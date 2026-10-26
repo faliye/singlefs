@@ -1,6 +1,6 @@
 ## E143 一事务一单元下的 journal 账 —— 已跑（2026-09-13，纯算术，6 单测 / 10 条变异全抓）
 
-**中文** · [English](143-一事务一单元下的journal账.en.md) · [日本語](143-一事务一单元下的journal账.ja.md)
+**中文** · [English](143-journal-accounting-under-one-transaction-one-unit.en.md) · [日本語](143-1トランザクション1ユニット下でのジャーナル記帳.ja.md)
 
 问的是 C310（事务切分纪律与记录数口径打架） 那笔账在用户定案（切分纪律是一事务一单元，D16（发布语义） 已定项 5 末段照旧）之下要付多少：
 按 D25（目标负载优先级） 的六个负载点，每次 fsync 几条记录、journal 占用户数据几成、T_dirty 满窗要多大的环。
@@ -11,12 +11,12 @@
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-bash scripts/experiments/replay.sh E143
+bash scripts/experiment-apparatus/replay.sh E143
 # 直接跑装置：
-cd scripts/experiments && cargo run --release --bin e143-one-unit-per-txn-journal
+cd scripts/experiment-apparatus && cargo run --release --bin e143-one-unit-per-txn-journal
 ```
 
-代码 `scripts/experiments/e143_one_unit_per_transaction_journal.rs`，原始输出 `e143-one-unit-per-txn-journal-2026-09-13.out`（34 行，末行 `emitted=34`），
+代码 `scripts/experiment-apparatus/e143_one_unit_per_transaction_journal.rs`，原始输出 `e143-one-unit-per-txn-journal-2026-09-13.out`（34 行，末行 `emitted=34`），
 跑前登记 `e143-preregistration.md`，变异表 `scripts/mutation/tables/e143_one_unit_per_transaction_journal.tsv`。
 
 ### 这是纯算术，不是测量

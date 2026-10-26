@@ -1,0 +1,65 @@
+## E80 Partial Release of Stripes —— Run Two Rounds (2026-09-02, count model, N=5 seeds × 2 workloads, 14 unit tests / 11 mutations caught): **Unchecked reuse loses 10–13 live units on single disk failure; among three zero-loss handlings lazy restriping is cheapest (saves 37% vs immediate repair)**
+
+[中文](80-条带的部分释放.md) · **English** · [日本語](80-ストライプの部分解放.ja.md)
+
+Three settled clauses combine to create a state with zero coverage across the entire repository (grep "stripe × partial release" yields zero hits): `w = clamp(batch+1, 2, 4)` (D2 (RAID Stripe Policy) settled item 6) ⇒ when batch ≥ 2, a single stripe couples multiple different units (settled item 10: unit lands whole in one column; E63 (How Many Columns Allocator Writes per Invocation) measurement basis: "w−1 data cells + 1 parity cell"); while COW makes "stripe members being released" a regular occurrence. Once space of a released member is reused, reconstruction inputs (parity + raw bytes of remaining data columns) for surviving members vanish. bcachefs bucket-level erasure coding pays for this with "stripe cannot be reused while it has live data" (literal quote from D2 (RAID Stripe Policy) background section); this project settled neither rule.
+⚠️ **v1 2 disks constantly w=2 (1 data + 1 replica), where stripes do not couple other units ⇒ this loophole is invisible across all v1 tests.**
+
+### Criteria (Hardcoded Before Run in Source Header, Unmodified After Run; 6–8 Added in Round Two)
+
+1. Manual anchor: single w=4 stripe, releasing one column and reusing it, other column fails ⇒ free_now loses exactly 1; pin pins exactly 1 cell and loses 0.
+2. Loss for pin / restripe / lazy three arms must be constantly 0 (all disks × all seeds × both workloads); violation eliminates that arm.
+3. Negative control: constantly w=2 yields identically valued cells across arms, 0 loss, 0 pinned, 0 extra writes.
+4. Conservation: sum of five cell categories constantly equals total allocated cells.
+5. Report costs faithfully; selecting which arm is a decision, not an experiment.
+6. Drain of lazy arm: continuing repairs under budget after workload stops, the queue must drain to empty within bounded rounds, with pinned returning to zero.
+7. Lazy ≤ eager: under identical seed and workload, lazy extra writes must not exceed eager (sharing repair implementation, lazy can only repair less).
+8. Skew and uniform must produce distinct worlds (workload parameters are genuinely active).
+
+### Round Two Measurement Basis Changes (2026-09-02, Two Rounds Same Day)
+
+Round one eager arm calculated per "each survivor restriped independently at w=2" (upper-bound measurement basis, extra writes +64.3–66.4%), abandoned starting this round: **restripe_on_free and newly added lazy_restripe share identical repair implementation** (survivors restripe together into a new stripe, old stripe reclaimed as a whole); the only difference between the two arms is **when to repair**. Workload adds a dimension: uniform and skew (80% rewrites land on 20% objects).
+
+### Actual Run (8 Disks, g=4 Bound Group, 24 Objects × 12 Units, 4000 Rounds Batch 1..=3 COW Rewrites, 5 Seeds × 2 Workloads)
+
+| Arm (How Space of Released Member is Handled) | Live Units Lost on Single Disk Failure (Mean) | Worst Disk | Pinned Share of Live Data | Extra Write Amplification | Repair Count |
+|---|---|---|---|---|---|
+| **free_now** (reusable immediately upon release) | **9.8 – 13.0** (288 live units total) | 24 – 34 | 0 | 0 | — |
+| **pin_stripe** (reclaim only when stripe fully dead, bcachefs form) | **0** | 0 | **33.3 – 46.5%** | 0 | — |
+| **restripe_on_free** (restripe full batch immediately upon member death) | **0** | 0 | 0 | **+74.7 – 77.1%** | 3961 – 4139 |
+| **lazy_restripe** (pin + background repair 2 stripes per round, D26 (Background Compaction and Placement Reclamation) arm 1 form) | **0** | 0 | Constantly 0 at round end (budget 2 keeps up) | **+46.6 – 47.7%** | 2532 – 2611 |
+| Negative control: constantly w=2 | 0 (all zero across four arms) | 0 | 0 | 0 | — |
+
+Figures for skew and uniform are within the same order of magnitude per arm (diff < 2 percentage points)—this model's batching and object group binding causes locality to only marginally affect the rate at which stripes fully die.
+
+### Four Conclusions
+
+1. **Unchecked reuse = silent redundancy loss**: no errors reported before disk failure; when one disk fails, ~3.4–4.5% of live units (worst disk 8–12%) **cannot be reconstructed**—the shape of [pitfalls.md](../pitfalls.md) item 9 "undesigned degraded behavior: the more you rescue, the worse it gets", occurring on the release path.
+2. **Among three zero-loss handlings, lazy restriping is comprehensively dominant**: sharing identical repair implementation with eager, relying on "sparing repairs for stripes that fully die + merging multiple releases into one repair" reduces repair events from ~4000 to ~2570, and extra writes from +75% down to **+47%**; a budget of 2 stripes/round keeps pinned constantly 0 at round end, draining to zero after workload ceases. Its relationship to pin_stripe is "bounded + observable + self-liquidating pinned" versus "unboundedly accumulating pinned (33–46%)".
+3. **Repairs recouple**: whole-batch repair places survivors into multi-unit stripes again ⇒ repaired stripes will undergo partial release in the future ⇒ repair debt renews itself (the majority of eager's 4000 repairs snowballed this way). A real implementation can merge survivors into foreground batched writes (not forming stripes with each other), unmodeled here—both arms' absolute figures are inflated thereby, but **relative ordering is unaffected**.
+4. **w=2 control all-zero proves v1 cannot see it**—an instance of `.claude/rules/fs-design.md` "Five Hard Requirements" item 2 "every branch must be forcibly exercisable by tests". Placement in [checks-owed.md](../checks-owed.md) C81 (no rule for partial stripe release).
+
+### Failure Clauses (Hardcoded Before Run)
+
+Criteria 1–4, 6–8 fully hit. Did not trigger voiding.
+
+### What It Cannot Answer
+
+Count model, 0 file operations. Does not model defer window duration (free_now computed per worst-case "immediate reuse"), contention between repairs and foreground writes, form of merging survivors into foreground batches, parity ≥ 2 (D2 (RAID Stripe Policy) itself states parity cells have never been settled). Batch size uniform 1..=3 and skew 80/20 are selected scenario points. **Loss and write amplification numbers are order-of-magnitude indicators under this model's workload, not forecasts.** Lower bound of repair budget was not swept (budget 2 happened to keep up with partial release rate of this workload; how much backlog a smaller budget accumulates was unmeasured).
+
+### Measurement Basis and Re-run
+
+- Code `scripts/experiment-apparatus/e80_partial_stripe.rs` (`cargo run --release --bin e80-partial-stripe`), raw output `e80-partial-stripe-2026-09-02.out` (46 lines, concluding line `emitted=46`).
+- N=5 seeds (11/22/33/44/55) × 2 workloads, deterministic output per seed, identical md5 across 5 rounds. **14 unit tests, 11 mutations caught item by item, 0 blind spots**, mutation table `scripts/mutation/tables/e80_partial_stripe.tsv` (`bash scripts/mutation/mutate.sh e80-partial-stripe scripts/experiment-apparatus/e80_partial_stripe.rs scripts/mutation/tables/e80_partial_stripe.tsv`).
+- Seed obfuscation follows lessons of C59 (Seeds Folding into the Same State) with multiplicative mixing, and unit tests pin (2,3) seed pair to not fold.
+
+### Impacted Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D2 (RAID Stripe Policy) settled item 11 | Supports | 2026-10-11 unaffected: only modified wording (temporal words, location references and self-references); conclusions, figures and artifacts unchanged |
+| D26 (Background Compaction and Placement Reclamation) | No impact | 2026-10-11 unaffected: only modified wording (temporal words, location references and self-references); conclusions, figures and artifacts unchanged |
+
+## Historical Versions
+
+Historical entries for E80 (Partial Release of Stripes) are centralized in [experiments-history.md](../experiments-history.md).

@@ -1,0 +1,80 @@
+## E46 Root Ring Region Spacing and Failure Domains — Run (2026-08-30)
+
+[中文](46-根环区域间距与失败域.md) · **English** · [日本語](46-ルートリング領域間隔と障害ドメイン.ja.md)
+
+**What it supplements is the zero-coverage note recorded by E41 (Root Ring Slot Geometry 2×4×256)**:
+In the model of that experiment, the region count **only participated in multiplication**, without region spacing or failure domain inputs,
+yet those were the sole justification for the number "2 regions". E41 (Root Ring Slot Geometry 2×4×256) verbatim states "zero coverage, not a negative result".
+
+**What it tests is not physical failure domains** (which require real hardware), but a **purely geometric, decidable** matter:
+On a striped array, **whether the two positions "disk head" and "disk tail" fall onto the identical physical disk**.
+If they do ⇒ the assumption self-professed by D22 (Synthesizing Unit Atomicity) settled item 2 ("failure domains of disk head and disk tail are independent")
+**is already geometrically invalid, without waiting for physical evidence**.
+
+### Empirical Measurements (2026-08-30)
+
+**Criterion 1 (Same Disk): 7 out of 18 cells fall on same disk ⇒ assumption invalid.**
+
+| Chunk | Device Count Tiers on Same Disk |
+|---|---|
+| 64 KiB (common md default) | **1, 2, 3, 6 disks** |
+| 512 KiB | 1, 2 disks |
+| 4 MiB | 1 disk |
+
+The chunk index at disk tail (10 TB, 64 KiB chunk) is **152,587,890**,
+divisible by 2, 3, and 6 ⇒ **in pools of 2 / 3 / 6 disks, disk tail and disk head land on the same disk**.
+For 4 / 8 disks, `152587890 % 4 = 2` and `% 8 = 2` ⇒ distinct disks.
+⇒ **Whether they share the same disk depends strictly on the divisibility between device count and capacity, representing a decidable geometric fact rather than a probability.**
+
+**Criterion 2 (Spacing): Candidate layout completely satisfied.**
+The spacing between disk head and disk tail is ~10 TB, far exceeding any of the three `io_min` tiers (512 / 4096 / 65536)
+⇒ The number of regions touched by a single internal device RMW is constantly **1**.
+⇒ **The candidate falls on the same-disk rule, not on spacing.** These two must not be conflated.
+
+**Criterion 3 (Region Count): 2 regions tolerate only 1 failure domain.**
+Tolerating `F` concurrent failure domains while retaining at least one surviving witness requires `F + 1` regions
+⇒ The candidate's 2 regions are insufficient starting from `F = 2`.
+
+**Positive control holds bidirectionally**:
+① Placing both regions within the same chunk ⇒ same-disk judged true (all six device count tiers run);
+② Setting spacing to 0 ⇒ number of regions touched by a single RMW is 2 (all three `io_min` tiers run).
+
+### Conclusions
+
+1. **"Failure domains of disk head and disk tail are independent" can no longer be written as a premise**——it is directly false under the most common geometries
+   (64 KiB chunk, 2 / 3 / 6 disks).
+2. **Region positions must be selected based on "landing in distinct failure domains", rather than the naive notion of "disk head and disk tail".**
+   ⇒ Requires a format quantity: region position or its selection rule, evaluatable at mount time
+   (isomorphic to D21 (Boundary Between Authoritative and Derived States) settled item 16).
+3. **A region count of 2 is insufficient**: it equals "number of failure domains to tolerate" plus one, a number not yet settled in kb.
+
+### Measurement Basis and Known Limitations
+
+- Code `scripts/experiment-apparatus/e46_region_spacing.rs`
+  (`cargo run --release --bin e46_region_spacing`), artifact
+  `e46-region-spacing-2026-08-30.out` (45 lines, final line `emitted=45`).
+  Replay passes the E46 (Root Ring Region Spacing and Failure Domains) identifier as an argument to `scripts/experiment-apparatus/replay.sh`.
+- **All 9 unit tests green; all 6 mutations caught** (`scripts/mutation/tables/e46_region_spacing.tsv`).
+  ⚠️ **Does not claim "zero blind spots"**: mutations only cover functions with assertions already written.
+- ⚠️ **"Running 5 rounds byte-identical" proves "no hidden state", not statistical stability**:
+  E46 (Root Ring Region Spacing and Failure Domains) is a deterministic geometric model without random sources, I/O, or clock inputs.
+- **Stripe layout pattern taken from Linux md**: `drivers/md/raid0.c` and `raid5.c` both use
+  `lim.io_min = mddev->chunk_sectors << 9`, with data rotating across chunks
+  ⇒ LBA `p` lands on disk `(p / chunk) % device_count`. **RAID1 / non-rotating layouts do not apply to this model.**
+- ⚠️ **It can only falsify in one direction**: geometrically landing on the same disk ⇒ assumption already invalid;
+  conversely, **"geometrically on distinct disks" does not equal physical failure domain independence** (same controller, same backplane, same power supply remain common causes).
+- **Does not verify true shapes of physical failure domains** (tracks, cylinders, erase blocks, controllers), which require real hardware.
+- **Capacity fixed at 10 TB** (consistent with E40 (Ciphertext Checksum Bit Width)). Changing capacity changes divisibility ⇒ same-disk cells will vary,
+  but the conclusion that "cells sharing the same disk exist" does not depend on specific capacity——single disk tier is constantly on the same disk.
+
+### Affected Decisions
+
+| Decision Branch | Relationship | Review |
+|---|---|---|
+| D22 (Synthesizing Unit Atomicity) settled item 2 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-19 Unaffected: disk head and disk tail share the same disk in 7 out of 18 geometric cells, serving as the basis for "region positions selected by failure domains, R = F + 1" |
+| D21 (Boundary Between Authoritative and Derived States) | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-19 Unaffected: only borrows "unit geometry evaluated once at mount time" as structural analogy |
+
+## Historical Versions
+
+### 2026-08-30
+- Created and run. Source: region dimension zero-coverage recorded by E41 (Root Ring Slot Geometry 2×4×256) + user request to "test D22 (Synthesizing Unit Atomicity) settled item 2 once more".

@@ -1,0 +1,112 @@
+## E141 Mount Admission Self-Test for Switchover Reservation — Run (2026-09-13, Pure Arithmetic, 9 Unit Tests / 14 Mutations All Caught; Same Day Warm-Up R × c_max Added, 2026-09-14 Reservation One Extra Share for Row Writing Publish)
+
+[中文](141-切换预留的挂载准入自证.md) · **English** · [日本語](141-切り替えリザーブのマウント受付自己証明.ja.md)
+
+What is being asked is the self-witnessing discriminative power owed by C126 (Worst-case amount of switching reservation has no measurement basis): whether mount acceptance written per D28 (Mount-Time Commitments) settled item 1 and settled item 3, specifically the conjunction "reservation for instance switching is obtainable" (D2 (RAID Stripe Policy) settled item 13), can distinguish writable from read-only across two pools differing by only 1 block.
+**All five criteria passed** (2026-09-14 third run): 28 sample points × two disks taking turns as tight disk, pool with free space exactly equal to share mounts as writable, short by 1 block mounts as read-only; when reservation is zeroed out, both mount as writable (positive control); a pool where one disk is short by 1 block while sum of two disks is sufficient is judged read-only per-device and writable under pool-level scalar; total reservation matches 28 pre-run manually calculated figures cell-by-cell; seven incorrect forms each have distinguishing sample points.
+⚠️ **This is self-witnessing at specification level, not implementation evidence**: apparatus writes mount decision per verbatim D28 (Mount-Time Commitments), demonstrating that "this set of sample points and these pools distinguish correct formulas from incorrect formulas"; it will be used for differential comparison once implementation is written.
+
+**Re-run command** (`exact` mode, byte-for-byte comparison against the retained artifact):
+
+```bash
+bash scripts/experiment-apparatus/replay.sh E141
+# Run apparatus directly:
+cd scripts/experiment-apparatus && cargo run --release --bin e141_switch_reserve_mount_admission
+```
+
+Code `scripts/experiment-apparatus/e141_switch_reserve_mount_admission.rs`, raw output `e141-switch-reserve-mount-admission-2026-09-14-row-writing.out` (121 lines, final line `emitted=121`; 2026-09-14 third run, share = (N_switch + 1) × (chain rewrite + warm-up R × c_max), c_max sweeps 4 / 9 tiers, 28 sample points, incorrect forms 6 → 7; second run `e141-switch-reserve-mount-admission-2026-09-13-warmup.out` (120 lines, N_switch shares) and first run `e141-switch-reserve-mount-admission-2026-09-13.out` (62 lines, chain rewrite only) archived), pre-run registration `e141-preregistration.md`, mutation table `scripts/mutation/tables/e141_switch_reserve_mount_admission.tsv`.
+
+### This Is Pure Arithmetic, Not Measurement
+
+No I/O, no random source ⇒ running N times is necessarily byte-for-byte identical, which only shows absence of hidden state. Evidence strength derives from **absolute values pinned across 9 unit tests + 14 mutations all caught** (two added in second run: R changed to 2, share omitting warm-up; one added in third run: omitting row writing share):
+changing rows per slice (not subtracting chain pointer), slice count not adding N_switch, N_switch changed to 2, code 3 header changed to 103, replica changed to 1, per-device changed to pool-level scalar, threshold ≥ changed to >, positive control not zeroed, block changed to 32 KiB, empty table zero slices, row width not recalculated with C304 (Instance table chain pointer record cannot accommodate 83-wide pointer); each has a test turning red.
+
+### Tested Object and Arms
+
+Tested object taken verbatim from D28 (Mount-Time Commitments) settled item 3: worst-case amount per switch = replica count × 32768 × max(1, ⌈(rows0 + N_switch) / rows per slice⌉) bytes, rows per slice = ⌊(32768 − 135) / row width⌋ − 1, reservation = (N_switch + 1) × this amount (N_switch = 3, extra share given to row writing publish, 2026-09-14 C329 (no check for the empty publish that raises F before the row-writing publish) settlement; slice count still per rows0 + N_switch, rows0 includes row to be written by that publish), two replicas each landing on one disk;
+mount decision: on each disk, capacity − allocated − unreclaimable − defer pending release ≥ this disk's share (four items summed per-device in D28 (Mount-Time Commitments) settled item 1; unreclaimable 7, defer 11 blocks, none of four items zero). Models two disks only (D2 (RAID Stripe Policy) settled item 9).
+
+| Arm | Reservation | Mount decision |
+|---|---|---|
+| Tested | Formula of D28 (Mount-Time Commitments) settled item 3 | Per-device |
+| Positive control | Forced to 0 | Per-device |
+| Pool-level scalar (control) | Same as tested | Sum of free space across two disks ≥ total reservation |
+| Incorrect forms ①–④ | First round candidate A (incremental accumulation, +1, 509 per slice) / slice not subtracting chain pointer / row width constant 64 / incremental accumulation instead of shares × worst single instance; share count same as tested, incremental starts from row writing share | Compares total reservation only |
+| Incorrect forms ⑤–⑦ | Omission of warm-up / warm-up pool-level one share only / omission of row writing share (N_switch shares) | Compares total reservation only |
+
+Sample points rows0 ∈ {0, 366, 367, 505, 506, 1014, 4064} × row width ∈ {64, 88}: 505 / 506 is slice boundary for row width 64 (rows0 + 3 = 508 / 509), 366 / 367 is slice boundary for row width 88 (369 / 370), 1014 straddles third slice, 4064 is cell called out by name in C126 (Worst-case amount of switching reservation has no measurement basis); 88 is active row width (widened from 64 upon C304 (Instance table chain pointer record cannot accommodate 83-wide pointer) closure), 64 is prior row width.
+
+### Verdict (Per Pre-Run Hardcoded Criteria, Transcribed Verbatim from Artifact)
+
+```text
+E7RESULT name=verdict crit1_bad_pairs=0 crit2_control_failures=0 crit3_settled_writable=0 crit3_scalar_read_only=0 crit4_mismatches=0 crit5_blind_forms=0
+```
+
+| # | Criterion | Result |
+|---|---|---|
+| 1 | Discriminative power | 56 pairs of pools (28 sample points × tight disk 0 / 1) all flip at share: free = share writable, share − 1 read-only |
+| 2 | Positive control | When reservation zeroed, 56 pairs of pools both writable ⇒ apparatus indeed measures reservation, not invalidated |
+| 3 | Device dimension | On 28 sample points, pool with "disk 0 free = share + 50, disk 1 = share − 1": tested arm all read-only, pool-level scalar arm all writable ⇒ this pool distinguishes the two arms, not invalidated |
+| 4 | Absolute values | 28 total reservations match pre-run manual calculations cell-by-cell, each disk's share exactly half |
+| 5 | Sample point sensitivity | Seven incorrect forms all have distinguishing sample points (seven lines of `name=sensitivity`); on rows0 = 0 cell, four chain rewrite incorrect forms share same numbers as tested (112 at c_max 4), alone cannot verify formula |
+
+```text
+E7RESULT name=sensitivity form=first_round_candidate points=28 agreeing_points=12 first_difference=506:64:4:settled=128:wrong=116
+E7RESULT name=sensitivity form=no_chain_pointer_per_page points=28 agreeing_points=18 first_difference=506:64:4:settled=128:wrong=112
+E7RESULT name=sensitivity form=fixed_row_width points=28 agreeing_points=22 first_difference=367:88:4:settled=128:wrong=112
+E7RESULT name=sensitivity form=summed_instead_of_worst_times_switches points=28 agreeing_points=20 first_difference=506:64:4:settled=128:wrong=116
+E7RESULT name=sensitivity form=no_warm_up points=28 agreeing_points=0 first_difference=0:64:4:settled=112:wrong=16
+E7RESULT name=sensitivity form=warm_up_pool_level_only points=28 agreeing_points=0 first_difference=0:64:4:settled=112:wrong=64
+E7RESULT name=sensitivity form=no_row_writing_publish_share points=28 agreeing_points=0 first_difference=0:64:4:settled=112:wrong=84
+```
+
+Selected cell numbers (transcribed verbatim):
+
+```text
+E7RESULT name=reserve rows_at_mount=0 row_bytes=64 checkpoint_cost_blocks=4 reserved_shares=4 records_per_page=509 rows_per_page=508 pages=1 chain_share_per_device_blocks=8 warm_up_share_per_device_blocks=48 total_blocks=112 share_per_device_blocks=56 expected_total_blocks=112
+E7RESULT name=reserve rows_at_mount=506 row_bytes=64 checkpoint_cost_blocks=4 reserved_shares=4 records_per_page=509 rows_per_page=508 pages=2 chain_share_per_device_blocks=16 warm_up_share_per_device_blocks=48 total_blocks=128 share_per_device_blocks=64 expected_total_blocks=128
+E7RESULT name=reserve rows_at_mount=4064 row_bytes=64 checkpoint_cost_blocks=4 reserved_shares=4 records_per_page=509 rows_per_page=508 pages=9 chain_share_per_device_blocks=72 warm_up_share_per_device_blocks=48 total_blocks=240 share_per_device_blocks=120 expected_total_blocks=240
+E7RESULT name=reserve rows_at_mount=367 row_bytes=88 checkpoint_cost_blocks=4 reserved_shares=4 records_per_page=370 rows_per_page=369 pages=2 chain_share_per_device_blocks=16 warm_up_share_per_device_blocks=48 total_blocks=128 share_per_device_blocks=64 expected_total_blocks=128
+E7RESULT name=reserve rows_at_mount=4064 row_bytes=88 checkpoint_cost_blocks=9 reserved_shares=4 records_per_page=370 rows_per_page=369 pages=12 chain_share_per_device_blocks=96 warm_up_share_per_device_blocks=108 total_blocks=408 share_per_device_blocks=204 expected_total_blocks=408
+E7RESULT name=flip rows_at_mount=4064 row_bytes=88 checkpoint_cost_blocks=9 tight_device=1 share_per_device_blocks=204 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=4064 row_bytes=88 checkpoint_cost_blocks=9 device_zero_free=254 device_one_free=203 settled=read_only pool_scalar=writable
+E7RESULT name=done emitted=121
+```
+
+⇒ Under new-pool file creation geometry (rows0 = 0), per-disk share is 56 blocks (c_max 4) / 116 blocks (c_max 9), of which chain rewrite is 8 blocks, warm-up is 48 / 108 blocks; slice boundary at rows0 = 506 (row width 64) / 367 (row width 88); at rows0 = 4064, chain rewrite total is 144 blocks (row width 64) / 192 blocks (row width 88).
+
+### What It Cannot Answer
+
+1. Implementation side lacks mount code: this is specification-level self-witnessing; once implementation is written, it must be differential tested against these 28 pairs of pools and 14 sample points, verifying decisions pair-by-pair (settles C126 (Worst-case amount of switching reservation has no measurement basis)).
+2. Which two disks two replicas land on when there are three or more disks: D28 (Mount-Time Commitments) settled item 3 does not specify (recorded in its scope); apparatus models two disks only.
+3. Row width settled on 2026-09-13 as 88 (C304 (Instance table chain pointer record cannot accommodate 83-wide pointer) closure), apparatus already took this cell; widening in future requires adding sample points and recalculating slice boundaries.
+4. Two pool-level items (deletion pending occupancy, committed reservation) not in mount conjunction (D2 (RAID Stripe Policy) settled item 13 lists reservation only), unjudged by apparatus; checkpoint reservation pool (D28 (Mount-Time Commitments) settled item 4) not in this item. ⚠️ Since 2026-09-13, formula gained pool-level eighth item checkpoint reservation pool (D28 (Mount-Time Commitments) settled item 4), and switching reservation gained "R empty publishes × active c_max" (D16 (Publish Semantics) settled item 8) — **second run added "R empty publishes × active c_max" to share** (from third run counted as N_switch + 1 shares): each disk (N_switch + 1) × R × c_max = 48 (c_max 4) / 108 (c_max 9) blocks, added to chain rewrite, criteria 1 / 2 / 3 passed as usual across 28 sample points, and incorrect forms "omitting warm-up", "warm-up pool-level one share only" distinguished across all 28 points; c_max is actively calculated quantity, treated as input swept across two tiers (E148 (Commit Fixed Point Recomputed with Two Record Trees) new-pool file creation scale 4, pool scale 9); two disks mirroring each other so each disk taking one share is apparatus design choice. Pool-level eighth item remains unmeasured.
+5. Where rows0 is read from (read instance table at mount, adding row to be written by that publish, D28 (Mount-Time Commitments) settled item 3) unmodeled; rows0 growth and row reclamation (C121 (unbounded instance table chain length on zoned)) unmodeled.
+6. Pure arithmetic: running N times identical, not statistical evidence.
+
+### Affected Decisions
+
+| Decision item | Relationship | Review |
+|---|---|---|
+| D28 (Mount-Time Commitments) settled item 3 | Supports | 2026-10-23 unaffected: only formatting changed; conclusions, numbers, and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language switcher was added; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D28 (Mount-Time Commitments) settled item 1 | Supports | 2026-10-23 unaffected: only formatting changed; conclusions, numbers, and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language switcher was added; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D28 (Mount-Time Commitments) settled item 4 | Does not affect | 2026-10-23 unaffected: only formatting changed; conclusions, numbers, and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language switcher was added; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D2 (RAID Stripe Policy) settled item 13 | Supports | 2026-10-23 unaffected: only formatting changed; conclusions, numbers, and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language switcher was added; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D2 (RAID Stripe Policy) settled item 9 | Does not affect | 2026-10-23 unaffected: only formatting changed; conclusions, numbers, and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language switcher was added; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D16 (Publish Semantics) settled item 8 | Does not affect | 2026-10-23 unaffected: only formatting changed; conclusions, numbers, and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language switcher was added; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+
+## Historical Versions
+
+### 2026-09-14
+- Third run following C329 (no check for the empty publish that raises F before the row-writing publish) settlement (reservation one extra share for row writing publish): share = (N_switch + 1) × (chain rewrite + warm-up), slice count still per rows0 + N_switch; before running, two manual calculation tables recalculated per N_switch + 1, four chain rewrite incorrect forms changed to same shares as tested (incremental starts from row writing share), added incorrect form "omitting row writing share" and one mutation (row writing share zeroed); criteria and invalidation clauses unchanged. Unit tests remained 9 (two renamed, several numbers updated), mutations 13 → 14, all caught.
+  Artifact `e141-switch-reserve-mount-admission-2026-09-14-row-writing.out` (121 lines), re-run registration redirects to it; second run artifact archived.
+
+### 2026-09-13
+
+#### (Part 1)
+- Created. Pre-run registration written prior to apparatus; single run, criteria and expected values never modified.
+- Same day C304 (Instance table chain pointer record cannot accommodate 83-wide pointer) closed, row width settled as 88: two row width constants in source renamed per pointer width (59-wide / 83-wide), mutation table M11 modified accordingly; artifact does not print constant names, re-run byte-for-byte identical.
+
+#### (Part 2)
+- Second run following D16 (Publish Semantics) settled item 8 (warm-up adopts Option E) settlement: share added warm-up N_switch × R × c_max (R = 3, c_max sweeps 4 / 9), sample points 14 → 28, incorrect forms added "omitting warm-up", "warm-up pool-level one share only", unit tests 8 → 9, mutations 11 → 13;
+  artifact `e141-switch-reserve-mount-admission-2026-09-13-warmup.out` (120 lines), re-run registration redirects to it; first run artifact archived. C126 (Worst-case amount of switching reservation has no measurement basis) model layer supplemented from "chain rewrite half" to "chain rewrite + warm-up".

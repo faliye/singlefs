@@ -1,0 +1,144 @@
+## E92 Worst-Case Block Reuse Delay Requirements — Run (2026-09-08 round 3, criteria hardcoded 2026-09-03 before run and unchanged across three rounds; 14 unit tests / 13 mutations all caught, N=5 rounds md5 consistent): **Unless K exactly equals root ring depth, fake candidates exist in administrator rollback candidate set — present in 21 of 22 pairs scanned**
+
+[中文](92-最坏块重用延迟需求.md) · **English** · [日本語](92-最悪ブロック再利用遅延要件.ja.md)
+
+**What it fills in is the missing comparison quantity for I-7.4 (Blocks in Recent K Generations Not Reused)**: E50 (Upper and Lower Bounds on Root Ring Slot Count) admitted "worst-case block reuse delay requirement does not exist in this repo => cannot judge whether millisecond ring cycle is sufficient"; the backward leg of E16 (Role of Journal: WAL vs Intent Log) maintenance cost three-way argument listed it as an uncleared owed check unique to Path A (publish on each fsync) — when publish rate = fsync rate, the K-generation protection window collapses to milliseconds (E50 (Upper and Lower Bounds on Root Ring Slot Count) arithmetic: R=3, S<=16, 2785 publishes/sec => one cycle ~17 ms), while "how wide is needed" was never derived.
+
+### What to Measure
+
+**Enumerate "consumers of older generation roots" one by one, derive for each consumer its block reuse delay requirement, and answer in what unit the requirement is priced** — by generations (publish count), by wallclock time, or by external events. This is decisive: K in I-7.4 (Blocks in Recent K Generations Not Reused) is counted in **generations**; if any consumer's requirement is in **wallclock**, under Path A (one generation = one fsync ≈ 0.36 ms), generation units cannot protect it.
+
+Consumer list known before run (the model either confirms or supplements, must not list fewer):
+
+| Consumer | Origin | Pre-run Measurement Basis Question |
+|---|---|---|
+| Recovery root selection rollback (latest root torn => roll back 1 generation) | D22 (Synthesizing Unit Atomicity) settled item 2 | Requirement should be "generations" — the generation rolled back to must be intact; unrelated to wallclock? |
+| Watermark replay (units named by records above selected root) | D23 (Journal Role & Format) settled item 14 | Named units must not be reused before application — window is in-flight record range |
+| Generational incremental scrub / checker traversing old generation roots | D13 (Verification Route) | **Traversing once requires wallclock time** — during scan, will blocks referenced by that generation root be reused? |
+| Timeline discrimination (lost device regained) | C88 (Timeline discrimination for root ring unimplemented) | Unimplemented, requirement unknown — honestly listed as blank |
+| Phases of two block pinning rules | E33 (Two Pinned Block Rules): helpful phase count = root ring(K) − 1 | Phase counted in generations |
+
+The runnable half (counting model): simulate publish stream (2785 publishes/sec) + one slow consumer (scrub traversing generation K−1 root at N blocks/sec), scan K × scrub duration, count events where "consumer has not finished traversing, but blocks it references have already been reused"; consumers priced in generations verified identically to be constant zero.
+
+### Criteria (Hardcoded Before Run)
+
+1. **Enumeration completeness latch**: Consumer list must give origins (decision / invariant / owed check number) entry by entry, at least one cell per consumer in model; consumers discovered outside list after run => supplement list and rerun, no quiet omissions.
+2. **Unit verdict**: Requirement of each consumer written as 3-way choice of (generations | wallclock | external event) with mechanism derivation; if wallclock priced consumer exists and its requirement under Path A publish rate exceeds K generation window => **verdict: "unit of I-7.4 (Blocks in Recent K Generations Not Reused) in generations cannot protect it under Path A"**, recorded truthfully, placement handed over to decide (do not alter invariants on the spot).
+3. **Positive control**: Root selection rollback cell must derive "exactly 1 generation + verification lag" (structurally derivable), violation of this consumer is constant 0 in simulation when K ≥ 2; violation must appear when K changed to 1 (discriminative power self-test).
+4. **Absolute values**: Violation count of slow consumer independently given by arithmetic of "scan duration × publish rate − K", simulation exactly matches closed-form.
+
+### Failure Clauses (Hardcoded Before Run)
+
+- Discriminative power self-test of criterion 3 misses => model is not measuring reuse, entire round voided.
+- C88 (Timeline discrimination for root ring unimplemented) cell cannot answer requirement => honestly mark "blank", do not fabricate.
+- Deterministic model: 5-round md5 proves only absence of hidden state.
+
+### Measurement Basis and Known Limitations
+
+- Pure counting model: does not build real scrub, consumption rate is parameter; publish rate 2785/sec is local machine figure (E44 (Host Testing and Cost of Sequence Number Bit Width)).
+- "Reuse" modeled literally per I-7.4 (Blocks in Recent K Generations Not Reused) (physical extent reallocated), does not model "reused but content happened not to change".
+- Prerequisites: none (pure arithmetic + simulation).
+
+### Measurement Results (2026-09-08 supplement list rerun, N=5 rounds md5 consistent)
+
+⚠️ **N=5 proves only absence of hidden state, not statistical stability** — deterministic model, evidence strength comes from 14 unit tests and 13 mutations.
+
+⚠️ **This round is a supplement list rerun, forced by criterion 1 enumeration latch** (it verbatim requires "consumers discovered outside list after run => supplement list and rerun, no quiet omissions"). Four supplemented: I-4.8 (Root Checksums Self-Consistent Within K Generations), record checker, administrator rollback, traversal hop. **Criteria 1-4 and failure clauses unchanged by a single word.**
+
+#### Conclusion 1: Nine consumers, all three pricing categories have objects, wallclock category has only one member
+
+Artifact verbatim `name=pricing_census generations=6 wallclock=1 external_event=1 blank=1 total=9`.
+
+| Consumer | Origin | Pricing | Requirement |
+|---|---|---|---|
+| c1 Recovery root selection rollback | D22 (Synthesizing Unit Atomicity) settled item 2 | Generations | **Exactly 2 generations** (1 generation + verification lag) |
+| c2 Watermark replay | D23 (Journal Role & Format) settled item 14 | Generations | Value = in-flight record count upper bound, **this repo lacks this number** |
+| c3 Generational incremental scrub | D13 (Verification Route) verbatim "only traverse blocks with `birth generation > watermark`" | Generations | **0** — watermark-based, does not hold old roots |
+| c4 Timeline discrimination | C88 (Timeline discrimination for root ring unimplemented) | **Blank** | Consumer unimplemented, **must not treat as 0** |
+| c5 Phases of two block pinning rules | E33 (Two Pinned Block Rules) | Generations | Defined by K itself, does not constitute independent requirement |
+| c6 I-4.8 (Root Checksums Self-Consistent Within K Generations) | Invariant I-4.8 (Root Checksums Self-Consistent Within K Generations) | Generations | **0** — runs on frozen image after crash-point replay |
+| c7 Record checker | D13 (Verification Route) verbatim arguments `(pre-crash image, record stream, post-crash image)` | Generations | **0** — all three arguments frozen |
+| c8 Administrator rollback | D23 (Journal Role & Format) settled item 14 (2026-09-05 user settlement) | **External event** (trigger instant) | **Entire root ring depth** — candidate set is "roots in ring judged still valid per instance table", K smaller than it has fake candidates |
+| c9 Traversal hop | D4 (Checksum Location) parent pointer checksum | **Wallclock** | Time of single "read parent → read child" |
+
+#### Before Conclusion 2, state this one first: Administrator rollback needs entire root ring depth, not 2 generations
+
+**The verdict given to c8 in round 2 was circular reasoning, withdrawn in round 3.** That sentence was "'how deep can roll back' is **defined** by root ring depth, not inversely requiring K to become larger" — it treated the to-be-proven `K = root ring depth` as premise.
+D23 (Journal Role & Format) settled item 14 verbatim settled candidate set as "roots in root ring judged still valid per instance table", settled depth as "rollback depth ≤ root ring depth", **not a single word about K in criteria**; while D22 (Synthesizing Unit Atomicity) verbatim writes when block reuse delay is not met, "**they are fake as rollback candidates**".
+
+⇒ Fake candidate count = root ring depth − K. Artifact verbatim
+`name=verdict_rollback pairs=22 pairs_with_fake_candidates=21 k_must_equal_ring_depth=1`:
+among scanned 22 pairs (root ring depth, K), **21 pairs have fake candidates**, only the pair where K exactly equals root ring depth is zero.
+Smallest ring (R=3, S=1) already has **1** fake candidate when K takes lower bound 2; S=16 tier with K=4 has **44**.
+
+⚠️ **This is not something E92 (Worst-Case Block Reuse Delay Requirements) can settle** — it only quantifies that two settled items cannot hold verbatim simultaneously, filing [checks-owed.md](../checks-owed.md) C215 (promises on rollback depth and lower bound on K cannot hold simultaneously).
+
+#### Conclusion 3: Criterion 2 **not triggered** — sole wallclock consumer covered by window, margin calculable
+
+Artifact verbatim `name=verdict_unit real_wallclock_consumers=1 hypothetical_cells_exceeding=12 hypothetical_cells_total=20`.
+
+K-generation window is the **crossover point** of wallclock requirement, containing no assumed device values: window = K ÷ publish rate
+⇒ K=1 is **359 microseconds**, K=2 is **718 microseconds**, K=3 is **1.077 milliseconds**, K=8 is **2.873 milliseconds** (artifact `name=window` five lines).
+One hop calculated at 100 microseconds, margin of K=2 is **7.18x**, K=1 still has 3.59x.
+⇒ **Today no consumer's requirement exceeds K-generation window.**
+
+⚠️ **One hop of 100 microseconds is a sample point, not measurement** — this repo has not measured single hop latency.
+What bears load is that crossover point sentence: **when single hop latency exceeds K ÷ publish rate it is no longer covered**,
+under Path A (2785 publishes/sec) and K=2 this line is 718 microseconds.
+
+#### Conclusion 4: Positive control independently recalculates lower bound 2 of I-7.4 (Blocks in Recent K Generations Not Reused)
+
+Artifact verbatim `name=poscontrol_fallback k1_violations=1 k2_violations=0 discriminates=1`
+⇒ K=1 yields violations, K≥2 constant 0. **Discriminative power self-test and independent recalculation are the same cell** —
+calculated lower bound is exactly the "lower bound ≥ 2" hardcoded in I-7.4 (Blocks in Recent K Generations Not Reused), neither sharing derivations.
+
+#### Conclusion 5: Pricing table for hypothetical wallclock consumers, closed-form and simulation match exactly per cell
+
+On 20 cells `sim_violations == closed_violations`. Absolute values: 10 seconds × 2785 publishes/sec = 27 850 publishes,
+K=3 has **27 847** violations.
+⚠️ **This table is a pricing table for "if a wallclock consumer lasting D seconds appears in future, how many generations are needed to cover it", not the shape required by any clause** — today no consumer in repo looks like this.
+
+### Measurement Basis and Re-run
+
+- Code `scripts/experiment-apparatus/e92_reuse_requirement.rs`
+  (`cd scripts/experiment-apparatus && cargo run --release --bin e92-reuse-requirement`),
+  raw output `e92-reuse-requirement-2026-09-08.out` (84 lines, last line `name=done emitted=84`).
+- Mutation table `scripts/mutation/tables/e92_reuse_requirement.tsv`, 13 entries **all caught**
+  (`cd scripts/experiment-apparatus && bash ../mutation/mutate.sh e92-reuse-requirement e92_reuse_requirement.rs ../mutations/e92_reuse_requirement.tsv`).
+- Re-run:
+
+```bash
+bash scripts/experiment-apparatus/replay.sh E92
+```
+
+### What It Cannot Answer
+
+1. **Requirement values of c2 and c4 do not exist in this repo**: in-flight record count upper bound (I-8.3 (Strictly Continuous Replay Prefix) mentions it without giving number),
+   requirement of timeline discrimination (C88 (Timeline discrimination for root ring unimplemented) unimplemented). Two cells judged only units, not values.
+2. **Single hop latency not measured**: 100 microseconds in conclusion 2 is sample point, this repo has not measured single hop latency.
+   What bears load is that crossover line (K ÷ publish rate), not that margin multiple.
+3. **Publish rate only takes Path A tier** (publish root on each fsync). How much window widens under Path B (batched publish) not scanned.
+4. **"Reuse" modeled literally per I-7.4 (Blocks in Recent K Generations Not Reused)** (physical extent reallocated),
+   does not model "reused but content happened not to change".
+
+### Affected Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D22 (Synthesizing Unit Atomicity) settled item 25 | Support | 2026-09-19 unaffected: nine consumers divided across three pricing categories, recovery root selection rollback exactly 2 generations, administrator rollback needs entire root ring depth, only traversal hop priced by wallclock, settling phrase "one cycle ≥ requirement"; 2026-10-11 unaffected: script path relocation only changed path (`../mutate.sh` changed to `../mutation/mutate.sh`), conclusions, numbers, and artifacts unchanged |
+| D22 (Synthesizing Unit Atomicity) settled item 2 | Unaffected | 2026-09-19 unaffected: only lists recovery root selection rollback as consumer of settled item 2; 2026-10-11 unaffected: script path relocation only changed path (`../mutate.sh` changed to `../mutation/mutate.sh`), conclusions, numbers, and artifacts unchanged |
+| D23 (Journal Role & Format) settled item 14 | Provisioning | 2026-09-19 unaffected: administrator rollback candidate set needs entire root ring depth; after block reuse bound changed to max(F_effective, oldest valid root in ring) that owed check settled; 2026-10-11 unaffected: script path relocation only changed path (`../mutate.sh` changed to `../mutation/mutate.sh`), conclusions, numbers, and artifacts unchanged |
+| D13 (Verification Route) | Unaffected | 2026-09-19 unaffected: requirements for generational incremental scrub and record checker are both 0; 2026-10-11 unaffected: script path relocation only changed path (`../mutate.sh` changed to `../mutation/mutate.sh`), conclusions, numbers, and artifacts unchanged |
+| D4 (Checksum Location) | Unaffected | 2026-09-19 unaffected: only treats parent pointer checksum as detection means when traversal hop mismatches; 2026-10-11 unaffected: script path relocation only changed path (`../mutate.sh` changed to `../mutation/mutate.sh`), conclusions, numbers, and artifacts unchanged |
+
+## Historical Versions
+
+### 2026-09-08
+- Run. Criteria and failure clauses unchanged by a single word since registration 2026-09-03. Four conclusions,
+  wherein criterion 2 triggered (wallclock consumer requirement exceeds K generation window on 15/15 cells),
+  per pre-run hardcoded disposition filed C213 (Wallclock consumers traversing old generation roots have no undertaker), do not alter invariants on the spot.
+
+### 2026-09-03
+- Project setup (design registration, unrun). Origin: E50 (Upper and Lower Bounds on Root Ring Slot Count) "what it cannot answer" item 1
+  and third recalculation of backward leg of E16 (Role of Journal: WAL vs Intent Log) maintenance cost three-way argument;
+  criteria and consumer list hardcoded before run.

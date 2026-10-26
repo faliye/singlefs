@@ -1,6 +1,6 @@
 ## E99 write buffer 条目与 seq 的去重 —— 已跑（2026-09-03，纯计数，12 单测 / 10 条变异全抓）：**记账树的 key 里已经有代 ⇒ seq 只要 4 字节的窗口内序号；在 seq 里再放一份 txg 是重复计账**
 
-**中文** · [English](99-writebuffer条目与seq的去重.en.md) · [日本語](99-writebuffer条目与seq的去重.ja.md)
+**中文** · [English](99-deduplication-of-write-buffer-entries-and-seq.en.md) · [日本語](99-ライトバッファエントリとseqの重複排除.ja.md)
 
 **它要答的是 D8（核心索引结构） 已定项 7（write buffer 条目自带的 `seq`）**：多宽、住哪、跨挂载单不单调。
 该项判过「改新池新建文件的字节：**是**」。
@@ -41,9 +41,9 @@
 
 ### 实测（2026-09-03，纯计数，N=5 轮逐字节一致，12 单测 / 10 条变异全抓 + 2 条等价变异留档）
 
-**口径与复跑**：代码 `scripts/experiments/e99_writebuffer_sequence.rs`，
+**口径与复跑**：代码 `scripts/experiment-apparatus/e99_writebuffer_sequence.rs`，
 产物 `e99-writebuffer-seq-2026-09-03.out`（37 行，收尾 `emitted=37`），
-变异表 `scripts/mutation/tables/e99_writebuffer_sequence.tsv`，已挂 `scripts/experiments/replay.sh`。
+变异表 `scripts/mutation/tables/e99_writebuffer_sequence.tsv`，已挂 `scripts/experiment-apparatus/replay.sh`。
 
 #### 判据 1 + 5：**8 字节装不下，12 字节才够**
 

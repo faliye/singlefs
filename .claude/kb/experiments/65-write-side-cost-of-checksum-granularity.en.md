@@ -1,0 +1,153 @@
+## E65 Write-Side Cost of Checksum Granularity — Run (2026-08-31, N=5)
+
+[中文](65-校验和粒度的写侧代价.md) · **English** · [日本語](65-チェックサム粒度の書き込み側コスト.ja.md)
+
+**Filling the gap in E58 (End-to-End Cost of Checksum Granularity): all three of its arms were read arms.**
+After D4 (Checksum Location) settled item 2 (padding to one unit) and settled item 3 (writes smaller than a unit go through read-modify-write)
+were settled, there was not a single number for write-side cost.
+
+### What to Measure
+
+| Arm | What a Single "Write 4 KiB User Data" Operation Does | What G Affects |
+|---|---|---|
+| `rmw` | Read back old unit (full G) + verify MAC → modify 4 KiB → recompute MAC → write full unit to new location | Read amplification and write amplification both grow with G |
+| `full` | Whole unit is new (append / new creation), **no read** | Write amplification only |
+| `rmwsync` | Same as `rmw`, with `fdatasync` per operation | Adds one persistence point to see how much fixed overhead amortizes the multiple |
+| `pad` | Pure arithmetic: space amplification from padding to G | Cost of D4 (Checksum Location) settled item 2 |
+
+**Write placement advances forward via COW** (cursor adds one unit each time, wrapping around at region end), never overwriting in place—
+in-place overwrite is not the write path of this project; measuring it amounts to measuring a different file system.
+
+### Criteria and Failure Clauses Hardcoded Before Run
+
+1. **Positive control, run arm by arm**: Kernel `/proc/self/io` `write_bytes` delta = `ops × G` (±2%).
+2. **Discriminative power control**: `read_bytes` of `full` arm must be **constantly 0**, while `rmw` arm must = `ops × G`.
+   Inability to separate the two ⇒ metric blind to the RMW read, entire round aborted.
+3. **Cannot read ≠ read 0**: Zero timing or unobtainable count uniformly aborts the entire round.
+4. N=5 rounds; judging "passed" requires passing all 5 rounds.
+5. **Acceptance of reverse outcome** (written before run): If single-operation elapsed time of 32 KiB `rmw` relative to 16 KiB
+   increases by less than 5%, write "write side cannot distinguish between 16 and 32"; **forbidden to declare it twice as expensive merely because byte multiple is 2×**.
+
+### Verdict for Two Controls: All Passed
+
+| Control | Criterion | Actual Measurement |
+|---|---|---|
+| Positive | `write_bytes ÷ (ops×G)` ≈ 1 | **90/90 cells** within ±2% |
+| Discriminative power | `full` reads 0, `rmw` reads full | Sum of `read_bytes` for `full` arm is **exactly 0**; set of ratios for `rmw` arm is precisely **{1.0}** |
+
+### Actual Measurement (5-Round Mean, ops=2048, 8 GiB Region)
+
+| G | `rmw` ns/op | `full` ns/op | `rmwsync` ns/op | Checksum Share of `rmw` |
+|---|---|---|---|---|
+| 4 KiB | 110402.8 | 11486.8 | 372990.8 | 2.4% |
+| 8 KiB | 169793.0 | 23204.3 | 437187.3 | 2.8% |
+| **16 KiB** | **189736.6** | **26936.4** | **436735.3** | 4.7% |
+| **32 KiB** | **219643.7** | **33917.3** | **472393.6** | 7.4% |
+| 64 KiB | 275346.9 | 47842.6 | 533841.3 | 11.2% |
+| 128 KiB | 355624.3 | 88699.7 | 603093.4 | 16.7% |
+
+**16 KiB → 32 KiB**: `rmw` is **15.76% more expensive**, `full` is **25.92% more expensive**, `rmwsync` is **8.16% more expensive**
+(inter-round variances for 32 KiB tier are 1.4% / 0.4% / 1.0% respectively).
+
+⚠️ **Byte multiple and time multiple differ by an order of magnitude, forbidden to conflate**: writing 4 KiB user data under 32 KiB unit,
+**byte write amplification is constantly 8×** (pinned by absolute value assertion), while **time increases by only 8–26%**.
+⇒ **When citing write amplification, one must state clearly which measurement basis is used.** Byte measurement basis relates to device lifespan and background compaction volume;
+time measurement basis is the latency seen by users.
+
+### Removing Checksum Verification Time: Multiples for All Three Arms Shrink Substantially
+
+⚠️ **Struck by the backward leg of three-way argument on 2026-08-31** (E58 (End-to-End Cost of Checksum Granularity) had performed this split,
+while round 1 of E65 (Write-Side Cost of Checksum Granularity) did not perform it once); main agent confirmed by independent round-by-round recalculation from original artifacts:
+
+| Arm | 16 KiB Total / Device ns | 32 KiB Total / Device ns | Total Multiple | **Device-Side Multiple** |
+|---|---|---|---|---|
+| `rmw` | 189737 / 180857 | 219644 / 203481 | 1.1576 | **1.1251** |
+| `full` | 26936 / 23093 | 33917 / 26448 | 1.2592 | **1.1453** |
+| `rmwsync` | 436735 / 428102 | 472394 / 456479 | 1.0816 | **1.0663** |
+
+⇒ **Of that 25.92% for `full`, 11 percentage points are AES; device side is only 14.53%.**
+The backward leg independently gave **1.136** using fio 3.36 (sequential O_DIRECT write, fixed 512 MiB footprint), consistent with device-side 1.145.
+
+⚠️ **`rmw` is not an independent observation**: its device side ≈ random read of E58 (End-to-End Cost of Checksum Granularity) plus write of `full`
+(16 KiB: 149.4 + 23.1 = 172.5 vs measured 180.9; 32 KiB: 162.3 + 26.4 = 188.7 vs measured 203.5).
+When citing it, know that its multiple is a weighted result of those two figures.
+
+### The Explanation That "NVMe Absorbs Writes into SLC" Is Invalidated; The Phenomenon Still Holds
+
+⚠️ **The two arms `rmw` and `full` have zero persistence points**—only `rmwsync` calls `sync_data`.
+`O_DIRECT` write only waits until device buffer ack ⇒ what is measured is PCIe transfer plus fixed command overhead,
+**irrelevant to whether media write completes**. The phenomenon "bytes grow 8× while time increases by only a tenth or so" holds,
+but **the SLC mechanism was never once tested in this dataset**, forbidden to use as explanation.
+
+### The 8.16% of `rmwsync`: Fixed Overhead Has a Definite Quantity
+
+The difference `rmwsync − rmw` across tiers is **263 / 267 / 247 / 253 / 258 / 247 μs** (4 KiB → 128 KiB)—
+**bytes increase 32× while it does not rise but drops slightly**. Two alternative explanations are thus refuted:
+"flush overhead rises with dirty byte count" and "fdatasync exposes overlapping writes as synchronous" both predict it should rise with G.
+⇒ It should be stated as **"`fdatasync` on this machine is a G-independent fixed overhead of 250–310 μs, which amortizes granularity differences"**,
+not a qualitative phrase.
+⚠️ **Another alternative cannot be separated**: ext4 journal commit is also G-independent, yielding the same prediction on this machine as "device flush fixed cost".
+Separating them requires bypassing ext4 to run directly on block device, which was **not done**.
+
+### Space Amplification of D4 (Checksum Location) Settled Item 2 (Padding), Pure Arithmetic
+
+| File Size | 16 KiB Unit | **32 KiB Unit** |
+|---|---|---|
+| 1 KiB | 16× | **32×** |
+| 4 KiB | 4× | **8×** |
+| Unit size minus one | 1.00006× | 1.00003× |
+
+⇒ **The entire cost of padding lands on small files, and 32 KiB exactly doubles it** (1 KiB file 16× → 32×).
+This entry is an identity, not a measurement; it depends solely on the definition of "padding".
+
+### Measurement Basis
+
+Run directly on host, without VM. An 8 GiB file inside ext4 on local NVMe (KINGSTON SNV3S4000G, 3.6 TB, **no onboard DRAM**),
+`O_DIRECT`, pre-filled with non-zero pattern before run.
+Checksum uses AES-256-GCM (`aes-gcm` 0.11.1), local machine has AES-NI. MAC computed twice per operation
+(verify old unit + compute new unit), which is the pattern required by D4 (Checksum Location) settled item 3.
+
+Code `scripts/experiment-apparatus/e65_write_grain.rs` (5 unit tests, 7 mutations proven individually to fail red,
+`bash scripts/mutation/mutate.sh e65-write-grain scripts/experiment-apparatus/e65_write_grain.rs scripts/mutation/tables/e65_write_grain.tsv`).
+
+**Rerun**:
+
+```bash
+cd scripts/experiment-apparatus && cargo build --release --bin e65-write-grain
+for s in 1 2 3 4 5; do
+  ./target/release/e65-write-grain "${E65_IMG:-${TMPDIR:-/tmp}/e65.img}" $s 2048 8192
+done                        # Artifact e65-write-grain-2026-08-31.out
+```
+
+### A Harness Defect: N=5 Actually Has Only 3 Seeds
+
+`let mut random_state = seed | 1` ⇒ **seed 2 and 3 fold into the same state, seed 4 and 5 fold into the same**
+(confirmed by 2026-08-31 recalculation). ⇒ N=5 is actually **3 access patterns × (1,2,2) repetitions**,
+**recorded inter-round variation (0.2–1.4%) is systematically depressed**.
+E58 (End-to-End Cost of Checksum Granularity) and E66 (How Small Files Land After Padding) share the identical code pattern.
+Placement in [checks-owed.md](../checks-owed.md) C59 (Seeds Folding into the Same State).
+
+### What It Cannot Answer
+
+**Does not include transaction and checkpoint amortization**—real write paths merge multiple mutations into a single publish;
+`rmw` arm counts as "one unit per operation", which is an **upper bound, not expected value**;
+does not include allocator, concurrency, or crash-point replay; `pad` arm is arithmetic, not measured;
+**must rerun when changing devices** ("bytes grow 8× while time increases by only a tenth or so" is a phenomenon measured on this disk when `O_DIRECT` write waits only until device buffer ack; SLC mechanism was never tested, not to be used as explanation).
+
+### Three-Way Argumentation: All Three Legs Finished (2026-08-31)
+
+Same round as E58 (End-to-End Cost of Checksum Granularity); positions and conclusions of three legs see
+"Three-Way Argumentation" section of E58 (End-to-End Cost of Checksum Granularity). **Two findings impacting E65 (Write-Side Cost of Checksum Granularity)**:
+11 percentage points of `full`'s 25.92% are AES (rewritten),
+and the explanation that "NVMe absorbs writes into SLC" does not hold (invalidated). Both adopted after main agent confirmed by recalculation.
+
+### Affected Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D4 (Checksum Location) settled item 2 | Supports | 2026-09-19 Unaffected: space amplification identity of pad arm (1 KiB file under 32 KiB unit occupies 32×) is precisely the cost of settled item 2 |
+| D4 (Checksum Location) settled item 3 | Supports | 2026-09-19 Unaffected: byte and time costs of three arms rmw / full / rmwsync are precisely what settled item 3 knowingly accepted |
+
+## Historical Versions
+
+Change history for E65 (Write-Side Cost of Checksum Granularity) is collected in [experiments-history.md](../experiments-history.md).

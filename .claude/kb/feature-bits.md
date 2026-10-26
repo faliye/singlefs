@@ -15,9 +15,10 @@
 |---|---|---|---|---|---|---|
 | 0 | incompat | INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT | 格式版本 1 | 53c9f38 | 退役 | 第一条纯 SSD 布局线；mkfs 起就置上，不认识这一位的读者挂不上（D12（目标介质） 已定项 1「每套布局一个 incompat 位」） |
 | 1 | incompat | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | 格式版本 1 | 45d49aaf | 在用 | 第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号、没有回退见证与回退行）；mkfs 起就置上，不认识这一位的读者挂不上；位 0 退役之后读者见到位 0 一律拒挂 |
+| 2 | incompat | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT | 格式版本 1 | 0b926bd3f | 在用 | inode 记录带截断字段（偏移 120 起 T 与 N_w；不带位 2 的池偏移 120–135 必须全零）；mkfs 起就置上，可写挂载把不带位 2 的旧池在取号那一写起升上；读者收只带位 1（第一字节 0x02）与位 1、位 2 都带（0x06）两种 |
 
-**compat_ro 与 compat 两张位图一位都没分，incompat 分了位 0（退役）与位 1，别的位一位都没分**（出处：D15（格式冻结政策） 已定项 4 登记表）。
+**compat_ro 与 compat 两张位图一位都没分，incompat 分了位 0（退役）、位 1 与位 2，别的位一位都没分**（出处：D15（格式冻结政策） 已定项 4 登记表）。
 
-**代码侧引用了哪几位**：`crates/singlefs-core/src/system_configuration.rs` 的 `INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT = 0x02`，位 1；同一份文件的 `INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT = 0x01` 是退役的位 0，只在测试与注释里用，留着让「用过的位不回收」写进代码；`SUPPORTED_INCOMPAT_BITS` 由位 1 合成，不是位掩码字面量，门禁 code-source-discipline 的 feature-bits 格解不出位号，把它列进成功那句的「没判位号的」名单。`crates/singlefs-checker/src/lib.rs` 判 incompat 用它自己的具名常量 `INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT = 0x02`（第 219 行）。
+**代码侧引用了哪几位**：`crates/singlefs-core/src/system_configuration.rs` 的 `INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT = 0x02`，位 1，与 `INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT = 0x04`，位 2；同一份文件的 `INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT = 0x01` 是退役的位 0，只在测试与注释里用，留着让「用过的位不回收」写进代码；`SUPPORTED_INCOMPAT_BITS` 由位 1 与位 2 合成，不是位掩码字面量，门禁 code-source-discipline 的 feature-bits 格解不出位号，把它列进成功那句的「没判位号的」名单。`crates/singlefs-checker/src/lib.rs` 判 incompat 用它自己的具名常量 `INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT = 0x02`（第 276 行）与 `INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT = 0x04`（第 280 行，常量名比核心层的少一个 S）。
 
 **位图的字节序**：位图小端，位 n 住第 n div 8 个字节的第 n mod 8 低位（D22（单元原子性怎么合成） 已定项 13）。

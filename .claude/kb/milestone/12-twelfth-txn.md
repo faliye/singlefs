@@ -16,7 +16,8 @@
 
 | # | 出口 | 归哪一项 |
 |---|---|---|
-| 1 | 执行 E152（按里程碑对比六家文件系统的文件性能）：singlefs 一臂换成 FUSE 挂载，与六家在同一次正式跑里跑同一组负载（两盘镜像七家 + singlefs 各 5 轮），产物入库，按里程碑对比的表 `scripts/experiments/perf-by-milestone.md` 加这个里程碑那一节 | 四 |
+| 1 | 执行 E152（按里程碑对比六家文件系统的文件性能）：singlefs 一臂换成 FUSE 挂载，与六家在同一次正式跑里跑同一组负载（两盘镜像七家 + singlefs 各 5 轮），产物入库，按里程碑对比的表 `scripts/experiment-apparatus/perf-by-milestone.md` 加这个里程碑那一节 | 四 |
+| 2 | 崩溃全量：新增的跑完，另补积压，每个里程碑至少 100 亿态（用户 2026-10-22 定）。照两段跑（录入在 CPU、判在 GPU，观察者挂全），不缩枚举域，全部 0 红。① 这一里程碑新增的崩溃流与单元键变了的块先跑；② 再从积压登记表（里程碑四立的）里补跑，至少 50 亿态，按登记表的次序接着上一次停下的地方。新增与积压合起来多于 100 亿态时，这一里程碑至少跑 100 亿态，新增跑不完的那一截进积压登记表末尾；合起来不足 100 亿时全部跑完。红了照 `.claude/rules/test-script-discipline.md`「全量的红，钉回快档」钉回快档、修好再跑。 | 崩溃全量（跨里程碑） |
 
 其余出口、xfstests 跑哪个子集，段 0 交用户定。主 agent 推的候选（推的，没量过）：
 
@@ -72,8 +73,8 @@
 | # | 做什么 | 压着的条款与欠账 | 验收 | 依赖 |
 |---|---|---|---|---|
 | 四·1 | 跑前登记修订：singlefs 一臂从真设备二进制换成 FUSE 挂载，八维跑与六家相同的 fio 负载；写明 FUSE 那一层的开销怎么与 singlefs 自己的分开报（推的：另加一臂「同一守护进程挂一个透传的空实现」当对照） | `.claude/singlefs-ai-sop/rules/test-discipline.md`「实验开跑之前，答案不许已经存在」「阳性对照必须对每一条被测的臂都跑」；E152（按里程碑对比六家文件系统的文件性能） 实验页「口径」 | 修订写在跑之前，判据、阈值、作废条款写死 | 二·1 |
-| 四·2 | 装置：`scripts/devices/e152-stage-root.sh` 把守护进程放进来宾、`scripts/devices/e152-run.sh` 的 singlefs 配置改成挂 FUSE 跑 fio；`scripts/experiments/e152-tables.py` 里 singlefs 那一行改填八维；单测与变异表跟着加 | E152（按里程碑对比六家文件系统的文件性能） 变异表 `scripts/mutation/tables/e152_file_system_benchmark.tsv` | 单测每条先证会红，变异全抓；单配置冒烟一次 `vm_exit=0` | 四·1 |
-| 四·3 | 正式跑：两盘镜像七家 + singlefs 各 5 轮；产物入库，实验页加这一次，`scripts/experiments/perf-by-milestone.md` 加这个里程碑一节（由 `scripts/experiments/e152-tables.py` 生成）；顺带回看 D17（实现分层与第三方管道） 已定项 5、D23（journal 的角色与格式） 两行备料 | E152（按里程碑对比六家文件系统的文件性能） 实验页「影响的决策」 | 全部虚机跑 `vm_exit=0`，失败的轮按跑前登记的作废条款记；差距说明 singlefs 该怎么改是推论，另走三方 | 四·2；二·2 |
+| 四·2 | 装置：`scripts/devices/e152-stage-root.sh` 把守护进程放进来宾、`scripts/devices/e152-run.sh` 的 singlefs 配置改成挂 FUSE 跑 fio；`scripts/experiment-apparatus/e152-tables.py` 里 singlefs 那一行改填八维；单测与变异表跟着加 | E152（按里程碑对比六家文件系统的文件性能） 变异表 `scripts/mutation/tables/e152_file_system_benchmark.tsv` | 单测每条先证会红，变异全抓；单配置冒烟一次 `vm_exit=0` | 四·1 |
+| 四·3 | 正式跑：两盘镜像七家 + singlefs 各 5 轮；产物入库，实验页加这一次，`scripts/experiment-apparatus/perf-by-milestone.md` 加这个里程碑一节（由 `scripts/experiment-apparatus/e152-tables.py` 生成）；顺带回看 D17（实现分层与第三方管道） 已定项 5、D23（journal 的角色与格式） 两行备料 | E152（按里程碑对比六家文件系统的文件性能） 实验页「影响的决策」 | 全部虚机跑 `vm_exit=0`，失败的轮按跑前登记的作废条款记；差距说明 singlefs 该怎么改是推论，另走三方 | 四·2；二·2 |
 
 - **开工前要先定的**：跑单盘还是只跑两盘镜像；FUSE 透传对照臂要不要（四·1 写死）。
 

@@ -19,7 +19,7 @@ Star counts and commit counts reflect values displayed on pages at that time (20
 | birth txg + deadlist | ZFS | Blocks carry birth generation; on deletion, generation compared against "next older snapshot" → freed directly, or placed into that snapshot's deadlist; deadlists cascade-merged when snapshots destroyed | Accounting maintained incrementally, never traverses |
 | accounting key in dedicated btree | bcachefs (2024 rewrite) | Counters themselves are bkeys, extensible via tagged union; percpu + eytzinger index in memory; updates proceed via normal transactions + write buffer | Rewrite broke disk format compatibility, forced upgrade in 6.11 |
 
-**Number Standards**: Percentages for qgroup / squota come from comparative benchmarks published by btrfs officials in the LWN squota article; workloads and hardware were not fully disclosed in that article and **must not be taken as performance expectations for this project**, serving only as qualitative evidence that "this path is impassable."
+**Measurement basis of the numbers**: Percentages for qgroup / squota come from comparative benchmarks published by btrfs officials in the LWN squota article; workloads and hardware were not fully disclosed in that article and **must not be taken as performance expectations for this project**, serving only as qualitative evidence that "this path is impassable."
 
 **Key Takeaway: btrfs conceded defeat itself.** squota is official admission that accurate accounting is intractable.
 That this path is impassable requires no further re-verification by this project.
@@ -39,7 +39,7 @@ Sources: [bcachefs Snapshots Design Document](https://bcachefs.org/Snapshots/),
 [Principles of Operation (2026-04-16, PDF)](https://bcachefs.org/bcachefs-principles-of-operation.pdf).
 **Principles of Operation is the newest and most authoritative bcachefs design document, not yet read in full.**
 
-1. **bucket + generation number**. Disks sliced into buckets, each carrying a generation number; pointers store "expected generation", mismatch indicates block reclaimed → data invalidation requires no reverse index updates. Directly alleviates burden on D1 (data relocatability / reverse indexing).
+1. **bucket + generation number**. Disks sliced into buckets, each carrying a generation number; pointers store "expected generation", mismatch indicates block reclaimed → data invalidation requires no reverse index updates. Directly alleviates burden on D1 (Data Mobility / Reverse Index).
 2. **Snapshot ID in low bits of key**. Snapshot IDs form an independent tree (root `U32_MAX`, allocated downward, parent ID strictly greater than child ID); lookups filtered by ancestor relationship, **without cloning any tree**; O(1) creation, supporting millions of snapshots.
    Cost: deleting snapshots requires traversing all btrees with snapshots (official notes mention desire for bloom filter optimization); read path incurs constant ancestor filtering overhead; write path must handle whiteouts and partial overwrite slicing across snapshots.
 3. **Pointers inline multiple replicas**. Extent pointer directly lists N replica locations, enabling per-file replica policies—btrfs uses per-chunk profiles and cannot achieve this.
@@ -68,11 +68,11 @@ Building from scratch, this project has neither—**the lack of an oracle is the
 By 2026, Rust has entered Linux drivers, filesystems, and network components. The filesystem abstraction layer continues evolving, without conclusion yet on "general-purpose vs. serving only simple filesystems."
 
 Source: [Rust for filesystems (LWN)](https://lwn.net/Articles/978738/).
-**Little relevance to this project**—D7 (whether to enter Linux mainline) already settled not entering mainline in early years.
+**Little relevance to this project**—D7 (Merging into Linux Mainline) already settled not entering mainline in early years.
 
 ## 5. Index Structures (Special Investigation for D8)
 
-**Standard**: Section 5 comes from bcachefs *Principles of Operation* Rev 1.39.2 (2026-08-25 revision) original text, LWN, XFS documentation, and paper abstracts. **None verified in this project, nor cloned/compiled/run from any implementation.**
+**Measurement basis**: Section 5 comes from bcachefs *Principles of Operation* Rev 1.39.2 (2026-08-25 revision) original text, LWN, XFS documentation, and paper abstracts. **None verified in this project, nor cloned/compiled/run from any implementation.**
 
 ### 5.1 bcachefs: 28 trees, single btree implementation
 
@@ -88,7 +88,7 @@ It is **not** "switching data structures per access pattern", but **divided into
 | **write buffer** | High-frequency small updates, batch application more economical | backpointers / LRU / accounting |
 
 Among the 28 trees, **10 are write-buffered**: `lru`, `need_discard`, `backpointers`, `deleted_inodes`, `accounting`, `stripe_backpointers`, and four `reconcile_*` trees.
-⚠️ 28 / 10 are figures from Principles of Operation Rev 1.39.2; checking linux-6.17 source `BCH_BTREE_IDS()` on 2026-08-29 shows 21 trees with 5 using write buffers; text of D8 (core index structure) takes precedence.
+⚠️ 28 / 10 are figures from Principles of Operation Rev 1.39.2; checking linux-6.17 source `BCH_BTREE_IDS()` on 2026-08-29 shows 21 trees with 5 using write buffers; text of D8 (Core Index Structure) takes precedence.
 
 **Cost of write buffer (explicit in original text)**: Updates are **unordered and eventually consistent**—btree cannot observe pending updates before next flush; flush sorts by key position, **discarding temporal order**; batched insertion into btree node order after deduplication.
 > "this sort-merge-sweep is inherently single-threaded, making its efficiency
@@ -122,7 +122,7 @@ Keys within bsets are **packed**: each bset has a format descriptor recording fi
 - Buckets are 512K–2M; buckets and data pointers both carry **generation numbers**; incrementing generation invalidates all old pointers, **avoiding locating or deleting any reverse references**.
 - Original text notes generation value extends beyond cache invalidation: makes **bootstrapping allocation info** feasible during journal replay, and **makes certain previously unrecoverable corruptions repairable**. Directly echoes our "reconstructibility" design objective.
 - Buckets are **never overwritten**; sealed once sequentially filled → copying GC mandatory.
-  **copyGC reserves 8% (default, configurable 5%–20%)**—a ready-made baseline for D3 (space allocation) "reserves must not be excessive."
+  **copyGC reserves 8% (default, configurable 5%–20%)**—a ready-made baseline for D3 (Space Allocation) "reserves must not be excessive."
 - A **fragmentation LRU btree** tracks bucket fullness; copygc targets the most fragmented buckets without scanning the entire alloc btree.
 - **Allocator originally used memory bucket array + dedicated scanning thread** maintaining freelist/discard/eviction; later completely replaced with btrees (freespace / discard / LRU), **scanning thread entirely removed**.
   Reasoning: transactional btree code is "far easier to debug and reason about", and old threads **consumed significant CPU** when nearing capacity—edge cases vanished after switching to btrees.
@@ -134,7 +134,7 @@ Keys within bsets are **packed**: each bset has a format descriptor recording fi
 > not by walking the btrees."
 
 `check_allocations` **rebuilds accounting via full traversal** to distinguish "counter stale" from "key genuinely present."
-Shares identical design with I-3.1 (allocated accounting reconciles) in `crates/singlefs-checker/invariants/05-空间记账.md`: **runtime incremental maintenance, checker verifies via traversal**.
+Shares identical design with I-3.1 (Allocated Statistics Match) in `crates/singlefs-checker/invariants/05-空间记账.md`: **runtime incremental maintenance, checker verifies via traversal**.
 
 ### 5.5 Erasure coding: second known solution to write hole
 
@@ -170,7 +170,7 @@ A healing mechanism preserves the invariant of "internal nodes have 4–16 child
 **Self-admitted costs in paper**: BetrFS 0.4 degrades relative to 0.3 when **node splitting and merging fall on critical path**, where extra lifting computation outweighs benefits; among all patterns, only **sequential write** was adversely affected.
 Rename performance claimed as "competitive with indirection-based file systems for a range of sizes"—**competitive within a size range, not winning across all sizes**.
 
-Standard: FAST 2018 paper + TOS 2018 extended version, **unverified in this project**.
+Measurement basis: FAST 2018 paper + TOS 2018 extended version, **unverified in this project**.
 Impact on key layout see [decisions.md](decisions.md) D8.
 
 Sources:
@@ -200,7 +200,7 @@ Sources:
 
 ## 6. Encryption (D9 (Encryption) Special Investigation)
 
-**Scope**: Sourced verbatim from bcachefs Encryption design document (page marked last edited 2025-11-02),
+**Measurement basis**: Sourced verbatim from bcachefs Encryption design document (page marked last edited 2025-11-02),
 OpenZFS `module/os/linux/zfs/zio_crypt.c` top design comments (master branch, retrieved 2026-08-26),
 Linux fscrypt kernel documentation, OpenZFS `zfs-load-key(8)` manual page, and OpenZFS public issues.
 **All obtained from documentation and source code reading, unverified in this project, with none compiled or executed.**
@@ -274,7 +274,7 @@ Scenarios not accepting this premise (e.g. network-attached access, paths known 
 
 ### 6.4 Encryption pitfalls encountered (public records)
 
-| Pitfall | Record | Scope |
+| Pitfall | Record | Measurement Basis |
 |---|---|---|
 | ZFS native encryption + send/recv prolonged corruption | openzfs/zfs#12014 open since 2021-05; Phoronix reported 2024-02-12; openzfs-docs#494 proposed doc warning; 2025-05-31 claimed fixing two non-raw send bugs in 2.2.8 / 2.3.3 | Public issues and news reports, **unverified in this project**. Qualitative evidence that encryption permeates replication/snapshot paths, not performance or probability data |
 | Compression before encryption inevitably leaks length | Kelsey, *Compression and Information Leakage of Plaintext*, FSE 2002 | Order cannot be inverted (ciphertext cannot be compressed); leakage must be accepted if compression is chosen |
@@ -294,7 +294,7 @@ Sources:
 
 **Inspected line by line in local kernel tree on 2026-08-29, used to finalize Item 8 of D9 (Encryption).**
 
-| Implementation | Where volume/file identity enters | What enters per-unit input | Source |
+| Implementation | Which layer volume and file identity enters | What is carried in per-unit input | Provenance source |
 |---|---|---|---|
 | ext4 checksum | s_uuid **folded once at mount time** into s_csum_seed | Only inum, gen, block content; s_uuid never appears | fs/ext4/super.c ext4_init_metadata_csum; fs/ext4/ialloc.c __ext4_new_inode; fs/ext4/bitmap.c ext4_inode_bitmap_csum_verify; fs/ext4/super.c ext4_group_desc_csum |
 | fscrypt key | Per-file nonce **generates random bytes once at inode creation**, persisted in on-disk context | Derived per-file key | fs/crypto/keysetup.c fscrypt_prepare_new_inode get_random_bytes(nonce, FSCRYPT_FILE_NONCE_SIZE); fs/crypto/fscrypt_private.h struct fscrypt_context_v2 |
@@ -323,7 +323,7 @@ Upstream resolution was not "include high-water mark in MAC", but rather **disab
 
 `crypto_gcm_check_authsize()` accepts 4 / 8 / 12 / 13 / 14 / 15 / 16 bytes
 (`crypto_gcm_check_authsize()` in `include/crypto/gcm.h`, inspected 2026-08-29).
-=> "MAC strictly 128-bit without truncation" is **this project's own design constraint, not imposed by cryptography or kernel**; the space cost it incurs (16 bytes per unit) should be accounted under this framing rather than deemed "having no choice".
+=> "MAC strictly 128-bit without truncation" is **this project's own design constraint, not imposed by cryptography or kernel**; the space cost it incurs (16 bytes per unit) should be accounted on this measurement basis rather than deemed "having no choice".
 
 ## 7. Survey of Academic Results in the Last Decade (2012–2026)
 
@@ -344,7 +344,7 @@ Measurements of BetrFS 0.4 vs mainstream filesystems on identical small random w
 | xfs | 2835.7 ± 67.9 |
 | zfs | 3288.9 ± 394.7 |
 
-**Scope**: 256K 4-byte random writes totaling only 1 MiB written—this is an **extreme microbenchmark**, not a realistic database or VM image workload. Paper self-reports "up to 600 times faster".
+**Measurement basis**: 256K 4-byte random writes totaling only 1 MiB written—this is an **extreme microbenchmark**, not a realistic database or VM image workload. Paper self-reports "up to 600 times faster".
 
 **⚠️ The durability model of these numbers differs from singlefs; must read this section before extrapolating (verified 2026-08-26).**
 FAST 2018 Paper Sections 2.1 & 4.x verbatim:
@@ -393,7 +393,7 @@ Costs of both paths are measurable; criteria see [experiments.md](experiments.md
 
 ### 7.3 Index structure: parameter space is far larger than "switching to another tree" (impacts D8)
 
-| Result | Conclusion | Scope |
+| Result | Conclusion | Measurement Basis |
 |---|---|---|
 | SplinterDB (ATC 2020) | STBε-tree = Bε-tree plus LSM size-tiering, structured as "tree of trees": trunk nodes point to B-tree branches, each with a quotient filter. Relative to RocksDB: 6–10x faster inserts, 2–2.6x faster point lookups, 2x write amplification reduction | Abstract figures, targeting NVMe SSD |
 | FAST 2022 "Closing the B+-tree vs. LSM-tree Write Amplification Gap" | On hardware with built-in transparent compression, Bε-tree write amplification is 28 (8KB pages) / 36 (16KB pages); under identical conditions RocksDB is 38, WiredTiger 268 (8KB) / 530 (16KB) | 500GB dataset, 32B records, 4 client threads |
@@ -404,18 +404,19 @@ Costs of both paths are measurable; criteria see [experiments.md](experiments.md
 Significance to D8: D8 establishes "single btree implementation + multiple keyspaces + write buffer / key cache frontends".
 These results do not negate that direction, but significantly broaden **tunable parameters within the same structural framework**:
 Bε buffer ratio, size-tiering, key-value separation, filter types—all represent parameters within one btree, rather than "adding another tree type".
-This does not conflict with D8 (where allocation record trees and extent trees can be heterogeneous per Item 14).
+This does not conflict with D8 (Core Index Structure) "the accounting tree, central mapping tree, tree table, instance table and inode tree are still built on one btree"; rather it complements it (the allocation record tree and the extent tree have been changed to allow heterogeneous implementations per settled item 14 and are excluded).
 
 ### 7.4 Crash consistency verification: the "no oracle" premise needs reassessment (impacts verification plan)
 
-The premise that "designing from scratch has no reference implementation to compare against" has five existing methodological categories over the last decade:
+[CLAUDE.md](../../CLAUDE.md) records that the largest hidden cost of this project is that "a design from scratch has no reference implementation to compare against".
+The last decade has produced at least five categories of ready-made methods, each giving something different:
 
 | Method | Exemplar | What it provides | Cost / Premise |
 |---|---|---|---|
 | Push-button formal verification | Yggdrasil (OSDI 2016, Best Paper) | **crash refinement** correctness: disk states an implementation produces (including crashes) must be a subset of specification-permitted states. Z3 automated verification, **no manual proof annotations** | Implementation must be written in symbolically executable form; paper reports verification under 1 minute after decoupling logical and physical representations |
 | Bounded black-box crash testing | CrashMonkey + ACE (OSDI 2018) | Exhaustive parameter exploration of workloads, checking recovery after each crash point. 65 machines run for 2 days: reproduced 24 known bugs, found 10 new bugs (7 in kernel since 2014); **also discovered a crash-consistency bug in formally verified FSCQ** | Bounded space only; says nothing about outside bounds |
-| PM specialized framework | Chipmunk (EuroSys 2023 Best Paper candidate) | Similar method applied to persistent memory filesystems, finding 23 new bugs across 5 PM filesystems, including mount failures and rename atomicity violations | Tailored to PM semantics |
-| Model checking + differential testing | Metis (FAST 2024) | Combines model checking state exploration with differential testing, **requiring no abstract model**: uses another filesystem as reference, comparing abstract states, syscall returns, and errno. Accompanied by **RefFS**—a small, fast reference filesystem designed for bug reproducibility | Requires trusted reference implementation |
+| PM specialized framework | Chipmunk (EuroSys 2023 Best Paper candidate) | Similar method applied to persistent memory filesystems, finding 23 new bugs across five persistent-memory (PM) filesystems, including mount failures and rename atomicity violations | Tailored to PM semantics |
+| Model checking + differential testing | Metis (FAST 2024) | Combines model checking state exploration with differential testing, **requiring no abstract model**: uses another filesystem as reference, comparing, operation by operation, abstract states, syscall returns, and errno. Accompanied by **RefFS**—a small, fast reference filesystem designed to accelerate model checking and improve bug reproducibility | Requires trusted reference implementation |
 | Machine-checked proofs for concurrency + crash | GoJournal (OSDI 2021) / DaisyNFS (OSDI 2022) | GoJournal is verified concurrent crash-safe journaling (Coq / Perennial 2.0), **uncovering a severe concurrency bug missed by extensive unit tests**; DaisyNFS sits atop GoTxn, verifying NFS operations **sequentially** using Dafny | High proof cost |
 
 **Two most direct takeaways for this project**:
@@ -449,7 +450,7 @@ This project's rule that "metadata blocks must be self-describing" (`.claude/rul
 | ZNS (Zoned Namespace) | Sequential writes, host-managed GC; adopted in scale deployments for cost efficiency | Zone size serves as input to D8 rule on "selecting node size per device characteristics" |
 | NVMe FDP (Flexible Data Placement) | Merged Google SmartFTL and Meta Direct Placement Mode proposals, bridging cost/benefit gap between ZNS and standard SSDs. **Requires no sequential writes, backward-compatible, applications run unmodified** | More likely target layer for this project than ZNS: does not force sequential writes, avoiding conflict with COW allocation flexibility |
 
-Scope: NVM Express and SNIA public materials, 2025 arXiv papers, **unverified in this project**.
+Measurement basis: NVM Express and SNIA public materials, 2025 arXiv papers, **unverified in this project**.
 Common thread is delegating placement and GC to host—**overlapping with COW filesystems managing allocation themselves**.
 Whether this overlap yields efficiency gains or double-management penalties requires empirical benchmarking.
 
@@ -475,7 +476,7 @@ For D7 decision to remain out-of-tree: this shifts evidence from "removal from m
 
 ### 7.10 bcachefs official documentation addendum (inspected 2026-08-26, Principles of Operation Rev 1.39.2+2202696)
 
-| Fact | Original text / Scope | Significance to this project |
+| Fact | Original text / Measurement basis | Significance to this project |
 |---|---|---|
 | **bucket gen scope restricted to cached data** | §1.5: "we can reuse a bucket with **cached data** in it without finding and deleting all the data pointers by incrementing the generation number" | [decisions.md](decisions.md) D1: Manages invalidation only, not relocation |
 | **gen wraparound mechanism superseded by reverse index** | State list need_gc_gens: "Legacy state, retained for compatibility … **now effectively unused since the invalidate worker uses backpointers instead of generation bumping**" | Aligns with D1 selection of day-1 reverse index |
@@ -522,7 +523,7 @@ Source: Linux mainline v6.17 `fs/bcachefs/` (`disk_accounting.{c,h}`, `disk_acco
 ## 8. Root ring slot width and racing long-running consumers against publications: how active implementations handle them
 
 **Inspected verbatim at local checkout `~/code/fs-refs` on 2026-09-08. Unverified in this project.**
-These answer D2 Item 15 (general criterion for objects with differing lifecycles) and [checks-owed.md](checks-owed.md) C214.
+These answer D2 (RAID Stripe Policy) Item 15 (general criterion for objects with differing lifecycles) and [checks-owed.md](checks-owed.md) C214 (Traversal-hop window margin is unguarded).
 
 ### 8.1 ZFS: root ring slot width scales with device granularity, capped at 8 KiB; widening slot width reduces slot count rather than taking more disk space
 
@@ -550,11 +551,11 @@ Source: `zfs/include/sys/vdev_impl.h` macros from `VDEV_UBERBLOCK_RING` to `VDEV
 | **Total ring size fixed at 128 KiB => widening slot width reduces slot count**, rather than consuming more disk space | `VDEV_UBERBLOCK_COUNT = VDEV_UBERBLOCK_RING >> SHIFT` |
 
 ⚠️ **The metric used is ashift (alignment / minimum allocation unit), not Linux io_min (stripe chunk size on arrays).**
-These two metrics diverge drastically on md arrays—E34 measured a 128x difference on real md/raid5.
+These two metrics diverge drastically on md arrays—E34 (Root Ring Slot Geometry) measured a 128x difference on real md/raid5.
 
 ⚠️ **Known difference with this project** (`.claude/singlefs-ai-sop/rules/evidence-discipline.md` requires noting):
 ZFS labels occupy 4 **fixed areas** per disk at 256 KiB each, with uberblock ring permanently taking 128 KiB;
-in this project, the root ring distributes R regions across the disk with prime stride; **region size is not a format constant**—slots per region S resides in system configuration (D22 Item 2 verbatim: "S resides in system configuration. Lower bound 1, upper bound calculated at mount time by blocks held by I-7.4").
+in this project, the root ring distributes R regions across the disk with prime stride; **region size is not a format constant**—slots per region S resides in system configuration, and only the two edges of its interval (lower bound 4, upper bound 16) are format constants (D22 (Synthesizing Unit Atomicity) settled item 2).
 => "Widening slot width = reducing slot count" holds in this project only if "fixed region size" is established, which does not exist in the repository.
 
 ### 8.2 btrfs: relies on commit root + pausable traversal, excluded in this project by two independent gates
@@ -570,9 +571,9 @@ Source: `linux-6.17/fs/btrfs/`, inspected verbatim 2026-09-08:
 | transaction.c btrfs_commit_transaction | `btrfs_scrub_pause(fs_info);` |
 
 ⚠️ **This project cannot use this path; excluded by two independent gates (settled 2026-09-08)**:
-1. **Commit interval differs by 83,000x**—btrfs default commit interval is verbatim `#define BTRFS_DEFAULT_COMMIT_INTERVAL (30)` (`linux-6.17/fs/btrfs/fs.h`, 30 seconds), whereas publication interval under singlefs workload A is **0.36 milliseconds** (2785 publishes/sec). btrfs implicitly assumes "commit interval is far larger than a consumer scan slice"; transplanted here, scrub would be paused 2785 times per second, never completing.
+① **Commit interval differs by 83,000x**—btrfs default commit interval is verbatim `#define BTRFS_DEFAULT_COMMIT_INTERVAL (30)` (`linux-6.17/fs/btrfs/fs.h`, 30 seconds), whereas publication interval under singlefs workload A is **0.36 milliseconds** (2785 publishes/sec). btrfs implicitly assumes "commit interval is far larger than a consumer scan slice"; transplanted here, scrub would be paused 2785 times per second, never completing.
 **This implicit premise was never cited alongside that practice.**
-2. **Checker side structurally cannot acquire that lock**—D13 Item 5 verbatim: "share only a constants module generated from kb; newtypes, parsing, checksums, traversals, and accounting written independently" => independent checker cannot hold the tested implementation's `commit_root_sem`.
+② **Checker side structurally cannot acquire that lock**—D13 (Verification Route) settled item 5 verbatim: "share only a constants module generated from kb; newtypes, parsing, checksums, traversals, and accounting written independently" => independent checker cannot hold the tested implementation's `commit_root_sem`.
 
 This triad is documented to clarify what is excluded, not as a candidate solution.
 
@@ -603,7 +604,7 @@ D21 Item 3 ③ verbatim states: "User-requested external survey (how others impl
 
 ## 10. Deadlist accounting, relocating shared blocks, and discard timing under snapshots
 
-Retrieved 2026-10-12; unverified in this project; constitutes clues rather than evidence.
+Retrieved on 2026-10-12. None of these items has been verified in this project; each is a clue, not evidence (`.claude/singlefs-ai-sop/rules/evidence-discipline.md`, "What other projects do is a clue, not evidence").
 
 **Versions Checked and Retrieval Method**
 
@@ -616,13 +617,13 @@ Retrieved 2026-10-12; unverified in this project; constitutes clues rather than 
 | APFS | Apple File System Reference, PDF CreationDate 2020-06-22, 181 pages | Downloaded from developer.apple.com, text extracted with pypdf |
 | btrfs Documentation | btrfs.readthedocs.io/en/latest Trim, btrfs-quota, Qgroups, btrfs-balance, btrfs-man5 | Fetched via curl |
 
-File:line references match commits in table above.
+Every file:line reference points to a commit in the "Versions inspected and how they were obtained" table. The preexisting local `/home/fy5090/code/fs-refs/zfs` (`58d73c90`, 2026-08-27) and `/home/fy5090/linux-bug-fix/linux` (v7.3-rc1, shallow clone) are older than mainline and were not used for citations.
 
-Facts used from singlefs: D19 Item 5: "location entries demoted to hints; central mapping is sole source of truth" and Item 7: "pointer headers carry birth (tree, txg), 8 bytes each" ("singlefs uses central mapping", "singlefs pointers carry birth txg").
+The singlefs-side facts used to describe the differences are only two, both checked live: "settled item 5: the position entry is demoted to a hint, the central mapping is the sole entry point" and "settled item 7: pointer headers carry birth (tree, txg), 8 bytes each" in `.claude/kb/decisions/19-块指针的结构与宽度预算.md` (abbreviated as "singlefs uses central mapping" and "singlefs pointers carry birth txg").
 
 ### 10.1 ZFS: deadlist, livelist, why no BP rewrite, device removal indirect mapping
 
-| Fact | Source (OpenZFS 4542a317) | Scope | Difference with singlefs |
+| Fact | Source (OpenZFS 4542a317) | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
 | Memory structure: deadlist is an AVL tree ordered by dle_mintxg, each entry holding a bpobj; dl_cache caches by mintxg bytes; on-disk header dsl_deadlist_phys_t stores only used/comp/uncomp totals | include/sys/dsl_deadlist.h definitions; module/zfs/dsl_deadlist.c:106 (dsl_deadlist_compare compares dle_mintxg) | Source reading | Deadlist bucketed by birth txg: ZFS block pointers are physical DVAs without central mapping; singlefs uses central mapping with pointers carrying birth txg |
 | Keys on disk: deadlist object is a ZAP, key is mintxg (decimal string), value is bpobj object ID | dsl_deadlist.c:534 (zap_add_int_key(... mintxg, obj ...)), :895-897 | Source reading | ZFS block pointers are physical DVAs; singlefs uses central mapping |
@@ -630,7 +631,7 @@ Facts used from singlefs: D19 Item 5: "location entries demoted to hints; centra
 | Entry timing: dsl_dataset_block_kill directly frees blocks with birth > ds_prev_snap_txg; otherwise enters head deadlist; zio callbacks enter ds_pending_deadlist first, sync thread inserts later | module/zfs/dsl_dataset.c:304-349; :2397-2398 | Source reading | ZFS block pointers are physical DVAs; singlefs uses central mapping |
 | Snapshot creation: snapshot inherits head's deadlist object; head receives clone (identical keys, empty bpobj) plus new key ds_prev_snap_txg | dsl_dataset.c:1787, :1842-1849; dsl_deadlist_clone at :700-730 | Source reading | ZFS block pointers are physical DVAs; singlefs uses central mapping |
 | Concurrency: deadlist modified exclusively in syncing thread; non-insert operations require dp_config_rwlock write lock | dsl_deadlist.c:25-31 | Comment reading | Concurrency model differences serve only as clues |
-| Snapshot deletion (new format): adjusts prev unique/snapused; moves next deadlist buckets with mintxg >= ds_prev_snap_txg in bulk to pool dp_free_bpobj; merges deleted snapshot deadlist into next deadlist; deletes creation_txg key from head deadlist | module/zfs/dsl_destroy.c:403-439, :478-487; dsl_deadlist.c:920-979, :855-918, :539-567 | Source reading | Singlefs plans merging deadlist into newer side; ZFS merges into next (newer side) |
+| Snapshot deletion (new format): first use `dsl_deadlist_space_range` to adjust prev unique and snapused; `dsl_deadlist_move_bpobj` moves whole buckets from next's deadlist whose mintxg ≥ the deleted snapshot's `ds_prev_snap_txg` to the pool's `dp_free_bpobj` (these blocks were born after the deleted snapshot and died before next, so nothing references them). Then `dsl_deadlist_merge` merges the deleted snapshot's own deadlist by key into next's deadlist. Finally remove the deleted snapshot's creation_txg key from the head deadlist (`remove_key` merges that bucket into the previous bucket). | `module/zfs/dsl_destroy.c:403-439`, `:478-487`; `dsl_deadlist.c:920-979` (move_bpobj), `:855-918` (merge), `:539-567` (remove_key) | Source reading | ZFS block pointers are physical DVAs, with no central mapping. This project uses central mapping and pointers carry birth txg. This project plans to merge a deleted snapshot's deadlist into the newer side; ZFS merges into next, the newer side. |
 | Merge and move attach whole bpobj sub-objects (bpobj_enqueue_subobj / dle_enqueue_subobj) without moving blocks individually; prefetches up to 128 sub-deadlists | dsl_deadlist.c:822, :954, :882-891, :942-949 | Source reading | ZFS block pointers are physical DVAs; singlefs uses central mapping |
 | Old on-disk format (single bpobj, dl_oldfmt) runs process_old_deadlist: block-by-block comparison of birth vs ds_prev_snap_txg | dsl_destroy.c:127-151, :154-188 | Source reading | Legacy burden: singlefs has no legacy format |
 | livelist definition: uses dsl_deadlist_t attached to clone dsl_dir, recording blocks born after clone creation, flagging FREE/ALLOC; clone deletion scans backward canceling pairs, freeing remainder; embedded blocks omitted | dsl_deadlist.c:45-63; dsl_dataset.c:291-302 | Comments & source | Singlefs plans read-only snapshots; ZFS livelist serves writable clones only |
@@ -640,41 +641,41 @@ Facts used from singlefs: D19 Item 5: "location entries demoted to hints; centra
 
 ZFS Group 2: No block pointer rewrite; device removal uses indirect mapping.
 
-| Fact | Source & Date | Scope | Difference with singlefs |
+| Fact | Source & Date | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
 | Self-stated rationale: indirect vdev corresponds to removed device, "since we cannot rewrite block pointers of snapshots, etc.", retaining old->new mapping checked on every DVA access | module/zfs/vdev_indirect.c:36-47 (4542a317) | Comment reading | Adding old->new mapping at SPA layer without altering pointers: ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
 | Mapping does not align with logical block boundaries; a DVA may span split blocks, so not every DVA can be replaced by an equivalent new DVA, providing segmented callback vdev_remap | vdev_indirect.c:41-58 | Comment reading | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
 | Designer public statement (Alex Reece, 2015-01-13, Delphix blog): per-block pointer mapping "quickly requires an unreasonably large data structure that must be stored both on disk and kept in memory"; "Even BP rewrite would require a huge temporary table"; hence SPA-layer contiguous extent mapping | Delphix blog 2020 web.archive.org snapshot, lines 104-107 | Archive doc reading | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
-| Removal workflow: halt allocation; thread copies allocated segments in LBA order; sync task updates mapping; frees during copy free both locations; vdev becomes indirect | module/zfs/vdev_removal.c:43-73 | Comment reading | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
-| Restrictions: no raidz/draid top-level vdevs in standard class; all top-level vdev ashifts match; keys loaded; all vdevs healthy | vdev_removal.c:75-92; man/man8/zpool-remove.8:50-52 | Comments & docs | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
+| Removal workflow: stop allocation; a separate thread copies allocated segments in LBA order, and sync tasks update partial mappings. Frees during copying free both the old position and the new position already copied. Once complete, the vdev becomes indirect. | `module/zfs/vdev_removal.c:43-73` | Comment reading | ZFS normally has no central mapping; it adds mapping for just that vdev after removing a device. This project uses central mapping, so all pointers already go through mapping. |
+| Restrictions: the normal allocation class must not contain top-level raidz/draid vdevs (segment copying ignores block boundaries, so it cannot calculate parity columns); all top-level vdevs must have the same ashift; keys for encrypted datasets must be loaded; all vdevs must be online and healthy. | `vdev_removal.c:75-92`; `man/man8/zpool-remove.8:50-52` | Comments & docs | ZFS normally has no central mapping; it adds mapping for just that vdev after removing a device. This project uses central mapping, so all pointers already go through mapping. |
 | Unresolved issues: #9013 "device removal for RAID-Z" (ahrens, 2019-07-10 open, still open 2026-10-12); #9129 "generic device removal" open | GitHub issues 9013, 9129, checked 2026-10-12 | Issue reading | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
 | Memory cost: entire mapping loaded into memory (vmem_alloc(map_size) + dmu_read); zpool remove -n estimates memory; zpool status reports mapping memory | module/zfs/vdev_indirect_mapping.c:357-361; zpool-remove.8:78-83; cmd/zpool/zpool_main.c:10607 | Source & docs | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
 | On-disk mapping entry = vimep_src (u64, 63b source offset + 1b mark) + vimep_dst (dva_t); asize 24b, maps up to 8GB | include/sys/vdev_indirect_mapping.h:29-43 | Source reading; inferred 24 bytes (8 + 16) | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
 | User report magnitude: removing 6.94TB vdev consumed "39.8M memory used for removed device mappings" | issue #18930 (2026-08-15, TrueNAS, zfs-2.3.0) | User report, workload unverified | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
-| Condensing mapping: freed/remapped blocks become obsolete; when obsolete pct >= zfs_condense_indirect_obsolete_pct (default 25%) or obsolete spacemap > 1GB, rewrites new mapping containing referenced entries only; resumable; obsolete_counts irreversible once active | vdev_indirect.c:60-124, :126-171, :175-197; zpool-features.7:864-878 | Comments & docs | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
+| Condensing mapping: freed/remapped blocks become obsolete; when obsolete pct >= zfs_condense_indirect_obsolete_pct (default 25%) or obsolete spacemap > 1GB, rewrites new mapping containing referenced entries only; resumable; the obsolete_counts feature has no rollback once active | vdev_indirect.c:60-124, :126-171, :175-197; zpool-features.7:864-878 | Comments & docs | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
 | remap: writing indirect blocks updates DVAs pointing to indirect vdevs to concrete DVAs where possible; dedup/gang blocks not remapped; snapshot-referenced old DVAs enter ds_remap_deadlist | module/zfs/metaslab.c:5699-5730; vdev_indirect.c:100-123; dsl_destroy.c:280-302 | Source reading | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
 | zfs remap subcommand removed from master | grep '"remap"' cmd/zfs/zfs_main.c yields zero matches | grep verification | Legacy burden: singlefs has none |
 | Reading split blocks with damaged replicas reconstructs via combinations, randomly sampling 100 if combinations exceed limit (default 4096) | vdev_indirect.c:207-215 | Comment reading | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
-| Recent defects: #18930 kernel NULL deref on pool with indirect vdev (open); #19120 validate split-block copies (closed 2026-09-16); #12200 obsolete spacemap assertion fail (open) | GitHub search API, retrieved 2026-10-12 | Titles & issue text | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
-| Related practice: zfs rewrite writes file blocks verbatim to new locations; snapshot-shared blocks duplicate, increasing usage; -S skips snapshot-shared, -C skips BRT clones, -P preserves logical birth | man/man8/zfs-rewrite.8:31-57, :84-91; zpool-features.7:880-895 | Doc reading | ZFS lacks central mapping normally; singlefs routes all pointers through central mapping |
+| Recent indirect-related defects (titles and status only): #18930 "Kernel NULL pointer dereference in vdev_indirect_mapping_duplicate_adjacent_entries() … on a pool with an indirect vdev", open; #19120 "vdev_indirect: validate split-block copies before repair", closed (2026-09-16); #12200 "VERIFY3(0 == vdev_obsolete_sm_object(...)) failed", open | GitHub search API `q=repo:openzfs/zfs "indirect vdev"`, 292 hits in total, retrieved on 2026-10-12 | Read titles only; also read the beginning of #18930's body | ZFS normally has no central mapping; it adds mapping for just that vdev after removing a device. This project uses central mapping, so all pointers already go through mapping. |
+| Related current practice: `zfs rewrite` rewrites file blocks unchanged to new locations. After rewriting blocks shared with snapshots, the old copies remain for the snapshots, increasing space use. `-S` skips snapshot-shared blocks, `-C` skips BRT clone blocks, and `-P` preserves logical birth (requires the `physical_rewrite` feature). | `man/man8/zfs-rewrite.8:31-57`, `:84-91`; `zpool-features.7:880-895` | Doc reading | ZFS normally has no central mapping; it adds mapping for just that vdev after removing a device. This project uses central mapping, so all pointers already go through mapping. |
 
-Not found: No design doc in OpenZFS tree detailing "why not BP rewrite"; Delphix blog is dead link (archive only); no published latency overhead figures for indirect mapping read path.
+Searched but not found: no design document in the OpenZFS tree explicitly explaining "why not BP rewrite" (running `grep -rn -i 'bp rewrite\|bprewrite\|block pointer rewrite\|rewrite block pointers\|bp_rewrite'` on the sparse checkout of `module include man cmd` found only the comment at `module/zfs/vdev_indirect.c:38`; directories not checked out, such as `tests` and `lib`, were not searched). The original Delphix blog page is offline, with only an archive remaining. No publicly measured latency cost was found for the indirect-mapping read path.
 
 ### 10.2 btrfs: shared block reference counts, snapshot deletion, balance/relocation
 
-| Fact | Source (Linux 24a19b95, 7.3-rc7) | Scope | Difference with singlefs |
+| Fact | Source (Linux 24a19b95, 7.3-rc7) | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
 | Snapshot creation: btrfs_copy_root copies root node only, calls btrfs_inc_ref on new root (incrementing child refs by 1), sets last_snapshot to transid; non-root tree blocks untouched | fs/btrfs/ctree.c:238-296; transaction.c:1798, :1827 | Source reading | Sharing via extent tree refcounts and backrefs, lazily pushing refs during COW: btrfs parents store child logical addresses directly; singlefs uses central mapping |
 | Determining sharing: non-shareable trees, root nodes, generation > last_snapshot without relocation deemed unshared without querying extent tree | ctree.c:312-347 | Source reading | btrfs parents store child logical addresses directly; singlefs uses central mapping |
 | COW on potentially shared block (update_ref_for_cow): refs > 1 sets BTRFS_BLOCK_FLAG_FULL_BACKREF on old block and increments ref; refs == 1 with full backref increments new and decrements old | ctree.c:349-451 | Source reading | btrfs parents store child logical addresses directly; singlefs uses central mapping |
 | btrfs_inc_ref / btrfs_dec_ref route to __btrfs_mod_ref: traverses child pointers generating delayed refs; parent = buf->start when full_backref, else parent = 0 | extent-tree.c:2553-2649 | Source reading | btrfs parents store child logical addresses directly; singlefs uses central mapping |
-| Snapshot deletion (btrfs_drop_snapshot): tree traversal frees blocks referenced solely by this tree; shared subtrees decrement ref without recursing | extent-tree.c:6247-6259, :5902-5913 | Comment reading | btrfs traverses refcounts; singlefs plans deadlist without refcount tree traversal |
+| Snapshot deletion, `btrfs_drop_snapshot`: walk the tree, freeing blocks referenced only by this tree. At a shared block, only decrement its reference without descending (the `do_walk_down` comment says "if the block is shared and there is no need to update back, this function drops the reference"). | `extent-tree.c:6247-6259`, `:5902-5913` | Comment reading | btrfs parent nodes store child-block logical addresses directly, without central mapping. This project uses central mapping and plans deadlists instead of walking reference counts. |
 | Resumable snapshot drop: writes drop_progress (key) and drop_level to root_item; commits transaction when yielding to cleaner or transaction boundaries, returning -EAGAIN; resumes on mount | extent-tree.c:6318-6373, :6403-6433, :6514-6519 | Source reading | btrfs parents store child logical addresses directly; singlefs uses central mapping |
 | Preventing duplicate dec_ref: check_ref_exists verifies reference exists before clearing restarted flag | extent-tree.c:5856-5869 | Source reading | btrfs parents store child logical addresses directly; singlefs uses central mapping |
 | Deleting snapshot under qgroup: shared subtree with refs > 1 calls btrfs_qgroup_trace_subtree; subtree root level >= qgroup_drop_subtree_thres (default 3) marks qgroup inconsistent without calculating, to avoid stalling commit | extent-tree.c:5871-5887; qgroup.c:2647-2658; qgroup.h:127; sysfs.c:2447-2448 | Source reading | btrfs parents store child logical addresses directly; singlefs uses central mapping |
 | Official docs on qgroup: "not recommended for daily usage unless there is no planned snapshot creation/deletion"; "core design of qgroup and snapshot are not compatible from day one"; snapshot deletion "can cause system hang" | btrfs-quota.html "STABILITY AND PERFORMANCE IMPLICATIONS" | Doc reading | Singlefs lacks qgroup accounting layer; informative clue |
 | Documentation on squota: qgroup "must count up trees referring to an extent after ref change, slowing transaction commits with unacceptable latency as snapshots scale" | Qgroups.html "Simple quotas (squota)" | Doc reading | Singlefs lacks qgroup accounting layer; informative clue |
-| Relocation workflow: set block group read-only; record extents; create data reloc tree and reloc tree (special snapshot holding relocated tree blocks); swap source tree and reloc tree; clean reloc trees | relocation.c:42-87 | Comment reading | Classic relocation: backref walking, reloc tree, rewriting all caller pointers: btrfs rewrites addresses in every caller; singlefs uses central mapping |
+| Overall relocation workflow: make the block group read-only; record every extent in it; build a data reloc tree (one inode holds the newly moved data extents) and a reloc tree (a special snapshot of the source tree holding relocated tree blocks); swap the source tree and the reloc tree; finally clean up both reloc tree and data reloc tree (old extents remain referenced by the reloc tree, so the block group can be freed only after cleanup). | `fs/btrfs/relocation.c:42-87` | Comment reading | Classic relocation: backref walking, reloc tree, rewriting all caller pointers: btrfs rewrites addresses in every caller; singlefs uses central mapping |
 | Backref walking: build_backref_tree ascends from backrefs finding upper referencing blocks recursively until tree root or cache hit | relocation.c:485-498 | Comment reading | btrfs rewrites addresses in every caller; singlefs uses central mapping |
 | Two-phase data relocation: MOVE_DATA_EXTENTS copies data, flushes and waits on ordered extents before switching to UPDATE_DATA_PTRS to rewrite file extent items | relocation.c:5382-5431, :928-959 | Source reading | btrfs rewrites addresses in every caller; singlefs uses central mapping |
 | Crash recovery: btrfs_recover_relocation merges reloc trees with fs trees, preserving tree block sharing; balance progress stored internally, resumed on mount | relocation.c:5614-5620; btrfs-balance.html | Comments & docs | btrfs rewrites addresses in every caller; singlefs uses central mapping |
@@ -684,88 +685,88 @@ Not found: No design doc in OpenZFS tree detailing "why not BP rewrite"; Delphix
 
 btrfs Group 2: Mainline remap tree (relocation without rewriting caller pointers via address remapping layer).
 
-| Fact | Source & Date | Scope | Difference with singlefs |
+| Fact | Source & Date | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
 | Introduction: incompat bit BTRFS_FEATURE_INCOMPAT_REMAP_TREE, tree ID BTRFS_REMAP_TREE_OBJECTID 13, keys IDENTITY_REMAP(234)/REMAP(235)/REMAP_BACKREF(236), flags REMAPPED & METADATA_REMAP | include/uapi/linux/btrfs.h:339; btrfs_tree.h:80, :288-290, :1174-1175, :1348-1355 | Source reading | Block-group-level old->new address mapping translated on I/O: btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
-| Mainline merge: absent in v6.19, present in v7.0-rc1; commit ef6a31d035a1 by Mark Harmstone, merged 2026-02-03 | git.kernel.org btrfs.h and commit | git verification | btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
+| First mainline tag: `INCOMPAT_REMAP_TREE` in `include/uapi/linux/btrfs.h` has count 0 in v6.19 and count 1 in v7.0-rc1. Introducing commit `ef6a31d035a1`, "btrfs: add definitions and constants for remap-tree", authored by Mark Harmstone on 2026-01-07 and committed by David Sterba on 2026-02-03. | git.kernel.org `plain/include/uapi/linux/btrfs.h?h=<tag>` and `commit/?id=ef6a31d…`, retrieved on 2026-10-12 | Measured (`curl` + `grep -c`) | btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
 | Experimental status: sysfs remap_tree property guarded by CONFIG_BTRFS_EXPERIMENTAL, comment "Remove once support is feature complete" | sysfs.c:297-304, :333-337 | Source reading | btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
 | Eligible block groups: non-SYSTEM, non-METADATA_REMAP with REMAP_TREE enabled; runs move_existing_remaps, start_block_group_remapping, do_remap_reloc; skips relocate_file_extent_cluster | relocation.h:15-24; relocation.c:5542-5559, :3747-3751; volumes.c:3745-3750 | Source reading | btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
 | I/O translation: btrfs_translate_remap queries remap tree for REMAPPED groups; IDENTITY_REMAP indicates unmoved, REMAP yields new start address | relocation.c:5256-5304; volumes.c:7258-7268 | Source reading | btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
 | Empty block group definition: REMAPPED groups empty when identity_remap_count == 0; regular groups empty when used == 0 && remap_bytes == 0 | discard.c:218-235 | Source reading | btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
-| RFC motivation: "Following backrefs to rewrite addresses in metadata trees can be slow, with knock-on effects breaking nocow files" | Mark Harmstone, RFC PATCH btrfs: remap tree, 2025-05-15, LWN | Email summary | btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
+| Motivation in the author's RFC: "Our present system involves following backrefs to rewrite addresses in the metadata trees, which can be slow", and "has knock-on effects such as breaking nocow files". For SYSTEM and REMAP block groups, "relocation is as it is at the moment". | Mark Harmstone, "[RFC PATCH 00/10] btrfs: remap tree", linux-btrfs, 2025-05-15, https://lwn.net/Articles/1021452/ | Read the email through a WebFetch summary; quotations are the original sentences supplied by that summary and were not checked verbatim against the email | btrfs applies mapping only to relocated block groups; singlefs translates all pointers through central mapping |
 
-Not found: No public benchmarks measuring balance slowdown under qgroup; remap tree defect list in 7.x unverified; qgroup accounting during remap relocation of snapshot-shared extents unexamined.
+Searched but not found: no publicly measured figure in btrfs mainline for "how much slower balance is with qgroup enabled", only qualitative statements in the documentation. Whether there is a known-defect list for remap tree in 7.x was not investigated (the linux-btrfs list and fixes in 7.0–7.3 were not reviewed). The source for qgroup accounting when remap tree relocates snapshot-shared extents was not read.
 
 ### 10.3 bcachefs: snapshot tree and key visibility, copygc moving shared data, backpointers
 
-| Fact | Source (bcachefs-tools efec39c7) | Scope | Difference with singlefs |
+| Fact | Source (bcachefs-tools efec39c7) | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
 | Four btrees carry snapshots (extents, inodes, dirents, xattrs); keys carry snapshot ID (bpos.snapshot); keys visible iff snapshot ID is ancestor/self without closer ancestor override; deletion inserts whiteouts | snapshots/snapshot.c:44-54 | Doc comments | Sharing via key visibility by snapshot ID, without refcounts or deadlist: bcachefs shares at key level in key space; singlefs uses deadlist bucketed by birth txg and central mapping |
 | Ancestor determination: snapshot nodes store 128-bit ancestor bitmap (O(1) within 128 ID difference) plus 3-entry skip list | snapshots/snapshot.c:56-60; snapshots/types.h:14 | Comments & source | bcachefs shares at key level; singlefs uses deadlist and central mapping |
 | Descending snapshot IDs: children smaller than parents, placing ancestors later and newest first; visibility filter is a forward scan | snapshots/snapshot.c:62-84 | Comment reading | bcachefs shares at key level; singlefs uses deadlist and central mapping |
-| Snapshot creation: splits current snapshot into two child nodes (one for new snapshot, one replacing source subvolume); does not copy keys | snapshots/snapshot.c:86-98 | Comment reading | bcachefs shares at key level; singlefs uses deadlist and central mapping |
+| Snapshot creation: split the source subvolume's current snapshot node into two child nodes, one for the new snapshot and one replacing the source subvolume; no keys are copied. The comment explicitly contrasts this with btrfs, which "clones entire COW btrees on snapshot". | `snapshots/snapshot.c:86-98` | Comment reading | The sharing unit in bcachefs is a btree key, with the snapshot tree in key space. This project plans to record deadlists by birth txg and use central mapping. |
 | Extent invariant: two extents in different snapshots either match exactly or do not overlap; write path splits ancestor extents for alignment | snapshots/snapshot.c:117-121 | Comment reading | bcachefs shares at key level; singlefs uses deadlist and central mapping |
-| Snapshot deletion: marked, then reclaimed via online/recovery passes by delete_dead_snapshots; keys with no live descendants dropped; intermediate nodes with one live child move keys to that child (live_child) | snapshots/snapshot.c:128-163 | Comment reading | Singlefs plans merging deadlist into newer side; bcachefs shifts keys down to unique live child |
-| Interrupt semantics: keys only shift downwards, inodes processed last; interrupts produce only content-shifted but inode-unmoved skew | snapshots/snapshot.c:215-218 | Comment reading | bcachefs shares at key level; singlefs uses deadlist and central mapping |
-| copygc: buckets append-only; copygc selects fragmented buckets, finds live data via backpointers, writes to new buckets, updating extent pointers atomically; reserves copygc_reserve (default 8%, 5–20%) | data/copygc.c:6-28; doc/bcachefs-principles-of-operation.tex:308-321 | Doc comments | Extents keyed by logical position with physical pointers in value; bcachefs updates single shared key; singlefs updates central mapping entry |
-| Bucket selection: LRU indexed by dirty_sectors / bucket_size scaled to 2^31 (greedy on lowest live data); skips active, unwritable, or mismatched buckets | alloc/background.h:127-145; data/copygc.c:98-140 | Source reading | bcachefs updates single shared key; singlefs updates central mapping entry |
-| Relocation commit: bch2_data_update writes new key at same snapshot position (with BTREE_UPDATE_internal_snapshot_node); inserts whiteouts if extent split | data/update.c:431, :473-479; btree/update.c:123-159 | Source reading | bcachefs updates single shared key; singlefs updates central mapping entry |
-| Relocation pointer modification: modifies physical pointer in extent key (single transaction); avoids per-snapshot modification because sharing uses single key | data/copygc.c:25-27; data/update.c:473-479 | Source reading | bcachefs updates single shared key; singlefs updates central mapping entry |
-| backpointers: every data sector has backpointer in write buffer btree: key = (device, sector offset, discriminator), value stores owner btree ID, level, pos (with snapshot ID), data_type, gen | alloc/background.c:246-263; bcachefs_format.h:568-577 | Comments & source | bcachefs backpointer points to single shared key; singlefs updates central mapping entry |
-| Consistency: matching backpointer and bucket sector counts certifies bucket consistency; mismatches trigger bidirectional audit | alloc/background.c:284-306 | Comment reading | bcachefs updates single shared key; singlefs updates central mapping entry |
-| Operations using backpointers: copygc, device evacuation, scrub, reconcile | alloc/background.c:271-282 | Comment reading | bcachefs updates single shared key; singlefs updates central mapping entry |
+| Snapshot deletion: mark first, then reclaim in one or more passes of the `delete_dead_snapshots` recovery pass (also run online). "Cost is proportional to the data in the deleted snapshot". Drop keys of nodes with no live descendants directly; an intermediate node with only one live child moves its keys down to that child (`live_child`); retain intermediate nodes with two live children. | `snapshots/snapshot.c:128-163` | Comment reading | The sharing unit in bcachefs is a btree key, with the snapshot tree in key space. This project plans to record deadlists by birth txg and use central mapping. This project plans to merge the deadlist into the newer side; bcachefs moves keys down to the sole live descendant. |
+| Interrupt semantics: keys only shift downwards, inodes processed last; interrupts produce only content-shifted but inode-unmoved skew | snapshots/snapshot.c:215-218 | Comment reading | The sharing unit in bcachefs is a btree key, with the snapshot tree in key space. This project plans to record deadlists by birth txg and use central mapping. |
+| copygc: buckets are append-only, and random overwrites leave half-empty buckets. copygc selects the most fragmented buckets, finds live data via backpointers, writes it into new buckets, and atomically updates extent pointers. `copygc_reserve` (default 8%, configurable from 5–20%) is reserved exclusively for copygc. | `data/copygc.c:6-28`; `doc/bcachefs-principles-of-operation.tex:308-321` | Doc comments | Extents are keyed by logical position with physical pointers in their values, and relocation changes that one key: bcachefs keys carry snapshot IDs; data shared by multiple snapshots has only one key in the ancestor snapshot, and relocation changes only that key. This project uses central mapping, and relocation changes the mapping entry. |
+| Bucket selection: the fragmentation LRU index is `dirty_sectors / bucket_size`, scaled by 2^31. Less live data ranks earlier (greedy by live-data volume). Do not move buckets currently being written, buckets on unwritable devices, or buckets whose backpointer and bucket counts disagree. | `alloc/background.h:127-145`; `data/copygc.c:98-140` | Source reading | bcachefs keys carry snapshot IDs; data shared by multiple snapshots has only one key in the ancestor snapshot, and relocation changes only that key. This project uses central mapping, and relocation changes the mapping entry. |
+| Relocation commit: `bch2_data_update` writes the new key at the same snapshot position as the original key (with `BTREE_UPDATE_internal_snapshot_node`, allowing direct modification of a key in an intermediate snapshot node). When a key is split, it calls `bch2_insert_snapshot_whiteouts` to add whiteouts for descendant snapshots that have already overwritten that position. | `data/update.c:431`, `:473-479`; `btree/update.h:89-110`; `btree/update.c:123-159` | Source reading | bcachefs keys carry snapshot IDs; data shared by multiple snapshots has only one key in the ancestor snapshot, and relocation changes only that key. This project uses central mapping, and relocation changes the mapping entry. |
+| Is it true that "being keyed by logical address means pointers need not change"? The source shows relocation still changes the physical pointer in the extent key (one transaction for that same key). What need not change is each snapshot's separate reference, because sharing has only one key. | `data/copygc.c:25-27`; `data/update.c:473-479` | Read source; "no per-snapshot changes needed" is inferred from "sharing has only one key" | bcachefs keys carry snapshot IDs; data shared by multiple snapshots has only one key in the ancestor snapshot, and relocation changes only that key. This project uses central mapping, and relocation changes the mapping entry. |
+| backpointers: every on-disk sector range containing data has a backpointer stored in a write-buffer btree, with key = (device, sector offset, discriminator). The value records the owner key's btree ID, level, position (including snapshot ID), data type, and bucket generation. Extent triggers add and remove these automatically. | `alloc/background.c:246-263`; structure at `bcachefs_format.h:568-577` | Comments & source | bcachefs keys carry snapshot IDs; data shared by multiple snapshots has only one key in the ancestor snapshot, and relocation changes only that key. This project uses central mapping, and relocation changes the mapping entry. A backpointer points to that one key, rather than one per snapshot (inferred from key sharing). |
+| Consistency: equal backpointer-sector and bucket-sector counts are taken to mean the bucket is consistent; only mismatches trigger a full bidirectional check. Three recovery passes cross-check one another. | `alloc/background.c:284-306` | Comment reading | bcachefs keys carry snapshot IDs; data shared by multiple snapshots has only one key in the ancestor snapshot, and relocation changes only that key. This project uses central mapping, and relocation changes the mapping entry. |
+| Operations using backpointers: copygc, device evacuation, scrub, reconcile | alloc/background.c:271-282 | Comment reading | bcachefs keys carry snapshot IDs; data shared by multiple snapshots has only one key in the ancestor snapshot, and relocation changes only that key. This project uses central mapping, and relocation changes the mapping entry. |
 
-Not found: No public figures on copygc or delete_dead_snapshots overhead under high snapshot counts.
+Searched but not found: no public measurements from bcachefs of "copygc or delete_dead_snapshots cost with many snapshots". The "Subvolumes and snapshots" section at line 722 of `doc/bcachefs-principles-of-operation.tex` was not read line by line; only the `DOC_LATEX(snapshots)` comment in the source was read.
 
 ### 10.4 F2FS and NILFS2: segment cleaning
 
 F2FS (Linux 24a19b95):
 
-| Fact | Source | Scope | Difference with singlefs |
+| Fact | Source | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
 | Three segment selection algorithms: GC_CB (cost-benefit), GC_GREEDY, GC_AT (age-threshold); two GC modes: BG_GC (background), FG_GC (foreground) | fs/f2fs/segment.h:132-154 | Source reading | Log-structured segment cleaning: F2FS has no snapshots, GC never handles shared blocks; singlefs GC relocates snapshot-shared blocks |
 | Default mappings: BG_GC uses CB (AT if atgc enabled), FG_GC uses GREEDY; gc_urgent/gc_idle can force modes | fs/f2fs/gc.c:248-273; Documentation/filesystems/f2fs.rst:822-828 | Source & docs | F2FS has no snapshots; singlefs GC relocates snapshot-shared blocks |
 | Greedy cost = valid blocks in segment; CB cost = UINT_MAX - (100*(100-u)*age)/(100+u), where u is valid block pct and age is normalized mtime | gc.c:390-410, :362-388 | Source reading | F2FS has no snapshots; singlefs GC relocates snapshot-shared blocks |
 | Background GC records selected victims in victim_secmap, prioritized by foreground GC; search bound by max_victim_search | gc.c:343-360, :302-310 | Source reading | F2FS has no snapshots; singlefs GC relocates snapshot-shared blocks |
-| Foreground trigger: insufficient free sections switches to FG_GC; checkpoints write out prefree segments first | gc.c:1986-2004, :2068-2075 | Source reading | F2FS has no snapshots; singlefs GC relocates snapshot-shared blocks |
+| Foreground trigger: insufficient free sections switches to FG_GC. If there are enough prefree segments, first write a checkpoint to turn prefree into free, which may avoid FG_GC. If free space remains insufficient after GC, another checkpoint reclaims prefree segments. | `gc.c:1986-2004`, `:2068-2075` | Source reading | F2FS has no snapshots and its GC never handles shared blocks. This project's GC must move blocks shared with snapshots. |
 | Relocation atomicity: cleaned segments enter prefree; f2fs_clear_prefree_segments clears them and issues discard only after successful checkpoint | fs/f2fs/checkpoint.c:2039-2046; fs/f2fs/segment.c:2209-2282 | Source reading | F2FS has no snapshots; singlefs GC relocates snapshot-shared blocks |
 | SSR allocation takes ckpt_valid_map \| cur_valid_map zero bits; blocks valid at last checkpoint not overwritten before next checkpoint | segment.c:3126-3140; segment.h:182-185 | Source reading | F2FS has no snapshots; singlefs GC relocates snapshot-shared blocks |
 | Docs: "F2FS adopts greedy algorithm for on-demand cleaner, while background cleaner adopts cost-benefit algorithm" | Documentation/filesystems/f2fs.rst:817-828 | Doc reading | F2FS has no snapshots; singlefs GC relocates snapshot-shared blocks |
 
 NILFS2 (Linux 24a19b95 kernel, nilfs-utils 26efb5da userspace):
 
-| Fact | Source | Scope | Difference with singlefs |
+| Fact | Source | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
 | Checkpoints generated automatically every few seconds or on sync writes; checkpoints can be converted to snapshots; NILFS_IOCTL_CHANGE_CPMODE toggles | Documentation/filesystems/nilfs2.rst:14-18, :100-102 | Doc reading | Block numbers virtualized via DAT; GC modifies DAT without touching trees; liveness based on checkpoint intervals: both use indirection; NILFS2 snapshots whole volume and runs liveness in userspace |
-| Deleting checkpoints skips snapshots: range deletion returns -EBUSY if snapshot encountered; single delete on snapshot returns -EBUSY | fs/nilfs2/cpfile.c:507-513, :558-559, :750-777 | Source reading | Virtualized DAT mapping vs singlefs central mapping |
-| Userspace GC: nilfs_cleanerd selects segments and judges liveness, passing checkpoint ranges, virtual block numbers, moved blocks, and freed segments via NILFS_IOCTL_CLEAN_SEGMENTS | nilfs2.rst:138-141; fs/nilfs2/ioctl.c:850-860 | Docs & source | Virtualized DAT mapping vs singlefs central mapping |
-| Segment selection policy: selection_policy supports timestamp only (oldest to newest); protection_period defaults to 3600s | man/nilfs_cleanerd.conf.5:22-26, :52-58 | Doc reading | F2FS uses greedy/CB; NILFS2 uses timestamp only |
-| Liveness check (userspace): block lifetime [p_start, p_end) in checkpoint numbers; live if p_end is NILFS_CNO_MAX or within protection period, or binary search finds snapshot in range | nilfs-utils lib/gc.c:417-470 | Source reading | Virtualized DAT mapping vs singlefs central mapping |
-| Kernel atomicity: nilfs_clean_segments saves DAT to shadow map; writes segment with SC_LSEG_SR (super root); frees segments during SUFILE phase, rolling back on failure; issues discard on success | fs/nilfs2/segment.c:2546-2580, :1260-1265, :1566-1573, :1880-1886 | Source reading | Virtualized DAT mapping vs singlefs central mapping |
-| Abort safety comments: checkpoint deletion "can be removed independently"; DAT "updated atomically using COW"; marking dirty "nondestructive" | fs/nilfs2/ioctl.c:797-834 | Comment reading | Virtualized DAT mapping vs singlefs central mapping |
-| Moving blocks modifies DAT: nilfs_btree_assign_gc calls nilfs_dat_move updating virtual-to-physical mapping; on-disk binfo preserves virtual block number, leaving referencing trees unchanged | fs/nilfs2/btree.c:2354-2379; fs/nilfs2/dat.c:317-331 | Source reading | Virtualized DAT mapping vs singlefs central mapping |
-| GC input blocks attached to dummy inode (gcinode), released after copy; current generation dirty blocks never overlap GC blocks | fs/nilfs2/gcinode.c:11-22 | Comment reading | Virtualized DAT mapping vs singlefs central mapping |
+| Skip snapshots when deleting checkpoints: range deletion counts encountered snapshots and ultimately returns `-EBUSY`; deleting a single snapshot returns `-EBUSY` directly. | `fs/nilfs2/cpfile.c:507-513`, `:558-559`, `:750-777` | Source reading | NILFS2 DAT provides one layer mapping virtual block numbers to physical block numbers, and this project uses central mapping: both have one level of indirection. The difference is that NILFS2 snapshots are whole-volume checkpoints, and a userspace daemon judges liveness. |
+| GC runs in userspace: `nilfs_cleanerd` selects segments and judges liveness, then passes the checkpoint ranges to delete, virtual block numbers to free, blocks to move, and segments to free to the kernel in one `NILFS_IOCTL_CLEAN_SEGMENTS` call. | `nilfs2.rst:138-141`; `fs/nilfs2/ioctl.c:850-860` (five argv sections) | Docs & source | NILFS2 DAT provides one layer mapping virtual block numbers to physical block numbers, and this project uses central mapping: both have one level of indirection. The difference is that NILFS2 snapshots are whole-volume checkpoints, and a userspace daemon judges liveness. |
+| Segment-selection policy: `selection_policy` supports only `timestamp` (reclaim oldest to newest); `nsegments_per_clean` defaults to 2; `protection_period` defaults to 3600 seconds: "NILFS2 GC never deletes checkpoints and their blocks whose duration time is less than the value". | nilfs-utils `man/nilfs_cleanerd.conf.5:22-26`, `:52-58` | Doc reading | NILFS2 DAT provides one layer mapping virtual block numbers to physical block numbers, and this project uses central mapping: both have one level of indirection. The difference is that NILFS2 snapshots are whole-volume checkpoints, and a userspace daemon judges liveness. F2FS uses greedy/CB, whereas NILFS2 uses time alone. |
+| Liveness check (userspace): block lifetime [p_start, p_end) in checkpoint numbers; live if p_end is NILFS_CNO_MAX or within protection period, or binary search finds snapshot in range | nilfs-utils lib/gc.c:417-470 | Source reading | NILFS2 DAT provides one layer mapping virtual block numbers to physical block numbers, and this project uses central mapping: both have one level of indirection. The difference is that NILFS2 snapshots are whole-volume checkpoints, and a userspace daemon judges liveness. |
+| Kernel-side atomicity: `nilfs_clean_segments` first saves DAT in a shadow map and restores it from shadow if preparation fails. It then writes segments using `SC_LSEG_SR` (a complete log with super root). Segment release occurs in the SUFILE phase of that same segment construction (`nilfs_free_segments`); failed construction is undone with `nilfs_sufile_cancel_freev`. After success, discard is issued to freed segments only if discard is enabled. | `fs/nilfs2/segment.c:2546-2580`, `:1260-1265`, `:1566-1573`, `:1880-1886` | Source reading | NILFS2 DAT provides one layer mapping virtual block numbers to physical block numbers, and this project uses central mapping: both have one level of indirection. The difference is that NILFS2 snapshots are whole-volume checkpoints, and a userspace daemon judges liveness. |
+| Comments explain why preparation can safely abort: checkpoints "can be removed independently"; DAT "is updated atomically using a copy-on-write technique"; marking dirty is "nondestructive". | `fs/nilfs2/ioctl.c:797-834` | Comment reading | NILFS2 DAT provides one layer mapping virtual block numbers to physical block numbers, and this project uses central mapping: both have one level of indirection. The difference is that NILFS2 snapshots are whole-volume checkpoints, and a userspace daemon judges liveness. |
+| Moving blocks modifies DAT: nilfs_btree_assign_gc calls nilfs_dat_move updating virtual-to-physical mapping; on-disk binfo preserves virtual block number, leaving referencing trees unchanged | fs/nilfs2/btree.c:2354-2379; fs/nilfs2/dat.c:317-331 | Source reading | NILFS2 DAT provides one layer mapping virtual block numbers to physical block numbers, and this project uses central mapping: both have one level of indirection. The difference is that NILFS2 snapshots are whole-volume checkpoints, and a userspace daemon judges liveness. |
+| GC input blocks attached to dummy inode (gcinode), released after copy; current generation dirty blocks never overlap GC blocks | fs/nilfs2/gcinode.c:11-22 | Comment reading | NILFS2 DAT provides one layer mapping virtual block numbers to physical block numbers, and this project uses central mapping: both have one level of indirection. The difference is that NILFS2 snapshots are whole-volume checkpoints, and a userspace daemon judges liveness. |
 
-Not found: Neither F2FS nor NILFS2 contains dedicated crash resume logic for mid-GC crashes (F2FS reverts to checkpoint; NILFS2 relies on atomic super root log writes). NILFS2 kernel has no segment selection logic (all userspace).
+Searched but not found: no dedicated logic for resuming after a mid-GC crash was found in either F2FS or NILFS2. F2FS returns to the last checkpoint because "blocks valid before the last checkpoint are not reused before the next checkpoint"; NILFS2 relies on "segment release and the new log being written in the same operation". Both statements are inferred from their source code; no verbatim documentation statement was found. No GC segment-selection code was found in the NILFS2 kernel: `grep -rn -i 'victim\|greedy\|cost.benefit' fs/nilfs2 | wc -l` returned `0`.
 
 ### 10.5 APFS: snapshots and space reclamation facts
 
-| Fact | Source & Date | Scope | Difference with singlefs |
+| Fact | Source & Date | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
-| Creating snapshot moves current volume extent-reference tree to snapshot, replacing volume tree with empty tree | Apple File System Reference (2020-06-22) p.55 apfs_extentref_tree_oid | Official doc | Extent reference tree per snapshot + physical extent refcounts: APFS tracks refcounts per physical extent; singlefs plans deadlist by birth txg; APFS file data uses physical addresses directly |
-| Snapshot metadata j_snap_metadata_val_t holds extentref_tree_oid, sblock_oid; "Snapshots designed to be fast and inexpensive to create; deleting snapshot involves more work" | Apple File System Reference p.117-118 | Official doc | APFS tracks refcounts per physical extent; singlefs plans deadlist by birth txg |
-| Physical extent record j_phys_ext_val_t has refcnt; "Extent deleted when reference count reaches zero"; "Volume without snapshots has kind APFS_KIND_NEW" | Apple File System Reference p.102-103 | Official doc | APFS tracks refcounts per physical extent; singlefs plans deadlist by birth txg |
-| Object map maintains snapshot tree (xid -> omap_snapshot_t) | Apple File System Reference p.17, p.47 | Official doc | APFS tracks refcounts per physical extent; singlefs plans deadlist by birth txg |
-| Reaper handles "deletion of objects too large to delete in time between transactions", persisting progress across transactions; snapshot deletion uses apfs_reap_state_t | Apple File System Reference p.26, p.50, p.166-167 | Official doc | Singlefs deadlist merge has no cross-transaction reaper object |
+| Creating snapshot moves current volume extent-reference tree to snapshot, replacing volume tree with empty tree | Apple File System Reference (2020-06-22) p.55 apfs_extentref_tree_oid | Official doc | One extent-reference tree per snapshot with reference counts on physical extents: APFS records reference counts per physical extent; this project plans deadlists by birth txg. APFS has an object map (omap) mapping virtual oids to physical addresses, but file-data extents use physical addresses directly (on page 102, the key of `j_phys_ext_key_t` is a physical block address), unlike this project where all pointers go through central mapping. |
+| Snapshot metadata record `j_snap_metadata_val_t` contains `extentref_tree_oid`, `sblock_oid`, and other fields. The documentation says: "Snapshots are designed to be fast and inexpensive to create; however, deleting a snapshot involves more work". | Apple File System Reference (2020-06-22 edition), pp. 117–118 | Official doc | APFS records reference counts per physical extent; this project plans deadlists by birth txg. APFS has an object map (omap) mapping virtual oids to physical addresses, but file-data extents use physical addresses directly (on page 102, the key of `j_phys_ext_key_t` is a physical block address), unlike this project where all pointers go through central mapping. |
+| Physical extent record `j_phys_ext_val_t` has `refcnt`: "The extent can be deleted when its reference count reaches zero"; "For a volume that has no snapshots, the kind is always APFS_KIND_NEW". | Apple File System Reference (2020-06-22 edition), pp. 102–103 | Official doc | APFS records reference counts per physical extent; this project plans deadlists by birth txg. APFS has an object map (omap) mapping virtual oids to physical addresses, but file-data extents use physical addresses directly (on page 102, the key of `j_phys_ext_key_t` is a physical block address), unlike this project where all pointers go through central mapping. |
+| The object map has a snapshot tree (xid → `omap_snapshot_t`), accessed using xid as the key. | Apple File System Reference (2020-06-22 edition), pp. 17 and 47 | Official doc | APFS records reference counts per physical extent; this project plans deadlists by birth txg. APFS has an object map (omap) mapping virtual oids to physical addresses, but file-data extents use physical addresses directly (on page 102, the key of `j_phys_ext_key_t` is a physical block address), unlike this project where all pointers go through central mapping. |
+| The reaper handles "deletion of objects that are too large to be deleted in the time between transactions", preserving deletion progress across multiple transactions. Snapshot deletion uses `apfs_reap_state_t` (`last_pbn`, `cur_snap_xid`, `phase`) and the two omap reap phases (map tree first, then snapshot tree). | Apple File System Reference (2020-06-22 edition), pp. 26, 50, and 166–167 | Read official documentation (`apfs_reap_state_t` says "No overview available") | APFS records reference counts per physical extent; this project plans deadlists by birth txg. APFS has an object map (omap) mapping virtual oids to physical addresses, but file-data extents use physical addresses directly (on page 102, the key of `j_phys_ext_key_t` is a physical block address), unlike this project where all pointers go through central mapping. The planned deadlist merge in this project has no reaper-like object for deletion across transactions. |
 | Spaceman maintains free queue keyed by (xid, paddr), spaceman_free_queue_t holds sfq_oldest_xid; documentation lacks reallocation timing | Apple File System Reference p.159-160 | Official doc | Informative clue |
 | Partition shrinking uses evict-mapping tree recording "where blocks are being moved to" | Apple File System Reference p.33, p.42-43 | Official doc | Informative clue |
 | Secondary source: deleting small snapshot "may take around 0.2s, mainly cleaning up object map", executed by container Reaper | Howard Oakley, "APFS: Snapshots", eclecticlight.co, 2024-04-08 | Secondary article | Informative clue |
 
-Not found: Apple reference manual mentions TRIM 7 times, all for `INODE_ACTIVE_FILE_TRIMMED`, without documenting when TRIM is issued relative to block reallocation or how extent deletion is determined on snapshot removal.
+Searched but not found: `grep -c -i trim` over the entire Apple reference manual matched seven lines, all for `INODE_ACTIVE_FILE_TRIMMED` ("overprovisioning file that has been trimmed") and its index entries. None explains when TRIM is issued or its ordering relative to block reallocation. The manual does not explain how snapshot deletion decides which extents to release, or the difference in space released when deleting newer versus older snapshots. The original reverse-engineering paper by Hansen and Toolan (Digital Investigation, 2017) was not obtained this time. No other official document about snapshot-space reclamation was found on Apple's developer site (only one web search was performed).
 
 ### 10.6 discard/TRIM: timing and ordering relative to block reallocatability
 
-| Fact | Source | Scope | Difference with singlefs |
+| Fact | Source | Measurement Basis | Difference with singlefs |
 |---|---|---|---|
 | ZFS freed blocks enter ms_defer[txg % TXG_DEFER_SIZE] (TXG_DEFER_SIZE = 2); upon expiry, moved to ms_allocatable and added to ms_trim if autotrim active; un-deferred directly to ms_trim when low on slop, removing vdev, or expanding raidz | module/zfs/metaslab.c:4616-4667; include/sys/txg.h:39 | Source reading | Reallocatable first, trimmed later, removing range from pending trim on reallocation: ZFS trims per metaslab; singlefs produces fully cleared segments before discard |
 | Allocation removes range from ms_trim, ensuring reallocated ranges are not re-trimmed | metaslab.c:4928-4929, :5945-5946 | Source reading | ZFS trims per metaslab; singlefs produces fully cleared segments before discard |
@@ -781,7 +782,7 @@ Not found: Apple reference manual mentions TRIM 7 times, all for `INODE_ACTIVE_F
 | bcachefs: emptied bucket triggers set need_discard in need_discard btree; discard worker issues TRIM before clearing flag, moving bucket to freespace btree; requires journal sequence <= flushed_seq_ondisk and < rewind_seq_ondisk | alloc/background.c:1291-1300, :56-76; alloc/discard.c:343-351 | Source reading | bcachefs enforces "discard first, reallocatable second", opposite to ZFS/btrfs async |
 | APFS: Official reference contains no TRIM specifications | APFS manual lacks TRIM details (see 10.5 end) | Doc reading | Unclear |
 
-Not found: Neither ZFS nor btrfs specifies crash recovery semantics during uncompleted discard; discard latency/throughput not measured.
+Searched but not found: no dedicated description of handling "a crash before discard completes" was found for either ZFS or btrfs (the btrfs async comment only says everything is treated as undiscarded at mount). No discard latency or throughput was measured for either system.
 
 ### 10.7 Counterevidence checklist
 
@@ -792,7 +793,7 @@ Not found: Neither ZFS nor btrfs specifies crash recovery semantics during uncom
 | Across investigated systems, relocating snapshot-shared data without rewriting callers always introduces indirection: NILFS2 modifies DAT (virtual->physical), ZFS device removal adds indirect mapping, btrfs remap tree adds block-group-level remapping, bcachefs shares via a single key; only btrfs classic relocation rewrites all caller pointers directly, noted in RFC as "can be slow" | ZFS, btrfs, bcachefs, NILFS2; F2FS not applicable; APFS unknown | 10.1–10.4 sources and RFC verbatim |
 | ZFS and btrfs async make blocks reallocatable first and issue trim later, removing ranges from pending trim upon allocation; bcachefs does the inverse: discard first, freespace second | ZFS, btrfs, bcachefs; F2FS issues discard after checkpoint; NILFS2 issues after log commit | 10.6 sources |
 
-Scope note: Quotations from LWN remap tree RFC and eclecticlight APFS article are from WebFetch summaries without verbatim comparison to original emails; Delphix blog uses 2020 web.archive.org snapshot.
+Measurement basis note: Quotations from LWN remap tree RFC and eclecticlight APFS article are from WebFetch summaries without verbatim comparison to original emails; Delphix blog uses 2020 web.archive.org snapshot.
 
 ### 7.9 Sources for Section 7 ("Survey of Academic Results in the Last Decade (2012–2026)")
 

@@ -1,6 +1,6 @@
 ## E130 每头一份 livelist 过不过有界销毁 —— 已跑（2026-09-10）
 
-**中文** · [English](130-每头一份livelist过不过有界销毁.en.md) · [日本語](130-每头一份livelist过不过有界销毁.ja.md)
+**中文** · [English](130-does-per-head-livelist-pass-bounded-destruction.en.md) · [日本語](130-ヘッド毎のlivelistは有界破棄を満たすか.ja.md)
 
 **问的是**：D6（快照实现模型） 已定项 2 的候选甲（每头一份 livelist）过不过
 D6（快照实现模型） 九条判据第 5 条「**有界销毁**：可分批、可续做，
@@ -16,12 +16,12 @@ D6（快照实现模型） 九条判据第 5 条「**有界销毁**：可分批�
 **复跑命令**（登记成 `exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-bash scripts/experiments/replay.sh E130
+bash scripts/experiment-apparatus/replay.sh E130
 # 直接跑装置：
-cd scripts/experiments && cargo run --release --bin e130_livelist_bounded_destroy
+cd scripts/experiment-apparatus && cargo run --release --bin e130_livelist_bounded_destroy
 ```
 
-代码 `scripts/experiments/e130_livelist_bounded_destroy.rs`，原始输出 `e130-livelist-bounded-destroy-2026-09-10.out`（一次运行，无参数扫描）。
+代码 `scripts/experiment-apparatus/e130_livelist_bounded_destroy.rs`，原始输出 `e130-livelist-bounded-destroy-2026-09-10.out`（一次运行，无参数扫描）。
 
 ### 这是计数模型，不是实现——它证明不了什么
 

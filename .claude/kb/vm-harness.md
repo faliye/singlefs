@@ -9,7 +9,7 @@
 ## 一句话
 
 ```bash
-cd scripts/experiments
+cd scripts/experiment-apparatus
 cargo build --release --target x86_64-unknown-linux-musl --bin <实验二进制名>
 bash ../devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda <参数...>
 ```

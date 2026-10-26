@@ -1,6 +1,6 @@
 ## E9 key 编码对遍历局部性的影响 —— 已跑（2026-08-28 复跑定稿）
 
-**中文** · [English](09-key编码对遍历局部性的影响.en.md) · [日本語](09-key编码对遍历局部性的影响.ja.md)
+**中文** · [English](09-key-encoding-impact-on-traversal-locality.en.md) · [日本語](09-走査局所性に対するキー符号化の影響.ja.md)
 
 **背景**：[decisions.md](../decisions.md) D8（核心索引结构） 已定 key = `(locality_id, inode, offset)`，
 且 `locality_id` **创建时从父目录继承、改名时故意不更新**。E9（key 编码对遍历局部性的影响）量的是这个选择买到多少。
@@ -64,7 +64,7 @@ E9（key 编码对遍历局部性的影响）之前那句话没有任何数支�
 目录树 4 层 × 每层 6 个子目录 = 1296 个叶目录，每目录 24 个文件，共 31104 个对象；
 每叶 255 个 (key,val) 槽；`O_DIRECT`，镜像落临时目录（512 MiB，不进仓库）。
 5 个种子（3/7/11/13/17）取中位数。
-代码 `scripts/experiments/e9_keylayout.rs`，
+代码 `scripts/experiment-apparatus/e9_keylayout.rs`，
 调用 `cargo run --release --bin e9-keylayout -- <镜像> <种子> interleave <cache_leaves> <改名次数>`；
 输出 `e9-keylayout-2026-08-28.out`（25 轮，完成标记 25 个）。
 
@@ -81,8 +81,8 @@ done
 ```
 
 2026-08-29 按这个循环重跑，与入库产物**逐字节一致**（150 行、25 个完成标记全部对上）。
-它由 `scripts/experiments/replay.sh` 的 `driver_e9` 承载，
-复跑只需把E9（key 编码对遍历局部性的影响）的编号作为参数传给它：`bash scripts/experiments/replay.sh <E9（key 编码对遍历局部性的影响）编号>`。
+它由 `scripts/experiment-apparatus/replay.sh` 的 `driver_e9` 承载，
+复跑只需把E9（key 编码对遍历局部性的影响）的编号作为参数传给它：`bash scripts/experiment-apparatus/replay.sh <E9（key 编码对遍历局部性的影响）编号>`。
 
 ### ⚠️ E9（key 编码对遍历局部性的影响）此前一条绝对值断言都没有（2026-08-29 对抗验证补上）
 

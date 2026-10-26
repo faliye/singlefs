@@ -1,0 +1,200 @@
+{
+  "recorded_at_date": "2026-10-23",
+  "head": "841b3beabb9812ceaafcd636888b1201dd6e5adf",
+  "scope": "Current workspace; hashes recorded at audit close, not an assertion that every file was unchanged throughout the test run. No full-workspace or GPU/formal verification claimed.",
+  "test_results": [
+    {
+      "target": "compaction_intent_issue_writes_the_empty_segments_counted_before_the_issue",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "compaction_runs_stop_and_discard_after_the_publish",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "inode_record_truncation_field_written_by_each_publish",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "snapshot_creation_publish_and_the_entries_every_later_publish_carries",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "truncation_intent_batches_and_final_batch",
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "writes_by_inode_number_of_several_files",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "source_manifest": [
+    {
+      "path": "crates/singlefs-core/src/make_filesystem.rs",
+      "sha256": "9607c46ebbd6a08ffaac448988141e4d99166ad082ab44d4deceaf1bedf84186",
+      "bytes": 50084
+    },
+    {
+      "path": "crates/singlefs-core/src/mount.rs",
+      "sha256": "ca6dbdd54c17f100ee6d144171ee532a834cbdd892a717c96e530654e5054fc4",
+      "bytes": 710879
+    },
+    {
+      "path": "crates/singlefs-core/src/recovery.rs",
+      "sha256": "9aea28b615923d67f0f7c8dd1f8c6811a3046722b423cb3b92c8e7b1993f5109",
+      "bytes": 446700
+    },
+    {
+      "path": "crates/singlefs-core/src/mounted_session.rs",
+      "sha256": "381511a2f1d1c854e4b4ab364a31b0c37762f81dec5456bf93601fb6ec275e51",
+      "bytes": 232233
+    },
+    {
+      "path": "crates/singlefs-core/src/transaction.rs",
+      "sha256": "a891136e2c273dbd15a616dd68105f83b9394c9c1612f6c84a5e3de84fecee72",
+      "bytes": 864863
+    },
+    {
+      "path": "crates/singlefs-core/src/unit.rs",
+      "sha256": "7249312c68efa2a46627172d510c6c5d754fbf9cdb254ac46783264cadb1b77e",
+      "bytes": 37670
+    },
+    {
+      "path": "crates/singlefs-core/src/records.rs",
+      "sha256": "7852ff4a738970c2f98485728659edf0b6c63b82fc2d077358642a3308d006ed",
+      "bytes": 71147
+    },
+    {
+      "path": "crates/singlefs-core/src/logged_operations.rs",
+      "sha256": "1c9eb6fcfce4b49da5193f4261d82d716cfbe37fb859a93988cb3008d923b011",
+      "bytes": 24326
+    },
+    {
+      "path": "crates/singlefs-core/src/system_configuration.rs",
+      "sha256": "c2e1ddc2367f95ef8ed8d5d1d7ac48a2fb68e2295e8808921165d51788d1b65f",
+      "bytes": 68315
+    },
+    {
+      "path": "crates/singlefs-core/src/compaction_plan.rs",
+      "sha256": "826d7d3de270993b81a726fbe6cd2e3d26b3b091c7fcba1511579b9f15c7c4c1",
+      "bytes": 72758
+    },
+    {
+      "path": "crates/singlefs-core/src/admission.rs",
+      "sha256": "9dd47935ff0697bc532fd8db6d245f4b34cbfa4d4fecbbd1f5312178f519d007",
+      "bytes": 137455
+    },
+    {
+      "path": "crates/singlefs-core/src/pointer.rs",
+      "sha256": "db0646131293a99125c177e38f3e3a8bd0019e5a48a702f732b7859be4d448cd",
+      "bytes": 26153
+    },
+    {
+      "path": "crates/singlefs-checker/src/rebuild.rs",
+      "sha256": "7e76711bc19f8f14a7e007259e5d8c1b7a096c203e6e9749b47bdfe4b58fd485",
+      "bytes": 110556
+    },
+    {
+      "path": "crates/singlefs-harness/tests/compaction_intent_issue_writes_the_empty_segments_counted_before_the_issue.rs",
+      "sha256": "1a1cd1a304b90e6f920226bbf7e85ab3aa2dbf161c07a6fb59bfd5f390fb3c3c",
+      "bytes": 16178
+    },
+    {
+      "path": "crates/singlefs-harness/tests/compaction_runs_stop_and_discard_after_the_publish.rs",
+      "sha256": "aa70beac30f0c705d95c113ed45500f7bde2694b5efd290ac8ac8a0ba1353e92",
+      "bytes": 43713
+    },
+    {
+      "path": "crates/singlefs-harness/tests/inode_record_truncation_field_written_by_each_publish.rs",
+      "sha256": "0254533580b5e8ea4efc5a1e9ceece5ff50a42bdb125204a5ebdda096633282c",
+      "bytes": 15046
+    },
+    {
+      "path": "crates/singlefs-harness/tests/snapshot_creation_publish_and_the_entries_every_later_publish_carries.rs",
+      "sha256": "2ff0ce2ce48d48bf6df2a64347cdc2e56d969d1d80bf7c899473230ad6df3473",
+      "bytes": 19443
+    },
+    {
+      "path": "crates/singlefs-harness/tests/truncation_intent_batches_and_final_batch.rs",
+      "sha256": "e9c847d6afd76e78c44365c3f350f6c2f7fef341b88910635575b1d4b04662a2",
+      "bytes": 20646
+    },
+    {
+      "path": "crates/singlefs-harness/tests/writes_by_inode_number_of_several_files.rs",
+      "sha256": "bc01bbcd3e0fa18ddbac1f0b023a59f5d6ad30a3405db9ce20440264d06b1959",
+      "bytes": 39629
+    },
+    {
+      "path": ".claude/kb/decisions/04-校验和位置.md",
+      "sha256": "97b86bdfaefe88a0da7443c8ad19c18c21f1e913daa71b6a7d7f8b2af2300a0e",
+      "bytes": 19089
+    },
+    {
+      "path": ".claude/kb/decisions/08-核心索引结构.md",
+      "sha256": "7520f3dbb663afdc38e43e8c6a5212396dd23bc7375652083250b3245ae66f15",
+      "bytes": 132161
+    },
+    {
+      "path": ".claude/kb/decisions/09-加密.md",
+      "sha256": "319e51b2f7741d7020c0dba410c9d19fd975d634b1a500c976d3f316705dc5c5",
+      "bytes": 51004
+    },
+    {
+      "path": ".claude/kb/decisions/16-发布语义.md",
+      "sha256": "617acf3c26b5b592c62aac697dd0fe1f09e1944e1fee58d8a8c56df045a47928",
+      "bytes": 100904
+    },
+    {
+      "path": ".claude/kb/decisions/26-后台整理与放置回收.md",
+      "sha256": "a6fea364933154a9f04299c3b51c6e7fe02b59bcd15819e11236b71cf78859aa",
+      "bytes": 51257
+    },
+    {
+      "path": ".claude/kb/milestone/04-fourth-txn.md",
+      "sha256": "3d3b5f041a80bdfd5fc6e13cb9705b18d51214fe37ddb39763f5324f092dd9ce",
+      "bytes": 65673
+    },
+    {
+      "path": "research/prompts/m4-segment-code-r2-main-verification.md",
+      "sha256": "13ef93d37e3c45b3568364e26a518ee91bf4fbaab0ea52d318d6352de00389c1",
+      "bytes": 10481
+    },
+    {
+      "path": "research/prompts/m4-trunc-r2-main-verification.md",
+      "sha256": "983305b1ab4f6b682a1713db84da7bff10f0178e692fea346486c4803eb43032",
+      "bytes": 12885
+    },
+    {
+      "path": "README.md",
+      "sha256": "aac70da8e9dba1a4a5e68db72af6a244f2739bf19ad8ca21f779454112f3444d",
+      "bytes": 14615
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "2aa8e4d0c98a001fb8a4fd19b9050bf2bec5563815f0f6f4311b3715810bd47e",
+      "bytes": 869
+    },
+    {
+      "path": "crates/singlefs-core/Cargo.toml",
+      "sha256": "feb8160eba2758b7a244e515aeb73e7548584564a2886f6a38670b74b2a71cd5",
+      "bytes": 1413
+    },
+    {
+      "path": "records/2026-10-23-代码先行审计-定向测试.log",
+      "sha256": "ac699206161c1903f5f150e150d6c51a6dbee4a00cd619b95b7d320ff286a2f5",
+      "bytes": 9133
+    }
+  ]
+}

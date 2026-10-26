@@ -1,0 +1,140 @@
+## E136 Cost Rows for Mapping Key Forks —— Run (2026-09-11)
+
+[中文](136-映射key岔路的代价行.md) · **English** · [日本語](136-マッピングキー分岐のコスト行.ja.md)
+
+**The question asked**: Before D19 (Block Pointer Structure & Width Budget) settled item 6 round 3 confrontation (item ⑫㈤ of that cell) was submitted to the user, the forks lacked four cost figures; E136 (Cost Rows for Mapping Key Forks) supplements them—configuration of C280 (Central Mapping Has No Clause for Which Unit Classes It Contains) branch taking "only Code 1", fanout of Code 2 header increment under realistic header widths, mapping tree levels across pool scale bands, bytes to relocate a Code 2 / Code 3 node, and extra nodes read when relocating derived tree Code 2 nodes.
+Three arms: logical identity + write-order key (`k1_seq`), hybrid path (`k1_seq_class_reuse`), tightened class reuse of write-order key (`class_reuse_tagged`), definitions field-by-field identical to the eponymous arms in E134 (Mapping Key Format Cost: Slot Baseline and Two New Arms).
+**Reports numbers only, does not judge winner/loser**: `.claude/rules/fs-design.md` verbatim: "'saving more than another' does not constitute any criterion".
+
+**Fixed pre-run**: `e136-preregistration.md` (written prior to harness; two postscripts added before first run, adding definitions only without altering criteria).
+
+**Re-run commands** (`exact` mode, byte-by-byte comparison against archived artifact):
+
+```bash
+bash scripts/experiment-apparatus/replay.sh E136
+# Run harness directly:
+cd scripts/experiment-apparatus && cargo run --release --bin e136_fork_cost_rows
+```
+
+Code `scripts/experiment-apparatus/e136_fork_cost_rows.rs`,
+original output `e136-fork-cost-rows-2026-09-11.out` (single run, 159 lines, last line `emitted=149`).
+
+### This is a Counting Model, Not an Implementation
+
+No I/O, no random source ⇒ running N times is deterministically identical byte-for-byte; evidence strength derives from **15 unit tests + 24 mutations all caught**, plus three cross-harness gates:
+`all` config × node header 64 across 24 lines found byte-for-byte in E134 (Mapping Key Format Cost: Slot Baseline and Two New Arms) archived artifact; Code 2 three-tier header fanout formula reproduces D18 (Information Carried in a Block) line 308 registered "fanout (entry 54) 301 / 301 / 301", "fanout (entry 81) 201 / 200 / 200";
+relocation counts reproduce the five lines of key 33 in E109 (Runtime Costs of Three Location Authority Arms) archived artifact (pointer authority 66 048 × K, mapping authority 66 048 at K = 1, 2, 4, 8, 16).
+Expected values come from an independent Python arithmetic script (uses only registered raw quantities, does not read harness formulas).
+
+### Two Configurations and Two Fanout Measurement Bases
+
+| Configuration | What Mapping Contains | Pointers to Code 2 / Code 3 | Increment of Code 2 / Code 3 Headers |
+|---|---|---|---|
+| `all` | All pointers (literal text of D19 (Block Pointer Structure & Width Budget) settled item 5) | Carries Code 2 / Code 3 key segment of that arm (configuration of E134 (Mapping Key Format Cost: Slot Baseline and Two New Arms)) | Per arm table of E134 (Mapping Key Format Cost: Slot Baseline and Two New Arms) |
+| `code1_only` | Only Code 1 | Carries birth tree + birth txg only (+16) | 0 (birth seq serves only Code 2 / Code 3 mapping keys) |
+
+Two fanout measurement bases: node header 64, mapping node header 76 (measurement basis of E133 (Format Cost of Mapping Key Candidates) / E134 (Mapping Key Format Cost: Slot Baseline and Two New Arms), used only for cross-harness gates and reporting levels);
+D18 (Information Carried in a Block) settled item 14 Code 2 three-tier headers 96 / 105 / 114, each adding that arm's increment under that configuration as node header—three tiers represent three ways of sizing tree ID and level width, not split by tree.
+
+### Results (Copied Verbatim from `e136-fork-cost-rows-2026-09-11.out`)
+
+**Code 2 header +4 does not drop a single fanout cell under realistic header widths** (two arms adding birth seq, three header tiers, six entry widths in order: extent leaf / extent internal / inode internal / accounting internal / map leaf / map internal):
+
+```
+E7RESULT name=code2_header_increment_effect arm=k1_seq_class_reuse tier=96 increment=4 without=122/152/139/155/206/121 with=122/152/139/155/206/121 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=k1_seq_class_reuse tier=105 increment=4 without=122/152/139/155/206/121 with=122/152/139/155/206/121 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=k1_seq_class_reuse tier=114 increment=4 without=122/152/139/154/205/121 with=122/152/139/154/205/121 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=class_reuse_tagged tier=96 increment=4 without=149/152/139/155/296/148 with=149/152/139/155/296/148 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=class_reuse_tagged tier=105 increment=4 without=149/152/139/155/295/147 with=149/152/139/155/295/147 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=class_reuse_tagged tier=114 increment=4 without=149/152/139/154/295/147 with=149/152/139/154/295/147 dropped_cells=0
+```
+
+**Branch containing Code 1 only**: node pointers for both arms are 75; internal entries, tree table entries, root record identical cell-by-cell; difference remains only in pointers to Code 1, extent leaf, and mapping tree. The hybrid path rows match logical identity + write-order key cell-by-cell (reported as such in artifact).
+
+```
+E7RESULT name=code1_only_widths arm=k1_seq data_pointer=109 node_pointer=75 extent_leaf_entry=133 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=79
+E7RESULT name=code1_only_widths arm=class_reuse_tagged data_pointer=85 node_pointer=75 extent_leaf_entry=109 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=55
+E7RESULT name=code1_only_fanouts arm=k1_seq extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=206 map_internal=129 inode_leaf=233
+E7RESULT name=code1_only_fanouts arm=class_reuse_tagged extent_leaf=149 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=296 map_internal=159 inode_leaf=233
+E7RESULT name=code1_only_map_at_pool arm=k1_seq data_units_levels=5 data_units_leaf_bytes=38429540352
+E7RESULT name=code1_only_map_at_pool arm=class_reuse_tagged data_units_levels=4 data_units_leaf_bytes=26744881152
+E7RESULT name=map_level_bands config=code1_only basis=map_header_76 pair=k1_seq/class_reuse_tagged bands=2:207..297,3:26575..47065,4:3428047..7483177,5:442217935..1189824985,6:57046113487..189182172457 pool_in=5 leaf_bytes_ratio=1.43689
+```
+
+**Branch where all pointers enter mapping: scale bands for mapping tree level differences** (`bands` format is levels:lower..upper, half-open; `pool_in` indicates which level band the pool scale 483 183 820 of E109 (Runtime Costs of Three Location Authority Arms) falls into):
+
+```
+E7RESULT name=map_level_bands config=all basis=map_header_76 pair=k1_seq/class_reuse_tagged bands=2:207..297,3:26575..43809,4:3428047..6483585,5:442217935..959570433,6:57046113487..142016423937 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=all basis=map_header_76 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:207..297,3:24927..43809,4:3016047..6483585,5:364941567..959570433,6:44157929487..142016423937 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=all basis=map_header_76 pair=k1_seq/k1_seq_class_reuse bands=3:24927..26575,4:3016047..3428047,5:364941567..442217935,6:44157929487..57046113487 pool_in=none leaf_bytes_ratio=1.00000
+```
+
+**Bands where hybrid path extent tree has one extra level**: data pointers have the width of logical identity + write-order key, node pointers have the width of class reuse write-order key; extent leaf 122 and internal 152 are narrow on both ends, 5-level threshold 428 440 577 lower than both other arms (these three rows in the `all` × 64 section are byte-for-byte identical to E134 (Mapping Key Format Cost: Slot Baseline and Two New Arms) archived artifact):
+
+```
+E7RESULT name=thresholds arm=k1_seq tree=extent l2=123 l3=20009 l4=3281313 l5=538135169
+E7RESULT name=thresholds arm=k1_seq_class_reuse tree=extent l2=123 l3=18545 l4=2818689 l5=428440577
+E7RESULT name=thresholds arm=class_reuse_tagged tree=extent l2=150 l3=22649 l4=3442497 l5=523259393
+```
+
+**Relocating a Code 2 / Code 3 node**: goes through mapping when all pointers enter mapping, independent of reference tree count K and node level; when containing Code 1 only, node position entry reverts to authority, requiring COW from parent node up to root for each referencing tree, updating one root slot, plus reading the parent node path (other two arms match these three rows cell-by-cell):
+
+```
+E7RESULT name=relocate_node config=all arm=k1_seq map_height=5 bytes=82432
+E7RESULT name=relocate_node config=all arm=k1_seq_class_reuse map_height=5 bytes=82432
+E7RESULT name=relocate_node config=all arm=class_reuse_tagged map_height=4 bytes=66048
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=0 k=1 bytes=49664 parent_reads=3
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=0 k=2 bytes=99328 parent_reads=6
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=0 k=16 bytes=794624 parent_reads=48
+```
+
+**Extra nodes read when relocating a derived tree Code 2 node under logical identity + write-order key** (when all pointers enter mapping; descending from root to parent node to fetch separator key, whereas other two arms have all key segments in header):
+
+```
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq extent_height=4 level=0 reads=3
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq extent_height=4 level=1 reads=2
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq extent_height=4 level=2 reads=1
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq_class_reuse extent_height=5 level=0 reads=0
+E7RESULT name=derived_relocation_extra_reads config=all arm=class_reuse_tagged extent_height=4 level=0 reads=0
+```
+
+**Cross-harness gate row**:
+
+```
+E7RESULT name=cross_apparatus d18_308_entry54=301/301/301 d18_308_entry81=201/200/200 e109_move_ptr=66048/132096/264192/528384/1056768 e109_move_map=66048
+```
+
+| Interpretation | Number |
+|---|---|
+| Fanout cost of Code 2 header +4 | Two arms, three tiers, six entry widths, 0 cells (`dropped_cells=0` across six rows) |
+| Difference between the two in Code 1-only branch | Pointer to Code 1 is 109 vs 85, extent leaf fanout 122 vs 149, map leaf fanout 206 vs 296; mapping tree differs by one level only between 442 217 935 and 1 189 824 985, leaf level bytes 1.43689× |
+| Mapping tree in branch where all pointers enter mapping | Hybrid path vs class reuse write-order key differs by one level between 364 941 567 and 959 570 433; logical identity + write-order key vs it differs by one level between 442 217 935 and 959 570 433; pool scale 483 183 820 falls in both segments; logical identity + write-order key vs hybrid path differs by one level between 364 941 567 and 442 217 935, pool scale does not fall in that segment |
+| Hybrid path extent tree | Has one extra level between 428 440 577 and 523 259 393 (vs class reuse write-order key), and up to 538 135 169 (vs logical identity + write-order key); pool scale falls inside |
+| Relocation cost for switch C280 (Central Mapping Has No Clause for Which Unit Classes It Contains) | In Code 1-only, relocating a leaf-level node costs 49 664 × K bytes, reads 3 × K nodes; under mapping authority it costs 82 432 (5-level map tree) or 66 048 (4-level). Pointer authority saves at K = 1, mapping saves at K ≥ 2 |
+| Extra reads relocating derived tree Code 2 node | 3 / 2 / 1 nodes for logical identity + write-order key (leaf level / level 1 / level 2, extent tree height 4), 0 for other two arms |
+
+### Questions It Cannot Answer
+
+- **Does not judge winner/loser**, nor does it give a "who is better" ranking; its numbers only enter the cost row of D19 (Block Pointer Structure & Width Budget) settled item 6.
+- Does not compute CPU, cache, or I/O time; how often Code 2 / Code 3 nodes are relocated has not been measured; relocation only reports bytes and reads "per node relocated"; K takes five sample points, not representing shared distribution in realistic workloads.
+- Cost of disposing C163 (identical write sequence across fixed point rounds defeats tie-breaking) (forbidding implementations that COW while inserting) is not bytes, not reported.
+- Fanout of tree table unit and root record is not in the three-tier basis: tree table net bytes per level 16284 is taken from legacy Code 2 header 68; switching to three-tier header requires altering that denominator, not chosen arbitrarily here.
+- Level counts share measurement basis with E133 (Format Cost of Mapping Key Candidates) / E134 (Mapping Key Format Cost: Slot Baseline and Two New Arms) (node header 64, mapping node header 76); mapping tree thresholds under three-tier basis are in artifact `tier_fanouts` rows, differing by 1-2 cells, without changing the interval conclusions.
+
+### Mutations
+
+24 mutations all caught. Key ones: Code 1-only retains full mapping width for node pointers, three-tier header lacks increment, root slot counts 0, COW path counts one extra node, relocation does not multiply referencing tree count, extra read mistakenly applied to all arms, level interval inverted, pool scale interval open/closed inverted (caught only by the unit test "which segment pool scale falls into"), dropped cell count lacks increment (caught only by positive control unit test: increment crossing entry boundary must report dropped cells).
+⚠️ First run had one red unit test: Python script for expected leaf-layer byte ratio used `%.5f` rounding, whereas harness truncated downward after scaling per definition (1.43203 vs 1.43204)—fixed rounding method in expected value cell; recomputed per definition, all four cells passed.
+
+### Impacted Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D19 (Block Pointer Structure & Width Budget) settled item 6 | Support | 2026-09-21 unaffected: artifact merely retrieved from archive state (harness source reads it via include_str! at compile time), byte-for-byte identical to pre-archive; prose, conclusions, and numbers untouched |
+| D18 (Information Carried in a Block) | No impact | 2026-09-21 unaffected: artifact merely retrieved from archive state (harness source reads it via include_str! at compile time), byte-for-byte identical to pre-archive; prose, conclusions, and numbers untouched |
+
+## Historical Versions
+
+### 2026-09-11
+
+- Established and completed run. During harness development, extracted "which segment pool scale falls into" from main into a helper function and added that unit test (previously unmonitored by unit tests, mutations inverting open/closed would not turn red). After first run, added "Code 2 header increment evaluated separately" output segment and two unit tests (pre-run registration item 1 asked "whether cells drop", previously requiring reader deduction), regenerated artifact; prior to that, no prose had cited it.

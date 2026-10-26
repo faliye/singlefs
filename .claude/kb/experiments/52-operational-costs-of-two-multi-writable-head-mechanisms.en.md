@@ -1,0 +1,171 @@
+## E52 Operational Costs of Two Multi-Writable-Head Mechanisms — Run (2026-08-30, N=5 Rounds Byte-Identical, 10 Unit Tests / 9 Mutation Rules Caught): **Candidate ① Is Actually Two Branches**, Lower-Bit Branch Eliminated
+
+[中文](52-两种多可写头机制的运营代价.md) · **English** · [日本語](52-2つのマルチ書き込みヘッド機構の運用コスト.ja.md)
+
+**It answers D6 (Snapshot Implementation Model) settled item 1.** Whether to implement multi-writable heads is settled (yes, paying lookup cost);
+**which mechanism to adopt is unsettled**, and E35 (Two Forms of Multi-Writable-Heads) confessed that "only two coarse metrics were measured, both being constructive constants,
+**insufficient to choose between the two**". E52 (Operational Costs of Two Multi-Writable-Head Mechanisms) replaces those two metrics with scannable quantities, adding three more untouched by E35 (Two Forms of Multi-Writable-Heads).
+
+⚠️ **E52 (Operational Costs of Two Multi-Writable-Head Mechanisms) does not make decisions for humans**. Its deliverable is **a set of numbers**, allowing settlements to ground on data rather than intuition.
+
+### Two Candidates (Verbatim from D6 (Snapshot Implementation Model) Settled Item 1)
+
+| Arm | Form | key |
+|---|---|---|
+| ① `key_snapshot_dim` | Single tree, snapshot ID in key, lookup filtered by ancestry relation | `(locality, inode, offset, snapshot)` |
+| ② `tree_per_head` | **Each head has its own tree**, holding own `previous_snapshot_txg` and deadlist | `(locality, inode, offset)` |
+
+### What to Measure: Five Metrics, First Two Owed by E35 (Two Forms of Multi-Writable-Heads)
+
+| # | Metric | Why It Distinguishes the Two Arms |
+|---|---|---|
+| 1 | **Keys touched when deleting one head** | ① Must filter-scan single tree by snapshot; ② Drop entire tree ⇒ touches **nodes**, not keys |
+| 2 | **Key components compared in point lookup** | ① 4-segment key + walk ancestry chain along snapshot tree; ② 3-segment key, direct lookup in head tree |
+| 3 | **Side-table entries** (cross-head shared blocks)| ⚠️ ② **Breaks D5 (Snapshot / Space Accounting Mechanism) premise 3** (at most one live ref per block) ⇒ cross-head sharing needs ref-count side-table; ① relies on birth txg + ancestry check, no side-table |
+| 4 | **Bytes per key** | ① Extra snapshot dimension; ② No extra |
+| 5 | **Fixed metadata entries per head** | ② Each head holds tree root + accounting + deadlist; ① Global single copy |
+
+### Criteria (Hardcoded Before Run)
+
+| # | Criterion |
+|---|---|
+| 1 | **Definition of "distinguishable"**: Arms differ by **≥ 2×** on at least one metric. If unmet ⇒ **maintain verdict of E35 (Two Forms of Multi-Writable-Heads)** (indistinguishable empirically, must rely on judgment), faithfully recorded |
+| 2 | Each metric has an absolute assertion given by **independent arithmetic**, forbidden to do only inter-arm relative comparisons |
+| 3 | Five metrics **given separately**, not combined into a "total cost"—differing dimensions mean weighting is making decisions for humans |
+
+### What Constitutes Failure (Hardcoded Before Run, Forbidden to Change After Run)
+
+⚠️ **One pre-run correction**: Positive control in draft was "all five metrics identical when head count = 1";
+**that was wrong**—the two arms differ fundamentally in deletion granularity (① per-key, ② entire tree dropped),
+and would not match even under single head. Replaced before run by positive controls A and B; **no numbers were ever produced beforehand**.
+
+| Clause | Judgment When Triggered |
+|---|---|
+| **Positive control A**: Head count doubles ⇒ ① "keys touched when deleting one head" must **double** (scans full tree), ② must **remain unchanged** (drops only own tree) | Unmet ⇒ model not computing by mechanism, **entire round aborted** |
+| **Positive control B**: When head count = 1 and sharing ratio = 0, **side-table entries and fixed metadata entries must match across arms** | Differ ⇒ **entire round aborted** |
+| **Negative control**: Side-table entries must be **0** when sharing ratio = 0 | Non-zero ⇒ **entire round aborted** |
+| Both arms identical across all metrics | **Faithfully record "still indistinguishable"**, forbidden to tweak parameters to manufacture difference |
+| A metric differs at only one parameter point | Must **scan across entire parameter space** before concluding (pattern C49 (Universal Assertions Only Verified at Sample Points) prevents)|
+
+### The Half It Cannot Answer
+
+1. **This is a model, not implementation**. The five metrics are **constructive counts**, not measured time or I/O on real btrees.
+   Same limitation as failure domain experiments: **0 file operations**.
+2. **Ancestry filtering implementations vary in speed** (skiplist, bitmap cache); E52 (Operational Costs of Two Multi-Writable-Head Mechanisms) models naive "chain walking"
+   ⇒ ① side represents an **upper bound**, not its optimal form.
+3. **Excludes crash semantics**: divergence in recovery paths between the two arms is outside E52 (Operational Costs of Two Multi-Writable-Head Mechanisms) scope.
+4. **Does not model O(N) reverse-index lookup for snapshot deletion**—that is a settled cost of D6 (Snapshot Implementation Model) shared by both arms, measured by E26 (Lookup Cost and Accuracy of Three Accounting Models).
+
+### Prerequisites
+
+None. Pure counting model.
+
+### Measurement Basis and Reproduction
+
+- Code `scripts/experiment-apparatus/e52_head_mechanisms.rs`
+  (`cargo run --release --bin e52_head_mechanisms`),
+  raw output `e52-head-mechanisms-2026-08-30.out`.
+- Mutation table `scripts/mutation/tables/e52_head_mechanisms.tsv`.
+
+### ⚠️ Third Arm Added After Run Commenced, Before Conclusions: Candidate ① Has Two Forms, Stated Differently Across Repo
+
+Audit (2026-08-30):
+
+| Source | Verbatim | Position of Snapshot ID |
+|---|---|---|
+| D6 (Snapshot Implementation Model) settled item 1 / Candidate ① | "bcachefs **snapshot ID in lower key bits**" | **Lower bits** |
+| D8 (Core Index Structure) settled item 5 layout rule | "keys of same snapshot share **snapshot prefix** → snapshot deletion can become range operation" | **Prefix** |
+
+**Prefix vs lower bits are opposite positions, making head deletion cost entirely different** (full scan vs range operation).
+⇒ E52 (Operational Costs of Two Multi-Writable-Head Mechanisms) added third arm `key_snapshot_prefix`. **Criteria unchanged by a single word; arm added before writing any conclusion.**
+
+### Actual Measurement (2026-08-30, N=5 Rounds Byte-Identical)
+
+**Decisive cell** (4 heads / 10,000 keys per head / 4 KiB nodes / 100‰ sharing):
+
+| Metric | ①-Lower Bits | ①-Prefix | ② Tree Per Head |
+|---|---|---|---|
+| **Touched when deleting one head** | **40 000** | **69** | **59** |
+| Key components compared in point lookup | 7 | 4 | **3** |
+| **Tree descents in point lookup** | **1** | **4** | **1** |
+| **Side-table entries** | **0** | **0** | **1 000** |
+| Total key bytes | 1 120 000 | 1 120 000 | **960 000** |
+| Fixed metadata entries | **3** | **3** | 12 |
+
+**Separation**: Maximum ratio of keys touched during head deletion is **5442×** (①-lower bits : ②), point lookup components max **3.67×**
+⇒ Criterion 1 "≥ 2× on at least one metric" is **satisfied**, E52 (Operational Costs of Two Multi-Writable-Head Mechanisms) distinguishes them—
+**The verdict of E35 (Two Forms of Multi-Writable-Heads) that "experiments cannot distinguish them" is overthrown, not by new metrics, but by the third arm.**
+
+#### Reading 1: ①-Lower Bits Is Eliminated
+
+It is superior to ② in only two metrics (0 side-table entries, 3 metadata entries), while **678×** worse on **head deletion** (40,000 vs 59)
+and compares more key components (7 vs 3). Meanwhile, ①-prefix is **completely identical** to it on those two metrics (0 side-table, 3 metadata),
+yet drops head deletion to 69. ⇒ **①-lower bits is strictly dominated by ①-prefix**, possessing no unique advantage in any cell.
+
+#### Reading 2: The Real Tradeoff Is Two Statements, Not Five Metrics
+
+The remaining two arms each have only one genuine cost:
+
+| Arm | What It Must Pay | Quantity |
+|---|---|---|
+| **①-Prefix** | **H−1 extra tree descents per point lookup** | 4 descents at 4 heads, 8 at 8 heads; **constant multiplier imposed on read path** |
+| **② Tree Per Head** | **A ref-count side-table + 3 fixed metadata entries per head** | **1,000 entries** at 100‰ sharing / 10k keys per head; **50,000 entries** at 8 heads / 100k keys / 500‰ |
+
+⚠️ **Side-table cost was already measured by E12 (Batched Sequential Append vs Unbatched Random Page RMW)**:
+Counter table is **almost free when fitting in cache**; when spilling, **~1 device I/O per deletion** (8× cache tier ~350,042 ops / 200k deletions).
+⇒ **Whether ②'s cost is acceptable depends on whether side-table fits in cache**, determined by sharing ratio and scale.
+⚠️ **② breaks D5 (Snapshot / Space Accounting Mechanism) premise 3** (at most one live ref per block in live trees)—the side-table is needed precisely for this,
+not an invented cost of E52 (Operational Costs of Two Multi-Writable-Head Mechanisms), but stated long ago in D5 (Snapshot / Space Accounting Mechanism) "clones / writable snapshots need three rules".
+
+#### Itemized Control Verdicts
+
+| Clause | Verdict |
+|---|---|
+| **Positive control A**: Head count doubles ⇒ ①-lower bits doubles (2000 → 4000), ② unchanged (6 → 6)| **Passed** |
+| **Positive control B**: Single head + zero sharing ⇒ side-table and fixed metadata match | **Passed** |
+| **Negative control**: Sharing ratio 0 ⇒ side-table 0 | **Passed** |
+| Three arms identical across all cells ⇒ record "indistinguishable" | **Did not occur** |
+| Metric differs at only one parameter point ⇒ scan full parameter | Head deletion and point lookup differences consistent across **all** 4×3×2×3 cells |
+
+### Conclusions
+
+1. **Candidate ① has two branches, repo stated differently across locations; lower-bit branch eliminated**—strictly dominated by prefix branch.
+   ⇒ **Candidate set in D6 (Snapshot Implementation Model) settled item 1 was flawed and must be fixed first**.
+2. **The remaining choice is a single-statement tradeoff**:
+   **H−1 extra descents constantly on read path (①-prefix)** vs **a ref-count side-table scaling with sharing ratio (②)**.
+3. **E52 (Operational Costs of Two Multi-Writable-Head Mechanisms) does not decide for humans**, but collapses intuitive speculation: three of five metrics distinguish them,
+   and all three point to the same fact—**①-lower bits should not be in candidate set**.
+
+### Measurement Basis and Known Limitations
+
+- Code `scripts/experiment-apparatus/e52_head_mechanisms.rs`
+  (`cargo run --release --bin e52_head_mechanisms`),
+  raw output `e52-head-mechanisms-2026-08-30.out`.
+  Mutation table `scripts/mutation/tables/e52_head_mechanisms.tsv` (9 rules, all caught).
+- ⚠️ **Counting model, not implementation**: five metrics are constructive counts, **0 file operations**,
+  never measured time or I/O on real btrees. Same limitation as E46 (Root Ring Region Spacing and Failure Domains).
+- ⚠️ **①-prefix "H descents" is most naive form**: real implementation could use skiplist, bitmap,
+  or cache ancestry set to suppress it ⇒ **this cell is an upper bound, not optimal form**.
+  Likewise, ancestry filtering in ①-lower bits models chain walking.
+- ⚠️ **Excludes crash semantics**; does not model O(N) reverse-index lookup for snapshot deletion (shared across arms, measured by E26 (Lookup Cost and Accuracy of Three Accounting Models)).
+- Sharing ratio takes 0 / 100‰ / 500‰ tiers, **which are scenario points, not measurements**; side-table entries scale proportionally.
+
+### Impacted Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D6 (Snapshot Implementation Model) settled item 1 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: empirical measurement across three mechanisms on head deletion, point lookup components, side-table entries, total key bytes, fixed metadata—①-lower bits strictly dominated by ①-prefix; remaining tradeoff is "read path H−1 extra descents" vs "one side-table + 3 metadata entries per head" |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 17 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: ② ref-count side-table breaks "at most one live ref per block" premise; convergence form "primary + sparse side-table secondary" scale given here |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 6 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: side-table entries in two cells are 1,000 and 50,000 entries, providing scale basis for sparse side-table |
+| D8 (Core Index Structure) settled item 5 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: only cites range deletion to explain why ①-prefix head deletion is cheap |
+| D21 (Boundary Between Authoritative and Derived States) settled item 6 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: column header for sparse side-table is verbatim "Side-table entries (cross-head shared blocks)"—side-table tracks cross-head sharing, not reflink / dedup; candidate swapping index requirements of both categories eliminated |
+
+## Historical Versions
+
+### 2026-08-30
+
+- Run completed. Not a single criterion modified; **added third arm after run started, before writing conclusions** (audit discovered D6 (Snapshot Implementation Model) and D8 (Core Index Structure)
+  gave conflicting placements of snapshot ID in Candidate ①, and placement dictates full scan vs range operation).
+- Initiated. Basis: D6 (Snapshot Implementation Model) settled item 1 stalled on "which mechanism to adopt",
+  and E35 (Two Forms of Multi-Writable-Heads) confessed its two operational metrics were constructive constants insufficient for choice.
+  User required "confirmation by numbers, not by intuition".

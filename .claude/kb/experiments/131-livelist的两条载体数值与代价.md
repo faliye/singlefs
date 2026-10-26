@@ -1,6 +1,6 @@
 ## E131 livelist 的两条载体，数值与代价 —— 已跑（2026-09-10）
 
-**中文** · [English](131-livelist的两条载体数值与代价.en.md) · [日本語](131-livelist的两条载体数值与代价.ja.md)
+**中文** · [English](131-two-livelist-carriers-values-and-costs.en.md) · [日本語](131-livelistの2媒体-数値とコスト.ja.md)
 
 **问的是**：D6（快照实现模型） 已定项 2 候选甲的载体，「每头一棵自己的树」与「一棵共享树、key 以头的树 ID 打头」
 各付什么、各换到什么。甲的形态第二轮已确认保持 D5（快照 / 空间记账机制） 逐字的 ZFS 原形，**这里只比载体**。
@@ -14,12 +14,12 @@
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-bash scripts/experiments/replay.sh E131
+bash scripts/experiment-apparatus/replay.sh E131
 # 直接跑装置：
-cd scripts/experiments && cargo run --release --bin e131_livelist_carrier
+cd scripts/experiment-apparatus && cargo run --release --bin e131_livelist_carrier
 ```
 
-代码 `scripts/experiments/e131_livelist_carrier.rs`，
+代码 `scripts/experiment-apparatus/e131_livelist_carrier.rs`，
 原始输出 `e131-livelist-carrier-2026-09-10.out`（一次运行，扫的格写在「臂与口径」那一节）。
 
 ### 这是计数模型，不是实现——它证明不了什么

@@ -1,0 +1,147 @@
+## E44 Host Testing and Cost of Sequence Number Bit Width — Run (2026-08-30, N=5 Rounds, Dispersion <=0.42%)
+
+[中文](44-序号位宽的本机实测与代价.md) · **English** · [日本語](44-シーケンス番号ビット幅の実機測定とコスト.ja.md)
+
+**What it asks**: In D23 (Journal Role & Format) settled item 9 "bit-width partition between sequence number and instance generation", what are the two numbers——
+the **counter consumption rate** and the **widening cost**——actually on the host machine?
+
+⚠️ **It needs to displace an assumption.** Prior to running, D23 (Journal Role & Format) settled item 9 wrote
+"the 10⁶ records/sec tier **lacks host measurement**, being an upper-bound assumption taken",
+and a 48-bit counter in that tier only lasts **8.9 years**——**the conclusion rested on an unmeasured figure**.
+E44 (Host Testing and Cost of Sequence Number Bit Width) measures that number out.
+
+### What to Test
+
+**Segment A (Host empirical testing, requires device): How fast can a single fsync actually be?**
+Record count equals fsync count (D23 (Journal Role & Format) settled item 1 Axis 1 settled "emit root on each fsync")
+⇒ Counter consumption rate = workload fsync rate.
+
+| Arm | Action | Why It Is Needed |
+|---|---|---|
+| `sync_1` | O_DIRECT write 4 KiB + `fdatasync`, repeat | Worst-case consumption rate: each fsync carries only minimal data |
+| `sync_8` | Eight 4 KiB writes + one `fdatasync` | D25 (Target Workload Priority) settled coarse granularity |
+| `nosync` (**positive control**) | Same writes, **without** `fdatasync` | If speed matches `sync_1` ⇒ fdatasync never reached device, **entire round invalidated** |
+
+**Segment B (Arithmetic, device-free): What is paid when widening `jsn` from 8 bytes to 12 / 16 bytes?**
+The criterion is "bytes occupied on disk" and "how many named items fit in an atomic unit", not "percentage increase in header"——
+D23 (Journal Role & Format) settled item 4 settled "record header lands entirely within an atomic unit",
+and records must round up to atomic units.
+
+### Criteria
+
+- **Segment A**: Report host fsync/sec for `sync_1` and `sync_8` (N>=5 rounds, reporting median and all rounds),
+  and convert to how many years 48 / 56 / 64-bit counters can each endure based on that rate.
+  ⇒ **If 48 bits cannot last 10 years on the host worst-case arm, D23 (Journal Role & Format) settled item 9's assertion that "48 bits is insufficient" holds**;
+  if it lasts longer, **faithfully record "the premise of that deduction does not hold on this host"**.
+- **Segment B**: When `jsn` takes 8 / 12 / 16 bytes, if under 512 and 4096 atomic units
+  **on-disk bytes and named item capacities match cell-by-cell**, then widening cost is zero, and D23 (Journal Role & Format) settled item 9 can be settled.
+  ⇒ Simultaneously report **at what proportion of named item counts it occupies an extra unit**——that provides the complete shape of cost.
+
+### Failure Clauses
+
+- No significant difference between `nosync` and `sync_1` ⇒ **fdatasync failed to reach device, flawed implementation, entire round invalidated**.
+- Dispersion of fsync/sec across five rounds exceeds +-20% ⇒ report "unstable", no conclusion drawn
+  (`.claude/singlefs-ai-sop/rules/test-discipline.md`: faithfully report instability if neither side is satisfied).
+- ⚠️ **Unreadable != reading 0**: Failing to obtain duration reading on any round **invalidates the entire round**, cannot be treated as 0.
+
+### Measurement Basis Requirements
+
+- **Images land in temporary directory, not entering repository** (`.claude/singlefs-ai-sop/rules/command-safety.md`).
+  **Do not touch bare devices**——E44 (Host Testing and Cost of Sequence Number Bit Width) tests the path of "file + O_DIRECT + fdatasync".
+- ⚠️ **It measures the fsync path of ext4, not this project's**.
+  ext4's own journaling overhead is included ⇒ this number is an **upper-bound proxy for this project's fsync rate**,
+  not "what this project can achieve". This sentence must accompany any citation.
+- ⚠️ **Must carry absolute value assertions**: Counter lifespan must be independently calculated as `2^width / rate`,
+  on-disk bytes independently calculated by rounding up `(header + jsn + txn_fields + chain + items * item_width)`,
+  neither permitted to be read back from tested code.
+
+### Empirical Measurements (2026-08-30, N=5 Rounds, Dispersion <=0.42%; All 8 Mutations Caught, 0 Blind Spots)
+
+#### Segment A: Host fsync Rate **2785 ops/sec**, Displacing That Assumption
+
+Machine: KINGSTON SNV3S4000G (consumer NVMe, 3.6 TB), ext4, `physical_block_size = 512`.
+
+| Arm | Median (ops/sec) | Five-Round Dispersion |
+|---|---|---|
+| `sync_1` (one fdatasync per block) | **2785** | 0.42% |
+| `sync_8` (one per 8 blocks, D25 (Target Workload Priority) coarse granularity) | **2715** | 0.31% |
+| `nosync` (**positive control**) | **89 466** | 0.80% |
+
+**Positive control passed**: Without fdatasync it is **32.1x faster** ⇒ fdatasync indeed reached the device.
+
+⇒ **Counter lifespan converted at host rate**:
+
+| Counter | Under `sync_1` | Under `sync_8` |
+|---|---|---|
+| **48-bit** | **3202 years** | 3285 years |
+| 56-bit | 820,000 years | 841,000 years |
+| 64-bit | 210 million years | 215 million years |
+
+⚠️ **The upper-bound assumption of "10⁶ records/sec" in D23 (Journal Role & Format) settled item 9 is 359x higher than host empirical measurement.**
+At host rate, 48 bits lasts 3202 years ⇒ **the premise of the deduction "48 bits is insufficient" does not hold on this host, faithfully recorded.**
+
+#### Segment B: `jsn` Widened to 10 / 12 Bytes, Cost Empirically Measured as Zero
+
+Header = 84 - 8 (original `jsn`) + new `jsn` + 9 (transaction fields of D23 (Journal Role & Format) settled item 7)
++ 4 (reverse chain of settled item 8):
+
+| `jsn` | Header | Items Fit in 512 Unit | Items Fit in 4096 Unit | Cells Occupying Extra Unit in 0..=100 Items (512 / 4096) |
+|---|---|---|---|---|
+| 8 bytes (active width when run) | 97 | 7 | 71 | — |
+| **10 bytes** | 99 | **7** | **71** | **0 / 0** |
+| **12 bytes** | 101 | **7** | **71** | **0 / 0** |
+| 16 bytes | 105 | 7 | 71 | **1** / 0 |
+
+⇒ **Widening 8 -> 12 bytes occupies not a single extra cell across 0..=100 named items**, and capacity remains unchanged.
+Only at 16 bytes does it occupy an extra cell under 512 units (1 out of 101 item counts, 0.99%).
+
+### ⚠️ What It Cannot Answer: Host is Not All Machines
+
+**The measured 2785 ops/sec belongs to this consumer-grade disk**, which lacks power-loss protection (PLP).
+Enterprise disks with PLP can acknowledge flushes in DRAM, achieving fsync rates 1-2 orders of magnitude higher.
+⇒ **E44 (Host Testing and Cost of Sequence Number Bit Width) displaced "this host can reach 10⁶/sec", not "no machine can ever reach 10⁶/sec".**
+Converted at 10⁵/sec, 48 bits lasts **89 years**; only at 10⁶/sec is it compressed to 8.9 years.
+**That tier cannot be tested on this host, remaining an assumption.**
+
+⚠️ **It measures the fsync path of ext4, not this project's**——ext4's own journaling overhead is included,
+so this figure serves as an **upper-bound proxy** for this project's fsync rate, not "what this project can achieve".
+
+⚠️ **First round is cold**: Without pre-warming, Round 0 takes 2x the time of subsequent rounds, with five-round dispersion of 49.7%,
+which under E44 (Host Testing and Cost of Sequence Number Bit Width)'s failure clause precludes conclusions. The harness explicitly runs one warmup round and **reports it in the artifact** (`name=warmup counted=false`)——
+warmup must be visible; hiding it is equivalent to secretly discarding the slowest round.
+
+**Measurement basis**: 64 MiB image (landing in temporary directory, not entering repository), 4 KiB blocks, O_DIRECT, 2000 fsyncs per round,
+1 warmup round + 5 counted rounds per arm.
+Code `scripts/experiment-apparatus/e44_jsn_width.rs`
+(`cargo run --release --bin e44_jsn_width -- <image_path>`),
+raw output `e44-jsn-width-2026-08-30.out`,
+mutation table `scripts/mutation/tables/e44_jsn_width.tsv`.
+**10 unit tests, all 8 mutations caught one by one, 0 blind spots.**
+⚠️ **Four blind spots were caught by mutation testing**: omitting fdatasync, `sync_8` writing only one block,
+elapsed duration 0 clamped to 1, cost scan examining only one cell——all four initially **failed to turn a single test red**,
+because they lived entirely within the I/O path or `main()`. Adding a positive control unit test actually running I/O,
+extracting "unreadable != reading 0" into a pure function, and nailing down absolute values in the scan caught all of them.
+
+### Prerequisites
+
+None. Segment A requires host device (already present), Segment B is arithmetic.
+
+### Affected Decisions
+
+| Decision Branch | Relationship | Review |
+|---|---|---|
+| D5 (Snapshot / Space Accounting Mechanism) settled item 5 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D16 (Publish Semantics) settled item 5 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D16 (Publish Semantics) settled item 6 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D13 (Verification Route) settled item 2 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D3 (Space Allocation) settled item 7 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 9 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 1 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 4 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 7 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D25 (Target Workload Priority) | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+
+## Historical Versions
+
+### 2026-08-30
+- Created and run. Source: user request that "experiments must include host measurements", and requiring evaluation of `jsn` widening impact and cost before settling.

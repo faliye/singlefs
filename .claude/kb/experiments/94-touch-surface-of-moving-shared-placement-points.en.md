@@ -1,0 +1,131 @@
+## E94 Touch Surface of Moving Shared Placement Points — Run (2026-09-03, 14 unit tests / 11 mutations all caught + 1 equivalent archived): Under pointer position authority, batch move cost scales with snapshot count, each batch rewrites all snapshot roots; central map has constant 1 root, constant 0 deadlist rewrites; ceiling of moving only exclusives is 0–17%
+
+[中文](94-搬共享落点的触碰面.md) · **English** · [日本語](94-共有配置先移動の接触面.ja.md)
+
+**Problem**: D26 (Background Compaction and Placement Reclamation) settled item 5 — moving a placement referenced by snapshots, how birth txg and deadlist of D5 (Snapshot / Space Accounting Mechanism) change accordingly, and how much each structure must rewrite. E74 (Allocation Record Entry Count and Compaction Cost) only measured the allocation record tree half; the half referenced by snapshots was not measured. Behind this sits a known clash: where the authoritative recording point of position lives; C34 (three-way clash on plain text mapping layer states) was not yet closed at that time (still owed when running this page; invalidated on 2026-09-07 as no code object when D9 (Encryption) settled item 5 changed to "scrub only"; this page writes the state prior to invalidation) — D19 (Block Pointer Structure & Width Budget) puts position entries in pointers, D9 (Encryption) settled item 5 moved "authoritative recording point of physical address" out of encrypted structure to plaintext mapping layer, and mapping layer per D9 (Encryption) settled item 9 exists only when encryption is enabled.
+
+### Model
+
+A persistent COW tree with fanout F holding L extent pointers (nodes immutable, updates follow path copying, structural sharing). Rolling retention of K snapshots: establish a snapshot every u uniform random key updates, destroying oldest when exceeding (D5 (Snapshot / Space Accounting Mechanism) convention B: deadlist merges into next updated side, filtering and releasing merged result by `birth > prev(S).txg`; kill follows "birth > prev_snap ⇒ immediate release, otherwise enter live head deadlist, hand over at snapshot creation"). Walk u updates after the last snapshot — without this segment, all live versions have birth ≤ latest snapshot txg, and "exclusive versions" would not exist (modeling artifact). After history is generated, pick a batch of N=64 occupied slots as compaction batch, divided into two tiers by key dispersion: phys = 64 occupied slots with lowest slot numbers (physically adjacent, scattered in key order after aging); keyclu = current live versions of contiguous key segment (control).
+
+Three position authority architectures (arms):
+
+| Arm | Authoritative Recording Point of Position | What Must Be Altered to Move One Placement |
+|---|---|---|
+| ptr_rewrite | Position entry inside pointer of each referencing tree (literal form of D19 (Block Pointer Structure & Width Budget)) | All leaf copies containing it COW (memoized wave: shared node rewritten only once), rippling to each affected root; affected snapshot root records rewritten; deadlist entries keyed by placement rewritten |
+| central_map | Single-point mapping layer of "logical identity → physical" (settled form of D9 (Encryption) settled item 5 on encryption side, unconditionalized; mapping tree approximates key space with identical geometry, single root, does not branch with snapshots) | Mapping tree COW (it also suffers E74 (Allocation Record Entry Count and Compaction Cost) class amplification for key-scattered batches); main tree, deadlist, snapshot roots entirely untouched |
+| skip_shared | Same as ptr_rewrite, but moves only those not referenced by any snapshot tree | Movable set shrinks, measuring ceiling |
+
+Additionally equipped with a **discriminative negative arm** move_new_birth: upon moving, reassigns current checkpoint as birth to placement, proving via countable violations that "birth must follow logical version, not placement".
+
+### Criteria (Hardcoded Before Run 2026-09-03, Unchanged After Run) and Verdicts
+
+| # | Criterion | Verdict |
+|---|---|---|
+| 1 | Manual calculation anchor: L=8, F=2 two small scenarios COW node count and root reference update count hardcoded | **Passed** (unit test: shared entire tree (3, 2); partial branch (5, 2); central same scenario (3, 1, main tree zero writes)) |
+| 2 | Semantic conservation: each retained root reads back unchanged key-by-key; old slots zero references; occupied count and total slots conserved | **Passed** (all 60 configuration cells) |
+| 3 | Positive control: inject "missed one reference alteration", audit must catch (all three arms pass gate) | **Passed** (injected once per configuration cell × three arms, all caught) |
+| 4 | move_new_birth violation count > 0 and exactly equals independently calculated count of "referenced by snapshot and moved" | **Passed** (all 60 cells exactly equal, median 50–64 / 64) |
+| 5 | Under linear history, interval criterion and tree audit match version by version (equivalence of D5 (Snapshot / Space Accounting Mechanism) as model self-check) | **Passed** (asserted at conclusion of each history build) |
+
+### Actual Measurement (L=4096, F=16 (three-level tree), N=64, median of 5 seeds)
+
+#### 1. ptr_rewrite cost scales linearly with K, and each batch rewrites all snapshot roots (phys batch)
+
+| K | u | Batch Key Segments | ptr: COW Nodes | ptr: Root Reference Rewrites | ptr: deadlist Entry Rewrites | central: COW Nodes | Node Ratio |
+|---|---|---|---|---|---|---|---|
+| 1 | 1024 | 60 | 106 | 2 | 11 | 62 | 1.7× |
+| 4 | 1024 | 59 | 181 | 5 | 26 | 61 | 3.0× |
+| 16 | 1024 | 60 | **244** | **17** | 36 | **62** | **3.9×** |
+| 16 | 64 | 8 | 70 | 17 | 13 | 13 | 5.4× |
+
+- **Root reference rewrites constant = K + 1**: Every batch moved, root records of all retained snapshots must be swapped accordingly.
+  ⚠️ No invariant in repo settles snapshot roots as immutable (2026-09-03 grep D16 (Publish Semantics) /
+  D22 (Synthesizing Unit Atomicity) / `crates/singlefs-checker/invariants/`, only I-3.5 (precision of the reference interval) enumerates all snapshot roots in txg order),
+  so "snapshot root drift violates external anchors" is deduction, not settled clause; what can be solidly grounded are two things:
+  one batch of migrations must publish K+1 root records (byte cost), and the commit point combination of "one transaction rewriting K published snapshot roots"
+  was never enumerated by crash-point sampling of D13 (Verification Route) (pointed out by the backward leg of the three-way argument, 2026-09-03).
+- central_map **insensitive to K** (node count follows only batch key dispersion), root references constant 1, deadlist constant 0.
+- Key-clustered batches show larger gap: under K=16, u=1024 ptr 83 vs central 6 (**13.8×**) —
+  ptr must touch copies in every branched tree, while central traverses only a single mapping path.
+
+#### 2. How deadlist and birth change accordingly (the two items directly asked by D26 (Background Compaction and Placement Reclamation) settled item 5)
+
+- **deadlist**: Entries keyed by placement ⇒ under ptr_rewrite each batch must rewrite 11–36 entries entry-by-entry (scaling with K and batch composition);
+  under central_map entries keyed by logical identity ⇒ **constant zero rewrites**.
+- **birth**: **Not altered**. Negative arm measurement: after reassigning birth, violation count across 60 cells
+  **exactly equals** version count "referenced by ≥1 snapshot tree and moved" (median 50–64 / 64) —
+  reassigning pushes the left end of `birth(b) ≤ S.txg < death(b)` past all snapshot txgs,
+  and the shared portion is judged "unreferenced" one by one. birth is an attribute of logical version, not placement.
+
+#### 3. Ceiling of moving only exclusives (skip_shared): 0–17%
+
+| K | u | phys Batch Movable / 64 |
+|---|---|---|
+| 1 | 1024 | 11 (17%) |
+| 4 | 1024 | 5 (8%) |
+| 16 | 1024 | 5 (8%) |
+| Any | 64 | **0–1 (≈0%)** |
+
+=> More sparse updates between snapshots (quieter system), fewer exclusive versions in batch;
+under quiet system "moving only exclusives" **cannot move a single one**. The ceiling of this route is both low and inverse
+(older disks needing compaction more cannot move).
+
+### Model Revision Records (All occurred prior to formal round admission, criteria untouched)
+
+1. **Added post-snapshot newborn segment**: Initial history stopped exactly on snapshot boundary ⇒ exclusive versions did not exist, skip_shared constant 0/64 —
+   that was artifact, not ceiling.
+2. **Added destruction cascade**: Initial version never destroyed snapshots ⇒ disk bottom degraded into fossilized layer pinned by dead snapshots.
+   Cascade aligns with ZFS `dsl_destroy` form: filtering acts on **the next side after merge**
+   (filtering only transferred half pins blocks "dying in next window and referenced only by destroyed" for an extra window,
+   bidirectionally verified by manual calculation unit tests); prev must pass through (non-passthrough permanently pins, verified by mutation M5b).
+
+### What It Cannot Answer
+
+1. Counting model: no real I/O; "fewer COW nodes ⇒ cheaper" is extrapolation from structural quantity to latency.
+2. Read cost of central_map adding an extra hop on read path has no arm (originally wrote "to be supplemented when closing C34 (three-way clash on plain text mapping layer states)"; this account invalidated on 2026-09-07 as no code object when D9 (Encryption) settled item 5 changed to "scrub only", no plaintext mapping layer established, this cell no longer needed).
+3. Mapping tree approximated as "same geometry in key space, leaves store all generation entries for that key", intra-byte offset of variable-length leaves not modeled.
+4. COW of deadlist carrier itself not modeled, only counting entry rewrite counts.
+5. Disk lock period (keyless) semantics not modeled: D9 (Encryption) settled item 7 "movable but non-reclaimable" cited by definition, not reverified.
+6. Zero coverage of crash semantics: crash-point replay of migration transactions belongs to crash harness.
+7. Rotation destroying only oldest snapshot: path destroying intermediate snapshots (fork points, etc.) not modeled.
+8. **Absolute counts cannot be transferred to trees of D8 (Core Index Structure) / D11 (Message Buffers in Index Nodes)**:
+   model fanout 16, no message buffer; settled is fanout 119, 665 buffer entries per node;
+   tree height and mechanism of "modifying one reference" (direct node rewrite vs enter buffer first then flush) both differ.
+   **What can be transferred are only structural conclusions** — linear vs insensitive to K, whether each batch touches all snapshot roots,
+   whether deadlist rewrite is constant zero, birth belongs to logical version (pointed out by the backward leg of the three-way argument, 2026-09-03).
+9. Migration update cost of reverse index has no arm — E69 (Incremental Maintenance Cost of Reverse Index Taking Authoritative State) conclusion invalidated as a whole,
+   no valid measurement in repository.
+
+### Measurement Basis and Re-run
+
+- Code `scripts/experiment-apparatus/e94_move_touchset.rs`
+  (`cargo run --release --bin e94-move-touchset`),
+  raw output `e94-move-touchset-2026-09-03.out` (242 lines, ending `emitted=242`).
+- **N=5 rounds byte-for-byte consistent** (same md5). **14 unit tests, 11 mutations hit entry by entry, 1 judged equivalent**
+  (equivalence unit test archived: under rotation destroying only oldest, destroyed's own deadlist is constantly empty at destruction moment,
+  "merging transferred entries" is unreachable code), mutation table `scripts/mutation/tables/e94_move_touchset.tsv`
+  (`bash scripts/mutation/mutate.sh e94-move-touchset scripts/experiment-apparatus/e94_move_touchset.rs scripts/mutation/tables/e94_move_touchset.tsv`).
+- Hooked into `scripts/experiment-apparatus/replay.sh` (exact tier).
+
+### Affected Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D26 (Background Compaction and Placement Reclamation) settled item 2 | Support | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D26 (Background Compaction and Placement Reclamation) settled item 5 | Support | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 15 | Support | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 13 | Support | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 12 | Support | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D19 (Block Pointer Structure & Width Budget) | Provisioning | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D9 (Encryption) | Unaffected | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D16 (Publish Semantics) | Unaffected | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D22 (Synthesizing Unit Atomicity) | Unaffected | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D13 (Verification Route) | Unaffected | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D8 (Core Index Structure) | Unaffected | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D11 (Message Buffers in Index Nodes) | Unaffected | 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+
+## Historical Versions
+
+Historical entries for E94 (Touch Surface of Moving Shared Placement Points) are consolidated in [experiments-history.md](../experiments-history.md).
+

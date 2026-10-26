@@ -1,0 +1,3044 @@
+{
+  "audit_date": "2026-10-23",
+  "captured_at_date": "2026-10-23",
+  "scope": "静态文档和源码复核；未运行产品测试或重型验证",
+  "head": "841b3beabb9812ceaafcd636888b1201dd6e5adf",
+  "report": "records/2026-10-23-项目进度与知识腐烂审计-深入复核.md",
+  "report_sha256": "c5e7c2d784882327e83715aec190bcc492af1e6c3192085b591c8efc9d897dda",
+  "findings": [
+    {
+      "id": "R01",
+      "priority": "P2",
+      "title": "checker 数量实际有四套“当前值”",
+      "citations": [
+        {
+          "path": "README.md",
+          "line": 57,
+          "text": "| 池级 checker | 不变量清单（`crates/singlefs-checker/invariants/`）里「已实现」的 103 条，与代码里的清单同数 | 被上两样调用 |",
+          "context": [
+            {
+              "line": 56,
+              "text": "| 崩溃放量 | 同一套枚举放到几十亿态：流先录进判定库，再从库读回判，判器在 GPU 上，两台机器分片 | `scripts/crash/crash-amplification.sh`，用户要求时跑 |"
+            },
+            {
+              "line": 57,
+              "text": "| 池级 checker | 不变量清单（`crates/singlefs-checker/invariants/`）里「已实现」的 103 条，与代码里的清单同数 | 被上两样调用 |"
+            },
+            {
+              "line": 58,
+              "text": "| 模型对拍 | 随机操作序列与只住内存的理想模型逐步比 | harness-model-differential-and-scenarios |"
+            },
+            {
+              "line": 59,
+              "text": "| QEMU 真设备 | 两块 virtio 盘上跑固定负载，设备侧录下的写与 FLUSH 和程序录的流逐项比；没有崩溃注入 | checker-tier-qemu-device-streams |"
+            }
+          ]
+        },
+        {
+          "path": "README.en.md",
+          "line": 57,
+          "text": "| Pool-level checker | The 103 invariants marked implemented in the invariant list (`crates/singlefs-checker/invariants/`), the same count as the list in the code | Called by the two rows above |",
+          "context": [
+            {
+              "line": 56,
+              "text": "| Crash amplification | The same enumeration scaled to billions of states: streams are first recorded into the verdict library, then read back and judged; the judge runs on GPUs, sharded across two hosts | `scripts/crash/crash-amplification.sh`, run on user request |"
+            },
+            {
+              "line": 57,
+              "text": "| Pool-level checker | The 103 invariants marked implemented in the invariant list (`crates/singlefs-checker/invariants/`), the same count as the list in the code | Called by the two rows above |"
+            },
+            {
+              "line": 58,
+              "text": "| Model differential testing | Random operation sequences compared step by step with an ideal model that lives only in memory | harness-model-differential-and-scenarios |"
+            },
+            {
+              "line": 59,
+              "text": "| QEMU real device | A fixed workload on two virtio disks; the writes and FLUSHes recorded on the device side are compared item by item with the stream the program recorded; no crash injection | checker-tier-qemu-device-streams |"
+            }
+          ]
+        },
+        {
+          "path": "README.ja.md",
+          "line": 57,
+          "text": "| プールレベル checker | 不変条件の一覧（`crates/singlefs-checker/invariants/`）で「実装済み」の 103 条。コード中の一覧と同数 | 上の二行から呼ばれる |",
+          "context": [
+            {
+              "line": 56,
+              "text": "| クラッシュ増幅 | 同じ列挙を数十億状態まで広げる。ストリームをまず判定ライブラリに記録し、ライブラリから読み戻して判定する。判定器は GPU 上で動き、二台構成で分割する | `scripts/crash/crash-amplification.sh`。ユーザーの要求時に走らせる |"
+            },
+            {
+              "line": 57,
+              "text": "| プールレベル checker | 不変条件の一覧（`crates/singlefs-checker/invariants/`）で「実装済み」の 103 条。コード中の一覧と同数 | 上の二行から呼ばれる |"
+            },
+            {
+              "line": 58,
+              "text": "| モデル突き合わせ | ランダムな操作列を、メモリ上にだけ住む理想モデルと一歩ずつ比べる | harness-model-differential-and-scenarios |"
+            },
+            {
+              "line": 59,
+              "text": "| QEMU 実デバイス | 二つの virtio ディスク上で固定の負荷を走らせ、デバイス側で記録した書き込みと FLUSH をプログラムが記録したストリームと項目ごとに比べる。クラッシュ注入はない | checker-tier-qemu-device-streams |"
+            }
+          ]
+        },
+        {
+          "path": "CLAUDE.md",
+          "line": 113,
+          "text": "- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 24 项（数法：`bash scripts/crash/crash-amplification.sh --list-items` 的输出行数）；checker 判 104 条不变量（数它的命令：`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；I-8.4（重放幂等） 已实现在崩溃注入的二次崩溃上、不进池级 checker 清单，所以数法排掉它；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。",
+          "context": [
+            {
+              "line": 112,
+              "text": "- 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。"
+            },
+            {
+              "line": 113,
+              "text": "- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 24 项（数法：`bash scripts/crash/crash-amplification.sh --list-items` 的输出行数）；checker 判 104 条不变量（数它的命令：`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；I-8.4（重放幂等） 已实现在崩溃注入的二次崩溃上、不进池级 checker 清单，所以数法排掉它；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/verification-build.md",
+          "line": 140,
+          "text": "对拍崩溃前镜像、记录流、崩溃后镜像）。三者各自独立，缺一样就有一类错误没人看。三件都接上了：恢复 + oracle、池级 checker（`crates/singlefs-checker` 的 `walk::check_pool_image`，92 条，`IMPLEMENTED_INVARIANTS` 的长度，计数口径在 `crates/singlefs-checker/invariants/README.md`「状态」一节；最初的 29 条是：第一版 23 条加 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）、I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变）、I-5.4（分配记录罩住的槽互不相交））、记录核对器（`crates/singlefs-checker-tier` 的 `crash::check_records`），崩溃点重放全量在门禁 checker-tier-crash-point-replay。",
+          "context": [
+            {
+              "line": 139,
+              "text": "**每个崩溃状态跑三件事**：实现自己的恢复 → checker（一元判决）→ 记录核对器（二元判决，"
+            },
+            {
+              "line": 140,
+              "text": "对拍崩溃前镜像、记录流、崩溃后镜像）。三者各自独立，缺一样就有一类错误没人看。三件都接上了：恢复 + oracle、池级 checker（`crates/singlefs-checker` 的 `walk::check_pool_image`，92 条，`IMPLEMENTED_INVARIANTS` 的长度，计数口径在 `crates/singlefs-checker/invariants/README.md`「状态」一节；最初的 29 条是：第一版 23 条加 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）、I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变）、I-5.4（分配记录罩住的槽互不相交））、记录核对器（`crates/singlefs-checker-tier` 的 `crash::check_records`），崩溃点重放全量在门禁 checker-tier-crash-point-replay。"
+            },
+            {
+              "line": 141,
+              "text": ""
+            },
+            {
+              "line": 142,
+              "text": "**harness 自己要证明会红的用例，仓里已经点名了九条**（[checks-owed.md](checks-owed.md) 把它们的前置都写成崩溃点重放 harness，没有哪一条是可选的）："
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker/src/image.rs",
+          "line": 165,
+          "text": "pub const IMPLEMENTED_INVARIANTS: [&str; 108] = [",
+          "context": [
+            {
+              "line": 164,
+              "text": "/// 逐盘判 I-1.5，引用与快照那一截判 I-3.18，`crash_judge_gpu` 的覆盖表收了下标 106、107，对拍逐位比。"
+            },
+            {
+              "line": 165,
+              "text": "pub const IMPLEMENTED_INVARIANTS: [&str; 108] = ["
+            },
+            {
+              "line": 166,
+              "text": "    \"I-1.1\","
+            },
+            {
+              "line": 167,
+              "text": "    \"I-1.2\","
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R02",
+      "priority": "P1",
+      "title": "GPU 缺两项、覆盖表 106 项、必然编译失败的说明已过期",
+      "citations": [
+        {
+          "path": "crates/singlefs-checker/invariants/README.md",
+          "line": 29,
+          "text": "池级 checker（`walk::check_pool_image`）判 108 条（2026-10-22 里程碑三收尾加下标 106 的 I-1.5（系统配置记管道身份） 与下标 107 的 I-3.18（分配记录的跨度等于它罩住的单元那一类的槽数），GPU 判器两条都还没判、覆盖表没收；同日加下标 103 的 I-3.17（隔离记号与引用相符）；`crates/singlefs-checker/src/image.rs` 的 `IMPLEMENTED_INVARIANTS` 的长度；状态列写「已实现」的行用 `grep -ch '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | awk '{s+=$1} END{print s}'` 数得的条数比清单多 1，多的是 I-8.4（重放幂等）：它判在崩溃注入的二次崩溃上、不进池级 checker 的清单；排掉它（`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`）后与清单长度相同，同样是 108 条，其中 I-3.5（引用区间的精确性） 的出现规则与 ③ ④ 连同逆向都并在下标 65，I-4.4（意图只描述目标态） 在清单里（下标 73），2026-10-15 起判 logged_ops 里的整理意图（之前恒报不适用）；第一版 23 条，2026-09-16 里程碑「覆盖写、释放、回退与复用」步 3 加 I-3.8（实例表行唯一且低于挂载根），2026-09-17 步 6 加 I-7.4（近 K 代块未被复用） 与 I-4.8（近 K 代根校验和自洽），2026-09-18 加 I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变） 与 I-5.4（分配记录罩住的槽互不相交），2026-09-21 加 I-1.8（归并后版本全序）、I-7.3（环健康性）、I-8.6（反向链算法） 与 I-8.7（实例内事务号不重号），2026-09-22 加 I-1.10（码 2 条目宽等于字段表宽）、I-9.6（水位大于两处最大号）、I-9.12（分隔 key 落在孩子区间之外）、I-1.2（块头写序已发布） 与 I-4.2（无被引用未提交块），2026-09-23 加 I-8.8（前缀里的事务不被切开） 与 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号），2026-09-24 加 I-7.9（回退下界 F 不高于抬 F 的上限）、I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）、I-3.11（已分配减 defer 等于最新根走读） 与 I-8.9（一次发布的记录序号连续且只有末条带标志），2026-09-25 加过 I-7.10（已停用·回退见证表删了） 与 I-7.11（已停用·见证择根删了）、2026-09-26 随回退见证删掉退役，同日加 I-7.12（系统配置 F 不低于同盘根上的 F），2026-09-27 加 I-1.11（映射 key 与单元头相符），同日加 I-7.13（系统配置池级字段在读者收的范围里） 与 I-9.16（树表条目按树 ID 严格升序且合发号次序），2026-09-28 加 I-7.14（系统配置本盘设备号等于盘在池里的身份），2026-10-02 加里程碑三二·1 那一批 16 条（I-1.12（指针出生树等于被指单元头）、I-3.12（实例表行 T 低于引用它的根的 txg）、I-3.13（记账行代段等于这一版的 txg）、I-4.1（重放后树可遍历）、I-4.9（非最新候选根引用的单元不晚于它）、I-7.5（根槽按判定宽度对齐）、I-7.15（各盘所选系统配置槽设备数相同）、I-7.16（系统配置槽世代号与槽号的关系）、I-7.17（根槽位置等于 txg 算出的位置）、I-8.1（环几何够大）、I-8.5（tail 槽有效集非空）、I-8.10（记录新根段与同代根相同）、I-8.11（点名项与被指单元头相同）、I-8.12（同实例记录的 txg 不减）、I-9.25（树表条目的 previous_snapshot_txg 取值）、I-9.26（inode 改动计数落在出生代与容器诞生代号之间）），2026-10-04 加 I-9.27（树表条目的头 ID 取值）、I-5.5（从 mkfs 水位建树那一版的 t1 落点） 与 I-9.28（全部可读根里同一树 ID 的诞生 txg 相同），2026-10-05 加里程碑三·3 删除线那五条：下标 69 的 I-9.5（删除队列里的号仍在树里）、下标 70 的 I-3.4（可用空间扣待删占用）、下标 71 的 I-4.7（删除中 inode 有账）、下标 72 的 I-4.6（中间态其余不变量成立） 与下标 73 的 I-4.4（意图只描述目标态），2026-10-06 加下标 83 的 I-3.14（实例表每片记录形态合法），2026-10-09 加下标 84 的 I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上），2026-10-09 第 50 批加下标 85 到 89 的退役树那五条：I-9.31（退役树条目身份与子头相符）、I-9.32（退役记录合法）、I-9.33（谱系上的退役记录按身份不重复）、I-9.34（谱系上的退役记录不指本版活叶） 与 I-9.35（退役完备），同日第 53 批加下标 90、91 的 I-9.36（产品镜像里非最右谱系与退役容器装满） 与 I-9.37（测试镜像里谱系与退役容器不超旋钮值），2026-10-13 里程碑四四·2 加下标 92 的 I-1.13（扫描重建与遍历方向的索引相同），2026-10-15 里程碑四只读快照 checker 侧加下标 93 的 I-3.6（deadlist 紧界） 与下标 94 的 I-3.7（活快照可枚举），同日里程碑四自建 GC 的 checker 新判（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3 的 N2–N6）加下标 95 的 I-3.15（未释放记录罩住的单元由映射指在这一槽）、下标 96 的 I-5.6（活整理意图的区域里没有签发之后分配的记录）、下标 97 的 I-3.16（碎片度与全空段统计对得上） 与下标 98 的 I-1.14（同一映射 key 在各版里的单元逐字节相同），2026-10-16 截断那一批（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 的 T-2、T-4）加下标 99 的 I-4.10（截断中间态有账） 与下标 100 的 I-9.38（数据单元声明长度对 size），2026-10-18 截断字段那一批（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6）加下标 101 的 I-9.39（截断字段之外的活单元不早于它）），状态列写「已实现」的就是这 108 条（I-3.5（引用区间的精确性） 的出现规则与 ③ ④ 连同逆向都算在内）：每条配一份改坏了正好触发它的镜像（`crates/singlefs-harness/tests/checker_known_bad_images.rs`，删除线那几份的搭建与改法在 `crates/singlefs-harness/tests/common_deletion_in_progress/mod.rs`，I-4.4（意图只描述目标态） 与里程碑四自建 GC 那四条在 `crates/singlefs-harness/tests/checker_compaction_intent_and_relocation_must_red_worlds.rs`），崩溃点重放的每个崩溃状态都跑它。",
+          "context": [
+            {
+              "line": 28,
+              "text": "**当前里程碑是「删除与多次 COW」。** 磁盘格式已落成字节：mkfs、新池新建文件的写路径与冷启动恢复在 `crates/singlefs-core`；checker 在 `crates/singlefs-checker`，与实现只共享常量模块（D13（验证路线） 已定项 5）。"
+            },
+            {
+              "line": 29,
+              "text": "池级 checker（`walk::check_pool_image`）判 108 条（2026-10-22 里程碑三收尾加下标 106 的 I-1.5（系统配置记管道身份） 与下标 107 的 I-3.18（分配记录的跨度等于它罩住的单元那一类的槽数），GPU 判器两条都还没判、覆盖表没收；同日加下标 103 的 I-3.17（隔离记号与引用相符）；`crates/singlefs-checker/src/image.rs` 的 `IMPLEMENTED_INVARIANTS` 的长度；状态列写「已实现」的行用 `grep -ch '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | awk '{s+=$1} END{print s}'` 数得的条数比清单多 1，多的是 I-8.4（重放幂等）：它判在崩溃注入的二次崩溃上、不进池级 checker 的清单；排掉它（`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`）后与清单长度相同，同样是 108 条，其中 I-3.5（引用区间的精确性） 的出现规则与 ③ ④ 连同逆向都并在下标 65，I-4.4（意图只描述目标态） 在清单里（下标 73），2026-10-15 起判 logged_ops 里的整理意图（之前恒报不适用）；第一版 23 条，2026-09-16 里程碑「覆盖写、释放、回退与复用」步 3 加 I-3.8（实例表行唯一且低于挂载根），2026-09-17 步 6 加 I-7.4（近 K 代块未被复用） 与 I-4.8（近 K 代根校验和自洽），2026-09-18 加 I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变） 与 I-5.4（分配记录罩住的槽互不相交），2026-09-21 加 I-1.8（归并后版本全序）、I-7.3（环健康性）、I-8.6（反向链算法） 与 I-8.7（实例内事务号不重号），2026-09-22 加 I-1.10（码 2 条目宽等于字段表宽）、I-9.6（水位大于两处最大号）、I-9.12（分隔 key 落在孩子区间之外）、I-1.2（块头写序已发布） 与 I-4.2（无被引用未提交块），2026-09-23 加 I-8.8（前缀里的事务不被切开） 与 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号），2026-09-24 加 I-7.9（回退下界 F 不高于抬 F 的上限）、I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）、I-3.11（已分配减 defer 等于最新根走读） 与 I-8.9（一次发布的记录序号连续且只有末条带标志），2026-09-25 加过 I-7.10（已停用·回退见证表删了） 与 I-7.11（已停用·见证择根删了）、2026-09-26 随回退见证删掉退役，同日加 I-7.12（系统配置 F 不低于同盘根上的 F），2026-09-27 加 I-1.11（映射 key 与单元头相符），同日加 I-7.13（系统配置池级字段在读者收的范围里） 与 I-9.16（树表条目按树 ID 严格升序且合发号次序），2026-09-28 加 I-7.14（系统配置本盘设备号等于盘在池里的身份），2026-10-02 加里程碑三二·1 那一批 16 条（I-1.12（指针出生树等于被指单元头）、I-3.12（实例表行 T 低于引用它的根的 txg）、I-3.13（记账行代段等于这一版的 txg）、I-4.1（重放后树可遍历）、I-4.9（非最新候选根引用的单元不晚于它）、I-7.5（根槽按判定宽度对齐）、I-7.15（各盘所选系统配置槽设备数相同）、I-7.16（系统配置槽世代号与槽号的关系）、I-7.17（根槽位置等于 txg 算出的位置）、I-8.1（环几何够大）、I-8.5（tail 槽有效集非空）、I-8.10（记录新根段与同代根相同）、I-8.11（点名项与被指单元头相同）、I-8.12（同实例记录的 txg 不减）、I-9.25（树表条目的 previous_snapshot_txg 取值）、I-9.26（inode 改动计数落在出生代与容器诞生代号之间）），2026-10-04 加 I-9.27（树表条目的头 ID 取值）、I-5.5（从 mkfs 水位建树那一版的 t1 落点） 与 I-9.28（全部可读根里同一树 ID 的诞生 txg 相同），2026-10-05 加里程碑三·3 删除线那五条：下标 69 的 I-9.5（删除队列里的号仍在树里）、下标 70 的 I-3.4（可用空间扣待删占用）、下标 71 的 I-4.7（删除中 inode 有账）、下标 72 的 I-4.6（中间态其余不变量成立） 与下标 73 的 I-4.4（意图只描述目标态），2026-10-06 加下标 83 的 I-3.14（实例表每片记录形态合法），2026-10-09 加下标 84 的 I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上），2026-10-09 第 50 批加下标 85 到 89 的退役树那五条：I-9.31（退役树条目身份与子头相符）、I-9.32（退役记录合法）、I-9.33（谱系上的退役记录按身份不重复）、I-9.34（谱系上的退役记录不指本版活叶） 与 I-9.35（退役完备），同日第 53 批加下标 90、91 的 I-9.36（产品镜像里非最右谱系与退役容器装满） 与 I-9.37（测试镜像里谱系与退役容器不超旋钮值），2026-10-13 里程碑四四·2 加下标 92 的 I-1.13（扫描重建与遍历方向的索引相同），2026-10-15 里程碑四只读快照 checker 侧加下标 93 的 I-3.6（deadlist 紧界） 与下标 94 的 I-3.7（活快照可枚举），同日里程碑四自建 GC 的 checker 新判（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3 的 N2–N6）加下标 95 的 I-3.15（未释放记录罩住的单元由映射指在这一槽）、下标 96 的 I-5.6（活整理意图的区域里没有签发之后分配的记录）、下标 97 的 I-3.16（碎片度与全空段统计对得上） 与下标 98 的 I-1.14（同一映射 key 在各版里的单元逐字节相同），2026-10-16 截断那一批（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 的 T-2、T-4）加下标 99 的 I-4.10（截断中间态有账） 与下标 100 的 I-9.38（数据单元声明长度对 size），2026-10-18 截断字段那一批（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6）加下标 101 的 I-9.39（截断字段之外的活单元不早于它）），状态列写「已实现」的就是这 108 条（I-3.5（引用区间的精确性） 的出现规则与 ③ ④ 连同逆向都算在内）：每条配一份改坏了正好触发它的镜像（`crates/singlefs-harness/tests/checker_known_bad_images.rs`，删除线那几份的搭建与改法在 `crates/singlefs-harness/tests/common_deletion_in_progress/mod.rs`，I-4.4（意图只描述目标态） 与里程碑四自建 GC 那四条在 `crates/singlefs-harness/tests/checker_compaction_intent_and_relocation_must_red_worlds.rs`），崩溃点重放的每个崩溃状态都跑它。"
+            },
+            {
+              "line": 30,
+              "text": "I-7.7（系统配置实例代号不低于根环） 2026-09-14 按 C322（取号那一步的屏障怎么放没有条款） 定案改成 ① ②，崩溃点重放里 0 个状态判红；I-3.1（已分配统计对得上） 与 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 的 checker 读法 2026-09-14 由用户收尾弹窗定甲，写在各自那一行。"
+            },
+            {
+              "line": 31,
+              "text": "其余条目仍写「未实现」：它们要覆盖写、释放、回退与复用（释放、重用、残留）、journal 一侧的那一类检查、快照或加密，新池新建文件的镜像上判不出东西。"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
+          "line": 281,
+          "text": "pub const POOL_CHECKER_COVERED_INVARIANT_INDEXES: &[usize] = &[",
+          "context": [
+            {
+              "line": 280,
+              "text": "/// 用户 2026-10-04 定「改回要求全覆盖」：没有「内核还没判」那一张表。"
+            },
+            {
+              "line": 281,
+              "text": "pub const POOL_CHECKER_COVERED_INVARIANT_INDEXES: &[usize] = &["
+            },
+            {
+              "line": 282,
+              "text": "    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,"
+            },
+            {
+              "line": 283,
+              "text": "    26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/src/crash_judge_conclusions.rs",
+          "line": 441,
+          "text": "pub const POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS: &[usize] = &[];",
+          "context": [
+            {
+              "line": 440,
+              "text": "/// 编译期守着它不进这张表；池级 checker 那一批交回时是过渡的 `[92, 102]`，与扫描重建那一份合成空表）。"
+            },
+            {
+              "line": 441,
+              "text": "pub const POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS: &[usize] = &[];"
+            },
+            {
+              "line": 442,
+              "text": ""
+            },
+            {
+              "line": 443,
+              "text": "// 表里的下标都在池级 checker 的清单里、按下标升序、一条不重（挂 `gpu` 特性时另核都在覆盖表里，那一条在 `crate::crash_judge_gpu`）。"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl",
+          "line": 261,
+          "text": "const INVARIANT_I_1_5: u32 = 106u;",
+          "context": [
+            {
+              "line": 260,
+              "text": "// 引用与快照那一截在 I-3.15 那一份版本清单上判 I-3.18"
+            },
+            {
+              "line": 261,
+              "text": "const INVARIANT_I_1_5: u32 = 106u;"
+            },
+            {
+              "line": 262,
+              "text": ""
+            },
+            {
+              "line": 263,
+              "text": "const INVARIANT_I_3_18: u32 = 107u;"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/src/crash_judge_checker.wgsl",
+          "line": 5440,
+          "text": "        judge(INVARIANT_I_1_5, !all_zero(chosen.slot_bytes_base, SYSTEM_CONFIGURATION_WRITER_IMPLEMENTATION_IDENTIFIER_OFFSET,",
+          "context": [
+            {
+              "line": 5439,
+              "text": "        // （slot_bytes_base），不另带字段"
+            },
+            {
+              "line": 5440,
+              "text": "        judge(INVARIANT_I_1_5, !all_zero(chosen.slot_bytes_base, SYSTEM_CONFIGURATION_WRITER_IMPLEMENTATION_IDENTIFIER_OFFSET,"
+            },
+            {
+              "line": 5441,
+              "text": "            SYSTEM_CONFIGURATION_WRITER_IMPLEMENTATION_IDENTIFIER_BYTES));"
+            },
+            {
+              "line": 5442,
+              "text": "    }"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl",
+          "line": 6950,
+          "text": "        judge(INVARIANT_I_3_18, sw(record + 3u) == slots_of_the_class);",
+          "context": [
+            {
+              "line": 6949,
+              "text": "        }"
+            },
+            {
+              "line": 6950,
+              "text": "        judge(INVARIANT_I_3_18, sw(record + 3u) == slots_of_the_class);"
+            },
+            {
+              "line": 6951,
+              "text": "    }"
+            },
+            {
+              "line": 6952,
+              "text": "}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R03",
+      "priority": "P2",
+      "title": "不变量入口仍把里程碑三当作当前里程碑",
+      "citations": [
+        {
+          "path": "crates/singlefs-checker/invariants/README.md",
+          "line": 28,
+          "text": "**当前里程碑是「删除与多次 COW」。** 磁盘格式已落成字节：mkfs、新池新建文件的写路径与冷启动恢复在 `crates/singlefs-core`；checker 在 `crates/singlefs-checker`，与实现只共享常量模块（D13（验证路线） 已定项 5）。",
+          "context": [
+            {
+              "line": 27,
+              "text": ""
+            },
+            {
+              "line": 28,
+              "text": "**当前里程碑是「删除与多次 COW」。** 磁盘格式已落成字节：mkfs、新池新建文件的写路径与冷启动恢复在 `crates/singlefs-core`；checker 在 `crates/singlefs-checker`，与实现只共享常量模块（D13（验证路线） 已定项 5）。"
+            },
+            {
+              "line": 29,
+              "text": "池级 checker（`walk::check_pool_image`）判 108 条（2026-10-22 里程碑三收尾加下标 106 的 I-1.5（系统配置记管道身份） 与下标 107 的 I-3.18（分配记录的跨度等于它罩住的单元那一类的槽数），GPU 判器两条都还没判、覆盖表没收；同日加下标 103 的 I-3.17（隔离记号与引用相符）；`crates/singlefs-checker/src/image.rs` 的 `IMPLEMENTED_INVARIANTS` 的长度；状态列写「已实现」的行用 `grep -ch '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | awk '{s+=$1} END{print s}'` 数得的条数比清单多 1，多的是 I-8.4（重放幂等）：它判在崩溃注入的二次崩溃上、不进池级 checker 的清单；排掉它（`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`）后与清单长度相同，同样是 108 条，其中 I-3.5（引用区间的精确性） 的出现规则与 ③ ④ 连同逆向都并在下标 65，I-4.4（意图只描述目标态） 在清单里（下标 73），2026-10-15 起判 logged_ops 里的整理意图（之前恒报不适用）；第一版 23 条，2026-09-16 里程碑「覆盖写、释放、回退与复用」步 3 加 I-3.8（实例表行唯一且低于挂载根），2026-09-17 步 6 加 I-7.4（近 K 代块未被复用） 与 I-4.8（近 K 代根校验和自洽），2026-09-18 加 I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变） 与 I-5.4（分配记录罩住的槽互不相交），2026-09-21 加 I-1.8（归并后版本全序）、I-7.3（环健康性）、I-8.6（反向链算法） 与 I-8.7（实例内事务号不重号），2026-09-22 加 I-1.10（码 2 条目宽等于字段表宽）、I-9.6（水位大于两处最大号）、I-9.12（分隔 key 落在孩子区间之外）、I-1.2（块头写序已发布） 与 I-4.2（无被引用未提交块），2026-09-23 加 I-8.8（前缀里的事务不被切开） 与 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号），2026-09-24 加 I-7.9（回退下界 F 不高于抬 F 的上限）、I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）、I-3.11（已分配减 defer 等于最新根走读） 与 I-8.9（一次发布的记录序号连续且只有末条带标志），2026-09-25 加过 I-7.10（已停用·回退见证表删了） 与 I-7.11（已停用·见证择根删了）、2026-09-26 随回退见证删掉退役，同日加 I-7.12（系统配置 F 不低于同盘根上的 F），2026-09-27 加 I-1.11（映射 key 与单元头相符），同日加 I-7.13（系统配置池级字段在读者收的范围里） 与 I-9.16（树表条目按树 ID 严格升序且合发号次序），2026-09-28 加 I-7.14（系统配置本盘设备号等于盘在池里的身份），2026-10-02 加里程碑三二·1 那一批 16 条（I-1.12（指针出生树等于被指单元头）、I-3.12（实例表行 T 低于引用它的根的 txg）、I-3.13（记账行代段等于这一版的 txg）、I-4.1（重放后树可遍历）、I-4.9（非最新候选根引用的单元不晚于它）、I-7.5（根槽按判定宽度对齐）、I-7.15（各盘所选系统配置槽设备数相同）、I-7.16（系统配置槽世代号与槽号的关系）、I-7.17（根槽位置等于 txg 算出的位置）、I-8.1（环几何够大）、I-8.5（tail 槽有效集非空）、I-8.10（记录新根段与同代根相同）、I-8.11（点名项与被指单元头相同）、I-8.12（同实例记录的 txg 不减）、I-9.25（树表条目的 previous_snapshot_txg 取值）、I-9.26（inode 改动计数落在出生代与容器诞生代号之间）），2026-10-04 加 I-9.27（树表条目的头 ID 取值）、I-5.5（从 mkfs 水位建树那一版的 t1 落点） 与 I-9.28（全部可读根里同一树 ID 的诞生 txg 相同），2026-10-05 加里程碑三·3 删除线那五条：下标 69 的 I-9.5（删除队列里的号仍在树里）、下标 70 的 I-3.4（可用空间扣待删占用）、下标 71 的 I-4.7（删除中 inode 有账）、下标 72 的 I-4.6（中间态其余不变量成立） 与下标 73 的 I-4.4（意图只描述目标态），2026-10-06 加下标 83 的 I-3.14（实例表每片记录形态合法），2026-10-09 加下标 84 的 I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上），2026-10-09 第 50 批加下标 85 到 89 的退役树那五条：I-9.31（退役树条目身份与子头相符）、I-9.32（退役记录合法）、I-9.33（谱系上的退役记录按身份不重复）、I-9.34（谱系上的退役记录不指本版活叶） 与 I-9.35（退役完备），同日第 53 批加下标 90、91 的 I-9.36（产品镜像里非最右谱系与退役容器装满） 与 I-9.37（测试镜像里谱系与退役容器不超旋钮值），2026-10-13 里程碑四四·2 加下标 92 的 I-1.13（扫描重建与遍历方向的索引相同），2026-10-15 里程碑四只读快照 checker 侧加下标 93 的 I-3.6（deadlist 紧界） 与下标 94 的 I-3.7（活快照可枚举），同日里程碑四自建 GC 的 checker 新判（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3 的 N2–N6）加下标 95 的 I-3.15（未释放记录罩住的单元由映射指在这一槽）、下标 96 的 I-5.6（活整理意图的区域里没有签发之后分配的记录）、下标 97 的 I-3.16（碎片度与全空段统计对得上） 与下标 98 的 I-1.14（同一映射 key 在各版里的单元逐字节相同），2026-10-16 截断那一批（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 的 T-2、T-4）加下标 99 的 I-4.10（截断中间态有账） 与下标 100 的 I-9.38（数据单元声明长度对 size），2026-10-18 截断字段那一批（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6）加下标 101 的 I-9.39（截断字段之外的活单元不早于它）），状态列写「已实现」的就是这 108 条（I-3.5（引用区间的精确性） 的出现规则与 ③ ④ 连同逆向都算在内）：每条配一份改坏了正好触发它的镜像（`crates/singlefs-harness/tests/checker_known_bad_images.rs`，删除线那几份的搭建与改法在 `crates/singlefs-harness/tests/common_deletion_in_progress/mod.rs`，I-4.4（意图只描述目标态） 与里程碑四自建 GC 那四条在 `crates/singlefs-harness/tests/checker_compaction_intent_and_relocation_must_red_worlds.rs`），崩溃点重放的每个崩溃状态都跑它。"
+            },
+            {
+              "line": 30,
+              "text": "I-7.7（系统配置实例代号不低于根环） 2026-09-14 按 C322（取号那一步的屏障怎么放没有条款） 定案改成 ① ②，崩溃点重放里 0 个状态判红；I-3.1（已分配统计对得上） 与 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 的 checker 读法 2026-09-14 由用户收尾弹窗定甲，写在各自那一行。"
+            }
+          ]
+        },
+        {
+          "path": "README.md",
+          "line": 45,
+          "text": "当前里程碑是「共享与回收」（[`.claude/kb/milestone/04-fourth-txn.md`](.claude/kb/milestone/04-fourth-txn.md)）；上一个「删除与多次 COW」（[`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)）主体已完结，还开着的是段 4「优化」（二·6、六·4）。",
+          "context": [
+            {
+              "line": 44,
+              "text": ""
+            },
+            {
+              "line": 45,
+              "text": "当前里程碑是「共享与回收」（[`.claude/kb/milestone/04-fourth-txn.md`](.claude/kb/milestone/04-fourth-txn.md)）；上一个「删除与多次 COW」（[`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)）主体已完结，还开着的是段 4「优化」（二·6、六·4）。"
+            },
+            {
+              "line": 46,
+              "text": ""
+            },
+            {
+              "line": 47,
+              "text": "能做的：两块盘上 mkfs；写一个文件并提交，顺序写满多个数据单元、按偏移读回；一次发布建多个文件（没有目录）；覆盖写、释放、抬过回退下界之后复用落点；关闭再挂载成第二个可写实例；挂着的时候做管理员回退；冷启动读回；按 inode 号覆盖写、顺序写与删除文件（删除先发布删除意图，再分批回收它的数据单元）；截断（改小时先发布意图、再分批回收 size 之外的数据单元，改大与等长各一次发布）；建与删只读快照。"
+            }
+          ]
+        },
+        {
+          "path": "CLAUDE.md",
+          "line": 8,
+          "text": "当前里程碑：**「共享与回收」**（`.claude/kb/milestone/04-fourth-txn.md`，作业点、验收与次序在那份文件）。上一个里程碑**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`）主体已完结，还开着的是段 4「优化」（二·6、六·4）。再上一个**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`）已结束，没做完的转进里程碑三项五（五·7 到五·11）；它的崩溃放量已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，入口 `scripts/crash/crash-amplification.sh --list-items` 列分项。更早的「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下八个 crate（格式常量、核心、池级 checker、harness 档、checker 档、恢复重放取前缀、择根、扫环三截的核 `singlefs-replay-prefix`、参照文件系统 RefFS、函数单元图 `singlefs-unit-graph`；两档怎么分见 `.claude/rules/verification.md`）。",
+          "context": [
+            {
+              "line": 7,
+              "text": ""
+            },
+            {
+              "line": 8,
+              "text": "当前里程碑：**「共享与回收」**（`.claude/kb/milestone/04-fourth-txn.md`，作业点、验收与次序在那份文件）。上一个里程碑**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`）主体已完结，还开着的是段 4「优化」（二·6、六·4）。再上一个**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`）已结束，没做完的转进里程碑三项五（五·7 到五·11）；它的崩溃放量已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，入口 `scripts/crash/crash-amplification.sh --list-items` 列分项。更早的「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下八个 crate（格式常量、核心、池级 checker、harness 档、checker 档、恢复重放取前缀、择根、扫环三截的核 `singlefs-replay-prefix`、参照文件系统 RefFS、函数单元图 `singlefs-unit-graph`；两档怎么分见 `.claude/rules/verification.md`）。"
+            },
+            {
+              "line": 9,
+              "text": ""
+            },
+            {
+              "line": 10,
+              "text": "## 任务从哪进"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/milestone/04-fourth-txn.md",
+          "line": 37,
+          "text": "| 2 实现 | 一·2 → 二·2（共享先落地；GC 不涉共享的部分可与一·2 并行写）∥ 四·2 ∥ 六·2 | GC 最难的崩溃流（搬被共享的块）要先有共享才造得出来 | 核心层已合入 master（提交 0b926bd3f）：一·2 建只读快照 / 快照下覆盖写与删文件 / 删快照，二·2 整理（选段与搬迁计划、意图记录、区域扫描、`publish_relocation_batch`；产品路径在签整理意图之前停下），四·2 `rebuild.rs`，六·2 `truncate.rs`；各作业点还差什么见各作业点行与欠账表 |",
+          "context": [
+            {
+              "line": 36,
+              "text": "| 1 设计 | 一·1（D5（快照 / 空间记账机制） 重开与只读快照形态）∥ 二·1（GC 设计轮，含 E10（老化：结构抗老化 vs 事后整理） 跑前登记）∥ 四·1（扫描重建题面）∥ 六·1（截断设计轮） | 四边互不依赖（六·1 里被快照引用的尾部块那一问随一·1 的形态）；二·1 里搬共享块那一问要等一·1 的形态，其余先做 | 做了（一·1 `research/prompts/m4-snapshot-r1-main-verification.md`；二·1 `research/prompts/m4-gc-r1-main-verification.md`，E10（老化：结构抗老化 vs 事后整理） 的跑前登记是 `research/prompts/e10-r1-prereg.md`；四·1 题面随 `crates/singlefs-checker/src/rebuild.rs` 写成；六·1 `research/prompts/m4-trunc-r1-main-verification.md`、`research/prompts/m4-trunc-r2-main-verification.md`） |"
+            },
+            {
+              "line": 37,
+              "text": "| 2 实现 | 一·2 → 二·2（共享先落地；GC 不涉共享的部分可与一·2 并行写）∥ 四·2 ∥ 六·2 | GC 最难的崩溃流（搬被共享的块）要先有共享才造得出来 | 核心层已合入 master（提交 0b926bd3f）：一·2 建只读快照 / 快照下覆盖写与删文件 / 删快照，二·2 整理（选段与搬迁计划、意图记录、区域扫描、`publish_relocation_batch`；产品路径在签整理意图之前停下），四·2 `rebuild.rs`，六·2 `truncate.rs`；各作业点还差什么见各作业点行与欠账表 |"
+            },
+            {
+              "line": 38,
+              "text": "| 3 覆盖 | 一·4、二·3、三·1、六·3 的流跑在崩溃放量上全域；二·4 证性质 | 出口 1、2、3、5、7 在这一段满足 | 流已入库并登记在 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行（一·4、二·3、三·1、六·3 对应的流）；全域 0 红与二·4 的性质证明还没有记录 |"
+            },
+            {
+              "line": 39,
+              "text": "| GPU GC | 七·1 量 → 七·2 设计 → 七·3 实现 → 七·4 覆盖 ∥ 七·5 对照组 | 七·1 只等二·2 的 GC 发布路径（已在 master：`transaction.rs` 的 `publish_relocation_batch`）；七·2 要七·1 的 CPU 与 I/O 拆分；出口 8 在七·4 满足 | 未开 |"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R04",
+      "priority": "P2",
+      "title": "GPU GC 总表“未开”漏掉已完成的测量阶段",
+      "citations": [
+        {
+          "path": ".claude/kb/milestone/04-fourth-txn.md",
+          "line": 39,
+          "text": "| GPU GC | 七·1 量 → 七·2 设计 → 七·3 实现 → 七·4 覆盖 ∥ 七·5 对照组 | 七·1 只等二·2 的 GC 发布路径（已在 master：`transaction.rs` 的 `publish_relocation_batch`）；七·2 要七·1 的 CPU 与 I/O 拆分；出口 8 在七·4 满足 | 未开 |",
+          "context": [
+            {
+              "line": 38,
+              "text": "| 3 覆盖 | 一·4、二·3、三·1、六·3 的流跑在崩溃放量上全域；二·4 证性质 | 出口 1、2、3、5、7 在这一段满足 | 流已入库并登记在 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行（一·4、二·3、三·1、六·3 对应的流）；全域 0 红与二·4 的性质证明还没有记录 |"
+            },
+            {
+              "line": 39,
+              "text": "| GPU GC | 七·1 量 → 七·2 设计 → 七·3 实现 → 七·4 覆盖 ∥ 七·5 对照组 | 七·1 只等二·2 的 GC 发布路径（已在 master：`transaction.rs` 的 `publish_relocation_batch`）；七·2 要七·1 的 CPU 与 I/O 拆分；出口 8 在七·4 满足 | 未开 |"
+            },
+            {
+              "line": 40,
+              "text": ""
+            },
+            {
+              "line": 41,
+              "text": "**估计**：没估。"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/experiments.md",
+          "line": 209,
+          "text": "| E185（GC一批搬迁的挂钟拆分） | 第 2 次重跑已跑（占比 0.25 的几何改负载后造成了，单点核与第一、二段跑完；问题单四行都够判：第 1、2 行读这一趟，第 3、4 行沿用第 1 次重跑的产物；第三、四段够判后不跑） | 第一段 Q1、Q2 共 24 格 both 12、cpu 12：池小（P = 1024）六格两边都占，池大（P = 8192）六格 CPU 限，随池大小翻面，不随活槽占比与批大小；f = 0.25 两点几何改法甲后造成，S = 12 格全相容，第 1 行够判；第二段甲、乙、丙三段份额全不值（最大 0.020433、0.006521、0.028846，F7 打中），第 2 行够判；Q9 沿用第 1 次重跑 72 行全判 GPU 输，算不算翻面量交主 agent 并进七·2 设计轮定；第 3 行沿用 Q13 56 行全判要攒批（φ 0.911860–0.998500）；第 4 行单跑够（比值 0.015977） | [185-GC一批搬迁的挂钟拆分.md](experiments/185-GC一批搬迁的挂钟拆分.md) |",
+          "context": [
+            {
+              "line": 208,
+              "text": "| E184（常规层与大负载层的代价计数） | 部分已跑（第一段 J1 已跑，G1 够判；第二到四段未跑） | 第一段（J1，入库装置）：随机历史 J1-乙 随步数档 50 步 overlap（0.583333）、100 步 overlap（0.500000，正好在门槛上）、200 步 partial、400 步 separate，步数一行记不稳定；覆盖写链 u = 1、4、16 三档 separate；J1-丙 全部 independent（共用块占比最大 0.002761），9 条排不了计划的流取不出；锚 B1 触发 F6（条款写 12230590578，第一段重录 1358954634，取号写两轮之后 `selfcheck` 现录 1358954642）；区间 S 只含 14 条钉过的冒烟流 | [184-常规层与大负载层的代价计数.md](experiments/184-常规层与大负载层的代价计数.md) |"
+            },
+            {
+              "line": 209,
+              "text": "| E185（GC一批搬迁的挂钟拆分） | 第 2 次重跑已跑（占比 0.25 的几何改负载后造成了，单点核与第一、二段跑完；问题单四行都够判：第 1、2 行读这一趟，第 3、4 行沿用第 1 次重跑的产物；第三、四段够判后不跑） | 第一段 Q1、Q2 共 24 格 both 12、cpu 12：池小（P = 1024）六格两边都占，池大（P = 8192）六格 CPU 限，随池大小翻面，不随活槽占比与批大小；f = 0.25 两点几何改法甲后造成，S = 12 格全相容，第 1 行够判；第二段甲、乙、丙三段份额全不值（最大 0.020433、0.006521、0.028846，F7 打中），第 2 行够判；Q9 沿用第 1 次重跑 72 行全判 GPU 输，算不算翻面量交主 agent 并进七·2 设计轮定；第 3 行沿用 Q13 56 行全判要攒批（φ 0.911860–0.998500）；第 4 行单跑够（比值 0.015977） | [185-GC一批搬迁的挂钟拆分.md](experiments/185-GC一批搬迁的挂钟拆分.md) |"
+            },
+            {
+              "line": 210,
+              "text": "| E186（不认识的树·记账维重推） | 已跑（第一次跑 Q1、Q2 够判，变异表 17 条全抓；第二次跑 Q1 够判，变异表 26 条全抓） | 字典序在每代写行之前补「要改几条已定条款」一位、读法 B1 与 W2，11520 点 × 15 格：第一次跑合法点上 Q1 判「依赖取样点」——`r_tree_dim = 1`、`h_new > 0` 时 `Carry` 一次都不是胜者（`lpc = 0` 胜者 `NoCarry`，`lpc = 1` `NoCarry` 与随根留着并列），`r_tree_dim = 2` 时胜者是 `Carry`；Q2 读「计」时 `w_gens = 0` 的点上 `RejectEntry` 对 `Skip` 在第 6 位分得开、flags 胜者从并列换成 `Skip`，自证由绿转红；阳性阴性对照、账本两条路、锚点全部成立。第二次跑（判决 W1 那一格判第一次跑的 U5 空真与反向接受条款写错，改判据重跑，不是盲测）：U5 对 `NoCarry`、随根留着改记「要改」，被判点（合法点里 `h_new > 0`，6400 点）形态 `unique_carry`，㊀ 不翻面，不带参数的产物与第一次跑逐字节相同 | [186-不认识的树-记账维重推.md](experiments/186-不认识的树-记账维重推.md) |"
+            },
+            {
+              "line": 211,
+              "text": "| E187（隔离落盘代价） | 已跑（两段都已跑，岔路单那一行够判；变异表 18 条全抓） | 第一段 250 行：八段微历史钉值全成立，每次隔离甲多写 0 / 4 / 8 次、乙 2 / 6 次，谁小随取样点换号；两种丙在记号写对的完好隔离上不误红，记号写错时放过 2 / 4 张；落点甲的旧读者读成跨度 16385 / 16386、一条都落不进叶。第二段 320 格 × 三臂（旧的第二段产物排程两格没排满、整份作废，修装置后重跑）：密度 10 上甲最高档二、乙最高档三（17 格，全在 U = 200），密度 1、3 两个落点都不进档三，档随 U、K、几何换；甲与乙谁小依赖取样点（U = 200 甲全小）；终态不翻记号时 `no_mark` 误红 4992、丙误红 0，翻记号时 `mark_or_today` 放过 4966；`no_mark` 5600 个完好隔离事件里 606 个期末为 0，全在回退率 1 的格 | [187-隔离落盘代价.md](experiments/187-隔离落盘代价.md) |"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md",
+          "line": 1,
+          "text": "## E185 GC一批搬迁的挂钟拆分 —— 第 2 次重跑已跑（占比 0.25 的几何改负载后造成了，单点核与第一、二段跑完；问题单四行都够判：第 1、2 行读这一趟，第 3、4 行沿用第 1 次重跑的产物；第三、四段够判后不跑）",
+          "context": [
+            {
+              "line": 1,
+              "text": "## E185 GC一批搬迁的挂钟拆分 —— 第 2 次重跑已跑（占比 0.25 的几何改负载后造成了，单点核与第一、二段跑完；问题单四行都够判：第 1、2 行读这一趟，第 3、4 行沿用第 1 次重跑的产物；第三、四段够判后不跑）"
+            },
+            {
+              "line": 2,
+              "text": ""
+            },
+            {
+              "line": 3,
+              "text": "**中文** · [English](185-wall-clock-breakdown-of-a-batch-of-gc-migrations.en.md) · [日本語](185-GC-一バッチ分の移動の壁時計分解.ja.md)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R05",
+      "priority": "P1",
+      "title": "C412 的阻塞条件仍写“没有整理路径、没有挂钟数”",
+      "citations": [
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 291,
+          "text": "| C412 | 整理的挂钟代价没量过 | **D3（空间分配） 已定项 14 是「后台整理常驻、自动、用户无需知道」这条硬承诺，而它没有任何挂钟数在背书。** D3（空间分配） 已定项 1 的依据引 E74（分配记录的条目数与整理开销），而 E74（分配记录的条目数与整理开销） 量的是整理路径重写多少个节点（载体强制付出多少），不是它要花多少墙钟；D3（空间分配） 瘦身前的正文自陈挂钟那一问仍欠实现，那句话已随 2026-09-20 的瘦身移出正文、在决策变更史里。⇒ 整理跑一轮要多久、会不会跟前台抢 I/O，一个数都没有 | 建一个计数实验或给 E74（分配记录的条目数与整理开销） 补一轮，量一批整理的挂钟，口径写明设备、负载、批大小，断言钉绝对值而不是只比相对倍数。判别力自证：把批大小翻倍，挂钟必须跟着涨 | D26（后台整理与放置回收） 的整理策略未定项 8 / 9 / 10 还开着，先定量哪一条策略；`crates/` 里没有整理（`grep -rn 整理 crates --include=*.rs` 命中 12 行、4 个文件，都是注释、断言消息与字段名里的字（系统运行配置那三个整理水位恒取内置默认 0），没有整理路径） | 2026-09-20 D3（空间分配） 瘦身现查：瘦身前那一版第 90 行自陈挂钟那一问仍欠实现，而欠账表里没有对应编号 |",
+          "context": [
+            {
+              "line": 290,
+              "text": "| C411 | 分配记录的跨度段与单元类别不符没检查 | **D3（空间分配） 已定项 7 定「一条记录记一个存储单元」、跨度段说它覆盖几个 16 KiB 槽，而各单元类的大小不同**（D18（块里携带什么信息） 已定项 11 的登记表：码 1 数据单元 32768 是两槽，码 2 索引节点 16384 是一槽）⇒ 一条记录的跨度段与它所记单元的类别对不上时（比如给一个码 1 单元只记一槽），I-3.1（已分配统计对得上） 照样自洽——它按跨度段求和，而那个单元的第二个槽在盘上没有归属、可被重新分配 ⇒ 静默覆盖 | checker 全盘遍历时，每条分配记录按 key 读出它所记落点上的单元头、取单元类型标签，断言跨度段 × 16384 等于该类的单元大小。判别力自证：把某个码 1 单元那条记录的跨度段改成 1，检查必须由绿转红 | 要一张「类 → 单元大小」的表能被 checker 读到（D18（块里携带什么信息） 已定项 11 的登记表）；码 3 打包记录单元的大小随容器定，那一类先要有口径；去向：里程碑三二·5（2026-10-19 分诊定）。 | 2026-09-20 D3（空间分配） 按瘦身形态重写时现查：已定项 7 的欠段逐字说这条检查「还没有编号」，欠账表里搜不到对应编号 |"
+            },
+            {
+              "line": 291,
+              "text": "| C412 | 整理的挂钟代价没量过 | **D3（空间分配） 已定项 14 是「后台整理常驻、自动、用户无需知道」这条硬承诺，而它没有任何挂钟数在背书。** D3（空间分配） 已定项 1 的依据引 E74（分配记录的条目数与整理开销），而 E74（分配记录的条目数与整理开销） 量的是整理路径重写多少个节点（载体强制付出多少），不是它要花多少墙钟；D3（空间分配） 瘦身前的正文自陈挂钟那一问仍欠实现，那句话已随 2026-09-20 的瘦身移出正文、在决策变更史里。⇒ 整理跑一轮要多久、会不会跟前台抢 I/O，一个数都没有 | 建一个计数实验或给 E74（分配记录的条目数与整理开销） 补一轮，量一批整理的挂钟，口径写明设备、负载、批大小，断言钉绝对值而不是只比相对倍数。判别力自证：把批大小翻倍，挂钟必须跟着涨 | D26（后台整理与放置回收） 的整理策略未定项 8 / 9 / 10 还开着，先定量哪一条策略；`crates/` 里没有整理（`grep -rn 整理 crates --include=*.rs` 命中 12 行、4 个文件，都是注释、断言消息与字段名里的字（系统运行配置那三个整理水位恒取内置默认 0），没有整理路径） | 2026-09-20 D3（空间分配） 瘦身现查：瘦身前那一版第 90 行自陈挂钟那一问仍欠实现，而欠账表里没有对应编号 |"
+            },
+            {
+              "line": 292,
+              "text": "| C413 | 碎片度与全空段统计没有不变量 | **D26（后台整理与放置回收） 已定项 6 把 runs 与全空聚簇段数持久化进记账树当整理的触发输入，而 [crates/singlefs-checker/invariants/](../../crates/singlefs-checker/invariants/README.md) 里「碎片度」与「全空段」各命中 0 次** ⇒ 这两个增量维护的统计量没有任何一条不变量盯着它们与全扫审计对不对得上。形态同 I-3.1（已分配统计对得上）：增量值错了，整理会在错的时机触发、或者永不触发，而 checker 一声不吭 | 往 [crates/singlefs-checker/invariants/05-空间记账.md](../../crates/singlefs-checker/invariants/05-空间记账.md) 加一条「碎片度与全空段统计对得上」：增量维护的值等于全扫重算的值，审计路径与增量路径不共享代码（E93（老化下的放置与碎片度） 已经这么建过）。判别力自证：把增量维护那一步少加一次，检查必须由绿转红 | runs 2026-09-14 换过口径（C326（runs 换口径之后 E93 的数还能不能引）），先按新口径定义全扫重算怎么做；载体是 D5（快照 / 空间记账机制） 已定项 3 的记账树 | 2026-09-20 D26（后台整理与放置回收） 按瘦身形态重写时现查：已定项 6 的欠段逐字说这条不变量还没进 [crates/singlefs-checker/invariants/](../../crates/singlefs-checker/invariants/README.md)，`cat crates/singlefs-checker/invariants/*.md \\| grep -c -e 碎片度 -e 全空段` 为 0，欠账表里也搜不到 |"
+            },
+            {
+              "line": 293,
+              "text": "| C414 | 挂载时不比对 io_min 与记录的槽距 | **D2（RAID 条带策略） 已定项 19 定了挂载闸 (a)「实际 `io_min` ≤ 系统配置记录的固定结构槽距」，而 `crates/singlefs-core/src/mount.rs` 只有调用方 mkfs 参数与盘上记录的 io_min 相等比对（`parameters_of_the_selected_system_configuration_agreeing_with_the_caller_parameters_and_device_table`）** ⇒ 拿实际探测的 io_min 与记录的槽距比的那道闸 (a) 没有实现。镜像搬到 `io_min` 更大的设备上（E129（小于 io_min 的写在真设备上怎么出事） 实测 `dm-thin` 块 64 KiB、`io_min` 65536 而 `physical_block_size` 512，这种设备真的存在）照样挂得上，此后每次根槽写都小于 `io_min`、诱发设备侧多写，没有任何东西报警。与 C82（io_min 不在挂载比对清单） 的分界：C82（io_min 不在挂载比对清单） 的 D12（目标介质） 清单正文那一半已不欠（D12（目标介质） 已定项 4 射程句已把 `io_min` 列入清单并点名 C82（io_min 不在挂载比对清单），两条挂载闸第一版只设 (a)），C82（io_min 不在挂载比对清单） 剩下的落地和这条同指挂载处的比对；这条问的是闸 (a) 本身没写进代码 | 挂载时读系统配置几何段的两个字段，拿实际 `io_min` 比对记录的槽距，不满足就拒绝可写挂载。检查形态：造一份「槽距 4096、挂在 `io_min` 65536 的设备上」的镜像，断言可写挂载被拒。判别力自证：把那句比对去掉，检查必须由绿转红 | 无前置：条款已定（D2（RAID 条带策略） 已定项 19），系统配置两个字段与 `slot_spacing_for` 算式已在 `crates/singlefs-core/src/system_configuration.rs` | 2026-09-20 D2（RAID 条带策略） 瘦身时子 agent 报出，主 agent 现查 `grep -c minimum_input_output_bytes crates/singlefs-core/src/mount.rs` 为 0 坐实闸没实现 |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/mounted_session.rs",
+          "line": 1956,
+          "text": "    pub fn run_compaction<Device: BlockDevice>(",
+          "context": [
+            {
+              "line": 1955,
+              "text": "    /// 盘表与挂载核过的不同、现行那一版树表 0 条 ⇒ [`CompactionRunRefused`]，在任何读写之前。"
+            },
+            {
+              "line": 1956,
+              "text": "    pub fn run_compaction<Device: BlockDevice>("
+            },
+            {
+              "line": 1957,
+              "text": "        &mut self,"
+            },
+            {
+              "line": 1958,
+              "text": "        devices: &mut Vec<(DeviceIdentity, Device)>,"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/transaction.rs",
+          "line": 9675,
+          "text": "pub fn publish_relocation_batch<Device: BlockDevice>(",
+          "context": [
+            {
+              "line": 9674,
+              "text": "/// `planned` 是空的：调用方按 `PlannedBatch::Relocate` 才调（至少一项）。"
+            },
+            {
+              "line": 9675,
+              "text": "pub fn publish_relocation_batch<Device: BlockDevice>("
+            },
+            {
+              "line": 9676,
+              "text": "    pool: &mut PoolWriter<'_, Device>,"
+            },
+            {
+              "line": 9677,
+              "text": "    allocator: &mut PoolAllocator,"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R06",
+      "priority": "P2",
+      "title": "动态测试登记数与给出的现查命令不一致",
+      "citations": [
+        {
+          "path": ".claude/kb/milestone/03-third-txn.md",
+          "line": 141,
+          "text": "- **仓里已有的**：崩溃点由记录器按屏障段切（`crates/singlefs-checker-tier/src/crash_amplification.rs` 的 `CrashPointRecorder`，节点 `<入口>.<写的种类>.<第几段>`），共用步骤 6 个函数在 `crates/singlefs-checker-tier/tests/common_crash_points/mod.rs`（一处 ignore 都没写；ignore 的处理在 `crash_amplification.rs` 里 67 行（`grep -c ignore` 现数），展开上限 `expand_up_to`）；身份与复用键在 `crash_identity.rs`。枚举域定义是 D13（验证路线） 已定项 4（前若干段全持久、当前段任意整写子集、按设备切段、撕裂粒度不进模型）；三层分档是 D13（验证路线） 已定项 9，只有冒烟层（C409（常规层、大负载层在门禁里没有阶段）（已挪 [04-fourth-txn.md](04-fourth-txn.md) 八·3））。登记的流 35 条（`grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 现数；下面列的是里程碑三当时登记的 14 条，其后加的流看该文件里各 `crash-case:` 行）：新池新建文件、固定脚本到 E、会话推的抬 F、C561（记录核对器的复用豁免在复用只落一半时假红） 的 sigma、多记录发布、多记录发布之后 unlink 第一个文件、树分裂、位置寻址树、io_min 8192 池的可写挂载、崩溃注入快档、读故障状态上见证判据不成立、随机历史与故障注入给定状态、实例表清扫的挂载与清扫两相内重挂两条）；放量的登记表里 8 个分项（`bash scripts/crash/crash-amplification.sh --list-items` 现列）：2026-09-30 那一趟跑的是其中七个（固定脚本到 D、到 E 再卸载、多记录发布、树分裂、按位置寻址、抬 F、σ），报 0 红，其中多记录发布一项 exhaustive=false（`briefs/2026-09-28.md`「全量（2026-09-30）」一节）；第八项是多记录发布之后 unlink 第一个文件，2026-10-08 展开 30 重跑多记录发布与这一项都 exhaustive=true、0 红（C761（崩溃放量全量零违例里多记录流没穷举）），崩溃注入快档是随机历史上的抽样、不进放量。系统自己的判别力：checker 档里带会红形态的用例文件（`crash_enumeration_new_pool_file_creation_stream.rs`、`bad_disk_input_campaign.rs`、`crash_points_tree_identifier_watermark_orphans.rs`，另有两份是装置那边的对拍用例），`crates/mutations.tsv` 里点名 checker 档的行（`awk -F'\\t' '!/^#/ && $5 ~ /singlefs-checker-tier/' crates/mutations.tsv` 数；轻型核心行另登记在 `.claude/gate.d/crates-mutation-light-rows.tsv`），[verification-build.md](../verification-build.md)「harness 自己要证明会红的用例」表九条。已知的漏：崩溃点重放规模第二轮攻方量过按流列的输入清单漏共用文件（[02-second-txn.md](02-second-txn.md)「增补 4」第一项）；C467（新补的四条不变量的覆盖率没被穷举用例钉住） 量到 I-8.7（实例内事务号不重号） 在新池新建文件那条流上 0 次评估、I-1.8（归并后版本全序） ② 在单一 checkpoint 上一条判定都不产出；多次挂载里带读故障的注入由 E165（恢复重放有界穷举与变异杀伤界） r3 择根与重放合判一族判，C331（择根倒挂压过已确认的写） 已还清（见欠账表已还清表）；删除类发布崩在中间：多记录发布之后 unlink 第一个文件那条流已登记（`crash-case:unlink-after-the-multi-record-publish-stream`，放量第八项），2026-10-08 展开 30 跑过 exhaustive=true、0 红，全域没跑（三·4）。挂钟：CPU 判器两台合计每秒约 8 千态；GPU 判器两台五张卡在到 E 那一项上平均每秒约 9.9 万态（`briefs/2026-09-28.md`「全量（2026-09-30）」一节）。",
+          "context": [
+            {
+              "line": 140,
+              "text": "- **与放量装置的分界**：装置本身（身份、KV、双机、剪枝、批量派活）归 [02-second-txn.md](02-second-txn.md)「增补 4」与做那一部分的会话；这一项管**点**（写路径的哪些地方设了崩溃点、哪些该设没设、ignore 开着的哪些该开）与**系统的判别力和旋钮**（它抓不抓得到已知的坏法、每个参数取什么值凭什么、跑一次多贵）。做这一项时冒出的装置改动记给那边，不在这里做。"
+            },
+            {
+              "line": 141,
+              "text": "- **仓里已有的**：崩溃点由记录器按屏障段切（`crates/singlefs-checker-tier/src/crash_amplification.rs` 的 `CrashPointRecorder`，节点 `<入口>.<写的种类>.<第几段>`），共用步骤 6 个函数在 `crates/singlefs-checker-tier/tests/common_crash_points/mod.rs`（一处 ignore 都没写；ignore 的处理在 `crash_amplification.rs` 里 67 行（`grep -c ignore` 现数），展开上限 `expand_up_to`）；身份与复用键在 `crash_identity.rs`。枚举域定义是 D13（验证路线） 已定项 4（前若干段全持久、当前段任意整写子集、按设备切段、撕裂粒度不进模型）；三层分档是 D13（验证路线） 已定项 9，只有冒烟层（C409（常规层、大负载层在门禁里没有阶段）（已挪 [04-fourth-txn.md](04-fourth-txn.md) 八·3））。登记的流 35 条（`grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 现数；下面列的是里程碑三当时登记的 14 条，其后加的流看该文件里各 `crash-case:` 行）：新池新建文件、固定脚本到 E、会话推的抬 F、C561（记录核对器的复用豁免在复用只落一半时假红） 的 sigma、多记录发布、多记录发布之后 unlink 第一个文件、树分裂、位置寻址树、io_min 8192 池的可写挂载、崩溃注入快档、读故障状态上见证判据不成立、随机历史与故障注入给定状态、实例表清扫的挂载与清扫两相内重挂两条）；放量的登记表里 8 个分项（`bash scripts/crash/crash-amplification.sh --list-items` 现列）：2026-09-30 那一趟跑的是其中七个（固定脚本到 D、到 E 再卸载、多记录发布、树分裂、按位置寻址、抬 F、σ），报 0 红，其中多记录发布一项 exhaustive=false（`briefs/2026-09-28.md`「全量（2026-09-30）」一节）；第八项是多记录发布之后 unlink 第一个文件，2026-10-08 展开 30 重跑多记录发布与这一项都 exhaustive=true、0 红（C761（崩溃放量全量零违例里多记录流没穷举）），崩溃注入快档是随机历史上的抽样、不进放量。系统自己的判别力：checker 档里带会红形态的用例文件（`crash_enumeration_new_pool_file_creation_stream.rs`、`bad_disk_input_campaign.rs`、`crash_points_tree_identifier_watermark_orphans.rs`，另有两份是装置那边的对拍用例），`crates/mutations.tsv` 里点名 checker 档的行（`awk -F'\\t' '!/^#/ && $5 ~ /singlefs-checker-tier/' crates/mutations.tsv` 数；轻型核心行另登记在 `.claude/gate.d/crates-mutation-light-rows.tsv`），[verification-build.md](../verification-build.md)「harness 自己要证明会红的用例」表九条。已知的漏：崩溃点重放规模第二轮攻方量过按流列的输入清单漏共用文件（[02-second-txn.md](02-second-txn.md)「增补 4」第一项）；C467（新补的四条不变量的覆盖率没被穷举用例钉住） 量到 I-8.7（实例内事务号不重号） 在新池新建文件那条流上 0 次评估、I-1.8（归并后版本全序） ② 在单一 checkpoint 上一条判定都不产出；多次挂载里带读故障的注入由 E165（恢复重放有界穷举与变异杀伤界） r3 择根与重放合判一族判，C331（择根倒挂压过已确认的写） 已还清（见欠账表已还清表）；删除类发布崩在中间：多记录发布之后 unlink 第一个文件那条流已登记（`crash-case:unlink-after-the-multi-record-publish-stream`，放量第八项），2026-10-08 展开 30 跑过 exhaustive=true、0 红，全域没跑（三·4）。挂钟：CPU 判器两台合计每秒约 8 千态；GPU 判器两台五张卡在到 E 那一项上平均每秒约 9.9 万态（`briefs/2026-09-28.md`「全量（2026-09-30）」一节）。"
+            },
+            {
+              "line": 142,
+              "text": "- **作业点**："
+            },
+            {
+              "line": 143,
+              "text": ""
+            }
+          ]
+        },
+        {
+          "path": "CLAUDE.md",
+          "line": 113,
+          "text": "- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 24 项（数法：`bash scripts/crash/crash-amplification.sh --list-items` 的输出行数）；checker 判 104 条不变量（数它的命令：`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；I-8.4（重放幂等） 已实现在崩溃注入的二次崩溃上、不进池级 checker 清单，所以数法排掉它；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。",
+          "context": [
+            {
+              "line": 112,
+              "text": "- 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。"
+            },
+            {
+              "line": 113,
+              "text": "- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 24 项（数法：`bash scripts/crash/crash-amplification.sh --list-items` 的输出行数）；checker 判 104 条不变量（数它的命令：`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；I-8.4（重放幂等） 已实现在崩溃注入的二次崩溃上、不进池级 checker 清单，所以数法排掉它；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/verification-build.md",
+          "line": 6,
+          "text": "**现状**：`crates/` 下八个 crate——`singlefs-format`（格式常量）、`singlefs-core`（mkfs、分配器、事务层、journal、恢复）、`singlefs-replay-prefix`（恢复取 journal 前缀、择根、扫环建表的纯函数核与它的 Verus 证明，另有 `compaction_plan_proofs.rs` 证整理计划的选段健全、计划健全、进展与抽象恒等，只依赖 `vstd`，`singlefs-core` 依赖它）、`singlefs-reference-filesystem`（RefFS，语义级的参照文件系统，不依赖别的 crate，`singlefs-harness` 与 `singlefs-checker-tier` 依赖它）、`singlefs-unit-graph`（函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹、收调用闭包、算复用键，只用 std、不依赖工作区任何 crate，`singlefs-checker-tier` 的库与 `build.rs` 依赖它，`build.rs` 经它按 `judging_units_entries.rs` 算判器组单元键）、`singlefs-harness`（harness 档：录制器、内存池、理想模型、随机历史、故障注入设备与日常用例）、`singlefs-checker`（池级 checker，只依赖 `singlefs-format`）、`singlefs-checker-tier`（checker 档：崩溃点重放引擎、记录核对器、注入战役、QEMU 设备日志比对与装置二进制，D13（验证路线） 已定项 15）；新池新建文件从 mkfs 到恢复跑通，崩溃点重放在门禁 checker-tier-crash-point-replay（登记的崩溃枚举用例 35 条（`grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 数出），其中新池新建文件流是新池新建文件的全部 16 777 268 个崩溃状态（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES`；每次写只取两态的闭式是 16 777 243），覆盖写固定脚本流是里程碑「覆盖写、释放、回退与复用」步 0 那条固定脚本到 E 再正常卸载的全部 1 678 377 220 个崩溃状态（`crash_enumeration_fixed_script_stream.rs` 的 `FULL_STATES_THROUGH_THE_UNMOUNT`）），QEMU 真设备在门禁 checker-tier-qemu-device-streams（两块 virtio 盘上跑新池新建文件、发布 B、第二个实例、发布 D 与抬 F，六个模式并行各起一台虚机）。",
+          "context": [
+            {
+              "line": 5,
+              "text": "**口径**：2026-09-03 调研立档，2026-09-14 按代码现状改写（现查 `ls crates/`、根 `Cargo.toml` 的 workspace、`gate.sh` 的未实现清单与门禁 checker-tier-crash-point-replay 与 checker-tier-qemu-device-streams的 `gate-covers` 头）。"
+            },
+            {
+              "line": 6,
+              "text": "**现状**：`crates/` 下八个 crate——`singlefs-format`（格式常量）、`singlefs-core`（mkfs、分配器、事务层、journal、恢复）、`singlefs-replay-prefix`（恢复取 journal 前缀、择根、扫环建表的纯函数核与它的 Verus 证明，另有 `compaction_plan_proofs.rs` 证整理计划的选段健全、计划健全、进展与抽象恒等，只依赖 `vstd`，`singlefs-core` 依赖它）、`singlefs-reference-filesystem`（RefFS，语义级的参照文件系统，不依赖别的 crate，`singlefs-harness` 与 `singlefs-checker-tier` 依赖它）、`singlefs-unit-graph`（函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹、收调用闭包、算复用键，只用 std、不依赖工作区任何 crate，`singlefs-checker-tier` 的库与 `build.rs` 依赖它，`build.rs` 经它按 `judging_units_entries.rs` 算判器组单元键）、`singlefs-harness`（harness 档：录制器、内存池、理想模型、随机历史、故障注入设备与日常用例）、`singlefs-checker`（池级 checker，只依赖 `singlefs-format`）、`singlefs-checker-tier`（checker 档：崩溃点重放引擎、记录核对器、注入战役、QEMU 设备日志比对与装置二进制，D13（验证路线） 已定项 15）；新池新建文件从 mkfs 到恢复跑通，崩溃点重放在门禁 checker-tier-crash-point-replay（登记的崩溃枚举用例 35 条（`grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 数出），其中新池新建文件流是新池新建文件的全部 16 777 268 个崩溃状态（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES`；每次写只取两态的闭式是 16 777 243），覆盖写固定脚本流是里程碑「覆盖写、释放、回退与复用」步 0 那条固定脚本到 E 再正常卸载的全部 1 678 377 220 个崩溃状态（`crash_enumeration_fixed_script_stream.rs` 的 `FULL_STATES_THROUGH_THE_UNMOUNT`）），QEMU 真设备在门禁 checker-tier-qemu-device-streams（两块 virtio 盘上跑新池新建文件、发布 B、第二个实例、发布 D 与抬 F，六个模式并行各起一台虚机）。"
+            },
+            {
+              "line": 7,
+              "text": "门禁末尾的未实现清单有四项：共享的「最终判据」「命名纪律（shell）」，与 `.claude/gate-not-implemented.tsv` 登记的「崩溃点重放」「模型对拍」（后两项由门禁 checker-tier-crash-point-replay 与 harness-model-differential-and-scenarios 头部的 `gate-covers` 声明覆盖，那一阶段跑了且通过才换成「由哪个阶段覆盖」）；崩溃点重放由 checker-tier-crash-point-replay 覆盖，射程是登记的崩溃枚举用例（`grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 数出 35 条）；QEMU 真实负载由门禁 checker-tier-qemu-device-streams 覆盖，射程到新池新建文件、发布 B、第二个实例、发布 D 与抬 F，没有崩溃注入；模型对拍由门禁 harness-model-differential-and-scenarios 覆盖，射程是随机历史那五段取样点。"
+            },
+            {
+              "line": 8,
+              "text": "这份文档原是「三样怎么落地」的调研：每一样要消费哪些已定条款、被哪些未定项挡着、能从仓里复用什么、第一版最小该做到哪；各节里写着做到了哪一步，第六节是当时挡在代码前面、只有用户能定的几个问题。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R07",
+      "priority": "P1",
+      "title": "稀疏旁表被标成整项已实现，代码实际仍写零根",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/05-快照-空间记账机制.md",
+          "line": 16,
+          "text": "| 6 | **稀疏旁表的落点与字段表** | 自成一棵树 day-1 注册；条目 = 中央映射 key 27 + 计数 4 = 31 字节一宽；提交时维护，删除走意图机制 **状态：已定。** **进度：已实现。** |",
+          "context": [
+            {
+              "line": 15,
+              "text": "| 5 | **记账 key 各段的宽度** | `(标签 2, 树 ID 8, 设备 4, 代 8)` ⇒ key 22 字节；value 8 加 seq 4 ⇒ 条目 34 字节 **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 16,
+              "text": "| 6 | **稀疏旁表的落点与字段表** | 自成一棵树 day-1 注册；条目 = 中央映射 key 27 + 计数 4 = 31 字节一宽；提交时维护，删除走意图机制 **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 17,
+              "text": "| 7 | **「已分配字节」含不含 mkfs 写下的固定结构** | 不含：已分配 = 分配记录树里落点之和，准入里的「容量」= 单元区大小 **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 18,
+              "text": "| 8 | **新池新建文件记账树里写哪几行** | 有值的统计量写一行、没有对象的不写行；新池新建文件写 15 行 **状态：已定。** **进度：已实现。** |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/transaction.rs",
+          "line": 14164,
+          "text": "        table_entry(",
+          "context": [
+            {
+              "line": 14163,
+              "text": "        ),"
+            },
+            {
+              "line": 14164,
+              "text": "        table_entry("
+            },
+            {
+              "line": 14165,
+              "text": "            TREE_KIND_SPARSE_SIDE_TABLE,"
+            },
+            {
+              "line": 14166,
+              "text": "            trees.sparse_side_table,"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/milestone/04-fourth-txn.md",
+          "line": 46,
+          "text": "- **仓里已有的**：D5（快照 / 空间记账机制） 已定 21 项、D6（快照实现模型） 已定 10 项；D5（快照 / 空间记账机制） 已定项 17「引入同一块的第二个活引用必须先重开 D5（快照 / 空间记账机制）」，只读快照就是第二个活引用。deadlist、livelist、稀疏旁表三棵树新池里已注册进树表（`crates/singlefs-core/src/transaction.rs` 的 `FileVersionTreeIdentifiers` 里 `livelist`、`sparse_side_table`、`deadlist` 三个字段，`crates/singlefs-core/src/recovery.rs` 的 `rebuild_version_in_the_unit_area_starting_at` 读回），deadlist 已有写者（`transaction.rs` 的 `publish_create_snapshot` 建快照，快照下覆盖写与删文件把被快照引用的块记进 deadlist，`publish_snapshot_destruction_intent` 销毁快照），livelist 与稀疏旁表仍只注册、没有写者；`grep -rn \"克隆\" crates/singlefs-core/src` 仍只命中 `transaction.rs` 里一条 TODO 注释的 2 行（说「`crates/` 今天没有克隆路径」），没有克隆代码。I-3.6（deadlist 紧界）、I-3.7（活快照可枚举） 已实现（2026-10-15）；I-3.5（引用区间的精确性） 部分实现：出现规则（`walk.rs` 的 `judge_the_appearance_rule_of_adjacent_candidate_versions`）与 ③ ④（deadlist 那两条）已实现，余下以 `crates/singlefs-checker/invariants/05-空间记账.md` 的状态格为准。相关欠账：C144（快照谱系的区间标号没有载体）、C145（deadlist 在盘上没有落点）、C300（deadlist 条目按 key 查映射查不到没有条款）、C301（deadlist 与 livelist 的态别没写）、C336（写意图那一刻找不到快照的下一侧）。删除批与覆盖写共用的释放按快照分支：被快照引用的块进 deadlist，别的照常释放（`crates/singlefs-core/src/transaction.rs` 的 `snapshot_lifetime_verdict`）；一·2 改的是这处共用释放，不只是删除的分批回收。按关键词搜到、归属是推的（2026-10-12）：欠账 C195（销毁级联时 prev 传递只写在实验的模型修订记录里）、C302（快照那一刻的码 2 历史版本取不出）、C337（被销毁的头何时不算活引用没有条款）、C250（`previous_snapshot_txg` 的父链解析非单射）、C236（稀疏旁表被定为必做却没有任何落点）、C148（树表条目变宽把间接层门槛压到二层）、C149（根槽重发之后 birth 口径松一格）、C675（同一种树在树表里至多一条没有不变量）、C289（码 2 的出生树取哪个字段没写）、C292（码 2 身份段零消费者的理由已不成立）、C110（跨头共享与加密后元数据类的块头一致性读法）；分项 D16（发布语义） 已定项 14、D21（权威态与派生态的分界） 已定项 6；不变量清单 `crates/singlefs-checker/invariants/README.md`「待补」里没编号的「快照可见性」。别家的 deadlist 做法在 `.claude/kb/prior-art.md`「十、快照下的死块记账、搬被共享的块与 discard 时机」（未在本项目验证）。",
+          "context": [
+            {
+              "line": 45,
+              "text": "- **原话**：用户 2026-10-01 在「共享（快照 / 克隆）的最小形态要不要排到 GC 前面或一起做」那一问选「里程碑四：共享最小形态 + GC」。"
+            },
+            {
+              "line": 46,
+              "text": "- **仓里已有的**：D5（快照 / 空间记账机制） 已定 21 项、D6（快照实现模型） 已定 10 项；D5（快照 / 空间记账机制） 已定项 17「引入同一块的第二个活引用必须先重开 D5（快照 / 空间记账机制）」，只读快照就是第二个活引用。deadlist、livelist、稀疏旁表三棵树新池里已注册进树表（`crates/singlefs-core/src/transaction.rs` 的 `FileVersionTreeIdentifiers` 里 `livelist`、`sparse_side_table`、`deadlist` 三个字段，`crates/singlefs-core/src/recovery.rs` 的 `rebuild_version_in_the_unit_area_starting_at` 读回），deadlist 已有写者（`transaction.rs` 的 `publish_create_snapshot` 建快照，快照下覆盖写与删文件把被快照引用的块记进 deadlist，`publish_snapshot_destruction_intent` 销毁快照），livelist 与稀疏旁表仍只注册、没有写者；`grep -rn \"克隆\" crates/singlefs-core/src` 仍只命中 `transaction.rs` 里一条 TODO 注释的 2 行（说「`crates/` 今天没有克隆路径」），没有克隆代码。I-3.6（deadlist 紧界）、I-3.7（活快照可枚举） 已实现（2026-10-15）；I-3.5（引用区间的精确性） 部分实现：出现规则（`walk.rs` 的 `judge_the_appearance_rule_of_adjacent_candidate_versions`）与 ③ ④（deadlist 那两条）已实现，余下以 `crates/singlefs-checker/invariants/05-空间记账.md` 的状态格为准。相关欠账：C144（快照谱系的区间标号没有载体）、C145（deadlist 在盘上没有落点）、C300（deadlist 条目按 key 查映射查不到没有条款）、C301（deadlist 与 livelist 的态别没写）、C336（写意图那一刻找不到快照的下一侧）。删除批与覆盖写共用的释放按快照分支：被快照引用的块进 deadlist，别的照常释放（`crates/singlefs-core/src/transaction.rs` 的 `snapshot_lifetime_verdict`）；一·2 改的是这处共用释放，不只是删除的分批回收。按关键词搜到、归属是推的（2026-10-12）：欠账 C195（销毁级联时 prev 传递只写在实验的模型修订记录里）、C302（快照那一刻的码 2 历史版本取不出）、C337（被销毁的头何时不算活引用没有条款）、C250（`previous_snapshot_txg` 的父链解析非单射）、C236（稀疏旁表被定为必做却没有任何落点）、C148（树表条目变宽把间接层门槛压到二层）、C149（根槽重发之后 birth 口径松一格）、C675（同一种树在树表里至多一条没有不变量）、C289（码 2 的出生树取哪个字段没写）、C292（码 2 身份段零消费者的理由已不成立）、C110（跨头共享与加密后元数据类的块头一致性读法）；分项 D16（发布语义） 已定项 14、D21（权威态与派生态的分界） 已定项 6；不变量清单 `crates/singlefs-checker/invariants/README.md`「待补」里没编号的「快照可见性」。别家的 deadlist 做法在 `.claude/kb/prior-art.md`「十、快照下的死块记账、搬被共享的块与 discard 时机」（未在本项目验证）。"
+            },
+            {
+              "line": 47,
+              "text": "- **作业点**："
+            },
+            {
+              "line": 48,
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R08",
+      "priority": "P2",
+      "title": "deadlist 仍称“会红的检查没有”，实际已有坏镜像断言",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/05-快照-空间记账机制.md",
+          "line": 22,
+          "text": "| 12 | **deadlist 条目的形态** | key = 头的树 ID 8 + 纪元 8 + 中央映射 key 27 = 43 字节，value 空；条目按纪元分段，交接不搬条目 **状态：已定。** **进度：未实现。** |",
+          "context": [
+            {
+              "line": 21,
+              "text": "| 11 | **deadlist 的载体 day-1 建不建** | 建：自成一棵树 day-1 注册进树表，种类码 8、树 ID 65543、根指针零 **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 22,
+              "text": "| 12 | **deadlist 条目的形态** | key = 头的树 ID 8 + 纪元 8 + 中央映射 key 27 = 43 字节，value 空；条目按纪元分段，交接不搬条目 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 23,
+              "text": "| 13 | **生命周期判定取哪套机制** | 取诞生代号 + deadlist：删除时比 `previous_snapshot_txg`，建快照整个交接，销毁快照并到更新的那一侧、不做全盘扫描 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 24,
+              "text": "| 14 | **引用区间的充要条件** | `birth(b) ≤ S.txg < death(b)`，左闭右开；三个量各有定义；判据的输入取不到时默认进 deadlist **状态：已定。** **进度：未实现。** |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/records.rs",
+          "line": 607,
+          "text": "pub struct DeadlistEntry {",
+          "context": [
+            {
+              "line": 606,
+              "text": "#[derive(Clone, Debug, PartialEq, Eq)]"
+            },
+            {
+              "line": 607,
+              "text": "pub struct DeadlistEntry {"
+            },
+            {
+              "line": 608,
+              "text": "    pub head: TreeIdentifier,"
+            },
+            {
+              "line": 609,
+              "text": "    pub epoch: CheckpointTxg,"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-harness/tests/snapshot_release_and_destroy_through_the_deadlist.rs",
+          "line": 201,
+          "text": "fn an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata(",
+          "context": [
+            {
+              "line": 200,
+              "text": "#[test]"
+            },
+            {
+              "line": 201,
+              "text": "fn an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata("
+            },
+            {
+              "line": 202,
+              "text": ") {"
+            },
+            {
+              "line": 203,
+              "text": "    let mut pool = build_pool(\"snapshot-release-overwrite-keeps\");"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-harness/tests/checker_snapshot_space_accounting_must_red_worlds.rs",
+          "line": 791,
+          "text": "fn a_unit_born_after_the_snapshot_put_on_the_deadlist_reddens_the_tight_bound() {",
+          "context": [
+            {
+              "line": 790,
+              "text": "#[test]"
+            },
+            {
+              "line": 791,
+              "text": "fn a_unit_born_after_the_snapshot_put_on_the_deadlist_reddens_the_tight_bound() {"
+            },
+            {
+              "line": 792,
+              "text": "    let (mut pool, _) ="
+            },
+            {
+              "line": 793,
+              "text": "        pool_with_a_snapshot_and_an_overwrite_under_it(\"snapshot-deadlist-born-after\");"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R09",
+      "priority": "P2",
+      "title": "“搬迁不改 birth”仍标未实现",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/05-快照-空间记账机制.md",
+          "line": 25,
+          "text": "| 15 | **后台搬迁改不改 `birth`** | 不改：搬迁不是一次发布，`birth` 原样跟着单元走 **状态：已定。** **进度：未实现。** |",
+          "context": [
+            {
+              "line": 24,
+              "text": "| 14 | **引用区间的充要条件** | `birth(b) ≤ S.txg < death(b)`，左闭右开；三个量各有定义；判据的输入取不到时默认进 deadlist **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 25,
+              "text": "| 15 | **后台搬迁改不改 `birth`** | 不改：搬迁不是一次发布，`birth` 原样跟着单元走 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 26,
+              "text": "| 16 | **销毁快照时 deadlist 往哪一侧并** | 取约定 B（并到下一个更新的那一侧）；它不是「快照的 deadlist 永不改写」，只是例外少一个数量级 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 27,
+              "text": "| 17 | **四条前提，越过任何一条它就失效** | 四条前提逐条写死；引入同一块的第二个活引用必须先重开 D5（快照 / 空间记账机制）；已触发一次，收口形态是 D5（快照 / 空间记账机制） 为主 + 稀疏旁表为辅 **状态：已定。** **进度：无对象。** |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/transaction.rs",
+          "line": 11506,
+          "text": "fn allocate_relocation_destination(",
+          "context": [
+            {
+              "line": 11505,
+              "text": "/// 取不到 ⇒ `PlacementRefused`，带着释放判定用的那个角色。"
+            },
+            {
+              "line": 11506,
+              "text": "fn allocate_relocation_destination("
+            },
+            {
+              "line": 11507,
+              "text": "    allocator: &mut PoolAllocator,"
+            },
+            {
+              "line": 11508,
+              "text": "    relocation: &RelocationOfThePublish,"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/region_scan.rs",
+          "line": 68,
+          "text": "pub struct MovableUnit {",
+          "context": [
+            {
+              "line": 67,
+              "text": "#[derive(Clone, Debug, PartialEq, Eq)]"
+            },
+            {
+              "line": 68,
+              "text": "pub struct MovableUnit {"
+            },
+            {
+              "line": 69,
+              "text": "    pub mapping_key: Vec<u8>,"
+            },
+            {
+              "line": 70,
+              "text": "    pub unit_class: MappedUnitClass,"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "priority": "P2",
+      "title": "发布计数器仍标未实现，实际已被多个发布入口调用",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/16-发布语义.md",
+          "line": 16,
+          "text": "| 6 | **发布计数器** | 每次发布 checkpoint_txg 加一，fsync 触发的也是发布；根槽轮转键、记账的代、重放水位是同一个计数 **状态：已定。** **进度：未实现。** |",
+          "context": [
+            {
+              "line": 15,
+              "text": "| 5 | **`T_time` 与 `T_dirty` 取多少，丢失窗口的口径** | `T_time` = 5 s、越界只警告；`T_dirty` = 2 GiB、夹成 min(字段, 环长/F)；崩溃最多丢 T_time+N_switch×(T_retry+T_redo) **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 16,
+              "text": "| 6 | **发布计数器** | 每次发布 checkpoint_txg 加一，fsync 触发的也是发布；根槽轮转键、记账的代、重放水位是同一个计数 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 17,
+              "text": "| 7 | **发布的持久顺序** | 单元 / 节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽 → 屏障；重放施加前必须逐项验证点名单元 **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 18,
+              "text": "| 8 | **新实例要不要先让本实例的根落到两块盘上** | 取戊：根覆盖两块盘之前不让 fsync 返回，连推空发布至多 R = 3 次 **状态：已定。** **进度：已实现。** |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/transaction.rs",
+          "line": 5622,
+          "text": "pub fn checkpoint_txg_of_the_publish_after(",
+          "context": [
+            {
+              "line": 5621,
+              "text": "/// 加一越过 `u64::MAX` ⇒ `NextCheckpointTxgPastTheTopOfItsRange`（代码审阅第 36 条：不 panic）。"
+            },
+            {
+              "line": 5622,
+              "text": "pub fn checkpoint_txg_of_the_publish_after("
+            },
+            {
+              "line": 5623,
+              "text": "    version_to_build_on: CheckpointTxg,"
+            },
+            {
+              "line": 5624,
+              "text": ") -> Result<CheckpointTxg, PublishError> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R11",
+      "priority": "P2",
+      "title": "466 字节根记录字段表仍标未实现",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/22-单元原子性怎么合成.md",
+          "line": 18,
+          "text": "| 7 | **根记录的字段表** | 恒走间接层：固定头 + 一条树表单元指针，树根不平铺进根槽；17 个字段合计 466 字节 **状态：已定。** **进度：未实现。** |",
+          "context": [
+            {
+              "line": 17,
+              "text": "| 5 | **D2（RAID 条带策略） 的口径要扩** | 已完成：两条写粒度硬要求在 D2（RAID 条带策略） 已定项 16 / 17 **状态：已定。** **进度：无对象。** |"
+            },
+            {
+              "line": 18,
+              "text": "| 7 | **根记录的字段表** | 恒走间接层：固定头 + 一条树表单元指针，树根不平铺进根槽；17 个字段合计 466 字节 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 19,
+              "text": "| 8 | **固定结构的放置** | 系统配置每盘一份、槽轮换、取号写两轮；journal 环两盘镜像；mkfs 先把每盘 [0, 根环基址) 写 0、过屏障，再把第 0 代根种进全部根环区域并把区域整段写 0 **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 20,
+              "text": "| 9 | **系统配置的字段表** | 取 `layout/01-first-txn.md`「系统配置字段表」那一张：五段 46 行、489 字节，住 4096 字节的系统配置槽 **状态：已定。** **进度：已实现。** |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/root_record.rs",
+          "line": 101,
+          "text": "pub struct RootRecord {",
+          "context": [
+            {
+              "line": 100,
+              "text": "#[derive(Clone, Copy, Debug, PartialEq, Eq)]"
+            },
+            {
+              "line": 101,
+              "text": "pub struct RootRecord {"
+            },
+            {
+              "line": 102,
+              "text": "    pub filesystem_identifier: [u8; 16],"
+            },
+            {
+              "line": 103,
+              "text": "    /// flags 位 0（D22（单元原子性怎么合成） 已定项 7）；flags 其余位第一版恒 0，不进内存。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "priority": "P2",
+      "title": "journal 的 previous_hash 覆盖范围仍标未实现",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/23-journal的角色与格式.md",
+          "line": 29,
+          "text": "| 10 | **`previous_hash` 覆盖哪些字段** | 覆盖前一条记录的整个记录头，其中含 jsn，因而含实例代号 **状态：已定。** **进度：未实现。** |",
+          "context": [
+            {
+              "line": 28,
+              "text": "| 9 | **序号与实例代号的位宽划分** | jsn = 实例代号 32 位 + 计数器 48 位，两个字段共 10 字节；代号不许回滚 **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 29,
+              "text": "| 10 | **`previous_hash` 覆盖哪些字段** | 覆盖前一条记录的整个记录头，其中含 jsn，因而含实例代号 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 30,
+              "text": "| 11 | **反向链的 hash 算法** | 取完整 32 位 CRC32C，与密文校验和同一个函数 **状态：已定。** **进度：已实现。** |"
+            },
+            {
+              "line": 31,
+              "text": "| 12 | **记录尺寸** | 4 KiB 定长，写进系统配置 **状态：已定。** **进度：已实现。** |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/journal.rs",
+          "line": 178,
+          "text": "pub fn back_chain_of(previous_record_bytes: &[u8]) -> u32 {",
+          "context": [
+            {
+              "line": 177,
+              "text": "#[must_use]"
+            },
+            {
+              "line": 178,
+              "text": "pub fn back_chain_of(previous_record_bytes: &[u8]) -> u32 {"
+            },
+            {
+              "line": 179,
+              "text": "    let mut header ="
+            },
+            {
+              "line": 180,
+              "text": "        previous_record_bytes[..usize::try_from(JOURNAL_HEADER_BYTES).expect(\"496\")].to_vec();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R13",
+      "priority": "P2",
+      "title": "GC 意图事务形态仍标未实现",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/26-后台整理与放置回收.md",
+          "line": 14,
+          "text": "| 2 | **整理的事务形态** | 不新增 `CommitStep` 成员；意图的目标态写成「`R` 内不存在分配代 ≤ `c0` 且未释放的落点」 **状态：已定。** **进度：未实现。** |",
+          "context": [
+            {
+              "line": 13,
+              "text": "| 1 | **整理的触发判据** | 三水位任一越线起跑；停机取 `R` 本地谓词「删意图那一刻 `R` 按记录全空」，签发前判空洞够不够，无产出就不签下一条；`R` 在意图期内不可作分配目的地 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 14,
+              "text": "| 2 | **整理的事务形态** | 不新增 `CommitStep` 成员；意图的目标态写成「`R` 内不存在分配代 ≤ `c0` 且未释放的落点」 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 15,
+              "text": "| 3 | **整理自己要不要申请空间** | 走常规准入；第一版就留常驻底额，做成准入的第二个合取式；底额取「尽可能小」 **状态：已定。** **进度：未实现。** |"
+            },
+            {
+              "line": 16,
+              "text": "| 4 | **结构抗老化取什么形态** | 不进格式：不存组身份、不动索引节点内部布局，组只从 key 算；政策那一半落回 D3（空间分配） 已定项 8 与已定项 1 **状态：已定。** **进度：未实现。** |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/logged_operations.rs",
+          "line": 135,
+          "text": "pub struct CompactionIntent {",
+          "context": [
+            {
+              "line": 134,
+              "text": "#[derive(Clone, Copy, Debug, PartialEq, Eq)]"
+            },
+            {
+              "line": 135,
+              "text": "pub struct CompactionIntent {"
+            },
+            {
+              "line": 136,
+              "text": "    pub region: CompactionRegion,"
+            },
+            {
+              "line": 137,
+              "text": "    /// `c0`：签发那一刻的分配代；目标态是「R 内不存在分配代 ≤ `c0` 且未释放的落点」（D26 已定项 2）。"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/transaction.rs",
+          "line": 9748,
+          "text": "pub fn publish_compaction_step<Device: BlockDevice>(",
+          "context": [
+            {
+              "line": 9747,
+              "text": "/// `planned` 是空的而 `intent_step` 是两种照抄之一：这样的发布什么都不做，调用方不许走到这里。"
+            },
+            {
+              "line": 9748,
+              "text": "pub fn publish_compaction_step<Device: BlockDevice>("
+            },
+            {
+              "line": 9749,
+              "text": "    pool: &mut PoolWriter<'_, Device>,"
+            },
+            {
+              "line": 9750,
+              "text": "    allocator: &mut PoolAllocator,"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-harness/tests/compaction_intent_is_logged_and_resumed_after_a_crash.rs",
+          "line": 220,
+          "text": "fn the_issue_publish_logs_the_compaction_intent_and_a_writable_mount_reads_it_back_with_its_region_excluded(",
+          "context": [
+            {
+              "line": 219,
+              "text": "#[test]"
+            },
+            {
+              "line": 220,
+              "text": "fn the_issue_publish_logs_the_compaction_intent_and_a_writable_mount_reads_it_back_with_its_region_excluded("
+            },
+            {
+              "line": 221,
+              "text": ") {"
+            },
+            {
+              "line": 222,
+              "text": "    let (mut pool, (issued_txg, intent), _records_left) ="
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R14",
+      "priority": "P1",
+      "title": "里程碑声称 GC 性质证明“没有记录”，证明与登记实际都在",
+      "citations": [
+        {
+          "path": ".claude/kb/milestone/04-fourth-txn.md",
+          "line": 38,
+          "text": "| 3 覆盖 | 一·4、二·3、三·1、六·3 的流跑在崩溃放量上全域；二·4 证性质 | 出口 1、2、3、5、7 在这一段满足 | 流已入库并登记在 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行（一·4、二·3、三·1、六·3 对应的流）；全域 0 红与二·4 的性质证明还没有记录 |",
+          "context": [
+            {
+              "line": 37,
+              "text": "| 2 实现 | 一·2 → 二·2（共享先落地；GC 不涉共享的部分可与一·2 并行写）∥ 四·2 ∥ 六·2 | GC 最难的崩溃流（搬被共享的块）要先有共享才造得出来 | 核心层已合入 master（提交 0b926bd3f）：一·2 建只读快照 / 快照下覆盖写与删文件 / 删快照，二·2 整理（选段与搬迁计划、意图记录、区域扫描、`publish_relocation_batch`；产品路径在签整理意图之前停下），四·2 `rebuild.rs`，六·2 `truncate.rs`；各作业点还差什么见各作业点行与欠账表 |"
+            },
+            {
+              "line": 38,
+              "text": "| 3 覆盖 | 一·4、二·3、三·1、六·3 的流跑在崩溃放量上全域；二·4 证性质 | 出口 1、2、3、5、7 在这一段满足 | 流已入库并登记在 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行（一·4、二·3、三·1、六·3 对应的流）；全域 0 红与二·4 的性质证明还没有记录 |"
+            },
+            {
+              "line": 39,
+              "text": "| GPU GC | 七·1 量 → 七·2 设计 → 七·3 实现 → 七·4 覆盖 ∥ 七·5 对照组 | 七·1 只等二·2 的 GC 发布路径（已在 master：`transaction.rs` 的 `publish_relocation_batch`）；七·2 要七·1 的 CPU 与 I/O 拆分；出口 8 在七·4 满足 | 未开 |"
+            },
+            {
+              "line": 40,
+              "text": ""
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs",
+          "line": 711,
+          "text": "pub proof fn lemma_a_planned_batch_keeps_every_read(",
+          "context": [
+            {
+              "line": 710,
+              "text": "// （分配器的性质），按计划搬完这一批，每个 key 读到的字节不变，映射里的 key 一个不多一个不少。"
+            },
+            {
+              "line": 711,
+              "text": "pub proof fn lemma_a_planned_batch_keeps_every_read("
+            },
+            {
+              "line": 712,
+              "text": "    allocations: Seq<CompactionKernelScannedAllocation>,"
+            },
+            {
+              "line": 713,
+              "text": "    batch_units: usize,"
+            }
+          ]
+        },
+        {
+          "path": ".claude/gate.d/verus-pins.tsv",
+          "line": 29,
+          "text": "kernel\tcrates/singlefs-replay-prefix/src/compaction_plan_proofs.rs",
+          "context": [
+            {
+              "line": 28,
+              "text": "kernel\tcrates/singlefs-replay-prefix/src/lib.rs"
+            },
+            {
+              "line": 29,
+              "text": "kernel\tcrates/singlefs-replay-prefix/src/compaction_plan_proofs.rs"
+            },
+            {
+              "line": 30,
+              "text": "must-red-worlds\tcrates/singlefs-replay-prefix/verus-must-red-worlds.tsv"
+            },
+            {
+              "line": 31,
+              "text": "# rlimit 取 10，就是 Verus 0.2026.09.20 不给 --rlimit 时的默认值：今天的核与必红世界表都是在默认值上验的（实现员 4-1 的报告 /tmp/claude-1000/m3-verus-core-4-1/report.md"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-replay-prefix/verus-must-red-worlds.tsv",
+          "line": 179,
+          "text": "改模型·P4 搬迁写目的地时多写一个零字节（GC 改掉内容）\tcrates/singlefs-replay-prefix/src/compaction_plan_proofs.rs\t            storage(source_slot)\\n        } else {\t            storage(source_slot).push(0u8)\\n        } else {\tproof_errors=1",
+          "context": [
+            {
+              "line": 178,
+              "text": "改判定·P3 计划核取不到时一律报搬空（搬不动的 R 也报搬空）\tcrates/singlefs-replay-prefix/src/compaction_plan_proofs.rs\t    if allocations.is_empty() {\\n        CompactionKernelPlannedBatch::RegionEmptied\t    if true {\\n        CompactionKernelPlannedBatch::RegionEmptied\tproof_errors=1"
+            },
+            {
+              "line": 179,
+              "text": "改模型·P4 搬迁写目的地时多写一个零字节（GC 改掉内容）\tcrates/singlefs-replay-prefix/src/compaction_plan_proofs.rs\t            storage(source_slot)\\n        } else {\t            storage(source_slot).push(0u8)\\n        } else {\tproof_errors=1"
+            },
+            {
+              "line": 180,
+              "text": "改前提·P4 搬到 R 空去掉「R 内每条未释放记录都有映射 key 且不在隔离集里」（攻方 H-G7-1）\tcrates/singlefs-replay-prefix/src/compaction_plan_proofs.rs\t        every_allocation_in_the_region_is_movable(allocations),\\n        movable_mapping_keys_are_distinct(allocations),\\n        scan_agrees_with_the_mapping(allocations, mapping),\\n        destinations_are_distinct_and_free(mapping, destinations, allocations.len() as int),\t        movable_mapping_keys_are_distinct(allocations),\\n        scan_agrees_with_the_mapping(allocations, mapping),\\n        destinations_are_distinct_and_free(mapping, destinations, allocations.len() as int),\tproof_errors=2"
+            },
+            {
+              "line": 181,
+              "text": "改前提·P4 目的地去掉「不被映射里任何 key 占着」（分配器那一半）\tcrates/singlefs-replay-prefix/src/compaction_plan_proofs.rs\t        0 <= index < count ==> destination_is_free_in_the_mapping(\t        0 <= index < count ==> true || destination_is_free_in_the_mapping(\tproof_errors=3"
+            }
+          ]
+        },
+        {
+          "path": "records/2026-10-13-里程碑四预开发.md",
+          "line": 773,
+          "text": "- 轻型形式化第六趟绿（`m4-revalidate6-formal-quick.log`）：「checker-tier-formal-verification.sh：3 格里 3 格绿」，Verus 成项 69 个、verified 之和 78、0 errors；但 69 项全部现判、复用 0，原因「拒算（判法单元指纹）：refused shell-command-unfolded scripts/crash/crash-amplification-lib.sh:600」，判法单元指纹算不出，复用整片失效。记进下一批工具改动（交 tooling-writer：查 `crash-amplification-lib.sh` 第 600 行那条 env 展开为什么让形式化的判法单元指纹拒算、谁改的）。",
+          "context": [
+            {
+              "line": 772,
+              "text": "- 合入后验证第六趟全绿（`~/.local/share/singlefs/work/merge-and-verify/2026-10-20-1858919/`）：「测试全绿（286 个测试二进制，共 2865 条测试；跑了 7 个包）」、fmt 过、clippy 过、build 过，验证红 0 项；里程碑三收尾会话 报的 `new_pool_file_creation_write_regions` 与 clippy `enum_variant_names` 已被批 9 修好。轻型登记表 里程碑三收尾会话 补了 13 行，`crates-mutation-light-rows.py check` 退 0（242 行，主 agent 现核）。接着起轻型三条：形式化 `m4-revalidate6-formal-quick.log`、崩溃 `m4-revalidate6-crash-quick.log`（内存包装排队上限 21600 秒）、变异点名 181 行 `m4-revalidate6-mutation-quick.log`。起跑时本机两张卡上有别的会话的计算进程 2119048，崩溃轻型带 GPU 的几项可能清场回读不过、退 78。"
+            },
+            {
+              "line": 773,
+              "text": "- 轻型形式化第六趟绿（`m4-revalidate6-formal-quick.log`）：「checker-tier-formal-verification.sh：3 格里 3 格绿」，Verus 成项 69 个、verified 之和 78、0 errors；但 69 项全部现判、复用 0，原因「拒算（判法单元指纹）：refused shell-command-unfolded scripts/crash/crash-amplification-lib.sh:600」，判法单元指纹算不出，复用整片失效。记进下一批工具改动（交 tooling-writer：查 `crash-amplification-lib.sh` 第 600 行那条 env 展开为什么让形式化的判法单元指纹拒算、谁改的）。"
+            },
+            {
+              "line": 774,
+              "text": "- GPU 垃圾回收那个会话报它在主工作区的崩溃轻型 6 条真失败（`crash_injection_campaign` 5 条、给定状态表 1 条「录制写 34 次」left (38, 76) right (34, 68)，写流变长、段号挪了）。这边两份补丁不碰 core、不改写流；转 里程碑三收尾会话，里程碑三收尾会话 认下：系统配置落地「甲' 取号写两轮」每轮多一个 2 写的段，这两份测试不在批 9 丙改的 22 份段形钉值里。里程碑三收尾会话 等整份红的清单到齐合成一批派实现员，补丁等轻型跑完再打。"
+            },
+            {
+              "line": 775,
+              "text": "- 第六趟轻型崩溃 36 分钟就退了，不算数（`m4-revalidate6-crash-quick.log`）：`CRASH_POINT_REPLAY_TOTAL tier=quick dispatched=35 collected=35 green=5 red=9 not_run=21 … seconds=2179`。这一趟 ✓ 5 ✗ 9 本次未跑 21，✗ 的是：GPU 对拍组 7 个二进制与剪枝自证 2 个都退 78（清场回读不过）、large-file-overwritten-across-lower-leaves、one-file-overwritten-across-two-writable-remounts、several-inodes-overwritten-in-turn、unlink-of-two-files-holding-data 都是快档退 78；read-faulted-states-never-hold-the-witness-criterion、random-histories-and-fault-injection-given-states 双机驱动退 2；crash-injection-fast-tier 真红一条（推的是 里程碑三收尾会话 认下的写流旧钉值）。21 项本次未跑都是放量入口退 78。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R15",
+      "priority": "P1",
+      "title": "D5 仍称 deadlist 在崩溃流中零覆盖",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/05-快照-空间记账机制.md",
+          "line": 310,
+          "text": "**射程**：引用判据与三个量的定义在已定项 14，运行时形态与代价口径在已定项 19，适用前提在已定项 17。与 D9（加密） 的连锁：birth txg **不能**当加密 nonce——同一事务里的块共享它，nonce 会重复。D5（快照 / 空间记账机制） 自己那次实测只剩崩溃重放一格没跑：deadlist 的追加与级联合并**不幂等**（多重集相加，同一条目追加两次就会在销毁时双重释放），而双重释放是数据丢失方向，已证的「数据丢失方向结构性为零」只覆盖稳态下的 `death` 规则取值；崩溃点重放的两条流一条 deadlist 条目都不写，这一格仍然零覆盖，在它跑起来之前不许说 D5（快照 / 空间记账机制） 的风险路径验过了（E13（D5 的四条风险路径） 路径 3）。",
+          "context": [
+            {
+              "line": 309,
+              "text": ""
+            },
+            {
+              "line": 310,
+              "text": "**射程**：引用判据与三个量的定义在已定项 14，运行时形态与代价口径在已定项 19，适用前提在已定项 17。与 D9（加密） 的连锁：birth txg **不能**当加密 nonce——同一事务里的块共享它，nonce 会重复。D5（快照 / 空间记账机制） 自己那次实测只剩崩溃重放一格没跑：deadlist 的追加与级联合并**不幂等**（多重集相加，同一条目追加两次就会在销毁时双重释放），而双重释放是数据丢失方向，已证的「数据丢失方向结构性为零」只覆盖稳态下的 `death` 规则取值；崩溃点重放的两条流一条 deadlist 条目都不写，这一格仍然零覆盖，在它跑起来之前不许说 D5（快照 / 空间记账机制） 的风险路径验过了（E13（D5 的四条风险路径） 路径 3）。"
+            },
+            {
+              "line": 311,
+              "text": ""
+            },
+            {
+              "line": 312,
+              "text": "**依据**："
+            }
+          ]
+        },
+        {
+          "path": ".claude/gate.d/stage-inputs.tsv",
+          "line": 55,
+          "text": "crash-case:overwrite-and-unlink-under-a-snapshot-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream:full_enumeration_of_the_overwrite_and_unlink_under_a_snapshot_stream_is_exhaustive_and_clean count-line=CRASH_POINT_REPLAY_OVERWRITE_AND_UNLINK_UNDER_A_SNAPSHOT exhaustive=CRASH_POINT_REPLAY_OVERWRITE_AND_UNLINK_UNDER_A_SNAPSHOT threads=CRASH_POINT_REPLAY_OVERWRITE_AND_UNLINK_UNDER_A_SNAPSHOT shard=across-machines\t# 快照下覆盖写与删文件流（A → 建快照 → 覆盖写，被快照引用的四个单元进 deadlist → unlink 意图 → 最后一批，里程碑四一·4 F2）的崩溃点重放全量，枚举域 167837792 个状态；版本表 A、S、W 有文件、意图那一版起没有文件；逐状态核活快照读出建它那一刻的内容（只记计数的观察者）；可写挂载续做是交回镜像的观察者（两段：录入段在 CPU 上挂、按恢复镜像的字节去重，判段在挂完的盘上判池级 checker，配了 GPU 上卡）；带断点续跑、可双机分片（同多记录流的入口）",
+          "context": [
+            {
+              "line": 54,
+              "text": "crash-case:snapshot-creation-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_snapshot_creation_stream:full_enumeration_of_the_snapshot_creation_stream_is_exhaustive_and_clean count-line=CRASH_POINT_REPLAY_SNAPSHOT_CREATION exhaustive=CRASH_POINT_REPLAY_SNAPSHOT_CREATION threads=CRASH_POINT_REPLAY_SNAPSHOT_CREATION shard=across-machines\t# 只读快照的建快照流（取号 → 暖机两次 → A 一个数据单元 → 建快照，里程碑四一·4 F1）的崩溃点重放全量，枚举域 16842815 个状态（用例 `#[ignore]` 说明里的数）；版本表 A、S 都有文件（内容相同）；逐状态核恢复落到 S 时活快照读出建它那一刻的内容（只记计数的观察者）；带断点续跑、可双机分片（同多记录流的入口）。CRASH_POINT_REPLAY_SNAPSHOT_CREATION 是计数行、要 exhaustive=true，threads= 按它的 states= 找那一行 CRASH_POINT_REPLAY_PARALLEL_FINISHED"
+            },
+            {
+              "line": 55,
+              "text": "crash-case:overwrite-and-unlink-under-a-snapshot-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream:full_enumeration_of_the_overwrite_and_unlink_under_a_snapshot_stream_is_exhaustive_and_clean count-line=CRASH_POINT_REPLAY_OVERWRITE_AND_UNLINK_UNDER_A_SNAPSHOT exhaustive=CRASH_POINT_REPLAY_OVERWRITE_AND_UNLINK_UNDER_A_SNAPSHOT threads=CRASH_POINT_REPLAY_OVERWRITE_AND_UNLINK_UNDER_A_SNAPSHOT shard=across-machines\t# 快照下覆盖写与删文件流（A → 建快照 → 覆盖写，被快照引用的四个单元进 deadlist → unlink 意图 → 最后一批，里程碑四一·4 F2）的崩溃点重放全量，枚举域 167837792 个状态；版本表 A、S、W 有文件、意图那一版起没有文件；逐状态核活快照读出建它那一刻的内容（只记计数的观察者）；可写挂载续做是交回镜像的观察者（两段：录入段在 CPU 上挂、按恢复镜像的字节去重，判段在挂完的盘上判池级 checker，配了 GPU 上卡）；带断点续跑、可双机分片（同多记录流的入口）"
+            },
+            {
+              "line": 56,
+              "text": "crash-case:snapshot-destruction-resumed-after-a-crash-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_snapshot_destruction_resumed_after_a_crash_stream:full_enumeration_of_the_snapshot_destruction_resumed_after_a_crash_stream_is_exhaustive_and_clean count-line=CRASH_POINT_REPLAY_SNAPSHOT_DESTRUCTION_RESUMED_AFTER_A_CRASH exhaustive=CRASH_POINT_REPLAY_SNAPSHOT_DESTRUCTION_RESUMED_AFTER_A_CRASH threads=CRASH_POINT_REPLAY_SNAPSHOT_DESTRUCTION_RESUMED_AFTER_A_CRASH shard=across-machines\t# 删快照崩溃续做流（A → 建快照 → 覆盖写 → 删快照意图 → 三批 → 最后一批，批大小 1，判决 S6 的 S W0 X0 C，里程碑四一·4 F3）的崩溃点重放全量，枚举域 84869249 个状态；版本表每一版都有文件；逐状态核活快照读出建它那一刻的内容（只记计数的观察者）；可写挂载续做把删快照走到空是交回镜像的观察者（两段，同上一行）；带断点续跑、可双机分片（同多记录流的入口）"
+            },
+            {
+              "line": 57,
+              "text": "crash-case:compaction-relocation-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_compaction_relocation_stream:full_enumeration_of_the_compaction_relocation_stream_is_exhaustive_and_clean count-line=CRASH_POINT_REPLAY_COMPACTION_RELOCATION exhaustive=CRASH_POINT_REPLAY_COMPACTION_RELOCATION threads=CRASH_POINT_REPLAY_COMPACTION_RELOCATION shard=across-machines\t# 整理搬迁流（取号 → 暖机两次 → A → B → C → 重挂 → 整理签发 → 一批 → 最后一批，批大小 2，里程碑四二·3 G6 前缀 a）的崩溃点重放全量，42 段、最大段 30 写，每次写只取两态时的闭式 1377370259（系统配置槽写取三态的枚举域 1377370329 = 两态闭式 + 14 个系统配置槽 2 写段（取号四段、十次轮换）各 3² − 2²，以用例打出的 closed_form= 为准）；版本表每一版都有文件；逐状态抹掉整理搬走的源落点再读第一个文件（只记计数的观察者）；可写挂载续做把整理意图推到删了是交回镜像的观察者（两段：录入段在 CPU 上挂、按恢复镜像的字节去重，判段在挂完的盘上判池级 checker）；带断点续跑、可双机分片（同多记录流的入口）"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R16",
+      "priority": "P1",
+      "title": "C146 ① 仍说 GC 排他保护没有代码、挂在没开工",
+      "citations": [
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 140,
+          "text": "| C146 | 无空段时的回落政策全仓无定义 | **「聚簇段里没有位置了，这次分配落到哪」全仓一条条款都没有。** `grep -rn \"回落\" .claude/kb/` 现查：D26（后台整理与放置回收） 已定项 6 把「回落计数」列成观测量、E93（老化下的放置与碎片度） 建模过「最低空槽优先」这一种，**而没有任何一条决策说它该是哪一种**。⇒ **三条后果**：① 按 E93（老化下的放置与碎片度） 那一种，整理搬走区域 `R` 的第一个对象之后，`R` 里那个洞就是全池最低的空槽 ⇒ **整理的下一个目的地落回自己正在清空的段** ⇒ 意图正常完成而空段供给恒为零（C140（意图完成不等于空段被腾出） 的最硬形态，前台一次写都不用做）；② 回落政策还决定 D3（空间分配） 已定项 5 那条「提交内生块必须从聚簇段分配」在段耗尽时降级成什么，而那一格正是 I-8.1（环几何够大） 最坏占用发散的入口（C139（整理停摆之后释放也发不出去））；③ **它还决定整理自己那批搬迁要写多少分配记录节点**（2026-09-08 补）——目的地侧散着时改写量从 `⌈N/扇出⌉` 变成 `min(N, 叶总数)`，E74（分配记录的条目数与整理开销） 在 16 TiB / N = 4096 那一档上是 13 → 4823 个节点（371 倍），而整理起跑的条件恰恰是池已经碎了 ⇒ 唯一被建模过的那条政策**保证**目的地不连续。⚠️ 这一条**不经过段耗尽**，与 ② 是两条不同的通路。⚠️ 它是**分配器政策不是格式位**，与 D3（空间分配） 已定项 5 同一类——盘上没有字段声明它，违反它的镜像完全合法 ⚠️ 2026-09-13 总审核定案：D3（空间分配） 已定项 10 定聚簇段 64 槽、开放段取最低全空段、bump 只在内存、用户数据不进开放段，② 已还（实现与用例都在），① ③（整理那两条）仍开着，前置是 D26（后台整理与放置回收） 已定项 1 那一侧 | ② 已有：断言段耗尽时的回落落点符合写下来的那条政策（D3（空间分配） 已定项 8；用例 `crates/singlefs-harness/tests/commit_generated_units_fall_back_when_the_segment_runs_out.rs`、`crates/singlefs-harness/tests/allocator_fallback_count_on_small_devices_after_repeated_mounts_and_the_first_file.rs`）。仍欠 ①：断言一批整理跑完之后 `R` 内不存在这批整理自己写出的落点（拦「搬回自己正在清空的段」），等 D26（后台整理与放置回收） 已定项 1 那一侧（后台整理，`crates/*/src/**` 里零命中，挂在没开工）。判别力自证：把回落改成「最低空槽优先」而 `R` 恰好含最低空槽，第一条必须由绿转红 | 第 ② 条的前置已还：D3（空间分配） 已定项 8（2026-09-13 用户定案）定用户数据不进聚簇段、提交内生块段耗尽回落到该设备内槽号最小且不在 `R` 保护期内的空槽；第 ① 条（整理目的地落回自己正在清空的段）仍等 D26（后台整理与放置回收） 已定项 1 那一侧。两条断言的模型形态同日由 E151（用户数据落点的到达序与容器臂） 第六次跑做出（排除 `R` 时搬回 `R` 与落点偏离政策函数都恒 0，不排除时数万次），实现侧的检查登记在 [verification-build.md](verification-build.md) 事务层第一版「运行时计数与准入自证」表与必红用例表第九条；②的计数 `allocator::PoolAllocator::policy_mismatches` 已删（2026-09-25，C515（政策不一致计数恒 0，口径没改） 已还清，`verification-build.md` 改核「写记录」）；去向：挪出里程碑三，归里程碑四（`.claude/kb/milestone/04-fourth-txn.md` 二·1 整理设计轮，二「仓里已有的」点名这一笔，归属是推的） | 2026-09-06 D26（后台整理与放置回收） 第三轮反推攻击腿面 2，主 agent 现查全仓 `回落` 命中坐实无一处是条款 |",
+          "context": [
+            {
+              "line": 139,
+              "text": "| C168 | E66 的 pack 臂只覆盖最差的一种实现 | **E66（补齐之后小文件怎么落） 的 `pack` 臂源码逐字 `fn needs_rmw(arm: &str) -> bool { arm != \"extent\" }`（`scripts/experiment-apparatus/e66_small_files.rs` 的 `needs_read_modify_write`）⇒ 每写一个小对象都从盘上读回整个容器，而 `extent` 臂是纯写新单元（源码头部表格逐字「新文件不必 RMW」）。两条臂测的不是同一个操作。** E66（补齐之后小文件怎么落） 自己的局限段已承认缺「一次事务里写同一单元上的多个小文件」那一格，但结论「`pack` 出局、I/O 上纯劣」被 D4（校验和位置） 已定项 2 的三臂对比表与 D14（双轨（大小文件 / 持久临时）） 已定项 3 的旁证当成对整条路的否决在用。E114（小数据打包容器的总账） 算出攒批形态写字节反而省 30 倍（1 KiB / m=30），方向相反 | E66（补齐之后小文件怎么落） 加一条攒批臂（开放容器住内存、写满才落盘）与一条后台整理臂，在同一台设备上重跑并报绝对值；D4（校验和位置） 已定项 2 那张表要标注射程「单次操作口径」 | 无前置（纯欠工，装置已在） | 2026-09-07 小数据打包容器论证轮：主 agent 读源码发现，第三轮替代腿独立复核确认 |"
+            },
+            {
+              "line": 140,
+              "text": "| C146 | 无空段时的回落政策全仓无定义 | **「聚簇段里没有位置了，这次分配落到哪」全仓一条条款都没有。** `grep -rn \"回落\" .claude/kb/` 现查：D26（后台整理与放置回收） 已定项 6 把「回落计数」列成观测量、E93（老化下的放置与碎片度） 建模过「最低空槽优先」这一种，**而没有任何一条决策说它该是哪一种**。⇒ **三条后果**：① 按 E93（老化下的放置与碎片度） 那一种，整理搬走区域 `R` 的第一个对象之后，`R` 里那个洞就是全池最低的空槽 ⇒ **整理的下一个目的地落回自己正在清空的段** ⇒ 意图正常完成而空段供给恒为零（C140（意图完成不等于空段被腾出） 的最硬形态，前台一次写都不用做）；② 回落政策还决定 D3（空间分配） 已定项 5 那条「提交内生块必须从聚簇段分配」在段耗尽时降级成什么，而那一格正是 I-8.1（环几何够大） 最坏占用发散的入口（C139（整理停摆之后释放也发不出去））；③ **它还决定整理自己那批搬迁要写多少分配记录节点**（2026-09-08 补）——目的地侧散着时改写量从 `⌈N/扇出⌉` 变成 `min(N, 叶总数)`，E74（分配记录的条目数与整理开销） 在 16 TiB / N = 4096 那一档上是 13 → 4823 个节点（371 倍），而整理起跑的条件恰恰是池已经碎了 ⇒ 唯一被建模过的那条政策**保证**目的地不连续。⚠️ 这一条**不经过段耗尽**，与 ② 是两条不同的通路。⚠️ 它是**分配器政策不是格式位**，与 D3（空间分配） 已定项 5 同一类——盘上没有字段声明它，违反它的镜像完全合法 ⚠️ 2026-09-13 总审核定案：D3（空间分配） 已定项 10 定聚簇段 64 槽、开放段取最低全空段、bump 只在内存、用户数据不进开放段，② 已还（实现与用例都在），① ③（整理那两条）仍开着，前置是 D26（后台整理与放置回收） 已定项 1 那一侧 | ② 已有：断言段耗尽时的回落落点符合写下来的那条政策（D3（空间分配） 已定项 8；用例 `crates/singlefs-harness/tests/commit_generated_units_fall_back_when_the_segment_runs_out.rs`、`crates/singlefs-harness/tests/allocator_fallback_count_on_small_devices_after_repeated_mounts_and_the_first_file.rs`）。仍欠 ①：断言一批整理跑完之后 `R` 内不存在这批整理自己写出的落点（拦「搬回自己正在清空的段」），等 D26（后台整理与放置回收） 已定项 1 那一侧（后台整理，`crates/*/src/**` 里零命中，挂在没开工）。判别力自证：把回落改成「最低空槽优先」而 `R` 恰好含最低空槽，第一条必须由绿转红 | 第 ② 条的前置已还：D3（空间分配） 已定项 8（2026-09-13 用户定案）定用户数据不进聚簇段、提交内生块段耗尽回落到该设备内槽号最小且不在 `R` 保护期内的空槽；第 ① 条（整理目的地落回自己正在清空的段）仍等 D26（后台整理与放置回收） 已定项 1 那一侧。两条断言的模型形态同日由 E151（用户数据落点的到达序与容器臂） 第六次跑做出（排除 `R` 时搬回 `R` 与落点偏离政策函数都恒 0，不排除时数万次），实现侧的检查登记在 [verification-build.md](verification-build.md) 事务层第一版「运行时计数与准入自证」表与必红用例表第九条；②的计数 `allocator::PoolAllocator::policy_mismatches` 已删（2026-09-25，C515（政策不一致计数恒 0，口径没改） 已还清，`verification-build.md` 改核「写记录」）；去向：挪出里程碑三，归里程碑四（`.claude/kb/milestone/04-fourth-txn.md` 二·1 整理设计轮，二「仓里已有的」点名这一笔，归属是推的） | 2026-09-06 D26（后台整理与放置回收） 第三轮反推攻击腿面 2，主 agent 现查全仓 `回落` 命中坐实无一处是条款 |"
+            },
+            {
+              "line": 141,
+              "text": "| C95 | 依据被撤回的已定项无人回看 | **一条已定项所依据的实验结论被撤回或证伪之后，它照旧挂着「已定」，没人回头判它还站不站得住。** 实测就在仓里：E38（记账结构 COW 还是原地） 的恢复代价列 2026-08-30 撤回，D22（单元原子性怎么合成） 已定项 3 从此只剩 mkfs 预留一条腿；那条腿的原地臂形态 2026-09-03 又被判为稻草人（静态地址映射全量预留，而原地方案真正的形态是首次使用时动态分配、此后地址不变）；而 E38（记账结构 COW 还是原地） 唯一测过的写放大轴指向反面（D25（目标负载优先级） 粗粒度下 COW 贵 25–37.5%）。**三件事各自都记下来了，没有一处把它们合起来问「这条已定项现在还有依据吗」**。⚠️ **第二笔同型，2026-09-09 记，射程要从「实验 → 分项」扩到「决策条款 → 它引的决策条款」**：D21（权威态与派生态的分界） 已定项 3 ① 的依据 2026-09-06 被撤回，撤回的理由是它与「无密钥的一侧要能搬」互斥；而 D9（加密） 已定项 5 于 2026-09-07 改取「只做 scrub」（逐字「加密开启时，无密钥的一侧只读只检测——不搬、不疏散、不回收」）之后，那条理由的另一半没了，D21（权威态与派生态的分界） 正文两天里没人动 ⇒ **失效的是撤回的理由本身**，而引用它的分项照旧写着「这一格现在连依据都没有」。⚠️ **它躲过了 2026-09-07 那次回扫**：C167（明文映射层的引用全仓回扫没做） 逐字按「明文映射层」四个字扫，而这一条的措辞是「无密钥的一侧要能搬」，四个字一个都不含 | 已有（实验 → 决策分项那一支）：门禁 doc-experiments 的 decision-links 格（`.claude/gate.d/doc-experiments.sh`）③ 双向（分项「依据」段引的实验，实验页里要有这一行、关系是支撑或推翻）、④ 时效（实验最近一次变动晚于表里某一行的回看日期即红）。仍欠：把同一道检查的射程扩到「决策条款 → 它引的决策条款」那一支（要拦什么里的第二笔）；原形态：门禁抽「实验 → 引用它的决策分项」引用图：凡实验正文里带撤回标记的结论，其全部引用方分项必须在撤回日期之后有一条新写的依据，没有即判红并列出分项与撤回日期。判别力自证：造一份「实验已撤回、分项仍引用且无新依据」的样本必须红，给分项补一条日期在后的依据必须转绿 | 实验撤回要有机器认得的标记（只是正文里的「撤回」二字）；决策分项到实验的引用图（编号引用已在，可抽） | 2026-09-03 三方论证（opus 反例腿逐字核 E38（记账结构 COW 还是原地） 正文，指出恢复代价列已撤回而 mkfs 预留臂是稻草人）；主 agent 现查 E38（记账结构 COW 还是原地） 与 D22（单元原子性怎么合成） 正文确认 |"
+            },
+            {
+              "line": 142,
+              "text": "| C178 | 系统配置必需字段表靠手抄 | **E115（系统配置字段表的完备性与字节预算） 的 `REQUIRED` 表（31 项）是人从 kb 里抄出来的**（`scripts/experiment-apparatus/e115_system_configuration_completeness.rs`）。它证明的是「抄下来的这 31 项里有 9 项没进候选表」，**证明不了「已定条款要求的就是这 31 项」**——以后任何一条决策再写一句「某某住系统配置 / 系统配置声明」，那张表一个字都不会说，而 E115（系统配置字段表的完备性与字节预算） 照样全绿。2026-09-07 那一轮立表本身就是这么发现的：机械普查（`grep -rn \"系统配置\"）翻出 D2（RAID 条带策略） 已定项 7 那条**用户定案**要求的根环逐区域设备身份，而它躺在 kb 里已经七天没人把它算进字段表 | 做成门禁阶段：扫 `.claude/kb/decisions/*.md` 与 `crates/singlefs-checker/invariants/*.md` 里「住系统配置 / 系统配置声明 / 写进系统配置 / 进系统配置」这几种说法，每命中一处就要求 `REQUIRED` 里有对应一行（按出处串匹配），对不上判红。判别力自证：往任一决策正文加一句「XX 住系统配置」，检查必须由绿转红；把 `REQUIRED` 里删一行，也必须由绿转红。⚠️ **同形的一条已经落地**，可照抄它的形态：`.claude/gate.d/doc-registries.sh` 的 field-projection 格做的是「决策分项的字段表 → [layout/01-first-txn.md](layout/01-first-txn.md) 投影」的反向检查，**只对已经被投影过的分项要求完整投影**（否则不属于新池新建文件的字段会假红）。系统配置这一格难在哪：「某某住系统配置」是散在段落里的句子，不是 `\\| 字段 \\| 宽 \\|` 表，扫不出结构 | 无前置（纯欠工，装置已在 E115（系统配置字段表的完备性与字节预算））。⚠️ 它是 `.claude/singlefs-ai-sop/rules/show-me-test.md`「这个坑在哪一层」那一节点名的**口径层**形态：检查要立在 kb 与实验装置**之间**，立在装置内部管不住 | 2026-09-07 立 E115（系统配置字段表的完备性与字节预算） 时主 agent 自记 |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/compaction_plan.rs",
+          "line": 578,
+          "text": "    pub fn region_excluded_from_placement(&self) -> Option<CompactionRegion> {",
+          "context": [
+            {
+              "line": 577,
+              "text": "    #[must_use]"
+            },
+            {
+              "line": 578,
+              "text": "    pub fn region_excluded_from_placement(&self) -> Option<CompactionRegion> {"
+            },
+            {
+              "line": 579,
+              "text": "        self.live_intent"
+            },
+            {
+              "line": 580,
+              "text": "            .filter(|live| live.is_the_region_excluded_from_placement)"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-harness/tests/compaction_plan_chooses_regions_and_batches_by_the_clauses.rs",
+          "line": 855,
+          "text": "fn user_data_does_not_land_in_the_live_intent_region_while_it_is_excluded() {",
+          "context": [
+            {
+              "line": 854,
+              "text": "#[test]"
+            },
+            {
+              "line": 855,
+              "text": "fn user_data_does_not_land_in_the_live_intent_region_while_it_is_excluded() {"
+            },
+            {
+              "line": 856,
+              "text": "    let mut allocator = allocator_with_a_live_intent_on("
+            },
+            {
+              "line": 857,
+              "text": "        FIRST_SEGMENT,"
+            }
+          ]
+        },
+        {
+          "path": "crates/mutations.tsv",
+          "line": 4170,
+          "text": "m4 R 排他：用户数据落进 R\tcrates/singlefs-core/src/allocator.rs\t            let inside_the_excluded_region =\\n                excluded_region.is_some_and(|region| region.contains_slot(SlotNumber(candidate)));\t            let inside_the_excluded_region = excluded_region.is_some() && candidate == 0;\t-p singlefs-harness --test compaction_plan_chooses_regions_and_batches_by_the_clauses -- user_data_does_not_land_in_the_live_intent_region_while_it_is_excluded --exact\tuser_data_does_not_land_in_the_live_intent_region_while_it_is_excluded",
+          "context": [
+            {
+              "line": 4169,
+              "text": "m4 整理：预算少减一\tcrates/singlefs-core/src/compaction_plan.rs\t        .saturating_sub(4)\t        .saturating_sub(3)\t-p singlefs-harness --test compaction_plan_chooses_regions_and_batches_by_the_clauses -- the_publish_budget_of_a_run_is_three_s_minus_four_minus_the_publishes_passed_and_at_least_one --exact\tthe_publish_budget_of_a_run_is_three_s_minus_four_minus_the_publishes_passed_and_at_least_one"
+            },
+            {
+              "line": 4170,
+              "text": "m4 R 排他：用户数据落进 R\tcrates/singlefs-core/src/allocator.rs\t            let inside_the_excluded_region =\\n                excluded_region.is_some_and(|region| region.contains_slot(SlotNumber(candidate)));\t            let inside_the_excluded_region = excluded_region.is_some() && candidate == 0;\t-p singlefs-harness --test compaction_plan_chooses_regions_and_batches_by_the_clauses -- user_data_does_not_land_in_the_live_intent_region_while_it_is_excluded --exact\tuser_data_does_not_land_in_the_live_intent_region_while_it_is_excluded"
+            },
+            {
+              "line": 4171,
+              "text": "m4 R 排他：开段开进 R\tcrates/singlefs-core/src/allocator.rs\t                    && !excluded_region.is_some_and(|region| {\\n                        region.contains_slot(self.segment_start_slot(*segment))\\n                    })\t                    && !excluded_region.is_some_and(|region| region.start_slot().0 == 0)\t-p singlefs-harness --test compaction_plan_chooses_regions_and_batches_by_the_clauses -- a_new_cluster_segment_is_not_opened_in_the_live_intent_region --exact\ta_new_cluster_segment_is_not_opened_in_the_live_intent_region"
+            },
+            {
+              "line": 4172,
+              "text": "m4 R 排他：关掉排他的开关不认\tcrates/singlefs-core/src/compaction_plan.rs\t            is_the_region_excluded_from_placement: match self.switches.region_exclusion {\\n                CompactionRegionExclusion::ExcludedWhileTheIntentIsLive => true,\\n                CompactionRegionExclusion::SwitchedOffForTests => false,\t            is_the_region_excluded_from_placement: match self.switches.region_exclusion {\\n                CompactionRegionExclusion::ExcludedWhileTheIntentIsLive => true,\\n                CompactionRegionExclusion::SwitchedOffForTests => true,\t-p singlefs-harness --test compaction_plan_chooses_regions_and_batches_by_the_clauses -- user_data_lands_in_the_live_intent_region_when_the_exclusion_is_switched_off_for_tests --exact\tuser_data_lands_in_the_live_intent_region_when_the_exclusion_is_switched_off_for_tests"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R17",
+      "priority": "P1",
+      "title": "C197 仍把“等待搬迁写路径存在”当作前置",
+      "citations": [
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 163,
+          "text": "| C197 | 迁移的三笔写是不是一个事务没写下来 | **一次搬迁要写三笔：新单元字节、中央映射条目、分配记录条目（源侧标已释放 + 目的地侧标已分配）。它们是不是同属一次事务，D26（后台整理与放置回收） 已定项 2 与全仓其余条款一个字都没写。** 拆开写的两种后果都到不了任何现有检查：先标源已释放 ⇒ 崩后映射指向一个 defer 期满即可复用的落点 ⇒ 解引用解到**第三方数据**（比 E96（混合架构的一致性） 测到的「读到同 key 的新版本」更坏）；先改映射 ⇒ 旧落点永久标已分配，而 D3（空间分配） 已定项 7 的孤儿准入要求「没有条目」，管不到一个**有条目且标已分配**的落点 ⇒ 泄漏 | checker 判「任一分配记录条目标已释放，其对应的中央映射条目要么已指向别处、要么该版本已在某处 deadlist 或 defer 队列里」。判别力自证：把迁移拆成两个事务并在中间截断，检查必须由绿转红 | 修法零格式位（只约束哪些写打包进同一条 journal 记录），崩溃点重放已有（门禁 checker-tier-crash-point-replay），要等整理有搬迁写路径才有对象（`crates/singlefs-core/src` 里没有）；⚠️ 另欠一条依赖声明：迁移对映射的写寄生在 D13（验证路线） 已定项 2 的「串行提交」上，而那条自陈是过渡默认值 | 2026-09-08 D26（后台整理与放置回收） 已定项 5 第二轮崩溃点与并发交错腿 |",
+          "context": [
+            {
+              "line": 162,
+              "text": "| C195 | 销毁级联时 prev 传递只写在实验的模型修订记录里 | **`grep -rn \"prev 要传递\\|prev_txg\" .claude/kb/` 全仓只命中一处**：`experiments/94-搬共享落点的触碰面.md` 的**模型修订记录**，逐字「prev 要传递（不传递会永久钉住，变异 M5b 验证）」。而 D5（快照 / 空间记账机制） 正文那条销毁规则逐字只写到「销毁快照时把它的 deadlist **合并到下一个更新的那一侧**，并按 `birth > prev(S).txg`」，**一个字没提传递** ⇒ 光读 D5（快照 / 空间记账机制） 正文，「级联销毁之后 deadlist 条目永远等不到 `birth > prev(S).txg`」这个无界泄漏构造**驳不倒**（实测：本地腿两轮四次抽样反复造出它） | checker 判「任一 deadlist 条目，其归属快照的 `prev(S).txg` 等于它在销毁级联中**写意图那一刻**继承来的那个值」（2026-09-16 收窄：prev 在写意图的那个事务里传，拆到以后的发布时 D5（快照 / 空间记账机制） 已定项 12 的三条候选都 5 步多放）。判别力自证：把继承那一步去掉（每次销毁各用各的原始 prev），检查必须由绿转红——E94（搬共享落点的触碰面） 的变异 M5b 已经在模型层证过这条会红 | D5（快照 / 空间记账机制） 正文那一句已补（文件开头「`prev` 要跟着传递」那一行）；剩 checker | 2026-09-08 D26（后台整理与放置回收） 已定项 5 三轮论证，本地腿四次抽样都撞在这里 |"
+            },
+            {
+              "line": 163,
+              "text": "| C197 | 迁移的三笔写是不是一个事务没写下来 | **一次搬迁要写三笔：新单元字节、中央映射条目、分配记录条目（源侧标已释放 + 目的地侧标已分配）。它们是不是同属一次事务，D26（后台整理与放置回收） 已定项 2 与全仓其余条款一个字都没写。** 拆开写的两种后果都到不了任何现有检查：先标源已释放 ⇒ 崩后映射指向一个 defer 期满即可复用的落点 ⇒ 解引用解到**第三方数据**（比 E96（混合架构的一致性） 测到的「读到同 key 的新版本」更坏）；先改映射 ⇒ 旧落点永久标已分配，而 D3（空间分配） 已定项 7 的孤儿准入要求「没有条目」，管不到一个**有条目且标已分配**的落点 ⇒ 泄漏 | checker 判「任一分配记录条目标已释放，其对应的中央映射条目要么已指向别处、要么该版本已在某处 deadlist 或 defer 队列里」。判别力自证：把迁移拆成两个事务并在中间截断，检查必须由绿转红 | 修法零格式位（只约束哪些写打包进同一条 journal 记录），崩溃点重放已有（门禁 checker-tier-crash-point-replay），要等整理有搬迁写路径才有对象（`crates/singlefs-core/src` 里没有）；⚠️ 另欠一条依赖声明：迁移对映射的写寄生在 D13（验证路线） 已定项 2 的「串行提交」上，而那条自陈是过渡默认值 | 2026-09-08 D26（后台整理与放置回收） 已定项 5 第二轮崩溃点与并发交错腿 |"
+            },
+            {
+              "line": 164,
+              "text": "| C198 | 映射 key 与节点头常量没有 format-const 登记位 | **`grep -rn \"format-const\" .claude/kb/` 现查：中央映射 key 的宽度在 kb 里没有登记位**，而 `scripts/experiment-apparatus/e109_position_authority.rs` 有 `const KEY_BYTES: u64 = 33`、`e116_pack_settle.rs` 有 `const MAP_KEY: u64 = 33`；两处算同一个映射树节点头的常量（`e109` 的 `MAP_NODE_HEADER_BYTES = 76` 与 `e116` 的 `NODE_HDR = 86`）**取值还不一样**，只是在两轮论证用过的那两个取样点（key 33 / 41）上恰好都给出 267 / 236。⇒ D19（块指针的结构与宽度预算） 已定项 6 定案之后改完 kb，`.claude/gate.d/code-source-discipline.sh` 的 format-constants 格对这几处源码**一个字都不会说**（C187（源码里没在 kb 登记的格式常量，格式常量门禁看不见） 的同一形状，对象换成映射） ⚠️ 条目 55 与节点指针 86 已有 format-const 登记位（`MAPPING_ENTRY_BYTES`、`NODE_POINTER_BYTES`），映射树节点头也有（`CENTRAL_MAPPING_TREE_INDEX_NODE_HEADER_BYTES`），映射 key 27 仍没有，E116（打包容器的账·补元数据写与整理策略） / E145（码 2 自描述头与映射树 key 宽的代价） / E146（livelist 条目按映射 key 定身份之后的宽度与代价） 三份装置因此停在旧值而门禁 code-source-discipline 的 format-constants 格看不见（见 C56（没登记的格式常量仍会漂） 那一行的现查） | 给映射 key 宽度与映射树节点头各补一个 `format-const` 登记位，让门禁 code-source-discipline 的 format-constants 格覆盖到那三处源码常量。判别力自证：把源码里那个常量改一位，门禁必须由绿转红 | D19（块指针的结构与宽度预算） 已定项 6 定案（登记位要登记一个定下来的值；已定，这一条前置解开）；两个节点头常量对不对得上要另查 | 2026-09-08 D26（后台整理与放置回收） 已定项 5 第二轮跨决策连锁腿 + 第三轮辩方腿 |"
+            },
+            {
+              "line": 165,
+              "text": "| C199 | 实例代号递增与 jsn 断号即止互相矛盾 | D23（journal 的角色与格式） 已定项 9 定「实例代号 32 位 + 计数器 48 位」且代号每次恢复递增，E37（日志实例代号） 逐字 `jsn = (代号 << 48) \\| 计数器` ⇒ 一次实例切换让 `jsn` 跳 2⁴⁸；而 I-8.3（重放前缀严格连续） 与 D23（journal 的角色与格式） 已定项 14「前缀判定的完整口径五条」第一条都是「jsn 严格连续（断号即止）」（`jsn == expected`）⇒ 照字面，实例切换之后新实例的记录一条都不施加（E37（日志实例代号） `epoch` 臂实测 `lost_new=1`）。**矛盾已收口（2026-09-14 用户复核）**：前缀规则不改；D23（journal 的角色与格式） 已定项 14 补了链首、比较序（实例代号为主）、计数器（全池接着走）、切换时的 W（窄读）四条注，D16（发布语义） 已定项 7 补了新实例第一个根是单点的代价（D23（journal 的角色与格式） 已定项 9 与 14、D16（发布语义） 已定项 7 都是用户定案）；要不要暖机落 D16（发布语义） 已定项 8，建议先还 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元）。两轮三方的结局：维持严格前缀（甲）被打中——每次可写挂载都取新代号（D18（块里携带什么信息） 已定项 11「只读挂载不取号」），干净重挂之后第一个根所在的槽读不出、再在第二次发布之前崩一次，fsync 已返回的事务就丢，一个故障就够（根槽不镜像）；按实例表跨边界（乙）按字面同样丢；交接记录（丙）与链尾锚（丁）都把一次没持久的回退接上，丁一个故障就丢已确认的回退（被抛弃尾巴点名的单元被复用、验不过即停）出局；严格前缀 + 新实例先暖机（戊）单故障没打中；三条臂都被 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 那一格打中 ⇒ 不替用户选臂，回到严格前缀、写明代价（`research/prompts/c199-r1-main-verification.md`、`research/prompts/c199-r2-main-verification.md`） | 崩溃点重放造两格：① 所选根是新实例的根 ⇒ 新实例在水位之后的记录全部施加；② 新实例的根全读不出、退到旧实例的根 ⇒ 新实例的记录一条都不施加、写出的行 W = 0（D16（发布语义） 已定项 7 那条代价）。判别力自证：把跨实例改成放行，② 必须由绿转红。实现里跨实例有两道守：`crates/singlefs-replay-prefix/src/lib.rs` 的 `is_above_the_chosen_root` 只认同实例的记录，链首那一判（`record.instance.0 != expected_key.0.0`）也比实例代号，单改一道不红（戊簇实现员 2026-10-22 在草稿副本里只去掉链首那一判，带读故障的那一遍仍落在实例 1 的根、一条都不施加），所以变异行改在喂给核的实例代号那一处（`crates/singlefs-core/src/recovery.rs` 的 `replay_journal` 里 `instance: PrefixKernelInstanceGeneration(record.instance.0),` 改成 `root.instance.0`），两道一起绕过；把链首改成「环里第一条」另行自证，没量 | I-8.3（重放前缀严格连续） 未实现；崩溃点重放 harness 已接入（门禁 checker-tier-crash-point-replay；崩溃点重放覆盖写固定脚本流有三次可写挂载含回退，但没有「新实例的根全读不出」那一格的故障注入）；多次挂载读故障的录制流已写：`crates/singlefs-checker-tier/tests/crash_enumeration_mounts_with_read_faults_stream.rs`（`.claude/gate.d/stage-inputs.tsv` 登记 `crash-case:mounts-with-read-faults-stream`；实例 1 写 A、B，实例 2 可写挂载、覆盖写 C、建快照 S；计数观察者判 ① ② 两格，② 把实例 2 落了盘的根槽读成读不到再恢复一遍），`crates/mutations.tsv` 里以「m3 收尾戊簇」打头、名字带「恢复把每条记录的实例代号当成所选根的」的那一行点名它的快档用例；快档与全量没跑（重型），待跑；去向：里程碑三二·5（要新写多次挂载读故障录制流；2026-10-19 分诊定）。 | 2026-09-08 三方论证（D22（单元原子性怎么合成） 那条世代号硬要求要不要销账）的反推腿指出，主 agent 逐字核 I-8.3（重放前缀严格连续）、D23（journal 的角色与格式） 已定项 14 的五条口径、E37（日志实例代号） 正文坐实 |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/transaction.rs",
+          "line": 9675,
+          "text": "pub fn publish_relocation_batch<Device: BlockDevice>(",
+          "context": [
+            {
+              "line": 9674,
+              "text": "/// `planned` 是空的：调用方按 `PlannedBatch::Relocate` 才调（至少一项）。"
+            },
+            {
+              "line": 9675,
+              "text": "pub fn publish_relocation_batch<Device: BlockDevice>("
+            },
+            {
+              "line": 9676,
+              "text": "    pool: &mut PoolWriter<'_, Device>,"
+            },
+            {
+              "line": 9677,
+              "text": "    allocator: &mut PoolAllocator,"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-harness/tests/checker_compaction_intent_and_relocation_must_red_worlds.rs",
+          "line": 345,
+          "text": "/// （`RelocationPublishOrder::SourceReleasedWhileTheMappingStillNamesItForTests`）。目的槽那条未释放的记录罩住的副本，映射里那把 key 指着源槽：",
+          "context": [
+            {
+              "line": 344,
+              "text": "/// 必红世界「只写副本不改映射」：只供测试的开关让一批照样写目的地与它的分配记录、释放源落点，映射条目与各处指针却留在源槽"
+            },
+            {
+              "line": 345,
+              "text": "/// （`RelocationPublishOrder::SourceReleasedWhileTheMappingStillNamesItForTests`）。目的槽那条未释放的记录罩住的副本，映射里那把 key 指着源槽："
+            },
+            {
+              "line": 346,
+              "text": "/// I-3.15 红、点名目的槽。"
+            },
+            {
+              "line": 347,
+              "text": "#[test]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R18",
+      "priority": "P1",
+      "title": "C411 仍称缺类别宽度前置，且称码 3 大小随容器定",
+      "citations": [
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 290,
+          "text": "| C411 | 分配记录的跨度段与单元类别不符没检查 | **D3（空间分配） 已定项 7 定「一条记录记一个存储单元」、跨度段说它覆盖几个 16 KiB 槽，而各单元类的大小不同**（D18（块里携带什么信息） 已定项 11 的登记表：码 1 数据单元 32768 是两槽，码 2 索引节点 16384 是一槽）⇒ 一条记录的跨度段与它所记单元的类别对不上时（比如给一个码 1 单元只记一槽），I-3.1（已分配统计对得上） 照样自洽——它按跨度段求和，而那个单元的第二个槽在盘上没有归属、可被重新分配 ⇒ 静默覆盖 | checker 全盘遍历时，每条分配记录按 key 读出它所记落点上的单元头、取单元类型标签，断言跨度段 × 16384 等于该类的单元大小。判别力自证：把某个码 1 单元那条记录的跨度段改成 1，检查必须由绿转红 | 要一张「类 → 单元大小」的表能被 checker 读到（D18（块里携带什么信息） 已定项 11 的登记表）；码 3 打包记录单元的大小随容器定，那一类先要有口径；去向：里程碑三二·5（2026-10-19 分诊定）。 | 2026-09-20 D3（空间分配） 按瘦身形态重写时现查：已定项 7 的欠段逐字说这条检查「还没有编号」，欠账表里搜不到对应编号 |",
+          "context": [
+            {
+              "line": 289,
+              "text": "| C410 | checker 两个方向共享什么没有检查 | **D13（验证路线） 已定项 12 定 checker 做遍历式与扫描式两个方向、对同一条不变量独立判断，「共享的只有格式解析」——这是它给冲突 1（`checker 即规范` 与「校验的两条路径不许共享工具」打架）开的那条出路。** 池级 checker 两个方向都有（`crates/singlefs-checker/src/walk.rs` 文件头），而那句「共享的只有格式解析」没有任何会红的形态盯着，立账之前 D13（验证路线） 已定项 12 的欠块逐字记着它没有 C 编号，立账后欠块已列 C410（checker 两个方向共享什么没有检查） ⇒ 两个方向哪天共用了同一段遍历或同一份重建代码，冲突 1 那个单点就回来了，而门禁全绿 | 照 C12（增量语义共用） 的判据方向做检查：扫描式方向调用的函数集合与遍历式方向调用的函数集合，交集只许落在格式解析与常量里；取不到调用图、或交集越界即判红。⚠️ **不能直接借 C12（增量语义共用） 的工装**：那一条 2026-09-21 落成的门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格是 **crate 粒度**的依赖闭包交集，不是符号级，调用图那件工装根本没造出来。判别力自证：把扫描式方向改成调用遍历式的某个判定函数，检查必须由绿转红 | 取得到 `crates/singlefs-checker` 的调用图——这一条要的是**同一个 crate 内部**两个方向的符号集合，C12（增量语义共用） 的门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格判的是两个 crate 之间的依赖闭包，罩不到这一格，调用图仍要另建 | 2026-09-19 第二批 D13（验证路线） 瘦身时子 agent 指出，主 agent 现查 D13（验证路线） 已定项 12 正文与欠块、`crates/singlefs-checker/src/walk.rs` 文件头坐实 |"
+            },
+            {
+              "line": 290,
+              "text": "| C411 | 分配记录的跨度段与单元类别不符没检查 | **D3（空间分配） 已定项 7 定「一条记录记一个存储单元」、跨度段说它覆盖几个 16 KiB 槽，而各单元类的大小不同**（D18（块里携带什么信息） 已定项 11 的登记表：码 1 数据单元 32768 是两槽，码 2 索引节点 16384 是一槽）⇒ 一条记录的跨度段与它所记单元的类别对不上时（比如给一个码 1 单元只记一槽），I-3.1（已分配统计对得上） 照样自洽——它按跨度段求和，而那个单元的第二个槽在盘上没有归属、可被重新分配 ⇒ 静默覆盖 | checker 全盘遍历时，每条分配记录按 key 读出它所记落点上的单元头、取单元类型标签，断言跨度段 × 16384 等于该类的单元大小。判别力自证：把某个码 1 单元那条记录的跨度段改成 1，检查必须由绿转红 | 要一张「类 → 单元大小」的表能被 checker 读到（D18（块里携带什么信息） 已定项 11 的登记表）；码 3 打包记录单元的大小随容器定，那一类先要有口径；去向：里程碑三二·5（2026-10-19 分诊定）。 | 2026-09-20 D3（空间分配） 按瘦身形态重写时现查：已定项 7 的欠段逐字说这条检查「还没有编号」，欠账表里搜不到对应编号 |"
+            },
+            {
+              "line": 291,
+              "text": "| C412 | 整理的挂钟代价没量过 | **D3（空间分配） 已定项 14 是「后台整理常驻、自动、用户无需知道」这条硬承诺，而它没有任何挂钟数在背书。** D3（空间分配） 已定项 1 的依据引 E74（分配记录的条目数与整理开销），而 E74（分配记录的条目数与整理开销） 量的是整理路径重写多少个节点（载体强制付出多少），不是它要花多少墙钟；D3（空间分配） 瘦身前的正文自陈挂钟那一问仍欠实现，那句话已随 2026-09-20 的瘦身移出正文、在决策变更史里。⇒ 整理跑一轮要多久、会不会跟前台抢 I/O，一个数都没有 | 建一个计数实验或给 E74（分配记录的条目数与整理开销） 补一轮，量一批整理的挂钟，口径写明设备、负载、批大小，断言钉绝对值而不是只比相对倍数。判别力自证：把批大小翻倍，挂钟必须跟着涨 | D26（后台整理与放置回收） 的整理策略未定项 8 / 9 / 10 还开着，先定量哪一条策略；`crates/` 里没有整理（`grep -rn 整理 crates --include=*.rs` 命中 12 行、4 个文件，都是注释、断言消息与字段名里的字（系统运行配置那三个整理水位恒取内置默认 0），没有整理路径） | 2026-09-20 D3（空间分配） 瘦身现查：瘦身前那一版第 90 行自陈挂钟那一问仍欠实现，而欠账表里没有对应编号 |"
+            },
+            {
+              "line": 292,
+              "text": "| C413 | 碎片度与全空段统计没有不变量 | **D26（后台整理与放置回收） 已定项 6 把 runs 与全空聚簇段数持久化进记账树当整理的触发输入，而 [crates/singlefs-checker/invariants/](../../crates/singlefs-checker/invariants/README.md) 里「碎片度」与「全空段」各命中 0 次** ⇒ 这两个增量维护的统计量没有任何一条不变量盯着它们与全扫审计对不对得上。形态同 I-3.1（已分配统计对得上）：增量值错了，整理会在错的时机触发、或者永不触发，而 checker 一声不吭 | 往 [crates/singlefs-checker/invariants/05-空间记账.md](../../crates/singlefs-checker/invariants/05-空间记账.md) 加一条「碎片度与全空段统计对得上」：增量维护的值等于全扫重算的值，审计路径与增量路径不共享代码（E93（老化下的放置与碎片度） 已经这么建过）。判别力自证：把增量维护那一步少加一次，检查必须由绿转红 | runs 2026-09-14 换过口径（C326（runs 换口径之后 E93 的数还能不能引）），先按新口径定义全扫重算怎么做；载体是 D5（快照 / 空间记账机制） 已定项 3 的记账树 | 2026-09-20 D26（后台整理与放置回收） 按瘦身形态重写时现查：已定项 6 的欠段逐字说这条不变量还没进 [crates/singlefs-checker/invariants/](../../crates/singlefs-checker/invariants/README.md)，`cat crates/singlefs-checker/invariants/*.md \\| grep -c -e 碎片度 -e 全空段` 为 0，欠账表里也搜不到 |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker/src/walk.rs",
+          "line": 17154,
+          "text": "fn judge_allocation_record_spans_against_the_classes_of_the_units_they_cover(",
+          "context": [
+            {
+              "line": 17153,
+              "text": "/// 已释放的记录不判：落点可以已被别的类的单元合法复用，罩住的就不是它记的那个单元了。"
+            },
+            {
+              "line": 17154,
+              "text": "fn judge_allocation_record_spans_against_the_classes_of_the_units_they_cover("
+            },
+            {
+              "line": 17155,
+              "text": "    reader: &dyn ImageReader,"
+            },
+            {
+              "line": 17156,
+              "text": "    versions: &[VersionWithItsRootPointers<'_>],"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-harness/tests/checker_known_bad_images.rs",
+          "line": 3308,
+          "text": "fn an_unreleased_allocation_record_spanning_one_slot_of_a_two_slot_data_unit_reddens_only_the_span_invariant(",
+          "context": [
+            {
+              "line": 3307,
+              "text": "#[test]"
+            },
+            {
+              "line": 3308,
+              "text": "fn an_unreleased_allocation_record_spanning_one_slot_of_a_two_slot_data_unit_reddens_only_the_span_invariant("
+            },
+            {
+              "line": 3309,
+              "text": ") {"
+            },
+            {
+              "line": 3310,
+              "text": "    let clean = build_pool(\"known-bad-data-unit-record-narrowed\").memory_pool();"
+            }
+          ]
+        },
+        {
+          "path": "crates/mutations.tsv",
+          "line": 5277,
+          "text": "C411 I-3.18：未释放记录的跨度对它罩住的单元那一类那一判改成恒成立\tcrates/singlefs-checker/src/walk.rs\t                record.span_slots == slots_of_the_class,\t                record.span_slots == slots_of_the_class || true,\t-p singlefs-harness --test checker_known_bad_images -- an_unreleased_allocation_record_spanning_one_slot_of_a_two_slot_data_unit_reddens_only_the_span_invariant --exact\tan_unreleased_allocation_record_spanning_one_slot_of_a_two_slot_data_unit_reddens_only_the_span_invariant",
+          "context": [
+            {
+              "line": 5276,
+              "text": "C868 I-1.5：择到的系统配置实现标识全零那一判改成恒成立\tcrates/singlefs-checker/src/walk.rs\t            WriterImplementationIdentifier::AllZero => false,\t            WriterImplementationIdentifier::AllZero => true,\t-p singlefs-harness --test checker_known_bad_images -- a_chosen_system_configuration_whose_writer_implementation_identifier_is_all_zero_reddens_only_the_writer_identity_invariant --exact\ta_chosen_system_configuration_whose_writer_implementation_identifier_is_all_zero_reddens_only_the_writer_identity_invariant"
+            },
+            {
+              "line": 5277,
+              "text": "C411 I-3.18：未释放记录的跨度对它罩住的单元那一类那一判改成恒成立\tcrates/singlefs-checker/src/walk.rs\t                record.span_slots == slots_of_the_class,\t                record.span_slots == slots_of_the_class || true,\t-p singlefs-harness --test checker_known_bad_images -- an_unreleased_allocation_record_spanning_one_slot_of_a_two_slot_data_unit_reddens_only_the_span_invariant --exact\tan_unreleased_allocation_record_spanning_one_slot_of_a_two_slot_data_unit_reddens_only_the_span_invariant"
+            },
+            {
+              "line": 5278,
+              "text": "C738 I-8.10 往非末条扩：同一次发布几条记录新根段逐字节相同那一判改成恒成立\tcrates/singlefs-checker/src/walk.rs\t                let segments_are_byte_identical = segment == first_segment;\t                let segments_are_byte_identical = segment == first_segment || true;\t-p singlefs-harness --test checker_known_bad_images -- a_non_last_record_of_a_publish_carrying_the_new_root_segment_of_the_version_before_reddens_only_the_new_root_segment_invariant --exact\ta_non_last_record_of_a_publish_carrying_the_new_root_segment_of_the_version_before_reddens_only_the_new_root_segment_invariant"
+            },
+            {
+              "line": 5279,
+              "text": "C395 第 10 项：I-3.5 (a) 新出现的单元诞生代号严格大于前一版那一判改成恒成立（诞生代号连同指针、映射 key、分配代一起往小改的那一份照旧 0 违例）\tcrates/singlefs-checker/src/walk.rs\t                    born_after_the_previous_version || in_a_tree_inherited_whole,\t                    born_after_the_previous_version || true || in_a_tree_inherited_whole,\t-p singlefs-harness --test checker_known_bad_images -- a_new_data_unit_born_in_the_previous_version_everywhere_it_is_named_reddens_only_the_reference_interval_invariant --exact\ta_new_data_unit_born_in_the_previous_version_everywhere_it_is_named_reddens_only_the_reference_interval_invariant"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R19",
+      "priority": "P1",
+      "title": "现行 journal 容量推导仍按 95 字节头和每记录 71 项计算",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/16-发布语义.md",
+          "line": 166,
+          "text": "- **由 `T_dirty` 推出的两个派生数按已定记录格式算**：D23（journal 的角色与格式） 已定项 12 的 4 KiB 定长记录（头 95 B、每项 56 B、71 项/条）下，同一个 `T_dirty` 满窗是 1847 条记录、占用 **7388 KiB**，I-8.1（环几何够大） 的环下界 F = 2 时 **14776 KiB**、F = 3 时 **22164 KiB**。两个阈值的定案值不变，变的只是这两个派生数的口径。",
+          "context": [
+            {
+              "line": 165,
+              "text": "- **「向上取整到 200 ms」与「预算取 0.1」都是选的，不是算出来的**：0.2 给 94 ms、0.05 给 410 ms（外推），下界随预算线性挪，改预算就要重算。"
+            },
+            {
+              "line": 166,
+              "text": "- **由 `T_dirty` 推出的两个派生数按已定记录格式算**：D23（journal 的角色与格式） 已定项 12 的 4 KiB 定长记录（头 95 B、每项 56 B、71 项/条）下，同一个 `T_dirty` 满窗是 1847 条记录、占用 **7388 KiB**，I-8.1（环几何够大） 的环下界 F = 2 时 **14776 KiB**、F = 3 时 **22164 KiB**。两个阈值的定案值不变，变的只是这两个派生数的口径。"
+            },
+            {
+              "line": 167,
+              "text": "- **一事务一单元下的记录账与这个派生数打架**：按六个负载点算，每次 fsync 的记录数等于数据单元数（seq 批 1 是 8 条、批 10 是 80 条），journal 恒占用户数据 12.5%，`T_dirty` 满窗 65 536 条记录、256 MiB，是字节表预想的 64 MiB 环的 4 倍。两条口径原样并列，改法要用户定。"
+            },
+            {
+              "line": 168,
+              "text": "- **本机持续写带宽没有实测**（E58（校验和粒度的端到端代价） 那个 2045 MiB/s 是校验和实验里的顺序口径，不是写带宽，不许拿来换算），所以「5 秒能写多少字节」算不出来。"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-format/src/lib.rs",
+          "line": 252,
+          "text": "pub const JOURNAL_HEADER_BYTES: u64 = 496;",
+          "context": [
+            {
+              "line": 251,
+              "text": "/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 373 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案；本次发布内序号 2026-09-23 用户定案，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES"
+            },
+            {
+              "line": 252,
+              "text": "pub const JOURNAL_HEADER_BYTES: u64 = 496;"
+            },
+            {
+              "line": 253,
+              "text": ""
+            },
+            {
+              "line": 254,
+              "text": "/// journal 点名项：位置条目 14 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1（D23（journal 的角色与格式） 已定项 17）。format-const: JOURNAL_NAMED_ENTRY_BYTES"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R20",
+      "priority": "P1",
+      "title": "验证说明只教三态，漏掉会影响绿灯解读的“部分没判”",
+      "citations": [
+        {
+          "path": ".claude/kb/verification-build.md",
+          "line": 18,
+          "text": "| **checker** | 是模型对拍与崩溃点重放两条阶段共同的判决器，本身对应 O2（独立解析器 + checker） | **一个**镜像 | 每条不变量的成立 / 不成立 / 不适用 | D13（验证路线） 已定项 6、D13（验证路线） 已定项 7：一元谓词，只判单个镜像，不许调用被测 crate 的任何反序列化或遍历代码；[invariants/README.md](../../crates/singlefs-checker/invariants/README.md) 是它的规格 |",
+          "context": [
+            {
+              "line": 17,
+              "text": "| **事务层**（被测对象） | 没有单独阶段；模型对拍、崩溃点重放、QEMU 负载三条都以它为前置 | mkfs 参数、一串操作、一个块设备 | 镜像，以及一条写请求流（给崩溃点重放用） | 项目 `CLAUDE.md`「第一个可运行目标是正确提交一个事务」；结构约束在 D13（验证路线） 已定项 10 的 `CommitStep` 封闭枚举与 D17（实现分层与第三方管道）的腰线 |"
+            },
+            {
+              "line": 18,
+              "text": "| **checker** | 是模型对拍与崩溃点重放两条阶段共同的判决器，本身对应 O2（独立解析器 + checker） | **一个**镜像 | 每条不变量的成立 / 不成立 / 不适用 | D13（验证路线） 已定项 6、D13（验证路线） 已定项 7：一元谓词，只判单个镜像，不许调用被测 crate 的任何反序列化或遍历代码；[invariants/README.md](../../crates/singlefs-checker/invariants/README.md) 是它的规格 |"
+            },
+            {
+              "line": 19,
+              "text": "| **崩溃点重放** | 「崩溃点重放」阶段 | 写请求流（含屏障）+ 崩溃前镜像 | 每个崩溃状态上「恢复 → checker → 记录核对器」的结果 | `.claude/singlefs-ai-sop/rules/test-discipline.md`「崩溃一致性只能靠崩溃点重放验证」；分层与剪枝在 D13（验证路线） 已定项 9「崩溃点重放怎么分层」 |"
+            },
+            {
+              "line": 20,
+              "text": ""
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker/src/image.rs",
+          "line": 33,
+          "text": "pub enum InvariantVerdict {",
+          "context": [
+            {
+              "line": 32,
+              "text": "#[derive(Clone, Debug, PartialEq, Eq)]"
+            },
+            {
+              "line": 33,
+              "text": "pub enum InvariantVerdict {"
+            },
+            {
+              "line": 34,
+              "text": "    Holds,"
+            },
+            {
+              "line": 35,
+              "text": "    Violated(String),"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker/invariants/README.md",
+          "line": 7,
+          "text": "每条不变量必须写成**可判定**的形式——能对着一个镜像回答\"成立/不成立\"。池级 checker 对一条不变量的判定有四种：成立、不成立、不适用（必须带理由，不许静默算成立）、部分没判（`InvariantVerdict::PartiallyJudged`，`crates/singlefs-checker/src/image.rs`）。部分没判是判到的那一部分都对得上、射程里另有一部分这张镜像上判不了，说明逐条列出没判到的是什么；它不是红，也不是成立：崩溃点重放与崩溃放量把它算成不红，崩溃点重放计数并进「不适用」那一格，GPU 判器只记违例位、它在那一侧与成立、不适用同是 0。报它的不止一条，逐条见各行（例：I-5.4（分配记录罩住的槽互不相交）、I-5.5（从 mkfs 水位建树那一版的 t1 落点）、I-9.28（全部可读根里同一树 ID 的诞生 txg 相同））。",
+          "context": [
+            {
+              "line": 6,
+              "text": "这份清单按类拆成本目录下的 9 份文件，README.md 只放开头说明、状态、条数登记与「待补」；"
+            },
+            {
+              "line": 7,
+              "text": "每条不变量必须写成**可判定**的形式——能对着一个镜像回答\"成立/不成立\"。池级 checker 对一条不变量的判定有四种：成立、不成立、不适用（必须带理由，不许静默算成立）、部分没判（`InvariantVerdict::PartiallyJudged`，`crates/singlefs-checker/src/image.rs`）。部分没判是判到的那一部分都对得上、射程里另有一部分这张镜像上判不了，说明逐条列出没判到的是什么；它不是红，也不是成立：崩溃点重放与崩溃放量把它算成不红，崩溃点重放计数并进「不适用」那一格，GPU 判器只记违例位、它在那一侧与成立、不适用同是 0。报它的不止一条，逐条见各行（例：I-5.4（分配记录罩住的槽互不相交）、I-5.5（从 mkfs 水位建树那一版的 t1 落点）、I-9.28（全部可读根里同一树 ID 的诞生 txg 相同））。"
+            },
+            {
+              "line": 8,
+              "text": "写不成可判定形式的，说明还没想清楚，不许进这份清单。"
+            },
+            {
+              "line": 9,
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R21",
+      "priority": "P1",
+      "title": "记录核对器的输入契约漏了持久集合与两份镜像",
+      "citations": [
+        {
+          "path": ".claude/kb/verification-build.md",
+          "line": 25,
+          "text": "记录核对器（入参 `(崩溃前镜像, 记录流, 崩溃后镜像)`，D13（验证路线） 已定项 7 故意不给编号）",
+          "context": [
+            {
+              "line": 24,
+              "text": "也不在三样里，它是 D13（验证路线） 已定项 6 三个 oracle 里离代码最远的一个，落地顺序放在最后一步。"
+            },
+            {
+              "line": 25,
+              "text": "记录核对器（入参 `(崩溃前镜像, 记录流, 崩溃后镜像)`，D13（验证路线） 已定项 7 故意不给编号）"
+            },
+            {
+              "line": 26,
+              "text": "同样不在三样里，却是崩溃点重放的第二个判决器——没有它，「根在案而记录缺席」那 7 类状态"
+            },
+            {
+              "line": 27,
+              "text": "（E77（发布的持久顺序））只能靠 checker 的单镜像判据间接发现。"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/decisions/13-验证路线.md",
+          "line": 209,
+          "text": "**需要第二个输入的核对归记录核对器**，入参 `(崩溃前镜像, 记录流, 崩溃后镜像, 持久集合)`——持久集合是枚举器给出的这个崩溃状态里哪些写落了盘（崩溃点重放的段内整写子集）；只看盘上字节分不开「写没落、而原地内容恰好相同」与「写落了」，判复用与缺席要拿持久集合判；它与自研第 1 项「Merkle 根链差分」（已定项 8）同属二元检查。⚠️ **故意不给它编号**——O2（独立解析器 + checker） 那场混乱就是编号当称呼造成的，再加一个 O4 只会给下一次漂移多一个落脚点。⚠️ **「崩溃后镜像」是两份，不是一份**：harness 的顺序是先跑实现自己的恢复、再跑记录核对器，而恢复本身会改盘（实例切换写行、重发在飞 checkpoint，D23（journal 的角色与格式） 已定项 14）⇒ 择根与前缀判定看**崩溃态镜像**（「记录流」就是它环里的 journal 记录），比对的对象是**实现恢复后的镜像**。",
+          "context": [
+            {
+              "line": 208,
+              "text": ""
+            },
+            {
+              "line": 209,
+              "text": "**需要第二个输入的核对归记录核对器**，入参 `(崩溃前镜像, 记录流, 崩溃后镜像, 持久集合)`——持久集合是枚举器给出的这个崩溃状态里哪些写落了盘（崩溃点重放的段内整写子集）；只看盘上字节分不开「写没落、而原地内容恰好相同」与「写落了」，判复用与缺席要拿持久集合判；它与自研第 1 项「Merkle 根链差分」（已定项 8）同属二元检查。⚠️ **故意不给它编号**——O2（独立解析器 + checker） 那场混乱就是编号当称呼造成的，再加一个 O4 只会给下一次漂移多一个落脚点。⚠️ **「崩溃后镜像」是两份，不是一份**：harness 的顺序是先跑实现自己的恢复、再跑记录核对器，而恢复本身会改盘（实例切换写行、重发在飞 checkpoint，D23（journal 的角色与格式） 已定项 14）⇒ 择根与前缀判定看**崩溃态镜像**（「记录流」就是它环里的 journal 记录），比对的对象是**实现恢复后的镜像**。"
+            },
+            {
+              "line": 210,
+              "text": ""
+            },
+            {
+              "line": 211,
+              "text": "**射程**：指针层目标态下核对一条记录只需格式解析 + 校验和 + 根环择新；逻辑意图记录不点名任何盘上对象，核对方要自行实现树语义 + 记账 + 分配合法性——D23（journal 的角色与格式） 否掉逻辑意图日志的第二条理由据此改写成第一条的一条封堵，写在 D23（journal 的角色与格式） 已定项 5。记录核对器的代码在 `crates/singlefs-checker-tier/src/crash.rs`，接在崩溃点重放的每个崩溃状态上（门禁 checker-tier-crash-point-replay）。记录核对器的判定因此不只是镜像的函数：崩溃后镜像逐字节相同、持久集合不同的两个状态，它可以判得不同，按镜像去重的提速对它不适用（O2（独立解析器 + checker） 与 oracle 照旧只看镜像）。 崩溃点重放不覆盖可写挂载：崩溃点重放在每个崩溃状态上只跑只读恢复（看 journal 与不看各一遍），取号、写行、暖机在崩溃点重放的任何崩溃状态上都不跑。可写挂载由崩溃注入覆盖（`crates/singlefs-checker-tier/src/crash_injection.rs`）：每个抽到的崩溃状态上，只读恢复与判定之后在同一份崩溃后镜像上起一次可写挂载、再发一次布、跑池级 checker；挂载途中再崩一次，取号、写行、暖机三段各摆一个二次崩溃状态，每个上只读恢复、问模型、池级 checker、记录核对器：第三截交给记录核对器的写表从「挂载那一段到当前段为止的前缀」换成整条历史录制流 + 整条挂载流 + 挂载之后那次发布，持久集合逐段对应（历史那一段取第一次崩溃的持久集合，挂载那一段按二次崩溃取子集，之后那次发布全没落）。「比对的对象是实现恢复后的镜像」那一半：记录核对器改收两份镜像，崩溃态镜像判根在而记录在不在（择根与前缀），恢复后的镜像判单元在不在、读落到那一版的实例表；第二截接的恢复后镜像是挂载与那次发布之后的池，恢复自称的那一版取挂载与那次发布写出的最新那条根，挂载一条根都没写出时退回第一次崩溃落到的那一版。"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/src/crash.rs",
+          "line": 96,
+          "text": "pub fn check_records_against<",
+          "context": [
+            {
+              "line": 95,
+              "text": "#[must_use]"
+            },
+            {
+              "line": 96,
+              "text": "pub fn check_records_against<"
+            },
+            {
+              "line": 97,
+              "text": "    CrashStateImage: PoolReader + ImageReader,"
+            },
+            {
+              "line": 98,
+              "text": "    RecoveredImage: PoolReader + ImageReader,"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R22",
+      "priority": "P2",
+      "title": "C635 已还清，三条验证/介质决策入口仍列为欠账",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/12-目标介质.md",
+          "line": 98,
+          "text": "**欠**：C635（上一次全量没有机器可读的标记）（并入自 C20（罕见布局无人跑））。",
+          "context": [
+            {
+              "line": 97,
+              "text": ""
+            },
+            {
+              "line": 98,
+              "text": "**欠**：C635（上一次全量没有机器可读的标记）（并入自 C20（罕见布局无人跑））。"
+            },
+            {
+              "line": 99,
+              "text": ""
+            },
+            {
+              "line": 100,
+              "text": "#### 已定项 6：按介质分支，不做一套布局加参数"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/decisions/13-验证路线.md",
+          "line": 277,
+          "text": "**欠**：C409（常规层、大负载层在门禁里没有阶段）；C635（上一次全量没有机器可读的标记）。",
+          "context": [
+            {
+              "line": 276,
+              "text": ""
+            },
+            {
+              "line": 277,
+              "text": "**欠**：C409（常规层、大负载层在门禁里没有阶段）；C635（上一次全量没有机器可读的标记）。"
+            },
+            {
+              "line": 278,
+              "text": ""
+            },
+            {
+              "line": 279,
+              "text": "#### 已定项 10：真正必须精确覆盖的 N 不是「布局套数」，是「提交协议结构的等价类数」"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 879,
+          "text": "| C635 | 上一次全量没有机器可读的标记 | 证据：门禁 checker-tier-crash-point-replay 的 last-full-judgement 格（`.claude/gate.d/checker-tier-crash-point-replay.sh`）调 `scripts/crash/crash-flow-coverage.py` 的 `last-full` 子命令：读崩溃判定库每块的判定日期与跑法，列出全量判定不是当前的块，这一趟没跑全量退 77、不挡提交；该脚本的自证有 `last-full-not-current`、`last-full-after-full`、`last-full-block-count`、`last-full-library-missing`、`last-full-unrecognized` 五格。按套布局标记那一半：`.claude/gate.d/layouts.tsv` 现在只有一套布局，按套布局记与整体记今天没有区别（登记行原话），核完即销账 | 2026-10-22 |",
+          "context": [
+            {
+              "line": 878,
+              "text": "| C612 | 变异自证把包装的排队时间算进 2 秒限时 | 证据：`scripts/mutation/mutate.sh` 里五样都在：限时交包装的 `RUN_WITH_MEMORY_CAP_TIME_LIMIT`；自证各例各用 `$scratch/<例名>` 一份目录（`prepare_case` 里 `case_directory=\"$scratch/$1\"`）；`queued-admission` 一例让包装每次放行前停一会、仍判对；包装的 252（排不上）与 254（被总上限挤掉）各自归类、整轮判失败；只供自证的变量平常跑退 2（`TEST_ONLY_VARIABLES`）。其中限时交包装、252 与 254 各自分类、只供自证的变量平常跑退 2 这四样各有弄坏开关证红（`MUTATE_BREAK=outertimeout`、`queueasinvalid`、`squeezedascrashed`、`honorbreakoutsideselftest`，打开后 `mutate.sh --selftest` 各退 1）；各用一份目录没有弄坏开关，销账时不再另欠（核完即销账） | 2026-10-22 |"
+            },
+            {
+              "line": 879,
+              "text": "| C635 | 上一次全量没有机器可读的标记 | 证据：门禁 checker-tier-crash-point-replay 的 last-full-judgement 格（`.claude/gate.d/checker-tier-crash-point-replay.sh`）调 `scripts/crash/crash-flow-coverage.py` 的 `last-full` 子命令：读崩溃判定库每块的判定日期与跑法，列出全量判定不是当前的块，这一趟没跑全量退 77、不挡提交；该脚本的自证有 `last-full-not-current`、`last-full-after-full`、`last-full-block-count`、`last-full-library-missing`、`last-full-unrecognized` 五格。按套布局标记那一半：`.claude/gate.d/layouts.tsv` 现在只有一套布局，按套布局记与整体记今天没有区别（登记行原话），核完即销账 | 2026-10-22 |"
+            },
+            {
+              "line": 880,
+              "text": "| C722 | 几个数只在实现员探针与编译输出里量过 | 题面消失：C773（读坏与全零根槽的回收门槛钉只在内存里） 之后，I-3.1（已分配统计对得上） 多记账的 `Some(3145728)` 与 `1441792` 在同一场景里不再出现：`pool_just_before_the_admission_raise(17, 3, FailingReadsOfARange::Every)` 抬 F 到 6 之后，池级 checker 判 I-3.1（已分配统计对得上） 成立（丁簇实现员 2026-10-22 实测 `Holds`），最新根带的回收门槛 t = 8，钉在 9 的槽不是门槛的来源；把「钉带出来的那一截」整段关掉也照绿，这一刻没有多记账，也就没有这两个数要钉。GPU 内核展开大小那一半原先就由 `crates/singlefs-checker-tier/src/crash_judge_dispatch.rs` 的 `each_kernel_keeps_its_pinned_inlined_size_and_margin_under_the_budget` 钉具体数与离预算的余量 | 2026-10-22 |"
+            },
+            {
+              "line": 881,
+              "text": "| C713 | 删除线两个树根的层级没有条款 | 条款已写：D8（核心索引结构） 已定项 16 第 3 条（`deleted_inodes` 根的码 2 头层级字节写 0）与 D18（块里携带什么信息） 已定项 24 第 1 条（墓碑树根层级取容器树的层数，根直接管容器时 1）；`.claude/kb/layout/03-third-txn.md` 形态表这两行的「状态」格已改成层级已定；盘上钉值的用例 `crates/singlefs-harness/tests/deleted_inodes_and_tombstone_tree_root_levels_read_from_disk.rs` 读盘上两个根节点头的层级字节、按条款的值比；`crates/mutations.tsv` 里名字带「deleted_inodes 根写成层级 1」与「容器树（墓碑树）的码 2 节点层级写成形状里的层级减一」的两行变异，丁簇实现员 2026-10-22 在副本里证红，两行都抓到 | 2026-10-22 |"
+            }
+          ]
+        },
+        {
+          "path": ".claude/gate.d/checker-tier-crash-point-replay.sh",
+          "line": 337,
+          "text": "CRASH_AUDIT_CELL_NAMES=(crash-flow-coverage crash-ignored-nodes invariant-zero-evaluations crash-case-must-red crash-knobs last-full-judgement)",
+          "context": [
+            {
+              "line": 336,
+              "text": "# 出口 4 那六格（文件头「出口 4 那六格」）：名字与判什么，次序同文件头"
+            },
+            {
+              "line": 337,
+              "text": "CRASH_AUDIT_CELL_NAMES=(crash-flow-coverage crash-ignored-nodes invariant-zero-evaluations crash-case-must-red crash-knobs last-full-judgement)"
+            },
+            {
+              "line": 338,
+              "text": "CRASH_AUDIT_CELL_TITLES=("
+            },
+            {
+              "line": 339,
+              "text": "  \"崩溃流覆盖表：没有登记表 crash-entries.tsv 外的入口、登记的入口都有覆盖行、StepKind 每个成员都被一条流罩住（快档判轻型域，--full 判全量域）\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R23",
+      "priority": "P2",
+      "title": "C446 已还清，第三方管道决策仍说没有不变量前置登记",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/17-实现分层与第三方管道.md",
+          "line": 129,
+          "text": "**欠**：C446（未实现的不变量没有前置登记，也没有到期）。",
+          "context": [
+            {
+              "line": 128,
+              "text": ""
+            },
+            {
+              "line": 129,
+              "text": "**欠**：C446（未实现的不变量没有前置登记，也没有到期）。"
+            },
+            {
+              "line": 130,
+              "text": ""
+            },
+            {
+              "line": 131,
+              "text": "#### 已定项 8：一条第三方管道要还的五笔债"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 882,
+          "text": "| C446 | 未实现的不变量没有前置登记，也没有到期 | 证据：门禁 doc-registries 的 invariant-prerequisites 格（`.claude/gate.d/doc-registries.sh`）判不变量表里状态是「未实现」的每一行都写了编号前置（C 编号、D 分项、E 编号），指得到、而且还没全满足（前置已满足而状态仍写「未实现」的判红，前置指不到的判红）；样本 `invariant-prerequisites-red`、`invariant-prerequisites-green`，弄坏开关 `DOC_REGISTRIES_BREAK=invariant-prerequisites`（整格不跑）、`prerequisites-satisfied-unchecked`（前置已满足不判）、`prerequisites-existence-unchecked`（前置指不到不判）；真仓上绿：未实现 20 行、前置 27 个编号（工具员报告 `~/.local/share/singlefs/work/m3-close-b16-tools-ji12/report.md` 第一节第 2 行与第五节） | 2026-10-22 |",
+          "context": [
+            {
+              "line": 881,
+              "text": "| C713 | 删除线两个树根的层级没有条款 | 条款已写：D8（核心索引结构） 已定项 16 第 3 条（`deleted_inodes` 根的码 2 头层级字节写 0）与 D18（块里携带什么信息） 已定项 24 第 1 条（墓碑树根层级取容器树的层数，根直接管容器时 1）；`.claude/kb/layout/03-third-txn.md` 形态表这两行的「状态」格已改成层级已定；盘上钉值的用例 `crates/singlefs-harness/tests/deleted_inodes_and_tombstone_tree_root_levels_read_from_disk.rs` 读盘上两个根节点头的层级字节、按条款的值比；`crates/mutations.tsv` 里名字带「deleted_inodes 根写成层级 1」与「容器树（墓碑树）的码 2 节点层级写成形状里的层级减一」的两行变异，丁簇实现员 2026-10-22 在副本里证红，两行都抓到 | 2026-10-22 |"
+            },
+            {
+              "line": 882,
+              "text": "| C446 | 未实现的不变量没有前置登记，也没有到期 | 证据：门禁 doc-registries 的 invariant-prerequisites 格（`.claude/gate.d/doc-registries.sh`）判不变量表里状态是「未实现」的每一行都写了编号前置（C 编号、D 分项、E 编号），指得到、而且还没全满足（前置已满足而状态仍写「未实现」的判红，前置指不到的判红）；样本 `invariant-prerequisites-red`、`invariant-prerequisites-green`，弄坏开关 `DOC_REGISTRIES_BREAK=invariant-prerequisites`（整格不跑）、`prerequisites-satisfied-unchecked`（前置已满足不判）、`prerequisites-existence-unchecked`（前置指不到不判）；真仓上绿：未实现 20 行、前置 27 个编号（工具员报告 `~/.local/share/singlefs/work/m3-close-b16-tools-ji12/report.md` 第一节第 2 行与第五节） | 2026-10-22 |"
+            },
+            {
+              "line": 883,
+              "text": "| C478 | 码 2 头的 key 区间是条目键区间还是子树覆盖区间 | 证据：D18（块里携带什么信息） 已定项 2 经用户 2026-09-23 定码 2 头的 key 区间取子树覆盖区间，写者、读者、池级 checker 与 GPU 判器都已按它改。写者 `crates/singlefs-core/src/transaction.rs`：`build_inode_tree_units` 写最左那片的最小记录号到最右那片的最大记录号，`build_container_tree_units` 层级 ≥ 2 的节点写第一个孩子那一枝最左容器号到最后一个孩子那一枝最右容器号、层级 1 照旧贴紧首末分隔 key；core 读者 `crates/singlefs-core/src/recovery.rs` 的 `inode_tree_root_key_range_is_the_subtree_coverage` 与 `read_container_tree_index_nodes`；池级 checker `crates/singlefs-checker/src/lib.rs` 的 `check_separators_of_a_node_whose_subtree_coverage_the_walk_judges` 与 `crates/singlefs-checker/src/walk.rs` 的 `KeyRangeReading::SubtreeCoverageOfTheInodeTreeJudgedByTheCaller`、`judge_the_key_range_of_an_inode_internal_node_against_its_leaves`；GPU 走读内核 `crates/singlefs-checker-tier/src/crash_judge_checker.wgsl` 与恢复内核同改。用例 `crates/singlefs-harness/tests/key_range_of_code_two_nodes_over_containers_is_the_subtree_coverage.rs`（写者与 core 读者，11 条）与 `crates/singlefs-harness/tests/pool_checker_judges_the_key_range_of_code_two_nodes_over_containers_against_the_subtree.rs`（池级 checker，12 条），`crates/mutations.tsv` 里名字以「C478 子树覆盖区间：」起头的 22 行变异。GPU 对拍 `crates/singlefs-checker-tier/tests/crash_judge_gpu_judges_the_subtree_coverage_key_range_like_the_cpu_judge.rs`（4 条，带特性 gpu）实现员没跑，归提交时的 checker 档 | 2026-10-23 |"
+            },
+            {
+              "line": 884,
+              "text": "| C743 | 重建分配器记新类时不核根住不住这一槽 | 证据：读根环时核落点公式已实现。`crates/singlefs-core/src/root_ring.rs` 的 `root_sits_in_the_ring_slot_the_formula_gives`（第 0 代根照 mkfs 种根的槽另认），择根读槽 `crates/singlefs-core/src/recovery.rs` 的 `read_root_ring_slot` 与重建分配器读根环那一遍（`crates/singlefs-core/src/mount.rs`）都调它，错位读出的根不当这一槽住着它。用例 `crates/singlefs-harness/tests/root_ring_readers_take_a_root_outside_its_formula_slot_for_a_bad_read.rs` 与 `mount.rs` 的 `misplaced_root_read_by_the_allocator_rebuild_tests`；`crates/mutations.tsv` 里名字以「根环一簇 R1」起头的四行（落点核恒认、第 0 代根不另认、择根不核、重建分配器不核）；D22（单元原子性怎么合成） 已定项 7 的欠里已去掉 C743。checker 档 6 个手摆根文件照落点公式摆根，没跑，归提交时的 checker 档 | 2026-10-23 |"
+            }
+          ]
+        },
+        {
+          "path": ".claude/gate.d/doc-registries.sh",
+          "line": 43,
+          "text": "# gate-cell: invariant-prerequisites 不变量表里状态是「未实现」的每一行都写了编号前置（C / D 分项 / E），指得到、而且还没全满足",
+          "context": [
+            {
+              "line": 42,
+              "text": "# gate-cell: inline-sums 「整数 = 项 + 项 + …」形态的内联算式（kb 正文里，每项是可选标签加一个整数），左右相等"
+            },
+            {
+              "line": 43,
+              "text": "# gate-cell: invariant-prerequisites 不变量表里状态是「未实现」的每一行都写了编号前置（C / D 分项 / E），指得到、而且还没全满足"
+            },
+            {
+              "line": 44,
+              "text": "# gate-cell: field-frequency-sizes 决策与布局正文里「每 X 一份」这种字段频率，X 指得到一条已定条款给出的大小（字面大小要等于已定的某个粒度）"
+            },
+            {
+              "line": 45,
+              "text": "#"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R24",
+      "priority": "P1",
+      "title": "C743 已还清，发布语义仍明确说落点公式核没实现",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/16-发布语义.md",
+          "line": 187,
+          "text": "1. **根记录必须带 32 位实例代号**（与 D23（journal 的角色与格式） 已定项 9 的 journal 实例代号是同一个计数），择新在 checkpoint_txg 平局时按实例代号高者赢。读根环时每条根照落点公式（D22（单元原子性怎么合成） 已定项 16）核槽位，第 0 代根照 mkfs 种根的槽另认，一个 txg 只有一个落点槽，平局只剩第 0 代那几份同字节的根、取读根环次序最前的（D22（单元原子性怎么合成） 已定项 24）；公式核还没实现，欠在 C743（重建分配器记新类时不核根住不住这一槽）。字段落点在 D22（单元原子性怎么合成） 已定项 7。",
+          "context": [
+            {
+              "line": 186,
+              "text": ""
+            },
+            {
+              "line": 187,
+              "text": "1. **根记录必须带 32 位实例代号**（与 D23（journal 的角色与格式） 已定项 9 的 journal 实例代号是同一个计数），择新在 checkpoint_txg 平局时按实例代号高者赢。读根环时每条根照落点公式（D22（单元原子性怎么合成） 已定项 16）核槽位，第 0 代根照 mkfs 种根的槽另认，一个 txg 只有一个落点槽，平局只剩第 0 代那几份同字节的根、取读根环次序最前的（D22（单元原子性怎么合成） 已定项 24）；公式核还没实现，欠在 C743（重建分配器记新类时不核根住不住这一槽）。字段落点在 D22（单元原子性怎么合成） 已定项 7。"
+            },
+            {
+              "line": 188,
+              "text": "2. **记账 key 的「代」段宽度 ≥ 48 位**：按本机 2785 发布/秒，32 位 17.8 天回绕。记账 key 的宽度算术自陈是假设，要按此重算。"
+            },
+            {
+              "line": 189,
+              "text": "3. **`T_time` 下界的推导（197 ms）只适用于非 fsync 触发的发布**——那步推导以「一窗多次操作共享一次发布」为前提，fsync 密集负载下窗口由 fsync 自身触发。引用已定项 5 的下界时连这句一起引；上界 5 s（用户定的丢失窗口）不受影响。"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 884,
+          "text": "| C743 | 重建分配器记新类时不核根住不住这一槽 | 证据：读根环时核落点公式已实现。`crates/singlefs-core/src/root_ring.rs` 的 `root_sits_in_the_ring_slot_the_formula_gives`（第 0 代根照 mkfs 种根的槽另认），择根读槽 `crates/singlefs-core/src/recovery.rs` 的 `read_root_ring_slot` 与重建分配器读根环那一遍（`crates/singlefs-core/src/mount.rs`）都调它，错位读出的根不当这一槽住着它。用例 `crates/singlefs-harness/tests/root_ring_readers_take_a_root_outside_its_formula_slot_for_a_bad_read.rs` 与 `mount.rs` 的 `misplaced_root_read_by_the_allocator_rebuild_tests`；`crates/mutations.tsv` 里名字以「根环一簇 R1」起头的四行（落点核恒认、第 0 代根不另认、择根不核、重建分配器不核）；D22（单元原子性怎么合成） 已定项 7 的欠里已去掉 C743。checker 档 6 个手摆根文件照落点公式摆根，没跑，归提交时的 checker 档 | 2026-10-23 |",
+          "context": [
+            {
+              "line": 883,
+              "text": "| C478 | 码 2 头的 key 区间是条目键区间还是子树覆盖区间 | 证据：D18（块里携带什么信息） 已定项 2 经用户 2026-09-23 定码 2 头的 key 区间取子树覆盖区间，写者、读者、池级 checker 与 GPU 判器都已按它改。写者 `crates/singlefs-core/src/transaction.rs`：`build_inode_tree_units` 写最左那片的最小记录号到最右那片的最大记录号，`build_container_tree_units` 层级 ≥ 2 的节点写第一个孩子那一枝最左容器号到最后一个孩子那一枝最右容器号、层级 1 照旧贴紧首末分隔 key；core 读者 `crates/singlefs-core/src/recovery.rs` 的 `inode_tree_root_key_range_is_the_subtree_coverage` 与 `read_container_tree_index_nodes`；池级 checker `crates/singlefs-checker/src/lib.rs` 的 `check_separators_of_a_node_whose_subtree_coverage_the_walk_judges` 与 `crates/singlefs-checker/src/walk.rs` 的 `KeyRangeReading::SubtreeCoverageOfTheInodeTreeJudgedByTheCaller`、`judge_the_key_range_of_an_inode_internal_node_against_its_leaves`；GPU 走读内核 `crates/singlefs-checker-tier/src/crash_judge_checker.wgsl` 与恢复内核同改。用例 `crates/singlefs-harness/tests/key_range_of_code_two_nodes_over_containers_is_the_subtree_coverage.rs`（写者与 core 读者，11 条）与 `crates/singlefs-harness/tests/pool_checker_judges_the_key_range_of_code_two_nodes_over_containers_against_the_subtree.rs`（池级 checker，12 条），`crates/mutations.tsv` 里名字以「C478 子树覆盖区间：」起头的 22 行变异。GPU 对拍 `crates/singlefs-checker-tier/tests/crash_judge_gpu_judges_the_subtree_coverage_key_range_like_the_cpu_judge.rs`（4 条，带特性 gpu）实现员没跑，归提交时的 checker 档 | 2026-10-23 |"
+            },
+            {
+              "line": 884,
+              "text": "| C743 | 重建分配器记新类时不核根住不住这一槽 | 证据：读根环时核落点公式已实现。`crates/singlefs-core/src/root_ring.rs` 的 `root_sits_in_the_ring_slot_the_formula_gives`（第 0 代根照 mkfs 种根的槽另认），择根读槽 `crates/singlefs-core/src/recovery.rs` 的 `read_root_ring_slot` 与重建分配器读根环那一遍（`crates/singlefs-core/src/mount.rs`）都调它，错位读出的根不当这一槽住着它。用例 `crates/singlefs-harness/tests/root_ring_readers_take_a_root_outside_its_formula_slot_for_a_bad_read.rs` 与 `mount.rs` 的 `misplaced_root_read_by_the_allocator_rebuild_tests`；`crates/mutations.tsv` 里名字以「根环一簇 R1」起头的四行（落点核恒认、第 0 代根不另认、择根不核、重建分配器不核）；D22（单元原子性怎么合成） 已定项 7 的欠里已去掉 C743。checker 档 6 个手摆根文件照落点公式摆根，没跑，归提交时的 checker 档 | 2026-10-23 |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/root_ring.rs",
+          "line": 183,
+          "text": "pub fn root_sits_in_the_ring_slot_the_formula_gives(",
+          "context": [
+            {
+              "line": 182,
+              "text": "#[must_use]"
+            },
+            {
+              "line": 183,
+              "text": "pub fn root_sits_in_the_ring_slot_the_formula_gives("
+            },
+            {
+              "line": 184,
+              "text": "    checkpoint_txg: CheckpointTxg,"
+            },
+            {
+              "line": 185,
+              "text": "    ring_slot: RootRingSlot,"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/recovery.rs",
+          "line": 1751,
+          "text": "            if !root_sits_in_the_ring_slot_the_formula_gives(",
+          "context": [
+            {
+              "line": 1750,
+              "text": "        Some(root)"
+            },
+            {
+              "line": 1751,
+              "text": "            if !root_sits_in_the_ring_slot_the_formula_gives("
+            },
+            {
+              "line": 1752,
+              "text": "                root.checkpoint_txg,"
+            },
+            {
+              "line": 1753,
+              "text": "                ring_slot,"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/mount.rs",
+          "line": 2758,
+          "text": "            if !root_sits_in_the_ring_slot_the_formula_gives(",
+          "context": [
+            {
+              "line": 2757,
+              "text": "        Some(root)"
+            },
+            {
+              "line": 2758,
+              "text": "            if !root_sits_in_the_ring_slot_the_formula_gives("
+            },
+            {
+              "line": 2759,
+              "text": "                root.checkpoint_txg,"
+            },
+            {
+              "line": 2760,
+              "text": "                ring_slot,"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R25",
+      "priority": "P2",
+      "title": "C116 已还清，inode 字段表仍欠分裂/合并会红检查",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/08-核心索引结构.md",
+          "line": 233,
+          "text": "**欠**：C100（inode 容器丢失是永久损失而没有任何冗余条款覆盖它）、C102（索引节点头没有预留区，加字段不是 compat）、C103（容器索引无落点）、C104（扫描路径上码 1 / 2 的载荷完整性无自包含证据）、C106（开放容器数上界）、C107（索引节点的 AAD 身份无落点）、C110（跨头共享与加密后元数据类的块头一致性读法）、C113（扫描重建时多版单元的现行版本判定无输入）、C115（inode 属性的溢出路线无落点）、C116（叶容器的分裂 / 合并纪律没有会失败的检查）、C119（冻结组件没有 spec 文件）、C152（收窄后未发布号重发的扫描重建复核）、C347（祖先表读不出时克隆头认领什么没有条款）、C677（写入时间在三格写路径上没有用例）。",
+          "context": [
+            {
+              "line": 232,
+              "text": ""
+            },
+            {
+              "line": 233,
+              "text": "**欠**：C100（inode 容器丢失是永久损失而没有任何冗余条款覆盖它）、C102（索引节点头没有预留区，加字段不是 compat）、C103（容器索引无落点）、C104（扫描路径上码 1 / 2 的载荷完整性无自包含证据）、C106（开放容器数上界）、C107（索引节点的 AAD 身份无落点）、C110（跨头共享与加密后元数据类的块头一致性读法）、C113（扫描重建时多版单元的现行版本判定无输入）、C115（inode 属性的溢出路线无落点）、C116（叶容器的分裂 / 合并纪律没有会失败的检查）、C119（冻结组件没有 spec 文件）、C152（收窄后未发布号重发的扫描重建复核）、C347（祖先表读不出时克隆头认领什么没有条款）、C677（写入时间在三格写路径上没有用例）。"
+            },
+            {
+              "line": 234,
+              "text": ""
+            },
+            {
+              "line": 235,
+              "text": "#### 已定项 7：write buffer 条目的 `seq` —— 4 字节，住 value"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 864,
+          "text": "| C116 | 叶容器的分裂 / 合并纪律没有会失败的检查 | 证据：合并那几次发布的崩溃点重放流 `crates/singlefs-checker-tier/tests/crash_enumeration_unlink_merging_inode_leaf_containers_stream.rs`（unlink 最后一批先并后借，左从右借与左吸收右各一次；起点镜像不枚举、只录这四次发布的写，每个写请求之后截断的崩溃状态全量枚举，每个状态跑恢复、多版本 oracle、池级 checker 与记录核对器），登记为崩溃枚举用例 `crash-case:unlink-merging-inode-leaf-containers-stream`（`.claude/gate.d/stage-inputs.tsv`）与放量分项 `unlink-merging-inode-leaf-containers`（`.claude/gate.d/crash-point-replay-items.tsv`）；`crates/mutations.tsv` 里以「三·5 C116 合并流」开头的两行（左吸收右时右片不摘；左从右借时右邻不进重写清单）靶这条流，以「并行线三 C116」开头的三行靶分裂的三条纪律；这条流的全量随 C564（另外 6 条崩溃点重放全量没人跑） 收尾那一趟；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |",
+          "context": [
+            {
+              "line": 863,
+              "text": "| C312 | 第一条布局线的 incompat 位没赋值 | 证据：用例 `mounting_a_pool_whose_system_configuration_carries_no_layout_identity_bit_is_refused_before_any_write`（`crates/singlefs-harness/tests/system_configuration_rollback_floor_and_layout_identity.rs`）：四个系统配置槽的 incompat 第一个字节改成 0、整槽校验和重封，checker 的 `check_system_configuration_slot` 判不认识的 incompat 位，挂载在任何写之前拒成 incompat 位图不认识、四个槽逐字节不变；`crates/mutations.tsv` 里点名 C312 的一行（checker 收一个布局身份位都不带的 incompat，拿掉那一支）靶这条用例；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 864,
+              "text": "| C116 | 叶容器的分裂 / 合并纪律没有会失败的检查 | 证据：合并那几次发布的崩溃点重放流 `crates/singlefs-checker-tier/tests/crash_enumeration_unlink_merging_inode_leaf_containers_stream.rs`（unlink 最后一批先并后借，左从右借与左吸收右各一次；起点镜像不枚举、只录这四次发布的写，每个写请求之后截断的崩溃状态全量枚举，每个状态跑恢复、多版本 oracle、池级 checker 与记录核对器），登记为崩溃枚举用例 `crash-case:unlink-merging-inode-leaf-containers-stream`（`.claude/gate.d/stage-inputs.tsv`）与放量分项 `unlink-merging-inode-leaf-containers`（`.claude/gate.d/crash-point-replay-items.tsv`）；`crates/mutations.tsv` 里以「三·5 C116 合并流」开头的两行（左吸收右时右片不摘；左从右借时右邻不进重写清单）靶这条流，以「并行线三 C116」开头的三行靶分裂的三条纪律；这条流的全量随 C564（另外 6 条崩溃点重放全量没人跑） 收尾那一趟；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 865,
+              "text": "| C147 | 树 ID 水位的不变量还没有 | 证据：I-7.8（根记录树 ID 水位不低于全池最大树 ID） 判别力自证的两个盘面都有坏镜像，都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：水位压到实例 2 发的第一个号（`published_nodes_behind_an_intermediate_row_still_count_against_the_tree_identifier_watermark`），与根轮出环之后环里每条根的水位压低、钉住累计高水位的读法（`a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant`，只红 I-7.8（根记录树 ID 水位不低于全池最大树 ID））；`crates/mutations.tsv` 里以「C147（树 ID 水位的不变量还没有）判别力」开头的一行把 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 改成按本 checkpoint 发出的最高号判，靶后一条用例；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 866,
+              "text": "| C196 | 中央映射树的根住哪全仓无条款 | 证据：用例 `after_rolling_back_two_versions_the_mapping_of_the_new_root_resolves_the_data_unit_only_the_target_version_references`（`crates/singlefs-harness/tests/rollback_dereferences_a_version_only_the_target_references.rs`：固定脚本发布三代、挂着时回退到最早那一代，回退那次发布之后内存里与从盘上照新根重建出来的中央映射树，都按那一代数据单元的映射 key 解出它的两条位置条目）；`crates/mutations.tsv` 与 `.claude/gate.d/crates-mutation-light-rows.tsv` 里以「C196（中央映射树的根住哪全仓无条款）」开头的一行（回退那次发布接在后面的上一版里用户可见单元的映射 key 照现行那一版带，映射不随根回退）靶它；条款是 D19（块指针的结构与宽度预算） 已定项 11（中央映射树的根住根记录）与 D23（journal 的角色与格式） 已定项 14（根环回退）；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R26",
+      "priority": "P2",
+      "title": "C147 已还清，树表字段表仍说没有树 ID 水位不变量",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/08-核心索引结构.md",
+          "line": 296,
+          "text": "**欠**：C144（快照谱系的区间标号没有载体）、C145（deadlist 在盘上没有落点）、C147（树 ID 水位的不变量还没有）、C148（树表条目变宽把间接层门槛压到二层）、C149（根槽重发之后 birth 口径松一格）、C156（记录编码误读没有不变量）、C158（checker 跳过不认识的树会判假阳性）、C159（E112 的臂集缺三条且天平不含挂不上的代价）、C342（树 ID 水位在根读不出时退回去重发）、C675（同一种树在树表里至多一条没有不变量）、C865（树表条目未知 flags 位让整张树表读不下去）、C866（F2 退回不分字节丢了与内容拒收）。",
+          "context": [
+            {
+              "line": 295,
+              "text": ""
+            },
+            {
+              "line": 296,
+              "text": "**欠**：C144（快照谱系的区间标号没有载体）、C145（deadlist 在盘上没有落点）、C147（树 ID 水位的不变量还没有）、C148（树表条目变宽把间接层门槛压到二层）、C149（根槽重发之后 birth 口径松一格）、C156（记录编码误读没有不变量）、C158（checker 跳过不认识的树会判假阳性）、C159（E112 的臂集缺三条且天平不含挂不上的代价）、C342（树 ID 水位在根读不出时退回去重发）、C675（同一种树在树表里至多一条没有不变量）、C865（树表条目未知 flags 位让整张树表读不下去）、C866（F2 退回不分字节丢了与内容拒收）。"
+            },
+            {
+              "line": 297,
+              "text": ""
+            },
+            {
+              "line": 298,
+              "text": "#### 已定项 9：树的种类码的登记表"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 865,
+          "text": "| C147 | 树 ID 水位的不变量还没有 | 证据：I-7.8（根记录树 ID 水位不低于全池最大树 ID） 判别力自证的两个盘面都有坏镜像，都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：水位压到实例 2 发的第一个号（`published_nodes_behind_an_intermediate_row_still_count_against_the_tree_identifier_watermark`），与根轮出环之后环里每条根的水位压低、钉住累计高水位的读法（`a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant`，只红 I-7.8（根记录树 ID 水位不低于全池最大树 ID））；`crates/mutations.tsv` 里以「C147（树 ID 水位的不变量还没有）判别力」开头的一行把 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 改成按本 checkpoint 发出的最高号判，靶后一条用例；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |",
+          "context": [
+            {
+              "line": 864,
+              "text": "| C116 | 叶容器的分裂 / 合并纪律没有会失败的检查 | 证据：合并那几次发布的崩溃点重放流 `crates/singlefs-checker-tier/tests/crash_enumeration_unlink_merging_inode_leaf_containers_stream.rs`（unlink 最后一批先并后借，左从右借与左吸收右各一次；起点镜像不枚举、只录这四次发布的写，每个写请求之后截断的崩溃状态全量枚举，每个状态跑恢复、多版本 oracle、池级 checker 与记录核对器），登记为崩溃枚举用例 `crash-case:unlink-merging-inode-leaf-containers-stream`（`.claude/gate.d/stage-inputs.tsv`）与放量分项 `unlink-merging-inode-leaf-containers`（`.claude/gate.d/crash-point-replay-items.tsv`）；`crates/mutations.tsv` 里以「三·5 C116 合并流」开头的两行（左吸收右时右片不摘；左从右借时右邻不进重写清单）靶这条流，以「并行线三 C116」开头的三行靶分裂的三条纪律；这条流的全量随 C564（另外 6 条崩溃点重放全量没人跑） 收尾那一趟；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 865,
+              "text": "| C147 | 树 ID 水位的不变量还没有 | 证据：I-7.8（根记录树 ID 水位不低于全池最大树 ID） 判别力自证的两个盘面都有坏镜像，都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：水位压到实例 2 发的第一个号（`published_nodes_behind_an_intermediate_row_still_count_against_the_tree_identifier_watermark`），与根轮出环之后环里每条根的水位压低、钉住累计高水位的读法（`a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant`，只红 I-7.8（根记录树 ID 水位不低于全池最大树 ID））；`crates/mutations.tsv` 里以「C147（树 ID 水位的不变量还没有）判别力」开头的一行把 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 改成按本 checkpoint 发出的最高号判，靶后一条用例；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 866,
+              "text": "| C196 | 中央映射树的根住哪全仓无条款 | 证据：用例 `after_rolling_back_two_versions_the_mapping_of_the_new_root_resolves_the_data_unit_only_the_target_version_references`（`crates/singlefs-harness/tests/rollback_dereferences_a_version_only_the_target_references.rs`：固定脚本发布三代、挂着时回退到最早那一代，回退那次发布之后内存里与从盘上照新根重建出来的中央映射树，都按那一代数据单元的映射 key 解出它的两条位置条目）；`crates/mutations.tsv` 与 `.claude/gate.d/crates-mutation-light-rows.tsv` 里以「C196（中央映射树的根住哪全仓无条款）」开头的一行（回退那次发布接在后面的上一版里用户可见单元的映射 key 照现行那一版带，映射不随根回退）靶它；条款是 D19（块指针的结构与宽度预算） 已定项 11（中央映射树的根住根记录）与 D23（journal 的角色与格式） 已定项 14（根环回退）；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 867,
+              "text": "| C333 | 删行那次发布被重放 | 证据：清扫器落地后删行那次发布的崩溃点枚举 `crates/singlefs-checker-tier/tests/crash_points_of_the_instance_table_sweep.rs`，其中观察者 `judge_the_rebuilt_instance_table_against_the_allocation_records` 在恢复交回了实际走的那条根的每个状态上判：重建出来的那条根指着的实例表每一片的每一份副本，在同一条根的分配记录里都有一条罩住它、仍分配的记录（被引用的片没有记成释放，也不是账外的槽），清扫发布那一版的实例表里被删的行一个不剩；判法只读盘、按恢复的读法重建，不调清扫器。快档用例 `quick_tier_of_the_sweeping_mount_leaves_no_unpublished_unit_of_the_deleted_row`，全量两条登记在 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:instance-table-sweep-mount`、`crash-case:instance-table-sweep-phases-remount`；`crates/mutations.tsv` 里以「C333」开头的一行（删行那次发布的重建根，实例表指针与分配记录树根照抄所选根）靶快档用例；全量随 C564（另外 6 条崩溃点重放全量没人跑） 收尾那一趟；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R27",
+      "priority": "P2",
+      "title": "C196 已还清，GC 交互条款仍说映射根位置没条款",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/26-后台整理与放置回收.md",
+          "line": 154,
+          "text": "**欠**：C122（分配记录不点删之后的条目数口径）；C194（代际增量 scrub 看不见被搬过的副本）；C146（无空段时的回落政策全仓无定义）；C195（销毁级联时 prev 传递只写在实验的模型修订记录里）；C196（中央映射树的根住哪全仓无条款）；C197（迁移的三笔写是不是一个事务没写下来）。",
+          "context": [
+            {
+              "line": 153,
+              "text": ""
+            },
+            {
+              "line": 154,
+              "text": "**欠**：C122（分配记录不点删之后的条目数口径）；C194（代际增量 scrub 看不见被搬过的副本）；C146（无空段时的回落政策全仓无定义）；C195（销毁级联时 prev 传递只写在实验的模型修订记录里）；C196（中央映射树的根住哪全仓无条款）；C197（迁移的三笔写是不是一个事务没写下来）。"
+            },
+            {
+              "line": 155,
+              "text": ""
+            },
+            {
+              "line": 156,
+              "text": "#### 已定项 6：走没走整理的运行时观测点"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 866,
+          "text": "| C196 | 中央映射树的根住哪全仓无条款 | 证据：用例 `after_rolling_back_two_versions_the_mapping_of_the_new_root_resolves_the_data_unit_only_the_target_version_references`（`crates/singlefs-harness/tests/rollback_dereferences_a_version_only_the_target_references.rs`：固定脚本发布三代、挂着时回退到最早那一代，回退那次发布之后内存里与从盘上照新根重建出来的中央映射树，都按那一代数据单元的映射 key 解出它的两条位置条目）；`crates/mutations.tsv` 与 `.claude/gate.d/crates-mutation-light-rows.tsv` 里以「C196（中央映射树的根住哪全仓无条款）」开头的一行（回退那次发布接在后面的上一版里用户可见单元的映射 key 照现行那一版带，映射不随根回退）靶它；条款是 D19（块指针的结构与宽度预算） 已定项 11（中央映射树的根住根记录）与 D23（journal 的角色与格式） 已定项 14（根环回退）；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |",
+          "context": [
+            {
+              "line": 865,
+              "text": "| C147 | 树 ID 水位的不变量还没有 | 证据：I-7.8（根记录树 ID 水位不低于全池最大树 ID） 判别力自证的两个盘面都有坏镜像，都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：水位压到实例 2 发的第一个号（`published_nodes_behind_an_intermediate_row_still_count_against_the_tree_identifier_watermark`），与根轮出环之后环里每条根的水位压低、钉住累计高水位的读法（`a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant`，只红 I-7.8（根记录树 ID 水位不低于全池最大树 ID））；`crates/mutations.tsv` 里以「C147（树 ID 水位的不变量还没有）判别力」开头的一行把 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 改成按本 checkpoint 发出的最高号判，靶后一条用例；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 866,
+              "text": "| C196 | 中央映射树的根住哪全仓无条款 | 证据：用例 `after_rolling_back_two_versions_the_mapping_of_the_new_root_resolves_the_data_unit_only_the_target_version_references`（`crates/singlefs-harness/tests/rollback_dereferences_a_version_only_the_target_references.rs`：固定脚本发布三代、挂着时回退到最早那一代，回退那次发布之后内存里与从盘上照新根重建出来的中央映射树，都按那一代数据单元的映射 key 解出它的两条位置条目）；`crates/mutations.tsv` 与 `.claude/gate.d/crates-mutation-light-rows.tsv` 里以「C196（中央映射树的根住哪全仓无条款）」开头的一行（回退那次发布接在后面的上一版里用户可见单元的映射 key 照现行那一版带，映射不随根回退）靶它；条款是 D19（块指针的结构与宽度预算） 已定项 11（中央映射树的根住根记录）与 D23（journal 的角色与格式） 已定项 14（根环回退）；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 867,
+              "text": "| C333 | 删行那次发布被重放 | 证据：清扫器落地后删行那次发布的崩溃点枚举 `crates/singlefs-checker-tier/tests/crash_points_of_the_instance_table_sweep.rs`，其中观察者 `judge_the_rebuilt_instance_table_against_the_allocation_records` 在恢复交回了实际走的那条根的每个状态上判：重建出来的那条根指着的实例表每一片的每一份副本，在同一条根的分配记录里都有一条罩住它、仍分配的记录（被引用的片没有记成释放，也不是账外的槽），清扫发布那一版的实例表里被删的行一个不剩；判法只读盘、按恢复的读法重建，不调清扫器。快档用例 `quick_tier_of_the_sweeping_mount_leaves_no_unpublished_unit_of_the_deleted_row`，全量两条登记在 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:instance-table-sweep-mount`、`crash-case:instance-table-sweep-phases-remount`；`crates/mutations.tsv` 里以「C333」开头的一行（删行那次发布的重建根，实例表指针与分配记录树根照抄所选根）靶快档用例；全量随 C564（另外 6 条崩溃点重放全量没人跑） 收尾那一趟；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 868,
+              "text": "| C479 | inode 号复用已发过的号今天造不出来 | 证据：只供测试的开关 `InodeNumberWatermarkPressedBackForTests`（`crates/singlefs-core/src/transaction.rs`）把水位压回已发过的号，`crates/singlefs-harness/tests/inode_number_watermark_pressed_back_reissues_a_number.rs` 三条用例（`creating_an_inode_after_the_watermark_is_pressed_back_below_the_largest_key_reddens_the_watermark_invariant`、`creating_an_inode_after_the_watermark_is_pressed_back_below_the_largest_tombstone_reddens_the_tombstone_half_of_the_watermark_invariant`、`pressing_the_watermark_back_to_the_largest_issued_number_reissues_it_and_reddens_the_one_birth_per_number_and_the_watermark_step_invariants`）判重发号时 I-9.6（水位大于两处最大号）、I-9.29（同号只许一个出生代）、I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上） 红；「活记录被原地换、旧版转出回退候选集」那一形的坏镜像 `a_reissued_inode_number_whose_old_object_left_the_rollback_candidate_set_reddens_only_the_watermark_step_invariant`（`crates/singlefs-harness/tests/checker_known_bad_images.rs`，只 I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上） 红）；`crates/mutations.tsv` 里点名 C479 的十行：开关与水位源六行、新池新建文件那一支三行、I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上） 不拿 inode 树里的记录比台阶一行；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-core/src/root_record.rs",
+          "line": 112,
+          "text": "    pub mapping_root: NodePointer,",
+          "context": [
+            {
+              "line": 111,
+              "text": "    /// 中央映射树的根住根记录（D19（块指针的结构与宽度预算） 已定项 11）。"
+            },
+            {
+              "line": 112,
+              "text": "    pub mapping_root: NodePointer,"
+            },
+            {
+              "line": 113,
+              "text": "    /// 树表 0 条的那一版的分配记录树的根（2026-09-23 用户定案随 C512（树表 0 条的一版上被换下的单元记在哪） 加）。"
+            },
+            {
+              "line": 114,
+              "text": "    ///"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R28",
+      "priority": "P2",
+      "title": "C297 已还清，指针身份条款仍欠两份出生树的处理",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/19-块指针的结构与宽度预算.md",
+          "line": 179,
+          "text": "**欠**：C295（指针里的 key 段算不算 AAD 的查找路径）、C297（inode 内部条目里出生树两份没有定处理）、C237（码 1 / 码 2 的指针里没有出生 (树, txg) 的位置）。",
+          "context": [
+            {
+              "line": 178,
+              "text": ""
+            },
+            {
+              "line": 179,
+              "text": "**欠**：C295（指针里的 key 段算不算 AAD 的查找路径）、C297（inode 内部条目里出生树两份没有定处理）、C237（码 1 / 码 2 的指针里没有出生 (树, txg) 的位置）。"
+            },
+            {
+              "line": 180,
+              "text": ""
+            },
+            {
+              "line": 181,
+              "text": "#### 已定项 8：全部指针进映射，引用侧按类携带映射 key 的各段"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 862,
+          "text": "| C297 | inode 内部条目里出生树两份没有定处理 | 证据：孩子读得出那一支的坏镜像两条，都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：`an_inode_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_leaf_that_reads_back_reddens_the_inode_entry_invariant` 与 `a_tombstone_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_container_that_reads_back_reddens_the_tombstone_entry_invariant`（只把根第一条条目里子指针头部的出生树加 1，身份引用与孩子都不改，I-9.2（条目身份与子头相符） 与墓碑树的条目不变量红，违例说明是孩子读得出那一句）；`crates/mutations.tsv` 里点名 C297 的两行（inode 树读得出孩子时类型段 2 不比子指针头部出生树与身份引用出生树；墓碑树、谱系树容器读得出时同）各靶其中一条；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |",
+          "context": [
+            {
+              "line": 861,
+              "text": "| C659 | fsid 前 8 字节相同时重做 mkfs 实例代号不变式红 | 认作已知形态、不改产品代码（用户 2026-10-20 定「认作已知形态，钉坏镜像」）：坏镜像用例 `crates/singlefs-harness/tests/checker_a_pool_remade_over_an_old_pool_sharing_the_first_eight_identifier_bytes.rs` 在用过的盘上经内层入口拿前 8 字节相同的 fsid 把 mkfs 做完，四条用例钉住：池级 checker 报 I-7.7（系统配置实例代号不低于根环） 红（`the_pool_checker_reports_the_instance_invariant_red_right_after_a_remake_sharing_the_first_eight_identifier_bytes`）；读者读回新池、不是旧池的任何一版（`the_reader_reads_the_remade_pool_and_not_the_old_one_when_the_first_eight_identifier_bytes_are_shared`）；红随取号自愈，新池实例代号到旧池单元里最大的那个之后转绿（`the_instance_invariant_turns_green_at_the_mount_whose_instance_reaches_the_old_pools_highest`）；前 8 字节不同的对照判成立（`a_remake_with_different_first_eight_identifier_bytes_keeps_the_instance_invariant_green`）。`crates/mutations.tsv` 里以「C659」开头的 3 行。对外入口从随机源取 fsid（`make_filesystem_drawing_the_filesystem_identifier`）之后，来路只剩前 8 字节随机碰撞（2⁻⁶⁴，推的）与带 fsid 的内层入口 | 2026-10-22 |"
+            },
+            {
+              "line": 862,
+              "text": "| C297 | inode 内部条目里出生树两份没有定处理 | 证据：孩子读得出那一支的坏镜像两条，都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：`an_inode_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_leaf_that_reads_back_reddens_the_inode_entry_invariant` 与 `a_tombstone_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_container_that_reads_back_reddens_the_tombstone_entry_invariant`（只把根第一条条目里子指针头部的出生树加 1，身份引用与孩子都不改，I-9.2（条目身份与子头相符） 与墓碑树的条目不变量红，违例说明是孩子读得出那一句）；`crates/mutations.tsv` 里点名 C297 的两行（inode 树读得出孩子时类型段 2 不比子指针头部出生树与身份引用出生树；墓碑树、谱系树容器读得出时同）各靶其中一条；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 863,
+              "text": "| C312 | 第一条布局线的 incompat 位没赋值 | 证据：用例 `mounting_a_pool_whose_system_configuration_carries_no_layout_identity_bit_is_refused_before_any_write`（`crates/singlefs-harness/tests/system_configuration_rollback_floor_and_layout_identity.rs`）：四个系统配置槽的 incompat 第一个字节改成 0、整槽校验和重封，checker 的 `check_system_configuration_slot` 判不认识的 incompat 位，挂载在任何写之前拒成 incompat 位图不认识、四个槽逐字节不变；`crates/mutations.tsv` 里点名 C312 的一行（checker 收一个布局身份位都不带的 incompat，拿掉那一支）靶这条用例；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            },
+            {
+              "line": 864,
+              "text": "| C116 | 叶容器的分裂 / 合并纪律没有会失败的检查 | 证据：合并那几次发布的崩溃点重放流 `crates/singlefs-checker-tier/tests/crash_enumeration_unlink_merging_inode_leaf_containers_stream.rs`（unlink 最后一批先并后借，左从右借与左吸收右各一次；起点镜像不枚举、只录这四次发布的写，每个写请求之后截断的崩溃状态全量枚举，每个状态跑恢复、多版本 oracle、池级 checker 与记录核对器），登记为崩溃枚举用例 `crash-case:unlink-merging-inode-leaf-containers-stream`（`.claude/gate.d/stage-inputs.tsv`）与放量分项 `unlink-merging-inode-leaf-containers`（`.claude/gate.d/crash-point-replay-items.tsv`）；`crates/mutations.tsv` 里以「三·5 C116 合并流」开头的两行（左吸收右时右片不摘；左从右借时右邻不进重写清单）靶这条流，以「并行线三 C116」开头的三行靶分裂的三条纪律；这条流的全量随 C564（另外 6 条崩溃点重放全量没人跑） 收尾那一趟；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R29",
+      "priority": "P2",
+      "title": "C576 已还清，准入承诺量仍说三条测试改法待选",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/28-挂载期承诺量.md",
+          "line": 140,
+          "text": "**欠**：C83（提交固定点没人回答）：实现后记固定点轮数，超过当时现算的量判红；分配记录树按 K1 的式子已写进 `admission.rs`（实审 A4d，`m2-rev-a4d-implementer-report.md`），交主 agent 的三处设计问题记欠：C573（固定点上界没算有普通分配那次发布多出的删插）、C574（落得下那一判不核两槽对齐与各盘同槽）、C575（一个错误成员装两种判据的载荷）、C576（三条用例被准入先拒连带红，改法待选）。",
+          "context": [
+            {
+              "line": 139,
+              "text": ""
+            },
+            {
+              "line": 140,
+              "text": "**欠**：C83（提交固定点没人回答）：实现后记固定点轮数，超过当时现算的量判红；分配记录树按 K1 的式子已写进 `admission.rs`（实审 A4d，`m2-rev-a4d-implementer-report.md`），交主 agent 的三处设计问题记欠：C573（固定点上界没算有普通分配那次发布多出的删插）、C574（落得下那一判不核两槽对齐与各盘同槽）、C575（一个错误成员装两种判据的载荷）、C576（三条用例被准入先拒连带红，改法待选）。"
+            },
+            {
+              "line": 141,
+              "text": ""
+            },
+            {
+              "line": 142,
+              "text": "## 历史版本"
+            }
+          ]
+        },
+        {
+          "path": ".claude/kb/checks-owed.md",
+          "line": 851,
+          "text": "| C576 | 三条用例被准入先拒连带红，改法待选 | 证据：两条用例的结局已钉：`devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written` 钉 `SpaceAdmissionRefused`、`user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written` 钉 `PlacementRefused`（都在 `crates/singlefs-harness/tests/unequal_devices.rs`）；点名的变异「失败的发布不退回分配器」已按名字登记，点名 `crates/singlefs-harness/tests/overwrite_in_one_instance.rs` 的 `publish_refused_only_after_the_real_allocator_released_and_reclaimed_leaves_the_allocator_as_it_was`（`crates/mutations.tsv`），取样点注释在同一个测试文件；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-19 |",
+          "context": [
+            {
+              "line": 850,
+              "text": "| C568 | 固定结构取严之后 io_min 1 MiB 的盘建不了卷 | 证据：用例 `one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_four_slots_per_region` 起到 `_at_sixteen_slots_per_region` 共十三条，与取值集合覆盖用例 `every_slots_per_region_the_implementation_accepts_has_a_one_mebibyte_minimum_input_output_size_refusal_case`（都在 `crates/singlefs-harness/tests/core_review_geometry_back_chain_and_empty_inode.rs`）；变异行「C568：mkfs 固定结构重叠那一判改成放（io_min 1 MiB、S = 4 收下）」「C568：实现收的 S 少了上界 16（io_min 1 MiB 的拒绝用例罩的 S 与实现收的对不上）」；射程写进 D2（RAID 条带策略） 已定项 19 | 2026-10-18 |"
+            },
+            {
+              "line": 851,
+              "text": "| C576 | 三条用例被准入先拒连带红，改法待选 | 证据：两条用例的结局已钉：`devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written` 钉 `SpaceAdmissionRefused`、`user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written` 钉 `PlacementRefused`（都在 `crates/singlefs-harness/tests/unequal_devices.rs`）；点名的变异「失败的发布不退回分配器」已按名字登记，点名 `crates/singlefs-harness/tests/overwrite_in_one_instance.rs` 的 `publish_refused_only_after_the_real_allocator_released_and_reclaimed_leaves_the_allocator_as_it_was`（`crates/mutations.tsv`），取样点注释在同一个测试文件；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-19 |"
+            },
+            {
+              "line": 852,
+              "text": "| C296 | journal 重放时凑不齐映射 key | 证据：I-8.11（点名项与被指单元头相同）状态「已实现」（`crates/singlefs-checker/invariants/03-journal.md`），池级 checker 的 `walk::judge_named_entries_against_the_unit_headers` 在每个镜像上判点名项的类标签、诞生代号、key 尾段与被指单元头的同名字段逐字节相同，`crates/mutations.tsv` 里 I-8.11（点名项与被指单元头相同） 的 6 行变异靶它；D23（journal 的角色与格式） 已定项 17 写了点名项带类标签、出生树、出生 txg、key 尾段，条款已在。「怎么拦」写的字段表对账门禁，按 I-8.11（点名项与被指单元头相同） 在每个镜像上判同几段相等算罩住；出生树取哪个字段归 C289（码 2 的出生树取哪个字段没写） | 2026-10-19 |"
+            },
+            {
+              "line": 853,
+              "text": "| C587 | 扫描候选槽头被伪造头骗过 | 证据：用例 `a_node_header_forged_on_the_second_slot_of_a_file_unit_is_claimed_by_that_unit_and_the_watermark_invariant_holds`（伪头健康池判绿）、`a_node_header_carrying_another_pools_identifier_forged_on_the_second_slot_of_a_file_unit_is_claimed_and_the_watermark_invariant_holds`（别的池 fsid 一臂）、`a_file_reaching_the_second_slot_of_its_unit_without_a_forged_header_holds_the_watermark_invariant`（去伪头对照），都在 `crates/singlefs-harness/tests/pool_checker_scan_of_tree_identifiers_claims_whole_units.rs`；`crates/mutations.tsv` 里「第9批 I-7.8 认领（F4）」开头的四行变异；GPU 一侧对拍 `the_gpu_judge_agrees_with_the_cpu_that_a_data_unit_claims_its_second_slot_and_a_header_forged_there_is_not_counted`（`crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`）；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-19 |"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R30",
+      "priority": "P1",
+      "title": "D17 仍说 mkfs 崩溃没有进入枚举",
+      "citations": [
+        {
+          "path": ".claude/kb/decisions/17-实现分层与第三方管道.md",
+          "line": 47,
+          "text": "**射程**：mkfs 的崩溃状态仍不在崩溃点重放枚举里（E142（新池新建文件的干跑） G19），钉住的只是它的段序列；「现值 1」是单元素集合上的恒等式，任何判据都给 1，条款的重量在第 1、4、5 条。",
+          "context": [
+            {
+              "line": 46,
+              "text": ""
+            },
+            {
+              "line": 47,
+              "text": "**射程**：mkfs 的崩溃状态仍不在崩溃点重放枚举里（E142（新池新建文件的干跑） G19），钉住的只是它的段序列；「现值 1」是单元素集合上的恒等式，任何判据都给 1，条款的重量在第 1、4、5 条。"
+            },
+            {
+              "line": 48,
+              "text": ""
+            },
+            {
+              "line": 49,
+              "text": "**依据**："
+            }
+          ]
+        },
+        {
+          "path": ".claude/gate.d/stage-inputs.tsv",
+          "line": 68,
+          "text": "crash-case:make-filesystem-over-a-used-pool-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_make_filesystem_over_a_used_pool_stream:full_enumeration_of_make_filesystem_over_a_used_pool_lands_every_crash_state_in_an_outcome_the_clause_allows count-line=CRASH_POINT_REPLAY_MAKE_FILESYSTEM_OVER_A_USED_POOL red-blocks=judged-by-test\t# 用过的盘上重做 mkfs（两趟写序）的每个崩溃状态，结局按 D22（单元原子性怎么合成） 已定项 8 第 3 条射程分三种（C656（mkfs 中途崩溃的语义没有条款） 的验收格）；整池拒的状态 oracle 与 I-8.5 判红、读回旧池的状态记录核对器判「恢复自称的那一版缺单元」都是条文允许的结局，用例按态数认下（red-blocks=judged-by-test）；用例不打 exhaustive=、threads= 那两样，不登记",
+          "context": [
+            {
+              "line": 67,
+              "text": "crash-case:formatted-pool-remounted-without-a-file-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_formatted_pool_remounted_without_a_file_stream:every_crash_state_of_the_formatted_pool_remounted_without_a_file_remounts_and_publishes_the_first_file count-line=CRASH_POINT_REPLAY_FORMATTED_POOL_REMOUNTED_WITHOUT_A_FILE exhaustive=CRASH_POINT_REPLAY_FORMATTED_POOL_REMOUNTED_WITHOUT_A_FILE threads=CRASH_POINT_REPLAY_FORMATTED_POOL_REMOUNTED_WITHOUT_A_FILE\t# C492 的 R1 历史（mkfs → 可写挂载 → 不写文件 → 正常卸载 → 进程重开、再可写挂载，在树表 0 条的一版上写行）mkfs 之后整条录制流的崩溃点重放全量，15 段、闭式 4176 个状态（原地覆写三态）；每个状态恢复、oracle、池级 checker、记录核对器，再经观察者重开可写挂载、发第一个文件版本（挂不上、发不出当场 panic），挂完发完的盘在判段判池级 checker。用例打一行 CRASH_POINT_REPLAY_FORMATTED_POOL_REMOUNTED_WITHOUT_A_FILE（状态数等于闭式时 exhaustive=true），threads= 按它的 states= 找 CRASH_POINT_REPLAY_PARALLEL_FINISHED。没登记 shard=across-machines"
+            },
+            {
+              "line": 68,
+              "text": "crash-case:make-filesystem-over-a-used-pool-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_make_filesystem_over_a_used_pool_stream:full_enumeration_of_make_filesystem_over_a_used_pool_lands_every_crash_state_in_an_outcome_the_clause_allows count-line=CRASH_POINT_REPLAY_MAKE_FILESYSTEM_OVER_A_USED_POOL red-blocks=judged-by-test\t# 用过的盘上重做 mkfs（两趟写序）的每个崩溃状态，结局按 D22（单元原子性怎么合成） 已定项 8 第 3 条射程分三种（C656（mkfs 中途崩溃的语义没有条款） 的验收格）；整池拒的状态 oracle 与 I-8.5 判红、读回旧池的状态记录核对器判「恢复自称的那一版缺单元」都是条文允许的结局，用例按态数认下（red-blocks=judged-by-test）；用例不打 exhaustive=、threads= 那两样，不登记"
+            },
+            {
+              "line": 69,
+              "text": "crash-case:crash-in-the-middle-of-the-acquisition-write-stream\t-\ttest=singlefs-checker-tier:crash_enumeration_crash_in_the_middle_of_the_acquisition_write_stream:every_crash_state_of_the_remount_after_the_first_file_remounts_with_an_instance_above_every_one_on_the_disks count-line=CRASH_POINT_REPLAY_CRASH_IN_THE_MIDDLE_OF_THE_ACQUISITION_WRITE exhaustive=CRASH_POINT_REPLAY_CRASH_IN_THE_MIDDLE_OF_THE_ACQUISITION_WRITE threads=CRASH_POINT_REPLAY_CRASH_IN_THE_MIDDLE_OF_THE_ACQUISITION_WRITE\t# 取号写写到一半崩溃的结局（records/2026-10-13-代码欠账批.md「收拢表（2026-10-18）」第 7 行，L1 ②）：第一个文件版本之后进程重开那次可写挂载（取号 2 → 写行 → 暖机）的崩溃点重放全量，9 段、闭式 327711 个状态；每个状态恢复、oracle、池级 checker、记录核对器，再经观察者重开可写挂载，判挂得上、取到的号比崩溃镜像上读得出的每一个实例代号都大（重号当场 panic）。快档只展开取号那一段（9 个状态）。用例打一行 CRASH_POINT_REPLAY_CRASH_IN_THE_MIDDLE_OF_THE_ACQUISITION_WRITE（状态数等于闭式时 exhaustive=true），threads= 按它的 states= 找 CRASH_POINT_REPLAY_PARALLEL_FINISHED。没登记 shard=across-machines"
+            },
+            {
+              "line": 70,
+              "text": "crash-case:crash-injection-fast-tier\t-\ttest=singlefs-checker-tier:crash_injection_campaign:crash_injection_fast_tier_recovers_only_into_versions_the_model_committed count-line=CRASH_INJECTION_FINISHED threads=CRASH_INJECTION_FINISHED threads-variable=SINGLEFS_CRASH_INJECTION_THREADS features=verdict-store\t# 随机崩溃注入快档（features=verdict-store：用例经引擎判、进判定库，重型这一趟要和合表第四列的轻型编同一组特性；开 GPU 时命令另加 gpu、整条经 gpu-quiesce-run.sh 起，写法见 admission.py 文件头）（种子基起 24 段、每段 24 步、每段 4 个崩溃状态）：每个崩溃状态上只读恢复与判定、再起可写挂载发一次布跑 checker、挂载途中取号/写行/暖机各一个二次崩溃（代码审阅第 2 条）；debug 下单跑一百来秒，标了 ignore，release 跑；普通 cargo test 由同文件的小快档（头 4 段）守。计数行 CRASH_INJECTION_FINISHED 只调一次、恰好一行；它不打 CRASH_POINT_REPLAY_PARALLEL_FINISHED，跑完那一行自己带 worker_threads= 与 slices=，登记 threads= 拿它判线程；用例读的线程变量是 SINGLEFS_CRASH_INJECTION_THREADS（threads-variable=，crash-case-command 把它设成配的线程数）；抽样，没登记 exhaustive="
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/tests/crash_enumeration_make_filesystem_over_a_used_pool_stream.rs",
+          "line": 5,
+          "text": "//! 流：用过的盘（旧池：mkfs → 取号 1 → 暖机 → 第一个文件 txg 3，最后确认的一版是 (实例 1, txg 3)）上，经内层入口拿一个与旧池 fsid",
+          "context": [
+            {
+              "line": 4,
+              "text": "//!"
+            },
+            {
+              "line": 5,
+              "text": "//! 流：用过的盘（旧池：mkfs → 取号 1 → 暖机 → 第一个文件 txg 3，最后确认的一版是 (实例 1, txg 3)）上，经内层入口拿一个与旧池 fsid"
+            },
+            {
+              "line": 6,
+              "text": "//! 前 8 字节不同的 fsid（对外入口从随机源取的那一种，前 8 字节撞上的概率按 2⁻⁶⁴ 算，推的）重做 mkfs，枚举 mkfs 录下的每个崩溃状态。"
+            },
+            {
+              "line": 7,
+              "text": "//! 基线是旧池用完之后的整份盘面，写表是 mkfs 那 27 步（段序列 `2+12+1+1+1+4`），与任何从 mkfs 之后起的流都不相交："
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R31",
+      "priority": "P1",
+      "title": "验证路线说明仍说“崩溃—恢复—续写—再崩”没有",
+      "citations": [
+        {
+          "path": ".claude/kb/verification-build.md",
+          "line": 162,
+          "text": "所以崩溃点重放的固定脚本是三次发布夹一次恢复：mkfs、发布 A（写文件）、发布 B（覆盖写）、在 B 的每个崩溃点恢复、再发布 C（短）、在 C 的每个崩溃点恢复。2026-09-17 起崩溃点重放覆盖写固定脚本流已含覆盖写、释放、重开写行、回退、抬 F 与复用（固定脚本到发布 E，门禁 checker-tier-crash-point-replay 全量），「崩溃 → 恢复 → 少量续写 → 再崩」与残留记录的反例还没有，现状见 `.claude/kb/milestone/02-second-txn.md` 步 0 与增补 2 收口表第 22、23 行。",
+          "context": [
+            {
+              "line": 161,
+              "text": "造出一次释放、一次延迟重用与一次记账变更；C42（残留记录冒充合法前缀）还要「崩溃 → 恢复 → 少量续写 → 再崩」，"
+            },
+            {
+              "line": 162,
+              "text": "所以崩溃点重放的固定脚本是三次发布夹一次恢复：mkfs、发布 A（写文件）、发布 B（覆盖写）、在 B 的每个崩溃点恢复、再发布 C（短）、在 C 的每个崩溃点恢复。2026-09-17 起崩溃点重放覆盖写固定脚本流已含覆盖写、释放、重开写行、回退、抬 F 与复用（固定脚本到发布 E，门禁 checker-tier-crash-point-replay 全量），「崩溃 → 恢复 → 少量续写 → 再崩」与残留记录的反例还没有，现状见 `.claude/kb/milestone/02-second-txn.md` 步 0 与增补 2 收口表第 22、23 行。"
+            },
+            {
+              "line": 163,
+              "text": "**基镜像要能预置**（反推腿指出）：录制器只录本次跑的写，环里「上一条时间线的残留」不会自己出现，harness 得能把一条残留记录种进基镜像。"
+            },
+            {
+              "line": 164,
+              "text": "屏障与空发布相关的用例在只有 mkfs 与空发布时就能跑，释放、重用、残留三类要等到发布 B 与 C。**C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 那两格还要一次管理员回退**：发布 C 之后回退到 A 的根、再发布 D，第 ① 格枚举回退那次发布的崩溃点，第 ② 格在 D 之后按故障组合让回退实例的根读不出——崩溃点重放的固定脚本因此是 mkfs、A、B、C、回退到 A、D（2026-09-13 随 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 定案登记）；固定脚本再往后走到抬 F 之后复用的发布 E，见 `.claude/kb/milestone/02-second-txn.md` 步 0 现状。"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/tests/crash_injection_campaign.rs",
+          "line": 345,
+          "text": "/// 每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后（代码审阅第 2 条），这一档 debug 下单跑一百来秒，标了 ignore，",
+          "context": [
+            {
+              "line": 344,
+              "text": "/// 快档的规模：段数、每段步数与每段摆几个崩溃状态。规模与种子基都写死（种子基是这个测试周期的常量）。"
+            },
+            {
+              "line": 345,
+              "text": "/// 每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后（代码审阅第 2 条），这一档 debug 下单跑一百来秒，标了 ignore，"
+            },
+            {
+              "line": 346,
+              "text": "/// 用户要求时由主 agent 经门禁 checker-tier-crash-point-replay `--full`（`crash-case:crash-injection-fast-tier`）在 release 下跑，提交时的快档只核它的全绿标记；普通 `cargo test` 由小快档守。"
+            },
+            {
+              "line": 347,
+              "text": "const FAST_TIER_SEEDS: u64 = 24;"
+            }
+          ]
+        },
+        {
+          "path": "crates/singlefs-checker-tier/src/crash_injection.rs",
+          "line": 366,
+          "text": "    SecondCrashInsideTheWritableMount(WritableMountPhase),",
+          "context": [
+            {
+              "line": 365,
+              "text": "    /// 可写挂载途中再崩一次（二次崩溃），崩在挂载的这一段里：只读恢复、问模型、池级 checker、记录核对器（历史与挂载写出的发布都核）。"
+            },
+            {
+              "line": 366,
+              "text": "    SecondCrashInsideTheWritableMount(WritableMountPhase),"
+            },
+            {
+              "line": 367,
+              "text": "    /// 二次崩溃镜像上再起一次可写挂载之后的池：读出的内容要与没崩过的那一次挂载之后读出的相同（I-8.4 的 R-换）。"
+            },
+            {
+              "line": 368,
+              "text": "    RemountAfterASecondCrashInsideTheWritableMount(WritableMountPhase),"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "static_cross_checks": {
+    "cpu_invariant_count": 108,
+    "implemented_doc_rows_excluding_I_8_4": 108,
+    "gpu_covered_indexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107
+    ],
+    "registered_crash_cases": 38,
+    "amplification_items": [
+      "fixed-script-through-rollback",
+      "fixed-script-through-unmount",
+      "unlink-after-the-fixed-script",
+      "unlink-merging-inode-leaf-containers",
+      "multi-record-publish",
+      "unlink-after-the-multi-record-publish",
+      "tree-split-streams",
+      "position-addressed-trees",
+      "floor-raise-pushed-by-the-session",
+      "truncate-to-zero-on-a-nearly-full-pool",
+      "sigma-of-the-misaligned-reuse",
+      "compaction-relocation",
+      "compaction-relocating-a-block-shared-with-a-snapshot",
+      "lifecycle-closure",
+      "unlink-under-a-snapshot",
+      "truncate-to-zero",
+      "truncate-into-a-unit-then-extend",
+      "truncate-under-a-snapshot",
+      "snapshot-creation",
+      "overwrite-and-unlink-under-a-snapshot",
+      "snapshot-destruction-resumed-after-a-crash",
+      "one-file-overwritten-across-two-writable-remounts",
+      "several-inodes-overwritten-in-turn",
+      "large-file-overwritten-across-lower-leaves",
+      "unlink-of-two-files-holding-data"
+    ],
+    "journal_geometry_recalculation": {
+      "record_bytes": 4096,
+      "header_bytes": 496,
+      "named_entry_bytes": 56,
+      "named_entries_per_record": 64,
+      "same_input_named_entries": 131072,
+      "records": 2048,
+      "kib": 8192,
+      "F2_kib": 16384,
+      "F3_kib": 24576,
+      "increase_over_old_percent": 10.882512181916626
+    },
+    "closed_debt_rows": {
+      "R22": {
+        "id": "C635",
+        "closed_row": "| C635 | 上一次全量没有机器可读的标记 | 证据：门禁 checker-tier-crash-point-replay 的 last-full-judgement 格（`.claude/gate.d/checker-tier-crash-point-replay.sh`）调 `scripts/crash/crash-flow-coverage.py` 的 `last-full` 子命令：读崩溃判定库每块的判定日期与跑法，列出全量判定不是当前的块，这一趟没跑全量退 77、不挡提交；该脚本的自证有 `last-full-not-current`、`last-full-after-full`、`last-full-block-count`、`last-full-library-missing`、`last-full-unrecognized` 五格。按套布局标记那一半：`.claude/gate.d/layouts.tsv` 现在只有一套布局，按套布局记与整体记今天没有区别（登记行原话），核完即销账 | 2026-10-22 |"
+      },
+      "R23": {
+        "id": "C446",
+        "closed_row": "| C446 | 未实现的不变量没有前置登记，也没有到期 | 证据：门禁 doc-registries 的 invariant-prerequisites 格（`.claude/gate.d/doc-registries.sh`）判不变量表里状态是「未实现」的每一行都写了编号前置（C 编号、D 分项、E 编号），指得到、而且还没全满足（前置已满足而状态仍写「未实现」的判红，前置指不到的判红）；样本 `invariant-prerequisites-red`、`invariant-prerequisites-green`，弄坏开关 `DOC_REGISTRIES_BREAK=invariant-prerequisites`（整格不跑）、`prerequisites-satisfied-unchecked`（前置已满足不判）、`prerequisites-existence-unchecked`（前置指不到不判）；真仓上绿：未实现 20 行、前置 27 个编号（工具员报告 `~/.local/share/singlefs/work/m3-close-b16-tools-ji12/report.md` 第一节第 2 行与第五节） | 2026-10-22 |"
+      },
+      "R24": {
+        "id": "C743",
+        "closed_row": "| C743 | 重建分配器记新类时不核根住不住这一槽 | 证据：读根环时核落点公式已实现。`crates/singlefs-core/src/root_ring.rs` 的 `root_sits_in_the_ring_slot_the_formula_gives`（第 0 代根照 mkfs 种根的槽另认），择根读槽 `crates/singlefs-core/src/recovery.rs` 的 `read_root_ring_slot` 与重建分配器读根环那一遍（`crates/singlefs-core/src/mount.rs`）都调它，错位读出的根不当这一槽住着它。用例 `crates/singlefs-harness/tests/root_ring_readers_take_a_root_outside_its_formula_slot_for_a_bad_read.rs` 与 `mount.rs` 的 `misplaced_root_read_by_the_allocator_rebuild_tests`；`crates/mutations.tsv` 里名字以「根环一簇 R1」起头的四行（落点核恒认、第 0 代根不另认、择根不核、重建分配器不核）；D22（单元原子性怎么合成） 已定项 7 的欠里已去掉 C743。checker 档 6 个手摆根文件照落点公式摆根，没跑，归提交时的 checker 档 | 2026-10-23 |"
+      },
+      "R25": {
+        "id": "C116",
+        "closed_row": "| C116 | 叶容器的分裂 / 合并纪律没有会失败的检查 | 证据：合并那几次发布的崩溃点重放流 `crates/singlefs-checker-tier/tests/crash_enumeration_unlink_merging_inode_leaf_containers_stream.rs`（unlink 最后一批先并后借，左从右借与左吸收右各一次；起点镜像不枚举、只录这四次发布的写，每个写请求之后截断的崩溃状态全量枚举，每个状态跑恢复、多版本 oracle、池级 checker 与记录核对器），登记为崩溃枚举用例 `crash-case:unlink-merging-inode-leaf-containers-stream`（`.claude/gate.d/stage-inputs.tsv`）与放量分项 `unlink-merging-inode-leaf-containers`（`.claude/gate.d/crash-point-replay-items.tsv`）；`crates/mutations.tsv` 里以「三·5 C116 合并流」开头的两行（左吸收右时右片不摘；左从右借时右邻不进重写清单）靶这条流，以「并行线三 C116」开头的三行靶分裂的三条纪律；这条流的全量随 C564（另外 6 条崩溃点重放全量没人跑） 收尾那一趟；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+      },
+      "R26": {
+        "id": "C147",
+        "closed_row": "| C147 | 树 ID 水位的不变量还没有 | 证据：I-7.8（根记录树 ID 水位不低于全池最大树 ID） 判别力自证的两个盘面都有坏镜像，都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：水位压到实例 2 发的第一个号（`published_nodes_behind_an_intermediate_row_still_count_against_the_tree_identifier_watermark`），与根轮出环之后环里每条根的水位压低、钉住累计高水位的读法（`a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant`，只红 I-7.8（根记录树 ID 水位不低于全池最大树 ID））；`crates/mutations.tsv` 里以「C147（树 ID 水位的不变量还没有）判别力」开头的一行把 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 改成按本 checkpoint 发出的最高号判，靶后一条用例；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+      },
+      "R27": {
+        "id": "C196",
+        "closed_row": "| C196 | 中央映射树的根住哪全仓无条款 | 证据：用例 `after_rolling_back_two_versions_the_mapping_of_the_new_root_resolves_the_data_unit_only_the_target_version_references`（`crates/singlefs-harness/tests/rollback_dereferences_a_version_only_the_target_references.rs`：固定脚本发布三代、挂着时回退到最早那一代，回退那次发布之后内存里与从盘上照新根重建出来的中央映射树，都按那一代数据单元的映射 key 解出它的两条位置条目）；`crates/mutations.tsv` 与 `.claude/gate.d/crates-mutation-light-rows.tsv` 里以「C196（中央映射树的根住哪全仓无条款）」开头的一行（回退那次发布接在后面的上一版里用户可见单元的映射 key 照现行那一版带，映射不随根回退）靶它；条款是 D19（块指针的结构与宽度预算） 已定项 11（中央映射树的根住根记录）与 D23（journal 的角色与格式） 已定项 14（根环回退）；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+      },
+      "R28": {
+        "id": "C297",
+        "closed_row": "| C297 | inode 内部条目里出生树两份没有定处理 | 证据：孩子读得出那一支的坏镜像两条，都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：`an_inode_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_leaf_that_reads_back_reddens_the_inode_entry_invariant` 与 `a_tombstone_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_container_that_reads_back_reddens_the_tombstone_entry_invariant`（只把根第一条条目里子指针头部的出生树加 1，身份引用与孩子都不改，I-9.2（条目身份与子头相符） 与墓碑树的条目不变量红，违例说明是孩子读得出那一句）；`crates/mutations.tsv` 里点名 C297 的两行（inode 树读得出孩子时类型段 2 不比子指针头部出生树与身份引用出生树；墓碑树、谱系树容器读得出时同）各靶其中一条；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-22 |"
+      },
+      "R29": {
+        "id": "C576",
+        "closed_row": "| C576 | 三条用例被准入先拒连带红，改法待选 | 证据：两条用例的结局已钉：`devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written` 钉 `SpaceAdmissionRefused`、`user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written` 钉 `PlacementRefused`（都在 `crates/singlefs-harness/tests/unequal_devices.rs`）；点名的变异「失败的发布不退回分配器」已按名字登记，点名 `crates/singlefs-harness/tests/overwrite_in_one_instance.rs` 的 `publish_refused_only_after_the_real_allocator_released_and_reclaimed_leaves_the_allocator_as_it_was`（`crates/mutations.tsv`），取样点注释在同一个测试文件；变异红不红由提交时门禁 checker-tier-crates-mutation-replay 判 | 2026-10-19 |"
+      }
+    }
+  },
+  "source_manifest": [
+    {
+      "path": ".claude/gate.d/checker-tier-crash-point-replay.sh",
+      "sha256": "b1b5f748c6d9a999f997d824c3a526e3671e99b165cd76805306c52ebab68b4b",
+      "bytes": 186157
+    },
+    {
+      "path": ".claude/gate.d/doc-registries.sh",
+      "sha256": "ea60e5717db63c40d30fadf27b0feb25bca01b27b01b4c74c74fb163eadb67bb",
+      "bytes": 306967
+    },
+    {
+      "path": ".claude/gate.d/stage-inputs.tsv",
+      "sha256": "0d586ac49257f7d170269352bce29ffc0b26282870346b1b102ed9e961a4edc6",
+      "bytes": 52956
+    },
+    {
+      "path": ".claude/gate.d/verus-pins.tsv",
+      "sha256": "2cc596f00a587b7996b253d50f18a3360ae5057c47304e593daf573e0ad7c390",
+      "bytes": 5829
+    },
+    {
+      "path": ".claude/kb/checks-owed.md",
+      "sha256": "719e413ab7a2fdb6b0c88a8d9a2e83b082bbe62a2c00e6548f95ce1a13d4eeb0",
+      "bytes": 1263770
+    },
+    {
+      "path": ".claude/kb/decisions-history.md",
+      "sha256": "afaf35baccc86a95feee22346e784cf6ebbd32132918e0a391d4db10900a88d2",
+      "bytes": 2697746
+    },
+    {
+      "path": ".claude/kb/decisions.md",
+      "sha256": "5a1f3e3490c8d5bcd82eb1354595cb6f16caafc56b14bde19f233de71aed3bc4",
+      "bytes": 43586
+    },
+    {
+      "path": ".claude/kb/decisions/05-快照-空间记账机制.md",
+      "sha256": "8fe666699f49ec29e49e75e05f4b6c04d8a239a2c90c9dc5b032c659e35509b5",
+      "bytes": 70918
+    },
+    {
+      "path": ".claude/kb/decisions/08-核心索引结构.md",
+      "sha256": "7520f3dbb663afdc38e43e8c6a5212396dd23bc7375652083250b3245ae66f15",
+      "bytes": 132161
+    },
+    {
+      "path": ".claude/kb/decisions/12-目标介质.md",
+      "sha256": "d6affaffe60fe3d2fa10520e81e401a5c3ae99df7bf31ff9fb319563b1db5cec",
+      "bytes": 27720
+    },
+    {
+      "path": ".claude/kb/decisions/13-验证路线.md",
+      "sha256": "41a3c08630cdbe78344495b475c84d47c26526fe49a03a125b0dba4c6eed2235",
+      "bytes": 102816
+    },
+    {
+      "path": ".claude/kb/decisions/16-发布语义.md",
+      "sha256": "617acf3c26b5b592c62aac697dd0fe1f09e1944e1fee58d8a8c56df045a47928",
+      "bytes": 100904
+    },
+    {
+      "path": ".claude/kb/decisions/17-实现分层与第三方管道.md",
+      "sha256": "c76919b4207fa8fe5fd2bb956cbe02bfb2af57482b485e00f6f91e52f91ad096",
+      "bytes": 24996
+    },
+    {
+      "path": ".claude/kb/decisions/19-块指针的结构与宽度预算.md",
+      "sha256": "5e2cb9e207b3489923a6ca60ddc92b6a9b7f861697ce3b19782491e5250143f0",
+      "bytes": 47610
+    },
+    {
+      "path": ".claude/kb/decisions/22-单元原子性怎么合成.md",
+      "sha256": "5de1c32b5bd50495f2e2928dd1522d56b6c9fa912f0790a7d713e5274a5fa52c",
+      "bytes": 103242
+    },
+    {
+      "path": ".claude/kb/decisions/23-journal的角色与格式.md",
+      "sha256": "62e78e94e1283d7a1412b1c7913b605b121101fe1bee791024ed0465a9e0f459",
+      "bytes": 144048
+    },
+    {
+      "path": ".claude/kb/decisions/26-后台整理与放置回收.md",
+      "sha256": "a6fea364933154a9f04299c3b51c6e7fe02b59bcd15819e11236b71cf78859aa",
+      "bytes": 51257
+    },
+    {
+      "path": ".claude/kb/decisions/28-挂载期承诺量.md",
+      "sha256": "7f109e63de1da479d9ffd324713c8227a45b480fc397db551c8099c6134524e1",
+      "bytes": 30605
+    },
+    {
+      "path": ".claude/kb/experiments.md",
+      "sha256": "4120608e93a80bf1f008bc412928ea37a95ccab5bb36ae933038ed8f06fe5c45",
+      "bytes": 123250
+    },
+    {
+      "path": ".claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md",
+      "sha256": "25fab857849323d57eefc71d40cfaf8ef00b3662326c6f796068bb0c59b82916",
+      "bytes": 79489
+    },
+    {
+      "path": ".claude/kb/milestone/03-third-txn.md",
+      "sha256": "d41460fddb7001d2d8b5711d714bb1bba66aa38820d84c2033cad8ef80fbb63e",
+      "bytes": 151028
+    },
+    {
+      "path": ".claude/kb/milestone/04-fourth-txn.md",
+      "sha256": "3d3b5f041a80bdfd5fc6e13cb9705b18d51214fe37ddb39763f5324f092dd9ce",
+      "bytes": 65673
+    },
+    {
+      "path": ".claude/kb/verification-build.md",
+      "sha256": "67d47dda0093030e16a2c97fb6a3aa40c250e64cb2d9a17e13096be8deaefa8e",
+      "bytes": 59919
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "4203f234f96f2209aad71bc8a345489aecbe914bfc61b79bb6cde3af4b4cce35",
+      "bytes": 14894
+    },
+    {
+      "path": "README.en.md",
+      "sha256": "71c54c9d9e4fe9584a4585b591e39fb01005c4d4aa88102abf1e1a0e26217477",
+      "bytes": 17204
+    },
+    {
+      "path": "README.ja.md",
+      "sha256": "0a176255e046a1db07bf5f95ae35989c6d044a879fd882c48245fd862bd0fc17",
+      "bytes": 21464
+    },
+    {
+      "path": "README.md",
+      "sha256": "aac70da8e9dba1a4a5e68db72af6a244f2739bf19ad8ca21f779454112f3444d",
+      "bytes": 14615
+    },
+    {
+      "path": "crates/mutations.tsv",
+      "sha256": "89fc00a02f114a16b5848383d9b64670a97faf9ce4675d964c234a723379183a",
+      "bytes": 3243528
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash.rs",
+      "sha256": "00607776f79ea0254b5869257bba1b3a46412d338769298ebd462292108c93bf",
+      "bytes": 191016
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash_injection.rs",
+      "sha256": "53fc3430a08f1090a4df6b80428b0d54ed1447e163fef4eee3bf56ab0efef81f",
+      "bytes": 531652
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash_judge_checker.wgsl",
+      "sha256": "e32f72ad79f9129c488c2da4d41386bc921b55f928c34388f7f01b68eb4326a2",
+      "bytes": 308295
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl",
+      "sha256": "75b3596c8d83694f5fab13421efe76f8d0b7bf026d56f64973646e8acc680f76",
+      "bytes": 100411
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl",
+      "sha256": "66363d1d3a036d357da691757a67bde76f16cc27e755fc5e4a03cf20faac306f",
+      "bytes": 392795
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash_judge_conclusions.rs",
+      "sha256": "3acf84c6b4c0078fab56e7791f2df6dbc15f2fae3fc6018aa51c36a6bfcb6627",
+      "bytes": 128608
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
+      "sha256": "2782586a2df2d97cbe26972c42433adfb6e00b0cbd94951c94a70956a835af13",
+      "bytes": 113913
+    },
+    {
+      "path": "crates/singlefs-checker-tier/tests/crash_enumeration_make_filesystem_over_a_used_pool_stream.rs",
+      "sha256": "892f6f1c81bfc6581514e42982bccc5796ecc31e042e2cde443aceec51d73ade",
+      "bytes": 16152
+    },
+    {
+      "path": "crates/singlefs-checker-tier/tests/crash_injection_campaign.rs",
+      "sha256": "4e4419a7377e416c4608c332bdf65fb06bd344a247e67aaf06f0ec8e24fe0bfd",
+      "bytes": 191486
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/01-块自描述.md",
+      "sha256": "7c57b59c1f78e063191e3b17585e6883260ee7329434bc7a5964bd7c8f257efe",
+      "bytes": 38036
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/02-根环.md",
+      "sha256": "d795737b5575e618fe62ef00b962d686c576cc341f0784cbcbb939f19b3002ea",
+      "bytes": 46148
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/03-journal.md",
+      "sha256": "d0d6a92c3235fefb70a14157917dc418978ff44b6e13b0b637ab517b5b2ef3b5",
+      "bytes": 26043
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/04-校验和.md",
+      "sha256": "4b41828508b5c27e72a14d1dd2b19850821a563558664de76a0c60ca9bc0ce08",
+      "bytes": 17335
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/05-空间记账.md",
+      "sha256": "5a4cbdd2c050ba6022d1944a8abd7ffa68356a5e936160ca62f4dfd74417e79c",
+      "bytes": 53300
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/06-事务与崩溃一致性.md",
+      "sha256": "6165cebe1c553988531283371c6ca80a3582b39fc84faf0bfb15a6fa2cbdca6a",
+      "bytes": 17616
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/07-分配器.md",
+      "sha256": "bd9a31b176b23d6e6a2c9453e057865c3cf432c658b5ed2b8613412e7ab7549c",
+      "bytes": 17939
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/08-加密不变量.md",
+      "sha256": "1841b52821ecd05a992ad726aa194646a88035ee55171dfe577e41a68686ccf2",
+      "bytes": 6849
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/09-inode树结构.md",
+      "sha256": "ba7adcd0a8711ae9bf398127f248bb17bfb3b7b4851856c3d825203bf15a23b8",
+      "bytes": 63338
+    },
+    {
+      "path": "crates/singlefs-checker/invariants/README.md",
+      "sha256": "4bdaa336f7031d27865a7f578aaef63ca5b74ca31466fd138555182e7caba19f",
+      "bytes": 14351
+    },
+    {
+      "path": "crates/singlefs-checker/src/image.rs",
+      "sha256": "171ea65b879340b27ad0a2ccc403f686ac0702c5fb1c4cc7c049d0c62bf0966f",
+      "bytes": 155277
+    },
+    {
+      "path": "crates/singlefs-checker/src/walk.rs",
+      "sha256": "1ec7571ffbc1b0d4049b42329d9b6586040ad5b773e456c0f8b519d16e4aec6f",
+      "bytes": 1122400
+    },
+    {
+      "path": "crates/singlefs-core/src/compaction_plan.rs",
+      "sha256": "826d7d3de270993b81a726fbe6cd2e3d26b3b091c7fcba1511579b9f15c7c4c1",
+      "bytes": 72758
+    },
+    {
+      "path": "crates/singlefs-core/src/journal.rs",
+      "sha256": "518b136508cabf5ff60c898a1a09e168780e07284e8b7d2b713d1d8c3180af3b",
+      "bytes": 38300
+    },
+    {
+      "path": "crates/singlefs-core/src/logged_operations.rs",
+      "sha256": "1c9eb6fcfce4b49da5193f4261d82d716cfbe37fb859a93988cb3008d923b011",
+      "bytes": 24326
+    },
+    {
+      "path": "crates/singlefs-core/src/mount.rs",
+      "sha256": "ca6dbdd54c17f100ee6d144171ee532a834cbdd892a717c96e530654e5054fc4",
+      "bytes": 710879
+    },
+    {
+      "path": "crates/singlefs-core/src/mounted_session.rs",
+      "sha256": "381511a2f1d1c854e4b4ab364a31b0c37762f81dec5456bf93601fb6ec275e51",
+      "bytes": 232233
+    },
+    {
+      "path": "crates/singlefs-core/src/records.rs",
+      "sha256": "7852ff4a738970c2f98485728659edf0b6c63b82fc2d077358642a3308d006ed",
+      "bytes": 71147
+    },
+    {
+      "path": "crates/singlefs-core/src/recovery.rs",
+      "sha256": "9aea28b615923d67f0f7c8dd1f8c6811a3046722b423cb3b92c8e7b1993f5109",
+      "bytes": 446700
+    },
+    {
+      "path": "crates/singlefs-core/src/region_scan.rs",
+      "sha256": "d0f9316a4dcdc1c254e7fb8fabfd78c5b01822f92f5ee97f8f05ebe273ed8f3e",
+      "bytes": 42479
+    },
+    {
+      "path": "crates/singlefs-core/src/root_record.rs",
+      "sha256": "666042836d563ff543508522ec02e76cd3e41615d730e71063426a6ebf4a5f02",
+      "bytes": 20510
+    },
+    {
+      "path": "crates/singlefs-core/src/root_ring.rs",
+      "sha256": "92402c9c70189929977b29d831da92835de9e186b420d7404a5135813cb6906b",
+      "bytes": 18811
+    },
+    {
+      "path": "crates/singlefs-core/src/transaction.rs",
+      "sha256": "a891136e2c273dbd15a616dd68105f83b9394c9c1612f6c84a5e3de84fecee72",
+      "bytes": 864863
+    },
+    {
+      "path": "crates/singlefs-format/src/lib.rs",
+      "sha256": "f0a126bc88d3424e74ed5465565fa218e8bf56c852061ec3fd0c0241c7364da2",
+      "bytes": 48531
+    },
+    {
+      "path": "crates/singlefs-harness/tests/checker_compaction_intent_and_relocation_must_red_worlds.rs",
+      "sha256": "185e72e9ff3b0c911c5273b90cbfc9eb80f42c1f50e39125f8f02563e25ab7b8",
+      "bytes": 43816
+    },
+    {
+      "path": "crates/singlefs-harness/tests/checker_known_bad_images.rs",
+      "sha256": "d719c1d5bbaf7b13be3d292a564075c31749460f8bbcef15a19c698eb816badb",
+      "bytes": 938763
+    },
+    {
+      "path": "crates/singlefs-harness/tests/checker_snapshot_space_accounting_must_red_worlds.rs",
+      "sha256": "4c3c4f2ee578d251098a9ba8cb9493837d135c7255d76e9e268bda30bc77e4ca",
+      "bytes": 41289
+    },
+    {
+      "path": "crates/singlefs-harness/tests/compaction_intent_is_logged_and_resumed_after_a_crash.rs",
+      "sha256": "9a7cae1ba3b805557ffbbfac11e989542cbb09fdbeab4025820f173044d30f65",
+      "bytes": 17636
+    },
+    {
+      "path": "crates/singlefs-harness/tests/compaction_plan_chooses_regions_and_batches_by_the_clauses.rs",
+      "sha256": "3f470387cc128b46b0bcd2a98c0cc23a194fbdcddb677a54dfe5adf177ac4a2e",
+      "bytes": 36862
+    },
+    {
+      "path": "crates/singlefs-harness/tests/compaction_relocation_batches_publish_through_the_mapping.rs",
+      "sha256": "973ec18cb16e9c81b8e92ede6064f8b7648233e59c27bd8f32000195bb55f9f5",
+      "bytes": 22625
+    },
+    {
+      "path": "crates/singlefs-harness/tests/snapshot_release_and_destroy_through_the_deadlist.rs",
+      "sha256": "04063e5e800cbc06ed108161dbadeb0caab88df52656d92e981fcacc17b354c7",
+      "bytes": 35305
+    },
+    {
+      "path": "crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs",
+      "sha256": "408f80368de4f5cd6bc24e55b2bb145764f0df6b6e22cc5921148a11f68cf537",
+      "bytes": 52972
+    },
+    {
+      "path": "crates/singlefs-replay-prefix/verus-must-red-worlds.tsv",
+      "sha256": "1364107a0f33a163f936cdfaf5009b3e446e268c0742a9753121e25406a888f3",
+      "bytes": 59051
+    },
+    {
+      "path": "records/2026-10-13-里程碑四预开发.md",
+      "sha256": "1a82d6c49161e50de93094ee7665f398ad82b9e3cf38bddedfef90f3c7d7a87e",
+      "bytes": 480400
+    }
+  ]
+}

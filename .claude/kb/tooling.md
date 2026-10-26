@@ -11,11 +11,11 @@
 
 | 项 | 值 |
 |---|---|
-| 入口 | `~/code/ai-center` 的 OpenAI 兼容网关，`http://127.0.0.1:8200/v1/chat/completions` |
-| 鉴权 | 请求头 `X-Api-Key`，取值来自 `~/code/ai-center/.env.tenants` 的 `AI_CENTER_KEY_VSCODE_CHAT` |
+| 入口 | 本机的本地模型网关（OpenAI 兼容，地址与所在目录不进仓） |
+| 鉴权 | 请求头 `X-Api-Key`，取值在本机私有配置里，不进仓 |
 | 模型 | `local` → `Qwen3-Next-80B-A3B-Thinking-AWQ-4bit`，`max_model_len` 262144 |
 | 调用脚本 | 仓里没有了（取回办法见本节开头那一段） |
-| 预算 | 不传 `max_tokens` 与 `thinking_token_budget`（`~/code/ai-center/.claude/kb/token-budget.md`） |
+| 预算 | 不传 `max_tokens` 与 `thinking_token_budget` |
 
 用它的时候：
 
@@ -105,10 +105,38 @@ cargo mutants --list --package singlefs-core | wc -l
 |---|---|
 | 版本 | rustc 1.98.0 / cargo 1.98.0 |
 | 安装方式 | rustup，`--profile minimal --default-toolchain stable`，装在宿主 `~/.cargo` |
-| 额外目标 | `x86_64-unknown-linux-musl`，实验二进制（`scripts/experiments/` 下的包）编成静态的在虚机的 busybox initramfs 里跑；checker 档的真设备二进制 `new_pool_file_creation_on_device` 不走它（checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器），改用 `--target x86_64-unknown-linux-gnu` 加 `+crt-static` 编成 static-pie，命令在 `.claude/gate.d/checker-tier-qemu-device-streams.sh` |
+| 额外目标 | `x86_64-unknown-linux-musl`，实验二进制（`scripts/experiment-apparatus/` 下的包）编成静态的在虚机的 busybox initramfs 里跑；checker 档的真设备二进制 `new_pool_file_creation_on_device` 不走它（checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器），改用 `--target x86_64-unknown-linux-gnu` 加 `+crt-static` 编成 static-pie，命令在 `.claude/gate.d/checker-tier-qemu-device-streams.sh` |
 | 组件 | `rustfmt` + `clippy`（`--profile minimal` 不含它们，要另装） |
-| **PATH** | rustup 的 shim 软链在 `~/.local/bin/`（cargo / rustc / rustup / rustdoc / rustfmt / cargo-fmt / cargo-clippy）；门禁与脚本用 `bash -c` 起，不读 `~/.bashrc`，PATH 不靠改 dotfile |
-| release 溢出检查 | 树根 `Cargo.toml` 与 `scripts/experiments/Cargo.toml` 的 `[profile.release]` 都设了 `overflow-checks = true`；profile 只认工作区根，写在成员 manifest 里不生效 |
+| **PATH** | rustup 的 shim 软链在 PATH 上的用户级可执行文件目录里（cargo / rustc / rustup / rustdoc / rustfmt / cargo-fmt / cargo-clippy）；门禁与脚本用 `bash -c` 起，不读 shell 的启动文件，PATH 不靠改 dotfile |
+| release 溢出检查 | 树根 `Cargo.toml` 与 `scripts/experiment-apparatus/Cargo.toml` 的 `[profile.release]` 都设了 `overflow-checks = true`；profile 只认工作区根，写在成员 manifest 里不生效 |
+
+## RocksDB 与 snappy 的预编库：每台主机编一次，取值只走进程环境
+
+librocksdb-sys 的 C++（`librocksdb.a` 与 `libsnappy.a`）每台主机只编一次，各编译目录经环境变量链这一份，不在每个编译目录里现编。工具是 `scripts/hosts/rocksdb-prebuilt.py`，用法写在它的文件头（它不认 `--help`，退出码 2）。子命令都在仓根跑，`--root R` 不给就是这份脚本所在的仓。
+
+| 子命令 | 做什么 |
+|---|---|
+| `key` | 打这台主机此刻的键（各组成）与预编库目录，不编 |
+| `env` | 预编库在、对得上时打四行 `export`（给 `eval` 用）；不在退 1、标准输出为空 |
+| `build` | 预编库不在就编一次，持锁：几个进程同时来只编一次，后来的等锁之后看到编好了直接退 0；起真 cargo，是重活，经 `bash scripts/hosts/capped.sh <N>` 起 |
+| `install` | `build`，再写这台主机的三处环境来源、改用户级 systemd 管理器此刻的环境，最后跑 `check`；同样是重活 |
+| `check` | 判这台主机：两个工作区（`crates/singlefs-checker-tier/Cargo.toml` 与 `scripts/experiment-apparatus/Cargo.toml`）的依赖对得上、预编库在且对得上、三处环境来源与此刻进程环境的取值都与预编库一致、cargo 配置里没写这四个变量 |
+| `audit-target <编译目录>…` | 判编译目录：librocksdb-sys 构建脚本那一次拿到的取值是不是这台的预编库、`out/` 里有没有现编过的 C++、同一把键下见过几种取值；一份构建脚本记录都没找到退 77（本次未判） |
+| `entry [--cargo C]` | 起 cargo 的入口开头调的轻判（谁调、取值缺了怎么办写在「起 cargo 的入口」那一段） |
+
+**预编库放哪**：`${SINGLEFS_ROCKSDB_PREBUILT_STORE:-~/.local/share/singlefs/rocksdb-prebuilt}/librocksdb-sys-<版本>/<键的前 16 位>/lib/{librocksdb.a,libsnappy.a}`；同目录 `manifest.json` 记键的各组成与两份库的 sha256，`complete` 最后写（有它才算编好）；不放开机清空的目录。`SINGLEFS_ROCKSDB_PREBUILT_STORE` 只给自证换临时目录用。键由两个工作区的 rocksdb 依赖写法、两份 `Cargo.lock` 里相关包的版本与 checksum、`rustc -vV`、c++ / cc / ar 的真实路径与版本、交给 C++ 的指令集、编法组成，哪一样变了键就变、要重编。
+
+**取值从哪来**：四个变量 `ROCKSDB_LIB_DIR`、`ROCKSDB_STATIC`、`SNAPPY_LIB_DIR`、`SNAPPY_STATIC` 的取值写在三处环境来源里，都由 `install` 写：
+
+| 位置 | 作用 |
+|---|---|
+| `~/.config/singlefs/rocksdb-prebuilt.env` | 唯一的取值来源：四行 `export`，外加 `unset ROCKSDB_COMPILE`、`unset SNAPPY_COMPILE`；别手改，改了重跑 `install` |
+| `~/.bashrc` 最前面一段（三行，`# >>> singlefs rocksdb-prebuilt >>>` 到 `# <<< singlefs rocksdb-prebuilt <<<`） | `source` 那份 env 文件；放在交互判断之前，所以交互 shell、从它起的会话与 ssh 起的非交互命令都读得到 |
+| `~/.config/environment.d/60-singlefs-rocksdb-prebuilt.conf` | 用户级 systemd 管理器起的单元读（`scripts/hosts/detached-run.sh` 起的长活）；`install` 另跑 `systemctl --user set-environment`，让此刻在跑的管理器当场换上 |
+
+**四个变量只走进程环境**：不写进 `.cargo/config.toml` 或别的哪一层 cargo 配置的 `[env]`（写了 `check` 判红；理由在 `.cargo/config.toml` 开头的注释）。`ROCKSDB_COMPILE`、`SNAPPY_COMPILE` 一律不设，设成 1 就在编译目录里现编。
+
+**起 cargo 的入口**：门禁阶段、崩溃与变异驱动、`merge-and-verify.sh`、`admission.py` 交的命令、第二台那一侧，开头都调 `entry`。它只判三样：这台装了（预编库在、对得上，不算两份库的 sha256）、此刻进程环境的四个取值与预编库一致、没设 `ROCKSDB_COMPILE` 与 `SNAPPY_COMPILE`；不判三处环境来源（那是 `check` 的事）。取值缺了或对不上，入口当场拒、一个 cargo 都不起，逐项写出出路。出路：此刻进程没有取值的，开新会话（`install` 之后起的登录 shell 读 `~/.bashrc` 最前面那一段），或在命令前 `eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"`；这台还没装的先 `bash scripts/hosts/capped.sh <N> python3 scripts/hosts/rocksdb-prebuilt.py install`。要编的那棵树里没有依赖 rocksdb 的工作区时（编不到 librocksdb-sys，门禁样本与自证的小仓多是这样），`entry` 不判、退 0。
 
 ## 虚机 benchmark harness（E7（离线索引 harness） 用）
 
@@ -181,11 +209,11 @@ cargo mutants --list --package singlefs-core | wc -l
 | 看清哪些不是这次要提交的 | `git -c core.quotepath=false status --short`，中文路径默认被转义成八进制，grep 中文关键词会漏 |
 | 两边改动交织在同一文件 | 一个提交带全部，消息里写明（拆开提交会让门禁 doc-registries 的 experiment-refs 格与门禁 doc-experiments 的 experiment-orphans 格判红） |
 
-## 复跑与变异脚本要在 `scripts/experiments/` 下跑
+## 复跑与变异脚本要在 `scripts/experiment-apparatus/` 下跑
 
-- `scripts/mutation/mutate.sh` 在 `scripts/experiments/` 下跑：`cd scripts/experiments && bash ../mutation/mutate.sh <bin 名> <源文件> ../mutation/tables/<变异表>`。
+- `scripts/mutation/mutate.sh` 在 `scripts/experiment-apparatus/` 下跑：`cd scripts/experiment-apparatus && bash ../mutation/mutate.sh <bin 名> <源文件> ../mutation/tables/<变异表>`。
 - `replay.sh` 只认带 E 的实验号（`E` 加数字），裸数字退出码 2。
-- release 二进制在 `scripts/experiments/target/release/`，不在 `scripts/experiments/target/`。
+- `replay.sh` 每一趟编进它在 `${TMPDIR:-/tmp}/singlefs-replay-build-<进程号>-XXXXXX/target/` 自己建的编译目录、跑完删（调用方设了 `CARGO_TARGET_DIR` 的照它编、不删），研究二进制从 `$REPLAY_RELEASE_DIRECTORY`（`$CARGO_TARGET_DIR/release/`）起；`scripts/experiment-apparatus/target/` 不再有复跑编出来的二进制。
 
 ## 批量立 / 定分项时门禁会红的形态
 
@@ -199,7 +227,7 @@ cargo mutants --list --package singlefs-core | wc -l
 | doc-registries 的 table-shape 格（欠账表形状） | 新的六列欠账行接在文件末尾，而那里是「已还清」那张 4 列表；欠着那张里一格开头写「已还（…）」或「销账」；欠着那张中间夹一个空行 | 接在第一张表最后一行后面：第一个五竖线的 `\|---\|` 之前、最后一行以 `\| C` 开头且竖线 ≥ 7 的行；还清了就按四列挪进已还清表，只还一部分的开头写「已还一半」「决策已定、检查仍欠」「前置已还」；表中间不留空行 |
 | doc-registries 的 segment-registry 格（段序列登记表） | `--selftest` 要「mkfs 种根」那一行的段序列串在整份 `layout/01-first-txn.md` 里只出现一次，同一串在别处再写一遍就红 | 别处引用写成「4 + 1 + 1 + 1 + 4」带空格的写法 |
 | 门禁 doc-decisions 的变更史三格（entry-added、shape、history-loss） | 「（其N）」、快查两行与节顶现状行 | 写法与判法在 `.claude/rules/changelog-format.md`；数与编号有没有丢由 history-loss 格判，整理变更史时暂存前自己先跑 `scripts/kb/history-consolidate.py loss-check` |
-| code-source-discipline 的 format-constants 格（格式常量） | kb 标记改值后，`scripts/experiments/**/*.rs` 与 `crates/**/*.rs` 里每一份同名 `const` 都要跟（`research/` 下只剩冻结证据，扫它但由 `.claude/format-constants-exclude` 逐份放行）；`stale=` 列的旧值串不许再出现在 kb 正文 | 别把仍在别处合法出现的串（`base = 95`）加进 `stale=` |
+| code-source-discipline 的 format-constants 格（格式常量） | kb 标记改值后，`scripts/experiment-apparatus/**/*.rs` 与 `crates/**/*.rs` 里每一份同名 `const` 都要跟（`research/` 下只剩冻结证据，扫它但由 `.claude/format-constants-exclude` 逐份放行）；`stale=` 列的旧值串不许再出现在 kb 正文 | 别把仍在别处合法出现的串（`base = 95`）加进 `stale=` |
 | clippy `shadow_unrelated` | 同一个测试函数里第二次 `let reader = …` / `let segments = …` 判红，rustfmt 重排之后用正则替换还会漏改后半段 | 每个读者 / 段 / 报告起不同的名字（`extent_reader`、`warm_up_segments`、`control_report`） |
 | naming-lint | 「字母 + 数字」当单字母：`read_u48` 判红，测试名以 `a_` 开头判红；它扫全仓的 .rs，连 `research/prompts` 里云端腿写的模型源码也扫 | 写 `read_six_byte_unsigned`；`research/prompts` 在 `.claude/naming-lint-exclude`（证据目录，不回收），腿的模型写到别的目录照查 |
 | checker-tier-crash-point-replay（崩溃点重放全量） | 用例标 `#[ignore]`、住 `crates/singlefs-checker-tier/tests/`（D13（验证路线） 已定项 15），`cargo test -p singlefs-checker-tier` 报几条 ignored 是正常的；harness 档 `cargo test -p singlefs-harness` 跑不到它们 | 门禁的 `--full` 在 release 下逐条照复用判定跑（快档不跑全量）；全量在跑时换 `CARGO_TARGET_DIR` 就能同时编别的测试 |

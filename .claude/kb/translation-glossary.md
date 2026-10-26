@@ -1,5 +1,6 @@
 # 翻译术语表 / Translation glossary / 翻訳用語集
 
+**中文** · [English](translation-glossary.en.md) · [日本語](translation-glossary.ja.md)
 **仓根 README、`briefs/` 与 `.claude/kb/` 的三语版本照这张对照表译。** 登记在 `.claude/trilingual-documents` 的文件，中文是默认版本（`<名>.md`），英语是 `<名>.en.md`，日语是 `<名>.ja.md`；改一份就要三份一起改。
 新术语先加进对照表，再在译文里用。门禁 doc-text 的 trilingual-glossary 格判：中文列的串出现在中文那份里，英语列的串（不分大小写）就要出现在英语那份里，日语列的串就要出现在日语那份里。
 说明列可以空；不空就写三段，用 `<br>` 隔开，依次是中文、英语、日语。
@@ -27,8 +28,11 @@
 | 治理 | governance | ガバナンス | |
 | 里程碑 | milestone | マイルストーン | |
 | 简报 | brief | ブリーフ | `briefs/` 下按日期一份<br>one per date under `briefs/`<br>`briefs/` の下に日付ごとに一つ |
+| 增补 | supplement | 増補 | |
 | 决策 | decision | 決定 | |
+| 用户定案 | user settlement | ユーザー決定 | |
 | 已定项 | settled item | 確定項目 | 决策里定下来的一条分项<br>a settled sub-item of a decision<br>決定のうち確定した小項目 |
+| 未定项 | unsettled item | 未定項目 | |
 | 实验 | experiment | 実験 | |
 | 不变量 | invariant | 不変条件 | |
 | 欠账 | owed check | 未済の検査 | 知道要拦什么但还拦不了的检查<br>a check we know we need but cannot enforce yet<br>何を止めるべきか分かっているがまだ止められない検査 |
@@ -38,35 +42,49 @@
 | 共享与回收 | sharing and reclamation | 共有と回収 | 里程碑名<br>a milestone name<br>マイルストーン名 |
 | 覆盖写 | overwrite | 上書き | |
 | 释放 | release | 解放 | |
+| 墓碑 | tombstone | 墓石 | |
 | 回退 | rollback | ロールバック | |
 | 回退下界 | rollback floor | ロールバック下限 | 简称 F<br>called F for short<br>略して F |
+| 回收门槛 | reclamation threshold | 回収閾値 | |
+| 清扫 | sweep | 掃除 | 回收里删掉不再要的东西那一步：清扫器、清扫发布、清扫水位<br>the reclamation step that deletes what is no longer needed: sweeper, sweep publish, sweep watermark<br>回収のうち不要になったものを消すステップ：掃除器、掃除パブリッシュ、掃除水位 |
+| 钉槽 | pinned slot | 固定スロット | |
 | 管理员回退 | administrator rollback | 管理者ロールバック | |
 | 复用 | reuse | 再利用 | |
 | 续跑 | resume | 再開 | |
 | 发布 | publish | パブリッシュ | |
 | 多记录发布 | multi-record publish | マルチレコードパブリッシュ | |
+| 在飞 | in-flight | インフライト | |
 | 落点 | placement | 配置先 | 一个单元在盘上落的位置<br>where a unit lands on disk<br>ユニットがディスク上に置かれる位置 |
+| 几何 | geometry | 幾何 | |
 | 系统配置 | system configuration | システム構成 | 每盘偏移 0 与 4096 两个槽里的那块结构<br>the structure in the two slots at offsets 0 and 4096 of each disk<br>各ディスクのオフセット 0 と 4096 の二つのスロットにある構造 |
 | 根环 | root ring | ルートリング | |
 | 根记录 | root record | ルートレコード | |
 | 树表 | tree table | ツリーテーブル | |
 | 索引树 | index tree | インデックスツリー | |
 | 分配记录树 | allocation record tree | 割り当てレコードツリー | |
+| 退役树 | retirement tree | 退役ツリー | |
 | 数据单元 | data unit | データユニット | |
 | 单元 | unit | ユニット | |
 | 自描述 | self-describing | 自己記述 | |
+| 自证 | self-test | 自己検証 | 跑一遍、证明判法该红时会红；单元、槽、根自带校验的结构自证不是它，那几种写法登记在更长词表里<br>a run showing that a check goes red when it should; the structural self-verification of units, slots and roots is a different thing, and its wordings are registered as longer words<br>判定法が赤になるべきときに赤になることを一度走らせて示すもの。ユニット・スロット・ルートが自分で検証する構造側の検証は別物で、その書き方はより長い語として登録してある |
 | 校验和 | checksum | チェックサム | |
+| 诞生代号 | birth generation | 誕生世代 | |
 | 补齐 | padding | パディング | |
 | 位置条目 | position entry | 位置エントリ | |
+| 意图 | intent | インテント | |
 | 撕裂写 | torn write | 断裂書き込み | |
 | 屏障 | barrier | バリア | |
+| 取号 | number acquisition | 番号取得 | |
 | 实例号 | instance number | インスタンス番号 | |
+| 实例代号 | instance generation | インスタンス世代 | 写序的前 4 字节，与实例号不是一回事<br>the first 4 bytes of the write order; not the instance number<br>書き込み順序の先頭 4 バイト。インスタンス番号とは別物 |
 | 暖机 | warm-up | ウォームアップ | |
 | 可写挂载 | writable mount | 書き込み可能マウント | |
+| 挂载续做 | mount resumption | マウント継続 | |
 | 冷启动 | cold start | コールドスタート | |
 | 恢复重放 | recovery replay | リカバリ再生 | |
 | 择根 | root selection | ルート選択 | |
 | 扫环 | ring scan | リングスキャン | |
+| 扫描重建 | scan rebuild | スキャン再構築 | |
 | 前缀 | prefix | プレフィックス | |
 | 固定脚本 | fixed script | 固定スクリプト | |
 | 随机历史 | random history | ランダム履歴 | |
@@ -81,12 +99,17 @@
 | 池级 checker | pool-level checker | プールレベル checker | 判一个镜像的判决器库<br>the library that judges one image<br>一つのイメージを判定するライブラリ |
 | 记录核对器 | record checker | レコード照合器 | |
 | 判器 | judge | 判定器 | |
+| 攻方 | attacker | 攻撃側 | |
 | 判定库 | verdict library | 判定ライブラリ | |
 | 判法单元指纹 | judging-unit fingerprint | 判定法ユニット指紋 | |
 | 观察者 | observer | オブザーバー | |
+| 辩方 | defense | 弁護側 | |
 | 必红流 | must-red stream | 必赤ストリーム | 改坏一个字段、必须红在指定不变量上的流<br>a stream with one field corrupted that must go red on a named invariant<br>一つのフィールドを壊し、指定の不変条件で赤にならなければならないストリーム |
+| 判别力 | discriminative power | 判別力 | |
 | 对拍 | differential | 突き合わせ | 两条互不共享代码的路子算同一件事再逐项比<br>two code paths that share no code compute the same thing and are compared item by item<br>コードを共有しない二つの経路で同じものを計算し、項目ごとに比べる |
+| 合谋 | collusion | 共謀 | |
 | 理想模型 | ideal model | 理想モデル | |
+| 调查员 | investigator | 調査担当 | |
 | 形式化验证 | formal verification | 形式検証 | |
 | 广谱变异 | broad mutation | 広域ミューテーション | |
 | 变异表 | mutation table | ミューテーション表 | |
@@ -95,6 +118,7 @@
 | 快档 | quick tier | クイック層 | |
 | 慢档用例 | slow-tier case | スロー層ケース | |
 | 全量 | full run | フル実行 | |
+| 崩溃全量 | crash full run | クラッシュフル実行 | |
 | 剪枝 | pruning | 枝刈り | |
 | 轻型 | light tier | ライト層 | |
 | 重型 | heavy tier | ヘビー層 | |
@@ -103,17 +127,25 @@
 | 显卡 | GPU card | GPU カード | |
 | 内核 | kernel | カーネル | |
 | 派活 | dispatch | ディスパッチ | |
+| 零轮 | zero round | ゼロラウンド | |
 | 双机 | two-host | 二台構成 | |
 | 第二台 | second host | 二台目 | |
 | 分项 | item | 項目 | |
 | 合表 | merged table | 統合表 | |
 | 登记表 | registry | 登録表 | |
+| 岔路单 | fork sheet | 分岐表 | |
+| 积压登记表 | backlog registry | 積み残し登録表 | |
+| 收口表 | closeout table | 収束表 | |
 | 钉表 | pin table | 固定表 | |
 | 产物 | artifact | 成果物 | |
+| 装置 | apparatus | 装置 | |
 | 弄坏开关 | breakage switch | 破壊スイッチ | |
 | 主 agent | main agent | メイン agent | |
+| 三方论证 | three-way argument | 三者論証 | |
 | 实现员 | implementation writer | 実装担当 | |
+| 正推腿 | forward leg | 順推レッグ | |
 | 合入后验证 | post-merge verification | マージ後検証 | |
+| 反推腿 | backward leg | 逆推レッグ | |
 | 验证路线 | verification route | 検証ルート | D13（验证路线） 的简称<br>short name of that decision<br>その決定の略称 |
 | 小数据打包容器 | small-data packing container | 小データパッキングコンテナ | D27（小数据打包容器） 的简称<br>short name of that decision<br>その決定の略称 |
 | 补齐之后小文件怎么落 | how small files land after padding | パディング後に小ファイルがどう配置されるか | E66（补齐之后小文件怎么落） 的简称<br>short name of that experiment<br>その実験の略称 |
@@ -122,8 +154,8 @@
 | 按里程碑对比六家文件系统的文件性能 | per-milestone file performance against six file systems | マイルストーン別の六ファイルシステムとのファイル性能比較 | E152（按里程碑对比六家文件系统的文件性能） 的简称<br>short name of that experiment<br>その実験の略称 |
 | 恢复重放有界穷举与变异杀伤界 | bounded exhaustive recovery replay and mutation kill bound | リカバリ再生の有界全数探索とミューテーション殺傷限界 | E165（恢复重放有界穷举与变异杀伤界） 的简称<br>short name of that experiment<br>その実験の略称 |
 | 吞写之后可写挂载被拒而模型说该成 | writable mount refused after a swallowed write while the model says it should succeed | 書き込み消失後に書き込み可能マウントが拒否されモデルは成功すべきとする | C600（吞写之后可写挂载被拒而模型说该成） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
-| fsid 前 8 字节相同时重做 mkfs 实例代号不变式红 | instance generation invariant red when mkfs is redone with the same first 8 bytes of fsid | fsid の先頭 8 バイトが同じまま mkfs をやり直すとインスタンスコード不変条件が赤 | C659（fsid 前 8 字节相同时重做 mkfs 实例代号不变式红） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
-| 钉槽的两类坏实现镜像上判不出 | two kinds of bad slot-pin implementations not judgeable on images | スロット固定の二種の不良実装がイメージ上で判定できない | C863（钉槽的两类坏实现镜像上判不出） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| fsid 前 8 字节相同时重做 mkfs 实例代号不变式红 | instance generation invariant red when mkfs is redone with the same first 8 bytes of fsid | fsid の先頭 8 バイトが同じまま mkfs をやり直すとインスタンス世代不変条件が赤 | C659（fsid 前 8 字节相同时重做 mkfs 实例代号不变式红） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 钉槽的两类坏实现镜像上判不出 | two kinds of bad implementations of the pinned slot not judgeable on images | 固定スロットの二種の不良実装がイメージ上で判定できない | C863（钉槽的两类坏实现镜像上判不出） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
 | 树表条目未知 flags 位让整张树表读不下去 | unknown flags bits in a tree table entry make the whole tree table unreadable | ツリーテーブルエントリの未知 flags ビットでツリーテーブル全体が読めなくなる | C865（树表条目未知 flags 位让整张树表读不下去） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
 | F2 退回不分字节丢了与内容拒收 | F2 rollback does not tell lost bytes from rejected content | F2 のロールバックがバイト消失と内容拒否を区別しない | C866（F2 退回不分字节丢了与内容拒收） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
 | 别的自证结构的读错位没人查 | misplaced reads of other self-verifying structures go unchecked | 他の自己検証構造の位置ずれ読み出しを誰も検査していない | C864（别的自证结构的读错位没人查） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
@@ -132,6 +164,10 @@
 | 重放前缀严格连续没有会红的判定 | strictly contiguous replay prefix has no must-red verdict | 再生プレフィックスの厳密な連続性に赤になる判定がない | C869（重放前缀严格连续没有会红的判定） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
 | 提交原子没有崩溃点重放 oracle | commit atomicity has no crash-point replay oracle | コミットの原子性にクラッシュポイント再生の oracle がない | C870（提交原子没有崩溃点重放 oracle） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
 | 记录 inode 号等于 key 没有 checker 判定 | record inode number equal to key has no checker verdict | レコードの inode 番号が key と等しいことに checker 判定がない | C871（记录 inode 号等于 key 没有 checker 判定） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 隔离记录两盘不对称没人判 | nobody judges asymmetric quarantine records across two disks | 隔離レコードの二ディスク間非対称を誰も判定していない | C873（隔离记录两盘不对称没人判） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 冷读与 RefFS 按 size 整份分配内存 | cold read and RefFS allocate memory for the whole size | コールドリードと RefFS が size 全体のメモリを確保する | C878（冷读与 RefFS 按 size 整份分配内存） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 补写那一支进不了崩溃测试、运行时看不出 | the rewrite branch cannot enter crash tests and is invisible at run time | 補い書きの分岐がクラッシュテストに入れず、実行時に見えない | C874（补写那一支进不了崩溃测试、运行时看不出） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 预编库 | prebuilt library | プリビルトライブラリ | 每台主机编一次的 librocksdb.a 与 libsnappy.a<br>librocksdb.a and libsnappy.a, built once per host<br>ホストごとに一度だけビルドする librocksdb.a と libsnappy.a |
 | 空间分配 | space allocation | 領域割り当て | D3（空间分配） 的简称<br>short name of that decision<br>その決定の略称 |
 | 核心索引结构 | core index structure | コアインデックス構造 | D8（核心索引结构） 的简称<br>short name of that decision<br>その決定の略称 |
 | 加密 | encryption | 暗号化 | D9（加密） 的简称<br>short name of that decision<br>その決定の略称 |
@@ -148,4 +184,9 @@
 | 恢复报告分桶 | recovery-report bucketing | リカバリ報告のバケット分け | |
 | 判表 | judge tables | 判定表 | |
 | 显存账 | GPU memory ledger | GPU メモリ台帳 | |
+| 影子账 | shadow accounting | シャドウ会計 | |
 | 预期红 | expected red | 想定内の赤 | |
+| 补写闸 | rewrite gate | 補い書きゲート | 取号那一步补写某块盘两槽之前要都成立的五件<br>the five conditions that must all hold before the sequence generation step rewrites both slots of a disk<br>番号取得ステップがあるディスクの 2 スロットを補い書きする前にすべて成り立つべき五条件 |
+| 补写例外 | rewrite exception | 補い書き例外 | |
+| 历史版本 | Historical Versions | 履歴バージョン | |
+| 覆盖号 | coverage id | カバレッジ識別子 | |

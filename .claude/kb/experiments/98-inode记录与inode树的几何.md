@@ -1,6 +1,6 @@
 ## E98 inode 记录与 inode 树的几何 —— 已跑（2026-09-03，纯算术，12 单测 / 9 条变异全抓）：**14 个字段里 11 个不能只从权威态重算 ⇒ 住索引节点触发 D21（权威态与派生态的分界） 硬约束 6，打包进共享单元不触发**
 
-**中文** · [English](98-inode记录与inode树的几何.en.md) · [日本語](98-inode记录与inode树的几何.ja.md)
+**中文** · [English](98-geometry-of-inode-records-and-inode-trees.en.md) · [日本語](98-inode-レコードと-inode-ツリーの幾何.ja.md)
 
 **它要答的是 D8（核心索引结构） 已定项 6（inode 记录的盘上字段表）。** 该项判过
 「改新池新建文件的字节：**是**」——新池新建文件要写一个文件，就必然要写它的元数据。
@@ -46,11 +46,11 @@
 
 **口径与复跑**：
 
-- 代码 `scripts/experiments/e98_inode_record.rs`
+- 代码 `scripts/experiment-apparatus/e98_inode_record.rs`
   （`cargo run --release --bin e98-inode-record`），
  原始输出 `e98-inode-record-2026-09-07.out`（2026-09-07 按那天成立的头宽重跑；补账前那份是 `e98-inode-record-2026-09-03.out，留在 results/ 里不动）`（74 行，收尾 `emitted=74`）。
 - 变异表 `scripts/mutation/tables/e98_inode_record.tsv`，9 条逐条命中、0 条判等价；单测 12 个。
-- 已挂进 `scripts/experiments/replay.sh`（exact 档）。
+- 已挂进 `scripts/experiment-apparatus/replay.sh`（exact 档）。
 - ⚠️ **头宽停在旧值，欠一次复跑**（C89（单元头收口的遗留重算） ④ ⑤）：源码 `DATA_UNIT_HEADER = 91`，
   现行 105（`format-const: DATA_UNIT_HEADER_BYTES`）；索引节点头按 58 / 67 / 76 算，现行 68 / 77 / 86。
   两处按 E102（单元类登记表与打包记录单元） 的头宽区间算都不翻（打包 233 在 [9, 148] 内、索引叶 116 在 16 KiB 节点上同值），

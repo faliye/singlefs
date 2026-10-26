@@ -1,0 +1,115 @@
+## E42 Number of Records per Transaction —— Run (2026-08-29, N=5 rounds byte-identical)
+
+[中文](42-一事务几条记录.md) · **English** · [日本語](42-1トランザクションあたりのレコード数.ja.md)
+
+**What it asks**: D23 (Journal Role & Format) settled item 7 "does a transaction produce exactly one journal record".
+
+⚠️ **This item is not about "picking a better one", but rather "two repository wordings give two readings, and both hold"**:
+I-8.1 (Ring Geometry Sufficiently Large) states "ring size ≥ F × worst-case journal **occupancy** of any transaction"—
+**occupancy is a dimensional space quantity, not 'one record'**; whereas D23 (Journal Role & Format) deadlock 3 says
+"operations that cannot fit must be splittable into multiple individually legal transactions", which reads like "one transaction one record" being maintained.
+
+### What to Test, Criteria, Failure Clauses
+
+- **What to test**: Construct two arms—**Arm A 'exactly one record per transaction'** and **Arm B 'transaction can span multiple records'**,
+  run full enumeration of "arbitrary prefix truncation → replay → judge validity" on the same workload, measuring:
+  1. **Number of cut transactions**: Times a prefix lands in the middle of a transaction;
+  2. **Number of prefixes in illegal state after replay** (illegal = replay outcome does not match outcome of any integer number of committed transactions);
+  3. After adding "transaction boundary field + commit flag" to Arm B, can item 2 return to 0.
+- **Criteria**:
+  - Arm A item 2 must be **constantly 0**—this is the direct form of I-4.3 (Atomic Commit) and D16 (Publish Semantics)
+    "root + arbitrary prefix of journal, valid after replay".
+  - Arm B without boundary fields must have item 2 **significantly non-zero**—this is the exact volume where "spanning multiple records causes failure".
+  - If Arm B returns to 0 after adding boundary fields, **both readings are implementable**,
+    with difference reducing to "whether the 84-byte record header needs these extra bytes", at which point `.claude/rules/fs-design.md` "do not sacrifice self-containment to save space" selects the branch with boundary fields.
+- **Positive control**: Turn off Arm A's "one record per transaction" constraint (equivalent to degrading into Arm B without fields);
+  item 2 must flip from 0 to non-zero—otherwise "constantly 0" cannot distinguish whether constraint is effective or enumeration simply never sliced mid-transaction.
+- **Failure clauses**: If Arm B without boundary fields also has item 2 constantly 0, it means model failed to generate transactions spanning multiple records,
+  **implementation is faulty, invalidate entire round**.
+- ⚠️ **Must include absolute value assertions**: Total number of truncatable prefixes is directly calculated from `(record count + 1)`,
+  number of cut transactions is directly calculated by construction, neither allowed to be read back from tested code.
+
+### ⚠️ It Decides Bytes, Not Merely Semantics
+
+**Bytes that cannot be written**: Does the 84-byte record header need a transaction boundary / commit flag field.
+Among 11 fields verbatim listed in E23 (Journal Geometry), **not a single transaction identifier exists**;
+if the answer is "can span multiple records", that settled header **was wrong from record 1 onward**.
+
+⚠️ **It is not a corollary of D13 (Verification Route) settled item 2 (serial / concurrent)**—truncation occurs mid-transaction under serial execution just the same.
+Both were momentarily conflated (2026-08-29) and subsequently separated by adversarial verification.
+
+### Host Testing (2026-08-29, N=5 rounds byte-identical; 7 mutation items all caught, 0 blind spots)
+
+**Enumerate all prefixes, judge legality by state** (replayed map must match truth map of some "integer number of committed transactions" entry by entry):
+
+| Slices per Txn | Arm | Record Count | Prefix Count | Cut Prefixes | **Illegal Prefixes** |
+|---|---|---|---|---|---|
+| 8 | One record per transaction | 200 | 201 | 0 | **0** |
+| 8 | Multi-record, no boundary fields | 1600 | 1601 | 1400 | **1400** |
+| 8 | Multi-record, with boundary fields | 1600 | 1601 | 1400 | **0** |
+| 4 | Multi-record, no boundary fields | 800 | 801 | 600 | **600** |
+| 2 | Multi-record, no boundary fields | 400 | 401 | 200 | **200** |
+
+**All three criteria met**: One record per transaction is constantly 0; multi-record without boundary fields is **significantly non-zero and exactly equals cut prefixes**;
+after adding transaction number + commit flag, it **returns to 0**.
+
+⇒ **Conclusion: Both readings are implementable, reducing to 'whether record header needs these extra bytes'.**
+(The 84 bytes in prose reflects header width at run time; current width is 496 (ten basic fields 78 plus subsequent incremental additions), D23 (Journal Role & Format) settled item 4. Difference is independent of header width; conclusion remains unaltered.)
+Per `.claude/rules/fs-design.md` "do not sacrifice self-containment to save space", the branch with boundary fields should be adopted—
+**but this step is a settlement decision that an experiment cannot substitute for**, see E42 (Number of Records per Transaction) "The cell it did not answer".
+
+⚠️ **1400 is not a small number**: At chunk=1, **1400 out of 1601 prefixes are illegal, accounting for 87.4%**.
+"Trouble spanning multiple records" is not an edge case, but **the vast majority of crash points**.
+
+**Positive control**: Turning off the "one record per transaction" constraint (i.e. the arm without boundary fields),
+illegal prefixes change from 0 to 1400 ⇒ enumeration indeed cut mid-transaction, not a lucky guess of "constantly 0".
+
+**Measurement basis**: 200 transactions × 8 idempotent full value writes per transaction (coarse granularity settled in D25 (Target Workload Priority)),
+each transaction sliced into three tiers: 8 / 4 / 2 records. Both key and value are uniquely determined by transaction ID
+⇒ **State of half a transaction cannot match any committed state**, so "illegal count = cut count" is an expected identity, not a coincidence.
+Code `scripts/experiment-apparatus/e42_transaction_records.rs`
+(`cargo run --release --bin e42_transaction_records`),
+raw output `e42-txn-records-2026-08-29.out`,
+mutation table `scripts/mutation/tables/e42_transaction_records.tsv`.
+
+**8 unit tests, 7 mutation items caught one by one, 0 blind spots.** Three absolute value assertions:
+**Actually enumerated** prefix count exactly equals record count + 1; record count exactly equals `txn count × ceil(8/chunk)`;
+cut prefix count exactly equals `txn count × (records per txn − 1)`.
+
+⚠️ **A blind spot was caught and patched by mutation testing**: Initial version wrote "prefix count" as `recs.len() + 1`, a **normative expected value**,
+so when changing loop bound from `0..=len` to `0..len`, **none of the eight tests went red**—
+neither side being compared derived from the loop. Caught after switching to counting "how many were genuinely enumerated".
+
+### ⚠️ The Cell It Did Not Answer: Respective Costs of the Two Approaches
+
+Experiment proved both paths **can satisfy I-4.3 (Atomic Commit)**, but did not measure their costs, which land in different places:
+
+| Which to Take | Where Cost Lands |
+|---|---|
+| **Exactly one record per transaction** | Record must fit worst-case transaction ⇒ "maximum record bytes" pushed high ⇒ driven up by I-8.1 (Ring Geometry Sufficiently Large) "ring size ≥ F × worst-case occupancy", **ring expands accordingly**. And it imposes a hard constraint on transaction layer: all operations must be decomposeable into transactions that "fit into one record" |
+| **Multi-record + boundary fields** | 84-byte record header must add transaction number and commit flag; replay requires extra step to "discard uncommitted tails" |
+
+⚠️ **Two repository wordings point to each respectively**: I-8.1 (Ring Geometry Sufficiently Large) writes "worst-case journal **occupancy**" (spatial dimension ⇒ permits multiple records), D23 (Journal Role & Format) deadlock 3 writes "split into multiple individually legal transactions" (⇒ one record per transaction).
+**Both must converge to a single ruling**, which is the purpose of settlement.
+
+### Prerequisites
+
+None. Pure enumeration model, immediately executable. Decidable form and gate shape in
+[checks-owed.md](../checks-owed.md) C37 (transaction to record mapping undefined).
+
+### Impacted Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D13 (Verification Route) settled item 1 | Supports | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D13 (Verification Route) settled item 2 | Supports | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 7 | Supports | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 4 | No impact | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D16 (Publish Semantics) settled item 12 | Supports | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D25 (Target Workload Priority) | No impact | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+
+## Historical Versions
+
+### 2026-08-29
+- Documented and ran. Source: D23 (Journal Role & Format) settled item 7, user requested "test it".
+- Conclusion: Both paths satisfy I-4.3 (Atomic Commit), **experiment cannot judge right or wrong, only identifies where costs land**; settlement remains owed. ⚠️ First version had a blind spot (prefix count compared two normative values), caught by mutation testing.

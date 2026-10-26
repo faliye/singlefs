@@ -1,0 +1,71 @@
+## E27 Three Modelable Risk Paths of D5 — Run (2026-08-29)
+
+[中文](27-D5三条可建模的风险路径.md) · **English** · [日本語](27-D5のモデル化可能な3つのリスクパス.ja.md)
+
+**Clears the three modelable risk paths among [experiments.md](../experiments.md) E13 (Four Risk Paths of D5)** (Paths 1 / 2 / 4).
+⚠️ **Path 3 (Crash Replay) is not in E27 (Three Modelable Risk Paths of D5)**: it requires block-layer write records + checker + crash-point replay harness,
+none of which exist. E27 (Three Modelable Risk Paths of D5) **does not pretend to cover it**.
+
+### Path 1: Three Boundaries, Consequences of Erroneous Choices Truly Asymmetric—but Not Three Independent Slips
+
+Definition sentence of D5 (Snapshot / Space Accounting Mechanism) verbatim: **Block b is referenced by snapshot S ⟺ `birth(b) ≤ S.txg < death(b)`, left-closed right-open.**
+
+| Rule | Data Loss | Leakage | Consistent with Text |
+|---|---|---|---|
+| `birth ≤ S < death` (Text) | 0 | 0 | **3 / 3** |
+| `birth < S < death` (Left boundary strictly open) | **1** | 0 | 2 |
+| `birth ≤ S ≤ death` (Right boundary closed) | 0 | **2** | 1 |
+
+**Two Conclusions**:
+
+1. **Failure directions of the two erroneous choices are indeed opposite**—strict left boundary causes solely data loss, closed right boundary causes solely leakage.
+   The "asymmetric consequences" table in the body of D5 (Snapshot / Space Accounting Mechanism) is confirmed.
+2. ⚠️ **However, "closed right boundary" hits two boundaries simultaneously, not one.**
+   `birth ≤ S ≤ death` evaluates to "referenced" on both `death == S.txg` and `birth == death` cells.
+   ⇒ **The text lists three boundaries across three rows, reading like three independent slips; in reality, the exact same slip hits two rows simultaneously.**
+   First version of E27 (Three Modelable Risk Paths of D5) guessed "one leak" based on that table, failing red on the spot. Written back to D5 (Snapshot / Space Accounting Mechanism).
+
+### Path 2: deadlist Cascading Merge, Bucketing by birth Saves Roughly Half
+
+Measures **number of examined entries**, not time. Target snapshot takes median.
+
+| deadlist Entries | No Bucketing | Bucket Width 16 | Bucket Width 64 | Bucket Width 256 |
+|---|---|---|---|---|
+| 64 | 64 | **34** | 64 | 64 |
+| 256 | 256 | **136** | 130 | 256 |
+| 1024 | 1024 | **544** | —— | —— |
+
+⇒ Bucketing compresses examined volume to approximately **53%**; **when bucket width equals entry count, it degrades to no bucketing** (cannot skip entire buckets).
+What is saved is precisely the half where "the whole bucket is older than target"—absolute value is calculable:
+1024 entries, bucket width 64, target at 512 ⇒ first 8 buckets skipped whole (paying one bucket-header check each) + remaining 512 entries one-by-one = 520.
+
+### Path 4: Persistence Cost of defer Queue
+
+D16 (Publish Semantics) Settled Item 15 requires releases within a checkpoint forbidden from entering allocatable set prior to publish
+⇒ the half that ought to be "released immediately" must also enter the defer queue first, incurring additional persistence writes.
+
+**Entry count and I/O count are two separate metrics, do not confuse them**: entry count is determined solely by release count,
+I/O count is entry count rounded up by packing width (16384 entries, 128 entries per block ⇒ 128 times; 512 entries per block ⇒ 32 times).
+
+### Measurement Basis and Known Limitations
+
+- Pure logic and pure counting, no device, no transaction layer.
+- **Path 3 was completely unaddressed**, crash replay risk of D5 (Snapshot / Space Accounting Mechanism) remains at zero coverage.
+- Path 2 deadlist entries are uniformly distributed by birth; **actual distribution is unknown**—
+  bucketing gains depend heavily on distribution, and uniform distribution is among the most favorable for bucketing.
+- Path 4 counts entries and I/O only, **without modeling space occupied by the defer queue itself** (which is the domain of E19 (Spurious ENOSPC Under Defer Window)).
+- Code `scripts/experiment-apparatus/e27_snapshot_accounting_risk_paths.rs` (`cargo run --release --bin e27_snapshot_accounting_risk_paths`),
+  raw output `e27-d5-paths-2026-08-29.out`. Three rounds byte-identical.
+
+**Engineering Quality**: 9 unit tests, **all 8 mutations caught**, three rounds byte-identical.
+
+### Impacted Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D5 (Snapshot / Space Accounting Mechanism) Settled Item 14 | Support | 2026-09-20 unaffected: consequences of erroneous boundary choices are indeed asymmetric, and writing right boundary as `S.txg ≤ death` hits two rows simultaneously, one clerical error causing two leakages |
+| D16 (Publish Semantics) | No impact | 2026-09-20 unaffected: merely treats Settled Item 15 (releases in checkpoint not entering allocatable set before publish) as a constraint in model, judging none of its text |
+
+## Historical Versions
+
+Historical entries for E27 (Three Modelable Risk Paths of D5) are gathered in [experiments-history.md](../experiments-history.md).

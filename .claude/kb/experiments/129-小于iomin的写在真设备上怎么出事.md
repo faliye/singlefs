@@ -1,6 +1,6 @@
 ## E129 小于 io_min 的写在真设备上怎么出事 —— 已跑（2026-09-10，三段真设备，5 轮逐格一致，9 条变异全抓）
 
-**中文** · [English](129-小于iomin的写在真设备上怎么出事.en.md) · [日本語](129-小于iomin的写在真设备上怎么出事.ja.md)
+**中文** · [English](129-how-writes-below-io_min-fail-on-real-devices.en.md) · [日本語](129-io_min-未満の書き込みの実デバイス上での障害形態.ja.md)
 
 **它答两件事**，判据、阈值、作废条款写在 `e129-preregistration.md`，先于任何一行 harness 代码：
 

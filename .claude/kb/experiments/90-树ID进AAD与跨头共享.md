@@ -1,6 +1,6 @@
 ## E90 树 ID 进 AAD 与跨头共享 —— 已跑（2026-09-03，真 AEAD 纯逻辑，9 单测 / 9 条变异全抓）：**连锁 4 推论只对一半——读者树维抓全换挂但合法共享读 6 剩 2；可行形态是出生 (树,txg) 进 AAD + 祖先表验收，两判据全过**
 
-**中文** · [English](90-树ID进AAD与跨头共享.en.md) · [日本語](90-树ID进AAD与跨头共享.ja.md)
+**中文** · [English](90-tree-id-into-aad-and-cross-head-sharing.en.md) · [日本語](90-ツリーIDのAAD格納とヘッド間共有.ja.md)
 
 **它验的是 D6（快照实现模型）定案连锁第 4 处那条挂着的推论**：
 「AAD 含树 ID（D9（加密）已定项 6 已定），而每头一棵树下两个头的 AAD 天然不同
@@ -96,10 +96,10 @@
 
 ### 口径与复跑
 
-- 代码 `scripts/experiments/e90_tree_aad.rs`
+- 代码 `scripts/experiment-apparatus/e90_tree_aad.rs`
   （`cargo run --release --bin e90-tree-aad`），产物
   `e90-tree-aad-2026-09-03.out`（5 行，收尾 `emitted=5`）。
-  复跑把 E90（树 ID 进 AAD 与跨头共享）的编号传给 `scripts/experiments/replay.sh`，字节比对。
+  复跑把 E90（树 ID 进 AAD 与跨头共享）的编号传给 `scripts/experiment-apparatus/replay.sh`，字节比对。
 - **9 个单测全绿；9 条变异全部被抓**（`scripts/mutation/tables/e90_tree_aad.tsv`），
   含验收边界改开、验收跳过、祖先链不夹 min、祖先臂不绑 txg、读者树臂偷看指针、
   共享夹具挪到克隆点后、对照翻了个寂寞。

@@ -1,6 +1,6 @@
 ## E19 defer 窗口下的假性 ENOSPC —— 建模层已跑（2026-08-28），真机压测未跑
 
-**中文** · [English](19-defer窗口下的假性ENOSPC.en.md) · [日本語](19-defer窗口下的假性ENOSPC.ja.md)
+**中文** · [English](19-spurious-enospc-under-defer-window.en.md) · [日本語](19-deferウィンドウ下の疑似ENOSPC.ja.md)
 
 **结论**：
 
@@ -36,7 +36,7 @@
 
 **口径**：纯逻辑建模，无设备、无文件系统。容量 100 万块（4 KiB/块 ≈ 3.8 GiB），
 每个临时文件 4 块，每 checkpoint 窗口 200 次「删一个 + 建一个」，跑 200 个 checkpoint，
-一次 checkpoint 自己写 64 块。代码 `scripts/experiments/e19_defer.rs`（`cargo run --release --bin e19-defer`）。
+一次 checkpoint 自己写 64 块。代码 `scripts/experiment-apparatus/e19_defer.rs`（`cargo run --release --bin e19-defer`）。
 原始输出 `e19-defer-2026-08-28.out`。
 
 **两个数分开算，不是同一个公式导出**：

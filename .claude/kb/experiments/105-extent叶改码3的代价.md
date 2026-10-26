@@ -1,6 +1,6 @@
 ## E105 extent 叶改码 3 的代价 —— 已跑（2026-09-05，纯算术，6 单测 / 5 条变异全抓）：**extent 树的叶从码 2 索引叶改成码 3 打包记录单元后，单次更新与点查的字节比由两侧树高定：乙比甲矮一层的区段上恒 1.000（宽记录 N ∈ [38417, 77028] 与 [7529537, 15097488]，对数轴上占 13%）、其余 N 上 1 + 1/树高（1.5 / 1.333 / 1.25）；1e6 条上批量 10 / 100 / 1000 次散开更新贵 1.44× / 1.66× / 1.78×，1e4 条上批量饱和时 1.000；三档节点头逐格同一个数，窄记录同形**
 
-**中文** · [English](105-extent叶改码3的代价.en.md) · [日本語](105-extent叶改码3的代价.ja.md)
+**中文** · [English](105-cost-of-changing-extent-leaf-to-code-3.en.md) · [日本語](105-extentリーフのコード3化コスト.ja.md)
 
 **它验的是 C113（扫描重建时多版单元的现行版本判定无输入） 定案第五版第五节对立臂 B 的价钱**：臂 B 把写序只加在码 2 / 3 上，数据单元头不动，代价是 extent 树的叶得改成码 3 打包记录单元（数据 extent 顺着重建出来的 extent 树到达）。第四轮反推腿 6.3 点名「臂 B 的代价要量不要估」，E105（extent 叶改码 3 的代价） 量的就是这一项；臂 B 的判定残余由 E104（扫描重建的现行版本判定） 的 `wseq_meta_only` 臂量。
 
@@ -54,9 +54,9 @@
 
 ### 口径与复跑
 
-- 代码 `scripts/experiments/e105_extent_leaf_packed.rs`（`cargo run --release --bin e105-extent-leaf-packed`，在 `research/` 下跑），原始输出 `e105-extent-leaf-packed-2026-09-12.out`（116 行，收尾行 `emitted=116`；容器头 107 的那一版，与留在 results/ 的上一版 `e105-extent-leaf-packed-2026-09-05.out` 只差 config 行；变异复跑 `e105-mutate-2026-09-12.log` 5 条全抓）。
-- 变异表 `scripts/mutation/tables/e105_extent_leaf_packed.tsv`，日志 `e105-mutate-2026-09-05.log`（`cd scripts/experiments && bash ../mutation/mutate.sh e105-extent-leaf-packed e105_extent_leaf_packed.rs ../mutations/e105_extent_leaf_packed.tsv`）。
-- 复跑比对：`bash scripts/experiments/replay.sh` 的 E105（extent 叶改码 3 的代价） 那一行。
+- 代码 `scripts/experiment-apparatus/e105_extent_leaf_packed.rs`（`cargo run --release --bin e105-extent-leaf-packed`，在 `research/` 下跑），原始输出 `e105-extent-leaf-packed-2026-09-12.out`（116 行，收尾行 `emitted=116`；容器头 107 的那一版，与留在 results/ 的上一版 `e105-extent-leaf-packed-2026-09-05.out` 只差 config 行；变异复跑 `e105-mutate-2026-09-12.log` 5 条全抓）。
+- 变异表 `scripts/mutation/tables/e105_extent_leaf_packed.tsv`，日志 `e105-mutate-2026-09-05.log`（`cd scripts/experiment-apparatus && bash ../mutation/mutate.sh e105-extent-leaf-packed e105_extent_leaf_packed.rs ../mutations/e105_extent_leaf_packed.tsv`）。
+- 复跑比对：`bash scripts/experiment-apparatus/replay.sh` 的 E105（extent 叶改码 3 的代价） 那一行。
 - 容器头常量在源码里叫 `PACKED_UNIT_HEADER_BYTES`，与 kb 的登记名同名 ⇒ `.claude/gate.d/code-source-discipline.sh` 的 format-constants 格 绑得住它。
   （2026-09-05 跑的时候它临时叫 `PACKED_HDR_WITH_WSEQ`，为的是不让门禁把 103 当成当时登记值 93 的漂移；
   C113（扫描重建时多版单元的现行版本判定无输入） 定案当日已把登记值改成 103，2026-09-06 改回登记名，产物逐字节不变。）

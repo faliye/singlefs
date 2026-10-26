@@ -1,5 +1,7 @@
 ## E146 livelist 条目按映射 key 定身份之后的宽度与代价 —— 已跑（2026-09-13，计数模型，8 单测 / 12 条变异全抓）
 
+**中文** · [English](146-width-and-cost-of-livelist-entries-identified-by-mapping-key.en.md) · [日本語](146-livelist-エントリをマッピング-key-で識別した場合の幅とコスト.ja.md)
+
 问的是 D6（快照实现模型） 已定项 2 ①：livelist 条目的 key 与宽度。从已定条款推出的约束是身份必须用中央映射的 key（D19（块指针的结构与宽度预算） 已定项 5 规则 1「释放一律经映射，不经提示」），
 共享树的 key 以头的树 ID 8 字节打头（D6（快照实现模型） 已定项 3），后接映射 key（D19（块指针的结构与宽度预算） 已定项 6：码 1 27 字节、码 2 / 码 3 25 字节）；
 E130（每头一份 livelist 过不过有界销毁） 用的 24 字节形态随 C266（livelist 条目的身份用了会过期的位置提示） 作废，C260（livelist 条目的预付没算进解开自己那个量） 的每次 FREE 预付量也跟着定不下。
@@ -12,14 +14,14 @@ E132（livelist 载体·按真实树数与内部扇出重算） 的 21 个规模
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-bash scripts/experiments/replay.sh E146
+bash scripts/experiment-apparatus/replay.sh E146
 # 直接跑装置：
-cd scripts/experiments && cargo run --release --bin e146-livelist-entry-width
+cd scripts/experiment-apparatus && cargo run --release --bin e146-livelist-entry-width
 ```
 
-代码 `scripts/experiments/e146_livelist_entry_width.rs`，原始输出 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行，末行 `emitted=130`；树表条目按 200 算的那一版，上一版 `e146-livelist-entry-width-2026-09-14-round2.out` 按 148 算、与它只差 6 行（`name=config` 1 行与 5 行 `name=new_pool_file_creation`），再上一版 `e146-livelist-entry-width-2026-09-13.out` 按 145 算，两版都原样保留；变异复跑 `e146_livelist_entry_width-mutate-2026-09-16-tree-table-200.log`，12 条全抓），
+代码 `scripts/experiment-apparatus/e146_livelist_entry_width.rs`，原始输出 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行，末行 `emitted=130`；树表条目按 200 算的那一版，上一版 `e146-livelist-entry-width-2026-09-14-round2.out` 按 148 算、与它只差 6 行（`name=config` 1 行与 5 行 `name=new_pool_file_creation`），再上一版 `e146-livelist-entry-width-2026-09-13.out` 按 145 算，两版都原样保留；变异复跑 `e146_livelist_entry_width-mutate-2026-09-16-tree-table-200.log`，12 条全抓），
 跑前登记 `e146-preregistration.md`，变异表 `scripts/mutation/tables/e146_livelist_entry_width.tsv`（12 条全抓，
-`bash scripts/mutation/mutate.sh e146-livelist-entry-width scripts/experiments/e146_livelist_entry_width.rs scripts/mutation/tables/e146_livelist_entry_width.tsv`）。
+`bash scripts/mutation/mutate.sh e146-livelist-entry-width scripts/experiment-apparatus/e146_livelist_entry_width.rs scripts/mutation/tables/e146_livelist_entry_width.tsv`）。
 
 ### 这是计数模型，不是实现
 

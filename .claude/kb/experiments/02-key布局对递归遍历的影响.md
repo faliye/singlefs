@@ -1,6 +1,6 @@
 ## E2 key 布局对递归遍历的影响 —— 由 E9（key 编码对遍历局部性的影响） 回答，不单独立实验
 
-**中文** · [English](02-key布局对递归遍历的影响.en.md) · [日本語](02-key布局对递归遍历的影响.ja.md)
+**中文** · [English](02-key-layout-impact-on-recursive-traversal.en.md) · [日本語](02-再帰走査に対するキー配置の影響.ja.md)
 
 **E2（key 布局对递归遍历的影响） 要测的三档就是 E9（key 编码对遍历局部性的影响） 的三条真实臂**：按 inode 编 key、按 inode + locality 前缀编 key、
 按全路径编 key——同一棵目录树、同一个 LRU，E9（key 编码对遍历局部性的影响） 另加一条阳性对照（哈希打散）。

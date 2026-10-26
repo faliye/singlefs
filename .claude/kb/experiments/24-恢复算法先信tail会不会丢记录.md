@@ -1,6 +1,6 @@
 ## E24 恢复算法：先信 tail 会不会丢记录 —— 已跑（2026-08-29）
 
-**中文** · [English](24-恢复算法先信tail会不会丢记录.en.md) · [日本語](24-恢复算法先信tail会不会丢记录.ja.md)
+**中文** · [English](24-recovery-algorithm-does-trusting-tail-first-lose-records.en.md) · [日本語](24-リカバリアルゴリズム-tailを先に信用するとレコードを喪失するか.ja.md)
 
 **这不是性能实验，是安全性实验。** 还 [checks-owed.md](../checks-owed.md) C29（恢复先信 tail 会丢数据）。
 [decisions.md](../decisions.md) D23（journal 的角色与格式）新增的硬要求
@@ -46,7 +46,7 @@
 - 只建模了一个窗口（checkpoint 完成 → tail 写），**没有建模多个 checkpoint 交错**。
 - `spurious` 的代价没有量化，只数了条数——重放一条已生效记录的实际后果取决于幂等性，
   而幂等性本工程未定。
-- 代码 `scripts/experiments/e24_recovery.rs`（`cargo run --release --bin e24_recovery`），
+- 代码 `scripts/experiment-apparatus/e24_recovery.rs`（`cargo run --release --bin e24_recovery`），
   原始输出 `e24-recovery-2026-08-29.out`。三轮字节一致。
 
 ### 08-29 那一轮踩的三个坑，都由测试自己抓出来

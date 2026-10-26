@@ -1,6 +1,6 @@
 ## E132 livelist 载体·按真实树数与内部扇出重算 —— 已跑（2026-09-10）
 
-**中文** · [English](132-livelist载体按真实树数与内部扇出重算.en.md) · [日本語](132-livelist载体按真实树数与内部扇出重算.ja.md)
+**中文** · [English](132-livelist-carrier-recomputed-with-real-tree-count-and-fanout.en.md) · [日本語](132-livelist媒体-実ツリー数と内部ファンアウトでの再計算.ja.md)
 
 **问的是**：D6（快照实现模型） 已定项 2 候选甲的三种载体——每头一棵 livelist（`per_head_1`）、每棵数据树各一棵（`per_head_t`）、
 一棵共享树（`shared`）——在**真实树数**与**真实内部扇出**下，树表层数门槛与点查深度各是多少。
@@ -15,12 +15,12 @@
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-bash scripts/experiments/replay.sh E132
+bash scripts/experiment-apparatus/replay.sh E132
 # 直接跑装置：
-cd scripts/experiments && cargo run --release --bin e132_livelist_carrier_recount
+cd scripts/experiment-apparatus && cargo run --release --bin e132_livelist_carrier_recount
 ```
 
-代码 `scripts/experiments/e132_livelist_carrier_recount.rs`，
+代码 `scripts/experiment-apparatus/e132_livelist_carrier_recount.rs`，
 原始输出 `e132-livelist-carrier-recount-2026-09-10.out`（一次运行，扫的格写在「臂与口径」那一节）。
 
 ### 这是计数模型，不是实现

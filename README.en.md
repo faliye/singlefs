@@ -1,6 +1,6 @@
 # singlefs
 
-[中文](README.md) · [English](README.en.md) · [日本語](README.ja.md)
+[中文](README.md) · **English** · [日本語](README.ja.md)
 
 ---
 The big disks belong to the company; the good sleep belongs to you.
@@ -20,7 +20,7 @@ In practice, changing one place may mean changing many branches together. That i
 Well, I am still verifying all this, but I reckon it should work.
 waaagh!
 
-Several pain points of existing COW file systems are **format-level**: patches cannot fix them, they can only be avoided at design time:
+Design problems that led singlefs to start with its format and architecture, and the directions chosen: these are design goals; implementation boundaries are listed under "Current status".
 
 | Pain point | Root cause | Choice made here |
 |---|---|---|
@@ -32,52 +32,81 @@ Several pain points of existing COW file systems are **format-level**: patches c
 
 Decisions and their grounds are in [`.claude/kb/decisions.md`](.claude/kb/decisions.md); the pitfall list is in [`.claude/kb/pitfalls.md`](.claude/kb/pitfalls.md).
 
-### Performance estimates
+### Capacity and overhead data
 
-Every number comes from an experiment that has been run; read each on its own measurement basis and do not convert between them:
+Existing experiments include measurements and arithmetic models; each value has its own measurement basis: device, workload and format assumptions. They are not throughput, latency or general performance promises for the current complete file system; the comparison table records the full results and limits of historical versions.
 
-- Usable space after formatting: on a 16 GiB disk, 95.2% is usable on a single disk and 47.6% on a two-disk mirror; the default formatting of six other file systems is in the same range (E152 (per-milestone file performance against six file systems), table in [`scripts/experiments/perf-by-milestone.md`](scripts/experiments/perf-by-milestone.md)).
-- Small files: any data under 32 KiB is padded to one 32 KiB unit (E66 (how small files land after padding)). Small-object packing has been decided by D27 (small-data packing container) but is not implemented yet; once implemented, the worst-case padding waste is 11.1% (E120 (choosing the common ratio of a geometric size-class table)).
-- Metadata overhead: the allocation record tree takes about 0.055% of capacity at 32 KiB placements and 90% fill (E74 (allocation record entry count and compaction cost), arithmetic model).
+- Capacity ceiling: in the 16 GiB-per-disk configuration of E152 (Per-Milestone File Performance Against Six File Systems), the unit area occupies 95.2% of one disk; the mirrored pool ceiling is 47.6% of the two disks combined. Trees and accounting consume additional space, so actual usable capacity is lower; this does not imply single-disk mkfs support. Comparison: [`scripts/experiment-apparatus/perf-by-milestone.md`](scripts/experiment-apparatus/perf-by-milestone.md).
+- Small files: each data unit occupies 32 KiB on disk; after the 105-byte header and 29 reserved bytes, its current payload limit is 32634 bytes. Unused space is zero-padded and every unit takes its own space (E66 (How Small Files Land After Padding); implementation: [data-unit construction](crates/singlefs-core/src/unit.rs)). D27 (Small-Data Packing Container) is settled but unimplemented; the 11.1% in E120 (Choosing the Common Ratio of a Geometric Size-Class Table) bounds padding waste for the selected classes, not measured overhead of the current implementation or a complete container.
+- Allocation record tree: the arithmetic model with 32 KiB placements and 90% fill uses about 0.055% of capacity (E74 (Allocation Record Entry Count and Compaction Cost)); this counts that tree alone, excluding other indexes, the journal, snapshots and reserved space.
 
 ## Current status
 
-The current milestone is "sharing and reclamation" ([`.claude/kb/milestone/04-fourth-txn.md`](.claude/kb/milestone/04-fourth-txn.md)); the main body of the previous one, "deletion and repeated COW" ([`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)), is complete, and what remains open is segment 4, "optimization" (2·6, 6·4).
+The current milestone is "sharing and reclamation" ([milestone four](.claude/kb/milestone/04-fourth-txn.md)). A readable and writable two-disk file-system library prototype exists; having core mechanisms does not complete every milestone acceptance condition. The previous stage's handoff is in [milestone three](.claude/kb/milestone/03-third-txn.md).
 
-What it can do: mkfs on two disks; write a file and commit, filling several data units sequentially and reading back by offset; create several files in one publish (no directories); overwrite, release, and reuse a placement once the rollback floor has been raised past it; close and remount as a second writable instance; perform an administrator rollback while mounted; read back after a cold start; overwrite, sequentially write and delete a file by inode number (deletion publishes the deletion intent first, then reclaims its data units in batches); truncate (shrinking publishes an intent first and then reclaims the data units beyond the size in batches; growing and keeping the same size each take one publish); create and destroy read-only snapshots.
+| Capability | Implemented | Current boundary |
+|---|---|---|
+| Formatting and mounting | Two-disk mkfs, writable mount, remount after closing, cold start reads | mkfs currently requires exactly two disks; arbitrary disk counts, RAID5/6 and hot-add are not delivered |
+| Files and content I/O | Create several files in one publish; write by inode number and read by byte offset | No directories; both overwrite and sequential writes replace whole contents from the beginning, with no arbitrary-offset partial-write entry point |
+| Deletion and reuse | Publish a deletion intent, then reclaim in batches; reuse placements after the rollback floor passes them | An inode born after the first file has been fully deleted cannot receive data writes; other files already present before deletion can still be written |
+| Truncation and extension | Shrinking issues an intent and reclaims in batches; extension and same-size requests each take one publish | Actual size changes support inode 1 only; other live inodes accept same-size requests only |
+| Read-only snapshots | Create and destroy snapshots; old blocks retained by snapshots enter the deadlist | At most 10 coexist; the provided snapshot-reading interface reads the first file only; no writable snapshots or clones |
+| Rollback and recovery | Administrator rollback while mounted, journal replay and intention continuation after recovery | Validated through supported library calls and test workloads; no complete POSIX use path |
+| Transaction publication | User changes publish synchronously; one request can contain several per-unit transactions | Time/dirty-byte automatic checkpoints, cross-request batching and mount-time threshold setting are not connected |
+| Compaction and reclamation | Internal paths exist for intentions, region scans, relocation and post-publish discard | The default product path stops before intention issuance because batch size is undecided; test switches driving it do not provide automatic background GC |
+| Index scan rebuild | The checker can scan central-mapping, extent and inode tables into memory and compare them | No general tool rebuilds all trees and writes repairs to disk; livelist and sparse side-table entry writers are still absent |
 
-What it cannot do: it cannot be mounted into the system (no FUSE, no kernel module), has no directories or POSIX interface, and has no writable snapshots, encryption or compression; the entry point for compaction (GC) exists, but the batch-size clause is not yet decided, so the product path stops before it signs a compaction intent. **Do not store any data in it.** The disk format is still soft and may be torn down and redone at any time before the first external user appears ([`.claude/rules/format-evolution.md`](.claude/rules/format-evolution.md)).
+There is no system mounting entry point (FUSE / kernel module), directory or POSIX interface, encryption, compression or small-object packing. The GPU judge serves testing; product GPU GC is unimplemented. Variable-width stripes, automatic compaction and rebuildability in the design table are goals, not evidence of current product capability.
 
-How far verification reaches:
+**Do not store any data in it.** The disk format is still soft and may be replaced at any time before the first external user appears ([format evolution rules](.claude/rules/format-evolution.md)). Future code work and acceptance conditions are recorded under pending optimization at the end of milestone four.
+
+For actual library usage, start with the [multi-inode content-write tests](crates/singlefs-harness/tests/writes_by_inode_number_of_several_files.rs) and [truncation-intention and batch tests](crates/singlefs-harness/tests/truncation_intent_batches_and_final_batch.rs). These are development examples, not file-system commands for everyday use.
+
+### Verification mechanisms and evidence scope
+
+The table lists existing mechanisms and entry points; it does not mean the current workspace has passed every gate:
 
 | Verification | What it judges | Gate |
 |---|---|---|
 | Crash-point replay | Cut the write-request stream into segments at each disk's barriers, enumerate every persistence state inside each segment, build an image for each, and run recovery plus the pool-level checker | checker-tier-crash-point-replay; the full run happens only on user request |
 | Crash amplification | The same enumeration scaled to billions of states: streams are first recorded into the verdict library, then read back and judged; the judge runs on GPUs, sharded across two hosts | `scripts/crash/crash-amplification.sh`, run on user request |
-| Pool-level checker | The 102 invariants marked implemented in the invariant list (`crates/singlefs-checker/invariants/`), the same count as the list in the code | Called by the two rows above |
+| Pool-level checker | The code list `IMPLEMENTED_INVARIANTS` contains 108 entries; applicability depends on the image and prerequisites, so the count does not mean all 108 are fully judged on every image | Called by the two rows above |
 | Model differential testing | Random operation sequences compared step by step with an ideal model that lives only in memory | harness-model-differential-and-scenarios |
 | QEMU real device | A fixed workload on two virtio disks; the writes and FLUSHes recorded on the device side are compared item by item with the stream the program recorded; no crash injection | checker-tier-qemu-device-streams |
 | Memory ordering | herd7 judges every Never under `litmus/`, each paired with a control that drops the barrier | checker-tier-lkmm |
-| Formal verification | Verus verifies the pure-function core of recovery replay that takes the journal prefix, does root selection and the ring scan (`crates/singlefs-replay-prefix`); this same code is what gets compiled into the product | checker-tier-formal-verification |
+| Formal verification | Verus verifies the pure-function recovery prefix, root-selection and ring-scan core used by the product; separate compaction-plan/abstract-model proofs exclude core relocation execution and crashes and are not an end-to-end file-system proof | checker-tier-formal-verification |
 | Mutation | The crates mutation table breaks one place per row and the named test must go red; broad mutation (cargo-mutants) requires a conclusion for every mutant and none left unkilled | checker-tier-crates-mutation-replay, checker-tier-broad-mutation |
 
-How much has been judged: the full run of 2026-10-16 to 2026-10-18 covered 14 crash enumeration cases; the 12 whose logs print a state count total 5,149,586,107 crash states (about 5.15 billion), every state with a verdict under the same key and 0 violations; verdicts are stored in the crash verdict library and reused by function unit key, and the judge runs on the GPUs of two hosts. Case 6 was not rerun on the final tree, and the quick tier judgement of case 12 was changed on the last day. The six heavy gates had one pass on 2026-10-15: herd7 and QEMU (6 VM runs, 123 checks) green, formal verification and the mutation table ran their light tier (2 of 172 mutation rows not red), and broad mutation has no conclusions for this version of the code yet; the numbers of every test are summarized in the "Summary of test data" section of the 2026-10-18 brief.
+The checker returns satisfied, violated, not applicable or partially judged; the latter two are not full satisfaction. Zero violations or zero GPU violation bits do not establish that every applicable clause was fully judged.
 
-**An all-green gate is only evidence of crash consistency at the model level**, not "verified". For how far each item reaches, which items are recorded as not run this time, and what is not covered yet, see the latest file in [`briefs/`](briefs/).
+Targeted audit record: the workspace audit on 2026-10-23 ran 6 harness targets, with 60 passed and 0 failed, covering multi-inode writes, snapshots, truncation fields/batches and internal compaction behavior. It did not rerun the whole workspace, GPU, Verus, QEMU or domain-wide crash validation and is not overall acceptance; commands, limits and logs are in the [code-first audit report](records/2026-10-23-代码先行的工程进度与决策核对.md).
+
+Historical full-run record (not a full-run conclusion for the current workspace): the full run of 2026-10-16 to 2026-10-18 covered 14 crash enumeration cases; the 12 whose logs print a state count total 5,149,586,107 crash states (about 5.15 billion), every state with a verdict under the same key and 0 violations; verdicts are stored in the crash verdict library and reused by function unit key, and the judge runs on the GPUs of two hosts. Case 6 was not rerun on the final tree, and the quick tier judgement of case 12 was changed on the last day. The six heavy gates had one pass on 2026-10-15: herd7 and QEMU (6 VM runs, 123 checks) green, formal verification and the mutation table ran their light tier (2 of 172 mutation rows not red), and broad mutation had no conclusions for that version of the code; test numbers, measurement basis and omissions are in the "Summary of test data" section of the [2026-10-18 brief](briefs/2026-10-18.md).
+
+**An all-green gate is only evidence of crash consistency at the model level**, not "verified". For how far each item reaches, which items are recorded as not run this time, and what is not covered yet, see the [latest brief (2026-10-25)](briefs/2026-10-25.md) (historical briefs in [`briefs/`](briefs/)).
 
 ## System configuration
 
-Mounting starts by reading two 4096-byte slots at offsets 0 and 4096 of each disk. They hold the **system configuration**: a 489-byte structure, one per disk, alternating between the two slots. It is the start of the whole chain (system configuration → root ring → root record → tree table → each index tree → data units), and also the only small piece on disk that cannot be rescued: everything else can be scanned back from self-describing units, but geometry such as where the journal ring is and how large a unit is has no second copy anywhere.
+Mounting reads the **system configuration** from two 4096-byte slots at offsets 0 and 4096 on each disk. The defined structure is 489 bytes and the slots alternate. It supplies the geometry and identity needed by the chain system configuration → root ring → root record → tree table → index trees → data units. Slot redundancy does not provide automatic recovery after all configuration copies are lost.
 
-Its contents fall into four classes: immutable configuration set by the user at mkfs, which needs a new file system to change (389 bytes); mutable configuration whose change only rebuilds indexes without losing data (4 bytes); run configuration that can be reset at every mount (36 bytes); and run quantities the file system maintains itself and the user can never set (60 bytes, changing at every publish, so do not cache them as constants). The field table is in [`.claude/kb/layout/01-first-txn.md`](.claude/kb/layout/01-first-txn.md).
+The format divides fields into four classes; reserved fields do not mean every setting interface or reconstruction mechanism is implemented:
+
+| Format class | Bytes | Current implementation boundary |
+|---|---:|---|
+| Immutable configuration | 389 | Format, layout and geometry identities; only some values have mkfs parameters, not every field is tunable |
+| Mutable configuration | 4 | Index-node size; currently implemented as a 16 KiB constant, without a general product entry point to resize and rebuild indexes |
+| Runtime configuration | 36 | Time, dirty-byte and compaction-watermark fields use defaults; mount-time setting and corresponding automatic triggers are absent |
+| Runtime quantities | 60 | Generations, watermarks and other state maintained by the file system and updated by the relevant publications; users cannot set them directly |
+
+Self-describing units support scanning and cross-checking; current reconstruction reads some index tables into memory, not all metadata into a repaired on-disk file system. Full fields and compatibility conditions: [byte layout table](.claude/kb/layout/01-first-txn.md).
 
 ## Contributor governance
 
-> **Implementation That Favors the AI, Review That Favors the Human.**
+> **Implementation That Favors the AI, Review That Favors the Human (AI-friendly in implementation, human-friendly in review).**
 >
-> **Make every submitted patch review-worthy.**
+> **Make every submitted patch review-worthy (ensure every submitted patch is worth reviewing).**
 >
-> **Contribution throughput may be unbounded; acceptance throughput is evidence-bound.**
+> **Contribution throughput may be unbounded; acceptance throughput is evidence-bound (contribution throughput may be unbounded, while acceptance throughput is constrained by evidence).**
 
 The gate does not exist to keep anyone out. It exists to raise every submission to the line where it is worth a human's time: the mechanical part goes to scripts, and human attention goes to what only a human can judge.
 
@@ -94,10 +123,16 @@ Three hard requirements:
 3. **Unimplemented verification must not pretend to pass.** The gate lists the stages that are not wired in yet; green only means the implemented part passed.
 
 ```bash
-bash .claude/scripts/gate.sh                                  # full gate round: shared stages plus the project stages in .claude/gate.d/
-cargo test -p singlefs-harness                                # harness tier: unit and integration tests, run any time after a change
-bash scripts/hosts/run-with-memory-cap.sh <cap> bash scripts/crash/crash-point-replay.sh --quick   # light-tier crash-point replay
+SINGLEFS_RUN_SCOPE='种类=target; 跑什么=多inode内容写测试; 范围=1 个测试目标; 为什么=验证README的库级使用入口' \
+bash scripts/hosts/capped.sh default \
+bash scripts/hosts/run-with-memory-cap.sh 12G \
+bash scripts/hosts/run-build-directory.sh \
+cargo test -p singlefs-harness --test writes_by_inode_number_of_several_files
+
+bash scripts/crash/crash-point-replay.sh --list-items
 ```
+
+The example runs one harness target. 12G is the example memory cap; the project registry supplies thread counts and the wrapper cleans the temporary build directory. `--list-items` lists registered cases without running validation. Choose other targets by change scope; resource prerequisites, scope declarations and full pre-commit gate commands are in the [commit workflow](.claude/skills/gate/staged-gate.md).
 
 The checker tier (crash enumeration cases, QEMU, herd7, mutation tables, formal verification, broad mutation) runs by default only at commit time, with `SINGLEFS_HEAVY_TESTS=commit` on the command; the full run of crash-point replay and of crash amplification happens only on user request. What counts as heavy, and how the light tier and heavy tier are split, is in [`.claude/rules/verification.md`](.claude/rules/verification.md).
 
@@ -120,7 +155,7 @@ cd singlefs
 rsync -a --exclude '.git' --exclude CLAUDE.md ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/
 diff -rq --exclude=.git --exclude=CLAUDE.md ../singlefs-ai-sop-zh .claude/singlefs-ai-sop   # no output means the copy is complete
 bash .claude/singlefs-ai-sop/install.sh     # refresh the version stamp .singlefs-ai-sop-version
-bash .claude/scripts/gate.sh
+bash scripts/crash/crash-point-replay.sh --list-items
 ```
 
 After an upstream release, copy again with the same `rsync` and run `install.sh` again. **Rule changes go to the upstream repository**; do not edit `.claude/singlefs-ai-sop/` in place.
@@ -145,7 +180,7 @@ After an upstream release, copy again with the same `rsync` and run `install.sh`
 | [`.claude/gate.d/`](.claude/gate.d/) | Project-local gate stages and the registry files they read |
 | [`.claude/agents/`](.claude/agents/), [`.claude/hooks/`](.claude/hooks/), [`.claude/skills/`](.claude/skills/) | Subagent definitions, Claude Code hooks, skills |
 | `.claude/singlefs-ai-sop/` | Copy of the shared specification and gate scripts, git-ignored, fetched in "Getting started" |
-| [`research/`](research/) | Three-way review material and verdicts (`prompts/`) and retained experiment artifacts (`results/`); both can be deleted wholesale and fetched again |
+| [`research/`](research/) | Three-way argument materials and verdicts (`prompts/`), retained experiment artifacts (`results/`), for tracing design and validation evidence |
 | [`records/`](records/) | The construction process |
 | [`briefs/`](briefs/) | A brief per update, one per date: what that version can do, how far it is verified, and what is not covered yet. Each brief has Chinese (default), English (`.en.md`) and Japanese (`.ja.md`) versions |
 

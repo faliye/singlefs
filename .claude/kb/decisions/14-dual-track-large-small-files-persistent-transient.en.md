@@ -1,0 +1,154 @@
+## D14 Dual-Track: Large/Small Files & Persistent/Transient —— Settled
+
+[中文](14-双轨大小文件-持久临时.md) · **English** · [日本語](14-大小ファイル・永続-一時デュアルトラック.ja.md)
+
+D14 (Dual-Track: Large/Small Files & Persistent/Transient) governs which layer "track-splitting by object" lands on: track splitting on the large/small file and persistent/transient axes lands only in the two layers of allocator hints and small file inlining into inodes, with no format-level second track (Settled Item 6). In the first version, both layers are empty: allocator hints are not implemented (Settled Item 2), and the inline threshold is set to 0 (Settled Item 3). D14 (Dual-Track: Large/Small Files & Persistent/Transient) forbids using literature or other projects' outcomes as evidence; derivations and verifications must be done in-house. What it does not govern: how objects smaller than one allocation unit save space belongs to D27 (Small-Data Packing Container)—write path pads as usual (D4 (Checksum Location) Settled Item 1 / 5: units are 32 KiB with header; a 4 KiB file occupies 32 KiB), background compaction moves objects ≤ 4 KiB into shared containers, which adds a new unit class rather than a new track; how large an allocation unit itself is belongs to parameters in D12 (Target Media) / D19 (Block Pointer Structure & Width Budget) and cannot be settled solely by space utilization (E20 (CPU Cache Cost of Widening Pointers) measured that pointer width on small nodes nearly doubles CPU cache costs); objects ≥ one allocation unit do not constitute a problem; whether persistent/transient can serve as a criterion for D11 (Message Buffers in Index Nodes) belongs to D14 (Dual-Track: Large/Small Files & Persistent/Transient) Settled Item 4.
+
+### Settled Items
+
+| # | Item | Decision |
+|---|---|---|
+| 1 | **Settled · Question invalid · Number no longer used** | Question invalid: Reference 3 which it wants recomputed cannot move any settled clauses under D14 (Dual-Track: Large/Small Files & Persistent/Transient) measurement basis; this number is no longer used **Status: Settled.** **Progress: No code object.** |
+| 2 | **Formulation of allocator hint criteria** | Allocator hints not implemented in first version; placements follow D3 (Space Allocation) Settled Item 8, criteria column written as "None"; three reopening conditions **Status: Settled.** **Progress: Implemented.** |
+| 3 | **Inline threshold setting** | 0, meaning no inlining; criterion is atomicity, not performance **Status: Settled.** **Progress: Implemented.** |
+| 4 | **Whether "persistent/transient" is the missing criterion for D11 (Message Buffers in Index Nodes)** | No: asynchronously flipped from outside operation scope, not a qualified branching variable **Status: Settled.** **Progress: No code object.** |
+| 5 | **Settled · No code object · Number no longer used** | No code object: with inline threshold at 0, the "inline -> extent" step does not exist; reverts immediately to unsettled if threshold changed to non-zero **Status: Settled.** **Progress: No code object.** |
+| 6 | **Which layers track-splitting lands on** | Lands only on allocator hints and small file inlining into inodes, no format-level second track: no second checksum semantics, no second accounting ledger, no second recovery semantics **Status: Settled.** **Progress: Implemented.** |
+
+#### Settled Item 1: Settled · Question invalid · Number no longer used
+
+**Settled**: Question invalid, this number no longer used. Original issue: Reference 3 must be recomputed under the premise of "day-1 multi-track compatibility". Two sentences in the same file contradict each other: the object of recomputation is **Reference 3**, whereas D14 (Dual-Track: Large/Small Files & Persistent/Transient) own measurement basis dictates that references **must not be used to support or refute D14 (Dual-Track: Large/Small Files & Persistent/Transient)**, serving only as checklists for D-1 (exhausting inversion entry points) / D-2 (deriving the six skipped items one by one) => regardless of outcome, recomputation cannot move "no format-level second track", yet its verdict text claimed "if recomputation flips, that overrules a settled clause". Modifying new-pool file creation bytes: no.
+
+**Scope**: D15 (Format Freeze Policy) cell requires no modification by D14 (Dual-Track: Large/Small Files & Persistent/Transient): item 7 on freeze checklist verbatim reserves the branch "or explicitly state v1 does not contain this feature", which is what D14 (Dual-Track: Large/Small Files & Persistent/Transient) Settled Item 6 v1 clause follows; "how to add things post-freeze" resides in D15 (Format Freeze Policy) three settled sections, not D15 (Format Freeze Policy) Settled Item 1.
+
+**Basis**:
+
+- No experiments: self-contradictory formulation, textual judgment without measurable quantities.
+- User settlement: original words in changelog.
+
+**Owed**: None.
+
+#### Settled Item 2: Formulation of allocator hint criteria
+
+**Settled**: Five sentences—
+
+1. **Allocator hints not implemented in first version**: user data placements strictly follow D3 (Space Allocation) Settled Item 8 (lowest slot number within chosen device, passing acceptance conjunction, outside `R` protection period); allocator reads no hints about objects; criteria column written as "None", and three clauses (no disk persistence, re-evaluated per allocation, zero format bits) along with five hard requirements pass vacuously.
+2. **Three independent rationales, none relying on performance numbers**: ① D8 (Core Index Structure) Settled Item 3 states verbatim "first version has no directories", `locality_id` is 0 in first version => directory-based criteria have no input in first version, and bytes written are identical whether implemented or not; ② criteria set is unsolvable under existing clauses—the "no disk persistence" clause disqualifies all criteria derived from on-disk fields (suffix tables, parent directories, `locality_id`), while remaining arrival order / publish batch (Arm G) placements are preempted by D3 (Space Allocation) Settled Item 8 clause 1; ③ mechanism constraint "inherited once at creation, never altered thereafter" conflicts with clause "re-evaluated per allocation" (two sentences in same item), so this cell is not "waiting for performance data", but requires criteria closure first.
+3. **Three reopening conditions, each verifiable**: ㈠ Directories actually exist after first version, and D8 (Core Index Structure) Settled Item 3 clause on "what to take when no parent directory exists" is settled; ㈡ "no disk persistence" clause itself reopens or narrows scope (before narrowing, directory-based / suffix-based criteria need not be measured); ㈢ D3 (Space Allocation) Settled Item 8 clause 1 reopens (it uniquely determines first version placements, and any hint is incompatible with it). When reopening, judge compaction destination side together (fixed home makes compaction destination most dispersed by construction, falling into D26 (Background Compaction and Placement Reclamation) Settled Item 5 ② 370x worst case).
+4. **"Fixed home + retain N₀" registered as measured clue, not candidate**: E151 (Arrival Order of User Data Placement Points and Container Arms) runs 4/5—fixed home directory hints pin each directory within 2 segments (directory traversal segments 54%–55% of subtractor arm); retaining 24 tail segments on uniform for commit-endogenous blocks allows recovery to 0 with zero locality drop; on runs8, no overflow segment count achieved both "retaining segments" and "≤ 3 segments per directory"—locality and all-empty segment supply compete for the same segments. Hints following members disperse almost identically to subtractor arm under aging (97%–99%).
+5. **E122 (Benefits Bought by Directory-Based Grouping) three arms mapping to subtractor arm**: `grouped` (same directory contiguous) is the initial condition of E151 (Arrival Order of User Data Placement Points and Container Arms) and corresponds to no arm; `arrival` corresponds to uniform permutation arm of E151 (Arrival Order of User Data Placement Points and Container Arms); `random` has no correspondence. The two gain cells of E122 (Benefits Bought by Directory-Based Grouping) drop to 0 on uniform under aging, and only 12 / 256 remain on runs8 (32-slot blocks holding only one directory).
+
+Modifying new-pool file creation bytes: no—allocator hints have zero format bits, and new-pool file creation placements are governed by D3 (Space Allocation) Settled Item 8.
+
+**Scope**:
+
+- Criteria must satisfy not only hard requirement 1 (explicit, computable, documented) and hard requirement 2 (test-enforced entry), but also the three sub-clauses recorded for this layer in Settled Item 6, **passing all three clauses**: **no disk persistence**—criteria must not be on-disk fields, which is stricter than "zero format bits": an on-disk field **already paid for other reasons** adds 0 bytes yet still lands on disk; **re-evaluated per allocation**—criterion value must be recomputable on every allocation, representing the opposite extreme of a tradeoff with hard requirement 5: forms satisfying hard requirement 5 via "fixed once at creation, never altered" violate this clause; **zero format bits**—adds no on-disk bytes.
+- Mechanism constraint if implemented in the future: can only adopt "inherited once at creation, never modified thereafter"; querying current filename / current directory on every allocation is directly defeated by rename and hardlink.
+- "Suspected short-lived" half remains entirely blank project-wide: "short-lived / lifetime" appears 0 times across D25 (Target Workload Priority).
+- Disqualified candidates—Arm A (suffix table), Arm B (explicit upper-layer hint), criteria taking `locality_id`, Arm G (arrival order / publish batch)—each have disqualification reasons in three-way verdicts and three records; Arm A had one retracted basis without being revived (invalidation of retraction reason does not resurrect retracted conclusions).
+
+**Basis**:
+
+- E151 (Arrival Order of User Data Placement Points and Container Arms): runs 4/5 measured two directory-clustering hint arms against subtractor arm under identical aging models—member-following arm dispersed almost identically to subtractor arm; fixed home pinned directories, but on runs8 locality and all-empty segment supply competed for the same segments, with no overflow segment count satisfying both.
+- Three-way argument: three rounds, verdict in `research/prompts/d14-r3-main-verification.md`, process in [records/2026-09-07-D14项2第一轮.md](../../../records/2026-09-07-D14项2第一轮.md), [records/2026-09-09-D14项2第二轮.md](../../../records/2026-09-09-D14项2第二轮.md), [records/2026-09-13-D14项2第三轮.md](../../../records/2026-09-13-D14项2第三轮.md); in round 3, criteria ③④⑤ hit hint arms, criterion ① semi-hit, criterion ② hit uniform but missed runs8, with all three legs unanimous.
+- User settlement: original words in changelog.
+
+**Owed**: C65 (Contradiction on Whether Allocator Hints Are Persisted): still owed gate check, judged together upon reopening.
+
+#### Settled Item 3: Inline threshold setting
+
+**Settled**: Inline threshold 0, meaning no inlining. **Small files strictly take independent data extents** (padded to 32 KiB per D4 (Checksum Location) Settled Item 2), **never inlined into index nodes, not a single byte inlined.**
+
+**Criterion is atomicity, not performance.** Inlining crowds **data from multiple files into the same index node** => writing to one file disrupts the atomic unit of other files on the same node. This shares the **exact same coupling shape** as the `pack` arm (multiple small files sharing one data unit) disqualified in E66 (How Small Files Land After Padding), merely swapping containers. Atomicity is henceforth the criterion of this item itself, not merely the rationale for this choice: **any future proposal to raise inline thresholds must first pass the gate of "multiple files sharing an atomic unit"**, which performance figures cannot answer.
+
+**Cross-file tail packing** on the write path is likewise **rejected**: two files sharing a unit => writing one requires COW of entire unit => **pointers of the other file must also change**, **instantly violating "unit self-containment" in D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment).** Raising inline threshold is essentially tail packing where the container is a btree leaf rather than a bare block => reduces to this item, which is set to 0 => path not enabled.
+
+**Scope**:
+
+- Answer for packed record units (D8 (Core Index Structure) Settled Item 6): packing inode records into Code 3 leaf containers has 233 objects sharing a 32 KiB unit, identical in shape to inlining, answered not by performance numbers—packed record unit class registered in D18 (Information Carried in a Block) Settled Item 11 was created specifically for "multiple objects sharing a self-describing unit", having its own identity (birth tree, type, container number, birth gen) and payload checksum, where one object's record does not self-verify via another object; under COW, updating one object writes a new container version leaving the old untouched, with atomicity per publish without tearing other objects; file data remains uninlined. Remaining debts are cost (E103 (Update Cost of Inode Packing Path 1) measured 1.25–1.5x per single update) and blast radius (C100 (Inode Container Loss Is Permanent With No Redundancy Clause Covering It)), both tracked.
+- Answer for data-side background packing containers resides in scope of D27 (Small-Data Packing Container) Settled Item 10: under "moving out" form, writing one object does not COW the container at all, so the rejection rationale for cross-file tail packing cannot reach it; that rejection remains untouched.
+- Costs knowingly accepted (measured on E66 (How Small Files Land After Padding) and E68 (Selection of Inlining Threshold) pages, not basis for this item): space-wise, a 512 B file occupies **64x** (padded to 32 KiB), 1 KiB occupies 32x; point read slower than inlining, magnitude unsettled—E66 (How Small Files Land After Padding) asymmetric accounting gives 16.6%, symmetric accounting gives 54.5% (leaf miss) to 100% (leaf hit); cache-wise, E68 (Selection of Inlining Threshold) read model indicates inlining is 10% better at 16 MiB+ cache tiers; data bytes saved on knowingly abandoned path shown in positive control of E8 (Different Write Paths for Large vs Small Files) (4096 files of 64 B pay 16 MiB on unsegregated arm, 0 bytes on inline arm).
+- Gains in return: metadata working set does not expand (inlining inflates per-file 64 B -> 89 B, leaf count 1.40x); and **cross-threshold migration path vanishes entirely**—with threshold at 0, "inline -> extent" does not exist, so constraint recorded in E8 (Different Write Paths for Large vs Small Files) "threshold is not a qualified branching variable" ceases to apply (it barred "append writes crossing threshold mid-operation"). The first write also takes RMW and reads the residue of the new slot once (D4 (Checksum Location) settled item 3 scope; C385 (two settled items contradict each other on whether the first write needs a read-back) settled by the user on 2026-10-26 as "the first write also reads back"), so the write side does not count the gain "the first write needs no RMW".
+
+**Basis**:
+
+- No experiments: criterion is atomicity (multiple files sharing an atomic unit), a structural judgment unanswered by performance figures; costs and gains columns merely establish that this decision incurs no massive performance penalty, not serving as basis.
+- User settlement: original words in changelog.
+- User settlement 2026-10-26: C385 (two settled items contradict each other on whether the first write needs a read-back) "the first write also reads back"; the gain "the first write needs no RMW" is removed from the gains column (original wording in history; review table of verdict `research/prompts/m4-partial-write-r1-main-verification.md`).
+
+**Owed**: C385 (two settled items contradict each other on whether the first write needs a read-back); C100 (Inode Container Loss Is Permanent With No Redundancy Clause Covering It).
+
+#### Settled Item 4: Whether "persistent/transient" is the missing criterion for D11 (Message Buffers in Index Nodes)
+
+**Settled**: No, judged invalid. This criterion is asynchronously flipped from outside operation scope by `linkat` / `fsync` / snapshot / `rename` (Reference 1) => violating hard requirement 5 of .claude/rules/fs-design.md "branching variables must not alter mid-operation", **not a qualified branching variable**.
+
+**Scope**: Excludes only one candidate without answering the question of D11 (Message Buffers in Index Nodes) itself; that question is answered by D11 (Message Buffers in Index Nodes) Settled Item 6: layout axis does not branch, tree axis branches by "can pending flush messages be recomputed solely from authoritative state".
+
+**Basis**:
+
+- No experiments: external flipping is a derivation from POSIX semantics—entry points listed in Reference 1 are all operations promised as O(1) or atomic by POSIX, and asymmetric conclusion in Derivation D-3 (multi-track compatibility criteria) expresses the same reality without measurable quantities.
+- User settlement: original words in changelog.
+
+**Owed**: None.
+
+#### Settled Item 5: Settled · No code object · Number no longer used
+
+**Settled**: No code object, this number no longer used. Original issue: crash semantics of the bounded transaction for inline -> extent. After Settled Item 3 fixed the inline threshold to 0, the "inline -> extent" step does not exist => this item **has no code object**, rather than "insufficient evidence". Following precedent of D9 (Encryption) Items 7 / 9, proper disposition is **changing to settled and specifying no code object**, retaining number without recycling. Modifying new-pool file creation bytes: no code object.
+
+**Scope**: If inline threshold changes from 0 to non-zero in the future, this cell **reverts immediately to unsettled**: at that point "inline -> extent" re-emerges while its crash semantics remain unverified.
+
+**Basis**:
+
+- No experiments: no code object to measure; step does not exist when threshold is 0.
+
+**Owed**: None.
+
+#### Settled Item 6: Track-splitting lands only in two layers, no format-level second track
+
+**Settled**: Track splitting **lands only in these two layers, with no format-level second track**—no second checksum semantics, no second accounting ledger, no second recovery semantics.
+
+| Layer | Function | Why it owes no debt |
+|---|---|---|
+| **Allocator hints** | Clusters small file blocks together; places suspected short-lived data into regions expected to release en masse | No disk persistence, re-evaluated per allocation, **zero format bits**. Basis for this layer reduces to these three sub-clauses, criteria must pass all three (Settled Item 2) |
+| **Small file inlining into inode** | Inlines data small enough to fit remaining inode space | **Migration bounded by construction** (≤ remaining inode space), "inline -> extent" is a bounded transaction, avoiding intent log requirements of D8 (Core Index Structure) for unbounded operations, one bit per inode suffices |
+
+v1 contains no format-level second track and reserves no bits; if v2 implements it, a new layout opens via incompat—following the branch "explicitly state v1 does not contain this feature" in item 7 of D15 (Format Freeze Policy) pre-freeze checklist, with padding width 0.
+
+Any future multi-track proposal is judged per day-1 multi-track compatibility criteria (Derivation D-3 (multi-track compatibility criteria)). **Strongest form is "tracks reduce commitments only, never modifying encoding"**: track fields only downgrade durability commitments, never changing byte layout; decidable form (if adopted, opened in [invariants/README.md](../../../crates/singlefs-checker/invariants/README.md)): **after zeroing track field of any pointer, it must remain byte-for-byte parseable by single-track parser, with checksum / MAC / nonce / birth txg / reverse index semantics identical verbatim.** Under this form, inode tracks are **not stored**, derived as infimum over all its extent tracks => hybrid state naturally valid, "migration" degenerates to flipping two bits merged with the transaction already rewriting pointers, with **no data movement, no re-encoding, and no MAC recomputation**.
+
+| # | Four Criteria (All Design-Time Constants) | How Judged |
+|---|---|---|
+| 1 | **Track fields reduce commitments only, never changing encoding** | Zeroed field remains byte-for-byte parseable by single-track parser. Written as invariant, checker-decidable, provably red (construct asymmetric-width dual-track image) |
+| 2 | **Each reduced commitment can be written as predicate reading only the pointer's own fields** | Pin predicate signature to `fn(&Pointer) -> bool`, extra parameter triggers red |
+| 3 | **Track determined at object creation, immutable thereafter** | Enumerate all entry points modifying tracks, set must be empty |
+| 4 | **D12 (Target Media) and D6 (Snapshot Implementation Model) settled** | Track contends for **same ordering priority** with nonce carrier, snapshot ID, locality_id |
+
+**Criterion 3 carries all the weight of decidability**: a durability track "fixed at birth, immutable thereafter" is an irrevocable declaration, **automatically disqualifying persistent/transient axis without relying on historical induction.** This project already possesses a day-1 multi-track satisfying all four criteria: algorithm type field for each data/metadata write reserved in D9 (Encryption)—reducing commitments without modifying encoding (old data decoded per respective field), predicate reading write itself, **immutable once written**. Hence an asymmetric conclusion: day-1 multi-track helps **large/small axis** significantly (flipping caused by operation itself, mergeable into same transaction), while helping **persistent/transient axis** not at all (flipping originates outside operation scope). **What day-1 buys is precisely formulated as: formats survive flipping; operations cannot.**
+
+<!-- doc-lint:registry name-col=2 -->
+
+| Derivation | Short Name | What It Derives | Status |
+|---|---|---|---|
+| D-1 | Exhausting Inversion Entry Points | Enumerate all entry points altering "object -> track" mapping (criterion from hard requirement 5 of `.claude/rules/fs-design.md`): one line per syscall / internal event, detailing what it modifies, whether modifications are atomic, how mid-operation failures resolve, whether it can be prohibited; known entry points include at least `linkat` / `rename` / `fsync` / snapshot capture / hardlink / mmap dirty writeback / quota settlement / `truncate` / `fallocate` | Exhaustive table not yet derived, exhaustiveness unproven |
+| D-2 | Deriving Six Skipped Items One by One | Derive for each of six "skipped items" (snapshot visibility, deadlist accounting, Merkle tree chain, nonce, recovery commitments, reverse index) whether it can be judged from a single image; undetectable => requires on-disk fact => falls into accepted format branch budget of D12 (Target Media), rather than opening new debt | Verification half (measuring each "skipped item" individually, flip migration slope) belongs to E11 (Dual-Track: Gains and Flip Cost, Measured Directly), unrun: Settled Item 6 implements no format-level second track, so dual tracks are unimplemented, run only if v2 proposes format-level second track |
+| D-3 | Multi-Track Compatibility Criteria | Day-1 multi-track compatibility criteria, independent of historical induction | Completed derivation, four criteria and asymmetric conclusions written into settlement |
+
+**Scope**:
+
+- Allocator hint layer retracted "misprediction loses only locality": misprediction leads directly to ENOSPC (acceptance inequality counts "unreclaimable" into available space, D28 (Mount-Time Commitments) Settled Item 1, originally in D3 (Space Allocation) Settled Item 4), becoming mandatory moved bytes (halting predicate in D26 (Background Compaction and Placement Reclamation) Settled Item 1), with D3 (Space Allocation) Settled Item 5 serving as measured precedent; hence that layer reduces to three clauses, whose validity is answered by D14 (Dual-Track: Large/Small Files & Persistent/Transient) Settled Item 2.
+- Inlining layer's "migration bounded by construction" bounds **migration magnitude**, not **criterion stability** (appends cross threshold mid-operation); the latter is eliminated by Settled Item 3—inline threshold at 0 leaves no threshold to cross.
+- Recomputing six "skipped items" per Derivation D-3 (multi-track compatibility criteria) criteria: truly cheaper item is **deadlist alone** (I-3.1 (Allocated Statistics Match) transforms from scalar equation to "track-bucketed vector equation + scalar contraction", with discriminative power **net increased**, catching entire class of "correct total, wrong classification"); two items are "saving 0 bytes with veto power removed" (reverse index) and "marginally cheaper" (recovery commitments); remaining three (snapshot visibility, Merkle, nonce) yield net savings of 0. ⚠️ The mechanism enabling the first three is precisely "letting transient track save nothing"—this design eliminates cost by eliminating gains.
+
+**Basis**:
+
+- Basis 2 (in-house derivation): the only two irrevocable declarations are achieved by barring inversion entry points, not by designing stable variables—`O_TMPFILE | O_EXCL` (`man 2 open`: "Specifying O_EXCL in conjunction with O_TMPFILE **prevents a temporary file from being linked into the filesystem**", at the cost that the file can never have a name) and independent subvolumes / mount points (cross-boundary `rename` returns `EXDEV`, not per-file); once cordoned off, the original appeal of "transient files transparently taking fast path" disappears, and O_TMPFILE expresses "this name does not exist yet", not "this data is transient".
+- Derivation D-3 (multi-track compatibility criteria): `linkat` is O(1) under POSIX; linking an object with 1 TB of temporary extents into directory tree makes eager relabeling an O(N) metadata rewrite invalidating O(1) promise, lazy relabeling introduces in-flight derived state "unrelabeled" lacking draining contract and staleness detection of D11 (Message Buffers in Index Nodes) Settled Item 3 / 5, and intent log relabeling recovers by discarding data of a successfully linked file when crash falls after return and before relabel completion—the root cause is not retrofit, but "commitment inversion originating outside operation scope".
+- E8 (Different Write Paths for Large vs Small Files): inlining gains concentrate at ≤ threshold while costs fall on read side, and append writes cross threshold mid-operation—"migration bounded by construction" answers only magnitude.
+- Other file system records (References 1, 3, 4, 5: no stable branching variables during operations on either axis, zero of six skipped items in purely behavioral branch, 16x verification cross-product, no file system in history successfully shipping format-level transient track) **must not be used to support or refute D14 (Dual-Track: Large/Small Files & Persistent/Transient)**; they serve solely as checklists for D-1 (exhausting inversion entry points) / D-2 (deriving the six skipped items one by one), original text in changelog.
+- User settlement: original words in changelog.
+
+**Owed**: C392 (Exhaustive Table of Dual-Track Flip Entries Not Derived): exhaustive table for Derivation D-1 (exhausting inversion entry points) not derived (v1 does not build second track, needed only if proposed in v2); C210 (Nobody Has Judged Which Kind of Extension the Three 'Second Sets' Are).
+
+## Historical Versions
+
+Historical entries for D14 (Dual-Track: Large/Small Files & Persistent/Transient) are collected in [decisions-history.md](../decisions-history.md).

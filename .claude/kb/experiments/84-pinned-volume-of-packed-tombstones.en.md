@@ -1,0 +1,72 @@
+## E84 Pinned Volume of Packed Tombstones — Run (2026-09-02, Counting Model, 9 Unit Tests / All 7 Mutations Caught): **Under Inter-Generation Mixing in Sparse Deletion, 84% of Live Tombstone Units Are Dead Records; Cohort-Bound Loading Invariably Yields Zero Pinning**
+
+[中文](84-打包墓碑的钉住量.md) · **English** · [日本語](84-パックされた墓石の固定量.ja.md)
+
+D18 (Information Carried in a Block) settled item 10 settled tombstones as "range records + packed shared units", with initial reclamation rule
+"purged along with snapshot deadlist cadence", acknowledging pinned volume owed an experiment (the remaining half of C84 (Nobody Has Settled the Granularity of Tombstone Units)).
+E84 (Pinned Volume of Packed Tombstones) evaluated both loading disciplines — sharing identical structural shape with D2 (RAID Stripe Policy)
+"never allow two objects with different lifecycles to share the same physical mapping unit":
+**the lifecycle of a tombstone record is the death queue (snapshot cohort) to which it belongs**.
+
+### Criteria (Hardcoded Before Run; Denominator of Criterion 4 Revised Once During Pilot Run, Documented in Source Header Prior to Formal Ingestion)
+
+1. Hand-calculated anchors (CAP=8 small scenario pinned cell-by-cell); 2. Audit conservation (runtime counters vs closing per-unit recalculation,
+stuck + live + reclaimed == total); 3. stuck for cohort_bound invariably 0;
+4. **Resident dead ratio** of append_order (stuck / (stuck+live)) monotonically decreases with record count per cohort
+(⚠️ initial draft used cumulative dead as denominator, unconditionally diluted over runtime without measuring steady state — revised to resident measurement basis);
+5. Settlement of loading discipline belongs to D18 (Information Carried in a Block), submitting figures only.
+
+### Measurement (CAP=584 Records/Unit, One Cohort per 10 Publishes, Retaining 8 Cohorts, 4000 Publishes)
+
+| Records per Cohort | append_order (Full Pack Then Swap) | cohort_bound (Close Unit at Cohort Boundary) |
+|---|---|---|
+| 10 (sparse deletion) | Resident dead ratio **84.1%** (422/502) | **0%**, 8 live units |
+| 60 | 25.0% | 0% |
+| 600 | 8.3% | 0% |
+| 6000 | 0.5% | 0% |
+
+Three conclusions:
+
+1. **Sparse deletion is worst-case cell**: one unit spans ~58 cohorts, lifespan pinned by the youngest record —
+   over 80% of bytes inside surviving tombstone units are records already eligible for reclamation.
+2. **Loading discipline eliminates pinning entirely**: forcing unit close at cohort boundary ⇒ one unit packs only identical cohorts ⇒ cohort death equals unit death.
+   Cost is merely one unfilled open unit per live cohort (retaining 8 cohorts = odd fragments across 8 live units).
+3. Open units are not reclaimed even if fully dead (still being appended to; reclamation requires sealing first) — direct manifestation of reclamation granularity = unit,
+   pinned by unit tests (including constructed scenario where "deletion stream halts").
+
+⇒ **Candidate supplement for D18 (Information Carried in a Block) settled item 10** (adopted by user settlement, written into loading discipline of D18 (Information Carried in a Block) settled item 10):
+load tombstone units by cohort — close open units at cohort boundaries, avoiding inter-cohort mixing.
+
+### Failure Clauses (Hardcoded Before Run)
+
+Criteria 1–4 all hit. Invalidation not triggered.
+
+### What It Cannot Answer
+
+Counting model, 0 file operations. Deletion stream is constant speed; "purged along with deadlist cadence" coarsely modeled as "cohort destroyed ⇒ records in cohort
+reclaimable"; CAP=584 relies on 56-byte record width assumption from E83 (Granularity of Tombstones); D18 (Information Carried in a Block) settled item 24 settled v1 at 40 bytes (capacity 815), this page not re-run alongside it.
+
+### Measurement Basis and Re-run
+
+- Code `scripts/experiment-apparatus/e84_tombstone_pinning.rs`
+  (`cargo run --release --bin e84-tombstone-pinning`),
+  raw output `e84-tombstone-pinning-2026-09-02.out` (10 lines, ending with line `emitted=10`).
+- Deterministic model, identical md5 across 5 rounds. **9 unit tests, all 7 mutations hit one-by-one, 0 blind spots**,
+  mutation table `scripts/mutation/tables/e84_tombstone_pinning.tsv`
+  (`bash scripts/mutation/mutate.sh e84-tombstone-pinning scripts/experiment-apparatus/e84_tombstone_pinning.rs scripts/mutation/tables/e84_tombstone_pinning.tsv`).
+
+### Impacted Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D18 (Information Carried in a Block) settled item 10 | Support | 2026-10-01 unaffected: added note that v1 tombstone record settled at 40 bytes (D18 (Information Carried in a Block) settled item 24); this page ran on 56 bytes without re-run; conclusions, figures, and artifact unchanged |
+| D2 (RAID Stripe Policy) | Does not affect | 2026-10-01 unaffected: added note that v1 tombstone record settled at 40 bytes (D18 (Information Carried in a Block) settled item 24); this page ran on 56 bytes without re-run; conclusions, figures, and artifact unchanged |
+
+## Historical Versions
+
+### 2026-09-03
+- Packing capacity CAP updated from 584 to **583** (recalculated alongside E83 (Granularity of Tombstones) per 91-byte unit header of D18 (Information Carried in a Block) settled item 7): sparse deletion resident dead ratio 83.9% (416/496) → **84.1% (422/502)**; on 2026-09-04 D18 (Information Carried in a Block) settled item 11 settled tombstone container header at 93, capacity remains 583, number untouched,
+  absolute anchor 416→422. **Both conclusions unchanged**: resident bytes during mixing are predominantly dead records, cohort-bound loading invariably 0.
+  9 unit tests re-pinned, all 7 mutations caught again, artifact `e84-tombstone-pinning-2026-09-03.out`.
+
+Historical entries for E84 (Pinned Volume of Packed Tombstones) are concentrated in [experiments-history.md](../experiments-history.md).

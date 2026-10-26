@@ -1,6 +1,6 @@
 ## E38 记账结构 COW 还是原地 —— 已跑（2026-08-29）；⚠️ 恢复代价那一栏已撤回（2026-08-30）
 
-**中文** · [English](38-记账结构COW还是原地.en.md) · [日本語](38-记账结构COW还是原地.ja.md)
+**中文** · [English](38-accounting-structure-cow-vs-in-place.en.md) · [日本語](38-記帳構造-COW-かインプレースか.ja.md)
 **它问的是**：D22（单元原子性怎么合成） 已定项 3 的方向定案「取 COW、挂父指针下」，
 理由是「单元自包含 ⇒ 父指针那条路不需要额外的定位约定」——**这一步是推论，没测过。**
 
@@ -100,7 +100,7 @@ COW 那一侧**恒为 0**。
 写量从 110 000 降到 80 000 ⇒ 模型确实在量 COW 那部分代价。
 
 **口径**：10 000 次提交 × 每次 8 叶；池 4 GiB / 64 GiB / 1 TiB 三档 × 四档树几何 × 两种摊法。
-代码 `scripts/experiments/e38_accounting_copy_on_write.rs`
+代码 `scripts/experiment-apparatus/e38_accounting_copy_on_write.rs`
 （`cargo run --release --bin e38_accounting_copy_on_write`），
 原始输出 `e38-accounting-cow-2026-08-29.out`，
 变异表 `scripts/mutation/tables/e38_accounting_copy_on_write.tsv`。

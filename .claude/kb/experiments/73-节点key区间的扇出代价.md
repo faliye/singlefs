@@ -1,6 +1,6 @@
 ## E73 节点 key 区间的扇出代价 —— 已跑（2026-09-01，纯算术，8 单测 / 8 条变异全抓）：**扇出最多掉 1 格（0.33%），树高一层没涨**
 
-**中文** · [English](73-节点key区间的扇出代价.en.md) · [日本語](73-节点key区间的扇出代价.ja.md)
+**中文** · [English](73-fanout-cost-of-node-key-interval.en.md) · [日本語](73-ノードキー区間のファンアウトコスト.ja.md)
 
 D18（块里携带什么信息） 已定项 2 定了记账树的节点带 key 区间，并自陈
 「扇出下降多少、写放大动没动，一次都没量过；D8（核心索引结构） 已定项 2 的 16 KiB 是在**没有**这两个字段的前提下选的」。
@@ -110,12 +110,12 @@ COW 下改一条 key 要重写的节点数 = 树高，两条臂**逐格相同**�
 
 ### 口径与复跑
 
-- 代码 `scripts/experiments/e73_key_range.rs`
+- 代码 `scripts/experiment-apparatus/e73_key_range.rs`
   （`cargo run --release --bin e73-key-range`），
   原始输出 `e73-key-range-2026-09-07.out`（2026-09-07 按那天成立的头宽重跑；补账前那份是 `e73-key-range-2026-09-01.out，留在 results/ 里不动）`（26 行，收尾行 `emitted=26`）。
 - **N=5 轮逐字节一致**（同一个 md5）。**8 个单测，8 条变异逐条命中、0 个盲区**，
   变异表 `scripts/mutation/tables/e73_key_range.tsv`
-  （`bash scripts/mutation/mutate.sh e73-key-range scripts/experiments/e73_key_range.rs scripts/mutation/tables/e73_key_range.tsv`）。
+  （`bash scripts/mutation/mutate.sh e73-key-range scripts/experiment-apparatus/e73_key_range.rs scripts/mutation/tables/e73_key_range.tsv`）。
 
 ⚠️ **2026-09-07 按那天成立的头宽重跑过一遍**（用户在 D18（块里携带什么信息） 已定项 14
 定案前要的那一步）。2026-09-07 之前源码里的三档基础节点头是 **58 / 67 / 76**，那是 E73（节点 key 区间的扇出代价）

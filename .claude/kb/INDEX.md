@@ -25,7 +25,7 @@
 | [feature-bits.md](feature-bits.md) | feature bit 记账表：incompat / compat_ro / compat 三张位图各 256 位，每分出去一位写一行；位号的唯一登记位在 D15（格式冻结政策） 已定项 4 |
 | [freeze-layer-membership.md](freeze-layer-membership.md) | 冻结层归属登记表：一行一个结构，落 D15（格式冻结政策） 已定项 7 的哪一层、权威态还是派生态、退不退出冻结 |
 | [term-renames.md](term-renames.md) | 术语改名对照表：旧名与新名的唯一权威对照，别处一律用新名 |
-| [translation-glossary.md](translation-glossary.md) | 翻译术语表：中、英、日三语并排，仓根 README 与 `briefs/` 的三语版本照它用词 |
+| [translation-glossary.md](translation-glossary.md) | 翻译术语表：中、英、日三语并排，仓根 README、`briefs/` 与 `.claude/kb/` 的三语版本照它用词 |
 
 ## 不是编号的记号
 

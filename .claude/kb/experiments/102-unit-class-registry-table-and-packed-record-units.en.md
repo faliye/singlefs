@@ -1,0 +1,171 @@
+## E102 Unit Class Registry Table and Packed Record Units — Run (Round 2 2026-10-04, Tombstone Record 40 Bytes, Pure Arithmetic, 13 Unit Tests / 12 Mutations All Caught; Round 1 2026-09-04, Tombstone Record 56 Bytes, 9 Unit Tests / 8 Mutations All Caught): **Round 2: Tombstone Record 40 Bytes, Records Area Origin 136 Gives cap(136, 40) = 815, cap(136, 140) = 233, Matching kb-Registered TOMBSTONE_CONTAINER_RECORDS and INODE_LEAF_RECORDS, P8 Rewriting Holds (136 Falls in Intersection [129, 148] of Two Holding Intervals, Margin 7 to Lower, 12 to Upper), Original Reverse Acceptance Clause (Literal 103) Not Triggered; Changing Width Without Changing Header (h = 107) Gives Tombstone Capacity 816, Not 815; 5-Tuple Identifies Only 1 of 815 Filled Entries (Fails to Identify 814 Entries), Packed Class Identity Segment + Parsing Identifies All; Parsing Accepts 815, Judges 816 Corrupt; Mixing 40 / 140 Misparses 5, Unmixed 0. Four-List Mapping, Domain Separation, Unregistered Code Policy, Value Range Headroom Byte-Identical with Round 1: Four Lists Map to 0 Unmapped Under Registry; Taking Only D9 (Encryption) Settled Item 6 Row as Registry Leaves 5 Names on Unregistered Codes (Including Tombstones); Equi-Width Bodies Removing Tags Collides Exactly 1 Pair, With Tags 0 Pairs; Unregistered Unit Classes incompat Silently Misses 0, Skip Policy Misses 7**
+
+[中文](102-单元类登记表与打包记录单元.md) · **English** · [日本語](102-ユニットクラス登録表とパック記録ユニット.ja.md)
+
+**This is the counting model for the settlement proposal of D18 (Information Carried in a Block) settled item 11** (proposal v1 `_d18-item11-unit-class-registry.md`, v3 `_d18-item11-r3-amended.md`; numbers of E102 (Unit Class Registry Table and Packed Record Units) per v3). It asks: after turning unit type tags into a registry table and establishing packed shared units as an independent class, whether the four mutually disparate lists in the repository can all map across, what domain separation of AAD relies on to hold, and whether numbers of E83 (Granularity of Tombstones) / E84 (Pinned Volume of Packed Tombstones) / E98 (Geometry of Inode Records and Inode Trees) move.
+
+**Round 2 asks**: after tombstone records change from 56 bytes to 40 bytes (D18 (Information Carried in a Block) settled item 24 item 2), what each number on this page dependent on record width becomes, and whether items they support flip. Registered in `e102-r2-prereg.md` (issue ticket `m3-tombstone-record-40-rerun-questions.md` line 2); reading B: width takes 40, capacity, identification power, and records area origin for parsing take 136 (including 29-byte reserved bits, settled item 16; 107 retained as class identity segment end and sensitivity sample point). "Criteria", "Failure Clauses", and "Actual Measurement" sections retain Round 1 (56 bytes, h = 107) as-is; Round 2 revisions, readings, mutations, and differential checks are written in sections prefixed with "Round 2".
+
+### Cited Clauses (Copied Verbatim into Source Code Comments)
+
+| Clause | The Sentence Used |
+|---|---|
+| D9 (Encryption) settled item 6 | Unit type tag is domain separator of AAD — "without domain separation, AAD of two unit classes can serialize into the same byte sequence ⇒ type confusion becomes a legitimate MAC pass"; value range "data extent / btree node / accounting unit / root record" |
+| D9 (Encryption) settled item 6 exclusion table | "Field composition of AAD is a day-1 permanent contract... criterion can only be settled by 'whether this field could possibly differ pointer-by-pointer in future'" |
+| D18 (Information Carried in a Block) settled item 7 | Common prefix 42; data unit header 105 (was 91 before 2026-09-05 C113 (No Input to Current-Version Determination of Multi-Version Units in Scan Rebuild) settlement added write sequence 10 and payload CRC 4); self-proving units do not use this table |
+| D18 (Information Carried in a Block) settled item 8 / settled item 10 | "Unit type tag takes 'tombstone'"; packed shared units, generational loading, reclamation granularity = unit |
+| D21 (Boundary Between Authoritative and Derived States) settled item 4 | Extension points belong to three categories |
+| I-6.2 (plaintext header field allowlist) | Two whitelists |
+| D15 (Format Freeze Policy) | Adding record types ⇒ compat_ro; altering meaning of existing fields ⇒ incompat |
+| D23 (Journal Role & Format) settled item 1 subsection "Type Field of Record Header" clause A | "Unknown types ⇒ refuse mount, carried by system configuration incompat bits" |
+| D18 (Information Carried in a Block) settled item 16 (Round 2) | "Origin of declared length = header end including reserved bits, upper bound 32768 − 136 (code 3); capacity of settled item 11 and I-1.7 (packing container validity and judgment order) calculated per 136: `⌊(32768 − 136) / 40⌋ = ⌊32632 / 40⌋ = 815`" |
+| D18 (Information Carried in a Block) settled item 24 (Round 2) | "Tombstone record: object_id 8 + object_birth_gen 8 + range_start 8 + range_end 8 + death_txg 8 = 40 bytes; one 32 KiB container fits ⌊(32768 − 136) ÷ 40⌋ = 815 entries" |
+
+### Criteria (Hardcoded Before Run, Unchanged After Run)
+
+1. **Coverage**: 15 class names used across four lists and settled item 8 map to exactly one code under registry table; unmapped, one-name-multi-code, and mapped-to-unregistered must all strictly equal 0. Positive control: taking only names in D9 (Encryption) settled item 6 row as registry table, tombstones must land on unregistered code.
+2. **Domain separation**: Canonical encoding of two AAD classes can match ⇔ tags match (or both lack) and bodies equal length (AEAD implicit authentication assoclen). Positive control: synthetic class equi-wide with data unit body without tag must collide exactly 1 pair, with tag 0 pairs; negative control: single class constantly 0.
+3. **Capacity and downstream numbers**: cap(h, r) = (32768 − h) / r. Pin cap(103, 56) = 583, cap(103, 140) = 233 (identical when packed header 93), and calculate holding closed intervals of header width; adding 1 byte at either end must drop 1 slot. ⚠️ When criteria were hardcoded packed header was 76 (class identity segment 34: tree_id 8 + record_type 2 + intra-gen sequence 4 + record_count 2 + record_width 2 + birth_gen 8 + fsid 8); round 1 two cloud legs independently hit "header checksum protects only header, whole-unit checksum lives in parent pointer", backward leg hit "birth generation is not loading generation", v2 changed to 48 bytes (container number + container birth gen + 4-byte payload checksum, removing record width), header 90; round 2 backward leg hit "record width is necessary for readers not recognizing type" and "tag must have replica on ciphertext side", v3 restored record width 2 and tag 1, class identity segment 51, header 93. **Form of criteria unchanged, pinned numbers unchanged**, only h changed from 76 to 93 (all versions within interval; 93 plus reserved bits 12 for nonce code and 16 for MAC is 121, exceeding 120 ⇒ if reserved bits fall inside header, tombstone capacity 582, E83 (Granularity of Tombstones) / E84 (Pinned Volume of Packed Tombstones) must rerun — 120 is not format constraint, but absolute value anchor of E83 (Granularity of Tombstones)).
+4. **Identification power**: 5-tuple fails to identify N − 1 entries for unit holding N entries; packed class identity segment + parsing enumeration exactly 0.
+5. **Fixed-width parsing and mixing**: record_count × record_width + header > declared length judges corrupt; misparsed count when mixing two widths parsed per first type independently computed via gcd; unmixed constantly 0.
+6. **Two-tier policy for unregistered codes**: k unregistered unit classes — incompat silently misses 0 and refuses mount, "skip" misses exactly k; m containers of unregistered record types — verifiable exactly m, records applied exactly 0, read-only, non-reclaimable.
+7. **Value range headroom**: 256 − 7 = 249.
+
+### Failure Clauses (Hardcoded Before Run)
+
+| Clause | Disposition When Triggered |
+|---|---|
+| Positive control of criteria 1 / 2 / 5 misses any | That dimension not in model, whole round voided |
+| Negative control of criteria 2 / 5 non-zero | Model errs on trivial inputs, whole round voided |
+| **Reverse acceptance clause**: cap(103, 56) ≠ 583 or cap(103, 140) ≠ 233 | Proposal P8 does not hold, E83 (Granularity of Tombstones) / E84 (Pinned Volume of Packed Tombstones) / E98 (Geometry of Inode Records and Inode Trees) must rerun, written faithfully |
+| Unreadable ≠ read as 0 | Verdict on unregistered codes returns error, must not degenerate into "0 units" |
+
+### Actual Measurement (2026-09-04, Pure Arithmetic, N=5 Rounds Byte-Identical, 9 Unit Tests / 8 Mutations All Caught; 2026-09-05 Regenerated per C113 (No Input to Current-Version Determination of Multi-Version Units in Scan Rebuild) Settlement Changing Header Constants to 105 / 103, Pinned Numbers Untouched; 2026-09-12 Regenerated per C288 (collateral changes from mapped key settlement did not land in other decisions) Item 1 to 105 / 107, Pinned Numbers Changed Only Cell "Max Entries When Declared 1000", 16 → 15)
+
+**Measurement basis and re-run**: Code `scripts/experiment-apparatus/e102_unit_class_registry.rs` (`cargo run --release --bin e102-unit-class-registry`), artifact `e102-unit-class-registry-2026-09-12.out` (39 lines, ending `emitted=39`; version with header constants 105 / 107, previous version `e102-unit-class-registry-2026-09-05.out` retained untouched in `results/`; mutation rerun `e102-mutate-2026-09-12.log` 8 entries all caught), mutation table `scripts/mutation/tables/e102_unit_class_registry.tsv` (`bash scripts/mutation/mutate.sh e102-unit-class-registry scripts/experiment-apparatus/e102_unit_class_registry.rs scripts/mutation/tables/e102_unit_class_registry.tsv`, log `e102-mutate-2026-09-05.log`), hooked into `scripts/experiment-apparatus/replay.sh`.
+
+| Criterion | Value |
+|---|---|
+| 1 Coverage | Proposal registry: unmapped 0 / one-name-multi-code 0 / unregistered 0. Taking only D9 (Encryption) settled item 6 row as registry: **5 names land on unregistered codes** (tombstones, metadata class of I-6.2 (plaintext header field allowlist), journal records, system configuration slot, self-proving units of D21 (Boundary Between Authoritative and Derived States)), pinning tombstone individually as 1 |
+| 2 Domain separation | Two settled bodies (data 32, packed 26) unequal length, colliding not even without tags — so they are **not** positive controls; synthetic equi-wide class without tags collides exactly **1** pair, with tags **0** pairs; single class 0 |
+| 3 Capacity | cap(107, 56) = **583** (identical at 93, 103), holding interval header width **[65, 120]** (64 ⇒ 584, 121 ⇒ 582); cap(107, 140) = **233**, interval **[9, 148]** (8 ⇒ 234, 149 ⇒ 232) ⇒ reverse acceptance clause **not triggered**; identical across 76 / 91 / 120 tiers; 121 (93 + reserved bits 28) outside interval, tombstone capacity 582 |
+| 4 Identification power | 583 entries: 5-tuple fails to identify **582**; packed class identity segment + parsing **0** |
+| 5 Parsing | 583 entries legitimate, 584 entries judged corrupt (584 × 56 + 107 = 32811 > 32768); mixing 56 / 140 10 entries each misparses **5** (period = 56 / gcd(56, 140) = 2); coprime widths 56 / 57 errs 9; unmixed 0 |
+| 6 Policy | 7 unregistered unit classes: incompat refuses mount, silent misses **0**; skip policy mounts, silent misses **7**. 3 unregistered record type containers: verifiable 3, applied 0, read-only, non-reclaimable |
+| 7 Headroom | Registered 7 codes, remaining **249**; flags high byte 8 bits completely free |
+
+**What it said to proposal**: ① Registry table accommodates four lists and tombstones completely, whereas D9 (Encryption) settled item 6 row alone cannot — countable form of the hole described by C98 (Value Domain of Unit Type Tags Has No Registration Point); ② What domain separation truly buys is "equi-wide bodies also separate", and that two settled bodies happened to differ in length was pure coincidence, **cannot be treated as basis**; ③ Packed header taking 93 bytes leaves numbers in three experiments untouched, but header exceeding 120 / 148 requires rerun (plus nonce / MAC reserved bits is 121, exceeding 120 — if reserved bits fall in header, 583 of E83 (Granularity of Tombstones) / E84 (Pinned Volume of Packed Tombstones) becomes 582, absolute anchor must repin; those two numbers are not format constants); ④ Identification power of 5-tuple on packed units is precisely "identifies only 1", and D18 (Information Carried in a Block) settled item 8 phrase "those five fields just suffice to identify it" holds only when holding 1 entry; ⑤ Not mixing record types is not aesthetic preference — misparsed entries under fixed-width parsing when mixed is computable via gcd, and non-zero.
+
+### Round 2: Revised Criteria and Failure Clauses (Tombstone Record 40 Bytes, Reading B, Hardcoded Before Run)
+
+Registered in `e102-r2-prereg.md` (sha256 `6173c1364ee372cabb14d65ad2061dd3778196d143e0c580696cd95c76dcec88`), main agent on 2026-10-04 settled reading B: width takes `TOMBSTONE_RECORD_BYTES` = 40, capacity, identification power, and parsing records area origin take `PACKED_UNIT_RECORDS_OFFSET` = 136 (code 3 header with reserved bits, settled item 16 "capacity of settled item 11 and I-1.7 (packing container validity and judgment order) calculated per 136"), with 107 (`PACKED_UNIT_HEADER_BYTES`, class identity segment end) kept as sample point. Two reasons for choosing B: issue ticket line 2 must match `format-const: TOMBSTONE_CONTAINER_RECORDS = 815`; settled item 16 explicitly writes capacity calculated per 136. Reading changing only width without moving h (A) constructively yields 816; effect of width isolated via retained h = 107 sample point.
+
+Criteria 1, 2, 6, 7 and their positive/negative controls unchanged. Original criteria 3, 4, 5 and original reverse acceptance clause juxtaposed as-is; Round 2 revisions:
+
+| Original Clause | Round 2 Modification | Why |
+|---|---|---|
+| Criterion 3 | Pin cap(136, 40) = 815, cap(136, 140) = 233; calculate closed intervals [129, 168], [9, 148] where 815 / 233 hold, adding 1 byte at either end dropping 1 slot (816 / 814, 234 / 232); additionally report intersection [129, 148] and margins 7 / 12 from 136 to both ends. Original clause kept literally in unit tests (literal 56, 140, `capacity(103, 56) == 583`, `capacity(103, 140) == 233`, interval (65, 120)) | Tombstone width 40 is settled (settled item 24 item 2); capacity calculated per header end including reserved bits (settled item 16) |
+| Criterion 4 | N = cap(136, 40) = 815: 5-tuple fails to identify 814, class identity segment + parsing 0 | N is entries filling one container, varying with width |
+| Criterion 5 | Parsing origin changed to 136; example juxtaposes "40 / 140 successively 10 entries each ⇒ 5 (gcd 20, period 2)"; unmixed constantly 0. Original example (56 / 140 ⇒ 5, origin 107) kept literally in unit tests | Both width and origin changed |
+| Reverse acceptance clause | Original clause calculated and reported literally (cap(103, 56) and cap(103, 140)); additionally establish rewrite: **if cap(136, 40) ≠ 815 or cap(136, 140) ≠ 233 ⇒ this rewrite of P8 does not hold, and E83 (Granularity of Tombstones) / E84 (Pinned Volume of Packed Tombstones) / E98 (Geometry of Inode Records and Inode Trees) using that capacity must rerun, written faithfully**. Thresholds 815 / 233 taken from kb-registered values (`TOMBSTONE_CONTAINER_RECORDS`, `INODE_LEAF_RECORDS`), not derived from capacity formula | Original clause asked whether code 3 header pushed away downstream capacity 583, whereas downstream width is now 40, 583 itself no longer downstream number; P8 sentence 1 "583 unchanged" literally fails under 40 because of record width rather than code 3 header, not belonging to reverse acceptance clause, recorded as separate observation |
+
+Round 2 newly added failure clauses, each with observation triggering it:
+
+| Clause | Observation Triggering It |
+|---|---|
+| F1 Tombstone downstream capacity conflicts with clause | `name=capacity rec=40 hdr=136 cap=` or `name=capacity_interval_at_records_offset rec=40 cap_at_records_offset=` not 815. Harness ≠ 815 while independently computed number (registration section 13 pasted command and output) = 815 ⇒ harness wrong, voided; both ≠ 815 ⇒ settled item 24 item 2 / settled item 16 arithmetic possibly wrong, follow "clause possibly wrong" |
+| F2 inode downstream capacity conflicts with clause | `name=capacity rec=140 hdr=136 cap=` not 233, disposition same as F1 |
+| F3 Issue ticket line 2 flips | F1 or F2 triggered in "both ≠" branch ⇒ rewritten reverse acceptance clause triggers, E83 (Granularity of Tombstones) / E84 (Pinned Volume of Packed Tombstones) / E98 (Geometry of Inode Records and Inode Trees) must rerun |
+| F4 Width knob does not move output | `name=positive_control` any line `moved_as_expected=false`: r = 40 and r = 56 equal capacity on h = 136, interval ends do not drop 1 slot outside, 40 / 41 mixing not 9 ⇒ that dimension not in model, whole round voided |
+
+Original failure clauses (criteria 1 / 2 / 5 positive controls miss, criteria 2 / 5 negative controls non-zero ⇒ whole round voided; unreadable ≠ read as 0) remain. Invalidation also includes: registration section 7 category B any cell mismatching artifact, width-independent lines in Round 1 artifact not byte-identical with Round 2, `name=done emitted=N` mismatching line count, binary run twice emitting differing outputs.
+
+### Round 2 Actual Measurement (2026-10-04, Pure Arithmetic, 13 Unit Tests / 12 Mutations All Caught, Two Runs Byte-Identical)
+
+**Measurement basis and re-run**: Code `scripts/experiment-apparatus/e102_unit_class_registry.rs` (13 unit tests, `cargo test --release --bin e102-unit-class-registry` under memory wrapper; Round 1 had 9), mutation table `scripts/mutation/tables/e102_unit_class_registry.tsv` (12 entries: Round 1 M1–M8 kept, M4 modified due to parsing origin rename, newly added M9–M12), artifact `research/results/e102-unit-class-registry-2026-10-04.out` (91 lines, ending `emitted=91`; Round 1 artifact `e102-unit-class-registry-2026-09-12.out` archived, obtained via `git show 3cff909b^:research/results/e102-unit-class-registry-2026-09-12.out`), mutation log `e102-mutate-2026-10-04.log` (12 lines ✅, ending "restored, baseline all green"). Re-run: `bash scripts/experiment-apparatus/replay.sh E102` (Unit Class Registry Table and Packed Record Units), registered in `scripts/experiment-apparatus/replay.sh` on line `e102-unit-class-registry` (exact tier, repointed to Round 2 artifact). Harness is independent hand-written model without importing `crates/`: tombstone width 40, records area origin 136, reserved bits 29, downstream capacities 815 / 233 written as local constants, values copied from kb `format-const` markers.
+
+**Readings** (copied line by line from `research/results/e102-unit-class-registry-2026-10-04.out`, line numbers refer to that file):
+
+```text
+Line 27 E7RESULT name=capacity_interval_at_records_offset rec=40 cap_at_records_offset=815 hdr_lo=129 hdr_hi=168 cap_at_lo_minus_1=816 cap_at_hi_plus_1=814
+Line 65 E7RESULT name=capacity_interval_at_records_offset rec=140 cap_at_records_offset=233 hdr_lo=9 hdr_hi=148 cap_at_lo_minus_1=234 cap_at_hi_plus_1=232
+Line 66 E7RESULT name=downstream_at_records_offset records_offset=136 tomb_rec=40 cap_tomb=815 kb_tomb=815 inode_rec=140 cap_inode=233 kb_inode=233 joint_hdr_lo=129 joint_hdr_hi=148 margin_to_lo=7 margin_to_hi=12
+Line 67 E7RESULT name=reverse_acceptance_original literal_hdr=103 cap_rec_56=583 cap_rec_140=233 note=literal_clause_not_the_downstream_any_more
+Line 68 E7RESULT name=identity records=815 unnamed_by_five_tuple=814 unnamed_by_packed_identity=0
+Line 69 E7RESULT name=parse count=815 width=40 declared=32768 result=Records(815)
+Line 70 E7RESULT name=parse count=816 width=40 declared=32768 result=Corrupt note=one_too_many
+Line 71 E7RESULT name=mixing a=40 n_a=10 b=140 n_b=10 misparsed=5
+Line 72 E7RESULT name=mixing a=40 n_a=10 b=40 n_b=10 misparsed=0 note=unmixed
+```
+
+| Registered Quantity | Reading | Verdict |
+|---|---|---|
+| Q1 config | Line 1 `tomb_rec=40 packed_records_offset=136 reserved=29` | Meets threshold |
+| Q2 capacity sampling table (r ∈ {40, 56, 140} × h 17 points, 51 cells) | Cell-by-cell equals registration section 7 category B (one python command extracting 51 lines of `name=capacity` by (r, h) comparing against table, 0 discrepancies); r = 40: h = 128 is 816, h = 129–168 is 815, h = 169 is 814 | Conforms |
+| Q3 header width intervals | h = 136: r = 40 is [129, 168], r = 56 is [121, 176], r = 140 is [9, 148]; h = 107 (Round 1 row format): r = 40 is 816 and [89, 128], r = 56 is 583 and [65, 120], r = 140 is 233 and [9, 148]; all six rows drop 1 slot outside boundaries | Conforms |
+| Q4 downstream numbers (P8 under 40) | Line 66: cap(136, 40) = 815 = kb, cap(136, 140) = 233 = kb; intersection [129, 148], 136 to ends 7 and 12 | F1, F2, F3 not triggered; P8 rewrite holds |
+| Original reverse acceptance clause (literal) | Line 67: cap(103, 56) = 583, cap(103, 140) = 233 | Not triggered (no longer evaluates original intent, reason in reverse acceptance row of "Revised Criteria" table) |
+| Q5 identification power | Line 68: 815 entries, 5-tuple fails to identify 814, class identity segment + parsing 0 | Conforms; does not flip (qualitative conclusion independent of N) |
+| Q6 fixed-width parsing | Lines 69, 70: 815 accepted, 816 judged corrupt (816 × 40 + 136 = 32776 > 32768) | Conforms |
+| Q7 mixed misparsing | Lines 71, 72: 40 / 140 misparses 5, 40 / 40 is 0; unit test additionally pins 40 / 41 as 9, 48 / 140 as 9 | Conforms; 5 is not constant of this formula across widths |
+| Q8 r = 56 cells untouched | In Round 1 artifact, 10 lines of `name=capacity rec=56` and `name=capacity_interval rec=56` appear verbatim in Round 2 | Byte-identical |
+| Q9 width-independent lines untouched | In Round 1 artifact, 22 lines of coverage, aad_domain, unknown_class, unknown_record_type, headroom and rec=140 capacity / capacity_interval appear verbatim in Round 2 | Byte-identical |
+| F4 positive control | Lines 78–84 seven knobs: r 40 → 56 at h = 136 capacity 582, h = 128 and 169 capacities 816 and 814, r = 56 interval 121–176, r = 56 full capacity and 5-tuple unidentified count 582 and 581, one extra judged corrupt, 40 → 41 mixing 9 | Seven lines `moved_as_expected=true`, F4 not triggered |
+
+Of the 39 lines in Round 1 artifact, only 7 lines do not appear verbatim in Round 2: config (two more fields, `tomb_rec` 56 → 40), identity (583 / 582 → 815 / 814), two lines parse, two lines mixing (56 → 40), and ending `done` (`emitted=39` → `emitted=91`). Command: `grep -Fxv -f research/results/e102-unit-class-registry-2026-10-04.out <Round 1 artifact>`.
+
+**Geometric sensitivity** (`.claude/rules/mutation-sampling.md` category 6): Verdict of Q4 depends on two knobs: records area origin h and record width r.
+Dimension h across 17 sample points in Q2: capacity for r = 40 is 817 for h ≤ 88, 816 for 89–128, 815 for 129–168, 814 for 169; verdict (capacity equals 815) flips at 128 and 169, holding between 129 and 168;
+233 for r = 140 drops to 232 at h = 149. Therefore "P8 rewrite holds" holds only for h ∈ [129, 148], with 136 inside, margin 12 to upper, 7 to lower;
+changing width without changing header (h = 107) yields tombstone capacity 816, not 815.
+Dimension r: r = 56 at h = 136 is 582 (interval [121, 176]), differing by 1 from Round 1's 583 in opposite direction; r = 140 another downstream.
+Self-test of discriminative power: unit test runs check "cap(h, 40) = 815 and cap(h, 140) = 233" across h = 128, 136, 149, requiring false, true, false; artifact line 90 `rejects_h128=true accepts_h136=true rejects_h149=true`.
+
+**Mutations** (12 entries, caught 12 / invalid 0 / unkilled 0; `e102-mutate-2026-10-04.log`):
+M1–M8 as in Round 1; M9 reverts record width to 56 (6 unit tests red); M10 omits reserved bits in capacity origin, changing `PACKED_RECORDS_AREA_ORIGIN` from 136 to 107 (an alias shared by capacity, identification power, parsing, downstream numbers, 6 tests red);
+M11 reserved bits short by 1 byte (29 → 28) caught only by structural assertion `136 == 107 + 29` in `format_constants_match_knowledge_base`, insensitive in capacity (135 remains in [129, 168] and [9, 148]), disposed per `.claude/rules/mutation-sampling.md` category 3, not recorded as equivalent;
+M12 interval lower bound short by 1 (3 tests red). Wording of M4 changed with rename of parsing origin, intent unchanged.
+
+### Round 2 Differential Check Against `crates/` (Registration Section 11 Halting Clause, Performed Before Running Artifact)
+
+Harness does not import `crates/`; differential reads those lines in `crates/`, constants extracted individually via python command comparing against local constants in harness source, 0 discrepancies:
+
+| Harness Local Constant / Computed Value | `crates/` Line |
+|---|---|
+| `UNIT_BYTES` 32768 | `DATA_UNIT_BYTES` in `crates/singlefs-format/src/lib.rs` |
+| `DATA_UNIT_HEADER_BYTES` 105, `PACKED_UNIT_HEADER_BYTES` 107 | Same file lines 35, 41 |
+| `TOMBSTONE_RECORD_BYTES` 40, `INODE_RECORD_BYTES` 140 | Same file lines 113, 104 |
+| `NONCE_MAC_ALGORITHM_RESERVED_BYTES` 29, `PACKED_UNIT_RECORDS_OFFSET` 136 | Same file lines 32, 44 |
+| cap(136, 40) = 815, cap(136, 140) = 233 | Same file line 116 `TOMBSTONE_CONTAINER_RECORDS`, line 110 `INODE_LEAF_RECORDS`; calculated per crates constants (32768 − 136) ÷ 40, ÷ 140 also yields 815, 233 |
+| `parse_packed(815, 40, 32768)` accepts, `parse_packed(816, 40, 32768)` corrupt | In `crates/singlefs-checker/src/walk.rs` (`count * width <= declared`, `declared <= data_unit_bytes() - 136`); in `crates/singlefs-core/src/unit.rs` (`records_start = header_end + reserved_bytes()`, `records_start + declared_length > bytes.len()`): 815 × 40 = 32600 ≤ 32632, 816 × 40 = 32640 > 32632 |
+
+This differential was calculated after reading constants and conditions, without executing `crates/` code; core requires "record_count × record_width == declared_length", checker requires "not greater", this difference is independent of width, not judged.
+
+### What It Cannot Answer
+
+Pure arithmetic, 0 file operations. Does not build cryptographic model of AAD (domain separation judged only by "can encodings match", not judging MAC), does not run scanner, does not judge how packed record units are indexed in normal path, does not answer which path D8 (Core Index Structure) settled item 6 takes, does not answer how many times a packed unit is written when published multiple times within a snapshot generation (that belongs to write amplification measurement basis of E83 (Granularity of Tombstones)).
+
+Round 2 additionally cannot answer:
+
+- Measures only reading B (records area origin 136). Reading A (origin 107) appears only as sensitivity sample point for h = 107 (tombstone capacity 816), without establishing a separate set of criteria per A.
+- "P8 rewrite holds" answers: code 3 header end 136 including reserved bits does not push tombstone 40-byte capacity 815 and inode capacity 233 away from kb-registered values, and 136 falls in [129, 148]. It does not answer what happens to 583 in body of E83 (Granularity of Tombstones) / E84 (Pinned Volume of Packed Tombstones) under 40 bytes: 583 was under 56 bytes, no longer downstream number under 40; E83 (Granularity of Tombstones) rerun belongs to its own Round 2 registration, E84 (Pinned Volume of Packed Tombstones) harness hardcodes 583 (`scripts/experiment-apparatus/e84_tombstone_pinning.rs`), gate code-source-discipline format-constants cell cannot bind it, handed to main agent.
+- Differential check against `crates/` reads constants and corruption conditions, not running `crates/` code; registry table, AAD, and two-tier policy not differentially checked with `crates/` (independent of width); harness modeled only "tombstones → code 3", tier-2 registry registers packed record types 1 through 5.
+- Construction where `RecordTypeOutcome.records_applied` is constantly 0 untouched (registered under C60 (Constant Readings Lack Fault Injection Self-Test) in `.claude/gate.d/experiment-constant-reading-lag.tsv`), this rerun did not supplement real writes.
+
+### Affected Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D18 (Information Carried in a Block) settled item 11 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D18 (Information Carried in a Block) settled item 8 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D18 (Information Carried in a Block) settled item 24 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D18 (Information Carried in a Block) settled item 16 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D9 (Encryption) settled item 6 | Provisioning | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D8 (Core Index Structure) settled item 6 | Provisioning | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D15 (Format Freeze Policy) | Provisioning | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D21 (Boundary Between Authoritative and Derived States) settled item 4 | Unaffected | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+| D23 (Journal Role & Format) settled item 1 | Unaffected | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 unaffected: this round only synchronized wording, artifact pointers, paths, and numbers, conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only altered wording (time words, position designations, self-references), conclusions, numbers, and artifacts unchanged |
+
+## Historical Versions
+
+Historical entries for E102 (Unit Class Registry Table and Packed Record Units) are consolidated in [experiments-history.md](../experiments-history.md).

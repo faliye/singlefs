@@ -1,6 +1,6 @@
 ## E20 指针变宽的 CPU 缓存代价 —— 已跑（2026-08-28）
 
-**中文** · [English](20-指针变宽的CPU缓存代价.en.md) · [日本語](20-指针变宽的CPU缓存代价.ja.md)
+**中文** · [English](20-cpu-cache-cost-of-widening-pointers.en.md) · [日本語](20-ポインタ肥大化によるCPUキャッシュコスト.ja.md)
 
 **背景**：[decisions.md](../decisions.md) D19（块指针的结构与宽度预算） 在 E20（指针变宽的 CPU 缓存代价） 之前只量了两样——内部节点的**常驻内存容量**
 （10.6 → 68.8 GB/PiB）与**树深**，两样都算出「代价很小」。
@@ -73,7 +73,7 @@
 条目第二个 8 字节存子节点号（形成依赖式载入链）。**固定 key 数、不固定工作集**——
 条目变宽 ⇒ 工作集变大 ⇒ 被挤出缓存，这才是要问的。
 本机每核 L1d 48 KiB、L2 1 MiB、L3 32 MiB、缓存行 64 字节。
-代码 `scripts/experiments/e20_fanout.rs`（`cargo run --release --bin e20-fanout`），
+代码 `scripts/experiment-apparatus/e20_fanout.rs`（`cargo run --release --bin e20-fanout`），
 原始输出 `e20-fanout-2026-08-28.out`（两档首版）与
 `e20-sweep-2026-08-29.out`（六档 × 三轮）。
 

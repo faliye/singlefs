@@ -1,6 +1,6 @@
 ## E5 nonce 唯一性 × 崩溃点重放 —— 未跑（事务层与 checker 已有，仍欠加密实现）
 
-**中文** · [English](05-nonce唯一性×崩溃点重放.en.md) · [日本語](05-nonce唯一性×崩溃点重放.ja.md)
+**中文** · [English](05-nonce-uniqueness-crash-point-replay-crash-point-replay.en.md) · [日本語](05-nonce一意性-クラッシュポイントリプレイ-クラッシュポイント再生.ja.md)
 
 **背景**：[invariants/08-加密不变量.md](../../../crates/singlefs-checker/invariants/08-加密不变量.md) I-6.1（nonce 不重用） 与 I-6.5（nonce 水位单调）。
 nonce 重用在 ChaCha20 这类流密码下**直接泄漏明文**，而它不产生任何读写错误、

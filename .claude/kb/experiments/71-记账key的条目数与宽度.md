@@ -1,6 +1,6 @@
-## E71 记账 key 的条目数与宽度 —— 已跑（2026-09-01，纯算术，12 单测 / 8 条变异全抓）：**先撑爆的是 `树数 × 设备数` 这个乘积，且只在「维度用满」那个读法下撑爆**
+## E71 记账 key 的条目数与宽度 —— 已跑（2026-09-01，纯算术，12 单测 / 8 条变异全抓；2026-10-20 第 1 次重跑判据 2 按每条根只装一代重算）：**先撑爆的是 `树数 × 设备数` 这个乘积，且只在「维度用满」那个读法下撑爆**
 
-**中文** · [English](71-记账key的条目数与宽度.en.md) · [日本語](71-记账key的条目数与宽度.ja.md)
+**中文** · [English](71-entry-count-and-width-of-accounting-keys.en.md) · [日本語](71-記帳キーのエントリ数と幅.ja.md)
 
 <!-- doc-lint:not-numbers Q3 FC1 FC2 FC3 FC4 FC5 V1 V2 V3 V4 S1 S2 S3 EV1 EV2 EV3 EV4 EV5 EV6 EV7 EV8 EV9 EV10 -->
 
@@ -205,9 +205,9 @@ E7RESULT name=verdict cells=180 positive_control_write_factor_holds=true positiv
 
 | # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
 |---|---|---|---|---|
-| 1 | 新装置两口径算术 | 每格按臂数一代条目数，乘写次数系数（旧 2、新 1）与条目宽，与门槛比；扫遍登记的 180 格（四档宽度 × 15 个 (t, d) × 三臂），不是抽样 | `scripts/experiments/e71_accounting_keys_single_generation.rs:219 publish_write_bytes` | 2026-09-01 那张九项表的维度标记、三档宽度与 34 字节、门槛 21 474 836、两个写次数系数（都抄自跑前登记读法第 1–3 条） |
+| 1 | 新装置两口径算术 | 每格按臂数一代条目数，乘写次数系数（旧 2、新 1）与条目宽，与门槛比；扫遍登记的 180 格（四档宽度 × 15 个 (t, d) × 三臂），不是抽样 | `scripts/experiment-apparatus/e71_accounting_keys_single_generation.rs:219 publish_write_bytes` | 2026-09-01 那张九项表的维度标记、三档宽度与 34 字节、门槛 21 474 836、两个写次数系数（都抄自跑前登记读法第 1–3 条） |
 | 2 | 独立锚点脚本 | 只按跑前登记读法第 2、3 条的式子现算 48 格（四档宽度 × 四组 (t, d) × 三臂），不读装置与 `crates/` 的代码；48 格是挑的判决格与邻格，不是扫遍 | 无实现：仓里没有这份脚本，它在跑前登记作者的草稿目录 `~/.local/share/singlefs/work/m3-close-w8-c693-reruns/anchors.py`（sha256 `1cef0e2b…`），输出被新装置的单测 `independent_anchor_rows_match_on_every_width_arm_and_cell` 钉成 48 行常量 | 同第 1 行的九项表、宽度、门槛与系数（同一份登记读法） |
-| 3 | 原装置旧口径 | 原装置 `checkpoint_bytes`（2 × 一代条目数 × 条目宽），2026-09-01 那一次产出的 90 格 `name=ckpt_budget` | `scripts/experiments/e71_accounting_keys.rs:128 checkpoint_bytes` | 九项表、三档宽度、门槛；旧系数 2 |
+| 3 | 原装置旧口径 | 原装置 `checkpoint_bytes`（2 × 一代条目数 × 条目宽），2026-09-01 那一次产出的 90 格 `name=ckpt_budget` | `scripts/experiment-apparatus/e71_accounting_keys.rs:128 checkpoint_bytes` | 九项表、三档宽度、门槛；旧系数 2 |
 
 三条路径共用同一张九项表与同一条门槛：表本身若不是要判的那张（今天是十二项），三条会一起错，这一节的数因此只写成「按 2026-09-01 那张九项表」。路径 1 对路径 2 的比对钉在单测里（48 行逐格 `assert_eq!`）；路径 1 对路径 3 只有 3 行钉在单测 `original_format_lines_match_the_original_product_text` 里，90 行全量比对是一条 `diff` 命令、源码里没有断言连起来，还欠这一条。
 
@@ -232,27 +232,27 @@ E7RESULT name=verdict cells=180 positive_control_write_factor_holds=true positiv
 
 ### 口径与复跑
 
-- 代码 `scripts/experiments/e71_accounting_keys.rs`
+- 代码 `scripts/experiment-apparatus/e71_accounting_keys.rs`
   （`cargo run --release --bin e71-accounting-keys`），
   原始输出 `e71-accounting-keys-2026-09-01.out`（209 行，收尾行 `emitted=209`）。
 - **N=5 轮逐字节一致**（同一个 md5）。**12 个单测，8 条变异逐条命中、0 个盲区**，
   变异表 `scripts/mutation/tables/e71_accounting_keys.tsv`
-  （`bash scripts/mutation/mutate.sh e71-accounting-keys scripts/experiments/e71_accounting_keys.rs scripts/mutation/tables/e71_accounting_keys.tsv`）。
-- 第 1 次重跑（2026-10-20）：代码 `scripts/experiments/e71_accounting_keys_single_generation.rs`（bin `e71-accounting-keys-single-generation`，不 `use` 原装置与 `crates/`），
+  （`bash scripts/mutation/mutate.sh e71-accounting-keys scripts/experiment-apparatus/e71_accounting_keys.rs scripts/mutation/tables/e71_accounting_keys.tsv`）。
+- 第 1 次重跑（2026-10-20）：代码 `scripts/experiment-apparatus/e71_accounting_keys_single_generation.rs`（bin `e71-accounting-keys-single-generation`，不 `use` 原装置与 `crates/`），
   原始输出 `research/results/e71-accounting-keys-single-generation-2026-10-20.out`（302 行，收尾行 `emitted=302`），
-  复跑登记是 `scripts/experiments/replay.sh` 里 E71（记账 key 的条目数与宽度） 名下的第二行：驱动 `e71-accounting-keys-single-generation`、产物 `e71-accounting-keys-single-generation-2026-10-20.out`、判法 exact。
-  变异：`cd scripts/experiments && bash ../mutation/mutate.sh e71-accounting-keys-single-generation e71_accounting_keys_single_generation.rs ../mutation/tables/e71_accounting_keys_single_generation.tsv`（上限 `MUTATE_MEMORY_MAX=2G`）。
+  复跑登记是 `scripts/experiment-apparatus/replay.sh` 里 E71（记账 key 的条目数与宽度） 名下的第二行：驱动 `e71-accounting-keys-single-generation`、产物 `e71-accounting-keys-single-generation-2026-10-20.out`、判法 exact。
+  变异：`cd scripts/experiment-apparatus && bash ../mutation/mutate.sh e71-accounting-keys-single-generation e71_accounting_keys_single_generation.rs ../mutation/tables/e71_accounting_keys_single_generation.tsv`（上限 `MUTATE_MEMORY_MAX=2G`）。
 
 ### 影响的决策
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D5（快照 / 空间记账机制） 已定项 4 | 支撑 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 改了：依据句按第 1 次重跑的数改写——条目数比随 `树数 × 设备数` 涨，`1024 × 64` 宽读臂三种宽度新口径都不过界、上界臂只有 50 字节那档过，窄读臂 45 格 0 格过界（`research/prompts/m3-close-c693-r3-main-verification.md` 第二节 T3 一格） |
-| D5（快照 / 空间记账机制） 已定项 1 | 支撑 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：依据里「先撑爆预算的是 `树数 × 设备数` 这个乘积」在新口径下照旧成立——上界臂 5 格过界都在 t × d 大的一端，窄读臂 0 格；变的只是过界门槛点（30 字节那档 1024 × 64 不再过界） |
-| D5（快照 / 空间记账机制） 已定项 2 | 不影响 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：第 1 次重跑把这一项的现行定案（每条根只装一代、每次发布全写一遍）当输入口径用，不量它、不判它 |
-| D16（发布语义） | 不影响 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：门槛仍取已定项 5 的 `T_dirty` = 2 GiB 的 1%，第 1 次重跑没动它 |
-| D6（快照实现模型） | 不影响 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：树数 t 仍是扫出来的取值，第 1 次重跑没加依据 |
-| D22（单元原子性怎么合成） | 不影响 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：K 的取值只进总条目数，第 1 次重跑的新口径 K ≡ 1、不用它 |
+| D5（快照 / 空间记账机制） 已定项 4 | 支撑 | 2026-10-21 不受影响：标题与索引行补上 2026-10-20 第 1 次重跑一项，正文、数、结论与产物不变；此前 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 改了：依据句按第 1 次重跑的数改写——条目数比随 `树数 × 设备数` 涨，`1024 × 64` 宽读臂三种宽度新口径都不过界、上界臂只有 50 字节那档过，窄读臂 45 格 0 格过界（`research/prompts/m3-close-c693-r3-main-verification.md` 第二节 T3 一格） |
+| D5（快照 / 空间记账机制） 已定项 1 | 支撑 | 2026-10-21 不受影响：标题与索引行补上 2026-10-20 第 1 次重跑一项，正文、数、结论与产物不变；此前 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：依据里「先撑爆预算的是 `树数 × 设备数` 这个乘积」在新口径下照旧成立——上界臂 5 格过界都在 t × d 大的一端，窄读臂 0 格；变的只是过界门槛点（30 字节那档 1024 × 64 不再过界） |
+| D5（快照 / 空间记账机制） 已定项 2 | 不影响 | 2026-10-21 不受影响：标题与索引行补上 2026-10-20 第 1 次重跑一项，正文、数、结论与产物不变；此前 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：第 1 次重跑把这一项的现行定案（每条根只装一代、每次发布全写一遍）当输入口径用，不量它、不判它 |
+| D16（发布语义） | 不影响 | 2026-10-21 不受影响：标题与索引行补上 2026-10-20 第 1 次重跑一项，正文、数、结论与产物不变；此前 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：门槛仍取已定项 5 的 `T_dirty` = 2 GiB 的 1%，第 1 次重跑没动它 |
+| D6（快照实现模型） | 不影响 | 2026-10-21 不受影响：标题与索引行补上 2026-10-20 第 1 次重跑一项，正文、数、结论与产物不变；此前 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：树数 t 仍是扫出来的取值，第 1 次重跑没加依据 |
+| D22（单元原子性怎么合成） | 不影响 | 2026-10-21 不受影响：标题与索引行补上 2026-10-20 第 1 次重跑一项，正文、数、结论与产物不变；此前 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：K 的取值只进总条目数，第 1 次重跑的新口径 K ≡ 1、不用它 |
 
 ## 历史版本
 

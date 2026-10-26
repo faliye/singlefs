@@ -1,6 +1,6 @@
 ## E70 checkpoint 两个阈值的可行域 —— 已跑（2026-08-31，纯算术；2026-09-03 增到 5 单测、6 条变异全抓）：**`T_dirty` 的实际约束不是环几何，是脏页内存**
 
-**中文** · [English](70-checkpoint两个阈值的可行域.en.md) · [日本語](70-checkpoint两个阈值的可行域.ja.md)
+**中文** · [English](70-feasible-region-for-two-checkpoint-thresholds.en.md) · [日本語](70-チェックポイント2つの閾値の実行可能領域.ja.md)
 
 D16（发布语义） 已定项 2 定了触发形态 `(now − 上次 ≥ T_time) ∨ (脏字节 ≥ T_dirty)`，
 D16（发布语义） 已定项 5 问那两个数取多少，并写着两条耦合。**E70（checkpoint 两个阈值的可行域） 验的正是那两句对不对。**
@@ -67,7 +67,7 @@ D25（目标负载优先级） 已定主负载是 seq（一次 fsync 带 8 叶�
 
 ### 口径与复跑
 
-- 代码 `scripts/experiments/e70_ckpt_thresholds.rs`
+- 代码 `scripts/experiment-apparatus/e70_ckpt_thresholds.rs`
   （`cargo run --release --bin e70-ckpt-thresholds`），
   原始输出 `e70-ckpt-thresholds-2026-08-31.out`（18 行，收尾行 `emitted=18`）。
 - 变异表 `scripts/mutation/tables/e70_ckpt_thresholds.tsv`（2026-09-03，6 条全抓）。

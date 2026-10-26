@@ -1,0 +1,95 @@
+## E37 Log Instance Generation — Run (2026-08-29, N=5 Rounds Byte-Identical)
+
+[中文](37-日志实例代号.md) · **English** · [日本語](37-ログインスタンス識別子.ja.md)
+
+**What it asks**: Is placing a "log instance identifier" into the high bits of the sequence number a true path out for D23 (Journal Role & Format) settled item 8?
+
+### It Connects to the Only Untested Option in That Out-Path Table
+
+| Path Out | Status (Prior to E37 (Log Instance Generation)) |
+|---|---|
+| Reverse chain (each carries hash of previous record) | Tested, passed both criteria, consumes record header bytes |
+| Physically invalidate stale slots during recovery | Tested, all passed, but requires in-place overwrite, zoned cannot do this |
+| Decouple slot from sequence number | E36 (Slot Mapping Dimension) tested, **does not hold** |
+| **High bits of sequence number carry log instance identifier** | **Untested**, table recorded cost as "needed, but only consumes bits in sequence number" |
+
+### What is Tested
+
+At each recovery, increment the instance identifier by one and place it in the high bits of the sequence number: `jsn = (identifier << 48) | counter`.
+Stale records carry the old identifier ⇒ their `jsn` falls into a different high-bit range from the expected next number in the new timeline
+⇒ Break-at-gap stops immediately on the spot.
+
+**Four Arms**:
+
+| Arm | Identifier Incremented | Recovery Rule |
+|---|---|---|
+| `baseline` | No concept of identifier | The settled rules from D23 (Journal Role & Format) |
+| `epoch` | Incremented | **Unchanged** (only adds field) |
+| `epoch_rolled_back` | Should increment but failed to persist | Unchanged |
+| `epoch_aware_recovery` | Incremented | **Adapted accordingly**: accepts "identifier +1 with counter continuing" |
+
+### Criteria (Two, Must Be Satisfied Simultaneously)
+
+1. `stale_replayed == 0`; 2. `lost_new == 0`.
+
+### Positive Control
+
+`baseline` must reproduce the formula measured by E32 (Remnants of the Previous Timeline): `max(0, stale - (new_writes - 1))`.
+A mismatch indicates the model of E37 (Log Instance Generation) has drifted.
+
+### Empirical Measurements (2026-08-29, N=5 Rounds Byte-for-Byte Identical; Ring 64 Slots, Settled Segment 20 Records, Identifier 16 Bits / Counter 48 Bits)
+
+| Arm | Replay Stale (Stale 7 / New 1) | Lost New Records | Verdict |
+|---|---|---|---|
+| `baseline` | **7** | 0 | ✗ |
+| `epoch` (only adds field) | 0 | **1 (all new writes lost)** | ✗ |
+| `epoch_rolled_back` | **7** | 0 | ✗ |
+| `epoch_aware_recovery` | **0** | **0** | ✓ |
+
+**Three Conclusions**:
+
+1. ⚠️ **The cost of this path is heavier than recorded in the D23 (Journal Role & Format) table**:
+   Merely adding the field is **insufficient**. Once the identifier increments, the `jsn` of new records becomes **discontinuous** with the old prefix,
+   while the settled criterion is `jsn == expected`, stopping on inequality ⇒ **all newly written records are lost**, sharing the same disease as `skip_hole`.
+   ⇒ **It also requires modifying a settled prefix rule** (accepting "identifier +1 with counter continuing").
+   The statement in the table "needed, but only consumes bits in sequence number" must be rewritten.
+   ⚠️ 2026-09-13 C199 (instance generation increment contradicts stopping at jsn gaps) two-round three-way argument: D23 (Journal Role & Format) settled item 14 has replay proceed after the last record covered by the selected root; in normal recovery new records and the selected root share the same instance, so the prefix rule does not change; this conclusion holds only under the measurement basis of E37 (Log Instance Generation) where "recovery connects from a stale tail".
+2. **If the identifier is rolled back by one tick, the path fails on the spot, falling back step-by-step to `baseline`.**
+   ⇒ The correctness of this path is **staked entirely on "identifier rollbacks are forbidden"**.
+   ⚠️ **That is isomorphic to the requirement in D9 (Encryption) settled item 8 for the nonce watermark**:
+   D9 (Encryption) verbatim requires the watermark "must not reside in bare plaintext system configuration... must land in a field covered by MAC".
+   **The identifier requires the exact same protection, yet D23 (Journal Role & Format) did not write a single word about it.**
+3. **Where the identifier resides is itself a cycle**: Residing in journal records ⇒ recovery must first read records to discover the identifier,
+   yet reading records requires the identifier to judge; residing in system configuration ⇒ falls into the rollback problem of point 2.
+
+**Bit Width Accounting (Given by Construction)**: Identifier 16 bits ⇒ at most 65,535 recoveries in the lifetime of a volume;
+Counter 48 bits ⇒ 2.8×10¹⁴ records per instance. ⚠️ These two numbers are the division chosen by E37 (Log Instance Generation), not a settled design.
+
+### Measurement Basis and Known Limitations
+
+- **Pure counting model**, no physical device, no virtual machine. Only tests the single dimension of "how the identifier advances",
+  while the follow-up write strategy dimension is fixed to "connect to prefix end + 1" (E32 (Remnants of the Previous Timeline) already tested the alternative).
+- **Persistence path of identifier not modeled**: `epoch_rolled_back` merely constructs the **consequences** of rollback,
+  without modeling where it resides, how it is written, or how it is covered by MAC.
+- **Multiple recoveries not modeled**: Only ran a single identifier increment. What happens upon identifier exhaustion (after 65,535 recoveries) is untested.
+- ⚠️ **One geometry coincidence must be stated explicitly**: When the ring is a power of 2, the high-bit identifier naturally vanishes after modulo,
+  yielding identical results with or without masking (mutation M3 empirical test: removing mask, not a single test went red in power-of-2 cells).
+  A unit test has been supplemented with a **non-power-of-2** ring to nail down the masking step.
+- Code `scripts/experiment-apparatus/e37_log_epoch.rs`
+  (`cargo run --release --bin e37-log-epoch`),
+  raw output `e37-log-epoch-2026-08-29.out`.
+  7 unit tests, **all 6 mutations caught** (table at `scripts/mutation/tables/e37_log_epoch.tsv`).
+
+**Prerequisites**: None. Pure counting model.
+
+### Affected Decisions
+
+| Decision Branch | Relationship | Review |
+|---|---|---|
+| D23 (Journal Role & Format) settled item 9 | Supports | 2026-09-20 Unaffected: recovery with instance identifier passes both criteria, provided identifier rollbacks are forbidden; "must modify prefix rule" holds only under the measurement basis of E37 (Log Instance Generation) connecting from stale tail; repository-wide renaming on same date "系统配置" → "系统配置" only touched wording, conclusions, numbers, and artifacts unchanged |
+| D23 (Journal Role & Format) settled item 10 | Supports | 2026-09-20 Unaffected: instance identifier path is precise; chaining value covering instance identifier provides input guaranteeing "two timelines differ"; repository-wide renaming on same date "系统配置" → "系统配置" only touched wording, conclusions, numbers, and artifacts unchanged |
+| D9 (Encryption) | Prepares material | 2026-09-20 Unaffected: forbidden identifier rollback is isomorphic to D9 (Encryption) settled item 8 requirement for nonce watermark, being the identical vehicle problem; repository-wide renaming on same date "系统配置" → "系统配置" only touched wording, conclusions, numbers, and artifacts unchanged |
+
+## Historical Versions
+
+Historical entries for E37 (Log Instance Generation) are centralized in [experiments-history.md](../experiments-history.md).

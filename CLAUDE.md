@@ -5,7 +5,7 @@
 **并行agent治理与上游sop治理**
 agent治理与上游sop治理，是另外一个重要的任务。因此遇到问题优先从流程、规范和门禁等方面着手解决问题，目的不是改一行代码，而是避免再发。
 
-当前里程碑：**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`，作业点、验收与次序在那份文件；调度在 `records/2026-09-30-里程碑三开工第一轮.md`）。上一个里程碑**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`）已结束，没做完的转进里程碑三项五（五·7 到五·11）；它的崩溃放量已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，入口 `scripts/crash/crash-amplification.sh --list-items` 列分项。再上一个里程碑「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下八个 crate（格式常量、核心、池级 checker、harness 档、checker 档、恢复重放取前缀、择根、扫环三截的核 `singlefs-replay-prefix`、参照文件系统 RefFS、函数单元图 `singlefs-unit-graph`；两档怎么分见 `.claude/rules/verification.md`）。
+当前里程碑：**「共享与回收」**（`.claude/kb/milestone/04-fourth-txn.md`，作业点、验收与次序在那份文件）。上一个里程碑**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`）主体已完结，还开着的是段 4「优化」（二·6、六·4）。再上一个**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`）已结束，没做完的转进里程碑三项五（五·7 到五·11）；它的崩溃放量已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，入口 `scripts/crash/crash-amplification.sh --list-items` 列分项。更早的「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下八个 crate（格式常量、核心、池级 checker、harness 档、checker 档、恢复重放取前缀、择根、扫环三截的核 `singlefs-replay-prefix`、参照文件系统 RefFS、函数单元图 `singlefs-unit-graph`；两档怎么分见 `.claude/rules/verification.md`）。
 
 ## 任务从哪进
 
@@ -13,31 +13,29 @@ agent治理与上游sop治理，是另外一个重要的任务。因此遇到问
 
 @.claude/main-agent.md
 
-改了定义要新派才生效：续做（SendMessage）沿用第一次派发时的定义；新建的定义要等几秒才派得出去。改了 `CLAUDE.md`（连同它 `@` 的规则）要新开会话才对临时派的 agent（general-purpose 这类）生效：同一会话里派的继承会话开始时那一份；`.claude/agents/` 下的定义都开了 `omitClaudeMd`，根本不读 `CLAUDE.md`，要它们知道就写进定义或 `.claude/agent-common.md`。计划、实测与现状在 `records/2026-09-16-subagent拆分提案.md`（除非要查来历，别读它）。
+改了定义要新派才生效：续做（SendMessage）沿用第一次派发时的定义；新建的定义要等几秒才派得出去。改了 `CLAUDE.md`（连同它 `@` 的规则）要新开会话才对临时派的 agent（general-purpose 这类）生效：同一会话里派的继承会话开始时那一份；`.claude/agents/` 下的定义都开了 `omitClaudeMd`，根本不读 `CLAUDE.md`，要它们知道就写进定义或 `.claude/agent-common.md`。计划与实测在 `records/2026-09-16-subagent拆分提案.md`（除非要查来历，别读它），开着的欠账在 `records/2026-10-23-subagent拆分提案.md`。
 
 ## 经验与约定写在哪
 
 别的会话、别的贡献者、派出去的 subagent 可能撞上的坑与约定，写进项目：规则（`.claude/rules/`）、agent 定义与 `.claude/agent-common.md`、kb、`records/`。私有 memory 只放用户个人的偏好（提交时间窗、回复语言这类）。往 `CLAUDE.md` 加内容之前先问它属于哪个 agent，属于就写进那个定义或共用约束。
 
-subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案.md`，不占 `.claude/kb/` 的 C / D / E 编号，kb 只管文件系统本身。定义、共用约束、三方流程与配套脚本的问题：修它们本身就是这一轮的出口时，直接改，不先问；是做别的任务时撞上的，照 `.claude/main-agent.md`「禁止」一节，记下或弹窗，不自行扩大范围。改完记进那份计划；门禁归提交时，由提交前主 agent 照 `.claude/skills/gate/staged-gate.md` 跑的 `scripts/gate/gate-staged.sh` 判；脚本自证与门禁样本，`.claude/hooks/selftest-registry.tsv` 登记为 light 的照钩子拒绝说明里写的起法改了就跑；登记为 heavy 的、登记为 heavy-if-set 而命令里设了那个变量的、没登记的，归提交时。改了定义与共用约束的走一轮三方或由用户逐份豁免（门禁 doc-process-records 的 agent-def-adversarial-review 格判），改了触发文件的写阶段同步记录（门禁 doc-process-records 的 knowledge-sync 格判）。
+subagent 与协作工具的欠账记在 `records/2026-10-23-subagent拆分提案.md`（`records/2026-09-16-subagent拆分提案.md` 是它拆出来之前的历史，不再追加），不占 `.claude/kb/` 的 C / D / E 编号，kb 只管文件系统本身。定义、共用约束、三方流程与配套脚本的问题：修它们本身就是这一轮的出口时，直接改，不先问；是做别的任务时撞上的，照 `.claude/main-agent.md`「禁止」一节，记下或弹窗，不自行扩大范围。改完记进那份计划；门禁归提交时，由提交前主 agent 照 `.claude/skills/gate/staged-gate.md` 跑的 `scripts/gate/gate-staged.sh` 判；脚本自证与门禁样本，`.claude/hooks/selftest-registry.tsv` 登记为 light 的照钩子拒绝说明里写的起法改了就跑；登记为 heavy 的、登记为 heavy-if-set 而命令里设了那个变量的、没登记的，归提交时。改了定义与共用约束的走一轮三方或由用户逐份豁免（门禁 doc-process-records 的 agent-def-adversarial-review 格判），改了触发文件的写阶段同步记录（门禁 doc-process-records 的 knowledge-sync 格判）。
 
 ## 规则（始终生效）
 
 @.claude/singlefs-ai-sop/rules/sop-first.md
 @.claude/singlefs-ai-sop/rules/show-me-test.md
-@.claude/singlefs-ai-sop/rules/code-discipline.md
 @.claude/singlefs-ai-sop/rules/writing-discipline.md
 @.claude/singlefs-ai-sop/rules/rules-discipline.md
 @.claude/singlefs-ai-sop/rules/kb-discipline.md
-@.claude/singlefs-ai-sop/rules/test-discipline.md
 @.claude/singlefs-ai-sop/rules/evidence-discipline.md
 @.claude/singlefs-ai-sop/rules/verify-before-claiming.md
 @.claude/singlefs-ai-sop/rules/command-safety.md
 @.claude/singlefs-ai-sop/rules/session-wrapup.md
-@.claude/singlefs-ai-sop/rules/preflight-discipline.md
 
 四篇理念类规则不 `@` 常驻，开会话先整份读一次、之后按名字回查：`.claude/singlefs-ai-sop/rules/engineering-philosophy.md`、`.claude/singlefs-ai-sop/rules/machine-first.md`、`.claude/singlefs-ai-sop/rules/design-doc-discipline.md`、`.claude/singlefs-ai-sop/rules/pushback-discipline.md`。
-<!-- doc-lint:read-once engineering-philosophy.md machine-first.md design-doc-discipline.md pushback-discipline.md -->
+管怎么写代码、测试与脚本的三篇不 `@` 常驻：派出去的 agent 由定义点名读，主 agent 自己写 `crates/`、测试或脚本之前先整份读一次：`.claude/singlefs-ai-sop/rules/code-discipline.md`、`.claude/singlefs-ai-sop/rules/test-discipline.md`、`.claude/singlefs-ai-sop/rules/preflight-discipline.md`。
+<!-- doc-lint:read-once engineering-philosophy.md machine-first.md design-doc-discipline.md pushback-discipline.md code-discipline.md test-discipline.md preflight-discipline.md -->
 
 ## 规范从哪来
 
@@ -96,9 +94,9 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 | `scripts/gate/stage-mine.py` | 几个会话共写一批文件时，只把这一轮的块放进暂存区（命中 `--match` 的进，命中 `--foreign` 的拒绝） |
 | `scripts/kb/replace-once.py` | 定点替换：旧串在文件里必须恰好命中一次，否则不写；几个会话共写一批文件时只许这样改，不许整份重写 |
 | `scripts/kb/insert-row.py` | 往公共表里插一行：按锚点定位（锚点必须恰好命中一次），写之前复核文件没被别人改过（读时记 sha256，写前再比一次，变了就拒绝）。`replace-once.py` 只解决「改一处已有的文字」，插入没有旧串可替、只能读整份写回，两个会话一前一后会互相覆盖 |
-| `scripts/experiments/perf-by-milestone.md` | singlefs 与六家文件系统按里程碑的性能对比；数来自 E152（按里程碑对比六家文件系统的文件性能），表由 `scripts/experiments/e152-tables.py` 生成 |
+| `scripts/experiment-apparatus/perf-by-milestone.md` | singlefs 与六家文件系统按里程碑的性能对比；数来自 E152（按里程碑对比六家文件系统的文件性能），表由 `scripts/experiment-apparatus/e152-tables.py` 生成 |
 | `records/` | 建设过程 |
-| `briefs/` | 每次更新的简报，按日期一份：那一版能做什么、验到哪、还没罩到什么；旧的不回头改。三语：`YYYY-MM-DD.md` 是中文（默认），`YYYY-MM-DD.en.md` 英语，`YYYY-MM-DD.ja.md` 日语；仓根 README 与 `.claude/kb/` 下的文件同样三份。改一份就三份一起改，怎么改照 `.claude/skills/trilingual/SKILL.md`，用词照 `.claude/kb/translation-glossary.md`；哪些文件受管登记在 `.claude/trilingual-documents`，门禁 doc-text 的 trilingual 四格判 |
+| `briefs/` | 每次更新的简报，按日期一份：那一版能做什么、验到哪、还没罩到什么；旧的不回头改。三语：`YYYY-MM-DD.md` 是中文（默认），`YYYY-MM-DD.en.md` 英语，`YYYY-MM-DD.ja.md` 日语；仓根 README 与 `.claude/kb/` 下的文件同样三份。改一份就三份一起改，怎么改照 `.claude/skills/trilingual/SKILL.md`，用词照 `.claude/kb/translation-glossary.md`；哪些文件受管登记在 `.claude/trilingual-documents`，门禁 doc-text 的 trilingual 六格判 |
 | `.claude/kb/translation-glossary.md` | 翻译术语表：中、英、日三语并排，README、简报与 kb 的译文照它用词，新术语先加进表再用 |
 
 ## 本项目的特殊性
@@ -110,4 +108,4 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 
 - 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。
 - 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。
-- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 8 项；checker 判 103 条不变量（数它的命令：`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；I-8.4（重放幂等） 已实现在崩溃注入的二次崩溃上、不进池级 checker 清单，所以数法排掉它；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。
+- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 25 项（数法：`bash scripts/crash/crash-amplification.sh --list-items` 的输出行数）；checker 判 109 条不变量（数它的命令：`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；I-8.4（重放幂等） 已实现在崩溃注入的二次崩溃上、不进池级 checker 清单，所以数法排掉它；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。

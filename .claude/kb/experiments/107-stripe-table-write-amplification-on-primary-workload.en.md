@@ -1,0 +1,142 @@
+## E107 Stripe Table Write Amplification on Primary Workload — Run (2026-09-06): **Between `w ≥ 3` + stripe member table and `w` constantly 2 all-mirrored, written bytes intersection per publish on D25 (Target Workload Priority) primary workload falls precisely on that primary workload point (8 leaves); whether container is full or empty flips conclusion**
+
+[中文](107-条带表对主负载的写放大.md) · **English** · [日本語](107-ストライプ表が主負荷に与える書き込み増幅.ja.md)
+
+**This tests two costs never measured before**: (a) additional bytes written per publish due to maintaining stripe member table,
+(b) impact of three-phase write ordering "all cells written successfully → write records → publish root" on serial waiting / barrier counts.
+E106 (Carrier for Stripe Member Table) explicitly did not answer these two items — it measured **steady-state space ppm**, not write amplification of a **single publish**.
+
+**The hand-calculated figures from round 3 forward leg reproduced, but its measurement basis is not what the decision asked**:
+332 288 → 496 128 bytes, **1.4931×** (1.2465× unmirrored) reproduced bit-for-bit,
+and that was a measurement basis **excluding parity** — it measured "how much extra is written when adding stripe table", **not "which is cheaper between Arm A and Arm C"**.
+A fair comparison of both arms on the same ruler must include parity; that ratio appears in the "Results" section.
+⚠️ Citing 1.493× must include the measurement basis; assertion `third_round_hand_arithmetic_is_the_no_redundancy_ratio` nails it down.
+
+### Three Arms
+
+| Arm | What It Does | Type |
+|---|---|---|
+| Arm A (byte model) | Given "N leaves per publish" and "currently open container occupied slots f ∈ [0, 582]", slices stripes per D2 (RAID Stripe Policy) settled item 6, counts records per "records not deleted only retired" and "parity cell has entry", calculates COW bytes per container and index fanout; sweeps all values of N ∈ {1, 8, 12, 64} and f; builds variants evaluating tail stripe `w` independently / inheriting full batch | Pure arithmetic |
+| Arm B (hardware latency) | O_DIRECT on temporary file, compares end-to-end latency difference between "single commit of stripe data + parity + record container, wait once for completion" vs "first commit data + parity wait for completion, then commit record container wait for completion"; tests both "write success" semantics (ack / after `fdatasync`) | Local machine test |
+| **Arm C (control: `w` constantly 2 all-mirrored)** | Under same workload, entire pool constantly `w = 2`: data written twice, **zero stripe records written**. Reports total bytes per publish under same measurement basis | Pure arithmetic |
+
+**Arm C is the question this experiment genuinely needs to answer**: benefit of `w ≥ 3` is capacity efficiency, cost is stripe table;
+cost of `w = 2` is writing data twice, benefit is complete absence of stripe table mechanism.
+How their **write bytes** compare on the same ruler had zero numbers across the repository before E107 (Stripe Table Write Amplification on Primary Workload) — and survival of D2 (RAID Stripe Policy) settled item 12 hinged on this comparison.
+⚠️ Space efficiency dimension **does not enter criteria** (`.claude/rules/fs-design.md` "comparing who saves more does not constitute any criterion"), write amplification dimension enters.
+
+### Positive Controls
+
+- Arm A: Force container parameters to match index node size (16384) without counting container index level; cost of packing side level
+  must equal corresponding level in "records directly reside in index leaves" model — inequality indicates two arms not on same ruler (modeled after E103 (Update Cost of Inode Packing Path 1)).
+- Arm B: Insert known `sleep` (5 ms) between two rounds in "wait for completion then commit" path;
+  measured additional latency must fall within ±10%; also include `nosync` control, which must be an order of magnitude faster when not waiting (modeled after E44 (Host Testing and Cost of Sequence Number Bit Width)).
+
+### Invalidation Clauses (Locked Before Run)
+
+1. Arm A negative control: `N = 0` yields non-zero bytes on both sides ⇒ whole round invalidated.
+2. Arm A saturation control: When `N` is much greater than 583, difference between touched containers and `⌈N / 583⌉` exceeds 0.5% ⇒ model wrong, whole round invalidated.
+3. Arm B: Difference between `nosync` and "wait for completion" < 10% ⇒ I/O did not genuinely reach disk, whole round invalidated.
+4. Arm B: Dispersion across five rounds exceeds ±20% ⇒ report "unstable", draw no conclusion.
+5. Unreadable ≠ reading 0: Failing to obtain latency reading in any round invalidates that round.
+
+### Assertions Nailing Absolute Values (Locked Before Run, At Least Five)
+
+`records_per_container_matches_e106` (`107 + 56 × 583 + 13 == 32768`, copied directly from E106 (Carrier for Stripe Member Table)),
+`container_index_height_is_pinned` (828 789 containers, header 76, entry 85 ⇒ height exactly 3),
+`mirror_doubles_component_bytes_exactly` (`81920 × 2 == 163840`, nails stripe table's **own** portion, not ratio of whole publish),
+`baseline_total_bytes_is_pinned` (`8 × 32768 + 4 × 16384 + 4096 + 512 == 332288`),
+`mirror_arm_bytes_are_pinned` (Arm C: 8 leaves × 32768 × 2 + ancestors × 2 + journal + root slot, absolute value calculated separately),
+Arm B `injected_sleep_is_recovered_within_tolerance` (injected 5 ms, recovers within [4.5, 5.5] ms).
+
+### What It Does Not Answer (Locked Before Run)
+
+Covers only D25 (Target Workload Priority) primary workload point (8 leaves / 1 spine), does not cover metaheavy / rand / multistream;
+does not answer cost of branch "do not repair during disk lock period" when encryption enabled;
+**does not adjudicate whether "write success" in three-phase write ordering is ack or durable** — tests both semantics, reports both numbers, leaving semantics to three-way argument or user settlement;
+does not answer interference on Arm B latency when two mirrored copies land on different disks (initially single disk only).
+
+### Prerequisites
+
+Arm A has no prerequisites. Arm B requires real device backend (`.claude/kb/vm-harness.md` measurement basis, image in temp directory not tracked in repo).
+
+### Results (2026-09-06, artifact `e107-stripe-table-wa-2026-09-06.out`, 22 lines, `emitted=22`)
+
+**Measurement basis** (locked before run, in source header): One publish = D25 (Target Workload Priority) primary workload (`N` data leaves 32768 + one shared spine of 4 index nodes 16384
++ journal record 4096 + root slot 512); **journal and root slot do not enter stripes**, both arms count as writing one copy (added and subtracted equally);
+parity constantly 1 cell per stripe; **member records one per cell** (record contains "which column I am" segment);
+`w = clamp(cells in bucket + 1, 2, 4)` clamped to device count, bucketed by cell width (D2 (RAID Stripe Policy) settled item 6).
+
+**Arm A (`w ≥ 3` + stripe table) ÷ Arm C (`w` constantly 2 all-mirrored), same ruler (including parity)**:
+
+| Leaf Count | Container Empty (`f = 0`) | Container Nearly Full (`f = 582`) |
+|---|---|---|
+| 1 | **1.651×** | 1.977× |
+| **8 (D25 (Target Workload Priority) primary workload)** | **0.950×** | **1.050×** |
+| 12 | 0.858× | 0.929× |
+| 64 | 0.712× | 0.728× |
+
+**The figure this experiment needed to answer**: `first_leaves_where_arm_a_cheaper = 8` —
+Arm A is strictly cheaper than Arm C for the first time **precisely at D25 (Target Workload Priority) primary workload**, and cheaper by only **32 768 bytes (4.97%)**.
+At 6 and 7 leaves both arms are **byte-for-byte equal** (528 896 / 594 432), verified cell-by-cell by manual arithmetic:
+`Arm A − Arm C = parity + 163840 − (data + index)`; at 6 leaves `98304 + 163840 = 262144` cancels out exactly;
+at 7 leaves data and parity grow by +32768 simultaneously, difference still 0; at 8 leaves `ceil(8/3)` remains 3 ⇒ parity does not increase ⇒ difference −32768.
+
+⚠️ **Intersection calculated by hand when filing was 6, which was wrong**: missed simultaneous growth of data and parity at 7 leaves.
+Assertion nailing absolute values corrected to 8 after re-listing by hand arithmetic, formulas recorded cell-by-cell in source comments.
+
+**Absolute value of stripe table's share**: Container 32768 + container index 3 levels × 16384 = **81 920 bytes**,
+entire chain constantly takes `w = 2` mirroring ⇒ **163 840 bytes**, and it is **independent of leaf count** —
+this is the entire reason Arm A is expensive on small publishes and economical on large publishes.
+
+**Arm B (hardware latency, O_DIRECT, local ext4 on NVMe, median of 5 rounds)**:
+
+| "Write Success" Semantics | Single Commit All | Three-Phase Write Order (Wait Data+Parity, Then Commit Record Container) | How Much Slower |
+|---|---|---|---|
+| ack (`pwrite` returns) | 152 289 ns | 149 560 ns | **Difference within noise** |
+| durable (`fdatasync`) | 739 846 ns | 1 202 134 ns | **1.625×** |
+
+⇒ **Cost of three-phase write ordering comes entirely from one additional durable barrier**; as long as "write success" is evaluated as ack, it is virtually free.
+***E107 (Stripe Table Write Amplification on Primary Workload) does not adjudicate which semantics should be taken** (item 3 of "What It Does Not Answer" locked before run), reporting both numbers.
+
+**Controls and invalidation clauses**: Negative control `N = 0` constantly 0 on both arms (pass); saturation control 20 000 leaves ⇒ 26 673 records,
+46 containers = `⌈26673/583⌉` (pass, criterion tightened from "diff ≤ 0.5%" at filing to "exact equality");
+positive control byte-for-byte equal between two models on same geometry and unequal on differing geometry (pass);
+invalidation clause 3: durable ÷ nosync = **30.36×** (739 846 ÷ 24 367, far exceeding 10%, I/O genuinely reached disk);
+positive control injected 5 ms recovered to **5 199 857 ns**, falling within ±10%.
+⚠️ **Invalidation clause 4 was triggered once**: without warmup `one_shot` five-round dispersion reached **214%**, dropping to ≤ 24% after adding 8 warmup rounds;
+in `durable` `two_phase` cell, two of three independent runs prior to retained round had dispersion exceeding ±20% (0.342 / 0.267 / 0.077);
+retained artifact round was **0.057** (`spread_two_phase=0.057`, previous three runs had no retained artifact)
+⇒ **that cell truthfully reports "unstable"**: stable across runs is median (959–1202 μs), not single-round dispersion.
+
+**Mutations**: 14 items in `scripts/mutation/tables/e107_stripe_table_wa.tsv`, **all 14 caught**, baseline green before and after run.
+**Rerun** (criterion `timing`, plus five conclusion interval assertions nailing Arm A vs Arm C ratio, intersection point, durable multiple, injection recovery, invalidation clause 3):
+
+```bash
+bash scripts/experiment-apparatus/replay.sh E107
+```
+
+### What It Cannot Answer
+
+- **Only D25 (Target Workload Priority) primary workload point**, does not cover metaheavy / rand / multistream.
+- **No model for real workload distribution of `f` (currently occupied slots in container)** — while at primary workload point `f` going from 0 to 582
+  flips ratio from 0.950 to 1.050. **Conclusion on this cell is sensitive to `f`, and `f` has not been measured.**
+- Does not answer space efficiency (`.claude/rules/fs-design.md` "comparing who saves more does not constitute any criterion"), only answers write bytes and latency.
+- Does not answer interference on Arm B latency when two mirrored copies land on different disks (tested single disk only).
+- Does not answer cost of branch "do not repair during disk lock period" when encryption enabled.
+
+### Decisions Affected
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D2 (RAID Stripe Policy) settled item 12 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D25 (Target Workload Priority) | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+
+## Historical Versions
+
+### 2026-09-06
+- Filed and run on same day. Hand-calculated intersection point 6 at filing mismatched measured 8; verified cell-by-cell by hand arithmetic and nailed to 8, reasons detailed in body.
+- Saturation control criterion tightened from "diff ≤ 0.5%" at filing to "container count exactly equals ⌈record count / 583⌉" —
+  whether `N` in filing text referred to leaf count or record count was ambiguous; tightened version can only be stricter, never looser.
+- Added 8 warmup rounds to Arm B: without warmup first-touch allocation dispersed `one_shot` five rounds to 214%, directly triggering invalidation clause 4.
+

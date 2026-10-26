@@ -1,0 +1,56 @@
+## E28 Can Plaintext Mapping Rebuild Solely from Self-Describing Units — Run (2026-08-29)
+
+[中文](28-明文映射层能不能只靠单元自描述重建.md) · **English** · [日本語](28-平文マッピング層はユニット自己記述のみで再構築可能か.ja.md)
+
+**This page was originally run to clear [checks-owed.md](../checks-owed.md) C34 (three-way clash on plain text mapping layer states); that debt was voided without object on 2026-09-07 following D9 (Encryption) Settled Item 5 shifting to "scrub only" (no plaintext mapping layer established), and is no longer an owed check.**
+D9 (Encryption) Settled Item 7 adopted the interpretation that "plaintext mapping layer is derived state, and reconstruction source is unit self-description",
+an interpretation with an unmet prerequisite: D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment) had already pointed out **zero self-description in data blocks**.
+
+**Criterion is "reconstructed table is entry-by-entry identical to original table"**, not "a table was reconstructed"—
+judging only entry counts would allow a completely erroneous table to pass.
+
+### Measured Results (Byte-identical across Three Rounds)
+
+| Metadata | Data Blocks | Data Blocks Carry Self-description | Missing Entries | Address Errors | Missing Metadata | Missing Data Blocks |
+|---|---|---|---|---|---|---|
+| 64 | 256 | No | **256** | 0 | 0 | **256** |
+| 64 | 256 | Yes | **0** | 0 | 0 | 0 |
+| 1024 | 4096 | No | **4096** | 0 | 0 | **4096** |
+| 1024 | 4096 | Yes | **0** | 0 | 0 | 0 |
+
+**Two Conclusions**:
+
+1. **On the metadata side, zero missing, zero errors** ⇒ D21 (Boundary Between Authoritative and Derived States) Settled Item 9 "indexes are derived state" and
+   I-6.10 (deactivated · the plaintext mapping layer no longer exists) "reconstruct from authoritative side" hold for metadata,
+   and two of the three conflicting locations are self-consistent.
+2. **On the data block side, the shortfall exactly equals total data block count** ⇒ not a single entry could be reconstructed on 2026-08-29.
+   **Positive control**: after adding self-description to data blocks, shortfall drops to zero —
+   ⇒ what is missing is self-description itself, not a broken reconstruction path.
+   This is the quantifiable manifestation of D18 (Information Carried in a Block) Settled Item 3.
+
+⇒ **The ruling of D9 (Encryption) Settled Item 7 holds for metadata units, but owes D18 (Information Carried in a Block) Settled Item 3 for data blocks.** That statement is backed by empirical measurements.
+
+### Measurement Basis and Known Limitations
+
+- Pure logical model. **Does not model concurrent relocations, nor does it model corruption of self-description itself**.
+- "Entry-by-entry identical" compares only (tree, object, generation) → physical address layer, **without comparing other fields of self-description**.
+- Code `scripts/experiment-apparatus/e28_map_rebuild.rs` (`cargo run --release --bin e28_map_rebuild`),
+  raw output `e28-map-rebuild-2026-08-29.out`. Three rounds byte-identical.
+- 5 unit tests, all 5 mutations caught. ⚠️ One blind spot caught by mutation testing:
+  first version of "entry-by-entry address comparison" test **computed wrong itself**, bypassing tested code, so deleting statistical lines left zero tests red.
+
+### Impacted Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D18 (Information Carried in a Block) Settled Item 3 | Support | 2026-10-17 unaffected: this round only synchronizes phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: wording only (time words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D18 (Information Carried in a Block) Settled Item 13 | Support | 2026-10-17 unaffected: this round only synchronizes phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: wording only (time words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D9 (Encryption) | No impact | 2026-10-17 unaffected: this round only synchronizes phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: wording only (time words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment) | No impact | 2026-10-17 unaffected: this round only synchronizes phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: wording only (time words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D21 (Boundary Between Authoritative and Derived States) Settled Item 9 | Support | 2026-10-17 unaffected: this round only synchronizes phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: wording only (time words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D21 (Boundary Between Authoritative and Derived States) Settled Item 12 | Support | 2026-10-17 unaffected: this round only synchronizes phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: wording only (time words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D21 (Boundary Between Authoritative and Derived States) Settled Item 13 | Support | 2026-10-17 unaffected: this round only synchronizes phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: wording only (time words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+
+## Historical Versions
+
+Historical entries for E28 (Can Plaintext Mapping Rebuild Solely from Self-Describing Units) are gathered in [experiments-history.md](../experiments-history.md).

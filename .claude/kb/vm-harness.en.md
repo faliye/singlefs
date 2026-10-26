@@ -9,7 +9,7 @@ This document covers only the current status, not history.
 ## In short
 
 ```bash
-cd scripts/experiments
+cd scripts/experiment-apparatus
 cargo build --release --target x86_64-unknown-linux-musl --bin <experiment_bin_name>
 bash ../devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<name> /dev/vda <args...>
 ```
@@ -23,7 +23,7 @@ bash ../devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<name> /dev
 VM_DISKS=4 VM_DISK_MB=64 bash scripts/devices/vm-bench.sh <static_binary>
 ```
 
-Multiple disks are required for E53 (can root ring still mount after losing an entire disk): "whether it can still mount after losing an entire disk"
+Multiple disks are required for E53 (Can Root Ring Mount After Losing an Entire Disk): "whether it can still mount after losing an entire disk"
 can only be asked when there are truly multiple disks. After modifying the harness, **run `--selftest` first**; it counts only if it passes.
 
 ⚠️ **Minimal initramfs lacks `dm-error` / `mdadm`**:
@@ -47,14 +47,14 @@ the first acquires KVM, the second fails to acquire, outputting "success case �
 ⚠️ **Only one readable kernel exists under local `/boot`: `vmlinuz-6.17.0-lockdep`** (others are `-rw-------`）。
 **It carries lockdep**, with massive lock-checking overhead ⇒ **times measured in VM cannot be compared to host**,
 though **counting metrics (I/O count, block count) are unaffected**. Citations of times measured in VM must include this statement.
-⚠️ **To compare time, use `vm-kernel.sh --release $(uname -r)` to get the OEM kernel currently running on host** (used by E152 (per-milestone file performance against six file systems)):
+⚠️ **To compare time, use `vm-kernel.sh --release $(uname -r)` to get the OEM kernel currently running on host** (used by E152 (Per-Milestone File Performance Against Six File Systems)):
 Without lockdep, times across several VM runs on the same test bench can be compared with each other; they still cannot be compared with times on host (virtualization and `cache=none` are involved).
 Times measured with lockdep kernel are unsuitable even for cross-VM comparison: lock checking overhead scales with lock acquisition count, and tested subjects acquire locks differently (conjectured, not measured locally).
 
 ## Hygiene check before running
 
 `vm-bench.sh` carries `EXIT` trap to clean working directories, but **still worth checking before launching**
-(this cleanup was retrofitted; before retrofitting, 154 directories and 4.5 GB were cleaned at once, see changelog at end):
+(this cleanup was retrofitted; before retrofitting, 154 directories and 4.5 GB were cleaned at once, see Historical Versions at end):
 
 ```bash
 ps -eo pid,etimes,args --no-headers | grep '[q]emu-system'   # leftover VMs
@@ -66,7 +66,7 @@ losetup -a                                                    # leftover loops
 Pattern string will match wrapper's own command line. To stop VMs, check with `ps` first, then kill with literal pid.
 `VM_KEEP=1` preserves working directory to inspect scene upon failure.
 
-## Harness must self-check first
+## Harness must self-test first
 
 ```bash
 bash scripts/devices/vm-bench.sh --selftest
@@ -85,8 +85,8 @@ identical to `.claude/singlefs-ai-sop/rules/show-me-test.md` "gates must not pre
 | Time | Comparable | lockdep kernel: **incomparable**; `--release` OEM kernel: comparable across multiple VM runs on same bench, still incomparable to host |
 
 ⚠️ **Independent block-layer reading is the verification path for several experiments**—
-E7 (offline index harness) lists "block layer matching program counters cell by cell" as one of its four verification layers;
-E12 (sequential append in batches vs unbatched random page read-modify-write) relied on it for fault injection verification
+E7 (Offline Index Harness) lists "block layer matching program counters cell by cell" as one of its four verification layers;
+E12 (Batched Sequential Append vs Unbatched Random Page RMW) relied on it for fault injection verification
 (after removing `O_DIRECT`, block-layer reading dropped to zero while program counter remained unchanged).
 ⇒ **Re-running these experiments on regular files reproduces numbers, not that verification.** When citing, distinguish them.
 
@@ -102,7 +102,7 @@ anchoring with `^` silently misses lines. Thus extraction uses `grep -ao` withou
 **Once `-<feature>` appears in `VM_CPU`, `vm-bench.sh` requires tested program to emit at least one line of
 `E7RESULT name=kat ... ok=true`**, otherwise entire round is invalidated.
 
-**Why this gate is needed** (experienced on 2026-08-31, E6 (encryption algorithm selection)):
+**Why this gate is needed** (experienced on 2026-08-31, E6 (Encryption Algorithm Selection)):
 `-cpu host,-aes` only strips CPUID's `aes` bit, while RustCrypto's `aes` 0.9.3
 **separately** probes both `aes` and `vaes` bits (`src/lib.rs` snippet `cpufeatures::new!(features_vaes256,`) ⇒ guest still executes AES instructions:
 
@@ -138,16 +138,16 @@ Recording happens outside guest, sharing no code with tested program's own recor
 
 ⚠️ This tier verifies "writes and FLUSHes emitted by program arrive verbatim with order preserved on virtual device", not real disk durability semantics: under `cache=none`, device-side FLUSH maps to host `fdatasync`, host disk's own cache is not in scope.
 
-## Auxiliary root and disk image preallocation (two switches added for E152 (per-milestone file performance against six file systems))
+## Auxiliary root and disk image preallocation (two switches added for E152 (Per-Milestone File Performance Against Six File Systems))
 
 | Switch | Function | Measurement basis |
 |---|---|---|
-| `VM_EXTRA_ROOT=<dir>` | Contents in directory merged verbatim into initramfs root | E152 (per-milestone file performance against six file systems) generates it via `scripts/devices/e152-stage-root.sh`: fio, formatting and mounting tools of each file system along with all libraries resolved by ldd, decompressed kernel modules and load orders, total 129 MB; initramfs packaged with gzip -1, adding a few seconds per VM boot |
+| `VM_EXTRA_ROOT=<dir>` | Contents in directory merged verbatim into initramfs root | E152 (Per-Milestone File Performance Against Six File Systems) generates it via `scripts/devices/e152-stage-root.sh`: fio, formatting and mounting tools of each file system along with all libraries resolved by ldd, decompressed kernel modules and load orders, total 129 MB; initramfs packaged with gzip -1, adding a few seconds per VM boot |
 | `VM_DISK_PREALLOCATE=1` | Disk image preallocated via fallocate instead of truncated into sparse file | Host ext4 does not allocate on the fly while guest writes; run aborted if preallocation fails, never falling back to sparse file |
 
 ⚠️ **When placing dynamically linked programs into auxiliary root, libraries (especially `/lib64/ld-linux-x86-64.so.2`) must carry execution bits.**
 Kernel executes ELF loader first when running dynamic programs; without execute bit, every dynamic program in guest reports Permission denied, while statically linked programs run normally.
-Measured (2026-09-15, E152 (per-milestone file performance against six file systems) first smoke run): libraries installed as 0644, 7 of 8 configurations stuck on first external command, only statically linked singlefs binary succeeded.
+Measured (2026-09-15, E152 (Per-Milestone File Performance Against Six File Systems) first smoke run): libraries installed as 0644, 7 of 8 configurations stuck on first external command, only statically linked singlefs binary succeeded.
 `e152-stage-root.sh` installs with 0755 and tests fio with assembled loader and libraries upon completion; auxiliary root is not delivered if this step fails.
 
 ## Timing does not log timestamps inside output forwarding loops
@@ -155,20 +155,20 @@ Measured (2026-09-15, E152 (per-milestone file performance against six file syst
 Guest often runs tested program as child process (`Stdio::piped()`) via wrapper, reading result lines and re-printing to standard output, captured by host via serial. **Never take line arrival timestamp inside "read line, log timestamp, forward line, read next line" loop as segment wall clock.**
 Guest standard output is serial ttyS0 (`scripts/devices/vm-bench.sh` flags `-serial mon:stdio` and `console=ttyS0`), forwarding a line blocks for several milliseconds; child process writes to pipe unblocked, causing timestamps of subsequent lines to carry accumulated forwarding lag of previous lines, fluctuating and mimicking VM scheduling jitter.
 
-Measured (2026-09-17, E152 (per-milestone file performance against six file systems) two formal runs on 2026-09-17): lines printed consecutively by child process with only microseconds of computation had timestamps spanning 21.7–25.8 ms; in 9 of 10 rounds, outer wall clock for overwrite, release, rollback and reuse was smaller than nanoseconds measured by child itself, physically impossible; initial two runs' first-segment wall clock "splitting into two groups" was also this backlog. Round-by-round numbers in E152 (per-milestone file performance against six file systems) experiment page section "What these numbers show (overwrite, release, rollback and reuse compared with two-disk mirror of six systems)" item 4.
+Measured (2026-09-17, E152 (Per-Milestone File Performance Against Six File Systems) two formal runs on 2026-09-17): lines printed consecutively by child process with only microseconds of computation had timestamps spanning 21.7–25.8 ms; in 9 of 10 rounds, outer wall clock for overwrite, release, rollback and reuse was smaller than nanoseconds measured by child itself, physically impossible; initial two runs' first-segment wall clock "splitting into two groups" was also this backlog. Round-by-round numbers in E152 (Per-Milestone File Performance Against Six File Systems) experiment page section "What these numbers show (overwrite, release, rollback and reuse compared with two-disk mirror of six systems)" item 4.
 After modifying harness to read completely before forwarding, a smoke run on same machine showed 9 lines spanning 24 µs, with outer 6 632 915 ns containing child's self-measured 6 575 144 ns (`e152-preregistration.md` section 14).
 
 | Approach | Example |
 |---|---|
 | Measure time inside tested process, record nanoseconds in result line | `nanoseconds=` in `name=file_overwrite` line of real device binary; take this number when comparing wall clock per operation with others, covering only that operation |
-| If slicing by arrival time is truly necessary, read child output to EOF first, record arrival timestamp per line, forward after reading | `read_lines_with_arrival_times` in E152 (per-milestone file performance against six file systems) harness: signature provides no output handle, preventing forwarding inside read loop |
-| When both outer and inner counts exist, report inclusion self-check; rounds where outer fails to contain inner excluded from median | `file_overwrite_outer_contains_inner` in E152 (per-milestone file performance against six file systems), reporting `summary_excluded` for false, NA, or missing fields |
+| If slicing by arrival time is truly necessary, read child output to EOF first, record arrival timestamp per line, forward after reading | `read_lines_with_arrival_times` in E152 (Per-Milestone File Performance Against Six File Systems) harness: signature provides no output handle, preventing forwarding inside read loop |
+| When both outer and inner counts exist, report inclusion self-test; rounds where outer fails to contain inner excluded from median | `file_overwrite_outer_contains_inner` in E152 (Per-Milestone File Performance Against Six File Systems), reporting `summary_excluded` for false, NA, or missing fields |
 
 Enforced by: Built-in "relay timing" stage in shared `gate.sh` (merged upstream into `.claude/singlefs-ai-sop/scripts/relay-timing-lint.py`, no longer local gate under `.claude/gate.d/`) scans Rust and Python harnesses under `research/` and `crates/`, going red if timestamp and output are taken simultaneously inside child output read loop; detects read loops moved to another function in same file (one layer); unable to reach outputs hidden in custom functions, cross-file / 2+ layer transfers, channel / struct field transfers, or shell `while read` with `date`, listed in script header. Does not scan `research/prompts/` and `research/results/` (frozen evidence).
-⚠️ Inclusion self-check only checks if outer contains inner, unable to detect concurrent drift; nanoseconds measured by child process itself is the only sound path.
+⚠️ Inclusion self-test only checks if outer contains inner, unable to detect concurrent drift; nanoseconds measured by child process itself is the only sound path.
 
 ## Guest block-layer counts vs program counts: Different conventions for write request counts
 
 Write request count in guest `/sys/block/*/stat` exceeds write calls counted by program by "barrier count + FUA write count": for every barrier (`fdatasync`) and FUA write in program, block layer logs one additional write request; written bytes and FLUSH counts match one-to-one.
-Measured (2026-09-17, E152 (per-milestone file performance against six file systems) two formal runs on 2026-09-17, all 4 groups matching per-disk readings): publish B disk 0 had 10 program writes, 2 barriers, block layer 12; disk 1 had 11 program writes, 2 barriers, 1 FUA, block layer 14; prior to publish B, disk 0 had 23 program writes, 8 barriers, 4 FUAs, block layer 35; disk 1 had 21 program writes, 8 barriers, 2 FUAs, block layer 31. Kernel rationale uninvestigated.
-⇒ Convert first when comparing write requests between program counts and block-layer counts; when comparing against other file systems (which have only block-layer numbers), use block-layer counts. Block layer counts only requests and bytes without distinguishing categories; using it to corroborate "how read requests are split" can only claim compatibility (E152 (per-milestone file performance against six file systems) experiment page first result item 1).
+Measured (2026-09-17, E152 (Per-Milestone File Performance Against Six File Systems) two formal runs on 2026-09-17, all 4 groups matching per-disk readings): publish B disk 0 had 10 program writes, 2 barriers, block layer 12; disk 1 had 11 program writes, 2 barriers, 1 FUA, block layer 14; prior to publish B, disk 0 had 23 program writes, 8 barriers, 4 FUAs, block layer 35; disk 1 had 21 program writes, 8 barriers, 2 FUAs, block layer 31. Kernel rationale uninvestigated.
+⇒ Convert first when comparing write requests between program counts and block-layer counts; when comparing against other file systems (which have only block-layer numbers), use block-layer counts. Block layer counts only requests and bytes without distinguishing categories; using it to corroborate "how read requests are split" can only claim compatibility (E152 (Per-Milestone File Performance Against Six File Systems) experiment page first result item 1).

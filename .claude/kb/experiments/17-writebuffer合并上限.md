@@ -1,6 +1,6 @@
 ## E17 write buffer 合并上限 —— 已跑（2026-08-28）
 
-**中文** · [English](17-writebuffer合并上限.en.md) · [日本語](17-writebuffer合并上限.ja.md)
+**中文** · [English](17-write-buffer-merge-limit.en.md) · [日本語](17-ライトバッファマージ上限.ja.md)
 
 **测的是**：合并的单线程上限，以及无锁并行。
 
@@ -58,7 +58,7 @@ D8（核心索引结构） 正文明写「flush 时按 key 排序**丢弃时间�
 **口径**：纯 CPU/内存实验，无设备、无虚机。400 万条目 / 4096 个目标叶 /
 key 空间为叶数的 64 倍（保证有重复可去）/ 条目 24 字节（key + seq + value）/
 每档取 5 轮最好值。机器：AMD Ryzen 9 9950X，16 核 32 线程。
-代码 `scripts/experiments/e17_merge.rs`，`cargo run --release --bin e17-merge`，
+代码 `scripts/experiment-apparatus/e17_merge.rs`，`cargo run --release --bin e17-merge`，
 原始输出 `e17-merge-2026-08-28.out`。
 
 **非平凡性保证**：两条臂**共用同一份输入**，且**输出必须与真值逐位相同**，不同即整轮作废。

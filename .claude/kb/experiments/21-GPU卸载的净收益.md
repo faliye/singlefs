@@ -1,6 +1,6 @@
 ## E21 GPU 卸载的净收益 —— 三段全部已测（2026-08-28）；纯扫描那格判负收益，候选三格**暂缓不排期**
 
-**中文** · [English](21-GPU卸载的净收益.en.md) · [日本語](21-GPU卸载的净收益.ja.md)
+**中文** · [English](21-net-benefit-of-gpu-offloading.en.md) · [日本語](21-GPUオフロードの純収支.ja.md)
 
 ### 已跑的两段，以及它们单独就能判掉什么
 
@@ -101,7 +101,7 @@ E21（GPU 卸载的净收益）前几次测量各自只让 GPU 忙 2.06 ms（计
 「阴性结果要能和『代码没跑到』分开」——**要说「这条路径跑过」，就得有读数证明它真的执行了**，
 而毫秒级基准本身提供不了那个读数。
 ⇒ **做法**：GPU 类基准要么同时采占用率/功耗，要么另跑一段足够长的持续负载作为存在性证明。
-脚本 `scripts/experiments/e21-prove-gpu.py`。
+脚本 `scripts/experiment-apparatus/e21-prove-gpu.py`。
 
 ### 还有一层压在上面：这三个场景全是盘限的
 
@@ -165,14 +165,14 @@ E21（GPU 卸载的净收益）的两个单测钉的是「折叠与顺序无关�
 
 ### 口径与代码
 
-GPU 传输段：`scripts/experiments/e21-transfer.py`（torch 2.11.0+cu130），每档先跑一轮丢弃（建 CUDA 上下文），
+GPU 传输段：`scripts/experiment-apparatus/e21-transfer.py`（torch 2.11.0+cu130），每档先跑一轮丢弃（建 CUDA 上下文），
 **每次计时前后都 `torch.cuda.synchronize()`**——不同步量到的是异步启动不是传输，数字会好看一个数量级。
 N=5 取中位。
-CPU：`scripts/experiments/e21_cpu.rs`，`cargo run --release --bin e21-cpu -- 2048 5`，
+CPU：`scripts/experiment-apparatus/e21_cpu.rs`，`cargo run --release --bin e21-cpu -- 2048 5`，
 2 GiB 缓冲、5 轮取最好值；4 个单测，3 条变异逐条证明会红
 （其中一条变异暴露了单测**自己重写了一遍分块逻辑、没走生产路径**，已抽成共用函数）。
 输出 `e21-cpu-2026-08-28.out`。
-GPU 计算段：`scripts/experiments/e21-compute.py`（显存内异或折叠 + 含传输的同一个算子 + 阳性对照），
+GPU 计算段：`scripts/experiment-apparatus/e21-compute.py`（显存内异或折叠 + 含传输的同一个算子 + 阳性对照），
 「计算段」那一节的 1041.3 GB/s、50.3 GB/s、9.7% 与阳性对照 10.3× 都出自它；
 ⚠️ **它的原始输出未留存**，那几个数只能靠重跑这个脚本复核（本机要 CUDA 与 ≥ 4 GiB 空闲显存，脚本自己会拒绝不满足的机器）。
 

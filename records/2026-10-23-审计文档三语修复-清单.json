@@ -1,0 +1,372 @@
+{
+  "scope": "Code-first audit K01-K10, retained sparse-table progress issue, current journal-format arithmetic and dependent index/history/capability updates. Markdown only.",
+  "files": [
+    {
+      "path": ".claude/kb/decisions-history.en.md",
+      "before_sha256": "700dc630fb77ea6884fa941b52ea298f45ab63cf878d8d703a3acc0d58036d54",
+      "after_sha256": "d259f603b4244e99fe1e14056f78e7907ed535eedd31971c64d50818337e666d",
+      "exact_replacements": 6,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions-history.ja.md",
+      "before_sha256": "e98a5e5caa0d9df951390ebd637e86120c1d2708b02d502f480a8c41e641904c",
+      "after_sha256": "e8eb2743c60476ded1e2bf19bd318120ef094dd2d4a0d4db40dc56ed6934a1ba",
+      "exact_replacements": 6,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions-history.md",
+      "before_sha256": "afaf35baccc86a95feee22346e784cf6ebbd32132918e0a391d4db10900a88d2",
+      "after_sha256": "d54a5c5e10af7eac8e431e7ffb30595fcd06ee7b94884186098f4c70d081a342",
+      "exact_replacements": 6,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions.en.md",
+      "before_sha256": "62429095f12232aba98768908394526633571e966c06157002ab0162eab5af36",
+      "after_sha256": "b2d855a3d301368f4bde5c363286298e6ba4e7187f4ed62a90efbce3cf1ab5b7",
+      "exact_replacements": 5,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions.ja.md",
+      "before_sha256": "6cc808b110a36d7a7fd79b57de19a370055693186fc461bb26f8345d5fb0b76f",
+      "after_sha256": "3117ddc5a02d508d17b8b56a36f3bc956845a3be5b51287bb1fcfe90ba6ae0ac",
+      "exact_replacements": 4,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions.md",
+      "before_sha256": "5a1f3e3490c8d5bcd82eb1354595cb6f16caafc56b14bde19f233de71aed3bc4",
+      "after_sha256": "fbd76ff1b7f575511d16faf6c11084268d9d76cf7191ddf86e2487eaf2bdf116",
+      "exact_replacements": 4,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/04-checksum-location.en.md",
+      "before_sha256": "1cb170b129ea640e8a50627d77679d1f9d26b21e9e42b5de0ed5dc8876e36b38",
+      "after_sha256": "c934e5b358a21dd143a72c8f9263fdcec3577403c2702ae9b7e1165d0c112d51",
+      "exact_replacements": 3,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/04-チェックサム配置位置.ja.md",
+      "before_sha256": "5338e13c9d28b8f359f80e167bdf015c704efe96cd490c8acd880cddc53094f6",
+      "after_sha256": "9337659a5ef8fa50fe31ae4729b8e28f78187b6ef5c977799b786e53ec9a8a35",
+      "exact_replacements": 3,
+      "concurrent_difference": [
+        "--- \n",
+        "+++ \n",
+        "@@ -139 +139 @@\n",
+        "-## 履歴",
+        "+## 履歴バージョン"
+      ]
+    },
+    {
+      "path": ".claude/kb/decisions/04-校验和位置.md",
+      "before_sha256": "97b86bdfaefe88a0da7443c8ad19c18c21f1e913daa71b6a7d7f8b2af2300a0e",
+      "after_sha256": "89e2ac533621fc4c8adb95ce222a415de022be839d82e7500d11abca6448223b",
+      "exact_replacements": 3,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/05-snapshot-space-accounting-mechanism.en.md",
+      "before_sha256": "e01441389a2369727f93b4133c869674f57a437dbfbf57fe79fcc7fa0a9aa910",
+      "after_sha256": "000e6d4ba8a391d10aa244735ff0ce24a07e0626fdf8af8fba2003dd58271acd",
+      "exact_replacements": 2,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/05-スナップショット-空間会計メカニズム.ja.md",
+      "before_sha256": "114c11af9d0c4e53774cb1c99fee05b30e384500f7145a9e3ec508b184a8b470",
+      "after_sha256": "ac8306bae88007ee40641fab289f54df551a7719adb1bb5998e04333941f369a",
+      "exact_replacements": 2,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/05-快照-空间记账机制.md",
+      "before_sha256": "8fe666699f49ec29e49e75e05f4b6c04d8a239a2c90c9dc5b032c659e35509b5",
+      "after_sha256": "ace0e64276da5bbadb855dd813b9d8c450d066a2bcb5b67f75a3ed877094f8ff",
+      "exact_replacements": 2,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/08-core-index-structure.en.md",
+      "before_sha256": "20dc884aa15e55991fd0d4a4bdaca9e62903ae66a3dad85cb39c2dea3f3dcbde",
+      "after_sha256": "a27012fa599a8a506aa19d868b73ad305f48d58360675ebe4750d9e8208540a7",
+      "exact_replacements": 3,
+      "concurrent_difference": [
+        "--- \n",
+        "+++ \n",
+        "@@ -531 +531 @@\n",
+        "-## Version History",
+        "+## Historical Versions"
+      ]
+    },
+    {
+      "path": ".claude/kb/decisions/08-コアインデックス構造.ja.md",
+      "before_sha256": "68ae33d40ccf409f8f83be3b8f9216fd4e0aa894404a1eeaf87c50284ec8f7af",
+      "after_sha256": "7972a9f53a7fde94491f69132dfef9c205af0e394def685e31c415a975bf5192",
+      "exact_replacements": 3,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/08-核心索引结构.md",
+      "before_sha256": "7520f3dbb663afdc38e43e8c6a5212396dd23bc7375652083250b3245ae66f15",
+      "after_sha256": "cf535e04aea2c6e9fd0afc2db87743d078774568bc0694bf560f9d1035296c1d",
+      "exact_replacements": 3,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/09-encryption.en.md",
+      "before_sha256": "e4096fca440ace0438dbe24f453598c28ac3edf076258640bc35c08414e6fbb8",
+      "after_sha256": "7a1b5ba870c37efc3bad2fafdf04ebb367cb2cdb59955a526e58db14e7ed1f12",
+      "exact_replacements": 3,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/09-加密.md",
+      "before_sha256": "319e51b2f7741d7020c0dba410c9d19fd975d634b1a500c976d3f316705dc5c5",
+      "after_sha256": "8ff08ab7d12631073c3da3ae7c7c21e09e11a46c3e7404f1680a416818d60da7",
+      "exact_replacements": 3,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/09-暗号化.ja.md",
+      "before_sha256": "c860b70719b9cb3625a19852a6ec414c622131f59b26def9ac9478912118cd78",
+      "after_sha256": "123c5b32515d93b75cbcedd8e6f5426a1484cc6c499659f6c127e73a922a3dff",
+      "exact_replacements": 3,
+      "concurrent_difference": [
+        "--- \n",
+        "+++ \n",
+        "@@ -372 +372 @@\n",
+        "-## 履歴",
+        "+## 履歴バージョン"
+      ]
+    },
+    {
+      "path": ".claude/kb/decisions/16-publish-semantics.en.md",
+      "before_sha256": "ae329baec0213aa161d7d146cb6f9bd14c79f27ae672602e09d89bb00fd86e07",
+      "after_sha256": "c1d106ced85cde263c9dc1abb4dcccbfcd9a42906aae49dadaac29dc77e5946f",
+      "exact_replacements": 7,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/16-パブリッシュセマンティクス.ja.md",
+      "before_sha256": "ea78c0a5a6f781fcac009b826a6246c388ea9e019fd0a7d78fccccc8a6ce3033",
+      "after_sha256": "439e1b6b49fe2d7af753ce743a6d651c9671ad75a45a117b5d4e8616505e1f43",
+      "exact_replacements": 7,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/16-发布语义.md",
+      "before_sha256": "617acf3c26b5b592c62aac697dd0fe1f09e1944e1fee58d8a8c56df045a47928",
+      "after_sha256": "e705327d0b2cb00fe6e8f61a3f3889e4c99ee55a8cf094ad583d2ff44e3b7453",
+      "exact_replacements": 7,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/decisions/26-background-compaction-and-placement-reclamation.en.md",
+      "before_sha256": "dfcf289ea2c4075bc6acfca65cb4141f594542c4624933f992e6236275f1a101",
+      "after_sha256": "694b7b039fd28f35bedb1e751d3141d5d92bf23c710f49e20485229f7fb49ae7",
+      "exact_replacements": 4,
+      "concurrent_difference": [
+        "--- \n",
+        "+++ \n",
+        "@@ -332 +332 @@\n",
+        "-## Version History",
+        "+## Historical Versions"
+      ]
+    },
+    {
+      "path": ".claude/kb/decisions/26-バックグラウンド整理と配置回収.ja.md",
+      "before_sha256": "0f1cb3b497b4988ce90007be0fc1cb4b374accffb8fafa5d1fe9a323b94cfab7",
+      "after_sha256": "29d535375e377d02c7785a15c5eb9ecbfde177b73399458c52e17eb39a66f758",
+      "exact_replacements": 4,
+      "concurrent_difference": [
+        "--- \n",
+        "+++ \n",
+        "@@ -332 +332 @@\n",
+        "-## 変更履歴",
+        "+## 履歴バージョン"
+      ]
+    },
+    {
+      "path": ".claude/kb/decisions/26-后台整理与放置回收.md",
+      "before_sha256": "a6fea364933154a9f04299c3b51c6e7fe02b59bcd15819e11236b71cf78859aa",
+      "after_sha256": "4465cb4a7a873e34e15b0424ac1cd9c011fa9f88ef4db8b3b2ea6400ec8d02b8",
+      "exact_replacements": 4,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/milestone/04-fourth-txn.en.md",
+      "before_sha256": "e5b89774fe92574c1ca60b4647abbb1127233b0e71b4da34b62a45cca64955da",
+      "after_sha256": "905022732df0c36e277cc2a8c0a7bd94da4bce5770ae635612f9a8ea568a9c67",
+      "exact_replacements": 9,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/milestone/04-fourth-txn.ja.md",
+      "before_sha256": "1d6d5d3069cc5a8fed11b60857971a8acb81fadab17781537c2e9e9ee0aceee7",
+      "after_sha256": "9f784bd10c46926f1fa5da6455974d30d4b82bb811f0c3c90301a1c0046f9c13",
+      "exact_replacements": 7,
+      "concurrent_difference": []
+    },
+    {
+      "path": ".claude/kb/milestone/04-fourth-txn.md",
+      "before_sha256": "3d3b5f041a80bdfd5fc6e13cb9705b18d51214fe37ddb39763f5324f092dd9ce",
+      "after_sha256": "29b6209c4288a27dcc9661ab3970a0ecb659a374063635d8e85e66d01d83e6f4",
+      "exact_replacements": 6,
+      "concurrent_difference": []
+    },
+    {
+      "path": "README.en.md",
+      "before_sha256": "71c54c9d9e4fe9584a4585b591e39fb01005c4d4aa88102abf1e1a0e26217477",
+      "after_sha256": "699dd4ccb70952292546063589d55fd6bef4cc1bcf6ac5a7c3fdd6eb5cf447a6",
+      "exact_replacements": 1,
+      "concurrent_difference": []
+    },
+    {
+      "path": "README.ja.md",
+      "before_sha256": "0a176255e046a1db07bf5f95ae35989c6d044a879fd882c48245fd862bd0fc17",
+      "after_sha256": "7ee7c48826b098587383751ec197d4a9b0badd850e8aa7a6175fdafc6ccba6d6",
+      "exact_replacements": 1,
+      "concurrent_difference": []
+    },
+    {
+      "path": "README.md",
+      "before_sha256": "aac70da8e9dba1a4a5e68db72af6a244f2739bf19ad8ca21f779454112f3444d",
+      "after_sha256": "4a3ffdd337845c6db88622c115e2b85a7537c0802e06106a3a5d2d40c1baa52f",
+      "exact_replacements": 1,
+      "concurrent_difference": []
+    }
+  ],
+  "trilingual_groups": [
+    {
+      "group": "README",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/decisions",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [
+        [
+          "en",
+          "历史版本",
+          "Historical Versions"
+        ]
+      ],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/decisions-history",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/milestone/04-fourth-txn",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [
+        [
+          "en",
+          "历史版本",
+          "Historical Versions"
+        ]
+      ],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/decisions/04-校验和位置",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [
+        [
+          "ja",
+          "历史版本",
+          "履歴バージョン"
+        ]
+      ],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/decisions/05-快照-空间记账机制",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/decisions/08-核心索引结构",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [
+        [
+          "en",
+          "历史版本",
+          "Historical Versions"
+        ]
+      ],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/decisions/09-加密",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/decisions/16-发布语义",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [],
+      "new_problems": []
+    },
+    {
+      "group": ".claude/kb/decisions/26-后台整理与放置回收",
+      "structure": [],
+      "baseline_structure": [],
+      "glossary": [],
+      "baseline_glossary": [
+        [
+          "en",
+          "历史版本",
+          "Historical Versions"
+        ],
+        [
+          "ja",
+          "历史版本",
+          "履歴バージョン"
+        ]
+      ],
+      "new_problems": []
+    }
+  ],
+  "checks": {
+    "groups": 10,
+    "files": 30,
+    "structure_errors": 0,
+    "glossary_errors": 0,
+    "changed_together": "passed",
+    "six_decision_progress_counts_match_across_languages": true,
+    "product_tests": "not rerun for documentation-only changes",
+    "repository_wide_commit_gate": "not run"
+  }
+}

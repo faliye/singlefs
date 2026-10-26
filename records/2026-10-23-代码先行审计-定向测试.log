@@ -1,0 +1,119 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+   Compiling singlefs-format v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-reference-filesystem)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-replay-prefix)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 53.98s
+     Running tests/compaction_intent_issue_writes_the_empty_segments_counted_before_the_issue.rs (/tmp/singlefs-run-with-memory-cap-331686-pbZVYF/singlefs-run-build-directory-331993-8jxjL9/target/debug/deps/compaction_intent_issue_writes_the_empty_segments_counted_before_the_issue-e71ce425f1c6612a)
+
+running 3 tests
+test an_issue_inside_the_open_segment_writes_the_empty_segments_before_the_issue ... ok
+test an_issue_opening_a_new_cluster_segment_writes_the_empty_segments_before_the_issue_not_its_own_accounting ... ok
+test an_intent_whose_issue_opened_a_new_segment_yields_only_after_freeing_one_more_segment ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.64s
+
+     Running tests/compaction_runs_stop_and_discard_after_the_publish.rs (/tmp/singlefs-run-with-memory-cap-331686-pbZVYF/singlefs-run-build-directory-331993-8jxjL9/target/debug/deps/compaction_runs_stop_and_discard_after_the_publish-d71e8de8e4bb0fe8)
+
+running 18 tests
+test a_segment_holding_an_isolated_slot_is_not_discarded ... ok
+test a_segment_held_until_the_floor_takes_effect_is_discarded_only_after_the_hold_is_released ... ok
+test a_segment_with_a_slot_still_allocated_is_not_discarded ... ok
+test a_segment_reclaimed_as_a_whole_is_handed_out_for_discard_once ... ok
+test a_foreground_write_is_refused_by_the_empty_cluster_segments_floor ... ok
+test an_unlink_intent_is_exempt_from_the_empty_cluster_segments_floor ... ok
+test a_quarantine_after_the_issue_drops_the_intent_and_its_region_exclusion ... ok
+test a_run_on_the_product_path_stops_before_issuing_because_the_batch_size_is_not_decided ... ok
+test a_user_change_with_the_forced_start_runs_at_most_one_compaction_batch_after_it ... ok
+test a_segment_emptied_by_the_compaction_is_discarded_on_both_devices_once_its_slots_are_reclaimed ... ok
+test a_snapshot_is_destroyed_on_a_version_whose_files_are_all_deleted ... ok
+test a_run_stops_before_issuing_when_the_holes_outside_the_region_are_too_few ... ok
+test a_run_stopped_by_the_test_only_switch_writes_nothing ... ok
+test a_segment_holding_an_unswept_orphan_head_is_withheld_from_the_discard ... ok
+test a_run_on_a_forced_region_relocates_it_batch_by_batch_until_it_is_empty_by_the_records ... ok
+test a_foreground_write_refused_by_the_empty_cluster_segments_floor_in_a_session_pushes_no_floor_raise ... ok
+test the_segments_refused_by_the_region_scan_are_forgotten_by_the_next_mount ... ok
+test a_run_after_a_user_change_publishes_the_drop_of_a_quarantined_intent_an_issue_and_one_batch ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.86s
+
+     Running tests/inode_record_truncation_field_written_by_each_publish.rs (/tmp/singlefs-run-with-memory-cap-331686-pbZVYF/singlefs-run-build-directory-331993-8jxjL9/target/debug/deps/inode_record_truncation_field_written_by_each_publish-8e0937f5fe52b64f)
+
+running 10 tests
+test the_truncation_intent_that_releases_data_units_writes_its_own_txg_and_the_target_size ... ok
+test a_whole_file_sequential_write_after_a_truncation_clears_the_field ... ok
+test the_truncation_batches_and_the_final_batch_leave_the_field_the_intent_wrote ... ok
+test new_inodes_are_created_with_a_zero_field_beside_a_truncated_first_file ... ok
+test the_unlink_intent_and_its_batches_carry_the_field ... ok
+test truncating_into_the_hole_after_an_extension_carries_the_field_of_the_version_before ... ok
+test a_truncation_within_the_last_data_unit_releases_nothing_and_carries_the_field_of_the_version_before ... ok
+test an_extension_and_a_size_change_to_the_same_size_carry_the_field ... ok
+test a_whole_file_overwrite_after_a_truncation_clears_the_field ... ok
+test rolling_back_to_the_version_before_the_truncation_intent_restores_a_zero_field ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
+     Running tests/snapshot_creation_publish_and_the_entries_every_later_publish_carries.rs (/tmp/singlefs-run-with-memory-cap-331686-pbZVYF/singlefs-run-build-directory-331993-8jxjL9/target/debug/deps/snapshot_creation_publish_and_the_entries_every_later_publish_carries-001733d1c4d28e21)
+
+running 6 tests
+test creating_a_snapshot_writes_one_pair_of_entries_whose_fields_follow_the_judgement ... ok
+test an_overwrite_after_a_snapshot_moves_the_live_roots_and_keeps_the_snapshot_entries ... ok
+test ten_snapshots_are_created_and_the_eleventh_is_refused_before_any_write ... ok
+test a_pool_with_two_snapshots_keeps_both_pairs_through_a_writable_mount_and_a_publish ... ok
+test a_snapshot_created_after_every_file_is_deleted_reads_no_file_and_is_destroyed ... ok
+test creating_a_snapshot_through_the_mounted_session_publishes_one_version_of_its_own ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.02s
+
+     Running tests/truncation_intent_batches_and_final_batch.rs (/tmp/singlefs-run-with-memory-cap-331686-pbZVYF/singlefs-run-build-directory-331993-8jxjL9/target/debug/deps/truncation_intent_batches_and_final_batch-92cd09c53bca00e9)
+
+running 13 tests
+test the_truncation_publishes_are_deletion_class_and_the_size_change_without_an_intent_is_not ... ok
+test a_size_change_of_an_inode_that_is_not_in_the_tree_is_refused_before_any_write ... ok
+test a_size_change_of_an_inode_other_than_the_first_file_is_refused_unless_the_size_stays ... ok
+test truncating_into_the_middle_of_unit_one_rewrites_unit_one_to_the_bytes_beyond_its_start ... ok
+test the_truncation_entry_rebuilt_from_disk_is_the_kind_two_entry_the_intent_issued ... ok
+test a_truncation_releasing_no_data_unit_still_publishes_an_intent_and_a_final_batch ... ok
+test a_size_change_of_an_inode_being_deleted_is_refused_before_any_write ... ok
+test a_target_size_whose_whole_data_units_overflow_is_refused_before_any_write ... ok
+test truncating_a_three_unit_file_into_unit_zero_in_batches_of_one_publishes_the_intent_two_batches_and_replaces_only_unit_zero_at_the_intent ... ok
+test a_size_change_to_the_current_size_publishes_one_version_changing_only_the_record ... ok
+test the_truncation_intent_newly_takes_eleven_slots_per_device_outside_the_allocation_record_tree ... ok
+test keeping_one_hundred_and_forty_four_data_units_rewrites_the_leaf_holding_the_cut_unit_and_reads_back ... ok
+test a_session_truncate_publishes_the_intent_and_every_batch_in_one_call ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.49s
+
+     Running tests/writes_by_inode_number_of_several_files.rs (/tmp/singlefs-run-with-memory-cap-331686-pbZVYF/singlefs-run-build-directory-331993-8jxjL9/target/debug/deps/writes_by_inode_number_of_several_files-ca6885ea26c11bf2)
+
+running 10 tests
+test the_space_admission_counts_the_units_of_another_inode_as_it_counts_the_first_files ... ok
+test a_write_to_another_inode_being_deleted_is_refused_by_both_entries_before_anything_reaches_the_disk ... ok
+test writing_one_inode_leaves_the_data_units_and_extent_lower_nodes_of_the_other_files_untouched_on_disk ... ok
+test the_writes_by_structure_kind_of_another_inode_are_counted_as_the_first_files_are ... ok
+test a_write_to_an_inode_number_that_is_not_in_the_inode_tree_is_refused_before_anything_reaches_the_disk ... ok
+test a_data_write_to_an_inode_created_after_the_first_file_was_deleted_is_refused_before_anything_reaches_the_disk ... ok
+test writing_a_file_after_the_first_file_emptied_the_upper_segment_replaces_the_zero_entry_root ... ok
+test a_write_to_an_inode_past_the_first_upper_leaf_grows_the_upper_segment_and_every_file_reads_back_after_a_remount ... ok
+test unlink_while_a_file_other_than_the_first_holds_data_units_deletes_it_and_then_the_first_file ... ok
+test two_inodes_overwritten_in_turn_across_two_writable_remounts_each_read_back_what_was_last_written_to_it ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.72s
+

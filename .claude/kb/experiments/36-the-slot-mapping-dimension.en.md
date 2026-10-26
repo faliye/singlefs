@@ -1,0 +1,101 @@
+## E36 Slot Mapping Dimension — Run (2026-08-29, N=5 Rounds Byte-identical)
+
+[中文](36-槽位映射那一维.md) · **English** · [日本語](36-スロットマッピングの次元.ja.md)
+
+**What it asks**: Whether decoupling journal slots from sequence numbers truly immunizes against "replaying residuals from previous timeline".
+
+### What It Connects: The Dimension Owed by E32 (Remnants of the Previous Timeline)
+
+Failure clauses of E32 (Remnants of the Previous Timeline) required four combinations of "two slot mappings × two continuation strategies",
+actual run covering only 2 / 4—**what was owed is precisely what production implementations (jbd2) use: decoupling position from sequence number**.
+The backward leg of the 2026-08-29 three-way argument judged on this basis that "jbd2 is therefore immune". **E36 (Slot Mapping Dimension) verifies this exact claim.**
+
+### Why It Fails Under Deduction, Demanding Measurement
+
+After decoupling, positions still advance **sequentially**: when recovery reaches position p, it accepts the read record if its sequence number happens to equal
+expected. When a new timeline resumes writing from the break position ⇒ the position immediately following it **still** holds the next record of the residual sequence.
+⇒ **Merely decoupling does not alter read-side alignment.**
+
+What can genuinely scatter alignment is **record length**: a jbd2 transaction occupies "descriptor block + data blocks + commit block",
+varying in count with transaction contents. If records written by the new timeline **occupy a different number of positions** than the discarded one,
+subsequent residuals shift out of alignment en masse.
+
+### Three Axes
+
+| Axis | Values |
+|---|---|
+| Slot mapping | `by_jsn` (position = sequence % slot_count) / `decoupled` (position sequentially advanced by cursor, jbd2 pattern) |
+| Continuation strategy | `at_prefix` (resume at prefix end + 1) / `skip_hole` (number skips breakpoint) |
+| New record length | **Identical** / **different** compared to discarded record |
+
+### Criteria (Two, Must Be Satisfied Simultaneously)
+
+1. `stale_replayed == 0`; 2. `lost_new == 0`.
+
+### Positive Control
+
+The `by_jsn` + `at_prefix` + identical length cell **must** reproduce the formula measured by E32 (Remnants of the Previous Timeline):
+`max(0, residual − (new_written − 1))`. **Two independently written models must yield the exact same answer**; a discrepancy indicates E36 (Slot Mapping Dimension) went astray.
+
+### Measured Results (2026-08-29, N=5 Rounds Byte-identical; Ring 256 Positions, Settled Segment 20 Records, Old Records Occupy 2 Positions)
+
+**Primary Results, `at_prefix` Column**:
+
+| Slot Mapping | New Record Length | Residual 3 / New Written 1 | Residual 3 / New Written 3 | Residual 7 / New Written 1 |
+|---|---|---|---|---|
+| `by_jsn` | Identical | Replay 3 | Replay 1 | Replay 7 |
+| **`decoupled`** | **Identical** | **Replay 3** | **Replay 1** | **Replay 7** |
+| `decoupled` | +1 Position | **0** | **0** | **0** |
+
+**Four Conclusions**:
+
+1. **Positive control passed**: The `by_jsn` column reproduces E32 (Remnants of the Previous Timeline) formula cell-by-cell
+   —two independently written models matched.
+2. **Merely decoupling slots cannot rescue**: Under identical length, `decoupled` and `by_jsn` are **cell-by-cell identical**.
+   ⇒ **The exit "jbd2 is therefore immune" proposed in the three-way argument is invalid per E36 (Slot Mapping Dimension).**
+   What was decoupled is write-side position, while the read side remains sequentially aligned.
+3. **What truly disrupts alignment is differing record length**: New record occupying 1 more position ⇒ residuals shift en masse ⇒ all blocked.
+4. ⚠️ **Yet that is coincidence, not a guarantee**: On the same arm, simply changing new record length back to identical results in **wholesale replay**
+   (all 7 residuals return). ⇒ **"Decoupled slots" buys probability, not structural immunity.**
+
+**The two mappings indeed differ, in "where bytes land"** (visible only under `skip_hole`):
+Decoupled branch writes new records back to **break position**, overwriting residuals (overwriting `new_written − 1` records);
+sequence-number branch writes new records **after residuals**, overwriting none.
+⚠️ Without this quantity, the "decoupled" dimension is entirely invisible to metrics (mutation M1 verified).
+
+**Under `skip_hole`, both mappings are broken, in opposite directions**: residuals are not replayed, but newly written records cannot connect to prefix and are dropped entirely.
+
+### Impact of This Measurement on D23 (Journal Role & Format) Settled Item 8
+
+The third option in D23 (Journal Role & Format) exit table, "Decouple slot from sequence number (jbd2 pattern)",
+**must be downgraded**: it is not an exit; it is effective only when "new and old record lengths happen to differ",
+which cannot be written into specifications as a criterion (`.claude/rules/fs-design.md` Hard Requirement 1: Transition criteria must be explicit and computable).
+
+⇒ **Remaining exits are**: Back-chaining (costs record header bytes), physically invalidating residual slots during recovery (requires in-place overwrite, impossible on zoned),
+or high bits of sequence number carrying journal instance generation (**unmeasured by E36 (Slot Mapping Dimension)**).
+
+### Measurement Basis and Known Limitations
+
+- **Pure counting model**, no device, no VM. Record length modeled as "occupying how many positions", not bytes.
+- **Does not model real recovery algorithm of jbd2** (PASS_SCAN following chain, `next_commit_ID` advancement).
+  E36 (Slot Mapping Dimension) models **settled recovery rules of this repo's D23 (Journal Role & Format)** running on both slot mappings,
+  ⇒ conclusion is "this repo's rules still leak under decoupled mapping", **not** "jbd2 has a bug".
+- **Only tested two record lengths (identical / +1 position)**, without sweeping length distributions, so characterization of "coincidence"
+  is not paired with probability—**saying "how high the probability of collision is" owes a distribution sweep**.
+- **Fourth exit (instance generation in high bits of sequence) unmeasured.**
+- Code `scripts/experiment-apparatus/e36_slot_mapping.rs`
+  (`cargo run --release --bin e36-slot-mapping`),
+  raw output `e36-slot-mapping-2026-08-29.out`.
+  8 unit tests, **all 7 mutations caught** (table in `scripts/mutation/tables/e36_slot_mapping.tsv`).
+
+**Prerequisites**: None. Pure counting model.
+
+### Impacted Decisions
+
+| Decision Item | Relationship | Review |
+|---|---|---|
+| D23 (Journal Role & Format) Settled Item 8 | Support | 2026-09-19 unaffected: decoupling slots from sequence numbers cannot rescue; when new and old records are identical length it matches sequence-number branch cell-by-cell; removed this entry from exit table |
+
+## Historical Versions
+
+Historical entries for E36 (Slot Mapping Dimension) are gathered in [experiments-history.md](../experiments-history.md).

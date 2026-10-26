@@ -19,7 +19,7 @@
 | birth txg + deadlist | ZFS | ブロック自身が誕生世代番号を保持；削除時に「1つ古いスナップショット」と世代を比較 → 直接解放、またはそのスナップショットの deadlist に追加；スナップショット破棄時に deadlist をカスケードマージ | 会計は増分更新、全走査は一切不要 |
 | 専用 btree に accounting key を配置 | bcachefs（2024年再設計） | カウンタ自体が bkey（tagged union で拡張可能）；メモリ側は percpu + eytzinger インデックス；更新は通常のトランザクション + write buffer 経由 | この再設計はディスクフォーマット互換性を破綻させ、6.11 で強制アップグレード |
 
-**数値基準**: qgroup / squota の割合は btrfs 公式が LWN の squota 記事で提示した比較テストによるものです。ワークロードとハードウェアの詳細は完全には開示されていないため、**本プロジェクトの性能予測値として扱うことはできず**、「この路線は行き詰まる」という定性的証拠としてのみ参照します。
+**数値の計測条件**: qgroup / squota の割合は btrfs 公式が LWN の squota 記事で提示した比較テストによるものです。ワークロードとハードウェアの詳細は完全には開示されていないため、**本プロジェクトの性能予測値として扱うことはできず**、「この路線は行き詰まる」という定性的証拠としてのみ参照します。
 
 **重要な知見: btrfs 自身が白旗を上げたこと。** squota の存在は、厳密な会計が維持困難であることを公式に認めた証拠です。この路線が破綻することは、本プロジェクトが改めて追試する必要はありません。
 
@@ -38,7 +38,7 @@ btrfs qgroup の事後走査 → 破綻；ZFS および再設計後 bcachefs の
 [Principles of Operation (2026-04-16, PDF)](https://bcachefs.org/bcachefs-principles-of-operation.pdf)。
 **Principles of Operation は最新かつ最も権威ある bcachefs 設計ドキュメントですが、完全通読は未了です。**
 
-1. **bucket + generation 番号**。ディスクを bucket に分割し、各 bucket に世代番号を付与；ポインタは「期待される世代番号」を保持し、世代が一致しなければ解放済みとみなす → データの無効化において逆インデックスを更新する必要がない。D1（データ移動性 / 逆インデックス）の負担を直接軽減。
+1. **bucket + generation 番号**。ディスクを bucket に分割し、各 bucket に世代番号を付与；ポインタは「期待される世代番号」を保持し、世代が一致しなければ解放済みとみなす → データの無効化において逆インデックスを更新する必要がない。D1 (データ移動性 / 逆インデックス)の負担を直接軽減。
 2. **キー下位ビットへのスナップショット ID 組み込み**。スナップショット ID 自体がツリー構造を成し（ルート `U32_MAX`、下向きに割り当て、親 ID は常に子 ID より大きい）、探索時に祖先関係でフィルタリング。**ツリーのクローンは一切不要**で、O(1) 作成、百万単位のスナップショットに対応可能。
    代償: スナップショット削除時にスナップショット付きの全 btree を走査する必要がある（公式は bloom filter による最適化を検討と記載）；読み取りパスに一定の祖先フィルタリングオーバーヘッドが発生；書き込みパスで whiteout やスナップショット跨ぎの部分上書き分割を処理する必要がある。
 3. **ポインタ内インライン複数レプリカ**。1つの extent ポインタ内に N 個のレプリカ位置を直接列挙。ファイル単位でレプリカ数を設定可能——btrfs の per-chunk profile では不可能。
@@ -67,11 +67,11 @@ btrfs qgroup の事後走査 → 破綻；ZFS および再設計後 bcachefs の
 2026年時点で、Rust は Linux のドライバ、ファイルシステム、ネットワークコンポーネントに導入されています。fs 抽象化レイヤーは依然として進化途上であり、「汎用的なものか、単純なファイルシステム専用か」についての合意には達していません。
 
 参照元: [Rust for filesystems (LWN)](https://lwn.net/Articles/978738/)。
-**本プロジェクトとの関連性は希薄**——D7（Linux メインラインへのマージ是非）において、初期の数年間はメインラインに入らない方針が確定しています。
+**本プロジェクトとの関連性は希薄**——D7 (Linux メインラインへのマージ是非)において、初期の数年間はメインラインに入らない方針が確定しています。
 
-## 5. インデックス構造（D8（中核インデックス構造） 専門調査）
+## 5. インデックス構造（D8 (コアインデックス構造) 専門調査）
 
-**基準**: 「5. インデックス構造」の節は bcachefs *Principles of Operation* Rev 1.39.2（2026-08-25 改訂版）原文、LWN、XFS ドキュメントおよび論文要約に基づきます。**本プロジェクト内での検証は未実施であり、いずれの実装もクローン/コンパイル/実行は行っていません。**
+**計測条件**: 「5. インデックス構造」の節は bcachefs *Principles of Operation* Rev 1.39.2（2026-08-25 改訂版）原文、LWN、XFS ドキュメントおよび論文要約に基づきます。**本プロジェクト内での検証は未実施であり、いずれの実装もクローン/コンパイル/実行は行っていません。**
 
 ### 5.1 bcachefs: 28本のツリー、単一の btree 実装
 
@@ -87,7 +87,7 @@ btrfs qgroup の事後走査 → 破綻；ZFS および再設計後 bcachefs の
 | **write buffer** | 高頻度の小さな更新、バッチ適用のほうが有利 | backpointers / LRU / accounting |
 
 28本のツリーのうち **10本が write-buffered** です: `lru`、`need_discard`、`backpointers`、`deleted_inodes`、`accounting`、`stripe_backpointers`、4本の `reconcile_*`。
-⚠️ 28 / 10 は Principles of Operation Rev 1.39.2 ドキュメント内の数値です。2026-08-29 に linux-6.17 ソースの `BCH_BTREE_IDS()` を確認したところ 21本、write buffer 経由は 5本でした。D8 本文の記載を正とします。
+⚠️ 28 / 10 は Principles of Operation Rev 1.39.2 ドキュメント内の数値です。2026-08-29 に linux-6.17 ソースの `BCH_BTREE_IDS()` を確認したところ 21本、write buffer 経由は 5本でした。D8 (コアインデックス構造) 本文の記載を正とします。
 
 **write buffer の代償（原文に明記）**: 更新は**順不同かつ結果整合性**です——btree は次回の flush まで未処理の更新を認識できません；flush はキー位置順にソートされ、**時間順序は破棄**されます；重複排除後に btree ノード順にバッチ挿入されます。
 > "this sort-merge-sweep is inherently single-threaded, making its efficiency
@@ -114,25 +114,25 @@ btrfs qgroup の事後走査 → 破綻；ZFS および再設計後 bcachefs の
 > seeks per lookup and level-2 nodes too large to stay resident under page
 > cache pressure."
 
-**本プロジェクトへの意義**: D7（Linux メインラインへのマージ是非）でメインラインに入らないことが確定しているため、**この制約は当方には一切存在しません**——大きなノードは無償で享受でき、「キャッシュの独自管理」以外の代償を支払う必要はありません。
+**本プロジェクトへの意義**: D7 (Linux メインラインへのマージ是非)でメインラインに入らないことが確定しているため、**この制約は当方には一切存在しません**——大きなノードは無償で享受でき、「キャッシュの独自管理」以外の代償を支払う必要はありません。
 
 ### 5.3 bucket アロケータ: 走査スレッドから btree への移行
 
 - bucket サイズは 512K–2M；bucket とデータポインタの双方が **generation 番号** を保持し、世代番号をインクリメントするだけで古いポインタをすべて無効化できます。**逆参照を探して削除しに行く必要はありません**。
 - 原文では世代番号メカニズムの価値はキャッシュ無効化にとどまらないと説明されています: ジャーナルリプレイ時の**割り当て情報の自己ブートストラップ**を可能にし、**本来修復不可能な破損を修復可能にします**。← これは当方の「再構築性」という設計目標に直結します。
-- bucket 内は**絶対に上書きされず**、シーケンシャルに満杯になったら凍結されます → copying GC が必須。**copyGC の予約領域は 8%（デフォルト、5%–20% で設定可能）**——これは D3（空間割り当て）の「過大な予約は不可」に対する格好の参照値です。
+- bucket 内は**絶対に上書きされず**、シーケンシャルに満杯になったら凍結されます → copying GC が必須。**copyGC の予約領域は 8%（デフォルト、5%–20% で設定可能）**——これは D3 (領域割り当て) の「過大な予約は不可」に対する格好の参照値です。
 - bucket の充填度を記録する **fragmentation LRU btree** が存在し、copygc は全 alloc btree を走査することなく最も断片化した bucket を直接特定できます。
 - **アロケータは当初、メモリ上の bucket 配列 + 専用走査スレッド** で freelist/discard/eviction を管理していましたが、後にすべて btree（freespace / discard / LRU の3本）に置き換えられ、**走査スレッドは完全に削除**されました。
   原文の理由: トランザクショナルな btree コードは「far easier to debug and reason about」であり、古いスレッドはファイルシステムが満杯に近づいた際に**膨大な CPU を浪費**していました——btree への移行によりこれらコーナーケースが解消しました。
 - bucket は SMR / zoned デバイスの zone に自然にマッピングされます。
 
-### 5.4 会計（D5（スナップショット / 空間会計メカニズム）に対する独立した裏付け）
+### 5.4 会計（D5 (スナップショット / 空間会計メカニズム)に対する独立した裏付け）
 
 > "Accounting counters are maintained by triggers as keys are committed,
 > not by walking the btrees."
 
 一方、`check_allocations` は**全走査による会計の再構築**に依存し、「カウンタの陳腐化」と「キーが真に存在するか」を識別します。
-これは `crates/singlefs-checker/invariants/05-空间记账.md` の I-3.1（割り当て済み統計の一致）と同一の設計です: **実行時は増分維持、チェッカーは走査で検証**。
+これは `crates/singlefs-checker/invariants/05-空间记账.md` の I-3.1 (割り当て済み統計が一致する)と同一の設計です: **実行時は増分維持、チェッカーは走査で検証**。
 
 ### 5.5 イレースコーディング: write hole に対する第2の既知の解法
 
@@ -167,8 +167,8 @@ BetrFS は**フルパスインデックス**（キーが完全なパスそのも
 **論文が自認する代償**: BetrFS 0.4 が 0.3 に対して悪化するケースは、**ノードの分割とマージがクリティカルパス上に位置する場合**であり、lifting による追加の計算オーバーヘッドが利益を上回ります；すべてのアクセスパターンのうち唯一悪影響を受けたのは**シーケンシャル書き込み**でした。
 名前変更性能についての主張は「competitive with indirection-based file systems for a range of sizes」——**一定のサイズ範囲内で競争力があるということであり、全サイズで勝っているわけではありません**。
 
-基準: FAST 2018 論文 + TOS 2018 拡張版、**本プロジェクト内では未検証**。
-本プロジェクトのキーレイアウトへの影響は [decisions.md](decisions.md) D8（中核インデックス構造）を参照。
+計測条件: FAST 2018 論文 + TOS 2018 拡張版、**本プロジェクト内では未検証**。
+本プロジェクトのキーレイアウトへの影響は [decisions.md](decisions.md) D8 (コアインデックス構造) を参照。
 
 参照元:
 - [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/system/files/conference/fast18/fast18-zhan.pdf)
@@ -181,7 +181,7 @@ rmapbt は各 AG ごとに1本の b+tree であり、`(物理ブロック, 所�
 **空間コスト（単一の情報源による基準、未再確認）**: 50TB のファイルシステムにおいて、素の `mkfs.xfs` は約 52GB のメタデータ（~1%）；`rmapbt=1` を有効化すると 675GB（~1.35%）に増加；さらに `reflink=1` を有効化すると 981GB（~1.96%）に達します。
 ⚠️ この数値は個人ブログの mkfs 出力によるものであり、**フォーマット時のメタデータ規模であって実際の使用量ではありません**。規模感の目安に留まります。
 
-**さらに重要な点は、D1（データ移動性 / 逆インデックス）に第2の正当化根拠を与えていることです**: XFS ドキュメントには、逆マッピングが「is an essential feature for repairing filesystems online because the secondary copy can be used to rebuild damaged primary metadata」と記載されています。
+**さらに重要な点は、D1 (データ移動性 / 逆インデックス)に第2の正当化根拠を与えていることです**: XFS ドキュメントには、逆マッピングが「is an essential feature for repairing filesystems online because the secondary copy can be used to rebuild damaged primary metadata」と記載されています。
 
 すなわち: **逆インデックスは単に balance/defrag のためだけではなく、オンライン修復を可能にするための前提条件です**——順方向インデックスが破損した際、逆方向インデックスを用いて再構築できます。これは避坑項目リスト第10条（誰も実行を恐れる修復ツール）に直結します。
 
@@ -197,7 +197,7 @@ rmapbt は各 AG ごとに1本の b+tree であり、`(物理ブロック, 所�
 
 ## 6. 暗号化（D9（暗号化） 専門調査）
 
-**基準**: bcachefs Encryption 設計ドキュメント原文（最終編集 2025-11-02 と表記）、
+**計測条件**: bcachefs Encryption 設計ドキュメント原文（最終編集 2025-11-02 と表記）、
 OpenZFS `module/os/linux/zfs/zio_crypt.c` 先頭の設計コメント（master ブランチ、2026-08-26 取得）、
 Linux fscrypt カーネルドキュメント、OpenZFS `zfs-load-key(8)` マニュアルページ、および OpenZFS の公開 issue から取得。
 **すべてドキュメントおよびソースコードの精読によるものであり、本プロジェクト内では未検証であり、いかなる実装もコンパイル・実行していません。**
@@ -220,7 +220,7 @@ fscrypt カーネルドキュメント自身も認証を行わない旨を明記
 > accessing the filesystem."
 理由は「ciphertext expansion（暗号文拡張）の取り扱いが困難である」こと——すなわち暗号文が平文より長くなり、ブロックアライメントされたファイルシステムに収まらないためです。
 
-**本プロジェクトへの意義**: チェックサムがポインタに追従する方式（[decisions.md](decisions.md) D4（チェックサム配置位置））自体が、MAC と nonce の格納領域を自然に確保しています。AEAD は本プロジェクトにとって実質無償で得られるものであり、ブロックアライメントされたファイルシステムとは前提が異なります。
+**本プロジェクトへの意義**: チェックサムがポインタに追従する方式（[decisions.md](decisions.md) D4 (チェックサム配置位置)）自体が、MAC と nonce の格納領域を自然に確保しています。AEAD は本プロジェクトにとって実質無償で得られるものであり、ブロックアライメントされたファイルシステムとは前提が異なります。
 
 ### 6.2 ZFS と bcachefs が同一の問いで袂を分かつ: 鍵なしで保守が可能か
 
@@ -270,7 +270,7 @@ ZIL と dnode にもそれぞれ「平文で残さなければならない」部
 
 ### 6.4 暗号化で踏まれた落とし穴（公開記録）
 
-| 落とし穴 | 記録 | 基準 |
+| 落とし穴 | 記録 | 計測条件 |
 |---|---|---|
 | ZFS ネイティブ暗号化 + send/recv の長期破損 | openzfs/zfs#12014 は 2021-05 よりオープン；2024-02-12 Phoronix 報道；openzfs-docs#494 でドキュメント警告追加を提案；同 issue 下で 2025-05-31 に非 raw send の暗号化バグ2件修正と報告、2.2.8 / 2.3.3 へマージ | 公開 issue とニュース報道、**本プロジェクト内では未検証**。「暗号化がレプリケーション/スナップショット経路に浸食する」定性的証拠であり、性能や確率データではない |
 | 暗号化前の圧縮は必然的に長さを漏洩 | Kelsey, *Compression and Information Leakage of Plaintext*, FSE 2002 | 順序は逆転不可（暗号文は圧縮できない）のため、圧縮を選択した以上受容すべき漏洩 |
@@ -312,7 +312,7 @@ nonce は **inode 作成時に** 1回生成されてディスク上の context �
 
 アップストリームの対処は「水位を MAC に含める」ことではなく、**鍵が存在する場合はデフォルトでそのパスを無効化し**、明示的に `legacy_recalculate` を指定した場合のみ有効化する設計としました（`drivers/md/dm-integrity.c` の `dm_integrity_disable_recalculate()`）。
 
-**本プロジェクトへの意義**: I-6.5（nonce 水位の単調性）の nonce 水位は同一の構造であり、その結果はさらに致命的です——ロールバックは単なる「改ざん検知の失敗」にとどまらず、**ストリーム暗号の nonce 再利用 ⇒ 2つの平文の直接 XOR 漏洩** を招きます。
+**本プロジェクトへの意義**: I-6.5 (nonce 水位単調)の nonce 水位は同一の構造であり、その結果はさらに致命的です——ロールバックは単なる「改ざん検知の失敗」にとどまらず、**ストリーム暗号の nonce 再利用 ⇒ 2つの平文の直接 XOR 漏洩** を招きます。
 ⇒ D9（暗号化）既定項目8にて「水位はマスターキーから導出された MAC で保護されなければならず、非鍵側による書き込みは禁止される」と定められました。
 
 ### 6.7 AEAD の tag 長: カーネルは 32 ビットまでの切り詰めを許容
@@ -320,7 +320,7 @@ nonce は **inode 作成時に** 1回生成されてディスク上の context �
 `crypto_gcm_check_authsize()` は 4 / 8 / 12 / 13 / 14 / 15 / 16 バイトを受け付けます
 （`include/crypto/gcm.h` の `crypto_gcm_check_authsize()`、2026-08-29 確認）。
 ⇒ 「MAC は一律 128 ビットで切り詰めない」という規則は、**本プロジェクト独自の設計制約であり、暗号理論やカーネルから強制されたものではありません**。
-それが支払う空間コスト（ユニットあたり 16 バイト）はこの前提に基づいて記録されるべきであり、「選択の余地がなかった」と表現してはなりません。
+それが支払う空間コスト（ユニットあたり 16 バイト）はこの計測条件に基づいて記録されるべきであり、「選択の余地がなかった」と表現してはなりません。
 
 ## 7. 直近10年の学術成果スキャン（2012–2026）
 
@@ -341,7 +341,7 @@ nonce は **inode 作成時に** 1回生成されてディスク上の context �
 | xfs | 2835.7 ± 67.9 |
 | zfs | 3288.9 ± 394.7 |
 
-**基準**: 256K 回の 4バイトランダム書き込み、合計わずか 1 MiB の書き込み量——これは**極端に振り切ったマイクロベンチマーク**であり、データベースや仮想マシンイメージの現実的な負荷ではありません。論文自認で「up to 600 times faster」。
+**計測条件**: 256K 回の 4バイトランダム書き込み、合計わずか 1 MiB の書き込み量——これは**極端に振り切ったマイクロベンチマーク**であり、データベースや仮想マシンイメージの現実的な負荷ではありません。論文自認で「up to 600 times faster」。
 
 **⚠️ この数値群の永続化モデルは singlefs と異なるため、外挿前に本節を精読してください（2026-08-26 確認）。**
 FAST 2018 論文 2.1 および 4.x 節原文:
@@ -359,38 +359,38 @@ FAST 2018 論文 2.1 および 4.x 節原文:
 | 事実 | singlefs にとっての含意 |
 |---|---|
 | BetrFS は COW **である**——ノードは copy-on-write でディスクに書き出される | 「その数値は非 COW システムのものだ」という反論は成り立ちません；これを理由に Bε を退けることはできません |
-| BetrFS の永続性は **redo log + 5秒ごとの checkpoint** に依存している | その5秒ウィンドウが膨大な量の COW ノード書き換えを償却しています。⚠️ **本プロジェクトには「トランザクションごとに新しいルートを発行する」というコミットメントはありません**——`litmus/commit-publish.litmus` は単一の発行イベント**内部**の順序（ブロック内容書き込み → smp_wmb → generation 書き込み）を規定しているだけで、発行頻度には一切言及していません；`decisions.md` / `CLAUDE.md` / `.claude/rules/fs-design.md` にもそのような記述はありません（2026-08-26 grep 確認）。発行頻度は**未決定**事項です |
+| BetrFS の永続性は **redo log + 5秒ごとの checkpoint** に依存している | その5秒ウィンドウが膨大な量の COW ノード書き換えを償却しています。⚠️ **本プロジェクトには「トランザクションごとに新しいルートをパブリッシュする」というコミットメントはありません**——`litmus/commit-publish.litmus` は単一のパブリッシュイベント**内部**の順序（ブロック内容書き込み → smp_wmb → generation 書き込み）を規定しているだけで、パブリッシュ頻度には一切言及していません；`decisions.md` / `CLAUDE.md` / `.claude/rules/fs-design.md` にもそのような記述はありません（2026-08-26 grep 確認）。パブリッシュ頻度は**未決定**事項です |
 | 論文全体を通じて **checksum が一切登場しない**。親ノードが子ノードのチェックサムを保持する Merkle 連鎖が存在しない | singlefs の D4 インラインチェックサム + D9 AEAD MAC/nonce は、各ノード書き換えに BetrFS が支払わない固定コストを課します。クロスオーバーポイントは移動しますが、その移動幅は未知数です |
 
 **したがってこの数値が証明できること**: メッセージバッファは「キーが書き直される回数」を O(樹高) から O(樹高/B) に引き下げられること。
-**証明できないこと**: Merkle チェックサム連鎖 + AEAD が存在し、発行頻度を特定の値に設定した前提下で、どれほどの利益が残存するか。
-残存する利益の検証は [experiments.md](experiments.md) E7（オフラインインデックス harness）で独自に測定する必要があります。
+**証明できないこと**: Merkle チェックサム連鎖 + AEAD が存在し、パブリッシュ頻度を特定の値に設定した前提下で、どれほどの利益が残存するか。
+残存する利益の検証は [experiments.md](experiments.md) E7 (オフラインインデックスharness)で独自に測定する必要があります。
 
-⚠️ **発行頻度はここでは自由変数であり、定数ではありません。** 本プロジェクトが checkpoint セマンティクス（メモリ内にダーティノードを蓄積し、定期的に一括書き込みする）を採用する場合、「小さな書き込みが葉から根までの全パスを直ちに書き直す必要がない」という効果は、**checkpoint バッチ処理自体が無償で提供します**。フォーマット内に永続的なメッセージバッファを組み込む必要はありません。
+⚠️ **パブリッシュ頻度はここでは自由変数であり、定数ではありません。** 本プロジェクトが checkpoint セマンティクス（メモリ内にダーティノードを蓄積し、定期的に一括書き込みする）を採用する場合、「小さな書き込みが葉から根までの全パスを直ちに書き直す必要がない」という効果は、**checkpoint バッチ処理自体が無償で提供します**。フォーマット内に永続的なメッセージバッファを組み込む必要はありません。
 BetrFS の数値のうち、どれだけがメッセージバッファに起因し、どれだけが5秒 checkpoint に起因するかは、**論文内で分離されたことがありません**。
 E7 の対照群はしたがって、2つの「メッセージバッファなし」ベースラインを区別しなければなりません: バッチ処理皆無、および checkpoint バッチ処理はあるがフォーマットレベルのメッセージバッファはない構成。両者を混同すると、メッセージバッファの必要性が実際以上に過大評価されます。
 
 メカニズムは、小書き込みをインプレース更新や COW の無効化ではなく、Bε-tree のメッセージバッチフラッシュに変換することです。
 
-D10（ランダム書き込み / 断片化の真の回答）への意義: btrfs の `nodatacow` は「COW を無効化してランダム書き込み性能を得る代わりに、チェックサムとスナップショット整合性を同時に喪失する」アプローチですが、この路線は「ランダム書き込みをインデックスのメッセージ層に吸収し」、チェックサムとスナップショットの双方を無傷で維持します。
+D10 (ランダム書き込み / 断片化の真の回答)への意義: btrfs の `nodatacow` は「COW を無効化してランダム書き込み性能を得る代わりに、チェックサムとスナップショット整合性を同時に喪失する」アプローチですが、この路線は「ランダム書き込みをインデックスのメッセージ層に吸収し」、チェックサムとスナップショットの双方を無傷で維持します。
 **これは実測数値に裏付けられた D10 の唯一の候補方向です。**
 
 **付随して確認されたもう一つの事実**: BetrFS のすべてのバージョンは**2本の** Bε-tree を使用しています——1本はファイルデータ用、もう1本はファイルシステムメタデータ用（論文 2.2 節原文: "All versions of BetrFS use two Bε-trees: one for file data and one for file system metadata"）。
-これは D8（中核インデックス構造）の「複数の独立 keyspace」と同一の思想であり、ツリーの数がはるかに少ないだけです（bcachefs は 28本）。
+これは D8 (コアインデックス構造) の「複数の独立 keyspace」と同一の思想であり、ツリーの数がはるかに少ないだけです（bcachefs は 28本）。
 
-### 7.2 老化は宿命ではなく、構造設計レベルで排除可能（D3、D10 に影響）
+### 7.2 老化は宿命ではなく、構造設計レベルで排除可能（D3 (領域割り当て)、D10 (ランダム書き込み / 断片化の真の回答) に影響）
 
 FAST 2017「File Systems Fated for Senescence? Nonsense, Says Science!」は、**Linux カーネルソースの連続 git checkout** によってファイルシステムを劣化させ、btrfs / ext4 / F2FS / XFS / ZFS と BetrFS を測定しました。
 結論: **劣化した BetrFS は、他のファイルシステムが劣化していない未老朽化状態（btrfs を除く）をすら上回りました**。
 FAST 2018 の動機として引用されたもう1つの数値: git バージョン管理ワークロードは ext4 の scan 性能を最大 **15倍** 退化させます。
 
-本プロジェクトにとって: D3 は「分類しない → 断片化圧力が単一のアロケータに集中する」という理由から、常駐の自動デフラグを公約しています。
+本プロジェクトにとって: D3 (領域割り当て) は「分類しない → 断片化圧力が単一のアロケータに集中する」という理由から、常駐の自動デフラグを公約しています。
 この成果は第2の道筋を提示しています——**劣化はインデックス構造そのものによって吸収可能であり、事後整理に全面的に頼る必要はない**ということです。
 両方式のトレードオフは測定可能であり、判定基準は [experiments.md](experiments.md) E10 を参照してください。
 
-### 7.3 インデックス構造: パラメータ空間は「別のツリーへの換装」より遥かに広大（D8 に影響）
+### 7.3 インデックス構造: パラメータ空間は「別のツリーへの換装」より遥かに広大（D8 (コアインデックス構造) に影響）
 
-| 成果 | 結論 | 基準 |
+| 成果 | 結論 | 計測条件 |
 |---|---|---|
 | SplinterDB（ATC 2020） | STBε-tree = Bε-tree + LSM の size-tiering、「ツリーのツリー」構造: 幹（trunk）ツリーの各ノードが B-tree 分岐の集合を指し、各分岐が quotient filter を保持。RocksDB 比: 挿入 6–10倍高速、ポイント検索 2–2.6倍高速、書き込み増幅 2倍低減 | 論文抄録数値、NVMe SSD 対象 |
 | FAST 2022「Closing the B+-tree vs. LSM-tree Write Amplification Gap」 | ハードウェア内蔵の透過的圧縮下で、Bε-tree の書き込み増幅は 28（8KB ページ）/ 36（16KB ページ）；同条件で RocksDB は 38、WiredTiger は 268（8KB）/ 530（16KB） | 500GB データセット、32B レコード、4 クライアントスレッド |
@@ -398,14 +398,15 @@ FAST 2018 の動機として引用されたもう1つの数値: git バージョ
 | HashFS（FAST 2021「Rethinking File Mapping for Persistent Memory」） | ファイルマッピング自体が IO パスの **70%** を占め得る；ハッシュ式マッピングはページキャッシュ内の extent ツリーに対して LevelDB 上の YCSB スループットを最大 45% 向上 | **永続メモリ環境**；本プロジェクトが PM を対象としない場合は参考扱い |
 | TableFS（ATC 2013） | メタデータをすべて LSM（LevelDB）に格納、メタデータ集約型負荷で ext4 / XFS / btrfs より 50%–1000% 高速 | FUSE 実装、著者自認で非効率な実装ながらも優位 |
 
-D8 への意義: D8 は「単一の btree 実装 + 複数 keyspace + write buffer / key cache の2つのフロントエンド」を決定済みです。
+D8 (コアインデックス構造) への意義: D8 (コアインデックス構造) は「単一の btree 実装 + 複数 keyspace + write buffer / key cache の2つのフロントエンド」を決定済みです。
 これらの成果はこの方向性を否定するものではなく、**同一構造内部での調整可能項目** を大幅に拡大します:
 Bε バッファ比率、size-tiering、key-value 分離、フィルタ種別——これらはすべて単一の btree 内のパラメータであり、「ツリー種別の追加」ではありません。
-これは D8 の「会計ツリー、中央マッピングツリー、ツリーテーブル、インスタンステーブル、inode ツリーは単一の btree で統一する」と矛盾せず、むしろ補強となります（割り当て記録ツリーと extent ツリーは既定項目14により異種可能とされたため除外）。
+これは D8 (コアインデックス構造) の「会計ツリー、中央マッピングツリー、ツリーテーブル、インスタンステーブル、inode ツリーは単一の btree で統一する」と矛盾せず、むしろ補強となります（割り当てレコードツリーと extent ツリーは確定項目 14 により異種可能とされたため除外）。
 
 ### 7.4 クラッシュ整合性の検証: 「オラクルが存在しない」という前提の再評価（検証計画に影響）
 
-ゼロからの設計において比較対象となる参照実装が存在しないことに対して、過去10年間に少なくとも5つの手法体系が存在します:
+[CLAUDE.md](../../CLAUDE.md) には、本プロジェクト最大の隠れたコストは「ゼロからの設計には比較できる参照実装がない」ことだと記されています。
+過去10年間に少なくとも5種類の既存手法があり、それぞれ得られるものが異なります:
 
 | 手法 | 代表例 | 提供されるもの | コスト / 前提 |
 |---|---|---|---|
@@ -433,20 +434,20 @@ OptFS（SOSP 2013）は ext4 のジャーナルコミットを楽観的プロト
 NoFS（FAST 2012, "Consistency Without Ordering"）はさらに進んでいます:
 各データブロックに**バックポインタ**を付与し、読み取り時にバックポインタで整合性を判定、**書き込みの順序付けを完全に排除**し、形式化モデルを提示。
 
-本プロジェクトにとって: `litmus/commit-publish.litmus` は単一の発行イベント内部の「ブロック内容を先に書き、システム設定を後に書く」順序を固定しており、発行頻度には触れていません。
+本プロジェクトにとって: `litmus/commit-publish.litmus` は単一のパブリッシュイベント内部の「ブロック内容を先に書き、システム設定を後に書く」順序を固定しており、パブリッシュ頻度には触れていません。
 これらの成果は、順序付けに代替形態が存在し、トレードオフが異なることを示しています。
 ⚠️ **NoFS のバックポインタと D1 の逆インデックスは別物です**:
 NoFS のものは「各ブロックが誰に属するかを自証する」単一フィールドであり、D1 は「物理ブロックが誰から参照されているか」の検索可能インデックスです。
 本プロジェクトの「メタデータブロックは自己記述的でなければならない」（`.claude/rules/fs-design.md`）は NoFS のフィールドに近接しています。
 
-### 7.6 ハードウェアインタフェース: ブロックインタフェースはもはや唯一の抽象層ではない（D2、D3、D8 ノードサイズに影響）
+### 7.6 ハードウェアインタフェース: ブロックインタフェースはもはや唯一の抽象層ではない（D2 (RAID ストライプ方針)、D3 (領域割り当て)、D8 (コアインデックス構造) のノードサイズに影響）
 
 | インタフェース | 状態 | 本プロジェクトへの意義 |
 |---|---|---|
-| ZNS（Zoned Namespace） | シーケンシャル書き込み、ホスト管理 GC；コスト効率のため大規模配備で採用 | zone サイズは D8 の「デバイス特性に応じてノードサイズを選択する」規則への入力値 |
+| ZNS（Zoned Namespace） | シーケンシャル書き込み、ホスト管理 GC；コスト効率のため大規模配備で採用 | zone サイズは D8 (コアインデックス構造) の「デバイス特性に応じてノードサイズを選択する」規則への入力値 |
 | NVMe FDP（Flexible Data Placement） | Google SmartFTL と Meta Direct Placement Mode を統合、ZNS と標準 SSD の間のコスト/利益の空白を埋める。**シーケンシャル書き込みを強制せず後方互換、未改変アプリも稼働** | ZNS より本プロジェクトに適した層: シーケンシャル書き込みを強制せず、COW の配置自由度と衝突しない |
 
-基準: NVM Express および SNIA 公開資料、2025年 arXiv 論文、**本プロジェクト内では未検証**。
+計測条件: NVM Express および SNIA 公開資料、2025年 arXiv 論文、**本プロジェクト内では未検証**。
 両者の共通点はデータ配置と GC の責務をホストに委ねる点にあります——**これは COW ファイルシステム自身が割り当てを管理することと重複します**。
 重複部分が利益となるか二重管理の代償となるかは、実測による検証が必要です。
 
@@ -472,11 +473,11 @@ D7 のメインライン非マージ方針に対して: この事実は論拠を
 
 ### 7.10 bcachefs 公式ドキュメント追補（2026-08-26 確認、Principles of Operation Rev 1.39.2+2202696）
 
-| 事実 | 原文 / 基準 | 本プロジェクトへの意義 |
+| 事実 | 原文 / 計測条件 | 本プロジェクトへの意義 |
 |---|---|---|
 | **bucket gen の適用範囲はキャッシュデータに限定** | §1.5: "we can reuse a bucket with **cached data** in it without finding and deleting all the data pointers by incrementing the generation number" | [decisions.md](decisions.md) D1: 無効化のみを管理し、移動は管理しない |
 | **gen ラップアラウンド機構は逆インデックスに置換済み** | 状態一覧 need_gc_gens: "Legacy state, retained for compatibility … **now effectively unused since the invalidate worker uses backpointers instead of generation bumping**" | D1 で選択した「初日からの逆インデックス」方針と同調 |
-| **copygc は 8% を予約、5–20% で設定可能** | §1.5 および §9.1.10。また "Normal writes cannot dip into this reserve"、容量約90%超過時に書き込みレイテンシが上昇 | D3 の「空間予約はアドミッション制御形態とし、量は小さく抑える」に対する比較基準: **他社は 8% を使用不可として確保**、本プロジェクトは動的アドミッションを採用しており、差異を明記すべき |
+| **copygc は 8% を予約、5–20% で設定可能** | §1.5 および §9.1.10。また "Normal writes cannot dip into this reserve"、容量約90%超過時に書き込みレイテンシが上昇 | D3 (領域割り当て) の「空間予約はアドミッション制御形態とし、量は小さく抑える」に対する比較基準: **他社は 8% を使用不可として確保**、本プロジェクトは動的アドミッションを採用しており、差異を明記すべき |
 | **暗号化は全か無か、mkfs 時のみ有効化可能** | §2.1.2: "Encryption is all-or-nothing at the filesystem level: all data and metadata except the superblock is encrypted, and all data and metadata is authenticated … **Encryption can only be enabled at format time; it cannot be added to an existing filesystem**" | D9 の方向性を裏付け；ただし本プロジェクト D9 は「システム設定の KDF 識別子 + マスターキースロット」を予約し、**既存ファイルシステム上での暗号化有効化** を目指しており、意図的な相違点 |
 | ⚠️ **nocow で書き込まれたデータは暗号化ファイルシステム上でも平文保存** | §2.1.2: "Data written with the nocow option is stored **unencrypted**, even on an encrypted filesystem. **This is a hard design incompatibility, not a policy choice**: ChaCha20 requires a unique nonce per (key, plaintext), and bcachefs stores the nonce externally alongside each data pointer" | **D9 と D10 の連動を示す実証**: 本プロジェクトは「COW を回避する高速パスであっても暗号化を回避してはならない；インプレース上書きは直ちに nonce 再利用を招く」と決定済み。bcachefs も同一の制約に直面し、**nocow データを非暗号化とする**選択をした——本プロジェクトはその妥協を受け入れず、D10 のいかなる候補もインプレース上書きを禁止 |
 | **マウント前にアンロック必須** | §4.2.3: "the passphrase is requested once the devices have been found and **before any attempt to mount**"；FAQ: 未アンロックマウントは Required key not available を返却 | D9 既定項目5の推論を支える前提の1つ |
@@ -495,7 +496,7 @@ D7 のメインライン非マージ方針に対して: この事実は論拠を
 
 **本節は推測ではなく、現実に発生した障害を記録するものです。**
 
-bcachefs の `bch2_check_allocations()` は全走査によって会計を再構築し、実行時カウンタと `memcmp` で突き合わせます——**形態は本プロジェクトの [invariants/05-空间记账.md](../../crates/singlefs-checker/invariants/05-空间记账.md) における I-3.1（割り当て済み統計の一致）と同一です**。しかし、両パスは全く同一の加減算コードを共有しています:
+bcachefs の `bch2_check_allocations()` は全走査によって会計を再構築し、実行時カウンタと `memcmp` で突き合わせます——**形態は本プロジェクトの [invariants/05-空间记账.md](../../crates/singlefs-checker/invariants/05-空间记账.md) における I-3.1 (割り当て済み統計が一致する)と同一です**。しかし、両パスは全く同一の加減算コードを共有しています:
 
 ```c
 this_cpu_add(e->v[gc][i], a.v->d[i]);        // fs/bcachefs/disk_accounting.h, bch2_accounting_mem_mod_locked()
@@ -516,7 +517,7 @@ this_cpu_add(e->v[gc][i], a.v->d[i]);        // fs/bcachefs/disk_accounting.h, b
 
 出典: Linux mainline v6.17 `fs/bcachefs/`（`disk_accounting.{c,h}`、`disk_accounting_format.h`、`btree_write_buffer.{c,h}`、`btree_trans_commit.c`、`btree_gc.c`、`buckets.c`、`bcachefs_format.h`）、取得の上行単位で突合。
 
-## 8. ルートリングのスロット幅と「長時間消費者が発行とどう競合するか」の実装状況
+## 8. ルートリングのスロット幅と「長時間消費者がパブリッシュとどう競合するか」の実装状況
 
 **2026-09-08 にローカル固定点 `~/code/fs-refs` で確認・抽出。いずれも本プロジェクト内では未検証。**
 D2 既定項目15（ライフサイクルの異なるオブジェクトの一般的基準）および [checks-owed.md](checks-owed.md) C214 に対する回答です。
@@ -547,11 +548,11 @@ D2 既定項目15（ライフサイクルの異なるオブジェクトの一般
 | **リング総サイズは 128 KiB 固定 ⇒ スロット幅拡大はスロット数削減を意味**し、ディスク専有領域の増加ではない | `VDEV_UBERBLOCK_COUNT = VDEV_UBERBLOCK_RING >> SHIFT` |
 
 ⚠️ **使用されている指標は ashift（アライメント / 最小割り当て単位）であり、Linux の io_min（アレイ上のストライプチャンクサイズ）ではありません。**
-両指標は md アレイ上で大幅に乖離します——E34 は実環境の md/raid5 で 128倍の開きを測定しました。
+両指標は md アレイ上で大幅に乖離します——E34 (ルートリングスロット幾何) は実環境の md/raid5 で 128倍の開きを測定しました。
 
 ⚠️ **本プロジェクトとの既知の相違点**（`.claude/singlefs-ai-sop/rules/evidence-discipline.md` の要求事項）:
 ZFS のラベルはディスクあたり4箇所、各 256 KiB の**固定領域**であり、uberblock リングはそのうち 128 KiB を恒久的に占有します；
-一方本プロジェクトのルートリングは R 個の領域が素数ストライドでディスク上に分散配置され、**領域サイズはフォーマット定数ではありません**——領域あたりスロット数 S はシステム設定に保持されます（D22 既定項目2: 「S はシステム設定に存在。下限1、上限は I-7.4 が確保するブロック数に基づきマウント時に算出」）。⇒ 「スロット幅拡大 = スロット数削減」という等式は、本プロジェクトにおいて「領域サイズ固定」の条項が明文化されて初めて成立するものであり、現状リポジトリにその条項はありません。
+一方本プロジェクトのルートリングは R 個の領域が素数ストライドでディスク上に分散配置され、**領域サイズはフォーマット定数ではありません**——領域あたりスロット数 S はシステム構成に保持され、区間の二つの境界（下限 4、上限 16）だけがフォーマット定数です（D22 (ユニット原子性の合成手法) 確定項目 2）。⇒ 「スロット幅拡大 = スロット数削減」という等式は、本プロジェクトにおいて「領域サイズ固定」の条項が明文化されて初めて成立するものであり、現状リポジトリにその条項はありません。
 
 ### 8.2 btrfs: commit root + 中断可能走査に依存するが、本プロジェクトでは2つの独立したゲートにより除外
 
@@ -566,9 +567,9 @@ ZFS のラベルはディスクあたり4箇所、各 256 KiB の**固定領域*
 | transaction.c btrfs_commit_transaction | `btrfs_scrub_pause(fs_info);` |
 
 ⚠️ **本プロジェクトはこの手法を採用できません。2つの除外ゲートが独立して存在します（2026-09-08 確定）**:
-1. **コミット間隔が 8.3万倍乖離**——btrfs のデフォルトコミット間隔は `#define BTRFS_DEFAULT_COMMIT_INTERVAL (30)`（`linux-6.17/fs/btrfs/fs.h`、30秒）ですが、本プロジェクトの負荷甲における発行間隔は **0.36ミリ秒**（2785発行/秒）です。btrfs の前提は「コミット間隔が消費者の走査スライスより遥かに長い」ことであり、移植した場合 scrub は毎秒2785回中断され、走査が完了しません。
+① **コミット間隔が 8.3万倍乖離**——btrfs のデフォルトコミット間隔は `#define BTRFS_DEFAULT_COMMIT_INTERVAL (30)`（`linux-6.17/fs/btrfs/fs.h`、30秒）ですが、本プロジェクトの負荷甲におけるパブリッシュ間隔は **0.36ミリ秒**（2785パブリッシュ/秒）です。btrfs の前提は「コミット間隔が消費者の走査スライスより遥かに長い」ことであり、移植した場合 scrub は毎秒2785回中断され、走査が完了しません。
 **この暗黙の前提はその手法とともに引用されたことがありません。**
-2. **チェッカー側が構造的にそのロックを取得できない**——D13 既定項目5: 「kb から生成された定数モジュールのみを共有；newtype、パース、チェックサム、走査、会計はそれぞれ独立実装」⇒ 独立したチェッカーが被テスト実装の `commit_root_sem` を保持することは不可能です。
+② **チェッカー側が構造的にそのロックを取得できない**——D13 (検証ルート) 確定項目 5 の原文: 「kb から生成された定数モジュールのみを共有；newtype、パース、チェックサム、走査、会計はそれぞれ独立実装」⇒ 独立したチェッカーが被テスト実装の `commit_root_sem` を保持することは不可能です。
 
 3点セットの記録は、何が除外されたかを明確化するためであり、候補案ではありません。
 
@@ -578,7 +579,7 @@ ZFS のラベルはディスクあたり4箇所、各 256 KiB の**固定領域*
 ブロック再利用の世代ウィンドウには手を加えず、消費者を**一時停止可能にし、コミット点と同期させる**方式です。
 
 ⚠️ **本プロジェクトとの既知の相違点**: btrfs の commit root は**1世代のみ**（直近コミット済みトランザクション）をメモリ内の読み書きロックで維持するため、**実行時**の半分のみをカバーします；
-一方 I-7.4 は「クラッシュ後は defer キューのメモリ状態が消失し、実行時の K はルートリングの深度が引き継ぐ（清掃アドミッション『解放世代 ≤ リング内の最古ルート txg』ゲート）、保護幅はそれに応じて変化する」と規定しており——**クラッシュ後の半分に対して、ロックは何の発言権も持ちません。**
+一方 I-7.4 は「クラッシュ後は defer キューのメモリ状態が消失し、実行時の K はルートリングの深度が引き継ぐ（掃除アドミッション『解放世代 ≤ リング内の最古ルート txg』ゲート）、保護幅はそれに応じて変化する」と規定しており——**クラッシュ後の半分に対して、ロックは何の発言権も持ちません。**
 
 <!-- doc-lint:not-numbers EXT4 NILFS2 -->
 
@@ -612,13 +613,13 @@ D21 既定項目3 ③: 「ユーザー要求の外部調査（他社がオブジ
 | APFS | Apple File System Reference、PDF 作成日 2020-06-22、181頁 | developer.apple.com からダウンロード、pypdf でテキスト抽出 |
 | btrfs ドキュメント | btrfs.readthedocs.io/en/latest の Trim、btrfs-quota、Qgroups、btrfs-balance、btrfs-man5 | curl で取得 |
 
-ファイル:行番号は上記コミットに対応します。
+ファイル:行番号はすべて「確認した版と取得方法」の表にあるコミットを指す。本機に元からあった `/home/fy5090/code/fs-refs/zfs`（`58d73c90`、2026-08-27）と `/home/fy5090/linux-bug-fix/linux`（v7.3-rc1、浅いクローン）はメインラインより古いため、引用には使わなかった。
 
-本プロジェクト側の前提事実: D19 既定項目5「位置エントリはヒントに降格、中央マッピングが唯一の入口」および既定項目7「ポインタヘッダに誕生 (tree, txg) を保持、各8バイト」（「中央マッピング経由」「ポインタが誕生 txg を保持」）。
+本プロジェクト側で差分を書くのに使った事実は二つだけで、どちらもその場で確認したものです：`.claude/kb/decisions/19-块指针的结构与宽度预算.md` の「確定項目 5：位置エントリはヒントに降格し、中央マッピングが唯一の入口」と「確定項目 7：ポインタヘッダに誕生 (tree, txg) を持ち、各 8 バイト」（略して「本プロジェクトは中央マッピング経由」「本プロジェクトのポインタは誕生 txg を持つ」）。
 
 ### 10.1 ZFS: deadlist、livelist、BP rewrite 不在の理由、device removal の indirect mapping
 
-| 事実 | 出典（OpenZFS 4542a317） | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典（OpenZFS 4542a317） | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | メモリ構造: deadlist は dle_mintxg でソートされた AVL ツリー、各エントリが bpobj を保持；dl_cache が存在；ディスク上ヘッダ dsl_deadlist_phys_t は used/comp/uncomp の3合計のみ保持 | include/sys/dsl_deadlist.h 定義；module/zfs/dsl_deadlist.c:106（dsl_deadlist_compare が dle_mintxg を比較） | ソース精読 | 誕生 txg でバケット分割された deadlist: ZFS のブロックポインタは物理 DVA であり中央マッピングなし；本プロジェクトは中央マッピング経由で誕生 txg を保持 |
 | ディスク上のキー: deadlist オブジェクトは ZAP、キーは mintxg（10進数文字列）、値は bpobj オブジェクト番号 | dsl_deadlist.c:534（zap_add_int_key(... mintxg, obj ...)）、:895-897 | ソース精読 | ZFS は物理 DVA；本プロジェクトは中央マッピング経由 |
@@ -636,29 +637,29 @@ D21 既定項目3 ③: 「ユーザー要求の外部調査（他社がオブジ
 
 ZFS 第2群: block pointer rewrite 不在、device removal は indirect mapping を採用。
 
-| 事実 | 出典および日付 | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典および日付 | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | ソース自認の理由: 削除デバイスに対応する indirect vdev は「since we cannot rewrite block pointers of snapshots, etc.」のため旧位置から新位置へのマッピングを保持し、DVA アクセスごとに照合 | module/zfs/vdev_indirect.c:36-47（4542a317） | コメント精読 | ポインタを変更せず SPA 層に旧→新マッピングを追加: ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
 | マッピングは論理ブロック境界に従わず、1つの DVA が複数セグメントに跨がり得る（split block）ため、全 DVA を新 DVA に置換できるわけではなく、セグメント単位コールバック vdev_remap を提供 | vdev_indirect.c:41-58 | コメント精読 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
 | 設計者発言（Alex Reece, 2015-01-13, Delphix ブログ）: ブロックポインタごとのマッピングは「quickly requires an unreasonably large data structure that must be stored both on disk and kept in memory」；BP rewrite も巨大な一時テーブルを要するため、SPA 層で連続セグメント単位マッピングを採用 | Delphix ブログ 2020年 web.archive.org 魚拓 104-107行 | 魚拓ドキュメント精読 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
 | 削除フロー: 割り当て停止；スレッドが LBA 順に割り当て済みセグメントをコピー、sync task がマッピング更新；コピー中の free は旧位置とコピー先新位置を同時解放；完了後 vdev は indirect に変化 | module/zfs/vdev_removal.c:43-73 | コメント精読 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
 | 制約: 通常クラスに raidz/draid トップレベル vdev 不可；全トップレベル vdev の ashift 一致；暗号化データセットのキー読み込み済み；全 vdev オンライン・健全 | vdev_removal.c:75-92；man/man8/zpool-remove.8:50-52 | コメントとドキュメント | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
-| 未解決課題: #9013 raidz device removal（ahrens, 2019-07-10 open、2026-10-12 時点も open）；#9129 generic device removal open | GitHub issues 9013, 9129 | issue 精読 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
+| 既知の未解決事項：「device removal for RAID-Z」issue #9013（ahrens、2019-07-10 起票、2026-10-12 時点でも open）、「RFC: generic device removal」#9129（2019-08-05 起票、引き続き open） | GitHub API `repos/openzfs/zfs/issues/9013`、`/9129`、2026-10-12 取得 | issue を読んだ | ZFS は通常は中央マッピングを持たず、デバイスを除去した後にその vdev だけにマッピングを追加する。本プロジェクトは中央マッピング方式であり、すべてのポインタが最初からマッピングを経由する。 |
 | メモリコスト: マッピング全体をメモリに展開（vmem_alloc(map_size) + dmu_read）；zpool remove -n が予想メモリを表示；zpool status が使用メモリを表示 | module/zfs/vdev_indirect_mapping.c:357-361；zpool-remove.8:78-83；cmd/zpool/zpool_main.c:10607 | ソースとドキュメント | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
 | ディスク上の1マッピング = vimep_src（u64、元オフセット63ビット + 1ビットマーク）+ vimep_dst（dva_t）；asize 24ビット、単一エントリで最大 8GB マッピング | include/sys/vdev_indirect_mapping.h:29-43 | ソース精読；推定 24バイト（8 + 16） | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
-| ユーザー報告の規模: 6.94TB の vdev 削除後に「39.8M memory used for removed device mappings」 | issue #18930（2026-08-15, TrueNAS, zfs-2.3.0） | 報告出力、負荷未確認 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
+| あるユーザーが報告した量：6.94T の vdev を除去した後「39.8M memory used for removed device mappings」 | issue #18930 本文（2026-08-15、TrueNAS、zfs-2.3.0） | 他者が報告した出力。負荷と断片化の程度は未確認 | ZFS は通常は中央マッピングを持たず、デバイスを除去した後にその vdev だけにマッピングを追加する。本プロジェクトは中央マッピング方式であり、すべてのポインタが最初からマッピングを経由する。 |
 | マッピング縮小: 解放または remap されたブロックは obsolete となりカウント；obsolete 率 >= zfs_condense_indirect_obsolete_pct（デフォルト 25%）または obsolete spacemap > 1GB で condense 実行、有効エントリのみで新マッピング再書き込み；再開可能；obsolete_counts 特性は不可逆 | vdev_indirect.c:60-124、:126-171、:175-197；zpool-features.7:864-878 | コメントとドキュメント | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
 | remap: 間接ブロック書き込み時に indirect vdev を指す DVA を具体的 DVA に置換（置換可能時のみ）；dedup/gang は対象外；スナップショット参照の旧 DVA は ds_remap_deadlist へ投入 | module/zfs/metaslab.c:5699-5730；vdev_indirect.c:100-123；dsl_destroy.c:280-302 | ソース精読 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
 | zfs remap サブコマンドは master で廃止済み | grep '"remap"' cmd/zfs/zfs_main.c で該当なし | grep 実測 | 互換性の負債: 本プロジェクトにはなし |
 | split block 読み取り時に破損レプリカがある場合、組み合わせで再構築。組み合わせ数が上限（デフォルト 4096）を超えるとランダムに 100種のみ試行 | vdev_indirect.c:207-215 | コメント精読 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
-| 最近の不具合: #18930 indirect vdev を持つプールでの NULL ポインタ参照（open）；#19120 修復前の split-block コピー検証（closed 2026-09-16）；#12200 obsolete spacemap アサーション失敗（open） | GitHub search API、2026-10-12 取得 | タイトルと本文冒頭 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
+| 最近の indirect 関連の不具合（タイトルと状態だけ）:#18930「Kernel NULL pointer dereference in vdev_indirect_mapping_duplicate_adjacent_entries() … on a pool with an indirect vdev」open、#19120「vdev_indirect: validate split-block copies before repair」closed（2026-09-16）、#12200「VERIFY3(0 == vdev_obsolete_sm_object(...)) failed」open | GitHub search API `q=repo:openzfs/zfs "indirect vdev"`、全 292 件、2026-10-12 取得 | タイトルだけを読んだ。#18930 は本文の冒頭も読んだ | ZFS は通常は中央マッピングを持たず、デバイスを除去した後にその vdev だけにマッピングを追加する。本プロジェクトは中央マッピング方式であり、すべてのポインタが最初からマッピングを経由する。 |
 | 近似の現役手法: zfs rewrite はファイルブロックを新位置にそのまま書き直す；スナップショット共有ブロックは新旧両方残り容量増、-S で共有ブロック除外、-C で BRT クローン除外、-P で論理 birth 保持 | man/man8/zfs-rewrite.8:31-57、:84-91；zpool-features.7:880-895 | ドキュメント精読 | ZFS は通常時中央マッピングなし；本プロジェクトは全ポインタが中央マッピング経由 |
 
-見つからなかったもの: OpenZFS ツリー内に「なぜ BP rewrite を行わないか」を詳述した設計ドキュメントは存在せず；Delphix ブログはアーカイブのみ；indirect mapping の読み取り遅延の実測値は見当たらず。
+調べたが見つからなかったもの：OpenZFS のツリーに「なぜ BP rewrite をしないか」を正面から説明する設計文書は見つからなかった（疎なチェックアウトの `module include man cmd` で `grep -rn -i 'bp rewrite\|bprewrite\|block pointer rewrite\|rewrite block pointers\|bp_rewrite'` を実行し、唯一の一致は `module/zfs/vdev_indirect.c:38` のコメント。チェックアウトしていない `tests`、`lib` などのディレクトリは調べていない）。Delphix の元のブログページは公開終了し、アーカイブだけが残る。indirect mapping の読み取り経路の遅延コストを公開測定した数値は見つからなかった。
 
 ### 10.2 btrfs: 共有ブロック参照カウント、スナップショット削除、balance/relocation
 
-| 事実 | 出典（Linux 24a19b95、7.3-rc7） | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典（Linux 24a19b95、7.3-rc7） | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | スナップショット作成: btrfs_copy_root はルートノードのみコピー、新ルートに btrfs_inc_ref 呼び出し（子ポインタ参照カウント +1）、元ツリーの last_snapshot に transid 設定；非ルートブロックは複製せず | fs/btrfs/ctree.c:238-296；transaction.c:1798、:1827 | ソース精読 | extent tree 内の参照カウントとバックレフ、COW 時の遅延参照プッシュ: btrfs は親ノードが子の論理アドレスを直接保持；本プロジェクトは中央マッピング経由 |
 | 共有判定: 非共有ツリー、ルートノード、generation > last_snapshot かつ relocation 由来でないブロックは extent tree を見ずに非共有と判定 | ctree.c:312-347 | ソース精読 | btrfs は親ノードが子の論理アドレスを直接保持；本プロジェクトは中央マッピング経由 |
@@ -680,7 +681,7 @@ ZFS 第2群: block pointer rewrite 不在、device removal は indirect mapping 
 
 btrfs 第2群: メインライン新規の remap tree（relocation 時に参照元ポインタを変更せず、アドレス再マッピング層を挟む方式）。
 
-| 事実 | 出典および日付 | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典および日付 | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | 導入: incompat ビット BTRFS_FEATURE_INCOMPAT_REMAP_TREE、ツリー ID BTRFS_REMAP_TREE_OBJECTID 13、キー IDENTITY_REMAP(234)/REMAP(235)/REMAP_BACKREF(236)、フラグ REMAPPED & METADATA_REMAP | include/uapi/linux/btrfs.h:339；btrfs_tree.h:80、:288-290、:1174-1175、:1348-1355 | ソース精読 | ブロックグループ単位の旧→新アドレスマッピング、I/O 時に変換: btrfs は移動対象ブロックグループのみマッピング；本プロジェクトは全ポインタが中央マッピング経由 |
 | 初回マージ: v6.19 で未導入、v7.0-rc1 で導入；コミット ef6a31d035a1（Mark Harmstone, 2026-01-07） | git.kernel.org btrfs.h およびコミット | git 検証 | btrfs は移動対象ブロックグループのみマッピング；本プロジェクトは全ポインタが中央マッピング経由 |
@@ -690,34 +691,34 @@ btrfs 第2群: メインライン新規の remap tree（relocation 時に参照�
 | 空ブロックグループ判定: REMAPPED は identity_remap_count == 0、通常は used == 0 && remap_bytes == 0 | discard.c:218-235 | ソース精読 | btrfs は移動対象ブロックグループのみマッピング；本プロジェクトは全ポインタが中央マッピング経由 |
 | RFC の動機: 「バックレフを追跡してメタデータツリー内のアドレスを書き換える現行方式は低速であり、nocow ファイルを破壊する副作用がある」 | Mark Harmstone, RFC PATCH btrfs: remap tree, 2025-05-15, LWN | メール要約 | btrfs は移動対象ブロックグループのみマッピング；本プロジェクトは全ポインタが中央マッピング経由 |
 
-見つからなかったもの: qgroup 有効時の balance 速度低下の公表実測値；7.x における remap tree の既知不具合一覧；remap tree 下での共有 extent 移動時の qgroup 会計詳細。
+調べたが見つからなかったもの：btrfs メインラインで「qgroup を有効にすると balance がどれだけ遅くなるか」の公開測定値は見つからず、文書の定性的な記述だけだった。7.x の remap tree に既知の不具合一覧があるかは調べていない（linux-btrfs メーリングリストと 7.0～7.3 の fixes は読んでいない）。remap tree 上でスナップショット共有 extent を移動する際に qgroup をどう計算するかのソースも読んでいない。
 
 ### 10.3 bcachefs: スナップショットツリーとキーの可視性、copygc による共有データ移動、backpointers
 
-| 事実 | 出典（bcachefs-tools efec39c7） | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典（bcachefs-tools efec39c7） | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | 4本の btree がスナップショット対応（extents, inodes, dirents, xattrs）；各キーの位置にスナップショット ID（bpos.snapshot）を保持；要求スナップショットの祖先または自身であり、より近い祖先で上書きされていない場合に可視；削除時は whiteout を挿入 | snapshots/snapshot.c:44-54 | ドキュメントコメント | 参照カウントや deadlist ではなくスナップショット ID によるキー可視性で共有: bcachefs はキー空間内で共有；本プロジェクトは誕生 txg 分割 deadlist + 中央マッピング |
 | 祖先判定: 各スナップショットノードが 128ビット祖先ビットマップ（差 128 以内 O(1)）+ 3要素ランダムスキップリストを保持 | snapshots/snapshot.c:56-60；snapshots/types.h:14 | コメントとソース | bcachefs はキー空間内で共有；本プロジェクトは誕生 txg 分割 deadlist + 中央マッピング |
 | スナップショット ID は下向き割り当て: 子は親より小さく、「祖先は後方、最新が前方」に配置されるため、可視性フィルタは前方スキャン1回 | snapshots/snapshot.c:62-84 | コメント精読 | bcachefs はキー空間内で共有；本プロジェクトは誕生 txg 分割 deadlist + 中央マッピング |
 | スナップショット作成: 現在のスナップショットノード下に2つの子ノードを分岐（1つは新スナップショット、1つは元サブボリューム置換）；キーの複製は行わない | snapshots/snapshot.c:86-98 | コメント精読 | bcachefs はキー空間内で共有；本プロジェクトは誕生 txg 分割 deadlist + 中央マッピング |
 | extent 不変条件: 異なるスナップショットの2つの extent は完全に同一範囲であるか、一切重複しないかのいずれか；書き込み時に祖先 extent を分割してアライメント | snapshots/snapshot.c:117-121 | コメント精読 | bcachefs はキー空間内で共有；本プロジェクトは誕生 txg 分割 deadlist + 中央マッピング |
-| スナップショット削除: マーク後 delete_dead_snapshots パスで回収；生存子孫のないノードのキーは破棄；単一生存子ノードを持つ中間ノードのキーはその子ノード（live_child）へ下降 | snapshots/snapshot.c:128-163 | コメント精読 | 本プロジェクトは「deadlist を新しい側へマージ」予定；bcachefs は唯一の生存子へキーを下降 |
+| スナップショット削除：まずマークし、続いて `delete_dead_snapshots` リカバリ pass（オンラインでも実行）で一回または複数回に分けて回収する。「Cost is proportional to the data in the deleted snapshot」。生存する子孫がないノードの key は直接捨て、生存する子が一つだけの中間ノードでは key をその子（`live_child`）に下げる。生存する子が二つある中間ノードは残す。 | `snapshots/snapshot.c:128-163` | コメント精読 | bcachefs の共有単位は btree key で、スナップショットツリーは key 空間にある。本プロジェクトは誕生 txg による deadlist と中央マッピングを使う計画。本プロジェクトの計画は「deadlist を新しい側へマージ」で、bcachefs は key を唯一の生存子孫に下げる。 |
 | 中断セマンティクス: キーは下向きにのみ移動し、inodes btree は最後に処理されるため、中断時は「内容キー移動済み、inode 未移動」の偏向のみ残る | snapshots/snapshot.c:215-218 | コメント精読 | bcachefs はキー空間内で共有；本プロジェクトは誕生 txg 分割 deadlist + 中央マッピング |
 | copygc: bucket は追記のみ；copygc が最も断片化した bucket を選択し、backpointers で生存データを特定、新 bucket へ書き出して extent ポインタをアトミック更新；copygc_reserve（デフォルト 8%、5–20%）を確保 | data/copygc.c:6-28；doc/bcachefs-principles-of-operation.tex:308-321 | ドキュメントコメント | extent は論理位置をキーとし物理ポインタを値に格納；bcachefs は単一の共有キーを書き換え；本プロジェクトは中央マッピングエントリを書き換え |
 | bucket 選択: 断片化 LRU は dirty_sectors / bucket_size を 2^31 でスケーリング（生存データ最少のものを貪欲選択）；書き込み中、書き込み不可、backpointer 不一致の bucket はスキップ | alloc/background.h:127-145；data/copygc.c:98-140 | ソース精読 | bcachefs は単一の共有キーを書き換え；本プロジェクトは中央マッピングエントリを書き換え |
 | 移動コミット: bch2_data_update が旧キーと同一スナップショット位置に新キーを書き込み（BTREE_UPDATE_internal_snapshot_node 付与）；extent 分割時は whiteout を補完 | data/update.c:431、:473-479；btree/update.c:123-159 | ソース精読 | bcachefs は単一の共有キーを書き換え；本プロジェクトは中央マッピングエントリを書き換え |
-| 移動時のポインタ変更: extent キー内の物理ポインタは変更必須（同一キー・単一トランザクション）；共有は単一キーであるため各スナップショットの個別修正は不要 | data/copygc.c:25-27；data/update.c:473-479 | ソース精読 | bcachefs は単一の共有キーを書き換え；本プロジェクトは中央マッピングエントリを書き換え |
-| backpointers: データセクタごとに write buffer btree 内に逆ポインタを保持: key = (device, sector offset, discriminator)、value に所有者 btree ID、level、pos（スナップショット ID 含む）、data_type、gen を記録 | alloc/background.c:246-263；bcachefs_format.h:568-577 | コメントとソース | bcachefs の backpointer は単一の共有キーを指す；本プロジェクトは中央マッピングエントリを書き換え |
-| 整合性: backpointer セクタ数と bucket セクタ数の一致で整合と判定、不一致時のみ双方向全検査 | alloc/background.c:284-306 | コメント精読 | bcachefs は単一の共有キーを指す；本プロジェクトは中央マッピングエントリを書き換え |
+| 「論理アドレスでキー付けするのでポインタを変更しなくてよい」のか：ソースによれば、移動時にも extent key 内の物理ポインタを変更する必要がある（同じ key に対して一トランザクション）。変更不要なのは「各スナップショットそれぞれの参照」であり、共有 key が一つしかないため。 | `data/copygc.c:25-27`、`data/update.c:473-479` | ソースを読んだ。「スナップショットごとの変更は不要」は「共有 key が一つだけ」からの推論 | bcachefs の key はスナップショット ID を持つ。複数のスナップショットが共有するデータには祖先スナップショット内の key が一つだけあり、移動時はそれだけを変更する。本プロジェクトは中央マッピングを経由し、移動時はマッピングエントリを変更する。 |
+| backpointers：データを持つディスク上の各セクタ範囲に逆ポインタがあり、書き込みバッファ btree に保存する。key = (device, sector offset, discriminator)、値には所有者 key の btree ID、level、位置（スナップショット ID を含む）、データ型、バケット generation を記録する。extent trigger が自動的に追加・削除する。 | `alloc/background.c:246-263`、構造は `bcachefs_format.h:568-577` | コメントとソース | bcachefs の key はスナップショット ID を持つ。複数のスナップショットが共有するデータには祖先スナップショット内の key が一つだけあり、移動時はそれだけを変更する。本プロジェクトは中央マッピングを経由し、移動時はマッピングエントリを変更する。 backpointer が指すのはその唯一の key であり、スナップショットごとに一条あるのではない（key の共有からの推論）。 |
+| 整合性：backpointer のセクタ数とバケットのセクタ数が同じなら、そのバケットは整合していると見なし、一致しない場合だけ双方向の全検査を行う。三つのリカバリ pass が相互検査する。 | `alloc/background.c:284-306` | コメント精読 | bcachefs の key はスナップショット ID を持つ。複数のスナップショットが共有するデータには祖先スナップショット内の key が一つだけあり、移動時はそれだけを変更する。本プロジェクトは中央マッピングを経由し、移動時はマッピングエントリを変更する。 |
 | backpointers 利用操作: copygc、デバイス撤退、scrub、reconcile | alloc/background.c:271-282 | コメント精読 | bcachefs は単一の共有キーを指す；本プロジェクトは中央マッピングエントリを書き換え |
 
-見つからなかったもの: スナップショット多数時における copygc や delete_dead_snapshots のオーバーヘッド実測値。
+調べたが見つからなかったもの：bcachefs が「スナップショットが多い場合の copygc または delete_dead_snapshots のコスト」を公開測定した数値は見つからなかった。`doc/bcachefs-principles-of-operation.tex` の 722 行目「Subvolumes and snapshots」節は一行ずつ読んではおらず、ソースにある `DOC_LATEX(snapshots)` コメントだけを読んだ。
 
 ### 10.4 F2FS と NILFS2: セグメントクリーニング
 
 F2FS（Linux 24a19b95）:
 
-| 事実 | 出典 | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典 | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | 3種のセグメント選択アルゴリズム: GC_CB（費用便益）、GC_GREEDY、GC_AT（年齢閾値）；2種の GC モード: BG_GC（バックグラウンド）、FG_GC（オンデマンド） | fs/f2fs/segment.h:132-154 | ソース精読 | ログ構造セグメントクリーニング: F2FS はスナップショットを持たず共有ブロックを扱わない；本プロジェクトの GC はスナップショット共有ブロックを移動 |
 | デフォルト対応: BG_GC は CB（atgc 有効時は AT）、FG_GC は GREEDY；gc_urgent/gc_idle で強制指定可能 | fs/f2fs/gc.c:248-273；Documentation/filesystems/f2fs.rst:822-828 | ソースとドキュメント | F2FS はスナップショットなし；本プロジェクトの GC は共有ブロックを移動 |
@@ -730,38 +731,38 @@ F2FS（Linux 24a19b95）:
 
 NILFS2（Linux 24a19b95 カーネル、nilfs-utils 26efb5da ユーザー空間）:
 
-| 事実 | 出典 | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典 | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | チェックポイントは数秒ごとまたは同期書き込み時に自動生成；チェックポイントをスナップショットへ変換可能；NILFS_IOCTL_CHANGE_CPMODE で切り替え | Documentation/filesystems/nilfs2.rst:14-18、:100-102 | ドキュメント精読 | DAT によるブロック仮想化、GC は DAT を修正しツリーは不変、生存期間はチェックポイント区間で判定: 双方とも間接層あり；NILFS2 は全巻チェックポイントでユーザー空間デーモン判定 |
 | チェックポイント削除時のスナップショットスキップ: 範囲削除でスナップショットに遭遇すると -EBUSY；単一削除も -EBUSY | fs/nilfs2/cpfile.c:507-513、:558-559、:750-777 | ソース精読 | DAT 仮想ブロック番号マッピング vs 本プロジェクト中央マッピング |
-| ユーザー空間 GC: nilfs_cleanerd がセグメント選定と生存判定を行い、NILFS_IOCTL_CLEAN_SEGMENTS で一括してカーネルへ指示 | nilfs2.rst:138-141；fs/nilfs2/ioctl.c:850-860 | ドキュメントとソース | DAT 仮想ブロック番号マッピング vs 本プロジェクト中央マッピング |
-| セグメント選定ポリシー: selection_policy は timestamp（最古から最新へ）のみ対応；protection_period はデフォルト 3600秒 | man/nilfs_cleanerd.conf.5:22-26、:52-58 | ドキュメント精読 | F2FS は greedy/CB、NILFS2 は時間順のみ |
+| GC はユーザー空間で実行する：`nilfs_cleanerd` がセグメントを選び、生存を判定し、`NILFS_IOCTL_CLEAN_SEGMENTS` で削除する checkpoint 区間、解放する仮想ブロック番号、移動するブロック、解放するセグメントを一括してカーネルに渡す。 | `nilfs2.rst:138-141`、`fs/nilfs2/ioctl.c:850-860`（argv の五区画） | ドキュメントとソース | NILFS2 の DAT は仮想ブロック番号から物理ブロック番号への一層のマッピングで、本プロジェクトは中央マッピングを使うため、どちらにも一層の間接参照がある。違いは、NILFS2 のスナップショットがボリューム全体の checkpoint で、生存判定をユーザー空間のデーモンが行う点。 |
+| セグメント選定方針：`selection_policy` は `timestamp`（最古から最新の順で回収）のみ対応。`nsegments_per_clean` の既定値は 2、`protection_period` は 3600 秒で、「NILFS2 GC never deletes checkpoints and their blocks whose duration time is less than the value」。 | nilfs-utils `man/nilfs_cleanerd.conf.5:22-26`、`:52-58` | ドキュメント精読 | NILFS2 の DAT は仮想ブロック番号から物理ブロック番号への一層のマッピングで、本プロジェクトは中央マッピングを使うため、どちらにも一層の間接参照がある。違いは、NILFS2 のスナップショットがボリューム全体の checkpoint で、生存判定をユーザー空間のデーモンが行う点。 F2FS は greedy/CB を使うが NILFS2 は時刻だけによる。 |
 | 生存判定（ユーザー空間）: ブロックの生存区間 [p_start, p_end) はチェックポイント番号；p_end が NILFS_CNO_MAX または保護期間内なら生存、区間内にスナップショットがあれば生存 | nilfs-utils lib/gc.c:417-470 | ソース精読 | DAT 仮想ブロック番号マッピング vs 本プロジェクト中央マッピング |
-| カーネル側原子性: nilfs_clean_segments は DAT を shadow map に退避；SC_LSEG_SR（super root 付きログ）で書き込み、SUFILE 段階でセグメント解放、失敗時はロールバック；成功後 discard 発行 | fs/nilfs2/segment.c:2546-2580、:1260-1265、:1566-1573、:1880-1886 | ソース精読 | DAT 仮想ブロック番号マッピング vs 本プロジェクト中央マッピング |
-| 中断安全性コメント: チェックポイント削除は「can be removed independently」；DAT は「updated atomically using COW」；ダーティマークは「nondestructive」 | fs/nilfs2/ioctl.c:797-834 | コメント精読 | DAT 仮想ブロック番号マッピング vs 本プロジェクト中央マッピング |
-| ブロック移動は DAT を変更: nilfs_btree_assign_gc が nilfs_dat_move を呼び出し仮想→物理対応を変更；ディスク上 binfo は仮想番号を保持するため参照元ツリーは修正不要 | fs/nilfs2/btree.c:2354-2379；fs/nilfs2/dat.c:317-331 | ソース精読 | DAT 仮想ブロック番号マッピング vs 本プロジェクト中央マッピング |
-| GC 読み込みブロックはダミー inode（gcinode）に保持、新ログ書き出し後に解放；現行世代のダーティブロックと GC 対象は重複しない | fs/nilfs2/gcinode.c:11-22 | コメント精読 | DAT 仮想ブロック番号マッピング vs 本プロジェクト中央マッピング |
+| カーネル側の原子性：`nilfs_clean_segments` はまず DAT を shadow map に保存し、準備に失敗すれば shadow から復元する。その後 `SC_LSEG_SR`（super root 付きの完全なログ）でセグメントを書き、同じセグメント構築の SUFILE 段階でセグメントを解放する（`nilfs_free_segments`）。構築に失敗したら `nilfs_sufile_cancel_freev` で取り消す。成功後、discard が有効なときだけ、解放したセグメントへ discard を発行する。 | `fs/nilfs2/segment.c:2546-2580`、`:1260-1265`、`:1566-1573`、`:1880-1886` | ソース精読 | NILFS2 の DAT は仮想ブロック番号から物理ブロック番号への一層のマッピングで、本プロジェクトは中央マッピングを使うため、どちらにも一層の間接参照がある。違いは、NILFS2 のスナップショットがボリューム全体の checkpoint で、生存判定をユーザー空間のデーモンが行う点。 |
+| 準備ステップを安全に中止できる理由はコメントにある。checkpoint の削除は「can be removed independently」、DAT は「is updated atomically using a copy-on-write technique」、ダーティの印付けは「nondestructive」。 | `fs/nilfs2/ioctl.c:797-834` | コメント精読 | NILFS2 の DAT は仮想ブロック番号から物理ブロック番号への一層のマッピングで、本プロジェクトは中央マッピングを使うため、どちらにも一層の間接参照がある。違いは、NILFS2 のスナップショットがボリューム全体の checkpoint で、生存判定をユーザー空間のデーモンが行う点。 |
+| ブロック移動は DAT を変更: nilfs_btree_assign_gc が nilfs_dat_move を呼び出し仮想→物理対応を変更；ディスク上 binfo は仮想番号を保持するため参照元ツリーは修正不要 | fs/nilfs2/btree.c:2354-2379；fs/nilfs2/dat.c:317-331 | ソース精読 | NILFS2 の DAT は仮想ブロック番号から物理ブロック番号への一層のマッピングで、本プロジェクトは中央マッピングを使うため、どちらにも一層の間接参照がある。違いは、NILFS2 のスナップショットがボリューム全体の checkpoint で、生存判定をユーザー空間のデーモンが行う点。 |
+| GC 読み込みブロックはダミー inode（gcinode）に保持、新ログ書き出し後に解放；現行世代のダーティブロックと GC 対象は重複しない | fs/nilfs2/gcinode.c:11-22 | コメント精読 | NILFS2 の DAT は仮想ブロック番号から物理ブロック番号への一層のマッピングで、本プロジェクトは中央マッピングを使うため、どちらにも一層の間接参照がある。違いは、NILFS2 のスナップショットがボリューム全体の checkpoint で、生存判定をユーザー空間のデーモンが行う点。 |
 
 見つからなかったもの: F2FS、NILFS2 の双方とも GC 中断クラッシュ後の専用再開ロジックは見当たらず（前者は checkpoint 巻き戻り、後者は super root ログの原子性に依存）。NILFS2 カーネル側にはセグメント選定コードなし（全量ユーザー空間）。
 
 ### 10.5 APFS: スナップショットと空間回収に関する公開情報
 
-| 事実 | 出典および日付 | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典および日付 | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | スナップショット作成時、現在の extent-reference tree 全体をスナップショットへ移管し、ボリューム側は空の新規ツリーへ置換 | Apple File System Reference（2020-06-22版）55頁 apfs_extentref_tree_oid | 公式ドキュメント | スナップショットごとに1本の extent 参照ツリー + 物理 extent 参照カウント: APFS は物理 extent 単位で参照管理、本プロジェクトは誕生 txg 分割 deadlist；APFS ファイルデータは物理アドレス直接指定 |
-| スナップショットメタデータ j_snap_metadata_val_t は extentref_tree_oid, sblock_oid を保持；「Snapshots are designed to be fast and inexpensive to create; however, deleting a snapshot involves more work」 | 同 117-118頁 | 公式ドキュメント | APFS は物理 extent 単位で参照管理、本プロジェクトは誕生 txg 分割 deadlist |
-| 物理 extent レコード j_phys_ext_val_t は refcnt を保持；「Extent deleted when reference count reaches zero」；「Volume without snapshots has kind APFS_KIND_NEW」 | 同 102-103頁 | 公式ドキュメント | APFS は物理 extent 単位で参照管理、本プロジェクトは誕生 txg 分割 deadlist |
-| オブジェクトマップ（omap）はスナップショットツリー（xid -> omap_snapshot_t）を保持 | 同 17頁、47頁 | 公式ドキュメント | APFS は物理 extent 単位で参照管理、本プロジェクトは誕生 txg 分割 deadlist |
-| Reaper がトランザクション間の制限時間内に削除しきれない巨大オブジェクトの削除を担当、進捗を複数トランザクションに跨ぎ保持；スナップショット削除は apfs_reap_state_t を使用 | 同 26頁、50頁、166-167頁 | 公式ドキュメント | 本プロジェクトの deadlist マージには reaper のようなトランザクション跨ぎオブジェクトなし |
+| スナップショットメタデータのレコード `j_snap_metadata_val_t` は `extentref_tree_oid`、`sblock_oid` などを持つ。文書の原文は「Snapshots are designed to be fast and inexpensive to create; however, deleting a snapshot involves more work」。 | Apple File System Reference（2020-06-22 版）117～118 ページ | 公式ドキュメント | APFS は物理 extent ごとに参照数を記録し、本プロジェクトは誕生 txg ごとに deadlist を記録する計画。APFS には仮想 oid を物理アドレスに写すオブジェクトマップ（omap）があるが、ファイルデータ extent は物理アドレスを直接使う（102 ページの `j_phys_ext_key_t` の key は物理ブロックアドレス）。本プロジェクトの「すべてのポインタが中央マッピング経由」とは異なる。 |
+| 物理 extent レコード `j_phys_ext_val_t` には `refcnt` があり、「The extent can be deleted when its reference count reaches zero」、また「For a volume that has no snapshots, the kind is always APFS_KIND_NEW」。 | Apple File System Reference（2020-06-22 版）102～103 ページ | 公式ドキュメント | APFS は物理 extent ごとに参照数を記録し、本プロジェクトは誕生 txg ごとに deadlist を記録する計画。APFS には仮想 oid を物理アドレスに写すオブジェクトマップ（omap）があるが、ファイルデータ extent は物理アドレスを直接使う（102 ページの `j_phys_ext_key_t` の key は物理ブロックアドレス）。本プロジェクトの「すべてのポインタが中央マッピング経由」とは異なる。 |
+| オブジェクトマッピングにはスナップショットツリー（xid → `omap_snapshot_t`）があり、アクセス時のキーは xid。 | Apple File System Reference（2020-06-22 版）17 ページ、47 ページ | 公式ドキュメント | APFS は物理 extent ごとに参照数を記録し、本プロジェクトは誕生 txg ごとに deadlist を記録する計画。APFS には仮想 oid を物理アドレスに写すオブジェクトマップ（omap）があるが、ファイルデータ extent は物理アドレスを直接使う（102 ページの `j_phys_ext_key_t` の key は物理ブロックアドレス）。本プロジェクトの「すべてのポインタが中央マッピング経由」とは異なる。 |
+| reaper は「deletion of objects that are too large to be deleted in the time between transactions」を担当し、削除の進捗を複数のトランザクションにまたがって保存する。スナップショット削除は `apfs_reap_state_t`（`last_pbn`、`cur_snap_xid`、`phase`）と omap の二つの reap 段階（先に map tree、後に snapshot tree）を使う。 | Apple File System Reference（2020-06-22 版）26 ページ、50 ページ、166～167 ページ | 公式文書を読んだ（`apfs_reap_state_t` の説明は「No overview available」） | APFS は物理 extent ごとに参照数を記録し、本プロジェクトは誕生 txg ごとに deadlist を記録する計画。APFS には仮想 oid を物理アドレスに写すオブジェクトマップ（omap）があるが、ファイルデータ extent は物理アドレスを直接使う（102 ページの `j_phys_ext_key_t` の key は物理ブロックアドレス）。本プロジェクトの「すべてのポインタが中央マッピング経由」とは異なる。 本プロジェクトで予定する deadlist のマージには reaper のようなトランザクションをまたいで削除するオブジェクトはない。 |
 | 空間マネージャは (xid, paddr) をキーとする free queue を保持、spaceman_free_queue_t は sfq_oldest_xid を保持；再割り当て可能時期の記述はなし | 同 159-160頁 | 公式ドキュメント | 手がかり |
-| パーティション縮小は evict-mapping tree で移動先を記録 | 同 33頁、42-43頁 | 公式ドキュメント | 手がかり |
-| 二次資料: 小さなスナップショット削除は「may take around 0.2s, mainly cleaning up object map」、Reaper が実行 | Howard Oakley, "APFS: Snapshots", eclecticlight.co, 2024-04-08 | 二次記事 | 手がかり |
+| パーティション縮小は evict-mapping tree で「where the blocks are being moved to」（ブロックの移動先）を記録する。 | Apple File System Reference（2020-06-22 版）33 ページ、42～43 ページ | 公式ドキュメント | 違いは不明であり、手がかりとしてしか扱えない |
+| 二次情報（Apple 以外）：非常に小さいスナップショットの削除は「may take around 0.2 seconds, mainly with cleaning up the object map」で、コンテナ唯一の Reaper が行う。 | Howard Oakley、「APFS: Snapshots」、eclecticlight.co、2024-04-08（WebFetch の要約経由で、原文との逐語照合はしていない） | 二次記事 | 違いは不明であり、手がかりとしてしか扱えない |
 
-見つからなかったもの: Apple 公式マニュアルにおいて TRIM は 7行のみ言及（すべて `INODE_ACTIVE_FILE_TRIMMED` 関連）、TRIM 発行とブロック再割り当ての前後関係や、スナップショット削除時の extent 解放判定基準は非公開。
+調べたが見つからなかったもの：Apple の参考マニュアル全文に `grep -c -i trim` をかけると 7 行一致したが、すべて `INODE_ACTIVE_FILE_TRIMMED`（「overprovisioning file that has been trimmed」）とその索引であり、TRIM をいつ発行するか、ブロックの再割り当てとの前後関係を説明する箇所はない。マニュアルはスナップショット削除でどの extent を解放するかの決め方、新しいスナップショットと古いものを削除する際の解放量の違いも説明していない。Hansen と Toolan のリバースエンジニアリング論文（Digital Investigation、2017）は今回原文を取得できなかった。Apple 開発者サイトにもスナップショット空間回収を説明する別の公式文書は見つからなかった（ウェブ検索は一回だけ）。
 
 ### 10.6 discard/TRIM: 発行時期とブロック再割り当て可能時期の順序
 
-| 事実 | 出典 | 基準 | 本プロジェクトとの差異 |
+| 事実 | 出典 | 計測条件 | 本プロジェクトとの差異 |
 |---|---|---|---|
 | ZFS 解放ブロックは ms_defer[txg % TXG_DEFER_SIZE]（TXG_DEFER_SIZE = 2）へ投入；満了で ms_allocatable へ戻ると同時に autotrim 有効時は ms_trim へ追加；slop 不足や vdev 撤退時は defer せず直接 ms_trim へ | module/zfs/metaslab.c:4616-4667；include/sys/txg.h:39 | ソース精読 | 再割り当て可能化が先、TRIM は後、割り当て時に TRIM 待機集合から除外: ZFS は metaslab 単位、本プロジェクトは全空セグメント生成後に discard 発行 |
 | 割り当て時に該当範囲を ms_trim から削除するため、再割り当て済み範囲が再 TRIM されることはない | metaslab.c:4928-4929、:5945-5946 | ソース精読 | ZFS は metaslab 単位、本プロジェクトは全空セグメント生成後に discard 発行 |
@@ -775,7 +776,7 @@ NILFS2（Linux 24a19b95 カーネル、nilfs-utils 26efb5da ユーザー空間�
 | F2FS: prefree セグメントは checkpoint 成功後に free へ変化し discard 発行；ブロック割り当て時に未発行 discard が重なれば除外、発行中なら完了を待機 | fs/f2fs/segment.c:2223-2282、:1874-1917、:3933 | ソース精読 | セグメント回収形態は本プロジェクトと類似；F2FS はスナップショットなし |
 | NILFS2: GC 解放セグメントは super root 付きログの書き込み成功後に discard 発行 | fs/nilfs2/segment.c:2560-2580 | ソース精読 | セグメント回収形態は本プロジェクトと類似 |
 | bcachefs: bucket が空になった時点で trigger が need_discard を need_discard btree に設定；discard worker が TRIM 完了後にフラグを解除し freespace btree へ投入；ジャーナル番号が flushed_seq_ondisk 以下かつ rewind_seq_ondisk 未満であることを要求 | alloc/background.c:1291-1300、:56-76；alloc/discard.c:343-351 | ソース精読 | bcachefs は「discard が先、再割り当て可能化が後」、ZFS/btrfs async と逆 |
-| APFS: 公式マニュアルに TRIM 仕様の記述なし | 10.5 末尾参照 | ドキュメント精読 | 不明 |
+| APFS: 公式マニュアルに TRIM 仕様の記述なし | APFS マニュアルでの TRIM の扱いは 10.5 末尾「調べたが見つからなかったもの」を参照 | ドキュメント精読 | 不明 |
 
 見つからなかったもの: ZFS、btrfs 双方とも discard 未完了時のクラッシュ復旧に関する記述なし；各社の discard 遅延・スループットの実測値なし。
 
@@ -788,7 +789,7 @@ NILFS2（Linux 24a19b95 カーネル、nilfs-utils 26efb5da ユーザー空間�
 | 調査した全実装において、各参照元のポインタを変更せずにスナップショット共有データを移動する手法はすべて間接層を導入している: NILFS2 は DAT 変更（仮想→物理）、ZFS device removal は indirect mapping、btrfs remap tree はブロックグループ単位再マッピング、bcachefs は元々単一キー共有；全参照元ポインタを直接書き換えるのは btrfs の従来型 relocation のみであり、RFC で「低速になり得る」と自認 | ZFS、btrfs、bcachefs、NILFS2；F2FS は非該当；APFS は不明 | 10.1〜10.4 のソースおよび RFC 原文 |
 | ZFS および btrfs async は「ブロックが先に再割り当て可能となり、後に TRIM 発行；割り当て時に待機集合から除外」；bcachefs は逆で「先に discard、後に freespace 投入」 | ZFS、btrfs、bcachefs；F2FS は checkpoint 後発行；NILFS2 はログコミット後発行 | 10.6 のソース |
 
-基準補記: LWN 上の remap tree RFC および eclecticlight の APFS 記事の引用は WebFetch 要約によるものであり原文メールとの行単位突合は未実施；Delphix ブログは web.archive.org の 2020年魚拓を使用。
+計測条件補記: LWN 上の remap tree RFC および eclecticlight の APFS 記事の引用は WebFetch 要約によるものであり原文メールとの行単位突合は未実施；Delphix ブログは web.archive.org の 2020年魚拓を使用。
 
 ### 7.9 第7節（「直近10年の学術成果スキャン（2012–2026）」）の参照元
 

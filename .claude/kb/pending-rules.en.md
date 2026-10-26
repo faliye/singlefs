@@ -3,16 +3,16 @@
 [中文](pending-rules.md) · **English** · [日本語](pending-rules.ja.md)
 
 Clauses that cannot be turned into failing checks and therefore cannot enter rules are kept in `pending-rules.md` as pending (`.claude/singlefs-ai-sop/rules/sop-first.md` "Boundaries": keep what cannot be turned into checks in kb as pending, do not write them as rules).
-Each entry records the original text, where it originally came from, why it was withdrawn, and what is missing to make it a rule. The original text is preserved verbatim in code blocks as it stood when withdrawn.
+Each entry records the original text, where it originally came from, why it was withdrawn, and what is missing to make it a rule. The original text is preserved verbatim in code blocks as it stood when withdrawn; inside each block, an English translation follows the original.
 
-## Search for existing before creating verification harness or test entry point — Pending
+## Search for existing before creating verification apparatus or test entry point — Pending
 
 | Item | Contents |
 |---|---|
-| Where it was | Shared SOP `rules/sop-first.md` section "Search for existing before creating verification harness or test entry point", since 0.0.64 (2026-10-11 release) |
+| Where it was | Shared SOP `rules/sop-first.md` section "Search for existing before creating verification apparatus or test entry point", since 0.0.64 (2026-10-11 release) |
 | Withdrawn | 2026-10-16, user decided "withdraw all clauses that cannot be made into checks and rely only on review to kb pending" |
 | Status | Pending: not a rule, does not bind execution |
-| What is missing to become a rule | A check that can go red: go red if a new entry script has no `# gate-similar:` in file header, and verify whether named harnesses exist; "whether two harnesses judge the same thing" still cannot be judged |
+| What is missing to become a rule | A check that can go red: go red if a new entry script has no `# gate-similar:` in file header, and verify whether named apparatuses exist; "whether two apparatuses judge the same thing" still cannot be judged |
 
 ```text
 ## 立验证装置或测试入口之前，同样先找已有的
@@ -26,6 +26,20 @@ Each entry records the original text, where it originally came from, why it was 
 5. 非单独立不可，在新入口的文件头写 `# gate-similar: <已有的装置或入口> <为什么不并进它>`；一个像的都没有，写 `# gate-similar: 无 <查过哪些>`。
 
 「立验证装置或测试入口之前，同样先找已有的」门禁还不判：新入口的文件头写没写 `gate-similar`、两套装置判的是不是同一件事，都靠 review。
+
+English translation:
+
+## Search for existing before creating verification apparatus or test entry point
+
+Scope: verification apparatuses (the code that enumerates, runs a differential, or drives real devices or external tools), test entry points (the entry scripts that `test-script-discipline.md` refers to), and the gate stages and the quick and slow tiers that run them.
+
+1. First list what each existing apparatus and entry point judges: which thing, which set of objects (which streams, which enumeration domain), with which judging method, in which stage.
+2. If one already judges the same thing on the same set of objects, merge the new one into it: a different algorithm, a move to acceleration hardware, an added stream or an added domain is written as its acceleration path or a new item, using its name, its entry point, its stage and its quick and slow tiers; do not start another name, another stage, or a separate quick tier and full run. An acceleration path keeps the reference path and runs a differential between the two, per `test-script-discipline.md` "Use the existing hardware acceleration".
+3. If only part overlaps (some streams or part of the domain are the same), merge the overlapping part and add the rest as new items in the same apparatus.
+4. If the repo already has two apparatuses side by side judging the same thing, merge them into one first, then run its pruning run or full run; before merging, do not run the full run of each one.
+5. If it truly has to stand alone, write `# gate-similar: <existing apparatus or entry point> <why it is not merged into it>` in the file header of the new entry point; if nothing is similar, write `# gate-similar: 无 <what was checked>`.
+
+The gate does not judge "Search for existing before creating verification apparatus or test entry point" yet: whether the file header of a new entry point has `gate-similar`, and whether two apparatuses judge the same thing, both rely on review.
 ```
 
 ## When fixing a bug, thoroughly inspect places with similar logic and code across the entire codebase — Pending
@@ -33,7 +47,7 @@ Each entry records the original text, where it originally came from, why it was 
 | Item | Contents |
 |---|---|
 | Where it was | Shared SOP `rules/code-discipline.md` section "When fixing a bug, thoroughly inspect places with similar logic and code across the entire codebase", since 0.0.66 (2026-10-15 release) |
-| Withdrawn | 2026-10-16, same withdrawal decision as "Search for existing before creating verification harness or test entry point" |
+| Withdrawn | 2026-10-16, same withdrawal decision as "Search for existing before creating verification apparatus or test entry point" |
 | Status | Pending: not a rule, does not bind execution |
 | What is missing to become a rule | A check that can go red: go red if bug-fix commit message lacks the three items "what was searched, how many hits, how many places modified"; whether search was thorough or judgment correct still cannot be judged |
 
@@ -51,6 +65,22 @@ Each entry records the original text, where it originally came from, why it was 
 5. 提交信息写：搜了什么（关键字或命令）、命中几处、改了几处、没改的几处各自的原因。搜不到别的相似处，写「搜了 <什么>，0 处」，不写「没有」。
 
 缺陷在口径层（同一个量在两套装置里算法不同）的，相似处就是另一套装置，照 `show-me-test.md`「装置里，还是口径上」立跨装置的检查。
+
+English translation:
+
+## When fixing a bug, thoroughly inspect places with similar logic and code across the entire codebase
+
+Scope: every fix of a defect, whether in code, scripts, gates or documents, and in every language version.
+
+**Criterion: after the fix, you can say which other places in the whole codebase follow the same pattern, and for each one whether it was changed, or checked and confirmed free of this defect.**
+
+1. Split the defect into two forms: the **code form** (the same way of writing, the same function or regex, the same copied passage) and the **logic form** (the same assumption, the same boundary, the same measurement basis, even when written differently).
+2. Search the whole codebase for both forms. Grep the code form by how it is written; find the logic form by asking "who else does the same thing": other implementations of the same concept, other handling of the same kind of input, other checks of the same criterion, including tests, examples and every language version. Do not truncate output; count first, then look (`verify-before-claiming.md` "Truncated output is the narrow claim too").
+3. Judge each hit one by one. Fix those with the same defect in the same change; for those without it, write down why they are not affected.
+4. Each similar place fixed along the way gets its own test that is first shown to go red (`show-me-test.md`).
+5. The commit message states what was searched (keywords or commands), how many hits, how many places were changed, and the reason for each place left unchanged. If no other similar place is found, write "searched <what>, 0 places", not "none".
+
+When the defect is at the level of the measurement basis (the same quantity computed with different algorithms in two apparatuses), the similar place is the other apparatus; set up a cross-apparatus check per `show-me-test.md` "In the apparatus, or in the measurement basis".
 ```
 
 ## Thoroughly fix discovered problems without citing sunk costs as an excuse — Pending
@@ -58,7 +88,7 @@ Each entry records the original text, where it originally came from, why it was 
 | Item | Contents |
 |---|---|
 | Where it was | Shared SOP `rules/code-discipline.md` section "Thoroughly fix discovered problems without citing sunk costs as an excuse", written into upstream workspace on 2026-10-16, unreleased |
-| Withdrawn | 2026-10-16, same withdrawal decision as "Search for existing before creating verification harness or test entry point" |
+| Withdrawn | 2026-10-16, same withdrawal decision as "Search for existing before creating verification apparatus or test entry point" |
 | Status | Pending: not a rule, does not bind execution |
 | What is missing to become a rule | Checks that go red can only cover a small literal fraction: go red if arguments or output conventions of shared scripts change while callers in consumer projects still follow old conventions; "whether fix is thorough" and "whether refactoring is warranted" cannot be judged |
 
@@ -72,6 +102,18 @@ Each entry records the original text, where it originally came from, why it was 
 - **不走捷径。** 不放宽检查、不加豁免、不改用例的预期让它变绿、不把报错吞掉；改的是出错的原因，不是它露出来的症状；修完照「修了 bug，要严查全库里逻辑和代码相似的地方」查相似处。
 - **改了共享的东西，同一次改动里把用它的地方一起改。** 脚本的参数、输出、文件名与目录约定变了，本仓的调用方、各语言版本、使用者项目里的调用方与样本一起改到位，再发版；只改上游、下游还按旧约定跑的，算没改完。
 - 修的是缺陷本身，当场修；为防它再犯而新立的门禁，立的时机照 `sop-first.md`「边界」一节。
+
+English translation:
+
+## Thoroughly fix discovered problems without citing sunk costs as an excuse
+
+Scope: every problem from review, gates, self-tests or reports by others that is confirmed to hold.
+
+- **Once confirmed, fix it, and finish the fix in this change.** Do not write "not touched in this change", "next time" or "leave it for now". For what cannot be fixed (it needs the user's decision, or a change in another repo), say plainly where it is stuck and who it goes to; do not leave it by default.
+- **The criterion is what change is right, not how much is already written.** Code already written, versions already released and a large change surface are not reasons to leave it or only patch it; if the structure is wrong, restructure it instead of adding bypass branches on the wrong structure.
+- **No shortcuts.** Do not loosen checks, add exemptions, change a test's expectation to make it go green, or swallow errors; change the cause of the error, not the symptom it shows; after the fix, check similar places per "When fixing a bug, thoroughly inspect places with similar logic and code across the entire codebase".
+- **When something shared changes, change the places that use it in the same change.** When a script's arguments, output, file names or directory conventions change, bring the callers in this repo, every language version, and the callers and fixtures in consumer projects up to date together, then release; changing only upstream while downstream still runs on the old conventions counts as unfinished.
+- Fix the defect itself on the spot; for a gate newly set up to keep it from coming back, the timing follows `sop-first.md` section "Boundaries".
 ```
 
 ## Pin positive controls per unit, three formal runs match — Pending
@@ -79,7 +121,7 @@ Each entry records the original text, where it originally came from, why it was 
 | Item | Contents |
 |---|---|
 | Where it was | Three clauses in shared SOP `rules/test-discipline.md` section "Positive controls must run against every tested arm", since 0.0.64 (2026-10-11 release) |
-| Withdrawn | 2026-10-16, same withdrawal decision as "Search for existing before creating verification harness or test entry point" |
+| Withdrawn | 2026-10-16, same withdrawal decision as "Search for existing before creating verification apparatus or test entry point" |
 | Status | Pending: not a rule, does not bind execution |
 | What is missing to become a rule | A check that can go red: compare formal run lists across pre-run registration, unit test unit table, and rerun registration, go red if missing anywhere; whether control readings per cell suffice still cannot be judged |
 
@@ -87,4 +129,10 @@ Each entry records the original text, where it originally came from, why it was 
 - **对照按单元钉，不并起来判。** 正式跑切成几格（档、族、域这类）的，每一格判了哪几条判据，那一格自己的正式跑里就要有那几条判据的对照读数；单元测试按格写死各格的期望集，不拿几格的读数取并集去判。
 - **登记时逐格写出对照由哪一跑担。** 跑前登记写判据集合时，按格列出每条判据的对照落在哪一条正式跑；某一格没有一条正式跑担得起，就补一跑，或者那一格不判那条判据。
 - **登记、单元测试、复跑三处的正式跑逐条对得上。** 登记里的每条正式跑，在单元测试的单元表与复跑登记里都找得到；少一处就是那一格没人对照。
+
+English translation:
+
+- **Pin controls per unit; do not judge them pooled.** When formal runs are split into cells (tiers, families, domains and the like), each cell's own formal runs must contain control readings for the criteria judged in that cell; unit tests hard-code the expected set per cell and do not judge on the union of readings across cells.
+- **At registration, write per cell which run carries the control.** When the pre-run registration writes the set of criteria, list per cell which formal run carries the control for each criterion; if no formal run in a cell can carry it, add a run, or do not judge that criterion in that cell.
+- **The formal runs in registration, unit tests and reruns match one by one.** Every formal run in the registration can be found in the unit table of the unit tests and in the rerun registration; one missing place means nobody controls that cell.
 ```
