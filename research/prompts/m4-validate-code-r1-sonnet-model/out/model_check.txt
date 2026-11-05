@@ -1,1 +1,0 @@
-checked {'TRUNC': 1140, 'STEPS': 3420, 'EXT': 1140, 'FITS': 7} bad 0

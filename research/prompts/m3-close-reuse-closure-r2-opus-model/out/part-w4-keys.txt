@@ -1,2 +1,0 @@
-name=judging_key tree=cut entry=check_proof key=274ceff933716fc2
-name=judging_key tree=cut-hr-int-cap entry=check_proof key=274ceff933716fc2

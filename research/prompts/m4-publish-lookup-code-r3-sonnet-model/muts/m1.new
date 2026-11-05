@@ -1,1 +1,0 @@
-            pairs.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));

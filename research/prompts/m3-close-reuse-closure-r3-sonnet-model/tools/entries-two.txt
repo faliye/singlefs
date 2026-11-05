@@ -1,2 +1,0 @@
-scripts/gate/verus-proof-check.py::check_proof
-scripts/mutation/broad-mutation.py::Runner.escalate_step
