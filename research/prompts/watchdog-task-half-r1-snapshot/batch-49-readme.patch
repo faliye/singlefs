@@ -1,0 +1,11 @@
+--- a/scripts/agents/README.md
++++ b/scripts/agents/README.md
+@@ -6,7 +6,7 @@
+ 
+ | 文件 | 做什么 |
+ |---|---|
+-| `watch.sh`、`watch.conf`、`agent-watch.py` | 看门狗：复检子 agent 的会话记录，每次回报另读任务服务（`task-server/control check` 通不通、本会话已有结局还没 `task clean` 的编译目录）与本会话任务正不正常（排队等的东西没人正常占着、跑得远超预计、反复重试、异常结局、服务告警，异常就叫醒主 agent、说明里带一句要转告用户的话）；`--processes` 只等本实例底下起的长命令退出。任务进程卡不卡、停不停、用多少内存与核数归 `task-server`，看门狗只读它给的状态；阈值在 `watch.conf` |
++| `watch.sh`、`watch.conf`、`agent-watch.py` | 看门狗：复检子 agent 的会话记录与 hook 的检出记录；`--processes` 只等本实例底下起的长命令退出。任务卡不卡、停不停、用多少内存与核数、异常结局都归 `task-server`（经 `task wait` 叫醒），看门狗不读服务；阈值在 `watch.conf` |
+ | `dispatch-prompt.py` | 派发提示的骨架与检查 |
+ | `copy-originals.py` | 改仓内文件之前把原文件留底：`copy <草稿目录> <文件>…` 拷到 `<草稿目录>/originals/<相对仓根的路径>` 并记清单（路径、sha256），`check <草稿目录>` 列出自那以后改过的；目标由它照相对路径算，不在 Bash 里拼 `$(echo $f | tr / _)` 这类变量目标 |
+ | `agent-handover.py` | 从会话记录抽交接摘要 |

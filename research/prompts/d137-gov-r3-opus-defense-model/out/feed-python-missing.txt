@@ -1,0 +1,2 @@
+name=python-missing hook=heavy-test-guard.sh rc=0 detections_added=1
+name=python-missing hook=bash-command-detector.sh rc=0 detections_added=1

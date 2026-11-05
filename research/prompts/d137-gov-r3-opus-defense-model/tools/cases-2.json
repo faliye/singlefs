@@ -1,0 +1,18 @@
+[
+ {"id": "e3-literal-heredoc-target", "role": "three-way-forward", "command": "t={S}/w.sh; cat > $t <<'EOS'\necho hi\nEOS\nbash $t"},
+ {"id": "e5-awk-file-literal-variable", "role": "implementation-writer", "command": "W={S}; awk -f $W/p.awk f.txt"},
+ {"id": "r2-line34-exact", "role": "main", "command": "printf \"echo hi\\n\" > x.sh; cd \"$PWD\" && bash ./x.sh"},
+ {"id": "r2-line34-exact-subagent", "role": "implementation-writer", "command": "printf \"echo hi\\n\" > x.sh; cd \"$PWD\" && bash ./x.sh"},
+ {"id": "r2-line30-sed-arithmetic", "role": "main", "command": "n=5; sed -n \"$((n-3)),$((n))p\" f.txt"},
+ {"id": "r2-line32-sed-append-hello", "role": "main", "command": "sed '1a\\\nhello' f.txt"},
+ {"id": "r2-defense-sed-append-foo-bar", "role": "main", "command": "sed '/x/a\\\nfoo\\\nbar' f.txt"},
+ {"id": "r2-line33-python-cat-variable", "role": "main", "command": "python3 -c 'import subprocess; x=\"f.txt\"; subprocess.run([\"cat\", x])'"},
+ {"id": "control-mkdir-and-chain-heredoc", "role": "implementation-writer", "command": "mkdir -p made-d137r3 && cd made-d137r3 && cat > r.sh <<'EOS' && bash r.sh\necho hi\nEOS"},
+ {"id": "r1-line27-combined-short-options", "role": "main", "command": "bash -euo pipefail -c 'cargo test --all'"},
+ {"id": "r1-line29-trap", "role": "main", "command": "trap 'cargo test --all' EXIT; true"},
+ {"id": "r1-line31-dev-stdin", "role": "main", "command": "echo 'cargo test --all' | bash /dev/stdin"},
+ {"id": "r1-line32-renamed-shell", "role": "main", "command": "cp /bin/bash ./mysh && ./mysh -c 'cargo test --all'"},
+ {"id": "r1-line33-bash-env-function", "role": "main", "command": "printf 'cargo test --all\\n' > e.sh; f(){ bash -c true; }; BASH_ENV={S}/e.sh f"},
+ {"id": "echo-literal-no-escape-subagent", "role": "implementation-writer", "command": "echo 'ls' > w2.sh && bash w2.sh"},
+ {"id": "echo-literal-heavy-subagent", "role": "implementation-writer", "command": "echo 'cargo test --all' > w3.sh && bash w3.sh"}
+]

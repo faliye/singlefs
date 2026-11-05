@@ -1,0 +1,9 @@
+S=4 region_devices=(0, 1, 0) legal_images=20000 window_red=0 whole_ring_red=452 legal_images_meeting_the_c717_must_red_condition=856
+S=4 region_devices=(0, 1, 1) legal_images=20000 window_red=0 whole_ring_red=452 legal_images_meeting_the_c717_must_red_condition=856
+S=8 region_devices=(0, 1, 0) legal_images=20000 window_red=0 whole_ring_red=1793 legal_images_meeting_the_c717_must_red_condition=4465
+S=8 region_devices=(0, 1, 1) legal_images=20000 window_red=0 whole_ring_red=1790 legal_images_meeting_the_c717_must_red_condition=4463
+EXAMPLE S=4 region_devices=(0, 1, 0) seed=16
+  c717_condition_hits(raise_txg, F, X, W)=[(34, 19, 15, 26)]
+  raises_at_write_time(txg, inst, F_new, F_old, allocator_ceiling_whole_ring_at_raise)=[(24, 3, 12, 0, 14), (34, 4, 19, 12, 22)]
+  rows(instance->T)={1: 5, 2: 12, 3: 27}
+  image_roots(txg, inst, F, state)=[(15, 3, 0, 5), (26, 3, 12, 7), (28, 4, 12, 7), (29, 4, 12, 8), (30, 4, 12, 9), (31, 4, 12, 9), (32, 4, 12, 9), (33, 4, 12, 10), (34, 4, 19, 10), (35, 4, 19, 10), (36, 4, 19, 10), (37, 4, 19, 10)]

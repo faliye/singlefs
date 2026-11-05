@@ -1,0 +1,20 @@
+target/4096 = 8.9375  octaves beyond 4096 = 3.1598713367783895  octaves sampled 1024..4096 = 2
+[each] slope 1024->2048=2.759 2048->4096=2.362 LSfit slope=2.560
+   anchored at P=4096, exponent 2.362 (top-octave slope):       167581 s =    46.6 h
+   anchored at P=4096, exponent 2.560 (LS-fit slope):       258949 s =    71.9 h
+   anchored at P=4096, exponent 2.759 (1024->2048 slope):       400131 s =   111.1 h
+   anchored at P=4096, exponent 2.000 (pure P^2):        75921 s =    21.1 h
+   LS-fit curve itself at 36608:       271113 s =    75.3 h
+[shared] slope 1024->2048=2.398 2048->4096=1.778 LSfit slope=2.088
+   anchored at P=4096, exponent 1.778 (top-octave slope):        31749 s =     8.8 h
+   anchored at P=4096, exponent 2.088 (LS-fit slope):        62633 s =    17.4 h
+   anchored at P=4096, exponent 2.398 (1024->2048 slope):       123559 s =    34.3 h
+   anchored at P=4096, exponent 2.000 (pure P^2):        51668 s =    14.4 h
+   LS-fit curve itself at 36608:        67287 s =    18.7 h
+probe-run (with probe overhead) slopes: 512->1024 1.5735411326791666  1024->2048 2.1457057512034283
+P=1024 spread 1.3098375054896794
+P=2048 spread 1.298243078638231
+P=4096 spread 1.4694043511063288
+1024 publishes/P 1.630859375 U_final/P 1.6748046875
+2048 publishes/P 1.6123046875 U_final/P 1.6533203125
+4096 publishes/P 1.60302734375 U_final/P 1.6416015625

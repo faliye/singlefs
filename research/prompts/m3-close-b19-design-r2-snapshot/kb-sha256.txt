@@ -1,0 +1,7 @@
+63f2048ab600237793f7fb3daa5505c55ad23c52f039960080baa8709197d90a  .claude/kb/checks-owed.md
+6656450f77cc0eb8c62447bfd6a4d8549a8f49414b664e297cd30f20c25e29e3  crates/singlefs-checker/invariants/09-inode树结构.md
+81f83f948852b7c43642c94fccb1a7b3be88382196efdf3f6ffaceeb1e1ff69a  crates/singlefs-checker/invariants/01-块自描述.md
+a5f0a32746b53b5810c0993965b21f6a1ab6fe4a56eb84322d384f1c40abef2f  crates/singlefs-checker/invariants/03-journal.md
+7ce9682bc717a418fa1e260bc94fe91e5eada1764e1020b297f9554992e6bad7  crates/singlefs-checker/invariants/02-根环.md
+530586d0b74d6a0c748ccf1e6749bea2862664fc67034e50ed07dd537b4a89a2  crates/singlefs-checker/invariants/05-空间记账.md
+4b41828508b5c27e72a14d1dd2b19850821a563558664de76a0c60ca9bc0ce08  crates/singlefs-checker/invariants/04-校验和.md

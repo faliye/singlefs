@@ -1,0 +1,2 @@
+{'worlds': 180794, 'judged': 2239343, 'na': 471637, 'old_false_red': 484090, 'rcw_false_red': 0, 'old_false_red_full': 0, 'rcw_false_red_full': 0}
+{'drop_n': 307580, 'drop_old': 218827, 'drop_rcw': 218827, 'leak_n': 54008, 'leak_old': 54008, 'leak_rcw': 54008, 'short_n': 180794, 'short_old': 180794, 'short_rcw': 180794}

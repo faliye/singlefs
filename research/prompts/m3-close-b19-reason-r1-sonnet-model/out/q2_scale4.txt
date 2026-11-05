@@ -1,0 +1,216 @@
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(0, 0, 1) [只放开 C] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=8 legal_raise_roots=15992 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=15992 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(0, 0, 0) [不放开（今天的实现）] holds=10834 partial=5158 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(2, 0, 0) [只放开 A（B 不放）] holds=10834 partial=5158 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(0, 1, 0) [只放开 B（A 不放）] holds=10834 partial=5158 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(1, 1, 0) [放开 A 一层加 B] holds=14318 partial=1674 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(2, 1, 0) [放开 A 不限层加 B] holds=14318 partial=1674 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(0, 0, 1) [只放开 C] holds=10834 partial=5158 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=14318 partial=1674 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=10834 partial=5158 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=32 legal_raise_roots=15992 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=10834 partial=5158 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(0, 0, 0) [不放开（今天的实现）] holds=10842 partial=5150 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(2, 0, 0) [只放开 A（B 不放）] holds=10842 partial=5150 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(0, 1, 0) [只放开 B（A 不放）] holds=10842 partial=5150 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(1, 1, 0) [放开 A 一层加 B] holds=14737 partial=1255 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(2, 1, 0) [放开 A 不限层加 B] holds=15047 partial=945 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(0, 0, 1) [只放开 C] holds=10842 partial=5150 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=15047 partial=945 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=10842 partial=5150 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=4 J=128 legal_raise_roots=15992 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=10842 partial=5150 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(0, 0, 1) [只放开 C] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=8 legal_raise_roots=29790 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=29790 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(0, 0, 0) [不放开（今天的实现）] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(2, 0, 0) [只放开 A（B 不放）] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(0, 1, 0) [只放开 B（A 不放）] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(1, 1, 0) [放开 A 一层加 B] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(2, 1, 0) [放开 A 不限层加 B] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(0, 0, 1) [只放开 C] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=32 legal_raise_roots=29790 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=7570 partial=22220 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(0, 0, 0) [不放开（今天的实现）] holds=14275 partial=15515 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(2, 0, 0) [只放开 A（B 不放）] holds=14275 partial=15515 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(0, 1, 0) [只放开 B（A 不放）] holds=14275 partial=15515 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(1, 1, 0) [放开 A 一层加 B] holds=27677 partial=2113 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(2, 1, 0) [放开 A 不限层加 B] holds=29091 partial=699 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(0, 0, 1) [只放开 C] holds=14275 partial=15515 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=29091 partial=699 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=14275 partial=15515 red=0 none=0
+steps_scale=4 genesis=0 writer=admission S=8 J=128 legal_raise_roots=29790 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=14275 partial=15515 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(0, 0, 1) [只放开 C] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=8 illegal_raise_roots=14302 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=14302 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=4760 red=9542 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=4760 red=9542 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=4760 red=9542 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=1407 red=12895 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=1407 red=12895 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(0, 0, 1) [只放开 C] holds=0 partial=4760 red=9542 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=1407 red=12895 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=4760 red=9542 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=32 illegal_raise_roots=14302 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=4760 red=9542 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=4756 red=9546 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=4756 red=9546 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=4756 red=9546 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=987 red=13315 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=658 red=13644 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(0, 0, 1) [只放开 C] holds=0 partial=4756 red=9546 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=658 red=13644 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=4756 red=9546 none=0
+steps_scale=4 genesis=0 writer=bad S=4 J=128 illegal_raise_roots=14302 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=4756 red=9546 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(0, 0, 1) [只放开 C] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=8 illegal_raise_roots=26916 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=26916 red=0 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(0, 0, 1) [只放开 C] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=32 illegal_raise_roots=26916 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=20125 red=6791 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=14101 red=12815 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=14101 red=12815 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=14101 red=12815 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=1488 red=25428 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=188 red=26728 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(0, 0, 1) [只放开 C] holds=0 partial=14101 red=12815 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=188 red=26728 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=14101 red=12815 none=0
+steps_scale=4 genesis=0 writer=bad S=8 J=128 illegal_raise_roots=26916 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=14101 red=12815 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(0, 0, 1) [只放开 C] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=8 legal_raise_roots=16006 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=16006 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(0, 0, 0) [不放开（今天的实现）] holds=10828 partial=5178 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(2, 0, 0) [只放开 A（B 不放）] holds=10828 partial=5178 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(0, 1, 0) [只放开 B（A 不放）] holds=10828 partial=5178 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(1, 1, 0) [放开 A 一层加 B] holds=14315 partial=1691 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(2, 1, 0) [放开 A 不限层加 B] holds=14315 partial=1691 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(0, 0, 1) [只放开 C] holds=10828 partial=5178 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=14315 partial=1691 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=10828 partial=5178 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=32 legal_raise_roots=16006 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=10828 partial=5178 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(0, 0, 0) [不放开（今天的实现）] holds=10834 partial=5172 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(2, 0, 0) [只放开 A（B 不放）] holds=10834 partial=5172 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(0, 1, 0) [只放开 B（A 不放）] holds=10834 partial=5172 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(1, 1, 0) [放开 A 一层加 B] holds=14736 partial=1270 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(2, 1, 0) [放开 A 不限层加 B] holds=15053 partial=953 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(0, 0, 1) [只放开 C] holds=10834 partial=5172 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=15053 partial=953 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=10834 partial=5172 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=4 J=128 legal_raise_roots=16006 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=10834 partial=5172 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(0, 0, 1) [只放开 C] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=8 legal_raise_roots=29787 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=29787 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(0, 0, 0) [不放开（今天的实现）] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(2, 0, 0) [只放开 A（B 不放）] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(0, 1, 0) [只放开 B（A 不放）] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(1, 1, 0) [放开 A 一层加 B] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(2, 1, 0) [放开 A 不限层加 B] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(0, 0, 1) [只放开 C] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=32 legal_raise_roots=29787 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=7531 partial=22256 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(0, 0, 0) [不放开（今天的实现）] holds=14220 partial=15567 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(2, 0, 0) [只放开 A（B 不放）] holds=14220 partial=15567 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(0, 1, 0) [只放开 B（A 不放）] holds=14220 partial=15567 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(1, 1, 0) [放开 A 一层加 B] holds=27659 partial=2128 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(2, 1, 0) [放开 A 不限层加 B] holds=29079 partial=708 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(0, 0, 1) [只放开 C] holds=14220 partial=15567 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=29079 partial=708 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=14220 partial=15567 red=0 none=0
+steps_scale=4 genesis=1 writer=admission S=8 J=128 legal_raise_roots=29787 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=14220 partial=15567 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(0, 0, 1) [只放开 C] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=8 illegal_raise_roots=14322 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=14322 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=4793 red=9529 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=4793 red=9529 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=4793 red=9529 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=1438 red=12884 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=1438 red=12884 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(0, 0, 1) [只放开 C] holds=0 partial=4793 red=9529 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=1438 red=12884 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=4793 red=9529 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=32 illegal_raise_roots=14322 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=4793 red=9529 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=4789 red=9533 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=4789 red=9533 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=4789 red=9533 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=996 red=13326 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=659 red=13663 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(0, 0, 1) [只放开 C] holds=0 partial=4789 red=9533 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=659 red=13663 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=4789 red=9533 none=0
+steps_scale=4 genesis=1 writer=bad S=4 J=128 illegal_raise_roots=14322 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=4789 red=9533 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(0, 0, 1) [只放开 C] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=8 illegal_raise_roots=26917 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=26917 red=0 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(0, 0, 1) [只放开 C] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=32 illegal_raise_roots=26917 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=20113 red=6804 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(0, 0, 0) [不放开（今天的实现）] holds=0 partial=14130 red=12787 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(2, 0, 0) [只放开 A（B 不放）] holds=0 partial=14130 red=12787 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(0, 1, 0) [只放开 B（A 不放）] holds=0 partial=14130 red=12787 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(1, 1, 0) [放开 A 一层加 B] holds=0 partial=1488 red=25429 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(2, 1, 0) [放开 A 不限层加 B] holds=0 partial=184 red=26733 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(0, 0, 1) [只放开 C] holds=0 partial=14130 red=12787 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] holds=0 partial=184 red=26733 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] holds=0 partial=14130 red=12787 none=0
+steps_scale=4 genesis=1 writer=bad S=8 J=128 illegal_raise_roots=26917 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] holds=0 partial=14130 red=12787 none=0

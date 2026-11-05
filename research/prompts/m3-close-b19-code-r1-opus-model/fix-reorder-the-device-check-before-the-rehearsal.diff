@@ -1,0 +1,33 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -7106,6 +7106,15 @@
+         admission_before_acquisition,
+         devices_rewritten_by_the_acquisition: Vec::new(),
+     };
++    // 攻方副本改法一（零轮）：逐盘核挪到续做预演之前。
++    // 丙'：过了补写闸的两槽全废的盘交给取号，取号写两轮把它两槽补写成新号（补写失败照甲' 每块盘回卷一次）。
++    publishes_planned.devices_rewritten_by_the_acquisition =
++        devices_rewritten_by_the_acquisition_after_checking_each_device(
++            &pool,
++            &start,
++            &units_of_the_selected_version,
++            &read_route,
++        )?;
+     // 挂载续做接着写行与暖机预演到最后的那一版整个预演一遍（续做要推抬 F 时连同取号之后那一串在只进内存的盘上走）：
+     // 有一步要开的容器号到顶（C841）就在取号之前拒，盘上逐字节不变；不预演的话这一错在写行那次发布落盘之后才在续做里交回。
+     // 预演没走到续做的结局而读盘时有过读错（盘报了错，那一块没记进共用的那一份）或读坏（读成而自证不过，那几块已从共用的那一份里丢掉）：
+@@ -7121,14 +7130,6 @@
+         &reads_failed_on_the_disk,
+         &reads_failing_self_verification,
+     )?;
+-    // 丙'：过了补写闸的两槽全废的盘交给取号，取号写两轮把它两槽补写成新号（补写失败照甲' 每块盘回卷一次）。
+-    publishes_planned.devices_rewritten_by_the_acquisition =
+-        devices_rewritten_by_the_acquisition_after_checking_each_device(
+-            &pool,
+-            &start,
+-            &units_of_the_selected_version,
+-            &read_route,
+-        )?;
+     let devices_rewritten_by_the_acquisition = publishes_planned
+         .devices_rewritten_by_the_acquisition
+         .clone();

@@ -1,0 +1,91 @@
+name=excuse_formula cores=1.0 span=600 declared=0 excused=False header_formula=False
+name=excuse_formula cores=1.0 span=600 declared=1 excused=False header_formula=False
+name=excuse_formula cores=1.0 span=600 declared=500 excused=False header_formula=False
+name=excuse_formula cores=1.0 span=600 declared=522 excused=False header_formula=False
+name=excuse_formula cores=1.0 span=600 declared=523 excused=True header_formula=True
+name=excuse_formula cores=1.0 span=600 declared=600 excused=True header_formula=True
+name=excuse_formula cores=0.0 span=600 declared=599.9 excused=False header_formula=False
+name=excuse_formula cores=0.0 span=600 declared=600 excused=True header_formula=True
+name=excuse_formula cores=7.8 span=600 declared=0 excused=False header_formula=False
+name=expected_seconds expected=none now=1500 status=low cores=1.000 span=600 declared=500.0 excused=False problems=0 line_has=声明解释不了
+name=expected_seconds expected=none now=1600 status=low cores=1.000 span=700 declared=600.0 excused=False problems=0 line_has=声明解释不了
+name=expected_seconds expected=none now=1677 status=low cores=1.000 span=777 declared=600.0 excused=False problems=0 line_has=声明解释不了|拖过了它算数的
+name=expected_seconds expected=none now=1700 status=low cores=1.000 span=800 declared=600.0 excused=False problems=0 line_has=声明解释不了|拖过了它算数的
+name=expected_seconds expected=none now=8200 status=low cores=1.000 span=700 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=expected_seconds expected=none now=8277 status=low cores=1.000 span=777 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=expected_seconds expected=none now=8300 status=low cores=1.000 span=800 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=expected_seconds expected=none now=8800 status=low cores=1.000 span=700 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=expected_seconds expected=none now=9000 status=low cores=1.000 span=600 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=expected_seconds expected=zero now=1500 status=low cores=1.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=zero now=1600 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=zero now=1677 status=low cores=1.000 span=777 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=zero now=1700 status=low cores=1.000 span=800 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=zero now=8200 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=zero now=8277 status=low cores=1.000 span=777 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=zero now=8300 status=low cores=1.000 span=800 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=zero now=8800 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=zero now=9000 status=low cores=1.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=1500 status=low cores=1.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=1600 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=1677 status=low cores=1.000 span=777 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=1700 status=low cores=1.000 span=800 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=8200 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=8277 status=low cores=1.000 span=777 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=8300 status=low cores=1.000 span=800 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=8800 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=leading-zero now=9000 status=low cores=1.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=7200 now=1500 status=low cores=1.000 span=600 declared=500.0 excused=False problems=0 line_has=声明解释不了
+name=expected_seconds expected=7200 now=1600 status=low cores=1.000 span=700 declared=600.0 excused=False problems=0 line_has=声明解释不了
+name=expected_seconds expected=7200 now=1677 status=low cores=1.000 span=777 declared=677.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=7200 now=1700 status=low cores=1.000 span=800 declared=700.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=7200 now=8200 status=low cores=1.000 span=700 declared=700.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=7200 now=8277 status=low cores=1.000 span=777 declared=700.0 excused=True problems=0 line_has=声明解释得了|拖过了它算数的
+name=expected_seconds expected=7200 now=8300 status=low cores=1.000 span=800 declared=700.0 excused=True problems=0 line_has=声明解释得了|拖过了它算数的
+name=expected_seconds expected=7200 now=8800 status=low cores=1.000 span=700 declared=100.0 excused=False problems=0 line_has=声明解释不了|拖过了它算数的
+name=expected_seconds expected=7200 now=9000 status=low cores=1.000 span=600 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=expected_seconds expected=7201 now=1500 status=low cores=1.000 span=600 declared=500.0 excused=False problems=0 line_has=声明解释不了
+name=expected_seconds expected=7201 now=1600 status=low cores=1.000 span=700 declared=600.0 excused=False problems=0 line_has=声明解释不了
+name=expected_seconds expected=7201 now=1677 status=low cores=1.000 span=777 declared=677.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=7201 now=1700 status=low cores=1.000 span=800 declared=700.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=7201 now=8200 status=low cores=1.000 span=700 declared=700.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=7201 now=8277 status=low cores=1.000 span=777 declared=700.0 excused=True problems=0 line_has=声明解释得了|拖过了它算数的
+name=expected_seconds expected=7201 now=8300 status=low cores=1.000 span=800 declared=700.0 excused=True problems=0 line_has=声明解释得了|拖过了它算数的
+name=expected_seconds expected=7201 now=8800 status=low cores=1.000 span=700 declared=100.0 excused=False problems=0 line_has=声明解释不了|拖过了它算数的
+name=expected_seconds expected=7201 now=9000 status=low cores=1.000 span=600 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=expected_seconds expected=99999 now=1500 status=low cores=1.000 span=600 declared=500.0 excused=False problems=0 line_has=声明解释不了
+name=expected_seconds expected=99999 now=1600 status=low cores=1.000 span=700 declared=600.0 excused=False problems=0 line_has=声明解释不了
+name=expected_seconds expected=99999 now=1677 status=low cores=1.000 span=777 declared=677.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=99999 now=1700 status=low cores=1.000 span=800 declared=700.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=99999 now=8200 status=low cores=1.000 span=700 declared=700.0 excused=True problems=0 line_has=声明解释得了
+name=expected_seconds expected=99999 now=8277 status=low cores=1.000 span=777 declared=700.0 excused=True problems=0 line_has=声明解释得了|拖过了它算数的
+name=expected_seconds expected=99999 now=8300 status=low cores=1.000 span=800 declared=700.0 excused=True problems=0 line_has=声明解释得了|拖过了它算数的
+name=expected_seconds expected=99999 now=8800 status=low cores=1.000 span=700 declared=100.0 excused=False problems=0 line_has=声明解释不了|拖过了它算数的
+name=expected_seconds expected=99999 now=9000 status=low cores=1.000 span=600 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=expected_seconds expected=no-space now=1500 status=low cores=1.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=no-space now=1600 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=no-space now=1677 status=low cores=1.000 span=777 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=no-space now=1700 status=low cores=1.000 span=800 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=no-space now=8200 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=no-space now=8277 status=low cores=1.000 span=777 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=no-space now=8300 status=low cores=1.000 span=800 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=no-space now=8800 status=low cores=1.000 span=700 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=expected_seconds expected=no-space now=9000 status=low cores=1.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=across_windows now=700 status=low cores=0.000 span=700 declared=600.0 excused=False problems=0 line_has=声明解释不了
+name=across_windows now=900 status=low cores=0.000 span=600 declared=600.0 excused=True problems=0 line_has=声明解释得了
+name=across_windows now=1000 status=low cores=0.000 span=700 declared=700.0 excused=True problems=0 line_has=声明解释得了
+name=across_windows now=1100 status=low cores=0.000 span=800 declared=700.0 excused=False problems=0 line_has=声明解释不了|拖过了它算数的
+name=across_windows now=1300 status=low cores=0.000 span=700 declared=400.0 excused=False problems=0 line_has=声明解释不了|拖过了它算数的
+name=shared_file case=writer_alone now=3600 status=low cores=0.200 span=600 declared=600.0 excused=True problems=0 line_has=声明解释得了
+name=shared_file case=writer_closed_by_other now=3600 status=low cores=0.200 span=600 declared=100.0 excused=False problems=0 line_has=声明解释不了
+name=shared_file case=writer_alone now=8000 status=low cores=0.200 span=800 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段|拖过了它算数的
+name=shared_file case=writer_extended_by_other now=8000 status=low cores=0.200 span=800 declared=800.0 excused=True problems=0 line_has=声明解释得了
+name=shared_file case=writer_extended_by_other now=14000 status=low cores=0.200 span=800 declared=800.0 excused=True problems=0 line_has=声明解释得了
+name=shared_file case=writer_extended_by_other now=14300 status=low cores=0.200 span=800 declared=700.0 excused=False problems=0 line_has=声明解释不了|拖过了它算数的
+name=broken_file case=not-seconds status=low cores=0.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=broken_file case=milliseconds status=low cores=0.000 span=600 declared=0.0 excused=False problems=0 line_has=这一窗口里没有声明串行段
+name=broken_file case=parallel-typo-keeps-open status=low cores=0.000 span=600 declared=500.0 excused=False problems=1 line_has=声明解释不了|写坏的
+name=broken_file case=short-reason status=low cores=0.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=broken_file case=binary-garbage status=low cores=0.000 span=600 declared=0.0 excused=False problems=1 line_has=这一窗口里没有声明串行段|写坏的
+name=record_rounding trials=200000 line_wakes_record_silent=43 line_silent_record_wakes=34
+name=record_rounding_example kind=line_silent_record_wakes cores=2.4739497171667413 span=797.4581267101262 declared=543.2509334351927 record_cores=2.47 record_span=797.5 record_declared=543.3
+name=record_rounding_example kind=line_wakes_record_silent cores=7.247466649228653 span=754.8397420680681 declared=48.86858865624724 record_cores=7.25 record_span=754.8 record_declared=48.9

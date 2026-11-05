@@ -1,0 +1,4 @@
+test a_device_with_both_system_configuration_slots_zeroed_is_rewritten_by_the_acquisition_when_the_continuation_rehearses_on_devices_keeping_writes_in_memory ... ok
+test a_tree_table_reading_back_garbage_every_time_is_named_by_the_rehearsal_refusal_instead_of_the_slots_of_a_device_rewritten_by_the_acquisition ... ok
+test a_whole_zeroed_device_on_an_image_whose_continuation_opens_a_container_past_the_top_of_its_range_is_refused_by_the_check_of_every_device ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in Ns

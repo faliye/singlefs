@@ -1,0 +1,26 @@
+E7RESULT name=config table_rows=11 unit_test_modules=test_list_check,test_removal_effect timeout_seconds=300
+E7RESULT name=anchor mutation=M1_撤项核算不从_Q2_集合里减被撤的行 hits=1 files=removal_effect.py
+E7RESULT name=anchor mutation=M2_撤项核算不从分母_D_里减被撤的计入行 hits=1 files=removal_effect.py
+E7RESULT name=anchor mutation=M3_撤项核算按行号减时差一（减的是前一行的类） hits=1 files=removal_effect.py
+E7RESULT name=anchor mutation=M4_判定词用撤之前的全放行行代进原比对器的函数 hits=1 files=removal_effect.py
+E7RESULT name=anchor mutation=M5_干扰判法不看_name=substitution_行 hits=1 files=removal_effect.py
+E7RESULT name=anchor mutation=M6_名单核对读表不跳过_#_起头的行 hits=1 files=list_check.py
+E7RESULT name=anchor mutation=M7_分类乙只比文件与原文、不比替换文 hits=1 files=list_check.py
+E7RESULT name=anchor mutation=M8_分类乙不读术语改名表 hits=1 files=list_check.py
+E7RESULT name=anchor mutation=M9_改后核对的行集写死成_1–281 hits=1 files=list_check.py
+E7RESULT name=anchor mutation=M10_判别力自证：钉值变也算乙（第八节） hits=1 files=removal_effect.py
+E7RESULT name=anchor mutation=M11_判别力自证：干扰按同一行号而不按同文件（第八节） hits=1 files=removal_effect.py
+E7RESULT name=baseline unit_tests=green
+E7RESULT name=mutation number=1 outcome=✅ mutation=M1_撤项核算不从_Q2_集合里减被撤的行 unit_test_exit=1
+E7RESULT name=mutation number=2 outcome=✅ mutation=M2_撤项核算不从分母_D_里减被撤的计入行 unit_test_exit=1
+E7RESULT name=mutation number=3 outcome=✅ mutation=M3_撤项核算按行号减时差一（减的是前一行的类） unit_test_exit=1
+E7RESULT name=mutation number=4 outcome=✅ mutation=M4_判定词用撤之前的全放行行代进原比对器的函数 unit_test_exit=1
+E7RESULT name=mutation number=5 outcome=✅ mutation=M5_干扰判法不看_name=substitution_行 unit_test_exit=1
+E7RESULT name=mutation number=6 outcome=✅ mutation=M6_名单核对读表不跳过_#_起头的行 unit_test_exit=1
+E7RESULT name=mutation number=7 outcome=✅ mutation=M7_分类乙只比文件与原文、不比替换文 unit_test_exit=1
+E7RESULT name=mutation number=8 outcome=✅ mutation=M8_分类乙不读术语改名表 unit_test_exit=1
+E7RESULT name=mutation number=9 outcome=✅ mutation=M9_改后核对的行集写死成_1–281 unit_test_exit=1
+E7RESULT name=mutation number=10 outcome=✅ mutation=M10_判别力自证：钉值变也算乙（第八节） unit_test_exit=1
+E7RESULT name=mutation number=11 outcome=✅ mutation=M11_判别力自证：干扰按同一行号而不按同文件（第八节） unit_test_exit=1
+E7RESULT name=verdict mutations=11 caught=11 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
+E7RESULT name=done emitted=26

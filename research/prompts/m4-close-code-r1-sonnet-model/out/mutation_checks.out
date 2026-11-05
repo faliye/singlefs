@@ -1,0 +1,36 @@
+（一）变异表共 6311 行；原文在冻结副本里不是恰好命中一次的 14 行
+  锚点失效 (1232, 'litmus/publish-returns-after-the-rotation-barrier.litmus', 'nofile', 'C577 结清 ②：litmus「轮换之后屏障」的 P0 去掉轮换之后那道屏障，与录制流里发布最后三')
+  锚点失效 (1859, 'crates/singlefs-core/src/unlink.rs', 0, '三·2 unlink：一批多截一个单元')
+  锚点失效 (1860, 'crates/singlefs-core/src/unlink.rs', 0, '三·2 unlink：剩下正好一批时不走最后一批（多出一个空的一批）')
+  锚点失效 (2491, 'crates/singlefs-core/src/unlink.rs', 0, '删除批第 21 批 C2：unlink 的产品批大小取 max(144, ⌈剩下 ÷ 3⌉)（一次 ')
+  锚点失效 (2544, 'crates/singlefs-core/src/unlink.rs', 0, '删除批第 22 批 N7：unlink 的产品批大小取 max(144, ⌈剩下 ÷ 32⌉)（批数')
+  锚点失效 (3529, 'crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl', 0, '第59批 E14 GPU 扫描内核 I-1.8 ② 比相邻两组时拿整条归并键当「对象 key 连着全')
+  锚点失效 (4387, 'crates/singlefs-core/src/truncate.rs', 0, 'm4 截断截甲 K2：最后一批删截断条目而不放单元（最后一批与截断意图同事务的会红版本）（trunc')
+  锚点失效 (4404, 'crates/singlefs-core/src/truncate.rs', 0, 'm4 截断截甲 K12：目标 size 上限按饱和乘法判（the_target_size_limit')
+  锚点失效 (5894, 'crates/singlefs-core/src/write_request_split.rs', 0, 'm4 部分写 R5：空隙单元也读新槽残留（空隙补零不该读）')
+  锚点失效 (5896, 'crates/singlefs-core/src/write_request_split.rs', 0, 'm4 部分写 R5：写进洞里时把满的最后一个存在的单元也一起重写')
+  锚点失效 (5901, 'crates/singlefs-core/src/write_request_split.rs', 0, 'm4 部分写计划：盖满的已有单元也读回')
+  锚点失效 (5902, 'crates/singlefs-core/src/write_request_split.rs', 0, 'm4 部分写计划：写之后的单元数少算最后写到的那一个')
+  锚点失效 (5903, 'crates/singlefs-core/src/write_request_split.rs', 0, 'm4 部分写计划：最后一个存在的单元满了也当不满、一起重写')
+  锚点失效 (5904, 'crates/singlefs-core/src/write_request_split.rs', 0, 'm4 部分写计划：落在单元里的那一段从这次字节的哪里取算错')
+    其中点名被判 30 份文件的行 1192 ，失效 8
+（二）
+   多 inode 改 size 30 行；点名测试在仓里找不到 fn 的 0 行
+   部分写 39 行；点名测试在仓里找不到 fn 的 0 行
+   发布触发 21 行；点名测试在仓里找不到 fn 的 0 行
+   块设备 75 行；点名测试在仓里找不到 fn 的 0 行
+（三）
+  bytes.rs：非测试 exec fn 26 个，有变异行落在函数体里的 1 个；没有的：every_byte_is_zero, copied_into_an_array, copied_into_a_vector, new, put, put_little_endian, put_u8, put_u16, put_u32, put_six_byte_unsigned, put_u64, skip, position, assert_position, into_bytes, at, take, get_little_endian, get_u8, get_u16, get_u32, get_six_byte_unsigned, get_u64, skip, position
+  checksum.rs：非测试 exec fn 18 个，有变异行落在函数体里的 3 个；没有的：castagnoli_tables, table_index, castagnoli_route_of_this_processor, castagnoli_route_of_this_processor, crc32_castagnoli, crc32_castagnoli_on_route, tables_shifting_over_one_lane_of_zero_bytes, shifted_over_one_lane_of_zero_bytes, low_half_of_the_register, register_after_the_bytes, register_after_one_lane, register_after_one_three_way_block, wide_checksum_field_of_the_crc, wide_checksum_with_field_zeroed, wide_checksum_field_holds
+  pointer.rs：非测试 exec fn 22 个，有变异行落在函数体里的 5 个；没有的：read_from, slot_shared_by_both_location_entries, location_entries_ascend_by_device, field_group, read_from, read_from, read_judging_the_encryption_compression_and_extent_offset_fields_from, empty_root, is_the_empty_root, location_entries_ascend_by_device, read_from, read_judging_the_encryption_compression_and_extent_offset_fields_from, read_with_head_fields_judgement_from, read_after_the_head, read_from, read_judging_the_encryption_compression_and_extent_offset_fields_from, read_after_the_head
+  root_record.rs：非测试 exec fn 6 个，有变异行落在函数体里的 3 个；没有的：flags_bits, of_flags_bits_carrying_only_the_marker, of_the_lowest_pin
+  journal.rs：非测试 exec fn 13 个，有变异行落在函数体里的 5 个；没有的：record_flags_byte, write_to, read_from, mapping_key, back_chain_of, of_records, plus, record_offset
+  container_tree.rs：非测试 exec fn 40 个，有变异行落在函数体里的 3 个；没有的：separator_key, containers_one_container_tree_root_holds, entries, name, entries_per_node, clone, copy_of_the_children_counts, copy_of_one_level, level_of_a_single_node, children_count_sum_of_the_first, checked_children_count_sum, every_node_has_a_child, each_level_counts_the_nodes_below, zero_root, from_children_of_each_node_at_each_level, root_level, internal_levels, containers, nodes_at_level, positions_in_bump_order, root_position, has_a_node_at, is_the_root, children_of, ancestors_of_containers, position_is_listed, copy_of_the_records, copy_of_the_containers, carried, is_the_root_rewritten, internal_levels, grew_a_level_this_publish, previous_root_is_carried_down_unchanged, rewritten_nodes, node_origins, append_record_to_the_open_container, vec_of_one
+  inode_tree.rs：非测试 exec fn 29 个，有变异行落在函数体里的 10 个；没有的：position, of_position, container_number, smallest_inode_number, largest_inode_number, separator_key, leaf_containers_one_root_node_holds, retired_identities, records_below_which_a_leaf_borrows_from_its_right_neighbour, search_records_by_inode, index_is_noted, note_rewritten, position_of_the_container_holding, largest_inode_number_in_the_tree, copy_of_the_leaf_containers, copy_of_one_leaf_container, from_the_previous_version, records_at, retire
+  unit.rs：非测试 exec fn 21 个，有变异行落在函数体里的 8 个；没有的：reserved_bytes, unit_filesystem_identifier, write_common_prefix, seal_header_checksum, seal_payload_checksum, build_packed_unit, data_unit_payload_capacity, build_data_unit, declared_length, check_encryption_reserved_bytes_are_zero, check_common_prefix, check_payload_checksum, pieces_of_one_width
+  records.rs：非测试 exec fn 41 个，有变异行落在函数体里的 22 个；没有的：written_by_the_truncation_intent_of, truncation_txg, truncated_size_in_bytes, is_written, of_the_whole_object, build_inode_internal_entry, build_extent_record, sort_key, mapping_key_for_data, mapping_key_for_node, mapping_key_sort_key, build_mapping_entry, data_key_tail, node_key_tail, flags, birth_txg_of_a_mapping_key, birth_txg, root_pointer_bytes, parse_inode_internal_entry
+  logged_operations.rs：非测试 exec fn 24 个，有变异行落在函数体里的 7 个；没有的：code, device, start_slot, slot_count, end_slot, contains_slot, kind, precedes, keys_strictly_ascend, number_of_entries_of_kind, entry_bytes, key, logged_operations_one_root_node_holds, logged_operations_root_entries, logged_operation_entries_of_the_root_entries, live_compaction_intent_of_the_entries, live_truncation_intent_of_the_entries
+  deleted_inodes.rs：非测试 exec fn 3 个，有变异行落在函数体里的 1 个；没有的：deleted_inodes_one_root_node_holds, inode_numbers_of_the_deleted_inodes_root_entries
+  lineage_tree.rs：非测试 exec fn 7 个，有变异行落在函数体里的 0 个；没有的：position, of_position, new, records, name, records_per_container, append_lineage_record_to_the_open_container
+  retirement_tree.rs：非测试 exec fn 8 个，有变异行落在函数体里的 2 个；没有的：position, of_position, records, name, records_per_container, append_retirement_records_to_the_open_container
+  tombstone_tree.rs：非测试 exec fn 7 个，有变异行落在函数体里的 1 个；没有的：position, of_position, records, name, records_per_container, append_tombstone_to_the_open_container

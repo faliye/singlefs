@@ -1,0 +1,8 @@
+c39751e75520d5063969021236ade62dc70acfddedf9b9ddb90ac0f3960c700f  .claude/kb/checks-owed.md
+4bfa225b423d45966974376517fb62f87b107c3f79a546393d8abbba2ce0b789  .claude/kb/decisions/16-发布语义.md
+00ad8a75874580daf955f77b19892b8ef973094c387a01b59da81f9cc4911120  .claude/kb/decisions/23-journal的角色与格式.md
+3ad3493600e161ab2aa1e7c7152b66b21f518a6a40c141518908a58831171b4c  crates/singlefs-checker/invariants/02-根环.md
+ac78991a86f510849a01d8229592753f974517997f854cda058daba08d95e166  crates/singlefs-checker/invariants/05-空间记账.md
+a26c4a3fa4ff4fe34ff8c21c1453b1792259fce3d68818715ee92045e1f4f86c  crates/singlefs-checker/invariants/09-inode树结构.md
+0ac0470cfa93b2fd5b2e48e165a9d788a7bb61e2504f35fde726a376d6646fd1  .claude/kb/experiments/112-legacy-writer-encountering-unknown-trees.en.md
+3e86833b26841f6de0b0443a481a40535d305ae9aebfda14ab655a83b1963ef1  .claude/kb/experiments/112-旧ライターが未知のツリーに遭遇した場合.ja.md

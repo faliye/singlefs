@@ -1,0 +1,41 @@
+name=q3 n=6 rewrite=!= mixed/hit/i54_green/i311_green_free_D/i311_green_writer_D=104
+name=q3 n=6 rewrite=!= mixed/hit/i54_green/i311_green_free_D/i311_writer_D_red=92
+name=q3 n=6 rewrite=!= mixed/hit/i54_green/i311_red/i311_writer_D_red=112
+name=q3 n=6 rewrite=!= mixed/hit/i54_red/i311_green_free_D/i311_green_writer_D=156
+name=q3 n=6 rewrite=!= mixed/hit/i54_red/i311_green_free_D/i311_writer_D_red=170
+name=q3 n=6 rewrite=!= mixed/hit/i54_red/i311_red/i311_writer_D_red=258
+name=q3 n=6 rewrite=!= mixed/rec_fails=186956
+name=q3 n=6 rewrite=!= mixed/widened_holds=20210
+name=q3 n=6 rewrite=!= narrow/rec_fails=410428
+name=q3 n=6 rewrite=!= narrow/widened_holds=36592
+name=q3 n=6 rewrite=!= wide/hit/i54_green/i311_green_free_D/i311_green_writer_D=3043
+name=q3 n=6 rewrite=!= wide/hit/i54_green/i311_green_free_D/i311_writer_D_red=3090
+name=q3 n=6 rewrite=!= wide/hit/i54_green/i311_red/i311_writer_D_red=1121
+name=q3 n=6 rewrite=!= wide/hit/i54_red/i311_green_free_D/i311_green_writer_D=9551
+name=q3 n=6 rewrite=!= wide/hit/i54_red/i311_green_free_D/i311_writer_D_red=11904
+name=q3 n=6 rewrite=!= wide/hit/i54_red/i311_red/i311_writer_D_red=4430
+name=q3 n=6 rewrite=!= wide/rec_fails=1867740
+name=q3 n=6 rewrite=!= wide/widened_holds=93749
+  example rewrite=!= mixed/hit/i54_green/i311_green_free_D/i311_green_writer_D units=[(0, 1), (1, 1), (3, 2)] refs=('new', 'old', 'new') records(start,span,released,gen_above)=[(0, 3, False, False), (3, 1, False, False)] A=3 D_writer=0
+  example rewrite=!= mixed/hit/i54_green/i311_green_free_D/i311_writer_D_red units=[(0, 1), (1, 1), (2, 2)] refs=('new', 'new', 'new') records(start,span,released,gen_above)=[(0, 2, False, False), (2, 1, False, False), (3, 2, True, True)] A=4 D_writer=2
+  example rewrite=!= mixed/hit/i54_green/i311_red/i311_writer_D_red units=[(0, 1), (1, 1), (3, 2)] refs=('new', 'new', 'new') records(start,span,released,gen_above)=[(0, 3, False, False), (3, 1, False, False)] A=3 D_writer=0
+  example rewrite=!= mixed/hit/i54_red/i311_green_free_D/i311_green_writer_D units=[(0, 1), (1, 1), (3, 2)] refs=('new', 'old', 'new') records(start,span,released,gen_above)=[(0, 3, False, False), (3, 1, False, False), (0, 1, True, False)] A=3 D_writer=0
+  example rewrite=!= mixed/hit/i54_red/i311_green_free_D/i311_writer_D_red units=[(0, 1), (1, 1), (2, 2)] refs=('new', 'new', 'new') records(start,span,released,gen_above)=[(0, 3, False, False), (2, 1, False, False), (3, 2, True, True)] A=4 D_writer=2
+  example rewrite=!= mixed/hit/i54_red/i311_red/i311_writer_D_red units=[(0, 1), (1, 1), (2, 2)] refs=('new', 'new', 'new') records(start,span,released,gen_above)=[(0, 2, False, False), (2, 1, False, False), (2, 2, True, True)] A=3 D_writer=2
+  example rewrite=!= wide/hit/i54_green/i311_green_free_D/i311_green_writer_D units=[(0, 1), (1, 1)] refs=('new', 'new') records(start,span,released,gen_above)=[(0, 3, False, False)] A=2 D_writer=0
+  example rewrite=!= wide/hit/i54_green/i311_green_free_D/i311_writer_D_red units=[(0, 1), (1, 1)] refs=('new', 'old') records(start,span,released,gen_above)=[(0, 3, False, False)] A=2 D_writer=0
+  example rewrite=!= wide/hit/i54_green/i311_red/i311_writer_D_red units=[(0, 1), (1, 1)] refs=('new', 'new') records(start,span,released,gen_above)=[(0, 2, False, False)] A=1 D_writer=0
+  example rewrite=!= wide/hit/i54_red/i311_green_free_D/i311_green_writer_D units=[(0, 1), (1, 1)] refs=('new', 'new') records(start,span,released,gen_above)=[(0, 3, False, False), (0, 1, True, False)] A=2 D_writer=0
+  example rewrite=!= wide/hit/i54_red/i311_green_free_D/i311_writer_D_red units=[(0, 1), (1, 1)] refs=('new', 'new') records(start,span,released,gen_above)=[(0, 3, False, False), (0, 1, True, True)] A=2 D_writer=1
+  example rewrite=!= wide/hit/i54_red/i311_red/i311_writer_D_red units=[(0, 1), (1, 1)] refs=('new', 'new') records(start,span,released,gen_above)=[(0, 2, False, False), (0, 1, True, True)] A=1 D_writer=1
+name=q3 n=6 rewrite=> mixed/rec_fails=186956
+name=q3 n=6 rewrite=> mixed/widened_holds=18692
+name=q3 n=6 rewrite=> narrow/rec_fails=410428
+name=q3 n=6 rewrite=> narrow/widened_holds=36592
+name=q3 n=6 rewrite=> wide/rec_fails=1867740
+name=q3 n=6 rewrite=>|unwalked mixed/rec_fails=186956
+name=q3 n=6 rewrite=>|unwalked mixed/widened_holds=20067
+name=q3 n=6 rewrite=>|unwalked narrow/rec_fails=410428
+name=q3 n=6 rewrite=>|unwalked narrow/widened_holds=36592
+name=q3 n=6 rewrite=>|unwalked wide/rec_fails=1867740
+name=q3 n=6 rewrite=>|unwalked wide/widened_holds=44377

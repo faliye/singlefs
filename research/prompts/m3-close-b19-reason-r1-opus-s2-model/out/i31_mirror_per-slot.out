@@ -1,0 +1,9 @@
+name=calibration test=record_one_slot_short_..._counting_both_slots expected=(False, True) got=(False, True) match=True
+name=calibration test=record_one_slot_short_..._counting_one_slot expected=(False, True) got=(False, True) match=True
+name=calibration test=record_wider_than_its_two_slot_unit expected=(False, True) got=(False, True) match=True
+name=calibration test=walked_slot_outside_every_record_..._stays_red expected=(False, False) got=(False, False) match=True
+name=calibration test=walked_slot_without_a_record_..._stays_red expected=(False, None) got=(False, None) match=True
+name=world label=mirror_narrow_record_plus_headerless_leak fix=per-slot I-3.1=violated I-3.18=['red', 'no-object'] I-3.15=['holds', 'no-object'] I-3.10=['judged', 'no-object'] I-5.4=holds I-3.11=holds I-5.2=holds I-3.16=holds
+name=world label=control_leak_alone fix=per-slot I-3.1=violated I-3.18=['holds', 'no-object'] I-3.15=['holds', 'no-object'] I-3.10=['judged', 'no-object'] I-5.4=holds I-3.11=red I-5.2=holds I-3.16=partial
+name=world label=control_narrow_alone_counting_records fix=per-slot I-3.1=partial I-3.18=['red'] I-3.15=['holds'] I-3.10=['judged'] I-5.4=holds I-3.11=red I-5.2=holds I-3.16=partial
+name=world label=control_narrow_alone_counting_the_unit fix=per-slot I-3.1=partial I-3.18=['red'] I-3.15=['holds'] I-3.10=['judged'] I-5.4=holds I-3.11=holds I-5.2=holds I-3.16=holds

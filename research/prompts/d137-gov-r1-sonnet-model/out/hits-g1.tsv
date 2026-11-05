@@ -1,0 +1,38 @@
+H1a	子agent rc=0 检出1	主agent rc=0 检出1	真bash 真起	bash -euo pipefail -c 'cargo test --all'
+H1b	子agent rc=0 检出1	主agent rc=0 检出1	真bash 真起	bash -eo pipefail -c 'cargo test --all'
+H1c	子agent rc=0 检出1	主agent rc=0 检出1	真bash 真起	bash -euo pipefail heavy.sh
+H1d	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	bash -ouc pipefail 'cargo test --all'
+H1e	子agent rc=0 检出1	主agent rc=0 检出1	真bash 真起	env bash -euo pipefail -c 'cargo test --all'
+H1f	子agent rc=2 检出1	主agent rc=2 检出1	真bash 真起	bash -o pipefail -c 'cargo test --all'
+H2a	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	trap 'cargo test --all' EXIT
+H2b	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	trap 'bash heavy.sh' EXIT
+H2c	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	trap 'cargo test --all' DEBUG; true
+H2d	子agent rc=2 检出1	主agent rc=2 检出1	真bash 真起	eval 'cargo test --all'
+H3a	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	alias cargo='cargo test --all'\nshopt -s expand_aliases\ncargo
+H3b	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	shopt -s expand_aliases\nalias ll='bash heavy.sh'\nll
+H4a	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	source /dev/stdin <<< 'cargo test --all'
+H4b	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	bash /dev/stdin < heavy.sh
+H4c	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	exec < heavy.sh; bash
+H4d	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	{ bash; } < heavy.sh
+H4e	子agent rc=2 检出1	主agent rc=2 检出1	真bash 真起	bash < heavy.sh
+H5a	子agent rc=0 检出1	主agent rc=0 检出1	真bash 真起	cd missing_d137 2>/dev/null; bash heavy.sh
+H5b	子agent rc=0 检出1	主agent rc=0 检出1	真bash 真起	cd missing_d137 || true; bash heavy.sh
+H5c	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	cd "$(echo missing_d137)" 2>/dev/null; bash heavy.sh
+H5d	子agent rc=0 检出1	主agent rc=0 检出1	真bash 真起	cd ' '; bash heavy.sh
+H6a	子agent rc=0 检出1	主agent rc=0 检出1	真bash 真起	bash ~+/heavy.sh
+H6b	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	BASH_ENV=~+/heavy.sh bash -c :
+H7a	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	echo 'cargo test --all' > m1.txt; cat src_ok.sh m1.txt > dd1.sh; bash dd1.sh
+H7b	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	echo 'cargo test --all' > m9.txt; cat m9.txt >> dd9.sh; bash dd9.sh
+H7c	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	echo 'cargo test --all' > m10.txt; cat m10.txt | tee dd10.sh > /dev/null; bash dd10.sh
+H7d	子agent rc=2 检出1	主agent rc=2 检出1	真bash 真起	echo 'cargo test --all' > m3.txt && cat m3.txt > dd3.sh && bash dd3.sh
+H8a	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	cp /bin/bash ./mysh_d137; ./mysh_d137 heavy.sh
+H8b	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	ln -sf /bin/bash ./mysh_d137b; ./mysh_d137b -c 'cargo test --all'
+H8c	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	rbash -c 'cargo test --all'
+H8d	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	busybox sh -c 'cargo test --all'
+H9a	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	tclsh <<< 'exec cargo test --all'
+H9b	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	awk 'BEGIN{system("cargo test --all")}'
+H9c	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	sed -n '1e cargo test --all' heavy.sh
+H9d	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	git -c alias.x='!cargo test --all' x
+H9e	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	perl -e 'system("cargo test --all")'
+H9f	子agent rc=0 检出0	主agent rc=0 检出0	真bash 真起	python3 -c 'import os; os.system("cargo test --all")'
+H10	子agent rc=2 检出1	主agent rc=2 检出1	真bash 没起	'{cargo,test,--all}'

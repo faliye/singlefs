@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# 假的 systemd-run：记一笔；带 --scope/--wait/--pipe/--pty 的前台起命令，否则像真的一样把命令放到脱离会话的地方去跑
+source "$(dirname "${BASH_SOURCE[0]}")/../stublib.sh"
+stub_log 'systemd-run' "$@"
+fg=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --scope|--wait|--pipe|--pty|-P|-t|-S) fg=1; shift ;;
+    -p|-u|-E|--property|--unit|--slice|--setenv|--uid|--gid|-G|--description|--working-directory|-d) shift 2 ;;
+    -*) shift ;;
+    *) break ;;
+  esac
+done
+[ "$#" -gt 0 ] || exit 0
+if [ "$fg" = 1 ]; then exec "$@"; fi
+setsid -f "$@" >/dev/null 2>&1 < /dev/null
+exit 0

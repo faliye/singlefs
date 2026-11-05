@@ -1,0 +1,32 @@
+E7RESULT name=config table_rows=14 unit_test_modules=test_contrast_against_r1,test_q2_misses,test_attribution,test_whole_table_matrix,test_current_tree_row_driver,test_full_table_run timeout_seconds=300
+E7RESULT name=anchor mutation=V1_红的计数逐值比 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V2_红的计数取是否大于_1 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V3_配键丢掉流 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V4_只在一边的键不当一格 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V5_判定词字段归钉值格 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V6_G2_比名字不比变异行 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=V7_G4_比整份文件 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=V8_G4_不标参照近似 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=V9_G6_的_RefFS_列不查_RefFS_入口 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=V10_漏判取批_2 hits=1 files=q2_misses.py
+E7RESULT name=anchor mutation=V11_多了按个数 hits=1 files=q2_misses.py
+E7RESULT name=anchor mutation=V12_D_不要求_r1_计入分母 hits=1 files=q2_misses.py
+E7RESULT name=anchor mutation=V13_键不含改坏用的变异行 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=V14_哨兵不挑 hits=1 files=full_table_run.py
+E7RESULT name=baseline unit_tests=green
+E7RESULT name=mutation number=1 outcome=✅ mutation=V1_红的计数逐值比 unit_test_exit=1
+E7RESULT name=mutation number=2 outcome=✅ mutation=V2_红的计数取是否大于_1 unit_test_exit=1
+E7RESULT name=mutation number=3 outcome=✅ mutation=V3_配键丢掉流 unit_test_exit=1
+E7RESULT name=mutation number=4 outcome=✅ mutation=V4_只在一边的键不当一格 unit_test_exit=1
+E7RESULT name=mutation number=5 outcome=✅ mutation=V5_判定词字段归钉值格 unit_test_exit=1
+E7RESULT name=mutation number=6 outcome=✅ mutation=V6_G2_比名字不比变异行 unit_test_exit=1
+E7RESULT name=mutation number=7 outcome=✅ mutation=V7_G4_比整份文件 unit_test_exit=1
+E7RESULT name=mutation number=8 outcome=✅ mutation=V8_G4_不标参照近似 unit_test_exit=1
+E7RESULT name=mutation number=9 outcome=✅ mutation=V9_G6_的_RefFS_列不查_RefFS_入口 unit_test_exit=1
+E7RESULT name=mutation number=10 outcome=✅ mutation=V10_漏判取批_2 unit_test_exit=1
+E7RESULT name=mutation number=11 outcome=✅ mutation=V11_多了按个数 unit_test_exit=1
+E7RESULT name=mutation number=12 outcome=✅ mutation=V12_D_不要求_r1_计入分母 unit_test_exit=1
+E7RESULT name=mutation number=13 outcome=✅ mutation=V13_键不含改坏用的变异行 unit_test_exit=1
+E7RESULT name=mutation number=14 outcome=✅ mutation=V14_哨兵不挑 unit_test_exit=1
+E7RESULT name=verdict mutations=14 caught=14 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
+E7RESULT name=done emitted=32

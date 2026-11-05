@@ -1,0 +1,6 @@
+PROBE name=u4a_after_failed_then_good_resend discarded=2 still_reusable=1
+PROBE name=u4b_segment device=DeviceIdentity(1) segment=50432 reusable_after_the_change=false discarded_by_the_change=false
+PROBE name=u4b_summary discarded=0 reusable_now_but_not_discarded=[]
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in Ns
+test u4_a_resend_that_fails_once_keeps_the_pending_discards_for_the_compaction_run_after_the_good_resend ... PROBE name=u4a_first_resend result=Err("BlockDevice(InputOutput(Custom { kind: Other, error: \"注入的写错\"")
+test u4_b_the_user_change_after_the_resend_discards_the_segments_reclaimed_before_the_freeze ... PROBE name=u4b_segment device=DeviceIdentity(0) segment=50432 reusable_after_the_change=false discarded_by_the_change=false

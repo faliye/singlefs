@@ -1,0 +1,14 @@
+detector rc=0 ✗行=0
+heavyguard rc=1 ✗行=2
+heavylib rc=0 ✗行=0
+cargolock rc=0 ✗行=0
+runscope rc=0 ✗行=0
+twologs rc=0 ✗行=0
+handback rc=0 ✗行=0
+timer rc=0 ✗行=0
+hostres rc=0 ✗行=0
+sharedindex rc=0 ✗行=0
+detachedrun rc=0 ✗行=4
+agentwatch rc=0 ✗行=1
+lightguard rc=0 ✗行=0
+memorypeaks rc=0 ✗行=0

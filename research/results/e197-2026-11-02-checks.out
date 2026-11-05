@@ -1,0 +1,29 @@
+E7RESULT name=e197_config step=checks binary_sha256=418b2bd6a9c5bcd5a7118a604dc5259fb29ffac6dd39722fc84cfed1289acaba threads_per_cell=1 registered_heavy_threads=31 peak_source=task_server_attempt_memory_peak
+E7RESULT name=e197_s1 file=crates/singlefs-core/src/recovery.rs registered_start=4431 registered_end=4484 found_start=4932 sha256=0ca338aaafcfff2796656134c9246295e33d58503f439d61588a9cb394697c55 expected=0ca338aaafcfff2796656134c9246295e33d58503f439d61588a9cb394697c55 status=moved_same
+E7RESULT name=e197_s1 file=crates/singlefs-replay-prefix/src/lib.rs registered_start=4029 registered_end=4058 found_start=4034 sha256=60e0648acc3f3a3a730b3c1731781cf0eda6e28068a56b6e0aad8d58dc1d2d41 expected=60e0648acc3f3a3a730b3c1731781cf0eda6e28068a56b6e0aad8d58dc1d2d41 status=moved_same
+E7RESULT name=e197_s1 file=crates/singlefs-core/src/mount.rs registered_start=8446 registered_end=8500 found_start=8446 sha256=58f00a3e70e681cf18cf672e29707b9bee2fe2655bb2ea996a4072f72a5d3f8c expected=58f00a3e70e681cf18cf672e29707b9bee2fe2655bb2ea996a4072f72a5d3f8c status=same
+E7RESULT name=e197_checks constants_match_the_implementation=true ring_slots=196608 ring_slots_remainder=0 device_holds_the_default_ring=true capacity_after_196608_pushes=262144 capacity_after_786432_pushes=1048576
+E7RESULT name=e197_sizes size_location_entry=16 size_named_unit=64 size_node_pointer=56 size_journal_record=320 size_cache_key=24
+E7RESULT name=e197_run mode=--checks exit=0
+E7RESULT name=e197_diff case=D1 arm=baseline_pc equal=true reference_records=64
+E7RESULT name=e197_diff case=D1 arm=split equal=true reference_records=64
+E7RESULT name=e197_diff case=D1 arm=split_pc equal=true reference_records=64
+E7RESULT name=e197_diff case=D1 arm=read_stage_cache equal=true reference_records=64
+E7RESULT name=e197_diff case=D1 arm=read_stage_cache_keeps_zeros_pc equal=true reference_records=64
+E7RESULT name=e197_diff case=D2 arm=baseline_pc equal=true reference_records=1
+E7RESULT name=e197_diff case=D2 arm=split equal=true reference_records=1
+E7RESULT name=e197_diff case=D2 arm=split_pc equal=true reference_records=1
+E7RESULT name=e197_diff case=D2 arm=read_stage_cache equal=true reference_records=1
+E7RESULT name=e197_diff case=D2 arm=read_stage_cache_keeps_zeros_pc equal=true reference_records=1
+E7RESULT name=e197_diff case=D3 arm=baseline_pc equal=true reference_records=64
+E7RESULT name=e197_diff case=D3 arm=split equal=true reference_records=64
+E7RESULT name=e197_diff case=D3 arm=split_pc equal=true reference_records=64
+E7RESULT name=e197_diff case=D3 arm=read_stage_cache equal=true reference_records=64
+E7RESULT name=e197_diff case=D3 arm=read_stage_cache_keeps_zeros_pc equal=true reference_records=64
+E7RESULT name=e197_diff case=D4 arm=baseline_pc equal=true reference_records=1
+E7RESULT name=e197_diff case=D4 arm=split equal=true reference_records=1
+E7RESULT name=e197_diff case=D4 arm=split_pc equal=true reference_records=1
+E7RESULT name=e197_diff case=D4 arm=read_stage_cache equal=true reference_records=1
+E7RESULT name=e197_diff case=D4 arm=read_stage_cache_keeps_zeros_pc equal=true reference_records=1
+E7RESULT name=e197_run mode=--diff-set exit=0
+E7RESULT name=e197_segment_done step=checks cells=2

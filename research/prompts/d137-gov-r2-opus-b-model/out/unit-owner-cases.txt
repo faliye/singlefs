@@ -1,0 +1,16 @@
+name=record_half label='own' record_unit_session=None record_session=S-me watched_session=S-me unit_owner=S-me watched=True foreign=False outcome=woken
+name=record_half label='own' record_unit_session=None record_session=S-other watched_session=S-me unit_owner=S-me watched=True foreign=False outcome=woken
+name=record_half label='theirs' record_unit_session=None record_session=S-me watched_session=S-me unit_owner=S-other watched=True foreign=True outcome=logged-foreign
+name=record_half label='theirs' record_unit_session=None record_session=S-other watched_session=S-me unit_owner=S-other watched=False foreign=True outcome=skipped-silently
+name=record_half label='empty-owner' record_unit_session=None record_session=S-me watched_session=S-me unit_owner=None watched=True foreign=False outcome=woken
+name=record_half label='empty-owner' record_unit_session=None record_session=S-other watched_session=S-me unit_owner=None watched=False foreign=False outcome=skipped-silently
+name=record_half label='legacy' record_unit_session=None record_session=S-me watched_session=S-me unit_owner=None watched=True foreign=False outcome=woken
+name=record_half label='legacy' record_unit_session=None record_session=S-other watched_session=S-me unit_owner=None watched=False foreign=False outcome=skipped-silently
+name=record_half label='unreadable' record_unit_session=None record_session=S-me watched_session=S-me unit_owner=None watched=True foreign=False outcome=woken
+name=record_half label='unreadable' record_unit_session=None record_session=S-other watched_session=S-me unit_owner=None watched=False foreign=False outcome=skipped-silently
+name=record_half label='missing-registry' record_unit_session=None record_session=S-other watched_session=S-me unit_owner=None watched=False foreign=False outcome=skipped-silently
+name=record_half label='theirs' record_unit_session=S-me record_session=S-other watched_session=S-me unit_owner=S-me watched=True foreign=False outcome=woken
+name=record_half label='own' record_unit_session=S-other record_session=S-me watched_session=S-me unit_owner=S-other watched=True foreign=True outcome=logged-foreign
+name=record_half label='bad label' record_unit_session=None record_session=S-other watched_session=S-me unit_owner=None watched=False foreign=False outcome=skipped-silently
+name=verdict_half_reused_label watched_session=S-me red_counted=1 foreign_not_counted=2 registry_now=S-other old_run_owner=S-me
+name=verdict_half_no_session red_counted=3 foreign_not_counted=0

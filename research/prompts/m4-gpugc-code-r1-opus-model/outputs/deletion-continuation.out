@@ -1,0 +1,18 @@
+run-with-memory-cap: 排队（已等 0 秒，不设上限）：第 4 位 / 共 4 条，排头要 8.0 GiB；slice 已占 36.2 GiB，这一条要 3.0 GiB（峰值表里没有这条，按它的上限 3G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 没查到别的机器：53 秒前包装 1397694 刚查过（几条一起排队时每 60 秒只查一次，看那一条打的；要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）
+run-with-memory-cap: 排了 2 秒，起跑（singlefs-memory-cap-1473587-5826897）
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running tests/attack_probe_deletion_continuation_while_stopped.rs (/home/fy5090/.local/share/singlefs/work/m4-gpugc-code-r1-opus/target/debug/deps/attack_probe_deletion_continuation_while_stopped-818bb09668b9b332)
+
+running 2 tests
+ATTACK name=rolled_back_queue tag=attack-deletion-continuation-compensating deleted_inodes_after_the_rollback=[InodeNumber(1)] stopped=1
+ATTACK name=compensating_run_after_rollback outcome=Stopped(PublishBudgetSpent { budget: 1 }) versions_published=2 txg_before=12 txgs_published=[13, 14] deleted_inodes_after_the_run=[] batches_recorded=1
+test attack_probe_a_compensating_run_continues_the_deletion_queue_brought_back_by_a_rollback ... ok
+ATTACK name=rolled_back_queue tag=attack-deletion-continuation-left-stopped deleted_inodes_after_the_rollback=[InodeNumber(1)] stopped=1
+ATTACK name=left_stopped_run_after_rollback outcome=Stopped(BackgroundTaskStoppedAfterAnEarlierComputeError) versions_published=0 deleted_inodes_after_the_run=[InodeNumber(1)]
+test attack_probe_a_run_left_stopped_does_not_continue_the_deletion_queue_brought_back_by_a_rollback ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.83s
+

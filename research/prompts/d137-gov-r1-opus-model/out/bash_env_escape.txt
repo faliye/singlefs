@@ -1,0 +1,5 @@
+name=bash_env_escape form=direct
+rc=2
+rc=0
+research/prompts/d137-gov-r1-opus-model/prototypes/bash_env_forwarding_escape.sh: line 23: /tmp/bash-env-escape.u5kLFb/det-fwd.jsonl: No such file or directory
+name=bash_env_escape form=forwarding-function detections_after=0

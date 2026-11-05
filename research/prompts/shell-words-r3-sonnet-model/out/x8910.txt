@@ -1,0 +1,16 @@
+第8条 r1 {'对': 308, '误拒': 116} 放行的: []
+第8条 r2 {'对': 308, '误拒': 116} 放行的: []
+第8条 now {'对': 310, '误拒': 114} 放行的: ['function foo { cargo build; }', 'function foo() { cargo build; }']
+第9条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE | "tee 'records/{a,b}.md' </dev/null"
+第9条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE | 'dd if=light.sh of=records/{a,b}.md'
+第9条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE | 'sed -i s/x/y/ records/{a,b}.md'
+第9条 共 59 条，与应当值不符 3
+第10条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE | 'echo x > crates/singlefs-core/Cargo.toml'
+第10条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE/crates | 'echo x > crates/singlefs-core/src/lib.rs'
+第10条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE/crates/singlefs-core/src | 'cp ../Cargo.toml z.toml'
+第10条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE/scripts | 'echo x > crates/singlefs-core/src/lib.rs'
+第10条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=/nonexistent/dir | 'echo x > src/lib.rs'
+第10条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=<work>/scratch | 'cd "$X" && echo x > crates/singlefs-core/src/lib.rs'
+第10条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE | 'echo x > crates/singlefs-core/src/lib.rs.bak'
+第10条 与我写的应当值不符: 应当0 r1=2 r2=2 now=2 | cwd=TREE | 'cp crates/singlefs-core/src/lib.rs scratch.rs'
+第10条 共 38 条，与应当值不符 8

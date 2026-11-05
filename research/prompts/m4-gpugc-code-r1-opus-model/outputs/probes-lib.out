@@ -1,0 +1,21 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 36.1 GiB，这一条要 8.0 GiB（峰值表里没有这条，按 host-resources.py 对它的预测 8.0 GiB 算（比它的上限 16G 小；scope 的上限照旧是 16G）），总上限 40.1 GiB；账上在跑 1 条
+  → 第二台此刻放得下（可用 55.1 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 16G --label moved-from-queue-817777-802529400 -- nice -n 19 cargo test -p singlefs-background-gpu --lib attack_probe -- --nocapture
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 36.1 GiB，这一条要 8.0 GiB（峰值表里没有这条，按 host-resources.py 对它的预测 8.0 GiB 算（比它的上限 16G 小；scope 的上限照旧是 16G）），总上限 40.1 GiB；账上在跑 1 条
+run-with-memory-cap: 排队（已等 120 秒，至多 3600 秒）：slice 已占 36.1 GiB，这一条要 8.0 GiB（峰值表里没有这条，按 host-resources.py 对它的预测 8.0 GiB 算（比它的上限 16G 小；scope 的上限照旧是 16G）），总上限 40.1 GiB；账上在跑 1 条
+run-with-memory-cap: 排队（已等 180 秒，至多 3600 秒）：slice 已占 36.1 GiB，这一条要 8.0 GiB（峰值表里没有这条，按 host-resources.py 对它的预测 8.0 GiB 算（比它的上限 16G 小；scope 的上限照旧是 16G）），总上限 40.1 GiB；账上在跑 1 条
+run-with-memory-cap: 排了 218 秒，起跑（singlefs-memory-cap-817777-802529400）
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m4-gpugc-code-r1-opus/target/debug/deps/singlefs_background_gpu-33a3c657c99bb4ff)
+
+running 3 tests
+ATTACK name=unnamed_card_refuses_the_list listed=Err(DiscreteGpuWithoutAPciBusAddressIsNotSupported { name: "unnamed card" })
+ATTACK name=per_chunk_resubmission batch_ok=true submissions=8 waits_for_earlier=4 timeouts_in_the_batch=4 resubmissions_allowed_per_submission=3
+ATTACK name=same_selection_without_the_unnamed_card admitted_ok=true
+ATTACK name=naming_a_virtual_gpu refused=Err(NamedGpuDeviceNotInTheInventory { device: GpuDeviceIdentifier([48, 48, 48, 48, 58, 48, 50, 58, 48, 48, 46, 48]) })
+test waiting_for_the_gpu::tests::attack_probe_a_batch_of_four_chunks_each_timing_out_once_returns_after_four_resubmissions ... ok
+test adapter_inventory::tests::attack_probe_an_unnamed_discrete_gpu_without_a_bus_address_refuses_a_mount_naming_another_card ... ok
+ATTACK name=batch_dependent_smallest_piece admitted_minimum=972 left_out_at_the_minimum=None one_entry_plan_ok=true two_entries_plan=Some(SmallestPieceLargerThanTheRoom { entry_position: 0, smallest_piece_bytes: 1048 })
+test region_record_kernels::tests::attack_probe_two_entries_on_one_location_make_the_smallest_piece_larger_than_the_admitted_minimum ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 116 filtered out; finished in 0.00s
+

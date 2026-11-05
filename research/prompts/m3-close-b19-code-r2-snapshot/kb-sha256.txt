@@ -1,0 +1,5 @@
+3ad3493600e161ab2aa1e7c7152b66b21f518a6a40c141518908a58831171b4c  crates/singlefs-checker/invariants/02-根环.md
+ac78991a86f510849a01d8229592753f974517997f854cda058daba08d95e166  crates/singlefs-checker/invariants/05-空间记账.md
+5405336cb85d89677f8d2594c85f4b7becd0e54aa35489b34dd403bb896758ce  .claude/kb/decisions/22-单元原子性怎么合成.md
+c39751e75520d5063969021236ade62dc70acfddedf9b9ddb90ac0f3960c700f  .claude/kb/checks-owed.md
+a26c4a3fa4ff4fe34ff8c21c1453b1792259fce3d68818715ee92045e1f4f86c  crates/singlefs-checker/invariants/09-inode树结构.md

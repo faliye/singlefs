@@ -1,0 +1,10 @@
+L [('allocator_ceiling_at_raise_txg_15', 9)] F_new=5 legal
+B [('allocator_ceiling_at_raise_txg_15', 1)] F_new=5 ILLEGAL
+images_identical True
+image_roots [(1, 1, 0, 'A'), (14, 2, 0, 'E'), (15, 2, 5, 'E'), (16, 2, 5, 'E'), (17, 2, 5, 'E'), (18, 2, 5, 'E'), (19, 2, 5, 'E'), (20, 2, 5, 'E'), (21, 2, 5, 'E'), (22, 2, 5, 'E'), (23, 2, 5, 'E'), (24, 2, 5, 'E')]
+L window_judgement(raise_txg,F,ceiling,red) [(15, 5, 14, False)]
+L whole_ring_judgement(raise_txg,F,ceiling,red) [(15, 5, 1, True)]
+L c717_must_red_condition(raise_txg,F,X,W) [(15, 5, 1, 14)]
+B window_judgement(raise_txg,F,ceiling,red) [(15, 5, 14, False)]
+B whole_ring_judgement(raise_txg,F,ceiling,red) [(15, 5, 1, True)]
+B c717_must_red_condition(raise_txg,F,X,W) [(15, 5, 1, 14)]

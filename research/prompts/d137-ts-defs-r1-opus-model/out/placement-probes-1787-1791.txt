@@ -1,0 +1,10 @@
+任务 1787：finished、结局 command-failed、退 1、不要卡、命令 bash
+第 1 次：第二台、上限 4096M、卡 无、线程 31、状态 ended、退 1（command-failed）
+任务 1788：finished、结局 command-failed、退 1、不要卡、命令 bash
+第 1 次：第二台、上限 4096M、卡 无、线程 31、状态 ended、退 1（command-failed）
+任务 1789：finished、结局 command-failed、退 1、不要卡、命令 bash
+第 1 次：第二台、上限 4096M、卡 无、线程 31、状态 ended、退 1（command-failed）
+任务 1790：finished、结局 succeeded、退 0、不要卡、命令 bash -c '
+第 1 次：第二台、上限 4096M、卡 无、线程 31、状态 ended、退 0（succeeded）
+任务 1791：finished、结局 succeeded、退 0、不要卡、命令 bash -c '
+第 1 次：第二台、上限 4096M、卡 无、线程 31、状态 ended、退 0（succeeded）

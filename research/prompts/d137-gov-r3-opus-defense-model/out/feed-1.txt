@@ -1,0 +1,87 @@
+name=feed id=over-printf-written role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "printf 'echo hi\\n' > w.sh && bash w.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/w.sh 是同一条命令里前面的 printf 写的，写法认不出（不是 cat / tee 读 heredoc、cp / ln / install / mv、cat 源 > 目的、tee 拷出这几种），执行前算不出它里面是什么：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=over-echo-written role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "echo 'echo hi' > w.sh; bash w.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/w.sh 是同一条命令里前面的 echo 写的，写法认不出（不是 cat / tee 读 heredoc、cp / ln / install / mv、cat 源 > 目的、tee 拷出这几种），执行前算不出它里面是什么：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=control-cat-heredoc-written role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "cat > w.sh <<'EOS'\necho hi\nEOS\nbash w.sh"
+name=feed id=over-cat-fd0-empty role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "cat s.sh 0> d.sh && bash d.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/d.sh 是同一条命令里前面的 cat 写的，写法认不出（不是 cat / tee 读 heredoc、cp / ln / install / mv、cat 源 > 目的、tee 拷出这几种），执行前算不出它里面是什么：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=over-ln-dangling role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "ln -s s.sh sub/l2.sh && bash sub/l2.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/sub/l2.sh 是同一条命令里前面的 ln 拷出或链出的，而源此刻盘上不在、或源与目的的写法认不出（ln -s 的相对源从链接所在的目录算），执行前算不出它里面是什么：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=control-ln-resolving role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "ln -s ../s.sh sub/l3.sh && bash sub/l3.sh"
+name=feed id=over-cat-or-not-run role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "cat s.sh > d.sh || bash d.sh"
+name=feed id=control-cat-and-run role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "cat s.sh > d.sh && bash d.sh"
+name=feed id=over-cd-missing-then-heredoc-script role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "cd /nonexistent-d137r3; cat > r.sh <<'EOS'\necho hi\nEOS\nbash r.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 r.sh 要先 cd 到 /nonexistent-d137r3，那个目录此刻盘上不在（同一条命令里前面 mkdir 建的也照不在算），cd 会失败而这一条照跑（cd 后面接的是 `;`、换行或括号；写成 `cd 目录 && …` 或 `cd 目录 || exit` 才照 cd 成功了的目录判），而这一条的当前目录算不出，认不出起的是哪一份：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=over-mkdir-semicolon-cd-heredoc role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "mkdir -p made-d137r3; cd made-d137r3; cat > r.sh <<'EOS'\necho hi\nEOS\nbash r.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 r.sh 要先 cd 到 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/made-d137r3，那个目录此刻盘上不在（同一条命令里前面 mkdir 建的也照不在算），cd 会失败而这一条照跑（cd 后面接的是 `;`、换行或括号；写成 `cd 目录 && …` 或 `cd 目录 || exit` 才照 cd 成功了的目录判），而这一条的当前目录算不出，认不出起的是哪一份：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=control-mkdir-and-cd-heredoc role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "mkdir -p made-d137r3 && cd made-d137r3 && cat > r.sh <<'EOS'\necho hi\nEOS\nbash r.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 r.sh 要先 cd 到 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/made-d137r3，那个目录此刻盘上不在（同一条命令里前面 mkdir 建的也照不在算），cd 会失败而这一条照跑（cd 后面接的是 `;`、换行或括号；写成 `cd 目录 && …` 或 `cd 目录 || exit` 才照 cd 成功了的目录判），而这一条的当前目录算不出，认不出起的是哪一份：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=over-mkdir-semicolon-cd-parent-script role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "mkdir -p made-d137r3; cd made-d137r3; bash ../fx/light.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 ../fx/light.sh 要先 cd 到 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/made-d137r3，那个目录此刻盘上不在（同一条命令里前面 mkdir 建的也照不在算），cd 会失败而这一条照跑（cd 后面接的是 `;`、换行或括号；写成 `cd 目录 && …` 或 `cd 目录 || exit` 才照 cd 成功了的目录判），而这一条的当前目录算不出，认不出起的是哪一份：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=control-cd-missing-heavy role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "cd /nonexistent-d137r3; bash heavy.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 heavy.sh 要先 cd 到 /nonexistent-d137r3，那个目录此刻盘上不在（同一条命令里前面 mkdir 建的也照不在算），cd 会失败而这一条照跑（cd 后面接的是 `;`、换行或括号；写成 `cd 目录 && …` 或 `cd 目录 || exit` 才照 cd 成功了的目录判），而这一条的当前目录算不出，认不出起的是哪一份：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=python-script-variable-literal role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "P=t.py; python3 $P"
+name=feed id=control-python-script-literal role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "python3 t.py"
+name=feed id=over-cp-brace-operands role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "cp s.sh d{01..02}.sh && bash d01.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/d01.sh 是同一条命令里前面的 cp 拷出或链出的，而源此刻盘上不在、或源与目的的写法认不出（ln -s 的相对源从链接所在的目录算），执行前算不出它里面是什么：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=e1-python-heredoc-literal-variable role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "D=out; python3 - <<EOS\nprint(\"$D\")\nEOS"
+name=feed id=e2-systemd-run-light role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "systemd-run --user --wait bash fx/light.sh"
+name=feed id=e2-chrt-light role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "chrt -i 0 bash fx/light.sh"
+name=feed id=e2-control-systemd-run-heavy role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "systemd-run --user --wait bash heavy.sh"
+  heavy-test-guard.sh: ✗ 重型测试被拒：脚本 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/heavy.sh:1 里的 cargo test 带 --workspace / --all（全量测试）：implementation-writer 不跑「全量测试」
+name=feed id=e3-variable-heredoc-target role=three-way-forward htg_rc=2 bcd_rc=0
+  command: "t=$PWD/w.sh; cat > $t <<'EOS'\necho hi\nEOS\nbash $t"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本路径 `$t` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-forward 不跑「认不出起什么的写法」
+name=feed id=e4-alias-one-line role=three-way-forward htg_rc=0 bcd_rc=0
+  command: "shopt -s expand_aliases; alias ct='cargo test --workspace'; ct"
+name=feed id=e4-control-alias-newline role=three-way-forward htg_rc=2 bcd_rc=0
+  command: "shopt -s expand_aliases; alias ct='cargo test --workspace'\nct"
+  heavy-test-guard.sh: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：three-way-forward 不跑「全量测试」
+name=feed id=e5-awk-file-variable role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "W=$PWD; awk -f $W/p.awk f.txt"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：awk 读的文件 $W/p.awk 写成变量或命令替换，认不出读的是哪一份（awk 里起的命令）：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=e6-python-list-concat role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "python3 -c 'import subprocess; ds=[\"f.txt\"]; subprocess.run([\"du\",\"-sch\"]+ds)'"
+name=feed id=e7-python-compile-only role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "python3 -c \"import sys; compile(open(sys.argv[1]).read(), sys.argv[1], 'exec')\" t.py"
+name=feed id=e9-cd-missing-and-subshell role=main htg_rc=0 bcd_rc=0
+  command: "cd /nonexistent-d137r3 && (bash fx/light.sh)"
+name=feed id=posix-function-uncalled role=main htg_rc=0 bcd_rc=0
+  command: "foo() { cargo build; }; echo hi"
+name=feed id=builtin-coproc role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "builtin coproc true"
+name=feed id=claude-execpath-main role=main htg_rc=0 bcd_rc=0
+  command: "\"$CLAUDE_CODE_EXECPATH\" -p hi"
+name=feed id=h5-cd-missing-and-relative role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "cd /nonexistent-d137r3 && ./x.sh"
+name=feed id=h5-cd-missing-or-exit role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "cd /nonexistent-d137r3 || exit 1; bash fx/light.sh"
+name=feed id=r2a-sed-arithmetic-address role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "n=5; sed -n \"$((n-3)),$((n))p\" f.txt"
+name=feed id=r2c-python-literal-head-variable-argument role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "python3 -c 'import subprocess; x=\"f.txt\"; subprocess.run([\"cat\", x])'"
+name=feed id=r2f-cd-pwd-relative role=implementation-writer htg_rc=2 bcd_rc=0
+  command: "printf 'echo hi\\n' > x.sh; cd \"$PWD\" && bash ./x.sh"
+  heavy-test-guard.sh: ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 /home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/samples/x.sh 是同一条命令里前面的 printf 写的，写法认不出（不是 cat / tee 读 heredoc、cp / ln / install / mv、cat 源 > 目的、tee 拷出这几种），执行前算不出它里面是什么：implementation-writer 不跑「认不出起什么的写法」
+name=feed id=r2f-control-cd-pwd-heredoc role=implementation-writer htg_rc=0 bcd_rc=0
+  command: "cat > x.sh <<'EOS'\necho hi\nEOS\ncd \"$PWD\" && bash ./x.sh"

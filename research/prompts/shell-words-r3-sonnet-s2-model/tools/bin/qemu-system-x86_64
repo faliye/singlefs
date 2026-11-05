@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+source "$(dirname "${BASH_SOURCE[0]}")/../stublib.sh"
+stub_log 'qemu-system-x86_64' "$@"
+exit 0

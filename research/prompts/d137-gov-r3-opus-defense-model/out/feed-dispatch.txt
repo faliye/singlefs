@@ -1,0 +1,18 @@
+name=dispatch script=nonexistent.py env_reason=no rc=2 refused=True noted=False
+  ✗ E142 的重跑准入判不了：scripts/gate/admission.py experiment 退 2，而输出不是它自己报「没登记」「登记有错」的句子（判法本身没跑起来：脚本不在、python 只打用法、什么都没打），不写它的重跑登记。
+name=dispatch script=usage-exit-2.py env_reason=no rc=2 refused=True noted=False
+  ✗ E142 的重跑准入判不了：scripts/gate/admission.py experiment 退 2，而输出不是它自己报「没登记」「登记有错」的句子（判法本身没跑起来：脚本不在、python 只打用法、什么都没打），不写它的重跑登记。
+name=dispatch script=silent-exit-2.py env_reason=no rc=2 refused=True noted=False
+  ✗ E142 的重跑准入判不了：scripts/gate/admission.py experiment 退 2，而输出不是它自己报「没登记」「登记有错」的句子（判法本身没跑起来：脚本不在、python 只打用法、什么都没打），不写它的重跑登记。
+name=dispatch script=unregistered.py env_reason=no rc=2 refused=True noted=False
+  ✗ E142 的重跑准入判不了（scripts/gate/admission.py experiment 退 2：准入登记里没有这个实验键，或这个实验的登记有错），不写它的重跑登记。
+name=dispatch script=admission-break.py env_reason=no rc=2 refused=True noted=False
+  ✗ E142 的重跑准入判不了：scripts/gate/admission.py experiment 退 2，而输出不是它自己报「没登记」「登记有错」的句子（判法本身没跑起来：脚本不在、python 只打用法、什么都没打），不写它的重跑登记。
+name=dispatch script=crashed.py env_reason=no rc=2 refused=False noted=True
+  ! 派发闸：scripts/gate/admission.py experiment 退 1（认得的只有 0、2、3、77），准入这一条没判，照常放行：Traceback 自造
+name=dispatch script=key-refused.py env_reason=no rc=2 refused=False noted=True
+  ! 派发闸：scripts/gate/admission.py experiment 退 0，而它的产物头写着 sha256=refused（实验键拒算，判不了「单元键没变」），准入这一条没判，照常放行：! E142 的实验键拒算（样本）：照放行，下一趟也判不了「没变」
+name=dispatch script=force-rerun-reason.py env_reason=no rc=2 refused=True noted=False
+  ✗ E142 的单元键与上次产物头记的相同（scripts/gate/admission.py experiment 退 77），不写它的重跑登记。
+name=dispatch script=force-rerun-reason.py env_reason=yes rc=2 refused=True noted=False
+  ✗ E142 的单元键与上次产物头记的相同（scripts/gate/admission.py experiment 退 77），不写它的重跑登记。

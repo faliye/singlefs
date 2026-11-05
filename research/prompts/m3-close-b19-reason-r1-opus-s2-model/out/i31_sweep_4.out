@@ -1,0 +1,1 @@
+name=i31_narrow_sweep N=4 worlds=21870 partial=128 partial_with_leak=31 partial_with_leak_nothing_else_red=13 partial_dead_record_only=20 partial_clean=77 fix_partial_with_leak=0 fix_partial_dead_record_only=0 fix_partial_clean=77

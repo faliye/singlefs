@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# 假 systemd-run：丢掉选项（--wait --user --pipe --collect -q 等），后面的命令在当前环境里同步跑
+while [ $# -gt 0 ]; do case "$1" in --property=*|--unit=*|-p|-u) [ "$1" = -p -o "$1" = -u ] && shift; shift;; -*) shift;; *) break;; esac; done
+exec "$@"

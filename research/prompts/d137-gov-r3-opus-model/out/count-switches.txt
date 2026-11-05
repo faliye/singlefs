@@ -1,0 +1,8 @@
+name=switch_count file=.claude/hooks/heavy-test-guard.sh entries=79 distinct=79 HEAVY_TEST_GUARD_BREAK=28 LIB_HEAVY_TESTS_BREAK=5 LIB_SHELL_WORDS_BREAK=38 SINGLEFS_WORK_ROOT_BREAK=1 WORKSPACE_CARGO_LOCK_BREAK=7
+name=switch_count file=.claude/hooks/lib_heavy_tests.py entries=74 distinct=74 LIB_HEAVY_TESTS_BREAK=63 LIB_SHELL_WORDS_BREAK=11
+name=switch_count file=.claude/hooks/bash-command-detector.sh entries=118 distinct=118 BASH_COMMAND_DETECTOR_BREAK=66 LIB_LONG_RUN_BREAK=7 LIB_SHELL_WORDS_BREAK=43 SINGLEFS_WORK_ROOT_BREAK=2
+name=switch_count file=scripts/hosts/core_usage.py entries=22 distinct=22 CORE_USAGE_BREAK=22
+name=switch_count file=.claude/hooks/lib_shell_words.py entries=76 distinct=76 LIB_SHELL_WORDS_BREAK=76
+name=switch_count file=scripts/hosts/run-with-memory-cap.sh entries=94 distinct=94 RUN_WITH_MEMORY_CAP_BREAK=94
+name=switch_count file=scripts/agents/dispatch-prompt.py entries=24 distinct=24 DISPATCH_PROMPT_BREAK=21 RUNNER_DISPATCH_GUARD_BREAK=3
+name=switch_count file=scripts/agents/agent-watch.py entries=146 distinct=146 AGENT_WATCH_BREAK=143 SINGLEFS_WORK_ROOT_BREAK=2 SUBAGENT_TRANSCRIPT_BREAK=1

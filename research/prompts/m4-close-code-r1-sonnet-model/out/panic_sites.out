@@ -1,0 +1,112 @@
+== bytes HEAD 6 NEW 7
+  +  copied_into_an_array | assert!(slice.len() == WIDTH, "拷成定长数组的那一段字节恰好是数组那么宽"); x1 line [259]
+  +  put_little_endian | .expect("对 256 取余装得进一个字节"); x1 line [417]
+  +  assert_position | assert!( x1 line [556]
+  +  get_u16 | u16::try_from(wide_value).expect("2 字节的小端值装得进 u16") x1 line [721]
+  +  get_u32 | u32::try_from(wide_value).expect("4 字节的小端值装得进 u32") x1 line [737]
+  -  assert_position | assert_eq!(cursor, expected, "{what} 的偏移与字段表不符"); x1
+  -  get_u16 | u16::from_le_bytes(self.take(2).try_into().expect("切了 2 字节")) x1
+  -  get_u32 | u32::from_le_bytes(self.take(4).try_into().expect("切了 4 字节")) x1
+  -  get_u64 | u64::from_le_bytes(self.take(8).try_into().expect("切了 8 字节")) x1
+== checksum HEAD 9 NEW 12
+  +  wide_checksum_field_of_the_crc | field[0] = u8::try_from(crc % 256).expect("对 256 取余装得进一个字节"); x1 line [334]
+  +  wide_checksum_field_of_the_crc | field[1] = u8::try_from(crc / 0x100 % 256).expect("对 256 取余装得进一个字节"); x1 line [335]
+  +  wide_checksum_field_of_the_crc | field[2] = u8::try_from(crc / 0x1_0000 % 256).expect("对 256 取余装得进一个字节"); x1 line [336]
+  +  wide_checksum_field_of_the_crc | field[3] = u8::try_from(crc / 0x100_0000 % 256).expect("对 256 取余装得进一个字节"); x1 line [337]
+  -  wide_checksum_with_field_zeroed | let crc_width = usize::try_from(CHECKSUM_CRC32_CASTAGNOLI_BYTES).expect("4"); x1
+== pointer HEAD 11 NEW 11
+  +  write_to | assert!( x4 line [96, 503, 708]
+  +  write_to | writer.position() - start == usize::try_from(LOC_ENTRY).expect("14"), x1 line [97]
+  +  write_to | assert!(writer.position() - start == 34, "出生树落在指针头部偏移 34"); x1 line [499]
+  +  write_to | writer.position() - start == usize::try_from(POINTER_HEAD_BYTES).expect("50"), x1 line [504]
+  +  write_to | writer.position() - start == usize::try_from(NODE_POINTER_BYTES).expect("86"), x1 line [718]
+  +  write_to | writer.position() - start == usize::try_from(DATA_POINTER_BYTES).expect("88"), x1 line [922]
+  -  write_to | assert_eq!( x4
+  -  write_to | usize::try_from(LOC_ENTRY).expect("14") x1
+  -  write_to | assert_eq!(writer.position() - start, 34, "出生树落在指针头部偏移 34"); x1
+  -  write_to | usize::try_from(POINTER_HEAD_BYTES).expect("50") x1
+  -  write_to | usize::try_from(NODE_POINTER_BYTES).expect("86") x1
+  -  write_to | usize::try_from(DATA_POINTER_BYTES).expect("88") x1
+== unit HEAD 37 NEW 36
+  +  build_packed_unit | assert!( x1 line [785]
+  +  build_index_node | assert!(smallest_key.len() == key_width, "最小 key 是 key 宽个字节"); x1 line [992]
+  +  build_index_node | assert!(largest_key.len() == key_width, "最大 key 是 key 宽个字节"); x1 line [993]
+  +  build_index_node | assert!( x1 line [996, 1057, 1061]
+  +  parse_index_node | assert!(reader.position() == header_end, "码 2 头读到明文头末尾"); x1 line [1535]
+  +  parse_packed_unit | assert!(reader.position() == header_end, "码 3 头读到偏移 107"); x1 line [1738]
+  -  unit_filesystem_identifier | u64::from_le_bytes(filesystem_identifier[..8].try_into().expect("切了 8 字节")) x1
+  -  build_packed_unit | assert_eq!( x1
+  -  build_index_node | assert_eq!(smallest_key.len(), key_width); x1
+  -  build_index_node | assert_eq!(largest_key.len(), key_width); x1
+  -  build_index_node | assert_eq!( x1
+  -  parse_index_node | assert_eq!(reader.position(), header_end); x1
+  -  parse_packed_unit | assert_eq!(reader.position(), header_end); x1
+== root_record HEAD 10 NEW 11
+  +  of_the_lowest_pin | .expect("钉着的槽的编码 3·槽 + 区域小于环长 3S ≤ 48：装得进一个字节、撞不上「没有钉着」的 255"); x1 line [167]
+  +  of_the_lowest_pin | assert!( x1 line [168]
+  +  lemma_parse_slot_round_trip | assert(Self::spec_parse_slot(sealed, self.filesystem_identifier).unwrap().filesystem_identifier x1 line [347]
+  +  parse_slot | assert!( x1 line [472]
+  +  parse_slot | == ROOT_CHECKSUM_OFFSET + 32 + 3 * usize::try_from(NODE_POINTER_BYTES).expect("86"), x1 line [474]
+  -  of_the_lowest_pin | .expect("钉值是那一槽可能住过的最旧 txg，小于环长 3S ≤ 48：装得进一个字节、撞不上「没有钉着」的 255"); x1
+  -  parse_slot | let filesystem_identifier: [u8; 16] = reader.take(16).try_into().expect("切了 16 字节"); x1
+  -  parse_slot | assert_eq!( x1
+  -  parse_slot | ROOT_CHECKSUM_OFFSET + 32 + 3 * usize::try_from(NODE_POINTER_BYTES).expect("86") x1
+== records HEAD 35 NEW 35
+  +  written_by_the_truncation_intent_of | assert!( x1 line [149]
+  +  build_mapping_entry | assert!( x1 line [1052]
+  +  build_mapping_entry | key.len() == usize::try_from(MAPPING_KEY_BYTES).expect("27"), x1 line [1053]
+  +  key_bytes | assert!( x1 line [1257]
+  +  key_bytes | self.mapping_key.len() == usize::try_from(MAPPING_KEY_BYTES).expect("27"), x1 line [1258]
+  +  parse_mapping_entry | let key = copied_into_a_vector(&bytes[..usize::try_from(MAPPING_KEY_BYTES).expect("27")]); x1 line [1759]
+  -  written_by_the_truncation_intent_of | assert_ne!( x1
+  -  build_mapping_entry | assert_eq!(key.len(), usize::try_from(MAPPING_KEY_BYTES).expect("27")); x1
+  -  key_bytes | assert_eq!( x1
+  -  key_bytes | usize::try_from(MAPPING_KEY_BYTES).expect("27"), x1
+  -  parse_extent_record | let key: [u8; 24] = bytes[..24].try_into().expect("24"); x1
+  -  parse_mapping_entry | let key = bytes[..usize::try_from(MAPPING_KEY_BYTES).expect("27")].to_vec(); x1
+== logged_operations HEAD 6 NEW 6
+== journal HEAD 25 NEW 24
+  +  write_to | assert!( x1 line [284]
+  +  write_to | writer.position() - start == usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56"), x1 line [285]
+  +  back_chain_of | let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("496"); x1 line [388]
+  +  back_chain_of | let field_width = usize::try_from(WIDE_CHECKSUM_BYTES).expect("32"); x1 line [389]
+  +  to_bytes | assert!( x1 line [759]
+  +  to_bytes | == usize::try_from(JOURNAL_NEW_ROOT_SEGMENT_BYTES).expect("373"), x1 line [761]
+  +  parse | let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("496"); x1 line [942]
+  +  parse | let named_entry_bytes = usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56"); x1 line [943]
+  +  parse | assert!(reader.position() == header_bytes, "记录头读到偏移 496"); x1 line [945]
+  -  write_to | assert_eq!( x1
+  -  write_to | usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56") x1
+  -  read_from | let key_tail: [u8; 10] = reader.take(10).try_into().expect("切了 10 字节"); x1
+  -  back_chain_of | previous_record_bytes[..usize::try_from(JOURNAL_HEADER_BYTES).expect("496")].to_vec(); x1
+  -  back_chain_of | ..JOURNAL_HEADER_CHECKSUM_OFFSET + usize::try_from(WIDE_CHECKSUM_BYTES).expect("32")] x1
+  -  to_bytes | assert_eq!( x1
+  -  to_bytes | usize::try_from(JOURNAL_NEW_ROOT_SEGMENT_BYTES).expect("373") x1
+  -  parse | assert_eq!( x1
+  -  parse | usize::try_from(JOURNAL_HEADER_BYTES).expect("496") x1
+  -  parse | + named_count * usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56"); x1
+== container_tree HEAD 17 NEW 15
+  +  positions_in_bump_order | index_in_level: u32::try_from(node).expect("同层节点数装得进 u32"), x1 line [1768]
+  +  ancestors_of_containers | let level = u8::try_from(level_index + 1).expect("层数在构造时判过装得进一字节"); x1 line [1951]
+  +  ancestors_of_containers | index_in_level: u32::try_from(node).expect("同层节点数装得进 u32"), x1 line [2038]
+  +  carried | assert!( x1 line [2311]
+  +  append_records_to_the_open_container | assert!( x2 line [3035, 3039, 3174]
+  +  append_records_to_the_open_container | let mut open = containers.pop().expect("上一句判过最右那片在"); x1 line [3096]
+  -  positions_in_bump_order | index_in_level: u32::try_from(index).expect("同层节点数装得进 u32"), x1
+  -  ancestors_of_containers | .expect( x1
+  -  ancestors_of_containers | level: u8::try_from(level_index + 1).expect("层数在构造时判过装得进一字节"), x1
+  -  ancestors_of_containers | index_in_level: u32::try_from(parent).expect("同层节点数装得进 u32"), x1
+  -  after_a_container_is_opened_at_the_right_end | .expect("形状的每一层至少一个节点（构造时判过）"); x1
+  -  carried | assert_eq!( x1
+  -  append_records_to_the_open_container | assert_eq!( x2
+  -  append_records_to_the_open_container | .expect("上一句判过最右那片在") x1
+== deleted_inodes HEAD 3 NEW 2
+  -  inode_numbers_of_the_deleted_inodes_root_entries | .expect("条目宽在读者那里核过等于 8"), x1
+== inode_tree HEAD 11 NEW 11
+  +  records_below_which_a_leaf_borrows_from_its_right_neighbour | usize::try_from((INODE_LEAF_RECORDS + 1) / 2).expect("117") x1 line [264]
+  +  borrow_from_the_right_neighbour_if_below_the_floor | .expect("右邻借出的条数少于它的记录数：借完至少还剩一条") x1 line [2277]
+  -  records_below_which_a_leaf_borrows_from_its_right_neighbour | usize::try_from(INODE_LEAF_RECORDS.div_ceil(2)).expect("117") x1
+  -  borrow_from_the_right_neighbour_if_below_the_floor | .expect("右邻借出的条数少于它的记录数：借完至少还剩一条"); x1
+== lineage_tree HEAD 3 NEW 3
+== retirement_tree HEAD 3 NEW 3
+== tombstone_tree HEAD 3 NEW 3

@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running tests/compaction_on_the_cpu_while_stopped_after_a_gpu_failure.rs (/home/fy5090/.local/share/singlefs/work/m4-gpugc-code-r1-opus/target/debug/deps/compaction_on_the_cpu_while_stopped_after_a_gpu_failure-e452464db15e236e)
+
+running 9 tests
+test a_gc_cpu_compensation_threshold_above_one_hundred_percent_is_refused_at_the_mount_and_at_a_switch ... ok
+test the_background_entry_starts_a_compaction_stopped_after_a_gpu_failure_and_runs_its_batch_on_the_cpu_while_the_pool_is_above_the_threshold ... ok
+test a_switch_with_a_new_gc_cpu_compensation_threshold_lifts_the_stop_and_the_next_batches_follow_the_new_settings ... ok
+test a_run_left_stopped_at_its_start_reports_the_stop_before_judging_the_batch_size_or_continuing_the_deletion_queue ... ok
+test a_compensating_run_stops_at_the_next_batch_once_it_is_not_above_the_threshold_and_withdraws_the_region_exclusion ... ok
+test a_run_left_stopped_at_its_start_withdraws_the_region_exclusion_a_compensating_batch_put_back ... ok
+test a_compaction_stopped_after_a_gpu_failure_stays_stopped_while_the_pool_is_not_above_the_threshold ... ok
+test a_compaction_stopped_after_a_gpu_failure_moves_its_intent_on_the_cpu_while_the_pool_is_above_the_threshold ... ok
+test a_compaction_stopped_after_a_gpu_failure_runs_on_the_cpu_when_one_device_is_above_the_threshold_though_the_pool_as_a_whole_is_not ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.31s
+

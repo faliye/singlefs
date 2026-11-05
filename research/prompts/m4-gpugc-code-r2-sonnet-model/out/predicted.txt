@@ -1,0 +1,6 @@
+# 推的，没量过（读 waiting_for_the_gpu.rs 第 195–213 行逐步推出；主 agent 跑出来之前不引）
+PROBE name=wait_times_out_once_then_resubmission_completes outcome_is_ok=true submissions_made=2 waits_made=2 timeouts_recorded=2 resubmissions_recorded=2 resubmissions_really_made=1
+PROBE name=wait_times_out_three_times_no_resubmission_ever_made outcome_is_ok=false submissions_made=1 waits_made=3 timeouts_recorded=4 resubmissions_recorded=3 resubmissions_really_made=0
+PROBE name=three_submissions_time_out_fourth_completes outcome_is_ok=true submissions_made=4 waits_made=3 timeouts_recorded=3 resubmissions_recorded=3 resubmissions_really_made=3
+STATIC name=removed_member_hits count=2
+STATIC name=cargo_toml_files_naming_the_gpu_package count=1

@@ -1,0 +1,7 @@
+name=samples dir=/home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/rerun-2/samples
+name=rerun_compare file=feed-1 same=yes
+name=rerun_compare file=feed-2 same=yes
+name=rerun_compare file=feed-3 same=yes
+name=rerun_compare file=feed-dispatch same=yes
+name=rerun_compare file=feed-python-missing same=yes
+name=rerun_roots repo=/home/fy5090/code/singlefs frozen=/home/fy5090/code/singlefs model=/home/fy5090/code/singlefs/research/prompts/d137-gov-r3-opus-defense-model work=/home/fy5090/.local/share/singlefs/work/d137-gov-r3-defense/rerun-2

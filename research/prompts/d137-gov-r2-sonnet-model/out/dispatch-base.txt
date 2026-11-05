@@ -1,0 +1,20 @@
+退出码 adm0.py                  rc=0 notes=0 
+退出码 adm2.py                  rc=2 notes=0 ✗ E142 的重跑准入判不了（scripts/gate/admission.py experiment 退 2：准入登记里没有这个实验键，或这个实验的登记有错），不写它的重跑登记
+退出码 adm3.py                  rc=2 notes=0 ✗ E142 的重跑准入前提没齐（scripts/gate/admission.py experiment 退 3），不写它的重跑登记。
+退出码 adm77.py                 rc=2 notes=0 → 怎么办：沿用上次产物与结论；要为别的原因重跑（换臂、换判据），在提示里写一行「准入已判：<哪一样变了>」。
+退出码 adm1.py                  rc=0 notes=1 ! 派发闸：scripts/gate/admission.py experiment 退 1（认得的只有 0、2、3、77），准入这一条没判，照常放行
+      检出: ['派发闸没判全、照常放行：派发闸：scripts/gate/admission.py experiment 退 1（认得的只有 0、2、3、77），准入这一条没判，照常放行'] 只记
+退出码 adm4.py                  rc=0 notes=1 ! 派发闸：scripts/gate/admission.py experiment 退 4（认得的只有 0、2、3、77），准入这一条没判，照常放行
+      检出: ['派发闸没判全、照常放行：派发闸：scripts/gate/admission.py experiment 退 4（认得的只有 0、2、3、77），准入这一条没判，照常放行'] 只记
+退出码 adm5.py                  rc=0 notes=1 ! 派发闸：scripts/gate/admission.py experiment 退 5（认得的只有 0、2、3、77），准入这一条没判，照常放行
+      检出: ['派发闸没判全、照常放行：派发闸：scripts/gate/admission.py experiment 退 5（认得的只有 0、2、3、77），准入这一条没判，照常放行'] 只记
+退出码 adm124.py                rc=0 notes=1 ! 派发闸：scripts/gate/admission.py experiment 退 124（认得的只有 0、2、3、77），准入这一条没判，照常放行
+      检出: ['派发闸没判全、照常放行：派发闸：scripts/gate/admission.py experiment 退 124（认得的只有 0、2、3、77），准入这一条没判，照常放行'] 只记
+退出码 adm250.py                rc=0 notes=1 ! 派发闸：scripts/gate/admission.py experiment 退 250（认得的只有 0、2、3、77），准入这一条没判，照常放行
+      检出: ['派发闸没判全、照常放行：派发闸：scripts/gate/admission.py experiment 退 250（认得的只有 0、2、3、77），准入这一条没判，照常放行'] 只记
+退出码 admhang.py               rc=0 notes=1 ! 派发闸跑不了 admission.py，准入这一条没判：Command '['/usr/bin/python3', '~/.local/share/singlefs
+      检出: ["派发闸没判全、照常放行：派发闸跑不了 admission.py，准入这一条没判：Command '['/usr/bin/python3', '~/.local/share/singlefs"] 只记
+退出码 nonexistent.py           rc=2 notes=0 ✗ E142 的重跑准入判不了（scripts/gate/admission.py experiment 退 2：准入登记里没有这个实验键，或这个实验的登记有错），不写它的重跑登记
+退 2 + 准入已判                   rc=2 notes=0 ✗ 派 experiment-designer 的草稿目录里已经有写者锁，持锁的子 agent 还在跑：
+退 3 + 准入已判                   rc=2 notes=0 ✗ 派 experiment-designer 的草稿目录里已经有写者锁，持锁的子 agent 还在跑：
+不是重跑登记                       rc=2 notes=0 ✗ E142 的重跑准入判不了（scripts/gate/admission.py experiment 退 2：准入登记里没有这个实验键，或这个实验的登记有错），不写它的重跑登记

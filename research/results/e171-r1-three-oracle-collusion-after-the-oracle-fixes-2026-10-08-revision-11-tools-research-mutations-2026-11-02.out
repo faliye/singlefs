@@ -1,0 +1,34 @@
+E7RESULT name=config table_rows=15 unit_test_modules=test_revision_11 timeout_seconds=300
+E7RESULT name=anchor mutation=RV1_驱动行_[closure]_用没改坏的文件内容（RP3_改坏之后内容相同那一格：原式取到，变异取不到） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV2_[limit]_不进键（RP3_改_L） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV3_[upstream]_取上游单元名、不取文件_sha256（RP3_改上游一个文件） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV4_驱动行_[research]_只取_row_driver.py（RP3_改驱动_import_的模块） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV5_[build]_不取工具链（RP3_改工具链文本） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV6_[args]_去掉_--positive-control_那一对（RP3_改参数：两项对照原式两个键，变异一个键） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV7_[env]_设了的变量当没设（RP3_设一个环境变量） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV8_读数相等不比导出目录（RP7：原式_identical=false，变异_true） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV9_入库条件：装置退_253_也入库（RP1_超时不入库那一格） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV10_入库条件：250–254_也入库（RP1_包装结局不入库那一格） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV11_永远现跑的集合少_step-9（RP1_永远现跑那一格） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV12_入库直接写进_entries/、不经_staging/（RP5） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV13_取用不核_manifest.sha256（RP8） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV14_账本把取来的记成现跑（RP1_账本_N、M_那一格） hits=1 files=reuse_library.py
+E7RESULT name=anchor mutation=RV15_取来的单元不看判法、直接记绿（单元编排层端到端第三遍：假判法在取来的_step-1_上判红，原式红、变异绿） hits=1 files=segment_one_units_revision_11.py
+E7RESULT name=baseline unit_tests=green
+E7RESULT name=mutation number=1 outcome=✅ mutation=RV1_驱动行_[closure]_用没改坏的文件内容（RP3_改坏之后内容相同那一格：原式取到，变异取不到） unit_test_exit=1
+E7RESULT name=mutation number=2 outcome=✅ mutation=RV2_[limit]_不进键（RP3_改_L） unit_test_exit=1
+E7RESULT name=mutation number=3 outcome=✅ mutation=RV3_[upstream]_取上游单元名、不取文件_sha256（RP3_改上游一个文件） unit_test_exit=1
+E7RESULT name=mutation number=4 outcome=✅ mutation=RV4_驱动行_[research]_只取_row_driver.py（RP3_改驱动_import_的模块） unit_test_exit=1
+E7RESULT name=mutation number=5 outcome=✅ mutation=RV5_[build]_不取工具链（RP3_改工具链文本） unit_test_exit=1
+E7RESULT name=mutation number=6 outcome=✅ mutation=RV6_[args]_去掉_--positive-control_那一对（RP3_改参数：两项对照原式两个键，变异一个键） unit_test_exit=1
+E7RESULT name=mutation number=7 outcome=✅ mutation=RV7_[env]_设了的变量当没设（RP3_设一个环境变量） unit_test_exit=1
+E7RESULT name=mutation number=8 outcome=✅ mutation=RV8_读数相等不比导出目录（RP7：原式_identical=false，变异_true） unit_test_exit=1
+E7RESULT name=mutation number=9 outcome=✅ mutation=RV9_入库条件：装置退_253_也入库（RP1_超时不入库那一格） unit_test_exit=1
+E7RESULT name=mutation number=10 outcome=✅ mutation=RV10_入库条件：250–254_也入库（RP1_包装结局不入库那一格） unit_test_exit=1
+E7RESULT name=mutation number=11 outcome=✅ mutation=RV11_永远现跑的集合少_step-9（RP1_永远现跑那一格） unit_test_exit=1
+E7RESULT name=mutation number=12 outcome=✅ mutation=RV12_入库直接写进_entries/、不经_staging/（RP5） unit_test_exit=1
+E7RESULT name=mutation number=13 outcome=✅ mutation=RV13_取用不核_manifest.sha256（RP8） unit_test_exit=1
+E7RESULT name=mutation number=14 outcome=✅ mutation=RV14_账本把取来的记成现跑（RP1_账本_N、M_那一格） unit_test_exit=1
+E7RESULT name=mutation number=15 outcome=✅ mutation=RV15_取来的单元不看判法、直接记绿（单元编排层端到端第三遍：假判法在取来的_step-1_上判红，原式红、变异绿） unit_test_exit=1
+E7RESULT name=verdict mutations=15 caught=15 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
+E7RESULT name=done emitted=34

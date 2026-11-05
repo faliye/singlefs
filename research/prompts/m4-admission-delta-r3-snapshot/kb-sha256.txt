@@ -1,0 +1,2 @@
+83427662ba8e9d3f0c0e1d7f5a4c2b6dd5cb65b324b9df045eab0d04ebd7e0fb  .claude/kb/decisions/08-核心索引结构.md
+41efbfc073eb7aa2d3d4b8528dda3b7ce3bfe6ae0c141f44bf23a60c02c2a5cb  .claude/kb/experiments/199-发布照抄上一版的代价.md

@@ -1,0 +1,3 @@
+# Bash 工具对这条前台命令（timeout 4000 毫秒，python 睡 12 秒后往 tool-timeout-probe-file.txt 追加一行）的原样回复；会话任务输出文件的路径换成〔会话任务输出文件〕（原文里带会话目录名）
+Command did not complete within its 4s timeout and was moved to the background (ID: b0gtfvzda). Output is being written to: 〔会话任务输出文件〕. You will be notified when it completes. It is running now: do not start a second copy while it runs. If it is no longer needed, stop it with TaskStop. No output had been read from it when it was moved. A program that buffers its output, or a pipe into one such as tail, can keep the output file empty until the command finishes. To check interim output, use Read on that file path.
+# 随后的任务通知：Background command "Probe whether tool timeout kills foreground process" completed (exit code 0)

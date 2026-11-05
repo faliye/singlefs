@@ -1,0 +1,11 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -3836,7 +3836,7 @@
+             }
+             continue;
+         }
+-        if !ring_slots_known_to_hold_a_root.contains(&ring_slot) {
++        if true {
+             ring_slots_bad_on_this_read_taken_as_holding_no_root.insert(ring_slot);
+             continue;
+         }

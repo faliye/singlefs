@@ -1,0 +1,15 @@
+pre -> r2 {'0->0': 166, '0->2': 168, '2->0': 12, '2->2': 229} 共 575
+pre -> now {'0->0': 166, '0->2': 168, '2->0': 13, '2->2': 228} 共 575
+1. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令='env A=1 {,}cargo test --all'
+2. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令='{,}cargo test --all'
+3. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令='cargo{,} test --all'
+4. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令='c{,}argo test --all'
+5. det/clerk r1树=0 真bash跑出重活=否 bash_rc=None 命令='cp x scripts/hosts/y.sh{,}'
+6. det/clerk r1树=0 真bash跑出重活=否 bash_rc=None 命令='cp x records/{,out}.md'
+7. det/clerk r1树=0 真bash跑出重活=否 bash_rc=0 命令='bash {,}scripts/hosts/detached-run.sh start --label m -- sleep 1'
+8. guard/main r1树=2 真bash跑出重活=否 bash_rc=127 命令='env FOO=1 -- cargo test --all'
+9. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令="bash --rcfile s.sh -c 'echo hi'"
+10. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令="bash --init-file s.sh -c 'echo hi'"
+11. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令='bash --rcfile s.sh light.sh'
+12. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令='bash --rcfile s.sh -n light.sh'
+13. guard/main r1树=0 真bash跑出重活=否 bash_rc=0 命令='bash --rcfile s.sh'

@@ -1,0 +1,1 @@
+name=selftest_history_ext_equals_round2 seeds=2000 mismatches=0

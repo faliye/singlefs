@@ -1,0 +1,5 @@
+ee462e58ef7f02111ba398cf684211fa3bf8800e4ce92917ce71380007feae95  scripts/agents/agent-watch.py
+ffdcc32d86fb9fc1096e557b92c99d40d6445dd3d2b528b1981e0b9460425136  scripts/agents/watch.sh
+1fb36f8ebcbb2e01dfdefd9a33d3cc543e54426c3558eca224680d6efc22eab0  scripts/agents/watch.conf
+3ee752dfb0905ba30e118598f4014e7dae18f8b81b56afb538b01745bc905866  .claude/main-agent.md
+060f9403a35dad3307e5dd9bcf5a7ffc10ba8f3cc33213d87e6f706929af2c31  scripts/agents/README.md

@@ -1,0 +1,15 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -4425,6 +4425,12 @@
+         &ring_slots_bad_at_mount_by(allocator),
+         &ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes_by(allocator),
+     )
++    .inspect_err(|refusal| {
++        assert!(
++            !matches!(refusal, MountError::Recovery(RecoveryFailure::NoValidRoot)),
++            "变异：公开入口在一条有效根都没有时断言失败"
++        );
++    })
+ }
+ 
+ /// 算抬 F 的上限读根环时，这一遍读坏、重读一次仍坏就拒的槽（[`rollback_floor_ceiling`] 的 `ring_slots_whose_reread_still_bad_refuses_the_ceiling`）：

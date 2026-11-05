@@ -1,0 +1,15 @@
+name=lsw_coverage registered_rows=60 lib_shell_words_switches=76 listed_in_some_registered_header=62 not_listed=14
+  not_listed LIB_SHELL_WORDS_BREAK=aliases-unexpanded
+  not_listed LIB_SHELL_WORDS_BREAK=brace-sequence-width-padded-ends-only
+  not_listed LIB_SHELL_WORDS_BREAK=conditional-expression-split
+  not_listed LIB_SHELL_WORDS_BREAK=coproc-as-command
+  not_listed LIB_SHELL_WORDS_BREAK=env-ignore-environment-kept
+  not_listed LIB_SHELL_WORDS_BREAK=extended-assignments-as-command
+  not_listed LIB_SHELL_WORDS_BREAK=quoted-braces-as-unknown
+  not_listed LIB_SHELL_WORDS_BREAK=renamed-shells-unseen
+  not_listed LIB_SHELL_WORDS_BREAK=shell-option-clusters-unvalued
+  not_listed LIB_SHELL_WORDS_BREAK=shell-standard-input-file-unread
+  not_listed LIB_SHELL_WORDS_BREAK=standard-input-device-script-unread
+  not_listed LIB_SHELL_WORDS_BREAK=substitution-case-and-comment-unseen
+  not_listed LIB_SHELL_WORDS_BREAK=tilde-plus-minus-unexpanded
+  not_listed LIB_SHELL_WORDS_BREAK=trap-action-unread

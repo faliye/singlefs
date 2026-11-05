@@ -1,0 +1,13 @@
+# 攻方腿模型（三方轮 m3-close-b19-c699-r1，承接腿修依赖）的包清单：tools/rerun.sh 把它拷进草稿副本的 crates/c699-attack-model/，只在副本里，不进仓。
+[package]
+name = "c699-attack-model"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+# E198 装置源码第 2981、2998 行引 singlefs_format::ROOT_RING_REGIONS 与 singlefs_format::INSTANCE_TABLE_PAGE_RECORDS；checker 档包依赖 singlefs-format，模型包照同一条路径依赖。
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

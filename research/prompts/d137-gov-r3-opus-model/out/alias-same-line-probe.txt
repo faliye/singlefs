@@ -1,0 +1,11 @@
+name=alias_same_line case=plain-bash-c-same-line rc=127 expanded=no
+  output: bash: line 1: ct: command not found
+name=alias_same_line case=plain-bash-c-eval-same-line rc=127 expanded=no
+  output: bash: line 1: ct: command not found
+name=alias_same_line case=tool-wrapper-expand-aliases-state rc=0 expanded=no
+  output: expand_aliases 	on
+name=alias_same_line case=tool-wrapper-eval-same-line-with-shopt rc=127 expanded=no
+  output: bash: line 1: ct: command not found
+name=alias_same_line case=tool-wrapper-eval-same-line-without-shopt rc=127 expanded=no
+  output: bash: line 1: ct: command not found
+name=alias_same_line bash_version=5.2.21(1)-release

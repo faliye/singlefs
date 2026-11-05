@@ -1,0 +1,9 @@
+30a4de195c24c08a0e358949ac7fb13b4acb262c0456e92829748848220c426d  .claude/kb/checks-owed.md
+7ce9682bc717a418fa1e260bc94fe91e5eada1764e1020b297f9554992e6bad7  crates/singlefs-checker/invariants/02-根环.md
+6656450f77cc0eb8c62447bfd6a4d8549a8f49414b664e297cd30f20c25e29e3  crates/singlefs-checker/invariants/09-inode树结构.md
+a5f0a32746b53b5810c0993965b21f6a1ab6fe4a56eb84322d384f1c40abef2f  crates/singlefs-checker/invariants/03-journal.md
+530586d0b74d6a0c748ccf1e6749bea2862664fc67034e50ed07dd537b4a89a2  crates/singlefs-checker/invariants/05-空间记账.md
+bd9a31b176b23d6e6a2c9453e057865c3cf432c658b5ed2b8613412e7ab7549c  crates/singlefs-checker/invariants/07-分配器.md
+ed59d7c44dabbdd88f3ca40bf6992b1b95541c603b849437534d54d53c2efcd4  .claude/kb/decisions/08-核心索引结构.md
+81f83f948852b7c43642c94fccb1a7b3be88382196efdf3f6ffaceeb1e1ff69a  crates/singlefs-checker/invariants/01-块自描述.md
+50bf1c56f6bb41ad212275e99c6318009b6d4cf04e74c2e1ea01e3445ef51414  .claude/kb/decisions/28-挂载期承诺量.md

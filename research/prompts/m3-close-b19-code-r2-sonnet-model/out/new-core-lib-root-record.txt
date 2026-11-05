@@ -1,0 +1,8 @@
+test allocator::tests::placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_answer_only_for_the_same_root_on_its_ring_slot ... ok
+test allocator::tests::placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_lend_an_empty_entry_as_some_empty ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 364 filtered out; finished in Ns
+test root_record::tests::root_carrying_the_unmount_marker_is_accepted_and_any_other_flag_bit_is_refused ... ok
+test root_record::tests::root_record_is_466_bytes_with_the_checksum_at_138_and_round_trips ... ok
+test root_record::tests::the_pinned_ring_slot_byte_is_the_encoding_of_the_pinned_slot_or_255_when_nothing_is_pinned ... ok
+test root_record::tests::the_reclaim_threshold_and_the_pinned_ring_slot_sit_after_the_allocation_record_tree_root_and_round_trip ... ok
+test root_record::tests::the_writer_puts_the_unmount_marker_into_flag_bit_zero_and_leaves_it_clear_on_every_other_root ... ok

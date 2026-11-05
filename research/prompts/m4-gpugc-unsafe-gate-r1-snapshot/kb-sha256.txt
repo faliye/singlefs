@@ -1,0 +1,4 @@
+f0406da430119a2970e29b8e59e462a2136548af5c33e2a7b94f5fb16515d03a  .claude/kb/experiments/197-扫环胶水内存随盘数.md
+1f7fadbaeaf2aa3c4cb3da0aef9d20b6557bf0113639f92b7e87757c5e73f41b  .claude/kb/experiments/183-容量斜率读缓存小盘准入与清扫阈值的代价数.md
+32abbe1a950ed59722baddffdd623644bf7a0d5619dc45a24d579377ea0a1529  .claude/kb/experiments/202-GPU与CPU两种模式GC对照组.md
+884b70bca43b760c9e4c240a86312c2cb4269b3dddbc8b82a0e82a4257bfe12d  .claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md

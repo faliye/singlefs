@@ -1,0 +1,7 @@
+3d453f9669ef728e7bd0fa27541aee1c8c257e839b8555b1a3453abaf6d82834  crates/singlefs-core/src/recovery.rs
+92402c9c70189929977b29d831da92835de9e186b420d7404a5135813cb6906b  crates/singlefs-core/src/root_ring.rs
+aecc4c1a9adc0b5938fda62e32d0cb3d66411fc27bf88730a6289686dd3a5eb0  crates/singlefs-core/src/instance_table_sweep.rs
+66f08858c51a97a98b8ebbad2209140f7dcd9da0cf1f6b8ab793de242f10a2f4  crates/singlefs-replay-prefix/src/lib.rs
+b1b7221ce7cfaae91865ad0f64fe1d76876a8c6d79d621b9668297c6fc5d59d9  crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+c7fa5be28f37b50ed92a603872f55465e057eaf711cfaee3bb48b253bdab4c94  research/prompts/m3-close-b19-e165-r2-main-verification.md
+e07dbb207a4814bf3387433bdb9ddd9cdbe27e92f10315e092358d1766e069b0  research/prompts/m3-close-b19-e165-r2-opus-model/e165_attack_form_a_reader.rs

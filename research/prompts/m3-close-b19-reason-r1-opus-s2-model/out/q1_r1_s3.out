@@ -1,0 +1,1 @@
+name=q1_model R=1 S=3 attempts<=7 faults<=3 mounts<=3 break=none images=223094 roots_judged=620274 slots_recognised=1179240 mismatch=0 caught_record_without_root=129246 caught_new_instance_first_txg_is_u_plus_one=129246 caught_row_of_u_instance_at_most_u=129246

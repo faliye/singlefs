@@ -1,0 +1,14 @@
+== r2
+内建表 61 bash compgen -b 61 表里多 [] bash 里多 []
+type RedirectOperator True
+copy.copy TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+copy.deepcopy TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+pickle TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu) | env (GNU coreutils) 9.4
+== now
+内建表 61 bash compgen -b 61 表里多 [] bash 里多 []
+type RedirectOperator True
+copy.copy TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+copy.deepcopy TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+pickle TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu) | env (GNU coreutils) 9.4

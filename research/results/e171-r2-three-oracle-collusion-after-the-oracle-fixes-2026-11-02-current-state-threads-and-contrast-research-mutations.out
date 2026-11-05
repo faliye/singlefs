@@ -1,0 +1,36 @@
+E7RESULT name=config table_rows=16 unit_test_modules=test_thread_shares,test_revision_8 timeout_seconds=300
+E7RESULT name=anchor mutation=R2P-33_对照_②③_造不回来的两格写成_0 hits=1 files=contrast_revision_6_against_revision_8.py
+E7RESULT name=anchor mutation=R2P-34_对照_②_不按步各写一行 hits=1 files=contrast_revision_6_against_revision_8.py
+E7RESULT name=anchor mutation=R2P-35_对照照改前要_H15_的导出根 hits=1 files=contrast_revision_6_against_revision_8.py
+E7RESULT name=anchor mutation=R2P-36_对照里那一趟的账不在时各行记本机 hits=1 files=contrast_revision_6_against_revision_8.py
+E7RESULT name=anchor mutation=R2P-37_对照不报行产物不在 hits=1 files=contrast_revision_6_against_revision_8.py
+E7RESULT name=anchor mutation=R2P-38_占位核对_H15_导出根没填也要它在 hits=1 files=revision_8_placeholders.py
+E7RESULT name=anchor mutation=R2P-39_读数单元照登记值分（第_7_步不再是_10_线程） hits=1 files=segment_one_units_revision_8.py
+E7RESULT name=anchor mutation=R2P-40_逐行编排拿整份额度、不去除不尽_5_的余数 hits=1 files=segment_one_units_revision_8.py
+E7RESULT name=anchor mutation=R2P-41_逐行编排照修订_8_的旧闸起（与单元同时跑） hits=1 files=segment_one_units_revision_8.py
+E7RESULT name=anchor mutation=R2P-42_单元不经_capped.sh_起（分到的线程不落到单元里） hits=1 files=segment_one_units_revision_8.py
+E7RESULT name=anchor mutation=R2P-43_逐行编排照整份额度起 hits=1 files=segment_one_units_revision_8.py
+E7RESULT name=anchor mutation=R2P-44_分到的线程不落到子进程里 hits=1 files=segment_one_units_revision_8.py
+E7RESULT name=anchor mutation=R2P-45_余数恰好放得下小单元也不给 hits=1 files=segment_one_units_revision_8.py
+E7RESULT name=anchor mutation=R2P-46_额度不认服务设的_SINGLEFS_THREAD_CAP hits=1 files=segment_one_units_revision_8.py
+E7RESULT name=anchor mutation=R2P-47_第二段本机驱动照额度起、不照它那一槽 hits=1 files=rows_orchestrator_segment_two.py
+E7RESULT name=anchor mutation=R2P-48_第二段转交到别的台的驱动照额度起、不照它那一槽 hits=1 files=rows_orchestrator_segment_two.py
+E7RESULT name=baseline unit_tests=green
+E7RESULT name=mutation number=1 outcome=✅ mutation=R2P-33_对照_②③_造不回来的两格写成_0 unit_test_exit=1
+E7RESULT name=mutation number=2 outcome=✅ mutation=R2P-34_对照_②_不按步各写一行 unit_test_exit=1
+E7RESULT name=mutation number=3 outcome=✅ mutation=R2P-35_对照照改前要_H15_的导出根 unit_test_exit=1
+E7RESULT name=mutation number=4 outcome=✅ mutation=R2P-36_对照里那一趟的账不在时各行记本机 unit_test_exit=1
+E7RESULT name=mutation number=5 outcome=✅ mutation=R2P-37_对照不报行产物不在 unit_test_exit=1
+E7RESULT name=mutation number=6 outcome=✅ mutation=R2P-38_占位核对_H15_导出根没填也要它在 unit_test_exit=1
+E7RESULT name=mutation number=7 outcome=✅ mutation=R2P-39_读数单元照登记值分（第_7_步不再是_10_线程） unit_test_exit=1
+E7RESULT name=mutation number=8 outcome=✅ mutation=R2P-40_逐行编排拿整份额度、不去除不尽_5_的余数 unit_test_exit=1
+E7RESULT name=mutation number=9 outcome=✅ mutation=R2P-41_逐行编排照修订_8_的旧闸起（与单元同时跑） unit_test_exit=1
+E7RESULT name=mutation number=10 outcome=✅ mutation=R2P-42_单元不经_capped.sh_起（分到的线程不落到单元里） unit_test_exit=1
+E7RESULT name=mutation number=11 outcome=✅ mutation=R2P-43_逐行编排照整份额度起 unit_test_exit=1
+E7RESULT name=mutation number=12 outcome=✅ mutation=R2P-44_分到的线程不落到子进程里 unit_test_exit=1
+E7RESULT name=mutation number=13 outcome=✅ mutation=R2P-45_余数恰好放得下小单元也不给 unit_test_exit=1
+E7RESULT name=mutation number=14 outcome=✅ mutation=R2P-46_额度不认服务设的_SINGLEFS_THREAD_CAP unit_test_exit=1
+E7RESULT name=mutation number=15 outcome=✅ mutation=R2P-47_第二段本机驱动照额度起、不照它那一槽 unit_test_exit=1
+E7RESULT name=mutation number=16 outcome=✅ mutation=R2P-48_第二段转交到别的台的驱动照额度起、不照它那一槽 unit_test_exit=1
+E7RESULT name=verdict mutations=16 caught=16 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
+E7RESULT name=done emitted=36

@@ -1,0 +1,106 @@
+=== .claude/agent-common.md
+[1] Claude Code 给会话的临时目录 `/tmp/claude-<uid>/`
+[2] scratchpad 在里面）不在任何子 agent 的写范围里：Write / Edit 写进去由写闸拒，没有项目定义的 agent 在 Bash 里写进去由检出钩子拒；草稿与报告写派发提示给的草稿目录。命令词由变量
+[3] 命令替换拼出的（`$c`、`eval "$c"`）由重型测试闸照「认不出起什么的写法」拒（子 agent 一律拒），写成字面命令；钩子判不到的写法（`eval "$c"` 这种代码在变量里的
+[4] 、python subprocess 起的
+[5] `eval` 的字面代码照判，`xargs`、`find -exec`、`parallel` 接进来的落点照算不出拒，改成逐个写字面路径；
+[6] - 写进仓里的注释与 `.md`（kb 之外的也算）引 D、E 编号，写成「编号（简称）」，不只写编号；简称取登记位里的（`.claude/singlefs-ai-sop/rules/kb-discipline.md`「5. 编号只能做索引，不能做称呼」）。
+[7] ；草稿脚本里起自证、门禁阶段、入口脚本或 cargo 的，每一条写字面路径与字面参数，不经数组、变量或 `"$@"` 拼（重型测试闸按「认不出起什么的写法」拒）
+[8] - 装置与判法里起样本进程（真 shell、被测程序）时，在脚本里把每条样本放进它自己的进程组（shell 用 `setsid --wait` 起，python 用 `start_new_session=True` 起），超时与结束时在脚本里对整组发信号，跑完核没有留下进程；命令行里停进程照旧一次点名一个（「执行前拒绝的写法」那一条的 ⑥）。
+[9] `setsid` 写成 `setsid --wait`，
+[10] ；判不了的（hook 输入不是 JSON 对象、哪一道判的时候抛异常、读不到用到的库、喂给 shell 的不是字面的、钩子 bash 那一层起不来）照常执行并记一条检出（只记）
+[11] ，或看门狗所在那一段把输出丢进 
+[12] （连同 `| tee /dev/null`；包着它的那一层（`bash -c '…' > /dev/null`、花括号与圆括号整组、`exec >/dev/null`）与管道后段把标准输出丢进去的照算，挂在别的命令上的 `2>/dev/null` 不算）
+[13] （带计数上限、`break`、`while read`、`kill -0` 探活这类真会结束的循环同样照拒，外面套 `timeout` 就放行）
+[14] 之后同一条命令里没有等齐它的 
+[15] ：不带参数的 `wait`、调用里有不带参数 `wait` 的函数算等齐之前的全部；`wait <进程号>…` 写了几个号算等了几个，两个 `&` 只等一个的照拒；`wait -n`、`tail --pid`、`kill -0` 轮询各算等了一个
+[16]     只记不拒（检出 ②）：run_in_background 里命令位置上不带 `--wait`（`-w`）的 `setsid`（前缀与 `capped.sh` 这类包装剥开）记一条检出，它是进程组组长时会 fork、自己马上退出，完成通知当场发出；写成 `setsid --wait`。
+[17] rsync --inplace` 的目标、`
+[18] `xargs`、`find -exec`、`parallel` 读进来接进命令的词、
+[19] 、重定向目标上展开成几个词的花括号（bash 报 ambiguous redirect、一个字节都不写；引号里的同样）
+[20] 命令参数上引号外的花括号照 bash 展开、逐个落点判，
+[21] `eval` 的字面代码照命令接着算，启动器里面写的字面路径照落点判，
+[22] 命令替换、here-string、`env -S` 拆出来的、名单外启动器（`xargs`、`ssh`、`find -exec` 这类）里的同样认，`BASH_ENV` / `ENV` / `--rcfile` 指的、`bash -i` 读的 `~/.bashrc`、zsh 读的 `ZDOTDIR` 下的启动文件（读得到的）里起 claude 的同样认
+[23] 、`git stash`（`push`、`save` 同；不带 `-k` / `--keep-index`、不带路径或路径是整棵树）、`git rm --cached` 的路径是整棵树、`git checkout [<提交>] -- <整棵树>`；git 的子命令写成变量、命令替换而展开不了的照拒（前面赋过字面值的照展开再判）
+[24] 认不出起什么的写法照重型办（子 agent 一律拒，主 agent 带前缀放行）：命令词、`bash` / `sh` / `source` 起的脚本路径、cargo test / run / bench 的子命令与参数由变量、命令替换、位置参数、进程替换拼出而执行前展开不了的（前面赋过字面值的照展开再判）；shell 启动文件指的路径（`BASH_ENV` / `ENV` / `--rcfile` 这类，`bash -i` 读的 `~/.bashrc`、zsh 读的 `ZDOTDIR` 下的 `.zshenv` 与 zshrc，直接执行的脚本 `#!` 行指到的 shell 读的同理）当被起的脚本读正文判，路径解不出的照认不出办；`xargs`、`find -exec`、`parallel` 读进来接进命令词、脚本路径或 cargo 参数的；同一条命令里先用 echo / printf / dd / sed / python 这类写法写出、再起的脚本；读进来的脚本正文里命令词或脚本路径解不出、而它点到的变量的定义或起这份脚本的参数里写着自证、门禁阶段、入口脚本或 cargo 的（本仓里的脚本与它的逐字节相同拷贝不判）；喂给 shell 的标准输入不是字面的；出路是写成展开之后的字面命令。名单外启动器（`xargs`、`find -exec`、`ssh`、`unshare`、`numactl` 这类）剥掉之后里面那条照判；脚本里自己的转发函数（函数体里有一条命令的命令词是位置参数）的调用，参数照一条命令判。按名字判的仓内脚本（门禁阶段、`mutate.sh`、`capped.sh`、`run-with-memory-cap.sh` 这类）只认本仓那一份，或内容（连同它按自己所在目录 source / import 的库）与本仓那一份逐字节相同的拷贝，别处内容不同的照读正文，剥掉的内存包装不算经内存包装；放行靠参数的三份入口（`replay.sh`、`crash-point-replay.sh`、`crash-amplification.sh`）只认本仓那一份，别处的
+[25] ，入口按自己所在目录 source / import 的库改过的同样不起
+[26] 闸另比这几份库
+[27] 副本里有而与主仓那一份不同的照拒
+[28] 判不了的（输入不是 JSON 对象、`questions` 不是列表、判的时候抛异常）照常放行并记一条检出（只记）。
+[29]  写重跑登记而准入（`scripts/gate/admission.py experiment`）判输入没变（退 77）、准入登记里没有这个实验或登记有错（退 2）、前提没齐（退 3），提示里又没有一行「准入已判：<理由>」
+[30] Claude Code 的会话临时目录 
+[31] 一行点名了工作根或会话临时目录 `/tmp/claude-<uid>` 下的路径
+[32] 判不了的（hook 输入不是 JSON 对象、判的时候抛异常、读不到用到的库、⑥ 的快照清单读不了、⑮ 读不到登记的每台默认重活线程数、准入的 `admission.py` 跑不了或退 0、2、3、77 之外的码）照常放行并记一条检出（只记）；「草稿目录：」点名的目录里写者锁在而判不了的照拒（⑯）。
+[33] 判不了的（输入不是 JSON 对象、主会话记录不在、读不到 `scripts/agents/subagent_transcript.py`、判的时候抛异常）照常放行并记一条检出（只记）。
+[34] 判不了的（输入不是 JSON 对象、判的时候抛异常、找不到自己的会话记录、读不到用到的库或脚本、报告或规格读不了）照常放行并记一条检出（只记）；命名检查那一条切不开的命令按没跑算，写回员与执行员那两节读不了的报告按那一节没写算，照拒。
+[35] - 报告里转述的数每个都标「量的」或「推的」，并写明是哪个量（哪个文件、哪份产物、源文件还是编出来的二进制）；收到的数没标的按「推的」办（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「进结论的每个数，先问它是量的还是拍的」）。
+[36] - 说「没有」「只有」「全仓」之前，把话缩到真核过的那个范围：核的是一个文件就只说这个文件（`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`「核了窄的那一句，说出口的却是宽的那一句」）。
+=== .claude/main-agent.md
+[1] 钩子判不了而照常放行的只记进报告
+[2] ；只报本会话起的单元，别的会话的单元、排内存队的、声明了串行段的、登记成轻的自证底下的只在报告里记一行
+[3] 与钩子判不了而照常放行的检出（重型测试闸没判全、长活判不了、各闸「没判、照常放行」
+[4] 没判全
+[5] ）只记进这一轮的调度记录
+[6] 本机内存排队、别的机器放得下（出路是改去第二台）同样只记；
+[7] 声明了串行段的看门狗只在报告里记一行、不叫醒
+[8] 那一行带串行段秒数与理由
+[9] 读到时核理由
+[10] 不成立的照没声明办
+[11] --ack
+[12] ，键四种：`进程:<pid>`、`<agent 号>:<告警名>`、`单元:<名>`（`detached-run.sh start --label` 的名，确认那个单元的全部告警）、`类:<告警名>`（这一类的全部，不分进程与单元，范围最大）
+=== .claude/agents/tooling-writer.md
+[1] 「边界」
+[2] 「别用 echo 假装命令成功」「结果抓取要有完整性闸」「带闸的脚本，判完了才交出产物」「管道里的退出码不是你想要的那个」「测试镜像一律放临时目录」
+[3] 「一条改动不同步铺满全仓时，排除的每一份都要登记」；`.claude/singlefs-ai-sop/rules/code-discipline.md`「注释、断言、常量、重复」；`.claude/rules/implementation-workflow.md`「复用重型门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判」「测试与崩溃检测优先多线程」；`.claude/rules/verification.md`「门禁的结构」；`.claude/rules/test-script-discipline.md`「入口脚本：不带参数就是剪枝跑全部项」「测试脚本自己也要被测试证明有效」「判定可复用：按输入存，按前缀剪」；`.claude/rules/directory-layout.md`「scripts/：反复要用的脚本」
+[4] 3. 搬出来的东西直接删掉」「4. 指向历史的链接要带劝阻句」「5. 规则文件不留历史节」「
+=== .claude/agents/implementation-writer.md
+[1] ；`.claude/rules/format-evolution.md`「硬约束」「改一个格式常量：旧值的派生形态要逐类搜，改完登记进 `stale=`」；`.claude/rules/mutation-sampling.md`「没红的三类，判据不同」「第三类不许当等价变异留档」「第八类：变异跑了但无效——替换编不过，那条行为零覆盖」「判据」；`.claude/rules/test-script-discipline.md`「用例原子化：每一条都能单独跑」；`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」；`.claude/singlefs-ai-sop/rules/command-safety.md`「测试镜像一律放临时目录」；`.claude/singlefs-ai-sop/rules/test-discipline.md`「变异测试证明的是断言会红，不是覆盖」
+=== .claude/agents/experiment-runner.md
+[1] `.claude/rules/verification.md`「两档：轻型与重型」；`.claude/rules/changelog-format.md`；`.claude/singlefs-ai-sop/rules/command-safety.md`「结果抓取要有完整性闸」「别用 echo 假装命令成功」「测试镜像一律放临时目录」；`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」；`.claude/rules/directory-layout.md`「scripts/：反复要用的脚本」；`.claude/singlefs-ai-sop/rules/preflight-discipline.md`；
+=== .claude/agents/investigator.md
+[1] ；`.claude/rules/verification.md`「两档：轻型与重型」；派发提示写了「查到就修」的，另读 `.claude/agents/implementation-writer.md`「开工先读：」那一行点名的规则与小节
+=== .claude/agents/three-way-forward.md
+[1] 、「别的项目怎么做，是线索不是证据」「不许先有结论再建模型」
+[2] ；装置与判法里起样本进程（真 shell、被测程序）时，在脚本里把每条样本放进它自己的进程组（shell 用 `setsid --wait` 起，python 用 `start_new_session=True` 起），超时与结束时在脚本里对整组发信号，跑完核没有留下进程；命令行里停进程照旧一次点名一个（「执行前拒绝的写法」那一条的 ⑥）
+=== .claude/agents/three-way-attack.md
+[1] 「别的项目怎么做，是线索不是证据」「不许先有结论再建模型」
+[2]    - 装置与判法里起样本进程（真 shell、被测程序）时，在脚本里把每条样本放进它自己的进程组（shell 用 `setsid --wait` 起，python 用 `start_new_session=True` 起），超时与结束时在脚本里对整组发信号，跑完核没有留下进程；命令行里停进程照旧一次点名一个（「执行前拒绝的写法」那一条的 ⑥）。
+=== .claude/agents/three-way-defense.md
+[1] ；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」
+[2] ；装置与判法里起样本进程（真 shell、被测程序）时，在脚本里把每条样本放进它自己的进程组（shell 用 `setsid --wait` 起，python 用 `start_new_session=True` 起），超时与结束时在脚本里对整组发信号，跑完核没有留下进程；命令行里停进程照旧一次点名一个（「执行前拒绝的写法」那一条的 ⑥）
+=== .claude/agents/three-way-materials.md
+[1] ；`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`「它定了没，和它到底怎么定义的，是两个问题」
+[2] 正文拿某条决策去推导的，该决策定义句所在的节标「抄」；正文涉及借用式条款、方案比省不省或格式分支的，`.claude/rules/fs-design.md` 也进清单，压着本轮条款的节（「借用式条款要把被借规则的每个参数都绑死」「不为省空间牺牲自包含」「分支的三条约束」「五条硬要求」「格式分支的判据」）标「抄」。
+=== .claude/agents/mutation-triage.md
+=== .claude/rules/verification.md
+[1] ，照旧一条 `cargo test`；不带特性那一趟与特性里没有 `gpu` 的那一趟经 `python3 scripts/gate/test-targets-parallel.py --jobs <每台默认重活线程数> -- <cargo test 的参数>` 按测试目标并行起，`--jobs` 取登记的每台默认重活线程数（`.claude/heavy-thread-default`），第二个 `--` 之后的 `--nocapture`、`--exact --skip` 原样交给每个目标
+[2] ，可点名的项用各条的 `--list-items` 列
+[3] 形式化与变异：
+[4] 跑核心部分加点名的那几项。崩溃点重放的轻型与重型同一套逻辑（计划、复用、入库、判红是同一段）
+[5] 轻型只缩范围：快档那一段两档相同，放量那一段展开到 6、分片的段一趟一块，没有崩溃点重放部分；不带 
+[6] --item
+[7]  是全部项连同两档都跑的那几类
+[8] 带 `--item <项>` 只跑点名的项（两档同义
+[9] 两档都按单元键复用
+[10] 跑过的判定入库
+[11] 快档按测试函数，与门禁 `checker-tier-crash-point-replay` 快档同一份库；放量按块，与重型同一份崩溃判定库
+[12] 键相同、库里不红的照复用，单元键对不上的与红过的现判 | 形式化那一条
+[13] 。崩溃点重放不另取核心部分：轻型的范围是每项在
+[14] 与展开 6 两个域的并集上
+[15] 不带 `--item` 时连同小输入上的 GPU 与 CPU 对拍
+[16] 两个域与范围的写法以 
+[17]  文件头「轻型与重型同一套逻辑」为准
+[18] 崩溃点重放的轻型与重型调同一个计划函数，同一份项上轻型的计划是重型的计划去掉崩溃点重放部分、放量展开深度换成 6。
+[19] 测试目标 `crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state` 除外：它的测试按显存额度排队（排队写在 `crates/singlefs-checker-tier` 的用例里），门禁 `checker-tier-crash-point-replay` 带 gpu 特性那一趟（这个目标另起一趟）、`scripts/crash/crash-point-replay.sh` 快档与 `scripts/gate/admission.py` 拼的 crash-case 命令都不给它带 `--test-threads 1`，测试线程取登记的每台默认重活线程数（`.claude/heavy-thread-default`）；除外名单在这三处各一份 `GPU_TEST_THREADS_RELEASED_TARGETS`，三处一起改，别的 GPU 测试目标照旧带 `--test-threads 1`。
+[20] verus-must-red-worlds 四格用 Verus 逐个 crate 验登记表 
+[21] .claude/gate.d/verus-pins.tsv` 的 crate 行点名的被验区域；verus-toolchain-pinned 另核 Verus 与产品的 rustc 版本与登记表的 `rustc` 行相同；verus-proof 起 Verus 之前照信任清单 `.claude/gate.d/verus-trust-list.tsv
+[22]  判被验区域里的可信声明与 cfg 原子
+[23] 逐条登记；axiom、作弊标记与 
+[24] verus!
+[25]  外面被验类型的 trait impl 判红
+[26] ，整格跑时另比产品构建与 `verus --compile` 构建的 MIR 逐条目相同
+=== .claude/skills/crash-test/commit-stages.md
+[1] 两台各跑一片时先交换密钥：两台各自往判定库写行的用法（真跑、`--import-results`）第一次开跑时在本机建自己的 `${XDG_CONFIG_HOME:-~/.config}/singlefs/broad-mutation-result.key`（没建过就先各起一趟写库的用法让它建好），再各自经私有通道把对方那一份原样拷成本机同一目录下的 `broad-mutation-result.peer.key`（`chmod 600`，目录 700；不打印、不进仓、不进库目录）；导入时取不到对端密钥退 2、有一行用对端密钥核不过整表退 1，两种都一行不写，出路照驱动打的「→」；交换好密钥再各起一趟
+=== CLAUDE.md
+[1] 四篇项目本地规则不 `@` 常驻：派出去的 agent 由定义点名读，主 agent 碰到对应的活之前先整份读一次——判变异没红、无效变异之前读 `.claude/rules/mutation-sampling.md`；写测试用例、入口脚本或自证之前读 `.claude/rules/test-script-discipline.md`；搬文件或目录、改全仓术语之前读 `.claude/rules/path-moves.md`；新加脚本、往 `scripts/` 或 `research/` 放文件之前读 `.claude/rules/directory-layout.md`。
+[2] <!-- doc-lint:read-once mutation-sampling.md test-script-discipline.md path-moves.md directory-layout.md -->

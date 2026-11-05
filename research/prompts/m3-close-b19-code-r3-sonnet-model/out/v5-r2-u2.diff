@@ -1,0 +1,8 @@
+--- /dev/fd/63	2026-10-29 17:22:54.323634375 +0000
++++ 〔第二台的目录〕/runs/m3-close-b19-code-r3-sonnet-run3/work-r3/out/v5-r2-u2.txt	2026-10-29 17:22:54.323634375 +0000
+@@ -3,4 +3,4 @@
+ PROBE name=zeroed_garbage_once result=MountMade devices_rewritten=[DeviceIdentity(1)]
+ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in Ns
+ test u2_zeroed_slots_and_a_tree_table_read_back_garbage_once_is_made ... PROBE name=zeroed_fault_free result=MountMade devices_rewritten=[DeviceIdentity(1)]
+-test u2_zeroed_slots_and_a_tree_table_reading_back_garbage_every_time_names_which_read ... PROBE name=zeroed_garbage_every_time result=ReadBackFailingSelfVerification device=DeviceIdentity(1) offset=DeviceOffsetInBytes(0) length=4096
++test u2_zeroed_slots_and_a_tree_table_reading_back_garbage_every_time_names_which_read ... PROBE name=zeroed_garbage_every_time result=ReadBackFailingSelfVerification device=DeviceIdentity(0) offset=DeviceOffsetInBytes(25067520) length=16384

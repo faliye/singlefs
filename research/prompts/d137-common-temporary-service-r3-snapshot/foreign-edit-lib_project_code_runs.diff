@@ -1,0 +1,7 @@
+1066c1066
+<     "task-server/control": ("first", frozenset({"install", "start", "stop", "watch", "clear-queue"})),
+---
+>     "task-server/control": ("first", frozenset({"install", "start", "stop", "watch", "clear-queue", "pause", "resume"})),
+3436a3437,3438
+>                 ("名单：主 agent 的 task-server/control pause", ["task-server/control", "pause", "--reason", "x"], HOOK_REPOSITORY, "python", "main-agent"),
+>                 ("名单：主 agent 的 task-server/control resume", ["task-server/control", "resume"], HOOK_REPOSITORY, "python", "main-agent"),

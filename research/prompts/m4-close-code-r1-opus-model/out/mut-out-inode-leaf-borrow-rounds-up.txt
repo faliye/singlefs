@@ -1,0 +1,71 @@
+case=unit_index widths=[] examples=1000 old_side_some_or_ok=339 old_side_panics=0
+case=unit_packed widths=[] examples=1000 old_side_some_or_ok=303 old_side_panics=0
+case=unit_data widths=[] examples=1000 old_side_some_or_ok=347 old_side_panics=0
+case=unit_declared_length widths=[] examples=1000 old_side_some_or_ok=0 old_side_panics=0
+case=unit_payload widths=[134, 135, 136, 137, 138, 139, 140, 141] examples=1000 old_side_some_or_ok=160 old_side_panics=0
+case=root_slot widths=[] examples=1000 old_side_some_or_ok=362 old_side_panics=6
+case=inode_record widths=[140] examples=1000 old_side_some_or_ok=94 old_side_panics=0
+case=tombstone widths=[40] examples=1000 old_side_some_or_ok=519 old_side_panics=0
+case=lineage widths=[24] examples=1000 old_side_some_or_ok=556 old_side_panics=0
+case=retirement widths=[34] examples=1000 old_side_some_or_ok=519 old_side_panics=0
+case=accounting widths=[34] examples=1000 old_side_some_or_ok=519 old_side_panics=0
+case=deadlist widths=[43] examples=1000 old_side_some_or_ok=531 old_side_panics=0
+case=tree_table widths=[] examples=1000 old_side_some_or_ok=178 old_side_panics=7
+case=tree_table_mark widths=[] examples=1000 old_side_some_or_ok=207 old_side_panics=5
+case=root_pointer_bytes widths=[] examples=1000 old_side_some_or_ok=0 old_side_panics=28
+case=inode_internal widths=[120] examples=1000 old_side_some_or_ok=54 old_side_panics=0
+case=inode_internal_refusal widths=[120] examples=1000 old_side_some_or_ok=22 old_side_panics=34
+case=extent_record widths=[112] examples=1000 old_side_some_or_ok=79 old_side_panics=0
+case=mapping_entry widths=[55, 56, 57, 58, 59, 60, 61, 62] examples=1000 old_side_some_or_ok=934 old_side_panics=0
+case=mapping_sort_key widths=[] examples=1000 old_side_some_or_ok=0 old_side_panics=82
+case=birth_txg_of_mapping_key widths=[27] examples=1000 old_side_some_or_ok=529 old_side_panics=0
+case=logged_entry widths=[] examples=1000 old_side_some_or_ok=367 old_side_panics=0
+case=journal widths=[] examples=1000 old_side_some_or_ok=238 old_side_panics=0
+case=back_chain widths=[] examples=1000 old_side_some_or_ok=0 old_side_panics=14
+case=wide_checksum_holds widths=[] examples=1000 old_side_some_or_ok=0 old_side_panics=738
+case=wide_checksum_zeroed widths=[] examples=1000 old_side_some_or_ok=0 old_side_panics=754
+case=node_pointer_judging widths=[86, 87, 88, 89, 90, 91, 92, 93] examples=1000 old_side_some_or_ok=98 old_side_panics=76
+case=data_pointer_judging widths=[88, 89, 90, 91, 92, 93, 94, 95] examples=1000 old_side_some_or_ok=114 old_side_panics=76
+case=head_judging widths=[50, 51, 52, 53, 54, 55, 56, 57] examples=1000 old_side_some_or_ok=102 old_side_panics=74
+case=node_pointer_judgement_shadow widths=[86, 87, 88, 89, 90, 91, 92, 93] examples=1000 old_side_some_or_ok=865 old_side_panics=135
+case=node_pointer_judgement_first widths=[86, 87, 88, 89, 90, 91, 92, 93] examples=1000 old_side_some_or_ok=108 old_side_panics=76
+case=location_entries widths=[28, 29, 30, 31, 32, 33, 34, 35] examples=1000 old_side_some_or_ok=546 old_side_panics=36
+case=reader_ops widths=[] examples=1000 old_side_some_or_ok=0 old_side_panics=185
+ROUND_TRIP case=w_journal i=3 seed=0xb66636b590a54165 new=("len=4096 fnv=32a30bb2fcf150de", false, false) | ordinal=0
+ROUND_TRIP case=w_journal i=9 seed=0xe3331c1c94e469e7 new=("len=4096 fnv=807f2e25989e6556", false, false) | ordinal=0
+ROUND_TRIP case=w_journal i=20 seed=0x3095d9e41cab84fe new=("len=4096 fnv=ed3e1e55d05a6e81", false, false) | ordinal=0
+case=w_journal examples=1000 old_side_panics=420 new_side_round_trip_breaks=120 of_which_at_journal_ordinal_zero=120
+case=w_root examples=1000 old_side_panics=448 new_side_round_trip_breaks=0 of_which_at_journal_ordinal_zero=0
+ROUND_TRIP case=w_packed i=1 seed=0xa46d0fc6abdb55a2 new=("len=32768 fnv=b9d93287d45fd094", Err(Structure(PackedUnitRecordWidthZeroWithRecords)), 0)
+ROUND_TRIP case=w_packed i=4 seed=0x4287909a29b8d9e3 new=("len=32768 fnv=870f50d3ec1c8870", Err(Structure(PackedUnitRecordWidthZeroWithRecords)), 0)
+ROUND_TRIP case=w_packed i=5 seed=0x2d4f16e0a8e545de new=("len=32768 fnv=ee5cc5b3b3a62f4b", Err(Structure(PackedUnitRecordWidthZeroWithRecords)), 0)
+case=w_packed examples=1000 old_side_panics=159 new_side_round_trip_breaks=210 of_which_at_journal_ordinal_zero=0
+ROUND_TRIP case=w_index i=12 seed=0x8059c1f86fc9557d new=("len=16384 fnv=1dc38eb214daf381", Err(Structure(IndexNodeEntryWidthBelowTheKeyWidth)), 0)
+ROUND_TRIP case=w_index i=33 seed=0x8fe6c5a0f02d7b34 new=("len=16384 fnv=b3c71beb5c50d989", Err(Structure(IndexNodeEntryWidthBelowTheKeyWidth)), 0)
+ROUND_TRIP case=w_index i=36 seed=0xd50d6b5c7ecdf775 new=("len=16384 fnv=b9634849164dd323", Err(Structure(IndexNodeEntryWidthBelowTheKeyWidth)), 0)
+case=w_index examples=1000 old_side_panics=572 new_side_round_trip_breaks=38 of_which_at_journal_ordinal_zero=0
+case=w_index_capacity examples=1000 old_side_panics=3 new_side_round_trip_breaks=0 of_which_at_journal_ordinal_zero=0
+case=w_data examples=1000 old_side_panics=132 new_side_round_trip_breaks=0 of_which_at_journal_ordinal_zero=0
+case=w_records examples=1000 old_side_panics=408 new_side_round_trip_breaks=0 of_which_at_journal_ordinal_zero=0
+case=w_logged_root examples=1000 old_side_panics=467 new_side_round_trip_breaks=0 of_which_at_journal_ordinal_zero=0
+case=w_writer_ops examples=1000 old_side_panics=895 new_side_round_trip_breaks=0 of_which_at_journal_ordinal_zero=0
+case=tree_shape examples=1000 old_side_examples_with_a_panic=637 old_side_examples_with_a_merge_or_a_new_level=0
+case=tree_append examples=1000 old_side_examples_with_a_panic=78 old_side_examples_with_a_merge_or_a_new_level=337
+MISMATCH case=inode_tree i=10 seed=0x9ddf4a9273ed44af
+  old=wr 233: Ok:672aaa2293147133 | wr 235: Ok:03021526a4597c81 | rm 4: Ok:44214a9abe010f97 | rm 5: Ok:6143cb2455dd0123 | rm 561: Ok:65b68f45b4e2fc38:RetiredInodeLeafContainer { | rm 6: Ok:e980a1b34079696f | rm 7: Ok:38dd5bc844b61cd8 | rm 88: Ok:6e6468583782ac28 | rm 8: Ok:beceedef1b0e78ee | rm 566: Ok:030d313d90457ea4 | rm 414: Ok:439b377f1d9fa707 | rm 9: Ok:70547e51cc1fa6f1 | rm 14: Ok:d92039ab713b04cc | rm 15: Ok:8ca5e11ca656c2b4 | rm 226: Ok:a2b9ad578cf25912 | rm 283: Ok:f0347e484a850088 | rm 97: Ok:c6859b05f0779e7f | rm 16: Ok:81857b89349ef51c | rm 496: Ok:3683a89613bec61c | rm 17: Ok:45e169b47d26acfd | rm 420: Ok:d0162dfc2ca6d39a | rm 63: Ok:70e2c2bfeeee4fbb | rm 584: Ok:a721f1280f3e8990 | r
+  new=wr 233: Ok:672aaa2293147133 | wr 235: Ok:03021526a4597c81 | rm 4: Ok:44214a9abe010f97 | rm 5: Ok:6143cb2455dd0123 | rm 561: Ok:65b68f45b4e2fc38:RetiredInodeLeafContainer { | rm 6: Ok:e980a1b34079696f | rm 7: Ok:38dd5bc844b61cd8 | rm 88: Ok:6e6468583782ac28 | rm 8: Ok:beceedef1b0e78ee | rm 566: Ok:030d313d90457ea4 | rm 414: Ok:439b377f1d9fa707 | rm 9: Ok:70547e51cc1fa6f1 | rm 14: Ok:d92039ab713b04cc | rm 15: Ok:8ca5e11ca656c2b4 | rm 226: Ok:a2b9ad578cf25912 | rm 283: Ok:f0347e484a850088 | rm 97: Ok:c6859b05f0779e7f | rm 16: Ok:81857b89349ef51c | rm 496: Ok:3683a89613bec61c | rm 17: Ok:45e169b47d26acfd | rm 420: Ok:d0162dfc2ca6d39a | rm 63: Ok:70e2c2bfeeee4fbb | rm 584: Ok:a721f1280f3e8990 | r
+MISMATCH case=inode_tree i=17 seed=0x325a9efdf8f7a118
+  old=wr 233: Ok:361a37b6646e8735 | wr 234: Ok:5c4c4b58305d60d7 | wr 117: Ok:b78ce9622c619d74 | wr 4: Ok:7bbcf0cb442d540b | rm 180: Ok:ca964a5d4b532a8c | rm 999999: Err:6c8804f413f00b96 | rm 999999: Err:6c8804f413f00b96 | rm 694: Ok:7f37fe4b61fe6dfe | rm 3: Ok:8f399a9a0eed2858 | rm 54: Ok:504952531ac9c689 | rm 4: Ok:20e45e707d51ab11 | rm 8: Ok:cf9dfb44d9bd2936 | rm 137: Ok:5f4b8ad32d4dbcb3 | rm 695: Ok:490fa620d576528a | rm 999999: Err:6c8804f413f00b96 | rm 483: Ok:b564e83cde27c5ab | rm 9: Ok:834d2db08dbe277f | rm 472: Ok:7861343561fcd618 | rm 333: Ok:a748b2b9a5b35709 | rm 91: Ok:1a6a4a42639985bb | rm 10: Ok:0781c34173a0df54 | rm 11: Ok:fa2d037980b7c5e7 | rm 999999: Err:6c8804f413f00b96 | rm 12: O
+  new=wr 233: Ok:361a37b6646e8735 | wr 234: Ok:5c4c4b58305d60d7 | wr 117: Ok:b78ce9622c619d74 | wr 4: Ok:7bbcf0cb442d540b | rm 180: Ok:ca964a5d4b532a8c | rm 999999: Err:6c8804f413f00b96 | rm 999999: Err:6c8804f413f00b96 | rm 694: Ok:7f37fe4b61fe6dfe | rm 3: Ok:8f399a9a0eed2858 | rm 54: Ok:504952531ac9c689 | rm 4: Ok:20e45e707d51ab11 | rm 8: Ok:cf9dfb44d9bd2936 | rm 137: Ok:5f4b8ad32d4dbcb3 | rm 695: Ok:490fa620d576528a | rm 999999: Err:6c8804f413f00b96 | rm 483: Ok:b564e83cde27c5ab | rm 9: Ok:834d2db08dbe277f | rm 472: Ok:7861343561fcd618 | rm 333: Ok:a748b2b9a5b35709 | rm 91: Ok:1a6a4a42639985bb | rm 10: Ok:0781c34173a0df54 | rm 11: Ok:fa2d037980b7c5e7 | rm 999999: Err:6c8804f413f00b96 | rm 12: O
+MISMATCH case=inode_tree i=35 seed=0x12602ff0ec2b6aa2
+  old=wr 234: Ok:104851f71b1a5c03 | wr 233: Ok:400fac6dd7307900 | rm 3: Ok:0984f68580b5db72 | rm 573: Ok:a41e56e4a5e7a6ce:RetiredInodeLeafContainer { | rm 89: Ok:7f098cfcd89adfd1 | rm 4: Ok:34ab41af2a552ee2 | rm 5: Ok:1645e8f77c2c955e | rm 158: Ok:18f3ee3da3a5b243 | rm 6: Ok:c30717e7fab233cd | rm 327: Ok:b649ee4d61ae4161 | rm 357: Ok:d01418e8d6578936 | rm 7: Ok:a033419bb1187ac7 | rm 166: Ok:4749dda792eeb489 | rm 303: Ok:574d44859a35ccaa | rm 11: Ok:3940a334bc86524a | rm 12: Ok:f814bac693bac8bf | rm 568: Ok:e375988e2521602d | rm 290: Ok:62e330330d472871 | rm 13: Ok:3effade3e9db4455 | rm 14: Ok:5dd513fe839e1c05 | rm 470: Ok:29aa5fa842faa3bd | rm 19: Ok:7c0fbad0815ece69 | rm 20: Ok:01885993377a25d5 |
+  new=wr 234: Ok:104851f71b1a5c03 | wr 233: Ok:400fac6dd7307900 | rm 3: Ok:0984f68580b5db72 | rm 573: Ok:a41e56e4a5e7a6ce:RetiredInodeLeafContainer { | rm 89: Ok:7f098cfcd89adfd1 | rm 4: Ok:34ab41af2a552ee2 | rm 5: Ok:1645e8f77c2c955e | rm 158: Ok:18f3ee3da3a5b243 | rm 6: Ok:c30717e7fab233cd | rm 327: Ok:b649ee4d61ae4161 | rm 357: Ok:d01418e8d6578936 | rm 7: Ok:a033419bb1187ac7 | rm 166: Ok:4749dda792eeb489 | rm 303: Ok:574d44859a35ccaa | rm 11: Ok:3940a334bc86524a | rm 12: Ok:f814bac693bac8bf | rm 568: Ok:e375988e2521602d | rm 290: Ok:62e330330d472871 | rm 13: Ok:3effade3e9db4455 | rm 14: Ok:5dd513fe839e1c05 | rm 470: Ok:29aa5fa842faa3bd | rm 19: Ok:7c0fbad0815ece69 | rm 20: Ok:01885993377a25d5 |
+MISMATCH case=inode_tree i=41 seed=0xe517f519e9e84320
+  old=wr 119: Ok:9f175ccfa55382eb | wr 235: Ok:b1ac0e8286b84eb8 | wr 0: Ok:5763677f42153d42 | rm 310: Ok:6a76940149ea19d2 | rm 3: Ok:56d42416d4d8f160 | rm 4: Ok:c5f3e2bc3f148fb3 | rm 5: Ok:80d1d591fecf7011 | rm 386: Ok:b3d3c12e451e2f7a | rm 999999: Err:6c8804f413f00b96 | rm 425: Ok:f5150270d5081ba1 | rm 219: Ok:a89d212c18808755 | rm 10: Ok:4877f068b25c3b82 | rm 59: Ok:9d60cfb77fffa91f | rm 11: Ok:9973cb559e18e40a | rm 122: Ok:019561140eeed789 | rm 71: Ok:eb5ad37c37818ede | rm 12: Ok:e56aecf334432633 | rm 254: Ok:4019e178e3af616a | rm 13: Ok:a7b5c603284b3a96 | rm 174: Ok:41200e41243cb459 | rm 87: Ok:629d495612680c80 | rm 316: Ok:eabc3c682899bc35 | rm 14: Ok:8ed1c5f157f3a9d0 | rm 222: Ok:565e0efbdf6
+  new=wr 119: Ok:9f175ccfa55382eb | wr 235: Ok:b1ac0e8286b84eb8 | wr 0: Ok:5763677f42153d42 | rm 310: Ok:6a76940149ea19d2 | rm 3: Ok:56d42416d4d8f160 | rm 4: Ok:c5f3e2bc3f148fb3 | rm 5: Ok:80d1d591fecf7011 | rm 386: Ok:b3d3c12e451e2f7a | rm 999999: Err:6c8804f413f00b96 | rm 425: Ok:f5150270d5081ba1 | rm 219: Ok:a89d212c18808755 | rm 10: Ok:4877f068b25c3b82 | rm 59: Ok:9d60cfb77fffa91f | rm 11: Ok:9973cb559e18e40a | rm 122: Ok:019561140eeed789 | rm 71: Ok:eb5ad37c37818ede | rm 12: Ok:e56aecf334432633 | rm 254: Ok:4019e178e3af616a | rm 13: Ok:a7b5c603284b3a96 | rm 174: Ok:41200e41243cb459 | rm 87: Ok:629d495612680c80 | rm 316: Ok:eabc3c682899bc35 | rm 14: Ok:8ed1c5f157f3a9d0 | rm 222: Ok:565e0efbdf6
+case=inode_tree examples=166 old_side_examples_with_a_panic=0 old_side_examples_with_a_merge_or_a_new_level=79
+case=tree_capacities examples=1000 old_side_examples_with_a_panic=196 old_side_examples_with_a_merge_or_a_new_level=0
+case=partial_write_oracle examples=4000 mismatches=0
+per_case_mismatches={"inode_tree": 26}
+panic_message_only_differences={"back_chain": 2, "data_pointer_judging": 34, "head_judging": 31, "location_entries": 36, "mapping_sort_key": 76, "node_pointer_judgement_first": 23, "node_pointer_judgement_shadow": 90, "node_pointer_judging": 32, "pinned_ring_slot": 661, "reader_ops": 178, "tree_shape": 318, "w_index": 70, "w_journal": 83, "w_packed": 40, "w_records": 257, "w_writer_ops": 513, "wide_checksum_zeroed": 749}
+name=codec_differential cases=51466 mismatches=26

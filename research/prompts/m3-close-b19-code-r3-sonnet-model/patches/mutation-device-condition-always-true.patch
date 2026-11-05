@@ -1,0 +1,11 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -5752,7 +5752,7 @@
+     devices_rewritten_by_the_acquisition: &[DeviceIdentity],
+     slot_spacing_in_bytes: u64,
+ ) -> bool {
+-    devices_rewritten_by_the_acquisition.contains(&read_failing_self_verification.device)
++    (devices_rewritten_by_the_acquisition.contains(&read_failing_self_verification.device) || true)
+         && read_failing_self_verification.length_in_bytes
+             == singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES
+         && (0..singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE).any(|slot_index| {

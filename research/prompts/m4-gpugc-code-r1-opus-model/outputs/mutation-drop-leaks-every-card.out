@@ -1,0 +1,127 @@
+   Compiling singlefs-background-gpu v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-gpugc-code-r1-opus/repo/crates/singlefs-background-gpu)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 30.23s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m4-gpugc-code-r1-opus/target/debug/deps/singlefs_background_gpu-33a3c657c99bb4ff)
+
+running 119 tests
+test adapter_inventory::tests::named_gpus_participate_in_the_named_order_with_their_memory_limits ... ok
+test adapter_inventory::tests::naming_a_gpu_that_is_not_a_discrete_gpu_of_this_host_refuses_the_mount ... ok
+test adapter_inventory::tests::no_discrete_gpu_refuses_the_mount_as_gpu_not_present ... ok
+test adapter_inventory::tests::a_memory_limit_count_different_from_the_participating_gpus_refuses_the_mount ... ok
+test adapter_inventory::tests::a_discrete_gpu_without_a_pci_bus_address_is_refused ... ok
+test adapter_inventory::tests::only_the_discrete_gpu_counts_among_discrete_integrated_and_software_adapters ... ok
+test adapter_inventory::tests::a_discrete_gpu_without_a_device_local_memory_heap_is_refused ... ok
+test adapter_inventory::tests::attack_probe_an_unnamed_discrete_gpu_without_a_bus_address_refuses_a_mount_naming_another_card ... ok
+test background_gpu::tests::a_wgpu_future_still_pending_at_the_wait_limit_is_a_timeout_failure ... ok
+test adapter_inventory::tests::two_discrete_gpus_reporting_the_same_pci_bus_address_are_refused ... ok
+test adapter_inventory::tests::without_named_gpus_every_discrete_gpu_participates_without_a_memory_limit ... ok
+test adapter_inventory::tests::the_selection_of_the_mount_settings_carries_their_gpus_memory_limits_and_wait_limit ... ok
+test background_gpu_compute::tests::inputs_the_gpu_cannot_take_are_reported_with_their_card_and_entry ... ok
+test checksum_kernels::tests::a_chunk_of_empty_units_still_has_a_four_byte_input ... ok
+test checksum_kernels::tests::the_two_kernels_are_separate_sources_with_their_own_entry_points ... ok
+test checksum_kernels::tests::units_are_packed_end_to_end_at_unaligned_offsets_and_padded_to_a_whole_word ... ok
+test background_gpu::tests::waiting_for_a_future_that_is_pending_once_returns_its_output ... ok
+test background_gpu_compute::tests::a_gpu_unusable_after_its_resubmissions_is_reported_with_its_resubmissions_and_wait_limit ... ok
+test background_gpu_compute::tests::each_entry_decision_maps_to_the_core_decision_of_the_same_kind ... ok
+test background_gpu_compute::tests::every_gpu_failure_is_reported_to_the_core_with_its_card_and_cause ... ok
+test background_gpu_compute::tests::every_participating_gpu_left_out_is_reported_with_each_card_its_limit_and_the_smallest_piece ... ok
+test checksum_kernels::tests::an_outcome_the_kernel_never_wrote_is_an_unrecognized_verdict_word ... ok
+test checksum_kernels::tests::both_ways_of_combining_two_pieces_give_the_crc32c_of_the_whole_bytes ... ok
+test checksum_kernels::tests::descriptor_bytes_are_little_endian_words ... ok
+test checksum_kernels::tests::readback_records_decode_into_computed_checksums_and_verdicts ... ok
+test adapter_inventory::tests::virtual_and_unknown_adapters_do_not_count_as_background_gpus ... ok
+test checksum_kernels::tests::the_cpu_reference_outcome_uses_the_core_crc32c ... ok
+test adapter_inventory::tests::discrete_gpus_are_listed_by_pci_bus_address_not_by_enumeration_order ... ok
+test checksum_kernels::tests::units_cut_into_pieces_under_a_small_memory_limit_match_the_cpu_reference_on_every_unit ... ok
+test gpus_of_this_host::tests::a_memory_limit_below_the_smallest_piece_leaves_the_gpu_out_without_refusing_the_mount ... ok
+test gpus_of_this_host::tests::a_memory_limit_smaller_than_the_cost_probe_cuts_it_into_pieces_instead_of_refusing_the_mount ... ok
+test gpus_of_this_host::tests::a_named_card_that_did_not_open_refuses_the_mount ... ok
+test gpus_of_this_host::tests::an_unnamed_card_that_did_not_open_is_skipped_and_reported_while_the_named_cards_take_part ... ok
+test gpus_of_this_host::tests::after_a_switch_of_the_wait_limit_the_next_batch_waits_by_the_new_limit ... ok
+test gpus_of_this_host::tests::after_a_switch_to_fewer_cards_the_next_batch_is_split_only_over_the_named_cards ... ok
+test adapter_inventory::tests::a_memory_limit_above_the_total_memory_of_its_gpu_refuses_the_mount ... ok
+test gpus_of_this_host::tests::after_a_switch_to_a_smaller_memory_limit_the_next_batch_is_cut_by_the_smaller_limit ... ok
+test gpus_of_this_host::tests::dropping_the_gpus_leaks_the_one_with_a_running_submission_and_drops_the_others ... ok
+test gpus_of_this_host::tests::the_cost_of_a_cost_probe_cut_into_pieces_is_the_sum_over_the_pieces ... ok
+test gpus_of_this_host::tests::the_smallest_piece_every_participating_gpu_holds_is_the_largest_of_the_three_segments ... ok
+test gpus_of_this_host::tests::without_named_cards_any_card_that_did_not_open_refuses_the_mount ... ok
+test live_slot_kernels::tests::a_memory_limit_below_the_smallest_live_slot_piece_reports_how_much_it_needs ... ok
+test live_slot_kernels::tests::record_table_bytes_counted_from_the_record_count_match_the_tables_built ... ok
+test live_slot_kernels::tests::a_record_table_cut_into_slices_under_a_small_memory_limit_sums_to_the_cpu_reference ... ok
+test live_slot_kernels::tests::a_segment_counted_differently_by_the_two_kernels_is_uncertain_once_and_judged_by_the_cpu_reference_the_next_round ... ok
+test live_slot_kernels::tests::an_empty_record_table_still_has_one_item_in_both_buffers ... ok
+test live_slot_kernels::tests::allocation_records_are_listed_in_order_with_their_released_word_and_sorted_by_device_and_slot ... ok
+test live_slot_kernels::tests::an_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word ... ok
+test live_slot_kernels::tests::parameters_carry_the_segment_count_the_record_count_and_the_device_of_the_unit_area ... ok
+test live_slot_kernels::tests::readback_records_decode_into_sixty_four_bit_live_slot_counts ... ok
+test live_slot_kernels::tests::records_at_the_same_device_and_slot_are_sorted_by_their_position ... ok
+test live_slot_kernels::tests::segment_bounds_are_the_first_slot_and_the_slot_past_each_cluster_segment ... ok
+test live_slot_kernels::tests::segments_other_than_every_full_segment_of_the_unit_area_panic - should panic ... ok
+test live_slot_kernels::tests::the_two_kernels_are_separate_sources_with_their_own_entry_points ... ok
+test memory_limit_and_chunks::tests::a_batch_that_does_not_fit_the_memory_limit_is_cut_into_chunks_that_each_fit ... ok
+test memory_limit_and_chunks::tests::a_batch_whose_entries_each_fit_is_cut_like_the_chunks_with_one_whole_piece_per_entry ... ok
+test memory_limit_and_chunks::tests::a_chunk_exactly_at_the_memory_limit_is_kept_whole ... ok
+test memory_limit_and_chunks::tests::a_chunk_whose_wait_timed_out_stays_held_until_its_submission_completes_on_the_gpu ... ok
+test memory_limit_and_chunks::tests::a_gpu_whose_timed_out_submission_is_still_running_gets_no_chunk_of_the_next_batch ... ok
+test memory_limit_and_chunks::tests::a_memory_limit_below_the_smallest_piece_reports_how_much_the_smallest_piece_needs ... ok
+test memory_limit_and_chunks::tests::an_entry_that_alone_exceeds_the_memory_limit_refuses_the_batch ... ok
+test memory_limit_and_chunks::tests::holding_a_chunk_while_a_timed_out_submission_is_still_running_panics - should panic ... ok
+test background_gpu::tests::the_thread_cpu_clock_does_not_advance_while_the_thread_sleeps ... ok
+test memory_limit_and_chunks::tests::a_gpu_given_no_entries_of_the_next_batch_does_not_wait_for_its_timed_out_submission ... ok
+test memory_limit_and_chunks::tests::holding_past_the_memory_limit_panics - should panic ... ok
+test memory_limit_and_chunks::tests::an_entry_larger_than_the_memory_limit_is_cut_into_pieces_that_each_fit ... ok
+test memory_limit_and_chunks::tests::input_buffers_round_up_to_whole_words_and_never_have_zero_bytes ... ok
+test memory_limit_and_chunks::tests::an_empty_batch_has_no_chunk ... ok
+test memory_limit_and_chunks::tests::the_dispatch_and_binding_limits_also_cut_chunks ... ok
+test memory_limit_and_chunks::tests::the_room_left_after_other_segments_without_a_memory_limit_is_still_unlimited ... ok
+test memory_limit_and_chunks::tests::holding_up_to_the_memory_limit_is_allowed_and_releasing_gives_it_back ... ok
+test memory_limit_and_chunks::tests::two_segments_held_on_one_gpu_together_stay_within_its_memory_limit ... ok
+test memory_limit_and_chunks::tests::without_a_memory_limit_a_batch_is_one_chunk ... ok
+test memory_limit_and_chunks::tests::without_a_memory_limit_holding_is_never_refused ... ok
+test region_record_kernels::tests::a_mapping_key_longer_than_the_kernels_hold_refuses_the_tables ... ok
+test region_record_kernels::tests::an_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word ... ok
+test region_record_kernels::tests::empty_mapping_tables_still_have_one_item_in_every_buffer ... ok
+test region_record_kernels::tests::mapping_tables_list_each_entry_with_its_key_length_and_both_locations ... ok
+test region_record_kernels::tests::attack_probe_two_entries_on_one_location_make_the_smallest_piece_larger_than_the_admitted_minimum ... ok
+test region_record_kernels::tests::every_outcome_kind_decodes_into_its_region_scan_class ... ok
+test region_record_kernels::tests::mapping_table_bytes_counted_from_the_entries_match_the_tables_built ... ok
+test region_record_kernels::tests::pieces_are_packed_end_to_end_with_their_location_span_read_flag_kind_and_registers ... ok
+test region_record_kernels::tests::registers_after_the_pieces_decode_only_from_the_kind_the_kernels_write_for_them ... ok
+test region_record_kernels::tests::the_key_index_is_sorted_by_key_length_and_words_with_ties_in_table_order ... ok
+test region_record_kernels::tests::the_location_index_is_sorted_by_device_and_slot_and_lists_an_entry_once_per_distinct_location ... ok
+test region_record_kernels::tests::the_two_kernels_are_separate_sources_with_their_own_entry_points ... ok
+test region_record_kernels::tests::the_cpu_reference_classifies_each_record_as_the_whole_region_scan_does ... ok
+test region_record_kernels::tests::the_cpu_reference_refuses_a_record_outside_the_region - should panic ... ok
+test two_kernel_reconciliation::tests::an_entry_absent_from_a_batch_keeps_its_count ... ok
+test waiting_for_the_gpu::tests::a_failure_other_than_a_timeout_is_not_resubmitted ... ok
+test two_kernel_reconciliation::tests::agreeing_again_after_a_disagreement_restarts_the_consecutive_count ... ok
+test two_kernel_reconciliation::tests::different_outcomes_are_uncertain_for_one_round_without_asking_the_cpu ... ok
+test two_kernel_reconciliation::tests::dropping_the_counts_forgets_every_uncertain_round ... ok
+test two_kernel_reconciliation::tests::identical_outcomes_are_confirmed ... ok
+test two_kernel_reconciliation::tests::the_same_entry_twice_in_one_batch_panics - should panic ... ok
+test two_kernel_reconciliation::tests::two_consecutive_uncertain_rounds_hand_the_entry_to_the_cpu_reference ... ok
+test waiting_for_the_gpu::tests::a_batch_whose_wait_times_out_leaves_the_consecutive_uncertainty_counts_unchanged ... ok
+test waiting_for_the_gpu::tests::a_failure_reported_by_the_wait_is_returned_as_it_is ... ok
+test waiting_for_the_gpu::tests::attack_probe_a_batch_of_four_chunks_each_timing_out_once_returns_after_four_resubmissions ... ok
+test live_slot_kernels::tests::both_live_slot_kernels_pass_the_shader_validator ... ok
+test region_record_kernels::tests::a_mapping_cut_into_slices_under_a_small_memory_limit_classifies_every_record_as_the_whole_mapping ... ok
+test region_record_kernels::tests::both_region_record_kernels_pass_the_shader_validator ... ok
+test waiting_for_the_gpu::tests::a_completion_later_than_the_wait_limit_is_a_timeout_failure ... ok
+test waiting_for_the_gpu::tests::four_timeouts_report_the_gpu_unusable_after_exactly_three_resubmissions ... ok
+test waiting_for_the_gpu::tests::two_timeouts_then_a_completion_return_the_outcome_of_the_third_submission ... ok
+test work_split_by_measured_cost::tests::a_cost_measured_as_zero_counts_as_the_smallest_cost ... ok
+test work_split_by_measured_cost::tests::a_gpu_three_times_as_costly_takes_a_third_as_many_entries ... ok
+test work_split_by_measured_cost::tests::a_single_gpu_takes_every_entry ... ok
+test work_split_by_measured_cost::tests::a_vastly_cheaper_gpu_takes_nearly_every_entry ... ok
+test work_split_by_measured_cost::tests::an_empty_batch_gives_every_gpu_nothing ... ok
+test work_split_by_measured_cost::tests::entry_ranges_follow_the_gpu_order_and_cover_the_batch_contiguously ... ok
+test work_split_by_measured_cost::tests::fewer_entries_than_gpus_go_to_the_cheapest_gpus_first ... ok
+test work_split_by_measured_cost::tests::gpus_with_the_same_cost_split_evenly_and_the_earlier_gpu_takes_the_leftover ... ok
+test waiting_for_the_gpu::tests::a_completion_within_the_wait_limit_returns_its_output ... ok
+test waiting_for_the_gpu::tests::a_resubmission_whose_wait_for_the_earlier_submission_times_out_counts_as_failed_without_submitting ... ok
+test waiting_for_the_gpu::tests::a_zero_wait_limit_times_out_before_checking ... ok
+test work_split_by_measured_cost::tests::the_shares_always_add_up_to_the_entry_count ... ok
+test background_gpu::tests::the_thread_cpu_clock_advances_while_the_thread_computes ... ok
+test region_record_kernels::tests::units_cut_into_pieces_under_a_memory_limit_smaller_than_a_unit_classify_every_record_as_the_whole_unit ... ok
+
+test result: ok. 119 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.84s
+

@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'partial_write_split_matches_a_brute_force_model' (1145536) panicked at crates/singlefs-core/tests/probe_partial_write_split.rs:85:21:
+内容对不上 n=0 size=1 off=1 len=1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test partial_write_split_matches_a_brute_force_model ... FAILED
+
+failures:
+
+failures:
+    partial_write_split_matches_a_brute_force_model
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+

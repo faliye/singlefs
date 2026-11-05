@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# 假的 sudo：记一笔，把后面当本地命令执行（ssh 把第一个参数当主机名丢掉，其余交给 bash -c）
+source "$(dirname "${BASH_SOURCE[0]}")/../stublib.sh"
+stub_log 'sudo' "$@"
+if [ 'sudo' = ssh ]; then shift; exec bash -c "$*"; fi
+exec "$@"

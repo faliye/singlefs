@@ -1,0 +1,1331 @@
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | "sed '/x/c\\\nfoo' README.md"
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | "sed '/x/c\\\nfoo' README.md"
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/x/c\\\nfoo' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.7s | bash three-way-defense | sed2 | "sed '/x/c\\\nfoo' README.md"
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | "sed '/x/a\\\nfoo\\\nbar' README.md"
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | "sed '/x/a\\\nfoo\\\nbar' README.md"
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/x/a\\\nfoo\\\nbar' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.7s | bash three-way-defense | sed2 | "sed '/x/a\\\nfoo\\\nbar' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -e '/x/{' -e 'p' -e '}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.7s | heavy three-way-defense | sed2 | "sed -e '/x/{' -e 'p' -e '}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -e '/x/{' -e 'p' -e '}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.7s | bash three-way-defense | sed2 | "sed -e '/x/{' -e 'p' -e '}' README.md"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '/a/{=;p}' README.md"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '/a/{=;p}' README.md"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -n '/a/{=;p}' README.md"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -n '/a/{=;p}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/a/\\n/g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/a/\\n/g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash main | sed2 | "sed 's/a/\\n/g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | bash three-way-defense | sed2 | "sed 's/a/\\n/g' README.md"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's|/|-|g' README.md"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.2s | heavy three-way-defense | sed2 | "sed 's|/|-|g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's|/|-|g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's|/|-|g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed -n '/^$/!p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '/^$/!p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | sed2 | "sed -n '/^$/!p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -n '/^$/!p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '/^#/d;/^$/d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/^#/d;/^$/d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/^#/d;/^$/d' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed '/^#/d;/^$/d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed -e :a -e '$q;N;11,$D;ba' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | sed2 | "sed -e :a -e '$q;N;11,$D;ba' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash main | sed2 | "sed -e :a -e '$q;N;11,$D;ba' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash three-way-defense | sed2 | "sed -e :a -e '$q;N;11,$D;ba' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '$=' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy three-way-defense | sed2 | "sed -n '$=' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -n '$=' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -n '$=' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/[[:space:]]*$//' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/[[:space:]]*$//' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's/[[:space:]]*$//' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's/[[:space:]]*$//' README.md"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed ':a;N;$!ba;s/\\n/ /g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed ':a;N;$!ba;s/\\n/ /g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed ':a;N;$!ba;s/\\n/ /g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed ':a;N;$!ba;s/\\n/ /g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -z 's/\\n/,/g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -z 's/\\n/,/g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -z 's/\\n/,/g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed -z 's/\\n/,/g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed -n '/a/,/b/{/b/!p}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | sed2 | "sed -n '/a/,/b/{/b/!p}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | sed2 | "sed -n '/a/,/b/{/b/!p}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed -n '/a/,/b/{/b/!p}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '1d' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '1d' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | sed2 | "sed '1d' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | "sed '1d' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed "s/\'/\\"/g" README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy three-way-defense | sed2 | 'sed "s/\'/\\"/g" README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash main | sed2 | 'sed "s/\'/\\"/g" README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash three-way-defense | sed2 | 'sed "s/\'/\\"/g" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | heavy main | sed2 | "sed -n 'x;p' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy three-way-defense | sed2 | "sed -n 'x;p' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | sed2 | "sed -n 'x;p' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash three-way-defense | sed2 | "sed -n 'x;p' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.5s | heavy main | sed2 | "sed 'N;P;D' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 'N;P;D' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 'N;P;D' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 'N;P;D' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '/a/ s//b/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/a/ s//b/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/a/ s//b/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed '/a/ s//b/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/a/b/;t;s/c/d/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/a/b/;t;s/c/d/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's/a/b/;t;s/c/d/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's/a/b/;t;s/c/d/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '/a/{p;b};p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '/a/{p;b};p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -n '/a/{p;b};p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -n '/a/{p;b};p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed "/^$/d" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed "/^$/d" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed "/^$/d" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed "/^$/d" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed -n "/$a/,/$b/p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed -n "/$a/,/$b/p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "/$a/,/$b/p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed -n "/$a/,/$b/p" README.md'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$((n))p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$((n))p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "$((n))p" README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | 'sed -n "$((n))p" README.md'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$((n-3)),${m}p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$((n-3)),${m}p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "$((n-3)),${m}p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | 'sed -n "$((n-3)),${m}p" README.md'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$((n - 3)),$((n + 3))p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$((n - 3)),$((n + 3))p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "$((n - 3)),$((n + 3))p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash three-way-defense | sed2 | 'sed -n "$((n - 3)),$((n + 3))p" README.md'
+now:rc=2/n=1/0.4s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$(( n ))p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.4s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$(( n ))p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "$(( n ))p" README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed -n "$(( n ))p" README.md'
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$((${n}-3)),$((${n}+3))p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.3s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$((${n}-3)),$((${n}+3))p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "$((${n}-3)),$((${n}+3))p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed -n "$((${n}-3)),$((${n}+3))p" README.md'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$[n-3],$[n+3]p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$[n-3],$[n+3]p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "$[n-3],$[n+3]p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed -n "$[n-3],$[n+3]p" README.md'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$(wc -l < README.md)p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$(wc -l < README.md)p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | sed2 | 'sed -n "$(wc -l < README.md)p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | 'sed -n "$(wc -l < README.md)p" README.md'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$(expr $n - 3),${n}p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$(expr $n - 3),${n}p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | sed2 | 'sed -n "$(expr $n - 3),${n}p" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | 'sed -n "$(expr $n - 3),${n}p" README.md'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.3s CHANGED | heavy main | sed2 | 'sed -n "$(($(wc -l < README.md)-3)),\\$p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.3s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$(($(wc -l < README.md)-3)),\\$p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash main | sed2 | 'sed -n "$(($(wc -l < README.md)-3)),\\$p" README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash three-way-defense | sed2 | 'sed -n "$(($(wc -l < README.md)-3)),\\$p" README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy main | sed2 | 'sed -n "${n}q;p" README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy three-way-defense | sed2 | 'sed -n "${n}q;p" README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash main | sed2 | 'sed -n "${n}q;p" README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | 'sed -n "${n}q;p" README.md'
+now:rc=2/n=1/0.5s base:rc=0/n=0/0.1s CHANGED | heavy main | sed2 | 'sed -n "$LINE p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | sed2 | 'sed -n "$LINE p" README.md'
+    now> ✗ 认不出起什么的写法被拒：sed 脚本解析不下去，认不出里面起不起命令（sed 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "$LINE p" README.md'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.5s | bash three-way-defense | sed2 | 'sed -n "$LINE p" README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed "${n}d" README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy three-way-defense | sed2 | 'sed "${n}d" README.md'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed "${n}d" README.md'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed "${n}d" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed "${n}s/a/b/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed "${n}s/a/b/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed "${n}s/a/b/" README.md'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed "${n}s/a/b/" README.md'
+now:rc=0/n=0/0.8s base:rc=0/n=0/0.3s | heavy main | sed2 | 'sed "s/a/${b}/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed "s/a/${b}/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed "s/a/${b}/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed "s/a/${b}/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed -e "s/a/$b/" -e "s/c/$d/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed -e "s/a/$b/" -e "s/c/$d/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -e "s/a/$b/" -e "s/c/$d/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed -e "s/a/$b/" -e "s/c/$d/" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed -i "s/a/${b}/" ~/.local/share/singlefs/work/d137-gov-r2-sonnet/x.txt'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed -i "s/a/${b}/" ~/.local/share/singlefs/work/d137-gov-r2-sonnet/x.txt'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -i "s/a/${b}/" ~/.local/share/singlefs/work/d137-gov-r2-sonnet/x.txt'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed -i "s/a/${b}/" ~/.local/share/singlefs/work/d137-gov-r2-sonnet/x.txt'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed -n "${start},${end}p" README.md | cat -A'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed -n "${start},${end}p" README.md | cat -A'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n "${start},${end}p" README.md | cat -A'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed -n "${start},${end}p" README.md | cat -A'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '1,3p' $f"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '1,3p' $f"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -n '1,3p' $f"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -n '1,3p' $f"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed -n \'1,3p\' "$f"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed -n \'1,3p\' "$f"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed -n \'1,3p\' "$f"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed -n \'1,3p\' "$f"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '1,3p' ${files}"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '1,3p' ${files}"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | sed2 | "sed -n '1,3p' ${files}"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | "sed -n '1,3p' ${files}"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed -n '1,3p' $(git ls-files | head -2)"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | sed2 | "sed -n '1,3p' $(git ls-files | head -2)"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -n '1,3p' $(git ls-files | head -2)"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -n '1,3p' $(git ls-files | head -2)"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '1,3p' <(echo hi)"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '1,3p' <(echo hi)"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -n '1,3p' <(echo hi)"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed -n '1,3p' <(echo hi)"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed -u -n '1p' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy three-way-defense | sed2 | "sed -u -n '1p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -u -n '1p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -u -n '1p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -r 's/(a)/\\1/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -r 's/(a)/\\1/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -r 's/(a)/\\1/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -r 's/(a)/\\1/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed --quiet --regexp-extended 's/(a)/\\1/p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed --quiet --regexp-extended 's/(a)/\\1/p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | sed2 | "sed --quiet --regexp-extended 's/(a)/\\1/p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | "sed --quiet --regexp-extended 's/(a)/\\1/p' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy main | sed2 | "sed -n '/Error/I p' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy three-way-defense | sed2 | "sed -n '/Error/I p' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash main | sed2 | "sed -n '/Error/I p' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash three-way-defense | sed2 | "sed -n '/Error/I p' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy main | sed2 | "sed '0~3d' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy three-way-defense | sed2 | "sed '0~3d' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.3s | bash main | sed2 | "sed '0~3d' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | "sed '0~3d' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.3s | heavy main | sed2 | "sed -n '/a/Ip' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.2s | heavy three-way-defense | sed2 | "sed -n '/a/Ip' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.3s | bash main | sed2 | "sed -n '/a/Ip' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -n '/a/Ip' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy main | sed2 | "sed 's/\\bfoo\\b/bar/g' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/\\bfoo\\b/bar/g' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's/\\bfoo\\b/bar/g' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's/\\bfoo\\b/bar/g' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/.*:\\s*//' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.5s | heavy three-way-defense | sed2 | "sed 's/.*:\\s*//' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's/.*:\\s*//' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's/.*:\\s*//' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '/<!--/,/-->/p' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '/<!--/,/-->/p' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -n '/<!--/,/-->/p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed -n '/<!--/,/-->/p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/\\x1b\\[[0-9;]*m//g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/\\x1b\\[[0-9;]*m//g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's/\\x1b\\[[0-9;]*m//g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's/\\x1b\\[[0-9;]*m//g' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | 'sed "s/\\x27/\'/g" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | 'sed "s/\\x27/\'/g" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | 'sed "s/\\x27/\'/g" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed "s/\\x27/\'/g" README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '/^---$/q' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/^---$/q' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | sed2 | "sed '/^---$/q' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed '/^---$/q' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '/^---$/,$d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/^---$/,$d' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/^---$/,$d' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed '/^---$/,$d' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed -n '/foo/=' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '/foo/=' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | sed2 | "sed -n '/foo/=' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | "sed -n '/foo/=' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy main | sed2 | 'sed 1q README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | sed2 | 'sed 1q README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | sed2 | 'sed 1q README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | 'sed 1q README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '$d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '$d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '$d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed '$d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '2q;d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '2q;d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '2q;d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed '2q;d' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '3{p;q;}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '3{p;q;}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed -n '3{p;q;}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed -n '3{p;q;}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/a/b/I' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/a/b/I' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's/a/b/I' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed 's/a/b/I' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/a/b/2' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/a/b/2' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | sed2 | "sed 's/a/b/2' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed 's/a/b/2' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed 's/a/b/gI' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/a/b/gI' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash main | sed2 | "sed 's/a/b/gI' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | "sed 's/a/b/gI' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed 's/a/b/m' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.9s | heavy three-way-defense | sed2 | "sed 's/a/b/m' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | bash main | sed2 | "sed 's/a/b/m' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's/a/b/m' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/a/b/w' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/a/b/w' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's/a/b/w' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's/a/b/w' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 's/a/b/pw /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 's/a/b/pw /dev/null' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 's/a/b/pw /dev/null' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 's/a/b/pw /dev/null' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '/a/w /dev/stdout' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/a/w /dev/stdout' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/a/w /dev/stdout' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed '/a/w /dev/stdout' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '/a/R /dev/null' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/a/R /dev/null' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | sed2 | "sed '/a/R /dev/null' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | sed2 | "sed '/a/R /dev/null' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy main | sed2 | "sed '/a/W /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/a/W /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/a/W /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed '/a/W /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '/a/r /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/a/r /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/a/r /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed '/a/r /dev/null' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed 'F' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 'F' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 'F' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed 'F' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed -n '/a/z;p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed -n '/a/z;p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | sed2 | "sed -n '/a/z;p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | sed2 | "sed -n '/a/z;p' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed 'l 70' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | sed2 | "sed 'l 70' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | sed2 | "sed 'l 70' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed 'l 70' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | sed2 | "sed '/a/Q' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed '/a/Q' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | sed2 | "sed '/a/Q' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | sed2 | "sed '/a/Q' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | sed2 | "sed 'T;s/a/b/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | sed2 | "sed 'T;s/a/b/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.6s | bash main | sed2 | "sed 'T;s/a/b/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | bash three-way-defense | sed2 | "sed 'T;s/a/b/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | heavy main | awk2 | "awk -F, 'NR==FNR{a[$1]=$2;next} {print a[$1]}' README.md CLAUDE.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | heavy three-way-defense | awk2 | "awk -F, 'NR==FNR{a[$1]=$2;next} {print a[$1]}' README.md CLAUDE.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | awk2 | "awk -F, 'NR==FNR{a[$1]=$2;next} {print a[$1]}' README.md CLAUDE.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | bash three-way-defense | awk2 | "awk -F, 'NR==FNR{a[$1]=$2;next} {print a[$1]}' README.md CLAUDE.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | awk2 | 'awk \'{print $1 > "/tmp/" $2}\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | heavy three-way-defense | awk2 | 'awk \'{print $1 > "/tmp/" $2}\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash main | awk2 | 'awk \'{print $1 > "/tmp/" $2}\' README.md'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | 'awk \'{print $1 > "/tmp/" $2}\' README.md'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | heavy main | awk2 | 'awk \'BEGIN{printf "%s", ENVIRON["HOME"]}\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | 'awk \'BEGIN{printf "%s", ENVIRON["HOME"]}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | bash main | awk2 | 'awk \'BEGIN{printf "%s", ENVIRON["HOME"]}\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'BEGIN{printf "%s", ENVIRON["HOME"]}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | awk2 | 'awk \'/a/{print $0 | "sort -u"}\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | awk2 | 'awk \'/a/{print $0 | "sort -u"}\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | awk2 | 'awk \'/a/{print $0 | "sort -u"}\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | 'awk \'/a/{print $0 | "sort -u"}\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | awk2 | 'awk \'BEGIN{"pwd" | getline d; print d}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | 'awk \'BEGIN{"pwd" | getline d; print d}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | awk2 | 'awk \'BEGIN{"pwd" | getline d; print d}\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.3s | bash three-way-defense | awk2 | 'awk \'BEGIN{"pwd" | getline d; print d}\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy main | awk2 | 'awk \'{ print | "cat 1>&2" }\' README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy three-way-defense | awk2 | 'awk \'{ print | "cat 1>&2" }\' README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash main | awk2 | 'awk \'{ print | "cat 1>&2" }\' README.md'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'{ print | "cat 1>&2" }\' README.md'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy main | awk2 | "awk -v n=3 'NR>=n' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | "awk -v n=3 'NR>=n' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash main | awk2 | "awk -v n=3 'NR>=n' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | "awk -v n=3 'NR>=n' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy main | awk2 | "awk 'function f(x){return x*2} {print f($1)}' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | "awk 'function f(x){return x*2} {print f($1)}' README.md"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | awk2 | "awk 'function f(x){return x*2} {print f($1)}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | "awk 'function f(x){return x*2} {print f($1)}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | awk2 | "awk '{print substr($0, index($0,$3))}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | "awk '{print substr($0, index($0,$3))}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | awk2 | "awk '{print substr($0, index($0,$3))}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | "awk '{print substr($0, index($0,$3))}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy main | awk2 | "awk -F'|' -v OFS='\\t' '{print $1,$2}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy three-way-defense | awk2 | "awk -F'|' -v OFS='\\t' '{print $1,$2}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | awk2 | "awk -F'|' -v OFS='\\t' '{print $1,$2}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | "awk -F'|' -v OFS='\\t' '{print $1,$2}' README.md"
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy main | awk2 | 'awk \'BEGIN { cmd = "date"; cmd | getline d; close(cmd); print d}\''
+    now> ✗ 认不出起什么的写法被拒：awk 程序里 … | getline 的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | awk2 | 'awk \'BEGIN { cmd = "date"; cmd | getline d; close(cmd); print d}\''
+    now> ✗ 认不出起什么的写法被拒：awk 程序里 … | getline 的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | awk2 | 'awk \'BEGIN { cmd = "date"; cmd | getline d; close(cmd); print d}\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | 'awk \'BEGIN { cmd = "date"; cmd | getline d; close(cmd); print d}\''
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy main | awk2 | 'awk \'{ cmd = "wc -c < " $1; cmd | getline n; print n }\' README.md'
+    now> ✗ 认不出起什么的写法被拒：awk 程序里 … | getline 的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | awk2 | 'awk \'{ cmd = "wc -c < " $1; cmd | getline n; print n }\' README.md'
+    now> ✗ 认不出起什么的写法被拒：awk 程序里 … | getline 的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'{ cmd = "wc -c < " $1; cmd | getline n; print n }\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | 'awk \'{ cmd = "wc -c < " $1; cmd | getline n; print n }\' README.md'
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy main | awk2 | "awk '{ print $1 | cmd }' cmd='sort' README.md"
+    now> ✗ 认不出起什么的写法被拒：awk 程序里管道 | 到的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | awk2 | "awk '{ print $1 | cmd }' cmd='sort' README.md"
+    now> ✗ 认不出起什么的写法被拒：awk 程序里管道 | 到的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | awk2 | "awk '{ print $1 | cmd }' cmd='sort' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | "awk '{ print $1 | cmd }' cmd='sort' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | awk2 | 'awk \'BEGIN { while ((getline line < "README.md") > 0) n++; print n }\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.6s | heavy three-way-defense | awk2 | 'awk \'BEGIN { while ((getline line < "README.md") > 0) n++; print n }\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'BEGIN { while ((getline line < "README.md") > 0) n++; print n }\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'BEGIN { while ((getline line < "README.md") > 0) n++; print n }\''
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy main | awk2 | 'awk \'{ getline x < "README.md"; print x }\' CLAUDE.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | awk2 | 'awk \'{ getline x < "README.md"; print x }\' CLAUDE.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'{ getline x < "README.md"; print x }\' CLAUDE.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'{ getline x < "README.md"; print x }\' CLAUDE.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | awk2 | 'awk \'{ print > FILENAME ".out" }\' /dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | 'awk \'{ print > FILENAME ".out" }\' /dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'{ print > FILENAME ".out" }\' /dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'{ print > FILENAME ".out" }\' /dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | awk2 | "awk '{print;fflush()}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | "awk '{print;fflush()}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | awk2 | "awk '{print;fflush()}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | "awk '{print;fflush()}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | awk2 | 'awk \'BEGIN{ print system("true") }\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | 'awk \'BEGIN{ print system("true") }\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'BEGIN{ print system("true") }\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'BEGIN{ print system("true") }\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | awk2 | 'awk \'BEGIN{ system("") }\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | 'awk \'BEGIN{ system("") }\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'BEGIN{ system("") }\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'BEGIN{ system("") }\''
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | awk2 | 'awk \'{ if (system("test -f " $1) == 0) print $1 }\' README.md'
+    now> ✗ 认不出起什么的写法被拒：awk 程序里 system(…) 的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | awk2 | 'awk \'{ if (system("test -f " $1) == 0) print $1 }\' README.md'
+    now> ✗ 认不出起什么的写法被拒：awk 程序里 system(…) 的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'{ if (system("test -f " $1) == 0) print $1 }\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'{ if (system("test -f " $1) == 0) print $1 }\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | awk2 | "awk 'END{print NR}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | "awk 'END{print NR}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | awk2 | "awk 'END{print NR}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | "awk 'END{print NR}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | awk2 | "awk -v RS='' '{print NR}' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | "awk -v RS='' '{print NR}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | awk2 | "awk -v RS='' '{print NR}' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | "awk -v RS='' '{print NR}' README.md"
+now:rc=0/n=1/0.1s base:rc=0/n=0/0.2s | heavy main | awk2 | 'awk -f README.md'
+now:rc=0/n=1/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | awk2 | 'awk -f README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | awk2 | 'awk -f README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | 'awk -f README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy main | awk2 | 'awk --version'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.7s | heavy three-way-defense | awk2 | 'awk --version'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk --version'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk --version'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | awk2 | 'awk \'BEGIN{x="a"; print x}\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | 'awk \'BEGIN{x="a"; print x}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash main | awk2 | 'awk \'BEGIN{x="a"; print x}\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | 'awk \'BEGIN{x="a"; print x}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | heavy main | awk2 | 'awk \'BEGIN{print toupper("a")}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | heavy three-way-defense | awk2 | 'awk \'BEGIN{print toupper("a")}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash main | awk2 | 'awk \'BEGIN{print toupper("a")}\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash three-way-defense | awk2 | 'awk \'BEGIN{print toupper("a")}\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy main | awk2 | 'awk \'BEGIN{printf("%d\\n", 1)}\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy three-way-defense | awk2 | 'awk \'BEGIN{printf("%d\\n", 1)}\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'BEGIN{printf("%d\\n", 1)}\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'BEGIN{printf("%d\\n", 1)}\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.2s | heavy main | awk2 | 'awk \'{ print $1; next } END { print "done" }\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | awk2 | 'awk \'{ print $1; next } END { print "done" }\' README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | awk2 | 'awk \'{ print $1; next } END { print "done" }\' README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | awk2 | 'awk \'{ print $1; next } END { print "done" }\' README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | awk2 | "awk '$1 ~ /^#/' README.md"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | awk2 | "awk '$1 ~ /^#/' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash main | awk2 | "awk '$1 ~ /^#/' README.md"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | awk2 | "awk '$1 ~ /^#/' README.md"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.5s | heavy main | awk2 | 'awk \'BEGIN { "date +%s" | getline t; print t }\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy three-way-defense | awk2 | 'awk \'BEGIN { "date +%s" | getline t; print t }\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash main | awk2 | 'awk \'BEGIN { "date +%s" | getline t; print t }\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | awk2 | 'awk \'BEGIN { "date +%s" | getline t; print t }\''
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.1s CHANGED | heavy main | awk2 | 'awk \'{ "date +%s -d @" $1 | getline t; print t }\' README.md'
+    now> ✗ 认不出起什么的写法被拒：awk 程序里 … | getline 的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | awk2 | 'awk \'{ "date +%s -d @" $1 | getline t; print t }\' README.md'
+    now> ✗ 认不出起什么的写法被拒：awk 程序里 … | getline 的命令不是字面字符串，认不出起的是什么（awk 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | awk2 | 'awk \'{ "date +%s -d @" $1 | getline t; print t }\' README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | awk2 | 'awk \'{ "date +%s -d @" $1 | getline t; print t }\' README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'print("subprocess.run(cmd)")\''
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'print("subprocess.run(cmd)")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'print("subprocess.run(cmd)")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'print("subprocess.run(cmd)")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'print("exec(x)")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'print("exec(x)")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'print("exec(x)")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'print("exec(x)")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | python2 | "python3 -c 'import ast,sys; print(ast.literal_eval(sys.argv[1]))' '[1]'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 -c 'import ast,sys; print(ast.literal_eval(sys.argv[1]))' '[1]'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 -c 'import ast,sys; print(ast.literal_eval(sys.argv[1]))' '[1]'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 -c 'import ast,sys; print(ast.literal_eval(sys.argv[1]))' '[1]'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'import sqlite3; c = sqlite3.connect(":memory:"); c.execute("select 1")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'import sqlite3; c = sqlite3.connect(":memory:"); c.execute("select 1")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import sqlite3; c = sqlite3.connect(":memory:"); c.execute("select 1")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | python2 | 'python3 -c \'import sqlite3; c = sqlite3.connect(":memory:"); c.execute("select 1")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'import re; print(re.compile("a").search("a"))\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'import re; print(re.compile("a").search("a"))\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import re; print(re.compile("a").search("a"))\''
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import re; print(re.compile("a").search("a"))\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 -c 'import asyncio; asyncio.run(asyncio.sleep(0))'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy three-way-defense | python2 | "python3 -c 'import asyncio; asyncio.run(asyncio.sleep(0))'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | python2 | "python3 -c 'import asyncio; asyncio.run(asyncio.sleep(0))'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 -c 'import asyncio; asyncio.run(asyncio.sleep(0))'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'import unittest; unittest.main(argv=["x"], exit=False)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | python2 | 'python3 -c \'import unittest; unittest.main(argv=["x"], exit=False)\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.5s | bash main | python2 | 'python3 -c \'import unittest; unittest.main(argv=["x"], exit=False)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import unittest; unittest.main(argv=["x"], exit=False)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy main | python2 | "python3 -c 'import json,sys; d=json.load(sys.stdin); print(d)' < /dev/null"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.5s | heavy three-way-defense | python2 | "python3 -c 'import json,sys; d=json.load(sys.stdin); print(d)' < /dev/null"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.5s | bash main | python2 | "python3 -c 'import json,sys; d=json.load(sys.stdin); print(d)' < /dev/null"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.5s | bash three-way-defense | python2 | "python3 -c 'import json,sys; d=json.load(sys.stdin); print(d)' < /dev/null"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'from pathlib import Path; print(Path("README.md").read_text()[:10])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'from pathlib import Path; print(Path("README.md").read_text()[:10])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'from pathlib import Path; print(Path("README.md").read_text()[:10])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'from pathlib import Path; print(Path("README.md").read_text()[:10])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'import shutil; print(shutil.which("git"))\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'import shutil; print(shutil.which("git"))\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import shutil; print(shutil.which("git"))\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.2s | bash three-way-defense | python2 | 'python3 -c \'import shutil; print(shutil.which("git"))\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.2s | heavy main | python2 | 'python3 -c \'import shutil; shutil.copy("README.md", "/tmp/r.md")\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.2s | heavy three-way-defense | python2 | 'python3 -c \'import shutil; shutil.copy("README.md", "/tmp/r.md")\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 -c \'import shutil; shutil.copy("README.md", "/tmp/r.md")\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import shutil; shutil.copy("README.md", "/tmp/r.md")\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.2s | heavy main | python2 | 'python3 -c \'import os; os.makedirs("/tmp/q", exist_ok=True)\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy three-way-defense | python2 | 'python3 -c \'import os; os.makedirs("/tmp/q", exist_ok=True)\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 -c \'import os; os.makedirs("/tmp/q", exist_ok=True)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import os; os.makedirs("/tmp/q", exist_ok=True)\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy main | python2 | 'python3 -c \'import os; os.remove("/tmp/nonexist")\' 2>/dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | python2 | 'python3 -c \'import os; os.remove("/tmp/nonexist")\' 2>/dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | python2 | 'python3 -c \'import os; os.remove("/tmp/nonexist")\' 2>/dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import os; os.remove("/tmp/nonexist")\' 2>/dev/null'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 -c 'import threading; threading.Thread(target=print).start()'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 -c 'import threading; threading.Thread(target=print).start()'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.5s | bash main | python2 | "python3 -c 'import threading; threading.Thread(target=print).start()'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.5s | bash three-way-defense | python2 | "python3 -c 'import threading; threading.Thread(target=print).start()'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.5s | heavy main | python2 | "python3 -c 'import concurrent.futures as f; f.ThreadPoolExecutor().submit(print, 1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | heavy three-way-defense | python2 | "python3 -c 'import concurrent.futures as f; f.ThreadPoolExecutor().submit(print, 1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | bash main | python2 | "python3 -c 'import concurrent.futures as f; f.ThreadPoolExecutor().submit(print, 1)'"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 -c 'import concurrent.futures as f; f.ThreadPoolExecutor().submit(print, 1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | heavy main | python2 | "python3 -c 'import multiprocessing as m; m.Pool(2).map(abs, [1,-1])'"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 -c 'import multiprocessing as m; m.Pool(2).map(abs, [1,-1])'"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash main | python2 | "python3 -c 'import multiprocessing as m; m.Pool(2).map(abs, [1,-1])'"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 -c 'import multiprocessing as m; m.Pool(2).map(abs, [1,-1])'"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'import timeit; print(timeit.timeit("1+1"))\''
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'import timeit; print(timeit.timeit("1+1"))\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import timeit; print(timeit.timeit("1+1"))\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import timeit; print(timeit.timeit("1+1"))\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -c \'import compileall; compileall.compile_dir("scripts", quiet=1)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'import compileall; compileall.compile_dir("scripts", quiet=1)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import compileall; compileall.compile_dir("scripts", quiet=1)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import compileall; compileall.compile_dir("scripts", quiet=1)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 -c 'import doctest'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 -c 'import doctest'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | python2 | "python3 -c 'import doctest'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | python2 | "python3 -c 'import doctest'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 -c 'import code'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 -c 'import code'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 -c 'import code'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 -c 'import code'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 -c 'import cmd'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 -c 'import cmd'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 -c 'import cmd'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 -c 'import cmd'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 -c 'import webbrowser'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 -c 'import webbrowser'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 -c 'import webbrowser'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 -c 'import webbrowser'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | python2 | 'python3 -c \'import os; os.spawnlp(os.P_WAIT, "ls", "ls")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'import os; os.spawnlp(os.P_WAIT, "ls", "ls")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash main | python2 | 'python3 -c \'import os; os.spawnlp(os.P_WAIT, "ls", "ls")\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash three-way-defense | python2 | 'python3 -c \'import os; os.spawnlp(os.P_WAIT, "ls", "ls")\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "-C", "~/code/singlefs", "status"])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "-C", "~/code/singlefs", "status"])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "-C", "~/code/singlefs", "status"])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "-C", "~/code/singlefs", "status"])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run(["bash", "-c", "echo hi"])\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["bash", "-c", "echo hi"])\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run(["bash", "-c", "echo hi"])\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["bash", "-c", "echo hi"])\''
+now:rc=2/n=1/0.4s base:rc=0/n=0/0.1s CHANGED | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run(["bash", "-c", script])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["bash", "-c", script])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run(["bash", "-c", script])\''
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["bash", "-c", script])\''
+now:rc=2/n=1/0.6s base:rc=0/n=0/0.2s CHANGED | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run(["cargo", "build", "-p", pkg])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["cargo", "build", "-p", pkg])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run(["cargo", "build", "-p", pkg])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["cargo", "build", "-p", pkg])\''
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.check_call(["git", "diff", "--stat", path])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.check_call(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.check_call(["git", "diff", "--stat", path])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.check_call(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.check_call(["git", "diff", "--stat", path])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.check_call(["git", "diff", "--stat", path])\''
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "diff", "--stat"] + paths)\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "diff", "--stat"] + paths)\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "diff", "--stat"] + paths)\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "diff", "--stat"] + paths)\''
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "diff", *paths])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "diff", *paths])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "diff", *paths])\''
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "diff", *paths])\''
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.2s CHANGED | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run(["ls", "-l", f"{d}/x"])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.2s CHANGED | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["ls", "-l", f"{d}/x"])\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run(["ls", "-l", f"{d}/x"])\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["ls", "-l", f"{d}/x"])\''
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.3s CHANGED | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run("ls -l".split())\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.3s CHANGED | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run("ls -l".split())\''
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run("ls -l".split())\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run("ls -l".split())\''
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy main | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "log", "-1"], check=True, capture_output=True, text=True, cwd="/tmp")\''
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "log", "-1"], check=True, capture_output=True, text=True, cwd="/tmp")\''
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "log", "-1"], check=True, capture_output=True, text=True, cwd="/tmp")\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | 'python3 -c \'import subprocess; subprocess.run(["git", "log", "-1"], check=True, capture_output=True, text=True, cwd="/tmp")\''
+now:rc=2/n=1/0.5s base:rc=0/n=0/0.3s CHANGED | heavy main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\ndef run(*a):\n    return subprocess.run(a, capture_output=True, text=True).stdout\nprint(run("git", "status"))\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.5s base:rc=0/n=0/0.3s CHANGED | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\ndef run(*a):\n    return subprocess.run(a, capture_output=True, text=True).stdout\nprint(run("git", "status"))\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.3s | bash main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\ndef run(*a):\n    return subprocess.run(a, capture_output=True, text=True).stdout\nprint(run("git", "status"))\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\ndef run(*a):\n    return subprocess.run(a, capture_output=True, text=True).stdout\nprint(run("git", "status"))\nEOF'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\ndef sh(cmd):\n    return subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout\nprint(sh("git status"))\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\ndef sh(cmd):\n    return subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout\nprint(sh("git status"))\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\ndef sh(cmd):\n    return subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout\nprint(sh("git status"))\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\ndef sh(cmd):\n    return subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout\nprint(sh("git status"))\nEOF'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfor f in ["a", "b"]:\n    subprocess.run(["ls", f])\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfor f in ["a", "b"]:\n    subprocess.run(["ls", f])\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfor f in ["a", "b"]:\n    subprocess.run(["ls", f])\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfor f in ["a", "b"]:\n    subprocess.run(["ls", f])\nEOF'
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.5s CHANGED | heavy main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfor f in ["a", "b"]:\n    subprocess.run(["ls", "-l", f], check=False)\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.5s CHANGED | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfor f in ["a", "b"]:\n    subprocess.run(["ls", "-l", f], check=False)\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.5s | bash main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfor f in ["a", "b"]:\n    subprocess.run(["ls", "-l", f], check=False)\nEOF'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfor f in ["a", "b"]:\n    subprocess.run(["ls", "-l", f], check=False)\nEOF'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.5s | heavy main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nsubprocess.run(["git", "diff", "--stat", "--", "README.md"])\nEOF'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nsubprocess.run(["git", "diff", "--stat", "--", "README.md"])\nEOF'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nsubprocess.run(["git", "diff", "--stat", "--", "README.md"])\nEOF'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.6s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nsubprocess.run(["git", "diff", "--stat", "--", "README.md"])\nEOF'
+now:rc=2/n=1/0.4s base:rc=0/n=0/0.2s CHANGED | heavy main | python2 | 'python3 - <<\'EOF\'\nimport os, subprocess\nroot = os.getcwd()\nsubprocess.run(["git", "-C", root, "status"])\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.4s base:rc=0/n=0/0.2s CHANGED | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport os, subprocess\nroot = os.getcwd()\nsubprocess.run(["git", "-C", root, "status"])\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 - <<\'EOF\'\nimport os, subprocess\nroot = os.getcwd()\nsubprocess.run(["git", "-C", root, "status"])\nEOF'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport os, subprocess\nroot = os.getcwd()\nsubprocess.run(["git", "-C", root, "status"])\nEOF'
+now:rc=2/n=1/0.4s base:rc=0/n=0/0.6s CHANGED | heavy main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nr = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)\nsha = r.stdout.strip()\nsubprocess.run(["git", "show", sha])\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.6s CHANGED | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nr = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)\nsha = r.stdout.strip()\nsubprocess.run(["git", "show", sha])\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nr = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)\nsha = r.stdout.strip()\nsubprocess.run(["git", "show", sha])\nEOF'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.6s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nr = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)\nsha = r.stdout.strip()\nsubprocess.run(["git", "show", sha])\nEOF'
+now:rc=2/n=1/0.6s base:rc=0/n=0/0.1s CHANGED | heavy main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfiles = subprocess.check_output(["git", "ls-files"], text=True).split()\nfor f in files[:3]:\n    subprocess.run(["wc", "-l", f])\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.6s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfiles = subprocess.check_output(["git", "ls-files"], text=True).split()\nfor f in files[:3]:\n    subprocess.run(["wc", "-l", f])\nEOF'
+    now> ✗ 认不出起什么的写法被拒：python 代码里 subprocess.run(…) 的命令不是字面的，认不出起的是什么（python3 里起的命令）：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfiles = subprocess.check_output(["git", "ls-files"], text=True).split()\nfor f in files[:3]:\n    subprocess.run(["wc", "-l", f])\nEOF'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport subprocess\nfiles = subprocess.check_output(["git", "ls-files"], text=True).split()\nfor f in files[:3]:\n    subprocess.run(["wc", "-l", f])\nEOF'
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.2s | heavy main | python2 | "python3 - <<'EOF'\nimport sqlite3\nconn = sqlite3.connect(':memory:')\nconn.execute('create table t(a)')\nEOF"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.2s | heavy three-way-defense | python2 | "python3 - <<'EOF'\nimport sqlite3\nconn = sqlite3.connect(':memory:')\nconn.execute('create table t(a)')\nEOF"
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash main | python2 | "python3 - <<'EOF'\nimport sqlite3\nconn = sqlite3.connect(':memory:')\nconn.execute('create table t(a)')\nEOF"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | "python3 - <<'EOF'\nimport sqlite3\nconn = sqlite3.connect(':memory:')\nconn.execute('create table t(a)')\nEOF"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy main | python2 | 'python3 - <<\'EOF\'\nimport json\nd = json.loads(\'{"a":1}\')\nprint(eval(\'1+1\'), d)\nEOF'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport json\nd = json.loads(\'{"a":1}\')\nprint(eval(\'1+1\'), d)\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | python2 | 'python3 - <<\'EOF\'\nimport json\nd = json.loads(\'{"a":1}\')\nprint(eval(\'1+1\'), d)\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | 'python3 - <<\'EOF\'\nimport json\nd = json.loads(\'{"a":1}\')\nprint(eval(\'1+1\'), d)\nEOF'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 - <<'EOF'\nimport ast\nprint(ast.literal_eval('[1,2]'))\nEOF"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 - <<'EOF'\nimport ast\nprint(ast.literal_eval('[1,2]'))\nEOF"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | python2 | "python3 - <<'EOF'\nimport ast\nprint(ast.literal_eval('[1,2]'))\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | python2 | "python3 - <<'EOF'\nimport ast\nprint(ast.literal_eval('[1,2]'))\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | python2 | "python3 - <<'EOF'\nimport unittest\nclass T(unittest.TestCase):\n    def test_a(self): self.assertTrue(True)\nunittest.main(argv=['x'], exit=False)\nEOF"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 - <<'EOF'\nimport unittest\nclass T(unittest.TestCase):\n    def test_a(self): self.assertTrue(True)\nunittest.main(argv=['x'], exit=False)\nEOF"
+now:rc=0/n=0/1.1s base:rc=0/n=0/0.2s | bash main | python2 | "python3 - <<'EOF'\nimport unittest\nclass T(unittest.TestCase):\n    def test_a(self): self.assertTrue(True)\nunittest.main(argv=['x'], exit=False)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 - <<'EOF'\nimport unittest\nclass T(unittest.TestCase):\n    def test_a(self): self.assertTrue(True)\nunittest.main(argv=['x'], exit=False)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 - <<'EOF'\nimport re\nprint(re.sub('a', 'b', 'aaa'))\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 - <<'EOF'\nimport re\nprint(re.sub('a', 'b', 'aaa'))\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 - <<'EOF'\nimport re\nprint(re.sub('a', 'b', 'aaa'))\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 - <<'EOF'\nimport re\nprint(re.sub('a', 'b', 'aaa'))\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 - <<'EOF'\nimport asyncio\nasync def main(): pass\nasyncio.run(main())\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 - <<'EOF'\nimport asyncio\nasync def main(): pass\nasyncio.run(main())\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 - <<'EOF'\nimport asyncio\nasync def main(): pass\nasyncio.run(main())\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 - <<'EOF'\nimport asyncio\nasync def main(): pass\nasyncio.run(main())\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 - <<'EOF'\nimport pathlib, hashlib\nprint(hashlib.sha256(pathlib.Path('README.md').read_bytes()).hexdigest())\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 - <<'EOF'\nimport pathlib, hashlib\nprint(hashlib.sha256(pathlib.Path('README.md').read_bytes()).hexdigest())\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 - <<'EOF'\nimport pathlib, hashlib\nprint(hashlib.sha256(pathlib.Path('README.md').read_bytes()).hexdigest())\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 - <<'EOF'\nimport pathlib, hashlib\nprint(hashlib.sha256(pathlib.Path('README.md').read_bytes()).hexdigest())\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 tools.py <<'EOF'\nsubprocess.run(cmd)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 tools.py <<'EOF'\nsubprocess.run(cmd)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 tools.py <<'EOF'\nsubprocess.run(cmd)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 tools.py <<'EOF'\nsubprocess.run(cmd)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "python3 scripts/kb/replace-once.py --selftest <<'EOF'\nos.system(x)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "python3 scripts/kb/replace-once.py --selftest <<'EOF'\nos.system(x)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "python3 scripts/kb/replace-once.py --selftest <<'EOF'\nos.system(x)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 scripts/kb/replace-once.py --selftest <<'EOF'\nos.system(x)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "cat <<'EOF' | python3 -c 'import sys; print(len(sys.stdin.read()))'\nsubprocess.run(cmd)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "cat <<'EOF' | python3 -c 'import sys; print(len(sys.stdin.read()))'\nsubprocess.run(cmd)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "cat <<'EOF' | python3 -c 'import sys; print(len(sys.stdin.read()))'\nsubprocess.run(cmd)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "cat <<'EOF' | python3 -c 'import sys; print(len(sys.stdin.read()))'\nsubprocess.run(cmd)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "cat > /tmp/x.py <<'EOF'\nimport subprocess\nsubprocess.run(cmd, shell=True)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "cat > /tmp/x.py <<'EOF'\nimport subprocess\nsubprocess.run(cmd, shell=True)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "cat > /tmp/x.py <<'EOF'\nimport subprocess\nsubprocess.run(cmd, shell=True)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "cat > /tmp/x.py <<'EOF'\nimport subprocess\nsubprocess.run(cmd, shell=True)\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "cat > /tmp/x.sh <<'EOF'\ncargo test --all\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "cat > /tmp/x.sh <<'EOF'\ncargo test --all\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | "cat > /tmp/x.sh <<'EOF'\ncargo test --all\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "cat > /tmp/x.sh <<'EOF'\ncargo test --all\nEOF"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'cat > /tmp/x.sh <<\'EOF\'\neval "$cmd"\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'cat > /tmp/x.sh <<\'EOF\'\neval "$cmd"\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'cat > /tmp/x.sh <<\'EOF\'\neval "$cmd"\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'cat > /tmp/x.sh <<\'EOF\'\neval "$cmd"\nEOF'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'echo "os.system(cmd)" > /tmp/x.py'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'echo "os.system(cmd)" > /tmp/x.py'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'echo "os.system(cmd)" > /tmp/x.py'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | 'echo "os.system(cmd)" > /tmp/x.py'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "echo 'subprocess.run(cmd)' | grep -c subprocess"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "echo 'subprocess.run(cmd)' | grep -c subprocess"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | python2 | "echo 'subprocess.run(cmd)' | grep -c subprocess"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | "echo 'subprocess.run(cmd)' | grep -c subprocess"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | "grep -n 'subprocess.run' scripts/kb/replace-once.py"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | "grep -n 'subprocess.run' scripts/kb/replace-once.py"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | python2 | "grep -n 'subprocess.run' scripts/kb/replace-once.py"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | python2 | "grep -n 'subprocess.run' scripts/kb/replace-once.py"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy main | python2 | "grep -rn 'os.system' scripts | head"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | python2 | "grep -rn 'os.system' scripts | head"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | python2 | "grep -rn 'os.system' scripts | head"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "grep -rn 'os.system' scripts | head"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.2s | heavy main | python2 | "python3 scripts/kb/replace-once.py /tmp/x 'a' 'b'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy three-way-defense | python2 | "python3 scripts/kb/replace-once.py /tmp/x 'a' 'b'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | python2 | "python3 scripts/kb/replace-once.py /tmp/x 'a' 'b'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | "python3 scripts/kb/replace-once.py /tmp/x 'a' 'b'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 scripts/kb/replace-once.py "$f" "$old" "$new"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 scripts/kb/replace-once.py "$f" "$old" "$new"'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 scripts/kb/replace-once.py "$f" "$old" "$new"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 scripts/kb/replace-once.py "$f" "$old" "$new"'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -u scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -u scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -u scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -u scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -W ignore scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.9s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -W ignore scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -W ignore scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'python3 -W ignore scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -m pytest -q'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -m pytest -q'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'python3 -m pytest -q'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.6s | bash three-way-defense | python2 | 'python3 -m pytest -q'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -m unittest discover'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'python3 -m unittest discover'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.6s | bash main | python2 | 'python3 -m unittest discover'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.7s | bash three-way-defense | python2 | 'python3 -m unittest discover'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.6s | heavy main | python2 | 'python3 -m http.server --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.7s | heavy three-way-defense | python2 | 'python3 -m http.server --help'
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 -m http.server --help'
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.2s | bash three-way-defense | python2 | 'python3 -m http.server --help'
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | heavy main | python2 | 'python3 -m venv /tmp/venv'
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.2s | heavy three-way-defense | python2 | 'python3 -m venv /tmp/venv'
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 -m venv /tmp/venv'
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.2s | bash three-way-defense | python2 | 'python3 -m venv /tmp/venv'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | python2 | 'python3 -m pip --version'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy three-way-defense | python2 | 'python3 -m pip --version'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | python2 | 'python3 -m pip --version'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | python2 | 'python3 -m pip --version'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | python2 | 'pip install requests'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'pip install requests'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | python2 | 'pip install requests'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'pip install requests'
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.3s | heavy main | python2 | 'pip3 list | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | python2 | 'pip3 list | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | python2 | 'pip3 list | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | python2 | 'pip3 list | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git submodule foreach 'echo $name'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git submodule foreach 'echo $name'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git submodule foreach 'echo $name'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git submodule foreach 'echo $name'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git bisect run ./test.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git bisect run ./test.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git bisect run ./test.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git bisect run ./test.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git rebase -x 'echo hi' HEAD~1"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git rebase -x 'echo hi' HEAD~1"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git rebase -x 'echo hi' HEAD~1"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git rebase -x 'echo hi' HEAD~1"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git filter-branch --tree-filter 'rm -f x' HEAD"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git filter-branch --tree-filter 'rm -f x' HEAD"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git filter-branch --tree-filter 'rm -f x' HEAD"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | git2 | "git filter-branch --tree-filter 'rm -f x' HEAD"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git config core.editor vim'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git config core.editor vim'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git config core.editor vim'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | git2 | 'git config core.editor vim'
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.6s CHANGED | heavy main | git2 | 'git -c core.editor="$EDITOR" commit --amend --no-edit'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$EDITOR` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.6s CHANGED | heavy three-way-defense | git2 | 'git -c core.editor="$EDITOR" commit --amend --no-edit'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$EDITOR` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.6s | bash main | git2 | 'git -c core.editor="$EDITOR" commit --amend --no-edit'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | git2 | 'git -c core.editor="$EDITOR" commit --amend --no-edit'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy main | git2 | 'GIT_EDITOR=true git commit --amend --no-edit'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | git2 | 'GIT_EDITOR=true git commit --amend --no-edit'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.6s | bash main | git2 | 'GIT_EDITOR=true git commit --amend --no-edit'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.6s | bash three-way-defense | git2 | 'GIT_EDITOR=true git commit --amend --no-edit'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.6s | heavy main | git2 | "GIT_SSH_COMMAND='ssh -i key' git fetch --dry-run"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.6s | heavy three-way-defense | git2 | "GIT_SSH_COMMAND='ssh -i key' git fetch --dry-run"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | bash main | git2 | "GIT_SSH_COMMAND='ssh -i key' git fetch --dry-run"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "GIT_SSH_COMMAND='ssh -i key' git fetch --dry-run"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | heavy main | git2 | "git -c core.sshCommand='ssh -o X=1' fetch --dry-run"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git -c core.sshCommand='ssh -o X=1' fetch --dry-run"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | bash main | git2 | "git -c core.sshCommand='ssh -o X=1' fetch --dry-run"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git -c core.sshCommand='ssh -o X=1' fetch --dry-run"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git -c credential.helper='!f() { echo x; }; f' fetch --dry-run"
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.2s | heavy three-way-defense | git2 | "git -c credential.helper='!f() { echo x; }; f' fetch --dry-run"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git -c credential.helper='!f() { echo x; }; f' fetch --dry-run"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git -c credential.helper='!f() { echo x; }; f' fetch --dry-run"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git diff --ext-diff'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git diff --ext-diff'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git diff --ext-diff'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git diff --ext-diff'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git grep -O'less' foo"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git grep -O'less' foo"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git grep -O'less' foo"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git grep -O'less' foo"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git log -p --textconv'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git log -p --textconv'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git log -p --textconv'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git log -p --textconv'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git diff --submodule=diff'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git diff --submodule=diff'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git diff --submodule=diff'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git diff --submodule=diff'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git -c diff.external='echo' diff"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git -c diff.external='echo' diff"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git -c diff.external='echo' diff"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | git2 | "git -c diff.external='echo' diff"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git status -sb'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git status -sb'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | git2 | 'git status -sb'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | git2 | 'git status -sb'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | git2 | 'git add -N README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | git2 | 'git add -N README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | git2 | 'git add -N README.md'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash three-way-defense | git2 | 'git add -N README.md'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | git2 | 'git apply --check /dev/null'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy three-way-defense | git2 | 'git apply --check /dev/null'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | git2 | 'git apply --check /dev/null'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash three-way-defense | git2 | 'git apply --check /dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git am --abort'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git am --abort'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | bash main | git2 | 'git am --abort'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git am --abort'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git cherry-pick --abort'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git cherry-pick --abort'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git cherry-pick --abort'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git cherry-pick --abort'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git clean -nd'
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.2s | heavy three-way-defense | git2 | 'git clean -nd'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git clean -nd'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git clean -nd'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git count-objects -v'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git count-objects -v'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git count-objects -v'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git count-objects -v'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git fsck --no-progress'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git fsck --no-progress'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git fsck --no-progress'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git fsck --no-progress'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git gc --dry-run'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git gc --dry-run'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git gc --dry-run'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git gc --dry-run'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git maintenance run --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git maintenance run --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git maintenance run --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | git2 | 'git maintenance run --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git help -a | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git help -a | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | git2 | 'git help -a | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | git2 | 'git help -a | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | git2 | 'git instaweb'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | git2 | 'git instaweb'
+now:rc=0/n=0/0.2s base:rc=0/n=0/1.2s | bash main | git2 | 'git instaweb'
+now:rc=0/n=0/0.3s base:rc=0/n=0/1.2s | bash three-way-defense | git2 | 'git instaweb'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | git2 | 'git daemon --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/1.2s | heavy three-way-defense | git2 | 'git daemon --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/1.1s | bash main | git2 | 'git daemon --help'
+now:rc=0/n=0/0.3s base:rc=0/n=0/1.1s | bash three-way-defense | git2 | 'git daemon --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/1.0s | heavy main | git2 | 'git credential fill < /dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/1.1s | heavy three-way-defense | git2 | 'git credential fill < /dev/null'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git credential fill < /dev/null'
+now:rc=0/n=0/1.2s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git credential fill < /dev/null'
+now:rc=0/n=0/1.2s base:rc=0/n=0/0.1s | heavy main | git2 | 'git config --list | head'
+now:rc=0/n=0/1.2s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git config --list | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/1.0s | bash main | git2 | 'git config --list | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.9s | bash three-way-defense | git2 | 'git config --list | head'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git config --show-origin --get-regexp '^alias'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git config --show-origin --get-regexp '^alias'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | git2 | "git config --show-origin --get-regexp '^alias'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | git2 | "git config --show-origin --get-regexp '^alias'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | git2 | "git -c alias.st='status' st"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git -c alias.st='status' st"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | git2 | "git -c alias.st='status' st"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | git2 | "git -c alias.st='status' st"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | git2 | 'git st'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.2s | heavy three-way-defense | git2 | 'git st'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.2s | bash main | git2 | 'git st'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.7s | bash three-way-defense | git2 | 'git st'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | git2 | 'git co -b foo'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git co -b foo'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | git2 | 'git co -b foo'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git co -b foo'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | git2 | 'git unknown-subcommand'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git unknown-subcommand'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git unknown-subcommand'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git unknown-subcommand'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git log --format='%an <%ae>' -1"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git log --format='%an <%ae>' -1"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git log --format='%an <%ae>' -1"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git log --format='%an <%ae>' -1"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git log --format="$fmt" -1'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git log --format="$fmt" -1'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git log --format="$fmt" -1'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git log --format="$fmt" -1'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git diff "$base"..HEAD'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git diff "$base"..HEAD'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git diff "$base"..HEAD'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git diff "$base"..HEAD'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git -C "$dir" status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git -C "$dir" status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git -C "$dir" status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git -C "$dir" status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git -C "$(git rev-parse --show-toplevel)" status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git -C "$(git rev-parse --show-toplevel)" status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git -C "$(git rev-parse --show-toplevel)" status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git -C "$(git rev-parse --show-toplevel)" status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git --git-dir="$d/.git" log -1'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git --git-dir="$d/.git" log -1'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git --git-dir="$d/.git" log -1'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git --git-dir="$d/.git" log -1'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git diff --stat $(git merge-base HEAD master)'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | git2 | 'git diff --stat $(git merge-base HEAD master)'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | git2 | 'git diff --stat $(git merge-base HEAD master)'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | git2 | 'git diff --stat $(git merge-base HEAD master)'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | git2 | 'git show $(git rev-parse HEAD):README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy three-way-defense | git2 | 'git show $(git rev-parse HEAD):README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash main | git2 | 'git show $(git rev-parse HEAD):README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash three-way-defense | git2 | 'git show $(git rev-parse HEAD):README.md'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy main | git2 | 'git archive --format=tar HEAD scripts | tar -x -C /tmp'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | heavy three-way-defense | git2 | 'git archive --format=tar HEAD scripts | tar -x -C /tmp'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | git2 | 'git archive --format=tar HEAD scripts | tar -x -C /tmp'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git archive --format=tar HEAD scripts | tar -x -C /tmp'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | heavy main | git2 | 'git ls-files -z | xargs -0 grep -l foo'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git ls-files -z | xargs -0 grep -l foo'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | git2 | 'git ls-files -z | xargs -0 grep -l foo'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git ls-files -z | xargs -0 grep -l foo'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git ls-files | xargs sed -n '1p'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | git2 | "git ls-files | xargs sed -n '1p'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | git2 | "git ls-files | xargs sed -n '1p'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git ls-files | xargs sed -n '1p'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git ls-files | xargs awk 'END{print NR}'"
+now:rc=0/n=0/1.0s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git ls-files | xargs awk 'END{print NR}'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git ls-files | xargs awk 'END{print NR}'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git ls-files | xargs awk 'END{print NR}'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git ls-files | xargs python3 -c 'import sys; print(sys.argv)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git ls-files | xargs python3 -c 'import sys; print(sys.argv)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git ls-files | xargs python3 -c 'import sys; print(sys.argv)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git ls-files | xargs python3 -c 'import sys; print(sys.argv)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git ls-files '*.py' | xargs python3 -m py_compile"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git ls-files '*.py' | xargs python3 -m py_compile"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git ls-files '*.py' | xargs python3 -m py_compile"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git ls-files '*.py' | xargs python3 -m py_compile"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git ls-files '*.sh' | xargs -I{} bash -n {}"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git ls-files '*.sh' | xargs -I{} bash -n {}"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git ls-files '*.sh' | xargs -I{} bash -n {}"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git ls-files '*.sh' | xargs -I{} bash -n {}"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git ls-files '*.sh' | xargs -n1 -P4 bash -n"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git ls-files '*.sh' | xargs -n1 -P4 bash -n"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git ls-files '*.sh' | xargs -n1 -P4 bash -n"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git ls-files '*.sh' | xargs -n1 -P4 bash -n"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | "git diff --name-only | xargs -r sed -i 's/a/b/'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | "git diff --name-only | xargs -r sed -i 's/a/b/'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | "git diff --name-only | xargs -r sed -i 's/a/b/'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | "git diff --name-only | xargs -r sed -i 's/a/b/'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git diff --name-only | while read -r f; do sed -n \'1p\' "$f"; done'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git diff --name-only | while read -r f; do sed -n \'1p\' "$f"; done'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git diff --name-only | while read -r f; do sed -n \'1p\' "$f"; done'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git diff --name-only | while read -r f; do sed -n \'1p\' "$f"; done'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git diff --name-only | xargs ls -l'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git diff --name-only | xargs ls -l'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git diff --name-only | xargs ls -l'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git diff --name-only | xargs ls -l'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | git2 | 'git diff --name-only HEAD | xargs -r git add'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | git2 | 'git diff --name-only HEAD | xargs -r git add'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | git2 | 'git diff --name-only HEAD | xargs -r git add'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | git2 | 'git diff --name-only HEAD | xargs -r git add'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | 'cd $DIR && ./run.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./run.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd $DIR && ./run.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./run.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd $DIR && ./run.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd $DIR && ./run.sh'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | 'cd $DIR && bash run.sh'
+    now> ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 run.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd $DIR && bash run.sh'
+    now> ✗ 认不出起什么的写法被拒：bash / sh 起的脚本 run.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd $DIR && bash run.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd $DIR && bash run.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'cd $DIR && python3 run.py'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'cd $DIR && python3 run.py'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd $DIR && python3 run.py'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd $DIR && python3 run.py'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'cd $DIR && ls'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'cd $DIR && ls'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | misc2 | 'cd $DIR && ls'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'cd $DIR && ls'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | 'cd ${DIR} && ./run.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./run.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd ${DIR} && ./run.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./run.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd ${DIR} && ./run.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd ${DIR} && ./run.sh'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | 'cd "$DIR" && ./run.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./run.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd "$DIR" && ./run.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./run.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | misc2 | 'cd "$DIR" && ./run.sh'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'cd "$DIR" && ./run.sh'
+now:rc=0/n=1/0.1s base:rc=0/n=1/0.2s | heavy main | misc2 | 'cd "$HOME" && ./x.sh'
+now:rc=0/n=1/0.1s base:rc=0/n=1/0.2s | heavy three-way-defense | misc2 | 'cd "$HOME" && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | misc2 | 'cd "$HOME" && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | misc2 | 'cd "$HOME" && ./x.sh'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | 'cd "$OLDPWD" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.3s CHANGED | heavy three-way-defense | misc2 | 'cd "$OLDPWD" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | misc2 | 'cd "$OLDPWD" && ./x.sh'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'cd "$OLDPWD" && ./x.sh'
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.7s CHANGED | heavy main | misc2 | 'cd "$PWD" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd "$PWD" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd "$PWD" && ./x.sh'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd "$PWD" && ./x.sh'
+now:rc=0/n=1/0.5s base:rc=0/n=1/0.1s | heavy main | misc2 | 'cd .. && ./x.sh'
+now:rc=0/n=1/0.1s base:rc=0/n=1/0.1s | heavy three-way-defense | misc2 | 'cd .. && ./x.sh'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd .. && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd .. && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'cd ../.. && ./scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'cd ../.. && ./scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd ../.. && ./scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd ../.. && ./scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'cd ~/code/singlefs && ./scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'cd ~/code/singlefs && ./scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd ~/code/singlefs && ./scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.5s | bash three-way-defense | misc2 | 'cd ~/code/singlefs && ./scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=2/n=1/0.1s base:rc=0/n=1/0.1s CHANGED | heavy main | misc2 | 'cd /tmp/nonexist-xyz && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 要先 cd 到 /tmp/nonexist-xyz，那个目录不在、cd 会失败，认不出起的是哪一份，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=1/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd /tmp/nonexist-xyz && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 要先 cd 到 /tmp/nonexist-xyz，那个目录不在、cd 会失败，认不出起的是哪一份，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd /tmp/nonexist-xyz && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd /tmp/nonexist-xyz && ./x.sh'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | '(cd "$d" && ./x.sh)'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | '(cd "$d" && ./x.sh)'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | '(cd "$d" && ./x.sh)'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | misc2 | '(cd "$d" && ./x.sh)'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.2s CHANGED | heavy main | misc2 | '(cd $d; ./x.sh)'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.2s CHANGED | heavy three-way-defense | misc2 | '(cd $d; ./x.sh)'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash main | misc2 | '(cd $d; ./x.sh)'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash three-way-defense | misc2 | '(cd $d; ./x.sh)'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.4s CHANGED | heavy main | misc2 | 'pushd "$d" >/dev/null && ./x.sh; popd >/dev/null'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.4s CHANGED | heavy three-way-defense | misc2 | 'pushd "$d" >/dev/null && ./x.sh; popd >/dev/null'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash main | misc2 | 'pushd "$d" >/dev/null && ./x.sh; popd >/dev/null'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | bash three-way-defense | misc2 | 'pushd "$d" >/dev/null && ./x.sh; popd >/dev/null'
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.3s CHANGED | heavy main | misc2 | 'cd "$(mktemp -d)" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=0/n=0/0.3s CHANGED | heavy three-way-defense | misc2 | 'cd "$(mktemp -d)" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd "$(mktemp -d)" && ./x.sh'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd "$(mktemp -d)" && ./x.sh'
+now:rc=2/n=1/0.3s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | 'cd "$(dirname "$f")" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd "$(dirname "$f")" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd "$(dirname "$f")" && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd "$(dirname "$f")" && ./x.sh'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | 'cd "$(dirname "$0")" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd "$(dirname "$0")" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd "$(dirname "$0")" && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd "$(dirname "$0")" && ./x.sh'
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy main | misc2 | 'cd -P "$d" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=0/n=0/0.1s CHANGED | heavy three-way-defense | misc2 | 'cd -P "$d" && ./x.sh'
+    now> ✗ 认不出起什么的写法被拒：直接执行的脚本 ./x.sh 的当前目录算不出，而这一条的当前目录算不出，认不出起的是哪一份：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | misc2 | 'cd -P "$d" && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'cd -P "$d" && ./x.sh'
+now:rc=0/n=1/0.1s base:rc=0/n=1/0.1s | heavy main | misc2 | 'cd ~/code/singlefs && ./x.sh'
+now:rc=0/n=1/0.1s base:rc=0/n=1/0.1s | heavy three-way-defense | misc2 | 'cd ~/code/singlefs && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'cd ~/code/singlefs && ./x.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'cd ~/code/singlefs && ./x.sh'
+now:rc=0/n=1/0.1s base:rc=0/n=1/0.1s | heavy main | misc2 | './run.sh'
+now:rc=0/n=1/0.1s base:rc=0/n=1/0.2s | heavy three-way-defense | misc2 | './run.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | './run.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | './run.sh'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | './scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.4s | heavy three-way-defense | misc2 | './scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | misc2 | './scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.8s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | './scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy main | misc2 | 'scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | misc2 | 'scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | misc2 | 'scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | heavy main | misc2 | 'x=scripts/hosts/run-with-memory-cap.sh; bash $x --status'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'x=scripts/hosts/run-with-memory-cap.sh; bash $x --status'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | misc2 | 'x=scripts/hosts/run-with-memory-cap.sh; bash $x --status'
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'x=scripts/hosts/run-with-memory-cap.sh; bash $x --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'x=scripts/hosts/run-with-memory-cap.sh; bash "$x" --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'x=scripts/hosts/run-with-memory-cap.sh; bash "$x" --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'x=scripts/hosts/run-with-memory-cap.sh; bash "$x" --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'x=scripts/hosts/run-with-memory-cap.sh; bash "$x" --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'd=scripts/hosts; bash $d/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'd=scripts/hosts; bash $d/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'd=scripts/hosts; bash $d/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'd=scripts/hosts; bash $d/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'd=scripts/hosts; bash "$d/run-with-memory-cap.sh" --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'd=scripts/hosts; bash "$d/run-with-memory-cap.sh" --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'd=scripts/hosts; bash "$d/run-with-memory-cap.sh" --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'd=scripts/hosts; bash "$d/run-with-memory-cap.sh" --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'd=scripts/hosts; f=run-with-memory-cap.sh; bash $d/$f --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'd=scripts/hosts; f=run-with-memory-cap.sh; bash $d/$f --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'd=scripts/hosts; f=run-with-memory-cap.sh; bash $d/$f --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'd=scripts/hosts; f=run-with-memory-cap.sh; bash $d/$f --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'd=~/code/singlefs; python3 $d/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'd=~/code/singlefs; python3 $d/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'd=~/code/singlefs; python3 $d/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'd=~/code/singlefs; python3 $d/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'd=~/code/singlefs; bash $d/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'd=~/code/singlefs; bash $d/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'd=~/code/singlefs; bash $d/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'd=~/code/singlefs; bash $d/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy main | misc2 | 'M=~/code/singlefs/research/prompts/x; python3 $M/tools/probe.py'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | heavy three-way-defense | misc2 | 'M=~/code/singlefs/research/prompts/x; python3 $M/tools/probe.py'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | misc2 | 'M=~/code/singlefs/research/prompts/x; python3 $M/tools/probe.py'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | misc2 | 'M=~/code/singlefs/research/prompts/x; python3 $M/tools/probe.py'
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.3s | heavy main | misc2 | 'M=$PWD/research/prompts/x; python3 $M/tools/probe.py'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$M/tools/probe.py` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.9s | heavy three-way-defense | misc2 | 'M=$PWD/research/prompts/x; python3 $M/tools/probe.py'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$M/tools/probe.py` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.9s | bash main | misc2 | 'M=$PWD/research/prompts/x; python3 $M/tools/probe.py'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.9s | bash three-way-defense | misc2 | 'M=$PWD/research/prompts/x; python3 $M/tools/probe.py'
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.1s | heavy main | misc2 | 'M=$(pwd)/research/prompts/x; python3 $M/tools/probe.py'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$M/tools/probe.py` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.1s | heavy three-way-defense | misc2 | 'M=$(pwd)/research/prompts/x; python3 $M/tools/probe.py'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$M/tools/probe.py` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | misc2 | 'M=$(pwd)/research/prompts/x; python3 $M/tools/probe.py'
+now:rc=0/n=0/0.9s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'M=$(pwd)/research/prompts/x; python3 $M/tools/probe.py'
+now:rc=0/n=0/0.9s base:rc=0/n=0/0.1s | heavy main | misc2 | 'python3 $HOME/code/singlefs/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.9s base:rc=0/n=0/0.2s | heavy three-way-defense | misc2 | 'python3 $HOME/code/singlefs/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.9s base:rc=0/n=0/0.1s | bash main | misc2 | 'python3 $HOME/code/singlefs/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.6s | bash three-way-defense | misc2 | 'python3 $HOME/code/singlefs/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | heavy main | misc2 | 'python3 ~/code/singlefs/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.6s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'python3 ~/code/singlefs/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash main | misc2 | 'python3 ~/code/singlefs/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | misc2 | 'python3 ~/code/singlefs/scripts/kb/replace-once.py --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'python3 "$HOME/code/singlefs/scripts/kb/replace-once.py" --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'python3 "$HOME/code/singlefs/scripts/kb/replace-once.py" --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | misc2 | 'python3 "$HOME/code/singlefs/scripts/kb/replace-once.py" --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | misc2 | 'python3 "$HOME/code/singlefs/scripts/kb/replace-once.py" --selftest'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy main | misc2 | 'bash ~/code/singlefs/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | misc2 | 'bash ~/code/singlefs/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'bash ~/code/singlefs/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.8s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'bash ~/code/singlefs/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.5s | heavy main | misc2 | 'bash $HOME/code/singlefs/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.5s | heavy three-way-defense | misc2 | 'bash $HOME/code/singlefs/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | misc2 | 'bash $HOME/code/singlefs/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash three-way-defense | misc2 | 'bash $HOME/code/singlefs/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=2/n=1/0.6s base:rc=2/n=1/0.2s | heavy main | misc2 | 'bash $CLAUDE_PROJECT_DIR/scripts/hosts/run-with-memory-cap.sh --status'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$CLAUDE_PROJECT_DIR/scripts/hosts/run-with-memory-cap.sh` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.6s base:rc=2/n=1/0.2s | heavy three-way-defense | misc2 | 'bash $CLAUDE_PROJECT_DIR/scripts/hosts/run-with-memory-cap.sh --status'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$CLAUDE_PROJECT_DIR/scripts/hosts/run-with-memory-cap.sh` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | misc2 | 'bash $CLAUDE_PROJECT_DIR/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash three-way-defense | misc2 | 'bash $CLAUDE_PROJECT_DIR/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.3s | heavy main | misc2 | 'bash "$CLAUDE_PROJECT_DIR"/scripts/hosts/run-with-memory-cap.sh --status'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$CLAUDE_PROJECT_DIR/scripts/hosts/run-with-memory-cap.sh` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.3s | heavy three-way-defense | misc2 | 'bash "$CLAUDE_PROJECT_DIR"/scripts/hosts/run-with-memory-cap.sh --status'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$CLAUDE_PROJECT_DIR/scripts/hosts/run-with-memory-cap.sh` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | misc2 | 'bash "$CLAUDE_PROJECT_DIR"/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'bash "$CLAUDE_PROJECT_DIR"/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.1s | heavy main | misc2 | 'bash "$(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh" --status'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.1s | heavy three-way-defense | misc2 | 'bash "$(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh" --status'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash main | misc2 | 'bash "$(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh" --status'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.5s | bash three-way-defense | misc2 | 'bash "$(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh" --status'
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.2s | heavy main | misc2 | 'bash $(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh --status'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.2s | heavy three-way-defense | misc2 | 'bash $(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh --status'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | misc2 | 'bash $(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | bash three-way-defense | misc2 | 'bash $(git rev-parse --show-toplevel)/scripts/hosts/run-with-memory-cap.sh --status'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | heavy main | misc2 | 'bash scripts/hosts/*.sh --help'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'bash scripts/hosts/*.sh --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'bash scripts/hosts/*.sh --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'bash scripts/hosts/*.sh --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh --status 2>&1 | tail -3'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh --status 2>&1 | tail -3'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh --status 2>&1 | tail -3'
+now:rc=0/n=0/0.9s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh --status 2>&1 | tail -3'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy main | misc2 | "bash scripts/hosts/run-with-memory-cap.sh 4G python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | misc2 | "bash scripts/hosts/run-with-memory-cap.sh 4G python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | misc2 | "bash scripts/hosts/run-with-memory-cap.sh 4G python3 -c 'print(1)'"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.4s | bash three-way-defense | misc2 | "bash scripts/hosts/run-with-memory-cap.sh 4G python3 -c 'print(1)'"
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.4s | heavy main | misc2 | "bash scripts/hosts/run-with-memory-cap.sh 4G bash -c 'echo hi'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy three-way-defense | misc2 | "bash scripts/hosts/run-with-memory-cap.sh 4G bash -c 'echo hi'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash main | misc2 | "bash scripts/hosts/run-with-memory-cap.sh 4G bash -c 'echo hi'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | bash three-way-defense | misc2 | "bash scripts/hosts/run-with-memory-cap.sh 4G bash -c 'echo hi'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy main | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh "$cap" python3 -c \'print(1)\''
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.4s | heavy three-way-defense | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh "$cap" python3 -c \'print(1)\''
+now:rc=0/n=0/0.5s base:rc=0/n=0/1.0s | bash main | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh "$cap" python3 -c \'print(1)\''
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh "$cap" python3 -c \'print(1)\''
+now:rc=2/n=1/0.4s base:rc=2/n=1/0.2s | heavy main | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh 4G python3 "$tool" --work /tmp/w'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$tool` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.4s base:rc=2/n=1/0.7s | heavy three-way-defense | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh 4G python3 "$tool" --work /tmp/w'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$tool` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.3s | bash main | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh 4G python3 "$tool" --work /tmp/w'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'bash scripts/hosts/run-with-memory-cap.sh 4G python3 "$tool" --work /tmp/w'
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.1s | heavy main | misc2 | 'nice -n 19 python3 "$tool" --work /tmp/w'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$tool` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.1s | heavy three-way-defense | misc2 | 'nice -n 19 python3 "$tool" --work /tmp/w'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$tool` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'nice -n 19 python3 "$tool" --work /tmp/w'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'nice -n 19 python3 "$tool" --work /tmp/w'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | "nice -n 19 timeout 600 python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | "nice -n 19 timeout 600 python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.4s | bash main | misc2 | "nice -n 19 timeout 600 python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.6s | bash three-way-defense | misc2 | "nice -n 19 timeout 600 python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | heavy main | misc2 | 'timeout "$t" ls'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.5s | heavy three-way-defense | misc2 | 'timeout "$t" ls'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.7s | bash main | misc2 | 'timeout "$t" ls'
+now:rc=0/n=0/0.5s base:rc=0/n=0/0.3s | bash three-way-defense | misc2 | 'timeout "$t" ls'
+now:rc=2/n=1/0.5s base:rc=2/n=1/0.3s | heavy main | misc2 | 'timeout 60 "$cmd"'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$cmd` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.4s base:rc=2/n=1/0.3s | heavy three-way-defense | misc2 | 'timeout 60 "$cmd"'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$cmd` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.7s base:rc=0/n=0/0.1s | bash main | misc2 | 'timeout 60 "$cmd"'
+now:rc=0/n=0/0.4s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'timeout 60 "$cmd"'
+now:rc=2/n=1/0.4s base:rc=2/n=1/0.1s | heavy main | misc2 | '"$cmd" --help'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$cmd` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.1s | heavy three-way-defense | misc2 | '"$cmd" --help'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$cmd` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | misc2 | '"$cmd" --help'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | '"$cmd" --help'
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.1s | heavy main | misc2 | '$cmd --help'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$cmd` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.2s | heavy three-way-defense | misc2 | '$cmd --help'
+    now> ✗ 认不出起什么的写法被拒：命令词 `$cmd` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash main | misc2 | '$cmd --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | '$cmd --help'
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.1s | heavy main | misc2 | '${cmd} --help'
+    now> ✗ 认不出起什么的写法被拒：命令词 `${cmd}` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.1s | heavy three-way-defense | misc2 | '${cmd} --help'
+    now> ✗ 认不出起什么的写法被拒：命令词 `${cmd}` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | '${cmd} --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | '${cmd} --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | '"$HOME/sample_bin/tool" --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | '"$HOME/sample_bin/tool" --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash main | misc2 | '"$HOME/sample_bin/tool" --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | '"$HOME/sample_bin/tool" --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy main | misc2 | '$HOME/.cargo/bin/tool --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | misc2 | '$HOME/.cargo/bin/tool --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | '$HOME/.cargo/bin/tool --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | '$HOME/.cargo/bin/tool --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | misc2 | '~/.cargo/bin/tool --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | '~/.cargo/bin/tool --help'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | '~/.cargo/bin/tool --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | '~/.cargo/bin/tool --help'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | misc2 | "/usr/bin/env python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.2s | heavy three-way-defense | misc2 | "/usr/bin/env python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | misc2 | "/usr/bin/env python3 -c 'print(1)'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/1.0s | bash three-way-defense | misc2 | "/usr/bin/env python3 -c 'print(1)'"
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | "env python3 -c 'print(1)'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/1.0s | heavy three-way-defense | misc2 | "env python3 -c 'print(1)'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/1.0s | bash main | misc2 | "env python3 -c 'print(1)'"
+now:rc=0/n=0/0.2s base:rc=0/n=0/1.0s | bash three-way-defense | misc2 | "env python3 -c 'print(1)'"
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.2s | heavy main | misc2 | 'env "$PY" -c \'print(1)\''
+    now> ✗ 认不出起什么的写法被拒：命令词 `$PY` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.2s base:rc=2/n=1/0.2s | heavy three-way-defense | misc2 | 'env "$PY" -c \'print(1)\''
+    now> ✗ 认不出起什么的写法被拒：命令词 `$PY` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'env "$PY" -c \'print(1)\''
+now:rc=0/n=0/1.2s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'env "$PY" -c \'print(1)\''
+now:rc=0/n=0/1.0s base:rc=0/n=0/0.2s | heavy main | misc2 | 'export PATH="$PATH:/x"; ls'
+now:rc=0/n=0/1.0s base:rc=0/n=0/0.2s | heavy three-way-defense | misc2 | 'export PATH="$PATH:/x"; ls'
+now:rc=0/n=0/1.1s base:rc=0/n=0/0.2s | bash main | misc2 | 'export PATH="$PATH:/x"; ls'
+now:rc=0/n=0/1.0s base:rc=0/n=0/0.2s | bash three-way-defense | misc2 | 'export PATH="$PATH:/x"; ls'
+now:rc=0/n=0/1.0s base:rc=0/n=0/0.1s | heavy main | misc2 | 'PATH="$HOME/sample_bin:$PATH" ls'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | 'PATH="$HOME/sample_bin:$PATH" ls'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash main | misc2 | 'PATH="$HOME/sample_bin:$PATH" ls'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.3s | bash three-way-defense | misc2 | 'PATH="$HOME/sample_bin:$PATH" ls'
+now:rc=0/n=0/0.2s base:rc=0/n=0/0.1s | heavy main | misc2 | 'FOO="$(date)" ls'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | heavy three-way-defense | misc2 | 'FOO="$(date)" ls'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.3s | bash main | misc2 | 'FOO="$(date)" ls'
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'FOO="$(date)" ls'
+now:rc=0/n=0/0.3s base:rc=0/n=0/1.1s | heavy main | misc2 | "setsid --wait bash -c 'echo hi'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | "setsid --wait bash -c 'echo hi'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | misc2 | "setsid --wait bash -c 'echo hi'"
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | "setsid --wait bash -c 'echo hi'"
+now:rc=2/n=1/0.3s base:rc=2/n=1/0.1s | heavy main | misc2 | 'setsid --wait bash "$script"'
+    now> ✗ 认不出起什么的写法被拒：bash / sh 起的脚本路径 `$script` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.3s base:rc=2/n=1/0.1s | heavy three-way-defense | misc2 | 'setsid --wait bash "$script"'
+    now> ✗ 认不出起什么的写法被拒：bash / sh 起的脚本路径 `$script` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.3s base:rc=0/n=0/0.1s | bash main | misc2 | 'setsid --wait bash "$script"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'setsid --wait bash "$script"'
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.1s | heavy main | misc2 | 'setsid --wait python3 "$script"'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$script` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：主 agent 跑「认不出起什么的写法」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+now:rc=2/n=1/0.1s base:rc=2/n=1/0.1s | heavy three-way-defense | misc2 | 'setsid --wait python3 "$script"'
+    now> ✗ 认不出起什么的写法被拒：python 起的脚本路径 `$script` 由变量、命令替换、位置参数或进程替换拼出，执行前展开不了，认不出起的是什么：three-way-defense 不跑「认不出起什么的写法」
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | 'setsid --wait python3 "$script"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash three-way-defense | misc2 | 'setsid --wait python3 "$script"'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy main | misc2 | '(setsid --wait python3 /tmp/x.py &)'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | heavy three-way-defense | misc2 | '(setsid --wait python3 /tmp/x.py &)'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.1s | bash main | misc2 | '(setsid --wait python3 /tmp/x.py &)'
+now:rc=0/n=0/0.1s base:rc=0/n=0/0.7s | bash three-way-defense | misc2 | '(setsid --wait python3 /tmp/x.py &)'
+cases=1208

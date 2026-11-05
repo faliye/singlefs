@@ -1,0 +1,98 @@
+E7RESULT name=config table_rows=47 unit_test_modules=test_contrast_against_r1,test_q2_misses,test_attribution,test_whole_table_matrix,test_current_tree_row_driver,test_full_table_run timeout_seconds=300
+E7RESULT name=anchor mutation=V1_红的计数逐值比 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V2_红的计数取是否大于_1 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V3_配键丢掉流 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V4_只在一边的键不当一格 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V5_判定词字段归钉值格 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=V6_G2_比名字不比变异行 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=V7_G4_比整份文件 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=V8_G4_不标参照近似 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=V9_G6_的_RefFS_列不查_RefFS_入口 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=V10_漏判取批_2 hits=1 files=q2_misses.py
+E7RESULT name=anchor mutation=V11_多了按个数 hits=1 files=q2_misses.py
+E7RESULT name=anchor mutation=V12_D_不要求_r1_计入分母 hits=1 files=q2_misses.py
+E7RESULT name=anchor mutation=V13_键不含改坏用的变异行 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=V14_哨兵不挑 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_拷树不排除_target hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_改动清单只记第一行 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_T3_不看装置退出码 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_宽归因只数新出的单元 hits=1 files=attribution.py
+E7RESULT name=anchor mutation=落地_Z1_不比交回值 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_逐文件比不比内容 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_Z3_不核快照摘要 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_片收尾不核 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_Z4_编后不核重编 hits=1 files=current_tree_row_driver.py
+E7RESULT name=anchor mutation=落地_Z4_合并不查没核过的行 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_Z6_不解_gz hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_S1_S3_S5_不判 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_S4_认退_3 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_S2_只看有没有那一行 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_S2_导出没跑成当相同 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_S6_编不过照跑 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_S6_合并不判 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_S7_两台不同当相同 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_K3_panic_不核截在第_3_次调用 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_K3_装置计数不核精确数 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_K2_空变异触达不算 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_F3_不收_ran_是_false_的行 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_A7_不比 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_Z6_不数第二次基线 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_计划拷树漏_prune-server hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_线道树同步漏_prune-server hits=1 files=current_tree_row_driver.py
+E7RESULT name=anchor mutation=落地_改动清单漏_prune-server hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_计划拷树漏编译期读的_heavy-thread-default hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_线道树同步漏多机配置判法 hits=1 files=current_tree_row_driver.py
+E7RESULT name=anchor mutation=落地_计划拷树漏规范副本起的_preflight.py hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_线道树同步漏判法_source_的_peer-host-lib hits=1 files=current_tree_row_driver.py
+E7RESULT name=anchor mutation=落地_计划拷树单个文件不建上级目录 hits=1 files=full_table_run.py
+E7RESULT name=anchor mutation=落地_线道树同步单个文件不建上级目录 hits=1 files=current_tree_row_driver.py
+E7RESULT name=baseline unit_tests=green
+E7RESULT name=mutation number=1 outcome=✅ mutation=V1_红的计数逐值比 unit_test_exit=1
+E7RESULT name=mutation number=2 outcome=✅ mutation=V2_红的计数取是否大于_1 unit_test_exit=1
+E7RESULT name=mutation number=3 outcome=✅ mutation=V3_配键丢掉流 unit_test_exit=1
+E7RESULT name=mutation number=4 outcome=✅ mutation=V4_只在一边的键不当一格 unit_test_exit=1
+E7RESULT name=mutation number=5 outcome=✅ mutation=V5_判定词字段归钉值格 unit_test_exit=1
+E7RESULT name=mutation number=6 outcome=✅ mutation=V6_G2_比名字不比变异行 unit_test_exit=1
+E7RESULT name=mutation number=7 outcome=✅ mutation=V7_G4_比整份文件 unit_test_exit=1
+E7RESULT name=mutation number=8 outcome=✅ mutation=V8_G4_不标参照近似 unit_test_exit=1
+E7RESULT name=mutation number=9 outcome=✅ mutation=V9_G6_的_RefFS_列不查_RefFS_入口 unit_test_exit=1
+E7RESULT name=mutation number=10 outcome=✅ mutation=V10_漏判取批_2 unit_test_exit=1
+E7RESULT name=mutation number=11 outcome=✅ mutation=V11_多了按个数 unit_test_exit=1
+E7RESULT name=mutation number=12 outcome=✅ mutation=V12_D_不要求_r1_计入分母 unit_test_exit=1
+E7RESULT name=mutation number=13 outcome=✅ mutation=V13_键不含改坏用的变异行 unit_test_exit=1
+E7RESULT name=mutation number=14 outcome=✅ mutation=V14_哨兵不挑 unit_test_exit=1
+E7RESULT name=mutation number=15 outcome=✅ mutation=落地_拷树不排除_target unit_test_exit=1
+E7RESULT name=mutation number=16 outcome=✅ mutation=落地_改动清单只记第一行 unit_test_exit=1
+E7RESULT name=mutation number=17 outcome=✅ mutation=落地_T3_不看装置退出码 unit_test_exit=1
+E7RESULT name=mutation number=18 outcome=✅ mutation=落地_宽归因只数新出的单元 unit_test_exit=1
+E7RESULT name=mutation number=19 outcome=✅ mutation=落地_Z1_不比交回值 unit_test_exit=1
+E7RESULT name=mutation number=20 outcome=✅ mutation=落地_逐文件比不比内容 unit_test_exit=1
+E7RESULT name=mutation number=21 outcome=✅ mutation=落地_Z3_不核快照摘要 unit_test_exit=1
+E7RESULT name=mutation number=22 outcome=✅ mutation=落地_片收尾不核 unit_test_exit=1
+E7RESULT name=mutation number=23 outcome=✅ mutation=落地_Z4_编后不核重编 unit_test_exit=1
+E7RESULT name=mutation number=24 outcome=✅ mutation=落地_Z4_合并不查没核过的行 unit_test_exit=1
+E7RESULT name=mutation number=25 outcome=✅ mutation=落地_Z6_不解_gz unit_test_exit=1
+E7RESULT name=mutation number=26 outcome=✅ mutation=落地_S1_S3_S5_不判 unit_test_exit=1
+E7RESULT name=mutation number=27 outcome=✅ mutation=落地_S4_认退_3 unit_test_exit=1
+E7RESULT name=mutation number=28 outcome=✅ mutation=落地_S2_只看有没有那一行 unit_test_exit=1
+E7RESULT name=mutation number=29 outcome=✅ mutation=落地_S2_导出没跑成当相同 unit_test_exit=1
+E7RESULT name=mutation number=30 outcome=✅ mutation=落地_S6_编不过照跑 unit_test_exit=1
+E7RESULT name=mutation number=31 outcome=✅ mutation=落地_S6_合并不判 unit_test_exit=1
+E7RESULT name=mutation number=32 outcome=✅ mutation=落地_S7_两台不同当相同 unit_test_exit=1
+E7RESULT name=mutation number=33 outcome=✅ mutation=落地_K3_panic_不核截在第_3_次调用 unit_test_exit=1
+E7RESULT name=mutation number=34 outcome=✅ mutation=落地_K3_装置计数不核精确数 unit_test_exit=1
+E7RESULT name=mutation number=35 outcome=✅ mutation=落地_K2_空变异触达不算 unit_test_exit=1
+E7RESULT name=mutation number=36 outcome=✅ mutation=落地_F3_不收_ran_是_false_的行 unit_test_exit=1
+E7RESULT name=mutation number=37 outcome=✅ mutation=落地_A7_不比 unit_test_exit=1
+E7RESULT name=mutation number=38 outcome=✅ mutation=落地_Z6_不数第二次基线 unit_test_exit=1
+E7RESULT name=mutation number=39 outcome=✅ mutation=落地_计划拷树漏_prune-server unit_test_exit=1
+E7RESULT name=mutation number=40 outcome=✅ mutation=落地_线道树同步漏_prune-server unit_test_exit=1
+E7RESULT name=mutation number=41 outcome=✅ mutation=落地_改动清单漏_prune-server unit_test_exit=1
+E7RESULT name=mutation number=42 outcome=✅ mutation=落地_计划拷树漏编译期读的_heavy-thread-default unit_test_exit=1
+E7RESULT name=mutation number=43 outcome=✅ mutation=落地_线道树同步漏多机配置判法 unit_test_exit=1
+E7RESULT name=mutation number=44 outcome=✅ mutation=落地_计划拷树漏规范副本起的_preflight.py unit_test_exit=1
+E7RESULT name=mutation number=45 outcome=✅ mutation=落地_线道树同步漏判法_source_的_peer-host-lib unit_test_exit=1
+E7RESULT name=mutation number=46 outcome=✅ mutation=落地_计划拷树单个文件不建上级目录 unit_test_exit=1
+E7RESULT name=mutation number=47 outcome=✅ mutation=落地_线道树同步单个文件不建上级目录 unit_test_exit=1
+E7RESULT name=verdict mutations=47 caught=47 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
+E7RESULT name=done emitted=98

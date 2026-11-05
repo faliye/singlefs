@@ -1,0 +1,8 @@
+3b275d59a9b4ee9bf3fac2dac76c30d774477fb9254495c469964aa6b29c5b3c  .claude/agent-common.md
+4ec28172d59f6921d31270828ae603f33352c4427c4c060f72c0bf0882efdae0  .claude/main-agent.md
+d6a78c2f6e4e628546800195caf4aa80b10a3027b752c2bdbcefa5e380771d83  .claude/rules/verification.md
+3ccee6c851622a78a6ce96577a02a382de4b0852a81202928470bd5dea9ad066  .claude/kb/checks-owed.md
+5d25d23c08ecdfea04eb74d11416a7dafb296e2e198e10b02d44e6fc51fdc5a1  .claude/rules/implementation-workflow.md
+4b82780043e552dec4cd57db557f7fdee8e87a235f83c119ab3430938793aaef  .claude/rules/test-script-discipline.md
+e5b025bc332d35dc979430d6e8499987cd584d457df472aabb532c7c5d7d4345  .claude/skills/gate/staged-gate.md
+a6ea016bca2ff72a831456fc71c0d05e75b7ab5e5dba2f4a47d3b15c5432bcef  .claude/skills/crash-test/commit-stages.md

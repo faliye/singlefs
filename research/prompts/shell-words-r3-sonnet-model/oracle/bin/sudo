@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# 假 sudo：丢掉选项，把后面的命令在当前环境里照跑（真 sudo 在这台机器上不能无口令用）
+while [ $# -gt 0 ]; do case "$1" in -*) shift;; *) break;; esac; done
+exec "$@"

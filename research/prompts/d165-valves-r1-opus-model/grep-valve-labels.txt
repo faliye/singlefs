@@ -1,0 +1,31 @@
+$ git ls-files -co --exclude-standard -- . ":!research" ":!records" | tr "\n" "\0" | xargs -0 grep -c -E "[^「」[:space:]，。；：:]{1,12}已判[*]*[：:]" | grep -v ":0$"
+.claude/agent-common.md:1
+.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a28fe10b58d88beec.txt:2
+.claude/hooks/lib_snapshot_conflicts.py:4
+.claude/hooks/lib_writer_lock.py:1
+.claude/hooks/runner-dispatch-guard.sh:36
+.claude/hooks/write-guard.sh:2
+.claude/main-agent.md:1
+scripts/agents/dispatch-prompt.py:2
+scripts/gate/apply-writer-patch.py:8
+
+$ git ls-files -co --exclude-standard -- . ":!research" ":!records" | tr "\n" "\0" | xargs -0 grep -ohE "[^「」[:space:]，。；：:`（(]{1,12}已判[*]*[：:]" | sort | uniq -c | sort -nr
+      9 快照冲突已判：
+      7 "快照冲突已判：
+      6 准入已判：
+      6 写者锁已判：
+      5 规格检查已判：
+      4 '快照冲突已判：
+      4 \n准入已判：
+      3 通用已判：
+      3 "写者锁已判：
+      2 限额窗口已判：
+      2 "通用已判：
+      2 \n规格检查已判：
+      1 ["规格检查已判：
+      1 "线程上限已判：
+      1 "第四件\n写者锁已判：
+      1 "多机已判：
+      1 n只补落产物\n限额窗口已判：
+      1 50G\n多机已判：
+      1 16\n线程上限已判：

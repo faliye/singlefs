@@ -1,0 +1,11 @@
+name=h0-light-crash-main hook=heavy-test-guard exit=0 expected=0
+name=h1-light-crash-in-copy hook=heavy-test-guard exit=2 expected=0
+name=h2-light-formal-in-copy hook=heavy-test-guard exit=0 expected=0
+name=h3-rerun-builds-and-runs-probe hook=heavy-test-guard exit=0 expected=0
+name=h3b-rerun-feeds-hook-by-variable hook=heavy-test-guard exit=0 expected=0
+name=h4-kb-scribe-precheck-as-written hook=heavy-test-guard exit=0 expected=0
+name=h5-writer-combined-clippy-build hook=heavy-test-guard exit=0 expected=0
+name=w1-kb-scribe-precheck-in-scope hook=write-guard exit=0 expected=0
+name=w2-kb-scribe-precheck-out-of-scope hook=write-guard exit=0 expected=2
+name=w3-precheck-input-missing hook=write-guard exit=1 expected=not-2
+name=feed_done samples=10

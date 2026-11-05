@@ -1,0 +1,5 @@
+PROBE unchanged_image mounted instance=InstanceGeneration(2) devices_rewritten_by_the_acquisition=[] continuation_steps=16
+PROBE zeroed_image_space_admission_judged refused Publish cause=ReadBackFailingSelfVerificationWhileRehearsingTheContinuationBeforeAcquisition(ReadFailingSelfVerification { device: DeviceIdentity(1), offset: DeviceOffsetInBytes(0), length_in_bytes: 4096 }) persisted=0 failed=0
+PROBE zeroed_image_space_admission_judged devices_unchanged=true
+PROBE zeroed_image_space_admission_skipped refused Publish cause=ReadBackFailingSelfVerificationWhileRehearsingTheContinuationBeforeAcquisition(ReadFailingSelfVerification { device: DeviceIdentity(1), offset: DeviceOffsetInBytes(0), length_in_bytes: 4096 }) persisted=0 failed=0
+PROBE zeroed_after_the_continuation mounted instance=InstanceGeneration(3) devices_rewritten_by_the_acquisition=[DeviceIdentity(1)] continuation_steps=0

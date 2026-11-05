@@ -1,0 +1,6 @@
+PROBE zeroed_after_the_continuation mounted instance=InstanceGeneration(3) devices_rewritten_by_the_acquisition=[DeviceIdentity(1)] continuation_steps=0
+PROBE zeroed_image_space_admission_judged devices_unchanged=false
+PROBE zeroed_image_space_admission_judged mounted instance=InstanceGeneration(2) devices_rewritten_by_the_acquisition=[DeviceIdentity(1)] continuation_steps=16
+PROBE zeroed_image_space_admission_skipped mounted instance=InstanceGeneration(2) devices_rewritten_by_the_acquisition=[DeviceIdentity(1)] continuation_steps=15
+test attack_probe_narrow_image_with_a_device_without_any_self_verified_system_configuration ... PROBE unchanged_image mounted instance=InstanceGeneration(2) devices_rewritten_by_the_acquisition=[] continuation_steps=16
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in Ns

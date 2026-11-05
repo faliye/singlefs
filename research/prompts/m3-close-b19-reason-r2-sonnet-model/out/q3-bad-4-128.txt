@@ -1,0 +1,8 @@
+q3 writer=bad S=4 J=128 p_rootfail=0.0 cfg=today illegal_raise_roots=14382 reaches_ding=10942 final[holds=0 red=13225 partial=838 not_judged=319] partial_why[ambiguous:838] partial_ratio=0.0583
+q3 writer=bad S=4 J=128 p_rootfail=0.0 cfg=verdict illegal_raise_roots=14382 reaches_ding=10942 final[holds=0 red=13232 partial=831 not_judged=319] partial_why[ambiguous:831] partial_ratio=0.0578
+q3 writer=bad S=4 J=128 p_rootfail=0.0 cfg=today_known_genesis illegal_raise_roots=14382 reaches_ding=10942 final[holds=0 red=13225 partial=838 not_judged=319] partial_why[ambiguous:838] partial_ratio=0.0583
+q3 writer=bad S=4 J=128 p_rootfail=0.0 cfg=today_genesis_only illegal_raise_roots=14382 reaches_ding=10942 final[holds=0 red=13230 partial=833 not_judged=319] partial_why[ambiguous:833] partial_ratio=0.0579
+q3 writer=bad S=4 J=128 p_rootfail=0.0 cfg=today_both_fixed illegal_raise_roots=14382 reaches_ding=10942 final[holds=0 red=13232 partial=831 not_judged=319] partial_why[ambiguous:831] partial_ratio=0.0578
+q3 writer=bad S=4 J=128 p_rootfail=0.0 cfg=today_no_stop illegal_raise_roots=14382 reaches_ding=10942 final[holds=0 red=13225 partial=838 not_judged=319] partial_why[ambiguous:838] partial_ratio=0.0583
+q3enum writer=bad S=4 J=128 p_rootfail=0.0 illegal slots_overwritten_since_the_raise=72743 covered=72743 NOT_COVERED=0 not_recognized=0
+q3stop writer=bad S=4 J=128 p_rootfail=0.0 illegal same=14382

@@ -1,0 +1,112 @@
+defense LEGAL S=4 images=20000
+  S=4 legal J=12 mode=(0, 0, 0) [不放开（今天的实现）] red_images=0 partial_images=909
+  S=4 legal J=12 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=0 partial_images=909
+  S=4 legal J=12 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=0 partial_images=813
+  S=4 legal J=12 mode=(1, 1, 0) [放开 A 一层加 B] red_images=0 partial_images=93
+  S=4 legal J=12 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=0 partial_images=70
+  S=4 legal J=12 mode=(0, 0, 1) [只放开 C] red_images=0 partial_images=909
+  S=4 legal J=12 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=0 partial_images=70
+  S=4 legal J=12 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=0 partial_images=813
+  S=4 legal J=12 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=0 partial_images=909
+  S=4 legal J=24 mode=(0, 0, 0) [不放开（今天的实现）] red_images=0 partial_images=899
+  S=4 legal J=24 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=0 partial_images=899
+  S=4 legal J=24 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=0 partial_images=803
+  S=4 legal J=24 mode=(1, 1, 0) [放开 A 一层加 B] red_images=0 partial_images=55
+  S=4 legal J=24 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=0 partial_images=29
+  S=4 legal J=24 mode=(0, 0, 1) [只放开 C] red_images=0 partial_images=899
+  S=4 legal J=24 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=0 partial_images=29
+  S=4 legal J=24 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=0 partial_images=803
+  S=4 legal J=24 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=0 partial_images=899
+  S=4 legal J=64 mode=(0, 0, 0) [不放开（今天的实现）] red_images=0 partial_images=899
+  S=4 legal J=64 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=0 partial_images=899
+  S=4 legal J=64 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=0 partial_images=803
+  S=4 legal J=64 mode=(1, 1, 0) [放开 A 一层加 B] red_images=0 partial_images=55
+  S=4 legal J=64 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=0 partial_images=29
+  S=4 legal J=64 mode=(0, 0, 1) [只放开 C] red_images=0 partial_images=899
+  S=4 legal J=64 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=0 partial_images=29
+  S=4 legal J=64 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=0 partial_images=803
+  S=4 legal J=64 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=0 partial_images=899
+defense BAD   S=4 images=20000 images_with_a_true_violation_visible=3801
+  S=4 bad J=12 mode=(0, 0, 0) [不放开（今天的实现）] red_images=2808 partial_images=1246
+  S=4 bad J=12 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=2808 partial_images=1246
+  S=4 bad J=12 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=2962 partial_images=1055
+  S=4 bad J=12 mode=(1, 1, 0) [放开 A 一层加 B] red_images=3311 partial_images=274
+  S=4 bad J=12 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=3320 partial_images=252
+  S=4 bad J=12 mode=(0, 0, 1) [只放开 C] red_images=2808 partial_images=1246
+  S=4 bad J=12 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=3320 partial_images=252
+  S=4 bad J=12 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=2962 partial_images=1055
+  S=4 bad J=12 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=2808 partial_images=1246
+  S=4 bad J=24 mode=(0, 0, 0) [不放开（今天的实现）] red_images=2808 partial_images=1242
+  S=4 bad J=24 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=2808 partial_images=1242
+  S=4 bad J=24 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=2962 partial_images=1051
+  S=4 bad J=24 mode=(1, 1, 0) [放开 A 一层加 B] red_images=3327 partial_images=234
+  S=4 bad J=24 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=3336 partial_images=208
+  S=4 bad J=24 mode=(0, 0, 1) [只放开 C] red_images=2808 partial_images=1242
+  S=4 bad J=24 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=3336 partial_images=208
+  S=4 bad J=24 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=2962 partial_images=1051
+  S=4 bad J=24 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=2808 partial_images=1242
+  S=4 bad J=64 mode=(0, 0, 0) [不放开（今天的实现）] red_images=2808 partial_images=1242
+  S=4 bad J=64 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=2808 partial_images=1242
+  S=4 bad J=64 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=2962 partial_images=1051
+  S=4 bad J=64 mode=(1, 1, 0) [放开 A 一层加 B] red_images=3327 partial_images=234
+  S=4 bad J=64 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=3336 partial_images=208
+  S=4 bad J=64 mode=(0, 0, 1) [只放开 C] red_images=2808 partial_images=1242
+  S=4 bad J=64 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=3336 partial_images=208
+  S=4 bad J=64 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=2962 partial_images=1051
+  S=4 bad J=64 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=2808 partial_images=1242
+defense LEGAL S=8 images=20000
+  S=8 legal J=12 mode=(0, 0, 0) [不放开（今天的实现）] red_images=0 partial_images=4042
+  S=8 legal J=12 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=0 partial_images=4042
+  S=8 legal J=12 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=0 partial_images=3053
+  S=8 legal J=12 mode=(1, 1, 0) [放开 A 一层加 B] red_images=0 partial_images=2808
+  S=8 legal J=12 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=0 partial_images=2808
+  S=8 legal J=12 mode=(0, 0, 1) [只放开 C] red_images=0 partial_images=4042
+  S=8 legal J=12 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=0 partial_images=2808
+  S=8 legal J=12 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=0 partial_images=3053
+  S=8 legal J=12 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=0 partial_images=4042
+  S=8 legal J=24 mode=(0, 0, 0) [不放开（今天的实现）] red_images=0 partial_images=2718
+  S=8 legal J=24 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=0 partial_images=2718
+  S=8 legal J=24 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=0 partial_images=753
+  S=8 legal J=24 mode=(1, 1, 0) [放开 A 一层加 B] red_images=0 partial_images=51
+  S=8 legal J=24 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=0 partial_images=51
+  S=8 legal J=24 mode=(0, 0, 1) [只放开 C] red_images=0 partial_images=2718
+  S=8 legal J=24 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=0 partial_images=51
+  S=8 legal J=24 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=0 partial_images=753
+  S=8 legal J=24 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=0 partial_images=2718
+  S=8 legal J=64 mode=(0, 0, 0) [不放开（今天的实现）] red_images=0 partial_images=2718
+  S=8 legal J=64 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=0 partial_images=2718
+  S=8 legal J=64 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=0 partial_images=752
+  S=8 legal J=64 mode=(1, 1, 0) [放开 A 一层加 B] red_images=0 partial_images=48
+  S=8 legal J=64 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=0 partial_images=48
+  S=8 legal J=64 mode=(0, 0, 1) [只放开 C] red_images=0 partial_images=2718
+  S=8 legal J=64 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=0 partial_images=48
+  S=8 legal J=64 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=0 partial_images=752
+  S=8 legal J=64 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=0 partial_images=2718
+defense BAD   S=8 images=20000 images_with_a_true_violation_visible=7684
+  S=8 bad J=12 mode=(0, 0, 0) [不放开（今天的实现）] red_images=5751 partial_images=3445
+  S=8 bad J=12 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=5751 partial_images=3445
+  S=8 bad J=12 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=6325 partial_images=2463
+  S=8 bad J=12 mode=(1, 1, 0) [放开 A 一层加 B] red_images=6416 partial_images=2234
+  S=8 bad J=12 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=6416 partial_images=2234
+  S=8 bad J=12 mode=(0, 0, 1) [只放开 C] red_images=5751 partial_images=3445
+  S=8 bad J=12 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=6416 partial_images=2234
+  S=8 bad J=12 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=6325 partial_images=2463
+  S=8 bad J=12 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=5751 partial_images=3445
+  S=8 bad J=24 mode=(0, 0, 0) [不放开（今天的实现）] red_images=6171 partial_images=2364
+  S=8 bad J=24 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=6171 partial_images=2364
+  S=8 bad J=24 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=7019 partial_images=639
+  S=8 bad J=24 mode=(1, 1, 0) [放开 A 一层加 B] red_images=7235 partial_images=22
+  S=8 bad J=24 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=7235 partial_images=22
+  S=8 bad J=24 mode=(0, 0, 1) [只放开 C] red_images=6171 partial_images=2364
+  S=8 bad J=24 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=7235 partial_images=22
+  S=8 bad J=24 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=7019 partial_images=639
+  S=8 bad J=24 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=6171 partial_images=2364
+  S=8 bad J=64 mode=(0, 0, 0) [不放开（今天的实现）] red_images=6171 partial_images=2364
+  S=8 bad J=64 mode=(2, 0, 0) [只放开 A（B 不放）] red_images=6171 partial_images=2364
+  S=8 bad J=64 mode=(0, 1, 0) [只放开 B（A 不放）] red_images=7019 partial_images=638
+  S=8 bad J=64 mode=(1, 1, 0) [放开 A 一层加 B] red_images=7235 partial_images=20
+  S=8 bad J=64 mode=(2, 1, 0) [放开 A 不限层加 B] red_images=7235 partial_images=20
+  S=8 bad J=64 mode=(0, 0, 1) [只放开 C] red_images=6171 partial_images=2364
+  S=8 bad J=64 mode=(2, 1, 1) [全放开 A 不限层加 B 加 C] red_images=7235 partial_images=20
+  S=8 bad J=64 mode=(0, 1, 1) [只留 A 不放（放开 B、C）] red_images=7019 partial_images=638
+  S=8 bad J=64 mode=(2, 0, 1) [只留 B 不放（放开 A、C）] red_images=6171 partial_images=2364

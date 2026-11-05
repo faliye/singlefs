@@ -1,0 +1,3 @@
+name=decl_silencing tag=no-declaration-stuck status=low cores=1.0 threshold=7.8 declared_in_window=0 declared_fraction=0.00 watchdog_silenced=False
+name=decl_silencing tag=one-open-declaration-never-closed status=low cores=1.0 threshold=7.8 declared_in_window=600 declared_fraction=1.00 watchdog_silenced=True
+name=decl_silencing tag=one-second-serial-then-closed status=low cores=1.0 threshold=7.8 declared_in_window=1 declared_fraction=0.00 watchdog_silenced=True

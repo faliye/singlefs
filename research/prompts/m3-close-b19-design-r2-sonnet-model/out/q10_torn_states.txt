@@ -1,0 +1,4 @@
+screen_between_rounds=True torn_as_whole_mutation=False states_total=18 new_dead_L_states=0 D_without_verified_slot_states=6
+screen_between_rounds=True torn_as_whole_mutation=True states_total=18 new_dead_L_states=0 D_without_verified_slot_states=3
+screen_between_rounds=False torn_as_whole_mutation=False states_total=81 new_dead_L_states=9 D_without_verified_slot_states=36
+screen_between_rounds=False torn_as_whole_mutation=True states_total=81 new_dead_L_states=0 D_without_verified_slot_states=9

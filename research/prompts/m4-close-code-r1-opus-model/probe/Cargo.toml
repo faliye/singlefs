@@ -1,0 +1,18 @@
+# 攻方腿（m4-close-code-r1）的差分探针：同一份 suite.rs、trees.rs 编进两个模块，一边连改后（冻结副本）的 singlefs-core，
+# 一边连改前（HEAD 59ce5a865）的那一份、包名改成 singlefs-core-old。NEW_TREE / OLD_TREE 由 tools/rerun.sh 换成草稿目录里的两棵树。
+[package]
+name = "attack-codec-differential"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+singlefs-core = { path = "NEW_TREE/crates/singlefs-core" }
+singlefs-core-old = { path = "OLD_TREE/crates/singlefs-core" }
+
+[workspace]
+
+[profile.dev]
+opt-level = 1
+overflow-checks = true
+debug = 0

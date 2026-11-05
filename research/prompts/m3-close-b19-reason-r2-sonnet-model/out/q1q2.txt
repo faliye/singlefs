@@ -1,0 +1,140 @@
+name=q1q2 slots=7 worlds=641608
+name=side upper_slot_judge_alone_turns_partial_into_red_mode_gt=1754
+name=side upper_slot_judge_alone_turns_partial_into_red_mode_ne=6226
+name=verdict mode=ne holds=74382 partial=50406 red=516820
+name=verdict mode=gt holds=74382 partial=10658 red=556568
+name=verdict mode=none holds=74382 partial=0 red=567226
+name=only_span_wrong mode=gt verdict=holds worlds=6140
+name=only_span_wrong mode=gt verdict=partial worlds=2996
+name=only_span_wrong mode=gt verdict=red worlds=17404
+name=only_span_wrong mode=ne verdict=holds worlds=6140
+name=only_span_wrong mode=ne verdict=partial worlds=17056
+name=only_span_wrong mode=ne verdict=red worlds=3344
+name=only_span_wrong mode=none verdict=holds worlds=6140
+name=only_span_wrong mode=none verdict=red worlds=20400
+name=partial_ne kinds=accounting_off+duplicate_unreleased+missing named_by_another_invariant worlds=348
+name=partial_ne kinds=accounting_off+duplicate_unreleased+missing only_I-3.18 worlds=60
+name=partial_ne kinds=accounting_off+duplicate_unreleased+missing+released_live named_by_another_invariant worlds=60
+name=partial_ne kinds=accounting_off+missing named_by_another_invariant worlds=200
+name=partial_ne kinds=accounting_off+missing only_I-3.18 worlds=3840
+name=partial_ne kinds=accounting_off+missing+released_over_unit named_by_another_invariant worlds=980
+name=partial_ne kinds=accounting_off+missing+released_over_unit only_I-3.18 worlds=1152
+name=partial_ne kinds=accounting_off+missing+stray_unreleased named_by_another_invariant worlds=120
+name=partial_ne kinds=accounting_off+released_live+released_over_unit named_by_another_invariant worlds=286
+name=partial_ne kinds=accounting_off+released_over_unit named_by_another_invariant worlds=2150
+name=partial_ne kinds=accounting_off+released_over_unit only_I-3.18 worlds=204
+name=partial_ne kinds=accounting_off+stray_unreleased named_by_another_invariant worlds=328
+name=partial_ne kinds=duplicate_unreleased named_by_another_invariant worlds=3208
+name=partial_ne kinds=duplicate_unreleased+missing named_by_another_invariant worlds=36
+name=partial_ne kinds=duplicate_unreleased+missing only_I-3.18 worlds=720
+name=partial_ne kinds=duplicate_unreleased+missing+released_live only_I-3.18 worlds=100
+name=partial_ne kinds=duplicate_unreleased+released_live named_by_another_invariant worlds=1872
+name=partial_ne kinds=missing only_I-3.18 worlds=120
+name=partial_ne kinds=missing+released_over_unit only_I-3.18 worlds=334
+name=partial_ne kinds=only_span_wrong named_by_another_invariant worlds=4040
+name=partial_ne kinds=only_span_wrong only_I-3.18 worlds=13016
+name=partial_ne kinds=released_live named_by_another_invariant worlds=328
+name=partial_ne kinds=released_live only_I-3.18 worlds=4176
+name=partial_ne kinds=released_live+released_over_unit named_by_another_invariant worlds=2786
+name=partial_ne kinds=released_live+released_over_unit only_I-3.18 worlds=100
+name=partial_ne kinds=released_live+stray_unreleased named_by_another_invariant worlds=368
+name=partial_ne kinds=released_over_unit named_by_another_invariant worlds=7390
+name=partial_ne kinds=released_over_unit only_I-3.18 worlds=640
+name=partial_ne kinds=stray_unreleased named_by_another_invariant worlds=1240
+name=partial_ne kinds=stray_unreleased only_I-3.18 worlds=204
+name=partial_ne_i318_red {True: 50406}
+name=partial_gt_but_ne_says ('red',) 1064
+name=partial_ne_but_gt_says ('red', 'only_span_wrong') 14060
+name=partial_ne_but_gt_says ('red', 'other_kinds') 26752
+name=triple ne=holds gt=holds none=holds worlds=74382
+name=triple ne=partial gt=partial none=red worlds=9594
+name=triple ne=partial gt=red none=red worlds=40812
+name=triple ne=red gt=partial none=red worlds=1064
+name=triple ne=red gt=red none=red worlds=515756
+name=c944_pure mode=gt verdict=holds kinds=accounting_off+duplicate_unreleased+missing worlds=84
+name=c944_pure mode=gt verdict=holds kinds=accounting_off+missing worlds=4595
+name=c944_pure mode=gt verdict=holds kinds=accounting_off+missing+released_live worlds=2004
+name=c944_pure mode=gt verdict=holds kinds=accounting_off+missing+released_live+released_over_unit worlds=588
+name=c944_pure mode=gt verdict=holds kinds=accounting_off+missing+released_over_unit worlds=1450
+name=c944_pure mode=gt verdict=holds kinds=duplicate_unreleased+missing worlds=302
+name=c944_pure mode=gt verdict=holds kinds=duplicate_unreleased+missing+released_live worlds=144
+name=c944_pure mode=gt verdict=holds kinds=missing worlds=702
+name=c944_pure mode=gt verdict=holds kinds=missing+released_live worlds=330
+name=c944_pure mode=gt verdict=holds kinds=missing+released_live+released_over_unit worlds=216
+name=c944_pure mode=gt verdict=holds kinds=missing+released_over_unit worlds=453
+name=c944_pure mode=gt verdict=holds kinds=released_live worlds=7371
+name=c944_pure mode=ne verdict=holds kinds=accounting_off+duplicate_unreleased+missing worlds=84
+name=c944_pure mode=ne verdict=holds kinds=accounting_off+missing worlds=4595
+name=c944_pure mode=ne verdict=holds kinds=accounting_off+missing+released_live worlds=2004
+name=c944_pure mode=ne verdict=holds kinds=accounting_off+missing+released_live+released_over_unit worlds=588
+name=c944_pure mode=ne verdict=holds kinds=accounting_off+missing+released_over_unit worlds=1450
+name=c944_pure mode=ne verdict=holds kinds=duplicate_unreleased+missing worlds=302
+name=c944_pure mode=ne verdict=holds kinds=duplicate_unreleased+missing+released_live worlds=144
+name=c944_pure mode=ne verdict=holds kinds=missing worlds=702
+name=c944_pure mode=ne verdict=holds kinds=missing+released_live worlds=330
+name=c944_pure mode=ne verdict=holds kinds=missing+released_live+released_over_unit worlds=216
+name=c944_pure mode=ne verdict=holds kinds=missing+released_over_unit worlds=453
+name=c944_pure mode=ne verdict=holds kinds=released_live worlds=7371
+name=c944_pure mode=none verdict=holds kinds=accounting_off+duplicate_unreleased+missing worlds=84
+name=c944_pure mode=none verdict=holds kinds=accounting_off+missing worlds=4595
+name=c944_pure mode=none verdict=holds kinds=accounting_off+missing+released_live worlds=2004
+name=c944_pure mode=none verdict=holds kinds=accounting_off+missing+released_live+released_over_unit worlds=588
+name=c944_pure mode=none verdict=holds kinds=accounting_off+missing+released_over_unit worlds=1450
+name=c944_pure mode=none verdict=holds kinds=duplicate_unreleased+missing worlds=302
+name=c944_pure mode=none verdict=holds kinds=duplicate_unreleased+missing+released_live worlds=144
+name=c944_pure mode=none verdict=holds kinds=missing worlds=702
+name=c944_pure mode=none verdict=holds kinds=missing+released_live worlds=330
+name=c944_pure mode=none verdict=holds kinds=missing+released_live+released_over_unit worlds=216
+name=c944_pure mode=none verdict=holds kinds=missing+released_over_unit worlds=453
+name=c944_pure mode=none verdict=holds kinds=released_live worlds=7371
+name=c944_ne_not_red verdict=holds alone worlds=18239
+name=c944_ne_not_red verdict=holds with_another_red worlds=24610
+name=c944_ne_not_red verdict=partial with_another_red worlds=17986
+example ('c944_pure', 'gt', 'holds', 'accounting_off+duplicate_unreleased+missing') ((2, 1, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'absent+absent', 'x_u@0', 5, 1), ['accounting_off', 'duplicate_unreleased', 'missing'])
+example ('c944_pure', 'gt', 'holds', 'accounting_off+missing') ((1, 0, 7), (((0, 1, 'Q'),), 'absent', 'none', 5, 0), ['accounting_off', 'missing'])
+example ('c944_pure', 'gt', 'holds', 'accounting_off+missing+released_live') ((2, 1, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'none', 5, 1), ['accounting_off', 'missing', 'released_live'])
+example ('c944_pure', 'gt', 'holds', 'accounting_off+missing+released_live+released_over_unit') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'x_r4@1', 5, 1), ['accounting_off', 'missing', 'released_live', 'released_over_unit'])
+example ('c944_pure', 'gt', 'holds', 'accounting_off+missing+released_over_unit') ((1, 1, 7), (((0, 1, 'Q'),), 'absent', 'x_r4@0', 5, 0), ['accounting_off', 'missing', 'released_over_unit'])
+example ('c944_pure', 'gt', 'holds', 'duplicate_unreleased+missing') ((1, 1, 7), (((0, 1, 'W'),), 'absent', 'x_u@0', 5, 1), ['duplicate_unreleased', 'missing'])
+example ('c944_pure', 'gt', 'holds', 'duplicate_unreleased+missing+released_live') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'W')), 'absent+r7', 'x_u@0', 5, 2), ['duplicate_unreleased', 'missing', 'released_live'])
+example ('c944_pure', 'gt', 'holds', 'missing') ((1, 1, 7), (((0, 1, 'Q'),), 'absent', 'x_r4@1', 3, 1), ['missing'])
+example ('c944_pure', 'gt', 'holds', 'missing+released_live') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'x_r4@2', 3, 2), ['missing', 'released_live'])
+example ('c944_pure', 'gt', 'holds', 'missing+released_live+released_over_unit') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'W')), 'absent+r7', 'x_r7@0', 5, 2), ['missing', 'released_live', 'released_over_unit'])
+example ('c944_pure', 'gt', 'holds', 'missing+released_over_unit') ((1, 1, 7), (((0, 1, 'W'),), 'absent', 'x_r7@0', 5, 1), ['missing', 'released_over_unit'])
+example ('c944_pure', 'gt', 'holds', 'released_live') ((1, 1, 7), (((0, 1, 'W'),), 'r7', 'none', 5, 1), ['released_live'])
+example ('c944_pure', 'ne', 'holds', 'accounting_off+duplicate_unreleased+missing') ((2, 1, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'absent+absent', 'x_u@0', 5, 1), ['accounting_off', 'duplicate_unreleased', 'missing'])
+example ('c944_pure', 'ne', 'holds', 'accounting_off+missing') ((1, 0, 7), (((0, 1, 'Q'),), 'absent', 'none', 5, 0), ['accounting_off', 'missing'])
+example ('c944_pure', 'ne', 'holds', 'accounting_off+missing+released_live') ((2, 1, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'none', 5, 1), ['accounting_off', 'missing', 'released_live'])
+example ('c944_pure', 'ne', 'holds', 'accounting_off+missing+released_live+released_over_unit') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'x_r4@1', 5, 1), ['accounting_off', 'missing', 'released_live', 'released_over_unit'])
+example ('c944_pure', 'ne', 'holds', 'accounting_off+missing+released_over_unit') ((1, 1, 7), (((0, 1, 'Q'),), 'absent', 'x_r4@0', 5, 0), ['accounting_off', 'missing', 'released_over_unit'])
+example ('c944_pure', 'ne', 'holds', 'duplicate_unreleased+missing') ((1, 1, 7), (((0, 1, 'W'),), 'absent', 'x_u@0', 5, 1), ['duplicate_unreleased', 'missing'])
+example ('c944_pure', 'ne', 'holds', 'duplicate_unreleased+missing+released_live') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'W')), 'absent+r7', 'x_u@0', 5, 2), ['duplicate_unreleased', 'missing', 'released_live'])
+example ('c944_pure', 'ne', 'holds', 'missing') ((1, 1, 7), (((0, 1, 'Q'),), 'absent', 'x_r4@1', 3, 1), ['missing'])
+example ('c944_pure', 'ne', 'holds', 'missing+released_live') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'x_r4@2', 3, 2), ['missing', 'released_live'])
+example ('c944_pure', 'ne', 'holds', 'missing+released_live+released_over_unit') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'W')), 'absent+r7', 'x_r7@0', 5, 2), ['missing', 'released_live', 'released_over_unit'])
+example ('c944_pure', 'ne', 'holds', 'missing+released_over_unit') ((1, 1, 7), (((0, 1, 'W'),), 'absent', 'x_r7@0', 5, 1), ['missing', 'released_over_unit'])
+example ('c944_pure', 'ne', 'holds', 'released_live') ((1, 1, 7), (((0, 1, 'W'),), 'r7', 'none', 5, 1), ['released_live'])
+example ('c944_pure', 'none', 'holds', 'accounting_off+duplicate_unreleased+missing') ((2, 1, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'absent+absent', 'x_u@0', 5, 1), ['accounting_off', 'duplicate_unreleased', 'missing'])
+example ('c944_pure', 'none', 'holds', 'accounting_off+missing') ((1, 0, 7), (((0, 1, 'Q'),), 'absent', 'none', 5, 0), ['accounting_off', 'missing'])
+example ('c944_pure', 'none', 'holds', 'accounting_off+missing+released_live') ((2, 1, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'none', 5, 1), ['accounting_off', 'missing', 'released_live'])
+example ('c944_pure', 'none', 'holds', 'accounting_off+missing+released_live+released_over_unit') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'x_r4@1', 5, 1), ['accounting_off', 'missing', 'released_live', 'released_over_unit'])
+example ('c944_pure', 'none', 'holds', 'accounting_off+missing+released_over_unit') ((1, 1, 7), (((0, 1, 'Q'),), 'absent', 'x_r4@0', 5, 0), ['accounting_off', 'missing', 'released_over_unit'])
+example ('c944_pure', 'none', 'holds', 'duplicate_unreleased+missing') ((1, 1, 7), (((0, 1, 'W'),), 'absent', 'x_u@0', 5, 1), ['duplicate_unreleased', 'missing'])
+example ('c944_pure', 'none', 'holds', 'duplicate_unreleased+missing+released_live') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'W')), 'absent+r7', 'x_u@0', 5, 2), ['duplicate_unreleased', 'missing', 'released_live'])
+example ('c944_pure', 'none', 'holds', 'missing') ((1, 1, 7), (((0, 1, 'Q'),), 'absent', 'x_r4@1', 3, 1), ['missing'])
+example ('c944_pure', 'none', 'holds', 'missing+released_live') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'r7+absent', 'x_r4@2', 3, 2), ['missing', 'released_live'])
+example ('c944_pure', 'none', 'holds', 'missing+released_live+released_over_unit') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'W')), 'absent+r7', 'x_r7@0', 5, 2), ['missing', 'released_live', 'released_over_unit'])
+example ('c944_pure', 'none', 'holds', 'missing+released_over_unit') ((1, 1, 7), (((0, 1, 'W'),), 'absent', 'x_r7@0', 5, 1), ['missing', 'released_over_unit'])
+example ('c944_pure', 'none', 'holds', 'released_live') ((1, 1, 7), (((0, 1, 'W'),), 'r7', 'none', 5, 1), ['released_live'])
+example ('partial_ne_hidden', 'accounting_off+duplicate_unreleased+missing') ((2, 1, 7), (((0, 1, 'Q'), (1, 2, 'W')), 'absent+absent', 'x_u@1', 5, 2), ['accounting_off', 'duplicate_unreleased', 'missing'])
+example ('partial_ne_hidden', 'accounting_off+missing') ((2, 1, 7), (((0, 1, 'W'), (1, 1, 'Q')), 'u2+absent', 'none', 5, 1), ['accounting_off', 'missing', 'span_wrong'])
+example ('partial_ne_hidden', 'accounting_off+missing+released_over_unit') ((2, 2, 7), (((0, 1, 'W'), (1, 2, 'Q')), 'u2+absent', 'x_r7@2', 5, 2), ['accounting_off', 'missing', 'released_over_unit', 'span_wrong'])
+example ('partial_ne_hidden', 'accounting_off+released_over_unit') ((2, 3, 7), (((0, 1, 'W'), (2, 2, 'Q')), 'u2+u1', 'x_r7@3', 5, 3), ['accounting_off', 'released_over_unit', 'span_wrong'])
+example ('partial_ne_hidden', 'duplicate_unreleased+missing') ((1, 1, 7), (((0, 2, 'W'),), 'absent', 'x_u@0', 5, 2), ['duplicate_unreleased', 'missing'])
+example ('partial_ne_hidden', 'duplicate_unreleased+missing+released_live') ((2, 2, 7), (((0, 1, 'W'), (1, 2, 'W')), 'r7+absent', 'x_u@1', 5, 3), ['duplicate_unreleased', 'missing', 'released_live'])
+example ('partial_ne_hidden', 'missing') ((2, 2, 7), (((0, 1, 'Q'), (1, 2, 'W')), 'absent+u1', 'x_r4@3', 3, 3), ['missing', 'span_wrong'])
+example ('partial_ne_hidden', 'missing+released_over_unit') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'W')), 'absent+u2', 'x_r7@0', 5, 2), ['missing', 'released_over_unit', 'span_wrong'])
+example ('partial_ne_hidden', 'released_live') ((2, 2, 7), (((0, 1, 'W'), (1, 1, 'W')), 'r7+u2', 'none', 5, 2), ['released_live', 'span_wrong'])
+example ('partial_ne_hidden', 'released_live+released_over_unit') ((2, 3, 7), (((0, 1, 'W'), (1, 2, 'W')), 'r7+u1', 'x_r4@2', 5, 3), ['released_live', 'released_over_unit', 'span_wrong'])
+example ('partial_ne_hidden', 'released_over_unit') ((1, 2, 7), (((0, 2, 'W'),), 'u1', 'x_r4@1', 5, 2), ['released_over_unit', 'span_wrong'])
+example ('partial_ne_hidden', 'stray_unreleased') ((2, 3, 7), (((0, 1, 'W'), (2, 2, 'W')), 'u2+u1', 'x_u@3', 5, 3), ['span_wrong', 'stray_unreleased'])

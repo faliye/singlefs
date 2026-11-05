@@ -1,0 +1,10 @@
+147568485b2138e5c7b156a3c91df248ef6c5a678a30f6dbad12f60e4b511412  .claude/kb/decisions/16-发布语义.md
+790840038937a51b1c2c33f2905beb091208b69c28837560daa8118ae94e115b  .claude/kb/checks-owed.md
+9e3a5dae161cee3175e5cd401001cff9302e0126a11f6b5c47dec3a03cbcdce4  .claude/kb/experiments/183-容量斜率读缓存小盘准入与清扫阈值的代价数.md
+a834ca6f933d5b577c1059c6eb6dd5cf603e868291cea1225f199eb2c09080f2  .claude/kb/experiments/197-扫环胶水内存随盘数.md
+e7fbc0de76e7e76b5b76d4a9745afc45c2eb2ce7027ec703bbad082b20d6b9ca  crates/singlefs-checker/invariants/02-根环.md
+589b7705d115c0918cb643a82de7894c26fe82df684d3bd62f77df2961615a32  crates/singlefs-checker/invariants/05-空间记账.md
+cd991ff2a3df5f9a68558f31eda30a139aaa6bea91b452cccf5311f83b7ee0d8  crates/singlefs-checker/invariants/07-分配器.md
+80586ec42c1f4d1484859206c2c53843dd61bdd3a4e300a35ac1532b50fd4eaf  .claude/kb/experiments/173-上限卡在读坏槽的三种处置.md
+0ac0470cfa93b2fd5b2e48e165a9d788a7bb61e2504f35fde726a376d6646fd1  .claude/kb/experiments/112-legacy-writer-encountering-unknown-trees.en.md
+3e86833b26841f6de0b0443a481a40535d305ae9aebfda14ab655a83b1963ef1  .claude/kb/experiments/112-旧ライターが未知のツリーに遭遇した場合.ja.md

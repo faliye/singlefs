@@ -1,0 +1,11 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -5707,7 +5707,7 @@
+             .borrow_mut()
+             .drain(..)
+             .find(|read_failing_self_verification| {
+-                !read_back_a_system_configuration_slot_of_a_device_rewritten_by_the_acquisition(
++                true || !read_back_a_system_configuration_slot_of_a_device_rewritten_by_the_acquisition(
+                     read_failing_self_verification,
+                     &publishes_planned.devices_rewritten_by_the_acquisition,
+                     slot_spacing_in_bytes,

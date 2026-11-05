@@ -1,0 +1,18 @@
+# 派发：kb-scribe
+
+重型测试：不跑
+批次：records/2026-10-18-里程碑三收尾与近期欠账.md#批 10
+判决：research/prompts/agentdef-r3-main-verification.md
+草稿目录：/home/fy5090/.local/share/singlefs/work/d165-valves-r1-opus/probe-scratch-p1
+报告：/home/fy5090/.local/share/singlefs/work/d165-valves-r1-opus/probe-scratch-p1/result.md
+
+## 关的是哪几条
+
+照判决写回里程碑三的作业点与出口行。
+
+## 写范围
+
+只改 `.claude/kb/milestone/03-third-txn.md`。
+
+不碰的：
+- `.claude/kb/milestone/04-fourth-txn.md`：里程碑四的会话在改，主 agent 自己写。

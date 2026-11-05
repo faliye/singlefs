@@ -1,0 +1,53 @@
+heavy 行=171 符合=166 不符=1 漏拒(主agent带前缀类)=4
+heavy 不符: A43
+heavy 漏拒: M02,M06,M11,M13
+fuzz 行=232 符合=142 漏拒=81 放过且没起=7 拒了但没起=2
+fuzz 漏拒: Y001,Y002,Y003,Y004,Y007,Y008,Y009,Y010,Y011,Y012,Y013,Y014,Y015,Y016,Y017,Y018,Y019,Y023,Y024,Y025,Y026,Y027,Y028,Y029,Y030,Y032,Y033,Y034,Y035,Y037,Y038,Y039,Y040,Y042,Y047,Y051,Y052,Y053,Y054,Y055,Y056,Y064,Y065,Y066,Y067,Y068,Y069,Y070,Y071,Y072,Y073,Y082,Y083,Y084,Y085,Y086,Y087,Y088,Y092,Z015,Z016,Z019,Z020,Z021,Z028,Z030,Z044,Z045,Z046,Z047,Z048,Z050,Z051,Z052,Z053,Z063,Z070,Z077,Z082,Z100,Z136
+opts 行=105 符合=66 漏拒=14 误拒=25
+opts 漏拒: bash -Eeo pipefail -c 'cargo test --all' | bash -Eeuo pipefail -c 'cargo test --all' | bash -ceo pipefail 'cargo test --all' | bash -eco pipefail 'cargo test --all' | bash -eo pipefail -c 'cargo test --all' | bash -eo pipefail heavy.sh | bash -euo pipefail -c 'cargo test --all' | bash -euo pipefail ./heavy.sh | bash -euo pipefail heavy.sh | bash -euxo pipefail -c 'cargo test --all' | bash -ouc pipefail 'cargo test --all' | env bash -euo pipefail -c 'cargo test --all' | nice bash -euo pipefail -c 'cargo test --all' | timeout 5 bash -euo pipefail -c 'cargo test --all'
+hits H1a 子agent rc=0 检出1 主agent rc=0 检出1 真bash 真起
+hits H1b 子agent rc=0 检出1 主agent rc=0 检出1 真bash 真起
+hits H1c 子agent rc=0 检出1 主agent rc=0 检出1 真bash 真起
+hits H1d 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H1e 子agent rc=0 检出1 主agent rc=0 检出1 真bash 真起
+hits H1f 子agent rc=2 检出1 主agent rc=2 检出1 真bash 真起
+hits H2a 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H2b 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H2c 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H2d 子agent rc=2 检出1 主agent rc=2 检出1 真bash 真起
+hits H3a 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H3b 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H4a 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H4b 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H4c 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H4d 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H4e 子agent rc=2 检出1 主agent rc=2 检出1 真bash 真起
+hits H5a 子agent rc=0 检出1 主agent rc=0 检出1 真bash 真起
+hits H5b 子agent rc=0 检出1 主agent rc=0 检出1 真bash 真起
+hits H5c 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H5d 子agent rc=0 检出1 主agent rc=0 检出1 真bash 真起
+hits H6a 子agent rc=0 检出1 主agent rc=0 检出1 真bash 真起
+hits H6b 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H7a 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H7b 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H7c 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H7d 子agent rc=2 检出1 主agent rc=2 检出1 真bash 真起
+hits H8a 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H8b 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H8c 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H8d 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H9a 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H9b 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H9c 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H9d 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H9e 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H9f 子agent rc=0 检出0 主agent rc=0 检出0 真bash 真起
+hits H10 子agent rc=2 检出1 主agent rc=2 检出1 真bash 没起
+battery ②④①⑮=16/16 ⑫写范围=24/24 ⑫花括号=4/5 ⑬=4/4 准入=14/15 拷贝边界=5/5 旧根:写闸=8/8 旧根:检出=6/6 旧根:检出⑦=6/6 草稿目录=9/9
+battery 不符: admission.py 不在（python 自己退 2）（0 条检出） | 引号里的重定向花括号（真 bash 写一个字面名文件） | echo x > "out{1,2}.txt"
+g2 bash层=0/4 dr=20/20 ②=6/6 ④=9/9 ⑦⑬=11/11 ⑮=6/6 入口=4/4
+g2 不符: bash-command-detector.sh 没有 python3：记了几条检出 | bash-command-detector.sh 没有 python3：退出码 | heavy-test-guard.sh 没有 python3：记了几条检出 | heavy-test-guard.sh 没有 python3：退出码
+garbage 行=30 rc全0=True 每行检出+1=True
+refs 74 bad 3
+overblock 行=20 符合=20 误拒=
+overblock 该拒且拒=$EDITOR CLAUDE.md,"$PY" x.py,${CARGO:-cargo} fmt --all -- --check,$(which python3) -c "print(1)",exec "$@",bash "$SCRIPT",x=$(command -v git); $x status

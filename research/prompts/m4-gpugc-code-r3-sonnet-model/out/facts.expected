@@ -1,0 +1,24 @@
+FACT name=participating_gpus_callers_outside_tests count=0
+FACT name=mutation_rows_pinning_completed_pieces_redone count=0
+FACT name=free_bytes_assignments count=5 files=singlefs-background-gpu/src/background_gpu.rs,
+FACT name=mutation_rows_extra_unaccounted_buffer count=0
+FACT name=peak_measurement_lines count=0
+FACT name=remeasure_site 1697
+FACT name=real_gpu_mutation_rows count=38
+FACT name=seven_three_mutation_rows count=340
+FACT name=milestone_line_149_has_batching_word count=1
+FACT name=mount_parameters_anchor file=background_compute.rs line=640 text= background_compute: BackgroundComputeBackend::Cpu,
+FACT name=mount_parameters_anchor file=background_compute.rs line=642 text= background_gpu_memory_limit: None,
+FACT name=mount_parameters_anchor file=background_compute.rs line=644 text= };
+FACT name=mount_parameters_anchor file=background_compute.rs line=648 text=/// 「对 挂载参数默认，但是提供给可调节的
+FACT name=mount_parameters_anchor file=background_compute.rs line=668 text=/// （`allocator::DeviceFreeMap::allocated_slots`，含已
+FACT name=c942_anchor file=mounted_session.rs line=3238 text= devices: &mut [(DeviceIdentity, Device)],
+FACT name=c942_anchor file=mounted_session.rs line=3353 text= }
+FACT name=c943_anchor file=background_compute.rs line=683 text= /// # Panics
+FACT name=c943_anchor file=background_compute.rs line=698 text= allocator
+FACT name=c943_anchor file=background_compute.rs line=366 text= records: &[RegionRecordToClassifyOnTheGpu<'_>],
+FACT name=tables_larger_leftover count=0
+FACT name=frozen_vs_snapshot_not_ok count=0
+FACT name=old_frozen_repo round=m4-gpugc-code-r1 exists=no
+FACT name=old_frozen_repo round=m4-gpugc-code-r2 exists=no
+FACT name=kb_quotes_not_matching count=0

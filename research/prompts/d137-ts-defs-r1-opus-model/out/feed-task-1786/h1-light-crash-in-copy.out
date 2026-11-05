@@ -1,0 +1,5 @@
+✗ implementation-writer 经 task-server 提交的命令里有子 agent 不跑的一类：cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；--test $target）（checker 档）
+  另有：门禁 checker-tier-crash-point-replay.sh；要跑它的样本档：cd 进放了 .crash-point-replay-sample-tools 的样本根、根参数写同一个目录（登记表第 183 行；标记里的假工具要可执行、与仓里那一道某份样本的逐字节相同），或在仓根 bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh $PWD/.claude/gate.d --item checker-tier-crash-point-replay.sh 只喂它的样本（样本要与暂存区相同）（崩溃点重放）
+  另有：scripts/crash/crash-amplification.sh（崩溃放量：每一项经 crash-amplification-lib.sh 起 checker 档 cargo test；只有 crash-amplification.sh --list-items 与登记表里的单独 --selftest 不算）（崩溃放量）
+→ 规矩：子 agent 的非重型自己经 task-server 交，重型交回主 agent（用户定 M01「非重型自己交，重型交回」，records/2026-10-30-编译绕过内存总上限.md「收尾批」那一节）；服务认不出提交的是不是子 agent，所以由这道闸照 lib_heavy_tests.classify 判 `--` 之后那条：重型、提交时才跑的检查与认不出起什么的写法照拒，轻型三条、登记成 light 的自证、样本档与弄坏开关、harness 测试、clippy / build 放行。
+→ 怎么办：这一条不提交，把命令原样写进交回报告「要主 agent 跑的命令」一节（写成 `task-server/task submit -- <命令>`，标「重型」），交回之后由主 agent 提交。

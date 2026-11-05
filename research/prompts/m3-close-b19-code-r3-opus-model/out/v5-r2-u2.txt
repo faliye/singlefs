@@ -1,0 +1,6 @@
+PROBE name=plain_garbage_every_time result=ReadBackFailingSelfVerification device=DeviceIdentity(0) offset=DeviceOffsetInBytes(25067520) length=16384
+PROBE name=zeroed_garbage_every_time_tree_table_offset result=DeviceOffsetInBytes(25067520)
+PROBE name=zeroed_garbage_once result=MountMade devices_rewritten=[DeviceIdentity(1)]
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in Ns
+test u2_zeroed_slots_and_a_tree_table_read_back_garbage_once_is_made ... PROBE name=zeroed_fault_free result=MountMade devices_rewritten=[DeviceIdentity(1)]
+test u2_zeroed_slots_and_a_tree_table_reading_back_garbage_every_time_names_which_read ... PROBE name=zeroed_garbage_every_time result=ReadBackFailingSelfVerification device=DeviceIdentity(0) offset=DeviceOffsetInBytes(25067520) length=16384
