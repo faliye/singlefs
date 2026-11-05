@@ -6,7 +6,7 @@ scripts/mutation/mutate.sh 只跑 cargo，这一侧照它的形态写（登记�
 结局照 .claude/rules/mutation-sampling.md 的符号：✅ 抓到（单测红，或基线上为真的检查转假）、⏭ 无效（替换之后编不过）、❌ 没红、
 💥 检查进程没跑完（单测没红、检查没打出 __complete__）、⏱ 超时。结果行不带耗时，两次跑逐字节相同。
 
-跑法（经 run-with-memory-cap.sh 与 capped.sh）：
+跑法（整条命令交 `task-server/task submit --`）：
   python3 mutation_driver.py --table <变异表> --dumps <导出目录> --frozen-verdicts <第二段产物> --scratch <草稿目录> --output <新文件>
 """
 

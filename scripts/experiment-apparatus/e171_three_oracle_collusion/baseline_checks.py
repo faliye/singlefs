@@ -14,7 +14,7 @@ from run_directory import STREAM_NAMES, file_sha256, read_rows
 IMPLEMENTATION_VERDICTS_FILE = "impl-verdicts.tsv"
 MANIFEST_FILE = "manifest.tsv"
 NEUTRAL_FILES_COMPARED_WITH_E170 = ("base-sectors.bin", "ops.tsv", "ops-payload.bin", "calls.tsv", "torn.tsv",
-                                    "torn-payload.bin", "states.tsv", "quick-tier.tsv")
+                                    "torn-payload.bin", "states.tsv", "in-place-subsets.tsv")
 FILES_COMPARED_BETWEEN_TWO_BASELINES = NEUTRAL_FILES_COMPARED_WITH_E170 + (
     IMPLEMENTATION_VERDICTS_FILE, MANIFEST_FILE, "oracle-verdicts.tsv", "call-outcomes.tsv", "stream-status.tsv")
 FIRST_BATCH_DIVISOR = 7

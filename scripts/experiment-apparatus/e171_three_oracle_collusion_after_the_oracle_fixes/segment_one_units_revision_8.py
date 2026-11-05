@@ -7,38 +7,58 @@
       跑。同一条命令再起就是续跑：做完的单元（序列日志有它的绿行、日志点名的产物都在且行数同、它绿那一刻写下的清单里每个文件 sha256 不变、
       它的导出目录里不多不少）跳过，没做完的整个重跑、产物名与导出目录加 -attempt<N>（N 从 2 起，上一次的半份原样留着），重跑的单元下游的单元一并重跑。
   segment_one_units_revision_8.py plan --config C
-      干跑（PLAN_ONLY）：占位核对、前提核对、本机资源与槽、单元表与依赖图、按推的用时排出的次序、每个单元会跑的每一条命令（单元脚本 PRINT_ONLY=1）、
+      干跑（PLAN_ONLY）：占位核对、前提核对、本机线程与槽、单元表与依赖图、按推的用时排出的次序、每个单元会跑的每一条命令（单元脚本 PRINT_ONLY=1）、
       逐行编排的 plan（各台槽数、每行推的用时）；一个装置都不起、不编、不写产物与日志。干跑配置（dry_run=true）只认这一种用法。
   segment_one_units_revision_8.py --selftest [--cells 格,…] [--rounds N]
-      假单元脚本、假逐行编排、假资源、假前提走一遍各格；自证进程是收养者，每格之后收进程，末尾数遗留；逐个打开弄坏开关核红在点名格。
+      假单元脚本、假逐行编排、假前提走一遍各格；自证进程是收养者，每格之后收进程，末尾数遗留；逐个打开弄坏开关核红在点名格。
 
 单元（第 8.4 节「续跑」第一条；第 9 步的 Z1 与第 10 步的 Z7 各另成一个小单元，因为它们要等两边都绿、而第 9 步装置那一趟与第 7 步同时起）：
   step-0、step-1、step-2、step-2b 依次；之后 step-3-<十项>、step-4-<十项>、step-5、step-6、step-7、step-9、step-10-run-1、step-10-run-2 同时起，
   step-8 等 step-7，step-9-z1 等 step-7 与 step-9，step-10-z7 等第 10 步两次；第 0 步判 research_side_differs=true 时另排 research-mutations（等 step-0）。
-  第 11–13 步：step-0、1、2、2b、7（与 research-mutations，排了的话）都绿就起 rows_orchestrator_revision_8.py run，它与还在跑的单元共用本机，按它现查的余量分配。
-次序与资源：线程额度取登记的每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads，读 .claude/heavy-thread-default；
-  SINGLEFS_THREAD_CAP 设了照它），不看此刻忙闲，登记读不出退 78；内存额度（内存护栏）每次起跑、续跑现查 scripts/hosts/host-resources.py --json：
-  min(memory.slice_room, memory.available)；
-  每个单元占 THREADS（修订 6 跑法的 10）个线程（只比对的小单元 1 个）、内存照修订 6 跑法的 CAP_LARGE 6G（流三在里面的）/ CAP_SMALL 4G，
-  第 4 步每项另加编译 3 GiB（驱动在单元里冷编一次）；放得下就起，放不下的排队；队首是 step-7，其余按推的用时从长到短（推的用时只排先后，不进判定）。
-  逐行编排起了之后，每起一个单元之前再现查一次本机内存，此刻可用的内存也要放得下（线程额度照旧是登记值）。此刻一个单元都放不下（本机一个都没在跑）退 78。
+  第 11–13 步：要跑的单元（step-0 到 step-10-z7，与 research-mutations，排了的话）全部绿、一个都不在跑，才起 rows_orchestrator_revision_8.py run
+  （第 2 次重跑登记修订 7：逐行编排与单元不同时跑，它独占这一条任务的额度）。
+次序与资源：额度是这一条任务的线程，取登记的每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads，读 .claude/heavy-thread-default；
+  服务给每次尝试设的 SINGLEFS_THREAD_CAP 就是它，设了照它），不看此刻忙闲，登记读不出退 78；内存不在这里算：整条命令交 task-server，
+  内存额度按记录由服务给，撞上限由服务放大重排。额度只在这一条任务的进程里分，不落盘、不跨任务（修订 7）：
+  每个读数单元分 READING_UNIT_THREADS（10，r1 修订 6 跑法每个装置一趟的线程上限 10，第 7 步的 T 就是这么量的），只比对的小单元分 1；
+  在跑的单元分到的合起来加上要起的那一个不超过额度才起，放不下的排队；队首是 step-7，其余按推的用时从长到短（推的用时只排先后，不进判定）。
+  余数（额度减去在跑的）只给放得下的单元：额度 31 时三个读数单元同时跑，剩的 1 线程只给得了小单元。此刻一个单元都放不下（本机一个都没在跑）退 78。
+  逐行编排分 ROW_LANE_THREADS 的整数倍（额度减去除不尽的余数；额度 31 分 30，逐行编排照它排 6 条线道、每道 5 线程，与 r1 修订 6 跑法同）。
+  分到的线程设进子进程的环境：单元与逐行编排直接起，环境里线程数变量（frozen_o3.CHILD_THREAD_VARIABLES）都设成分到的数，
+  里面的装置与驱动读到的 SINGLEFS_THREAD_CAP 与各线程变量就是它（任务里面不再套线程包装，第 2 次重跑登记修订 8）。
 一步停：某个单元红，不再起新单元，并在日志目录写停派文件，逐行编排见到它不再派新行；在跑的跑完再收尾，退 1。
 收到 TERM / INT / HUP：给在跑的单元（各自一个进程组）与逐行编排各发一次 TERM，等它们退出，退 143；同一条命令再起就是续跑。
 第 7 步绿时往它的 -timing 产物末尾追加一行 E7TIMING name=concurrent_units_during_step_7（它跑的期间同时在跑的单元名，只描述，第 8.4 节）。
 
 退出码：0 全部单元绿、逐行编排退 0；1 有单元红、逐行编排退 1、或前提不过（S16 ②、Z5、H7、H8、Z2）；2 用法错；
-  78 运行条件不满足（占位没填或核不过、资源读不到、一个单元都放不下、逐行编排退 78）；143 收到停止信号。
+  78 运行条件不满足（占位没填或核不过、一个单元都放不下、逐行编排退 78）；143 收到停止信号。
 
-弄坏开关 UNITS_R8_BREAK=<项>（只在 --selftest 起的子进程里认，UNITS_R8_SELFTEST=1；自证还认几个只换假件的变量，见 fake_world）。项名、弄坏哪一处、打开后红在哪一格：
-  resume-reruns-green          续跑时做完的单元也重跑                              e2e-resume
-  resume-ignores-manifest      续跑时不核清单里的 sha256                            e2e-resume-manifest-changed
-  downstream-not-rerun         重跑的单元下游的单元不跟着重跑                      e2e-resume-manifest-changed
-  dependency-ignored           不等依赖的单元绿就起                                e2e-order
-  stop-ignored                 一个单元红了还接着起新单元                          e2e-unit-red
-  rows-before-step-7           逐行编排不等第 7 步绿就起                            e2e-order
-  budget-ignored               不看内存额度，线程放得下就起                        allocation-memory
-  concurrency-line-missing     第 7 步绿时不追加同时在跑的单元那一行                e2e-two-rounds
-  dry-run-runs                 干跑配置也照真的起跑                                e2e-dry-run-refused
+弄坏开关 UNITS_R8_BREAK=<项>（只在 --selftest 起的子进程里认，UNITS_R8_SELFTEST=1；自证还认几个只换假件的变量，见 fake_world）。逐项写开关名、弄坏哪一处，
+下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」；开关轮只核每项第一格）：
+  UNITS_R8_BREAK=resume-reruns-green  续跑时做完的单元也重跑
+      「✗ 自证 e2e-resume：」「✗ 自证 e2e-resume-manifest-changed：」
+  UNITS_R8_BREAK=resume-ignores-manifest  续跑时不核清单里的 sha256
+      「✗ 自证 e2e-resume-manifest-changed：」
+  UNITS_R8_BREAK=downstream-not-rerun  重跑的单元下游的单元不跟着重跑
+      「✗ 自证 e2e-resume-manifest-changed：」
+  UNITS_R8_BREAK=dependency-ignored  不等依赖的单元绿就起
+      「✗ 自证 e2e-order：」「✗ 自证 e2e-two-rounds：」「✗ 自证 e2e-unit-red：」「✗ 自证 e2e-resume：」「✗ 自证 e2e-resume-manifest-changed：」「✗ 自证 e2e-no-room：」
+  UNITS_R8_BREAK=stop-ignored  一个单元红了还接着起新单元
+      「✗ 自证 e2e-unit-red：」
+  UNITS_R8_BREAK=rows-before-units-done  逐行编排照修订 8 的旧闸起（step-0、1、2、2b、7 绿就起，不等别的单元做完）
+      「✗ 自证 e2e-order：」「✗ 自证 e2e-threads-within-quota：」
+  UNITS_R8_BREAK=threads-ignored  不看线程额度，放不放得下都起
+      「✗ 自证 allocation-threads：」「✗ 自证 e2e-no-room：」
+  UNITS_R8_BREAK=shares-not-applied  单元与逐行编排的环境里不设分到的线程（里面读到的是整份额度）
+      「✗ 自证 e2e-threads-within-quota：」
+  UNITS_R8_BREAK=concurrency-line-missing  第 7 步绿时不追加同时在跑的单元那一行
+      「✗ 自证 e2e-two-rounds：」
+  UNITS_R8_BREAK=dry-run-runs  干跑配置也照真的起跑
+      「✗ 自证 e2e-dry-run-refused：」
+  UNITS_R8_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  UNITS_R8_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 
@@ -58,6 +78,7 @@ import zoneinfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import frozen_o3  # noqa: E402（线程数变量那一组与设法 thread_environment）
 import frozen_tree_lines_revision_8 as judge  # noqa: E402
 import revision_8_placeholders as placeholders  # noqa: E402
 import revision_8_selftest_harness as harness  # noqa: E402
@@ -70,12 +91,11 @@ RESEARCH_RELATIVE = placeholders.RESEARCH_RELATIVE
 UNIT_SCRIPT = os.path.join(HERE, "segment_one_unit_revision_8.sh")
 ROWS_ORCHESTRATOR = os.path.join(HERE, "rows_orchestrator_revision_8.py")
 HOSTS_DIRECTORY = os.path.join(HERE, "..", "..", "hosts")  # scripts/hosts：线程额度的登记取法 heavy_threads.py 在这里
-GIB = 1 << 30
-# 修订 6 跑法第 53–58 行：每个装置一趟 capped.sh 10，流三在里面的 6G、只有流一流二的 4G
-THREADS = 10
-CAP_SMALL, CAP_LARGE = "4G", "6G"
-COMPILE_BYTES = 3 * GIB  # 第 4 步每项的驱动在单元里冷编一次（编排器文件头「资源与分配」同一个数：峰值表 2.54 GiB 向上取整）
-LIGHT_BYTES = 1 * GIB
+# r1 修订 6 跑法第 53–58 行：每个装置一趟的线程上限 10；第 7 步的进程挂钟 T（逐行限时 max(1800 秒, 3T) 的来源）就是这么量的（第 2 次重跑登记修订 7）
+READING_UNIT_THREADS = 10
+SMALL_UNIT_THREADS = 1  # 只比对的小单元（Z1、Z7）
+# r1 修订 6 跑法逐行驱动每条线道的线程；与 rows_orchestrator.py 的 LANE_THREADS_MINIMUM 同值（单测钉），逐行编排分到它的整数倍
+ROW_LANE_THREADS = 5
 STOP_FILE = "stop-dispatching-rows"
 MANIFEST = "resume-manifest.tsv"
 STEP_7_CONCURRENCY_PREFIX = "E7TIMING name=concurrent_units_during_step_7 "
@@ -83,7 +103,6 @@ STEP_7_CONCURRENCY_PREFIX = "E7TIMING name=concurrent_units_during_step_7 "
 # 第 8 步 5–30 分钟取 30；第 10 步两次共 233），没写的取几分钟（推的）
 STEP_3_ITEMS = ("o1-comparison", "o1-comparison-unmount", "o2", "return-value", "memory-object", "panic", "witness", "o3-p1", "o1-crash-judge", "reference-filesystem")
 STEP_4_ITEMS = ("o1-comparison", "o1-comparison-unmount", "o1-crash-judge", "reference-filesystem", "o2", "return-value", "memory-object", "panic", "witness", "o3-p1")
-CHAIN = ("step-0", "step-1", "step-2", "step-2b")
 ROWS_GATE = ("step-0", "step-1", "step-2", "step-2b", "step-7")
 
 
@@ -91,47 +110,42 @@ def broken(item: str) -> bool:
     return harness.broken(BREAK_VARIABLE, item)
 
 
-def bytes_of(cap: str) -> int:
-    return int(cap[:-1]) * GIB
-
-
 @dataclasses.dataclass(frozen=True)
 class Unit:
-    """一个单元：deps 是要先绿的单元；threads、memory_bytes 是它在本机占的额度；estimated_seconds 只排先后；
+    """一个单元：deps 是要先绿的单元；threads 是它在本机占的线程额度；estimated_seconds 只排先后；
     exports 是它写出、下游要的名字（环境变量名 → 不带 TAG 的名字，编排给下游时接上它这一次的 TAG）。"""
     name: str
     deps: tuple[str, ...]
     threads: int
-    memory_bytes: int
     estimated_seconds: float
     exports: tuple[tuple[str, str], ...] = ()
 
 
 def unit_table() -> dict[str, Unit]:
     after_chain = ("step-2b",)
+    threads = READING_UNIT_THREADS
     units = [
-        Unit("step-0", (), THREADS, bytes_of(CAP_SMALL), 900),
-        Unit("step-1", ("step-0",), THREADS, bytes_of(CAP_SMALL), 120, (("S2_BASELINE", "s2-device-baseline-streams-1-2"),)),
-        Unit("step-2", ("step-1",), THREADS, bytes_of(CAP_SMALL), 60, (("S2_E170_EXPORT", "s2-e170-export"),)),
-        Unit("step-2b", ("step-2",), THREADS, bytes_of(CAP_SMALL), 120, (("E170_SECOND_RUN", "e170-bad-states-second-run"),)),
+        Unit("step-0", (), threads, 900),
+        Unit("step-1", ("step-0",), threads, 120, (("S2_BASELINE", "s2-device-baseline-streams-1-2"),)),
+        Unit("step-2", ("step-1",), threads, 60, (("S2_E170_EXPORT", "s2-e170-export"),)),
+        Unit("step-2b", ("step-2",), threads, 120, (("E170_SECOND_RUN", "e170-bad-states-second-run"),)),
     ]
     for item in STEP_3_ITEMS:
-        stream_three = item in ("o1-crash-judge", "reference-filesystem")
         seconds = {"o1-crash-judge": 9698, "reference-filesystem": 8128}.get(item, 48)
-        units.append(Unit(f"step-3-{item}", after_chain, THREADS, bytes_of(CAP_LARGE if stream_three else CAP_SMALL), seconds))
+        units.append(Unit(f"step-3-{item}", after_chain, threads, seconds))
     for item in STEP_4_ITEMS:
-        units.append(Unit(f"step-4-{item}", after_chain, THREADS, bytes_of(CAP_SMALL) + COMPILE_BYTES, 72))
+        units.append(Unit(f"step-4-{item}", after_chain, threads, 72))
     units += [
-        Unit("step-5", after_chain, THREADS, bytes_of(CAP_SMALL), 300),
-        Unit("step-6", after_chain, THREADS, bytes_of(CAP_SMALL), 100),
-        Unit("step-7", after_chain, THREADS, bytes_of(CAP_LARGE), 14582, (("BASELINE_RUN1", "baseline-run1"),)),
-        Unit("step-8", ("step-7",), THREADS, bytes_of(CAP_LARGE), 1800),
-        Unit("step-9", after_chain, THREADS, bytes_of(CAP_LARGE), 14582, (("BASELINE_RUN2", "baseline-run2"),)),
-        Unit("step-9-z1", ("step-7", "step-9"), 1, LIGHT_BYTES, 60),
-        Unit("step-10-run-1", after_chain, THREADS, bytes_of(CAP_SMALL), 117, (("Q5_MAIN_RUN_1", "q5-main-before-the-first-barrier-of-call-3-run-1"),)),
-        Unit("step-10-run-2", after_chain, THREADS, bytes_of(CAP_SMALL), 117, (("Q5_MAIN_RUN_2", "q5-main-before-the-first-barrier-of-call-3-run-2"),)),
-        Unit("step-10-z7", ("step-10-run-1", "step-10-run-2"), 1, LIGHT_BYTES, 5),
-        Unit("research-mutations", ("step-0",), THREADS, 2 * GIB, 600),
+        Unit("step-5", after_chain, threads, 300),
+        Unit("step-6", after_chain, threads, 100),
+        Unit("step-7", after_chain, threads, 14582, (("BASELINE_RUN1", "baseline-run1"),)),
+        Unit("step-8", ("step-7",), threads, 1800),
+        Unit("step-9", after_chain, threads, 14582, (("BASELINE_RUN2", "baseline-run2"),)),
+        Unit("step-9-z1", ("step-7", "step-9"), SMALL_UNIT_THREADS, 60),
+        Unit("step-10-run-1", after_chain, threads, 117, (("Q5_MAIN_RUN_1", "q5-main-before-the-first-barrier-of-call-3-run-1"),)),
+        Unit("step-10-run-2", after_chain, threads, 117, (("Q5_MAIN_RUN_2", "q5-main-before-the-first-barrier-of-call-3-run-2"),)),
+        Unit("step-10-z7", ("step-10-run-1", "step-10-run-2"), SMALL_UNIT_THREADS, 5),
+        Unit("research-mutations", ("step-0",), threads, 600),
     ]
     return {unit.name: unit for unit in units}
 
@@ -325,7 +339,6 @@ class RunCondition(Exception):
 @dataclasses.dataclass(frozen=True)
 class Budget:
     threads: int
-    memory_bytes: int
 
 
 def registered_threads() -> int:
@@ -339,34 +352,29 @@ def registered_threads() -> int:
         raise RunCondition(f"线程额度的登记读不出：{error}（{error.howto}）") from error
 
 
-def idle_budget(settings: Settings) -> Budget | None:
-    """干跑里另排一遍用的「本机空着时」的额度：登记的线程额度与 min(slice 总量, 内存总量)（只给人看挂钟，起跑不用它）；读不到交回 None。"""
-    command = override("UNITS_R8_RESOURCES_COMMAND", "python3 scripts/hosts/host-resources.py --json")
-    completed = subprocess.run(["bash", "-c", command], cwd=settings.repo, capture_output=True, text=True)
-    hosts = [host for host in json.loads(completed.stdout).get("hosts", []) if host.get("number") == 1] if completed.returncode == 0 else []
-    if not hosts or not hosts[0].get("read"):
-        return None
-    memory = hosts[0]["memory"]
-    return Budget(registered_threads(), min(int(memory.get("slice_total", 0)), int(memory.get("mem_total", 0))))
-
-
 def local_budget(settings: Settings) -> Budget:
-    command = override("UNITS_R8_RESOURCES_COMMAND", "python3 scripts/hosts/host-resources.py --json")
-    completed = subprocess.run(["bash", "-c", command], cwd=settings.repo, capture_output=True, text=True)
-    if completed.returncode != 0:
-        raise RunCondition(f"host-resources.py --json 退 {completed.returncode}")
-    hosts = [host for host in json.loads(completed.stdout).get("hosts", []) if host.get("number") == 1]
-    if not hosts or not hosts[0].get("read"):
-        raise RunCondition("本机的资源没读到")
-    memory = hosts[0]["memory"]
-    memory_bytes = (1 << 60) if broken("budget-ignored") else min(int(memory["slice_room"]), int(memory["available"]))
-    return Budget(registered_threads(), memory_bytes)
+    return Budget(registered_threads())
 
 
 def fits(unit: Unit, running: list[Unit], budget: Budget) -> bool:
-    threads = sum(item.threads for item in running) + unit.threads
-    memory = sum(item.memory_bytes for item in running) + unit.memory_bytes
-    return threads <= budget.threads and memory <= budget.memory_bytes
+    return broken("threads-ignored") or sum(item.threads for item in running) + unit.threads <= budget.threads
+
+
+def rows_threads(quota: int) -> int:
+    """逐行编排分到的线程（文件头「次序与资源」）：额度里放得下的整条线道，每道 ROW_LANE_THREADS，除不尽的余数不给。"""
+    return quota - quota % ROW_LANE_THREADS
+
+
+def rows_may_start(required: set[str], done: set[str], running_count: int) -> bool:
+    """第 11–13 步起不起（文件头「单元」末条）：要跑的单元全部绿、一个都不在跑。"""
+    if broken("rows-before-units-done"):
+        return set(ROWS_GATE) | ({"research-mutations"} & required) <= done
+    return required <= done and running_count == 0
+
+
+def within_share(threads: int, environment: dict[str, str]) -> dict[str, str]:
+    """子进程的环境：线程数变量都设成分到的线程，里面读到的 SINGLEFS_THREAD_CAP 与各线程变量就是分到的数（文件头「次序与资源」）。"""
+    return dict(environment) if broken("shares-not-applied") else frozen_o3.thread_environment(threads, environment)
 
 
 def prerequisite_commands(settings: Settings) -> list[tuple[str, list[str]]]:
@@ -413,7 +421,7 @@ def unit_environment(settings: Settings, unit: Unit, attempt: int, directory: st
     environment = dict(os.environ, REPO=settings.repo, RESEARCH=RESEARCH_RELATIVE, PREFIX=settings.prefix, SUFFIX=settings.suffix, TAG=attempt_tag(attempt),
                        DUMPS=settings.dumps, TREE=tree, BIN=f"{tree}/target/release/{judge.E171_BINARY}", E170_BIN=f"{tree}/target/release/{judge.E170_BINARY}",
                        SNAPSHOT_DIGEST=settings.snapshot_digest, MUTATIONS_SHA256=settings.mutations_sha256, CONFIG=settings.config_path,
-                       THREADS=str(THREADS), CAP_SMALL=CAP_SMALL, CAP_LARGE=CAP_LARGE, WORK_ROOT=os.path.join(settings.logs, "work", f"{unit.name}-attempt-{attempt}"),
+                       THREADS=str(unit.threads), WORK_ROOT=os.path.join(settings.logs, "work", f"{unit.name}-attempt-{attempt}"),
                        UNIT_LOG=os.path.join(directory, "unit.log"), UNIT_PRODUCTS=os.path.join(directory, "products.tsv"),
                        UNIT_DIRECTORIES=os.path.join(directory, "directories.tsv"), Q5_REVERSE_STATES=settings.q5_reverse_states,
                        Q5_MAIN_STATES=settings.q5_main_states, PRINT_ONLY="1" if print_only else "0", PYTHONDONTWRITEBYTECODE="1",
@@ -437,8 +445,9 @@ def launch(settings: Settings, unit: Unit, attempt: int, names: dict[str, str]) 
     environment = unit_environment(settings, unit, attempt, directory, names, False)
     script = override("UNITS_R8_UNIT_SCRIPT", UNIT_SCRIPT)
     with open(os.path.join(directory, "stdout"), "x", encoding="utf-8") as out, open(os.path.join(directory, "stderr"), "x", encoding="utf-8") as err:
-        process = subprocess.Popen(["bash", script, unit.name], cwd=settings.repo, stdout=out, stderr=err, env=environment, start_new_session=True)
-    say(settings, f"▶ 单元 {unit.name} 起（第 {attempt} 次{'，TAG ' + attempt_tag(attempt) if attempt > 1 else ''}）：{unit.threads} 线程、{unit.memory_bytes // GIB} GiB")
+        process = subprocess.Popen(["bash", script, unit.name], cwd=settings.repo, stdout=out, stderr=err, env=within_share(unit.threads, environment),
+                                   start_new_session=True)
+    say(settings, f"▶ 单元 {unit.name} 起（第 {attempt} 次{'，TAG ' + attempt_tag(attempt) if attempt > 1 else ''}）：{unit.threads} 线程")
     return Running(unit, attempt, process, directory, time.monotonic())
 
 
@@ -496,12 +505,19 @@ def research_side_differs(settings: Settings, done: dict[str, tuple[int, str]]) 
     return judge.verdict_fields(path).get("research_side_differs", "true") != "false" if os.path.isfile(path) else True
 
 
-def rows_command(settings: Settings, done: dict[str, tuple[int, str]], mode: str) -> list[str]:
+def rows_command(settings: Settings, done: dict[str, tuple[int, str]], mode: str, budget: Budget) -> list[str]:
+    """逐行编排那一条，直接起（分到的线程由 rows_environment 设进环境，它照分到的线程排线道；文件头「次序与资源」）。"""
     script = override("UNITS_R8_ROWS_ORCHESTRATOR", ROWS_ORCHESTRATOR)
     tag = done.get("step-7", (1, ""))[1]
     interpreter = ["bash"] if script.endswith(".sh") else ["python3", "-B"]  # 自证的假逐行编排是 bash
-    return ["nice", "-n", "19"] + interpreter + [script, mode, "--config", settings.config_path, "--repo", settings.repo,
-            "--baseline-timing", settings.timing(f"baseline-run1{tag}"), "--stop-file", os.path.join(settings.logs, STOP_FILE)]
+    return ["nice", "-n", "19"] + interpreter + [
+        script, mode, "--config", settings.config_path, "--repo", settings.repo, "--baseline-timing", settings.timing(f"baseline-run1{tag}"),
+        "--stop-file", os.path.join(settings.logs, STOP_FILE)]
+
+
+def rows_environment(budget: Budget) -> dict[str, str]:
+    """逐行编排的环境：线程数变量都设成 rows_threads(额度)（文件头「次序与资源」）。"""
+    return within_share(rows_threads(budget.threads), dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
 
 
 STOP_REQUESTED = {"signal": None}
@@ -539,7 +555,8 @@ def run(settings: Settings) -> int:
         say(settings, "  上一趟留下的停派文件删了（这一趟重新起）")
     units = unit_table()
     budget = local_budget(settings)
-    say(settings, f"  本机额度：{budget.threads} 线程（登记值）、{budget.memory_bytes / GIB:.1f} GiB（内存每次起跑、续跑现查）")
+    say(settings, f"  这一条任务的额度：{budget.threads} 线程（SINGLEFS_THREAD_CAP，没设取登记值）；读数单元各分 {READING_UNIT_THREADS}、小单元各分 {SMALL_UNIT_THREADS}、"
+                  f"逐行编排分 {rows_threads(budget.threads)}")
     done, not_done = resume_state(settings, units)
     for name in sorted(done):
         say(settings, f"  复用 {name}（第 {done[name][0]} 次绿的那一份，清单核过）")
@@ -552,7 +569,6 @@ def run(settings: Settings) -> int:
     failures: list[str] = []
     orchestrator: subprocess.Popen | None = None
     orchestrator_exit: int | None = None
-    last_requery, fresh = 0.0, budget
     while True:
         if STOP_REQUESTED["signal"] is not None:
             say(settings, "收到停止信号：给在跑的单元与逐行编排各发一次 TERM，等它们退出")
@@ -583,26 +599,17 @@ def run(settings: Settings) -> int:
             orchestrator_exit = orchestrator.returncode
             say(settings, f"  逐行编排退 {orchestrator_exit}")
         required = set(units) - ({"research-mutations"} if not research_side_differs(settings, done) else set())
-        gate = set(CHAIN) if broken("rows-before-step-7") else set(ROWS_GATE) | ({"research-mutations"} & required)
-        if orchestrator is None and not failures and gate <= set(done):
-            orchestrator = subprocess.Popen(rows_command(settings, done, "run"), cwd=settings.repo, start_new_session=True,
-                                            env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
-            say(settings, f"▶ 第 11–13 步：逐行编排起（{', '.join(sorted(gate))} 都绿）")
+        if orchestrator is None and not failures and rows_may_start(required, set(done), len(running)):
+            orchestrator = subprocess.Popen(rows_command(settings, done, "run", budget), cwd=settings.repo, start_new_session=True,
+                                            env=rows_environment(budget))
+            say(settings, f"▶ 第 11–13 步：逐行编排起（要跑的 {len(required)} 个单元都绿，在跑的单元 {len(running)} 个）：分到 {rows_threads(budget.threads)} 线程"
+                          f"（额度 {budget.threads}，每道 {ROW_LANE_THREADS}）")
         stopping = bool(failures) or orchestrator_exit not in (None, 0)
         if not stopping or broken("stop-ignored"):
             ready = [units[name] for name in pending & required if name not in {item.unit.name for item in running}
                      and (broken("dependency-ignored") or all(dep in done for dep in units[name].deps))]
             for unit in queue_order(ready):
-                if orchestrator is not None and orchestrator.poll() is None and time.monotonic() - last_requery > float(override("UNITS_R8_REQUERY_SECONDS", "60")):
-                    last_requery = time.monotonic()
-                    try:
-                        fresh = local_budget(settings)
-                    except RunCondition as error:  # 单元在跑时读不到资源：不起新单元、等下一次再查，不丢下在跑的
-                        say(settings, f"  现查本机没读到（{error}），这一轮不起新单元")
-                        fresh = Budget(0, 0)
                 if not fits(unit, [item.unit for item in running], budget):
-                    continue
-                if orchestrator is not None and orchestrator.poll() is None and not fits(unit, [], fresh):
                     continue
                 attempt = next_attempt(settings, unit.name)
                 item = launch(settings, unit, attempt, exported_names(units, done))
@@ -616,7 +623,7 @@ def run(settings: Settings) -> int:
                 break
             ready = [name for name in pending & required if all(dep in done for dep in units[name].deps)]
             if ready:
-                raise RunCondition(f"此刻一个单元都放不下（本机额度 {budget.threads} 线程、{budget.memory_bytes / GIB:.1f} GiB；排着的 {','.join(sorted(ready))}）")
+                raise RunCondition(f"此刻一个单元都放不下（本机额度 {budget.threads} 线程；排着的 {','.join(sorted(ready))}）")
             if not ready and not required <= set(done) and orchestrator is None:
                 raise RunCondition("还有单元没做完、却没有一个依赖齐了（单元表有环或依赖缺）")
         time.sleep(poll_seconds())
@@ -659,10 +666,11 @@ def plan(settings: Settings) -> int:
     print(f"树 {settings.tree}；产物 {settings.prefix}-<步名>{settings.suffix}.out；导出 {settings.dumps}；日志 {settings.logs}")
     print("── 占位与前提（只核、不停）──")
     check_prerequisites(settings, quiet=True)
-    print("── 本机资源与额度 ──")
+    print("── 本机线程额度 ──")
     budget = local_budget(settings)
-    print(f"本机额度：{budget.threads} 线程、{budget.memory_bytes / GIB:.1f} GiB；每个单元 {THREADS} 线程（Z1、Z7 两个小单元 1 线程），"
-          f"内存 {CAP_LARGE}（流三在里面的）/ {CAP_SMALL}，第 4 步每项另加编译 {COMPILE_BYTES // GIB} GiB")
+    print(f"本机额度（这一条任务的）：{budget.threads} 线程；每个读数单元分 {READING_UNIT_THREADS} 线程，Z1、Z7 两个小单元分 {SMALL_UNIT_THREADS} 线程，"
+          f"逐行编排在单元全部做完之后分 {rows_threads(budget.threads)} 线程（每道 {ROW_LANE_THREADS}）；各自直接起、环境里 {len(frozen_o3.CHILD_THREAD_VARIABLES)} 个线程数变量设成分到的数，"
+          f"只在这一条任务的进程里分")
     units = unit_table()
     done, not_done = resume_state(settings, units)
     research = research_side_differs(settings, done)
@@ -671,19 +679,17 @@ def plan(settings: Settings) -> int:
     for name in names:
         unit = units[name]
         state = f"做完（第 {done[name][0]} 次）" if name in done else f"要跑（第 {next_attempt(settings, name)} 次）"
-        print(f"单元 {name}：依赖 {','.join(unit.deps) or '无'}；{unit.threads} 线程；{unit.memory_bytes / GIB:.0f} GiB；推的用时 {unit.estimated_seconds:.0f} 秒；{state}")
+        print(f"单元 {name}：依赖 {','.join(unit.deps) or '无'}；{unit.threads} 线程；推的用时 {unit.estimated_seconds:.0f} 秒；{state}")
     print("── 依赖图（边：先 → 后）──")
     for name in names:
         for dep in units[name].deps:
             print(f"{dep} → {name}")
-    print(f"{' + '.join(ROWS_GATE)}{' + research-mutations' if research else ''} → 第 11–13 步（rows_orchestrator_revision_8.py）")
-    idle = idle_budget(settings)
-    for title, room in (("此刻的本机额度（登记线程、现查内存）", budget), ("本机空着时（登记线程、slice 总量；只给人看挂钟）", idle)):
-        print(f"── 按推的用时在{title}里排（只排先后，不进判定）──")
-        placed = simulate(units, [name for name in names if name not in done], room) if room else []
-        for name, start, end in sorted(placed, key=lambda entry: (entry[1], entry[0])):
-            print(f"{start / 3600:6.2f} h 起 → {end / 3600:6.2f} h 止  {name}")
-        print(f"排进去 {len(placed)} 个（要 {len([name for name in names if name not in done])} 个）" + (f"；额度 {room.threads} 线程、{room.memory_bytes / GIB:.1f} GiB" if room else "；读不到"))
+    print(f"要跑的 {len(names)} 个单元全部绿 → 第 11–13 步（rows_orchestrator_revision_8.py）")
+    print("── 按推的用时在此刻的本机额度里排（只排先后，不进判定）──")
+    placed = simulate(units, [name for name in names if name not in done], budget)
+    for name, start, end in sorted(placed, key=lambda entry: (entry[1], entry[0])):
+        print(f"{start / 3600:6.2f} h 起 → {end / 3600:6.2f} h 止  {name}")
+    print(f"排进去 {len(placed)} 个（要 {len([name for name in names if name not in done])} 个）；额度 {budget.threads} 线程")
     print("── 各单元的命令（单元脚本 PRINT_ONLY=1）──")
     predicted = dict(done)
     for name in names:
@@ -699,9 +705,9 @@ def plan(settings: Settings) -> int:
         print(f"单元 {name}（第 {attempt} 次）：")
         print(completed.stdout.rstrip("\n") + (f"\n  ✗ 单元脚本退 {completed.returncode}：{completed.stderr.strip()}" if completed.returncode else ""))  # gate-lint:detail
     print("── 第 11–13 步：逐行编排的 plan ──")
-    command = rows_command(settings, predicted, "plan")
-    print("$ " + " ".join(shlex.quote(word) for word in command))
-    completed = subprocess.run(command, cwd=settings.repo, capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+    command = rows_command(settings, predicted, "plan", budget)
+    print(f"（线程数变量都设成 {rows_threads(budget.threads)}）$ " + " ".join(shlex.quote(word) for word in command))
+    completed = subprocess.run(command, cwd=settings.repo, capture_output=True, text=True, env=rows_environment(budget))
     print(completed.stdout.rstrip("\n"))
     if completed.returncode:
         print(f"逐行编排 plan 退 {completed.returncode}：{completed.stderr.strip()}")
@@ -733,7 +739,7 @@ FAKE_UNIT_SCRIPT = r'''#!/bin/bash
 set -u
 unit=$1
 if [ "${PRINT_ONLY:-0}" = 1 ]; then echo "  \$ fake-device $unit S2_BASELINE=${S2_BASELINE:-unset} BASELINE_RUN1=${BASELINE_RUN1:-unset}"; exit 0; fi
-echo "start $unit ${TAG:--} $(date +%s.%N)" >> "$FAKE_LOG"
+echo "start $unit ${TAG:--} $(date +%s.%N) cap=${SINGLEFS_THREAD_CAP:-unset}" >> "$FAKE_LOG"
 seconds=${FAKE_SECONDS:-0.05}; variable="FAKE_SECONDS_${unit//-/_}"; [ -n "${!variable:-}" ] && seconds=${!variable}
 sleep "$seconds"
 mkdir -p "$DUMPS/$unit$TAG" && echo "$unit" > "$DUMPS/$unit$TAG/data" && echo "$DUMPS/$unit$TAG" >> "$UNIT_DIRECTORIES"
@@ -752,7 +758,7 @@ echo "end $unit ${TAG:--} $(date +%s.%N)" >> "$FAKE_LOG"
 '''
 FAKE_ROWS = r'''#!/bin/bash
 mode=$1
-echo "rows-$mode start $(date +%s.%N)" >> "$FAKE_LOG"
+echo "rows-$mode start $(date +%s.%N) cap=${SINGLEFS_THREAD_CAP:-unset}" >> "$FAKE_LOG"
 if [ "$mode" = plan ]; then echo "fake rows plan"; exit 0; fi
 sleep "${FAKE_ROWS_SECONDS:-0.1}"
 echo "rows-$mode end $(date +%s.%N)" >> "$FAKE_LOG"
@@ -772,21 +778,22 @@ class FakeWorld:
         return [sys.executable, "-B", os.path.abspath(__file__), mode, "--config", self.config, "--repo", self.repo]
 
 
-def fake_world(root: str, threads: int = 30, room_gib: float = 40, extra: dict[str, str] | None = None, dry_run: bool = False) -> FakeWorld:
+def fake_world(root: str, thread_cap: int | None = 30, extra: dict[str, str] | None = None, dry_run: bool = False) -> FakeWorld:
+    """thread_cap 是这一条任务的额度（SINGLEFS_THREAD_CAP）；None 是不设，额度取登记值。"""
     repo = os.path.join(root, "repo")
     os.makedirs(os.path.join(repo, "research/results"))
     unit_script = judge.write_text(os.path.join(root, "fake-unit.sh"), FAKE_UNIT_SCRIPT)
     rows = judge.write_text(os.path.join(root, "fake-rows.sh"), FAKE_ROWS)
-    resources = judge.write_text(os.path.join(root, "resources.json"), json.dumps({"hosts": [{"number": 1, "read": True, "cpu": {"available_threads": threads},
-                                                                                            "memory": {"available": int(room_gib * 2 * GIB), "slice_room": int(room_gib * GIB)}}]}))
     config = {"dry_run": dry_run, "dry_run_note": "自证" if dry_run else None, "tree": "scripts/experiment-apparatus/target/fake-tree", "H3": {"snapshot_digest": "f" * 64},
               "H8": {"mutations_table_sha256": "e" * 64}, "H14": {"reverse_states": 72, "main_states": 1207959552}, "H7": {},
               "H16": {"run_date": "2026-10-09", "run_suffix": "-r8", "dumps_root": "scripts/experiment-apparatus/target/e171-r1-dumps/fake", "logs_directory": os.path.join(root, "logs")}}
     config_path = judge.write_text(os.path.join(root, "config.json"), json.dumps(config))
     log = os.path.join(root, "fake.log")
     environment = dict(os.environ, UNITS_R8_SELFTEST="1", UNITS_R8_UNIT_SCRIPT=unit_script, UNITS_R8_ROWS_ORCHESTRATOR=rows,
-                       UNITS_R8_RESOURCES_COMMAND=f"cat {shlex.quote(resources)}", UNITS_R8_PREREQUISITES_COMMAND="true",
-                       UNITS_R8_POLL_SECONDS="0.02", UNITS_R8_REQUERY_SECONDS="0", FAKE_LOG=log, PYTHONDONTWRITEBYTECODE="1")
+                       UNITS_R8_PREREQUISITES_COMMAND="true", SINGLEFS_THREAD_CAP=str(thread_cap),
+                       UNITS_R8_POLL_SECONDS="0.02", FAKE_LOG=log, PYTHONDONTWRITEBYTECODE="1")
+    if thread_cap is None:
+        environment.pop("SINGLEFS_THREAD_CAP")
     environment.update(extra or {})
     return FakeWorld(root, repo, config_path, log, environment)
 
@@ -802,7 +809,7 @@ def fake_events(world: FakeWorld) -> list[tuple[str, str, str, float, str]]:
     for line in open(world.log, encoding="utf-8") if os.path.exists(world.log) else []:
         words = line.split()
         if words[0].startswith("rows-"):
-            events.append((words[1], words[0], "-", float(words[2]), ""))
+            events.append((words[1], words[0], "-", float(words[2]), " ".join(words[3:])))
         else:
             events.append((words[0], words[1], words[2], float(words[3]), " ".join(words[4:])))
     return events
@@ -816,15 +823,22 @@ def times_of(events, kind: str) -> dict[str, list[float]]:
     return found
 
 
-def cell_allocation_memory(scratch: str) -> tuple[bool, str]:
-    world = fake_world(scratch, threads=30, room_gib=14)
-    os.environ.update({key: world.environment[key] for key in ("UNITS_R8_RESOURCES_COMMAND",)})
-    settings = settings_from_config(world.repo, world.config)
-    budget = local_budget(settings)
-    units = unit_table()
-    placed = simulate(units, ["step-7", "step-9", "step-3-o1-crash-judge"], budget)
+def cell_allocation_threads(scratch: str) -> tuple[bool, str]:
+    world = fake_world(scratch, thread_cap=20)
+    saved = os.environ.get("SINGLEFS_THREAD_CAP")
+    os.environ["SINGLEFS_THREAD_CAP"] = world.environment["SINGLEFS_THREAD_CAP"]
+    try:
+        settings = settings_from_config(world.repo, world.config)
+        budget = local_budget(settings)
+        units = unit_table()
+        placed = simulate(units, ["step-7", "step-9", "step-3-o1-crash-judge"], budget)
+    finally:
+        if saved is None:
+            os.environ.pop("SINGLEFS_THREAD_CAP", None)
+        else:
+            os.environ["SINGLEFS_THREAD_CAP"] = saved
     at_zero = sorted(name for name, start, _ in placed if start == 0)
-    return at_zero == ["step-7", "step-9"], f"额度 {budget.threads} 线程、{budget.memory_bytes / GIB:.0f} GiB：同时起的 {at_zero}（三个 6G 的只放得下两个）"
+    return at_zero == ["step-7", "step-9"], f"额度 {budget.threads} 线程：同时起的 {at_zero}（三个各分 {READING_UNIT_THREADS} 线程的只放得下两个）"
 
 
 def cell_queue_order(scratch: str) -> tuple[bool, str]:
@@ -862,13 +876,14 @@ def cell_e2e_order(scratch: str) -> tuple[bool, str]:
     started, ended = times_of(events, "start"), times_of(events, "end")
     units = unit_table()
     early = [name for name in started if name in units and any(dep in ended and started[name][0] < ended[dep][0] for dep in units[name].deps)]
-    rows_early = "rows-run" in started and "step-7" in ended and started["rows-run"][0] < ended["step-7"][0]
+    last_unit_end = max((moments[-1] for name, moments in ended.items() if name in units), default=None)
+    rows_early = "rows-run" in started and (last_unit_end is None or started["rows-run"][0] < last_unit_end)
     return code == 0 and not early and not rows_early and "research-mutations" not in started, \
-        f"退 {code}；依赖没绿就起的 {early or '无'}；逐行编排早于第 7 步绿起 {rows_early}；研究一侧变异表没排（第 0 步报没有不同）{'research-mutations' not in started}"
+        f"退 {code}；依赖没绿就起的 {early or '无'}；逐行编排早于最后一个单元收尾起 {rows_early}；研究一侧变异表没排（第 0 步报没有不同）{'research-mutations' not in started}"
 
 
 def cell_e2e_unit_red(scratch: str) -> tuple[bool, str]:
-    world = fake_world(scratch, threads=20, extra={"FAKE_RED": "step-3-o2", "FAKE_SECONDS_step_7": "0.5", "FAKE_SECONDS_step_9": "0.5"})
+    world = fake_world(scratch, extra={"FAKE_RED": "step-3-o2", "FAKE_SECONDS_step_7": "0.5", "FAKE_SECONDS_step_9": "0.5"})
     code, output = world_run(world)
     events = fake_events(world)
     red_end = [moment for event, name, _, moment, note in events if event == "end" and name == "step-3-o2"]
@@ -880,7 +895,7 @@ def cell_e2e_unit_red(scratch: str) -> tuple[bool, str]:
 
 def cell_e2e_resume(scratch: str) -> tuple[bool, str]:
     """跑到一半收 TERM（退 143），同一条命令再起（退 0）：TERM 之前绿了的单元不重跑；被打断的那几个重跑、带 -attempt2。"""
-    world = fake_world(scratch, threads=20, extra={"FAKE_SECONDS": "0.15"})
+    world = fake_world(scratch, extra={"FAKE_SECONDS": "0.15"})
     process = subprocess.Popen(world.command(), cwd=world.repo, env=world.environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     deadline = time.monotonic() + 120
     while time.monotonic() < deadline and len(times_of(fake_events(world), "end")) < 8:
@@ -920,10 +935,45 @@ def cell_e2e_dry_run_refused(scratch: str) -> tuple[bool, str]:
 
 
 def cell_e2e_no_room(scratch: str) -> tuple[bool, str]:
-    world = fake_world(scratch, threads=5, room_gib=3)
+    world = fake_world(scratch, thread_cap=5)
     code, output = world_run(world)
     return (code == EXIT_RUN_CONDITION and "放不下" in output,
-            f"本机内存额度只有 3 GiB（此刻空闲 5 线程不看，线程额度是登记值）：退 {code}；{output.strip().splitlines()[-1:]}")
+            f"本机线程额度只有 5（每个读数单元分 {READING_UNIT_THREADS}）：退 {code}；{output.strip().splitlines()[-1:]}")
+
+
+def peak_concurrent_threads(events, shares: dict[str, int]) -> int:
+    """假件日志里同一时刻在跑的单元与逐行编排分到的线程之和的峰值（start 加、end 减，同一时刻先减后加）。"""
+    changes = sorted((moment, 0 if event == "end" else 1, shares.get(name, 0) * (-1 if event == "end" else 1))
+                     for event, name, _, moment, _ in events if event in ("start", "end"))
+    total, peak = 0, 0
+    for _, _, change in changes:
+        total += change
+        peak = max(peak, total)
+    return peak
+
+
+def cell_e2e_threads_within_quota(scratch: str) -> tuple[bool, str]:
+    """SINGLEFS_THREAD_CAP 不设（额度取登记值）：每个读数单元里读到的上限是 10、小单元是 1、逐行编排是登记值去掉除不尽 5 的余数；
+    同一时刻在跑的合起来不超过登记值；逐行编排在最后一个单元收尾之后才起（不与单元同时跑）。"""
+    world = fake_world(scratch, thread_cap=None, extra={"FAKE_SECONDS_step_7": "0.3", "FAKE_SECONDS_step_9": "0.3"})
+    if HOSTS_DIRECTORY not in sys.path:
+        sys.path.insert(0, HOSTS_DIRECTORY)
+    import heavy_threads  # noqa: E402（现用现引）
+    quota = heavy_threads.default_heavy_threads(world.environment)   # 假世界里没设 SINGLEFS_THREAD_CAP：登记值
+    code, _ = world_run(world)
+    events = fake_events(world)
+    units = unit_table()
+    caps = {name: note.split("cap=")[1].split()[0] for event, name, _, _, note in events if event == "start" and "cap=" in note}
+    wanted = {name: str(unit.threads) for name, unit in units.items() if name in caps} | {"rows-run": str(rows_threads(quota))}
+    shares = {name: int(value) for name, value in caps.items() if value.isdigit()}
+    peak = peak_concurrent_threads(events, shares)
+    ended = times_of(events, "end")
+    last_unit_end = max((moments[-1] for name, moments in ended.items() if name in units), default=None)
+    rows_after = "rows-run" in times_of(events, "start") and last_unit_end is not None and times_of(events, "start")["rows-run"][0] >= last_unit_end
+    wrong = sorted(name for name in wanted if caps.get(name) != wanted[name])
+    good = code == 0 and not wrong and peak <= quota and rows_after and caps.get("step-7") == "10" and caps.get("rows-run") == str(rows_threads(quota))
+    return good, (f"退 {code}；额度 {quota}（登记值）；读到的上限与分到的不同的 {wrong or '无'}（第 7 步 {caps.get('step-7')}、逐行编排 {caps.get('rows-run')}）；"
+                  f"同时在跑的合起来峰值 {peak}；逐行编排在最后一个单元收尾之后起 {rows_after}")
 
 
 def cell_plan_prints_commands(scratch: str) -> tuple[bool, str]:
@@ -963,15 +1013,16 @@ def cell_unit_script_commands(scratch: str) -> tuple[bool, str]:
 
 SELFTEST_CELLS = {
     "unit-script-commands": cell_unit_script_commands,
-    "allocation-memory": cell_allocation_memory, "queue-order": cell_queue_order, "downstream": cell_downstream,
+    "allocation-threads": cell_allocation_threads, "queue-order": cell_queue_order, "downstream": cell_downstream,
     "e2e-two-rounds": cell_e2e_two_rounds, "e2e-order": cell_e2e_order, "e2e-unit-red": cell_e2e_unit_red, "e2e-resume": cell_e2e_resume,
     "e2e-resume-manifest-changed": cell_e2e_resume_manifest_changed, "e2e-dry-run-refused": cell_e2e_dry_run_refused, "e2e-no-room": cell_e2e_no_room,
+    "e2e-threads-within-quota": cell_e2e_threads_within_quota,
     "plan-prints-commands": cell_plan_prints_commands,
 }
 SELFTEST_SWITCHES = {
     "resume-reruns-green": "e2e-resume", "resume-ignores-manifest": "e2e-resume-manifest-changed", "downstream-not-rerun": "e2e-resume-manifest-changed",
-    "dependency-ignored": "e2e-order", "stop-ignored": "e2e-unit-red", "rows-before-step-7": "e2e-order", "budget-ignored": "allocation-memory",
-    "concurrency-line-missing": "e2e-two-rounds", "dry-run-runs": "e2e-dry-run-refused",
+    "dependency-ignored": "e2e-order", "stop-ignored": "e2e-unit-red", "rows-before-units-done": "e2e-order", "threads-ignored": "allocation-threads",
+    "concurrency-line-missing": "e2e-two-rounds", "dry-run-runs": "e2e-dry-run-refused", "shares-not-applied": "e2e-threads-within-quota",
 }
 
 

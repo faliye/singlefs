@@ -10,15 +10,20 @@ table_row、rows_sharing_this_replacement、table、rerun、run_exit、copy_rest
 用法：
   e165-compare-kill-bounds.py <入库那份> <今天那份> [--expected 27]
       每个变体一行 name=r3_variant，末尾一行 name=r3_summary；比了几行不等于 --expected（默认 27）退 2，有一个变体一格不同退 1，全同退 0。
-  e165-compare-kill-bounds.py --selftest [<一份第二段产物>]
+  e165-compare-kill-bounds.py --selftest
       登记 5.2 R3 那四格 + 比满行数那一格 + not_red_domains、first_anchor_red 各一格，共 7 项：自己比自己 0 行不同；改一个变体的 outcome= 恰 1 行不同且点名变体与字段；
       只改一个域的 N 恰 1 行不同；只改 table_row= 与 rerun= 0 行不同；漏读最后一行时比满那一格退 2；只改 not_red_domains、只改 first_anchor_red 一个域的 N 各恰 1 行不同。
-      不给产物就拿内嵌的合成产物（SAMPLE_PRODUCT）；不开弄坏开关时另把三条弄坏开关逐个打开重跑一遍，每条都要让它点名的那一项判错。
+      这 7 项先在内嵌的合成产物（SAMPLE_PRODUCT）上跑，再在复跑表登记的那一份真产物（REGISTERED_PRODUCT，复跑表 E165 第一行 driver_e165_segment2 对着的那份）上跑；
+      真产物不在（归档过了，取回办法见 replay.sh 文件头）就退 77、点名它，不当通过；不开弄坏开关时另把三条弄坏开关逐个打开重跑一遍，每条都要让它点名的那一项判错。
 
-弄坏开关 E165_COMPARE_KILL_BOUNDS_BREAK=<项>（登记 9.5 末三行；只给证红用）：
-  match-by-table-row     按 table_row= 认变体、不按 title=                      「只改 table_row= 与 rerun=」那一项判错（由 0 行不同转非 0）
-  clause-size-unchecked  不比 first_clause_red 每个域的 N                      「只改一个域的 N」那一项判错（由 1 行不同转 0）
-  last-row-dropped       读产物时漏读最后一行 name=kill_bound                  「自己比自己」那一项判错（比的行数不满，第七节乙类「比了 27 行」那一格）
+弄坏开关 E165_COMPARE_KILL_BOUNDS_BREAK=<项>（登记 9.5 末三行；只在 --selftest 里认：命令行第一个参数不是 --selftest 时设了它，参数解析之前退 2、点名它只在自证里认）。
+逐项写开关名、弄坏哪一处，下一行起写打开后自证红的项（自证逐项打「✗ <项标签>：…」，末尾一句「✗ e165-compare-kill-bounds 自证 7 项里 N 项判错：…」）：
+  E165_COMPARE_KILL_BOUNDS_BREAK=match-by-table-row  按 table_row= 认变体、不按 title=
+      「改一个变体的 outcome=：恰 1 行不同、点名变体与 outcome」「只改 table_row= 与 rerun=：0 行不同」
+  E165_COMPARE_KILL_BOUNDS_BREAK=clause-size-unchecked  不比 first_clause_red 每个域的 N
+      「只改一个域的 N：恰 1 行不同」
+  E165_COMPARE_KILL_BOUNDS_BREAK=last-row-dropped  读产物时漏读最后一行 name=kill_bound
+      「自己比自己：比满 4 个变体行、0 行不同、退 0」「改一个变体的 outcome=：恰 1 行不同、点名变体与 outcome」「只改一个域的 N：恰 1 行不同」「只改 table_row= 与 rerun=：0 行不同」「漏掉最后一个变体行：比的行数不满、退 2」「只改 not_red_domains：恰 1 行不同」「只改 first_anchor_red 一个域的 N：恰 1 行不同」
 """
 import os
 import re
@@ -34,6 +39,9 @@ from project_preflight import preflight  # noqa: E402
 
 TOKEN = re.compile(r'(\w+)=("[^"]*"|\S+)')
 BASELINE_TITLE = "基线（不改）"
+# 复跑表登记的那一份第二段真产物（replay.sh 复跑表 E165 的 driver_e165_segment2 那一行）；自证也在它上面跑一遍。
+REGISTERED_PRODUCT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "research", "results",
+                                  "e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out")
 BREAK = {item for item in os.environ.get("E165_COMPARE_KILL_BOUNDS_BREAK", "").split(",") if item}
 # 每条弄坏开关要让哪一项判错（自证里那一项的标签开头）
 BREAK_NAMED_CHECK = {
@@ -252,14 +260,22 @@ def selftest_on(product, directory):
     return checked, wrong
 
 
-def selftest(product=None):
+def selftest():
     with tempfile.TemporaryDirectory(prefix="e165-compare-kill-bounds-selftest-") as directory:
-        if product is None:
-            product = os.path.join(directory, "sample-kill-bounds.out")
-            with open(product, "w", encoding="utf-8") as handle:
-                handle.write(SAMPLE_PRODUCT)
-        checked, wrong = selftest_on(product, directory)
-    print(f"自检：查了 {checked} 项，{len(wrong)} 项不过")
+        sample = os.path.join(directory, "sample-kill-bounds.out")
+        with open(sample, "w", encoding="utf-8") as handle:
+            handle.write(SAMPLE_PRODUCT)
+        checked, wrong = selftest_on(sample, directory)
+        print(f"自检（合成产物）：查了 {checked} 项，{len(wrong)} 项不过")
+        if not wrong:
+            if not os.path.isfile(REGISTERED_PRODUCT):
+                print(f"NOT_RUN_ARCHIVED_PRODUCT test=e165-compare-kill-bounds.selftest reason=复跑表登记的真产物不在 {os.path.normpath(REGISTERED_PRODUCT)}")
+                print("     → 怎么办：从 git 历史取回（git log --diff-filter=D 找删它的提交，git show <提交>^:<路径>），放回原路径再跑；这一趟的真产物那一格没跑，不算通过")
+                return 77
+            real_checked, real_wrong = selftest_on(REGISTERED_PRODUCT, directory)
+            print(f"自检（真产物 {os.path.basename(REGISTERED_PRODUCT)}）：查了 {real_checked} 项，{len(real_wrong)} 项不过")
+            checked += real_checked
+            wrong += [f"真产物上的{label}" for label in real_wrong]
     if wrong:
         print(f"  ✗ e165-compare-kill-bounds 自证 {checked} 项里 {len(wrong)} 项判错：{'；'.join(wrong)}")
         print("     → 怎么办：按判错那几项的标签找对应的比对函数（compare_variant、parse_rows、run_compare）修；判据写在文件头")
@@ -282,8 +298,12 @@ def selftest(product=None):
 
 
 def main(argv):
-    if argv[:1] == ["--selftest"] and len(argv) <= 2:
-        return selftest(argv[1] if len(argv) == 2 else None)
+    if argv[:1] == ["--selftest"]:
+        if len(argv) != 1:
+            print("  ✗ --selftest 不带别的参数")
+            print("     → 怎么办：写 e165-compare-kill-bounds.py --selftest（真产物取复跑表登记的那一份）")
+            return 2
+        return selftest()
     expected = 27
     if "--expected" in argv:
         position = argv.index("--expected")
@@ -303,6 +323,19 @@ def main(argv):
     return code
 
 
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行第一个参数不是 --selftest 而 E165_COMPARE_KILL_BOUNDS_BREAK 非空（不管值是什么），
+    退 2 并点名它只在自证里认；在参数解析之前判（自证逐个开关起自己时命令行就是 --selftest）。"""
+    if os.environ.get("E165_COMPARE_KILL_BOUNDS_BREAK") and arguments[:1] != ["--selftest"]:
+        print("  ✗ E165_COMPARE_KILL_BOUNDS_BREAK 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证", file=sys.stderr)
+        print("     → 怎么办：去掉 E165_COMPARE_KILL_BOUNDS_BREAK 再跑；要证红就跑 E165_COMPARE_KILL_BOUNDS_BREAK=<项> python3 scripts/experiment-apparatus/e165-compare-kill-bounds.py --selftest", file=sys.stderr)
+        return 2
+    return 0
+
+
 if __name__ == "__main__":
+    refusal = refuse_break_outside_selftest(sys.argv[1:])
+    if refusal:
+        sys.exit(refusal)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

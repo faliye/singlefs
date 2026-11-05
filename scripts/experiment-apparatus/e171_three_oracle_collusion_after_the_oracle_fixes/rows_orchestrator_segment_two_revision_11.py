@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
+# task-server-shards: run
 """E171 第 1 次重跑·修订 11：修订 8 那一趟第二段整表的多机编排，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.2–11.5、11.9、11.10 节）。
 由 run_segment_two_revision_11_multi_host.sh 起，在仓根跑；修订 11 占位（revision_11_placeholders.json 那一形）点名修订 10 那一份占位（revision_10_config）。
 
-为什么另写一层：rows_orchestrator_segment_two_revision_10.py（627e48c6…）一个字节不改。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256
-载入 rows_orchestrator_segment_two.py 7d7b458b… 与第一段编排器 1dcfb8d0…），修订 10 那一层的几处（树与 T₂、H8 核对、落点、起跑闸、本机闸、停派文件、让路、
+为什么另写一层：rows_orchestrator_segment_two_revision_10.py（57a7d2ca…）一个字节不改。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256
+载入 rows_orchestrator_segment_two.py 2b91b18a… 与第一段编排器 2ab19c53…），修订 10 那一层的几处（树与 T₂、H8 核对、落点、起跑闸、本机闸、停派文件、让路、
 输入清单、S17 联动）由它自己的 run_layer 原样装上；这一层只在第二段编排器上再换四处：
   ① 整表派发之前（phase_rows）：281 行（编排器现算的行集）照第 11.2、11.3 节算键（L 取 T₂ 那份计时的 process_wall），查库、写标记
     （<H23 导出根>/reuse-markers/segment-two-rows/）；取来的行数 M ≥ 1 时照 RC3 挑 k = max(3, ⌈0.02 × M⌉) 行现跑（按 sha256(H23 后缀 ‖ 键) 从小到大，
     挑中的与挑法记一行 name=reuse_sample，即 H32），其余命中的照第 11.5 节「取用」硬链接进行输出根（row-result.tsv 最后链），编排器原有的续跑当它做完了、
-    不派，合成时由原有的 --skip-finished 重报并进产物。跨机对照那一行（编排器现算的那一行）在整表与跨机那一次都永远现跑（RC2）；要补位的行（按名字取不到、
+    不派，合成时由原有的按键复用重报并进产物。跨机对照那一行（编排器现算的那一行）在整表与跨机那一次都永远现跑（RC2）；要补位的行（按名字取不到、
     锚点不是恰 1 次、碰到模块集合）永远现跑、不进库，补位协调照编排器原样；
   ② 一个分片结束（finish_shard_two）：编排器原来那样收尾，再把这一分片现跑完的行照入库条件入库（库里有同键条目照 RC1 比，第二趟 RC2，抽到的 RC3）；
-    本机的行先照 RC4 核那一槽这一次编译的 dep-info，别的台取回的行先核三样（reuse_library.peer_row_problems；别的台不做 RC4，H35）；
+    本机的行先照 RC4 核那一槽这一次编译的 dep-info，别的台跑的行先核三样（reuse_library.peer_row_problems；别的台不做 RC4，H35）；
     S18 触发就冻库、这一分片记没跑成（编排器不再派新行，在跑的跑完再停，退 1）；
   ③ 跨机对照（phase_cross_host）之前给那一行的跨机那一份登记、写标记（永远现跑）；
   ④ 超时重跑（phase_timeout_reruns，只另出产物）：超时的行（限时再乘 3）照同一套查库、取用。
@@ -21,12 +22,20 @@
   rows_orchestrator_segment_two_revision_11.py plan --config <修订 11 占位> [--repo R]   修订 10 的 plan 原样，先打每行永远现跑的缘由与库在不在（只读）
   rows_orchestrator_segment_two_revision_11.py --selftest [--cells 格,…] [--rounds N]
 退出码：同修订 10 第二段编排层（0、1、2、3、78、143）；账本 N + M 不等于登记数退 1；H31 不过、库目录写不了退 78。
+经 task-server：文件头第二行声明了 run 这一种分片，服务照计划、各片、合并三步起（rows_orchestrator.py 文件头「经 task-server」），
+  计划、合并与代跑的片在读配置、碰库之前就交了退出码；不经服务直接调只用这一台，跨机对照报 not_run。
 
-弄坏开关 SEGMENT_TWO_R11_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，SEGMENT_TWO_R11_SELFTEST=1）。项名、弄坏哪一处、打开后红在哪一格：
-  sample-skipped         取来的行一行都不挑出来现跑（RC3 不做）              reuse-e2e
-  peer-checks-skipped    别的台取回的行入库之前不核那三样                    peer-checks
-  s18-ignored            S18 触发了照样跑完、库不冻                          s18-stops
-  sweep-skipped、temporary-kept（自证外壳 revision_8_selftest_harness.py 的两个）     no-leftover-processes、temporary-directory-removed
+弄坏开关 SEGMENT_TWO_R11_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，SEGMENT_TWO_R11_SELFTEST=1）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
+  SEGMENT_TWO_R11_BREAK=sample-skipped  取来的行一行都不挑出来现跑（RC3 不做）
+      「✗ 自证 reuse-e2e：」
+  SEGMENT_TWO_R11_BREAK=peer-checks-skipped  别的台跑的行入库之前不核那三样
+      「✗ 自证 peer-checks：」
+  SEGMENT_TWO_R11_BREAK=s18-ignored  S18 触发了照样跑完、库不冻
+      「✗ 自证 s18-stops：」
+  SEGMENT_TWO_R11_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  SEGMENT_TWO_R11_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 
@@ -42,12 +51,13 @@ sys.path.insert(0, HERE)
 import device_timing  # noqa: E402
 import frozen_tree_lines_revision_8 as judge  # noqa: E402
 import reuse_library as reuse  # noqa: E402
+import reuse_library_root as library_roots  # noqa: E402
 import revision_8_selftest_harness as harness  # noqa: E402
 
 BREAK_VARIABLE = "SEGMENT_TWO_R11_BREAK"
 SELFTEST_VARIABLE = "SEGMENT_TWO_R11_SELFTEST"
 SEGMENT_TWO_R10_PATH = os.path.join(HERE, "rows_orchestrator_segment_two_revision_10.py")
-SEGMENT_TWO_R10_SHA256 = "627e48c6f35e872f2eaf7be08f8c19ff4fead2d39e46bed23710f678108e2ace"
+SEGMENT_TWO_R10_SHA256 = "ab4f6a78fb489e88c62dfd6070993f2c65a4dbb07c75d8805a8076d436f4703e"
 EXIT_WRONG_PINNED_FILE = 3
 LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-two-rows"
@@ -269,7 +279,8 @@ def run_two_with_ledger(context, plan_only: bool) -> int:
 
 def install(reuse_config: dict, repo: str, segment_two) -> None:
     h30 = reuse_config.get("H30") or {}
-    STATE["reuse"] = SegmentTwoReuse(reuse.Library(h30.get("library_root") or reuse.DEFAULT_LIBRARY_ROOT), bool(h30.get("lookup", True)),
+    root, _ = library_roots.library_root_of(h30)   # 库根两台同一（reuse_library_root）；取不成的 run 在 main 里已退 78，plan 照缺省那一个打
+    STATE["reuse"] = SegmentTwoReuse(reuse.Library(root), bool(h30.get("lookup", True)),
                                      os.path.join(repo, segment_two.dumps, "reuse-markers", MARKERS_NAME), segment_two.suffix, {}, [])
     ORIGINAL.update({"phase_rows": two.phase_rows, "finish_shard_two": two.finish_shard_two, "phase_cross_host": two.phase_cross_host,  # 换掉之前逐个点名留下原件
                      "phase_timeout_reruns": two.phase_timeout_reruns, "run_two": two.run_two})
@@ -289,7 +300,7 @@ def main(argument_list: list[str]) -> int:
             print(refusal, file=sys.stderr)
             return 2
     if os.environ.get(two.SELFTEST_ROWS_VARIABLE) and os.environ.get(two.SELFTEST_VARIABLE) != "1":
-        print(f"✗ {two.SELFTEST_ROWS_VARIABLE} 只在自证起的子进程里认（平常跑整表 1–281）；设了它就拒（退 2）", file=sys.stderr)
+        print(f"✗ {two.SELFTEST_ROWS_VARIABLE} 只在自证起的子进程里认（平常跑整表）；设了它就拒（退 2）", file=sys.stderr)
         print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
         return 2
     if argument_list[:1] == ["--selftest"]:
@@ -301,6 +312,10 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--repo", default=os.getcwd())
     arguments = parser.parse_args(argument_list)
     repo = os.path.abspath(arguments.repo)
+    if arguments.mode == "run":
+        phase_exit = one.shard_phase_before_layer(repo, say=lambda line: print(line, flush=True))
+        if phase_exit is not None:
+            return phase_exit
     try:
         reuse_config = json.load(open(arguments.config, encoding="utf-8"))
         revision_10_path = judge.resolve(repo, reuse_config["revision_10_config"])
@@ -312,11 +327,12 @@ def main(argument_list: list[str]) -> int:
             problems = reuse.h31_problems(repo, reuse_config)
             if problems:
                 raise reuse.RunCondition("H31 不过：" + "；".join(problems[:4]))
-            library = reuse.Library((reuse_config.get("H30") or {}).get("library_root") or reuse.DEFAULT_LIBRARY_ROOT)
+            library = reuse.Library(library_roots.require_library_root(reuse_config.get("H30")))
             library.check_run_condition(repo)
             library.clear_stale_staging()
         else:
             print(f"修订 11 占位 {os.path.abspath(arguments.config)}（dry_run={str(bool(reuse_config.get('dry_run'))).lower()}；{reuse_config.get('dry_run_note') or '-'}）；"
+                  f"{library_roots.library_root_of(reuse_config.get('H30'))[1] or 'H30 库根两台同一个路径'}；"
                   f"H31 {'；'.join(reuse.h31_problems(repo, reuse_config)) or '与现在的文件逐个相同'}；修订 10 占位 {revision_10_path}")
     except (reuse.RunCondition, judge.RunConditionError, KeyError, OSError) as error:
         print(f"✗ 运行条件不满足（退 78）：{error}", flush=True)
@@ -336,15 +352,15 @@ def static_plan_lines(repo: str, tree: str) -> list[str]:
     except (reuse.ClosureOutsideTheTree, OSError, RuntimeError) as error:
         return [f"✗ 算键用的树 {tree} 认不全或读不到：{error}"]
     selected, reasons = reuse.selected_row_lines(repo), {}
-    for row in reuse.segment_two_row_units(tuple(range(1, 282)), None):
+    for row in reuse.segment_two_row_units(tuple(sorted(selected)), None):  # 整表行集：两张行表第一列之并（E171 第 2 次重跑登记读法 4，不写死）
         reason = reuse.row_sections(inputs, row, selected, reuse.limit_lines(None), [])[1] or "照常查库"
         reasons.setdefault(reason, []).append(row.number)
-    return [f"复用·树 {tree}：装置 bin 的 dep-info {len(inputs.closure_files['device'])} 个文件；整表 281 行里 " +
+    return [f"复用·树 {tree}：装置 bin 的 dep-info {len(inputs.closure_files['device'])} 个文件；整表 {len(selected)} 行里 " +
             "；".join(f"{reason} {len(rows)} 行" + (f"（第 {','.join(map(str, rows[:8]))} 行）" if reason != "照常查库" else "") for reason, rows in sorted(reasons.items())) +
             "；各行的键要 L，T₂ 定了之后由编排层现算（跨机对照那一行另记永远现跑）"]
 
 
-# ── 自证：借第二段编排器的假世界（假驱动、假 multi-host-run、假机器清单与资源），假树补上算键要的几样，配置照修订 10 自证那一形逐遍另写；
+# ── 自证：借第二段编排器的假世界（假驱动、假的代跑那一片、假机器清单与资源），假树补上算键要的几样，配置照修订 10 自证那一形逐遍另写；
 #    假驱动外面包一层，在 <工作根>/lane0 下放一份「这一次编译」的 dep-info 给 RC4 ──
 FAKE_DRIVER = os.path.join(HERE, "fake_row_driver.py")
 FAKE_ROWS = tuple(range(1, 13))
@@ -391,8 +407,11 @@ def pass_config(world: WorldEleven, name: str, lookup: bool) -> str:
                             json.dumps({"revision_10_config": revision_10, "H30": {"library_root": world.library, "lookup": lookup}, "H31": {"files": h31}}))
 
 
-def run_pass(world: WorldEleven, name: str, lookup: bool, extra: dict[str, str] | None = None) -> tuple[int, str]:
+def run_pass(world: WorldEleven, name: str, lookup: bool, extra: dict[str, str] | None = None, served: bool = False) -> tuple[int, str]:
+    """起这一层一遍；served 时照服务的分片三步起（两台的那一格要别的台的行）。"""
     command = [sys.executable, "-B", os.path.abspath(__file__), "run", "--config", pass_config(world, name, lookup), "--repo", world.base.repo]
+    if served:
+        command = one.served_command(world.base.root, command)
     completed = subprocess.run(command, cwd=world.base.repo, env=dict(world.environment, **(extra or {})), capture_output=True, text=True, timeout=300)
     return completed.returncode, completed.stdout + completed.stderr
 
@@ -437,10 +456,10 @@ def cell_reuse_end_to_end(scratch: str) -> tuple[bool, str]:
 
 
 def cell_reuse_two_hosts(scratch: str) -> tuple[bool, str]:
-    """两台：别的台取回的行入库之前核三样（假驱动的 mutation_line_sha256 不是变异行的 sha256，所以别的台的行都不入、各记一行 peer-check），
+    """两台：别的台跑的行入库之前核三样（假驱动的 mutation_line_sha256 不是变异行的 sha256，所以别的台的行都不入、各记一行 peer-check），
     本机的行照 RC4 入库；跨机对照那一份登记、永远现跑；账本 units=13。"""
     world = fake_world_eleven(scratch, hosts_code=0)
-    code, output = run_pass(world, "21", False)
+    code, output = run_pass(world, "21", False, served=True)
     events = events_of(world, "21")
     peer_refused = [line for line in events if "reason=peer-check-" in line]
     inserted = [line for line in events if " name=reuse_insert " in f" {line} " and " state=inserted " in f" {line} "]

@@ -16,3 +16,17 @@
 乙每次fsync落全部脏单元不扣已落过的	let unpersisted_count = write_ahead_log_leaf_dirty.difference(&write_ahead_log_leaf_persisted).count() as u64;	let unpersisted_count = write_ahead_log_leaf_dirty.len() as u64;
 checkpoint间隔恒取2000不取批的整数倍	batch * CHECKPOINT_BASE_OPERATIONS.div_ceil(batch)	CHECKPOINT_BASE_OPERATIONS
 记录宽旋钮的EntriesPerRecord改成地板除	RecordFormat::EntriesPerRecord(entries_per_record) => entry_count.div_ceil(entries_per_record),	RecordFormat::EntriesPerRecord(entries_per_record) => entry_count / entries_per_record,
+准入键里第二段的方式名写成下划线	RunMode::SecondSegmentKnobs => "E16R5/second-segment",	RunMode::SecondSegmentKnobs => "E16R5/second_segment",
+复跑表参数列里阳性对照那一种写错	RunMode::OriginalGeometryPositiveControl => "pc3",	RunMode::OriginalGeometryPositiveControl => "pc4",
+空串参数认成第一段全网格	!argument_text.is_empty() && 	
+仓根从装置源文件少往上一层	        .nth(3)	        .nth(2)
+二维最大值的批轴内部判定取反	let batch_interior = batches_upper != batch_axis_maximum;	let batch_interior = batches_upper == batch_axis_maximum;
+正误差占比把零误差也算正	.filter(|cell| selector(cell) > 0.0)	.filter(|cell| selector(cell) >= 0.0)
+跌破1的判定把等于1也算	row_dips_below_one: minimum_cell.ratio < 1.0,	row_dips_below_one: minimum_cell.ratio <= 1.0,
+峰值前段的上升步数漏掉落在峰值上的那一步	if next.batch <= peak_batch_low {	if next.batch < peak_batch_low {
+几何敏感性恒判两点同判	classes.windows(2).all(|window| window[0].1 == window[1].1)	classes.windows(2).all(|_window| true)
+空的fsync代价序列不报错	let minimum = *samples.iter().min().expect("空的代价序列——上游没跑到任何一次 fsync");\n    let maximum = *samples.iter().max().expect("空的代价序列——上游没跑到任何一次 fsync");	let minimum = *samples.iter().min().unwrap_or(&0);\n    let maximum = *samples.iter().max().unwrap_or(&0);
+原装置记录头从48换成4048	const LEGACY_RECORD_HEADER_BYTES: u64 = 48;	const LEGACY_RECORD_HEADER_BYTES: u64 = 4048;
+记录头宽改回上一代（496→487）	const JOURNAL_HEADER_BYTES: u64 = 496;	const JOURNAL_HEADER_BYTES: u64 = 487;
+记录头宽跨出装64项的区间（496→513）	const JOURNAL_HEADER_BYTES: u64 = 496;	const JOURNAL_HEADER_BYTES: u64 = 513;
+不是仓根的目录也认成仓根	if root.join(PREFLIGHT_SCRIPT_UNDER_REPOSITORY_ROOT).is_file() {	if true {

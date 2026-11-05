@@ -9,7 +9,6 @@
 # 都在 EXIT 上删（scripts/hosts/run-build-directory.sh：删之前核本机没有进程开着里面的文件，有就不删、报出进程、退非 0），再删掉那个空目录。
 #
 #   gate-staged.sh [项目根] [传给 gate.sh 的别的参数…]
-#   gate-staged.sh --light [项目根]   轻档：只跑不重的门禁（见下「轻档」），重型几道报本次未跑；不前移 ref、不跑 gate.sh
 #   gate-staged.sh --selftest   自证：转给 scripts/gate/gate-staged-selftest.sh（临时仓 + 假 gate.sh，全绿 / 有红 / 跑的过程中暂存区变了 / 给了 GATE_BASE，格数由它的成功行现算）
 #
 # 为什么前移放在外壳里：共享 `gate.sh` 在上游（`.claude/singlefs-ai-sop/scripts/`），本仓的
@@ -21,26 +20,24 @@
 #   ③ 不带 `--staged` 跑不许前移，所以这个外壳只做 `--staged` 这一条路。
 # ref 是覆盖语义，永远只有一条，不累积、不落盘第二份状态。
 #
-# 轻档（--light；.claude/kb/milestone/03-third-txn.md「待优化」第 56、48 行：只想在暂存树上跑不重的门禁，整轮跳不掉刚跑过的重型几道）：
-#   被判的还是同一棵暂存树（git write-tree），交给 scripts/gate/staged-tree-worktree.sh light-stages：它在那棵树的私有 worktree 上（被忽略的规范副本与本地配置拷进去）
-#   并行跑门禁目录里不重的每一道（重型照 .claude/hooks/lib_heavy_tests.py 的 STAGE_KIND 认，逐道报本次未跑），每道的输出留在
-#   <日志目录>/gate-staged-…-light/<阶段>.log；退出码转手（0 没有红，1 有红）。不经 gate.sh，上游共享的几道 lint 也不跑；refs/sop/staged-green 一律不前移。
-#   轻档的自证在 staged-tree-worktree.sh --selftest 里（「gate-staged.sh --light 跑轻档、不前移、退出码转手」那一格）。
-#
 # 日志出两份（用户 2026-10-21：整轮门禁的输出动辄上万行，一般只看错误警告）：gate.sh 的输出照常转打，同时经 scripts/hosts/two-logs.sh 写
 #   <日志目录>/gate-staged-<日期时刻>-<暂存树前 12 位>-<进程号>.log（全量）与同名的 .problems.log（只收 ✗ 与它的 → 出路、⚠、本次未跑、逐格汇总、
 #   cargo / rustc 的 error 与 warning:、libtest 的 FAILED 与 panicked、Traceback、非 0 退出码，行前带全量日志里的行号，末行写收了几行全量几行）。
-#   日志目录取 SINGLEFS_GATE_STAGED_LOG_DIRECTORY，没给是 ~/.local/share/singlefs/gate-staged-logs；开跑前与收尾都打这两份的路径，红的出路先指到 .problems.log。
+#   日志目录取 SINGLEFS_GATE_STAGED_LOG_DIRECTORY，没给是共享数据根下的 gate-staged-logs（.claude/hooks/lib_work_root.py shared gate-staged-logs，两台同一份；
+#   取不到就停、退 2，不退回家目录）；开跑前与收尾都打这两份的路径，红的出路先指到 .problems.log。
 #   日志只增不删：太多了自己清（按文件名里的日期）。退出码仍是 gate.sh 的。
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 2
-light_tier=0
-if [[ "${1:-}" == "--light" ]]; then light_tier=1; shift; fi
-ROOT="${1:-$(cd "$SCRIPT_DIRECTORY/../.." && pwd)}"
 [[ "${1:-}" != "--selftest" ]] || exec bash "$SCRIPT_DIRECTORY/gate-staged-selftest.sh"
+if [[ "${1:-}" == -* ]]; then
+  echo "  ✗ 认不出的参数：$1"
+  echo "     → 怎么办：用法是 gate-staged.sh [项目根] [传给 gate.sh 的别的参数…]；第一个参数要么不给，要么是项目根的路径（不以 - 起头）。"
+  exit 2
+fi
+ROOT="${1:-$(cd "$SCRIPT_DIRECTORY/../.." && pwd)}"
 shift 2>/dev/null || true
 cd "$ROOT" || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给仓库根的绝对路径，或者在仓里直接跑它。"; exit 2; }
 ROOT="$PWD"
@@ -54,7 +51,14 @@ SINGLEFS_STAGED_TREE="$staged_tree"
 export SINGLEFS_STAGED_TREE
 GATE_STAGED_TREE="$staged_tree"
 export GATE_STAGED_TREE
-gate_log_directory="${SINGLEFS_GATE_STAGED_LOG_DIRECTORY:-$HOME/.local/share/singlefs/gate-staged-logs}"
+gate_log_directory="${SINGLEFS_GATE_STAGED_LOG_DIRECTORY:-}"
+if [[ -z "$gate_log_directory" ]]; then   # 没给：共享数据根下的 gate-staged-logs（文件头「日志出两份」），取不到就停，不退回家目录
+  if ! gate_log_directory="$(python3 "$SCRIPT_DIRECTORY/../../.claude/hooks/lib_work_root.py" shared gate-staged-logs)" || [[ "$gate_log_directory" != /* ]]; then
+    echo "  ✗ 取不到门禁日志目录（.claude/hooks/lib_work_root.py shared gate-staged-logs 没打出绝对路径，原因见上一行），这一趟没起 gate.sh"
+    echo "     → 怎么办：照上一行的出路在多机配置里写好 SHARED_DATA_ROOT（模板 multi-host.env.example），或设 SINGLEFS_GATE_STAGED_LOG_DIRECTORY 指到共享根下的日志目录"
+    exit 2
+  fi
+fi
 gate_log_name="$gate_log_directory/gate-staged-$(date -u +%Y%m%dT%H%M%SZ)-${staged_tree:0:12}-$$"
 # 编译目录（文件头）：调用方给了照它；没给建在这一趟自己的目录里，收尾的 EXIT trap 删
 source "$SCRIPT_DIRECTORY/../hosts/run-build-directory.sh"
@@ -79,13 +83,6 @@ else
 fi
 two_logs_script="$SCRIPT_DIRECTORY/../hosts/two-logs.sh"
 [[ -f "$two_logs_script" ]] || { echo "  ✗ 找不到 $two_logs_script（日志出两份的包装）"; echo "     → 怎么办：从完整的仓里跑它；scripts/hosts/two-logs.sh 随仓走。"; exit 2; }
-if ((light_tier)); then
-  if (($#)); then echo "  ✗ 轻档不收别的参数（收到：$*）"; echo "     → 怎么办：写成 gate-staged.sh --light [项目根]；要给 gate.sh 传参数就不带 --light 跑整轮。"; exit 2; fi
-  echo "  轻档：只跑不重的门禁，每道的输出在 $gate_log_name-light/"
-  if bash "$SCRIPT_DIRECTORY/staged-tree-worktree.sh" light-stages "$ROOT" --tree "$staged_tree" --log-directory "$gate_log_name-light"; then light_rc=0; else light_rc=$?; fi
-  echo "  ! 轻档不前移 refs/sop/staged-green：重型几道与上游共享的 lint 没跑，这一趟不是整轮"
-  exit "$light_rc"
-fi
 echo "  日志两份（跑完在这里；一般只看 .problems.log）：全量 $gate_log_name.log；错误警告 $gate_log_name.problems.log"
 bash "$two_logs_script" "$gate_log_name" -- bash "$ROOT/.claude/scripts/gate.sh" --staged "$@"
 gate_rc=$?

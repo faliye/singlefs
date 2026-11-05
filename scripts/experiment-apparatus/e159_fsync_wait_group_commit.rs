@@ -3099,6 +3099,30 @@ struct CliArguments {
 }
 const KNOWN_SUBCOMMANDS: [&str; 3] = ["anchors", "cell", "probe-device"];
 
+/// `cell` 子命令登记的暖机秒数、时长秒数与文件数；不给对应选项就是它们。
+const REGISTERED_WARMUP_SECONDS: f64 = 1.0;
+const REGISTERED_DURATION_SECONDS: f64 = 2.0;
+const REGISTERED_FILE_COUNT: u64 = 10_000;
+
+/// 与登记规模不同的暖机、时长或文件数就是缩过规模的一趟：结果行接这一段，产物不当正式产物；三项都是登记值时不接。
+fn reduced_scale_note(arguments: &CliArguments) -> String {
+    let mut registered_values: Vec<String> = Vec::new();
+    if arguments.warmup_seconds != REGISTERED_WARMUP_SECONDS {
+        registered_values.push(format!("registered_warmup_seconds={REGISTERED_WARMUP_SECONDS}"));
+    }
+    if arguments.duration_seconds != REGISTERED_DURATION_SECONDS {
+        registered_values.push(format!("registered_duration_seconds={REGISTERED_DURATION_SECONDS}"));
+    }
+    if arguments.file_count != REGISTERED_FILE_COUNT {
+        registered_values.push(format!("registered_file_count={REGISTERED_FILE_COUNT}"));
+    }
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 /// `scripts/devices/vm-bench.sh` 按 `.claude/kb/vm-harness.md`「挂几块盘」的约定，
 /// 把设备路径按顺序当成前缀参数塞在最前面、我们自己的参数跟在后面——
 /// 所以在找到第一个认得出的子命令之前，把前面的位置参数都当成设备路径，
@@ -3121,11 +3145,11 @@ fn parse_arguments(raw_arguments: &[String]) -> CliArguments {
         arm: Arm::Jia,
         concurrent_fsync_count: 1,
         group_commit_enabled: true,
-        warmup_seconds: 1.0,
-        duration_seconds: 2.0,
+        warmup_seconds: REGISTERED_WARMUP_SECONDS,
+        duration_seconds: REGISTERED_DURATION_SECONDS,
         pc1_inject_milliseconds: None,
         seed: 1,
-        file_count: 10_000,
+        file_count: REGISTERED_FILE_COUNT,
         family: Family::EightAdjacentDataUnitsPerFsync,
     };
     let raw_arguments = remaining_arguments;
@@ -3199,7 +3223,7 @@ fn run_cell_subcommand(arguments: &CliArguments) {
     println!(
         "{}",
         emitter.emit_raw(&format!(
-            "E159RESULT arm={} k={} group_commit={} samples={} median_ns={} p99_ns={} containment_violations={} checkpoint_count={} checkpoint_bytes={} bytes_written_estimate={}",
+            "E159RESULT arm={} k={} group_commit={} samples={} median_ns={} p99_ns={} containment_violations={} checkpoint_count={} checkpoint_bytes={} bytes_written_estimate={}{}",
             arguments.arm.tag(),
             arguments.concurrent_fsync_count,
             arguments.group_commit_enabled,
@@ -3210,6 +3234,7 @@ fn run_cell_subcommand(arguments: &CliArguments) {
             report.checkpoint_count,
             report.checkpoint_bytes_total,
             report.bytes_written_estimate,
+            reduced_scale_note(arguments),
         ))
     );
     if let (Some(before), Some(after)) = (before, after) {
@@ -3614,5 +3639,17 @@ mod e159_anchor_and_rule_tests {
         let has_uninjected_gap = gaps_nanos.iter().any(|&gap| gap < half_inject_nanos);
         assert!(has_injected_gap, "M6：偶数号批次应当在 made_durable_at 之后、released_at 之前吃到那 30 ms（观测 {gaps_nanos:?}）");
         assert!(has_uninjected_gap, "M6：奇数号批次不该被注入，released_at 应当紧跟 made_durable_at（观测 {gaps_nanos:?}）");
+    }
+
+    /// 给了缩规模的暖机、时长或文件数，`cell` 的结果行要写缩过、不当正式产物；三项都是登记值不加这一段。
+    #[test]
+    fn reduced_cell_scale_is_marked_and_registered_scale_is_not() {
+        let registered_arguments = parse_arguments(&["cell".to_string(), "--device".to_string(), "device".to_string()]);
+        assert_eq!(reduced_scale_note(&registered_arguments), "");
+        let reduced_arguments = parse_arguments(&["cell".to_string(), "--device".to_string(), "device".to_string(), "--duration-seconds".to_string(), "0.5".to_string(), "--file-count".to_string(), "100".to_string()]);
+        assert_eq!(
+            reduced_scale_note(&reduced_arguments),
+            " reduced=yes registered_duration_seconds=2 registered_file_count=10000 not_official_product=yes"
+        );
     }
 }

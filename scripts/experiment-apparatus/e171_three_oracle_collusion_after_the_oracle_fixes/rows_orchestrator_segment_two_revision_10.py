@@ -1,29 +1,33 @@
 #!/usr/bin/env python3
+# task-server-shards: run
 """E171 第 1 次重跑·修订 10：修订 8 那一趟第二段整表的多机编排（下称「第二段·修订 8 编排层」；登记 research/prompts/e171-r1-prereg.md
 修订 10 第 10.2、10.3、10.7、10.9 节与「主 agent 认定：修订 10 交回」）。由 run_segment_two_revision_10_multi_host.sh 起，在仓根跑；
 值从 revision_10_placeholders.json 那一形的配置与它点名的修订 8 那一份配置、修订 8 那一趟的序列日志读（revision_10_placeholders.py）。
 
-为什么另写一层：rows_orchestrator_segment_two.py（7d7b458b…）与入口 run_segment_two_on_the_revision_6_tree_multi_host.sh（c582ee61…）一个字节不改
+为什么另写一层：rows_orchestrator_segment_two.py（按 sha256 钉住，SEGMENT_TWO_ORCHESTRATOR_SHA256）与入口 run_segment_two_on_the_revision_6_tree_multi_host.sh（c582ee61…）一个字节不改
 （修订 6 那一趟的输入清单记着前者；入口里树、摘要、T、变异表写死成修订 6 树的值）。这一层按路径载入 rows_orchestrator_segment_two.py（开跑先核 sha256，
-不是就退 3；它照旧按 sha256 载入第一段编排器 1dcfb8d0…），行集、驱动参数、分配、补位协调、合并规则 ①–⑦、判法 check_product.py rows_without_executor、
+不是就退 3；它照旧按 sha256 载入第一段编排器），行集、驱动参数、分配、补位协调、合并规则 ①–⑦、判法 check_product.py rows_without_executor、
 跨机对照的取法（权重最接近 1 的那一行，现算）与比法、超时重跑只留档、续跑都调它原来的函数。改的只有修订 10 第 10.2 节「这一趟改的几处」与第 10.3 节：
   ① 树、快照摘要（H3）、树里变异表（H8）、T₂ 那份计时产物（H21）从修订 8 那一份配置与序列日志读；产物前缀 …-<RUN_DATE>-s2、后缀 -r8、导出根、日志目录、
     工作根取 H23；
   ② 每行前后（编排器起驱动之前、收尾之后核 Z5 的那两处，与开跑、收尾各一次）另核树里 crates/mutations.tsv 等于 H8，不等记作废 Z5、停（退 1）；
-  ③ 别的台四个落点（工具包、冻结树快照、取回、起法目录）与标签前缀取 H24（不与修订 6 第二段、修订 8 第一段同名）；
+  ③ 别的台的标签前缀取 H24（不与修订 6 第二段、修订 8 第一段同名）；H24 的四个落点（工具包、冻结树快照、取回、起法目录）不再用：别的台照同一个绝对路径
+    读写共享根（rows_orchestrator.py 文件头「机器」，不送、不取回），工具包、快照、输出与排除表都在这一趟自己的分片目录里，不与别的趟撞名；
   ④ 起跑闸：修订 8 那一趟第 0、1、2 步（与研究一侧变异表，排了的话）绿，没过退 78；T₂ 包不住各流之和退 78（第 10.1 节：不起、交主 agent）；
-  ⑤ 本机闸：第 7 步绿、修订 8 的逐行编排起过之前，分配那一步把本机的槽数记 0；之后经编排器原有的「起跑时放不下的台每 600 秒重查、放得下就加槽」
+  ⑤ 本机闸：第 7 步绿、修订 8 的逐行编排起过之前，分配那一步把本机的槽数记 0；之后经编排器原有的「起跑时没有槽的台每 600 秒重算分配、有槽了就加槽」
     给本机加槽（已有槽的台不增不减，第 10.2 节表第 6 条）；
   ⑥ 停派文件：<H16 日志目录>/stop-dispatching-rows 在时不再派新行，在跑的跑完再停（退 1）；已落的行原样留着，主 agent 处置之后同一条命令续跑；
   ⑦ 让路（H27）：修订 8 的逐行编排在跑、第 11、12 步与跨机对照 X 还有既没做完也没在跑的行时，第二段在各台都不起新行，在跑的跑完；
-    第一段逐行的槽由它自己的加槽（rows_orchestrator_revision_8.py 每 600 秒重查）拿走。第 13 步超时重跑那几行不看。让路只动挂钟，不动任何读数；
+    第一段逐行的槽在第二段让路的这段时间里空出来、被它自己的队列拿走。第 13 步超时重跑那几行不看。让路只动挂钟，不动任何读数；
   ⑧ 输入清单（H26）：第一趟开跑那一刻写 <导出根>/inputs.sha256（研究一侧文件、T₂ 那份计时产物、树里的变异表）与 run-values.tsv（树、H3、H8、T₂、
     前缀后缀、落点）；续跑先核，对不上停（退 1）：第 1 步在第二段起了之后又重跑（新的 -attempt<N>），T₂ 换了来源，已跑的行不与新 T₂ 下跑的行合进一份产物；
   ⑨ S17 两处联动（第 10.7 节）：第一段那一处（<H16 前缀>-rows-cross-host-check<H16 后缀>.out 的 verdict 行）cross_host_identical=false 时，
     两段在别的台跑的行一起不作数：这一层同停派文件一样不再派新行、在跑的跑完再停（退 1），交主 agent；第二段那一处
     （<H23 前缀>-rows-cross-host-check-r8.out）不同时编排器原来就停（退 1）。修订 8 的逐行编排不看第二段那一处（修订 8 的装置这一次不改），
     那一边由主 agent 照第 10.7 节处置。
-派发那一个循环照抄 rows_orchestrator_segment_two.py 的 run_queue_two（第 629–685 行），改两处：⑥ ⑨ 不再派新行的缘由、⑦ 让路。
+派发那一个循环照抄 rows_orchestrator_segment_two.py 的 run_queue_two，改两处：⑥ ⑨ 不再派新行的缘由、⑦ 让路。
+经 task-server：文件头第二行声明了 run 这一种分片，服务照计划、各片、合并三步起（rows_orchestrator.py 文件头「经 task-server」）；编排在片号 0 那一片，
+  别的台的行经 shard_relay.py 交给落在那一台的那一片代跑；不经服务直接调（入口 run_segment_two_revision_10_multi_host.sh 里调的那一下）只用这一台，跨机对照报 not_run。
 
 用法：
   rows_orchestrator_segment_two_revision_10.py run  --config C [--repo R]
@@ -38,19 +42,34 @@
 
 自证只换假件的变量（只在 SEGMENT_TWO_R10_SELFTEST=1 时认）：SEGMENT_TWO_R10_SKIP_CONFIG_CHECK=1（假世界里不核两份配置，起跑闸与 T₂ 照核）、
   SEGMENT_TWO_R10_YIELD_RECHECK_SECONDS（让路的重查间隔，平常 30 秒）、SEGMENT_TWO_R10_RESEARCH_ROOT（研究一侧文件在哪棵仓里，平常是 --repo）。
-弄坏开关 SEGMENT_TWO_R10_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认）。项名、弄坏哪一处、打开后红在哪一格：
-  peer-names-unchanged      别的台的落点与标签不换成 H24 的                        overrides-applied
-  mutations-table-skipped   每行前后不核树里 crates/mutations.tsv                  mutations-table-checked
-  local-gate-ignored        本机闸没开也给本机分槽                                  e2e-local-gate-closed
-  running-shards-ignored    让路时第一段在跑的行也当排着的                          segment-one-rows-waiting
-  yield-ignored             第一段逐行还有排着的行也照样派                          e2e-yield
-  stop-file-ignored         见到停派文件照样派新行                                  e2e-stop-file
-  s17-ignored               第一段那一处 S17 触发了照样派新行                       e2e-s17-segment-one
-  gate-ignored              起跑闸没过也起                                          e2e-gate-refused
-  inputs-unchecked          续跑不核 inputs.sha256                                  inputs-checked
-  run-values-unchecked      续跑不核 run-values.tsv                                 run-values-checked
-  plan-writes-inputs        干跑也写输入清单                                        plan-writes-nothing
-  sweep-skipped、temporary-kept（自证外壳 revision_8_selftest_harness.py 的两个）     no-leftover-processes、temporary-directory-removed
+弄坏开关 SEGMENT_TWO_R10_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，平常跑设了退 2）。逐项写开关名、弄坏哪一处，
+下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」；开关轮只核每项第一格）：
+  SEGMENT_TWO_R10_BREAK=peer-names-unchanged  别的台的标签不换成 H24 的前缀
+      「✗ 自证 overrides-applied：」「✗ 自证 e2e-two-hosts：」
+  SEGMENT_TWO_R10_BREAK=mutations-table-skipped  每行前后不核树里 crates/mutations.tsv
+      「✗ 自证 mutations-table-checked：」
+  SEGMENT_TWO_R10_BREAK=local-gate-ignored  本机闸没开也给本机分槽
+      「✗ 自证 e2e-local-gate-closed：」「✗ 自证 e2e-local-gate-opens：」
+  SEGMENT_TWO_R10_BREAK=running-shards-ignored  让路时第一段在跑的行也当排着的
+      「✗ 自证 segment-one-rows-waiting：」
+  SEGMENT_TWO_R10_BREAK=yield-ignored  第一段逐行还有排着的行也照样派
+      「✗ 自证 e2e-yield：」
+  SEGMENT_TWO_R10_BREAK=stop-file-ignored  见到停派文件照样派新行
+      「✗ 自证 e2e-stop-file：」
+  SEGMENT_TWO_R10_BREAK=s17-ignored  第一段那一处 S17 触发了照样派新行
+      「✗ 自证 e2e-s17-segment-one：」
+  SEGMENT_TWO_R10_BREAK=gate-ignored  起跑闸没过也起
+      「✗ 自证 e2e-gate-refused：」
+  SEGMENT_TWO_R10_BREAK=inputs-unchecked  续跑不核 inputs.sha256
+      「✗ 自证 inputs-checked：」
+  SEGMENT_TWO_R10_BREAK=run-values-unchecked  续跑不核 run-values.tsv
+      「✗ 自证 run-values-checked：」
+  SEGMENT_TWO_R10_BREAK=plan-writes-inputs  干跑也写输入清单
+      「✗ 自证 plan-writes-nothing：」
+  SEGMENT_TWO_R10_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  SEGMENT_TWO_R10_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 
@@ -76,15 +95,16 @@ import revision_8_selftest_harness as harness  # noqa: E402
 BREAK_VARIABLE = "SEGMENT_TWO_R10_BREAK"
 SELFTEST_VARIABLE = "SEGMENT_TWO_R10_SELFTEST"
 SEGMENT_TWO_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator_segment_two.py")
-SEGMENT_TWO_ORCHESTRATOR_SHA256 = "7d7b458b95e0a2b8a650e5e9f45b5405902661ffc296b06643100f63cea98393"
+# 钉的是第二段编排器此刻的内容（它钉的第一段编排器按此刻内容重钉了，跟着变）
+SEGMENT_TWO_ORCHESTRATOR_SHA256 = "413ce4a869667696acd62b05caba6441d3936e022d49db5fce72f437df5f0b39"
 SEGMENT_TWO_SELFTEST_LAST_LINE = "自证 46 项，红 0"
 EXIT_WRONG_PINNED_FILE = 3
 YIELD_RECHECK_SECONDS = 30.0
 # 修订 8 那一趟第 11、12 步与跨机对照 X（第一段编排器 STEPS 的键）：让路看它们还有没有排着的行
 SEGMENT_ONE_ROW_STEPS = ("s11", "s12", "sx")
 # 输入清单（H26）里的研究一侧文件：修订 6 第二段那 13 个里的 11 个（基线计时换成 T₂ 那一份、树里的变异表另列），加这一层与它 import 的几份
-INPUT_RESEARCH_FILES = ("row_driver.py", "device_timing.py", "frozen_o3.py", "run_directory.py", "bad_implementation_table.py", "bad-implementations-117.tsv",
-                        "bad-implementations-expansion-164.tsv", "rows_orchestrator.py", "rows_orchestrator_segment_two.py", "peer_side.py", "check_product.py",
+INPUT_RESEARCH_FILES = ("row_driver.py", "device_timing.py", "frozen_o3.py", "run_directory.py", "bad_implementation_table.py", "bad-implementations-step-8.tsv",
+                        "bad-implementations-step-4-only.tsv", "rows_orchestrator.py", "rows_orchestrator_segment_two.py", "peer_side.py", "check_product.py",
                         "rows_orchestrator_segment_two_revision_10.py", "revision_10_placeholders.py", "run_segment_two_revision_10_multi_host.sh",
                         "revision_8_selftest_harness.py", "revision_8_placeholders.py", "frozen_tree_lines_revision_8.py", "segment_one_units_revision_8.py")
 
@@ -107,6 +127,14 @@ def load_pinned(path: str, expected: str, module_name: str) -> types.ModuleType:
     return module
 
 
+# 这一层自己的弄坏开关，守卫在下面按 sha256 载入第二段编排器之前：平常跑设了先退 2，不让钉值核对的退 3 把它盖住、也不先载被钉的那一份
+# （第二段、第一段编排器的开关要载入之后才知道变量名，照旧在 main 开头拒）
+if __name__ == "__main__":
+    _refusal = harness.refuse_break_outside_selftest(BREAK_VARIABLE, SELFTEST_VARIABLE)
+    if _refusal:
+        print(_refusal, file=sys.stderr)
+        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
+        sys.exit(2)
 try:
     two = load_pinned(SEGMENT_TWO_ORCHESTRATOR_PATH, SEGMENT_TWO_ORCHESTRATOR_SHA256, "rows_orchestrator_segment_two_7d7b458b")
 except WrongPinnedFile as wrong_file:
@@ -143,9 +171,9 @@ def snapshot_check_with_the_tree_table(context) -> None:
         raise one.Stopped(f"树里 crates/mutations.tsv 不是 H8 那一份（作废 Z5）：现算 {found}")
 
 
-def allocate_behind_the_local_gate(hosts, resources):
+def allocate_behind_the_local_gate(hosts, threads=None):
     """编排器的分配（文件头 ⑤）：本机闸没开时本机那一台的槽数记 0，别的台照编排器原来的算法。"""
-    allocations = ORIGINAL["allocate"](hosts, resources)
+    allocations = ORIGINAL["allocate"](hosts, threads)
     gate_open, why = placeholders.local_gate(STATE["segment_one"])
     if gate_open or broken("local-gate-ignored"):
         return allocations
@@ -160,7 +188,6 @@ def peer_label_of_this_segment(context, label: str) -> str:
 
 def configure(segment_one: placeholders.SegmentOne, segment_two: placeholders.SegmentTwo) -> None:
     if not broken("peer-names-unchanged"):
-        one.PEER_KIT_RELATIVE, one.PEER_SNAPSHOT_RELATIVE, one.PEER_OUT_RELATIVE, two.PEER_LAUNCH_RELATIVE = segment_two.peer_names
         one.peer_label = peer_label_of_this_segment
         two.peer_label_two = peer_label_of_this_segment
     STATE.update(segment_one=segment_one, tree_table_sha256_h8=segment_one.mutations_sha256, label_prefix=segment_two.label_prefix,
@@ -261,12 +288,11 @@ def run_queue_with_stop_file_and_yield(context, slots: list[tuple[int, int, int]
             try:
                 one.snapshot_check(context)  # 作废 Z5（另核 H8）：每个驱动起之前核一次
                 exclusion_names = two.exclusions_for(context, job.step, job.row)
-                if slot[0] == 1:
+                if slot[0] == context.own_host:
                     process, record = two.launch_local_two(context, expected_hashes, label, step, (job.row,), slot[2],
                                                            two.work_root_for(context, job, slot, label), "local", exclusion_names)
                 else:
-                    process, record = two.launch_peer_two(context, setup.kit, label, step, job.row, slot[2], slot[0],
-                                                          setup.configurations.get(slot[0]), exclusion_names)
+                    process, record = two.launch_peer_two(context, setup.kit, label, step, job.row, slot[2], slot[0], exclusion_names)
             except one.Stopped as error:
                 failures.append(str(error))
                 break
@@ -369,7 +395,7 @@ def row_command(context, row: int, threads: str) -> list[str]:
     return (["nice", "-n", "19", "python3", "-B", context.driver_path, "--repo-root", context.repo, "--work-root", f"{context.work_root}/<槽>",
              "--output-root", context.step_root(two.ROWS_STEP), "--snapshot-from", os.path.join(context.repo, context.tree),
              "--baseline-timing", os.path.join(context.repo, context.baseline_timing), "--timing-output", "<分片目录>/timing.out"]
-            + two.driver_arguments(two.ROWS_STEP, (row,), threads, "<分片目录>/send/exclusions.tsv"))
+            + two.driver_arguments(two.ROWS_STEP, (row,), threads, f"<分片目录>/{two.LAUNCH_DIRECTORY_NAME}/{two.EXCLUSIONS_FILE}"))
 
 
 def plan_text(repo: str, segment_one: placeholders.SegmentOne, segment_two: placeholders.SegmentTwo,
@@ -383,7 +409,7 @@ def plan_text(repo: str, segment_one: placeholders.SegmentOne, segment_two: plac
              f"依赖·停派文件 {segment_one.stop_file}：{'在' if os.path.exists(segment_one.stop_file) else '不在'}",
              "依赖·S17 第一段那一处 {0}：cross_host_identical={1}".format(*placeholders.segment_one_cross_host_verdict(repo, segment_one)),
              f"产物前缀 {segment_two.prefix}-…{segment_two.suffix}.out；导出根 {segment_two.dumps}；日志 {segment_two.logs}；工作根 {segment_two.work_root}",
-             f"别的台落点 {','.join(segment_two.peer_names)}；标签前缀 {segment_two.label_prefix}"]
+             f"别的台标签前缀 {segment_two.label_prefix}（H24 的四个落点不再用：别的台照同一个绝对路径读写共享根下这一趟的分片目录）"]
     if timing is not None:
         lines.append(f"T₂：TAG {timing.tag or '-'}，{timing.path}（sha256 {timing.sha256}），process_wall {timing.seconds:.3f} 秒，各流之和 "
                      f"{timing.stream_seconds:.3f} 秒，逐行限时 {timing.row_time_limit_seconds} 秒")
@@ -391,15 +417,16 @@ def plan_text(repo: str, segment_one: placeholders.SegmentOne, segment_two: plac
 
 
 def print_row_commands(context) -> None:
-    """干跑：每一行本机驱动那一条命令（按派发的次序：推的用时最长先），再打别的台那一行的起法（multi-host-run.sh --peer 那一层）。"""
+    """干跑：每一行本机驱动那一条命令（按派发的次序：推的用时最长先），再打别的台那一行的起法（经 shard_relay.py 交给代跑那一片的那一层）。"""
     ordered = sorted(context.rows, key=lambda row: (-context.row_seconds.get(row, 0.0), row))
     for row in ordered:
         print(f"行 {row}（推 {context.row_seconds.get(row, 0.0):.0f} 秒）：{shlex.join(row_command(context, row, '<每槽线程>'))}")
-    peer_inner = (["run-driver", "--expected", f"{one.PEER_KIT_RELATIVE}/expected.json", "--"]
-                  + two.driver_arguments(two.ROWS_STEP, (ordered[0],), "<每槽线程>", f"{two.PEER_LAUNCH_RELATIVE}/{two.EXCLUSIONS_FILE}"))
-    peer = (["bash", context.multi_host_run, "--peer", "--memory-cap", one.PEER_OUTER_MEMORY_CAP, "--label", f"{STATE['label_prefix']}-attempt-<趟>-rows-row-{ordered[0]}-h<台>",
-             "--send", "<工具包>", one.PEER_KIT_RELATIVE, "--send", "<冻结树快照>", one.PEER_SNAPSHOT_RELATIVE, "--send", "<分片目录>/send", two.PEER_LAUNCH_RELATIVE,
-             "--fetch", one.PEER_OUT_RELATIVE, "--", "python3", "-B", f"{one.PEER_KIT_RELATIVE}/peer_side.py"] + peer_inner)
+    shard_directory = f"<分片目录 {context.shards}/attempt-<趟>/rows-row-{ordered[0]}-h<台>>"
+    peer_inner = (one.peer_side_arguments(f"<工具包 {context.shards}/attempt-<趟>/peer-kit>", "run-driver", f"{shard_directory}/{one.PEER_OUT_DIRECTORY_NAME}")
+                  + ["--"] + two.driver_arguments(two.ROWS_STEP, (ordered[0],), "<每槽线程>",
+                                                  f"{shard_directory}/{two.LAUNCH_DIRECTORY_NAME}/{two.EXCLUSIONS_FILE}"))
+    peer = (["python3", "-B", one.SHARD_RELAY, "relay", "--plan", "<服务给的计划目录>", "--to", "<代跑那一片的片号>",
+             "--label", f"{STATE['label_prefix']}-attempt-<趟>-rows-row-{ordered[0]}-h<台>", "--"] + one.peer_side_invocation() + peer_inner)
     print(f"别的台那一行（第 {ordered[0]} 行为例）：{shlex.join(peer)}")
     print(f"行命令 {len(ordered)} 条；跨机对照那一行第 {context.cross_host_row} 行在整表那一次之外的另一台再跑一次（同一张补位排除表）")
 
@@ -460,7 +487,7 @@ def run_layer(repo: str, config_path: str, plan_only: bool) -> int:
         one.say(context, f"✗ 停：{error}")
         return 1
     except one.Interrupted:
-        one.say(context, "收到停止信号：在跑的各行已停、别的台已做完的行已取回收进来；同一条命令再起就是续跑")
+        one.say(context, "收到停止信号：在跑的各行已停、别的台已做完的行已收进来；同一条命令再起就是续跑")
         return one.EXIT_STOPPED_BY_SIGNAL
 
 
@@ -472,7 +499,7 @@ def main(argument_list: list[str]) -> int:
             print(refusal, file=sys.stderr)
             return 2
     if os.environ.get(two.SELFTEST_ROWS_VARIABLE) and os.environ.get(two.SELFTEST_VARIABLE) != "1":
-        print(f"✗ {two.SELFTEST_ROWS_VARIABLE} 只在自证起的子进程里认（平常跑整表 1–281）；设了它就拒（退 2）", file=sys.stderr)
+        print(f"✗ {two.SELFTEST_ROWS_VARIABLE} 只在自证起的子进程里认（平常跑整表）；设了它就拒（退 2）", file=sys.stderr)
         print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
         return 2
     if argument_list[:1] == ["--selftest"]:
@@ -482,10 +509,14 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--config", required=True)
     parser.add_argument("--repo", default=os.getcwd())
     arguments = parser.parse_args(argument_list)
+    if arguments.mode == "run":
+        phase_exit = one.shard_phase_before_layer(os.path.abspath(arguments.repo), say=lambda line: print(line, flush=True))
+        if phase_exit is not None:
+            return phase_exit
     return run_layer(os.path.abspath(arguments.repo), arguments.config, arguments.mode == "plan")
 
 
-# ── 自证：借第二段编排器的假世界（fake_world_two：假驱动、假 multi-host-run、假机器清单与资源），起的是这一层；
+# ── 自证：借第二段编排器的假世界（fake_world_two：假驱动、假 task-server 分片、假机器清单与资源），起的是这一层；
 #    另写假的两份配置、假的修订 8 序列日志与 T₂ 那份计时产物 ──
 FAKE_RUN_DATE = "2026-10-09"
 SEGMENT_ONE_GREEN_UNITS = {
@@ -515,9 +546,9 @@ def segment_one_lines(segment_one: placeholders.SegmentOne, repo: str, kind: str
     return lines
 
 
-def fake_world_ten(root: str, kind: str = "finished", rows: str = "1,2,3,4,5,6", resources: list[dict] | None = None,
+def fake_world_ten(root: str, kind: str = "finished", rows: str = "1,2,3,4,5,6",
                    extra_environment: dict[str, str] | None = None, mode: str = "run") -> WorldTen:
-    base = two.fake_world_two(root, rows=rows, resources=resources, extra_environment=extra_environment)
+    base = two.fake_world_two(root, rows=rows, extra_environment=extra_environment)
     tree = os.path.join(base.repo, "scripts/experiment-apparatus/target/fake-frozen-tree")
     judge.write_text(os.path.join(tree, judge.MUTATIONS_TABLE), "# 假的坏实现表\n")
     segment_one = placeholders.SegmentOne(tree="scripts/experiment-apparatus/target/fake-frozen-tree", snapshot_digest=judge.row_driver.snapshot_digest(tree)[0],
@@ -539,7 +570,8 @@ def fake_world_ten(root: str, kind: str = "finished", rows: str = "1,2,3,4,5,6",
     environment = dict(base.environment, SEGMENT_TWO_R10_SELFTEST="1", SEGMENT_TWO_R10_SKIP_CONFIG_CHECK="1", SEGMENT_TWO_R10_YIELD_RECHECK_SECONDS="0.2",
                        SEGMENT_TWO_R10_RESEARCH_ROOT=two.REAL_REPOSITORY, **(extra_environment or {}))
     command = [sys.executable, "-B", os.path.abspath(__file__), mode, "--config", config_path, "--repo", base.repo]
-    world = two.WorldTwo(base.root, base.repo, command, environment, segment_two.prefix + "-", segment_two.dumps)
+    served = one.served_command(base.root, command) if mode == "run" else command
+    world = two.WorldTwo(base.root, base.repo, served, environment, segment_two.prefix + "-", segment_two.dumps, command)
     return WorldTen(world, config_path, segment_one, segment_two)
 
 
@@ -564,13 +596,12 @@ def timing_of(world: WorldTen) -> placeholders.BaselineTimingOfStepOne:
 def cell_overrides_applied(scratch: str) -> tuple[bool, str]:
     world = fake_world_ten(os.path.join(scratch, "world"))
     configure(world.segment_one, world.segment_two)
-    names = (one.PEER_KIT_RELATIVE, one.PEER_SNAPSHOT_RELATIVE, one.PEER_OUT_RELATIVE, two.PEER_LAUNCH_RELATIVE)
     attempt = types.SimpleNamespace(attempt_dir="/x/attempt-1", tag="-s2")
     labels = (one.peer_label(attempt, "preflight-h2"), two.peer_label_two(attempt, "rows-row-3-h2"))
-    good = (names == world.segment_two.peer_names and all(label.startswith(world.segment_two.label_prefix + "-attempt-1-") for label in labels)
+    good = (all(label.startswith(world.segment_two.label_prefix + "-attempt-1-") for label in labels)
             and one.snapshot_check is snapshot_check_with_the_tree_table and one.allocate is allocate_behind_the_local_gate
             and two.run_queue_two is run_queue_with_stop_file_and_yield)
-    return good, f"四个落点 {names}；标签 {labels}"
+    return good, f"标签 {labels}"
 
 
 def cell_mutations_table_checked(scratch: str) -> tuple[bool, str]:
@@ -639,18 +670,17 @@ def cell_e2e_two_hosts(scratch: str) -> tuple[bool, str]:
     world = fake_world_ten(os.path.join(scratch, "world"), extra_environment={"FAKE_DRIVER_TIMEOUT_ROWS": "4"})
     code, output = two.world_run_two(world.base)
     counts, expected = two.ran_counts_two(world.base), two.plain_counts((1, 2, 3, 4, 5, 6), 1, (4,))
-    mhr_log = os.path.join(world.base.root, "mhr.log")
-    labels = [one.key_values(line)["label"] for line in open(mhr_log, encoding="utf-8")] if os.path.exists(mhr_log) else []
+    labels = one.relay_labels(world.base.root)
     shards = os.path.join(world.base.repo, world.segment_two.dumps, "segment2-rows-shards")
-    fetched = [root for root, _, _ in os.walk(shards) if root.endswith(world.segment_two.peer_names[2])]
+    peer_outputs = [root for root, _, _ in os.walk(shards) if os.path.basename(root) == one.PEER_OUT_DIRECTORY_NAME]
     dumps = os.path.join(world.base.repo, world.segment_two.dumps)
     good = (code == 0 and counts == expected and os.path.exists(product_ten(world, "rows-driver"))
             and "cross_host_identical=true" in two.last_verdict(product_ten(world, two.CROSS_HOST_CHECK_STEM))
             and "substitute_collisions=0" in two.last_verdict(product_ten(world, two.COORDINATION_STEM))
-            and bool(labels) and all(label.startswith(world.segment_two.label_prefix + "-") for label in labels) and bool(fetched)
+            and bool(labels) and all(label.startswith(world.segment_two.label_prefix + "-") for label in labels) and bool(peer_outputs)
             and all(os.path.exists(os.path.join(dumps, name)) for name in (placeholders.INPUTS_FILE, placeholders.RUN_VALUES_FILE)))
     return good, (f"退 {code}；真跑过的次数与预期{'相同' if counts == expected else '不同：' + str(counts)}；别的台标签 {sorted(set(label[:9] for label in labels))}；"
-                  f"取回到 H24 落点的分片 {len(fetched)}；末行 {last_line(output)}")
+                  f"别的台写在共享根下的分片输出目录 {len(peer_outputs)}；末行 {last_line(output)}")
 
 
 def cell_e2e_stop_file(scratch: str) -> tuple[bool, str]:
@@ -695,9 +725,8 @@ def wait_for(predicate, seconds: float) -> bool:
 
 
 def cell_e2e_local_gate_opens(scratch: str) -> tuple[bool, str]:
-    """起跑时本机闸没开（第二台一槽）；跑起来之后修订 8 日志里第 7 步绿、逐行编排起过，编排器的加槽把本机加进来。"""
-    resources = [one.resources_entry(1, 10, 25, 25), one.resources_entry(2, 5, 25, 25)]
-    world = fake_world_ten(os.path.join(scratch, "world"), kind="before-step-7", resources=resources,
+    """起跑时本机闸没开（第二台一槽）；跑起来之后修订 8 日志里第 7 步绿、逐行编排起过，编排器的加槽把本机加进来（重算分配时本机的槽数不再记 0）。"""
+    world = fake_world_ten(os.path.join(scratch, "world"), kind="before-step-7",
                            extra_environment={"FAKE_DRIVER_ROW_SECONDS": "0.3", "ROWS_ORCHESTRATOR_TWO_REGROW_SECONDS": "0.2"})
     process = subprocess.Popen(world.base.command, cwd=world.base.repo, env=world.base.environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     wait_for(lambda: bool(ran_lines(world)), 60)

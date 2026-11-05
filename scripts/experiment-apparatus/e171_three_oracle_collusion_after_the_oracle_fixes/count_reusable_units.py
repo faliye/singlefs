@@ -8,7 +8,7 @@
 开头核：单元表里每条装置与 E170 导出装置的参数串（--seed-hex 之前那一截）、执行器那一项的末一个词、第 4 步每项的「empty_control <段> <对照> <流>」
   与变异驱动的变异表路径，在 segment_one_unit_revision_8.sh 与 segment_one_unit_revision_11.sh 里都逐字出现；缺了退 2、不出计数。
 不读任何 E171 产物与导出：[upstream] 与 [limit] 两节按单元名接成上游那一单元的键（上游重跑之后读数字节相同才可复用，所以这两节不同记 upstream 一类）。
-第二段跨机对照那一行与 RC3 抽样按那一趟现算，不在计数里；单元总数 330 = 第 0–10 步 33 + 第一段 16 行 + 第二段 281 行。
+第二段跨机对照那一行与 RC3 抽样按那一趟现算，不在计数里；单元总数 = 第 0–10 步 33 + 第一段 16 行 + 第二段整表行数（改后两张名单第一列之并，list_check.whole_table_row_numbers 现算；E171 第 2 次重跑撤项之前是 281）。
 判定四类：same（键相同，可复用）；upstream（只差 [upstream] 或 [limit]，条件式）；differs（别的节不同，写第一处不同的节）；
   fresh-always（第 11.1、11.3 节永远现跑：step-9、step-10-run-2、第一段 row-0，与要补位的行：按名字取不到、锚点不是恰 1 次、改坏那一处碰到模块集合）。
 输出：count group=<组> verdict=<类> units=<数>，first_difference group=<组> section=<节> units=<数>，末行 total units=<数>；--per-unit 另逐单元一行。
@@ -23,10 +23,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import list_check  # noqa: E402
 import reuse_library as reuse  # noqa: E402
 
 UNIT_SCRIPTS = ("segment_one_unit_revision_8.sh", "segment_one_unit_revision_11.sh")
-WHOLE_TABLE_ROWS = tuple(range(1, 282))
+WHOLE_TABLE_ROWS = list_check.whole_table_row_numbers()
 GROUP_STEPS, GROUP_SEGMENT_ONE, GROUP_SEGMENT_TWO = "第 0–10 步单元", "第一段行", "第二段行"
 
 

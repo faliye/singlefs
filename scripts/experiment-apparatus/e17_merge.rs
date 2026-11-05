@@ -130,16 +130,36 @@ fn mibs(n: usize, ns: u64) -> f64 {
     (n * ENTRY_BYTES) as f64 / (1024.0 * 1024.0) / (ns as f64 / 1e9)
 }
 
+/// 登记的条目数与轮数；不给参数就是它们。
+const REGISTERED_ENTRY_COUNT: usize = 4_000_000;
+const REGISTERED_ROUND_COUNT: usize = 5;
+
+/// 与登记规模不同的参数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+/// 每项是（名字，这一趟的值，登记的值）；全部等于登记值时不接。
+fn reduced_scale_note(scales: &[(&str, u64, u64)]) -> String {
+    let registered_values: Vec<String> = scales
+        .iter()
+        .filter(|(_, actual, registered)| actual != registered)
+        .map(|(name, _, registered)| format!("registered_{name}={registered}"))
+        .collect();
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 fn main() {
-    let n: usize = std::env::args().nth(1).and_then(|x| x.parse().ok()).unwrap_or(4_000_000);
-    let rounds: usize = std::env::args().nth(2).and_then(|x| x.parse().ok()).unwrap_or(5);
+    let n: usize = std::env::args().nth(1).and_then(|x| x.parse().ok()).unwrap_or(REGISTERED_ENTRY_COUNT);
+    let rounds: usize = std::env::args().nth(2).and_then(|x| x.parse().ok()).unwrap_or(REGISTERED_ROUND_COUNT);
     let mut em = Emitter::new();
     let mut out = String::new();
     let mut say = |s: String| { out.push_str(&s); out.push('\n'); };
 
     say(em.emit_raw(&format!(
-        "name=config entries={n} rounds={rounds} entry_bytes={ENTRY_BYTES} leaves={N_LEAVES} cores={}",
-        std::thread::available_parallelism().map(|v| v.get()).unwrap_or(0)
+        "name=config entries={n} rounds={rounds} entry_bytes={ENTRY_BYTES} leaves={N_LEAVES} cores={}{}",
+        std::thread::available_parallelism().map(|v| v.get()).unwrap_or(0),
+        reduced_scale_note(&[("entries", n as u64, REGISTERED_ENTRY_COUNT as u64), ("rounds", rounds as u64, REGISTERED_ROUND_COUNT as u64)])
     )));
 
     // ── 正确性闸：两条臂 + 真值三方一致，否则整轮作废 ──
@@ -249,5 +269,14 @@ mod tests {
         for th in [3usize, 7, 16] {
             assert_eq!(arm_parallel(&inp, th), a);
         }
+    }
+
+    /// 给了缩规模的条目数或轮数，config 行要写缩过、不当正式产物；两项都是登记值不加这一段。
+    #[test]
+    fn reduced_entries_or_rounds_are_marked_and_registered_ones_are_not() {
+        let registered = [("entries", REGISTERED_ENTRY_COUNT as u64, REGISTERED_ENTRY_COUNT as u64), ("rounds", REGISTERED_ROUND_COUNT as u64, REGISTERED_ROUND_COUNT as u64)];
+        assert_eq!(reduced_scale_note(&registered), "");
+        let reduced = [("entries", 1000, REGISTERED_ENTRY_COUNT as u64), ("rounds", 2, REGISTERED_ROUND_COUNT as u64)];
+        assert_eq!(reduced_scale_note(&reduced), " reduced=yes registered_entries=4000000 registered_rounds=5 not_official_product=yes");
     }
 }

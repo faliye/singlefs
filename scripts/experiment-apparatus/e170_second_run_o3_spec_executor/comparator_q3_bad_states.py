@@ -9,7 +9,7 @@ bad-patches.bin 里这一行的补丁」，判完换回去。A(c) 因此照底�
 比的是补丁之后的摘要（导出装置从 CrashImage 算的那一份），另核补丁之前的摘要与导出写的底态摘要相同（登记第十一节 S2 同形）。
 判的那一半不打开 bad-expected.tsv 与 bad-impl-verdicts.tsv；判定行全部写出之后，比对那一半才打开它们（登记 5.5「期望答案…只给比对器读」）。
 
-跑法（在本目录，经 run-with-memory-cap.sh 与 capped.sh）：
+跑法（在本目录，整条命令交 `task-server/task submit --`，线程数经 capped.sh）：
   python3 comparator_q3_bad_states.py --dumps <导出目录> --freeze-reference <第一段产物> --output <新文件>
 文件名以 comparator 起头，不进冻结的 sha256（executor_main.FILES_OUTSIDE_THE_FREEZE）。
 """

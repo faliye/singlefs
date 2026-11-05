@@ -36,16 +36,47 @@
 #         3 判不了——某一趟的门禁脚本退出码不是 0 / 1 / 77（工具缺、崩了、准入没满足退 78），或退 1 却一行红行都抽不出；
 #         77 本次未跑——工作区那一趟退 77，或两趟都退 77。基准那一趟退 77 不碍事（基准没有对象，工作区的红行全算新增）。
 # 起它的命令里带 SINGLEFS_RUN_SCOPE（照 .claude/hooks/run-scope-guard.sh 文件头）：门禁脚本是从这里面起的，声明由起它的这一条命令负责。
-# 弄坏开关 BASELINE_DIFF_BREAK=<项>（只给证红用，一次一个；自证退 1）：
-#   report-all          不比，工作区所有红行都报：自证里「基准就红的格不报」那一项红
-#   keep-line-numbers   不抹行号：基准那一格的红行在工作区里挪了行号，被当成新红行，「基准就红的格不报」与「只挪了行号不报」两项红
-#   no-tool-overlay     基准树里没有的判法脚本不补：基准那一趟退 127，「基准树缺判法脚本照用主仓的」与「只报新红的格」两项红
-#   counts-as-new       不做掩数字那一遍：只差数字的红行被当成新红，「计数变了不报新红」那几项红
-#   worktree-left       收尾不删 worktree 与工作目录：「收尾删干净」那一项红
-#   sandbox-left        自证只在里面那一趟（自证跑自证，TMPDIR 指到新空目录）退出时不删自己的临时目录：「自证跑完不留临时目录」那一项红；
-#                       外面这一趟的临时目录照删，所以开着它跑完也不会在 $TMPDIR 里留东西
+# 弄坏开关（只给证红用，一次一个；自证退 1；只在 --selftest 与它起的子进程里认，平常跑设了退 2、点名只在自证里认）。
+# 下一行起写打开后自证红的项（失败行 `✗ <项>：` 之后的句首）：
+#   BASELINE_DIFF_BREAK=report-all  不比，工作区所有红行都报
+#       「只报新红的格」「基准就红的格不报」「只挪了行号不报」「只跑基准就红的格」「像 doc-lint 的门禁」「计数变了不报新红」「计数变了单列」「计数变了之外有真新红」
+#   BASELINE_DIFF_BREAK=keep-line-numbers  不抹行号：基准那一格的红行在工作区里挪了行号，被当成新红行
+#       「只报新红的格」「基准就红的格不报」「只挪了行号不报」「只跑基准就红的格」
+#   BASELINE_DIFF_BREAK=no-tool-overlay  基准树里没有的判法脚本不补：基准那一趟退 127
+#       「只报新红的格」「基准就红的格不报」「只挪了行号不报」「基准树缺判法脚本照用主仓的」
+#   BASELINE_DIFF_BREAK=counts-as-new  不做掩数字那一遍：只差数字的红行被当成新红
+#       「计数变了不报新红」「计数变了单列」「计数变了之外有真新红」
+#   BASELINE_DIFF_BREAK=worktree-left  收尾不删 worktree 与工作目录
+#       「收尾删干净」
+#   BASELINE_DIFF_BREAK=sandbox-left  自证只在里面那一趟（自证跑自证，TMPDIR 指到新空目录）退出时不删自己的临时目录；外面这一趟的临时目录照删，所以开着它跑完也不会在 $TMPDIR 里留东西
+#       「自证跑完不留临时目录」
 set -uo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_NAMESPACE
+# 弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道：命令行第一个词是 --selftest，或祖先里有一个的命令行里带 --selftest（自证起的子进程）才放行；
+# 否则下面这些变量有设了的，点名它、说它只在自证里认，退 2
+BREAK_VARIABLES=(BASELINE_DIFF_BREAK)
+inside_selftest() { # 往上数这个进程的祖先，有一个的命令行里带 --selftest 就退 0
+  local pid="$PPID" stat words word fields
+  while ((pid > 1)); do
+    mapfile -d '' -t words 2> /dev/null < "/proc/$pid/cmdline" || return 1
+    for word in "${words[@]}"; do [[ "$word" == --selftest ]] && return 0; done
+    IFS= read -r stat 2> /dev/null < "/proc/$pid/stat" || return 1
+    read -ra fields <<< "${stat##*) }"
+    pid="${fields[1]:-0}"
+  done
+  return 1
+}
+settle_break_switches() { # settle_break_switches <命令行的词…>
+  local name setting=()
+  for name in "${BREAK_VARIABLES[@]}"; do [[ -n "${!name:-}" ]] && setting+=("$name"); done
+  ((${#setting[@]} == 0)) && return 0
+  [[ "${1:-}" == --selftest ]] && return 0
+  inside_selftest && return 0
+  echo "  ✗ ${setting[*]} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做" >&2
+  echo "     → 怎么办：unset ${setting[*]} 再来；要看开关红在哪一项，跑 ${setting[0]}=<项> bash scripts/gate/baseline-diff.sh --selftest" >&2
+  exit 2
+}
+settle_break_switches "$@"
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 
@@ -69,7 +100,7 @@ overlay_missing_tools() {
       relative="${relative#"$main_root"/}"
       [[ -e "$base_tree/$relative" ]] && continue
       mkdir -p "$base_tree/$(dirname "$relative")" || return 1
-      cp -p "$main_root/$relative" "$base_tree/$relative" || return 1
+      cp --preserve=timestamps "$main_root/$relative" "$base_tree/$relative" || return 1
       copied=$((copied + 1))
     done < <(find "$main_root/$tooling_directory" \( -name fixtures -o -name target -o -name 'target-*' -o -name __pycache__ -o -name .git -o -name node_modules \) -prune \
                -o -type f \( -name '*.sh' -o -name '*.py' \) -print0)

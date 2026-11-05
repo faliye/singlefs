@@ -20,27 +20,46 @@
 # 登记放在 ${REMIND_STATE_ROOT:-~/.local/state/singlefs/reminders}/<会话号>/<名字>.conf，会话号取 CLAUDE_CODE_SESSION_ID（停止钩子按它认是哪个会话的）；
 # 等着的进程号与它的启动时刻（/proc/<进程号>/stat 的 starttime）写在同目录的 <名字>.pid（一行「<进程号> <启动时刻>」），已提醒的次数写在 <名字>.count。
 # 认「在等」（同名去重、stop、list）与停止钩子 remind-rearm-stop-guard.sh 共用 .claude/hooks/lib_remind_waiter.py：进程活着、启动时刻与登记相同、
-#   命令真是 bash …/remind.sh 三样都对才算；进程号被复用、无关进程参数里带 remind.sh、旧登记没有启动时刻的，都按没人在等。
+#   命令真是 bash …/remind.sh 三样都对才算；进程号被复用、无关进程参数里带 remind.sh、读不出启动时刻的，都按没人在等。
 # 等着的进程到点或被停（TERM、INT）时，<名字>.pid 里仍是「自己的进程号 自己的启动时刻」才删（同一份库的 remove-own）；
 #   已被换成别的进程的（新旧登记交替时重起的那一份已经写了自己的）不删，免得删掉新的那份、停止钩子再重起一份。
 # 退出码：0 做完；2 用法错或认不出会话（stderr 写卡在哪与下一步）；1 自证红；78 准入或运行条件不满足（preflight）。
 # REMIND_PERIOD_UNIT_SECONDS 把「一分钟」缩成这么多秒（缺省 60），只给自证和试跑用。
 #
-# 弄坏开关 REMIND_BREAK=<项>（只给 --selftest-cells 证红用，逗号连几个；平常跑时不认）。项名、弄坏哪一处、打开后红在哪一格（格名是「✗ 自证 <格名>：」里的那一段）：
-#   once-keeps-registration   --once 提醒完不删登记                             once
-#   loop-drops-registration   循环提醒完把登记删了                               loop
-#   count-resets              次数不跨重启累加（每次都算第 1 次）                 loop-count
-#   restart-drops-message     登记里的 restart= 那一行丢了 --message            loop-count
-#   no-duplicate-guard        同名已有一个在等时仍另起一个                       duplicate
-#   list-always-waiting       list 把没在等的也写成在等                          list
-#   stop-leaves-waiter        stop 只删登记、不停等着的进程                       stop
-#   trap-leaves-sleeper       等着的进程被停时不停它的计时子进程                   stop-sleeper
-#   accept-bad-every          --every 不校验（0、前导零、非数字都收）             usage-every
-#   identity-by-name          认在等退回只看进程活着、命令行任意位置含 remind.sh   unrelated-process、start-time-mismatch、legacy-registration
-#   pidfile-removed-unchecked 到点与被停时不核登记、无条件删进程号文件（改前的样子） foreign-registration-at-end、foreign-registration-on-term
+# 弄坏开关 REMIND_BREAK=<项>（只给 --selftest 起的各轮证红用，逗号连几个；平常跑设了就在一切之前退 2、点名变量只在自证里认，自证起的子进程由 REMIND_SELFTEST_MARK 认）。项名、弄坏哪一处、打开后红在哪一格（格名是「✗ 自证 <格名>：」里的那一段）：
+#   REMIND_BREAK=once-keeps-registration  --once 提醒完不删登记
+#       「✗ 自证 once：」
+#   REMIND_BREAK=loop-drops-registration  循环提醒完把登记删了
+#       「✗ 自证 loop：」
+#   REMIND_BREAK=count-resets  次数不跨重启累加（每次都算第 1 次）
+#       「✗ 自证 loop-count：」
+#   REMIND_BREAK=restart-drops-message  登记里的 restart= 那一行丢了 --message
+#       「✗ 自证 loop-count：」
+#   REMIND_BREAK=no-duplicate-guard  同名已有一个在等时仍另起一个
+#       「✗ 自证 duplicate：」
+#   REMIND_BREAK=list-always-waiting  list 把没在等的也写成在等
+#       「✗ 自证 list：」
+#   REMIND_BREAK=stop-leaves-waiter  stop 只删登记、不停等着的进程
+#       「✗ 自证 stop：」
+#   REMIND_BREAK=trap-leaves-sleeper  等着的进程被停时不停它的计时子进程
+#       「✗ 自证 stop-sleeper：」
+#   REMIND_BREAK=accept-bad-every  --every 不校验（0、前导零、非数字都收）
+#       「✗ 自证 usage-every：」
+#   REMIND_BREAK=identity-by-name  认在等退回只看进程活着、命令行任意位置含 remind.sh
+#       「✗ 自证 unrelated-process：」、「✗ 自证 start-time-mismatch：」
+#   REMIND_BREAK=pidfile-removed-unchecked  到点与被停时不核登记、无条件删进程号文件（改前的样子）
+#       「✗ 自证 foreign-registration-at-end：」、「✗ 自证 foreign-registration-on-term：」
 set -u
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+
+# 弄坏开关只在自证里认：自证自带开关轮（--selftest 自己逐个设 REMIND_BREAK 起 --selftest-cells），起这些轮的 --selftest 先设 REMIND_SELFTEST_MARK；
+# 没有这个标记而变量非空（含 --selftest 本身，外面设了会弄脏不带开关的那一轮），一切之前就退 2、点名变量只在自证里认，不管值是什么。
+if [[ -n "${REMIND_BREAK:-}" && "${REMIND_SELFTEST_MARK:-}" != remind-selftest ]]; then
+  echo "✗ REMIND_BREAK=${REMIND_BREAK} 是弄坏开关，只在自证（remind.sh --selftest 起的各轮）里认，平常跑设了就拒，这一趟什么都没做" >&2
+  echo "→ 怎么办：去掉 REMIND_BREAK 再跑；要证红直接跑 bash scripts/agents/remind.sh --selftest（自证自己逐个打开弄坏开关，外面不用设）" >&2
+  exit 2
+fi
 
 STATE_ROOT=${REMIND_STATE_ROOT:-$HOME/.local/state/singlefs/reminders}
 SESSION=${CLAUDE_CODE_SESSION_ID:-}
@@ -286,7 +305,7 @@ run_cells() {
   # 无关进程：bash -c 跑命令串，remind.sh 只是它的一个参数
   bash -c 'read -r -t 60 _ <>"$1"' remind.sh "$hold" &
   unrelated=$!
-  # 命令确是 bash …/remind.sh 的进程：登记里的启动时刻对不上（进程号被复用的样子）、或旧登记只有进程号
+  # 命令确是 bash …/remind.sh 的进程：登记里的启动时刻对不上（进程号被复用的样子）
   bash "$fake" "$hold" &
   impostor=$!
   for _ in $(seq 1 100); do
@@ -295,12 +314,11 @@ run_cells() {
   done
   unrelated_start="$(python3 -B "$WAITER_LIBRARY" start-time "$unrelated")"
   impostor_start="$(python3 -B "$WAITER_LIBRARY" start-time "$impostor")"
-  for case_name in unrelated-case mismatch-case legacy-case; do
+  for case_name in unrelated-case mismatch-case; do
     printf 'every=1\nonce=0\nmessage=x\nrestart=bash %q start --every 1 --message x --name %s\n' "$SELF" "$case_name" >"$dir/$case_name.conf"
   done
   echo "$unrelated $unrelated_start" >"$dir/unrelated-case.pid"
   echo "$impostor $((impostor_start + 1))" >"$dir/mismatch-case.pid"
-  echo "$impostor" >"$dir/legacy-case.pid"
   run_remind "" list
   local identity_list="${cell_out//$'\n'/ ／ }"
   run_remind "" stop --name unrelated-case
@@ -308,8 +326,6 @@ run_cells() {
   cell_check unrelated-process $(( state )) "参数里带 remind.sh 的无关进程 $unrelated 写进登记：list 应当写没在等、stop 不停它，实际 list：$identity_list；stop 之后它$(kill -0 "$unrelated" 2>/dev/null && echo 还活着 || echo 被停了)"
   state=1; if [[ "$identity_list" == *"mismatch-case：每 1 分钟，循环，没在等"* ]]; then state=0; fi
   cell_check start-time-mismatch $(( state )) "登记的启动时刻与进程 $impostor 此刻的对不上，list 应当写没在等，实际：$identity_list"
-  state=1; if [[ "$identity_list" == *"legacy-case：每 1 分钟，循环，没在等"* ]]; then state=0; fi
-  cell_check legacy-registration $(( state )) "旧登记只有进程号 $impostor、没有启动时刻，list 应当写没在等，实际：$identity_list"
   # 收自己起的：只对自己起的进程号发信号
   kill "$unrelated" 2>/dev/null
   kill "$impostor" 2>/dev/null
@@ -366,7 +382,7 @@ run_cells() {
 SELFTEST_BREAKS=(
   "once-keeps-registration once" "loop-drops-registration loop" "count-resets loop-count" "restart-drops-message loop-count"
   "no-duplicate-guard duplicate" "list-always-waiting list" "stop-leaves-waiter stop" "trap-leaves-sleeper stop-sleeper" "accept-bad-every usage-every"
-  "identity-by-name unrelated-process,start-time-mismatch,legacy-registration"
+  "identity-by-name unrelated-process,start-time-mismatch"
   "pidfile-removed-unchecked foreign-registration-at-end,foreign-registration-on-term"
 )
 
@@ -387,6 +403,7 @@ selftest() {
   # 不带开关的一轮与每个开关各一轮互不相干（各用自己的临时登记目录），一起起；每轮输出写自己的文件，按派出的次序逐个 wait 进程号收退出码
   work="$(mktemp -d)"
   trap 'rm -rf "${work:?}"' EXIT
+  export REMIND_SELFTEST_MARK=remind-selftest   # 起的各轮（--selftest-cells 与它们底下的 start、stop）靠它认：弄坏开关只在自证里认
   bash "$SELF" --selftest-cells >"$work/clean.out" 2>&1 &
   pids+=($!)
   for index in "${!SELFTEST_BREAKS[@]}"; do

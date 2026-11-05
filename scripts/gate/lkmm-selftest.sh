@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# admission: always 判的是此刻的 .claude/scripts/lkmm.sh、门禁 checker-tier-lkmm 的样本与 scripts/gate/lib_reuse_checks.py，上一次的结论不替这一次作保
+# admission: always 判的是此刻的 .claude/scripts/lkmm.sh、门禁 lkmm 的样本与 scripts/gate/lib_reuse_checks.py，上一次的结论不替这一次作保
 # run-condition: command python3 bash
-# gate-similar: checker-tier-lkmm.sh 那一道的样本档（litmus-key-samples-*）判门禁接 lkmm.sh 的两趟复用；这一份是 lkmm.sh 自己的自证（复用三问四趟、复用哨兵），
-#   lkmm.sh 本身带 --selftest 会被重型测试闸按 herd7 拦（.claude/hooks/lib_heavy_tests.py 按名字认 lkmm.sh），另放一份可以单独起的
+# gate-similar: lkmm.sh 那一道的样本档（litmus-key-samples-*）判门禁接 lkmm.sh 的两趟复用；这一份是 lkmm.sh 自己的自证（复用三问四趟、复用哨兵），
+#   lkmm.sh 本身带 --selftest 会被项目代码闸按 herd7 拦（.claude/hooks/lib_project_code_runs.py 按名字认 lkmm.sh），另放一份可以单独起的
 # .claude/scripts/lkmm.sh 的自证：复用三问（格名 reuse-three-questions）与复用哨兵（reuse-sentinel），判法与规范输出在 scripts/gate/lib_reuse_checks.py 文件头「一」「二」；
 #   另有一格判绑定判定的键里有写出文件名的测试（binding-test-mentions-in-key），一格判两个子目录里同名的 litmus 各是各的项（litmus-same-name-subdirectories），
 #   一格判写出项名那一查看边界（binding-mention-boundary）。
 #
 #   bash scripts/gate/lkmm-selftest.sh --selftest
 #
-# 现场：临时目录里照门禁 checker-tier-lkmm 的样本 litmus-key-samples-anchor-body-changed 的 setup.sh 造一对 litmus（publish 与它去掉屏障的对照）、
+# 现场：临时目录里照门禁 lkmm 的样本 litmus-key-samples-anchor-body-changed 的 setup.sh 造一对 litmus（publish 与它去掉屏障的对照）、
 #   锚点 crates/demo/src/lib.rs :: publish、写出文件名的测试、假 herd7（打固定版本串、照 litmus 里 fake-observation 交判定）与只有模型文件的假内核树；
-#   判定库放这一趟的临时目录。不起真 herd7、不编不跑。
+#   每一份现场造完都在现场根 git init（不提交）：lkmm.sh 的判定库是 <现场的 git common-dir>/singlefs-lkmm-verdicts，不是 git 工作树退 2；
+#   判定库经 scripts/crash/lib_verdict_library.py 写进 prune-server，每份现场的库目录不同、在临时服务里各占一个命名空间：
+#   只在临时服务上跑，裸跑开跑前调客户端 selftest_service_problem、退 2、一格都不跑，不写真服务。起法：
+#   python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --server-binary <prune-server 二进制> -- bash scripts/gate/lkmm-selftest.sh --selftest
+#   不起真 herd7、不编不跑。
 # 格：
 #   reuse-three-questions  头一趟（空库）、同一份输入第二趟、改没人引的 fn unrelated 的函数体（闭包外）、改锚点 publish 的函数体（闭包内：只有 binding:publish.litmus 现判）
 #                          各跑一趟，三条判定（binding:publish.litmus、herd7:publish.litmus、herd7:publish-nofence.litmus）照三问判、打规范输出
@@ -23,16 +27,46 @@
 #   litmus-same-name-subdirectories  另照同一份样本造一份现场与判定库：那一对 litmus 挪进 litmus/a/，再拷一对进 litmus/b/（data 换成 payload，内容与 a/ 的不同），
 #                          测试写出 litmus/a/publish.litmus、litmus/b/publish.litmus 与光秃的 publish.litmus；接连两趟、输入不变：
 #                          头一趟退 0、六条（binding:a/、binding:b/ 与四条 herd7）都现判（「· 按条：现判 6、复用 0」），第二趟退 0、「· 按条：现判 0、复用 6」
-#   binding-mention-boundary  另照同一份样本造一份现场，只跑静态档（--static-only，绑定检查过了退 3）：测试里的 "publish.litmus" 换成 "mp-publish.litmus"，
-#                          binding:publish.litmus 要判红、整趟退 1；再换成 "litmus/publish.litmus"，要判绿、整趟退 3
-# 弄坏开关（逐个打开重跑这一份，核红在点名的那一格）：
-#   GATE_LKMM_BREAK=reuse-lookup-skipped                       lkmm.sh 一律不读库：reuse-three-questions 判错（reuse-sentinel 照常那一趟也判红）
-#   REUSE_CHECKS_BREAK=rejudged-sentinel-passes（共用库的开关）  哨兵被现判不红：reuse-sentinel 判错
-#   GATE_LKMM_BREAK=binding-key-drops-test-mentions            绑定那一条的键不放写出文件名的测试：删掉测试照样复用判绿，binding-test-mentions-in-key 判错
-#   GATE_LKMM_BREAK=litmus-items-by-file-name                  项名只取文件名：a/ 与 b/ 的同名 litmus 共用项名与临时文件，litmus-same-name-subdirectories 判错
-#   GATE_LKMM_BREAK=binding-mention-substring                  写出项名那一查按子串找：只写了 mp-publish.litmus 也算写出 publish.litmus，binding-mention-boundary 判错
+#   binding-mention-boundary  另照同一份样本造一份现场，经假 herd7 跑：测试里的 "publish.litmus" 换成 "mp-publish.litmus"，
+#                          binding:publish.litmus 要判红、整趟退 1；再换成 "litmus/publish.litmus"，要判绿、整趟退 0
+# 弄坏开关（逐个打开重跑这一份，核红在点名的那一格；只在 --selftest 与它起的子进程里认，平常跑设了退 2、点名只在自证里认。红的格逐条打「    <格名> 这一格判错」）：
+#   GATE_LKMM_BREAK=reuse-lookup-skipped  lkmm.sh 一律不读库（reuse-sentinel 照常那一趟也判红）
+#       「reuse-three-questions 这一格判错」「reuse-sentinel 这一格判错」「binding-test-mentions-in-key 这一格判错」「litmus-same-name-subdirectories 这一格判错」
+#   REUSE_CHECKS_BREAK=rejudged-sentinel-passes  共用库的开关：哨兵被现判不红
+#       「reuse-sentinel 这一格判错」
+#   GATE_LKMM_BREAK=binding-key-drops-test-mentions  绑定那一条的键不放写出文件名的测试：删掉测试照样复用判绿
+#       「binding-test-mentions-in-key 这一格判错」
+#   GATE_LKMM_BREAK=litmus-items-by-file-name  项名只取文件名：a/ 与 b/ 的同名 litmus 共用项名与临时文件
+#       「litmus-same-name-subdirectories 这一格判错」
+#   GATE_LKMM_BREAK=binding-mention-substring  写出项名那一查按子串找：只写了 mp-publish.litmus 也算写出 publish.litmus
+#       「binding-mention-boundary 这一格判错」
 # 退出码：0 都判对；1 有格判错或开关没红在点名那一格；2 用法错。
 set -uo pipefail
+# 弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道：命令行第一个词是 --selftest，或祖先里有一个的命令行里带 --selftest（自证起的子进程）才放行；
+# 否则下面这些变量有设了的，点名它、说它只在自证里认，退 2
+BREAK_VARIABLES=(GATE_LKMM_BREAK REUSE_CHECKS_BREAK)
+inside_selftest() { # 往上数这个进程的祖先，有一个的命令行里带 --selftest 就退 0
+  local pid="$PPID" stat words word fields
+  while ((pid > 1)); do
+    mapfile -d '' -t words 2> /dev/null < "/proc/$pid/cmdline" || return 1
+    for word in "${words[@]}"; do [[ "$word" == --selftest ]] && return 0; done
+    IFS= read -r stat 2> /dev/null < "/proc/$pid/stat" || return 1
+    read -ra fields <<< "${stat##*) }"
+    pid="${fields[1]:-0}"
+  done
+  return 1
+}
+settle_break_switches() { # settle_break_switches <命令行的词…>
+  local name setting=()
+  for name in "${BREAK_VARIABLES[@]}"; do [[ -n "${!name:-}" ]] && setting+=("$name"); done
+  ((${#setting[@]} == 0)) && return 0
+  [[ "${1:-}" == --selftest ]] && return 0
+  inside_selftest && return 0
+  echo "  ✗ ${setting[*]} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做" >&2
+  echo "     → 怎么办：unset ${setting[*]} 再来；要看开关红在哪一项，跑 ${setting[0]}=<项> bash scripts/gate/lkmm-selftest.sh --selftest" >&2
+  exit 2
+}
+settle_break_switches "$@"
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 
@@ -40,20 +74,26 @@ SELFTEST_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY="$(cd "$SELFTEST_DIRECTORY/../.." && pwd)"
 LKMM="$REPOSITORY/.claude/scripts/lkmm.sh"
 REUSE_CHECKS="$REPOSITORY/scripts/gate/lib_reuse_checks.py"
-SAMPLE_SETUP="$REPOSITORY/.claude/gate.d/fixtures/checker-tier-lkmm.sh/litmus-key-samples-anchor-body-changed/setup.sh"
+SAMPLE_SETUP="$REPOSITORY/.claude/gate.d/fixtures/lkmm.sh/litmus-key-samples-anchor-body-changed/setup.sh"
 
 if [[ "${1:-}" != --selftest || $# -ne 1 ]]; then
   echo "  ✗ 用法：bash scripts/gate/lkmm-selftest.sh --selftest"
-  echo "     → 怎么办：这一份只跑 .claude/scripts/lkmm.sh 的复用自证，不带别的参数；真判 litmus 走门禁 checker-tier-lkmm"
+  echo "     → 怎么办：这一份只跑 .claude/scripts/lkmm.sh 的复用自证，不带别的参数；真判 litmus 走门禁 lkmm"
+  exit 2
+fi
+# 判定库写进 prune-server：不是临时服务就一格都不跑（文件头「现场」），不写真服务
+if ! service_problem="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import prune_server_client; print(prune_server_client.selftest_service_problem())' "$REPOSITORY/scripts/prune-server" 2>&1)" || [[ -n "$service_problem" ]]; then
+  echo "  ✗ lkmm-selftest.sh 自证没跑：${service_problem:-读不了 scripts/prune-server/prune_server_client.py}"
+  echo "     → 怎么办：照 scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service 那一条，在临时服务底下起这一份自证（带 --server-binary 就不编）"
   exit 2
 fi
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/lkmm-selftest.XXXXXX")" || { echo "  ✗ 建不了临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
 trap 'rm -rf "${work:?}"' EXIT
 root="$work/root"; mkdir -p "$root" "$work/bin"
-if ! (cd "$root" && bash "$SAMPLE_SETUP") > "$work/setup.log" 2>&1; then
-  echo "  ✗ 照样本 $SAMPLE_SETUP 造现场没成：$(tail -n 3 "$work/setup.log" | tr '\n' ' ')"
-  echo "     → 怎么办：那一份样本搬了家或改坏了，照门禁 checker-tier-lkmm 的样本改 SAMPLE_SETUP 这一行"
+if ! (cd "$root" && bash "$SAMPLE_SETUP" && git init -q .) > "$work/setup.log" 2>&1; then
+  echo "  ✗ 照样本 $SAMPLE_SETUP 造现场、git init 没成：$(tail -n 3 "$work/setup.log" | tr '\n' ' ')"
+  echo "     → 怎么办：那一份样本搬了家或改坏了，照门禁 lkmm 的样本改 SAMPLE_SETUP 这一行"
   exit 1
 fi
 printf '#!/usr/bin/env bash\nexec bash %q "$@"\n' "$root/.lkmm-fake-herd7/herd7" > "$work/bin/herd7"
@@ -61,12 +101,13 @@ chmod +x "$work/bin/herd7"
 
 wrong=(); cases=0
 cell_wrong() { wrong+=("$1"); echo "    $1 这一格判错：$2"; }   # gate-lint:detail
-round_root="$root"; round_library="$work/library"; round_options=()
-# run_round <名> [环境…]：在现场 $round_root 上跑一趟 lkmm.sh（假 herd7、判定库 $round_library，round_options 里的参数接在后面），输出落 $work/<名>.log、退出码落 $work/<名>.exit
+round_root="$root"
+# run_round <名> [环境…]：在现场 $round_root 上跑一趟 lkmm.sh（假 herd7、判定库是这份现场自己的 git common-dir 底下那一份），
+#   输出落 $work/<名>.log、退出码落 $work/<名>.exit
 run_round() {
   local name="$1"; shift
   env PATH="$work/bin:$PATH" SINGLEFS_KERNEL_TREE="$root/.lkmm-fake-herd7/linux" SINGLEFS_NO_FETCH=1 "$@" \
-    bash "$LKMM" "$round_root" --verdict-library "$round_library" ${round_options[@]+"${round_options[@]}"} > "$work/$name.log" 2>&1
+    bash "$LKMM" "$round_root" > "$work/$name.log" 2>&1
   echo "$?" > "$work/$name.exit"
 }
 replace_in() { # replace_in <文件> <原文> <新文>：原文恰好一处才换
@@ -109,9 +150,9 @@ fi
 
 # ── binding-test-mentions-in-key（另一份现场与判定库）──
 cases=$((cases + 1))
-round_root="$work/mentions-root"; round_library="$work/mentions-library"; mkdir -p "$round_root"
-if ! (cd "$round_root" && bash "$SAMPLE_SETUP") > "$work/mentions-setup.log" 2>&1; then
-  cell_wrong binding-test-mentions-in-key "照样本 $SAMPLE_SETUP 造现场没成：$(tail -n 3 "$work/mentions-setup.log" | tr '\n' ' ')"
+round_root="$work/mentions-root"; mkdir -p "$round_root"
+if ! (cd "$round_root" && bash "$SAMPLE_SETUP" && git init -q .) > "$work/mentions-setup.log" 2>&1; then
+  cell_wrong binding-test-mentions-in-key "照样本 $SAMPLE_SETUP 造现场、git init 没成：$(tail -n 3 "$work/mentions-setup.log" | tr '\n' ' ')"
 else
   run_round mentions-first "${many[@]}"
   rm -f "$round_root/crates/demo/tests/publish_order.rs"
@@ -124,9 +165,9 @@ fi
 
 # ── litmus-same-name-subdirectories（另一份现场与判定库）──
 cases=$((cases + 1))
-round_root="$work/subdirectories-root"; round_library="$work/subdirectories-library"; mkdir -p "$round_root"
-if ! (cd "$round_root" && bash "$SAMPLE_SETUP") > "$work/subdirectories-setup.log" 2>&1; then
-  cell_wrong litmus-same-name-subdirectories "照样本 $SAMPLE_SETUP 造现场没成：$(tail -n 3 "$work/subdirectories-setup.log" | tr '\n' ' ')"
+round_root="$work/subdirectories-root"; mkdir -p "$round_root"
+if ! (cd "$round_root" && bash "$SAMPLE_SETUP" && git init -q .) > "$work/subdirectories-setup.log" 2>&1; then
+  cell_wrong litmus-same-name-subdirectories "照样本 $SAMPLE_SETUP 造现场、git init 没成：$(tail -n 3 "$work/subdirectories-setup.log" | tr '\n' ' ')"
 elif ! (cd "$round_root/litmus" && mkdir a b && mv publish.litmus publish-nofence.litmus a/ \
         && sed 's/data/payload/g' a/publish.litmus > b/publish.litmus && sed 's/data/payload/g' a/publish-nofence.litmus > b/publish-nofence.litmus \
         && printf '#[test]\nfn publish_litmus_files_are_read_by_path() {\n    let litmus_paths = ["litmus/a/publish.litmus", "litmus/b/publish.litmus", "publish.litmus"];\n    assert_eq!(litmus_paths.len(), 3);\n}\n' \
@@ -142,11 +183,11 @@ else
   fi
 fi
 
-# ── binding-mention-boundary（另一份现场与判定库，只跑静态档）──
+# ── binding-mention-boundary（另一份现场与判定库）──
 cases=$((cases + 1))
-round_root="$work/boundary-root"; round_library="$work/boundary-library"; round_options=(--static-only); mkdir -p "$round_root"
-if ! (cd "$round_root" && bash "$SAMPLE_SETUP") > "$work/boundary-setup.log" 2>&1; then
-  cell_wrong binding-mention-boundary "照样本 $SAMPLE_SETUP 造现场没成：$(tail -n 3 "$work/boundary-setup.log" | tr '\n' ' ')"
+round_root="$work/boundary-root"; mkdir -p "$round_root"
+if ! (cd "$round_root" && bash "$SAMPLE_SETUP" && git init -q .) > "$work/boundary-setup.log" 2>&1; then
+  cell_wrong binding-mention-boundary "照样本 $SAMPLE_SETUP 造现场、git init 没成：$(tail -n 3 "$work/boundary-setup.log" | tr '\n' ' ')"
 elif ! replace_in "$round_root/crates/demo/tests/publish_order.rs" '"publish.litmus"' '"mp-publish.litmus"' > "$work/boundary-arrange.log" 2>&1; then
   cell_wrong binding-mention-boundary "改不了测试里的文件名：$(tail -n 3 "$work/boundary-arrange.log" | tr '\n' ' ')"
 else
@@ -156,11 +197,10 @@ else
   run_round boundary-litmus-path "${many[@]}"
   if [[ "$(cat "$work/boundary-prefixed-name.exit")" != 1 ]] || ! grep -q '· binding:publish.litmus：红，现判' "$work/boundary-prefixed-name.log" \
      || ! grep -q 'crates/ 下没有一个 .rs 写出 publish.litmus' "$work/boundary-prefixed-name.log" \
-     || [[ "$(cat "$work/boundary-litmus-path.exit")" != 3 ]] || ! grep -q '· binding:publish.litmus：绿，现判' "$work/boundary-litmus-path.log"; then
-    cell_wrong binding-mention-boundary "只写了 mp-publish.litmus 那一趟退 $(cat "$work/boundary-prefixed-name.exit")（要 1、判红）：$(grep 'binding:' "$work/boundary-prefixed-name.log" | tr '\n' ' ')；写了 litmus/publish.litmus 那一趟退 $(cat "$work/boundary-litmus-path.exit")（要 3、判绿）：$(grep 'binding:' "$work/boundary-litmus-path.log" | tr '\n' ' ')"
+     || [[ "$(cat "$work/boundary-litmus-path.exit")" != 0 ]] || ! grep -q '· binding:publish.litmus：绿，现判' "$work/boundary-litmus-path.log"; then
+    cell_wrong binding-mention-boundary "只写了 mp-publish.litmus 那一趟退 $(cat "$work/boundary-prefixed-name.exit")（要 1、判红）：$(grep 'binding:' "$work/boundary-prefixed-name.log" | tr '\n' ' ')；写了 litmus/publish.litmus 那一趟退 $(cat "$work/boundary-litmus-path.exit")（要 0、判绿）：$(grep 'binding:' "$work/boundary-litmus-path.log" | tr '\n' ' ')"
   fi
 fi
-round_options=()
 
 # ── 弄坏开关：逐个打开重跑这一份，核红在点名的那一格（开着开关的那一趟不再重跑开关）──
 breaks_missed=(); breaks_proven=0

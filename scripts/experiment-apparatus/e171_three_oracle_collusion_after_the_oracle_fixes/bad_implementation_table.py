@@ -1,7 +1,8 @@
 """E171 坏实现表（登记 5.2、5.9）：从 `crates/mutations.tsv` 按名字取行、核锚点、施加替换、补位。
 
-挑法本身（哪 117 行）在 `select_bad_implementations.py`（登记 5.2，sha256 4032a0e0…）与登记 5.9 的表里；这里的 `bad-implementations-117.tsv`
-是那张表照名字抄出来的（# / 刀 / 文件 / 组内下标 / 变异名 / 行文 sha256 前 12 位），开工时表若已变照名字取行、不重挑（登记 5.2「行文变了」）。
+挑法本身（哪 117 行）在 `select_bad_implementations.py`（登记 5.2，sha256 4032a0e0…）与登记 5.9 的表里；这里的 `bad-implementations-step-8.tsv`
+是那张表照名字抄出来的（# / 刀 / 文件 / 组内下标 / 变异名 / 行文 sha256 前 12 位；E171 第 2 次重跑登记 5.4 按内容改了名、撤掉的行留空号），
+开工时表若已变照名字取行、不重挑（登记 5.2「行文变了」）。
 """
 
 from __future__ import annotations

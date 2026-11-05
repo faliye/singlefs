@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # admission: always 判的是此刻 crates/ 的 Rust 源码与判器调用点登记表，几秒读完；两边有一边改了都要现判
 # run-condition: none 只读仓里的 Rust 源码与 .claude/gate.d/cpu-judging-sites.tsv，除了 python3 之外没有环境要求
-"""没打标记的 CPU 就地判：checker 档与 harness 档的源码里每一处调判器的地方，要么在判定段里，要么带了标记（课题 4「能走两段的都走两段」，
+"""没打标记的 CPU 就地判：验证包的源码里每一处调判器的地方，要么在判定段里，要么带了标记（课题 4「能走两段的都走两段」，
 records/2026-10-13-复用键与全仓改名.md「课题 4」出口 ④：豁免表的核法 scripts/crash/gpu-exemptions-check.py 只核标记与表行对上，管不到没打标记的）。
 门禁 checker-independence-and-sync 的 cpu-judging-sites 格调它。
 
 判器（调用点按名字认，名字是一个标识符；`fn <名>` 的定义与 `use …;` 里的那一处不算调用点，注释与串字面量里的不算）：
   池级 checker            check_pool_image 起头的（singlefs_checker::walk::check_pool_image 一族）
-  记录核对器              check_records 起头的（crates/singlefs-checker-tier/src/crash.rs 的 check_records、check_records_against）
+  记录核对器              check_records 起头的（crates/singlefs-verification/src/crash.rs 的 check_records、check_records_against）
   RefFS 允许集合比对      allowed_set_for_a_crash_in、crash_and_recover（crates/singlefs-reference-filesystem）；这一类的名字另看调用的接收者（下面「RefFS 判器名的接收者」）
   登记表里的判器本体      judging-body 那几行的函数名：它们的函数体就是判法（把上面几样包一层），里面那几处调用不判，调它们的地方照判器调用点判
-扫的范围：crates/singlefs-checker-tier/{src,tests}、crates/singlefs-harness/{src,tests} 下全部 .rs（target/ 除外）。
+扫的范围：crates/singlefs-verification/{src,tests} 下全部 .rs（target/ 除外）。
 
 一处调用点算合规，有一样成立就行：
   ① 落在判定段里：登记表 judging-stage 那几行，写整份文件（可带 * 通配）就是那份文件里的每一处，写 <文件>::<函数名> 就是那个函数（连同它里面嵌套的）；
@@ -18,7 +18,7 @@ records/2026-10-13-复用键与全仓改名.md「课题 4」出口 ④：豁免�
   ③ 包住它的某一个函数（最里层到最外层都算）前面写了标记：函数的属性、文档注释与签名之前那一串紧挨着的 // 注释行，连同属性与签名之间的注释行，
      有一行去掉行首空白之后是 `// gpu-exempt: <截名>`（不走 GPU 的那一截，截名与豁免表 .claude/gate.d/gpu-exemptions.tsv 对不对得上归 gpu-exemptions-check.py）
      或恰好是 `// cpu-reference-for-gpu-comparison`（GPU 对拍用例的 CPU 参照那一侧）；
-  ④ 文件在登记表 excluded 那几行里：整份不判（harness 档池级 checker 自己的单测，手造一张镜像、断言判器的结论，不是产出再判；每行写为什么）；
+  ④ 文件在登记表 excluded 那几行里：整份不判（验证包池级 checker 自己的单测，手造一张镜像、断言判器的结论，不是产出再判；每行写为什么）；
   ⑤ 落在判器自测里：登记表 judge-self-test 那几行（<文件>::<函数名>，函数级，连同它里面嵌套的）：函数判的是判器自己的契约（手摆盘、手给根、给判器塞已知坏法），
      不是「产出再判」，所以不走两段也不打 gpu-exempt 标记。只登函数，不整份登：同一份文件里别的函数照判。
 其余的每一处判红，逐处列「文件:行 函数 调 名字（哪一类）」。
@@ -79,7 +79,7 @@ from preflight import preflight  # noqa: E402
 
 BROKEN = os.environ.get("CPU_JUDGING_SITES_CHECK_BREAK", "")
 TABLE = os.path.join(".claude", "gate.d", "cpu-judging-sites.tsv")
-SCANNED_DIRECTORIES = ("crates/singlefs-checker-tier/src", "crates/singlefs-checker-tier/tests", "crates/singlefs-harness/src", "crates/singlefs-harness/tests")
+SCANNED_DIRECTORIES = ("crates/singlefs-verification/src", "crates/singlefs-verification/tests")
 REFERENCE_CRATE = "singlefs_reference_filesystem"
 REFERENCE_TYPE = "ReferenceFileSystem"
 REFERENCE_FAMILY = "RefFS 允许集合比对"
@@ -504,25 +504,25 @@ def command_check(root):
 
 SELFTEST_TABLE_HEAD = "# 样本登记表\n"
 SELFTEST_ROWS = (
-    "judging-stage\tcrates/singlefs-checker-tier/src/crash_judge_*.rs\t# 判定段：从库里读回再判的那几份",
-    "judging-stage\tcrates/singlefs-checker-tier/src/crash.rs::judge_read_back_range\t# 判定段：判从库里读回的一段状态",
-    "judging-body\tcrates/singlefs-checker-tier/src/crash.rs::judge_crash_image\t# 判器本体：池级 checker 加记录核对器包一层",
-    "judge-self-test\tcrates/singlefs-checker-tier/tests/crash_record_checker_contract.rs::a_hand_laid_disk_is_refused\t# 判器自测：手摆的盘断言记录核对器的结论",
-    "excluded\tcrates/singlefs-harness/tests/checker_*.rs\t# 池级 checker 自己的单测：手造一张镜像断言判器的结论",
+    "judging-stage\tcrates/singlefs-verification/src/crash_judge_*.rs\t# 判定段：从库里读回再判的那几份",
+    "judging-stage\tcrates/singlefs-verification/src/crash.rs::judge_read_back_range\t# 判定段：判从库里读回的一段状态",
+    "judging-body\tcrates/singlefs-verification/src/crash.rs::judge_crash_image\t# 判器本体：池级 checker 加记录核对器包一层",
+    "judge-self-test\tcrates/singlefs-verification/tests/crash_record_checker_contract.rs::a_hand_laid_disk_is_refused\t# 判器自测：手摆的盘断言记录核对器的结论",
+    "excluded\tcrates/singlefs-verification/tests/checker_*.rs\t# 池级 checker 自己的单测：手造一张镜像断言判器的结论",
 )
 SELFTEST_SOURCES = {
-    "crates/singlefs-checker-tier/src/crash_judge_tables.rs": "use singlefs_checker::walk::check_pool_image;\npub fn judge_one_block() { check_pool_image(&reader); }\n",
-    "crates/singlefs-checker-tier/src/crash.rs": (
+    "crates/singlefs-verification/src/crash_judge_tables.rs": "use singlefs_checker::walk::check_pool_image;\npub fn judge_one_block() { check_pool_image(&reader); }\n",
+    "crates/singlefs-verification/src/crash.rs": (
         "use singlefs_checker::walk::{check_pool_image, Other};\n"
         "/// 判器本体\npub fn judge_crash_image() { check_pool_image(&reader); check_records(&records); }\n"
         "pub fn judge_read_back_range() { judge_crash_image(); }\n"
         "// check_pool_image 在注释里不算\npub fn quotes() { let text = \"check_pool_image(\"; }\n"
         "fn check_pool_image_given_a_knob() {}\n"),
-    "crates/singlefs-checker-tier/tests/crash_mount_observer.rs": (
+    "crates/singlefs-verification/tests/crash_mount_observer.rs": (
         "// gpu-exempt: writable-mount\n#[test]\nfn the_mount_is_judged() { check_pool_image(&mounted); }\n"
         "// cpu-reference-for-gpu-comparison\nfn cpu_reference_side() { let verdicts = vec![1].iter().map(|_| check_records(&r)).count(); }\n"),
-    "crates/singlefs-harness/tests/checker_known_bad_images.rs": "#[test]\nfn a_bad_image_is_refused() { check_pool_image(&bad); }\n",
-    "crates/singlefs-checker-tier/tests/crash_record_checker_contract.rs": (
+    "crates/singlefs-verification/tests/checker_known_bad_images.rs": "#[test]\nfn a_bad_image_is_refused() { check_pool_image(&bad); }\n",
+    "crates/singlefs-verification/tests/crash_record_checker_contract.rs": (
         "#[test]\nfn a_hand_laid_disk_is_refused() { check_records_against(&hand_laid, root); }\n"
         "fn another_judged_here() { let judged = 1; }\n"),
 }
@@ -556,20 +556,20 @@ def selftest():
 
         # clean：判定段整份与按函数、判器本体里的、带两种标记的各一处，排除表里的不判；use、注释、串字面量、fn 定义不算调用点
         expect("clean", world("clean"), None, sites=7)
-        expect("unmarked-site", world("unmarked-site", extra={"crates/singlefs-harness/src/history.rs": "pub fn violations_on() -> usize { check_pool_image(&image).len() }\n"}),
-               "crates/singlefs-harness/src/history.rs:1 violations_on 调 check_pool_image（池级 checker）")
-        expect("wrapper-call", world("wrapper-call", extra={"crates/singlefs-checker-tier/tests/crash_direct.rs": "#[test]\nfn judged_here() { judge_crash_image(); }\n"}),
-               "crates/singlefs-checker-tier/tests/crash_direct.rs:2 judged_here 调 judge_crash_image（判器本体）")
-        expect("marker-elsewhere", world("marker-elsewhere", extra={"crates/singlefs-checker-tier/tests/crash_other.rs":
+        expect("unmarked-site", world("unmarked-site", extra={"crates/singlefs-verification/src/history.rs": "pub fn violations_on() -> usize { check_pool_image(&image).len() }\n"}),
+               "crates/singlefs-verification/src/history.rs:1 violations_on 调 check_pool_image（池级 checker）")
+        expect("wrapper-call", world("wrapper-call", extra={"crates/singlefs-verification/tests/crash_direct.rs": "#[test]\nfn judged_here() { judge_crash_image(); }\n"}),
+               "crates/singlefs-verification/tests/crash_direct.rs:2 judged_here 调 judge_crash_image（判器本体）")
+        expect("marker-elsewhere", world("marker-elsewhere", extra={"crates/singlefs-verification/tests/crash_other.rs":
                                                                    "// gpu-exempt: writable-mount\nfn somewhere_else() {}\n\nfn judged_without_marker() {\n    // gpu-exempt: writable-mount\n    allowed_set_for_a_crash_in(hi);\n}\n"}),
                "crash_other.rs:6 judged_without_marker 调 allowed_set_for_a_crash_in（RefFS 允许集合比对）")
-        expect("nested-function-marker", world("nested-function-marker", extra={"crates/singlefs-checker-tier/tests/crash_nested.rs":
+        expect("nested-function-marker", world("nested-function-marker", extra={"crates/singlefs-verification/tests/crash_nested.rs":
                                                                                "// cpu-reference-for-gpu-comparison\nfn outer() {\n    fn inner() { check_records_against(&r); }\n}\n"}), None)
-        expect("local-function-of-the-same-name", world("local-function-of-the-same-name", extra={"crates/singlefs-checker-tier/src/bin/e_local_judge.rs":
+        expect("local-function-of-the-same-name", world("local-function-of-the-same-name", extra={"crates/singlefs-verification/src/bin/e_local_judge.rs":
                                                                                     "// gpu-exempt: experiment-measures-the-cpu-judge-itself\nfn judge_crash_image() { check_pool_image(&r); }\nfn caller() { judge_crash_image(); }\n"}), None, sites=8)
-        expect("self-test-nested", world("self-test-nested", extra={"crates/singlefs-checker-tier/tests/crash_record_checker_contract.rs":
+        expect("self-test-nested", world("self-test-nested", extra={"crates/singlefs-verification/tests/crash_record_checker_contract.rs":
                                                                     "#[test]\nfn a_hand_laid_disk_is_refused() {\n    fn inside() { check_pool_image(&hand_laid); }\n    inside();\n}\n"}), None, sites=7)
-        expect("self-test-other-function", world("self-test-other-function", extra={"crates/singlefs-checker-tier/tests/crash_record_checker_contract.rs":
+        expect("self-test-other-function", world("self-test-other-function", extra={"crates/singlefs-verification/tests/crash_record_checker_contract.rs":
                                                                                    "#[test]\nfn a_hand_laid_disk_is_refused() { check_records_against(&hand_laid, root); }\n"
                                                                                    "fn judged_a_real_output() { check_records_against(&produced, root); }\n"}),
                "crash_record_checker_contract.rs:3 judged_a_real_output 调 check_records_against（记录核对器）")
@@ -591,33 +591,33 @@ def selftest():
             "    literal.allowed_set_for_a_crash_in();\n"
             "    AnchorModel::crash_and_recover(&mut literal);\n"
             "}\n")
-        expect("same-name-local-method", world("same-name-local-method", extra={"crates/singlefs-checker-tier/src/bin/e_local_anchor.rs": local_anchor}), None, sites=7)
+        expect("same-name-local-method", world("same-name-local-method", extra={"crates/singlefs-verification/src/bin/e_local_anchor.rs": local_anchor}), None, sites=7)
         # 真 RefFS 的调用照报（标注是 ReferenceFileSystem 的参数），旁边同文件里同名的本地方法不报
         beside = ("use singlefs_reference_filesystem::ReferenceFileSystem;\n" + local_anchor +
                   "fn judge_the_recovery(mut model: ReferenceFileSystem) { model.crash_and_recover(1, 2); }\n")
-        expect("reference-call-beside-local-method", world("reference-call-beside-local-method", extra={"crates/singlefs-checker-tier/src/bin/e_beside.rs": beside}),
+        expect("reference-call-beside-local-method", world("reference-call-beside-local-method", extra={"crates/singlefs-verification/src/bin/e_beside.rs": beside}),
                "e_beside.rs:18 judge_the_recovery 调 crash_and_recover（RefFS 允许集合比对）", sites=8)
-        expect("reference-path-call", world("reference-path-call", extra={"crates/singlefs-harness/src/path_call.rs":
+        expect("reference-path-call", world("reference-path-call", extra={"crates/singlefs-verification/src/path_call.rs":
                                                                          "fn judged() { singlefs_reference_filesystem::allowed_set_for_a_crash_in(&x); }\n"}),
                "path_call.rs:1 judged 调 allowed_set_for_a_crash_in（RefFS 允许集合比对）")
-        expect("reference-through-use-alias", world("reference-through-use-alias", extra={"crates/singlefs-harness/src/alias_call.rs":
+        expect("reference-through-use-alias", world("reference-through-use-alias", extra={"crates/singlefs-verification/src/alias_call.rs":
                                                                                          "use singlefs_reference_filesystem as reference_filesystem;\n"
                                                                                          "fn judged() { let mut model = reference_filesystem::ReferenceFileSystem::on_a_freshly_formatted_pool(); model.crash_and_recover(a, b); }\n"}),
                "alias_call.rs:2 judged 调 crash_and_recover（RefFS 允许集合比对）")
-        expect("reference-receiver-type-unknown", world("reference-receiver-type-unknown", extra={"crates/singlefs-harness/src/unknown_receiver.rs":
+        expect("reference-receiver-type-unknown", world("reference-receiver-type-unknown", extra={"crates/singlefs-verification/src/unknown_receiver.rs":
                                                                                                  "fn judged() { let mut model = build_the_model(); model.crash_and_recover(a, b); }\n"}),
                "unknown_receiver.rs:1 judged 调 crash_and_recover（RefFS 允许集合比对）")
-        expect("stale-exclusion", world("stale-exclusion", rows=SELFTEST_ROWS + ("excluded\tcrates/singlefs-harness/tests/pool_checker_*.rs\t# 池级 checker 自己的单测：手造镜像",)),
-               "「crates/singlefs-harness/tests/pool_checker_*.rs」在")
-        expect("missing-function", world("missing-function", rows=SELFTEST_ROWS + ("judging-stage\tcrates/singlefs-checker-tier/src/crash.rs::gone_away\t# 判定段：已经没了的函数",)),
+        expect("stale-exclusion", world("stale-exclusion", rows=SELFTEST_ROWS + ("excluded\tcrates/singlefs-verification/tests/pool_checker_*.rs\t# 池级 checker 自己的单测：手造镜像",)),
+               "「crates/singlefs-verification/tests/pool_checker_*.rs」在")
+        expect("missing-function", world("missing-function", rows=SELFTEST_ROWS + ("judging-stage\tcrates/singlefs-verification/src/crash.rs::gone_away\t# 判定段：已经没了的函数",)),
                "crash.rs::gone_away：那份文件里没有 fn gone_away")
-        expect("missing-self-test-function", world("missing-self-test-function", rows=SELFTEST_ROWS + ("judge-self-test\tcrates/singlefs-checker-tier/tests/crash_record_checker_contract.rs::gone_away\t# 判器自测：已经没了的函数",)),
+        expect("missing-self-test-function", world("missing-self-test-function", rows=SELFTEST_ROWS + ("judge-self-test\tcrates/singlefs-verification/tests/crash_record_checker_contract.rs::gone_away\t# 判器自测：已经没了的函数",)),
                "crash_record_checker_contract.rs::gone_away：那份文件里没有 fn gone_away")
-        expect("self-test-without-function", world("self-test-without-function", rows=SELFTEST_ROWS + ("judge-self-test\tcrates/singlefs-checker-tier/tests/crash_record_checker_contract.rs\t# 判器自测没写函数名",)),
+        expect("self-test-without-function", world("self-test-without-function", rows=SELFTEST_ROWS + ("judge-self-test\tcrates/singlefs-verification/tests/crash_record_checker_contract.rs\t# 判器自测没写函数名",)),
                "判器自测要写成 <文件>::<函数名>")
-        expect("unknown-kind", world("unknown-kind", rows=SELFTEST_ROWS + ("judged-elsewhere\tcrates/singlefs-checker-tier/src/crash.rs\t# 写错的种类名字",)), "种类「judged-elsewhere」认不得")
-        expect("reason-too-short", world("reason-too-short", rows=SELFTEST_ROWS[:3] + ("excluded\tcrates/singlefs-harness/tests/checker_*.rs\t# 单测",)), "的为什么只有 2 个字")
-        expect("body-without-function", world("body-without-function", rows=SELFTEST_ROWS + ("judging-body\tcrates/singlefs-checker-tier/src/crash_judge_tables.rs\t# 判器本体没写函数名",)),
+        expect("unknown-kind", world("unknown-kind", rows=SELFTEST_ROWS + ("judged-elsewhere\tcrates/singlefs-verification/src/crash.rs\t# 写错的种类名字",)), "种类「judged-elsewhere」认不得")
+        expect("reason-too-short", world("reason-too-short", rows=SELFTEST_ROWS[:3] + ("excluded\tcrates/singlefs-verification/tests/checker_*.rs\t# 单测",)), "的为什么只有 2 个字")
+        expect("body-without-function", world("body-without-function", rows=SELFTEST_ROWS + ("judging-body\tcrates/singlefs-verification/src/crash_judge_tables.rs\t# 判器本体没写函数名",)),
                "判器本体要写成 <文件>::<函数名>")
         cells.append("table-missing")
         missing_root = world("table-missing")
@@ -648,6 +648,23 @@ def main(arguments):
     return 2
 
 
+BREAK_VARIABLES = ("CPU_JUDGING_SITES_CHECK_BREAK",)
+
+
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行不是单独一个 --selftest而 BREAK_VARIABLES 里有一个非空（不管值是什么），
+    退 2 并点名它只在自证里认；在参数解析之前判。"""
+    for name in BREAK_VARIABLES:
+        if os.environ.get(name) and arguments != ["--selftest"]:
+            print(f"  ✗ {name} 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证", file=sys.stderr)
+            print(f"     → 怎么办：去掉 {name} 再跑；要证红就跑 {name}=<项> python3 scripts/crash/cpu-judging-sites-check.py --selftest", file=sys.stderr)
+            return 2
+    return 0
+
+
 if __name__ == "__main__":
+    refusal = refuse_break_outside_selftest(sys.argv[1:])
+    if refusal:
+        sys.exit(refusal)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

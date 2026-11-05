@@ -21,15 +21,25 @@
   contrast_segment_two_revision_10.py --selftest [--cells 格,…] [--rounds N]
 退出码：0 写完；2 用法错（含产物已存在）；78 配置读不到、H28 没填齐或核不过、点名的产物不在。
 
-弄坏开关 CONTRAST_R10_BREAK=<项>（只在 --selftest 起的子进程里认，CONTRAST_R10_SELFTEST=1）。项名、弄坏哪一处、打开后红在哪一格：
-  identity-ignored        比对器的行一律按出现次序配，不按身份字段                    pairing-by-identity
-  role-missing            格子行不带 role=contrast                                      every-line-carries-role
-  summary-as-verdict      收尾那一行写成 name=verdict                                  every-line-carries-role
-  touch-batch-1-only      批 2 的触达也拿批 1 那一遍恢复的报告算                        touch-flips
-  category-first-batch    类变了的行每种读法只看批 1                                    q2-membership-and-categories
-  row-host-ignored        行耗时一律记在本机                                            row-times-by-host
-  h28-unchecked           H28 没核过也照写                                              h28-required
-  sweep-skipped、temporary-kept（自证外壳 revision_8_selftest_harness.py 的两个）           no-leftover-processes、temporary-directory-removed
+弄坏开关 CONTRAST_R10_BREAK=<项>（只在 --selftest 起的子进程里认，CONTRAST_R10_SELFTEST=1）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
+  CONTRAST_R10_BREAK=identity-ignored  比对器的行一律按出现次序配，不按身份字段
+      「✗ 自证 pairing-by-identity：」
+  CONTRAST_R10_BREAK=role-missing  格子行不带 role=contrast
+      「✗ 自证 every-line-carries-role：」
+  CONTRAST_R10_BREAK=summary-as-verdict  收尾那一行写成 name=verdict
+      「✗ 自证 every-line-carries-role：」
+  CONTRAST_R10_BREAK=touch-batch-1-only  批 2 的触达也拿批 1 那一遍恢复的报告算
+      「✗ 自证 touch-flips：」
+  CONTRAST_R10_BREAK=category-first-batch  类变了的行每种读法只看批 1
+      「✗ 自证 q2-membership-and-categories：」
+  CONTRAST_R10_BREAK=row-host-ignored  行耗时一律记在本机
+      「✗ 自证 row-times-by-host：」
+  CONTRAST_R10_BREAK=h28-unchecked  H28 没核过也照写
+      「✗ 自证 h28-required：」
+  CONTRAST_R10_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  CONTRAST_R10_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 

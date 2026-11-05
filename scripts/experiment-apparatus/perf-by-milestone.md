@@ -120,7 +120,7 @@
 | Bcachefs | 31.1 ⚠25% | 16 384 | 1.00 | 92.0 | 90.6 |
 | OpenZFS（vdev 是分区） | 278 | 1 791 488 | 13.0 | 93.8 | 93.8 |
 
-#### singlefs（两块 16 GiB 盘，门禁 checker-tier-qemu-device-streams 的真设备二进制）
+#### singlefs（两块 16 GiB 盘，门禁 qemu-device-streams 的真设备二进制）
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 |
 |---|---|---|---|---|
@@ -253,7 +253,7 @@
 | Bcachefs 双副本 | 23.4 ⚠43% | 32 768 | 2.00 | 92.0 | 90.6 |
 | OpenZFS mirror（vdev 是分区） | 546 | 3 586 048 | 26.0 | 46.9 | 46.9 |
 
-#### singlefs（两块 16 GiB 盘，门禁 checker-tier-qemu-device-streams 的真设备二进制）
+#### singlefs（两块 16 GiB 盘，门禁 qemu-device-streams 的真设备二进制）
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 |
 |---|---|---|---|---|
@@ -354,7 +354,7 @@ E7RESULT name=write_list writes=21 barriers=2 fua=1 named=8 units=t1@50180x32768
 E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_form=65543 kinds=[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]
 ```
 
-门禁 checker-tier-qemu-device-streams 已经在虚机里证过这条录制流与设备侧日志逐项相等。由它算出（算术，不是测量）：
+门禁 qemu-device-streams 已经在虚机里证过这条录制流与设备侧日志逐项相等。由它算出（算术，不是测量）：
 
 | 量 | 盘 0 | 盘 1 | 合计 |
 |---|---|---|---|
@@ -364,7 +364,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 - 表里写请求是二进制的写调用数；六家那一列是来宾块层计数，块层把每道屏障与每次 FUA 各多记一次写请求，同口径是盘 0 14、盘 1 12、合计 26（第三·二节「两处口径问题」）。
 - 一个 3000 字节的文件，每块盘落 172 544 字节，约 57.5 倍。
-- 每道屏障发给两块盘（`crates/singlefs-core/src/transaction.rs` 第 151–155 行），根槽的 FUA 只写根所在区域的那块盘；virtio 盘没有原生 FUA，来宾内核把它拆成写加 FLUSH（门禁 checker-tier-qemu-device-streams 的设备侧日志读法）。
+- 每道屏障发给两块盘（`crates/singlefs-core/src/transaction.rs` 第 151–155 行），根槽的 FUA 只写根所在区域的那块盘；virtio 盘没有原生 FUA，来宾内核把它拆成写加 FLUSH（门禁 qemu-device-streams 的设备侧日志读法）。
 - 挂载后第一次写之前还有一次性的取号（2 次写）与暖机（10 次写），每次挂载只付一回，没算在这张表里。
 - 格式化：13 次操作（11 次写、2 道屏障）、116 224 字节（实例表单元 32 768 × 2、树表单元 16 384 × 2、三个根槽 512 × 3、系统配置槽 4096 × 4）；真设备上还欠一次整环写 0（每块盘 768 MiB）。
 - 可用容量的上限：单元区从 784 MiB 起（前面是系统配置、根环与 768 MiB 的 journal 环），16 GiB 盘上单元区占一块盘的 95.2%；两盘互为镜像，池能装的是一块盘的单元区，占两块盘总量的 47.6%。树与记账还要再占一些，这一格没算。
@@ -442,7 +442,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 ### 收尾时再跑一次（2026-09-17，跑前登记第十三节）
 
-里程碑收尾时用户要求再跑一轮。上一次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条），真设备二进制的负载与判据不变。产物 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，5 轮一次过，宿主 1 分钟负载 2.27–2.45（门禁 checker-tier-crash-point-replay 的崩溃点重放全量同时在跑，`nice -n 19`，照跑照记）。
+里程碑收尾时用户要求再跑一轮。上一次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条），真设备二进制的负载与判据不变。产物 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，5 轮一次过，宿主 1 分钟负载 2.27–2.45（门禁 crash-point-replay 的崩溃点重放全量同时在跑，`nice -n 19`，照跑照记）。
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 覆盖写、释放、回退与复用（覆盖写 B）ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 | B 两盘写请求 | B 两盘写字节 | B 两盘屏障 | B 两盘 FUA 写 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -537,7 +537,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 | Bcachefs 双副本 | 40.9 ⚠31% | 32 768 | 2.00 | 92.0 | 90.6 |
 | OpenZFS mirror（vdev 是分区） | 543 | 3 586 560 | 26.0 | 46.9 | 46.9 |
 
-#### singlefs（两块 16 GiB 盘，门禁 checker-tier-qemu-device-streams 的真设备二进制）
+#### singlefs（两块 16 GiB 盘，门禁 qemu-device-streams 的真设备二进制）
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 覆盖写、释放、回退与复用（覆盖写 B）ms | 发布 B（二进制自己计）ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 | B 两盘写请求 | B 两盘写字节 | B 两盘屏障 | B 两盘 FUA 写 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -662,7 +662,7 @@ singlefs 一臂的代码与 9 月 28 日那次同一个提交（dbcc0d2f，核�
 | Bcachefs 双副本 | 28.4 ⚠53% | 32 768 | 2.00 | 92.0 | 90.6 |
 | OpenZFS mirror（vdev 是分区） | 544 | 3 574 272 ⚠111% | 26.0 | 46.9 | 46.9 |
 
-#### singlefs（两块 16 GiB 盘，门禁 checker-tier-qemu-device-streams 的真设备二进制）
+#### singlefs（两块 16 GiB 盘，门禁 qemu-device-streams 的真设备二进制）
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 覆盖写、释放、回退与复用（覆盖写 B）ms | 发布 B（二进制自己计）ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 | B 两盘写请求 | B 两盘写字节 | B 两盘屏障 | B 两盘 FUA 写 |
 |---|---|---|---|---|---|---|---|---|---|---|

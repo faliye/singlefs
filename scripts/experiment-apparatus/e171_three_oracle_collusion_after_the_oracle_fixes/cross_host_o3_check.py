@@ -2,9 +2,9 @@
 """E171 第 1 次重跑第一段·修订 6 树 `-resume2` 那一趟：跨机一致对照（停机条款 S17，登记「主 agent 认定：多机跑法交回」第 4 条）的单独入口。
 在已经跑完的两份行目录（第 12 步 row-0 本机那一次、跨机对照 X 第二台那一次）上重出对照产物；一行都不跑、不起驱动、不起 cargo、不碰别的台。
 
-与编排器 rows_orchestrator.py（sha256 1dcfb8d0…，不改）的关系：row 行、device.out 的 E7RESULT 行、导出 z1 五个文件三样的比法与产物的行形
+与编排器 rows_orchestrator.py（按 sha256 钉住，ORCHESTRATOR_SHA256，不改）的关系：row 行、device.out 的 E7RESULT 行、导出 z1 五个文件三样的比法与产物的行形
 照抄自它——前三样直接调它的函数（row_line_without_timing、device_result_lines、dump_differences、row_line、read_ledger、host_of），开跑先核它的
-sha256，不是 1dcfb8d0… 就退 3。只改 o3 那一样：在它的去法（normalized_o3_lines：去 name=config、name=state_time 两种行与键名以 _ns 结尾的字段，
+sha256，不是钉的那一份就退 3。只改 o3 那一样：在它的去法（normalized_o3_lines：去 name=config、name=state_time 两种行与键名以 _ns 结尾的字段，
 原样调它）之后，再去三个只随进程号、工作进程数与调度变的键，并按整行排序再比：
   name=state 行的 worker=（冻结执行器 executor_main.py 判那一态的工作进程号 os.getpid()）；
   name=timing 行的 workers=（--workers 参数，即每槽线程）与 worker_processes=（这一批实际判过态的工作进程个数）；
@@ -19,16 +19,24 @@ sha256，不是 1dcfb8d0… 就退 3。只改 o3 那一样：在它的去法（n
       把对照产物写到标准输出（落盘由调用的一方用排他的重定向写新文件名）；末行是 name=verdict。
   cross_host_o3_check.py --selftest
       假行目录走一遍各格，末尾逐个打开弄坏开关核它红在点名格；末行「自证 N 项，红 M」。
-退出码：0 四样都同；1 有一样不同（停机条款 S17 的「不同」）；2 用法错，或平常跑时设了弄坏开关；3 编排器不是 1dcfb8d0… 那一份。
+退出码：0 四样都同；1 有一样不同（停机条款 S17 的「不同」）；2 用法错，或平常跑时设了弄坏开关；3 编排器不是钉的那一份。
 
-弄坏开关 CROSS_HOST_O3_BREAK=<项>（只在 --selftest 起的子进程里认，CROSS_HOST_O3_SELFTEST=1；别处设了退 2）。项名、弄坏哪一处、打开后红在哪一格：
-  o3-keeps-worker                      name=state 行的 worker= 不去              o3-same-after-process-identifiers-changed
-  o3-keeps-workers                     name=timing 行的 workers=、worker_processes= 不去  o3-same-after-thread-count-changed
-  o3-keeps-line-order                  不排序，逐行按原次序比                    o3-same-after-line-order-shuffled
-  o3-drops-strict                      连 strict= 也去掉                         o3-differs-after-strict-changed
-  o3-compares-sets                     比去重之后的行集合，不比多重集            o3-differs-after-one-line-duplicated
-  o3-drops-worker-keys-in-every-kind   三个键在每一种行里都去                    o3-differs-when-worker-key-appears-in-another-line-kind
-  parts-ignore-dumps                   不比导出那一样                            parts-dump-difference-detected
+弄坏开关 CROSS_HOST_O3_BREAK=<项>（只在 --selftest 起的子进程里认，CROSS_HOST_O3_SELFTEST=1；别处设了退 2）。逐项写开关名、弄坏哪一处，
+下一行起写打开后红的格（自证 --cells-only 打「✗ <格名>：…」；开关轮只核每项第一格）：
+  CROSS_HOST_O3_BREAK=o3-keeps-worker  name=state 行的 worker= 不去
+      「✗ o3-same-after-process-identifiers-changed：」「✗ o3-same-after-all-three-changed：」
+  CROSS_HOST_O3_BREAK=o3-keeps-workers  name=timing 行的 workers=、worker_processes= 不去
+      「✗ o3-same-after-thread-count-changed：」「✗ o3-same-after-all-three-changed：」
+  CROSS_HOST_O3_BREAK=o3-keeps-line-order  不排序，逐行按原次序比
+      「✗ o3-same-after-line-order-shuffled：」「✗ o3-same-after-all-three-changed：」
+  CROSS_HOST_O3_BREAK=o3-drops-strict  连 strict= 也去掉
+      「✗ o3-differs-after-strict-changed：」
+  CROSS_HOST_O3_BREAK=o3-compares-sets  比去重之后的行集合，不比多重集
+      「✗ o3-differs-after-one-line-duplicated：」
+  CROSS_HOST_O3_BREAK=o3-drops-worker-keys-in-every-kind  三个键在每一种行里都去
+      「✗ o3-differs-when-worker-key-appears-in-another-line-kind：」
+  CROSS_HOST_O3_BREAK=parts-ignore-dumps  不比导出那一样
+      「✗ parts-dump-difference-detected：」
 """
 from __future__ import annotations
 
@@ -43,9 +51,9 @@ import sys
 import tempfile
 import types
 
-# 编排器取同一目录里入库的那一份（与原先草稿 e171-r1-segment1-rev6/ 里那份逐字节相同，开跑照旧核 sha256）
+# 编排器取同一目录里入库的那一份，开跑核 sha256。钉的是它此刻的内容：跑那一趟的 1dcfb8d0… 那一版与此刻差的不只是登记过的搬迁（每台线程改取登记值等），倒换不回去
 ORCHESTRATOR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rows_orchestrator.py")
-ORCHESTRATOR_SHA256 = "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"
+ORCHESTRATOR_SHA256 = "d2ebaaaf914db01f384004676d9e127593c11d1796a4694b50924db38b2255c1"
 # 去法：键只在点名的那一种行里去（行种类 → 键）
 SCHEDULING_KEYS_BY_LINE_KIND = {"name=state": ("worker",), "name=timing": ("workers", "worker_processes")}
 EVERY_SCHEDULING_KEY = ("worker", "workers", "worker_processes")
@@ -66,7 +74,7 @@ EXIT_WRONG_ORCHESTRATOR = 3
 
 
 class WrongOrchestrator(Exception):
-    """编排器文件的 sha256 不是 1dcfb8d0… 那一份：照抄的三样比法不再是跑那一趟用的那一份。"""
+    """编排器文件的 sha256 不是钉的那一份：照抄的三样比法不再是钉住的那一份。"""
 
 
 def broken(item: str) -> bool:
@@ -286,7 +294,7 @@ def cells_o3(orchestrator: types.ModuleType, scratch: str) -> list[tuple[str, bo
     }
     for name, other in same_pairs.items():
         results.append((name, o3_same(orchestrator, scratch, name, base, other), "两边只差进程号、线程数、行序之一（或三样都差），要判同"))
-    # 这几格的输入真分得出：原样逐字不同，编排器 1dcfb8d0… 的去法判不同，打乱的那一份 name=state 行次序真变了
+    # 这几格的输入真分得出：原样逐字不同，编排器原来的去法判不同，打乱的那一份 name=state 行次序真变了
     other = same_pairs["o3-same-after-all-three-changed"]
     old_a = orchestrator.normalized_o3_lines(write_o3(os.path.join(scratch, "old", "a"), base))
     old_b = orchestrator.normalized_o3_lines(write_o3(os.path.join(scratch, "old", "b"), other))
@@ -343,8 +351,8 @@ def cells_end_to_end(scratch: str) -> list[tuple[str, bool, str]]:
     orchestrator = load_orchestrator()
     results = []
     for case, edit, ledger_text, expected_exit in (
-            ("same", None, "sx\t0\t2\tattempt-1\tfetched\ns12\t0\t1\tattempt-1\tlocal\n", EXIT_SAME),
-            ("strict", O3_EDITS["o3-differs-after-strict-changed"], "sx\t0\t2\tattempt-1\tfetched\n", EXIT_DIFFERENT),
+            ("same", None, "sx\t0\t2\tattempt-1\tpeer\ns12\t0\t1\tattempt-1\tlocal\n", EXIT_SAME),
+            ("strict", O3_EDITS["o3-differs-after-strict-changed"], "sx\t0\t2\tattempt-1\tpeer\n", EXIT_DIFFERENT),
             ("same-host", None, "sx\t0\t1\tattempt-1\tlocal\n", EXIT_DIFFERENT)):
         root = os.path.join(scratch, f"e2e-{case}")
         line_a = orchestrator.write_fake_row(os.path.join(root, "rows", "row-0"), workers=6)

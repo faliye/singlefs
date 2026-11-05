@@ -130,6 +130,7 @@ def uncarried_follow_rows(rows, extra_paths=frozenset()):
 
 
 def selftest():
+    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 自证拉起的子进程（环境原样继承）靠它认：弄坏开关只在自证里认
     with tempfile.TemporaryDirectory() as directory:
         kb = os.path.join(directory, 'sample.md')
         open(kb, 'w', encoding='utf-8').write('## 样本 —— 已定\n\n开篇一句。\n\n### 已定项 1（带空格 的标题）\n\n正文。\n\n## 历史版本\n')
@@ -191,8 +192,27 @@ def refuse(reason, howto):
     return 2
 
 
+BREAK_VARIABLES = ('CHECKLIST_SPECS_BREAK', 'CHECKLIST_SPECS_SPLIT_ON_SPACE')
+SELFTEST_MARK_VARIABLE = 'CHECKLIST_SPECS_SELFTEST_MARK'
+SELFTEST_MARK_CONTENT = 'checklist-specs.py --selftest 起的子进程'
+
+
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest、环境里也没有自证留的标记（自证起的子进程）而开关非空，参数解析之前就拒，交回退出码 2；放行交回 None。"""
+    set_names = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not set_names or arguments == ['--selftest'] or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    for name in set_names:
+        print(f'  ✗ {name}={os.environ[name]} 是弄坏开关，只在自证（checklist-specs.py --selftest）里认，平常跑设了就拒，这一趟什么都没做', file=sys.stderr)
+    print(f'     → 怎么办：去掉 {"、".join(set_names)} 再跑；要证红就跑 {set_names[0]}=<项> python3 scripts/agents/checklist-specs.py --selftest', file=sys.stderr)
+    return 2
+
+
 def main():
     arguments = sys.argv[1:]
+    refused = refuse_break_outside_selftest(arguments)
+    if refused is not None:
+        return refused
     if arguments == ['--selftest']:
         return selftest()
     usage = 'checklist-specs.py 清单.md [--cited 正文.md --out 出口.md] [--extra 取法 …]'

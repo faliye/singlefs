@@ -55,7 +55,7 @@ N=0
 emit() { printf 'E7RESULT %s\n' "$*"; N=$((N+1)); }
 
 # 每设备条目宽度：dev_uuid 16 + pbs 4 + lbs 4 + capacity 8 + layout_bits 8 = 40
-# ⚠️ 仓里没定过，是假设。另扫 24 / 64 两档。
+# ⚠️ 仓里没定过，是假设。另扫 24 / 64 两个值。
 ENTRY_W=40
 DISK_MB=16
 emit "name=config entry_width=$ENTRY_W disk_mb=$DISK_MB rounds=5 pool=heterogeneous"

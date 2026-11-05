@@ -16,12 +16,18 @@
 # 够不着的：qemu-io 一次 writev 的所有段填同一个字节，段之间次序错了看不出来。
 # 临时目录在 ${TMPDIR:-/tmp} 下，数据节点要 O_DIRECT，TMPDIR 在 tmpfs 上时 qemu-io 打不开盘；跑完删掉，QEMU_BLKLOGWRITES_CHECK_KEEP=1 时留着并打印路径。
 #
-# 弄坏开关 QEMU_BLKLOGWRITES_CHECK_BREAK=<项>（只给证红用；--selftest 里点名的那一格判错）：
-#   skip-qemu-io-status     不看 qemu-io 的退出码与 wrote 那一行 → 「qemu-io 报 writev failed，日志与数据盘都对」那一格
-#   skip-system_configuration-count   不核系统配置条数                     → 「系统配置条数多一条」那一格
-#   skip-entry-shape        不核两个条目头（含空洞）           → 「第一条条目头的盘扇区写成 8」「原版 1023 段的空洞」两格
-#   skip-payload-compare    不比日志里那一条的数据             → 「日志数据错一个字节」那一格
-#   skip-disk-compare       不比数据盘                         → 「数据盘错一个字节」那一格
+# 弄坏开关 QEMU_BLKLOGWRITES_CHECK_BREAK=<项>（只在 --selftest 里认：命令行第一个参数不是 --selftest 时设了它，在参数解析之前退 2、点名它只在自证里认）。
+# 逐项写开关名、弄坏哪一处，下一行起写打开后自证红的格（自证逐格打「✗ <格名>：该红且说明里有…，判成…」，末尾一句「✗ 自证 N 格里 M 格判错：<格名…>」）：
+#   QEMU_BLKLOGWRITES_CHECK_BREAK=skip-qemu-io-status  不看 qemu-io 的退出码与 wrote 那一行
+#       「qemu-io 报 writev failed，日志与数据盘都对」
+#   QEMU_BLKLOGWRITES_CHECK_BREAK=skip-system_configuration-count  不核系统配置条数
+#       「系统配置条数多一条」
+#   QEMU_BLKLOGWRITES_CHECK_BREAK=skip-entry-shape  不核两个条目头（含空洞）
+#       「第一条条目头的盘扇区写成 8」「原版 1023 段的空洞」
+#   QEMU_BLKLOGWRITES_CHECK_BREAK=skip-payload-compare  不比日志里那一条的数据
+#       「日志数据错一个字节」
+#   QEMU_BLKLOGWRITES_CHECK_BREAK=skip-disk-compare  不比数据盘
+#       「数据盘错一个字节」
 #
 # admission: always 判的是这一刻给的那个 qemu-io 二进制的行为，每次调都要现跑
 # run-condition: command python3
@@ -35,6 +41,15 @@ die() {
   exit 1
 }
 
+# 弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行第一个参数不是 --selftest 而下面的变量有一个非空（不管值是什么），
+# 在参数解析之前退 2、点名它只在自证里认，一步都没做
+for break_variable in QEMU_BLKLOGWRITES_CHECK_BREAK; do
+  if [[ -n "${!break_variable:-}" && "${1:-}" != --selftest ]]; then
+    echo "  ✗ $break_variable 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证，一步都没做" >&2
+    echo "     → 怎么办：去掉 $break_variable 再跑；要证红就跑 $break_variable=<项> bash scripts/devices/qemu-blklogwrites-check.sh --selftest" >&2
+    exit 2
+  fi
+done
 usage_howto="用法：qemu-blklogwrites-check.sh <qemu-io 路径>，或 qemu-blklogwrites-check.sh --selftest"
 [[ $# -eq 1 ]] || die "要恰好一个参数，给了 $# 个" "$usage_howto"
 case "$1" in

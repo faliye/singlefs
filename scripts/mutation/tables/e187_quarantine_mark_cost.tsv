@@ -3,7 +3,7 @@ cow_without_ancestors	        for level in 1..root_level {	        for level in 
 unit_written_to_one_device	WriteTally { device_writes: DEVICE_COUNT, bytes_on_both_devices: DEVICE_COUNT * span_slots * UNIT_WRITE_BYTES_PER_SLOT }	WriteTally { device_writes: 1, bytes_on_both_devices: span_slots * UNIT_WRITE_BYTES_PER_SLOT }
 quarantine_tree_creation_not_counted	    for unit in new_units.iter() {	    for unit in new_units.iter().filter(|unit| !(unit.structure == WrittenStructure::QuarantineTreeNode && quarantine_tree_registered_by_this_publish)) {
 fixed_point_skips_the_old_slot	    for replaced_node in &released_nodes {\n        release_a_unit(	    for replaced_node in released_nodes.iter().take(0) {\n        release_a_unit(
-journal_names_per_record_off_by_one	const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = (JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES;	const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = (JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES + 1;
+journal_names_per_record_off_by_one	const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 64;	const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 65;
 bytes_per_unit_write_wrong	const UNIT_WRITE_BYTES_PER_SLOT: u64 = SLOT_BYTES;	const UNIT_WRITE_BYTES_PER_SLOT: u64 = 4096;
 old_reader_masks_both_high_bits	    u64::from(span_field & !ALLOCATION_RECORD_RELEASED_FLAG)	    u64::from(span_field & 0x3FFF)
 old_reader_leaf_fit_off_by_one	start_in_leaf + span - 1 <= ALLOCATION_RECORD_TREE_LEAF_SLOTS - 1	start_in_leaf + span - 1 <= ALLOCATION_RECORD_TREE_LEAF_SLOTS

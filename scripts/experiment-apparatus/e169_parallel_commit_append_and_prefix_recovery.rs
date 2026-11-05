@@ -4398,20 +4398,45 @@ fn run_replay_core_inputs() {
 const SEGMENT_THREE_ARGUMENT: &str = "segment-three";
 const REPLAY_CORE_INPUTS_ARGUMENT: &str = "replay-core-inputs";
 
-/// 不带参数跑第一段（`research/results/e169-parallel-commit-append-and-prefix-recovery-2026-10-01-r3.out` 那一份）；带 `segment-two` 跑第二段（多飞）。
+/// 不带参数依次跑第一、二、三段（三段的产物依次接在一起，每段自己的收尾行照打；第一段停机条款打中就退 3、不往下）；
+/// 带 `segment-one` 只跑第一段（`research/results/e169-parallel-commit-append-and-prefix-recovery-2026-10-01-r3.out` 那一份）；带 `segment-two` 只跑第二段（多飞）。
+const SEGMENT_ONE_ARGUMENT: &str = "segment-one";
 const SEGMENT_TWO_ARGUMENT: &str = "segment-two";
+
+/// 命令行参数选哪几段。不带参数是第一、二、三段依次全跑；段名是指定范围；`replay-core-inputs` 是子集。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SegmentChoice {
+    One,
+    Two,
+    Three,
+    ReplayCoreInputs,
+}
+
+/// 认不出的参数返回 `None`，由 `main` 退 2。
+fn segments_for_arguments(arguments: &[String]) -> Option<Vec<SegmentChoice>> {
+    match arguments {
+        [] => Some(vec![SegmentChoice::One, SegmentChoice::Two, SegmentChoice::Three]),
+        [segment] if segment == SEGMENT_ONE_ARGUMENT => Some(vec![SegmentChoice::One]),
+        [segment] if segment == SEGMENT_TWO_ARGUMENT => Some(vec![SegmentChoice::Two]),
+        [segment] if segment == SEGMENT_THREE_ARGUMENT => Some(vec![SegmentChoice::Three]),
+        [mode] if mode == REPLAY_CORE_INPUTS_ARGUMENT => Some(vec![SegmentChoice::ReplayCoreInputs]),
+        _ => None,
+    }
+}
 
 fn main() {
     preflight();
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    match arguments.as_slice() {
-        [] => run_segment_one(),
-        [segment] if segment == SEGMENT_TWO_ARGUMENT => run_segment_two(),
-        [segment] if segment == SEGMENT_THREE_ARGUMENT => run_segment_three(),
-        [mode] if mode == REPLAY_CORE_INPUTS_ARGUMENT => run_replay_core_inputs(),
-        other => {
-            eprintln!("用法：不带参数跑第一段；带 {SEGMENT_TWO_ARGUMENT} 跑第二段；带 {SEGMENT_THREE_ARGUMENT} 跑第三段；带 {REPLAY_CORE_INPUTS_ARGUMENT} 打出恢复输入。收到的参数：{other:?}");
-            std::process::exit(2);
+    let Some(choices) = segments_for_arguments(&arguments) else {
+        eprintln!("用法：不带参数依次跑三段；带 {SEGMENT_ONE_ARGUMENT}、{SEGMENT_TWO_ARGUMENT}、{SEGMENT_THREE_ARGUMENT} 只跑那一段；带 {REPLAY_CORE_INPUTS_ARGUMENT} 打出恢复输入。收到的参数：{arguments:?}");
+        std::process::exit(2);
+    };
+    for choice in choices {
+        match choice {
+            SegmentChoice::One => run_segment_one(),
+            SegmentChoice::Two => run_segment_two(),
+            SegmentChoice::Three => run_segment_three(),
+            SegmentChoice::ReplayCoreInputs => run_replay_core_inputs(),
         }
     }
 }
@@ -5163,6 +5188,19 @@ mod tests {
         assert!(grid.values().all(|result| result.pending.final_value == 0 && result.pending.peak_after_drain == 0));
         assert!(grid.values().all(|result| result.reserved_lag.is_none_or(|lag| lag.final_value == 0)));
         assert!(grid.iter().all(|(key, result)| result.return_times.len() == usize::try_from(key.6).expect("k ≤ 64")));
+    }
+
+    /// 不带参数三段依次都跑；段名只跑那一段；认不出的参数不选任何一段。
+    #[test]
+    fn no_argument_selects_all_three_segments_and_a_segment_name_selects_one() {
+        let arguments = |texts: &[&str]| texts.iter().map(|text| text.to_string()).collect::<Vec<String>>();
+        assert_eq!(segments_for_arguments(&arguments(&[])), Some(vec![SegmentChoice::One, SegmentChoice::Two, SegmentChoice::Three]));
+        assert_eq!(segments_for_arguments(&arguments(&["segment-one"])), Some(vec![SegmentChoice::One]));
+        assert_eq!(segments_for_arguments(&arguments(&["segment-two"])), Some(vec![SegmentChoice::Two]));
+        assert_eq!(segments_for_arguments(&arguments(&["segment-three"])), Some(vec![SegmentChoice::Three]));
+        assert_eq!(segments_for_arguments(&arguments(&["replay-core-inputs"])), Some(vec![SegmentChoice::ReplayCoreInputs]));
+        assert_eq!(segments_for_arguments(&arguments(&["never-used-segment-name"])), None);
+        assert_eq!(segments_for_arguments(&arguments(&["segment-one", "segment-two"])), None);
     }
 }
 

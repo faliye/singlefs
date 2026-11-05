@@ -1,4 +1,4 @@
-"""replace-once.py、insert-row.py、replace-batch.py 写之前判新串：会话号（任何后缀的仓内文件）；三份另判写 .md 的新串里的钟点、时区词、时间戳
+"""replace-once.py、insert-row.py、replace-batch.py 写之前判新串：会话号（任何后缀的仓内文件）；三份另判写 .md、.json、.txt 的新串里的钟点、时区词、时间戳
 （含运行目录名、日志文件名里连写的紧凑写法）。
 
 判据与 write-guard.sh 的第五道、门禁 doc-text 的 clock-times 格是同一份：`.claude/gate.d/lib-forbidden-notations.py`（形态键 clock-times），
@@ -11,15 +11,18 @@
 
 会话号一判（session_name_refusal）：判据是同一份库里的 session-names 那一形态（write-guard.sh 的第七道、门禁 doc-text 的 session-names 格读的就是它），
 排除前缀、「# session-names:allow <理由>」放行标记（.sh、.py、.rs 里）、仓外不判都由那份库管，这里没有另抄；与钟点不同的是后缀不限：写闸对 Write、Edit 的内容
-不分后缀都判，这里照同一个范围。出路用那份库登记的 remedy（头一条就是「写成「别的会话」这类不带号的说法」）。
+不分后缀都判，这里照同一个范围。出路用那份库登记的 remedy（头一条是「只写两位短号，或写成「别的会话」这类不带号的说法」）。
+新串里没有会话号的，同一个函数接着判批次代号（同一份库的 batch-codes 形态，write-guard.sh 第七道里「写了批次代号」那一判读的也是它）：
+库按后缀只判 .md、.tsv、.txt，排除前缀与上下文规则都在库里；拒绝的退出码与会话号同一个（三份脚本不另分），出路用那一形态的 remedy。
+两样都有时先报会话号，改完再写一次报批次代号。三份脚本的 no-session-guard 开关关掉这个函数，两样一起不判。
 
 用法（给 scripts/kb/ 里写文件的脚本 import；脚本按路径跑时 sys.path[0] 就是这个目录）：
     from lib_notation_check import clock_refusal, session_name_refusal, session_guard_problems
     refusal = clock_refusal(路径, 新串, 新串第一行在改完之后文件里的行号)    # None 放行；否则是说明行的列表，第一行是摘要（不带「✗」）
-    refusal = session_name_refusal(路径, 新串, 行号)                      # 同上，判会话号
+    refusal = session_name_refusal(路径, 新串, 行号)                      # 同上，判会话号，没有会话号再判批次代号
     problems = session_guard_problems(临时目录, attempt, 拒绝时的退出码)    # 三份脚本的自证共用的会话号样本，见函数说明
 
-范围：钟点——目标路径以 .md 结尾（不分大小写）、在仓里（以这份文件所在的仓为准）、不在那份库里钟点那一形态的排除前缀下才判；别的后缀与仓外不判。
+范围：钟点——目标路径以 JUDGED_SUFFIXES 那几种（.md、.json、.txt，不分大小写）结尾、在仓里（以这份文件所在的仓为准）、不在那份库里钟点那一形态的排除前缀下才判；别的后缀与仓外不判。
 会话号——目标路径在仓里、不在会话号那一形态的排除前缀下就判，不看后缀；仓外不判。
 判据库取被判的那个仓里的那一份（root 下的 .claude/gate.d/lib-forbidden-notations.py）：仓范围、排除前缀、库三样同属一个仓；
 平时 root 是这份文件所在的仓，所以等于「脚本自己所在的仓的库」。自证把临时目录当仓根时，用 copy_library_into 把真的库抄一份进去，
@@ -37,7 +40,8 @@ import sys
 
 FORM_KEY = 'clock-times'
 SESSION_FORM_KEY = 'session-names'
-JUDGED_SUFFIXES = ('.md',)
+BATCH_FORM_KEY = 'batch-codes'
+JUDGED_SUFFIXES = ('.md', '.json', '.txt')
 LISTED_HITS_LIMIT = 20
 
 
@@ -107,7 +111,7 @@ def form_refusal(form_key, form_name, summary, show_shape, suffixes, path, new_t
 
 
 def clock_refusal(path, new_text, first_line, root=None):
-    """新串带钟点、时区词或时间戳就返回说明行的列表（第一行是摘要，其余行自带缩进与「→」），放行返回 None。只判 .md 目标。
+    """新串带钟点、时区词或时间戳就返回说明行的列表（第一行是摘要，其余行自带缩进与「→」），放行返回 None。只判 JUDGED_SUFFIXES 那几种后缀的目标。
     first_line：新串第一行在改完之后的文件里是第几行（1 起），说明里的「第 n 行」按它折算。
     root：自检才传（把哪个目录当仓根，判据库取它下面的 .claude/gate.d/lib-forbidden-notations.py），平时取这份文件所在的仓。"""
     return form_refusal(FORM_KEY, '钟点', '新串在描述里写了钟点、时区词或时间戳，共 {count} 处，{relative} 一个字节没写：', True, JUDGED_SUFFIXES,
@@ -116,8 +120,13 @@ def clock_refusal(path, new_text, first_line, root=None):
 
 def session_name_refusal(path, new_text, first_line, root=None):
     """新串带会话号（ListAgents 列的会话名）就返回说明行的列表（形状同 clock_refusal），放行返回 None。仓内任何后缀的目标都判，与写闸判 Write、Edit 的范围一致。
+    没有会话号的接着判批次代号（库里 batch-codes 那一形态，库按后缀只判 .md、.tsv、.txt）；读不到库时交会话号那一判的拒绝，不再判批次代号。
     first_line、root 的意思同 clock_refusal。"""
-    return form_refusal(SESSION_FORM_KEY, '会话号', '新串写了会话号（ListAgents 列的会话名），共 {count} 处，{relative} 一个字节没写：', False, None,
+    refusal = form_refusal(SESSION_FORM_KEY, '会话号', '新串写了会话号（ListAgents 列的会话名），共 {count} 处，{relative} 一个字节没写：', False, None,
+                           path, new_text, first_line, root)
+    if refusal is not None:
+        return refusal
+    return form_refusal(BATCH_FORM_KEY, '批次代号', '新串写了批次代号，共 {count} 处，{relative} 一个字节没写：', True, None,
                         path, new_text, first_line, root)
 
 
@@ -179,6 +188,19 @@ def session_guard_problems(workspace, attempt, refused_code, entry=None):
         if code != 0 or new_text not in content_of(target):
             problems.append(f'写会话号：{label}本该放行（退出码 0）并写进文件，实际 {code}：{said!r}'
                             '（LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names 关掉放行标记的话带标记的那一条本来就该红）')
+    # 批次代号与会话号同一个函数判：.md 目标的新串带代号拒（与会话号同一个退出码），.py 目标不判（库里批次代号只判 .md、.tsv、.txt）
+    for label, target, new_text, refused in (
+            ('.md 目标的新串带数字加字母的代号', markdown, '24c-1 交回', True),
+            ('.md 目标的新串带天干编号的批号', markdown, '批 10 甲交回', True),
+            ('.py 目标的新串带代号（批次代号只判 .md、.tsv、.txt）', program, 'VALUE = 1  # 24c-1 交回', False)):
+        reset(target)
+        code, said = run(target, new_text)
+        if refused and (code != refused_code or '写了批次代号' not in said or '→ 怎么办' not in said or content_of(target) != original):
+            problems.append(f'写会话号：{label}，本该退出码 {refused_code}、说「写了批次代号」带出路且不写文件，实际 {code}：{said!r}'
+                            '（脚本的 no-session-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK=batch-codes 关掉这一判的话这一条本来就该红）')
+        if not refused and (code != 0 or new_text not in content_of(target)):
+            problems.append(f'写会话号：{label}，本该放行（退出码 0）并写进文件，实际 {code}：{said!r}'
+                            '（LIB_FORBIDDEN_NOTATIONS_BREAK=judged-suffixes-ignored 让批次代号什么后缀都判的话这一条本来就该红）')
     reset(excluded)
     code, said = run(excluded, refused_text)
     if code != 0 or refused_text not in content_of(excluded):

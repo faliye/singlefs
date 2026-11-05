@@ -1,0 +1,12 @@
+# E171（三oracle合谋测试） 第 2 次重跑现状整表段前置的研究一侧变异表（登记 research/prompts/e171-r2-prereg.md 修订 4）：第一段第 2 步重写入库的逐文件比 s2_compare.py、逐行编排外层的 H16 与冻结树两处运行条件。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经同目录 mutation_driver.py 带 --unit-test-module test_revision_8 跑；原文在研究一侧目录（test_*.py 与 mutation_driver.py 除外）恰好命中一次。复用库根那几条在scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_library_root.tsv。
+R2P-1 S2 两边都缺的件当成相同（第 2 步逐文件比，s2_compare.py）	rows.append((stream, label, left, right, left == right and left != ABSENT))	rows.append((stream, label, left, right, left == right))
+R2P-2 S2 impl-verdicts.tsv 不去耗时列（整份比）	        return hashlib.sha256(lines_without_the_last_column(path)).hexdigest()	        return file_sha256(path)
+R2P-3 S2 连流三也比	S2_STREAMS = STREAM_NAMES[:2]	S2_STREAMS = STREAM_NAMES[:3]
+R2P-4 S2 导出目录不在也照比、写产物	    missing = [path for path in (e170_dump, device_baseline) if not os.path.isdir(path)]	    missing = []
+R2P-5 S2 产物已在也照写（不先拒、不退 2）	    if os.path.exists(output):\n        print(f"✗ 产物 {output} 已存在，不覆盖（退 2）", file=sys.stderr)\n        return EXIT_USAGE\n	
+R2P-6 S2 不同的件数一律数成 0	    differing = sum(1 for row in rows if not row[4])	    differing = sum(1 for row in rows if row[4] and not row[4])
+R2P-7 冻结树快照是空集照往下判 Z5（逐行编排外层）	    if one.row_driver_module(context).snapshot_digest(tree)[1] == 0:	    if False:
+R2P-8 核 Z5 之前不核树认不认得全	    require_readable_tree(context)\n    ORIGINAL["snapshot_check"](context)	    ORIGINAL["snapshot_check"](context)
+R2P-9 H16 的值是 null 当成填了	    return [name for name in H16_ITEMS if h16.get(name) in (None, "")]	    return [name for name in H16_ITEMS if name not in h16]
+R2P-10 逐行上下文不核 H16	    require_h16(config)\n    h16 = judge.section(config, "H16")\n    logs = str(h16.get("logs_directory"))	    h16 = judge.section(config, "H16")\n    logs = str(h16.get("logs_directory"))
+R2P-11 外层 main 在 configure 之前不核 H16	        require_h16(config)   # 在 configure 之前	        pass   # 在 configure 之前

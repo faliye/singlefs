@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都照此刻片目录里哪几片做完了判还差什么，上一次跑完不替这一次作保
 # run-condition: command cargo git python3
+# task-server-shards: *
 # E180（准入读数与真可写量）第一段（读数段，跑前登记 research/prompts/e180-preregistration.md 5.5 节与第十二节修订 4）的分片跑法：
-#   装置是入库装置 crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs（bin 同名）。一片 = 装置的一次
+#   装置是入库装置 crates/singlefs-verification/src/bin/e180_admission_reading_versus_writable_bytes.rs（bin 同名）。一片 = 装置的一次
 #   reading --geometry <几何名> --family <族名> --shard-output <片目录>/<片名>；片齐了由装置 merge <片目录> 合成产物
 #   research/results/e180-admission-reading-versus-writable-bytes-reading.out。合并与一次 reading 跑全部共用装置里拼产物的那一个函数
 #   （装置单测 merging_the_shards_of_every_cell_gives_the_product_of_running_every_cell_at_once_byte_for_byte）；族汇总行的 seconds 是各片自己的耗时。
@@ -10,46 +11,53 @@
 # long-run-shards: 一片 = 装置一次 reading --geometry <几何名> --family <族名> --shard-output <片文件>：5 个几何 × 5 个带探测的族，加 unequal_devices_geometry 之外 4 个几何的 hl，共 29 片（装置 list-shards 逐行列片名、几何、族与这一片占的线程数）；片之间互不依赖，装置 merge 按片的固定次序（几何 × 族）合成产物
 # long-run-resume: 同一条命令重起就是续跑：装置把一片先写进 <片>.partial-<进程号>、刷盘再换名成 <片>（.shard 结尾），末行是 shard_done<TAB><整份行数>；重起时末行齐、且片旁 <片>.binary-sha256 记的装置 sha256 与这一趟的相同的片沿用、只补没做完的（记的不同或没有记录的片整份移到 <日志目录>/void-<日期>-<进程号>/ 再现跑，逐片报「作废：<片名>（装置 sha256 不同）」），成功那句报「现跑 N、沿用 M」
 # long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
-#   多机的读法：台数 = 1 + --emit-hosts 打的 MULTI_HOST_COUNT（双机关着、它退 3 时只有本机）；片按 list-shards 的次序轮流分给各台（第 k 片给第 k mod 台数 台，本机是第 0 台）。
-#   第二台那一份由本脚本经 scripts/hosts/multi-host-run.sh --peer 起（在第二台的树里跑 本脚本 --host-share 1/2，--send 把本机片目录带过去好让做完的片沿用，
-#   --fetch 取回它的片目录），取回后把做完的片并进本机片目录；台数超过 2 时 multi-host-run.sh 只到得了 PEER 那一台，退 78。
+#   多机的读法：台数 = 1 + --emit-hosts 打的 MULTI_HOST_COUNT（双机关着、它退 3 时只有本机）；服务分片的计划写台数那么多片（服务片），第 k 片领装置片里片号 mod 台数等于 k 的那几片。
+#   本脚本不自己连第二台（不起 multi-host-run.sh --peer）：经 task-server 分片（下面「经 task-server 分片」），各服务片由服务挑机器；
+#   片目录在工作根下（NFS 共享根，两台同一个绝对路径），哪一台做完的片都直接落进它，合并照样沿用，不送、不取回。
+#   经 task-server 分片（task-server/task_server_lib.py 文件头「分片」；文件头那一行 task-server-shards 声明了，提交 task-server/task submit -- bash scripts/experiment-apparatus/e180-reading-shards.sh）：
+#     plan  在本机：编好装置、拷私有副本，把私有副本的绝对路径写进 <计划目录>/binary，plan.json 写台数那么多片（每片只写 label，不钉台：records/2026-10-31-task-server巡检.md 问题 94）；
+#           带 --merge-only、--host-share 的用法计划写 0 片，合并那一步照用法跑
+#     shard 照 TASK_SERVER_SHARD=<k>/<n> 跑 --host-share k/n，装置用 <计划目录>/binary 那一份（不自己编），建好服务给的产物目录（空的）
+#     merge 在本机：片齐了合并出产物（与 --merge-only 同一段）
+#   不经服务分片（环境里没有 TASK_SERVER_SHARD_PHASE）：全部片在这一台跑，片齐了合并。
 #   每台的线程是 scripts/hosts/heavy-threads.sh 的 heavy_thread_default（E180_THREADS 设了用它）；同一个数当装置的 E180_THREADS 传给每一片（探测线程数由它定，
 #   装置合并时核每片的这个数相同），也是这台上同时在跑的片占的线程合计的上限（每片占几个照 list-shards 的第四列）。
 #   装置在一趟里不许换，每片记下打它的是哪一版装置（欠账 C862，共用段落在 long-run-lib/binary-identity.sh）：开跑时把装置程序文件拷一份进 $LOG_DIRECTORY/pinned-binary/<sha256>/（只读），
 #   列片、起每一片、合并都按这份拷贝，不再 exec 仓根 target/release 下那一份（别的会话的 cargo 随时会把它换掉）；每片做完在片旁写 <片>.binary-sha256（这份拷贝的 sha256），
 #   续跑只沿用记的 sha256 相同的片，合并之前再核一遍全部片的记录相同（不同就拒、退 1、装置 merge 不起）。老的拷贝留着不删（一个 sha256 一个目录），确认不再续跑那一版之后手删。
-#   第二台不自己编装置：两台各编一份，程序文件里编进了编译机的绝对路径，树在哪不同 sha256 就不同，第二台的片就会被本机当成别的版本作废。所以本机那一份拷贝经 multi-host-run.sh 的第二个 --send 送进第二台的树，
-#   第二台的命令带 --binary <送到的路径> --shipped-binary-sha256 <本机算的 sha256>：第二台先核送到的文件 sha256 与本机的相同，不同就退 1、一片不跑；第二台跑装置前在 PATH 最前面放一个 python3 垫片
-#   （写在 $LOG_DIRECTORY 下），装置起 python3 判准入时把编译机的 preflight.py 与装置源文件路径换成第二台这棵树里的同名文件（装置不起 python3 判准入时垫片不被用到）。
+#   各服务片不自己编装置：两台各编一份 sha256 就不同，那一台的片就会被当成别的版本作废。各片用计划那一步拷的私有副本
+#   （私有副本在日志目录下，日志目录在工作根下、两台同一份），照同一个绝对路径用同一个文件；装置里编进的编译树路径在两台上也是同一棵树。
 #
 # 用法（在仓里任何目录起都行，脚本自己回到仓根）：
-#   bash scripts/experiment-apparatus/e180-reading-shards.sh                         本机跑本机那一份、起第二台那一份，片齐了合并出产物
-#   bash scripts/experiment-apparatus/e180-reading-shards.sh --local-only            全部片在本机跑（不读多机配置），片齐了合并出产物
-#   bash scripts/experiment-apparatus/e180-reading-shards.sh --host-share <k>/<n>    只跑第 k 份（片号 mod n 等于 k 的片），写进片目录，不合并（第二台上用）
+#   bash scripts/experiment-apparatus/e180-reading-shards.sh                         经服务交时服务按「经 task-server 分片」拆；直接跑时全部片在这一台跑，片齐了合并出产物
+#   bash scripts/experiment-apparatus/e180-reading-shards.sh --host-share <k>/<n>    只跑第 k 份（片号 mod n 等于 k 的片），写进片目录，不合并（服务片用的就是这一种）
 #   bash scripts/experiment-apparatus/e180-reading-shards.sh --merge-only            不跑，片齐了合并出产物
 #   bash scripts/experiment-apparatus/e180-reading-shards.sh --list-items            逐行列片名与做没做完（要装置已编好，不编译）
-#   bash scripts/experiment-apparatus/e180-reading-shards.sh --selftest              假装置、假多机驱动走一遍续跑、分台与停机（不起 cargo）
+#   bash scripts/experiment-apparatus/e180-reading-shards.sh --selftest              假装置、假机器清单、假的 task-server（照分片协议逐步起这一份）走一遍续跑、分台与停机（不起 cargo）
 #   --shard-directory <目录> 可与前四种合用，换片目录（相对仓根或绝对路径）。
 #   --binary <程序文件> 可与前四种合用，装置用这一份、不编（命令行优先于 E180_BINARY）。
-#   --shipped-binary-sha256 <64 位十六进制> 与 --binary 合用，说明这份程序文件是别台编好送来的：核 sha256 相同才往下（不同退 1），并放 python3 垫片。本机起的命令里不带；第二台那一份由本脚本自己带。
 # 环境：E180_BINARY（装置二进制；没给就先 cargo build --release 编仓根 target/ 下的那一份）、E180_SHARD_DIRECTORY（片目录，默认
-#   ~/.local/share/singlefs/work/e180-shards）、E180_SHARD_MEMORY_CAP（每片的内存包装上限，默认 auto：照峰值表现算）、E180_THREADS（见「多机的读法」）、
-#   E180_LOG_DIRECTORY（每片的标准输出与错误输出，默认 ~/.local/share/singlefs/work/e180-shards-logs）、E180_PRODUCT_DIRECTORY（产物目录，默认 research/results）。
-#   只给自证换假的：E180_HOSTS_EMITTER（默认 scripts/crash/crash-point-replay-shard-configuration-check.sh）、E180_MULTI_HOST_RUN（默认 scripts/hosts/multi-host-run.sh）、
-#   E180_MEMORY_WRAPPER（默认 scripts/hosts/run-with-memory-cap.sh）。
+#   工作根下的 e180-shards，工作根取 .claude/hooks/lib_work_root.py、两台同一份）、E180_THREADS（见「多机的读法」）、
+#   E180_LOG_DIRECTORY（每片的标准输出与错误输出，默认工作根下的 e180-shards-logs）、E180_PRODUCT_DIRECTORY（产物目录，默认 research/results）。
+#   只给自证换假的：E180_HOSTS_EMITTER（默认 scripts/crash/crash-point-replay-shard-configuration-check.sh）。
 # 产物名：…-reading.out 已有时另存 …-reading-<日期>.out，同一天再跑加 -r2、-r3；已有的一个不动。合并出的与最新那一份逐字节相同时不另存，只报已在。
-# 退出码：0 做完（--host-share 是这一份的片做完）；1 有片没跑成或合并失败（同一条命令重起续跑）；2 用法错；3 装置报停机（name=stop 那一行交主 agent，不重跑）；
-#   78 装置没编好（--list-items）或台数超过 multi-host-run.sh 到得了的两台。
+# 退出码：0 做完（--host-share 与服务片是这一份的片做完，计划那一步是计划写好）；1 有片没跑成或合并失败（同一条命令重起续跑）；2 用法错（含 TASK_SERVER_SHARD_PHASE 认不出、
+#   服务的那一步缺变量）；3 装置报停机（name=stop 那一行交主 agent，不重跑）；78 装置没编好（--list-items）。
 #
 # 弄坏开关 E180_SHARDS_BREAK=<项>（只在 --selftest 起的那几趟里认：自证设 E180_SHARDS_SELFTEST_MARK 指到它建的标记文件，别处设了拒、退 2）：
-#   done-marker-ignored   .shard 文件在就算做完、不看末行          打开后自证「删一片的完成标记重起只补那一片」红
-#   host-share-ignored    --host-share 不分份、每台跑全部片        打开后自证「两台各跑自己那一份」红
-#   exec-root-binary      每片仍按开跑时给的那个路径起、不按私有副本  打开后自证「装置在一趟里不许换」红（跑着的时候仓根那份被换，后起的片自报的 sha256 就不是开跑时那份）
-#   stale-binary-reused   沿用只看完成标记、不看片旁记的装置 sha256    打开后自证「旧装置打的片作废」红
-#   merge-sha-unchecked   合并之前不核全部片的装置 sha256            打开后自证「合并之前核全部片的装置 sha256」红（旧装置的片被合进产物）
-#   peer-binary-not-shipped  第二台那一份不送程序文件、不带 --binary，第二台用自己编的另一份   打开后自证「两台各跑自己那一份」「第二台用本机送去的同一份程序文件」红
-#   no-peer-sha-check     第二台不核送到的程序文件 sha256        打开后自证「第二台拿到的程序文件与本机的 sha256 不同」红
-#   no-python-shim        第二台不放 python3 垫片                 打开后自证「第二台用本机送去的同一份程序文件」红（装置的准入路径是编译机的，第二台上找不到）
+#   E180_SHARDS_BREAK=done-marker-ignored  .shard 文件在就算做完、不看末行
+#       「删一片的完成标记重起只补那一片」
+#   E180_SHARDS_BREAK=host-share-ignored  --host-share 不分份、每台跑全部片
+#       「两台各跑自己那一份（本机片号 0、2、4，第二台 1、3）」「三台：计划写三片、各领片号 mod 3 的那几片、合并出产物」
+#   E180_SHARDS_BREAK=exec-root-binary  每片仍按开跑时给的那个路径起、不按私有副本
+#       「装置在一趟里不许换：跑着的时候仓根那份被换掉，之后起的五片自报的 sha256 与片旁记的都是开跑时那份」
+#   E180_SHARDS_BREAK=stale-binary-reused  沿用只看完成标记、不看片旁记的装置 sha256
+#       「旧装置打的五片全作废：逐片报作废、五片全现跑、旧片连记录整份留在作废目录、片旁记的都是新装置的」「片旁记的 sha256 不同的、没有记录的片都作废重跑，另外三片沿用」「--list-items：装置换了之后，旧装置打的片标出续跑时作废」
+#   E180_SHARDS_BREAK=merge-sha-unchecked  合并之前不核全部片的装置 sha256
+#       「合并之前核全部片的装置 sha256：有一片对不上就拒（退 1、点名那一片、不另出产物）」
+#   E180_SHARDS_BREAK=shard-binary-not-from-plan  服务片不读计划目录里私有副本的路径，用那一台自己的那一份（假的第二台给的是它自己编的另一份）
+#       「两台各跑自己那一份（本机片号 0、2、4，第二台 1、3）」「第二台用本机那一份私有副本（同一个绝对路径）：五片旁记的 sha256 只有一种、合并出产物」
+#       「三台：计划写三片、各领片号 mod 3 的那几片、合并出产物」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../hosts/heavy-threads.sh"
@@ -60,16 +68,19 @@ cd "$(dirname "$0")/../.." || { echo "  ✗ 进不去仓根" >&2; echo "     →
 
 BINARY_DEFAULT="target/release/e180_admission_reading_versus_writable_bytes"
 PRODUCT_STEM_NAME="e180-admission-reading-versus-writable-bytes-reading"
-MEMORY_CAP="${E180_SHARD_MEMORY_CAP:-auto}"
-MERGE_MEMORY_CAP="auto"
-LOG_DIRECTORY="${E180_LOG_DIRECTORY:-$HOME/.local/share/singlefs/work/e180-shards-logs}"
+# 缺省的片目录与日志目录放工作根（.claude/hooks/lib_work_root.py，两台同一份）下：只在没给那个目录时取（自证的各格都给了），取不到就停，不退回 $HOME 下
+work_root_or_stop() {   # <没给的那个变量名>：成了把工作根放进 WORK_ROOT
+  [[ -n "${WORK_ROOT:-}" ]] && return 0
+  if ! WORK_ROOT="$(python3 .claude/hooks/lib_work_root.py)" || [[ "$WORK_ROOT" != /* ]]; then
+    echo "  ✗ 取不到工作根（.claude/hooks/lib_work_root.py 跑不起来），缺省的目录没处放" >&2
+    echo "     → 怎么办：修好 .claude/hooks/lib_work_root.py，或设 $1 指到要用的目录" >&2
+    exit 2
+  fi
+}
+LOG_DIRECTORY="${E180_LOG_DIRECTORY:-}"
+[[ -n "$LOG_DIRECTORY" ]] || { work_root_or_stop E180_LOG_DIRECTORY; LOG_DIRECTORY="$WORK_ROOT/e180-shards-logs"; }
 PRODUCT_DIRECTORY="${E180_PRODUCT_DIRECTORY:-research/results}"
 HOSTS_EMITTER="${E180_HOSTS_EMITTER:-scripts/crash/crash-point-replay-shard-configuration-check.sh}"
-MULTI_HOST_RUN="${E180_MULTI_HOST_RUN:-scripts/hosts/multi-host-run.sh}"
-MEMORY_WRAPPER="${E180_MEMORY_WRAPPER:-scripts/hosts/run-with-memory-cap.sh}"
-PEER_SHARD_DIRECTORY="e180-shards-share-1-of-2"
-PEER_BINARY_DIRECTORY="e180-binary-for-peer"
-DEVICE_SOURCE_PATH="crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs"
 
 usage_error() {
   echo "  ✗ $1" >&2
@@ -151,7 +162,7 @@ host_count() {
   if ((exit_code == 3)); then echo 1; return 0; fi
   if ((exit_code != 0)); then
     echo "  ✗ 多机配置判不过（$HOSTS_EMITTER --emit-hosts 退 $exit_code）" >&2
-    echo "     → 怎么办：照它打的原因修 multi-host.env，或用 --local-only 只在本机跑" >&2
+    echo "     → 怎么办：照它打的原因修 multi-host.env（单跑 bash $HOSTS_EMITTER 看原因）" >&2
     return 1
   fi
   count=$(grep -m1 '^MULTI_HOST_COUNT=' <<< "$emitted" | cut -d= -f2)
@@ -167,7 +178,7 @@ prepare_binary() {
     BINARY="$E180_BINARY"
   else
     BINARY="$BINARY_DEFAULT"
-    bash scripts/hosts/capped.sh "$THREADS" cargo build --release -p singlefs-checker-tier --bin e180_admission_reading_versus_writable_bytes \
+    bash scripts/hosts/capped.sh "$THREADS" cargo build --release -p singlefs-verification --bin e180_admission_reading_versus_writable_bytes \
       > "$LOG_DIRECTORY/build-$RUN_STAMP.log" 2>&1 || {
       echo "  ✗ 装置编不过（$LOG_DIRECTORY/build-$RUN_STAMP.log）" >&2
       echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本" >&2
@@ -182,25 +193,11 @@ prepare_binary() {
   BINARY_SHA256="$PINNED_BINARY_SHA256"
   LAUNCH_BINARY="$BINARY"
   break_is exec-root-binary && LAUNCH_BINARY="$SOURCE_BINARY"
-  if [[ -n "$SHIPPED_SHA256" ]]; then
-    if [[ "$BINARY_SHA256" != "$SHIPPED_SHA256" ]] && ! break_is no-peer-sha-check; then
-      echo "  ✗ 送到的装置程序文件 sha256 是 $BINARY_SHA256，本机的是 $SHIPPED_SHA256，不是同一份：这一份一片都不跑" >&2
-      echo "     → 怎么办：看 multi-host-run.sh 的 --send 有没有送全（盘满、传输中断）；重起本机那条命令" >&2
-      exit 1
-    fi
-    install_python_path_shim
-  fi
-}
-
-# 别台编好送来的装置：它的准入脚本路径是编译机的绝对路径，这台上没有；PATH 最前面放 python3 垫片（做法在 long-run-lib/binary-identity.sh）。
-install_python_path_shim() {
-  break_is no-python-shim && return 0
-  binary_identity_install_python_shim "$DEVICE_SOURCE_PATH" "$LOG_DIRECTORY/python3-path-shim-$RUN_STAMP" || exit 1
 }
 
 # 片的清单：一行「片名 TAB 几何 TAB 族 TAB 占的线程数」，次序是装置 list-shards 的次序（也是合并的次序）。
 load_shard_list() {
-  mapfile -t SHARD_LINES < <(E180_THREADS="$THREADS" bash "$MEMORY_WRAPPER" 1G "$BINARY" list-shards)
+  mapfile -t SHARD_LINES < <(E180_THREADS="$THREADS" "$BINARY" list-shards)
   ((${#SHARD_LINES[@]} > 0)) || { echo "  ✗ 装置 list-shards 什么都没列（$BINARY）" >&2; echo "     → 怎么办：单跑 $BINARY list-shards 看装置为什么没列片；装置没编好就先 cargo build --release，或用 --binary 给一份编好的" >&2; exit 1; }
 }
 
@@ -225,7 +222,7 @@ run_shards() {
     threads_of[$name]=$threads
     binary_identity_assert_unchanged || exit 1
     echo "片 $name：起跑（占 $threads 线程，这台已占 $busy）"
-    { E180_THREADS="$THREADS" bash "$MEMORY_WRAPPER" "$MEMORY_CAP" nice -n 19 "$LAUNCH_BINARY" reading --geometry "$geometry" --family "$family" \
+    { E180_THREADS="$THREADS" nice -n 19 "$LAUNCH_BINARY" reading --geometry "$geometry" --family "$family" \
         --shard-output "$SHARD_DIRECTORY/$name" > "$LOG_DIRECTORY/$name-$RUN_STAMP.out" 2> "$LOG_DIRECTORY/$name-$RUN_STAMP.err"
       echo "$?" > "$jobs/$name.exit"; } &
     launched+=("$name")
@@ -250,7 +247,7 @@ run_shards() {
       echo "     → 怎么办：该停下，把这一行 name=stop 交回主 agent，不重跑" >&2
     else
       FAILED+=("$name")
-      echo "  ✗ 片 $name：退 $exit_code，没做完（错误输出 $LOG_DIRECTORY/$name-$RUN_STAMP.err；245 与 250–254 是内存包装的结局，见 run-with-memory-cap.sh 文件头「退出码」）" >&2
+      echo "  ✗ 片 $name：退 $exit_code，没做完（错误输出 $LOG_DIRECTORY/$name-$RUN_STAMP.err；内存不够的撞顶、重排与放大由 task-server 管，整条命令的结局看 task-server/task status）" >&2
       echo "     → 怎么办：看那份错误输出；同一条命令重起只补没做完的片" >&2
     fi
   done
@@ -263,50 +260,17 @@ run_shards() {
   fi
 }
 
-# 第二台那一份：经 multi-host-run.sh --peer 在第二台的树里跑 --host-share 1/2；本机片目录送过去（做完的片在那边沿用），它的片目录取回。
-start_peer_share() {
-  PEER_FETCH_DIRECTORY="$LOG_DIRECTORY/peer-fetch-$RUN_STAMP"
-  PEER_EXIT_FILE="$LOG_DIRECTORY/peer-$RUN_STAMP.exit"
-  local binary_name binary_arguments=() binary_send=()
-  if ! break_is peer-binary-not-shipped; then
-    # 本机这一份程序文件（私有副本）送过去（暂存目录里放一个硬链接，跨文件系统时拷一份），第二台核 sha256 后用它，不自己编
-    binary_name=$(basename -- "$BINARY")
-    PEER_BINARY_STAGE="$LOG_DIRECTORY/peer-binary-$RUN_STAMP"
-    mkdir -p -- "$PEER_BINARY_STAGE" || exit 1
-    trap 'rm -rf -- "$PEER_BINARY_STAGE"' EXIT
-    ln -- "$BINARY" "$PEER_BINARY_STAGE/$binary_name" 2> /dev/null || cp -p -- "$BINARY" "$PEER_BINARY_STAGE/$binary_name" || exit 1
-    binary_send=(--send "$PEER_BINARY_STAGE" "$PEER_BINARY_DIRECTORY")
-    binary_arguments=(--binary "$PEER_BINARY_DIRECTORY/$binary_name" --shipped-binary-sha256 "$BINARY_SHA256")
-  fi
-  echo "第二台：起 --host-share 1/2（日志 $LOG_DIRECTORY/peer-$RUN_STAMP.log）"
-  { MULTI_HOST_RUN_FETCH_DIRECTORY="$PEER_FETCH_DIRECTORY" bash "$MULTI_HOST_RUN" --peer --label "e180-reading-$RUN_STAMP" \
-      --send "$SHARD_DIRECTORY" "$PEER_SHARD_DIRECTORY" ${binary_send[@]+"${binary_send[@]}"} --fetch "$PEER_SHARD_DIRECTORY" \
-      -- bash scripts/experiment-apparatus/e180-reading-shards.sh --host-share 1/2 --shard-directory "$PEER_SHARD_DIRECTORY" \
-      ${binary_arguments[@]+"${binary_arguments[@]}"} \
-      > "$LOG_DIRECTORY/peer-$RUN_STAMP.log" 2>&1
-    echo "$?" > "$PEER_EXIT_FILE"; } &
-}
-
-# 取回的片里做完的并进本机片目录（本机已做完的不覆盖）；交回时设 IMPORTED。
-import_peer_shards() {
-  local fetched="$PEER_FETCH_DIRECTORY/$PEER_SHARD_DIRECTORY" file name
-  IMPORTED=0
-  [[ -d "$fetched" ]] || { echo "  ✗ 第二台的片目录没取回来（$fetched）" >&2; echo "     → 怎么办：看第二台那一份的日志 $LOG_DIRECTORY/peer-$RUN_STAMP.log；同一条命令重起会再起第二台、再取一次" >&2; return 1; }
-  for file in "$fetched"/*.shard; do
-    [[ -e "$file" ]] || continue
-    name=$(basename -- "$file")
-    is_shard_done "$file" || continue
-    # 第二台取回的片要记着是这一趟的装置打的（第二台用本机送去的那一份），不是的不并进来
-    if ! is_shard_reusable "$file"; then
-      echo "  ✗ 第二台取回的片 $name 的装置 sha256（$(binary_identity_stamp_read "$file")）不是这一趟本机的（$BINARY_SHA256），不并进来" >&2
-      echo "     → 怎么办：核第二台那一趟带的是不是本机送去的 --binary；同一条命令重起，这一片由本机补跑" >&2
-      continue
-    fi
-    is_shard_reusable "$SHARD_DIRECTORY/$name" && continue
-    cp -- "$file" "$SHARD_DIRECTORY/$name.importing-$$" && mv -- "$SHARD_DIRECTORY/$name.importing-$$" "$SHARD_DIRECTORY/$name" \
-      && binary_identity_stamp_write "$SHARD_DIRECTORY/$name" "$(binary_identity_stamp_read "$file")" \
-      && IMPORTED=$((IMPORTED + 1))
-  done
+# 服务分片的计划（文件头「经 task-server 分片」plan）：<片数>：往计划目录写 plan.json，每片只写 label、不钉台（先写临时文件再改名）
+write_plan() {
+  python3 - "$plan_directory" "$1" <<'PLAN_PYTHON' || { echo "  ✗ 计划目录 $plan_directory 写不进 plan.json（上面是 python 的报错）" >&2; echo "     → 怎么办：看那个目录可不可写" >&2; return 1; }
+import json, os, sys
+directory, count = sys.argv[1], int(sys.argv[2])
+shards = [{"label": f"--host-share {index}/{count}（片号 mod {count} 等于 {index} 的那几片）"} for index in range(count)]
+temporary = os.path.join(directory, "plan.json.partial")
+with open(temporary, "w", encoding="utf-8") as handle:
+    json.dump({"shards": shards, "note": "e180 读数段分片（e180-reading-shards.sh 文件头「经 task-server 分片」）"}, handle, ensure_ascii=False)
+os.replace(temporary, os.path.join(directory, "plan.json"))
+PLAN_PYTHON
 }
 
 # 片齐了合并出产物（与最新那一份逐字节相同就不另存）。
@@ -320,7 +284,7 @@ merge_product() {
     done
     binary_identity_check_same "$BINARY_SHA256" "${checked_pairs[@]}" || exit 1
   fi
-  bash "$MEMORY_WRAPPER" "$MERGE_MEMORY_CAP" "$BINARY" merge "$SHARD_DIRECTORY" > "$temporary" 2> "$LOG_DIRECTORY/merge-$RUN_STAMP.err"
+  "$BINARY" merge "$SHARD_DIRECTORY" > "$temporary" 2> "$LOG_DIRECTORY/merge-$RUN_STAMP.err"
   if ! is_complete_product "$temporary"; then
     echo "  ✗ 合并没出齐（$temporary）：$(grep -m1 '^E name=stop ' "$temporary" || tail -n 1 -- "$temporary")" >&2
     echo "     → 怎么办：片对不上（合并拒）就看那一行点名的片；别的看 $LOG_DIRECTORY/merge-$RUN_STAMP.err；产物不入库" >&2
@@ -339,8 +303,8 @@ merge_product() {
   echo "产物：$destination（$(wc -l < "$destination") 行，sha256 $(sha256sum -- "$destination" | cut -d' ' -f1)）"
 }
 
-# 自证：假装置（五片、两个假几何）、假内存包装（直接起命令）、假机器清单、假 multi-host-run（在临时树里跑 --host-share 1/2），
-# 每一格在自己的临时目录里从头搭，格与格不共用状态。
+# 自证：假装置（五片、两个假几何）、假机器清单、假的 task-server（run_phases：照分片协议起计划、各服务片、合并，片目录是同一个；
+# 第 0 片当本机、别的当第二台，第二台那几片的环境里 E180_BINARY 是它自己编的另一份），每一格在自己的临时目录里从头搭，格与格不共用状态。
 run_selftest() {
   local work failures=0 fakes
   work=$(mktemp -d) || return 1
@@ -349,12 +313,6 @@ run_selftest() {
   echo e180-shards-selftest > "$work/mark"
   cat > "$fakes/device" <<'FAKE'
 #!/usr/bin/env bash
-# 若装置起 python3 判准入，路径编进了编译机的树；E180_SELFTEST_BAKED_TREE 设了就照这个样子判，判不过照真装置的样子退 python3 的码。
-if [[ -n "${E180_SELFTEST_BAKED_TREE:-}" ]]; then
-  python3 "$E180_SELFTEST_BAKED_TREE/crates/singlefs-checker-tier/../../.claude/singlefs-ai-sop/scripts/preflight.py" check \
-    "$E180_SELFTEST_BAKED_TREE/crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs" -- "$@" > /dev/null 2>&1 || exit 2
-  echo "${E180_SELFTEST_HOST_TAG:-local} $*" >> "$E180_SELFTEST_CALLS.preflight-passed"
-fi
 # E180_SELFTEST_SWAP_TARGET：列片的时候（开跑之后、起第一片之前）把这个路径的装置换成另一份字节不同的，像别的会话的 cargo 把仓根那份换掉。
 if [[ -n "${E180_SELFTEST_SWAP_TARGET:-}" && "$1" == list-shards && ! -e "$E180_SELFTEST_SWAP_TARGET.swapped" ]]; then
   { cat -- "$E180_SELFTEST_SWAP_TARGET"; echo "# swapped by a build while the long run is going"; } > "$E180_SELFTEST_SWAP_TARGET.swap" \
@@ -375,47 +333,12 @@ case "$1" in
     printf 'E name=merged shards=5\nE name=done emitted=2\n' ;;
 esac
 FAKE
-  printf '%s\n' '#!/usr/bin/env bash' 'shift' 'exec "$@"' > "$fakes/wrapper"
   cat > "$fakes/hosts" <<'FAKE'
 #!/usr/bin/env bash
 case "$E180_SELFTEST_HOSTS" in
   1) echo "双机：关"; exit 3 ;;
   *) echo "MULTI_HOST_COUNT=$((E180_SELFTEST_HOSTS - 1))"; exit 0 ;;
 esac
-FAKE
-  cat > "$fakes/multi-host-run" <<'FAKE'
-#!/usr/bin/env bash
-# 假 multi-host-run.sh --peer：每个 --send 的目录拷进临时树（保留执行位），--shard-directory 与 --binary 的值换成临时树里的绝对路径，在仓根跑那条命令，再把 --fetch 的目录拷到取回目录。
-# 命令里没有 --binary（第二台自己编）时，第二台用的是它自己编的另一份装置（字节不同，sha256 就不同）；有 --binary 时第二台上的装置带着编译机的准入路径（那棵树在这里不存在）。
-# E180_SELFTEST_PEER_CORRUPTS_BINARY=1：送到的程序文件末尾多一个字节（传输坏了）。
-tree=$(mktemp -d); fetch=""; send_sources=(); send_relatives=()
-while [[ "$1" != -- ]]; do
-  case "$1" in
-    --peer) shift ;;
-    --label) shift 2 ;;
-    --fetch) fetch="$2"; shift 2 ;;
-    --send) send_sources+=("$2"); send_relatives+=("$3"); shift 3 ;;
-  esac
-done
-shift
-for send_index in "${!send_sources[@]}"; do
-  mkdir -p -- "$tree/${send_relatives[$send_index]}" && cp -p -- "${send_sources[$send_index]}"/* "$tree/${send_relatives[$send_index]}/" 2> /dev/null
-  if [[ "${send_relatives[$send_index]}" == *binary* && "${E180_SELFTEST_PEER_CORRUPTS_BINARY:-0}" == 1 ]]; then
-    for sent_file in "$tree/${send_relatives[$send_index]}"/*; do chmod u+w "$sent_file"; printf x >> "$sent_file"; done
-  fi
-done
-words=(); shipped=0
-while (($# > 0)); do
-  if [[ "$1" == --shard-directory || "$1" == --binary ]]; then
-    [[ "$1" == --binary ]] && shipped=1
-    words+=("$1" "$tree/$2"); shift 2
-  else words+=("$1"); shift; fi
-done
-if ((shipped)); then export E180_SELFTEST_BAKED_TREE="$tree/builder-tree-that-is-not-here"; else export E180_BINARY="$E180_SELFTEST_PEER_BUILT_DEVICE"; fi
-E180_SELFTEST_HOST_TAG=peer "${words[@]}"
-exit_code=$?
-mkdir -p -- "$MULTI_HOST_RUN_FETCH_DIRECTORY" && cp -r -- "$tree/$fetch" "$MULTI_HOST_RUN_FETCH_DIRECTORY/$fetch"
-exit "$exit_code"
 FAKE
   # 第二台自己编的那一份：同一份源码、字节不同（编进去的树路径不同）
   { cat "$fakes/device"; echo '# built on the peer in another tree'; } > "$fakes/device-built-on-peer"
@@ -424,57 +347,111 @@ FAKE
   invoke() {
     local cell="$1" hosts="$2"
     shift 2
-    E180_BINARY="${INVOKE_BINARY:-$fakes/device}" E180_MEMORY_WRAPPER="$fakes/wrapper" E180_HOSTS_EMITTER="$fakes/hosts" E180_MULTI_HOST_RUN="$fakes/multi-host-run" \
-      E180_SELFTEST_PEER_BUILT_DEVICE="$fakes/device-built-on-peer" E180_SELFTEST_HOSTS="$hosts" E180_SELFTEST_CALLS="$cell/calls" E180_THREADS=3 E180_SHARDS_SELFTEST_MARK="$work/mark" \
-      E180_SHARD_DIRECTORY="$cell/shards" E180_LOG_DIRECTORY="$cell/logs" E180_PRODUCT_DIRECTORY="$cell/product" \
-      bash "$SCRIPT_PATH" "$@" > "$cell/out" 2>&1
+    [[ -n "${INVOKE_APPEND:-}" ]] || : > "$cell/out"
+    env -u TASK_SERVER_SHARD_PHASE -u TASK_SERVER_SHARD -u TASK_SERVER_SHARD_PLAN_DIRECTORY -u TASK_SERVER_SHARD_OUTPUT_DIRECTORY -u TASK_SERVER_SHARD_OUTPUTS -u TASK_SERVER_SHARD_HOST \
+      E180_BINARY="${INVOKE_BINARY:-$fakes/device}" E180_HOSTS_EMITTER="$fakes/hosts" \
+      E180_SELFTEST_HOSTS="$hosts" E180_SELFTEST_CALLS="$cell/calls" E180_THREADS=3 E180_SHARDS_SELFTEST_MARK="$work/mark" \
+      E180_SHARD_DIRECTORY="$cell/shards" E180_LOG_DIRECTORY="$cell/logs" E180_PRODUCT_DIRECTORY="$cell/product" ${INVOKE_ENVIRONMENT[@]+"${INVOKE_ENVIRONMENT[@]}"} \
+      bash "$SCRIPT_PATH" "$@" >> "$cell/out" 2>&1
+  }
+  # invoke_phase <格目录> <台数> <环境 键=值…> -- [参数…]：照服务的一步起（环境放进 INVOKE_ENVIRONMENT，输出接在 $cell/out 后面）；退那一步的码
+  invoke_phase() {
+    local cell="$1" hosts="$2" code=0
+    shift 2
+    INVOKE_ENVIRONMENT=()
+    while (($# > 0)) && [[ "$1" != -- ]]; do INVOKE_ENVIRONMENT+=("$1"); shift; done
+    shift
+    INVOKE_APPEND=1 invoke "$cell" "$hosts" "$@" || code=$?
+    INVOKE_ENVIRONMENT=()
+    return "$code"
+  }
+  # 假的 task-server（文件头「经 task-server 分片」）：<格目录> <台数> [参数…]：计划 → 读 plan.json 照片数起各服务片（第 0 片本机、别的当第二台：环境里 E180_BINARY 换成
+  #   第二台自己编的那一份、调用记录标 peer）→ 各片都退 0 才起合并。phase_exits 是「plan=<码> shard-0=<码> … merge=<码>」；plan_keys 是各片的键（排好、逗号连）
+  run_phases() {
+    local cell="$1" hosts="$2" count index tag step_exit
+    shift 2
+    phase_exits="" plan_keys=""
+    mkdir -p -- "$cell/plan"
+    : > "$cell/out"
+    step_exit=0; invoke_phase "$cell" "$hosts" TASK_SERVER_SHARD_PHASE=plan TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" -- "$@" || step_exit=$?
+    phase_exits="plan=$step_exit"
+    ((step_exit == 0)) || return 0
+    read -r count plan_keys <<< "$(python3 -c 'import json, sys
+plan = json.load(open(sys.argv[1], encoding="utf-8"))
+print(len(plan["shards"]), "|".join(",".join(sorted(shard)) for shard in plan["shards"]) or "-")' "$cell/plan/plan.json" 2>/dev/null)"
+    [[ "$count" =~ ^[0-9]+$ ]] || { phase_exits+=" plan-unreadable"; return 0; }
+    local failed=0
+    : > "$cell/outputs.tsv"
+    for ((index = 0; index < count; index++)); do
+      tag=peer
+      ((index == 0)) && tag=local
+      step_exit=0
+      if [[ "$tag" == peer ]]; then
+        INVOKE_BINARY="$fakes/device-built-on-peer" invoke_phase "$cell" "$hosts" TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD="$index/$count" TASK_SERVER_SHARD_HOST=192.0.2.2 \
+          E180_SELFTEST_HOST_TAG=peer TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" TASK_SERVER_SHARD_OUTPUT_DIRECTORY="$cell/output-$index" -- "$@" || step_exit=$?
+      else
+        invoke_phase "$cell" "$hosts" TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD="$index/$count" TASK_SERVER_SHARD_HOST=192.0.2.1 \
+          TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" TASK_SERVER_SHARD_OUTPUT_DIRECTORY="$cell/output-$index" -- "$@" || step_exit=$?
+      fi
+      phase_exits+=" shard-$index=$step_exit"
+      [[ -d "$cell/output-$index" ]] || phase_exits+="(没建产物目录)"
+      printf '%s\t%s\t%s\n' "$index" "$tag" "$cell/output-$index" >> "$cell/outputs.tsv"
+      ((step_exit == 0)) || failed=1
+    done
+    ((failed == 0)) || return 0
+    step_exit=0; invoke_phase "$cell" "$hosts" TASK_SERVER_SHARD_PHASE=merge TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" TASK_SERVER_SHARD_OUTPUTS="$cell/outputs.tsv" -- "$@" || step_exit=$?
+    phase_exits+=" merge=$step_exit"
   }
   expect() {
     local name="$1" condition="$2"
     cell_count=$((cell_count + 1))
     if eval "$condition"; then echo "  ✓ $name"; else echo "  ✗ $name：条件「$condition」不成立"; echo "     → 怎么办：按这一格的名字找对应的续跑、分台或合并逻辑改，或看 E180_SHARDS_BREAK 是不是设着"; failures=$((failures + 1)); fi
   }
-  local cell exit_code first_exit old_sha original_sha cell_count=0
+  local cell exit_code first_exit old_sha original_sha cell_count=0 phase_exits="" plan_keys=""
+  local -a INVOKE_ENVIRONMENT=()
   cell="$work/single"; mkdir -p -- "$cell"
   invoke "$cell" 1; exit_code=$?
-  expect "单机全新：五片都现跑、合并出产物" '((exit_code == 0)) && grep -q "现跑 5（本机 5、第二台 0）、沿用 0" "$cell/out" && (($(wc -l < "$cell/calls") == 5)) && [[ -f "$cell/product/e180-admission-reading-versus-writable-bytes-reading.out" ]]'
-  invoke "$cell" 1; exit_code=$?
-  expect "原样重起：五片都沿用、产物不另存" '((exit_code == 0)) && grep -q "现跑 0（本机 0、第二台 0）、沿用 5" "$cell/out" && (($(wc -l < "$cell/calls") == 5)) && grep -q "不另存" "$cell/out"'
+  expect "单机全新：五片都现跑、合并出产物" '((exit_code == 0)) && grep -q "现跑 5、沿用 0" "$cell/out" && (($(wc -l < "$cell/calls") == 5)) && [[ -f "$cell/product/e180-admission-reading-versus-writable-bytes-reading.out" ]]'
+  : > "$cell/out"; invoke "$cell" 1; exit_code=$?
+  expect "原样重起：五片都沿用、产物不另存" '((exit_code == 0)) && grep -q "现跑 0、沿用 5" "$cell/out" && (($(wc -l < "$cell/calls") == 5)) && grep -q "不另存" "$cell/out"'
   head -n 2 -- "$cell/shards/g_a-ho.shard" > "$cell/shards/g_a-ho.shard.cut" && mv -- "$cell/shards/g_a-ho.shard.cut" "$cell/shards/g_a-ho.shard"
-  invoke "$cell" 1; exit_code=$?
-  expect "删一片的完成标记重起只补那一片" '((exit_code == 0)) && grep -q "现跑 1（本机 1、第二台 0）、沿用 4" "$cell/out" && [[ "$(tail -n 1 -- "$cell/calls")" == "local g_a-ho" ]] && (($(wc -l < "$cell/calls") == 6))'
+  : > "$cell/out"; invoke "$cell" 1; exit_code=$?
+  expect "删一片的完成标记重起只补那一片" '((exit_code == 0)) && grep -q "现跑 1、沿用 4" "$cell/out" && [[ "$(tail -n 1 -- "$cell/calls")" == "local g_a-ho" ]] && (($(wc -l < "$cell/calls") == 6))'
   cell="$work/two"; mkdir -p -- "$cell"
-  invoke "$cell" 2; exit_code=$?
-  expect "两台各跑自己那一份（本机片号 0、2、4，第二台 1、3）" '((exit_code == 0)) && [[ "$(grep "^local " "$cell/calls" | sort | tr "\n" " ")" == "local g_a-hf local g_a-hl local g_b-ho " ]] && [[ "$(grep "^peer " "$cell/calls" | sort | tr "\n" " ")" == "peer g_a-ho peer g_b-hf " ]] && grep -q "现跑 5（本机 3、第二台 2）、沿用 0" "$cell/out"'
+  run_phases "$cell" 2
+  expect "两台各跑自己那一份（本机片号 0、2、4，第二台 1、3）" '[[ "$phase_exits" == "plan=0 shard-0=0 shard-1=0 merge=0" ]] && [[ "$(grep "^local " "$cell/calls" | sort | tr "\n" " ")" == "local g_a-hf local g_a-hl local g_b-ho " ]] && [[ "$(grep "^peer " "$cell/calls" | sort | tr "\n" " ")" == "peer g_a-ho peer g_b-hf " ]] && [[ -f "$cell/product/e180-admission-reading-versus-writable-bytes-reading.out" ]]'
+  expect "计划不钉台：两片都只写 label、私有副本的路径写进计划目录" '[[ "$plan_keys" == "label|label" ]] && [[ -x "$(head -n 1 "$cell/plan/binary" 2>/dev/null)" ]]'
   cell="$work/three"; mkdir -p -- "$cell"
-  invoke "$cell" 3; exit_code=$?
-  expect "三台：退 78、一片都不跑" '((exit_code == 78)) && [[ ! -e "$cell/calls" ]]'
+  run_phases "$cell" 3
+  expect "三台：计划写三片、各领片号 mod 3 的那几片、合并出产物" '[[ "$phase_exits" == "plan=0 shard-0=0 shard-1=0 shard-2=0 merge=0" ]] && (($(wc -l < "$cell/calls") == 5)) && [[ "$(grep -c "^local " "$cell/calls")" == 2 ]] && [[ -f "$cell/product/e180-admission-reading-versus-writable-bytes-reading.out" ]]'
+  cell="$work/direct-two"; mkdir -p -- "$cell"
+  invoke "$cell" 2; exit_code=$?
+  expect "不经服务分片直接跑：多机配置给两台也全部片在这一台跑，不连第二台" '((exit_code == 0)) && [[ "$(grep -c "^local " "$cell/calls")" == 5 ]] && ! grep -q "^peer " "$cell/calls"'
+  cell="$work/merge-only-phases"; mkdir -p -- "$cell"
+  invoke "$cell" 1; first_exit=$?
+  run_phases "$cell" 2 --merge-only
+  expect "带 --merge-only 经服务交：计划写 0 片、合并那一步照用法合并" '((first_exit == 0)) && [[ "$phase_exits" == "plan=0 merge=0" ]] && grep -q "这个用法不分片（0 片）" "$cell/out" && grep -q "不另存" "$cell/out"'
   cell="$work/stop"; mkdir -p -- "$cell"
   E180_SELFTEST_STOP_SHARD=g_b-hf invoke "$cell" 1; exit_code=$?
   expect "装置报停机：退 3、那一片没有片文件、别的片做完" '((exit_code == 3)) && [[ ! -e "$cell/shards/g_b-hf.shard" ]] && (($(find "$cell/shards" -name "*.shard" | wc -l) == 4))'
   cell="$work/usage"; mkdir -p -- "$cell"
   invoke "$cell" 1 --host-share 2/2; exit_code=$?
   expect "第几份不小于共几份：用法错退 2" '((exit_code == 2))'
-  invoke "$cell" 1 --shipped-binary-sha256 "$(printf 'a%.0s' {1..64})"; exit_code=$?
-  expect "--shipped-binary-sha256 不带 --binary：用法错退 2" '((exit_code == 2)) && grep -q "要与 --binary 合用" "$cell/out"'
   cell="$work/two-shipped"; mkdir -p -- "$cell"
-  invoke "$cell" 2; exit_code=$?
-  expect "第二台用本机送去的同一份程序文件：装置的准入路径换到第二台的树里判过三次（列片、两片）、五片旁记的 sha256 只有一种、合并出产物" '((exit_code == 0)) && [[ "$(grep -c "^peer " "$cell/calls.preflight-passed")" == 3 ]] && (($(cat "$cell"/shards/*.binary-sha256 | sort -u | wc -l) == 1)) && (($(ls "$cell"/shards/*.binary-sha256 | wc -l) == 5)) && [[ -f "$cell/product/e180-admission-reading-versus-writable-bytes-reading.out" ]]'
-  cell="$work/peer-corrupted"; mkdir -p -- "$cell"
-  E180_SELFTEST_PEER_CORRUPTS_BINARY=1 invoke "$cell" 2; exit_code=$?
-  expect "第二台拿到的程序文件与本机的 sha256 不同：第二台一片不跑、本机不合并、退 1" '((exit_code == 1)) && [[ ! -e "$cell/calls.preflight-passed" ]] && ! grep -q "^peer " "$cell/calls" && [[ ! -d "$cell/product" ]] && grep -q "不是同一份" "$cell"/logs/peer-*.log'
+  run_phases "$cell" 2
+  expect "第二台用本机那一份私有副本（同一个绝对路径）：五片旁记的 sha256 只有一种、合并出产物" '[[ "$phase_exits" == "plan=0 shard-0=0 shard-1=0 merge=0" ]] && [[ "$(grep -c "^peer " "$cell/calls")" == 2 ]] && (($(cat "$cell"/shards/*.binary-sha256 | sort -u | wc -l) == 1)) && (($(ls "$cell"/shards/*.binary-sha256 | wc -l) == 5)) && [[ -f "$cell/product/e180-admission-reading-versus-writable-bytes-reading.out" ]]'
   cell="$work/old-binary"; mkdir -p -- "$cell/bin"; cp -- "$fakes/device" "$cell/bin/device"
   INVOKE_BINARY="$cell/bin/device" invoke "$cell" 1; first_exit=$?
   old_sha=$(sha256sum -- "$cell/bin/device" | cut -d' ' -f1)
   echo "# a newer build of the device" >> "$cell/bin/device"
   INVOKE_BINARY="$cell/bin/device" invoke "$cell" 1; exit_code=$?
-  expect "旧装置打的五片全作废：逐片报作废、五片全现跑、旧片连记录整份留在作废目录、片旁记的都是新装置的" '((first_exit == 0 && exit_code == 0)) && grep -q "现跑 5（本机 5、第二台 0）、沿用 0" "$cell/out" && (($(grep -c "^作废：g_.-h.\.shard（装置 sha256 不同）" "$cell/out") == 5)) && (($(find "$cell"/logs/void-* -name "*.shard" | wc -l) == 5)) && (($(find "$cell"/logs/void-* -name "*.binary-sha256" | wc -l) == 5)) && ! grep -q "$old_sha" "$cell"/shards/*.binary-sha256 && (($(cat "$cell"/shards/*.binary-sha256 | sort -u | wc -l) == 1))'
+  expect "旧装置打的五片全作废：逐片报作废、五片全现跑、旧片连记录整份留在作废目录、片旁记的都是新装置的" '((first_exit == 0 && exit_code == 0)) && grep -q "现跑 5、沿用 0" "$cell/out" && (($(grep -c "^作废：g_.-h.\.shard（装置 sha256 不同）" "$cell/out") == 5)) && (($(find "$cell"/logs/void-* -name "*.shard" | wc -l) == 5)) && (($(find "$cell"/logs/void-* -name "*.binary-sha256" | wc -l) == 5)) && ! grep -q "$old_sha" "$cell"/shards/*.binary-sha256 && (($(cat "$cell"/shards/*.binary-sha256 | sort -u | wc -l) == 1))'
   cell="$work/stale-one"; mkdir -p -- "$cell"
   invoke "$cell" 1; exit_code=$?
   printf '%s\n' "$(printf 'f%.0s' {1..64})" > "$cell/shards/g_b-hf.shard.binary-sha256"
   rm -f -- "$cell/shards/g_a-hl.shard.binary-sha256"
-  invoke "$cell" 1; exit_code=$?
-  expect "片旁记的 sha256 不同的、没有记录的片都作废重跑，另外三片沿用" '((exit_code == 0)) && grep -q "现跑 2（本机 2、第二台 0）、沿用 3" "$cell/out" && grep -q "^作废：g_b-hf.shard（装置 sha256 不同）：记的是 f" "$cell/out" && grep -q "^作废：g_a-hl.shard（装置 sha256 不同）：记的是 没有记录" "$cell/out" && (($(wc -l < "$cell/calls") == 7))'
+  : > "$cell/out"; invoke "$cell" 1; exit_code=$?
+  expect "片旁记的 sha256 不同的、没有记录的片都作废重跑，另外三片沿用" '((exit_code == 0)) && grep -q "现跑 2、沿用 3" "$cell/out" && grep -q "^作废：g_b-hf.shard（装置 sha256 不同）：记的是 f" "$cell/out" && grep -q "^作废：g_a-hl.shard（装置 sha256 不同）：记的是 没有记录" "$cell/out" && (($(wc -l < "$cell/calls") == 7))'
   cell="$work/merge-check"; mkdir -p -- "$cell"
   invoke "$cell" 1; exit_code=$?
   printf '%s\n' "$(printf 'f%.0s' {1..64})" > "$cell/shards/g_a-ho.shard.binary-sha256"
@@ -496,16 +473,13 @@ FAKE
 }
 
 mode=run
-local_only=0
 share=""
-SHARD_DIRECTORY="${E180_SHARD_DIRECTORY:-$HOME/.local/share/singlefs/work/e180-shards}"
+SHARD_DIRECTORY="${E180_SHARD_DIRECTORY:-}"
+[[ -n "$SHARD_DIRECTORY" ]] || { work_root_or_stop E180_SHARD_DIRECTORY; SHARD_DIRECTORY="$WORK_ROOT/e180-shards"; }
 BINARY_OPTION=""
-SHIPPED_SHA256=""
 while (($# > 0)); do
   case "$1" in
     --binary) (($# >= 2)) || usage_error "--binary 后面要写装置程序文件"; BINARY_OPTION="$2"; shift 2 ;;
-    --shipped-binary-sha256) (($# >= 2)) || usage_error "--shipped-binary-sha256 后面要写 64 位十六进制"; SHIPPED_SHA256="$2"; shift 2 ;;
-    --local-only) local_only=1; shift ;;
     --host-share) (($# >= 2)) || usage_error "--host-share 后面要写 第几份/共几份"; share="$2"; mode=share; shift 2 ;;
     --merge-only) mode=merge; shift ;;
     --list-items) mode=list; shift ;;
@@ -516,11 +490,6 @@ while (($# > 0)); do
 done
 if [[ "$mode" == share && ! "$share" =~ ^[0-9]+/[1-9][0-9]*$ ]]; then usage_error "--host-share 要写 第几份/共几份（两个整数），给的是「$share」"; fi
 if [[ "$mode" == share ]] && ((${share%/*} >= ${share#*/})); then usage_error "--host-share 的第几份要小于共几份，给的是「$share」"; fi
-
-if [[ -n "$SHIPPED_SHA256" ]]; then
-  [[ "$SHIPPED_SHA256" =~ ^[0-9a-f]{64}$ ]] || usage_error "--shipped-binary-sha256 要写 64 位小写十六进制，给的是「$SHIPPED_SHA256」"
-  [[ -n "$BINARY_OPTION" ]] || usage_error "--shipped-binary-sha256 要与 --binary 合用（核的是送到的那一份程序文件）"
-fi
 
 if [[ "$mode" == selftest ]]; then
   run_selftest
@@ -534,7 +503,7 @@ mkdir -p -- "$LOG_DIRECTORY" "$SHARD_DIRECTORY" || exit 1
 
 if [[ "$mode" == list ]]; then
   BINARY="${BINARY_OPTION:-${E180_BINARY:-$BINARY_DEFAULT}}"
-  [[ -x "$BINARY" ]] || { echo "  ✗ 装置还没编好：$BINARY" >&2; echo "     → 怎么办：先不带 --list-items 跑一次本脚本，或 cargo build --release -p singlefs-checker-tier --bin e180_admission_reading_versus_writable_bytes" >&2; exit 78; }
+  [[ -x "$BINARY" ]] || { echo "  ✗ 装置还没编好：$BINARY" >&2; echo "     → 怎么办：先不带 --list-items 跑一次本脚本，或 cargo build --release -p singlefs-verification --bin e180_admission_reading_versus_writable_bytes" >&2; exit 78; }
   load_shard_list
   PINNED_BINARY_SHA256=$(binary_identity_sha256_of "$BINARY") || { echo "  ✗ 算不出装置程序文件的 sha256（$BINARY）" >&2; echo "     → 怎么办：核这个文件在、当前用户读得了；装置没编好就先 cargo build --release，或用 --binary 给一份编好的" >&2; exit 1; }
   for line in "${SHARD_LINES[@]}"; do
@@ -546,18 +515,53 @@ if [[ "$mode" == list ]]; then
   exit 0
 fi
 
-hosts=1
-if [[ "$mode" == run && "$local_only" == 0 ]]; then
+# 经 task-server 分片（文件头「经 task-server 分片」）：服务起的那一步照 TASK_SERVER_SHARD_PHASE 换用法
+task_server_phase="${TASK_SERVER_SHARD_PHASE:-}"
+plan_directory="${TASK_SERVER_SHARD_PLAN_DIRECTORY:-}"
+case "$task_server_phase" in
+  "") ;;
+  plan|shard|merge)
+    [[ -n "$plan_directory" && -d "$plan_directory" ]] || { echo "  ✗ 服务的 $task_server_phase 那一步没给在的计划目录（TASK_SERVER_SHARD_PLAN_DIRECTORY=${plan_directory:-没设}）" >&2; echo "     → 怎么办：这一步只由 task-server 起；直接跑就去掉 TASK_SERVER_SHARD_PHASE" >&2; exit 2; } ;;
+  *) echo "  ✗ TASK_SERVER_SHARD_PHASE=$task_server_phase 认不出（认 plan、shard、merge）" >&2; echo "     → 怎么办：这个变量只由 task-server 设；直接跑就去掉它" >&2; exit 2 ;;
+esac
+if [[ "$task_server_phase" == plan ]]; then
+  if [[ "$mode" != run ]]; then
+    # 不带参数之外的用法（--merge-only、--host-share）不分：计划写 0 片，合并那一步照用法跑
+    write_plan 0 || exit 1
+    echo "计划：这个用法不分片（0 片），合并那一步照它跑"
+    exit 0
+  fi
+  prepare_binary
+  load_shard_list
   hosts=$(host_count) || exit 1
-  if ((hosts > 2)); then
-    echo "  ✗ 多机配置列了 $hosts 台，multi-host-run.sh --peer 只到得了 PEER 那一台" >&2
-    echo "     → 怎么办：改多机配置，或用 --local-only 只在本机跑、再把别的台跑出的片拷进片目录" >&2
-    exit 78
+  printf '%s\n' "$BINARY" > "$plan_directory/binary" || { echo "  ✗ 计划目录 $plan_directory 写不进私有副本的路径" >&2; echo "     → 怎么办：看那个目录可不可写" >&2; exit 1; }
+  write_plan "$hosts" || exit 1
+  echo "计划：$hosts 片（各片领片号 mod $hosts 的那几片，不钉台、由服务挑机器），私有副本 $BINARY（sha256 $BINARY_SHA256），共 ${#SHARD_LINES[@]} 片装置片"
+  exit 0
+fi
+if [[ "$task_server_phase" == shard ]]; then
+  [[ "${TASK_SERVER_SHARD:-}" =~ ^[0-9]+/[1-9][0-9]*$ ]] || { echo "  ✗ 服务的 shard 那一步没给片号（TASK_SERVER_SHARD=${TASK_SERVER_SHARD:-没设}）" >&2; echo "     → 怎么办：这一步只由 task-server 起" >&2; exit 2; }
+  [[ -z "${TASK_SERVER_SHARD_OUTPUT_DIRECTORY:-}" ]] || mkdir -p -- "$TASK_SERVER_SHARD_OUTPUT_DIRECTORY" || exit 1
+  mode=share share="$TASK_SERVER_SHARD"
+  # 各片用计划那一步拷好的私有副本（两台同一个绝对路径），不自己编；弄坏开关 shard-binary-not-from-plan 下不读计划里的路径
+  if ! break_is shard-binary-not-from-plan; then
+    BINARY_OPTION="$(head -n 1 -- "$plan_directory/binary" 2>/dev/null)"
+    [[ -n "$BINARY_OPTION" ]] || { echo "  ✗ 计划目录里没有私有副本的路径（$plan_directory/binary）" >&2; echo "     → 怎么办：计划那一步没写全：看计划那一步的日志，重交这一件" >&2; exit 1; }
   fi
 fi
+if [[ "$task_server_phase" == merge ]]; then
+  if [[ "$mode" != run ]]; then
+    task_server_phase=""   # 计划写了 0 片的用法：合并那一步照用法跑
+  else
+    mode=merge
+    BINARY_OPTION="$(head -n 1 -- "$plan_directory/binary" 2>/dev/null)"
+    [[ -n "$BINARY_OPTION" ]] || { echo "  ✗ 计划目录里没有私有副本的路径（$plan_directory/binary）" >&2; echo "     → 怎么办：计划那一步没写全：看计划那一步的日志，重交这一件" >&2; exit 1; }
+  fi
+fi
+
 prepare_binary
 load_shard_list
-echo "e180 分片跑法：$hosts 台，这台线程 $THREADS、每片内存上限 $MEMORY_CAP、片目录 $SHARD_DIRECTORY、共 ${#SHARD_LINES[@]} 片"
+echo "e180 分片跑法：这台线程 $THREADS、片目录 $SHARD_DIRECTORY、共 ${#SHARD_LINES[@]} 片"
 
 if [[ "$mode" == merge ]]; then
   for line in "${SHARD_LINES[@]}"; do
@@ -565,59 +569,37 @@ if [[ "$mode" == merge ]]; then
     is_shard_done "$SHARD_DIRECTORY/$name" || { echo "  ✗ 片还没齐：缺 $name" >&2; echo "     → 怎么办：先不带 --merge-only 跑一趟把缺的片做完，再合并" >&2; exit 1; }
   done
   merge_product
+  echo "片齐了：合并出产物（共 ${#SHARD_LINES[@]} 片）"
   exit 0
 fi
 
-# 这台要跑的片：分份时片号 mod 共几份等于第几份；默认跑法时片号 mod 台数等于 0（本机是第 0 台）。做完的沿用。
-this_share=0; share_count=$hosts
+# 这台要跑的片：分份时片号 mod 共几份等于第几份；直接跑（不经服务分片）时全部片都在这一台跑。做完的沿用。
+this_share=0; share_count=1
 if [[ "$mode" == share ]]; then this_share=${share%/*}; share_count=${share#*/}; fi
 break_is host-share-ignored && share_count=1 && this_share=0
 selected=(); reused=0
 for index in "${!SHARD_LINES[@]}"; do
   name="${SHARD_LINES[$index]%%$'\t'*}"
-  in_this_share=0
-  ((index % share_count == this_share)) && in_this_share=1
+  ((index % share_count == this_share)) || continue
   if is_shard_reusable "$SHARD_DIRECTORY/$name"; then
-    # 默认跑法数全部做完的片（第二台那一份里做完的也是沿用）；分份时只数这一份里的。
-    [[ "$mode" == run || "$in_this_share" == 1 ]] && reused=$((reused + 1))
+    reused=$((reused + 1))
     continue
   fi
-  # 做完了而片旁记的装置 sha256 不是这一趟的：移开、这一份里的现跑（默认跑法里谁的份都移开，别台送来的片目录里不留它）。
-  if is_shard_done "$SHARD_DIRECTORY/$name" && [[ "$mode" == run || "$in_this_share" == 1 ]]; then
-    set_aside_stale_shard "$name"
-  fi
-  ((in_this_share)) && selected+=("$index")
+  # 做完了而片旁记的装置 sha256 不是这一趟的：移开、现跑
+  is_shard_done "$SHARD_DIRECTORY/$name" && set_aside_stale_shard "$name"
+  selected+=("$index")
 done
-peer_started=0
-if [[ "$mode" == run ]] && ((hosts == 2)); then
-  start_peer_share
-  peer_started=1
-fi
 run_shards ${selected[@]+"${selected[@]}"}
 if ((${#STOPPED[@]} > 0)); then
   echo "  ✗ ${#STOPPED[@]} 片装置报停机（${STOPPED[*]}）" >&2
   echo "     → 怎么办：该停下，把各片 .out 里 name=stop 那一行交回主 agent，不重跑" >&2
   exit 3
 fi
+((${#FAILED[@]} == 0)) || { echo "  ✗ ${#FAILED[@]} 片没做完（${FAILED[*]}）" >&2; echo "     → 怎么办：看各片的错误输出；同一条命令重起只补没做完的" >&2; exit 1; }
 if [[ "$mode" == share ]]; then
-  ((${#FAILED[@]} == 0)) || { echo "  ✗ ${#FAILED[@]} 片没做完（${FAILED[*]}）" >&2; echo "     → 怎么办：看各片的错误输出；同一条命令重起只补没做完的" >&2; exit 1; }
   echo "这一份（$share）的片做完：现跑 $RAN_NOW、沿用 $reused；片目录 $SHARD_DIRECTORY"
   exit 0
 fi
-IMPORTED=0
-if ((peer_started)); then
-  peer_exit=$(cat -- "$PEER_EXIT_FILE" 2> /dev/null || echo missing)
-  [[ "$peer_exit" == 0 ]] || { echo "  ✗ 第二台那一份退 $peer_exit（日志 $LOG_DIRECTORY/peer-$RUN_STAMP.log）；取回了的片照样并进来" >&2; echo "     → 怎么办：看那份日志；同一条命令重起，第二台没做完的片由重起补" >&2; }
-  import_peer_shards
-  [[ "$peer_exit" == 3 ]] && { echo "  ✗ 第二台那一份里装置报停机" >&2; echo "     → 怎么办：该停下，把第二台日志里 name=stop 那一行交回主 agent，不重跑" >&2; exit 3; }
-fi
-((${#FAILED[@]} == 0)) || { echo "  ✗ ${#FAILED[@]} 片没做完（${FAILED[*]}）" >&2; echo "     → 怎么办：看各片的错误输出；同一条命令重起只补没做完的" >&2; exit 1; }
-missing=()
-for line in "${SHARD_LINES[@]}"; do
-  name="${line%%$'\t'*}"
-  is_shard_done "$SHARD_DIRECTORY/$name" || missing+=("$name")
-done
-((${#missing[@]} == 0)) || { echo "  ✗ 片还没齐：缺 ${missing[*]}" >&2; echo "     → 怎么办：同一条命令重起只补没做完的" >&2; exit 1; }
 merge_product
-echo "片齐了：现跑 $((RAN_NOW + IMPORTED))（本机 $RAN_NOW、第二台 $IMPORTED）、沿用 $reused（共 ${#SHARD_LINES[@]} 片）"
+echo "片齐了：现跑 $RAN_NOW、沿用 $reused（共 ${#SHARD_LINES[@]} 片）"
 exit 0

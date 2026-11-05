@@ -26,8 +26,65 @@ run_wrapped 的合同：
   开跑前把两份日志截成空的（旧的不残留）；收尾往 problems 日志写一行「收了几行、全量几行、退出码」，再往标准错误打一行两份日志的路径（--quiet 不打）。
 退出码：被包命令的；125 用法不对或这一份自己出了问题（同 env 的约定）；126 命令起不来（没有执行权限）；127 找不到命令。
 
-弄坏开关 TWO_LOGS_BREAK=<项>（逗号分隔，只给自证证红；认不出的项直接拒，退 125）：逐个写在 two-logs.sh 文件头，连同打开后红的格；
+弄坏开关 TWO_LOGS_BREAK=<项>（逗号分隔，只给自证证红；认不出的项直接拒，退 125；平常跑设了就在参数解析之前退 2、点名变量只在自证里认，自证起的子进程由 TWO_LOGS_SELFTEST_MARK 认）：
+逐个写在 two-logs.sh 文件头（自证核那里的写法），这里照 mutate.sh 的写法抄一份，连同打开后红的格；
 自证不设开关时末了跑开关轮，逐个打开、核红的格与 BREAK_RED_CELLS 逐字相等，开关名都要写在 two-logs.sh 文件头里。
+  TWO_LOGS_BREAK=fail-mark-ignored  不认 ✗ 行
+      红：「✗ 行连同明细与出路」「✗ 之后的 → 出路行到下一处非 → 续行为止」「明细超过上限只收到上限并说明」
+  TWO_LOGS_BREAK=fail-arrow-dropped  ✗ 与 ⚠ 后面的 → 出路行不收
+      红：「✗ 行连同明细与出路」「✗ 之后的 → 出路行到下一处非 → 续行为止」「⚠ 行连同出路」「明细超过上限只收到上限并说明」
+  TWO_LOGS_BREAK=fail-details-dropped  ✗ 之后的明细与 → 之后的续行不收
+      红：「✗ 行连同明细与出路」「明细超过上限只收到上限并说明」
+  TWO_LOGS_BREAK=warn-mark-ignored  不认 ⚠ 行
+      红：「⚠ 行连同出路」
+  TWO_LOGS_BREAK=not-run-ignored  不认「本次未跑」行
+      红：「本次未跑的行」
+  TWO_LOGS_BREAK=summary-ignored  不收汇总段
+      红：「逐格汇总段」
+  TWO_LOGS_BREAK=cargo-error-ignored  不认 cargo 的 error 行
+      红：「cargo error 连同 --> 行」
+  TWO_LOGS_BREAK=cargo-warning-ignored  不认 cargo 的 warning: 行
+      红：「cargo warning 连同 --> 行」
+  TWO_LOGS_BREAK=cargo-location-dropped  不收 error、warning 下面的 --> 行
+      红：「cargo error 连同 --> 行」「cargo warning 连同 --> 行」
+  TWO_LOGS_BREAK=libtest-failed-ignored  不认 FAILED
+      红：「libtest FAILED 与 panicked」
+  TWO_LOGS_BREAK=panicked-ignored  不认 panicked
+      红：「libtest FAILED 与 panicked」
+  TWO_LOGS_BREAK=traceback-body-dropped  只收 Traceback 起头那一行，栈帧与异常行不收
+      红：「Python Traceback 整段」
+  TWO_LOGS_BREAK=exit-code-ignored  不认报非 0 退出码的行
+      红：「报非 0 退出码的行」
+  TWO_LOGS_BREAK=collect-everything  什么行都收
+      红：筛选一侧每一格
+  TWO_LOGS_BREAK=line-number-missing  problems 日志的行不带行号
+      红：「problems 日志的行带行号、末行写收了几行全量几行」「没有换行的最后一行」「非 UTF-8 字节原样转打」
+  TWO_LOGS_BREAK=footer-missing  不写收尾行
+      红：「problems 日志的行带行号、末行写收了几行全量几行」
+  TWO_LOGS_BREAK=exit-code-lost  退出码恒为 0
+      红：「退出码原样交回」「入口脚本 two-logs.sh 转参数、交退出码」
+  TWO_LOGS_BREAK=stdout-not-forwarded  不转打标准输出
+      红：「标准输出与标准错误各自照原样转打、全量日志收全」「非 UTF-8 字节原样转打」「入口脚本 two-logs.sh 转参数、交退出码」
+  TWO_LOGS_BREAK=stderr-not-forwarded  不转打标准错误
+      红：「标准输出与标准错误各自照原样转打、全量日志收全」
+  TWO_LOGS_BREAK=stderr-merged-into-stdout  标准错误并进标准输出转打
+      红：「标准输出与标准错误各自照原样转打、全量日志收全」
+  TWO_LOGS_BREAK=full-log-skips-stderr  全量日志不收标准错误
+      红：「标准输出与标准错误各自照原样转打、全量日志收全」「problems 日志的行带行号、末行写收了几行全量几行」
+  TWO_LOGS_BREAK=partial-line-dropped  没有换行的最后一行丢掉
+      红：「没有换行的最后一行」
+  TWO_LOGS_BREAK=stale-logs-kept  开跑前不截旧日志
+      红：「旧日志不残留」
+  TWO_LOGS_BREAK=signal-not-forwarded  SIGTERM 不转给被包的命令
+      红：「SIGTERM 转给被包的命令」
+  TWO_LOGS_BREAK=drain-unbounded  被包命令退出后一直等管道关
+      红：「后台孙进程占着管道不挂住」
+  TWO_LOGS_BREAK=quiet-forwards  --quiet 也转打
+      红：「--quiet 只写日志不转打」
+  TWO_LOGS_BREAK=strict-decoding  按 UTF-8 严格解码，遇到非 UTF-8 字节就崩
+      红：「非 UTF-8 字节原样转打」
+  TWO_LOGS_BREAK=sigint-ignored-inherited  本进程用 SIG_IGN 忽略 SIGINT（被包的命令 exec 之后继承「不理 Ctrl-C」）
+      红：「被包的命令的 SIGINT 仍是默认处置」
 """
 import concurrent.futures
 import math
@@ -390,7 +447,24 @@ def usage_error(message):
     return EXIT_USAGE
 
 
+SELFTEST_MARK_VARIABLE = "TWO_LOGS_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "two_logs.py --selftest 起的子进程"
+
+
+def refuse_break_outside_selftest(argv):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest、环境里也没有自证留的标记（自证起的子进程）而 TWO_LOGS_BREAK 非空，参数解析之前就拒，交回退出码 2；放行交回 None。"""
+    value = os.environ.get("TWO_LOGS_BREAK", "")
+    if not value or argv == ["--selftest"] or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    sys.stderr.write(f"  ✗ two-logs：TWO_LOGS_BREAK={value} 是弄坏开关，只在自证（two-logs.sh --selftest）里认，平常跑设了就拒，这一趟什么都没做\n"
+                     "     → 怎么办：去掉 TWO_LOGS_BREAK 再跑；要证红就跑 TWO_LOGS_BREAK=<项> bash scripts/hosts/two-logs.sh --selftest。\n")
+    return 2
+
+
 def main(argv):
+    refused = refuse_break_outside_selftest(argv)
+    if refused is not None:
+        return refused
     try:
         breaks = parse_breaks(os.environ.get("TWO_LOGS_BREAK", ""))
     except ValueError as error:
@@ -512,11 +586,13 @@ def relay_cells(scratch, breaks):
     directory = scratch
     shim = os.path.join(os.path.dirname(os.path.abspath(__file__)), "two-logs.sh")
 
-    def wrapped(name, shell_text, quiet=False, extra_environment=None, timeout=20):
+    def wrapped(name, shell_text, quiet=False, extra_environment=None, timeout=20, sigint_default=False):
+        """sigint_default：起 two-logs 之前在子进程里把 SIGINT 设回默认处置（调用方继承来的「忽略」不带进去）。"""
         arguments = (["--quiet"] if quiet else []) + [os.path.join(directory, name), "--", "bash", "-c", shell_text]
         combined = dict(environment)
         combined.update(extra_environment or {})
-        completed = subprocess.run([sys.executable, "-B", os.path.abspath(__file__)] + arguments, capture_output=True, env={**os.environ, **combined}, timeout=timeout)
+        completed = subprocess.run([sys.executable, "-B", os.path.abspath(__file__)] + arguments, capture_output=True, env={**os.environ, **combined}, timeout=timeout,
+                                   preexec_fn=(lambda: signal.signal(signal.SIGINT, signal.SIG_DFL)) if sigint_default else None)
         return completed
 
     def log_lines(name, suffix):
@@ -654,10 +730,9 @@ def relay_cells(scratch, breaks):
     cells.append(("SIGTERM 转给被包的命令", signal_goes_to_command))
 
     def sigint_stays_default_in_command():
-        baseline = subprocess.run(["grep", "SigIgn", "/proc/self/status"], capture_output=True, timeout=20).stdout.decode().split()
-        if baseline and int(baseline[-1], 16) & (1 << (signal.SIGINT - 1)):
-            return ""   # 自证自己就是在忽略 SIGINT 的环境里起的（后台作业），分不出继承来的，这一格不判
-        wrapped("sigint", "grep SigIgn /proc/self/status")
+        # 场景自己造：起 two-logs 时 SIGINT 设回默认。自证常在 SIGINT 已被忽略的环境里起（服务经 systemd 单元起、后台作业），
+        #   不设回的话命令里看到的「忽略」分不出是继承来的还是 two-logs 弄的，开关 sigint-ignored-inherited 也看不出红
+        wrapped("sigint", "grep SigIgn /proc/self/status", sigint_default=True)
         logged = (log_lines("sigint", ".log") or [""])[0]   # 读全量日志，不读转打的输出：转打坏了不连累这一格
         words = logged.split()
         if not words or int(words[-1], 16) & (1 << (signal.SIGINT - 1)):
@@ -780,6 +855,7 @@ def expected_red_cells(break_name):
 
 
 def selftest(breaks):
+    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 自证另起的 two_logs.py 子进程（环境原样继承）靠它认：弄坏开关只在自证里认
     failures = []
 
     def fail(label, reason):

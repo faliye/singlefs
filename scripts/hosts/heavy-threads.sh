@@ -16,13 +16,17 @@
 #     「<正整数><空格或制表符>#<理由>」（理由不空），打那个数；文件不在、读不了、没有非注释行、那一行不是这个形状，都拒。
 #   拒了不退回按核数算。
 #
-# 弄坏开关 HEAVY_THREADS_BREAK=<项>（逗号分隔，只给自证证红；scripts/hosts/heavy_threads.py 认同样的名字），
+# 弄坏开关 HEAVY_THREADS_BREAK=<项>（逗号分隔，只给自证证红；scripts/hosts/heavy_threads.py 认同样的名字）。只在自证里认：直接执行时平常跑设了就在一切之前退 2、点名变量只在自证里认；
+# source 进来用的库函数只在自证设了 HEAVY_COUNT_SELFTEST_MARK（起的子进程环境原样继承）时认，外面漏进来的开关改不了别的脚本取到的线程数。
 # 打开后自证哪几格红（失败行「✗ heavy-threads.sh 自证：<格名>：…」）：
-#   cap-unchecked                         SINGLEFS_THREAD_CAP 原样打出、不判正整数：「SINGLEFS_THREAD_CAP=0 拒」「SINGLEFS_THREAD_CAP=abc 拒」
-#   missing-registration-uses-core-count  登记文件不在时照改前取本机核数：「登记文件不在拒」
+#   HEAVY_THREADS_BREAK=cap-unchecked  SINGLEFS_THREAD_CAP 原样打出、不判正整数
+#       「✗ heavy-threads.sh 自证：SINGLEFS_THREAD_CAP=0 拒」、「✗ heavy-threads.sh 自证：SINGLEFS_THREAD_CAP=abc 拒」
+#   HEAVY_THREADS_BREAK=missing-registration-uses-core-count  登记文件不在时照改前取本机核数
+#       「✗ heavy-threads.sh 自证：登记文件不在拒」
 
+# 弄坏开关只在自证里认（自证设 HEAVY_COUNT_SELFTEST_MARK 才认）：这份库被很多脚本 source，外面漏进来的开关不许改它们取到的线程数。
 heavy_threads_break_is_set() {
-  [[ ",${HEAVY_THREADS_BREAK:-}," == *",$1,"* ]]
+  [[ "${HEAVY_COUNT_SELFTEST_MARK:-}" == heavy-threads-selftest && ",${HEAVY_THREADS_BREAK:-}," == *",$1,"* ]]
 }
 
 # heavy_thread_default：打每台默认重活线程数（判法在文件头）。
@@ -35,7 +39,7 @@ heavy_thread_default() {
       return 0
     fi
     echo "  ✗ SINGLEFS_THREAD_CAP=$cap 不是正整数，取不了每台默认重活线程数" >&2
-    echo "     → 怎么办：设成正整数（经 bash scripts/hosts/capped.sh <N> 起就是 N），或 unset 它取 .claude/heavy-thread-default 的登记值" >&2
+    echo "     → 怎么办：unset 它，取 .claude/heavy-thread-default 的登记值（线程固定取登记值，SINGLEFS_THREAD_CAP 由 task-server 套的 capped.sh 设，调用方不设）" >&2
     return 2
   fi
   directory="${BASH_SOURCE[0]%/*}"
@@ -44,7 +48,7 @@ heavy_thread_default() {
   if [[ ! -f "$registration" ]]; then
     if heavy_threads_break_is_set missing-registration-uses-core-count; then nproc; return 0; fi
     echo "  ✗ 每台默认重活线程数的登记文件 $registration 不在" >&2
-    echo "     → 怎么办：在仓根建 .claude/heavy-thread-default，第一条非注释行写「31  # <理由>」（写法在仓里那一份的文件头）；临时要别的数设 SINGLEFS_THREAD_CAP 或经 capped.sh <N> 起，不退回按核数算" >&2
+    echo "     → 怎么办：在仓根建 .claude/heavy-thread-default，第一条非注释行写「31  # <理由>」（写法在仓里那一份的文件头）；不退回按核数算" >&2
     return 2
   fi
   if [[ ! -r "$registration" ]]; then
@@ -96,6 +100,7 @@ except heavy_threads.HeavyThreadDefaultError:
 
 heavy_threads_selftest() {
   local here tree index=0 checked=0 failures=0 label registration cap want got rc python_got real_value printed
+  export HEAVY_COUNT_SELFTEST_MARK=heavy-threads-selftest   # 起的子进程（source 的取值、--print、heavy_threads.py，环境原样继承）靠它认：弄坏开关只在自证里认
   here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
   heavy_threads_selftest_scratch="$(mktemp -d)" || { echo "  ✗ heavy-threads.sh 自证：建不了临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限"; return 1; }
   trap 'rm -rf "${heavy_threads_selftest_scratch:?}"' EXIT
@@ -171,6 +176,12 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   set -uo pipefail
   source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
   preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+  # 弄坏开关只在自证里认：命令行不是单独一个 --selftest、也不是自证起的子进程（HEAVY_COUNT_SELFTEST_MARK 对得上）而变量非空，参数解析之前就退 2（不管值是什么）。
+  if [[ -n "${HEAVY_THREADS_BREAK:-}" && ! ( "$#" -eq 1 && "${1:-}" == --selftest ) && "${HEAVY_COUNT_SELFTEST_MARK:-}" != heavy-threads-selftest ]]; then
+    echo "  ✗ 弄坏开关 HEAVY_THREADS_BREAK=${HEAVY_THREADS_BREAK:-} 只在自证（bash scripts/hosts/heavy-threads.sh --selftest）里认，平常跑设了就拒，这一趟什么都没做" >&2
+    echo "     → 怎么办：去掉 HEAVY_THREADS_BREAK 再跑；要证红就跑 HEAVY_THREADS_BREAK=<项> bash scripts/hosts/heavy-threads.sh --selftest" >&2
+    exit 2
+  fi
   case "${1:-}" in
     --selftest) heavy_threads_selftest; exit $? ;;
     --print) heavy_thread_default; exit $? ;;

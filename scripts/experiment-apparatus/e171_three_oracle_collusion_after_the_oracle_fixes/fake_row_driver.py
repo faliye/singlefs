@@ -3,7 +3,7 @@
 row-result.tsv、device.out、dump/<流>/ 五个文件、o3.out），不编、不跑装置。限时与快照摘要用真的 device_timing.row_time_limit_seconds 与
 row_driver.snapshot_digest（FAKE_RESEARCH_DIRECTORY 指到真的驱动目录）。
 环境变量：FAKE_DRIVER_LOG（每行追加一行 ran / skipped / failed）、FAKE_DRIVER_HOST（台号，默认 1）、FAKE_DRIVER_ROW_SECONDS（每行睡几秒）、
-FAKE_DRIVER_TIMEOUT_ROWS（这几行 device_exit=253，带 --rerun-of-timed-out-rows 时不超时）、FAKE_DRIVER_FAIL_ROWS（这几行驱动出错、不写 row-result.tsv、退 1）、
+FAKE_DRIVER_TIMEOUT_ROWS（这几行 device_exit=253；同一输出根里同键的上一次结果是超时的行，这一趟限时乘 3、不超时）、FAKE_DRIVER_FAIL_ROWS（这几行驱动出错、不写 row-result.tsv、退 1）、
 FAKE_DRIVER_SALT_HOST 与 FAKE_DRIVER_SALT_PART（在那一台上往 device / dump / o3 / row 那一样里掺一个不同）。
 第二段（rows_orchestrator_segment_two.py）另用：--no-executor（不写 o3.out、o3_status=skipped_by_request、不打 freeze_check 行，同真驱动）；
 --other-selected-rows（可给几次，名字用真的 bad_implementation_table.read_selected_rows 读，补位时跳过）；
@@ -70,27 +70,37 @@ def substitution_fields(arguments, number, name):
 
 def run_row(arguments, number, host):
     row_directory = os.path.join(arguments.output_root, f"row-{number}")
-    if arguments.skip_finished and os.path.isdir(row_directory):
-        if os.path.exists(os.path.join(row_directory, "row-result.tsv")):
-            log(f"skipped row={number} host={host} root={os.path.basename(arguments.output_root)}")
-            return dict(line.rstrip("\n").split("\t", 1) for line in open(os.path.join(row_directory, "row-result.tsv"), encoding="utf-8"))
+    name = f"假 第 {number} 行{' 掺' if salted('row') else ''}"
+    # 按键复用，照真驱动（row_driver.py）：同键、做完了、不是编不过 / 测量管子缺陷 / 超时的行目录直接读回；别的行目录先清再做；上一次同键是超时的，限时乘 3
+    key = row_driver.reuse_key_of(arguments, number, name)
+    earlier = row_driver.earlier_result_with_the_key(row_directory, key)
+    if earlier is not None and row_driver.result_is_reusable(earlier):
+        log(f"reused row={number} host={host} root={os.path.basename(arguments.output_root)}")
+        return earlier
+    timed_out_before = ((earlier is not None and earlier.get("device_exit") == str(row_driver.ROW_TIMEOUT_EXIT_CODE))
+                        or row_driver.marked_as_timed_out_before(row_directory, key))
+    if os.path.isdir(row_directory):
         shutil.rmtree(row_directory)
     os.makedirs(row_directory)
+    if timed_out_before:
+        with open(os.path.join(row_directory, row_driver.TIMED_OUT_MARKER_FILE), "w", encoding="utf-8") as handle:
+            handle.write(key + "\n")
     time.sleep(float(os.environ.get("FAKE_DRIVER_ROW_SECONDS", "0")))
     if number in numbers("FAKE_DRIVER_FAIL_ROWS"):
         log(f"failed row={number} host={host}")
         return {"row_number": number, "status": "driver_error", "error": "fake"}
-    name = f"假 第 {number} 行{' 掺' if salted('row') else ''}"
     substitution, runnable = substitution_fields(arguments, number, name)
     if not runnable:
-        fields = {"row_number": number, "row_name": name, "lane": 0, "line_matches_the_registration": "false", **substitution, "status": "compile_failed",
+        fields = {"row_number": number, "row_name": name, "lane": 0, row_driver.REUSE_KEY_FIELD: key, "line_matches_the_registration": "false", **substitution,
+                  "status": "compile_failed",
                   "device_exit": "-", "copy_ns": 1, "compile_ns": 1, "compile_kind": "cold", "device_ns": "-", "o3_ns": "-", "o3_status": "not_reached"}
         with open(os.path.join(row_directory, "row-result.tsv"), "w", encoding="utf-8") as handle:
             for key, value in fields.items():
                 handle.write(f"{key}\t{value}\n")
-        log(f"ran row={number} host={host} root={os.path.basename(arguments.output_root)} rerun={str(arguments.rerun_of_timed_out_rows).lower()}")
+        log(f"ran row={number} host={host} root={os.path.basename(arguments.output_root)} rerun={str(timed_out_before).lower()}")
         return fields
-    exit_code = 253 if number in numbers("FAKE_DRIVER_TIMEOUT_ROWS") and not arguments.rerun_of_timed_out_rows else 0
+    time_limit_seconds = device_timing.row_time_limit_seconds(arguments.baseline_process_wall_seconds, timed_out_before)
+    exit_code = 253 if number in numbers("FAKE_DRIVER_TIMEOUT_ROWS") and not timed_out_before else 0
     probe = "true" if arguments.writable_mount_probe else "false"
     with open(os.path.join(row_directory, "device.out"), "w", encoding="utf-8") as handle:
         handle.write(f"E7RESULT name=config segment=s1 mode=row streams={arguments.streams} writable_mount_probe={probe}\n")
@@ -108,12 +118,13 @@ def run_row(arguments, number, host):
             handle.write(f"name=load stream=new_pool_file_creation load_ns={random.randint(1, 10**9)} ops=3\n")
             handle.write(f"name=verdict_summary row={number} strict_not_in=0{' salt=1' if salted('o3') else ''}\n")
             handle.write(f"name=state_time batch=1 workers={arguments.threads}\n")
-    fields = {"row_number": number, "row_name": name, "lane": 0, "packages_checked_rebuilt": "crates/singlefs-core",
+    fields = {"row_number": number, "row_name": name, "lane": 0, row_driver.REUSE_KEY_FIELD: key, "packages_checked_rebuilt": "crates/singlefs-core",
               "substituted_from": substitution["substituted_from"], "line_matches_the_registration": "true" if substitution["substituted_from"] == "-" else "false",
               "mutated_row_name": substitution["mutated_row_name"], "failed_attempts": substitution["failed_attempts"],
               **{key: value for key, value in substitution.items() if key.startswith("failed_attempt_")},
               "mutation_line_sha256": hashlib.sha256(str(number).encode()).hexdigest(), "copy_ns": random.randint(1, 10**6),
-              "compile_ns": random.randint(1, 10**9), "compile_kind": "cold", "status": "ok", "device_exit": exit_code, "device_ns": random.randint(1, 10**9)}
+              "compile_ns": random.randint(1, 10**9), "compile_kind": "cold", "status": "ok", "device_exit": exit_code, "device_ns": random.randint(1, 10**9),
+              "time_limit_seconds": time_limit_seconds, "timed_out_before": str(timed_out_before).lower()}
     if exit_code == 0 and arguments.no_executor:
         fields.update({"o3_status": "skipped_by_request", "o3_exit": "-", "o3_ns": "-", "o3_streams": "-"})
     elif exit_code == 0:
@@ -123,7 +134,7 @@ def run_row(arguments, number, host):
     with open(os.path.join(row_directory, "row-result.tsv"), "w", encoding="utf-8") as handle:
         for key, value in fields.items():
             handle.write(f"{key}\t{value}\n")
-    log(f"ran row={number} host={host} root={os.path.basename(arguments.output_root)} rerun={str(arguments.rerun_of_timed_out_rows).lower()}")
+    log(f"ran row={number} host={host} root={os.path.basename(arguments.output_root)} rerun={str(timed_out_before).lower()}")
     return fields
 
 
@@ -135,22 +146,23 @@ def main():
     parser.add_argument("--streams", default="1,2,3")
     parser.add_argument("--threads", type=int, default=6)
     parser.add_argument("--lanes", type=int, default=1)
-    parser.add_argument("--memory-cap", default="4G")
-    for flag in ("--empty-mutation", "--writable-mount-probe", "--keep-dumps", "--skip-finished", "--rerun-of-timed-out-rows", "--no-executor"):
+    for flag in ("--empty-mutation", "--writable-mount-probe", "--keep-dumps", "--no-executor"):
         parser.add_argument(flag, action="store_true")
     parser.add_argument("--other-selected-rows", action="append", default=[])
+    parser.set_defaults(positive_control=None, disable_oracle=None, o3_control_bad_states=None)   # 复用键里的项，真驱动有这几个参数、这里固定为没给
     arguments = parser.parse_args()
     if os.path.exists(arguments.timing_output):
         parser.error("timing output exists")
     baseline = device_timing.read_baseline_timing(open(arguments.baseline_timing, encoding="utf-8").read().splitlines())
-    limit = device_timing.row_time_limit_seconds(baseline.process_wall_seconds, arguments.rerun_of_timed_out_rows)
-    print(f"name=row_time_limit seconds={limit} baseline_seconds={baseline.process_wall_seconds:.3f} source={os.path.basename(arguments.baseline_timing)} "
-          f"rerun_of_timed_out_rows={str(arguments.rerun_of_timed_out_rows).lower()}", flush=True)
+    arguments.baseline_process_wall_seconds = baseline.process_wall_seconds
+    limit = device_timing.row_time_limit_seconds(baseline.process_wall_seconds, False)
+    print(f"name=row_time_limit seconds={limit} baseline_seconds={baseline.process_wall_seconds:.3f} source={os.path.basename(arguments.baseline_timing)}", flush=True)
     if not arguments.no_executor:
         print("freeze_check before=true differences=0 detail=none")
     snapshot_root = os.path.join(arguments.work_root, "snapshot")
     row_driver.sync_tree(arguments.snapshot_from, snapshot_root)
     digest, count = row_driver.snapshot_digest(snapshot_root)
+    arguments.snapshot_digest = digest
     jobs = ([0] if arguments.empty_mutation else []) + sorted(int(token) for token in arguments.rows.split(",") if token)
     print(f"snapshot_digest={digest} files={count} snapshot_ns={random.randint(1, 10**6)} rows={len(jobs)}")
     os.makedirs(arguments.output_root, exist_ok=True)

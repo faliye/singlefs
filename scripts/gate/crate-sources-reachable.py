@@ -22,13 +22,20 @@
 
 退出码：0 每一份都有着落；1 有落空的（逐份列出）；2 用法错；77 给的目录里一份 .rs 都没有。
 
-弄坏开关 CRATE_SOURCES_REACHABLE_BREAK=<开关>（只给 --selftest 用，--selftest 之外不认）：
-  ignore-path-attributes   不认 #[path = "…"]：path-attribute 那一格该红
-  ignore-mod-declarations  不认不带 #[path] 的 mod <名>;：mod-declaration 那一格该红
-  ignore-automatic-targets 不认自动发现的目标：automatic-target 那一格该红
-  non-mod-rs-like-root     非 mod.rs 文件里的 mod <名>; 也按所在目录找：nested-module 那一格该红
-  ignore-text-includes     不认 include_str!、include_bytes!：text-include 那一格该红
-  pass-orphans             落空的不报：orphan-reported 那一格该红
+弄坏开关（只给自证用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认；自证自带开关轮，逐个设上起 --selftest-inner，
+红的格逐条以「✗ 自证 <格名>：」起头；单跑一条：CRATE_SOURCES_REACHABLE_BREAK=<开关> python3 scripts/gate/crate-sources-reachable.py --selftest-inner）：
+  CRATE_SOURCES_REACHABLE_BREAK=ignore-path-attributes  不认 #[path = "…"]
+      「✗ 自证 all-reachable：」「✗ 自证 orphan-reported：」「✗ 自证 path-attribute：」
+  CRATE_SOURCES_REACHABLE_BREAK=ignore-mod-declarations  不认不带 #[path] 的 mod <名>;
+      「✗ 自证 all-reachable：」「✗ 自证 orphan-reported：」「✗ 自证 mod-declaration：」「✗ 自证 nested-module：」
+  CRATE_SOURCES_REACHABLE_BREAK=ignore-automatic-targets  不认自动发现的目标
+      「✗ 自证 all-reachable：」「✗ 自证 orphan-reported：」「✗ 自证 automatic-target：」
+  CRATE_SOURCES_REACHABLE_BREAK=non-mod-rs-like-root  非 mod.rs 文件里的 mod <名>; 也按所在目录找
+      「✗ 自证 all-reachable：」「✗ 自证 orphan-reported：」「✗ 自证 nested-module：」
+  CRATE_SOURCES_REACHABLE_BREAK=ignore-text-includes  不认 include_str!、include_bytes!
+      「✗ 自证 all-reachable：」「✗ 自证 orphan-reported：」「✗ 自证 text-include：」
+  CRATE_SOURCES_REACHABLE_BREAK=pass-orphans  落空的不报
+      「✗ 自证 orphan-reported：」
 """
 import glob
 import os
@@ -278,6 +285,39 @@ def main(arguments):
     return judge(directories, base)
 
 
+BREAK_VARIABLES = ("CRATE_SOURCES_REACHABLE_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头（--selftest-inner 同）；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] in (["--selftest"], ["--selftest-inner"]) or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 python3 scripts/gate/crate-sources-reachable.py --selftest（开关轮逐个打开）", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

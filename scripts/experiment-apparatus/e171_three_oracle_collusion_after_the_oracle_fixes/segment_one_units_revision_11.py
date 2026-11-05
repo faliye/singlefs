@@ -2,8 +2,8 @@
 """E171 第 1 次重跑·修订 11：修订 8 那一趟第 0–10 步按单元编排，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.4、11.5、11.9、11.10 节
 与其后「主 agent 认定：修订 11 交回」）。由 run_segment_one_revision_11_multi_host.sh 起，在仓根跑。
 
-为什么另写一层：segment_one_units_revision_8.py 与单元脚本 segment_one_unit_revision_8.sh 一个字节不改（前者改成线程额度取登记值之后按现内容重钉了
-UNITS_R8_SHA256，原钉 cc52fcfc…）。这一层按路径载入前者（开跑先核 sha256，
+为什么另写一层：segment_one_units_revision_8.py 与单元脚本 segment_one_unit_revision_8.sh 一个字节不改（第 2 次重跑登记修订 7、8 改了前者的线程分法、
+删了两份里的线程包装，之后按现内容重钉了 UNITS_R8_SHA256，现钉的值就是那个常量）。这一层按路径载入前者（开跑先核 sha256，
 不是就退 3），单元表、依赖、次序与资源、续跑、一步停、逐行编排的起法都调它原来的函数；改的只有第 11.10 节表那几处：
   ① 单元脚本换成 segment_one_unit_revision_11.sh（修订 8 那份照抄，只在读数进程那几处加取用），逐行编排换成 rows_orchestrator_revision_11.py
     （修订 11 占位的路径经环境变量 E171_REVISION_11_CONFIG 交给它）；
@@ -25,10 +25,15 @@ UNITS_R8_SHA256，原钉 cc52fcfc…）。这一层按路径载入前者（开�
 退出码：同修订 8 单元编排（0、1、2、78、143）；另 3：segment_one_units_revision_8.py 不是钉的那一份；账本 N + M 不等于登记数退 1。
 
 自证只换假件的变量（只在 UNITS_R11_SELFTEST=1 时认，另带修订 8 的 UNITS_R8_* 与 reuse_library 的 REUSE_SELFTEST_*）：UNITS_R11_FAKE_* 交给假单元脚本。
-弄坏开关 UNITS_R11_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认）。项名、弄坏哪一处、打开后红在哪一格：
-  h31-unchecked          不核 H31（没填也起跑）                         h31-refused
-  s18-ignored            S18 触发了照样记绿、库不冻                     s18-stops
-  sweep-skipped、temporary-kept（自证外壳 revision_8_selftest_harness.py 的两个）     no-leftover-processes、temporary-directory-removed
+弄坏开关 UNITS_R11_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
+  UNITS_R11_BREAK=h31-unchecked  不核 H31（没填也起跑）
+      「✗ 自证 h31-refused：」
+  UNITS_R11_BREAK=s18-ignored  S18 触发了照样记绿、库不冻
+      「✗ 自证 s18-stops：」
+  UNITS_R11_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  UNITS_R11_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 
@@ -37,7 +42,6 @@ import dataclasses
 import importlib.util
 import json
 import os
-import shlex
 import subprocess
 import sys
 import types
@@ -47,13 +51,14 @@ sys.path.insert(0, HERE)
 import device_timing  # noqa: E402
 import frozen_tree_lines_revision_8 as judge  # noqa: E402
 import reuse_library as reuse  # noqa: E402
+import reuse_library_root as library_roots  # noqa: E402
 import revision_8_selftest_harness as harness  # noqa: E402
 
 BREAK_VARIABLE = "UNITS_R11_BREAK"
 SELFTEST_VARIABLE = "UNITS_R11_SELFTEST"
 CONFIG_VARIABLE = "E171_REVISION_11_CONFIG"
 UNITS_R8_PATH = os.path.join(HERE, "segment_one_units_revision_8.py")
-UNITS_R8_SHA256 = "be014e3334d494e4f947ef3de367461a5d2c48fe5fdb01a4be0facefe3e74537"
+UNITS_R8_SHA256 = "b2d4c89a8e1a7c63c264d5841d4f5e3bedfe405df91d7fadf525229c71f7411f"
 UNIT_SCRIPT = os.path.join(HERE, "segment_one_unit_revision_11.sh")
 ROWS_ORCHESTRATOR = os.path.join(HERE, "rows_orchestrator_revision_11.py")
 EXIT_WRONG_PINNED_FILE = 3
@@ -106,16 +111,16 @@ class ReuseState:
     inputs_error: str = ""
 
 
-STATE: dict = {"reuse": None}
+STATE: dict = {"reuse": None, "library_root_problem": ""}
 ORIGINAL = {"unit_table": units8.unit_table, "unit_environment": units8.unit_environment, "finish_unit": units8.finish_unit,  # 逐个点名留下原件
             "run": units8.run, "plan": units8.plan}
 
 
 # ── 换进修订 8 单元编排的几处（configure 一次装好；那边的函数按模块全局名取，换了就用这里的）──
 def unit_table_with_selfproof() -> dict:
-    """修订 8 的单元表加 reuse-selfproof（RP2，依赖 step-0；只打 S1 常量的三趟 stream-constants，内存照 CAP_SMALL）。"""
+    """修订 8 的单元表加 reuse-selfproof（RP2，依赖 step-0；只打 S1 常量的三趟 stream-constants）。"""
     units = ORIGINAL["unit_table"]()
-    units[SELFPROOF_UNIT] = units8.Unit(SELFPROOF_UNIT, ("step-0",), units8.THREADS, units8.bytes_of(units8.CAP_SMALL), 300)
+    units[SELFPROOF_UNIT] = units8.Unit(SELFPROOF_UNIT, ("step-0",), units8.READING_UNIT_THREADS, 300)
     return units
 
 
@@ -226,7 +231,7 @@ def finish_with_insertion(settings, item, intervals) -> bool:
         else:
             insertable = reuse.device_exit_insertable(int(exit_text), unit.expected_exits) if exit_text.lstrip("-").isdigit() else (False, "no-exit")
         meta = {"exit": exit_text, "origin_run": f"{settings.prefix}{settings.suffix}", "origin_product": f"{step}{units8.attempt_tag(item.attempt)}",
-                "origin_host": "1", "threads": str(units8.THREADS)}
+                "origin_host": "1", "threads": str(item.unit.threads)}
         outcome = reuse.record_finished(state.library, state.markers, decision, reading, insertable, meta)
         units8.say(settings, f"  入库 {decision.unit}：{outcome}（{insertable[1] or '入库条件过'}）")
     problems = reuse.s18_problems(state.markers)
@@ -271,7 +276,12 @@ def plan_with_reuse(settings) -> int:
     print("── 复用（修订 11）──")
     print(f"库 {state.library.root}（{'在' if os.path.isdir(state.library.root) else '还没建'}；冻住 {state.library.frozen_reason() or '否'}）；"
           f"查库 {'开' if state.lookup else '关'}；标记 {state.markers}")
-    inputs = tree_inputs(settings)
+    try:
+        inputs = tree_inputs(settings)
+    except (OSError, RuntimeError) as error:   # 冻结树还没拍、读不到：同第二段编排层那一句，不打 traceback（第 2 次重跑登记修订 4）
+        print(f"✗ 算键用的树 {settings.tree} 认不全或读不到：{error}")
+        print('     → 怎么办：拍好修订 8 那棵冻结树（H3）再起')
+        return code
     if inputs is None:
         print(f"✗ 算键用的树认不全（S18 ②）：{state.inputs_error}")
         print('     → 怎么办：把闭包里认不出的那几份（上面那句点名的）放进树里，或在登记里补上它们再起')
@@ -293,9 +303,14 @@ def plan_with_reuse(settings) -> int:
     return code
 
 
-def configure(repo: str, config: dict) -> None:
+def configure(repo: str, config: dict, plan: bool) -> None:
+    """装好复用状态与换进修订 8 的几处。库根经 reuse_library_root 取（两台同一个绝对路径）：取不成时 run 退 78，plan 记下问题照打。"""
     h30 = config.get("H30") or {}
-    library = reuse.Library(h30.get("library_root") or reuse.DEFAULT_LIBRARY_ROOT)
+    root, problem = library_roots.library_root_of(h30)
+    if problem and not plan:
+        raise reuse.RunCondition(problem)
+    STATE["library_root_problem"] = problem
+    library = reuse.Library(root)
     STATE["reuse"] = ReuseState(repo, library, bool(h30.get("lookup", True)), "", {})
     units8.UNIT_SCRIPT, units8.ROWS_ORCHESTRATOR = UNIT_SCRIPT, ROWS_ORCHESTRATOR
     units8.unit_table = unit_table_with_selfproof
@@ -321,11 +336,12 @@ def main(argument_list: list[str]) -> int:
     try:
         config = load_reuse_config(config_path)
         settings = units8.settings_from_config(repo, resolve(repo, config["revision_8_config"]))
-        configure(repo, config)
+        configure(repo, config, arguments.mode == "plan")
         STATE["reuse"].markers = os.path.join(repo, settings.dumps, "reuse-markers", "units")
         os.environ[CONFIG_VARIABLE] = config_path
         if arguments.mode == "plan":
             print(f"修订 11 占位 {config_path}（dry_run={str(bool(config.get('dry_run'))).lower()}；{config.get('dry_run_note') or '-'}）；"
+                  f"{STATE['library_root_problem'] or 'H30 库根 ' + STATE['reuse'].library.root + '（两台同一个路径）'}；"
                   f"H31 {'；'.join(reuse.h31_problems(repo, config)) or '与现在的文件逐个相同'}")
             return plan_with_reuse(settings)
         if config.get("dry_run"):
@@ -407,11 +423,9 @@ def fake_world_eleven(root: str) -> WorldEleven:
     base = reuse.fake_world(os.path.join(root, "world"))
     script = judge.write_text(os.path.join(root, "fake-reuse-unit.sh"), FAKE_REUSE_UNIT_SCRIPT)
     rows = judge.write_text(os.path.join(root, "fake-rows.sh"), units8.FAKE_ROWS)
-    resources = judge.write_text(os.path.join(root, "resources.json"), json.dumps({"hosts": [{"number": 1, "read": True, "cpu": {"available_threads": 40},
-                                                                                          "memory": {"available": 120 << 30, "slice_room": 60 << 30}}]}))
     environment = dict(os.environ, UNITS_R8_SELFTEST="1", UNITS_R11_SELFTEST="1", REUSE_SELFTEST="1", UNITS_R8_UNIT_SCRIPT=script, UNITS_R8_ROWS_ORCHESTRATOR=rows,
-                       UNITS_R8_RESOURCES_COMMAND=f"cat {shlex.quote(resources)}", UNITS_R8_PREREQUISITES_COMMAND="true", UNITS_R8_POLL_SECONDS="0.02",
-                       UNITS_R8_REQUERY_SECONDS="0", FAKE_LOG=os.path.join(root, "fake.log"), REUSE_SELFTEST_TOOLCHAIN="cargo fake\nrustc fake\n",
+                       UNITS_R8_PREREQUISITES_COMMAND="true", UNITS_R8_POLL_SECONDS="0.02",
+                       FAKE_LOG=os.path.join(root, "fake.log"), REUSE_SELFTEST_TOOLCHAIN="cargo fake\nrustc fake\n",
                        REUSE_SELFTEST_BUILD_ENVIRONMENT="<构建环境：假> 0", REUSE_LIBRARY_SCRIPT=os.path.join(HERE, "reuse_library.py"), PYTHONDONTWRITEBYTECODE="1")
     return WorldEleven(root, base.repo, os.path.join(root, "library"), environment)
 
@@ -506,8 +520,8 @@ def real_script_step_1(scratch: str, label: str, world, library: reuse.Library, 
     tree = os.path.relpath(world.tree, world.repo)
     environment = dict(os.environ, REPO=world.repo, RESEARCH=HERE, PREFIX=f"research/results/fake-{label}", SUFFIX="-r8", TAG="", DUMPS=f"scripts/experiment-apparatus/target/fake-dumps-{label}",
                        TREE=tree, BIN="/bin/false", E170_BIN="/bin/false", SNAPSHOT_DIGEST=judge.row_driver.snapshot_digest(world.tree)[0],
-                       MUTATIONS_SHA256=reuse.sha256_file(os.path.join(world.tree, "crates/mutations.tsv")), CONFIG="-", THREADS="1", CAP_SMALL="4G",
-                       CAP_LARGE="6G", WORK_ROOT=os.path.join(unit_directory, "work"), UNIT_LOG=os.path.join(unit_directory, "unit.log"),
+                       MUTATIONS_SHA256=reuse.sha256_file(os.path.join(world.tree, "crates/mutations.tsv")), CONFIG="-", THREADS="1",
+                       WORK_ROOT=os.path.join(unit_directory, "work"), UNIT_LOG=os.path.join(unit_directory, "unit.log"),
                        UNIT_PRODUCTS=os.path.join(unit_directory, "products.tsv"), UNIT_DIRECTORIES=os.path.join(unit_directory, "directories.tsv"),
                        REUSE_LIBRARY=library.root, REUSE_ENTRIES=entries, REUSE_READINGS=os.path.join(unit_directory, "reuse-readings.tsv"), PRINT_ONLY="0")
     code = subprocess.run(["bash", UNIT_SCRIPT, "step-1"], cwd=world.repo, env=environment, capture_output=True, text=True, timeout=120).returncode

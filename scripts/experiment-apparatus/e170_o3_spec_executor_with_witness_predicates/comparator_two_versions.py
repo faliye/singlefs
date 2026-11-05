@@ -4,9 +4,10 @@
 `provisional=` 对 v2 的 `strict_before_witness=`、`provisional_before_witness=`；v2 的 `gaps=` 去掉 G23 起的新行再比（射程（b）单列）。
 分类照读法 6：合法态 = I1、I2 的批态与 I3、I4 不打补丁的底态；补丁态 = I3、I4 的补丁行与已知坏镜像；I5 单独一类（单测，另由 --unit-tests 读）。
 
-跑法：python3 comparator_two_versions.py --pair <输入名>:<states|images>:<v1 产物>:<v2 产物> [...] --batches 1,2
+跑法：python3 comparator_two_versions.py --pair <输入名>:<states|images>:<v1 产物>:<v2 产物> [...] [--batches <批号,…>]
       --names <输入名>:<含 bad-expected.tsv 的导出目录>[:<已知坏镜像目录>] [...] --unit-tests <I5 产物>
       --anchors <v2 executor_main 产物> [...] --positive-control-input <输入名> --scratch <草稿目录> --output <新文件>
+不给 --batches 就是比全部批（1、2、3）；给了是指定范围，config 行的 batches= 写实际值，不是全部批的那一趟不当正式产物。
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ NOT_COMPARED = {"name", "time_ns", "worker", "input", "source", "label", "stream
 VERSION_ONE_TO_VERSION_TWO_FIELD = {"strict": "strict_before_witness", "provisional": "provisional_before_witness"}
 FIRST_NEW_GAP_NUMBER = 23  # 上一次登记读法 5 的欠一句表：v2 新记的从 G23 起（登记 5.2 改四）
 IN, NOT_IN, SPEC_GAP = "in", "not_in", "spec_gap"
+ALL_BATCHES = "1,2,3"
 
 
 def fields_of(line: str) -> dict[str, str]:
@@ -192,17 +194,21 @@ def positive_control(label: str, kind: str, version_one_path: str, version_two_p
          f"out_of_range_before={before} out_of_range_after={after} added={after - before} exactly_one={str(after - before == 1).lower()} copy={copy_path}")
 
 
-def main(argument_list: list[str]) -> int:
+def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="E170 第 2 次重跑第二段：Q1 比对器")
     parser.add_argument("--pair", action="append", required=True, help="<输入名>:<states|images>:<v1 产物>:<v2 产物>")
-    parser.add_argument("--batches", default="1,2")
+    parser.add_argument("--batches", default=ALL_BATCHES, help="指定范围：不给就是全部批")
     parser.add_argument("--names", action="append", default=[], help="<输入名>:<含 bad-expected.tsv 的导出目录>[:<已知坏镜像目录>]")
     parser.add_argument("--unit-tests")
     parser.add_argument("--anchors", action="append", default=[])
     parser.add_argument("--positive-control-input", required=True)
     parser.add_argument("--scratch", required=True)
     parser.add_argument("--output", required=True)
-    arguments = parser.parse_args(argument_list)
+    return parser
+
+
+def main(argument_list: list[str]) -> int:
+    arguments = build_argument_parser().parse_args(argument_list)
     batches = set(arguments.batches.split(","))
     names_by_input = {}
     for entry in arguments.names:

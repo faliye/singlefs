@@ -8,7 +8,7 @@ executor_main.py（v2-487）判完 Z1 批 1、批 2 之后，往同一份产物�
   按文件名排序逐个喂进 sha256，前 16 个十六进制字符）。
 文件名以 run_ 开头，不进冻结（5.6）。锚点不符走 F10（两边都查，不作废、不改锚点），这里照打 holds=false。
 
-跑法（仓根，经 capped.sh 与 run-with-memory-cap.sh；PYTHONDONTWRITEBYTECODE=1，不在执行器目录里留 __pycache__）：
+跑法（仓根，整条命令交 `task-server/task submit --`；PYTHONDONTWRITEBYTECODE=1，不在执行器目录里留 __pycache__）：
   python3 <本文件> --dumps scripts/experiment-apparatus/target/e170-r2-today-dumps/e170-dump --product <executor_main 写的那份产物>
 """
 

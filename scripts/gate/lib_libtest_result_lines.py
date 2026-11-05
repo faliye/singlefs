@@ -3,11 +3,11 @@
 # run-condition: none 只读一份文本、打印取出的用例名，不起子进程，也不碰仓里的文件
 """libtest（cargo test 起的测试二进制与 rustdoc）打的结果行与汇总行，全仓只在这里解析一份。
 
-调它的：scripts/mutation/crates-mutation-rows.py（门禁 checker-tier-crates-mutation-replay 的判法 results_by_test）、
+调它的：scripts/mutation/crates-mutation-rows.py（门禁 crates-mutation-replay 的判法 results_by_test）、
 scripts/mutation/prove-red.sh（经 crates-mutation-rows.py 的 verdict_of_run）、scripts/gate/rerun-failed-tests.py、
 scripts/mutation/mutate.sh（经下面的命令行 failed-names）、scripts/mutation/broad-mutation.py（取第一条红的测试名与进度行里的条数，libtest_outcome / libtest_failed_name）、
-门禁 checker-tier-crash-point-replay 的快档两格（recordable_results：逐条认判绿的测试函数、打了记号的那一条不记，照键记库；判定请求点名
-judge:scripts/gate/lib_libtest_result_lines.py::recordable_results）与 checker-tier-research-build-and-replay 的 research-unit-tests 格（binary_runs；判定请求点名
+门禁 crash-point-replay 按条复用的两趟（crash-case-replay 格与 feature-gated-tests 格；recordable_results：逐条认判绿的测试函数、打了记号的那一条不记，照键记库；判定请求点名
+judge:scripts/gate/lib_libtest_result_lines.py::recordable_results）与 research-build-and-replay 的 research-unit-tests 格（binary_runs；判定请求点名
 judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个函数的闭包改了，按条记的判定一起作废。
 各自按文件路径用 importlib 导入（调用方的 sys.path 不一定有本目录）。
 
@@ -33,7 +33,7 @@ judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个
   recordable_results(text, serial=False, cpu_judging_recordable=False) -> [BinaryAccount]   按条记库（下面「按条记库」）：BinaryAccount = (source, recorded, withheld, markers, unseen)；
       recorded 是判绿可记库的结果行，withheld 是 [(全名, 不记的原因)]，markers 是 [Marker]，Marker = (source, kind, text, candidates, complete)，
       unseen 是汇总行报了、这一段里连「test <名> ... 」都没认出的条数
-按条记库（门禁 checker-tier-crash-point-replay 快档两格）：只认结局是 ok 的那几条，下面几种不记，别的照记：
+按条记库（门禁 crash-point-replay 按条复用的两趟）：只认结局是 ok 的那几条，下面几种不记，别的照记：
   打散的结果行：--nocapture 下「test <名> ... 」后面接了测试自己打的字，结局另起一行单独打（`ok`、`FAILED`、`ignored`，可带「, 理由」或用时）的，
       接成一条照认；结局粘在别的字后面、或下一条「test <名> ... 」先来了的，那一条认不出结局、不记。这一段另有对不上号的单独一行结局时，接出来的都不认。
   完整性闸：没有汇总行的一段一条不记；认出的结果行（总数，或 ok、FAILED、ignored 任一种）比汇总行报的多，整段不记；同一段里同名的结果行不止一行，那个名字不记。
@@ -51,23 +51,25 @@ judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个
   lib_libtest_result_lines.py recordable <日志|-> [--serial] [--cpu-judging-recordable]  逐条打「green<TAB><源文件><TAB><全名>」「withheld<TAB><源文件><TAB><全名><TAB><原因>」
       「marker<TAB><源文件><TAB><not-run|cpu-judging><TAB><complete：1|0><TAB><那一截><TAB><认作谁打的，一个一列>」，末行 RECORDABLE binaries=… green=… withheld=… markers=…
   lib_libtest_result_lines.py --selftest
-弄坏开关 LIBTEST_RESULT_LINES_BREAK（只给证红用，逗号分隔可给几个），下一行起写打开后自证红在哪几格：
-  should-panic-in-name   ` - should panic` 当成全名的一部分（mutate.sh 改前的取法）
+弄坏开关 LIBTEST_RESULT_LINES_BREAK（只给证红用，逗号分隔可给几个；--selftest 本身与它起的子进程、门禁样本根里由阶段转来的认，平常跑设了退 2、点名只在自证里认），下一行起写打开后自证红在哪几格：
+  LIBTEST_RESULT_LINES_BREAK=should-panic-in-name  ` - should panic` 当成全名的一部分（mutate.sh 改前的取法）
     本库「should panic 的失败行取得出全名」「rustdoc 的结果行整段算全名、should panic 照样摘掉」「点名省掉模块路径、should panic 的用例对得上」
     「取 FAILED 的全名按出现次序」「failed-names 从标准输入取名字、退 0」；连带 crates-mutation-rows.py「should panic 的用例红了判抓到、点名省掉模块路径只对上那一个」、
     prove-red.sh「#[should_panic] 的用例红了……应当判抓到」、rerun-failed-tests.py「should panic 的失败用例按全名重跑」、
     mutate.sh 的 should-panic 与 baseline-red-should-panic 两格
-  ignored-reason-kept    `ignored, <理由>` 的结局照原样交「ignored,」
+  LIBTEST_RESULT_LINES_BREAK=ignored-reason-kept  `ignored, <理由>` 的结局照原样交「ignored,」
     本库「带理由的 ignored 记 ignored」
-  summary-failed-unread  汇总行的 failed 数不读、一律当 0，结局也不看
-    本库「汇总行报了失败：failed-names 名字取不到退 3」「汇总行取出 passed、failed、ignored」
-  per-binary-count-unchecked  binary_runs 不核「结果行条数 = 汇总行三个数之和」，一律当对得上
+  LIBTEST_RESULT_LINES_BREAK=summary-failed-unread  汇总行的 failed 数不读、一律当 0，结局也不看
+    本库「汇总行报了失败：failed-names 名字取不到退 3」「汇总行取出 passed、failed、ignored」「逐条认出测试名与结局：结果行条数与汇总行对得上的段算对得上」
+    「逐条认出测试名与结局：--nocapture 打散了结果行的那一段对不上」「binary-results 逐条打源文件、全名、结局、这一段对不对得上…」「recordable --cpu-judging-recordable：几条同时…」
+  LIBTEST_RESULT_LINES_BREAK=per-binary-count-unchecked  binary_runs 不核「结果行条数 = 汇总行三个数之和」，一律当对得上
     本库「逐条认出测试名与结局：--nocapture 打散了结果行的那一段对不上」
-  marker-withholds-whole-binary  一段里有记号就整段不记（改前门禁 excluded_binaries_of_log 的样子）
-    本库「按条记库：一段三条、一条打了 NOT_RUN_…」「按条记库：带 --test-threads 1 的一段…」；连带门禁 checker-tier-crash-point-replay 的 GATE_CRASH_POINT_REPLAY_BREAK=withhold-whole-binary
-  count-mismatch-withholds-whole-binary  没打散的结果行条数与汇总行对不上就整段不记（改前 binary_runs 的 consistent 当门槛的样子）
-    本库「按条记库：结果行被打散，接得上结局的照记…」「按条记库：带 --test-threads 1 的一段…」；连带同上那个门禁开关
-  cpu-judging-always-withheld  给了 cpu_judging_recordable（--cpu-judging-recordable）也照改前把判段判在 CPU 的那一条不记
+  LIBTEST_RESULT_LINES_BREAK=marker-withholds-whole-binary  一段里有记号就整段不记（改前门禁 excluded_binaries_of_log 的样子）
+    本库「按条记库：一段三条、一条打了 NOT_RUN_…」「按条记库：带 --test-threads 1 的一段…」「按条记库：没开 GPU 时判段判在 CPU 的照记…」「recordable 逐条打 green、withheld、marker…」；连带门禁 crash-point-replay 的 GATE_CRASH_POINT_REPLAY_BREAK=withhold-whole-binary
+  LIBTEST_RESULT_LINES_BREAK=count-mismatch-withholds-whole-binary  没打散的结果行条数与汇总行对不上就整段不记（改前 binary_runs 的 consistent 当门槛的样子）
+    本库「按条记库：结果行被打散，接得上结局的照记…」「按条记库：带 --test-threads 1 的一段…」「按条记库：没开 GPU 时判段判在 CPU 的照记…」
+    「按条记库：这一段另有对不上号的单独一行结局，接出来的结局不认…」「recordable 逐条打 green、withheld、marker…」；连带同上那个门禁开关
+  LIBTEST_RESULT_LINES_BREAK=cpu-judging-always-withheld  给了 cpu_judging_recordable（--cpu-judging-recordable）也照改前把判段判在 CPU 的那一条不记
     本库「按条记库：没开 GPU 时判段判在 CPU 的照记…」「recordable --cpu-judging-recordable…」
 """
 import collections
@@ -425,8 +427,8 @@ def selftest():
     check("FAILED 的结果行（行尾带空白）取出全名与结局", failed == ResultLine("integration::walks_to_ten", "FAILED", False), repr(failed))
     panics = result_line("test tests::answer_panics - should panic ... FAILED")
     check("should panic 的失败行取得出全名", panics == ResultLine("tests::answer_panics", "FAILED", True), repr(panics))
-    with_reason = result_line("test tests::slow_case ... ignored, 慢档用例")
-    check("带理由的 ignored 记 ignored", with_reason == ResultLine("tests::slow_case", "ignored", False), repr(with_reason))
+    with_reason = result_line("test tests::needs_card ... ignored, 要 NVIDIA 卡")
+    check("带理由的 ignored 记 ignored", with_reason == ResultLine("tests::needs_card", "ignored", False), repr(with_reason))
     timed = result_line("test tests::timed ... ok <0.012s>")
     check("--report-time 补的用时不算进结局", timed == ResultLine("tests::timed", "ok", False), repr(timed))
     doctest = result_line("test crates/demo/src/lib.rs - answer (line 12) - should panic ... ok")
@@ -520,12 +522,12 @@ def selftest():
           repr(recordable_accounts))
     cpu_judged = "\n".join([
         "     Running tests/plain_stream.rs (target/release/deps/plain_stream-0000000000000007)", "running 2 tests",
-        "test plain_stream_full ... ignored", "CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=gpu_not_enabled_in_the_configuration threads=4",
-        "test plain_stream_quick ... ok", "", "test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"])
+        "test plain_stream_not_run ... ignored", "CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=gpu_not_enabled_in_the_configuration threads=4",
+        "test plain_stream_judged ... ok", "", "test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"])
     output = io.StringIO()
     code = command_recordable(["-", "--cpu-judging-recordable"], standard_input=io.StringIO(cpu_judged), standard_output=output, standard_error=errors)
     check("recordable --cpu-judging-recordable：几条同时跑的一段里判段判在 CPU 的一行照打 marker、不让打它时还没出结果的那一条不记",
-          code == 0 and "green\ttests/plain_stream.rs\tplain_stream_quick" in output.getvalue() and "\nwithheld\t" not in "\n" + output.getvalue()
+          code == 0 and "green\ttests/plain_stream.rs\tplain_stream_judged" in output.getvalue() and "\nwithheld\t" not in "\n" + output.getvalue()
           and "marker\ttests/plain_stream.rs\tcpu-judging\t1\t" in output.getvalue() and "RECORDABLE binaries=1 green=1 withheld=0 markers=1" in output.getvalue(),
           f"退 {code}，输出 {output.getvalue()!r}")
     orphaned = "\n".join(["     Running tests/noisy.rs (target/release/deps/noisy-0000000000000004)", "running 2 tests",
@@ -577,6 +579,40 @@ def main(arguments):
     return EXIT_USAGE
 
 
+BREAK_VARIABLES = ("LIBTEST_RESULT_LINES_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；门禁样本根（当前目录有 .gate-cells 或 .gate-break-sample、没设 GATE_STAGED_FROM）里由阶段转来的；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    sample_root = (os.path.exists(".gate-cells") or os.path.exists(".gate-break-sample")) and not os.environ.get("GATE_STAGED_FROM")
+    if not setting or arguments[:1] == ["--selftest"] or sample_root or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）和门禁样本根里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/lib_libtest_result_lines.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

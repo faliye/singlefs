@@ -10,7 +10,8 @@
 //! - 真值 T(P) = P 允许的全部发出流上这套枚举域的并；另有一份按设备偏序算的精确可达集 T_exact 只核参照。
 //! - 臂 K1（按根槽写切）= 录到的那一条发出流上的枚举域；臂 K2（按事务切）= 两条单事务链各自枚举域的积。
 //!
-//! 子命令：不带参数跑第一段的全部量；`halt` 只跑登记第十一节的停机条款 S1、S2。
+//! 子命令：不带参数跑第一、二、三段全部（一份产物、一个收尾行；第一段停机条款打中就不往下）；段名 `first`、`second`、`third` 各跑一段（指定范围）；
+//! `halt` 只跑登记第十一节的停机条款 S1、S2；`s3` 只估规模、不判。认不出的参数退 2。
 
 // admission: always 独立手写的计数模型，每次现算；不读 crates/，只读自己的常量
 // run-condition: command python3
@@ -29,11 +30,11 @@ const TORN: u8 = 2;
 const BITS_PER_WRITE: usize = 2;
 const MAXIMUM_WRITES_IN_STATE_CODE: usize = 64;
 
-/// 崩溃放量装置 GPU 持久掩码的位数：`crates/singlefs-checker-tier/src/crash_facts.rs:129` `MAXIMUM_ENUMERATED_WRITES`（登记第三节，结构常量）。
+/// 崩溃放量装置 GPU 持久掩码的位数：`crates/singlefs-verification/src/crash_facts.rs:129` `MAXIMUM_ENUMERATED_WRITES`（登记第三节，结构常量）。
 const MAXIMUM_ENUMERATED_WRITES: usize = 2048;
-/// 一段展开出的状态数要装得进 u32：`crates/singlefs-checker-tier/src/crash_verify_gpu.rs:305` 的断言（登记第三节，结构常量）。
+/// 一段展开出的状态数要装得进 u32：`crates/singlefs-verification/src/crash_verify_gpu.rs:305` 的断言（登记第三节，结构常量）。
 const MAXIMUM_SEGMENT_STATES_IN_U32: u128 = u32::MAX as u128;
-/// 一段的状态数要装得进 u64：`crates/singlefs-checker-tier/src/crash.rs:1681`（登记第三节，结构常量）。
+/// 一段的状态数要装得进 u64：`crates/singlefs-verification/src/crash.rs:1681`（登记第三节，结构常量）。
 const MAXIMUM_SEGMENT_STATES_IN_U64: u128 = u64::MAX as u128;
 
 fn value_of(state: StateCode, write_index: usize) -> u8 {
@@ -1356,6 +1357,13 @@ struct RunTally {
 }
 
 impl RunTally {
+    /// 把另一段的结果并进来：不通过的条件接在后面，通过的自检数相加。
+    fn absorb(&mut self, other: RunTally) {
+        self.void_conditions.extend(other.void_conditions);
+        self.halt_conditions.extend(other.halt_conditions);
+        self.self_checks_passed += other.self_checks_passed;
+    }
+
     fn self_check(&mut self, passed: bool, void_label: &str) {
         if passed {
             self.self_checks_passed += 1;
@@ -2124,23 +2132,51 @@ fn preflight() {
     }
 }
 
+/// 命令行的第一个参数选哪几段。不带参数是第一、二、三段全跑；段名是指定范围；`halt` 与 `s3` 是子集。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SegmentChoice {
+    First,
+    Second,
+    Third,
+    HaltChecksOnly,
+    ScaleEstimateOnly,
+}
+
+/// 认不出的参数返回 `None`，由 `main` 退 2。
+fn segments_for_argument(argument: Option<&str>) -> Option<Vec<SegmentChoice>> {
+    match argument {
+        None => Some(vec![SegmentChoice::First, SegmentChoice::Second, SegmentChoice::Third]),
+        Some("first") => Some(vec![SegmentChoice::First]),
+        Some("second") => Some(vec![SegmentChoice::Second]),
+        Some("third") => Some(vec![SegmentChoice::Third]),
+        Some("halt") => Some(vec![SegmentChoice::HaltChecksOnly]),
+        Some("s3") => Some(vec![SegmentChoice::ScaleEstimateOnly]),
+        Some(_) => None,
+    }
+}
+
 fn main() {
     preflight();
-    let mut emitter = Emitter::new();
-    let tally = match std::env::args().nth(1).as_deref() {
-        Some("halt") => {
-            let mut tally = RunTally::default();
-            run_halt_checks(&mut emitter, &mut tally);
-            tally
-        }
-        Some("s3") => {
-            run_s3_estimate(&mut emitter);
-            RunTally::default()
-        }
-        Some("second") => run_second_segment(&mut emitter),
-        Some("third") => run_third_segment(&mut emitter),
-        _ => run_everything(&mut emitter),
+    let arguments: Vec<String> = std::env::args().skip(1).filter(|argument| argument != "--force").collect();
+    let Some(choices) = segments_for_argument(arguments.first().map(String::as_str)) else {
+        eprintln!("  ✗ 认不出的参数 {:?}", arguments.first());
+        eprintln!("  → 怎么办：不带参数跑全部三段；写段名 first、second、third 之一只跑那一段，或写 halt（只跑停机条款）、s3（只估规模）");
+        std::process::exit(2);
     };
+    let mut emitter = Emitter::new();
+    let mut tally = RunTally::default();
+    for choice in choices {
+        if !tally.halt_conditions.is_empty() {
+            break;
+        }
+        match choice {
+            SegmentChoice::First => tally.absorb(run_everything(&mut emitter)),
+            SegmentChoice::Second => tally.absorb(run_second_segment(&mut emitter)),
+            SegmentChoice::Third => tally.absorb(run_third_segment(&mut emitter)),
+            SegmentChoice::HaltChecksOnly => run_halt_checks(&mut emitter, &mut tally),
+            SegmentChoice::ScaleEstimateOnly => run_s3_estimate(&mut emitter),
+        }
+    }
     emit(
         &mut emitter,
         format!(
@@ -5283,5 +5319,32 @@ mod tests {
         assert_eq!(observed, vec![(27, 42, 12_870), (13, 28, 3_747), (11, 20, 3_432), (5, 14, 973), (0, 150, 2_431_067)]);
         // 一盘上 K2 的积包住 T（第四节第 6 条），所以一盘四格的 L3b 全是 0。
         assert!(judgements[..4].iter().all(|judgement| judgement.arm_by_transaction_true_cross_misses == 0));
+    }
+
+    /// 不带参数三段都跑（第一、二、三段依次）；段名只跑那一段；认不出的参数不选任何一段。
+    #[test]
+    fn no_argument_selects_all_three_segments_and_a_segment_name_selects_one() {
+        assert_eq!(segments_for_argument(None), Some(vec![SegmentChoice::First, SegmentChoice::Second, SegmentChoice::Third]));
+        assert_eq!(segments_for_argument(Some("first")), Some(vec![SegmentChoice::First]));
+        assert_eq!(segments_for_argument(Some("second")), Some(vec![SegmentChoice::Second]));
+        assert_eq!(segments_for_argument(Some("third")), Some(vec![SegmentChoice::Third]));
+        assert_eq!(segments_for_argument(Some("halt")), Some(vec![SegmentChoice::HaltChecksOnly]));
+        assert_eq!(segments_for_argument(Some("s3")), Some(vec![SegmentChoice::ScaleEstimateOnly]));
+        assert_eq!(segments_for_argument(Some("never-used-segment-name")), None);
+    }
+
+    /// 并进来的段把不通过的条件与通过的自检数都带上。
+    #[test]
+    fn absorbing_a_segment_keeps_its_conditions_and_self_check_count() {
+        let mut first = RunTally::default();
+        first.self_check(true, "first-void");
+        first.self_check(false, "first-void");
+        let mut second = RunTally::default();
+        second.self_check(true, "second-void");
+        second.halt_conditions.push("second-halt".to_string());
+        first.absorb(second);
+        assert_eq!(first.self_checks_passed, 2);
+        assert_eq!(first.void_conditions, vec!["first-void".to_string()]);
+        assert_eq!(first.halt_conditions, vec!["second-halt".to_string()]);
     }
 }

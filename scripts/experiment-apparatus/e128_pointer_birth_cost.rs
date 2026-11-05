@@ -156,8 +156,20 @@ const ARMS: [(&str, usize); 6] = [
 ];
 const KEY_TIERS: [usize; 4] = [1 << 11, 1 << 15, 1 << 19, 1 << 23];
 
+/// 登记的每格查找次数；不给参数就是它。
+const REGISTERED_LOOKUP_COUNT: usize = 2_000_000;
+
+/// 给了与登记不同的查找次数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+fn reduced_scale_note(lookup_count: usize) -> String {
+    if lookup_count == REGISTERED_LOOKUP_COUNT {
+        String::new()
+    } else {
+        format!(" reduced=yes registered_iterations={REGISTERED_LOOKUP_COUNT} not_official_product=yes")
+    }
+}
+
 fn main() {
-    let lookup_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(2_000_000);
+    let lookup_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(REGISTERED_LOOKUP_COUNT);
     let rounds = 5usize;
     let timed_repetitions_per_round = 3usize;
     let mut emitter = Emitter::new();
@@ -165,7 +177,7 @@ fn main() {
     let mut say = |line: String| { output.push_str(&line); output.push('\n'); };
 
     say(emitter.emit_raw(&format!(
-        "name=config iters={lookup_count} rounds={rounds} inner={timed_repetitions_per_round} node_bytes={NODE_BYTES} node_hdr={NODE_HEADER_BYTES}")));
+        "name=config iters={lookup_count} rounds={rounds} inner={timed_repetitions_per_round} node_bytes={NODE_BYTES} node_hdr={NODE_HEADER_BYTES}{}", reduced_scale_note(lookup_count))));
 
     // ── 纯算术那一半：甲 / 丙 各自的派生数 ──
     for (arm, child_pointer_bytes) in [("bing", 59usize), ("jia", 75)] {
@@ -409,6 +421,13 @@ mod tests {
         assert_eq!(unit_atomicity_decision_tree_table_denominator / 137 + 1, this_experiment_tree_table_denominator / 137);        // 甲那一臂：差 1
         assert_eq!(unit_atomicity_decision_tree_table_denominator / 137, 118);
         assert_eq!(this_experiment_tree_table_denominator / 137, 119);
+    }
+
+    /// 给了缩规模的查找次数，config 行要写缩过、不当正式产物；登记规模不加这一段。
+    #[test]
+    fn reduced_lookup_count_is_marked_and_registered_one_is_not() {
+        assert_eq!(reduced_scale_note(REGISTERED_LOOKUP_COUNT), "");
+        assert_eq!(reduced_scale_note(1000), " reduced=yes registered_iterations=2000000 not_official_product=yes");
     }
 
     /// median 取中位不取均值——一次异常慢的轮次不许把结论拉走。

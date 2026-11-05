@@ -54,7 +54,6 @@ X60_编不过之后不补位	    if selected is None or failed.substitutions_use
 X61_编不过之后的补位不计次数	substitutions_used=failed.substitutions_used + 1, failed_attempts=attempts)	substitutions_used=failed.substitutions_used, failed_attempts=attempts)
 X62_补位的组把装置自己的变异行也算进去	return [row.name for row in table if row.file == file and not row.name.startswith(OWN_INSTRUMENT_ROW_PREFIX)]	return [row.name for row in table if row.file == file]
 X63_换上的行编之前不过时结局不记编不过	        return dataclasses.replace(chosen, status=STATUS_COMPILE_FAILED)	        return chosen
-X64_补位那一趟把结局不是编不过的行也领	            if read_result(os.path.join(rows_root, entry)).get("status") == STATUS_COMPILE_FAILED:	            if True:
 X65_驱动不记试过而没用上的名字	    fields.update(failed_attempt_fields(choice.failed_attempts))	    fields.update({})
 X66_编不过之后不领补位直接跑装置	        keep_the_tail_of_the_compile_log(row_directory, len(choice.failed_attempts) + 1)	        keep_the_tail_of_the_compile_log(row_directory, len(choice.failed_attempts) + 1)\n        break
 X67_比对器补位不核原行是不是编不过	        if original_fields.get("status") != "compile_failed":	        if False:
@@ -64,4 +63,3 @@ X70_补位合计把补不上的也算换上	        substituted += substitute !=
 X71_行分析不套补位	    merged, _ = rows_with_substitutes(row_directories(rows_roots), substitution_roots or [])	    merged = row_directories(rows_roots)
 X72_编不过的日志序号与试过的名字不同号	f"compile-failed-{failed_attempt_number}.log"	f"compile-failed-{failed_attempt_number + 1}.log"
 X73_复跑开关不起作用	        if getattr(arguments, "keep_compile_failures_as_they_are", False):	        if False:
-X74_补位那一趟同一行在两个输出根里不拒	            if number in root_of_number:	            if False:

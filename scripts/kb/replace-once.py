@@ -20,7 +20,7 @@
 8 目标在仓里（任何后缀），新串带会话号（ListAgents 列的会话名），一个字节没写。
 命中 0 次时附上文件里最像旧串的那一段（行号、相似度）与第一处不同（旧串在那里是什么、文件里是什么），算法在 nearest_hint()。
 
-写 .md 之前判新串（退出码 7）：目标是仓里的 .md 时，旧串恰好命中一次之后、写之前，用 write-guard.sh 与门禁 doc-text 同一份判据
+写 .md、.json、.txt 之前判新串（退出码 7）：目标是仓里这几种后缀时，旧串恰好命中一次之后、写之前，用 write-guard.sh 与门禁 doc-text 同一份判据
 （.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 调它）判新串；带钟点、时区词、时间戳的拒绝，逐处列出行号与形态与出路。
 判新串不判旧串；别的后缀、仓外、排除前缀下的文件不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 clock-times 格兜底。
 
@@ -120,8 +120,10 @@ def replace_once(path, old_text, new_text, notation_root=None):
         return 2, '旧串是空串，拒绝：空串在每个位置都命中\n     → 把旧串换成文件里真实存在、唯一定位那处的一段文字'
     if not os.path.isfile(path):
         return 2, f'找不到文件 {path}\n     → 检查路径是否写对（相对路径相对当前工作目录），文件是否已经被别的进程删掉或改名'
-    with open(path, encoding='utf-8') as handle:
-        content = handle.read()
+    from lib_atomic_replace import unchanged_bytes
+    with open(path, 'rb') as handle:
+        original_bytes = handle.read()
+    content = original_bytes.decode('utf-8')
     occurrences = content.count(old_text)
     if occurrences == 0:
         hint = ''.join(f'\n{line}' for line in nearest_hint(content, old_text))
@@ -139,11 +141,12 @@ def replace_once(path, old_text, new_text, notation_root=None):
             return 8, '\n'.join(refusal)
     replaced = content.replace(old_text, new_text, 1)
     try:
-        notes = replace_file_contents_by_rename(path, replaced)
+        notes = replace_file_contents_by_rename(
+            path, replaced, check_before_rename=lambda: unchanged_bytes(path, original_bytes))
     except ReplaceRefused as refused:
         return 6, str(refused)
-    with open(path, encoding='utf-8') as handle:
-        written = handle.read()
+    with open(path, 'rb') as handle:
+        written = handle.read().decode('utf-8')
     if written != replaced or written.count(new_text) < 1:
         return 5, f'写完回读 {path} 与预期不一致\n     → 检查文件是不是被别的进程同时改了'
     return 0, f'{path}：命中 1 次，已替换（改名换上新 inode）并回读确认' + ''.join(f'\n  ! {note}' for note in notes)
@@ -204,8 +207,14 @@ def problems_with_clock_guard(workspace):
     code, message = replace_once(dirty, glue(('2026-10-14 ', zone, ' 15', colon, '30 定')), '2026-10-14 定', notation_root=root)
     if code != 0 or content_of(dirty) != '用户 2026-10-14 定\n':
         problems.append(f'写 .md：旧串带钟点、新串只写日期（删掉钟点的改动）本该放行，实际 {code}：{message!r}')
+    # 范围：.json、.txt 与 .md 同判（带紧凑时间戳的新串拒、文件不动）
+    for label, path in (('.txt 目标', os.path.join(root, 'records', 'notes.txt')), ('.json 目标', os.path.join(root, 'records', 'notes.json'))):
+        reset(path)
+        code, message = replace_once(path, '第二行 乙', glue(('运行目录 ', stamp)), notation_root=root)
+        if code != 7 or content_of(path) != original:
+            problems.append(f'写 .md：{label}的新串带紧凑时间戳本该退出码 7 且不写文件，实际 {code}：{message!r}')
     # 范围：别的后缀与仓外不判（带紧凑时间戳的新串照写）
-    for label, path in (('.txt 目标', os.path.join(root, 'records', 'notes.txt')), ('仓外的 .md', os.path.join(workspace, 'outside.md'))):
+    for label, path in (('.tsv 目标', os.path.join(root, 'records', 'notes.tsv')), ('仓外的 .md', os.path.join(workspace, 'outside.md'))):
         reset(path)
         code, message = replace_once(path, '第二行 乙', glue(('运行目录 ', stamp)), notation_root=root)
         if code != 0:
@@ -287,7 +296,7 @@ def selftest_in(workspace):
         return 1
     print('  ✓ --selftest 通过：命中 0 次拒绝（3）并附上最像的一行与第一处不同、2 次拒绝（4）、空串拒绝（2），都一个字节没写；命中 1 次写成功并回读确认；'
           '写仓里的 .md 之前判新串：带紧凑时间戳、带日期时区词时分、带光秃时区词的拒绝（7）并点名形态、行号与出路且不写文件，'
-          '8 位数字后跟 T 但不是时间戳、只写日期、旧串带钟点而新串干净、.txt 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 7，理由不是钟点），入口退出码 7；'
+          '8 位数字后跟 T 但不是时间戳、只写日期、旧串带钟点而新串干净、.json、.txt 与 .md 同判，.tsv 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 7，理由不是钟点），入口退出码 7；'
           '写仓里任何后缀的文件之前判新串里的会话号：.md 与 .py 目标带会话名的拒绝（8）并点名行号与出路「别的会话」且不写文件，干净的新串、.py 里带放行标记的一行、排除前缀下的文件、仓外的文件放行，'
           '假仓里没有共用库时读不到会话号判据按拒绝办（退出码 8），入口退出码 8；'
           '换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、'
@@ -308,6 +317,39 @@ def main(arguments, notation_root=None):
     return code
 
 
+BREAK_VARIABLES = ("REPLACE_ONCE_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/replace-once.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

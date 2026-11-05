@@ -478,6 +478,8 @@ def sweep(root, apply_changes, defer=(), tally=None):
     refused = []
     path_hits = []          # (相对路径, 行号, 路径形态的那一段文字)：只报不换
     for relative in candidates:
+        if os.path.commonpath([os.path.realpath(root), os.path.realpath(os.path.join(root, relative))]) != os.path.realpath(root):
+            continue
         if exempt(relative, entries):
             continue
         own_fixture_directory = own_cell_fixture_directory(relative)
@@ -485,7 +487,9 @@ def sweep(root, apply_changes, defer=(), tally=None):
             own_fixture_directories.add(own_fixture_directory)
             continue
         try:
-            text = open(os.path.join(root, relative), encoding="utf-8").read()
+            with open(os.path.join(root, relative), 'rb') as handle:
+                original = handle.read()
+            text = original.decode('utf-8')
         except (UnicodeDecodeError, OSError):
             continue
         scanned += 1
@@ -505,7 +509,9 @@ def sweep(root, apply_changes, defer=(), tally=None):
             text = restore_archived_product_names(text, masked)
             text = restore_exempt_lines(text, kept_lines)
             try:
-                notes = replace_file_contents_by_rename(os.path.join(root, relative), text)
+                from lib_atomic_replace import unchanged_bytes
+                path = os.path.join(root, relative)
+                notes = replace_file_contents_by_rename(path, text, check_before_rename=lambda: unchanged_bytes(path, original))
             except ReplaceRefused as refusal:
                 refused.append((relative, count, str(refusal)))
                 continue
@@ -987,7 +993,7 @@ def check_git_listing():
                            GIT_COMMITTER_NAME="selftest", GIT_COMMITTER_EMAIL="selftest@example.invalid")
     with tempfile.TemporaryDirectory() as root:
         write_selftest_tables(root, [("超级块", "系统配置", "整串", "中文")], [])
-        ignored = {"multi-host.env": "PEER_REPOSITORY_DIRECTORY=/home/peer/超级块\n",
+        ignored = {"multi-host.env": "NFS_SHARED_ROOTS=/home/peer/超级块\n",
                    os.path.join("scripts", "hosts", "memory-peaks.tsv"): "超级块\t1G\n"}
         os.makedirs(os.path.join(root, "scripts", "hosts"))
         with open(os.path.join(root, ".gitignore"), "w", encoding="utf-8") as handle:
@@ -1162,6 +1168,39 @@ def main(argv):
     return sweep(root, apply_changes, defer)
 
 
+BREAK_VARIABLES = ("SWEEP_TERM_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行里有 --selftest；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or "--selftest" in arguments or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/sweep-term.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

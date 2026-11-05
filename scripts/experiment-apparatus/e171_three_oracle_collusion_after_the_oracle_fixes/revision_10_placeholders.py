@@ -25,19 +25,35 @@ T₂（第 10.1 节，H21）：第 1 步绿的那一次的 TAG；计时产物 <H
   revision_10_placeholders.py --selftest [--cells 格,…] [--rounds N]
 退出码：0 这一阶段要的都填了、都核过；78 有没填或核不过的（verdict 行点名哪几个；起跑闸没过也在这里）；2 用法错。
 
-弄坏开关 PLACEHOLDERS_R10_BREAK=<项>（只在 --selftest 起的子进程里认，PLACEHOLDERS_R10_SELFTEST=1）。项名、弄坏哪一处、打开后红在哪一格：
-  unfilled-passes                   没填（null）的占位当已填                          unfilled-named
-  gate-ignores-research-mutations   起跑闸不看研究一侧变异表那一单元                  gate-research-mutations
-  gate-ignores-line-counts          起跑闸不核绿行点名产物的行数                      gate-line-counts
-  t2-cover-skipped                  T₂ 不核进程挂钟包住各流之和                        t2-covers-the-streams
-  t2-any-product                    T₂ 不核计时产物在第 1 步绿行点名的产物里            t2-named-by-the-green-line
-  local-gate-without-rows-start     本机闸只看第 7 步绿，不看逐行编排起了没有          local-gate
-  running-ignores-end-lines         逐行编排在不在跑只看起过没有，不看退了没有          rows-orchestrator-running
-  h23-collision-skipped             H23 不核与修订 6 第二段、修订 8 第一段撞名          h23-collision
-  h24-old-names-accepted            H24 与修订 6 第二段、修订 8 第一段同名也收          h24-names
-  h25-sha-skipped                   H25 不核各文件的 sha256                             h25-files
-  h28-sha-skipped                   H28 不核文件的 sha256                               h28-files
-  dry-run-accepted                  干跑配置在 start 阶段也算过                         dry-run-refused
+弄坏开关 PLACEHOLDERS_R10_BREAK=<项>（只在 --selftest 起的子进程里认，PLACEHOLDERS_R10_SELFTEST=1）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
+  PLACEHOLDERS_R10_BREAK=unfilled-passes  没填（null）的占位当已填
+      「✗ 自证 unfilled-named：」
+  PLACEHOLDERS_R10_BREAK=gate-ignores-research-mutations  起跑闸不看研究一侧变异表那一单元
+      「✗ 自证 gate-research-mutations：」
+  PLACEHOLDERS_R10_BREAK=gate-ignores-line-counts  起跑闸不核绿行点名产物的行数
+      「✗ 自证 gate-line-counts：」
+  PLACEHOLDERS_R10_BREAK=t2-cover-skipped  T₂ 不核进程挂钟包住各流之和
+      「✗ 自证 t2-covers-the-streams：」
+  PLACEHOLDERS_R10_BREAK=t2-any-product  T₂ 不核计时产物在第 1 步绿行点名的产物里
+      「✗ 自证 t2-named-by-the-green-line：」
+  PLACEHOLDERS_R10_BREAK=local-gate-without-rows-start  本机闸只看第 7 步绿，不看逐行编排起了没有
+      「✗ 自证 local-gate：」
+  PLACEHOLDERS_R10_BREAK=running-ignores-end-lines  逐行编排在不在跑只看起过没有，不看退了没有
+      「✗ 自证 rows-orchestrator-running：」
+  PLACEHOLDERS_R10_BREAK=h23-collision-skipped  H23 不核与修订 6 第二段、修订 8 第一段撞名
+      「✗ 自证 h23-collision：」
+  PLACEHOLDERS_R10_BREAK=h24-old-names-accepted  H24 与修订 6 第二段、修订 8 第一段同名也收
+      「✗ 自证 h24-names：」
+  PLACEHOLDERS_R10_BREAK=h25-sha-skipped  H25 不核各文件的 sha256
+      「✗ 自证 h25-files：」
+  PLACEHOLDERS_R10_BREAK=h28-sha-skipped  H28 不核文件的 sha256
+      「✗ 自证 h28-files：」
+  PLACEHOLDERS_R10_BREAK=dry-run-accepted  干跑配置在 start 阶段也算过
+      「✗ 自证 dry-run-refused：」
+  PLACEHOLDERS_R10_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  PLACEHOLDERS_R10_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 

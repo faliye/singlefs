@@ -109,7 +109,7 @@ def missing_tokens(old_text, new_text, extra_texts):
     missing = []
     for kind, fragment in sorted(tokens_of(old_body)):
         if kind == '数':
-            present = re.search(r'(?<![\d.,])' + re.escape(fragment) + r'(?![\d])', haystack) is not None
+            present = re.search(r'(?<![\d.,])' + re.escape(fragment) + r'(?!\d|[.,]\d)', haystack) is not None
         else:
             present = normalized(fragment) in haystack
         if not present:

@@ -873,6 +873,25 @@ fn query_phase(
     (reads_per_query[0], reads_per_query[1], key_set_sizes[0], key_set_sizes[1])
 }
 
+/// 登记的叶数与负载次数；不给对应参数就是它们（缓存节点数的登记值是 DEFAULT_CACHE_NODE_COUNT）。
+const REGISTERED_LEAF_COUNT: usize = 1024;
+const REGISTERED_OPERATION_COUNT: u64 = 200_000;
+
+/// 与登记规模不同的参数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+/// 每项是（名字，这一趟的值，登记的值）；全部等于登记值时不接。
+fn reduced_scale_note(scales: &[(&str, u64, u64)]) -> String {
+    let registered_values: Vec<String> = scales
+        .iter()
+        .filter(|(_, actual, registered)| actual != registered)
+        .map(|(name, _, registered)| format!("registered_{name}={registered}"))
+        .collect();
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 fn main() {
     let device_path = std::env::args().nth(1).unwrap_or_else(|| {
         eprintln!("用法：e56_epsilon <块设备或文件> [种子] [none|selfcheck|nodirect] [缓存节点数] [叶数] [负载次数]");
@@ -884,10 +903,10 @@ fn main() {
     let opens_device_with_direct_flag = mode != "nodirect";
     let cache_node_count: usize = std::env::args().nth(4).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(DEFAULT_CACHE_NODE_COUNT);
     // 第 5 个参数：叶数。**在构造任何 Geom 之前设定，此后不再改。**
-    let leaf_count_argument: usize = std::env::args().nth(5).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(1024);
+    let leaf_count_argument: usize = std::env::args().nth(5).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(REGISTERED_LEAF_COUNT);
     unsafe { LEAF_COUNT_AT_RUNTIME = leaf_count_argument.max(2) };
     // 第 6 个参数：负载次数。必须远大于总缓冲容量，见「稳态可用区」。
-    let operation_count_argument: u64 = std::env::args().nth(6).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(200_000);
+    let operation_count_argument: u64 = std::env::args().nth(6).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(REGISTERED_OPERATION_COUNT);
     unsafe { OPERATION_COUNT_AT_RUNTIME = operation_count_argument.max(1) };
 
     let mut open_options = OpenOptions::new();
@@ -919,7 +938,7 @@ fn main() {
              leaf_cap={LEAF_ENTRY_CAPACITY} keys_per_leaf={KEYS_PER_LEAF} n_leaf={} keys={} \
              ops={} qn={POINT_QUERIES_PER_KEY_SET} wb_cap={WRITE_BUFFER_CAPACITY} ckpt={CHECKPOINT_INTERVAL} cache_nodes={cache_node_count} \
              base_fanout={} base_height={} base_nodes={} cache_ratio={:.4} \
-             seed={seed} mode={mode} o_direct={opens_device_with_direct_flag} blkstat={}",
+             seed={seed} mode={mode} o_direct={opens_device_with_direct_flag} blkstat={}{}",
             nleaf(),
             key_count(),
             operation_count(),
@@ -927,7 +946,12 @@ fn main() {
             base_geometry.height(),
             base_geometry.total_nodes(),
             cache_node_count as f64 / base_geometry.total_nodes() as f64,
-            read_block_layer_counters(&device_path).is_some()
+            read_block_layer_counters(&device_path).is_some(),
+            reduced_scale_note(&[
+                ("cache_nodes", cache_node_count as u64, DEFAULT_CACHE_NODE_COUNT as u64),
+                ("leaves", leaf_count_argument as u64, REGISTERED_LEAF_COUNT as u64),
+                ("operations", operation_count_argument, REGISTERED_OPERATION_COUNT),
+            ])
         ))
     );
 
@@ -1296,5 +1320,22 @@ mod tests {
         node.compact();
         assert_eq!(node.get(7), Some(2), "压实之后仍该是后写的那个");
         assert_eq!(node.entry_count, 1, "压实该把同 key 合成一条");
+    }
+
+    /// 给了缩规模的缓存节点数、叶数或负载次数，config 行要写缩过、不当正式产物；三项都是登记值不加这一段。
+    #[test]
+    fn reduced_cache_leaves_or_operations_are_marked_and_registered_ones_are_not() {
+        let registered = [
+            ("cache_nodes", DEFAULT_CACHE_NODE_COUNT as u64, DEFAULT_CACHE_NODE_COUNT as u64),
+            ("leaves", REGISTERED_LEAF_COUNT as u64, REGISTERED_LEAF_COUNT as u64),
+            ("operations", REGISTERED_OPERATION_COUNT, REGISTERED_OPERATION_COUNT),
+        ];
+        assert_eq!(reduced_scale_note(&registered), "");
+        let reduced = [
+            ("cache_nodes", DEFAULT_CACHE_NODE_COUNT as u64, DEFAULT_CACHE_NODE_COUNT as u64),
+            ("leaves", REGISTERED_LEAF_COUNT as u64, REGISTERED_LEAF_COUNT as u64),
+            ("operations", 1000, REGISTERED_OPERATION_COUNT),
+        ];
+        assert_eq!(reduced_scale_note(&reduced), " reduced=yes registered_operations=200000 not_official_product=yes");
     }
 }

@@ -27,34 +27,10 @@ def load_host_module(name, filename):
 stamp = load_host_module('stamp_review', 'source-stamp.py')
 minimal = load_host_module('minimal_review', 'minimal-copy.py')
 logs = load_host_module('logs_review', 'two_logs.py')
-broadcast = load_host_module('broadcast_review', 'resource_release_broadcast.py')
 environment_check = load_host_module('environment_review', 'test-environment-check.py')
-dispatch = load_host_module('dispatch_review', 'host-dispatch.py')
-resources = load_host_module('resources_review', 'host-resources.py')
 
 
 class InputBoundaryTests(unittest.TestCase):
-    def test_dispatch_refuses_invalid_wait_before_launch(self):
-        for value in ('nan', 'inf', '-1', 'invalid'):
-            with self.subTest(value=value), mock.patch.dict(os.environ, HOST_DISPATCH_WAIT_SECONDS=value), \
-                 mock.patch.object(dispatch, 'run_request', return_value=0) as launch:
-                self.assertEqual(dispatch.main(['--', 'true']), dispatch.EXIT_USAGE)
-                launch.assert_not_called()
-
-    def test_resource_probe_refuses_invalid_timing_before_collect(self):
-        for variable in ('HOST_RESOURCES_SAMPLE_SECONDS', 'HOST_RESOURCES_HOST_TIMEOUT_SECONDS'):
-            for value in ('nan', 'inf', '-1', 'invalid'):
-                with self.subTest(variable=variable, value=value), mock.patch.dict(os.environ, {variable: value}), \
-                     mock.patch.object(resources, 'collect', return_value={}) as collect, \
-                     mock.patch.object(resources, 'render', return_value=''):
-                    self.assertEqual(resources.main([], output=lambda line: None), resources.EXIT_USAGE)
-                    collect.assert_not_called()
-
-    def test_event_follow_refuses_nonfinite_since(self):
-        for value in ('nan', 'inf', '-inf'):
-            with self.subTest(value=value), mock.patch.object(broadcast.os, 'getppid', side_effect=[1, 2]):
-                self.assertEqual(broadcast.command_follow(['--since', value]), 2)
-
     def test_ownership_break_switch_cannot_turn_dry_run_into_deletion(self):
         with tempfile.TemporaryDirectory(prefix='hosts-ownership-review-') as work:
             tree = Path(work) / 'mine'
@@ -112,13 +88,6 @@ class InputBoundaryTests(unittest.TestCase):
                     with mock.patch.object(logs.subprocess, 'Popen') as start:
                         self.assertEqual(logs.run_wrapped(str(Path(work) / 'log'), ['true'], quiet=True), logs.EXIT_USAGE)
                         start.assert_not_called()
-
-    def test_event_wait_rejects_nonfinite_timeout(self):
-        for value in ('nan', 'inf', '-inf'):
-            with self.subTest(value=value), mock.patch.object(broadcast, 'wait_for_events', return_value=[]) as wait:
-                self.assertEqual(broadcast.command_wait(['--after', '0', '--timeout', value]), 2)
-                wait.assert_not_called()
-
 
 class CleanupRegressionTests(unittest.TestCase):
     def setUp(self):

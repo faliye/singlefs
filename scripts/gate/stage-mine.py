@@ -66,7 +66,7 @@ dry-run 报「留在工作区 1 块」，留下的正是那一行的旧版。
   STAGE_MINE_BREAK=first-occurrence-anchor   choose_rows() 找锚点退回取底的块里第一处命中（改前的写法）
       红在块里有重复行：「✗ selftest: 重复行：| MINE | 应当落在第二张表的 |---| 之后」
   STAGE_MINE_BREAK=keep-foreign-refuses   --keep-foreign 不生效：命中 --foreign 的块照旧整份拒（改前的样子）
-      红在 --keep-foreign：「✗ selftest: --keep-foreign 应当只暂存我那一块」
+      红在 --keep-foreign：「✗ record.md：进暂存区的一块里有命中 --foreign 的行」、「✗ selftest: --keep-foreign 应当只暂存我那一块」
   STAGE_MINE_BREAK=verify-without-rename   --verify 不套改名：删除行原样与新增行相减
       红在 --verify 只改名：「✗ selftest: --verify 只改名的暂存应当剩 0 行、退 0」
   STAGE_MINE_BREAK=verify-set-difference   --verify 按集合相减（同一行几份只算一份）
@@ -672,6 +672,39 @@ def main():
     sys.exit(run(sys.argv[1:], top))
 
 
+BREAK_VARIABLES = ("STAGE_MINE_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/stage-mine.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     main()

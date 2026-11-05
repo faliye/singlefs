@@ -23,14 +23,22 @@
 # 编译目录在 ${TMPDIR:-/tmp} 下，约 1 GiB。
 # 退出码：0 装好（或已是最新）；1 拒绝或失败（原因与下一步写在 stderr）。
 #
-# 弄坏开关 BUILD_PATCHED_QEMU_BREAK=<项>（只给证红用；--selftest 里点名的那一格判错）：
-#   skip-dsc-checksum     不核 .dsc 自己的 sha256          → 「.dsc 改了一个字节」那一格
-#   skip-file-checksum    不核 .dsc 列出的文件             → 「tarball 改了一个字节」「tarball 短了一截」两格
-#   allow-volatile-home   私有目录落在开机会清空的地方也放行 → 「私有目录在 /tmp 下」「私有目录在 tmpfs 上」两格
-#   skip-version-match    不核系统 qemu-system-x86 的版本  → 「系统包版本不同」那一格
-#   skip-patch-readback   打完补丁不回读                   → 「源码树里没有补丁那一行」那一格
-#   stamp-ignores-patch   装过的戳不记补丁的 sha256        → 「补丁变了要重编」那一格
-#   threads-from-nproc    make 的并行数缺省取核数（改前）   → 「没设上限时 make 的并行数是登记的重活默认」那一格
+# 弄坏开关 BUILD_PATCHED_QEMU_BREAK=<项>（只在 --selftest 里认：命令行第一个参数不是 --selftest 时设了它，在别的一切判之前退 2、点名它只在自证里认）。
+# 逐项写开关名、弄坏哪一处，下一行起写打开后自证红的格（自证逐格打「✗ <格名>：该红，判成绿（…）」，末尾一句「✗ 自证 N 格里 M 格判错：<格名…>」）：
+#   BUILD_PATCHED_QEMU_BREAK=skip-dsc-checksum  不核 .dsc 自己的 sha256
+#       「.dsc 改了一个字节」
+#   BUILD_PATCHED_QEMU_BREAK=skip-file-checksum  不核 .dsc 列出的文件
+#       「tarball 改了一个字节」「tarball 短了一截」
+#   BUILD_PATCHED_QEMU_BREAK=allow-volatile-home  私有目录落在开机会清空的地方也放行
+#       「私有目录在 /tmp 下」「私有目录在 /dev/shm 下」「私有目录在 tmpfs 上」
+#   BUILD_PATCHED_QEMU_BREAK=skip-version-match  不核系统 qemu-system-x86 的版本
+#       「系统包版本不同」
+#   BUILD_PATCHED_QEMU_BREAK=skip-patch-readback  打完补丁不回读
+#       「源码树里没有补丁那一行」
+#   BUILD_PATCHED_QEMU_BREAK=stamp-ignores-patch  装过的戳不记补丁的 sha256
+#       「补丁变了要重编」
+#   BUILD_PATCHED_QEMU_BREAK=threads-from-nproc  make 的并行数缺省取核数（改前）
+#       「没设上限时 make 的并行数是登记的重活默认」
 #
 # admission: always 每次调都现判私有目录里装的是不是这一份源码与补丁、核不核得过，装好了它自己什么都不做就退出
 # run-condition: single-instance
@@ -38,6 +46,14 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+
+# 弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行第一个参数不是 --selftest 而 BUILD_PATCHED_QEMU_BREAK 非空（不管值是什么），
+# 在一切别的判之前退 2、点名它只在自证里认，一步都没做（下面认不认得这个值的那一判也在它后面）
+if [[ -n "${BUILD_PATCHED_QEMU_BREAK:-}" && "${1:-}" != --selftest ]]; then
+  echo "  ✗ BUILD_PATCHED_QEMU_BREAK 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证，一步都没做" >&2
+  echo "     → 怎么办：去掉 BUILD_PATCHED_QEMU_BREAK 再跑；要证红就跑 BUILD_PATCHED_QEMU_BREAK=<项> bash scripts/devices/build-patched-qemu.sh --selftest" >&2
+  exit 2
+fi
 
 script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd "$script_directory/../.." && pwd)"
@@ -318,7 +334,7 @@ case "${1:-}" in
   *) die "认不出的参数 $1" "用法：build-patched-qemu.sh [--rebuild]，或 build-patched-qemu.sh --selftest" ;;
 esac
 [[ $# -eq 0 ]] || die "多给了参数：$*" "用法：build-patched-qemu.sh [--rebuild]，或 build-patched-qemu.sh --selftest"
-[[ "$build_threads" =~ ^[1-9][0-9]*$ ]] || die "并行数「$build_threads」不是正整数" "SINGLEFS_THREAD_CAP 设成正整数，或经 scripts/hosts/capped.sh <上限> 起这个脚本"
+[[ "$build_threads" =~ ^[1-9][0-9]*$ ]] || die "并行数「$build_threads」不是正整数" "并行数取每台默认重活线程数（.claude/heavy-thread-default 的登记值），照上一行的原因修登记；整条经 task-server/task submit -- bash scripts/devices/build-patched-qemu.sh 交，线程由服务定，不自己设 SINGLEFS_THREAD_CAP"
 
 system_version="$(dpkg-query -W -f='${Version}' "$SYSTEM_QEMU_PACKAGE" 2>/dev/null)" || system_version="（没装）"
 problem="$(system_version_problem "$system_version")" \
@@ -458,7 +474,7 @@ echo "── 换进 $install_home ──"
 install_parent="$(dirname "$install_home")"
 mkdir -p "$install_parent"
 incoming="$(mktemp -d "$install_parent/.singlefs-qemu-incoming.XXXXXX")"
-cp -a "$staged_home/." "$incoming/" || { rm -rf "${incoming:?}"; die "拷不进 $incoming" "看 $install_parent 的空间与权限"; }
+cp -dR --preserve=timestamps,links "$staged_home/." "$incoming/" || { rm -rf "${incoming:?}"; die "拷不进 $incoming" "看 $install_parent 的空间与权限"; }
 stamp_text "$patch_sha256" > "$incoming/$STAMP_FILE_NAME"
 previous=""
 if [[ -e "$install_home" ]]; then

@@ -26,12 +26,18 @@
 
 退出码：0 都不超（乙可以是本次未跑）；1 有超的（逐个列路径与大小，乙另列提交号）；2 用法错；77 根不是 git 仓的顶层、或既没有跟踪文件也没有待检查的未推送提交。
 
-弄坏开关 LARGE_FILE_CHECK_BREAK=<项>（逗号隔开可给几项；门禁那一格把 CODE_TOOLING_BREAK=committed-size-<项> 折成这里的 <项>）：
-  tracked-half-skipped    甲不判：committed-file-size-red 判绿
-  unpushed-half-skipped   乙不判：committed-file-size-unpushed-red、committed-file-size-detached-red 判绿
-  limit-inclusive         恰好等于上限的也算超：committed-file-size-green（里面放了一个恰好等于门限的文件）判红
-  no-upstream-as-pass     没有上游时乙当成判过、查了 0 笔：committed-file-size-no-upstream-green 里「乙（还没推的提交）本次未跑」那条 want 找不到
-  detached-unresolved     游离的 HEAD 一律当没有上游：committed-file-size-detached-red 判绿
+弄坏开关（逗号隔开可给几项；这份脚本没有 --selftest，只在门禁样本根里认：门禁 code-tooling.sh 的 committed-file-size 格在样本根（当前目录有 .gate-cells 或 .gate-break-sample）里
+把 CODE_TOOLING_BREAK=committed-size-<项> 折成这里的 <项>转来，平常跑设了退 2、点名只在自证里认。下面「点名的项」是 code-tooling.sh 的样本名）：
+  LARGE_FILE_CHECK_BREAK=tracked-half-skipped  甲不判
+      「committed-file-size-red」判绿
+  LARGE_FILE_CHECK_BREAK=unpushed-half-skipped  乙不判
+      「committed-file-size-unpushed-red」「committed-file-size-detached-red」判绿
+  LARGE_FILE_CHECK_BREAK=limit-inclusive  恰好等于上限的也算超
+      「committed-file-size-green」（里面放了一个恰好等于门限的文件）判红
+  LARGE_FILE_CHECK_BREAK=no-upstream-as-pass  没有上游时乙当成判过、查了 0 笔
+      「committed-file-size-no-upstream-green」里「乙（还没推的提交）本次未跑」那条 want 找不到
+  LARGE_FILE_CHECK_BREAK=detached-unresolved  游离的 HEAD 一律当没有上游
+      「committed-file-size-detached-red」判绿
 """
 import os
 import stat
@@ -301,6 +307,24 @@ def main(arguments):
         return 1
 
 
+BREAK_VARIABLES = ("LARGE_FILE_CHECK_BREAK",)
+
+
+def settle_break_switches():
+    """弄坏开关只在门禁样本根里认（checks-owed.md C622），参数解析之前先过这一道：BREAK_VARIABLES 里有设了的，而当前目录不是样本根
+    （没有 .gate-cells 与 .gate-break-sample，或设了 GATE_STAGED_FROM），点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    sample_root = (os.path.exists(".gate-cells") or os.path.exists(".gate-break-sample")) and not os.environ.get("GATE_STAGED_FROM")
+    if not setting or sample_root:
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（门禁样本根里由 code-tooling.sh 转来）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 CODE_TOOLING_BREAK=committed-size-<项> 喂 code-tooling.sh 的样本（文件头）", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches()
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

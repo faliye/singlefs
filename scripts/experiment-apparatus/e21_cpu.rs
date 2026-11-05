@@ -86,9 +86,28 @@ fn decimal_gigabytes_per_second(bytes: usize, nanoseconds: u64) -> f64 {
     bytes as f64 / (nanoseconds as f64)
 }
 
+/// 登记的缓冲区大小（MiB）与轮数；不给参数就是它们。
+const REGISTERED_BUFFER_MEBIBYTES: usize = 2048;
+const REGISTERED_ROUND_COUNT: usize = 5;
+
+/// 与登记规模不同的参数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+/// 每项是（名字，这一趟的值，登记的值）；全部等于登记值时不接。
+fn reduced_scale_note(scales: &[(&str, u64, u64)]) -> String {
+    let registered_values: Vec<String> = scales
+        .iter()
+        .filter(|(_, actual, registered)| actual != registered)
+        .map(|(name, _, registered)| format!("registered_{name}={registered}"))
+        .collect();
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 fn main() {
-    let buffer_mebibytes: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(2048);
-    let round_count: usize = std::env::args().nth(2).and_then(|argument| argument.parse().ok()).unwrap_or(5);
+    let buffer_mebibytes: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(REGISTERED_BUFFER_MEBIBYTES);
+    let round_count: usize = std::env::args().nth(2).and_then(|argument| argument.parse().ok()).unwrap_or(REGISTERED_ROUND_COUNT);
     let core_count = std::thread::available_parallelism().map(|parallelism| parallelism.get()).unwrap_or(1);
     let mut emitter = Emitter::new();
     let mut output_text = String::new();
@@ -97,7 +116,7 @@ fn main() {
     let word_count = buffer_mebibytes * 1024 * 1024 / 8;
     let shared_words = Arc::new((0..word_count).map(|word_index| word_index as u64).collect::<Vec<u64>>());
     let buffer_byte_count = word_count * 8;
-    append_output_line(emitter.emit_raw(&format!("name=config mib={buffer_mebibytes} rounds={round_count} cores={core_count}")));
+    append_output_line(emitter.emit_raw(&format!("name=config mib={buffer_mebibytes} rounds={round_count} cores={core_count}{}", reduced_scale_note(&[("mib", buffer_mebibytes as u64, REGISTERED_BUFFER_MEBIBYTES as u64), ("rounds", round_count as u64, REGISTERED_ROUND_COUNT as u64)]))));
 
     let mut best_nanoseconds_by_thread_count = std::collections::BTreeMap::new();
     for &thread_count in &[1usize, 2, 4, 8, 16, 32] {
@@ -200,5 +219,14 @@ mod tests {
             }
             assert_eq!(previous_chunk_end, element_count, "th={thread_count} 分块没覆盖到末尾");
         }
+    }
+
+    /// 给了缩规模的缓冲区或轮数，config 行要写缩过、不当正式产物；两项都是登记值不加这一段。
+    #[test]
+    fn reduced_buffer_or_rounds_are_marked_and_registered_ones_are_not() {
+        let registered = [("mib", REGISTERED_BUFFER_MEBIBYTES as u64, REGISTERED_BUFFER_MEBIBYTES as u64), ("rounds", REGISTERED_ROUND_COUNT as u64, REGISTERED_ROUND_COUNT as u64)];
+        assert_eq!(reduced_scale_note(&registered), "");
+        let reduced = [("mib", 64, REGISTERED_BUFFER_MEBIBYTES as u64), ("rounds", REGISTERED_ROUND_COUNT as u64, REGISTERED_ROUND_COUNT as u64)];
+        assert_eq!(reduced_scale_note(&reduced), " reduced=yes registered_mib=2048 not_official_product=yes");
     }
 }

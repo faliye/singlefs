@@ -773,3 +773,13 @@ resolver = "2"
 opt-level = 3
 debug = true
 overflow-checks = true
+
+# E199（发布照抄上一版的代价）第一段：跑前登记 research/prompts/e199-preregistration-r4.md（第四份，没写到的照第三份）。纯算术计数模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e199-transaction-output-copy"
+path = "e199_transaction_output_copy.rs"
+
+# E203（准入之前扫类的步代价）第一段：跑前登记 research/prompts/e203-preregistration.md。计数模型，纯算术，不与 crates/ 共用代码；读量的那一路（插了计数的副本）打出的产物。
+[[bin]]
+name = "e203-admission-scan-cost"
+path = "e203_admission_scan_cost.rs"

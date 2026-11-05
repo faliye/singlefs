@@ -97,6 +97,15 @@ selftest() {
   return 0
 }
 
+# 弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行第一个参数不是 --selftest 而下面的变量有一个非空（不管值是什么），
+# 在参数解析之前退 2、点名它只在自证里认，一步都没做
+for break_variable in SNAPSHOT_CHECK_BREAK; do
+  if [[ -n "${!break_variable:-}" && "${1:-}" != --selftest ]]; then
+    echo "  ✗ $break_variable 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证，一步都没做" >&2
+    echo "     → 怎么办：去掉 $break_variable 再跑；要证红就跑 $break_variable=<项> bash scripts/devices/snapshot-check.sh --selftest" >&2
+    exit 2
+  fi
+done
 if [[ "${1:-}" == "--selftest" ]]; then selftest; exit $?; fi
 [[ $# -ge 1 && "$1" != --* ]] || die "用法：snapshot-check.sh <轮名> [--root 仓根]" "给三方轮名（快照在 research/prompts/<轮名>-snapshot/）"
 round="$1"; root="$(cd "$here/../.." && pwd)"; shift

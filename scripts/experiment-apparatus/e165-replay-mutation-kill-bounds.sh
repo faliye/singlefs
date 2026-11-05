@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都照此刻的仓、变异表与结果文件判还差哪几个变体，上一次跑完不替这一次作保
-# run-condition: command cargo python3 nice git
+# run-condition: command cargo python3 nice git rsync
 # E165（恢复重放有界穷举与变异杀伤界）第二段：量变异表里动 replay_journal 那五个函数的每个变体在小界内红不红、首红的 N。
 # 登记：research/prompts/e165-preregistration.md 5.5 第二段、5.6 的界、第九节甲表、第十二节修订第 10、11、12 条；
 #   第 1 次重跑 research/prompts/e165-r1-prereg.md 5.5 第二段、第九节（判定搬进 crates/singlefs-replay-prefix/src/lib.rs 之后，
@@ -14,9 +14,9 @@
 #   改的文件取变异行第二列，原文命中处要落在 choose_root_slot 或 choose_root 里）；每个变体逐 (域, M, U) 比 KJ0–KJ3 的违例数与
 #   root_choice_states 行，全跑不早停；产物每个变体一行（first_red_by_criterion、每格违例数 cells、ka_kj2 与 ka_pin）；红例账不落（9.3 第 5 条）。
 #   r3 模式要 --root 指第二段冻结根（REGISTERED_R3 钉着它的 recovery.rs、lib.rs、crates/mutations.tsv 的 sha256 与两个函数的区间），
-#   内存包装与第二段产物（TV7 的比对对象）取脚本所在的仓、不取 --root（冻结根里只有 Cargo.toml、Cargo.lock、.cargo、crates/）。
+#   --measure 用的内存包装与第二段产物（TV7 的比对对象）取脚本所在的仓、不取 --root（冻结根里只有 Cargo.toml、Cargo.lock、.cargo、crates/）。
 #
-#   e165-replay-mutation-kill-bounds.sh --profile r3 --root <第二段冻结根> --scratch <草稿目录> --output <产物> [--item <变体>]… [--jobs <并行度>] [--threads <每个变体的线程数>]
+#   e165-replay-mutation-kill-bounds.sh --profile r3 --root <第二段冻结根> --scratch <草稿目录> --output <产物> [--item <变体>]… [--jobs <并行度>] [--threads <每个变体的线程数>（只给自证）]
 #       r3 模式整轮：开头基线（核 criteria=root_choice 判决行在、与第二段产物 E7RESULT 逐行相同，不同退 6）、每个变体一份副本各编一次、收尾基线；
 #       7 个变体都有行、收尾基线与开头逐字相同，才写收尾三行；不给 --ledger（给了退 2）；r3 模式不认 --recheck、--select-rows、--measure（退 2）。
 #       选行 4 条（恰 1 行、文件列、原文命中 1 次、命中处落在两个函数里）有一条不满足，那一行记 outcome=not_compared（登记 TH5），别的行照做，整轮退 1。
@@ -33,10 +33,10 @@
 #   not_red_within_bounds 并报 differs_on=KG|KA|KG+KA。变体在 KA 上 KJ2 的违例数不等于登记钉值（v1823 → 18、v1824 → 52、v1825 → 36、v1826 → 18）记 ka_pin=mismatch，
 #   在 KG 上每个 (M, U) 格的 KJ1、KJ1T、KJ2 合计不等于登记第七节「本地择根序」表里它那一列（v1827 取 v1823 那一列）记 kg_pin=mismatch，整轮跑完退 1（TF7）；
 #   v1822、v1827 的 KA 读数 0、18 是登记里推的，不钉，报 ka_inferred=match|mismatch，KG 那一列的核不管钉没钉都做（kg_pin）。
-#   r4 模式要 --root 指第一段根（R4_REGISTERED 钉着它的 recovery.rs、lib.rs、crates/mutations.tsv 的 sha256 与两个函数的区间），内存包装与第一段产物（TV7 的比对对象）取脚本所在的仓、
+#   r4 模式要 --root 指第一段根（R4_REGISTERED 钉着它的 recovery.rs、lib.rs、crates/mutations.tsv 的 sha256 与两个函数的区间），--measure 用的内存包装与第一段产物（TV7 的比对对象）取脚本所在的仓、
 #   不取 --root；基线的 E7RESULT 行必须与第一段产物逐行相同（不同退 6）、criteria=root_choice_faults 的判决行要在（缺了退 7）；整遍峰值 RSS 约 1.7 GB，
-#   E165_KILL_BOUNDS_MEMORY_CAP 默认 4G（r2 512M、r3 1G），同时跑的变体数 --jobs 照机器的内存排队。
-#   e165-replay-mutation-kill-bounds.sh --profile r4 --root <第一段根> --scratch <草稿目录> --output <产物> [--item <变体>]… [--jobs <并行度>] [--threads <每个变体的线程数>]
+#   同时跑的变体数 --jobs 与每个变体的线程数 --threads 见「并行」一段；内存额度整条命令交 task-server（见「内存」一段）。
+#   e165-replay-mutation-kill-bounds.sh --profile r4 --root <第一段根> --scratch <草稿目录> --output <产物> [--item <变体>]… [--jobs <并行度>] [--threads <每个变体的线程数>（只给自证）]
 #       r4 模式整轮：开头基线、每个变体一份副本各编一次、收尾基线；7 个变体都有行、收尾基线与开头逐字相同，才写收尾三行；不给 --ledger（给了退 2）；
 #       r4 模式不认 --recheck、--select-rows、--measure（退 2）；选行 4 条有一条不满足，那一行记 outcome=not_compared（登记 TH5），别的行照做，整轮退 1。
 #   e165-replay-mutation-kill-bounds.sh --profile r4 --root <第一段根> --list-items
@@ -60,7 +60,7 @@
 #   第 5 次重跑 research/prompts/e165-r5-prereg.md 9.3（第二段）与修订 1「修1.九」乙（第五段 5-乙）：
 #   --pins r5   三个模式（不给 --profile、--profile r3、--profile r4）都认：开工核对改用 R5_PINS 那一套（第一段根 /tmp/claude-1000/e165-r5-segment1/root 上的
 #       recovery.rs、replay-prefix lib.rs、crates/mutations.tsv 的 sha256 与函数区间；名字、标签、KA / KG 钉值、custom_keys 同旧的），V7 / TV7 的比对对象换成第一段的重跑产物；
-#       自造表、标签表、内存包装与第一段产物一律取脚本所在的仓（第一段根里只有 Cargo.toml、Cargo.lock、.cargo、crates/）。不给 --pins 时三个模式照旧取原来三套，一个字不改。
+#       自造表、标签表、--measure 用的内存包装与第一段产物一律取脚本所在的仓（第一段根里只有 Cargo.toml、Cargo.lock、.cargo、crates/）。不给 --pins 时三个模式照旧取原来三套，一个字不改。
 #   --gate r2   只在 --profile r4 --pins r5 同给时认（别的组合退 2、一条都不跑）：调装置在 --bounds segment1 --family root_choice_faults 之后加 --gate r2；
 #       基线 family=root_choice_faults 的 name=config 行要带 witness_gate=r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots（5-甲 的装置在 --gate r2 时
 #       实际写的闸字段与值，见 5-甲 产物第一行），缺了退 7、变体一个不编；TV7 的比对对象换成 5-甲 的产物；
@@ -74,6 +74,10 @@
 #       「r5：--gate r2 整轮应当退 0、假装置每一次被调都带 --gate r2、产物带 gate=r2」（实际退 7：基线缺 R2 的闸字段、变体一个不编）
 #   E165_KILL_BOUNDS_BREAK=defaultone  --jobs、--threads 都不给时取 1 × 1（改前的样子），不取登记的重活默认并行度
 #       「--jobs、--threads 的缺省：…」（实际 (1, 1)）
+#   E165_KILL_BOUNDS_BREAK=fixedcopylist  每个变体的副本照写死的 FIXED_COPY_ENTRIES 拷，不取共用库的闭包（改前的样子：没有 path 依赖的 prune-server/ 与编译期读的 .claude/heavy-thread-default）
+#       「副本应当照共用库的闭包拷：…」（实际只有 Cargo.toml、Cargo.lock 与 crates/ 底下的）
+#   E165_KILL_BOUNDS_BREAK=copyconfigurationunset  副本里编、跑装置不交多机配置（改前的样子：--root 给的根不在 git 里，照它的位置找不到配置）
+#       「副本里起命令的多机配置应当取脚本所在的仓那一份：…」（实际没设得 None）
 #   下面两项外面打开时自证的每一趟都带着它（drive() 照下面七项那一段的带法）：
 #   E165_KILL_BOUNDS_BREAK=pincheckskipped  钉红例时不跑 --check（当场追加之后不核钉全）
 #       「账写完而钉表没钉时驱动当场核钉全应当判红、退 8、一次不编」（实际退 0）、「已收尾的一对重跑同一条命令应当只重做钉红例」（实际「核了 没核」）、
@@ -89,7 +93,7 @@
 #       原文命中 1 次、命中处落在 9.2 的函数里），再把 scripts/mutation/tables/e165_replay_bounded_enumeration_tags.tsv 里每行的标签集合与登记时的集合比；
 #       写 <产物>（已存在就不写、退 2），不编不跑。选不到（RQ4 / RQ6 有一行不满足）退 1，逐行比对结果照写；核对输入对不上（停机条款 RH1）退 4、不写。
 #       r2 登记 9.1 不判标签（附带照报）：Z5 不在标签表里，它那一行的标签几列写 not_judged_in_r2，只按原文命中 1 次判选没选到。
-#   e165-replay-mutation-kill-bounds.sh --scratch <草稿目录> --output <产物> --ledger <红例账> [--item <变体>]… [--jobs <并行度>] [--threads <每个变体的线程数>]
+#   e165-replay-mutation-kill-bounds.sh --scratch <草稿目录> --output <产物> --ledger <红例账> [--item <变体>]… [--jobs <并行度>] [--threads <每个变体的线程数>（只给自证）]
 #       跑还没落行的变体（给了 --item 就只看点名的）；每个变体跑完立刻记下，产物里照变体的次序落行；重跑同一条命令只补没跑的。
 #       27 个变体都有行、收尾的基线与开头逐字相同，才写收尾三行（name=restored、name=verdict、name=done）。
 #   e165-replay-mutation-kill-bounds.sh --scratch <草稿目录> --output <产物> --ledger <红例账> --recheck --item <变体>
@@ -119,8 +123,9 @@
 #   3. 基线（不改的副本）先编先跑 --profile r2 --bounds segment2；每个有 J6 行的 (域, N) 都要有 J6Qn 两行，缺了就是装置没带 --profile r2，退 7、
 #      变体一个不编（r2 9.4 第 6 条）；它每个 (域, N) 的行必须逐字出现在第一段 r2 档的两份产物里（作废条款 V7，r2 9.4 第 2 条、SV9），不然退 6
 #      （产物有不在的，这一项本次未跑，见「留存产物」一段）。
-#   4. 每个变体：把 Cargo.toml、Cargo.lock、.cargo、crates/（不带 target）拷成一份副本，原件另存在副本之外、核 sha256；
-#      改坏、`cargo build --release --offline -p singlefs-checker-tier --bin e165_replay_bounded_enumeration`（编不过记「无效」）、
+#   4. 每个变体：照 scripts/hosts/lib_repository_copy.py 在根上现算的共用清单与闭包（path 依赖、编译期读与运行期起的仓根文件）拷成一份副本（不带 target），
+#      原件另存在副本之外、核 sha256；副本里编、跑编出来的装置时，多机配置取脚本所在的仓那一份（照副本或冻结根的位置找不到它）；
+#      改坏、`cargo build --release --offline -p singlefs-verification --bin e165_replay_bounded_enumeration`（编不过记「无效」）、
 #      跑 --bounds segment2、逐行与基线比；红了的域在首红的 N 上找一个反例状态（两边的 --list-states 逐行比出第一个判定不同的状态），
 #      再拿两边的二进制各 --replay-state 单条重放一遍，判定必须与逐态行相同；收尾把原件拷回副本、核 sha256，删掉这份副本与编译目录。
 #   5. 收尾再建一份不改的副本重编重跑基线，输出必须与开头逐字相同；仓里 recovery.rs 的 sha256 与 `git status --porcelain crates/`
@@ -149,24 +154,34 @@
 #   first_text_red_criteria=<域>:<N>:<判据>+<判据>;…——每个域上任一条判据的 name=violations 行文字与基线不同的最小 N，与那个 N 上文字不同的全部判据名
 #   （SQ5 要 Z5 的这一格；每个变体都报）。
 #
-# 并行：--jobs 个变体同时做，每个变体的编译与装置各用 --threads 条线程；经 scripts/hosts/capped.sh N 起时 jobs × threads 不许超过 N。
+# 并行：--jobs 个变体同时做，每个变体的编译与装置各用 --threads 条线程；jobs × threads 不许超过线程上限 N（统一任务服务套的 capped.sh <N> 设的 SINGLEFS_THREAD_CAP）。
+#   --threads 只给自证（自证拿它把假跑压到 1 条线程）；交给统一任务服务的命令里不写，写了被拒。
 #   缺省：--jobs 不给是 1；--threads 不给是 N ÷ --jobs（向下取整，至少 1），N = SINGLEFS_THREAD_CAP，没设取登记的重活默认并行度（.claude/heavy-thread-default，
 #   scripts/hosts/heavy_threads.py）；所以什么都不给是 1 个变体、N 条线程（登记 31 时 jobs 1 × threads 31，--jobs 4 时 4 × 7）。
-# 内存：跑编译出来的二进制一律经 scripts/hosts/run-with-memory-cap.sh（上限 E165_KILL_BOUNDS_MEMORY_CAP，默认 512M：
-#   2026-10-01 量到基线 --bounds segment1 --family legal 的峰值 47 MiB，变体的用量没逐个量过，留十倍）；退出码 245（显存不够：起止之间内核报了
-#   NV_ERR_NO_MEMORY，单独报「显存不够」）与 250–254 的那一次不算结果，那个变体不落行，整条退 1（判法 wrapper_own_problem，三套变体共用）。
-#   cargo build 不跑编出来的代码，不经包装。
+# 内存：装置、基线与每个变体的二进制都直接起，脚本里不套内存包装、不设内层上限：整条命令交 task-server
+#   （task-server/task submit -- bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh …），内存额度按记录由服务给，撞上限由服务放大重排整条命令。
+#   变体的退出码一律是装置自己的退出码，照装置的退出码比，没有「包装的结局不算结果」那一支。
+#   唯一的例外是 --measure：它量的就是内存峰值，量编译那一步仍经 scripts/hosts/run-with-memory-cap.sh 8G 读它写的峰值表。
 #
-# 退出码：0 点名的都落了行（或本来就都有）；1 有变体没得出结果（包装结局、装置没跑完）、--recheck 对不上、或自证判红；2 用法不对；
+# 退出码：0 点名的都落了行（或本来就都有）；1 有变体没得出结果（装置没跑完）、--recheck 对不上、派出与收回的项数对不上（「每项一行与总计」一段）、或自证判红；
+#   2 用法不对（--item 写了不认识的变体名时列出可点名的全部变体）；
 #   3 锚点腐化；4 停机条款 H1（含自造表的 Z 行名字与登记不等）；5 作废条款 V6（收尾基线与开头不同，或仓里的 crates/ 在跑的时候变了）；6 作废条款 V7；
 #   7 基线里缺 J6Qn_ 行（装置没带 --profile r2，r2 9.4 第 6 条）；8 钉红例没过（当场追加或 --check 退非 0，「钉红例」一段）。
 # 弄坏开关 E165_KILL_BOUNDS_BREAK=<项>（只给 --selftest 证明它会红用，逗号分隔可给几个；不认识的项当场退出）。
 # 逐项写开关名、弄坏哪一处、打开后自证哪几项红（自证的例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
-#   E165_KILL_BOUNDS_BREAK=gpumemoryasresult  wrapper_own_problem 不认 245（显存不够），照装置自己的退出码往下比
-#       「经假内存包装跑一趟、包装退 245 时应当判不算结果、报显存不够」（实际退 245，判的 None）
 #   E165_KILL_BOUNDS_BREAK=progressnever  进度间隔的判断永不触发、一行进度都不打
 #       「假时钟上过了进度间隔（300 秒）应当各打一行、没到不打」（实际：差一秒 None；到了 None；再过一个间隔 None）
 #       「整轮里一个变体跑过进度间隔应当打出点名它的进度行」（实际退 0、进度行 []）
+#   下面三项是入口脚本格式那几格（「每项一行与总计」一段），外面打开时自证的每一趟都带着它：
+#   E165_KILL_BOUNDS_BREAK=itemcountsdropped  每项一行不带 judged=、red=、reused=（改前没有这几样）
+#       「整轮每项一行应当带判了、红了、复用了多少与秒，末行总计」、「补跑：已有行的两项应当各打一行 reused=1」
+#   E165_KILL_BOUNDS_BREAK=itemlinedropped  第一个做完的变体（基线除外）不打它那一行、不算收回（造一项收不回）
+#       「整轮每项一行应当带判了、红了、复用了多少与秒，末行总计」（实际派出 6 项、收回 5 项，退 1）
+#       连带红的格（这几趟都有变体做完，少收回一项就退 1）：「✗ 自检：整轮应当退 0」、「✗ 自检：补跑应当退 0」、「✗ 自检：补跑：已有行的两项」、「✗ 自检：r2：第一段产物不在时 V7 的比对」、
+#       「✗ 自检：--recheck 同一条」、「✗ 自检：整轮里一个变体跑过进度间隔」、「✗ 自检：r2 整轮」、「✗ 自检：r3 整轮」、「✗ 自检：弄坏开关 r3kapinunchecked 开着时同一趟」、
+#       「✗ 自检：r4 整轮」、「✗ 自检：弄坏开关 r4kgpinunchecked 开着时同一趟」、「✗ 自检：r5：--gate r2 整轮」
+#   E165_KILL_BOUNDS_BREAK=unknownitemunlisted  --item 写错时不列可点名的变体（改前只说「--list-items 看」）
+#       「--item 写了不认识的变体名应当退 2、列出可点名的 6 项、一次不编」
 #   下面四项是 r2 登记 9.5「驱动」三行加一项，外面打开时自证同样红（自证的 r2 那几趟把外面给的这四项原样传进去）：
 #   E165_KILL_BOUNDS_BREAK=j6qnfromj6  J6Qn 的首红取了 J6 那两行（9.5「J6Qn 的首红取了 J6 的列」）
 #       「r2：假变体 J6 在 N = 2、J6Qn 在 N = 3 与基线不同应当报 J6:L=2、J6Qn:L=3」（实际 J6Qn:L=2）
@@ -216,6 +231,12 @@
 #       「补跑之后每个变体恰好一行完整的」（实际 tsv-5、Z1 各 0 行）、「补齐之后要写收尾行」、
 #       「弄坏开关 rerunall 开着时应当每个变体都重编（证明上一例的 6 次来自只补没跑的）」（实际 4）、「r2 整轮应当退 0」（实际 3）
 #       连带红的格：「✗ 自检：r2：第一段产物不在时 V7 的比对」、「✗ 自检：r3 整轮：收尾行」、「✗ 自检：r3：K 族不红而 KA 读数等于钉值的变体记 not_red_within_bounds、ka_pin=match；推的两个（1…」、「✗ 自检：r3：假变体 KJ1 在 (1, 2)、KJ2 在 (1, 0) 与基线不同」、「✗ 自检：r3：假变体的 KA 读数不等于钉值」、「✗ 自检：r3：变体跑到装置自己退 1（halt 行）而 K 域 KJ0 变红」、「✗ 自检：r3：变异名选不到的那一行」、「✗ 自检：r3：第二段产物不在时 TV7 的比对」、「✗ 自检：r4 整轮：收尾行」、「✗ 自检：r4：KA 读数等于钉值、KG 读数等于那一列的变体记 ka_pin=match、kg_pin=match；推的 v1822、v1…」、「✗ 自检：r4：假变体 KJ1T 在 (1, 2, 无, 罩着)、KJ2 在 (1, 0, RN, 罩着) 与基线不同」、「✗ 自检：r4：假变体只在 KG 与基线不同（读数换成它自己那一列）」、「✗ 自检：r4：假变体的 KG 读数不等于它那一列」、「✗ 自检：r4：变体跑到装置自己退 1（halt 行）而 KF 域 KJ0 变红」、「✗ 自检：r4：变异名选不到的那一行」、「✗ 自检：r4：第一段产物不在时 TV7 的比对」、「✗ 自检：已收尾的一对重跑同一条命令」、「✗ 自检：弄坏开关 pincheckskipped 开着时」、「✗ 自检：弄坏开关 r3kapinunchecked 开着时同一趟」、「✗ 自检：弄坏开关 r4kgpinunchecked 开着时同一趟」、「✗ 自检：整轮写完账与产物要当场钉进钉表、再核钉全：红例账里有 1 行反例，钉表」、「✗ 自检：补跑补齐之后照样当场钉、当场核：同一批红例已钉，钉表」、「✗ 自检：账写完而钉表没钉时驱动当场核钉全」、「✗ 锚点腐化：Z1 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」、「✗ 锚点腐化：tsv-2 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」、『✗ 锚点腐化：tsv-3 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次』、「✗ 锚点腐化：tsv-5 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」
+# 每项一行与总计（.claude/rules/test-script-discipline.md「入口脚本：不带参数就是剪枝跑全部项」）：三套整轮（不给 --profile、--profile r3、--profile r4）都往 stdout 打，
+#   每个点名的变体（含基线）一行 E165_KILL_BOUNDS_ITEM item=<变体> exit=<0 得出结果、1 没得出> judged=<这一趟现判 1，否则 0> red=<那一行的结局是 red 记 1，否则 0>
+#   reused=<产物里或草稿目录的记录里已有、这一趟没跑记 1，否则 0> seconds=<这一项的挂钟>；这一趟跑的做完时打，已有的开跑前打。
+#   整轮收尾（中途停机退出的也算）末行 E165_KILL_BOUNDS_TOTAL dispatched=<派出几项> collected=<收回几项> items=<打了几行> judged= red= reused= failed= seconds=；
+#   派出与收回对不上（.claude/singlefs-ai-sop/rules/command-safety.md「并行不许把失败吃掉」）先打 ✗ 再打总计，本来退 0 的改退 1。
+#   已收尾（name=done）的产物重跑、--list-items、--select-rows、--measure、--clean 不打。判定复用就是「产物里已有行的变体不重跑」：没有按键存的判定库，也没有 --full。
 # 进度：跑着的时候每过 PROGRESS_INTERVAL_SECONDS 秒（300，.claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」定的进度间隔）往 stderr 打一行
 #   E165_KILL_BOUNDS_PROGRESS：挂钟、变体做完几个（共几个），在做的每一项在哪一步（建副本与编译、跑 --bounds segment2、在哪个 域:N 上找红例或单条重放）、
 #   这一步与这一项各跑了多久。开头与收尾的基线也算在做的项。
@@ -223,6 +244,15 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+# 弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行第一个参数不是 --selftest、又不是自证起的子进程而下面的变量有一个非空（不管值是什么），
+# 在参数解析之前退 2、点名它只在自证里认，一步都没做
+for break_variable in E165_KILL_BOUNDS_BREAK; do
+  if [[ -n "${!break_variable:-}" && "${1:-}" != --selftest && -z "${E165_KILL_BOUNDS_SELFTEST_ROOT:-}" ]]; then
+    echo "  ✗ $break_variable 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证，一步都没做" >&2
+    echo "     → 怎么办：去掉 $break_variable 再跑；要证红就跑 $break_variable=<项> bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --selftest" >&2
+    exit 2
+  fi
+done
 E165_KILL_BOUNDS_SELF_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 export E165_KILL_BOUNDS_SELF_PATH
 exec python3 - "$@" <<'PYTHON'
@@ -245,6 +275,7 @@ SELF_PATH = os.environ["E165_KILL_BOUNDS_SELF_PATH"]
 SCRIPT_DIRECTORY = os.path.dirname(SELF_PATH)
 sys.path.insert(0, os.path.join(SCRIPT_DIRECTORY, "..", "hosts"))
 from heavy_threads import default_heavy_threads  # noqa: E402
+import lib_repository_copy as repository_copy  # noqa: E402   拷副本的范围与副本里起命令的环境（scripts/hosts/lib_repository_copy.py）
 DEFAULT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 BIN_NAME = "e165_replay_bounded_enumeration"
 RECOVERY_PATH = "crates/singlefs-core/src/recovery.rs"
@@ -253,7 +284,7 @@ SOURCE_FILES = (RECOVERY_PATH, LIB_PATH)     # 变异改的文件取变异行第
 TABLE_PATH = "crates/mutations.tsv"
 CUSTOM_TABLE_PATH = "scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv"
 TAGS_TABLE_PATH = "scripts/mutation/tables/e165_replay_bounded_enumeration_tags.tsv"   # r1 9.3：每个变体在两版源码上的判定标签集合与依据
-COPIED_ROOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates")
+FIXED_COPY_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates")   # 弄坏开关 fixedcopylist 下照拷的那几样（改前的样子）
 WORK_DIRECTORY_NAME = "kill-bounds"
 # crates/mutations.tsv 的登记值在第一段收尾之前填不出（第一段要往表里加装置的行）：占位串让开工核对一律停在 RH1，填了真值才跑得起来。
 TABLE_SHA256_PENDING = "pending-segment1-frozen-root"
@@ -334,8 +365,9 @@ BREAK_MODES = ("noanchorcheck", "rerunall", "progressnever", "byrownumber", "nod
                "j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour",
                "r3itemsmissing", "r3firstredswap", "r3kapinunchecked", "r3noprofile",
                "r4itemsmissing", "r4firstredswap", "r4kgcountsasred", "r4kgpinunchecked", "r4noprofile",
-               "r5pinsignored", "r4gateignored", "gpumemoryasresult", "owntablesplit", "defaultone",
-               "pincheckskipped", "retainedmissingred")
+               "r5pinsignored", "r4gateignored", "owntablesplit", "defaultone",
+               "pincheckskipped", "retainedmissingred", "itemcountsdropped", "itemlinedropped", "unknownitemunlisted",
+               "fixedcopylist", "copyconfigurationunset")
 # 外面打开时自证的 r2 那几趟原样传进去的四项（文件头「弄坏开关」）
 R2_BREAK_MODES = ("j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour")
 # 外面打开时自证的 r3 那几趟原样传进去的四项（登记 r3 9.3 第 6 条的表）；别的趟不带
@@ -496,6 +528,55 @@ class Stop(Exception):
         self.code = code
 
 
+def unknown_item(name, names, listing):
+    """--item 写了不认识的变体名：列出可点名的变体，退 2（文件头「每项一行与总计」那一条规则）。"""
+    named = "" if "unknownitemunlisted" in BREAK else f"；可点名的 {len(names)} 项：{' '.join(names)}"
+    return Stop(EXIT_USAGE, f"  ✗ 不认识的变体：{name}{named}\n  → 怎么办：--item 照可点名的名字写；{listing} 逐行列变体与它的表、行号")
+
+
+ITEM_LINES = {"report": None}   # 这一趟整轮的那一份 ItemLines；文件末尾收尾时打总计
+
+
+class ItemLines:
+    """整轮每项一行与末行总计（文件头「每项一行与总计」）。打的时候由调用方拿着锁（work() 里那把），这里不另加锁。"""
+
+    def __init__(self):
+        self.dispatched = self.collected = self.lines = 0
+        self.judged = self.red = self.reused = self.failed = 0
+        self.dropped = False
+        self.started = time.monotonic()
+        ITEM_LINES["report"] = self
+
+    def emit(self, name, exit_code, judged, red, reused, seconds):
+        counts = "" if "itemcountsdropped" in BREAK else f" judged={judged} red={red} reused={reused}"
+        print(f"E165_KILL_BOUNDS_ITEM item={name} exit={exit_code}{counts} seconds={seconds:.1f}", flush=True)
+        self.lines += 1
+        self.judged, self.red, self.reused, self.failed = self.judged + judged, self.red + red, self.reused + reused, self.failed + (1 if exit_code else 0)
+
+    def reused_item(self, name, line):
+        self.emit(name, 0, 0, int(parse_row(line).get("outcome") == "red"), 1, 0.0)
+
+    def dispatch(self, count):
+        self.dispatched += count
+
+    def judged_item(self, name, record):
+        if "itemlinedropped" in BREAK and not self.dropped and name != "baseline":
+            self.dropped = True
+            return
+        self.collected += 1
+        outcome = parse_row(record["lines"][0]).get("outcome") if record["lines"] else None
+        self.emit(name, 1 if record["problem"] else 0, 0 if record["problem"] else 1, int(outcome == "red"), 0, record["timing"][2])
+
+    def close(self, code):
+        if self.collected != self.dispatched:
+            print(f"  ✗ 派出 {self.dispatched} 项、收回 {self.collected} 项：有变体做完了没打出它那一行，这一趟的总计不算数")
+            print("  → 怎么办：看上面每项一行少了哪个变体、它的日志在草稿目录 kill-bounds/ 下；修好之后重跑同一条命令")
+            code = code or EXIT_INCOMPLETE
+        print(f"E165_KILL_BOUNDS_TOTAL dispatched={self.dispatched} collected={self.collected} items={self.lines} judged={self.judged} red={self.red} "
+              f"reused={self.reused} failed={self.failed} seconds={time.monotonic() - self.started:.1f}", flush=True)
+        return code
+
+
 PROGRESS_INTERVAL_SECONDS = 300   # 进度间隔（文件头「进度」）
 
 
@@ -595,9 +676,9 @@ class Setup:
             with open(os.path.join(root, name + ".json"), encoding="utf-8") as handle:
                 self.registered = json.load(handle)
         self.cargo = [os.path.join(root, "fake-cargo")] if selftest else ["cargo"]
-        # r3 模式的 --root 是第二段冻结根（只有 Cargo.toml、Cargo.lock、.cargo、crates/）：内存包装与第二段产物取脚本所在的仓（自证里取假仓）。
+        # r3 模式的 --root 是第二段冻结根（只有 Cargo.toml、Cargo.lock、.cargo、crates/）：--measure 用的内存包装与第二段产物取脚本所在的仓（自证里取假仓）。
         self.script_root = root if selftest else DEFAULT_ROOT
-        # r2 模式原来的冻结根自己带 research/（自造表、标签表、内存包装、第一段产物都从根里读）；--pins r5 的根是第一段根，只有 crates/ 那几样，
+        # r2 模式原来的冻结根自己带 research/（自造表、标签表、--measure 用的内存包装、第一段产物都从根里读）；--pins r5 的根是第一段根，只有 crates/ 那几样，
         # 这几样改取脚本所在的仓（登记 r5 第十一节「根、清单、在哪编」：驱动的自造表与 scripts 取脚本所在的仓）。
         self.research_root = self.script_root if pins == "r5" else root
         self.memory_cap_runner = os.path.join(self.research_root if profile == "r2" else self.script_root, "scripts/hosts/run-with-memory-cap.sh")
@@ -618,31 +699,18 @@ class Setup:
         """复跑命令里要带的 --pins / --gate（照这一次给的原样写）。"""
         return (["--pins", self.pins] if self.pins else []) + (["--gate", self.gate] if self.gate else [])
 
-    def wrap(self, kind, command):
-        """跑编译出来的二进制：经内存包装（自证里的假二进制是 shell 脚本，直接跑）。command 第一项是二进制，档参数接在它后面（r2 9.4 第 2 条；r3 同法带 --profile r3）。"""
+    def device_command(self, command):
+        """跑编译出来的二进制：直接起，不套内存包装。command 第一项是二进制，档参数接在它后面（r2 9.4 第 2 条；r3 同法带 --profile r3）。"""
         if self.profile == "r2":
             profile = [] if "noprofile" in BREAK else DEVICE_PROFILE_ARGUMENTS
         elif self.profile == "r3":
             profile = [] if "r3noprofile" in BREAK else R3_DEVICE_PROFILE_ARGUMENTS
         else:
             profile = [] if "r4noprofile" in BREAK else R4_DEVICE_PROFILE_ARGUMENTS
-        command = command[:1] + profile + command[1:]
-        if self.selftest:
-            return command, dict(os.environ)
-        environment = dict(os.environ)
-        environment["RUN_WITH_MEMORY_CAP_KEY"] = f"e165-kill-bounds {kind}"
-        environment["RUN_WITH_MEMORY_CAP_PARALLEL_REASON"] = ("E165 第二段变体之间并行，每个变体各跑各的二进制（登记修订第 11 条）" if self.profile == "r2"
-                                                              else "E165 第 3 次重跑第三段变体之间并行，每个变体各跑各的二进制" if self.profile == "r3"
-                                                              else "E165 第 4 次重跑第二段变体之间并行，每个变体各跑各的二进制")
-        environment["RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON"] = "变体的内存用量没逐个量过，照基线峰值留十倍"
-        environment.setdefault("RUN_WITH_MEMORY_CAP_WAIT_SECONDS", "1800")
-        if kind == "segment2 run":
-            environment["RUN_WITH_MEMORY_CAP_TIME_LIMIT"] = "3600"
-        cap = os.environ.get("E165_KILL_BOUNDS_MEMORY_CAP", "512M" if self.profile == "r2" else "1G" if self.profile == "r3" else "4G")
-        return ["bash", self.memory_cap_runner, cap] + command, environment
+        return command[:1] + profile + command[1:], environment_in_the_copy(self.script_root)
 
 
-DEVICE_SOURCE_PATH = "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs"
+DEVICE_SOURCE_PATH = "crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs"
 
 
 def pins_config_text(setup):
@@ -666,7 +734,7 @@ _CRATES_MUTATION_ROWS = []
 
 def mutation_table_rows(setup):
     """crates/mutations.tsv 里成形的行：[(表行号, 各段原样)]。切表与成形照 scripts/mutation/crates-mutation-rows.py 的 read_table
-    （门禁 checker-tier-crates-mutation-replay 与 prove-red.sh 同一份）；弄坏开关 owntablesplit 下照改前自己切（四段以上就收）。"""
+    （门禁 crates-mutation-replay 与 prove-red.sh 同一份）；弄坏开关 owntablesplit 下照改前自己切（四段以上就收）。"""
     if "owntablesplit" in BREAK:
         rows = []
         for number, line in enumerate(read_source(setup, TABLE_PATH).split("\n"), 1):
@@ -681,7 +749,7 @@ def mutation_table_rows(setup):
         module = importlib.util.module_from_spec(specification)
         specification.loader.exec_module(module)
         _CRATES_MUTATION_ROWS.append(module)
-    rows, _malformed, _memory_from_table, _timeout_from_table = _CRATES_MUTATION_ROWS[0].read_table(os.path.join(setup.root, TABLE_PATH))
+    rows, _malformed = _CRATES_MUTATION_ROWS[0].read_table(os.path.join(setup.root, TABLE_PATH))
     return [(row.line_number, list(row.fields)) for row in rows]
 
 
@@ -1065,15 +1133,37 @@ def check_the_profile_rows(baseline):
 
 # ── 一个变体
 
-def copy_the_tree(setup, destination):
+COPY_ENTRIES_BY_ROOT = {}            # 每棵根只算一次闭包：一趟里根不变；几个变体并行建副本，用锁串起来
+COPY_ENTRIES_LOCK = threading.Lock()
+
+
+def copy_root_entries(root, destination):
+    """把 root 照 scripts/hosts/lib_repository_copy.py 在它上面现算的共用清单与闭包拷进 destination（不在就建；文件头「做法」第 4 步）。
+    闭包算不成、拷不成抛 Stop（退 1，点名哪一处）。弄坏开关 fixedcopylist：只拷 FIXED_COPY_ENTRIES（改前的样子）。"""
+    if "fixedcopylist" in BREAK:
+        entries = FIXED_COPY_ENTRIES
+    else:
+        with COPY_ENTRIES_LOCK:
+            if root not in COPY_ENTRIES_BY_ROOT:
+                try:
+                    COPY_ENTRIES_BY_ROOT[root] = repository_copy.copy_closure(root).entries
+                except ValueError as error:   # ClosureRefused 是它的子类
+                    raise Stop(EXIT_INCOMPLETE, f"  ✗ 副本的范围在 {root} 上算不成：{error}\n"
+                                                "  → 怎么办：照 scripts/hosts/lib_repository_copy.py 文件头「闭包」修好那一处（根里缺编译期读的文件就先补进根）") from error
+            entries = COPY_ENTRIES_BY_ROOT[root]
     os.makedirs(destination)
-    for entry in COPIED_ROOT_ENTRIES:
-        source = os.path.join(setup.root, entry)
-        if os.path.isdir(source):
-            shutil.copytree(source, os.path.join(destination, entry), symlinks=True,
-                            ignore=shutil.ignore_patterns("target"))
-        elif os.path.exists(source):
-            shutil.copy2(source, os.path.join(destination, entry))
+    try:
+        repository_copy.copy_entries(root, destination, entries)
+    except OSError as error:
+        raise Stop(EXIT_INCOMPLETE, f"  ✗ 副本 {destination} 没拷成：{error}\n  → 怎么办：看 rsync 的报错（盘满、权限）") from error
+
+
+def environment_in_the_copy(script_root, environment=None):
+    """副本里起命令（编、跑副本里编出来的装置）的环境：多机配置取脚本所在的仓那一份（scripts/hosts/lib_repository_copy.py 的
+    environment_for_commands_in_the_copy；--root 给的根与副本都不在 git 里，照它们的位置找不到配置）。弄坏开关 copyconfigurationunset：照原样交（改前的样子）。"""
+    if "copyconfigurationunset" in BREAK:
+        return dict(os.environ if environment is None else environment)
+    return repository_copy.environment_for_commands_in_the_copy(script_root, environment)
 
 
 def run_captured(command, environment, cwd=None, log_path=None):
@@ -1091,7 +1181,7 @@ def prepare_and_build(setup, item, directory, threads, wrap_build_for_measure=Fa
     if os.path.exists(directory):
         shutil.rmtree(directory)
     tree = os.path.join(directory, "tree")
-    copy_the_tree(setup, tree)
+    copy_root_entries(setup.root, tree)
     for path in SOURCE_FILES:
         if sha256_of_file(os.path.join(tree, path)) != setup.registered["files_sha256"][path]:
             raise Stop(EXIT_HALT_H1, f"  ✗ 停机条款 RH1：副本里的 {path} 的 sha256 不等于登记值\n  → 怎么办：仓里的源文件在跑的时候被改了；交回主 agent")
@@ -1107,13 +1197,12 @@ def prepare_and_build(setup, item, directory, threads, wrap_build_for_measure=Fa
             raise Stop(EXIT_ANCHOR, f"  ✗ 锚点腐化：{item['name']} 的原文在副本里的 {target} 命中 {text.count(item['old'])} 次\n  → 怎么办：改那一行的原文")
         with open(os.path.join(tree, target), "w", encoding="utf-8") as handle:
             handle.write(text)
-    environment = dict(os.environ)
+    environment = environment_in_the_copy(setup.script_root)
     environment["CARGO_TARGET_DIR"] = os.path.join(directory, "target")
     environment["CARGO_BUILD_JOBS"] = str(threads)
-    command = ["nice", "-n", "19"] + setup.cargo + ["build", "--release", "--offline", "-p", "singlefs-checker-tier", "--bin", BIN_NAME]
+    command = ["nice", "-n", "19"] + setup.cargo + ["build", "--release", "--offline", "-p", "singlefs-verification", "--bin", BIN_NAME]
     if wrap_build_for_measure:
         environment["RUN_WITH_MEMORY_CAP_KEY"] = "e165-kill-bounds measure build"
-        environment["RUN_WITH_MEMORY_CAP_PARALLEL_REASON"] = "E165 第二段定并行度之前量一次单变体编译的内存峰值"
         command = ["bash", setup.memory_cap_runner, "8G"] + command
     started = time.monotonic()
     completed = run_captured(command, environment, cwd=tree, log_path=os.path.join(directory, "build.log"))
@@ -1147,21 +1236,8 @@ def restore_and_remove(setup, directory, keep, target=None):
     return restored
 
 
-GPU_MEMORY_HIT_EXIT = 245   # run-with-memory-cap.sh：显存不够（命令退了非 0、起止之间内核报了 NV_ERR_NO_MEMORY），结果不算数
-
-
-def wrapper_own_problem(returncode):
-    """内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」）：这一次不算结果，交原因；装置自己的退出码交 None。
-    245（显存不够）单独一支；弄坏开关 gpumemoryasresult 下当装置自己的退出码。"""
-    if returncode == GPU_MEMORY_HIT_EXIT and "gpumemoryasresult" not in BREAK:
-        return f"内存包装退出码 {returncode}：显存不够（起止之间内核报了 NV_ERR_NO_MEMORY），这一次不算结果"
-    if 250 <= returncode <= 254:
-        return f"内存包装退出码 {returncode}，这一次不算结果"
-    return None
-
-
 def run_segment_two(setup, binary, threads, log_directory):
-    command, environment = setup.wrap("segment2 run", [binary] + setup.bounds_arguments())
+    command, environment = setup.device_command([binary] + setup.bounds_arguments())
     environment["E165_THREADS"] = str(threads)
     started = time.monotonic()
     completed = run_captured(["nice", "-n", "19"] + command, environment, log_path=os.path.join(log_directory, "run.log"))
@@ -1169,7 +1245,7 @@ def run_segment_two(setup, binary, threads, log_directory):
 
 
 def state_lines(setup, binary, kind, place):
-    command, environment = setup.wrap(kind, [binary, "--list-states" if kind == "list-states" else "--replay-state", place])
+    command, environment = setup.device_command([binary, "--list-states" if kind == "list-states" else "--replay-state", place])
     return subprocess.Popen(["nice", "-n", "19"] + command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
 
 
@@ -1242,11 +1318,6 @@ def process_item(setup, item, baseline, options):
         return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
     mark(options, item["name"], "跑 --bounds segment2")
     completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    wrapper_problem = wrapper_own_problem(completed.returncode)
-    if wrapper_problem:
-        restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        return {"lines": [], "ledger": [], "problem": wrapper_problem,
-                "timing": (build_seconds, run_seconds, time.monotonic() - started)}
     mutant_rows = result_rows(completed.stdout)
     domains, per_domain = compare_with_baseline(baseline["rows"], mutant_rows)
     finished = bool(mutant_rows) and mutant_rows[-1].startswith("E7RESULT name=done ")
@@ -1344,7 +1415,7 @@ def build_and_run_baseline(setup, options, name):
         options["progress"].finished(label, counted=False)
     rows = result_rows(completed.stdout)
     if completed.returncode != 0 or not rows or not rows[-1].startswith("E7RESULT name=done "):
-        raise Stop(EXIT_INCOMPLETE, f"  ✗ 基线没跑完或退出码不是 0（{completed.returncode}；日志 {directory}/run.log）\n  → 怎么办：退出码 245（显存不够）与 250–254 是内存包装的结局，照它报的办（245 先 nvidia-smi 看谁在用卡、等它跑完）；别的先单跑基线看")
+        raise Stop(EXIT_INCOMPLETE, f"  ✗ 基线没跑完或退出码不是 0（{completed.returncode}；日志 {directory}/run.log）\n  → 怎么办：先单跑基线看（撞内存上限的由 task-server 放大重排整条命令，不在这里判）")
     print(f"  基线 {name}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，{len(rows)} 行", file=sys.stderr)
     return {"binary": binary, "rows": rows, "exit": completed.returncode, "directory": directory}
 
@@ -1825,11 +1896,6 @@ def process_item_r4(setup, item, baseline, options):
         return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
     mark(options, item["name"], "跑 " + " ".join(setup.bounds_arguments()))
     completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    wrapper_problem = wrapper_own_problem(completed.returncode)
-    if wrapper_problem:
-        restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        return {"lines": [], "ledger": [], "problem": wrapper_problem,
-                "timing": (build_seconds, run_seconds, time.monotonic() - started)}
     mutant_rows = result_rows(completed.stdout)
     finished = bool(mutant_rows) and mutant_rows[-1].startswith("E7RESULT name=done ")
     panic_lines = [line for line in completed.stderr.split("\n") if "panicked at" in line]
@@ -1997,11 +2063,6 @@ def process_item_r3(setup, item, baseline, options):
         return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
     mark(options, item["name"], "跑 " + " ".join(setup.bounds_arguments()))
     completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    wrapper_problem = wrapper_own_problem(completed.returncode)
-    if wrapper_problem:
-        restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        return {"lines": [], "ledger": [], "problem": wrapper_problem,
-                "timing": (build_seconds, run_seconds, time.monotonic() - started)}
     mutant_rows = result_rows(completed.stdout)
     finished = bool(mutant_rows) and mutant_rows[-1].startswith("E7RESULT name=done ")
     panic_lines = [line for line in completed.stderr.split("\n") if "panicked at" in line]
@@ -2090,7 +2151,7 @@ def main_run(setup, options, item_names, recheck):
     by_name = {item["name"]: item for item in items}
     for name in item_names:
         if name not in by_name:
-            raise Stop(EXIT_USAGE, f"  ✗ 不认识的变体：{name}\n  → 怎么办：--list-items 看全部变体的名字")
+            raise unknown_item(name, list(by_name), "--list-items")
     wanted = [by_name[name] for name in item_names] if item_names else items
     recorded, closed, torn = recorded_items(options["output"])
     if "rerunall" in BREAK:
@@ -2115,6 +2176,10 @@ def main_run(setup, options, item_names, recheck):
     sha_at_start = source_hashes(setup)
     print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；已有行 {sum(1 for item in wanted if item['name'] in recorded)} 个；"
           f"这一次要跑 {len(to_run)} 个：{' '.join(item['name'] for item in to_run) or '无'}")
+    item_lines = ItemLines()   # 文件头「每项一行与总计」：已有的那几项开跑前各打一行
+    for item in wanted:
+        if item not in to_run:
+            item_lines.reused_item(item["name"], (recorded.get(item["name"]) or (stored_record(item) or {}).get("lines") or [""])[0])
 
     options["progress"] = Progress(len(to_run), progress_interval(setup))
     options["progress"].start()   # 守护线程：收尾基线跑完就停；中途 Stop 退出的，进程退出时随之结束
@@ -2167,6 +2232,7 @@ def main_run(setup, options, item_names, recheck):
         with lock:
             results[item["name"]] = record
             options["progress"].finished(item["name"])
+            item_lines.judged_item(item["name"], record)
             build_seconds, run_seconds, total_seconds = record["timing"]
             print(f"  {item['name']}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，合计 {total_seconds:.1f} 秒"
                   + (f"；没得出结果：{record['problem']}" if record["problem"] else ""), file=sys.stderr)
@@ -2182,6 +2248,7 @@ def main_run(setup, options, item_names, recheck):
     started = time.monotonic()
     halted = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
+        item_lines.dispatch(len(to_run))
         futures = [pool.submit(work, item) for item in to_run]
         for future in concurrent.futures.as_completed(futures):
             try:
@@ -2265,7 +2332,7 @@ def main_run_r3(setup, options, item_names):
     by_name = {item["name"]: item for item in items}
     for name in item_names:
         if name not in by_name:
-            raise Stop(EXIT_USAGE, f"  ✗ 不认识的变体：{name}\n  → 怎么办：--profile r3 --list-items 看全部变体的名字")
+            raise unknown_item(name, list(by_name), "--profile r3 --list-items")
     wanted = [by_name[name] for name in item_names] if item_names else items
     recorded, closed, torn = recorded_items(options["output"])
     if "rerunall" in BREAK:
@@ -2287,6 +2354,10 @@ def main_run_r3(setup, options, item_names):
     sha_at_start = source_hashes(setup)
     print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；已有行 {sum(1 for item in wanted if item['name'] in recorded)} 个；"
           f"这一次要跑 {len(to_run)} 个：{' '.join(item['name'] for item in to_run) or '无'}")
+    item_lines = ItemLines()   # 文件头「每项一行与总计」：已有的那几项开跑前各打一行
+    for item in wanted:
+        if item not in to_run:
+            item_lines.reused_item(item["name"], (recorded.get(item["name"]) or (stored_record(item) or {}).get("lines") or [""])[0])
 
     options["progress"] = Progress(len(to_run), progress_interval(setup))
     options["progress"].start()
@@ -2332,6 +2403,7 @@ def main_run_r3(setup, options, item_names):
         with lock:
             results[item["name"]] = record
             options["progress"].finished(item["name"])
+            item_lines.judged_item(item["name"], record)
             build_seconds, run_seconds, total_seconds = record["timing"]
             print(f"  {item['name']}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，合计 {total_seconds:.1f} 秒"
                   + (f"；没得出结果：{record['problem']}" if record["problem"] else ""), file=sys.stderr)
@@ -2347,6 +2419,7 @@ def main_run_r3(setup, options, item_names):
     started = time.monotonic()
     halted = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
+        item_lines.dispatch(len(to_run))
         futures = [pool.submit(work, item) for item in to_run]
         for future in concurrent.futures.as_completed(futures):
             try:
@@ -2420,7 +2493,7 @@ def main_run_r4(setup, options, item_names):
     by_name = {item["name"]: item for item in items}
     for name in item_names:
         if name not in by_name:
-            raise Stop(EXIT_USAGE, f"  ✗ 不认识的变体：{name}\n  → 怎么办：--profile r4 --list-items 看全部变体的名字")
+            raise unknown_item(name, list(by_name), "--profile r4 --list-items")
     wanted = [by_name[name] for name in item_names] if item_names else items
     recorded, closed, torn = recorded_items(options["output"])
     if "rerunall" in BREAK:
@@ -2442,6 +2515,10 @@ def main_run_r4(setup, options, item_names):
     sha_at_start = source_hashes(setup)
     print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；已有行 {sum(1 for item in wanted if item['name'] in recorded)} 个；"
           f"这一次要跑 {len(to_run)} 个：{' '.join(item['name'] for item in to_run) or '无'}")
+    item_lines = ItemLines()   # 文件头「每项一行与总计」：已有的那几项开跑前各打一行
+    for item in wanted:
+        if item not in to_run:
+            item_lines.reused_item(item["name"], (recorded.get(item["name"]) or (stored_record(item) or {}).get("lines") or [""])[0])
 
     options["progress"] = Progress(len(to_run), progress_interval(setup))
     options["progress"].start()
@@ -2488,6 +2565,7 @@ def main_run_r4(setup, options, item_names):
         with lock:
             results[item["name"]] = record
             options["progress"].finished(item["name"])
+            item_lines.judged_item(item["name"], record)
             build_seconds, run_seconds, total_seconds = record["timing"]
             print(f"  {item['name']}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，合计 {total_seconds:.1f} 秒"
                   + (f"；没得出结果：{record['problem']}" if record["problem"] else ""), file=sys.stderr)
@@ -2503,6 +2581,7 @@ def main_run_r4(setup, options, item_names):
     started = time.monotonic()
     halted = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
+        item_lines.dispatch(len(to_run))
         futures = [pool.submit(work, item) for item in to_run]
         for future in concurrent.futures.as_completed(futures):
             try:
@@ -2578,18 +2657,22 @@ def measure(setup, options, name):
     check_the_anchors(items, texts)
     item = next((item for item in items if item["name"] == name), None)
     if item is None:
-        raise Stop(EXIT_USAGE, f"  ✗ 不认识的变体：{name}\n  → 怎么办：--list-items 看全部变体的名字")
+        raise unknown_item(name, [item["name"] for item in items], "--list-items")
     directory = os.path.join(options["work"], "measure-" + name)
     binary, problem, build_seconds = prepare_and_build(setup, item, directory, options["threads"], wrap_build_for_measure=True)
     peak = "没读到"
-    peaks_path = os.environ.get("RUN_WITH_MEMORY_CAP_PEAKS") or os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "singlefs", "memory-peaks.tsv")
-    if os.path.exists(peaks_path):
-        for line in open(peaks_path, encoding="utf-8"):
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) >= 4 and fields[3] == "e165-kill-bounds measure build":
-                peak = f"{int(fields[0]) / (1 << 20):.0f} MiB"
+    # 峰值表的位置与读法只在 scripts/hosts/memory_peaks_lib.py（共享数据根下一份、只认本台的行；RUN_WITH_MEMORY_CAP_PEAKS 给了照它）
+    sys.path.insert(0, os.path.join(DEFAULT_ROOT, "scripts", "hosts"))
+    import memory_peaks_lib
+    try:
+        peaks_path = os.environ.get("RUN_WITH_MEMORY_CAP_PEAKS") or memory_peaks_lib.default_peak_table()
+        row = memory_peaks_lib.read_peak_rows(peaks_path).get(memory_peaks_lib.command_key([], "e165-kill-bounds measure build"))
+        if row is not None:
+            peak = f"{row[0] / (1 << 20):.0f} MiB"
+    except (OSError, ValueError) as error:   # PeakTableUnavailable 与 TableRowRefused 都是 ValueError
+        peak = f"没读到（{error}）"
     print(f"量到：变体 {name}，{options['threads']} 线程冷编译（从改 recovery.rs 到编完 bin）挂钟 {build_seconds:.1f} 秒，"
-          f"内存峰值（cgroup memory.peak，含页缓存）{peak}；编译{'过了' if binary else '没过：' + problem}")
+          f"内存峰值（回收不掉的用量的峰值，不含页缓存）{peak}；编译{'过了' if binary else '没过：' + problem}")
     if binary:
         completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
         print(f"量到：跑 --bounds segment2（{options['threads']} 线程）挂钟 {run_seconds:.1f} 秒，退出码 {completed.returncode}，E7RESULT {len(result_rows(completed.stdout))} 行")
@@ -3022,25 +3105,38 @@ def selftest():
            f"--jobs、--threads 的缺省：什么都不给要 1 × 登记的重活默认并行度（{registered}）、只给 --jobs 4 要 4 × 登记值 ÷ 4、上限 7 要 1 × 7、给了的原样（实际 {defaults}）",
            "看 default_jobs_and_threads 与 .claude/heavy-thread-default")
 
+    # 副本的范围取共用库在根上现算的闭包（copy_root_entries）：假仓里 crates/demo 经 path 依赖仓根下的 served/、编译期读 .claude/heavy-thread-default
+    # ⇒ 两样连同共用清单拷进副本，research/ 不拷；副本里起命令的多机配置取脚本所在的仓那一份（environment_in_the_copy：假仓 git init 过，没设取它的 multi-host.env，设了的照原样）
+    with tempfile.TemporaryDirectory(prefix="e165-kill-bounds-copy-") as temporary:
+        source = os.path.join(temporary, "root")
+        for relative, text in (("Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["crates/demo"]\n'), ("Cargo.lock", "# lock\n"),
+                               ("crates/demo/Cargo.toml", '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n'
+                                                          '[dependencies]\nserved = { path = "../../served" }\n'),
+                               ("crates/demo/src/lib.rs", 'pub const THREADS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../.claude/heavy-thread-default"));\n'),
+                               ("served/Cargo.toml", '[package]\nname = "served"\nversion = "0.1.0"\nedition = "2021"\n'), ("served/src/lib.rs", "pub fn served() {}\n"),
+                               (".claude/heavy-thread-default", "7\n"), ("research/results/big.out", "r\n")):
+            os.makedirs(os.path.dirname(os.path.join(source, relative)), exist_ok=True)
+            write(os.path.join(source, relative), text)
+        copy = os.path.join(temporary, "copy")
+        try:
+            copy_root_entries(source, copy)
+            problem = None
+        except Stop as stop:
+            problem = str(stop)
+        copied = sorted(os.path.relpath(os.path.join(directory, name), copy) for directory, _, names in os.walk(copy) for name in names)
+        wanted = [".claude/heavy-thread-default", "Cargo.lock", "Cargo.toml", "crates/demo/Cargo.toml", "crates/demo/src/lib.rs", "served/Cargo.toml", "served/src/lib.rs"]
+        expect(problem is None and copied == wanted,
+               f"副本应当照共用库的闭包拷：应当是 {wanted}（path 依赖的 served/、编译期读的 .claude/heavy-thread-default 都在，research/ 不在），实际 {problem or copied}",
+               "看 copy_root_entries 与 scripts/hosts/lib_repository_copy.py 的 copy_closure、copy_entries")
+        git_made = subprocess.run(["git", "init", "-q", source], capture_output=True, stdin=subprocess.DEVNULL).returncode == 0
+        wanted_configuration = os.path.join(os.path.realpath(source), "multi-host.env")
+        unset = environment_in_the_copy(source, {}).get("SINGLEFS_MULTI_HOST_CONFIG")
+        given = environment_in_the_copy(source, {"SINGLEFS_MULTI_HOST_CONFIG": "/given/multi-host.env"}).get("SINGLEFS_MULTI_HOST_CONFIG")
+        expect(git_made and unset == wanted_configuration and given == "/given/multi-host.env",
+               f"副本里起命令的多机配置应当取脚本所在的仓那一份：没设应当是 {wanted_configuration}、设了的照原样，实际 git 建仓 {git_made}、没设得 {unset}、设了得 {given}",
+               "看 environment_in_the_copy 与 scripts/hosts/lib_repository_copy.py 的 environment_for_commands_in_the_copy")
+
     with tempfile.TemporaryDirectory(prefix="e165-kill-bounds-selftest-") as temporary:
-        # 内存包装自己的结局：不是自证模式的 Setup（经包装起），包装换成假的（它所在的根下 scripts/hosts/run-with-memory-cap.sh 只退给定的码），
-        # 走 run_segment_two 跑一趟，再照三套变体共用的 wrapper_own_problem 判
-        wrapper_root = os.path.join(temporary, "wrapper-root")
-        os.makedirs(os.path.join(wrapper_root, "scripts", "hosts"))
-        wrapper_codes = {}
-        for wrapper_exit in (245, 252, 101):
-            write(os.path.join(wrapper_root, "scripts/hosts/run-with-memory-cap.sh"),
-                  f"#!/usr/bin/env bash\n# 自证用的假内存包装：什么都不起，退 {wrapper_exit}\nexit {wrapper_exit}\n")
-            wrapper_log = os.path.join(temporary, f"wrapper-{wrapper_exit}")
-            os.makedirs(wrapper_log)
-            wrapped, _ = run_segment_two(Setup(wrapper_root, False), "/bin/true", 1, wrapper_log)
-            wrapper_codes[wrapper_exit] = (wrapped.returncode, wrapper_own_problem(wrapped.returncode))
-        expect(wrapper_codes[245][0] == 245 and "显存不够" in (wrapper_codes[245][1] or "") and "不算结果" in (wrapper_codes[245][1] or ""),
-               f"经假内存包装跑一趟、包装退 245 时应当判不算结果、报显存不够（实际退 {wrapper_codes[245][0]}，判的 {wrapper_codes[245][1]}）",
-               "看 wrapper_own_problem 的 245 那一支")
-        expect(wrapper_codes[252][1] is not None and "显存不够" not in wrapper_codes[252][1] and wrapper_codes[101][1] is None,
-               f"包装退 252 应当判不算结果（不说显存不够）、装置自己退 101 不算包装的结局（实际 {wrapper_codes[252][1]}、{wrapper_codes[101][1]}）",
-               "看 wrapper_own_problem 的 250–254 那一支")
         root = os.path.join(temporary, "root")
         os.makedirs(os.path.join(root, "crates/singlefs-core/src"))
         os.makedirs(os.path.join(root, "crates/singlefs-replay-prefix/src"))
@@ -3131,6 +3227,13 @@ def selftest():
         expect(re.search(r"item=Z1 .* outcome=red ", output) is not None, "自造的那一条（文件列 lib.rs）应当记 red", "看 load_items 读自造表")
         expect("已还原，基线与开头逐字相同" in completed.stdout and " name=restored " in output, "收尾要打「已还原，基线与开头逐字相同」并写 name=restored 行", "看 main_run 的收尾")
         expect(last_line == "E7RESULT name=done emitted=10", f"收尾行应当是 name=done emitted=10，实际 {last_line!r}", "emitted 数的是 E7RESULT 行，含 config 与 done")
+        item_rows = [line for line in completed.stdout.split("\n") if line.startswith("E165_KILL_BOUNDS_ITEM ")]
+        item_reds = {found.group(1): int(found.group(2)) for found in (re.match(r"E165_KILL_BOUNDS_ITEM item=(\S+) exit=0 judged=1 red=(\d) reused=0 seconds=\d+\.\d$", line) for line in item_rows) if found}
+        stdout_last = completed.stdout.rstrip("\n").split("\n")[-1]
+        expect(len(item_rows) == 6 and item_reds == {"baseline": 0, "tsv-2": 1, "tsv-3": 0, "tsv-4": 0, "tsv-5": 1, "Z1": 1}
+               and re.match(r"E165_KILL_BOUNDS_TOTAL dispatched=6 collected=6 items=6 judged=6 red=3 reused=0 failed=0 seconds=\d+\.\d$", stdout_last) is not None,
+               f"整轮每项一行应当带判了、红了、复用了多少与秒，末行总计派出 6 收回 6、红 3，实际 {item_rows}；末行 {stdout_last!r}",
+               "看 ItemLines 与三套 main_run 里 work() 的 judged_item")
         expect(re.search(r"tsv-2\t2\tL\t2\t1\tcounters\t\+J4\ttrue\ttrue\ttrue\t", ledger) is not None, f"红例账应当有 tsv-2 在 L、N = 2、序号 1、+J4、两边单条重放都对上的一行，实际：{ledger[-300:]!r}", "看 first_differing_state 与 replayed_state_line")
         expect(len(builds) == 7, f"整轮应当编 7 次（基线 2、变体 5），实际 {len(builds)}", "每个变体一份副本、编一次")
         expect(not os.path.exists(os.path.join(temporary, "scratch-full", WORK_DIRECTORY_NAME, "tsv-2")), "变体的副本与编译目录做完要删掉", "看 restore_and_remove")
@@ -3157,7 +3260,7 @@ def selftest():
 
         # 三、被打断的结果文件：只剩基线与第一条、末行半截；重跑只补没跑的。
         kept = [line for line in output.split("\n") if " name=config " in line or " item=baseline " in line or " item=tsv-2 " in line]
-        torn_line = [line for line in output.split("\n") if " item=tsv-3 " in line][0][:60]
+        torn_line = ([line for line in output.split("\n") if " item=tsv-3 " in line] or [""])[0][:60]
         interrupted = os.path.join(temporary, "resume.out")
         kept_text = "\n".join(kept).replace("full.", "resume.") + "\n" + torn_line
         write(interrupted, kept_text)
@@ -3171,6 +3274,13 @@ def selftest():
         expect(resumed.rstrip("\n").split("\n")[-1].startswith("E7RESULT name=done "), "补齐之后要写收尾行", "看 main_run 的收尾")
         complete_lines = lambda text: sorted(line for line in text.replace("resume.", "full.").split("\n") if line.endswith("complete=yes"))
         expect(complete_lines(resumed) == complete_lines(output), "补跑出来的变体行应当与整轮的逐字相同", "变体行里不许有随跑法变的量")
+        resumed_items = [line for line in completed.stdout.split("\n") if line.startswith("E165_KILL_BOUNDS_ITEM ")]
+        resumed_last = completed.stdout.rstrip("\n").split("\n")[-1]
+        expect(any(line.startswith("E165_KILL_BOUNDS_ITEM item=baseline exit=0 judged=0 red=0 reused=1 ") for line in resumed_items)
+               and any(line.startswith("E165_KILL_BOUNDS_ITEM item=tsv-2 exit=0 judged=0 red=1 reused=1 ") for line in resumed_items) and len(resumed_items) == 6
+               and re.match(r"E165_KILL_BOUNDS_TOTAL dispatched=4 collected=4 items=6 judged=4 red=3 reused=2 failed=0 ", resumed_last) is not None,
+               f"补跑：已有行的两项应当各打一行 reused=1（tsv-2 照产物里那一行记 red=1），末行总计派出 4 收回 4、复用 2，实际 {resumed_items}；末行 {resumed_last!r}",
+               "看 main_run 开跑前的 reused_item")
         pinned_after_resume = [line for line in read(pinned_table).split("\n") if line and not line.startswith("#")]
         expect(pinned_after_resume == pinned_rows and f"钉红例：钉进 0 行、核了 {len(ledger_examples)} 行" in completed.stdout,
                f"补跑补齐之后照样当场钉、当场核：同一批红例已钉，钉表应当不变、报钉进 0 行，实际 {len(pinned_after_resume)} 行：{completed.stdout[-300:]}",
@@ -3214,6 +3324,9 @@ def selftest():
         completed, builds = drive(["--list-items"])
         listed = [line for line in completed.stdout.split("\n") if line.strip()]
         expect(completed.returncode == 0 and len(listed) == 6 and len(builds) == 0, f"--list-items 应当列 6 个变体、不编，实际：{completed.stdout!r}", "看 main 的 list 分支")
+        completed, builds = drive(paths("unknown-item") + ["--item", "tsv-99"])
+        expect(completed.returncode == 2 and "不认识的变体：tsv-99；可点名的 6 项：baseline tsv-2 tsv-3 tsv-4 tsv-5 Z1" in completed.stdout and len(builds) == 0,
+               f"--item 写了不认识的变体名应当退 2、列出可点名的 6 项、一次不编，实际退 {completed.returncode}、编 {len(builds)} 次：{completed.stdout[-300:]}", "看 unknown_item")
 
         # 五、进度（假时钟）：差一秒到间隔不打；到了间隔打一行，点名在做的变体、它在哪一步、做完几个；再过一个间隔再打一行。
         clock = [1000.0]
@@ -3789,7 +3902,7 @@ def main(arguments):
     options["gate_field"] = f" gate={gate}" if gate else ""
     if profile in ("r3", "r4") and (action in ("select", "measure") or recheck or ledger is not None):
         raise Stop(EXIT_USAGE, f"  ✗ {profile} 模式不认 --select-rows、--measure、--recheck 与 --ledger（登记 {profile} 9.3：红例账不落，选行在整轮开头做）\n"
-                               f"  → 怎么办：{profile} 模式只有 --list-items、--clean 与整轮（--scratch、--output、--item、--jobs、--threads）")
+                               f"  → 怎么办：{profile} 模式只有 --list-items、--clean 与整轮（--scratch、--output、--item、--jobs；每个变体的线程数不写 --threads，取每台默认重活线程数 ÷ --jobs，经 task-server/task submit 交时 --threads 当场被拒）")
     if action == "list":
         items = load_items_r4(setup)[0] if profile == "r4" else load_items_r3(setup)[0] if profile == "r3" else load_items(setup)[0]
         for item in items:
@@ -3813,7 +3926,7 @@ def main(arguments):
         return EXIT_OK
     cap = os.environ.get("SINGLEFS_THREAD_CAP")
     if cap and cap.isdigit() and options["jobs"] * options["threads"] > int(cap):
-        raise Stop(EXIT_USAGE, f"  ✗ jobs × threads = {options['jobs'] * options['threads']} 超过线程上限 {cap}\n  → 怎么办：压小 --jobs 或 --threads")
+        raise Stop(EXIT_USAGE, f"  ✗ jobs × threads = {options['jobs'] * options['threads']} 超过线程上限 {cap}\n  → 怎么办：压小 --jobs、去掉 --threads（不写时取 {cap} ÷ --jobs；经 task-server/task submit 交时 --threads 当场被拒）")
     os.makedirs(options["work"], exist_ok=True)
     if action == "measure":
         return measure(setup, options, measure_name)
@@ -3843,8 +3956,11 @@ def main(arguments):
 
 
 try:
-    sys.exit(main(sys.argv[1:]))
+    exit_code = main(sys.argv[1:])
 except Stop as stop:
     print(str(stop))
-    sys.exit(stop.code)
+    exit_code = stop.code
+if ITEM_LINES["report"] is not None:
+    exit_code = ITEM_LINES["report"].close(exit_code)
+sys.exit(exit_code)
 PYTHON

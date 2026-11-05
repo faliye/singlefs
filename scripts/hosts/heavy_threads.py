@@ -17,10 +17,13 @@ default_heavy_threads(environment=os.environ, *, registration_file=None) -> int�
     （空行与 # 开头的行不算）要是「<正整数><空格或制表符>#<理由>」（理由不空），交那个数；文件不在、读不了、没有非注释行、
     那一行不是这个形状，都拒。拒了不退回按核数算。
 
-弄坏开关 HEAVY_THREADS_BREAK=<项>（逗号分隔，只给自证证红；与 heavy-threads.sh 认同样的名字），打开后自证哪几格红
-（失败行「✗ heavy_threads.py 自证：<格名>：…」）：
-  cap-unchecked                         SINGLEFS_THREAD_CAP 原样交出、不判正整数：「SINGLEFS_THREAD_CAP=0 拒」「SINGLEFS_THREAD_CAP=abc 拒」
-  missing-registration-uses-core-count  登记文件不在时照改前取本机核数：「登记文件不在拒」
+弄坏开关 HEAVY_THREADS_BREAK=<项>（逗号分隔，只给自证证红；与 heavy-threads.sh 认同样的名字）。只在自证里认：直接执行时平常跑设了就在一切之前退 2、点名变量只在自证里认；
+import 进来用的 default_heavy_threads 只在环境里有自证设的 HEAVY_COUNT_SELFTEST_MARK 时认开关，外面漏进来的开关改不了别的脚本取到的线程数。
+打开后自证哪几格红（失败行「✗ heavy_threads.py 自证：<格名>：…」）：
+  HEAVY_THREADS_BREAK=cap-unchecked  SINGLEFS_THREAD_CAP 原样交出、不判正整数
+      「✗ heavy_threads.py 自证：SINGLEFS_THREAD_CAP=0 拒」、「✗ heavy_threads.py 自证：SINGLEFS_THREAD_CAP=abc 拒」、「✗ heavy_threads.py 自证：拒的时候带出路」
+  HEAVY_THREADS_BREAK=missing-registration-uses-core-count  登记文件不在时照改前取本机核数
+      「✗ heavy_threads.py 自证：登记文件不在拒」
 """
 import os
 import re
@@ -30,6 +33,9 @@ REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 REGISTRATION_FILE = os.path.join(REPOSITORY, ".claude", "heavy-thread-default")
 THREAD_CAP_VARIABLE = "SINGLEFS_THREAD_CAP"
 BREAK_VARIABLE = "HEAVY_THREADS_BREAK"
+# 弄坏开关只在自证里认：自证设这个标记（起的子进程环境原样继承）才认开关，外面漏进来的开关改不了别的脚本取到的线程数；直接执行时平常跑设了开关一切之前退 2
+SELFTEST_MARK_VARIABLE = "HEAVY_COUNT_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "heavy-threads-selftest"   # 与 heavy-threads.sh 的自证同一句：两份互相对拍，各起对方的子进程
 POSITIVE_INTEGER = re.compile(r"[1-9][0-9]*")
 COMMENT_OR_BLANK = re.compile(r"[ \t]*(#|$)")
 REGISTRATION_LINE = re.compile(r"[ \t]*([1-9][0-9]*)[ \t]+#[ \t]*[^ \t]")
@@ -45,7 +51,8 @@ class HeavyThreadDefaultError(ValueError):
 
 
 def break_is_set(name, environment=None):
-    return name in (environment if environment is not None else os.environ).get(BREAK_VARIABLE, "").split(",")
+    environment = environment if environment is not None else os.environ
+    return environment.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT and name in environment.get(BREAK_VARIABLE, "").split(",")
 
 
 def default_heavy_threads(environment=os.environ, *, registration_file=None):
@@ -55,14 +62,14 @@ def default_heavy_threads(environment=os.environ, *, registration_file=None):
         if POSITIVE_INTEGER.fullmatch(cap) or break_is_set("cap-unchecked", environment):
             return int(cap) if cap.isdigit() else cap
         raise HeavyThreadDefaultError(f"{THREAD_CAP_VARIABLE}={cap} 不是正整数，取不了每台默认重活线程数",
-                                      f"设成正整数（经 bash scripts/hosts/capped.sh <N> 起就是 N），或 unset 它取 .claude/heavy-thread-default 的登记值")
+                                      "unset 它，取 .claude/heavy-thread-default 的登记值（线程固定取登记值，SINGLEFS_THREAD_CAP 由 task-server 套的 capped.sh 设，调用方不设）")
     path = registration_file or REGISTRATION_FILE
     if not os.path.isfile(path):
         if break_is_set("missing-registration-uses-core-count", environment):
             return os.cpu_count() or 1
         raise HeavyThreadDefaultError(f"每台默认重活线程数的登记文件 {path} 不在",
                                       "在仓根建 .claude/heavy-thread-default，第一条非注释行写「31  # <理由>」（写法在仓里那一份的文件头）；"
-                                      "临时要别的数设 SINGLEFS_THREAD_CAP 或经 capped.sh <N> 起，不退回按核数算")
+                                      "不退回按核数算")
     try:
         with open(path, encoding="utf-8", errors="surrogateescape") as handle:
             text = handle.read()
@@ -115,6 +122,7 @@ def run_selftest():
 
     here = os.path.dirname(os.path.abspath(__file__))
     failures, checked = [], 0
+    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 起的子进程（--print、shell 对拍，环境原样继承）靠它认：弄坏开关只在自证里认
 
     def expect(label, holds, detail):
         if not holds:
@@ -183,7 +191,20 @@ def run_selftest():
     return 0
 
 
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest、环境里也没有自证留的标记（自证起的子进程）而 HEAVY_THREADS_BREAK 非空，参数解析之前就拒，交回退出码 2；放行交回 None。"""
+    value = os.environ.get(BREAK_VARIABLE, "")
+    if not value or arguments == ["--selftest"] or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    print(f"  ✗ {BREAK_VARIABLE}={value} 是弄坏开关，只在自证（heavy_threads.py --selftest）里认，平常跑设了就拒，这一趟什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：去掉 {BREAK_VARIABLE} 再跑；要证红就跑 {BREAK_VARIABLE}=<项> python3 scripts/hosts/heavy_threads.py --selftest", file=sys.stderr)
+    return 2
+
+
 def main(arguments):
+    refused = refuse_break_outside_selftest(arguments)
+    if refused is not None:
+        return refused
     if arguments == ["--selftest"]:
         return run_selftest()
     if arguments == ["--print"]:

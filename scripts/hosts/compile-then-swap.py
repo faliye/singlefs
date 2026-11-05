@@ -1,25 +1,35 @@
 #!/usr/bin/env python3
 # admission: always 每一次换装置都要现编现判，判的是这一刻的草稿副本与主工作区，上一次编过不替这一次作保
-# run-condition: command cargo nice
+# run-condition: command cargo nice rsync
 """先编后换：草稿目录里改好的入库装置（crates/<crate>/src/bin/ 下的 .rs）先在仓副本里编过，再整份换进主工作区。
 
 用法：
-    compile-then-swap.py <草稿副本> <目标> --scratch <草稿目录> [--root 仓根] [--release]
+    compile-then-swap.py <草稿副本> <目标> --scratch <草稿目录> [--root 仓根] [--release] [特性写法…（下面「特性」）]
     compile-then-swap.py --clean --scratch <草稿目录>     # 删掉这条脚本在草稿目录里建的仓副本与编译目录
     compile-then-swap.py --selftest                        # 假 cargo，不起真编译；COMPILE_THEN_SWAP_BREAK=<项> 时必须判红
 
-<目标> 写相对仓根的路径（crates/singlefs-checker-tier/src/bin/e<号>_<英文名>.rs）或绝对路径；只收 crates/<crate>/src/bin/ 下的
+<目标> 写相对仓根的路径（crates/singlefs-verification/src/bin/e<号>_<英文名>.rs）或绝对路径；只收 crates/<crate>/src/bin/ 下的
 <名>.rs 与 <名>/main.rs。<草稿副本> 与 <草稿目录> 都要在仓外。
+起法：task-server/task submit -- python3 scripts/hosts/compile-then-swap.py <草稿副本> <目标> --scratch <草稿目录>（不套 capped.sh 与内存包装：
+线程、内存上限与挑机器都由 task-server 定；records/2026-10-30-编译绕过内存总上限.md「收尾批」）。
+特性：这个装置登记的特性，照它的跑前登记（research/prompts/e<号>…prereg….md）里起它的那条 cargo run / cargo test 的特性写法原样给
+（走崩溃判段的装置登记的是 gpu；仓里没有按装置记特性的机读登记表，跑前登记是唯一的登记处，门禁 doc-experiments 的 preregistration-judge-features 格判它带没带 gpu）。
+认的写法与那一格认的相同：--features <值>、--features=<值>、-F <值>、-F<值>，可写几次、取并集（次序照头一次出现），值里逗号与空白都算分隔；
+--all-features 原样交给 cargo。--features 或 -F 后面缺值退 2。两条 cargo 都带合起来的 `--features <特性>,<特性>…`（与给了的 `--all-features`）；
+不给就不带特性编：多机配置开着 GPU 时，走判段的装置编出来判段只打 NOT_RUN、不判。
 
 做法：
-  1. 把主工作区此刻的 Cargo.toml、Cargo.lock、.cargo/、crates/（不带 target/）与每台默认重活线程数的登记文件 .claude/heavy-thread-default
-     （harness 包经 include_str! 在编译时读它，副本里没有就编不过）与装置启动时 preflight() 读的上游准入脚本
-     .claude/singlefs-ai-sop/scripts/preflight.py、proc.py（装置把 env!("CARGO_MANIFEST_DIR") 烘进二进制，运行时按
-     <树>/crates/<crate>/../../.claude/singlefs-ai-sop/scripts/preflight.py 找脚本、按 <树>/crates/<crate>/src/bin/<名>.rs 找自己的源文件）
-     拷进 <草稿目录>/compile-then-swap/tree，把草稿副本放到目标在副本里的位置；主工作区一个字节不碰。
-  2. 在副本里 `nice -n 19 cargo build --offline -p <crate> --bin <名>` 与 `cargo test --offline --no-run -p <crate> --bin <名>`
-     （后一条编 bin 里的 #[cfg(test)]），CARGO_TARGET_DIR 放 <草稿目录>/compile-then-swap/target。线程数照环境里的
-     CARGO_BUILD_JOBS（经 scripts/hosts/capped.sh N 起时就是 N）。编译输出落 <草稿目录>/compile-then-swap/build-*.log。
+  1. 把主工作区此刻的拷贝范围拷进 <草稿目录>/compile-then-swap/tree（每次删了重建，rsync 拷、修改时刻是此刻，不带 target/、.git），
+     把草稿副本放到目标在副本里的位置；主工作区一个字节不碰。拷贝范围不在这里写：取 scripts/hosts/lib_repository_copy.py 的 copy_closure
+     （共用清单加它的闭包：工作区成员与它们 path 依赖指到的目录、编译期 include_str! 读的仓根文件（.claude/heavy-thread-default 这类）、
+     装置运行期读的仓根文件连同它们 source、起的（装置把 env!("CARGO_MANIFEST_DIR") 烘进二进制，运行时按 <树>/crates/<crate>/../../ 起
+     .claude/singlefs-ai-sop/scripts/preflight.py 与多机配置判法，按 <树>/crates/<crate>/src/bin/<名>.rs 找自己的源文件）；那份文件头「闭包」）。
+     闭包算不成（path 依赖指到仓根之外、编译期读的文件认不出或不在）退 2：副本带不出它们。
+  2. 在副本里 `nice -n 19 cargo build --offline -p <crate> --bin <名> [--release] [--features <特性>,…] [--all-features]` 与
+     `cargo test --offline --no-run -p <crate> --bin <名> [--release] [--features <特性>,…] [--all-features]`
+     （后一条编 bin 里的 #[cfg(test)]），CARGO_TARGET_DIR 放 <草稿目录>/compile-then-swap/target，环境取 lib_repository_copy.py 的
+     environment_for_commands_in_the_copy（SINGLEFS_MULTI_HOST_CONFIG 显式指到主工作区那一份多机配置）。线程数照环境里的
+     CARGO_BUILD_JOBS（task-server 起每一次尝试时套 scripts/hosts/capped.sh <N>，就是那个 N）。编译输出落 <草稿目录>/compile-then-swap/build-*.log。
   3. 两条都编过，再核主工作区那份在编的这段时间里没被改过（开跑时记的字节与此刻相同，或开跑时与此刻都不存在）。
   4. 换上：目标已有的，同目录临时文件写完、fsync、照原权限位改名盖上（scripts/kb/lib_atomic_replace.py）；目标还没有的，
      同目录临时文件写完再硬链接到目标名（目标名这时被别人占了就失败）、删临时文件。换上之后回读，与草稿副本逐字节相同。
@@ -31,7 +41,8 @@
 4 换上时失败或回读对不上（看提示行）。
 
 自证（--selftest）：每一项各建一份自己的临时仓（workspace 加 crates/demo）与草稿目录，PATH 最前面放一份假 cargo
-（FAKE_CARGO_SCRIPT），不起真编译。假 cargo 只认 build() 调的 `cargo build|test --offline [--no-run] -p <包> --bin <名>`，
+（FAKE_CARGO_SCRIPT），不起真编译。每一项都经命令行那一层起（run_command_line()：main() 解析参数、交给 swap() 的同一段），不直接调 swap()，
+命令行上的参数怎么交到 cargo 手里一并在判。假 cargo 只认 build() 调的 `cargo build|test --offline [--no-run] -p <包> --bin <名> [--release] [--features <特性>,…] [--all-features]`，
 按当前目录（应当是仓副本）里那份 bin 源码的标记演三种结局：没标记的编过；「FAKE_CARGO: build-fails」两条都编不过；
 「FAKE_CARGO: test-build-fails」cargo build 编过、cargo test --no-run 编不过；找不到那个 bin 时照真 cargo 退 101。
 每次被调往 COMPILE_THEN_SWAP_FAKE_CARGO_LOG 记一行「当前目录|CARGO_TARGET_DIR|参数」，每一项核它被调了哪几条、在不在仓副本里调。
@@ -53,38 +64,73 @@ PATH 上解到的 cargo 不是那一项自己的假 cargo，那一项不跑、�
   clean-removes-work   --clean 删得掉编译目录
   thread-registry-copied  库源码里有 include_str 登记文件的标记（假 cargo 照它找 .claude/heavy-thread-default，找不到照真 cargo 退 101）：
                        仓副本里有那份登记文件，编过、换上
+  path-dependency-outside-crates  工作区包 path 依赖仓根下 crates/ 以外的目录（那个目录再 path 依赖另一个、只在 dev-dependencies 里写的目录；
+                       假 cargo 照真 cargo 沿 path 依赖找 Cargo.toml，找不到退 101「failed to get」）：编过、换上，仓副本里有这几个目录，
+                       没被引用的仓根目录不在副本里
+  gpu-feature-passed-through  跑前登记了 gpu 的装置（命令行 --features gpu）：cargo build 与 cargo test --no-run 两条都带 --features gpu，编过、换上
+  features-twice-gpu-first    命令行写两次、gpu 在前（--features gpu --features extra）：两条 cargo 都带 gpu 与 extra（取并集，不是后写的盖前写的）
+  features-equals-spelling    --features=gpu：两条 cargo 都带 gpu
+  features-short-flag         -F gpu：两条 cargo 都带 gpu
+  features-short-flag-attached  -Fgpu：两条 cargo 都带 gpu
+  features-quoted-list        --features "extra gpu"（一个参数里空格隔开两个特性）：两条 cargo 都带 extra 与 gpu
+  all-features-passed-through  --all-features：两条 cargo 都带 --all-features
+  release-features-passed-through  执行员的用法 --release --features gpu：两条 cargo 都带 --release 与 gpu
+  features-missing-value      --features 写在最后、后面没有值：退 2、不编、主工作区一个字节不写
 以 root 跑时目录的只读权限挡不住写，swap-error 会红。
 
 弄坏开关（只给自证判红用，生效时往 stderr 打一行）：COMPILE_THEN_SWAP_BREAK=<一个值>。不认识的值直接拒绝，免得拼错的开关被当成「没开」。
 逐项写开关名、弄坏哪一处，下一行起写打开后自证哪几项红（括号里是那条「✗ 自检 <项>：」后面的开头）：
-  swap-on-failure     编不过也换上
+  COMPILE_THEN_SWAP_BREAK=swap-on-failure  编不过也换上
       build-fails、test-build-fails（「退出码 0（应当 1）」）、new-bin-build-fails（「退出码 0（应当 1）」「目标 sha256」）
-  skip-test-build     只跑 cargo build，不跑 cargo test --no-run（#[cfg(test)] 里编不过的放过去）
+  COMPILE_THEN_SWAP_BREAK=skip-test-build  只跑 cargo build，不跑 cargo test --no-run（#[cfg(test)] 里编不过的放过去）
       test-build-fails（「退出码 0（应当 1）」）；changed-during-build、swap-existing、create-new-bin、swap-error、readback-mismatch、
-      tree-kept-until-clean、clean-removes-work（「假 cargo 的调用 ['build']（应当 ['build', 'test']）」）
-  build-in-root       cargo 在主工作区里编，不在仓副本里编（草稿副本没进编译）
+      tree-kept-until-clean、clean-removes-work、thread-registry-copied、path-dependency-outside-crates、gpu-feature-passed-through、
+      features-twice-gpu-first、features-equals-spelling、features-short-flag、features-short-flag-attached、features-quoted-list、
+      all-features-passed-through、release-features-passed-through（「假 cargo 的调用 ['build']（应当 ['build', 'test']）」）
+  COMPILE_THEN_SWAP_BREAK=build-in-root  cargo 在主工作区里编，不在仓副本里编（草稿副本没进编译）
       build-fails、test-build-fails（「退出码 0（应当 1）」）；凡调到假 cargo 的项（build-fails、test-build-fails、new-bin-build-fails、
-      changed-during-build、swap-existing、create-new-bin、swap-error、readback-mismatch、tree-kept-until-clean、clean-removes-work）都报「假 cargo 在」
-  skip-race-check     不核主工作区那份在编的时候改没改
+      changed-during-build、swap-existing、create-new-bin、swap-error、readback-mismatch、tree-kept-until-clean、clean-removes-work、
+      thread-registry-copied、path-dependency-outside-crates、gpu-feature-passed-through、features-twice-gpu-first、features-equals-spelling、
+      features-short-flag、features-short-flag-attached、features-quoted-list、all-features-passed-through、release-features-passed-through）都报「假 cargo 在」
+  COMPILE_THEN_SWAP_BREAK=skip-race-check  不核主工作区那份在编的时候改没改
       changed-during-build（「退出码 0（应当 3）」）
-  in-place-write      不改名换上，直接在目标原来的 inode 上截断重写
+  COMPILE_THEN_SWAP_BREAK=in-place-write  不改名换上，直接在目标原来的 inode 上截断重写
       swap-existing（「换上之后 inode 没变」）、swap-error（「退出码 0（应当 4）」：只读目录挡不住在原 inode 上写）
-  swap-error-ignored  换上时抛错不停下，接着往下走
+  COMPILE_THEN_SWAP_BREAK=swap-error-ignored  换上时抛错不停下，接着往下走
       swap-error（「输出里没有「时失败」」：落到回读那一支才停）
-  skip-readback       换上之后不回读
+  COMPILE_THEN_SWAP_BREAK=skip-readback  换上之后不回读
       readback-mismatch（「退出码 0（应当 4）」）
-  remove-tree         编完就删仓副本（装置 preflight 要的路径跟着没了）
+  COMPILE_THEN_SWAP_BREAK=remove-tree  编完就删仓副本（装置 preflight 要的路径跟着没了）
       tree-kept-until-clean（「编完之后仓副本不在草稿目录里」）
-  preflight-not-copied  仓副本里不拷 .claude/singlefs-ai-sop/scripts/preflight.py、proc.py
+  COMPILE_THEN_SWAP_BREAK=preflight-not-copied  仓副本里不拷 .claude/singlefs-ai-sop/scripts/preflight.py、proc.py
       tree-kept-until-clean（「仓副本里缺 .claude/singlefs-ai-sop/scripts/preflight.py」）
-  draft-in-repo       不核草稿副本在不在主工作区里
+  COMPILE_THEN_SWAP_BREAK=draft-in-repo  不核草稿副本在不在主工作区里
       draft-inside-repo（「退出码 0（应当 2）」）
-  any-crates-source   不核目标是不是 src/bin/ 下的装置，crate 里别的 .rs 拿文件名当 bin 名
+  COMPILE_THEN_SWAP_BREAK=any-crates-source  不核目标是不是 src/bin/ 下的装置，crate 里别的 .rs 拿文件名当 bin 名
       non-bin-source（「退出码 1（应当 2）」：假 cargo 照真 cargo 找不到那个 bin、退 101）
-  outside-crates      不核目标在不在 crates/ 里
+  COMPILE_THEN_SWAP_BREAK=outside-crates  不核目标在不在 crates/ 里
       outside-crates（「退出码 1（应当 2）」：仓副本里没有 tools/，假 cargo 找不到那个 bin）
-  registry-not-copied 仓副本里不拷 .claude/heavy-thread-default
+  COMPILE_THEN_SWAP_BREAK=registry-not-copied  仓副本里不拷 .claude/heavy-thread-default
       thread-registry-copied（「退出码 1（应当 0）」：假 cargo 照 include_str 标记找不到登记文件、退 101）
+  COMPILE_THEN_SWAP_BREAK=fixed-copy-list  按写死的清单拷：只拷 lib_repository_copy.py 的共用清单 COMMON_ENTRIES，不调 copy_closure
+      path-dependency-outside-crates（「退出码 1（应当 0）」：假 cargo 沿 path 依赖找不到 crates/ 以外的目录、退 101）、
+      thread-registry-copied（「退出码 1（应当 0）」）、tree-kept-until-clean（「仓副本里缺 .claude/singlefs-ai-sop/scripts/preflight.py」）
+  COMPILE_THEN_SWAP_BREAK=features-dropped  build() 拿到了特性也不交给 cargo，照改前不带特性编（走判段的装置编出来只打 NOT_RUN）
+      gpu-feature-passed-through、features-twice-gpu-first、features-equals-spelling、features-short-flag、features-short-flag-attached、
+      features-quoted-list、release-features-passed-through（「假 cargo 的调用里没带 --features」）；all-features-passed-through（「假 cargo 的调用里没带 --all-features」）
+  COMPILE_THEN_SWAP_BREAK=command-line-features-dropped  命令行上的特性解析完就丢，不交给 swap()（攻方 d137-ledger-defs-r2 B6 的变异体）
+      gpu-feature-passed-through、features-twice-gpu-first、features-equals-spelling、features-short-flag、features-short-flag-attached、
+      features-quoted-list、release-features-passed-through（「假 cargo 的调用里没带 --features」）；all-features-passed-through（「假 cargo 的调用里没带 --all-features」）
+  COMPILE_THEN_SWAP_BREAK=features-last-only  --features 写几次只留后一个（改前 options 字典后写的盖前写的）
+      features-twice-gpu-first（「假 cargo 的调用里没带 --features gpu」）
+  COMPILE_THEN_SWAP_BREAK=features-long-form-only  只认分开写的 --features <值>（改前）：--features=、-F、-F<值>、--all-features 落进位置参数
+      features-equals-spelling、features-short-flag、features-short-flag-attached、all-features-passed-through（「退出码 2（应当 0）」）
+  COMPILE_THEN_SWAP_BREAK=features-missing-value-ignored  --features 或 -F 后面缺值时当没给特性，照编照换
+      features-missing-value（「退出码 0（应当 2）」）
+  COMPILE_THEN_SWAP_BREAK=release-drops-features  build() 带 --release 时不把特性交给 cargo（攻方 d137-ledger-defs-r3 C4 的变异体 release-drops-features）
+      release-features-passed-through（「假 cargo 的调用里没带 --features gpu」）
+  COMPILE_THEN_SWAP_BREAK=release-ignored  build() 不把 --release 交给 cargo、只编 debug（攻方 d137-ledger-defs-r3 C4 的变异体 release-ignored）
+      release-features-passed-through（「假 cargo 的调用里没带 --release」）
 """
 import hashlib
 import os
@@ -102,17 +148,21 @@ sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "scripts"))
 from project_preflight import preflight  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "kb"))
 from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  # noqa: E402
+sys.path.insert(0, SCRIPT_DIRECTORY)
+import lib_repository_copy as repository_copy  # noqa: E402
 
 BREAK_VARIABLE = "COMPILE_THEN_SWAP_BREAK"
 KNOWN_BREAK_MODES = ("swap-on-failure", "skip-test-build", "build-in-root", "skip-race-check", "in-place-write", "swap-error-ignored",
                      "skip-readback", "remove-tree", "draft-in-repo", "any-crates-source", "outside-crates", "registry-not-copied",
-                     "preflight-not-copied")
+                     "preflight-not-copied", "fixed-copy-list", "features-dropped", "command-line-features-dropped", "features-last-only",
+                     "features-long-form-only", "features-missing-value-ignored", "release-drops-features", "release-ignored")
+# 命令行上的特性写法（文件头「特性」；与门禁 doc-experiments 的 preregistration-judge-features 格认的同一套）
+FEATURES_OPTION, FEATURES_SHORT_OPTION, ALL_FEATURES_FLAG = "--features", "-F", "--all-features"
 WORK_DIRECTORY_NAME = "compile-then-swap"
-THREAD_REGISTRY_ENTRY = ".claude/heavy-thread-default"   # harness 经 include_str! 编进来的登记文件（crates/singlefs-harness/src/heavy_threads.rs）
-# 装置启动时 preflight() 读的上游脚本（crates/singlefs-checker-tier/src/bin/e*.rs 的 preflight 按 <CARGO_MANIFEST_DIR>/../../ 找它；它再同目录加载 proc.py）
+# 弄坏开关 registry-not-copied、preflight-not-copied 从闭包里去掉的条目，也是自证样本里造的（拷贝范围由 lib_repository_copy.py 的 copy_closure 现算）
+THREAD_REGISTRY_ENTRY = ".claude/heavy-thread-default"
+UPSTREAM_PREFLIGHT_PREFIX = ".claude/singlefs-ai-sop/"
 UPSTREAM_PREFLIGHT_ENTRIES = (".claude/singlefs-ai-sop/scripts/preflight.py", ".claude/singlefs-ai-sop/scripts/proc.py")
-COPIED_ROOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates", THREAD_REGISTRY_ENTRY,
-                       *UPSTREAM_PREFLIGHT_ENTRIES)
 ERROR_LINES_SHOWN = 40
 EXIT_SWAPPED, EXIT_BUILD_FAILED, EXIT_BAD_INPUT, EXIT_CHANGED_DURING_BUILD, EXIT_SWAP_FAILED = 0, 1, 2, 3, 4
 
@@ -121,12 +171,13 @@ class BadInput(Exception):
     """参数或路径不对：str 是两行，第二行以「→」开头写下一步。"""
 
 
-def break_mode():
+def break_mode(announce=True):
+    """此刻设着的弄坏开关（没设是空串）；不认识的值抛 BadInput。announce 为真时往 stderr 打一行生效提示（命令行那一层先读一次不打，swap() 里再读时打）。"""
     mode = os.environ.get(BREAK_VARIABLE, "")
     if mode and mode not in KNOWN_BREAK_MODES:
         raise BadInput(f"{BREAK_VARIABLE}={mode} 不认识，没编、一个字节没写\n"
                        f"→ 怎么办：弄坏开关只认 {'、'.join(KNOWN_BREAK_MODES)}；平时不设这个变量")
-    if mode:
+    if mode and announce:
         print(f"  ! {BREAK_VARIABLE}={mode} 生效：故意走坏的写法，只给自证判红用", file=sys.stderr)
     return mode
 
@@ -188,27 +239,47 @@ def locate_bin(target, root, mode=""):
     return crate_directory, package, bin_name
 
 
+def entries_to_copy(root, mode=""):
+    """拷进仓副本的仓根条目（文件头「做法」第 1 步）：lib_repository_copy.py 的 copy_closure。闭包算不成抛 BadInput（退 2）。
+    弄坏开关 fixed-copy-list：只交共用清单里在的；registry-not-copied、preflight-not-copied：去掉登记文件、规范副本下的条目。"""
+    if mode == "fixed-copy-list":
+        return [entry for entry in repository_copy.COMMON_ENTRIES if os.path.lexists(os.path.join(root, entry))]
+    try:
+        entries = list(repository_copy.copy_closure(root).entries)
+    except repository_copy.ClosureRefused as error:
+        raise BadInput(f"仓副本的拷贝范围算不成：{error}\n"
+                       "→ 怎么办：path 依赖改成仓根里面的路径、编译期读的文件写成 scripts/hosts/lib_repository_copy.py 文件头「闭包」认得的写法并让它进仓，"
+                       "或交主 agent；修好之前不换") from error
+    if mode == "registry-not-copied":
+        entries = [entry for entry in entries if entry != THREAD_REGISTRY_ENTRY]
+    if mode == "preflight-not-copied":
+        entries = [entry for entry in entries if not entry.startswith(UPSTREAM_PREFLIGHT_PREFIX)]
+    return entries
+
+
 def copy_workspace(root, tree, mode=""):
     if os.path.lexists(tree):
         shutil.rmtree(tree)
     os.makedirs(tree)
-    for entry in COPIED_ROOT_ENTRIES:
-        if entry == THREAD_REGISTRY_ENTRY and mode == "registry-not-copied":
-            continue
-        if entry in UPSTREAM_PREFLIGHT_ENTRIES and mode == "preflight-not-copied":
-            continue
-        source = os.path.join(root, entry)
-        if os.path.isdir(source):
-            shutil.copytree(source, os.path.join(tree, entry), symlinks=True, ignore=shutil.ignore_patterns("target", ".git"))
-        elif os.path.isfile(source):
-            os.makedirs(os.path.dirname(os.path.join(tree, entry)), exist_ok=True)
-            shutil.copy2(source, os.path.join(tree, entry))
+    try:
+        repository_copy.copy_entries(root, tree, entries_to_copy(root, mode))
+    except OSError as error:
+        raise BadInput(f"拷仓副本没拷成：{error}\n→ 怎么办：看草稿目录可不可写、盘满没有、rsync 在不在；没拷成就不编、不换") from error
 
 
-def build(tree, target_directory, package, bin_name, release, log_path, mode=""):
-    """两条 cargo 在 tree 里依次跑；交回 (都编过没有, 失败那条的错误行)。"""
-    environment = dict(os.environ, CARGO_TARGET_DIR=target_directory)
+def build(tree, target_directory, package, bin_name, release, log_path, mode="", features=(), all_features=False):
+    """两条 cargo 在 tree 里依次跑，都带这个装置登记的特性（文件头「特性」）；交回 (都编过没有, 失败那条的错误行)。
+    环境是副本里起命令用的那一份（lib_repository_copy.py 的 environment_for_commands_in_the_copy，按这份脚本所在的主工作区取多机配置）。"""
+    environment = repository_copy.environment_for_commands_in_the_copy(REPOSITORY_ROOT)
+    environment["CARGO_TARGET_DIR"] = target_directory
     profile = ["--release"] if release else []
+    if mode == "release-ignored":   # 弄坏开关：不把 --release 交给 cargo
+        profile = []
+    if features and mode != "features-dropped":
+        if not (release and mode == "release-drops-features"):   # 弄坏开关：带 --release 时丢特性
+            profile += [FEATURES_OPTION, ",".join(features)]
+    if all_features and mode != "features-dropped":
+        profile.append(ALL_FEATURES_FLAG)
     commands = [["nice", "-n", "19", "cargo", "build", "--offline", "-p", package, "--bin", bin_name, *profile],
                 ["nice", "-n", "19", "cargo", "test", "--offline", "--no-run", "-p", package, "--bin", bin_name, *profile]]
     if mode == "skip-test-build":
@@ -247,8 +318,15 @@ def create_new_file(target, data):
             pass
 
 
-def swap(draft, target, scratch, root, release=False, after_build=None, after_swap=None):
-    """交回 (退出码, 提示行)。after_build、after_swap 只给自证用：编完、核改没改之前调一次；换上之后、回读之前调一次。"""
+def describe_features(features, all_features):
+    """提示行里的特性：--features <合起来的>、--all-features，都没给写「不带」。"""
+    words = ([FEATURES_OPTION, ",".join(features)] if features else []) + ([ALL_FEATURES_FLAG] if all_features else [])
+    return " ".join(words) or "不带"
+
+
+def swap(draft, target, scratch, root, release=False, after_build=None, after_swap=None, features=(), all_features=False):
+    """交回 (退出码, 提示行)。features 是这个装置登记的特性（已合成一份、去重），all_features 是给没给 --all-features（文件头「特性」）。
+    after_build、after_swap 只给自证用：编完、核改没改之前调一次；换上之后、回读之前调一次。"""
     mode = break_mode()
     root = os.path.realpath(root)
     draft = os.path.abspath(draft)
@@ -276,7 +354,7 @@ def swap(draft, target, scratch, root, release=False, after_build=None, after_sw
     target_directory = os.path.join(work, "target")
     os.makedirs(work, exist_ok=True)
     log_path = os.path.join(work, f"build-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{os.getpid()}.log")
-    lines = [f"目标 {os.path.relpath(target, root)}（包 {package}，bin {bin_name}）；草稿副本 {draft}",
+    lines = [f"目标 {os.path.relpath(target, root)}（包 {package}，bin {bin_name}，特性 {describe_features(features, all_features)}）；草稿副本 {draft}",
              f"主工作区那份开跑时 sha256 {sha256_of(before)}；草稿副本 sha256 {sha256_of(draft_bytes)}"]
     try:
         copy_workspace(root, tree, mode)
@@ -284,7 +362,8 @@ def swap(draft, target, scratch, root, release=False, after_build=None, after_sw
         os.makedirs(os.path.dirname(tree_target), exist_ok=True)
         with open(tree_target, "wb") as handle:
             handle.write(draft_bytes)
-        built, errors = build(root if mode == "build-in-root" else tree, target_directory, package, bin_name, release, log_path, mode)
+        built, errors = build(root if mode == "build-in-root" else tree, target_directory, package, bin_name, release, log_path, mode,
+                              features, all_features)
     finally:
         if mode == "remove-tree":
             shutil.rmtree(tree, ignore_errors=True)
@@ -327,7 +406,8 @@ def swap(draft, target, scratch, root, release=False, after_build=None, after_sw
         lines += [f"✗ 换上之后回读 {os.path.relpath(target, root)}，sha256 {sha256_of(after)} 与草稿副本不同",
                   "→ 怎么办：有别的进程同时在写这一份；把现状写进报告交主 agent，不再重跑"]
         return EXIT_SWAP_FAILED, lines
-    lines.append(f"✓ 编过（cargo build 与 cargo test --no-run，-p {package} --bin {bin_name}），已整份换进主工作区 "
+    carried = f" {describe_features(features, all_features)}" if features or all_features else ""
+    lines.append(f"✓ 编过（cargo build 与 cargo test --no-run，-p {package} --bin {bin_name}{carried}），已整份换进主工作区 "
                  f"{os.path.relpath(target, root)}，回读 sha256 {sha256_of(after)}")
     return EXIT_SWAPPED, lines
 
@@ -341,8 +421,15 @@ def clean(scratch):
 
 
 SELFTEST_MANIFEST = '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n'
+PATH_DEPENDENCY_MANIFEST = (SELFTEST_MANIFEST + '\n[dependencies]\nhelper = { path = "../../shared/helper" }\n'
+                            '\n[dev-dependencies]\ntest_only = { path = "../../test-support/test_only" }\n')
+PATH_DEPENDENCY_HELPER_MANIFEST = ('[package]\nname = "helper"\nversion = "0.1.0"\nedition = "2021"\n'
+                                   '\n[dependencies]\ndeeper = { path = "../../deeper" }\n')
 OUTSIDE_CRATES_MANIFEST = '[package]\nname = "demo2"\nversion = "0.1.0"\nedition = "2021"\n'
-LIBRARY_SOURCE = "pub fn value() -> u32 {\n    1\n}\n"
+# 库源码照装置的写法拼上游准入脚本的路径（lib_repository_copy.py 的闭包按它把 preflight.py 拷进仓副本，preflight.py 再点名同目录的 proc.py）
+LIBRARY_SOURCE = ("pub fn value() -> u32 {\n    1\n}\n"
+                  'pub const PREFLIGHT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../.claude/singlefs-ai-sop/scripts/preflight.py");\n')
+UPSTREAM_PREFLIGHT_SAMPLE_TEXT = "# 自证样本：上游准入脚本\nPROCESS_MODULE = 'proc.py'\n"
 GOOD_BIN = "fn main() {\n    println!(\"{}\", demo::value());\n}\n"
 GOOD_BIN_CHANGED = "fn main() {\n    println!(\"{}\", demo::value() + 1);\n}\n"
 BAD_BIN = "fn main() {\n    println!(\"{}\", unit_check_fields);\n}\n// FAKE_CARGO: build-fails\n"
@@ -350,12 +437,13 @@ BAD_TEST_MODULE = (GOOD_BIN + "#[cfg(test)]\nmod tests {\n    #[test]\n    fn t(
                    "// FAKE_CARGO: test-build-fails\n")
 OTHER_WRITER_TEXT = GOOD_BIN + "// 别的会话的改动\n"
 REGISTRY_INCLUDE_MARKER = "// FAKE_CARGO: include_str ../../" + THREAD_REGISTRY_ENTRY + "\n"
+REGISTRY_INCLUDE = 'pub const THREADS: &str = include_str!("../../../' + THREAD_REGISTRY_ENTRY + '");\n'
 REGISTRY_SAMPLE_TEXT = "7  # 自证样本的登记\n"
 BOTH_CARGO_COMMANDS = ("build", "test")
 FAKE_CARGO_LOG_VARIABLE = "COMPILE_THEN_SWAP_FAKE_CARGO_LOG"
 FAKE_CARGO_SCRIPT = r"""#!/usr/bin/env bash
 # 假 cargo：compile-then-swap.py --selftest 把它放在 PATH 最前面（文件头「自证」一段）。只认 build() 调的
-# `cargo build|test --offline [--no-run] -p <包> --bin <名> [--release]`；按当前目录（应当是仓副本）里那份 bin 源码的
+# `cargo build|test --offline [--no-run] -p <包> --bin <名> [--release] [--features <特性>,…] [--all-features]`（特性只记进调用记录、不影响结局）；按当前目录（应当是仓副本）里那份 bin 源码的
 # FAKE_CARGO 标记演编过、编不过、测试编不过；每次被调往 $COMPILE_THEN_SWAP_FAKE_CARGO_LOG 记一行「当前目录|CARGO_TARGET_DIR|参数」
 set -u
 printf '%s|%s|%s\n' "$PWD" "${CARGO_TARGET_DIR:-}" "$*" >>"${COMPILE_THEN_SWAP_FAKE_CARGO_LOG:?假 cargo 没拿到调用记录文件}"
@@ -375,6 +463,27 @@ if [[ ! -f Cargo.toml ]]; then
   echo "error: could not find \`Cargo.toml\` in \`$PWD\` or any parent directory"
   exit 101
 fi
+# 照真 cargo 沿 path 依赖找 Cargo.toml（包括依赖的依赖）：目录不在照真 cargo 退 101「failed to get」
+dependency_manifests=(crates/*/Cargo.toml)
+checked_manifests=" "
+while ((${#dependency_manifests[@]} > 0)); do
+  manifest="${dependency_manifests[0]}"
+  dependency_manifests=("${dependency_manifests[@]:1}")
+  [[ "$checked_manifests" == *" $manifest "* ]] && continue
+  checked_manifests="$checked_manifests$manifest "
+  while IFS= read -r dependency_line; do
+    dependency_name="${dependency_line%% = *}"
+    dependency_path="${dependency_line#*path = \"}"
+    dependency_path="${dependency_path%%\"*}"
+    dependency_directory="$(realpath -m "$(dirname "$manifest")/$dependency_path")"
+    dependency_directory="${dependency_directory#"$PWD"/}"
+    if [[ ! -f "$dependency_directory/Cargo.toml" ]]; then
+      echo "error: failed to get \`$dependency_name\` as a dependency of package \`demo v0.1.0 ($PWD/$manifest)\`"
+      exit 101
+    fi
+    dependency_manifests+=("$dependency_directory/Cargo.toml")
+  done < <(grep -E '^[A-Za-z_-]+ = \{ path = "' "$manifest")
+done
 # 照 include_str! 读编译时的文件：crates/<包>/src/ 下源码里的「FAKE_CARGO: include_str <相对包目录的路径>」标记点名的文件找不到，照真 cargo 退 101
 while IFS= read -r marker_line; do
   marker_file="${marker_line%%:*}"
@@ -426,7 +535,7 @@ class SelftestFixture:
             os.makedirs(directory)
         for entry in UPSTREAM_PREFLIGHT_ENTRIES:
             os.makedirs(os.path.dirname(os.path.join(self.root, entry)), exist_ok=True)
-            write_text(os.path.join(self.root, entry), "# 自证样本：上游准入脚本\n")
+            write_text(os.path.join(self.root, entry), UPSTREAM_PREFLIGHT_SAMPLE_TEXT)
         write_text(os.path.join(self.root, "Cargo.toml"), '[workspace]\nresolver = "2"\nmembers = ["crates/demo"]\n')
         write_text(os.path.join(self.root, "crates", "demo", "Cargo.toml"), SELFTEST_MANIFEST)
         write_text(self.library, LIBRARY_SOURCE)
@@ -447,13 +556,12 @@ class SelftestFixture:
 
 
 def check_swap(fixture, draft_path, target, want_code, want_bytes, want_calls, after_build=None, after_swap=None,
-               want_new_inode=False, want_line=None):
-    """跑一次 swap，交回问题列表（空就是判对了）。want_calls 是假 cargo 依次该被调的子命令。"""
+               want_new_inode=False, want_line=None, extra_arguments=()):
+    """经命令行那一层（run_command_line）跑一次，交回问题列表（空就是判对了）。want_calls 是假 cargo 依次该被调的子命令；
+    extra_arguments 接在 <草稿副本> <目标> --scratch … --root … 后面（特性写法这类）。"""
     inode_before = os.stat(target).st_ino if os.path.exists(target) else None
-    try:
-        code, lines = swap(draft_path, target, fixture.scratch, fixture.root, after_build=after_build, after_swap=after_swap)
-    except BadInput as error:
-        code, lines = EXIT_BAD_INPUT, str(error).splitlines()
+    code, lines = run_command_line([draft_path, target, "--scratch", fixture.scratch, "--root", fixture.root, *extra_arguments],
+                                   after_build=after_build, after_swap=after_swap)
     got_bytes = read_bytes_or_none(target)
     target_directory = os.path.dirname(target)
     leftovers = [name for name in os.listdir(target_directory) if name.startswith(".")] if os.path.isdir(target_directory) else []
@@ -569,11 +677,99 @@ def case_tree_kept_until_clean(fixture):
 
 
 def case_thread_registry_copied(fixture):
-    write_text(fixture.library, LIBRARY_SOURCE + REGISTRY_INCLUDE_MARKER)
+    write_text(fixture.library, LIBRARY_SOURCE + REGISTRY_INCLUDE + REGISTRY_INCLUDE_MARKER)
     os.makedirs(os.path.dirname(os.path.join(fixture.root, THREAD_REGISTRY_ENTRY)), exist_ok=True)
     write_text(os.path.join(fixture.root, THREAD_REGISTRY_ENTRY), REGISTRY_SAMPLE_TEXT)
     return check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
                       BOTH_CARGO_COMMANDS)
+
+
+def case_path_dependency_outside_crates(fixture):
+    """工作区包 path 依赖 crates/ 以外的目录：dependencies 里的 shared/helper（它再依赖 deeper）、dev-dependencies 里的 test-support/test_only；
+    这几个目录都拷进仓副本，没被引用的 unrelated/ 不拷。"""
+    root = fixture.root
+    for directory, manifest in (("shared/helper", PATH_DEPENDENCY_HELPER_MANIFEST), ("deeper", SELFTEST_MANIFEST.replace("demo", "deeper")),
+                                ("test-support/test_only", SELFTEST_MANIFEST.replace("demo", "test_only")), ("unrelated", OUTSIDE_CRATES_MANIFEST)):
+        os.makedirs(os.path.join(root, directory, "src"))
+        write_text(os.path.join(root, directory, "Cargo.toml"), manifest)
+        write_text(os.path.join(root, directory, "src", "lib.rs"), LIBRARY_SOURCE)
+    write_text(os.path.join(root, "crates", "demo", "Cargo.toml"), PATH_DEPENDENCY_MANIFEST)
+    problems = check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
+                          BOTH_CARGO_COMMANDS)
+    tree = os.path.join(fixture.scratch, WORK_DIRECTORY_NAME, "tree")
+    problems += [f"仓副本里缺 {directory}/Cargo.toml：crates/ 以外的 path 依赖没拷，真 cargo 会报 failed to get"
+                 for directory in ("shared/helper", "deeper", "test-support/test_only") if not os.path.isfile(os.path.join(tree, directory, "Cargo.toml"))]
+    if os.path.lexists(os.path.join(tree, "unrelated")):
+        problems.append("仓副本里有没被任何包引用的 unrelated/：要编的目录该现算，不整个仓根拷")
+    return problems
+
+
+def features_in_cargo_call(arguments):
+    """假 cargo 一次调用的参数 → (--features 后面各值按逗号拆开的特性集合, 带没带 --all-features)。"""
+    words = arguments.split()
+    named = {feature for word, following in zip(words, words[1:]) if word == FEATURES_OPTION for feature in following.split(",")}
+    return named, ALL_FEATURES_FLAG in words
+
+
+def check_features_through_command_line(fixture, extra_arguments, want_features=(), want_all_features=False):
+    """命令行上给 extra_arguments 这样写的特性：编过、换上，假 cargo 收到的两条（build、test --no-run）都带 want_features 里的每一个
+    （与 want_all_features 为真时的 --all-features）。"""
+    problems = check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
+                          BOTH_CARGO_COMMANDS, extra_arguments=extra_arguments)
+    for _, _, arguments in fixture.cargo_calls():
+        named, all_features = features_in_cargo_call(arguments)
+        missing = [feature for feature in want_features if feature not in named]
+        if missing:
+            problems.append(f"假 cargo 的调用里没带 --features {','.join(missing)}：{arguments}")
+        if want_all_features and not all_features:
+            problems.append(f"假 cargo 的调用里没带 --all-features：{arguments}")
+    return problems
+
+
+def case_gpu_feature_passed_through(fixture):
+    """跑前登记了 gpu 的装置（命令行 --features gpu）：两条 cargo 都带 --features gpu，编过、换上。"""
+    return check_features_through_command_line(fixture, ["--features", "gpu"], ["gpu"])
+
+
+def case_features_twice_gpu_first(fixture):
+    """写两次、gpu 在前：两条 cargo 都带 gpu 与 extra（取并集）。"""
+    return check_features_through_command_line(fixture, ["--features", "gpu", "--features", "extra"], ["gpu", "extra"])
+
+
+def case_features_equals_spelling(fixture):
+    return check_features_through_command_line(fixture, ["--features=gpu"], ["gpu"])
+
+
+def case_features_short_flag(fixture):
+    return check_features_through_command_line(fixture, ["-F", "gpu"], ["gpu"])
+
+
+def case_features_short_flag_attached(fixture):
+    return check_features_through_command_line(fixture, ["-Fgpu"], ["gpu"])
+
+
+def case_features_quoted_list(fixture):
+    """--features "extra gpu"：一个参数里空格隔开两个特性，两个都交给 cargo。"""
+    return check_features_through_command_line(fixture, ["--features", "extra gpu"], ["extra", "gpu"])
+
+
+def case_all_features_passed_through(fixture):
+    return check_features_through_command_line(fixture, ["--all-features"], want_all_features=True)
+
+
+def case_release_features_passed_through(fixture):
+    """执行员的用法 --release --features gpu：两条 cargo 都带 --release 与 --features gpu，编过、换上。"""
+    problems = check_features_through_command_line(fixture, ["--release", "--features", "gpu"], ["gpu"])
+    for _, _, arguments in fixture.cargo_calls():
+        if "--release" not in arguments.split():
+            problems.append(f"假 cargo 的调用里没带 --release：{arguments}")
+    return problems
+
+
+def case_features_missing_value(fixture):
+    """--features 写在最后、后面没有值：退 2、不编、目标一个字节不写。"""
+    return check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_BAD_INPUT, GOOD_BIN.encode(), [],
+                      extra_arguments=["--features"])
 
 
 def case_clean_removes_work(fixture):
@@ -601,6 +797,16 @@ SELFTEST_CASES = (
     ("tree-kept-until-clean", case_tree_kept_until_clean),
     ("clean-removes-work", case_clean_removes_work),
     ("thread-registry-copied", case_thread_registry_copied),
+    ("path-dependency-outside-crates", case_path_dependency_outside_crates),
+    ("gpu-feature-passed-through", case_gpu_feature_passed_through),
+    ("features-twice-gpu-first", case_features_twice_gpu_first),
+    ("features-equals-spelling", case_features_equals_spelling),
+    ("features-short-flag", case_features_short_flag),
+    ("features-short-flag-attached", case_features_short_flag_attached),
+    ("features-quoted-list", case_features_quoted_list),
+    ("all-features-passed-through", case_all_features_passed_through),
+    ("release-features-passed-through", case_release_features_passed_through),
+    ("features-missing-value", case_features_missing_value),
 )
 
 
@@ -645,49 +851,101 @@ def selftest():
     print(f"  ✓ compile-then-swap 自检通过（查了 {len(SELFTEST_CASES)} 项，假 cargo 一共被调 {cargo_calls} 次，不起真编译）："
           "编不过的（bin 本身、#[cfg(test)]、新 bin）一个字节不写，编的时候主工作区那份被改了不盖，编过的整份换上且换的是新 inode、"
           "新 bin 建得出来，换上失败与回读对不上都退 4，bin 以外的源文件、crates/ 以外的 .rs、放在主工作区里的草稿都不收，"
-          "cargo 只在仓副本里调，仓副本带着 include_str 读的登记文件 .claude/heavy-thread-default，"
-          "编完不 --clean 时仓副本留着、带着装置 preflight 读的源文件与 .claude/singlefs-ai-sop/scripts/preflight.py、proc.py，--clean 之后树和编译目录都删")
+          "cargo 只在仓副本里调，仓副本带着 include_str 读的登记文件 .claude/heavy-thread-default 与 crates/ 以外的 path 依赖目录（依赖的依赖、dev 依赖也在，没被引用的目录不拷），"
+          "编完不 --clean 时仓副本留着、带着装置 preflight 读的源文件与 .claude/singlefs-ai-sop/scripts/preflight.py、proc.py，--clean 之后树和编译目录都删，"
+          "每一项都经命令行那一层起，命令行上的特性（--features 写几次取并集、--features=、-F、-F<值>、引号里空格隔开的几个、--all-features）"
+          "两条 cargo 都带，执行员的用法 --release --features gpu 两条 cargo 都带 --release 与 gpu，--features 后面缺值退 2")
     return 0
 
 
-def main(arguments):
-    if arguments == ["--selftest"]:
-        return selftest()
-    usage = ("compile-then-swap.py <草稿副本> <目标> --scratch <草稿目录> [--root 仓根] [--release]，"
-             "或 compile-then-swap.py --clean --scratch <草稿目录>")
-    options = {"--scratch": None, "--root": REPOSITORY_ROOT}
-    flags = {"--release": False, "--clean": False}
-    positional = []
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest 而 COMPILE_THEN_SWAP_BREAK 非空（不管值是什么），参数解析之前就拒，交回退出码 2；放行交回 None。
+    自证在进程里调 run_command_line()（命令行解析那一层，绕过这一道），不起自己的子进程。"""
+    value = os.environ.get(BREAK_VARIABLE, "")
+    if not value or arguments == ["--selftest"]:
+        return None
+    print(f"✗ {BREAK_VARIABLE}={value} 是弄坏开关，只在自证（compile-then-swap.py --selftest）里认，平常跑设了就拒，没编、一个字节没写")
+    print(f"→ 怎么办：去掉 {BREAK_VARIABLE} 再跑；要证红就跑 {BREAK_VARIABLE}=<项> python3 scripts/hosts/compile-then-swap.py --selftest")
+    return 2
+
+
+USAGE = ("compile-then-swap.py <草稿副本> <目标> --scratch <草稿目录> [--root 仓根] [--release] "
+         "[--features <特性>[,<特性>…] | --features=<特性>… | -F <特性>… | -F<特性>…（可写几次）] [--all-features]，"
+         "或 compile-then-swap.py --clean --scratch <草稿目录>")
+
+
+def feature_names_union(feature_values):
+    """命令行上每次写的特性值（按出现次序）→ 合起来的特性：逗号与空白都算分隔，去重，次序照头一次出现。"""
+    names = [name for value in feature_values for name in value.replace(",", " ").split()]
+    return tuple(dict.fromkeys(names))
+
+
+def parse_command_line(arguments, mode=""):
+    """命令行 → (位置参数, --scratch, --root, --release, --clean, 合起来的特性, --all-features)；参数不对抛 BadInput。
+    特性的写法见文件头「特性」；mode 是弄坏开关（features-long-form-only、features-last-only、command-line-features-dropped、features-missing-value-ignored）。"""
+    value_options = {"--scratch": None, "--root": REPOSITORY_ROOT}
+    feature_options = (FEATURES_OPTION,) if mode == "features-long-form-only" else (FEATURES_OPTION, FEATURES_SHORT_OPTION)
+    release = clean_requested = all_features = False
+    feature_values, positional = [], []
     position = 0
     while position < len(arguments):
         argument = arguments[position]
-        if argument in options and position + 1 < len(arguments):
-            options[argument] = arguments[position + 1]
-            position += 2
-            continue
-        if argument in flags:
-            flags[argument] = True
+        position += 1
+        if argument in value_options or argument in feature_options:
+            if position >= len(arguments):
+                if argument in feature_options and mode == "features-missing-value-ignored":
+                    continue
+                raise BadInput(f"{argument} 后面缺值，没编、一个字节没写\n→ 怎么办：{USAGE}")
+            value = arguments[position]
+            position += 1
+            if argument in value_options:
+                value_options[argument] = value
+            else:
+                feature_values.append(value)
+        elif mode != "features-long-form-only" and argument.startswith(FEATURES_OPTION + "="):
+            feature_values.append(argument[len(FEATURES_OPTION) + 1:])
+        elif mode != "features-long-form-only" and argument.startswith(FEATURES_SHORT_OPTION) and len(argument) > len(FEATURES_SHORT_OPTION):
+            feature_values.append(argument[len(FEATURES_SHORT_OPTION):])
+        elif mode != "features-long-form-only" and argument == ALL_FEATURES_FLAG:
+            all_features = True
+        elif argument == "--release":
+            release = True
+        elif argument == "--clean":
+            clean_requested = True
         else:
             positional.append(argument)
-        position += 1
-    if options["--scratch"] is None:
-        print("✗ 没给 --scratch <草稿目录>")
-        print(f"→ 怎么办：{usage}")
-        return EXIT_BAD_INPUT
-    if flags["--clean"]:
-        print("\n".join(clean(options["--scratch"])))
-        return 0
-    if len(positional) != 2:
-        print(f"✗ 要给草稿副本与目标两个路径，给了 {len(positional)} 个")
-        print(f"→ 怎么办：{usage}")
-        return EXIT_BAD_INPUT
+    if mode == "features-last-only":
+        feature_values = feature_values[-1:]
+    features = feature_names_union(feature_values)
+    if mode == "command-line-features-dropped":
+        features, all_features = (), False
+    return positional, value_options["--scratch"], value_options["--root"], release, clean_requested, features, all_features
+
+
+def run_command_line(arguments, after_build=None, after_swap=None):
+    """命令行那一层：解析参数、交给 swap() 或 clean()，交回 (退出码, 要打的行)。main() 与自证都经它；after_build、after_swap 只给自证用（见 swap()）。"""
     try:
-        code, lines = swap(positional[0], positional[1], options["--scratch"], options["--root"], release=flags["--release"])
+        positional, scratch, root, release, clean_requested, features, all_features = parse_command_line(arguments, break_mode(announce=False))
+        if scratch is None:
+            return EXIT_BAD_INPUT, ["✗ 没给 --scratch <草稿目录>", f"→ 怎么办：{USAGE}"]
+        if clean_requested:
+            return 0, clean(scratch)
+        if len(positional) != 2:
+            return EXIT_BAD_INPUT, [f"✗ 要给草稿副本与目标两个路径，给了 {len(positional)} 个", f"→ 怎么办：{USAGE}"]
+        return swap(positional[0], positional[1], scratch, root, release=release, after_build=after_build, after_swap=after_swap,
+                    features=features, all_features=all_features)
     except BadInput as error:
         problem, _, next_step = str(error).partition("\n")
-        print(f"✗ {problem}")
-        print(f"→ {next_step.lstrip('→ ') or usage}")
-        return EXIT_BAD_INPUT
+        return EXIT_BAD_INPUT, [f"✗ {problem}", f"→ {next_step.lstrip('→ ') or USAGE}"]
+
+
+def main(arguments):
+    refused = refuse_break_outside_selftest(arguments)
+    if refused is not None:
+        return refused
+    if arguments == ["--selftest"]:
+        return selftest()
+    code, lines = run_command_line(arguments)
     print("\n".join(lines))
     return code
 

@@ -1,7 +1,9 @@
 """E170（O3规约执行器第一版） 执行器的驱动：读导出、按批判每一态、计时、打判定行与汇总行，最后打冻结的 sha256。
 
-跑法（在本目录，经 run-with-memory-cap.sh 与 capped.sh）：
-  python3 executor_main.py --dumps <scripts/experiment-apparatus/target/e170-dumps> --batches 1,2,3 --workers <N> --output <新文件>
+跑法（在本目录，整条命令交 `task-server/task submit --`，线程数经 capped.sh）：
+  python3 executor_main.py --dumps <scripts/experiment-apparatus/target/e170-dumps> --workers <N> --output <新文件> [--streams <流名,…>] [--batches <批号,…>]
+不给 --streams、--batches 就是全部流、全部批（1,2,3），每条流都算 Q2-g（附带）。给了就是指定范围：config 行的 streams=、batches= 写实际值，
+不是全部流、全部批的那一趟不当正式产物。
 每态耗时在执行器进程里计（time.perf_counter_ns，从开始建这一态的镜像起，到判定行定稿止；登记第一节读法 7），
 一批的合计用时从第一态派出前到最后一行写完止，由主进程计；读入导出文件的时间另报（name=load）。
 """
@@ -27,6 +29,7 @@ from replay_prefix import UnitChecksumCache
 from version_table import allowed_versions
 
 STREAM_NAMES = ("new_pool_file_creation", "fixed_script_through_e_then_unmount")
+ALL_BATCHES = (1, 2, 3)
 FILES_OUTSIDE_THE_FREEZE = ("comparator", "mutation_driver")  # 登记 5.6：比对器与变异驱动不进冻结的 sha256
 EXECUTOR_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
@@ -236,15 +239,18 @@ def freeze_lines(emit) -> None:
     emit(f"name=freeze_seed sha256_prefix16={seed_hasher.hexdigest()[:16]}")
 
 
-def main(argument_list: list[str]) -> int:
+def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="E170 O3 规约执行器：判每个取样崩溃状态落不落在规约允许的集合里")
     parser.add_argument("--dumps", required=True, help="导出目录（每条流一个子目录，登记 5.3）")
-    parser.add_argument("--streams", default=",".join(STREAM_NAMES))
-    parser.add_argument("--batches", default="1,2,3")
+    parser.add_argument("--streams", default=",".join(STREAM_NAMES), help="指定范围：不给就是全部流")
+    parser.add_argument("--batches", default=",".join(str(batch) for batch in ALL_BATCHES), help="指定范围：不给就是全部批")
     parser.add_argument("--workers", type=int, required=True, help="工作进程数，不超过派发提示的线程上限")
     parser.add_argument("--output", required=True, help="产物路径；已存在就拒绝（不覆盖）")
-    parser.add_argument("--skip-torn-reading", action="store_true", help="不算 Q2-g（附带，够判后不跑）")
-    arguments = parser.parse_args(argument_list)
+    return parser
+
+
+def main(argument_list: list[str]) -> int:
+    arguments = build_argument_parser().parse_args(argument_list)
     if os.path.exists(arguments.output):
         print(f"产物 {arguments.output} 已存在，不覆盖", file=sys.stderr)
         return 2
@@ -278,10 +284,9 @@ def main(argument_list: list[str]) -> int:
                 emit(f"name=version stream={stream_name} index={version.version_index} projection={version.projection.short_text()} "
                      f"root_write={version.root_write_stream_index} return_point={version.return_point} call={version.call_label}")
             anchor_assertions(stream_name, context, emit)
-            if not arguments.skip_torn_reading:
-                executor_count, dumped_count, differing = torn_reading_disagreements(context)
-                emit(f"name=torn_reading stream={stream_name} executor_third_state_writes={executor_count} "
-                     f"dumped_third_state_writes={dumped_count} differing_entries={differing}")
+            executor_count, dumped_count, differing = torn_reading_disagreements(context)
+            emit(f"name=torn_reading stream={stream_name} executor_third_state_writes={executor_count} "
+                 f"dumped_third_state_writes={dumped_count} differing_entries={differing}")
         for batch_number in (int(token) for token in arguments.batches.split(",")):
             results = run_batch(batch_number, arguments.workers, emit)
             summarise_verdicts(batch_number, results, emit)

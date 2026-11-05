@@ -664,6 +664,32 @@ class VersionComparisonInTheJudgement(unittest.TestCase):
 class DriverEndToEnd(unittest.TestCase):
     """驱动从导出目录读到写完产物：单进程与两个工作进程各跑一趟，判定行逐态相同、汇总行与包含自检照打。"""
 
+    def test_a_run_without_scope_arguments_judges_every_stream_and_every_batch_and_reads_the_torn_writes(self):
+        """不给 --streams、--batches 就是全部流、全部批（1、2、3），每条流都算 Q2-g；没有跳过 Q2-g 的选项。"""
+        import contextlib
+        import io
+
+        import executor_main
+        stream, _parts = synthetic.new_pool_file_creation_stream()
+        with tempfile.TemporaryDirectory(dir=SCRATCH_ROOT) as directory:
+            dumps_directory = os.path.join(directory, "dumps")
+            for stream_name in executor_main.STREAM_NAMES:
+                synthetic.write_dump(os.path.join(dumps_directory, stream_name), stream, LANDING_VECTORS, stream_name=stream_name)
+            executor_main.contexts_by_stream.clear()
+            output_path = os.path.join(directory, "all.out")
+            exit_code = executor_main.main(["--dumps", dumps_directory, "--workers", "1", "--output", output_path])
+            self.assertEqual(exit_code, 0)
+            with open(output_path, encoding="utf-8") as handle:
+                lines = handle.read().splitlines()
+        config = [line for line in lines if line.startswith("name=config ")][0]
+        self.assertIn(f"streams={','.join(executor_main.STREAM_NAMES)}", config)
+        self.assertIn("batches=1,2,3", config)
+        self.assertEqual(sorted(line.split()[1] for line in lines if line.startswith("name=timing ")), ["batch=1", "batch=2", "batch=3"])
+        self.assertEqual(sorted(line.split()[1] for line in lines if line.startswith("name=torn_reading ")),
+                         sorted(f"stream={name}" for name in executor_main.STREAM_NAMES))
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            executor_main.build_argument_parser().parse_args(["--dumps", "d", "--workers", "1", "--output", "o", "--skip-torn-reading"])
+
     def run_driver(self, dumps_directory: str, output_path: str, worker_count: int) -> tuple[int, list[str]]:
         import executor_main
         executor_main.contexts_by_stream.clear()

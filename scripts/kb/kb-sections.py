@@ -55,12 +55,12 @@ def fenced_lines(lines):
     """返回落在代码栅栏里的行号集合（1 起）。栅栏里的 `## ` 不是标题。"""
     inside, fence = set(), None
     for i, l in enumerate(lines, 1):
-        fm = re.match(r'(`{3,}|~{3,})', l)
-        if fence is None and fm:
+        fm = re.match(r' {0,3}(`{3,}|~{3,})', l)
+        if fence is None and fm and not (fm.group(1)[0] == '`' and '`' in l[fm.end():]):
             fence = (fm.group(1)[0], len(fm.group(1))); inside.add(i); continue
         if fence is not None:
             inside.add(i)
-            cm = re.fullmatch(r'(`{3,}|~{3,})\s*', l)
+            cm = re.fullmatch(r' {0,3}(`{3,}|~{3,})\s*', l)
             if cm and cm.group(1)[0] == fence[0] and len(cm.group(1)) >= fence[1]:
                 fence = None
     return inside
@@ -210,6 +210,39 @@ def main(args):
     return 0
 
 
+BREAK_VARIABLES = ("KB_SECTIONS_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/kb-sections.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

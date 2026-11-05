@@ -141,11 +141,10 @@ class LayerTests(TemporaryDirectoryCase):
     def test_local_gate_zeroes_only_the_local_host_slots_until_it_opens(self) -> None:
         _, _, _, segment_one = self.world()
         hosts = layer.one.two_hosts()
-        resources, _ = layer.one.resources_from_json({"hosts": [layer.one.resources_entry(1, 10, 25, 25), layer.one.resources_entry(2, 10, 25, 25)]}, hosts)
         layer.STATE["segment_one"] = segment_one
-        closed = [(item.number, item.slots) for item in layer.allocate_behind_the_local_gate(hosts, resources)]
+        closed = [(item.number, item.slots) for item in layer.allocate_behind_the_local_gate(hosts, 10)]
         self.append_log(segment_one, placeholders.green_line("step-7", [], {}), STARTED)
-        opened = [(item.number, item.slots) for item in layer.allocate_behind_the_local_gate(hosts, resources)]
+        opened = [(item.number, item.slots) for item in layer.allocate_behind_the_local_gate(hosts, 10)]
         self.assertEqual((closed, opened), ([(1, 0), (2, 2)], [(1, 2), (2, 2)]))
 
     def test_running_rows_come_from_the_latest_attempt_without_an_exit_file_and_skip_carry(self) -> None:

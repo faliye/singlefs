@@ -5,10 +5,13 @@
 许共用的只有三样（5.4）：建镜像（`crash_image.build_crash_image`，它要 `crash_dump.load_stream_dump` 读出的流；建完的镜像摘要与 `states.tsv`
 或坏状态表里导出装置算的那一个比）、CRC-32C（`crc32c_castagnoli.crc32c`，第七节 B8–B10）、L(c) 与 ack(c)（从 v2 判定行的 `landed=`、`ack=` 读）。
 
-跑法（在本目录，经 capped.sh 与 run-with-memory-cap.sh）：
+跑法（在本目录，整条命令交 `task-server/task submit --`）：
   python3 witness_reference.py states --dumps <导出目录> --v2-output <v2 的 executor_main 产物> --input-label <名> --output <新文件>
-  python3 witness_reference.py images --dumps <含 bad-*.tsv 的导出目录> [--known-bad-dir <目录>] --v2-output <v2 的坏镜像判定产物>
+  python3 witness_reference.py images --dumps <含 bad-*.tsv 的导出目录> (--known-bad-dir <目录> | --known-bad-not-applicable) --v2-output <v2 的坏镜像判定产物>
       --input-label <名> --output <新文件>
+images 模式的 --known-bad-dir 与 --known-bad-not-applicable 二选一（两个都给退 2）：这个输入没有已知坏镜像这份东西（I3）就给 --known-bad-not-applicable，
+那一节不读不判，结果行写 `known_bad=not_applicable`，其余照跑、退 0。两个都不给，已知坏镜像那一节没有输入：结果行写
+`name=not_run section=known_bad_images …`、往标准错误打一行 NOT_RUN_INPUT_NOT_GIVEN，别的节都不跑，整趟退 77（本次未跑，不是通过）。states 模式没有这份输入。
 文件名以 witness_reference 起头，不进 v2 冻结的 sha256（登记 5.6）。
 """
 
@@ -542,9 +545,47 @@ def read_patch_rows(states_path: str, patches_path: str) -> dict[int, tuple[str,
     return rows
 
 
+NOT_RUN_MARKER = "NOT_RUN_INPUT_NOT_GIVEN"
+NOT_RUN_EXIT_CODE = 77
+
+
+KNOWN_BAD_NOT_APPLICABLE = "not_applicable"
+
+
+def images_sections_without_input(arguments: argparse.Namespace) -> list[tuple[str, str]]:
+    """(节名, 选项名)：images 模式要读而没给的选填输入对应的节。"""
+    return [("known_bad_images", "--known-bad-dir")] if not (arguments.known_bad_dir or arguments.known_bad_not_applicable) else []
+
+
+def known_bad_config_text(arguments: argparse.Namespace) -> str:
+    """config 行里已知坏镜像那一项：给了目录写目录，给了 --known-bad-not-applicable 写 known_bad=not_applicable。"""
+    return f"known_bad={KNOWN_BAD_NOT_APPLICABLE}" if arguments.known_bad_not_applicable else f"known_bad_dir={arguments.known_bad_dir}"
+
+
+def known_bad_patch_rows(arguments: argparse.Namespace) -> dict:
+    """已知坏镜像的补丁行；给了 --known-bad-not-applicable 没有这份输入，不读，交回空表。"""
+    if arguments.known_bad_not_applicable:
+        return {}
+    return {("known_bad", STREAM_NAMES[0]): read_patch_rows(os.path.join(arguments.known_bad_dir, "known-bad-states.tsv"),
+                                                            os.path.join(arguments.known_bad_dir, "known-bad-patches.bin"))}
+
+
+def report_sections_not_run(output: "ResultFile", missing: list[tuple[str, str]], mode: str, input_label: str) -> int:
+    """没给输入的节在结果行里写本次未跑、往标准错误打记号行，别的节不跑，退 77。"""
+    output.emit(f"name=config mode={mode} input={input_label} not_run=true")
+    for section, option in missing:
+        output.emit(f"name=not_run section={section} input={option} reason=input_not_given")
+        print(f"{NOT_RUN_MARKER} test=witness_reference.py reason={option} 没给，{section} 这一节本次未跑", file=sys.stderr)
+    output.finish()
+    return NOT_RUN_EXIT_CODE
+
+
 def run_images(arguments: argparse.Namespace) -> int:
     output = ResultFile(arguments.output)
-    output.emit(f"name=config mode=images input={arguments.input_label} dumps={arguments.dumps} known_bad_dir={arguments.known_bad_dir or '-'} "
+    missing = images_sections_without_input(arguments)
+    if missing:
+        return report_sections_not_run(output, missing, "images", arguments.input_label)
+    output.emit(f"name=config mode=images input={arguments.input_label} dumps={arguments.dumps} {known_bad_config_text(arguments)} "
                 f"v2_output={os.path.basename(arguments.v2_output)} crc32c_self_check={'pass' if not crc32c_castagnoli.LOAD_TIME_DISAGREEMENTS else 'fail'}")
     image_fields = read_v2_lines(arguments.v2_output, "image_judgement")
     materials, patch_rows, emitted = {}, {}, []
@@ -554,9 +595,7 @@ def run_images(arguments: argparse.Namespace) -> int:
         rotation_lines(arguments.input_label, stream_name, materials[stream_name], {}, output.emit)
         patch_rows[("e170", stream_name)] = read_patch_rows(os.path.join(stream_directory, "bad-states.tsv"),
                                                             os.path.join(stream_directory, "bad-patches.bin"))
-    if arguments.known_bad_dir:
-        patch_rows[("known_bad", STREAM_NAMES[0])] = read_patch_rows(os.path.join(arguments.known_bad_dir, "known-bad-states.tsv"),
-                                                                     os.path.join(arguments.known_bad_dir, "known-bad-patches.bin"))
+    patch_rows.update(known_bad_patch_rows(arguments))
     for fields in image_fields:
         source, stream_name, row_id = fields["source"], fields["stream"], int(fields["state"])
         material = materials[stream_name]
@@ -581,7 +620,10 @@ def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser(description="E170 第 2 次重跑第二段：参照谓词 W_ref、T_ref")
     parser.add_argument("mode", choices=["states", "images"])
     parser.add_argument("--dumps", required=True)
-    parser.add_argument("--known-bad-dir")
+    known_bad = parser.add_mutually_exclusive_group()
+    known_bad.add_argument("--known-bad-dir", help="images 模式用；和 --known-bad-not-applicable 都不给这一趟本次未跑、退 77")
+    known_bad.add_argument("--known-bad-not-applicable", action="store_true",
+                           help="images 模式用：这个输入没有已知坏镜像这份东西，那一节不判，结果行写 known_bad=not_applicable")
     parser.add_argument("--v2-output", required=True)
     parser.add_argument("--input-label", required=True)
     parser.add_argument("--output", required=True)

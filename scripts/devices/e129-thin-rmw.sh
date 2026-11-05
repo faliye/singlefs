@@ -56,6 +56,8 @@ cleanup() {
     rm -rf "${W:?}" || status=1
   else
     printf '  ✗ 清理失败，保留后备文件：%s（meta=%s data=%s）\n' "$W" "$LOOP_M" "$LOOP_D" >&2
+    printf '     → 怎么办：sudo dmsetup ls 看这几个映射还剩哪几个，按 %s、%s、%s 的次序逐个 sudo dmsetup remove <名字>；再 sudo losetup -d 上面还写着的 meta、data 两个 loop；都没了再 rm -rf %s\n' \
+      "$SN" "$TH" "$POOL" "$W" >&2
     status=1
   fi
   exit "$status"

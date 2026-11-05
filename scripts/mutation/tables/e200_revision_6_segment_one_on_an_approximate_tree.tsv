@@ -1,0 +1,10 @@
+# E200（修订6近似树重跑） 第一段：造树与 Q1 判法的变异表（跑前登记第九节 M40–M47）。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。
+# 经 scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/mutation_driver.py 跑（mutate.sh 只跑 cargo）；M48–M52 归第二段的对照脚本，那时再追加。
+M40 T3 的候选不收悬空 blob	        candidates.setdefault(blob, UNREACHABLE)	        pass
+M41 T5 取最晚改它的后代提交	    return min(changed, key=lambda version: (version.time, version.commit)) if changed else None	    return max(changed, key=lambda version: (version.time, version.commit)) if changed else None
+M42 T5 的新文件取最晚加它的提交	    return min(additions, key=lambda version: (version.time, version.commit)) if additions else None	    return max(additions, key=lambda version: (version.time, version.commit)) if additions else None
+M43 T2 取今天 HEAD 那一版	        t2_blob = repository.blob_at(BASE_COMMIT, path)	        t2_blob = repository.blob_at("HEAD", path)
+M44 singlefs-core 挪进别的验证包	PRODUCT_PREFIXES = ("crates/singlefs-core/", "crates/singlefs-format/", "crates/singlefs-checker/", "crates/singlefs-replay-prefix/")\nOTHER_PREFIXES = ("crates/singlefs-verification/", 	PRODUCT_PREFIXES = ("crates/singlefs-format/", "crates/singlefs-checker/", "crates/singlefs-replay-prefix/")\nOTHER_PREFIXES = ("crates/singlefs-core/", "crates/singlefs-verification/", 
+M45 Q1-逐份的相等只比长度	    return near_sha256 == target_sha256	    return len(near_sha256) == len(target_sha256)
+M46 T4 删第 3477–3483 行（差一）	REMOVED_FIRST_LINE = 3478	REMOVED_FIRST_LINE = 3477
+M47 T4 不核枚举名	    if REMOVED_BLOCK_NAME.encode("utf-8") not in block:	    if False:

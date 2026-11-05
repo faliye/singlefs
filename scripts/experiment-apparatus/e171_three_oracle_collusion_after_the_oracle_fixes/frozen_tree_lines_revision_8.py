@@ -21,20 +21,37 @@
   frozen_tree_lines_revision_8.py --selftest [--cells 格,…] [--rounds N]
 退出码：0、1 见各子命令；2 用法错（含平常跑时设了弄坏开关）；78 配置读不到、或点名的树与文件不在。
 
-弄坏开关 FROZEN_TREE_R8_BREAK=<项>（只在 --selftest 起的子进程里认，FROZEN_TREE_R8_SELFTEST=1）。项名、弄坏哪一处、打开后红在哪一格：
-  s16-1-paths-only            S16 ① 只比路径、不比 sha256                        snapshot-table-content-differs
-  s16-1-counts-target         逐文件表把 target/ 也收进来                        snapshot-table-ignores-target
-  s16-2-no-known-differences  S16 ② 不撤认过的已知差额                          s16-2-known-difference-removed
-  s16-3-any-source            块表的来源不核是不是那三种                        s16-3-source-kind
-  s16-3-fuzz                  打块时容模糊（--fuzz=2）                           s16-3-blocks-apply
-  fixture-timestamps-allowed  fixture 头两行带修改时刻也收                       fixture-header-timestamps
-  class-a-missing-passes      甲类那一行在草稿产物里没有也算过                   class-a-checks
-  announcement-count-ignored  宣布行不核恰一行                                   announcement-count
-  after-sha-first-wins        同一文件几份 after.sha256 取先出现的那份           after-sha256-last-wins
-  merge-process-ignored       不看在跑的合入验证                                 merge-process
-  a12-zero-as-at-least-one    A12「恰 0」那几项当「≥ 1」判                        a12-greps
-  anchors-count-substring     十五行的锚点按行名子串取                           named-row-anchors
-  step-0-ignores-z5           第 0 步不核快照摘要等于 H3                         step-0-end-to-end-red
+弄坏开关 FROZEN_TREE_R8_BREAK=<项>（只在 --selftest 起的子进程里认，FROZEN_TREE_R8_SELFTEST=1）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
+  FROZEN_TREE_R8_BREAK=s16-1-paths-only  S16 ① 只比路径、不比 sha256
+      「✗ 自证 snapshot-table-content-differs：」
+  FROZEN_TREE_R8_BREAK=s16-1-counts-target  逐文件表把 target/ 也收进来
+      「✗ 自证 snapshot-table-ignores-target：」
+  FROZEN_TREE_R8_BREAK=s16-2-no-known-differences  S16 ② 不撤认过的已知差额
+      「✗ 自证 s16-2-known-difference-removed：」
+  FROZEN_TREE_R8_BREAK=s16-3-any-source  块表的来源不核是不是那三种
+      「✗ 自证 s16-3-source-kind：」
+  FROZEN_TREE_R8_BREAK=s16-3-fuzz  打块时容模糊（--fuzz=2）
+      「✗ 自证 s16-3-blocks-apply：」
+  FROZEN_TREE_R8_BREAK=fixture-timestamps-allowed  fixture 头两行带修改时刻也收
+      「✗ 自证 fixture-header-timestamps：」
+  FROZEN_TREE_R8_BREAK=class-a-missing-passes  甲类那一行在草稿产物里没有也算过
+      「✗ 自证 class-a-checks：」
+  FROZEN_TREE_R8_BREAK=announcement-count-ignored  宣布行不核恰一行
+      「✗ 自证 announcement-count：」
+  FROZEN_TREE_R8_BREAK=after-sha-first-wins  同一文件几份 after.sha256 取先出现的那份
+      「✗ 自证 after-sha256-last-wins：」
+  FROZEN_TREE_R8_BREAK=merge-process-ignored  不看在跑的合入验证
+      「✗ 自证 merge-process：」
+  FROZEN_TREE_R8_BREAK=a12-zero-as-at-least-one  A12「恰 0」那几项当「≥ 1」判
+      「✗ 自证 a12-greps：」
+  FROZEN_TREE_R8_BREAK=anchors-count-substring  十五行的锚点按行名子串取
+      「✗ 自证 named-row-anchors：」
+  FROZEN_TREE_R8_BREAK=step-0-ignores-z5  第 0 步不核快照摘要等于 H3
+      「✗ 自证 step-0-end-to-end-red：」
+  FROZEN_TREE_R8_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  FROZEN_TREE_R8_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 
@@ -67,15 +84,15 @@ REVISION_6_TREE = "scripts/experiment-apparatus/target/e171-r1-frozen-tree-revis
 BASE_DEVICE_SHA256 = "ab35105f861d509457296741d2c60515a3a94b9fefe77944f03d1b358afd45df"
 REVISION_6_TREE_DEVICE_SHA256 = "67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156"
 SNAPSHOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates")
-ANNOUNCEMENT_PREFIX = "- E171 最终主线拍树宣布"
-RECORDS_FILE = "records/2026-10-01-里程碑三形式化接入.md"
+ANNOUNCEMENT_PREFIX = "- E171 第 2 次重跑拍树宣布"   # 第 2 次重跑登记 research/prompts/e171-r2-prereg.md 第十一节末段与修订 5 第 5.6 条
+RECORDS_FILE = "records/2026-10-31-删兼容旧版本代码.md"
 PREREGISTRATION = "research/prompts/e171-r1-prereg.md"
 REVISION_9_HEADING = "### 修订 9"
 MERGE_VERIFY_SCRIPT = "merge-and-verify.sh"
 BLOCK_SOURCE_KINDS = ("revision_9_constants", "core_refusal_arm", "main_agent_ruling")
 # 第三节点名的十五行（两张坏实现表的整表编号）
 NAMED_ROWS = (15, 23, 42, 49, 110, 125, 155, 161, 162, 174, 242, 252, 269, 270, 271)
-ROW_TABLES = ("bad-implementations-117.tsv", "bad-implementations-expansion-164.tsv")
+ROW_TABLES = ("bad-implementations-step-8.tsv", "bad-implementations-step-4-only.tsv")
 OTHER_FILES = ("crates/singlefs-core/src/allocator.rs", "crates/singlefs-harness/tests/common/mod.rs")
 STREAMS = ("new_pool_file_creation", "fixed_script_through_e_then_unmount", "first_file_unlinked_then_inodes_across_one_leaf")
 # 甲类（第 8.2 节「定义钉死，不许变」）：草稿副本 stream-constants 产物里这几条 name=s1 行都要 holds=true

@@ -80,13 +80,13 @@ done
 [[ -n "$PASS" ]] || die ".env 里的口令都不通过 sudo 校验" "检查 $REPO/.env 里 SUDO_PASS_A / SUDO_PASS_B 是不是最新口令；改完重跑，或者手动 sudo cp $SRC $DEST 再 sudo chown \$USER $DEST。"
 
 # 私有临时文件验证完成后才发布；复制失败不会污染下一次读取的缓存。
-COPY="$(mktemp "$DEST_DIR/.singlefs-vmlinuz.XXXXXX")" || die "建不了内核临时文件：$DEST_DIR"
+COPY="$(mktemp "$DEST_DIR/.singlefs-vmlinuz.XXXXXX")" || die "建不了内核临时文件：$DEST_DIR" "→ 看 $DEST_DIR 在不在、可不可写、盘满没满（df -h $DEST_DIR）；要换目录就设 SINGLEFS_KERNEL_DIR=<可写的目录> 再跑"
 trap 'rm -f -- "${COPY:?}"' EXIT
-printf '%s\n' "$PASS" | sudo -S -p '' cp "$SRC" "$COPY" 2>/dev/null || die "复制内核失败：$SRC"
-printf '%s\n' "$PASS" | sudo -S -p '' chown "$(id -u):$(id -g)" "$COPY" 2>/dev/null || die "内核副本改属主失败"
-kernel_readable "$COPY" || die "内核副本为空、不可读或不是普通文件"
-SRC_SZ="$(printf '%s\n' "$PASS" | sudo -S -p '' stat -c%s "$SRC" 2>/dev/null)" || die "读取源内核大小失败"
-DST_SZ="$(stat -c%s "$COPY")" || die "读取副本大小失败"
-[[ "$SRC_SZ" == "$DST_SZ" ]] || die "大小对不上：源 $SRC_SZ 目标 $DST_SZ"
-mv -T -- "$COPY" "$DEST" || die "发布内核缓存失败：$DEST"
+printf '%s\n' "$PASS" | sudo -S -p '' cp "$SRC" "$COPY" 2>/dev/null || die "复制内核失败：$SRC" "→ 手动跑一次 sudo cp $SRC <可写的目录>/ 看报什么（多半是 $DEST_DIR 盘满或不可写）；修好再跑，或设 SINGLEFS_KERNEL 指一个现成可读的镜像"
+printf '%s\n' "$PASS" | sudo -S -p '' chown "$(id -u):$(id -g)" "$COPY" 2>/dev/null || die "内核副本改属主失败" "→ 手动跑一次 sudo chown $(id -u):$(id -g) <$DEST_DIR 下的一个文件> 看报什么（$DEST_DIR 在不让改属主的挂载上就换一个目录：SINGLEFS_KERNEL_DIR=<目录>）"
+kernel_readable "$COPY" || die "内核副本为空、不可读或不是普通文件" "→ 看源镜像本身（sudo ls -l $SRC）是不是空的或不是普通文件；是就换一个版本（--release <版本>），或设 SINGLEFS_KERNEL 指一个可读的镜像"
+SRC_SZ="$(printf '%s\n' "$PASS" | sudo -S -p '' stat -c%s "$SRC" 2>/dev/null)" || die "读取源内核大小失败" "→ 手动跑一次 sudo stat -c%s $SRC 看报什么；sudo 口令过期就把 $REPO/.env 里的 SUDO_PASS_A / SUDO_PASS_B 改成最新的再跑"
+DST_SZ="$(stat -c%s "$COPY")" || die "读取副本大小失败" "→ 副本 $COPY 被删了或 $DEST_DIR 被卸掉了：ls -l $DEST_DIR 看一眼，修好再跑（副本退出时自己删）"
+[[ "$SRC_SZ" == "$DST_SZ" ]] || die "大小对不上：源 $SRC_SZ 目标 $DST_SZ" "→ 复制没写完，多半是 $DEST_DIR 所在的盘满了：df -h $DEST_DIR 看余量，腾出空间或换 SINGLEFS_KERNEL_DIR=<目录> 再跑"
+mv -T -- "$COPY" "$DEST" || die "发布内核缓存失败：$DEST" "→ ls -ld $DEST 看它是不是一个目录或改不动的文件；挪走它，或换 SINGLEFS_KERNEL_DIR=<目录> 再跑"
 printf '%s\n' "$DEST"

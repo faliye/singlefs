@@ -10,15 +10,15 @@ count_reusable_units.py 都从这里取。参照实现是设计员草稿 reuse_k
               admission.build_environment_lines 给的构建环境各行（名字与内容的 sha256）
   [closure]   树里编的 release 二进制的 dep-info 列的每个源文件，相对树根的路径与 sha256；驱动行用改坏之后的内容（bad_implementation_table.apply_mutation）；
               树外的路径出现就停（S18 ②，ClosureOutsideTheTree）
-  [env]       闭包源码里按名字读的 SINGLEFS_、KS_、RAYON_ 字面量，去掉 capped.sh 设的八个线程数变量，逐个记 set / unset；有一个 set 的单元不查库、不进库
+  [env]       闭包源码里按名字读的 SINGLEFS_、KS_、RAYON_ 字面量，去掉任务服务设的线程数变量里的那八个，逐个记 set / unset；有一个 set 的单元不查库、不进库
   [mutation]  行号、行表那一行原文、变异表那一行原文；空变异记 empty-of <原名> 与那一行原文
-  [args]      装置或驱动的参数，去掉输出目录、--threads、--memory-cap、--lanes、工作根、输出根
+  [args]      装置或驱动的参数，去掉输出目录、--threads、--lanes、工作根、输出根
   [limit]     逐行限时 L 的秒数；不限时的单元记 none
   [upstream]  角色名与上游读数各文件的 sha256（按读数内容，不按上游的键）
   [research]  研究一侧运行期闭包各文件的 sha256（装置单元 device_timing.py；驱动行是驱动与它 import 的四份；跑执行器的另加执行器目录、冻结行那份产物、
               frozen_o3.py、o3_bad_image_judge.py、result_lines.py；变异驱动是研究一侧整个目录与它的变异表）
   [python]    python3 -VV 原样
-库（H30，默认 ~/.local/share/singlefs/reuse/e171-r1/）：entries/<键前 2 位>/<键>/ 下 key.txt、reading/<角色>…、meta.tsv、manifest.sha256（最后写）；
+库（H30，默认 <数据根>/reuse/e171-r1/，数据根取 .claude/hooks/lib_work_root.py 的 shared_data_path，两台同一份）：entries/<键前 2 位>/<键>/ 下 key.txt、reading/<角色>…、meta.tsv、manifest.sha256（最后写）；
   staging/<进程号>-<随机>/（先写这里再 rename；起跑时清残留）；quarantine/（RC5 不符的条目挪进来）；frozen-by-s18（S18 触发时写，在就不取、不入）。
   读数按角色存：product、timing（文件），directory（装置的导出目录），row（驱动行的行目录）；meta.tsv 记这一单元原来的名字（前缀后缀换成占位）。
 账本：<导出根>/reuse-markers/<层>/ 下每个单元一份标记（先写标记、再链接、最后链 row-result.tsv 或写绿行），events.tsv 收 RC1–RC5 的每一次；
@@ -27,7 +27,7 @@ count_reusable_units.py 都从这里取。参照实现是设计员草稿 reuse_k
 用法：
   reuse_library.py fetch --library L --entry E --map <角色>=<目标路径> [--map …]
       单元脚本取用：核 RC5（不符的挪进隔离目录、退 1）、按角色把条目里的读数硬链接到这一趟的名字（目标已在就拒、退 1）；标准输出一行条目 meta 里的退出码。
-  reuse_library.py selfproof --library L --binary B --scratch S --output O --threads N --memory-cap C
+  reuse_library.py selfproof --library L --binary B --scratch S --output O --threads N
       RP2（修订 8 那一趟 step-0 绿之后的 reuse-selfproof 单元）：H7 那个装置二进制跑三次 stream-constants --streams 1,2,3。
   reuse_library.py --selftest [--cells 格,…] [--rounds N]
       RP1、RP3–RP8（假树、假装置、假驱动、假判法；RP1 另起三层编排各自的端到端格），钉值认搬迁登记的两格（pin-moves：假前缀的红绿红样本；
@@ -36,27 +36,51 @@ count_reusable_units.py 都从这里取。参照实现是设计员草稿 reuse_k
       冻结执行器核对），末尾逐个打开弄坏开关核红在点名格。末行「自证 N 项，红 M」。
 退出码：0 成；1 取用不成或 RP2 不过；2 用法错；78 库目录写不了或与 scripts/experiment-apparatus/target 不在同一个文件系统（硬链接不成）。
 
-弄坏开关 REUSE_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，REUSE_SELFTEST=1；别处设了退 2）。项名、弄坏哪一处、打开后红在哪一格：
-  drop-kind                键文本里不写 [kind]                                  rp3-kind
-  drop-build               不写 [build]                                         rp3-build
-  drop-closure             不写 [closure]                                       rp3-closure
-  drop-env                 不写 [env]                                           rp3-env
-  drop-mutation            不写 [mutation]                                      rp3-mutation
-  drop-args                不写 [args]                                          rp3-args
-  drop-limit               不写 [limit]                                         rp3-limit
-  drop-upstream            不写 [upstream]                                      rp3-upstream
-  drop-research            不写 [research]                                      rp3-research
-  drop-python              不写 [python]                                        rp3-python
-  check-skipped            RC1–RC3 不比读数（库里有同键条目就算相同）           rp7-check-mismatch
-  closure-check-skipped    RC4 不核 dep-info                                    rp6-closure-extra-file
-  manifest-unchecked       RC5 不核 manifest.sha256                             rp8-corrupted-entry
-  insert-in-place          入库直接写进 entries/、不经 staging/                 rp5-atomic-insert
-  fresh-always-ignored     永远现跑的几类（step-9 等）也查库                    rp1-two-passes
-  pin-moves-ignored        钉值核对不看搬迁登记（pinned_sha256_now 只认逐字节相同）   pin-moves
-  frozen-o3-moves-ignored  冻结执行器核对不看搬迁登记（子进程设 FROZEN_O3_BREAK=path-moves-ignored）   frozen-o3-moves
-  pin-partial-accepted     钉值核对倒换之前不核此刻的内容正着换一遍动不动（格里设 FROZEN_O3_BREAK=partial-accepted）   pin-moves-partial
-  frozen-o3-partial-accepted  冻结执行器核对同上（两份 frozen_o3，格里设 FROZEN_O3_BREAK=partial-accepted）   frozen-o3-reverse-moves
-  frozen-o3-whole-chain-only  冻结执行器核对只倒全部登记那一版、不逐次倒（格里设 FROZEN_O3_BREAK=whole-chain-only）   frozen-o3-reverse-moves
+弄坏开关 REUSE_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，REUSE_SELFTEST=1；别处设了退 2）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
+  REUSE_BREAK=drop-kind  键文本里不写 [kind]
+      「✗ 自证 rp3-kind：」
+  REUSE_BREAK=drop-build  不写 [build]
+      「✗ 自证 rp3-build：」
+  REUSE_BREAK=drop-closure  不写 [closure]
+      「✗ 自证 rp3-closure：」
+  REUSE_BREAK=drop-env  不写 [env]
+      「✗ 自证 rp3-env：」
+  REUSE_BREAK=drop-mutation  不写 [mutation]
+      「✗ 自证 rp3-mutation：」
+  REUSE_BREAK=drop-args  不写 [args]
+      「✗ 自证 rp3-args：」
+  REUSE_BREAK=drop-limit  不写 [limit]
+      「✗ 自证 rp3-limit：」
+  REUSE_BREAK=drop-upstream  不写 [upstream]
+      「✗ 自证 rp3-upstream：」
+  REUSE_BREAK=drop-research  不写 [research]
+      「✗ 自证 rp3-research：」
+  REUSE_BREAK=drop-python  不写 [python]
+      「✗ 自证 rp3-python：」
+  REUSE_BREAK=check-skipped  RC1–RC3 不比读数（库里有同键条目就算相同）
+      「✗ 自证 rp7-check-mismatch：」
+  REUSE_BREAK=closure-check-skipped  RC4 不核 dep-info
+      「✗ 自证 rp6-closure-extra-file：」
+  REUSE_BREAK=manifest-unchecked  RC5 不核 manifest.sha256
+      「✗ 自证 rp8-corrupted-entry：」
+  REUSE_BREAK=insert-in-place  入库直接写进 entries/、不经 staging/
+      「✗ 自证 rp5-atomic-insert：」
+  REUSE_BREAK=fresh-always-ignored  永远现跑的几类（step-9 等）也查库
+      「✗ 自证 rp1-two-passes：」
+  REUSE_BREAK=pin-moves-ignored  钉值核对不看搬迁登记（pinned_sha256_now 只认逐字节相同）
+      「✗ 自证 pin-moves：」
+  REUSE_BREAK=frozen-o3-moves-ignored  冻结执行器核对不看搬迁登记（子进程设 FROZEN_O3_BREAK=path-moves-ignored）
+      「✗ 自证 frozen-o3-moves：」
+  REUSE_BREAK=pin-partial-accepted  钉值核对倒换之前不核此刻的内容正着换一遍动不动（格里设 FROZEN_O3_BREAK=partial-accepted）
+      「✗ 自证 pin-moves-partial：」
+  REUSE_BREAK=frozen-o3-partial-accepted  冻结执行器核对同上（两份 frozen_o3，格里设 FROZEN_O3_BREAK=partial-accepted）
+      「✗ 自证 frozen-o3-reverse-moves：」
+  REUSE_BREAK=frozen-o3-whole-chain-only  冻结执行器核对只倒全部登记那一版、不逐次倒（格里设 FROZEN_O3_BREAK=whole-chain-only）
+      「✗ 自证 frozen-o3-reverse-moves：」
+  REUSE_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  REUSE_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 自证只换假件的变量（只在 REUSE_SELFTEST=1 时认）：REUSE_SELFTEST_KILL_AT=before-manifest|before-rename|before-row-result:<行目录名>
   （入库或取用走到那一处时进程给自己发 SIGKILL，RP4、RP5 用）。
 """
@@ -90,16 +114,25 @@ KILL_POINT_VARIABLE = "REUSE_SELFTEST_KILL_AT"
 EXIT_RUN_CONDITION = 78
 RESEARCH_RELATIVE = "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes"
 EXECUTOR_RELATIVE = "scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487"
-FREEZE_REFERENCE_RELATIVE = "research/results/e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out"
+FREEZE_REFERENCE_RELATIVE = "research/results/e170-r2-o3-spec-executor-2026-11-05-refreeze-executor.out"
 MUTATIONS_TABLE_RELATIVE = "scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv"
 ADMISSION_SCRIPT_RELATIVE = "scripts/gate/admission.py"
 DEVICE_BINARY = "e171_three_oracle_collusion_after_the_oracle_fixes"
 E170_BINARY = "e170_o3_spec_executor_export"
-DEFAULT_LIBRARY_ROOT = os.path.expanduser("~/.local/share/singlefs/reuse/e171-r1")
+def shared_reuse_root():
+    """数据根下的 reuse（.claude/hooks/lib_work_root.py 的 shared_data_path，两台同一份）。"""
+    specification = importlib.util.spec_from_file_location("lib_work_root_for_e171_reuse_library",
+                                                           os.path.join(HERE, "..", "..", "..", ".claude", "hooks", "lib_work_root.py"))
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module.shared_data_path("reuse")
+
+
+DEFAULT_LIBRARY_ROOT = os.path.join(shared_reuse_root(), "e171-r1")
 KEY_SCHEMA_LINE = "schema e171-r1-reuse-key 1"
 SECTION_ORDER = ("kind", "build", "closure", "env", "mutation", "args", "limit", "upstream", "research", "python")
 UNIT_KINDS = ("device", "e170", "driver-row", "o3-executor", "mutation-driver")
-# scripts/hosts/capped.sh 第 22–31 行设的八个线程数变量：不进 [env]（线程数在键外，第 11.2 节「键外的几样」）
+# 任务服务设的线程数变量里的八个（取这一张表时 scripts/hosts/ 下线程上限脚本第 22–31 行那一份）：不进 [env]（线程数在键外，第 11.2 节「键外的几样」）
 THREAD_COUNT_VARIABLES = ("CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "SINGLEFS_LAYER0_THREADS", "SINGLEFS_CRASH_INJECTION_THREADS",
                           "SINGLEFS_FAULT_INJECTION_WORKER_THREADS", "SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS",
                           "SINGLEFS_RANDOM_HISTORY_THREADS", "SINGLEFS_THREAD_CAP")
@@ -108,7 +141,7 @@ ENVIRONMENT_NAME_PATTERN = re.compile(r'"(SINGLEFS_[A-Z0-9_]+|KS_[A-Z0-9_]+|RAYO
 DRIVER_RESEARCH_FILES = ("row_driver.py", "device_timing.py", "frozen_o3.py", "run_directory.py", "bad_implementation_table.py")
 EXECUTOR_RESEARCH_FILES = ("frozen_o3.py", "o3_bad_image_judge.py", "result_lines.py")
 DEVICE_RESEARCH_FILES = ("device_timing.py",)
-SELECTED_ROW_TABLES = ("bad-implementations-117.tsv", "bad-implementations-expansion-164.tsv")
+SELECTED_ROW_TABLES = ("bad-implementations-step-8.tsv", "bad-implementations-step-4-only.tsv")
 # 改坏的那一处碰到模块集合的，dep-info 认不全（第 11.2 节 RC4 的静态拦）：永远现跑
 MODULE_SET_TOKENS = ("mod ", "#[path", "include_str!", "include_bytes!", "include!")
 TIMEOUT_EXIT_CODE = 253
@@ -253,8 +286,8 @@ def research_lines(repo: str, relative_paths: list[str]) -> list[str]:
     return lines
 
 
-# [args] 不进键的那几项（带一个值）：输出与工作的落点、线程、内存上限、线道，与已经在别的节里的输入（树进 [closure]、基线计时进 [limit]、上游进 [upstream]）
-VOLATILE_ARGUMENT_OPTIONS = ("--output-directory", "--dump-directory", "--output-root", "--work-root", "--threads", "--memory-cap", "--lanes",
+# [args] 不进键的那几项（带一个值）：输出与工作的落点、线程、线道，与已经在别的节里的输入（树进 [closure]、基线计时进 [limit]、上游进 [upstream]）
+VOLATILE_ARGUMENT_OPTIONS = ("--output-directory", "--dump-directory", "--output-root", "--work-root", "--threads", "--lanes",
                              "--timing-output", "--baseline-timing", "--snapshot-from", "--repo-root", "--o3-control-bad-states", "--other-selected-rows")
 
 
@@ -406,9 +439,10 @@ def segment_one_reading_names() -> list[str]:
 
 
 _pinned_modules: dict[str, types.ModuleType] = {}
-# 第一段编排器 rows_orchestrator.py 搬目录（10-11、10-14 两次提交改了里面的路径）之后按现内容重钉：修订 11 这几层认 ORCHESTRATOR_SHA256。
-# 冻结的修订 8、修订 10 与它们钉住的 cross_host_o3_check.py、rows_orchestrator_segment_two.py 里写的是搬之前的 ORCHESTRATOR_SHA256_BEFORE_MOVE，
-# 一个字节不改：修订 11 载入它们时先核它们自己的 sha256（load_repinned），再把正文里那个旧值换成新值编（RepinnedLoader）。
+# 冻结层（rows_orchestrator_revision_8.py、rows_orchestrator_segment_two.py、rows_orchestrator_segment_two_revision_10.py、cross_host_o3_check.py）
+# 正文里钉的第一段编排器、跨机对照入口、第二段编排器的 sha256，与这里的 ORCHESTRATOR_SHA256、CROSS_HOST_CHECK_SHA256、SEGMENT_TWO_ORCHESTRATOR_SHA256
+# 是同一组值，都是被钉文件此刻的内容：跑那一趟的第一段编排器 1dcfb8d0… 那一版与此刻差的不只是登记过的搬迁（每台线程改取登记值等），倒换不回去，
+# 所以冻结层与这里一起按此刻内容重钉。修订 11 载入冻结层时先核它们自己的 sha256（load_repinned），再把正文里的钉值换成此刻该认的那一个编（RepinnedLoader）。
 # 之后整个目录再搬家、登记在 .claude/gate.d/path-moves.tsv 的（读法在 frozen_o3 文件头「搬迁登记」）：钉值一个不改。核 sha256 时
 # （pinned_sha256_now）此刻的内容不是钉住的那一份，就把此刻内容里登记过的新前缀从最近一次起逐次倒着换回旧前缀再算，有一步是钉值就认（只差登记过的前缀）；
 # 此刻的内容照全部登记正着换一遍要不动，只换了一半的不倒、不认；
@@ -417,14 +451,10 @@ _pinned_modules: dict[str, types.ModuleType] = {}
 # 用全部登记行倒换（不只此刻生效的）：换回去之后逐字节等于钉住的那一版，此刻与它就只差登记过的前缀；还改了别处的换回去也对不上。登记表不在或没有内容行时与改前逐字节同判。
 # 关不住的一种：登记表里留着一行老行（旧前缀下已没有文件、新前缀是早就在的另一份实现），再加一行真搬迁，钉住的文件改指那一份早就在的实现，换回去照样等于钉值，这里认；
 # 门禁一侧这份文件照算改动，要人看（.claude/rules/path-moves.md「门禁管哪一半」）。换算只认仓根起的前缀（lib-lag-baseline.py 文件头「搬迁登记」）。
-ORCHESTRATOR_SHA256_BEFORE_MOVE = "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"
-# scripts/experiments → scripts/experiment-apparatus 那一次搬迁，两份编排器造假仓的函数里把路径拆成 "scripts", "experiments" 几段写，
-# 跟着换了，不只差登记过的前缀，按现内容重钉这两个值（records/2026-10-23-实验装置目录改名.md 批 2）。
-# 第一段编排器改成每台线程取登记值、不按此刻空闲现算之后，ORCHESTRATOR_SHA256 再按现内容重钉一次（records/2026-10-22-子agent结果落地审计.md 第十二批）。
-ORCHESTRATOR_SHA256 = "e6f3a370ca6f66577e5cd9f3d44a30dd315660958ebb50922df3fc53ec6ef8ff"
-SEGMENT_TWO_ORCHESTRATOR_SHA256 = "7dda75bcbfdca6b6705f2e0b995977d1e279044897c8a1ec717e30e1d5fcda08"
+ORCHESTRATOR_SHA256 = "d2ebaaaf914db01f384004676d9e127593c11d1796a4694b50924db38b2255c1"
+SEGMENT_TWO_ORCHESTRATOR_SHA256 = "413ce4a869667696acd62b05caba6441d3936e022d49db5fce72f437df5f0b39"
 # 冻结的修订 8（rows_orchestrator_revision_8.py 的 CROSS_HOST_CHECK_SHA256）钉的跨机对照入口：载入修订 8 时同样按此刻认不认换
-CROSS_HOST_CHECK_SHA256 = "4ab952419acc40890bb68e03135e1f18555dd29a5e02ff86581950f03ab297a5"
+CROSS_HOST_CHECK_SHA256 = "7247276e8046551e18bbfe2a3402babfb3e4e8554f467bac56796c2e6975fc42"
 PIN_REPOSITORY_ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))   # 搬迁登记表从这一个仓根取
 # 钉住的编排器：模块名 → 路径、模块名 → sha256 两张表（路径表照字面拼，函数单元库认得出载的是哪几份）；PINNED_REPINS 是载入时正文里要换的钉值（现算）
 PINNED_PATHS = {"rows_orchestrator_1dcfb8d0": os.path.join(HERE, "rows_orchestrator.py"),
@@ -467,8 +497,8 @@ def orchestrator_sha256_now(directory: str = HERE, root: str = PIN_REPOSITORY_RO
 
 
 def orchestrator_repin(directory: str = HERE, root: str = PIN_REPOSITORY_ROOT) -> tuple[tuple[str, str], ...]:
-    """冻结层正文里第一段编排器的旧钉值 → 此刻该认的那一个（rows_orchestrator_segment_two.py、rows_orchestrator_revision_8.py 载入时换）。"""
-    return ((ORCHESTRATOR_SHA256_BEFORE_MOVE, orchestrator_sha256_now(directory, root)),)
+    """冻结层正文里第一段编排器的钉值（同 ORCHESTRATOR_SHA256）→ 此刻该认的那一个（rows_orchestrator_segment_two.py、rows_orchestrator_revision_8.py 载入时换）。"""
+    return ((ORCHESTRATOR_SHA256, orchestrator_sha256_now(directory, root)),)
 
 
 def rows_revision_8_repins(directory: str = HERE, root: str = PIN_REPOSITORY_ROOT) -> tuple[tuple[str, str], ...]:
@@ -1283,14 +1313,12 @@ def command_fetch(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def selfproof_run(repo: str, binary: str, threads: str, memory_cap: str, directory: str) -> tuple[int, str]:
-    """RP2 的一次：装置 stream-constants --streams 1,2,3（只打 S1 常量），经内存包装与线程上限；产物是它的 E7RESULT 行。"""
+def selfproof_run(repo: str, binary: str, threads: str, directory: str) -> tuple[int, str]:
+    """RP2 的一次：装置 stream-constants --streams 1,2,3（只打 S1 常量），直接起、线程变量设成 `threads`（frozen_o3.thread_environment；内存额度由任务服务给）；产物是它的 E7RESULT 行。"""
     os.makedirs(directory)
     product = os.path.join(directory, "stream-constants.out")
-    command = ["nice", "-n", "19", "bash", os.path.join(repo, "scripts/hosts/run-with-memory-cap.sh"), memory_cap, "bash",
-               os.path.join(repo, "scripts/hosts/capped.sh"), threads, binary, "stream-constants", "--streams", "1,2,3"]
-    completed = subprocess.run(command, cwd=repo, capture_output=True, text=True,
-                               env=dict(os.environ, RUN_WITH_MEMORY_CAP_PARALLEL_REASON="同一会话派出去的几个执行员各跑各的装置"))
+    command = ["nice", "-n", "19", binary, "stream-constants", "--streams", "1,2,3"]
+    completed = subprocess.run(command, cwd=repo, env=frozen_o3.thread_environment(threads), capture_output=True, text=True)
     with open(product, "x", encoding="utf-8") as handle:
         handle.writelines(line + "\n" for line in completed.stdout.splitlines() if line.startswith("E7RESULT "))
     return completed.returncode, product
@@ -1306,7 +1334,7 @@ def command_selfproof(arguments: argparse.Namespace) -> int:
     sections = {"kind": ["device"], "build": [f"binary {sha256_file(arguments.binary)}"], "args": ["stream-constants --streams 1,2,3"],
                 "limit": limit_lines(None), "python": [python_text()]}
     lines = [f"E7RESULT name=reuse_selfproof_config library={value(root)} binary_sha256={sha256_file(arguments.binary)} key={key_of(sections)}"]
-    first_exit, first_product = selfproof_run(repo, arguments.binary, arguments.threads, arguments.memory_cap, os.path.join(arguments.scratch, "run-1"))
+    first_exit, first_product = selfproof_run(repo, arguments.binary, arguments.threads, os.path.join(arguments.scratch, "run-1"))
     first, _ = decide(library, "reuse-selfproof", "device", sections, "", False)
     inserted = record_finished(library, markers, first, {"product": first_product}, device_exit_insertable(first_exit, (0,)),
                                {"exit": str(first_exit), "origin_product": "reuse-selfproof-run-1"})
@@ -1318,7 +1346,7 @@ def command_selfproof(arguments: argparse.Namespace) -> int:
         fetch(library, second.entry, {"product": second_product})
         fetched_identical = open(second_product, "rb").read() == open(first_product, "rb").read()
     lines.append(f"E7RESULT name=reuse_selfproof step=2 lookup=on state={second.state} fetched_identical_to_step_1={str(fetched_identical).lower()}")
-    third_exit, third_product = selfproof_run(repo, arguments.binary, arguments.threads, arguments.memory_cap, os.path.join(arguments.scratch, "run-3"))
+    third_exit, third_product = selfproof_run(repo, arguments.binary, arguments.threads, os.path.join(arguments.scratch, "run-3"))
     third, _ = decide(library, "reuse-selfproof", "device", sections, "", False)
     compared = record_finished(library, markers, third, {"product": third_product}, device_exit_insertable(third_exit, (0,)), {"exit": str(third_exit)})
     lines.append(f"E7RESULT name=reuse_selfproof step=3 lookup=off exit={third_exit} insert={compared} identical={str(compared == 'present-identical').lower()}")
@@ -1343,7 +1371,7 @@ def main(argument_list: list[str]) -> int:
     fetch_parser.add_argument("--entry", required=True)
     fetch_parser.add_argument("--map", action="append", required=True)
     proof = commands.add_parser("selfproof")
-    for name in ("--library", "--binary", "--scratch", "--output", "--threads", "--memory-cap"):
+    for name in ("--library", "--binary", "--scratch", "--output", "--threads"):
         proof.add_argument(name, required=True)
     proof.add_argument("--repo", default=os.getcwd())
     arguments = parser.parse_args(argument_list)
@@ -1450,7 +1478,8 @@ def furnish_rows_world(repo: str, tree: str, numbers: tuple[int, ...]) -> None:
     write_text(os.path.join(research, SELECTED_ROW_TABLES[0]), table)
     write_text(os.path.join(research, SELECTED_ROW_TABLES[1]), "")
     write_text(os.path.join(repo, EXECUTOR_RELATIVE, "executor_main.py"), "# 假执行器\n")
-    if not os.path.exists(os.path.join(repo, FREEZE_REFERENCE_RELATIVE)):
+    # 假仓里的参照可能是指向真仓 research/results/ 下产物的链接（编排器自证的假仓就是）：链在就不写，悬空时 open(..., "w") 会顺着链把假内容写进真仓
+    if not os.path.lexists(os.path.join(repo, FREEZE_REFERENCE_RELATIVE)):
         write_text(os.path.join(repo, FREEZE_REFERENCE_RELATIVE), "E7RESULT name=freeze fake=1\n")
 
 
@@ -1965,7 +1994,7 @@ def cell_pin_moves_real_files(scratch: str) -> tuple[bool, str]:
             problems.append(f"{pinned_file}：除了路径还多改一处也认了")
         with open(path, "wb") as handle:
             handle.write(moved)
-    wanted = ((ORCHESTRATOR_SHA256_BEFORE_MOVE, moved_sha256.get("rows_orchestrator.py")),
+    wanted = ((ORCHESTRATOR_SHA256, moved_sha256.get("rows_orchestrator.py")),
               (CROSS_HOST_CHECK_SHA256, moved_sha256.get("cross_host_o3_check.py")))
     if rows_revision_8_repins(directory, scratch) != wanted:
         problems.append(f"冻结的修订 8 载入时要换的钉值不是换过之后那两份的 sha256：{rows_revision_8_repins(directory, scratch)}")

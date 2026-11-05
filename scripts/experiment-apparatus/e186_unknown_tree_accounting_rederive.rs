@@ -1092,7 +1092,7 @@ struct EvaluatedPoint {
 }
 
 impl EvaluatedPoint {
-    fn cell(&self, flags_policy: UnknownFlagsPolicy, accounting_policy: AccountingPolicy) -> &CellOutcome {
+    fn outcome_under_the_arms(&self, flags_policy: UnknownFlagsPolicy, accounting_policy: AccountingPolicy) -> &CellOutcome {
         self.cells
             .iter()
             .find(|cell| cell.flags_policy == flags_policy && cell.accounting_policy == accounting_policy)
@@ -1100,7 +1100,7 @@ impl EvaluatedPoint {
     }
 
     fn vector(&self, flags_policy: UnknownFlagsPolicy, accounting_policy: AccountingPolicy, reading: Reading) -> LexicographicVector {
-        vector_under(self.cell(flags_policy, accounting_policy), &self.point, reading)
+        vector_under(self.outcome_under_the_arms(flags_policy, accounting_policy), &self.point, reading)
     }
 }
 
@@ -1532,13 +1532,13 @@ fn positive_control_failures(evaluated: &EvaluatedPoint, control: PositiveContro
     match control {
         PositiveControl::IgnoreViolatesSemantics => {
             for accounting_policy in ACCOUNTING_ARMS {
-                let cell = evaluated.cell(UnknownFlagsPolicy::Ignore, accounting_policy);
+                let cell = evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Ignore, accounting_policy);
                 judge(cell.read_only_violations > 0 && cell.revived_dead_trees == 1);
             }
         }
         PositiveControl::SkipFreesReferencedBlocks if point.invisible_window_generations > 0 => {
             for accounting_policy in ACCOUNTING_ARMS {
-                judge(evaluated.cell(UnknownFlagsPolicy::Skip, accounting_policy).blocks_freed_while_referenced > 0);
+                judge(evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Skip, accounting_policy).blocks_freed_while_referenced > 0);
             }
         }
         PositiveControl::RejectEntryCountedSemanticsAddsOne => {
@@ -1549,11 +1549,11 @@ fn positive_control_failures(evaluated: &EvaluatedPoint, control: PositiveContro
             }
         }
         PositiveControl::RejectEntryNoCarryLosesTuples if has_unknown_heads && point.tree_dimension_statistic_count == 2 => {
-            judge(evaluated.cell(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::NoCarry).rows_lost > 0);
+            judge(evaluated.outcome_under_the_arms(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::NoCarry).rows_lost > 0);
         }
         PositiveControl::ReadOnlyNeverPublishes => {
             for accounting_policy in ACCOUNTING_ARMS {
-                judge(evaluated.cell(UnknownFlagsPolicy::ReadOnly, accounting_policy).writable_generations == 0);
+                judge(evaluated.outcome_under_the_arms(UnknownFlagsPolicy::ReadOnly, accounting_policy).writable_generations == 0);
             }
         }
         PositiveControl::PerBitEqualsTheArmItReducesTo => {
@@ -1567,19 +1567,19 @@ fn positive_control_failures(evaluated: &EvaluatedPoint, control: PositiveContro
         PositiveControl::CarryWritesTheUnknownRows if has_unknown_heads => {
             for flags_policy in &acting_flags {
                 let extra = point.unknown_writable_head_count * point.tree_dimension_statistic_count;
-                let carry = evaluated.cell(*flags_policy, AccountingPolicy::Carry).rows_written_this_generation;
-                let no_carry = evaluated.cell(*flags_policy, AccountingPolicy::NoCarry).rows_written_this_generation;
+                let carry = evaluated.outcome_under_the_arms(*flags_policy, AccountingPolicy::Carry).rows_written_this_generation;
+                let no_carry = evaluated.outcome_under_the_arms(*flags_policy, AccountingPolicy::NoCarry).rows_written_this_generation;
                 judge(carry == no_carry + extra && extra > 0);
             }
         }
         PositiveControl::NoCarryLosesTuples if has_unknown_heads && (point.tree_dimension_statistic_count == 2 || !point.is_legal_under_todays_step_rows()) => {
             for flags_policy in &acting_flags {
-                judge(evaluated.cell(*flags_policy, AccountingPolicy::NoCarry).rows_lost > 0);
+                judge(evaluated.outcome_under_the_arms(*flags_policy, AccountingPolicy::NoCarry).rows_lost > 0);
             }
         }
         PositiveControl::KeepWithRootKeepsTheInitialRow if has_unknown_heads && !point.initial_publish_changed_the_watermark => {
             for flags_policy in &acting_flags {
-                let cell = evaluated.cell(*flags_policy, AccountingPolicy::KeepWithRoot);
+                let cell = evaluated.outcome_under_the_arms(*flags_policy, AccountingPolicy::KeepWithRoot);
                 let every_version_keeps_an_initial_row = cell.trajectory_unknown_rows_at_the_initial_txg.is_some_and(|trajectory| trajectory.positive_versions == point.published_generations);
                 let i313_false = cell
                     .clause_false_trajectories
@@ -1591,14 +1591,14 @@ fn positive_control_failures(evaluated: &EvaluatedPoint, control: PositiveContro
         // 新 U5 的三条（第二次跑第五节补的表）：`Carry` 每一版都为真，另两条每一版都为假（为正版数 = G）。
         PositiveControl::DanglingU5CarryHolds if has_unknown_heads => {
             for flags_policy in &acting_flags {
-                let trajectory = u5_false_trajectory_of(evaluated.cell(*flags_policy, AccountingPolicy::Carry));
+                let trajectory = u5_false_trajectory_of(evaluated.outcome_under_the_arms(*flags_policy, AccountingPolicy::Carry));
                 judge(trajectory.is_some_and(|trajectory| trajectory.peak == 0 && trajectory.positive_versions == 0 && trajectory.final_value == 0));
             }
         }
         PositiveControl::DanglingU5NoCarryDangles | PositiveControl::DanglingU5KeepWithRootDangles if has_unknown_heads => {
             let accounting_policy = if control == PositiveControl::DanglingU5NoCarryDangles { AccountingPolicy::NoCarry } else { AccountingPolicy::KeepWithRoot };
             for flags_policy in &acting_flags {
-                let trajectory = u5_false_trajectory_of(evaluated.cell(*flags_policy, accounting_policy));
+                let trajectory = u5_false_trajectory_of(evaluated.outcome_under_the_arms(*flags_policy, accounting_policy));
                 judge(trajectory.is_some_and(|trajectory| trajectory.peak == 1 && trajectory.positive_versions == point.published_generations && trajectory.final_value == 1));
             }
         }
@@ -1818,7 +1818,7 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
     check(
         "skip_blocks_freed_w_gens_0_1_3_8_is_0_64_192_512".to_string(),
         &|_point| true,
-        &|evaluated| evaluated.cell(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry).blocks_freed_while_referenced,
+        &|evaluated| evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry).blocks_freed_while_referenced,
         &|point| match point.invisible_window_generations {
             0 => 0,
             1 => 64,
@@ -1829,7 +1829,7 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
     check(
         "ignore_rdonly_violations_g_gens_1_4_5_10_is_1_4_5_10".to_string(),
         &|_point| true,
-        &|evaluated| evaluated.cell(UnknownFlagsPolicy::Ignore, AccountingPolicy::Carry).read_only_violations,
+        &|evaluated| evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Ignore, AccountingPolicy::Carry).read_only_violations,
         &|point| match point.published_generations {
             1 => 1,
             4 => 4,
@@ -1843,8 +1843,8 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
             format!("w1_carry_equals_no_carry_plus_{extra}_at_h_new_{head_count}_r_tree_dim_{statistic_count}"),
             &move |point| point.unknown_writable_head_count == head_count && point.tree_dimension_statistic_count == statistic_count,
             &move |evaluated| {
-                let carry = evaluated.cell(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry).rows_written_this_generation;
-                let no_carry = evaluated.cell(UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry).rows_written_this_generation;
+                let carry = evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry).rows_written_this_generation;
+                let no_carry = evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry).rows_written_this_generation;
                 u64::from(carry == no_carry + extra)
             },
             &|_point| 1,
@@ -1853,7 +1853,7 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
     check(
         "baseline_reject_entry_carry_w1_e113_h_new_2_r_tree_dim_1_is_19".to_string(),
         &|point| point.geometry == Geometry::UnknownTreeFullArms && point.unknown_writable_head_count == 2 && point.tree_dimension_statistic_count == 1,
-        &|evaluated| evaluated.cell(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::Carry).rows_written_this_generation,
+        &|evaluated| evaluated.outcome_under_the_arms(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::Carry).rows_written_this_generation,
         &|_point| 19,
     );
     let closed_form_points: [(Geometry, u64, u64, bool, u64, RowsWrittenReading, [u64; 3]); 5] = [
@@ -1884,7 +1884,7 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
                         && point.tree_dimension_statistic_count == statistic_count
                 },
                 &move |evaluated| {
-                    let cell = evaluated.cell(UnknownFlagsPolicy::Skip, accounting_policy);
+                    let cell = evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Skip, accounting_policy);
                     match rows_written {
                         RowsWrittenReading::AllRowsW2 => cell.rows_written_all_rows,
                         RowsWrittenReading::ThisGenerationRowsW1 => cell.rows_written_this_generation,
@@ -1897,7 +1897,7 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
     check(
         "clause_anchor_implementation_h_new_0_r_tree_dim_1_w1_is_15".to_string(),
         &|point| point.geometry == Geometry::ImplementationTwoDevices && point.unknown_writable_head_count == 0 && point.tree_dimension_statistic_count == 1,
-        &|evaluated| evaluated.cell(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry).rows_written_this_generation,
+        &|evaluated| evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry).rows_written_this_generation,
         &|_point| 15,
     );
     results
@@ -2278,7 +2278,7 @@ fn main() {
             let partner = &evaluated_points[partner_index(&point_with(point, PointChange::PublishedGenerations(10)))];
             for flags_policy in FLAGS_ARMS {
                 g_gens_checked += 1;
-                g_gens_mismatches += u64::from(evaluated.cell(flags_policy, AccountingPolicy::NoCarry).rows_lost != partner.cell(flags_policy, AccountingPolicy::NoCarry).rows_lost);
+                g_gens_mismatches += u64::from(evaluated.outcome_under_the_arms(flags_policy, AccountingPolicy::NoCarry).rows_lost != partner.outcome_under_the_arms(flags_policy, AccountingPolicy::NoCarry).rows_lost);
             }
         }
     }
@@ -2549,7 +2549,7 @@ mod tests {
         // 只读挂载那几格（`ReadOnly`、未登记时的 `PerBit`）可写代数为 0，照样进比较。
         let evaluated = evaluate_point(point_at(Geometry::UnknownTreeFullArms, 2, 1, true, 1));
         assert_eq!(u64::try_from(evaluated.cells.len()).expect("计数装得进 u64"), CELLS_PER_POINT);
-        assert_eq!(evaluated.cell(UnknownFlagsPolicy::ReadOnly, AccountingPolicy::Carry).writable_generations, 0);
+        assert_eq!(evaluated.outcome_under_the_arms(UnknownFlagsPolicy::ReadOnly, AccountingPolicy::Carry).writable_generations, 0);
     }
 
     #[test]

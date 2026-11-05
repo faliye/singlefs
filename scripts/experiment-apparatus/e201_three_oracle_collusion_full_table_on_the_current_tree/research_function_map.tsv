@@ -1,0 +1,36 @@
+# E201（三oracle合谋今树整表） 读法 8 归因 G7 的对应表：判定格（产物, 行种, 字段）→ 研究一侧（比对器、collusion_matrix.py 与它们读导出、驱动的那几份）里算它的函数。
+# 写于 2026-11-03，今天任何产物之前；sha256 记在跑前登记第十二节修订 2，之后不改（attribution.py 开跑时核）。
+# 两种行（同 device_function_map.tsv）：group<TAB><组名><TAB><文件::函数,…>；cell<TAB><产物><TAB><行种><TAB><字段><TAB><组名或 文件::函数,…>。
+# 文件名相对 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/；row_driver.py 的函数今天那一边比本目录的 current_tree_row_driver.py。
+# r1 那一版按 E171 研究一侧 revision_8_research_side_of_the_revision_6_run.json 的 files 记的 sha256 在 git 历史里找；那份 files 里没有、或在历史里找不到的文件记 research_reference_missing，
+# 那一种算查不了（F6）。比法：每个点名的函数，r1 那一版与今天那一版里同名单元的指纹不同或一边不在，G7 中。
+group	reading	run_directory.py::load_run_directory,run_directory.py::load_stream_run,run_directory.py::read_states,run_directory.py::read_calls
+group	touch	collusion_matrix.py::touch_report,collusion_matrix.py::outcome_words,collusion_matrix.py::batch_states,segment_two_comparator.py::touch_report_on_the_batch,segment_two_comparator.py::with_only_the_batch_as_the_first
+group	category	segment_two_comparator.py::not_ran_category,segment_two_comparator.py::ran_category,segment_two_comparator.py::reading_of,segment_two_comparator.py::is_a_self_crash_by_the_original_reading_5,segment_two_comparator.py::recovery_panic_states,segment_two_comparator.py::panicked_before_the_first_call,collusion_matrix.py::counts_as_a_self_crash,collusion_matrix.py::judged_calls_before_the_first_panic
+group	comparison	collusion_matrix.py::red_calls,collusion_matrix.py::streams_present
+group	states	collusion_matrix.py::state_is_red,collusion_matrix.py::red_state_counts,collusion_matrix.py::o3_verdict_of,collusion_matrix.py::trajectory
+group	return_values	collusion_matrix.py::return_value_differences,collusion_matrix.py::unstable_memory_objects,segment_two_comparator.py::q2_set,segment_two_comparator.py::q2_row_of,segment_two_comparator.py::q2_verdict,segment_two_comparator.py::q2_lines,segment_two_comparator.py::q2_call_lines
+group	segment_two_rows	segment_two_comparator.py::row_line,segment_two_comparator.py::read_the_row,segment_two_comparator.py::check_lines,segment_two_comparator.py::q3_lines,segment_two_comparator.py::denominator,segment_two_comparator.py::rows_by_category,segment_two_comparator.py::self_crash_place
+group	segment_one_rows	segment_one_comparator.py::q1_lines,segment_one_comparator.py::row_column_lines,segment_one_comparator.py::q2_named_row_lines,segment_one_comparator.py::q3_lines,segment_one_comparator.py::read_row_result,collusion_matrix.py::all_quiet,collusion_matrix.py::column_is_red
+group	driver	row_driver.py::prepare_row,row_driver.py::substitute_after_a_compile_failure,row_driver.py::run_row_on_the_lane,bad_implementation_table.py::locate_by_name,bad_implementation_table.py::substitute_for,bad_implementation_table.py::anchor_hit_count,bad_implementation_table.py::read_mutation_rows
+cell	P1	row	status	driver,category,segment_two_rows
+cell	P1	row	*	reading,touch,category,segment_two_rows
+cell	P1	substitution	*	driver,segment_two_rows
+cell	P1	not_located_row	*	driver,segment_two_rows
+cell	P1	untouched_row_red	*	reading,touch,comparison,states,segment_two_rows
+cell	P1	q2_set_row	*	reading,touch,comparison,return_values
+cell	P1	q2_set_call	*	reading,comparison,return_values
+cell	P1	q2_named_row	*	reading,touch,category,comparison,return_values
+cell	P1	q2_named_row_call	*	reading,comparison,return_values
+cell	P1	q2	*	reading,touch,comparison,return_values
+cell	P1	q3_denominator_class	*	reading,touch,category,segment_two_rows
+cell	P1	q3_self_crash_row	*	reading,category,segment_two_rows
+cell	P1	q3_row_125	*	reading,touch,category,segment_two_rows
+cell	P1	verdict	*	reading,touch,category,comparison,states,return_values,segment_two_rows,driver
+cell	P2	row	*	driver
+cell	P3	q1	*	reading,touch,comparison,states,segment_one_rows
+cell	P3	q1_row	*	reading,comparison,states,segment_one_rows
+cell	P3	q2_named_row	*	reading,touch,comparison,return_values,segment_one_rows
+cell	P3	q2_named_row_call	*	reading,comparison,return_values,segment_one_rows
+cell	P3	q3	*	reading,touch,category,segment_one_rows
+cell	P3	verdict	*	reading,touch,category,comparison,states,segment_one_rows

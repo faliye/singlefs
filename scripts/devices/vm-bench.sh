@@ -5,8 +5,8 @@
 #   vm-bench.sh --initramfs-manifest <静态二进制> [参数...]
 #                                         不起虚机：照 run_one 同一段代码（stage_initramfs_root）把 initramfs 的根拼进临时目录，打它的清单，打完删掉；
 #                                         另打要用的内核镜像与 QEMU（kernel<TAB><路径>、qemu<TAB><可执行文件的路径>），清单每行前面接 entry<TAB>。
-#                                         门禁 checker-tier-qemu-device-streams 开跑前拿它算每一档的判定键（清单进键，不取 cpio.gz 的哈希：cpio 头里有 mtime）
-#   vm-bench.sh --selftest                验证本 harness 能分辨成功与失败，清单不随 mtime 变、随参数变
+#                                         门禁 qemu-device-streams 开跑前拿它算每一档的判定键（清单进键，不取 cpio.gz 的哈希：cpio 头里有 mtime）
+#   vm-bench.sh --selftest                验证本 harness 能分辨成功与失败，清单不随 mtime 变、随参数变；用假驱动（PATH 前面一份假 qemu-system-x86_64，不起 QEMU/KVM）
 #
 # initramfs 的清单（initramfs_manifest）：根里每个条目一行「<相对路径><TAB><种类 f|l|d><TAB><权限><TAB><内容 sha256，链接写目标，目录写 ->」，按路径的字节序排；
 #   不带 mtime、属主与 inode。run_one 打包之前打一份进工作目录，设了 VM_INITRAMFS_MANIFEST 的另拷一份到那个路径（门禁拿它核开跑前算键用的那一份）。
@@ -21,8 +21,19 @@
 # （自证的例没有标签，项名直接写那条「✗」失败行的句首，括号里写那一行接着报的）：
 #   VM_BENCH_BREAK=keepselftestscratch  --selftest 建好桩程序目录之后不挂 EXIT 的 trap（读不到退出标记、die 退出时桩程序目录与日志指针不删）
 #       「读不到退出标记那条路（die）没走到或临时目录没删」（按代码推的、没跑过：「：子进程退出码 …，TMPDIR 里留下「singlefs-vmself.……」」，留下的是没删的桩程序目录）
+#   VM_BENCH_BREAK=fake-driver-always-zero  假驱动不管来宾二进制退几都打 SINGLEFS_EXIT=0
+#       「失败用例 → 0，期望 7 —— harness 会把失败当成成功」（按代码推的、没跑过）
 #   VM_BENCH_BREAK=manifest-with-mtime  initramfs 的清单每行另带文件的 mtime（换成按 cpio 包取摘要那种口径）
 #       「清单随 mtime 变了」（按代码推的、没跑过：同一份桩程序、中间 touch 一下，两份清单不同）
+# 弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行第一个参数不是 --selftest 而下面的变量有一个非空（不管值是什么），
+# 在参数解析之前退 2、点名它只在自证里认，一步都没做
+for break_variable in VM_BENCH_BREAK; do
+  if [[ -n "${!break_variable:-}" && "${1:-}" != --selftest ]]; then
+    echo "  ✗ $break_variable 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证，一步都没做" >&2
+    echo "     → 怎么办：去掉 $break_variable 再跑；要证红就跑 $break_variable=<项> bash scripts/devices/vm-bench.sh --selftest" >&2
+    exit 2
+  fi
+done
 set -uo pipefail
 
 VM_MEM="${VM_MEM:-2048}"
@@ -70,7 +81,7 @@ stage_initramfs_root() { # stage_initramfs_root <根目录> <静态二进制> [�
   cp "$bin" "$ird/bench"; chmod +x "$ird/bench"
   # VM_EXTRA_ROOT：这个目录里的东西原样并进 initramfs 的根
   # （E152（按里程碑对比六家文件系统的文件性能） 要的 fio、各家用户态、依赖库、解压过的模块）。
-  [[ -n "${VM_EXTRA_ROOT:-}" ]] && cp -a "$VM_EXTRA_ROOT"/. "$ird"/
+  [[ -n "${VM_EXTRA_ROOT:-}" ]] && cp -dR --preserve=timestamps,links "$VM_EXTRA_ROOT"/. "$ird"/
   # POSIX sh 可读取的单引号字面量：保留空参数、换行与通配符，不执行参数内容。
   local arg
   {
@@ -239,8 +250,52 @@ cleanup_work() {
 trap cleanup_work EXIT
 
 say ""; say "══ 虚机 benchmark harness ══"
+selftest_rig=""
+if [[ "${1:-}" == "--selftest" ]]; then
+  # 自证用假驱动，不起 QEMU/KVM：PATH 最前面放一份假 qemu-system-x86_64、假 busybox 与一个空的内核镜像，用的临时目录自证退出时删（EXIT 的 trap）。
+  # 假 qemu 不起虚机：把 -initrd 的 initramfs 解开，在宿主上照 /init 的样子跑 /bench（盘参数换成 -drive 给的盘镜像），打 SINGLEFS_EXIT=<退出码>
+  selftest_rig="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmrig.XXXXXX")"
+  mkdir -p "$selftest_rig/bin"
+  cat > "$selftest_rig/bin/busybox" <<'FAKE_BUSYBOX'
+#!/bin/sh
+case "$1" in
+  --list) printf 'sh\nblockdev\nmount\nmdev\npoweroff\n' ;;
+  blockdev) [ "$2" = --getsize64 ] && stat -c %s "$3" ;;
+esac
+exit 0
+FAKE_BUSYBOX
+  cat > "$selftest_rig/bin/qemu-system-x86_64" <<'FAKE_QEMU'
+#!/usr/bin/env bash
+# 假 qemu-system-x86_64（vm-bench.sh --selftest 的假驱动）：不起虚机。VM_BENCH_FAKE_MODE=silent 时不打退出标记；
+# VM_BENCH_BREAK=fake-driver-always-zero 时不管来宾二进制退几都打 0（证红用）
+initrd=""; disks=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -initrd) initrd="$2"; shift ;;
+    -drive) drive="${2#file=}"; disks+=("${drive%%,*}"); shift ;;
+  esac
+  shift
+done
+scratch="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-fakeqemu.XXXXXX")"
+trap 'rm -rf "${scratch:?}"' EXIT
+( cd "$scratch" && gzip -dc "$initrd" | cpio -id --quiet ) || exit 1
+echo "FAKE_QEMU_RAN"
+[[ "${VM_BENCH_FAKE_MODE:-}" == silent ]] && exit 0
+if [[ "${VM_BENCH_BREAK:-}" == fake-driver-always-zero ]]; then echo "SINGLEFS_EXIT=0"; exit 0; fi
+devices=(); index=0
+for device in $(cat "$scratch/devs"); do devices+=("${disks[$index]:-/nonexistent}"); index=$((index + 1)); done
+sed "s#/bin/busybox#${VM_BENCH_FAKE_BUSYBOX}#g" "$scratch/bench" > "$scratch/bench.host"; chmod +x "$scratch/bench.host"
+( cd "$scratch" && set -- "${devices[@]}" && . ./args && ./bench.host "$@" ); code=$?
+echo "SINGLEFS_EXIT=$code"
+exit 0
+FAKE_QEMU
+  chmod +x "$selftest_rig/bin/busybox" "$selftest_rig/bin/qemu-system-x86_64"
+  : > "$selftest_rig/kernel"
+  PATH="$selftest_rig/bin:$PATH"; export VM_BENCH_FAKE_BUSYBOX="$selftest_rig/bin/busybox"
+  SINGLEFS_KERNEL="$selftest_rig/kernel"
+fi
 command -v qemu-system-x86_64 >/dev/null || die "缺 qemu-system-x86_64" "装 qemu-system-x86（apt install qemu-system-x86），装完重跑。"
-[[ -r /dev/kvm && -w /dev/kvm ]] || die "/dev/kvm 不可读写 —— 不降级到软件模拟" "把当前用户加进 kvm 组（sudo usermod -aG kvm \$USER，重新登录生效），确认 /dev/kvm 存在；不接受回退到软件模拟。"
+[[ -n "$selftest_rig" ]] || [[ -r /dev/kvm && -w /dev/kvm ]] || die "/dev/kvm 不可读写 —— 不降级到软件模拟" "把当前用户加进 kvm 组（sudo usermod -aG kvm \$USER，重新登录生效），确认 /dev/kvm 存在；不接受回退到软件模拟。"
 command -v busybox >/dev/null || die "busybox 缺失（apt install busybox-static）" "装完 busybox-static 重跑这个脚本。"
 command -v cpio >/dev/null || die "cpio 缺失" "装 cpio（apt install cpio），装完重跑。"
 KERNEL="$(find_kernel)" || die "找不到可读的内核镜像。SINGLEFS_KERNEL=/path/to/bzImage 指定，或 sudo chmod +r /boot/vmlinuz-\$(uname -r)" "按提示设 SINGLEFS_KERNEL 或修好 /boot 下内核镜像的读权限，然后重跑。"
@@ -304,16 +359,16 @@ fi
 
 if [[ "${1:-}" == "--selftest" ]]; then
   say ""
-  say "  自检：跑一个必然成功的、一个必然失败的、一个查得到 /dev/vda 的。"
+  say "  自检：用假驱动（假 qemu-system-x86_64，不起 QEMU/KVM）跑一个必然成功的、一个必然失败的、一个查得到盘的。"
   say "  分辨不出失败的那个，说明这个 harness 会把失败当成成功。"
   say ""
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmself.XXXXXX")"
   # 读不到退出标记时 die 直接退出，走不到下面那句 rm：桩程序目录挂进 EXIT 的 trap，哪条路退都删。
-  [[ "${VM_BENCH_BREAK:-}" == keepselftestscratch ]] || trap 'rm -rf "${tmp:?}"; cleanup_work' EXIT
+  [[ "${VM_BENCH_BREAK:-}" == keepselftestscratch ]] || trap 'rm -rf "${tmp:?}" "${selftest_rig:?}"; cleanup_work' EXIT
   # 用 busybox sh 当「二进制」：它在 initramfs 里一定跑得起来
   printf '#!/bin/sh\nexit 0\n'  > "$tmp/ok";   chmod +x "$tmp/ok"
   printf '#!/bin/sh\nexit 7\n'  > "$tmp/bad";  chmod +x "$tmp/bad"
-  printf '#!/bin/sh\n[ -b "$1" ] || exit 9\nsz=$(/bin/busybox blockdev --getsize64 "$1" 2>/dev/null)\necho "VMBENCH_DISK_BYTES=$sz"\n[ "$sz" -gt 0 ] || exit 10\nexit 0\n' > "$tmp/disk"; chmod +x "$tmp/disk"
+  printf '#!/bin/sh\n[ -e "$1" ] || exit 9\nsz=$(/bin/busybox blockdev --getsize64 "$1" 2>/dev/null)\necho "VMBENCH_DISK_BYTES=$sz"\n[ "$sz" -gt 0 ] || exit 10\nexit 0\n' > "$tmp/disk"; chmod +x "$tmp/disk"
   fail=0
   # 清单不随 mtime 变、随参数变（门禁按清单算每一档的键：cpio 包的字节随 mtime 变，清单不该）；不起虚机
   manifest_probe="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmself-manifest.XXXXXX")"
@@ -364,6 +419,18 @@ if [[ "${1:-}" == "--selftest" ]]; then
   else
     printf '  ✗ 盘用例 → %s（9=不是块设备，10=大小为 0，200=根本没有 /dev/vda）\n' "$g_dsk"
     printf '     → 怎么办：9 就检查虚机是否真的挂了 /dev/vda（VM_DISKS、-drive 参数）；10 就检查盘镜像文件大小是不是 0；200 就是设备节点没建出来，去看 initramfs 的 mdev 规则。\n'
+    fail=1
+  fi
+  # 假驱动不打退出标记：读不到就如实判「读不到」（run_one 返回 1），不当成 0；日志里确实是假 qemu 跑的
+  if VM_BENCH_FAKE_MODE=silent run_one "$tmp/ok" "$KERNEL" >/dev/null 2>&1; then
+    printf '  ✗ 假驱动不打退出标记，run_one 却返回了 0 —— 读不到退出标记被当成了成功\n'
+    printf '     → 怎么办：看 run_one 末尾抓 SINGLEFS_EXIT 的那一句：抓不到必须 return 1，不许当 0。\n'
+    fail=1
+  elif grep -q FAKE_QEMU_RAN "$(cat "$VM_LOGPTR")"; then
+    ok "假驱动下判法照判：不打退出标记 → run_one 读不到（不当成 0），日志里是假 qemu 跑的"
+  else
+    printf '  ✗ 控制台日志里没有 FAKE_QEMU_RAN —— 自证没走假驱动\n'
+    printf '     → 怎么办：看 --selftest 开头往 PATH 前面放假 qemu-system-x86_64 那一段，run_one 起的 $QEMU_SYSTEM_BINARY 要是它。\n'
     fail=1
   fi
   rm -rf "$tmp"

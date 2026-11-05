@@ -14,11 +14,11 @@
 `--print-mkfs-segments-line`：不比对，只把八节登记表「mkfs 种根」那一行登记的段序列、次操作、崩溃状态数与种类串
 拼成虚机二进制打的那种行（`E7RESULT name=segments path=mkfs operations=… segments=… closed_form=… kinds=…`，
 字段次序同 crates 里真设备二进制的输出）打到 stdout，一行；只读布局文件，不读 replay.sh 与产物。
-门禁 checker-tier-qemu-device-streams 拿它与虚机输出的 `path=mkfs` 那一行逐字比（那一行的权威是钉住活代码的用例，
+门禁 qemu-device-streams 拿它与虚机输出的 `path=mkfs` 那一行逐字比（那一行的权威是钉住活代码的用例，
 不是 E142 的产物）。那一行找不到、不止一行、四样缺一样，退 2。
 `--print-segments-lines`：同样不比对，把八节开头「`path=…`」声明的每一条路径（表格里出处写 `path=<名>` 的行与整条流那句提示）
 各拼成一行同样形态的 `E7RESULT name=segments path=<名> …`，按声明的次序打到 stdout；只读布局文件。
-门禁 checker-tier-qemu-device-streams 拿它与虚机输出里 `path=mkfs` 之外那几行逐字比。声明的路径没有登记行、一条路径登记了两处、四样缺一样，退 2。
+门禁 qemu-device-streams 拿它与虚机输出里 `path=mkfs` 之外那几行逐字比。声明的路径没有登记行、一条路径登记了两处、四样缺一样，退 2。
 
 为什么要有它：`.claude/kb/checks-owed.md` C316（提交步骤的登记位有四处且互不相同） 收窄之后
 剩两半，第①半是「kb 登记表八与产物 `name=segments` 行之间没有逐字比对（表是人抄的）」——
@@ -34,7 +34,7 @@ research/ 整个可删（.claude/rules/directory-layout.md「research/：可以�
   <名> 在 PATH_PINNING_TESTS 里登记了钉住它的 crates 用例的，与那条用例比（compare_against_path_pinning_test）：
   用例函数体里要有一条 `(<次操作>, "<段序列>"[.to_string()], <崩溃状态数>)` 的断言（kb 没写次操作或状态数的那一样不比），
   种类串要逐字出现。今天四条路径（instance_acquisition、warm_up、transaction、post_mkfs_stream）都登记在那里，
-  钉它们的是 `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 的 `recorded_paths_match_the_registered_segment_sequences`，
+  钉它们的是 `crates/singlefs-verification/tests/new_pool_file_creation_publish.rs` 的 `recorded_paths_match_the_registered_segment_sequences`，
   它由 `cargo test` 钉在活代码上——串对不上活代码，那条用例先红。
   <名> 没登记钉住它的用例的，才与 E142 产物比：产物路径从 `scripts/experiment-apparatus/replay.sh` 复跑登记表里 `E142|...` 那一行的
   「入库产物」那一列取；那份产物不在，这几行记「本次未跑」（退 77，不判红）。
@@ -99,7 +99,7 @@ PRODUCT_SAMPLE_PATHS = ('mkfs', 'instance_acquisition', 'warm_up', 'transaction'
 # 出处写 `path=<名>` 的登记行与整条流提示按名字找钉住它的 crates 用例：(<用例文件>, <测试函数名>)。
 # 这条用例把 mkfs 之后每一条录制路径的 (次操作, 段序列, 闭式) 与种类串钉成绝对值，由 cargo test 钉在活代码上。
 # 新加一条 path 的登记行，先在 crates 里有钉住它的用例、登记进这里；没登记的那条才退回与 E142 产物比（产物不在报本次未跑）。
-NEW_POOL_FILE_CREATION_PINNING_TEST = ('crates/singlefs-harness/tests/new_pool_file_creation_publish.rs',
+NEW_POOL_FILE_CREATION_PINNING_TEST = ('crates/singlefs-verification/tests/new_pool_file_creation_publish.rs',
                                        'recorded_paths_match_the_registered_segment_sequences')
 PATH_PINNING_TESTS = {
     'instance_acquisition': NEW_POOL_FILE_CREATION_PINNING_TEST,
@@ -1190,11 +1190,11 @@ def main():
     printing = parser.add_mutually_exclusive_group()
     printing.add_argument(
         '--print-mkfs-segments-line', action='store_true',
-        help='不比对：把八节登记表「mkfs 种根」那一行拼成 E7RESULT name=segments path=mkfs … 打一行（门禁 checker-tier-qemu-device-streams 用）',
+        help='不比对：把八节登记表「mkfs 种根」那一行拼成 E7RESULT name=segments path=mkfs … 打一行（门禁 qemu-device-streams 用）',
     )
     printing.add_argument(
         '--print-segments-lines', action='store_true',
-        help='不比对：把八节开头声明的每一条路径的登记拼成 E7RESULT name=segments path=<名> … 按声明次序各打一行（门禁 checker-tier-qemu-device-streams 用）',
+        help='不比对：把八节开头声明的每一条路径的登记拼成 E7RESULT name=segments path=<名> … 按声明次序各打一行（门禁 qemu-device-streams 用）',
     )
     arguments = parser.parse_args()
 
@@ -1213,6 +1213,23 @@ def main():
     sys.exit(exit_code)
 
 
+BREAK_VARIABLES = ("CHECK_SEGMENT_REGISTRY_BREAK",)
+
+
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行不是单独一个 --selftest而 BREAK_VARIABLES 里有一个非空（不管值是什么），
+    退 2 并点名它只在自证里认；在参数解析之前判。"""
+    for name in BREAK_VARIABLES:
+        if os.environ.get(name) and arguments != ["--selftest"]:
+            print(f"  ✗ {name} 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证", file=sys.stderr)
+            print(f"     → 怎么办：去掉 {name} 再跑；要证红就跑 {name}=<项> python3 scripts/crash/check-segment-registry.py --selftest", file=sys.stderr)
+            return 2
+    return 0
+
+
 if __name__ == '__main__':
+    refusal = refuse_break_outside_selftest(sys.argv[1:])
+    if refusal:
+        sys.exit(refusal)
     preflight(__file__)
     main()

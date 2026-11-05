@@ -51,6 +51,8 @@ research/prompts/ 三份历史材料里 9 处节尾因此截短，已改）。
       连带红的格：「✗ 自检：正文只按路径引了 .claude/kb/decisions/27-小数据打包容器.md（没有编号）而清单里没有它，--cited」
   QUOTE_KB_BREAK=invariants-to-readme  invariant_files_for() 不按类号找类文件，I 号一律退回不变量目录的 README.md
       不变量号按类那一格（「✗ 自检：正文点名 I-7.4 与 I-8.3」）；three-way-materials.py 调的是同一份，它的自证同样红在「正文点名 I-7.4」
+  QUOTE_KB_BREAK=invariant-carriers-any-page  invariant_class_files() 不挑目录与译文，候选目录里有 `| I-<类>.` 表行的 .md 一律当载体（改前的样子：实验页、决策页与译文被当成 I 号的载体）
+      载体那一格（「✗ 自检：实验页、决策页与不变量目录里的译文都有」开头那条）
   QUOTE_KB_BREAK=no-readme-fallback  invariant_files_for() 类号找不到类文件时什么都不给，不退回 README.md
       退回 README 那一格（「✗ 自检：正文点名 I-10.1」）
   QUOTE_KB_BREAK=fence-not-skipped  pick() 找节尾时不跳过代码围栏（改前的样子：围栏里一行 `# 注释` 当一级标题，整节在那里截断）
@@ -72,7 +74,7 @@ D / E 编号按 `<号>-*.md` 找决策与实验页时，严格读法只数中文
 三语之后同号 3 份也认得出；宽读法照旧把同号的几份都给（three-way-materials.py 自己排译文）。
 I-<类>[.<号>] 指到哪份文件不认死文件名（invariant_files_for）：在 `.claude/kb-directories` 登记的 kb 目录里
 （登记是替换不是追加，没登记就是 `.claude/kb`；读法与规整只在这里的 kb_directory_entries 一份，`.claude/gate.d/doc-registries.sh` 的 kb_candidate_roots
-与 stale-candidates.py 都调它：开头的 `./`、结尾的 `/` 去掉，绝对路径与 `..` 走出仓的行拒、打到 stderr）找含 `| I-<类>.` 表行的 .md，
+与 stale-candidates.py 都调它：开头的 `./`、结尾的 `/` 去掉，绝对路径与 `..` 走出仓的行拒、打到 stderr）找含 `| I-<类>.` 表行的 .md（只认同目录有 README.md 的中文类文件：实验页、决策页与译文里抄着同类表行，不算载体），
 这一类住在哪几份就指哪几份；类号找不到文件的，退回那些文件所在目录的 README.md（没有编号、跨类的引用都指它），退 5 的说明里点名是退回的。
 退 5 时逐个写缺的文件是正文里哪个记号引出的，给一条能照抄的 `python3 scripts/kb/kb-sections.py <文件> >> <清单>`，
 并写明接上的那几张要逐行标抄不抄、标完重跑。
@@ -167,13 +169,13 @@ def pick(spec):
         # `@## E131…` 只取到 15 行就停了，是 `--checklist` 第一次接上时抓到的。
         j, fence = i + 1, None
         while j < len(L):
-            fm = re.match(r'(`{3,}|~{3,})', L[j])
+            fm = re.match(r' {0,3}(`{3,}|~{3,})', L[j])
             if fm and os.environ.get('QUOTE_KB_BREAK') == 'fence-not-skipped':
                 fm = None   # 弄坏开关：不认围栏，围栏里的 `# 注释` 当标题（C264 改前的样子）
-            if fence is None and fm:
+            if fence is None and fm and not (fm.group(1)[0] == '`' and '`' in L[j][fm.end():]):
                 fence = (fm.group(1)[0], len(fm.group(1)))
             elif fence is not None:
-                cm = re.fullmatch(r'(`{3,}|~{3,})\s*', L[j])
+                cm = re.fullmatch(r' {0,3}(`{3,}|~{3,})\s*', L[j])
                 if cm and cm.group(1)[0] == fence[0] and len(cm.group(1)) >= fence[1]:
                     fence = None
             elif re.match(r'#{1,6} ', L[j]) and len(re.match(r'#*', L[j]).group(0)) <= lvl:   # 标题要「#」后带空格：节内 `#9` 这类行不是标题（C264 复核扫出的 9 处）
@@ -501,12 +503,20 @@ def kb_candidate_roots(root):
 
 
 def invariant_class_files(root):
-    """候选 kb 目录里含不变量表行的 .md：→ ({类号: [相对仓根的路径…]}, [回退用的 README.md…])。
-    单文件的清单与按类拆开的几份文件都照表行找，不认文件名；回退是这些文件所在目录里的 README.md（在的那几份；
-    一份都不在就是第一个目录的那一份，退 5 时报「这份文件不在」）；一份带表行的文件都没有，回退是第一个候选目录的 README.md。"""
+    """不变量目录里含不变量表行的 .md：→ ({类号: [相对仓根的路径…]}, [回退用的 README.md…])。
+    载体只认不变量目录里的中文类文件：候选 kb 目录里同目录有索引 README.md（INVARIANT_DIRECTORY_INDEX）的 .md，不认文件名；
+    实验页、决策页（它们的目录没有索引）与任何目录里的译文（TRANSLATION_SUFFIXES）也有同类表行，不算（账本一百八十六节：
+    正文引 I-3.21 曾因此拉进 E112（旧写者遇到不认识的树） 的英日两页）。
+    回退是这些文件所在目录里的 README.md（在的那几份；一份都不在就是第一个目录的那一份，退 5 时报「这份文件不在」）；
+    一份带表行的文件都没有，回退是第一个候选目录的 README.md。
+    弄坏开关 QUOTE_KB_BREAK=invariant-carriers-any-page：不挑目录与译文，候选目录里有表行的 .md 都算载体（改前的样子）。"""
     by_class, directories = {}, []
+    carriers_any_page = os.environ.get('QUOTE_KB_BREAK') == 'invariant-carriers-any-page'
     for candidate in kb_candidate_roots(root):
         for path in sorted(glob.glob(os.path.join(root, candidate, '**', '*.md'), recursive=True)):
+            if not carriers_any_page and (path.endswith(TRANSLATION_SUFFIXES)
+                                          or not os.path.isfile(os.path.join(os.path.dirname(path), INVARIANT_DIRECTORY_INDEX))):
+                continue
             try:
                 classes = {int(number) for number in INVARIANT_TABLE_ROW.findall(open(path, encoding='utf-8').read())}
             except (OSError, UnicodeDecodeError):
@@ -954,6 +964,25 @@ def selftest_in(work):
         print("     → 怎么办：看 invariant_files_for() 的退回那一支与 lacking_checklist_message()；QUOTE_KB_BREAK=no-readme-fallback 设着的话这里本来就该红。")
         return 1
     print("  ✓ 自检：类号找不到类文件时退回 README.md，退 5 的说明点名是退回的")
+    # 载体只认不变量目录里的中文类文件：实验页、决策页与任何目录里的译文也有 `| I-7.` 表行，正文引 I-7.4 不拉它们、不要求它们的清单（账本一百八十六节）
+    os.makedirs(os.path.join(cited_root, '.claude/kb/experiments'), exist_ok=True)
+    os.makedirs(os.path.join(cited_root, '.claude/kb/decisions'), exist_ok=True)
+    page_table = '| 编号 | 简称 | 陈述 |\n|---|---|---|\n| I-7.9 | 页里的行 | 实验页或译文里抄着的同类表行 |\n'
+    lookalikes = ['.claude/kb/experiments/77-样本.md', '.claude/kb/experiments/77-sample.en.md', '.claude/kb/decisions/77-样本.md',
+                  f'{invariants_directory}/02-根环.en.md']
+    for relative in lookalikes:
+        with open(os.path.join(cited_root, relative), 'w', encoding='utf-8') as f:
+            f.write('# 样本页\n\n' + page_table)
+    carrier_body = '这一轮判 I-7.4（样本不变量） 站不站得住。\n'
+    carrier_hits = sorted(cited_kb_files(carrier_body, cited_root))
+    carrier_loose = sorted(path for path, _token in cited_kb_sources('这一轮判 I-7.9 站不站得住。\n', cited_root, loose=True))
+    if carrier_hits != [f'{invariants_directory}/02-根环.md'] or carrier_loose != [f'{invariants_directory}/02-根环.md']:
+        print(f"  ✗ 自检：实验页、决策页与不变量目录里的译文都有 `| I-7.` 表行，正文引 I-7.4（严格读法）与 I-7.9（宽读法）应当只认 {invariants_directory}/02-根环.md，"
+              f"实认严格 {carrier_hits}、宽 {carrier_loose}")
+        print("     → 怎么办：看 invariant_class_files() 挑载体的那一行：同目录要有 README.md、不是 TRANSLATION_SUFFIXES 结尾的译文；"
+              "QUOTE_KB_BREAK=invariant-carriers-any-page 设着的话这里本来就该红。")
+        return 1
+    print("  ✓ 自检：I 号的载体只认不变量目录里的中文类文件，同类表行出现在实验页、决策页与译文里不拉它们")
     # 登记位 .claude/kb-directories 的规整与拒绝（kb_directory_entries、kb_candidate_roots）
     registry_root = os.path.join(work, 'kb-directories-sample')
     for directory in ('.claude/kb', 'crates/x/invariants'):
@@ -1064,6 +1093,39 @@ def main(argv):
     return 0
 
 
+BREAK_VARIABLES = ("QUOTE_KB_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/quote-kb.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

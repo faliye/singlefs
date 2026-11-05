@@ -11,7 +11,8 @@
 只抽它做过的动作与说过的话，不判哪一件做成了：新 agent 开工先核现场（编不编得过、产物是不是这一轮的），再接着做。
 
 用法：
-    agent-handover.py --agent <agent id> --out <交接摘要.md>   # 在 ~/.claude/projects/*/*/subagents/ 里按 id 找会话记录
+    agent-handover.py --agent <agent id> --out <交接摘要.md>   # 在 <家目录>/.claude/projects/*/*/subagents/ 里按 id 找会话记录：家目录从统一任务服务给的来源仓根
+                                                              # TASK_SERVER_SOURCE_REPOSITORY 的路径取（两台一致，不用 $HOME），没有这个变量（服务外手跑）取本机家目录；取法只在同目录 lib_session_directory.py 里
     agent-handover.py --transcript <会话记录.jsonl> --out <交接摘要.md>
     agent-handover.py --selftest                              # 造一份假会话记录走一遍，临时目录用完即删（判红、抛异常也删）；AGENT_HANDOVER_BREAK=<项> 时必须判红
 
@@ -25,6 +26,9 @@
   AGENT_HANDOVER_BREAK=keepscratch  selftest() 的临时目录走回 mkdtemp 不删
       通过的这一次（「✗ 自检：通过的这一次，临时目录用完没删」）、red 那条路（「✗ 自检：red 那条路上临时目录没删」）、
       crash 那条路（「✗ 自检：crash 那条路上临时目录没删」）
+同目录 lib_session_directory.py 的开关（判法在那一份，开关表也在它的文件头），打开后这里红的项：
+  SESSION_DIRECTORY_BREAK=home-from-environment  设了 TASK_SERVER_SOURCE_REPOSITORY 也照改前取 HOME
+      按 id 找会话记录（「✗ 自检：按 id 找会话记录取来源仓根的会话目录：」）
 """
 import argparse
 import glob
@@ -40,6 +44,8 @@ import os as preflight_os, sys as preflight_sys  # noqa: E402
 preflight_sys.dont_write_bytecode = True
 preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
 from project_preflight import preflight  # noqa: E402
+preflight_sys.path.insert(0, preflight_os.path.dirname(preflight_os.path.realpath(__file__)))
+import lib_session_directory as session_directories  # noqa: E402  会话记录目录的唯一取法（来源仓根 TASK_SERVER_SOURCE_REPOSITORY，不经 $HOME；agent-cost.py、agent-watch.py、watch.sh、move-directory-in-use-check.py 同取它）
 
 BROKEN = os.environ.get("AGENT_HANDOVER_BREAK", "")
 SELFTEST_DIRECTORY_PREFIX = "agent-handover-selftest-"
@@ -54,8 +60,11 @@ LAST_WRITING_COMMANDS = 25
 OUTPUT_TAIL_LINES = 6
 
 
-def find_transcript(agent_id):
-    candidates = glob.glob(os.path.expanduser(f"~/.claude/projects/*/*/subagents/agent-{agent_id}.jsonl"))
+def find_transcript(agent_id, environment=None):
+    """按 id 在各项目的会话目录里找子 agent 的会话记录；项目目录的上一层（<家目录>/.claude/projects）只在 lib_session_directory.py 里取
+    （统一任务服务给的来源仓根 TASK_SERVER_SOURCE_REPOSITORY，没有就是本机家目录，不经 $HOME 拼）。取不到抛 session_directories.SessionDirectoryError。"""
+    projects = session_directories.projects_root(environment)
+    candidates = glob.glob(os.path.join(glob.escape(projects), "*", "*", "subagents", f"agent-{agent_id}.jsonl"))
     return max(candidates, key=os.path.getmtime) if candidates else None
 
 
@@ -223,17 +232,38 @@ def selftest():
     problems = [f"交接摘要里没有「{label}」" for label, ok in checks if not ok]
     # 子进程只走它那一条路，不再往下拉子进程
     cleanup_problems = [] if SELFTEST_ROLE else scratch_cleanup_problems(work)
-    for problem in problems + cleanup_problems:
+    directory_problems = [] if SELFTEST_ROLE else session_directory_problems()
+    for problem in problems + cleanup_problems + directory_problems:
         print(f"  ✗ 自检：{problem}")  # gate-lint:detail
-    if problems or cleanup_problems:
-        print("    → 看 read_transcript() 与 render()；临时目录那几格看 selftest() 里的 TemporaryDirectory；AGENT_HANDOVER_BREAK 设着的话这里本来就该红")
+    if problems or cleanup_problems or directory_problems:
+        print("    → 看 read_transcript() 与 render()；临时目录那几格看 selftest() 里的 TemporaryDirectory；按 id 找会话记录看 find_transcript() 与 lib_session_directory.py；"
+              "AGENT_HANDOVER_BREAK、SESSION_DIRECTORY_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ agent-handover 自检通过：派发提示、续做消息、写过的文件与现状、跑过的命令与输出、最后说的话、上下文都抽得出；"
-          f"自检的临时目录在通过、判红、抛异常三条路上都删掉了（查了 {len(checks) + SCRATCH_CLEANUP_CELLS} 项）")
+          f"自检的临时目录在通过、判红、抛异常三条路上都删掉了；按 id 找会话记录取来源仓根的会话目录（HOME 指到别处也找对）"
+          f"（查了 {len(checks) + SCRATCH_CLEANUP_CELLS + SESSION_DIRECTORY_CELLS} 项）")
     return 0
 
 
 SCRATCH_CLEANUP_CELLS = 3   # scratch_cleanup_problems 判的格数：通过的这一次、判红的子进程、抛异常的子进程
+SESSION_DIRECTORY_CELLS = 1   # session_directory_problems 判的格数
+
+
+def session_directory_problems():
+    """按 id 找会话记录（find_transcript）：在一棵临时树里，HOME 指到别处、TASK_SERVER_SOURCE_REPOSITORY 指到来源仓，要找到来源仓会话目录里的那一份；
+    HOME 指到的别处有一份同 id 的（找错了会找到一个在但不对的）不能被选中。回问题句的列表。"""
+    agent_id = "afeedbeef1234567"
+    with tempfile.TemporaryDirectory(prefix=SELFTEST_DIRECTORY_PREFIX) as work:
+        tree = session_directories.build_selftest_tree(work)
+        wanted = os.path.join(tree["session_directory"], "selftest-session", "subagents", f"agent-{agent_id}.jsonl")
+        decoy = os.path.join(tree["other_home"], ".claude", "projects", session_directories.mangle(tree["own_repository"]), "selftest-session", "subagents", f"agent-{agent_id}.jsonl")
+        for path in (wanted, decoy):
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("{}\n")
+        found = find_transcript(agent_id, tree["environment"])
+        if found != wanted:
+            return [f"按 id 找会话记录取来源仓根的会话目录：HOME 指到别处时应当找到 {wanted}，实际 {found}"]
+    return []
 
 
 def scratch_cleanup_problems(own_directory):
@@ -294,7 +324,22 @@ def extraction_checks_in(work):
     return checks
 
 
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest 而 AGENT_HANDOVER_BREAK 非空（不管值是什么），参数解析之前就拒，交回退出码 2；放行交回 None。
+    自证拉起自己的子进程也是 --selftest（带角色变量），所以不需要另认标记。"""
+    set_names = [name for name in ("AGENT_HANDOVER_BREAK", "SESSION_DIRECTORY_BREAK") if os.environ.get(name)]   # 后一个经 lib_session_directory.py 进来
+    if not set_names or arguments == ["--selftest"]:
+        return None
+    for name in set_names:
+        print(f"  ✗ {name}={os.environ[name]} 是弄坏开关，只在自证（agent-handover.py --selftest）里认，平常跑设了就拒，这一趟什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：去掉 {'、'.join(set_names)} 再跑；要证红就跑 {set_names[0]}=<项> python3 scripts/agents/agent-handover.py --selftest", file=sys.stderr)
+    return 2
+
+
 def main():
+    refused = refuse_break_outside_selftest(sys.argv[1:])
+    if refused is not None:
+        return refused
     if len(sys.argv) >= 2 and sys.argv[1] == "--selftest":
         return selftest()
     parser = argparse.ArgumentParser(description="从子 agent 的会话记录里抽交接摘要")
@@ -302,10 +347,15 @@ def main():
     parser.add_argument("--transcript", help="会话记录路径（给了就不按 id 找）")
     parser.add_argument("--out", required=True, help="交接摘要写到哪")
     arguments = parser.parse_args()
-    transcript = arguments.transcript or (find_transcript(arguments.agent) if arguments.agent else None)
+    try:
+        transcript = arguments.transcript or (find_transcript(arguments.agent) if arguments.agent else None)
+    except ValueError as error:   # SessionDirectoryError 是它的子类；弄坏开关的值认不出也是 ValueError
+        print(f"  ✗ 取不到会话记录所在的目录：{error}")
+        print(f"    → 怎么办：{getattr(error, 'howto', '去掉不认识的弄坏开关再跑')}；或给 --transcript 指到那份会话记录")
+        return 2
     if not transcript or not os.path.isfile(transcript):
         print(f"  ✗ 找不到会话记录（--agent {arguments.agent} / --transcript {arguments.transcript}）")
-        print("    → 怎么办：给 --transcript 指到 ~/.claude/projects/<项目>/<会话>/subagents/agent-<id>.jsonl，或核对 agent id")
+        print("    → 怎么办：给 --transcript 指到 <家目录>/.claude/projects/<项目>/<会话>/subagents/agent-<id>.jsonl，或核对 agent id")
         return 2
     facts = write_handover(transcript, arguments.out)
     print(f"  ✓ 交接摘要写到 {arguments.out}：续做消息 {len(facts['continuations'])} 条、写过的文件 {len(facts['written'])} 个、"

@@ -11,7 +11,7 @@ A(c) 因此照底态落地向量算（补丁不算写）。拷的只有判的那
 - `known_bad`：装置 `known-bad-images` 写的 41 条已知坏镜像（`known-bad-states.tsv` 与 `known-bad-patches.bin`，格式同上，只在流一全持久态上）；
 - `base`：不打补丁的底态（Q2-阴性，每条流 F、Mk、Mk⁺、Mk⁻ 各一张）。
 
-跑法（经 run-with-memory-cap.sh 与 capped.sh）：
+跑法（整条命令交 `task-server/task submit --`，线程数取服务设的线程变量；驱动起它时照线道线程数设进环境）：
   python3 o3_bad_image_judge.py judge --e170-dumps <含 bad-*.tsv 的导出目录> --known-bad-dir <装置 known-bad-images 的输出> --output <新文件>
   python3 o3_bad_image_judge.py control --dumps <一趟的导出目录> --e170-dumps <含 bad-*.tsv 的导出目录> --row-name P1-F --output <新文件>
 """

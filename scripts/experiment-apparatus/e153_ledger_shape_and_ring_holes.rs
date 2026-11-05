@@ -3060,7 +3060,7 @@ mod tests {
 
     /// S1(b)（登记第十一节停机条款 S1，`plain_remount` 补的驱动）：A(txg3,inst1)、B(txg4,inst1，实例内覆盖写)、
     /// 普通挂载取号 2（写行 txg5、暖机 txg6-7）、C(txg8,inst2)、回退到 A 的根 (1,3)。
-    /// 对拍目标（`crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 已断言过的真实值，
+    /// 对拍目标（`crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 已断言过的真实值，
     /// 逐字段见该文件 `rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content`
     /// 190-198 行与 `rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keeps_the_isolation`
     /// 223-235 行）：回退发布（D）落 txg 9、实例 3；写的行 = [(1,3),(2,0)]（回退行 + 中间实例，(instance,T) 分量）；
@@ -3107,7 +3107,7 @@ mod tests {
 
     /// 对拍段落后半（登记第十一节停机条款 S1）：在上一个对拍测试的回退之后再覆盖写四次（实例 3），
     /// 抬 F 到第一次释放代（=第一次覆盖写的 txg），比对回收的落点集合与之后一次复用的落点。
-    /// 对拍目标（`crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs`
+    /// 对拍目标（`crates/singlefs-verification/tests/reuse_after_raising_the_floor.rs`
     /// `raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it`
     /// 144-192 行）：抬 F 上限 = 第一次覆盖写的 txg；两次带新 F 的空发布；复用发布落在最低可再分配的偶数槽对。
     #[test]

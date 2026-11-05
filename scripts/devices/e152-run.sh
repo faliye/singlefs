@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 # E152（按里程碑对比六家文件系统的文件性能）：八个配置轮流跑 N 轮，每轮一个新虚机、一块新盘。
 #
-#   bash scripts/devices/e152-run.sh <产物路径>
-#   E152_ROUNDS=1 E152_CONFIGURATIONS="ext4" bash scripts/devices/e152-run.sh <产物路径>   # 冒烟
+#   task-server/task submit -- bash scripts/devices/e152-run.sh <产物路径>                  不指定范围：八个配置、五轮，全部跑
+#   task-server/task submit -- env E152_ROUNDS=1 E152_CONFIGURATIONS="ext4" bash scripts/devices/e152-run.sh <产物路径>   # 指定范围加缩域
+#   bash scripts/devices/e152-run.sh --selftest                                              自证：缩过的那一趟产物头写「缩过、不当 E152 的产物」（不起虚机、不编译）
+# E152_CONFIGURATIONS 当指定范围（点名哪几个配置），E152_ROUNDS 当缩域（少于登记的 5 轮）；设了与登记不同的值，产物头 E152RUN_HEADER 接
+# reduced=yes registered_rounds=… registered_configurations=… not_e152_product=yes，这一份不当 E152 的产物。
+# 弄坏开关 E152_RUN_BREAK=reduced-unmarked（只在 --selftest 起的那一趟里认，别处设了拒、退 2）：缩过的一趟产物头不接缩过那一段
+#   打开后红的格：「缩过规模：轮数少于登记，产物头写缩过、不当 E152 的产物」「缩过规模：只点名一个配置，产物头写缩过」
+#
+# 不嵌套、经 task-server/task submit 交：三条 cargo build 直接起，编译并行度读服务交的 CARGO_BUILD_JOBS（每台默认重活线程数），
+# 内存上限由服务给；脚本里不套 capped.sh、run-with-memory-cap.sh，也不写线程数。
 #
 # 口径、判据与作废条款都在跑前登记 research/prompts/e152-preregistration.md；这里只照着跑、照着记。
 # 纪律（.claude/singlefs-ai-sop/rules/command-safety.md）：
@@ -13,11 +21,33 @@
 set -uo pipefail
 RESEARCH="$(cd "$(dirname "$0")/../experiment-apparatus" && pwd)"
 REPOSITORY="$(cd "$RESEARCH/../.." && pwd)"
-# 三条 cargo build 不吃 cargo 自己的缺省（核数）：经 capped.sh default 起，编译并行度取登记的重活默认并行度（SINGLEFS_THREAD_CAP 设了取它）
-CAPPED_DEFAULT=(bash "$REPOSITORY/scripts/hosts/capped.sh" default)
+REGISTERED_ROUNDS=5
+REGISTERED_CONFIGURATIONS="raw ext4 xfs f2fs btrfs bcachefs zfs singlefs"
+
+# 与登记不同的轮数或配置就是缩过的一趟：产物头接这一段，不当 E152 的产物；都是登记值时不接。
+reduced_note() { # <轮数> <配置，空格隔开>
+  if [[ "$1" == "$REGISTERED_ROUNDS" && "$2" == "$REGISTERED_CONFIGURATIONS" ]]; then return 0; fi
+  if [[ "${E152_RUN_BREAK:-}" == reduced-unmarked ]]; then return 0; fi
+  echo " reduced=yes registered_rounds=$REGISTERED_ROUNDS registered_configurations=${REGISTERED_CONFIGURATIONS// /,} not_e152_product=yes"
+}
+
+if [[ "${1:-}" == --selftest ]]; then
+  failures=0
+  expect() { # <名字> <条件>
+    if eval "$2"; then echo "  ✓ $1"; else echo "  ✗ $1：条件「$2」不成立"; echo "     → 怎么办：改 reduced_note，再单独起 bash scripts/devices/e152-run.sh --selftest 到它退 0"; failures=$((failures + 1)); fi
+  }
+  expect "登记规模：产物头不接缩过那一段" '[[ -z "$(reduced_note "$REGISTERED_ROUNDS" "$REGISTERED_CONFIGURATIONS")" ]]'
+  expect "缩过规模：轮数少于登记，产物头写缩过、不当 E152 的产物" '[[ "$(reduced_note 1 "$REGISTERED_CONFIGURATIONS")" == " reduced=yes registered_rounds=5 registered_configurations=raw,ext4,xfs,f2fs,btrfs,bcachefs,zfs,singlefs not_e152_product=yes" ]]'
+  expect "缩过规模：只点名一个配置，产物头写缩过" '[[ "$(reduced_note "$REGISTERED_ROUNDS" ext4)" == *"reduced=yes"*"not_e152_product=yes" ]]'
+  if ((failures > 0)); then echo "e152-run.sh 自证：$failures 格红"; exit 1; fi
+  echo "e152-run.sh 自证：3 格全绿"
+  exit 0
+fi
+if [[ -n "${E152_RUN_BREAK:-}" ]]; then echo "  ✗ E152_RUN_BREAK 只给 --selftest 证红用，这一趟不是自证" >&2; echo "    → 平常跑时不设它" >&2; exit 2; fi
+
 OUTPUT="${1:?用法：e152-run.sh <产物路径>}"
-ROUNDS="${E152_ROUNDS:-5}"
-CONFIGURATIONS="${E152_CONFIGURATIONS:-raw ext4 xfs f2fs btrfs bcachefs zfs singlefs}"
+ROUNDS="${E152_ROUNDS:-$REGISTERED_ROUNDS}"
+CONFIGURATIONS="${E152_CONFIGURATIONS:-$REGISTERED_CONFIGURATIONS}"
 RELEASE="${E152_KERNEL_RELEASE:-$(uname -r)}"
 
 fail() { echo "  ✗ $1" >&2; echo "    → $2" >&2; exit 1; }
@@ -26,13 +56,13 @@ case "$OUTPUT" in /*) ;; *) OUTPUT="$PWD/$OUTPUT" ;; esac
 cd "$RESEARCH" || fail "进不了 $RESEARCH" "从仓里跑"
 KERNEL="$(bash ../devices/vm-kernel.sh --release "$RELEASE")" \
   || fail "拿不到 $RELEASE 的内核镜像" "单跑 bash scripts/devices/vm-kernel.sh --release $RELEASE 看报错"
-"${CAPPED_DEFAULT[@]}" cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark >/dev/null 2>&1 \
+cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark >/dev/null 2>&1 \
   || fail "来宾二进制编不过" "cd scripts/experiment-apparatus && cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark"
-"${CAPPED_DEFAULT[@]}" cargo build --release --bin e152-file-system-benchmark >/dev/null 2>&1 \
+cargo build --release --bin e152-file-system-benchmark >/dev/null 2>&1 \
   || fail "宿主上的汇总二进制编不过" "cd scripts/experiment-apparatus && cargo build --release --bin e152-file-system-benchmark"
-# singlefs 的真设备二进制与门禁 checker-tier-qemu-device-streams 同一种编法：glibc 目标加 +crt-static（checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器）
-( cd "$REPOSITORY" && "${CAPPED_DEFAULT[@]}" cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1 ) \
-  || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device"
+# singlefs 的真设备二进制与门禁 qemu-device-streams 同一种编法：glibc 目标加 +crt-static（验证包默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器）
+( cd "$REPOSITORY" && cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-verification --bin new_pool_file_creation_on_device >/dev/null 2>&1 ) \
+  || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-verification --bin new_pool_file_creation_on_device"
 GUEST_BINARY="$RESEARCH/target/x86_64-unknown-linux-musl/release/e152-file-system-benchmark"
 HOST_BINARY="$RESEARCH/target/release/e152-file-system-benchmark"
 SINGLEFS_BINARY="$REPOSITORY/target/x86_64-unknown-linux-gnu/release/new_pool_file_creation_on_device"
@@ -49,7 +79,7 @@ bash "$WORK/scripts/devices/e152-stage-root.sh" "$WORK/root" "$RELEASE" "$SINGLE
 PARTIAL="$OUTPUT.partial"
 [[ ! -d "$OUTPUT" ]] || fail "产物路径是目录：$OUTPUT" "指定一个文件路径"
 rm -f -- "$PARTIAL" || fail "无法清理 $PARTIAL" "检查产物目录权限"   # 成功发布前保留上一份产物
-echo "E152RUN_HEADER kernel=$RELEASE rounds=$ROUNDS configurations=${CONFIGURATIONS// /,} started_jst=$(TZ=Asia/Tokyo date '+%Y-%m-%dT%H:%M')" > "$PARTIAL" || fail "写不了 $PARTIAL" "检查父目录是否存在、空间及权限"
+echo "E152RUN_HEADER kernel=$RELEASE rounds=$ROUNDS configurations=${CONFIGURATIONS// /,} started_jst=$(TZ=Asia/Tokyo date '+%Y-%m-%dT%H:%M')$(reduced_note "$ROUNDS" "$CONFIGURATIONS")" > "$PARTIAL" || fail "写不了 $PARTIAL" "检查父目录是否存在、空间及权限"
 for ((round = 1; round <= ROUNDS; round++)); do
   for configuration in $CONFIGURATIONS; do
     case "$configuration" in

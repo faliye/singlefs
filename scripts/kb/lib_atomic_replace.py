@@ -20,14 +20,23 @@
 任何一步失败（OSError、check_before_rename 抛的异常、Ctrl-C）都先删临时文件，原文件一个字节没动；
 OSError 换成 ReplaceRefused 抛出，别的异常原样抛出。
 
-弄坏开关（只给自证判红用，生效时往 stderr 打一行）：ATOMIC_REPLACE_BREAK=
-  inplace        走就地写（改前的写法）：inode 不变，在读的进程读到新内容
-  nochmod        不照原文件的权限位：换上的文件是 mkstemp 给的 0600
-  nofsync        不 fsync 临时文件
-  nocleanup      失败时不删临时文件
-  nofollow       不解符号链接：链接本身被换成普通文件
-  allowhardlink  不拒绝有多个硬链接的文件
-  allowreadonly  不拒绝当前用户只读的文件
+弄坏开关（只给自证判红用，生效时往 stderr 打一行；平常跑设了拒绝写、点名只在自证里认：祖先进程里有一个的命令行带 --selftest 才认）。
+这份库没有自己的 --selftest，自证是调它的脚本的：python3 scripts/kb/replace-once.py --selftest（insert-row.py、replace-batch.py 的 --selftest 同样走
+problems_with_replacement_by_rename），打开开关后红的项逐条以「✗ [<格名>] 」起头：
+  ATOMIC_REPLACE_BREAK=inplace  走就地写（改前的写法）：inode 不变，在读的进程读到新内容
+      「[读者与 inode]」「[fsync 失败]」「[改名失败]」
+  ATOMIC_REPLACE_BREAK=nochmod  不照原文件的权限位：换上的文件是 mkstemp 给的 0600
+      「[读者与 inode]」
+  ATOMIC_REPLACE_BREAK=nofsync  不 fsync 临时文件
+      「[读者与 inode]」「[fsync 失败]」
+  ATOMIC_REPLACE_BREAK=nocleanup  失败时不删临时文件
+      「[fsync 失败]」「[改名失败]」
+  ATOMIC_REPLACE_BREAK=nofollow  不解符号链接：链接本身被换成普通文件
+      「[符号链接]」
+  ATOMIC_REPLACE_BREAK=allowhardlink  不拒绝有多个硬链接的文件
+      「[硬链接]」
+  ATOMIC_REPLACE_BREAK=allowreadonly  不拒绝当前用户只读的文件
+      「[只读文件]」
 不认识的值直接拒绝写，免得拼错的开关被当成「没开」。
 """
 import contextlib
@@ -51,10 +60,34 @@ class ReplaceRefused(Exception):
     """没换上：原文件一个字节没动，临时文件已删。str(异常) 的第二行是以「→」开头的下一步。"""
 
 
+def inside_selftest():
+    """这个进程自己与它的祖先里，有一个的命令行里带 --selftest（自证本身在进程里调库、自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getpid()
+    while pid > 1:
+        try:
+            with open(f'/proc/{pid}/cmdline', 'rb') as handle:
+                if b'--selftest' in handle.read().split(b'\0'):
+                    return True
+            with open(f'/proc/{pid}/stat', 'rb') as handle:
+                pid = int(handle.read().rsplit(b')', 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def refuse_break_outside_selftest(break_mode):
+    """弄坏开关只在自证里认（checks-owed.md C622）：设了而祖先里没有自证，拒绝写（ReplaceRefused），点名变量、说它只在自证里认。"""
+    if break_mode and not inside_selftest():
+        raise ReplaceRefused(
+            f'{BREAK_ENVIRONMENT_VARIABLE}={break_mode} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，一个字节没写\n'
+            f'     → 怎么办：unset {BREAK_ENVIRONMENT_VARIABLE} 再来；要看开关红在哪一项，跑 {BREAK_ENVIRONMENT_VARIABLE}=<项> python3 scripts/kb/replace-once.py --selftest')
+
+
 def active_break_mode():
     break_mode = os.environ.get(BREAK_ENVIRONMENT_VARIABLE, '')
     if break_mode == '':
         return ''
+    refuse_break_outside_selftest(break_mode)
     if break_mode not in KNOWN_BREAK_MODES:
         raise ReplaceRefused(
             f'{BREAK_ENVIRONMENT_VARIABLE}={break_mode} 不认识，一个字节没写\n'
@@ -99,6 +132,19 @@ def keep_owner_where_permitted(temporary_descriptor, target_status, target_path)
     kept_status = os.fstat(temporary_descriptor)
     return [f'属主没能全保留：{target_path} 原来是 uid {target_status.st_uid} gid {target_status.st_gid}，'
             f'换上之后是 uid {kept_status.st_uid} gid {kept_status.st_gid}（没有改属主的权限）']
+
+
+def unchanged_bytes(path, expected_bytes):
+    """写前复核调用方实际读过的字节；读不了也拒绝，不覆盖后来写入的内容。"""
+    try:
+        with open(path, 'rb') as handle:
+            same = handle.read() == expected_bytes
+    except OSError as error:
+        raise ReplaceRefused(f'{path} 写前复核读不了：{error}\n'
+                             '     → 怎么办：确认文件状态后重新读取、重跑') from error
+    if not same:
+        raise ReplaceRefused(f'{path} 在读取之后被改过，没覆盖新内容\n'
+                             '     → 怎么办：重新读取文件，核对改动后重跑')
 
 
 def replace_file_contents_by_rename(path, new_text, check_before_rename=None):
@@ -374,3 +420,15 @@ def problems_with_replacement_by_rename(run_tool, original_text, expected_text):
         with tempfile.TemporaryDirectory(prefix='atomic-replace-selftest-') as workspace:
             problems.extend(f'[{label}] {problem}' for problem in check(workspace))
     return problems
+
+
+if __name__ == '__main__':
+    # 这是库，没有命令行用法；直接跑也先过弄坏开关那一道（平常跑设了 ATOMIC_REPLACE_BREAK 退 2、点名只在自证里认），再说明用法
+    try:
+        refuse_break_outside_selftest(os.environ.get(BREAK_ENVIRONMENT_VARIABLE, ''))
+    except ReplaceRefused as refused:
+        print(f'  ✗ {refused}', file=sys.stderr)  # str(ReplaceRefused) 第二行是「→」起头的下一步
+        sys.exit(2)
+    print('  ✗ lib_atomic_replace.py 是库，没有命令行用法', file=sys.stderr)
+    print('     → 怎么办：在脚本里 from lib_atomic_replace import replace_file_contents_by_rename；要自证跑 python3 scripts/kb/replace-once.py --selftest', file=sys.stderr)
+    sys.exit(2)

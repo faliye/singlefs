@@ -2,35 +2,42 @@
 """E171 第 1 次重跑·修订 11：修订 8 那一趟第 11–13 步的多机逐行编排，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.2–11.5、11.9、11.10 节）。
 由 segment_one_units_revision_11.py 在修订 8 的逐行起跑闸都绿之后起（同修订 8 的命令行），修订 11 占位的路径从环境变量 E171_REVISION_11_CONFIG 取。
 
-为什么另写一层：rows_orchestrator_revision_8.py（25d77b2b…）一个字节不改。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256 载入
-第一段编排器 1dcfb8d0… 与 cross_host_o3_check.py），修订 8 那一层改的几处（落点、H8 核对、跨机 o3 比法、停派文件、加槽）原样装上，再在第一段编排器上换三处：
+为什么另写一层：rows_orchestrator_revision_8.py 这一层不改它（它自己的改动按依赖次序重钉进下面的 ROWS_R8_SHA256：第 2 次重跑登记修订 4 补了 H16
+与冻结树两处运行条件之后重钉）。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256 载入
+第一段编排器 2ab19c53… 与 cross_host_o3_check.py），修订 8 那一层改的几处（落点、H8 核对、跨机 o3 比法、停派文件、加槽）原样装上，再在第一段编排器上换三处：
   ① 第 11、12 步派发之前（phase_rows_and_checks）：每行照第 11.2、11.3 节算键（L 取 --baseline-timing 那份 step-7 计时的 process_wall），查库、写标记
     （<H16 导出根>/reuse-markers/segment-one-rows/），命中的行照第 11.5 节「取用」先写标记、再把条目里的行目录硬链接进行输出根（row-result.tsv 最后链），
-    编排器原有的续跑因此当它做完了、不派；合成时由编排器原有的 --skip-finished 重报把它并进产物（合并规则 ①–⑦ 不改）。第 12 步 row-0 与跨机那一份 X
+    编排器原有的续跑因此当它做完了、不派；合成时由编排器原有的按键复用重报把它并进产物（合并规则 ①–⑦ 不改）。第 12 步 row-0 与跨机那一份 X
     （RC2）、要补位的行（按名字取不到、锚点不是恰 1 次、碰到模块集合）永远现跑；
-  ② 一个分片结束（finish_shard）：编排器原来那样记退出码、收取回的行，再把这一分片现跑完的每一行照入库条件入库（库里有同键条目照 RC1 比，第二趟 RC2）；
+  ② 一个分片结束（finish_shard）：编排器原来那样记退出码、收别的台做完的行，再把这一分片现跑完的每一行照入库条件入库（库里有同键条目照 RC1 比，第二趟 RC2）；
     本机的行先照 RC4 核那一槽这一次编译的 dep-info（<工作根>/lane0/target/release/<装置>.d，相对 <工作根>/lane0/tree），不符不入；
-    别的台取回的行入库之前另核三样（第 11.5 节「两台」）：行结果里 row_number 与 mutation_line_sha256 对得上键里 [mutation]、那一分片的 row_time_limit
-    秒数等于键里的 L、那一分片的 snapshot_digest 等于 H3；不过不入、记一行。别的台的行不做 RC4（H35：peer_side.py 是修订 6 那一趟钉住的那一份，
-    这一次没改，那边编完的 dep-info 不取回），只有第 11.2 节的静态拦。S18 触发就冻库、这一分片记没跑成（编排器不再派新行，在跑的跑完再停，退 1）；
+    别的台跑的行入库之前另核三样（第 11.5 节「两台」）：行结果里 row_number 与 mutation_line_sha256 对得上键里 [mutation]、那一分片的 row_time_limit
+    秒数等于键里的 L、那一分片的 snapshot_digest 等于 H3；不过不入、记一行。别的台的行不做 RC4（H35：那边编完的 dep-info 在那一台本地盘上，
+    跑完由代跑那一片删掉，不进共享根），只有第 11.2 节的静态拦。S18 触发就冻库、这一分片记没跑成（编排器不再派新行，在跑的跑完再停，退 1）；
   ③ 第 13 步（phase_timeout_reruns）：超时的行（限时再乘 3）照同一套查库、取用。
   收尾由标记现合复用账本 <H16 前缀>-reuse-ledger-rows<H16 后缀>.out（登记的行：第 11、12 步各行、多机时 X、第 13 步超时重跑的各行），N + M 不等于登记数退 1。
   ④ 本机逐行驱动的工作根（--work-root，线道的树与编译目录；用户 2026-10-23 定案「自己用完自己删」）由这一层用完就删：编排器每起一个本机分片（launch_local，
     含续带的 carry）记下它的工作根；只给一个分片用的（行 0、第 13 步重跑、carry 这几种按分片现建的）在那一分片 finish_shard 做完 RC4 与入库之后删；
     同一槽接着用的（rows_orchestrator_revision_8.py 里非 fresh 的行落 host1-slot<槽>，修订 5 的增量编译口径，SLOT_WORK_ROOT_PREFIX）在整趟 run 收尾时删
     （正常结束、出错、被 TERM / INT 停：编排器 stop_running 等分片退出、照 finish_shard 收完，run 抛出来也走收尾）。删法照 scripts/hosts/run_build_directory.py
-    （删之前核本机没有进程开着里面的文件，有就不删、报出进程；整趟本来退 0 的改退 1）。别的台的工作根在那一边的树里，由 multi-host-run.sh 连同树删。
+    （删之前核本机没有进程开着里面的文件，有就不删、报出进程；整趟本来退 0 的改退 1）。别的台的工作根在那一台本地盘上，由代跑那一片（shard_relay.py）在那条命令跑完时删。
 用法：
   rows_orchestrator_revision_11.py run  --config C --repo R --baseline-timing B --stop-file S      （同修订 8；E171_REVISION_11_CONFIG 要给）
   rows_orchestrator_revision_11.py plan --config C --repo R --baseline-timing B --stop-file S      （修订 8 的 plan 原样，另打每行的键与库里有没有；只读）
   rows_orchestrator_revision_11.py --selftest [--cells 格,…] [--rounds N]
 退出码：同修订 8 逐行编排（0、1、2、3、78、143）；账本 N + M 不等于登记数退 1；E171_REVISION_11_CONFIG 没给、库目录写不了退 78。
 
-弄坏开关 ROWS_R11_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，ROWS_R11_SELFTEST=1）。项名、弄坏哪一处、打开后红在哪一格：
-  peer-checks-skipped    别的台取回的行入库之前不核那三样                 peer-checks
-  s18-ignored            S18 触发了照样跑完、库不冻                       s18-stops
-  work-roots-kept        本机逐行驱动的工作根用完不删（改前的样子：线道的树与编译目录留在 <日志目录>/rows-work 下）   reuse-e2e（s18-stops 同样红，开关轮只核前一格）
-  sweep-skipped、temporary-kept（自证外壳 revision_8_selftest_harness.py 的两个）     no-leftover-processes、temporary-directory-removed
+弄坏开关 ROWS_R11_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，ROWS_R11_SELFTEST=1）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
+  ROWS_R11_BREAK=peer-checks-skipped  别的台跑的行入库之前不核那三样
+      「✗ 自证 peer-checks：」
+  ROWS_R11_BREAK=s18-ignored  S18 触发了照样跑完、库不冻
+      「✗ 自证 s18-stops：」
+  ROWS_R11_BREAK=work-roots-kept  本机逐行驱动的工作根用完不删（改前的样子：线道的树与编译目录留在 <日志目录>/rows-work 下）
+      「✗ 自证 reuse-e2e：」「✗ 自证 s18-stops：」（开关轮只核前一格 reuse-e2e）
+  ROWS_R11_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  ROWS_R11_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 
@@ -48,6 +55,7 @@ sys.path.insert(1, os.path.join(HERE, "..", "..", "hosts"))   # scripts/hosts：
 import device_timing  # noqa: E402
 import frozen_tree_lines_revision_8 as judge  # noqa: E402
 import reuse_library as reuse  # noqa: E402
+import reuse_library_root as library_roots  # noqa: E402
 import revision_8_selftest_harness as harness  # noqa: E402
 import run_build_directory as build_directories  # noqa: E402
 
@@ -55,7 +63,7 @@ BREAK_VARIABLE = "ROWS_R11_BREAK"
 SELFTEST_VARIABLE = "ROWS_R11_SELFTEST"
 CONFIG_VARIABLE = "E171_REVISION_11_CONFIG"
 ROWS_R8_PATH = os.path.join(HERE, "rows_orchestrator_revision_8.py")
-ROWS_R8_SHA256 = "25d77b2bf5f90b066bd33bc31bf37c36cad6c1b9e9f196e606ba0a6077f5a416"
+ROWS_R8_SHA256 = "055844678056bfd032017b7a6c35671aa17b6d5f92620716b16aaed02e090526"
 EXIT_WRONG_PINNED_FILE = 3
 LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-one-rows"
@@ -64,7 +72,7 @@ SLOT_WORK_ROOT_PREFIX = "host1-slot"
 
 
 try:
-    # 修订 8 一个字节不改（先核它的 sha256，只差登记过的搬迁也认），载入时把它钉的第一段编排器与 cross_host_o3_check.py 的 sha256
+    # 修订 8 这一层不改（先核它的 sha256，只差登记过的搬迁也认），载入时把它钉的第一段编排器与 cross_host_o3_check.py 的 sha256
     # 换成此刻该认的那一个（reuse_library 的 rows_revision_8_repins：搬目录后重钉的、再只差登记过的搬迁的）
     rows8 = reuse.load_repinned(ROWS_R8_PATH, ROWS_R8_SHA256, "rows_orchestrator_revision_8_25d77b2b", reuse.rows_revision_8_repins())
 except RuntimeError as wrong_file:
@@ -196,7 +204,7 @@ def command_value(words: list[str], option: str) -> str:
 
 
 def peer_check_problems(context, record: dict, row: int, row_directory: str, decision: reuse.Decision) -> list[str]:
-    """别的台取回的行入库之前另核三样（reuse_library.peer_row_problems；快照摘要比发给别的台的那一份冻结树快照）。交回不过的那几样。"""
+    """别的台跑的行入库之前另核三样（reuse_library.peer_row_problems；快照摘要比给别的台读的那一份冻结树快照）。交回不过的那几样。"""
     if broken("peer-checks-skipped"):
         return []
     product = open(record["product"], encoding="utf-8").read() if os.path.exists(record["product"]) else ""
@@ -303,7 +311,8 @@ def run_with_ledger(context, plan_only: bool) -> int:
 
 def install(reuse_config: dict, repo: str, dumps: str) -> None:
     h30 = reuse_config.get("H30") or {}
-    STATE["reuse"] = RowsReuse(reuse.Library(h30.get("library_root") or reuse.DEFAULT_LIBRARY_ROOT), bool(h30.get("lookup", True)),
+    root, _ = library_roots.library_root_of(h30)   # 库根两台同一（reuse_library_root）；取不成的 run 在 main 里已退 78，plan 照缺省那一个打
+    STATE["reuse"] = RowsReuse(reuse.Library(root), bool(h30.get("lookup", True)),
                                os.path.join(repo, dumps, "reuse-markers", MARKERS_NAME), {}, [])
     ORIGINAL.update({"phase_rows_and_checks": one.phase_rows_and_checks, "finish_shard": one.finish_shard,  # 换掉之前逐个点名留下原件
                      "phase_timeout_reruns": one.phase_timeout_reruns, "run": one.run, "launch_local": one.launch_local})
@@ -335,7 +344,7 @@ def main(argument_list: list[str]) -> int:
         try:
             if problems:
                 raise reuse.RunCondition("H31 不过：" + "；".join(problems[:4]))
-            reuse.Library((reuse_config.get("H30") or {}).get("library_root") or reuse.DEFAULT_LIBRARY_ROOT).check_run_condition(repo)
+            reuse.Library(library_roots.require_library_root(reuse_config.get("H30"))).check_run_condition(repo)
         except reuse.RunCondition as error:
             print(f"✗ 运行条件不满足（退 78）：{error}", file=sys.stderr)
             return one.EXIT_RUN_CONDITION
@@ -349,7 +358,7 @@ def main(argument_list: list[str]) -> int:
     return rows8.main(argument_list)
 
 
-# ── 自证：借第一段编排器的假世界（假驱动、假 multi-host-run、假机器清单与资源；这里只用本机一台），假树补上算键要的几样；
+# ── 自证：借第一段编排器的假世界（假驱动、假机器清单与资源；这里只用本机一台，不经假 task-server），假树补上算键要的几样；
 #    假驱动外面包一层，在 <工作根>/lane0 下放一份「这一次编译」的 dep-info 给 RC4 ──
 FAKE_RUN_DATE = "2026-10-09"
 FAKE_DRIVER = os.path.join(HERE, "fake_row_driver.py")
@@ -405,7 +414,7 @@ def product_of(world: WorldEleven, name: str, stem: str) -> str:
 
 
 def ran_rows(world: WorldEleven) -> list[str]:
-    """假驱动真跑过（不是 --skip-finished 跳过）的行：driver.log 里 ran 开头的那几行。"""
+    """假驱动真跑过（按键复用读回的不算）的行：driver.log 里 ran 开头的那几行。"""
     path = os.path.join(world.base.root, "driver.log")
     return [line.strip() for line in open(path, encoding="utf-8") if line.startswith("ran ")] if os.path.exists(path) else []
 
@@ -444,7 +453,7 @@ def cell_reuse_end_to_end(scratch: str) -> tuple[bool, str]:
 
 
 def cell_peer_checks(scratch: str) -> tuple[bool, str]:
-    """别的台取回的行入库之前的三样：都对得上交回空表；row_number、mutation_line_sha256、row_time_limit、snapshot_digest 各错一样各报一样。"""
+    """别的台跑的行入库之前的三样：都对得上交回空表；row_number、mutation_line_sha256、row_time_limit、snapshot_digest 各错一样各报一样。"""
     raw = "m-row-two\tcrates/core/src/other.rs\talpha\tbeta\t-p core\tt_two"
     decision = reuse.Decision("seg1-s12-row-15", "driver-row", "k", f"[mutation]\nrow 15\nmutation {raw}\n[limit]\nseconds 1800\n[python]\nx\n", reuse.STATE_FRESH, "no-entry")
     STATE["frozen_snapshot_digest"] = "d" * 64

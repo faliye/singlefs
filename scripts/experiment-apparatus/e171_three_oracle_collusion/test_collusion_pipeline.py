@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 import baseline_checks as checks
@@ -304,15 +305,6 @@ class CompileFailureSubstitutionTests(unittest.TestCase):
     def test_the_group_leaves_the_device_own_rows_out(self) -> None:
         self.assertEqual(table.group_names_of_file(self.rows, self.FILE), [f"r{index}" for index in range(6)])
 
-    def test_the_rerun_takes_the_rows_whose_result_is_a_compile_failure_and_refuses_a_row_in_two_roots(self) -> None:
-        for relative, status in (("first/row-3", "compile_failed"), ("first/row-4", "ok"), ("second/row-120", "compile_failed"),
-                                 ("second/row-121", "self_crash"), ("again/row-4", "ok")):
-            write(os.path.join(self.root, relative, "row-result.tsv"), f"row_number\t{relative.split('-')[1]}\nstatus\t{status}\n")
-        os.makedirs(os.path.join(self.root, "first", "row-5"))  # 中途停下、没有 row-result.tsv 的行目录不算
-        self.assertEqual(row_driver.compile_failed_row_numbers([os.path.join(self.root, "first"), os.path.join(self.root, "second")]), {3, 120})
-        with self.assertRaises(ValueError):
-            row_driver.compile_failed_row_numbers([os.path.join(self.root, "first"), os.path.join(self.root, "again")])
-
 
 class BadImagesReportTests(unittest.TestCase):
     def test_negative_bases_come_from_p_and_n_rows_and_the_blind_family_has_its_own_bases(self) -> None:
@@ -351,11 +343,68 @@ class ComparatorSectionTests(unittest.TestCase):
 
 
 class DriverArgumentTests(unittest.TestCase):
-    def test_the_device_command_goes_through_the_memory_wrapper_with_the_thread_cap(self) -> None:
-        command = row_driver.device_command("/repo", "/bin/dev", "/out/dump", 6, "4G", ["--positive-control", "O2"])
-        self.assertEqual(command[:4], ["bash", "/repo/scripts/hosts/run-with-memory-cap.sh", "4G", "bash"])
-        self.assertEqual(command[4:7], ["/repo/scripts/hosts/capped.sh", "6", "/bin/dev"])
-        self.assertEqual(command[7:], ["row", "--output-directory", "/out/dump", "--positive-control", "O2"])
+    def test_the_device_command_starts_the_device_itself_with_no_wrapper(self) -> None:
+        command = row_driver.device_command("/bin/dev", "/out/dump", ["--positive-control", "O2"])
+        self.assertEqual(command, ["/bin/dev", "row", "--output-directory", "/out/dump", "--positive-control", "O2"])
+
+    def test_the_device_reads_the_threads_of_its_lane_from_every_thread_variable(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            device = os.path.join(root, "device.sh")
+            with open(device, "w", encoding="utf-8") as handle:
+                handle.write("#!/bin/sh\nenv\n")
+            os.chmod(device, 0o755)
+            exit_code, _ = row_driver.run_device(root, device, root, 6, [])
+            self.assertEqual(exit_code, 0)
+            with open(os.path.join(root, "device.out"), encoding="utf-8") as handle:
+                seen = dict(line.split("=", 1) for line in handle.read().splitlines() if "=" in line)
+            self.assertEqual({name: seen.get(name) for name in row_driver.frozen_o3.CHILD_THREAD_VARIABLES},
+                             {name: "6" for name in row_driver.frozen_o3.CHILD_THREAD_VARIABLES})
+            self.assertEqual(len(row_driver.frozen_o3.CHILD_THREAD_VARIABLES), 20)
+            self.assertIn("SINGLEFS_THREAD_CAP", row_driver.frozen_o3.CHILD_THREAD_VARIABLES)
+            self.assertIn("CARGO_BUILD_JOBS", row_driver.frozen_o3.CHILD_THREAD_VARIABLES)
+
+    def test_a_row_over_the_time_limit_is_killed_as_a_group_and_exits_253(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            marker = os.path.join(root, "grandchild-alive")
+            # 子进程再起一个睡着的孙进程，超时要把整组杀掉：孙进程不留下标记文件
+            command = ["bash", "-c", f"(sleep 3; : > {marker}) & sleep 30"]
+            started = time.monotonic()
+            exit_code = row_driver.run_with_time_limit(command, 1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.assertEqual(exit_code, row_driver.ROW_TIMEOUT_EXIT_CODE)
+            self.assertLess(time.monotonic() - started, 10)
+            time.sleep(3.5)
+            self.assertFalse(os.path.exists(marker), "孙进程没被一起杀掉")
+
+    def test_the_device_and_the_executor_run_once_whatever_their_exit_code(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            counter = os.path.join(root, "device-runs")
+            original_command = row_driver.device_command
+            row_driver.device_command = lambda *unused: ["bash", "-c", f"echo run >> {counter}; exit 252"]
+            try:
+                exit_code, _ = row_driver.run_device(root, "/bin/dev", root, 1, [])
+            finally:
+                row_driver.device_command = original_command
+            self.assertEqual(exit_code, 252)
+            with open(counter, encoding="utf-8") as handle:
+                self.assertEqual(handle.read().count("run"), 1, "装置退非 0 不重跑")
+            with open(os.path.join(root, "device.err"), encoding="utf-8") as handle:
+                self.assertNotIn("first_attempt_exit", handle.read())
+            stream_directory = os.path.join(root, "dump", STREAM_NAMES[0])
+            os.makedirs(stream_directory)
+            with open(os.path.join(stream_directory, "oracle-verdicts.tsv"), "w", encoding="utf-8"):
+                pass
+            calls: list[tuple] = []
+            original_executor = row_driver.frozen_o3.run_executor
+            row_driver.frozen_o3.run_executor = lambda *arguments: (calls.append(arguments), (252, 5))[1]
+            try:
+                fields = row_driver.run_o3_step(argparse.Namespace(no_executor=False, positive_control=None, repo_root="/repo", threads=2), root)
+            finally:
+                row_driver.frozen_o3.run_executor = original_executor
+            self.assertEqual(len(calls), 1, "执行器退非 0 不重跑")
+            self.assertEqual((fields["o3_status"], fields["o3_exit"], fields["o3_ns"]), (row_driver.O3_STATUS_EXECUTOR_FAILED, 252, 5))
+
+    def test_a_row_inside_the_time_limit_returns_its_own_exit_code(self) -> None:
+        self.assertEqual(row_driver.run_with_time_limit(["bash", "-c", "exit 7"], 30, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL), 7)
         self.assertIsInstance(argparse.Namespace(), argparse.Namespace)
 
 

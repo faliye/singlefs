@@ -49,11 +49,20 @@
 import argparse
 import collections
 import hashlib
+import importlib.util
 import os
 import re
 import subprocess
 import sys
 import tempfile
+
+# doc-experiments 通过文件路径导入 doc-consolidate，再由它导入本模块。
+# 这种入口的 sys.path 不含 scripts/kb，依赖也必须按本文件的位置加载。
+_FENCE_SPEC = importlib.util.spec_from_file_location(
+    'kb_markdown_fences', os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib_markdown.py'))
+_FENCES = importlib.util.module_from_spec(_FENCE_SPEC)
+_FENCE_SPEC.loader.exec_module(_FENCES)
+FENCE, advance_fence, fenced_flags = _FENCES.FENCE, _FENCES.advance_fence, _FENCES.fenced_flags
 
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 preflight_sys.dont_write_bytecode = True
@@ -130,7 +139,21 @@ def parse_history(text):
     section = None
     block = None
     entry = None
-    for line in text.split('\n'):
+    lines = text.split('\n')
+    flags = fenced_flags(lines)
+    for index, line in enumerate(lines):
+        if flags[index]:
+            if trailing:
+                trailing.append(line)
+            elif entry is not None:
+                entry.body.append(line)
+            elif block is not None:
+                block.lead.append(line)
+            elif section is not None:
+                section.status_lines.append(line)
+            else:
+                preamble.append(line)
+            continue
         if trailing:
             trailing.append(line)
             continue
@@ -331,7 +354,7 @@ def find_old_version(repo, path, block_date, fence_rows):
         old = git_show(repo, full + '^', path)
         if old is None:
             continue
-        unmatched = [raw for number, text, raw in numbered if not (number - 1 < len(old) and old[number - 1] == text)]
+        unmatched = [raw for number, text, raw in numbered if not (1 <= number <= len(old) and old[number - 1] == text)]
         share = 1 - len(unmatched) / len(numbered)
         if share > best[1]:
             best = (full, share, unmatched)
@@ -357,22 +380,27 @@ def home_section_for(entry, holders, kind):
 def transform_entry(entry, date, repo, report, section_name, break_mode):
     """机械四类里的三类：快查行、围栏、同日日期。返回新条目与它引的 git 版本内容。"""
     body = list(entry.body)
+    flags = fenced_flags(body)
     referenced_git_text = ''
     # 围栏换 git 引用
     new_body = []
     index = 0
     while index < len(body):
         line = body[index]
-        intro = FENCE_INTRO_RE.match(line)
+        intro = FENCE_INTRO_RE.match(line) if not flags[index] else None
         if intro and repo:
             path = intro.group(1)
             look = index + 1
             while look < len(body) and not body[look].strip():
                 look += 1
-            if look < len(body) and body[look].startswith('```'):
+            if look < len(body) and FENCE.match(body[look]) and advance_fence(body[look], None):
+                fence = advance_fence(body[look], None)
                 end = look + 1
-                while end < len(body) and not body[end].startswith('```'):
+                while end < len(body) and advance_fence(body[end], fence):
                     end += 1
+                if end == len(body):
+                    new_body.extend(body[index:])
+                    break
                 fence_rows = body[look + 1:end]
                 revision, share, unmatched = find_old_version(repo, path, date, fence_rows)
                 if revision:
@@ -392,13 +420,14 @@ def transform_entry(entry, date, repo, report, section_name, break_mode):
         index = 1 + index
     body = new_body
     # 快查行：数、编号、产物名与别的日期在条目别处都找得到才删
-    rest_text = '\n'.join([entry.title] + [l for l in body if not QUICK_RE.match(l)]) + referenced_git_text
+    flags = fenced_flags(body)
+    rest_text = '\n'.join([entry.title] + [l for i, l in enumerate(body) if flags[i] or not QUICK_RE.match(l)]) + referenced_git_text
     rest_tokens = tokens_of(rest_text, date)
     kept = []
     conclusions = []
     dropped_any = False
-    for line in body:
-        if QUICK_RE.match(line):
+    for position, line in enumerate(body):
+        if not flags[position] and QUICK_RE.match(line):
             # 「快查·改后」「快查·改了什么」就是这条变更的结论句，留下当结论；「快查·改前」说的是旧态，旧态在 git 与改前引用里
             after_match = re.match(r'^> 快查·(改后|改了什么)：\s*(.*)$', line)
             if after_match and after_match.group(2).strip():
@@ -418,8 +447,9 @@ def transform_entry(entry, date, repo, report, section_name, break_mode):
     body = kept
     if dropped_any:
         cleaned = []
-        for line in body:
-            if line.strip() == '>' and (not cleaned or cleaned[-1].strip() in ('', '>')):
+        flags = fenced_flags(body)
+        for position, line in enumerate(body):
+            if not flags[position] and line.strip() == '>' and (not cleaned or cleaned[-1].strip() in ('', '>')):
                 continue
             cleaned.append(line)
         body = cleaned
@@ -429,8 +459,9 @@ def transform_entry(entry, date, repo, report, section_name, break_mode):
         title = strip_same_date(title, date)
         report['dates_stripped'] += 1
     stripped_body = []
-    for line in body:
-        if date in line:
+    flags = fenced_flags(body)
+    for position, line in enumerate(body):
+        if not flags[position] and date in line:
             report['dates_stripped'] += line.count(date)
             line = strip_same_date(line, date)
         stripped_body.append(line)
@@ -442,8 +473,8 @@ def transform_entry(entry, date, repo, report, section_name, break_mode):
                 body[position] = line.replace(match.group(0), '', 1)
                 break
     collapsed = []
-    for line in body:
-        if not line.strip() and collapsed and not collapsed[-1].strip():
+    for position, line in enumerate(body):
+        if not flags[position] and not line.strip() and collapsed and not collapsed[-1].strip():
             continue
         collapsed.append(line)
     body = collapsed
@@ -863,5 +894,38 @@ def main():
     sys.exit(1)
 
 
+BREAK_VARIABLES = ("HISTORY_CONSOLIDATE_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行里有 --selftest；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or "--selftest" in arguments or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/history-consolidate.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     main()

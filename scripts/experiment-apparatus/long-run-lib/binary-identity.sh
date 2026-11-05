@@ -11,7 +11,6 @@
 #   binary_identity_void_shard <片名> <片文件> <作废目录>        片与它的记录一起移进作废目录（留着不删），并报上面那一行
 #   binary_identity_check_same <期望 sha256 或空串> <片名> <片里记的 sha256> [<片名> <片里记的 sha256> …]
 #                                                合并产物之前再核一遍：期望值空串时要求彼此相同；任何一片没有记录或不同就拒、返回 1
-#   binary_identity_install_python_shim <装置源文件相对仓根的路径> <放垫片的目录>   别台编好送来的装置带着编译机的准入脚本路径，这台上没有：PATH 最前面放 python3 垫片把 preflight.py 与装置源文件两个路径换成这棵树里的同名文件
 # gate-similar: scripts/hosts/compile-then-swap.py 它管「编译放在另一个目录、编完整份换上」，不管长跑脚本开跑后装置在不在变；scripts/hosts/source-stamp.py 它给源码树记指纹，不给二进制记；没有已有的库管长跑里装置是哪一版
 
 PINNED_BINARY=""
@@ -114,30 +113,8 @@ binary_identity_check_same() { # <期望 sha256 或空串> <片名> <记的 sha2
   done
   if ((mismatched > 0)); then
     echo "  ✗ 合并产物之前核全部片的装置 sha256：$total 片里 $mismatched 片对不上，不出产物" >&2
-    echo "     → 怎么办：不带只合并的参数重起本脚本，对不上的片会作废、用这一趟的装置重做；别台做的片要让别台用同一份装置（把本机这一份送过去）" >&2
+    echo "     → 怎么办：不带只合并的参数重起本脚本，对不上的片会作废、用这一趟的装置重做；别台做的片要用同一份装置（放在共享根下，两台照同一个绝对路径起）" >&2
     return 1
   fi
   echo "核过：$total 片的装置 sha256 相同（$expected）"
-}
-
-binary_identity_install_python_shim() { # <装置源文件相对仓根的路径> <放垫片的目录>
-  local device_source_path="$1" shim_directory="$2" device_source_name real_python tree
-  device_source_name="${device_source_path##*/}"
-  real_python=$(command -v python3) || { echo "  ✗ 这台上没有 python3，装置判不了准入" >&2; echo "     → 怎么办：装上 python3 再起本脚本" >&2; return 1; }
-  tree=$(pwd -P)
-  mkdir -p -- "$shim_directory" || return 1
-  cat > "$shim_directory/python3" <<SHIM
-#!/usr/bin/env bash
-if [[ "\${2:-}" == check ]]; then
-  case "\$1" in
-    */.claude/singlefs-ai-sop/scripts/preflight.py) set -- "$tree/.claude/singlefs-ai-sop/scripts/preflight.py" "\${@:2}" ;;
-  esac
-  case "\${3:-}" in
-    */$device_source_name) set -- "\$1" "\$2" "$tree/$device_source_path" "\${@:4}" ;;
-  esac
-fi
-exec "$real_python" "\$@"
-SHIM
-  chmod +x "$shim_directory/python3"
-  export PATH="$shim_directory:$PATH"
 }

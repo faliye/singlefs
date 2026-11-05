@@ -641,14 +641,26 @@ fn command_anchors(arguments: &[String]) {
     }
 }
 
+/// 登记的输入单元数（登记第七节 N = 2560）；`gen-input` 不给 `--units` 就是它。
+const REGISTERED_UNIT_COUNT: u64 = 2560;
+
+/// 给了与登记不同的单元数就是缩过规模的一趟：`GEN_INPUT` 行接这一段，产物不当正式产物。
+fn reduced_scale_note(units: u64) -> String {
+    if units == REGISTERED_UNIT_COUNT {
+        String::new()
+    } else {
+        format!(" reduced=yes registered_units={REGISTERED_UNIT_COUNT} not_official_product=yes")
+    }
+}
+
 fn command_generate_input(arguments: &[String]) {
     let output_path = PathBuf::from(parse_named_argument(arguments, "--output").expect("gen-input 需要 --output"));
-    let units: u64 = parse_named_argument(arguments, "--units").expect("gen-input 需要 --units").parse().expect("units 不是数字");
+    let units: u64 = parse_named_argument(arguments, "--units").map(|text| text.parse().expect("units 不是数字")).unwrap_or(REGISTERED_UNIT_COUNT);
     let seed_text = parse_named_argument(arguments, "--seed").expect("gen-input 需要 --seed");
     let seed_text = seed_text.strip_prefix("0x").unwrap_or(&seed_text);
     let seed = u64::from_str_radix(seed_text, 16).expect("seed 不是合法的十六进制");
     write_batch_file(&output_path, units, seed).expect("写批文件失败");
-    println!("GEN_INPUT path={output_path:?} units={units} seed=0x{seed:016X} bytes={}", units as usize * UNIT_BYTE_LENGTH + 32);
+    println!("GEN_INPUT path={output_path:?} units={units} seed=0x{seed:016X} bytes={}{}", units as usize * UNIT_BYTE_LENGTH + 32, reduced_scale_note(units));
 }
 
 /// `run-shard`：一片的完整流程——PC-A 锚点、读输入区间、按需翻位（只改上传副本）、GPU 派发、
@@ -977,5 +989,13 @@ mod tests {
         let results = run_gpu_crc(&context, &uploaded_copy, &[UNIT_BYTE_LENGTH as u32]);
         assert_full_coverage_no_sentinel(&results);
         assert_ne!(results[0].0, cpu_reference_on_original, "V7 要抓的场景：翻位只进了上传副本，GPU 结果必须与未翻位的 CPU 参照不同");
+    }
+
+    /// 给了缩规模的单元数，`GEN_INPUT` 行要写缩过、不当正式产物；登记的 2560 不加这一段。
+    #[test]
+    fn reduced_unit_count_is_marked_and_registered_one_is_not() {
+        assert_eq!(REGISTERED_UNIT_COUNT, 2560);
+        assert_eq!(reduced_scale_note(REGISTERED_UNIT_COUNT), "");
+        assert_eq!(reduced_scale_note(64), " reduced=yes registered_units=2560 not_official_product=yes");
     }
 }

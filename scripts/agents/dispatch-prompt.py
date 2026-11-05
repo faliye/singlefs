@@ -10,29 +10,23 @@
 
 --check 的判法不在这里另写：知道类型（--type，或骨架第一行「# 派发：<类型>」）就起派发闸自己的
 `bash .claude/hooks/runner-dispatch-guard.sh --check-prompt <提示文件> --type <类型> --root <仓根>`，同一份判法各条都判完，
-不成立的一次列全（占位、重型测试一行、定义要的输入、写范围、快照、长活声明、书记员规格……）；⑤ 与在跑的实现员撞文件、⑦ 并发与限额窗口
+不成立的一次列全（占位、定义要的输入、写范围、快照、批次一行、书记员规格……）；⑤ 与在跑的实现员撞文件、⑦ 并发
 要会话状态，写成「派的那一刻另判」。不知道类型、或派发闸跑不起来的，只查占位（<填 …>），并写明别几条没核。
 
 为什么：2026-09-20 起 8 天里派发闸拒了 187 次，前几种原因全是缺一行（岔路行、要改的文件、出口、还差）；主 agent 派完再给子 agent
 发了 573 条纠正或追加。缺项该在写的时候补，不该在派的时候拒：骨架把定义要的每一样都列成一行占位，占位没填完就不派。
-骨架里的固定行与派发闸（.claude/hooks/runner-dispatch-guard.sh）判的是同一套：重型测试一行、开工先读（没有定义的类型）、
-定义的 required-inputs 每组一行、实现员的「要动的 crates 文件」、写回员的「规格检查已判」、执行员的「这一段回答的岔路」、
-设计员与带重活的几种类型（线程上限那张类型表，九种：实现员、调查员、工具员、执行员、变异分诊员、攻方腿、clerk、前向腿、防方腿）的「预计挂钟」与超过 2 小时时的「分片」「续跑」「多机」三行
-（派发闸的判法在 .claude/hooks/lib_long_run.py；「多机」一行只认那份库的 CANONICAL_HOSTS_SENTENCE 那一句规范写法，逐字（可带句末句号），后面不接任何说明（说明另起一行写），别的写法一律拒，判在派发闸 ⑭；骨架的占位引那一句，不另抄一份）。
-「多机」一行的占位里另写放行行「多机已判：」的写法（HOSTS_VALVE_HINT）：用户给了逐台不同的台数或线程时另起一行写它与理由、逐台参数再另起一行，派发闸 ⑭ 判这一行理由不空、只写一行；
-子 agent 有这一行时照逐台写的参数跑，没有就只照规范句。--check 认它（起派发闸，同一份判法）。
-这十种类型的骨架在「多机」一行后面另打一行「复用：<填 …>」（REUSE_LINE）：超过 2 小时的写判定按什么入库、键相同的怎么沿用，不产出判定的写「无判定：」接为什么，2 小时内删掉；
-派发闸 ⑭ 判这一行在、不是占位、不短于 8 个字、只写一行（「分不了：」顶不了它），也判「分片：」「续跑：」不短于 8 个字；
+骨架里的固定行与派发闸（.claude/hooks/runner-dispatch-guard.sh）判的是同一套：开工先读（没有定义的类型）、
+定义的 required-inputs 每组一行、实现员的「要动的 crates 文件」、写回员的「规格检查已判」、执行员的「这一段回答的岔路」、每种类型的「批次」一行。
 「批次：」一行派发闸 ⑱ 判形如 records/<文件>.md#<批号>、文件在本仓或登记的工作树里，十种类型缺这一行拒（判法只在派发闸文件头 ⑱ 条）。
 「自证在哪跑」一行派发闸不单判，没填时按占位拒。
+类型在写范围表（.claude/hooks/agent-write-scope.tsv，读法 lib_write_scope.py 的 load_scopes，这里不另抄）里有行的，骨架在类型专属的几行后面、「## 关的是哪几条」前面打一行「写范围：<表里这个类型的路径模式，用「、」隔开>」
+（clerk 列 records/**、research/prompts/**、research/results/** 与 $SINGLEFS_WORK_ROOT/**，不列 .claude/kb/）：主 agent 填「要改的文件」「报告」时对着它写，派发闸 ④ 就不会拒「提示要子 agent 写进写范围之外的路径」。
+表里没有行的类型、没有这张表的仓（自检的样本仓）不打这一行；--set 写范围=… 可以改写这一行。
 带「草稿目录：」一行的类型，骨架在它后面多一行「认领：bash scripts/hosts/work-directory-ownership.sh claim <草稿目录> --purpose '<用途一句>'」
 （欠账 C792：草稿目录要有归属文件；--set 草稿目录=… 与 --set 认领用途=… 填进去）。--check 提示里有「草稿目录：」一行时再判这一行：
 在不在、claim 后面的目录与「草稿目录：」是不是同一个（~ 展开、末尾斜杠不计）、用途是不是空的；占位没填的归占位那一判，不在这里重复报。
-「线程上限」一行默认填登记的每台默认重活线程数（.claude/heavy-thread-default，经 scripts/hosts/heavy_threads.py 的 default_heavy_threads 取），
-不再是「整机核数 ÷ 同时在跑的重活数」的占位（用户 2026-10-12 定：没给参数每台默认登记值）；派发闸 ⑮ 判提示里的 N 等于它，不等于要另写「线程上限已判：<理由>」。
-登记读不到时这一行留占位，--check 拒。派发闸 ⑮ 这一行只认一个十进制整数，后面什么都不接，括注也不行（不写 ÷、/、一半、第二个数）；要说明的另起一行照普通正文写，那一行不判；闭合了的围栏代码块（照 CommonMark 认）里的行派发闸 ⑮ 同样不判（标签行两种认法遮不遮不一致的拒，派发闸文件头 ⑮ 条）。
-带重活的九种类型缺这一行也拒；九种里多数派发并不带重活（clerk 的定义许编译、跑编译出来的代码，three-way-forward、three-way-defense 的定义只跑模型目录里的 tools/rerun.sh、不编译），不带重活的写一行「线程上限已判：<理由>」顶缺行（要登记值以外的数的，写「线程上限：N」再加这一行）。
-骨架的两张类型表 HEAVY_WORK_TYPES、LONG_RUN_TYPES 与派发闸的 THREAD_LIMIT_REQUIRED_AGENTS、LONG_RUN_AGENTS 逐个相同，自检解析派发闸那两行逐个比。
+派发闸不判「线程上限」「预计挂钟」「分片」「续跑」「多机」「复用」这几行（records/2026-10-30-编译绕过内存总上限.md 批 3b），骨架一种类型都不打；
+自检核每种类型的骨架里都没有这几行，带这几行的提示 --check 照样退 0。
 「报告：」一行默认填 <草稿目录>/result.md（--set 报告=… 填别的）：Claude Code 自带的拦截不让子 agent 用 Write 建名字为 report.md 的文件，写 result.md 写得进去；
 派发闸 ⑰ 判报告行（「报告」「报告路径」「报告写进」「报告写到」四种标签，与 ④ 写范围共用一份解析）点名的文件名里带 report（不分大小写）的、以 SUMMARY、FINDINGS、ANALYSIS 开头（不分大小写）的 .md 拒，
 --check 经 --check-prompt 带出这一条。
@@ -47,174 +41,85 @@
 退出码：0 打出骨架，或 --check 判下来派发闸放行（不知道类型时：没有占位）；2 用法错、定义不在、提示文件读不了；3 --check 判下来派发闸会拒（或有占位）。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句的开头，括号里是那条「✗ 自检：」的开头）；
-逐格列全的几条（long-run-lines-dropped、long-run-types-narrowed、live-words-narrowed、draft-line-own-regex）每一项是打开开关后一格失败行「✗ 自检：」起到「实际」为止的原文
+逐格列全的几条（draft-line-own-regex、retired-lines-printed）每一项是打开开关后一格失败行「✗ 自检：」起到「实际」为止的原文
 （没有「实际」的到第一处不在「」里的全角冒号为止），项之间用「；」隔开，与失败的格逐格相同：
   DISPATCH_PROMPT_BREAK=ignore-placeholders  placeholders() 一处占位都不认（不知道类型、只查占位的那一路）
       --check 带占位、不知道类型的骨架（「✗ 自检：--check 对带占位、不知道类型的骨架应当退 3 并逐行列出」）
   DISPATCH_PROMPT_BREAK=guard-skipped  check_prompt() 知道类型也不起派发闸的 --check-prompt，只查占位
-      --check 带类型一次列全（「✗ 自检：--check 带类型应当一次列全派发闸会拒的三处」）
+      --check 带类型一次列全（「✗ 自检：--check 带类型应当一次列全派发闸会拒的两处」）
       「✗ 自检：三方腿骨架报告填成草稿目录下的 result.md（three-way-forward），--check 应当退 3并点名「research/prompts/<轮>-<模型>-output.md」，实际」
       「✗ 自检：三方腿骨架报告填成草稿目录下的 result.md（three-way-attack），--check 应当退 3并点名「research/prompts/<轮>-<模型>-output.md」，实际」
       「✗ 自检：三方腿骨架报告填成草稿目录下的 result.md（three-way-defense），--check 应当退 3并点名「research/prompts/<轮>-<模型>-output.md」，实际」
       「✗ 自检：--check 对「报告：」写 report.md 的提示应当退 3 并点名文件名、给 result.md 的写法，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句后接「；」与说明，--check 应当退 3，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句后接按此刻空闲现算，--check 应当退 3，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句后接机器忙时按负载降，--check 应当退 3，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句后接 host-resources 的 available_threads，--check 应当退 3，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行写现算，--check 应当退 3，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行换了词的取法（不看忙闲），--check 应当退 3，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句后的说明里有数字，--check 应当退 3，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句加多机已判而没写理由，--check 应当退 3，实际」
-      「✗ 自检：工具员骨架的线程上限一行后接括注，--check 应当退 3（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架的线程上限一行后接按负载降的括注，--check 应当退 3（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架超过 2 小时、没写复用一行，--check 应当退 3，实际」
-      「✗ 自检：工具员骨架超过 2 小时、复用一行只写了几个字，--check 应当退 3，实际」
       「✗ 自检：工具员骨架批次一行点名不在的调度记录，--check 应当退 3 并点名那份记录，实际」
-  DISPATCH_PROMPT_BREAK=long-run-lines-dropped  skeleton() 不打预计挂钟与分片、续跑、多机那四行
-      「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（experiment-designer）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（implementation-writer）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（investigator）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（tooling-writer）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（experiment-runner）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（mutation-triage）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（three-way-attack）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（clerk）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（three-way-forward）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（three-way-defense）」；「✗ 自检：骨架的多机一行应当点名 --emit-hosts 与 heavy-thread-default、引 CANONICAL_HOSTS_SENTENCE、不出现现算词（出现了 []）」；「✗ 自检：骨架的多机一行应当写上放行行「多机已判：」的写法（用户给了逐台参数时用）」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（clerk）」；「✗ 自检：clerk 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（experiment-designer）」；「✗ 自检：experiment-designer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（experiment-runner）」；「✗ 自检：experiment-runner 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（implementation-writer）」；「✗ 自检：implementation-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（investigator）」；「✗ 自检：investigator 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（mutation-triage）」；「✗ 自检：mutation-triage 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-attack）」；「✗ 自检：three-way-attack 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-defense）」；「✗ 自检：three-way-defense 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-forward）」；「✗ 自检：three-way-forward 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（tooling-writer）」；「✗ 自检：tooling-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-forward），--check 应当退 0，实际」；「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-attack），--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-defense），--check 应当退 0，实际」；「✗ 自检：工具员骨架不动线程上限，--check 应当退 0（默认填的登记值过派发闸 ⑮），实际」；「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、带句末句号，--check 应当退 0，实际」；「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、说明另起一行写，--check 应当退 0，实际」；「✗ 自检：工具员骨架超过 2 小时、多机一行规范句加多机已判与逐台参数一行，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架的线程上限一行另起一行照普通正文写说明，--check 应当退 0（括注一概拒、说明另起一行不判），实际」；「✗ 自检：工具员骨架的线程上限一行代码块里的示例行，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（experiment-designer）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（implementation-writer）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（investigator）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（tooling-writer）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（experiment-runner）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（mutation-triage）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-attack）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（clerk）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-forward）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-defense）」
-      「✗ 自检：工具员骨架超过 2 小时、复用一行写无判定与为什么，--check 应当退 0，实际」
   DISPATCH_PROMPT_BREAK=claim-line-dropped  skeleton() 不在「草稿目录：」后面打「认领：」一行
       带草稿目录的类型骨架在草稿目录那一行后面紧跟认领行（「✗ 自检：带草稿目录的类型骨架应当在草稿目录那一行后紧跟一行认领」）、
       --set 认领用途=… 填得进（「✗ 自检：--set 草稿目录、认领用途」）
-      「✗ 自检：clerk 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
+      「✗ 自检：clerk 的骨架填完，--check 应当退 0，实际」
       「✗ 认领行：有「草稿目录：…」却没有「认领：…」一行」
-      「✗ 自检：experiment-designer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：experiment-runner 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：implementation-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：investigator 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：mutation-triage 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-attack 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-defense 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-forward 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：tooling-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
+      「✗ 自检：experiment-designer 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：experiment-runner 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：implementation-writer 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：investigator 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：mutation-triage 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：three-way-attack 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：three-way-defense 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：three-way-forward 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：tooling-writer 的骨架填完，--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-forward），--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-attack），--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-defense），--check 应当退 0，实际」
       「✗ 自检：--check 对填完的提示应当退 0（骨架第一行认出类型、派发闸放行），实际」
-      「✗ 自检：工具员骨架不动线程上限，--check 应当退 0（默认填的登记值过派发闸 ⑮），实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、带句末句号，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、说明另起一行写，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句加多机已判与逐台参数一行，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架的线程上限一行另起一行照普通正文写说明，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架的线程上限一行代码块里的示例行，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架超过 2 小时、复用一行写无判定与为什么，--check 应当退 0，实际」
+      「✗ 自检：工具员骨架填完、另加撤掉的线程上限与长活几行，--check 应当退 0（派发闸不再判这几行），实际」
+      「✗ 自检：写范围一行：clerk 的骨架带着「写范围：」一行填完，--check 应当退 0（派发闸不把这一行当写进范围外的路径），实际」
+      「✗ 自检：骨架里要临时服务的自证那一行点名了登记的脚本、拼了整条包装写法，填完过派发闸 --check 应当退 0，实际」
   DISPATCH_PROMPT_BREAK=claim-check-skipped  --check 不判认领行
       认领行缺、目录对不上、用途为空各判红（「✗ 自检：认领行」）、--check 端到端缺认领行退 3（「✗ 自检：--check 对缺认领行的提示」）
-  DISPATCH_PROMPT_BREAK=long-run-types-narrowed  skeleton() 只给设计员、执行员打那四行（退回改前的类型）
-      「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（implementation-writer）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（investigator）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（tooling-writer）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（mutation-triage）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（three-way-attack）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（clerk）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（three-way-forward）」；「✗ 自检：设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（three-way-defense）」
-      「✗ 自检：骨架的多机一行应当点名 --emit-hosts 与 heavy-thread-default、引 CANONICAL_HOSTS_SENTENCE、不出现现算词（出现了 []）」；「✗ 自检：骨架的多机一行应当写上放行行「多机已判：」的写法（用户给了逐台参数时用）」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（clerk）」；「✗ 自检：clerk 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（implementation-writer）」；「✗ 自检：implementation-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（investigator）」；「✗ 自检：investigator 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（mutation-triage）」；「✗ 自检：mutation-triage 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-attack）」；「✗ 自检：three-way-attack 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-defense）」；「✗ 自检：three-way-defense 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-forward）」；「✗ 自检：three-way-forward 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（31，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（tooling-writer）」；「✗ 自检：tooling-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-forward），--check 应当退 0，实际」；「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-attack），--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-defense），--check 应当退 0，实际」；「✗ 自检：工具员骨架不动线程上限，--check 应当退 0（默认填的登记值过派发闸 ⑮），实际」；「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、带句末句号，--check 应当退 0，实际」；「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、说明另起一行写，--check 应当退 0，实际」；「✗ 自检：工具员骨架超过 2 小时、多机一行规范句加多机已判与逐台参数一行，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架的线程上限一行另起一行照普通正文写说明，--check 应当退 0（括注一概拒、说明另起一行不判），实际」；「✗ 自检：工具员骨架的线程上限一行代码块里的示例行，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（implementation-writer）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（investigator）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（tooling-writer）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（mutation-triage）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-attack）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（clerk）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-forward）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-defense）」
-      「✗ 自检：工具员骨架超过 2 小时、复用一行写无判定与为什么，--check 应当退 0，实际」
-  DISPATCH_PROMPT_BREAK=types-before-nine  两张类型表退回补 clerk、three-way-forward、three-way-defense 之前的（线程上限表少前向腿、防方腿，预计挂钟表少 clerk、前向腿、防方腿）
-      骨架的类型表与派发闸的表逐个相同（「✗ 自检：骨架的类型表与派发闸的表应当逐个相同：线程上限 骨架多 [] 少 ['three-way-defense', 'three-way-forward']…」）、
-      真定义打出的骨架带线程上限与预计挂钟四行（clerk、three-way-forward、three-way-defense 三句）、这三种的骨架填完 --check 应当退 0（三句，实际 3）
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（clerk）：」
-      「✗ 自检：clerk 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-defense）：」
-      「✗ 自检：three-way-defense 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-forward）：」
-      「✗ 自检：three-way-forward 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-forward），--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-defense），--check 应当退 0，实际」
-  DISPATCH_PROMPT_BREAK=long-run-hosts-live-restored  skeleton() 的「多机」一行退回现算的写法（点名 host-resources.py 现算每台线程与内存）
-      骨架的多机一行引规范句、不写现算（「✗ 自检：骨架的多机一行应当点名 --emit-hosts 与 heavy-thread-default、引 CANONICAL_HOSTS_SENTENCE、不出现现算词」；
-      现算词是 LIVE_HOSTS_WORDS 那一张：host-resources、available_threads、available_parallelism、nproc、cpu_count、sched_getaffinity、核数、忙闲、空闲、负载、除以、÷）、
-      骨架的多机一行写上多机已判（「✗ 自检：骨架的多机一行应当写上放行行「多机已判：」的写法」）
-  DISPATCH_PROMPT_BREAK=reuse-line-dropped  LONG_RUN_LINES 里不加「复用：」一行（REUSE_LINE），十种类型的骨架都不打它
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（experiment-designer）」；「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（implementation-writer）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（investigator）」；「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（tooling-writer）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（experiment-runner）」；「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（mutation-triage）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-attack）」；「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（clerk）」
-      「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-forward）」；「✗ 自检：设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（three-way-defense）」
-  DISPATCH_PROMPT_BREAK=hosts-valve-hint-dropped  skeleton() 的「多机」一行占位里不写放行行「多机已判：」的写法（HOSTS_VALVE_HINT）
-      骨架的多机一行写上多机已判（「✗ 自检：骨架的多机一行应当写上放行行「多机已判：」的写法」）
-  DISPATCH_PROMPT_BREAK=live-words-narrowed  live_hosts_words_in() 退回只认 host-resources 与 available_threads 两个现算词（改前的判法）
-      「✗ 自检：现算词表应当认出每一个现算词」
   DISPATCH_PROMPT_BREAK=selftest-location-dropped  skeleton() 不打「自证在哪跑」一行
       会跑自证的类型骨架带这一行（「✗ 自检：会跑自证的类型骨架应当带一行「自证在哪跑：<填 …>」」）、
       --set 填得进这一行（「✗ 自检：--set 自证在哪跑=…」）、--check 没填时点名这一行（「✗ 自检：--check 对没填自证在哪跑的提示」）
-  DISPATCH_PROMPT_BREAK=thread-formula-restored  skeleton() 的线程上限默认退回「<填 整机核数 ÷ 同时在跑的重活数>」占位，不填登记值
-      实现员骨架应当带登记的线程上限（「✗ 自检：实现员骨架应当带登记的线程上限」）、
-      线程上限默认填的数应当过派发闸（「✗ 自检：工具员骨架不动线程上限，--check 应当退 0」）
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（clerk）：」
-      「✗ 自检：clerk 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（experiment-runner）：」
-      「✗ 自检：experiment-runner 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（implementation-writer）：」
-      「✗ 自检：implementation-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（investigator）：」
-      「✗ 自检：investigator 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（mutation-triage）：」
-      「✗ 自检：mutation-triage 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-attack）：」
-      「✗ 自检：three-way-attack 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-defense）：」
-      「✗ 自检：three-way-defense 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（three-way-forward）：」
-      「✗ 自检：three-way-forward 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（…，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（tooling-writer）：」
-      「✗ 自检：tooling-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-forward），--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-attack），--check 应当退 0，实际」
-      「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-defense），--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、带句末句号，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、说明另起一行写，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句加多机已判与逐台参数一行，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架的线程上限一行后接括注，--check 应当退 3（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架的线程上限一行后接按负载降的括注，--check 应当退 3（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架的线程上限一行另起一行照普通正文写说明，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架的线程上限一行代码块里的示例行，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架超过 2 小时、复用一行写无判定与为什么，--check 应当退 0，实际」
+  DISPATCH_PROMPT_BREAK=selftest-location-handback-hint-dropped  SELFTEST_LOCATION_LINE 的占位里不写这些命令由主 agent 起、子 agent 写进报告自己不起（SELFTEST_LOCATION_HANDBACK_HINT）
+      「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（tooling-writer）」；「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（implementation-writer）」
+      「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（investigator）」；「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（experiment-runner）」
+  DISPATCH_PROMPT_BREAK=selftest-location-hint-bare  SELFTEST_LOCATION_HANDBACK_HINT 退回改前：不分表内表外，一律写 `task-server/task submit -- <脚本> --selftest` 这一形（SELFTEST_LOCATION_REQUIRED_CLAUSE 交空；表里 required 的脚本裸写会被 project-code-guard.sh 拒）
+      「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当点到「要临时服务的自证」那一行（表里 required 的脚本裸写会被拒）（tooling-writer）」；「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当点到「要临时服务的自证」那一行（表里 required 的脚本裸写会被拒）（implementation-writer）」
+      「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当点到「要临时服务的自证」那一行（表里 required 的脚本裸写会被拒）（investigator）」；「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当点到「要临时服务的自证」那一行（表里 required 的脚本裸写会被拒）（experiment-runner）」
+  DISPATCH_PROMPT_BREAK=temporary-service-line-dropped  skeleton() 不打「要临时服务的自证」一行
+      「✗ 自检：会跑自证的类型骨架应当带一行「要临时服务的自证：…」（tooling-writer）」；「✗ 自检：会跑自证的类型骨架应当带一行「要临时服务的自证：…」（implementation-writer）」
+      「✗ 自检：会跑自证的类型骨架应当带一行「要临时服务的自证：…」（investigator）」；「✗ 自检：会跑自证的类型骨架应当带一行「要临时服务的自证：…」（experiment-runner）」
+      「✗ 自检：骨架点名了要临时服务的自证，那一行应当拼出整条包装写法」；「✗ 自检：--set 要临时服务的自证=… 应当把这一行换成主 agent 写的」
+  DISPATCH_PROMPT_BREAK=temporary-service-named-dropped  这一行不拼点名了的脚本的整条命令（只写规则）
+      「✗ 自检：骨架点名了要临时服务的自证，那一行应当拼出整条包装写法」
+  DISPATCH_PROMPT_BREAK=temporary-service-command-bare  拼出来的整条命令是裸写的样子（没有包装）
+      「✗ 自检：骨架点名了要临时服务的自证，那一行应当拼出整条包装写法」
+  DISPATCH_PROMPT_BREAK=temporary-service-table-unread  读不到要临时服务的自证登记表（名单当空）
+      「✗ 自检：要临时服务的自证登记表应当读得到 scripts/mutation/crates-mutation-rows.py（任务 2731 退 2 的那一份）」、「✗ 自检：骨架点名了要临时服务的自证，那一行应当拼出整条包装写法」
+  DISPATCH_PROMPT_BREAK=temporary-service-line-unquoted  「要临时服务的自证」那一行的规则一句退回会被两道闸拒的写法：借别处做法（「照登记表那一份的写法」）却不带原文，
+      整条命令放在反引号里、句子里不写写进报告与由主 agent 交（点名了的脚本那一截照旧）
+      「✗ 自检：骨架照抄进提示的每一行都要过借用写法闸与派发闸（tooling-writer）」；「✗ 自检：骨架照抄进提示的每一行都要过借用写法闸与派发闸（implementation-writer）」
+      「✗ 自检：骨架照抄进提示的每一行都要过借用写法闸与派发闸（investigator）」；「✗ 自检：骨架照抄进提示的每一行都要过借用写法闸与派发闸（experiment-runner）」
+      「✗ 自检：experiment-runner 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：implementation-writer 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：investigator 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：tooling-writer 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：工具员骨架填完、另加撤掉的线程上限与长活几行，--check 应当退 0（派发闸不再判这几行），实际」
+      点名了登记脚本、拼了整条包装写法的那一格（骨架里要临时服务的自证那一行填完过派发闸 --check）不红：点名时规则一句后面接着带
+      写进报告、由主 agent 交的整条命令，整句因提到主 agent、有交回说法被派发闸 ㉒ 放过，又因带了直角引号括起的原文过借用写法闸，规则一句写错这一格看不出来；规则一句由上面不点名的几格盯
+
+  DISPATCH_PROMPT_BREAK=scratch-expanded-from-home  selftest_work_root() 退回改前：自检的草稿目录与报告路径写成 ~/ 起头、照家目录展开的样子（~/ 加工作根相对本机家目录的路径）
+      （本机家目录下展开回工作根；自证把 HOME 换成别的目录再判同一份提示，展开就落到工作根外面，--check 的结局跟着变，第二台的家目录是另一个，平常的趟里也一样靠工作根取）
+      「✗ 自检：clerk 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：experiment-designer 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：experiment-runner 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：implementation-writer 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：investigator 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：mutation-triage 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：three-way-attack 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：three-way-defense 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：three-way-forward 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 自检：tooling-writer 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
+      「✗ 派 … 的提示报告行点名的 ~/」
+      本机家目录下展开回工作根，哪一台上跑红的都是这十格；十格的失败信息嵌着派发闸打的 ✗ 行，其中报告行点名的 ~/ 那一行在六种类型（clerk、experiment-runner、implementation-writer、investigator、mutation-triage、tooling-writer）里单独成行，上面最后一项点名它；别的格不红
 
   DISPATCH_PROMPT_BREAK=report-default-dropped  skeleton() 的「报告：」一行退回 <填 报告|报告路径> 占位，不填 <草稿目录>/result.md
       骨架的「报告：」一行默认填草稿目录下的 result.md（「✗ 自检：骨架的「报告：」一行默认应当填 <草稿目录>/result.md」；有定义的类型骨架那一格「✗ 自检：有定义的类型：骨架缺 …」同样红）
@@ -222,9 +127,9 @@
       三方腿的骨架只打一行占位（「✗ 自检：三方腿的骨架应当只打一行「报告：research/prompts/<填 轮>-<填 模型>-output.md」」，三种各一句）、
       只填别的占位时点名报告行（「✗ 自检：三方腿骨架只填别的占位、不动报告行」，三种各一句）、
       骨架读到的三方腿类型与 frontmatter 逐个相同（「✗ 自检：三方腿类型表：样本仓骨架按三方腿打报告占位的类型」「✗ 自检：三方腿类型表：本仓骨架按三方腿打报告占位的类型」）
-      「✗ 自检：three-way-attack 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-defense 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-forward 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
+      「✗ 自检：three-way-attack 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：three-way-defense 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：three-way-forward 的骨架填完，--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-forward），--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-attack），--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-defense），--check 应当退 0，实际」
@@ -235,74 +140,83 @@
       「✗ 自检：认领行 绿：闭合了的围栏代码块里的草稿目录一行不算，不要求认领：应当 0 个问题，实际」；「✗ 自检：认领行 红：半角冒号的草稿目录一行同样要认领：应当 1 个问题，实际」；「✗ 自检：认领行调共用库：「草稿目录：」一行应当经 lib_prompt_scratch_line.py 的 scratch_line_values 认，实际」
   DISPATCH_PROMPT_BREAK=untouched-line-dropped  skeleton() 不给实现员、工具员打「不碰：<填 …>」一行（常设要求 D3）
       「✗ 自检：实现员与工具员的骨架应当带一行「不碰：<填 …>」（implementation-writer）」；「✗ 自检：实现员与工具员的骨架应当带一行「不碰：<填 …>」（tooling-writer）」
-      「✗ 自检：implementation-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：tooling-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：工具员骨架不动线程上限，--check 应当退 0（默认填的登记值过派发闸 ⑮），实际」
-      「✗ 自检：工具员骨架超过 2 小时、复用一行写无判定与为什么，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、带句末句号，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、说明另起一行写，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句加多机已判与逐台参数一行，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架的线程上限一行另起一行照普通正文写说明，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架的线程上限一行代码块里的示例行，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
+      「✗ 自检：implementation-writer 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：tooling-writer 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：工具员骨架填完、另加撤掉的线程上限与长活几行，--check 应当退 0（派发闸不再判这几行），实际」
+      「✗ 自检：骨架里要临时服务的自证那一行点名了登记的脚本、拼了整条包装写法，填完过派发闸 --check 应当退 0，实际」
+  DISPATCH_PROMPT_BREAK=scope-line-omitted  skeleton() 不打「写范围：…」一行（拆分提案第一百六十一节骨架那一半：按类型从写范围表取模式，主 agent 填要改的文件与报告时对着它写）
+      「✗ 自检：写范围一行：clerk 的骨架应当有一行「写范围：」列 records/**、research/prompts/**、research/results/** 与 $SINGLEFS_WORK_ROOT/**、不列 .claude/kb/，实际」
+      「✗ 自检：写范围一行：kb-scribe 的骨架应当有一行「写范围：」列 .claude/kb/**、不列 records/，实际」
   DISPATCH_PROMPT_BREAK=handover-line-dropped  skeleton() 不给执行员打「承接：<填 …>」一行（常设要求 B8）
       「✗ 自检：执行员骨架应当在「上一段岔路表里还差」后面紧跟一行「承接：<填 …>」」
   DISPATCH_PROMPT_BREAK=addressed-section-dropped  skeleton() 不打「## 关的是哪几条」一节（常设要求 A5）
       「✗ 自检：骨架应当带「## 关的是哪几条」一节（缺的类型：…）」
-      「✗ 自检：clerk 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：experiment-designer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：experiment-runner 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：implementation-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：investigator 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：mutation-triage 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-attack 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-defense 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-forward 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：tooling-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
+      「✗ 自检：clerk 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：experiment-designer 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：experiment-runner 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：implementation-writer 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：investigator 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：mutation-triage 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：three-way-attack 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：three-way-defense 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：three-way-forward 的骨架填完，--check 应当退 0，实际」
+      「✗ 自检：tooling-writer 的骨架填完，--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-forward），--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-attack），--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-defense），--check 应当退 0，实际」
       「✗ 自检：--check 对填完的提示应当退 0（骨架第一行认出类型、派发闸放行），实际」
-      「✗ 自检：工具员骨架不动线程上限，--check 应当退 0（默认填的登记值过派发闸 ⑮），实际」
-      「✗ 自检：工具员骨架超过 2 小时、复用一行写无判定与为什么，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、带句末句号，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、说明另起一行写，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句加多机已判与逐台参数一行，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架的线程上限一行另起一行照普通正文写说明，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架的线程上限一行代码块里的示例行，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
+      「✗ 自检：工具员骨架填完、另加撤掉的线程上限与长活几行，--check 应当退 0（派发闸不再判这几行），实际」
+      「✗ 自检：写范围一行：clerk 的骨架带着「写范围：」一行填完，--check 应当退 0（派发闸不把这一行当写进范围外的路径），实际」
+      「✗ 自检：骨架里要临时服务的自证那一行点名了登记的脚本、拼了整条包装写法，填完过派发闸 --check 应当退 0，实际」
+  DISPATCH_PROMPT_BREAK=retired-lines-printed  skeleton() 退回撤掉之前的样子：每种类型都在批次一行后面打线程上限、预计挂钟、分片、续跑、多机、复用几行占位
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（clerk）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（experiment-designer）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（experiment-runner）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（implementation-writer）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（investigator）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（mutation-triage）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（three-way-attack）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（three-way-defense）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（three-way-forward）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（tooling-writer）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（kb-scribe）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（sweep）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（Explore）」
+      「✗ 自检：骨架不该带撤掉的线程上限与长活几行（sample-writer）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（clerk）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（experiment-designer）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（experiment-runner）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（implementation-writer）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（investigator）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（mutation-triage）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（three-way-attack）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（three-way-defense）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（three-way-forward）」
+      「✗ 自检：真定义打出的骨架不该带撤掉的线程上限与长活几行（tooling-writer）」
 派发闸那一边的开关（经 --check 起的派发闸照样带着）打开后这里红的格：
   RUNNER_DISPATCH_GUARD_BREAK=three-way-report-unchecked  派发闸不判三方腿的报告形态
       填成草稿目录下的 result.md 退 3（「✗ 自检：三方腿骨架报告填成草稿目录下的 result.md」，三种各一句）
   RUNNER_DISPATCH_GUARD_BREAK=placeholders-ignored  派发闸不认 <填 …> 占位
       只填别的占位退 3（「✗ 自检：三方腿骨架只填别的占位、不动报告行」，三种各一句）
-      「✗ 自检：--check 带类型应当一次列全派发闸会拒的三处（['有 3 处不成立', '没有「重型测试：不跑」一行', '占位没填', '缺它定义要的输入：禁读清单', '禁读清单：<填 禁读清单>']），实际」
+      「✗ 自检：--check 带类型应当一次列全派发闸会拒的两处（['有 2 处不成立', '占位没填', '缺它定义要的输入：禁读清单', '禁读清单：<填 禁读清单>']），实际」
       「✗ 派 sample-attack 的提示缺它定义要的输入：禁读清单（.claude/agents/sample-attack.md 的 required-inputs）。」
       「✗ 自检：--check 对没填自证在哪跑的提示应当退 3 并点名那一行，实际」
-  RUNNER_DISPATCH_GUARD_BREAK=thread-limit-any-refused  派发闸线程上限写什么都拒
-      填成 research/prompts/x-r1-opus-output.md 退 0（「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md」，三种各一句；这一格是对照，别的开关不碰它）
-      「✗ 自检：clerk 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：experiment-runner 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：implementation-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：investigator 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：mutation-triage 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-attack 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-defense 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：three-way-forward 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：tooling-writer 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际」
-      「✗ 自检：工具员骨架不动线程上限，--check 应当退 0（默认填的登记值过派发闸 ⑮），实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、带句末句号，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行取规范句、说明另起一行写，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架超过 2 小时、多机一行规范句加多机已判与逐台参数一行，--check 应当退 0，实际」
-      「✗ 自检：工具员骨架的线程上限一行另起一行照普通正文写说明，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架的线程上限一行代码块里的示例行，--check 应当退 0（括注一概拒、说明另起一行不判），实际」
-      「✗ 自检：工具员骨架超过 2 小时、复用一行写无判定与为什么，--check 应当退 0，实际」
+  RUNNER_DISPATCH_GUARD_BREAK=retired-lines-refused  派发闸退回撤掉之前的一部分样子：提示里有线程上限、预计挂钟、多机这几种标签行就拒
+      「✗ 自检：工具员骨架填完、另加撤掉的线程上限与长活几行，--check 应当退 0（派发闸不再判这几行），实际」
 
 会跑自证的类型（SELFTEST_RUNNER_TYPES，按各定义「输入」一节判）的骨架另带一行「自证在哪跑：<填 …>」：
-自证登记 .claude/hooks/selftest-registry.tsv 按本仓路径认，副本、草稿里的拷贝跑 --selftest 被重型闸拒，派的时候就写明在哪跑。
+自证登记 .claude/hooks/selftest-registry.tsv 按本仓路径认，副本、草稿里的拷贝跑 --selftest 被 project-code-guard.sh 拒，派的时候就写明在哪跑。
+占位里另写一句这些命令由主 agent 经 task-server 交、子 agent 写进报告自己不起（SELFTEST_LOCATION_HANDBACK_HINT）：主 agent 照它填，不写内存包装与绕开包装的起法；
+表外的脚本写 `task-server/task submit -- <脚本> --selftest` 这一形，表里 required 的脚本裸写会被 project-code-guard.sh 拒、整条写在「要临时服务的自证」那一行（SELFTEST_LOCATION_REQUIRED_CLAUSE 点到它）。
+同样这几种类型的骨架再带一行「要临时服务的自证：…」（TEMPORARY_SERVICE_LABEL）：.claude/hooks/selftest-temporary-service.tsv 里判定是 required 的自证只在临时 prune-server 底下跑，
+裸写 --selftest 退 2，执行前也被 project-code-guard.sh 拒；这一行写明整条写法（task-server/task submit -- 加包装 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- 再加解释器、脚本与 --selftest，包装不带 --server-binary），
+并把 --set 的值里点名了的 required 脚本各拼成整条（temporary_service_line）。这一行不是占位，原样留在提示里。
+骨架里的每一行都要能原样照抄进派发提示：整条命令放在「」里当原文（借用写法闸 .claude/singlefs-ai-sop/scripts/claude-hooks/borrowed-convention-guard.sh 认「」里的原文），
+同一句写明「写进报告「要主 agent 跑的命令」一节，由主 agent 交」（派发闸 ㉒ 认交回的说法，「」里的命令不当许可子 agent 交任务）；
+自检把会跑自证的几种类型的骨架逐行喂借用写法闸、整份填完喂派发闸，被拒就红。
 """
 import glob
+import json
 import os
 import re
 import subprocess
@@ -316,19 +230,22 @@ from project_preflight import preflight  # noqa: E402
 
 REPOSITORY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "hooks"))
-try:   # 多机一行的规范句只写在 .claude/hooks/lib_long_run.py 一处，骨架引它（读不到时占位里只指过去，派发闸 ⑭ 照样判）
-    from lib_long_run import CANONICAL_HOSTS_SENTENCE  # noqa: E402
-except Exception:   # 文件不在、语法错都算读不到
-    CANONICAL_HOSTS_SENTENCE = "<规范句见 .claude/hooks/lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE，读不到时先恢复那份库>"
 try:   # 三方腿类型表只登记在定义 frontmatter 的 leg: three-way 一行，读法在 .claude/hooks/lib_three_way_legs.py（与派发闸、交回闸、账表共用；读不到时骨架不打三方腿的报告占位，stderr 写一句）
     import lib_three_way_legs as three_way_legs  # noqa: E402
     three_way_legs_error = None
 except Exception as error:   # 文件不在、语法错都算读不到
     three_way_legs, three_way_legs_error = None, error
+try:   # 写范围表的读法只在 .claude/hooks/lib_write_scope.py（write-guard.sh、bash-command-detector.sh、派发闸共用；读不到时骨架不打「写范围：」一行，stderr 写一句）
+    import lib_write_scope as write_scope  # noqa: E402
+    write_scope_error = None
+except Exception as error:   # 文件不在、语法错都算读不到
+    write_scope, write_scope_error = None, error
+try:   # 工作根的定义只在 .claude/hooks/lib_work_root.py：自检的草稿目录与报告路径从这里取，不经 ~ 与 $HOME 展开（第二台的家目录是另一个，展开就落到工作根外面）
+    import lib_work_root as work_root_library  # noqa: E402
+    work_root_library_error = None
+except Exception as error:   # 文件不在、语法错都算读不到
+    work_root_library, work_root_library_error = None, error
 BROKEN = os.environ.get("DISPATCH_PROMPT_BREAK", "")
-# 骨架的「多机」一行里不许出现的现算词（台数与线程照登记值读，不现算）：现查余量的脚本与字段、各种取核数的写法、按忙闲算的中文说法；
-# 「不现算」是规范句自己的话，不在表里
-LIVE_HOSTS_WORDS = tuple("host-resources available_threads available_parallelism nproc cpu_count sched_getaffinity 核数 忙闲 空闲 负载 除以 ÷".split())   # 一个字面量按空白切：词表里写 nproc 单独成一个字面量，门禁 heavy-thread-defaults 会把它当取核数的写法点名
 PLACEHOLDER = re.compile(r"<填[^>]*>")
 REPORT_LINE_NAME, REPORT_FILE_NAME = "报告", "result.md"   # 骨架的「报告：」一行默认填 <草稿目录>/result.md（派发闸 ⑰ 拒文件名里带 report 的）
 # 三方腿的报告就是 research/prompts/<轮>-<模型>-output.md（交回闸只认这种形态；派发闸 ⑰ 读同一处类型表）：骨架填这个占位，轮与模型两处主 agent 填
@@ -351,33 +268,11 @@ THREE_WAY_REPORT_PLACEHOLDER = "research/prompts/<填 轮>-<填 模型>-output.m
 DISPATCH_GUARD = os.path.join(REPOSITORY_ROOT, ".claude", "hooks", "runner-dispatch-guard.sh")
 DISPATCH_HEADER = re.compile(r"\A# 派发：(\S+)")
 GUARD_TIMEOUT_SECONDS = 120
-HEAVY_TEST_OWNERS = set()   # 子 agent 一个都不跑重型测试，骨架一律带「重型测试：不跑」
-# 派发闸 ⑮ 要线程上限一行的九种类型（与 .claude/hooks/runner-dispatch-guard.sh 的 THREAD_LIMIT_REQUIRED_AGENTS 逐个相同；自检把两边的表逐个比）
-HEAVY_WORK_TYPES = {"implementation-writer", "experiment-runner", "three-way-attack", "investigator", "tooling-writer", "clerk", "mutation-triage",
-                    "three-way-forward", "three-way-defense"}
-# 派发闸 ⑭ 判预计挂钟的类型：设计员，加上 ⑮ 的九种（与 .claude/hooks/runner-dispatch-guard.sh 的 LONG_RUN_AGENTS 逐个相同）
-LONG_RUN_TYPES = ("experiment-designer", "implementation-writer", "investigator", "tooling-writer", "experiment-runner", "mutation-triage", "three-way-attack",
-                  "clerk", "three-way-forward", "three-way-defense")
-LONG_RUN_TYPES_BEFORE_WIDENING = ("experiment-designer", "experiment-runner")
-if BROKEN == "types-before-nine":   # 补 clerk、three-way-forward、three-way-defense 之前的两张表（线程上限行有 clerk、没有预计挂钟四行，后两种两样都没有）
-    HEAVY_WORK_TYPES = {"implementation-writer", "experiment-runner", "three-way-attack", "investigator", "tooling-writer", "clerk", "mutation-triage"}
-    LONG_RUN_TYPES = ("experiment-designer", "implementation-writer", "investigator", "tooling-writer", "experiment-runner", "mutation-triage", "three-way-attack")
 # 定义之外、派发闸另判的行：类型 → 那一行的骨架
-# 派设计员、执行员要的预计挂钟一行与超过 2 小时时的三行（派发闸 ⑭；只写 2 小时内的，后三行删掉）
-# 多机一行的占位里写上放行行「多机已判：<理由>」的写法（派发闸 ⑭ 认它）：用户给了逐台不同的台数或线程才写，子 agent 有它时照逐台写的参数、没有就只照规范句
-HOSTS_VALVE_HINT = "用户给了逐台不同的台数或线程的，另起一行「多机已判：」后面写理由，逐台参数再另起一行照普通正文写（没有这一行，子 agent 只照规范句）；"   # 占位里不再套尖括号：骨架占位只认到第一个 >
-LONG_RUN_LINES = ["预计挂钟：<填 2 小时内 / 超过 2 小时，后面接推的依据>",
-                  "分片：<填 超过 2 小时才写：分片单元，几片怎么定；2 小时内删掉这一行>",
-                  "续跑：<填 超过 2 小时才写：同一条命令重起只补没做完的，怎么认做完的；2 小时内删掉这一行>",
-                  "多机：<填 超过 2 小时才写：逐字写这一句「" + CANONICAL_HOSTS_SENTENCE + "」（可带句末句号，后面不接任何说明，要说明另起一行写；别的写法派发闸 ⑭ 一律拒）；"
-                  + ("" if BROKEN == "hosts-valve-hint-dropped" else HOSTS_VALVE_HINT) +
-                  "分不了的这一行改写成「分不了：」点名缺的分片、续跑、多机与为什么；2 小时内删掉这一行>"]
-# 超过 2 小时另要的「复用：」一行（派发闸 ⑭；「分不了：」顶不了它）：占位里不套尖括号（骨架占位只认到第一个 >）
-REUSE_LINE = "复用：<填 超过 2 小时才写：判定按什么入库、键相同的怎么沿用，至少 8 个字；这一件不产出判定的写「无判定：」后面接为什么；2 小时内删掉这一行>"
-if BROKEN != "reuse-line-dropped":
-    LONG_RUN_LINES.append(REUSE_LINE)
-LONG_RUN_HOSTS_LINE_BEFORE_REGISTERED = ("多机：<填 超过 2 小时才写：台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读、每台的线程与内存从 host-resources.py --json 现算，"
-                                         "不写常量；分不了的这一行改写成「分不了：」点名缺的分片、续跑、多机与为什么；2 小时内删掉这一行>")   # 只有 long-run-hosts-live-restored 开关下还会打出来
+# 派发闸不判的几种标签行（records/2026-10-30-编译绕过内存总上限.md 批 3b）：骨架不打，自检核每种类型的骨架里都没有
+RETIRED_SKELETON_LABELS = ("线程上限：", "线程上限已判：", "预计挂钟：", "分片：", "续跑：", "多机：", "多机已判：", "分不了：", "复用：")
+RETIRED_LINES_BEFORE = ["线程上限：<填 登记的每台默认重活线程数>", "预计挂钟：<填 2 小时内 / 超过 2 小时>", "分片：<填 超过 2 小时才写>", "续跑：<填 超过 2 小时才写>",
+                        "多机：<填 超过 2 小时才写>", "复用：<填 超过 2 小时才写>"]   # 只有弄坏开关 retired-lines-printed 下还在用：撤掉之前骨架打的那几行
 # 常设要求 D3（实现员、工具员：这一轮别的会话在改、这一件不碰的文件）与 B8（执行员续做：上一段的报告），派发闸 ⑱ ⑪ 核这两行（拆分提案第一百二十二节 ⑨）
 UNTOUCHED_LINE = "不碰：<填 这一轮别的会话在改、这一件不碰的文件，逐个列；没有写「无」>"
 HANDOVER_LINE = "承接：<填 续做时写上一段执行员的报告路径（派发闸核它在）；第一段删掉这一行>"
@@ -387,42 +282,71 @@ EXTRA_LINES = {
     "tooling-writer": [] if BROKEN == "untouched-line-dropped" else [UNTOUCHED_LINE],
     "kb-scribe": ["规格检查已判：写回员自己起草并跑 kb-spec-check.py"],
     "experiment-runner": ["这一段回答的岔路：<填 岔路单里的哪几行>", "上一段岔路表里还差：<填 续做时写还差的行；第一段删掉这一行>",
-                          *([] if BROKEN == "handover-line-dropped" else [HANDOVER_LINE]), *LONG_RUN_LINES],
-    "experiment-designer": [*LONG_RUN_LINES],
+                          *([] if BROKEN == "handover-line-dropped" else [HANDOVER_LINE])],
 }
-for long_run_type in LONG_RUN_TYPES:   # 执行员、设计员上面已经带了；别的几种在这里补（要动的 crates 文件之类的类型专属行排在前面）
-    if long_run_type not in ("experiment-designer", "experiment-runner"):
-        EXTRA_LINES.setdefault(long_run_type, []).extend(LONG_RUN_LINES)
 # 会跑自证的类型要的一行（用户 2026-10-11 定「派发提示写明自证在哪跑」）：按各定义「输入」一节判——
 # 工具员要给判红样本与弄坏开关，实现员与执行员会改脚本、装置或变异表锚点，调查员在仓副本里改坏、二分
-SELFTEST_LOCATION_LINE = ("自证在哪跑：<填 自证与样本档在哪个路径起：本仓主工作区那一份（自证登记按本仓路径认，副本与草稿里的拷贝被重型闸拒）；"
-                          "这一轮不跑自证的写「不跑」>")
+# 占位里另提一句这些命令谁起、怎么起：一切跑项目代码的命令只认经 task-server/task 起（records/2026-10-30-编译绕过内存总上限.md 批 3b），
+# 子 agent 一律不往统一任务服务交任务（用户 2026-11-01 定，records/2026-10-29-subagent拆分提案.md 第一百七十四节），所以这一行写的是主 agent 起交回命令的那棵树；
+# 主 agent 填这一行时写过「排不上带 ulimit -v 与 nice 直跑」，子 agent 照它把自证跑在 slice 外面；现在内存与排队归服务，提示里不写包装
+# 表里 required 的自证裸写 --selftest 在执行前被 project-code-guard.sh 拒（一百九十七节 ②）：占位里表外的写这一形，required 的指到下面「要临时服务的自证」那一行的整条；
+# 弄坏开关 selftest-location-hint-bare 下退回改前：不分表内表外，一律写这一形
+TEMPORARY_SERVICE_LABEL = "要临时服务的自证"
+SELFTEST_LOCATION_REQUIRED_CLAUSE = ("" if BROKEN == "selftest-location-hint-bare" else
+                                     f"（表外的脚本写这一形，.claude/hooks/selftest-temporary-service.tsv 里 required 的脚本裸写会被 project-code-guard.sh 拒，照骨架「{TEMPORARY_SERVICE_LABEL}」那一行的整条写）")
+SELFTEST_LOCATION_HANDBACK_HINT = ("子 agent 照它填命令里的路径、自己不起：自证、样本档与弄坏开关拼成 `task-server/task submit -- <脚本> --selftest` 这样的整条" + SELFTEST_LOCATION_REQUIRED_CLAUSE + "，"
+                                   "写进报告「要主 agent 跑的命令」一节，由主 agent 在这棵树里交服务；命令里不写内存包装、host-dispatch.py 与绕开包装的起法（ulimit -v、nice 直跑、改小上限）")
+SELFTEST_LOCATION_LINE = ("自证在哪跑：<填 子 agent 交回的自证与样本档命令由主 agent 在哪棵树里起：本仓主工作区那一份（自证登记按本仓路径认，副本与草稿里的拷贝被 project-code-guard.sh 拒）；"
+                          + ("" if BROKEN == "selftest-location-handback-hint-dropped" else SELFTEST_LOCATION_HANDBACK_HINT + "；")
+                          + "这一轮没有自证要交的写「不跑」>")
 SELFTEST_RUNNER_TYPES = ("tooling-writer", "implementation-writer", "investigator", "experiment-runner")
 for selftest_runner_type in SELFTEST_RUNNER_TYPES:
     EXTRA_LINES.setdefault(selftest_runner_type, []).append(SELFTEST_LOCATION_LINE)
-HEAVY_THREADS_DIRECTORY = os.path.join(REPOSITORY_ROOT, "scripts", "hosts")
-OLD_THREAD_FORMULA_PLACEHOLDER = "<填 整机核数 ÷ 同时在跑的重活数>"   # 用户 2026-10-11 否掉的公式，只有 thread-formula-restored 开关下还会打出来
-THREAD_OVERRIDE_VARIABLE = "SINGLEFS_THREAD_CAP"
+
+# 要临时 prune-server 的自证（登记在 .claude/hooks/selftest-temporary-service.tsv，判定写 required 的：--selftest 开跑先核临时服务，裸跑退 2，执行前也被 project-code-guard.sh 拒）：
+# 骨架给整条写法，--set 的值里点名了的脚本各拼一条。这一行不是占位（不带 <填 …>），原样留在提示里；句子里写明由主 agent 交、子 agent 写进报告（派发闸 ㉒ 认交回的说法）
+TEMPORARY_SERVICE_TABLE = os.path.join(REPOSITORY_ROOT, ".claude", "hooks", "selftest-temporary-service.tsv")
+TEMPORARY_SERVICE_WRAPPER = "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --"
+TEMPORARY_SERVICE_REQUIRED = "required"
 
 
-def registered_heavy_threads():
-    """登记的每台默认重活线程数（.claude/heavy-thread-default，经 scripts/hosts/heavy_threads.py 的 default_heavy_threads 取）；读不到返回 None。
-    临时覆盖（SINGLEFS_THREAD_CAP）不算：骨架填的是登记值本身。"""
+def temporary_service_scripts(table=TEMPORARY_SERVICE_TABLE):
+    """要临时服务的自证登记表里判定写 required 的脚本（相对仓根的路径，按表里次序）。一行 `<路径> <判定> # <理由>`，空行与 # 起头的行不算；
+    读不到交空、stderr 写一句；弄坏开关 temporary-service-table-unread 下交空。"""
+    if BROKEN == "temporary-service-table-unread":
+        return []
     try:
-        sys.path.insert(0, HEAVY_THREADS_DIRECTORY)
-        import heavy_threads
-        environment = {name: value for name, value in os.environ.items() if name != THREAD_OVERRIDE_VARIABLE}
-        return int(heavy_threads.default_heavy_threads(environment=environment))
-    except Exception:   # 文件不在、语法错、接口对不上、登记文件读不出数都算读不到
-        return None
+        with open(table, encoding="utf-8") as handle:
+            lines = handle.read().split("\n")
+    except (OSError, UnicodeDecodeError) as error:
+        print(f"  ! 读不到 {table}（{error!r}），骨架里这一次没拼要临时服务的自证", file=sys.stderr)
+        return []
+    rows = [line.split(None, 2) for line in lines if line.strip() and not line.lstrip().startswith("#")]
+    return [fields[0] for fields in rows if len(fields) > 1 and fields[1] == TEMPORARY_SERVICE_REQUIRED]
 
 
-def thread_limit_default():
-    """骨架里「线程上限」一行没用 --set 给时填什么：登记值；读不到留占位（--check 拒）。"""
-    if BROKEN == "thread-formula-restored":
-        return OLD_THREAD_FORMULA_PLACEHOLDER
-    registered = registered_heavy_threads()
-    return str(registered) if registered is not None else "<填 登记的每台默认重活线程数读不到，照 .claude/heavy-thread-default 填>"
+def temporary_service_command(script):
+    """一份 required 脚本的整条写法：task-server/task submit -- 包装 解释器 脚本 --selftest（.py 用 python3，别的用 bash）。弄坏开关 temporary-service-command-bare 下没有包装。"""
+    bare = f"{'python3' if script.endswith('.py') else 'bash'} {script} --selftest"
+    return f"task-server/task submit -- {bare if BROKEN == 'temporary-service-command-bare' else TEMPORARY_SERVICE_WRAPPER + ' ' + bare}"
+
+
+def temporary_service_line(settings):
+    """骨架里「要临时服务的自证」那一行：规则一句，加上 --set 的值里点名了的 required 脚本各拼出来的整条。一句话写完（句中不用句号与分号：派发闸 ㉒ 按句判，
+    每一处点到 task-server/task submit 的句子都要有写进报告、由主 agent 交的说法；整条命令放在「」里当原文，借用写法闸与派发闸都不拒）。
+    弄坏开关 temporary-service-named-dropped 下只写规则；temporary-service-line-unquoted 下规则一句退回会被两道闸拒的写法。"""
+    if BROKEN == "temporary-service-line-unquoted":   # 改前会被两道闸拒的写法：借别处做法不带原文，命令在反引号里、不写交回
+        text = (f"{TEMPORARY_SERVICE_LABEL}：这些脚本的自证照登记表那一份的写法拼成 "
+                f"`task-server/task submit -- {TEMPORARY_SERVICE_WRAPPER} <解释器> <脚本> --selftest` 交服务")
+    else:
+        text = (f"{TEMPORARY_SERVICE_LABEL}：名单在 .claude/hooks/selftest-temporary-service.tsv（判定是 required 的脚本，--selftest 开跑先核临时 prune-server，裸写退 2，执行前也被拒），"
+                f"这些脚本的自证整条拼成「task-server/task submit -- {TEMPORARY_SERVICE_WRAPPER} <解释器> <脚本> --selftest」这一形态"
+                "（整条不带 --server-binary，交给服务的这一条由服务认成会编的、给编译目录，包装现编一遍 prune-server，自己编了、两台都读得到的二进制才另加 --server-binary，写在整条之外），"
+                "写进报告「要主 agent 跑的命令」一节，由主 agent 交，子 agent 自己不起")
+    named = [script for script in temporary_service_scripts() if any(script in value for value in settings.values())]
+    if named and BROKEN != "temporary-service-named-dropped":
+        text += "，这一件点名的要临时服务的自证：" + "、".join(f"「{temporary_service_command(script)}」" for script in named) + "，都写进报告「要主 agent 跑的命令」一节，由主 agent 交"
+    return text
 
 
 def frontmatter_fields(definition_path):
@@ -502,17 +426,38 @@ def claim_problems(text):
     return problems
 
 
+WRITE_SCOPE_LABEL = "写范围"
+
+
+def write_scope_line(agent_type, agents_dir):
+    """骨架里的「写范围：…」一行：类型在写范围表（<仓根>/.claude/hooks/agent-write-scope.tsv，仓根取 agents_dir 往上两层）里的路径模式，原样列出（表的写法与读法在
+    lib_write_scope.py 的 load_scopes，不另抄）。主 agent 填「要改的文件」「报告」时对着它写，免得派发闸 ④ 拒「提示要子 agent 写进写范围之外的路径」。
+    类型不在表里（没有 Write / Edit 的）、表不在、读不了的不打这一行。弄坏开关 scope-line-omitted 下不打。"""
+    if BROKEN == "scope-line-omitted":
+        return None
+    table_path = os.path.join(os.path.dirname(os.path.dirname(os.path.normpath(agents_dir))), ".claude", "hooks", "agent-write-scope.tsv")
+    if not os.path.isfile(table_path):
+        return None
+    if write_scope is None:
+        print(f"  ! 读不到 .claude/hooks/lib_write_scope.py（{write_scope_error!r}），骨架这一次没打「{WRITE_SCOPE_LABEL}：」一行", file=sys.stderr)
+        return None
+    try:
+        patterns = write_scope.load_scopes(table_path).get(agent_type, [])
+    except OSError as error:
+        print(f"  ! 读不了写范围表 {table_path}（{error}），骨架这一次没打「{WRITE_SCOPE_LABEL}：」一行", file=sys.stderr)
+        return None
+    return f"{WRITE_SCOPE_LABEL}：" + "、".join(patterns) if patterns else None
+
+
 def skeleton(agent_type, agents_dir, settings, batch):
     fields = frontmatter_fields(os.path.join(agents_dir, f"{agent_type}.md"))
     three_way = agent_type in three_way_report_types(agents_dir)
     lines = [f"# 派发：{agent_type}", ""]
     if fields is None:
         lines.append("开工先读 `.claude/agent-common.md`")
-    if agent_type not in HEAVY_TEST_OWNERS:
-        lines.append("重型测试：不跑")
     lines.append(f"批次：{batch or '<填 调度记录#批号>'}")
-    if agent_type in HEAVY_WORK_TYPES:
-        lines.append(f"线程上限：{settings.get('线程上限') or thread_limit_default()}")
+    if BROKEN == "retired-lines-printed":   # 退回撤掉之前的样子：每种类型都打那几行占位
+        lines += RETIRED_LINES_BEFORE
     required = (fields or {}).get("required-inputs", "")
     emitted = set()
     for group in [piece.strip() for piece in required.split(",") if piece.strip()]:
@@ -530,28 +475,21 @@ def skeleton(agent_type, agents_dir, settings, batch):
     # 三方腿：定义的 required-inputs 没要「报告」时骨架也打这一行（排在类型专属的几行前面）；要了的，上面按定义打过就不重复
     three_way_lines = [f"{REPORT_LINE_NAME}：{THREE_WAY_REPORT_PLACEHOLDER}"] if three_way and BROKEN != "three-way-report-default-dropped" else []
     for extra in three_way_lines + EXTRA_LINES.get(agent_type, []):
-        if BROKEN == "long-run-lines-dropped" and extra in LONG_RUN_LINES:
-            continue
-        if BROKEN == "long-run-types-narrowed" and extra in LONG_RUN_LINES and agent_type not in LONG_RUN_TYPES_BEFORE_WIDENING:
-            continue
-        if BROKEN == "long-run-hosts-live-restored" and extra.startswith("多机："):
-            extra = LONG_RUN_HOSTS_LINE_BEFORE_REGISTERED
         if BROKEN == "selftest-location-dropped" and extra == SELFTEST_LOCATION_LINE:
             continue
         key = extra.split("：", 1)[0]
         if key in emitted:
             continue   # 定义的 required-inputs 已经要了这一行，不重复
         lines.append(f"{key}：{settings[key]}" if key in settings else extra)
+    if agent_type in SELFTEST_RUNNER_TYPES and BROKEN != "temporary-service-line-dropped":
+        lines.append(f"{TEMPORARY_SERVICE_LABEL}：{settings[TEMPORARY_SERVICE_LABEL]}" if TEMPORARY_SERVICE_LABEL in settings else temporary_service_line(settings))   # --set 要临时服务的自证=… 换成主 agent 写的
+    scope_line = f"{WRITE_SCOPE_LABEL}：{settings[WRITE_SCOPE_LABEL]}" if WRITE_SCOPE_LABEL in settings else write_scope_line(agent_type, agents_dir)
+    if scope_line:
+        lines.append(scope_line)
     if BROKEN != "addressed-section-dropped":
         lines += ["", ADDRESSED_SECTION_TITLE, "", settings.get("关的是哪几条", "<填 逐条列已经抓到的问题，每条各自的验收标准>")]
     lines += ["", "## 出口", "", settings.get("出口", "<填 做到什么算完、交什么到哪>"), ""]
     return "\n".join(lines) + "\n"
-
-
-def live_hosts_words_in(text):
-    """text 里出现的现算词（LIVE_HOSTS_WORDS，按子串找），按表里的次序交回。弄坏开关 live-words-narrowed 下只认 host-resources 与 available_threads。"""
-    words = LIVE_HOSTS_WORDS[:2] if BROKEN == "live-words-narrowed" else LIVE_HOSTS_WORDS
-    return [word for word in words if word in text]
 
 
 def placeholders(text):
@@ -614,7 +552,39 @@ def check_prompt(path, agent_type=None, root=None, model=None):
 
 
 SELFTEST_BATCH_RECORD = os.path.join("records", "dispatch-prompt-selftest.md")   # 自检填进批次一行的调度记录：--check 的样本仓里都建这一份（派发闸 ⑱ 核它在不在）
-SELFTEST_SCRATCH = "~/.local/share/singlefs/work/dispatch-prompt-selftest"   # 自检填进草稿目录一行的目录（派发闸 ⑱ 要它落在工作根下；--check 不建锁，目录不用在）
+SELFTEST_SCRATCH_NAME = "dispatch-prompt-selftest"   # 自检填进草稿目录一行的目录名，落在工作根下（派发闸 ⑱ 要它在工作根下；--check 不建锁，目录不用在）
+
+
+def selftest_work_root():
+    """自检造草稿目录、报告路径用的工作根：lib_work_root.py 的 configured_work_root（绝对路径，两台同一个，不经 ~ 与 $HOME）；读不到那份库、取不到工作根抛 RuntimeError 或 ValueError。
+    弄坏开关 scratch-expanded-from-home 下退回改前经家目录展开的写法：~/ 加工作根相对本机家目录的路径（本机家目录下展开回工作根，HOME 换成别的目录就落到工作根外面；
+    改前写死 ~/.local/share/singlefs/work，第二台上平常的趟也红，这里按各台家目录算，让这个开关在哪台跑红的格都一样）。"""
+    if work_root_library is None:
+        raise RuntimeError(f"读不到 .claude/hooks/lib_work_root.py（{work_root_library_error!r}）")
+    work_root = work_root_library.configured_work_root()
+    if BROKEN == "scratch-expanded-from-home":
+        return "~/" + os.path.relpath(work_root, os.path.expanduser("~"))
+    return work_root
+
+
+def selftest_scratch():
+    """自检填进草稿目录一行的目录（工作根下的 SELFTEST_SCRATCH_NAME）。"""
+    return os.path.join(selftest_work_root(), SELFTEST_SCRATCH_NAME)
+
+
+def with_home_directory(directory, function):
+    """HOME 换成 directory 之后调 function()，调完还原（不管抛不抛）；自证拿它判「--check 的结局不随家目录变」。"""
+    saved = os.environ.get("HOME")
+    os.environ["HOME"] = directory
+    try:
+        return function()
+    finally:
+        if saved is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = saved
+
+
 SCRATCH_PLACEHOLDER = "<填 草稿目录，与上一行一致>"   # 认领行与报告行里跟着草稿目录走的那一处占位（claim_line、skeleton 打的）
 
 
@@ -628,47 +598,48 @@ def write_batch_record(root):
 
 
 def fill_for_guard(skeleton_text, keep_prefix=None):
-    """骨架里的占位填成能过派发闸的样子：预计挂钟填 2 小时内、分片 / 续跑 / 多机 / 复用四行删掉（骨架写明 2 小时内删掉这几行），
-    批次一行的占位填成 SELFTEST_BATCH_RECORD（调用方在 --check 的样本仓里建它），草稿目录一行与跟着它的认领行、报告行填成工作根下的 SELFTEST_SCRATCH，
-    别的占位填「已填」；keep_prefix 开头的行原样留着。"""
+    """骨架里的占位填成能过派发闸的样子：批次一行的占位填成 SELFTEST_BATCH_RECORD（调用方在 --check 的样本仓里建它），
+    草稿目录一行与跟着它的认领行、报告行填成工作根下的 selftest_scratch()，别的占位填「已填」；keep_prefix 开头的行原样留着。"""
+    scratch = selftest_scratch()
     filled = []
     for line in skeleton_text.split("\n"):
         if keep_prefix and line.startswith(keep_prefix):
             filled.append(line)
             continue
-        line = line.replace(SCRATCH_PLACEHOLDER, SELFTEST_SCRATCH)
+        line = line.replace(SCRATCH_PLACEHOLDER, scratch)
         if line.startswith("草稿目录：") and PLACEHOLDER.search(line):
-            filled.append(f"草稿目录：{SELFTEST_SCRATCH}")
-        elif line.startswith("预计挂钟："):
-            filled.append("预计挂钟：2 小时内")
+            filled.append(f"草稿目录：{scratch}")
         elif line.startswith("批次：") and PLACEHOLDER.search(line):
             filled.append(f"批次：{SELFTEST_BATCH_RECORD}#1")
-        elif not line.startswith(("分片：", "续跑：", "多机：", "复用：")):
+        else:
             filled.append(PLACEHOLDER.sub("已填", line))
     return "\n".join(filled)
 
 
-GUARD_THREAD_TABLE = re.compile(r"^THREAD_LIMIT_REQUIRED_AGENTS = \{(.*?)\}", re.M | re.S)
-GUARD_LONG_RUN_TABLE = re.compile(r"^LONG_RUN_AGENTS = \{([^}]*)\}([^\n]*)", re.M)
+GUARD_BATCH_TABLE = re.compile(r"^BATCH_LINE_AGENTS = \{([^}]*)\}", re.M)
 
 
-def guard_type_tables():
-    """派发闸（runner-dispatch-guard.sh）里 THREAD_LIMIT_REQUIRED_AGENTS 与 LONG_RUN_AGENTS 两张类型表 → (线程上限的类型集, 预计挂钟的类型集, None)；读不出 → (None, None, 原因)。"""
+def guard_batch_types():
+    """派发闸（runner-dispatch-guard.sh）里 BATCH_LINE_AGENTS 那张类型表（没写批次一行也拒的十种）→ (类型集, None)；读不出 → (None, 原因)。"""
     try:
         guard_text = open(DISPATCH_GUARD, encoding="utf-8").read()
     except OSError as error:
-        return None, None, f"读不了派发闸 {DISPATCH_GUARD}：{error!r}"
-    thread_table, long_run_table = GUARD_THREAD_TABLE.search(guard_text), GUARD_LONG_RUN_TABLE.search(guard_text)
-    if thread_table is None or long_run_table is None:
-        return None, None, "派发闸里认不出 THREAD_LIMIT_REQUIRED_AGENTS = {…} 或 LONG_RUN_AGENTS = {…} 那两行（表改了写法，这里的解析要跟着改）"
-    thread_types = set(re.findall(r'"([^"]+)"', thread_table.group(1)))
-    long_run_types = set(re.findall(r'"([^"]+)"', long_run_table.group(1)))
-    if "THREAD_LIMIT_REQUIRED_AGENTS" in long_run_table.group(2):
-        long_run_types |= thread_types
-    return thread_types, long_run_types, None
+        return None, f"读不了派发闸 {DISPATCH_GUARD}：{error!r}"
+    table = GUARD_BATCH_TABLE.search(guard_text)
+    if table is None:
+        return None, "派发闸里认不出 BATCH_LINE_AGENTS = {…} 那一行（表改了写法，这里的解析要跟着改）"
+    return set(re.findall(r'"([^"]+)"', table.group(1))), None
 
 
 def selftest():
+    # 自证起的派发闸子进程（--check-prompt，环境原样继承）靠派发闸的标记认：RUNNER_DISPATCH_GUARD_BREAK 只在自证里认，这一趟是自证起的
+    os.environ["RUNNER_DISPATCH_GUARD_SELFTEST_MARK"] = "runner-dispatch-guard.sh --selftest 与 dispatch-prompt.py --selftest 起的子进程"
+    try:
+        work_root_text = selftest_work_root()
+    except (RuntimeError, ValueError) as error:
+        print(f"  ✗ 自检：取不到工作根，自检的草稿目录没处落：{error}")   # gate-lint:detail
+        print("    → 怎么办：工作根只由 .claude/hooks/lib_work_root.py 定（数据根取 SINGLEFS_DATA_ROOT 或多机配置 multi-host.env 的 SHARED_DATA_ROOT），照那份库的说明配好再跑")
+        return 1
     work = tempfile.mkdtemp(prefix="dispatch-prompt-selftest-")
     failures, checked = [], 0
     try:
@@ -677,9 +648,9 @@ def selftest():
         os.makedirs(agents)
         open(os.path.join(agents, "sample-writer.md"), "w", encoding="utf-8").write(
             "---\nname: sample-writer\nmodel: sonnet\nrequired-inputs: 草稿目录, 报告|报告路径, 条款\n---\n")
-        text = skeleton("sample-writer", agents, {"草稿目录": "~/.local/share/singlefs/work/x/"}, None)
+        text = skeleton("sample-writer", agents, {"草稿目录": f"{work_root_text}/x/"}, None)
         checked += 1
-        wanted = ["重型测试：不跑", "批次：<填 调度记录#批号>", "草稿目录：~/.local/share/singlefs/work/x/", "报告：~/.local/share/singlefs/work/x/result.md", "条款：<填 条款>", "## 出口"]
+        wanted = ["批次：<填 调度记录#批号>", f"草稿目录：{work_root_text}/x/", f"报告：{work_root_text}/x/result.md", "条款：<填 条款>", "## 出口"]
         missing = [piece for piece in wanted if piece not in text]
         if missing or "开工先读" in text:
             failures.append(f"有定义的类型：骨架缺 {missing}，或多了没定义类型才有的开工先读行：\n{text}")
@@ -691,71 +662,36 @@ def selftest():
             "---\nname: implementation-writer\nmodel: opus\nrequired-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件\n---\n")
         text_writer = skeleton("implementation-writer", agents, {}, None)
         checked += 1
-        registered_threads = registered_heavy_threads()
         if text_writer.count("要动的 crates 文件：") != 1:
             failures.append(f"实现员骨架「要动的 crates 文件」应当只一行（定义已经要了就不再加）：\n{text_writer}")
-        checked += 1
-        if registered_threads is None or f"\n线程上限：{registered_threads}\n" not in text_writer or "整机核数" in text_writer:
-            failures.append(f"实现员骨架应当带登记的线程上限（{registered_threads}，.claude/heavy-thread-default 经 scripts/hosts/heavy_threads.py 取），不再是整机核数除以重活数的占位：\n{text_writer}")
-        checked += 1
-        if "线程上限：16" not in skeleton("implementation-writer", agents, {"线程上限": "16"}, None):
-            failures.append("--set 线程上限=16 应当把这一行填成 16，不被默认值盖掉")
-        long_run_keys = ["预计挂钟：<填", "分片：<填", "续跑：<填", "多机：<填"]
-        for long_run_type in LONG_RUN_TYPES:
-            text_long_run = skeleton(long_run_type, agents, {}, None)
-            checked += 1
-            if any(text_long_run.count(key) != 1 for key in long_run_keys):
-                failures.append(f"设计员与带重活的类型的骨架应当带预计挂钟与分片、续跑、多机四行（{long_run_type}）：\n{text_long_run}")
-        for long_run_type in LONG_RUN_TYPES:
-            checked += 1
-            if skeleton(long_run_type, agents, {}, None).count("\n复用：<填") != 1:
-                failures.append(f"设计员与带重活的类型的骨架应当带一行「复用：<填 …>」（{long_run_type}）")
-        checked += 1
-        if "复用：" in skeleton("kb-scribe", agents, {}, None):
-            failures.append("不在类型表里的类型（kb-scribe）骨架不该带「复用：」一行")
-        checked += 1
-        if any(key in skeleton("kb-scribe", agents, {}, None) for key in long_run_keys):
-            failures.append("不在类型表里的类型（kb-scribe）骨架不该带预计挂钟与分片、续跑、多机四行")
-        hosts_line = next((line for line in skeleton("tooling-writer", agents, {}, None).split("\n") if line.startswith("多机：")), "")
-        checked += 1
-        if ("--emit-hosts" not in hosts_line or "heavy-thread-default" not in hosts_line or live_hosts_words_in(hosts_line)
-                or CANONICAL_HOSTS_SENTENCE not in hosts_line or CANONICAL_HOSTS_SENTENCE.startswith("<")):
-            failures.append(f"骨架的多机一行应当点名 --emit-hosts 与 heavy-thread-default、引 CANONICAL_HOSTS_SENTENCE、不出现现算词"
-                            f"（出现了 {live_hosts_words_in(hosts_line)}）：{hosts_line}")
-        # 现算词表自己认得全：每个词各造一句，都要认出来（开关 live-words-narrowed 下只认两个，这一项红）
-        checked += 1
-        missed = [word for word in LIVE_HOSTS_WORDS if word not in live_hosts_words_in(f"多机：每台线程按 {word} 取")]
-        if missed:
-            failures.append(f"现算词表应当认出每一个现算词：{' '.join(missed)}")
-        checked += 1
-        if "「多机已判：」后面写理由" not in hosts_line:
-            failures.append(f"骨架的多机一行应当写上放行行「多机已判：」的写法（用户给了逐台参数时用）：{hosts_line}")
-        # 骨架的两张类型表与派发闸 ⑮ ⑭ 的表逐个相同；表里每一种用真定义打骨架：带线程上限与预计挂钟四行，填完过派发闸
-        guard_thread_types, guard_long_run_types, tables_problem = guard_type_tables()
+        # 派发闸不判的那几种标签行，骨架一种类型都不打（开关 retired-lines-printed 下这几格红）；类型表读派发闸的 BATCH_LINE_AGENTS
+        guard_types, tables_problem = guard_batch_types()
         checked += 1
         if tables_problem:
             failures.append(tables_problem)
-        elif HEAVY_WORK_TYPES != guard_thread_types or set(LONG_RUN_TYPES) != guard_long_run_types:
-            failures.append("骨架的类型表与派发闸的表应当逐个相同："
-                            f"线程上限 骨架多 {sorted(HEAVY_WORK_TYPES - guard_thread_types)} 少 {sorted(guard_thread_types - HEAVY_WORK_TYPES)}；"
-                            f"预计挂钟 骨架多 {sorted(set(LONG_RUN_TYPES) - guard_long_run_types)} 少 {sorted(guard_long_run_types - set(LONG_RUN_TYPES))}")
+        for retired_type in (*sorted(guard_types or ()), "kb-scribe", "sweep", "Explore", "sample-writer"):
+            checked += 1
+            printed = [line for line in skeleton(retired_type, agents, {}, None).split("\n") if line.startswith(RETIRED_SKELETON_LABELS)]
+            if printed:
+                failures.append(f"骨架不该带撤掉的线程上限与长活几行（{retired_type}）：{printed}")
         import io, contextlib
         real_work = os.path.join(work, "real-definitions")
         real_agents = os.path.join(real_work, ".claude", "agents")
         os.makedirs(real_agents)
+        foreign_home = os.path.join(work, "foreign-home")   # 换了家目录那一格的 HOME：不是 $HOME，里面什么都没有
+        os.makedirs(foreign_home)
         write_batch_record(real_work)
-        for guard_type in sorted((guard_thread_types or set()) | (guard_long_run_types or set())):
+        for guard_type in sorted(guard_types or set()):
             real_definition = os.path.join(REPOSITORY_ROOT, ".claude", "agents", f"{guard_type}.md")
             if os.path.isfile(real_definition):
                 with open(real_definition, encoding="utf-8") as source, open(os.path.join(real_agents, f"{guard_type}.md"), "w", encoding="utf-8") as target:
                     target.write(source.read())
-        for guard_type in sorted(guard_long_run_types or set()):
+        for guard_type in sorted(guard_types or set()):
             text_real = skeleton(guard_type, real_agents, {}, None)
             checked += 1
-            wanted_lines = (["预计挂钟：<填", "分片：<填", "续跑：<填", "多机：<填"]
-                            + ([f"\n线程上限：{registered_threads}\n"] if guard_type in (guard_thread_types or set()) else []))
-            if registered_threads is None or any(text_real.count(key) != 1 for key in wanted_lines):
-                failures.append(f"派发闸要预计挂钟的类型，真定义打出的骨架应当带线程上限（{registered_threads}，在线程上限表里的）与预计挂钟、分片、续跑、多机各一行（{guard_type}）：\n{text_real}")
+            printed = [line for line in text_real.split("\n") if line.startswith(RETIRED_SKELETON_LABELS)]
+            if printed:
+                failures.append(f"真定义打出的骨架不该带撤掉的线程上限与长活几行（{guard_type}）：{printed}\n{text_real}")
             table_text = "变异表 crates/mutations.tsv。\n" if guard_type == "mutation-triage" else ""   # 变异分诊员的变异表由派发闸 ⑩ 另判
             real_path = os.path.join(work, f"real-{guard_type}.md")
             open(real_path, "w", encoding="utf-8").write(fill_for_guard(text_real) + table_text)
@@ -764,7 +700,77 @@ def selftest():
                 code_real = check_prompt(real_path, guard_type, real_work)
             checked += 1
             if code_real != 0:
-                failures.append(f"{guard_type} 的骨架填完（预计挂钟 2 小时内）--check 应当退 0，实际 {code_real}：{buffer.getvalue()[-600:]}")
+                failures.append(f"{guard_type} 的骨架填完，--check 应当退 0，实际 {code_real}：{buffer.getvalue()[-600:]}")
+            # 家目录换成别的目录（第二台的家目录就是另一个）再判同一份提示：--check 的结局（退出码与输出）不随家目录变。
+            # 草稿目录从工作根取，所以换了家目录结局相同；写成 ~ 起头的（弄坏开关 scratch-expanded-from-home）在本机家目录下过、换了家目录就落到工作根外面
+            buffer_foreign = io.StringIO()
+            with contextlib.redirect_stdout(buffer_foreign):
+                code_foreign_home = with_home_directory(foreign_home, lambda: check_prompt(real_path, guard_type, real_work))
+            checked += 1
+            if code_foreign_home != code_real or buffer_foreign.getvalue() != buffer.getvalue():
+                failures.append(f"{guard_type} 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际 本机家目录下退 {code_real}、换了之后退 {code_foreign_home}："
+                                f"{buffer_foreign.getvalue()[-600:]}")
+        # 骨架照抄进提示的每一行都要过借用写法闸与派发闸（「要临时服务的自证」那一行照抄进派发提示被两道拒过）：会跑自证的类型，骨架带上点名了登记脚本的那一截，
+        # 逐行喂借用写法闸（.claude/singlefs-ai-sop/scripts/borrowed-convention.py --hook，挂 Agent），整份填完喂派发闸的 --check-prompt，看有没有许可跑项目代码与叫子 agent 交任务两种拒绝
+        # （弄坏开关 temporary-service-line-unquoted 下这四格红：红在不点名脚本的那一种骨架上）
+        borrow_judge = os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts", "borrowed-convention.py")
+        for runner_type in SELFTEST_RUNNER_TYPES:
+            checked += 1
+            refused_lines = []
+            # 骨架分两种各喂一遍：不点名脚本的（那一行只有规则一句，没有交回说法的整条命令跟在后面）与点名了登记脚本的（那一行后面接着带「写进报告……由主 agent 交」的整条命令，
+            # 整句因提到主 agent 与有交回说法而不被派发闸判，也因带了「」原文而过借用写法闸）；只喂点名的那种，规则一句退回错写法也看不出来
+            for copy_name, copy_settings in (("不点名脚本", {}), ("点名了登记脚本", {"出口": "改 scripts/mutation/crates-mutation-rows.py"})):
+                copied = skeleton(runner_type, real_agents, copy_settings, None)
+                for line in (line for line in copied.split("\n") if line.strip()):
+                    hook_input = json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": runner_type, "prompt": line}}, ensure_ascii=False)
+                    try:
+                        judged = subprocess.run([sys.executable, borrow_judge, "--hook"], input=hook_input, capture_output=True, text=True, timeout=GUARD_TIMEOUT_SECONDS)
+                        if judged.returncode == 2:
+                            refused_lines.append(f"{copy_name}：借用写法闸拒：{line[:120]}")
+                    except (OSError, subprocess.TimeoutExpired) as error:
+                        refused_lines.append(f"{copy_name}：借用写法闸起不来（{error!r}）：{line[:120]}")
+                copied_path = os.path.join(work, f"copied-{runner_type}-{'named' if copy_settings else 'unnamed'}.md")
+                open(copied_path, "w", encoding="utf-8").write(fill_for_guard(copied))
+                buffer = io.StringIO()
+                with contextlib.redirect_stdout(buffer):
+                    check_prompt(copied_path, runner_type, real_work)
+                refused_lines += [f"{copy_name}：派发闸拒：{piece}" for piece in ("许可或要求它跑项目代码", "许可或要求它自己往统一任务服务交任务") if piece in buffer.getvalue()]
+            if refused_lines:
+                failures.append(f"骨架照抄进提示的每一行都要过借用写法闸与派发闸（{runner_type}）：" + "；".join(refused_lines))
+        # 写范围一行（拆分提案第一百六十一节骨架那一半）：骨架按类型从写范围表取模式打一行「写范围：…」（读法 lib_write_scope.py）；表里没有行的类型、没有表的仓不打。
+        # 样本仓里放本仓的 clerk、kb-scribe 定义与写范围表，端到端过一遍派发闸（这一行不能被当成写进范围外的路径）；弄坏开关 scope-line-omitted 下前两格红
+        scope_work = os.path.join(work, "scope-line")
+        scope_agents = os.path.join(scope_work, ".claude", "agents")
+        os.makedirs(scope_agents)
+        os.makedirs(os.path.join(scope_work, ".claude", "hooks"))
+        write_batch_record(scope_work)
+        for relative_path in (os.path.join(".claude", "agents", "clerk.md"), os.path.join(".claude", "agents", "kb-scribe.md"), os.path.join(".claude", "hooks", "agent-write-scope.tsv")):
+            with open(os.path.join(REPOSITORY_ROOT, relative_path), encoding="utf-8") as source, open(os.path.join(scope_work, relative_path), "w", encoding="utf-8") as target:
+                target.write(source.read())
+        clerk_text = skeleton("clerk", scope_agents, {}, None)
+        clerk_scope_lines = [line for line in clerk_text.split("\n") if line.startswith(f"{WRITE_SCOPE_LABEL}：")]
+        checked += 1
+        if len(clerk_scope_lines) != 1 or not all(pattern in clerk_scope_lines[0] for pattern in ("records/**", "research/prompts/**", "research/results/**", "$SINGLEFS_WORK_ROOT/**")) \
+                or ".claude/kb/" in clerk_scope_lines[0]:
+            failures.append(f"写范围一行：clerk 的骨架应当有一行「写范围：」列 records/**、research/prompts/**、research/results/** 与 $SINGLEFS_WORK_ROOT/**、不列 .claude/kb/，实际 {clerk_scope_lines}")
+        kb_scope_lines = [line for line in skeleton("kb-scribe", scope_agents, {}, None).split("\n") if line.startswith(f"{WRITE_SCOPE_LABEL}：")]
+        checked += 1
+        if len(kb_scope_lines) != 1 or ".claude/kb/**" not in kb_scope_lines[0] or "records/" in kb_scope_lines[0]:
+            failures.append(f"写范围一行：kb-scribe 的骨架应当有一行「写范围：」列 .claude/kb/**、不列 records/，实际 {kb_scope_lines}")
+        unlisted_scope_lines = [line for line in skeleton("sweep", scope_agents, {}, None).split("\n") if line.startswith(f"{WRITE_SCOPE_LABEL}：")] \
+            + [line for line in text.split("\n") if line.startswith(f"{WRITE_SCOPE_LABEL}：")]
+        checked += 1
+        if unlisted_scope_lines:
+            failures.append(f"写范围一行：写范围表里没有行的类型（sweep）与没有表的样本仓里的骨架不该打「写范围：」一行，实际 {unlisted_scope_lines}")
+        scope_prompt = os.path.join(work, "scope-clerk.md")
+        with open(scope_prompt, "w", encoding="utf-8") as handle:
+            handle.write(fill_for_guard(clerk_text).replace(selftest_scratch(), "$SINGLEFS_WORK_ROOT/dispatch-prompt-selftest"))   # 草稿目录写工作根记号：这一格有表，派发闸 ④ 判报告行的落点
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code_scope = check_prompt(scope_prompt, "clerk", scope_work)
+        checked += 1
+        if code_scope != 0:
+            failures.append(f"写范围一行：clerk 的骨架带着「写范围：」一行填完，--check 应当退 0（派发闸不把这一行当写进范围外的路径），实际 {code_scope}：{buffer.getvalue()[-600:]}")
         # 三方腿的报告行（派发闸 ⑰ 判形态）：骨架打 research/prompts/<填 轮>-<填 模型>-output.md 占位（定义的 required-inputs 要不要「报告」都打、只打一行）；
         # 只填别的占位、不动这一行 --check 退 3 并点名这一行；填成 research/prompts/x-r1-opus-output.md 退 0；填成草稿目录下的 result.md 退 3 并给出形态
         three_way_inputs = {"three-way-forward": "禁读清单, 草稿目录, 背景材料, 报告", "three-way-attack": "禁读清单, 草稿目录, 背景材料, 攻击面",
@@ -772,7 +778,7 @@ def selftest():
         for three_way_type, three_way_required in three_way_inputs.items():
             open(os.path.join(agents, f"{three_way_type}.md"), "w", encoding="utf-8").write(
                 f"---\nname: {three_way_type}\nmodel: sonnet\nrequired-inputs: {three_way_required}\nleg: three-way\n---\n")
-            three_way_text = skeleton(three_way_type, agents, {"草稿目录": "~/.local/share/singlefs/work/x-r1/"}, None)
+            three_way_text = skeleton(three_way_type, agents, {"草稿目录": f"{work_root_text}/x-r1/"}, None)
             report_lines_found = [line for line in three_way_text.split("\n") if line.startswith(f"{REPORT_LINE_NAME}：")]
             checked += 1
             if report_lines_found != [f"{REPORT_LINE_NAME}：{THREE_WAY_REPORT_PLACEHOLDER}"]:
@@ -780,7 +786,7 @@ def selftest():
             for three_way_label, report_value, three_way_want, three_way_needle in (
                     ("只填别的占位、不动报告行", None, 3, f"报告：{THREE_WAY_REPORT_PLACEHOLDER}"),
                     ("报告填成 research/prompts/x-r1-opus-output.md", "research/prompts/x-r1-opus-output.md", 0, None),
-                    ("报告填成草稿目录下的 result.md", "~/.local/share/singlefs/work/x-r1/result.md", 3, "research/prompts/<轮>-<模型>-output.md")):
+                    ("报告填成草稿目录下的 result.md", f"{work_root_text}/x-r1/result.md", 3, "research/prompts/<轮>-<模型>-output.md")):
                 three_way_filled = fill_for_guard(three_way_text, keep_prefix=f"{REPORT_LINE_NAME}：")
                 if report_value is not None:
                     three_way_filled = three_way_filled.replace(f"{REPORT_LINE_NAME}：{THREE_WAY_REPORT_PLACEHOLDER}", f"{REPORT_LINE_NAME}：{report_value}")
@@ -831,7 +837,7 @@ def selftest():
         remaining_at = next((index for index, line in enumerate(runner_lines) if line.startswith("上一段岔路表里还差：")), None)
         if remaining_at is None or runner_lines[remaining_at + 1:remaining_at + 2] != [HANDOVER_LINE]:
             failures.append("执行员骨架应当在「上一段岔路表里还差」后面紧跟一行「承接：<填 …>」：\n" + "\n".join(runner_lines))
-        missing_section = [section_type for section_type in (*LONG_RUN_TYPES, "kb-scribe", "sweep", "Explore")
+        missing_section = [section_type for section_type in (*sorted(guard_types or ()), "kb-scribe", "sweep", "Explore")
                            if f"\n{ADDRESSED_SECTION_TITLE}\n" not in skeleton(section_type, agents, {}, None)]
         checked += 1
         if missing_section:
@@ -839,9 +845,13 @@ def selftest():
         # 会跑自证的类型带一行「自证在哪跑」，别的类型不带；--set 填得进去
         for selftest_runner_type in SELFTEST_RUNNER_TYPES:
             text_selftest = skeleton(selftest_runner_type, agents, {}, None)
-            checked += 1
+            checked += 3
             if text_selftest.count("自证在哪跑：<填") != 1:
                 failures.append(f"会跑自证的类型骨架应当带一行「自证在哪跑：<填 …>」（{selftest_runner_type}）：\n{text_selftest}")
+            elif f"{SELFTEST_LOCATION_HANDBACK_HINT}；这一轮没有自证要交的写「不跑」>" not in text_selftest:   # 没有这一行的归上一格报，这一格不重复红
+                failures.append(f"会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（{selftest_runner_type}）：\n{text_selftest}")
+            elif f"「{TEMPORARY_SERVICE_LABEL}」" not in next(line for line in text_selftest.split("\n") if line.startswith("自证在哪跑：<填")):   # 表里 required 的裸写会被拒，占位要点到整条写法在哪一行
+                failures.append(f"会跑自证的类型骨架的「自证在哪跑」占位应当点到「{TEMPORARY_SERVICE_LABEL}」那一行（表里 required 的脚本裸写会被拒）（{selftest_runner_type}）：\n{text_selftest}")
         checked += 1
         if "自证在哪跑" in skeleton("kb-scribe", agents, {}, None):
             failures.append("不跑自证的类型（kb-scribe）骨架不该带「自证在哪跑」一行")
@@ -849,12 +859,33 @@ def selftest():
         checked += 1
         if "自证在哪跑：本仓主工作区那一份" not in text_selftest_set or "自证在哪跑：<填" in text_selftest_set:
             failures.append(f"--set 自证在哪跑=… 应当把这一行填上、不再留占位：\n{text_selftest_set}")
+        # 要临时 prune-server 的自证（.claude/hooks/selftest-temporary-service.tsv 里 required 的）：会跑自证的类型带一行「要临时服务的自证」，别的类型不带；
+        # --set 的值里点名了登记的脚本，那一行拼出它的整条包装写法，没登记的不拼（DISPATCH_PROMPT_BREAK=temporary-service-line-dropped、temporary-service-named-dropped、
+        # temporary-service-command-bare、temporary-service-table-unread 下红的格写在文件头）
+        for selftest_runner_type in SELFTEST_RUNNER_TYPES:
+            checked += 1
+            if skeleton(selftest_runner_type, agents, {}, None).count(f"\n{TEMPORARY_SERVICE_LABEL}：") != 1:
+                failures.append(f"会跑自证的类型骨架应当带一行「{TEMPORARY_SERVICE_LABEL}：…」（{selftest_runner_type}）")
+        checked += 1
+        if f"{TEMPORARY_SERVICE_LABEL}：" in skeleton("kb-scribe", agents, {}, None):
+            failures.append(f"不跑自证的类型（kb-scribe）骨架不该带「{TEMPORARY_SERVICE_LABEL}」一行")
+        incident_script = "scripts/mutation/crates-mutation-rows.py"
+        checked += 1
+        if incident_script not in temporary_service_scripts():
+            failures.append(f"要临时服务的自证登记表应当读得到 {incident_script}（任务 2731 退 2 的那一份），实际 {temporary_service_scripts()}")
+        text_named = skeleton("tooling-writer", agents, {"出口": f"改 {incident_script} 与 scripts/kb/replace-once.py"}, None)
+        incident_command = f"task-server/task submit -- {TEMPORARY_SERVICE_WRAPPER} python3 {incident_script} --selftest"
+        checked += 2
+        if incident_command not in text_named or "replace-once.py --selftest" in text_named:
+            failures.append(f"骨架点名了要临时服务的自证，那一行应当拼出整条包装写法（{incident_command}），没登记的脚本（replace-once.py）不拼：\n{text_named}")
+        if f"{TEMPORARY_SERVICE_LABEL}：自己写的" not in skeleton("tooling-writer", agents, {TEMPORARY_SERVICE_LABEL: "自己写的"}, None):
+            failures.append(f"--set {TEMPORARY_SERVICE_LABEL}=… 应当把这一行换成主 agent 写的")
         # 认领行（欠账 C792）：带「草稿目录：」的类型骨架在它后面紧跟一行，没有草稿目录的类型不带；--set 填得进；--check 判在不在、目录对不对得上、用途空不空
         open(os.path.join(agents, "sample-nodir.md"), "w", encoding="utf-8").write("---\nname: sample-nodir\nmodel: sonnet\nrequired-inputs: -body.md\n---\n")
-        lines_writer = skeleton("sample-writer", agents, {"草稿目录": "~/.local/share/singlefs/work/x/"}, None).split("\n")
+        lines_writer = skeleton("sample-writer", agents, {"草稿目录": f"{work_root_text}/x/"}, None).split("\n")
         checked += 1
         position = next((index for index, line in enumerate(lines_writer) if line.startswith("草稿目录：")), None)
-        want_claim = f"认领：{CLAIM_COMMAND} ~/.local/share/singlefs/work/x/ --purpose '<填 这个目录的用途一句>'"
+        want_claim = f"认领：{CLAIM_COMMAND} {work_root_text}/x/ --purpose '<填 这个目录的用途一句>'"
         if position is None or lines_writer[position + 1:position + 2] != [want_claim]:
             failures.append(f"带草稿目录的类型骨架应当在草稿目录那一行后紧跟一行认领（{want_claim}）：\n" + "\n".join(lines_writer))
         checked += 1
@@ -864,7 +895,7 @@ def selftest():
         if (f"认领：{CLAIM_COMMAND} ~/x/ --purpose '测试用'" not in text_claim_set or "认领：" in text_nodir
                 or f"认领：{CLAIM_COMMAND} <填 草稿目录，与上一行一致> --purpose '<填" not in text_claim_empty):
             failures.append(f"--set 草稿目录、认领用途：要填进认领行，没填留占位，没有草稿目录的类型不带：\n{text_claim_set}\n{text_claim_empty}\n{text_nodir}")
-        good_claim = f"草稿目录：~/.local/share/singlefs/work/x/\n认领：{CLAIM_COMMAND} {os.path.expanduser('~')}/.local/share/singlefs/work/x --purpose '一句'\n"
+        good_claim = f"草稿目录：~/x/\n认领：{CLAIM_COMMAND} {os.path.expanduser('~')}/x --purpose '一句'\n"   # 判 ~ 与展开写法是同一个目录（只过认领行那一判，不进派发闸，不涉工作根）
         for claim_label, claim_text, claim_want in (
                 ("绿：目录写法不同（~ 与展开、末尾斜杠）但是同一个", good_claim, 0),
                 ("红：没有认领行", "草稿目录：~/x/\n报告：y\n", 1),
@@ -918,8 +949,6 @@ def selftest():
             failures.append(f"--check 对「报告：」写 report.md 的提示应当退 3 并点名文件名、给 result.md 的写法，实际 {code_report_red}：{buffer.getvalue()[-600:]}")
         text_gate = skeleton("gate-triage", agents, {}, None)
         checked += 1
-        if "重型测试：不跑" not in text_gate:
-            failures.append("原来跑重型测试的类型名，骨架也要带「重型测试：不跑」")
         draft = os.path.join(work, "draft.md")
         open(draft, "w", encoding="utf-8").write(text.split("\n", 1)[1])   # 去掉「# 派发：」那一行：不知道类型，只查占位
         import io, contextlib
@@ -937,19 +966,19 @@ def selftest():
         checked += 1
         if code_filled != 0:
             failures.append(f"--check 对填完的提示应当退 0（骨架第一行认出类型、派发闸放行），实际 {code_filled}：{buffer.getvalue()[-300:]}")
-        # 带类型时起派发闸的 --check-prompt，同一份判法一次列全：缺重型测试一行、有占位、缺禁读清单（写的是「禁读：」）三处
+        # 带类型时起派发闸的 --check-prompt，同一份判法一次列全：有占位、缺禁读清单（写的是「禁读：」）两处
         open(os.path.join(agents, "sample-attack.md"), "w", encoding="utf-8").write(
             "---\nname: sample-attack\nmodel: sonnet\nrequired-inputs: 禁读清单, 草稿目录, 攻击面\n---\n")
         attack = os.path.join(work, "attack.md")
-        open(attack, "w", encoding="utf-8").write("草稿目录 ~/.local/share/singlefs/work/t/\n禁读：别的腿的产出\n攻击面：<填 攻击面>\n"
+        open(attack, "w", encoding="utf-8").write(f"草稿目录 {work_root_text}/t/\n禁读：别的腿的产出\n攻击面：<填 攻击面>\n"
                                                   "\n## 关的是哪几条\n\n1. 自检样本\n")   # 派发闸 ⑱ 要有定义的类型带这一节；这一格只判上面三处
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             code_attack = check_prompt(attack, "sample-attack", work)
         checked += 1
-        wanted_attack = ["有 3 处不成立", "没有「重型测试：不跑」一行", "占位没填", "缺它定义要的输入：禁读清单", "禁读清单：<填 禁读清单>"]
+        wanted_attack = ["有 2 处不成立", "占位没填", "缺它定义要的输入：禁读清单", "禁读清单：<填 禁读清单>"]
         if code_attack != 3 or any(piece not in buffer.getvalue() for piece in wanted_attack):
-            failures.append(f"--check 带类型应当一次列全派发闸会拒的三处（{wanted_attack}），实际 {code_attack}：{buffer.getvalue()[-600:]}")
+            failures.append(f"--check 带类型应当一次列全派发闸会拒的两处（{wanted_attack}），实际 {code_attack}：{buffer.getvalue()[-600:]}")
         # 工具员的骨架别的都填了、只留「自证在哪跑」：--check 起派发闸，退 3 并点名这一行
         open(os.path.join(agents, "tooling-writer.md"), "w", encoding="utf-8").write(
             "---\nname: tooling-writer\nmodel: opus\nrequired-inputs: 草稿目录, 报告, 出口, 要改的文件\n---\n")
@@ -961,31 +990,26 @@ def selftest():
         checked += 1
         if code_location != 3 or "自证在哪跑：<填" not in buffer.getvalue():
             failures.append(f"--check 对没填自证在哪跑的提示应当退 3 并点名那一行，实际 {code_location}：{buffer.getvalue()[-600:]}")
-        # 工具员骨架里线程上限一行不动（默认填的登记值），别的占位都填上：派发闸 ⑮ 要放行（骨架默认与闸判的是同一个数）
-        thread_default_filled = os.path.join(work, "thread-default-filled.md")
-        open(thread_default_filled, "w", encoding="utf-8").write(fill_for_guard(skeleton("tooling-writer", agents, {}, None)))
+        # 撤掉的那几行写进提示，派发闸不再因为它们拒：工具员骨架填完、另加线程上限（公式、括注）、预计挂钟超过 2 小时与写现算的多机一行，--check 退 0
+        # （派发闸那一边的开关 retired-lines-refused 下这一格红）
+        retired_filled = os.path.join(work, "retired-lines-filled.md")
+        open(retired_filled, "w", encoding="utf-8").write(fill_for_guard(skeleton("tooling-writer", agents, {}, None))
+                                                          + "\n线程上限：7 ÷ 2（本机）\n预计挂钟：超过 2 小时\n多机：每台线程按此刻空闲现算\n")
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
-            code_thread_default = check_prompt(thread_default_filled, root=work)
+            code_retired = check_prompt(retired_filled, root=work)
         checked += 1
-        if code_thread_default != 0 or "线程上限" in buffer.getvalue():
-            failures.append(f"工具员骨架不动线程上限，--check 应当退 0（默认填的登记值过派发闸 ⑮），实际 {code_thread_default}：{buffer.getvalue()[-600:]}")
-        # 预计挂钟超过 2 小时：骨架的分片、续跑、多机三行填成「台数取多机配置、每台线程取登记值」的写法过派发闸 ⑭，多机写现算的不过
-        def over_two_hours_prompt(hosts_line, reuse_line="复用：判定按单元键入库，键相同的照库里的结论沿用"):
-            lines = ["预计挂钟：超过 2 小时，推的：一千行 × 每行 2 分钟" if line.startswith("预计挂钟：") else line
-                     for line in fill_for_guard(skeleton("tooling-writer", agents, {}, None)).split("\n")]
-            return "\n".join(lines + ["分片：按行号 mod 片数切", "续跑：结果表里已有的行跳过，重起同一条命令只补没做完的", hosts_line]
-                             + ([reuse_line] if reuse_line else []) + [""])
-        for reuse_label, reuse_text, reuse_want in (("没写复用一行", None, 3), ("复用一行写无判定与为什么", "复用：无判定：这一件只改文档表格，不产出判定", 0),
-                                                    ("复用一行只写了几个字", "复用：沿用", 3)):
-            reuse_path = os.path.join(work, f"over-two-hours-reuse-{reuse_want}-{len(reuse_label)}.md")
-            open(reuse_path, "w", encoding="utf-8").write(over_two_hours_prompt("多机：" + CANONICAL_HOSTS_SENTENCE, reuse_text))
-            buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                code_reuse = check_prompt(reuse_path, root=work)
-            checked += 1
-            if code_reuse != reuse_want or (reuse_want == 3 and "复用" not in buffer.getvalue()):
-                failures.append(f"工具员骨架超过 2 小时、{reuse_label}，--check 应当退 {reuse_want}，实际 {code_reuse}：{buffer.getvalue()[-600:]}")
+        if code_retired != 0:
+            failures.append(f"工具员骨架填完、另加撤掉的线程上限与长活几行，--check 应当退 0（派发闸不再判这几行），实际 {code_retired}：{buffer.getvalue()[-600:]}")
+        # 「要临时服务的自证」那一行（点名了登记脚本、拼了整条包装写法的样子）填完过派发闸：每一处点到 task-server/task submit 的句子都带写进报告、由主 agent 交的说法（派发闸 ㉒）
+        named_filled = os.path.join(work, "temporary-service-named-filled.md")
+        open(named_filled, "w", encoding="utf-8").write(fill_for_guard(skeleton("tooling-writer", agents, {"出口": "改 scripts/mutation/crates-mutation-rows.py"}, None)))
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code_named = check_prompt(named_filled, root=work)
+        checked += 1
+        if code_named != 0:
+            failures.append(f"骨架里要临时服务的自证那一行点名了登记的脚本、拼了整条包装写法，填完过派发闸 --check 应当退 0，实际 {code_named}：{buffer.getvalue()[-600:]}")
         batch_missing_record = os.path.join(work, "batch-missing-record.md")
         open(batch_missing_record, "w", encoding="utf-8").write(
             fill_for_guard(skeleton("tooling-writer", agents, {}, "records/dispatch-prompt-selftest-not-there.md#1")))
@@ -995,40 +1019,6 @@ def selftest():
         checked += 1
         if code_batch != 3 or "records/dispatch-prompt-selftest-not-there.md 在本仓仓根与各棵工作树里都不在" not in buffer.getvalue():
             failures.append(f"工具员骨架批次一行点名不在的调度记录，--check 应当退 3 并点名那份记录，实际 {code_batch}：{buffer.getvalue()[-600:]}")
-        for over_index, (over_label, hosts_text, over_want) in enumerate((
-                ("取规范句", "多机：" + CANONICAL_HOSTS_SENTENCE, 0),
-                ("取规范句、带句末句号", "多机：" + CANONICAL_HOSTS_SENTENCE + "。", 0),
-                ("取规范句、说明另起一行写", "多机：" + CANONICAL_HOSTS_SENTENCE + "\n说明：双机时两台各取这一个数", 0),
-                ("规范句后接「；」与说明", "多机：" + CANONICAL_HOSTS_SENTENCE + "；双机时两台各取这一个数", 3),
-                ("规范句后接按此刻空闲现算", "多机：" + CANONICAL_HOSTS_SENTENCE + "；按此刻空闲现算每台槽数与线程", 3),
-                ("规范句后接机器忙时按负载降", "多机：" + CANONICAL_HOSTS_SENTENCE + "；机器忙时按负载降", 3),
-                ("规范句后接 host-resources 的 available_threads", "多机：" + CANONICAL_HOSTS_SENTENCE + "；每台线程按 host-resources.py 的 available_threads 取", 3),
-                ("写现算", "多机：台数取 crash-point-replay-shard-configuration-check.sh --emit-hosts，每台线程用 host-resources.py --json 现算", 3),
-                ("换了词的取法（不看忙闲）", "多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default，不看忙闲", 3),
-                ("规范句后的说明里有数字", "多机：" + CANONICAL_HOSTS_SENTENCE + "；见第 2 节", 3),
-                ("规范句加多机已判与逐台参数一行", "多机：" + CANONICAL_HOSTS_SENTENCE + "\n多机已判：用户给了逐台参数，第二台上在跑用户自己的基准\n逐台参数：本机照登记值，第二台 16 线程", 0),
-                ("规范句加多机已判而没写理由", "多机：" + CANONICAL_HOSTS_SENTENCE + "\n多机已判：\n逐台参数：第二台 16 线程", 3))):
-            over_path = os.path.join(work, f"over-two-hours-{over_index}.md")
-            open(over_path, "w", encoding="utf-8").write(over_two_hours_prompt(hosts_text))
-            buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                code_over = check_prompt(over_path, root=work)
-            checked += 1
-            if code_over != over_want or (over_want == 3 and "多机" not in buffer.getvalue()):
-                failures.append(f"工具员骨架超过 2 小时、多机一行{over_label}，--check 应当退 {over_want}，实际 {code_over}：{buffer.getvalue()[-600:]}")
-        # 线程上限一行：只认一个整数，括注一概拒（说明另起一行照普通正文写，那一行不判；代码块里的示例行不判）
-        for thread_label, thread_text, thread_want in (("后接括注", "线程上限：{n}（本机）", 3), ("后接按负载降的括注", "线程上限：{n}（机器忙时按负载降）", 3),
-                                                       ("另起一行照普通正文写说明", "线程上限：{n}\n本机，双机时两台各取这一个数（{n} 与 {n}）", 0),
-                                                       ("代码块里的示例行", "线程上限：{n}\n喂法示例：\n```\n线程上限：{n}（本机）\n```", 0)):
-            thread_path = os.path.join(work, f"thread-note-{thread_want}-{len(thread_label)}.md")
-            filled = fill_for_guard(skeleton("tooling-writer", agents, {}, None)).replace(f"线程上限：{registered_threads}", thread_text.format(n=registered_threads))
-            open(thread_path, "w", encoding="utf-8").write(filled)
-            buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                code_thread_note = check_prompt(thread_path, root=work)
-            checked += 1
-            if code_thread_note != thread_want or (thread_want == 3 and "括注一概不认" not in buffer.getvalue()):
-                failures.append(f"工具员骨架的线程上限一行{thread_label}，--check 应当退 {thread_want}（括注一概拒、说明另起一行不判），实际 {code_thread_note}：{buffer.getvalue()[-600:]}")
     finally:
         import shutil
         shutil.rmtree(work, ignore_errors=True)
@@ -1037,20 +1027,34 @@ def selftest():
     if failures:
         print("    → 怎么办：看 skeleton()、check_prompt() 与派发闸的 --check-prompt；DISPATCH_PROMPT_BREAK 设着的话这里本来就该红")
         return 1
-    print(f"  ✓ 自检通过（查了 {checked} 项）：有定义的类型按 required-inputs 逐组一行、--set 填进去；没有定义的带开工先读；实现员带要动的文件与线程上限；"
-          "每种类型都带重型测试行；设计员与带重活的九种类型带预计挂钟与分片、续跑、多机四行（多机一行取登记值、不写现算），别的类型不带；骨架的类型表与派发闸的表逐个相同，九种类型的真定义骨架填完过派发闸；"
+    print(f"  ✓ 自检通过（查了 {checked} 项）：有定义的类型按 required-inputs 逐组一行、--set 填进去；没有定义的带开工先读；实现员带要动的文件；"
+          "每种类型的骨架都不打线程上限、预计挂钟、分片、续跑、多机、复用几行，派发闸十种类型的真定义骨架填完过派发闸，另加那几行照样过；"
           f"会跑自证的 {len(SELFTEST_RUNNER_TYPES)} 种类型（{'、'.join(SELFTEST_RUNNER_TYPES)}）带「自证在哪跑」一行、别的不带、--set 填得进；"
+          "同样带「要临时服务的自证」一行（名单取 .claude/hooks/selftest-temporary-service.tsv，点名了登记脚本的拼出整条包装写法、填完过派发闸），骨架逐行照抄过借用写法闸与派发闸；"
           "带草稿目录的类型在草稿目录那一行后多一行认领（--set 草稿目录、认领用途填得进），--check 判认领行在不在、目录对得上、用途非空（「草稿目录：」一行经 lib_prompt_scratch_line.py 认）；"
-          "线程上限一行默认填登记的每台默认重活线程数（--set 给了的用给的），该默认过派发闸 ⑮；"
           "「报告：」一行默认填 <草稿目录>/result.md、--check 写 report.md 的退 3；三方腿三种的「报告：」一行是 research/prompts/<填 轮>-<填 模型>-output.md 占位（只打一行），"
           "不填 --check 退 3、填成 research/prompts/x-r1-opus-output.md 退 0、填成草稿目录下的 result.md 退 3；"
           "--check 不知道类型时只查占位（有占位退 3、写明没给类型），"
           "知道类型时起派发闸的 --check-prompt、会拒的几处一次列全退 3（只留「自证在哪跑」没填的点名这一行），填完的退 0；"
-          "实现员、工具员带「不碰：」一行，执行员在「上一段岔路表里还差」后面带「承接：」一行，每种类型都带「## 关的是哪几条」一节")
+          "实现员、工具员带「不碰：」一行，执行员在「上一段岔路表里还差」后面带「承接：」一行，每种类型都带「## 关的是哪几条」一节；"
+          "自检的草稿目录从工作根取（lib_work_root.py），HOME 换成别的目录再判派发闸十种类型的真定义骨架，--check 的结局与本机家目录下相同")
     return 0
 
 
+def refuse_break_outside_selftest(argv):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest 而 DISPATCH_PROMPT_BREAK 非空（不管值是什么），参数解析之前就拒，交回退出码 2；放行交回 None。
+    自证不起自己的子进程（只起派发闸，派发闸的开关另有它自己的标记），所以不需要认本脚本的标记。"""
+    if not BROKEN or argv == ["--selftest"]:
+        return None
+    print(f"  ✗ DISPATCH_PROMPT_BREAK={BROKEN} 是弄坏开关，只在自证（dispatch-prompt.py --selftest）里认，平常跑设了就拒，这一趟什么都没做", file=sys.stderr)
+    print("     → 怎么办：去掉 DISPATCH_PROMPT_BREAK 再跑；要证红就跑 DISPATCH_PROMPT_BREAK=<项> python3 scripts/agents/dispatch-prompt.py --selftest", file=sys.stderr)
+    return 2
+
+
 def main(argv):
+    refused = refuse_break_outside_selftest(argv)
+    if refused is not None:
+        return refused
     if argv[:1] == ["--selftest"]:
         return selftest()
     if argv[:1] == ["--check"]:

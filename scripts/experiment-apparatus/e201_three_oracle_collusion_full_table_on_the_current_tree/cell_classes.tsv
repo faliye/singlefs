@@ -1,0 +1,215 @@
+# E201（三oracle合谋今树整表） 读法 7 的分类表：r1 留在 git 里的三份产物 P1、P2、P3（只读了字段名，没读值）每个（行种, 字段）归哪一类。
+# 写于 2026-11-03，今天任何产物之前；sha256 记在跑前登记第十二节修订 2，之后不改（contrast_against_r1.py 开跑时核这一份的 sha256）。
+# 列：产物<TAB>行种<TAB>字段<TAB>类<TAB>依据
+#   类：key 配对的键；decision 判定格①（封闭词表，逐字比）；decision_set 判定格③（行号集合，按集合比）；decision_positive 判定格④（红的计数，取「是否大于 0」比）；
+#       pinned 钉值格（其余数值、计数、名字、sha256，差另报、不进 Q1）；not_compared 不比；today_only 今天独有（读法 7 末条，照报、不进 Q1、Q2）。
+#   行种整行写 * 的是整种不比（读法 7「不比」点名的那几种）。判定格②（带键的行在不在）不逐字段登记，由键表现算。
+#   P2 的 o3_status、o3_exit、o3_streams 归今天独有：r1 第二段整表不跑执行器（P1 文件头），这三个字段说的是整表 O3 那一列跑没跑，读法 7 末条把整表 O3 两列记今天独有。
+P1	baseline_stability	*	not_compared	读法 7 不比
+P1	config	*	not_compared	读法 7 不比
+P1	done	*	not_compared	读法 7 不比
+P1	driver_product	*	not_compared	读法 7 不比
+P1	driver_product_rows	*	not_compared	读法 7 不比
+P1	recovery_panic_sum	*	not_compared	读法 7 不比
+P1	unstable_memory_objects	*	not_compared	读法 7 不比
+P1	row	row	key	读法 7 配键
+P1	row	status	decision	①
+P1	row	device_exit	pinned	其余数值
+P1	row	substituted_from	pinned	补位名
+P1	row	failed_attempts	pinned	计数
+P1	row	mutated_row_name	pinned	行名
+P1	row	ran	decision	①
+P1	row	write_stream_differs	decision	①
+P1	row	call_outcomes_differ	decision	①
+P1	row	recovery_report_differs_batch_1	decision	①
+P1	row	recovery_report_differs_batch_2	decision	①
+P1	row	ignored_pass_differs_batch_1	decision	①
+P1	row	ignored_pass_differs_batch_2	decision	①
+P1	row	call_panic	decision	①
+P1	row	judged_calls_before_the_first_panic	pinned	计数
+P1	row	recovery_panic_states	pinned	计数
+P1	row	panicked_before_the_first_call	decision	①
+P1	row	category_registration_batch_1	decision	①
+P1	row	category_registration_batch_2	decision	①
+P1	row	category_original_reading_5_batch_1	decision	①
+P1	row	category_original_reading_5_batch_2	decision	①
+P1	substitution	row	key	读法 7 配键
+P1	substitution	status	decision	①
+P1	substitution	failed_attempts	pinned	计数
+P1	substitution	substituted_by	pinned	补位名
+P1	not_located_row	row	key	读法 7 配键
+P1	not_located_row	status	decision	①
+P1	not_located_row	failed_attempts	pinned	计数
+P1	not_located_row	substituted_from	pinned	补位名
+P1	not_located_row	name_hits_in_the_frozen_table	pinned	计数
+P1	untouched_row_red	row	key	读法 7 配键
+P1	untouched_row_red	O1-对拍	decision_positive	④
+P1	untouched_row_red	O1-模型崩溃判官	decision_positive	④
+P1	untouched_row_red	O1-RefFS	decision_positive	④
+P1	untouched_row_red	O2	decision_positive	④
+P1	q2_set_row	row	key	读法 7 配键
+P1	q2_set_row	calls_with_a_difference	pinned	计数
+P1	q2_set_row	calls_whose_observation_differs	pinned	计数
+P1	q2_set_row	calls_whose_observation_is_the_same	pinned	计数
+P1	q2_set_row	o1_comparison_red_calls	decision_positive	④
+P1	q2_set_row	o1_red	decision	①
+P1	q2_set_call	row	key	读法 7 配键
+P1	q2_set_call	stream	key	读法 7 配键
+P1	q2_set_call	call	key	读法 7 配键
+P1	q2_set_call	label	pinned	名字
+P1	q2_set_call	fields	pinned	名字
+P1	q2_set_call	objects	pinned	名字
+P1	q2_set_call	observation_differs	decision	①
+P1	q2_set_call	o1_comparison	decision	①
+P1	q2_named_row	row	key	读法 7 配键
+P1	q2_named_row	ran	decision	①
+P1	q2_named_row	category	decision	①
+P1	q2_named_row	touched	decision	①
+P1	q2_named_row	in_the_set	decision	①
+P1	q2_named_row	calls_with_a_difference	pinned	计数
+P1	q2_named_row	calls_whose_observation_differs	pinned	计数
+P1	q2_named_row	calls_whose_observation_is_the_same	pinned	计数
+P1	q2_named_row	o1_comparison_red_calls	decision_positive	④
+P1	q2_named_row_call	row	key	读法 7 配键
+P1	q2_named_row_call	stream	key	读法 7 配键
+P1	q2_named_row_call	call	key	读法 7 配键
+P1	q2_named_row_call	label	pinned	名字
+P1	q2_named_row_call	fields	pinned	名字
+P1	q2_named_row_call	objects	pinned	名字
+P1	q2_named_row_call	observation_differs	decision	①
+P1	q2_named_row_call	o1_comparison	decision	①
+P1	q2_observation	set_rows	pinned	计数
+P1	q2_observation	calls_with_a_difference	pinned	计数
+P1	q2_observation	calls_whose_observation_differs	pinned	计数
+P1	q2_observation	calls_whose_observation_is_the_same	pinned	计数
+P1	q2	set_rows	pinned	计数
+P1	q2	o1_red_rows	decision_positive	④
+P1	q2	rows_o1_red	decision_set	③
+P1	q2	rows_o1_not_red	decision_set	③
+P1	q2	verdict	decision	①
+P1	q3_denominator	reading	key	读法 7 配键
+P1	q3_denominator	batch	key	读法 7 配键
+P1	q3_denominator	*	pinned	各类计数（字段随类变）
+P1	q3_denominator_class	reading	key	读法 7 配键
+P1	q3_denominator_class	batch	key	读法 7 配键
+P1	q3_denominator_class	class	key	读法 7 配键
+P1	q3_denominator_class	rows	pinned	计数
+P1	q3_denominator_class	row_numbers	decision_set	③
+P1	q3_self_crash_row	row	key	读法 7 配键
+P1	q3_self_crash_row	where	pinned	落点描述（带调用序号与计数）
+P1	q3_self_crash_row	registration	decision	①
+P1	q3_self_crash_row	original_reading_5	decision	①
+P1	q3_row_125	row	pinned	行号本身
+P1	q3_row_125	ran	decision	①
+P1	q3_row_125	category	decision	①
+P1	q3_row_125	registration_batch_1	decision	①
+P1	q3_row_125	counted_registration_batch_1	decision	①
+P1	q3_row_125	registration_batch_2	decision	①
+P1	q3_row_125	counted_registration_batch_2	decision	①
+P1	q3_row_125	original_reading_5_batch_1	decision	①
+P1	q3_row_125	counted_original_reading_5_batch_1	decision	①
+P1	q3_row_125	original_reading_5_batch_2	decision	①
+P1	q3_row_125	counted_original_reading_5_batch_2	decision	①
+P1	verdict	q2	decision	①
+P1	verdict	q2_set_rows	pinned	计数
+P1	verdict	q2_o1_red_rows	decision_positive	④
+P1	verdict	d_registration_batch_1	pinned	计数
+P1	verdict	d_registration_batch_2	pinned	计数
+P1	verdict	d_original_reading_5_batch_1	pinned	计数
+P1	verdict	d_original_reading_5_batch_2	pinned	计数
+P1	verdict	row_125_counted_registration_batch_1	decision	①
+P1	verdict	rows_read	pinned	计数
+P1	verdict	table_rows	pinned	计数
+P1	verdict	rows_not_located	decision_set	③
+P1	verdict	unstable_memory_objects	not_compared	读法 7 不比（稳定性）
+P1	verdict	stability_baseline_files_differing	not_compared	读法 7 不比（稳定性）
+P1	verdict	rows_compiled_without_the_rebuild_check	pinned	计数
+P1	verdict	rows_with_an_errored_call_the_comparison_did_not_judge	pinned	计数
+P1	verdict	rows_with_o1_not_applicable_from_another_source	pinned	计数
+P1	verdict	untouched_rows_with_a_red_column	decision_positive	④
+P1	verdict	rows_whose_directory_differs_from_the_driver_product	pinned	计数
+P2	row	row_number	key	读法 7 配键
+P2	row	row_name	pinned	行名
+P2	row	lane	not_compared	趟内编排
+P2	row	status	decision	①
+P2	row	device_exit	pinned	其余数值
+P2	row	substituted_from	pinned	补位名
+P2	row	line_matches_the_registration	decision	①
+P2	row	mutated_row_name	pinned	行名
+P2	row	mutation_line_sha256	pinned	sha256
+P2	row	failed_attempts	pinned	计数
+P2	row	failed_attempt_1	pinned	名字
+P2	row	failed_attempt_2	pinned	名字
+P2	row	failed_attempt_3	pinned	名字
+P2	row	packages_checked_rebuilt	pinned	名字
+P2	row	copy_ns	not_compared	耗时
+P2	row	compile_ns	not_compared	耗时
+P2	row	compile_kind	not_compared	趟内编排
+P2	row	device_ns	not_compared	耗时
+P2	row	o3_ns	not_compared	耗时
+P2	row	bulky_dump_files_removed	not_compared	趟内编排
+P2	row	o3_status	today_only	读法 7 末条（整表 O3）
+P2	row	o3_exit	today_only	读法 7 末条（整表 O3）
+P2	row	o3_streams	today_only	读法 7 末条（整表 O3）
+P3	a1	*	not_compared	读法 7 不比（阳性对照）
+P3	a1_empty_mutation	*	not_compared	读法 7 不比（阳性对照）
+P3	a1_empty_mutation_touch	*	not_compared	读法 7 不比（阳性对照）
+P3	a8	*	not_compared	读法 7 不比（阳性对照）
+P3	a11	*	not_compared	读法 7 不比（稳定性）
+P3	z1	*	not_compared	读法 7 不比（稳定性）
+P3	z1_unstable_memory_objects	*	not_compared	读法 7 不比（稳定性）
+P3	q4	*	not_compared	读法 7 不比（可写挂载）
+P3	q4_trip	*	not_compared	读法 7 不比（可写挂载）
+P3	q4_trajectory	*	not_compared	读法 7 不比（可写挂载）
+P3	q4_trajectory_by_inode_creation	*	not_compared	读法 7 不比（可写挂载）
+P3	q4_counter_branch_state	*	not_compared	读法 7 不比（可写挂载）
+P3	q5_judged	*	not_compared	读法 7 不比（「已确认的丢了」）
+P3	q5_trajectory	*	not_compared	读法 7 不比（「已确认的丢了」）
+P3	q5_trajectory_cell	*	not_compared	读法 7 不比（「已确认的丢了」）
+P3	o3_third_stream_coverage	*	not_compared	读法 7 不比
+P3	config	*	not_compared	读法 7 不比
+P3	done	*	not_compared	读法 7 不比
+P3	q1	reading	key	读法 7 配键
+P3	q1	streams	key	读法 7 配键
+P3	q1	batch	key	读法 7 配键
+P3	q1	rows	pinned	计数
+P3	q1	invalid_rows	decision_set	③
+P3	q1	all_quiet_rows	decision_set	③
+P3	q1	verdict	decision	①
+P3	q1_row	row	key	读法 7 配键
+P3	q1_row	stream	key	读法 7 配键
+P3	q1_row	batch	key	读法 7 配键
+P3	q1_row	o1_comparison_red_calls	decision_positive	④
+P3	q1_row	O1-模型崩溃判官_red	decision_positive	④
+P3	q1_row	O1-RefFS_red	decision_positive	④
+P3	q1_row	O2_red	decision_positive	④
+P3	q1_row	O3甲_red	decision_positive	④
+P3	q1_row	O3乙_red	decision_positive	④
+P3	q1_row	*	pinned	峰值、为正段数、期末值、单点数
+P3	q2_named_row	row	key	读法 7 配键
+P3	q2_named_row	streams	key	读法 7 配键
+P3	q2_named_row	ran	decision	①
+P3	q2_named_row	status	decision	①
+P3	q2_named_row	touched	decision	①
+P3	q2_named_row	calls_with_a_difference	pinned	计数
+P3	q2_named_row	calls_whose_observation_differs	pinned	计数
+P3	q2_named_row	calls_whose_observation_is_the_same	pinned	计数
+P3	q2_named_row	o1_comparison_red_calls	decision_positive	④
+P3	q2_named_row_call	row	key	读法 7 配键
+P3	q2_named_row_call	stream	key	读法 7 配键
+P3	q2_named_row_call	call	key	读法 7 配键
+P3	q2_named_row_call	fields	pinned	名字
+P3	q2_named_row_call	objects	pinned	名字
+P3	q2_named_row_call	observation_differs	decision	①
+P3	q3	row	pinned	行号本身
+P3	q3	ran	decision	①
+P3	q3	status	decision	①
+P3	q3	call_panic	decision	①
+P3	q3	judged_calls_before_the_first_panic	pinned	计数
+P3	q3	states_judged	pinned	计数
+P3	q3	recovery_panic_states	pinned	计数
+P3	q3	touched	decision	①
+P3	q3	verdict	decision	①
+P3	verdict	q1	decision	①
+P3	verdict	q3	decision	①
+P3	verdict	*	not_compared	读法 7 不比（q4、q5、a1、a8、a11、z1、f7 与空变异两样）

@@ -1,8 +1,8 @@
 """E171 O3 一侧：冻结的执行器版本核对、起执行器、读执行器的判定行（登记第一节读法 7、8，5.4，作废条款 Z2、Z4）。
 
-冻结的那一版是 E170 第 1 次重跑（`research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out`）冻结的执行器目录
+冻结的那一版是 E170 第 1 次重跑的执行器目录改过（执行器默认全跑）之后重冻结的：`research/results/e170-r1-o3-spec-executor-2026-11-05-refreeze-executor.out` 是用它现跑出来的冻结参照，目录
 `scripts/experiment-apparatus/e170_second_run_o3_spec_executor/`：产物里 `name=freeze file=… sha256=…` 每个文件一行（不含 `comparator*`
-与 `mutation_driver*`），最后一行 `name=freeze_seed sha256_prefix16=…` 是盲测族的种子。本实验不改那一份，只读、只起它。
+与 `mutation_driver*`），最后一行 `name=freeze_seed sha256_prefix16=…` 是这一份目录内容的指纹（盲测族给导出装置的种子取登记的 `85441ae491419411`，写死在各驱动与复跑里，不随重冻结变）。本实验不改那一份，只读、只起它。
 
 那份参照产物在 research/results/ 下、可以被归档删掉（用户 2026-10-18 定：别的实验的产物缺了报本次未跑）：读不到时
 `freeze_reference_lines` 抛 `FreezeReferenceMissing`；comparator.py、o3_bad_image_judge.py（judge）、row_driver.py 开跑前经
@@ -41,17 +41,23 @@ import types
 from dataclasses import dataclass, field
 
 FROZEN_DIRECTORY_RELATIVE = "scripts/experiment-apparatus/e170_second_run_o3_spec_executor"
-FREEZE_REFERENCE_RELATIVE = "research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out"
+FREEZE_REFERENCE_RELATIVE = "research/results/e170-r1-o3-spec-executor-2026-11-05-refreeze-executor.out"
 FILES_OUTSIDE_THE_FREEZE = ("comparator", "mutation_driver")
 FREEZE_PREFIXES = ("name=freeze ", "name=freeze_seed ")
 FREEZE_FILE_PREFIX = "name=freeze file="
 FREEZE_SEED_PREFIX = "name=freeze_seed "
 EXECUTOR_SCRIPT = "executor_main.py"
 VERDICT_ERROR = "error"
-PARALLEL_REASON = "同一会话派出去的几个执行员各跑各的装置"
 # 本次未跑那一行的记号与退出码（写法照 scripts/experiment-apparatus/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER、NOT_RUN_EXIT_CODE）
 NOT_RUN_MARKER = "NOT_RUN_ARCHIVED_PRODUCT"
 NOT_RUN_EXIT_CODE = 77
+# 编译、装置与执行器读的线程数变量（任务服务给每次尝试设的那一组，名单照 scripts/hosts/ 下线程上限脚本文件头「设的变量」）：
+# 任务里面不再套线程包装，驱动按一条线道分到的线程把它们设进子进程的环境（thread_environment）
+CHILD_THREAD_VARIABLES = ("CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "SINGLEFS_CRASH_POINT_REPLAY_THREADS", "SINGLEFS_CRASH_INJECTION_THREADS",
+                          "SINGLEFS_FAULT_INJECTION_WORKER_THREADS", "SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS", "SINGLEFS_RANDOM_HISTORY_THREADS",
+                          "E161_THREADS", "SINGLEFS_CRASH_JUDGE_CPU_THREADS", "SINGLEFS_CRASH_AMPLIFICATION_THREADS", "E165_THREADS", "E168_THREADS",
+                          "E175_WORKER_THREADS", "E180_THREADS", "E182_THREADS", "E183_THREADS", "E184_THREADS", "E185_THREADS",
+                          "GATE_MUTATION_KEY_WORKERS", "SINGLEFS_THREAD_CAP")
 PATH_ONLY_CHANGES_TABLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "freeze-path-only-changes.tsv")
 PATH_ONLY_CHANGES_COLUMNS = 5
 SEED_NAME = "freeze_seed"
@@ -321,24 +327,29 @@ def read_executor_output(path: str) -> ExecutorReading:
     return reading
 
 
-def executor_command(repo_root: str, dumps: str, streams: list[str], batches: str, workers: int, output: str, memory_cap: str) -> list[str]:
-    """登记 5.4 的命令：`python3 executor_main.py --dumps <导出> --batches 1,2 --workers N --output <新文件>`，经 `capped.sh` 与 `run-with-memory-cap.sh`。
-    `--streams` 只列这一趟导出了的流（没导出的流没有文件可读）。"""
+def thread_environment(threads: int | str, base: dict[str, str] | None = None) -> dict[str, str]:
+    """子进程的环境：`base`（不给取此刻的进程环境）的一份拷贝，CHILD_THREAD_VARIABLES 每个都设成 `threads`。"""
+    environment = dict(os.environ if base is None else base)
+    environment.update({name: str(threads) for name in CHILD_THREAD_VARIABLES})
+    return environment
+
+
+def executor_command(repo_root: str, dumps: str, streams: list[str], batches: str, workers: int, output: str) -> list[str]:
+    """登记 5.4 的命令：`python3 executor_main.py --dumps <导出> --batches 1,2 --workers N --output <新文件>`，直接起（线程变量由 run_executor 设进环境，
+    内存额度由任务服务给，这里不套包装）。`--streams` 只列这一趟导出了的流（没导出的流没有文件可读）。"""
     script = os.path.join(repo_root, FROZEN_DIRECTORY_RELATIVE, EXECUTOR_SCRIPT)
-    return ["bash", os.path.join(repo_root, "scripts/hosts/run-with-memory-cap.sh"), memory_cap, "bash",
-            os.path.join(repo_root, "scripts/hosts/capped.sh"), str(workers), "nice", "-n", "19", "python3", script,
+    return ["nice", "-n", "19", "python3", script,
             "--dumps", dumps, "--streams", ",".join(streams), "--batches", batches, "--workers", str(workers), "--output", output]
 
 
-def run_executor(repo_root: str, dumps: str, streams: list[str], workers: int, output: str, memory_cap: str, log_path: str) -> tuple[int, int]:
-    """起冻结的执行器，交回 (退出码, 墙钟 ns)。墙钟在这个进程里用 `time.monotonic_ns` 计；每态耗时在执行器里自己计（`time_ns`）。不写 `.pyc`（冻结目录里不留东西）。"""
-    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", RUN_WITH_MEMORY_CAP_PARALLEL_REASON=PARALLEL_REASON,
-                       RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="执行器峰值表里没有这条命令，上限按派发提示的写法给",
-                       RUN_WITH_MEMORY_CAP_WAIT_SECONDS="1800")
+def run_executor(repo_root: str, dumps: str, streams: list[str], workers: int, output: str, log_path: str) -> tuple[int, int]:
+    """起冻结的执行器，交回 (退出码, 墙钟 ns)。墙钟在这个进程里用 `time.monotonic_ns` 计；每态耗时在执行器里自己计（`time_ns`）。不写 `.pyc`（冻结目录里不留东西）。
+    线程变量都设成 `workers`（thread_environment）。"""
+    environment = thread_environment(workers, dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
     started = time.monotonic_ns()
     with open(log_path, "w", encoding="utf-8") as log:
         # 执行器在冻结目录里起（cwd 是那里），所以导出与产物都要给绝对路径
-        completed = subprocess.run(executor_command(repo_root, os.path.abspath(dumps), streams, "1,2", workers, os.path.abspath(output), memory_cap),
+        completed = subprocess.run(executor_command(repo_root, os.path.abspath(dumps), streams, "1,2", workers, os.path.abspath(output)),
                                    cwd=os.path.join(repo_root, FROZEN_DIRECTORY_RELATIVE), env=environment, stdout=log, stderr=subprocess.STDOUT)
     return completed.returncode, time.monotonic_ns() - started
 

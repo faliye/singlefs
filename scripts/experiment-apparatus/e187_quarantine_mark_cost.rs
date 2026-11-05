@@ -31,7 +31,7 @@ const JOURNAL_HEADER_BYTES: u64 = 496;
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 /// 一条 journal 记录装几个点名项（`crates/singlefs-format/src/lib.rs` 的 `JOURNAL_NAMED_ENTRIES_PER_RECORD`，这里现算）。
 const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 64;
-/// 根槽宽 = physical_block_size，取 E142 那套几何的 512（`crates/singlefs-harness/src/new_pool_file_creation_regions.rs` 文件头）；
+/// 根槽宽 = physical_block_size，取 E142 那套几何的 512（`crates/singlefs-verification/src/new_pool_file_creation_regions.rs` 文件头）；
 /// 每次发布只写根环所在区域的那一块盘（`transaction.rs` 的 `WriteRootRecordForceUnitAccess`）。
 const ROOT_SLOT_BYTES: u64 = 512;
 const ROOT_SLOT_WRITES_PER_PUBLISH: u64 = 1;
@@ -70,7 +70,7 @@ const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
 const QUARANTINE_MARK_BIT: u16 = 0x4000;
 /// 几何敏感性里拿来对照的低位（登记第八节：低位让多数记录照样落叶）。
 const LOW_SPAN_BIT_PROBE: u16 = 0x0004;
-/// 旧读者的阳性对照：`crates/singlefs-checker-tier/src/bad_disk_input.rs` 那一条坏法的跨度段值与槽。
+/// 旧读者的阳性对照：`crates/singlefs-verification/src/bad_disk_input.rs` 那一条坏法的跨度段值与槽。
 const OLD_READER_POSITIVE_CONTROL_SPAN_FIELD: u16 = 0x7FFF;
 const OLD_READER_POSITIVE_CONTROL_SLOT: u64 = 50176;
 /// 第一版合法记录的跨度只有这两种（D3（空间分配） 已定项 7「第一版恒为 1 或 2」）。
@@ -317,10 +317,18 @@ struct AllocationNodePosition {
 /// 一片叶（两块盘同一个位置）及它的全部祖先与根：叶一变，父指针一路变到根（`allocation_record_tree.rs` 的 `nodes_whose_contents_changed`）。
 fn leaf_and_its_ancestors(root_level: u8, leaf_index: u64, positions: &mut BTreeSet<AllocationNodePosition>) {
     for device in 0..u32::try_from(DEVICE_COUNT).expect("两块盘") {
-        positions.insert(AllocationNodePosition { level: 0, device, index_in_device: leaf_index });
+        positions.insert(AllocationNodePosition {
+            level: 0,
+            device,
+            index_in_device: leaf_index,
+        });
         for level in 1..root_level {
             let index_in_device = leaf_index * ALLOCATION_RECORD_TREE_LEAF_SLOTS / span_in_slots_at_level(level);
-            positions.insert(AllocationNodePosition { level, device, index_in_device });
+            positions.insert(AllocationNodePosition {
+                level,
+                device,
+                index_in_device,
+            });
         }
     }
     positions.insert(AllocationNodePosition { level: root_level, device: 0, index_in_device: 0 });
@@ -3164,7 +3172,7 @@ fn run_segment_two(threads: usize) -> Vec<String> {
 const CRATES_FORMAT_SOURCE: &str = include_str!("../../crates/singlefs-format/src/lib.rs");
 const CRATES_ALLOCATOR_SOURCE: &str = include_str!("../../crates/singlefs-core/src/allocator.rs");
 const CRATES_CHECKER_WALK_SOURCE: &str = include_str!("../../crates/singlefs-checker/src/walk.rs");
-const CRATES_GPU_JUDGE_SOURCE: &str = include_str!("../../crates/singlefs-checker-tier/src/crash_judge_common.wgsl");
+const CRATES_GPU_JUDGE_SOURCE: &str = include_str!("../../crates/singlefs-verification/src/crash_judge_common.wgsl");
 
 fn crates_source_checks() -> Vec<(&'static str, &'static str, String, bool)> {
     let format_lines = [
@@ -3219,7 +3227,7 @@ fn crates_source_checks() -> Vec<(&'static str, &'static str, String, bool)> {
     let gpu_span_line = format!("let span = span_field & 0x{:04X}u;", !(ALLOCATION_RECORD_RELEASED_FLAG | QUARANTINE_MARK_BIT));
     checks.push((
         "gpu_span_mask",
-        "crates/singlefs-checker-tier/src/crash_judge_common.wgsl",
+        "crates/singlefs-verification/src/crash_judge_common.wgsl",
         gpu_span_line.clone(),
         CRATES_GPU_JUDGE_SOURCE.lines().any(|source_line| source_line.trim() == gpu_span_line),
     ));
@@ -3272,7 +3280,7 @@ const OLD_READER_FIELD_TABLE: [(&str, &str, &str, &str); 5] = [
     ),
     (
         "gpu_crash_judge",
-        "crates/singlefs-checker-tier/src/crash_judge_common.wgsl:2566",
+        "crates/singlefs-verification/src/crash_judge_common.wgsl:2566",
         "device=as_written slot=as_written span=16385_or_16386 generation=as_written span_field_kept_raw",
         "stops_the_walk_at_FAILURE_POINT_ALLOCATION_RECORD_OUTSIDE_THE_POOL_GEOMETRY",
     ),
@@ -3663,18 +3671,6 @@ fn threads_from_the_environment() -> usize {
         .unwrap_or_else(|| default_heavy_threads(include_str!("../../.claude/heavy-thread-default")))
 }
 
-/// 串行段当场声明（`scripts/hosts/core_usage.py` 文件头「声明」）：环境变量没设就不写。
-fn declare_the_core_usage(declaration: &str) {
-    let Ok(path) = std::env::var("SINGLEFS_SERIAL_DECLARATIONS") else {
-        return;
-    };
-    let seconds = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_secs());
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
-        // 声明写不进去只少一行提示，不影响产物。
-        let _ignored = writeln!(file, "{seconds}\t{declaration}");
-    }
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum RunMode {
     BothSegments,
@@ -3713,9 +3709,7 @@ fn main() {
     )];
     let mut stop_checks_hold = true;
     if runs_segment_one {
-        declare_the_core_usage("此刻串行：第一段只有八段微历史与几十张造出来的盘面，单线程几秒跑完");
         let (segment_one_lines, judgements) = run_segment_one();
-        declare_the_core_usage("此刻并行");
         stop_checks_hold = judgements.stop_checks_hold;
         lines.extend(segment_one_lines);
     }
@@ -4050,7 +4044,7 @@ mod tests {
     }
 
     /// 两次隔离挨得近（相隔 21 次与 2 次发布）、K = 64 的格：第一遍抽到的延迟与另一次回退的区间相交，第二遍补上，
-    /// 10 次回退都排上、每次都让一个隔离单元重新被引用（全量里出过的红，钉回快档）。
+    /// 10 次回退都排上、每次都让一个隔离单元重新被引用（全量里出过的红，钉回这一条）。
     #[test]
     fn close_quarantine_events_under_the_wide_window_still_get_ten_reviving_rollbacks() {
         for seed in [1, 2] {

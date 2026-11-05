@@ -1,0 +1,57 @@
+settle_round_not_times_the_rounds	settle_rounds * self.settle_round	self.settle_round
+retirement_tree_appends_only_when_records_are_added	ContainerTree::new(knobs.retirement_records, knobs.retirements_added, RETIREMENT_CONTAINER_RECORDS, true)	ContainerTree::new(knobs.retirement_records, knobs.retirements_added, RETIREMENT_CONTAINER_RECORDS, false)
+bottom_level_rounds_down	let mut levels = vec![count.div_ceil(bottom_capacity)];	let mut levels = vec![count / bottom_capacity];
+code_two_fanout_134	const CODE_TWO_FANOUT: u64 = 135;	const CODE_TWO_FANOUT: u64 = 134;
+tombstone_capacity_814	const TOMBSTONE_CONTAINER_RECORDS: u64 = 815;	const TOMBSTONE_CONTAINER_RECORDS: u64 = 814;
+container_records_after_admission_use_the_old_count	rest += tree.records_after * record_width	rest += tree.records * record_width
+carried_containers_do_not_subtract_the_open_container	(tree.containers - tree.open_container_rewritten) * CONTAINER_UNIT_MEMORY_BYTES	tree.containers * CONTAINER_UNIT_MEMORY_BYTES
+rewritten_index_nodes_round_the_span_up	nodes_at_level.saturating_sub(leftmost_touched_container / span)	nodes_at_level.saturating_sub(leftmost_touched_container.div_ceil(span))
+inode_leaves_round_down	knobs.live_inodes.div_ceil(INODE_LEAF_RECORDS).max(1)	(knobs.live_inodes / INODE_LEAF_RECORDS).max(1)
+allocation_records_one_per_unit	allocation_records: 2 * units,	allocation_records: units,
+persistent_depth_in_base_two	reach = reach.saturating_mul(fanout);	reach = reach.saturating_mul(fanout.min(2));
+bing_log_drops_the_allocation_records	        + 2 * ALLOCATION_RECORD_MEMORY_BYTES * geometry.rewritten_units\n}	        + 0\n}
+ding_compaction_copies_the_version_before	compaction == Compaction::WholeNewBase {\n        version_bytes_after(geometry)	compaction == Compaction::WholeNewBase {\n        version_bytes(geometry)
+ding_layers_reset_one_publish_late	let layers = publish_number % period;	let layers = (publish_number - 1) % period;
+installed_bytes_drop_the_fixed_point_nodes	        + FIXED_POINT_NODES * NODE_UNIT_MEMORY_BYTES\n        + (geometry.mapping_rewritten_nodes	        + (geometry.mapping_rewritten_nodes
+jia_today_drops_the_new_container_shapes	(2 + tree.new_containers - u64::from(!tree.appends))	(2 - u64::from(!tree.appends))
+open_container_rewritten_even_when_full	u64::from(added > 0 && containers > 0 && room > 0)	u64::from(added > 0 && containers > 0 && room + 1 > 0)
+cumulative_unlinks_count_only_the_intent	[(2 * unlink + 1, intent), (2 * unlink + 2, final_batch)]	[(2 * unlink + 1, intent), (2 * unlink + 2, final_batch)].into_iter().take(1)
+ordinary_allocation_pass_times_the_rounds_only	(settle_rounds + 1) * self.ordinary_allocation_pass	settle_rounds * self.ordinary_allocation_pass
+inode_leaves_copied_once_before_admission	ordinary_allocation_pass += 2 * (INODE_RECORD_MEMORY_BYTES	ordinary_allocation_pass += (INODE_RECORD_MEMORY_BYTES
+mapping_carried_nodes_copied_once	+ 2 * self.mapping_carried_nodes_each_copy	+ self.mapping_carried_nodes_each_copy
+mapping_capacity_ignores_the_fill	(CENTRAL_MAPPING_TREE.leaf_entries / 2, CENTRAL_MAPPING_TREE.internal_entries / 2)	(CENTRAL_MAPPING_TREE.leaf_entries, CENTRAL_MAPPING_TREE.internal_entries)
+allocation_touched_leaves_swapped	TouchedLeaves::Spread => allocation_levels_after[0].min(allocation_changed_records),\n            TouchedLeaves::Focused => allocation_levels_after[0].min(2),	TouchedLeaves::Spread => allocation_levels_after[0].min(2),\n            TouchedLeaves::Focused => allocation_levels_after[0].min(allocation_changed_records),
+mapping_entries_keep_the_tree_table	let mapping_entries = core_units - 1 + allocation_nodes;	let mapping_entries = core_units + allocation_nodes;
+allocation_slots_count_a_unit_as_one_slot	let slots = 2 * (containers + inode_leaves + file_data_units + INSTANCE_TABLE_UNITS)	let slots = (containers + inode_leaves + file_data_units + INSTANCE_TABLE_UNITS)
+allocation_records_grouped_once_per_round	settle_round += 2 * geometry.allocation_records * ALLOCATION_RECORD_MEMORY_BYTES;	settle_round += geometry.allocation_records * ALLOCATION_RECORD_MEMORY_BYTES;
+recompute_after_admission_drops_the_mapping_key_bytes	MAPPED_UNIT_WITH_LOCATIONS_BYTES + MAPPED_UNIT_ENTRY_BYTES + MAPPING_ENTRY_TABLE_BYTES + MAPPING_KEY_BYTES_ENTRY_BYTES	MAPPED_UNIT_WITH_LOCATIONS_BYTES + MAPPED_UNIT_ENTRY_BYTES + MAPPING_ENTRY_TABLE_BYTES
+residual_does_not_cap_the_changed_mappings	let changed_mappings = geometry.mapping_changed_entries.min(geometry.mapping_entries_after);	let changed_mappings = geometry.mapping_changed_entries;
+yi2_after_admission_touches_two_fewer_segments	.count() as u64 + 4;	.count() as u64 + 2;
+bing_log_drops_the_mapping_and_allocation_paths	        geometry.mapping_levels.len() as u64,\n        geometry.allocation_levels.len() as u64,\n    ];	    ];
+installed_bytes_drop_the_rewritten_mapping_and_allocation_nodes	        + (geometry.mapping_rewritten_nodes + geometry.allocation_rewritten_nodes) * NODE_UNIT_MEMORY_BYTES\n}	        + 0\n}
+accounting_entries_without_the_step_row	const STEP_ACCOUNTING_ROWS: u64 = 1;	const STEP_ACCOUNTING_ROWS: u64 = 0;
+multi_level_shape_counts_every_node_as_a_child	+ (nodes - 1) * (key_structure + MULTI_LEVEL_CHILD_POSITION_BYTES)	+ nodes * (key_structure + MULTI_LEVEL_CHILD_POSITION_BYTES)
+tombstone_shape_not_copied_when_not_appending	        ordinary_allocation_pass += shape_copied_when_not_appending(tree);	        ordinary_allocation_pass += 0;
+tombstone_shape_item_times_the_rounds_only	(settle_rounds + 1) * shape_copied_when_not_appending(tombstones)	settle_rounds * shape_copied_when_not_appending(tombstones)
+lineage_shape_not_copied_when_not_appending	    settle_round += shape_copied_when_not_appending(lineage);	    settle_round += 0;
+lineage_shape_item_times_the_rounds_plus_one	settle_rounds * shape_copied_when_not_appending(lineage)	(settle_rounds + 1) * shape_copied_when_not_appending(lineage)
+not_appending_condition_swapped	if tree.appends { 0 } else { tree.shape_bytes() }	if tree.appends { tree.shape_bytes() } else { 0 }
+after_admission_drops_the_carried_file_data_units	carried_file_data_units: CARRIED_DATA_UNIT_BYTES * knobs.file_data_units,	carried_file_data_units: 0,
+after_admission_drops_the_carried_file_data_pointers	carried_file_data_pointers: DATA_POINTER_MEMORY_BYTES * knobs.file_data_units,	carried_file_data_pointers: 0,
+version_bytes_drop_the_data_pointers	(without_pointers, DATA_POINTER_MEMORY_BYTES * knobs.file_data_units)	(without_pointers, 0)
+yi2_sharing_off_skips_the_untouched_trees	        sharing_off_pass += whole_container_tree_bytes(tree, record_width);	        sharing_off_pass += u64::from(tree.added > 0) * whole_container_tree_bytes(tree, record_width);
+yi2_sharing_off_copies_only_the_open_container_records	fn whole_container_tree_bytes(tree: &ContainerTree, record_width: u64) -> u64 {\n    tree.records * record_width	fn whole_container_tree_bytes(tree: &ContainerTree, record_width: u64) -> u64 {\n    tree.fill * record_width
+yi1_inode_second_copy_in_the_first_registration_form	let inode_leaves_second_copy = INODE_RECORD_MEMORY_BYTES * knobs.live_inodes + CONTAINER_SHELL_BYTES * geometry.inode_leaves;	let inode_leaves_second_copy = REFERENCE_COUNTED_POINTER_BYTES * geometry.inode_leaves + INODE_LEAF_RECORDS.min(knobs.live_inodes) * INODE_RECORD_MEMORY_BYTES;
+yi1_drops_the_copy_on_write_of_the_rewritten_container	if is_shared { tree.open_container_rewritten * tree.fill * record_width } else { 0 }	if is_shared { 0 } else { 0 }
+yi1_inode_first_copy_copies_every_inode	REFERENCE_COUNTED_POINTER_BYTES * geometry.inode_leaves + INODE_LEAF_RECORDS.min(knobs.live_inodes) * INODE_RECORD_MEMORY_BYTES	REFERENCE_COUNTED_POINTER_BYTES * geometry.inode_leaves + knobs.live_inodes * INODE_RECORD_MEMORY_BYTES
+yi1_after_admission_unit_bytes_times_the_unit_shell	{ if is_shared { REFERENCE_COUNTED_POINTER_BYTES * units } else { CONTAINER_UNIT_MEMORY_BYTES * units } };\n    let carried_node_units = |units: u64| -> u64 { if is_shared { REFERENCE_COUNTED_POINTER_BYTES * units }	{ if is_shared { UNIT_SHELL_BYTES * units } else { CONTAINER_UNIT_MEMORY_BYTES * units } };\n    let carried_node_units = |units: u64| -> u64 { if is_shared { UNIT_SHELL_BYTES * units }
+yi1_after_admission_drops_the_data_pointers	let yi1_carried_file_data_pointers = knobs.file_data_units * DATA_POINTER_MEMORY_BYTES;	let yi1_carried_file_data_pointers = 0;
+bing_peak_replaced_old_bytes_count_the_new_containers	tree.open_container_rewritten * UNIT_BYTES	(tree.open_container_rewritten + tree.new_containers) * UNIT_BYTES
+ding_peak_drops_the_residual	+ new_base_copy + residual_before / geometry.knobs.settle_rounds + recomputed_after_in_the_peak	+ new_base_copy
+ding_peak_at_compaction_takes_the_residual	let recomputed_after_in_the_peak = if compacts_now { recomputed_in_full(geometry).1 } else { residual_after };	let recomputed_after_in_the_peak = residual_after;
+cumulative_unlinks_start_at_one_record	let intent = Knobs { tombstone_records: unlink, tombstones_added: 1, ..Knobs::main_geometry() };\n        let final_batch = Knobs { tombstone_records: unlink + 1, tombstones_added: 0,	let intent = Knobs { tombstone_records: unlink + 1, tombstones_added: 1, ..Knobs::main_geometry() };\n        let final_batch = Knobs { tombstone_records: unlink + 2, tombstones_added: 0,
+cumulative_ding_compacts_by_the_unlink_number	let ding = ding_bytes(&geometry, publish_number % ding_period == 0, Compaction::WholeNewBase);	let ding = ding_bytes(&geometry, publish_number % 2 == 0 && (publish_number / 2) % ding_period == 0, Compaction::WholeNewBase);
+cumulative_ratio_pair_keeps_the_arm_enum_label	cumulative_arm_name(arm),\n                ratio_text(jia_copied, other_copied),	arm.label(),\n                ratio_text(jia_copied, other_copied),
+cumulative_arm_line_keeps_the_arm_enum_label	let label = cumulative_arm_name(arm);	let label = arm.label();
+cumulative_arm_name_ding_without_compaction	{ "ding_period_64_whole_new_base" } else { arm.label() }	{ "ding_without_compaction" } else { arm.label() }
+cumulative_ratio_divides_by_the_bing_arm_for_every_pair	let (jia, other) = (totals.jia, totals.arm(arm));	let (jia, other) = (totals.jia, totals.bing);

@@ -27,17 +27,19 @@ import sys
 from dataclasses import dataclass
 
 import collusion_matrix as matrix
+import list_check
 import segment_one_comparator as segment_one
 from result_lines import ResultLines, field
 from row_driver import REBUILD_CHECK_FIELD
 from run_directory import TOUCH_STREAM_NAMES, RunDirectory, file_sha256, load_run_directory, result_lines_named
 
-TABLE_ROWS = 281  # 117 + 164（登记第七节 A6）
+# 整表行数：改后两张名单第一列之并现算（E171 第 2 次重跑登记读法 4、7：撤掉的行留空号，不写死）；复跑第 1 次重跑那一份产物时由 --table-rows 给当时的 281
+TABLE_ROWS = len(list_check.whole_table_row_numbers())
 STATUS_OK = "ok"
 RAN_EXIT_CODE = "0"
 DEVICE_STOP_EXIT_CODE = "3"  # 装置自己停机（S 类回比不过）：原比对器 `collusion_report.classify_row` 的 `device_stop`，不进分母
-TIMEOUT_EXIT_CODE = "253"  # run-with-memory-cap.sh 的超时
-WRAPPER_EXIT_CODES = ("250", "251", "252", "254")  # 包装自己的其余结局（作废 Z3）
+TIMEOUT_EXIT_CODE = "253"  # row_driver.py 的行限时（超时由驱动杀整组并记这个码）
+WRAPPER_EXIT_CODES = ("250", "251", "252", "254")  # 早先产物里内存包装自己的其余结局（作废 Z3）：读旧产物时仍按这几个码认
 NO_RECOVERY_PANIC = "-"
 
 CATEGORY_COUNTED = "counted"
@@ -462,15 +464,18 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--product-prefix", required=True)
     parser.add_argument("--product-suffix", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--table-rows", type=int, default=TABLE_ROWS, help="整表行数（默认照改后的两张名单现算）")
     arguments = parser.parse_args(argument_list)
-    if segment_one.report_missing_inputs("segment_two_comparator.py", [*arguments.dumps_root, arguments.baseline, *arguments.stability_baseline,
-                                                                       arguments.rows_root, arguments.driver_product, arguments.mutations_table]):
-        return segment_one.NOT_RUN_EXIT_CODE   # 给的输入有不在的：逐项报本次未跑，一行产物都不写
+    # 先按路径核「是不是这一趟的」（不碰盘），再核在不在：接错了另一趟的输入，不管它在不在都退 2（修订 8 第 8.5 节第 1 条与「主 agent 认定」
+    # 「对不上退 2」；E171 第 2 次重跑登记修订 3 照 segment_one_comparator.py 换的同一处次序），不落进本次未跑的 77 里被当成没跑；接对了的输入缺了，照旧报本次未跑。
     outside = inputs_outside_this_run(arguments.dumps_root, arguments.product_prefix, arguments.product_suffix,
                                       [arguments.baseline, arguments.rows_root, *arguments.stability_baseline], [arguments.driver_product])
     if outside:
         print("比对器只读这一趟的导出根与产物前缀（登记修订 8 第 8.5 节第 1 条），不在这一趟里的输入：" + "，".join(outside), file=sys.stderr)
         return 2
+    if segment_one.report_missing_inputs("segment_two_comparator.py", [*arguments.dumps_root, arguments.baseline, *arguments.stability_baseline,
+                                                                       arguments.rows_root, arguments.driver_product, arguments.mutations_table]):
+        return segment_one.NOT_RUN_EXIT_CODE   # 给的输入有不在的：逐项报本次未跑，一行产物都不写
     lines = ResultLines(arguments.output)
     lines.result(f"name=config segment=s2 comparator=segment_two baseline={field(arguments.baseline)} "
                  f"stability_baselines={field(','.join(arguments.stability_baseline) or '-')} rows_root={field(arguments.rows_root)} "
@@ -494,7 +499,7 @@ def main(argument_list: list[str]) -> int:
     lines.result(f"name=verdict q2={q2} q2_set_rows={len(found)} q2_o1_red_rows={sum(q2_row.comparison_red_calls > 0 for q2_row in found)} "
                  + " ".join(f"d_{key}={value}" for key, value in denominators.items())
                  + f" row_125_counted_registration_batch_1={str(row_125 is not None and row_125.category(READING_REGISTRATION, matrix.FIRST_BATCH) == CATEGORY_COUNTED).lower()}"
-                 + f" rows_read={len(rows)} table_rows={TABLE_ROWS} rows_not_located={field(','.join(map(str, not_located)) or '-')}"
+                 + f" rows_read={len(rows)} table_rows={arguments.table_rows} rows_not_located={field(','.join(map(str, not_located)) or '-')}"
                  + f" unstable_memory_objects={len(unstable)} stability_baseline_files_differing={stability_differing} "
                  + " ".join(f"{key}={value}" for key, value in checks.items()))
     lines.finish()

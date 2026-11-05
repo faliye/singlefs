@@ -221,6 +221,24 @@ _lib_changed_paths_added_lines_raw() {
 # ── 直接跑（不是 source）时：只认 --selftest，在临时仓里自证 ─────────────────
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   set -uo pipefail
+  # 弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道：命令行第一个词是 --selftest，或祖先里有一个的命令行里带 --selftest（自证起的子进程）才放行；
+  # 否则 LIB_CHANGED_PATHS_BREAK 设了，点名它、说它只在自证里认，退 2。source 进阶段时不走这一段，阶段那一侧的读法见上面 C839 一段
+  inside_selftest() { # 往上数这个进程的祖先，有一个的命令行里带 --selftest 就退 0
+    local pid="$PPID" stat words word fields
+    while ((pid > 1)); do
+      mapfile -d '' -t words 2> /dev/null < "/proc/$pid/cmdline" || return 1
+      for word in "${words[@]}"; do [[ "$word" == --selftest ]] && return 0; done
+      IFS= read -r stat 2> /dev/null < "/proc/$pid/stat" || return 1
+      read -ra fields <<< "${stat##*) }"
+      pid="${fields[1]:-0}"
+    done
+    return 1
+  }
+  if [[ -n "${LIB_CHANGED_PATHS_BREAK:-}" && "${1:-}" != "--selftest" ]] && ! inside_selftest; then
+    echo "  ✗ LIB_CHANGED_PATHS_BREAK 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做" >&2
+    echo "     → 怎么办：unset LIB_CHANGED_PATHS_BREAK 再来；要看开关红在哪一项，跑 LIB_CHANGED_PATHS_BREAK=<项> bash scripts/gate/changed-paths.sh --selftest" >&2
+    exit 2
+  fi
   [[ "${1:-}" == "--selftest" ]] || { echo "  ✗ 用法：bash scripts/gate/changed-paths.sh --selftest（平时由门禁阶段 source 它）"; echo "     → 怎么办：自证就带 --selftest；要取改动路径，在阶段里 source 它再调 gate_diff_base / gate_changed_paths。"; exit 2; }
   _lib_changed_paths_break="${LIB_CHANGED_PATHS_BREAK:-}"
   library_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"

@@ -16,12 +16,11 @@ R8-14 H20 写分到别的台也收	    supported = h20["steps_3_and_9_on_other_h
 R8-15 干跑配置在 start 阶段也算过	    if dry and phase == "start" and not broken("dry-run-accepted"):	    if False:
 R8-16 第 7 步不排队首	(unit.name != "step-7", -unit.estimated_seconds, unit.name)	(unit.name == "step-7", -unit.estimated_seconds, unit.name)
 R8-17 下游要每个依赖都在才算	if unit.name not in found and any(dep in found for dep in unit.deps):	if unit.name not in found and all(dep in found for dep in unit.deps):
-R8-18 放得下只看线程	    return threads <= budget.threads and memory <= budget.memory_bytes	    return threads <= budget.threads
+R8-18 放得下不算在跑的单元	sum(item.threads for item in running) + unit.threads <= budget.threads	unit.threads <= budget.threads
 R8-19 第二次的 TAG 记成 -attempt1	    return "" if attempt == 1 else f"-attempt{attempt}"	    return "" if attempt == 1 else f"-attempt{attempt - 1}"
 R8-20 续跑不核产物行数	        elif line_count(path) != lines:	        elif False:
 R8-21 同时在跑只认第 7 步之前起的	other_start < end and (other_end is None or other_end > start)	other_start < start and (other_end is None or other_end > start)
 R8-22 停派文件不拦	    if stop_file and os.path.exists(stop_file) and not broken("stop-file-ignored"):	    if False:
 R8-23 树里 crates/mutations.tsv 变了不停	    if actual != STATE["mutations_sha256"]:	    if False:
 R8-24 对照按出现次序配行	            identity = (kind,) + tuple((name, values.pop(name, "absent")) for name in identity_fields)	            identity = (kind, ("occurrence", str(sum(1 for key in keyed if key[0] == kind) + 1)))
-R8-25 s15 的 triggered 不改名	        if name == RENAMED_S15_KEY[0] and not broken("s15-triggered-kept"):	        if False:
-R8-26 行耗时一律记本机	else ledger.get((step, values.get("row_number", "?")), "1")	else "1"
+R8-26 行耗时一律记本机	    return ledger.get((step, row), "1")	    return "1"

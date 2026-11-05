@@ -2,8 +2,8 @@
 # E170 第 2 次重跑第二段 Q5 那一半（`research/prompts/e170-r2-prereg.md` 12.8 分段表「第二段」、修订 2 的 12.13–12.15）：
 # Z 族输入核对（含第一段乙没核的 impl-verdicts.tsv）、v2-487 判 Z1 批 1–3 / Z3 / Z4 / Z5 批 1–3、Q5-pc（v2 原样判 Z1 / Z5 批 1–2、Z3、Z4）、
 # Q5-e 第一项、Q5-d 与 Q4-fmt-487、照抄核对（Q5-i、Q5-pc3、XC8 / XC9）、Q5 比对器（含 B4-487、B15、B17、Q5-pc2）两趟。全是 Python，不编 Rust。
-# 跑法（在仓根，整条脚本经两层包装）：
-#   bash scripts/hosts/capped.sh <线程> bash scripts/hosts/run-with-memory-cap.sh 8G \
+# 跑法（在仓根，整条命令交 task-server，内存额度与线程由服务定）：
+#   task-server/task submit -- \
 #     bash scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh <日期标签> <工作进程数> <空的草稿目录> [产物目录]
 # 产物：research/results/e170-r2-o3-spec-executor-<日期标签>-s2-q5-*.out 与 -s2b-known-bad-recopy*.out，已存在就不覆盖（noclobber；Python 一侧用 open(…, "x")）。
 # 每一步的退出码记进 -s2-q5-run-status.out；一步失败不吞，照记、接着跑后面不依赖它的步。
@@ -109,8 +109,8 @@ run_executor() {  # <版本：v487|v2> <导出目录> <批> <产物>；版本按
   esac
   (cd "$version_directory" && python3 executor_main.py --dumps "$2" --batches "$3" --workers "$WORKERS" --output "$4")
 }
-judge_images() {  # <执行器目录> <冻结参照> <输入名> <导出目录> <产物> [已知坏镜像目录]
-  local known=(); [ $# -ge 6 ] && known=(--known-bad-dir "$6")
+judge_images() {  # <执行器目录> <冻结参照> <输入名> <导出目录> <产物> [已知坏镜像目录；不给就是这个输入没有已知坏镜像（Z3）]
+  local known=(--known-bad-not-applicable); [ $# -ge 6 ] && known=(--known-bad-dir "$6")
   (cd "$V2" && python3 comparator_bad_image_judge.py --executor-directory "$1" --input-label "$3" --dumps "$4" "${known[@]}" \
      --freeze-reference "$2" --output "$5")
 }
@@ -196,7 +196,8 @@ compare() {  # <产物> <冻结参照> <今天那一边的前缀> [额外参数.
 }
 step comparator compare "$P-comparator.out" "$SCRATCH/v2-487-freeze-reference.out" "$P-v2-487" \
   --record-paths "$P-record-paths.out" --anchors-b15 Z3-I3,Z4-I4 --b17 "$PB.out:$ZKB" --positive-control-row-input Z3-I3 --scratch "$SCRATCH"
-step pc-comparator compare "$P-pc-comparator.out" "$V2_FREEZE" "$P-pc-v2"
+step pc-comparator compare "$P-pc-comparator.out" "$V2_FREEZE" "$P-pc-v2" \
+  --record-paths "$P-record-paths.out" --anchors-b15 Z3-I3,Z4-I4 --b17 "$PB.out:$ZKB" --positive-control-row-input Z3-I3 --scratch "$SCRATCH"
 
 freeze_check v2_487 "$V487" "$S1B" - end >> "$STATUS"
 freeze_check v1_487 "$V1487" "$S1B" v1_487 end >> "$STATUS"

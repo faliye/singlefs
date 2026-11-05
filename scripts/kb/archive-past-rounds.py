@@ -57,6 +57,7 @@
         （`GATE_BASE`，否则 `@{upstream}` 的 merge-base，都没有就 HEAD），见 base_of 的说明。
         没改过 = 它是上一次提交固化下来的，属于上一轮及更早。
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
+        带 assume-unchanged 或 skip-worktree 索引标记的文件（Git 可能跳过差异检查，保守留下）、
         `abandoned-rounds.tsv`（登记表，门禁 doc-process-records 的 abandoned-rounds 格的输入）、还被代码当输入的产物（still_an_input）、
         被检查读的 .tsv 登记表非注释行点名的产物（named_by_registries：门禁目录下的 .tsv，门禁目录照 .claude/gate-directory 登记、没登记取 .claude/gate.d；
         scripts/ 与 crates/ 下的 .tsv，钉表、变异表 scripts/mutation/tables/、crates/mutations.tsv 都在里面）。
@@ -131,8 +132,9 @@ BROKEN = os.environ.get("ARCHIVE_PAST_ROUNDS_BREAK", "")
 
 
 def git(*args, root="."):
-    return subprocess.run(["git", "-c", "core.quotepath=false", *args], cwd=root,
-                          capture_output=True, text=True, check=True).stdout
+    # NUL 分隔的路径中也可能含 CR/LF，不能经 text=True 做换行转换。
+    return os.fsdecode(subprocess.run(["git", "-c", "core.quotepath=false", *args], cwd=root,
+                                     capture_output=True, check=True).stdout)
 
 
 class BaseUnavailable(Exception):
@@ -162,17 +164,34 @@ def base_of(root="."):
     return base
 
 
-def past_round_files(root="."):
+def past_round_files(root=".", snapshots=None):
     # gitlink（模式位 160000，子模块）不是文件：--apply 对它 os.remove 抛 IsADirectoryError，后面的 stale_exclusions 与 missing_code_inputs 一条都跑不到（C437）。
     # 只有 ls-files --stage 带模式位；冲突时同一路径有几个阶段，去重。
     tracked = []
-    for entry in git("ls-files", "--stage", *DIRS, root=root).splitlines():
+    for entry in git("ls-files", "-v", "--stage", "-z", "--", *DIRS, root=root).split("\0"):
         meta, _, path = entry.partition("\t")
-        if not path or (meta.split()[0] == "160000" and BROKEN != "gitlinks-kept"):
+        if not path:
+            continue
+        tag, mode, *_ = meta.split()
+        # Git 可跳过这些路径的工作区差异；不能据 diff 干净判定可删。
+        if tag.islower() or tag == 'S':
+            continue
+        if mode == "160000" and BROKEN != "gitlinks-kept":
             continue
         tracked.append(path)
     tracked = sorted(set(tracked))
-    dirty = set(p for p in git("diff", "--name-only", base_of(root), "--", *DIRS, root=root).splitlines() if p)
+    # 快照必须早于差异检查；检查后才记录会把这段间隙的新写入当作可删的原文。
+    if snapshots is not None:
+        for path in tracked:
+            try:
+                snapshots[path] = os.lstat(os.path.join(root, path))
+            except FileNotFoundError:
+                pass
+    dirty = set(p for p in git("diff", "--name-only", "-z", base_of(root), "--", *DIRS, root=root).split("\0") if p)
+    # 归档引用固定到 HEAD：工作区或索引不等于 HEAD 的内容都不能删。
+    dirty.update(p for p in git("diff", "--name-only", "-z", "HEAD", "--", *DIRS, root=root).split("\0")
+                 if p and os.path.lexists(os.path.join(root, p)))
+    dirty.update(git("diff", "--cached", "--name-only", "-z", "HEAD", "--", *DIRS, root=root).split("\0"))
     return sorted(p for p in tracked if p not in dirty and not KEEP.search(p))
 
 
@@ -437,6 +456,8 @@ def rewrite_links(root, doomed, commit=None):
         commit = commit_before_deletion(root)
     for relative in text_files(root):
         path = os.path.join(root, relative)
+        if os.path.commonpath([os.path.realpath(root), os.path.realpath(path)]) != os.path.realpath(root):
+            continue
         if guarded(relative):
             try:
                 kept = sum(1 for match in LINK.finditer(open(path, encoding="utf-8").read()) if match.group(0) in doomed)
@@ -447,7 +468,9 @@ def rewrite_links(root, doomed, commit=None):
                 kept_hits += kept
             continue
         try:
-            text = open(path, encoding="utf-8").read()
+            with open(path, 'rb') as handle:
+                original = handle.read()
+            text = original.decode('utf-8')
         except (UnicodeDecodeError, OSError):
             continue
         hits = 0
@@ -471,7 +494,8 @@ def rewrite_links(root, doomed, commit=None):
         new = LINK.sub(fix, text)
         if hits:
             # 反引号里的路径换掉之后那对反引号就多余了，留着不碍事；括注重复的收一下
-            open(path, "w", encoding="utf-8").write(new)
+            from lib_atomic_replace import replace_file_contents_by_rename, unchanged_bytes
+            replace_file_contents_by_rename(path, new, check_before_rename=lambda: unchanged_bytes(path, original))
             changed += hits
             touched += 1
     return changed, touched, kept_files, kept_hits
@@ -551,7 +575,8 @@ def run(root, apply_changes, keep_registered=False):
         print("               真要按 HEAD 算（只有手里一个提交都没暂存时才成立），显式写 GATE_BASE=HEAD。")
         return 2
     try:
-        doomed = past_round_files(root)
+        snapshots = {}
+        doomed = past_round_files(root, snapshots=snapshots if apply_changes else None)
         # 磁盘上已删、索引里还跟踪着的（上一趟 --apply 删的，还没暂存或提交）：不再算待归档，--apply 也不再删它们
         splitting = BROKEN != ("rerun-crashes" if apply_changes else "check-counts-index")
         gone = [p for p in doomed if splitting and not os.path.lexists(os.path.join(root, p))]
@@ -592,7 +617,8 @@ def run(root, apply_changes, keep_registered=False):
         kept = sum(len(names) for base in DIRS for _, _, names in os.walk(os.path.join(root, base)))
         print("  ✓ 没有上一轮留下的实验记录（%s 下磁盘上现有 %d 份，都是本轮的或按规则保留的；「这一轮」的起点 %s，取法同门禁 doc-process-records 的 knowledge-sync 格：changed-paths.sh 的 gate_diff_base gate）"
               % ("、".join(DIRS), kept, base_of(root)))
-        print("     保留的四类：三方判决 *-main-verification.md（kb 的依据指着它）、abandoned-rounds.tsv（门禁 doc-process-records 的 abandoned-rounds 格的输入）、"
+        print("     保留的五类：三方判决 *-main-verification.md（kb 的依据指着它）、abandoned-rounds.tsv（门禁 doc-process-records 的 abandoned-rounds 格的输入）、"
+              "带 assume-unchanged 或 skip-worktree 标记的文件、"
               "还被代码当输入的产物（这一次 %d 份）、被检查读的登记表点名的产物（这一次 %d 份），后两类逐个列在上面" % (len(inputs), len(registered)))
         return 0
     if not apply_changes:
@@ -621,6 +647,16 @@ def run(root, apply_changes, keep_registered=False):
     commit = commit_before_deletion(root)
     changed, touched, kept_files, kept_hits = rewrite_links(root, doomed + gone, commit)   # 引用在删之前改，写的是删之前的提交
     for relative in doomed:
+        before = snapshots.get(relative)
+        try:
+            now = os.lstat(os.path.join(root, relative))
+        except FileNotFoundError:
+            continue
+        fields = ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns', 'st_mode')
+        if before is None or any(getattr(before, field) != getattr(now, field) for field in fields):
+            print(f'  ✗ {relative} 在检查之后被改过，停止删除；此前已处理的引用与文件不回退')
+            print('     → 怎么办：核对这份文件的新内容，重新确认归档范围后再跑')
+            return 1
         os.remove(os.path.join(root, relative))
     dangling = dangling_registry_namings(root)                      # 删完再算一遍：这一趟删掉的平铺登记表点名的那几份落进来
     dangling_namings = {entry.split("  ", 1)[0] for entry in dangling}
@@ -1260,6 +1296,39 @@ def main(argv):
     return run(root, "--apply" in argv, "--keep-registered" in argv)
 
 
+BREAK_VARIABLES = ("ARCHIVE_PAST_ROUNDS_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行里有 --selftest；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or "--selftest" in arguments or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/archive-past-rounds.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

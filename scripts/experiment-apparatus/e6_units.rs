@@ -176,13 +176,31 @@ fn cpu_has_aes() -> bool {
         .unwrap_or(false)
 }
 
+/// 登记的轮数；不给参数就是它。
+const REGISTERED_ROUND_COUNT: usize = 5;
+
+/// 与登记规模不同的参数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+/// 每项是（名字，这一趟的值，登记的值）；全部等于登记值时不接。
+fn reduced_scale_note(scales: &[(&str, u64, u64)]) -> String {
+    let registered_values: Vec<String> = scales
+        .iter()
+        .filter(|(_, actual, registered)| actual != registered)
+        .map(|(name, _, registered)| format!("registered_{name}={registered}"))
+        .collect();
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 fn main() {
     // vm-bench.sh 把盘路径当前缀参数塞进来，本实验不碰盘，跳过它们。
     let rounds: usize = std::env::args()
         .skip(1)
         .find(|argument| !argument.starts_with("/dev/"))
         .and_then(|argument_text| argument_text.parse().ok())
-        .unwrap_or(5);
+        .unwrap_or(REGISTERED_ROUND_COUNT);
     let mut emitter = Emitter::new();
     let mut output_buffer = String::new();
     let mut say = |line: String| {
@@ -192,7 +210,8 @@ fn main() {
 
     let aes_ni = cpu_has_aes();
     say(emitter.emit_raw(&format!(
-        "name=config total_mib={TOTAL_MIB} rounds={rounds} cpu_aes={aes_ni}"
+        "name=config total_mib={TOTAL_MIB} rounds={rounds} cpu_aes={aes_ni}{}",
+        reduced_scale_note(&[("rounds", rounds as u64, REGISTERED_ROUND_COUNT as u64)])
     )));
 
     // ── 已知答案测试：先判「算的对不对」，再谈「算得快不快」 ──
@@ -316,5 +335,12 @@ mod tests {
         let (_, tagchk_with_4096_byte_units) = seal(CipherAlgorithm::Aes, &mut buffer_sealed_with_4096_byte_units, 4096);
         let (_, tagchk_with_65536_byte_units) = seal(CipherAlgorithm::Aes, &mut buffer_sealed_with_65536_byte_units, 65536);
         assert_ne!(tagchk_with_4096_byte_units, tagchk_with_65536_byte_units, "换单元大小之后分块没变，自变量没在动");
+    }
+
+    /// 给了缩规模的轮数，config 行要写缩过、不当正式产物；登记轮数不加这一段。
+    #[test]
+    fn reduced_round_count_is_marked_and_registered_one_is_not() {
+        assert_eq!(reduced_scale_note(&[("rounds", REGISTERED_ROUND_COUNT as u64, REGISTERED_ROUND_COUNT as u64)]), "");
+        assert_eq!(reduced_scale_note(&[("rounds", 1, REGISTERED_ROUND_COUNT as u64)]), " reduced=yes registered_rounds=5 not_official_product=yes");
     }
 }

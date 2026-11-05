@@ -217,11 +217,15 @@ def judge_section(lines, title, quote):
 
 def check_reports(report_paths, roots, background_paths, unchanged_since):
     by_basename = {}
+    known_real_paths = {}   # 文件名 → 已收下的那几份的真实路径；同名文件有几百份（expect、.gate-cells），每收一份都把已收下的真实路径重算一遍是平方级，所以收下时记进集合
     for root in roots:
         for name, paths in tracked_files_by_basename(root).items():
             matches = by_basename.setdefault(name, [])
+            known = known_real_paths.setdefault(name, set())
             for path in paths:
-                if os.path.realpath(path) not in {os.path.realpath(match) for match in matches}:
+                real = os.path.realpath(path)
+                if real not in known:
+                    known.add(real)
                     matches.append(path)
     background_lines = [(path, open(path, encoding="utf-8", errors="replace").read().splitlines()) for path in background_paths] or None
     bad, skipped, total, bare_total, bare_unjudged = [], [], 0, 0, 0
@@ -301,6 +305,7 @@ def run(arguments):
 
 
 def selftest():
+    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 自证拉起的子进程（环境原样继承）靠它认：弄坏开关只在自证里认
     work = tempfile.mkdtemp(prefix="cite-check-selftest-")
     plain_roots = []   # 非 git 根那两格的临时目录（不在 work 里：work 是 git 仓）
     try:
@@ -423,8 +428,23 @@ def selftest():
         subprocess.run(["rm", "-rf", "--", work, *plain_roots], check=False)
 
 
+SELFTEST_MARK_VARIABLE = "CITE_CHECK_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "cite-check.py --selftest 起的子进程"
+
+
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest、环境里也没有自证留的标记（自证起的子进程）而 CITE_CHECK_BREAK 非空，参数解析之前就拒，交回退出码 2；放行交回 None。"""
+    if not BROKEN or arguments == ["--selftest"] or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    print(f"  ✗ CITE_CHECK_BREAK={BROKEN} 是弄坏开关，只在自证（cite-check.py --selftest）里认，平常跑设了就拒，这一趟什么都没做", file=sys.stderr)
+    print("     → 怎么办：去掉 CITE_CHECK_BREAK 再跑；要证红就跑 CITE_CHECK_BREAK=<项> python3 scripts/agents/cite-check.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
     preflight(__file__)
+    if refuse_break_outside_selftest(sys.argv[1:]) is not None:
+        sys.exit(2)
     if sys.argv[1:] == ["--selftest"]:
         sys.exit(selftest())
     sys.exit(run(sys.argv[1:]))

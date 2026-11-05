@@ -4,7 +4,7 @@
  "dry_run_note": null,
  "tree": "scripts/experiment-apparatus/target/e171-r1-frozen-tree-final-mainline",
  "H1": {
-  "records_file": "records/2026-10-01-里程碑三形式化接入.md",
+  "records_file": "records/2026-10-31-删兼容旧版本代码.md",
   "line_number": null,
   "line_text": null,
   "after_sha256_files_in_merge_order": null,

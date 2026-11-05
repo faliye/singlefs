@@ -550,10 +550,28 @@ fn bytes_mode() {
     print!("{output}");
 }
 
+/// 登记的操作次数；不给次数就是它。
+const REGISTERED_OPERATION_COUNT: usize = 200_000;
+
+/// 与登记规模不同的参数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+/// 每项是（名字，这一趟的值，登记的值）；全部等于登记值时不接。
+fn reduced_scale_note(scales: &[(&str, u64, u64)]) -> String {
+    let registered_values: Vec<String> = scales
+        .iter()
+        .filter(|(_, actual, registered)| actual != registered)
+        .map(|(name, _, registered)| format!("registered_{name}={registered}"))
+        .collect();
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 fn main() {
     if std::env::args().nth(1).as_deref() == Some("sweep") { sweep(); return; }
     if std::env::args().nth(1).as_deref() == Some("bytes") { bytes_mode(); return; }
-    let operation_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(200_000);
+    let operation_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(REGISTERED_OPERATION_COUNT);
     let mut emitter = Emitter::new();
     let mut output = String::new();
     let mut append_output_line = |line: String| {
@@ -569,8 +587,9 @@ fn main() {
     };
 
     append_output_line(emitter.emit_raw(&format!(
-        "name=config ops={operation_count} fanout={FANOUT} height={HEIGHT} leaves={} block={BLOCK} intent_rec={INTENT_RECORD_BYTES}",
-        FANOUT.pow(HEIGHT)
+        "name=config ops={operation_count} fanout={FANOUT} height={HEIGHT} leaves={} block={BLOCK} intent_rec={INTENT_RECORD_BYTES}{}",
+        FANOUT.pow(HEIGHT),
+        reduced_scale_note(&[("operations", operation_count as u64, REGISTERED_OPERATION_COUNT as u64)])
     )));
 
     const ARMS: [Arm; 3] = [Arm::Intent, Arm::WriteAheadLogFull, Arm::WriteAheadLogLeaf];
@@ -972,5 +991,12 @@ mod tests {
         let operations = generate_operations(1_000, Workload::Sequential, 23);
         let expected_user_writes: u64 = operations.iter().map(|operation| operation.len() as u64).sum();
         assert_eq!(run(&operations, Arm::Intent, 0, 100, false).user_writes, expected_user_writes);
+    }
+
+    /// 给了缩规模的操作次数，config 行要写缩过、不当正式产物；登记次数不加这一段。
+    #[test]
+    fn reduced_operation_count_is_marked_and_registered_one_is_not() {
+        assert_eq!(reduced_scale_note(&[("operations", REGISTERED_OPERATION_COUNT as u64, REGISTERED_OPERATION_COUNT as u64)]), "");
+        assert_eq!(reduced_scale_note(&[("operations", 1000, REGISTERED_OPERATION_COUNT as u64)]), " reduced=yes registered_operations=200000 not_official_product=yes");
     }
 }

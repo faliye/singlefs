@@ -21,3 +21,13 @@ Mm4_少掉的状态数不按4封顶	let states_lost = candidates_before.min(NEWE
 Mm5_聚合里量大于0的位置数把零也算进去	        if value > 0 {\n            self.positive_positions += 1;	        if value >= 0 {\n            self.positive_positions += 1;
 Mm6_判定打中的门槛从一改成二	let hit = totals.observed_maximum.is_some_and(|value| value >= 1);	let hit = totals.observed_maximum.is_some_and(|value| value > 1);
 Mm7_轨迹峰值从第一次不够之后一步起取	peak_after_the_first_short: first_short_step.and_then(|step| series[step..].iter().copied().max()),	peak_after_the_first_short: first_short_step.and_then(|step| series[step + 1..].iter().copied().max()),
+MR9_代码读法的保留池取c而不是κ	Self::CheckpointCostCodeReading { checkpoint_cost_blocks, .. } => checkpoint_cost_blocks,	Self::CheckpointCostCodeReading { .. } => metadata_blocks,
+MR10_条款读法的10加7κ改成10加6κ	Self::CheckpointCostClauseReading { checkpoint_cost_blocks, .. } => 2 * 5 + empty_publishes_of_one_admission * checkpoint_cost_blocks,	Self::CheckpointCostClauseReading { checkpoint_cost_blocks, .. } => 2 * 5 + (empty_publishes_of_one_admission - 1) * checkpoint_cost_blocks,
+MR11_新模式的c取了κ	metadata_blocks: row.largest_actual_empty_publish_slots,\n                    reserve_reading,	metadata_blocks: row.checkpoint_cost_slots,\n                    reserve_reading,
+MR12_Z1的两个方向互换	split.only_code_hit += usize::from(*code_hit && !clause_hit);	split.only_code_hit += usize::from(clause_hit && !*code_hit);
+MR13_Z3拿读坏那一次而不是零点比	entry.1 += usize::from(code_cell.baseline_rejected > 0 && clause_cell.baseline_rejected == 0);	entry.1 += usize::from(code_cell.readings.0.get("rejected").map_or(0, |aggregate| aggregate.maximum) > 0 && clause_cell.baseline_rejected == 0);
+MR14_几何常量表开跑前不比第一段产物的κ	if *kappa != row.checkpoint_cost_slots {	if false && *kappa != row.checkpoint_cost_slots {
+MR15_代码读法的保留池改回10加7c	Self::CheckpointCostCodeReading { checkpoint_cost_blocks, .. } => checkpoint_cost_blocks,	Self::CheckpointCostCodeReading { .. } => 2 * 5 + empty_publishes_of_one_admission * metadata_blocks,
+MR16_常量表里G4的κ抄错一个数	checkpoint_cost_slots: 543,\n        product_line: 3345,	checkpoint_cost_slots: 544,\n        product_line: 3345,
+MR17_G4的B9期望换成G-min那一行的数	first_request_under_the_code_reading: Some(FIRST_REQUEST_ON_THE_LARGE_EMPTY_PUBLISH_GEOMETRY),	first_request_under_the_code_reading: Some(FIRST_REQUEST_ON_THE_SMALL_EMPTY_PUBLISH_GEOMETRIES),
+MR18_G4的B9期望里空闲减P写成61	const FIRST_REQUEST_ON_THE_LARGE_EMPTY_PUBLISH_GEOMETRY: &str = "accepted=true ceiling=47 sequence_publishes=3 floor=47 free_above_reserve_after=60";	const FIRST_REQUEST_ON_THE_LARGE_EMPTY_PUBLISH_GEOMETRY: &str = "accepted=true ceiling=47 sequence_publishes=3 floor=47 free_above_reserve_after=61";

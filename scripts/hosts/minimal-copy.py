@@ -9,10 +9,15 @@
 内容变了的才拷、拷过去的修改时刻是此刻，没变的不动。
 
 用法：
-  minimal-copy.py <源树> <副本> [--with-gate-tables] [--target-dir <编译目录>]
-      名单只有 crates/、Cargo.toml、Cargo.lock、.cargo/ 与每台默认重活线程数的登记文件 .claude/heavy-thread-default
-      （harness 包经 include_str! 在编译时读它，副本里没有就编不过）；--with-gate-tables 再加 .claude/gate.d/（要门禁表的副本）。
+  minimal-copy.py <源树> <副本> [--with-gate-tables] [--with-test-inputs] [--target-dir <编译目录>]
+      名单不在这里写：取 scripts/hosts/lib_repository_copy.py 的 copy_closure（共用清单 crates/、Cargo.toml、Cargo.lock、.cargo/ 加它的闭包：
+      path 依赖指到的目录（例：验证包依赖的仓根 prune-server/）、编译期 include_str! 读的仓根文件（例：.claude/heavy-thread-default）、
+      副本里起的二进制与脚本运行期读的仓根文件连同它们 source、起的；那份文件头「闭包」）。--with-gate-tables 再声明 .claude/gate.d/（要门禁表的副本）；
+      --with-test-inputs 连测试代码一起扫（副本里要跑测试的：scripts/mutation/prove-red.sh --copy 这类）。
+      闭包算不成（path 依赖指到仓根之外、编译期读的文件认不出或不在）拒绝、退 1、副本里一个文件都不写。
       拷之前先报每一处的大小与合计，合计超过阈值就拒绝、退 1，副本里一个文件都不写；名单里的每一处不进名叫 .git、target、target-*、__pycache__ 的目录。
+      副本里起命令的，多机配置照 lib_repository_copy.py configuration-path <源树> 打的那一份显式交给 SINGLEFS_MULTI_HOST_CONFIG（副本不是 git 工作树，
+      判法照仓位置找不到它）。
       不带 --delete：副本里已有的别的东西不动，顶层有名单之外的项（上一次手拷留下的 research/ 这类）报一行警告。
       给了 --target-dir：拷完对副本做一次 scripts/hosts/source-stamp.py 的 refresh（复用这个编译目录之前要做的那一步）；不给不动编译目录。
   minimal-copy.py --selftest
@@ -22,15 +27,27 @@
 
 弄坏开关 MINIMAL_COPY_BREAK=<项>（只给 --selftest 证红用，逗号连几个；在 --selftest 之外设了就拒、退 2）。项名、弄坏哪一处、打开后红在哪一格
   （格名是「✗ 自证 <格名>：」里的那一段；末尾那一轮照 SWITCH_EXPECTED_CELLS 逐个核）：
-  copy-research        名单里多拷 research/                                          whitelist-only
-  no-size-limit        超阈值不拒绝，照拷                                             over-threshold-refused
-  keep-times           rsync -a 带源树的修改时刻                                      mtime-now
-  gate-tables-always   不带 --with-gate-tables 也拷 .claude/gate.d/                   gate-tables-opt-in
-  no-size-report       拷前不报大小                                                   size-reported-before-copy
-  no-refresh           给了 --target-dir 也不 refresh                                 refresh-with-target-dir
-  no-root-check        源树不是仓根也照拷                                             refuses-non-root
-  no-extra-warning     副本顶层有名单之外的项也不报                                   warns-about-extra-top-level
-  no-thread-registry   名单里不拷 .claude/heavy-thread-default                        thread-registry-copied、whitelist-only
+  MINIMAL_COPY_BREAK=copy-research  名单里多拷 research/
+      「✗ 自证 whitelist-only：」
+  MINIMAL_COPY_BREAK=no-size-limit  超阈值不拒绝，照拷
+      「✗ 自证 over-threshold-refused：」
+  MINIMAL_COPY_BREAK=keep-times  rsync -a 带源树的修改时刻
+      「✗ 自证 mtime-now：」
+  MINIMAL_COPY_BREAK=gate-tables-always  不带 --with-gate-tables 也拷 .claude/gate.d/
+      「✗ 自证 gate-tables-opt-in：」
+  MINIMAL_COPY_BREAK=no-size-report  拷前不报大小
+      「✗ 自证 size-reported-before-copy：」
+  MINIMAL_COPY_BREAK=no-refresh  给了 --target-dir 也不 refresh
+      「✗ 自证 refresh-with-target-dir：」
+  MINIMAL_COPY_BREAK=no-root-check  源树不是仓根也照拷
+      「✗ 自证 refuses-non-root：」
+  MINIMAL_COPY_BREAK=no-extra-warning  副本顶层有名单之外的项也不报
+      「✗ 自证 warns-about-extra-top-level：」
+  MINIMAL_COPY_BREAK=closure-ignored  不调 copy_closure，只拷共用清单里在的那几样
+      「✗ 自证 thread-registry-copied：」、「✗ 自证 whitelist-only：」、「✗ 自证 path-dependencies-copied：」、「✗ 自证 path-dependency-outside-root-refused：」、
+      「✗ 自证 test-inputs-opt-in：」
+  MINIMAL_COPY_BREAK=test-inputs-always  不带 --with-test-inputs 也扫测试代码
+      「✗ 自证 test-inputs-opt-in：」
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -49,12 +66,15 @@ import sys  # noqa: E402
 import tempfile  # noqa: E402
 import time  # noqa: E402
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import lib_repository_copy as repository_copy  # noqa: E402
+
 MEBIBYTE = 1024 * 1024
 MAXIMUM_COPY_BYTES = 200 * MEBIBYTE          # 依据见文件头「阈值」，推的
-THREAD_REGISTRY_ITEM = ".claude/heavy-thread-default"   # harness 经 include_str! 编进来的登记文件（crates/singlefs-harness/src/heavy_threads.rs）
-COPY_ITEMS = ("crates", "Cargo.toml", "Cargo.lock", ".cargo", THREAD_REGISTRY_ITEM)
+THREAD_REGISTRY_ITEM = ".claude/heavy-thread-default"   # 自证样本里 include_str! 读的登记文件（名单由 copy_closure 现算，这里只给样本用）
 REQUIRED_ITEMS = ("crates", "Cargo.toml")     # 没有这两样的目录不是仓根
 GATE_TABLES_ITEM = ".claude/gate.d"
+GATE_TABLES_REASON = "带 --with-gate-tables：副本里要读门禁表"
 SKIPPED_DIRECTORY_NAMES = (".git", "__pycache__")
 LISTED_LARGEST_FILES = 5
 EXIT_REFUSED = 1
@@ -79,10 +99,15 @@ def human(byte_count):
     return f"{byte_count / 1024:.1f} KiB"
 
 
-def items_to_copy(with_gate_tables):
-    items = [item for item in COPY_ITEMS if not (item == THREAD_REGISTRY_ITEM and broken("no-thread-registry"))]
-    if with_gate_tables or broken("gate-tables-always"):
-        items.append(GATE_TABLES_ITEM)
+def items_to_copy(source, with_gate_tables, with_test_inputs):
+    """要拷的仓根条目：lib_repository_copy.py 的 copy_closure（文件头「用法」）；闭包算不成抛 repository_copy.ClosureRefused。
+    弄坏开关 closure-ignored：只交共用清单里在的那几样；test-inputs-always：不带 --with-test-inputs 也扫测试代码。"""
+    declared = [(GATE_TABLES_ITEM, GATE_TABLES_REASON)] if with_gate_tables or broken("gate-tables-always") else []
+    if broken("closure-ignored"):
+        items = [item for item in repository_copy.COMMON_ENTRIES if os.path.lexists(os.path.join(source, item))]
+        items += [item for item, _ in declared if os.path.lexists(os.path.join(source, item))]
+    else:
+        items = list(repository_copy.copy_closure(source, declared, test_inputs=with_test_inputs or broken("test-inputs-always")).entries)
     if broken("copy-research"):
         items.append("research")
     return items
@@ -143,13 +168,15 @@ def copy_tree(source, copy, items):
 
 def execute(arguments):
     """整个流程：交退出码。--selftest 的各格直接调它（不经 main 的弄坏开关拒绝）。"""
-    positional, with_gate_tables, target = [], False, None
+    positional, with_gate_tables, with_test_inputs, target = [], False, False, None
     index = 0
     try:
         while index < len(arguments):
             word = arguments[index]
             if word == "--with-gate-tables":
                 with_gate_tables = True
+            elif word == "--with-test-inputs":
+                with_test_inputs = True
             elif word == "--target-dir":
                 if index + 1 >= len(arguments):
                     raise ValueError("--target-dir 后面没给值")
@@ -172,9 +199,16 @@ def execute(arguments):
             raise ValueError(f"副本 {copy} 与源树 {source} 相同或互相包含")
     except ValueError as error:
         print(f"  ✗ minimal-copy.py 用法错：{error}", file=sys.stderr)
-        print("  → 怎么办：minimal-copy.py <仓根> <副本目录> [--with-gate-tables] [--target-dir <编译目录>]；副本放在仓外（草稿目录）", file=sys.stderr)
+        print("  → 怎么办：minimal-copy.py <仓根> <副本目录> [--with-gate-tables] [--with-test-inputs] [--target-dir <编译目录>]；副本放在仓外（草稿目录）",
+              file=sys.stderr)
         return EXIT_USAGE
-    items = items_to_copy(with_gate_tables)
+    try:
+        items = items_to_copy(source, with_gate_tables, with_test_inputs)
+    except (repository_copy.ClosureRefused, OSError) as error:
+        print(f"  ✗ 最小副本拒绝建：拷贝范围的闭包算不成：{error}；副本里一个文件都没写", file=sys.stderr)
+        print("  → 怎么办：path 依赖要指到仓根之下（包挪进仓里，或改它的 Cargo.toml）；Cargo.toml 写坏了的先修好它；编译期读的文件写成"
+              " scripts/hosts/lib_repository_copy.py 文件头「闭包」认得的写法并让它进仓", file=sys.stderr)
+        return EXIT_REFUSED
     per_item, every_file = measure(source, items)
     total = sum(item_bytes for _, _, item_bytes in per_item)
     total_files = sum(item_files for _, item_files, _ in per_item)
@@ -209,6 +243,7 @@ def execute(arguments):
 OLD_MTIME_SECONDS = 1577836800     # 2020-01-01：源树里的文件带着这个旧修改时刻
 RECENT_SECONDS = 3600              # 「此刻」：自证里文件的修改时刻离现在不超过这么多秒
 REGISTRY_SAMPLE_TEXT = "7  # 自证样本的登记\n"
+LIBRARY_SAMPLE_TEXT = 'pub const THREADS: &str = include_str!("../../../' + THREAD_REGISTRY_ITEM + '");\npub fn f() -> u32 { 1 }\n'
 
 
 def write(tree, relative, text, mtime_seconds=OLD_MTIME_SECONDS):
@@ -220,12 +255,14 @@ def write(tree, relative, text, mtime_seconds=OLD_MTIME_SECONDS):
 
 
 def make_source(base, name):
-    """一棵带着名单里的东西、也带着不该拷的东西（research/、scripts/、各层编译目录、.git）的源树，文件都是旧修改时刻。"""
+    """一棵带着名单里的东西、也带着不该拷的东西（research/、scripts/、各层编译目录、.git）的源树，文件都是旧修改时刻；
+    crates/demo 经 include_str! 在编译时读每台默认重活线程数的登记文件（闭包认它）。"""
     source = os.path.join(base, name, "source")
     write(source, "Cargo.toml", "[workspace]\n")
     write(source, "Cargo.lock", "# lock\n")
     write(source, ".cargo/config.toml", "[build]\n")
-    write(source, "crates/demo/src/lib.rs", "pub fn f() -> u32 { 1 }\n")
+    write(source, "crates/demo/Cargo.toml", '[package]\nname = "demo"\n')
+    write(source, "crates/demo/src/lib.rs", LIBRARY_SAMPLE_TEXT)
     write(source, "crates/demo/target/debug/artifact.bin", "x" * 1000)
     write(source, ".claude/gate.d/stage.sh", "echo gate\n")
     write(source, THREAD_REGISTRY_ITEM, REGISTRY_SAMPLE_TEXT)
@@ -263,7 +300,7 @@ def selftest_cells(root):
     source = make_source(root, "whitelist-only")
     copy = os.path.join(root, "whitelist-only", "copy")
     code, _, error = run_captured([source, copy])
-    wanted = [".cargo/config.toml", THREAD_REGISTRY_ITEM, "Cargo.lock", "Cargo.toml", "crates/demo/src/lib.rs"]
+    wanted = [".cargo/config.toml", THREAD_REGISTRY_ITEM, "Cargo.lock", "Cargo.toml", "crates/demo/Cargo.toml", "crates/demo/src/lib.rs"]
     check("whitelist-only", code == 0 and tree_files(copy) == wanted,
           f"副本里应当只有 {wanted}，实际退 {code}、有 {tree_files(copy)}：{error.strip()[-200:]}")
 
@@ -346,6 +383,41 @@ def selftest_cells(root):
     code, _, error = run_captured([source, copy])
     check("warns-about-extra-top-level", code == 0 and "名单之外的项：research" in error and os.path.isfile(os.path.join(copy, "research/old.out")),
           f"副本顶层有 research/ 应当报警告点名它、不删它，实际退 {code}：{error.strip()[-200:]}")
+
+    # path-dependencies-copied：crates/demo 经 path 依赖仓根下的 outside/（它再依赖 nested/）⇒ 两处都拷、它们的编译目录不拷、不报名单之外
+    source = make_source(root, "path-dependencies-copied")
+    write(source, "crates/demo/Cargo.toml", '[package]\nname = "demo"\n[dependencies]\noutside = { path = "../../outside", optional = true }\n')
+    write(source, "outside/Cargo.toml", '[package]\nname = "outside"\n[target.\'cfg(unix)\'.dependencies]\nnested = { path = "../nested" }\n')
+    write(source, "outside/src/lib.rs", "pub fn g() {}\n")
+    write(source, "outside/target/debug/artifact.bin", "x" * 1000)
+    write(source, "nested/Cargo.toml", '[package]\nname = "nested"\n')
+    write(source, "unrelated/Cargo.toml", '[package]\nname = "unrelated"\n')
+    copy = os.path.join(root, "path-dependencies-copied", "copy")
+    code, _, error = run_captured([source, copy])
+    copied = [name for name in tree_files(copy) if name.split("/", 1)[0] in ("outside", "nested", "unrelated")]
+    wanted = ["nested/Cargo.toml", "outside/Cargo.toml", "outside/src/lib.rs"]
+    check("path-dependencies-copied", code == 0 and copied == wanted and "名单之外" not in error,
+          f"path 依赖指到的 outside/ 与它再指到的 nested/ 应当拷进副本（编译目录不拷、unrelated/ 不拷、不报名单之外），实际退 {code}、拷了 {copied}：{error.strip()[-200:]}")
+
+    # path-dependency-outside-root-refused：path 依赖指到仓根之外 ⇒ 退 1、副本里一个文件都没有、拒绝信息点名它
+    source = make_source(root, "path-dependency-outside-root-refused")
+    write(source, "crates/demo/Cargo.toml", '[package]\nname = "demo"\n[dev-dependencies]\naway = { path = "../../../away" }\n')
+    copy = os.path.join(root, "path-dependency-outside-root-refused", "copy")
+    code, _, error = run_captured([source, copy])
+    check("path-dependency-outside-root-refused", code == EXIT_REFUSED and not tree_files(copy) and "仓根" in error and "away" in error,
+          f"path 依赖指到仓根之外应当退 {EXIT_REFUSED}、副本里没有文件、拒绝信息点名它，实际退 {code}、副本有 {tree_files(copy)}：{error.strip()[-200:]}")
+
+    # test-inputs-opt-in：crates/demo/tests/ 下的测试读仓根的 litmus/a.litmus ⇒ 不带 --with-test-inputs 不拷它，带了拷
+    source = make_source(root, "test-inputs-opt-in")
+    write(source, "crates/demo/tests/reads.rs", 'const LITMUS: &str = "../../litmus/a.litmus";\n')
+    write(source, "litmus/a.litmus", "C a\n")
+    plain, with_tests = os.path.join(root, "test-inputs-opt-in", "plain"), os.path.join(root, "test-inputs-opt-in", "with-tests")
+    code_plain, _, _ = run_captured([source, plain])
+    code_with, _, error = run_captured([source, with_tests, "--with-test-inputs"])
+    check("test-inputs-opt-in", code_plain == 0 and code_with == 0 and not os.path.exists(os.path.join(plain, "litmus"))
+          and os.path.isfile(os.path.join(with_tests, "litmus/a.litmus")),
+          f"不带参数副本里不该有 litmus/、带 --with-test-inputs 该有 litmus/a.litmus，实际退 {code_plain} 与 {code_with}、"
+          f"不带的有 {tree_files(plain)}、带的有 {tree_files(with_tests)}：{error.strip()[-200:]}")
     return failures, checked
 
 
@@ -358,7 +430,8 @@ SWITCH_EXPECTED_CELLS = {   # 文件头「弄坏开关」那一段，两处要�
     "no-refresh": ["refresh-with-target-dir"],
     "no-root-check": ["refuses-non-root"],
     "no-extra-warning": ["warns-about-extra-top-level"],
-    "no-thread-registry": ["thread-registry-copied", "whitelist-only"],
+    "closure-ignored": ["thread-registry-copied", "whitelist-only", "path-dependencies-copied", "path-dependency-outside-root-refused", "test-inputs-opt-in"],
+    "test-inputs-always": ["test-inputs-opt-in"],
 }
 
 
@@ -396,9 +469,11 @@ def selftest():
     if switch_failures:
         print("  → 怎么办：照上面那几个开关看它在代码里弄坏的那一处还在不在判法上；改了判法就改 SWITCH_EXPECTED_CELLS 与文件头的表")
         return 1
-    print(f"  ✓ minimal-copy.py 自证通过（查了 {checked} 格：只拷名单里的东西不拷 research/ 与各层编译目录、每台默认重活线程数的登记文件拷进副本、合计超阈值拒绝且副本里一个文件都不写并点名最大的文件、"
+    print(f"  ✓ minimal-copy.py 自证通过（查了 {checked} 格：只拷名单里的东西不拷 research/ 与各层编译目录、每台默认重活线程数的登记文件拷进副本、"
+          "合计超阈值拒绝且副本里一个文件都不写并点名最大的文件、"
           "拷前先报大小、拷过去的与内容变了的是此刻的修改时刻而没变的不动、门禁表要 --with-gate-tables 才拷、给了 --target-dir 就刷源码戳、"
-          f"源树不是仓根退 {EXIT_USAGE}、副本顶层有名单之外的项报警告；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
+          f"源树不是仓根退 {EXIT_USAGE}、副本顶层有名单之外的项报警告、path 依赖逐层拷进副本而指到仓根之外的拒绝、测试读的仓根文件要 --with-test-inputs 才拷；"
+          f"弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 
 

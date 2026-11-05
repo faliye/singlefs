@@ -4,7 +4,7 @@
 # run-condition: check rustup target list --installed | grep -qx x86_64-unknown-linux-musl :: 装 musl 目标：rustup target add x86_64-unknown-linux-musl
 # E6 的单元大小 × CPU 特性档：两档各跑一次虚机，合成一份产物，并判三条跨档判据。
 #
-#   bash scripts/experiment-apparatus/e6-units.sh [轮数]     # 默认 5 轮
+#   bash scripts/experiment-apparatus/e6-units.sh [轮数]     # 不给就是登记的 5 轮；给了与登记不同的轮数算缩过，装置的 config 行写 reduced=yes，产物头写「缩过、不当正式产物」
 #
 # 为什么要有驱动脚本：判据里有三条是**跨档**的（一档的数字单独看不出问题），
 # 而二进制一次只跑一档。把判定留给人去心算，等于没有判据。
@@ -104,9 +104,13 @@ for u in 4096 16384 65536 262144; do
   fi
 done
 
-{ echo "# E6 单元大小 × CPU 特性档，两档合成。ROUNDS=$ROUNDS"
+# 缩过与否由装置在 config 行里说（reduced=yes），脚本不再自己比轮数
+reduced_note=""
+if grep -qF 'reduced=yes' "$TMP/ni.res" "$TMP/soft.res"; then reduced_note="（缩过、不当正式产物）"; fi
+
+{ echo "# E6 单元大小 × CPU 特性档，两档合成。ROUNDS=$ROUNDS$reduced_note"
   echo "# 档一 VM_CPU=host；档二 VM_CPU=host,-aes,-vaes（必须连 vaes 一起屏蔽，见脚本头注）"
   cat "$TMP/ni.res"; cat "$TMP/soft.res"; } >"$OUT"
 echo "── 产物：$OUT"
 [[ $bad -eq 0 ]] || { echo "✗ 有判据没过，上面那份产物不许引用"; echo "   → 怎么办：往上翻，逐条看是哪个 ✗（自带对照 / 失败条款 / 阴性对照）没过，按那一条各自的出路修好再重跑，不要引用 $OUT。"; exit 1; }
-echo "✓ 三条跨档判据全过（产物 $(grep -vc '^#' "$OUT") 行）"
+echo "✓ 三条跨档判据全过（产物 $(grep -vc '^#' "$OUT") 行）$reduced_note"

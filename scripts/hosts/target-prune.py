@@ -24,15 +24,15 @@
 退出码：0 做完（含编译目录不在、没有可删的）；1 有删不成的；2 用法错、配置读不出；78 有 cargo / rustc 在用这份编译目录，一项没删。
 由谁、什么时候调：主 agent 定（提交收尾或合入后验证收尾里挑一处），定了写进调用那一处；这里不自己挂到哪里。
 
-弄坏开关 TARGET_PRUNE_BREAK=<项>（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（格名是「✗ 自证 <格名>：」那一段）：
-  ignores-running    不核在用，照删
-      在用-工作目录是仓根、在用-CARGO_TARGET_DIR、在用-命令行
-  prunes-everything  不看时刻，四处底下全删
-      旧的删新的留
-  mtime-only         文件只看修改时刻，不看访问时刻
-      最近读过的留着
-  top-level-only     目录只看它自己的修改时刻，不看底下
-      底下有新文件的目录留着
+弄坏开关 TARGET_PRUNE_BREAK=<项>（只给 --selftest 证红用；平常跑设了就在参数解析之前退 2、点名变量只在自证里认）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（失败行「✗ 自证 <格名>：」那一段；末尾一句汇总「✗ target-prune.py 自证有 N 格判错」）：
+  TARGET_PRUNE_BREAK=ignores-running  不核在用，照删
+      「✗ 自证 在用-工作目录是仓根」、「✗ 自证 在用-CARGO_TARGET_DIR」、「✗ 自证 在用-命令行」、「✗ target-prune.py 自证有」
+  TARGET_PRUNE_BREAK=prunes-everything  不看时刻，四处底下全删
+      「✗ 自证 旧的删新的留」、「✗ 自证 最近读过的留着」、「✗ 自证 底下有新文件的目录留着」、「✗ 自证 --dry-run 一项不删」、「✗ target-prune.py 自证有」
+  TARGET_PRUNE_BREAK=mtime-only  文件只看修改时刻，不看访问时刻
+      「✗ 自证 旧的删新的留」、「✗ 自证 最近读过的留着」、「✗ 自证 --dry-run 一项不删」、「✗ target-prune.py 自证有」
+  TARGET_PRUNE_BREAK=top-level-only  目录只看它自己的修改时刻，不看底下
+      「✗ 自证 旧的删新的留」、「✗ 自证 底下有新文件的目录留着」、「✗ 自证 --dry-run 一项不删」、「✗ target-prune.py 自证有」
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__

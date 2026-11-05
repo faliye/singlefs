@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
 # run-condition: command git
-# `gate-staged.sh` 的自证：在临时小仓里用一个假 gate.sh 造四种局面，逐格核 refs/sop/staged-green 前不前移、交给 gate.sh 的环境；格数由成功行现算。
+# `gate-staged.sh` 的自证：在临时小仓里用一个假 gate.sh 造几种局面，逐格核 refs/sop/staged-green 前不前移、交给 gate.sh 的环境；格数由成功行现算。
 #
 #   gate-staged-selftest.sh [被测的 gate-staged.sh]    不给就测同目录那一份
 #
-# 四种局面，对着 gate-staged.sh 文件头那三条规矩与交给 gate.sh 的两样：
+# 局面，对着 gate-staged.sh 文件头那三条规矩与交给 gate.sh 的两样：
 #   全绿                 ⇒ 退出码 0；ref 指向一个提交，那个提交的树就是开跑时的暂存树（不是 HEAD 的树）；
 #                          假 gate.sh 收到的第一个参数是 --staged，环境里的 SINGLEFS_STAGED_TREE 与 GATE_STAGED_TREE 都是那棵暂存树，
 #                          CARGO_TARGET_DIR 是没给 SINGLEFS_GATE_TARGET_DIR 时这一趟自己建的 <日志目录>/gate-staged-*/target，跑完不在了
@@ -13,8 +13,7 @@
 #   被 TERM 停           ⇒ 假 gate.sh 睡着时只给外壳发 TERM：外壳等它退出后退 143，这一趟的编译目录不在了
 #   跑的过程中暂存区变了 ⇒ ref 不动（这时退几由 gate-staged.sh 自己定，这里不钉）
 #   给了 GATE_BASE       ⇒ 假 gate.sh 全绿、退出码 0，ref 不动，输出里有「不前移」；同一趟给了 SINGLEFS_GATE_TARGET_DIR，CARGO_TARGET_DIR 照它
-#   轻档（--light）      ⇒ 临时仓的门禁目录里放一道绿、一道红、一道名字是重型的：不起假 gate.sh，退出码 1 转手，ref 不动，重型那一道没起、报本次未跑
-#                          （轻档本身在 scripts/gate/staged-tree-worktree.sh light-stages，它的自证另核树与并行；这里只核 gate-staged.sh 那一层）
+#   认不出的参数         ⇒ 第一个参数以 - 起头（例 --no-such-option）：退出码 2，输出点名「认不出的参数」，不起 gate.sh，ref 不动
 #
 # 每一格都要先证明会红：把被测脚本拷一份，按 mutation 那几行逐条改坏（原文必须恰好命中一次，
 # 命中不是一次就是锚点腐化、当场判红），改坏的每一份都必须让它点名的那一格判红；原样那一份每一格都要过。
@@ -71,8 +70,7 @@ mutation "暂存树不交给门禁"          "全绿：环境里的暂存树对�
 mutation "全绿也退非 0"              "全绿：退出码 0"                   'exit $gate_rc'                                     'exit 1'
 mutation "门禁输出不经 two-logs.sh"  "全绿：日志出两份、路径写进输出"   'bash "$two_logs_script" "$gate_log_name" -- bash "$ROOT/.claude/scripts/gate.sh" --staged "$@"' 'bash "$ROOT/.claude/scripts/gate.sh" --staged "$@"'
 mutation "红了不指到错误警告日志"    "有红：出路先指到错误警告日志"     '  echo "     → 怎么办：先看错误警告日志 $gate_log_name.problems.log' '  true "     → 怎么办：先看错误警告日志 $gate_log_name.problems.log'
-mutation "轻档照跑整轮"              "轻档：不起 gate.sh"               'if ((light_tier)); then'                           'if false; then'
-mutation "轻档退出码不转手"          "轻档：退出码原样转手"             'exit "$light_rc"'                                  'exit 0'
+mutation "认不出的参数当项目根"      "认不出的参数：退 2、点名参数、不起 gate.sh" 'if [[ "${1:-}" == -* ]]; then'              'if false; then'
 
 # make_repository <目录>：一个提交、一处已暂存的改动（暂存树与 HEAD 的树不同），外加一个假 gate.sh。
 make_repository() {
@@ -114,7 +112,7 @@ record_cell() {
   fi
 }
 
-# run_cells <被测树根> <结果文件> <临时目录>：被测的是 <树根>/scripts/gate/gate-staged.sh；四种局面各起一个临时仓，逐格记过没过
+# run_cells <被测树根> <结果文件> <临时目录>：被测的是 <树根>/scripts/gate/gate-staged.sh；几种局面各起一个临时仓，逐格记过没过
 run_cells() {
   local target="$1/scripts/gate/gate-staged.sh" results="$2" scratch="$3"
   local repository record log gate_rc expected_tree sentinel_commit ref_type ref_tree arguments environment_tree ref_now target_directory
@@ -210,25 +208,18 @@ run_cells() {
   record_cell "$results" "给了 GATE_BASE：CARGO_TARGET_DIR 照 SINGLEFS_GATE_TARGET_DIR" "$([[ "$target_directory" == "$scratch/given-target" ]] && echo 1 || echo 0)" \
     "CARGO_TARGET_DIR=「${target_directory}」，调用方给的是 $scratch/given-target"
 
-  # ── 轻档 ──
-  repository="$scratch/light"; record="$scratch/light-record"; log="$scratch/light.log"
+  # ── 认不出的参数 ──
+  repository="$scratch/unknown-argument"; record="$scratch/unknown-argument-record"; log="$scratch/unknown-argument.log"
   mkdir -p "$record"; make_repository "$repository"
-  mkdir -p "$repository/.claude/gate.d"
-  printf '#!/usr/bin/env bash\necho "  ✓ 轻档样本绿（查了 1 项）"\n' > "$repository/.claude/gate.d/doc-green.sh"
-  printf '#!/usr/bin/env bash\necho "  ✗ 轻档样本红"\necho "  → 怎么办：样本"\nexit 1\n' > "$repository/.claude/gate.d/doc-red.sh"
-  printf '#!/usr/bin/env bash\ntouch "%s/heavy-ran"\n' "$record" > "$repository/.claude/gate.d/checker-tier-crash-point-replay.sh"
-  git -C "$repository" add .claude/gate.d
   sentinel_commit="$(git -C "$repository" commit-tree 'HEAD^{tree}' -m sentinel)"
   git -C "$repository" update-ref refs/sop/staged-green "$sentinel_commit"
   gate_rc=0
-  (cd "$repository" && env SINGLEFS_GATE_STAGED_LOG_DIRECTORY="$record/logs" FAKE_GATE_RECORD="$record" FAKE_GATE_EXIT=0 bash "$target" --light "$repository") > "$log" 2>&1 || gate_rc=$?
-  record_cell "$results" "轻档：不起 gate.sh" "$([[ ! -e "$record/arguments" ]] && echo 1 || echo 0)" "假 gate.sh 被起了，收到的参数是「$(tr '\n' ' ' < "$record/arguments" 2>/dev/null)」"
-  record_cell "$results" "轻档：退出码原样转手" "$([[ $gate_rc == 1 ]] && echo 1 || echo 0)" "一道红，外壳退 $gate_rc"
+  (cd "$repository" && env SINGLEFS_GATE_STAGED_LOG_DIRECTORY="$record/logs" FAKE_GATE_RECORD="$record" FAKE_GATE_EXIT=0 bash "$target" --no-such-option "$repository") > "$log" 2>&1 || gate_rc=$?
+  record_cell "$results" "认不出的参数：退 2、点名参数、不起 gate.sh" \
+    "$([[ $gate_rc == 2 && ! -e "$record/arguments" ]] && grep -qF '认不出的参数：--no-such-option' "$log" && echo 1 || echo 0)" \
+    "外壳退 $gate_rc（要 2），假 gate.sh $([[ -e "$record/arguments" ]] && echo 被起了 || echo 没起)；输出：$(tail -n 4 "$log" | tr '\n' ' ')"
   ref_now="$(git -C "$repository" rev-parse -q --verify refs/sop/staged-green 2>/dev/null)"
-  record_cell "$results" "轻档：ref 不动" "$([[ "$ref_now" == "$sentinel_commit" ]] && echo 1 || echo 0)" "ref 从 $sentinel_commit 变成了 ${ref_now:-（没有）}"
-  record_cell "$results" "轻档：重型那一道没起、报本次未跑" \
-    "$([[ ! -e "$record/heavy-ran" ]] && grep -qF 'checker-tier-crash-point-replay.sh：本次未跑（重型' "$log" && grep -qF 'doc-red.sh：红（退出 1）' "$log" && echo 1 || echo 0)" \
-    "重型那一道$([[ -e "$record/heavy-ran" ]] && echo 起了 || echo 没起)；输出：$(tail -n 8 "$log" | tr '\n' ' ')"
+  record_cell "$results" "认不出的参数：ref 不动" "$([[ "$ref_now" == "$sentinel_commit" ]] && echo 1 || echo 0)" "ref 从 $sentinel_commit 变成了 ${ref_now:-（没有）}"
 }
 
 # apply_mutation <原脚本> <副本> <原文> <替换文>：原文恰好命中一次才写副本；否则退 3 并打印命中次数
@@ -258,9 +249,6 @@ for mutation_index in "${!MUTATION_NAMES[@]}"; do
   ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/singlefs-ai-sop" "$scratch/.claude/singlefs-ai-sop"
   ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/scripts" "$scratch/.claude/scripts"
   ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/scripts/hosts" "$scratch/scripts/hosts"   # 门禁输出出两份日志的包装 scripts/hosts/two-logs.sh
-  # 轻档那一层调的 staged-tree-worktree.sh 与它读的重型名单（.claude/hooks/lib_heavy_tests.py）：副本里也要照原样跑得起，轻档那几格才只因改坏的那一处出结果
-  ln -s "$(cd "$(dirname "$TARGET")" && pwd)/staged-tree-worktree.sh" "$scratch/scripts/gate/staged-tree-worktree.sh"
-  ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/hooks" "$scratch/.claude/hooks"
   if ! occurrences="$(apply_mutation "$TARGET" "$scratch/scripts/gate/gate-staged.sh" "${MUTATION_ORIGINALS[$mutation_index]}" "${MUTATION_REPLACEMENTS[$mutation_index]}")"; then
     echo "  ✗ 改坏「$name」没施加上：原文在 $TARGET 里命中 ${occurrences:-?} 次（要恰好 1 次），这一格的判别力没证"   # gate-lint:detail
     failures=$((failures + 1)); continue
@@ -291,6 +279,6 @@ cells_all_green="$(grep -c $'\t全绿：' "$work/results.tsv")"
 cells_red="$(grep -c $'\t有红：' "$work/results.tsv")"
 cells_index_moved="$(grep -c $'\t暂存区变了：' "$work/results.tsv")"
 cells_gate_base="$(grep -c $'\t给了 GATE_BASE：' "$work/results.tsv")"
-cells_light="$(grep -c $'\t轻档：' "$work/results.tsv")"
+cells_unknown_argument="$(grep -c $'\t认不出的参数：' "$work/results.tsv")"
 cells_terminated="$(grep -c $'\t被 TERM 停：' "$work/results.tsv")"
-echo "  ✓ gate-staged.sh 自证通过（查了 $cells_checked 格：全绿 $cells_all_green 格、有红 $cells_red 格、跑的过程中暂存区变了 $cells_index_moved 格、给了 GATE_BASE $cells_gate_base 格、轻档 $cells_light 格、被 TERM 停 $cells_terminated 格；${#MUTATION_NAMES[@]} 份改坏的副本各让点名的那一格判红）"
+echo "  ✓ gate-staged.sh 自证通过（查了 $cells_checked 格：全绿 $cells_all_green 格、有红 $cells_red 格、跑的过程中暂存区变了 $cells_index_moved 格、给了 GATE_BASE $cells_gate_base 格、认不出的参数 $cells_unknown_argument 格、被 TERM 停 $cells_terminated 格；${#MUTATION_NAMES[@]} 份改坏的副本各让点名的那一格判红）"

@@ -29,14 +29,14 @@ scripts/mutation/prove-red.sh（每条变异施加后那一趟编译核被改的
   lib_rebuilt_packages.py --selftest
 补丁目录里读 crates.patch（.claude/agents/implementation-writer.md「产出」一节的格式）；没有这份文件的补丁目录不贡献路径。
 
-弄坏开关 REBUILT_PACKAGES_BREAK=<项>（只给证红用）。项名、弄坏哪一处、打开后自证红在哪几格：
-  any-compiling-line  编译输出里有任何一行 Compiling 就当改过的包全都重编了
+弄坏开关 REBUILT_PACKAGES_BREAK=<项>（只给证红用；--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认）。项名、弄坏哪一处、打开后自证红在哪几格：
+  REBUILT_PACKAGES_BREAK=any-compiling-line  编译输出里有任何一行 Compiling 就当改过的包全都重编了
       本库「改过两个包、只重编了一个：点名没重编的那个」「dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核」；连带 merge-and-verify.sh「编译目录里的产物比源码新」那一格
-  patch-new-side-only 只认 `+++ b/` 行，不认 `--- a/`（删掉的文件不算改过）
+  REBUILT_PACKAGES_BREAK=patch-new-side-only  只认 `+++ b/` 行，不认 `--- a/`（删掉的文件不算改过）
       本库「补丁里取出改过的路径（新旧两侧、去重、不认 /dev/null）」「补丁删了一个文件：那个包也算改过」
-  ignore-dep-info     不看编译目录的 dep-info，包里改过 .rs 的都核
+  REBUILT_PACKAGES_BREAK=ignore-dep-info  不看编译目录的 dep-info，包里改过 .rs 的都核
       本库「改过的 .rs 不在编译目录的任何 dep-info 里（没开的 feature）：那个包不核」「dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核」「dep-info 里是绝对路径：照原样认」
-  absolute-dep-info-only  dep-info 里的词只拿绝对路径比，相对路径不以工作区根解（改前的样子，真 cargo 写的 dep-info 一个都对不上）
+  REBUILT_PACKAGES_BREAK=absolute-dep-info-only  dep-info 里的词只拿绝对路径比，相对路径不以工作区根解（改前的样子，真 cargo 写的 dep-info 一个都对不上）
       本库「dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核」「改过的 .rs 不在编译目录的任何 dep-info 里（没开的 feature）：那个包不核」
       「没重编的文件在上一次留下的 dep-info 里：照核、判红」；连带 merge-and-verify.sh（它用 --write-selftest-cargo 那份假 cargo，写的也是相对路径）
       「头一次编、补丁改过的 demo 有 Compiling 行」「编过之后 --skip-apply 再验同一批补丁」「编译目录里的产物比源码新（共用编译目录）、补丁改过的 demo 没有 Compiling 行」三格（都报「重编核对本次未判」）
@@ -485,6 +485,39 @@ def main(arguments):
     return code
 
 
+BREAK_VARIABLES = ("REBUILT_PACKAGES_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/lib_rebuilt_packages.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

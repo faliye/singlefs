@@ -1,6 +1,6 @@
 """E171（三oracle合谋测试） 比对器：读装置、逐行驱动、冻结的 O3 执行器留下的导出目录与判定，写结果行（登记第六节、第七节、第十一节）。
 
-跑法（在本目录，经 run-with-memory-cap.sh 与 capped.sh；不起子进程跑编译出来的代码，只在 A6 起挑法脚本）：
+跑法（在本目录，整条命令交 `task-server/task submit --`；不起子进程跑编译出来的代码，只在 A6 起挑法脚本）：
   python3 comparator.py --output <新文件> --mutations-table <crates/mutations.tsv>
       --baseline-dir <基线导出> --baseline-device-output <基线装置的标准输出> [--baseline-repeat-dir <第二次基线导出>] [--e170-dump <E170 导出>]
       [--o3-baseline <冻结执行器在基线导出上的产物>] [--driver-output <逐行驱动的标准输出> …]
@@ -14,7 +14,11 @@ F4 扩表（登记 5.2「扩表」、F4）：`--rows-root` 给两份（117 行�
 Q1 的分母、甲乙丙与 Q3 都按并起来的全部行算（登记 F4「扩完仍不够记『不够判』」）。
 补位（登记第一节读法 5）：`--substitution-rows-root` 给补位那一趟的输出根，里面的行换掉 `--rows-root` 里同一个序号、编不过的那一行（别的情形拒），
 多出 `name=substitution`（逐行：原名、换上的行、试过的每一个、换上之后的分类）与 `name=substitution_summary`；分母与甲乙丙、Q3 按换过之后的行算。
-O3 是冻结的那一版执行器（E170 第 1 次重跑冻结，登记第一节读法 8）：开头与收尾各核一次冻结行（Z2）。没给 O3 的产物时 O3 那几列写 `not_run`。
+O3 是冻结的那一版执行器（E170 第 1 次重跑冻结，登记第一节读法 8）：开头与收尾各核一次冻结行（Z2）。
+选填输入没给的节没有输入：`--baseline-repeat-dir`（second_baseline）、`--e170-dump`（e170_dump_compare）、`--o3-baseline`（o3_baseline）、
+`--control`（positive_controls）、`--disabled`（disabled_oracles）、`--rows-root`（rows）、`--known-bad-dir` 与 `--e170-expected-dir`（bad_images）、
+`--image-judgements`（bad_images_o3）；哪一样没给，结果行写 `name=not_run section=<节> input=<选项> …`、往标准错误打一行 NOT_RUN_INPUT_NOT_GIVEN，
+别的节都不跑，整趟退 77（本次未跑，不是通过）。
 """
 
 from __future__ import annotations
@@ -380,7 +384,7 @@ def q3_core_rows(analyses: list[RowAnalysis], selected_path: str) -> list[int]:
 def driver_timing_lines(path: str, lines: ResultLines) -> None:
     """逐行驱动标准输出里的 `table …` 行（整表挂钟，驱动进程里 `monotonic_ns` 计）写成耗时行，前面带 `source=<那份标准输出的文件名>`：
     `--driver-output` 可以给几份（整表分两次起、Q3-核各一次），哪一行出自哪一次驱动要分得开。口径：`table_wall_ns` 只是那一次驱动进程的挂钟；
-    `--skip-finished` 的那一次把已做完的行从 `row-result.tsv` 读回、照原值并进 `rows` 与 `sum_of_row_ns`，挂钟里不含它们。不进入库产物。"""
+    按键复用的那一次把已做完的行从 `row-result.tsv` 读回、照原值并进 `rows` 与 `sum_of_row_ns`，挂钟里不含它们。不进入库产物。"""
     source = field(os.path.basename(path))
     with open(path, encoding="utf-8") as handle:
         for raw in handle:
@@ -424,11 +428,36 @@ def row_tallies(rows: list[RowAnalysis], tally: dict[str, int]) -> None:
         row.driver_fields.get("status") == STATUS_OK and REBUILD_CHECK_FIELD not in row.driver_fields for row in rows)
 
 
+NOT_RUN_MARKER = "NOT_RUN_INPUT_NOT_GIVEN"
+
+
+def sections_without_input(arguments: argparse.Namespace) -> list[tuple[str, str]]:
+    """(节名, 选项名)：这一趟要读而没给的选填输入对应的节。`--expansion-rows`、`--substitution-rows-root`、`--q3-core`、`--driver-output` 是各段
+    自己才有的输入（段名见 `--segment`），不在这里；`--known-bad-dir`、`--e170-expected-dir`、`--image-judgements` 三样合起来管坏镜像那一节。"""
+    sections = (("second_baseline", "--baseline-repeat-dir", arguments.baseline_repeat_dir), ("e170_dump_compare", "--e170-dump", arguments.e170_dump),
+                ("o3_baseline", "--o3-baseline", arguments.o3_baseline), ("positive_controls", "--control", arguments.control),
+                ("disabled_oracles", "--disabled", arguments.disabled), ("rows", "--rows-root", arguments.rows_root),
+                ("bad_images", "--known-bad-dir", arguments.known_bad_dir), ("bad_images", "--e170-expected-dir", arguments.e170_expected_dir),
+                ("bad_images_o3", "--image-judgements", arguments.image_judgements))
+    return [(section, option) for section, option, value in sections if not value]
+
+
+def report_sections_not_run(arguments: argparse.Namespace, missing: list[tuple[str, str]]) -> int:
+    """没给输入的节在结果行里写本次未跑、往标准错误打记号行，别的节不跑，退 frozen_o3.NOT_RUN_EXIT_CODE（77）。"""
+    lines = ResultLines(arguments.output)
+    lines.result(f"name=config segment={field(arguments.segment)} not_run=true baseline_run={field(os.path.basename(arguments.baseline_dir))}")
+    for section, option in missing:
+        lines.result(f"name=not_run section={section} input={option} reason=input_not_given")
+        print(f"{NOT_RUN_MARKER} test=comparator.py reason={option} 没给，{section} 这一节本次未跑", file=sys.stderr)
+    lines.finish()
+    return frozen_o3.NOT_RUN_EXIT_CODE
+
+
 def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser(description="E171 比对器")
     parser.add_argument("--output")
     parser.add_argument("--mutations-table")
-    parser.add_argument("--selected-rows", default=os.path.join(HERE, "bad-implementations-117.tsv"))
+    parser.add_argument("--selected-rows", default=os.path.join(HERE, "bad-implementations-step-8.tsv"))
     parser.add_argument("--baseline-dir")
     parser.add_argument("--baseline-device-output")
     parser.add_argument("--baseline-repeat-dir")
@@ -439,7 +468,7 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--disabled", action="append", default=[])
     parser.add_argument("--q3-core", action="append", default=[])
     parser.add_argument("--rows-root", action="append", default=[])
-    parser.add_argument("--expansion-rows", help="F4 扩表（bad-implementations-expansion-164.tsv）")
+    parser.add_argument("--expansion-rows", help="F4 扩表（bad-implementations-step-4-only.tsv）")
     parser.add_argument("--substitution-rows-root", action="append", default=[],
                         help="补位那一趟的输出根：里面的行换掉 --rows-root 里同一个序号、编不过的那一行（登记第一节读法 5）")
     parser.add_argument("--segment", default="s4", help="config 行里的段名")
@@ -460,6 +489,9 @@ def main(argument_list: list[str]) -> int:
             parser.error(f"--{required.replace('_', '-')} 必给")
     if frozen_o3.report_missing_freeze_reference(repo_root, "comparator.py"):   # 冻结行的参照产物不在：本次未跑，一行产物都不写
         return frozen_o3.NOT_RUN_EXIT_CODE
+    missing = sections_without_input(arguments)
+    if missing:
+        return report_sections_not_run(arguments, missing)
     lines = ResultLines(arguments.output)
     started = time.monotonic_ns()
     o3_columns = "frozen_executor" if (arguments.o3_baseline or arguments.rows_root or arguments.image_judgements) else "not_run"

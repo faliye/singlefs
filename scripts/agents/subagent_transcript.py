@@ -229,7 +229,7 @@ def sample_refused_then_delivered(base=SAMPLE_BASE):
 
 
 def sample_refused_only(base=SAMPLE_BASE):
-    """被交回闸拒之后再没送达（之后被停或撞限额）：不算交回。"""
+    """被交回闸拒之后再没送达（之后被停或失败）：不算交回。"""
     return sample_records([("toolu_sample_refused_only", "长的报告", "refused")], base)
 
 

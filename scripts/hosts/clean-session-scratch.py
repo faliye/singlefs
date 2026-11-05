@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 判的是此刻草稿根下的目录、归属、git 工作树与在跑的进程，上一次列出来的不替这一次作保
 # run-condition: command git du
-"""清盘：列（默认）或删（--delete）本会话在工作根与过渡期旧根下不再用的仓副本与编译目录。
+"""清盘：列（默认）或删（--delete）本会话在工作根与 Claude Code 的会话临时目录根下不再用的仓副本与编译目录。
 
 为什么：.claude/kb/milestone/03-third-txn.md「待优化」第 55 行——2026-10-18 清盘删 git 工作树前只 git stash push -u，被忽略的文件（规范副本、
 multi-host.env、qemu.env）跟着树丢了；删的范围按目录列，没先对 git worktree list 与用户给的排除名单逐个核，用户说不要动的那一个已被删。
@@ -10,7 +10,7 @@ multi-host.env、qemu.env）跟着树丢了；删的范围按目录列，没先�
     clean-session-scratch.py [--session <会话号>] [--keep <路径或名字>]… [--delete] [--work-root <目录>] [--tmp-root <目录>] [--repository <仓根>]
     clean-session-scratch.py --selftest      # CLEAN_SESSION_SCRATCH_BREAK=<项> 时点名的格必须红
   会话号依次取 --session、WORK_DIRECTORY_OWNER_SESSION、CLAUDE_CODE_SESSION_ID、CLAUDE_SESSION_ID，都没有就拒绝（退 2）。
-  工作根不给取 .claude/hooks/lib_work_root.py 的 work_root()，旧根不给取它的 legacy_root()（/tmp/claude-<uid>），仓根不给取这份脚本所在的仓。
+  工作根不给取 .claude/hooks/lib_work_root.py 的 work_root()，会话临时目录根（--tmp-root）不给取它的 claude_session_temporary_root()（/tmp/claude-<uid>），仓根不给取这份脚本所在的仓。
   --keep 可给几次：写绝对路径的，那个路径与它底下的都不碰；写名字的，路径里有一段恰好是这个名字的都不碰；包含保留项的候选父目录也不删。
   不带 --delete 只列、一个字不删。
 
@@ -20,7 +20,7 @@ multi-host.env、qemu.env）跟着树丢了；删的范围按目录列，没先�
   ① 工作根下一层的每个目录：归属是本会话的才往里找——<目录>/.owner（scripts/hosts/work-directory-ownership.sh 写的三行，session 那一行）
      或 <目录>/.writer-lock（派发闸建的写者锁，session_id）是本会话；那个目录自己就是仓副本的，它自己就是一处。
      归属是别的会话、或两样都没有（认不出）的，不往里找，只在末尾数一句各几个。
-  ② 旧根下 <旧根>/*/<会话号>/ 那一层（Claude Code 给每个会话的临时目录）：路径里的会话号就是归属，往里找。
+  ② 会话临时目录根下 <会话临时目录根>/*/<会话号>/ 那一层（Claude Code 给每个会话的临时目录，scratchpad 在里面）：路径里的会话号就是归属，往里找。
 每一处的判定（不删的写明为什么）：
   - 先 du -sh 量大小；
   - 有进程在用：/proc/<pid>/fd、cwd、exe 的链接目标落在它底下（只看得到本用户的进程，不按名字匹配），列出进程号，不删；
@@ -34,14 +34,21 @@ multi-host.env、qemu.env）跟着树丢了；删的范围按目录列，没先�
   这个仓的工作树用 git worktree remove 删（不加 --force），别的用 shutil.rmtree；删完回读：路径还在、或工作树还在 git worktree list 里，记「没删干净」。
 退出码：0 列完或删完（没有一处删失败）；1 有删失败的；2 参数不对、取不到会话号或工作根。
 
-弄坏开关（只给 --selftest 证红用；一次设一个）：CLEAN_SESSION_SCRATCH_BREAK=
-  ignored-dropped          git 树删之前不拷被忽略的文件            自证「被忽略的文件拷出来了」红
-  worktree-rmtree          这个仓的工作树也用 rmtree 删            自证「工作树经 git worktree remove 删、不在 worktree list 里」红
-  in-use-ignored           不看 /proc，有进程在用的也删            自证「有进程在用的不删、列出进程号」红
-  other-sessions-included  不看归属，工作根下每个目录都往里找       自证「别的会话与认不出归属的不碰」红
-  list-deletes             不带 --delete 也照删                    自证「只列时一个字不删」红
-  keep-ignored             不认 --keep                             自证「排除名单里的不碰」红
-  dirty-deleted            有没提交改动的 git 树也算会删            自证「会删的都删了」红（git worktree remove 不加 --force 拒删有改动的树，这一处记没删成、退 1）
+弄坏开关 CLEAN_SESSION_SCRATCH_BREAK=<项>（只给 --selftest 证红用；一次设一个；平常跑设了就在参数解析之前退 2、点名变量只在自证里认）。打开后自证哪几格红（失败行「✗ 自证 <格名>：…」）：
+  CLEAN_SESSION_SCRATCH_BREAK=ignored-dropped  git 树删之前不拷被忽略的文件
+      「✗ 自证 被忽略的文件拷出来了」
+  CLEAN_SESSION_SCRATCH_BREAK=worktree-rmtree  这个仓的工作树也用 rmtree 删
+      「✗ 自证 会删的都删了」、「✗ 自证 工作树经 git worktree remove 删、不在 worktree list 里」、「路径没了，但它还挂在 git worktree list 里」、「处没删成（逐处列在上面）」
+  CLEAN_SESSION_SCRATCH_BREAK=in-use-ignored  不看 /proc，有进程在用的也删
+      「✗ 自证 有进程在用的不删、列出进程号」
+  CLEAN_SESSION_SCRATCH_BREAK=other-sessions-included  不看归属，工作根下每个目录都往里找
+      「✗ 自证 别的会话与认不出归属的不碰」
+  CLEAN_SESSION_SCRATCH_BREAK=list-deletes  不带 --delete 也照删
+      「✗ 自证 只列时一个字不删」
+  CLEAN_SESSION_SCRATCH_BREAK=keep-ignored  不认 --keep
+      「✗ 自证 排除名单里的不碰」
+  CLEAN_SESSION_SCRATCH_BREAK=dirty-deleted  有没提交改动的 git 树也算会删（git worktree remove 不加 --force 拒删有改动的树，这一处记没删成、退 1）
+      「✗ 自证 会删的都删了」、「git worktree remove 退 128」、「处没删成（逐处列在上面）」
 """
 import argparse
 import importlib.util
@@ -191,7 +198,7 @@ def candidates(session, work_root, tmp_root):
     for project in sorted(os.scandir(tmp_root), key=lambda item: item.name) if os.path.isdir(tmp_root) else []:
         session_directory = os.path.join(project.path, session)
         if project.is_dir(follow_symlinks=False) and not os.path.islink(session_directory) and os.path.isdir(session_directory):
-            roots.append((session_directory, f"在旧根本会话目录 {project.name}/{session}/ 里"))
+            roots.append((session_directory, f"在会话临时目录根本会话目录 {project.name}/{session}/ 里"))
     for root, label in roots:
         hogs, _visited, truncated = SCRATCH_FINDER.find_scratch_hogs([root])
         found += [(path, kind, label) for path, kind in hogs]
@@ -301,7 +308,7 @@ def run(arguments, say=print, *, selftest=False):
         say("  → 怎么办：在 Claude Code 会话的 Bash 里跑（它设 CLAUDE_CODE_SESSION_ID），或加 --session <会话号>")
         return 2
     work_root = os.path.realpath(arguments.work_root or WORK_ROOTS.work_root())
-    tmp_root = os.path.realpath(arguments.tmp_root or WORK_ROOTS.legacy_root())
+    tmp_root = os.path.realpath(arguments.tmp_root or WORK_ROOTS.claude_session_temporary_root())
     repository = os.path.realpath(arguments.repository or REPOSITORY_ROOT)
     deleting = arguments.delete or BROKEN == "list-deletes"
     found, skipped = candidates(session, work_root, tmp_root)
@@ -310,7 +317,7 @@ def run(arguments, say=print, *, selftest=False):
     for path, kind, label in found:
         will, why, tree = judge(path, kind, arguments.keep, repository_worktrees)
         judged.append((path, kind, label, will, why, tree, size_of(path)))
-    say(f"本会话 {session} 的仓副本与编译目录（工作根 {work_root}、旧根 {tmp_root}）：")
+    say(f"本会话 {session} 的仓副本与编译目录（工作根 {work_root}、会话临时目录根 {tmp_root}）：")
     for path, kind, label, will, why, tree, size in judged:
         tree_text = {"worktree": "，这个仓的 git 工作树", "clone": "，带 .git 的克隆"}.get(tree, "")
         say(f"  {'会删' if will else '不删'} {kind} {path}：{size}{tree_text}，{label}；{why}")
@@ -377,7 +384,7 @@ def parse(argv):
 
 
 def selftest():
-    """临时目录当工作根、旧根与主仓，造本会话的工作树、克隆、副本、编译目录与几处不该碰的，先只列、再删，逐格判。"""
+    """临时目录当工作根、会话临时目录根与主仓，造本会话的工作树、克隆、副本、编译目录与几处不该碰的，先只列、再删，逐格判。"""
     session, other = "selftest-session-0001", "selftest-session-0002"
     work = tempfile.mkdtemp(prefix="clean-session-scratch-selftest-")
     failures = []
@@ -480,7 +487,7 @@ def selftest():
         print("  → 怎么办：看 candidates / judge / save_ignored / remove 的判法；CLEAN_SESSION_SCRATCH_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ clean-session-scratch 自证通过（{len(cells)} 格）：只列不删；本会话的工作树经 git worktree remove 删、被忽略的文件拷出来（target 不拷），"
-          "克隆外的副本、编译目录与旧根本会话目录里的副本删了；有进程在用的、排除名单里的、有没提交改动的、别的会话与认不出归属的、草稿里的报告都不碰")
+          "克隆外的副本、编译目录与会话临时目录根本会话目录里的副本删了；有进程在用的、排除名单里的、有没提交改动的、别的会话与认不出归属的、草稿里的报告都不碰")
     return 0
 
 
@@ -488,4 +495,8 @@ if __name__ == "__main__":
     preflight(__file__)
     if sys.argv[1:] == ["--selftest"]:
         sys.exit(selftest())
+    if BROKEN:   # 弄坏开关只在自证里认：命令行不是单独一个 --selftest 而变量非空，参数解析之前就退 2、点名变量只在自证里认，不管值是什么（run() 里同一句管自证进程内的调用）
+        print(f"  ✗ CLEAN_SESSION_SCRATCH_BREAK={BROKEN} 是弄坏开关，只在自证（clean-session-scratch.py --selftest）里认，平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+        print("  → 怎么办：unset CLEAN_SESSION_SCRATCH_BREAK 后再跑；要证红就跑 CLEAN_SESSION_SCRATCH_BREAK=<项> python3 scripts/hosts/clean-session-scratch.py --selftest", file=sys.stderr)
+        sys.exit(2)
     sys.exit(run(parse(sys.argv[1:])))

@@ -28,5 +28,22 @@ M25_rotation_judged_before_acquisition	const ATTRIBUTION_JUDGES_ACQUISITION_BEFO
 M26_both_back_to_the_r8b_order	const ATTRIBUTION_JUDGES_ACQUISITION_BEFORE_ROTATION: bool = true;\nconst ROTATION_ATTRIBUTION_REQUIRES_THE_SAME_INSTANCE: bool = true;	const ATTRIBUTION_JUDGES_ACQUISITION_BEFORE_ROTATION: bool = false;\nconst ROTATION_ATTRIBUTION_REQUIRES_THE_SAME_INSTANCE: bool = false;
 M27_intent_times_expect_the_sequential_write_time	Some(intent_seconds) => (three_equal_times_text(intent_seconds), true),	Some(_intent_seconds) => (three_equal_times_text(configuration.get("sequential_write_time_seconds").map_or("", String::as_str)), true),
 M28_second_branch_expects_the_first_branch	DeletedRecordLeaf::BesideOtherRecords => (1, 1),	DeletedRecordLeaf::BesideOtherRecords => (0, 0),
-M29_h3_tag6_anchor_98304	"h3" => Some(98_386),	"h3" => Some(98_304),
+M29_h3_tag6_anchor_98304	("h3", DeletionPublish::FinalBatch) => Some(196_760),	("h3", DeletionPublish::FinalBatch) => Some(196_678),
 M30_pc_h_does_not_reseal	reseal_system_configuration_slot(&mut write.bytes);	let _ = &write.bytes;
+M31_discriminating_arm_keeps_the_retirement_share	const DISCRIMINATING_ARM_RETIREMENT_SHARE: RetirementShare = RetirementShare::Removed;	const DISCRIMINATING_ARM_RETIREMENT_SHARE: RetirementShare = RetirementShare::Included;
+M32_retirement_share_per_record_34	const PER_INODE_RECORD_RETIREMENT_BYTES: u64 = 35;	const PER_INODE_RECORD_RETIREMENT_BYTES: u64 = 34;
+M33_retirement_slots_drop_the_plus_one	RetirementShare::Included => 2 + retirement_levels + 1,	RetirementShare::Included => 2 + retirement_levels,
+M34_retirement_levels_take_the_root_level	u64::from(retirement_root.level).saturating_sub(1)	u64::from(retirement_root.level)
+M35_inode_records_count_only_live_ones	u64_of(inode_records_of_version(state).len())	u64_of(inode_records_of_version(state).iter().filter(|record| read_u32(record, 36) >= 1).count())
+M36_h1_final_tag6_anchor_196678	("h1", DeletionPublish::FinalBatch) => Some(196_608),	("h1", DeletionPublish::FinalBatch) => Some(196_678),
+M37_intent_pinned_against_the_value_before_deletion	DeletionPublish::Intent => 2,	DeletionPublish::Intent => 1,
+M38_retirement_root_named_tt	(2, RETIREMENT_TREE, _) => "tr".to_string(),	(2, RETIREMENT_TREE, _) => "tt".to_string(),
+M39_final_batch_without_retirement_roles	DeletedRecordLeaf::OnlyTheDeletedRecord | DeletedRecordLeaf::NotFound => roles.extend(["tr@0", "tr"]),	DeletedRecordLeaf::OnlyTheDeletedRecord | DeletedRecordLeaf::NotFound => {}
+M40_retirement_records_left_unclaimed	(RETIREMENT_PACKED_RECORD_TYPE, RETIREMENT_RECORD_BYTES) => coverage.claim(start, end, ByteClass::LayoutThreeCell),	(RETIREMENT_PACKED_RECORD_TYPE, RETIREMENT_RECORD_BYTES) => {}
+M41_death_txg_expected_from_the_intent	deletion_publishes.iter().find(|(publish, _)| *publish == DeletionPublish::FinalBatch)	deletion_publishes.iter().find(|(publish, _)| *publish == DeletionPublish::Intent)
+M42_tree_table_expects_eleven_entries	const TREE_TABLE_ENTRIES_AFTER_THE_FIRST_FILE: usize = 12;	const TREE_TABLE_ENTRIES_AFTER_THE_FIRST_FILE: usize = 11;
+M43_journal_header_back_to_487	const JOURNAL_HEADER_BYTES: usize = 496;	const JOURNAL_HEADER_BYTES: usize = 487;
+M44_root_record_fields_back_to_457	const ROOT_RECORD_FIELD_BYTES: usize = 466;	const ROOT_RECORD_FIELD_BYTES: usize = 457;
+M45_root_record_widths_without_threshold_and_pin_slot	let root_record_widths = [4usize, 16, 4, 4, 8, 86, 8, 8, 32, 86, 86, 86, 8, 1, 1, 12, 16];	let root_record_widths = [4usize, 16, 4, 4, 8, 86, 8, 8, 32, 86, 86, 86, 1, 12, 16];
+M46_last_write_expectation_back_to_instance_acquisition	decoded: original_attribution,	decoded: original_attribution.map(|_| WriteAttribution::InstanceAcquisition),
+M47_system_configuration_generation_back_to_txg_plus_2	let generation = txg + 3;	let generation = txg + 2;

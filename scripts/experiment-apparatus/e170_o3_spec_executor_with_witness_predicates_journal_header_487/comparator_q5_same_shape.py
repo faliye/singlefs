@@ -16,9 +16,12 @@
 与 (ii)（其余）。
 跑法：python3 comparator_q5_same_shape.py --pair <名>:<states|images>:<judged|attached>:<族或 rows>:<今天的产物>:<参照的产物> [...]
       --today-names <名>:<导出目录>[:<已知坏镜像目录>] --reference-names <名>:<导出目录>[:<已知坏镜像目录>] [...]
-      --new-gaps G23 [--e171-tree <名>,<名>] [--expected-freeze <带冻结行的产物>] [--record-paths <Q5-e 第一项产物>]
-      [--anchors-b15 <名>,<名>] [--b17 <照抄核对产物>:<Z4 已知坏镜像目录>] [--positive-control-row-input <名> --scratch <草稿目录>]
+      --new-gaps G23 [--e171-tree <名>,<名>] --expected-freeze <带冻结行的产物> --record-paths <Q5-e 第一项产物>
+      --anchors-b15 <名>,<名> --b17 <照抄核对产物>:<Z4 已知坏镜像目录> --positive-control-row-input <名> --scratch <草稿目录>
       --output <新文件>
+--expected-freeze、--record-paths、--anchors-b15、--b17、--positive-control-row-input（连同 --scratch）各管一节（freeze_check_today、
+q5e_records、b15、b17、q5_pc2）；哪一样没给，那一节没有输入：结果行写 `name=not_run section=<节> input=<选项> …`、往标准错误打一行
+NOT_RUN_INPUT_NOT_GIVEN，别的节都不跑，整趟退 77（本次未跑，不是通过）。
 文件名以 comparator 起头，不进冻结。
 """
 
@@ -354,6 +357,33 @@ def cell_text(cell: Cell) -> str:
             f"reference_witness={'/'.join(map(str, cell.reference_witness)).replace(' ', '') or '-'}")
 
 
+NOT_RUN_MARKER = "NOT_RUN_INPUT_NOT_GIVEN"
+NOT_RUN_EXIT_CODE = 77
+
+
+def sections_without_input(arguments: argparse.Namespace) -> list[tuple[str, str]]:
+    """(节名, 选项名)：这一趟要读而没给的选填输入对应的节。"""
+    sections = (("freeze_check_today", "--expected-freeze", arguments.expected_freeze), ("q5e_records", "--record-paths", arguments.record_paths),
+                ("b15", "--anchors-b15", arguments.anchors_b15), ("b17", "--b17", arguments.b17),
+                ("q5_pc2", "--positive-control-row-input", arguments.positive_control_row_input))
+    missing = [(section, option) for section, option, value in sections if not value]
+    if arguments.positive_control_row_input and not arguments.scratch:
+        missing.append(("q5_pc2", "--scratch"))
+    return missing
+
+
+def report_sections_not_run(arguments: argparse.Namespace, missing: list[tuple[str, str]]) -> int:
+    """没给输入的节在结果行里写本次未跑、往标准错误打记号行，别的节不跑，退 77。"""
+    lines = [f"name=config pairs={len(arguments.pair)} not_run=true"]
+    for section, option in missing:
+        lines.append(f"name=not_run section={section} input={option} reason=input_not_given")
+        print(f"{NOT_RUN_MARKER} test=comparator_q5_same_shape.py reason={option} 没给，{section} 这一节本次未跑", file=sys.stderr)
+    lines.append(f"name=done emitted={len(lines) + 1}")
+    with open(arguments.output, "x", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+    return NOT_RUN_EXIT_CODE
+
+
 def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser(description="E170 第 2 次重跑 Q5 比对器")
     parser.add_argument("--pair", action="append", required=True)
@@ -369,6 +399,9 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--scratch")
     parser.add_argument("--output", required=True)
     arguments = parser.parse_args(argument_list)
+    missing = sections_without_input(arguments)
+    if missing:
+        return report_sections_not_run(arguments, missing)
     output_file = open(arguments.output, "x", encoding="utf-8")
     emitted = 0
 
@@ -393,7 +426,7 @@ def main(argument_list: list[str]) -> int:
     for label, kind, role, family, today_path, reference_path in pairs:
         emit(f"name=pair input={label} kind={kind} role={role} family={family} today={os.path.basename(today_path)} reference={os.path.basename(reference_path)}")
 
-    expected_freeze = read_output(arguments.expected_freeze).freeze_lines if arguments.expected_freeze else []
+    expected_freeze = read_output(arguments.expected_freeze).freeze_lines
     integrity_failures = 0
     for path in sorted({pair[4] for pair in pairs}):
         output = outputs[path]
@@ -414,7 +447,7 @@ def main(argument_list: list[str]) -> int:
     for label in [item for item in arguments.anchors_b15.split(",") if item]:
         today_path = next(pair[4] for pair in pairs if pair[0] == label)
         b15_results += b15(label, outputs[today_path], today_names[label], emit)
-    b17_holds = b17(*arguments.b17.split(":"), emit) if arguments.b17 else None
+    b17_holds = b17(*arguments.b17.split(":"), emit)
 
     cells = build_cells(pairs, outputs, today_names, reference_names, new_gaps)
     for cell in cells:
@@ -467,41 +500,37 @@ def main(argument_list: list[str]) -> int:
             if chosen and fields.get("applied", "0") != "0" and landing_pair(fields) != f"({chosen.group(1)},{chosen.group(2)})":
                 q5e_landed_by_replay += 1
             q5e_last_record += fields.get("witness_branch") == "last_record"
-    q5e_every_device = "not_given"
-    if arguments.record_paths:
-        with open(arguments.record_paths, encoding="utf-8") as handle:
-            q5e_every_device = sum(int(fields["every_device_has_a_self_verified_record"]) for fields in map(fields_of, handle)
-                                   if fields.get("name") == "q5e_records_on_every_device")
+    with open(arguments.record_paths, encoding="utf-8") as handle:
+        q5e_every_device = sum(int(fields["every_device_has_a_self_verified_record"]) for fields in map(fields_of, handle)
+                               if fields.get("name") == "q5e_records_on_every_device")
     emit(f"name=q5e every_device_has_a_self_verified_record={q5e_every_device} landed_by_replay_above_the_chosen_root={q5e_landed_by_replay} "
          f"witness_branch_last_record={q5e_last_record}")
 
-    positive_control = "not_run"
-    if arguments.positive_control_row_input:
-        label = arguments.positive_control_row_input
-        candidates = [cell for cell in cells if cell.input_label == label and cell.kind == "row" and cell.role == JUDGED
-                      and cell.status == "same" and cell.today and cell.today[0] in ("in", "not_in")]
-        chosen_cell = candidates[0]
-        pair = next(item for item in pairs if item[0] == label)
-        state = next(key[2] for key, name in today_names[label].items() if key[0] == chosen_cell.key[0] and key[1] == chosen_cell.key[1]
-                     and name.name == chosen_cell.key[2])
-        flipped = "not_in" if chosen_cell.today[0] == "in" else "in"
-        copy_path = os.path.join(arguments.scratch, "q5-positive-control-" + os.path.basename(pair[4]))
-        marker = f" source={chosen_cell.key[0]} "
-        changed = 0
-        with open(pair[4], encoding="utf-8") as source_handle, open(copy_path, "x", encoding="utf-8") as copy_handle:
-            for line in source_handle:
-                if (line.startswith("name=image_judgement ") and marker in line and f" stream={chosen_cell.key[1]} state={state} " in line):
-                    line = line.replace(f" strict={chosen_cell.today[0]} ", f" strict={flipped} ", 1)
-                    changed += 1
-                copy_handle.write(line)
-        assert changed == 1, f"阳性对照改了 {changed} 行"
-        outputs_after = dict(outputs)
-        outputs_after[copy_path] = read_output(copy_path)
-        pairs_after = [item if item[0] != label else item[:4] + (copy_path, item[5]) for item in pairs]
-        before, after = len(judged_differs), len(q5a_of(build_cells(pairs_after, outputs_after, today_names, reference_names, new_gaps)))
-        positive_control = str(after - before == 1).lower()
-        emit(f"name=q5_pc2 input={label} changed_key={'|'.join(chosen_cell.key)} state={state} from={chosen_cell.today[0]} to={flipped} "
-             f"q5a_before={before} q5a_after={after} exactly_one={positive_control} copy={copy_path}")
+    label = arguments.positive_control_row_input
+    candidates = [cell for cell in cells if cell.input_label == label and cell.kind == "row" and cell.role == JUDGED
+                  and cell.status == "same" and cell.today and cell.today[0] in ("in", "not_in")]
+    chosen_cell = candidates[0]
+    pair = next(item for item in pairs if item[0] == label)
+    state = next(key[2] for key, name in today_names[label].items() if key[0] == chosen_cell.key[0] and key[1] == chosen_cell.key[1]
+                 and name.name == chosen_cell.key[2])
+    flipped = "not_in" if chosen_cell.today[0] == "in" else "in"
+    copy_path = os.path.join(arguments.scratch, "q5-positive-control-" + os.path.basename(pair[4]))
+    marker = f" source={chosen_cell.key[0]} "
+    changed = 0
+    with open(pair[4], encoding="utf-8") as source_handle, open(copy_path, "x", encoding="utf-8") as copy_handle:
+        for line in source_handle:
+            if (line.startswith("name=image_judgement ") and marker in line and f" stream={chosen_cell.key[1]} state={state} " in line):
+                line = line.replace(f" strict={chosen_cell.today[0]} ", f" strict={flipped} ", 1)
+                changed += 1
+            copy_handle.write(line)
+    assert changed == 1, f"阳性对照改了 {changed} 行"
+    outputs_after = dict(outputs)
+    outputs_after[copy_path] = read_output(copy_path)
+    pairs_after = [item if item[0] != label else item[:4] + (copy_path, item[5]) for item in pairs]
+    before, after = len(judged_differs), len(q5a_of(build_cells(pairs_after, outputs_after, today_names, reference_names, new_gaps)))
+    positive_control = str(after - before == 1).lower()
+    emit(f"name=q5_pc2 input={label} changed_key={'|'.join(chosen_cell.key)} state={state} from={chosen_cell.today[0]} to={flipped} "
+         f"q5a_before={before} q5a_after={after} exactly_one={positive_control} copy={copy_path}")
 
     families_without = [family for family in FAMILIES
                         if not any(cell.family == family and cell.role == JUDGED and cell.comparable for cell in cells)]
@@ -518,7 +547,7 @@ def main(argument_list: list[str]) -> int:
          f"q5a_only_new_gaps={by_new_gaps} families_without_comparable_cells={','.join(families_without) or 'none'} q5_verdict={verdict} "
          f"q5a_all_class_ii={str(bool(judged_differs) and class_i == 0).lower()} e171_tree_subset_q5a={len(subset)} "
          f"b15_failures={sum(not holds for _, holds in b15_results)} b15_cells={len(b15_results)} "
-         f"b17_holds={'not_run' if b17_holds is None else str(b17_holds).lower()} integrity_failures={integrity_failures} "
+         f"b17_holds={str(b17_holds).lower()} integrity_failures={integrity_failures} "
          f"q5_pc2_exactly_one={positive_control}")
     emitted += 1
     output_file.write(f"name=done emitted={emitted}\n")

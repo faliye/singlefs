@@ -5,7 +5,8 @@
 `executor_main.py`，产物写到 `--output`。驱动只打命中的文件名与次数，不打原文与替换文（第二段写参照谓词的人不读 v2 的 W、T 判法，5.4）。
 v2 目录本身一个字节不动；拷贝跑完删掉。文件名以 mutation_driver 起头，不进 v2 冻结的 sha256。
 
-跑法：python3 mutation_driver_on_rows.py --mutation X21 --table <变异表> --scratch <草稿目录> --dumps <导出目录> --batches 1,2 --workers <N> --output <新文件>
+跑法：python3 mutation_driver_on_rows.py --mutation X21 --table <变异表> --scratch <草稿目录> --dumps <导出目录> [--batches <批号,…>] --workers <N> --output <新文件>
+不给 --batches 就是全部批（1、2、3）；给了是指定范围，交给 executor_main 的 config 行写实际值，不是全部批的那一趟不当正式产物。
 """
 
 from __future__ import annotations
@@ -20,18 +21,23 @@ sys.dont_write_bytecode = True
 
 EXECUTOR_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 FILES_NOT_COPIED = ("comparator", "mutation_driver", "witness_reference", "run_")
+ALL_BATCHES = "1,2,3"
 
 
-def main(argument_list: list[str]) -> int:
+def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="v2 的一条变异在一份导出上跑一趟")
     parser.add_argument("--mutation", required=True)
     parser.add_argument("--table", required=True)
     parser.add_argument("--scratch", required=True)
     parser.add_argument("--dumps", required=True)
-    parser.add_argument("--batches", default="1,2")
+    parser.add_argument("--batches", default=ALL_BATCHES, help="指定范围：不给就是全部批")
     parser.add_argument("--workers", type=int, required=True)
     parser.add_argument("--output", required=True)
-    arguments = parser.parse_args(argument_list)
+    return parser
+
+
+def main(argument_list: list[str]) -> int:
+    arguments = build_argument_parser().parse_args(argument_list)
     with open(arguments.table, encoding="utf-8") as handle:
         rows = [line.rstrip("\n").split("\t") for line in handle if line.strip()]
     chosen = [row for row in rows if row[0] == arguments.mutation or row[0].startswith(arguments.mutation + "_")]

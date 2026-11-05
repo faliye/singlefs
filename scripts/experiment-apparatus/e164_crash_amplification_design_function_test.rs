@@ -91,8 +91,8 @@ pub fn anchor_rows() -> Vec<(String, String, String)> {
     push("revision_w_fua_w_b_states", closed_form_state_count(&segment_write_counts(&fua_then_write)).to_string(), "5");
     push(
         "clause_identity_text",
-        repository_scans::identity_text("crates/singlefs-harness/tests/e164_probe.rs", "records_h_long", 3, "ab"),
-        "crates/singlefs-harness/tests/e164_probe.rs::records_h_long::3::ab",
+        repository_scans::identity_text("crates/singlefs-verification/tests/e164_probe.rs", "records_h_long", 3, "ab"),
+        "crates/singlefs-verification/tests/e164_probe.rs::records_h_long::3::ab",
     );
     let anchor_digest = "e7587d8d4f76653ed394fefe683bb459d4976354ee1366bf987fcd16750a418c";
     push("lexical_const", lexical::lexical_digest("const A: u8 = 1;"), anchor_digest);
@@ -301,7 +301,7 @@ fn main() {
 fn preflight() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let root = repository_root();
-    let source = root.join("scripts/experiments/e164_crash_amplification_design_function_test.rs");
+    let source = root.join("scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs");
     let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = std::process::Command::new("python3");
     command.arg(&script).arg("check").arg(&source);
@@ -400,9 +400,9 @@ mod tests {
     fn a_node_reruns_when_its_own_target_file_changes() {
         let closure = std::collections::BTreeSet::from(["singlefs-format".to_string()]);
         let untouched = std::collections::BTreeSet::new();
-        let changed = vec!["crates/singlefs-harness/tests/a.rs".to_string()];
-        assert!(repository_scans_w5::node_reruns(&closure, &untouched, Some("crates/singlefs-harness/tests/a.rs"), &changed));
-        assert!(!repository_scans_w5::node_reruns(&closure, &untouched, Some("crates/singlefs-harness/tests/b.rs"), &changed));
+        let changed = vec!["crates/singlefs-verification/tests/a.rs".to_string()];
+        assert!(repository_scans_w5::node_reruns(&closure, &untouched, Some("crates/singlefs-verification/tests/a.rs"), &changed));
+        assert!(!repository_scans_w5::node_reruns(&closure, &untouched, Some("crates/singlefs-verification/tests/b.rs"), &changed));
         let touched = std::collections::BTreeSet::from(["singlefs-format".to_string()]);
         assert!(repository_scans_w5::node_reruns(&closure, &touched, None, &[]));
     }
@@ -437,7 +437,7 @@ mod arms {
         write_table_hash_of_final_sectors, write_table_hash_with_barriers, RecordedOperation,
     };
 
-    const V5_TEST: (&str, &str, &str) = ("singlefs-harness", "crates/singlefs-harness/tests/new_pool_file_creation_publish.rs", "root_slots_system_configurations_and_journal_ring_hold_the_published_state");
+    const V5_TEST: (&str, &str, &str) = ("singlefs-verification", "crates/singlefs-verification/tests/new_pool_file_creation_publish.rs", "root_slots_system_configurations_and_journal_ring_hold_the_published_state");
     const V11_TEST: &str = "pointer_record_and_entry_width_literals";
     const F6_TEST: &str = "the_model_module_uses_only_the_standard_library_and_the_format_constants";
 
@@ -488,14 +488,14 @@ mod arms {
         prepare_copy(root, &copy, replacement.as_ref());
         let graph = dependency_graph(&copy, &[]).unwrap_or_else(|message| stop(&format!("副本上 cargo metadata --offline 起不来（S-offline）：{message}")));
         let rustc_text = rustc_version(&copy);
-        let harness_files = closure_source_files(&copy, &graph, "singlefs-harness");
+        let harness_files = closure_source_files(&copy, &graph, "singlefs-verification");
         let mut v5_files = harness_files.clone();
         v5_files.extend(target_files(&copy, V5_TEST.1));
         let format_files = closure_source_files(&copy, &graph, "singlefs-format");
-        let own_source = own_source_files(&copy, &package_source_files(&copy, "crates/singlefs-harness"));
+        let own_source = own_source_files(&copy, &package_source_files(&copy, "crates/singlefs-verification"));
         let mut probe_files = harness_files.clone();
         probe_files.extend(target_files(&copy, PROBE_TEST_FILE));
-        let probe_run = cargo_test(&copy, &["-p", "singlefs-harness", "--test", "e164_probe", "--", "--nocapture", "--test-threads=1"]);
+        let probe_run = cargo_test(&copy, &["-p", "singlefs-verification", "--test", "e164_probe", "--", "--nocapture", "--test-threads=1"]);
         let mut histories = BTreeMap::new();
         for probe in ["h_short", "h_long"] {
             let parsed = if probe_run.exit_code == 0 { parse_history(&probe_run.stdout, probe) } else { Err(format!("探针退出码 {}", probe_run.exit_code)) };
@@ -506,7 +506,7 @@ mod arms {
         };
         let mut pid_lines = vec![result_line(&probe_run.stdout, "pid")];
         if name == "V0" {
-            let second = cargo_test(&copy, &["-p", "singlefs-harness", "--test", "e164_probe", "--", "--nocapture", "--test-threads=1", "pid_probe"]);
+            let second = cargo_test(&copy, &["-p", "singlefs-verification", "--test", "e164_probe", "--", "--nocapture", "--test-threads=1", "pid_probe"]);
             pid_lines.push(result_line(&second.stdout, "pid"));
         }
         let mut named_exit = BTreeMap::new();
@@ -516,16 +516,16 @@ mod arms {
         if matches!(name, "V0" | "V11") {
             named_exit.insert("v11_test", cargo_test(&copy, &["-p", "singlefs-format", "--lib", "--", V11_TEST]).exit_code);
         }
-        let model_source = std::fs::read_to_string(copy.join("crates/singlefs-harness/src/model_comparison.rs")).unwrap_or_default();
+        let model_source = std::fs::read_to_string(copy.join("crates/singlefs-verification/src/model_comparison.rs")).unwrap_or_default();
         if !model_source.contains(F6_TEST) {
             stop(&format!("F6 那一条测试 {F6_TEST} 在副本里找不到（S-probe）"));
         }
         let mut harness_lib_outcomes = BTreeMap::new();
         if matches!(name, "V0" | "V4" | "V8") {
-            let run = cargo_test(&copy, &["-p", "singlefs-harness", "--lib"]);
+            let run = cargo_test(&copy, &["-p", "singlefs-verification", "--lib"]);
             harness_lib_outcomes = test_outcomes(&run.stdout);
             named_exit.insert("harness_lib", run.exit_code);
-            named_exit.insert("f6_test", cargo_test(&copy, &["-p", "singlefs-harness", "--lib", "--", F6_TEST]).exit_code);
+            named_exit.insert("f6_test", cargo_test(&copy, &["-p", "singlefs-verification", "--lib", "--", F6_TEST]).exit_code);
         }
         VariantObservation {
             histories,
@@ -533,7 +533,7 @@ mod arms {
             pid_lines,
             recording_code: digest_by_crate_closure(&copy, &closure_source_files(&copy, &graph, "singlefs-core"), &BTreeSet::new(), &rustc_text),
             judging_not_doing: packages_lexical_digest(&copy, &["crates/singlefs-checker", "crates/singlefs-format"]),
-            judging_doing: packages_lexical_digest(&copy, &["crates/singlefs-checker", "crates/singlefs-format", "crates/singlefs-harness", "crates/singlefs-checker-tier"]),
+            judging_doing: packages_lexical_digest(&copy, &["crates/singlefs-checker", "crates/singlefs-format", "crates/singlefs-verification"]),
             v5_node: three_digests(&copy, &v5_files, &rustc_text),
             v11_node: three_digests(&copy, &format_files, &rustc_text),
             harness_lib_not_doing: digest_by_crate_closure(&copy, &harness_files, &BTreeSet::new(), &rustc_text),
@@ -1133,16 +1133,16 @@ mod common {
     /// 跑前登记 5.1 的子进程白名单：起之前逐条核参数，碰到别的就整轮作废（退 3）。
     pub fn assert_subprocess_is_allowed(program: &str, arguments: &[String]) {
         let joined = arguments.join(" ");
-        let forbidden_words = ["singlefs-checker-tier", "layer0", "gate.d", "mutate.sh"];
+        let forbidden_words = ["singlefs-verification", "layer0", "gate.d", "mutate.sh"];
         if program == "cargo" && forbidden_words.iter().any(|word| joined.contains(word)) {
-            refuse_subprocess(program, &joined, "参数里有 checker 档、layer0、门禁阶段或 mutate.sh");
+            refuse_subprocess(program, &joined, "参数里有 验证包、layer0、门禁阶段或 mutate.sh");
         }
         let allowed = match program {
             "cargo" => match arguments.first().map(String::as_str) {
                 Some("build" | "test") => {
                     let package_position = arguments.iter().position(|argument| argument == "-p");
                     let package = package_position.and_then(|position| arguments.get(position + 1)).map(String::as_str);
-                    matches!(package, Some("singlefs-harness" | "singlefs-format"))
+                    matches!(package, Some("singlefs-verification" | "singlefs-format"))
                 }
                 Some("metadata") => arguments.iter().any(|argument| argument == "--offline"),
                 _ => false,
@@ -1214,7 +1214,7 @@ mod fingerprints {
     use crate::repository_scans::{dependency_graph, ProductSuffix};
 
     const CASE_KEY: &str = "crash-case:layer0-first-stream";
-    const CASE_PACKAGE: &str = "singlefs-checker-tier";
+    const CASE_PACKAGE: &str = "singlefs-verification";
 
     /// 做臂收的配置表与键：`build` 表里这几个键，`target.*` 下这几个键，`profile` 整张。`[env]` 另按闭包判。只给变异 M19 加键。
     const CONFIGURATION_KEYS_THAT_CHANGE_CODE: &[&str] = &["build.rustflags", "build.rustc", "build.rustc-wrapper", "build.rustc-workspace-wrapper", "build.target"];
@@ -1402,7 +1402,7 @@ mod fingerprints {
 
     /// 重编对照：同一份副本、同一个编译目录里编一次，交回 cargo 对工作区包报了 Compiling / Dirty 没有。
     fn builds_workspace_packages(copy_root: &Path, environment: &BTreeMap<String, String>) -> bool {
-        let arguments = strings(&["build", "--release", "--offline", "-p", "singlefs-harness", "--lib", "-v"]);
+        let arguments = strings(&["build", "--release", "--offline", "-p", "singlefs-verification", "--lib", "-v"]);
         let output = run_allowed("cargo", &arguments, copy_root, &environment_list(environment));
         assert!(output.status.success(), "重编对照的 cargo build 失败：{}", String::from_utf8_lossy(&output.stderr).lines().rev().take(5).collect::<Vec<&str>>().join(" / "));
         String::from_utf8_lossy(&output.stderr).lines().any(|line| {
@@ -1899,7 +1899,7 @@ mod repository_scans_w5 {
                 package,
             });
         }
-        for package in ["singlefs-harness", "singlefs-checker", "singlefs-core", "singlefs-format"] {
+        for package in ["singlefs-verification", "singlefs-checker", "singlefs-core", "singlefs-format"] {
             let directory = package_directory(graph, root, package);
             nodes.push(Node { name: format!("{package}:--lib"), is_crash_enumeration: false, package: package.to_string(), target_file: None });
             let mut test_files: Vec<String> = std::fs::read_dir(root.join(&directory).join("tests"))
@@ -3039,7 +3039,7 @@ mod repository_scans {
 }
 
 mod variants {
-    //! E164 第二段：仓副本、施加变体（跑前登记 5.3）、harness 档探针与点名测试，读回录制流。
+    //! E164 第二段：仓副本、施加变体（跑前登记 5.3）、验证包探针与点名测试，读回录制流。
 
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
@@ -3052,7 +3052,7 @@ mod variants {
 
     pub const PROBE_SOURCE: &str = include_str!("e164_crash_amplification_design_function_test/probe_recording.rs");
     const VARIANT_PATCHES: &str = include_str!("e164_crash_amplification_design_function_test/variant_patches.tsv");
-    pub const PROBE_TEST_FILE: &str = "crates/singlefs-harness/tests/e164_probe.rs";
+    pub const PROBE_TEST_FILE: &str = "crates/singlefs-verification/tests/e164_probe.rs";
 
     /// 变体表：名字 → 怎么施加（`crates/mutations.tsv` 的变异名，或 `variant_patches.tsv` 的一行，或不改）。
     pub fn variant_sources() -> Vec<(&'static str, Option<VariantSource>)> {

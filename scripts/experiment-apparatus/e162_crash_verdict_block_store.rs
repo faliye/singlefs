@@ -8,7 +8,7 @@
 //!
 //! 独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）。
 //! 与 `crates/` 的接点只有两处，都是照抄形态、不引代码：块键的形态（登记第三节「状态怎么编号」），
-//! 候选「加固的文件」的持久步骤（`crates/singlefs-checker-tier/src/layer0_progress.rs:1140-1160`）。
+//! 候选「加固的文件」的持久步骤（`crates/singlefs-verification/src/layer0_progress.rs:1140-1160`）。
 //!
 //! 角色：父进程按模式驱动；被杀的写入进程（`writer`）、核对进程（`verify`）、读进程（`read`）
 //! 都是这个 bin 按角色参数起的子进程。子进程不判准入（父进程已经判过），免得 python3 的启动
@@ -2909,27 +2909,35 @@ fn run_segment_one_crash_question(output: &mut ProductLines, remaining: &[String
 
 // ============================== 第一段：S2 与几何敏感性 ==============================
 
-/// P_B：`ssh -o BatchMode=yes <PEER_SSH_HOST> nproc`，主机名取多机配置（与 scripts/hosts/multi-host-run.sh 同一个取法：`SINGLEFS_MULTI_HOST_CONFIG`，没设取仓根 `multi-host.env`）。
+/// P_B：`ssh -o BatchMode=yes <第二台的地址> nproc`。第二台的地址取多机配置的主机数组（scripts/crash/crash-point-replay-shard-configuration-check.sh 文件头「主机数组」）：
+/// 照那份判法 `--emit-hosts`（不连任何一台）打的 `PEER_HOST_ADDRESS=` 那一行，与 scripts/hosts/multi-host-run.sh 同一个取法。
+/// 交回（产物里写的第二台，地址是私有的、只写 `peer`；nproc 的回答）。
 fn peer_logical_processors() -> (String, String) {
-    let configuration_path = std::env::var_os("SINGLEFS_MULTI_HOST_CONFIG")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| repository_root().join("multi-host.env"));
-    let configuration = fs::read_to_string(configuration_path).unwrap_or_default();
-    let host = configuration
-        .lines()
-        .find_map(|line| line.trim().strip_prefix("PEER_SSH_HOST="))
-        .map(|value| value.trim_matches('"').to_string())
+    let emitted = Command::new("bash")
+        .arg(repository_root().join("scripts/crash/crash-point-replay-shard-configuration-check.sh"))
+        .arg("--emit-hosts")
+        .arg(repository_root())
+        .stdin(Stdio::null())
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
         .unwrap_or_default();
-    if host.is_empty() {
+    let address = emitted
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("PEER_HOST_ADDRESS="))
+        .map(|value| value.trim_matches('\'').to_string())
+        .unwrap_or_default();
+    if address.is_empty() {
         return ("-".to_string(), "no_peer_host_configured".to_string());
     }
     let answer = Command::new("ssh")
-        .args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", &host, "nproc"])
+        .args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", &address, "nproc"])
         .stdin(Stdio::null())
         .output()
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
         .unwrap_or_default();
-    (host, if answer.is_empty() { "no_answer".to_string() } else { answer })
+    ("peer".to_string(), if answer.is_empty() { "no_answer".to_string() } else { answer })
 }
 
 /// 冷读之前：对库目录每个普通文件 posix_fadvise(DONTNEED)（python3 做，不给装置加依赖）。
@@ -3762,5 +3770,15 @@ mod tests {
             plain_outcome.timing_line,
             slept_outcome.timing_line
         );
+    }
+
+    /// 不写档位参数就是登记档、产物判；写 `feasibility` 是缩域，核产物那一格写 `not_judged…`，不当正式产物。
+    #[test]
+    fn feasibility_tier_is_a_narrowed_run_whose_verdict_says_not_judged() {
+        assert_eq!(RunTier::from_argument(None), Some(RunTier::Registered));
+        assert_eq!(RunTier::from_argument(Some(&"feasibility".to_string())), Some(RunTier::Feasibility));
+        assert_eq!(RunTier::from_argument(Some(&"unknown-tier".to_string())), None);
+        assert_eq!(RunTier::Registered.judgement(), "judged_by_registration");
+        assert!(RunTier::Feasibility.judgement().starts_with("not_judged"));
     }
 }

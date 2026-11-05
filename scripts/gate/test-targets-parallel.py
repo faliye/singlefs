@@ -4,7 +4,7 @@
 """一趟 cargo test 拆成按测试目标并行起：合入后验证（scripts/gate/merge-and-verify.sh）测试那一步用它。
 
 用法：
-  test-targets-parallel.py --jobs <N> -- <cargo test 的参数…>      例：--jobs 31 -- --offline --no-fail-fast -p singlefs-core -p singlefs-harness
+  test-targets-parallel.py --jobs <N> -- <cargo test 的参数…>      例：--jobs 31 -- --offline --no-fail-fast -p singlefs-core -p singlefs-verification
   test-targets-parallel.py --selftest
 为什么：cargo test 一个测试二进制接一个地跑，用例少的二进制跑的时候核就空着；2026-10-21 合入后验证在第二台只用了约 5 核（登记 31）
 （records/2026-10-18-里程碑三收尾与近期欠账.md 第 780 行）。
@@ -26,32 +26,24 @@
      全部跑完按派活的次序逐个回读、转打到标准输出（.claude/singlefs-ai-sop/rules/command-safety.md「并行不许把失败吃掉」）。
      收回来的退出码文件数与派出去的目标数对不上，整趟判红、退 1。
   ④ 文档测试：没有显式目标选择（--lib、--test 等）时，要测的包里库目标 doctest 为真的（cargo metadata），最后一条 cargo test <参数> -p <这些包> --doc 一起跑（③ 都跑完了，RUST_TEST_THREADS 取 N）。
-  测试二进制的参数：<cargo test 的参数…> 里第二个 `--` 之后的（--nocapture、--include-ignored、--exact、--skip <名> 这类）原样接在 ③ 每一条与 ④ 那一条的 `--` 之后，
-     一个字不改、不挑（checker 档快档拿 --exact --skip 跳过键相同的测试函数，合入后验证拿 --include-ignored 把慢档一起跑）。
-  ⑤ 数慢档（测试二进制的参数里有 --include-ignored 时）：③ 每一条开跑之前、④ 开跑之前，各先起一次同一条 cargo test，`--` 之后只交选用例的参数
-     （--exact、--skip <名>、不带 - 的筛选词）再接 --list --ignored，数它打的「<名>: test」行，就是这一条里标 #[ignore] 而这一趟会跑到的用例条数；
-     各条加起来写进末行的 slow=。列的那一趟退非 0 的，末行写 slow=?（数不出，不算红）；参数里没有 --include-ignored 的写 slow=-。
-     列的那一趟起的是测试二进制本身：harness = false 的目标不认 --list、会照跑它的 main（工作区里此刻没有这种目标，加了要改这一步）。
-  串行段声明（scripts/hosts/core_usage.py 文件头「声明」，SINGLEFS_SERIAL_DECLARATIONS 设了才写）：③ 的目标都派出去、只剩还没跑完的那几条时
-     声明一次（空出来的线没有目标可派，剩下的各自跑完自己的用例）；④ 开跑时再声明一次（文档测试只有一个 cargo，逐个编、逐个跑）。
-  末行 TEST_TARGETS_PARALLEL dispatched=<派出> collected=<收回> failed=<红的目标数> jobs=<同时至多几条> test_threads=<每条的线程数，各条不同时写 最少-最多> doc=<yes|no|failed> slow=<慢档条数|?|->。
+  测试二进制的参数：<cargo test 的参数…> 里第二个 `--` 之后的（--nocapture、--exact、--skip <名> 这类）原样接在 ③ 每一条与 ④ 那一条的 `--` 之后，
+     一个字不改、不挑（门禁 crash-point-replay 的按条复用拿 --exact --skip 跳过键相同的测试函数）。
+  末行 TEST_TARGETS_PARALLEL dispatched=<派出> collected=<收回> failed=<红的目标数> jobs=<同时至多几条> test_threads=<每条的线程数，各条不同时写 最少-最多> doc=<yes|no|failed>。
 退出码：都绿 0；有目标或文档测试红 101；编不过照 cargo 的；收回与派出对不上、cargo metadata 读不出 1；用法错 2。
 线程数只照 --jobs（调用方经 capped.sh 给登记值），这里不现算、不写常量。
-弄坏开关 TEST_TARGETS_PARALLEL_BREAK（只给自证证红用），一项一行，下一行写打开后判错的自证格：
-  serial            同时只起一条（改前的样子：一个测试二进制接一个地跑）
-    「四个目标同时在跑」「空出来的线程分给后起的、长的多分」（同时只起一条，每条都拿满 N 条线程）
-  drop-collection   回读时丢掉最后派出的那一条、也不核收回的条数
-    「收回的条数等于派出的」
-  ignore-red        目标退非 0 也按绿算、退 0
-    「红的目标照报、退 101」
-  even-threads      每条的 RUST_TEST_THREADS 一律取 ⌈N ÷ min(N, 目标数)⌉（改前的样子：空出来的线程不分给后起的）
-    「空出来的线程分给后起的、长的多分」
-  history-ignored   不看用时表，照编译输出的次序起（改前的样子）
-    「长的先起」「空出来的线程分给后起的、长的多分」（最长的 tool 不先起，多出来的那条线程落到先起的 lib 上）
-  test-arguments-dropped  ③ 每一条与 ④ 那一条都不接测试二进制的参数（--exact --skip 那几对丢了，键相同的测试函数照跑）
-    「测试二进制的参数原样交给每个目标」
-  slow-count-skipped  带 --include-ignored 也不数慢档，末行照写 slow=-
-    「带 --include-ignored 时逐个目标数出慢档条数」
+弄坏开关（只给自证证红用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认），一项一行，下一行写打开后判错的自证格：
+  TEST_TARGETS_PARALLEL_BREAK=serial  同时只起一条（改前的样子：一个测试二进制接一个地跑）
+      「四个目标同时在跑」「空出来的线程分给后起的、长的多分」（同时只起一条，每条都拿满 N 条线程）
+  TEST_TARGETS_PARALLEL_BREAK=drop-collection  回读时丢掉最后派出的那一条、也不核收回的条数
+      「收回的条数等于派出的」
+  TEST_TARGETS_PARALLEL_BREAK=ignore-red  目标退非 0 也按绿算、退 0
+      「红的目标照报、退 101」
+  TEST_TARGETS_PARALLEL_BREAK=even-threads  每条的 RUST_TEST_THREADS 一律取 ⌈N ÷ min(N, 目标数)⌉（改前的样子：空出来的线程不分给后起的）
+      「空出来的线程分给后起的、长的多分」
+  TEST_TARGETS_PARALLEL_BREAK=history-ignored  不看用时表，照编译输出的次序起（改前的样子）
+      「长的先起」「空出来的线程分给后起的、长的多分」（最长的 tool 不先起，多出来的那条线程落到先起的 lib 上）
+  TEST_TARGETS_PARALLEL_BREAK=test-arguments-dropped  ③ 每一条与 ④ 那一条都不接测试二进制的参数（--exact --skip 那几对丢了，键相同的测试函数照跑）
+      「测试二进制的参数原样交给每个目标」
 自证（--selftest）：PATH 最前面放一份假 cargo——metadata 打一个包 demo（库带文档测试），--no-run 打四个测试目标的产物（lib、test alpha、test beta、bin tool，
   另有一份不是测试的库产物与一份构建脚本产物，不算目标），跑某个目标时记下起止时刻与 RUST_TEST_THREADS、睡 3 秒，beta 那一个打一条 FAILED、退 101；--jobs 4：
   「四个目标同时在跑」四条的起止区间两两重叠（最晚的起点早于最早的终点）、每条的 RUST_TEST_THREADS 是 1；
@@ -61,11 +53,8 @@
   另两趟各带一份用时表（tool 30 秒、beta 20 秒、lib 5 秒、alpha 1 秒）：
   「长的先起」--jobs 2：tool 与 beta 先起，lib 与 alpha 的起点都不早于前两条里先跑完的那一条的终点；跑完用时表里四个目标都写回了这一趟的用时；
   「空出来的线程分给后起的、长的多分」--jobs 5：最长的 tool 拿 2 条线程、另三条各 1 条，合起来正好 5 条。
-  再一趟带测试二进制的参数 `-- --include-ignored --nocapture --exact --skip alpha_case --skip tool_case`（--jobs 4；假 cargo 跑某个目标时另记一行收到的参数，
-  遇到 --list 只打一条「<目标>_slow: test」、不睡、不记起止）：
-  「测试二进制的参数原样交给每个目标」四个目标与文档测试那一条收到的参数都以 `-- --include-ignored --nocapture --exact --skip alpha_case --skip tool_case` 收尾；
-  「带 --include-ignored 时逐个目标数出慢档条数」四个目标与文档测试各列了一次、列的那一趟 `--` 之后是 `--exact --skip alpha_case --skip tool_case --list --ignored`
-  （不带 --include-ignored 与 --nocapture），末行 slow=5。
+  再一趟带测试二进制的参数 `-- --nocapture --exact --skip alpha_case --skip tool_case`（--jobs 4；假 cargo 跑某个目标时另记一行收到的参数）：
+  「测试二进制的参数原样交给每个目标」四个目标与文档测试那一条收到的参数都以 `-- --nocapture --exact --skip alpha_case --skip tool_case` 收尾。
 """
 import concurrent.futures
 import fnmatch
@@ -83,16 +72,11 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 BREAK_VARIABLE = "TEST_TARGETS_PARALLEL_BREAK"
-DECLARATIONS_VARIABLE = "SINGLEFS_SERIAL_DECLARATIONS"   # 写法同 scripts/hosts/core_usage.py 的 SERIAL_MARK
-SERIAL_MARK = "此刻串行："
 LIBRARY_KINDS = {"lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"}
 SELECTOR_OPTION_BY_KIND = {"test": "--test", "bin": "--bin", "example": "--example", "bench": "--bench"}
 SUMMARY_PREFIX = "TEST_TARGETS_PARALLEL"
 SELFTEST_CELLS = ("四个目标同时在跑", "收回的条数等于派出的", "红的目标照报、退 101", "编译与文档测试", "长的先起",
-                  "空出来的线程分给后起的、长的多分", "测试二进制的参数原样交给每个目标", "带 --include-ignored 时逐个目标数出慢档条数")   # 自证的格名，判错行照抄
-SLOW_TIER_OPTION = "--include-ignored"   # 测试二进制的参数里有它就数慢档（文件头 ⑤）
-# 数慢档那一趟不交的 libtest 参数里带一个值的（文件头 ⑤：只留选用例的参数，这几样只管怎么跑）
-RUN_OPTIONS_WITH_VALUE = {"--test-threads", "--color", "--format", "--logfile", "--shuffle-seed", "-Z"}
+                  "空出来的线程分给后起的、长的多分", "测试二进制的参数原样交给每个目标")   # 自证的格名，判错行照抄
 DURATIONS_VARIABLE = "TEST_TARGETS_PARALLEL_DURATIONS"   # 用时表换位置（自证用）；不设取 target_directory 下的 DURATIONS_FILE_NAME
 DURATIONS_FILE_NAME = "singlefs-test-target-durations.tsv"
 
@@ -147,43 +131,6 @@ def execution_arguments(arguments):
         kept.append(argument)
         position += 1
     return kept, selected_targets
-
-
-def listing_arguments(test_arguments):
-    """数慢档那一趟交给测试二进制的参数（文件头 ⑤）：只留选用例的（--exact、--skip <名>、不带 - 的筛选词），再接 --list --ignored。"""
-    kept, position = [], 0
-    while position < len(test_arguments):
-        argument = test_arguments[position]
-        if argument == "--skip" and position + 1 < len(test_arguments):
-            kept += test_arguments[position:position + 2]
-            position += 2
-            continue
-        if argument == "--exact" or argument.startswith("--skip=") or not argument.startswith("-"):
-            kept.append(argument)
-        elif argument in RUN_OPTIONS_WITH_VALUE:
-            position += 1   # 跳过它的值
-        position += 1
-    return kept + ["--list", "--ignored"]
-
-
-def slow_count(command, environment):
-    """数一条 cargo test 里标 #[ignore] 而这一趟会跑到的用例（文件头 ⑤）：交条数；cargo 退非 0 交 None（数不出）。"""
-    completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env=environment)
-    if completed.returncode != 0:
-        return None
-    return sum(1 for line in completed.stdout.splitlines() if line.endswith(": test"))
-
-
-def declare_serial(reason):
-    """往 SINGLEFS_SERIAL_DECLARATIONS 追加一行串行段声明；没设、写不进都不碍跑测试。"""
-    path = os.environ.get(DECLARATIONS_VARIABLE, "")
-    if not path:
-        return
-    try:
-        with open(path, "a", encoding="utf-8") as handle:
-            handle.write(f"{time.time():.3f}\t{SERIAL_MARK}{reason}\n")
-    except OSError:
-        pass
 
 
 def selector_of(target):
@@ -343,19 +290,14 @@ def run(jobs, arguments):
     history = {} if broken("history-ignored") else read_durations(history_path)
     # 长的先起（文件头 ③「次序」）：用时表里没有的先起、照编译输出的次序，有的按用时从长到短
     order = sorted(range(len(units)), key=lambda index: (unit_key(*units[index]) in history, -history.get(unit_key(*units[index]), 0.0), index))
-    thread_counts, elapsed, slow_of = {}, {}, {}
+    thread_counts, elapsed = {}, {}
     environment = dict(os.environ)
     scratch = tempfile.mkdtemp(prefix="test-targets-parallel-")
     # 测试二进制的参数原样接在 `--` 之后（文件头「测试二进制的参数」）；弄坏开关 test-arguments-dropped 下丢掉
     passed_arguments = [] if broken("test-arguments-dropped") else test_arguments
-    # 数慢档（文件头 ⑤）；弄坏开关 slow-count-skipped 下不数
-    counting_slow = SLOW_TIER_OPTION in test_arguments and not broken("slow-count-skipped")
 
     def run_unit(index, package, selector, threads):
         command = ["cargo", "test"] + unit_arguments + ["-p", package] + selector + (["--"] + passed_arguments if passed_arguments else [])
-        if counting_slow:
-            slow_of[index] = slow_count(["cargo", "test"] + unit_arguments + ["-p", package] + selector + ["--"] + listing_arguments(test_arguments),
-                                        dict(environment, RUST_TEST_THREADS=str(threads)))
         unit_started = time.time()
         with open(os.path.join(scratch, f"{index}.log"), "w", encoding="utf-8") as output:
             exit_code = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, env=dict(environment, RUST_TEST_THREADS=str(threads))).returncode
@@ -373,8 +315,6 @@ def run(jobs, arguments):
                 thread_counts[index] = threads
                 free -= threads
                 running[executor.submit(run_unit, index, *units[index], threads)] = threads
-                if not pending and len(units) > 1:
-                    declare_serial("测试目标都派出去了，剩下的几条各自跑完自己的用例，空出来的线没有目标可派")
             done, _ = concurrent.futures.wait(list(running), return_when=concurrent.futures.FIRST_COMPLETED)
             for future in done:
                 free += running.pop(future)
@@ -400,10 +340,6 @@ def run(jobs, arguments):
     doc_state = "no"
     doc_packages = [] if selected_targets else [package for package in selected_packages if doctests.get(package)]
     if doc_packages:
-        declare_serial("文档测试只有一个 cargo，逐个编、逐个跑，没法按目标分开")
-        if counting_slow:
-            slow_of["doc"] = slow_count(["cargo", "test"] + unit_arguments + package_options(doc_packages) + ["--doc", "--"] + listing_arguments(test_arguments),
-                                        dict(environment, RUST_TEST_THREADS=str(jobs)))
         doc_exit = subprocess.run(["cargo", "test"] + unit_arguments + package_options(doc_packages) + ["--doc"]
                                   + (["--"] + passed_arguments if passed_arguments else []), env=dict(environment, RUST_TEST_THREADS=str(jobs))).returncode
         doc_state = "yes" if doc_exit == 0 else "failed"
@@ -414,8 +350,7 @@ def run(jobs, arguments):
     os.rmdir(scratch)
     counts = sorted(set(thread_counts.values())) or [1]
     threads_text = str(counts[0]) if len(counts) == 1 else f"{counts[0]}-{counts[-1]}"
-    slow_text = "-" if not counting_slow else "?" if None in slow_of.values() else str(sum(slow_of.values()))
-    print(f"{SUMMARY_PREFIX} dispatched={len(units)} collected={collected} failed={len(failed)} jobs={concurrent_jobs} test_threads={threads_text} doc={doc_state} slow={slow_text}")
+    print(f"{SUMMARY_PREFIX} dispatched={len(units)} collected={collected} failed={len(failed)} jobs={concurrent_jobs} test_threads={threads_text} doc={doc_state}")
     if collected != len(units) and not broken("drop-collection"):
         print(f"  ✗ 派出去 {len(units)} 个测试目标，收回 {collected} 个退出码：有目标的结局丢了，这一趟不算数")
         print("  → 怎么办：整趟重跑；还对不上就看临时目录里各目标的 .exit 为什么没写（目标被杀、磁盘写不进）")
@@ -443,14 +378,6 @@ if [[ "$arguments" == *" --no-run "* ]]; then
 fi
 name=lib
 if [[ "$arguments" == *" --doc "* ]]; then name=doc; elif [[ "$arguments" =~ --(test|bin)\ ([a-z_]+) ]]; then name="${BASH_REMATCH[2]}"; fi
-# 数慢档那一趟（--list）：记一行收到的参数，只列一条标了 ignore 的用例，不睡、不记起止
-if [[ "$arguments" == *" --list "* ]]; then
-  echo "list $name $*" >> "$SELFTEST_CALLS"
-  echo "${name}_slow: test"
-  echo
-  echo "1 test, 0 benchmarks"
-  exit 0
-fi
 if [[ "$name" == doc ]]; then
   echo "doc" >> "$SELFTEST_CALLS"
   echo "args doc $*" >> "$SELFTEST_CALLS"
@@ -506,7 +433,6 @@ def selftest_run(jobs, history=None, test_arguments=()):
             write_durations(paths["durations.tsv"], history)
         environment = dict(os.environ, PATH=bin_directory + os.pathsep + os.environ.get("PATH", ""), SELFTEST_METADATA=paths["metadata.json"],
                            SELFTEST_ARTIFACTS=paths["artifacts.jsonl"], SELFTEST_CALLS=paths["calls.txt"], **{DURATIONS_VARIABLE: paths["durations.tsv"]})
-        environment.pop(DECLARATIONS_VARIABLE, None)
         completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--jobs", str(jobs), "--", "--offline", "--no-fail-fast", "-p", "demo"]
                                    + (["--", *test_arguments] if test_arguments else []),
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment, cwd=work, timeout=300)
@@ -546,9 +472,9 @@ def selftest():
     threads = {line.split()[1]: line.split()[3] for line in calls if line.startswith("start ")}
     if threads != {"tool": "2", "beta": "1", "lib": "1", "alpha": "1"}:
         failures.append(f"空出来的线程分给后起的、长的多分：--jobs 5、四个目标时最长的 tool 应当拿 2 条线程、另三条各 1 条（合起来 5 条），实际 {threads}")
-    # 测试二进制的参数（文件头「测试二进制的参数」）与数慢档（文件头 ⑤）：同一趟里核两格
-    passed = ["--include-ignored", "--nocapture", "--exact", "--skip", "alpha_case", "--skip", "tool_case"]
-    completed, calls, _ = selftest_run(4, test_arguments=passed)
+    # 测试二进制的参数（文件头「测试二进制的参数」）
+    passed = ["--nocapture", "--exact", "--skip", "alpha_case", "--skip", "tool_case"]
+    _, calls, _ = selftest_run(4, test_arguments=passed)
     def shown_calls(recorded):
         return "；".join(name + "：" + " ".join(words) for name, words in sorted(recorded.items()))
     received = {line.split()[1]: line.split()[2:] for line in calls if line.startswith("args ")}
@@ -556,13 +482,6 @@ def selftest():
     if sorted(received) != ["alpha", "beta", "doc", "lib", "tool"] or any(words[-len(wanted_tail):] != wanted_tail for words in received.values()):
         failures.append("测试二进制的参数原样交给每个目标：四个目标与文档测试那一条收到的参数都应当以「" + " ".join(wanted_tail) + "」收尾，"
                         "实际 " + shown_calls(received))
-    listed = {line.split()[1]: line.split()[2:] for line in calls if line.startswith("list ")}
-    listing_tail = ["--", "--exact", "--skip", "alpha_case", "--skip", "tool_case", "--list", "--ignored"]
-    summary = [line for line in completed.stdout.splitlines() if line.startswith(SUMMARY_PREFIX + " ")]
-    if sorted(listed) != ["alpha", "beta", "doc", "lib", "tool"] or any(words[-len(listing_tail):] != listing_tail for words in listed.values()) \
-            or not summary or not summary[-1].endswith(" slow=5"):
-        failures.append("带 --include-ignored 时逐个目标数出慢档条数：四个目标与文档测试应当各列一次（`--` 之后是「" + " ".join(listing_tail[1:]) + "」）、末行 slow=5，"
-                        "实际列了 " + shown_calls(listed) + f"，末行 {summary}")
     if failures:
         for failure in failures:
             print(f"  ✗ test-targets-parallel 自检：{failure}")  # gate-lint:detail
@@ -578,11 +497,44 @@ def main():
         sys.exit(selftest())
     if len(arguments) < 3 or arguments[0] != "--jobs" or not arguments[1].isdigit() or int(arguments[1]) < 1 or arguments[2] != "--":
         print("  ✗ 用法：test-targets-parallel.py --jobs <正整数> -- <cargo test 的参数…>", file=sys.stderr)
-        print("  → 例：test-targets-parallel.py --jobs 31 -- --offline --no-fail-fast -p singlefs-core；线程数照调用方给的登记值（capped.sh），自检：--selftest", file=sys.stderr)
+        print("  → 例：test-targets-parallel.py --jobs 31 -- --offline --no-fail-fast -p singlefs-core；线程数是登记值（每台默认重活线程数，由 task-server 套的 capped.sh 设），自检：--selftest", file=sys.stderr)
         sys.exit(2)
     sys.exit(run(int(arguments[1]), arguments[3:]))
 
 
+BREAK_VARIABLES = (BREAK_VARIABLE,)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/test-targets-parallel.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     main()

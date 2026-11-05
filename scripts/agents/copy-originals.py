@@ -10,7 +10,7 @@
   copy-originals.py --help                                     # 打这一段用法（-h 同），退 0
 
 <草稿目录> 只收绝对路径，要落在工作根（lib_work_root.py 的 scratch_roots()：$SINGLEFS_WORK_ROOT，默认 ~/.local/share/singlefs/work）
-  或过渡期旧根 /tmp/claude-<uid>/ 下面（根本身不收），解开符号链接之后不许落在 <仓根> 或这份脚本所在的仓里。
+  下面（根本身不收；Claude Code 的会话临时目录根 /tmp/claude-<uid>/ 不收），解开符号链接之后不许落在 <仓根> 或这份脚本所在的仓里。
 <文件> 写相对仓根的路径或仓内的绝对路径，要是仓里已有的普通文件（目录、仓外的、不在的拒）。根下 manifest.tsv 路径留给备份清单，不收同路径的文件或目录子项。<仓根> 不给时是这份脚本所在的仓。
 清单 manifest.tsv：开头一行「# root<TAB><仓根>」，之后一行一份「<相对仓根的路径><TAB><sha256><TAB><拷贝相对草稿目录的路径>」；同一个草稿目录多次 copy 往里接着记。
 目标已在而内容相同的不再拷、照记；内容不同的整批拒（一份都不拷、清单不动），不静默覆盖；清单里这份记的 sha256 与此刻的不同也拒。
@@ -25,8 +25,8 @@ check 用清单开头记的仓根；改过的逐行写「改过 <路径>（拷�
       「拒相对路径的草稿目录」
   COPY_ORIGINALS_BREAK=inside-repository-accepted  scratch_problem() 不拒落在仓里的草稿目录
       「拒落在仓里的草稿目录」「拒落在仓里的草稿目录时一个字节不写」
-  COPY_ORIGINALS_BREAK=outside-scratch-roots-accepted  scratch_problem() 不拒工作根与旧根之外的草稿目录
-      「拒工作根之外的草稿目录」
+  COPY_ORIGINALS_BREAK=outside-scratch-roots-accepted  scratch_problem() 不拒工作根之外的草稿目录
+      「拒工作根之外的草稿目录」「拒会话临时目录根下的草稿目录」
   COPY_ORIGINALS_BREAK=source-checks-skipped  source_problem() 不拒仓外的、不在的与不是普通文件的源
       「拒仓外的源文件」「拒不在的源文件」「拒目录当源」「拒绝时整批一份都不拷」
   COPY_ORIGINALS_BREAK=differing-target-overwritten  plan_copies() 不拒内容不同的已有目标，照拷覆盖
@@ -39,7 +39,9 @@ check 用清单开头记的仓根；改过的逐行写「改过 <路径>（拷�
       「平常跑设了弄坏开关退 2 并点名只在自证里认」
   COPY_ORIGINALS_BREAK=guard-off-with-others  refuse_break_outside_selftest() 关守卫项与别的项同写也照认（改前的样子）；这一项只在自证进程本身里认
       「关守卫项与别的项同写：进程里也拒并点名它」
-这个变量只在自证（--selftest）里认：平常跑（命令行不是单独一个 --selftest）设了它，不管值是什么，参数解析之前就退 2、点名它只在自证里认。
+  SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  .claude/hooks/lib_work_root.py 的开关：scratch_roots() 另认会话临时目录根（撤掉之前的放行）
+      「拒会话临时目录根下的草稿目录」
+COPY_ORIGINALS_BREAK 只在自证（--selftest）里认：平常跑（命令行不是单独一个 --selftest）设了它，不管值是什么，参数解析之前就退 2、点名它只在自证里认。
 关守卫项 guard-off 整值比：只在它是唯一一项时照认（平常跑也放行）；与别的项同写一律退 2，点名「关守卫项 guard-off 只在它是唯一一项时认」。
 guard-off-with-others 只在自证进程本身调 refuse_break_outside_selftest(…, in_selftest=True) 时认；平常跑同写着它照拒，它自己不成借道。
 不认识的值直接拒绝（退 2），免得拼错的开关被当成「没开」。
@@ -146,7 +148,7 @@ def scratch_problem(scratch, repository_roots, scratch_roots):
     if not break_is_set("outside-scratch-roots-accepted"):
         roots = [os.path.realpath(root) for root in scratch_roots]
         if not any(resolved != root and is_within(resolved, root) for root in roots):
-            return (f"草稿目录 {scratch} 不在工作根或旧根下面（认的根：{'、'.join(roots)}，根本身不收）",
+            return (f"草稿目录 {scratch} 不在工作根下面（认的根：{'、'.join(roots)}，根本身不收）",
                     "用派发提示给的草稿目录，它在工作根 ~/.local/share/singlefs/work/ 下")
     return None
 
@@ -366,10 +368,14 @@ def selftest():
         print(f"  ✗ {error}")
         print(f"     → 怎么办：{BREAK_VARIABLE} 只写文件头开关表里列的项")
         return USAGE_EXIT
-    uid_root = f"/tmp/claude-{os.getuid()}"
-    os.makedirs(uid_root, exist_ok=True)
-    work = tempfile.mkdtemp(prefix="copy-originals-selftest-", dir=uid_root)
-    outside_roots = tempfile.mkdtemp(prefix="copy-originals-selftest-outside-", dir="/tmp")   # 工作根与旧根之外
+    work_root_library = load_work_root_library()
+    work_root_directory = work_root_library.configured_work_root()   # 草稿目录要在工作根下才收：样本仓与草稿目录都建在它下面，finally 里删
+    os.makedirs(work_root_directory, exist_ok=True)
+    work = tempfile.mkdtemp(prefix="copy-originals-selftest-", dir=work_root_directory)
+    outside_roots = tempfile.mkdtemp(prefix="copy-originals-selftest-outside-", dir="/tmp")   # 工作根之外
+    session_temporary_root = work_root_library.claude_session_temporary_root()   # Claude Code 的会话临时目录根：草稿目录落在这里照拒；开关下拷进去的，finally 里删
+    os.makedirs(session_temporary_root, exist_ok=True)
+    session_temporary_scratch = tempfile.mkdtemp(prefix="copy-originals-selftest-session-temporary-", dir=session_temporary_root)
     results = []
     def call(*arguments):
         output = io.StringIO()
@@ -430,6 +436,7 @@ def selftest():
         check_cell("拒落在仓里的草稿目录", REFUSED_EXIT, call("copy", inside, "scripts/gate/merge.sh", "--root", repository)[0])
         check_cell("拒落在仓里的草稿目录时一个字节不写", False, os.path.exists(inside))
         check_cell("拒工作根之外的草稿目录", REFUSED_EXIT, call("copy", os.path.join(outside_roots, "scratch"), "scripts/gate/merge.sh", "--root", repository)[0])
+        check_cell("拒会话临时目录根下的草稿目录", REFUSED_EXIT, call("copy", os.path.join(session_temporary_scratch, "scratch"), "scripts/gate/merge.sh", "--root", repository)[0])
         fresh = os.path.join(work, "fresh-scratch")
         check_cell("拒仓外的源文件", REFUSED_EXIT, call("copy", fresh, outside, "--root", repository)[0])
         check_cell("拒不在的源文件", REFUSED_EXIT, call("copy", fresh, "scripts/gate/absent.sh", "--root", repository)[0])
@@ -459,6 +466,7 @@ def selftest():
     finally:
         shutil.rmtree(work, ignore_errors=True)
         shutil.rmtree(outside_roots, ignore_errors=True)
+        shutil.rmtree(session_temporary_scratch, ignore_errors=True)
     failures = [item for item in results if item[1] != item[2]]
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want!r}，实际 {got!r}")  # gate-lint:detail
@@ -467,7 +475,7 @@ def selftest():
               f"{BREAK_VARIABLE} 设着的话（项与红的格见文件头）这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(results)} 格）：拷成并照相对仓根的路径落位、清单记 sha256、再拷同样的放行；核对出改动并点名那一份；"
-          "拒相对路径、仓内、工作根外的草稿目录，拒仓外、不在的源与目录，拒内容不同的已有目标且原样不动；用法错退 2；平常跑设了弄坏开关退 2，关守卫项与别的项同写也退 2 并点名它")
+          "拒相对路径、仓内、工作根外（会话临时目录根在内）的草稿目录，拒仓外、不在的源与目录，拒内容不同的已有目标且原样不动；用法错退 2；平常跑设了弄坏开关退 2，关守卫项与别的项同写也退 2 并点名它")
     return 0
 
 

@@ -6,7 +6,7 @@
 用法：
     test-environment-check.py [check] [--temporary-directory 目录]... [--report 路径]
                               [--minimum-free-percent 10] [--minimum-free-gibibytes 50]
-                              [--recent-minutes 10] [--kernel-log-since 时间] [--smart]
+                              [--recent-minutes 10] [--kernel-log-since 时间]
                               [--produced-after 时刻] [--gate-run-temporary-directory 目录]...
                               [--cross-run-temporary-directory 目录]...
     test-environment-check.py clean [--temporary-directory 目录]... [--yes]
@@ -27,7 +27,7 @@ check 逐类判，每类一行 ✓ / ✗ / !（没查成）/ -（没要求跑）
                    这一类另扫它（不是 /tmp 也不是这一轮的 TMPDIR 时，不点名就从来不扫），判法与别的临时目录相同；设备与宿主盘不算它
     宿主盘         /、/home、/tmp 与临时目录所在的文件系统变成只读；剩余空间低于阈值；
                    ext4 的 errors_count 不为 0；本次开机以来内核日志里宿主盘栈上的块设备错误；
-                   给了 --smart 时再用 sudo 跑 smartctl -H 或 nvme smart-log
+                   再用 sudo 跑 smartctl -H 或 nvme smart-log（工具或 sudo 取不到的记「没查成」，不跳过）
 clean 只清前两类判红的那些：卸载、dmsetup remove、losetup -d、删文件与目录；不给 --yes 只打印计划。
 qemu 进程不自动杀，列出 pid 交人判。白名单与在用的一律不碰，删之前断言路径就在临时目录下、以 singlefs- 开头。
 
@@ -46,16 +46,41 @@ record-run-start：把一趟门禁的开跑时刻写进 --run-times-file（本�
 
 退出码：0 干净；1 有残留或异常（clean --yes 时：有一步没做成）；2 用法错；3 有一类没查成（与 1 同时成立时取 1）；
 4 只给 clean --refuse-too-recent：还有太新、这一趟清不掉的项。
-破坏开关（只给 --selftest 用，证明自检会红）：环境变量 TEST_ENVIRONMENT_CHECK_BREAK 取
-aliveowner / allowlist / openfile / pidreuse / recent / readonly / freespace / kernellog / loopbacking / deleteguard /
-gaterunscanned / crossrununscanned / previousrunignored / runtimesnotrotated / retiredcachesallowlisted / guardoff 之一
-（guardoff：平常跑（命令行里没有 --selftest）设了 TEST_ENVIRONMENT_CHECK_BREAK 也不拒，自检「平常跑设了破坏开关退 2 并点名只在自证里认」那一条不中；
-这个变量只在 --selftest 里认，平常跑设了就在参数解析之前退 2、点名它只在自证里认；
-previousrunignored：clean 不认上一趟的开跑时刻，上一趟留下的太新条目仍当可能正在跑，自检「上一趟留下的删得掉」那几条不中；
-runtimesnotrotated：record-run-start 不把本趟转成上一趟，自检「记两个时刻」那几条不中；gaterunscanned：临时目录残留这一类照扫 --gate-run-temporary-directory 点名的目录，
-自检「这一轮门禁的临时目录不进临时目录残留」那一条不中；crossrununscanned：临时目录残留这一类不扫 --cross-run-temporary-directory 点名的目录，
-自检「gate.sh 开跑前的 TMPDIR 也扫」那一条不中；retiredcachesallowlisted：改前跨轮共用的编译目录与文本缓存的名字（RETIRED_CROSS_RUN_CACHES）照改前当白名单认，
-自检「临时条目 singlefs-crates-mutation-target 应判 residual」这一类四条、clean 预演汇总的「不碰几项」一条、「clean --yes 之后 … 还在」四条不中）。
+弄坏开关 TEST_ENVIRONMENT_CHECK_BREAK=<项>（只给 --selftest 证红用；一次设一个；平常跑设了就在参数解析之前退 2、点名变量只在自证里认）。项名、弄坏哪一处、打开后自证哪里红（失败行「✗ --selftest 没通过（破坏开关 <项>）：N / M 条断言不中」，下面逐条列不中的断言）：
+  TEST_ENVIRONMENT_CHECK_BREAK=aliveowner  创建者 pid 不核是否活着，一律当已不在
+      「✗ --selftest 没通过（破坏开关 aliveowner）」
+  TEST_ENVIRONMENT_CHECK_BREAK=allowlist  白名单一条都不认（match_allowlist 一律交 None）
+      「✗ --selftest 没通过（破坏开关 allowlist）」
+  TEST_ENVIRONMENT_CHECK_BREAK=openfile  不查有没有进程开着条目（find_openers 一律交空）
+      「✗ --selftest 没通过（破坏开关 openfile）」
+  TEST_ENVIRONMENT_CHECK_BREAK=pidreuse  不核创建者 pid 是不是被别的进程重用（起在条目最后一次修改之后的进程也当创建者）
+      「✗ --selftest 没通过（破坏开关 pidreuse）」
+  TEST_ENVIRONMENT_CHECK_BREAK=recent  不看条目新不新，不到阈值的太新条目也当能清
+      「✗ --selftest 没通过（破坏开关 recent）」
+  TEST_ENVIRONMENT_CHECK_BREAK=readonly  只读挂载不当只读
+      「✗ --selftest 没通过（破坏开关 readonly）」
+  TEST_ENVIRONMENT_CHECK_BREAK=freespace  可用空间的下限当 0
+      「✗ --selftest 没通过（破坏开关 freespace）」
+  TEST_ENVIRONMENT_CHECK_BREAK=kernellog  内核日志里的设备报错一律不当成和这一轮测试有关
+      「✗ --selftest 没通过（破坏开关 kernellog）」
+  TEST_ENVIRONMENT_CHECK_BREAK=loopbacking  回环设备的后备文件不查（loop 设备一律跳过）
+      「✗ --selftest 没通过（破坏开关 loopbacking）」
+  TEST_ENVIRONMENT_CHECK_BREAK=deleteguard  clean 删之前不核它在临时目录底下、名字带条目前缀
+      「✗ --selftest 没通过（破坏开关 deleteguard）」
+  TEST_ENVIRONMENT_CHECK_BREAK=gaterunscanned  临时目录残留这一类照扫 --gate-run-temporary-directory 点名的目录（自检「这一轮门禁的临时目录不进临时目录残留」那一条不中）
+      「✗ --selftest 没通过（破坏开关 gaterunscanned）」
+  TEST_ENVIRONMENT_CHECK_BREAK=crossrununscanned  临时目录残留这一类不扫 --cross-run-temporary-directory 点名的目录（自检「gate.sh 开跑前的 TMPDIR 也扫」那一条不中）
+      「✗ --selftest 没通过（破坏开关 crossrununscanned）」
+  TEST_ENVIRONMENT_CHECK_BREAK=previousrunignored  clean 不认上一趟的开跑时刻，上一趟留下的太新条目仍当可能正在跑（自检「上一趟留下的删得掉」那几条不中）
+      「✗ --selftest 没通过（破坏开关 previousrunignored）」
+  TEST_ENVIRONMENT_CHECK_BREAK=runtimesnotrotated  record-run-start 不把本趟转成上一趟（自检「记两个时刻」那几条不中）
+      「✗ --selftest 没通过（破坏开关 runtimesnotrotated）」
+  TEST_ENVIRONMENT_CHECK_BREAK=smartskipped  宿主盘·SMART 不查（judge_smart 一律交 skipped，改前默认不查 SMART 的样子）
+      「✗ --selftest 没通过（破坏开关 smartskipped）」
+  TEST_ENVIRONMENT_CHECK_BREAK=unknownoptionaccepted  main() 对认不出的选项不拒（用 parse_known_args 收下、丢掉）
+      「✗ --selftest 没通过（破坏开关 unknownoptionaccepted）」
+  TEST_ENVIRONMENT_CHECK_BREAK=guardoff  关守卫项：平常跑（命令行里没有 --selftest）设了 TEST_ENVIRONMENT_CHECK_BREAK 也不拒（自检「平常跑设了破坏开关退 2 并点名只在自证里认」那一条不中）；单独一项时才认，与别的项同写照拒
+      「✗ --selftest 没通过（破坏开关 guardoff）」
 """
 import argparse
 import contextlib
@@ -81,7 +106,7 @@ SCRIPT_RELATIVE_PATH = 'scripts/hosts/test-environment-check.py'
 BREAK_SWITCH_VARIABLE = 'TEST_ENVIRONMENT_CHECK_BREAK'
 BREAK_SWITCH_NAMES = ('aliveowner', 'allowlist', 'openfile', 'pidreuse', 'recent',
                       'readonly', 'freespace', 'kernellog', 'loopbacking', 'deleteguard', 'gaterunscanned', 'crossrununscanned',
-                      'previousrunignored', 'runtimesnotrotated', 'retiredcachesallowlisted', 'guardoff')
+                      'previousrunignored', 'runtimesnotrotated', 'smartskipped', 'unknownoptionaccepted', 'guardoff')
 # 退出码 4：clean --refuse-too-recent 预演见到太新、这一趟清不掉的项
 EXIT_TOO_RECENT = 4
 TOKYO_TIMEZONE = datetime.timezone(datetime.timedelta(hours=9))
@@ -93,29 +118,19 @@ LOOP_BLOCK_MAJOR = 7
 PROCESS_IDENTIFIER_REUSE_SLACK_SECONDS = 2.0
 
 # 有意跨轮留着的东西：不判残留、clean 不碰。每条写明谁在用它。编译生成物不在这里（用户 2026-10-23 定案「自己用完自己删」：
-# 每一趟自己的编译目录跑完删），改前跨轮共用的那几个名字（RETIRED_CROSS_RUN_CACHES）现在没人建，见到就是残留。
+# 每一趟自己的编译目录跑完删）。
 ALLOWLIST = (
     (re.compile(r'^singlefs-e152-packages$'),
      'E152 六家文件系统的下载包缓存（scripts/devices/e152-stage-root.sh 的 PACKAGES）'),
     (re.compile(r'^singlefs-vmlinuz(-.+)?$'),
      '给 QEMU 用的可读内核副本（scripts/devices/vm-kernel.sh 的 DEST）'),
 )
-# 改前跨轮共用、现在每趟自己建自己删的那几个名字：不在白名单里（见到就是没删干净的残留）；
-# 只有破坏开关 retiredcachesallowlisted 下照改前当白名单认（自检「改前跨轮共用的缓存名照残留判」那一条不中）
-RETIRED_CROSS_RUN_CACHES = (
-    (re.compile(r'^singlefs-crates-mutation-target(-w[0-9]+)?(-coverage)?$'),
-     '改前门禁 checker-tier-crates-mutation-replay 跨轮共用的编译目录（现在在这一趟的 <shard_root>/build/ 里，跑完删）'),
-    (re.compile(r'^singlefs-mutate-target$'),
-     '改前 mutate.sh 跨轮共用的编译目录（现在在这一趟的分片根里，跑完删）'),
-    (re.compile(r'^singlefs-pdftext-[0-9]+$'),
-     '改前引文核对跨轮共用的 PDF 抽文本缓存（scripts/kb/verify-citations.sh 现在每趟 mktemp -d、跑完删）'),
-)
 
 # 名字里带创建者 pid 的形态：按 pid 判创建者在不在。第一个捕获组是 pid。
 PROCESS_IDENTIFIER_NAME_PATTERNS = (
     (re.compile(r'^singlefs-replay-([0-9]+)$'), 'scripts/experiment-apparatus/replay.sh 的 OUT_DIR'),
     (re.compile(r'^singlefs-step[0-9]+-.+-([0-9]+)-[0-9]+-dev[0-9]+\.img$'),
-     'crates/singlefs-harness/tests/ 的 image_path'),
+     'crates/singlefs-verification/tests/ 的 image_path'),
     (re.compile(r'^singlefs-core-fake-sysfs-([0-9]+)$'), 'crates/singlefs-core/src/block_device.rs 的测试 queue_attributes_are_read_from_the_sysfs_tree_and_missing_ones_are_none'),
     (re.compile(r'^singlefs-core-.+-([0-9]+)-[0-9]+\.img$'), 'crates/singlefs-core/src/block_device.rs 的测试辅助函数 temporary_image_path'),
 )
@@ -320,7 +335,7 @@ def measure_entry(path):
 def match_allowlist(name):
     if break_switch_is('allowlist'):
         return None
-    for pattern, reason in ALLOWLIST + (RETIRED_CROSS_RUN_CACHES if break_switch_is('retiredcachesallowlisted') else ()):
+    for pattern, reason in ALLOWLIST:
         if pattern.match(name):
             return reason
     return None
@@ -373,7 +388,7 @@ def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds, pr
         if openers:
             return build('in_use', f'{owner_description}，但 {describe_openers(openers)}')
         if produced_after and latest_modification_epoch >= produced_after:
-            # 这一次跑自己产生的：门禁 checker-tier-crates-mutation-replay 让每条变异点名的测试判红，那些测试红在断言上就 panic，
+            # 这一次跑自己产生的：门禁 crates-mutation-replay 让每条变异点名的测试判红，那些测试红在断言上就 panic，
             # 写在断言之后的清理走不到（C448）。它确实是垃圾，但不是「上一轮没清干净」，不该让整道红。
             return build('produced_by_this_run', f'{owner_description}，也没有进程开着它'
                          f'（名字形态出自 {source}）；这一次跑自己产生的，本次跑完再清')
@@ -431,7 +446,6 @@ class Environment:
     minimum_free_percent: float = 10.0
     minimum_free_gibibytes: float = 50.0
     kernel_log_since: str = ''
-    smart_requested: bool = False
     # 这个时刻之后才出现的临时条目单列成「这一次跑自己产生的」、不判红（C448）；0 表示不分界、照旧全判
     produced_after: float = 0.0
     # 上一趟门禁的开跑时刻（C474）：clean 把最近修改落在 [它, produced_after) 内、没有进程开着的条目当上一趟留下的删掉，哪怕不到 recent_seconds；0 表示不认
@@ -447,6 +461,7 @@ class Environment:
     device_mapper_major: object = None
     command_runner: object = None           # (命令列表) -> (退出码, 输出)；clean 动设备用
     process_identifier_filter: object = None  # 只看这些 pid 里的 qemu；None 表示全部进程
+    smart_checker: object = None            # (宿主设备名集合) -> (状态, 一句话, 明细行)
 
 
 @dataclasses.dataclass
@@ -864,7 +879,7 @@ def judge_devices(device_scan):
             f'{len(device_scan.residual_emulators)} 个命令行里带 singlefs 的 qemu-system* 进程',
             [f'pid {process_identifier}（父 pid {parent_identifier}）：{command_text[:160]}'
              for process_identifier, parent_identifier, command_text in device_scan.residual_emulators],
-            '确认它不是正在跑的门禁 checker-tier-qemu-device-streams 或 vm-bench.sh 之后，按列出的 pid 另起一条 kill <pid> 停掉'
+            '确认它不是正在跑的门禁 qemu-device-streams 或 vm-bench.sh 之后，按列出的 pid 另起一条 kill <pid> 停掉'
             '（clean 不自动杀进程）；父 pid 是 1 多半是跑它的脚本已经没了'))
     else:
         results.append(CategoryResult('残留测试设备·qemu 进程', 'green',
@@ -1007,7 +1022,7 @@ def judge_kernel_log(environment, host_device_names, host_major_minor_numbers):
                               f'{source_description} 里 {len(groups["host"])} 行落在宿主盘栈（{host_names}）上、'
                               f'{len(groups["other"])} 行是别的真盘或认不出设备的块设备错误',
                               shown + information_lines,
-                              '逐行看列出的错误；是宿主盘的 I/O 错就停下交用户（带 --smart 再跑一次看盘自己的记录），'
+                              '逐行看列出的错误；是宿主盘的 I/O 错就停下交用户（看宿主盘·SMART 那一类里盘自己的记录），'
                               '不在这块盘上继续跑测试；确认是测试设备而没认出来的，把设备名规则补进本脚本')
     return CategoryResult('宿主盘·内核日志', 'green',
                           f'{source_description} 共 {len(lines)} 行，没有落在宿主盘栈（{host_names}）上的块设备错误',
@@ -1015,12 +1030,12 @@ def judge_kernel_log(environment, host_device_names, host_major_minor_numbers):
 
 
 def judge_smart(environment, host_device_names):
-    if not environment.smart_requested:
-        return CategoryResult('宿主盘·SMART', 'skipped', '没给 --smart', [])
-    status, headline, detail_lines = check_smart(host_device_names)
+    if break_switch_is('smartskipped'):
+        return CategoryResult('宿主盘·SMART', 'skipped', '不查（弄坏开关）', [])
+    status, headline, detail_lines = (environment.smart_checker or check_smart)(host_device_names)
     return CategoryResult('宿主盘·SMART', status, headline, detail_lines,
                           '有异常就停下交用户；没查成的装 smartmontools 或 nvme-cli、'
-                          '确认 .env 里有 SUDO_PASS_A / SUDO_PASS_B 再带 --smart 跑一次')
+                          '确认 .env 里有 SUDO_PASS_A / SUDO_PASS_B 再跑一次')
 
 
 def collect_host_results(environment):
@@ -1465,14 +1480,6 @@ def build_temporary_samples(fake_temporary, outside_directory, holders):
             handle.write('cache\n')
         set_tree_modification_time(os.path.join(fake_temporary, cache_name), old_epoch)
         expectations[cache_name] = 'allowlisted'
-    # 改前跨轮共用、现在每趟自己建自己删的编译目录与文本缓存：没人再建这几个名字，见到就是残留（RETIRED_CROSS_RUN_CACHES）
-    for retired_name in ('singlefs-crates-mutation-target', 'singlefs-crates-mutation-target-w3-coverage', 'singlefs-mutate-target', 'singlefs-pdftext-1000'):
-        os.mkdir(os.path.join(fake_temporary, retired_name))
-        with open(os.path.join(fake_temporary, retired_name, 'cached'), 'w') as handle:
-            handle.write('cache\n')
-        set_tree_modification_time(os.path.join(fake_temporary, retired_name), old_epoch)
-        expectations[retired_name] = 'residual'
-
     mktemp_dead = 'singlefs-e129t.AbC123'
     os.mkdir(os.path.join(fake_temporary, mktemp_dead))
     make_sparse_file(os.path.join(fake_temporary, mktemp_dead, 'data.img'), 16 << 20)
@@ -1662,7 +1669,7 @@ HOST_DEVICE_LOG_LINES = [
 ]
 
 
-def host_environment(workspace, mounts_text, kernel_lines, space, ext4_errors='0'):
+def host_environment(workspace, mounts_text, kernel_lines, space, ext4_errors='0', smart_result=None):
     """每次造一套独立的宿主盘输入；空临时目录、空 sysfs，只让宿主盘那几项有东西可判。"""
     case_directory = tempfile.mkdtemp(prefix='host-case-', dir=workspace)
     write_text(os.path.join(case_directory, 'mounts'), mounts_text)
@@ -1677,7 +1684,8 @@ def host_environment(workspace, mounts_text, kernel_lines, space, ext4_errors='0
         kernel_log_reader=lambda: (kernel_lines, '假内核日志') if kernel_lines is not None else (None, '假：权限'),
         host_device_resolver=lambda covering_mounts: ({'nvme0n1p2', 'nvme0n1', 'nvme0'}, {'259:2', '259:0'}),
         filesystem_space_reader=lambda path: space, device_mapper_major=252,
-        process_identifier_filter=set()), case_directory
+        process_identifier_filter=set(),
+        smart_checker=lambda host_device_names: smart_result or ('green', '假 SMART：查了 1 块盘，都正常', [])), case_directory
 
 
 def check_host_disk(recorder, workspace):
@@ -1694,16 +1702,20 @@ def check_host_disk(recorder, workspace):
         ('内核日志读不到', writable, None, roomy, '0', {'宿主盘·内核日志': 'unchecked'}, 3),
         ('只读且日志读不到', readonly, None, roomy, '0',
          {'宿主盘·只读挂载': 'red', '宿主盘·内核日志': 'unchecked'}, 1),
+        ('SMART 判红', writable, [], roomy, '0', {'宿主盘·SMART': 'red'}, 1),
+        ('SMART 没查成', writable, [], roomy, '0', {'宿主盘·SMART': 'unchecked'}, 3),
     ]
+    smart_results = {'SMART 判红': ('red', '假 SMART：查了 1 块盘，有异常', ['nvme0n1：critical_warning=0x4，media_errors=3']),
+                     'SMART 没查成': ('unchecked', '假 SMART：smartctl 与 nvme 都不在 PATH', [])}
     for host_line in HOST_DEVICE_LOG_LINES:
         cases.append((f'宿主盘栈上的错误：{host_line[len(KERNEL_LOG_PREFIX):][:40]}', writable,
                       TEST_DEVICE_LOG_LINES + [host_line], roomy, '0', {'宿主盘·内核日志': 'red'}, 1))
     for case_name, mounts_text, kernel_lines, space, ext4_errors, expected_statuses, expected_exit in cases:
-        environment, case_directory = host_environment(workspace, mounts_text, kernel_lines, space, ext4_errors)
+        environment, case_directory = host_environment(workspace, mounts_text, kernel_lines, space, ext4_errors, smart_results.get(case_name))
         results = collect_host_results(environment)
         statuses = {result.title: result.status for result in results}
         for title, status in statuses.items():
-            wanted = expected_statuses.get(title, 'skipped' if title == '宿主盘·SMART' else 'green')
+            wanted = expected_statuses.get(title, 'green')
             recorder.expect(status == wanted, f'宿主盘样本「{case_name}」：{title} 应判 {wanted}，实际 {status}')
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
@@ -1905,12 +1917,15 @@ def check_previous_run_window(recorder, workspace, holders):
                            main(['record-run-start']))
             end_to_end = main(['record-run-start', '--run-times-file', os.path.join(case_directory, 'cli', 'gate-run-times'),
                                '--run-started', '7'])
+        with contextlib.redirect_stderr(quiet):
+            unknown_option_code = parse_command_line(['check', '--no-such-option-ever-used'])[1]
     finally:
         if saved_switch is not None:
             os.environ[BREAK_SWITCH_VARIABLE] = saved_switch
     recorder.expect(usage_codes == (2, 2, 2, 2) and end_to_end == 0
                     and read_run_times(os.path.join(case_directory, 'cli', 'gate-run-times')) == (7.0, 0.0),
                     f'用法错退 2、record-run-start 从命令行记得进文件：{usage_codes}，{end_to_end}')
+    recorder.expect(unknown_option_code == 2, f'认不出的选项应当退 2，实际 {unknown_option_code}')
 
 
 def run_selftest():
@@ -1987,7 +2002,7 @@ def build_argument_parser():
                              '当上一趟留下的删，不受 --recent-minutes 限制（C474）；不给就照旧')
     parser.add_argument('--run-times-file', default='',
                         help='门禁开跑时刻的跨趟文件（门禁 harness-test-environment 的 machine-clean 格写在 '
-                             '${GATE_CROSS_RUN_TMPDIR:-~/.local/share/singlefs/cross-run-cache}/gate-run-times）；'
+                             '${GATE_CROSS_RUN_TMPDIR:-<数据根>/cross-run-cache}/gate-run-times，数据根取 .claude/hooks/lib_work_root.py）；'
                              'clean 从它读上一趟的时刻（与 --previous-run-started 二选一），record-run-start 写它')
     parser.add_argument('--run-started', type=float, default=0.0, help='只给 record-run-start：本趟门禁的开跑时刻（epoch 秒）')
     parser.add_argument('--refuse-too-recent', action='store_true',
@@ -1997,7 +2012,6 @@ def build_argument_parser():
                         help='名字里没有 pid 的条目这么多分钟内还在改就当可能正在跑，默认 10')
     parser.add_argument('--kernel-log-since', default='',
                         help='只看这个时间之后的内核日志（传给 journalctl --since，按本机时钟的时区读）；默认本次开机以来')
-    parser.add_argument('--smart', action='store_true', help='再用 sudo 跑 smartctl -H 或 nvme smart-log')
     parser.add_argument('--yes', action='store_true', help='clean 真的动手')
     return parser
 
@@ -2011,15 +2025,24 @@ def refuse_break_switch_outside_selftest(argument_list):
     return 2
 
 
+def parse_command_line(argument_list):
+    """解析命令行：交回 (参数, None)；argparse 要退出（--help 或认不出的选项）时交回 (None, 退出码)。"""
+    parser = build_argument_parser()
+    try:
+        if break_switch_is('unknownoptionaccepted'):   # 弄坏开关：认不出的选项收下丢掉
+            return parser.parse_known_args(argument_list)[0], None
+        return parser.parse_args(argument_list), None
+    except SystemExit as exit_signal:
+        return None, (0 if exit_signal.code == 0 else 2)
+
+
 def main(argument_list):
     refused = refuse_break_switch_outside_selftest(argument_list)
     if refused is not None:
         return refused
-    parser = build_argument_parser()
-    try:
-        arguments = parser.parse_args(argument_list)
-    except SystemExit as exit_signal:
-        return 0 if exit_signal.code == 0 else 2
+    arguments, exit_code = parse_command_line(argument_list)
+    if arguments is None:
+        return exit_code
     if arguments.selftest:
         return run_selftest()
     if arguments.yes and arguments.action != 'clean':
@@ -2074,7 +2097,7 @@ def main(argument_list):
                               recent_seconds=int(arguments.recent_minutes * 60),
                               minimum_free_percent=arguments.minimum_free_percent,
                               minimum_free_gibibytes=arguments.minimum_free_gibibytes,
-                              kernel_log_since=arguments.kernel_log_since, smart_requested=arguments.smart,
+                              kernel_log_since=arguments.kernel_log_since,
                               produced_after=arguments.produced_after, previous_run_started=previous_run_started)
     if arguments.action == 'clean':
         return run_clean(environment, arguments.yes, arguments.refuse_too_recent)

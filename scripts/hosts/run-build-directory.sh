@@ -91,12 +91,12 @@ run_build_directory_end() {
 
 # ── 包一层起（单独执行这一份） ──
 #   bash scripts/hosts/run-build-directory.sh [--] <命令> [参数…]
-#       主工作区里直接敲的 cargo 编进 <仓根>/target，由 .claude/hooks/heavy-test-guard.sh 在执行前拒（判法在 .claude/hooks/lib_workspace_cargo_lock.py 文件头「编译目录」一段），
-#       出路就是这一条：调用方没设 CARGO_TARGET_DIR 时，在 ${TMPDIR:-/tmp} 下 mktemp -d 这一趟的运行目录 singlefs-run-build-directory-<进程号>-XXXXXX，
+#       主工作区里直接敲的 cargo 编进 <仓根>/target，由 .claude/hooks/project-code-guard.sh 在执行前拒，出路是整条经 task-server/task submit 交（服务给这一次一个仓外的编译目录）；
+#       这一层只是编译目录那一判（.claude/hooks/lib_workspace_cargo_lock.py 文件头「编译目录」一段）放行的一种写法：调用方没设 CARGO_TARGET_DIR 时，在 ${TMPDIR:-/tmp} 下 mktemp -d 这一趟的运行目录 singlefs-run-build-directory-<进程号>-XXXXXX，
 #       照 run_build_directory_begin 把里面的 target 设成 CARGO_TARGET_DIR 交给命令；命令正常退、出错、包装被 TERM / INT 停之后都照 run_build_directory_end 删
 #       （删之前核本机没有进程开着里面的文件），再删运行目录。调用方设了 CARGO_TARGET_DIR 的照它的、不建不删（同 run_build_directory_begin）。
 #       经 run-with-memory-cap.sh 起的（它给命令一个这一条自己的 TMPDIR）运行目录落在那一份里，这一层被 KILL 时由外层删。
-#       范围声明（SINGLEFS_RUN_SCOPE）与 capped.sh、run-with-memory-cap.sh、nice、timeout、env 这些包装写在这一层外面；钩子经 lib_heavy_tests.py 的 command_under_launcher
+#       整条经 task-server/task submit 交，范围声明（SINGLEFS_RUN_SCOPE）写在 submit 前面、env 写在这一层外面；capped.sh、run-with-memory-cap.sh、nice、timeout 不写（服务套，写了当场拒）；钩子经 lib_project_code_runs.py 的 command_under_launcher
 #       看穿这一层（command_under_run_build_directory），里面那条照原判法判。
 #       退出码：命令自己的；编译目录删不成（有进程开着里面的文件、删完回读还在）或运行目录删完编译目录之后不是空的：打 ✗ 与出路，命令退 0 的改退 1；
 #       没给命令、命令前写了认不出的选项退 2；运行目录建不了退 1、命令没跑。
@@ -159,7 +159,7 @@ run_build_directory_wrapper() {
   fi
   if [[ $# -eq 0 ]]; then
     echo "  ✗ 用法不对：bash scripts/hosts/run-build-directory.sh [--] <命令> [参数…]（或 --selftest）" >&2
-    echo "  → 怎么办：把要编译的那条命令（例 cargo build --offline -p singlefs-harness）写在后面；范围声明与内存包装写在这一层外面（文件头「包一层起」一段）" >&2
+    echo "  → 怎么办：把要编译的那条命令（例 cargo build --offline -p singlefs-verification）写在后面；整条经 task-server/task submit 交（范围声明写在 submit 前面），不在外面套内存包装（文件头「包一层起」一段）" >&2
     exit 2
   fi
   if [[ -z "${CARGO_TARGET_DIR:-}" ]] && ! run_build_directory_run_directory="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-run-build-directory-$$-XXXXXX")"; then

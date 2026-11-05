@@ -3,7 +3,6 @@
 # run-condition: command git python3
 # gate-similar: stage-mine.py 它管「几个会话共写一批文件时只暂存这一轮的块」与 --write-index 直接写索引，是提交之前的一半；这里管提交之后共用索引有没有停在旧 HEAD 上，只读、不写任何索引，判的对象与时刻都不同
 # gate-similar: gate-staged.sh 它在提交前整轮门禁里用暂存区，不看提交之后共用索引与 HEAD 的差
-# gate-overlap:copy-kept host-resources-reminder.sh 自证末尾「逐个弄坏开关、起 --selftest-cells、核红在点名的格」的轮次样板各份各有自己的开关表与格名；抽成共用库要改 host-resources-reminder.sh 的自证，不在这一批的范围
 """提交之后查共用索引有没有停在旧 HEAD 上（C420）：几个会话共写一个仓时，有人用 GIT_INDEX_FILE 指私有索引暂存并提交，共用索引（git 目录里的 index）一个字没动，
 提交之后它存的还是旧版内容，`git diff --cached` 把刚进仓的文件全列成「已暂存的改动」，下一个人提交就把它们反向提交回去。
 
@@ -20,13 +19,18 @@
 
 退出码：0 没有停在旧 HEAD 上的文件；1 有，逐个列出文件与出路；77 本次未查（不在 git 仓里、没有 HEAD、HEAD 没改任何文件）。
 
-弄坏开关 SHARED_INDEX_STALE_CHECK_BREAK=<项>（逗号连几个；只在 --selftest 里认，平常跑设了也不认、打一句提醒）。
-逐项写开关名、弄坏哪一处、打开后自证哪几格红（格名是「✗ 自证 <格名>：」里的那一段）：
-  no-content-compare   不比内容：HEAD 改到而又在 `git diff --cached` 里的文件一律报            others-staged-kept、stale-others-mixed
-  trust-env-index      不摘环境里的 GIT_INDEX_FILE，查的是私有索引                           env-index-set
-  skip-removed         HEAD 删掉的文件不报                                                  stale-private-index、stale-others-mixed、env-index-set
-  skip-added           HEAD 新增的文件不报                                                  stale-private-index、stale-others-mixed、env-index-set、root-commit
-  always-green         什么都不报                                                          stale-private-index、stale-others-mixed、env-index-set、root-commit、remedy-text
+弄坏开关（逗号连几个；只给自证用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认；自证自带开关轮，逐个设上起 --selftest-cells）。
+逐项写开关名、弄坏哪一处、打开后红的格（红的格逐条以「✗ 自证 <格名>：」起头；单跑一条：SHARED_INDEX_STALE_CHECK_BREAK=<项> python3 scripts/gate/shared-index-stale-check.py --selftest-cells）：
+  SHARED_INDEX_STALE_CHECK_BREAK=no-content-compare  不比内容：HEAD 改到而又在 `git diff --cached` 里的文件一律报
+      「✗ 自证 others-staged-kept：」「✗ 自证 stale-others-mixed：」
+  SHARED_INDEX_STALE_CHECK_BREAK=trust-env-index  不摘环境里的 GIT_INDEX_FILE，查的是私有索引
+      「✗ 自证 env-index-set：」
+  SHARED_INDEX_STALE_CHECK_BREAK=skip-removed  HEAD 删掉的文件不报
+      「✗ 自证 stale-private-index：」「✗ 自证 stale-others-mixed：」「✗ 自证 env-index-set：」
+  SHARED_INDEX_STALE_CHECK_BREAK=skip-added  HEAD 新增的文件不报
+      「✗ 自证 stale-private-index：」「✗ 自证 stale-others-mixed：」「✗ 自证 env-index-set：」「✗ 自证 root-commit：」
+  SHARED_INDEX_STALE_CHECK_BREAK=always-green  什么都不报
+      「✗ 自证 stale-private-index：」「✗ 自证 stale-others-mixed：」「✗ 自证 env-index-set：」「✗ 自证 root-commit：」「✗ 自证 remedy-text：」
 """
 import concurrent.futures
 import os
@@ -350,13 +354,44 @@ def main(arguments):
         print("  ✗ 用法不对：只认 --repo <目录>、--selftest")
         print("  → 怎么办：不带参数（查当前目录的仓）、带 --repo <目录>，或带 --selftest")
         return 2
-    if os.environ.get(BREAK_VARIABLE):
-        print(f"  ! {BREAK_VARIABLE} 只在 --selftest 里认，这一次不认", file=sys.stderr)
     code, lines = render(inspect_repository(repository))
     print("\n".join(lines))
     return code
 
 
+BREAK_VARIABLES = (BREAK_VARIABLE,)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头（--selftest-cells 同）；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] in (["--selftest"], ["--selftest-cells"]) or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/shared-index-stale-check.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

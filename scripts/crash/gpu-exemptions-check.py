@@ -197,6 +197,23 @@ def main(arguments):
     return 2
 
 
+BREAK_VARIABLES = ("GPU_EXEMPTIONS_CHECK_BREAK",)
+
+
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在 --selftest 里认（文件头「弄坏开关」）：命令行不是单独一个 --selftest而 BREAK_VARIABLES 里有一个非空（不管值是什么），
+    退 2 并点名它只在自证里认；在参数解析之前判。"""
+    for name in BREAK_VARIABLES:
+        if os.environ.get(name) and arguments != ["--selftest"]:
+            print(f"  ✗ {name} 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证", file=sys.stderr)
+            print(f"     → 怎么办：去掉 {name} 再跑；要证红就跑 {name}=<项> python3 scripts/crash/gpu-exemptions-check.py --selftest", file=sys.stderr)
+            return 2
+    return 0
+
+
 if __name__ == "__main__":
+    refusal = refuse_break_outside_selftest(sys.argv[1:])
+    if refusal:
+        sys.exit(refusal)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

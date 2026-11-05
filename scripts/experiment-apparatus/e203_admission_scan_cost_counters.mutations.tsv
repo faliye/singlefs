@@ -1,0 +1,12 @@
+c1_two_hits_are_accepted	    if hits != 1:	    if hits < 1:
+c2_segment_switch_before_the_landing_judgement	"    let settled = settle_the_allocation_record_tree(\n", "before",	"    let device_identities_of_the_accounting_rows: Vec<DeviceIdentity> = allocator\n", "before",
+c3_timing_keeps_lookup_work_counters	result[harness] = result[harness].replace(HARNESS_FEATURES_FROM, HARNESS_FEATURES_TO)	result[harness] = result[harness]
+c4_copy_leaves_prune_server_out	COPIED_DIRECTORIES = ("crates", ".cargo", "prune-server")	COPIED_DIRECTORIES = ("crates", ".cargo")
+c5_statement_guard_is_never_closed	    timer_end = f"{indent}drop({timer_name});\n" if timer else ""	    timer_end = ""
+c6_a_timing_guard_is_not_inserted	    if inserted is None:	    if inserted is None or (build == "timing" and edit.ident == "s6_file_find"):
+c7_a_done_marker_with_another_key_is_trusted	done.read_text(encoding="utf-8") == key + "\n"	True
+c8_a_directory_without_the_begun_marker_is_cleared	if resume_off or not (COPY_BEGUN in entries or COPY_BEGUN + ".partial" in entries):	if resume_off:
+c9_a_half_copy_is_not_wiped_before_the_copy_again	shutil.rmtree(entry)	pass
+c10_the_key_ignores_the_content_of_the_copied_files	digest.update(hashlib.sha256((pathlib.Path(source) / relative).read_bytes()).digest())	digest.update(b"")
+c11_the_key_ignores_the_build_kind	(kind.encode("utf-8"), pathlib.Path(__file__).read_bytes(), diff_text.encode("utf-8"))	(b"", pathlib.Path(__file__).read_bytes(), diff_text.encode("utf-8"))
+c12_the_key_ignores_the_diff	(kind.encode("utf-8"), pathlib.Path(__file__).read_bytes(), diff_text.encode("utf-8"))	(kind.encode("utf-8"), pathlib.Path(__file__).read_bytes(), b"")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""变异判定的函数单元键与按条判定库：crates 变异表（scripts/mutation/crates-mutation-rows.py，门禁 checker-tier-crates-mutation-replay）
+"""变异判定的函数单元键与按条判定库：crates 变异表（scripts/mutation/crates-mutation-rows.py，门禁 crates-mutation-replay）
 与实验变异表（scripts/mutation/mutate.sh）共用这一份。只被 import，没有命令行入口；判法由两边的 --selftest 覆盖
 （crates-mutation-rows.py「单元键」那几格，mutate.sh 的 unit-library 那几例）。
 
@@ -7,7 +7,7 @@
 它的文件头「种类与限定名」「键」「拒算」）。这里做三件事：
   ① 一条变异落在哪几个单元上（UnitKeys.mutated_units）、点名的测试是哪一个单元（UnitKeys.resolve_test）、一个单元的闭包键与组成清单（UnitKeys.closure）；
   ② 工具链行与依赖版本行（toolchain_lines、dependency_lines）；
-  ③ 按条的判定库（Library）：每条判定按键寻址存一个文件，组成清单另按内容寻址存，多久没被任何一趟引用就删。
+  ③ 按条的判定库（Library）：每条判定按键寻址存进 prune-server，组成清单另按内容寻址存。
 
 单元：
   被改坏的单元 = 原文在那份 .rs 里占的行与之重叠的单元里最里层的那几个：fn 项（连同函数体里的嵌套条目），函数外的项按项单元
@@ -15,11 +15,21 @@
     拒算。文件是 .wgsl 的按 fn 切（UnitKeys.wgsl_mutated_units，切法只在 lib_function_units.py 的 wgsl_file 一处）：与原文所占的行重叠的顶层单元，
     原文在 fn 里取那个 wgsl_fn（带 @compute 的是 wgsl_compute），不在 fn 里的取它自己的单元（wgsl_const、wgsl_struct、wgsl_var 这类）；
     文件切不开、原文不落在任何单元上（只在注释或空白里）拒算，不退回整份文件。别的不是 .rs 的文件（litmus 这类测试读的数据文件）按数据单元取整份字节的 sha256。
+  视图：变异行键与点名测试的闭包平常取产品行为视图（UnitKeys.workspace：verus! 里的规格、证明与 #[verifier::…] 外属性不进键）；原文里有产品行为视图剥掉的字
+    （lib_function_units.py 的 verus_ghost_code_blanked 剥过之后与原样不同，例如 verus! 里 assume_specification 与 spec fn 那几行）的这一行，被改坏的单元与点名测试的闭包
+    改取形式化视图（UnitKeys.formal_workspace，规格与证明进键；产品行为视图里这几行不在任何单元上，会拒算）：mutated_units 判出来记下这一行用哪个视图，
+    紧接着的 resolve_test 与 closure 照它取（resolve_test 的 view 参数另可点名）；原文里没有被剥掉的字的行照旧取产品行为视图。
+  弄坏开关 specification-lines-product-view（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：一律取产品行为视图（改前的样子）；
+    自证是 specification_line_cell（本库的函数，crates-mutation-rows.py 的 --selftest 跑它）；这个开关下它必须判错。
   弄坏开关 wgsl-whole-file（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：.wgsl 照改前当数据单元、取整份字节的 sha256；
   crates-mutation-rows.py --selftest 的「WGSL 按 fn 取键」那一格必须判错。
   点名的测试 = cargo test 参数选中的编译目标（--lib、--bin <名>、--test <名>；都没写是这个包的 lib、bin 与 tests/ 目标）里，
     带 #[test]（或 #[<路径>::test]）的 fn 单元里 libtest 全名（文件在目标里的模块路径加单元的限定名）等于点名、或以「::<点名>」收尾的恰好一个；
-    一个都没有、对上几个都拒算（测试由宏展开出来的就是一个都没有）。
+    一个都没有、对上几个都拒算（测试由宏展开出来的就是一个都没有）。cargo 参数里写了几个 -p（-p a -p b）：每个包的选中目标一起找，对上恰好一个才算；
+    同一趟编的几个包，依赖图上共有的包按几个包请求的特性并集编（UnitKeys.features_of：别的 -p 包的缺省特性、命令行里的特性、它们依赖边上请求的特性并进
+    「包名/特性」交给 lib_function_units.py；crates-mutation-rows.py 行键里的特性行照这个并集写，只写一个 -p 的行不变）。
+    弄坏开关 multiple-packages-last-only（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK）：只留最后一个 -p（改前的样子）；
+    自证是 multiple_packages_cell（本库的函数，crates-mutation-rows.py 的 --selftest 跑它）；这个开关下它必须判错。
   闭包 = lib_function_units.py 的 rust_closure_of 从那个单元收的（测试单元按 cfg(test) 编；cargo 参数里有 --release 时 debug_assertions 不进 cfg），
     带上 cargo 参数里的特性；闭包里有拒算，这一个闭包就没有键。
 闭包算不成（precompute_closures 抛 ClosureRefused）：入口在这一组 cfg 下不编（点名的测试带 #[cfg(feature = "gpu")]、cargo 参数没开那个特性）、没有叫这个名字的包这一类
@@ -40,15 +50,17 @@
   落不到一个包的拒算（lock-dependency-unresolved），不静默跳过。闭包用到的工作区包里别的外部依赖不收。
   与 Rust 那一份的差别只有一处：那边按依赖的键找包，不认 package = 改名。
 
-判定库（Library，目录由调用方给，固定在 git common-dir 或 ~/.local/share/singlefs/ 下，不放会清的临时目录）：
+判定库（Library）：在 prune-server 结论表里，键 = mutation-units[@命名空间]/<库目录名>/<相对路径>（scripts/prune-server/prune_server_client.py 文件头「键空间」）。
+  库目录由调用方给（<库根的 git common-dir>/singlefs-crates-mutation-library、…/singlefs-mutate-library 这类），只当名字与命名空间：本地不建、不读、不写，
+  库目录落在临时目录底下的另带命名空间（自证一趟一个库，不串）。服务连不上客户端退 75（PruneServerFailure，是 SystemExit），调用方不当「库里没有」现判。
   records/<键>            一条判定（key=value 文本，一个字段一行）：判定、要打的那一行、判定日期 judged_date、跑法 how、各样组成的号
   baselines/<键>          基线 ok 的判定（crates 变异表用）
   coverage/<号>.json.gz   覆盖记录：一条测试执行过的单元（crates 变异表用）
   compositions/<号>.json.gz  一份组成清单（一个闭包的单元号列表，或一组工具链行、依赖版本行），号是它的内容键
-  units/<单元号前两位>.json.gz  单元号 → [种类, 文件, 限定名, 起-止, 指纹]（组成清单里出现过的单元；作废时按它报变了哪几个单元）
+  units/<单元号>          单元号 → [种类, 文件, 限定名, 起-止, 指纹]（组成清单里出现过的单元；作废时按它报变了哪几个单元）；每个单元一条，
+                          内容只由单元号定，几个进程同时写不丢
   index/<名字与文件的 sha256>  这一行上一次的键与几样组成的号：只用来说清「现判」的原因，不当复用的依据
-  timings/<六段的 sha256>  上一次现跑的用时（派活次序用，不是判定）
-  读到、写到的文件都把修改时刻摸成此刻；collect_garbage 删掉 UNREFERENCED_DAYS_KEPT 天里没有一趟读过、写过的文件（不按个数、不按版本删）。
+  服务没有删的操作：库不按天数、个数、版本回收。用时表、占盘这类运行记录不进库（crates-mutation-rows.py 文件头「判定库」末段）。
   单元号 = sha256（种类 NUL 文件 NUL 限定名 NUL 指纹）的前 16 位十六进制：只当组成清单里的索引，不进任何键。
 """
 import collections
@@ -60,22 +72,22 @@ import importlib.util
 import json
 import multiprocessing
 import os
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
-import time
 import tomllib
 import traceback
+import zlib
 
 sys.dont_write_bytecode = True
 LIBRARY_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 FUNCTION_UNITS_PATH = os.path.join(LIBRARY_DIRECTORY, "..", "gate", "lib_function_units.py")
 _FUNCTION_UNITS = []
 
-UNREFERENCED_DAYS_KEPT = 30
 UNIT_ID_LENGTH = 16
 PARALLEL_MINIMUM = 8   # 要算的闭包不到这么多就在本进程里算（fork 子进程的开销比算还大）
-KINDS = ("records", "baselines", "coverage", "compositions", "index", "timings", "units")
 BUILD_VARIABLES = frozenset(("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS", "CARGO_BUILD_RUSTFLAGS",
                              "CARGO_BUILD_TARGET", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"))
 BUILD_KEYS_NOT_AFFECTING_OUTPUT = frozenset(("jobs", "target-dir", "incremental"))
@@ -206,14 +218,16 @@ def _parallel_closure(task):
     sent.update(fresh)
     return index, info.key, info.dependencies, info.refusals, "".join(identifiers), fresh, None
 TestUnit = collections.namedtuple("TestUnit", "unit target full_name")
-CargoArguments = collections.namedtuple("CargoArguments", "package targets features no_default_features all_features switches release filters")
+CargoArguments = collections.namedtuple("CargoArguments", "packages targets features no_default_features all_features switches release filters")
 
 
 def parse_cargo_arguments(arguments):
-    """cargo test 参数（一串词）→ CargoArguments：包、选的目标、特性、开关（不是名字的那几个，进键）、--release 没有、`--` 之后的过滤词。"""
+    """cargo test 参数 → CargoArguments：包（每个 -p / --package 一个，按出现次序去重）、目标、特性、开关、是否 release、过滤词。
+    `--` 前后的测试过滤词都进 switches 的 filter: 项，避免筛掉点名测试后沿用旧结论。
+    弄坏开关 multiple-packages-last-only：只留最后一个 -p（改前的样子）。"""
     words = arguments.split() if isinstance(arguments, str) else list(arguments)
     before, after = (words[:words.index("--")], words[words.index("--") + 1:]) if "--" in words else (words, [])
-    package, targets, features, switches = None, [], [], []
+    packages, targets, features, switches, filters = [], [], [], [], []
     no_default = all_features = release = False
     index = 0
     while index < len(before):
@@ -223,7 +237,10 @@ def parse_cargo_arguments(arguments):
         takes_value = name in NAME_TAKING_SWITCHES or name in ("--profile", "--target", "-j", "--jobs", "--color", "--message-format")
         step = 1 if equals or not takes_value else 2
         if name in ("-p", "--package"):
-            package = value
+            if break_is("multiple-packages-last-only"):
+                packages = [value]
+            elif value not in packages:
+                packages.append(value)
         elif name in ("--bin", "--test", "--example", "--bench"):
             targets.append((name[2:], value))
         elif name == "--lib":
@@ -241,11 +258,14 @@ def parse_cargo_arguments(arguments):
             switches.append(word if step == 1 else f"{name}={value}")
         elif name not in SWITCHES_NOT_AFFECTING_OUTCOME and name.startswith("-"):
             switches.append(word if step == 1 else f"{name}={value}")
+        elif not name.startswith("-") and not (index == 0 and word in ("test", "check")):
+            filters.append(word)
         index += step
-    filters, libtest_switches, index = [], [], 0
+    libtest_switches, index = [], 0
     while index < len(after):
         word = after[index]
         if word == "--skip":
+            libtest_switches.append("--skip=" + (after[index + 1] if index + 1 < len(after) else ""))
             index += 2
             continue
         if word.startswith("-"):
@@ -254,11 +274,12 @@ def parse_cargo_arguments(arguments):
             filters.append(word)
         index += 1
     switches += [f"libtest:{word}" for word in libtest_switches]
+    switches += [f"filter:{escape_field(word)}" for word in filters]
     if no_default:
         switches.append("--no-default-features")
     if all_features:
         switches.append("--all-features")
-    return CargoArguments(package, targets, features, no_default, all_features, sorted(switches), release, filters)
+    return CargoArguments(tuple(packages), targets, features, no_default, all_features, sorted(switches), release, filters)
 
 
 class UnitKeys:
@@ -267,6 +288,11 @@ class UnitKeys:
     def __init__(self, root):
         self.root = os.path.abspath(root)
         self._workspace = None
+        self._formal_workspace = None   # 形式化视图的工作区：第一次有一行要用才建（文件头「视图」）
+        self._formal_unit_ids = set()   # 取自形式化视图工作区的单元的 id（closure 凭它选视图）
+        self._formal_references = set()   # mutated_units 在形式化视图上交出去的 UnitReference
+        self._last_mutation_formal = False   # 紧挨着的上一次 mutated_units 判的是不是形式化视图（resolve_test 默认照它）
+        self._blanked = {}   # 文件 → 剥过规格与证明的正文（verus_ghost_code_blanked，剥不了的是 None）
         self._closures = {}
         self._tests = {}
         self._lock = None
@@ -280,30 +306,66 @@ class UnitKeys:
             self._workspace = function_units().RustWorkspace(self.root, function_units().PRODUCT_BEHAVIOR)
         return self._workspace
 
+    @property
+    def formal_workspace(self):
+        if self._formal_workspace is None:
+            lfu = function_units()
+            self._formal_workspace = lfu.RustWorkspace(self.root, lfu.FORMAL_VERIFICATION)
+        return self._formal_workspace
+
     def rust_file(self, path):
         return self.workspace.file(path)
+
+    def unit_of(self, reference):
+        """UnitReference 对回的单元（种类、名字、起-止都对得上的那一个）；找不回交 None。被改坏的单元取自哪个视图，这里就在哪个视图的文件里找。"""
+        formal = reference in self._formal_references
+        rust_file = self.formal_workspace.file(reference.file) if formal else self.rust_file(reference.file)
+        found = next((unit for unit in rust_file.units
+                      if unit.kind == reference.kind and unit.name == reference.name and f"{unit.first_line}-{unit.last_line}" == reference.lines), None)
+        if found is not None and formal:
+            self._formal_unit_ids.add(id(found))
+        return found
+
+    def touches_stripped_text(self, path, text, start, end):
+        """text[start:end]（原文）里有没有产品行为视图剥掉的字：lib_function_units.py 的 verus_ghost_code_blanked 剥过（换成空格、长度不变）与原样不同。
+        文件里没有 verus、verifier 两个词的不剥；剥不了（括号配不上）的当没有，照产品行为视图走。"""
+        if "verus" not in text and "verifier" not in text:
+            return False
+        if path not in self._blanked:
+            self._blanked[path] = function_units().verus_ghost_code_blanked(text)
+        blanked = self._blanked[path]
+        return blanked is not None and blanked[start:end] != text[start:end]
 
     def lock_packages(self):
         if self._lock is None:
             self._lock = read_lock_packages(self.root)
         return self._lock
 
-    def dependencies_of(self, units):
-        """一组 lib_function_units.py 的单元的依赖版本行与拒算（文件头「依赖版本行」）。"""
-        return dependency_lines(self.workspace, units, self.lock_packages(), self.dependencies_by_whole_crate)
+    def dependencies_of(self, units, workspace=None):
+        """一组 lib_function_units.py 的单元的依赖版本行与拒算（文件头「依赖版本行」）；单元取自哪个视图的工作区就给哪个（不给是产品行为视图）。"""
+        return dependency_lines(workspace or self.workspace, units, self.lock_packages(), self.dependencies_by_whole_crate)
 
     def reference_dependencies(self, references):
-        """一组 UnitReference（被改坏的单元这一类）各自点名的外部 crate 的依赖版本行与拒算；数据单元与找不回单元的跳过。"""
-        units = []
+        """一组 UnitReference（被改坏的单元这一类）各自点名的外部 crate 的依赖版本行与拒算；数据单元与找不回单元的跳过。
+        形式化视图上交出去的那几个在形式化视图的文件里找，依赖版本行也照那个视图的词法单元取。"""
+        units, formal_units = [], []
         for reference in references:
             if reference.kind == "data-file" or not reference.file.endswith(".rs"):
                 continue
-            units += [unit for unit in self.rust_file(reference.file).units
-                      if unit.kind == reference.kind and unit.name == reference.name and f"{unit.first_line}-{unit.last_line}" == reference.lines]
-        return self.dependencies_of(units)
+            formal = reference in self._formal_references
+            rust_file = self.formal_workspace.file(reference.file) if formal else self.rust_file(reference.file)
+            (formal_units if formal else units).extend(
+                unit for unit in rust_file.units
+                if unit.kind == reference.kind and unit.name == reference.name and f"{unit.first_line}-{unit.last_line}" == reference.lines)
+        lines, refusals = self.dependencies_of(units)
+        if formal_units:
+            formal_lines, formal_refusals = self.dependencies_of(formal_units, self.formal_workspace)
+            lines, refusals = sorted(set(lines) | set(formal_lines)), sorted(set(refusals) | set(formal_refusals))
+        return lines, refusals
 
     def mutated_units(self, path, original):
-        """(被改坏的单元的 UnitReference 列表, None) 或 (None, 拒算那一句)。见文件头「单元」。"""
+        """(被改坏的单元的 UnitReference 列表, None) 或 (None, 拒算那一句)。见文件头「单元」「视图」。"""
+        self._last_mutation_formal = False
         try:
             with open(os.path.join(self.root, path), "rb") as handle:
                 data = handle.read()
@@ -319,7 +381,9 @@ class UnitKeys:
         start = text.find(original)
         first = text.count("\n", 0, start) + 1
         last = max(first, first + original.count("\n") - (1 if original.endswith("\n") else 0))
-        rust_file = self.rust_file(path)
+        formal = not break_is("specification-lines-product-view") and self.touches_stripped_text(path, text, start, start + len(original))
+        self._last_mutation_formal = formal
+        rust_file = self.formal_workspace.file(path) if formal else self.rust_file(path)
         if rust_file.refusals:
             refusal = rust_file.refusals[0]
             return None, f"{path} 切不开（{refusal.form}，第 {refusal.line} 行）"
@@ -329,7 +393,11 @@ class UnitKeys:
                                 and (other.first_line, other.last_line) != (unit.first_line, unit.last_line) for other in overlapping)]
         if not innermost:
             return None, f"原文（{path} 第 {first}–{last} 行）不落在任何单元上（只在注释、空白或内属性里）"
-        return sorted((reference_of(unit) for unit in innermost), key=lambda reference: (reference.lines, reference.kind, reference.name)), None
+        references = sorted((reference_of(unit) for unit in innermost), key=lambda reference: (reference.lines, reference.kind, reference.name))
+        if formal:
+            self._formal_references.update(references)
+            self._formal_unit_ids.update(id(unit) for unit in innermost)
+        return references, None
 
     def wgsl_mutated_units(self, path, data, original):
         """.wgsl 的被改坏的单元（文件头「单元」）：按 lib_function_units.py 的 wgsl_file 切出的顶层单元（wgsl_fn、wgsl_compute、wgsl_const、wgsl_struct、
@@ -369,11 +437,11 @@ class UnitKeys:
         """cargo 参数选中的编译目标（RustTarget 列表）；包不在工作区里交 None。"""
         lfu = function_units()
         workspace = self.workspace
-        if arguments.package is None:
+        if not arguments.packages:
             crates = [crate for crate in workspace.crates if crate.directory == ""] or list(workspace.crates)
         else:
             try:
-                crates = [workspace.crate_by_package(arguments.package)]
+                crates = [workspace.crate_by_package(package) for package in arguments.packages]
             except lfu.UsageError:
                 return None
         chosen = []
@@ -386,29 +454,34 @@ class UnitKeys:
                 chosen += [target for target in owned if target.kind == kind and (name in (None, "*") or target.name == name)]
         return sorted(set(chosen), key=lambda target: target.id)
 
-    def test_units(self, target):
-        """一个编译目标里的 #[test] fn 单元：[(libtest 全名, 单元)]。"""
-        if target.id not in self._tests:
+    def test_units(self, target, formal=False):
+        """一个编译目标里的 #[test] fn 单元：[(libtest 全名, 单元)]；formal 是取形式化视图的单元（文件头「视图」）。"""
+        if (target.id, formal) not in self._tests:
             found = []
+            workspace = self.formal_workspace if formal else self.workspace
             for path, (module_path, _chain) in sorted(target.files.items()):
-                rust_file = self.workspace.files.get(path) or self.rust_file(path)
+                rust_file = workspace.files.get(path) or workspace.file(path)
                 for unit in rust_file.units:
                     if unit.kind == "fn" and self.is_test_function(rust_file, unit):
                         found.append(("::".join(list(module_path) + [unit.name]), unit))
-            self._tests[target.id] = found
-        return self._tests[target.id]
+                        if formal:
+                            self._formal_unit_ids.add(id(unit))
+            self._tests[(target.id, formal)] = found
+        return self._tests[(target.id, formal)]
 
-    def resolve_test(self, arguments, expected):
-        """(TestUnit, None) 或 (None, 拒算那一句)。见文件头「单元」。"""
+    def resolve_test(self, arguments, expected, view=None):
+        """(TestUnit, None) 或 (None, 拒算那一句)。见文件头「单元」「视图」。view 不给，照紧挨着的上一次 mutated_units 判的视图
+        （同一行先问被改坏的单元、再问点名的测试）；给了 lib_function_units.py 的 FORMAL_VERIFICATION 取形式化视图，给 PRODUCT_BEHAVIOR 取产品行为视图。"""
+        formal = self._last_mutation_formal if view is None else view == function_units().FORMAL_VERIFICATION
         parsed = parse_cargo_arguments(arguments) if not isinstance(arguments, CargoArguments) else arguments
         targets = self.candidate_targets(parsed)
         if targets is None:
-            return None, f"cargo 参数里的包 {parsed.package} 不在工作区里"
+            return None, f"cargo 参数里的包 {'、'.join(parsed.packages)} 有不在工作区里的"
         if not targets:
             return None, "cargo 参数选不中一个编译目标（lib、bin、tests/）"
         hits = []
         for target in targets:
-            for full_name, unit in self.test_units(target):
+            for full_name, unit in self.test_units(target, formal):
                 if full_name == expected or full_name.endswith("::" + expected):
                     hits.append(TestUnit(unit, target.id, full_name))
         if len(hits) != 1:
@@ -424,7 +497,43 @@ class UnitKeys:
             features.append(item if "/" in item else f"{crate.package}/{item}")
         if arguments.all_features:
             features += [f"{crate.package}/{name}" for name in crate.features]
+        if len(arguments.packages) > 1 and not break_is("multiple-packages-last-only"):
+            features += self.features_unified_from_the_other_packages(arguments, crate)
         return tuple(sorted(set(features)))
+
+    def features_unified_from_the_other_packages(self, arguments, entry_crate):
+        """同一趟 cargo 编的别的 -p 包（不含入口 crate 自己）往依赖图上共有的包请求的特性，写成「包名/特性」（文件头「多个 -p」）：
+        cargo 把一趟里每个包对依赖开的特性并起来，共有的包按并集编。那几个包各自的缺省特性（没给 --no-default-features 时）、命令行给的特性（裸写的只算它们自己有的）、
+        --all-features 全开，加上依赖边上请求的特性与缺省特性：那几个包自己顺普通与 dev 两段依赖（按测试编），它们依赖的工作区包只顺普通依赖，一路顺下去。
+        别的 -p 包不是入口所在的包，不进 rust_closure_of 的链接集；这些请求只在共有的依赖包上起作用（enable 只加特性、顺特性里的 dep/子特性往下开）。"""
+        workspace, requests = self.workspace, []
+        for name in arguments.packages:
+            other = workspace.crate_by_package(name)
+            if other is entry_crate:
+                continue
+            if not arguments.no_default_features and "default" in other.features:
+                requests.append(f"{other.package}/default")
+            for item in arguments.features:
+                if "/" not in item and item in other.features:
+                    requests.append(f"{other.package}/{item}")
+            if arguments.all_features:
+                requests += [f"{other.package}/{feature}" for feature in other.features]
+            pending, seen = [(other, ("normal", "dev"))], set()
+            while pending:
+                crate, sections = pending.pop()
+                if crate.directory in seen:
+                    continue
+                seen.add(crate.directory)
+                for section in sections:
+                    for dependency in crate.dependencies[section]:
+                        dependency_crate = workspace.crate_by_directory.get(dependency.directory)
+                        if dependency_crate is None:
+                            continue
+                        if dependency.default_features and "default" in dependency_crate.features:
+                            requests.append(f"{dependency_crate.package}/default")
+                        requests += [f"{dependency_crate.package}/{feature}" for feature in dependency.features]
+                        pending.append((dependency_crate, ("normal",)))
+        return requests
 
     def cache_key(self, unit, target_id, parsed):
         return id(unit), target_id, self.features_of(parsed, target_id), parsed.no_default_features, parsed.release
@@ -503,9 +612,10 @@ class UnitKeys:
         cache_key = self.cache_key(unit, target_id, parsed)
         if cache_key not in self._closures:
             cfg = [item for item in lfu.DEFAULT_RUST_CFG if not (parsed.release and item == "debug_assertions")]
-            closure = lfu.rust_closure_of(self.workspace, unit, target_id, cfg, True, features, parsed.no_default_features)
+            workspace = self.formal_workspace if id(unit) in self._formal_unit_ids else self.workspace
+            closure = lfu.rust_closure_of(workspace, unit, target_id, cfg, True, features, parsed.no_default_features)
             key, refusals = lfu.closure_key(closure)
-            dependencies, dependency_refusals = self.dependencies_of(closure.order)
+            dependencies, dependency_refusals = self.dependencies_of(closure.order, workspace)
             self._closures[cache_key] = ClosureInfo(None if dependency_refusals else key, [reference_of(member) for member in closure.order], dependencies,
                                                     [f"{refusal.form} {refusal.file}:{refusal.line}" for refusal in refusals] + dependency_refusals)
         return self._closures[cache_key]
@@ -516,6 +626,10 @@ class UnitKeys:
         for reference in references:
             identity = (reference.kind, reference.file, reference.name)
             if identity in current:
+                continue
+            if reference.kind == "data-directory":
+                directory = os.path.join(self.root, reference.file)
+                current[identity] = {function_units().directory_fingerprint(self.root, reference.file)[0]} if os.path.isdir(directory) else set()
                 continue
             if not os.path.isfile(os.path.join(self.root, reference.file)):
                 current[identity] = set()
@@ -572,7 +686,7 @@ def cargo_configuration_files(root, environment):
     """cargo 读的配置文件（从根往上每一层的 .cargo/config.toml 或 .cargo/config，再加 CARGO_HOME 那一份），近的在前。"""
     found, directory = [], os.path.abspath(root)
     while True:
-        for name in ("config.toml", "config"):
+        for name in ("config", "config.toml"):
             path = os.path.join(directory, ".cargo", name)
             if os.path.isfile(path):
                 found.append(path)
@@ -582,10 +696,12 @@ def cargo_configuration_files(root, environment):
             break
         directory = parent
     cargo_home = environment.get("CARGO_HOME") or os.path.join(environment.get("HOME") or os.path.expanduser("~"), ".cargo")
-    for name in ("config.toml", "config"):
+    cargo_home = os.path.join(os.path.abspath(root), cargo_home)
+    for name in ("config", "config.toml"):
         path = os.path.join(cargo_home, name)
-        if os.path.isfile(path) and os.path.realpath(path) not in {os.path.realpath(item) for item in found}:
-            found.append(path)
+        if os.path.isfile(path):
+            if os.path.realpath(path) not in {os.path.realpath(item) for item in found}:
+                found.append(path)
             break
     return found
 
@@ -610,8 +726,7 @@ def toolchain_lines(root, environment):
             with open(path, "rb") as handle:
                 configuration = tomllib.load(handle)
         except (OSError, tomllib.TOMLDecodeError) as error:
-            lines.append(f"configuration\t{rank}\t读不懂（{type(error).__name__}）")
-            continue
+            raise MutationUnitsError(f"{path} 读不懂：{error}") from error
         for section in CONFIGURATION_SECTIONS:
             value = configuration.get(section)
             if section == "build" and isinstance(value, dict):
@@ -823,54 +938,67 @@ def parse_record(text):
 
 
 class Library:
-    """按条的判定库（文件头「判定库」）。读到、写到的文件都摸成此刻（collect_garbage 按它删）。"""
+    """按条的判定库（文件头「判定库」）：读写都经 prune-server，directory 只当库的名字与命名空间，本地不建。"""
 
     def __init__(self, directory, header="# 变异判定库的一条记录（scripts/mutation/lib_mutation_units.py 的 Library 写）\n"):
         self.directory = directory
         self.header = header
         self._units = {}
         self._new_units = collections.defaultdict(dict)
-
-    def path(self, kind, name):
-        return os.path.join(self.directory, kind, name)
+        self.service = self.service_store(directory)
 
     @staticmethod
-    def touch(path):
-        with contextlib.suppress(OSError):
-            os.utime(path)
+    def client():
+        """scripts/prune-server/prune_server_client.py（判定库服务的客户端），照它的名字只载入一次；载入不连服务。"""
+        name = "singlefs_prune_server_client"
+        if name not in sys.modules:
+            specification = importlib.util.spec_from_file_location(name, os.path.join(LIBRARY_DIRECTORY, "..", "prune-server", "prune_server_client.py"))
+            module = importlib.util.module_from_spec(specification)
+            sys.modules[name] = module
+            specification.loader.exec_module(module)
+        return sys.modules[name]
+
+    @staticmethod
+    def service_store(directory):
+        """这份库在 prune-server 里的 LibraryStore（文件头「判定库」）；只有客户端的弄坏开关 unreachable-treated-as-no-library 下交 None。"""
+        client = Library.client()
+        return client.library_store(client.FAMILY_MUTATION_UNITS, os.path.basename(os.path.normpath(directory)), directory)
+
+    def path(self, kind, name):
+        """这一条在 prune-server 里的位置（报错与给人看的那一行用；不是本地路径）。"""
+        return f"{self.service.location()}{kind}/{name}"
+
+    def read_text(self, kind, name):
+        """一份记录的原文（不解）；不在交 None，服务不可用客户端退 75。mutate.sh 的复用哨兵按它自己的读法解。"""
+        data = self.service.read(f"{kind}/{name}")
+        return None if data is None else data.decode("utf-8", "surrogateescape")
 
     def read(self, kind, name):
-        path = self.path(kind, name)
-        try:
-            with open(path, encoding="utf-8", errors="surrogateescape") as handle:
-                text = handle.read()
-        except OSError:
-            return None
-        self.touch(path)
-        return parse_record(text)
+        text = self.read_text(kind, name)
+        return None if text is None else parse_record(text)
 
     def write(self, kind, name, fields):
-        write_atomically(self.path(kind, name), record_text(self.header, fields))
+        self.service.write(f"{kind}/{name}", record_text(self.header, fields))
+
+    def stored_names(self, kind):
+        """这一种记录在库里的名字（按名字排好）：自证数「写进了几条」用。"""
+        return [relative[len(kind) + 1:] for relative, _value in self.service.scan(f"{kind}/")]
 
     def read_json(self, kind, name):
-        path = self.path(kind, name + ".json.gz")
-        try:
-            with gzip.open(path, "rt", encoding="utf-8", errors="surrogateescape") as handle:
-                value = json.load(handle)
-        except (OSError, ValueError, EOFError):
+        data = self.service.read(f"{kind}/{name}.json.gz")
+        if data is None:
             return None
-        self.touch(path)
-        return value
+        try:
+            return json.loads(gzip.decompress(data).decode("utf-8", "surrogateescape"))
+        except (OSError, ValueError, EOFError, zlib.error):
+            return None
 
     def write_json(self, kind, name, value):
-        write_atomically(self.path(kind, name + ".json.gz"),
-                         gzip.compress(json.dumps(value, sort_keys=True, ensure_ascii=False).encode("utf-8", "surrogateescape"), mtime=0))
+        self.service.write(f"{kind}/{name}.json.gz", gzip.compress(json.dumps(value, sort_keys=True, ensure_ascii=False).encode("utf-8", "surrogateescape"), mtime=0))
 
     def put_composition(self, key, references=None, lines=None):
-        """一份组成清单按它的键存（已有就只摸一下）：references 是单元（记进 units/），lines 是工具链行、依赖版本行这一类。"""
-        path = self.path("compositions", key + ".json.gz")
-        if os.path.exists(path):
-            self.touch(path)
+        """一份组成清单按它的键存（已有就不写）：references 是单元（记进 units/），lines 是工具链行、依赖版本行这一类。"""
+        if self.service.read(f"compositions/{key}.json.gz") is not None:
             return
         value = {}
         if isinstance(references, CompactMembers):
@@ -890,57 +1018,25 @@ class Library:
         self.write_json("compositions", key, value)
 
     def flush_units(self):
-        """这一趟新见到的单元并进 units/<前两位>.json.gz（读出来、并上、整份换上；几趟并发时后写的那一份照样并着前面的）。"""
+        """这一趟新见到的单元写进 units/<单元号>（每个单元一条，内容只由单元号定，几个进程同时写不丢）。"""
         for bucket, additions in sorted(self._new_units.items()):
-            existing = self.read_json("units", bucket) or {}
-            if all(existing.get(identifier) == value for identifier, value in additions.items()):
-                continue
-            existing.update(additions)
-            self.write_json("units", bucket, existing)
+            self.merge_units(bucket, additions)
         self._new_units.clear()
+
+    def merge_units(self, bucket, additions):
+        self._units.pop(bucket, None)
+        self.service.write_many([(f"units/{identifier}", json.dumps(value, ensure_ascii=False)) for identifier, value in sorted(additions.items())])
 
     def unit(self, identifier):
         bucket = identifier[:2]
         if bucket not in self._units:
-            self._units[bucket] = self.read_json("units", bucket) or {}
+            self._units[bucket] = {relative[len("units/"):]: json.loads(data.decode("utf-8", "surrogateescape"))
+                                   for relative, data in self.service.scan(f"units/{bucket}")}
         value = self._units[bucket].get(identifier) or self._new_units.get(bucket, {}).get(identifier)
         return UnitReference(*value) if value else None
 
     def composition(self, key):
         return self.read_json("compositions", key) if key else None
-
-    def collect_garbage(self, days=UNREFERENCED_DAYS_KEPT, now=None):
-        """删掉 days 天里没有一趟读过、写过的文件（units/ 除外：组成清单删了之后只留还被引的单元）。回 {目录: 删了几份}。"""
-        cutoff = (now if now is not None else time.time()) - days * 86400
-        removed = collections.Counter()
-        for kind in KINDS:
-            if kind == "units":
-                continue
-            directory = os.path.join(self.directory, kind)
-            with contextlib.suppress(OSError):
-                for entry in os.scandir(directory):
-                    if entry.is_file(follow_symlinks=False) and not entry.name.startswith(".partial-") and entry.stat().st_mtime < cutoff:
-                        with contextlib.suppress(OSError):
-                            os.unlink(entry.path)
-                            removed[kind] += 1
-        if removed["compositions"]:
-            wanted = set()
-            with contextlib.suppress(OSError):
-                for entry in os.scandir(os.path.join(self.directory, "compositions")):
-                    if entry.name.endswith(".json.gz"):
-                        value = self.read_json("compositions", entry.name[:-len(".json.gz")]) or {}
-                        wanted |= set(value.get("units", []))
-            with contextlib.suppress(OSError):
-                for entry in os.scandir(os.path.join(self.directory, "units")):
-                    if not entry.name.endswith(".json.gz"):
-                        continue
-                    bucket = entry.name[:-len(".json.gz")]
-                    existing = self.read_json("units", bucket) or {}
-                    kept = {identifier: value for identifier, value in existing.items() if identifier in wanted}
-                    if len(kept) != len(existing):
-                        removed["units"] += len(existing) - len(kept)
-                        self.write_json("units", bucket, kept)
-        return dict(removed)
 
 
 def changed_units(library, old_key, new_references):
@@ -986,8 +1082,9 @@ def summarize_changes(changes, limit=4):
 
 # ── 实验变异表（mutate.sh）：按条入库 ───────────────────────────────────────────
 
-MUTATE_KEY_FORM = "singlefs-mutate-row-v1"
-MUTATE_REUSABLE = {"run": ("caught", "notred", "invalid", "timeout"), "compile": ("compiled", "uncompiled")}
+# v1 丢过 --skip 且可能取错 Cargo 配置；旧记录即使表面键相同也不能沿用。
+MUTATE_KEY_FORM = "singlefs-mutate-row-v2"
+MUTATE_REUSABLE = ("caught", "notred", "invalid")
 
 
 def read_mutate_table(path):
@@ -1005,11 +1102,10 @@ def read_mutate_table(path):
     return rows
 
 
-def mutate_plan(workspace_root, source, binary, table, mode, cargo_words, environment, library_directory, full, plan_path, row_seconds=None, break_switches=()):
+def mutate_plan(workspace_root, source, binary, table, cargo_words, environment, library_directory, plan_path, break_switches=()):
     """mutate.sh 开跑前调：逐条算键、查库，写 plan_path（JSON：每条的键与组成、测试的闭包键），回 [(下标, 变异名, 复用不复用, 档, 要不要判失败, 那一行, 现判的原因)]。
     键（文件头「键」）：原文、替换文、包住原文那几个单元的闭包键（scope）、cargo 参数与特性（switches，bin 名不进）、工具链行、依赖版本行。
-    平常跑（mode = run）复用另要：抓到的，红了的那几条测试此刻的闭包键与记录里的相同；没红、无效、超时的，这个 bin 全部测试的闭包键合起来与记录里的相同；
-    超时的另要这一趟的限时不比记录里的长。只编不跑（mode = compile）只看键。full：只写不读。
+    复用另要：抓到的，红了的那几条测试此刻的闭包键与记录里的相同；没红、无效的，这个 bin 全部测试的闭包键合起来与记录里的相同。
     依赖版本行每条各算：包住原文那几个单元的闭包里点名的外部 crate（文件头「依赖版本行」），落不到包的那一条拒算。break_switches 是 mutate.sh 的弄坏开关：
       libraryunread   不读库（一律现判）；calleesignored  scope 只取包住原文那几个单元自己的指纹、不收它们调到的单元（依赖版本行也只看它们自己）；
       dependenciesbycrate  依赖版本行按整包收（单元所在 crate 的外部依赖不看点没点名全收）。"""
@@ -1018,8 +1114,6 @@ def mutate_plan(workspace_root, source, binary, table, mode, cargo_words, enviro
     library = Library(library_directory, "# 实验变异表的一条判定（scripts/mutation/mutate.sh 经 scripts/mutation/lib_mutation_units.py 写）\n")
     toolchain = toolchain_lines(workspace_root, environment)
     parsed = parse_cargo_arguments(cargo_words)
-    if mode == "compile":
-        parsed = parsed._replace(release=True)   # 只编不跑的 test 档关了 debug_assertions（mutate.sh 文件头「只编不跑」），cfg 照 --release 那一份收
     target_id = None
     for target in keys.workspace.targets.values():
         if target.kind == "bin" and target.name == binary and source in target.files:
@@ -1036,8 +1130,8 @@ def mutate_plan(workspace_root, source, binary, table, mode, cargo_words, enviro
             test_keys.append(info.key)
         all_tests_key = key_of_lines([("form", ["all-tests"]), ("test", test_keys)]) if test_refusal is None else None
     rows = read_mutate_table(table)
-    plan = {"rows": [], "tests": tests, "all_tests": all_tests_key, "mode": mode, "library": library_directory, "time_limit": row_seconds,
-            "toolchain": None, "how": f"mutate.sh {'只编不跑' if mode == 'compile' else '平常跑'}（{' '.join(cargo_words)}）"}
+    plan = {"rows": [], "tests": tests, "all_tests": all_tests_key, "library": library_directory,
+            "toolchain": None, "how": f"mutate.sh（{' '.join(cargo_words)}）"}
     toolchain_key = key_of_lines([("toolchain", toolchain)])
     plan["toolchain"] = toolchain_key
     decisions = []
@@ -1049,8 +1143,7 @@ def mutate_plan(workspace_root, source, binary, table, mode, cargo_words, enviro
         scope_keys, scope_members, dependencies = [], [], set()
         if refusal is None:
             for reference in units:
-                unit = next((candidate for candidate in keys.rust_file(source).units
-                             if candidate.kind == reference.kind and candidate.name == reference.name and f"{candidate.first_line}-{candidate.last_line}" == reference.lines), None)
+                unit = keys.unit_of(reference)
                 if "calleesignored" in break_switches:
                     scope_keys.append(f"{reference.kind}\t{reference.fingerprint}")
                     own_lines, own_refusals = keys.dependencies_of([unit])
@@ -1071,47 +1164,199 @@ def mutate_plan(workspace_root, source, binary, table, mode, cargo_words, enviro
             scope_key = key_of_lines([("scope", scope_keys)])
             dependency_key = key_of_lines([("dependency", sorted(dependencies))])
             entry["scope"], entry["dependency"] = scope_key, dependency_key
-            entry["key"] = key_of_lines([("form", [MUTATE_KEY_FORM]), ("mode", [mode]), ("original", [escape_field(original)]),
+            entry["key"] = key_of_lines([("form", [MUTATE_KEY_FORM]), ("original", [escape_field(original)]),
                                          ("replacement", [escape_field(replacement)]), ("scope", [scope_key]), ("switches", parsed.switches),
                                          ("features", list(parsed.features)), ("toolchain", [toolchain_key]), ("dependency", [dependency_key])])
             library.put_composition(scope_key, scope_members)
             library.put_composition(dependency_key, lines=sorted(dependencies))
         plan["rows"].append(entry)
-        decisions.append(mutate_decision(library, plan, entry, full, break_switches))
+        decisions.append(mutate_decision(library, plan, entry, break_switches))
     library.put_composition(toolchain_key, lines=toolchain)
     library.flush_units()
-    plan["garbage"] = library.collect_garbage()
     plan["test_refusal"] = test_refusal
     write_atomically(plan_path, json.dumps(plan, ensure_ascii=False, sort_keys=True))
     return [(index, plan["rows"][index]["name"]) + decision for index, decision in enumerate(decisions)]
 
 
-def mutate_decision(library, plan, entry, full, break_switches):
+def mutate_decision(library, plan, entry, break_switches):
     """(复用不复用, 档, 要不要判失败, 那一行, 现判的原因)。"""
     if entry["key"] is None:
         return False, "", "0", "", f"拒算：{entry['refusal']}"
-    if full:
-        return False, "", "0", "", "--full：只写不读"
     if "libraryunread" in break_switches:
         return False, "", "0", "", "弄坏开关 libraryunread：不读库"
     record = library.read("records", entry["key"])
     if record is None:
         return False, "", "0", "", "库里没有这把键（新加的行，或原文、替换文、包住原文的单元与它调到的单元、cargo 参数、工具链、依赖有一样变了）"
     verdict = record.get("verdict", "")
-    if verdict not in MUTATE_REUSABLE[plan["mode"]]:
+    if verdict not in MUTATE_REUSABLE:
         return False, "", "0", "", f"记录里的判定「{verdict}」不复用"
-    if plan["mode"] == "run":
-        if verdict == "caught":
-            red = [name for name in record.get("red_tests", "").split(",") if name]
-            recorded = dict(item.split("=", 1) for item in record.get("red_test_keys", "").split(",") if "=" in item)
-            if not red or any(plan["tests"].get(name) is None or plan["tests"].get(name) != recorded.get(name) for name in red):
-                return False, "", "0", "", "红了的那几条测试此刻对不上记录里的闭包键（改了、没了，或这一趟算不出）"
-        else:
-            if plan["all_tests"] is None or plan["all_tests"] != record.get("all_tests"):
-                return False, "", "0", "", "这个 bin 的测试此刻合起来的闭包键与记录里的不同"
-            if verdict == "timeout" and plan.get("time_limit") and record.get("time_limit") and int(plan["time_limit"]) > int(record["time_limit"]):
-                return False, "", "0", "", f"上次在 {record['time_limit']} 秒上超时，这一趟限时更长（{plan['time_limit']} 秒）"
+    if verdict == "caught":
+        red = [name for name in record.get("red_tests", "").split(",") if name]
+        recorded = dict(item.split("=", 1) for item in record.get("red_test_keys", "").split(",") if "=" in item)
+        if not red or any(plan["tests"].get(name) is None or plan["tests"].get(name) != recorded.get(name) for name in red):
+            return False, "", "0", "", "红了的那几条测试此刻对不上记录里的闭包键（改了、没了，或这一趟算不出）"
+    else:
+        if plan["all_tests"] is None or plan["all_tests"] != record.get("all_tests"):
+            return False, "", "0", "", "这个 bin 的测试此刻合起来的闭包键与记录里的不同"
     return True, verdict, record.get("fails", "0"), record.get("line", ""), ""
+
+
+MULTIPLE_PACKAGES_FIXTURE = {
+    "crates/fshared/Cargo.toml": '[package]\nname = "fshared"\n\n[features]\ntuned = []\n',
+    "crates/fshared/src/lib.rs": '''#[cfg(feature = "tuned")]
+pub fn mode() -> u32 {
+    2
+}
+#[cfg(not(feature = "tuned"))]
+pub fn mode() -> u32 {
+    1
+}
+''',
+    "crates/fleft/Cargo.toml": '[package]\nname = "fleft"\n\n[dependencies]\nfshared = { path = "../fshared" }\n',
+    "crates/fleft/src/lib.rs": '''pub fn left() -> u32 {
+    fshared::mode()
+}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_left_mode_is_read_from_the_shared_package() {
+        assert!(super::left() > 0);
+    }
+}
+''',
+    "crates/fright/Cargo.toml": '[package]\nname = "fright"\n\n[dependencies]\nfshared = { path = "../fshared", features = ["tuned"] }\n',
+    "crates/fright/src/lib.rs": '''pub fn right() -> u32 {
+    fshared::mode()
+}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_right_mode_is_read_from_the_shared_package() {
+        assert!(super::right() > 0);
+    }
+}
+''',
+}
+MULTIPLE_PACKAGES_CELL = ("多个 -p：点名的测试在前一个包里照样找得到；共有的依赖包按几个包请求的特性并集编（键随并集变、与 -p 的次序无关）；"
+                          "改被点名的包没调到的函数键不变，改共有依赖包里并集特性下那一份的函数体键变")
+
+
+def multiple_packages_cell(work):
+    """自证一格（crates-mutation-rows.py 的 --selftest 登记，弄坏开关 multiple-packages-last-only）：两个 -p（fleft、fright），点名的测试在 fleft；
+    fright 对共有的 fshared 开了 tuned。→ (过没过, 说明)。"""
+    root = os.path.join(work, "multiple-packages")
+    for path, text in MULTIPLE_PACKAGES_FIXTURE.items():
+        os.makedirs(os.path.dirname(os.path.join(root, path)), exist_ok=True)
+        with open(os.path.join(root, path), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    test_name = "the_left_mode_is_read_from_the_shared_package"
+
+    def key_of(arguments):
+        keys = UnitKeys(root)   # 工作区与闭包按入口缓存：改了源码之后另起一份
+        parsed = parse_cargo_arguments(arguments)
+        hit, why = keys.resolve_test(parsed, test_name)
+        if hit is None:
+            return None, why
+        info = keys.closure(hit.unit, hit.target, parsed)
+        return info.key, "; ".join(info.refusals)
+
+    single, single_note = key_of("-p fleft --lib")
+    both, both_note = key_of("-p fleft -p fright --lib")
+    swapped, swapped_note = key_of("-p fright -p fleft --lib")
+    parsed = parse_cargo_arguments("-p fleft -p fright --lib")
+    parsed_single = parse_cargo_arguments("-p fleft --lib")
+    keys = UnitKeys(root)
+    unified = keys.features_of(parsed, keys.resolve_test(parsed, test_name)[0].target) if both is not None else None
+    with open(os.path.join(root, "crates/fright/src/lib.rs"), "a", encoding="utf-8") as handle:
+        handle.write("pub fn unrelated() -> u32 {\n    7\n}\n")
+    outside, _note = key_of("-p fleft -p fright --lib")
+    shared = os.path.join(root, "crates/fshared/src/lib.rs")
+    with open(shared, encoding="utf-8") as handle:
+        text = handle.read()
+    with open(shared + ".new", "w", encoding="utf-8") as handle:
+        handle.write(text.replace("    2\n}", "    3\n}"))
+    os.replace(shared + ".new", shared)
+    tuned, _note = key_of("-p fleft -p fright --lib")
+    ok = (parsed.packages == ("fleft", "fright") and parsed_single.packages == ("fleft",) and single is not None and both is not None and swapped is not None
+          and both != single and swapped == both and outside == both and tuned is not None and tuned != both and unified == ("fshared/tuned",))
+    return ok, (f"包 {parsed.packages}；单个 -p 的键 {single}（{single_note}）、两个 -p 的 {both}（{both_note}）、换序的 {swapped}（{swapped_note}）"
+                f"（要后两个相同、与单个的不同）；并集特性 {unified}（要 ('fshared/tuned',)）；改 fright 里没调到的函数后 {outside}（要同前）；改 tuned 那一份的函数体后 {tuned}（要不同）")
+
+
+SPECIFICATION_LINE_FILE = "crates/fspec/src/lib.rs"
+SPECIFICATION_LINE_SOURCE = """verus! {
+pub open spec fn limit() -> int {
+    5 + 0
+}
+pub fn doubled(x: u64) -> u64 {
+    x + x
+}
+} // verus!
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn doubled_is_even() {
+        assert_eq!(super::doubled(3) % 2, 0);
+    }
+}
+"""
+SPECIFICATION_LINE_GHOST_PIECE = "pub open spec fn limit() -> int {\n    5 + 0\n}"   # 产品行为视图剥掉的那一截（spec fn 整条）
+SPECIFICATION_LINE_CELL = ("verus! 里的规格行：原文落在产品行为视图剥掉的字上，被改坏的单元与点名测试的闭包取形式化视图、算得出键，改那条规格键变；"
+                           "原文在执行代码上的行照旧取产品行为视图，改规格键不变")
+
+
+def specification_line_cell(work):
+    """自证一格（crates-mutation-rows.py 的 --selftest 登记，弄坏开关 specification-lines-product-view）：verus! 里一条 spec fn 与一个执行函数、
+    一个点名的测试；产品行为视图用的 unit-graph 由假程序替身（剥过的那一份照原样切出的 dump，照 lib_function_units.py 的 product_view_program_cell 的做法）。
+    → (过没过, 说明)。"""
+    lfu = function_units()
+    root = os.path.join(work, "specification-lines")
+    arguments, expected = "-p fspec --lib -- doubled_is_even", "doubled_is_even"
+
+    def key_of(original, edit_specification):
+        """(这一行的键或 None, 取的视图或拒算那一句)；键 = 被改坏的单元的指纹加点名测试的闭包键。"""
+        source, piece = SPECIFICATION_LINE_SOURCE, SPECIFICATION_LINE_GHOST_PIECE
+        if edit_specification:
+            source, piece = source.replace("5 + 0", "5 + 0 + 0"), piece.replace("5 + 0", "5 + 0 + 0")
+        blanked = source.replace(piece, "".join(character if character == "\n" else " " for character in piece))
+        manifest = {"crates/fspec/Cargo.toml": '[package]\nname = "fspec"\n'}
+        shutil.rmtree(root, ignore_errors=True)
+        lfu.write_tree(root, dict(manifest, **{SPECIFICATION_LINE_FILE: source}))
+        dump = lfu.product_view_dump_of(work, dict(manifest, **{SPECIFICATION_LINE_FILE: blanked}))
+        program_directory = os.path.join(work, "specification-lines-bin")
+        shutil.rmtree(program_directory, ignore_errors=True)
+        os.makedirs(program_directory)
+        dump_file = os.path.join(work, "specification-lines-dump.txt")
+        with open(dump_file, "w", encoding="utf-8") as handle:
+            handle.write("".join(line + "\n" for line in dump))
+        program = os.path.join(program_directory, "unit-graph")
+        with open(program, "w", encoding="utf-8") as handle:
+            handle.write(f'#!/bin/bash\n[[ "$1 $3 $4" == "dump --judgment-kind {lfu.PRODUCT_BEHAVIOR}" && $# == 4 ]] || exit 2\ncat {shlex.quote(dump_file)}\n')
+        os.chmod(program, 0o755)
+
+        def compute():
+            keys = UnitKeys(root)
+            references, why = keys.mutated_units(SPECIFICATION_LINE_FILE, original)
+            if references is None:
+                return None, why
+            view = "形式化视图" if keys._last_mutation_formal else "产品行为视图"
+            hit, why = keys.resolve_test(arguments, expected)
+            if hit is None:
+                return None, why
+            info = keys.closure(hit.unit, hit.target, parse_cargo_arguments(arguments))
+            if info.key is None:
+                return None, "闭包拒算 " + "; ".join(info.refusals)
+            return key_of_lines([("mutated", [f"{reference.kind}\t{reference.fingerprint}" for reference in references]), ("test", [info.key])]), view
+        return lfu.with_unit_graph_directory(program_directory, compute)
+
+    specification, specification_note = key_of("5 + 0", False)
+    specification_edited, _note = key_of("5 + 0", True)
+    executable, executable_note = key_of("x + x", False)
+    executable_after_specification_edit, _note = key_of("x + x", True)
+    ok = (specification is not None and specification_note == "形式化视图" and specification_edited is not None and specification_edited != specification
+          and executable is not None and executable_note == "产品行为视图" and executable_after_specification_edit == executable)
+    return ok, (f"规格行的键 {specification}（{specification_note}，要取形式化视图、有键）、改了那条规格之后 {specification_edited}（要有键、与前者不同）；"
+                f"执行代码行的键 {executable}（{executable_note}，要取产品行为视图）、改了那条规格之后 {executable_after_specification_edit}（要与前者相同）")
 
 
 def mutate_record(plan_path, index, verdict, fails, line, red_names=""):
@@ -1119,14 +1364,12 @@ def mutate_record(plan_path, index, verdict, fails, line, red_names=""):
     with open(plan_path, encoding="utf-8") as handle:
         plan = json.load(handle)
     entry = plan["rows"][int(index)]
-    if entry["key"] is None or verdict not in MUTATE_REUSABLE[plan["mode"]]:
+    if entry["key"] is None or verdict not in MUTATE_REUSABLE:
         return False
     red = [name for name in red_names.replace(",", " ").split() if name]
     fields = collections.OrderedDict(kind="mutate", key=entry["key"], verdict=verdict, fails=fails, line=line, judged_date=today_text(), how=plan["how"],
                                      scope=entry.get("scope", ""), toolchain=plan["toolchain"], dependency=entry.get("dependency", ""),
                                      all_tests=plan.get("all_tests") or "", red_tests=",".join(red),
                                      red_test_keys=",".join(f"{name}={plan['tests'].get(name, '')}" for name in red))
-    if verdict == "timeout":
-        fields["time_limit"] = plan.get("time_limit") or ""
     Library(plan["library"], "# 实验变异表的一条判定（scripts/mutation/mutate.sh 经 scripts/mutation/lib_mutation_units.py 写）\n").write("records", entry["key"], fields)
     return True

@@ -6,7 +6,12 @@
 # 为什么：几个 agent 同时在一台机器上跑时，各按整机核数起线程会把机器超卖——测试变慢、变异撞超时、
 # 计时不准（records/2026-09-16-subagent拆分提案.md 第四十节第 7 行）。上限默认是每台默认重活线程数：
 # .claude/heavy-thread-default 的登记值（scripts/hosts/heavy-threads.sh 的 heavy_thread_default 取，SINGLEFS_THREAD_CAP 设了照它），
-# 派发提示另给了「线程上限：N」的照 N；agent 用这个脚本把上限落到每条重命令上。
+# 统一任务服务给每次尝试的命令外面套 capped.sh <每台默认重活线程数>（task-server/README.md），调用方不写线程上限。
+#
+# 只认服务直接起的那一层：task-server 起每一次尝试时给这一层设 CAPPED_ADMITTED_BY_TASK_SERVER=<任务号>.<第几次尝试>（task-server/task_server_lib.py 的
+#   THREAD_ADMITTED_VARIABLE；非空就算设了，值不打、不记）。这里读掉它、exec 命令之前 unset，命令里看不到它；环境里没有它就拒、退 2、命令没跑。
+#   于是任务里面的脚本再套一层 capped.sh 当场被拒：线程数由服务定，脚本照读服务交的 SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS 这些变量，不再套这一层。
+#   --print 与 --selftest 不看它。
 #
 #   capped.sh <上限> <命令> [参数…]   # 设好变量后 exec 那条命令，退出码是那条命令的
 #   capped.sh --print <上限>          # 只打印会设的变量（一行一个），不执行
@@ -14,27 +19,38 @@
 # <上限> 是正整数，或 default：取 heavy_thread_default 交的数（登记文件不在、写坏，SINGLEFS_THREAD_CAP 不是正整数，都拒、退 2，不退回按核数算）。
 #   套在另一层 capped.sh <N> 里面的 default 取到的是 N（外层设了 SINGLEFS_THREAD_CAP）。
 #
-# 设的变量：cargo 的 CARGO_BUILD_JOBS、RUST_TEST_THREADS，crates/singlefs-harness 里各装置读的
+# 设的变量：cargo 的 CARGO_BUILD_JOBS、RUST_TEST_THREADS，crates/singlefs-verification 里各装置读的
 # SINGLEFS_CRASH_POINT_REPLAY_THREADS、SINGLEFS_CRASH_INJECTION_THREADS、SINGLEFS_FAULT_INJECTION_WORKER_THREADS、
-# SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS、SINGLEFS_RANDOM_HISTORY_THREADS，checker 档各处只读的 E161_THREADS（E161 装置）、
+# SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS、SINGLEFS_RANDOM_HISTORY_THREADS，验证包各处只读的 E161_THREADS（E161 装置）、
 # SINGLEFS_CRASH_JUDGE_CPU_THREADS（GPU 对拍与记录核对器两份测试的 CPU 判器一侧）、SINGLEFS_CRASH_AMPLIFICATION_THREADS（崩溃放量的核对线程）、
 # E165_THREADS（E165 装置）、E168_THREADS（E168 装置）、E175_WORKER_THREADS（E175 装置）、E180_THREADS、E182_THREADS、E183_THREADS、E184_THREADS、E185_THREADS
 # （各自的装置与分片脚本）、GATE_MUTATION_KEY_WORKERS（crates 变异表门禁算行键的子进程数），以及通用的 SINGLEFS_THREAD_CAP
-# （实验装置自己的线程变量没登记在这里的，照派发提示另设，或让装置读 SINGLEFS_THREAD_CAP；门禁 code-tooling 的 heavy-thread-defaults 格判：
+# （实验装置自己的线程变量没登记在这里的，加进本文件的 variable_names，或让装置读 SINGLEFS_THREAD_CAP；门禁 code-tooling 的 heavy-thread-defaults 格判：
 # 装置读自己的线程变量，这里不设、文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值的，红）。
-# 弄坏开关 CAPPED_BREAK=default-from-nproc（只给自证证红）：default 照改前的写法取本机核数、不读登记、不认 SINGLEFS_THREAD_CAP，
-#   本机核数不是 5、7、登记值时自证 default 那七格全红（失败行「✗ 自检：登记 7 ⇒ default 把 … 设成 7」「登记 7 ⇒ --print default …」
-#   「SINGLEFS_THREAD_CAP=5、登记 7 ⇒ …」「SINGLEFS_THREAD_CAP=0 ⇒ …」「登记文件不在 ⇒ …」「登记写坏 ⇒ …」「本仓的 default 与 heavy_thread_default 同值…」）。
-# 弄坏开关 CAPPED_BREAK=e161-threads-unset（只给自证证红）：变量清单里去掉 E161_THREADS，装置只读它而这里不设，
-#   自证只有一处出红：失败行「✗ 自检：装置只读的 E161_THREADS 要在变量清单里，实际没有」（逐个变量的那几格以清单为准，清单短了它们照绿，所以这一格单独钉）。
-# 弄坏开关 CAPPED_BREAK=crash-judge-cpu-threads-unset（只给自证证红）：变量清单里去掉 SINGLEFS_CRASH_JUDGE_CPU_THREADS，
-#   自证只有一处出红：失败行「✗ 自检：装置只读的 SINGLEFS_CRASH_JUDGE_CPU_THREADS 要在变量清单里，实际没有」（与 e161-threads-unset 同一格）。
-# 弄坏开关 CAPPED_BREAK=reject-says-default-for-all（只给自证证红）：上限写错的拒绝说明照改前写「没给线程上限写 default」，
-#   自证只有一处出红：失败行「✗ 自检：上限写错的拒绝说明应当写「子 agent 照派发提示里「线程上限：N」写 N」与 default「只给主 agent 与脚本内部用」…」。
+# 弄坏开关（只给 --selftest 证红用；平常跑设了就在一切之前退 2、点名变量只在自证里认，自证起的子进程由 CAPPED_SELFTEST_MARK 认）：
+#   CAPPED_BREAK=default-from-nproc  default 照改前的写法取本机核数、不读登记、不认 SINGLEFS_THREAD_CAP（本机核数不是 5、7、登记值时才红）
+#       「✗ 自检：登记 7 ⇒ default 把」、「✗ 自检：登记 7 ⇒ --print default」、「✗ 自检：SINGLEFS_THREAD_CAP=5、登记 7 ⇒ default 设成 5」、
+#       「✗ 自检：SINGLEFS_THREAD_CAP=0 ⇒ default 拒」、「✗ 自检：登记文件不在 ⇒ default 拒」、「✗ 自检：登记写坏 ⇒ default 拒」、
+#       「✗ 自检：本仓的 default 与 heavy_thread_default 同值」
+#   CAPPED_BREAK=e161-threads-unset  变量清单里去掉 E161_THREADS，装置只读它而这里不设（逐个变量的几格以清单为准，清单短了它们照绿，所以这一格单独钉）
+#       「✗ 自检：装置只读的 E161_THREADS 要在变量清单里」
+#   CAPPED_BREAK=crash-judge-cpu-threads-unset  变量清单里去掉 SINGLEFS_CRASH_JUDGE_CPU_THREADS（与 e161-threads-unset 同一格）
+#       「✗ 自检：装置只读的 SINGLEFS_CRASH_JUDGE_CPU_THREADS 要在变量清单里」
+#   CAPPED_BREAK=reject-says-default-for-all  上限写错的拒绝说明照改前写「没给线程上限写 default」
+#       「✗ 自检：上限写错的拒绝说明应当写」
+#   CAPPED_BREAK=admission-mark-kept  exec 命令之前不 unset CAPPED_ADMITTED_BY_TASK_SERVER（改前的样子：标记随环境传给命令，任务里面再套一层照跑）
+#       「✗ 自检：被服务起的命令里面再调 capped.sh 应当拒」
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 source "$(dirname "${BASH_SOURCE[0]}")/heavy-threads.sh"
+
+# 弄坏开关只在自证里认：命令行不是单独一个 --selftest、也不是自证起的子进程（CAPPED_SELFTEST_MARK 对得上）而变量非空，参数解析之前就退 2（不管值是什么）。
+if [[ -n "${CAPPED_BREAK:-}" && ! ( "$#" -eq 1 && "${1:-}" == --selftest ) && "${CAPPED_SELFTEST_MARK:-}" != capped-selftest ]]; then
+    echo "  ✗ CAPPED_BREAK=${CAPPED_BREAK} 是弄坏开关，只在自证（bash scripts/hosts/capped.sh --selftest）里认，平常跑设了就拒，这一趟什么都没做" >&2
+    echo "  → 怎么办：去掉 CAPPED_BREAK 再跑；要证红就跑 CAPPED_BREAK=<项> bash scripts/hosts/capped.sh --selftest" >&2
+    exit 2
+fi
 
 variable_names=(
     CARGO_BUILD_JOBS
@@ -58,7 +74,7 @@ variable_names=(
     GATE_MUTATION_KEY_WORKERS
     SINGLEFS_THREAD_CAP
 )
-# checker 档各处只读的线程变量（文件头「设的变量」）：自证逐个核它们在清单里
+# 验证包各处只读的线程变量（文件头「设的变量」）：自证逐个核它们在清单里
 device_only_variable_names=(E161_THREADS SINGLEFS_CRASH_JUDGE_CPU_THREADS SINGLEFS_CRASH_AMPLIFICATION_THREADS E165_THREADS E168_THREADS E175_WORKER_THREADS E180_THREADS E182_THREADS E183_THREADS E184_THREADS E185_THREADS)
 # 弄坏开关 e161-threads-unset、crash-judge-cpu-threads-unset：清单里去掉那一个变量（只读它的装置，capped.sh N 到不了）
 case "${CAPPED_BREAK:-}" in
@@ -73,7 +89,7 @@ if [[ -n "$dropped_name" ]]; then
 fi
 
 reject_cap() {
-    local howto="子 agent 照派发提示里「线程上限：N」写 N；default（取 .claude/heavy-thread-default 的登记值）只给主 agent 与脚本内部用"
+    local howto="线程上限不由调用方写：整条命令经 task-server/task submit 交，服务套 capped.sh <每台默认重活线程数>；default 取 .claude/heavy-thread-default 的登记值"
     # 弄坏开关 reject-says-default-for-all：改前的句子，没给线程上限的一律写 default（子 agent 也被指到 default 上）
     [[ "${CAPPED_BREAK:-}" == reject-says-default-for-all ]] && howto="派发提示给了「线程上限：N」照 N，没给写 default（取 .claude/heavy-thread-default 的登记值）"
     echo "  ✗ 线程上限要是正整数或 default，收到的是「$1」" >&2
@@ -94,6 +110,8 @@ resolved_cap() {
 
 run_selftest() {
     local failures=0 checked=0 output status
+    export CAPPED_SELFTEST_MARK=capped-selftest   # 起的子进程（bash "$0" …，环境原样继承）靠它认：弄坏开关只在自证里认
+    export CAPPED_ADMITTED_BY_TASK_SERVER=selftest-task.1   # 各格起的这一份都当服务直接起的那一层（文件头「只认服务直接起的那一层」）；要的格自己去掉
     checked=$((checked + 1))
     if bash "$0" 0 true 2>/dev/null; then
         echo "  ✗ 自检：上限 0 应当被拒绝"; failures=$((failures + 1))
@@ -104,13 +122,29 @@ run_selftest() {
         echo "  ✗ 自检：上限 abc 应当被拒绝"; failures=$((failures + 1))
         echo "  → 怎么办：check_cap 的正则要拒绝非数字"
     fi
-    # 拒绝说明里的出路：子 agent 照派发提示的 N，default 只给主 agent 与脚本内部（共用约束「派发」「写」两节同一说法）
+    # 拒绝说明里的出路：线程上限不由调用方写、整条经 task-server/task submit 交，default 只给脚本内部（task-server/README.md「提交写法」同一说法）
     checked=$((checked + 1))
     output="$(bash "$0" abc true 2>&1 || true)"
-    if [[ "$output" != *"子 agent 照派发提示里「线程上限：N」写 N"* || "$output" != *"只给主 agent 与脚本内部用"* ]]; then
-        echo "  ✗ 自检：上限写错的拒绝说明应当写「子 agent 照派发提示里「线程上限：N」写 N」与 default「只给主 agent 与脚本内部用」，实际「$output」"; failures=$((failures + 1))
-        echo "  → 怎么办：reject_cap 的出路改回：子 agent 照派发提示的 N，default 只给主 agent 与脚本内部"
+    if [[ "$output" != *"线程上限不由调用方写：整条命令经 task-server/task submit 交"* || "$output" != *"default 取 .claude/heavy-thread-default 的登记值"* ]]; then
+        echo "  ✗ 自检：上限写错的拒绝说明应当写「线程上限不由调用方写：整条命令经 task-server/task submit 交」与「default 取 .claude/heavy-thread-default 的登记值」，实际「$output」"; failures=$((failures + 1))
+        echo "  → 怎么办：reject_cap 的出路改回：线程上限不由调用方写、整条经 task-server/task submit 交，default 取登记值"
     fi
+    # 只认服务直接起的那一层（文件头）：没有准入标记 ⇒ 拒、退 2、命令没跑；被服务起的命令里面再调一层 ⇒ 里层拒、退 2、命令没跑
+    local admission_scratch
+    admission_scratch="$(mktemp -d)"
+    checked=$((checked + 1))
+    if env -u CAPPED_ADMITTED_BY_TASK_SERVER bash "$0" 3 touch "$admission_scratch/unadmitted-ran" 2>"$admission_scratch/unadmitted.err"; then status=0; else status=$?; fi
+    if [[ "$status" != 2 || -e "$admission_scratch/unadmitted-ran" ]] || ! grep -q '任务里面不再套包装：内存、线程、机器、卡由 task-server 定；删掉这一层' "$admission_scratch/unadmitted.err"; then
+        echo "  ✗ 自检：没有服务给的准入标记应当拒（退 2、命令没跑、出路写「任务里面不再套包装」），实际退 $status：$(head -c 300 "$admission_scratch/unadmitted.err")"; failures=$((failures + 1))
+        echo "  → 怎么办：run 那一段在 exec 之前判 CAPPED_ADMITTED_BY_TASK_SERVER，没有就拒"
+    fi
+    checked=$((checked + 1))
+    if bash "$0" 3 bash "$0" 3 touch "$admission_scratch/nested-ran" 2>"$admission_scratch/nested.err"; then status=0; else status=$?; fi
+    if [[ "$status" != 2 || -e "$admission_scratch/nested-ran" ]]; then
+        echo "  ✗ 自检：被服务起的命令里面再调 capped.sh 应当拒（里层退 2、命令没跑），实际退 $status、命令$([[ -e "$admission_scratch/nested-ran" ]] && echo 跑了 || echo 没跑)"; failures=$((failures + 1))
+        echo "  → 怎么办：exec 命令之前 unset CAPPED_ADMITTED_BY_TASK_SERVER，命令里看不到它；CAPPED_BREAK 设着的话这里本来就该红"
+    fi
+    rm -rf "${admission_scratch:?}"
     for name in "${variable_names[@]}"; do
         checked=$((checked + 1))
         output="$(bash "$0" 3 printenv "$name" || true)"
@@ -142,7 +176,7 @@ run_selftest() {
         echo "  → 怎么办：照上面逐条改"
         exit 1
     fi
-    echo "  ✓ capped.sh 自检通过（查了 $checked 项：上限写错两种拒绝、拒绝说明的出路、${#variable_names[@]} 个变量都设上、装置只读的 ${#device_only_variable_names[@]} 个线程变量在清单里、退出码原样传回、default 取登记值七格）"
+    echo "  ✓ capped.sh 自检通过（查了 $checked 项：上限写错两种拒绝、拒绝说明的出路、没有服务的准入标记拒、被服务起的命令里面再套一层拒、${#variable_names[@]} 个变量都设上、装置只读的 ${#device_only_variable_names[@]} 个线程变量在清单里、退出码原样传回、default 取登记值七格）"
 }
 
 # default 那七格：样本树里放这一份与 heavy-threads.sh 的拷贝、一份只交还参数的 preflight 桩（准入不在这里判），登记按格写；
@@ -217,5 +251,12 @@ if [ "$#" -eq 0 ]; then
     echo "  → 怎么办：写成 capped.sh $cap <命令> [参数…]" >&2
     exit 2
 fi
+# 只认服务直接起的那一层（文件头）：没有准入标记就拒；有就 unset，命令里看不到它（弄坏开关 admission-mark-kept 下照留）
+if [[ -z "${CAPPED_ADMITTED_BY_TASK_SERVER:-}" ]]; then
+    echo "  ✗ capped.sh 只认 task-server 起尝试时直接套的那一层，环境里没有服务给的 CAPPED_ADMITTED_BY_TASK_SERVER（任务里面又套了一层，或不经服务直接起），命令没跑" >&2
+    echo "  → 怎么办：任务里面不再套包装：内存、线程、机器、卡由 task-server 定；删掉这一层（线程数照读服务交的 SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS 这些变量），整条经 task-server/task submit -- <命令…> 交" >&2
+    exit 2
+fi
+[[ "${CAPPED_BREAK:-}" == admission-mark-kept ]] || unset CAPPED_ADMITTED_BY_TASK_SERVER
 for name in "${variable_names[@]}"; do export "$name=$cap"; done
 exec "$@"

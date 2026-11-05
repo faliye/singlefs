@@ -8,6 +8,11 @@
 每一行都以 name= 起头、不带耗时与绝对路径（目录与表只写末一段名字，副本路径写成 .），
 `scripts/experiment-apparatus/replay.sh` 的 E170 几行经 run_replay_result_lines.py wrap 把它改写成 E7RESULT 结果行逐字节比。
 
+名字以 XC 起头的行（journal_header_487 的 XC8、XC9）原文在照抄核对脚本 run_known_bad_recopy_check.py 里，不归单测管：它们逐条在草稿副本上替换、
+抓不抓到、原文是不是恰好命中一次，都由 run_segment_two_q5.sh 的 recopy_mutations 判（要照抄后的装置当输入）。本驱动对这几行不核原文、不跑单测
+（别的执行器目录里没有照抄核对脚本，核了只会退 3），结果行写 `result=judged_by_recopy_check`，计数行另记 `judged_by_recopy_check=<个数>`；
+整张表（XC 行在内）一起交给本驱动。
+
 用法：python3 mutation_driver_unit_level.py --executor-directory <目录> --table <变异表> --scratch <草稿目录> --output <新文件>
 """
 
@@ -24,6 +29,7 @@ import sys
 
 TEST_MODULE = "test_executor_on_synthetic_pool"
 PER_RUN_TIMEOUT_SECONDS = 180
+JUDGED_BY_THE_RECOPY_CHECK_PREFIX = "XC"   # 名字以它起头的变异行不归单测管（文件头）
 
 
 def source_files(directory: str) -> list[str]:
@@ -90,6 +96,10 @@ def without_whitespace(text: str) -> str:
     return "".join("_" if character.isspace() else character for character in text) or "-"
 
 
+def is_judged_by_the_recopy_check(mutation_name: str) -> bool:
+    return mutation_name.startswith(JUDGED_BY_THE_RECOPY_CHECK_PREFIX)
+
+
 def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--executor-directory", required=True)
@@ -110,7 +120,7 @@ def main(argument_list: list[str]) -> int:
 
         emit(f"name=mutation_config executor_directory={os.path.basename(directory)} table={os.path.basename(arguments.table)} rows={len(rows)} "
              f"python={sys.version.split()[0]} per_run_timeout_seconds={PER_RUN_TIMEOUT_SECONDS}")
-        bad_anchors = [(name, anchor_hits(directory, anchor)) for name, anchor, _replacement in rows]
+        bad_anchors = [(name, anchor_hits(directory, anchor)) for name, anchor, _replacement in rows if not is_judged_by_the_recopy_check(name)]
         bad_anchors = [(name, hits) for name, hits in bad_anchors if sum(count for _file, count in hits) != 1]
         for name, hits in bad_anchors:
             emit(f"name=anchor_problem mutation={name} hits={hits}")
@@ -125,7 +135,12 @@ def main(argument_list: list[str]) -> int:
             emit("name=mutation_aborted reason=baseline_is_red")
             return 4
         counts = {"✅": 0, "⏭": 0, "❌": 0, "⏱": 0}
+        judged_elsewhere = 0
         for name, anchor, replacement in rows:
+            if is_judged_by_the_recopy_check(name):
+                judged_elsewhere += 1
+                emit(f"name=mutation mutation={name} result=judged_by_recopy_check")
+                continue
             copy = fresh_copy(directory, arguments.scratch, "mutated")
             file_name = anchor_hits(copy, anchor)[0][0]
             path = os.path.join(copy, file_name)
@@ -164,7 +179,7 @@ def main(argument_list: list[str]) -> int:
         else:
             emit(f"name=restore_problem source_unchanged={after == before} final_baseline_state={final_state} exit={final_code}")
         emit(f"name=mutation_counts caught={counts['✅']} invalid={counts['⏭']} not_red={counts['❌']} timeout={counts['⏱']} "
-             f"total={sum(counts.values())} table_rows={len(rows)}")
+             f"judged_by_recopy_check={judged_elsewhere} total={sum(counts.values()) + judged_elsewhere} table_rows={len(rows)}")
         emit("name=complete")
     return 0
 

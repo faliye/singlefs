@@ -9,7 +9,9 @@ Q2 的判定取严格跑法（登记读法 5），暂代跑法只当附带（Q2-
 
 跑法（在执行器目录里）：
   python3 comparator_q2_implementation_verdicts.py --dumps <重导目录> --frozen-verdicts <执行器产物> --output <新文件>
-      [--freeze-reference <第一段产物>] [--primary-field strict]
+      --freeze-reference <第一段产物> [--primary-field strict]
+不给 --freeze-reference，freeze_check 那一节没有输入：结果行写 `name=not_run section=freeze_check …`、往标准错误打一行
+NOT_RUN_INPUT_NOT_GIVEN，其余各节都不跑，整趟退 77（本次未跑，不是通过）。
 文件名以 comparator 起头，不进冻结的 sha256（executor_main.FILES_OUTSIDE_THE_FREEZE）。--primary-field 只给单测式自查用（拿第一次的产物试跑
 比对器的逻辑），正式跑取默认值 strict。
 """
@@ -30,6 +32,23 @@ STATES_FILE = "states.tsv"
 VERDICTS_GIVEN = ("in", "not_in")
 LANDED_PAIR = re.compile(r"^\((\d+),(\d+),")
 HISTOGRAM_FIELDS = ("path", "stop", "refusal")  # Q2-e：执行器 name=state 行里的轨迹字段，按值数一遍
+NOT_RUN_MARKER = "NOT_RUN_INPUT_NOT_GIVEN"
+NOT_RUN_EXIT_CODE = 77
+
+
+def sections_without_input(arguments: argparse.Namespace) -> list[tuple[str, str]]:
+    """(节名, 选项名)：这一趟要读而没给的选填输入对应的节。"""
+    return [("freeze_check", "--freeze-reference")] if not arguments.freeze_reference else []
+
+
+def report_sections_not_run(lines: ResultLines, missing: list[tuple[str, str]]) -> int:
+    """没给输入的节在结果行里写本次未跑、往标准错误打记号行，其余各节不跑，退 77。"""
+    lines.result("name=config segment=r1_s2 mode=q2_comparator not_run=true")
+    for section, option in missing:
+        lines.result(f"name=not_run section={section} input={option} reason=input_not_given")
+        print(f"{NOT_RUN_MARKER} test=comparator_q2_implementation_verdicts.py reason={option} 没给，{section} 这一节本次未跑", file=sys.stderr)
+    lines.finish()
+    return NOT_RUN_EXIT_CODE
 
 
 def implementation_passes_both(columns: list[str]) -> bool:
@@ -176,22 +195,24 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--dumps", required=True, help="重导目录（scripts/experiment-apparatus/target/e170-second-run-dumps）")
     parser.add_argument("--frozen-verdicts", required=True, help="冻结的执行器在重导目录上跑出的产物（name=state 行）")
     parser.add_argument("--output", required=True, help="产物路径；已存在就拒绝")
-    parser.add_argument("--freeze-reference", help="第一段产物：它的 name=freeze 行与执行器产物里的逐行相同才算同一份执行器")
+    parser.add_argument("--freeze-reference", help="第一段产物：它的 name=freeze 行与执行器产物里的逐行相同才算同一份执行器；不给这一趟本次未跑、退 77")
     parser.add_argument("--primary-field", default="strict", choices=("strict", "provisional"),
                         help="Q2-a、Q2-d、Q2-pc 读哪一列；正式跑取 strict，provisional 只给拿第一次的产物自查比对器逻辑用")
     arguments = parser.parse_args(argument_list)
     primary, secondary = arguments.primary_field, ("provisional" if arguments.primary_field == "strict" else "strict")
     lines = ResultLines(arguments.output)
+    missing = sections_without_input(arguments)
+    if missing:
+        return report_sections_not_run(lines, missing)
     frozen_rows = read_frozen_lines(arguments.frozen_verdicts, "state")
     frozen = {(row["stream"], int(row["state"])): row for row in frozen_rows}
     states, implementation = read_stream_tables(arguments.dumps)
     lines.result(f"name=config segment=r1_s2 mode=q2_comparator streams={','.join(executor_main.STREAM_NAMES)} "
                  f"frozen_state_lines={len(frozen_rows)} primary_field={primary} secondary_field={secondary}")
-    if arguments.freeze_reference:
-        executor_freeze = read_freeze_lines(arguments.frozen_verdicts)
-        reference_freeze = read_freeze_lines(arguments.freeze_reference)
-        lines.result(f"name=freeze_check executor_freeze_lines={len(executor_freeze)} reference_freeze_lines={len(reference_freeze)} "
-                     f"same={str(executor_freeze == reference_freeze and len(executor_freeze) > 0).lower()}")
+    executor_freeze = read_freeze_lines(arguments.frozen_verdicts)
+    reference_freeze = read_freeze_lines(arguments.freeze_reference)
+    lines.result(f"name=freeze_check executor_freeze_lines={len(executor_freeze)} reference_freeze_lines={len(reference_freeze)} "
+                 f"same={str(executor_freeze == reference_freeze and len(executor_freeze) > 0).lower()}")
     for stream_name in executor_main.STREAM_NAMES:
         state_numbers = {int(columns[0]) for columns in states[stream_name]}
         frozen_numbers = {number for (name, number) in frozen if name == stream_name}

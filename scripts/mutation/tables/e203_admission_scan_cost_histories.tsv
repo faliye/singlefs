@@ -1,0 +1,19 @@
+# 被测的是 scripts/experiment-apparatus/e203_admission_scan_cost_histories.rs：它不是 scripts/experiment-apparatus 里的 bin，而是拷进插了计数的副本，当 crates/singlefs-verification 的集成测试编、起（入口 e203-admission-scan-cost-run.sh）。
+# mutate.sh 只会在 scripts/experiment-apparatus 里起 cargo test --release --bin <名>，那里没有这份用例，所以这张表不由 mutate.sh 跑。
+# 每一行由谁抓：在插了计数的副本里带着改坏的用例起点 unlinks_1（计数构建），再用模型 e203-admission-scan-cost report 读产物，对照没改坏那一份的读数。
+#   rounds_cut_to_four、overwrite_never_run：verdict clause=void_8 cells_not_measurable_in_counts 从 0 变 2。
+#   caller_flag_forced_false：verdict clause=stop_4 publishes_that_skipped_the_caller_or_the_judge 从 0 变成大于 0。
+#   done_marker_dropped：入口 name=item_failed、退出码 1，且 verdict clause=void_6 points_with_the_done_marker 从 1 变 0。
+#   unlink_not_done、history_unlinks_one_short：verdict clause=F4 fired 从 false 变 true。
+#   overwrite_state_line_dropped：name=b8_input_gap 里 kind=overwrite 的行从无变有。
+#   final_state_mislabeled：name=b8_input_gap 里 kind=unlink_final 的行从无变有。
+#   segment_slots_printed_wrong：name=constant_check key=segment_slots 的 match 从 true 变 false。
+rounds_cut_to_four	const ROUNDS: u64 = 5;	const ROUNDS: u64 = 4;
+overwrite_never_run	pool.overwrite(OVERWRITE_BYTES).expect("覆盖写发成");	();
+caller_flag_forced_false	record.had_caller_segment, record.rounds	false, record.rounds
+done_marker_dropped	println!("E203RESULT name=item_done build={build} point={point}");	();
+unlink_not_done	    unlink(pool, inode);\n    e203_scan::take_finished()	    e203_scan::take_finished()
+history_unlinks_one_short	for _ in 0..axes.unlinks {	for _ in 0..axes.unlinks.saturating_sub(1) {
+overwrite_state_line_dropped	println!("{scanned}");	let _ = &scanned;
+final_state_mislabeled	state_text(build, point, state, "unlink_final", round, pool)	state_text(build, point, state, "unlink_intent", round, pool)
+segment_slots_printed_wrong	segment_slots={CLUSTER_SEGMENT_SLOTS}	segment_slots={INODE_LEAF_RECORDS}

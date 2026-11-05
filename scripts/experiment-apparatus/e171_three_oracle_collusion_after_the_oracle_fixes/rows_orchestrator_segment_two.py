@@ -1,34 +1,37 @@
 #!/usr/bin/env python3
+# task-server-shards: run
 """E171 第 1 次重跑第二段（整表，登记 research/prompts/e171-r1-prereg.md 第五节 5.5 第二段、修订 2 第 2.5 节、修订 6 第 6.6 节「第二段（整表）照原文，
-在修订 6 树上跑」）的多机编排：281 行（第 1–117 行与第 118–281 行两张表）加补位，流一、流二，批 1 批 2，不跑执行器、不带探针。
+在修订 6 树上跑」）的多机编排：整表（两张坏实现表第一列之并）加补位，流一、流二，批 1 批 2，不跑执行器、不带探针。
 由 run_segment_two_on_the_revision_6_tree_multi_host.sh 起，在仓根跑。
 
-为什么另写一层、不改第一段那一份编排器：rows_orchestrator.py 被 cross_host_o3_check.py 按 sha256 1dcfb8d0… 钉住（改一个字节它退 3，复跑行
+为什么另写一层、不改第一段那一份编排器：rows_orchestrator.py 被 cross_host_o3_check.py 按 sha256 钉住（改一个字节它退 3，复跑行
 driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径载入那一份（开跑先核 sha256，不是就退 3），机器清单、资源、分配、预检、单台配置、
-发给别的台的快照与工具包、装产物都调它原来的函数；第二段不同的几处（行集、产物名、不跑执行器的合并与判法、补位协调、跨机对照那一行、逐行限时的超时重跑）写在这里。
+给别的台读的快照与工具包、装产物都调它原来的函数；第二段不同的几处（行集、产物名、不跑执行器的合并与判法、补位协调、跨机对照那一行、逐行限时的超时重跑）写在这里。
 
 用法：
   rows_orchestrator_segment_two.py run  --repo R --prefix P --suffix S --dumps D --tree TREE --snapshot-digest H --baseline-timing B --check C
                                         --logs L --work-root W [--research-root RR]
-      跑整表。被停、被杀之后同一条命令再起就是续跑：已做完的行（本机的、已取回的别的台的）不重跑，写到一半的重做，资源与分配重新现查现算。
+      跑整表。被停、被杀之后同一条命令再起就是续跑：已做完的行（本机的、已收进来的别的台的）不重跑，写到一半的重做，分配重新现算。
   rows_orchestrator_segment_two.py plan <同上>
-      只现查机器与资源、算分配、按每行推的用时推各台挂钟，打出来；一行都不起，不写产物。
+      只现查机器、算分配、按每行推的用时推各台挂钟，打出来；一行都不起，不写产物。
   rows_orchestrator_segment_two.py --selftest [--cells 格,…]
-      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（同目录的 fake_*），连同第一段编排器自己的 --selftest；自证进程是子进程的收养者
+      假驱动、假 task-server 分片（fake_task_server.py）、假机器清单走一遍各格（同目录的 fake_*），连同第一段编排器自己的 --selftest；自证进程是子进程的收养者
       （PR_SET_CHILD_SUBREAPER），每一格之后收掉它起的、还活着的每个进程，末尾数一遍自己的进程树，临时目录（自证给子进程的 TMPDIR）删掉；
       末尾逐个打开弄坏开关核它红在点名的格。末行「自证 N 项，红 M」。
 
 退出码：0 跑完（合并、判法、跨机对照、超时重跑都过）；1 停机或某一行没跑成（日志与 sequence.log 写停在哪、为什么）；2 用法错；
-  3 第一段编排器不是 1dcfb8d0… 那一份；78 运行条件不满足（多机配置判不过、某台连不上或没读到资源、别的台的预检没过、此刻一条线道都放不下、
+  3 第一段编排器不是钉的那一份（SEGMENT_ONE_ORCHESTRATOR_SHA256）；78 运行条件不满足（多机配置判不过、某台连不上（别的台的预检没过）、各台的线程都不够一条线道、
   跨机对照那一行此刻放不下）——不悄悄退回单机，出路是修好那台或改配置，再用同一条命令起；143 收到 TERM / INT / HUP，收完尾退出。
 
-行集：两张坏实现表（bad-implementations-117.tsv、bad-implementations-expansion-164.tsv）的整表编号，必须恰是 1–281（登记第一节）。不跑空变异（第二段登记里没有）。
-每行一个单线道驱动（--lanes 1），驱动参数：--rows <行> --streams 1,2 --no-executor --lanes 1 --threads <每槽线程> --memory-cap 6G --skip-finished
+行集：两张坏实现表（bad-implementations-step-8.tsv、bad-implementations-step-4-only.tsv）第一列之并，编号不许重（E171 第 2 次重跑登记读法 4：
+  撤掉的行留空号，行集不写死）；读不出或编号重了就停。不跑空变异（第二段登记里没有）。
+每行一个单线道驱动（--lanes 1），驱动参数：--rows <行> --streams 1,2 --no-executor --lanes 1 --threads <每槽线程>
   --other-selected-rows <这一行的补位排除表>；不带 --keep-dumps（登记 5.3「第二段的行导出判完即删」，驱动删三个大文件、留判定表与 manifest）；
   限时由驱动照 --baseline-timing 现算（修订 2 第 2.5 节第二段：T 取修订 6 树上 S2 那一趟 --streams 1,2、不带探针的基线的进程挂钟）。
-机器、资源、分配：照第一段编排器文件头「机器」「资源与分配」，调它的 hosts_from_configuration、resources_from_json、allocate（每槽 5 线程起、
-  本机 slice 账 6G、别的台 10G、实占 10 GiB、可用线程至多 31）。起跑时一台一槽都放不下的（例如本机正忙），每 REGROW_SECONDS 秒重查一次资源，
-  那台放得下了就给它加槽（别的台先过预检）；已有槽的台不增不减。
+机器、分配：照第一段编排器文件头「机器」「资源与分配」，调它的 hosts_from_configuration、allocate（每台线程取登记值，每槽 5 线程起，槽数 = ⌊每台线程 / 5⌋，可用线程至多 31；
+  内存不在这里算，整条命令交 task-server）。起跑时一台一槽都没有的（例如修订 10 的本机闸没开），每 REGROW_SECONDS 秒重算一次分配，
+  那台有槽了就给它加槽（别的台先过预检）；已有槽的台不增不减。线程只在这一条任务（与它在那一台的那一片）里分（第 2 次重跑登记修订 7）：每个驱动只给 --lanes 1
+  --threads <它那一槽的线程>，驱动照它设编译、装置、执行器环境里的线程数变量；一台上各槽合起来 = 槽数 × 每槽线程，不超过那一台那一片的额度。
 派发：每行推的用时 = T × 权重 + 120 秒；权重 = 那一行在 s4 整表（research/results 下 S4_TIMING_PRODUCTS 那份）里的 device_ns ÷ 各行 device_ns 的中位数，
   读不到的行取 1（推的：s4 是旧树、旧装置，只拿来排先后，不进任何判据）。队列最长先做，用时相同按行号；哪一槽空了就取队头。
   跨机对照那一行 R 取权重最接近 1 的行（平手取行号小的）；R 在本机跑时用新的工作根（冷编译，跨机对照比得了编译那几列之外的一切）。
@@ -40,29 +43,47 @@ driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径�
   ③ 产物 <P>-rows-substitution-coordination<S>.out：每个用过补位的行一行、重做过的行、末行 name=verdict substitute_collisions=0。
 产物（照第一段「产物与合并」，按不跑执行器改了两处：分片里没有 freeze_check 行，有就拒；判法换成 check_product.py rows_without_executor，
   它照 rows 判，只把不跑执行器的那两处换掉、补位补不上的几类不算红；合成的先写进分片目录 merged/ 判，判过了才装进 research/results）：
-  <P>-rows-driver<S>.out 与 -timing.out：这一趟各行的分片 + 更早几趟已做完的行由本机一个 --skip-finished 驱动重报的分片，按写死的规则合成：
-  ① 各分片的 name=row_time_limit 行逐字相同；② snapshot_digest 与 files 等于冻结树快照；③ row 行按序号排，不许重复，行集恰是 1–281；
+  <P>-rows-driver<S>.out 与 -timing.out：这一趟各行的分片 + 更早几趟已做完的行由本机一个驱动重报的分片（同键做完的行按键复用、直接读回；
+  上一次是超时、编不过或测量管子缺陷的行，驱动照自己的规则重做），按写死的规则合成：
+  ① 各分片的 name=row_time_limit 行逐字相同；② snapshot_digest 与 files 等于冻结树快照；③ row 行按序号排，不许重复，行集等于这一趟的行集；
   ④ 没有 freeze_check 行；⑤ table 行：lanes、rows、sum_of_row_ns 相加，table_wall_ns 取最大，threads_per_lane 去重升序，加 shards=；
   ⑥ 每个分片一行 merged_shard，计时按 row_device 分块、块按序号排、行集与产物的相等；⑦ 认不得的行拒。
 跨机一致对照（照「主 agent 认定：-resume2 跨机一致对照 S17 停机的处置」第 3 条与第一段编排器的比法）：整表做完、补位没有重复之后，R 在另一台再跑一次
   （同一张补位排除表），比三样：row 行去四个耗时列、device.out 的 E7RESULT 行、导出 z1 五个文件；o3 那一格不跑执行器就没有，报 identical=not_run。
   有一样不同就停机（退 1）；产物 <P>-rows-cross-host-check<S>.out 与 R 那次的 <P>-rows-cross-host-row-<R>-driver<S>.out。只有一台时报 not_run。
 超时重跑（主 agent 派发写定；登记修订 2 第 2.5 节原文「第二段照原登记读法 5 与补位规则，不重跑」，所以这一份只另出产物、不改合成的整表那一份）：
-  整表产物里 device_exit=253 的行，单线道、限时再乘 3（--rerun-of-timed-out-rows），挑有槽的台里可用线程最多的那台，用那一行原来那张补位排除表；
-  产物 <P>-rows-timeout-rerun-driver<S>.out。
-续跑：同第一段（取回目录里有 row-result.tsv 的行先收进本机输出根，写到一半的删掉重做；已装的产物不重合）。
+  整表产物里 device_exit=253 的行，单线道，驱动参数与整表那一步完全一样、行输出根也是整表那个根：驱动按键复用，在这个根里看到同键的上一次结果是超时，
+  就自己把限时乘 3（重做中途停下，行目录里的标记文件 timed-out-before 还记着）；上一次超时的行目录在编排那一台的行输出根里，所以跑在编排那一台，
+  用那一行原来那张补位排除表；产物 <P>-rows-timeout-rerun-driver<S>.out。
+别的台与经 task-server：同第一段文件头「机器」「经 task-server」（文件头第二行声明了 run 这一种分片，服务照计划、各片、合并三步起；
+  编排在片号 0 那一片，别的台的行经 shard_relay.py 交给落在那一台的那一片代跑，同一个绝对路径读写共享根，不送、不取回；
+  不经服务直接调只用这一台，跨机对照报 not_run）；这一行的补位排除表写在共享根下它的分片目录 launch/ 里，驱动照绝对路径读。
+续跑：同第一段（别的台分片输出目录里有 row-result.tsv 的行先收进本机输出根，写到一半的删掉重做；已装的产物不重合）。
 
-弄坏开关 ROWS_ORCHESTRATOR_TWO_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，别处设了退 2）。项名、弄坏哪一处、打开后红在哪一格：
-  sweep-skipped               每一格之后与末尾不收进程                          no-leftover-processes
-  temporary-kept              末尾不删自证给子进程的临时目录                    temporary-directory-removed
-  merge-allows-freeze-lines   合并时分片里有 freeze_check 行也收                merge-refuse-freeze-line
-  merge-allows-duplicates     合并时同一序号两行取前一行、不拒                  merge-refuse-duplicate
-  exclusions-not-given        起一行时不给补位排除表（空表）                    e2e-substitution-sequential
-  collisions-ignored          整表做完不核补位重复                              e2e-substitution-collision
-  cross-host-ignores-dumps    跨机对照不比导出那一样                            cross-host-compare
-  resume-reruns-finished      续跑时已做完的行也重跑                            e2e-resume
-  harvest-skipped             别的台取回的行不收进本机行输出根                  e2e-two-hosts
-  regrow-skipped              起跑时放不下的台之后放得下了也不加槽              e2e-regrow
+弄坏开关 ROWS_ORCHESTRATOR_TWO_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，别处设了退 2）。逐项写开关名、弄坏哪一处，
+下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」；开关轮只核每项第一格）：
+  ROWS_ORCHESTRATOR_TWO_BREAK=sweep-skipped  每一格之后与末尾不收进程
+      「✗ 自证 no-leftover-processes：」「✗ 自证 straggler-swept：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=temporary-kept  末尾不删自证给子进程的临时目录
+      「✗ 自证 temporary-directory-removed：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=merge-allows-freeze-lines  合并时分片里有 freeze_check 行也收
+      「✗ 自证 merge-refuse-freeze-line：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=merge-allows-duplicates  合并时同一序号两行取前一行、不拒
+      「✗ 自证 merge-refuse-duplicate：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=exclusions-not-given  起一行时不给补位排除表（空表）
+      「✗ 自证 e2e-substitution-sequential：」「✗ 自证 e2e-substitution-collision：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=collisions-ignored  整表做完不核补位重复
+      「✗ 自证 e2e-substitution-collision：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=cross-host-ignores-dumps  跨机对照不比导出那一样
+      「✗ 自证 cross-host-compare：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=resume-reruns-finished  续跑时已做完的行也重跑
+      「✗ 自证 e2e-resume：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=harvest-skipped  别的台做完的行不收进本机行输出根
+      「✗ 自证 e2e-two-hosts：」「✗ 自证 e2e-resume：」「✗ 自证 e2e-regrow：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=regrow-skipped  起跑时没有槽的台之后有槽了也不加槽
+      「✗ 自证 e2e-regrow：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=peer-command-gets-memory-cap  转交给别的台的命令又带上 --memory-cap 外层上限（shard_relay.py 不认、退 2）
+      「✗ 自证 e2e-two-hosts：」
 """
 from __future__ import annotations
 
@@ -89,16 +110,17 @@ import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SEGMENT_ONE_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator.py")
-SEGMENT_ONE_ORCHESTRATOR_SHA256 = "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"
-SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 34 项，红 0"
-TABLE_FILES = ("bad-implementations-117.tsv", "bad-implementations-expansion-164.tsv")
-WHOLE_TABLE_ROWS = tuple(range(1, 282))
+# 钉的是第一段编排器此刻的内容：跑那一趟的 1dcfb8d0… 那一版与此刻差的不只是登记过的搬迁（每台线程改取登记值等），倒换不回去
+SEGMENT_ONE_ORCHESTRATOR_SHA256 = "d2ebaaaf914db01f384004676d9e127593c11d1796a4694b50924db38b2255c1"
+SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 35 项，红 0"
+TABLE_FILES = ("bad-implementations-step-8.tsv", "bad-implementations-step-4-only.tsv")
 ROW_FLAGS = ("--streams", "1,2", "--no-executor")
 # s4 整表那一趟各行的计时（旧树、旧装置，流一流二）：只拿来排先后（文件头「派发」），不进任何判据
 S4_TIMING_PRODUCTS = ("e171-three-oracle-collusion-2026-10-03-s4-f4-substitutes-rows-timing.out",)
 ROW_OVERHEAD_SECONDS = 120
 REGROW_SECONDS = 600
-PEER_LAUNCH_RELATIVE = "research/e171-s2-launch"
+SAMPLE_THREAD_CAP = "10"  # 自证的假世界里每台线程：两槽、每槽 5 线程（SINGLEFS_THREAD_CAP 设了登记值读它）
+LAUNCH_DIRECTORY_NAME = "launch"  # 一个分片的补位排除表写在它的分片目录下的这个目录里（共享根下，别的台照绝对路径读）
 EXCLUSIONS_FILE = "exclusions.tsv"
 EXCLUSION_ROW_NUMBER_BASE = 900000
 EXIT_WRONG_SEGMENT_ONE_ORCHESTRATOR = 3
@@ -109,7 +131,7 @@ PR_SET_CHILD_SUBREAPER = 36
 
 
 class WrongSegmentOneOrchestrator(Exception):
-    """第一段编排器文件的 sha256 不是 1dcfb8d0…：这一层调的那几个函数不再是第一段跑的那一份。"""
+    """第一段编排器文件的 sha256 不是钉的那一份：这一层调的那几个函数不再是钉住的那一份。"""
 
 
 def load_segment_one_orchestrator(path: str = SEGMENT_ONE_ORCHESTRATOR_PATH) -> types.ModuleType:
@@ -126,6 +148,26 @@ def load_segment_one_orchestrator(path: str = SEGMENT_ONE_ORCHESTRATOR_PATH) -> 
     return module
 
 
+def refuse_break_switches_outside_selftest() -> bool:
+    """平常跑（不是自证起的子进程）设了只给自证用的变量：逐个打拒因，交回 True（调用方退 2）。"""
+    if os.environ.get(BREAK_VARIABLE) and os.environ.get(SELFTEST_VARIABLE) != "1":
+        print(f"✗ {BREAK_VARIABLE} 只在 --selftest 起的子进程里认；平常跑时设了它就拒（退 2）", file=sys.stderr)
+        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
+        return True
+    if os.environ.get("ROWS_ORCHESTRATOR_BREAK") and os.environ.get("ROWS_ORCHESTRATOR_SELFTEST") != "1":
+        print("✗ ROWS_ORCHESTRATOR_BREAK（第一段编排器的弄坏开关，这一层调的函数里也认）只在自证里认；平常跑时设了它就拒（退 2）", file=sys.stderr)
+        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
+        return True
+    if os.environ.get(SELFTEST_ROWS_VARIABLE) and os.environ.get(SELFTEST_VARIABLE) != "1":
+        print(f"✗ {SELFTEST_ROWS_VARIABLE} 只在 --selftest 起的子进程里认（平常跑整表）；设了它就拒（退 2）", file=sys.stderr)
+        print(f"  → 怎么办：平常跑整表就从环境里去掉 {SELFTEST_ROWS_VARIABLE}；只跑几行的样子由 --selftest 起", file=sys.stderr)
+        return True
+    return False
+
+
+# 守卫在下面按 sha256 载入第一段编排器之前：平常跑设了弄坏开关先退 2，不让钉值核对的退 3 把它盖住、也不先载被钉的那一份
+if __name__ == "__main__" and refuse_break_switches_outside_selftest():
+    sys.exit(2)
 try:
     one = load_segment_one_orchestrator()
 except WrongSegmentOneOrchestrator as wrong_orchestrator:
@@ -144,10 +186,11 @@ class StepTwo:
     stem: str
     root_suffix: str
     flags: tuple[str, ...]
+    rerun: bool = False   # 超时重跑：行输出根与参数同整表那一步，做完的标志是 row-result.tsv 里 timed_out_before=true
 
 
 ROWS_STEP = StepTwo("rows", "rows-driver", "", ROW_FLAGS)
-RERUN_STEP = StepTwo("rerun", "rows-timeout-rerun-driver", "-timeout-rerun", ("--rerun-of-timed-out-rows",) + ROW_FLAGS)
+RERUN_STEP = StepTwo("rerun", "rows-timeout-rerun-driver", "", ROW_FLAGS, rerun=True)
 
 
 def cross_host_step(row: int) -> StepTwo:
@@ -161,7 +204,7 @@ COORDINATION_STEM = "rows-substitution-coordination"
 @dataclasses.dataclass
 class ContextTwo(one.Context):
     """第一段的 Context 加第二段的行集与跨机对照那一行；行输出根是 segment2-rows，产物名不接 tag（tag 只进别的台那一趟的标签）。"""
-    rows: tuple[int, ...] = WHOLE_TABLE_ROWS
+    rows: tuple[int, ...] = ()  # plan_rows 现算（两张表第一列之并）
     cross_host_row: int = 0
     row_seconds: dict = dataclasses.field(default_factory=dict)
 
@@ -181,12 +224,13 @@ def step_of(context: ContextTwo, key: str) -> StepTwo:
 
 
 def whole_table_rows(research_directory: str) -> tuple[int, ...]:
-    """两张表的整表编号；不是恰好 1–281 就拒（登记第一节）。"""
+    """两张表的整表编号：第一列之并，升序（E171 第 2 次重跑登记读法 4：撤掉的行留空号，行集不写死）；一行都读不出或编号重了就停。"""
     sys.path.insert(0, research_directory)
     import bad_implementation_table  # noqa: E402
     numbers = sorted(row.number for name in TABLE_FILES for row in bad_implementation_table.read_selected_rows(os.path.join(research_directory, name)))
-    if tuple(numbers) != WHOLE_TABLE_ROWS:
-        raise one.Stopped(f"两张坏实现表的整表编号不是恰好 1–281（{len(numbers)} 行）")
+    repeated = sorted({number for number in numbers if numbers.count(number) > 1})
+    if not numbers or repeated:
+        raise one.Stopped(f"两张坏实现表的整表编号读出 {len(numbers)} 行、重了的编号 {repeated or '无'}：整表行集要非空、编号不重")
     return tuple(numbers)
 
 
@@ -425,7 +469,7 @@ def cross_host_product_two(parts: list[tuple[str, str, str]] | None, row: int, h
     return "\n".join(lines) + "\n", bool(differing)
 
 
-# ── 跑的时候：账、补位排除表、起驱动、取回 ──
+# ── 跑的时候：账、补位排除表、起驱动、收别的台的行 ──
 def read_row_result(directory: str) -> dict[str, str]:
     with open(os.path.join(directory, "row-result.tsv"), encoding="utf-8") as handle:
         return dict(line.rstrip("\n").split("\t", 1) for line in handle if "\t" in line)
@@ -468,15 +512,16 @@ def exclusions_for(context: ContextTwo, step: str, row: int) -> set[str]:
 
 def driver_arguments(step: StepTwo, rows: tuple[int, ...], threads: int, exclusions_path: str) -> list[str]:
     return (["--rows", ",".join(str(row) for row in sorted(rows))] + list(step.flags)
-            + ["--lanes", "1", "--threads", str(threads), "--memory-cap", one.DEVICE_MEMORY_CAP, "--skip-finished", "--other-selected-rows", exclusions_path])
+            + ["--lanes", "1", "--threads", str(threads), "--other-selected-rows", exclusions_path])
 
 
 def prepare_launch(context: ContextTwo, label: str, step: StepTwo, rows: tuple[int, ...], exclusion_names: set[str],
                    log_exclusions: bool = True) -> tuple[str, str]:
-    """建分片目录与要送的那一份（send/exclusions.tsv），真跑一行的记进 exclusions-given.tsv（重报不记）。交回 (分片目录, 排除表路径)。"""
+    """建分片目录与这一行的补位排除表（launch/exclusions.tsv，共享根下，别的台照绝对路径读），真跑一行的记进 exclusions-given.tsv（重报不记）。
+    交回 (分片目录, 排除表路径)。"""
     directory = os.path.join(context.attempt_dir, label)
-    os.makedirs(os.path.join(directory, "send"))
-    path = os.path.join(directory, "send", EXCLUSIONS_FILE)
+    os.makedirs(os.path.join(directory, LAUNCH_DIRECTORY_NAME))
+    path = os.path.join(directory, LAUNCH_DIRECTORY_NAME, EXCLUSIONS_FILE)
     with open(path, "x", encoding="utf-8") as handle:
         handle.write(exclusion_table_text(exclusion_names))
     if log_exclusions:
@@ -496,7 +541,7 @@ def launch_local_two(context: ContextTwo, expected_hashes: dict[str, str], label
     command = ["nice", "-n", "19", "python3", "-B", context.driver_path, "--repo-root", context.repo, "--work-root", work_root,
                "--output-root", context.step_root(step), "--snapshot-from", os.path.join(context.repo, context.tree),
                "--baseline-timing", os.path.join(context.repo, context.baseline_timing), "--timing-output", timing] + driver_arguments(step, rows, threads, exclusions_path)
-    record = {"label": label, "step": step.key, "rows": list(rows), "host": 1, "kind": kind, "product": product, "timing": timing,
+    record = {"label": label, "step": step.key, "rows": list(rows), "host": context.own_host, "kind": kind, "product": product, "timing": timing,
               "attempt": os.path.basename(context.attempt_dir), "exclusions": sorted(exclusion_names), "command": command[5:]}
     one.write_record(directory, record)
     with open(product, "x", encoding="utf-8") as out, open(os.path.join(directory, "driver.stderr"), "x", encoding="utf-8") as err:
@@ -508,24 +553,20 @@ def peer_label_two(context: ContextTwo, label: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "-", f"e171s2-{os.path.basename(context.attempt_dir)}-{label}")
 
 
-def launch_peer_two(context: ContextTwo, kit: str, label: str, step: StepTwo, row: int, threads: int, host: int, configuration_file: str | None,
+def launch_peer_two(context: ContextTwo, kit: str, label: str, step: StepTwo, row: int, threads: int, host: int,
                     exclusion_names: set[str]) -> tuple[subprocess.Popen, dict]:
-    directory, _ = prepare_launch(context, label, step, (row,), exclusion_names)
-    fetch = os.path.join(directory, "fetch")
-    inner = (["run-driver", "--expected", f"{one.PEER_KIT_RELATIVE}/expected.json", "--"]
-             + driver_arguments(step, (row,), threads, f"{PEER_LAUNCH_RELATIVE}/{EXCLUSIONS_FILE}"))
-    command = (["bash", context.multi_host_run, "--peer", "--memory-cap", one.PEER_OUTER_MEMORY_CAP, "--label", peer_label_two(context, label),
-                "--send", kit, one.PEER_KIT_RELATIVE, "--send", os.path.join(context.shards, "frozen-snapshot"), one.PEER_SNAPSHOT_RELATIVE,
-                "--send", os.path.join(directory, "send"), PEER_LAUNCH_RELATIVE, "--fetch", one.PEER_OUT_RELATIVE, "--", "env", "PYTHONDONTWRITEBYTECODE=1",
-                f"RUN_WITH_MEMORY_CAP_PARALLEL_REASON={one.PARALLEL_REASON}", "nice", "-n", "19", "python3", "-B", f"{one.PEER_KIT_RELATIVE}/peer_side.py"] + inner)
-    record = {"label": label, "step": step.key, "rows": [row], "host": host, "kind": "peer", "fetch_dir": fetch,
-              "product": os.path.join(fetch, one.PEER_OUT_RELATIVE, "product.out"), "timing": os.path.join(fetch, one.PEER_OUT_RELATIVE, "timing.out"),
+    directory, exclusions_path = prepare_launch(context, label, step, (row,), exclusion_names)
+    out = os.path.join(directory, one.PEER_OUT_DIRECTORY_NAME)
+    inner = one.peer_side_arguments(kit, "run-driver", out) + ["--"] + driver_arguments(step, (row,), threads, exclusions_path)
+    memory_arguments = "--memory-cap 4G".split() if broken("peer-command-gets-memory-cap") else []   # 弄坏开关造的错参数：整句写成一个字面量再拆
+    command = one.peer_command(context, peer_label_two(context, label), host, inner, memory_arguments)
+    record = {"label": label, "step": step.key, "rows": [row], "host": host, "kind": "peer", "peer_out": out,
+              "product": os.path.join(out, "product.out"), "timing": os.path.join(out, "timing.out"),
               "attempt": os.path.basename(context.attempt_dir), "exclusions": sorted(exclusion_names), "command": inner}
     one.write_record(directory, record)
-    with open(os.path.join(directory, "multi-host-run.out"), "x", encoding="utf-8") as out, \
-            open(os.path.join(directory, "multi-host-run.err"), "x", encoding="utf-8") as err:
-        process = subprocess.Popen(command, cwd=context.repo, stdout=out, stderr=err, env=one.multi_host_environment(fetch, configuration_file),
-                                   start_new_session=True)
+    with open(os.path.join(directory, "relay.out"), "x", encoding="utf-8") as out_file, \
+            open(os.path.join(directory, "relay.err"), "x", encoding="utf-8") as err:
+        process = subprocess.Popen(command, cwd=one.PEER_START_DIRECTORY, stdout=out_file, stderr=err, start_new_session=True)
     return process, record
 
 
@@ -540,10 +581,11 @@ def superseded_entries(context: ContextTwo) -> set[tuple[str, int, str]]:
 
 
 def harvest_two(context: ContextTwo, record: dict) -> list[int]:
-    """别的台分片取回目录里有 row-result.tsv 的行收进本机那一步的输出根：先记账、硬链接拷进 <行>.harvest-partial、再改名；本机写到一半的同名行目录删掉。"""
+    """别的台分片输出目录（共享根下）里有 row-result.tsv 的行收进本机那一步的输出根：先记账、硬链接拷进 <行>.harvest-partial、再改名；
+    本机写到一半的同名行目录删掉。"""
     if broken("harvest-skipped"):
         return []
-    source_root = os.path.join(record["fetch_dir"], one.PEER_OUT_RELATIVE, "rows")
+    source_root = one.peer_rows_directory(record)
     step = step_of(context, record["step"])
     superseded = superseded_entries(context)
     harvested = []
@@ -554,7 +596,7 @@ def harvest_two(context: ContextTwo, record: dict) -> list[int]:
                 or os.path.exists(os.path.join(target, "row-result.tsv")) or int(entry.split("-", 1)[1]) not in record["rows"] \
                 or (step.key, int(entry.split("-", 1)[1]), record["label"]) in superseded:
             continue  # 补位重做顶掉的那一次不再收回来
-        one.append_ledger(context, step.key, int(entry.split("-", 1)[1]), record["host"], "fetched")
+        one.append_ledger(context, step.key, int(entry.split("-", 1)[1]), record["host"], "peer")
         os.makedirs(context.step_root(step), exist_ok=True)
         partial = target + ".harvest-partial"
         shutil.rmtree(partial, ignore_errors=True)
@@ -576,7 +618,7 @@ class RunningTwo:
 
 
 def finish_shard_two(context: ContextTwo, record: dict, code: int) -> bool:
-    """一个分片结束：记退出码；别的台的把取回的行收进本机；本机的把做完的行记账。交回跑成没有（退 0、点名的行都有 row-result.tsv、产物在）。"""
+    """一个分片结束：记退出码；别的台的把它输出目录里做完的行收进本机；本机的把做完的行记账。交回跑成没有（退 0、点名的行都有 row-result.tsv、产物在）。"""
     with open(os.path.join(context.attempt_dir, record["label"], "exit"), "w", encoding="utf-8") as handle:
         handle.write(f"{code}\n")
     step = step_of(context, record["step"])
@@ -585,7 +627,7 @@ def finish_shard_two(context: ContextTwo, record: dict, code: int) -> bool:
     elif record["kind"] == "local":
         for row in record["rows"]:
             if one.is_done(context, step, row):
-                one.append_ledger(context, step.key, row, 1, "local")
+                one.append_ledger(context, step.key, row, record["host"], "local")
     done = all(one.is_done(context, step, row) for row in record["rows"])
     shard_ran_through = code == 0 and done and os.path.exists(record["product"])
     note = "（250–254、245 是内存包装自己的结局，那一次不算）" if code == 245 or 250 <= code <= 254 else ""
@@ -595,7 +637,8 @@ def finish_shard_two(context: ContextTwo, record: dict, code: int) -> bool:
 
 
 def stop_running_two(context: ContextTwo, running: list[RunningTwo]) -> None:
-    """收到停止信号：给每个在跑的分片（各自一个进程组）发一次 TERM；multi-host-run.sh 收到后先停那边、取回、再删树。等它们都退出，再把取回的行收进来。"""
+    """收到停止信号：给每个在跑的分片（各自一个进程组）发一次 TERM；转交的那一条收到后写停止请求，代跑那一片停那边那条命令、删那一台本地盘上它的目录。
+    等它们都退出，再把别的台已写进共享根的做完的行收进来。"""
     for item in running:
         try:
             os.killpg(item.process.pid, signal.SIGTERM)
@@ -649,12 +692,11 @@ def run_queue_two(context: ContextTwo, slots: list[tuple[int, int, int]], jobs: 
             try:
                 one.snapshot_check(context)  # 作废 Z5：每个驱动起之前核一次
                 exclusion_names = exclusions_for(context, job.step, job.row)
-                if slot[0] == 1:
+                if slot[0] == context.own_host:
                     process, record = launch_local_two(context, expected_hashes, label, step, (job.row,), slot[2], work_root_for(context, job, slot, label),
                                                        "local", exclusion_names)
                 else:
-                    process, record = launch_peer_two(context, setup.kit, label, step, job.row, slot[2], slot[0], setup.configurations.get(slot[0]),
-                                                      exclusion_names)
+                    process, record = launch_peer_two(context, setup.kit, label, step, job.row, slot[2], slot[0], exclusion_names)
             except one.Stopped as error:
                 failures.append(str(error))
                 break
@@ -686,7 +728,7 @@ def run_queue_two(context: ContextTwo, slots: list[tuple[int, int, int]], jobs: 
 
 
 def run_carry_two(context: ContextTwo, step: StepTwo, rows: tuple[int, ...], expected_hashes: dict[str, str]) -> dict:
-    """更早几趟（或这一趟里被重做顶掉的分片）已做完的行：本机一个 --skip-finished 驱动从行目录重报（不编、不跑装置）。"""
+    """更早几趟（或这一趟里被重做顶掉的分片）已做完的行：本机一个驱动从行目录重报（同键做完的行按键复用，不编、不跑装置）。"""
     work_root = os.path.join(context.attempt_dir, f"carry-work-{step.key}")
     process, record = launch_local_two(context, expected_hashes, f"{step.key}-carry", step, rows, one.CARRY_THREADS, work_root, "carry", set())
     code = process.wait()
@@ -747,19 +789,14 @@ def slots_of(allocations: list) -> list[tuple[int, int, int]]:
 
 # ── 主流程 ──
 def make_regrow(context: ContextTwo, hosts: list, setup, slots: list[tuple[int, int, int]]):
-    """起跑时一槽都没有的台：重查资源，放得下了就给它加槽（别的台先过预检）。重查或预检不过只记一行、这一回不加，不停这一趟。"""
+    """起跑时一槽都没有的台：重算分配，有槽了就给它加槽（别的台先过预检）。预检不过只记一行、这一回不加，不停这一趟。"""
     waiting = {host.number for host in hosts} - {slot[0] for slot in slots}
 
     def regrow() -> list[tuple[int, int, int]]:
         if not waiting or broken("regrow-skipped"):
             return []
-        try:
-            resources = one.query_resources(context, hosts)
-        except one.RunCondition as error:
-            one.say(context, f"  重查资源没成（这一回不加槽）：{error}")
-            return []
         added = []
-        for allocation in one.allocate([host for host in hosts if host.number in waiting], resources):
+        for allocation in one.allocate([host for host in hosts if host.number in waiting]):
             if allocation.slots == 0:
                 continue
             try:
@@ -817,7 +854,7 @@ def phase_rows(context: ContextTwo, hosts: list, slots: list[tuple[int, int, int
         jobs = [JobTwo("rows", row, context.row_seconds[row]) for row in context.rows if not one.is_done(context, ROWS_STEP, row)]
         if jobs:
             if not slots:
-                raise one.RunCondition("此刻各台都放不下一条线道（每槽要 5 线程、slice 里 6G（别的台 10G）、实占 10 GiB）")
+                raise one.RunCondition("各台的线程都不够一条线道（每槽要 5 线程）")
             one.say(context, f"  这一趟要跑 {len(jobs)} 行（已做完的不重跑），跨机对照那一行是第 {context.cross_host_row} 行")
             for line in prediction_lines(slots, simulate_two(slots, jobs)):
                 one.say(context, "  " + line)
@@ -836,9 +873,8 @@ def phase_rows(context: ContextTwo, hosts: list, slots: list[tuple[int, int, int
 
 
 def current_allocations(context: ContextTwo, hosts: list) -> list:
-    resources = one.query_resources(context, hosts)
-    allocations = one.allocate(hosts, resources)
-    for line in one.allocation_text(allocations, resources):
+    allocations = one.allocate(hosts)
+    for line in one.allocation_text(allocations):
         one.say(context, "  " + line)
     return allocations
 
@@ -847,7 +883,7 @@ def phase_cross_host(context: ContextTwo, hosts: list, setup, expected_hashes: d
     """文件头「跨机一致对照」：R 在整表那一次之外的另一台再跑一次，比三样，o3 报 not_run。"""
     row, path = context.cross_host_row, context.product(CROSS_HOST_CHECK_STEM)
     if len(hosts) == 1:
-        text, _ = cross_host_product_two(None, row, None, None, "只有一台（双机开关没开或清单里只有本机）")
+        text, _ = cross_host_product_two(None, row, None, None, one.single_host_reason(context))
         one.install(context, path, text)
         one.say(context, f"  跨机一致对照：本次未跑（只有一台），产物 {os.path.relpath(path, context.repo)}")
         return
@@ -887,7 +923,7 @@ def phase_timeout_reruns(context: ContextTwo, hosts: list, setup, expected_hashe
     remaining = tuple(row for row in timed if not one.is_done(context, RERUN_STEP, row))
     records: list[dict] = []
     if remaining:
-        chosen = one.single_lane_host(current_allocations(context, hosts))
+        chosen = one.single_lane_host(current_allocations(context, hosts), context.own_host)
         one.say(context, f"  超时重跑第 {one.rows_text(remaining)} 行 → {one.host_name(chosen.number)}，单线道 {chosen.threads} 线程（限时再乘 3 由驱动现算）")
         setup.ready(chosen.number, 1, chosen.threads)
         records, deferred, failures = run_queue_two(context, [(chosen.number, 0, chosen.threads)], [JobTwo("rerun", row, 0.0) for row in remaining],
@@ -899,7 +935,7 @@ def phase_timeout_reruns(context: ContextTwo, hosts: list, setup, expected_hashe
 
 
 def rows_of_this_run(context: ContextTwo) -> tuple[int, ...]:
-    """整表 1–281；只在 --selftest 起的子进程里认 ROWS_ORCHESTRATOR_TWO_ROWS（假世界里只有几行）。"""
+    """整表（两张表第一列之并，whole_table_rows）；只在 --selftest 起的子进程里认 ROWS_ORCHESTRATOR_TWO_ROWS（假世界里只有几行）。"""
     override = os.environ.get(SELFTEST_ROWS_VARIABLE, "")
     if override and os.environ.get(SELFTEST_VARIABLE) == "1":
         return tuple(sorted(int(token) for token in override.split(",") if token))
@@ -923,16 +959,15 @@ def run_two(context: ContextTwo, plan_only: bool) -> int:
     for signal_number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(signal_number, one.on_signal)
     one.snapshot_check(context)
-    hosts, values, note = one.load_hosts(context)
+    hosts, values, note = one.load_hosts(context) if plan_only else one.session_hosts(context)
     plan_rows(context)
     if plan_only:
         if note:
             print(note)
-        resources = one.query_resources(context, hosts)
-        allocations = one.allocate(hosts, resources)
+        allocations = one.allocate(hosts)
         slots = slots_of(allocations)
         jobs = [JobTwo("rows", row, context.row_seconds[row]) for row in context.rows if not one.is_done(context, ROWS_STEP, row)]
-        for line in one.allocation_text(allocations, resources) + prediction_lines(slots, simulate_two(slots, jobs)):
+        for line in one.allocation_text(allocations) + prediction_lines(slots, simulate_two(slots, jobs)):
             print(line)
         longest = sorted(context.row_seconds.items(), key=lambda item: (-item[1], item[0]))[:10]
         print(f"行 {len(context.rows)}，没做完 {len(jobs)}；跨机对照那一行第 {context.cross_host_row} 行；推的用时最长十行（秒）："
@@ -947,7 +982,7 @@ def run_two(context: ContextTwo, plan_only: bool) -> int:
         if record["kind"] == "peer" and record["attempt"] != os.path.basename(context.attempt_dir):
             harvested = harvest_two(context, record)
             if harvested:
-                one.say(context, f"  收进以前取回的行：{record['label']}（{record['attempt']}）第 {one.rows_text(harvested)} 行")
+                one.say(context, f"  收进以前各趟别的台做完的行：{record['label']}（{record['attempt']}）第 {one.rows_text(harvested)} 行")
     allocations = current_allocations(context, hosts)
     expected_hashes = one.driver_hashes(context)
     setup = one.PeerSetup(context, hosts, values, one.build_snapshot_staging(context))
@@ -966,16 +1001,7 @@ def context_from_arguments_two(arguments: argparse.Namespace) -> ContextTwo:
 
 
 def main(argument_list: list[str]) -> int:
-    if os.environ.get(BREAK_VARIABLE) and os.environ.get(SELFTEST_VARIABLE) != "1":
-        print(f"✗ {BREAK_VARIABLE} 只在 --selftest 起的子进程里认；平常跑时设了它就拒（退 2）", file=sys.stderr)
-        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
-        return 2
-    if os.environ.get("ROWS_ORCHESTRATOR_BREAK") and os.environ.get("ROWS_ORCHESTRATOR_SELFTEST") != "1":
-        print("✗ ROWS_ORCHESTRATOR_BREAK（第一段编排器的弄坏开关，这一层调的函数里也认）只在自证里认；平常跑时设了它就拒（退 2）", file=sys.stderr)
-        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
-        return 2
-    if os.environ.get(SELFTEST_ROWS_VARIABLE) and os.environ.get(SELFTEST_VARIABLE) != "1":
-        print(f"✗ {SELFTEST_ROWS_VARIABLE} 只在 --selftest 起的子进程里认（平常跑整表 1–281）；设了它就拒（退 2）", file=sys.stderr)
+    if refuse_break_switches_outside_selftest():
         return 2
     if argument_list[:1] == ["--selftest"]:
         return selftest(argument_list[1:])
@@ -985,6 +1011,10 @@ def main(argument_list: list[str]) -> int:
         parser.add_argument(name, required=True)
     parser.add_argument("--research-root")
     arguments = parser.parse_args(argument_list)
+    if arguments.mode == "run":
+        phase_exit = one.shard_phase_before_layer(os.path.abspath(arguments.repo), say=lambda line: print(line, flush=True))
+        if phase_exit is not None:
+            return phase_exit
     context = context_from_arguments_two(arguments)
     try:
         return run_two(context, arguments.mode == "plan")
@@ -995,7 +1025,7 @@ def main(argument_list: list[str]) -> int:
         one.say(context, f"✗ 停：{error}")
         return 1
     except one.Interrupted:
-        one.say(context, "收到停止信号：在跑的各行已停、别的台已做完的行已取回收进来；同一条命令再起就是续跑")
+        one.say(context, "收到停止信号：在跑的各行已停、别的台已做完的行已收进来；同一条命令再起就是续跑")
         return one.EXIT_STOPPED_BY_SIGNAL
 
 
@@ -1151,7 +1181,7 @@ def cells_substitution() -> list[tuple[str, bool, str]]:
 
 
 def fake_shard_two(label: str, host: int, rows: tuple[int, ...], limit: str = "1800", digest: str = "d" * 64, extra: str = "") -> object:
-    product = [f"name=row_time_limit seconds={limit} baseline_seconds=75.274 source=x-timing.out rerun_of_timed_out_rows=false",
+    product = [f"name=row_time_limit seconds={limit} baseline_seconds=75.274 source=x-timing.out",
                f"snapshot_digest={digest} files=9 snapshot_ns=5 rows={len(rows)}"]
     product += [f"row row_number={row} row_name=r{row} lane=0 status=ok device_exit=0 device_ns={row + 1} o3_status=skipped_by_request" for row in rows]
     product += [f"table lanes=1 threads_per_lane=10 rows={len(rows)} table_wall_ns=10 sum_of_row_ns=3"]
@@ -1182,7 +1212,7 @@ def cells_merge_two() -> list[tuple[str, bool, str]]:
              ("merge-refuse-missing", [fake_shard_two("a", 1, (1,))], (1, 15), "缺 [15]"),
              ("merge-refuse-time-limit", [fake_shard_two("a", 1, (1,)), fake_shard_two("b", 2, (15,), limit="1801")], (1, 15), "①"),
              ("merge-refuse-snapshot", [fake_shard_two("a", 1, (1,)), fake_shard_two("b", 2, (15,), digest="e" * 64)], (1, 15), "②"),
-             ("merge-refuse-unknown-line", [fake_shard_two("a", 1, (1,), extra="rerun_compile_failed rows=1")], (1,), "⑦")]
+             ("merge-refuse-unknown-line", [fake_shard_two("a", 1, (1,), extra="not_a_known_line rows=1")], (1,), "⑦")]
     for name, shards, rows_wanted, mark in cases:
         refused = merge_refused_two(shards, rows_wanted)
         results.append((name, mark in refused, f"拒因：{refused or '没拒'}"))
@@ -1201,7 +1231,7 @@ def judge(scratch: str, name: str, lines: list[str]) -> tuple[int, str]:
 
 
 def cells_judge(scratch: str) -> list[tuple[str, bool, str]]:
-    head = ["name=row_time_limit seconds=1800 baseline_seconds=75.274 source=x rerun_of_timed_out_rows=false", "snapshot_digest=d files=9 snapshot_ns=1 rows=4"]
+    head = ["name=row_time_limit seconds=1800 baseline_seconds=75.274 source=x", "snapshot_digest=d files=9 snapshot_ns=1 rows=4"]
     good_rows = ["row row_number=1 status=ok device_exit=0 o3_status=skipped_by_request", "row row_number=2 status=compile_failed device_exit=- o3_status=not_reached",
                  "row row_number=3 status=ok device_exit=253 o3_status=not_reached", "row row_number=5 status=not_found device_exit=- o3_status=not_reached"]
     tail = ["table lanes=1 threads_per_lane=10 rows=4 table_wall_ns=1 sum_of_row_ns=1"]
@@ -1255,14 +1285,15 @@ def cells_cross_host_two(scratch: str) -> list[tuple[str, bool, str]]:
 class WorldTwo:
     root: str
     repo: str
-    command: list[str]
+    command: list[str]   # 照服务的分片三步起（one.served_command）
     environment: dict[str, str]
     prefix: str
     dumps: str
+    direct: list[str]   # 编排器那一条本身（不经假 task-server）
 
 
-def fake_world_two(root: str, rows: str = "1,2,3,4,5,6", hosts_code: int = 0, resources: list[dict] | None = None,
-                   extra_environment: dict[str, str] | None = None, resources_command: str | None = None) -> WorldTwo:
+def fake_world_two(root: str, rows: str = "1,2,3,4,5,6", hosts_code: int = 0, extra_environment: dict[str, str] | None = None,
+                   peer_without_rsync: bool = False) -> WorldTwo:
     repo = os.path.join(root, "repo")
     results = os.path.join(repo, "research", "results")
     os.makedirs(results)
@@ -1276,51 +1307,56 @@ def fake_world_two(root: str, rows: str = "1,2,3,4,5,6", hosts_code: int = 0, re
     baseline = "research/results/fake-e171-s1-s2-device-baseline-streams-1-2-r6-r3-timing.out"
     with open(os.path.join(repo, baseline), "w", encoding="utf-8") as handle:
         handle.write("E7TIMING name=stream_time stream=a elapsed_ns=1000000000\nE7TIMING name=process_wall seconds=75.274 exit=0\n")
-    frozen_reference = "e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out"
+    frozen_reference = "e170-r2-o3-spec-executor-2026-11-05-refreeze-executor.out"
     os.symlink(os.path.join(REAL_REPOSITORY, "research", "results", frozen_reference), os.path.join(results, frozen_reference))
     os.makedirs(os.path.join(repo, "scripts", "experiment-apparatus", "target", "fake-dumps"))
     sys.path.insert(0, os.path.join(REAL_REPOSITORY, one.RESEARCH_RELATIVE))
     import row_driver  # noqa: E402
     digest = row_driver.snapshot_digest(tree)[0]
-    assignments = ("PEER_SSH_HOST=fakepeer\nPEER_REPOSITORY_DIRECTORY=/fake/peer\nPEER_CARGO_BIN_DIRECTORY=/fake/cargo\nPEER_MEMORY_CAP=50G\n"
+    assignments = ("HOSTS='127.0.0.1 192.0.2.67'\nTHIS_HOST_ADDRESS=127.0.0.1\nPEER_HOST_ADDRESS=192.0.2.67\nCARGO_BIN_DIRECTORY_BY_HOST='127.0.0.1=/fake/cargo 192.0.2.67=/fake/cargo'\nBUILD_ROOT_BY_HOST='127.0.0.1=/fake/builds 192.0.2.67=/fake/peer'\nSLICE_MEMORY_CAP_BY_HOST='127.0.0.1=50G 192.0.2.67=50G'\n"
                    "QUIESCE_STOP_COMMAND=''\nQUIESCE_STOPPED_CHECK_COMMAND=''\nQUIESCE_START_COMMAND=''\nQUIESCE_STARTED_CHECK_COMMAND=''\n"
-                   "ENABLE_ACROSS_MACHINES=1\nENABLE_GPU=0\nMULTI_HOST_COUNT=1\nMULTI_HOST_2_SSH_HOST=fakepeer\n"
+                   "ENABLE_ACROSS_MACHINES=1\nENABLE_GPU=0\nMULTI_HOST_COUNT=1\nMULTI_HOST_2_SSH_HOST=192.0.2.67\n"
                    "MULTI_HOST_2_REPOSITORY_DIRECTORY=/fake/peer\nMULTI_HOST_2_CARGO_BIN_DIRECTORY=/fake/cargo\nMULTI_HOST_2_MEMORY_CAP=50G\nMULTI_HOST_2_IS_PEER=1\n")
     with open(os.path.join(root, "hosts.txt"), "w", encoding="utf-8") as handle:
         handle.write(assignments)
-    with open(os.path.join(root, "resources.json"), "w", encoding="utf-8") as handle:
-        json.dump({"hosts": resources or [one.resources_entry(1, 10, 25, 25), one.resources_entry(2, 10, 25, 25)]}, handle)
-    os.makedirs(os.path.join(root, "peer"))
-    environment = dict(os.environ, ROWS_ORCHESTRATOR_SELFTEST="1", ROWS_ORCHESTRATOR_DRIVER=os.path.join(FAKES, "fake_row_driver.py"),
-                       ROWS_ORCHESTRATOR_MULTI_HOST_RUN=os.path.join(FAKES, "fake_multi_host_run.sh"),
+    environment = {name: value for name, value in os.environ.items() if not name.startswith(("TASK_SERVER_SHARD", "MULTI_HOST_RUN_PEER_SCRATCH"))}
+    environment.update(ROWS_ORCHESTRATOR_SELFTEST="1", ROWS_ORCHESTRATOR_DRIVER=os.path.join(FAKES, "fake_row_driver.py"),
                        ROWS_ORCHESTRATOR_HOSTS_COMMAND=f"cat {shlex.quote(os.path.join(root, 'hosts.txt'))}; exit {hosts_code}",
-                       ROWS_ORCHESTRATOR_RESOURCES_COMMAND=resources_command or f"cat {shlex.quote(os.path.join(root, 'resources.json'))}",
-                       ROWS_ORCHESTRATOR_POLL_SECONDS="0.05", ROWS_ORCHESTRATOR_PEER_COMPILE_CHECK="0",
+                       ROWS_ORCHESTRATOR_POLL_SECONDS="0.05", ROWS_ORCHESTRATOR_PEER_COMPILE_CHECK="0", SINGLEFS_THREAD_CAP=SAMPLE_THREAD_CAP,
                        FAKE_RESEARCH_DIRECTORY=os.path.join(REAL_REPOSITORY, one.RESEARCH_RELATIVE), FAKE_REAL_REPOSITORY=REAL_REPOSITORY,
-                       FAKE_RESULTS_DIRECTORY=results, FAKE_PEER_ROOT=os.path.join(root, "peer"), FAKE_DRIVER_LOG=os.path.join(root, "driver.log"),
-                       FAKE_MHR_LOG=os.path.join(root, "mhr.log"), PYTHONDONTWRITEBYTECODE="1", **{SELFTEST_VARIABLE: "1", SELFTEST_ROWS_VARIABLE: rows})
+                       FAKE_RESULTS_DIRECTORY=results, FAKE_DRIVER_LOG=os.path.join(root, "driver.log"), PYTHONDONTWRITEBYTECODE="1",
+                       **{SELFTEST_VARIABLE: "1", SELFTEST_ROWS_VARIABLE: rows})
     environment.update(extra_environment or {})
     dumps = "scripts/experiment-apparatus/target/fake-dumps"
     command = ["python3", "-B", os.path.abspath(__file__), "run", "--repo", repo, "--prefix", prefix, f"--suffix={suffix}", "--dumps", dumps,
                "--tree", "scripts/experiment-apparatus/target/fake-frozen-tree", "--snapshot-digest", digest, "--baseline-timing", baseline,
                "--check", os.path.join(HERE, "check_product.py"), "--logs", os.path.join(root, "logs"), "--work-root", os.path.join(root, "work"),
                "--research-root", REAL_REPOSITORY]
-    return WorldTwo(root, repo, command, environment, prefix + "-", dumps)
+    return WorldTwo(root, repo, one.served_command(root, command, peer_without_rsync=peer_without_rsync), environment, prefix + "-", dumps, command)
+
+
+def stop_served_world(process: subprocess.Popen) -> str:
+    """假 task-server 到点还没退：给它 TERM（它转给各片的进程组），10 秒后还没退再给一次（它对各片的进程组发 KILL），再 10 秒后 KILL 它自己，交回它的输出。
+    各片里编排器自己另起的进程（各自一个会话）不在那些组里，由每一格之后的收尾收掉、算进 no-leftover-processes。"""
+    for _ in range(2):
+        process.send_signal(signal.SIGTERM)
+        try:
+            output, _ = process.communicate(timeout=10)
+            return output or ""
+        except subprocess.TimeoutExpired:
+            continue
+    process.kill()
+    output, _ = process.communicate()
+    return output or ""
 
 
 def world_run_two(world: WorldTwo, timeout: float = 180) -> tuple[int, str]:
-    """起编排器、等它退；到点还没退就停它（TERM，10 秒后 KILL），它起的、还活着的由每一格之后的收尾收掉。"""
+    """起编排器、等它退；到点还没退就停它（stop_served_world），它起的、还活着的由每一格之后的收尾收掉。"""
     process = subprocess.Popen(world.command, cwd=world.repo, env=world.environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
         output, _ = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        process.terminate()
-        try:
-            output, _ = process.communicate(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            output, _ = process.communicate()
-        return 124, (output or "") + f"\n（{timeout} 秒没退，停了）"
+        return 124, stop_served_world(process) + f"\n（{timeout} 秒没退，停了）"
     return process.returncode, output
 
 
@@ -1373,19 +1409,26 @@ def two_hosts_cell(scratch: str) -> tuple[str, bool, str]:
     ledger_path = os.path.join(world.repo, world.dumps, "segment2-rows-shards", "row-hosts.tsv")
     ledger = open(ledger_path, encoding="utf-8").read() if os.path.exists(ledger_path) else ""
     expected = plain_counts((1, 2, 3, 4, 5, 6), 1, (4,))
-    cell_holds = (code == 0 and counts == expected and sorted(rows) == [1, 2, 3, 4, 5, 6] and "fetched" in ledger and ran_hosts_two(world) == {"1", "2"}
+    rows_root = os.path.join(world.repo, world.dumps, "segment2-rows")
+    rerun_results, plain_results = (one.read_row_result_fields(os.path.join(rows_root, f"row-{row}")) for row in (4, 5))
+    cell_holds = (code == 0 and counts == expected and sorted(rows) == [1, 2, 3, 4, 5, 6] and "\tpeer\n" in ledger and ran_hosts_two(world) == {"1", "2"}
             and "cross_host_identical=true" in last_verdict(world_product_two(world, CROSS_HOST_CHECK_STEM))
             and "substitute_collisions=0" in last_verdict(world_product_two(world, COORDINATION_STEM))
             and sorted(product_rows(world_product_two(world, "rows-timeout-rerun-driver"))) == [4]
+            # 超时重跑在整表同一个行输出根里：上一次超时的第 4 行限时是别的行的 3 倍、记着乘过 3，没有另一个输出根
+            and rerun_results.get("timed_out_before") == "true" and plain_results.get("timed_out_before") == "false"
+            and int(rerun_results.get("time_limit_seconds", "0")) == 3 * int(plain_results.get("time_limit_seconds", "0")) > 0
+            and not os.path.exists(rows_root + "-timeout-rerun")
             and os.path.exists(world_product_two(world, "rows-cross-host-row-1-driver")))
     return ("e2e-two-hosts", cell_holds, f"退 {code}；真跑过的次数与预期{'相同' if counts == expected else '不同：' + str(counts)}；整表行 {sorted(rows)}；"
                                    f"跨机 {last_verdict(world_product_two(world, CROSS_HOST_CHECK_STEM))[-60:]}；末行 {output.strip().splitlines()[-1:]}")
 
 
 def substitution_sequential_cell(scratch: str) -> tuple[str, bool, str]:
-    """一台一槽、一次一行：第 2 行补上 g1，第 3 行起的时候排除表里已有 g1，补上 g2，不用重做。"""
-    world = fake_world_two(os.path.join(scratch, "substitution-sequential"), rows="1,2,3,4", hosts_code=3, resources=[one.resources_entry(1, 5, 25, 25)],
-                           extra_environment={"FAKE_DRIVER_SUBSTITUTES": "2:g1,g2;3:g1,g2"})
+    """一台一槽、一次一行：第 2 行补上 g1，第 3 行起的时候排除表里已有 g1，补上 g2，不用重做。
+    一槽靠线程卡：每台线程设成 5，⌊5/5⌋ = 1。每台线程设成 10 是两槽，第 2、第 3 行同时起、排除表里还没有 g1，补位撞车要重做，撞不撞看两行谁先落盘，所以负载一高这一格就红。"""
+    world = fake_world_two(os.path.join(scratch, "substitution-sequential"), rows="1,2,3,4", hosts_code=3,
+                           extra_environment={"FAKE_DRIVER_SUBSTITUTES": "2:g1,g2;3:g1,g2", "SINGLEFS_THREAD_CAP": "5"})
     code, output = world_run_two(world)
     rows = product_rows(world_product_two(world, "rows-driver"))
     mutated = {row: rows[row].get("mutated_row_name") for row in rows}
@@ -1396,7 +1439,7 @@ def substitution_sequential_cell(scratch: str) -> tuple[str, bool, str]:
 
 def substitution_collision_cell(scratch: str) -> tuple[str, bool, str]:
     """一台两槽、两行同时起、都补上 g1：核出重复，行号大的第 3 行挪走、带着 g1 重做，补上 g2。"""
-    world = fake_world_two(os.path.join(scratch, "substitution-collision"), rows="2,3", hosts_code=3, resources=[one.resources_entry(1, 10, 25, 25)],
+    world = fake_world_two(os.path.join(scratch, "substitution-collision"), rows="2,3", hosts_code=3,
                            extra_environment={"FAKE_DRIVER_SUBSTITUTES": "2:g1,g2;3:g1,g2", "FAKE_DRIVER_ROW_SECONDS": "0.3"})
     code, output = world_run_two(world)
     rows = product_rows(world_product_two(world, "rows-driver"))
@@ -1409,8 +1452,24 @@ def substitution_collision_cell(scratch: str) -> tuple[str, bool, str]:
     return ("e2e-substitution-collision", cell_holds, f"退 {code}；补上的 {mutated}；真跑过 {counts}；{verdict[-80:]}；末行 {output.strip().splitlines()[-1:]}")
 
 
+def relay_to_exited_server(scratch: str) -> tuple[bool, str]:
+    """转交给已经退出的代跑片：没人再认领，转交的一方见到那一片的 gone 就退 255、不卡到心跳停满（编排那一片和代跑那一片同时收到 TERM、
+    代跑那一片先退，编排那一片在停的过程中又转交出去的一条就是这个形状）。30 秒没退算红。"""
+    plan = os.path.join(scratch, "relay-to-exited-server")
+    os.makedirs(plan)
+    one.shard_relay.register(plan, 1, "192.0.2.2")
+    one.shard_relay.mark_gone(plan, 1)
+    try:
+        completed = subprocess.run(["python3", "-B", one.shard_relay.__file__, "relay", "--plan", plan, "--to", "1", "--label", "exited-server", "--poll", "0.05", "--", "true"],
+                                   capture_output=True, text=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        return False, "转交给已退出的代跑片 30 秒没退"
+    return completed.returncode == one.shard_relay.EXIT_TRANSPORT, f"转交给已退出的代跑片退 {completed.returncode}（要 {one.shard_relay.EXIT_TRANSPORT}）"
+
+
 def resume_cell_two(scratch: str) -> tuple[str, bool, str]:
-    """跑到一半收 TERM（退 143），同一条命令再起（退 0）：每个 (行, 输出根) 只真跑过一次；第二台已做完的行在 TERM 时取回、续跑时收进来。"""
+    """跑到一半收 TERM（退 143），同一条命令再起（退 0）：每个 (行, 输出根) 只真跑过一次；第二台已做完的行（写在共享根下它的分片输出目录里）在 TERM 时或续跑时收进来。
+    另核转交给已退出的代跑片退 255（relay_to_exited_server）。"""
     world = fake_world_two(os.path.join(scratch, "resume"), extra_environment={"FAKE_DRIVER_ROW_SECONDS": "0.4"})
     process = subprocess.Popen(world.command, cwd=world.repo, env=world.environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
@@ -1424,57 +1483,70 @@ def resume_cell_two(scratch: str) -> tuple[str, bool, str]:
         process.send_signal(signal.SIGTERM)
         process.communicate(timeout=120)
     except subprocess.TimeoutExpired:
-        process.kill()
-        process.communicate()
+        stop_served_world(process)  # TERM 后 120 秒没退：再给 TERM（假 task-server 对各片发 KILL），不让它和它的各片挂在这一格里
     first = process.returncode
     before = sum(ran_counts_two(world).values())
     world.environment["FAKE_DRIVER_ROW_SECONDS"] = "0"
     second, output = world_run_two(world)
     counts = ran_counts_two(world)
     ledger = os.path.join(world.repo, world.dumps, "segment2-rows-shards", "row-hosts.tsv")
-    fetched = os.path.exists(ledger) and "fetched" in open(ledger, encoding="utf-8").read()
+    harvested = os.path.exists(ledger) and "\tpeer\n" in open(ledger, encoding="utf-8").read()
     expected = plain_counts((1, 2, 3, 4, 5, 6), 1)
-    cell_holds = first == one.EXIT_STOPPED_BY_SIGNAL and second == 0 and counts == expected and before >= 3 and fetched
+    relay_ok, relay_detail = relay_to_exited_server(scratch)
+    cell_holds = first == one.EXIT_STOPPED_BY_SIGNAL and second == 0 and counts == expected and before >= 3 and harvested and relay_ok
     return ("e2e-resume", cell_holds, f"第一次退 {first}（停前做完 {before} 行），续跑退 {second}；真跑过的次数与预期{'相同' if counts == expected else '不同：' + str(counts)}；"
-                                f"取回过第二台的行 {fetched}；续跑末行 {output.strip().splitlines()[-1:]}")
+                                f"收进过第二台的行 {harvested}；{relay_detail}；续跑末行 {output.strip().splitlines()[-1:]}")
 
 
 def refusal_cells_two(scratch: str) -> list[tuple[str, bool, str]]:
     results = []
-    unreachable = fake_world_two(os.path.join(scratch, "unreachable"), resources=[one.resources_entry(1, 10, 25, 25), one.resources_entry(2, 0, 0, 0, read=False)])
-    code, output = world_run_two(unreachable)
-    results.append(("e2e-unreachable", code == one.EXIT_RUN_CONDITION and "没读到资源" in output and not os.path.exists(os.path.join(unreachable.root, "driver.log")),
-                    f"退 {code}；{output.strip().splitlines()[-1:]}"))
     refused = fake_world_two(os.path.join(scratch, "config-refused"), hosts_code=1)
     code, output = world_run_two(refused)
     results.append(("e2e-config-refused", code == one.EXIT_RUN_CONDITION and "多机配置判不过" in output, f"退 {code}"))
-    single = fake_world_two(os.path.join(scratch, "switch-off"), rows="1,2", hosts_code=3, resources=[one.resources_entry(1, 10, 25, 25)])
+    single = fake_world_two(os.path.join(scratch, "switch-off"), rows="1,2", hosts_code=3)
     code, output = world_run_two(single)
     results.append(("e2e-switch-off", code == 0 and "cross_host_identical=not_run" in last_verdict(world_product_two(single, CROSS_HOST_CHECK_STEM))
                     and "只用本机" in output and ran_hosts_two(single) == {"1"}, f"退 {code}"))
-    preflight = fake_world_two(os.path.join(scratch, "preflight-refused"), extra_environment={"FAKE_MHR_EXIT_FOR_LABEL": "preflight:255"})
+    preflight = fake_world_two(os.path.join(scratch, "preflight-refused"), peer_without_rsync=True)
     code, output = world_run_two(preflight)
     results.append(("e2e-preflight-refused", code == one.EXIT_RUN_CONDITION and "预检没过" in output and not os.path.exists(os.path.join(preflight.root, "driver.log")),
                     f"退 {code}"))
     return results
 
 
+GATED_RUN = """import dataclasses, os, sys
+sys.path.insert(0, {here!r})
+import rows_orchestrator_segment_two as two
+original = two.one.allocate
+def gated(hosts, threads=None):
+    allocations = original(hosts, threads)
+    if os.path.exists({flag!r}):
+        return allocations
+    return [dataclasses.replace(a, slots=0, threads_per_slot=0, terms="本机的槽先记 0（自证的闸）") if a.number == 1 else a for a in allocations]
+two.one.allocate = gated
+sys.exit(two.main(sys.argv[1:]))
+"""
+
+
 def regrow_cell(scratch: str) -> tuple[str, bool, str]:
-    """起跑时本机 4 个可用线程（一槽都放不下）、第二台一槽；重查时本机放得下了，整表的行有落到本机的。"""
+    """起跑时本机一槽都没有（自证包一层：分配里本机的槽数记 0，直到旗标文件出现）、第二台有槽；旗标出现之后重算分配，本机有槽了，整表的行有落到本机的。"""
     root = os.path.join(scratch, "regrow")
     os.makedirs(root)
-    for name, entries in (("first.json", [one.resources_entry(1, 4, 25, 25), one.resources_entry(2, 5, 25, 25)]),
-                          ("later.json", [one.resources_entry(1, 10, 25, 25), one.resources_entry(2, 5, 25, 25)])):
-        with open(os.path.join(root, name), "w", encoding="utf-8") as handle:
-            json.dump({"hosts": entries}, handle)
-    script = os.path.join(root, "resources.sh")
-    with open(script, "w", encoding="utf-8") as handle:
-        handle.write('counter="$(dirname "$0")/calls"; calls=$(cat "$counter" 2>/dev/null || echo 0); echo $((calls + 1)) > "$counter"\n'
-                     'if [ "$calls" -eq 0 ]; then cat "$(dirname "$0")/first.json"; else cat "$(dirname "$0")/later.json"; fi\n')
-    world = fake_world_two(os.path.join(root, "world"), resources_command=f"bash {shlex.quote(script)}",
-                           extra_environment={"FAKE_DRIVER_ROW_SECONDS": "0.3", "ROWS_ORCHESTRATOR_TWO_REGROW_SECONDS": "0.2"})
-    code, output = world_run_two(world)
+    flag = os.path.join(root, "local-gate-open")
+    wrapper = os.path.join(root, "gated_run.py")
+    with open(wrapper, "x", encoding="utf-8") as handle:
+        handle.write(GATED_RUN.format(here=HERE, flag=flag))
+    world = fake_world_two(os.path.join(root, "world"), extra_environment={"FAKE_DRIVER_ROW_SECONDS": "0.3", "ROWS_ORCHESTRATOR_TWO_REGROW_SECONDS": "0.2"})
     path = os.path.join(world.root, "driver.log")
+    process = subprocess.Popen(one.served_command(world.root, ["python3", "-B", wrapper] + world.direct[3:]), cwd=world.repo, env=world.environment,
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline and not (os.path.exists(path) and "ran " in open(path, encoding="utf-8").read()):
+        time.sleep(0.02)
+    with open(flag, "x", encoding="utf-8"):
+        pass
+    output, _ = process.communicate(timeout=240)
+    code = process.returncode
     # 本机整表的行写在 segment2-rows，第二台那一头的输出根叫 rows；跨机对照那一次（本机，segment2-rows-cross-host）不算
     rows_hosts = {one.key_values(line)["host"] for line in open(path, encoding="utf-8")
                   if line.startswith("ran ") and (" root=segment2-rows " in line or " root=rows " in line)} \
@@ -1484,7 +1556,7 @@ def regrow_cell(scratch: str) -> tuple[str, bool, str]:
 
 
 def segment_one_selftest_cell() -> tuple[str, bool, str]:
-    """第一段编排器自己的 --selftest（34 项）在这一个收养者底下跑：它留下的进程由之后的收尾收掉、算进 no-leftover-processes。"""
+    """第一段编排器自己的 --selftest（35 项）在这一个收养者底下跑：它留下的进程由之后的收尾收掉、算进 no-leftover-processes。"""
     try:
         completed = subprocess.run(["python3", "-B", SEGMENT_ONE_ORCHESTRATOR_PATH, "--selftest"], capture_output=True, text=True, timeout=900,
                                    env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
@@ -1510,10 +1582,10 @@ SWITCH_CELLS_TWO = {"sweep-skipped": "no-leftover-processes", "temporary-kept": 
                     "merge-allows-freeze-lines": "merge-refuse-freeze-line", "merge-allows-duplicates": "merge-refuse-duplicate",
                     "exclusions-not-given": "e2e-substitution-sequential", "collisions-ignored": "e2e-substitution-collision",
                     "cross-host-ignores-dumps": "cross-host-compare", "resume-reruns-finished": "e2e-resume", "harvest-skipped": "e2e-two-hosts",
-                    "regrow-skipped": "e2e-regrow"}
+                    "regrow-skipped": "e2e-regrow", "peer-command-gets-memory-cap": "e2e-two-hosts"}
 END_TO_END_CELLS = {"e2e-two-hosts": two_hosts_cell, "e2e-substitution-sequential": substitution_sequential_cell,
                     "e2e-substitution-collision": substitution_collision_cell, "e2e-resume": resume_cell_two, "e2e-regrow": regrow_cell}
-REFUSAL_CELLS = ("e2e-unreachable", "e2e-config-refused", "e2e-switch-off", "e2e-preflight-refused")
+REFUSAL_CELLS = ("e2e-config-refused", "e2e-switch-off", "e2e-preflight-refused")
 
 
 class SelftestInterrupted(Exception):

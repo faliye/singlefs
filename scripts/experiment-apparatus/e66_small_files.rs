@@ -161,14 +161,33 @@ fn fill(path: &str, region: u64) {
     device_file.sync_all().expect("sync 失败");
 }
 
+/// 登记的操作次数与区域大小（MiB）；不给对应参数就是它们。
+const REGISTERED_OPERATIONS: u64 = 1024;
+const REGISTERED_REGION_MEBIBYTES: u64 = 8192;
+
+/// 与登记规模不同的参数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+/// 每项是（名字，这一趟的值，登记的值）；全部等于登记值时不接。
+fn reduced_scale_note(scales: &[(&str, u64, u64)]) -> String {
+    let registered_values: Vec<String> = scales
+        .iter()
+        .filter(|(_, actual, registered)| actual != registered)
+        .map(|(name, _, registered)| format!("registered_{name}={registered}"))
+        .collect();
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 fn main() {
     let path = std::env::args().nth(1).unwrap_or_else(|| {
         eprintln!("用法：e66-small-files <块设备或文件> [种子] [ops] [区域 MiB]");
         std::process::exit(2)
     });
     let seed: u64 = std::env::args().nth(2).and_then(|argument| argument.parse().ok()).unwrap_or(0x6666_1234);
-    let operation_count: u64 = std::env::args().nth(3).and_then(|argument| argument.parse().ok()).unwrap_or(1024);
-    let region_mebibytes: u64 = std::env::args().nth(4).and_then(|argument| argument.parse().ok()).unwrap_or(8192);
+    let operation_count: u64 = std::env::args().nth(3).and_then(|argument| argument.parse().ok()).unwrap_or(REGISTERED_OPERATIONS);
+    let region_mebibytes: u64 = std::env::args().nth(4).and_then(|argument| argument.parse().ok()).unwrap_or(REGISTERED_REGION_MEBIBYTES);
     let mut region = region_mebibytes * 1024 * 1024;
 
     if std::fs::metadata(&path).map(|metadata| metadata.is_file()).unwrap_or(true) { fill(&path, region); }
@@ -190,7 +209,8 @@ fn main() {
     let mut emitter = Emitter::new();
     println!("{}", emitter.emit_raw(&format!(
         "name=config dev={path} size={size} region={region} ops={operation_count} unit={UNIT} node={NODE} \
-         node_hdr={NODE_HEADER_BYTES} warmup={WARMUP} seed={seed} sizes={SIZES:?}")));
+         node_hdr={NODE_HEADER_BYTES} warmup={WARMUP} seed={seed} sizes={SIZES:?}{}",
+        reduced_scale_note(&[("operations", operation_count, REGISTERED_OPERATIONS), ("region_mib", region_mebibytes, REGISTERED_REGION_MEBIBYTES)]))));
 
     for &file_size in SIZES.iter() {
         for arm in ["extent", "inline", "pack"] {
@@ -312,5 +332,15 @@ mod tests {
         assert_eq!(first_sequence, second_sequence);
         assert_eq!(first_sequence.len(), 8);
         assert!(first_sequence.windows(2).all(|adjacent_pair| adjacent_pair[0] != adjacent_pair[1]));
+    }
+
+    /// 给了缩规模的操作次数或区域，config 行要写缩过、不当正式产物；两项都是登记值不加这一段。
+    #[test]
+    fn reduced_operations_or_region_are_marked_and_registered_ones_are_not() {
+        assert_eq!(reduced_scale_note(&[("operations", REGISTERED_OPERATIONS, REGISTERED_OPERATIONS), ("region_mib", REGISTERED_REGION_MEBIBYTES, REGISTERED_REGION_MEBIBYTES)]), "");
+        assert_eq!(
+            reduced_scale_note(&[("operations", 64, REGISTERED_OPERATIONS), ("region_mib", REGISTERED_REGION_MEBIBYTES, REGISTERED_REGION_MEBIBYTES)]),
+            " reduced=yes registered_operations=1024 not_official_product=yes"
+        );
     }
 }

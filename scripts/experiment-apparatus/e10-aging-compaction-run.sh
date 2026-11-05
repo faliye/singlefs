@@ -8,28 +8,33 @@
 # long-run-shards: 一片 =（取样点, S），七个取样点 × S 三档共二十一片；片名 <取样点>-s<S>，片产物 research/results/e10-aging-compaction-<日期>/<片名>.out；片的次序就是全跑的正式跑次序，装置的 --merge 逐条核次序与条数
 # long-run-resume: 同一条命令重起只跑缺的片：片文件在、末行是 name=done emitted=N 且 N 等于行数、片旁 <片名>.out.binary-sha256 记的装置 sha256 是这一趟的才算做完、跳过（记的不同或没有记录的片整份移到 <E10_LOG_DIRECTORY>/void-<日期>-<进程号>/ 再现跑，逐片报「作废：<片名>（装置 sha256 不同）」）；每片先写进临时目录，核过收尾行、记下装置 sha256 才换名进片目录，跑到一半被打断的片不留在片目录里
 # long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
-#   多机的读法：每台线程是 scripts/hosts/heavy-threads.sh 的 heavy_thread_default（E10_THREADS 设了就用它）；第二台照 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts 读出的那一台，
-#   由主 agent 经 bash scripts/hosts/multi-host-run.sh --peer --fetch <片目录（片文件连同 <片名>.out.binary-sha256）> -- bash scripts/experiment-apparatus/e10-aging-compaction-run.sh --shards <片名,…> 起另一半、取回之后在本机再跑一次本脚本合并
+#   多机的读法：每台线程是 scripts/hosts/heavy-threads.sh 的 heavy_thread_default（E10_THREADS 设了就用它）；另一半的片
+#   由主 agent 整条交统一任务服务：task-server/task submit -- env E10_BINARY=<共享根下装置私有副本的绝对路径> bash scripts/experiment-apparatus/e10-aging-compaction-run.sh --shards <片名,…>，
+#   派哪台由服务定（调用方不钉台）；仓在 NFS 共享根下，两台的片连同 <片名>.out.binary-sha256 都直接写进同一个片目录，不拷、不取回；两半都跑完，在哪一台再跑一次本脚本合并都行
 #   装置在一趟里不许换，每片记下打它的是哪一版装置（欠账 C862，共用段落在 long-run-lib/binary-identity.sh）：开跑时把装置程序文件拷一份进 $E10_LOG_DIRECTORY/pinned-binary/<sha256>/（只读），
 #   每片、合并都按这份拷贝起，不再 exec 编译目录里那一份（别的会话的 cargo 随时会把它换掉）；每片做完先在片旁写 <片名>.out.binary-sha256 再换名进片目录；续跑只沿用记的 sha256 相同的片；
-#   合并之前再核二十一片记的 sha256 都是这一趟的，不同就拒、不出产物。第二台要用与本机同一份装置：把本机私有副本经 multi-host-run.sh 的 --send 送过去，第二台设 E10_BINARY 指到送到的文件
-#   （不再自己 cargo build）、E10_SHIPPED_BINARY_SHA256 写本机算的 sha256（核送到的文件相同才往下，不同退 1；并在 PATH 最前面放 python3 垫片，让装置的准入判法找得到第二台这棵树里的 preflight.py 与源文件）；
-#   第二台自己编的另一份 sha256 一般不同，取回的片会被本机当成别的版本作废。老的私有副本留着不删（一个 sha256 一个目录），确认不再续跑那一版之后手删。
+#   合并之前再核二十一片记的 sha256 都是这一趟的，不同就拒、不出产物。两台要用同一份装置：命令里 E10_BINARY 写共享根下那一份的绝对路径（共享根外的路径提交时 task submit 退 3），
+#   两台照同一个绝对路径起同一个文件，不送、不换、不再自己 cargo build；各台自己编的一般 sha256 不同，另一台打的片续跑时会被当成别的版本作废。
+#   老的私有副本留着不删（一个 sha256 一个目录），确认不再续跑那一版之后手删。
 #
 # 用法（在仓里任何目录起都行，脚本自己回到仓根）：
 #   bash scripts/experiment-apparatus/e10-aging-compaction-run.sh                 跑缺的片；二十一片齐了合并出产物（产物已在就只核、不重写）
 #   bash scripts/experiment-apparatus/e10-aging-compaction-run.sh --shards a,b    只跑点名的片，不合并
 #   bash scripts/experiment-apparatus/e10-aging-compaction-run.sh --list-items    逐行列片名与做没做完，不编、不跑
-#   bash scripts/experiment-apparatus/e10-aging-compaction-run.sh --selftest      假装置、假内存包装、假 cargo 在临时树里走一遍续跑、换装置作废、跑着换二进制、合并前核 sha256（不起 cargo、不碰真装置）
-# 环境：E10_THREADS（装置的线程数，没设取登记的每台默认重活线程数）、E10_MEMORY_CAP（每片的内存包装上限，默认 auto：照峰值表现算）、E10_RUN_DATE（产物日期）、
-#   E10_LOG_DIRECTORY（装置私有副本与作废的片放这里，默认 ~/.local/share/singlefs/work/e10-run）、E10_BINARY（装置程序文件；设了就不 cargo build，用它）、E10_SHIPPED_BINARY_SHA256（见上，与 E10_BINARY 合用）。
+#   bash scripts/experiment-apparatus/e10-aging-compaction-run.sh --selftest      假装置、假 nice、假 cargo 在临时树里走一遍续跑、换装置作废、跑着换二进制、合并前核 sha256（不起 cargo、不碰真装置）
+# 环境：E10_THREADS（装置的线程数，没设取登记的每台默认重活线程数）、E10_RUN_DATE（产物日期）、
+#   E10_LOG_DIRECTORY（装置私有副本与作废的片放这里，默认工作根下的 e10-run，工作根取 .claude/hooks/lib_work_root.py、两台同一份）、E10_BINARY（装置程序文件；设了就不 cargo build，用它）。
 # 退出码：0 二十一片齐、产物在；1 有片跑失败（那一片不留）或合并失败；2 用法错；3 片还没齐（--shards 跑完的正常结局）。
 #
 # 弄坏开关 E10_LONG_RUN_BREAK=<项，逗号分隔>（只在 --selftest 起的那几趟里认：自证设 E10_LONG_RUN_SELFTEST_MARK 指到它建的标记文件，别处设了拒、退 2）：
-#   exec-root-binary      每片仍按编译目录那个路径起、不按私有副本               打开后自证「装置在一趟里不许换」红（跑着的时候仓根那份被换，后起的片自报的 sha256 就不是开跑时那份）
-#   stale-binary-reused   沿用只看片末行、不看片旁记的装置 sha256               打开后自证「旧装置打的片作废」红
-#   merge-sha-unchecked   合并之前不核各片记的装置 sha256                      打开后自证「合并之前各片记的装置 sha256 不同：拒」红
-#   done-marker-ignored   片输出末行不齐也当做完                                打开后自证「末行不齐的片输出不进片目录」红
+#   E10_LONG_RUN_BREAK=exec-root-binary  每片仍按编译目录那个路径起、不按私有副本
+#       「装置在一趟里不许换：跑着的时候编译目录里那份被换掉，之后起的二十一片自报的 sha256 与片旁记的都是开跑时那份」
+#   E10_LONG_RUN_BREAK=stale-binary-reused  沿用只看片末行、不看片旁记的装置 sha256
+#       「旧装置打的二十一片全作废：逐片报作废、全现跑、旧片连记录整份留在作废目录、片旁记的都是新装置的」「片旁记的 sha256 不同的、没有记录的片都作废重跑，另外十九片沿用」
+#   E10_LONG_RUN_BREAK=merge-sha-unchecked  合并之前不核各片记的装置 sha256
+#       「合并之前核二十一片的装置 sha256：有一片对不上就拒（退 1、点名那一片、装置 --merge 不起、不出产物）」
+#   E10_LONG_RUN_BREAK=done-marker-ignored  片输出末行不齐也当做完
+#       「末行不齐的片输出不进片目录：退 1、没有片文件、不合并」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../hosts/heavy-threads.sh"
@@ -54,9 +59,15 @@ RUN_DATE="${E10_RUN_DATE:-2026-10-13}"
 SHARD_DIRECTORY="research/results/e10-aging-compaction-$RUN_DATE"
 PRODUCT="research/results/e10-aging-compaction-$RUN_DATE.out"
 BINARY="${E10_BINARY:-scripts/experiment-apparatus/target/release/e10-aging-compaction}"
-LOG_DIRECTORY="${E10_LOG_DIRECTORY:-$HOME/.local/share/singlefs/work/e10-run}"
-DEVICE_SOURCE_PATH="scripts/experiment-apparatus/e10_aging_compaction.rs"
-MEMORY_CAP="${E10_MEMORY_CAP:-auto}"
+LOG_DIRECTORY="${E10_LOG_DIRECTORY:-}"
+if [[ -z "$LOG_DIRECTORY" ]]; then   # 没设：工作根（.claude/hooks/lib_work_root.py，两台同一份）下的 e10-run；自证的临时树各格都给了目录，不走这里
+  if ! LOG_DIRECTORY="$(python3 .claude/hooks/lib_work_root.py)" || [[ "$LOG_DIRECTORY" != /* ]]; then
+    echo "  ✗ 取不到工作根（.claude/hooks/lib_work_root.py 跑不起来），缺省的日志目录没处放" >&2
+    echo "     → 怎么办：修好 .claude/hooks/lib_work_root.py，或设 E10_LOG_DIRECTORY 指到日志目录" >&2
+    exit 2
+  fi
+  LOG_DIRECTORY="$LOG_DIRECTORY/e10-run"
+fi
 POINTS=(main disk_1gib no_remount delete_units snapshots_10 leaf_203 base_6sc)
 ROOT_RING_SLOTS_PER_REGION_CHOICES=(4 8 16)
 
@@ -93,7 +104,7 @@ run_shard() {
   temporary=$(mktemp -d)
   binary_identity_assert_unchanged || return 1
   started=$(date +%s)
-  E10_THREADS="$THREADS" bash scripts/hosts/run-with-memory-cap.sh "$MEMORY_CAP" nice -n 19 "$LAUNCH_BINARY" \
+  E10_THREADS="$THREADS" nice -n 19 "$LAUNCH_BINARY" \
     --point "$point" --root-ring-slots-per-region "$root_ring_slots_per_region" > "$temporary/out" 2> "$temporary/err"
   exit_code=$?
   finished=$(date +%s)
@@ -109,10 +120,10 @@ run_shard() {
   return 1
 }
 
-# 自证：假装置、假内存包装、假 cargo 在每一格自己的临时树里走一遍（本脚本与共用库拷进树里，树里 .claude 指向真仓的）；不起 cargo、不碰真装置。
+# 自证：假装置、假 nice、假 cargo 在每一格自己的临时树里走一遍（本脚本与共用库拷进树里，树里 .claude 指向真仓的）；不起 cargo、不碰真装置。
 run_selftest() {
   local work failures=0 cell_count=0 fakes real_root cell exit_code first_exit old_sha original_sha swap_target product shard_count=21
-  unset E10_BINARY E10_SHIPPED_BINARY_SHA256 E10_LOG_DIRECTORY E10_MEMORY_CAP
+  unset E10_BINARY E10_LOG_DIRECTORY
   real_root="$PWD"
   work=$(mktemp -d) || return 1
   fakes="$work/fakes"
@@ -140,15 +151,15 @@ if [[ -n "${E10_SELFTEST_TAMPER_STAMP:-}" && "$2" == base_6sc && "$4" == 16 ]]; 
 fi
 printf 'E7RESULT name=row point=%s s=%s device=%s\nE7RESULT name=done emitted=2\n' "$2" "$4" "$self_sha"
 FAKE
-  cat > "$fakes/run-with-memory-cap.sh" <<'FAKE'
+  cat > "$fakes/bin/nice" <<'FAKE'
 #!/usr/bin/env bash
-echo "cap $1" >> "$E10_SELFTEST_CALLS.wrappers"
+# 自证的假 nice（每片装置都经 nice -n 19 起）：吞掉 -n 19，起后面的命令。
 # E10_SELFTEST_SWAP_TARGET：起装置之前（脚本已拷过私有副本）把这个路径的装置换成另一份字节不同的，像别的会话的 cargo 把编译目录里那份换掉。
-if [[ -n "${E10_SELFTEST_SWAP_TARGET:-}" && "$*" == *"nice -n 19"* && ! -e "$E10_SELFTEST_SWAP_TARGET.swapped" ]]; then
+if [[ -n "${E10_SELFTEST_SWAP_TARGET:-}" && ! -e "$E10_SELFTEST_SWAP_TARGET.swapped" ]]; then
   { cat -- "$E10_SELFTEST_SWAP_TARGET"; echo "# swapped by a build while the long run is going"; } > "$E10_SELFTEST_SWAP_TARGET.swap" \
     && chmod +x "$E10_SELFTEST_SWAP_TARGET.swap" && mv -f -- "$E10_SELFTEST_SWAP_TARGET.swap" "$E10_SELFTEST_SWAP_TARGET" && : > "$E10_SELFTEST_SWAP_TARGET.swapped"
 fi
-shift
+shift 2
 exec "$@"
 FAKE
   cat > "$fakes/bin/cargo" <<'FAKE'
@@ -156,16 +167,16 @@ FAKE
 echo "cargo $*" >> "$E10_SELFTEST_CALLS.cargo"
 exit 0
 FAKE
-  chmod +x "$fakes/device" "$fakes/run-with-memory-cap.sh" "$fakes/bin/cargo"
-  # 一格的树：本脚本与共用库的拷贝、假的 run-with-memory-cap.sh、真的线程取法、默认位置上的假装置、指向真仓 .claude 的符号链接、空的 git 仓。
+  chmod +x "$fakes/device" "$fakes/bin/nice" "$fakes/bin/cargo"
+  # 一格的树：本脚本与共用库的拷贝、真的线程取法、默认位置上的假装置、指向真仓 .claude 的符号链接、空的 git 仓。
   make_tree() {
     local tree="$1/tree"
-    mkdir -p -- "$tree/scripts/experiment-apparatus/long-run-lib" "$tree/scripts/experiment-apparatus/target/release" "$tree/scripts/hosts" "$tree/research/results" "$1/logs" "$1/shipped"
+    mkdir -p -- "$tree/scripts/experiment-apparatus/long-run-lib" "$tree/scripts/experiment-apparatus/target/release" "$tree/scripts/hosts" "$tree/research/results" "$1/logs" "$1/given"
     cp -- "$SCRIPT_PATH" "$tree/scripts/experiment-apparatus/e10-aging-compaction-run.sh"
     cp -- "$(dirname -- "$SCRIPT_PATH")/long-run-lib/binary-identity.sh" "$tree/scripts/experiment-apparatus/long-run-lib/"
-    cp -- "$fakes/run-with-memory-cap.sh" "$real_root/scripts/hosts/heavy-threads.sh" "$tree/scripts/hosts/"
+    cp -- "$real_root/scripts/hosts/heavy-threads.sh" "$tree/scripts/hosts/"
     cp -- "$fakes/device" "$tree/scripts/experiment-apparatus/target/release/e10-aging-compaction"
-    cp -- "$fakes/device" "$1/shipped/e10-aging-compaction"
+    cp -- "$fakes/device" "$1/given/e10-aging-compaction"
     ln -s -- "$real_root/.claude" "$tree/.claude"
     git -C "$tree" init -q > /dev/null 2>&1
   }
@@ -215,14 +226,10 @@ FAKE
   cell="$work/merge-check"; make_tree "$cell"
   E10_SELFTEST_TAMPER_STAMP="$cell/tree/$shard_directory/main-s4.out.binary-sha256" invoke "$cell"; exit_code=$?
   expect "合并之前核二十一片的装置 sha256：有一片对不上就拒（退 1、点名那一片、装置 --merge 不起、不出产物）" '((exit_code == 1)) && grep -qF "片 main-s4 的装置 sha256 对不上" "$cell/out" && grep -qF "合并产物之前核全部片的装置 sha256" "$cell/out" && (($(wc -l < "$cell/calls") == shard_count)) && [[ ! -e "$cell/tree/$product" ]]'
-  cell="$work/shipped"; make_tree "$cell"
-  original_sha=$(sha256sum -- "$cell/shipped/e10-aging-compaction" | cut -d' ' -f1)
-  E10_BINARY="$cell/shipped/e10-aging-compaction" E10_SHIPPED_BINARY_SHA256="$original_sha" invoke "$cell" --shards main-s4,main-s8; exit_code=$?
-  expect "别台送来的装置 sha256 对得上：不 cargo build、放 python3 垫片、点名的两片现跑、片旁记着送来那份的 sha256" '((exit_code == 3)) && [[ ! -e "$cell/calls.cargo" ]] && [[ -x "$(ls "$cell"/logs/python3-path-shim-*/python3)" ]] && (($(wc -l < "$cell/calls") == 2)) && [[ "$(cat "$cell/tree/$shard_directory"/*.binary-sha256 | sort -u)" == "$original_sha" ]]'
-  cell="$work/shipped-mismatch"; make_tree "$cell"
-  echo "# corrupted in transfer" >> "$cell/shipped/e10-aging-compaction"
-  E10_BINARY="$cell/shipped/e10-aging-compaction" E10_SHIPPED_BINARY_SHA256="$original_sha" invoke "$cell" --shards main-s4; exit_code=$?
-  expect "别台送来的装置 sha256 对不上：退 1、一片不跑" '((exit_code == 1)) && grep -qF "不是同一份" "$cell/out" && [[ ! -e "$cell/calls" ]]'
+  cell="$work/given"; make_tree "$cell"
+  original_sha=$(sha256sum -- "$cell/given/e10-aging-compaction" | cut -d' ' -f1)
+  E10_BINARY="$cell/given/e10-aging-compaction" invoke "$cell" --shards main-s4,main-s8; exit_code=$?
+  expect "设了 E10_BINARY：不 cargo build、点名的两片现跑、片旁记着那一份的 sha256" '((exit_code == 3)) && [[ ! -e "$cell/calls.cargo" ]] && (($(wc -l < "$cell/calls") == 2)) && [[ "$(cat "$cell/tree/$shard_directory"/*.binary-sha256 | sort -u)" == "$original_sha" ]]'
   cell="$work/list"; make_tree "$cell"
   invoke "$cell"; first_exit=$?
   echo "# a newer build of the device" >> "$cell/tree/scripts/experiment-apparatus/target/release/e10-aging-compaction"
@@ -284,17 +291,8 @@ binary_identity_pin "$SOURCE_BINARY" "$LOG_DIRECTORY/pinned-binary" || exit 1
 BINARY="$PINNED_BINARY"
 LAUNCH_BINARY="$BINARY"
 break_is exec-root-binary && LAUNCH_BINARY="$SOURCE_BINARY"
-if [[ -n "${E10_SHIPPED_BINARY_SHA256:-}" ]]; then
-  # 别台编好送来的装置：核 sha256，并放 python3 垫片（装置的准入判法按编译机的绝对路径找 preflight.py 与源文件）
-  if [[ "$PINNED_BINARY_SHA256" != "$E10_SHIPPED_BINARY_SHA256" ]]; then
-    echo "  ✗ 送到的装置程序文件 sha256 是 $PINNED_BINARY_SHA256，本机的是 $E10_SHIPPED_BINARY_SHA256，不是同一份：这一份一片都不跑" >&2
-    echo "     → 怎么办：看 multi-host-run.sh 的 --send 有没有送全（盘满、传输中断）；重起本机那条命令" >&2
-    exit 1
-  fi
-  binary_identity_install_python_shim "$DEVICE_SOURCE_PATH" "$LOG_DIRECTORY/python3-path-shim-$$" || exit 1
-fi
 THREADS=$(thread_count) || { echo "  ✗ 取不到装置的线程数（原因见上一行）" >&2; echo "     → 怎么办：设 E10_THREADS，或照上一行的出路修好 .claude/heavy-thread-default" >&2; exit 2; }
-echo "e10 分片跑法：线程 $THREADS、每片内存上限 $MEMORY_CAP、片目录 $SHARD_DIRECTORY、装置 sha256 $PINNED_BINARY_SHA256（私有副本 $PINNED_BINARY，源 $SOURCE_BINARY）"
+echo "e10 分片跑法：线程 $THREADS、片目录 $SHARD_DIRECTORY、装置 sha256 $PINNED_BINARY_SHA256（私有副本 $PINNED_BINARY，源 $SOURCE_BINARY）"
 void_directory="$LOG_DIRECTORY/void-$(TZ=Asia/Tokyo date +%F)-$$"
 failed=0
 for name in "${selected[@]}"; do
@@ -328,7 +326,7 @@ if ! break_is merge-sha-unchecked; then
   binary_identity_check_same "$PINNED_BINARY_SHA256" "${checked_pairs[@]}" || exit 1
 fi
 temporary=$(mktemp -d)
-bash scripts/hosts/run-with-memory-cap.sh "$MEMORY_CAP" "$BINARY" --merge "${shard_files[@]}" > "$temporary/out" 2> "$temporary/err" \
+"$BINARY" --merge "${shard_files[@]}" > "$temporary/out" 2> "$temporary/err" \
   && is_complete_output "$temporary/out" \
   || { echo "  ✗ 合并失败" >&2; echo "     → 怎么办：看输出 $temporary 里的报错，修好装置的合并那一步再起同一条命令（做完的片复用）" >&2; exit 1; }
 mv -- "$temporary/out" "$PRODUCT"

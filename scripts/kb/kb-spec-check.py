@@ -4,11 +4,11 @@
 """kb 写回规格检查：派书记员（kb-scribe）之前，规格原文本身会不会让门禁红。
 
 用法：
-    kb-spec-check.py <规格.json 或 规格.md> [<规格> …] [--root 仓根] [--allow-uncommitted <路径> …]
+    kb-spec-check.py <规格.json 或 规格.md> [<规格> …] [--root 仓根]
     kb-spec-check.py --selftest          # KB_SPEC_CHECK_BREAK=<项> 时必须判红
     kb-spec-check.py --help              # 打这一段用法（-h 同），退 0
   一次给几份同批规格（并行写回员按 kb 文件切开写的那几份）时，除了各份各自判，再做跨规格比对（⑦）。
-  --allow-uncommitted：这一次确认「依据」里这份只在工作区的文件会跟这一批一起提交，放行它（⑥）；可重复。
+  依据里点名的已跟踪文件有没提交的改动时，只认登记在 `.claude/batch-scope` 里的（⑥）。
 
 规格的两种写法（kb-spec-drafter 两份都写，主 agent 手写的用哪种都行）：
   JSON：[{"file": "<仓根起的路径>", "old": "<旧串>", "new": "<新串>", "basis": "<依据>"}, …]，或 {"entries": [同上]}
@@ -29,8 +29,8 @@
      （门禁 doc-experiments 的 decision-links 格那条双向检查的另一侧）；
   ⑤ 写决策变更史（.claude/kb/decisions-history.md）的，新串里要有「### <日期>」行或顶格「- 」变更项，不许有「#### 」子条目、「快查·」两行与「**现状**：」行（.claude/rules/changelog-format.md）；
   ⑥ 「依据」里点名的路径（从仓根起、带目录层的；写了「:行号」的连行号）：已跟踪、工作区与暂存区都和 HEAD 相同的放行；
-     已跟踪而工作区或暂存区与 HEAD 不同（别的会话还没提交的改动）、又没登记在 `.claude/batch-scope`（这一批的改动范围）、
-     也没被 --allow-uncommitted 点名放行的，判红、点名是哪一条哪一个路径（写了行号的，那几行在 HEAD 里存在、且工作区与暂存区的同一行与 HEAD 相同才放行）；
+     已跟踪而工作区或暂存区与 HEAD 不同（别的会话还没提交的改动）、又没登记在 `.claude/batch-scope`（这一批的改动范围，常设登记、带理由，
+     门禁 doc-process-records 的 batch-scope 格核）的，判红、点名是哪一条哪一个路径（写了行号的，那几行在 HEAD 里存在、且工作区与暂存区的同一行与 HEAD 相同才放行）；
      暂存区里的新文件（HEAD 里没有）同样判红；未跟踪的新文件（这一批新写的判决与证据）放行，输出里另列一行「依据是未跟踪的新文件 N 份：<名单>」；
      三处都没有的路径不判；仓根不是 git 仓而依据里有路径，判红（不静默放行）。判法在 lib_basis_paths.py；
   ⑦ 跨规格：命令行给了两份以上规格时，各份新串里新加的句子（比旧串多出来的）中，同一个已登记编号所在的那一句里的状态词不一致，判红，点名两份规格与两句。
@@ -60,7 +60,7 @@
   KB_SPEC_CHECK_BREAK=no-references  check_entries() 不调 reference_problems()（②）
       编号没带简称（「✗ 自检：编号没带简称：应当判红」）、简称与登记位不一致（「✗ 自检：简称与登记位不一致：应当判红」）、
       判决段名撞了登记编号（「✗ 自检：判决段名撞了登记编号：应当判红」）
-      连带红的格：「✗ 自检：嵌套括号简称写错：应当判红」、「✗ 自检：嵌套括号简称只写了外层：应当判红」、「✗ 自检：嵌套括号简称括号没配平：应当判红」、「✗ 自检：译文写全角中文简称：应当判红」、「✗ 自检：译文写全角日文译名：应当判红」、「✗ 自检：译文编号没带译名：应当判红」、「✗ 自检：译文译名带中文简称原样：应当判红」、「✗ 自检：中文写半角括号简称：应当判红」
+      连带红的格：「✗ 自检：嵌套括号简称写错：应当判红」、「✗ 自检：嵌套括号简称只写了外层：应当判红」、「✗ 自检：嵌套括号简称括号没配平：应当判红」、「✗ 自检：译文写全角中文简称：应当判红」、「✗ 自检：译文写全角日文译名：应当判红」、「✗ 自检：译文编号没带译名：应当判红」、「✗ 自检：译文译名带中文简称原样：应当判红」、「✗ 自检：中文写半角括号简称：应当判红」、「✗ 自检：简称里带别的编号、简称后面另有裸引用：应当判红」
   KB_SPEC_CHECK_BREAK=translations-as-registry  load_registry() 把译文（.en.md、.ja.md）也当登记位读，译名先于中文简称被认到（②，改前的读法）
       译文登记位简称与中文不同（「✗ 自检：译文登记位简称与中文不同：应当判绿」），连带 selftest() 里别的引用了登记编号的绿例（干净的一条、简称带嵌套括号、依据段加实验号带了配对）
       连带红的格：「✗ 自检：干净的一条：应当判绿」、「✗ 自检：简称带嵌套括号：应当判绿」、「✗ 自检：依据段加实验号带了配对：应当判绿」、「✗ 自检：命令行 ['…spec-done.json', '--root', '…'] 应当退 0」、「✗ 规格 1 条（1 份）里有 1 处会让门禁红」
@@ -85,6 +85,8 @@
       连带红的格：「✗ 自检：跨规格不变量编号状态不一致：应当判红」、「✗ 自检：命令行 ['…spec-done.json', '…spec-open.json', '--root', '…'] 应当退 1」
   KB_SPEC_CHECK_BREAK=cross-spec-any-word  cross_spec_problems() 状态词不同就判红，不分「已实现与已还清同属已完成」这类一族（⑦）
       跨规格状态词同族一致（「✗ 自检：跨规格状态词同族一致：应当判绿」）
+  KB_SPEC_CHECK_BREAK=name-interior-counted  reference_problems() 不跳简称内部，简称里的别的登记编号照判（②，改前的样子）
+      简称里带别的编号、整行搬家（「✗ 自检：简称里带别的编号、整行搬家：应当判绿」）
 """
 import glob
 import json
@@ -241,13 +243,19 @@ def parse_markdown_spec(text):
 
 
 def load_spec(path):
-    text = open(path, encoding="utf-8", errors="replace").read()
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        text = handle.read()
     try:
         data = json.loads(text)
         entries = data.get("entries") if isinstance(data, dict) else data
         if isinstance(entries, list):
-            return [{"file": str(item.get("file", "")), "old": item.get("old"), "new": item.get("new"), "basis": item.get("basis", "")}
-                    for item in entries if isinstance(item, dict)]
+            if not all(isinstance(item, dict)
+                       and all(isinstance(item.get(key), str) for key in ('file', 'old', 'new'))
+                       and item['file'] and item['old'] and isinstance(item.get('basis', ''), str)
+                       for item in entries):
+                return []
+            return [{"file": item["file"], "old": item["old"], "new": item["new"], "basis": item.get("basis", "")}
+                    for item in entries]
     except ValueError:
         pass
     return parse_markdown_spec(text)
@@ -276,8 +284,11 @@ def reference_problems(new, old, registry, not_numbers, language=None):
             first_cell = line.strip().strip("|").split("|")[0].strip().replace("**", "").replace("`", "") if line.strip().startswith("|") else None
             if REGISTRY_HEADING.match(line):
                 continue
+            name_end = 0   # 前一个编号后面合法简称占到的位置；起点落在它之前的编号是简称里的字，不判（与 doc-lint.sh 同一个读法）
             for match in NUMBER_TOKEN.finditer(line):
                 token = match.group(1)
+                if match.start() < name_end and BROKEN != "name-interior-counted":   # name-interior-counted 弄坏开关：简称里的编号照判
+                    continue
                 if token not in registry or token in not_numbers or token == first_cell:
                     continue
                 if language is not None and BROKEN != "translations-as-chinese":
@@ -287,6 +298,7 @@ def reference_problems(new, old, registry, not_numbers, language=None):
                     continue
                 following = following_name(line, match.end())
                 if following is not None and (normalized_name(following) == normalized_name(registry[token]) or BROKEN == "any-name"):
+                    name_end = FOLLOWING_NAME_PREFIX.match(line, match.end()).end() + len(following) + 1
                     continue
                 written = following if following is not None else "没带简称"
                 found.append(f"{token}（{written}）→ 登记位写的是「{token}（{registry[token]}）」")
@@ -391,7 +403,7 @@ def cross_spec_problems(specs, registry, not_numbers):
     return problems
 
 
-def check_entries(entries, root, allowed=(), untracked_out=None):
+def check_entries(entries, root, untracked_out=None):
     """untracked_out 传一个列表，依据里引的未跟踪新文件按出现次序追加进去（不重复）。"""
     registry, not_numbers = load_registry(root)
     problems = []
@@ -414,7 +426,7 @@ def check_entries(entries, root, allowed=(), untracked_out=None):
             language = translation.group(0)[1:3] if translation else None
             problems += [f"{label}：编号引用不对：{item}" for item in reference_problems(entry["new"], entry["old"], registry, not_numbers, language)]
         if BROKEN != "basis-unchecked":
-            basis_problems, basis_untracked = lib_basis_paths.basis_check(root, entry.get("basis") or "", allowed, committed)
+            basis_problems, basis_untracked = lib_basis_paths.basis_check(root, entry.get("basis") or "", committed)
             problems += [f"{label}：依据是别的会话还没提交的改动，不能当现状依据：{item}（{lib_basis_paths.ADVICE}）" for item in basis_problems]
             if untracked_out is not None:
                 untracked_out += [path for path in basis_untracked if path not in untracked_out]
@@ -439,14 +451,6 @@ def run(arguments):
     if guarded and arguments[:1] in (["--help"], ["-h"]):
         print(__doc__)
         return 0
-    allowed = []
-    while "--allow-uncommitted" in arguments:
-        position = arguments.index("--allow-uncommitted")
-        if position + 1 >= len(arguments) or arguments[position + 1].startswith("-"):
-            print("✗ --allow-uncommitted 后面没给路径\n→ 怎么办：--allow-uncommitted <从仓根起的路径>（可重复）；用法跑 kb-spec-check.py --help")
-            return 2
-        allowed.append(arguments[position + 1])
-        arguments = arguments[:position] + arguments[position + 2:]
     if "--root" in arguments:
         position = arguments.index("--root")
         if guarded and position + 1 >= len(arguments):
@@ -456,7 +460,7 @@ def run(arguments):
         arguments = arguments[:position] + arguments[position + 2:]
     options = [argument for argument in arguments if argument.startswith("-")]
     if guarded and options:
-        print(f"✗ 不认的选项：{' '.join(options)}\n→ 怎么办：只认 --root、--allow-uncommitted（用法跑 kb-spec-check.py --help）")
+        print(f"✗ 不认的选项：{' '.join(options)}\n→ 怎么办：只认 --root；依据里要认的未提交改动登记进 .claude/batch-scope（用法跑 kb-spec-check.py --help）")
         return 2
     if not arguments:
         print("✗ 要给一份规格文件\n→ 怎么办：kb-spec-check.py <规格.json 或 规格.md> [<规格> …] [--root 仓根]")
@@ -475,7 +479,7 @@ def run(arguments):
     many = len(specs) > 1
     problems, untracked = [], []
     for path, entries in specs:
-        problems += [f"规格 {path}：{problem}" if many else problem for problem in check_entries(entries, root, allowed, untracked)]
+        problems += [f"规格 {path}：{problem}" if many else problem for problem in check_entries(entries, root, untracked_out=untracked)]
     if many:
         registry, not_numbers = load_registry(root)
         problems += cross_spec_problems(specs, registry, not_numbers)
@@ -501,7 +505,7 @@ def selftest():
         os.makedirs(os.path.join(kb, "decisions"))
         os.makedirs(os.path.join(kb, "experiments"))
         open(os.path.join(kb, "checks-owed.md"), "w", encoding="utf-8").write(
-            "# 欠的检查\n\n<!-- doc-lint:registry name-col=2 -->\n| 编号 | 简称 | 内容 |\n|---|---|---|\n| C120 | 锚点腐化 | 旧行 |\n| C121 | 另一笔 | 行 |\n| C122 | 对拍（HashMap 理想文件系统） | 简称里套着括号 |\n")
+            "# 欠的检查\n\n<!-- doc-lint:registry name-col=2 -->\n| 编号 | 简称 | 内容 |\n|---|---|---|\n| C120 | 锚点腐化 | 旧行 |\n| C121 | 另一笔 | 行 |\n| C122 | 对拍（HashMap 理想文件系统） | 简称里套着括号 |\n| C123 | 对拍 J4 的写法 | 简称里带别的登记编号 |\n| J4 | 另一份 | 行 |\n| C124 | 搬家行 | 见 C123（对拍 J4 的写法） |\n")
         open(os.path.join(kb, "decisions", "03-空间分配.md"), "w", encoding="utf-8").write(
             "## D3 空间分配 —— 已定\n\n**依据**：E10（样本实验） 证明了 x。\n")
         open(os.path.join(kb, "experiments", "10-样本实验.md"), "w", encoding="utf-8").write("## E10 样本实验 —— 已跑\n\n### 影响的决策\n| D3 | 支撑 | 不受影响 |\n")
@@ -554,6 +558,9 @@ def selftest():
             ("嵌套括号简称写错", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C122（对拍（别的名字）） |")], 1),
             ("嵌套括号简称只写了外层", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C122（对拍） |")], 1),
             ("嵌套括号简称括号没配平", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C122（对拍（HashMap 理想文件系统） |")], 1),
+            ("简称里带别的编号、整行搬家", [entry(owed, "| C124 | 搬家行 | 见 C123（对拍 J4 的写法） |", ""),
+                                            entry(".claude/kb/decisions/03-空间分配.md", "## D3 空间分配 —— 已定", "## D3 空间分配 —— 已定\n\n见 C123（对拍 J4 的写法）")], 0),
+            ("简称里带别的编号、简称后面另有裸引用", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C123（对拍 J4 的写法） 与 J4 |")], 1),
             ("旧串 0 次", [entry(owed, "不在的行", "新")], 1),
             ("编号没带简称", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行，见 C121 |")], 1),
             ("简称与登记位不一致", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C121（别的名字） |")], 1),
@@ -604,10 +611,6 @@ def selftest():
             problems = check_entries(entries, work)
             if (1 if problems else 0) != want:
                 failures.append(f"{label}：应当{'判红' if want else '判绿'}，实际 {problems or '判绿'}")
-        if check_entries([entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行 |", "docs/edited.md 写了 x")], work, allowed=["docs/edited.md"]):
-            failures.append("依据已跟踪且有改动、命令行 --allow-uncommitted 点名放行：应当判绿")
-        if check_entries([entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行 |", "docs/edited.md 写了 x")], work, allowed=["docs/"]):
-            failures.append("依据已跟踪且有改动、命令行 --allow-uncommitted 以目录（docs/）放行：应当判绿")
         named_untracked = []
         check_entries([entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行 |", "docs/worktree-only.md 与 docs/committed.md 与 docs/worktree-only.md:1")], work, untracked_out=named_untracked)
         if named_untracked != ["docs/worktree-only.md"]:
@@ -652,15 +655,15 @@ def selftest():
         for name, specification in (("spec-done.json", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C121（另一笔）已还清 |")]),
                                     ("spec-open.json", [entry(".claude/kb/decisions/03-空间分配.md", "## D3 空间分配 —— 已定", "## D3 空间分配 —— 已定\n\nC121（另一笔）未实现")]),
                                     ("spec-worktree.json", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行 |", "docs/edited.md 写了 x")]),
-                                    ("spec-untracked.json", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行 |", "docs/worktree-only.md 写了 x")])):
+                                    ("spec-untracked.json", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行 |", "docs/worktree-only.md 写了 x")]),
+                                    ("spec-scoped.json", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行 |", "docs/scoped-tracked.md 写了 x")])):
             spec_files[name] = os.path.join(work, name)
             open(spec_files[name], "w", encoding="utf-8").write(json.dumps(specification, ensure_ascii=False))
         cli_cases += [([spec_files["spec-done.json"], "--root", work], 0, "（1 份）"),
                       ([spec_files["spec-done.json"], spec_files["spec-open.json"], "--root", work], 1, "跨规格状态不一致"),
                       ([spec_files["spec-worktree.json"], "--root", work], 1, "依据是别的会话还没提交的改动"),
                       ([spec_files["spec-untracked.json"], "--root", work], 0, "依据是未跟踪的新文件 1 份：docs/worktree-only.md"),
-                      ([spec_files["spec-worktree.json"], "--root", work, "--allow-uncommitted", "docs/edited.md"], 0, "（1 份）"),
-                      ([spec_files["spec-worktree.json"], "--root", work, "--allow-uncommitted"], 2, "--allow-uncommitted 后面没给路径")]
+                      ([spec_files["spec-scoped.json"], "--root", work], 0, "（1 份）")]
         for arguments, want_code, want_text in cli_cases:
             child = subprocess.run([sys.executable, os.path.abspath(__file__), *arguments], capture_output=True, text=True)
             said = child.stdout + child.stderr
@@ -672,15 +675,48 @@ def selftest():
             print("  → 看 check_entries() / reference_problems() / pointer_problems() / parse_markdown_spec() 的判法；KB_SPEC_CHECK_BREAK 设着的话这里本来就该红")
             return 1
         print(f"  ✓ kb-spec-check 自检通过：旧串次数、编号简称、段名撞登记、位置与时间指代、依据配对、变更史形态各有红绿样本，译文不当登记位，markdown 规格认得出（{len(cases) + 1} 种）；"
-              f"译文编号写半角译名判绿、写全角中文简称判红；依据已跟踪且工作区或暂存区有没进这一批的改动判红（引的行号被改、暂存区里的新文件同样红）、与 HEAD 相同的、登记在 batch-scope 里的、未跟踪的新文件判绿（未跟踪的另列一行）；跨规格同一编号状态词不一致判红（{len(cross_cases)} 种）；"
-              f"命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的规格、--root 缺值退 2 带出路，两份规格的跨规格比对与 --allow-uncommitted")
+              f"译文编号写半角译名判绿、写全角中文简称判红；依据已跟踪且工作区或暂存区有没进这一批的改动判红（引的行号被改、暂存区里的新文件同样红）、与 HEAD 相同的、登记在 batch-scope 里的、未跟踪的新文件判绿（未跟踪的另列一行）；简称里带别的登记编号不当成裸引用（简称后面另有的裸引用照红）；跨规格同一编号状态词不一致判红（{len(cross_cases)} 种）；"
+              f"命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的规格、--root 缺值退 2 带出路，两份规格的跨规格比对、依据登记在 batch-scope 里照绿")
         return 0
     finally:
         import shutil
         shutil.rmtree(work, ignore_errors=True)
 
 
+BREAK_VARIABLES = ("KB_SPEC_CHECK_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/kb-spec-check.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     if sys.argv[1:] == ["--selftest"]:
         sys.exit(selftest())

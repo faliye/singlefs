@@ -1,0 +1,3 @@
+# E171（三oracle合谋测试） 第 2 次重跑现状整表段前置的研究一侧变异表之三（登记 research/prompts/e171-r2-prereg.md 修订 5 第 5.6 条）：第 0 步判法读宣布行的那一处（行首与调度记录）。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经同目录 mutation_driver.py 带 --unit-test-module test_revision_8 跑；原文在研究目录的源文件里合起来恰命中一次。
+R2P-16 宣布行照第 1 次重跑的行首认	ANNOUNCEMENT_PREFIX = "- E171 第 2 次重跑拍树宣布"	ANNOUNCEMENT_PREFIX = "- E171 最终主线拍树宣布"
+R2P-17 宣布行照第 1 次重跑的调度记录读	RECORDS_FILE = "records/2026-10-31-删兼容旧版本代码.md"	RECORDS_FILE = "records/2026-10-01-里程碑三形式化接入.md"

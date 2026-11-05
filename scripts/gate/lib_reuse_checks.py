@@ -22,15 +22,17 @@
   抽 K 条当哨兵（K 取 SINGLEFS_REUSE_SENTINEL_COUNT，默认 3），再从剩下的里抽 1 条强制现判（只这一条不读库）；
     这一趟结束时：哨兵有一条被现判 ⇒ 整道红「复用失灵：<项> 键相同却现判了」；强制现判那一条的判定与库里那一条不同 ⇒ 整道红「判定不稳：<项>」；
     抽中强制现判的那一条这一趟还是复用 ⇒ 整道红（强制现判没起作用）。
-  键相同的不足 K 条（库是空的也算）报「哨兵不足 K 条」，不红；这一趟不读库（全量、--no-reuse、没给库）报「不抽哨兵」，不红；
+  键相同的不足 K 条（库是空的也算）报「哨兵不足 K 条」，不红；这一趟不读库（没给库）报「不抽哨兵」，不红；
   抽中的项这一趟没报结局（没跑到）的逐条报出来，不红。
   python：s = ReuseSentinel(脚本, 标签); s.plan({项: 库里的判定}, reuse=…); s.forced(项); s.observe(项, 结局, 判定); problems = s.finish()
   shell：sentinel-plan / sentinel-forced / sentinel-observe / sentinel-finish 四条命令行，状态放调用方给的一份文件（见「命令行」）。
 
 三、上次红的清单（每道门禁与入口跑完写，.claude/hooks/run-scope-guard.sh 的拒绝说明读它）
-  ~/.local/share/singlefs/last-runs/<脚本相对仓根的路径，/ 换成 __>.tsv（SINGLEFS_LAST_RUNS_DIRECTORY 设了放它底下）：一行一个红的项名或测试名，全绿写空文件。
-  写入原子（同目录建临时文件、写完 fsync、改名换上）。整轮跑（ran 给 None）照这一趟的红整份写；只跑了几项的（--item、--check）
-  上一份里这一趟没跑到的项照留、跑到的换成这一趟的结局。
+  <数据根>/last-runs/<脚本相对仓根的路径，/ 换成 __>.tsv（SINGLEFS_LAST_RUNS_DIRECTORY 设了放它底下；数据根取 .claude/hooks/lib_work_root.py 的 shared_data_path，
+  两台读同一份，那份库读不到、取不到时抛 OSError、不退回 ~ 下）：一行一个红的项名或测试名，全绿写空文件。
+  写入原子（同目录建临时文件、写完 fsync、改名换上）。整轮跑（ran 给 None）照这一趟的红整份写；给了 ran（--item、--check，与入口 scripts/crash/crash-point-replay.sh
+  每一趟交的「这一趟真判过的项」）的，只用 ran 里的项换掉它们在清单里的状态：上一份里这一趟没判到的项（本次未跑、没跑到）照留，判到的换成这一趟的结局。
+  读上一份、合并、换上在一把锁里做（同目录的 <清单文件>.lock，fcntl.flock 排他）：几趟同时写同一份清单的，后写的读到先写的那一份再合，不丢对方的项。
   测试目标（跑一个 cargo 测试目标的驱动：crash-amplification-item.sh、crash-amplification-two-hosts.sh，经 last-run-target）：项名是「<测试目标>」，
   带 --test-filter 的是「<测试目标>::<用例函数>」；退 0 是绿、退 2 / 77 / 130 / 143（用法错、本次未跑、被停）不写、照留，别的退出码是红。
   整个目标跑的那一趟换掉这个目标的全部项（「<目标>」与「<目标>::…」），点名用例的那一趟只换那一项。没显式设 SINGLEFS_LAST_RUNS_DIRECTORY、
@@ -41,11 +43,12 @@
   第三列三种写法：判定库放哪（有判定库）、「无判定库：<欠账 C 号或「待立」>」（没有判定库的测试入口）、「不算：<理由>」（射程里扫到、只是提到别人的复用）。
   判：路径不在、同一路径登记两行、列数不对 ⇒ 红；射程里注释行写了「判定库」或「复用」（^#.*(判定库|复用)）的脚本登记表里没有 ⇒ 红（漏登记）、
     登记成「无判定库」⇒ 红（声称复用而没有这一格）；有判定库的第四列不是 reuse-three-questions ⇒ 红；
-    自证在 .claude/hooks/selftest-registry.tsv 登记为 light（heavy-if-set 而命令里没设那个变量的同算 light；门禁阶段登记 samples-light 与 samples-light-marker 的同算）的现跑，
+    自证一律现跑，
       输出里要有那一份脚本的规范输出且三问都过（认的脚本名：自证命令里那一份、这一行的路径、这一行自己第三列里点名的判法脚本），没有、或有一问 red ⇒ 红；
-    登记为 heavy、heavy-if-set 而命令里设了那个变量、samples-heavy 与没登记的，读上一次输出
-      （SINGLEFS_SELFTEST_OUTPUTS_DIRECTORY，默认 ~/.local/share/singlefs/selftest-outputs/<路径 / 换 __>.log，由 keep-output 写：头一行带那一份脚本当时的 sha256）：
-      没有、或脚本已经变了 ⇒ 这一份本次未跑；有就照判那一行。无判定库的报「本次未跑：没有判定库」；不算的只列名。
+      被测脚本的源码里调 selftest_service_problem 的（自证只在临时 prune-server 上跑，裸跑退 2）包一层起：
+      python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --server-binary <--server-binary 给的那一份> -- bash -c <自证命令>；
+      二进制由调用方（门禁 code-tooling 的 reuse-selftests 格）一趟取一份交 --server-binary，这里不编、不取缺省；要包而没给 --server-binary ⇒ 那一份红；
+    无判定库的报「本次未跑：没有判定库」；不算的只列名。
   退 0 至少一份过、没有红；1 有红；77 一份都没判（全是本次未跑或不算）。成功句报过几份、本次未跑几份（逐个列名）、不算几份。
 
 命令行（退出码：0 成、1 红、2 用法错）：
@@ -57,29 +60,44 @@
   lib_reuse_checks.py sentinel-observe <状态文件> <项> <结局> <判定>
   lib_reuse_checks.py sentinel-observe-many <状态文件> <结局文件>   结局文件一行「项<TAB>结局<TAB>判定」，一次记好几条
   lib_reuse_checks.py sentinel-finish <状态文件>              打判定；退 0 不红、1 红（✗ 行带出路）
-  lib_reuse_checks.py verdict-library-candidate <目录> <种类> <组成表>   VerdictLibrary 形态（scripts/crash/lib_verdict_library.py）的库里这把键有判绿的记录退 0，没有退 1
+  lib_reuse_checks.py verdict-library-candidate <目录> <种类> <组成表>   VerdictLibrary 形态（scripts/crash/lib_verdict_library.py）的库里这把键有判绿的记录退 0，没有退 1；
+                                                              prune-server 不可用退 75（调用方整道退 75，不当「不是候选」）
   lib_reuse_checks.py last-run <脚本相对仓根的路径> <红的清单文件，- 是标准输入> [--ran <跑到的项清单文件>]
   lib_reuse_checks.py last-run-target <脚本相对仓根的路径> <测试目标> <退出码> [--test-filter <用例函数>] [--target-file <测试目标的源文件>]   文件头「三」「测试目标」
-  lib_reuse_checks.py audit <根> --jobs <N> [--timeout <秒>]  门禁 code-tooling 的 reuse-selftests 格
-  lib_reuse_checks.py sample <阶段文件名> <样本名>       门禁样本档（登记成轻的阶段）里的一份：拷进临时目录、跑 setup.sh、起那一道，输出照打、退出码照交
-  lib_reuse_checks.py keep-output <根> <脚本相对仓根的路径> -- <命令…>   跑一条（登记为 heavy 的）自证，输出照原样打、另存成上一次输出，退出码照原样交
+  lib_reuse_checks.py audit <根> --jobs <N> [--timeout <秒>] [--server-binary <prune-server 二进制>]  门禁 code-tooling 的 reuse-selftests 格（文件头「四」）
+  lib_reuse_checks.py sample <阶段文件名> <样本名>       门禁样本档（登记成 samples 或 samples:<假工具目录> 的阶段）里的一份：拷进临时目录、跑 setup.sh、起那一道，输出照打、退出码照交
   lib_reuse_checks.py --selftest
 
-弄坏开关 REUSE_CHECKS_BREAK=<项>[,<项>…]（只给证红用；自证逐个打开，核红在点名那一格）：
-  short-reuse-passes          ① 只看第二趟现判 0、不比复用条数                     「三问：第二趟少复用一条」那一格判错
-  extra-rejudge-passes        ③ 现判的项包住 affected 就算过（多现判的不红）       「三问：闭包内改动多现判一条」那一格判错
-  rejudged-sentinel-passes    哨兵被现判不红                                        「哨兵：被现判判红」那一格判错；各份脚本自证里 reuse-sentinel 那一格同样判错
-  forced-mismatch-passes      强制现判的判定与库里不同不红                          「哨兵：强制现判判定不同判红」那一格判错
-  last-run-partial-overwrites 只跑了几项时整份覆盖上一份（没跑到的红丢了）          「上次红：只跑几项照留没跑到的」那一格判错
-  last-run-in-place           不经临时文件、就地写                                  「上次红：原子换上」那一格判错
-  audit-line-unchecked        audit 不看规范输出那一行，自证退 0 就算过              「audit：缺规范输出判红」那一格判错；门禁 code-tooling 的样本 reuse-selftests-red 判绿
-  audit-scan-skipped          audit 不现扫射程，漏登记的不红                        「audit：漏登记判红」那一格判错
-  audit-leaked-library        audit 另认的判法脚本取登记表最后一行的第三列，不取这一行自己的   「audit：每一行认自己第三列点名的判法脚本」那一格判错
+弄坏开关 REUSE_CHECKS_BREAK=<项>[,<项>…]（只给证红用；自证逐个打开，核红在点名那一格；--selftest 本身与它起的子进程、门禁样本根里由阶段转来的认，平常跑设了退 2、点名只在自证里认）：
+  REUSE_CHECKS_BREAK=short-reuse-passes  ① 只看第二趟现判 0、不比复用条数
+      「三问：第二趟少复用一条」那一格判错
+  REUSE_CHECKS_BREAK=extra-rejudge-passes  ③ 现判的项包住 affected 就算过（多现判的不红）
+      「三问：闭包内改动多现判一条」那一格判错
+  REUSE_CHECKS_BREAK=rejudged-sentinel-passes  哨兵被现判不红
+      「哨兵：被现判判红」那一格判错；各份脚本自证里 reuse-sentinel 那一格同样判错
+  REUSE_CHECKS_BREAK=forced-mismatch-passes  强制现判的判定与库里不同不红
+      「哨兵：强制现判判定不同判红」那一格判错
+  REUSE_CHECKS_BREAK=last-run-partial-overwrites  只跑了几项时整份覆盖上一份（没跑到的红丢了）
+      「上次红：只跑几项照留没跑到的」「上次红：两趟交错写，没判的项照留」两格判错
+  REUSE_CHECKS_BREAK=last-run-in-place  不经临时文件、就地写
+      「上次红：原子换上」那一格判错
+  REUSE_CHECKS_BREAK=last-run-unlocked  读上一份、合并、换上不拿锁（几趟同时写时后换上的盖掉先换上的）
+      「上次红：并发两趟各写各的、不丢对方的项」那一格判错
+  REUSE_CHECKS_BREAK=audit-line-unchecked  audit 不看规范输出那一行，自证退 0 就算过
+      「audit：缺规范输出判红」那一格判错；门禁 code-tooling 的样本 reuse-selftests-red 判绿
+  REUSE_CHECKS_BREAK=audit-scan-skipped  audit 不现扫射程，漏登记的不红
+      「audit：漏登记判红」那一格判错
+  REUSE_CHECKS_BREAK=audit-leaked-library  audit 另认的判法脚本取登记表最后一行的第三列，不取这一行自己的
+      「audit：每一行认自己第三列点名的判法脚本」那一格判错
+  REUSE_CHECKS_BREAK=audit-bare-selftest  audit 现跑要临时服务的自证也裸跑、不包 --with-temporary-service（改前的样子）
+      「audit：要临时服务的自证包一层起」那一格判错
+  REUSE_CHECKS_BREAK=shared-directories-ignore-data-root  上次红的清单不看 SINGLEFS_DATA_ROOT，一律落在 ~ 下（改前的样子：第二台落进它本地那一份）
+      「上次红：没设目录时取数据根下的 last-runs」那一格判错
 """
 import concurrent.futures
+import fcntl
 import fnmatch
 import glob
-import hashlib
 import importlib.util
 import json
 import os
@@ -107,9 +125,7 @@ SENTINEL_COUNT_VARIABLE = "SINGLEFS_REUSE_SENTINEL_COUNT"
 SENTINEL_SEED_VARIABLE = "SINGLEFS_REUSE_SENTINEL_SEED"
 DEFAULT_SENTINEL_COUNT = 3
 LAST_RUNS_VARIABLE = "SINGLEFS_LAST_RUNS_DIRECTORY"
-DEFAULT_LAST_RUNS_DIRECTORY = "~/.local/share/singlefs/last-runs"
-SELFTEST_OUTPUTS_VARIABLE = "SINGLEFS_SELFTEST_OUTPUTS_DIRECTORY"
-DEFAULT_SELFTEST_OUTPUTS_DIRECTORY = "~/.local/share/singlefs/selftest-outputs"
+LAST_RUNS_ENTRY = "last-runs"   # 没设上面那个变量时取数据根下的这一项（.claude/hooks/lib_work_root.py 的 shared_data_path，两台读同一份）
 REGISTRY = os.path.join(".claude", "gate.d", "verdict-library-scripts.tsv")
 SELFTEST_REGISTRY = os.path.join(".claude", "hooks", "selftest-registry.tsv")
 CLAIM_LINE = re.compile(r"^#.*(判定库|复用)")
@@ -121,6 +137,7 @@ BREAK = {item for item in os.environ.get("REUSE_CHECKS_BREAK", "").split(",") if
 SCRIPT_PATH = os.path.realpath(__file__)
 REPOSITORY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_PATH)))
 VERDICT_LIBRARY_PATH = os.path.join(REPOSITORY_ROOT, "scripts", "crash", "lib_verdict_library.py")
+WORK_ROOT_LIBRARY_PATH = os.path.join(REPOSITORY_ROOT, ".claude", "hooks", "lib_work_root.py")   # 数据根与它下面共享的那几项只在它里面定义
 _VERDICT_LIBRARY = []
 
 
@@ -271,7 +288,7 @@ class ReuseSentinel:
         return f"复用哨兵（{self.label}）" if self.label else "复用哨兵"
 
     def plan(self, candidates, reuse=True, off_reason="这一趟不读判定库", printer=print):
-        """candidates：{项: 库里那一条的判定}，只放此刻键相同、有判定的项。reuse 为假（全量、--no-reuse、没给库）不抽。"""
+        """candidates：{项: 库里那一条的判定}，只放此刻键相同、有判定的项。reuse 为假（没给库）不抽。"""
         if not reuse:
             self.state, self.off_reason = "off", off_reason
             printer(f"  · {self.title()}：{off_reason}，不抽哨兵")  # gate-lint:detail
@@ -358,22 +375,39 @@ def verdict_library():
 
 
 def verdict_library_candidate(directory, kind, components, judging_units):
-    """VerdictLibrary 形态的库（<目录>/<种类>/keys/<键>.json）里此刻这把键有判绿的记录：交 True。
-    与复用判法（VerdictLibrary.lookup）分开查：只看键文件在不在、记的是不是绿、键对不对得上；拒算的不是候选。"""
+    """VerdictLibrary 形态的库（<目录>/<种类> 在 prune-server 里那一份的 keys/<键>.json）里此刻这把键有判绿的记录：交 True。
+    与复用判法（VerdictLibrary.lookup）分开查：只看键文件在不在、记的是不是绿、键对不对得上；拒算的不是候选。服务不可用客户端退 75（不交 False）。"""
     if not directory:
         return False
     library = verdict_library()
     if library.refused_component(components, judging_units) is not None:
         return False
     key = library.key_of(components, judging_units)
-    record = library.read_json(os.path.join(directory, kind, "keys", key + ".json"))
+    # 键文件读 prune-server 里那一份（lib_verdict_library.py 文件头「存放」）；仍与 lookup 分开，只看这一份记录
+    record = library.read_library_json(os.path.join(directory, kind), f"keys/{key}.json")
     return isinstance(record, dict) and record.get("verdict") == "green" and record.get("key") == key
 
 
 # ── 三、上次红的清单 ──
 
+def shared_data_path(name, variable):
+    """数据根下共享的那一项（.claude/hooks/lib_work_root.py 的 shared_data_path，两台读同一份）；那份库读不到、取不到时抛 OSError，说明里写出路。
+    弄坏开关 shared-directories-ignore-data-root：交给它的环境里摘掉 SINGLEFS_DATA_ROOT（改前的样子：一律落在 ~ 下，第二台落进它本地那一份）。"""
+    try:
+        specification = importlib.util.spec_from_file_location("lib_work_root_for_reuse_checks", WORK_ROOT_LIBRARY_PATH)
+        module = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(module)
+        environment = None
+        if "shared-directories-ignore-data-root" in BREAK:
+            environment = {key: value for key, value in os.environ.items() if key != module.DATA_ROOT_VARIABLE}
+        return module.shared_data_path(name, environment)
+    except (OSError, ImportError, AttributeError, ValueError) as error:
+        raise OSError(f"取不到数据根下的 {name}（{WORK_ROOT_LIBRARY_PATH}：{error}）；修好那份库（还没有 shared_data_path 的先把那一版换上），"
+                      f"或设 {variable} 指到要用的目录") from error
+
+
 def last_runs_directory():
-    return os.environ.get(LAST_RUNS_VARIABLE) or os.path.expanduser(DEFAULT_LAST_RUNS_DIRECTORY)
+    return os.environ.get(LAST_RUNS_VARIABLE) or shared_data_path(LAST_RUNS_ENTRY, LAST_RUNS_VARIABLE)
 
 
 def last_run_path(script_key):
@@ -408,15 +442,34 @@ def write_atomically(path, text):
         raise
 
 
-def write_last_run(script_key, red_names, ran_names=None):
-    """写上次红的清单，交路径。ran_names 给 None 是整轮；给了是这一趟只跑到的那几项（上一份里别的项照留）。"""
-    path = last_run_path(script_key)
+def last_run_lock_path(path):
+    return path + ".lock"
+
+
+def merge_and_write_last_run(path, red_names, ran_names):
+    """读上一份、合并、原子换上（调用方已拿着锁，或弄坏开关 last-run-unlocked 下不拿）：写法照文件头「三」。"""
     red = list(dict.fromkeys(name for name in red_names if name))
     if ran_names is not None and "last-run-partial-overwrites" not in BREAK:
         ran = set(ran_names) | set(red)
         kept = [name for name in read_last_run(path) if name not in ran]
         red = kept + red
     write_atomically(path, "".join(name + "\n" for name in red))
+
+
+def write_last_run(script_key, red_names, ran_names=None):
+    """写上次红的清单，交路径。ran_names 给 None 是整轮；给了是这一趟真判过的那几项（上一份里别的项照留）。
+    读上一份、合并、换上在同目录 <清单文件>.lock 的排他锁里做（文件头「三」）；弄坏开关 last-run-unlocked 下不拿锁。"""
+    path = last_run_path(script_key)
+    if "last-run-unlocked" in BREAK:
+        merge_and_write_last_run(path, red_names, ran_names)
+        return path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(last_run_lock_path(path), "a", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            merge_and_write_last_run(path, red_names, ran_names)
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
     return path
 
 
@@ -512,47 +565,6 @@ def command_script(command):
     return None, assigned
 
 
-def command_is_light(tier, assigned):
-    if tier == "light" or tier in ("samples-light",) or (tier or "").startswith("samples-light-marker:"):
-        return True
-    if (tier or "").startswith("heavy-if-set:"):
-        return tier.split(":", 1)[1] not in assigned
-    return False
-
-
-def selftest_outputs_directory():
-    return os.environ.get(SELFTEST_OUTPUTS_VARIABLE) or os.path.expanduser(DEFAULT_SELFTEST_OUTPUTS_DIRECTORY)
-
-
-def selftest_output_path(script_key):
-    return os.path.join(selftest_outputs_directory(), script_key.replace("/", "__") + ".log")
-
-
-def file_sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for block in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def stored_output(root, script_key):
-    """上一次输出：交 (正文或 None, 为什么没有)。头一行「# selftest-output script=<路径> sha256=<那时的 sha256> …」，脚本变了不认。"""
-    path = selftest_output_path(script_key)
-    try:
-        with open(path, encoding="utf-8", errors="replace") as handle:
-            text = handle.read()
-    except OSError:
-        return None, f"没有上一次输出（{path}；主 agent 提交前用 python3 scripts/gate/lib_reuse_checks.py keep-output . {script_key} -- <自证命令> 跑一次）"
-    found = re.match(r"^# selftest-output script=(\S+) sha256=([0-9a-f]{64})", text)
-    if not found or found.group(1) != script_key:
-        return None, f"{path} 头一行不是 keep-output 写的那种，不认"
-    current = file_sha256(os.path.join(root, script_key))
-    if found.group(2) != current:
-        return None, f"{path} 是 {script_key} 旧版本（sha256 {found.group(2)[:12]}…，此刻 {current[:12]}…）的输出，脚本变了之后还没重跑"
-    return text, ""
-
-
 def run_command(root, command, timeout):
     try:
         completed = subprocess.run(["bash", "-c", command], cwd=root, capture_output=True, text=True, timeout=timeout,
@@ -563,11 +575,13 @@ def run_command(root, command, timeout):
         return None, output + f"\n（{timeout} 秒没跑完）"
 
 
-def audit(root, jobs, timeout):
+def audit(root, jobs, timeout, server_binary=None):
+    # 自证只在临时 prune-server 上跑的脚本（源码里调 selftest_service_problem）包一层起（文件头「四」）；常量放函数里：模块级赋值会进 import 这一份的各家判法单元闭包
+    temporary_service_wrapper = "scripts/prune-server/prune_server_client_selftest.py"
+    temporary_service_mark = "selftest_service_problem"
     root = os.path.abspath(root)
     rows, scans, problems = read_registry(root)
     red = [(problem, f"照 {REGISTRY} 表头的写法改这一行") for problem in problems]
-    tiers = selftest_tiers(root)
     by_path = {}
     for number, path, command, library, cell in rows:
         if path in by_path:
@@ -603,25 +617,26 @@ def audit(root, jobs, timeout):
         if script is None or not os.path.isfile(os.path.join(root, script)):
             red.append((f"{REGISTRY} 第 {number} 行：自证命令「{command}」里认不出被测脚本，或它不在", "命令写成 python3 <脚本> --selftest 或 bash <脚本> --selftest 这种样子"))
             continue
-        to_run.append((path, command, script, command_is_light(tiers.get(script), assigned), tiers.get(script), library))
-    light_commands = sorted({command for _path, command, _script, light, _tier, _library in to_run if light})
+        with open(os.path.join(root, script), encoding="utf-8", errors="replace") as handle:
+            needs_service = temporary_service_mark in handle.read()
+        if needs_service and "audit-bare-selftest" not in BREAK:
+            if not server_binary:
+                red.append((f"{path}：自证只在临时 prune-server 上跑（{script} 调 {temporary_service_mark}，裸跑退 2），audit 没给 --server-binary",
+                            "门禁 code-tooling 的 reuse-selftests 格先取一份 prune-server 二进制再交 --server-binary；单跑写 python3 scripts/gate/lib_reuse_checks.py audit <根> --jobs <N> --server-binary <prune-server 二进制>"))
+                continue
+            command = (f"python3 {temporary_service_wrapper} --with-temporary-service --server-binary {shlex.quote(server_binary)} -- bash -c {shlex.quote(command)}")
+        to_run.append((path, command, script, library))
+    commands = sorted({command for _path, command, _script, _library in to_run})
     outputs = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(jobs, len(light_commands) or 1))) as pool:
-        futures = {command: pool.submit(run_command, root, command, timeout) for command in light_commands}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(jobs, len(commands) or 1))) as pool:
+        futures = {command: pool.submit(run_command, root, command, timeout) for command in commands}
         for command, future in futures.items():
             outputs[command] = future.result()
-    if len(outputs) != len(light_commands):
-        red.append((f"现跑的自证派出 {len(light_commands)} 条、收回 {len(outputs)} 条", "整格重跑一次；收不全的一趟不算判过"))
-    for path, command, script, light, tier, row_library in sorted(to_run):
-        if light:
-            exit_code, text = outputs.get(command, (None, ""))
-            how = f"现跑「{command}」退 {exit_code}"
-        else:
-            text, why = stored_output(root, script)
-            if text is None:
-                not_run.append(f"{path}（本次未跑：自证登记为 {tier or '没登记'}，{why}）")
-                continue
-            exit_code, how = 0, f"读 {script} 的上一次输出（自证登记为 {tier or '没登记'}）"
+    if len(outputs) != len(commands):
+        red.append((f"现跑的自证派出 {len(commands)} 条、收回 {len(outputs)} 条", "整格重跑一次；收不全的一趟不算判过"))
+    for path, command, script, row_library in sorted(to_run):
+        exit_code, text = outputs.get(command, (None, ""))
+        how = f"现跑「{command}」退 {exit_code}"
         if "audit-line-unchecked" in BREAK:
             verdict, why = exit_code == 0, "没看规范输出那一行"
         else:
@@ -655,31 +670,16 @@ def audit(root, jobs, timeout):
     return EXIT_GREEN
 
 
-def keep_output(root, script_key, command):
-    root = os.path.abspath(root)
-    if not os.path.isfile(os.path.join(root, script_key)):
-        print(f"  ✗ keep-output：{script_key} 不在 {root} 底下")
-        print("     → 怎么办：脚本路径写相对仓根的，例如 scripts/crash/crash-point-replay-shard-run.sh")
-        return EXIT_USAGE
-    digest = file_sha256(os.path.join(root, script_key))
-    completed = subprocess.run(command, cwd=root, capture_output=True, text=True, errors="replace")
-    text = completed.stdout + completed.stderr
-    sys.stdout.write(text)
-    write_atomically(selftest_output_path(script_key),
-                     f"# selftest-output script={script_key} sha256={digest} exit={completed.returncode} command={shlex.join(command)}\n{text}")
-    return completed.returncode
-
-
 def run_sample(stage, name):
-    """门禁样本档里的一份（登记成 samples-light、samples-light-marker 的阶段）：拷进临时目录、有 setup.sh 先跑它，再在那里起这一道阶段，输出照原样打，退出码照交。
+    """门禁样本档里的一份（登记成 samples、samples:<假工具目录> 的阶段）：拷进临时目录、有 setup.sh 先跑它，再在那里起这一道阶段，输出照原样打，退出码照交。
     门禁 code-tooling 的 reuse-selftests 格经它起样本档里的复用三问（只判那一份样本的规范输出，不比 expect）。"""
     import shutil
     key = f".claude/gate.d/{stage}"
     tier = selftest_tiers(REPOSITORY_ROOT).get(key, "")
     fixture = os.path.join(REPOSITORY_ROOT, ".claude", "gate.d", "fixtures", stage, name)
-    if not (tier == "samples-light" or tier.startswith("samples-light-marker:")):
-        print(f"  ✗ sample：{key} 的样本档在 {SELFTEST_REGISTRY} 里登记的是「{tier or 没登记}」，不是轻的，这里不起")
-        print("     → 怎么办：登记成 samples-heavy 的样本档归提交前；轻的照 selftest-registry.tsv 表尾的写法登记")
+    if not (tier == "samples" or tier.startswith("samples:")):
+        print(f"  ✗ sample：{key} 的样本档在 {SELFTEST_REGISTRY} 里登记的是「{tier or '没登记'}」，不是样本档的登记")
+        print("     → 怎么办：样本档照 selftest-registry.tsv 表头的写法登记成 samples 或 samples:<假工具目录>")
         return EXIT_USAGE
     if not os.path.isdir(fixture):
         print(f"  ✗ sample：没有样本 {os.path.relpath(fixture, REPOSITORY_ROOT)}")
@@ -747,7 +747,7 @@ def main(arguments):
     if arguments[:1] == ["--selftest"]:
         return selftest()
     if not arguments:
-        print("  ✗ 用法：lib_reuse_checks.py three-questions|sentinel-plan|sentinel-forced|sentinel-observe|sentinel-finish|verdict-library-candidate|last-run|audit|keep-output … | --selftest")
+        print("  ✗ 用法：lib_reuse_checks.py three-questions|sentinel-plan|sentinel-forced|sentinel-observe|sentinel-finish|verdict-library-candidate|last-run|audit … | --selftest")
         print("     → 怎么办：看文件头「命令行」一段")
         return EXIT_USAGE
     command, rest = arguments[0], arguments[1:]
@@ -841,16 +841,11 @@ def main(arguments):
             if jobs is None or not jobs.isdigit() or int(jobs) < 1:
                 raise ValueError("要 --jobs <正整数>（门禁 code-tooling 取每台默认重活线程数给）")
             timeout = int(option_value(rest, "--timeout", str(DEFAULT_AUDIT_TIMEOUT_SECONDS)))
-            return audit(rest[0], int(jobs), timeout)
+            return audit(rest[0], int(jobs), timeout, option_value(rest, "--server-binary"))
         if command == "sample":
             if len(rest) != 2:
                 raise ValueError("要 <阶段文件名> <样本名>")
             return run_sample(rest[0], rest[1])
-        if command == "keep-output":
-            if len(rest) < 4 or "--" not in rest:
-                raise ValueError("要 <根> <脚本相对仓根的路径> -- <命令…>")
-            separator = rest.index("--")
-            return keep_output(rest[0], rest[1], rest[separator + 1:])
     except (ValueError, OSError, json.JSONDecodeError, KeyError) as error:
         print(f"  ✗ {command}：{error}")
         print("     → 怎么办：看文件头「命令行」一段的写法")
@@ -863,6 +858,14 @@ def main(arguments):
 # ── 自证 ──
 
 def selftest():
+    # 「判定库形态的候选」那一格写进 prune-server：只在临时服务上跑（scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service），
+    # 不是就一格都不跑，不写真服务
+    client = verdict_library().prune_server_client()
+    service_problem = client.selftest_service_problem() if client is not None else "这棵树里没有 scripts/prune-server/prune_server_client.py"
+    if service_problem:
+        print(f"  ✗ lib_reuse_checks 自证没跑：{service_problem}")
+        print(f"     → 怎么办：{client.SELFTEST_SERVICE_REMEDY if client is not None else '在带着 scripts/prune-server/ 的仓里跑'}")
+        return EXIT_USAGE
     cases, wrong = 0, []
 
     def cell(label, passed, detail):
@@ -944,7 +947,7 @@ def selftest():
     cell("哨兵：不足 K 条报出、不红", any("哨兵不足 3 条" in text for text in lines) and finished(short, {"a": (REUSED, "绿")}) == [], repr(lines))
     lines = []
     off = ReuseSentinel("scripts/x.sh", "格", count=3, seed=1)
-    off.plan(candidates, reuse=False, off_reason="全量（不读判定库）", printer=lines.append)
+    off.plan(candidates, reuse=False, off_reason="没给判定库", printer=lines.append)
     cell("哨兵：不读库的一趟不抽", off.state == "off" and not off.forced("a") and finished(off, {"a": (JUDGED, "绿")}) == [] and "不抽哨兵" in lines[0], repr(lines))
 
     with tempfile.TemporaryDirectory(prefix="lib-reuse-checks-selftest-") as work:
@@ -1014,6 +1017,38 @@ def selftest():
             write_last_run("scripts/crash/x.sh", ["丁"])
             cell("上次红：原子换上", os.stat(path).st_ino != inode and read_last_run(path) == ["丁"]
                  and not [name for name in os.listdir(os.path.dirname(path)) if name.startswith(".")], f"inode {inode} → {os.stat(path).st_ino}")
+            # 两趟交错写：一趟判了甲红、乙没跑（ran 只有甲），另一趟判了乙绿、甲没跑（ran 只有乙）⇒ 清单里甲仍红
+            write_last_run("scripts/crash/v.sh", ["甲"], ran_names=["甲"])
+            write_last_run("scripts/crash/v.sh", [], ran_names=["乙"])
+            interleaved = read_last_run(last_run_path("scripts/crash/v.sh"))
+            cell("上次红：两趟交错写，没判的项照留", interleaved == ["甲"], f"判了甲红的一趟、判了乙绿的一趟之后清单是 {interleaved}，应为 ['甲']")
+            # 并发两趟：这一边先拿着锁、读了上一份（子），再起另一趟（子进程，判了丑红）；锁在手里时那一趟应当等着；这一边写上自己判的寅红、放锁，
+            #   那一趟才读到含寅的一份再合 ⇒ 子、丑、寅都在。不拿锁（last-run-unlocked）时那一趟不等、先换上子丑，这一边再照先读的一份换上子寅，丑丢了
+            concurrent_key = "scripts/crash/u.sh"
+            concurrent_path = last_run_path(concurrent_key)
+            write_last_run(concurrent_key, ["子"])
+            ran_file = os.path.join(work, "concurrent.ran")
+            with open(ran_file, "w", encoding="utf-8") as handle:
+                handle.write("丑\n")
+            waited, other_exit = False, None
+            with open(last_run_lock_path(concurrent_path), "a", encoding="utf-8") as lock:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+                earlier = read_last_run(concurrent_path)
+                other = subprocess.Popen(command + ["last-run", concurrent_key, "-", "--ran", ran_file], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                         stderr=subprocess.DEVNULL, text=True)
+                other.stdin.write("丑\n")
+                other.stdin.close()
+                try:
+                    other_exit = other.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    waited = True
+                write_atomically(concurrent_path, "".join(name + "\n" for name in [name for name in earlier if name != "寅"] + ["寅"]))
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+            if other_exit is None:
+                other_exit = other.wait(timeout=60)
+            concurrent = read_last_run(concurrent_path)
+            cell("上次红：并发两趟各写各的、不丢对方的项", waited and other_exit == 0 and sorted(concurrent) == sorted(["子", "丑", "寅"]),
+                 f"另一趟{'等了锁' if waited else '没等锁'}、退 {other_exit}，清单是 {concurrent}，应为子、丑、寅都在")
             piped = subprocess.run(command + ["last-run", "scripts/crash/y.sh", "-"], input="戊\n", capture_output=True, text=True)
             cell("上次红：命令行从标准输入读", piped.returncode == 0 and read_last_run(last_run_path("scripts/crash/y.sh")) == ["戊"], piped.stdout)
             # 测试目标：整个目标红、点名用例绿（目标那一项照留）、点名用例红、本次未跑照留、整个目标绿（这个目标的项全换掉，别的目标的照留）
@@ -1031,16 +1066,28 @@ def selftest():
         finally:
             os.environ.pop(LAST_RUNS_VARIABLE, None)
 
+        # 目录变量没设：取数据根下的那一项（.claude/hooks/lib_work_root.py 的 shared_data_path），数据根照 SINGLEFS_DATA_ROOT
+        saved = {name: os.environ.pop(name, None) for name in (LAST_RUNS_VARIABLE, "SINGLEFS_DATA_ROOT")}
+        os.environ["SINGLEFS_DATA_ROOT"] = os.path.join(work, "data-root")
+        try:
+            shared = last_runs_directory()
+        except OSError as error:
+            shared = f"取不到：{error}"
+        finally:
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+        cell("上次红：没设目录时取数据根下的 last-runs", shared == os.path.join(work, "data-root", "last-runs"), f"取到 {shared}")
+
         # audit：一棵小仓
         def audit_root(name, registry_rows, scripts):
             root = os.path.join(work, name)
             os.makedirs(os.path.join(root, ".claude", "gate.d"))
-            os.makedirs(os.path.join(root, ".claude", "hooks"))
             os.makedirs(os.path.join(root, "scripts", "gate"))
             with open(os.path.join(root, REGISTRY), "w", encoding="utf-8") as handle:
                 handle.write("# 自证用\n# scan: scripts/gate/*.sh\n" + "".join("\t".join(row) + "\n" for row in registry_rows))
-            with open(os.path.join(root, SELFTEST_REGISTRY), "w", encoding="utf-8") as handle:
-                handle.write("".join(f"scripts/gate/{script}\tlight\t# 自证用\n" for script in scripts))
             for script, body in scripts.items():
                 with open(os.path.join(root, "scripts", "gate", script), "w", encoding="utf-8") as handle:
                     handle.write(body)
@@ -1052,9 +1099,9 @@ def selftest():
         mention = "#!/usr/bin/env bash\n# 只提到别人的复用\necho\n"
         row = lambda script, library="<临时目录>/a": [f"scripts/gate/{script}", f"bash scripts/gate/{script} --selftest", library, CELL_NAME]  # noqa: E731
 
-        def audit_of(root):
+        def audit_of(root, extra=()):
             buffer = []
-            completed = subprocess.run(command + ["audit", root, "--jobs", "2"], capture_output=True, text=True)
+            completed = subprocess.run(command + ["audit", root, "--jobs", "2", *extra], capture_output=True, text=True)
             buffer.append(completed.stdout)
             return completed.returncode, "".join(buffer)
 
@@ -1080,32 +1127,32 @@ def selftest():
                           {"x.sh": judged_by("judge-x.sh"), "y.sh": judged_by("judge-y.sh")})
         got, text = audit_of(root)
         cell("audit：每一行认自己第三列点名的判法脚本", got == 0 and "复用三问过 2 份" in text, f"退 {got}：{text.strip()[-400:]}")
-        root = audit_root("audit-heavy", [row("h.sh")], {"h.sh": green_body.replace("a.sh", "h.sh")})
-        with open(os.path.join(root, SELFTEST_REGISTRY), "w", encoding="utf-8") as handle:
-            handle.write("scripts/gate/h.sh\theavy\t# 偏离上游：自证用\n")
-        os.environ[SELFTEST_OUTPUTS_VARIABLE] = os.path.join(work, "outputs")
-        try:
-            got, text = audit_of(root)
-            not_stored = got == 77 and "没有上一次输出" in text
-            kept = subprocess.run(command + ["keep-output", root, "scripts/gate/h.sh", "--", "bash", "scripts/gate/h.sh", "--selftest"], capture_output=True, text=True)
-            got, text = audit_of(root)
-            stored = got == 0 and "读 scripts/gate/h.sh 的上一次输出" in text
-            with open(os.path.join(root, "scripts", "gate", "h.sh"), "a", encoding="utf-8") as handle:
-                handle.write("# 改了一行\n")
-            got, text = audit_of(root)
-            stale = got == 77 and "旧版本" in text
-        finally:
-            os.environ.pop(SELFTEST_OUTPUTS_VARIABLE, None)
-        cell("audit：heavy 读上一次输出、脚本变了本次未跑", not_stored and kept.returncode == 0 and stored and stale,
-             f"没存 {not_stored}，keep-output 退 {kept.returncode}，存了 {stored}，变了 {stale}：{text.strip()[-300:]}")
+        # 要临时服务的自证（源码里调 selftest_service_problem）：audit 包一层起。小仓里放一份假的包装（核参数、设 FAKE_TEMPORARY_SERVICE=1 再起 -- 后面那条），
+        #   假自证只在那个变量设着时打三问都过的规范输出、没设退 2（照真的那几份裸跑退 2）；给了 --server-binary 过，没给判红
+        wrapped_body = ("#!/usr/bin/env bash\n# 判定库：自证用；自证开跑先调 selftest_service_problem（只在临时服务上跑）\n"
+                        "[[ \"${FAKE_TEMPORARY_SERVICE:-}\" == 1 ]] || { echo '  ✗ 自证没跑：没有临时 prune-server'; echo '     → 怎么办：经 prune_server_client_selftest.py --with-temporary-service 起'; exit 2; }\n"
+                        + green_body.split("\n", 2)[2].replace("a.sh", "w.sh"))
+        root = audit_root("audit-temporary-service", [row("w.sh")], {"w.sh": wrapped_body})
+        os.makedirs(os.path.join(root, "scripts", "prune-server"))
+        with open(os.path.join(root, "scripts", "prune-server", "prune_server_client_selftest.py"), "w", encoding="utf-8") as handle:
+            handle.write("import os, sys\narguments = sys.argv[1:]\n"
+                         "if arguments[:3] != ['--with-temporary-service', '--server-binary', '/fake/prune-server'] or arguments[3:4] != ['--']:\n"
+                         "    print('假包装认不出参数：', arguments); sys.exit(2)\n"
+                         "os.environ['FAKE_TEMPORARY_SERVICE'] = '1'\nos.execvp(arguments[4], arguments[4:])\n")
+        wrapped_got, wrapped_text = audit_of(root, ("--server-binary", "/fake/prune-server"))
+        bare_got, bare_text = audit_of(root)
+        cell("audit：要临时服务的自证包一层起", wrapped_got == 0 and "复用三问过 1 份" in wrapped_text and bare_got == 1 and "audit 没给 --server-binary" in bare_text,
+             f"给了 --server-binary 退 {wrapped_got}：{wrapped_text.strip()[-300:]}；没给退 {bare_got}：{bare_text.strip()[-300:]}")
 
     breaks_missed, breaks_proven = [], 0
     if not wrong and not BREAK:
         for item, label in (("short-reuse-passes", "三问：第二趟少复用一条"), ("extra-rejudge-passes", "三问：闭包内改动多现判一条"),
                             ("rejudged-sentinel-passes", "哨兵：被现判判红"), ("forced-mismatch-passes", "哨兵：强制现判判定不同判红"),
-                            ("last-run-partial-overwrites", "上次红：只跑几项照留没跑到的"), ("last-run-in-place", "上次红：原子换上"),
+                            ("last-run-partial-overwrites", "上次红：只跑几项照留没跑到的"), ("last-run-partial-overwrites", "上次红：两趟交错写，没判的项照留"),
+                            ("last-run-in-place", "上次红：原子换上"), ("last-run-unlocked", "上次红：并发两趟各写各的、不丢对方的项"),
                             ("audit-line-unchecked", "audit：缺规范输出判红"), ("audit-scan-skipped", "audit：漏登记判红"),
-                            ("audit-leaked-library", "audit：每一行认自己第三列点名的判法脚本")):
+                            ("audit-leaked-library", "audit：每一行认自己第三列点名的判法脚本"), ("audit-bare-selftest", "audit：要临时服务的自证包一层起"),
+                            ("shared-directories-ignore-data-root", "上次红：没设目录时取数据根下的 last-runs")):
             completed = subprocess.run([sys.executable, SCRIPT_PATH, "--selftest"], capture_output=True, text=True, env=dict(os.environ, REUSE_CHECKS_BREAK=item))
             if completed.returncode == 0 or f"{label} 这一格判错" not in completed.stdout:
                 breaks_missed.append(f"{item}（要红在「{label}」）")
@@ -1124,6 +1171,40 @@ def selftest():
     return EXIT_GREEN
 
 
+BREAK_VARIABLES = ("REUSE_CHECKS_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；门禁样本根（当前目录有 .gate-cells 或 .gate-break-sample、没设 GATE_STAGED_FROM）里由阶段转来的；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    sample_root = (os.path.exists(".gate-cells") or os.path.exists(".gate-break-sample")) and not os.environ.get("GATE_STAGED_FROM")
+    if not setting or arguments[:1] == ["--selftest"] or sample_root or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）和门禁样本根里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/lib_reuse_checks.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

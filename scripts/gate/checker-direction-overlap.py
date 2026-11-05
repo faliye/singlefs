@@ -485,8 +485,8 @@ def check(root, show_all=False):
     for unit in outside:
         scan_via, traversal_via = scan_referrers.get(id(unit)), traversal_referrers.get(id(unit))
         no_referrer = "没有函数点它的名字，库按结构或类型连进来"
-        print(f"  ✗ 越界 {unit_place(unit)}（扫描式从 {scan_origins[id(unit)].unit.name} 收进、经 {short_place(scan_via) if scan_via else no_referrer}；"
-              f"遍历式从 {traversal_origins[id(unit)].unit.name} 收进、经 {short_place(traversal_via) if traversal_via else no_referrer}）")  # gate-lint:detail
+        print(f"  ✗ 越界 {unit_place(unit)}（扫描式从 {scan_origins[id(unit)].unit.name} 收进、经 {short_place(scan_via) if scan_via else no_referrer}；"  # gate-lint:detail
+              f"遍历式从 {traversal_origins[id(unit)].unit.name} 收进、经 {short_place(traversal_via) if traversal_via else no_referrer}）")  # 出路在 report() 的汇总行
     return report(problems, summary, len(outside), len(allowed_functions), len(declarations), len(constants), len(structures), len(reporting))
 
 

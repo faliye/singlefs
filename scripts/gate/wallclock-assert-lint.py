@@ -36,17 +36,25 @@
 
 退出码：0 全对；1 有红（逐条点名文件:行号）；2 用法错；77 scripts/experiment-apparatus/ 下一份 .rs 都没有、或一个 #[test] 都没扫到。
 
-弄坏开关 WALLCLOCK_ASSERT_LINT_BREAK=<项>（逗号连几个；只在 --selftest 里认，别处设了只打一句提醒）：
-  registration-unchecked 有挂钟断言没登记位的也判绿，unregistered 与 propagated-unregistered 两格该红
-  misplaced-unchecked    登记位挂在没有挂钟断言的函数上、或下面不是 #[test] 的也判绿，misplaced 与 orphan 与 load-safe-misplaced 三格该红
-  placement-unchecked    登记位不在 #[test] 与 fn 之间、也不是 #[test] 上方紧挨的一行，也判绿，marker-too-far 一格该红
-  reason-unchecked       理由太短也判绿，reason-short 一格该红
-  collision-unchecked    登记名是别的测试名的子串也判绿，name-collision 一格该红
-  propagation-off        只看断言参数字面上的挂钟量、不传污染：propagated-unregistered 一格该红
-  lag-unchecked          滞后表里已经登记了或不再是挂钟断言的陈旧行不报：lag-stale 一格该红
+弄坏开关（逗号连几个；只给自证用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认；
+自证自带开关轮，逐个设上起 --selftest-inner，红的格逐条以「✗ 自证 <格名>：」起头；单跑一条：WALLCLOCK_ASSERT_LINT_BREAK=<项> python3 scripts/gate/wallclock-assert-lint.py --selftest）：
+  WALLCLOCK_ASSERT_LINT_BREAK=registration-unchecked  有挂钟断言没登记位的也判绿
+      「✗ 自证 unregistered：」「✗ 自证 propagated-unregistered：」
+  WALLCLOCK_ASSERT_LINT_BREAK=misplaced-unchecked  登记位挂在没有挂钟断言的函数上、或下面不是 #[test] 的也判绿
+      「✗ 自证 misplaced：」「✗ 自证 orphan：」「✗ 自证 load-safe-misplaced：」
+  WALLCLOCK_ASSERT_LINT_BREAK=placement-unchecked  登记位不在 #[test] 与 fn 之间、也不是 #[test] 上方紧挨的一行，也判绿
+      「✗ 自证 marker-too-far：」
+  WALLCLOCK_ASSERT_LINT_BREAK=reason-unchecked  理由太短也判绿
+      「✗ 自证 reason-short：」
+  WALLCLOCK_ASSERT_LINT_BREAK=collision-unchecked  登记名是别的测试名的子串也判绿
+      「✗ 自证 name-collision：」
+  WALLCLOCK_ASSERT_LINT_BREAK=propagation-off  只看断言参数字面上的挂钟量、不传污染
+      「✗ 自证 propagated-unregistered：」
+  WALLCLOCK_ASSERT_LINT_BREAK=lag-unchecked  滞后表里已经登记了或不再是挂钟断言的陈旧行不报
+      「✗ 自证 lag-stale：」
 
 查过的已有判据：code-source-discipline.sh 的实验源码纪律只判有没有钉绝对值的断言、种子与读数，不看断言量的是不是挂钟；
-  checker-tier-research-build-and-replay.sh 的 research-unit-tests 格是用它的 --list 按名传 --skip 的一方，两边读同一份登记。
+  research-build-and-replay.sh 的 research-unit-tests 格是用它的 --list 按名传 --skip 的一方，两边读同一份登记。
 """
 import os
 import re
@@ -722,8 +730,6 @@ def main(arguments):
             return run_selftest()
         status = run_selftest()
         return status or switch_wheel()
-    if os.environ.get("WALLCLOCK_ASSERT_LINT_BREAK"):
-        print("  ! WALLCLOCK_ASSERT_LINT_BREAK 只在 --selftest 里认，这一次不理它")
     list_only = arguments[:1] == ["--list"]
     rest = arguments[1:] if list_only else arguments
     if any(argument.startswith("-") for argument in rest) or len(rest) > 1:
@@ -734,6 +740,39 @@ def main(arguments):
     return judge(root, list_only)
 
 
+BREAK_VARIABLES = ("WALLCLOCK_ASSERT_LINT_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头（--selftest-inner 同）；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] in (["--selftest"], ["--selftest-inner"]) or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/wallclock-assert-lint.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

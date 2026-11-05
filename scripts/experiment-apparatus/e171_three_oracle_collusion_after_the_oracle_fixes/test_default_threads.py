@@ -1,13 +1,10 @@
 """row_driver.py 的 --threads 缺省：给了照它；没给取登记的重活默认并行度（.claude/heavy-thread-default，SINGLEFS_THREAD_CAP 设了取它）÷ --lanes，向下取整，至少 1。
 多机编排 rows_orchestrator.py 的每台线程与修订 8 单元编排 segment_one_units_revision_8.py 的本机线程额度：都等于登记值，与此刻空闲无关
-（喂的假资源此刻空闲只报 1 线程）。
+（与 SINGLEFS_THREAD_CAP 之外的此刻状态无关）。
 
 跑法：在这个目录里 `python3 -B -m unittest test_default_threads`。
 """
-import json
 import os
-import shlex
-import tempfile
 import types
 import unittest
 from unittest import mock
@@ -50,37 +47,24 @@ def environment_without_the_cap() -> dict:
 
 
 class RegisteredHostThreadsTests(unittest.TestCase):
-    """每台线程等于登记值、与此刻空闲无关：假资源里此刻空闲只有 1 线程，内存放得下几槽。"""
+    """每台线程等于登记值；槽数只看线程，不看内存。"""
 
     def test_every_host_of_the_rows_orchestrator_gets_the_registered_threads(self) -> None:
         registered = registered_threads()
         hosts = rows_orchestrator.two_hosts()
-        entries = [rows_orchestrator.resources_entry(1, 1, 200, 200), rows_orchestrator.resources_entry(2, 1, 200, 200)]
-        found, unread = rows_orchestrator.resources_from_json({"hosts": entries}, hosts)
-        self.assertEqual(unread, [])
         with mock.patch.dict(os.environ, environment_without_the_cap(), clear=True):
-            allocations = rows_orchestrator.allocate(hosts, found)
+            allocations = rows_orchestrator.allocate(hosts)
         self.assertEqual([allocation.threads for allocation in allocations], [registered, registered])
         self.assertTrue(all(allocation.slots >= 1 for allocation in allocations))
-        self.assertEqual(rows_orchestrator.single_lane_host(allocations).threads, registered)
+        self.assertEqual(rows_orchestrator.single_lane_host(allocations, 2).number, 2)
+        self.assertEqual(rows_orchestrator.single_lane_host(allocations, 1).threads, registered)
 
     def test_the_local_budget_of_the_revision_8_units_takes_the_registered_threads(self) -> None:
         registered = registered_threads()
-        with tempfile.TemporaryDirectory() as scratch:
-            resources = os.path.join(scratch, "resources.json")
-            with open(resources, "w", encoding="utf-8") as handle:
-                json.dump({"hosts": [{"number": 1, "read": True, "cpu": {"available_threads": 1, "cores": 2},
-                                      "memory": {"available": 40 << 30, "slice_room": 20 << 30, "slice_total": 60 << 30, "mem_total": 80 << 30}}]}, handle)
-            environment = environment_without_the_cap()
-            environment.update(UNITS_R8_SELFTEST="1", UNITS_R8_RESOURCES_COMMAND=f"cat {shlex.quote(resources)}")
-            settings = types.SimpleNamespace(repo=scratch)
-            with mock.patch.dict(os.environ, environment, clear=True):
-                budget = units_revision_8.local_budget(settings)
-                idle = units_revision_8.idle_budget(settings)
+        settings = types.SimpleNamespace(repo="/nowhere")
+        with mock.patch.dict(os.environ, environment_without_the_cap(), clear=True):
+            budget = units_revision_8.local_budget(settings)
         self.assertEqual(budget.threads, registered)
-        self.assertEqual(budget.memory_bytes, 20 << 30)
-        self.assertEqual(idle.threads, registered)
-        self.assertEqual(idle.memory_bytes, 60 << 30)
 
 
 if __name__ == "__main__":

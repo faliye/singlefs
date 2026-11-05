@@ -1,5 +1,5 @@
-//! E164（崩溃放量新设计的小范围功能测试）第二段的 harness 档探针：只录制、不造崩溃状态。
-//! 装置把这份文本放进仓副本的 `crates/singlefs-harness/tests/e164_probe.rs`，在副本里 `cargo test -p singlefs-harness --test e164_probe` 起它；
+//! E164（崩溃放量新设计的小范围功能测试）第二段的 验证包探针：只录制、不造崩溃状态。
+//! 装置把这份文本放进仓副本的 `crates/singlefs-verification/tests/e164_probe.rs`，在副本里 `cargo test -p singlefs-verification --test e164_probe` 起它；
 //! 主仓里没有这份文件。每行 `E7RESULT probe=<哪条探针> name=<什么> …`，字段次序固定，装置逐行解析。
 //! 装置自己独立算切段、状态数与写表哈希；这里打出的 harness 切段与闭式只拿来对拍（跑前登记第十一节 S-seg）。
 
@@ -13,17 +13,17 @@ use singlefs_core::transaction::{
     acquire_instance, publish_first_file, publish_overwrite, publish_sequential_write, warm_up,
     FirstFile, PoolWriter,
 };
-use singlefs_harness::history::with_panic_capture;
-use singlefs_harness::memory_pool::SparseBlockDevice;
-use singlefs_harness::scenario::{
+use singlefs_verification::history::with_panic_capture;
+use singlefs_verification::memory_pool::SparseBlockDevice;
+use singlefs_verification::scenario::{
     e142_parameters, first_file_content, run_new_pool_file_creation, ScenarioPoint,
     FIXED_WRITE_TIME_SECONDS,
 };
-use singlefs_harness::segments::{
+use singlefs_verification::segments::{
     closed_form_state_count, segment_sizes_text, split_into_segments, FixedGeometry,
 };
-use singlefs_harness::sha256::sha256_hexadecimal;
-use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};
+use singlefs_verification::sha256::sha256_hexadecimal;
+use singlefs_verification::{RecordedOperationKind, RecordingBlockDevice, SharedStream};
 
 /// 内存盘每块 4 GiB（与 harness 集成测试的镜像同大）。
 const DEVICE_BYTES: u64 = 4 << 30;

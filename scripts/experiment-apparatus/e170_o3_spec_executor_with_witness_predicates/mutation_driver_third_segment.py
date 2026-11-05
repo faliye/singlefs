@@ -373,6 +373,7 @@ def run_q1_comparator(copy: str, results_directory: str, scratch: str, tag: str)
     positive_scratch = os.path.join(scratch, f"{tag}-q1-positive-control")
     os.makedirs(positive_scratch)
     target = os.path.join(ROOT, "scripts/experiment-apparatus/target")
+    # --batches 1,2 是登记的范围：research/prompts/e170-r2-prereg.md 5.3 的 Q1 只判两条流批 1、批 2（第 53、54 行），批 3 在 Q1、Q2 上不判不跑（第 631 行）
     command = [sys.executable, "comparator_two_versions.py",
                "--pair", f"I1:states:{P('v1-i1')}:{P('v2-i1')}", "--pair", f"I2:states:{P('v1-i2')}:{P('v2-i2')}",
                "--pair", f"I3:images:{P('v1-i3-images')}:{P('v2-i3-images')}", "--pair", f"I4:images:{P('v1-i4-images')}:{P('v2-i4-images')}",

@@ -5,21 +5,23 @@
  "revision_8_config": "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_placeholders.json",
  "revision_10_config": "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_10_placeholders.json",
  "H30": {
-  "library_root": "~/.local/share/singlefs/reuse/e171-r1",
+  "library_root": null,
+  "why_library_root": "第 2 次重跑登记 research/prompts/e171-r2-prereg.md 修订 5 第 5.4 条：留空，库根由 reuse_library_root.py 取数据根下的缺省 <数据根>/reuse/e171-r1（.claude/hooks/lib_work_root.py 的 shared_data_path），派到两台里哪一台都是同一个绝对路径；原值经 ~ 取，第二台的家目录是另一个",
   "lookup": true,
   "why_lookup": "修订 11 第 11.12 节第 7 条：修订 8 那一趟查库开着（库空）、入库与 RC1–RC5 开着、RP2 跑，全部现跑；主 agent 要这一趟连查库也关，只把 lookup 改成 false（入库与核对照开）"
  },
  "H31": {
   "files": {
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py": "c8b9080ec2da139af712247cf3d594e8b60dc086f79edb5d34ec0793a1f96973",
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/count_reusable_units.py": "20b063446dd512033f6feeb8fcbd2b37861d6613716d9993d925ee34bbf04734",
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_11.py": "403dacb6a3a81308c166a09511d48fdff9a87f17bb0bb84f035d169be146e272",
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh": "320bd26ed33daaeb0058e7b5e6d8a4135d279ef96d6350dab42a25bf260d8ac2",
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_11.py": "f4703e75aad78790fb498a0f4fa7a42fc611f74b779d7bbf152a52a80451aed1",
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_11.py": "56a665362d4695e45c87893c418cdebbb4a3d7f2fa2ea11e18f8db44b88998a2",
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh": "396177b8e417be805cc1a1097bb97692d7d68292bb85b1e589da8cd80556c949",
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_revision_11_multi_host.sh": "6c0da0d642cbb45ec2406a071df1e0e530465ed50d3167124a0c5d9a1807d7bb",
-   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_revision_11.py": "a2aae6e2cabde8677978d1d5b40deffb7124f4f3316eb3f7dbd890c22555f1f4"
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py": "5c513fa59546f483bcbfe4c9e7ecdee9db52923ac6677f23372d0041f328c24d",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/count_reusable_units.py": "f8470a156a265846636fe90c27ba5d5d161e034289eb827c04cdb71539806629",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_11.py": "67082bfbb0b2db000111b33b5e90ada23eac8c199d2a9c57897edd7877228e18",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh": "3fa8f3b8f85b47c69015b4fea2daa61c6490090a3933eed0176f7c9b2c800435",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_11.py": "15224dc26382e66ba5aedaa37891ee91614f74846b1f0d6f0a64ed4dbbeb8a4f",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_11.py": "bc99c5f3565f75771f51a7703e0ce84c50667630962195b94d457b18fc626cb8",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh": "8cc0f66741c3a8367c4b0c11a4c9ae3ce2c5fb0de1e824edd1fb05d06a7cfd85",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_revision_11_multi_host.sh": "40bb0fd7e9b68bf1c419beda23cffeff16303c13fa450a8f97a9bb14dce32ee7",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_revision_11.py": "5662f76b0030370ba1010fea251205547f2c6893820aea5ba72431c1d0e855d8",
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library_root.py": "7d66754f7d8e8fffc34cd95ac8ac53cbe9601dede6be8908431a6f2cee1fafb6"
   }
  },
  "H32": "第二段编排层在整表派发之前现算（第二段复用账本里 name=reuse_sample 那一行：k、挑中的行、取来的行数与后缀；续跑照第一次挑的那份）",

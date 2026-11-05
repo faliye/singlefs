@@ -121,8 +121,26 @@ fn throughput_in_mebibytes_per_second(byte_count: usize, elapsed_nanoseconds: u6
     byte_count as f64 / (1024.0 * 1024.0) / (elapsed_nanoseconds as f64 / 1e9)
 }
 
+/// 登记的轮数；不给参数就是它。
+const REGISTERED_ROUND_COUNT: usize = 3;
+
+/// 与登记规模不同的参数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+/// 每项是（名字，这一趟的值，登记的值）；全部等于登记值时不接。
+fn reduced_scale_note(scales: &[(&str, u64, u64)]) -> String {
+    let registered_values: Vec<String> = scales
+        .iter()
+        .filter(|(_, actual, registered)| actual != registered)
+        .map(|(name, _, registered)| format!("registered_{name}={registered}"))
+        .collect();
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 fn main() {
-    let round_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(3);
+    let round_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(REGISTERED_ROUND_COUNT);
     let core_count = std::thread::available_parallelism().map(|parallelism| parallelism.get()).unwrap_or(1);
     let mut emitter = Emitter::new();
     let mut output_text = String::new();
@@ -132,7 +150,7 @@ fn main() {
         eprintln!("E6MC: {failure_message}"); std::process::exit(4);
     };
 
-    append_output_line(emitter.emit_raw(&format!("name=config unit={ENCRYPTION_UNIT_BYTES} rounds={round_count} cores={core_count} e6_aes_4k_mibs={E6_AES_4_KIBIBYTE_TIER_MEBIBYTES_PER_SECOND}")));
+    append_output_line(emitter.emit_raw(&format!("name=config unit={ENCRYPTION_UNIT_BYTES} rounds={round_count} cores={core_count} e6_aes_4k_mibs={E6_AES_4_KIBIBYTE_TIER_MEBIBYTES_PER_SECOND}{}", reduced_scale_note(&[("rounds", round_count as u64, REGISTERED_ROUND_COUNT as u64)]))));
 
     // ── 阳性对照 1：单核 AES 必须复现 E6 ──
     let mut single_core_best_nanoseconds = u64::MAX; let mut single_core_best_byte_count = 0;
@@ -214,5 +232,12 @@ mod tests {
         let four_thread_nanoseconds = compute(4, 1_000_000);
         assert!(one_thread_nanoseconds > 0 && four_thread_nanoseconds > 0);
         assert!(four_thread_nanoseconds < one_thread_nanoseconds, "4 线程做同样总量应当更快，实测 {four_thread_nanoseconds} vs {one_thread_nanoseconds}");
+    }
+
+    /// 给了缩规模的轮数，config 行要写缩过、不当正式产物；登记轮数不加这一段。
+    #[test]
+    fn reduced_round_count_is_marked_and_registered_one_is_not() {
+        assert_eq!(reduced_scale_note(&[("rounds", REGISTERED_ROUND_COUNT as u64, REGISTERED_ROUND_COUNT as u64)]), "");
+        assert_eq!(reduced_scale_note(&[("rounds", 1, REGISTERED_ROUND_COUNT as u64)]), " reduced=yes registered_rounds=3 not_official_product=yes");
     }
 }

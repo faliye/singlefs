@@ -16,12 +16,18 @@
 
 退出码：0 都对；1 有不对的（逐条列出）；2 用法错；77 research/ 与 scripts/ 都不在。
 
-弄坏开关 DIRECTORY_LAYOUT_CHECK_BREAK=<开关>（只给 --selftest 用，--selftest 之外不认）：
-  allow-research-extra  research/ 顶层多出来的不报：research-top 那一格该红
-  skip-readme           说明文件缺了不报：readme 那一格该红
-  ignore-depth          层级不判：depth 那一格该红
-  allow-results         产物与日志类的文件不报：no-results 那一格该红
-  allow-scripts-top     scripts/ 顶层多出来的文件不报：scripts-top 那一格该红
+弄坏开关（只给自证用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认；自证自带开关轮，逐个设上起 --selftest-inner，
+红的格逐条以「✗ 自证 <格名>：」起头；单跑一条：DIRECTORY_LAYOUT_CHECK_BREAK=<开关> python3 scripts/gate/directory-layout-check.py --selftest-inner）：
+  DIRECTORY_LAYOUT_CHECK_BREAK=allow-research-extra  research/ 顶层多出来的不报
+      「✗ 自证 research-top：」
+  DIRECTORY_LAYOUT_CHECK_BREAK=skip-readme  说明文件缺了不报
+      「✗ 自证 readme：」
+  DIRECTORY_LAYOUT_CHECK_BREAK=ignore-depth  层级不判
+      「✗ 自证 depth：」
+  DIRECTORY_LAYOUT_CHECK_BREAK=allow-results  产物与日志类的文件不报
+      「✗ 自证 no-results：」
+  DIRECTORY_LAYOUT_CHECK_BREAK=allow-scripts-top  scripts/ 顶层多出来的文件不报
+      「✗ 自证 scripts-top：」
 """
 import os
 import re
@@ -187,6 +193,39 @@ def main(arguments):
     return judge(root)
 
 
+BREAK_VARIABLES = ("DIRECTORY_LAYOUT_CHECK_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头（--selftest-inner 同）；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] in (["--selftest"], ["--selftest-inner"]) or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 python3 scripts/gate/directory-layout-check.py --selftest（开关轮逐个打开）", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

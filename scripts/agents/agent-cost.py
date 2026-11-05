@@ -15,6 +15,9 @@
                                                                    # 每批收尾落账的写法：outcome --since <批开工那天> --until <收尾那天> --summary --out <那一轮调度记录目录>/<轮>-outcome-<日期>.txt
     agent-cost.py --selftest                                       # 造假会话目录与假仓算一遍，钉住数；弄坏开关打开时必须判红
 
+默认会话目录（--root 不给）：统一任务服务给任务的来源仓根 TASK_SERVER_SOURCE_REPOSITORY（本机与第二台都给本机那份仓的绝对路径）定仓路径，家目录从这个路径取
+（会话记录在第二台挂在本机的同一绝对路径，第二台的 $HOME 是另一个，不用它）；没有这个变量（服务外手跑）取脚本自己所在的仓与本机家目录。取法只在同目录 lib_session_directory.py 里。
+
 口径（与 records/2026-09-28-agent体系用量时间与调度分析.md 第一节同）：一次调用是一条带 usage 的 assistant 消息、按消息 id 去重；
 上下文 = cache_read + cache_creation + input；折算 = 新输入 ×1 + 读缓存 ×0.1 + 5 分钟缓存写 ×1.25 + 1 小时缓存写 ×2 + 输出 ×5（相对量，不是账单）；
 等待 = 相邻两次调用间隔超过 3 分钟。第一版分析用的五份脚本在 research/prompts/agent-cost-2026-09-28/，这一份把它们收进仓、加自证。
@@ -39,8 +42,8 @@ outcome 的口径（桶名照 records/2026-10-22-子agent结果落地审计.md�
     派发闸、交回闸与骨架读同一处，拆分提案第九十节 ⑯；材料员这类以 three-way 起头而没登记的按别的类型分桶）交回了的分两桶：交回里点名的 research/prompts/<轮>-*-output.md 有一份在工作树（git worktree list 列出的每一棵）
     或 git 历史（所有分支加 HEAD，删过的也算）里、且同轮的 research/prompts/<轮>-main-verification.md 也在（轮名取 -output 前面最长的、有判决的那一段前缀）的
     记 verdict-archived，其余记 three-way-report-or-verdict-missing（攻方 landing-audit-r2 K3-2：原来按类型名一律记有效）；
-    没交回的按最后一句分 cut-by-usage-limit、cut-by-api-error、in-flight（最后一条记录距此刻不到
-    30 分钟）、stopped-salvaged（停掉，但后来有人点到）、stopped-abandoned；交回了的写了不少于 10 行的按落地率分 written-landed（不低于 70%）、
+    没交回的按最后一句分 cut-by-api-error、in-flight（最后一条记录距此刻不到
+    30 分钟）、stopped-salvaged（中途停下，但后来有人点到）、stopped-abandoned（中途停下，没人点到；被停掉的与别的原因中途断掉的都在这里）；交回了的写了不少于 10 行的按落地率分 written-landed（不低于 70%）、
     written-partial（30% 到 70%）、written-overwritten（更低，主 agent 点到过）、written-unused（更低，没人点到）；其余按引用分 report-used-by-main、
     report-used-by-later-sub、report-unreferenced。
     70%、30%、10 行这三个门槛（LANDED_AT、PARTIAL_AT、WRITTEN_MINIMUM）没有出处；换值之后各桶怎么变的读数见
@@ -74,6 +77,9 @@ outcome 的口径（桶名照 records/2026-10-22-子agent结果落地审计.md�
       主会话按记录时刻切天（「✗ 自检：主会话按记录时刻切天：」）
   AGENT_COST_BREAK=outcome-out-clobber  outcome --out 不排他：文件已在也不拒，整份覆盖
       结局账落盘（「✗ 自检：结局账落盘：」）
+同目录 lib_session_directory.py 的开关（判法在那一份，开关表也在它的文件头），打开后这里红的项：
+  SESSION_DIRECTORY_BREAK=home-from-environment  设了 TASK_SERVER_SOURCE_REPOSITORY 也照改前取 HOME（家目录接脚本自己所在的仓路径）
+      默认会话目录取来源仓根（「✗ 自检：默认会话目录取来源仓根：」）、不给 --root（「✗ 自检：不给 --root 时 run_command 应当按来源仓根取会话目录」）
 同目录 subagent_transcript.py 的两个开关（判法在那一份，开关表也在它的文件头），打开后这里红的项：
   SUBAGENT_TRANSCRIPT_BREAK=refused-counts-delivered  被交回闸拒的交回也算送达
       交回与起点（「✗ 自检：交回与起点：outcome 应当收…」「✗ 自检：交回与起点：timing 应当收 3 个…」）
@@ -110,14 +116,21 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "hosts"))
 import heavy_threads  # noqa: E402  每台默认重活线程数只在这一份里取（登记位 .claude/heavy-thread-default）
 import subagent_transcript as transcripts  # noqa: E402  子 agent 会话记录的「交回」与「起点」只在这一份里定义（续做闸、看门狗同取它）
+import lib_session_directory as session_directories  # noqa: E402  默认会话目录的唯一取法（来源仓根 TASK_SERVER_SOURCE_REPOSITORY，不经 $HOME；agent-handover.py、agent-watch.py、watch.sh、move-directory-in-use-check.py 同取它）
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".claude", "hooks"))
 import lib_three_way_legs as three_way_legs  # noqa: E402  三方腿类型表只登记在定义 frontmatter 的 leg: three-way，读法只在这一份里（派发闸、交回闸、骨架同取它）
 import lib_prompt_scratch_line as prompt_scratch_line  # noqa: E402  派发提示里「草稿目录：」那一行的唯一认法（派发闸、交回闸、完工清理闸、看门狗取的是同一份）
 
 REPOSITORY_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-# Claude Code 按项目的绝对路径把 / 换成 - 起会话目录名（同 scripts/agents/watch.sh 的 ${root//\//-}）
-DEFAULT_ROOT = os.path.join(os.path.expanduser("~/.claude/projects"), REPOSITORY_ROOT.replace("/", "-"))
 BROKEN = os.environ.get("AGENT_COST_BREAK", "")
+
+
+def default_root(environment=None):
+    """--root 不给时的会话目录：统一任务服务给的来源仓根 TASK_SERVER_SOURCE_REPOSITORY（两台一致）定仓路径与家目录；没有这个变量（服务外手跑）取脚本自己所在的仓与本机家目录。
+    取法只在 scripts/agents/lib_session_directory.py 里；取不到抛 session_directories.SessionDirectoryError。"""
+    return session_directories.session_directory(REPOSITORY_ROOT, environment=environment)
+
+
 UTC = datetime.timezone.utc   # clock-times:allow 会话记录的时间戳是 UTC，按它比较与切日期，不是给人看的钟点
 DATE_ZONE = zoneinfo.ZoneInfo("Asia/Tokyo")   # clock-times:allow --since、--until 的日期按东京日期切天，与调度记录、存档文件名写的日期同一种
 AGENT_ID = re.compile(r"a[0-9a-f]{16}")
@@ -444,7 +457,7 @@ def rework_words():
     if BROKEN == "fix-no-word-end":
         return REWORK_WORDS_FIX_PREFIX_FOR_BREAK
     return NARROW_REWORK_WORDS_FOR_BREAK if BROKEN == "narrow-rework-words" else REWORK_WORDS
-USAGE_LIMIT_TAIL = re.compile(r"limit · resets|weekly limit|usage limit")
+CUT_REASON_ORDER = ("API 错", "停掉", "还在跑")   # --summary 末行报截断原因的次序；不在表里的原因排在后面，不丢
 API_ERROR_TAIL = re.compile(r"API Error|Not logged in|Overloaded")
 REPOSITORY_MARKS = ("crates", ".claude", "scripts", "research", "records", "briefs", "litmus")
 NOT_REPOSITORY = ("projects", "plans", "todos", "shell-snapshots")   # ~/.claude/ 底下的，不是仓里的 .claude
@@ -471,10 +484,9 @@ BUCKET_GLOSS = [
     ("report-unreferenced", "只交报告、没人点到"),
     ("written-overwritten", "写了、低于 30%、主 agent 点到过"),
     ("written-unused", "写了、低于 30%、没人点到"),
-    ("cut-by-usage-limit", "没交回、用量撞顶"),
     ("cut-by-api-error", "没交回、API 错"),
-    ("stopped-salvaged", "没交回、被停掉、后来有人点到"),
-    ("stopped-abandoned", "没交回、被停掉、没人点到"),
+    ("stopped-salvaged", "没交回、中途停下、后来有人点到"),
+    ("stopped-abandoned", "没交回、中途停下、没人点到"),
     ("in-flight", "没交回、还在跑"),
 ]
 # 调度记录「按结局分」那张表的五行各含哪几桶；不在任何一行里的归「其余」
@@ -483,7 +495,7 @@ RECORD_TABLE_ROWS = [
     ("写了东西、30% 到 70%", ("written-partial",)),
     ("三方腿", ("verdict-archived",)),
     ("只交报告、交回后主 agent 有动作点到", ("report-used-by-main",)),
-    ("看起来没效果的几桶", ("report-unreferenced", "written-overwritten", "written-unused", "report-used-by-later-sub", "stopped-abandoned", "cut-by-usage-limit")),
+    ("看起来没效果的几桶", ("report-unreferenced", "written-overwritten", "written-unused", "report-used-by-later-sub", "stopped-abandoned")),
 ]
 
 
@@ -1023,8 +1035,6 @@ def history_and_worktree_lines(repository, since, lines, workers):
 
 def cut_reason(last_text):
     tail = last_text[-600:]
-    if USAGE_LIMIT_TAIL.search(tail):
-        return "用量撞顶"
     if API_ERROR_TAIL.search(tail):
         return "API 错"
     return "停掉"
@@ -1099,8 +1109,6 @@ def outcome_bucket(agent, used_main, used_any, now):
         return "report-used-by-later-sub" if used_any else "report-unreferenced"
     if agent["end"] and (now - agent["end"]).total_seconds() < IN_FLIGHT_MINUTES * 60:
         return "in-flight"
-    if agent["cut"] == "用量撞顶":
-        return "cut-by-usage-limit"
     if agent["cut"] == "API 错":
         return "cut-by-api-error"
     return "stopped-salvaged" if used_any else "stopped-abandoned"
@@ -1251,7 +1259,8 @@ def outcome_lines(agents, since, show_rows, until_day=None):
     rework_count, rework_cost = summary["rework"]
     lines.append(f"## 描述带返工字样（REWORK_WORDS，词表在文件头）的派发：{rework_count} 个，占个数 {rework_count / max(1, len(agents)):.1%}，占花费 {rework_cost / total_cost:.1%}")
     cuts = summary["cuts"]
-    lines.append(f"## 没交回的 {sum(cuts.values())} 个，按截断原因：" + "、".join(f"{reason} {cuts[reason]}" for reason in ("用量撞顶", "API 错", "停掉", "还在跑") if cuts.get(reason)))
+    reasons = sorted((reason for reason in cuts if cuts[reason]), key=lambda reason: (CUT_REASON_ORDER.index(reason) if reason in CUT_REASON_ORDER else len(CUT_REASON_ORDER), reason))
+    lines.append(f"## 没交回的 {sum(cuts.values())} 个，按截断原因：" + "、".join(f"{reason} {cuts[reason]}" for reason in reasons))
     return lines
 
 
@@ -1402,7 +1411,7 @@ def build_outcome_fixture(work):
     add_agent(11, "clerk", "花括号拼路径", agent_records(0, [(1, [])], handback=report_handback("braced-draft-b", "，其余略"), prompt=f"草稿目录：{home}/braced-draft-b\n"))
     add_agent(12, "investigator", "只被子 agent 用", agent_records(0, [(1, [])], handback=report_handback("read-by-sub")))
     add_agent(13, "investigator", "重跑一次没人看", agent_records(0, [(1, [])], handback=report_handback("nobody-reads")))
-    add_agent(14, "experiment-runner", "撞顶", agent_records(0, [(1, [])], last_text="You've hit your limit · resets soon"))
+    add_agent(14, "experiment-runner", "中途断掉", agent_records(0, [(1, [])], last_text="跑到第三格，接着核下一格"))
     add_agent(15, "experiment-runner", "接口错", agent_records(0, [(1, [])], last_text="API Error: 529 Overloaded"))
     add_agent(16, "experiment-runner", "停掉被续做", agent_records(0, [(1, [])]))
     add_agent(17, "experiment-runner", "停掉没人管", agent_records(100, [(101, [use("bash-17", "Bash", {"command": f"cat {home}/read-by-sub/report.md"})])]))
@@ -1420,7 +1429,7 @@ def build_outcome_fixture(work):
     write_json_lines(session + ".jsonl", main_events)
     expected = {1: "written-landed", 2: "written-landed", 3: "written-landed", 4: "written-landed", 5: "written-partial", 6: "written-overwritten", 7: "written-unused",
                 8: "verdict-archived", 9: "report-used-by-main", 10: "report-used-by-main", 11: "report-used-by-main", 12: "report-used-by-later-sub",
-                13: "report-unreferenced", 14: "cut-by-usage-limit", 15: "cut-by-api-error", 16: "stopped-salvaged", 17: "stopped-abandoned", 18: "in-flight",
+                13: "report-unreferenced", 14: "stopped-abandoned", 15: "cut-by-api-error", 16: "stopped-salvaged", 17: "stopped-abandoned", 18: "in-flight",
                 19: "three-way-report-or-verdict-missing", 20: "three-way-report-or-verdict-missing", 21: "report-unreferenced"}
     return root, repository, base + datetime.timedelta(minutes=303), {identifiers[number]: bucket for number, bucket in expected.items()}
 
@@ -1479,8 +1488,8 @@ def selftest_outcome():
                             f"没登记的材料员应得 report-unreferenced，实际（预期, 实际）{wrong}")
         summary = outcome_summary(agents)
         checked += 1
-        if summary["rework"] != (2, 3000) or summary["cuts"] != collections.Counter({"用量撞顶": 1, "API 错": 1, "停掉": 2, "还在跑": 1}):
-            failures.append(f"汇总：返工字样应当 2 个 3000（「重跑一次没人看」「停掉被续做」）、没交回的应当用量撞顶 1、API 错 1、停掉 2、还在跑 1，实际 {summary['rework']}、{dict(summary['cuts'])}")
+        if summary["rework"] != (2, 3000) or summary["cuts"] != collections.Counter({"API 错": 1, "停掉": 3, "还在跑": 1}):
+            failures.append(f"汇总：返工字样应当 2 个 3000（「重跑一次没人看」「停掉被续做」）、没交回的应当 API 错 1、停掉 3、还在跑 1，实际 {summary['rework']}、{dict(summary['cuts'])}")
         checked += 1
         counted_as_rework = ["七·6 代码轮第二轮攻方腿（接续）", "实验执行：E181 第一段（接续）", "m3-batch28-code-r1 正推腿（续）", "7-2b 接手：M3 在核上证",
                              "准入条款簇三方攻方腿（重派）", "Runner E187 r2 (redispatch)", "Fix E193 guard flush bug and rerun", "E156 第 7 次收尾", "批 12 变异三行修红",
@@ -1639,7 +1648,7 @@ def selftest_outcome_out():
         def run_main():
             captured = io.StringIO()
             with contextlib.redirect_stdout(captured):
-                exit_code = main(arguments)
+                exit_code = run_command(arguments)
             return exit_code, captured.getvalue()
 
         exit_code, printed = run_main()
@@ -1683,6 +1692,47 @@ def selftest_draft_directory():
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return len(cases), failures
+
+
+def selftest_default_root():
+    """--root 不给时的默认会话目录（文件头「默认会话目录」）：在一棵临时树里，HOME 指到别处、脚本自己所在的仓在别处，TASK_SERVER_SOURCE_REPOSITORY 指到来源仓，
+    default_root() 与 run_command() 都取到来源仓的会话目录；没设那个变量时取脚本自己所在的仓与 HOME。取法在 lib_session_directory.py。返回 (项数, 失败句)。"""
+    failures, checked, work = [], 0, tempfile.mkdtemp(prefix="agent-cost-default-root-selftest-")
+    try:
+        tree = session_directories.build_selftest_tree(work)
+        checked += 1
+        got = default_root(tree["environment"])
+        if got != tree["session_directory"]:
+            failures.append(f"默认会话目录取来源仓根：HOME 指到别处时应当取到来源仓的会话目录 {tree['session_directory']}，实际 {got}")
+        checked += 1
+        got, want = default_root({"HOME": tree["home"]}), os.path.join(tree["home"], ".claude", "projects", session_directories.mangle(REPOSITORY_ROOT))
+        if got != want:
+            failures.append(f"默认会话目录没设来源仓根时取脚本自己所在的仓与 HOME：应当 {want}，实际 {got}")
+        # run_command 不给 --root 就走 default_root：来源仓的会话目录还没建过，退 2 的说明里点名的路径就是按来源仓根取到的那一个
+        checked += 1
+        lonely_home = os.path.join(work, "lonely-home")
+        lonely_source = os.path.join(lonely_home, "code", "fresh-repository")
+        os.makedirs(os.path.join(lonely_home, ".claude", "projects"))
+        os.makedirs(lonely_source)
+        want = os.path.join(lonely_home, ".claude", "projects", session_directories.mangle(lonely_source))
+        patched = {"HOME": tree["other_home"], session_directories.SOURCE_REPOSITORY_VARIABLE: lonely_source}
+        saved = {name: os.environ.get(name) for name in patched}
+        os.environ.update(patched)
+        captured = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(captured):
+                code = run_command(["usage"])
+        finally:
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+        if code != 2 or f"会话目录不在：{want}" not in captured.getvalue():
+            failures.append(f"不给 --root 时 run_command 应当按来源仓根取会话目录并在它不在时退 2、说明里点名 {want}，实际退 {code}：{captured.getvalue().strip()[-300:]}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    return checked, failures
 
 
 def selftest():
@@ -1749,7 +1799,7 @@ def selftest():
     zone_checked, zone_failures = selftest_date_zone()
     checked += zone_checked
     failures += zone_failures
-    for extra_checked, extra_failures in (selftest_main_session_window(), selftest_outcome_out(), selftest_draft_directory()):
+    for extra_checked, extra_failures in (selftest_main_session_window(), selftest_outcome_out(), selftest_draft_directory(), selftest_default_root()):
         checked += extra_checked
         failures += extra_failures
     for failure in failures:
@@ -1760,13 +1810,14 @@ def selftest():
               "三方腿看 prompts_paths()、leg_output_verdicts()，三方腿类型表看 three_way_leg_types_of() 与定义 frontmatter 的 leg: three-way；"
               "AGENT_COST_BREAK 设着 no-dedupe、no-path-normalize、no-bash-writes、narrow-rework-words、fix-no-word-end、day-cut-by-record-zone、three-way-by-type、three-way-history-unread、leg-types-by-prefix、"
               "main-session-by-mtime、outcome-out-clobber 或 draft-anywhere-in-line，"
-              "或 SUBAGENT_TRANSCRIPT_BREAK 设着的话这里本来就该红")
+              "或 SUBAGENT_TRANSCRIPT_BREAK、SESSION_DIRECTORY_BREAK 设着的话这里本来就该红；默认会话目录看 default_root() 与 lib_session_directory.py")
         return 1
-    print(f"  ✓ 自检通过（查了 {checked} 项，其中 outcome 的 {outcome_agents} 个子 agent）：调用按消息 id 去重、读缓存与两档缓存写分开、等待按 3 分钟间隔算、派发只数真正起来的、派发闸的拒绝按钩子归类、"
+    print(f"  ✓ 自检通过（查了 {checked} 项，其中 outcome 的 {outcome_agents} 个子 agent）：调用按消息 id 去重、读缓存与两种缓存写分开、等待按 3 分钟间隔算、派发只数真正起来的、派发闸的拒绝按钩子归类、"
           "每个结局桶都对得上、路径归一化、Bash 里的写入认得出、「修订」与 fixture 这类不算返工；三方腿报告在仓且同轮有判决才记 verdict-archived（判决只在 git 历史里也算），三方腿类型读定义 frontmatter 的 leg: three-way（假仓与本仓读到的都与 frontmatter 逐个相同）；"
           "交回按送达认（先被拒后送达的算、被拒之后再没送达的不算）、起点按首条记录、--until 含那一天、--since 与 --until 按东京日期切天；"
           "主会话按每条记录的时刻切天（跨两天的主会话只收窗口里那几条）；outcome --out 排他落账、回读与标准输出逐字相同、已在就拒；"
-          "草稿目录只认派发提示行首「草稿目录：」那一行（认法同 lib_prompt_scratch_line.py）")
+          "草稿目录只认派发提示行首「草稿目录：」那一行（认法同 lib_prompt_scratch_line.py）；"
+          "默认会话目录取来源仓根（HOME 指到别处也取对）")
     return 0
 
 
@@ -1790,13 +1841,34 @@ def write_ledger_exclusively(path, text):
     return 0, None
 
 
+def refuse_break_outside_selftest(argv):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest 而 AGENT_COST_BREAK（或经 subagent_transcript.py 进来的 SUBAGENT_TRANSCRIPT_BREAK、经 lib_session_directory.py 进来的 SESSION_DIRECTORY_BREAK）非空，
+    参数解析之前就拒，交回退出码 2；放行交回 None。自证不起自己的子进程；自证里要走命令行那条路的（outcome --out）直接调 run_command()，不经 main()，
+    所以守卫只管真正的命令行入口，自证里设着开关也不会被自己拒。"""
+    set_names = [name for name in ("AGENT_COST_BREAK", "SUBAGENT_TRANSCRIPT_BREAK", "SESSION_DIRECTORY_BREAK") if os.environ.get(name)]
+    if not set_names or argv == ["--selftest"]:
+        return None
+    for name in set_names:
+        print(f"  ✗ {name}={os.environ[name]} 是弄坏开关，只在自证（agent-cost.py --selftest）里认，平常跑设了就拒，这一趟什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：去掉 {'、'.join(set_names)} 再跑；要证红就跑 {set_names[0]}=<项> python3 scripts/agents/agent-cost.py --selftest", file=sys.stderr)
+    return 2
+
+
 def main(argv):
+    refused = refuse_break_outside_selftest(argv)
+    if refused is not None:
+        return refused
     if argv[:1] == ["--selftest"]:
         return selftest()
+    return run_command(argv)
+
+
+def run_command(argv):
+    """usage、timing、dispatch、outcome 四个子命令的解析与执行（不含 --selftest 与弄坏开关的守卫，那两样在 main()）。"""
     if not argv or argv[0] not in ("usage", "timing", "dispatch", "outcome"):
         print("  ✗ 用法：agent-cost.py usage|timing|dispatch|outcome [--root 会话目录] [--since YYYY-MM-DD] | --selftest\n  → 怎么办：第一个参数写 usage、timing、dispatch 或 outcome")
         return 2
-    root, since = DEFAULT_ROOT, datetime.datetime.now(UTC) - datetime.timedelta(days=7)   # clock-times:allow 会话记录的时间戳是 UTC，按它比较与切日期，不是给人看的钟点
+    root, since = None, datetime.datetime.now(UTC) - datetime.timedelta(days=7)   # clock-times:allow 会话记录的时间戳是 UTC，按它比较与切日期，不是给人看的钟点
     repository, summary_only, workers, out = REPOSITORY_ROOT, False, None, None
     since_given, until_day, until = None, None, None
     rest = argv[1:]
@@ -1831,8 +1903,14 @@ def main(argv):
     if until is not None and until <= since:
         print(f"  ✗ --until {until_day} 早于 --since {since.date()}，窗口是空的\n  → 怎么办：--until 写不早于 --since 的那一天")
         return 2
+    if root is None:
+        try:
+            root = default_root()
+        except ValueError as error:   # SessionDirectoryError 是它的子类；弄坏开关的值认不出也是 ValueError
+            print(f"  ✗ 取不到默认的会话目录：{error}\n  → 怎么办：{getattr(error, 'howto', '去掉不认识的弄坏开关再跑')}；或直接给 --root")
+            return 2
     if not os.path.isdir(root):
-        print(f"  ✗ 会话目录不在：{root}\n  → 怎么办：--root 给 ~/.claude/projects/<项目> 那个目录")
+        print(f"  ✗ 会话目录不在：{root}\n  → 怎么办：--root 给 <家目录>/.claude/projects/<项目> 那个目录（统一任务服务里跑时不用给：取 TASK_SERVER_SOURCE_REPOSITORY 那份仓的）")
         return 2
     if argv[0] == "outcome":
         if workers is None:

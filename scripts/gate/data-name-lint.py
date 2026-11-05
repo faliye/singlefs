@@ -31,19 +31,33 @@ naming-lint 只查我们声明的名字；实验装置的字段表标签 ("syste
 
 退出码：0 通过；1 判红（违规，或排除表不合规）；2 用法错或缺词表；77 没有可扫的 .rs 与 kb 表格。
 
-弄坏开关 DATA_NAME_LINT_BREAK=<开关>（逗号隔开可给几个；平常的判与 --selftest 都认），--selftest 里各自要红在点名的格，门禁样本里打开后判错的在 .claude/gate.d/code-source-discipline.sh 文件头：
-  string-literals-skipped   三种字面量形态一个都不扫          tuple-column-red、arrow-right-red、key-name-red、single-letter-red
-  arrow-right-skipped       => "名字" 右侧不扫                arrow-right-red
-  key-names-skipped         键= 的键名不扫                    key-name-red
-  call-arguments-judged     函数调用的字符串实参（左括号前是标识符）也当元组首列  call-arguments-green
-  comments-scanned          注释里的串也扫                    comments-green
-  kb-tables-skipped         kb 表格不扫                       kb-table-red
-  single-letters-passed     单字母放行                        single-letter-red
-  registered-ignored        登记表不认                        registered-green
-  numbered-ignored          e<数字> 这类整类登记不认          numbered-green
-  exclusions-ignored        排除表不认                        exclusion-green
-  stale-exclusions-passed   排除表里已经没有违规的行、指向不存在的路径、没写理由的行不判  exclusion-stale-red
-  external-marker-ignored   .rs 里那一行的 `// naming-lint:external <理由>` 不认          external-marker-green
+弄坏开关 DATA_NAME_LINT_BREAK=<开关>（逗号隔开可给几个；只给自证与门禁样本证红用：--selftest 本身与它起的子进程认，门禁样本根（有 .gate-cells 或 .gate-break-sample）里由阶段转来的认，
+平常跑设了退 2、点名只在自证里认）。自证打开后红的格逐条以「✗ 自证 <格名>：」起头；门禁样本里打开后判错的样本在 .claude/gate.d/code-source-discipline.sh 文件头：
+  DATA_NAME_LINT_BREAK=string-literals-skipped  三种字面量形态一个都不扫
+      「✗ 自证 tuple-column-red：」「✗ 自证 registered-green：」「✗ 自证 single-letter-red：」「✗ 自证 arrow-right-red：」「✗ 自证 key-name-red：」「✗ 自证 key-line-red：」
+      「✗ 自证 numbered-green：」「✗ 自证 numbered-red：」「✗ 自证 exclusion-green：」「✗ 自证 exclusion-whole-file-green：」「✗ 自证 external-marker-no-reason-red：」
+  DATA_NAME_LINT_BREAK=arrow-right-skipped  => "名字" 右侧不扫
+      「✗ 自证 arrow-right-red：」「✗ 自证 external-marker-no-reason-red：」
+  DATA_NAME_LINT_BREAK=key-names-skipped  键= 的键名不扫
+      「✗ 自证 key-name-red：」「✗ 自证 key-line-red：」
+  DATA_NAME_LINT_BREAK=call-arguments-judged  函数调用的字符串实参（左括号前是标识符）也当元组首列
+      「✗ 自证 comments-green：」「✗ 自证 call-arguments-green：」
+  DATA_NAME_LINT_BREAK=comments-scanned  注释里的串也扫
+      「✗ 自证 comments-green：」
+  DATA_NAME_LINT_BREAK=kb-tables-skipped  kb 表格不扫
+      「✗ 自证 kb-table-red：」「✗ 自证 kb-term-renames-skipped：」「✗ 自证 kb-table-green：」
+  DATA_NAME_LINT_BREAK=single-letters-passed  单字母放行
+      「✗ 自证 single-letter-red：」「✗ 自证 numbered-red：」
+  DATA_NAME_LINT_BREAK=registered-ignored  登记表不认
+      「✗ 自证 registered-green：」
+  DATA_NAME_LINT_BREAK=numbered-ignored  e<数字> 这类整类登记不认
+      「✗ 自证 numbered-green：」
+  DATA_NAME_LINT_BREAK=exclusions-ignored  排除表不认
+      「✗ 自证 exclusion-green：」「✗ 自证 exclusion-whole-file-green：」「✗ 自证 exclusion-stale-red：」
+  DATA_NAME_LINT_BREAK=stale-exclusions-passed  排除表里已经没有违规的行、指向不存在的路径、没写理由的行不判
+      「✗ 自证 exclusion-stale-red：」「✗ 自证 exclusion-missing-path-red：」「✗ 自证 exclusion-no-reason-red：」
+  DATA_NAME_LINT_BREAK=external-marker-ignored  .rs 里那一行的 `// naming-lint:external <理由>` 不认
+      「✗ 自证 external-marker-green：」
 """
 import os
 import re
@@ -525,6 +539,40 @@ def main(arguments):
     return status
 
 
+BREAK_VARIABLES = ("DATA_NAME_LINT_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头（--selftest-inner 同）；门禁样本根（当前目录有 .gate-cells 或 .gate-break-sample、没设 GATE_STAGED_FROM）里由阶段转来的；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    sample_root = (os.path.exists(".gate-cells") or os.path.exists(".gate-break-sample")) and not os.environ.get("GATE_STAGED_FROM")
+    if not setting or arguments[:1] in (["--selftest"], ["--selftest-inner"]) or sample_root or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）和门禁样本根里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/data-name-lint.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

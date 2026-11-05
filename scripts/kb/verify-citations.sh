@@ -24,26 +24,72 @@
 #
 # 复跑：bash scripts/kb/verify-citations.sh
 # 自证：bash scripts/kb/verify-citations.sh --selftest（合成两棵假树，不碰本机的真树）
-# 源码固定点由环境变量覆盖：FS_REFS=/path bash scripts/kb/verify-citations.sh
+# 两棵树的根（records/2026-10-31-task-server巡检.md 问题 94：两台都要跑得起、判得一样）：缺省取共享数据根下的 fs-refs 与 kernel-tree
+#   （.claude/hooks/lib_work_root.py shared <名>，数据根经 NFS 两台挂在同一绝对路径上；不经 ~ 与 $HOME 取：第二台的家目录是另一个），取不到退 2、什么都没核。
+#   环境变量覆盖：FS_REFS=/path（固定点那三棵的上一层）、KERNEL_TREE=/path（非固定点那一棵），设了就不取共享数据根。--selftest 那一趟不取（各格自己给）。
+# 弄坏开关（只给 --selftest 证红用）：只有一个变量 VERIFY_CITATIONS_BREAK=<项>，一次给一个项。
+# 逐项写开关名、弄坏哪一处、打开后自证红的那几格（「」里是失败行的开头：自证逐条以 ✗ 起头列出没过的格，格号随增删格移动，写 …；
+# 红格里转述的被测程序输出也以 ✗ 起头，一并列出）：
+#   VERIFY_CITATIONS_BREAK=home-trees  verify_citations_shared_tree() 缺省照改前取家目录下的 code/fs-refs 与 kbuild/linux-om，不取共享数据根
+#       「✗ 自证第 … 格「缺省取共享数据根下的两棵树」没过」、「✗ 自证第 … 格「缺省取共享数据根下的两棵树：非固定点那一棵」没过」
+#       （两格里转述的合成表输出：「✗ D… 源码不在」、「✗ D… 取数命令失败（退 2）」）
+#   VERIFY_CITATIONS_BREAK=tally  score() 漏记一格分组计数（造「分组报数算错」的输入；每一趟子进程都继承它，凡是有命中的合成表都在末尾那道对账上红）
+#       「✗ 自证第 … 格「基线：固定点树那一组的数」没过」、「✗ 自证第 … 格「基线：非固定点树那一组的数」没过」、「✗ 自证第 … 格「基线：一条断言都没有的树也要列出来」没过」
+#       「✗ 自证第 … 格「C44 汇总闸自己判红」没过」、「✗ 自证第 … 格「文本缓存跑完连目录删、TMPDIR 与 GATE_CROSS_RUN_TMPDIR 里都不留」没过」
+#       「✗ 自证第 … 格「钉零命中：递归 grep 数成 0」没过」、「✗ 自证第 … 格「钉零命中：grep -c 数成 0」没过」、「✗ 自证第 … 格「文献里钉零命中数成 0」没过」
+#       「✗ 自证第 … 格「缺省取共享数据根下的两棵树」没过」、「✗ 自证第 … 格「缺省取共享数据根下的两棵树：非固定点那一棵」没过」
+#       （这些格里转述的被测程序输出：「✗ 分组报数与被扫集合对不上」、「✗ ck 的格数不对」）
+#   VERIFY_CITATIONS_BREAK=cache-kept  文本缓存照改前放进跨轮共用的 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-<uid>、跑完留着
+#       「✗ 自证第 … 格「文本缓存跑完连目录删、TMPDIR 与 GATE_CROSS_RUN_TMPDIR 里都不留」没过」
+#   VERIFY_CITATIONS_BREAK=grep-no-match-fails  grep_counting() 不把 grep 的零命中（退 1）改成退 0，零命中照取数失败判
+#       「✗ 自证第 … 格「钉零命中：递归 grep 数成 0」没过」、「✗ 自证第 … 格「钉零命中：grep -c 数成 0」没过」、「✗ 自证第 … 格「文献里钉零命中数成 0」没过」
+#       （三格里转述的合成表输出：「✗ D… 取数命令失败（退 1）」）
+#   VERIFY_CITATIONS_BREAK=count-status-ignored  ckn、ckdocn 不看取数命令的退出码，只比输出
+#       「✗ 自证第 … 格「取数读的目录不在判红」没过」、「✗ 自证第 … 格「取数程序起不来判红」没过」
+#       「✗ 自证第 … 格「管道里 awk 写坏判红」没过」、「✗ 自证第 … 格「文献计数的模式写坏判红」没过」
+#   VERIFY_CITATIONS_BREAK=guard-off  平常跑设了弄坏开关也不拒（关守卫项：自证里探针往下跑完合成表退 0）
+#       「✗ 自证第 … 格「平常跑设了弄坏开关退 2 并点名只在自证里认」没过」
+#   VERIFY_CITATIONS_BREAK=guard-off-with-others  关守卫项 guard-off 与别的项按逗号同写时也照放过（只在自证进程里认：子进程里变量值就是那串逗号，认不到这一项）
+#       「✗ 自证第 … 格「关守卫项与别的项同写，守卫照拒」没过」
+# 弄坏开关只在 --selftest 起的那几趟里认（自证设 VERIFY_CITATIONS_SELFTEST_MARK 指到它建的标记文件）：平常跑设了就在一切之前退 2、点名它只在自证里认；
+#   guard-off 整值比，只在它是唯一一项时放过，与别的项同写照拒。
 set -uo pipefail
-# 弄坏开关 VERIFY_CITATIONS_BREAK_TALLY、VERIFY_CITATIONS_BREAK_CACHE_KEPT 只在 --selftest 起的那几趟里认（自证设 VERIFY_CITATIONS_SELFTEST_MARK 指到它建的标记文件）：
-# 平常跑设了就在一切之前退 2、点名变量只在自证里认。弄坏开关 VERIFY_CITATIONS_BREAK_GUARD_OFF=1：这一道不拒（自证里「平常跑设了弄坏开关退 2」那一格转红）
-if [[ -z "${VERIFY_CITATIONS_BREAK_GUARD_OFF:-}" && "${1:-}" != --selftest ]]; then
-  for verify_citations_break_variable in VERIFY_CITATIONS_BREAK_TALLY VERIFY_CITATIONS_BREAK_CACHE_KEPT; do
-    [[ -n "${!verify_citations_break_variable:-}" ]] || continue
-    if [[ -z "${VERIFY_CITATIONS_SELFTEST_MARK:-}" || "$(cat -- "$VERIFY_CITATIONS_SELFTEST_MARK" 2>/dev/null)" != verify-citations-selftest ]]; then
-      echo "  ✗ $verify_citations_break_variable 是弄坏开关，只在自证（--selftest）里认；平常跑设了就拒，这一次什么都没跑" >&2
-      echo "  → 怎么办：去掉 $verify_citations_break_variable 再跑；要证红就跑 $verify_citations_break_variable=1 bash scripts/kb/verify-citations.sh --selftest" >&2
-      exit 2
-    fi
-  done
+VERIFY_CITATIONS_SELFTEST_MARK_CONTENT=verify-citations-selftest
+verify_citations_guard_lets_through() { # verify_citations_guard_lets_through <VERIFY_CITATIONS_BREAK 的值> —— 平常跑的守卫放过它就返回 0：空，或整值是 guard-off
+  [[ -z "$1" || "$1" == guard-off ]] && return 0
+  [[ "${VERIFY_CITATIONS_BREAK:-}" == guard-off-with-others && ",$1," == *,guard-off,* ]] && return 0
+  return 1
+}
+if [[ -n "${VERIFY_CITATIONS_BREAK:-}" && "${1:-}" != --selftest ]] && ! verify_citations_guard_lets_through "$VERIFY_CITATIONS_BREAK" \
+    && [[ -z "${VERIFY_CITATIONS_SELFTEST_MARK:-}" || "$(cat -- "$VERIFY_CITATIONS_SELFTEST_MARK" 2>/dev/null)" != "$VERIFY_CITATIONS_SELFTEST_MARK_CONTENT" ]]; then
+  echo "  ✗ VERIFY_CITATIONS_BREAK=$VERIFY_CITATIONS_BREAK 是弄坏开关，只在自证（--selftest）里认；平常跑设了就拒，这一次什么都没跑" >&2
+  echo "  → 怎么办：去掉 VERIFY_CITATIONS_BREAK 再跑；要证红就跑 VERIFY_CITATIONS_BREAK=<项> bash scripts/kb/verify-citations.sh --selftest" >&2
+  exit 2
 fi
-unset verify_citations_break_variable
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-REFS="${FS_REFS:-$HOME/code/fs-refs}"
-KERN="${KERNEL_TREE:-$HOME/kbuild/linux-om}"
+# 两棵树的根（文件头「两棵树的根」）：没设的那一个取共享数据根下那一项；--selftest 那一趟不取
+verify_citations_shared_tree() { # <共享数据根下的名字> <没设的那个变量名>：打那一项的绝对路径；取不到就停
+  local path
+  if [[ "${VERIFY_CITATIONS_BREAK:-}" == home-trees ]]; then
+    case "$1" in fs-refs) echo "$HOME/code/fs-refs" ;; *) echo "$HOME/kbuild/linux-om" ;; esac
+    return 0
+  fi
+  if ! path="$(python3 "$(dirname "${BASH_SOURCE[0]}")/../../.claude/hooks/lib_work_root.py" shared "$1")" || [[ "$path" != /* ]]; then
+    echo "  ✗ 取不到共享数据根下的 $1（.claude/hooks/lib_work_root.py shared $1 没打出绝对路径，原因在上一行），一条引用都没核" >&2
+    echo "  → 怎么办：照上一行的出路配好数据根（多机配置的 SHARED_DATA_ROOT，或 SINGLEFS_DATA_ROOT），或设 $2 指到那棵树" >&2
+    exit 2
+  fi
+  echo "$path"
+}
+if [[ "${1:-}" == --selftest ]]; then
+  REFS="${FS_REFS:-/verify-citations-selftest-sets-its-own/refs}"
+  KERN="${KERNEL_TREE:-/verify-citations-selftest-sets-its-own/kern}"
+else
+  REFS="${FS_REFS:-$(verify_citations_shared_tree fs-refs FS_REFS)}" || exit 2
+  KERN="${KERNEL_TREE:-$(verify_citations_shared_tree kernel-tree KERNEL_TREE)}" || exit 2
+fi
 
 # ── 树登记表：一行一棵树，树名 | 根路径 | 固定点还是非固定点 ──────────────
 # 固定点＝scripts/kb/fetch-refs.sh 按 URL + sha256 取回、放在 $FS_REFS 底下的那一份。
@@ -91,7 +137,7 @@ score() { # score <树名> <pass 或 fail> —— 分组计数与总计在同一
   fi
   # 只供自证使用的开关（.claude/rules/fs-design.md「每条分支必须能被测试强制进入」）：
   # 漏记**一格**分组计数，末尾那道「分组报数与被扫集合对得上」必须由绿转红。
-  if [[ "${VERIFY_CITATIONS_BREAK_TALLY:-}" == "1" && "$tally_dropped" == 0 && "$outcome" == pass ]]; then
+  if [[ "${VERIFY_CITATIONS_BREAK:-}" == tally && "$tally_dropped" == 0 && "$outcome" == pass ]]; then
     TREE_PASS["$tree"]=$(( ${TREE_PASS[$tree]} - 1 )); tally_dropped=1
   fi
 }
@@ -132,6 +178,26 @@ cmd_in_tree() { # cmd_in_tree <树名> <决策> <说的是什么> <已把 %ROOT%
   return 0
 }
 
+# 取数（ckn、ckdocn 共用）：取数命令照 pipefail 跑，管道里任何一段退非 0 都判取数失败（命令起不来、文件或目录读不了、模式写坏）；
+# 只有 grep 的「一行没选中」不算失败：grep 零命中退 1，这时它要数的就是 0 ⇒ 取数时 grep 换成 grep_counting，退 1 改成退 0，退 2 及以上原样传出。
+# 别的程序退 1 照失败判（gawk 语法错就退 1）。取数命令里不拿 grep 的退出码当条件：`grep -q … && …` 在这里零命中也算真。
+# 进程替换 <(…) 里那一段的退出码 pipefail 收不到：读不到时下游数出的数对不上期望，照「期望 N，实测 M」判红。
+grep_counting() { # grep_counting <grep 的参数…> —— 照 grep 跑，只把零命中的退 1 改成退 0
+  local rc=0
+  command grep "$@" || rc=$?
+  [[ "${VERIFY_CITATIONS_BREAK:-}" == grep-no-match-fails ]] && return "$rc"
+  (( rc == 1 )) && return 0
+  return "$rc"
+}
+
+count_run() { # count_run <取数命令> —— 子 shell 里照 pipefail 跑、命令里的 grep 走 grep_counting；打印标准输出，退非 0 就是取数失败
+  (
+    set -o pipefail
+    grep() { grep_counting "$@"; }
+    eval "$1" 2>/dev/null
+  )
+}
+
 ck() { # ck <决策> <树名> <说的是什么> <树内相对路径> <ERE 模式>
   (( $# == 5 )) || { arity_red ck 5 "$@"; return; }
   local d="$1" tree="$2" what="$3" rel="$4" pat="$5" f
@@ -150,11 +216,16 @@ ck() { # ck <决策> <树名> <说的是什么> <树内相对路径> <ERE 模式
 
 ckn() { # ckn <决策> <树名> <说的是什么> <期望数> <实测命令，拿 %ROOT% 指那棵树的根>
   (( $# == 5 )) || { arity_red ckn 5 "$@"; return; }
-  local d="$1" tree="$2" what="$3" want="$4" cmd="$5" got
+  local d="$1" tree="$2" what="$3" want="$4" cmd="$5" got count_status
   mark_tree "$tree" "$d" "$what" || return
   cmd="${cmd//%ROOT%/${TREE_ROOT[$tree]}}"
   cmd_in_tree "$tree" "$d" "$what" "$cmd" || return
-  got=$(eval "$cmd" 2>/dev/null)
+  got=$(count_run "$cmd"); count_status=$?
+  [[ "${VERIFY_CITATIONS_BREAK:-}" == count-status-ignored ]] && count_status=0
+  if (( count_status != 0 )); then
+    printf '  ✗ %-6s %-42s 取数命令失败（退 %s）\n' "$d" "$what" "$count_status"  # gate-lint:detail
+    score "$tree" fail; return
+  fi
   if [[ "$got" == "$want" ]]; then printf '  ✓ %-6s %s（%s）\n' "$d" "$what" "$got"; score "$tree" pass
   else printf '  ✗ %-6s %-42s 期望 %s，实测 %s\n' "$d" "$what" "$want" "${got:-取不到}"; score "$tree" fail; fi  # gate-lint:detail
 }
@@ -166,7 +237,7 @@ ckn() { # ckn <决策> <树名> <说的是什么> <期望数> <实测命令，�
 #    ZFS On-Disk Specification 就是这种（CID 字体），所以它不在那张表里，见 fetch-refs.sh 的说明。
 # 抽出的文本放这一趟自己的临时目录 PDFTXT_CACHE（下面「跑」那一段开头在 ${TMPDIR:-/tmp} 下 mktemp -d），同一趟里一份文献只抽一次，
 # 退出时（跑完、判红、被 TERM / INT 停）连同目录删掉，不留给以后的趟复用（用户 2026-10-23 定案「自己用完自己删」）。
-# 只供自证使用的开关 VERIFY_CITATIONS_BREAK_CACHE_KEPT=1：照改前放进跨轮共用的 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-<uid>、跑完留着
+# 只供自证使用的开关 VERIFY_CITATIONS_BREAK=cache-kept：照改前放进跨轮共用的 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-<uid>、跑完留着
 #   （自证「文本缓存跑完连目录删」那一格由绿转红）。
 pdftxt() { # pdftxt <树名> <文献名> —— 这一趟里抽一次缓存一次，打印缓存路径；抽不出就打印空
   local tree="$1" name="$2" pdf="" out="" partial=""
@@ -207,14 +278,18 @@ ckdoc() { # ckdoc <决策> <树名> <说的是什么> <文献名> <ERE 模式>
 }
 ckdocn() { # ckdocn <决策> <树名> <说的是什么> <文献名> <ERE 模式> <期望命中数>
   (( $# == 6 )) || { arity_red ckdocn 6 "$@"; return; }
-  local d="$1" tree="$2" what="$3" name="$4" pat="$5" want="$6" txt="" got=""
+  local d="$1" tree="$2" what="$3" name="$4" pat="$5" want="$6" txt="" got="" count_status=0
   mark_tree "$tree" "$d" "$what" || return
   rel_in_tree "$tree" "$d" "$what" "$name" || return
   if [[ ! -f "${TREE_ROOT[$tree]}/$name" ]]; then
     printf '  ✗ %-6s %-42s 文献不在本机：%s\n' "$d" "$what" "${TREE_ROOT[$tree]}/$name"; score "$tree" fail; return  # gate-lint:detail
   fi
   txt="$(pdftxt "$tree" "$name")" || { printf '  ✗ %-6s %-42s 抽取失败：%s\n' "$d" "$what" "$name"; score "$tree" fail; return; }  # gate-lint:detail
-  got=$(grep -oiE "$pat" "$txt" | wc -l)
+  got=$(set -o pipefail; grep_counting -oiE "$pat" "$txt" | wc -l); count_status=$?
+  [[ "${VERIFY_CITATIONS_BREAK:-}" == count-status-ignored ]] && count_status=0
+  if (( count_status != 0 )); then
+    printf '  ✗ %-6s %-42s 取数命令失败（退 %s）：%s\n' "$d" "$what" "$count_status" "$name"; score "$tree" fail; return  # gate-lint:detail
+  fi
   if [[ "$got" == "$want" ]]; then printf '  ✓ %-6s %s（%s 次）\n' "$d" "$what" "$got"; score "$tree" pass
   else printf '  ✗ %-6s %-42s 期望 %s 次，实测 %s 次\n' "$d" "$what" "$want" "$got"; score "$tree" fail; fi  # gate-lint:detail
 }
@@ -375,6 +450,19 @@ selftest_assertions() {
       ckdoc D9 refs-docs "合成：抽取到一半失败的文献" half.pdf '合成的半截原文' ;;
     whole-extraction)
       ckdoc D9 refs-docs "合成：抽得出的文献" whole.pdf '合成的整篇原文' ;;
+    zero-count)
+      ckn D9  refs-linux  "合成：递归 grep 钉零命中" 0 "grep -rE '这个串不在树里|那个也不在' '%ROOT%/fs/bcachefs' | wc -l"
+      ckn D9  refs-linux  "合成：grep -c 钉零命中"   0 "grep -c '这个串不在文件里' '%ROOT%/fs/bcachefs/alloc_background.h'" ;;
+    count-tree-missing)
+      ckn D9  refs-linux  "合成：取数读的目录不在"   0 "grep -rE 'BUCKET_GC_GEN_MAX' '%ROOT%/fs/没有这个目录' | wc -l" ;;
+    count-program-missing)
+      ckn D9  refs-linux  "合成：取数程序起不来"     0 "'%ROOT%/没有这个取数程序' | wc -l" ;;
+    count-awk-broken)
+      ckn D9  refs-linux  "合成：管道里 awk 写坏"    0 "awk '{' '%ROOT%/fs/bcachefs/alloc_background.h' | wc -l" ;;
+    doc-zero-count)
+      ckdocn D9 refs-docs "合成：文献里钉零命中"     whole.pdf '这个串不在原文里' 0 ;;
+    doc-broken-pattern)
+      ckdocn D9 refs-docs "合成：文献计数的模式写坏" whole.pdf '(' 0 ;;
     *)
       echo "  ✗ VERIFY_CITATIONS_ASSERTIONS=$1：本文件里没有这一张自证断言表"
       echo "  → 怎么办：这个变量只给 --selftest 用，写 selftest_assertions 里的表名之一；平常跑不设它"
@@ -386,12 +474,12 @@ st_run() { # st_run <合成树目录> <断言表名> [额外的环境赋值…] 
   env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$assertions" "$@" bash "$SELF" 2>&1
 }
 selftest() {
-  local work="" out="" rc=0 leftovers=0
+  local work="" out="" rc=0 leftovers=0 guard_probe_break=tally
   work="$(mktemp -d "${TMPDIR:-/tmp}/verify-citations-selftest-XXXXXX")"
   # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
   trap "rm -rf -- '$work'" EXIT
   # 自证起的子进程的标记：别处（平常跑）设了弄坏开关会被拒，自证自己起的那几趟靠它放行（文件头附近那一道）
-  printf '%s\n' verify-citations-selftest >"$work/mark"
+  printf '%s\n' "$VERIFY_CITATIONS_SELFTEST_MARK_CONTENT" >"$work/mark"
   export VERIFY_CITATIONS_SELFTEST_MARK="$work/mark"
   mkdir -p "$work/refs/linux-6.17/fs/bcachefs" "$work/refs/zfs/include/sys" "$work/refs/docs" "$work/kern/fs/xfs" "$work/tmp"
   printf '#define BUCKET_GC_GEN_MAX\t96U\n' >"$work/refs/linux-6.17/fs/bcachefs/alloc_background.h"
@@ -414,12 +502,24 @@ selftest() {
   out="$(st_run "$work" unknown-tree)"; rc=$?
   st_case "标了一棵没登记的树，那一行判红" 红 "$rc" "$out" '没标树来源，或标了一棵没登记的树'
   # ⑦ 分组报数与被扫集合对不上 ⇒ 判红（开关只漏记一格，钉的是一个 1 的差）
-  out="$(st_run "$work" green VERIFY_CITATIONS_BREAK_TALLY=1)"; rc=$?
+  out="$(st_run "$work" green VERIFY_CITATIONS_BREAK=tally)"; rc=$?
   st_case "分组报数算错判红" 红 "$rc" "$out" '分组报数与被扫集合对不上'
-  # 平常跑设了弄坏开关：标记清掉、带一个认不得的选项，要退非 0 并点名变量只在自证里认；没有这道拒时它照常跑完合成表（所以这里也指到合成表，不碰真树）
+  # 平常跑设了弄坏开关：标记清掉、带一个认不得的选项，要退非 0 并点名变量只在自证里认；没有这道拒时它照常跑完合成表（所以这里也指到合成表，不碰真树）。
+  # 弄坏开关 guard-off 下守卫放过整值是 guard-off 的探针（外面设着它，探针也设它），往下跑完合成表退 0，这一格红
+  [[ "${VERIFY_CITATIONS_BREAK:-}" != guard-off ]] || guard_probe_break=guard-off
   out="$(env VERIFY_CITATIONS_SELFTEST_MARK= TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=green \
-         VERIFY_CITATIONS_BREAK_TALLY=1 bash "$SELF" --force --break-guard-probe-unknown-option 2>&1)"; rc=$?
-  st_case "平常跑设了弄坏开关退 2 并点名只在自证里认" 红 "$rc" "$out" 'VERIFY_CITATIONS_BREAK_TALLY 是弄坏开关，只在自证'
+         VERIFY_CITATIONS_BREAK="$guard_probe_break" bash "$SELF" --force --break-guard-probe-unknown-option 2>&1)"; rc=$?
+  st_case "平常跑设了弄坏开关退 2 并点名只在自证里认" 红 "$rc" "$out" 'VERIFY_CITATIONS_BREAK=tally 是弄坏开关，只在自证'
+  # 关守卫项 guard-off 只在它是唯一一项时放过：与别的项按逗号同写，守卫照拒（本进程里直接问守卫那一判；弄坏开关 guard-off-with-others 下它放过）
+  if verify_citations_guard_lets_through guard-off,tally; then out="守卫放过了 guard-off,tally"; rc=0; else out="守卫拒了 guard-off,tally"; rc=1; fi
+  st_case "关守卫项与别的项同写，守卫照拒" 红 "$rc" "$out" '守卫拒了'
+  # 缺省取共享数据根下的两棵树（文件头「两棵树的根」）：FS_REFS、KERNEL_TREE 都不设，数据根给这一格自己的（SINGLEFS_DATA_ROOT），家目录指到不在的地方（第二台的条件）
+  mkdir -p "$work/data-root"
+  ln -s "$work/refs" "$work/data-root/fs-refs"
+  ln -s "$work/kern" "$work/data-root/kernel-tree"
+  out="$(env -u FS_REFS -u KERNEL_TREE TMPDIR="$work/tmp" SINGLEFS_DATA_ROOT="$work/data-root" HOME=/nonexistent/x VERIFY_CITATIONS_ASSERTIONS=green bash "$SELF" 2>&1)"; rc=$?
+  st_case "缺省取共享数据根下的两棵树" 绿 "$rc" "$out" "refs-linux（固定点）根：$work/data-root/fs-refs/linux-6.17"
+  st_case "缺省取共享数据根下的两棵树：非固定点那一棵" 绿 "$rc" "$out" "host-kernel（非固定点）根：$work/data-root/kernel-tree"
   # ⑧ ⑨ 原有的两条判据一条都没放松
   out="$(st_run "$work" missing-file)"; rc=$?
   st_case "文件不在仍判红" 红 "$rc" "$out" '源码不在'
@@ -462,21 +562,38 @@ WHOLE_EXTRACTOR_EOF
   cross_run_leftovers="$(find "$work/cross-run-tmp" -mindepth 1 | wc -l)"
   st_case "文本缓存跑完连目录删、TMPDIR 与 GATE_CROSS_RUN_TMPDIR 里都不留" 绿 "$(( rc == 0 && private_leftovers == 0 && cross_run_leftovers == 0 ? 0 : 1 ))" \
     "退出码 $rc；TMPDIR 里留下 $private_leftovers 项，GATE_CROSS_RUN_TMPDIR 里留下 $cross_run_leftovers 项；输出：$out" 'TMPDIR 里留下 0 项，GATE_CROSS_RUN_TMPDIR 里留下 0 项'
+  # ⑯ ⑰ 钉零命中、期望 0 的计数：grep 零命中退 1，pipefail 下整条管道退 1，可这条数本来就是 0 ⇒ 判绿（grep_counting）
+  out="$(st_run "$work" zero-count)"; rc=$?
+  st_case "钉零命中：递归 grep 数成 0" 绿 "$rc" "$out" '合成：递归 grep 钉零命中（0）'
+  st_case "钉零命中：grep -c 数成 0"   绿 "$rc" "$out" '合成：grep -c 钉零命中（0）'
+  # ⑱ ⑲ ⑳ 取数命令真坏了仍判取数失败，期望 0 也不许数成 0 过关：grep 读的目录不在（退 2）、取数程序起不来（退 127）、grep 之外的一段退 1（gawk 语法错）
+  out="$(st_run "$work" count-tree-missing)"; rc=$?
+  st_case "取数读的目录不在判红" 红 "$rc" "$out" '取数命令失败（退 2）'
+  out="$(st_run "$work" count-program-missing)"; rc=$?
+  st_case "取数程序起不来判红"   红 "$rc" "$out" '取数命令失败（退 127）'
+  out="$(st_run "$work" count-awk-broken)"; rc=$?
+  st_case "管道里 awk 写坏判红"  红 "$rc" "$out" '取数命令失败（退 '
+  # ㉑ ㉒ 文献计数同一判法：零命中数成 0 判绿，模式写坏（grep 退 2）判取数失败；用上面那份整篇吐完的假抽取器
+  out="$(env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=doc-zero-count bash "$work/bin-whole/verify-citations.sh" 2>&1)"; rc=$?
+  st_case "文献里钉零命中数成 0"     绿 "$rc" "$out" '合成：文献里钉零命中（0 次）'
+  out="$(env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=doc-broken-pattern bash "$work/bin-whole/verify-citations.sh" 2>&1)"; rc=$?
+  st_case "文献计数的模式写坏判红"   红 "$rc" "$out" '取数命令失败（退 2）：whole.pdf'
 
   rm -rf "${work:?}"
   if (( st_failed )); then
     echo "    → 怎么办：上面逐格列出了要什么、实测什么。分组报数那几格看本脚本末尾那道"
-    echo "      「分组报数与被扫集合对不上」；树来源那几格看 mark_tree 与 cmd_in_tree；文本缓存那一格看 PDFTXT_CACHE 那一行。"
+    echo "      「分组报数与被扫集合对不上」；树来源那几格看 mark_tree 与 cmd_in_tree；文本缓存那一格看 PDFTXT_CACHE 那一行；"
+    echo "      钉零命中与取数失败那几格看 grep_counting、count_run 与 ckn、ckdocn 里判 count_status 的那几行。"
     exit 1
   fi
-  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格、文本缓存跑完连目录删、平常跑设了弄坏开关退 2）"
+  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格、文本缓存跑完连目录删、平常跑设了弄坏开关退 2、关守卫项与别的项同写照拒、钉零命中数成 0 三格、取数命令坏了判红四格、缺省取共享数据根下的两棵树两格）"
   exit 0
 }
 if [[ "${1:-}" == "--selftest" ]]; then selftest; fi
 
 # ── 跑 ─────────────────────────────────────────────────────────────────
 # 这一趟的文本缓存（上面「外部文献」那一段）：退出时连同目录删；被 TERM / INT 停先转成 exit，EXIT 钩子照跑
-if [[ "${VERIFY_CITATIONS_BREAK_CACHE_KEPT:-}" == "1" ]]; then
+if [[ "${VERIFY_CITATIONS_BREAK:-}" == cache-kept ]]; then
   PDFTXT_CACHE="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-$(id -u)"
   mkdir -p "$PDFTXT_CACHE"
 else

@@ -1,72 +1,97 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都照此刻工作目录里哪几件做完了判还差什么，上一次跑完不替这一次作保
 # run-condition: command python3 flock
+# task-server-shards: *
 # E184（常规层与大负载层的代价计数）第一段（岔路 G1，跑前登记 research/prompts/e184-preregistration.md 5.6 的第一段与第十二节修订 6 至 10）的长活跑法：
-#   装置是入库装置 crates/singlefs-checker-tier/src/bin/e184_regular_layer_cost_counts.rs 与转储 bin
+#   装置是入库装置 crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts.rs 与转储 bin
 #   e184_regular_layer_cost_counts_write_dump.rs（都由主 agent 经 compile-then-swap.py 编好；二进制路径见「环境」）。
 #   本脚本把第一段的产物拆成若干件活，每件活的输出落进工作目录、齐了拼成一份产物
 #   research/results/e184-regular-layer-cost-counts-segment-one-<日期>.out。
 #   件的次序（--list-segments 逐行列）：读仓里的钉住常量与停机 T6、selfcheck、record-fixed-chains、固定流的 keys、
 #   各档随机历史的 dump 与 keys（先小后大）、share、library（只在 share 有一族判「部分」时跑）。
 #
-# long-run-shards: 一片 = 一条流一件活：装置已把每条流做成一片（转储是一条历史一份文件、块键是一条流一组文件，都写到临时名再改名，完成标记在才算做完）；本脚本在外层按步与档把片排成件（读仓里的钉住常量与停机 T6、selfcheck、record-fixed-chains、固定流的 keys、六档随机历史各一件 dump 与一件 keys、share、library），--share k/n 再把每档 keys 里的流按文件次序对 n 取余分给各台
+# long-run-shards: 一片 = 一条流一件活：装置已把每条流做成一片（转储是一条历史一份文件、块键是一条流一组文件，都写到临时名再改名，完成标记在才算做完）；本脚本在外层按步与档把片排成件（读仓里的钉住常量与停机 T6、selfcheck、record-fixed-chains、固定流的 keys、六档随机历史各一件 dump 与一件 keys、share、library），服务的 shard 那一步（TASK_SERVER_SHARD=k/n）再把每档 keys 里的流按文件次序对 n 取余分给各台
 # long-run-resume: 同一条命令重起就是续跑：每件活做完才写一份完成记录（输出末行是装置的 name=<步>_done 且 emitted= 等于行数、装置二进制的 sha256 对得上），重起先读记录、做完的整件跳过，没做完的那件重起装置，装置自己再把已有完成标记的转储与块键文件整份跳过，只补没做完的流；记的装置 sha256 与这一趟不同的件（连同装置自己写的转储与块键目录）先作废移走，逐件报「作废：<件名>（装置 sha256 不同）」；成功那句报「现跑 N、沿用 M」
 # long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
-#   多机的读法：本脚本只管一台。--list-segments 打出 --emit-hosts 读到的台数。第二台由主 agent 照这个台数起：
-#     MULTI_HOST_RUN_FETCH_DIRECTORY=<不存在的取回目录> bash scripts/hosts/multi-host-run.sh --peer --label e184-share-1 --fetch e184-share-work-1-of-2/keys -- env E184_WORK_DIRECTORY=e184-share-work-1-of-2 bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --build-here --share 1/2
-#   （工作目录写成树里的相对路径，--fetch 才取得回；--build-here 在第二台那棵树里编装置：编译目录里的二进制烘进了本机的路径，带不过去。）
-#   本机同时跑 --share 0/2。两台各自重录同样的转储（种子固定、可重现；实测 50 步档 13 秒、100 步档 7 秒，200、400 步档没量），各只算自己那一半流的块键；
-#   取回之后在本机 --import-work <取回目录> 把对方做完的块键文件并进本机（不覆盖已有的），再不带参数跑一次本脚本：块键全部沿用、拼出产物。
-#   取回的块键文件有多大随步数档涨（实测 100 步档 20 条流的块键文件合计 15G），传输量大时只跑本机，不起第二台也行：台数是读到的，不是脚本强求的。
+#   多机的读法：本脚本不自己连第二台；--list-segments 打出 --emit-hosts 读到的台数。经 task-server 分片（task-server/task_server_lib.py 文件头「分片」；文件头那一行 task-server-shards 声明了，
+#   提交 task-server/task submit -- bash scripts/experiment-apparatus/e184-segment-one-long-run.sh，派哪台由服务定，两台在同一棵共享的树里跑；工作目录放工作根下（NFS 共享根，两台同一份）：
+#     plan  在本机：plan.json 写台数那么多片（台数 = 1 + --emit-hosts 打的 MULTI_HOST_COUNT，双机关着它退 3、只有本机；每片只写 label，不钉台）
+#     shard 照 TASK_SERVER_SHARD=<k>/<n> 在 <工作目录>-share-<k>-of-<n> 里只转储各档随机历史、只算序号对 n 取余等于 k 的流的块键，不拼产物；建好服务给的产物目录（空的）
+#     merge 在本机：TASK_SERVER_SHARD_MISSING 不空就退 77、点名缺的片；把各片工作目录里做完的块键文件并进本机工作目录（不覆盖已有的，做法同 --import-work，装置 sha256 对不上的作废），再不分片地跑一遍：块键全部沿用、拼出产物
+#   不经服务分片（环境里没有 TASK_SERVER_SHARD_PHASE）：全部在这一台做完。两台各自重录同样的转储（种子固定、可重现；实测 50 步档 13 秒、100 步档 7 秒，200、400 步档没量），各只算自己那一半流的块键。
+#   块键文件有多大随步数档涨（实测 100 步档 20 条流的块键文件合计 15G，第二台写的经 NFS 落到本机盘上），量大时只跑本机，不起第二台也行：台数是读到的，不是脚本强求的。
 #   每台的线程：登记值（.claude/heavy-thread-default）是上限，内存吃紧的档在表里写得更小（E184_THREADS 设了取它与表里的较小者）。
 #   装置在一趟里不许换，每件记下打它的是哪一版装置（欠账 C862，共用段落在 long-run-lib/binary-identity.sh）：开跑时把主装置与转储 bin 各拷一份进 $WORK_DIRECTORY/pinned-binary/<sha256>/（只读），
 #   每件每次起装置都按这两份拷贝，不再 exec 仓根或编译目录里那一份（别的会话的 cargo 随时会把它换掉）；每件做完的记录（steps/<件>.status）写这份拷贝的 sha256，起装置之前另在
 #   dumps/<档>.device-stamp、keys/<档>.device-stamp（其余件在 steps/<件>.device-stamp）写下这一趟的 sha256，因为装置自己会把已经写完的转储与块键文件整份跳过，换了装置之后这些旧文件不能留给新装置。
 #   续跑开头先过一遍：记的 sha256 与这一趟不同、或留着东西却没有记录的件，连同它的前提作废的件，逐件报「作废：<件名>（装置 sha256 不同）」，记录、输出和装置自己写的转储与块键目录整份移进
 #   $WORK_DIRECTORY/void-<日期>-<进程号>/<件名>/（留着不删）再现跑。--import-work 并进对方的块键文件时核对方 keys/<档>.device-stamp 与本机主装置的 sha256 相同，不同的跳过并报作废；
-#   拼产物之前再核各件记的 sha256 彼此相同（不同就拒）。第二台要让对方的块键并得进来，得用与本机同一份装置：把本机私有副本送过去、第二台用 E184_BINARY 指到送到的文件（装置里烘进的编译树路径
-#   在第二台上要有，见装置退 preflight.py 时的提示），第二台自己 --build-here 编出来的 sha256 一般不同，并进时会被报作废。老的私有副本留着不删（一个 sha256 一个目录），确认不再续跑那一版之后手删。
+#   拼产物之前再核各件记的 sha256 彼此相同（不同就拒）。第二台要让对方的块键并得进来，得用与本机同一份装置：第二台用 E184_BINARY 指到本机那一份私有副本（同一个绝对路径；装置里烘进的编译树路径
+#   在第二台上是同一棵共享的树），第二台自己 --build-here 编出来的 sha256 一般不同，并进时会被报作废。老的私有副本留着不删（一个 sha256 一个目录），确认不再续跑那一版之后手删。
 #
 # 用法（在仓里任何目录起都行，脚本自己回到仓根）：
 #   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh                         本机把没做完的件按次序全做完，拼出产物
 #   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --only <件名>            只做这一件（它前面的件要已做完），不拼产物
 #   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --assemble              不跑装置，件全做完时拼出产物
-#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --list-segments         逐行列件名、做没做完、内存上限与线程（不起装置、不编译）
-#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --print-commands        逐件打出会起的完整命令（可与 --share 合用，不起装置、不建目录）
-#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --share <第几份>/<共几份>  只转储各档随机历史、只算 序号对共几份取余等于第几份 的流的块键，不拼产物（第二台上用）
-#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --import-work <目录>     把另一台取回的工作目录里做完的块键文件并进本机（不覆盖已有的），不起装置
-#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --build-here            装置用这棵树里 cargo build --release 编出的 target/release 下那两份（第二台上用）
-#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --selftest              假装置、假内存包装、假机器清单在临时树里走一遍（不起 cargo、不碰真装置）
+#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --list-segments         逐行列件名、做没做完、线程（不起装置、不编译）
+#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --print-commands        逐件打出会起的完整命令（服务的 shard 那一步的环境变量也算数，不起装置、不建目录）
+#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --import-work <目录>     把另一台的工作目录（共享工作根下）里做完的块键文件并进本机（不覆盖已有的），不起装置
+#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --build-here            装置用这棵树里 cargo build --release 编出的 target/release 下那两份（不用主 agent 编好的那一份时用）
+#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --selftest              假装置、假机器清单在临时树里走一遍（不起 cargo、不碰真装置）；只在临时 prune-server 上跑
+#                                                                                           （scripts/prune-server/prune_server_client_selftest.py --with-temporary-service 起），不是就退 2、一格都不跑
 # 环境：E184_BINARY（主装置二进制，默认 编译目录里的 e184_regular_layer_cost_counts）、E184_DUMP_BINARY（转储 bin，默认 E184_BINARY 加 _write_dump）、
-#   E184_WORK_DIRECTORY（工作目录，默认 ~/.local/share/singlefs/work/e184-segment-one）、E184_THREADS（见「多机的读法」）、
-#   E184_DUMP_MEMORY_CAP / E184_KEYS_MEMORY_CAP（设了就覆盖表里每档的转储 / 块键内存上限）、E184_LIBRARY（长期库目录，默认 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY，
-#   再没设取 ~/.local/share/singlefs/crash-amplification/crash-state-verdicts）、E184_PRODUCT_DIRECTORY（产物目录，默认 research/results）。
-#   只给自证换假的：E184_HOSTS_EMITTER（默认 scripts/crash/crash-point-replay-shard-configuration-check.sh）、E184_MEMORY_WRAPPER（默认 scripts/hosts/run-with-memory-cap.sh）。
+#   E184_WORK_DIRECTORY（工作目录，默认工作根下的 e184-segment-one，工作根取 .claude/hooks/lib_work_root.py、两台同一份）、E184_THREADS（见「多机的读法」）、
+#   E184_PRODUCT_DIRECTORY（产物目录，默认 research/results）。library 那一件查的崩溃判定库在 prune-server 里（装置经客户端读，连哪一处照客户端的取法），不交库目录。
+#   只给自证换假的：E184_HOSTS_EMITTER（默认 scripts/crash/crash-point-replay-shard-configuration-check.sh）。
 # 产物名：research/results/e184-regular-layer-cost-counts-segment-one-<日期>.out，已有时同一天再跑加 -r2、-r3；已有的一个不动。
-# 退出码：0 做完（--share 是这一份做完）；1 有件没跑成或产物不齐（同一条命令重起续跑）；2 用法错；3 装置或仓里的读数报停机（STOP 行该交主 agent，不重跑）；
-#   4 阳性对照没过（装置退 4，那一段作废）；78 装置没编好或台数超过两台。
+# 退出码：0 做完（服务的 shard 那一步是这一份做完，plan 那一步是计划写好）；1 有件没跑成或产物不齐（同一条命令重起续跑）；2 用法错；3 装置或仓里的读数报停机（STOP 行该交主 agent，不重跑）；
+#   4 阳性对照没过（装置退 4，那一段作废）；77 merge 那一步有片缺（TASK_SERVER_SHARD_MISSING 不空）；78 装置没编好或台数超过两台。
 #
 # 弄坏开关 E184_SEGMENT_ONE_BREAK=<项，逗号分隔>（只在 --selftest 起的那几趟里认：自证设 E184_SEGMENT_ONE_SELFTEST_MARK 指到它建的标记文件，别处设了拒、退 2）：
-#   share-format-unchecked         --share 的写法不核对                                  打开后自证「--share 写坏退 2」三格红
-#   missing-value-unchecked        --share、--only、--import-work 后面缺值不拦             打开后自证「后面缺值退 2」三格红
-#   unknown-argument-accepted      认不得的参数悄悄跳过                                  打开后自证「认不得的参数退 2」红
-#   done-marker-ignored            输出末行不是 name=<步>_done 也算做完                    打开后自证「输出末行对不上行数的件不算做完」红
-#   binary-change-ignored          装置二进制变了也沿用旧记录                              打开后自证「换了装置二进制：做完的件全部重做」红
-#   stop-exit-ignored              装置退 3（停机）当普通失败（退 1）                      打开后自证「selfcheck 报停机退 3」红
-#   control-exit-ignored           装置退 4（阳性对照没过）当普通失败（退 1）               打开后自证「record-fixed-chains 报阳性对照没过退 4」红
-#   wrapper-exit-ignored           内存包装自己的结局（252）也当装置的输出收下              打开后自证「内存包装排不上退 1」红
-#   product-name-fixed             产物名不取号、一律用本名                              打开后自证「产物本名已有：另存加 -r2」红
-#   prerequisite-unchecked         --only 不查前面的件做完没有                            打开后自证「--only 点名的件前面的件没做完退 2」红
-#   share-restriction-ignored      --share 不分流、每台算全部流的块键                      打开后自证「--share 0/2 只算自己那一半流」红
-#   library-always                 share 没有判「部分」的族也跑 library                    打开后自证「share 没有判部分的族：library 不跑」红
-#   pinned-mismatch-ignored        钉住常量与段形现算的两态闭式对不上也往下走               打开后自证「钉住的常量对不上退 3」红
-#   missing-pinned-as-mismatch     有段形而认不出两态闭式钉值的流也记成对不上（改前的认法）  打开后自证「冒烟层测试钉的是另一个量：记缺钉值、不算对不上」「钉值写错的与钉另一个量的同在：对不上仍只有一条」红
-#   crashflow-hit-ignored          停机 T6 的读数有命中也往下走                            打开后自证「crates 里出现 CrashFlow 退 3」红
-#   import-overwrites              并进块键文件时覆盖已有的                                打开后自证「--import-work 并进块键文件、已有的不覆盖」红
-#   exec-root-binary               装置仍按开跑时给的那个路径起、不按私有副本                打开后自证「装置在一趟里不许换」红（跑着的时候仓根那份被换，后起的件自报的 sha256 就不是开跑时那份）
-#   owned-files-kept               换了装置作废一件时，装置自己写的转储与块键目录留在原处   打开后自证「换了装置二进制」红（新装置跳过旧装置写完的块键文件）
-#   import-sha-unchecked           --import-work 不核对方块键目录记的装置 sha256              打开后自证「--import-work 对方的装置 sha256 不同：跳过并报作废」红
-#   merge-sha-unchecked            拼产物之前不核各件记的装置 sha256 彼此相同              打开后自证「拼产物之前各件记的装置 sha256 不同：拒」红
+#   E184_SEGMENT_ONE_BREAK=share-format-unchecked  TASK_SERVER_SHARD 的写法不核对
+#       「shard 片号写坏退 2：abc」「shard 片号写坏退 2：1/」「shard 片号写坏退 2：1-2」「shard 片号写坏退 2：2/2」「shard 片号写坏退 2：0/0」
+#   E184_SEGMENT_ONE_BREAK=missing-value-unchecked  --only、--import-work 后面缺值不拦
+#       「--only 缺值退 2」「--import-work 缺值退 2」
+#   E184_SEGMENT_ONE_BREAK=unknown-argument-accepted  认不得的参数悄悄跳过
+#       「认不得的参数退 2」「--import-work 目录不在退 2」
+#   E184_SEGMENT_ONE_BREAK=done-marker-ignored  输出末行不是 name=<步>_done 也算做完
+#       「输出末行对不上行数的件不算做完」
+#   E184_SEGMENT_ONE_BREAK=binary-change-ignored  装置二进制变了也沿用旧记录
+#       「换了装置二进制：做完的件全部重做（主装置那几件），转储 bin 没变的沿用」「换了装置二进制：旧装置打的主装置那十件逐件报作废、旧的整份留在 void 目录、装置自己写的块键目录不留给新装置、转储 bin 那六件不作废」「只换了转储 bin：转储六件作废，吃它们输出的块键六件跟着作废（前提作废了），别的件沿用」
+#   E184_SEGMENT_ONE_BREAK=stop-exit-ignored  装置退 3（停机）当普通失败（退 1）
+#       「selfcheck 报停机退 3、不合格行转出来、后面的件不起、不拼产物」「钉住的常量与段形现算的两态闭式对不上退 3、装置一次没起」「钉值写错的与钉另一个量的同在：对不上仍只有一条（退 3、装置一次没起），钉另一个量的那条只记缺钉值」「crates 里出现 CrashFlow 退 3（停机 T6）、装置一次没起」「停机 T6 要读的文件一个都读不到：不当零命中，退 3」
+#   E184_SEGMENT_ONE_BREAK=control-exit-ignored  装置退 4（阳性对照没过）当普通失败（退 1）
+#       「record-fixed-chains 报阳性对照没过退 4、后面的件不起」
+#   E184_SEGMENT_ONE_BREAK=device-exit-ignored  装置自己退非 0 也当输出收下
+#       「装置退 1：退 1、说退几、不写完成记录」「装置因编译树里没有 preflight.py 退 1：给出路」
+#   E184_SEGMENT_ONE_BREAK=product-name-fixed  产物名不取号、一律用本名
+#       「单机全新：十七件现跑、library 不跑、产物按带日期的名字落进 research/results」「share 没有判部分的族：library 不跑」「原样重起：做完的件全部沿用（只有读仓里的读数重读）、产物另存 -r2」「产物本名已有：另存加 -r2」「换了装置二进制：做完的件全部重做（主装置那几件），转储 bin 没变的沿用」「只换了转储 bin：转储六件作废，吃它们输出的块键六件跟着作废（前提作废了），别的件沿用」「分片、并进、再不带参数跑：块键清单打全、产物拼出」「share 有一族判部分：library 跑、产物里是 library 的输出」「冒烟层测试钉的是另一个量：记缺钉值（只记一条）、不算对不上、不进钉表、别的流照常、装置照起」「--assemble：件齐了不起装置、另存 -r2」
+#   E184_SEGMENT_ONE_BREAK=prerequisite-unchecked  --only 不查前面的件做完没有
+#       「--only 点名的件前面的件没做完退 2、装置一次没起」
+#   E184_SEGMENT_ONE_BREAK=share-restriction-ignored  shard 那一步不分流、每片算全部流的块键
+#       「shard 0/2、1/2：只转储与算各自那一半流的块键、不拼产物、块键清单不写完成记录」「shard 0/2 只算自己那一半流」
+#   E184_SEGMENT_ONE_BREAK=plan-shard-count-ignored  plan 那一步不管台数、一律写 1 片（merge 那一步按 plan.json 的片数去并各片工作目录，只剩 1 片就并不进两片的块键文件）
+#       「plan 两台：写 2 片」「merge：并进各片的块键文件（已有的不覆盖）、块键清单打全、产物拼出」
+#   E184_SEGMENT_ONE_BREAK=missing-shards-ignored  merge 那一步有片缺（TASK_SERVER_SHARD_MISSING 不空）也照整趟做
+#       「merge 缺片：退 77、点名缺的片、装置一次没起」
+#   E184_SEGMENT_ONE_BREAK=library-always  share 没有判「部分」的族也跑 library
+#       「单机全新：十七件现跑、library 不跑、产物按带日期的名字落进 research/results」「share 没有判部分的族：library 不跑」「原样重起：做完的件全部沿用（只有读仓里的读数重读）、产物另存 -r2」「换了装置二进制：旧装置打的主装置那十件逐件报作废、旧的整份留在 void 目录、装置自己写的块键目录不留给新装置、转储 bin 那六件不作废」
+#   E184_SEGMENT_ONE_BREAK=pinned-mismatch-ignored  钉住常量与段形现算的两态闭式对不上也往下走
+#       「钉住的常量与段形现算的两态闭式对不上退 3、装置一次没起」「钉值写错的与钉另一个量的同在：对不上仍只有一条（退 3、装置一次没起），钉另一个量的那条只记缺钉值」
+#   E184_SEGMENT_ONE_BREAK=missing-pinned-as-mismatch  有段形而认不出两态闭式钉值的流也记成对不上（改前的认法）
+#       「冒烟层测试钉的是另一个量：记缺钉值（只记一条）、不算对不上、不进钉表、别的流照常、装置照起」「钉值写错的与钉另一个量的同在：对不上仍只有一条（退 3、装置一次没起），钉另一个量的那条只记缺钉值」
+#   E184_SEGMENT_ONE_BREAK=crashflow-hit-ignored  停机 T6 的读数有命中也往下走
+#       「crates 里出现 CrashFlow 退 3（停机 T6）、装置一次没起」「停机 T6 要读的文件一个都读不到：不当零命中，退 3」
+#   E184_SEGMENT_ONE_BREAK=import-overwrites  并进块键文件时覆盖已有的
+#       「--import-work 并进块键文件、已有的不覆盖、不起装置」
+#   E184_SEGMENT_ONE_BREAK=exec-root-binary  装置仍按开跑时给的那个路径起、不按私有副本
+#       「装置在一趟里不许换：起装置之前仓根那份被换掉，之后起的每一件自报的 sha256 与完成记录里的、块键文件里的都是开跑时那份」
+#   E184_SEGMENT_ONE_BREAK=owned-files-kept  换了装置作废一件时，装置自己写的转储与块键目录留在原处
+#       「换了装置二进制：旧装置打的主装置那十件逐件报作废、旧的整份留在 void 目录、装置自己写的块键目录不留给新装置、转储 bin 那六件不作废」
+#   E184_SEGMENT_ONE_BREAK=import-sha-unchecked  --import-work 不核对方块键目录记的装置 sha256
+#       「--import-work 对方的装置 sha256 不同：这一档的块键文件跳过并报作废，别的档照并」
+#   E184_SEGMENT_ONE_BREAK=merge-sha-unchecked  拼产物之前不核各件记的装置 sha256 彼此相同
+#       「拼产物之前各件记的装置 sha256 彼此不同：拒、退 1、不另出产物」
 #   （上面的 binary-change-ignored 同时管续跑开头那一遍作废：打开后记的 sha256 不同的件照旧沿用。）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -77,28 +102,36 @@ SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SO
 cd "$(dirname "$0")/../.." || { echo "  ✗ 进不去仓根" >&2; echo "     → 怎么办：本脚本得留在仓里的 scripts/experiment-apparatus/ 下（它按自己的位置找仓根）；挪走了就放回去再起" >&2; exit 2; }
 
 # 装置二进制的默认位置：主 agent 经 compile-then-swap.py 编好的那个编译目录（编译目录不进仓；--build-here 时改用这棵树的 target/release）。
-DEFAULT_BINARY_DIRECTORY="$HOME/.local/share/singlefs/work/m3-close-w4-e184-runner-b/compile-then-swap/target/release"
+#   它与缺省的工作目录都在工作根（.claude/hooks/lib_work_root.py，两台同一份）下：只在没给装置、没给工作目录时取（自证的各格都给了），取不到就停，不退回 $HOME 下
+DEFAULT_BINARY_SUBDIRECTORY="m3-close-w4-e184-runner-b/compile-then-swap/target/release"
+work_root_or_stop() {   # <没给的那个变量名>：成了把工作根放进 WORK_ROOT
+  [[ -n "${WORK_ROOT:-}" ]] && return 0
+  if ! WORK_ROOT="$(python3 .claude/hooks/lib_work_root.py)" || [[ "$WORK_ROOT" != /* ]]; then
+    echo "  ✗ 取不到工作根（.claude/hooks/lib_work_root.py 跑不起来），缺省的目录没处放" >&2
+    echo "     → 怎么办：修好 .claude/hooks/lib_work_root.py，或设 $1 指到要用的目录或装置" >&2
+    exit 2
+  fi
+}
 MAIN_BINARY_NAME="e184_regular_layer_cost_counts"
 DUMP_BINARY_NAME="e184_regular_layer_cost_counts_write_dump"
 PRODUCT_STEM_NAME="e184-regular-layer-cost-counts-segment-one"
 PRODUCT_DIRECTORY="${E184_PRODUCT_DIRECTORY:-research/results}"
-WORK_DIRECTORY="${E184_WORK_DIRECTORY:-$HOME/.local/share/singlefs/work/e184-segment-one}"
+WORK_DIRECTORY="${E184_WORK_DIRECTORY:-}"
+[[ -n "$WORK_DIRECTORY" ]] || { work_root_or_stop E184_WORK_DIRECTORY; WORK_DIRECTORY="$WORK_ROOT/e184-segment-one"; }
 HOSTS_EMITTER="${E184_HOSTS_EMITTER:-scripts/crash/crash-point-replay-shard-configuration-check.sh}"
-MEMORY_WRAPPER="${E184_MEMORY_WRAPPER:-scripts/hosts/run-with-memory-cap.sh}"
-FIXED_MEMORY_CAP="16G"
 SEEDS_PER_HISTORY_TIER=20
 
 # 随机历史的各档（登记 5.1 主取样四档、8.2 两个方向相反的取样点），次序就是先小后大。
-# 一行：档名|步数|比重|盘宽|转储内存上限|转储线程|块键内存上限|块键线程（线程写 all 取这台的登记值，写数字取它与登记值的较小者）。
-# 内存上限与线程是这一位执行员量过 50 步档与 100 步档之后定的：100 步档用 31 线程时块键那一步的峰值正好顶到 16G（内存峰值表 2026-10-19 的记录），
-# 200、400 步档没量过（块键上限放不进内存的展开不排计划，一条流最多约 7 GB），所以写得保守；撞顶退 250 时按退出码改表再起，已做完的件不重做。
+# 一行：档名|步数|比重|盘宽|转储线程|块键线程（线程写 all 取这台的登记值，写数字取它与登记值的较小者）。
+# 线程是这一位执行员量过 50 步档与 100 步档之后定的：100 步档用 31 线程时块键那一步内存吃紧，所以写成 8；200、400 步档没量过，写得保守。
+# 内存额度不在这里写：整条命令交任务服务，服务按记录给，撞了上限放大重排。
 RANDOM_CONFIGS='
-random-broad-4g-s050|50|BROAD|FourGibibytes|16G|all|16G|all
-random-broad-4g-s100|100|BROAD|FourGibibytes|16G|all|24G|8
-random-broad-240slots-s100|100|BROAD|UnitAreaOf240Slots|16G|all|24G|8
-random-compaction-4g-s100|100|BROAD_WITH_COMPACTION_WHILE_MOUNTED|FourGibibytes|16G|all|24G|8
-random-broad-4g-s200|200|BROAD|FourGibibytes|24G|16|30G|3
-random-broad-4g-s400|400|BROAD|FourGibibytes|24G|8|30G|3
+random-broad-4g-s050|50|BROAD|FourGibibytes|all|all
+random-broad-4g-s100|100|BROAD|FourGibibytes|all|8
+random-broad-240slots-s100|100|BROAD|UnitAreaOf240Slots|all|8
+random-compaction-4g-s100|100|BROAD_WITH_COMPACTION_WHILE_MOUNTED|FourGibibytes|all|8
+random-broad-4g-s200|200|BROAD|FourGibibytes|16|3
+random-broad-4g-s400|400|BROAD|FourGibibytes|8|3
 '
 
 usage_error() {
@@ -169,22 +202,35 @@ host_count() {
   echo $((1 + count))
 }
 
+# 服务的 plan 那一步：往计划目录写 plan.json（每片只写 label，不钉台）。
+write_plan() { # <片数>
+  python3 - "$PLAN_DIRECTORY" "$1" << 'PLAN_PYTHON' || { echo "  ✗ 计划目录 $PLAN_DIRECTORY 写不进 plan.json（上面是 python 的报错）" >&2; echo "     → 怎么办：看那个目录可不可写" >&2; return 1; }
+import json, os, sys
+directory, count = sys.argv[1], int(sys.argv[2])
+shards = [{"label": f"shard {index}/{count}（序号对 {count} 取余等于 {index} 的流）"} for index in range(count)]
+temporary = os.path.join(directory, "plan.json.partial")
+with open(temporary, "w", encoding="utf-8") as handle:
+    json.dump({"shards": shards, "note": "e184 第一段分片（本脚本文件头「多机的读法」）"}, handle, ensure_ascii=False)
+os.replace(temporary, os.path.join(directory, "plan.json"))
+PLAN_PYTHON
+}
+
 # ───────────────────────────── 件的清单与每件的属性 ─────────────────────────────
 
-declare -A CONFIG_STEPS=() CONFIG_WEIGHTS=() CONFIG_WIDTH=() CONFIG_DUMP_CAP=() CONFIG_DUMP_PARALLELISM=() CONFIG_KEYS_CAP=() CONFIG_KEYS_PARALLELISM=()
+declare -A CONFIG_STEPS=() CONFIG_WEIGHTS=() CONFIG_WIDTH=() CONFIG_DUMP_PARALLELISM=() CONFIG_KEYS_PARALLELISM=()
 CONFIG_LIST=()
 SEGMENTS=()
 
 load_segment_table() {
-  local name steps weights width dump_cap dump_threads keys_cap keys_threads
+  local name steps weights width dump_threads keys_threads
   CONFIG_LIST=()
   SEGMENTS=(repo-reads selfcheck record-fixed-chains keys-fixed)
-  while IFS='|' read -r name steps weights width dump_cap dump_threads keys_cap keys_threads; do
+  while IFS='|' read -r name steps weights width dump_threads keys_threads; do
     [[ -n "$name" ]] || continue
     CONFIG_LIST+=("$name")
     CONFIG_STEPS[$name]=$steps; CONFIG_WEIGHTS[$name]=$weights; CONFIG_WIDTH[$name]=$width
-    CONFIG_DUMP_CAP[$name]=$dump_cap; CONFIG_DUMP_PARALLELISM[$name]=$dump_threads
-    CONFIG_KEYS_CAP[$name]=$keys_cap; CONFIG_KEYS_PARALLELISM[$name]=$keys_threads
+    CONFIG_DUMP_PARALLELISM[$name]=$dump_threads
+    CONFIG_KEYS_PARALLELISM[$name]=$keys_threads
     SEGMENTS+=("dump-$name" "keys-$name")
   done <<< "$RANDOM_CONFIGS"
   SEGMENTS+=(share library)
@@ -232,16 +278,7 @@ segment_prerequisites() {
   esac
 }
 
-# 这一件活的内存上限与线程（线程不超过这台的上限 THREAD_LIMIT）。
-segment_cap() {
-  local seg="$1" config
-  case "$seg" in
-    dump-*) config="${seg#dump-}"; echo "${E184_DUMP_MEMORY_CAP:-${CONFIG_DUMP_CAP[$config]}}" ;;
-    keys-fixed) echo "$FIXED_MEMORY_CAP" ;;
-    keys-*) config="${seg#keys-}"; echo "${E184_KEYS_MEMORY_CAP:-${CONFIG_KEYS_CAP[$config]}}" ;;
-    *) echo "$FIXED_MEMORY_CAP" ;;
-  esac
-}
+# 这一件活的线程（不超过这台的上限 THREAD_LIMIT）。
 segment_threads() {
   local seg="$1" config
   case "$seg" in
@@ -344,7 +381,7 @@ segment_trace_sha() {
   echo "$recorded"
 }
 
-# 作废一件：记录、输出、秒数、起装置前写的记录、装置自己写的目录（--share 的半份块键输出也算）整份移进 void 目录，留着不删；报一行。
+# 作废一件：记录、输出、秒数、起装置前写的记录、装置自己写的目录（shard 那一步的半份块键输出也算）整份移进 void 目录，留着不删；报一行。
 void_segment() { # <件> <记的 sha256> <这一趟的 sha256> <前提作废了就写前提的件名，否则空>
   local seg="$1" recorded="$2" expected="$3" prerequisite="$4" void="$WORK_DIRECTORY/void-$RUN_STAMP/$1" path
   mkdir -p -- "$void" || exit 1
@@ -406,13 +443,14 @@ resolve_binaries() {
     MAIN_BINARY="$E184_BINARY"
     DUMP_BINARY="${E184_DUMP_BINARY:-${E184_BINARY}_write_dump}"
   else
-    MAIN_BINARY="$DEFAULT_BINARY_DIRECTORY/$MAIN_BINARY_NAME"
-    DUMP_BINARY="${E184_DUMP_BINARY:-$DEFAULT_BINARY_DIRECTORY/$DUMP_BINARY_NAME}"
+    work_root_or_stop E184_BINARY
+    MAIN_BINARY="$WORK_ROOT/$DEFAULT_BINARY_SUBDIRECTORY/$MAIN_BINARY_NAME"
+    DUMP_BINARY="${E184_DUMP_BINARY:-$WORK_ROOT/$DEFAULT_BINARY_SUBDIRECTORY/$DUMP_BINARY_NAME}"
   fi
 }
 
 build_here() {
-  bash scripts/hosts/capped.sh "$THREAD_LIMIT" cargo build --release -p singlefs-checker-tier --bin "$MAIN_BINARY_NAME" --bin "$DUMP_BINARY_NAME" \
+  bash scripts/hosts/capped.sh "$THREAD_LIMIT" cargo build --release -p singlefs-verification --bin "$MAIN_BINARY_NAME" --bin "$DUMP_BINARY_NAME" \
     > "$WORK_DIRECTORY/logs/build-$RUN_STAMP.log" 2>&1 || {
     echo "  ✗ 装置编不过（$WORK_DIRECTORY/logs/build-$RUN_STAMP.log）" >&2
     echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本" >&2
@@ -464,12 +502,11 @@ segment_command() {
       COMMAND+=(--against "$WORK_DIRECTORY/keys/fixed" --out "$WORK_DIRECTORY/steps/share.file" --pinned-smoke "$WORK_DIRECTORY/pinned-smoke.txt") ;;
     library)
       COMMAND=(library --keys "$WORK_DIRECTORY/keys/fixed")
-      for config in "${CONFIG_LIST[@]}"; do COMMAND+=(--keys "$WORK_DIRECTORY/keys/$config"); done
-      COMMAND+=(--library "$LIBRARY_DIRECTORY") ;;
+      for config in "${CONFIG_LIST[@]}"; do COMMAND+=(--keys "$WORK_DIRECTORY/keys/$config"); done ;;
   esac
 }
 
-# --share k/n：这一档转储里按文件次序序号对 n 取余等于 k 的流，用符号链接放进一个目录，块键那一步只读这个目录。
+# shard 那一步 k/n：这一档转储里按文件次序序号对 n 取余等于 k 的流，用符号链接放进一个目录，块键那一步只读这个目录。
 make_share_link_directory() {
   local config="$1" directory="$WORK_DIRECTORY/share-links/$config-${SHARE%/*}-of-${SHARE#*/}" index=0 dump_file
   if [[ "$MODE" == print ]]; then echo "$directory"; return 0; fi
@@ -503,7 +540,7 @@ store_segment_result() {
 
 # 起一件活：返回 0 做完，1 没跑成，3 停机，4 阳性对照没过。装置的标准输出进临时文件，错误输出进 logs。
 run_segment() {
-  local seg="$1" kind cap threads binary out_tmp log started exit_code seconds
+  local seg="$1" kind threads binary out_tmp log started exit_code seconds
   kind=$(segment_binary_kind "$seg")
   mkdir -p -- "$WORK_DIRECTORY/steps" "$WORK_DIRECTORY/logs" "$WORK_DIRECTORY/dumps" "$WORK_DIRECTORY/keys"
   out_tmp="$WORK_DIRECTORY/steps/$seg.out.running-$$"
@@ -512,9 +549,9 @@ run_segment() {
   if [[ "$kind" == none ]]; then
     run_repo_reads > "$out_tmp" 2> "$log"
     exit_code=$?
-    cap="-"; threads="-"
+    threads="-"
   else
-    cap=$(segment_cap "$seg"); threads=$(segment_threads "$seg")
+    threads=$(segment_threads "$seg")
     binary="$MAIN_BINARY"; [[ "$kind" == dump ]] && binary="$DUMP_BINARY"
     if break_is exec-root-binary; then
       binary="$MAIN_SOURCE"; [[ "$kind" == dump ]] && binary="$DUMP_SOURCE"
@@ -523,9 +560,9 @@ run_segment() {
     # 起装置之前先写下这一趟用的装置 sha256：装置会把写完的转储与块键文件整份跳过，下一趟换了装置时靠它认出这些文件是旧装置的
     printf '%s\n' "$(expected_binary_sha "$seg")" > "$(segment_stamp_path "$seg").tmp-$$" && mv -f -- "$(segment_stamp_path "$seg").tmp-$$" "$(segment_stamp_path "$seg")" || return 1
     segment_command "$seg"
-    echo "件 $seg：起跑（内存上限 $cap、线程 $threads、日志 $log）"
+    echo "件 $seg：起跑（线程 $threads、日志 $log）"
     # 装置自己的线程变量 E184_THREADS 排在 capped.sh 设的 SINGLEFS_THREAD_CAP 前面：用户环境里留着旧值时，这一件的线程数以表为准。
-    bash scripts/hosts/capped.sh "$threads" env "E184_THREADS=$threads" bash "$MEMORY_WRAPPER" "$cap" nice -n 19 "$binary" "${COMMAND[@]}" > "$out_tmp" 2> "$log"
+    bash scripts/hosts/capped.sh "$threads" env "E184_THREADS=$threads" nice -n 19 "$binary" "${COMMAND[@]}" > "$out_tmp" 2> "$log"
     exit_code=$?
   fi
   seconds=$(( $(date +%s) - started ))
@@ -537,13 +574,7 @@ run_segment() {
     4)
       break_is control-exit-ignored || { mv -- "$out_tmp" "$out_tmp.exit4"; echo "  ✗ 件 $seg：阳性对照没过，这一段作废（输出留在 $out_tmp.exit4）" >&2; show_control_lines "$out_tmp.exit4"; echo "     → 怎么办：看上面的对照行，修装置后再重跑这一段" >&2; return 4; } ;;
   esac
-  if ((exit_code == 245 || (exit_code >= 250 && exit_code <= 254))) && ! break_is wrapper-exit-ignored; then
-    echo "  ✗ 件 $seg：内存包装退 $exit_code（245 显存不够、250 撞了自己的上限、252 内存不够排不上、253 超时、254 被总上限挤掉，见 run-with-memory-cap.sh 文件头「退出码」）：这一次的输出不算结果" >&2
-    echo "     → 怎么办：按那个退出码的含义腾内存、等排队或换台机器，同一条命令重起这一件（这一次的输出留作 $out_tmp.wrapper-exit$exit_code，不当结果）" >&2
-    mv -- "$out_tmp" "$out_tmp.wrapper-exit$exit_code" 2> /dev/null
-    return 1
-  fi
-  if ((exit_code != 0)) && ! break_is wrapper-exit-ignored; then
+  if ((exit_code != 0)) && ! break_is device-exit-ignored; then
     echo "  ✗ 件 $seg：装置退 $exit_code（日志 $log）" >&2
     tail -n 5 -- "$log" >&2
     if grep -q 'preflight.py' -- "$log" 2> /dev/null; then
@@ -559,7 +590,7 @@ run_segment() {
     return 1
   fi
   if [[ -n "$SHARE" && "$seg" == keys-* && "$seg" != keys-fixed ]]; then
-    # --share 只算了一半流：这份输出不是整档的块键清单，不写完成记录（整档的清单由不带 --share 的那一趟沿用块键文件时打出）。
+    # shard 那一步只算了一半流：这份输出不是整档的块键清单，不写完成记录（整档的清单由不分片的那一趟沿用块键文件时打出）。
     mv -- "$out_tmp" "$WORK_DIRECTORY/logs/$seg.share-${SHARE%/*}-of-${SHARE#*/}.out" || return 1
     echo "件 $seg（这一份 $SHARE）：块键算完（$seconds 秒；$(tail -n 1 -- "$WORK_DIRECTORY/logs/$seg.share-${SHARE%/*}-of-${SHARE#*/}.out" | cut -c1-200)）"
     return 0
@@ -571,7 +602,8 @@ run_segment() {
 
 # ───────────────────────────── 仓里的读数：钉住的冒烟流与停机 T6 ─────────────────────────────
 
-# 停机 T6（登记第十一节）：crates/singlefs-checker-tier/src/crash_injection.rs 与 crates/singlefs-harness/src 里不能有 CrashFlow；
+# 停机 T6（登记第十一节）：crates/singlefs-verification/src/crash_injection.rs 与登记时 harness 那一半的源文件（并包之后同在 crates/singlefs-verification/src/，
+#   T6_SOURCES 逐份列，lib.rs 两半合成一份、照列）里不能有 CrashFlow；
 # 冒烟层测试钉了段形的流：从 SEGMENT_SIZES 现算两态闭式，与同一个测试文件里钉住的两态闭式比，一致才写进 --pinned-smoke 文件
 # （登记第十二节、装置文件头：执行员 grep 测试文件取常量、照闭式现算核过再写）。输出是 E7RESULT 行，末行 pinned_smoke_done。
 # 认钉值只认两种写法（常量 CLOSED_FORM_WITH_TWO_STATES_PER_WRITE / FULL_STATES_WITH_TWO_STATES_PER_WRITE，或 assert_eq!(closed_form_with_two_states_per_write, …)）；
@@ -599,16 +631,19 @@ def emit(text):
 
 # 停机 T6：读不到文件不等于零命中。
 hits, files_read = 0, 0
-for relative in ("crates/singlefs-checker-tier/src/crash_injection.rs", "crates/singlefs-harness/src"):
-    base = root / relative
-    found = [base] if base.is_file() else (sorted(base.rglob("*.rs")) if base.is_dir() else [])
-    for source in found:
+T6_SOURCES = tuple(f"crates/singlefs-verification/src/{name}.rs" for name in (
+    "crash_injection", "fault_injection", "gpu_memory_ledger", "heavy_threads", "hexadecimal", "history", "lib", "memory_pool", "model_comparison",
+    "model", "mount_transparency", "new_pool_file_creation_regions", "numeric_environment_variable", "read_tally", "reference_filesystem_translation",
+    "scenario", "segments", "sha256", "temporary_files", "verification_read"))
+for relative in T6_SOURCES:
+    source = root / relative
+    if source.is_file():
         files_read += 1
         hits += sum(1 for line in source.read_text(errors="replace").splitlines() if "CrashFlow" in line)
 t6_pass = files_read > 0 and hits == 0
 emit(f"name=stop_check item=T6_no_crashflow_in_crates result={'pass' if t6_pass else 'fail'} hits={hits} files_read={files_read}")
 
-tests = root / "crates/singlefs-checker-tier/tests"
+tests = root / "crates/singlefs-verification/tests"
 already_recorded_files = {
     "crash_enumeration_snapshot_creation_stream.rs", "crash_enumeration_fixed_script_stream.rs",
     "crash_enumeration_multi_record_publish_stream.rs", "crash_enumeration_new_pool_file_creation_stream.rs",
@@ -734,7 +769,7 @@ assemble_product() {
   echo "产物：$destination（$(wc -l < "$destination") 行，sha256 $(sha256sum -- "$destination" | cut -d' ' -f1)）"
 }
 
-# --import-work：另一台取回的工作目录里，做完的块键与对照文件并进本机（已有同名的不覆盖）。
+# --import-work：另一台的工作目录（共享工作根下）里，做完的块键与对照文件并进本机（已有同名的不覆盖）。
 import_work() {
   local source_directory="$1" file name parent destination imported=0 skipped=0 stamp recorded
   [[ -d "$source_directory" ]] || usage_error "--import-work 点名的目录不在：$source_directory"
@@ -765,19 +800,19 @@ import_work() {
     cp -- "$file" "$destination.importing-$$" && mv -- "$destination.importing-$$" "$destination" && imported=$((imported + 1))
   done < <(find "$source_directory" -maxdepth 6 -type f \( -name '*.keys' -o -name '*.controls' \) -print0)
   echo "并进块键与对照文件 $imported 个（已有的不覆盖），装置 sha256 对不上而跳过 $skipped 个：$WORK_DIRECTORY/keys"
-  ((skipped == 0)) || echo "     → 怎么办：对方要用与本机同一份装置算（把本机私有副本送过去，第二台 E184_BINARY 指到送到的文件），再取回重并" >&2
+  ((skipped == 0)) || echo "     → 怎么办：对方要用与本机同一份装置算（第二台 E184_BINARY 指到本机那一份私有副本，同一个绝对路径），再重并" >&2
 }
 
-# --print-commands：逐件打出会起的完整命令（内存包装、线程、nice、装置二进制与参数），不起装置、不建目录。
+# --print-commands：逐件打出会起的完整命令（线程、nice、装置二进制与参数），不起装置、不建目录。
 print_commands() {
-  local seg kind binary cap threads
+  local seg kind binary threads
   for seg in "${SEGMENTS[@]}"; do
     kind=$(segment_binary_kind "$seg")
     if [[ "$kind" == none ]]; then printf '%s\t（脚本自己读仓：python3 -I）\n' "$seg"; continue; fi
     binary="$MAIN_BINARY"; [[ "$kind" == dump ]] && binary="$DUMP_BINARY"
-    cap=$(segment_cap "$seg"); threads=$(segment_threads "$seg")
+    threads=$(segment_threads "$seg")
     segment_command "$seg"
-    printf '%s\tbash scripts/hosts/capped.sh %s env E184_THREADS=%s bash %s %s nice -n 19 %s %s\n' "$seg" "$threads" "$threads" "$MEMORY_WRAPPER" "$cap" "$binary" "${COMMAND[*]}"
+    printf '%s\tbash scripts/hosts/capped.sh %s env E184_THREADS=%s nice -n 19 %s %s\n' "$seg" "$threads" "$threads" "$binary" "${COMMAND[*]}"
   done
 }
 
@@ -796,16 +831,16 @@ list_segments() {
     else state="没做完"; fi
     prerequisites=$(segment_prerequisites "$seg" | tr '\n' ',' | sed 's/,$//')
     if [[ "$kind" == none ]]; then
-      printf '%s\t%s\t内存上限 -\t线程 -\t前提 %s\n' "$seg" "$state" "${prerequisites:--}"
+      printf '%s\t%s\t线程 -\t前提 %s\n' "$seg" "$state" "${prerequisites:--}"
     else
-      printf '%s\t%s\t内存上限 %s\t线程 %s\t前提 %s\n' "$seg" "$state" "$(segment_cap "$seg")" "$(segment_threads "$seg")" "${prerequisites:--}"
+      printf '%s\t%s\t线程 %s\t前提 %s\n' "$seg" "$state" "$(segment_threads "$seg")" "${prerequisites:--}"
     fi
   done
 }
 
 # ───────────────────────────── 自证 ─────────────────────────────
 
-# 自证：假装置（主装置与转储 bin 各一份）、假内存包装、假线程包装、假机器清单，每一格在自己的临时树里从头搭，格与格不共用状态。
+# 自证：假装置（主装置与转储 bin 各一份）、假线程包装、假机器清单，每一格在自己的临时树里从头搭，格与格不共用状态。
 # 换不掉的一处：产物名里的日期用 TZ=Asia/Tokyo date +%F 取，自证里同样取，跨零点的那一刻会误红，重跑即可。
 make_selftest_fakes() {
   local fakes="$1"
@@ -871,7 +906,6 @@ fi
 shift
 exec "$@"
 FAKE
-  printf '%s\n' '#!/usr/bin/env bash' 'echo "cap $1" >> "$E184_SELFTEST_CALLS"' 'shift' '"$@"; code=$?' '[[ -n "${E184_SELFTEST_WRAPPER_EXIT:-}" ]] && exit "$E184_SELFTEST_WRAPPER_EXIT"' 'exit $code' > "$fakes/run-with-memory-cap.sh"
   cat > "$fakes/hosts" <<'FAKE'
 #!/usr/bin/env bash
 case "${E184_SELFTEST_HOSTS:-2}" in
@@ -887,7 +921,7 @@ cp "$E184_SELFTEST_DEVICE_SOURCE" target/release/e184_regular_layer_cost_counts
 cp "$E184_SELFTEST_DEVICE_SOURCE" target/release/e184_regular_layer_cost_counts_write_dump
 exit 0
 FAKE
-  chmod +x "$fakes/device" "$fakes/capped.sh" "$fakes/run-with-memory-cap.sh" "$fakes/hosts" "$fakes/cargo"
+  chmod +x "$fakes/device" "$fakes/capped.sh" "$fakes/hosts" "$fakes/cargo"
 }
 
 # 一格的树：本脚本的拷贝、假的 scripts/hosts 两件与线程取法、指向真仓 .claude 的符号链接、假装置两份、钉住常量的一个测试夹具、
@@ -895,24 +929,32 @@ FAKE
 make_selftest_tree() {
   local cell="$1" fakes="$2" real_root="$3" tree="$1/tree"
   mkdir -p -- "$tree/scripts/experiment-apparatus/long-run-lib" "$tree/scripts/hosts" "$tree/scripts/crash" "$tree/research/results" "$cell/bin" "$cell/work" \
-    "$tree/crates/singlefs-checker-tier/src" "$tree/crates/singlefs-harness/src" "$tree/crates/singlefs-checker-tier/tests"
+    "$tree/crates/singlefs-verification/src" "$tree/crates/singlefs-verification/tests"
   cp -- "$SCRIPT_PATH" "$tree/scripts/experiment-apparatus/e184-segment-one-long-run.sh"
   cp -- "$(dirname -- "$SCRIPT_PATH")/long-run-lib/binary-identity.sh" "$tree/scripts/experiment-apparatus/long-run-lib/"
-  cp -- "$fakes/capped.sh" "$fakes/run-with-memory-cap.sh" "$real_root/scripts/hosts/heavy-threads.sh" "$tree/scripts/hosts/"
+  cp -- "$fakes/capped.sh" "$real_root/scripts/hosts/heavy-threads.sh" "$tree/scripts/hosts/"
   cp -- "$fakes/hosts" "$tree/scripts/crash/crash-point-replay-shard-configuration-check.sh"
   ln -s -- "$real_root/.claude" "$tree/.claude"
   cp -- "$fakes/device" "$cell/bin/e184_regular_layer_cost_counts"
   cp -- "$fakes/device" "$cell/bin/e184_regular_layer_cost_counts_write_dump"
-  echo "// 夹具：没有 T6 要找的词" > "$tree/crates/singlefs-checker-tier/src/crash_injection.rs"
-  echo "// 夹具" > "$tree/crates/singlefs-harness/src/lib.rs"
+  echo "// 夹具：没有 T6 要找的词" > "$tree/crates/singlefs-verification/src/crash_injection.rs"
+  echo "// 夹具" > "$tree/crates/singlefs-verification/src/lib.rs"
   printf '%s\n' 'const SEGMENT_SIZES: [usize; 2] = [2, 3];' 'const CLOSED_FORM_WITH_TWO_STATES_PER_WRITE: u64 = 11;' \
-    > "$tree/crates/singlefs-checker-tier/tests/crash_enumeration_lifecycle_closure_stream.rs"
+    > "$tree/crates/singlefs-verification/tests/crash_enumeration_lifecycle_closure_stream.rs"
 }
 
 run_selftest() {
   local work fakes real_root today cell exit_code failures=0 cell_count=0 stem product bad_share kept_output
   local peer_cell run_zero_exit run_one_exit old_sha original_sha swap_target import_main import_peer
-  unset E184_BINARY E184_DUMP_BINARY E184_WORK_DIRECTORY E184_THREADS E184_DUMP_MEMORY_CAP E184_KEYS_MEMORY_CAP E184_LIBRARY E184_PRODUCT_DIRECTORY E184_HOSTS_EMITTER E184_MEMORY_WRAPPER
+  # 只在临时 prune-server 上跑（文件头「--selftest」），不是就退 2、一格都不跑
+  local service_problem
+  if ! service_problem="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import prune_server_client; print(prune_server_client.selftest_service_problem())' \
+       "$(dirname "${BASH_SOURCE[0]}")/../prune-server" 2>&1)" || [[ -n "$service_problem" ]]; then
+    echo "  ✗ e184-segment-one-long-run.sh 自证没跑：${service_problem:-读不了 scripts/prune-server/prune_server_client.py}" >&2
+    echo "     → 怎么办：照 scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service 那一条，在临时服务底下起这一份自证（带 --server-binary 就不编）" >&2
+    return 2
+  fi
+  unset E184_BINARY E184_DUMP_BINARY E184_WORK_DIRECTORY E184_THREADS E184_PRODUCT_DIRECTORY E184_HOSTS_EMITTER
   real_root="$PWD"
   today=$(TZ=Asia/Tokyo date +%F)
   work=$(mktemp -d) || return 1
@@ -959,7 +1001,7 @@ run_selftest() {
   product="$cell/tree/$stem-$today.out"
   expect "单机全新：十七件现跑、library 不跑、产物按带日期的名字落进 research/results" '((exit_code == 0)) && grep -qF "现跑 17、沿用 0" "$cell/out" && [[ -f "$product" ]] && is_complete_product "$product" && (($(grep -c "^E7RESULT name=segment segment=" "$product") == 18)) && grep -qF "segment=library state=not_run" "$product" && (($(count_calls "$cell" "^device main selfcheck") == 1)) && (($(count_calls "$cell" "^device dump dump-random-histories") == 6)) && (($(count_calls "$cell" "^device main keys") == 7)) && (($(count_calls "$cell" "^device main share") == 1)) && (($(count_calls "$cell" "^device main library") == 0))'
   expect "share 没有判部分的族：library 不跑" '(($(count_calls "$cell" "^device main library") == 0)) && grep -qF "name=share_group scope=family:random_history_main" "$product"'
-  expect "每档的内存上限与线程：100 步档块键 24G、8 取 7；400 步档块键 30G、3；50 步档块键取这台上限 7" 'grep -qE "^device main keys --dump .*random-broad-4g-s400 .*\| threads=3$" "$cell/calls" && grep -qE "^device main keys --dump .*random-broad-4g-s100 .*\| threads=7$" "$cell/calls" && grep -qx "cap 30G" "$cell/calls" && grep -qx "cap 24G" "$cell/calls" && grep -qE "^device main keys --dump .*random-broad-4g-s050 .*\| threads=7$" "$cell/calls"'
+  expect "每档的线程：100 步档块键 8 取 7；400 步档块键 3；50 步档块键取这台上限 7" 'grep -qE "^device main keys --dump .*random-broad-4g-s400 .*\| threads=3$" "$cell/calls" && grep -qE "^device main keys --dump .*random-broad-4g-s100 .*\| threads=7$" "$cell/calls" && grep -qE "^device main keys --dump .*random-broad-4g-s050 .*\| threads=7$" "$cell/calls"'
   expect "转储每一档都带 --check-determinism" '(($(count_calls "$cell" "^device dump dump-random-histories .*--check-determinism") == 6))'
   invoke "$cell"; exit_code=$?
   expect "原样重起：做完的件全部沿用（只有读仓里的读数重读）、产物另存 -r2" '((exit_code == 0)) && grep -qF "现跑 1、沿用 16" "$cell/out" && [[ -f "$cell/tree/$stem-$today-r2.out" ]] && (($(count_calls "$cell" "^device main selfcheck") == 1)) && (($(count_calls "$cell" "^device dump") == 6))'
@@ -988,9 +1030,10 @@ run_selftest() {
   import_main="$cell"
   new_cell import-peer
   import_peer="$cell"
-  invoke "$import_peer" --share 1/2; run_zero_exit=$?
-  printf '%s\n' "$(printf 'f%.0s' {1..64})" > "$import_peer/work/keys/random-broad-4g-s050.device-stamp"
-  invoke "$import_main" --import-work "$import_peer/work"; exit_code=$?
+  mkdir -p -- "$import_peer/plan"
+  TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD=1/2 TASK_SERVER_SHARD_PLAN_DIRECTORY="$import_peer/plan" invoke "$import_peer"; run_zero_exit=$?
+  printf '%s\n' "$(printf 'f%.0s' {1..64})" > "$import_peer/work-share-1-of-2/keys/random-broad-4g-s050.device-stamp"
+  invoke "$import_main" --import-work "$import_peer/work-share-1-of-2"; exit_code=$?
   cell="$import_main"
   expect "--import-work 对方的装置 sha256 不同：这一档的块键文件跳过并报作废，别的档照并" '((run_zero_exit == 0 && exit_code == 0)) && grep -q "^作废：keys/random-broad-4g-s050/random_history-seed01.keys（装置 sha256 不同）" "$cell/out" && [[ ! -e "$cell/work/keys/random-broad-4g-s050/random_history-seed01.keys" ]] && [[ -f "$cell/work/keys/random-broad-4g-s100/random_history-seed01.keys" ]] && [[ -f "$cell/work/keys/random-broad-4g-s100.device-stamp" ]]'
   new_cell assemble-mixed
@@ -1009,40 +1052,48 @@ run_selftest() {
   expect "--only 点名的件前面的件没做完退 2、装置一次没起" '((exit_code == 2)) && grep -qF "前面的件没做完" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   new_cell list
   E184_SELFTEST_HOSTS=2 invoke "$cell" --list-segments; exit_code=$?
-  expect "--list-segments：读台数、逐件列状态与内存上限线程、不起装置" '((exit_code == 0)) && grep -qF "台数 2" "$cell/out" && (($(grep -c "没做完\|每次重读\|等 share" "$cell/out") >= 16)) && grep -qP "^keys-random-broad-4g-s400\t没做完\t内存上限 30G\t线程 3\t" "$cell/out" && [[ ! -e "$cell/calls" ]]'
+  expect "--list-segments：读台数、逐件列状态与线程、不起装置" '((exit_code == 0)) && grep -qF "台数 2" "$cell/out" && (($(grep -c "没做完\|每次重读\|等 share" "$cell/out") >= 16)) && grep -qP "^keys-random-broad-4g-s400\t没做完\t线程 3\t" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   E184_SELFTEST_HOSTS=1 invoke "$cell" --list-segments; exit_code=$?
   expect "--list-segments：双机关着只有本机一台" '((exit_code == 0)) && grep -qF "台数 1" "$cell/out"'
-  E184_KEYS_MEMORY_CAP=12G E184_DUMP_MEMORY_CAP=9G invoke "$cell" --list-segments; exit_code=$?
-  expect "E184_KEYS_MEMORY_CAP 与 E184_DUMP_MEMORY_CAP 覆盖表里的上限" '((exit_code == 0)) && grep -qP "^keys-random-broad-4g-s400\t.*内存上限 12G" "$cell/out" && grep -qP "^dump-random-broad-4g-s400\t.*内存上限 9G" "$cell/out"'
   CELL_THREADS= invoke "$cell" --list-segments; exit_code=$?
   expect "E184_THREADS 不设：线程上限取登记值（.claude/heavy-thread-default）" '((exit_code == 0)) && grep -qF "这台线程上限 $(heavy_thread_default)" "$cell/out"'
   new_cell print
   invoke "$cell" --print-commands; exit_code=$?
-  expect "--print-commands：逐件打出命令、线程与内存上限落在命令里、不起装置、不建目录" '((exit_code == 0)) && grep -qP "^keys-random-broad-4g-s400\tbash scripts/hosts/capped.sh 3 env E184_THREADS=3 bash scripts/hosts/run-with-memory-cap.sh 30G nice -n 19 \S+ keys --dump \S+/dumps/random-broad-4g-s400 --out \S+/keys/random-broad-4g-s400 --controls$" "$cell/out" && grep -qP "^share\t.* share --candidates \S+/keys/fixed --candidates \S+/keys/random-broad-4g-s050 .* --against \S+/keys/fixed --out \S+/steps/share.file --pinned-smoke \S+/pinned-smoke.txt$" "$cell/out" && [[ ! -e "$cell/calls" && ! -d "$cell/work/steps" ]]'
-  invoke "$cell" --print-commands --share 1/2; exit_code=$?
-  expect "--print-commands --share 1/2：块键那几件读链接目录、链接目录不建" '((exit_code == 0)) && grep -qP "^keys-random-broad-4g-s050\t.* keys --dump \S+/share-links/random-broad-4g-s050-1-of-2 --out " "$cell/out" && [[ ! -d "$cell/work/share-links" ]]'
-  new_cell main-host
-  local main_cell="$cell"
-  new_cell peer-host
-  peer_cell="$cell"
-  cell="$main_cell"
-  invoke "$main_cell" --share 0/2; run_zero_exit=$?
-  invoke "$peer_cell" --share 1/2; run_one_exit=$?
-  expect "--share 0/2、1/2：只转储与算各自那一半流的块键、不拼产物、块键清单不写完成记录" '((run_zero_exit == 0 && run_one_exit == 0)) && grep -qE "^keys-input random_history-seed00.dump random_history-seed02.dump $" "$main_cell/calls" && grep -qE "^keys-input random_history-seed01.dump random_history-seed03.dump $" "$peer_cell/calls" && (($(count_files "$main_cell/tree/research/results") == 0)) && [[ ! -e "$main_cell/work/steps/keys-random-broad-4g-s050.status" && -e "$main_cell/work/steps/dump-random-broad-4g-s050.status" ]]'
-  expect "--share 0/2 只算自己那一半流" '[[ -f "$main_cell/work/keys/random-broad-4g-s050/random_history-seed00.keys" && ! -e "$main_cell/work/keys/random-broad-4g-s050/random_history-seed01.keys" ]]'
+  expect "--print-commands：逐件打出命令、线程落在命令里、命令里没有内存包装、不起装置、不建目录" '((exit_code == 0)) && grep -qP "^keys-random-broad-4g-s400\tbash scripts/hosts/capped.sh 3 env E184_THREADS=3 nice -n 19 \S+ keys --dump \S+/dumps/random-broad-4g-s400 --out \S+/keys/random-broad-4g-s400 --controls$" "$cell/out" && grep -qP "^share\t.* share --candidates \S+/keys/fixed --candidates \S+/keys/random-broad-4g-s050 .* --against \S+/keys/fixed --out \S+/steps/share.file --pinned-smoke \S+/pinned-smoke.txt$" "$cell/out" && [[ ! -e "$cell/calls" && ! -d "$cell/work/steps" ]]'
+  mkdir -p -- "$cell/plan"
+  TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD=1/2 TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" invoke "$cell" --print-commands; exit_code=$?
+  expect "--print-commands（shard 1/2）：块键那几件读链接目录、链接目录不建" '((exit_code == 0)) && grep -qP "^keys-random-broad-4g-s050\t.* keys --dump \S+/share-links/random-broad-4g-s050-1-of-2 --out " "$cell/out" && [[ ! -d "$cell/work-share-1-of-2/share-links" ]]'
+  new_cell shards-then-merge
+  main_cell="$cell"; peer_cell="$cell"
+  mkdir -p -- "$cell/plan"
+  E184_SELFTEST_HOSTS=2 TASK_SERVER_SHARD_PHASE=plan TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" invoke "$cell"; plan_exit=$?
+  expect "plan 两台：写 2 片" '((plan_exit == 0)) && (($(grep -o "\"label\"" "$cell/plan/plan.json" | wc -l) == 2)) && [[ ! -e "$cell/calls" ]]'
+  TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD=0/2 TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" TASK_SERVER_SHARD_OUTPUT_DIRECTORY="$cell/output-0" invoke "$main_cell"; run_zero_exit=$?
+  TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD=1/2 TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" TASK_SERVER_SHARD_OUTPUT_DIRECTORY="$cell/output-1" invoke "$peer_cell"; run_one_exit=$?
+  expect "shard 0/2、1/2：只转储与算各自那一半流的块键、不拼产物、块键清单不写完成记录" '((run_zero_exit == 0 && run_one_exit == 0)) && grep -qE "^keys-input random_history-seed00.dump random_history-seed02.dump $" "$main_cell/calls" && grep -qE "^keys-input random_history-seed01.dump random_history-seed03.dump $" "$peer_cell/calls" && (($(count_files "$main_cell/tree/research/results") == 0)) && [[ ! -e "$main_cell/work-share-0-of-2/steps/keys-random-broad-4g-s050.status" && -e "$main_cell/work-share-0-of-2/steps/dump-random-broad-4g-s050.status" ]]'
+  expect "shard 0/2 只算自己那一半流" '[[ -f "$main_cell/work-share-0-of-2/keys/random-broad-4g-s050/random_history-seed00.keys" && ! -e "$main_cell/work-share-0-of-2/keys/random-broad-4g-s050/random_history-seed01.keys" ]]'
+  mkdir -p -- "$main_cell/work/keys/random-broad-4g-s050"
   echo kept > "$main_cell/work/keys/random-broad-4g-s050/random_history-seed01.quick.keys"
-  invoke "$main_cell" --import-work "$peer_cell/work"; exit_code=$?
-  expect "--import-work 并进块键文件、已有的不覆盖、不起装置" '((exit_code == 0)) && [[ -f "$main_cell/work/keys/random-broad-4g-s050/random_history-seed01.keys" && -f "$main_cell/work/keys/random-broad-4g-s050/random_history-seed03.keys" ]] && [[ "$(cat -- "$main_cell/work/keys/random-broad-4g-s050/random_history-seed01.quick.keys")" == kept ]]'
-  invoke "$main_cell"; exit_code=$?
-  expect "分片、并进、再不带参数跑：块键清单打全、产物拼出" '((exit_code == 0)) && is_complete_product "$main_cell/tree/$stem-$today.out" && grep -qE "^keys-input random_history-seed00.dump random_history-seed01.dump random_history-seed02.dump random_history-seed03.dump $" "$main_cell/calls"'
+  TASK_SERVER_SHARD_PHASE=merge TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" TASK_SERVER_SHARD_MISSING="" invoke "$main_cell"; exit_code=$?
+  expect "merge：并进各片的块键文件（已有的不覆盖）、块键清单打全、产物拼出" '((exit_code == 0)) && [[ -f "$main_cell/work/keys/random-broad-4g-s050/random_history-seed01.keys" && -f "$main_cell/work/keys/random-broad-4g-s050/random_history-seed03.keys" ]] && [[ "$(cat -- "$main_cell/work/keys/random-broad-4g-s050/random_history-seed01.quick.keys")" == kept ]] && is_complete_product "$main_cell/tree/$stem-$today.out" && grep -qE "^keys-input random_history-seed00.dump random_history-seed01.dump random_history-seed02.dump random_history-seed03.dump $" "$main_cell/calls"'
+  new_cell merge-missing-shard
+  mkdir -p -- "$cell/plan"
+  TASK_SERVER_SHARD_PHASE=merge TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" TASK_SERVER_SHARD_MISSING="1" invoke "$cell"; exit_code=$?
+  expect "merge 缺片：退 77、点名缺的片、装置一次没起" '((exit_code == 77)) && grep -qF "TASK_SERVER_SHARD_MISSING=1" "$cell/out" && [[ ! -e "$cell/calls" ]]'
+  new_cell plan-one-host
+  mkdir -p -- "$cell/plan"
+  E184_SELFTEST_HOSTS=1 TASK_SERVER_SHARD_PHASE=plan TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" invoke "$cell"; exit_code=$?
+  expect "plan 只有本机：写 1 片" '((exit_code == 0)) && (($(grep -o "\"label\"" "$cell/plan/plan.json" | wc -l) == 1)) && [[ ! -e "$cell/calls" ]]'
+  new_cell unknown-phase
+  TASK_SERVER_SHARD_PHASE=never-used-phase invoke "$cell"; exit_code=$?
+  expect "服务的步骤认不出退 2、装置一次没起" '((exit_code == 2)) && grep -qF "TASK_SERVER_SHARD_PHASE=never-used-phase 认不出" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   for bad_share in abc 1/ 1-2 2/2 0/0; do
     new_cell "bad-share-${bad_share//\//-slash}"
-    invoke "$cell" --share "$bad_share"; exit_code=$?
-    expect "--share 写坏退 2：$bad_share" '((exit_code == 2)) && grep -qF -e "--share 要写 第几份/共几份" "$cell/out" && [[ ! -e "$cell/calls" ]]'
+    mkdir -p -- "$cell/plan"
+    TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD="$bad_share" TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" invoke "$cell"; exit_code=$?
+    expect "shard 片号写坏退 2：$bad_share" '((exit_code == 2)) && grep -qF -e "服务的 shard 那一步没给片号" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   done
   new_cell bad-arguments
-  invoke "$cell" --share; exit_code=$?
-  expect "--share 缺值退 2" '((exit_code == 2)) && grep -qF -e "--share 后面要写" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   invoke "$cell" --only; exit_code=$?
   expect "--only 缺值退 2" '((exit_code == 2)) && grep -qF -e "--only 后面要写" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   invoke "$cell" --import-work; exit_code=$?
@@ -1063,9 +1114,6 @@ run_selftest() {
   new_cell preflight-missing
   E184_SELFTEST_DEVICE=preflight-missing invoke "$cell"; exit_code=$?
   expect "装置因编译树里没有 preflight.py 退 1：给出路" '((exit_code == 1)) && grep -qF "找不到 preflight.py" "$cell/out"'
-  new_cell wrapper-exit
-  E184_SELFTEST_WRAPPER_EXIT=252 invoke "$cell"; exit_code=$?
-  expect "内存包装排不上退 1：这一次的输出不算结果、不写完成记录" '((exit_code == 1)) && grep -qF "内存包装退 252" "$cell/out" && [[ ! -e "$cell/work/steps/selfcheck.status" ]]'
   new_cell unclosed
   E184_SELFTEST_DEVICE=unclosed invoke "$cell"; exit_code=$?
   expect "输出末行对不上行数的件不算做完" '((exit_code == 1)) && grep -qF "emitted= 对不上行数" "$cell/out" && [[ ! -e "$cell/work/steps/selfcheck.status" ]]'
@@ -1075,29 +1123,29 @@ run_selftest() {
   expect "share 有一族判部分：library 跑、产物里是 library 的输出" '((exit_code == 0)) && (($(count_calls "$cell" "^device main library") == 1)) && grep -qF "segment=library state=done" "$product" && grep -qF "name=library_share" "$product" && is_complete_product "$product"'
   new_cell pinned-mismatch
   printf '%s\n' 'const SEGMENT_SIZES: [usize; 2] = [2, 3];' 'const CLOSED_FORM_WITH_TWO_STATES_PER_WRITE: u64 = 12;' \
-    > "$cell/tree/crates/singlefs-checker-tier/tests/crash_enumeration_lifecycle_closure_stream.rs"
+    > "$cell/tree/crates/singlefs-verification/tests/crash_enumeration_lifecycle_closure_stream.rs"
   invoke "$cell"; exit_code=$?
   expect "钉住的常量与段形现算的两态闭式对不上退 3、装置一次没起" '((exit_code == 3)) && grep -qF "match=false" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   new_cell pinned-other-quantity
   printf '%s\n' 'const SEGMENT_SIZES: [usize; 3] = [2, 3, 4];' 'const CLOSED_FORM_OF_THE_EXPANDED_SEGMENTS_WITH_TWO_STATES_PER_WRITE: u64 = 99;' 'const QUICK_TIER_CLOSED_FORM_WITH_TWO_STATES_PER_WRITE: u64 = 7;' \
-    > "$cell/tree/crates/singlefs-checker-tier/tests/crash_enumeration_large_file_overwritten_across_lower_leaves_stream.rs"
+    > "$cell/tree/crates/singlefs-verification/tests/crash_enumeration_large_file_overwritten_across_lower_leaves_stream.rs"
   invoke "$cell"; exit_code=$?
   product="$cell/tree/$stem-$today.out"
   expect "冒烟层测试钉的是另一个量：记缺钉值（只记一条）、不算对不上、不进钉表、别的流照常、装置照起" '((exit_code == 0)) && [[ -f "$product" ]] && (($(grep -c "name=pinned_smoke_missing case=large-file-overwritten-across-lower-leaves-stream reason=segment_shape_present_but_no_pinned_two_state_closed_form " "$product") == 1)) && ! grep -qF "match=false" "$product" && grep -qE "name=pinned_smoke_done pinned=1 missing=[0-9]+ mismatches=0 " "$product" && grep -qF "lifecycle_closure_stream 11 3" "$cell/work/pinned-smoke.txt" && ! grep -qF "large_file" "$cell/work/pinned-smoke.txt" && (($(count_calls "$cell" "^device main selfcheck") == 1))'
   new_cell pinned-wrong-beside-other-quantity
   printf '%s\n' 'const SEGMENT_SIZES: [usize; 2] = [2, 3];' 'const CLOSED_FORM_WITH_TWO_STATES_PER_WRITE: u64 = 12;' \
-    > "$cell/tree/crates/singlefs-checker-tier/tests/crash_enumeration_lifecycle_closure_stream.rs"
+    > "$cell/tree/crates/singlefs-verification/tests/crash_enumeration_lifecycle_closure_stream.rs"
   printf '%s\n' 'const SEGMENT_SIZES: [usize; 3] = [2, 3, 4];' 'const CLOSED_FORM_OF_THE_EXPANDED_SEGMENTS_WITH_TWO_STATES_PER_WRITE: u64 = 99;' \
-    > "$cell/tree/crates/singlefs-checker-tier/tests/crash_enumeration_large_file_overwritten_across_lower_leaves_stream.rs"
+    > "$cell/tree/crates/singlefs-verification/tests/crash_enumeration_large_file_overwritten_across_lower_leaves_stream.rs"
   invoke "$cell"; exit_code=$?
   kept_output=$(cat -- "$cell"/work/steps/repo-reads.out.running-*.exit3 2> /dev/null)
   expect "钉值写错的与钉另一个量的同在：对不上仍只有一条（退 3、装置一次没起），钉另一个量的那条只记缺钉值" '((exit_code == 3)) && grep -qE "name=pinned_smoke_done pinned=0 missing=[0-9]+ mismatches=1 " <<< "$kept_output" && (($(grep -c "match=false" <<< "$kept_output") == 1)) && grep -qF "flow=lifecycle_closure_stream" "$cell/out" && (($(grep -c "name=pinned_smoke_missing case=large-file-overwritten-across-lower-leaves-stream" <<< "$kept_output") == 1)) && [[ ! -e "$cell/calls" ]]'
   new_cell crashflow-hit
-  echo "struct CrashFlow;" > "$cell/tree/crates/singlefs-harness/src/lib.rs"
+  echo "struct CrashFlow;" > "$cell/tree/crates/singlefs-verification/src/lib.rs"
   invoke "$cell"; exit_code=$?
   expect "crates 里出现 CrashFlow 退 3（停机 T6）、装置一次没起" '((exit_code == 3)) && grep -qF "T6_no_crashflow_in_crates result=fail hits=1" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   new_cell crashflow-unreadable
-  rm -rf -- "${cell:?}/tree/crates/singlefs-harness/src" "${cell:?}/tree/crates/singlefs-checker-tier/src/crash_injection.rs"
+  rm -rf -- "${cell:?}/tree/crates/singlefs-verification/src"
   invoke "$cell"; exit_code=$?
   expect "停机 T6 要读的文件一个都读不到：不当零命中，退 3" '((exit_code == 3)) && grep -qF "files_read=0" "$cell/out"'
   new_cell assemble-missing
@@ -1109,7 +1157,7 @@ run_selftest() {
   expect "--assemble：件齐了不起装置、另存 -r2" '((run_zero_exit == 0 && exit_code == 0)) && is_complete_product "$cell/tree/$stem-$today-r2.out" && (($(count_calls "$cell" "^device main selfcheck") == 1))'
   new_cell build-here
   INVOKE_BINARY= invoke "$cell" --build-here --only selfcheck; exit_code=$?
-  expect "--build-here：编一次（两个 bin 一条 cargo）、用这棵树 target/release 下的装置" '((exit_code == 0)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-checker-tier --bin e184_regular_layer_cost_counts --bin e184_regular_layer_cost_counts_write_dump") == 1)) && grep -q "^device main selfcheck" "$cell/calls"'
+  expect "--build-here：编一次（两个 bin 一条 cargo）、用这棵树 target/release 下的装置" '((exit_code == 0)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-verification --bin e184_regular_layer_cost_counts --bin e184_regular_layer_cost_counts_write_dump") == 1)) && grep -q "^device main selfcheck" "$cell/calls"'
   new_cell binary-missing
   INVOKE_BINARY="$cell/bin/not-built" invoke "$cell" --only selfcheck; exit_code=$?
   expect "装置二进制没编好退 78、装置一次没起" '((exit_code == 78)) && grep -qF "装置还没编好" "$cell/out" && [[ ! -e "$cell/calls" ]]'
@@ -1121,6 +1169,9 @@ run_selftest() {
   new_cell registered-threads
   CELL_THREADS= invoke "$cell" --only selfcheck; exit_code=$?
   expect "E184_THREADS 不设：装置的线程取登记值" '((exit_code == 0)) && grep -qF "threads=$(heavy_thread_default)" "$cell/calls"'
+  new_cell outside-temporary-service
+  env -u PRUNE_SERVER_TEMPORARY_SERVICE_SOCKET bash "$real_root/scripts/experiment-apparatus/e184-segment-one-long-run.sh" --selftest > "$cell/out" 2>&1; exit_code=$?
+  expect "不在临时 prune-server 底下起的自证：退 2、说自证没跑、一格都不跑" '((exit_code == 2)) && grep -qF "e184-segment-one-long-run.sh 自证没跑：" "$cell/out" && ! grep -qF "（第 1 格）" "$cell/out"'
   rm -rf -- "${work:?}"
   if ((failures > 0)); then echo "e184-segment-one-long-run.sh 自证：$failures 格红（共 $cell_count 格）"; return 1; fi
   echo "e184-segment-one-long-run.sh 自证：$cell_count 格全绿"
@@ -1142,7 +1193,6 @@ selftest=0
 while (($# > 0)); do
   case "$1" in
     --only) (($# >= 2)) || break_is missing-value-unchecked || usage_error "--only 后面要写件名"; ONLY="$2"; shift 2 ;;
-    --share) (($# >= 2)) || break_is missing-value-unchecked || usage_error "--share 后面要写 第几份/共几份"; SHARE="$2"; shift 2 ;;
     --import-work) (($# >= 2)) || break_is missing-value-unchecked || usage_error "--import-work 后面要写目录"; IMPORT_DIRECTORY="$2"; MODE=import; shift 2 ;;
     --assemble) MODE=assemble; shift ;;
     --list-segments) MODE=list; shift ;;
@@ -1158,17 +1208,42 @@ if ((selftest)); then
   exit $?
 fi
 
-load_segment_table
-if [[ -n "$SHARE" ]] && ! break_is share-format-unchecked; then
-  [[ "$SHARE" =~ ^[0-9]+/[0-9]+$ ]] || usage_error "--share 要写 第几份/共几份（两个整数），给的是「$SHARE」"
-  ((${SHARE#*/} >= 1 && ${SHARE%/*} < ${SHARE#*/})) || usage_error "--share 要写 第几份/共几份（第几份从 0 起、小于共几份、共几份不小于 1），给的是「$SHARE」"
+# 经 task-server 分片（文件头「多机的读法」）：服务起的那一步照 TASK_SERVER_SHARD_PHASE 换用法
+TASK_PHASE="${TASK_SERVER_SHARD_PHASE:-}"
+PLAN_DIRECTORY="${TASK_SERVER_SHARD_PLAN_DIRECTORY:-}"
+case "$TASK_PHASE" in
+  "") ;;
+  plan|shard|merge)
+    [[ -n "$PLAN_DIRECTORY" && -d "$PLAN_DIRECTORY" ]] || { echo "  ✗ 服务的 $TASK_PHASE 那一步没给在的计划目录（TASK_SERVER_SHARD_PLAN_DIRECTORY=${PLAN_DIRECTORY:-没设}）" >&2; echo "     → 怎么办：这一步只由 task-server 起" >&2; exit 2; } ;;
+  *) echo "  ✗ TASK_SERVER_SHARD_PHASE=$TASK_PHASE 认不出（认 plan、shard、merge）" >&2; echo "     → 怎么办：这个变量只由 task-server 设；直接跑就去掉它" >&2; exit 2 ;;
+esac
+if [[ "$TASK_PHASE" == plan ]]; then
+  HOST_TOTAL=$(host_count) || { echo "  ✗ 多机配置判不过（$HOSTS_EMITTER --emit-hosts）" >&2; echo "     → 怎么办：照它打的原因修 multi-host.env（单跑 bash $HOSTS_EMITTER --emit-hosts 看原因）" >&2; exit 1; }
+  break_is plan-shard-count-ignored && HOST_TOTAL=1
+  write_plan "$HOST_TOTAL" || exit 1
+  echo "计划：$HOST_TOTAL 片（各片算序号对 $HOST_TOTAL 取余等于片号的流，不钉台、由服务挑机器）"
+  exit 0
 fi
+if [[ "$TASK_PHASE" == shard ]]; then
+  if ! break_is share-format-unchecked; then
+    [[ "${TASK_SERVER_SHARD:-}" =~ ^[0-9]+/[1-9][0-9]*$ ]] && ((${TASK_SERVER_SHARD%/*} < ${TASK_SERVER_SHARD#*/})) \
+      || { echo "  ✗ 服务的 shard 那一步没给片号（TASK_SERVER_SHARD=${TASK_SERVER_SHARD:-没设}）" >&2; echo "     → 怎么办：这一步只由 task-server 起" >&2; exit 2; }
+  fi
+  [[ -z "${TASK_SERVER_SHARD_OUTPUT_DIRECTORY:-}" ]] || mkdir -p -- "$TASK_SERVER_SHARD_OUTPUT_DIRECTORY" || exit 1
+  SHARE="${TASK_SERVER_SHARD:-}"
+  WORK_DIRECTORY="$WORK_DIRECTORY-share-${SHARE%/*}-of-${SHARE#*/}"
+fi
+if [[ "$TASK_PHASE" == merge && -n "${TASK_SERVER_SHARD_MISSING:-}" ]] && ! break_is missing-shards-ignored; then
+  echo "  ✗ 合并那一步缺片（TASK_SERVER_SHARD_MISSING=$TASK_SERVER_SHARD_MISSING）：这几片被人手取消、没有它们算的块键，不当全了判" >&2
+  echo "     → 怎么办：重交这一件，让缺的片重做" >&2
+  exit 77
+fi
+load_segment_table
 if [[ -n "$ONLY" ]] && ! is_segment_name "$ONLY"; then
   usage_error "认不得的件「$ONLY」（--list-segments 列全部）"
 fi
 
 THREAD_LIMIT=$(registered_threads) || exit 2
-LIBRARY_DIRECTORY="${E184_LIBRARY:-${SINGLEFS_CRASH_AMPLIFICATION_LIBRARY:-$HOME/.local/share/singlefs/crash-amplification/crash-state-verdicts}}"
 RUN_STAMP="$(TZ=Asia/Tokyo date +%F)-$$"
 
 # 列件、拼产物时二进制在就算 sha256（核做完的记录是不是同一份二进制做的）；不在就只看记录。
@@ -1200,13 +1275,25 @@ case "$MODE" in
     exit $? ;;
 esac
 
+if [[ "$TASK_PHASE" == merge ]]; then
+  # 把各片工作目录里做完的块键文件并进本机（不覆盖已有的）；片数读计划（plan.json 的 shards 个数）
+  MERGE_SHARD_TOTAL=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))["shards"]))' "$PLAN_DIRECTORY/plan.json") \
+    || { echo "  ✗ 读不了计划 $PLAN_DIRECTORY/plan.json" >&2; echo "     → 怎么办：计划那一步没写全：看计划那一步的日志，重交这一件" >&2; exit 1; }
+  mkdir -p -- "$WORK_DIRECTORY"
+  read_shas_if_present
+  for ((shard_number = 0; shard_number < MERGE_SHARD_TOTAL; shard_number++)); do
+    shard_work_directory="$WORK_DIRECTORY-share-$shard_number-of-$MERGE_SHARD_TOTAL"
+    if [[ -d "$shard_work_directory" ]]; then import_work "$shard_work_directory"; fi
+  done
+fi
+
 mkdir -p -- "$WORK_DIRECTORY/steps" "$WORK_DIRECTORY/logs" "$WORK_DIRECTORY/dumps" "$WORK_DIRECTORY/keys" || exit 1
 exec 9> "$WORK_DIRECTORY/.run-lock"
 flock -n 9 || { echo "  ✗ 这个工作目录已有一趟在跑（$WORK_DIRECTORY/.run-lock 被占着）" >&2; echo "     → 怎么办：等它跑完，或换 E184_WORK_DIRECTORY" >&2; exit 2; }
 resolve_binaries
 if ((BUILD_HERE)); then build_here; fi
 require_binaries
-echo "e184 第一段长活：这台线程上限 $THREAD_LIMIT、工作目录 $WORK_DIRECTORY、主装置 $MAIN_SOURCE（私有副本 $MAIN_BINARY，sha256 ${MAIN_SHA::12}…）、转储 bin $DUMP_SOURCE（私有副本 $DUMP_BINARY，sha256 ${DUMP_SHA::12}…）${SHARE:+、只跑 --share $SHARE 那一份}"
+echo "e184 第一段长活：这台线程上限 $THREAD_LIMIT、工作目录 $WORK_DIRECTORY、主装置 $MAIN_SOURCE（私有副本 $MAIN_BINARY，sha256 ${MAIN_SHA::12}…）、转储 bin $DUMP_SOURCE（私有副本 $DUMP_BINARY，sha256 ${DUMP_SHA::12}…）${SHARE:+、只跑分片 $SHARE 那一份}"
 
 # 一件活前面的件都得做完（--only 点名时核；顺序跑时前面的件刚做完）。
 prerequisites_are_done() {

@@ -1,7 +1,7 @@
 """E171 第二段 O3 一侧的单测：冻结版本核对、执行器产物的读回、坏镜像的判法（拷来的那一半）、驱动的 O3 一步与线道队列。手造数据，不起执行器、不起装置。
 
 跑法（在本目录）：`python3 -m unittest test_o3_columns`（与 `test_collusion_matrix`、`test_collusion_pipeline` 一起由变异驱动跑）。
-每个比较旁边配钉绝对值的断言：冻结的种子写死成登记的 `85441ae491419411`，实际目录与冻结行逐个比。
+每个比较旁边配钉绝对值的断言：冻结的种子写死成重冻结之后的 `e49ebb14471be759`，实际目录与冻结行逐个比。
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from bad_implementation_table import STATUS_LOCATED, MutationRow
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPOSITORY_ROOT = os.environ.get("E171_REPOSITORY_ROOT") or os.path.abspath(os.path.join(HERE, "../../.."))  # 变异驱动在副本里跑单测时给真的仓根
-REGISTERED_SEED = "85441ae491419411"
+REGISTERED_SEED = "e49ebb14471be759"
 FROZEN_FILE_COUNT = 15
 
 EXECUTOR_OUTPUT = """name=config dumps=d streams=a batches=1,2 workers=1
@@ -87,11 +87,28 @@ class ExecutorOutputTests(unittest.TestCase):
             write(path, EXECUTOR_OUTPUT.replace("name=complete\n", ""))
             self.assertFalse(frozen_o3.read_executor_output(path).complete)
 
-    def test_the_command_goes_through_the_wrapper_lists_only_the_given_streams_and_asks_for_batches_one_and_two(self) -> None:
-        command = frozen_o3.executor_command("/repo", "/d", ["s1"], "1,2", 3, "/o", "4G")
-        self.assertEqual(command[:4], ["bash", "/repo/scripts/hosts/run-with-memory-cap.sh", "4G", "bash"])
-        self.assertEqual(command[4:7], ["/repo/scripts/hosts/capped.sh", "3", "nice"])
+    def test_the_command_starts_the_executor_itself_lists_only_the_given_streams_and_asks_for_batches_one_and_two(self) -> None:
+        command = frozen_o3.executor_command("/repo", "/d", ["s1"], "1,2", 3, "/o")
+        self.assertEqual(command[:4], ["nice", "-n", "19", "python3"])
+        self.assertFalse(any(word.endswith(".sh") for word in command), command)
         self.assertEqual(command[-10:], ["--dumps", "/d", "--streams", "s1", "--batches", "1,2", "--workers", "3", "--output", "/o"])
+
+    def test_the_compile_the_executor_and_the_image_control_read_the_threads_of_the_lane_from_every_thread_variable(self) -> None:
+        seen: list[dict] = []
+        commands: list[list[str]] = []
+        def recorded_run(command, **options):
+            commands.append(list(command))
+            seen.append(options["env"])
+            return types.SimpleNamespace(returncode=0)
+        with tempfile.TemporaryDirectory() as root, unittest.mock.patch.object(frozen_o3.subprocess, "run", recorded_run):
+            row_driver.run_compile(root, os.path.join(root, "target"), "/repo", 5, os.path.join(root, "compile.log"), os.path.join(root, "artifacts"))
+            frozen_o3.run_executor("/repo", root, ["s1"], 3, os.path.join(root, "o3.out"), os.path.join(root, "o3.log"))
+            row_driver.run_image_control(argparse.Namespace(repo_root="/repo", threads=4, o3_control_bad_states="/e170"), root)
+        wanted = [{name: value for name in frozen_o3.CHILD_THREAD_VARIABLES} for value in ("5", "3", "4")]
+        self.assertEqual([{name: environment.get(name) for name in frozen_o3.CHILD_THREAD_VARIABLES} for environment in seen], wanted)
+        self.assertEqual(seen[0].get("CARGO_TARGET_DIR"), os.path.join(root, "target"))
+        self.assertEqual([environment.get("PYTHONDONTWRITEBYTECODE") for environment in seen[1:]], ["1", "1"])
+        self.assertEqual([command[:4] for command in commands], [["nice", "-n", "19", "cargo"], ["nice", "-n", "19", "python3"], ["nice", "-n", "19", sys.executable]])
 
 
 class FreezeTests(unittest.TestCase):
@@ -309,7 +326,7 @@ class ImageJudgeTests(unittest.TestCase):
 
 class DriverO3StepTests(unittest.TestCase):
     def arguments(self, **overrides) -> argparse.Namespace:
-        values = {"no_executor": False, "positive_control": None, "repo_root": "/repo", "threads": 2, "memory_cap": "1G"}
+        values = {"no_executor": False, "positive_control": None, "repo_root": "/repo", "threads": 2}
         values.update(overrides)
         return argparse.Namespace(**values)
 
@@ -325,7 +342,7 @@ class DriverO3StepTests(unittest.TestCase):
             fields = row_driver.run_o3_step(self.arguments(), root)
         self.assertEqual((fields["o3_status"], fields["o3_ns"]), (row_driver.O3_STATUS_NO_EXPORTED_STREAM, "-"))
 
-    def test_a_finished_row_directory_is_read_back_and_an_interrupted_one_is_cleared_when_skipping_finished_rows(self) -> None:
+    def test_a_finished_row_directory_with_the_same_key_is_read_back_and_any_other_one_is_cleared(self) -> None:
         class Stop(Exception):
             pass
 
@@ -333,20 +350,44 @@ class DriverO3StepTests(unittest.TestCase):
             raise Stop
 
         with tempfile.TemporaryDirectory() as root:
-            write(os.path.join(root, "row-3", "row-result.tsv"), "status\tok\ndevice_exit\t0\n")
-            write(os.path.join(root, "row-4", "partial.txt"), "left over from an interrupted run")
-            arguments = argparse.Namespace(skip_finished=True, output_root=root, work_root=os.path.join(root, "work"))
-            self.assertEqual(row_driver.run_row_on_the_lane(3, None, None, [], set(), set(), arguments, 0), {"status": "ok", "device_exit": "0"})
+            arguments = argparse.Namespace(snapshot_digest="digest", positive_control=None, disable_oracle=None, no_executor=False,
+                                           o3_control_bad_states=None, output_root=root, work_root=os.path.join(root, "work"))
+            key = row_driver.reuse_key_of(arguments, 3, "-")
+            write(os.path.join(root, "row-3", "row-result.tsv"), f"status\tok\ndevice_exit\t0\nreuse_key\t{key}\n")
+            write(os.path.join(root, "row-4", "row-result.tsv"), "status\tok\ndevice_exit\t0\nreuse_key\tsome-other-key\n")
+            write(os.path.join(root, "row-5", "partial.txt"), "left over from an interrupted run")
+            self.assertEqual(row_driver.run_row_on_the_lane(3, None, None, [], set(), set(), arguments, 0),
+                             {"status": "ok", "device_exit": "0", "reuse_key": key})
             original = row_driver.sync_tree
             row_driver.sync_tree = stop_after_clearing
             try:
-                with self.assertRaises(Stop):
-                    row_driver.run_row_on_the_lane(4, None, None, [], set(), set(), arguments, 0)
+                for number in (4, 5):
+                    with self.assertRaises(Stop):
+                        row_driver.run_row_on_the_lane(number, None, None, [], set(), set(), arguments, 0)
             finally:
                 row_driver.sync_tree = original
-            self.assertEqual(os.listdir(os.path.join(root, "row-4")), [], "中途停下的行目录要先清掉")
-            with self.assertRaises(FileExistsError):
-                row_driver.run_row_on_the_lane(4, None, None, [], set(), set(), argparse.Namespace(skip_finished=False, output_root=root, work_root=root), 0)
+            self.assertEqual(os.listdir(os.path.join(root, "row-4")), [], "键不同的行目录要先清掉")
+            self.assertEqual(os.listdir(os.path.join(root, "row-5")), [], "中途停下的行目录要先清掉")
+
+    def test_a_row_directory_whose_result_is_a_compile_failure_or_a_timeout_is_not_reused(self) -> None:
+        for status, device_exit in (("compile_failed", "-"), ("ok", str(row_driver.ROW_TIMEOUT_EXIT_CODE))):
+            self.assertFalse(row_driver.result_is_reusable({"status": status, "device_exit": device_exit}), (status, device_exit))
+        self.assertTrue(row_driver.result_is_reusable({"status": "ok", "device_exit": "0"}))
+
+    def test_no_row_selection_is_every_row_and_a_given_one_is_a_narrowed_scope(self) -> None:
+        rows = [row_driver.SelectedRow(number, 1 if number <= 2 else 2, "file", 0, f"name-{number}", "0" * 12) for number in (1, 2, 3)]
+        every = argparse.Namespace(rows=None, first_slice=False)
+        self.assertEqual([row.number for row in row_driver.choose_rows(every, rows)], [1, 2, 3])
+        self.assertEqual([row.number for row in row_driver.choose_rows(argparse.Namespace(rows="2,3", first_slice=False), rows)], [2, 3])
+        self.assertEqual([row.number for row in row_driver.choose_rows(argparse.Namespace(rows="", first_slice=False), rows)], [])
+        self.assertEqual([row.number for row in row_driver.choose_rows(argparse.Namespace(rows=None, first_slice=True), rows)], [1, 2])
+
+    def test_the_retired_all_argument_is_a_usage_error(self) -> None:
+        error = io.StringIO()
+        with unittest.mock.patch("sys.stderr", error), self.assertRaises(SystemExit) as raised:
+            row_driver.main(["--repo-root", "r", "--work-root", "w", "--output-root", "o", "--all"])
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("unrecognized arguments: --all", error.getvalue())
 
     def test_every_job_is_taken_by_exactly_one_lane_and_a_row_that_raises_is_recorded_without_stopping_the_others(self) -> None:
         taken: list[tuple[int, int]] = []
@@ -446,8 +487,9 @@ class DriverRebuildTests(unittest.TestCase):
 
     def run_row(self, number: int, mutation: MutationRow) -> dict[str, object]:
         self.next_mutation = mutation
-        arguments = argparse.Namespace(skip_finished=False, output_root=os.path.join(self.root, "rows"), work_root=self.work_root, repo_root="/repo",
-                                       threads=1, memory_cap="1G", positive_control=None, disable_oracle=None, no_executor=True)
+        arguments = argparse.Namespace(snapshot_digest="digest", o3_control_bad_states=None, output_root=os.path.join(self.root, "rows"),
+                                       work_root=self.work_root, repo_root="/repo",
+                                       threads=1, positive_control=None, disable_oracle=None, no_executor=True)
         return row_driver.run_row_on_the_lane(number, None, None, [], set(), set(), arguments, 0)
 
     def record(self) -> row_driver.LaneBuildRecord | None:
@@ -516,8 +558,9 @@ class DriverRebuildTests(unittest.TestCase):
         broken = mutation_of(CORE_FILE, "{ 10 }", "{ BROKEN }")
         asked: list[str] = []
         self.next_mutation = broken
-        arguments = argparse.Namespace(skip_finished=False, output_root=os.path.join(self.root, "rows"), work_root=self.work_root, repo_root="/repo",
-                                       threads=1, memory_cap="1G", positive_control=None, disable_oracle=None, no_executor=True,
+        arguments = argparse.Namespace(snapshot_digest="digest", o3_control_bad_states=None, output_root=os.path.join(self.root, "rows"),
+                                       work_root=self.work_root, repo_root="/repo",
+                                       threads=1, positive_control=None, disable_oracle=None, no_executor=True,
                                        keep_compile_failures_as_they_are=True)
         with unittest.mock.patch.object(row_driver, "substitute_after_a_compile_failure", lambda *unused: asked.append("asked")):
             fields = row_driver.run_row_on_the_lane(1, None, None, [], set(), set(), arguments, 0)

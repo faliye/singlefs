@@ -4,11 +4,11 @@
 """librocksdb-sys 的 C++（librocksdb.a 与 libsnappy.a）每台主机只编一次，各编译目录经环境变量链这一份，不在每个编译目录里现编。
 
 用法（都在仓根跑；--root 不给是这份脚本所在的仓）：
-  rocksdb-prebuilt.py key [--root R]           打这台主机此刻的键（各组成）与预编库目录，不编
+  rocksdb-prebuilt.py key [--root R]           打这台主机此刻的键（各组成）、折进键的三个工作区（workspaces= 一行）与预编库目录，不编
   rocksdb-prebuilt.py env [--root R]           预编库在、对得上时打四行 export（eval 用）；不在退 1、标准输出为空
   rocksdb-prebuilt.py build [--root R]         预编库不在就编一次（持锁：几个进程同时来只编一次，后来的等锁之后看到编好了直接退 0）；起真 cargo，是重活
   rocksdb-prebuilt.py install [--root R]       build，再写这台主机的三处环境来源（见下「入口怎么拿到取值」）、改用户级 systemd 管理器此刻的环境，最后跑 check
-  rocksdb-prebuilt.py check [--root R]         判这台主机：两个工作区的依赖对得上、预编库在且对得上、三处环境来源与此刻进程环境的取值都与预编库一致、cargo 配置里没写这几个变量
+  rocksdb-prebuilt.py check [--root R]         判这台主机：三个工作区的依赖对得上、预编库在且对得上、三处环境来源与此刻进程环境的取值都与预编库一致、cargo 配置里没写这几个变量
   rocksdb-prebuilt.py entry [--root R] [--cargo C]
                                                起 cargo 的入口（门禁阶段、崩溃与变异驱动、merge-and-verify.sh、admission.py 交的命令、第二台那一侧）开头调的轻判：
                                                只判这台装了（预编库在、对得上，不算两份库的 sha256）、此刻进程环境的取值与它一致、没设 ROCKSDB_COMPILE / SNAPPY_COMPILE；
@@ -21,52 +21,67 @@
   同目录 manifest.json 记键的各组成、两份库的 sha256 与大小、编的用时与日期，complete 最后写（有它才算编好）。不放开机清空的目录。
   SINGLEFS_ROCKSDB_PREBUILT_STORE 只给自证换临时目录用。
 键（manifest.json 的 fields，sha256 取前 16 位）：
-  两个工作区（crates/singlefs-checker-tier/Cargo.toml 与 scripts/experiment-apparatus/Cargo.toml）的 rocksdb 依赖写法（版本、默认特性、特性），两份不同拒；
-  两份 Cargo.lock 里 rocksdb、librocksdb-sys、zstd-sys、lz4-sys、libz-sys、bzip2-sys、cc 的版本与 checksum，两份不同拒；
+  三个工作区（crates/singlefs-verification/Cargo.toml、scripts/experiment-apparatus/Cargo.toml 与 prune-server/Cargo.toml，即 MANIFESTS）的 rocksdb 依赖写法（版本、默认特性、特性），
+    有一份与头一份不同就拒（拒绝说明点名不同的那份清单）；
+  三份 Cargo.lock（LOCKS）里 rocksdb、librocksdb-sys、zstd-sys、lz4-sys、libz-sys、bzip2-sys、cc 的版本与 checksum，有一份与头一份不同就拒（点名不同的那份锁与那几个包）；
+  三个工作区对得上时键只取头一份的各组成，所以 prune-server 并进来之后键不变、已编的预编库照用；
   rustc -vV 原样；c++、cc、ar 解析到的真实路径与 --version 第一行；交给 C++ 的指令集（CPU_FEATURES 这台 /proc/cpuinfo 里缺一样就拒，OPTIONAL_CPU_FEATURES 这台有的才加）；
   编法（opt-level 3、不带调试信息）。
 怎么编：在库目录底下的临时目录里建一个只依赖 rocksdb（照仓里的写法）的试编工程，拷仓根 Cargo.lock 进去，cargo build --release --offline，
   环境里拿掉 ROCKSDB_*、SNAPPY_*、RUSTFLAGS 这一类、CC / CXX / CFLAGS / CXXFLAGS 这一类，设 ROCKSDB_COMPILE=1、SNAPPY_COMPILE=1、
   RUSTFLAGS=-C target-feature=<键里的指令集>（librocksdb-sys 照它给 C++ 加 -msse4.1 -msse4.2 -mpclmul，这台有的再加 -mavx2 -mbmi -mlzcnt）、BINDGEN_EXTRA_CLANG_ARGS 取仓里 .cargo/config.toml 的那一份；
   编完核试编工程的 Cargo.lock 里键里那几个包与仓里逐个相同、构建脚本输出里没有「compiling without SSE4.2」，再拷两份 .a、写 manifest.json 与 complete，整个目录改名换上。
-  线程数照 cargo 自己读的 CARGO_BUILD_JOBS（经 bash scripts/hosts/capped.sh <N> 起）。
+  线程数照 cargo 自己读的 CARGO_BUILD_JOBS（本机经 task-server/task submit -- python3 scripts/hosts/rocksdb-prebuilt.py build 起，服务给每一次尝试套 capped.sh <N>）。
 入口怎么拿到取值（四个变量 ROCKSDB_LIB_DIR、ROCKSDB_STATIC、SNAPPY_LIB_DIR、SNAPPY_STATIC，只走进程环境，不写进任何一层 cargo 配置：
   cargo 配置的 [env] 进 crates 变异的行键与广谱变异的全局键，scripts/mutation/lib_mutation_units.py 的 toolchain_lines、scripts/mutation/mutation-prune.py 的 build_environment_lines）：
   ~/.config/singlefs/rocksdb-prebuilt.env       四行 export，唯一的取值来源（install 写）
   ~/.bashrc 最前面一段（BASHRC_BEGIN 到 BASHRC_END） source 上面那一份：交互 shell、从它起的会话与 ssh 起的非交互命令都读（放在交互判断之前）
-  ~/.config/environment.d/60-singlefs-rocksdb-prebuilt.conf  用户级 systemd 管理器起的单元（scripts/hosts/detached-run.sh 起的长活）读；
+  ~/.config/environment.d/60-singlefs-rocksdb-prebuilt.conf  用户级 systemd 管理器起的单元（task-server 起的每一次尝试）读；
     install 另跑 systemctl --user set-environment 让此刻在跑的管理器当场换上
   ROCKSDB_COMPILE、SNAPPY_COMPILE 一律不设（设成 1 就在编译目录里现编）。
 entry（R 是 cargo 要编的那棵树的仓根，默认这份脚本所在的仓；C 是入口要起的 cargo，默认 PATH 上解到的 cargo）：
   不判、退 0 的两种，打一行「· rocksdb-prebuilt entry：… 不判」：
-    R 里 crates/singlefs-checker-tier/Cargo.toml 与 scripts/experiment-apparatus/Cargo.toml 都不在、或都没有 rocksdb 依赖（编不到 librocksdb-sys；门禁样本与自证的小仓多是这样）；
+    R 里 MANIFESTS 的三份清单（crates/singlefs-verification、scripts/experiment-apparatus、prune-server 各一份）都不在、或都没有 rocksdb 依赖（编不到 librocksdb-sys；门禁样本与自证的小仓多是这样）；
     只在自证与样本里认的跳过：C 解到的是一份脚本（#! 开头），头 4096 字节里有一行带 ENTRY_FAKE_CARGO_MARKER（「rocksdb-prebuilt-entry: selftest-fake-cargo」）。
       入口自证与门禁样本里的假 cargo 写这一行注释就不受这道判挡；真的 cargo（rustup 的代理与工具链里的都是 ELF）写不进这一行，带了 C 也照判。
       入口自证里「取值缺了当场退出、一个 cargo 都没起」那一格用一份不带这一行的假 cargo，判照起。
   照判时：先看进程环境（ROCKSDB_COMPILE、SNAPPY_COMPILE 设了、四个取值缺一个，当场红，不往下算键），再算键（只用树里依赖 rocksdb 的那几个工作区的清单与锁：
-  只拷了 crates/、Cargo.toml、Cargo.lock 的仓副本照判，各组成取头一个工作区，与两个都在时算出的键相同）、看预编库在不在（store_problem，不算 sha256）、
+  只拷了 crates/、Cargo.toml、Cargo.lock 的仓副本、只有 prune-server/ 的树都照判，各组成取头一个工作区，与三个都在时算出的键相同）、看预编库在不在（store_problem，不算 sha256）、
   比进程环境与预编库的取值。出路：此刻进程没有取值的「开新会话，或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"」；这台还没装的先 install。
 退出码：0 做完 / 全绿；1 判红或没做成（逐项打 ✗ 与 → 出路）；2 用法错；77 audit-target 一份构建脚本记录都没找到（本次未判）。
 
 弄坏开关 ROCKSDB_PREBUILT_BREAK=<项>（逗号分隔，只给 --selftest 证红用）。逐项写弄坏哪一处、打开后自证哪一格红（「✗ 自证 <格名>：」那一段）：
-  key-ignores-compiler        键里不放 c++ / cc / ar           「换了 C++ 编译器键就变」「换了编译器之后旧的取值 check 判红（要编新键）」
-  key-ignores-lock            键里不放 Cargo.lock 的包         「换了 librocksdb-sys 版本键就变」；键里没有锁，build 也不核试编工程的锁，
+  ROCKSDB_PREBUILT_BREAK=key-ignores-compiler  键里不放 c++ / cc / ar
+      「换了 C++ 编译器键就变」「换了编译器之后旧的取值 check 判红（要编新键）」
+  ROCKSDB_PREBUILT_BREAK=key-ignores-lock  键里不放 Cargo.lock 的包
+      「换了 librocksdb-sys 版本键就变」；键里没有锁，build 也不核试编工程的锁，
                                                                连带「试编工程的依赖版本与仓里对不上不落库」与 build 那几格（对不上的那一份落了库，后面不再起 cargo）
-  build-unlocked              build 不持锁                      「两个 build 同时来只编一次」「编好了再 build 不编」（起了两次 cargo）
-  unverified-lock-publishes   build 不核试编工程的 Cargo.lock    「试编工程的依赖版本与仓里对不上不落库」，连带「试编失败不落库、不留临时目录」
+  ROCKSDB_PREBUILT_BREAK=build-unlocked  build 不持锁
+      「两个 build 同时来只编一次」「编好了再 build 不编」（起了两次 cargo）
+  ROCKSDB_PREBUILT_BREAK=unverified-lock-publishes  build 不核试编工程的 Cargo.lock
+      「试编工程的依赖版本与仓里对不上不落库」，连带「试编失败不落库、不留临时目录」
                                                                「两个 build 同时来只编一次」「编好了再 build 不编」「试编交给 C++ 的指令集是键里的那几样」（对不上的那一份已经落了库）
-  missing-store-passes        check 不判预编库在不在            「预编库不在 check 判红」「换了编译器之后旧的取值 check 判红（要编新键）」
-  environment-unchecked       check 不比此刻进程环境            「进程环境里的取值与预编库不同 check 判红」「进程环境里设了 ROCKSDB_COMPILE check 判红」
-  fingerprint-ignored         audit-target 不读构建脚本的指纹   「编译目录没拿到预编库的取值 audit-target 判红」
-  residue-ignored             audit-target 不看 out/ 里现编的残留 「同一编译目录两次取值不同（现编过又换回预编）audit-target 判红」
-  ledger-ignored              audit-target 不读不记见过的取值   「同一把键下同一编译目录见过两种取值 audit-target 判红」
-  entry-environment-unchecked entry 不看此刻进程环境            「entry：进程环境没有取值判红、不往下算键、出路是开新会话或 eval env」「entry：取值与预编库不同判红」
+  ROCKSDB_PREBUILT_BREAK=missing-store-passes  check 不判预编库在不在
+      「预编库不在 check 判红」「换了编译器之后旧的取值 check 判红（要编新键）」
+  ROCKSDB_PREBUILT_BREAK=environment-unchecked  check 不比此刻进程环境
+      「进程环境里的取值与预编库不同 check 判红」「进程环境里设了 ROCKSDB_COMPILE check 判红」
+  ROCKSDB_PREBUILT_BREAK=fingerprint-ignored  audit-target 不读构建脚本的指纹
+      「编译目录没拿到预编库的取值 audit-target 判红」
+  ROCKSDB_PREBUILT_BREAK=residue-ignored  audit-target 不看 out/ 里现编的残留
+      「同一编译目录两次取值不同（现编过又换回预编）audit-target 判红」
+  ROCKSDB_PREBUILT_BREAK=ledger-ignored  audit-target 不读不记见过的取值
+      「同一把键下同一编译目录见过两种取值 audit-target 判红」
+  ROCKSDB_PREBUILT_BREAK=entry-environment-unchecked  entry 不看此刻进程环境
+      「entry：进程环境没有取值判红、不往下算键、出路是开新会话或 eval env」「entry：取值与预编库不同判红」
                                                                「entry：设了 ROCKSDB_COMPILE 判红」「entry：装好、取值对得上判绿」（少判两项）「entry：--cargo 点名的假 cargo 不带标记照判」
-                                                               「entry：只拷了 crates/ 的仓副本照判、键与两个工作区都在时相同」（少判两项）
-  entry-skips-unmarked-cargo  entry 见 cargo 是脚本就跳过、不看标记 「entry：进程环境没有取值判红、不往下算键、出路是开新会话或 eval env」「entry：取值与预编库不同判红」
+                                                               「entry：只拷了 crates/ 的仓副本照判、键与三个工作区都在时相同」「entry：只有 prune-server 的树照判、键与三个工作区都在时相同」（各少判两项）
+  ROCKSDB_PREBUILT_BREAK=entry-skips-unmarked-cargo  entry 见 cargo 是脚本就跳过、不看标记
+      「entry：进程环境没有取值判红、不往下算键、出路是开新会话或 eval env」「entry：取值与预编库不同判红」
                                                                「entry：设了 ROCKSDB_COMPILE 判红」「entry：装好、取值对得上判绿」「entry：--cargo 点名的假 cargo 不带标记照判」
-                                                               「entry：只拷了 crates/ 的仓副本照判、键与两个工作区都在时相同」
+                                                               「entry：只拷了 crates/ 的仓副本照判、键与三个工作区都在时相同」「entry：只有 prune-server 的树照判、键与三个工作区都在时相同」
                                                                （PATH 最前面的假 cargo 与点名的那一份都是不带标记的脚本，跳过了就不判）
+  ROCKSDB_PREBUILT_BREAK=third-workspace-unchecked  key_fields 只拿头两个工作区互相比，不比 prune-server 那一份（并进来之前的样子）
+      「prune-server 的 rocksdb 依赖写法与另两个不同，键算不出、点名 prune-server/Cargo.toml」「prune-server 的 Cargo.lock 里 librocksdb-sys 的版本与另两个不同，键算不出、点名 prune-server/Cargo.lock」
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -96,14 +111,14 @@ SCRIPT_RELATIVE = "scripts/hosts/rocksdb-prebuilt.py"
 BREAK_VARIABLE = "ROCKSDB_PREBUILT_BREAK"
 BREAK_SWITCHES = ("key-ignores-compiler", "key-ignores-lock", "build-unlocked", "unverified-lock-publishes", "missing-store-passes",
                   "environment-unchecked", "fingerprint-ignored", "residue-ignored", "ledger-ignored",
-                  "entry-environment-unchecked", "entry-skips-unmarked-cargo")
+                  "entry-environment-unchecked", "entry-skips-unmarked-cargo", "third-workspace-unchecked")
 ENTRY_FAKE_CARGO_MARKER = "rocksdb-prebuilt-entry: selftest-fake-cargo"   # 文件头「entry」：自证与样本的假 cargo 写这一行注释，entry 不判
 ENTRY_HOWTO = (f'开新会话（install 之后起的登录 shell 读 ~/.bashrc 最前面那一段），或命令前 eval "$(python3 {SCRIPT_RELATIVE} env)"；'
-               f"这台还没装就先 bash scripts/hosts/capped.sh <N> python3 {SCRIPT_RELATIVE} install")
+               f"这台还没装就先 task-server/task submit -- python3 {SCRIPT_RELATIVE} install（第二台上没有 task-server：在那一台的仓根直接跑 python3 {SCRIPT_RELATIVE} install）")
 STORE_VARIABLE = "SINGLEFS_ROCKSDB_PREBUILT_STORE"
 CPUINFO_VARIABLE = "SINGLEFS_ROCKSDB_PREBUILT_CPUINFO"   # 只给自证换假的 /proc/cpuinfo
-MANIFESTS = ("crates/singlefs-checker-tier/Cargo.toml", "scripts/experiment-apparatus/Cargo.toml")
-LOCKS = ("Cargo.lock", "scripts/experiment-apparatus/Cargo.lock")
+MANIFESTS = ("crates/singlefs-verification/Cargo.toml", "scripts/experiment-apparatus/Cargo.toml", "prune-server/Cargo.toml")
+LOCKS = ("Cargo.lock", "scripts/experiment-apparatus/Cargo.lock", "prune-server/Cargo.lock")   # 与 MANIFESTS 下标一一对应
 KEY_PACKAGES = ("rocksdb", "librocksdb-sys", "zstd-sys", "lz4-sys", "libz-sys", "bzip2-sys", "cc")
 COMPILERS = ("c++", "cc", "ar")
 # 交给 C++ 的指令集（rustc 的特性名，/proc/cpuinfo 的位名）：librocksdb-sys 照构建脚本的 CARGO_CFG_TARGET_FEATURE 加 -msse4.1 -msse4.2 -mpclmul -mavx2 -mbmi -mlzcnt。
@@ -217,7 +232,7 @@ def lock_packages(root, relative):
             found.setdefault(package["name"], []).append(f"{package.get('version')} {package.get('checksum', '-')}")
     missing = [name for name in KEY_PACKAGES if name not in found]
     if missing:
-        raise Refusal(f"{relative} 里没有 {'、'.join(missing)}", "两个工作区都要锁着 rocksdb 与它编 C++ 用的那几个包；先在那个工作区里 cargo generate-lockfile")
+        raise Refusal(f"{relative} 里没有 {'、'.join(missing)}", "每个工作区（MANIFESTS）都要锁着 rocksdb 与它编 C++ 用的那几个包；先在那个工作区里 cargo generate-lockfile")
     return {name: sorted(found[name]) for name in KEY_PACKAGES}
 
 
@@ -240,17 +255,23 @@ def cpu_flags():
     return set()
 
 
-def key_fields(root, workspaces=(0, 1)):
-    """这台主机此刻的键的各组成（见文件头「键」）；对不上的拒。workspaces 是 MANIFESTS / LOCKS 里取哪几个工作区（下标），
-    entry 只取树里依赖 rocksdb 的那几个（只拷了 crates/ 的仓副本没有 scripts/experiment-apparatus/）；各组成取头一个，两个工作区对得上时与取两个的相同。"""
+def key_fields(root, workspaces=None):
+    """这台主机此刻的键的各组成（见文件头「键」）；对不上的拒。workspaces 是 MANIFESTS / LOCKS 里取哪几个工作区（下标），不给取全部；
+    entry 只取树里依赖 rocksdb 的那几个（只拷了 crates/ 的仓副本没有 scripts/experiment-apparatus/ 与 prune-server/）；各组成取头一个，工作区都对得上时与取全部的相同。
+    弄坏开关 third-workspace-unchecked 下只拿头两个互相比。"""
+    workspaces = tuple(range(len(MANIFESTS))) if workspaces is None else workspaces
+    compared = range(min(2, len(workspaces))) if broken("third-workspace-unchecked") else range(len(workspaces))
     dependencies = [rocksdb_dependency(root, MANIFESTS[index]) for index in workspaces]
-    if any(dependency != dependencies[0] for dependency in dependencies):
-        raise Refusal(f"两个工作区的 rocksdb 依赖写法不同：{MANIFESTS[0]} {dependencies[0]}，{MANIFESTS[1]} {dependencies[1]}",
-                      "预编库只有一份，两边链同一份：把两边的 rocksdb 依赖改成同一种写法（版本、默认特性、特性）")
+    differing = [position for position in compared if dependencies[position] != dependencies[0]]
+    if differing:
+        raise Refusal("工作区的 rocksdb 依赖写法不同：" + "；".join(f"{MANIFESTS[workspaces[position]]} {dependencies[position]}" for position in (0, *differing)),
+                      f"预编库只有一份，几个工作区链同一份：把{'、'.join(MANIFESTS[workspaces[position]] for position in differing)} 的 rocksdb 依赖改成与 {MANIFESTS[workspaces[0]]} 同一种写法（版本、默认特性、特性）")
     locks = [lock_packages(root, LOCKS[index]) for index in workspaces]
-    if any(lock != locks[0] for lock in locks):
-        differing = [name for name in KEY_PACKAGES if locks[0][name] != locks[1][name]]
-        raise Refusal(f"两份 Cargo.lock 里 {'、'.join(differing)} 的版本不同", "两边锁到同一版（cargo update -p <包> --precise <版本>），预编库才只要一份")
+    differing = [position for position in compared if locks[position] != locks[0]]
+    if differing:
+        names = [name for name in KEY_PACKAGES if any(locks[position][name] != locks[0][name] for position in differing)]
+        raise Refusal(f"{'、'.join(LOCKS[workspaces[position]] for position in differing)} 里 {'、'.join(names)} 的版本与 {LOCKS[workspaces[0]]} 不同",
+                      f"几个工作区锁到同一版（在不同的那个工作区里 cargo update -p <包> --precise <版本>，或拷 {LOCKS[workspaces[0]]} 过去再 cargo generate-lockfile --offline），预编库才只要一份")
     flags = cpu_flags()
     lacking = [name for name, flag in CPU_FEATURES if flag not in flags]
     if lacking:
@@ -550,11 +571,11 @@ def command_check(root):
     except Refusal as refusal:
         say_red(f"键算不出：{refusal}", refusal.howto)
         return 1
-    item("两个工作区的 rocksdb 依赖与锁对得上、这台 CPU 有预编库用的指令集", None, "")
+    item(f"{len(MANIFESTS)} 个工作区的 rocksdb 依赖与锁对得上、这台 CPU 有预编库用的指令集", None, "")
     expected = expected_values(fields)
     if not broken("missing-store-passes"):
         item("预编库在、对得上", store_problem(fields, verify_contents=True),
-             f"bash scripts/hosts/capped.sh <N> python3 {SCRIPT_RELATIVE} build（版本、rustc 或编译器换过就是换了键，要编一次新的）")
+             f"task-server/task submit -- python3 {SCRIPT_RELATIVE} build（版本、rustc 或编译器换过就是换了键，要编一次新的）")
     path = environment_file()
     problem = f"{path} 不在" if not os.path.isfile(path) else "；".join(compare(parse_assignments(open(path, encoding="utf-8").read()), expected)) or None
     item(f"{path} 的取值", problem, f"python3 {SCRIPT_RELATIVE} install")
@@ -672,7 +693,7 @@ def command_entry(root, cargo):
             checked += 1
             problem = store_problem(fields)
             if problem:
-                problems.append((f"这台的预编库不能用：{problem}", f"bash scripts/hosts/capped.sh <N> python3 {SCRIPT_RELATIVE} install（版本、rustc 或编译器换过就是换了键，要编一次新的）"))
+                problems.append((f"这台的预编库不能用：{problem}", f"task-server/task submit -- python3 {SCRIPT_RELATIVE} install（版本、rustc 或编译器换过就是换了键，要编一次新的）"))
             elif not broken("entry-environment-unchecked"):
                 checked += 1
                 mismatched = compare(values, expected_values(fields))
@@ -856,8 +877,9 @@ class Selftest:
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(f"#!{sys.executable}\n{FAKE_TOOL}")
             os.chmod(path, 0o755)
-        for relative, text in (("Cargo.lock", SELFTEST_LOCK), ("scripts/experiment-apparatus/Cargo.lock", SELFTEST_LOCK),
-                               ("crates/singlefs-checker-tier/Cargo.toml", "[package]\nname = \"x\"\n[dependencies]\nrocksdb = { version = \"=0.25.0\", optional = true }\n"),
+        for relative, text in (("Cargo.lock", SELFTEST_LOCK), ("scripts/experiment-apparatus/Cargo.lock", SELFTEST_LOCK), ("prune-server/Cargo.lock", SELFTEST_LOCK),
+                               ("prune-server/Cargo.toml", "[package]\nname = \"z\"\n[dependencies]\nrocksdb = { version = \"=0.25.0\" }\n"),
+                               ("crates/singlefs-verification/Cargo.toml", "[package]\nname = \"x\"\n[dependencies]\nrocksdb = { version = \"=0.25.0\", optional = true }\n"),
                                ("scripts/experiment-apparatus/Cargo.toml", "[package]\nname = \"y\"\n[dependencies.rocksdb]\nversion = \"=0.25.0\"\noptional = true\n"),
                                (".cargo/config.toml", "[env]\nBINDGEN_EXTRA_CLANG_ARGS = \"-I/nowhere\"\n"),
                                ("cpuinfo", "processor : 0\nflags : fpu sse2 sse4_1 sse4_2 pclmulqdq avx2\n")):
@@ -875,12 +897,15 @@ class Selftest:
                           "FAKE_CARGO_COUNT": os.path.join(scratch, "cargo-count"), "FAKE_SYSTEMCTL_STATE": os.path.join(scratch, "systemd-environment")})
 
     def run(self, arguments, **overrides):
+        return self.run_in(self.root, arguments, **overrides)
+
+    def run_in(self, root, arguments, **overrides):
         environment = dict(self.base)
         environment.update({name: value for name, value in overrides.items() if value is not None})
         for name, value in overrides.items():
             if value is None:
                 environment.pop(name, None)
-        completed = subprocess.run([sys.executable, os.path.realpath(__file__), *arguments, "--root", self.root],
+        completed = subprocess.run([sys.executable, os.path.realpath(__file__), *arguments, "--root", root],
                                    capture_output=True, text=True, env=environment, stdin=subprocess.DEVNULL)
         return completed.returncode, completed.stdout + completed.stderr
 
@@ -934,6 +959,26 @@ def run_selftest():
         drifted_key = next((line for line in subprocess.run([sys.executable, os.path.realpath(__file__), "key", "--root", drifted], capture_output=True,
                                                             text=True, env={**selftest.base, **child}).stdout.splitlines() if line.startswith("key=")), "")
         selftest.check("换了 librocksdb-sys 版本键就变", drifted_key.startswith("key=") and drifted_key != base_key, f"{base_key} / {drifted_key}")
+        code, output = selftest.run(["key"], **child)
+        workspaces_line = next((line for line in output.splitlines() if line.startswith("workspaces=")), "")
+        selftest.check("key 报折进键的工作区，三个都在、含 prune-server", code == 0 and "prune-server" in workspaces_line.split("=", 1)[-1].split(",")
+                       and len(workspaces_line.split("=", 1)[-1].split(",")) == len(MANIFESTS), output)
+        dependency_drift = os.path.join(scratch, "dependency-drift")
+        shutil.copytree(selftest.root, dependency_drift)
+        with open(os.path.join(dependency_drift, "prune-server", "Cargo.toml"), "w", encoding="utf-8") as handle:
+            handle.write("[package]\nname = \"z\"\n[dependencies]\nrocksdb = { version = \"=0.25.0\", default-features = false, features = [\"lz4\"] }\n")
+        code, output = selftest.run_in(dependency_drift, ["key"], **child)
+        selftest.check("prune-server 的 rocksdb 依赖写法与另两个不同，键算不出、点名 prune-server/Cargo.toml", code == 1 and "prune-server/Cargo.toml" in output and "key=" not in output, output)
+        lock_drift = os.path.join(scratch, "lock-drift")
+        shutil.copytree(selftest.root, lock_drift)
+        prune_lock = os.path.join(lock_drift, "prune-server", "Cargo.lock")
+        with open(prune_lock, encoding="utf-8") as handle:
+            lock_text = handle.read()
+        with open(prune_lock, "w", encoding="utf-8") as handle:
+            handle.write(lock_text.replace('version = "0.19.0+11.8.1"', 'version = "0.20.0+11.9.0"'))
+        code, output = selftest.run_in(lock_drift, ["key"], **child)
+        selftest.check("prune-server 的 Cargo.lock 里 librocksdb-sys 的版本与另两个不同，键算不出、点名 prune-server/Cargo.lock",
+                       code == 1 and "prune-server/Cargo.lock" in output and "librocksdb-sys" in output and "key=" not in output, output)
         selftest.check("换了 rustc 键就变", selftest.key_line(FAKE_RUSTC_TEXT="rustc 9.9.10 (selftest)", **child) != base_key, base_key)
         with open(os.path.join(scratch, "no-sse42"), "w", encoding="utf-8") as handle:
             handle.write("flags : fpu sse2\n")
@@ -1016,8 +1061,8 @@ def run_selftest():
         code, output = selftest.run(["entry", "--cargo", os.path.join(selftest.fake, "cargo")], **child, **bare)
         selftest.check("entry：--cargo 点名的假 cargo 不带标记照判", code == 1 and "此刻进程环境里没有" in output, output)
         plain = os.path.join(scratch, "plain-tree")
-        os.makedirs(os.path.join(plain, "crates", "singlefs-checker-tier"))
-        with open(os.path.join(plain, "crates", "singlefs-checker-tier", "Cargo.toml"), "w", encoding="utf-8") as handle:
+        os.makedirs(os.path.join(plain, "crates", "singlefs-verification"))
+        with open(os.path.join(plain, "crates", "singlefs-verification", "Cargo.toml"), "w", encoding="utf-8") as handle:
             handle.write('[package]\nname = "x"\n[dependencies]\nserde = "1"\n')
         completed = subprocess.run([sys.executable, os.path.realpath(__file__), "entry", "--root", plain], capture_output=True, text=True,
                                    env={**selftest.base, **child}, stdin=subprocess.DEVNULL)
@@ -1025,9 +1070,18 @@ def run_selftest():
         crates_only = os.path.join(scratch, "crates-only-copy")
         shutil.copytree(selftest.root, crates_only)
         shutil.rmtree(os.path.join(crates_only, "scripts"))
+        shutil.rmtree(os.path.join(crates_only, "prune-server"))
         completed = subprocess.run([sys.executable, os.path.realpath(__file__), "entry", "--root", crates_only], capture_output=True, text=True,
                                    env={**selftest.base, **child, **exports}, stdin=subprocess.DEVNULL)
-        selftest.check("entry：只拷了 crates/ 的仓副本照判、键与两个工作区都在时相同", completed.returncode == 0 and "查了 4 项" in completed.stdout,
+        selftest.check("entry：只拷了 crates/ 的仓副本照判、键与三个工作区都在时相同", completed.returncode == 0 and "查了 4 项" in completed.stdout,
+                       completed.stdout + completed.stderr)
+        prune_only = os.path.join(scratch, "prune-server-only-copy")
+        shutil.copytree(selftest.root, prune_only)
+        shutil.rmtree(os.path.join(prune_only, "scripts"))
+        shutil.rmtree(os.path.join(prune_only, "crates"))
+        completed = subprocess.run([sys.executable, os.path.realpath(__file__), "entry", "--root", prune_only], capture_output=True, text=True,
+                                   env={**selftest.base, **child, **exports}, stdin=subprocess.DEVNULL)
+        selftest.check("entry：只有 prune-server 的树照判、键与三个工作区都在时相同", completed.returncode == 0 and "查了 4 项" in completed.stdout,
                        completed.stdout + completed.stderr)
 
         target = os.path.join(scratch, "target")
@@ -1110,6 +1164,7 @@ def main(argv):
         if command == "key":
             fields = key_fields(root)
             print(json.dumps(fields, ensure_ascii=False, indent=1, sort_keys=True))
+            print(f"workspaces={','.join(os.path.dirname(relative) for relative in MANIFESTS)}")   # 折进键的工作区：key_fields 比过它们的 rocksdb 依赖与锁，对得上才有键
             print(f"key={key_digest(fields)}")
             print(f"directory={key_directory(fields)}")
             return 0
@@ -1117,7 +1172,7 @@ def main(argv):
             fields = key_fields(root)
             problem = store_problem(fields)
             if problem:
-                say_red(f"预编库不能用：{problem}", f"bash scripts/hosts/capped.sh <N> python3 {SCRIPT_RELATIVE} build", stream=sys.stderr)
+                say_red(f"预编库不能用：{problem}", f"task-server/task submit -- python3 {SCRIPT_RELATIVE} build", stream=sys.stderr)
                 return 1
             print("".join(f"export {name}={shlex.quote(value)}\n" for name, value in link_values(fields).items()), end="")
             return 0

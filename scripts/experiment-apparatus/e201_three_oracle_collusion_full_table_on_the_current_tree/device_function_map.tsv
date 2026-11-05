@@ -1,0 +1,65 @@
+# E201（三oracle合谋今树整表） 读法 8 归因 G5 的对应表：判定格（产物, 行种, 字段）→ 入库装置 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs 里算它的函数。
+# 写于 2026-11-03，今天任何产物之前（只读了装置源码与 P1–P3 的字段名）；sha256 记在跑前登记第十二节修订 2，之后不改（attribution.py 开跑时核）。
+# 两种行：
+#   group<TAB><组名><TAB><函数名,…>        一组函数（按函数名的最后一段认：装置里同名的几个一并比）
+#   cell<TAB><产物><TAB><行种><TAB><字段><TAB><组名或函数名,…>   字段写 * 的是这一种里没单列的判定字段；写 - 的是装置不碰这一格（定位、补位、改坏出自逐行驱动），G5 不适用
+# 比法：对应到的每个函数名，r1 那一版装置（读法 8 G5：f8a9ddaab 删第 3478–3484 行）与今天那一版里同名 fn 单元的指纹多重集不同，G5 中。
+group	export	write_stream_files,export_prepared_stream,sample_ordinals,prepare_stream
+group	touch	write_stream_files,calls_file_text,call_outcomes_file_text,oracle_verdicts_file_text,observation_of_a_judged_state,observe_sampled_states,sample_ordinals,prepare_stream,crash_columns_and_consulted_recovery,consulted_recovery_recording_the_reads
+group	panic	outcome_text,observation_of_a_panicking_state,judge_runs_continuing_past_panicking_states,ending_of_the_driver
+group	comparison	judge,was_judged_by_the_comparison,outcome_word,call_outcomes_file_text,stop_the_model_at,note_that_the_model_cannot_take_the_observation
+group	crash_judge	crash_judge_of_the_state,crash_judge_verdict,crash_judge_is_applicable,oracle_verdicts_file_text,observation_of_a_judged_state
+group	reference_filesystem	reference_filesystem_vote_of_a_state,reference_filesystem_crash_moment,reference_filesystem_stream_of,reference_filesystem_events_of_a_call,oracle_verdicts_file_text
+group	pool_checker	pool_checker_red_names_of_a_sampled_state_through_the_given_states_engine,oracle_verdicts_file_text,observe_sampled_states
+group	return_values	call_return_values_file_text,record_memory_objects,memory_objects_text,memory_objects_digest,record_the_memory_objects_after_the_last_call,replace_the_recorded_return_value_of_the_last_call
+cell	P1	row	<present>	-
+cell	P1	row	status	-
+cell	P1	row	ran	export
+cell	P1	row	write_stream_differs	touch
+cell	P1	row	call_outcomes_differ	touch,comparison
+cell	P1	row	recovery_report_differs_batch_1	touch
+cell	P1	row	recovery_report_differs_batch_2	touch
+cell	P1	row	ignored_pass_differs_batch_1	touch
+cell	P1	row	ignored_pass_differs_batch_2	touch
+cell	P1	row	call_panic	panic
+cell	P1	row	panicked_before_the_first_call	panic
+cell	P1	row	*	touch,panic
+cell	P1	substitution	*	-
+cell	P1	not_located_row	*	-
+cell	P1	untouched_row_red	O1-对拍	comparison
+cell	P1	untouched_row_red	O1-模型崩溃判官	crash_judge
+cell	P1	untouched_row_red	O1-RefFS	reference_filesystem
+cell	P1	untouched_row_red	O2	pool_checker
+cell	P1	untouched_row_red	<present>	touch,comparison,crash_judge,reference_filesystem,pool_checker
+cell	P1	q2_set_row	*	touch,comparison,return_values
+cell	P1	q2_set_call	*	comparison,return_values
+cell	P1	q2_named_row	*	touch,comparison,return_values
+cell	P1	q2_named_row_call	*	comparison,return_values
+cell	P1	q2	*	touch,comparison,return_values
+cell	P1	q3_denominator_class	*	touch,panic
+cell	P1	q3_self_crash_row	*	touch,panic
+cell	P1	q3_row_125	*	touch,panic
+cell	P1	verdict	q2	touch,comparison,return_values
+cell	P1	verdict	q2_o1_red_rows	touch,comparison,return_values
+cell	P1	verdict	row_125_counted_registration_batch_1	touch,panic
+cell	P1	verdict	rows_not_located	-
+cell	P1	verdict	untouched_rows_with_a_red_column	touch,comparison,crash_judge,reference_filesystem,pool_checker
+cell	P2	row	*	-
+cell	P3	q1	invalid_rows	export,touch
+cell	P3	q1	*	export,touch,comparison,crash_judge,reference_filesystem,pool_checker
+cell	P3	q1_row	<present>	export,touch
+cell	P3	q1_row	o1_comparison_red_calls	comparison
+cell	P3	q1_row	O1-模型崩溃判官_red	crash_judge
+cell	P3	q1_row	O1-RefFS_red	reference_filesystem
+cell	P3	q1_row	O2_red	pool_checker
+cell	P3	q1_row	O3甲_red	export
+cell	P3	q1_row	O3乙_red	export
+cell	P3	q2_named_row	ran	-
+cell	P3	q2_named_row	status	-
+cell	P3	q2_named_row	*	touch,comparison,return_values
+cell	P3	q2_named_row_call	*	comparison,return_values
+cell	P3	q3	ran	-
+cell	P3	q3	status	-
+cell	P3	q3	*	touch,panic
+cell	P3	verdict	q1	export,touch,comparison,crash_judge,reference_filesystem,pool_checker
+cell	P3	verdict	q3	touch,panic

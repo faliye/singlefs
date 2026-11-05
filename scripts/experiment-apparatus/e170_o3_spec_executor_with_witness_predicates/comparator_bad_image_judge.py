@@ -10,9 +10,12 @@
 判的期间不打开 `bad-expected.tsv`：P、N、盲测各行与已知坏镜像判完之后，才读它的第 4 列（底态名）给没打补丁的底态取落地向量（同 E171 那一份）；
 行名留给比对器在判完之后读。
 
-跑法（经 capped.sh 与 run-with-memory-cap.sh）：
+跑法（整条命令交 `task-server/task submit --`）：
   python3 comparator_bad_image_judge.py --executor-directory <v1 或 v2 目录> --input-label I3|I4 --dumps <含 bad-*.tsv 的导出目录>
-      [--known-bad-dir <known-bad-images 的输出>] --freeze-reference <带那一版冻结行的产物> --output <新文件>
+      (--known-bad-dir <known-bad-images 的输出> | --known-bad-not-applicable) --freeze-reference <带那一版冻结行的产物> --output <新文件>
+--known-bad-dir 与 --known-bad-not-applicable 二选一（两个都给退 2）：这个输入没有已知坏镜像这份东西（I3）就给 --known-bad-not-applicable，
+已知坏镜像那一节不读不判，结果行写 `known_bad=not_applicable`，其余各节照跑、退 0。两个都不给，已知坏镜像那一节没有输入：结果行写
+`name=not_run section=known_bad_images …`、往标准错误打一行 NOT_RUN_INPUT_NOT_GIVEN，别的节都不跑，整趟退 77（本次未跑，不是通过）。
 文件名以 comparator 起头，不进 v2 冻结的 sha256。
 """
 
@@ -155,15 +158,59 @@ def base_items(stream_directory: str, read_tab_separated_rows) -> list[tuple[str
     return items
 
 
+NOT_RUN_MARKER = "NOT_RUN_INPUT_NOT_GIVEN"
+NOT_RUN_EXIT_CODE = 77
+KNOWN_BAD_NOT_APPLICABLE = "not_applicable"
+
+
+def sections_without_input(arguments: argparse.Namespace) -> list[tuple[str, str]]:
+    """(节名, 选项名)：这一趟要读而没给的选填输入对应的节。"""
+    return [("known_bad_images", "--known-bad-dir")] if not (arguments.known_bad_dir or arguments.known_bad_not_applicable) else []
+
+
+def known_bad_config_text(arguments: argparse.Namespace) -> str:
+    """config 行里已知坏镜像那一项：给了目录写目录，给了 --known-bad-not-applicable 写 known_bad=not_applicable。"""
+    return f"known_bad={KNOWN_BAD_NOT_APPLICABLE}" if arguments.known_bad_not_applicable else f"known_bad_dir={arguments.known_bad_dir}"
+
+
+def judge_known_bad_images(arguments: argparse.Namespace, modules, context, crash_dump, emit) -> int | str:
+    """已知坏镜像那一节：给了目录就判、交回判了几张；给了 --known-bad-not-applicable 不读不判，交回 not_applicable。"""
+    if arguments.known_bad_not_applicable:
+        return KNOWN_BAD_NOT_APPLICABLE
+    count = 0
+    items = read_image_items(arguments.known_bad_dir, "known-bad-states.tsv", "known-bad-patches.bin", crash_dump.read_tab_separated_rows)
+    for result in judge_images(modules, context, items):
+        emit(image_line(modules, arguments.input_label, "known_bad", "-", STREAM_NAMES[0], result))
+        count += 1
+    return count
+
+
+def report_sections_not_run(arguments: argparse.Namespace, missing: list[tuple[str, str]]) -> int:
+    """没给输入的节在结果行里写本次未跑、往标准错误打记号行，别的节不跑，退 77。"""
+    lines = [f"name=config input={arguments.input_label} not_run=true"]
+    for section, option in missing:
+        lines.append(f"name=not_run section={section} input={option} reason=input_not_given")
+        print(f"{NOT_RUN_MARKER} test=comparator_bad_image_judge.py reason={option} 没给，{section} 这一节本次未跑", file=sys.stderr)
+    lines.append(f"name=done emitted={len(lines) + 1}")
+    with open(arguments.output, "x", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+    return NOT_RUN_EXIT_CODE
+
+
 def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser(description="E170 第 2 次重跑第二段：坏状态与坏镜像的判法（v1、v2 各一遍）")
     parser.add_argument("--executor-directory", required=True)
     parser.add_argument("--input-label", required=True)
     parser.add_argument("--dumps", required=True)
-    parser.add_argument("--known-bad-dir")
+    known_bad = parser.add_mutually_exclusive_group()
+    known_bad.add_argument("--known-bad-dir", help="已知坏镜像的输出；和 --known-bad-not-applicable 都不给这一趟本次未跑、退 77")
+    known_bad.add_argument("--known-bad-not-applicable", action="store_true", help="这个输入没有已知坏镜像这份东西：那一节不判，结果行写 known_bad=not_applicable")
     parser.add_argument("--freeze-reference", required=True)
     parser.add_argument("--output", required=True)
     arguments = parser.parse_args(argument_list)
+    missing = sections_without_input(arguments)
+    if missing:
+        return report_sections_not_run(arguments, missing)
     modules = import_executor(arguments.executor_directory)
     executor_core, crash_dump, executor_main, _ = modules
     output = open(arguments.output, "x", encoding="utf-8")
@@ -177,7 +224,7 @@ def main(argument_list: list[str]) -> int:
     frozen = frozen_lines_of(arguments.freeze_reference)
     before = freeze_lines_now(executor_main)
     emit(f"name=config input={arguments.input_label} executor={os.path.basename(os.path.abspath(arguments.executor_directory))} "
-         f"dumps={arguments.dumps} known_bad_dir={arguments.known_bad_dir or '-'} freeze_reference={os.path.basename(arguments.freeze_reference)}")
+         f"dumps={arguments.dumps} {known_bad_config_text(arguments)} freeze_reference={os.path.basename(arguments.freeze_reference)}")
     emit(f"name=freeze_check when=start identical={str(before == frozen and len(frozen) > 0).lower()} files_now={len(before) - 1} reference_lines={len(frozen)}")
     contexts = {}
     for stream in STREAM_NAMES:
@@ -194,11 +241,7 @@ def main(argument_list: list[str]) -> int:
         for result in judge_images(modules, contexts[stream], items):
             emit(image_line(modules, arguments.input_label, "e170", "-", stream, result))
             counts["e170"] += 1
-    if arguments.known_bad_dir:
-        items = read_image_items(arguments.known_bad_dir, "known-bad-states.tsv", "known-bad-patches.bin", crash_dump.read_tab_separated_rows)
-        for result in judge_images(modules, contexts[STREAM_NAMES[0]], items):
-            emit(image_line(modules, arguments.input_label, "known_bad", "-", STREAM_NAMES[0], result))
-            counts["known_bad"] += 1
+    counts["known_bad"] = judge_known_bad_images(arguments, modules, contexts[STREAM_NAMES[0]], crash_dump, emit)
     for stream in STREAM_NAMES:
         for label, item in base_items(os.path.join(arguments.dumps, stream), crash_dump.read_tab_separated_rows):
             for result in judge_images(modules, contexts[stream], [item]):

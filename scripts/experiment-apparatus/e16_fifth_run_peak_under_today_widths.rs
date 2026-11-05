@@ -21,7 +21,7 @@
 //! ## 今天的宽度：三个常量，一处定义，回比 `crates/singlefs-format/src/lib.rs`
 //!
 //! 这不是入库装置，不受「入库装置不许引 `crates/` 常量」那条约束（那条只管
-//! `crates/singlefs-checker-tier/src/bin/`）；但跑前登记仍把这几个数登记成本地常量、
+//! `crates/singlefs-verification/src/bin/`）；但跑前登记仍把这几个数登记成本地常量、
 //! 靠停机条款 S1（第十三节命令二）人工核对，不在编译期 `use crates::…`——独立手写模型的意义
 //! 就在「不共用代码」，共用了常量定义就不独立了。
 //!
@@ -41,17 +41,17 @@ use std::collections::HashSet;
 const DATA_UNIT_BYTES: u64 = 32768;
 /// 数据单元头部字节数，载荷从这个偏移量开始。lib.rs:38 `DATA_UNIT_PAYLOAD_OFFSET`。
 const DATA_UNIT_PAYLOAD_OFFSET: u64 = 134;
-/// extent 树内部扇出。lib.rs:153 `EXTENT_TREE_INTERNAL_FANOUT`。M2 的锚点。
+/// extent 树内部扇出。lib.rs:176 `EXTENT_TREE_INTERNAL_FANOUT`。M2 的锚点。
 const EXTENT_TREE_INTERNAL_FANOUT: u64 = 147;
-/// extent 树下段叶罩的数据单元数。lib.rs:156 `EXTENT_TREE_LOWER_LEAF_DATA_UNITS`。M1 的锚点。
+/// extent 树下段叶罩的数据单元数。lib.rs:179 `EXTENT_TREE_LOWER_LEAF_DATA_UNITS`。M1 的锚点。
 const EXTENT_TREE_LOWER_LEAF_DATA_UNITS: u64 = 144;
-/// journal 一条记录的定长字节数。lib.rs:191 `JOURNAL_RECORD_BYTES`。
+/// journal 一条记录的定长字节数。lib.rs:241 `JOURNAL_RECORD_BYTES`。
 const JOURNAL_RECORD_BYTES: u64 = 4096;
-/// journal 记录头部字节数。lib.rs:223 `JOURNAL_HEADER_BYTES`。
-const JOURNAL_HEADER_BYTES: u64 = 487;
-/// journal 一个点名项的字节数。lib.rs:203 `JOURNAL_NAMED_ENTRY_BYTES`。
+/// journal 记录头部字节数。lib.rs:252 `JOURNAL_HEADER_BYTES`。
+const JOURNAL_HEADER_BYTES: u64 = 496;
+/// journal 一个点名项的字节数。lib.rs:255 `JOURNAL_NAMED_ENTRY_BYTES`。
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
-/// 一条记录最多装的点名项数 = (4096 − 487) ÷ 56 = 64。lib.rs:229
+/// 一条记录最多装的点名项数 = (4096 − 496) ÷ 56 = 64。lib.rs:258
 /// `JOURNAL_NAMED_ENTRIES_PER_RECORD`。两条记录宽变异的锚点：换成 72 是原装置的记录宽，换成 67 是上一代（头 311）的记录宽。
 const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 64;
 
@@ -75,7 +75,7 @@ const LEGACY_RECORD_HEADER_BYTES: u64 = 48;
 
 // ── 两条臂共用的块数常量：甲的记录与根槽恒为 1 块，两种记录宽下都成立 ────────────────
 
-/// 甲每次 fsync 写的那条游标记录的块数：今天 487 字节头、原装置 48 字节头，都 ≤ 一个块。
+/// 甲每次 fsync 写的那条游标记录的块数：今天 496 字节头、原装置 48 字节头，都 ≤ 一个块。
 /// M5 的锚点：换成 0 就是「游标记录不计块」。
 const INTENT_RECORD_BLOCKS: u64 = 1;
 /// 甲每次 fsync 覆写的根槽块数（D22：发根 = 覆写一个槽，不是追加）。
@@ -899,18 +899,47 @@ fn assert_registered_constants_are_internally_consistent() {
     assert_eq!(RECORD_WIDTH_KNOB_MAXIMUM_GEOMETRY.fanout, ONE_TEBIBYTE_FILE_GEOMETRY.fanout);
 }
 
-fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("仓根在 scripts/experiments 往上两层")
+/// 这份源文件在编译时的绝对路径。点名清单目录里的一份文件再往上取仓根，不写「清单目录往上两级」：
+/// 函数单元键（`scripts/gate/lib_function_units.py`）把清单目录拼出的目录当运行期路径拒算，
+/// 准入的实验键就算不出、产物头只能记 `sha256=refused`；点名一份文件时那份文件的字节进键（照 `lib.rs` 的准入入口）。
+fn this_apparatus_source_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("e16_fifth_run_peak_under_today_widths.rs")
+}
+
+/// 仓根下 preflight 判法脚本的相对路径：往上三层取到的目录下有这份文件，才认那是仓根。
+const PREFLIGHT_SCRIPT_UNDER_REPOSITORY_ROOT: &str = ".claude/singlefs-ai-sop/scripts/preflight.py";
+
+/// 仓根：这份源文件在 `<仓根>/scripts/experiment-apparatus/` 下，往上三层（文件、装置目录、scripts）。
+/// 只做路径算术，不看盘上有什么；那个目录是不是真仓由 `repository_root_with_preflight_script_above` 判。
+fn repository_root_above(apparatus_source_path: &std::path::Path) -> std::path::PathBuf {
+    apparatus_source_path
+        .ancestors()
+        .nth(3)
+        .expect("装置源文件在 <仓根>/scripts/experiment-apparatus/ 下")
+        .to_path_buf()
+}
+
+/// 往上三层的那个目录下有 preflight 判法脚本才交回它；没有就交回拒算说明，由 `preflight` 拒算。
+/// 拿不到真仓的地方有一处是常态：`scripts/mutation/mutate.sh` 的副本只拷了装置目录（`<分片根>/copy-<号>/scripts/experiment-apparatus/`），
+/// 往上三层是副本根，下面没有 `.claude/singlefs-ai-sop/`；那里只跑单测，不起装置本身。
+fn repository_root_with_preflight_script_above(apparatus_source_path: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    let root = repository_root_above(apparatus_source_path);
+    if root.join(PREFLIGHT_SCRIPT_UNDER_REPOSITORY_ROOT).is_file() {
+        Ok(root)
+    } else {
+        Err(format!("{} 不是仓根（下面没有 {PREFLIGHT_SCRIPT_UNDER_REPOSITORY_ROOT}），判不了 preflight 与准入", root.display()))
+    }
 }
 
 fn preflight() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let root = repository_root();
-    let source = root.join("scripts/experiments/e16_fifth_run_peak_under_today_widths.rs");
-    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let source = this_apparatus_source_path();
+    let root = repository_root_with_preflight_script_above(&source).unwrap_or_else(|refusal| {
+        eprintln!("  ✗ {refusal}");
+        eprintln!("  → 怎么办：在仓里的 scripts/experiment-apparatus/ 下编这个装置再起（仓根取编译时这份源文件往上三层）；只拷了装置目录的副本里只跑单测");
+        std::process::exit(78)
+    });
+    let script = root.join(PREFLIGHT_SCRIPT_UNDER_REPOSITORY_ROOT);
     let mut command = std::process::Command::new("python3");
     command.arg(&script).arg("check").arg(&source);
     if arguments.iter().any(|argument| argument == "--force") {
@@ -930,19 +959,112 @@ fn preflight() {
     }
 }
 
+/// 装置的三种跑法，各对应 `scripts/experiment-apparatus/replay.sh` 复跑表的一行。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RunMode {
+    /// `grid`：第一段全网格（G1、G2、G4）。
+    FirstSegmentGrid,
+    /// `pc3`：原装置几何上的原 56 格，对拍原装置（阳性对照 PC3）。
+    OriginalGeometryPositiveControl,
+    /// `second_segment`：第二段三个旋钮分组。
+    SecondSegmentKnobs,
+}
+
+impl RunMode {
+    const ALL: [RunMode; 3] = [RunMode::FirstSegmentGrid, RunMode::OriginalGeometryPositiveControl, RunMode::SecondSegmentKnobs];
+
+    /// 命令行的第一个参数认成跑法：按复跑表的参数列认；
+    /// 认不出的（连同空串）原样交回，由 main 报错退 2。
+    fn from_argument(argument_text: &str) -> Result<RunMode, String> {
+        RunMode::ALL
+            .into_iter()
+            .find(|run_mode| !argument_text.is_empty() && run_mode.replay_row_argument() == argument_text)
+            .ok_or_else(|| argument_text.to_string())
+    }
+
+    /// 命令行的第一个参数选哪几种跑法：不带参数是三种全跑；写跑法名是指定范围。
+    fn selected_by_argument(argument: Option<&str>) -> Result<Vec<RunMode>, String> {
+        match argument {
+            None => Ok(RunMode::ALL.to_vec()),
+            Some(argument_text) => RunMode::from_argument(argument_text).map(|run_mode| vec![run_mode]),
+        }
+    }
+
+    /// 复跑表这一行的参数列（第三列），与 `from_argument` 互逆。
+    fn replay_row_argument(self) -> &'static str {
+        match self {
+            RunMode::FirstSegmentGrid => "grid",
+            RunMode::OriginalGeometryPositiveControl => "pc3",
+            RunMode::SecondSegmentKnobs => "second_segment",
+        }
+    }
+
+    /// 准入键：`.claude/gate.d/stage-inputs.tsv` 的 E16R5、E16R5/pc3、E16R5/second-segment 三行，
+    /// 与 `scripts/experiment-apparatus/replay.sh` 的 ADMISSION_ROW_KEYS 逐字相同（键的方式部分只许小写字母、数字与连字符）。
+    fn admission_key(self) -> &'static str {
+        match self {
+            RunMode::FirstSegmentGrid => "E16R5",
+            RunMode::OriginalGeometryPositiveControl => "E16R5/pc3",
+            RunMode::SecondSegmentKnobs => "E16R5/second-segment",
+        }
+    }
+}
+
+/// 不带参数的全跑：三种跑法依次各起一个本程序的子进程（各自准入、各自打自己的产物和收尾行，产物依次接在一起）。
+/// 子进程红了就停、退它的码；三个都因输入没变本次未跑退 77，有跑的退 0。
+fn run_every_mode_in_child_processes(run_modes: &[RunMode]) -> i32 {
+    let this_program = std::env::current_exe().unwrap_or_else(|error| {
+        eprintln!("  ✗ 取不到本程序自己的路径：{error}");
+        eprintln!("  → 怎么办：改写 grid、pc3、second_segment 之一，一种一种跑");
+        std::process::exit(78)
+    });
+    let mut ran_any_mode = false;
+    for run_mode in run_modes {
+        let status = std::process::Command::new(&this_program)
+            .arg(run_mode.replay_row_argument())
+            .status()
+            .unwrap_or_else(|error| {
+                eprintln!("  ✗ 起不了子进程 {} {}：{error}", this_program.display(), run_mode.replay_row_argument());
+                std::process::exit(78)
+            });
+        match status.code() {
+            Some(0) => ran_any_mode = true,
+            Some(e7_index_bench::NOT_RUN_EXIT_CODE) => {
+                eprintln!("  跑法 {} 输入没变，本次未跑（准入 {}）", run_mode.replay_row_argument(), run_mode.admission_key());
+            }
+            other => {
+                eprintln!("  ✗ 跑法 {} 退 {other:?}，后面的跑法不起", run_mode.replay_row_argument());
+                return other.unwrap_or(1);
+            }
+        }
+    }
+    if ran_any_mode { 0 } else { e7_index_bench::NOT_RUN_EXIT_CODE }
+}
+
 fn main() {
     preflight();
     assert_registered_constants_are_internally_consistent();
-    match std::env::args().nth(1).as_deref() {
-        Some("pc3") => run_pc3_mode(),
-        Some("second_segment") => run_second_segment_mode(),
-        Some(other) => {
+    let run_modes = match RunMode::selected_by_argument(std::env::args().nth(1).as_deref()) {
+        Ok(run_modes) => run_modes,
+        Err(unrecognized_argument) => {
             eprintln!(
-                "e16_fifth_run_peak_under_today_widths: 认不出的模式 {other}，只有「不带参数」（grid）、pc3、second_segment 三种"
+                "e16_fifth_run_peak_under_today_widths: 认不出的模式 {unrecognized_argument}，只有「不带参数」（三种全跑）、grid、pc3、second_segment"
             );
             std::process::exit(2);
         }
-        None => run_grid_mode(),
+    };
+    if run_modes.len() > 1 {
+        std::process::exit(run_every_mode_in_child_processes(&run_modes));
+    }
+    let run_mode = run_modes[0];
+    // 准入（判法在 `scripts/gate/admission.py`）：输入自上次产物以来没变就不重跑（退 77）；放行时输入指纹打在产物最前面。
+    for admission_header_line in e7_index_bench::admit_experiment_run_or_exit(run_mode.admission_key()) {
+        println!("{admission_header_line}");
+    }
+    match run_mode {
+        RunMode::FirstSegmentGrid => run_grid_mode(),
+        RunMode::OriginalGeometryPositiveControl => run_pc3_mode(),
+        RunMode::SecondSegmentKnobs => run_second_segment_mode(),
     }
 }
 
@@ -1062,7 +1184,7 @@ mod tests {
         assert_eq!(EXTENT_TREE_INTERNAL_FANOUT, 147);
         assert_eq!(EXTENT_TREE_LOWER_LEAF_DATA_UNITS, 144);
         assert_eq!(JOURNAL_RECORD_BYTES, 4096);
-        assert_eq!(JOURNAL_HEADER_BYTES, 487);
+        assert_eq!(JOURNAL_HEADER_BYTES, 496);
         assert_eq!(JOURNAL_NAMED_ENTRY_BYTES, 56);
         assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 64);
     }
@@ -1248,5 +1370,235 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ── 准入：三种跑法各一把键，与复跑表的准入行键逐字对上（C777） ──────────────
+
+    #[test]
+    fn run_mode_admission_keys_are_the_three_registered_keys() {
+        assert_eq!(RunMode::FirstSegmentGrid.admission_key(), "E16R5");
+        assert_eq!(RunMode::OriginalGeometryPositiveControl.admission_key(), "E16R5/pc3");
+        assert_eq!(RunMode::SecondSegmentKnobs.admission_key(), "E16R5/second-segment");
+    }
+
+    #[test]
+    fn run_mode_from_argument_round_trips_through_the_replay_row_argument_and_refuses_unknown_modes() {
+        for run_mode in RunMode::ALL {
+            let argument = run_mode.replay_row_argument();
+            assert_eq!(RunMode::from_argument(argument), Ok(run_mode), "复跑表参数「{argument}」要认回同一种跑法");
+            assert_eq!(RunMode::selected_by_argument(Some(argument)), Ok(vec![run_mode]));
+        }
+        assert_eq!(RunMode::from_argument("second-segment"), Err("second-segment".to_string()));
+        assert_eq!(RunMode::from_argument(""), Err(String::new()));
+        assert_eq!(RunMode::selected_by_argument(Some("")), Err(String::new()));
+    }
+
+    /// 不带参数三种跑法都选（第一段全网格、原几何阳性对照、第二段旋钮），写跑法名只选那一种。
+    #[test]
+    fn no_argument_selects_every_run_mode() {
+        assert_eq!(RunMode::selected_by_argument(None), Ok(RunMode::ALL.to_vec()));
+        assert_eq!(RunMode::ALL.len(), 3);
+    }
+
+    #[test]
+    fn every_run_mode_has_its_admission_row_key_line_in_the_replay_script() {
+        // 复跑表准入行键（replay.sh 的 ADMISSION_ROW_KEYS）：<准入键><制表符><实验号|二进制|参数><制表符>device。
+        // 装置传的键与那一行对不上时，admission.py 按别的键比产物，产物头记的键也就对不上复跑表。
+        let replay_script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("replay.sh");
+        let replay_script = std::fs::read_to_string(&replay_script_path).expect("replay.sh 与装置在同一目录");
+        for run_mode in RunMode::ALL {
+            let expected_line = format!(
+                "{}\tE16R5|e16-fifth-run-peak-under-today-widths|{}\tdevice",
+                run_mode.admission_key(),
+                run_mode.replay_row_argument()
+            );
+            assert_eq!(
+                replay_script.lines().filter(|line| *line == expected_line).count(),
+                1,
+                "replay.sh 里要恰好一行「{expected_line}」"
+            );
+        }
+    }
+
+    #[test]
+    fn repository_root_is_three_levels_above_the_apparatus_source() {
+        // 只钉路径算术：编在哪里（主工作区、mutate.sh 的副本）都成立；那个目录是不是真仓由下一条用例钉。
+        let source = this_apparatus_source_path();
+        let root = repository_root_above(&source);
+        assert_eq!(root.join("scripts").join("experiment-apparatus").join("e16_fifth_run_peak_under_today_widths.rs"), source);
+        assert_eq!(
+            repository_root_above(std::path::Path::new("/repository/scripts/experiment-apparatus/e16_fifth_run_peak_under_today_widths.rs")),
+            std::path::PathBuf::from("/repository")
+        );
+    }
+
+    #[test]
+    fn repository_root_is_refused_without_the_preflight_script_and_accepted_with_it() {
+        // 两个手搭的目录：副本根那样只有装置目录的，与仓根那样带 preflight 判法脚本的；目录名带进程号，同一台上并行的几趟单测不互踩。
+        let scratch_root = std::env::temp_dir().join(format!("e16-fifth-run-repository-root-check-{}", std::process::id()));
+        let copy_root_without_preflight_script = scratch_root.join("copy-root");
+        let repository_root_with_preflight_script = scratch_root.join("repository-root");
+        let apparatus_relative_path = std::path::Path::new("scripts/experiment-apparatus/e16_fifth_run_peak_under_today_widths.rs");
+        let preflight_script_path = repository_root_with_preflight_script.join(PREFLIGHT_SCRIPT_UNDER_REPOSITORY_ROOT);
+        std::fs::create_dir_all(copy_root_without_preflight_script.join("scripts/experiment-apparatus")).expect("临时目录可写");
+        std::fs::create_dir_all(preflight_script_path.parent().expect("preflight 判法脚本的相对路径带目录")).expect("临时目录可写");
+        std::fs::write(&preflight_script_path, b"").expect("临时目录可写");
+        let refusal = repository_root_with_preflight_script_above(&copy_root_without_preflight_script.join(apparatus_relative_path));
+        let acceptance = repository_root_with_preflight_script_above(&repository_root_with_preflight_script.join(apparatus_relative_path));
+        std::fs::remove_dir_all(&scratch_root).expect("删得掉自己建的临时目录");
+        let refusal_text = refusal.expect_err("副本根下没有 preflight 判法脚本，应当拒算");
+        assert!(refusal_text.contains("不是仓根"), "拒算说明要写「不是仓根」：{refusal_text}");
+        assert!(refusal_text.contains(&copy_root_without_preflight_script.display().to_string()), "拒算说明要点名那个目录：{refusal_text}");
+        assert_eq!(acceptance, Ok(repository_root_with_preflight_script));
+    }
+
+    // ── 汇总行的判法（跑前登记 e16-r7-prereg.md 第五节那张表 T1–T7）：手搭小网格，钉每一种汇总的翻面处 ──
+
+    /// 一个只当名字用的网格：几何取真实基线的常量，`rows` 是手搭的格。
+    fn synthetic_grid(rows: Vec<(u64, Vec<PeakCellResult>)>) -> GeometryGrid {
+        GeometryGrid { geometry: ONE_TEBIBYTE_FILE_GEOMETRY, rows }
+    }
+
+    fn two_dimensional_maximum_summary_text(grid: &GeometryGrid) -> String {
+        let mut emitter = Emitter::new();
+        let mut output = String::new();
+        emit_two_dimensional_maximum_summary(&mut emitter, &mut output, "synthetic", grid);
+        output
+    }
+
+    // harness-test-granularity:one-scenario 三张网格只差最大值落在哪，一起钉住同一个判法的三种结局（登记 T1 写成一条）。
+    #[test]
+    fn two_dimensional_maximum_summary_flags_axis_endpoints_and_interior() {
+        // 最大值在流数 2、批 2，批轴最大取值是 4：两轴都在内部。
+        let interior_grid = synthetic_grid(vec![
+            (2, vec![synthetic_cell(2, 1, 2.0), synthetic_cell(2, 2, 3.0), synthetic_cell(2, 4, 2.5)]),
+            (4, vec![synthetic_cell(4, 1, 2.0), synthetic_cell(4, 2, 2.2), synthetic_cell(4, 4, 2.4)]),
+        ]);
+        let interior_text = two_dimensional_maximum_summary_text(&interior_grid);
+        assert!(interior_text.contains("streams_interior=true batch_interior=true"), "{interior_text}");
+        // 最大值在批轴最大取值 4 上：批轴落在端点。
+        let batch_endpoint_grid = synthetic_grid(vec![
+            (2, vec![synthetic_cell(2, 1, 2.0), synthetic_cell(2, 2, 2.5), synthetic_cell(2, 4, 3.0)]),
+            (4, vec![synthetic_cell(4, 1, 2.0), synthetic_cell(4, 2, 2.2), synthetic_cell(4, 4, 2.4)]),
+        ]);
+        let batch_endpoint_text = two_dimensional_maximum_summary_text(&batch_endpoint_grid);
+        assert!(batch_endpoint_text.contains("streams_interior=true batch_interior=false"), "{batch_endpoint_text}");
+        // 最大值只在流数 256 那一行：流数轴落在端点。
+        let streams_endpoint_grid = synthetic_grid(vec![
+            (2, vec![synthetic_cell(2, 1, 2.0), synthetic_cell(2, 2, 2.5), synthetic_cell(2, 4, 2.0)]),
+            (256, vec![synthetic_cell(256, 1, 2.0), synthetic_cell(256, 2, 3.0), synthetic_cell(256, 4, 2.0)]),
+        ]);
+        let streams_endpoint_text = two_dimensional_maximum_summary_text(&streams_endpoint_grid);
+        assert!(streams_endpoint_text.contains("streams_interior=false batch_interior=true"), "{streams_endpoint_text}");
+    }
+
+    #[test]
+    fn relative_error_summary_positive_fraction_counts_only_strictly_positive_errors() {
+        // 流数 2 一行 4 格（批 1、2、5、10 都在原 56 格里），两种误差都取 0.1、0.0、−0.1、0.2：严格为正的 2 格。
+        let cells: Vec<PeakCellResult> = [(1u64, 0.1f64), (2, 0.0), (5, -0.1), (10, 0.2)]
+            .into_iter()
+            .map(|(batch, error)| {
+                let mut cell = synthetic_cell(2, batch, 2.0);
+                cell.error_model_denominator = error;
+                cell.error_predicted_denominator = error;
+                cell
+            })
+            .collect();
+        let grid = synthetic_grid(vec![(2, cells)]);
+        let mut emitter = Emitter::new();
+        let mut output = String::new();
+        emit_relative_error_summary(&mut emitter, &mut output, "synthetic", &grid);
+        let matching_positive_fraction_summary_lines =
+            output.lines().filter(|line| line.contains("name=q4_summary") && line.contains("positive_error_fraction=0.5000 cells=4")).count();
+        assert_eq!(matching_positive_fraction_summary_lines, 2, "两种分母的 q4_summary 都该是 0.5000 / 4 格：\n{output}");
+    }
+
+    #[test]
+    fn batch_beyond_streams_rules_report_rise_settle_and_dip_below_one() {
+        // 流数 2，批 1、2、3、4、32 上比值 3.0、3.5、3.0、3.2、0.9。
+        let dipping_cells = vec![
+            synthetic_cell(2, 1, 3.0),
+            synthetic_cell(2, 2, 3.5),
+            synthetic_cell(2, 3, 3.0),
+            synthetic_cell(2, 4, 3.2),
+            synthetic_cell(2, 32, 0.9),
+        ];
+        let dipping_row = classify_row(2, &dipping_cells);
+        assert!(!dipping_row.ratio_non_increasing_beyond_streams_holds, "批 3 → 4 涨了 6.7%，超过 1% 容差");
+        assert!(dipping_row.settles_near_one_beyond_sixteen_streams_holds);
+        assert_eq!(dipping_row.settle_beyond_sixteen_streams_batch, 32);
+        assert_eq!(dipping_row.row_minimum_batch, 32);
+        assert!(dipping_row.row_dips_below_one, "最小比 0.9 跌破 1");
+        // 同样的格只把批 32 的比值换成 1.0：等于 1 不算跌破。
+        let touching_cells = vec![
+            synthetic_cell(2, 1, 3.0),
+            synthetic_cell(2, 2, 3.5),
+            synthetic_cell(2, 3, 3.0),
+            synthetic_cell(2, 4, 3.2),
+            synthetic_cell(2, 32, 1.0),
+        ];
+        let touching_row = classify_row(2, &touching_cells);
+        assert_eq!(touching_row.row_minimum_batch, 32);
+        assert!(!touching_row.row_dips_below_one, "最小比恰好是 1.0，不算跌破 1");
+    }
+
+    #[test]
+    fn row_trajectory_counts_rising_falling_and_opposite_steps_around_the_peak() {
+        // 流数 2，批 1–6 上比值 3.0、3.2、3.5、3.3、3.4、3.0：峰值只在批 3。
+        let cells: Vec<PeakCellResult> =
+            [3.0f64, 3.2, 3.5, 3.3, 3.4, 3.0].into_iter().zip(1u64..).map(|(ratio, batch)| synthetic_cell(2, batch, ratio)).collect();
+        let row = classify_row(2, &cells);
+        assert_eq!((row.peak_batch_low, row.peak_batch_high), (3, 3), "峰值集合只有批 3");
+        assert_eq!(row.rising_steps_before_peak, 2, "批 1 → 2、2 → 3 两步上升");
+        assert_eq!(row.falling_steps_after_peak, 2, "批 3 → 4、5 → 6 两步下降");
+        assert_eq!(row.opposite_direction_steps, 1, "峰值之后批 4 → 5 反向上升一步");
+        assert_eq!(row.final_batch, 6);
+        assert_eq!(row.final_ratio, 3.0);
+        assert_eq!(cost_statistics(&[3, 5, 4]), (4.0, 3, 5));
+    }
+
+    #[test]
+    fn geometry_sensitivity_reports_unstable_only_where_two_points_classify_a_row_differently() {
+        // 甲行：峰值在批 = 流数（带内）；乙行：峰值在批 = 4 × 流数（带外）。批轴最大取值都是 8 × 流数，两种都不是端点。
+        let near_diagonal_row = |streams: u64| classify_row(streams, &[synthetic_cell(streams, streams, 3.0), synthetic_cell(streams, 8 * streams, 2.0)]);
+        let moved_diagonal_row = |streams: u64| {
+            classify_row(
+                streams,
+                &[synthetic_cell(streams, streams, 2.0), synthetic_cell(streams, 4 * streams, 3.0), synthetic_cell(streams, 8 * streams, 2.0)],
+            )
+        };
+        let all_near_diagonal_rows: Vec<RowSummary> = stream_axis().into_iter().map(near_diagonal_row).collect();
+        let moved_at_three_streams_rows: Vec<RowSummary> =
+            stream_axis().into_iter().map(|streams| if streams == 3 { moved_diagonal_row(streams) } else { near_diagonal_row(streams) }).collect();
+        assert!(all_near_diagonal_rows.iter().all(|row| row.classification == RowClassification::NearDiagonal));
+        assert_eq!(moved_at_three_streams_rows.iter().filter(|row| row.classification == RowClassification::MovedDiagonal).count(), 1);
+        let mut emitter = Emitter::new();
+        let mut output = String::new();
+        emit_geometry_sensitivity(
+            &mut emitter,
+            &mut output,
+            &[("all_near_diagonal", all_near_diagonal_rows.as_slice()), ("moved_at_three_streams", moved_at_three_streams_rows.as_slice())],
+        );
+        let sensitivity_lines: Vec<&str> = output.lines().filter(|line| line.contains("name=geometry_sensitivity")).collect();
+        assert_eq!(sensitivity_lines.len(), 21, "流数轴 21 个取值各一行：\n{output}");
+        let unstable_lines: Vec<&&str> = sensitivity_lines.iter().filter(|line| line.contains("stable=false")).collect();
+        assert_eq!(unstable_lines.len(), 1, "只有流数 3 一行两点不同判：\n{output}");
+        assert!(unstable_lines[0].contains("streams=3 stable=false"), "{}", unstable_lines[0]);
+        assert_eq!(sensitivity_lines.iter().filter(|line| line.contains("stable=true")).count(), 20);
+    }
+
+    #[test]
+    #[should_panic(expected = "空的代价序列")]
+    fn cost_statistics_refuses_an_empty_fsync_sequence() {
+        cost_statistics(&[]);
+    }
+
+    #[test]
+    fn original_geometry_batch_one_cell_matches_the_independent_anchor() {
+        // 跑前登记 e16-r7-prereg.md 第十三节命令三：原装置几何 r = 3、L = 4，流数 2、批 1 那一格甲 7、乙 2、比值 3.5。
+        let cell = compute_peak_cell(&ORIGINAL_DEVICE_GEOMETRY, 2, 1, RecordFormat::LegacyOriginal);
+        assert_eq!((cell.intent_minimum, cell.intent_maximum, cell.intent_average), (7, 7, 7.0));
+        assert_eq!((cell.write_ahead_log_leaf_minimum, cell.write_ahead_log_leaf_maximum, cell.write_ahead_log_leaf_average), (2, 2, 2.0));
+        assert_eq!(cell.ratio, 3.5);
     }
 }

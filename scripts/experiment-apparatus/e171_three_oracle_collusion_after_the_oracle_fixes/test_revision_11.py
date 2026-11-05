@@ -1,14 +1,17 @@
 """E171 第 1 次重跑·修订 11（按输入复用）的单测：研究一侧变异表 scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv
-（RV1–RV15，登记修订 11 第 11.8 节）经 mutation_driver.py --unit-test-module test_revision_11 跑。
+（RV1–RV15，登记修订 11 第 11.8 节）经 mutation_driver.py --unit-test-module test_revision_11 跑；库根两台同一那几条（第 2 次重跑登记修订 4）
+另由 scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_library_root.tsv 带它跑。
 每条用例一个场景、自己建自己删临时目录；调 reuse_library.py 与 segment_one_units_revision_11.py 自证的那几格（假树、假装置、假驱动行、假单元脚本，
 另有一格起真的修订 11 单元脚本取用一份造好的条目），不起装置、不编、不连别的台。"""
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import unittest
 
 import reuse_library as reuse
+import reuse_library_root as library_roots
 import segment_one_units_revision_11 as units_layer
 
 
@@ -98,6 +101,52 @@ class UnitsLayerTests(CellCase):
 
     def test_the_real_unit_script_fetches_an_entry_and_judges_it(self) -> None:
         self.run_cell(units_layer.cell_unit_script_fetch)
+
+
+class FurnishedWorldTests(unittest.TestCase):
+    """两份逐行编排自证补假仓（furnish_rows_world）：假仓里的冻结参照是指向真仓 research/results/ 下产物的链接时，链悬空（产物还没生成）也不往真仓写。"""
+
+    def test_a_dangling_reference_link_is_not_written_through(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="e171-r11-furnish-") as root:
+            repo, tree, real_results = os.path.join(root, "repo"), os.path.join(root, "repo", "tree"), os.path.join(root, "real", "research", "results")
+            target = os.path.join(real_results, os.path.basename(reuse.FREEZE_REFERENCE_RELATIVE))
+            link = os.path.join(repo, reuse.FREEZE_REFERENCE_RELATIVE)
+            os.makedirs(os.path.dirname(link))
+            os.makedirs(real_results)
+            os.symlink(target, link)
+            reuse.furnish_rows_world(repo, tree, (3,))
+            self.assertFalse(os.path.exists(target), "悬空的参照链被写穿了：真仓里多了一份假产物")
+            self.assertTrue(os.path.islink(link))
+
+
+class LibraryRootTests(unittest.TestCase):
+    """H30 的库根派到两台里哪一台都是同一个绝对路径（reuse_library_root.py，第 2 次重跑登记 research/prompts/e171-r2-prereg.md 修订 4）。
+    两份环境数据根相同、家目录不同：第二台的家目录是另一个。"""
+    THIS_HOST = {"SINGLEFS_DATA_ROOT": "/shared/singlefs-data", "HOME": "/home/this-host"}
+    SECOND_HOST = {"SINGLEFS_DATA_ROOT": "/shared/singlefs-data", "HOME": "/home/second-host"}
+    UNDER_HOME = "~/e171-reuse-library-under-the-home-directory"   # 经 ~ 取的任一路径；不写数据根下那一份的样子（门禁 code-tooling 的 shared-data-root-literals 格）
+
+    def test_an_unfilled_library_root_is_the_same_data_root_path_on_both_hosts(self) -> None:
+        this_root, this_problem = library_roots.library_root_of({}, self.THIS_HOST)
+        second_root, second_problem = library_roots.library_root_of({"library_root": None}, self.SECOND_HOST)
+        self.assertEqual((this_problem, second_problem), ("", ""))
+        self.assertEqual(this_root, second_root)
+        self.assertEqual(this_root, os.path.join("/shared/singlefs-data", "reuse", library_roots.LIBRARY_NAME))
+
+    def test_a_library_root_under_the_home_directory_is_refused(self) -> None:
+        root, problem = library_roots.library_root_of({"library_root": self.UNDER_HOME}, self.SECOND_HOST)
+        self.assertIn("经 ~ 或相对路径取", problem)
+        self.assertNotIn("/home/second-host", root)
+        with self.assertRaises(reuse.RunCondition):
+            library_roots.require_library_root({"library_root": self.UNDER_HOME}, self.SECOND_HOST)
+
+    def test_an_absolute_library_root_is_kept(self) -> None:
+        self.assertEqual(library_roots.library_root_of({"library_root": "/shared/singlefs-data/reuse/other/"}, self.THIS_HOST),
+                         ("/shared/singlefs-data/reuse/other", ""))
+
+    def test_the_units_layer_refuses_to_run_with_a_library_root_under_the_home_directory(self) -> None:
+        with self.assertRaises(reuse.RunCondition):
+            units_layer.configure("/unused", {"H30": {"library_root": self.UNDER_HOME}}, False)
 
 
 if __name__ == "__main__":

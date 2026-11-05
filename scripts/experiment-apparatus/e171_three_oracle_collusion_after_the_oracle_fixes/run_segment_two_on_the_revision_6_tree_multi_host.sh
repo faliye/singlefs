@@ -2,12 +2,12 @@
 # E171 第 1 次重跑第二段（整表）·修订 6 树·多机跑法（2026-10-07 写）：登记 research/prompts/e171-r1-prereg.md 第五节 5.5 第二段、修订 2 第 2.5 节、
 # 修订 6 第 6.6 节「第二段（整表）照原文，在修订 6 树上跑」。281 行加补位，流一、流二，批 1 批 2，不跑执行器、不带探针；编排交 rows_orchestrator_segment_two.py
 # （文件头写行集、分配、派发、补位协调、合并、判法、跨机对照、超时重跑、续跑）。第一段那一份入口 run_segment_one_on_the_revision_6_tree_multi_host.sh 不改。
-# 起法（主 agent，仓根）：bash scripts/hosts/detached-run.sh start --wall-clock over-2h --label e171-r1-s2-revision-6 -- bash scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_on_the_revision_6_tree_multi_host.sh
+# 起法（主 agent，仓根；内存、线程、哪台由服务定，这一份不套包装）：task-server/task submit -- bash scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_on_the_revision_6_tree_multi_host.sh
 #   同一条命令就是续跑命令。只看分配与推的挂钟、不起任何一行：PLAN_ONLY=1 bash <这一份>（不写导出目录、不写清单）。
 # long-run-shards: 按行切：整表 281 行每行一个单线道逐行驱动，行按推的用时最长先派到各台空出来的槽（rows_orchestrator_segment_two.py 文件头「派发」）
 # long-run-resume: 同一条命令再起就是续跑：开跑先核输入清单与第一趟记下的相同，只补行目录里还没有 row-result.tsv 的行，别的台被停时取回的行先收进来、写到一半的重做，已装的产物不重合
 # long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
-# 多机的说明：每台槽数按每台线程与 scripts/hosts/host-resources.py --json 现查的内存额度算（起跑时、续跑时；起跑时放不下的台每 10 分钟重查内存）
+# 多机的说明：每台槽数 = ⌊每台线程 / 5⌋（起跑时、续跑时算，起跑时没有槽的台每 10 分钟重算；内存不在这里算，整条命令交 task-server）
 # 环境变量：RUN_SUFFIX（默认 -r6；整表从头另跑一趟给 -r6-r2 这类，导出目录跟着另起）、RUN_DATE（产物名里的日期：第一趟记进导出目录的 run-date，续跑照它；
 #   给了而与记下的不同就拒）、PLAN_ONLY=1（见上）。
 # 输入清单（第一趟开跑时写进 $DUMPS/inputs.sha256，续跑先 sha256sum -c）：逐行驱动与它引的模块、两张行表、两份编排器、别的台那一头、判法、基线计时、冻结树里的变异表。
@@ -28,9 +28,8 @@ BASELINE_TIMING=research/results/e171-r1-three-oracle-collusion-after-the-oracle
 BASELINE_TIMING_SHA256=1e19e717be8fe913e099d24a59a54b0ce55bfafa230777bcdafe0909b8403a91
 FROZEN_MUTATIONS_SHA256=4140c7847b56fa710755aebb0180a673cab6dd7f748297f6a95b4e2db7150cb8
 INPUTS=("$RESEARCH/row_driver.py" "$RESEARCH/device_timing.py" "$RESEARCH/frozen_o3.py" "$RESEARCH/run_directory.py" "$RESEARCH/bad_implementation_table.py"
-        "$RESEARCH/bad-implementations-117.tsv" "$RESEARCH/bad-implementations-expansion-164.tsv" "$RESEARCH/rows_orchestrator.py" "$ORCHESTRATOR"
+        "$RESEARCH/bad-implementations-step-8.tsv" "$RESEARCH/bad-implementations-step-4-only.tsv" "$RESEARCH/rows_orchestrator.py" "$ORCHESTRATOR"
         "$RESEARCH/peer_side.py" "$CHECK" "$BASELINE_TIMING" "$TREE/crates/mutations.tsv")
-export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="同一会话派出去的几个执行员各跑各的装置"
 export PYTHONDONTWRITEBYTECODE=1
 
 if [ -n "${PLAN_ONLY:-}" ]; then

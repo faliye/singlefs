@@ -6,7 +6,7 @@ scripts/mutation/mutate.sh 只跑 cargo，这一侧照 E170 的先例自己写�
 收尾在一份新副本上重跑基线，核「已还原，基线仍全绿」，并核本目录在跑前跑后逐字节相同。结局符号照 .claude/rules/mutation-sampling.md：
 ✅ 抓到、⏭ 无效、❌ 没红、⏱ 超时。结果行不带耗时，两次跑逐字节相同。
 
-跑法（在本目录，经 run-with-memory-cap.sh 与 capped.sh）：
+跑法（在本目录，整条命令交 `task-server/task submit --`）：
   python3 mutation_driver.py --table <变异表> --scratch <草稿目录> --output <新文件>
 """
 
@@ -24,6 +24,8 @@ from result_lines import ResultLines, field
 
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 THIS_FILE = os.path.basename(__file__)
+REPOSITORY_ROOT = os.path.abspath(os.path.join(DIRECTORY, "..", "..", ".."))
+PATH_FROM_REPOSITORY_ROOT = tuple(os.path.relpath(DIRECTORY, REPOSITORY_ROOT).split(os.sep))   # scripts、experiment-apparatus、本目录名
 # 第 1 次重跑（表 scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv）：比对器的单测，与逐行限时、进程挂钟的单测（修订 2 第 2.5、2.6 节）
 TEST_MODULES = ("test_segment_one", "test_device_timing")
 # 第二段比对器的表（scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_segment_two.tsv）给 `--unit-test-module test_segment_two`；
@@ -69,17 +71,33 @@ def anchor_hits(directory: str, original: str) -> list[tuple[str, int]]:
     return hits
 
 
+def copy_root(scratch: str, label: str) -> str:
+    """一份副本的根：<草稿目录>/<标签>，删副本删它。"""
+    return os.path.join(scratch, label)
+
+
 def fresh_copy(scratch: str, label: str) -> str:
-    destination = os.path.join(scratch, label)
-    shutil.rmtree(destination, ignore_errors=True)
-    shutil.copytree(DIRECTORY, destination, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    return destination
+    """在 <草稿目录>/<标签>/ 下搭一份仓形的副本，交回副本里的研究目录。
+    研究目录里的模块按自己所在位置往上三层取仓根（.claude/hooks/lib_work_root.py、.claude/heavy-thread-default、搬迁登记表这类）；
+    副本的根照仓根的样子：从仓根到研究目录这一条路径上，每一层除了往下那一项与 .git，别的条目都链回真仓，研究目录本身是拷贝。
+    副本里同一条相对路径就落到真仓那一份，调用方不用另搭镜像，--scratch 指哪里都一样（第 2 次重跑登记修订 5 第 5.2 条）。"""
+    root = copy_root(scratch, label)
+    shutil.rmtree(root, ignore_errors=True)
+    level_in_copy, level_in_repository = root, REPOSITORY_ROOT
+    for part in PATH_FROM_REPOSITORY_ROOT:
+        os.makedirs(level_in_copy)
+        for entry in sorted(os.listdir(level_in_repository)):
+            if entry not in (part, ".git"):
+                os.symlink(os.path.join(level_in_repository, entry), os.path.join(level_in_copy, entry))
+        level_in_copy, level_in_repository = os.path.join(level_in_copy, part), os.path.join(level_in_repository, part)
+    shutil.copytree(DIRECTORY, level_in_copy, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    return level_in_copy
 
 
 def run_unit_tests(directory: str, test_modules: tuple[str, ...] = TEST_MODULES) -> tuple[str, int]:
     """本目录全部单测；交回 (结局 抓到 / 没红 / 超时, 退出码)。"""
-    # 单测在草稿目录的副本里跑，仓根不能从副本的位置推出来；冻结目录那一条单测读真的仓，所以把真的仓根交给它
-    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", E171_REPOSITORY_ROOT=os.path.abspath(os.path.join(DIRECTORY, "../../..")))
+    # 单测在草稿目录的仓形副本里跑，副本的根不带 .git（git 命令认不出它是仓）；冻结目录那一条单测读真的仓，所以把真的仓根交给它
+    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", E171_REPOSITORY_ROOT=REPOSITORY_ROOT)
     try:
         completed = subprocess.run([sys.executable, "-m", "unittest", *test_modules], cwd=directory, env=environment,
                                    capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
@@ -131,11 +149,11 @@ def main(argument_list: list[str]) -> int:
             outcome, exit_code = INVALID, -1
         tally[outcome] += 1
         lines.result(f"name=mutation number={number} outcome={outcome} mutation={field(name)} unit_test_exit={exit_code}")
-        shutil.rmtree(directory, ignore_errors=True)
-    shutil.rmtree(baseline_directory, ignore_errors=True)
+        shutil.rmtree(copy_root(arguments.scratch, f"mutation-{number}"), ignore_errors=True)
+    shutil.rmtree(copy_root(arguments.scratch, "baseline-before"), ignore_errors=True)
     restored = fresh_copy(arguments.scratch, "baseline-after")
     restored_outcome, _ = run_unit_tests(restored, test_modules)
-    shutil.rmtree(restored, ignore_errors=True)
+    shutil.rmtree(copy_root(arguments.scratch, "baseline-after"), ignore_errors=True)
     unchanged = directory_digest(DIRECTORY) == digest_before
     lines.result(f"name=verdict mutations={len(rows)} caught={tally[CAUGHT]} invalid={tally[INVALID]} survived={tally[SURVIVED]} "
                  f"timed_out={tally[TIMED_OUT]} restored_and_baseline_green={str(restored_outcome == SURVIVED and unchanged).lower()}")

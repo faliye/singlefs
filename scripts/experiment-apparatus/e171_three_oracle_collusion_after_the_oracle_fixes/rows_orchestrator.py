@@ -2,37 +2,35 @@
 """E171 第 1 次重跑第一段·修订 6 树：第 11–13 步的多机编排（用户 2026-10-06 定案：「分片 双机62核 给80g」；「长时间重型任务。分片 断点重启 这都不用我说。
 自适应多机跑」）。由 run_segment_one_on_the_revision_6_tree_multi_host.sh 在前提与第 0–10 步的续跑核对都放行之后起，在仓根跑。
 判法（check_product.py rows）、阈值、限时规则（驱动照 --baseline-timing 现算）与每行驱动的参数照原跑法 run_segment_one_on_the_revision_6_tree.sh
-（sha256 869d2c0a…）第 11–13 步；改的只有 --lanes、--threads、--rows、输出根与工作根，另加 --skip-finished（驱动自带的续跑开关）。
+（sha256 869d2c0a…）第 11–13 步；改的只有 --lanes、--threads、--rows、输出根与工作根（驱动按键复用，同一输出根里同键做完的行不重做，不另给续跑开关）。
 
 用法：
   rows_orchestrator.py run  --repo R --prefix P --suffix=S --resume-tag=T --dumps D --tree TREE --snapshot-digest H --baseline-timing B
                             --check C --logs L --work-root W [--research-root RR]
-      跑第 11–13 步。被停、被杀之后同一条命令再起就是续跑：已做完的行（本机的、已取回的别的台的）不重跑，写到一半的重做，资源与分配重新现查现算。
+      跑第 11–13 步。被停、被杀之后同一条命令再起就是续跑：已做完的行（本机的、已收进来的别的台的）不重跑，写到一半的重做，资源与分配重新现查现算。
   rows_orchestrator.py plan <同上>
       只现查机器与资源、算分配、按每行推的用时推各台挂钟，打出来；一行都不起，不写产物。
   rows_orchestrator.py --selftest [--cells 格,…]
-      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（同目录的 fake_*），末尾逐个打开弄坏开关核它红在点名的格。
+      假驱动、假 task-server 分片（fake_task_server.py 演计划、各片、合并三步）、假机器清单与资源走一遍各格（同目录的 fake_*），末尾逐个打开弄坏开关核它红在点名的格。
 
 退出码：0 跑完（第 11–13 步都绿）；1 停机或某一行没跑成（日志与 sequence.log 写停在哪、为什么）；2 用法错；
-  78 运行条件不满足（多机配置判不过、某台连不上或没读到资源、别的台的预检没过（工具链、Python、离线编译、盘）、此刻一条线道都放不下、
+  78 运行条件不满足（多机配置判不过、计划分的片没都起来或都落在同一台、别的台的预检没过（工具链、Python、离线编译、盘）、此刻一条线道都放不下、
   跨机对照那一行此刻放不下）——不悄悄退回单机，出路是修好那台或改配置，再用同一条命令起；143 收到 TERM / INT / HUP，收完尾退出。
 
-机器：scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts 解出的清单（本机是第 1 台，HOSTS 里依次是第 2、3…台；没写 HOSTS 就是 PEER_SSH_HOST
-  一台）。判法退 3（ENABLE_ACROSS_MACHINES 没开）只用本机、打一行；退 1 退 78。日志与产物里台名只写「本机」「第二台」……，不写别名与目录。
-  别的台每行经 scripts/hosts/multi-host-run.sh --peer 起；它只读配置的 PEER_*，所以不是 PEER_SSH_HOST 的那几台，这里按 --emit-hosts 的
-  MULTI_HOST_<号>_* 另写一份只给那一台用的配置（PEER_* 换成那一台的，草稿状态目录里、权限 600），经 SINGLEFS_MULTI_HOST_CONFIG 交给它；那一台没配仓目录或
-  cargo 目录退 78。
+机器（下面「经 task-server」）：台号照服务给每片的 TASK_SERVER_SHARD_HOST 定（多机配置 HOSTS 里那一台的地址）：与编排那一片的地址相同的是第 1 台（本机），不同的是第 2 台（第二台）；两台对称，不认 local、peer 这类角色名；日志与产物里台名只写「本机」「第二台」，
+  不写别名与目录。计划那一步照 scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts 解出的清单定片数（判法退 3，即 ENABLE_ACROSS_MACHINES 没开，
+  只分一片、打一行；退 1 退 78）；服务只分本机与第二台两种，清单里多出来的台用不上，片数至多 2。
+  编排在片号 0 那一片里跑（下称编排那一片），它所在那一台的行直接起；别的台的行不自己连那一台，经 shard_relay.py 写进共享的计划目录，
+  交给服务派到那一台的那一片代跑（shard_relay.py 文件头）。代跑的命令是研究目录里的 peer_side.py：仓与工作根经 NFS 两台挂在同一绝对路径，
+  它在这一份所在那棵树的根（真跑时就是 --repo）、同一个绝对路径上起，读这一趟分片目录里的 peer-kit/expected.json 与冻结树快照 frozen-snapshot/，
+  每个分片的产物与行目录直接写进它的分片目录下的 peer-out/（共享根下，编排那一片照同一个路径读）；不送、不取回。
+  代跑那一台的编译与逐行的工作树放那一台本地盘（代跑那一片照服务派到第二台那一趟的样子给每条命令的 MULTI_HOST_RUN_PEER_SCRATCH）；
+  编排那一片落在第二台时，它自己那几行的工作根放这一片的 MULTI_HOST_RUN_PEER_SCRATCH 下（服务派到第二台时给的），不用 --work-root。
 资源与分配（每次起跑、每次续跑都算，写进日志）：每台线程取登记的每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads，
   读 .claude/heavy-thread-default；SINGLEFS_THREAD_CAP 设了照它），每台都是这一个数，不看此刻忙闲，登记读不出退 78。
-  内存额度由 scripts/hosts/host-resources.py --json 逐台现查（内存护栏），读不到一台退 78。
-  每台槽数 = min(⌊每台线程 / 5⌋, ⌊memory.slice_room / 包装账⌋, ⌊memory.available / 实占⌋,
-  ⌊那台配置的内存上限 / 包装账⌋)；每槽线程 = ⌊每台线程 / 槽数⌋（≥ 5：原跑法每道 5，限时基线在这个量级上量的）。
-  包装账（内存包装 run-with-memory-cap.sh 在 slice 里排队按的量）：本机每槽 6G，就是装置与 O3 那一层包装的上限（原跑法 CAP_LARGE；行目录每行不同、
-    峰值表里没有这条命令，包装按上限记账）；别的台每槽 10G，是那 6G 加外层包装 --memory-cap 4G（multi-host-run.sh 在那边把驱动与编译整个套进一层包装，
-    它在 slice 账上一直占着 4G 减已用；4G 管驱动加一次编译）。配置的内存上限（PEER_MEMORY_CAP、HOST_<号>_MEMORY_CAP）卡的是那台各层包装之和。
-  实占（memory.available：MemAvailable 减包装账上还没涨到量的那一截）：每槽 10 GiB = 6G + 编译 3 GiB（cargo build 不在装置包装里；峰值表
-    ~/.local/share/singlefs/memory-peaks.tsv 里 capped.sh 10 cargo build --release --offline -p singlefs-checker-tier --bin e171_… 那一行 2.54 GiB，向上取整）
-    + 驱动与杂项 1 GiB（推的）。本机的编译在 slice 外面，这一项防几道同时冷编译把 slice 外的余量吃光。
+  每台槽数 = ⌊每台线程 / 5⌋；每槽线程 = ⌊每台线程 / 槽数⌋（≥ 5：原跑法每道 5，限时基线在这个量级上量的）。
+  内存不在这里算：编排器不查机器的内存额度、不按内存定槽数、不给驱动与第二台的命令套内存上限；整条命令交 task-server，内存额度按记录由服务给，
+  撞上限由服务放大重排。读不到的台（连不上）在别的台的预检那一步退 78，不悄悄少用一台。
 行与派发：第 11 步 242、269（带探针）、第 12 步空变异 row-0 与 13 行、跨机对照 X（row-0 在另一台再跑一次），同进一个队列，第 11、12 步同时跑；
   每行一个单线道驱动（--lanes 1），哪一槽空了就从队列头取第一个放得下的（X 只放在第 12 步 row-0 那一台之外）；某一行没跑成就不再派新行，
   在跑的跑完再停。队列按每行推的用时从长到短（最长先做，各台挂钟接近）；用时相同的按 row-0、X、其余行号排。每行推的用时：
@@ -40,35 +38,62 @@
   没量过的，带探针的取第 7 步 baseline-run1 的 process_wall（T），不带探针的取第 3 步两份带流三的阳性对照（O1-崩溃判官、RefFS）process_wall 的较大者；
   每行另加 120 秒（编译 36 秒、O3 33 秒取自第 269 行早先那一份 row-result.tsv，加拷树，推的）。
   本机每槽一个固定工作根（同一槽上后一行增量编译，驱动自己核）；第 12 步 row-0 与 X 各用新的工作根（两边都冷编译，跨机对照比得了编译那几列之外的一切）。
-第 13 步：第 11、12 步合成的产物里 device_exit=253 的行，照原规则单线道、限时再乘 3（--rerun-of-timed-out-rows）；带探针的先、不带的后，各一个驱动，
-  跑在哪台照同一套分配挑（有槽的台里编号最小的），线程取每台线程（登记值）。
+第 13 步：第 11、12 步合成的产物里 device_exit=253 的行，照原规则单线道、限时再乘 3；带探针的先、不带的后，各一个驱动，驱动参数与第 11、12 步同一步的完全一样、
+  输出根也是同一个：驱动按键复用，在这个根里看到同键的上一次结果是超时，就自己把这一行的限时乘 3（重做中途停下，行目录里的标记文件 timed-out-before 还记着）。
+  行目录在编排那一台的行输出根里（别的台做完的行已收进来），所以跑在编排那一台（线程取每台线程，登记值），不挑别的台。
 产物与合并（写死的合并规则，merge_products）：每一步最后一份原名产物 <PREFIX>-<步名><RESUME_TAG><SUFFIX>.out 与 -timing.out，由「这一趟」的分片产物合成：
-  这一趟跑的每行一个分片；更早几趟已做完的行由本机一个 --skip-finished 驱动从行目录重报一份（驱动自带的续跑做法，行与 row-result.tsv 逐字相同）。
-  ① 各分片的 name=row_time_limit 行逐字相同，原样留一行，不同就拒；② snapshot_digest 与 files 各分片相同、且等于冻结树快照（发给别的台的那一份）的摘要，
+  这一趟跑的每行一个分片；更早几趟已做完的行由本机一个驱动从行目录重报一份（同键做完的行按键复用、直接读回，行与 row-result.tsv 逐字相同；
+  上一次是超时、编不过或测量管子缺陷的行，驱动照自己的规则重做，不是原样重报）。
+  ① 各分片的 name=row_time_limit 行逐字相同，原样留一行，不同就拒；② snapshot_digest 与 files 各分片相同、且等于冻结树快照（别的台读的那一份）的摘要，
   不同就拒；③ row 行按序号排，同一序号出现两次拒，与这一步登记的行集不等（缺、多）拒；④ freeze_check 前后各一行：differences 相加，detail 并起来；
   ⑤ table 行：lanes、rows、sum_of_row_ns 相加，table_wall_ns 取最大，threads_per_lane 写各分片取值去重升序，另加 shards=<分片数>；
   ⑥ 末尾每个分片一行 merged_shard host=<台号> rows=<行> sha256=<分片产物>；计时按 row_device 分块，块按序号排，行集与产物的不等就拒；
-  ⑦ 认不得的行拒。原始分片产物、取回目录与日志留在 <导出目录>/segment1-rows<RESUME_TAG>-shards/attempt-<趟>/ 下。
+  ⑦ 认不得的行拒。原始分片产物、别的台的输出目录与日志留在 <导出目录>/segment1-rows<RESUME_TAG>-shards/attempt-<趟>/ 下。
 跨机一致对照（新设，收严）：第 12 步 row-0 与 X 在两台各跑一次，比四样：row 行去掉 copy_ns、compile_ns、device_ns、o3_ns 四个耗时列；
   device.out 的 E7RESULT 行（E7TIMING 不比）；导出里三条流的 oracle-verdicts.tsv、call-outcomes.tsv、writable-mount-probe.tsv、ops.tsv、states.tsv
   （与 check_product.py z1 同一组）；o3.out 去掉 name=config、name=state_time 两种行与键名以 _ns 结尾的字段。有一样不同就停机（退 1，不作废、不当结果）；
   产物 <PREFIX>-rows-cross-host-check<RESUME_TAG><SUFFIX>.out。只有一台时那一格报 not_run。
-续跑：别的台那一行被停时 multi-host-run.sh 先停那边、再把 scripts/experiment-apparatus/target/e171-s1-peer-out（含已做完的行目录）取回本趟取回目录，再删那边的树；
-  每次起跑先把以前各趟取回目录里有 row-result.tsv 的行收进本机行输出根（先记账 row-hosts.tsv 再按硬链接拷、拷完改名），本机那一份写到一半的行目录删掉重做。
-  MULTI_HOST_RUN_POLL_SECONDS=30：multi-host-run.sh 连续 60 次 ssh 不通才判失败，即容半小时断线（它判失败时删那边的树而不取回，那几行下一趟重做）。
+续跑：别的台那一行被停时代跑那一片先停那边那条命令、再删那一台本地盘上那条命令的目录；已做完的行目录早已写在共享根下那个分片的 peer-out/rows/ 里。
+  每个别的台的分片结束时、每次起跑时（以前各趟的分片），把 peer-out/rows/ 里有 row-result.tsv 的行收进本机行输出根（先记账 row-hosts.tsv、记作 peer，
+  再按硬链接拷、拷完改名），本机那一份写到一半的行目录删掉重做。分片记录里没有 peer_out 的（不是这一版编排器写的）认不得、停（退 1），换新的 --resume-tag 从头跑。
+  代跑那一片的心跳停了 15 分钟（shard_relay.py 的 STALE_SECONDS），那一行的转交退 255、当没跑成（那一行没写完的部分下一趟重做）。
 
-弄坏开关 ROWS_ORCHESTRATOR_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，别处设了退 2）。项名、弄坏哪一处、打开后红在哪一格：
-  allocation-ignores-memory   槽数只看线程、不看内存额度            allocation-memory-bound
-  merge-allows-duplicates     合并时同一序号两行取前一行、不拒       merge-refuse-duplicate
-  merge-ignores-time-limit    合并时各分片 row_time_limit 不同也取第一行  merge-refuse-time-limit
-  cross-host-ignores-dumps    跨机对照不比导出那一样                  cross-host-compare
-  resume-reruns-finished      续跑时已做完的行也重跑                  e2e-resume
-  unreachable-dropped         读不到资源的那台悄悄不用（不退 78）      e2e-unreachable
-  harvest-skipped             别的台取回的行不收进本机行输出根         e2e-two-hosts
+经 task-server（用户：「现在就把分片收进服务」，records/2026-10-30-编译绕过内存总上限.md）：task-server 认得 rows_orchestrator.py run（task-server/task_server_lib.py 的 SHARDED_ENTRIES），
+  照环境里的 TASK_SERVER_SHARD_PHASE 跑服务拆的那一步（shard_phase_before_layer；变量的写法在 task-server/task_server_lib.py 文件头「分片」）：
+  ① plan：照上面「机器」定片数，每片只写 label（没有 pin 键：不钉台，records/2026-10-31-task-server巡检.md 问题 94；不写内存下限：内存额度由服务按记录给）；
+  ② shard：片号 0 是编排那一片：登记、起心跳，等计划里的各片都登记了（至多 REGISTRATION_WAIT_SECONDS 秒，没等齐退 78），台照各片的 TASK_SERVER_SHARD_HOST 定，
+     照下面 run 跑整件（第 11–13 步、合并、判法、跨机对照都在这一片），收尾写 finished；别的片照 shard_relay.py 代跑转交来的命令，见到 finished、手上的跑完退 0。
+     计划分了两片而两片都落在同一台：跨机对照做不成，退 78（第二台空出来后同一条命令再交），不悄悄退回单机；
+  ③ merge：整件已在编排那一片做完，只核编排那一片写了 finished、各片的产物目录在，退 0。
+  不经 task-server 直接调 run（各段入口脚本里调的那一下，TASK_SERVER_SHARD_PHASE 没设）：只用这一台，跨机对照报 not_run，原因写「没经 task-server 分片」。
+
+弄坏开关 ROWS_ORCHESTRATOR_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，别处设了退 2）。逐项写开关名、弄坏哪一处，
+下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」；开关轮只核每项第一格）：
+  ROWS_ORCHESTRATOR_BREAK=slots-ignore-lane-minimum  槽数取每台线程数、不按每槽至少 5 线程除
+      「✗ 自证 allocation-threads：」「✗ 自证 allocation-registered：」
+  ROWS_ORCHESTRATOR_BREAK=merge-allows-duplicates  合并时同一序号两行取前一行、不拒
+      「✗ 自证 merge-refuse-duplicate：」
+  ROWS_ORCHESTRATOR_BREAK=merge-ignores-time-limit  合并时各分片 row_time_limit 不同也取第一行
+      「✗ 自证 merge-refuse-time-limit：」
+  ROWS_ORCHESTRATOR_BREAK=cross-host-ignores-dumps  跨机对照不比导出那一样
+      「✗ 自证 cross-host-compare：」
+  ROWS_ORCHESTRATOR_BREAK=resume-reruns-finished  续跑时已做完的行也重跑
+      「✗ 自证 e2e-resume：」
+  ROWS_ORCHESTRATOR_BREAK=harvest-skipped  别的台做完的行不收进本机行输出根
+      「✗ 自证 e2e-two-hosts：」「✗ 自证 e2e-resume：」「✗ 自证 e2e-cross-host-mismatch：」「✗ 自证 e2e-product-collision：」
+  ROWS_ORCHESTRATOR_BREAK=plan-writes-memory-limit  plan 计划的那一片又带上一个内存键（片里只许有 label）
+      「✗ 自证 task-server-phases：」
+  ROWS_ORCHESTRATOR_BREAK=plan-pins-local  plan 计划的那一片照改前钉在本机（pin=local），服务拒
+      「✗ 自证 task-server-phases：」
+  ROWS_ORCHESTRATOR_BREAK=driver-gets-memory-cap  给逐行驱动的参数又带上 --memory-cap（驱动与假驱动都不认这个参数）
+      「✗ 自证 e2e-two-hosts：」
+  ROWS_ORCHESTRATOR_BREAK=peer-command-gets-memory-cap  转交给别的台的命令又带上 --memory-cap 外层上限（shard_relay.py 不认、退 2）
+      「✗ 自证 e2e-two-hosts：」
 """
 from __future__ import annotations
 
 import argparse
+import atexit
 import dataclasses
 import datetime
 import hashlib
@@ -92,30 +117,29 @@ DRIVER_NAME = "row_driver.py"
 GIB = 1 << 30
 LANE_THREADS_MINIMUM = 5
 HOSTS_DIRECTORY = os.path.join(HERE, "..", "..", "hosts")  # scripts/hosts：每台线程的登记取法 heavy_threads.py 在这里
-SLOT_DEVICE_MEMORY_BYTES = 6 * GIB
-SLOT_COMPILE_MEMORY_BYTES = 3 * GIB
-SLOT_DRIVER_MEMORY_BYTES = 1 * GIB
-SLOT_MEMORY_BYTES = SLOT_DEVICE_MEMORY_BYTES + SLOT_COMPILE_MEMORY_BYTES + SLOT_DRIVER_MEMORY_BYTES
-DEVICE_MEMORY_CAP = "6G"
-PEER_OUTER_MEMORY_CAP = "4G"
 PEER_DISK_BYTES_PER_SLOT = 3 * GIB
 CARRY_THREADS = 5
 ROW_OVERHEAD_SECONDS = 120
-MULTI_HOST_RUN_POLL_SECONDS = "30"
-PARALLEL_REASON = "同一会话派出去的几个执行员各跑各的装置"
 EXIT_STOPPED_BY_SIGNAL = 143
 EXIT_RUN_CONDITION = 78
-# --send 落点的上一级要在拷过去的树里已有：multi-host-run.sh 用 rsync 送，rsync 不建缺的上级目录，而 scripts/experiment-apparatus/target/ 不在 git 列得出的文件里
-# （2026-10-06 连通自证实测：送到 scripts/experiment-apparatus/target/… 时第二台 mkdir failed、退 255）。所以 kit 与快照送到 research/ 下。
-PEER_KIT_RELATIVE = "research/e171-s1-peer-kit"
-PEER_SNAPSHOT_RELATIVE = "research/e171-s1-frozen-snapshot"
-PEER_OUT_RELATIVE = "scripts/experiment-apparatus/target/e171-s1-peer-out"
+# 别的台那一头：研究目录里的这一份，别的台在这一份所在那棵树的根、照同一个绝对路径起（文件头「机器」；真跑时那棵树就是 --repo）
+PEER_SIDE = os.path.join(HERE, "peer_side.py")
+PEER_START_DIRECTORY = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+PEER_OUT_DIRECTORY_NAME = "peer-out"  # 别的台一个分片的产物与行目录写在它的分片目录下的这个目录里
+SHARD_RELAY = os.path.join(HERE, "shard_relay.py")  # 别的台的命令经它交给落在那一台的那一片代跑（文件头「机器」）
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import shard_relay  # noqa: E402
+ORCHESTRATOR_HOST_NUMBER = 1   # 编排那一片所在的台；登记地址与它不同的那一台是 2（文件头「机器」）
+MAXIMUM_SHARDS = 2   # 服务只分两台
+REGISTRATION_WAIT_SECONDS = 1800.0   # 编排那一片等计划里的各片都登记的上限（文件头「经 task-server」②）
 TIMING_COLUMNS = ("copy_ns", "compile_ns", "device_ns", "o3_ns")
 STREAMS = ("new_pool_file_creation", "fixed_script_through_e_then_unmount", "first_file_unlinked_then_inodes_across_one_leaf")
 Z1_FILES = ("oracle-verdicts.tsv", "call-outcomes.tsv", "writable-mount-probe.tsv", "ops.tsv", "states.tsv")
 HOST_NAMES = ("本机", "第二台", "第三台", "第四台", "第五台", "第六台", "第七台", "第八台", "第九台", "第十台")
-BREAK_SWITCHES = ("allocation-ignores-memory", "merge-allows-duplicates", "merge-ignores-time-limit", "cross-host-ignores-dumps",
-                  "resume-reruns-finished", "unreachable-dropped", "harvest-skipped")
+BREAK_SWITCHES = ("slots-ignore-lane-minimum", "merge-allows-duplicates", "merge-ignores-time-limit", "cross-host-ignores-dumps",
+                  "resume-reruns-finished", "harvest-skipped", "plan-writes-memory-limit", "driver-gets-memory-cap", "peer-command-gets-memory-cap",
+                  "plan-pins-local")
 
 
 def broken(item: str) -> bool:
@@ -135,15 +159,15 @@ class Step:
     stem: str
     root_suffix: str
     flags: tuple[str, ...]
+    rerun: bool = False   # 第 13 步：行输出根与参数同第 11、12 步那一步，只挑上一次超时的行；做完的标志是 row-result.tsv 里 timed_out_before=true
 
 
 STEPS = {
     "s11": Step("s11", 11, "rows-probe-driver", "", ("--keep-dumps", "--streams", "1,2,3", "--writable-mount-probe")),
     "s12": Step("s12", 12, "rows-driver", "", ("--keep-dumps", "--streams", "1,2,3")),
     "sx": Step("sx", 12, "rows-cross-host-row-0-driver", "-cross-host", ("--keep-dumps", "--streams", "1,2,3")),
-    "r11": Step("r11", 13, "rows-probe-timeout-rerun-driver", "-timeout-rerun",
-                ("--rerun-of-timed-out-rows", "--keep-dumps", "--streams", "1,2,3", "--writable-mount-probe")),
-    "r12": Step("r12", 13, "rows-timeout-rerun-driver", "-timeout-rerun", ("--rerun-of-timed-out-rows", "--keep-dumps", "--streams", "1,2,3")),
+    "r11": Step("r11", 13, "rows-probe-timeout-rerun-driver", "", ("--keep-dumps", "--streams", "1,2,3", "--writable-mount-probe"), rerun=True),
+    "r12": Step("r12", 13, "rows-timeout-rerun-driver", "", ("--keep-dumps", "--streams", "1,2,3"), rerun=True),
 }
 # 原跑法第 11、12 步的 --rows（第 12 步另带 --empty-mutation，即 row-0）；X 是第 12 步 row-0 在另一台的那一次
 STEP_ROWS = {"s11": (242, 269), "s12": (0, 15, 271, 42, 23, 270, 125, 49, 110, 155, 161, 162, 174, 252), "sx": (0,)}
@@ -167,23 +191,15 @@ class MergeRefused(Exception):
 
 
 def step_arguments(step: Step, rows: tuple[int, ...], lanes: int, threads: int) -> list[str]:
-    """一个分片驱动除路径之外的参数：行（0 写成 --empty-mutation，同原跑法第 12 步）、原跑法那一步的参数、线道与线程、装置上限、续跑开关。"""
+    """一个分片驱动除路径之外的参数：行（0 写成 --empty-mutation，同原跑法第 12 步）、原跑法那一步的参数、线道与线程。"""
     numbered = sorted(row for row in rows if row != 0)
     arguments: list[str] = []
     if numbered:
         arguments += ["--rows", ",".join(str(row) for row in numbered)]
     if 0 in rows:
         arguments.append("--empty-mutation")
-    return arguments + list(step.flags) + ["--lanes", str(lanes), "--threads", str(threads), "--memory-cap", DEVICE_MEMORY_CAP, "--skip-finished"]
-
-
-def capacity_bytes(text: str) -> int:
-    """正整数加 K / M / G / T（1024 进制，同 run-with-memory-cap.sh 的写法）。"""
-    match = re.fullmatch(r"([1-9][0-9]*)([KMGT])", text)
-    if not match:
-        raise ValueError(f"内存上限写法认不得：{text!r}")
-    power = "KMGT".index(match.group(2)) + 1
-    return int(match.group(1)) * 1024 ** power
+    memory_arguments = "--memory-cap 6G".split() if broken("driver-gets-memory-cap") else []   # 弄坏开关造的错参数：整句写成一个字面量再拆
+    return arguments + list(step.flags) + ["--lanes", str(lanes), "--threads", str(threads)] + memory_arguments
 
 
 @dataclasses.dataclass(frozen=True)
@@ -228,48 +244,17 @@ def hosts_from_configuration(exit_code: int, text: str) -> tuple[list[Host], dic
                           values.get(prefix + "CARGO_BIN_DIRECTORY", ""), values.get(prefix + "MEMORY_CAP", ""), values.get(prefix + "IS_PEER") == "1"))
     for host in hosts[1:]:
         if not (host.alias and host.repository_directory and host.cargo_bin_directory):
-            raise RunCondition(f"{host_name(host.number)}在配置里缺 ssh 别名、仓目录或 cargo 目录（HOST_{host.number}_*），multi-host-run.sh 起不了那一台")
+            raise RunCondition(f"{host_name(host.number)}在配置里缺 ssh 别名、仓目录或 cargo 目录（HOST_{host.number}_*），服务派不到那一台")
     return hosts, values, ""
-
-
-@dataclasses.dataclass(frozen=True)
-class HostResources:
-    """一台此刻的内存额度（内存护栏）；线程不从这里取，取登记值（registered_host_threads）。"""
-    number: int
-    available_memory: int
-    slice_room: int
-
-
-def resources_from_json(data: dict, hosts: list[Host]) -> tuple[dict[int, HostResources], list[str]]:
-    """(每台的资源, 读不到的台说明)。读不到的台交回调用方退 78；弄坏开关 unreachable-dropped 下悄悄丢掉。"""
-    by_number = {entry.get("number"): entry for entry in data.get("hosts", [])}
-    found: dict[int, HostResources] = {}
-    unread: list[str] = []
-    for host in hosts:
-        entry = by_number.get(host.number) or {}
-        memory = entry.get("memory") or {}
-        if not entry.get("read") or "available" not in memory or "slice_room" not in memory:
-            unread.append(f"{host_name(host.number)}没读到资源（{entry.get('problem') or '没报 memory'}）")
-            continue
-        found[host.number] = HostResources(host.number, int(memory["available"]), int(memory["slice_room"]))
-    if broken("unreachable-dropped"):
-        return found, []
-    return found, unread
 
 
 @dataclasses.dataclass(frozen=True)
 class HostAllocation:
     number: int
     threads: int
-    room_bytes: int
     slots: int
     threads_per_slot: int
     terms: str = ""
-
-
-def slot_wrapper_bytes(host: Host) -> int:
-    """一槽在那台 slice 账上的量：本机 6G；别的台多一层 multi-host-run.sh 的外层包装 4G。"""
-    return SLOT_DEVICE_MEMORY_BYTES + (0 if host.is_local else capacity_bytes(PEER_OUTER_MEMORY_CAP))
 
 
 def registered_host_threads(environment=None) -> int:
@@ -283,44 +268,27 @@ def registered_host_threads(environment=None) -> int:
         raise RunCondition(f"每台线程的登记读不出：{error}（{error.howto}）") from error
 
 
-def allocate(hosts: list[Host], resources: dict[int, HostResources], threads: int | None = None) -> list[HostAllocation]:
-    """文件头「资源与分配」：每台线程 = 登记值（threads 不给就现读登记，不看忙闲）；槽数 = min(⌊每台线程 / 5⌋, ⌊slice_room / 包装账⌋, ⌊available / 10 GiB⌋,
-    ⌊配置上限 / 包装账⌋)，每槽线程 = ⌊每台线程 / 槽数⌋。"""
+def allocate(hosts: list[Host], threads: int | None = None) -> list[HostAllocation]:
+    """文件头「资源与分配」：每台线程 = 登记值（threads 不给就现读登记，不看忙闲）；槽数 = ⌊每台线程 / 5⌋，每槽线程 = ⌊每台线程 / 槽数⌋。"""
     threads = registered_host_threads() if threads is None else threads
     allocations = []
     for host in hosts:
-        if host.number not in resources:
-            continue
-        found = resources[host.number]
-        wrapper = slot_wrapper_bytes(host)
-        limits = {f"⌊{threads}/5⌋": threads // LANE_THREADS_MINIMUM, f"⌊slice_room/{wrapper // GIB}G⌋": max(0, found.slice_room) // wrapper,
-                  "⌊available/10G⌋": max(0, found.available_memory) // SLOT_MEMORY_BYTES}
-        room = max(0, found.slice_room)
-        if host.memory_cap_text:
-            limits[f"⌊上限 {host.memory_cap_text}/{wrapper // GIB}G⌋"] = capacity_bytes(host.memory_cap_text) // wrapper
-            room = min(room, capacity_bytes(host.memory_cap_text))
-        slots = threads // LANE_THREADS_MINIMUM if broken("allocation-ignores-memory") else min(limits.values())
-        terms = "、".join(f"{name}={value}" for name, value in limits.items())
-        allocations.append(HostAllocation(host.number, threads, room, slots, threads // slots if slots else 0, terms))
+        slots = threads if broken("slots-ignore-lane-minimum") else threads // LANE_THREADS_MINIMUM
+        allocations.append(HostAllocation(host.number, threads, slots, threads // slots if slots else 0, f"⌊{threads}/{LANE_THREADS_MINIMUM}⌋={slots}"))
     return allocations
 
 
-def single_lane_host(allocations: list[HostAllocation]) -> HostAllocation:
-    """第 13 步挑台：有槽的台里编号最小的（每台线程都是登记值）。"""
-    candidates = [allocation for allocation in allocations if allocation.slots > 0]
-    if not candidates:
-        raise RunCondition("第 13 步：此刻各台都放不下一条线道（每槽要 5 线程、slice 里 6G（别的台 10G）、实占 10 GiB）")
-    return sorted(candidates, key=lambda allocation: allocation.number)[0]
+def single_lane_host(allocations: list[HostAllocation], own_host: int) -> HostAllocation:
+    """第 13 步挑台：编排那一台（上一次超时的行目录在它的行输出根里，驱动在同一个根里按键复用才看得见；每台线程都是登记值）。"""
+    chosen = [allocation for allocation in allocations if allocation.number == own_host and allocation.slots > 0]
+    if not chosen:
+        raise RunCondition(f"第 13 步：编排那一台（{host_name(own_host)}）的线程不够一条线道（每槽要 5 线程）")
+    return chosen[0]
 
 
-def allocation_text(allocations: list[HostAllocation], resources: dict[int, HostResources]) -> list[str]:
-    lines = []
-    for allocation in allocations:
-        found = resources[allocation.number]
-        lines.append(f"分配 {host_name(allocation.number)}：每台线程 {allocation.threads}（登记值）、"
-                     f"内存 available {found.available_memory / GIB:.1f} GiB、slice_room {found.slice_room / GIB:.1f} GiB；"
-                     f"槽 {allocation.slots}（{allocation.terms}），每槽线程 {allocation.threads_per_slot}")
-    return lines
+def allocation_text(allocations: list[HostAllocation]) -> list[str]:
+    return [f"分配 {host_name(allocation.number)}：每台线程 {allocation.threads}（登记值）；槽 {allocation.slots}（{allocation.terms}），每槽线程 {allocation.threads_per_slot}"
+            for allocation in allocations]
 
 
 # ── 每行推的用时、队列、派发次序与挂钟推算（纯函数；派发与推算共用 pick_job）──
@@ -629,7 +597,7 @@ def cross_host_product(parts: list[tuple[str, bool, str]] | None, host_a: int | 
     return "\n".join(lines) + "\n", bool(differing)
 
 
-# ── 跑的时候：路径、日志、账、取回 ──
+# ── 跑的时候：路径、日志、账、收别的台的行 ──
 @dataclasses.dataclass
 class Context:
     repo: str
@@ -646,12 +614,13 @@ class Context:
     work_root: str
     driver_path: str
     driver_overridden: bool
-    multi_host_run: str
     hosts_command: str
-    resources_command: str
     poll_seconds: float
     peer_compile_check: bool
     attempt_dir: str = ""
+    own_host: int = 1   # 编排那一片所在的台（文件头「机器」）；这一台的行直接起，别的台的转交
+    relay_plan: str = ""   # 经 task-server 分片时的计划目录（转交的请求写在它下面）
+    relay_targets: dict = dataclasses.field(default_factory=dict)   # 别的台号 → 代跑那一片的片号
 
     @property
     def rows_root(self) -> str:
@@ -713,10 +682,10 @@ def sha256_of_file(path: str) -> str:
     return digest.hexdigest()
 
 
-def driver_files(context: Context) -> list[tuple[str, str]]:
-    """驱动与它在同一目录里引的模块、两张行表：(本机路径, 别的台那棵树里的相对路径)。跑的中途改了就停（每行起之前核）。"""
+def driver_files(context: Context) -> list[str]:
+    """驱动与它在同一目录里引的模块、两张行表的绝对路径（两台相同）。跑的中途改了就停（每行起之前核）。"""
     if context.driver_overridden:
-        return [(context.driver_path, f"{PEER_KIT_RELATIVE}/driver/{os.path.basename(context.driver_path)}")]
+        return [context.driver_path]
     directory = os.path.dirname(context.driver_path)
     pending, seen = [os.path.splitext(os.path.basename(context.driver_path))[0]], set()
     while pending:
@@ -729,13 +698,12 @@ def driver_files(context: Context) -> list[tuple[str, str]]:
             match = re.match(r"(?:from|import)\s+([A-Za-z_][A-Za-z0-9_]*)", line)
             if match:
                 pending.append(match.group(1))
-    files = sorted([os.path.join(directory, module + ".py") for module in seen]
-                   + [os.path.join(directory, name) for name in os.listdir(directory) if name.endswith(".tsv")])
-    return [(path, os.path.relpath(path, context.research_root)) for path in files]
+    return sorted([os.path.join(directory, module + ".py") for module in seen]
+                  + [os.path.join(directory, name) for name in os.listdir(directory) if name.endswith(".tsv")])
 
 
 def driver_hashes(context: Context) -> dict[str, str]:
-    return {peer_path: sha256_of_file(local_path) for local_path, peer_path in driver_files(context)}
+    return {path: sha256_of_file(path) for path in driver_files(context)}
 
 
 def read_ledger(context: Context) -> dict[tuple[str, int], int]:
@@ -755,12 +723,19 @@ def append_ledger(context: Context, step: str, row: int, host: int, how: str) ->
         handle.write(f"{step}\t{row}\t{host}\t{os.path.basename(context.attempt_dir)}\t{how}\n")
 
 
-def is_done(context: Context, step: Step, row: int) -> bool:
-    return os.path.exists(os.path.join(context.step_root(step), f"row-{row}", "row-result.tsv"))
+def is_done(context: Context, step, row: int) -> bool:
+    """这一步这一行做完了：行目录里有 row-result.tsv。第 13 步（step.rerun）同一个根里本来就有上一次超时的那份，所以另要它记着限时乘过 3（timed_out_before=true）。"""
+    path = os.path.join(context.step_root(step), f"row-{row}", "row-result.tsv")
+    if not os.path.exists(path):
+        return False
+    if not step.rerun:
+        return True
+    with open(path, encoding="utf-8") as handle:
+        return "timed_out_before\ttrue\n" in handle.read().splitlines(keepends=True)
 
 
 def host_of(context: Context, ledger: dict[tuple[str, int], int], step: str, row: int) -> int:
-    """账上没有的做完的行是本机驱动直接写进行输出根的（取回的先记账再拷）。"""
+    """账上没有的做完的行是本机驱动直接写进行输出根的（别的台的先记账再拷）。"""
     return ledger.get((step, row), 1)
 
 
@@ -771,11 +746,18 @@ def link_or_copy(source: str, destination: str) -> None:
         shutil.copy2(source, destination)
 
 
-def harvest_fetch(context: Context, record: dict) -> list[int]:
-    """把一个别的台分片取回目录里有 row-result.tsv 的行收进本机行输出根：先记账、硬链接拷进 <行>.harvest-partial、再改名；本机写到一半的同名行目录删掉。"""
+def peer_rows_directory(record: dict) -> str:
+    """别的台一个分片写行目录的地方（共享根下它的 peer-out/rows/）；分片记录里没有 peer_out 的不是这一版编排器写的，认不得、停。"""
+    if "peer_out" not in record:
+        raise Stopped(f"分片记录 {record.get('label')}（{record.get('attempt')}）里没有 peer_out：不是这一版编排器写的，认不得；换一个新的 --resume-tag 从头跑")
+    return os.path.join(record["peer_out"], "rows")
+
+
+def harvest_peer_rows(context: Context, record: dict) -> list[int]:
+    """把一个别的台分片的输出目录里有 row-result.tsv 的行收进本机行输出根：先记账、硬链接拷进 <行>.harvest-partial、再改名；本机写到一半的同名行目录删掉。"""
     if broken("harvest-skipped"):
         return []
-    rows_directory = os.path.join(record["fetch_dir"], PEER_OUT_RELATIVE, "rows")
+    rows_directory = peer_rows_directory(record)
     step = STEPS[record["step"]]
     harvested = []
     for entry in sorted(os.listdir(rows_directory)) if os.path.isdir(rows_directory) else []:
@@ -786,7 +768,7 @@ def harvest_fetch(context: Context, record: dict) -> list[int]:
         target = os.path.join(context.step_root(step), entry)
         if os.path.exists(os.path.join(target, "row-result.tsv")):
             continue
-        append_ledger(context, step.key, row, record["host"], "fetched")
+        append_ledger(context, step.key, row, record["host"], "peer")
         os.makedirs(context.step_root(step), exist_ok=True)
         partial = target + ".harvest-partial"
         shutil.rmtree(partial, ignore_errors=True)
@@ -819,57 +801,41 @@ def has_google_crc32c() -> bool:
     return True
 
 
+def snapshot_staging_directory(context: Context) -> str:
+    """冻结树快照在这一趟分片目录里的那一份（共享根下，别的台照同一个路径读）。"""
+    return os.path.join(context.shards, "frozen-snapshot")
+
+
 def build_snapshot_staging(context: Context) -> tuple[str, str]:
-    """冻结树里驱动要拷的那几样（Cargo.toml、Cargo.lock、.cargo、crates，不带 target）照驱动自己的 sync_tree 拷一份，发给别的台；摘要也照驱动的算。"""
+    """冻结树里驱动要拷的那几样（Cargo.toml、Cargo.lock、.cargo、crates，不带 target）照驱动自己的 sync_tree 拷一份给别的台读；摘要也照驱动的算。"""
     module = row_driver_module(context)
-    staging = os.path.join(context.shards, "frozen-snapshot")
+    staging = snapshot_staging_directory(context)
     module.sync_tree(os.path.join(context.repo, context.tree), staging)
     digest, count = module.snapshot_digest(staging)
     return digest, str(count)
 
 
 def expected_description(context: Context, snapshot: tuple[str, str]) -> dict:
-    driver_peer_path = driver_files(context)[0][1] if context.driver_overridden else os.path.relpath(context.driver_path, context.research_root)
+    """别的台那一头要核的（peer_side.py 文件头「expected.json 的键」）：路径都是两台相同的绝对路径。"""
+    baseline_timing = os.path.join(context.repo, context.baseline_timing)
     return {"python": f"{sys.version_info.major}.{sys.version_info.minor}", "google_crc32c": has_google_crc32c(),
-            "baseline_timing": [context.baseline_timing, sha256_of_file(os.path.join(context.repo, context.baseline_timing))],
-            "files": driver_hashes(context), "snapshot": [PEER_SNAPSHOT_RELATIVE, snapshot[0], snapshot[1]], "research_directory": RESEARCH_RELATIVE,
-            "driver": driver_peer_path, "disk_bytes_per_slot": PEER_DISK_BYTES_PER_SLOT, "out": PEER_OUT_RELATIVE}
+            "baseline_timing": [baseline_timing, sha256_of_file(baseline_timing)], "files": driver_hashes(context),
+            "snapshot": [snapshot_staging_directory(context), snapshot[0], snapshot[1]],
+            "research_directory": HERE, "driver": context.driver_path,
+            "disk_bytes_per_slot": PEER_DISK_BYTES_PER_SLOT}
 
 
 def build_peer_kit(context: Context, expected: dict) -> str:
+    """这一趟给别的台读的那一份（共享根下）：kit 目录里只有 expected.json；交回 kit 目录。"""
     kit = os.path.join(context.attempt_dir, "peer-kit")
     os.makedirs(kit)
-    shutil.copy2(os.path.join(HERE, "peer_side.py"), os.path.join(kit, "peer_side.py"))
-    if context.driver_overridden:
-        os.makedirs(os.path.join(kit, "driver"))
-        shutil.copy2(context.driver_path, os.path.join(kit, "driver", os.path.basename(context.driver_path)))
     with open(os.path.join(kit, "expected.json"), "x", encoding="utf-8") as handle:
         json.dump(expected, handle, ensure_ascii=False, indent=1)
     return kit
 
 
-def configuration_for(context: Context, host: Host, values: dict[str, str]) -> str | None:
-    """不是 PEER_SSH_HOST 的那一台：另写一份只给它用的配置（文件头「机器」）。PEER_SSH_HOST 那一台用原配置，交回 None。"""
-    if host.is_peer:
-        return None
-    keys = {"PEER_SSH_HOST": host.alias, "PEER_REPOSITORY_DIRECTORY": host.repository_directory, "PEER_CARGO_BIN_DIRECTORY": host.cargo_bin_directory,
-            "PEER_MEMORY_CAP": host.memory_cap_text or values.get("PEER_MEMORY_CAP", "")}
-    for key in ("QUIESCE_STOP_COMMAND", "QUIESCE_STOPPED_CHECK_COMMAND", "QUIESCE_START_COMMAND", "QUIESCE_STARTED_CHECK_COMMAND"):
-        keys[key] = values.get(key, "")
-    keys.update({"ENABLE_ACROSS_MACHINES": "1", "ENABLE_GPU": values.get("ENABLE_GPU", "0")})
-    if any("'" in value or "\n" in value for value in keys.values()):
-        raise RunCondition(f"{host_name(host.number)}的配置值里有单引号或换行，写不成单台配置")
-    path = os.path.join(context.attempt_dir, f"host-{host.number}.env")
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write("# rows_orchestrator.py 按 --emit-hosts 为这一台另写的单台配置（PEER_* 换成这一台的），只给 multi-host-run.sh 用\n")
-        for key, value in keys.items():
-            handle.write(f"{key}='{value}'\n")
-    return path
-
-
 def driver_environment() -> dict[str, str]:
-    return dict(os.environ, PYTHONDONTWRITEBYTECODE="1", RUN_WITH_MEMORY_CAP_PARALLEL_REASON=PARALLEL_REASON)
+    return dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
 
 
 def write_record(directory: str, record: dict) -> None:
@@ -887,7 +853,7 @@ def launch_local(context: Context, expected_hashes: dict[str, str], label: str, 
     command = ["nice", "-n", "19", "python3", "-B", context.driver_path, "--repo-root", context.repo, "--work-root", work_root,
                "--output-root", context.step_root(step), "--snapshot-from", os.path.join(context.repo, context.tree),
                "--baseline-timing", os.path.join(context.repo, context.baseline_timing), "--timing-output", timing] + step_arguments(step, rows, lanes, threads)
-    record = {"label": label, "step": step.key, "rows": list(rows), "host": 1, "kind": kind, "product": product, "timing": timing,
+    record = {"label": label, "step": step.key, "rows": list(rows), "host": context.own_host, "kind": kind, "product": product, "timing": timing,
               "attempt": os.path.basename(context.attempt_dir), "command": command[5:]}
     write_record(directory, record)
     with open(product, "x", encoding="utf-8") as out, open(os.path.join(directory, "driver.stderr"), "x", encoding="utf-8") as err:
@@ -899,58 +865,63 @@ def peer_label(context: Context, label: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "-", f"e171s1{context.tag}-{os.path.basename(context.attempt_dir)}-{label}")
 
 
-def multi_host_command(context: Context, label: str, kit: str, inner: list[str]) -> list[str]:
-    return (["bash", context.multi_host_run, "--peer", "--memory-cap", PEER_OUTER_MEMORY_CAP, "--label", peer_label(context, label),
-             "--send", kit, PEER_KIT_RELATIVE, "--send", os.path.join(context.shards, "frozen-snapshot"), PEER_SNAPSHOT_RELATIVE,
-             "--fetch", PEER_OUT_RELATIVE, "--", "env", "PYTHONDONTWRITEBYTECODE=1", f"RUN_WITH_MEMORY_CAP_PARALLEL_REASON={PARALLEL_REASON}",
-             "nice", "-n", "19", "python3", "-B", f"{PEER_KIT_RELATIVE}/peer_side.py"] + inner)
+def peer_side_arguments(kit: str, mode: str, out: str) -> list[str]:
+    """别的台那一头 peer_side.py 的参数：读 kit 里的 expected.json，产物写进共享根下的 out。"""
+    return [mode, "--expected", os.path.join(kit, "expected.json"), "--out", out]
 
 
-def multi_host_environment(fetch_directory: str, configuration_file: str | None) -> dict[str, str]:
-    environment = dict(os.environ, MULTI_HOST_RUN_FETCH_DIRECTORY=fetch_directory, MULTI_HOST_RUN_POLL_SECONDS=MULTI_HOST_RUN_POLL_SECONDS)
-    if configuration_file:
-        environment["SINGLEFS_MULTI_HOST_CONFIG"] = configuration_file
-    return environment
+def peer_side_invocation() -> list[str]:
+    """转交的命令里 peer_side.py 参数之前那一截：研究目录里的 peer_side.py（别的台照同一个绝对路径起）。"""
+    return ["env", "PYTHONDONTWRITEBYTECODE=1", "nice", "-n", "19", "python3", "-B", PEER_SIDE]
 
 
-def launch_peer(context: Context, kit: str, label: str, step: Step, rows: tuple[int, ...], threads: int, host: int,
-                configuration_file: str | None) -> tuple[subprocess.Popen, dict]:
+def peer_command(context: Context, peer_name: str, host: int, inner: list[str], memory_arguments: list[str] | None = None) -> list[str]:
+    """在别的台 host 起 peer_side.py 那一条：经 shard_relay.py 交给落在那一台的那一片代跑（文件头「机器」），不自己连那一台。peer_name 是转交的标签；
+    memory_arguments 是调用方弄坏开关下多带的参数（不给取这一份的开关 peer-command-gets-memory-cap）。"""
+    if host not in context.relay_targets:
+        raise RunCondition(f"{host_name(host)}没有代跑的那一片（这一趟没经 task-server 分片，或计划里的那一片没落在那一台）")
+    if memory_arguments is None:
+        memory_arguments = "--memory-cap 4G".split() if broken("peer-command-gets-memory-cap") else []   # 弄坏开关造的错参数：整句写成一个字面量再拆
+    return (["python3", "-B", SHARD_RELAY, "relay", "--plan", context.relay_plan, "--to", str(context.relay_targets[host])] + memory_arguments
+            + ["--label", peer_name, "--poll", str(context.poll_seconds), "--"] + peer_side_invocation() + inner)
+
+
+def launch_peer(context: Context, kit: str, label: str, step: Step, rows: tuple[int, ...], threads: int, host: int) -> tuple[subprocess.Popen, dict]:
     directory = os.path.join(context.attempt_dir, label)
     os.makedirs(directory)
-    fetch = os.path.join(directory, "fetch")
-    inner = ["run-driver", "--expected", f"{PEER_KIT_RELATIVE}/expected.json", "--"] + step_arguments(step, rows, 1, threads)
-    command = multi_host_command(context, label, kit, inner)
-    record = {"label": label, "step": step.key, "rows": list(rows), "host": host, "kind": "peer", "fetch_dir": fetch,
-              "product": os.path.join(fetch, PEER_OUT_RELATIVE, "product.out"), "timing": os.path.join(fetch, PEER_OUT_RELATIVE, "timing.out"),
+    out = os.path.join(directory, PEER_OUT_DIRECTORY_NAME)
+    inner = peer_side_arguments(kit, "run-driver", out) + ["--"] + step_arguments(step, rows, 1, threads)
+    command = peer_command(context, peer_label(context, label), host, inner)
+    record = {"label": label, "step": step.key, "rows": list(rows), "host": host, "kind": "peer", "peer_out": out,
+              "product": os.path.join(out, "product.out"), "timing": os.path.join(out, "timing.out"),
               "attempt": os.path.basename(context.attempt_dir), "command": inner}
     write_record(directory, record)
-    with open(os.path.join(directory, "multi-host-run.out"), "x", encoding="utf-8") as out, \
-            open(os.path.join(directory, "multi-host-run.err"), "x", encoding="utf-8") as err:
-        process = subprocess.Popen(command, cwd=context.repo, stdout=out, stderr=err, env=multi_host_environment(fetch, configuration_file),
-                                   start_new_session=True)
+    with open(os.path.join(directory, "relay.out"), "x", encoding="utf-8") as out_file, \
+            open(os.path.join(directory, "relay.err"), "x", encoding="utf-8") as err:
+        process = subprocess.Popen(command, cwd=PEER_START_DIRECTORY, stdout=out_file, stderr=err, start_new_session=True)
     return process, record
 
 
-def preflight_peer(context: Context, kit: str, host: Host, slots: int, threads: int, configuration_file: str | None) -> list[str]:
-    """别的台的预检：multi-host-run.sh 自己比工具链（不同退 255），peer_side.py preflight 核 Python、google_crc32c、rsync、基线计时与驱动的 sha256、
-    快照摘要、O3 冻结行、盘，--compile 时把冻结快照离线编一遍。没过退 78。"""
+def preflight_peer(context: Context, kit: str, host: Host, slots: int, threads: int) -> list[str]:
+    """别的台的预检（经转交在那一台起）：peer_side.py preflight 核 Python、google_crc32c、rsync、基线计时与驱动的 sha256、
+    快照摘要、O3 冻结行、本地盘，--compile 时把冻结快照离线编一遍。没过退 78。"""
     label = f"preflight-h{host.number}"
     directory = os.path.join(context.attempt_dir, label)
     os.makedirs(directory)
-    fetch = os.path.join(directory, "fetch")
-    inner = ["preflight", "--expected", f"{PEER_KIT_RELATIVE}/expected.json", "--slots", str(slots), "--threads", str(threads)]
+    out = os.path.join(directory, PEER_OUT_DIRECTORY_NAME)
+    inner = peer_side_arguments(kit, "preflight", out) + ["--slots", str(slots), "--threads", str(threads)]
     if context.peer_compile_check:
         inner.append("--compile")
-    with open(os.path.join(directory, "multi-host-run.out"), "x", encoding="utf-8") as out, \
-            open(os.path.join(directory, "multi-host-run.err"), "x", encoding="utf-8") as err:
-        code = subprocess.run(multi_host_command(context, label, kit, inner), cwd=context.repo, stdout=out, stderr=err,
-                              env=multi_host_environment(fetch, configuration_file)).returncode
-    report_path = os.path.join(fetch, PEER_OUT_RELATIVE, "preflight.txt")
+    command = peer_command(context, peer_label(context, label), host.number, inner)
+    with open(os.path.join(directory, "relay.out"), "x", encoding="utf-8") as out_file, \
+            open(os.path.join(directory, "relay.err"), "x", encoding="utf-8") as err:
+        code = subprocess.run(command, cwd=PEER_START_DIRECTORY, stdout=out_file, stderr=err).returncode
+    report_path = os.path.join(out, "preflight.txt")
     report = open(report_path, encoding="utf-8").read().splitlines() if os.path.exists(report_path) else []
     if code != 0:
-        tail = open(os.path.join(directory, "multi-host-run.err"), encoding="utf-8").read().splitlines()[-4:]
+        tail = open(os.path.join(directory, "relay.err"), encoding="utf-8").read().splitlines()[-4:]
         failed = [line for line in report if " ok=false" in line] or tail
-        raise RunCondition(f"{host_name(host.number)}预检没过（multi-host-run.sh 退 {code}；255 是它自己没跑成：配置、工具链、拷树、连不上）："
+        raise RunCondition(f"{host_name(host.number)}预检没过（转交退 {code}；255 是代跑那一片没了心跳，2 是转交的参数错）："
                            + " | ".join(failed))
     return report
 
@@ -976,16 +947,16 @@ def rows_text(rows) -> str:
 
 
 def finish_shard(context: Context, record: dict, code: int) -> bool:
-    """一个分片结束：记退出码；别的台的把取回的行收进本机；本机的把做完的行记账。交回跑成没有（退 0、点名的行都有 row-result.tsv、产物在）。"""
+    """一个分片结束：记退出码；别的台的把它输出目录里做完的行收进本机；本机的把做完的行记账。交回跑成没有（退 0、点名的行都有 row-result.tsv、产物在）。"""
     with open(os.path.join(context.attempt_dir, record["label"], "exit"), "w", encoding="utf-8") as handle:
         handle.write(f"{code}\n")
     step = STEPS[record["step"]]
     if record["kind"] == "peer":
-        harvest_fetch(context, record)
+        harvest_peer_rows(context, record)
     elif record["kind"] == "local":  # 重报（carry）不真跑，不记台：那几行在哪台跑的，账上早先已记
         for row in record["rows"]:
             if is_done(context, step, row):
-                append_ledger(context, step.key, row, 1, "local")
+                append_ledger(context, step.key, row, record["host"], "local")
     done = all(is_done(context, step, row) for row in record["rows"])
     ok = code == 0 and done and os.path.exists(record["product"])
     note = "（250–254、245 是内存包装自己的结局，那一次不算）" if 245 == code or 250 <= code <= 254 else ""
@@ -995,7 +966,8 @@ def finish_shard(context: Context, record: dict, code: int) -> bool:
 
 
 def stop_running(context: Context, running: list[Running]) -> None:
-    """收到停止信号：给每个在跑的分片（各自一个进程组）发一次 TERM；multi-host-run.sh 收到后先停那边、取回、再删树。等它们都退出，再把取回的行收进来。"""
+    """收到停止信号：给每个在跑的分片（各自一个进程组）发一次 TERM；转交的那一条收到后写停止请求，代跑那一片停那边那条命令、删那一台本地盘上它的目录。
+    等它们都退出，再把别的台已写进共享根的做完的行收进来。"""
     for item in running:
         try:
             os.killpg(item.process.pid, signal.SIGTERM)
@@ -1006,7 +978,7 @@ def stop_running(context: Context, running: list[Running]) -> None:
 
 
 def run_queue(context: Context, allocations: list[HostAllocation], jobs: list[Job], row_zero_host: int | None, expected_hashes: dict[str, str],
-              kit: str | None, configurations: dict[int, str | None]) -> tuple[list[dict], list[Job], list[str]]:
+              kit: str | None) -> tuple[list[dict], list[Job], list[str]]:
     """交回 (跑成的分片记录, 放不下的, 没跑成的说明)。某一行没跑成就不再派新行，在跑的跑完。"""
     free = [(allocation.number, index) for allocation in allocations for index in range(allocation.slots)]
     threads_of = {allocation.number: allocation.threads_per_slot for allocation in allocations}
@@ -1024,13 +996,13 @@ def run_queue(context: Context, allocations: list[HostAllocation], jobs: list[Jo
             label = f"{job.step}-row-{'-'.join(str(row) for row in job.rows)}-h{slot[0]}"
             try:
                 snapshot_check(context)  # 作废 Z5：同原跑法 driver_step，每个驱动起之前核一次
-                if slot[0] == 1:
+                if slot[0] == context.own_host:
                     fresh = 0 in job.rows or job.step in ("r11", "r12")
                     work_root = os.path.join(context.work_root, f"{os.path.basename(context.attempt_dir)}-{label}" if fresh else f"host1-slot{slot[1]}")
-                    process, record = launch_local(context, expected_hashes, label, step, job.rows, 1, threads_of[1], work_root, "local")
+                    process, record = launch_local(context, expected_hashes, label, step, job.rows, 1, threads_of[slot[0]], work_root, "local")
                 else:
-                    assert kit is not None, "有别的台的槽就建过发给它的那一份"
-                    process, record = launch_peer(context, kit, label, step, job.rows, threads_of[slot[0]], slot[0], configurations.get(slot[0]))
+                    assert kit is not None, "有别的台的槽就建过给它读的那一份"
+                    process, record = launch_peer(context, kit, label, step, job.rows, threads_of[slot[0]], slot[0])
             except Stopped as error:
                 failures.append(str(error))
                 break
@@ -1084,7 +1056,7 @@ def install(context: Context, path: str, text: str) -> None:
 
 
 def run_carry(context: Context, step: Step, rows: tuple[int, ...], expected_hashes: dict[str, str]) -> dict:
-    """更早几趟已做完的行：本机一个 --skip-finished 驱动从行目录重报（不编、不跑装置），这一趟才有一份覆盖全部行的分片。"""
+    """更早几趟已做完的行：本机一个驱动从行目录重报（同键做完的行按键复用，不编、不跑装置），这一趟才有一份覆盖全部行的分片。"""
     work_root = os.path.join(context.attempt_dir, f"carry-work-{step.key}")
     process, record = launch_local(context, expected_hashes, f"{step.key}-carry", step, rows, 1, CARRY_THREADS, work_root, "carry")
     code = process.wait()
@@ -1122,16 +1094,6 @@ def load_hosts(context: Context) -> tuple[list[Host], dict[str, str], str]:
     return hosts_from_configuration(completed.returncode, completed.stdout)
 
 
-def query_resources(context: Context, hosts: list[Host]) -> dict[int, HostResources]:
-    completed = subprocess.run(["bash", "-c", context.resources_command], cwd=context.repo, capture_output=True, text=True)
-    if completed.returncode != 0:
-        raise RunCondition(f"host-resources.py --json 退 {completed.returncode}")
-    found, unread = resources_from_json(json.loads(completed.stdout), hosts)
-    if unread:
-        raise RunCondition("；".join(unread) + "（不悄悄少用一台：修好那台，或在多机配置里把它去掉）")
-    return found
-
-
 def timed_out_rows(product: str) -> tuple[int, ...]:
     rows = [int(key_values(line)["row_number"]) for line in open(product, encoding="utf-8") if line.startswith("row ") and " device_exit=253 " in line]
     return tuple(sorted(rows))
@@ -1161,24 +1123,23 @@ def check_rows(context: Context, product: str) -> None:
 
 
 class PeerSetup:
-    """这一趟发给别的台的那一份（快照、预检、单台配置）只做一次。"""
+    """这一趟给别的台读的那一份（共享根下的快照与 expected.json）、各台的预检只做一次。"""
 
     def __init__(self, context: Context, hosts: list[Host], values: dict[str, str], snapshot: tuple[str, str]) -> None:
         self.context, self.hosts, self.values, self.snapshot = context, {host.number: host for host in hosts}, values, snapshot
         self.kit: str | None = None
-        self.configurations: dict[int, str | None] = {}
+        self.prepared: set[int] = set()
 
     def ready(self, number: int, slots: int, threads: int) -> None:
-        if number == 1 or number in self.configurations:
+        if number == self.context.own_host or number in self.prepared:
             return
         if self.kit is None:
             self.kit = build_peer_kit(self.context, expected_description(self.context, self.snapshot))
-        configuration = configuration_for(self.context, self.hosts[number], self.values)
-        for line in preflight_peer(self.context, self.kit, self.hosts[number], slots, threads, configuration):
+        for line in preflight_peer(self.context, self.kit, self.hosts[number], slots, threads):
             say(self.context, f"  预检 {host_name(number)}：{line}")
         if STOP.is_set():
             raise Interrupted()
-        self.configurations[number] = configuration
+        self.prepared.add(number)
 
 
 def phase_rows_and_checks(context: Context, hosts: list[Host], allocations: list[HostAllocation], setup: PeerSetup,
@@ -1198,7 +1159,7 @@ def phase_rows_and_checks(context: Context, hosts: list[Host], allocations: list
     records: list[dict] = []
     if jobs:
         if sum(allocation.slots for allocation in allocations) == 0:
-            raise RunCondition("此刻各台都放不下一条线道（每槽要 5 线程、slice 里 6G（别的台 10G）、实占 10 GiB）")
+            raise RunCondition("各台的线程都不够一条线道（每槽要 5 线程）")
         placements, deferred = simulate(allocations, jobs, row_zero_host)
         say(context, f"  这一趟要跑 {len(jobs)} 行（已做完的不重跑）：" + " ".join(f"{job.step}:{rows_text(job.rows)}" for job in queue_order(jobs)))
         for line in prediction_text(allocations, placements, deferred):
@@ -1206,7 +1167,7 @@ def phase_rows_and_checks(context: Context, hosts: list[Host], allocations: list
         for allocation in allocations:
             if allocation.slots > 0:
                 setup.ready(allocation.number, allocation.slots, allocation.threads_per_slot)
-        records, deferred, failures = run_queue(context, allocations, jobs, row_zero_host, expected_hashes, setup.kit, setup.configurations)
+        records, deferred, failures = run_queue(context, allocations, jobs, row_zero_host, expected_hashes, setup.kit)
         if failures:
             raise Stopped("这几行没跑成：" + "；".join(failures) + "。做完的行都留着，同一条命令再起只补没做完的")
     for key in ("s11", "s12"):
@@ -1231,7 +1192,7 @@ def row_line(product: str, row: int) -> str:
 def cross_host_check(context: Context, multi: bool, records: list[dict], snapshot: tuple[str, str], expected_hashes: dict[str, str]) -> None:
     path = context.product(CROSS_HOST_CHECK_STEM)
     if not multi:
-        text, _ = cross_host_product(None, None, None, "只有一台（双机开关没开或清单里只有本机）")
+        text, _ = cross_host_product(None, None, None, single_host_reason(context))
         install(context, path, text)
         say(context, f"  跨机一致对照：本次未跑（只有一台），产物 {os.path.relpath(path, context.repo)}")
         return
@@ -1253,8 +1214,13 @@ def cross_host_check(context: Context, multi: bool, records: list[dict], snapsho
         raise Stopped(f"跨机一致对照不同（停机，不作废、不当结果；见 {os.path.relpath(path, context.repo)}）")
 
 
+def single_host_reason(context: Context) -> str:
+    """跨机对照报 not_run 时写的原因（文件头「经 task-server」）。"""
+    return "只有一台（双机开关没开或清单里只有本机）" if context.relay_plan else "没经 task-server 分片（只用这一台）"
+
+
 def phase_timeout_reruns(context: Context, hosts: list[Host], setup: PeerSetup, expected_hashes: dict[str, str]) -> None:
-    """第 13 步（原规则）：第 11、12 步里退 253 的行单线道再跑一次，限时再乘 3；带探针的先、不带的后；台照 single_lane_host 挑，线程取每台线程（登记值）。"""
+    """第 13 步（原规则）：第 11、12 步里退 253 的行单线道再跑一次，限时再乘 3；带探针的先、不带的后；台照 single_lane_host 挑（编排那一台），线程取每台线程（登记值）。"""
     timed = {"r11": timed_out_rows(context.product("rows-probe-driver")), "r12": timed_out_rows(context.product("rows-driver"))}
     say(context, f"  超时的行：带探针 {rows_text(timed['r11']) or 'none'}；不带探针 {rows_text(timed['r12']) or 'none'}")
     for key in ("r11", "r12"):
@@ -1264,15 +1230,14 @@ def phase_timeout_reruns(context: Context, hosts: list[Host], setup: PeerSetup, 
         remaining = tuple(row for row in rows if not is_done(context, step, row))
         records: list[dict] = []
         if remaining:
-            resources = query_resources(context, hosts)
-            allocations = allocate(hosts, resources)
-            for line in allocation_text(allocations, resources):
+            allocations = allocate(hosts)
+            for line in allocation_text(allocations):
                 say(context, "  " + line)
-            chosen = single_lane_host(allocations)
-            single = HostAllocation(chosen.number, chosen.threads, chosen.room_bytes, 1, chosen.threads)
+            chosen = single_lane_host(allocations, context.own_host)
+            single = HostAllocation(chosen.number, chosen.threads, 1, chosen.threads)
             say(context, f"  第 13 步 {key} 第 {rows_text(remaining)} 行 → {host_name(chosen.number)}，单线道 {chosen.threads} 线程（限时再乘 3 由驱动现算）")
             setup.ready(chosen.number, 1, chosen.threads)
-            records, deferred, failures = run_queue(context, [single], [Job(key, remaining, 0.0)], None, expected_hashes, setup.kit, setup.configurations)
+            records, deferred, failures = run_queue(context, [single], [Job(key, remaining, 0.0)], None, expected_hashes, setup.kit)
             if failures or deferred:
                 raise Stopped("第 13 步没跑成：" + "；".join(failures or ["放不下"]))
         merge_step(context, step, rows, records, setup.snapshot, expected_hashes)
@@ -1283,32 +1248,31 @@ def run(context: Context, plan_only: bool) -> int:
     for signal_number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(signal_number, on_signal)
     snapshot_check(context)
-    hosts, values, note = load_hosts(context)
     if plan_only:
+        hosts, values, note = load_hosts(context)
         if note:
             print(note)
-        resources = query_resources(context, hosts)
-        allocations = allocate(hosts, resources)
+        allocations = allocate(hosts)
         seconds = row_seconds(context)
         keys = ("s11", "s12", "sx") if len(hosts) > 1 else ("s11", "s12")
         jobs = [Job(key, (row,), seconds[(key, row)]) for key in keys for row in STEP_ROWS[key] if not is_done(context, STEPS[key], row)]
         placements, deferred = simulate(allocations, jobs, None)
-        for line in allocation_text(allocations, resources) + prediction_text(allocations, placements, deferred):
+        for line in allocation_text(allocations) + prediction_text(allocations, placements, deferred):
             print(line)
         print("每行推的用时（秒）：" + " ".join(f"{key}:{row}={value:.0f}" for (key, row), value in sorted(seconds.items())))
         return 0
+    hosts, values, note = session_hosts(context)
     context.attempt_dir = next_attempt_directory(context)
     say(context, f"多机编排开跑：{os.path.basename(context.attempt_dir)}，行输出根 {os.path.relpath(context.rows_root, context.repo)}")
     if note:
         say(context, "  " + note)
     for record in shard_records(context):
         if record["kind"] == "peer" and record["attempt"] != os.path.basename(context.attempt_dir):
-            harvested = harvest_fetch(context, record)
+            harvested = harvest_peer_rows(context, record)
             if harvested:
-                say(context, f"  收进以前取回的行：{record['label']}（{record['attempt']}）第 {rows_text(harvested)} 行")
-    resources = query_resources(context, hosts)
-    allocations = allocate(hosts, resources)
-    for line in allocation_text(allocations, resources):
+                say(context, f"  收进以前各趟别的台做完的行：{record['label']}（{record['attempt']}）第 {rows_text(harvested)} 行")
+    allocations = allocate(hosts)
+    for line in allocation_text(allocations):
         say(context, "  " + line)
     expected_hashes = driver_hashes(context)
     setup = PeerSetup(context, hosts, values, build_snapshot_staging(context))
@@ -1316,6 +1280,17 @@ def run(context: Context, plan_only: bool) -> int:
     phase_timeout_reruns(context, hosts, setup, expected_hashes)
     snapshot_check(context)
     return 0
+
+
+DEFAULT_HOSTS_COMMAND = "bash scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts"
+
+
+def hosts_command_of(environment) -> str:
+    return environment.get("ROWS_ORCHESTRATOR_HOSTS_COMMAND") or DEFAULT_HOSTS_COMMAND
+
+
+def poll_seconds_of(environment) -> float:
+    return float(environment.get("ROWS_ORCHESTRATOR_POLL_SECONDS") or 10)
 
 
 def context_from_arguments(arguments: argparse.Namespace) -> Context:
@@ -1327,12 +1302,173 @@ def context_from_arguments(arguments: argparse.Namespace) -> Context:
         dumps=arguments.dumps, tree=arguments.tree, snapshot_digest=arguments.snapshot_digest, baseline_timing=arguments.baseline_timing,
         check=os.path.abspath(arguments.check), logs=os.path.abspath(arguments.logs), work_root=os.path.abspath(arguments.work_root),
         driver_path=os.path.abspath(driver_override) if driver_override else os.path.join(research_root, RESEARCH_RELATIVE, DRIVER_NAME),
-        driver_overridden=bool(driver_override),
-        multi_host_run=environment.get("ROWS_ORCHESTRATOR_MULTI_HOST_RUN") or os.path.join(os.path.abspath(arguments.repo), "scripts/hosts/multi-host-run.sh"),
-        hosts_command=environment.get("ROWS_ORCHESTRATOR_HOSTS_COMMAND") or "bash scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts",
-        resources_command=environment.get("ROWS_ORCHESTRATOR_RESOURCES_COMMAND") or "python3 scripts/hosts/host-resources.py --json",
-        poll_seconds=float(environment.get("ROWS_ORCHESTRATOR_POLL_SECONDS") or 10),
+        driver_overridden=bool(driver_override), hosts_command=hosts_command_of(environment), poll_seconds=poll_seconds_of(environment),
         peer_compile_check=environment.get("ROWS_ORCHESTRATOR_PEER_COMPILE_CHECK", "1") != "0")
+
+
+# ── 经 task-server（文件头「经 task-server」）──
+TASK_SERVER_PHASE_VARIABLE = "TASK_SERVER_SHARD_PHASE"
+SHARD_POSITION_VARIABLE = "TASK_SERVER_SHARD"
+SHARD_PLAN_VARIABLE = "TASK_SERVER_SHARD_PLAN_DIRECTORY"
+SHARD_OUTPUT_VARIABLE = "TASK_SERVER_SHARD_OUTPUT_DIRECTORY"
+SHARD_OUTPUTS_VARIABLE = "TASK_SERVER_SHARD_OUTPUTS"
+SHARD_HOST_VARIABLE = "TASK_SERVER_SHARD_HOST"
+SESSION: dict = {}   # 编排那一片：plan、count、address、beat（orchestrator_session 填一次）
+
+
+def shard_position(text: str) -> tuple[int, int] | None:
+    """TASK_SERVER_SHARD=<片号>/<片数> → (片号, 片数)；写坏了交 None。"""
+    parts = text.split("/")
+    if len(parts) != 2 or not all(part.isdigit() for part in parts) or int(parts[0]) >= int(parts[1]):
+        return None
+    return int(parts[0]), int(parts[1])
+
+
+def planned_shards(repo: str, environment) -> tuple[int, str]:
+    """计划那一步的片数（文件头「机器」）：清单判法解出几台就几片，至多 MAXIMUM_SHARDS。交回 (片数, 给日志的一句)。"""
+    completed = subprocess.run(["bash", "-c", hosts_command_of(environment)], cwd=repo, capture_output=True, text=True,
+                               env=dict(environment))
+    hosts, _, note = hosts_from_configuration(completed.returncode, completed.stdout)
+    count = min(len(hosts), MAXIMUM_SHARDS)
+    if len(hosts) > MAXIMUM_SHARDS:
+        note = (note + "；" if note else "") + f"清单里有 {len(hosts)} 台，服务只分本机与第二台两种，多出来的 {len(hosts) - MAXIMUM_SHARDS} 台用不上"
+    return count, note
+
+
+def write_shard_plan(repo: str, plan: str, environment, say) -> int:
+    count, note = planned_shards(repo, environment)
+    shards = []
+    for index in range(count):
+        entry = {"label": "编排那一片（第 11–13 步、合并、判法、跨机对照）" if index == 0 else f"代跑那一片：编排那一片转交的第 {index} 片的行"}
+        if broken("plan-pins-local"):
+            entry["pin"] = "local"
+        if broken("plan-writes-memory-limit"):
+            entry.update(json.loads('{"memory_limit": "6G"}'))   # 弄坏开关造的错键：整句写成一个字面量再解
+        shards.append(entry)
+    temporary = os.path.join(plan, "plan.json.partial")
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump({"shards": shards, "note": note or "清单解出的台数"}, handle, ensure_ascii=False)
+    os.replace(temporary, os.path.join(plan, "plan.json"))
+    if note:
+        say(f"· {note}")
+    say(f"· 计划：{count} 片（不钉台，服务挑机器）；片号 0 编排，别的片代跑转交的命令")
+    return 0
+
+
+def merge_shards(plan: str, environment, say) -> int:
+    """合并那一步（文件头「经 task-server」③）：整件已在编排那一片做完；核它写了 finished、各片的产物目录在。"""
+    table = environment.get(SHARD_OUTPUTS_VARIABLE, "")
+    missing = []
+    for line in open(table, encoding="utf-8").read().splitlines() if table and os.path.exists(table) else []:
+        fields = line.split("\t")
+        if len(fields) >= 3 and not os.path.isdir(fields[2]):
+            missing.append(fields[0])
+    if not os.path.exists(shard_relay.finished_path(plan)):
+        say(f"✗ 合并：编排那一片没写 {shard_relay.finished_path(plan)}（退 1）")
+        return 1
+    if missing:
+        say(f"✗ 合并：第 {','.join(missing)} 片的产物目录不在（退 1）")
+        return 1
+    say("· 合并：整件已在编排那一片做完（合成、判法、跨机对照），没有要另合的")
+    return 0
+
+
+def orchestrator_session(plan: str, count: int, address: str) -> dict:
+    """编排那一片：登记、起心跳、收尾写 finished（atexit，退出码不论）。只做一次。服务重试这一片时先删上一次留下的 finished，
+    还在的代跑那一片接着代跑（已经见到 finished 退了的，这一次转交给它的命令照心跳停了退 255）。"""
+    if not SESSION:
+        if os.path.exists(shard_relay.finished_path(plan)):
+            os.remove(shard_relay.finished_path(plan))
+        shard_relay.register(plan, 0, address)
+        SESSION.update(plan=plan, count=count, address=address, beat=shard_relay.Beat(plan, 0).start())
+        atexit.register(shard_relay.mark_finished, plan)
+    return SESSION
+
+
+def shard_phase_before_layer(repo: str, environment=None, say=print) -> int | None:
+    """服务拆的那几步（文件头「经 task-server」）：计划、合并与代跑的片在这里跑完、交退出码；编排那一片与不经服务直接调的交 None，往下照编排跑。
+    各层编排器的 main 在载入配置、写任何东西之前调它。"""
+    environment = os.environ if environment is None else environment
+    phase = environment.get(TASK_SERVER_PHASE_VARIABLE, "")
+    if phase == "":
+        return None
+    if phase not in ("plan", "shard", "merge"):
+        say(f"✗ {TASK_SERVER_PHASE_VARIABLE}={phase} 认不出（只认 plan、shard、merge；这个变量只由 task-server 设）（退 2）")
+        return 2
+    plan = environment.get(SHARD_PLAN_VARIABLE, "")
+    if not plan or not os.path.isabs(plan) or not os.path.isdir(plan):
+        say(f"✗ {phase} 那一步没给在的计划目录（{SHARD_PLAN_VARIABLE}={plan or '没设'}）；这一步只由 task-server 起（退 2）")
+        return 2
+    if phase == "plan":
+        try:
+            return write_shard_plan(repo, plan, environment, say)
+        except RunCondition as error:
+            say(f"✗ 运行条件不满足（退 78）：{error}")
+            return EXIT_RUN_CONDITION
+    if phase == "merge":
+        return merge_shards(plan, environment, say)
+    position, address = shard_position(environment.get(SHARD_POSITION_VARIABLE, "")), environment.get(SHARD_HOST_VARIABLE, "")
+    if position is None or not shard_relay.is_host_address(address):
+        say(f"✗ 片那一步的 {SHARD_POSITION_VARIABLE}={environment.get(SHARD_POSITION_VARIABLE, '')!r}、{SHARD_HOST_VARIABLE}={address!r} 认不出（退 2）")
+        return 2
+    output = environment.get(SHARD_OUTPUT_VARIABLE, "")
+    if output:
+        os.makedirs(output, exist_ok=True)
+    index, count = position
+    if index == 0:
+        orchestrator_session(plan, count, address)
+        return None
+    shard_relay.register(plan, index, address)
+    return shard_relay.serve(plan, index, poll_seconds_of(environment), say)
+
+
+def wait_for_registrations(context: Context, plan: str, count: int) -> dict[int, str]:
+    deadline, told = time.monotonic() + REGISTRATION_WAIT_SECONDS, False
+    while True:
+        found = shard_relay.registrations(plan)
+        if len(found) >= count:
+            return found
+        if STOP.is_set():
+            raise Interrupted()
+        if time.monotonic() > deadline:
+            missing = [index for index in range(count) if index not in found]
+            raise RunCondition(f"计划分了 {count} 片，第 {rows_text(missing)} 片 {REGISTRATION_WAIT_SECONDS:.0f} 秒里没起来（服务还没派出去）：同一条命令再交")
+        if not told:
+            say(context, f"  等计划里的 {count} 片都起来（已登记 {len(found)} 片）")
+            told = True
+        time.sleep(context.poll_seconds)
+
+
+def session_hosts(context: Context) -> tuple[list[Host], dict[str, str], str]:
+    """跑的时候用哪几台（文件头「机器」）：不经服务直接调只用这一台；编排那一片等各片登记，台照各片的 TASK_SERVER_SHARD_HOST 定，别的台记下代跑的片号。"""
+    if os.environ.get(TASK_SERVER_PHASE_VARIABLE, "") != "shard":
+        context.own_host, context.relay_plan, context.relay_targets = 1, "", {}
+        return [Host(1, "", "", "", "", False)], {}, "没经 task-server 分片（TASK_SERVER_SHARD_PHASE 没设）：只用这一台，跨机对照报 not_run"
+    position = shard_position(os.environ.get(SHARD_POSITION_VARIABLE, ""))
+    address = os.environ.get(SHARD_HOST_VARIABLE, "")
+    if position is None or position[0] != 0 or not shard_relay.is_host_address(address):
+        raise RunCondition("编排只在片号 0 那一片里跑（别的片代跑转交的命令）")
+    session = orchestrator_session(os.environ[SHARD_PLAN_VARIABLE], position[1], address)
+    context.own_host, context.relay_plan = ORCHESTRATOR_HOST_NUMBER, session["plan"]
+    own_scratch = os.environ.get(shard_relay.SCRATCH_VARIABLE, "")
+    if own_scratch and os.path.isdir(own_scratch):   # 看这一台自己的性质：服务给了这一片本地盘上的草稿目录，自己那几行的工作根就放那里
+        context.work_root = os.path.join(own_scratch, "rows-work")
+    found = wait_for_registrations(context, session["plan"], session["count"])
+    targets: dict[int, int] = {}
+    numbers_of_other_addresses: dict[str, int] = {}
+    for index in sorted(found):
+        if found[index] == address:
+            continue
+        number = numbers_of_other_addresses.setdefault(found[index], ORCHESTRATOR_HOST_NUMBER + 1 + len(numbers_of_other_addresses))
+        if index != 0 and number not in targets:
+            targets[number] = index
+    if session["count"] > 1 and not targets:
+        raise RunCondition(f"计划分了 {session['count']} 片，都落在{host_name(context.own_host)}：跨机对照做不成。第二台空出来后同一条命令再交")
+    context.relay_targets = targets
+    hosts = [Host(number, "", "", "", "", number != 1) for number in sorted({context.own_host} | set(targets))]
+    note = (f"经 task-server 分片：{session['count']} 片，编排在{host_name(context.own_host)}"
+            + "".join(f"，{host_name(number)}由第 {index} 片代跑" for number, index in sorted(targets.items())))
+    return hosts, {}, note
 
 
 def main(argument_list: list[str]) -> int:
@@ -1352,6 +1488,10 @@ def main(argument_list: list[str]) -> int:
         parser.error("--resume-tag 要给（新的一趟的行输出根与产物名接它，不与上一趟撞名）")
     if os.path.realpath(arguments.check) != os.path.realpath(CHECK_PRODUCT):
         parser.error(f"--check 只认这一份旁边的 check_product.py（{CHECK_PRODUCT}），给的是 {arguments.check}")
+    if arguments.mode == "run":
+        phase_exit = shard_phase_before_layer(os.path.abspath(arguments.repo), say=lambda line: print(line, flush=True))
+        if phase_exit is not None:
+            return phase_exit
     context = context_from_arguments(arguments)
     try:
         return run(context, arguments.mode == "plan")
@@ -1362,24 +1502,17 @@ def main(argument_list: list[str]) -> int:
         say(context, f"✗ 停：{error}")
         return 1
     except Interrupted:
-        say(context, "收到停止信号：在跑的各行已停、别的台已做完的行已取回收进来；同一条命令再起就是续跑")
+        say(context, "收到停止信号：在跑的各行已停、别的台已做完的行已收进来；同一条命令再起就是续跑")
         return EXIT_STOPPED_BY_SIGNAL
 
 
 # ── 自证 ──
 REAL_REPOSITORY = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))  # 本文件在 scripts/experiment-apparatus/<装置>/ 下
 FAKES = HERE  # 假驱动 fake_*.py / fake_*.sh 与本文件同目录
+FAKE_TASK_SERVER = os.path.join(FAKES, "fake_task_server.py")
 
 
-SAMPLE_HOST_THREADS = 31  # 自证样本：只判内存那几项的格按每台 31 线程算槽，不随登记值变
-
-
-def resources_entry(number: int, threads: int, available_gib: float, room_gib: float, read: bool = True) -> dict:
-    """假的 host-resources.py --json 一台：threads 只写进 cpu 那一项当此刻空闲线程的样本，编排器不读它（allocation-caps 格核这一条）。"""
-    entry = {"number": number, "read": read}
-    if read:
-        entry.update(cpu={"available_threads": threads}, memory={"available": int(available_gib * GIB), "slice_room": int(room_gib * GIB)})
-    return entry
+SAMPLE_HOST_THREADS = 31  # 自证样本：按每台 31 线程算槽，不随登记值变
 
 
 def two_hosts(peer_cap: str = "50G") -> list[Host]:
@@ -1388,51 +1521,20 @@ def two_hosts(peer_cap: str = "50G") -> list[Host]:
 
 def cells_allocation() -> list[tuple[str, bool, str]]:
     results = []
-    today_found, _ = resources_from_json({"hosts": [resources_entry(1, 28, 19.5, 3.1), resources_entry(2, 32, 58.1, 42.5)]}, two_hosts())
-    today = [(item.slots, item.threads_per_slot) for item in allocate(two_hosts(), today_found, SAMPLE_HOST_THREADS)]
-    results.append(("allocation-today", today == [(0, 0), (4, 7)], f"本机/第二台 (槽, 每槽线程) = {today}，要 [(0, 0), (4, 7)]"))
-    bound_found, _ = resources_from_json({"hosts": [resources_entry(1, 31, 25, 40)]}, two_hosts()[:1])
-    bound = [(item.slots, item.threads_per_slot) for item in allocate(two_hosts()[:1], bound_found, SAMPLE_HOST_THREADS)]
-    results.append(("allocation-memory-bound", bound == [(2, 15)], f"31 线程、额度 25 GiB → {bound}，要 [(2, 15)]"))
-    # 每台线程是登记值、与此刻空闲无关：两台此刻空闲都只报 1 线程，分到的仍是登记值；第二台另被配置上限 30G 卡成 3 槽
+    threads = [(item.slots, item.threads_per_slot) for item in allocate(two_hosts(), SAMPLE_HOST_THREADS)]
+    results.append(("allocation-threads", threads == [(6, 5), (6, 5)], f"31 线程两台 (槽, 每槽线程) = {threads}，要 [(6, 5), (6, 5)]"))
+    short = [(item.slots, item.threads_per_slot) for item in allocate(two_hosts(), 4)]
+    results.append(("allocation-short", short == [(0, 0), (0, 0)], f"4 线程不够一槽 (槽, 每槽线程) = {short}，要 [(0, 0), (0, 0)]"))
+    # 每台线程是登记值、与此刻空闲无关，也与配置的内存上限无关
     registered = registered_host_threads()
-    capped_found, _ = resources_from_json({"hosts": [resources_entry(1, 1, 200, 200), resources_entry(2, 1, 200, 200)]}, two_hosts("30G"))
-    capped = [(item.threads, item.slots, item.threads_per_slot) for item in allocate(two_hosts("30G"), capped_found)]
-    local_slots, peer_slots = min(registered // 5, 200 // 6, 200 // 10), min(registered // 5, 200 // 10, 30 // 10)
-    wanted_caps = [(registered, local_slots, registered // local_slots), (registered, peer_slots, registered // peer_slots)]
-    results.append(("allocation-caps", registered > 1 and capped == wanted_caps,
-                    f"此刻空闲 1 线程，每台取登记值 {registered}；第二台配置上限 30G → {capped}，要 {wanted_caps}"))
-    account_found, _ = resources_from_json({"hosts": [resources_entry(1, 31, 100, 30), resources_entry(2, 31, 100, 30)]}, two_hosts())
-    account = [(item.slots, item.threads_per_slot) for item in allocate(two_hosts(), account_found, SAMPLE_HOST_THREADS)]
-    results.append(("allocation-wrapper-account", account == [(5, 6), (3, 10)],
-                    f"slice_room 30 GiB：本机每槽 6G、第二台每槽 10G（多外层 4G）→ {account}，要 [(5, 6), (3, 10)]"))
-    chosen = single_lane_host(allocate(two_hosts("30G"), capped_found))
-    results.append(("allocation-single-lane", (chosen.number, chosen.threads) == (1, registered),
-                    f"第 13 步挑 {chosen.number} 台 {chosen.threads} 线程，要本机 {registered}（登记值）"))
-    unread = resources_from_json({"hosts": [resources_entry(1, 8, 20, 20), resources_entry(2, 0, 0, 0, read=False)]}, two_hosts())[1]
-    results.append(("resources-unread", len(unread) == 1 and "第二台" in unread[0], f"读不到的台：{unread}"))
+    found = [(item.threads, item.slots, item.threads_per_slot) for item in allocate(two_hosts("30G"))]
+    wanted = [(registered, registered // 5, registered // (registered // 5))] * 2
+    results.append(("allocation-registered", registered > 1 and found == wanted, f"每台取登记值 {registered}、配置上限 30G 不卡槽数 → {found}，要 {wanted}"))
+    chosen = single_lane_host(allocate(two_hosts("30G")), 1)
+    on_peer = single_lane_host(allocate(two_hosts("30G")), 2)
+    results.append(("allocation-single-lane", (chosen.number, chosen.threads, on_peer.number, on_peer.threads) == (1, registered, 2, registered),
+                    f"第 13 步挑编排那一台：编排在本机挑 {chosen.number} 台 {chosen.threads} 线程，编排在第二台挑 {on_peer.number} 台 {on_peer.threads} 线程，要 {registered}（登记值）"))
     return results
-
-
-def cells_derived_configuration(scratch: str) -> list[tuple[str, bool, str]]:
-    """清单里不是 PEER_SSH_HOST 的那一台：--emit-hosts 解得出它，另写的单台配置经真的配置判法（--emit-hosts，不连机器）读出来 PEER_* 正是那一台的。"""
-    text = ("PEER_SSH_HOST=fakepeer\nPEER_REPOSITORY_DIRECTORY=/fake/peer\nPEER_CARGO_BIN_DIRECTORY=/fake/cargo\nPEER_MEMORY_CAP=50G\n"
-            "QUIESCE_STOP_COMMAND=''\nQUIESCE_STOPPED_CHECK_COMMAND=''\nQUIESCE_START_COMMAND=''\nQUIESCE_STARTED_CHECK_COMMAND=''\nENABLE_ACROSS_MACHINES=1\n"
-            "ENABLE_GPU=0\nMULTI_HOST_COUNT=2\nMULTI_HOST_2_SSH_HOST=fakepeer\nMULTI_HOST_2_REPOSITORY_DIRECTORY=/fake/peer\n"
-            "MULTI_HOST_2_CARGO_BIN_DIRECTORY=/fake/cargo\nMULTI_HOST_2_MEMORY_CAP=50G\nMULTI_HOST_2_IS_PEER=1\nMULTI_HOST_3_SSH_HOST=third.host\n"
-            "MULTI_HOST_3_REPOSITORY_DIRECTORY=/third/repo\nMULTI_HOST_3_CARGO_BIN_DIRECTORY=/third/cargo\nMULTI_HOST_3_MEMORY_CAP=''\nMULTI_HOST_3_IS_PEER=0\n")
-    hosts, values, _ = hosts_from_configuration(0, text)
-    attempt = os.path.join(scratch, "derived")
-    os.makedirs(attempt)
-    path = configuration_for(dataclasses.replace(Context(*([""] * 8), "", "", "", "", "", False, "", "", "", 1.0, False), attempt_dir=attempt), hosts[2], values)
-    completed = subprocess.run(["bash", os.path.join(REAL_REPOSITORY, "scripts/crash/crash-point-replay-shard-configuration-check.sh"), "--emit-hosts", REAL_REPOSITORY],
-                               capture_output=True, text=True, env=dict(os.environ, SINGLEFS_MULTI_HOST_CONFIG=path))
-    emitted = parse_assignments(completed.stdout)
-    good = (len(hosts) == 3 and not hosts[2].is_peer and completed.returncode == 0 and emitted.get("PEER_SSH_HOST") == "third.host"
-            and emitted.get("PEER_REPOSITORY_DIRECTORY") == "/third/repo" and emitted.get("PEER_MEMORY_CAP") == "50G"
-            and oct(os.stat(path).st_mode & 0o777) == "0o600" and configuration_for(None, hosts[1], values) is None)
-    return [("derived-host-config", good, f"清单 {len(hosts)} 台；判法退 {completed.returncode}，读出 PEER_SSH_HOST={emitted.get('PEER_SSH_HOST')}、"
-                                          f"上限 {emitted.get('PEER_MEMORY_CAP')}，权限 {oct(os.stat(path).st_mode & 0o777)}")]
 
 
 def cells_queue() -> list[tuple[str, bool, str]]:
@@ -1441,7 +1543,7 @@ def cells_queue() -> list[tuple[str, bool, str]]:
     order = [f"{job.step}:{job.rows[0]}" for job in queue_order(jobs)]
     good_order = order[:3] == ["s11:242", "s12:0", "sx:0"] and order[-1] == "s11:269" and len(order) == 17
     results = [("queue-order", good_order, f"头三个 {order[:3]}，末一个 {order[-1]}，共 {len(order)}")]
-    two = [HostAllocation(1, 10, 20 * GIB, 1, 10), HostAllocation(2, 10, 20 * GIB, 1, 10)]
+    two = [HostAllocation(1, 10, 1, 10), HostAllocation(2, 10, 1, 10)]
     placements, deferred = simulate(two, jobs, None)
     hosts_of = {(p.job.step, p.job.rows[0]): p.host for p in placements}
     walls = sorted(max(p.end for p in placements if p.host == number) for number in (1, 2))
@@ -1454,7 +1556,7 @@ def cells_queue() -> list[tuple[str, bool, str]]:
 
 
 def fake_shard(label: str, host: int, rows: tuple[int, ...], limit: str = "46124", digest: str = "d" * 64, extra: str = "") -> Shard:
-    product = [f"name=row_time_limit seconds={limit} baseline_seconds=15374.455 source=x-timing.out rerun_of_timed_out_rows=false",
+    product = [f"name=row_time_limit seconds={limit} baseline_seconds=15374.455 source=x-timing.out",
                "freeze_check before=true differences=0 detail=none", f"snapshot_digest={digest} files=9 snapshot_ns=5 rows={len(rows)}"]
     product += [f"row row_number={row} row_name=r{row} lane=0 status=ok device_exit=0 device_ns={row + 1} o3_status=ran" for row in rows]
     product += [f"table lanes=1 threads_per_lane=7 rows={len(rows)} table_wall_ns=10 sum_of_row_ns=3", "freeze_check before=false differences=0 detail=none"]
@@ -1491,7 +1593,7 @@ def cells_merge(scratch: str, check: str) -> list[tuple[str, bool, str]]:
              ("merge-refuse-missing", [fake_shard("a", 1, (0,))], (0, 15), "缺 [15]"),
              ("merge-refuse-duplicate", [fake_shard("a", 1, (0, 15)), fake_shard("b", 2, (15,))], (0, 15), "两个分片"),
              ("merge-refuse-snapshot", [fake_shard("a", 1, (0,)), fake_shard("b", 2, (15,), digest="e" * 64)], (0, 15), "②"),
-             ("merge-refuse-unknown-line", [fake_shard("a", 1, (0,), extra="rerun_compile_failed rows=0")], (0,), "⑦")]
+             ("merge-refuse-unknown-line", [fake_shard("a", 1, (0,), extra="not_a_known_line rows=0")], (0,), "⑦")]
     for name, case_shards, case_rows, mark in cases:
         refused = merge_refused(case_shards, case_rows)
         results.append((name, mark in refused, f"拒因：{refused or '没拒'}"))
@@ -1543,7 +1645,26 @@ class FakeWorld:
     dumps: str
 
 
-def fake_world(root: str, hosts_code: int = 0, resources: list[dict] | None = None, extra_environment: dict[str, str] | None = None) -> FakeWorld:
+def served_command(root: str, command: list[str], roles: str = "local,peer", peer_without_rsync: bool = False) -> list[str]:
+    """command 照服务的分片三步起（fake_task_server.py：计划、各片并行、合并），各片的台照 roles 轮着取。"""
+    return (["python3", "-B", FAKE_TASK_SERVER, "--root", os.path.join(root, "task-server"), "--roles", roles]
+            + (["--peer-without", "rsync"] if peer_without_rsync else []) + ["--"] + command)
+
+
+def relay_labels(root: str) -> list[str]:
+    """假 task-server 各趟里转交过的请求的标签（计划目录 relay/to-<片号>/<标签>）。"""
+    base = os.path.join(root, "task-server")
+    labels = []
+    for run_name in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+        relay = os.path.join(base, run_name, "plan", "relay")
+        for inbox in sorted(os.listdir(relay)) if os.path.isdir(relay) else []:
+            if inbox.startswith("to-") and os.path.isdir(os.path.join(relay, inbox)):
+                labels += sorted(os.listdir(os.path.join(relay, inbox)))
+    return labels
+
+
+def fake_world(root: str, hosts_code: int = 0, extra_environment: dict[str, str] | None = None, roles: str = "local,peer",
+               peer_without_rsync: bool = False) -> FakeWorld:
     repo = os.path.join(root, "repo")
     results = os.path.join(repo, "research", "results")
     os.makedirs(results)
@@ -1557,37 +1678,31 @@ def fake_world(root: str, hosts_code: int = 0, resources: list[dict] | None = No
     for stem, seconds in (("baseline-run1", "100.500"), ("positive-control-o1-crash-judge", "80.000"), ("positive-control-reference-filesystem", "70.000")):
         with open(os.path.join(repo, f"{prefix}-{stem}{suffix}-timing.out"), "w", encoding="utf-8") as handle:
             handle.write(f"E7TIMING name=stream_time stream=a elapsed_ns=1000000000\nE7TIMING name=process_wall seconds={seconds} exit=0\n")
-    frozen_reference = "e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out"
+    frozen_reference = "e170-r2-o3-spec-executor-2026-11-05-refreeze-executor.out"
     os.symlink(os.path.join(REAL_REPOSITORY, "research", "results", frozen_reference), os.path.join(results, frozen_reference))
     os.makedirs(os.path.join(repo, "scripts", "experiment-apparatus", "target", "fake-dumps"))
     sys.path.insert(0, os.path.join(REAL_REPOSITORY, RESEARCH_RELATIVE))
     import row_driver  # noqa: E402
     digest = row_driver.snapshot_digest(tree)[0]
-    assignments = ("PEER_SSH_HOST=fakepeer\nPEER_REPOSITORY_DIRECTORY=/fake/peer\nPEER_CARGO_BIN_DIRECTORY=/fake/cargo\nPEER_MEMORY_CAP=50G\n"
+    assignments = ("HOSTS='127.0.0.1 192.0.2.67'\nTHIS_HOST_ADDRESS=127.0.0.1\nPEER_HOST_ADDRESS=192.0.2.67\nCARGO_BIN_DIRECTORY_BY_HOST='127.0.0.1=/fake/cargo 192.0.2.67=/fake/cargo'\nBUILD_ROOT_BY_HOST='127.0.0.1=/fake/builds 192.0.2.67=/fake/peer'\nSLICE_MEMORY_CAP_BY_HOST='127.0.0.1=50G 192.0.2.67=50G'\n"
                    "QUIESCE_STOP_COMMAND=''\nQUIESCE_STOPPED_CHECK_COMMAND=''\nQUIESCE_START_COMMAND=''\nQUIESCE_STARTED_CHECK_COMMAND=''\n"
-                   "ENABLE_ACROSS_MACHINES=1\nENABLE_GPU=0\nMULTI_HOST_COUNT=1\nMULTI_HOST_2_SSH_HOST=fakepeer\n"
+                   f"ENABLE_ACROSS_MACHINES=1\nENABLE_GPU=0\nNFS_SHARED_ROOTS={root}\nMULTI_HOST_COUNT=1\nMULTI_HOST_2_SSH_HOST=192.0.2.67\n"
                    "MULTI_HOST_2_REPOSITORY_DIRECTORY=/fake/peer\nMULTI_HOST_2_CARGO_BIN_DIRECTORY=/fake/cargo\nMULTI_HOST_2_MEMORY_CAP=50G\nMULTI_HOST_2_IS_PEER=1\n")
     with open(os.path.join(root, "hosts.txt"), "w", encoding="utf-8") as handle:
         handle.write(assignments)
-    entries = resources or [resources_entry(1, 10, 25, 25), resources_entry(2, 10, 25, 25)]
-    with open(os.path.join(root, "resources.json"), "w", encoding="utf-8") as handle:
-        json.dump({"hosts": entries}, handle)
-    os.makedirs(os.path.join(root, "peer"))
-    environment = dict(os.environ, ROWS_ORCHESTRATOR_SELFTEST="1", ROWS_ORCHESTRATOR_DRIVER=os.path.join(FAKES, "fake_row_driver.py"),
-                       ROWS_ORCHESTRATOR_MULTI_HOST_RUN=os.path.join(FAKES, "fake_multi_host_run.sh"),
+    environment = {name: value for name, value in os.environ.items() if not name.startswith(("TASK_SERVER_SHARD", "MULTI_HOST_RUN_PEER_SCRATCH"))}
+    environment.update(ROWS_ORCHESTRATOR_SELFTEST="1", ROWS_ORCHESTRATOR_DRIVER=os.path.join(FAKES, "fake_row_driver.py"),
                        ROWS_ORCHESTRATOR_HOSTS_COMMAND=f"cat {shlex.quote(os.path.join(root, 'hosts.txt'))}; exit {hosts_code}",
-                       ROWS_ORCHESTRATOR_RESOURCES_COMMAND=f"cat {shlex.quote(os.path.join(root, 'resources.json'))}",
                        ROWS_ORCHESTRATOR_POLL_SECONDS="0.05", ROWS_ORCHESTRATOR_PEER_COMPILE_CHECK="0",
                        FAKE_RESEARCH_DIRECTORY=os.path.join(REAL_REPOSITORY, RESEARCH_RELATIVE), FAKE_REAL_REPOSITORY=REAL_REPOSITORY,
-                       FAKE_RESULTS_DIRECTORY=results, FAKE_PEER_ROOT=os.path.join(root, "peer"), FAKE_DRIVER_LOG=os.path.join(root, "driver.log"),
-                       FAKE_MHR_LOG=os.path.join(root, "mhr.log"), PYTHONDONTWRITEBYTECODE="1")
+                       FAKE_RESULTS_DIRECTORY=results, FAKE_DRIVER_LOG=os.path.join(root, "driver.log"), PYTHONDONTWRITEBYTECODE="1")
     environment.update(extra_environment or {})
     dumps = "scripts/experiment-apparatus/target/fake-dumps"
     command = ["python3", "-B", os.path.abspath(__file__), "run", "--repo", repo, "--prefix", prefix, f"--suffix={suffix}", "--resume-tag=-selftest",
                "--dumps", dumps, "--tree", "scripts/experiment-apparatus/target/fake-frozen-tree", "--snapshot-digest", digest,
                "--baseline-timing", f"{prefix}-baseline-run1{suffix}-timing.out", "--check", os.path.join(HERE, "check_product.py"),
                "--logs", os.path.join(root, "logs"), "--work-root", os.path.join(root, "work"), "--research-root", REAL_REPOSITORY]
-    return FakeWorld(root, repo, command, environment, prefix + "-", dumps)
+    return FakeWorld(root, repo, served_command(root, command, roles, peer_without_rsync), environment, prefix + "-", dumps)
 
 
 def world_run(world: FakeWorld) -> tuple[int, str]:
@@ -1600,7 +1715,7 @@ def world_product(world: FakeWorld, stem: str) -> str:
 
 
 def ran_counts(world: FakeWorld) -> dict[tuple[int, str], int]:
-    """假驱动真跑过（不是 --skip-finished 跳过）的次数，按 (行, 是不是第 13 步重跑) 数；第 12 步 row-0 与 X 都是 row-0，合起来该是 2。"""
+    """假驱动真跑过（按键复用读回的不算）的次数，按 (行, 限时是不是乘过 3) 数；第 12 步 row-0 与 X 都是 row-0，合起来该是 2。"""
     counts: dict[tuple[int, str], int] = {}
     path = os.path.join(world.root, "driver.log")
     for line in open(path, encoding="utf-8") if os.path.exists(path) else []:
@@ -1609,6 +1724,14 @@ def ran_counts(world: FakeWorld) -> dict[tuple[int, str], int]:
             key = (int(fields["row"]), fields["rerun"])
             counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def read_row_result_fields(row_directory: str) -> dict[str, str]:
+    path = os.path.join(row_directory, "row-result.tsv")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as handle:
+        return dict(line.rstrip("\n").split("\t", 1) for line in handle if "\t" in line)
 
 
 def verdict_of(path: str) -> str:
@@ -1628,7 +1751,9 @@ def cells_end_to_end(scratch: str, wanted: set[str] | None) -> list[tuple[str, b
         results.append(resume_cell(scratch))
     if want("e2e-cross-host-mismatch"):
         results.append(mismatch_cell(scratch))
-    if want("e2e-unreachable") or want("e2e-config-refused") or want("e2e-switch-off") or want("e2e-preflight-refused") or want("e2e-product-collision"):
+    if want("e2e-orchestrator-on-peer"):
+        results.append(orchestrator_on_peer_cell(scratch))
+    if want("e2e-config-refused") or want("e2e-switch-off") or want("e2e-preflight-refused") or want("e2e-product-collision"):
         results += refusal_cells(scratch)
     return results
 
@@ -1638,16 +1763,36 @@ def two_hosts_cell(scratch: str) -> tuple[str, bool, str]:
     code, output = world_run(world)
     counts = ran_counts(world)
     expected_runs = expected_ran_counts() | {(15, "true"): 1}
+    rows_root = os.path.join(world.repo, world.dumps, "segment1-rows-selftest")
+    results_of = {row: read_row_result_fields(os.path.join(rows_root, f"row-{row}")) for row in (15, 23)}
     s12 = world_product(world, "rows-driver")
     s12_rows = [key_values(line)["row_number"] for line in open(s12, encoding="utf-8") if line.startswith("row ")] if os.path.exists(s12) else []
     ledger = open(os.path.join(world.repo, world.dumps, "segment1-rows-selftest-shards", "row-hosts.tsv"), encoding="utf-8").read() \
         if os.path.exists(os.path.join(world.repo, world.dumps, "segment1-rows-selftest-shards", "row-hosts.tsv")) else ""
     good = (code == 0 and counts == expected_runs
-            and s12_rows == [str(row) for row in sorted(STEP_ROWS["s12"])] and "fetched" in ledger
+            and s12_rows == [str(row) for row in sorted(STEP_ROWS["s12"])] and "\tpeer\n" in ledger
             and "cross_host_identical=true" in verdict_of(world_product(world, CROSS_HOST_CHECK_STEM))
-            and os.path.exists(world_product(world, "rows-timeout-rerun-driver")) and not os.path.exists(world_product(world, "rows-probe-timeout-rerun-driver")))
+            and os.path.exists(world_product(world, "rows-timeout-rerun-driver")) and not os.path.exists(world_product(world, "rows-probe-timeout-rerun-driver"))
+            # 第 13 步在第 12 步同一个行输出根里重跑：上一次超时的第 15 行限时是别的行的 3 倍、记着乘过 3，没有另一个输出根
+            and results_of[15].get("timed_out_before") == "true" and results_of[23].get("timed_out_before") == "false"
+            and int(results_of[15].get("time_limit_seconds", "0")) == 3 * int(results_of[23].get("time_limit_seconds", "0")) > 0
+            and not os.path.exists(rows_root + "-timeout-rerun"))
     return ("e2e-two-hosts", good, f"退 {code}；真跑过的 (行, 重跑) 与次数和预期{'相同' if counts == expected_runs else '不同：' + str(counts)}；第 12 步产物行 {len(s12_rows)}；"
                                            f"跨机 {verdict_of(world_product(world, CROSS_HOST_CHECK_STEM))[:80]}；输出末行 {output.strip().splitlines()[-1:]}")
+
+
+def orchestrator_on_peer_cell(scratch: str) -> tuple[str, bool, str]:
+    """编排那一片落在第二台、代跑那一片落在本机（服务「各片第二台在前」）：两台的行都跑、跨机对照两次在两台，编排那一台自己的行的工作根在它的本地目录下。"""
+    world = fake_world(os.path.join(scratch, "on-peer"), roles="peer,local")
+    code, output = world_run(world)
+    lines = open(os.path.join(world.root, "driver.log"), encoding="utf-8").read().splitlines() if os.path.exists(os.path.join(world.root, "driver.log")) else []
+    hosts_ran = sorted({key_values(line).get("host", "?") for line in lines if line.startswith("ran ")})
+    verdict = verdict_of(world_product(world, CROSS_HOST_CHECK_STEM))
+    unused_work_root = not os.path.exists(os.path.join(world.root, "work"))
+    good = (code == 0 and ran_counts(world) == expected_ran_counts() and hosts_ran == ["1", "2"] and "cross_host_identical=true" in verdict
+            and unused_work_root)
+    return ("e2e-orchestrator-on-peer", good, f"退 {code}；真跑过的台 {hosts_ran}；跨机 {verdict[:80]}；--work-root 没用上 {unused_work_root}；"
+                                               f"输出末行 {output.strip().splitlines()[-1:]}")
 
 
 def mismatch_cell(scratch: str) -> tuple[str, bool, str]:
@@ -1660,17 +1805,14 @@ def mismatch_cell(scratch: str) -> tuple[str, bool, str]:
 
 def refusal_cells(scratch: str) -> list[tuple[str, bool, str]]:
     results = []
-    unreachable = fake_world(os.path.join(scratch, "unreachable"), resources=[resources_entry(1, 10, 25, 25), resources_entry(2, 0, 0, 0, read=False)])
-    code, output = world_run(unreachable)
-    results.append(("e2e-unreachable", code == EXIT_RUN_CONDITION and "没读到资源" in output, f"退 {code}；{output.strip().splitlines()[-1:]}"))
     refused = fake_world(os.path.join(scratch, "config-refused"), hosts_code=1)
     code, output = world_run(refused)
     results.append(("e2e-config-refused", code == EXIT_RUN_CONDITION and "多机配置判不过" in output, f"退 {code}"))
-    single = fake_world(os.path.join(scratch, "switch-off"), hosts_code=3, resources=[resources_entry(1, 10, 25, 25)])
+    single = fake_world(os.path.join(scratch, "switch-off"), hosts_code=3)
     code, output = world_run(single)
     results.append(("e2e-switch-off", code == 0 and "cross_host_identical=not_run" in verdict_of(world_product(single, CROSS_HOST_CHECK_STEM))
                     and not os.path.exists(world_product(single, "rows-cross-host-row-0-driver")) and "只用本机" in output, f"退 {code}"))
-    preflight = fake_world(os.path.join(scratch, "preflight-refused"), extra_environment={"FAKE_MHR_EXIT_FOR_LABEL": "preflight:255"})
+    preflight = fake_world(os.path.join(scratch, "preflight-refused"), peer_without_rsync=True)
     code, output = world_run(preflight)
     results.append(("e2e-preflight-refused", code == EXIT_RUN_CONDITION and "预检没过" in output and not os.path.exists(os.path.join(preflight.root, "driver.log")),
                     f"退 {code}；一行都没起：{not os.path.exists(os.path.join(preflight.root, 'driver.log'))}"))
@@ -1689,7 +1831,7 @@ def expected_ran_counts() -> dict[tuple[int, str], int]:
 
 
 def resume_cell(scratch: str) -> tuple[str, bool, str]:
-    """跑到一半收 TERM（退 143），同一条命令再起（退 0）：每个 (根, 行) 只真跑过一次；第二台已做完的行在 TERM 时取回、续跑时收进来。"""
+    """跑到一半收 TERM（退 143），同一条命令再起（退 0）：每个 (根, 行) 只真跑过一次；第二台已做完的行（写在共享根下它的分片输出目录里）在 TERM 时或续跑时收进来。"""
     world = fake_world(os.path.join(scratch, "resume"), extra_environment={"FAKE_DRIVER_ROW_SECONDS": "0.4"})
     process = subprocess.Popen(world.command, cwd=world.repo, env=world.environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     deadline = time.monotonic() + 120
@@ -1705,15 +1847,52 @@ def resume_cell(scratch: str) -> tuple[str, bool, str]:
     world.environment["FAKE_DRIVER_ROW_SECONDS"] = "0"
     second, output = world_run(world)
     counts = ran_counts(world)
-    fetched = "fetched" in open(os.path.join(world.repo, world.dumps, "segment1-rows-selftest-shards", "row-hosts.tsv"), encoding="utf-8").read()
-    good = first == EXIT_STOPPED_BY_SIGNAL and second == 0 and counts == expected_ran_counts() and sum(before.values()) >= 4 and fetched
+    harvested = "\tpeer\n" in open(os.path.join(world.repo, world.dumps, "segment1-rows-selftest-shards", "row-hosts.tsv"), encoding="utf-8").read()
+    good = first == EXIT_STOPPED_BY_SIGNAL and second == 0 and counts == expected_ran_counts() and sum(before.values()) >= 4 and harvested
     return ("e2e-resume", good, f"第一次退 {first}（停前做完 {sum(before.values())} 行），续跑退 {second}；真跑过的次数与预期{'相同' if counts == expected_ran_counts() else '不同：' + str(counts)}；"
-                               f"取回过第二台的行 {fetched}；续跑末行 {output.strip().splitlines()[-1:]}")
+                               f"收进过第二台的行 {harvested}；续跑末行 {output.strip().splitlines()[-1:]}")
 
 
-SWITCH_CELLS = {"allocation-ignores-memory": "allocation-memory-bound", "merge-allows-duplicates": "merge-refuse-duplicate",
+def cells_task_server(scratch: str) -> list[tuple[str, bool, str]]:
+    """经 task-server（文件头「经 task-server」）：两台的清单计划写两片、一台写一片，片里只有 label（没有 pin 键、没有内存键）；
+    合并见到 finished 退 0、没见到退 1；认不出的步退 2；不经服务直接调（变量没设）照常往下跑。"""
+    hosts_file = os.path.join(scratch, "task-server-hosts.txt")
+    with open(hosts_file, "w", encoding="utf-8") as handle:
+        handle.write("MULTI_HOST_COUNT=1\nMULTI_HOST_2_SSH_HOST=192.0.2.67\nMULTI_HOST_2_REPOSITORY_DIRECTORY=/fake/peer\n"
+                     "MULTI_HOST_2_CARGO_BIN_DIRECTORY=/fake/cargo\nMULTI_HOST_2_MEMORY_CAP=50G\nMULTI_HOST_2_IS_PEER=1\n")
+    said: list[str] = []
+    planned = {}
+    for name, code in (("two", 0), ("one", 3)):
+        plan_directory = os.path.join(scratch, f"task-server-plan-{name}")
+        os.makedirs(plan_directory)
+        environment = {"TASK_SERVER_SHARD_PHASE": "plan", "TASK_SERVER_SHARD_PLAN_DIRECTORY": plan_directory,
+                       "ROWS_ORCHESTRATOR_HOSTS_COMMAND": f"cat {shlex.quote(hosts_file)}; exit {code}", "PATH": os.environ.get("PATH", "")}
+        exit_code = shard_phase_before_layer(scratch, environment, said.append)
+        try:
+            with open(os.path.join(plan_directory, "plan.json"), encoding="utf-8") as handle:
+                shards = [sorted(shard) for shard in json.load(handle)["shards"]]
+        except (OSError, ValueError, KeyError) as error:
+            shards = [f"读不出：{type(error).__name__}"]
+        planned[name] = (exit_code, shards)
+    merge_directory = os.path.join(scratch, "task-server-merge")
+    os.makedirs(os.path.join(merge_directory, "relay"))
+    merge_environment = {"TASK_SERVER_SHARD_PHASE": "merge", "TASK_SERVER_SHARD_PLAN_DIRECTORY": merge_directory}
+    unfinished = shard_phase_before_layer(scratch, merge_environment, said.append)
+    shard_relay.mark_finished(merge_directory)
+    finished = shard_phase_before_layer(scratch, merge_environment, said.append)
+    unknown = shard_phase_before_layer(scratch, {"TASK_SERVER_SHARD_PHASE": "split", "TASK_SERVER_SHARD_PLAN_DIRECTORY": merge_directory}, said.append)
+    direct = shard_phase_before_layer(scratch, {}, said.append)
+    good = (planned == {"two": (0, [["label"], ["label"]]), "one": (0, [["label"]])} and unfinished == 1 and finished == 0 and unknown == 2
+            and direct is None)
+    return [("task-server-phases", good, f"计划（两台、一台）{planned}；合并没 finished 退 {unfinished}、有了退 {finished}；认不出的步退 {unknown}；"
+                                         f"不经服务直接调 {direct}")]
+
+
+SWITCH_CELLS = {"slots-ignore-lane-minimum": "allocation-threads", "merge-allows-duplicates": "merge-refuse-duplicate",
                 "merge-ignores-time-limit": "merge-refuse-time-limit", "cross-host-ignores-dumps": "cross-host-compare",
-                "resume-reruns-finished": "e2e-resume", "unreachable-dropped": "e2e-unreachable", "harvest-skipped": "e2e-two-hosts"}
+                "resume-reruns-finished": "e2e-resume", "harvest-skipped": "e2e-two-hosts",
+                "plan-writes-memory-limit": "task-server-phases", "driver-gets-memory-cap": "e2e-two-hosts", "peer-command-gets-memory-cap": "e2e-two-hosts",
+                "plan-pins-local": "task-server-phases"}
 CELL_GROUPS = {"allocation": cells_allocation, "queue": cells_queue}
 
 
@@ -1721,8 +1900,8 @@ def selftest(argument_list: list[str]) -> int:
     wanted = set(argument_list[argument_list.index("--cells") + 1].split(",")) if "--cells" in argument_list else None
     scratch = tempfile.mkdtemp(prefix="e171-rows-orchestrator-selftest-")
     try:
-        results = (cells_allocation() + cells_derived_configuration(scratch) + cells_queue() + cells_merge(scratch, os.path.join(HERE, "check_product.py"))
-                   + cells_cross_host(scratch))
+        results = (cells_allocation() + cells_queue() + cells_merge(scratch, os.path.join(HERE, "check_product.py"))
+                   + cells_cross_host(scratch) + cells_task_server(scratch))
         if wanted is None or any(name.startswith("e2e-") for name in wanted):
             results += cells_end_to_end(scratch, wanted)
     finally:

@@ -27,6 +27,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename, unchanged_bytes
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -61,6 +62,7 @@ def relabel(root, decision, item, dry_run):
         self_map = library.self_decisions()
         rewritten_count, changed_file_count = 0, 0
         for path in library.scanned_files():
+            original = pathlib.Path(path).read_bytes()
             spans_by_line = {}
             for line_number, _, match, written, owner, _, named in library.references(path, item_map, self_map):
                 if owner != decision or int(match.group(2)) != item or written == status:
@@ -70,7 +72,12 @@ def relabel(root, decision, item, dry_run):
                 spans_by_line.setdefault(line_number, []).append((match.start(1), match.end(1)))
             if not spans_by_line:
                 continue
-            lines = pathlib.Path(path).read_text(encoding='utf-8').split('\n')
+            try:
+                unchanged_bytes(path, original)
+            except ReplaceRefused as error:
+                print(f'  ✗ {error}')  # str(ReplaceRefused) 第二行是「→」起头的下一步
+                return 2, []
+            lines = original.decode('utf-8').split('\n')
             count_in_file = 0
             for line_number, spans in spans_by_line.items():
                 text = lines[line_number - 1]
@@ -82,7 +89,12 @@ def relabel(root, decision, item, dry_run):
             changed_file_count += 1
             print(f'  {path}：改写 {count_in_file} 处')
             if not dry_run:
-                pathlib.Path(path).write_text('\n'.join(lines), encoding='utf-8')
+                try:
+                    replace_file_contents_by_rename(path, '\n'.join(lines),
+                                                    check_before_rename=lambda: unchanged_bytes(path, original))
+                except ReplaceRefused as error:
+                    print(f'  ✗ {error}')  # str(ReplaceRefused) 第二行是「→」起头的下一步
+                    return 2, []
         review = []
         if status == '已':
             for path in library.scanned_files():

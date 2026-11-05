@@ -114,6 +114,13 @@ enum WholeRingArm {
     /// 只给单测 K15：RGall_Q 的候选下界取旧式（不并系统配置 F），用来对 Q 与原 G2S 逐处同式。不进任何一行产物。
     #[cfg_attr(not(test), allow(dead_code, reason = "只给单测 K15 用，产物里没有这条臂"))]
     ReadingQWithTheOldCandidateFloor,
+    /// 第 3 次重跑（`research/prompts/e139-r3-prereg.md` 第五节「臂」）：RGall 换上 `crates/singlefs-core/` 今天的回收门槛（CG 三处）。被测。
+    CoreGateCeilingSkipsRootlessDisks,
+    /// RGall_Q 换上 CG。被测（只报）。
+    CoreGateCeilingCountsRootlessDisksAsZero,
+    /// 两条 CG 被测臂的阳性对照：最旧那一项里「环里最旧有效根」换成缩短一行的窗口里的最旧有效根，钉值照并。
+    CoreGateCeilingSkipsRootlessDisksShortened,
+    CoreGateCeilingCountsRootlessDisksAsZeroShortened,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -130,26 +137,42 @@ impl WholeRingArm {
             WholeRingArm::ReadingPShort => "RGall_short",
             WholeRingArm::ReadingQShort => "RGall_Q_short",
             WholeRingArm::ReadingQWithTheOldCandidateFloor => "RGall_Q_old_candidate_floor",
+            WholeRingArm::CoreGateCeilingSkipsRootlessDisks => "RGall_core_gate",
+            WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero => "RGall_Q_core_gate",
+            WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened => "RGall_core_gate_short",
+            WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => "RGall_Q_core_gate_short",
         }
     }
     fn ceiling_reading(self) -> WholeRingCeilingReading {
         match self {
             WholeRingArm::ReadingP | WholeRingArm::ReadingPShort => WholeRingCeilingReading::DisksWithoutAValidRootAreSkipped,
+            WholeRingArm::CoreGateCeilingSkipsRootlessDisks | WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened => WholeRingCeilingReading::DisksWithoutAValidRootAreSkipped,
             WholeRingArm::ReadingQ | WholeRingArm::ReadingQShort | WholeRingArm::ReadingQWithTheOldCandidateFloor => {
                 WholeRingCeilingReading::DisksWithoutAValidRootCountAsZero
             }
+            WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => WholeRingCeilingReading::DisksWithoutAValidRootCountAsZero,
         }
     }
     fn is_reclaim_window_shortened(self) -> bool {
         match self {
             WholeRingArm::ReadingPShort | WholeRingArm::ReadingQShort => true,
+            WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => true,
             WholeRingArm::ReadingP | WholeRingArm::ReadingQ | WholeRingArm::ReadingQWithTheOldCandidateFloor => false,
+            WholeRingArm::CoreGateCeilingSkipsRootlessDisks | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero => false,
         }
     }
     fn uses_the_clause_candidate_floor(self) -> bool {
         match self {
             WholeRingArm::ReadingP | WholeRingArm::ReadingQ | WholeRingArm::ReadingPShort | WholeRingArm::ReadingQShort => true,
+            WholeRingArm::CoreGateCeilingSkipsRootlessDisks | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero | WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => true,
             WholeRingArm::ReadingQWithTheOldCandidateFloor => false,
+        }
+    }
+    /// 第 3 次重跑：回收门槛照 `crates/singlefs-core/` 今天的写法取（CG-F、CG-P、CG-R 三处）。
+    fn uses_the_core_gate(self) -> bool {
+        match self {
+            WholeRingArm::CoreGateCeilingSkipsRootlessDisks | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero | WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => true,
+            WholeRingArm::ReadingP | WholeRingArm::ReadingQ | WholeRingArm::ReadingPShort | WholeRingArm::ReadingQShort | WholeRingArm::ReadingQWithTheOldCandidateFloor => false,
         }
     }
 }
@@ -157,6 +180,9 @@ impl WholeRingArm {
 /// RGall 一族进全部格的两条被测臂，与它们的阳性对照（只进 steady、S ∈ {4, 16}）。
 const WHOLE_RING_ARMS: [WholeRingArm; 2] = [WholeRingArm::ReadingP, WholeRingArm::ReadingQ];
 const WHOLE_RING_SHORT_ARMS: [WholeRingArm; 2] = [WholeRingArm::ReadingPShort, WholeRingArm::ReadingQShort];
+/// 第 3 次重跑的两条 CG 被测臂，与它们的阳性对照（进 steady、torn_newest、activation_faults，S ∈ {4, 16}）。
+const CORE_GATE_ARMS: [WholeRingArm; 2] = [WholeRingArm::CoreGateCeilingSkipsRootlessDisks, WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero];
+const CORE_GATE_SHORT_ARMS: [WholeRingArm; 2] = [WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened, WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened];
 
 /// 第 1 次重跑的七条臂（`research/prompts/e139-r1-prereg.md` 第五节）：回收门槛改成一圈窗口（txg + 3S > N；
 /// 核心层后来退回整个环，那个判法函数已删，见 C842（一圈窗口判法成了死代码））之后的臂 G2S，与它的读法臂、旧门槛对照、阳性对照。
@@ -300,6 +326,14 @@ impl Arm {
             Arm::WholeRing(whole_ring_arm) => whole_ring_arm.uses_the_clause_candidate_floor(),
             Arm::RingPersisted | Arm::ProtectedGenerationsAtMinimum | Arm::FloorTxg | Arm::FloorPerDisk | Arm::FloorPerDiskTxgUpperLimit | Arm::TightenedRoots | Arm::TightenedStates
             | Arm::TightenedRootsAtMount | Arm::TightenedStatesWindowed(_) => false,
+        }
+    }
+    /// 第 3 次重跑：回收门槛照 `crates/singlefs-core/` 今天的写法取（只有 RGall 一族的 CG 臂）。
+    fn uses_the_core_gate(self) -> bool {
+        match self {
+            Arm::WholeRing(whole_ring_arm) => whole_ring_arm.uses_the_core_gate(),
+            Arm::RingPersisted | Arm::ProtectedGenerationsAtMinimum | Arm::FloorTxg | Arm::FloorPerDisk | Arm::FloorPerDiskTxgUpperLimit | Arm::TightenedRoots | Arm::TightenedStates
+            | Arm::TightenedRootsAtMount | Arm::TightenedStatesWindowed(_) | Arm::ClauseFloorWindowed(_) => false,
         }
     }
     /// 第 2 次重跑的新量（下界差、ⓐⓑⓒ、刻度）只在这一族臂上采；`w_` 行不打印它们，旧臂不为它们多算。
@@ -470,6 +504,94 @@ struct PendingFloor {
     value: u64,
     carrier_txg: Option<u64>,
     durable_publications_since_carrier: u64,
+}
+
+/// m 取不到（有一块幸存盘一条有效根都没有）时回收门槛 F 那一项当场取的值：`crates/singlefs-core/src/mount.rs` 的
+/// `reclaim_the_released_slots_of_the_rebuilt_allocator` 那一支只放到最旧那一项，等于 F 那一项取 0（第 3 次重跑登记第一节读法第 1 条）。
+const FLOOR_TERM_WHEN_A_SURVIVING_DISK_HAS_NO_VALID_ROOT: u64 = 0;
+
+/// 第 3 次重跑第五节「CG」：CG 臂在 `Simulation` 上多记的状态。回收门槛的 F 那一项仍住 `floor_active`、新根带的 F 仍住 `floor_carried`，
+/// 两者在 CG 臂上照 CG 的取法写；这里记 CG-F 的扣住那一截、CG-P 的钉槽，与同一状态上旧式门槛的影子（第六节第 4 行「旧式门槛」，只读不写回）。
+#[derive(Clone)]
+struct CoreGateState {
+    /// K-eq ② 的开关：关着时 CG 臂照 RGall 原样（恢复与回退照旧式取 F、不钉槽），影子与真值逐次相同。产物里恒开。
+    is_switched_on: bool,
+    /// CG-F：最近一次恢复算出的 F_生效。
+    effective_floor: u64,
+    /// CG-F：F 那一项还压在 min(F_生效, m) 上，在等这个实例号起（含之后回退开的实例）的根落满每块幸存盘；不在等时 `None`。
+    held_until_rooted_from_instance: Option<u64>,
+    /// CG-P：钉着的槽 → 钉值（落到这个槽、在 [0, min(3S, 新实例第一次发布的 txg)) 里的最小 txg）。
+    pinned_slots: BTreeMap<usize, u64>,
+    /// 同一状态上旧式（第 2 次 RGall）的 F：恢复与回退照 `floors_after_recovery` 重算，抬 F 与生效照原样跟。
+    shadow_floor_carried: u64,
+    shadow_floor_active: u64,
+    shadow_pending_floor_value: Option<u64>,
+}
+
+impl CoreGateState {
+    fn fresh() -> Self {
+        CoreGateState {
+            is_switched_on: true,
+            effective_floor: 0,
+            held_until_rooted_from_instance: None,
+            pinned_slots: BTreeMap::new(),
+            shadow_floor_carried: 0,
+            shadow_floor_active: 0,
+            shadow_pending_floor_value: None,
+        }
+    }
+}
+
+/// CG-F 与 CG-P 在择根之前读到的值（第一节读法第 1 条）。
+struct CoreGateReadingAtRecovery {
+    effective_floor: u64,
+    /// m：每块幸存盘上最新有效根 txg 的最小；有一块幸存盘一条有效根都没有时 `None`。
+    newest_valid_txg_on_every_surviving_disk: Option<u64>,
+    pinned_slots: BTreeMap<usize, u64>,
+}
+
+/// 第 3 次重跑第六节第 4 行的新量：每次 `allocate` 读一次（只在 CG 臂上采，几次运行合计时相加）。
+#[derive(Clone, Copy, Debug)]
+struct CoreGateObservations {
+    /// d = CG 门槛 − 同一状态上旧式门槛。
+    gate_difference: ObservedQuantity,
+    gate_difference_nonzero_samples: u64,
+    gate_difference_negative_samples: u64,
+    /// dF = CG 的 F 那一项 − 旧式 F 那一项 ≠ 0 的采样数。
+    floor_term_difference_nonzero_samples: u64,
+    /// 钉值的最小 < `oldest_persisted_valid_txg()` 的采样数。
+    pin_effective_samples: u64,
+    /// F 那一项 < F_生效 的采样数。
+    held_waiting_samples: u64,
+}
+
+impl CoreGateObservations {
+    fn fresh() -> Self {
+        CoreGateObservations {
+            gate_difference: ObservedQuantity::fresh(),
+            gate_difference_nonzero_samples: 0,
+            gate_difference_negative_samples: 0,
+            floor_term_difference_nonzero_samples: 0,
+            pin_effective_samples: 0,
+            held_waiting_samples: 0,
+        }
+    }
+    fn add(&mut self, other: &CoreGateObservations) {
+        self.gate_difference.add(&other.gate_difference);
+        self.gate_difference_nonzero_samples += other.gate_difference_nonzero_samples;
+        self.gate_difference_negative_samples += other.gate_difference_negative_samples;
+        self.floor_term_difference_nonzero_samples += other.floor_term_difference_nonzero_samples;
+        self.pin_effective_samples += other.pin_effective_samples;
+        self.held_waiting_samples += other.held_waiting_samples;
+    }
+    /// `core_gate_reach` 行的字段。
+    fn render(&self) -> String {
+        format!(
+            "{} gate_difference_nonzero={} gate_difference_negative={} floor_term_difference_nonzero={} pin_effective={} held_waiting={}",
+            self.gate_difference.render("gate_difference"), self.gate_difference_nonzero_samples, self.gate_difference_negative_samples,
+            self.floor_term_difference_nonzero_samples, self.pin_effective_samples, self.held_waiting_samples
+        )
+    }
 }
 
 /// 第 1 次重跑第八节的轨迹：被谓词消费的量报「吃光初始供给之后的峰值、为正的次数、期末值」（`test-discipline.md`「端点不是轨迹」）。
@@ -705,6 +827,8 @@ struct Metrics {
     lag_samples: u64,
     /// 第 2 次重跑的新量；第 1 次的每一行都不读它，也不打印它。
     second_rerun: SecondRerunObservations,
+    /// 第 3 次重跑的新量；第 1、2 次的每一行都不读它，也不打印它。
+    core_gate: CoreGateObservations,
 }
 
 impl Metrics {
@@ -737,6 +861,7 @@ impl Metrics {
             lag_maximum: 0,
             lag_samples: 0,
             second_rerun: SecondRerunObservations::fresh(),
+            core_gate: CoreGateObservations::fresh(),
         }
     }
     fn add(&mut self, other: &Metrics) {
@@ -767,6 +892,7 @@ impl Metrics {
         self.lag_maximum = self.lag_maximum.max(other.lag_maximum);
         self.lag_samples += other.lag_samples;
         self.second_rerun.add(&other.second_rerun);
+        self.core_gate.add(&other.core_gate);
     }
     fn minimum_candidates_or_zero(&self) -> u64 {
         if self.minimum_candidates == u64::MAX { 0 } else { self.minimum_candidates }
@@ -858,6 +984,8 @@ struct Simulation {
     abandoned_view: Option<(Rc<PoolState>, u64)>,
     /// 初始供给吃光了没有（第一次准入不够）：轨迹的「吃光之后的峰值」从这一刻起记。
     is_supply_exhausted: bool,
+    /// 第 3 次重跑：CG 臂的状态；别的臂是 `None`。
+    core_gate: Option<CoreGateState>,
 }
 
 impl Simulation {
@@ -909,6 +1037,7 @@ impl Simulation {
             metrics: Metrics::fresh(),
             abandoned_view: None,
             is_supply_exhausted: false,
+            core_gate: if arm.uses_the_core_gate() { Some(CoreGateState::fresh()) } else { None },
         }
     }
 
@@ -1235,8 +1364,34 @@ impl Simulation {
                 self.floor_active.max(self.oldest_persisted_valid_txg())
             }
             Arm::TightenedStatesWindowed(window_arm) | Arm::ClauseFloorWindowed(window_arm) => self.floor_active.max(self.oldest_valid_txg_for_the_reclaim_gate(window_arm)),
-            Arm::WholeRing(whole_ring_arm) => self.floor_active.max(self.oldest_valid_txg_for_the_whole_ring_gate(whole_ring_arm)),
+            Arm::WholeRing(whole_ring_arm) => self.floor_active.max(self.oldest_valid_txg_for_the_whole_ring_gate(whole_ring_arm).min(self.oldest_core_gate_pin())),
         }
+    }
+
+    /// CG-P：钉着的槽里最小的钉值；不是 CG 臂或一个都没钉时 `u64::MAX`（取最小时不起作用）。
+    fn oldest_core_gate_pin(&self) -> u64 {
+        self.core_gate.as_ref().and_then(|state| state.pinned_slots.values().min().copied()).unwrap_or(u64::MAX)
+    }
+
+    /// 第 3 次重跑第六节第 4 行：每次 `allocate` 之前读 CG 门槛与同一状态上旧式门槛之差、F 那一项之差、钉值起没起作用、扣住那一截在不在等。只在 CG 臂上做。
+    fn observe_the_core_gate(&mut self) {
+        let (Some(state), Some(whole_ring_arm)) = (self.core_gate.as_ref(), self.whole_ring_arm()) else {
+            return;
+        };
+        let core_gate = self.reuse_bound();
+        let old_style_gate = state.shadow_floor_active.max(self.oldest_valid_txg_for_the_whole_ring_gate(whole_ring_arm));
+        let gate_difference = signed_difference(core_gate, old_style_gate);
+        let is_floor_term_different = self.floor_active != state.shadow_floor_active;
+        let is_pin_effective = self.oldest_core_gate_pin() < self.oldest_persisted_valid_txg();
+        let is_held_waiting = self.floor_active < state.effective_floor;
+        let is_supply_exhausted = self.is_supply_exhausted;
+        let observations = &mut self.metrics.core_gate;
+        observations.gate_difference.observe(gate_difference, is_supply_exhausted);
+        observations.gate_difference_nonzero_samples += u64::from(gate_difference != 0);
+        observations.gate_difference_negative_samples += u64::from(gate_difference < 0);
+        observations.floor_term_difference_nonzero_samples += u64::from(is_floor_term_different);
+        observations.pin_effective_samples += u64::from(is_pin_effective);
+        observations.held_waiting_samples += u64::from(is_held_waiting);
     }
 
     fn count_freed_after(&self, bound: u64) -> u64 {
@@ -1310,6 +1465,7 @@ impl Simulation {
     /// 取 count 块：先取可再分配的已释放块，再取没用过的。复用一块就把它上一段区间记成损坏。
     fn allocate(&mut self, count: u64, txg: u64) -> Option<Vec<usize>> {
         self.observe_gate_difference();
+        self.observe_the_core_gate();
         let bound = self.reuse_bound();
         let wanted = usize::try_from(count).expect("块数装得进 usize");
         let mut chosen: Vec<usize> = self.pool.blocks.iter().enumerate()
@@ -1549,9 +1705,37 @@ impl Simulation {
                 self.pending_floor = Some(pending);
             }
         }
+        self.advance_the_core_gate_after_a_durable_root(slot);
         self.prune_damage();
         self.record_check();
         self.observe_after_the_root_is_durable();
+    }
+
+    /// 每块幸存盘上都有一条持久、自证合法、有效、实例号不小于 `since_instance` 的根（这个进程恢复之后写的根；装置的回退另开实例，登记差异 ⑯）。
+    fn is_rooted_on_every_surviving_disk_from_instance(&self, since_instance: u64) -> bool {
+        let roots = self.valid_roots_with_disk();
+        self.surviving_disks().iter().all(|disk| roots.iter().any(|(root_disk, root)| root_disk == disk && root.instance >= since_instance))
+    }
+
+    /// CG 臂一条自证合法的根落盘之后：写进的那一槽解钉（CG-P）；扣住那一截在本实例的根落满每块幸存盘时放开（CG-F，登记差异 ⑮）；
+    /// 旧式影子的等生效照原样（`floor_written_on_every_surviving_disk`）跟。
+    fn advance_the_core_gate_after_a_durable_root(&mut self, slot: usize) {
+        let Some(state) = self.core_gate.as_ref() else {
+            return;
+        };
+        let is_shadow_pending_floor_active = state.shadow_pending_floor_value.is_some_and(|value| self.floor_written_on_every_surviving_disk(value));
+        let is_held_part_released = state.held_until_rooted_from_instance.is_some_and(|instance| self.is_rooted_on_every_surviving_disk_from_instance(instance));
+        let held_effective_floor = state.effective_floor;
+        let state = self.core_gate.as_mut().expect("上面刚读过 CG 状态");
+        state.pinned_slots.remove(&slot);
+        if is_shadow_pending_floor_active {
+            let pending_value = state.shadow_pending_floor_value.take().expect("影子在等生效才判得出生效");
+            state.shadow_floor_active = state.shadow_floor_active.max(pending_value);
+        }
+        if is_held_part_released {
+            self.floor_active = self.floor_active.max(held_effective_floor);
+            state.held_until_rooted_from_instance = None;
+        }
     }
 
     fn empty_publication(&mut self) -> bool {
@@ -1579,6 +1763,12 @@ impl Simulation {
             self.system_configuration_floor = self.system_configuration_floor.max(target);
             self.floor_carried = target;
             self.pending_floor = Some(PendingFloor { value: target, carrier_txg: None, durable_publications_since_carrier: 0 });
+        }
+        if let Some(state) = self.core_gate.as_mut() {
+            if target > state.shadow_floor_carried {
+                state.shadow_floor_carried = target;
+                state.shadow_pending_floor_value = Some(target);
+            }
         }
     }
 
@@ -1799,6 +1989,76 @@ impl Simulation {
         };
     }
 
+    /// CG-F 与 CG-P 在择根之前读的值；不是 CG 臂或开关关着时 `None`。`first_txg` 是恢复之后新实例第一次发布的 txg。
+    fn read_the_core_gate_at_recovery(&self, first_txg: u64) -> Option<CoreGateReadingAtRecovery> {
+        if !self.core_gate.as_ref().is_some_and(|state| state.is_switched_on) {
+            return None;
+        }
+        let roots = self.valid_roots_with_disk();
+        let newest_root_on_each_surviving_disk: Vec<Option<RootRecord>> = self.surviving_disks().iter()
+            .map(|disk| roots.iter().filter(|(root_disk, _)| root_disk == disk).map(|(_, root)| *root).max_by_key(|root| (root.txg, root.instance)))
+            .collect();
+        let highest_on_the_newest_roots = newest_root_on_each_surviving_disk.iter().flatten().map(|root| root.floor).max().unwrap_or(0);
+        let highest_on_the_abandoned_roots = (0..self.ring.len())
+            .filter(|slot| self.slot_survives(*slot))
+            .filter_map(|slot| self.ring[slot])
+            .filter(|root| root.is_self_verified && !self.is_instance_valid(root))
+            .map(|root| root.floor).max().unwrap_or(0);
+        let effective_floor = highest_on_the_newest_roots.max(highest_on_the_abandoned_roots).max(self.system_configuration_floor);
+        let newest_valid_txg_on_every_surviving_disk = if newest_root_on_each_surviving_disk.iter().all(Option::is_some) {
+            newest_root_on_each_surviving_disk.iter().flatten().map(|root| root.txg).min()
+        } else {
+            None
+        };
+        let pin_window_end = first_txg.min(self.ring_depth);
+        let pinned_slots: BTreeMap<usize, u64> = (0..self.ring.len())
+            .filter(|slot| self.slot_survives(*slot))
+            .filter(|slot| self.ring[*slot].is_some_and(|root| !root.is_self_verified))
+            .filter_map(|slot| (0..pin_window_end).find(|txg| self.slot_index(*txg) == slot).map(|txg| (slot, txg)))
+            .collect();
+        Some(CoreGateReadingAtRecovery { effective_floor, newest_valid_txg_on_every_surviving_disk, pinned_slots })
+    }
+
+    /// 恢复之后取 F：CG 臂照 CG-F / CG-P（新根带 F_生效，F 那一项当场 min(F_生效, m)、扣到本实例的根落满每块幸存盘，钉槽换成这一次读到的），
+    /// 别的臂照原样；旧式影子总照 `floors_after_recovery` 的两个值取。
+    fn adopt_floors_after_recovery(&mut self, candidacy: u64, settled: u64, core_gate_reading: Option<CoreGateReadingAtRecovery>) {
+        self.adopt_the_core_gate_shadow_floors(candidacy, settled);
+        let Some(reading) = core_gate_reading else {
+            self.adopt_floors(candidacy, settled);
+            return;
+        };
+        let floor_term_now = match reading.newest_valid_txg_on_every_surviving_disk {
+            Some(newest_valid_txg_on_every_surviving_disk) => reading.effective_floor.min(newest_valid_txg_on_every_surviving_disk),
+            None => FLOOR_TERM_WHEN_A_SURVIVING_DISK_HAS_NO_VALID_ROOT,
+        };
+        self.floor_carried = reading.effective_floor;
+        self.floor_active = floor_term_now;
+        self.pending_floor = None;
+        let instance = self.instance;
+        let state = self.core_gate.as_mut().expect("读得到 CG 的值就是 CG 臂");
+        state.effective_floor = reading.effective_floor;
+        state.held_until_rooted_from_instance = if floor_term_now < reading.effective_floor { Some(instance) } else { None };
+        state.pinned_slots = reading.pinned_slots;
+    }
+
+    /// 管理员回退之后取 F：CG 臂开关开着时照 CG-R 一样都不动（`floor_carried`、F 那一项、等生效与扣住的两截、钉槽），别的照原样重算；旧式影子照原样重算。
+    fn adopt_floors_after_admin_rollback(&mut self, candidacy: u64, settled: u64) {
+        self.adopt_the_core_gate_shadow_floors(candidacy, settled);
+        let keeps_the_floors = self.core_gate.as_ref().is_some_and(|state| state.is_switched_on);
+        if !keeps_the_floors {
+            self.adopt_floors(candidacy, settled);
+        }
+    }
+
+    /// 旧式影子照 `adopt_floors` 的取法记下（RGall 一族的等生效只看 `floor_written_on_every_surviving_disk`，载体那两项不用）。
+    fn adopt_the_core_gate_shadow_floors(&mut self, candidacy: u64, settled: u64) {
+        if let Some(state) = self.core_gate.as_mut() {
+            state.shadow_floor_carried = candidacy;
+            state.shadow_floor_active = settled;
+            state.shadow_pending_floor_value = if candidacy > settled { Some(candidacy) } else { None };
+        }
+    }
+
     /// 崩溃之后的恢复：先验全部候选再择新（D22（单元原子性怎么合成） 已定项 7），分配状态从所选根重新载入，取新实例代号。
     fn crash_and_recover(&mut self) {
         let chosen = match self.newest_valid_root() {
@@ -1813,6 +2073,7 @@ impl Simulation {
             self.metrics.unrecoverable += 1;
         }
         let (candidacy, settled) = self.floors_after_recovery(&chosen);
+        let core_gate_reading = self.read_the_core_gate_at_recovery(self.maximum_published_txg + 1);
         if !self.restore_snapshot(chosen.instance, chosen.txg) {
             self.metrics.unrecoverable += 1;
             self.halted = true;
@@ -1822,7 +2083,7 @@ impl Simulation {
         self.instance += 1;
         self.newest_durable_txg = chosen.txg;
         self.next_txg = self.maximum_published_txg + 1;
-        self.adopt_floors(candidacy, settled);
+        self.adopt_floors_after_recovery(candidacy, settled, core_gate_reading);
         self.observe_pinned_after_recovery();
         self.save_snapshot();
         self.record_check();
@@ -1928,7 +2189,7 @@ impl Simulation {
         self.newest_durable_txg = target.txg;
         let newest_ring_txg = self.visible_roots().iter().map(|root| root.txg).max().unwrap_or(0);
         self.next_txg = newest_ring_txg.max(self.maximum_published_txg) + 1;
-        self.adopt_floors(candidacy, settled);
+        self.adopt_floors_after_admin_rollback(candidacy, settled);
         self.save_snapshot();
         self.record_check();
         true
@@ -1941,6 +2202,7 @@ impl Simulation {
         let durable_newest = self.newest_durable_txg;
         let durable_next = self.next_txg;
         let durable_floors = (self.floor_carried, self.floor_active, self.pending_floor);
+        let durable_core_gate = self.core_gate.clone();
         if !self.admin_rollback() {
             return;
         }
@@ -1953,6 +2215,7 @@ impl Simulation {
         self.floor_carried = durable_floors.0;
         self.floor_active = durable_floors.1;
         self.pending_floor = durable_floors.2;
+        self.core_gate = durable_core_gate;
         self.crash_and_recover();
         self.halted = true;
     }
@@ -1972,12 +2235,20 @@ fn schedule(seed: u64, ring_depth: u64, world: World) -> (u64, u64) {
 }
 
 fn run_world(arm: Arm, world: World, slots_per_region: u64, seed: u64, lost_disk: usize) -> Metrics {
+    run_world_with_the_core_gate_switch(arm, world, slots_per_region, seed, lost_disk, true)
+}
+
+/// `run_world` 的全形：CG 臂的开关可以关（第 3 次重跑 K-eq ② 用，产物恒开；别的臂没有这个开关）。
+fn run_world_with_the_core_gate_switch(arm: Arm, world: World, slots_per_region: u64, seed: u64, lost_disk: usize, is_core_gate_switched_on: bool) -> Metrics {
     let keep_snapshots = match world {
         World::TornNewest | World::DiskLoss | World::AdminRollback | World::RollbackFirstPublish => true,
         World::Steady | World::SlotWriteFail => false,
     };
     let (mount_cost, declared_maximum_cost) = COST_PAIRS[0];
     let mut simulation = Simulation::new(arm, slots_per_region, mount_cost, declared_maximum_cost, seed, keep_snapshots, None);
+    if let Some(state) = simulation.core_gate.as_mut() {
+        state.is_switched_on = is_core_gate_switched_on;
+    }
     simulation.prefill(STEADY_FILL);
     let (event_window, lead) = schedule(seed, simulation.ring_depth, world);
     for window in 0..WINDOWS_PER_WORLD {
@@ -2424,6 +2695,11 @@ struct LineNames {
     stuck_growth: &'static str,
     broken_slot_growth: &'static str,
     broken_slot_reversed_growth: &'static str,
+    /// 第 2 次重跑起有的行（第 1 次的 `w_` 一族不出，留空）：每行一行归因、卡住段每个种子一行刻度。
+    attribution: &'static str,
+    stuck_marks: &'static str,
+    /// 只有第 3 次重跑的 CG 一族有：每行一行 CG 走到（第六节第 4 行）；别的族留空、不打。
+    core_gate_reach: &'static str,
 }
 
 const FIRST_RERUN_LINES: LineNames = LineNames {
@@ -2446,6 +2722,9 @@ const FIRST_RERUN_LINES: LineNames = LineNames {
     stuck_growth: "",
     broken_slot_growth: "",
     broken_slot_reversed_growth: "",
+    attribution: "",
+    stuck_marks: "",
+    core_gate_reach: "",
 };
 
 const SECOND_RERUN_LINES: LineNames = LineNames {
@@ -2468,6 +2747,35 @@ const SECOND_RERUN_LINES: LineNames = LineNames {
     stuck_growth: "f_stuck_growth",
     broken_slot_growth: "f_broken_slot_growth",
     broken_slot_reversed_growth: "f_broken_slot_h1_growth",
+    attribution: "f_attribution",
+    stuck_marks: "f_stuck_marks",
+    core_gate_reach: "",
+};
+
+/// 第 3 次重跑的 CG 一族（登记第五节「臂」）：行名把 `f_` 换成 `core_gate_`，格式与 `f_` 行逐字同形。
+const CORE_GATE_LINES: LineNames = LineNames {
+    world: "core_gate_cell",
+    activation: "core_gate_activation",
+    near_full: "core_gate_near_full",
+    drain_failure: "core_gate_drain_failure",
+    broken_slot: "core_gate_broken_slot",
+    cost_growth: "core_gate_cost_growth",
+    activation_reversed: "core_gate_activation_h2",
+    broken_slot_reversed: "core_gate_broken_slot_h1",
+    crit1_push: "core_gate_crit1_push",
+    trajectory: "core_gate_trajectory",
+    detail_activation: "core_gate_detail_activation",
+    detail_drain: "core_gate_detail_drain",
+    readings_diff_row: "core_gate_readings_diff_row",
+    verdict_window: "verdict_core_gate_window",
+    disk_stuck: "core_gate_disk_stuck",
+    disk_stuck_h3: "core_gate_disk_stuck_h3",
+    stuck_growth: "core_gate_stuck_growth",
+    broken_slot_growth: "core_gate_broken_slot_growth",
+    broken_slot_reversed_growth: "core_gate_broken_slot_h1_growth",
+    attribution: "core_gate_attribution",
+    stuck_marks: "core_gate_stuck_marks",
+    core_gate_reach: "core_gate_reach",
 };
 
 /// 一族臂：进全部格的臂、只进 steady 的阳性对照，与几条对照关系里的角色（自证对照、两条读法臂）。
@@ -2481,6 +2789,12 @@ struct RowFamily {
     ring_lag_arm: Arm,
     /// 第 2 次重跑一族：多打 `f_attribution` 行与 `disk_stuck`、刻度。
     is_second_rerun: bool,
+    /// `disk_stuck` 跑哪几条臂（第 1 次一族不跑 `disk_stuck`，空）。
+    disk_stuck_arms: Vec<Arm>,
+    /// 阳性对照臂进哪几个基本世界（S ∈ {4, 16}）；第 1、2 次只进 steady。
+    short_arm_worlds: Vec<World>,
+    /// 阳性对照臂也进原取样点的 activation_faults（第 3 次重跑第五节）。
+    short_arms_enter_activation_faults: bool,
 }
 
 /// 第 1 次重跑的一族：窗口臂四条加三条阳性对照，候选下界取旧式。
@@ -2494,6 +2808,9 @@ fn first_rerun_family() -> RowFamily {
         disk_hold_arm: Arm::TightenedStatesWindowed(WindowArm::DiskHold),
         ring_lag_arm: Arm::TightenedStatesWindowed(WindowArm::RingLag),
         is_second_rerun: false,
+        disk_stuck_arms: Vec::new(),
+        short_arm_worlds: vec![World::Steady],
+        short_arms_enter_activation_faults: false,
     }
 }
 
@@ -2512,6 +2829,33 @@ fn second_rerun_family() -> RowFamily {
         disk_hold_arm: Arm::ClauseFloorWindowed(WindowArm::DiskHold),
         ring_lag_arm: Arm::ClauseFloorWindowed(WindowArm::RingLag),
         is_second_rerun: true,
+        disk_stuck_arms: vec![
+            Arm::WholeRing(WholeRingArm::ReadingP),
+            Arm::WholeRing(WholeRingArm::ReadingQ),
+            Arm::ClauseFloorWindowed(WindowArm::Window),
+            Arm::ClauseFloorWindowed(WindowArm::RingGate),
+        ],
+        short_arm_worlds: vec![World::Steady],
+        short_arms_enter_activation_faults: false,
+    }
+}
+
+/// 第 3 次重跑的 CG 一族：两条 CG 被测臂进 RGall 一族进的每一格（含 `disk_stuck`），两条阳性对照进 steady、torn_newest、activation_faults。
+/// 窗口一族的角色（自证对照、读法臂）这一族不用，填 CG 被测臂占位；这一族不调窗口一族的判决函数。
+fn core_gate_family() -> RowFamily {
+    let tested_arm = Arm::WholeRing(WholeRingArm::CoreGateCeilingSkipsRootlessDisks);
+    RowFamily {
+        lines: &CORE_GATE_LINES,
+        arms: CORE_GATE_ARMS.iter().map(|whole_ring_arm| Arm::WholeRing(*whole_ring_arm)).collect(),
+        short_arms: CORE_GATE_SHORT_ARMS.iter().map(|whole_ring_arm| Arm::WholeRing(*whole_ring_arm)).collect(),
+        window_arm: tested_arm,
+        ring_gate_arm: tested_arm,
+        disk_hold_arm: tested_arm,
+        ring_lag_arm: tested_arm,
+        is_second_rerun: true,
+        disk_stuck_arms: CORE_GATE_ARMS.iter().map(|whole_ring_arm| Arm::WholeRing(*whole_ring_arm)).collect(),
+        short_arm_worlds: vec![World::Steady, World::TornNewest],
+        short_arms_enter_activation_faults: true,
     }
 }
 
@@ -2571,16 +2915,44 @@ struct WindowRowDraft<'metrics> {
     metrics: &'metrics Metrics,
 }
 
-/// 打印一行结果与它的轨迹行（第 2 次重跑的一族再打一行 `f_attribution`），并记进行簿。
+thread_local! {
+    /// 第 3 次重跑逐行比用：开着时 `print_and_record` 打的每一行另记一份（第 2 次一族与 CG 一族各记一段）。只在 `main` 与单测里开关。
+    static RECORDED_LINES: std::cell::RefCell<Option<Vec<String>>> = const { std::cell::RefCell::new(None) };
+}
+
+fn start_recording_lines() {
+    RECORDED_LINES.with(|recorded| *recorded.borrow_mut() = Some(Vec::new()));
+}
+
+fn stop_recording_lines() -> Vec<String> {
+    RECORDED_LINES.with(|recorded| recorded.borrow_mut().take().expect("先 start_recording_lines 再 stop"))
+}
+
+/// 照原样打印一行；记录开着时另记一份。只改不改输出：打出去的字节与直接 `println!` 相同。
+fn print_and_record(line: String) {
+    println!("{line}");
+    RECORDED_LINES.with(|recorded| {
+        if let Some(lines) = recorded.borrow_mut().as_mut() {
+            lines.push(line);
+        }
+    });
+}
+
+/// 打印一行结果与它的轨迹行（第 2 次重跑起的一族再打一行归因，CG 一族再打一行 CG 走到），并记进行簿。
 fn emit_window_row(emitter: &mut Emitter, rows: &mut Vec<WindowRow>, family: &RowFamily, draft: WindowRowDraft) {
-    println!("{}", emitter.emit_raw(&format!("name={} arm={} {} {}", draft.line_name, draft.arm.name(), draft.row_key, draft.outcome_fields)));
+    print_and_record(emitter.emit_raw(&format!("name={} arm={} {} {}", draft.line_name, draft.arm.name(), draft.row_key, draft.outcome_fields)));
     let new_costs = if family.is_second_rerun { format!(" {}", draft.metrics.second_rerun.render_costs()) } else { String::new() };
-    println!("{}", emitter.emit_raw(&format!(
+    print_and_record(emitter.emit_raw(&format!(
         "name={} line={} arm={} {} {}{new_costs}", family.lines.trajectory, draft.line_name, draft.arm.name(), draft.row_key, draft.metrics.trajectory.render()
     )));
     if family.is_second_rerun {
-        println!("{}", emitter.emit_raw(&format!(
-            "name=f_attribution line={} arm={} {} {}", draft.line_name, draft.arm.name(), draft.row_key, draft.metrics.second_rerun.render_attribution()
+        print_and_record(emitter.emit_raw(&format!(
+            "name={} line={} arm={} {} {}", family.lines.attribution, draft.line_name, draft.arm.name(), draft.row_key, draft.metrics.second_rerun.render_attribution()
+        )));
+    }
+    if !family.lines.core_gate_reach.is_empty() {
+        print_and_record(emitter.emit_raw(&format!(
+            "name={} line={} arm={} {} {}", family.lines.core_gate_reach, draft.line_name, draft.arm.name(), draft.row_key, draft.metrics.core_gate.render()
         )));
     }
     rows.push(WindowRow {
@@ -2642,20 +3014,22 @@ fn emit_window_world_rows(emitter: &mut Emitter, rows: &mut Vec<WindowRow>, fami
             }
         }
     }
-    for arm in family.short_arms.iter().copied() {
-        for slots_per_region in WINDOW_SHORT_SLOTS_SWEEP {
-            let total = fresh_total_over_seeds(SEED_COUNT, |seed| run_world(arm, World::Steady, slots_per_region, seed, 0));
-            emit_window_row(emitter, rows, family, WindowRowDraft {
-                line_name: family.lines.world,
-                world_class: World::Steady.name(),
-                row_key: format!("world={} s={slots_per_region} lost_disk=0", World::Steady.name()),
-                arm,
-                outcome_fields: world_outcome_fields(&total),
-                judgement: RowJudgement::of(&total, false),
-                is_report_only_world: false,
-                has_false_enospc_field: true,
-                metrics: &total,
-            });
+    for world in family.short_arm_worlds.iter().copied() {
+        for arm in family.short_arms.iter().copied() {
+            for slots_per_region in WINDOW_SHORT_SLOTS_SWEEP {
+                let total = fresh_total_over_seeds(SEED_COUNT, |seed| run_world(arm, world, slots_per_region, seed, 0));
+                emit_window_row(emitter, rows, family, WindowRowDraft {
+                    line_name: family.lines.world,
+                    world_class: world.name(),
+                    row_key: format!("world={} s={slots_per_region} lost_disk=0", world.name()),
+                    arm,
+                    outcome_fields: world_outcome_fields(&total),
+                    judgement: RowJudgement::of(&total, false),
+                    is_report_only_world: false,
+                    has_false_enospc_field: true,
+                    metrics: &total,
+                });
+            }
         }
     }
 }
@@ -2677,8 +3051,10 @@ fn emit_window_activation_rows(emitter: &mut Emitter, rows: &mut Vec<WindowRow>,
             ActivationVariant::SkipThenRaise { repeats } => repeats,
             ActivationVariant::Plain | ActivationVariant::CrashWithoutLossFirst => 0,
         };
+        let short_arms_here: &[Arm] =
+            if family.short_arms_enter_activation_faults && point == GeometryPoint::Original && variant == ActivationVariant::Plain { &family.short_arms } else { &[] };
         for slots_per_region in FAULT_SLOTS_SWEEP {
-            for arm in family.arms.iter().copied() {
+            for arm in family.arms.iter().chain(short_arms_here.iter()).copied() {
                 let mut by_class = [[Metrics::fresh(); 3]; DISK_COUNT];
                 for seed in 0..FAULT_SEED_COUNT {
                     let prefix = match point {
@@ -2933,7 +3309,7 @@ fn emit_window_crit1_rows(emitter: &mut Emitter, family: &RowFamily) -> (u64, Ve
                      lag={maximum_lag} expect_lag={expect_lag} released={} holds={}",
                     arm.name(), format_set(&publication_set), format_set(&expect_set), u8::from(is_all_released), u8::from(holds)
                 );
-                println!("{}", emitter.emit_raw(&format!("name={} {line_body}", family.lines.crit1_push)));
+                print_and_record(emitter.emit_raw(&format!("name={} {line_body}", family.lines.crit1_push)));
                 line_bodies.push(line_body);
             }
         }
@@ -3188,7 +3564,7 @@ fn emit_stuck_growth_row(emitter: &mut Emitter, line_name: &'static str, arm: Ar
     } else {
         StuckBound::Unbounded
     };
-    println!("{}", emitter.emit_raw(&format!(
+    print_and_record(emitter.emit_raw(&format!(
         "name={line_name} arm={} {row_key} seeds={} {} s12_seeds={} s12_min_x100={first_to_second_smallest} s12_max_x100={first_to_second_largest} \
          s24_seeds={} s24_min_x100={second_to_fourth_smallest} s24_max_x100={second_to_fourth_largest} s24_seeds_not_below_one_half={seeds_not_below_one_half} \
          seeds_without_mark4={} bound={}",
@@ -3272,16 +3648,11 @@ fn stuck_outcome_fields(total: &Metrics) -> String {
 
 /// `disk_stuck`（登记第五节，第 2 行第三样代价的目标形态）：被测 RGall、RGall_Q 与对照 G2SW、G2SW_ringgate，全部开条款形候选下界。
 fn emit_disk_stuck_rows(emitter: &mut Emitter, rows: &mut Vec<WindowRow>, growth: &mut Vec<StuckGrowthSummary>, family: &RowFamily) {
-    let stuck_arms = [
-        Arm::WholeRing(WholeRingArm::ReadingP),
-        Arm::WholeRing(WholeRingArm::ReadingQ),
-        Arm::ClauseFloorWindowed(WindowArm::Window),
-        Arm::ClauseFloorWindowed(WindowArm::RingGate),
-    ];
+    let stuck_arms = family.disk_stuck_arms.clone();
     for stuck_disk in STUCK_DISKS {
         let (line_name, world_class) = if stuck_disk == 1 { (family.lines.disk_stuck, DISK_STUCK_CLASS) } else { (family.lines.disk_stuck_h3, DISK_STUCK_REVERSED_CLASS) };
         for slots_per_region in FAULT_SLOTS_SWEEP {
-            for arm in stuck_arms {
+            for arm in stuck_arms.iter().copied() {
                 for fill in STUCK_FILLS {
                     let growth_key = format!("s={slots_per_region} stuck_disk={stuck_disk} fill={fill:.2}");
                     let mut totals_by_ending = [Metrics::fresh(); 3];
@@ -3294,9 +3665,9 @@ fn emit_disk_stuck_rows(emitter: &mut Emitter, rows: &mut Vec<WindowRow>, growth
                             Some((increase, freed)) => slope_in_hundredths(*increase, *freed).to_string(),
                             None => "na".to_string(),
                         };
-                        println!("{}", emitter.emit_raw(&format!(
-                            "name=f_stuck_marks line={line_name} arm={} {growth_key} seed={seed} {} s12_x100={} s24_x100={}",
-                            arm.name(), render_stuck_marks(&marks), slope_text(0, 1), slope_text(1, 2)
+                        print_and_record(emitter.emit_raw(&format!(
+                            "name={} line={line_name} arm={} {growth_key} seed={seed} {} s12_x100={} s24_x100={}",
+                            family.lines.stuck_marks, arm.name(), render_stuck_marks(&marks), slope_text(0, 1), slope_text(1, 2)
                         )));
                         for (ending_index, ending) in STUCK_ENDINGS.iter().enumerate() {
                             totals_by_ending[ending_index].add(&disk_stuck_ending(&stuck_end, *ending));
@@ -3790,6 +4161,403 @@ fn emit_second_rerun_verdict_lines(
     )));
 }
 
+/// 第 3 次重跑第一节读法第 2 条：甲类行（随门槛变）的行名去掉族前缀之后的那一段。
+const PAIRED_LINE_SUFFIXES: [&str; 17] = [
+    "cell", "activation", "activation_h2", "near_full", "drain_failure", "broken_slot", "broken_slot_h1", "cost_growth", "crit1_push", "disk_stuck",
+    "disk_stuck_h3", "stuck_growth", "broken_slot_growth", "broken_slot_h1_growth", "stuck_marks", "trajectory", "attribution",
+];
+/// 同一类行里认「同键」看的字段（另加行名、`line=` 与臂）：世界 / 变体、S、丢盘、失败组合、开销对、开销升到、占用、收尾、卡住的盘、种子、空发布开销。
+const ROW_KEY_FIELD_NAMES: [&str; 14] =
+    ["world", "variant", "s", "lost_disk", "failures", "c0", "c_max", "grown_to", "within_declared", "fill", "ending", "stuck_disk", "seed", "empty_cost"];
+/// 两族臂名的对应：第 2 次（旧那一边）→ CG。前两对是第六节第 6 行的被测对，后两对是阳性对照。
+const CORE_GATE_ARM_COUNTERPARTS: [(&str, &str); 4] = [
+    ("RGall_ring_all", "RGall_core_gate"),
+    ("RGall_Q_ring_all", "RGall_Q_core_gate"),
+    ("RGall_short", "RGall_core_gate_short"),
+    ("RGall_Q_short", "RGall_Q_core_gate_short"),
+];
+/// 五个判定位的计数字段（第一节读法第 3 条：C3f、C3u、C4、C5、C7）。
+const JUDGEMENT_COUNT_FIELDS: [&str; 5] = ["fakes", "unrecoverable", "false_enospc_arm", "write_after_delete_failed", "retention_violations"];
+const SECOND_RERUN_LINE_PREFIX: &str = "f_";
+const CORE_GATE_LINE_PREFIX: &str = "core_gate_";
+/// 没有恢复、没有回退的那几类行（第十一节 V7）：去掉族前缀之后的行名（轨迹与归因行看它们的 `line=`）。
+const LINE_SUFFIXES_WITHOUT_RECOVERY: [&str; 8] =
+    ["near_full", "drain_failure", "broken_slot", "broken_slot_h1", "cost_growth", "crit1_push", "broken_slot_growth", "broken_slot_h1_growth"];
+const WORLDS_WITHOUT_RECOVERY: [&str; 2] = ["steady", "slot_write_fail"];
+
+/// 一行产物拆成 (字段名, 值)；`E7RESULT` 那一段不带等号，不算字段。
+fn result_line_fields(line: &str) -> Vec<(&str, &str)> {
+    line.split(' ').filter_map(|token| token.split_once('=')).collect()
+}
+
+fn field_value<'line>(fields: &[(&'line str, &'line str)], field_name: &str) -> Option<&'line str> {
+    fields.iter().find(|(name, _)| *name == field_name).map(|(_, value)| *value)
+}
+
+/// 两族之间配对的一行。
+struct PairedLine<'line> {
+    /// (去掉族前缀的行名, 去掉族前缀的 `line=`, 旧那一边的臂名, 行键字段) 拼成的键。
+    key: String,
+    base_arm: &'static str,
+    suffix: &'line str,
+    line_suffix: Option<&'line str>,
+    fields: Vec<(&'line str, &'line str)>,
+}
+
+/// 甲类行、臂在对应表里才交回；`is_core_gate_side` 说这一行是 CG 那一边（臂名按对应表的右列认）还是旧那一边。
+fn paired_line<'line>(line: &'line str, family_prefix: &str, is_core_gate_side: bool) -> Option<PairedLine<'line>> {
+    let fields = result_line_fields(line);
+    let suffix = field_value(&fields, "name")?.strip_prefix(family_prefix)?;
+    if !PAIRED_LINE_SUFFIXES.contains(&suffix) {
+        return None;
+    }
+    let arm = field_value(&fields, "arm")?;
+    let base_arm = CORE_GATE_ARM_COUNTERPARTS.iter().find(|(old_arm, new_arm)| if is_core_gate_side { *new_arm == arm } else { *old_arm == arm }).map(|(old_arm, _)| *old_arm)?;
+    let line_suffix = match field_value(&fields, "line") {
+        Some(line_name) => Some(line_name.strip_prefix(family_prefix)?),
+        None => None,
+    };
+    let key_fields: Vec<String> = fields.iter().filter(|(name, _)| ROW_KEY_FIELD_NAMES.contains(name)).map(|(name, value)| format!("{name}={value}")).collect();
+    let key = format!("{suffix} line={} arm={base_arm} {}", line_suffix.unwrap_or("-"), key_fields.join(" "));
+    Some(PairedLine { key, base_arm, suffix, line_suffix, fields })
+}
+
+/// 五个判定位：这一行判这一位、行里有这个字段时 `Some(计数 > 0)`，否则 `None`（第一节读法第 3 条）。
+fn judged_bits(suffix: &str, fields: &[(&str, &str)]) -> [Option<bool>; 5] {
+    let world = field_value(fields, "world");
+    let failures = field_value(fields, "failures").and_then(|text| text.parse::<u64>().ok());
+    let is_rollback_first_publish = world == Some("rollback_first_publish");
+    let is_space_judged = match suffix {
+        "near_full" | "broken_slot" | "broken_slot_h1" => true,
+        "drain_failure" => failures.is_some_and(|count| count <= TOLERATED_ROOT_WRITE_FAILURES),
+        "cost_growth" => field_value(fields, "within_declared") == Some("1"),
+        _ => false,
+    };
+    let is_retention_judged = !is_rollback_first_publish && suffix != "disk_stuck" && suffix != "disk_stuck_h3" && !(suffix == "drain_failure" && failures == Some(3));
+    let judged = [!is_rollback_first_publish, !is_rollback_first_publish, is_space_judged, is_space_judged, is_retention_judged];
+    let mut bits = [None; 5];
+    for (position, field_name) in JUDGEMENT_COUNT_FIELDS.iter().enumerate() {
+        if judged[position] {
+            bits[position] = field_value(fields, field_name).and_then(|text| text.parse::<u64>().ok()).map(|count| count > 0);
+        }
+    }
+    bits
+}
+
+fn judgement_counts(fields: &[(&str, &str)]) -> [Option<u64>; 5] {
+    JUDGEMENT_COUNT_FIELDS.map(|field_name| field_value(fields, field_name).and_then(|text| text.parse::<u64>().ok()))
+}
+
+/// 一对的五位：旧 0 → 新 1 的位数（翻面）、旧 1 → 新 0 的位数（反向）、两边同为 1 的位数（F9）。不判的位不数。
+fn judged_bit_transitions(old_bits: &[Option<bool>; 5], new_bits: &[Option<bool>; 5]) -> (u64, u64, u64) {
+    let mut flips = 0u64;
+    let mut reverse = 0u64;
+    let mut both_red = 0u64;
+    for (old_bit, new_bit) in old_bits.iter().zip(new_bits.iter()) {
+        if *old_bit == Some(false) && *new_bit == Some(true) {
+            flips += 1;
+        }
+        if *old_bit == Some(true) && *new_bit == Some(false) {
+            reverse += 1;
+        }
+        if *old_bit == Some(true) && *new_bit == Some(true) {
+            both_red += 1;
+        }
+    }
+    (flips, reverse, both_red)
+}
+
+/// 一条臂（按旧那一边的臂名）在逐行比里的计数（第六节第 5–8 行与 F9）。
+#[derive(Clone, Copy, Default)]
+struct CoreGateArmTally {
+    pairs: u64,
+    pairs_with_a_differing_field: u64,
+    pairs_with_counts_changed: u64,
+    flips: u64,
+    pairs_with_a_flip: u64,
+    reverse: u64,
+    pairs_both_red: u64,
+    /// 第六节第 7 行：CG 那一边判定位为 1 的行数，按五位分。
+    new_red_rows_by_position: [u64; 5],
+}
+
+/// 五个计数变了的一对（第六节第 6 行「变了的每一对」）。
+struct CoreGateChangedPair {
+    core_gate_line_name: String,
+    core_gate_arm: String,
+    key_fields: String,
+    old_counts: [Option<u64>; 5],
+    new_counts: [Option<u64>; 5],
+    old_bits: [Option<bool>; 5],
+    new_bits: [Option<bool>; 5],
+    flips: u64,
+    /// 这一行的 `core_gate_reach` 里 dF ≠ 0 与钉值起作用的采样数（F8 归因）；找不到写 None。
+    reach: Option<(String, String)>,
+}
+
+struct CoreGateComparison {
+    by_arm: BTreeMap<&'static str, CoreGateArmTally>,
+    /// (类, 旧那一边的臂) → (比了几对, 任一字段不同的对数)。
+    by_class_and_arm: BTreeMap<(String, &'static str), (u64, u64)>,
+    old_lines_without_partner: u64,
+    core_gate_lines_without_partner: u64,
+    duplicate_keys: u64,
+    pairs_differing_in_worlds_without_recovery: u64,
+    changed: Vec<CoreGateChangedPair>,
+}
+
+/// 第六节第 5、6、7、8 行与 V5、V7：旧那一边的甲类行与同键的 CG 行逐对比；只读两段记下来的行，不跑模型。
+fn compare_core_gate_lines(old_lines: &[String], core_gate_lines: &[String]) -> CoreGateComparison {
+    let mut comparison = CoreGateComparison {
+        by_arm: BTreeMap::new(),
+        by_class_and_arm: BTreeMap::new(),
+        old_lines_without_partner: 0,
+        core_gate_lines_without_partner: 0,
+        duplicate_keys: 0,
+        pairs_differing_in_worlds_without_recovery: 0,
+        changed: Vec::new(),
+    };
+    let mut core_gate_by_key: HashMap<String, PairedLine> = HashMap::new();
+    let mut reach_by_key: HashMap<String, (String, String)> = HashMap::new();
+    for line in core_gate_lines {
+        let fields = result_line_fields(line);
+        if field_value(&fields, "name") == Some(CORE_GATE_LINES.core_gate_reach) {
+            let key_fields: Vec<String> = fields.iter().filter(|(name, _)| *name == "line" || *name == "arm" || ROW_KEY_FIELD_NAMES.contains(name)).map(|(name, value)| format!("{name}={value}")).collect();
+            let reach_fields = (field_value(&fields, "floor_term_difference_nonzero").unwrap_or("na").to_string(), field_value(&fields, "pin_effective").unwrap_or("na").to_string());
+            reach_by_key.insert(key_fields.join(" "), reach_fields);
+            continue;
+        }
+        if let Some(paired) = paired_line(line, CORE_GATE_LINE_PREFIX, true) {
+            if core_gate_by_key.insert(paired.key.clone(), paired).is_some() {
+                comparison.duplicate_keys += 1;
+            }
+        }
+    }
+    let mut old_keys_seen: HashSet<String> = HashSet::new();
+    for line in old_lines {
+        let Some(old) = paired_line(line, SECOND_RERUN_LINE_PREFIX, false) else {
+            continue;
+        };
+        if !old_keys_seen.insert(old.key.clone()) {
+            comparison.duplicate_keys += 1;
+            continue;
+        }
+        let Some(new) = core_gate_by_key.get(&old.key) else {
+            comparison.old_lines_without_partner += 1;
+            continue;
+        };
+        let new_field_names: HashSet<&str> = new.fields.iter().map(|(name, _)| *name).collect();
+        let is_differing = old.fields.iter()
+            .filter(|(name, _)| *name != "name" && *name != "line" && *name != "arm" && new_field_names.contains(name))
+            .any(|(name, value)| field_value(&new.fields, name) != Some(*value));
+        let world = field_value(&old.fields, "world");
+        let effective_suffix = old.line_suffix.unwrap_or(old.suffix);
+        let class = match (old.line_suffix, world) {
+            (Some(line_suffix), Some(world)) => format!("{}:{line_suffix}:{world}", old.suffix),
+            (Some(line_suffix), None) => format!("{}:{line_suffix}", old.suffix),
+            (None, Some(world)) => format!("{}:{world}", old.suffix),
+            (None, None) => old.suffix.to_string(),
+        };
+        let class_tally = comparison.by_class_and_arm.entry((class, old.base_arm)).or_insert((0, 0));
+        class_tally.0 += 1;
+        class_tally.1 += u64::from(is_differing);
+        let is_without_recovery = LINE_SUFFIXES_WITHOUT_RECOVERY.contains(&effective_suffix)
+            || (effective_suffix == "cell" && world.is_some_and(|world| WORLDS_WITHOUT_RECOVERY.contains(&world)));
+        comparison.pairs_differing_in_worlds_without_recovery += u64::from(is_differing && is_without_recovery);
+        let old_bits = judged_bits(old.suffix, &old.fields);
+        let new_bits = judged_bits(new.suffix, &new.fields);
+        let old_counts = judgement_counts(&old.fields);
+        let new_counts = judgement_counts(&new.fields);
+        let (flips, reverse, both_red) = judged_bit_transitions(&old_bits, &new_bits);
+        let tally = comparison.by_arm.entry(old.base_arm).or_default();
+        tally.pairs += 1;
+        tally.pairs_with_a_differing_field += u64::from(is_differing);
+        tally.flips += flips;
+        tally.pairs_with_a_flip += u64::from(flips > 0);
+        tally.reverse += reverse;
+        tally.pairs_both_red += u64::from(both_red > 0);
+        for (position, bit) in new_bits.iter().enumerate() {
+            tally.new_red_rows_by_position[position] += u64::from(*bit == Some(true));
+        }
+        if old_counts != new_counts {
+            tally.pairs_with_counts_changed += 1;
+            let core_gate_line_name = field_value(&new.fields, "name").unwrap_or("na").to_string();
+            let core_gate_arm = field_value(&new.fields, "arm").unwrap_or("na").to_string();
+            let key_fields: Vec<String> = new.fields.iter().filter(|(name, _)| ROW_KEY_FIELD_NAMES.contains(name)).map(|(name, value)| format!("{name}={value}")).collect();
+            let key_fields = key_fields.join(" ");
+            let reach = reach_by_key.get(&format!("line={core_gate_line_name} arm={core_gate_arm} {key_fields}")).cloned();
+            comparison.changed.push(CoreGateChangedPair {
+                core_gate_line_name, core_gate_arm, key_fields, old_counts, new_counts, old_bits, new_bits, flips, reach,
+            });
+        }
+        core_gate_by_key.remove(&old.key);
+    }
+    comparison.core_gate_lines_without_partner = core_gate_by_key.values().filter(|paired| !is_core_gate_only_positive_control_line(paired)).count() as u64;
+    comparison
+}
+
+/// CG 一族的阳性对照比第 2 次多进的格（torn_newest 与 activation_faults；第 2 次的短臂只进 steady），在旧那一边没有同键的行，不算「没配上」。
+fn is_core_gate_only_positive_control_line(paired: &PairedLine) -> bool {
+    (paired.base_arm == "RGall_short" || paired.base_arm == "RGall_Q_short") && field_value(&paired.fields, "world") != Some("steady")
+}
+
+fn counts_pair_text(old_count: Option<u64>, new_count: Option<u64>) -> String {
+    let shown = |count: Option<u64>| count.map_or_else(|| "na".to_string(), |value| value.to_string());
+    format!("{}/{}", shown(old_count), shown(new_count))
+}
+
+/// 第六节第 5–8 行的行与判决行：变了的每一对、翻面的每一对（不截断），按臂与按类的计数。
+fn emit_core_gate_comparison(emitter: &mut Emitter, comparison: &CoreGateComparison) {
+    for changed in &comparison.changed {
+        let counts: Vec<String> = JUDGEMENT_COUNT_FIELDS.iter().enumerate()
+            .map(|(position, field_name)| format!("{field_name}_old_new={}", counts_pair_text(changed.old_counts[position], changed.new_counts[position]))).collect();
+        let (floor_term_nonzero, pin_effective) = changed.reach.clone().unwrap_or_else(|| ("na".to_string(), "na".to_string()));
+        let body = format!(
+            "line={} arm={} {} {} bits_old={} bits_new={}", changed.core_gate_line_name, changed.core_gate_arm, changed.key_fields, counts.join(" "),
+            bits_text(&changed.old_bits), bits_text(&changed.new_bits)
+        );
+        println!("{}", emitter.emit_raw(&format!("name=core_gate_changed_row {body}")));
+        if changed.flips > 0 {
+            println!("{}", emitter.emit_raw(&format!("name=core_gate_flip_row {body} flipped_bits={} floor_term_difference_nonzero={floor_term_nonzero} pin_effective={pin_effective}", changed.flips)));
+        }
+    }
+    for ((class, base_arm), (compared, differing)) in &comparison.by_class_and_arm {
+        println!("{}", emitter.emit_raw(&format!("name=verdict_core_gate_discrimination_class class={class} old_arm={base_arm} pairs_compared={compared} pairs_differing={differing}")));
+    }
+    for (base_arm, tally) in &comparison.by_arm {
+        println!("{}", emitter.emit_raw(&format!(
+            "name=verdict_core_gate_flips old_arm={base_arm} pairs_compared={} pairs_with_a_differing_field={} pairs_with_counts_changed={} flipped_bits={} \
+             pairs_with_a_flip={} reverse_bits={} pairs_both_red={} new_red_rows_c3f={} new_red_rows_c3u={} new_red_rows_c4={} new_red_rows_c5={} new_red_rows_c7={}",
+            tally.pairs, tally.pairs_with_a_differing_field, tally.pairs_with_counts_changed, tally.flips, tally.pairs_with_a_flip, tally.reverse,
+            tally.pairs_both_red, tally.new_red_rows_by_position[0], tally.new_red_rows_by_position[1], tally.new_red_rows_by_position[2],
+            tally.new_red_rows_by_position[3], tally.new_red_rows_by_position[4]
+        )));
+    }
+    println!("{}", emitter.emit_raw(&format!(
+        "name=verdict_core_gate_pairing old_lines_without_partner={} core_gate_lines_without_partner={} duplicate_keys={} pairs_differing_in_worlds_without_recovery={}",
+        comparison.old_lines_without_partner, comparison.core_gate_lines_without_partner, comparison.duplicate_keys, comparison.pairs_differing_in_worlds_without_recovery
+    )));
+}
+
+/// 第六节第 4、10 行：CG 一族的行簿上数 CG 走到（按世界类合计）与阳性对照（每一行的假候选）。返回 (d ≠ 0, dF ≠ 0, 钉值起作用) 三个合计，
+/// 与阳性对照为 0 的行数（steady，别的两类）。
+fn emit_core_gate_reach_and_control_verdicts(emitter: &mut Emitter, rows: &[WindowRow]) -> ([u64; 3], u64, u64) {
+    let mut by_class: BTreeMap<String, (u64, CoreGateObservations)> = BTreeMap::new();
+    for row in rows {
+        let entry = by_class.entry(row.world_class.clone()).or_insert((0, CoreGateObservations::fresh()));
+        entry.0 += 1;
+        entry.1.add(&row.metrics.core_gate);
+    }
+    let mut totals = CoreGateObservations::fresh();
+    for (class, (row_count, observations)) in &by_class {
+        println!("{}", emitter.emit_raw(&format!("name=core_gate_reach_class class={class} rows={row_count} {}", observations.render())));
+        totals.add(observations);
+    }
+    let is_short = |arm: Arm| CORE_GATE_SHORT_ARMS.iter().any(|whole_ring_arm| arm == Arm::WholeRing(*whole_ring_arm));
+    let mut control_rows: BTreeMap<String, (u64, u64)> = BTreeMap::new();
+    for row in rows.iter().filter(|row| is_short(row.arm)) {
+        let entry = control_rows.entry(row.world_class.clone()).or_insert((0, 0));
+        entry.0 += 1;
+        entry.1 += u64::from(row.metrics.fake_candidates == 0);
+    }
+    let mut steady_zero_rows = 0u64;
+    let mut other_zero_rows = 0u64;
+    for (class, (row_count, zero_rows)) in &control_rows {
+        println!("{}", emitter.emit_raw(&format!("name=verdict_core_gate_positive_control class={class} rows={row_count} rows_with_zero_fake_candidates={zero_rows}")));
+        if class == World::Steady.name() { steady_zero_rows += zero_rows } else { other_zero_rows += zero_rows }
+    }
+    println!("{}", emitter.emit_raw(&format!("name=verdict_core_gate_reach rows={} {}", rows.len(), totals.render())));
+    (
+        [totals.gate_difference_nonzero_samples, totals.floor_term_difference_nonzero_samples, totals.pin_effective_samples],
+        steady_zero_rows,
+        other_zero_rows,
+    )
+}
+
+/// 第六节第 9 行：保留池扫描两族（CG 开、CG 关）同 (臂, 开销对, 保留池) 逐行比全部字段。返回不同的行数。
+fn emit_core_gate_reserve_sweeps(emitter: &mut Emitter) -> u64 {
+    let mut bodies: [Vec<String>; 2] = [Vec::new(), Vec::new()];
+    for (family_index, (line_name, arms)) in [("core_gate_reserve_sweep", CORE_GATE_ARMS), ("core_gate_off_reserve_sweep", WHOLE_RING_ARMS)].iter().enumerate() {
+        for whole_ring_arm in arms {
+            let arm = Arm::WholeRing(*whole_ring_arm);
+            for (mount_cost, declared_maximum_cost) in COST_PAIRS {
+                let ring_depth = REGION_COUNT * RESERVE_SWEEP_SLOTS_PER_REGION;
+                let formula = arm.reserve_blocks(ring_depth, arm.formula_cost(mount_cost, declared_maximum_cost));
+                for reserve in (formula - RESERVE_SWEEP_BELOW)..=(formula + RESERVE_SWEEP_ABOVE) {
+                    let total = fresh_total_over_seeds(RESERVE_SWEEP_SEED_COUNT, |seed| run_near_full(arm, RESERVE_SWEEP_SLOTS_PER_REGION, mount_cost, declared_maximum_cost, seed, Some(reserve)));
+                    let body = format!(
+                        "s={RESERVE_SWEEP_SLOTS_PER_REGION} c0={mount_cost} c_max={declared_maximum_cost} reserve={reserve} formula={formula} \
+                         stalls={} false_enospc_arm={} write_after_delete_failed={} max_publications={} fakes={}",
+                        total.stalls, total.false_enospc_arm, total.write_after_delete_failed, total.maximum_publications_per_admission, total.fake_candidates
+                    );
+                    println!("{}", emitter.emit_raw(&format!("name={line_name} arm={} {body}", arm.name())));
+                    bodies[family_index].push(body);
+                }
+            }
+        }
+    }
+    let compared = bodies[0].len().min(bodies[1].len());
+    let differing = bodies[0].iter().zip(bodies[1].iter()).filter(|(core_gate_body, old_body)| core_gate_body != old_body).count() + bodies[0].len().abs_diff(bodies[1].len());
+    println!("{}", emitter.emit_raw(&format!("name=verdict_core_gate_reserve_sweep rows_compared={compared} rows_differing={differing}")));
+    differing as u64
+}
+
+/// 第 3 次重跑（`research/prompts/e139-r3-prereg.md`）：CG 一族进 RGall 一族进的每一格，保留池扫描两族，再与第 2 次那一族记下的行逐行比。
+/// 接在第 2 次重跑的全部行之后、`name=done` 之前；`second_rerun_lines` 是第 2 次那一族打出的、记下来的行（同一次运行里重出的旧那一边）。
+fn run_core_gate_arms(emitter: &mut Emitter, second_rerun_lines: &[String]) {
+    let family = core_gate_family();
+    let family = &family;
+    let arm_names = |arms: &[Arm]| arms.iter().map(|arm| arm.name()).collect::<Vec<&str>>().join("/");
+    println!("{}", emitter.emit_raw(&format!(
+        "name=core_gate_config core_gate_arms={} core_gate_short_arms={} short_worlds=steady/torn_newest/activation_faults short_slots={} disk_stuck_arms={} \
+         reserve_sweep_arms={} off_reserve_sweep_arms={} pin_rule=oldest_txg_below_min_of_ring_length_and_first_txg floor_term_rule=min_of_effective_floor_and_newest_on_every_surviving_disk_held_until_rooted",
+        arm_names(&family.arms), arm_names(&family.short_arms), format_set(&WINDOW_SHORT_SLOTS_SWEEP), arm_names(&family.disk_stuck_arms),
+        arm_names(&family.arms), WHOLE_RING_ARMS.iter().map(|whole_ring_arm| whole_ring_arm.name()).collect::<Vec<&str>>().join("/")
+    )));
+    let mut rows: Vec<WindowRow> = Vec::new();
+    let mut growth: Vec<StuckGrowthSummary> = Vec::new();
+    start_recording_lines();
+    let _ = emit_window_crit1_rows(emitter, family);
+    emit_window_world_rows(emitter, &mut rows, family);
+    emit_window_activation_rows(emitter, &mut rows, family, GeometryPoint::Original);
+    emit_window_near_full_rows(emitter, &mut rows, family);
+    emit_window_drain_failure_rows(emitter, &mut rows, family);
+    emit_window_broken_slot_rows(emitter, &mut rows, &mut growth, family, GeometryPoint::Original);
+    emit_window_cost_growth_rows(emitter, &mut rows, family);
+    emit_window_activation_rows(emitter, &mut rows, family, GeometryPoint::Reversed);
+    emit_window_broken_slot_rows(emitter, &mut rows, &mut growth, family, GeometryPoint::Reversed);
+    emit_disk_stuck_rows(emitter, &mut rows, &mut growth, family);
+    let core_gate_lines = stop_recording_lines();
+    let reserve_sweep_rows_differing = emit_core_gate_reserve_sweeps(emitter);
+    let ([gate_difference_nonzero, floor_term_difference_nonzero, pin_effective], steady_control_zero_rows, other_control_zero_rows) =
+        emit_core_gate_reach_and_control_verdicts(emitter, &rows);
+    let comparison = compare_core_gate_lines(second_rerun_lines, &core_gate_lines);
+    emit_core_gate_comparison(emitter, &comparison);
+    let tally_of = |base_arm: &str| comparison.by_arm.get(base_arm).copied().unwrap_or_default();
+    let tested = tally_of("RGall_ring_all");
+    let zero_counting_reading = tally_of("RGall_Q_ring_all");
+    let discrimination_pairs_differing: u64 = comparison.by_arm.values().map(|tally| tally.pairs_with_a_differing_field).sum();
+    let tested_red_rows: u64 = tested.new_red_rows_by_position.iter().sum();
+    println!("{}", emitter.emit_raw(&format!(
+        "name=verdict_core_gate_clauses tested_arm_pairs={} tested_arm_flipped_bits={} tested_arm_pairs_with_a_flip={} zero_counting_reading_pairs={} zero_counting_reading_pairs_with_a_flip={} \
+         discrimination_pairs_differing={discrimination_pairs_differing} gate_difference_nonzero_samples={gate_difference_nonzero} \
+         floor_term_difference_nonzero_samples={floor_term_difference_nonzero} pin_effective_samples={pin_effective} tested_arm_red_rows={tested_red_rows} \
+         steady_control_rows_with_zero_fakes={steady_control_zero_rows} other_control_rows_with_zero_fakes={other_control_zero_rows} \
+         tested_arm_pairs_both_red={} old_lines_without_partner={} core_gate_lines_without_partner={} duplicate_keys={} \
+         reserve_sweep_rows_differing={reserve_sweep_rows_differing} pairs_differing_in_worlds_without_recovery={}",
+        tested.pairs, tested.flips, tested.pairs_with_a_flip, zero_counting_reading.pairs, zero_counting_reading.pairs_with_a_flip, tested.pairs_both_red,
+        comparison.old_lines_without_partner, comparison.core_gate_lines_without_partner, comparison.duplicate_keys, comparison.pairs_differing_in_worlds_without_recovery
+    )));
+}
+
+fn bits_text(bits: &[Option<bool>; 5]) -> String {
+    bits.iter().map(|bit| match bit {
+        Some(true) => '1',
+        Some(false) => '0',
+        None => '-',
+    }).collect()
+}
+
 fn main() {
     let mut emitter = Emitter::new();
     println!("{}", emitter.emit_raw(&format!(
@@ -4178,7 +4946,10 @@ fn main() {
         ARMS.iter().enumerate().map(|(index, arm)| format!("{}={}", arm.name(), first_publish_unrecoverable[index])).collect::<Vec<String>>().join(" ")
     )));
     let (first_rerun_rows, first_rerun_crit1_bodies) = run_window_arms(&mut emitter);
+    start_recording_lines();
     run_second_rerun_arms(&mut emitter, &first_rerun_rows, &first_rerun_crit1_bodies);
+    let second_rerun_lines = stop_recording_lines();
+    run_core_gate_arms(&mut emitter, &second_rerun_lines);
     println!("{}", emitter.finish());
 }
 
@@ -5206,9 +5977,8 @@ mod second_rerun_tests {
     }
 
     /// `disk_stuck` 世界全部组合的预演（4 条臂 × S ∈ {4, 16} × 卡住的盘 × 占用两档 × 8 个种子 × 三种收尾）：不 panic、写失败真的注入过。
-    /// 耗时，平常不跑（`--ignored` 手动跑一次，整份产物跑之前用）。
+    /// 耗时，在默认那一趟里跑（慢的交统一任务服务，按单元键复用）。
     #[test]
-    #[ignore = "整个 disk_stuck 世界的预演，耗时；产物跑之前手动跑一次"]
     fn disk_stuck_world_runs_every_combination_without_panicking() {
         for arm in [WHOLE_RING_READING_P_ARM, WHOLE_RING_READING_Q_ARM, CLAUSE_WINDOW_ARM, CLAUSE_RING_GATE_ARM] {
             for slots_per_region in FAULT_SLOTS_SWEEP {
@@ -5225,5 +5995,346 @@ mod second_rerun_tests {
                 }
             }
         }
+    }
+}
+
+/// 第 3 次重跑（`research/prompts/e139-r3-prereg.md` 第七节）：CG 三处的锚、K-pc、K-eq 与翻面判法。
+#[cfg(test)]
+mod core_gate_tests {
+    use super::*;
+
+    const CORE_GATE_SKIPPING_ARM: Arm = Arm::WholeRing(WholeRingArm::CoreGateCeilingSkipsRootlessDisks);
+    const CORE_GATE_ZERO_COUNTING_ARM: Arm = Arm::WholeRing(WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero);
+    const WHOLE_RING_SKIPPING_ARM: Arm = Arm::WholeRing(WholeRingArm::ReadingP);
+    const WHOLE_RING_ZERO_COUNTING_ARM: Arm = Arm::WholeRing(WholeRingArm::ReadingQ);
+    /// 两条 CG 被测臂各与同读法的 RGall 臂成对（锚对两条臂各做一遍）。
+    const TESTED_PAIRS: [(Arm, Arm); 2] = [(CORE_GATE_SKIPPING_ARM, WHOLE_RING_SKIPPING_ARM), (CORE_GATE_ZERO_COUNTING_ARM, WHOLE_RING_ZERO_COUNTING_ARM)];
+
+    fn fresh_simulation(arm: Arm, slots_per_region: u64) -> Simulation {
+        let mut simulation = Simulation::new(arm, slots_per_region, 1, 5, 1, true, None);
+        simulation.prefill(STEADY_FILL);
+        simulation
+    }
+
+    /// 做 `windows` 个删建窗口（`run_user_window(true, false)`，不盘紧），每个都要发布成功。
+    fn run_publishing_windows(simulation: &mut Simulation, windows: u64) {
+        for _ in 0..windows {
+            assert_eq!(simulation.run_user_window(true, false), WindowOutcome::Created, "txg {} 的删建窗口要发布成功", simulation.next_txg);
+        }
+    }
+
+    /// 下一个窗口的根写之前崩溃（`run_user_window(true, true)`），然后恢复。
+    fn crash_before_the_next_root_and_recover(simulation: &mut Simulation) {
+        assert_eq!(simulation.run_user_window(true, true), WindowOutcome::AllocatedWithoutPublish, "崩溃那个窗口分配了、没发布");
+        simulation.crash_and_recover();
+        assert!(!simulation.halted, "恢复要择得到根");
+    }
+
+    /// Kcg1：S = 4，txg 1..10；`raise_floor_to(6)`；txg 11 的根写之前崩溃、恢复。
+    fn kcg1_state(arm: Arm) -> Simulation {
+        let mut simulation = fresh_simulation(arm, 4);
+        run_publishing_windows(&mut simulation, 10);
+        simulation.raise_floor_to(6);
+        crash_before_the_next_root_and_recover(&mut simulation);
+        simulation
+    }
+
+    /// Kcg2（`clear_system_configuration_floor` 为真时是 Kcg2n）：同 Kcg1，抬 F 之后再发 txg 11（带 6，落在盘 0），txg 12 的根写之前崩溃、恢复。
+    fn kcg2_state(arm: Arm, clear_system_configuration_floor: bool) -> Simulation {
+        let mut simulation = fresh_simulation(arm, 4);
+        run_publishing_windows(&mut simulation, 10);
+        simulation.raise_floor_to(6);
+        run_publishing_windows(&mut simulation, 1);
+        if clear_system_configuration_floor {
+            simulation.system_configuration_floor = 0;
+        }
+        crash_before_the_next_root_and_recover(&mut simulation);
+        simulation
+    }
+
+    /// Kcg3 / Kcg5 / Kcg5f：做 `windows` 个窗口（可先抬 F），下一次发布撕裂、恢复。
+    fn torn_state(arm: Arm, slots_per_region: u64, windows: u64, raise_to: Option<u64>) -> Simulation {
+        let mut simulation = fresh_simulation(arm, slots_per_region);
+        run_publishing_windows(&mut simulation, windows);
+        if let Some(target) = raise_to {
+            simulation.raise_floor_to(target);
+        }
+        simulation.tear_next_publication = true;
+        let instance_before = simulation.instance;
+        simulation.run_user_window(true, false);
+        assert_eq!(simulation.instance, instance_before + 1, "撕裂之后恢复过一次");
+        simulation
+    }
+
+    fn core_gate_state(simulation: &Simulation) -> &CoreGateState {
+        simulation.core_gate.as_ref().expect("CG 臂有 CG 状态")
+    }
+
+    #[test]
+    fn kc1_core_gate_arms_keep_the_tightened_states_bound_reserve_and_residue() {
+        for whole_ring_arm in CORE_GATE_ARMS.iter().chain(CORE_GATE_SHORT_ARMS.iter()) {
+            let arm = Arm::WholeRing(*whole_ring_arm);
+            assert_eq!(arm.publication_bound(12), 4 + 2 * 2, "{} B = 4 + 2 × k_tol = 8", arm.name());
+            assert_eq!((arm.reserve_blocks(12, 5), arm.push_residue_blocks(12, 5)), (10 + 7 * 5, 5 + 6 * 5), "{} c_max = 5：保留池 45、残留 35", arm.name());
+            assert_eq!((arm.reserve_blocks(12, 10), arm.push_residue_blocks(12, 10)), (10 + 7 * 10, 5 + 6 * 10), "{} c_max = 10：保留池 80、残留 65", arm.name());
+            assert!(arm.uses_the_core_gate() && arm.uses_the_clause_candidate_floor(), "{} 带 CG 与 CF", arm.name());
+        }
+    }
+
+    /// Kcg1（锚 `Kcg1 … core_f_eff=6 core_m=9 … core_gate_now=6`）；MG1、MG10、MG12 的取样点。
+    #[test]
+    fn kcg1_the_core_gate_takes_the_system_configuration_floor_six_where_the_old_gate_stays_at_zero() {
+        for (core_gate_arm, old_arm) in TESTED_PAIRS {
+            let mut core_gate = kcg1_state(core_gate_arm);
+            let old = kcg1_state(old_arm);
+            assert_eq!(core_gate.system_configuration_floor, 6, "{} 系统配置 F 6", core_gate_arm.name());
+            assert_eq!((core_gate.floor_carried, core_gate.floor_active, core_gate.reuse_bound()), (6, 6, 6), "{} floor_carried 6、F 那一项 min(6, m = 9) = 6、门槛 6", core_gate_arm.name());
+            assert_eq!(core_gate_state(&core_gate).effective_floor, 6, "{} F_生效 6", core_gate_arm.name());
+            assert_eq!((old.floor_carried, old.floor_active, old.reuse_bound()), (0, 0, 0), "{} 旧式 floor_carried 0、门槛 0", old_arm.name());
+            assert_eq!(core_gate.allocate(8, 11).map(|blocks| blocks.len()), Some(8), "{} 分配一个对象", core_gate_arm.name());
+            let observations = core_gate.metrics.core_gate;
+            assert_eq!((observations.gate_difference.maximum, observations.gate_difference_nonzero_samples), (6, 1), "{} d = 6 − 0，读一次", core_gate_arm.name());
+            assert_eq!(observations.floor_term_difference_nonzero_samples, 1, "{} dF = 6 − 0 ≠ 0", core_gate_arm.name());
+        }
+    }
+
+    /// Kc2 / Kcg2（锚 `Kcg2 … old_candidacy=6 old_settled=0 old_gate=0 core_f_eff=6 core_m=10 … core_gate_now=6`）。
+    #[test]
+    fn kcg2_the_effective_floor_is_six_from_the_newest_root_on_disk_zero_and_the_old_gate_waits_for_six() {
+        for (core_gate_arm, old_arm) in TESTED_PAIRS {
+            let core_gate = kcg2_state(core_gate_arm, false);
+            let old = kcg2_state(old_arm, false);
+            assert_eq!(core_gate_state(&core_gate).effective_floor, 6, "{} Kc2：F_生效 = max(盘 0 的 6, 盘 1 的 0, 系统配置 6) = 6", core_gate_arm.name());
+            assert_eq!((core_gate.floor_active, core_gate.reuse_bound()), (6, 6), "{} 当场 min(6, m = 10) = 6、门槛 6", core_gate_arm.name());
+            assert_eq!((old.floor_carried, old.floor_active, old.reuse_bound()), (6, 0, 0), "{} 旧式候选下界 6、生效值 0、门槛 0", old_arm.name());
+            assert_eq!(old.pending_floor.map(|pending| pending.value), Some(6), "{} 旧式等生效的 F 是 6", old_arm.name());
+            let shadow = core_gate_state(&core_gate);
+            assert_eq!((shadow.shadow_floor_carried, shadow.shadow_floor_active, shadow.shadow_pending_floor_value), (6, 0, Some(6)), "{} 影子与旧式逐值相同", core_gate_arm.name());
+        }
+    }
+
+    /// Kcg2n（锚 `Kcg2n … core_f_eff=6 … core_gate_now=6`）：系统配置 F 清零之后 F_生效 仍取盘 0 最新根带的 6（MG2 的取样点）。
+    #[test]
+    fn kcg2n_without_the_system_configuration_floor_the_newest_root_on_disk_zero_still_gives_six() {
+        for (core_gate_arm, _) in TESTED_PAIRS {
+            let core_gate = kcg2_state(core_gate_arm, true);
+            assert_eq!(core_gate_state(&core_gate).effective_floor, 6, "{} F_生效 = max(6, 0, 0) = 6", core_gate_arm.name());
+            assert_eq!(core_gate.reuse_bound(), 6, "{} 门槛 6", core_gate_arm.name());
+        }
+    }
+
+    /// Kcg3（锚 `Kcg3 … old_gate=15 … pins={8: 2} oldest_valid=15 core_gate_now=2`、`torn_slot = 8 … slot_of_first_txg = 8`）：MG6、MG7、MG8 的取样点。
+    #[test]
+    fn kcg3_the_torn_slot_eight_is_pinned_at_txg_two_until_the_first_publication_after_recovery_writes_it() {
+        for (core_gate_arm, old_arm) in TESTED_PAIRS {
+            let mut core_gate = torn_state(core_gate_arm, 4, 25, None);
+            let old = torn_state(old_arm, 4, 25, None);
+            assert_eq!(core_gate.slot_index(26), 8, "txg 26 落在槽 8");
+            assert_eq!(core_gate.next_txg, 26, "{} 恢复之后第一次发布的 txg 26（撕裂的那次不算发布过）", core_gate_arm.name());
+            assert_eq!(core_gate_state(&core_gate).pinned_slots, BTreeMap::from([(8usize, 2u64)]), "{} 钉值 {{槽 8: 2}}", core_gate_arm.name());
+            assert_eq!(core_gate.oldest_persisted_valid_txg(), 15, "{} 环里最旧有效根 15", core_gate_arm.name());
+            assert_eq!(core_gate.reuse_bound(), 2, "{} CG 门槛 = max(min(0, 24), min(15, 2)) = 2", core_gate_arm.name());
+            assert_eq!(old.reuse_bound(), 15, "{} 旧式门槛 15", old_arm.name());
+            run_publishing_windows(&mut core_gate, 1);
+            assert!(core_gate_state(&core_gate).pinned_slots.is_empty(), "{} txg 26 写进槽 8 之后解钉", core_gate_arm.name());
+            assert_eq!(core_gate.reuse_bound(), 15, "{} 解钉之后门槛回到 15", core_gate_arm.name());
+        }
+    }
+
+    /// Kcg4（锚 `Kcg4 … core_f_eff=10 core_m=9 … core_gate_now=9 core_gate_after_held=10`、`held_released_after_txg = 13`）：MG3、MG4 的取样点。
+    #[test]
+    fn kcg4_the_floor_term_waits_at_nine_until_txg_thirteen_roots_the_new_instance_on_both_disks_then_takes_ten() {
+        for (core_gate_arm, old_arm) in TESTED_PAIRS {
+            let build = |arm: Arm| {
+                let mut simulation = fresh_simulation(arm, 4);
+                run_publishing_windows(&mut simulation, 10);
+                simulation.raise_floor_to(10);
+                crash_before_the_next_root_and_recover(&mut simulation);
+                simulation
+            };
+            let mut core_gate = build(core_gate_arm);
+            let old = build(old_arm);
+            assert_eq!(core_gate_state(&core_gate).effective_floor, 10, "{} F_生效 10", core_gate_arm.name());
+            assert_eq!((core_gate.floor_active, core_gate.reuse_bound()), (9, 9), "{} 当场 min(10, m = 9) = 9", core_gate_arm.name());
+            assert_eq!(old.reuse_bound(), 0, "{} 旧式门槛 0", old_arm.name());
+            for (published_txg, expected_floor_term) in [(11u64, 9u64), (12, 9), (13, 10)] {
+                run_publishing_windows(&mut core_gate, 1);
+                assert_eq!(core_gate.newest_durable_txg, published_txg, "{} 发到 txg {published_txg}", core_gate_arm.name());
+                assert_eq!(core_gate.floor_active, expected_floor_term, "{} txg {published_txg} 之后 F 那一项 {expected_floor_term}", core_gate_arm.name());
+            }
+            assert_eq!(core_gate.reuse_bound(), 10, "{} 放开之后门槛 = max(10, 环里最旧有效根 2) = 10", core_gate_arm.name());
+            assert_eq!(core_gate_state(&core_gate).held_until_rooted_from_instance, None, "{} 扣住那一截放开了", core_gate_arm.name());
+        }
+    }
+
+    /// Kcg5（锚 `Kcg5 S=1 … old_gate=29 core_f_eff=0 core_m=None pins={1: 1} oldest_valid=29 core_gate_now=1`）：MG6 的第二个取样点。
+    #[test]
+    fn kcg5_with_one_slot_per_region_the_torn_slot_is_the_only_slot_of_disk_one_and_pins_the_gate_at_one() {
+        for (core_gate_arm, old_arm) in TESTED_PAIRS {
+            let core_gate = torn_state(core_gate_arm, 1, 30, None);
+            let old = torn_state(old_arm, 1, 30, None);
+            assert_eq!((core_gate.slot_index(31), core_gate.disk_of_slot(1)), (1, 1), "撕裂的是盘 1 唯一的槽 1");
+            assert_eq!(core_gate.newest_valid_txg_on_disk(1), None, "{} 盘 1 没有有效根：m 取不到", core_gate_arm.name());
+            assert_eq!(core_gate_state(&core_gate).pinned_slots, BTreeMap::from([(1usize, 1u64)]), "{} 钉值 {{槽 1: 1}}", core_gate_arm.name());
+            assert_eq!((core_gate.floor_active, core_gate.reuse_bound()), (0, 1), "{} F 那一项 0、门槛 1", core_gate_arm.name());
+            assert_eq!(old.reuse_bound(), 29, "{} 旧式门槛 29", old_arm.name());
+        }
+    }
+
+    /// Kcg5f（锚 `Kcg5f S=1 … core_f_eff=20 core_m=None … core_gate_now=1 core_gate_after_held=20`）：MG5 的取样点。
+    #[test]
+    fn kcg5f_without_a_root_on_every_disk_the_floor_term_is_zero_even_when_the_system_configuration_floor_is_twenty() {
+        for (core_gate_arm, old_arm) in TESTED_PAIRS {
+            let core_gate = torn_state(core_gate_arm, 1, 30, Some(20));
+            let old = torn_state(old_arm, 1, 30, Some(20));
+            assert_eq!(core_gate_state(&core_gate).effective_floor, 20, "{} F_生效 = 系统配置 20", core_gate_arm.name());
+            assert_eq!((core_gate.floor_active, core_gate.reuse_bound()), (0, 1), "{} m 取不到：F 那一项 0、门槛 1", core_gate_arm.name());
+            assert_eq!(core_gate_state(&core_gate).held_until_rooted_from_instance, Some(core_gate.instance), "{} 在等本实例落满两块盘再升到 20", core_gate_arm.name());
+            assert_eq!(old.reuse_bound(), 29, "{} 旧式门槛 29", old_arm.name());
+        }
+    }
+
+    /// Kcg6（第 2 次 K10 的构造，之后管理员回退）：CG-R 一样都不动（MG9 的取样点）。
+    #[test]
+    fn kcg6_admin_rollback_leaves_every_core_gate_floor_and_pin_as_it_was() {
+        for (core_gate_arm, _) in TESTED_PAIRS {
+            let mut simulation = fresh_simulation(core_gate_arm, 4);
+            run_publishing_windows(&mut simulation, 10);
+            simulation.raise_floor_to(6);
+            simulation.tear_next_publication = true;
+            simulation.run_user_window(true, false);
+            simulation.damaged_txgs = HashSet::from([2u64, 3]);
+            let fields_of = |simulation: &Simulation| {
+                let state = core_gate_state(simulation);
+                (simulation.floor_carried, simulation.floor_active, simulation.pending_floor.map(|pending| pending.value), state.effective_floor,
+                 state.held_until_rooted_from_instance, state.pinned_slots.clone())
+            };
+            let before = fields_of(&simulation);
+            assert_eq!((before.0, before.1, before.3), (6, 6, 6), "{} 恢复之后 F_生效 6、当场 min(6, 9) = 6", core_gate_arm.name());
+            assert!(simulation.admin_rollback(), "{} 回退要成功", core_gate_arm.name());
+            assert_eq!(simulation.newest_durable_txg, 6, "{} 回到条款形下界选的目标 6", core_gate_arm.name());
+            assert_eq!(fields_of(&simulation), before, "{} 回退前后 floor_carried、F 那一项、等生效、扣住、钉槽逐字段相同", core_gate_arm.name());
+            let shadow = core_gate_state(&simulation);
+            assert_eq!((shadow.shadow_floor_carried, shadow.shadow_floor_active), (0, 0), "{} 影子照旧式在回退处重算：根上带的 F 都是 0", core_gate_arm.name());
+        }
+    }
+
+    /// K-pc：Kcg1 的状态上分配一个对象，旧候选下界 0 数得出假候选、CF 下界 6 数不出（CG-F 把门槛抬到 6 的检测器）。
+    #[test]
+    fn positive_control_after_the_core_gate_reuses_up_to_six_the_old_candidate_floor_sees_fake_candidates_and_the_clause_floor_does_not() {
+        for (core_gate_arm, _) in TESTED_PAIRS {
+            let mut simulation = kcg1_state(core_gate_arm);
+            assert!(simulation.allocate(8, 11).is_some(), "{} 分配一个对象", core_gate_arm.name());
+            let (old_floor_fakes, _, _, _) = simulation.count_fake_candidates_at_floor(simulation.candidacy_floor());
+            let (clause_floor_fakes, _, _, _) = simulation.count_fake_candidates_at_floor(simulation.candidate_floor());
+            assert_eq!((simulation.candidacy_floor(), simulation.candidate_floor()), (0, 6), "{} 旧下界 0、CF 6", core_gate_arm.name());
+            assert!(old_floor_fakes > 0, "{} 旧下界下假候选 > 0（复用的块被 txg < 6 的根引用）", core_gate_arm.name());
+            assert_eq!(clause_floor_fakes, 0, "{} CF 下界下假候选 0", core_gate_arm.name());
+        }
+    }
+
+    /// `Metrics` 除第 3 次新加的观测之外的全部字段（含轨迹与第 2 次的新量），K-eq 逐个比。
+    fn metrics_signature_without_the_core_gate_observations(metrics: &Metrics) -> String {
+        let mut without = *metrics;
+        without.core_gate = CoreGateObservations::fresh();
+        format!("{without:?}")
+    }
+
+    /// 检查本身分得出差别：Kcg3 的构造上（撕裂之后钉值 2 压过环里最旧有效根 15）再发一个窗口，CG 臂与 RGall 的签名不同。
+    /// （`run_world` 的 torn_newest、S = 4 不行：撕裂之前盘紧把 F 抬过了钉值，F 那一项盖住了钉，门槛不变，签名逐字段相同。）
+    #[test]
+    fn core_gate_equality_the_signature_tells_the_core_gate_apart_where_it_takes_a_value() {
+        let signature_after_one_more_window = |arm: Arm| {
+            let mut simulation = torn_state(arm, 4, 25, None);
+            run_publishing_windows(&mut simulation, 1);
+            metrics_signature_without_the_core_gate_observations(&simulation.metrics)
+        };
+        assert_ne!(signature_after_one_more_window(CORE_GATE_SKIPPING_ARM), signature_after_one_more_window(WHOLE_RING_SKIPPING_ARM), "CG-P 把门槛压到 2，签名要看得出来");
+    }
+
+    /// K-eq ①：没有恢复、没有回退的世界里 CG 三处一处都不取值，CG 臂与同读法的 RGall 臂逐字段相同。
+    #[test]
+    fn core_gate_equality_without_recovery_or_rollback_the_core_gate_arms_agree_with_the_rgall_arms_in_every_field() {
+        for (core_gate_arm, old_arm) in TESTED_PAIRS {
+            for world in [World::Steady, World::SlotWriteFail] {
+                for slots_per_region in SLOTS_PER_REGION_SWEEP {
+                    for seed in 0..2u64 {
+                        assert_eq!(
+                            metrics_signature_without_the_core_gate_observations(&run_world(core_gate_arm, world, slots_per_region, seed, 0)),
+                            metrics_signature_without_the_core_gate_observations(&run_world(old_arm, world, slots_per_region, seed, 0)),
+                            "K-eq {} {} S={slots_per_region} 种子 {seed}", core_gate_arm.name(), world.name()
+                        );
+                    }
+                }
+            }
+            for seed in 0..2u64 {
+                let same = |core_gate: Metrics, old: Metrics, what: &str| assert_eq!(
+                    metrics_signature_without_the_core_gate_observations(&core_gate), metrics_signature_without_the_core_gate_observations(&old),
+                    "K-eq {} {what} 种子 {seed}", core_gate_arm.name()
+                );
+                same(run_near_full(core_gate_arm, 4, 1, 5, seed, None), run_near_full(old_arm, 4, 1, 5, seed, None), "near_full");
+                same(run_broken_slot(core_gate_arm, 4, 1, 5, seed), run_broken_slot(old_arm, 4, 1, 5, seed), "broken_slot");
+                same(run_cost_growth(core_gate_arm, 4, 1, 5, seed, 5), run_cost_growth(old_arm, 4, 1, 5, seed, 5), "cost_growth");
+                let core_gate_prefix = drain_failure_prefix(core_gate_arm, 4, 1, 5, seed).expect("填满不该卡死");
+                let old_prefix = drain_failure_prefix(old_arm, 4, 1, 5, seed).expect("填满不该卡死");
+                for pattern in drain_failure_patterns(old_arm.drain_failure_offset_limit(12)).iter().take(3) {
+                    same(run_drain_failure_case(&core_gate_prefix, pattern), run_drain_failure_case(&old_prefix, pattern), "drain_failure");
+                }
+            }
+        }
+    }
+
+    /// K-eq ② 与 V6：CG 开关关着的 CG 臂在六个基本世界里与同读法的 RGall 臂逐字段相同，旧式门槛的影子与真值逐次相同（d、dF 恒 0，且真的读过）。
+    #[test]
+    fn core_gate_equality_with_the_core_gate_switched_off_the_arm_and_its_shadow_agree_with_the_rgall_arm() {
+        let mut shadow_samples = 0u64;
+        for (core_gate_arm, old_arm) in TESTED_PAIRS {
+            for world in WORLDS {
+                for slots_per_region in SLOTS_PER_REGION_SWEEP {
+                    let lost_disks: &[usize] = if world == World::DiskLoss { &[0, 1] } else { &[0] };
+                    for &lost_disk in lost_disks {
+                        for seed in 0..2u64 {
+                            let switched_off = run_world_with_the_core_gate_switch(core_gate_arm, world, slots_per_region, seed, lost_disk, false);
+                            assert_eq!(
+                                metrics_signature_without_the_core_gate_observations(&switched_off),
+                                metrics_signature_without_the_core_gate_observations(&run_world(old_arm, world, slots_per_region, seed, lost_disk)),
+                                "K-eq ② {} {} S={slots_per_region} 丢盘 {lost_disk} 种子 {seed}", core_gate_arm.name(), world.name()
+                            );
+                            let observations = switched_off.core_gate;
+                            assert_eq!(
+                                (observations.gate_difference_nonzero_samples, observations.floor_term_difference_nonzero_samples, observations.pin_effective_samples),
+                                (0, 0, 0), "V6 {} {} S={slots_per_region} 丢盘 {lost_disk} 种子 {seed}：开关关着时影子等于真值", core_gate_arm.name(), world.name()
+                            );
+                            shadow_samples += observations.gate_difference.samples;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(shadow_samples > 0, "V6 要真的读过影子，否则上面那条什么都没测");
+    }
+
+    fn cell_line(line_name: &str, arm_name: &str, fakes: u64) -> String {
+        format!("E7RESULT name={line_name} arm={arm_name} world=torn_newest s=4 lost_disk=0 fakes={fakes} unrecoverable=0 retention_violations=0 checks=10 stalls=0 false_enospc_arm=0")
+    }
+
+    /// 第八节判别力自证：只有一对、一位从 0 到 1 的假行簿判乙（翻面 1），把那一位改回 0 判甲（翻面 0）；反过来从 1 到 0 只记反向、不记翻面（MG11 的取样点）。
+    #[test]
+    fn flip_verdict_turns_on_a_single_pair() {
+        let flipped = compare_core_gate_lines(&[cell_line("f_cell", "RGall_ring_all", 0)], &[cell_line("core_gate_cell", "RGall_core_gate", 1)]);
+        let tally = flipped.by_arm.get("RGall_ring_all").copied().unwrap_or_default();
+        assert_eq!((tally.pairs, tally.flips, tally.pairs_with_a_flip, tally.reverse, tally.pairs_with_a_differing_field), (1, 1, 1, 0, 1), "一位 0 → 1：判乙");
+        assert_eq!((flipped.old_lines_without_partner, flipped.core_gate_lines_without_partner, flipped.duplicate_keys), (0, 0, 0), "同键配上");
+        let unchanged = compare_core_gate_lines(&[cell_line("f_cell", "RGall_ring_all", 0)], &[cell_line("core_gate_cell", "RGall_core_gate", 0)]);
+        let tally = unchanged.by_arm.get("RGall_ring_all").copied().unwrap_or_default();
+        assert_eq!((tally.pairs, tally.flips, tally.pairs_with_a_differing_field), (1, 0, 0), "改回 0：判甲");
+        let reversed = compare_core_gate_lines(&[cell_line("f_cell", "RGall_ring_all", 1)], &[cell_line("core_gate_cell", "RGall_core_gate", 0)]);
+        let tally = reversed.by_arm.get("RGall_ring_all").copied().unwrap_or_default();
+        assert_eq!((tally.flips, tally.reverse), (0, 1), "1 → 0 只记反向");
+        let report_only = compare_core_gate_lines(
+            &[cell_line("f_cell", "RGall_ring_all", 0).replace("torn_newest", "rollback_first_publish")],
+            &[cell_line("core_gate_cell", "RGall_core_gate", 1).replace("torn_newest", "rollback_first_publish")],
+        );
+        assert_eq!(report_only.by_arm.get("RGall_ring_all").copied().unwrap_or_default().flips, 0, "rollback_first_publish 只报、不判");
     }
 }

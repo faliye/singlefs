@@ -10,14 +10,25 @@ H10、H12、H13、H19 是跑的时候现取的（第 0 步判法、第 2b 步、
   revision_8_placeholders.py --selftest [--cells 格,…] [--rounds N]
 退出码：0 这一阶段要的都填了、都核过；78 有没填或核不过的（verdict 行点名哪几个）；2 用法错。
 
-弄坏开关 PLACEHOLDERS_R8_BREAK=<项>（只在 --selftest 起的子进程里认，PLACEHOLDERS_R8_SELFTEST=1）。项名、弄坏哪一处、打开后红在哪一格：
-  unfilled-passes          没填（null）的占位当已填                          unfilled-named
-  h14-formula-skipped      H14 不核「主取样点态数 = K 取法数 × 2^C」          h14-formula
-  h16-collision-skipped    H16 不核头一次起跑时产物名撞没撞                    h16-collision
-  h17-sha-skipped          H17 不核各文件的 sha256                             h17-files
-  h18-revision-6-names     H18 与修订 6 那一趟同名也收                          h18-names
-  h20-true-accepted        H20 写「分到别的台」也收（编排器没补那一段）        h20-not-supported
-  dry-run-accepted         干跑配置在 start 阶段也算过                          dry-run-refused
+弄坏开关 PLACEHOLDERS_R8_BREAK=<项>（只在 --selftest 起的子进程里认，PLACEHOLDERS_R8_SELFTEST=1）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
+  PLACEHOLDERS_R8_BREAK=unfilled-passes  没填（null）的占位当已填
+      「✗ 自证 unfilled-named：」
+  PLACEHOLDERS_R8_BREAK=h14-formula-skipped  H14 不核「主取样点态数 = K 取法数 × 2^C」
+      「✗ 自证 h14-formula：」
+  PLACEHOLDERS_R8_BREAK=h16-collision-skipped  H16 不核头一次起跑时产物名撞没撞
+      「✗ 自证 h16-collision：」
+  PLACEHOLDERS_R8_BREAK=h17-sha-skipped  H17 不核各文件的 sha256
+      「✗ 自证 h17-files：」
+  PLACEHOLDERS_R8_BREAK=h18-revision-6-names  H18 与修订 6 那一趟同名也收
+      「✗ 自证 h18-names：」
+  PLACEHOLDERS_R8_BREAK=h20-true-accepted  H20 写「分到别的台」也收（编排器没补那一段）
+      「✗ 自证 h20-not-supported：」
+  PLACEHOLDERS_R8_BREAK=dry-run-accepted  干跑配置在 start 阶段也算过
+      「✗ 自证 dry-run-refused：」
+  PLACEHOLDERS_R8_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 no-leftover-processes：」
+  PLACEHOLDERS_R8_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
+      「✗ 自证 temporary-directory-removed：」
 """
 from __future__ import annotations
 
@@ -42,18 +53,28 @@ PHASES = ("before-snapshot", "start", "contrast")
 PRODUCT_STEM = "research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes"
 REVISION_8_SUFFIX = "-r8"
 DUMPS_PARENT = "scripts/experiment-apparatus/target/e171-r1-dumps/"
-WORK_ROOT = os.path.expanduser("~/.local/share/singlefs/work/")
+def configured_work_root():
+    """工作根（.claude/hooks/lib_work_root.py 的 configured_work_root：SINGLEFS_WORK_ROOT，没设是数据根下的 work，两台同一份）。"""
+    import importlib.util
+    specification = importlib.util.spec_from_file_location("lib_work_root_for_revision_8_placeholders",
+                                                           os.path.join(HERE, "..", "..", "..", ".claude", "hooks", "lib_work_root.py"))
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module.configured_work_root()
+
+
+WORK_ROOT = configured_work_root() + "/"
 # 拍树前后那几份（第 8.2 节草稿副本的 stream-constants、拍树前五项核对、拍树那一刻、树里编后）也带同一前缀与后缀，它们不是跑法写的，H16 撞名不算它们
 PRODUCTS_BEFORE_THE_RUN = ("stream-constants-on-the-draft-copy", "before-the-snapshot", "tree-snapshot", "tree-snapshot-build")
 REVISION_6_PEER_NAMES = ("research/e171-s1-peer-kit", "research/e171-s1-frozen-snapshot", "scripts/experiment-apparatus/target/e171-s1-peer-out")
 RESEARCH_RELATIVE = "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes"
-S2_COMPARE = os.path.expanduser("~/.local/share/singlefs/work/e171-r1-segment1-rev6/s2_compare.py")
-# H17：跑法脚本、第 0 步判法、编排器副本、续跑核对、对照脚本，连同它们按 sha256 载入的那几份
+# H17：跑法脚本、第 0 步判法、编排器副本、续跑核对、对照脚本，连同它们按 sha256 载入的那几份；第 2 步的逐文件比 s2_compare.py 是研究目录里
+# 照登记重写入库的那一份（当年仓外草稿里那一份丢了，第 2 次重跑登记 research/prompts/e171-r2-prereg.md 修订 4）
 H17_REQUIRED_FILES = tuple(f"{RESEARCH_RELATIVE}/{name}" for name in (
     "run_segment_one_on_the_revision_8_tree_multi_host.sh", "segment_one_units_revision_8.py", "segment_one_unit_revision_8.sh",
     "frozen_tree_lines_revision_8.py", "revision_8_placeholders.py", "revision_8_selftest_harness.py", "rows_orchestrator_revision_8.py",
     "contrast_revision_6_against_revision_8.py", "rows_orchestrator.py", "cross_host_o3_check.py", "check_product.py", "device_timing.py",
-    "row_driver.py", "peer_side.py")) + (S2_COMPARE,)
+    "row_driver.py", "peer_side.py", "s2_compare.py"))
 HEX64 = re.compile(r"[0-9a-f]{64}")
 HEX40 = re.compile(r"[0-9a-f]{40}")
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -288,13 +309,14 @@ def check_h14(repo: str, config: dict, phase: str) -> Outcome:
 
 def check_h15(repo: str, config: dict, phase: str) -> Outcome:
     h15 = judge.section(config, "H15")
-    absent = missing_keys(h15, ("comparator_product", "dumps_root", "product_prefix", "product_suffix", "rows_tag"))
+    # 导出根不必填：修订 6 那一趟的树与导出造不回来，对照只出 ①④（第 2 次重跑登记 research/prompts/e171-r2-prereg.md 修订 6）；填了就核它在
+    absent = missing_keys(h15, ("comparator_product", "product_prefix", "product_suffix", "rows_tag"))
     if absent:
         return unfilled("没填：" + ",".join(absent))
     comparator = os.path.isfile(judge.resolve(repo, h15["comparator_product"]))
-    dumps = os.path.isdir(judge.resolve(repo, h15["dumps_root"]))
+    dumps = h15.get("dumps_root") is None or os.path.isdir(judge.resolve(repo, h15["dumps_root"]))
     finished = h15.get("rows_finished") is True or bool(h15.get("stopped_at"))
-    return Outcome(True, comparator and dumps and finished, f"修订 6 那一趟比对器产物在 {str(comparator).lower()}、导出根在 {str(dumps).lower()}、"
+    return Outcome(True, comparator and dumps and finished, f"修订 6 那一趟比对器产物在 {str(comparator).lower()}、导出根没填或在 {str(dumps).lower()}、"
                                                           f"第 11–13 步跑完或写明停在哪 {str(finished).lower()}")
 
 

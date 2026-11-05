@@ -8,17 +8,21 @@
 //! 三样读法（登记第六节）：S1 账 = `recovery::readable_roots` 列可读根、`recovery::rebuild_version` 重建每条根那一版；
 //! S2 = `singlefs_checker::walk::check_pool_image`；S3 被崩溃恢复抛弃的根两条路（路 1 现行实例表、路 2 步账）。
 //!
-//! 弄坏开关（`E175_BREAK`，只给快档自证用，平常跑时不设；跑大规模的用例见到它就拒）：
+//! 弄坏开关（`E175_BREAK`，只给这份自证用，平常跑时不设；跑大规模的用例见到它就拒）：
 //!   ledger-ignores-birth      S1 账按号去重、不看出生代        打开后 V1 臂上 `rollback_one_step_then_create_on_v1_reissues_three_on_the_same_timeline` 红
 //!   every-root-abandoned      S3 给发号事件分类时每条持有旧出生代的根都判成被崩溃恢复抛弃（Q1 / Q3b 与 Q9 用的那一处；
 //!                             择现行那一版与两路比对不动）    打开后同一条红（Q1 由 1 变 0、Q3b 由 0 变 1）
 //!   q9-always-still-present   Q9 分类一律判「还在」            打开后 `q9_classification_says_gone_when_no_holder_is_readable` 红
 //!
-//! 跑大规模（`#[ignore]` 的那一条）读这几个环境变量：`E175_ARM`、`E175_FAMILY`（第一段 D、F3a、F2；第二段 F1 四组
+//! 跑大规模（`run_one_family_on_one_arm_into_the_result_file`，默认那一趟就跑）读这几个环境变量：`E175_ARM`（必给：它说的是这棵树施加的是哪一臂的补丁）、
+//! `E175_FAMILY`（不给就是这一臂登记了段的全部族；给了是指定范围。第一段 D、F3a、F2；第二段 F1 四组
 //! `F1-broad`、`F1-reuse-after-raising-the-floor`、`F1-deleting-files-of-several-lower-leaves`、
-//! `F1-newest-system-configuration-slot-reading-zeros` 与第八节几何点 `G-long`、`G-small`、`G-draw`、`G-long-F1`）、`E175_RESULT_FILE`、
-//! `E175_WORKER_THREADS`、`E175_TIME_BUDGET_SECONDS`（到点不再领新的历史，领了的跑完；同一条命令再跑就是续跑）、
+//! `F1-newest-system-configuration-slot-reading-zeros` 与第八节几何点 `G-long`、`G-small`、`G-draw`、`G-long-F1`）、
+//! `E175_RESULT_FILE`（不给就写在 `CARGO_TARGET_TMPDIR` 下的 `e175-result.out`）、
+//! `E175_WORKER_THREADS`（不给取本机可用并行度）、`E175_TIME_BUDGET_SECONDS`（不给就跑完；给了到点不再领新的历史，领了的跑完，同一条命令再跑就是续跑，这一趟是缩域）、
 //! 可选 `E175_INDICES`（逗号分隔，只跑这几段：F6 复跑与试跑用）、可选 `E175_INDEX_LIMIT`（只跑序号小于它的：试跑用）。
+//! `E175_INDICES`、`E175_INDEX_LIMIT`、`E175_TIME_BUDGET_SECONDS` 都不设就是登记的全部段；设了任一个就是缩域，缩过的那一趟不写 `family_complete` 行，汇总里这一族写 `complete=no`，缩过的结果不当整族的产物。
+//! 汇总那一条（`summarize_the_result_files`）读 `E175_SUMMARY_INPUTS`（逗号分隔的结果文件；不给就是上面默认那一趟的结果文件，先等它跑完）写到 `E175_SUMMARY_FILE`（不给写在 `CARGO_TARGET_TMPDIR` 下的 `e175-summary.out`，已有就覆盖）。
 //!
 //! 代码标记（登记第十二节修订 2 第 2 条）：`E175_CODE_BASELINE` = 冻结副本清单 `baseline-frozen-crates.sha` 的 sha256。
 //! 大规模那一条在新结果文件的第一行写 `# code_baseline=<值>`（不是 `E7RESULT` 行，复跑比对不看它），续写已有文件时第一行
@@ -237,9 +241,14 @@ impl GeometryPoint {
 }
 
 impl Family {
-    fn from_environment() -> Family {
-        let value = std::env::var("E175_FAMILY").expect("E175_FAMILY 没设：见文件头列的族名");
-        Family::from_label(&value).unwrap_or_else(|| panic!("E175_FAMILY 认不得「{value}」：见文件头列的族名"))
+    /// `E175_FAMILY` 点名的那一族；不给就是这一臂登记了段的全部族。
+    fn selected_from_environment(arm: Arm) -> Vec<Family> {
+        match std::env::var("E175_FAMILY") {
+            Ok(value) => {
+                vec![Family::from_label(&value).unwrap_or_else(|| panic!("E175_FAMILY 认不得「{value}」：见文件头列的族名"))]
+            }
+            Err(_) => Family::every_family().into_iter().filter(|family| family.registered_history_count(arm) > 0).collect(),
+        }
     }
 
     /// 每一族，按结果行里的族名次序：D、F3a、F2、F1 四组、几何四点。
@@ -1545,15 +1554,17 @@ fn evaluate_items(
     });
 }
 
-fn required_environment(name: &str) -> String {
-    std::env::var(name).unwrap_or_else(|_| panic!("{name} 没设（文件头列了跑大规模要的环境变量）"))
-}
-
-fn positive_number_from_environment(name: &str) -> u64 {
-    let value = required_environment(name);
+/// 没设返回 `None`；设了要是正整数。
+fn optional_positive_number_from_environment(name: &str) -> Option<u64> {
+    let value = std::env::var(name).ok()?;
     let number: u64 = value.parse().unwrap_or_else(|_| panic!("{name}=「{value}」不是正整数"));
     assert!(number > 0, "{name} 要是正整数，收到 0");
-    number
+    Some(number)
+}
+
+/// 没给 `E175_RESULT_FILE` 时的结果文件与没给 `E175_SUMMARY_FILE` 时的汇总文件所在目录（测试自己的暂存目录，在仓副本的 target 下）。
+fn default_scratch_file(name: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name)
 }
 
 /// 结果文件里已有的、写完整了的结果行（带 `line_end=ok`）的序号：续跑跳过它们。
@@ -1604,16 +1615,49 @@ fn code_baseline_from_environment_or_not_given() -> String {
 }
 
 #[test]
-#[ignore = "大规模：跑登记的一族一臂，参数取环境变量（文件头）；快档不跑"]
 fn run_one_family_on_one_arm_into_the_result_file() {
+    result_file_of_the_run_from_the_environment();
+}
+
+/// 大规模那一趟（按环境变量定范围）只跑一次：汇总那一条不给输入时要读它的结果文件，两条用例并行起来时由这里排队。
+fn result_file_of_the_run_from_the_environment() -> &'static std::path::Path {
+    static RESULT_FILE: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    RESULT_FILE.get_or_init(run_families_from_the_environment_into_the_result_file)
+}
+
+fn run_families_from_the_environment_into_the_result_file() -> std::path::PathBuf {
     let breakage = Breakage::from_environment();
-    assert_eq!(breakage, Breakage::NONE, "大规模不许开弄坏开关（E175_BREAK 只给快档自证用）");
+    assert_eq!(breakage, Breakage::NONE, "大规模不许开弄坏开关（E175_BREAK 只给自证用）");
     let arm = Arm::from_environment();
-    let family = Family::from_environment();
-    let path = std::path::PathBuf::from(required_environment("E175_RESULT_FILE"));
-    let worker_threads = usize::try_from(positive_number_from_environment("E175_WORKER_THREADS"))
-        .expect("线程数装得进 usize");
-    let budget = Duration::from_secs(positive_number_from_environment("E175_TIME_BUDGET_SECONDS"));
+    let families = Family::selected_from_environment(arm);
+    let path = std::env::var("E175_RESULT_FILE")
+        .map_or_else(|_| default_scratch_file("e175-result.out"), std::path::PathBuf::from);
+    let worker_threads = optional_positive_number_from_environment("E175_WORKER_THREADS").map_or_else(
+        || std::thread::available_parallelism().map_or(1, usize::from),
+        |threads| usize::try_from(threads).expect("线程数装得进 usize"),
+    );
+    let budget = optional_positive_number_from_environment("E175_TIME_BUDGET_SECONDS").map(Duration::from_secs);
+    let explicit_indices: Option<Vec<u64>> = std::env::var("E175_INDICES").ok().map(|list| {
+        list.split(',').map(|index| index.trim().parse().expect("E175_INDICES 是逗号分隔的序号")).collect()
+    });
+    let limit = std::env::var("E175_INDEX_LIMIT")
+        .ok()
+        .map(|limit| limit.parse::<u64>().expect("E175_INDEX_LIMIT 是正整数"));
+    for family in families {
+        run_one_family_on_one_arm(family, arm, &path, worker_threads, budget, explicit_indices.as_deref(), limit);
+    }
+    path
+}
+
+fn run_one_family_on_one_arm(
+    family: Family,
+    arm: Arm,
+    path: &std::path::Path,
+    worker_threads: usize,
+    budget: Option<Duration>,
+    explicit_indices: Option<&[u64]>,
+    limit: Option<u64>,
+) {
     let registered = family.registered_history_count(arm);
     assert!(
         registered > 0,
@@ -1621,28 +1665,22 @@ fn run_one_family_on_one_arm_into_the_result_file() {
         family.label(),
         arm.label()
     );
-    let explicit_indices: Option<Vec<u64>> = std::env::var("E175_INDICES").ok().map(|list| {
-        list.split(',').map(|index| index.trim().parse().expect("E175_INDICES 是逗号分隔的序号")).collect()
-    });
-    let limit = std::env::var("E175_INDEX_LIMIT")
-        .ok()
-        .map(|limit| limit.parse::<u64>().expect("E175_INDEX_LIMIT 是正整数"));
-    let wanted: Vec<u64> = match &explicit_indices {
-        Some(indices) => indices.clone(),
+    let wanted: Vec<u64> = match explicit_indices {
+        Some(indices) => indices.to_vec(),
         None => (0..limit.map_or(registered, |limit| limit.min(registered))).collect(),
     };
     assert!(wanted.iter().all(|index| *index < registered), "序号越过这一族在这一臂登记的 {registered} 段");
-    let done = indices_already_in(&path, family, arm);
+    let done = indices_already_in(path, family, arm);
     let items: Vec<HistoryItem> = wanted
         .iter()
         .filter(|index| !done.contains(index))
         .map(|index| history_item(family, *index))
         .collect();
-    let existing_text = std::fs::read_to_string(&path).unwrap_or_default();
+    let existing_text = std::fs::read_to_string(path).unwrap_or_default();
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(&path)
+        .open(path)
         .unwrap_or_else(|error| panic!("开不了结果文件 {}：{error}", path.display()));
     let code_baseline = code_baseline_from_environment_or_not_given();
     if existing_text.is_empty() {
@@ -1661,7 +1699,7 @@ fn run_one_family_on_one_arm_into_the_result_file() {
     }
     let started = Instant::now();
     let mut evaluated = 0_u64;
-    evaluate_items(&items, worker_threads, Some(started + budget), Breakage::NONE, |evaluation| {
+    evaluate_items(&items, worker_threads, budget.map(|budget| started + budget), Breakage::NONE, |evaluation| {
         let mut block = String::new();
         for line in evaluation.event_lines(arm) {
             block.push_str(&line);
@@ -1673,7 +1711,7 @@ fn run_one_family_on_one_arm_into_the_result_file() {
         file.flush().expect("刷结果文件");
         evaluated += 1;
     });
-    let now_done = indices_already_in(&path, family, arm);
+    let now_done = indices_already_in(path, family, arm);
     let remaining = wanted.iter().filter(|index| !now_done.contains(index)).count();
     let chunk_line = format!(
         "E7TIMING name=chunk family={} arm={} worker_threads={worker_threads} evaluated={evaluated} remaining={remaining} elapsed_ns={}\n",
@@ -1799,11 +1837,14 @@ fn summarize(text: &str) -> Vec<String> {
 }
 
 #[test]
-#[ignore = "汇总：读 E175_SUMMARY_INPUTS（逗号分隔的结果文件）写到 E175_SUMMARY_FILE；快档不跑"]
 fn summarize_the_result_files() {
     let mut text = String::new();
     let mut texts: Vec<(String, String)> = Vec::new();
-    for path in required_environment("E175_SUMMARY_INPUTS").split(',') {
+    let input_paths: Vec<String> = match std::env::var("E175_SUMMARY_INPUTS") {
+        Ok(list) => list.split(',').map(str::to_string).collect(),
+        Err(_) => vec![result_file_of_the_run_from_the_environment().display().to_string()],
+    };
+    for path in input_paths.iter().map(String::as_str) {
         let file_text = std::fs::read_to_string(path).unwrap_or_else(|error| panic!("读不了 {path}：{error}"));
         text.push_str(&file_text);
         if !text.ends_with('\n') {
@@ -1812,17 +1853,22 @@ fn summarize_the_result_files() {
         texts.push((path.to_string(), file_text));
     }
     let code_baseline = single_code_baseline_of_result_texts(&texts).unwrap_or_else(|reason| panic!("{reason}"));
-    assert_eq!(code_baseline, required_environment("E175_CODE_BASELINE"), "输入的代码标记与 E175_CODE_BASELINE 不同");
+    assert_eq!(code_baseline, code_baseline_from_environment_or_not_given(), "输入的代码标记与 E175_CODE_BASELINE 不同");
     let mut output = code_baseline_header(&code_baseline) + "\n";
     for line in summarize(&text) {
         output.push_str(&format!("{line} code_baseline={code_baseline}\n"));
     }
-    let target = required_environment("E175_SUMMARY_FILE");
-    assert!(!std::path::Path::new(&target).exists(), "{target} 已存在：汇总写新文件，不覆盖");
+    let target = match std::env::var("E175_SUMMARY_FILE") {
+        Ok(target) => {
+            assert!(!std::path::Path::new(&target).exists(), "{target} 已存在：汇总写新文件，不覆盖");
+            target
+        }
+        Err(_) => default_scratch_file("e175-summary.out").display().to_string(),
+    };
     std::fs::write(&target, output).expect("写汇总文件");
 }
 
-// ───────────── 快档：常量回比、规模、纯函数、D 族钉值（A1–A7）、多线程与单线程对拍 ─────────────
+// ───────────── 常量回比、规模、纯函数、D 族钉值（A1–A7）、多线程与单线程对拍 ─────────────
 
 #[test]
 fn result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary() {
@@ -2105,7 +2151,7 @@ E7RESULT name=family_complete family=F2 arm=P histories=2
     assert_eq!(output.len(), 4);
 }
 
-// ───────────── 快档：第二段（F1 四组、第八节几何四点）的规模、比重与每族一段的取样 ─────────────
+// ───────────── 第二段（F1 四组、第八节几何四点）的规模、比重与每族一段的取样 ─────────────
 
 /// 第二段的段数与步数（登记第五节 F1 那一行、第八节那张表）：
 /// `python3 -c "print(4*128*30, 4*32*30, 64*150+64*60+64*60+32*150, 32*150)"` 输出 `15360 3840 22080 4800`。
@@ -2207,7 +2253,7 @@ fn second_segment_families_change_only_the_registered_knob() {
     assert_eq!(Family::from_label("F1"), None);
 }
 
-/// 第二段每一族在序号 0 上走一遍（变异取样第四类：快档的取样点要覆盖大规模会跑到的每一族），结果行写得完整、两条被数的不变量每一步都有判定。
+/// 第二段每一族在序号 0 上走一遍（变异取样第四类：取样点要覆盖大规模会跑到的每一族），结果行写得完整、两条被数的不变量每一步都有判定。
 /// 一条带参数的函数，每族一条用例。
 fn first_history_of_the_family_yields_a_complete_line(family: Family) {
     let arm = Arm::from_environment();

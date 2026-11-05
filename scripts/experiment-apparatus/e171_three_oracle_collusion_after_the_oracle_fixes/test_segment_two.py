@@ -210,6 +210,23 @@ class InputsOfThisRun(unittest.TestCase):
                                                                                              os.path.join(third, "x")], ["p-rows-r6.out", "q-rows-r6.out"])
             self.assertEqual(outside, [os.path.join(third, "x"), "q-rows-r6.out"])
 
+    def test_an_input_of_another_run_is_refused_before_the_missing_check_and_nothing_is_written(self) -> None:
+        """接错了另一趟的输入（这里那一份也不在盘上）退 2、不写产物，不落进本次未跑的 77（修订 8 第 8.5 节第 1 条；E171 第 2 次重跑登记修订 3）。"""
+        with tempfile.TemporaryDirectory() as root:
+            dumps = os.path.join(root, "revision-6")
+            rows_root = os.path.join(dumps, "segment2-rows")
+            os.makedirs(rows_root)
+            prefix, suffix = "p-", "-r6.out"
+            driver_product = os.path.join(root, f"{prefix}rows-driver{suffix}")
+            with open(driver_product, "w", encoding="utf-8") as handle:
+                handle.write("")
+            other_baseline = os.path.join(root, "revision-8", "baseline-run1")
+            output = os.path.join(root, "comparator.out")
+            exit_code = comparator.main(["--baseline", other_baseline, "--rows-root", rows_root, "--driver-product", driver_product,
+                                         "--dumps-root", dumps, "--product-prefix", prefix, f"--product-suffix={suffix}", "--output", output])
+            self.assertEqual(exit_code, 2)
+            self.assertFalse(os.path.exists(output))
+
 
 def write_lines(path: str, rows: list[list[str]]) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -257,7 +274,7 @@ def write_row(rows_root: str, number: int, *, status: str = "ok", rebuild_checke
 
 
 EXPECTED_VERDICT = ("E7RESULT name=verdict q2=yi q2_set_rows=2 q2_o1_red_rows=1 d_registration_batch_1=2 d_registration_batch_2=1 "
-                    "d_original_reading_5_batch_1=2 d_original_reading_5_batch_2=1 row_125_counted_registration_batch_1=false rows_read=8 table_rows=281 "
+                    "d_original_reading_5_batch_1=2 d_original_reading_5_batch_2=1 row_125_counted_registration_batch_1=false rows_read=8 table_rows=278 "
                     "rows_not_located=4 unstable_memory_objects=1 stability_baseline_files_differing=1 rows_compiled_without_the_rebuild_check=1 "
                     "rows_with_an_errored_call_the_comparison_did_not_judge=0 rows_with_o1_not_applicable_from_another_source=0 "
                     "untouched_rows_with_a_red_column=1 rows_whose_directory_differs_from_the_driver_product=1")

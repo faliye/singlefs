@@ -6,10 +6,13 @@
 阳性对照各趟的产物；写一份新产物（已存在就拒绝）。不读 s4 的任何产物（登记读法 11）。
 
 跑法（在本目录）：
-  python3 segment_one_comparator.py --baseline <导出目录> [--second-baseline <导出目录>] [--baseline-o3 <执行器产物>]
-      [--rows-root <输出根>] [--q5-main <产物>] [--q5-reverse <产物>] [--control <对照名>=<产物> …] --output <新文件>
+  python3 segment_one_comparator.py --baseline <导出目录> --second-baseline <导出目录> --baseline-o3 <执行器产物>
+      --rows-root <输出根> --q5-main <产物> --q5-reverse <产物> --control <对照名>=<产物> … --output <新文件>
       --dumps-root <这一趟的导出根> --product-prefix <这一趟产物名的前缀> --product-suffix=<这一趟产物名的后缀（以 - 起头，要写成 = 连着）>
 导出目录不在导出根之下、产物名不带这一趟的前缀与后缀的，退 2、不写产物（登记修订 8 第 8.5 节第 1 条：两趟各读各的）。
+--second-baseline、--baseline-o3、--rows-root、--q5-main、--q5-reverse、--control 各管一节（z1_two_baselines、o3_baseline、rows、q5_main、
+q5_reverse、a8_positive_controls）；哪一样没给，那一节没有输入：结果行写 `name=not_run section=<节> input=<选项> …`、往标准错误打一行
+NOT_RUN_INPUT_NOT_GIVEN，别的节都不跑，整趟退 77（本次未跑，不是通过）。
 """
 
 from __future__ import annotations
@@ -35,7 +38,7 @@ Q4_ROWS = (242, 269)
 Q1_ORACLES_STRICT = (matrix.ORACLE_ONE, matrix.ORACLE_TWO, matrix.ORACLE_THREE_STRICT)
 Q1_ORACLES_PROVISIONAL = (matrix.ORACLE_ONE, matrix.ORACLE_TWO, matrix.ORACLE_THREE_PROVISIONAL)
 # Z1：基线两次逐字节相同的文件（`impl-verdicts.tsv` 去掉耗时那一列）
-Z1_FILES = ("base-sectors.bin", "ops.tsv", "ops-payload.bin", "calls.tsv", "torn.tsv", "torn-payload.bin", "states.tsv", "quick-tier.tsv",
+Z1_FILES = ("base-sectors.bin", "ops.tsv", "ops-payload.bin", "calls.tsv", "torn.tsv", "torn-payload.bin", "states.tsv", "in-place-subsets.tsv",
             "oracle-verdicts.tsv", "call-outcomes.tsv", "writable-mount-probe.tsv")
 # 第七节 A8：每样阳性对照在基线那一趟的精确数（结果行里取哪个数、要等于几）
 A8_EXPECTED = {
@@ -545,6 +548,8 @@ def inputs_outside_this_run(dumps_root: str, product_prefix: str, product_suffix
 # 写法照 scripts/experiment-apparatus/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER；segment_two_comparator.py 用同一个。
 NOT_RUN_MARKER = "NOT_RUN_ARCHIVED_PRODUCT"
 NOT_RUN_EXIT_CODE = 77
+# 选填输入没给（不是给了而不在）的那一行记号，和上面「给了而不在」的 NOT_RUN_ARCHIVED_PRODUCT 分开写
+INPUT_NOT_GIVEN_MARKER = "NOT_RUN_INPUT_NOT_GIVEN"
 
 
 def report_missing_inputs(test_name: str, paths: list[str | None]) -> bool:
@@ -554,6 +559,25 @@ def report_missing_inputs(test_name: str, paths: list[str | None]) -> bool:
         print(f"{NOT_RUN_MARKER} test={test_name} reason={path} 不在，这一项本次未跑；留存产物从 git 历史取回，那一趟的导出照登记"
               " research/prompts/e171-r1-prereg.md 重出到草稿目录、经驱动的环境变量指过去", file=sys.stderr)
     return bool(missing)
+
+
+def sections_without_input(arguments: argparse.Namespace, controls: dict[str, list[str]]) -> list[tuple[str, str]]:
+    """(节名, 选项名)：这一趟要读而没给的选填输入对应的节（不给 --rows-root 就没有逐行各节，Q1–Q4 都在里面）。"""
+    sections = (("z1_two_baselines", "--second-baseline", arguments.second_baseline), ("o3_baseline", "--baseline-o3", arguments.baseline_o3),
+                ("rows", "--rows-root", arguments.rows_root), ("q5_main", "--q5-main", arguments.q5_main),
+                ("q5_reverse", "--q5-reverse", arguments.q5_reverse), ("a8_positive_controls", "--control", controls))
+    return [(section, option) for section, option, value in sections if not value]
+
+
+def report_sections_not_run(arguments: argparse.Namespace, missing: list[tuple[str, str]]) -> int:
+    """没给输入的节在结果行里写本次未跑、往标准错误打记号行，别的节不跑，退 77。"""
+    lines = ResultLines(arguments.output)
+    lines.result(f"name=config segment=s1 comparator=segment_one not_run=true baseline={field(arguments.baseline)}")
+    for section, option in missing:
+        lines.result(f"name=not_run section={section} input={option} reason=input_not_given")
+        print(f"{INPUT_NOT_GIVEN_MARKER} test=segment_one_comparator.py reason={option} 没给，{section} 这一节本次未跑", file=sys.stderr)
+    lines.finish()
+    return NOT_RUN_EXIT_CODE
 
 
 def parse_controls(items: list[str]) -> dict[str, list[str]]:
@@ -582,10 +606,8 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--product-suffix", required=True)
     arguments = parser.parse_args(argument_list)
     controls = parse_controls(arguments.control)
-    if report_missing_inputs("segment_one_comparator.py", [arguments.dumps_root, arguments.baseline, arguments.second_baseline, arguments.rows_root,
-                                                          arguments.baseline_o3, arguments.q5_main, arguments.q5_reverse]
-                             + [path for paths in controls.values() for path in paths]):
-        return NOT_RUN_EXIT_CODE
+    # 先按路径核「是不是这一趟的」（不碰盘），再核在不在：接错了另一趟的输入，不管它在不在都退 2（修订 8 第 8.5 节第 1 条与「主 agent 认定」
+    # 「对不上退 2」），不落进本次未跑的 77 里被当成没跑；接对了的输入缺了，照旧报本次未跑。
     outside = inputs_outside_this_run(arguments.dumps_root, arguments.product_prefix, arguments.product_suffix,
                                       [arguments.baseline, arguments.second_baseline, arguments.rows_root],
                                       [arguments.baseline_o3, arguments.q5_main, arguments.q5_reverse]
@@ -593,42 +615,44 @@ def main(argument_list: list[str]) -> int:
     if outside:
         print("比对器只读这一趟的导出根与产物前缀（登记修订 8 第 8.5 节第 1 条），不在这一趟里的输入：" + "，".join(outside), file=sys.stderr)
         return 2
+    if report_missing_inputs("segment_one_comparator.py", [arguments.dumps_root, arguments.baseline, arguments.second_baseline, arguments.rows_root,
+                                                          arguments.baseline_o3, arguments.q5_main, arguments.q5_reverse]
+                             + [path for paths in controls.values() for path in paths]):
+        return NOT_RUN_EXIT_CODE
+    missing = sections_without_input(arguments, controls)
+    if missing:
+        return report_sections_not_run(arguments, missing)
     lines = ResultLines(arguments.output)
-    lines.result(f"name=config segment=s1 comparator=segment_one baseline={field(arguments.baseline)} second_baseline={field(arguments.second_baseline or '-')} "
-                 f"rows_root={field(arguments.rows_root or '-')} dumps_root={field(arguments.dumps_root)} product_prefix={field(arguments.product_prefix)} "
+    lines.result(f"name=config segment=s1 comparator=segment_one baseline={field(arguments.baseline)} second_baseline={field(arguments.second_baseline)} "
+                 f"rows_root={field(arguments.rows_root)} dumps_root={field(arguments.dumps_root)} product_prefix={field(arguments.product_prefix)} "
                  f"product_suffix={field(arguments.product_suffix)}")
     baseline = load_run_directory(arguments.baseline)
     baseline_o3 = read_o3(arguments.baseline_o3)
     baseline_reds = a1_lines(lines, baseline, baseline_o3)
     f7 = o3_third_stream_coverage(lines, baseline, baseline_o3)
     a11_failing = a11_lines(lines, baseline)
-    z1_differing = z1_lines(lines, arguments.baseline, arguments.second_baseline) if arguments.second_baseline else None
-    unstable = (matrix.unstable_memory_objects(baseline, load_run_directory(arguments.second_baseline))
-                if arguments.second_baseline else frozenset())
+    z1_differing = z1_lines(lines, arguments.baseline, arguments.second_baseline)
+    unstable = matrix.unstable_memory_objects(baseline, load_run_directory(arguments.second_baseline))
     a8_failing = a8_lines(lines, controls)
     verdicts: dict[str, str] = {}
-    empty_reds, empty_touched = "not_run", "not_run"
-    if arguments.rows_root:
-        empty_directory = os.path.join(arguments.rows_root, f"row-{EMPTY_MUTATION_ROW}")
-        empty_result = read_row_result(empty_directory)
-        if empty_result.get("status") == "ok" and os.path.isdir(os.path.join(empty_directory, "dump")):
-            reds, touched = empty_mutation_a1(lines, baseline, load_run_directory(os.path.join(empty_directory, "dump")),
-                                              read_o3(os.path.join(empty_directory, "o3.out")))
-            empty_reds, empty_touched = str(reds), str(touched).lower()
-        else:
-            lines.result(f"name=a1_empty_mutation_touch row={EMPTY_MUTATION_ROW} ran=false status={field(empty_result.get('status', 'missing'))}")
-        verdicts.update(q1_lines(lines, baseline, arguments.rows_root))
-        q2_named_row_lines(lines, baseline, arguments.rows_root, unstable)
-        verdicts["q3"] = q3_lines(lines, baseline, arguments.rows_root)
-        trips = {"baseline": baseline}
-        for number in Q4_ROWS:
-            dump = os.path.join(arguments.rows_root, f"row-{number}", "dump")
-            if os.path.isdir(dump):
-                trips[f"row_{number}"] = load_run_directory(dump)
-        verdicts.update({f"q4_{trip}": verdict for trip, verdict in q4_lines(lines, trips).items()})
+    empty_directory = os.path.join(arguments.rows_root, f"row-{EMPTY_MUTATION_ROW}")
+    empty_result = read_row_result(empty_directory)
+    if empty_result.get("status") == "ok" and os.path.isdir(os.path.join(empty_directory, "dump")):
+        reds, touched = empty_mutation_a1(lines, baseline, load_run_directory(os.path.join(empty_directory, "dump")),
+                                          read_o3(os.path.join(empty_directory, "o3.out")))
+        empty_reds, empty_touched = str(reds), str(touched).lower()
     else:
-        trips = {"baseline": baseline}
-        verdicts.update({f"q4_{trip}": verdict for trip, verdict in q4_lines(lines, trips).items()})
+        empty_reds, empty_touched = "not_run", "not_run"
+        lines.result(f"name=a1_empty_mutation_touch row={EMPTY_MUTATION_ROW} ran=false status={field(empty_result.get('status', 'missing'))}")
+    verdicts.update(q1_lines(lines, baseline, arguments.rows_root))
+    q2_named_row_lines(lines, baseline, arguments.rows_root, unstable)
+    verdicts["q3"] = q3_lines(lines, baseline, arguments.rows_root)
+    trips = {"baseline": baseline}
+    for number in Q4_ROWS:
+        dump = os.path.join(arguments.rows_root, f"row-{number}", "dump")
+        if os.path.isdir(dump):
+            trips[f"row_{number}"] = load_run_directory(dump)
+    verdicts.update({f"q4_{trip}": verdict for trip, verdict in q4_lines(lines, trips).items()})
     verdicts["q5_main"] = q5_lines(lines, arguments.q5_main, "main")
     verdicts["q5_reverse"] = q5_lines(lines, arguments.q5_reverse, "reverse")
     # 第六节 Q4-（ii）逐态清单与第八节 Q4、Q5 轨迹（第一段比对器交回之后补的量，只多出这几种新行，接在 Q5 判定之后、判决行之前）
@@ -639,7 +663,7 @@ def main(argument_list: list[str]) -> int:
     q5_stable = verdicts["q5_main"] == verdicts["q5_reverse"]
     lines.result("name=verdict " + " ".join(f"{key}={value}" for key, value in sorted(verdicts.items()))
                  + f" q5_same_at_both_sampling_points={str(q5_stable).lower()} a1_baseline_red={baseline_reds} a8_failing_controls={a8_failing}"
-                 + f" a11_failing_streams={a11_failing} z1_differing_files={'not_run' if z1_differing is None else z1_differing} f7={f7}"
+                 + f" a11_failing_streams={a11_failing} z1_differing_files={z1_differing} f7={f7}"
                  + f" a1_empty_mutation_red={empty_reds} empty_mutation_touched={empty_touched}")
     lines.finish()
     return 0

@@ -1,6 +1,6 @@
 # scripts/devices
 
-虚机、QEMU 与真块设备上的装置与探针。起虚机、真编 QEMU 是重型（`.claude/rules/implementation-workflow.md`「checker 档只在提交时跑，harness 随时跑」）。
+虚机、QEMU 与真块设备上的装置与探针。起虚机、真编 QEMU 的跑法一律经 `task-server/task submit --` 交；`vm-bench.sh --selftest` 用假驱动，不起 QEMU/KVM。
 
 | 文件 | 做什么 |
 |---|---|

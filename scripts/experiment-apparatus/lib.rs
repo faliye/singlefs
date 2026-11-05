@@ -165,7 +165,7 @@ pub fn admit_experiment_run_or_exit(admission_key: &str) -> Vec<String> {
 }
 
 /// 「本次未跑」那一行的记号：别的实验的产物、拿来当期望值的留存产物读不到时打它（写法照 crates 那一侧
-/// `NOT_RUN_<原因> test=<用例> reason=<一句>` 的约定，`singlefs_harness::gpu_memory_ledger::gpu_not_run_line`）。
+/// `NOT_RUN_<原因> test=<用例> reason=<一句>` 的约定，`singlefs_verification::gpu_memory_ledger::gpu_not_run_line`）。
 /// `research/` 可以整个删掉（`.claude/rules/directory-layout.md`「research/：可以整个删掉的研究目录」），
 /// 读它的装置与单测一律在运行时读、读不到报这一行，不用 `include_str!`（产物不在就编不过），也不 panic。
 /// 路径由调用处写成字面的 `concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/<文件名>")` 交进来：函数单元键
@@ -198,7 +198,7 @@ pub fn read_archived_product_or_report_not_run(test_name: &str, path: &str) -> O
 }
 
 /// [`read_archived_product_or_report_not_run`] 的本体：本次未跑那一行写进 `not_run_output`。自检用例交一块内存缓冲，
-/// 不往真的标准输出打：门禁 checker-tier-research-build-and-replay 的 research-unit-tests 格把输出里的每一行记号当成一条本次未跑。
+/// 不往真的标准输出打：门禁 research-build-and-replay 的 research-unit-tests 格把输出里的每一行记号当成一条本次未跑。
 fn read_archived_product_or_write_not_run_line(test_name: &str, path: &str, not_run_output: &mut dyn std::io::Write) -> Option<String> {
     match std::fs::read_to_string(path) {
         Ok(text) => Some(text),
@@ -229,17 +229,17 @@ pub fn read_archived_products_or_exit_not_run(device_name: &str, paths: &[&str])
     texts
 }
 
-/// E175 的装置源码：research 工作区不编它，`replay.sh` 的 `driver_e175` 把它拷进仓副本的 `crates/singlefs-harness/tests/` 编、按名字起一条用例。
-/// 这里钉住驱动依赖它的那几样（用例名、标了 `#[ignore]`、驱动设的几个环境变量），源码改了名字驱动就起不来，这一条先红。
+/// E175 的装置源码：research 工作区不编它，`replay.sh` 的 `driver_e175` 把它拷进仓副本的 `crates/singlefs-verification/tests/` 编、按名字起一条用例。
+/// 这里钉住驱动依赖它的那几样（用例名、没有任何用例标 `#[ignore]`、驱动设的几个环境变量），源码改了名字驱动就起不来，这一条先红。
 #[cfg(test)]
 mod e175_device_source_tests {
     const DEVICE_SOURCE: &str = include_str!("e175_product_path_inode_watermark_regression/device-source.rs");
 
     #[test]
-    fn the_e175_device_source_carries_the_ignored_case_and_the_variables_the_replay_driver_uses() {
+    fn the_e175_device_source_has_no_ignored_case_and_carries_the_variables_the_replay_driver_uses() {
         let case = "fn run_one_family_on_one_arm_into_the_result_file()";
-        let case_at = DEVICE_SOURCE.find(case).expect("装置源码里要有 driver_e175 按 --exact 起的那条用例");
-        assert!(DEVICE_SOURCE[..case_at].trim_end().rsplit('\n').take(3).any(|line| line.trim_start().starts_with("#[ignore")), "那条用例要标 #[ignore]：driver_e175 带 --ignored 起它");
+        assert!(DEVICE_SOURCE.contains(case), "装置源码里要有 driver_e175 按 --exact 起的那条用例");
+        assert!(!DEVICE_SOURCE.lines().any(|line| line.trim_start().starts_with("#[ignore")), "装置源码里的用例都在默认那一趟里跑，不标 #[ignore]");
         for variable in ["E175_ARM", "E175_FAMILY", "E175_RESULT_FILE", "E175_WORKER_THREADS", "E175_TIME_BUDGET_SECONDS"] {
             assert!(DEVICE_SOURCE.contains(&format!("\"{variable}\"")), "装置源码要读 driver_e175 设的 {variable}");
         }

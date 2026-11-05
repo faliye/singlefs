@@ -1,0 +1,5 @@
+# E171（三oracle合谋测试） 第 2 次重跑现状整表段前置的研究一侧变异表之二（登记 research/prompts/e171-r2-prereg.md 修订 4）：复用库根两台同一（reuse_library_root.py 与单元编排层）。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经同目录 mutation_driver.py 带 --unit-test-module test_revision_11 跑；原文在研究一侧目录（test_*.py 与 mutation_driver.py 除外）恰好命中一次。
+R2P-12 H30 库根经 ~ 或相对路径也收（两台各是一份库）	    if not os.path.isabs(text):\n        return default, (f"H30 library_root={text} 经 ~ 或相对路径取	    if False:\n        return default, (f"H30 library_root={text} 经 ~ 或相对路径取
+R2P-13 H30 没填时取家目录下那一份（改前的取法）	    if value in (None, ""):\n        return default, ""	    if value in (None, ""):\n        return os.path.expanduser("~/.local/share/singlefs/reuse/e171-r1"), ""
+R2P-14 单元编排层 run 不拒经 ~ 取的库根	    if problem and not plan:\n        raise reuse.RunCondition(problem)	    if problem and plan:\n        raise reuse.RunCondition(problem)
+R2P-15 require_library_root 不抛	    root, problem = library_root_of(h30, environment)\n    if problem:\n	    root, problem = library_root_of(h30, environment)\n    if False:\n

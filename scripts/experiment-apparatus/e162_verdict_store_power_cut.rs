@@ -5,23 +5,21 @@
 //!
 //! 跑前登记：`research/prompts/e162-preregistration.md` 补 1–补 14（S4 的定义在补 5.2、补 6、补 7、补 8、补 9、补 10、补 11；
 //! 这个文件是补 12 分段表「第四段」那一行）。独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）：
-//! 设备侧日志的解析自己写一份，读法照 dm-log-writes 的格式定义（与 `crates/singlefs-checker-tier/src/device_log.rs` 文件头读同一份定义，
+//! 设备侧日志的解析自己写一份，读法照 dm-log-writes 的格式定义（与 `crates/singlefs-verification/src/device_log.rs` 文件头读同一份定义，
 //! 不引它的代码；两处读法的差别写在补 5.2「设备侧日志的读法」）。候选的读写路径照登记 5.2 逐字实现，拷自 S1 那份源文件
 //! `scripts/experiment-apparatus/e162_crash_verdict_block_store.rs`（出处行号在登记第十二节修订）。
 //!
 //! 角色（`--role <名>`；来宾里的角色前面还有 `vm-bench.sh` 塞进来的设备路径 `/dev/vda`，不用它）：
 //!   selftest          锚点自检（登记 7.2 的 A1–A6 与补 7 的 B 系列），对不上退 1（V10）
 //!   s4-stage          搭写盘附加根：`--destination <空目录>`；搭完用搭好的加载器实跑一次搭好的二进制 `--role selftest`
-//!   s4-drive          宿主上的总驱动：`--arms <R1,R0,K,F 的子集> --kernel <内核> --out <产物文件> [--dry-run]`
+//!   s4-drive          宿主上的总驱动：`[--arms <R1,R0,K,F 的子集>] --kernel <内核> --out <产物文件> [--dry-run]`（不给 `--arms` 就是 R1、R0、K、F 全部四臂；给了是缩域，`s4_drive_config` 行写 `reduced=yes`）
 //!   s4-write-guest    来宾：写盘开机（分区、mkfs、挂载、建库、标记、逐块写）
 //!   s4-verify-guest   来宾：验盘开机（按计划重放盘面、loop、挂载、起核对子进程）
 //!   s4-check-point    来宾里验盘角色起的核对子进程（开库、PC4-S/P/O 的改动、逐块核）
 //!
-//! **s4-drive 起虚机，是重型测试**：环境变量 `SINGLEFS_HEAVY_TESTS` 不是 `user-request` 或 `commit` 时拒跑，退出码 64，
-//! stderr 写「s4-drive 起 QEMU 虚机，是重型测试；只在用户要求或提交时带 SINGLEFS_HEAVY_TESTS=user-request（或 commit）跑」。
-//! 带 `--dry-run` 时不查这个变量：只搭附加根、打印将要起的每条 vm-bench 命令与变量，不起虚机。单测不调 s4-drive。
+//! **s4-drive 起 QEMU 虚机**，经统一任务服务交。带 `--dry-run` 时只搭附加根、打印将要起的每条 vm-bench 命令与变量，不起虚机。单测不调 s4-drive。
 //! s4-drive 的退出码：0 全部开机做完、判定行都打了（判「翻」也是 0）；1 锚点对不上（V10）；2 用法不对；3 停机条款打中（H7–H10、H14）
-//! 或开跑前提不满足（可用盘 < 40 GiB、可用内存 < 16 GiB、机器上有别的虚机或性能测量）；64 见上一段。
+//! 或开跑前提不满足（可用盘 < 40 GiB、可用内存 < 16 GiB、机器上有别的虚机或性能测量）。
 //!
 //! 计时：只有 Q4h（重开用时）一个量，由核对子进程自己用 `Instant` 计、写进它的结果行；父进程读子进程输出不打时间戳
 //! （`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）。
@@ -187,9 +185,6 @@ const GUEST_PLAN_PATH: &str = "/s4/plan.txt";
 const STAGED_BINARY_GUEST_PATH: &str = "/usr/bin/e162-verdict-store-power-cut";
 const STAGED_LOADER_GUEST_PATH: &str = "/lib64/ld-linux-x86-64.so.2";
 
-const HEAVY_TEST_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_HEAVY_TESTS";
-const HEAVY_TEST_PERMITTED_VALUES: [&str; 2] = ["user-request", "commit"];
-const HEAVY_TEST_REFUSAL_EXIT_CODE: i32 = 64;
 const HALT_EXIT_CODE: i32 = 3;
 const USAGE_EXIT_CODE: i32 = 2;
 /// 开跑前提（补 5.3「S4：宿主资源」）：可用内存 ≥ 16 GiB，库所在文件系统可用 ≥ 40 GiB。
@@ -625,10 +620,12 @@ impl PowerCutArm {
         ALL_POWER_CUT_ARMS.iter().copied().find(|arm| arm.index() == index)
     }
 
+    /// 四条主臂（登记 R1、R0、K、F）；`s4-drive` 不给 `--arms` 就是它们全部。
+    const EVERY_MAIN_ARM: [PowerCutArm; 4] =
+        [PowerCutArm::RedbQuickRepair, PowerCutArm::RedbDefault, PowerCutArm::RocksDatabase, PowerCutArm::HardenedFile];
+
     fn main_arm_from_label(label: &str) -> Option<PowerCutArm> {
-        [PowerCutArm::RedbQuickRepair, PowerCutArm::RedbDefault, PowerCutArm::RocksDatabase, PowerCutArm::HardenedFile]
-            .into_iter()
-            .find(|arm| arm.label() == label)
+        PowerCutArm::EVERY_MAIN_ARM.into_iter().find(|arm| arm.label() == label)
     }
 
     fn candidate(self) -> Option<Candidate> {
@@ -2979,7 +2976,7 @@ fn main() {
         "s4-verify-guest" => run_verify_guest_role(&parsed),
         "s4-check-point" => run_check_point_role(&parsed),
         _ => {
-            eprintln!("  ✗ 用法：e162-verdict-store-power-cut --role selftest | s4-stage --destination <空目录> | s4-drive --arms <R1,R0,K,F> --kernel <内核> --out <产物> [--dry-run]");
+            eprintln!("  ✗ 用法：e162-verdict-store-power-cut --role selftest | s4-stage --destination <空目录> | s4-drive [--arms <R1,R0,K,F>] --kernel <内核> --out <产物> [--dry-run]");
             eprintln!("  → 怎么办：s4-write-guest、s4-verify-guest、s4-check-point 是来宾里的角色，由 s4-drive 经 vm-bench.sh 起，不手敲");
             USAGE_EXIT_CODE
         }
@@ -3673,10 +3670,6 @@ fn copy_log_prefix(log_path: &Path, byte_count: u64, destination: &Path) -> Resu
 }
 
 // ============================== 宿主：驱动 ==============================
-
-fn heavy_tests_permitted(value: Option<&str>) -> bool {
-    value.is_some_and(|value_text| HEAVY_TEST_PERMITTED_VALUES.contains(&value_text))
-}
 
 /// 写盘开机一次：臂、块数、在开机次序里的号。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -4427,6 +4420,14 @@ fn parse_main_arms(text: &str) -> Option<Vec<PowerCutArm>> {
     arms.filter(|parsed| !parsed.is_empty())
 }
 
+/// `--arms` 的值定哪几条主臂：不给就是全部四臂，给了照写的取（写错是 `None`）。
+fn selected_main_arms(arms_text: Option<&str>) -> Option<Vec<PowerCutArm>> {
+    match arms_text {
+        None => Some(PowerCutArm::EVERY_MAIN_ARM.to_vec()),
+        Some(text) => parse_main_arms(text),
+    }
+}
+
 fn write_launcher(scratch: &Path) -> Result<PathBuf, String> {
     let launcher = scratch.join("launcher.sh");
     fs::write(&launcher, format!("#!/bin/sh\nexec {STAGED_BINARY_GUEST_PATH} \"$@\"\n")).map_err(|error| error.to_string())?;
@@ -4446,13 +4447,8 @@ fn verify_items_upper_bound(arm: PowerCutArm) -> usize {
 
 fn run_drive_role(arguments: &RoleArguments, forced_summary: Option<&str>) -> i32 {
     let is_dry_run = arguments.flag("dry-run");
-    if !is_dry_run && !heavy_tests_permitted(std::env::var(HEAVY_TEST_ENVIRONMENT_VARIABLE).ok().as_deref()) {
-        eprintln!("  ✗ s4-drive 起 QEMU 虚机，是重型测试；只在用户要求或提交时带 SINGLEFS_HEAVY_TESTS=user-request（或 commit）跑");
-        eprintln!("  → 怎么办：要先看它会起什么，加 --dry-run（只搭附加根、打印每条 vm-bench 命令，不起虚机）");
-        return HEAVY_TEST_REFUSAL_EXIT_CODE;
-    }
-    let Some(main_arms) = arguments.text("arms").and_then(parse_main_arms) else {
-        eprintln!("  ✗ --arms 要写成 R1,R0,K,F 的子集（逗号分隔）");
+    let Some(main_arms) = selected_main_arms(arguments.text("arms")) else {
+        eprintln!("  ✗ --arms 要写成 R1,R0,K,F 的子集（逗号分隔），不给就是全部四臂");
         return USAGE_EXIT_CODE;
     };
     let kernel = arguments.text("kernel").map(str::to_string);
@@ -4479,11 +4475,21 @@ fn run_drive_role(arguments: &RoleArguments, forced_summary: Option<&str>) -> i3
     exit_code
 }
 
+/// 只跑了四条主臂的一部分就是缩域：`s4_drive_config` 行接这一段，产物不当正式产物；四臂全跑不接。
+fn reduced_scale_note(main_arms: &[PowerCutArm]) -> String {
+    if PowerCutArm::EVERY_MAIN_ARM.iter().all(|arm| main_arms.contains(arm)) {
+        String::new()
+    } else {
+        " reduced=yes registered_arms=R1,R0,K,F not_official_product=yes".to_string()
+    }
+}
+
 fn drive_body(output: &mut ProductLines, main_arms: &[PowerCutArm], kernel: &str, is_dry_run: bool) -> i32 {
     let arm_labels: Vec<&str> = main_arms.iter().map(|arm| arm.label()).collect();
     output.line(format!(
-        "name=s4_drive_config dry_run={is_dry_run} arms={} kernel={kernel} main_blocks={MAIN_BLOCK_COUNT} control_blocks={CONTROL_BLOCK_COUNT} states_per_block={PRIMARY_STATES_PER_BLOCK} small_states_per_block={SMALL_STATES_PER_BLOCK}",
-        arm_labels.join(",")
+        "name=s4_drive_config dry_run={is_dry_run} arms={} kernel={kernel} main_blocks={MAIN_BLOCK_COUNT} control_blocks={CONTROL_BLOCK_COUNT} states_per_block={PRIMARY_STATES_PER_BLOCK} small_states_per_block={SMALL_STATES_PER_BLOCK}{}",
+        arm_labels.join(","),
+        reduced_scale_note(main_arms)
     ));
     let mismatches = run_anchors(output);
     output.line(format!("name=verdict part=anchors anchor_mismatches={mismatches}"));
@@ -4952,14 +4958,6 @@ mod tests {
     }
 
     #[test]
-    fn heavy_test_gate_only_admits_user_request_or_commit() {
-        assert!(heavy_tests_permitted(Some("user-request")));
-        assert!(heavy_tests_permitted(Some("commit")));
-        assert!(!heavy_tests_permitted(Some("yes")));
-        assert!(!heavy_tests_permitted(None));
-    }
-
-    #[test]
     fn role_arguments_skip_the_device_path_that_vm_bench_prepends() {
         let arguments: Vec<String> = ["/dev/vda", "--role", "s4-write-guest", "--arm", "12", "--dry-run"].iter().map(|text| text.to_string()).collect();
         let parsed = RoleArguments::parse(&arguments);
@@ -4967,5 +4965,18 @@ mod tests {
         assert_eq!(parsed.number("arm"), Some(12));
         assert!(parsed.flag("dry-run"));
         assert_eq!(tagged_guest_line("3-K-write0", "name=write_guest arm=K confirmed=6000"), "name=write_guest boot=3-K-write0 arm=K confirmed=6000");
+    }
+
+    /// `--arms` 不给就是全部四臂；给了取写的子集并标缩过，四臂都写上不标；写错或空的拒。
+    #[test]
+    fn drive_without_arms_selects_all_four_main_arms_and_a_subset_is_marked_reduced() {
+        let every_arm = selected_main_arms(None).expect("不给 --arms 就是全部四臂");
+        assert_eq!(every_arm.iter().map(|arm| arm.label()).collect::<Vec<_>>(), vec!["R1", "R0", "K", "F"]);
+        assert_eq!(reduced_scale_note(&every_arm), "");
+        let subset = selected_main_arms(Some("R1,K")).expect("R1,K 是合法子集");
+        assert_eq!(subset.len(), 2);
+        assert_eq!(reduced_scale_note(&subset), " reduced=yes registered_arms=R1,R0,K,F not_official_product=yes");
+        assert_eq!(selected_main_arms(Some("")).map(|arms| arms.len()), None);
+        assert_eq!(selected_main_arms(Some("R1,X9")).map(|arms| arms.len()), None);
     }
 }

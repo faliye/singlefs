@@ -23,7 +23,7 @@ REPLACE_BATCH_WRITE_EACH=1 强制走回逐处写盘的旧行为，--selftest 在
 退出码：0 写成功（或 --dry-run 核过）；1 锚点命中数不对，一个文件都没写；2 用法不对；3 写完回读不一致；
 4 没换上：预演时被拒，一个文件都没换；预演过了、真换时失败，已经换上的文件逐个列出；
 5 目标在仓里（任何后缀），某一处的新串带会话号（ListAgents 列的会话名），一个文件都没写（--dry-run 同样判）；
-6 目标是仓里的 .md，某一处的新串带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法），一个文件都没写（--dry-run 同样判）。
+6 目标是仓里的 .md、.json 或 .txt，某一处的新串带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法），一个文件都没写（--dry-run 同样判）。
 核的时候每一处都核完（对不上的那一处不施加、接着核下一处），对不上的逐处列全再退 1（--dry-run 同样）：
 命中 0 次的附上文件里最像的一段与第一处不同（replace-once.py 的 nearest_hint，同一份算法），文件读不了的点名那个文件。
 
@@ -31,7 +31,7 @@ REPLACE_BATCH_WRITE_EACH=1 强制走回逐处写盘的旧行为，--selftest 在
 （.claude/gate.d/lib-forbidden-notations.py 的会话号形态，lib_notation_check.py 的 session_name_refusal 调它，三份定点写入脚本共用）判规格里每一处的 new；
 带会话名的逐处列出文件、行号与出路（写成「别的会话」这类不带号的说法）。后缀不限，范围与写闸判 Write、Edit 一致：排除前缀、.sh .py .rs 里带
 「# session-names:allow <理由>」的一行、仓外不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 session-names 格兜底。
-写仓里的 .md 之前判每一处的新串里的钟点（退出码 6）：锚点都核对得上之后、判会话号之前（--dry-run 也判），用 write-guard.sh 的第五道与门禁 doc-text 的 clock-times 格
+写仓里的 .md、.json、.txt 之前判每一处的新串里的钟点（退出码 6）：锚点都核对得上之后、判会话号之前（--dry-run 也判），用 write-guard.sh 的第五道与门禁 doc-text 的 clock-times 格
 同一份判据（.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 的 clock_refusal 调它，与 replace-once.py、insert-row.py 同一份）判规格里每一处的 new；
 带钟点、时区词、时间戳的逐处列出文件、行号、形态与出路。判新串不判旧串；别的后缀、仓外、排除前缀下的文件不判；读不到判据库按拒绝办（退出码 6）。
 
@@ -61,7 +61,7 @@ import sys
 import tempfile
 
 from lib_atomic_replace import ReplaceRefused, leftover_temporary_files, problems_with_replacement_by_rename, \
-    replace_file_contents_by_rename
+    replace_file_contents_by_rename, unchanged_bytes
 from lib_notation_check import clock_refusal, copy_library_into, session_guard_problems, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -78,7 +78,7 @@ def replace_once_module():
     return module
 
 
-def plan_in_memory(edits):
+def plan_in_memory(edits, originals=None):
     """每一处都核完（对不上的不施加、接着核下一处），→ (各文件改完的文本, [对不上的每一处的说明])；说明表空着才算全过。"""
     texts, errors, unreadable, nearest_hint = {}, [], {}, None
     for index, edit in enumerate(edits, 1):
@@ -89,7 +89,10 @@ def plan_in_memory(edits):
             continue
         if path not in texts:
             try:
-                texts[path] = pathlib.Path(path).read_text(encoding="utf-8")
+                data = pathlib.Path(path).read_bytes()
+                texts[path] = data.decode("utf-8")
+                if originals is not None:
+                    originals[path] = data
             except (OSError, UnicodeDecodeError) as error:
                 unreadable[path] = f"读不了这个文件（{error.__class__.__name__}：{error}）"
                 errors.append(f"第 {index} 处 {path}：{unreadable[path]}")
@@ -108,38 +111,36 @@ def plan_in_memory(edits):
     return (None if errors else texts), errors
 
 
-def clock_refusals(edits, notation_root=None):
-    """规格里每一处新串的钟点判定（共用库 clock-times 那一形态，写闸与 replace-once.py、insert-row.py 同一份）：→ [说明行列表]，每个有命中的新串一个。
-    只判仓里的 .md 目标（clock_refusal 自己管后缀、仓外与排除前缀）；「第 n 行」的算法同 session_name_refusals。弄坏开关 no-clock-guard 不判。"""
-    if os.environ.get("REPLACE_BATCH_BREAK") == "no-clock-guard":
-        return []
+def new_text_refusals(edits, check, notation_root=None, originals=None):
+    """按计划顺序检查新串；优先复用锚点核对时读到的字节，避免重复读取和换行转换。"""
     texts, refusals = {}, []
     for edit in edits:
-        path = edit["file"]
+        path = edit['file']
         if path not in texts:
-            texts[path] = pathlib.Path(path).read_text(encoding="utf-8")
-        refusal = clock_refusal(path, edit["new"], texts[path][:texts[path].find(edit["old"])].count("\n") + 1, notation_root)
+            data = originals[path] if originals is not None else pathlib.Path(path).read_bytes()
+            texts[path] = data.decode('utf-8')
+        first_line = texts[path][:texts[path].find(edit['old'])].count('\n') + 1
+        refusal = check(path, edit['new'], first_line, notation_root)
         if refusal:
             refusals.append(refusal)
-        texts[path] = texts[path].replace(edit["old"], edit["new"])
+        texts[path] = texts[path].replace(edit['old'], edit['new'])
     return refusals
 
 
-def session_name_refusals(edits, notation_root=None):
+def clock_refusals(edits, notation_root=None, originals=None):
+    """规格里每一处新串的钟点判定（共用库 clock-times 那一形态，写闸与 replace-once.py、insert-row.py 同一份）：→ [说明行列表]，每个有命中的新串一个。
+    只判仓里 .md、.json、.txt 目标（clock_refusal 自己管后缀、仓外与排除前缀）；「第 n 行」的算法同 session_name_refusals。弄坏开关 no-clock-guard 不判。"""
+    if os.environ.get("REPLACE_BATCH_BREAK") == "no-clock-guard":
+        return []
+    return new_text_refusals(edits, clock_refusal, notation_root, originals)
+
+
+def session_name_refusals(edits, notation_root=None, originals=None):
     """规格里每一处新串的会话号判定（共用库 session-names 那一形态，写闸同一份）：→ [说明行列表]，每个有命中的新串一个。
     各处按数组次序在内存里依次施加，「第 n 行」是那一处改完之后新串第一行在文件里的行号。弄坏开关 no-session-guard 不判。"""
     if os.environ.get("REPLACE_BATCH_BREAK") == "no-session-guard":
         return []
-    texts, refusals = {}, []
-    for edit in edits:
-        path = edit["file"]
-        if path not in texts:
-            texts[path] = pathlib.Path(path).read_text(encoding="utf-8")
-        refusal = session_name_refusal(path, edit["new"], texts[path][:texts[path].find(edit["old"])].count("\n") + 1, notation_root)
-        if refusal:
-            refusals.append(refusal)
-        texts[path] = texts[path].replace(edit["old"], edit["new"])
-    return refusals
+    return new_text_refusals(edits, session_name_refusal, notation_root, originals)
 
 
 def apply_each_edit_to_disk(edits):
@@ -169,10 +170,12 @@ def rehearse_replacement(path, text):
         return
 
 
-def replace_planned_texts(texts):
+def replace_planned_texts(texts, originals=None):
     """先整批预演，全过了再逐个改名换上。返回退出码；0 以外都已打印原因与下一步。"""
     for path, text in texts.items():
         try:
+            if originals is not None:
+                unchanged_bytes(path, originals[path])
             rehearse_replacement(path, text)
         except ReplaceRefused as refused:
             print(f"✗ {refused}")
@@ -181,7 +184,9 @@ def replace_planned_texts(texts):
     replaced_paths = []
     for path, text in texts.items():
         try:
-            notes = replace_file_contents_by_rename(path, text)
+            notes = replace_file_contents_by_rename(
+                path, text, check_before_rename=(lambda: unchanged_bytes(path, originals[path]))
+                if originals is not None else None)
         except ReplaceRefused as refused:
             print(f"✗ {refused}")
             print(f"→ 预演过了、真换时失败，这一批留了半套：已经换上的 {len(replaced_paths)} 个是 {replaced_paths}；"
@@ -194,6 +199,15 @@ def replace_planned_texts(texts):
 
 
 def run(edits, dry_run, notation_root=None):
+    if not isinstance(edits, list) or not all(
+            isinstance(edit, dict) and all(isinstance(edit.get(key), str) for key in ('file', 'old', 'new'))
+            and edit['file'] and edit['old'] and type(edit.get('count', 1)) is int and edit.get('count', 1) > 0
+            for edit in edits):
+        print('✗ 规格要是数组，file / old / new 要是字符串，file 与 old 不许为空，count 要是正整数')
+        print('→ 怎么办：修正规格后重跑，一个文件都没写')
+        return 2
+    # 同一文件的相对路径、绝对路径与符号链接共用一份计划，防止后写覆盖前写。
+    edits = [{**edit, 'file': os.path.realpath(edit['file'])} for edit in edits]
     if os.environ.get("REPLACE_BATCH_WRITE_EACH") == "1":
         error = apply_each_edit_to_disk(edits)
         if error:
@@ -201,7 +215,8 @@ def run(edits, dry_run, notation_root=None):
             print("→ 对一下原文再跑（这是逐处写盘的旧行为，前面几处已经落盘了）")
             return 1
         return 0
-    texts, errors = plan_in_memory(edits)
+    originals = {}
+    texts, errors = plan_in_memory(edits, originals)
     if errors:
         for error in errors:
             print(f"✗ {error}")  # gate-lint:detail
@@ -209,14 +224,14 @@ def run(edits, dry_run, notation_root=None):
               f"{'，--dry-run 没写' if dry_run else '，什么都没写'}")  # gate-lint:summary
         print("→ 怎么办：对一下每一处的原文（空白、全半角、同义字；命中 0 次的看上面「最像的一段」与第一处不同），改规格再整份重跑")
         return 1
-    clock_hits = clock_refusals(edits, notation_root)
+    clock_hits = clock_refusals(edits, notation_root, originals)
     if clock_hits:
         for refusal in clock_hits:
             print("✗ " + "\n".join(refusal))  # gate-lint:detail
         print(f"✗ {len(edits)} 处里 {len(clock_hits)} 处的新串在描述里写了钟点、时区词或时间戳{'，--dry-run 没写' if dry_run else '，什么都没写'}")  # gate-lint:summary
         print("→ 怎么办：照上面每一处的出路改新串（钟点与时区词去掉、只写日期，运行目录名与日志文件名里的时间戳不抄进 .md），改规格整份重跑")
         return 6
-    refusals = session_name_refusals(edits, notation_root)
+    refusals = session_name_refusals(edits, notation_root, originals)
     if refusals:
         for refusal in refusals:
             print("✗ " + "\n".join(refusal))  # gate-lint:detail
@@ -226,11 +241,11 @@ def run(edits, dry_run, notation_root=None):
     if dry_run:
         print(f"✓ {len(edits)} 处都命中得对（{len(texts)} 个文件），--dry-run 没写")
         return 0
-    exit_code = replace_planned_texts(texts)
+    exit_code = replace_planned_texts(texts, originals)
     if exit_code != 0:
         return exit_code
     for path, text in texts.items():
-        if pathlib.Path(path).read_text(encoding="utf-8") != text:
+        if pathlib.Path(path).read_bytes().decode("utf-8") != text:
             print(f"✗ {path} 回读与内存里的结果不一致")
             print("→ 看是不是有别的进程同时在写这个文件，核一遍再跑")
             return 3
@@ -301,7 +316,13 @@ def problems_with_clock_guard(directory):
     code, said = attempt([{"file": dirty, "old": glue(("2026-10-14 ", zone, " 15", colon, "30 定")), "new": "2026-10-14 定"}])
     if code != 0 or content_of(dirty) != "用户 2026-10-14 定\n":
         problems.append(f"写 .md：旧串带钟点、新串只写日期（删掉钟点的改动）本该放行，实际 {code}：{said!r}")
-    for label, path in (("仓里的 .txt 目标", os.path.join(root, "records", "notes.txt")), ("仓外的 .md", os.path.join(directory, "outside-clock.md"))):
+    # .json、.txt 与 .md 同判（带紧凑时间戳的新串拒、文件不动）
+    for label, path in (("仓里的 .txt 目标", os.path.join(root, "records", "notes.txt")), ("仓里的 .json 目标", os.path.join(root, "records", "notes.json"))):
+        reset(path)
+        code, said = attempt([{"file": path, "old": "第二行 乙", "new": glue(("运行目录 ", stamp))}])
+        if code != 6 or content_of(path) != original:
+            problems.append(f"写 .md：{label}的新串带紧凑时间戳本该退出码 6 且不写文件，实际 {code}：{said!r}")
+    for label, path in (("仓里的 .tsv 目标", os.path.join(root, "records", "notes.tsv")), ("仓外的 .md", os.path.join(directory, "outside-clock.md"))):
         reset(path)
         code, said = attempt([{"file": path, "old": "第二行 乙", "new": glue(("运行目录 ", stamp))}])
         if code != 0:
@@ -468,6 +489,39 @@ def main(arguments, notation_root=None):
     return run(edits, dry_run, notation_root)
 
 
+BREAK_VARIABLES = ("REPLACE_BATCH_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/replace-batch.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

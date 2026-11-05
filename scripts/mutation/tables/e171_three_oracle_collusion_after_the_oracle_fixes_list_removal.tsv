@@ -1,0 +1,12 @@
+# E171 第 2 次重跑（登记 research/prompts/e171-r2-prereg.md 第九节 M1–M9，加第八节判别力自证两条记成 M10、M11）：名单核对 list_check.py 与撤项核算 removal_effect.py 的变异表。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/mutation_driver.py 带 --unit-test-module test_list_check --unit-test-module test_removal_effect 跑。
+M1 撤项核算不从 Q2 集合里减被撤的行	set_after = [number for number in set_rows if number not in removed]	set_after = [number for number in set_rows]
+M2 撤项核算不从分母 D 里减被撤的计入行	denominator, "counted_D", len(counted_removed))	denominator, "counted_D", 0)
+M3 撤项核算按行号减时差一（减的是前一行的类）	sum(rows[number]["category"] == key for number in present)	sum(rows[number - 1]["category"] == key for number in present)
+M4 判定词用撤之前的全放行行代进原比对器的函数	else reading_verdict(quiet, list(range(counted_after))	else reading_verdict(quiet_before, list(range(counted_after))
+M5 干扰判法不看 name=substitution 行	failed_rows.update({int(line.fields["row"]): "substitution" for line in product if line.name == "substitution"})	failed_rows.update({})
+M6 名单核对读表不跳过 # 起头的行	if line.startswith("#"):	if False:
+M7 分类乙只比文件与原文、不比替换文	today.triple() == line.triple())	today.triple()[:2] == line.triple()[:2])
+M8 分类乙不读术语改名表	new_name = renamed(row.name, renames)	new_name = row.name
+M9 改后核对的行集写死成 1–281	before_numbers = {row.number for rows in before.values() for row in rows}	before_numbers = set(range(1, 282))
+M10 判别力自证：钉值变也算乙（第八节）	any(cell.kind == VERDICT_WORD and cell.changed() for cell in assessment.cells) else	any(cell.changed() for cell in assessment.cells) else
+M11 判别力自证：干扰按同一行号而不按同文件（第八节）	if number not in removed and files.get(number) in removed_files)	if number not in removed and number in removed)

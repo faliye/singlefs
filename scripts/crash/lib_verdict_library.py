@@ -2,13 +2,22 @@
 判法照 .claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」；口径照 .claude/kb/decisions/13-验证路线.md 已定项 17
 （判定复用的单元是函数，键只由函数单元、工具链、依赖版本与这条判定自己的内容输入组成）。
 
-Python 一侧这一个概念只叫「判定库」（类名 VerdictLibrary）。Rust 一侧 crates/singlefs-checker-tier 的判定存储（verdict_store 模块）是另一份存法，不在这里。
+Python 一侧这一个概念只叫「判定库」（类名 VerdictLibrary）。Rust 一侧 crates/singlefs-verification 的判定存储（verdict_store 模块）是另一份存法，不在这里。
 用它的：
-  门禁 checker-tier-formal-verification 的两份判法（scripts/gate/verus-proof-check.py、scripts/experiment-apparatus/e165-pin-red-examples.py）、
-    门禁 checker-tier-lkmm（.claude/scripts/lkmm.sh 每份 litmus 两条判定）与门禁 checker-tier-qemu-device-streams（每档一条判定）用整套：
-    函数单元闭包键（FunctionUnitIndex）、VerdictLibrary 存放与按键读、write_atomically 原子写、Tally 现判与复用分开报；两道 shell 写的门禁经下面的命令行用。
-  门禁 checker-tier-crates-mutation-replay 的判法（scripts/mutation/crates-mutation-rows.py）用 write_atomically、read_text 与 Tally。
-不用它、各自留一份的（gate-overlap:copy-kept 写在它们那里）：广谱变异的结论表（scripts/mutation/broad-mutation.py，只追加的 TSV）。
+  门禁 formal-verification 的两份判法（scripts/gate/verus-proof-check.py、scripts/experiment-apparatus/e165-pin-red-examples.py）、
+    门禁 lkmm（.claude/scripts/lkmm.sh 每份 litmus 两条判定）与门禁 qemu-device-streams（每档一条判定）用整套：
+    函数单元闭包键（FunctionUnitIndex）、VerdictLibrary 存放与按键读、Tally 现判与复用分开报；两道 shell 写的门禁经下面的命令行用
+    （lookup、record、record-red 记红撤绿）。
+  库目录取法与下面「存放」相同（被判那棵树的 git common-dir 下那一份固定目录，只当名字）、判定另经别的库类存进 prune-server 的：
+    门禁 crates-mutation-replay 的判法（scripts/mutation/crates-mutation-rows.py，调 library_directory）与 scripts/mutation/mutate.sh
+    （判定经 scripts/mutation/lib_mutation_units.py 的 Library 存进 prune-server，mutate.sh 判失败的档记 fails=1、不当绿复用），
+    与 scripts/experiment-apparatus/replay.sh（族 unit-verdicts、种类 replay-row，经 scripts/gate/admission.py library-files 读写服务，对不上的记 drift、不当绿复用）；
+    记红撤绿都是照同一把键盖掉原有的绿，存法各自的文件头写。
+  经 scripts/gate/admission.py 自己的 VerdictLibrary 存放（库目录取法与这里相同：它文件头「判定库」）、经它的 verdict-record --red-names 记红撤绿的：
+    门禁 crash-point-replay 按条复用的几格、model-differential-and-scenarios 各模型对拍格、research-build-and-replay 的 research-unit-tests 格、
+    code-tooling 的 research-script-selftests 格，与入口 scripts/crash/crash-point-replay.sh 按条复用的那一段。
+不用它、各自留一份的（gate-overlap:copy-kept 写在它们那里）：广谱变异的结论表（scripts/mutation/broad-mutation.py，族 broad-mutation，只追加的行；
+  同一把键先抓到、后判没红的翻面条不沿用、现判一次，见它文件头「判定行」末段）。
 
 共用库给判定算键用函数单元摘要（与 scripts/gate/lib_function_units.py 同一份切法，这里只 import 它，不另切）：
   FunctionUnitIndex(根).key(入口…) 交一把 UnitKey：从入口（<文件>::<限定名>、<文件>，写法同 lib_function_units.py 文件头「入口」）沿调用与引用收的
@@ -27,42 +36,65 @@ Python 一侧这一个概念只叫「判定库」（类名 VerdictLibrary）。R
   判法单元指纹（judging_units，摘要或 UnitKey）一个判定库一个，建库时给。键 = sha256（「输入指纹 NUL 判法单元指纹」）。
   两列有一样变了就现判；现判的原因点名是哪一列：输入里「<哪几样> 变了」，或「判法单元指纹 变了」；detail(项) 交变了的单元清单
   （上一份判定的组成清单与这一趟的比，按（种类，限定名，文件）对：改了、新进、出去的各列名），门禁照抄进它那一项的红句或现判行。
-  只记绿：红、没跑成、被信号停了的一律不记，下一趟照判。键相同就复用，不看记下来的是哪一项的名字（输入里要有这一项自己的那一段，不然两项会共用一份判定）。
-  一项判完当场落盘（write_atomically：同目录排他建临时文件、写完 fsync、改名换上）；被打断之后同一条命令重跑，判过的复用、没判的接着判。
+  记红、撤绿、下趟现判：判绿的调 record、判红的调 record_red，两样都照同一把键原子写 keys/<键>.json，后写的盖掉先写的（判红撤掉这把键原有的绿，
+  再判绿盖掉红）；lookup 遇到这把键记着红，答现判、原因是「上次判红」（RED_RECORD_REASON）。没跑成、被信号停了的两样都不记，下一趟照判。
+  键相同就复用，不看记下来的是哪一项的名字（输入里要有这一项自己的那一段，不然两项会共用一份判定）。
+  一项判完当场写进 prune-server（服务回确认才算数）；被打断之后同一条命令重跑，判过的复用、没判的接着判。
 
-存放（directory 由调用方给，几道门禁各给 git common-dir 下自己那一份固定目录，跨轮留着，不放 /tmp）：
-  <directory>/<kind>/keys/<键>.json      这一份判定：item、key、input_fingerprint、judging_units、components（名字 → 摘要）、compositions（名字 → 组成清单的摘要）、
-                                         verdict（只有 green）、summary、details（调用方给的几样数，例 verified 条数）、recorded（判定日期）、run（跑法）
-  <directory>/<kind>/items/<项名的 sha256>.json   这一项最近一次判绿的那一份（与上面同内容），只用来说清「现判」的原因
-  <directory>/<kind>/compositions/<组成清单的摘要>.json   组成清单本身（单元行），几条判定共用一份；只给 detail 报变了的单元，不进任何键
+存放（directory 由调用方照 library_directory(被判的根, <这一道的固定目录名>) 取：被判那棵树的 git common-dir 下那一份固定目录的路径；本地不建、不读、不写）：
+  键里只用固定目录名当库名，哪棵仓不进键：主仓与仓副本（git init 过的）读写同一份。被判的根不是 git 工作树（取不到 common-dir）时
+    library_directory 退 2（LibraryUnavailable，是 SystemExit；标准错误点名那棵树与出路），一项都不判；没给库目录、这棵树里没有客户端
+    （拷进不带 scripts/prune-server/ 的小树里跑的这一份）同样退 2。没有「不读不写、全部现判」的那条路。
+  每份判定库（<directory>/<kind>）的三样都在 prune-server 结论表里，键 = verdict-library[@命名空间]/<固定目录名>/<kind>/<相对路径>
+  （scripts/prune-server/prune_server_client.py 文件头「键空间」，library_service_store；命名空间只在临时服务底下给，自证与样本各给各的临时树，不串）：
+  keys/<键>.json      这一份判定：item、key、input_fingerprint、judging_units、components（名字 → 摘要）、compositions（名字 → 组成清单的摘要）、
+                      verdict（green 或 red）、summary、details（调用方给的几样数，例 verified 条数）、recorded（判定日期）、run（跑法）
+  items/<项名的 sha256>.json   这一项最近一次判绿的那一份（与上面同内容；判红不写它），只用来说清「现判」的原因
+  compositions/<组成清单的摘要>.json   组成清单本身（单元行），几条判定共用一份；只给 detail 报变了的单元，不进任何键
+  一份判定与它的 items/ 那一份放同一个写帧（原子）。服务连不上客户端退 75（PruneServerFailure，是 SystemExit）：库没有本地文件那条路，
+  调用方（门禁、命令行 lookup / record / record-red）照 75 整道退出，不当「无记录」现判。
 
 用法（python）：
     from lib_verdict_library import FunctionUnitIndex, VerdictLibrary, Tally, digest_text, judging_unit_key
     index = FunctionUnitIndex(根)
     units = index.key(["crates/x/src/bin/y.rs::main"], toolchain=[...], dependencies=locked_dependency_lines(根, "x"))
-    library = VerdictLibrary(目录或 None, "proof-function", judging_unit_key(仓根, ["scripts/gate/z.py::check"]), reuse=True)
+    library = VerdictLibrary(library_directory(根, "<这一道的固定目录名>"), "proof-function", judging_unit_key(仓根, ["scripts/gate/z.py::check"]))
     reused, reason = library.lookup(项名, [("被验函数单元", units), ("这一行", digest_text(...))])
-    ... 现判 ... library.record(项名, components, "一句判定", run="跑法", details={...})   # 只在判绿时调
+    ... 现判 ... library.record(项名, components, "一句判定", run="跑法", details={...})       # 判绿时调
+                 library.record_red(项名, components, "一句判定", run="跑法", details={...})   # 判红时调（撤掉同一把键的绿）
     tally.count(reused, reason); print(tally.text())
-目录给 None：不读不写（reason 写「没给判定库」），判法照旧全部现判。
 
-命令行（shell 写的门禁用；退出码 0 成、1 现判 / 写不成、2 用法错、3 算不出、4 拒算）：
+命令行（shell 写的门禁用；退出码 0 成、1 现判 / 写不成、2 用法错、3 算不出、4 拒算、75 prune-server 不可用（调用方整道退 75，不当现判））：
   lib_verdict_library.py unit-key <根> <入口>… [--target 目标] [--cfg 谓词]… [--toolchain 行]… [--dependency 行]… [--external 名=sha256=版本行]…
                                     [--exclude-file 相对根的路径]… [--exclude-unit <文件>::<限定名>]…
       打「key<TAB><键>」与组成清单（单元行），有拒算打拒算行、不打键行、退 4。--dependency-of <包名> 照 locked_dependency_lines 补依赖行；
       --programs-keyed-elsewhere 照 judging_unit_key 那样不要求外部程序（判法单元指纹用：外部程序由每条判定自己的那几样管）。
   lib_verdict_library.py judging-units <根> <入口>…        同 unit-key，去掉 NOT_JUDGING_FILES 两份的单元
-  lib_verdict_library.py lookup <目录> <种类> <项> <组成表> [--no-reuse]
+  lib_verdict_library.py lookup <目录> <种类> <项> <组成表>      <目录> 照「存放」：<被判那棵树的 git common-dir>/<固定目录名>
       组成表一行一样「名字<TAB>摘要」或「名字<TAB>@<unit-key 的输出文件>」，名字写 判法单元指纹 的那一行是判法单元指纹那一列；
       打一行「复用<TAB>原因」退 0，或「现判<TAB>原因<TAB>变了的单元」退 1
   lib_verdict_library.py record <目录> <种类> <项> <组成表> --summary <一句判定> --run <跑法> [--detail 名=值]…   判绿之后调；写不成退 1
-  lib_verdict_library.py --selftest
+  lib_verdict_library.py record-red <目录> <种类> <项> <组成表> --summary <一句判定> --run <跑法> [--detail 名=值]…   判红之后调（同 record_red）；写不成退 1
+  lib_verdict_library.py --selftest   只在临时 prune-server 上跑（scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service）；
+                                      不在那底下退 2、一格都不跑，不写真服务
 
-弄坏开关 VERDICT_LIBRARY_BREAK=<项>[,<项>…]（只给证红用；自证逐个打开，核点名的那一格转红）：
-  unit-key-from-raw-file   单元键改取入口文件整份原文的 sha256（不切单元、不去注释）      「只改注释单元键不变」那一格红
-  refusal-reused           拒算的键照一个固定的摘要算、照样复用                           「拒算不复用」那一格红
-  composition-not-recorded 不存组成清单，detail 报不出变了的单元                           「作废时点名变了的单元」那一格红
-  judging-files-included   判法单元指纹里留着这份库与 lib_function_units.py 的单元        「判法单元指纹不含库自己」那一格红
+弄坏开关 VERDICT_LIBRARY_BREAK=<项>[,<项>…]（只在 --selftest 里认：命令行第一个参数不是 --selftest、又不是自证起的子进程（自证设 VERDICT_LIBRARY_SELFTEST=1）时设了它，
+参数解析之前退 2、点名它只在自证里认；自证末尾逐个打开，核点名的那一格转红）。逐项写开关名、弄坏哪一处，下一行起写打开后自证红的格
+（「」里是失败行 「✗ lib_verdict_library 自证 N 格里 M 格判错：<格标签、…>」 里的标签）：
+  VERDICT_LIBRARY_BREAK=unit-key-from-raw-file  单元键改取入口文件整份原文的 sha256（不切单元、不去注释）
+      「只改注释单元键不变」「改没被调到的函数键不变」「作废时点名变了的单元」
+  VERDICT_LIBRARY_BREAK=refusal-reused  拒算的键照一个固定的摘要算、照样复用
+      「拒算不复用、不记」
+  VERDICT_LIBRARY_BREAK=composition-not-recorded  不存组成清单，detail 报不出变了的单元
+      「作废时点名变了的单元」「判法单元指纹变了整项现判」「点名判法的单元」
+  VERDICT_LIBRARY_BREAK=judging-files-included  判法单元指纹里留着这份库与 lib_function_units.py 的单元
+      「判法单元指纹不含库自己」
+  VERDICT_LIBRARY_BREAK=red-not-recorded  record_red 什么都不写（改前的样子：只记绿，判红不撤同一把键的绿）
+      「判绿入库、同一把键判红之后，下一趟这一项现判、不复用」
+  VERDICT_LIBRARY_BREAK=library-directory-outside-git-tolerated  library_directory 取不到 git common-dir 时交 None、不退 2（改前「不读不写、全部现判」的样子）
+      「不在 git 工作树里取库目录退 2」
+  VERDICT_LIBRARY_BREAK=missing-client-tolerated  这棵树里没有客户端时 library_service_store 交 None、不退 2（改前「照没给判定库办」的样子）
+      「树里没有客户端的命令行 lookup 退 2」
 """
 import collections
 import datetime
@@ -75,11 +107,10 @@ import sys
 import tempfile
 import tomllib
 
-NO_LIBRARY_REASON = "没给判定库"
-REUSE_OFF_REASON = "关了复用"
 NO_RECORD_REASON = "无记录"
 BROKEN_RECORD_REASON = "记录读不出"
 REFUSED_REASON = "拒算"
+RED_RECORD_REASON = "上次判红"
 JUDGING_UNITS_COLUMN = "判法单元指纹"
 LIBRARY_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 REPOSITORY_ROOT = os.path.dirname(os.path.dirname(LIBRARY_DIRECTORY))
@@ -268,6 +299,42 @@ def rust_toolchain_lines(root):
     return lines
 
 
+def git_common_directory(tree):
+    """tree 所在 git 仓的 common-dir（绝对路径）；不是 git 工作树、git 起不来交 None。"""
+    try:
+        completed = subprocess.run(["git", "-C", tree, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                                   capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return (completed.stdout.strip() or None) if completed.returncode == 0 else None
+
+
+class LibraryUnavailable(SystemExit):
+    """判定库没处放（文件头「存放」）：被判的根不是 git 工作树、没给库目录、这棵树里没有客户端。退 2；抛之前在标准错误打 ✗ 与出路。
+    是 SystemExit：调用方的 except Exception 拦不住，进程照 2 退。"""
+
+    def __init__(self, message, remedy):
+        print(f"  ✗ 判定库没处放：{message}（退 {EXIT_USAGE}）", file=sys.stderr)
+        print(f"     → 怎么办：{remedy}", file=sys.stderr)
+        super().__init__(EXIT_USAGE)
+        self.message = message
+
+    def __str__(self):
+        return self.message
+
+
+def library_directory(judged_root, name):
+    """这一道判定库的库目录（文件头「存放」）：被判那棵树的 git common-dir 下的 <name>，只当名字；取不到 common-dir 退 2（LibraryUnavailable）。
+    弄坏开关 library-directory-outside-git-tolerated 下取不到交 None（改前「不读不写、全部现判」的样子）。"""
+    common_directory = git_common_directory(judged_root)
+    if common_directory is None:
+        if "library-directory-outside-git-tolerated" in BREAK:
+            return None
+        raise LibraryUnavailable(f"{os.path.abspath(judged_root)} 不是 git 工作树（取不到 git common-dir）",
+                                 "在 git 工作树里跑；rsync 拷的仓副本先在副本根 git init（判定库按固定库名存，哪棵仓不进键，副本与主仓读写同一份）")
+    return os.path.join(common_directory, name)
+
+
 def component_digest(value):
     return value.key if isinstance(value, UnitKey) else value
 
@@ -298,45 +365,48 @@ def key_of(components, judging_units):
     return digest_text(f"{input_fingerprint(components)}\0{stable_digest(judging_units)}")
 
 
-def write_atomically(path, data):
-    """同目录排他建临时文件、写完 fsync、改名换上；data 是 str 或 bytes，所在目录不在先建。失败时删掉临时文件，原文件不动，异常照抛。"""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    handle_number, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=os.path.basename(path) + ".partial.")
+def prune_server_client():
+    """scripts/prune-server/prune_server_client.py（判定库服务的客户端），第一次用到时载入（文件头「存放」）；载入不连服务。
+    拷进不带它的小树里跑的这一份交 None（library_service_store 照它退 2，自证照它拒跑）。"""
+    name = "singlefs_prune_server_client"
+    if name not in sys.modules:
+        path = os.path.join(REPOSITORY_ROOT, "scripts", "prune-server", "prune_server_client.py")
+        if not os.path.isfile(path):
+            return None
+        specification = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(specification)
+        sys.modules[name] = module
+        specification.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def library_service_store(kind_directory):
+    """这一份库（<固定目录>/<kind>）在 prune-server 里的 LibraryStore（文件头「存放」）；这棵树里没有客户端退 2（LibraryUnavailable）。
+    弄坏开关 missing-client-tolerated 下没有客户端交 None（改前「照没给判定库办」的样子），客户端的弄坏开关 unreachable-treated-as-no-library 下客户端交 None。"""
+    client = prune_server_client()
+    if client is None:
+        if "missing-client-tolerated" in BREAK:
+            return None
+        raise LibraryUnavailable(f"这棵树（{REPOSITORY_ROOT}）里没有 scripts/prune-server/prune_server_client.py",
+                                 "在带着 scripts/prune-server/ 的整棵仓里跑：判定库只经 prune-server 的客户端读写")
+    kind = f"{os.path.basename(os.path.dirname(kind_directory))}/{os.path.basename(kind_directory)}"
+    return client.library_store(client.FAMILY_VERDICT_LIBRARY, kind, kind_directory)
+
+
+def stored_json(store, relative):
+    """(在不在, 读出来的 dict 或 None)：从 prune-server 读这一份库里的 <relative>。在而解不开交 (True, None)；服务不可用客户端退 75。"""
+    data = store.read(relative)
+    if data is None:
+        return False, None
     try:
-        if isinstance(data, bytes):
-            with os.fdopen(handle_number, "wb") as handle:
-                handle.write(data)
-                handle.flush()
-                os.fsync(handle.fileno())
-        else:
-            with os.fdopen(handle_number, "w", encoding="utf-8", errors="surrogateescape") as handle:
-                handle.write(data)
-                handle.flush()
-                os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
-        raise
-
-
-def read_text(path):
-    """按键读一份记录的原文：不在、读不了交 None（下一趟照判，不抛）。"""
-    try:
-        with open(path, encoding="utf-8", errors="surrogateescape") as handle:
-            return handle.read()
-    except OSError:
-        return None
-
-
-def read_json(path):
-    text = read_text(path)
-    if text is None:
-        return None
-    try:
-        return json.loads(text)
+        return True, json.loads(data.decode("utf-8", "surrogateescape"))
     except ValueError:
-        return None
+        return True, None
+
+
+def read_library_json(kind_directory, relative):
+    """一份 VerdictLibrary 形态的库（<目录>/<kind>）里按相对路径读一份记录（复用哨兵直接读键文件用，lib_reuse_checks.py）；记录不在、解不开交 None。"""
+    return stored_json(library_service_store(kind_directory), relative)[1]
 
 
 def unit_identity(line):
@@ -358,21 +428,44 @@ def changed_units(before, after):
 
 
 class VerdictLibrary:
-    def __init__(self, directory, kind, judging_units, reuse=True):
-        self.directory = os.path.join(directory, kind) if directory else None
+    def __init__(self, directory, kind, judging_units):
+        # directory 只当 prune-server 里的名字（文件头「存放」），本地不建；没给退 2，没有不读不写的形态
+        if not directory:
+            raise LibraryUnavailable("没给库目录", "照文件头「存放」：library_directory(被判的根, <这一道的固定目录名>) 取")
+        self.directory = os.path.join(directory, kind)
         self.judging_units = judging_units
-        self.reuse = reuse
         self.details = {}
         self.records = {}
+        self.store = library_service_store(self.directory)
 
-    def _key_path(self, key):
-        return os.path.join(self.directory, "keys", key + ".json")
+    @staticmethod
+    def _key_relative(key):
+        return f"keys/{key}.json"
 
-    def _item_path(self, item):
-        return os.path.join(self.directory, "items", digest_text(item) + ".json")
+    @staticmethod
+    def _item_relative(item):
+        return f"items/{digest_text(item)}.json"
 
-    def _composition_path(self, digest):
-        return os.path.join(self.directory, "compositions", digest + ".json")
+    @staticmethod
+    def _composition_relative(digest):
+        return f"compositions/{digest}.json"
+
+    def _stored(self, relative):
+        """(在不在, 读出来的 dict 或 None)，读 prune-server（文件头「存放」）。"""
+        return stored_json(self.store, relative)
+
+    def key_exists(self, key):
+        """这把键在库里有没有一份记录（不管红绿、读不读得出）：只数键的那一趟用（verus-proof-check.py 的 peek）。"""
+        return self._stored(self._key_relative(key))[0]
+
+    def item_record(self, item):
+        """这一项最近判绿的那一份（dict），没有交 None。"""
+        return self._stored(self._item_relative(item))[1]
+
+    def stored_keys(self):
+        """库里有记录的键（排好序）：自证核「写进了哪一份库」用。"""
+        names = [relative[len("keys/"):] for relative, _value in self.store.scan("keys/")]
+        return sorted(name[:-len(".json")] for name in names if name.endswith(".json"))
 
     def detail(self, item):
         """上一次 lookup 这一项时算出的变了的单元（「；」接起来，至多 DETAIL_UNIT_LIMIT 个，多的报个数）；没有交空串。"""
@@ -394,7 +487,7 @@ class VerdictLibrary:
             stored_digest = latest.get("judging_units") if name == JUDGING_UNITS_COLUMN else (latest.get("components") or {}).get(name)
             if stored_digest == value.key:
                 continue
-            stored = read_json(self._composition_path(compositions[name]))
+            stored = self._stored(self._composition_relative(compositions[name]))[1]
             if not isinstance(stored, list):
                 continue
             changes = changed_units(stored, value.units)
@@ -405,7 +498,8 @@ class VerdictLibrary:
             self.details[item] = "；".join(notes)
 
     def lookup(self, item, components):
-        """交 (复用?, 原因)：复用时原因是记下那一份的日期与一句判定；现判时原因是没给判定库、关了复用、无记录、记录读不出、拒算，
+        """交 (复用?, 原因)：复用时原因是记下那一份的日期与一句判定；现判时原因是无记录、记录读不出、拒算、
+        上次判红（这把键记着红：record_red 写的，那一句与日期另由 detail(项) 交），
         或「<输入里哪几样>、判法单元指纹 变了」（变了的输入按名字排，判法单元指纹变了排在最后）；变了的单元另由 detail(项) 交。"""
         self.details.pop(item, None)
         self.records.pop(item, None)
@@ -414,25 +508,21 @@ class VerdictLibrary:
             name, value = refused
             self.details[item] = f"{name}：{value.first_refusal()}"
             return False, f"{REFUSED_REASON}（{name}）"
-        if self.directory is None:
-            return False, NO_LIBRARY_REASON
-        if not self.reuse:
-            return False, REUSE_OFF_REASON
         key = key_of(components, self.judging_units)
-        if os.path.exists(self._key_path(key)):
-            record = read_json(self._key_path(key))
+        key_present, record = self._stored(self._key_relative(key))
+        if key_present:
+            if record is not None and record.get("verdict") == "red" and record.get("key") == key:
+                self.details[item] = f"{record.get('recorded', '?')} 判红：{record.get('summary', '')}"
+                return False, RED_RECORD_REASON
             if record is None or record.get("verdict") != "green" or record.get("key") != key:
                 return False, BROKEN_RECORD_REASON
-            latest = read_json(self._item_path(item))
+            latest = self._stored(self._item_relative(item))[1]
             if latest is None or latest.get("key") != key:
                 # 这一项最近那一份换成复用的这一份：下一趟「现判」的原因比的是这一趟的输入
-                try:
-                    write_atomically(self._item_path(item), json.dumps(dict(record, item=item), ensure_ascii=False, sort_keys=True) + "\n")
-                except OSError:
-                    pass
+                self.store.write_many([(self._item_relative(item), json.dumps(dict(record, item=item), ensure_ascii=False, sort_keys=True) + "\n")])
             self.records[item] = record
             return True, f"{record.get('recorded', '?')} 判绿：{record.get('summary', '')}"
-        latest = read_json(self._item_path(item))
+        latest = self._stored(self._item_relative(item))[1]
         if latest is None or not isinstance(latest.get("components"), dict):
             return False, NO_RECORD_REASON
         digests = {name: stable_digest(value) for name, value in components}
@@ -445,39 +535,47 @@ class VerdictLibrary:
 
     def lookup_by_item_only(self, item):
         """弄坏开关用（几份判法的 reuse-ignores-key）：这一项最近判绿过就复用，不比键。正常判法不调它。"""
-        latest = read_json(self._item_path(item))
+        latest = self._stored(self._item_relative(item))[1]
         if latest is None:
             return False, NO_RECORD_REASON
         self.records[item] = latest
         return True, f"{latest.get('recorded', '?')} 判绿（没比键）：{latest.get('summary', '')}"
 
     def record(self, item, components, summary, run="", details=None):
-        """判绿之后调：组成清单、键那一份与这一项最近那一份各原子写一次。写不成交一句原因（不抛：后果只是下一趟这一项照判），写成交 None。
-        有拒算的不写（交原因）。run 是跑法（判出这一份的那条命令或那几样参数），details 是调用方要随判定存的几样数。"""
-        if self.directory is None:
+        """判绿之后调：组成清单、键那一份与这一项最近那一份放一个写帧写进 prune-server（键那一份盖掉这把键原有的红）。写成交 None；
+        有拒算的不写（交原因）；服务不可用客户端退 75。run 是跑法（判出这一份的那条命令或那几样参数），details 是调用方要随判定存的几样数。"""
+        return self._write(item, components, summary, run, details, "green")
+
+    def record_red(self, item, components, summary, run=None, details=None):
+        """判红之后调：照同一把键写一条 verdict=red 的记录，盖掉这把键原有的绿；下一趟 lookup 答现判、原因「上次判红」。
+        这一项最近判绿的那一份（items/）不动。参数、返回同 record。弄坏开关 red-not-recorded 下什么都不写（改前的样子）。"""
+        if "red-not-recorded" in BREAK:
             return None
+        return self._write(item, components, summary, run or "", details, "red")
+
+    def _write(self, item, components, summary, run, details, verdict):
         refused = refused_component(components, self.judging_units)
         if refused is not None:
             return f"拒算（{refused[0]}），不记"
         key = key_of(components, self.judging_units)
         compositions = {}
-        try:
-            if "composition-not-recorded" not in BREAK:
-                for name, value in list(components) + [(JUDGING_UNITS_COLUMN, self.judging_units)]:
-                    if isinstance(value, UnitKey) and value.units:
-                        digest = value.composition_digest()
-                        compositions[name] = digest
-                        if not os.path.exists(self._composition_path(digest)):
-                            write_atomically(self._composition_path(digest), json.dumps(list(value.units), ensure_ascii=False) + "\n")
-            text = json.dumps({"item": item, "key": key, "input_fingerprint": input_fingerprint(components),
-                               "judging_units": stable_digest(self.judging_units),
-                               "components": {name: stable_digest(value) for name, value in components}, "compositions": compositions,
-                               "verdict": "green", "summary": summary, "details": dict(details or {}), "run": run,
-                               "recorded": datetime.date.today().isoformat()}, ensure_ascii=False, sort_keys=True) + "\n"
-            write_atomically(self._key_path(key), text)
-            write_atomically(self._item_path(item), text)
-        except OSError as error:
-            return f"判定库 {self.directory} 写不进：{error}"
+        pairs = []
+        if "composition-not-recorded" not in BREAK:
+            for name, value in list(components) + [(JUDGING_UNITS_COLUMN, self.judging_units)]:
+                if isinstance(value, UnitKey) and value.units:
+                    digest = value.composition_digest()
+                    compositions[name] = digest
+                    if not self._stored(self._composition_relative(digest))[0]:
+                        pairs.append((self._composition_relative(digest), json.dumps(list(value.units), ensure_ascii=False) + "\n"))
+        text = json.dumps({"item": item, "key": key, "input_fingerprint": input_fingerprint(components),
+                           "judging_units": stable_digest(self.judging_units),
+                           "components": {name: stable_digest(value) for name, value in components}, "compositions": compositions,
+                           "verdict": verdict, "summary": summary, "details": dict(details or {}), "run": run,
+                           "recorded": datetime.date.today().isoformat()}, ensure_ascii=False, sort_keys=True) + "\n"
+        pairs.append((self._key_relative(key), text))
+        if verdict == "green":
+            pairs.append((self._item_relative(item), text))
+        self.store.write_many(pairs)
         return None
 
 
@@ -598,11 +696,24 @@ def unit_key_command(arguments, judging):
     return EXIT_DONE
 
 
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在自证里认（文件头「弄坏开关」）：命令行第一个参数不是 --selftest、又不是自证起的子进程（自证设了 VERDICT_LIBRARY_SELFTEST=1）而 VERDICT_LIBRARY_BREAK 非空
+    （不管值是什么），退 2 并点名它只在自证里认；在参数解析之前判。"""
+    if os.environ.get("VERDICT_LIBRARY_BREAK") and arguments[:1] != ["--selftest"] and os.environ.get("VERDICT_LIBRARY_SELFTEST") != "1":
+        print("  ✗ VERDICT_LIBRARY_BREAK 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证", file=sys.stderr)
+        print("     → 怎么办：去掉 VERDICT_LIBRARY_BREAK 再跑；要证红就跑 VERDICT_LIBRARY_BREAK=<项> python3 scripts/crash/lib_verdict_library.py --selftest", file=sys.stderr)
+        return EXIT_USAGE
+    return None
+
+
 def main(arguments):
+    refusal = refuse_break_outside_selftest(arguments)
+    if refusal is not None:
+        return refusal
     if arguments[:1] == ["--selftest"]:
         return selftest()
-    if not arguments or arguments[0] not in ("unit-key", "judging-units", "lookup", "record"):
-        print("  ✗ 用法：lib_verdict_library.py unit-key|judging-units <根> <入口>… | lookup|record <目录> <种类> <项> <组成表> … | --selftest")
+    if not arguments or arguments[0] not in ("unit-key", "judging-units", "lookup", "record", "record-red"):
+        print("  ✗ 用法：lib_verdict_library.py unit-key|judging-units <根> <入口>… | lookup|record|record-red <目录> <种类> <项> <组成表> … | --selftest")
         print("     → 怎么办：看文件头「命令行」一段")
         return EXIT_USAGE
     command, rest = arguments[0], arguments[1:]
@@ -615,7 +726,9 @@ def main(arguments):
         extra = rest[4:]
         components, judge = read_components(table)
         if command == "lookup":
-            library = VerdictLibrary(directory, kind, judge, reuse="--no-reuse" not in extra)
+            if extra:
+                raise ValueError(f"lookup 认不出 {extra[0]}")
+            library = VerdictLibrary(directory, kind, judge)
             reused, reason = library.lookup(item, components)
             print(("复用\t" if reused else "现判\t") + reason + ("" if reused else "\t" + library.detail(item)))
             return EXIT_DONE if reused else EXIT_JUDGE
@@ -633,8 +746,9 @@ def main(arguments):
                     details[name] = detail_value
                 position += 2
                 continue
-            raise ValueError(f"record 认不出 {extra[position]}")
-        failed = VerdictLibrary(directory, kind, judge).record(item, components, summary, run=run, details=details)
+            raise ValueError(f"{command} 认不出 {extra[position]}")
+        library = VerdictLibrary(directory, kind, judge)
+        failed = (library.record_red if command == "record-red" else library.record)(item, components, summary, run=run, details=details)
         if failed:
             print(f"  ! {failed}")
             return EXIT_JUDGE
@@ -691,6 +805,14 @@ pub fn unrelated(value: u32) -> u32 {
 
 def selftest():
     import shutil
+    # 判定库的格写进 prune-server：只在临时服务上跑（文件头「命令行」--selftest），不是就一格都不跑，不写真服务
+    client = prune_server_client()
+    service_problem = client.selftest_service_problem() if client is not None else "这棵树里没有 scripts/prune-server/prune_server_client.py"
+    if service_problem:
+        print(f"  ✗ lib_verdict_library 自证没跑：{service_problem}")
+        print(f"     → 怎么办：{client.SELFTEST_SERVICE_REMEDY if client is not None else '在带着 scripts/prune-server/ 的仓里跑'}")
+        return EXIT_USAGE
+    os.environ["VERDICT_LIBRARY_SELFTEST"] = "1"   # 自证起的子进程（命令行 unit-key、lookup、record 与逐个开关的 --selftest）凭它认弄坏开关
     cases, wrong = 0, []
 
     def cell(label, passed, detail):
@@ -748,9 +870,9 @@ def selftest():
             dependencies = locked_dependency_lines(root, "sample")
             cell("依赖版本行只收引到的外部包", dependencies == ["outside 1.2.3 registry+https://example.invalid abc"], dependencies)
             # 判定库：记、复用、作废时点名变了的单元、拒算不复用
-            library_directory = os.path.join(work, "library")
+            selftest_library = os.path.join(work, "library")
             judge_key = UnitKey(digest_text("判法"), ("fn\tjudge\tx.py:1-2\taaa",), ())
-            store = VerdictLibrary(library_directory, "sample", judge_key)
+            store = VerdictLibrary(selftest_library, "sample", judge_key)
             components = [("被判函数", base["rust"]), ("这一行", digest_text("第一行"))]
             first = store.lookup("一项", components)
             failed = store.record("一项", components, "判绿", run="自证", details={"verified": "3"})
@@ -768,10 +890,50 @@ def selftest():
             wrote = store.record("拒算项", [("被判函数", refused)], "判绿")
             cell("拒算不复用、不记", not reused and reason.startswith(REFUSED_REASON) and "getattr-variable" in store.detail("拒算项") and wrote,
                  f"{reused} {reason} 「{store.detail('拒算项')}」 写 {wrote}")
-            other_judge = VerdictLibrary(library_directory, "sample", UnitKey(digest_text("另一份判法"), ("fn\tjudge\tx.py:1-2\tbbb",), ()))
+            other_judge = VerdictLibrary(selftest_library, "sample", UnitKey(digest_text("另一份判法"), ("fn\tjudge\tx.py:1-2\tbbb",), ()))
             reused, reason = other_judge.lookup("一项", components)
             cell("判法单元指纹变了整项现判、点名判法的单元", not reused and reason == f"{JUDGING_UNITS_COLUMN} 变了" and "改了 fn judge" in other_judge.detail("一项"),
                  f"{reused} {reason} 「{other_judge.detail('一项')}」")
+            # 记红、撤绿、下趟现判（文件头「键」）：同一把键先判绿入库、再判红 ⇒ 下一趟现判、原因「上次判红」；红之后再判绿 ⇒ 下一趟复用
+            red_store = VerdictLibrary(selftest_library, "red-sample", judge_key)
+            red_components = [("被判函数", base["rust"]), ("这一行", digest_text("红的那一行"))]
+            red_store.record("红项", red_components, "判绿", run="自证")
+            green_first = red_store.lookup("红项", red_components)
+            wrote_red = red_store.record_red("红项", red_components, "判红：断言没过", run="自证")
+            after_red = red_store.lookup("红项", red_components)
+            cell("判绿入库、同一把键判红之后，下一趟这一项现判、不复用",
+                 green_first[0] and wrote_red is None and after_red == (False, RED_RECORD_REASON) and "判红：断言没过" in red_store.detail("红项"),
+                 f"判绿之后 {green_first}，写红 {wrote_red}，判红之后 {after_red} 「{red_store.detail('红项')}」")
+            red_store.record("红项", red_components, "又判绿", run="自证")
+            green_again = red_store.lookup("红项", red_components)
+            cell("红之后再判绿，下一趟复用", green_again[0] and (red_store.record_of("红项") or {}).get("summary") == "又判绿",
+                 f"{green_again}，记录 {red_store.record_of('红项')}")
+            # 库目录（文件头「存放」）：git 工作树取 <common-dir>/<库名>；不是 git 工作树的退 2、点名那棵树，不交「没有库」
+            main_tree, copy_tree = os.path.join(work, "main-tree"), os.path.join(work, "copy-tree")
+            os.makedirs(main_tree)
+            os.makedirs(copy_tree)
+            initialized = subprocess.run(["git", "init", "-q", main_tree], capture_output=True, text=True)
+            main_common = git_common_directory(main_tree)
+            located = library_directory(main_tree, "selftest-verdicts")
+            try:
+                outside = ("交了", library_directory(copy_tree, "selftest-verdicts"))
+            except SystemExit as error:
+                outside = ("退出", error.code)
+            cell("不在 git 工作树里取库目录退 2",
+                 initialized.returncode == 0 and main_common is not None and located == os.path.join(main_common, "selftest-verdicts") and outside == ("退出", EXIT_USAGE),
+                 f"git init 退 {initialized.returncode}（{initialized.stderr.strip()[-200:]}），工作树取到 {located}（要 {main_common}/selftest-verdicts），"
+                 f"不是工作树的 {copy_tree} {outside[0]} {outside[1]}（要退出 {EXIT_USAGE}）")
+            # 这棵树里没有客户端（拷进不带 scripts/prune-server/ 的小树）：命令行 lookup 退 2、点名缺客户端，不答现判
+            small_tree = os.path.join(work, "small-tree")
+            os.makedirs(os.path.join(small_tree, "scripts", "crash"))
+            shutil.copy2(os.path.realpath(__file__), os.path.join(small_tree, "scripts", "crash", "lib_verdict_library.py"))
+            small_table = os.path.join(work, "small-components.tsv")
+            with open(small_table, "w", encoding="utf-8") as handle:
+                handle.write(f"这一档\t{digest_text('direct')}\n{JUDGING_UNITS_COLUMN}\t{digest_text('判法')}\n")
+            small = subprocess.run([sys.executable, os.path.join(small_tree, "scripts", "crash", "lib_verdict_library.py"), "lookup",
+                                    os.path.join(main_common or work, "selftest-verdicts"), "small", "一项", small_table], capture_output=True, text=True)
+            cell("树里没有客户端的命令行 lookup 退 2", small.returncode == EXIT_USAGE and "prune_server_client.py" in small.stderr and not small.stdout.startswith("现判"),
+                 f"退 {small.returncode}（要 {EXIT_USAGE}），标准输出「{small.stdout.strip()[:200]}」，标准错误「{small.stderr.strip()[-300:]}」")
             # 判法单元指纹不含库自己：仓里的 verus-proof-check.py 的 check_proof 闭包里，判定库与 lib_function_units 的单元一个都没有
             repository_index = FunctionUnitIndex(REPOSITORY_ROOT)
             judging = judging_unit_key(REPOSITORY_ROOT, ["scripts/gate/verus-proof-check.py::check_proof"], repository_index)
@@ -785,13 +947,23 @@ def selftest():
             with open(table, "w", encoding="utf-8") as handle:
                 handle.write(f"宿主脚本单元\t@{unit_file}\n这一档\t{digest_text('direct')}\n{JUDGING_UNITS_COLUMN}\t{digest_text('判法')}\n")
             command = [sys.executable, os.path.realpath(__file__)]
-            before = subprocess.run(command + ["lookup", library_directory, "shell", "direct", table], capture_output=True, text=True)
-            recorded = subprocess.run(command + ["record", library_directory, "shell", "direct", table, "--summary", "判绿", "--run", "自证"], capture_output=True, text=True)
-            after = subprocess.run(command + ["lookup", library_directory, "shell", "direct", table], capture_output=True, text=True)
+            before = subprocess.run(command + ["lookup", selftest_library, "shell", "direct", table], capture_output=True, text=True)
+            recorded = subprocess.run(command + ["record", selftest_library, "shell", "direct", table, "--summary", "判绿", "--run", "自证"], capture_output=True, text=True)
+            after = subprocess.run(command + ["lookup", selftest_library, "shell", "direct", table], capture_output=True, text=True)
             cell("命令行 unit-key、lookup、record 一个来回", done.returncode == 0 and before.returncode == 1 and before.stdout.startswith("现判\t无记录")
                  and recorded.returncode == 0 and after.returncode == 0 and after.stdout.startswith("复用\t"),
                  f"unit-key 退 {done.returncode}（{done.stderr.strip()[-200:]}），lookup 退 {before.returncode}「{before.stdout.strip()}」，"
                  f"record 退 {recorded.returncode}「{recorded.stdout.strip()}」，再 lookup 退 {after.returncode}「{after.stdout.strip()}」")
+            recorded_red = subprocess.run(command + ["record-red", selftest_library, "shell", "direct", table, "--summary", "判红", "--run", "自证"], capture_output=True, text=True)
+            after_red_line = subprocess.run(command + ["lookup", selftest_library, "shell", "direct", table], capture_output=True, text=True)
+            cell("命令行 record-red 之后 lookup 现判、原因上次判红", recorded_red.returncode == 0 and after_red_line.returncode == 1
+                 and after_red_line.stdout.startswith(f"现判\t{RED_RECORD_REASON}\t"),
+                 f"record-red 退 {recorded_red.returncode}「{recorded_red.stdout.strip()}」，再 lookup 退 {after_red_line.returncode}「{after_red_line.stdout.strip()}」")
+            # 判定只进 prune-server（文件头「存放」）：上面几格记过、复用过的那几份库，库目录底下一个判定文件都没有
+            local_library_files = [os.path.relpath(os.path.join(walked, name), work) for base in (selftest_library, os.path.join(main_common or work, "selftest-verdicts"))
+                                   for walked, _directories, names in os.walk(base) for name in names]
+            cell("判定只进服务、库目录本地不建", not os.path.exists(selftest_library) and not local_library_files and bool(store.stored_keys()),
+                 f"库目录 {selftest_library} 在不在 {os.path.exists(selftest_library)}，本地判定文件 {local_library_files[:3]}，服务里这份库的键 {len(store.stored_keys())} 个")
         except (AssertionError, ValueError) as error:
             cell("自证的现场", False, str(error))
         shutil.rmtree(root, ignore_errors=True)
@@ -799,7 +971,10 @@ def selftest():
     breaks_missed, breaks_proven = [], 0
     if not wrong and not BREAK:
         for item, cell_label in (("unit-key-from-raw-file", "只改注释单元键不变"), ("refusal-reused", "拒算不复用、不记"),
-                                 ("composition-not-recorded", "作废时点名变了的单元"), ("judging-files-included", "判法单元指纹不含库自己")):
+                                 ("composition-not-recorded", "作废时点名变了的单元"), ("judging-files-included", "判法单元指纹不含库自己"),
+                                 ("red-not-recorded", "判绿入库、同一把键判红之后，下一趟这一项现判、不复用"),
+                                 ("library-directory-outside-git-tolerated", "不在 git 工作树里取库目录退 2"),
+                                 ("missing-client-tolerated", "树里没有客户端的命令行 lookup 退 2")):
             completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
                                        env=dict(os.environ, VERDICT_LIBRARY_BREAK=item))
             if completed.returncode == 0 or f"{cell_label} 这一格判错" not in completed.stdout:

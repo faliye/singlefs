@@ -429,7 +429,7 @@ def selftest():
             words = shlex.split(given[0])
             captured = io.StringIO()
             with contextlib.redirect_stdout(captured):
-                resumed_code = main(words[2:])
+                resumed_code = run_command(words[2:])
             resumed_output = captured.getvalue()
         produced = [os.path.join(work, "research", "prompts", name) for name in
                     ("_t-r5-appendix.md", "_t-r5-background.md", os.path.join("t-r5-snapshot", "kb-sha256.txt"))]
@@ -477,9 +477,27 @@ def selftest():
     return 0
 
 
+def refuse_break_outside_selftest(argv):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest 而 THREE_WAY_MATERIALS_BREAK 非空（不管值是什么），参数解析之前就拒，交回退出码 2；放行交回 None。
+    自证不起自己的子进程；自证里要走命令行那条路的（--resume 续做）直接调 run_command()，不经 main()，所以守卫只管真正的命令行入口，自证里设着开关也不会被自己拒。"""
+    if not BROKEN or argv == ["--selftest"]:
+        return None
+    print(f"  ✗ THREE_WAY_MATERIALS_BREAK={BROKEN} 是弄坏开关，只在自证（three-way-materials.py --selftest）里认，平常跑设了就拒，这一趟什么都没做", file=sys.stderr)
+    print("     → 怎么办：去掉 THREE_WAY_MATERIALS_BREAK 再跑；要证红就跑 THREE_WAY_MATERIALS_BREAK=<项> python3 scripts/agents/three-way-materials.py --selftest", file=sys.stderr)
+    return 2
+
+
 def main(argv):
+    refused = refuse_break_outside_selftest(argv)
+    if refused is not None:
+        return refused
     if argv[:1] == ["--selftest"]:
         return selftest()
+    return run_command(argv)
+
+
+def run_command(argv):
+    """生成材料的命令行解析与执行（不含 --selftest 与弄坏开关的守卫，那两样在 main()）。"""
     if not argv or argv[0].startswith("--"):
         print("  ✗ 用法：three-way-materials.py <轮名> [--root 仓根] [--files kb文件 …] [--extra 文件:a-b …] [--no-history] [--resume]\n"
               "  → 怎么办：第一个参数写轮名（正文是 research/prompts/_<轮名>-body.md）")

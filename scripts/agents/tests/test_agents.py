@@ -288,26 +288,6 @@ class CostTests(ScriptCase):
 
 
 class WatchTests(ScriptCase):
-    def test_log_deleted_after_fd_scan_does_not_crash(self):
-        module = load_script('agent-watch.py')
-        path = self.root / 'progress.log'
-        child = self.spawn([sys.executable, '-c',
-                            'import sys,time; f=open(sys.argv[1],"w"); f.write("started\\n"); '
-                            'f.flush(); print("ready",flush=True); time.sleep(30)', str(path)])
-        self.assertEqual(child.stdout.readline().strip(), 'ready')
-        original = module.written_files
-        def disappear(pid):
-            files = original(pid)
-            if str(path) in files:
-                path.unlink()
-            return files
-        thresholds = SimpleNamespace(process_report_minutes=0, process_stale_minutes=10000, process_max_minutes=10000)
-        with mock.patch.object(module, 'written_files', side_effect=disappear):
-            lines, alerts = module.process_alerts(os.getpid(), set(), thresholds)
-        self.assertFalse(path.exists(), 'The disappearing-file race must actually be exercised')
-        self.assertTrue(any(str(child.pid) in line for line in lines))
-        self.assertEqual(alerts, [])
-
     def test_progress_deleted_before_read_is_reported(self):
         module = load_script('agent-watch.py')
         with mock.patch.object(module, 'progress_file_of', return_value=str(self.root / 'missing')):

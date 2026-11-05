@@ -5,68 +5,88 @@
 
 依据：用户 2026-10-15 定（剪枝的单元是函数；广谱变异一条一条按内容算，不按 HEAD 算）；复用键普查对账底稿第一节 L22 与第二节第 6、9 条、
 一之三 verify 路的改写；第二轮 design 路报告第三节 3.1；controls 路报告第 5 节（S34、T16、N37、N45、T17 与弄坏开关名）。
-清单与结论都按单元键存：每条变异过沿用判据，沿用不了才现判；不带参数就是剪枝，--full 只写不读（驱动那一头）。
+清单与结论都按单元键存：每条变异过沿用判据，沿用不了才现判；不带参数就是剪枝。
 没有 --changed-since、--sync-tree、changed-since-tree、notice_if_head_moved，没有「一版」与 git archive <提交> 导出的版本树。
 函数外的项各切单元（const、static、struct、impl 头、宏都是单元），切不开当解析缺陷修，不退整文件。判法是判结局那几个函数单元的指纹，没有手写的版本号。
 
   mutation-prune.py --selftest            自证：controls 路的 S34、T16、N37、N45、T17，verify 路量过的 index_node_entry_capacity 那一格，
                                           与本库自己加的几格（见 SAMPLES），逐个判沿用的决定；另有清单按单元存、覆盖者键跳过默认 cfg 下不编的测试、跑全部的例外、覆盖文件名归一、
-                                          -E 按块切、CPU 限时倍数、runner；不起 cargo，runner 那几格起一个假测试程序
+                                          -E 按块切；不起 cargo
   mutation-prune.py --index <树> [文件…]   打每个文件的单元（种类、限定名、起止行、指纹前 12 位），排查用
 
 单元与闭包都由 scripts/gate/lib_function_units.py 算（Rust 那一份；本库只 import 它，不另切）：
   一条变异的容器 = 包住它的最小的单元（fn、impl 头、const、static、struct、enum、宏……；嵌套 fn 与闭包算外层 fn 的）。
   变异键（verdict key）= sha256（form 一行、容器单元闭包的键、容器里的相对位置、原文、替换文）；闭包的键是 lib_function_units 的 closure_key：
     入口目标的生效 cfg、闭包里每个单元的（种类，指纹）多重集、数据单元的摘要，加调用方给的工具链行（global_lines）与依赖行（dependency_lines）。
-    相对位置按容器里去掉注释之后的词法单元下标与单元内偏移记（注释与空白不算）；不带路径、名字、行号、上限、限时。
+    相对位置按容器里去掉注释之后的词法单元下标与单元内偏移记（注释与空白不算）；不带路径、名字、行号。
   依赖行：闭包里的单元真点名的外部 crate 照 Cargo.lock 落到的包（名、版本、来源、checksum），连同传递依赖；取法只在
     scripts/mutation/lib_mutation_units.py 一处（它文件头「依赖版本行」，crates 变异表与 mutate.sh 用同一份）。
   工具链行（驱动给）：rustc -vV、cargo nextest / cargo-mutants / llvm-profdata 的版本、构建环境的生效值（build_environment_lines）、判法单元指纹。
     Cargo.toml 只取解析后的 [profile]、各包的 edition 与生效特性（特性在闭包的 cfg 行里），不取原文；.cargo/ 下的配置取解析后的值；排除表不进。
   测试键 = 抓到它那条测试的单元闭包键（入口是那条测试函数）；认不出是哪条测试、或闭包拒算，交 None 与原因（那一条现判，不退整包、不退只比测试函数）。
-  覆盖者键 = 静态闭包里有容器单元的每一条测试（第一段的、第二段慢档用例、checker 档的、被变异包的文档测试，排除表里的不算）各自测试键的多重集：
+  覆盖者键 = 静态闭包里有容器单元的每一条测试（第一段的、验证包的、被变异包的文档测试；标了 #[ignore] 的 cargo 不跑，不算；排除单里的不算：驱动登记的崩溃枚举用例与放量分项）各自测试键的多重集：
     闭包是那条测试执行得到的单元的上界，集合与各自的键不变、也没有新测试的闭包碰到它，没红就沿用。
     默认 cfg 下不编的测试（整份挂了这一次没开的 #![cfg(feature = "…")]，闭包交 entry-cfg-inactive）不可能是这一趟的覆盖者：跳过，不拒、不进条数，跳过几条写在 coverers_key 返回的第三项；别的拒因照旧整条拒。
-沿用判据（carry_decision）：键相同的那一行；抓到的另要测试键与现算的相同、那条测试此刻不在排除表里（升档判的抓到带档位，另要覆盖者键相同：超时、撞顶是在碰得到它的那几条测试跑着时出的，它们变了、或有新测试碰到它就现判）；
-  没红的要覆盖者键相同；无效的键相同就沿用（键里有容器与它点到的单元、依赖、工具链）；超时、内存撞顶、驱动错不是结论，照选中现判；
+沿用判据（carry_decision）：键相同的那一行；抓到的另要测试键与现算的相同、那条测试此刻不在排除表里；
+  没红的要覆盖者键相同才算数（这里判的是「这一行此刻还算不算数」，驱动的 --summary 与提交门禁按它定没红的状态；真跑一律不沿用没红、每趟现判，规矩在驱动的 Judgement.state 与 GpuJudging.state，见驱动文件头「记红、撤绿、下趟现判」）；
+  无效的键相同就沿用（键里有容器与它点到的单元、依赖、工具链）；驱动错不是结论，照选中现判；
   拒算的（容器或它的闭包里有认不出的形态）不沿用，每趟现判。
 清单按单元存（list_unit_key）：cargo-mutants 给的每一条变异记在它的容器单元下（相对位置、原文、替换文、变异名去掉位置的那一段），
   键 = cargo-mutants 版本、.cargo/mutants.toml 解析后的值、文件路径（examine_globs 按路径挑文件）、单元的种类与指纹、cfg 条件链、外层单元的指纹；
   被变异包里每一个单元都记（没有变异的记空表），提交门禁照这张表在此刻的源码上复原清单，不起 cargo。
 
 规则（每条后面是弄坏开关 BROAD_MUTATION_BREAK=<项>，只在 --selftest 与驱动的自证里生效）：
-  catching-test-own-function-only   测试键只取测试函数自己的指纹，不取它的闭包                    T16（「✗ 自证：样本 T16 判成 carry」）
-  mutated-function-only             变异键只取容器单元自己的指纹，不取它的闭包（依赖行跟着不进）  INDEXU、MACRO、S04、Y8、FC、FD、Y9、Q1、DEP（判成 carry）
-  container-fingerprint-dropped     变异键里的闭包去掉容器单元自己                                S34U、Y5、FF（判成 carry）
+  BROAD_MUTATION_BREAK=catching-test-own-function-only  测试键只取测试函数自己的指纹，不取它的闭包
+      「自证：样本 T16 判成 carry」「自证：同一条测试因别的原因拒算」
+  BROAD_MUTATION_BREAK=mutated-function-only  变异键只取容器单元自己的指纹，不取它的闭包（依赖行跟着不进）
+      「自证：样本 INDEXU 判成 carry」「自证：样本 MACRO 判成 carry」「自证：样本 S04 判成 carry」「自证：样本 Y8 判成 carry」「自证：样本 FC 判成 carry」「自证：样本 FD 判成 carry」「自证：样本 Y9 判成 carry」「自证：样本 Q1 判成 carry」「自证：样本 DEP 判成 carry」
+  BROAD_MUTATION_BREAK=container-fingerprint-dropped  变异键里的闭包去掉容器单元自己
+      「自证：样本 S34U 判成 carry」「自证：样本 Y5 判成 carry」「自证：样本 FF 判成 carry」
     抓到的结论另有测试键守着（测试的闭包里有被测函数与它调到的），S34、INDEX 要同开两个开关才红：
     container-fingerprint-dropped,catching-test-own-function-only 红在 S34，mutated-function-only,catching-test-own-function-only 红在 INDEX
-  defining-file-in-key              变异键另收闭包碰到的每份文件里全部单元的指纹                  N37、N45、T17、FA（判成 rejudge）
-  relative-position-dropped         相对位置不进变异键                                            TWO（判成 carry）
-  relative-position-counts-comments 相对位置连注释一起数                                          COMMENT（判成 rejudge）、清单那一格（「✗ 自证：清单的一条没复原回去」）
-  dependency-lines-dropped          依赖行不进键                                                  DEP（判成 carry）
-  dependency-whole-lock             依赖行取整份 Cargo.lock 的全部包                              DEP-OTHER（判成 rejudge）
-  profile-ignored                   构建环境不取 Cargo.toml 解析后的 [profile]                    Y7（判成 carry）
-  manifest-text-in-global-key       构建环境另收 Cargo.toml 原文的 sha256                         MANIFEST（判成 rejudge）
-  exclusions-in-global-key          工具链行另收排除表的 sha256                                   EXCLUDE-OTHER（判成 rejudge）
-  catching-test-exclusion-ignored   抓到它的测试进了排除表也沿用                                  EXCLUDE-CATCHER（判成 carry）
-  unviable-rejudged                 无效的条键相同也现判                                          UNVIABLE（判成 rejudge）
-  missed-coverers-ignored           没红的条不比覆盖者键                                          N1（判成 carry）
-  missed-always-rejudged            没红的条键相同也现判                                          MISSED（判成 rejudge）
-  escalated-not-carried             升档判的抓到键相同也现判                                      ESCALATED（判成 rejudge）
-  escalated-coverers-ignored        升档判的抓到不比覆盖者键                                      ESCALATED-COVERERS（判成 carry）
-  list-cache-context-dropped        清单的单元键不收 cfg 条件链                                   清单那一格（「✗ 自证：单元挪进 #[cfg(test)] 之后清单的单元键没变」）
-  outside-mutation-selected         不在 fn 单元里的变异也按覆盖挑测试                            K1（「✗ 自证：K1：…没判成跑全部」）
-  const-context-runs-selected       常量上下文里用到的 const fn 也按覆盖挑测试                    X3（「✗ 自证：X3：…没判成跑全部」）
-  spawning-binary-selected          起子进程的测试二进制一个都不认                                X1b（「✗ 自证：X1b：…没认出来」）
-  coverage-paths-unnormalized       覆盖文件名不拼不截                                            覆盖文件名归一（「✗ 自证：覆盖文件名没归一或行列没对上」）
-  nextest-filter-single-argument    挑测试的 -E 拼成一个参数                                      -E 按块切（「✗ 自证：挑测试的 -E 没按块切」）
-  limit-below-smt                   不核 CPU 限时倍数的下限                                       CPU 限时倍数（「✗ 自证：CPU 限时的倍数或上限算错」）
-  coverers-cfg-inactive-refused     覆盖者键碰到默认 cfg 下不编的测试（entry-cfg-inactive）也整条拒                覆盖者键那一格（「✗ 自证：覆盖者键没跳过默认 cfg 下不编的测试」）
-  cpu-limit-ignored                 RUNNER_SCRIPT 在 limit 模式不设 CPU 上限、只看墙钟             runner（「✗ 自证：runner 的限时不对」）
+  BROAD_MUTATION_BREAK=defining-file-in-key  变异键另收闭包碰到的每份文件里全部单元的指纹
+      「自证：样本 N37 判成 rejudge」「自证：样本 N45 判成 rejudge」「自证：样本 T17 判成 rejudge」「自证：样本 UNVIABLE 判成 rejudge」「自证：样本 FA 判成 rejudge」
+  BROAD_MUTATION_BREAK=relative-position-dropped  相对位置不进变异键
+      「自证：样本 TWO 判成 carry」
+  BROAD_MUTATION_BREAK=relative-position-counts-comments  相对位置连注释一起数
+      「自证：样本 COMMENT 判成 rejudge」「自证：清单的一条没复原回去」
+  BROAD_MUTATION_BREAK=dependency-lines-dropped  依赖行不进键
+      「自证：样本 DEP 判成 carry」
+  BROAD_MUTATION_BREAK=dependency-whole-lock  依赖行取整份 Cargo.lock 的全部包
+      「自证：样本 DEP-OTHER 判成 rejudge」
+  BROAD_MUTATION_BREAK=profile-dropped  构建环境不取 Cargo.toml 解析后的 [profile]
+      「自证：样本 Y7 判成 carry」
+  BROAD_MUTATION_BREAK=manifest-text-in-global-key  构建环境另收 Cargo.toml 原文的 sha256
+      「自证：样本 MANIFEST 判成 rejudge」
+  BROAD_MUTATION_BREAK=exclusions-in-global-key  工具链行另收排除表的 sha256
+      「自证：样本 EXCLUDE-OTHER 判成 rejudge」
+  BROAD_MUTATION_BREAK=catching-test-exclusion-dropped  抓到它的测试进了排除表也沿用
+      「自证：样本 EXCLUDE-CATCHER 判成 carry」
+  BROAD_MUTATION_BREAK=unviable-rejudged  无效的条键相同也现判
+      「自证：样本 UNVIABLE 判成 rejudge」
+  BROAD_MUTATION_BREAK=missed-coverers-unchecked  没红的条不比覆盖者键
+      「自证：样本 N1 判成 carry」
+  BROAD_MUTATION_BREAK=missed-always-rejudged  没红的条键相同也现判
+      「自证：样本 MISSED 判成 rejudge」
+  BROAD_MUTATION_BREAK=list-cache-context-dropped  清单的单元键不收 cfg 条件链
+      「自证：单元挪进 #[cfg(test)] 之后清单的单元键没变、或只加注释就变了」
+  BROAD_MUTATION_BREAK=outside-mutation-selected  不在 fn 单元里的变异也按覆盖挑测试
+      「自证：K1：常量初始化式里的变异没判成跑全部」
+  BROAD_MUTATION_BREAK=const-context-runs-selected  常量上下文里用到的 const fn 也按覆盖挑测试
+      「自证：X3：常量上下文里」
+  BROAD_MUTATION_BREAK=spawning-binary-selected  起子进程的测试二进制一个都不认
+      「自证：X1b：起本二进制当子进程的测试二进制没认出来」
+  BROAD_MUTATION_BREAK=coverage-paths-unnormalized  覆盖文件名不拼不截
+      「自证：覆盖文件名没归一或行列没对上」
+  BROAD_MUTATION_BREAK=nextest-filter-single-argument  挑测试的 -E 拼成一个参数
+      「自证：挑测试的 -E 没按块切」
+  BROAD_MUTATION_BREAK=coverers-cfg-inactive-refused  覆盖者键碰到默认 cfg 下不编的测试（entry-cfg-inactive）也整条拒
+      「自证：覆盖者键没跳过默认 cfg 下不编的测试」
   弄坏开关打开后本库 --selftest 退 1，汇总行「✗ mutation-prune.py --selftest：<格数> 格里 N 格判错」；驱动 broad-mutation.py 的 --selftest 打开同一个开关时红在哪写在它自己的文件头。
 弄坏开关只在自证里认（refuse_break_outside_selftest）：直接执行本库而命令行不是单独一个 --selftest（--index、不带参数、认不得的参数）时，环境里设了 BROAD_MUTATION_BREAK
   就在参数解析之前退 2，点名这个变量只在自证里认；被驱动当库载入时不判（驱动自己在参数解析之前拒）。
-  outside-selftest-guard-skipped    父进程是带 --selftest 的本库时（自证起的探针）平常跑设了也照跑（改前的样子）   守卫那一格（「✗ 自证：平常跑设了 BROAD_MUTATION_BREAK 没被拒」）
+  BROAD_MUTATION_BREAK=outside-selftest-guard-skipped  父进程是带 --selftest 的本库时（自证起的探针）平常跑设了也照跑（改前的样子）
+      「自证：平常跑设了 BROAD_MUTATION_BREAK 没被拒」
 
 gate-similar: broad-mutation.py 它是逐条驱动（库目录、续跑、逐步命令），这里是它载入的纯函数库，判的是同一件事的剪枝那一半，分开是为了自证不碰库目录
 gate-similar: lib_function_units.py 它切单元、收闭包、算闭包键；这里只调它，加上广谱变异自己的那几样（容器、相对位置、测试键、覆盖者键、清单的单元键、依赖行）
@@ -92,12 +112,6 @@ VERDICT_KEY_FORM = "broad-mutation-verdict-v1"
 LIST_KEY_FORM = "broad-mutation-list-v1"
 NEXTEST_FILTER_CHUNK_BYTES = 32768
 SINGLE_ARGUMENT_LIMIT = 131072
-MINIMUM_CPU_MULTIPLIER = 2.0
-DEFAULT_CPU_MULTIPLIER = 3.0       # 盖住 SMT 2.0 倍 × 12 线程散到 1.26 倍（第三轮攻方 c4-cpu-time.txt）
-DEFAULT_CPU_FLOOR_SECONDS = 30.0
-DEFAULT_WALL_MULTIPLIER = 10.0
-DEFAULT_WALL_FLOOR_SECONDS = 300.0
-ESCALATED_LABELS = ("caught-by-timeout", "caught-by-memory")
 SPAWN_PATTERNS = re.compile(r"\bcurrent_exe\b|CARGO_BIN_EXE_|\bCommand::new\b|process::Command\b")
 # 构建环境里取生效值的环境变量（名字逐个、前缀一族）：编译器、rustdoc 的标志，cargo 的 build / profile / target 配置，换编译器的那几个
 BUILD_VARIABLES = ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS", "RUSTC", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER",
@@ -780,7 +794,8 @@ def unit_attributes(tree, unit):
 
 
 def test_entries(tree, packages, exclusions=()):
-    """静态列出这几个包里的测试：[{binary, test, unit, target, ignored}]（排除表里的不算）。名字照 nextest：<二进制 id> <模块路径::fn 名>。"""
+    """静态列出这几个包里的测试：[{binary, test, unit, target, skipped_by_attribute}]（排除单里的不算；skipped_by_attribute 是标了 #[ignore]、cargo 不跑的）。
+    名字照 nextest：<二进制 id> <模块路径::fn 名>。"""
     excluded = {(binary, test) for binary, test, *_rest in exclusions}
     found = []
     for target in tree.workspace.targets.values():
@@ -797,7 +812,7 @@ def test_entries(tree, packages, exclusions=()):
                 name = "::".join(list(module_path) + [unit.name])
                 if (binary, name) in excluded:
                     continue
-                found.append({"binary": binary, "test": name, "unit": unit, "target": target.id, "ignored": "ignore" in attributes})
+                found.append({"binary": binary, "test": name, "unit": unit, "target": target.id, "skipped_by_attribute": "ignore" in attributes})
     return found
 
 
@@ -809,7 +824,7 @@ def doctest_entries(tree, packages):
             continue
         for unit in rust_file.units:
             if unit.kind == "doctest":
-                found.append({"binary": f"{crate.package}::doctest", "test": f"{path} - {unit.name}", "unit": unit, "target": None, "ignored": False})
+                found.append({"binary": f"{crate.package}::doctest", "test": f"{path} - {unit.name}", "unit": unit, "target": None})
     return found
 
 
@@ -876,7 +891,7 @@ def test_key(tree, unit, target_id, global_lines):
 def catching_test_key(tree, caught_by, global_lines, exclusions=()):
     """抓到它的测试此刻的测试键：→ (键或 None, 为什么)。在排除表里（不再跑）的交 None。"""
     binary, _space, test = caught_by.partition(" ")
-    if (binary, test) in {(entry[0], entry[1]) for entry in exclusions} and not broken("catching-test-exclusion-ignored"):
+    if (binary, test) in {(entry[0], entry[1]) for entry in exclusions} and not broken("catching-test-exclusion-dropped"):
         return None, "catching-test-excluded"
     unit, target_id, why = resolve_test(tree, caught_by)
     if unit is None:
@@ -919,16 +934,6 @@ def carry_decision(record, current, test_key_now="", test_reason="", coverers_no
         return False, "refused:" + ",".join(current["refused"])
     outcome = record.get("outcome")
     if outcome == "caught":
-        if record.get("caught_by") in ESCALATED_LABELS:
-            if broken("escalated-not-carried"):
-                return False, "escalated-rejudged"
-            if broken("escalated-coverers-ignored"):
-                return True, "carried"
-            if not coverers_now:
-                return False, coverers_reason or "coverers-unknown"
-            if record.get("coverage_key") != coverers_now:
-                return False, "coverers-changed"
-            return True, "carried"
         if not test_key_now:
             return False, test_reason or "catching-test-unknown"
         if record.get("test_key") != test_key_now:
@@ -937,7 +942,7 @@ def carry_decision(record, current, test_key_now="", test_reason="", coverers_no
     if outcome == "missed":
         if broken("missed-always-rejudged"):
             return False, "missed-rejudged"
-        if broken("missed-coverers-ignored"):
+        if broken("missed-coverers-unchecked"):
             return True, "carried"
         if not coverers_now:
             return False, coverers_reason or "coverers-unknown"
@@ -955,15 +960,18 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def program_digest(program, directory):
-    """指一个程序的值（RUSTC_WRAPPER 这一类）：那个程序的内容 sha256；找不到写「不在」。"""
+def program_digest(program, directory, environment=None, working_directory=None):
+    """程序内容的 sha256；找不到写「不在」。带斜杠的相对路径从 directory 起算；
+    裸名字从 PATH 找，相对 PATH 项从 working_directory（不给则 directory）起算。"""
     if not program:
         return "-"
-    candidate = program if os.path.isabs(program) else os.path.join(directory, program)
-    if not os.path.isfile(candidate):
-        for place in os.environ.get("PATH", "").split(os.pathsep):
-            if os.path.isfile(os.path.join(place, program)):
-                candidate = os.path.join(place, program)
+    environment = os.environ if environment is None else environment
+    candidate = os.path.join(directory, program) if os.path.dirname(program) else ""
+    if not os.path.dirname(program):
+        for place in environment.get("PATH", os.defpath).split(os.pathsep):
+            path = os.path.join(working_directory if working_directory is not None else directory, place, program)
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                candidate = path
                 break
     if not os.path.isfile(candidate):
         return "不在"
@@ -973,22 +981,7 @@ def program_digest(program, directory):
 
 def cargo_config_files(root, environment):
     """cargo 会读的配置：从树往上每一层的 .cargo/config(.toml)，再加 CARGO_HOME 下的；近的在前。"""
-    found, directory = [], os.path.abspath(root)
-    while True:
-        for name in ("config.toml", "config"):
-            path = os.path.join(directory, ".cargo", name)
-            if os.path.isfile(path):
-                found.append(path)
-        parent = os.path.dirname(directory)
-        if parent == directory:
-            break
-        directory = parent
-    home = environment.get("CARGO_HOME") or os.path.join(environment.get("HOME", os.path.expanduser("~")), ".cargo")
-    for name in ("config.toml", "config"):
-        path = os.path.join(home, name)
-        if os.path.isfile(path) and path not in found:
-            found.append(path)
-    return found
+    return mutation_units_library().cargo_configuration_files(root, environment)
 
 
 def toolchain_files(root):
@@ -1013,7 +1006,8 @@ def build_environment_lines(root, environment):
         if name in BUILD_VARIABLES or name.startswith(BUILD_VARIABLE_PREFIXES):
             lines.append(f"variable {name}={environment[name]}")
             if name in PROGRAM_VARIABLES or name.endswith(("_RUNNER", "_LINKER")):
-                lines.append(f"program {name} {program_digest(environment[name].split(' ', 1)[0], root)}")
+                program = environment[name].split(' ', 1)[0] if name.endswith("_RUNNER") else environment[name]
+                lines.append(f"program {name} {program_digest(program, root, environment)}")
     for depth, path in enumerate(cargo_config_files(root, environment)):
         try:
             with open(path, "rb") as handle:
@@ -1025,7 +1019,7 @@ def build_environment_lines(root, environment):
         for table, field in CARGO_CONFIG_PROGRAMS:
             value = parsed.get(table, {}).get(field)
             if isinstance(value, str):
-                lines.append(f"program {table}.{field} {program_digest(value, os.path.dirname(os.path.dirname(path)))}")
+                lines.append(f"program {table}.{field} {program_digest(value, os.path.dirname(os.path.dirname(path)), environment, root)}")
     for depth, path in enumerate(toolchain_files(root)):
         with open(path, "rb") as handle:
             content = handle.read()
@@ -1042,7 +1036,7 @@ def build_environment_lines(root, environment):
             parsed = tomllib.loads(content.decode("utf-8", "replace"))
         except tomllib.TOMLDecodeError as error:
             raise ValueError(f"读不出 {manifest}：{error}") from error
-        if not broken("profile-ignored"):
+        if not broken("profile-dropped"):
             lines.append(f"profile {canonical(parsed.get('profile', {}))}")
         if broken("manifest-text-in-global-key"):
             lines.append(f"manifest {hashlib.sha256(content).hexdigest()}")
@@ -1252,129 +1246,10 @@ def nextest_filters(tests):
     return chunks
 
 
-# ── 限时（C4） ─────────────────────────────────────────────────────────────────────────────────────────────
-
-def check_cpu_multiplier(multiplier):
-    """倍数要盖住 SMT 兄弟被占的 2.0 倍；交 None 或一句拒绝。"""
-    if multiplier < MINIMUM_CPU_MULTIPLIER and not broken("limit-below-smt"):
-        return f"CPU 限时倍数 {multiplier} 小于 {MINIMUM_CPU_MULTIPLIER}：盖不住 SMT 兄弟核被占时 CPU 时间涨的 2.0 倍（第三轮攻方 c4-cpu-time.txt 第 9 行）"
-    return None
-
-
-def limits_table(times, cpu_multiplier, cpu_floor, wall_multiplier, wall_floor):
-    """基线逐条的 (CPU 秒, 墙钟秒) → {(二进制文件名去掉哈希, 用例): (CPU 上限, 墙钟上限)}，另加 ("*", "*") 取全表最大，认不出的用例用它。"""
-    table = {}
-    for key, (cpu, wall) in times.items():
-        table[key] = (cpu_multiplier * cpu + cpu_floor, wall_multiplier * wall + wall_floor)
-    if table:
-        table[("*", "*")] = (max(value[0] for value in table.values()), max(value[1] for value in table.values()))
-    else:
-        table[("*", "*")] = (cpu_floor, wall_floor)
-    return table
-
-
-RUNNER_SCRIPT = r'''#!/usr/bin/env python3
-# 广谱变异驱动写的测试 runner（CARGO_TARGET_<三元组>_RUNNER，nextest 与 cargo test 都经它起测试二进制）。
-# BROAD_MUTATION_RUNNER_MODE：空或 --list 照原样 exec；measure 记这一条（或这个二进制）的 CPU 与墙钟秒；limit 按表设 CPU 上限（RLIMIT_CPU）、墙钟兜底。
-import os, re, resource, signal, sys, time
-arguments = sys.argv[1:]
-mode = os.environ.get("BROAD_MUTATION_RUNNER_MODE", "")
-if not arguments:
-    sys.exit(2)
-if mode not in ("measure", "limit") or "--list" in arguments[1:]:
-    os.execv(arguments[0], arguments)
-breaks = os.environ.get("BROAD_MUTATION_BREAK", "").split(",")
-stem = re.sub(r"-[0-9a-f]{16}$", "", os.path.basename(arguments[0]))
-test = arguments[arguments.index("--exact") + 1] if "--exact" in arguments[1:-1] else "*"
-cpu_limit = wall_limit = None
-if mode == "limit":
-    limits = {}
-    with open(os.environ["BROAD_MUTATION_RUNNER_LIMITS"], encoding="utf-8") as handle:
-        for line in handle:
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) == 4:
-                limits[(fields[0], fields[1])] = (float(fields[2]), float(fields[3]))
-    cpu_limit, wall_limit = limits.get((stem, test)) or limits.get((stem, "*")) or limits[("*", "*")]
-    if "cpu-limit-ignored" in breaks:
-        cpu_limit = None
-resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-started = time.monotonic()
-child = os.fork()
-if child == 0:
-    try:
-        os.setpgid(0, 0)
-        if cpu_limit is not None:
-            soft = max(1, int(cpu_limit + 0.999))
-            resource.setrlimit(resource.RLIMIT_CPU, (soft, soft + 5))
-        os.execv(arguments[0], arguments)
-    finally:
-        os._exit(127)
-wall_hit = []
-def forward(signal_number, _frame):
-    try:
-        os.killpg(child, signal_number)
-    except OSError:
-        pass
-def wall_expired(_signal_number, _frame):
-    wall_hit.append(True)
-    try:
-        os.killpg(child, signal.SIGKILL)
-    except OSError:
-        pass
-for name in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-    signal.signal(name, forward)
-if wall_limit is not None:
-    signal.signal(signal.SIGALRM, wall_expired)
-    signal.setitimer(signal.ITIMER_REAL, wall_limit)
-_pid, status, usage = os.wait4(child, 0)
-signal.setitimer(signal.ITIMER_REAL, 0)
-cpu, wall = usage.ru_utime + usage.ru_stime, time.monotonic() - started
-if mode == "measure":
-    line = f"{stem}\t{test}\t{cpu:.3f}\t{wall:.3f}\t{status}\n".encode()
-    descriptor = os.open(os.environ["BROAD_MUTATION_RUNNER_TIMES"], os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
-    os.write(descriptor, line)
-    os.close(descriptor)
-if wall_hit:
-    print(f"BROAD_MUTATION_LIMIT kind=wall test={stem} {test} wall_seconds={wall:.1f} limit={wall_limit:.1f} cpu_seconds={cpu:.1f}", file=sys.stderr, flush=True)
-    sys.exit(124)
-if os.WIFSIGNALED(status):
-    number = os.WTERMSIG(status)
-    if number == signal.SIGXCPU or (cpu_limit is not None and number == signal.SIGKILL and cpu >= cpu_limit):
-        print(f"BROAD_MUTATION_LIMIT kind=cpu test={stem} {test} cpu_seconds={cpu:.1f} limit={cpu_limit:.1f}", file=sys.stderr, flush=True)
-    signal.signal(number, signal.SIG_DFL)
-    os.kill(os.getpid(), number)
-    sys.exit(128 + number)
-sys.exit(os.WEXITSTATUS(status))
-'''
-
-
-def read_times(path):
-    """runner 在 measure 模式写的表 → {(文件名, 用例): (CPU 秒, 墙钟秒)}；同一个键取最大。"""
-    times = {}
-    if not os.path.exists(path):
-        return times
-    with open(path, encoding="utf-8") as handle:
-        for line in handle:
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) >= 4:
-                key = (fields[0], fields[1])
-                cpu, wall = float(fields[2]), float(fields[3])
-                old = times.get(key, (0.0, 0.0))
-                times[key] = (max(old[0], cpu), max(old[1], wall))
-    return times
-
-
-def write_limits(path, table):
-    with open(path + ".partial", "w", encoding="utf-8") as handle:
-        for (stem, test), (cpu, wall) in sorted(table.items()):
-            handle.write(f"{stem}\t{test}\t{cpu:.1f}\t{wall:.1f}\n")
-    os.replace(path + ".partial", path)
-
-
 # ── 自证：样本树上逐个判沿用的决定 ───────────────────────────────────────────────────────────────────────────
 # 每个样本：(名字, 期望, 守它的弄坏开关, 第一版的文件, 第二版换掉的文件, 变异 (文件, 原文, 替换文, 第几处), 判定库里那一行的结局, 别的选项)。
 # 期望 rejudge：沿用不了，必须现判（开关打开时那一格判成 carry、红）；期望 carry：键与沿用判据都对得上，照沿用（开关打开时判成 rejudge、红）。
-# 选项：record 第一版判的是哪一条（默认同一条）、label 抓到的是升档判的（标签）、exclusions 第二版的排除表多出的行。
+# 选项：record 第一版判的是哪一条（默认同一条）、exclusions 第二版的排除表多出的行。
 # 样本树：工作区两个包，mcore（被变异，lib.rs 由各模块文件现生成 pub mod）与 mharness（tests/t.rs 里的 catches 是抓到它的那条测试）。
 SAMPLE_TEST = "mharness::t catches"
 SAMPLE_WORKSPACE = {
@@ -1469,7 +1344,7 @@ SAMPLES = [
      {"crates/mcore/src/nested.rs": NESTED, T: test_calling("mcore::nested::outer(1)", 4)},
      {"crates/mcore/src/nested.rs": NESTED.replace("inner(value) * 2", "(value + 1) * 2")}, ("crates/mcore/src/nested.rs", "+", "-", 0), "unviable", {}),
     # 全局那几行：profile 的生效值进键、Cargo.toml 的注释不进、排除表不进
-    ("Y7", "rejudge", "profile-ignored",
+    ("Y7", "rejudge", "profile-dropped",
      {"Cargo.toml": SAMPLE_WORKSPACE["Cargo.toml"] + "\n[profile.dev]\noverflow-checks = true\n", "crates/mcore/src/y7.rs": "pub fn y7(n: u8) -> u8 {\n    n + 200\n}\n",
       T: test_calling("mcore::y7::y7(1)", 201)},
      {"Cargo.toml": SAMPLE_WORKSPACE["Cargo.toml"] + "\n[profile.dev]\noverflow-checks = false\n"}, ("crates/mcore/src/y7.rs", "+", "*", 0), "caught", {}),
@@ -1479,26 +1354,19 @@ SAMPLES = [
     ("EXCLUDE-OTHER", "carry", "exclusions-in-global-key",
      {"crates/mcore/src/check.rs": CHECK, T: test_calling("mcore::check::check(1)", 2)},
      {}, ("crates/mcore/src/check.rs", "+", "-", 0), "caught", {"exclusions": [("mharness::t", "some_other_case", "自证：排除表加了一条别的测试")]}),
-    ("EXCLUDE-CATCHER", "rejudge", "catching-test-exclusion-ignored",
+    ("EXCLUDE-CATCHER", "rejudge", "catching-test-exclusion-dropped",
      {"crates/mcore/src/check.rs": CHECK, T: test_calling("mcore::check::check(1)", 2)},
      {}, ("crates/mcore/src/check.rs", "+", "-", 0), "caught", {"exclusions": [("mharness::t", "catches", "自证：抓到它的那条测试进了排除表")]}),
-    # 无效、没红、升档判的抓到都进可沿用库
+    # 无效、没红都进可沿用库
     ("UNVIABLE", "carry", "unviable-rejudged", Y9, {"crates/mcore/src/zother.rs": "pub fn other() -> u64 {\n    3\n}\n"},
      ("crates/mcore/src/y9.rs", "W(1)", "Default::default()", 0), "unviable", {}),
-    ("N1", "rejudge", "missed-coverers-ignored",
+    ("N1", "rejudge", "missed-coverers-unchecked",
      {"crates/mcore/src/n1.rs": RARELY, "crates/mcore/src/check.rs": CHECK, T: test_calling("mcore::check::check(1)", 2)},
      {"crates/mharness/tests/n1.rs": "use mcore::n1::rarely;\n#[test]\nfn now_covered() {\n    assert_eq!(rarely(1), 8);\n}\n"},
      ("crates/mcore/src/n1.rs", "+", "-", 0), "missed", {}),
     ("MISSED", "carry", "missed-always-rejudged",
      {"crates/mcore/src/n1.rs": RARELY, "crates/mcore/src/check.rs": CHECK, T: test_calling("mcore::check::check(1)", 2)},
      {T: test_calling("mcore::check::check(2)", 3)}, ("crates/mcore/src/n1.rs", "+", "-", 0), "missed", {}),
-    ("ESCALATED", "carry", "escalated-not-carried",
-     {"crates/mcore/src/check.rs": CHECK, T: test_calling("mcore::check::check(1)", 2)},
-     {"crates/mcore/src/zother.rs": "pub fn other() -> u64 {\n    3\n}\n"}, ("crates/mcore/src/check.rs", "+", "-", 0), "caught", {"label": ESCALATED_LABELS[0]}),
-    ("ESCALATED-COVERERS", "rejudge", "escalated-coverers-ignored",
-     {"crates/mcore/src/check.rs": CHECK, T: test_calling("mcore::check::check(1)", 2)},
-     {"crates/mharness/tests/escalated.rs": "use mcore::check::check;\n#[test]\nfn now_also_covers() {\n    assert_eq!(check(4), 5);\n}\n"},
-     ("crates/mcore/src/check.rs", "+", "-", 0), "caught", {"label": ESCALATED_LABELS[0]}),
     # 同文件里别的函数改了不作废；同一个函数里两处同样的替换、两个 impl 里一样的方法各是各的；注释不改相对位置
     ("FA", "carry", "defining-file-in-key",
      {"crates/mcore/src/slots.rs": 'pub fn slot_of(offset: u64) -> u64 {\n    offset / 4096\n}\n\npub fn describe(offset: u64) -> String {\n    format!("slot-{}", slot_of(offset))\n}\n',
@@ -1582,11 +1450,11 @@ def sample_decision(work, sample):
     recorded = mutation_key(trees[0], item_for(files_one, options.get("record", mutation)), globals_one)
     test_one, _why = catching_test_key(trees[0], SAMPLE_TEST, globals_one)
     coverers_one = coverers_key(trees[0], recorded["unit"], test_entries(trees[0], packages), globals_one)[0] if recorded["unit"] else ""
-    record = {"key": recorded["key"], "outcome": outcome, "caught_by": options.get("label", SAMPLE_TEST) if outcome == "caught" else "",
-              "test_key": test_one if outcome == "caught" else "", "coverage_key": coverers_one if outcome == "missed" or options.get("label") else ""}
+    record = {"key": recorded["key"], "outcome": outcome, "caught_by": SAMPLE_TEST if outcome == "caught" else "",
+              "test_key": test_one if outcome == "caught" else "", "coverage_key": coverers_one if outcome == "missed" else ""}
     current = mutation_key(trees[1], item_for(files_two, mutation), globals_two)
     # 样本本身要算得出键：两版的变异键、第一版抓到它那条测试的测试键都不许是 None（不然「现判」可能只是算不出，不是判出来的）
-    if recorded["key"] is None or current["key"] is None or (outcome == "caught" and not options.get("label") and not test_one):
+    if recorded["key"] is None or current["key"] is None or (outcome == "caught" and not test_one):
         return "error", f"样本算不出键（第一版 {recorded['key'] and recorded['key'][:12]} {recorded['refused']}，第二版 {current['key'] and current['key'][:12]} {current['refused']}，测试键 {test_one}）"
     test_two, test_why = catching_test_key(trees[1], SAMPLE_TEST, globals_two, exclusions_two)
     coverers_two, _count, coverers_why = (coverers_key(trees[1], current["unit"], test_entries(trees[1], packages, exclusions_two), globals_two)
@@ -1706,20 +1574,13 @@ def run_selftest():
               f"覆盖文件名没归一或行列没对上（得 {covered}，指纹 {len(fingerprints)} 个）",
               "看 normalise_coverage_path（相对路径按树根拼、绝对路径截到 /crates/）、UnitTree.offset_of_byte_column（llvm-cov 的列按字节）与 covered_units")
         # 挑测试的 -E 按块切：第三轮正推量的全名 133 410 字节
-        names = [("singlefs-harness::random_histories", f"module_{index:04d}::a_rather_long_test_name_that_pads_the_filter_out") for index in range(1500)]
+        names = [("singlefs-verification::random_histories", f"module_{index:04d}::a_rather_long_test_name_that_pads_the_filter_out") for index in range(1500)]
         chunks = nextest_filters(names)
         total = sum(len(chunk.encode()) for chunk in chunks)
         check(total > SINGLE_ARGUMENT_LIMIT and all(len(chunk.encode()) <= NEXTEST_FILTER_CHUNK_BYTES for chunk in chunks)
               and sum(chunk.count("test(=") for chunk in chunks) == len(names),
               f"挑测试的 -E 没按块切（{len(chunks)} 块，最长 {max(len(chunk.encode()) for chunk in chunks)} 字节，合计 {total}）",
               f"看 nextest_filters：单个参数不许超过 {SINGLE_ARGUMENT_LIMIT} 字节（MAX_ARG_STRLEN），每块不超过 NEXTEST_FILTER_CHUNK_BYTES")
-        # C4：倍数盖住 SMT 2.0 倍
-        table = limits_table({("bin", "t"): (10.0, 12.0)}, 3.0, 30.0, 10.0, 300.0)
-        check(check_cpu_multiplier(1.5) is not None and check_cpu_multiplier(DEFAULT_CPU_MULTIPLIER) is None and table[("bin", "t")] == (60.0, 420.0)
-              and table[("*", "*")] == (60.0, 420.0),
-              f"CPU 限时的倍数或上限算错（1.5 倍{'没' if check_cpu_multiplier(1.5) is None else ''}拒；表 {table}）",
-              "看 check_cpu_multiplier 与 limits_table：上限 = 倍数 × 基线 CPU 秒 + 下限，倍数不小于 2.0")
-        selftest_runner(work, check)
         selftest_break_guard(work, check)
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -1728,46 +1589,8 @@ def run_selftest():
         print(f"     → 怎么办：照上面每一格的出路改，再跑 python3 {os.path.join(SCRIPT_DIRECTORY, 'mutation-prune.py')} --selftest", file=sys.stderr)
         return 1
     print(f"  ✓ mutation-prune.py --selftest：{len(SAMPLES)} 个样本的沿用决定（S34、T16、N37、N45、T17、INDEX 在内）、清单按单元存、覆盖者键跳过默认 cfg 下不编的测试、X1b / X3 / K1 跑全部、"
-          f"覆盖文件名归一、-E 按块切、CPU 限时倍数、runner 量时与限时，{cells[0]} 格都对")
+          f"覆盖文件名归一、-E 按块切，{cells[0]} 格都对")
     return 0
-
-
-def selftest_runner(work, check):
-    """runner：measure 记 CPU 秒；limit 下吃 CPU 的被 CPU 上限停、只睡的被墙钟兜底停；--list 照原样 exec。起的是假测试程序（python），不起 cargo。
-    假测试程序按 CPU 秒忙等（time.process_time()，short 0.3 秒、burn 2.5 秒），不按墙钟：机器负载高时按墙钟等拿不到那么多 CPU，
-    量到的 CPU 秒掉到下限 0.15 以下、burn 也碰不到 1 秒的 CPU 上限，这两格跟开关无关地红（2026-10-01 负载 46 时实测 0.105 CPU 秒）。"""
-    import subprocess
-    runner = os.path.join(work, "runner.py")
-    fake = os.path.join(work, "fake-test-0123456789abcdef")
-    with open(runner, "w") as handle:
-        handle.write(RUNNER_SCRIPT)
-    with open(fake, "w") as handle:
-        handle.write("#!/usr/bin/env python3\nimport sys, time\nif '--list' in sys.argv:\n    print('burn: test')\n    sys.exit(0)\n"
-                     "name = sys.argv[sys.argv.index('--exact') + 1]\ncpu_budget = 2.5 if name == 'burn' else 0.3\n"
-                     "if name == 'sleep':\n    time.sleep(5)\nwhile time.process_time() < cpu_budget:\n    pass\n")
-    os.chmod(runner, 0o755)
-    os.chmod(fake, 0o755)
-    times, limits = os.path.join(work, "times.tsv"), os.path.join(work, "limits.tsv")
-    base = {key: value for key, value in os.environ.items() if not key.startswith("BROAD_MUTATION_RUNNER")}
-    base["BROAD_MUTATION_BREAK"] = ",".join(sorted(BREAKS))
-
-    def run(mode, test, extra=None):
-        environment = dict(base, BROAD_MUTATION_RUNNER_MODE=mode, BROAD_MUTATION_RUNNER_TIMES=times, BROAD_MUTATION_RUNNER_LIMITS=limits, **(extra or {}))
-        return subprocess.run([sys.executable, runner, fake, "--exact", test, "--nocapture"], capture_output=True, text=True, env=environment, timeout=60)
-    measured = run("measure", "short")
-    recorded = read_times(times)
-    check(measured.returncode == 0 and 0.15 < recorded.get(("fake-test", "short"), (0, 0))[0] < 2.0,
-          f"runner 的 measure 没记下 CPU 秒（退 {measured.returncode}，记的 {recorded}）：{measured.stderr}",
-          "看 RUNNER_SCRIPT：wait4 取子进程的用户加系统时间，二进制名去掉 -<16 位哈希>")
-    write_limits(limits, {("fake-test", "burn"): (1.0, 30.0), ("fake-test", "sleep"): (30.0, 1.0), ("*", "*"): (30.0, 30.0)})
-    burned = run("limit", "burn")
-    slept = run("limit", "sleep")
-    listed = subprocess.run([sys.executable, runner, fake, "--list"], capture_output=True, text=True, timeout=60,
-                            env=dict(base, BROAD_MUTATION_RUNNER_MODE="limit", BROAD_MUTATION_RUNNER_LIMITS=limits))
-    check(burned.returncode != 0 and "kind=cpu" in burned.stderr and slept.returncode == 124 and "kind=wall" in slept.stderr
-          and listed.returncode == 0 and "burn: test" in listed.stdout,
-          f"runner 的限时不对（吃 CPU 的退 {burned.returncode}：{burned.stderr.strip()[-200:]}；只睡的退 {slept.returncode}：{slept.stderr.strip()[-200:]}；--list 退 {listed.returncode}）",
-          "看 RUNNER_SCRIPT：limit 模式给子进程设 RLIMIT_CPU（SIGXCPU 停了报 kind=cpu），墙钟到点停整个进程组报 kind=wall、退 124；--list 不限时")
 
 
 def selftest_break_guard(work, check):

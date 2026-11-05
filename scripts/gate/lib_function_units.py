@@ -13,7 +13,8 @@
 输出（一行一项、制表符分隔、次序确定；Rust 与 WGSL 的单元行与 crates/singlefs-unit-graph 的 unit-graph 逐字相同）：
   单元行   <种类>\t<限定名>\t<文件>:<起>-<止>\t<指纹>（Unit.dump_text；Unit.text 是进 UnitKey 组成清单与各判法按（种类, 限定名, 文件）认单元的那一行，
            限定名是文件里的嵌套路径、不带前缀）
-  数据行   data\t<数据文件>\t<读它的文件>:<行>-<行>\t<字节 sha256>（dump 里每一处读一行，与 unit-graph 的 dump 同一种写法）
+  数据行   data\t<数据文件>\t<读它的文件>:<行>-<行>\t<字节 sha256>（dump 里每一处读一行，与 unit-graph 的 dump 同一种写法）；
+           读的是目录的写 data-directory\t<目录>\t<读它的文件>:<行>-<行>\t<目录指纹>（下面「数据目录」）
   键行     key\t<sha256>
   拒算行   refused\t<形态>\t<文件>:<行>\t<原样片段>
   Rust、WGSL 与数据行按（文件，起行，止行，整行）排（与 unit-graph 的 dump 同一种次序），python 与 shell 的单元行按（文件，起行，种类，限定名）排，
@@ -24,18 +25,23 @@
   Rust   种类名照 crates/singlefs-unit-graph（src/units.rs 的 output_name）：fn（自由 fn 与 impl / trait 里的方法）、impl（impl 头：属性起、到 { 之前）、
          trait（trait 头）、const、static、struct、enum、union、type、macro_rules（macro_rules! 整个定义）、use、item_macro（条目级宏调用）、mod（mod x;）、
          mod_head（模块头：行内模块从外属性起、到 { 与紧跟的内属性 #![…]；文件开头的内属性 #![…] 另一个，限定名 <module attributes>；模块里的单元都连它）、
-         extern_block、extern_crate、broadcast_group（verus! 里的 broadcast group）、doctest（文档注释里的代码块）；
-         闭包里的数据单元 data-file（include_str! / include_bytes! 与运行期拼得出字面路径读的文件：限定名是那份文件相对根的路径，起止 1-<行数>，指纹是字节 sha256），
-         dump 照 unit-graph 按读它的那一处列（上面「数据行」）。
+         extern_block、extern_crate、broadcast_group（verus! 里的 broadcast group）、assume_specification（verus! 里的 assume_specification[ 路径 ] …;
+         整条连属性一个单元，按方括号里路径末段的名字找得到它、不按它自己的名字；产品行为视图里剥掉）、doctest（文档注释里的代码块）；
+         闭包里的数据单元 data-file（include_str! / include_bytes! 与运行期拼得出字面路径读的文件：限定名是那份文件相对根的路径，起止 1-<行数>，指纹是字节 sha256）、
+         data-directory（清单目录折出的 crates/ 之下一个目录，下面「数据目录」：限定名是目录相对根的路径，起止 1-<文件数>，指纹见 directory_fingerprint），
+         dump 与命令行 closure、key 照 unit-graph 按读它的那一处列（上面「数据行」：data-directory\t<目录>\t<读它的文件>:<行>-<行>\t<指纹>，closure_unit_lines）。
+         弄坏开关 closure-directory-lines-span-files：closure、key 把数据目录打成它自己那一行（<目录>:1-<文件数>，改前的样子）；
+         自证「命令行 closure：数据目录单元按读它的那一处列…」那一格必须判错。
          文件里的嵌套路径（Unit.name，入口 <文件>::<限定名> 照它找）用 :: 连：内联 mod 写名字；impl 写 <impl 词法单元…>（impl 关键字之后、去掉紧跟它的泛型参数表与 where 子句，
          逐个词法单元用一个空格连，相邻两个 : 连成 :: 且两边不留空格，例 <impl std::ops::Add for Money>、<impl Wrapper < T >>）；trait 头写名字，它的成员挂在 <trait 名> 下；use 写 use@<起行>
          （verus! 里的 broadcast use 写 broadcast-use@<broadcast 那一行>）；条目级宏调用写 <宏名>!@<宏名那一行>；extern 块写 extern@<起行>；
+         assume_specification 写 assume_specification@<关键字那一行>；
          文档测试写 <所挂条目的嵌套路径>::<doctest line 代码块起行>，挂模块的写 <模块路径>::<doctest line 行>（文件开头的就是 <doctest line 行>）。
          输出行里的限定名（Unit.full）照 unit-graph 带前缀：<crate 名>::<目标标记>::<模块路径>::<嵌套路径>——目标标记取这份文件所属的头一个目标
          （crate 里 lib、bin、test、example、bench、build 的次序，同种按名字与根文件排；lib 不写，bin 写 <bin 名>，构建脚本写 <build>），模块路径是它在那个目标的
-         模块树里经 mod 声明连进来的那一截；哪个目标都不属于的写 <unlinked 文件>。例 singlefs_checker_tier::<bin e158_root_choice_repair>::main。
+         模块树里经 mod 声明连进来的那一截；哪个目标都不属于的写 <unlinked 文件>。例 singlefs_verification::<bin e158_root_choice_repair>::main。
          verus! { … } 与 thread_local! { … } 展开成里面的条目再切；verus! 里一个条目从它起头到下一个同层条目起头之前（括号配平，
-         同层条目起头 = ; 或 } 之后接属性、条目关键字或宏调用）。
+         同层条目起头 = ; 或 } 之后接属性、条目关键字、宏调用或后面接 [ / < 的 assume_specification；; 本身不是起头，} 之后紧跟的 ; 归前一个条目）。
          指纹 = 单元的词法单元原文用 0x1f 连起来的 sha256。词法：去掉 // 与可嵌套的 /* */，文档注释 /// //! /** */ /*! */ 也去掉；
          串、原始串、字节串、C 串、字符、生命周期、数字（带指数与后缀）各一个词法单元，标识符一个，其余标点一个字符一个。
          单元从它的第一个外属性起（文档注释不算）、到条目末尾（含收尾的 ;）。
@@ -52,12 +58,13 @@
          是闭包里某个串字面量的一个词或某个单元定义、点名的名字；没有着落的拒算 wgsl-undefined-name。
          着落做成边：Rust 入口的闭包里还没有着落的外名，把链接集里、闭包外供它的单元（按名字定义了它或以 _ 加它收尾的常量、静态量、条目级宏调用，
          不是这一种的、串字面量里有它这个词的单元）连同它们的闭包并进来，再收再核，到不再有新单元为止（每个只试一次）；
+         带 #[test] 的 fn 与 #[cfg(test)] 模块里的单元不当名字供给者收（测试函数没人调，它的串到不了拼内核的函数；入口本身不在此列，早就在闭包里）；
          外名在链接集里别的单元 include_str! / include_bytes! 读进来、还不在模块里的一份 .wgsl 的顶层条目里有定义时，同样补一条着落边：
          读它的那个 Rust 单元连同它的闭包并进来，那份 .wgsl 进模块、名字在合起来的名字空间里解；拉不进的才拒算 wgsl-undefined-name。
          WGSL 入口（--rust-strings-entry 给 Rust 入口）的闭包带上给名字着落的 Rust 单元连同它的闭包。
   Python def（模块级 def / async def，类里的方法写 <类>.<方法>）、class（类头：装饰器、基类、类体里不是 def 的语句）、assign（模块级赋值，
          按目标名各一单元）、import（模块级 import，按绑定的名字各一单元）、module-body（其余模块级语句，限定名 <module-body>，每份文件一个，
-         没有语句也有）、main-guard（if __name__ == "__main__": 那一段，限定名 <main-guard>）、def-head（带装饰器或缺省值的模块级 def 与模块级类里的方法
+         没有语句也有）、main-guard（if __name__ == "__main__": 那一段，限定名 <main-guard>；认法与几段合一见下面「Python 闭包」）、def-head（带装饰器或缺省值的模块级 def 与模块级类里的方法
          另切的 def 头：只收装饰器与缺省值那几个表达式，限定名 <def 的限定名>.<head>，不进按名字的解析，下面「import 时执行的模块级语句」）；
          指纹 = ast.dump(节点, include_attributes=False)
          的 sha256，节点里各层 def / class 的文档串先去掉。数据单元 docstring（被读 __doc__ 的文档串，限定名 <所属>.__doc__，模块的写 <module>.__doc__）、
@@ -71,18 +78,36 @@ Python 闭包：import 时执行的模块级语句（research/prompts/m3-close-r
   一个模块有单元进闭包（ScriptClosure.module_entered），它就被载入过：它的模块级 import、assign、类头本身与 def-head 一起进闭包（规则名 import-time）；
   类头走 import-time-class：不算被点名、不连方法，之后被别的规则点到再照被点名的类连方法。其余模块级语句在 module-body 里，本来就连。
   内联 python（here-doc、-c）照样：这几样穿过去连边，自己不进闭包。不收的：只带注解、没装饰器也没缺省值的 def 头（注解在 import 时也求值）；main-guard 不在 import 时执行。
+  main-guard 认两种写法（is_main_guard）：if __name__ == "__main__":，与不带 else 的 if __name__ == "__main__" and <别的条件>:（and 从左往右短路，import 时
+  后面的条件与块都不执行；scripts/hosts/memory_peaks_lib.py 那一种）；and 写法里 __name__ 那一项不在最左、带 else 的认不出，留在 module-body，import 时照收。
+  头一种带 else（或 elif）的：if 那一支是 main-guard，else 那一支在 import 时执行，照别的模块级语句进 module-body。
+  被 import、被 spec_from_file_location 载入的模块只连 module-body，不连 main-guard（欠账 C947：不然被 import 的模块的自证分支连进判法闭包）；
+  这份文件被当程序起（子进程边、runpy.run_path、内联脚本、只写 <文件> 的入口）时连 main-guard，块里按 sys.argv 分派的分支不剪。
+  一份文件里几段 main-guard 合成一个单元（被当程序起时每一段都执行）：节点是那几段，起行取头一段、止行取末一段，只有一段时指纹照旧取那一段。
 不走的子进程边（EXCLUDED_PROGRAM_EDGES；同一份判决末节第 3、5 条）：登记了的（起它的文件, 起它的单元的限定名, 被起的程序）那一条子进程边不连
   （python 单元与 shell 单元起的都认；shell 函数的限定名同单元表，嵌套的写 <外层>::<名>）。
   按实测排：那一条边只打提示、不改结局；与 scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES（算键的库自己，按角色排、整份文件不进键）是两种排除。
-  今天三条，都在内存包装里：HostLookup.query 起 scripts/hosts/host-resources.py（包装文件头「排队时去找别的机器」「整体兜底」；判法读包装输出之前去掉它打的那几行）；
-  HostLookup.watch_events 与 broadcast_memory_released 起 scripts/hosts/resource_release_broadcast.py（包装文件头「资源释放广播」：排队时收、退出时发，
-  出事只打一行或一行都不打，排队、放行与退出码照旧；收到之后重查打的行与 HostLookup.query 打的同几种行首，判法照样去掉）。
-  自证 REAL_CUT_CELL 核切掉的单元只经这几条边可达：把被起的程序都当另几个根一起收，与不切的逐个相同。
+  登记了一条：E183 跑法脚本计划那一步（plan_step）起 scripts/gate/admission.py 的准入边。准入是闸，退出码只定这一件跑不跑，标准输出只有 E7INPUT 行，
+  读产物的判法先 sed 去掉这几行；它不改读数，所以不沿它把准入模块收进实验键。登记一条边之前先现查起点单元与被起的程序都在，不在的不登记。
+  自证 EXCLUDED_EDGE_PYTHON_CELL 与 EXCLUDED_EDGE_SHELL_CELL 在夹具上证这套机制：自证期间临时往表里登记夹具里的一条边，核登记了的那一条不连、
+  同一个单元起的另一个程序照连、不登记时那一条照连。EXCLUDED_EDGE_EXIT_CELL 在夹具上证「键不变而退出码变」必红。
+  登记的准入边配三格（真仓）：ADMISSION_EDGE_ANOMALY_CELL（准入这条路上的异常只让计划那一步不跑、读数出不来）、ADMISSION_EDGE_STRIP_CELL
+  （准入打的只有 E7INPUT 行，判法去掉之后读数一行不差）、ADMISSION_EDGE_REACH_CELL（切边前后少掉的单元都只经这条边可达）。
 判法入口的登记（registered_judging_entries；命令行 entries <根>）：存判定的各路判法入口从各份脚本的登记现取，不手抄——广谱变异的 JUDGING_ENTRIES 与
   GPU_JUDGING_ENTRIES、crates 变异的 JUDGING_ENTRIES、admission.py 的 REPLAY_SCRIPT 与 REPLAY_JUDGING_FUNCTIONS、e165 的 JUDGING_ENTRY、
   verus-proof-check.py 的 JUDGING_ENTRIES，加门禁阶段（.claude/gate.d/*.sh）里写死的 "judge:<文件>::<函数>" 令牌；自证真仓那几格的入口从它取。
+  登记值可以是字面量，也可以是前面模块级字面量的名字与 + 拼成的式子。自证 REAL_JUDGING_CLOSURES_CELL 逐个收登记的入口的闭包，有一个拒算就红
+  （拒算的那一路判定写不进库、每趟照判）；口径照 judging_unit_key：crates 变异的入口全算，别的入口去掉 lib_verdict_library.py 的 NOT_JUDGING_FILES。
 
 Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同义；这里只写 R-结构、R-路径、R-隐式与 R-开放的口径，别的几条照设计原文）：
+  入口名字的定义那一处（只给 scripts/gate/admission.py 用，rust_closure_of 的 entry_definition_name_unresolved=True）：入口单元自己的名字在它的词法单元里只出现在
+          定义那一处（fn <名>）时，这个名字不按 R-裸名解、也不拿来判连不连 use，同一目标里短名相同、不在同一模块的单元不因此收进入口的闭包
+          （两条同短名的测试函数各算各的键）；名字在函数体里另有出现（递归、经路径点名同名的另一个）照解。不给是 False：与 crates/singlefs-unit-graph
+          同义的那一份（两份实现对拍、dump、命令行 closure / key）照旧把定义那一处当裸名解
+  到这些单元就停（只给 scripts/mutation/crates-mutation-rows.py 的 static-check --reachability 用，rust_closure_of 的 stop_at）：stop_at 里每一项是
+          (来处单元, 单元)。来处是 None 的，那个单元不进闭包、也不从它往下连；来处是一个单元的，只是从来处连到它的那一条边不走，别的单元连到它照连
+          （方法调用经「类型后点名」连进来的那一条边，来处记的是点名类型的单元，按边停截不住，要截就按单元停）。入口不停。不给（空）就是全闭包。
+          截过的闭包只拿来判够不够得着，不算键、不进缓存；crates/singlefs-unit-graph 那一份没有这个参数，两份实现对拍不带它
   R-结构  成员连它的 impl / trait 头；单元（文档测试除外）连所在模块的模块头（mod_head），连这个目标里把它所在文件连进模块树的每一条 mod 声明
           （mod 声明再连它所在模块的头与声明，一路连到目标根；#[path] mod 的被引文件一样），连所在模块里引进了它用到的名字（裸名或方法名）的 use，
           use a::* 一律连。use 引进的名字只用来判连不连那条 use，不往下解（被引模块里没用到的单元不进闭包）；use a::b as c 里用到 c 的，b 按 R-裸名再解。
@@ -97,12 +122,84 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   R-开放  入口签名（到函数体的 { 之前）里紧跟 impl、dyn、:、+ 的名字当 trait 名（dyn Trait 与泛型 trait 约束），连这个 trait 的全部 impl 头与成员；
           按 trait 自己的名字（for 之前那一截最外层的最后一个名字）找它的 impl，不按 trait 参数里的名字。
           闭包里单元的 dyn Trait 不连 impl：具体类型照 R-隐式连，Trait 照 R-裸名连到 trait 头，trait 头带它的 blanket impl。
+  闭包外的四类边（records/2026-11-02-一百七十六节欠账.md；索引在 RustWorkspace.index_macro_and_foreign_edges，crates/singlefs-unit-graph 那一份还没有，
+  两份实现对拍要等它跟上）：
+  条目级宏调用生成的条目  调用体里跟在 enum / struct / union / type 后面的名字是宏生成的类型：调用进闭包时这些名字算被点名（R-方法、R-隐式照连到写给它的 impl）；
+          同名 macro_rules! 体里展开式顶层（宏体的括号一层、展开式的括号一层；impl $name { … } 里的关联项不算）跟在 const / static / fn / struct / enum /
+          union / type 后面、按字面写出的名字（不是 $ 起头的捕获）登到这个宏的每一次调用名下，
+          点名这个名字的单元连到调用（宏名同名的几份 macro_rules! 合起来算）。
+          弄坏开关 rust-macro-generated-types-unnamed：宏生成的类型不算被点名；rust-macro-rules-literal-names-unlinked：宏体里的字面名字不登
+  #[global_allocator]  带这个属性的 static 管整个链接出来的程序：入口的链接集里有它所在的目标，它就进闭包（规则名 global-allocator），经它的类型
+          R-隐式带上 GlobalAlloc 的 impl。弄坏开关 rust-global-allocators-unlinked：不进
+  外部类型上的 trait impl  trait 是本仓的、自身类型是外部类型（写成路径、头一段不是 crate / self / super / Self 与本仓 crate 名；或自身类型里的名字没有一个是本仓
+          定义的类型）的 trait impl，经泛型约束分派、自身类型永远不会被点名：R-方法落到 .x( 时它的成员 x 照连，R-路径 Tr::x 同样。
+          弄坏开关 rust-foreign-self-trait-impls-unlinked：不连
+  构建脚本交的值  env!("X") / option_env!("X") 的 X 不是 cargo 给的（不以 CARGO 起头、不是 OUT_DIR）：连到本 crate 构建脚本的 main（它经 cargo::rustc-env 交这个值），
+          规则名 build-environment；没有构建脚本的不连。弄坏开关 rust-build-environment-unlinked：不连
+  工作区外的 path 依赖  discover_rust_crates 从工作区成员顺 path 依赖（normal、dev、build）收落在仓根底下、有 Cargo.toml 的 crate，根清单 exclude 里的也收
+          （prune-server/ 这一类自己是工作区根的独立工程）；落在仓根外的不收。弄坏开关 rust-excluded-path-dependencies-dropped：不收。
+          这样收进来的 crate 按调用关系连，不按同名连（工作区成员之间照旧按 R-裸名同名连，与 crates/singlefs-unit-graph 同）：
+          别的包里的裸名要这个名字在工作区里经 use 或路径从这个 crate 引进来过（RustWorkspace.names_reaching_outside_crate：use / extern crate 语句里
+          库名或已引进的名字后面的名字、根名::a::b 路径里的段、它的 macro_rules! 名后接 !；根名后面有 glob 的全收），才连到这个 crate 的同名条目，
+          只是同名的字段、局部变量不连（弄坏开关 rust-outside-crate-names-linked-unimported：照旧按同名连）；这个 crate 同一个目标里的裸名只连单元所在模块
+          看得见的那几份（RustWorkspace.candidates_seen_from_module：同一模块的、所在模块的 use 引进了它且路径点到候选所在模块的、写成 模块::名 的；
+          点不准的退回全连，字段名、局部变量与 impl 成员自己的名字一份都不连：committer 里 impl 成员 fn run 不连到 command_line::run；
+          弄坏开关 rust-outside-crate-names-linked-across-modules：照旧按同名连）
+
+数据目录（RustFile.runtime_manifest_path、fold_manifest_chain；crates/singlefs-unit-graph 的 fold_manifest_directory_read、fold_path_chain 同写）：
+  Path::new(env!("CARGO_MANIFEST_DIR")) / PathBuf::from(…) 后接 .join("字面") 链、链后不再接别的方法，
+  折出的仓内路径是文件的收成 data-file；是目录、落在仓根 crates/ 之下（不含 crates/ 整个、不含仓根与根外）的，收成 data-directory：目录下递归全部文件的字节进键
+  （directory_fingerprint：什么目录都不跳过，指向目录的符号链接不进去；每个文件一行「<相对目录的路径>\t<字节 sha256>\n」，按相对路径排序，连起来取 sha256）。
+  折出的是仓根本身、crates/ 整个、根外的目录而直接用在表达式位置的，照旧拒算 runtime-path（读整棵仓，有键也复用不上）；接别的方法（.parent()）、.join(<不是字面>) 的也照旧拒算。
+  写法的三种：直接写在用目录的位置（read_dir(Path::new(env!(…)).join("rules"))）；整个是 let [mut] <名> [: 类型] = …; 右边的目录，不论是不是能收的目录
+  （prune-server/src/preflight.rs 绑清单目录本身，再 .join("..").join("…") 取仓里一份文件），这个单元里后面每一处用到 <名> 的写法各折一样：
+  <名> 或 Path::new(<名>) / PathBuf::from(<名>) 接 .join("字面") 链的折出那条路径，单独写 <名> 的取绑出的目录本身、照直接写的那一条判，
+  又整个是 let <别名> = …; 右边的照样跟 <别名>（最多跟 DEEPEST_MANIFEST_BINDING_CHAIN 层，再深的拒算）；.<名> 与 <名>:: 不算用法，碰到再 let 同名就停。
+  每一处各自结局：接别的方法、.join(<不是字面>)、折出的不是文件也不是能收的目录的，那一处拒算 runtime-path，别的处照收；读与拒算都记在 env! 那一处
+  （一处折不出、一处折出文件的，这个单元拒算、那份文件照记一条 data 读）。根外的路径与盘上没有的路径那一处拒算 runtime-path
+  （与 Rust 那一份不同写：那一份根外的文件照收，盘上没有的拒算 data-file-unreadable）。
+  const <名>: &str = env!("CARGO_MANIFEST_DIR");（私有、初始值整个就是那个宏）本身不读什么，同一份文件里
+  Path::new(<名>) / PathBuf::from(<名>) 照 env! 同一处折，别的写法用到 <名> 的拒算。记的行是 env! 那一处（常量写法记 <名> 那一处）的行。
+  弄坏开关 rust-manifest-directories-refused：目录一律拒算（改前的样子）；自证「Rust：清单目录折出 crates/ 之下的目录收成数据目录…」那一格必须判错。
+  弄坏开关 rust-manifest-binding-refused-whole：不是能收的目录不跟 let、拒算，绑给 let 的有一处折不出就整处拒算、一条读都不记（改前的样子）；
+  自证「Rust：清单目录绑给 let 变量的，一处 .join(变量) 折不出、一处折出文件…」那一格必须判错。
+
+测试二进制起自己（RustFile.current_exe_child；规则名 current-exe-child；crates/singlefs-unit-graph 同写）：
+  Command::new(…current_exe()…) 后接 .arg(…) / .args([…]) 链，参数里恰好有一个字面 "--exact"，紧跟在它后面的那个参数折得出测试名的，
+  从起子进程的那个单元连一条边到同一编译目标里 libtest 全名（文件在目标里的模块路径加限定名）恰好等于它的那一个 #[test] fn，不拒算 current-exe。
+  测试名折法：字面串；常量名（名字记下来，值在收闭包时解：先找起子进程那个单元自己里面的 const <名>: &str = "…";，再找同一个包、在这一次链接集里叫这个名字的
+  常量单元，几个都得写成 = "…";、值相同；单元里另有 let 绑定的名字不认，是参数的按参数）；全由这两样组成的 concat!(…) 与 format!("…{}…{名}…", …)；
+  起子进程那个 fn 自己的参数名：闭包里每一处调用它（不是 .方法 调用）的那个实参各折一遍，各自再对 #[test] fn，每趟 drain 之后、WGSL 供给之前跑，
+  一处都没有、折不出、实参又是参数的拒算。测试名写在 --exact 前面、用 module_path!() 拼的、套着 as_str() 的、单元里另有 let 绑定的，折不出。
+  同一个函数里起了子进程的（函数里出现 SPAWNING_WORDS 里的词：Command、spawn、posix_spawn、fork、execv、execve、execvp），对不上恰好一个 #[test] fn、折不出名字、
+  不是 Command::new(current_exe()) 的写法的（含路径先存进变量再交给 Command::new），照旧拒算 current-exe。
+  同一个函数里不起子进程、只问 current_exe() 路径的（取路径读文件大小、current_exe().is_ok()）不拒算，也不连边：路径拿去做什么与测试要点名的那一条无关。
+  不判：路径经参数交给别的函数、由那个函数起子进程的（那个函数里没有 current_exe，本来就不在这条规则里）。
+  弄坏开关 rust-current-exe-refused：Command::new(current_exe()) 的写法一律不认（起了子进程的函数里折不出测试名，拒算 current-exe）；
+  rust-current-exe-children-unlinked：折得出也不连边（子进程测试的函数体改了键不变）；
+  自证「Rust：current_exe() 交给 Command::new 起子进程…」那一格两个开关下都必须判错。
+  弄坏开关 rust-current-exe-path-only-refused：只问路径的也拒算（改前的样子）；自证「Rust：current_exe() 只问路径…」那一格必须判错。
+  弄坏开关 rust-current-exe-spawn-unrefused：起了子进程的函数里折不出测试名的也不拒算；自证「Rust：同一函数里起 Command 的 current_exe() 照旧按起自己判…」那一格必须判错。
+  弄坏开关 rust-current-exe-constants-same-file-only：常量名只在起子进程那个单元所在的那一份文件里找（改前的样子，常量定义在同包别的文件里的折不出）；
+  自证「Rust：current_exe() 的测试名里的常量定义在同包另一份文件里…」那一格必须判错。
+
+Rust 闭包读到的 shell 脚本（rust_closure_of 的 collect_shell_sources，shell_sourced_files）：数据文件是 shell 脚本（language_of_file：.sh / .bash 或 #! 行是 bash / sh）的，
+  它在自己那个 shell 里（传递地）source / . 进来的仓内文件各收成一个 data-file 单元（规则名 shell-source，从那份脚本的 data-file 单元来），字节进键。
+  路径照 ShellIndex.links 的折法（字面路径、"$(dirname "${BASH_SOURCE[0]}")/…"、前面赋过字面值的变量、$(cd … && pwd)、git rev-parse 折成根……），
+  每份文件的每个单元都看（读到它的是整份字节，不按函数调没调到挑），被 source 进来的那几份接着看，到不再多出文件为止。
+  折不出、落在根外、指到不在的文件拒算（shell-path-unfolded / shell-path-outside-root / shell-path-missing），bash 过不了的那几份拒算 bash-syntax。
+  不走的：bash -c '… source …' 这类子进程里的 source，与脚本起的 bash / python 子进程（这一份只沿 source 收）。
+  这几个单元另按读那份脚本的那一处（读它的单元、那一行）各记一条 data_sites（crates/singlefs-unit-graph 的 follow_shell_sources 同）：
+  与那一份对拍的闭包行（data\t<被 source 的文件>\t<读脚本的文件>:<行>-<行>\t<摘要>）与 unit_graph_key 都带它们；closure_key 照旧按文件各一个单元。
+  一个 RustWorkspace 里一份脚本只折一趟（RustWorkspace.shell_sourced）。
 
 键（3.1）：下面这些行各以 \\n 收尾、连起来取 sha256：
   form\tsinglefs-function-units-v1
   cfg\t<原子>\t<true|false>           Rust 闭包里各单元真引到的 cfg 原子（定案 2）：单元自己连外层的条件链（#[test] 不算）与它词法单元里每一处
                                         #[cfg(…)]、#![cfg(…)]、#[cfg_attr(条件, …)]（条件与里面套的 cfg）、cfg!(…) 的谓词的每个叶子，写 <名> 或 <名>="<值>"，
-                                        真值按收这个单元进来的那个目标的生效 cfg 判（特性按这个单元所在的包）；没引到的原子不进键；判不了真假的拒算
+                                        真值按收这个单元进来的那个目标的生效 cfg 判（特性按这个单元所在的包；包开了哪些特性照 cargo resolver 2
+                                        顺依赖边统一：入口 crate 照入口目标顺依赖段，构建脚本只顺 build 依赖，按 cfg(test) 编的 lib 与 bin、集成测试、
+                                        example、bench、文档测试连 dev 依赖，别的只顺普通依赖；别的 crate 只顺普通依赖）；没引到的原子不进键；判不了真假的拒算
                                         cfg-unrecognized。没记原子的闭包（别处拼的、并起来没并 cfg_atoms 的）退回整套生效 cfg（全局写 <名> 或 <名>="<值>"，
                                         特性写 feature="<特性>"@<包名>，测试编译的目标写 test@<目标>）；排序
   toolchain\t<调用方给的一行>          排序
@@ -113,6 +210,16 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
                                         howto）后面的词不算
   unit\t<种类>\t<指纹>                 闭包里每个单元一行（多重集：同种类同指纹的几个单元各一行），排序
   data\t<种类>\t<指纹>                 数据单元，排序
+  entry\t<种类>\t<指纹>[\t<种类>\t<指纹>…]   入口单元自己（Closure.entry_units：rust_closure_of 的入口、ScriptClosure.run 的入口、WGSL 点名的入口）
+                                        连同包它的 impl / trait 头（Unit.container）一层层往外，一个入口一行，排序去重（entry_key_lines）。闭包是单元的多重集，
+                                        几个入口互相收进对方的闭包（一个 trait impl 里的几个方法经 R-结构、R-隐式；python 里互相调用的两个 def）时闭包一模一样，
+                                        没有这一行就共用一把键、一份判定（与 scripts/gate/verus-proof-check.py 的 entry_unit_component 同一种写法）。
+                                        别处自己拼的闭包没记入口（lib_verdict_library.py 的 FunctionUnitIndex.key 并起来的那一份），不出这一行。
+                                        弄坏开关 key-entry-units-dropped：不出这一行（改前的样子）。
+                                        文档测试的入口只取它自己：它的 Unit.container 记的是所挂的条目，不是包它的 impl / trait 头，
+                                        R-结构也不连（文档测试另编一个 crate），不往外取；弄坏开关 key-entry-doctest-owner-chained：照别的单元往外取（改前的样子）。
+                                        文档测试入口（rust_closure_of）照 crates/singlefs-unit-graph 的 resolve_entry_units 文档测试那一支，所挂条目或模块的
+                                        全部文档测试一起当入口、各记一行（doctest_entry_group）；弄坏开关 rust-doctest-entry-alone：只记交进来的那一个（改前的样子）
   不带路径、名字与行号；组成清单（单元行）随键打出当索引。
 目标写法：<包目录名>:<lib|bin|test|bench|example|build|doctest>:<名>。
 
@@ -126,6 +233,8 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   lib_function_units.py controls <根>     V5 / V11 两处变异（crates/mutations.tsv 里原文是那两行的）在临时拷贝上施加，
                                            三个入口的键变不变与 design 报告 2.2 节那张表比；只读根，不写根
   lib_function_units.py entries <根>      判法入口的登记现取（registered_judging_entries），一行一个；只读根
+  lib_function_units.py cross-run-caches  跨轮缓存的登记（cross_run_cache_registry，下面「跨轮缓存的登记」）照此刻的环境现取每一份的位置：先打 tempdir\t<tempfile.gettempdir()>，
+                                           再一份一行 cache\t<名字>\t<脚本>\t<位置>（算不出的打 refused-cache\t<名字>\t<脚本>\t<原因>、退 3）；只读，不建目录
   lib_function_units.py --selftest        临时目录里的夹具，另把本仓的 scripts/ 与 .claude/（不带 fixtures、kb）拷进临时目录量真仓那几格；不写本仓
   选项：--target <目标>  --cfg <名或 名="值">（加进全局 cfg）  --no-default-cfg  --feature <包名>/<特性>  --no-default-features
         --toolchain <行>  --dependency <行>  --external <程序名>=<sha256>=<--version 那一行>
@@ -139,27 +248,63 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   rust_units(根) → [单元]；rust_closure(根, 入口, 目标=None, cfg=None) → 闭包；wgsl_units(根)、python_units(根, under)、shell_units(根, under)；
   closure_of(根, 入口, 选项) → 闭包（.members 成员与数据单元、.refusals、.cfg_lines、.programs）；
   closure_key(闭包, toolchain, dependencies, externals) → (键或 None, 拒算)；unit.text() 是进 UnitKey 组成清单的单元行（嵌套路径），
-  unit.dump_text() 是 dump 与命令行输出的那一行（unit-graph 的写法）；unit_graph_key(Rust 闭包, 工具链行, 依赖行) → 照 unit-graph 的 reuse_key 算的键（对拍用）。
+  unit.dump_text() 是 dump 与命令行输出的那一行（unit-graph 的写法）；unit_graph_key(Rust 闭包, 工具链行, 依赖行) → 照 unit-graph 的 reuse_key 算的键（对拍用），
+  取 sha256 的那几行是 unit_graph_key_lines（entry 行在数据行之后、工具链行之前，同 unit-graph 的 entry_key_lines；弄坏开关 unit-graph-key-entry-lines-dropped：不出 entry 行）。
 
 判定种类（D13（验证路线） 已定项 17：剥规格与证明块只用于判产品行为的那几类判定的键，形式化判定的键保留规格）：
   formal-verification（缺省）照源码原样切、收、算，verus! 里的规格与证明都进键（scripts/gate/verus-proof-check.py、
     scripts/experiment-apparatus/e165-pin-red-examples.py 经 scripts/crash/lib_verdict_library.py 的 FunctionUnitIndex 用这一种）。
-  product-behavior 是判产品行为的判定用的视图（checker 档快档按条复用与 admission.py 算的别的单元键：KeyContext.workspace；
-    crates 变异的行键与点名测试：scripts/mutation/lib_mutation_units.py 的 UnitKeys.workspace）。剥法不在这里另写一份，取 crates/singlefs-unit-graph 的
-    unit-graph dump <根> --judgment-kind product-behavior（那一份用 verus_syn 剥），按它交的行改这一份：
-    · 只动有 verus! 块的文件；别的文件两个视图逐字相同。一个工作区都没有 verus! 块时不起 unit-graph。
+  product-behavior 是判产品行为的判定用的视图（验证包按条复用与 admission.py 算的别的单元键：KeyContext.workspace；
+    crates 变异的行键与点名测试：scripts/mutation/lib_mutation_units.py 的 UnitKeys.workspace）。剥法以 crates/singlefs-unit-graph 的
+    unit-graph dump <根> --judgment-kind product-behavior（那一份用 verus_syn 剥）为准，按它交的行改这一份：
+    · 只动有 verus! 块的文件，与写着外属性 #[verifier::…] / #[verifier(…)] 的文件（没有 verus! 块的也算）；别的文件两个视图逐字相同。
+      一个工作区里这两样文件都没有时不起 unit-graph。
+    · 剥过的那一份：载入时照那一份的剥法按词法单元认同样的几截（VerusGhostCode：spec / proof / axiom 函数与常量整条、broadcast、assume_specification，
+      执行函数签名里的规格子句与具名返回值的名字、Ghost / Tracked 参数与字段、函数体里的 proof 块与 assert / assume / reveal 一族、let ghost、
+      循环头与闭包的子句、实参与字面量里的 Ghost(…) / Tracked(…)；另有 verus! 里外的外属性 #[verifier::…] / #[verifier(…)]，从 # 到配对的 ]，
+      不剥内属性 #![verifier::…]、#[cfg_attr(…)] 里套的、落在别的宏调用与 macro_rules! 词法单元组里的，没有 verus! 块的文件也剥；剥掉打头的属性之后
+      单元的起始行下挪，Rust 那一份同样下挪），换成空格（换行留着）重切；重切出来的单元与 Rust 那一份交的这份文件的单元
+      逐个相同（种类、文件:起-止、指纹，限定名以嵌套路径收尾）就用它：只给 Verus 看的单元压根不切，闭包从剥过的词法单元收边（规格与证明里点到的
+      执行代码不连），与 unit-graph 剥完再切、再收同一做法。核不上的、Rust 那一份解不开这份文件的，照原样那一份走下面两条。
     · 这份文件里逐单元按「种类、限定名、文件:起-止」（dump 行去掉指纹那一段）配对：配上的，指纹换成 Rust 那一份的；
       Rust 那一份没交、单元落在 verus! 块里的，记成只给 Verus 看的（Unit.ghost_only）：闭包收到它就停，不进键、不往下连（入口本身照收）；dump 不列。
     · 配不上的（Rust 交的单元这里没有、verus! 块外的单元 Rust 没交、同一配对键两边个数不同或几个指纹分不清谁对谁）记文件级拒算
       product-view-unmatched；Rust 那一份解不开的块（拒算行 verus-ghost-code-unparsed）照抄成这份文件的拒算；拿不到 Rust 那一份
       （找不到或编不出 unit-graph、它退非 0）记文件级拒算 product-view-unavailable。文件级拒算照 Rust 的口径进链接到那份文件的每个闭包。
-    · 闭包照原样那一份的词法单元收边：规格与证明里点到的执行代码照收，只多不少；门禁 code-tooling 的 function-units-two-implementations-agree 格
+    · 照原样那一份走的文件，闭包照原样的词法单元收边：规格与证明里点到的执行代码照收，只多不少；门禁 code-tooling 的 function-units-two-implementations-agree 格
       另有产品行为视图那一趟，逐入口比这一份与 unit-graph closure --judgment-kind product-behavior 的闭包与键。
   unit-graph 从哪来：设了 FUNCTION_UNITS_UNIT_GRAPH_DIRECTORY 起那个目录里的 unit-graph（调用方保证它是被判那一版的 crates/singlefs-unit-graph 编的；对拍格与自证用）；
     没设照这份库所在仓的 crates/singlefs-unit-graph、.claude/heavy-thread-default 与 Cargo.lock 的内容摘要找
-    ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-unit-graph-product-view/<摘要>/unit-graph，没有就在那里的临时工作区经 scripts/hosts/capped.sh default
+    <跨轮缓存目录>/singlefs-unit-graph-product-view/<摘要>/unit-graph（跨轮缓存目录：设了 GATE_CROSS_RUN_TMPDIR 取它，没设取这份库所在仓的 git common-dir（git worktree 里是主仓的 .git），不在 git 仓里取 TMPDIR），没有就在那里的临时工作区经 scripts/hosts/capped.sh default
     起 cargo build --release --offline 编一份（几个进程同时要时排他锁，编完删工作区与编译目录，只留最近 3 份程序）。
-  RustWorkspace 构造时取一次 Rust 那一份（fork 出来的子进程共用父进程那一份），之后载入的有 verus! 块的文件照同一份改。
+  RustWorkspace 构造时取一次 Rust 那一份（fork 出来的子进程共用父进程那一份），之后载入的有 verus! 块或写着外属性 #[verifier…] 的文件照同一份改。
+
+Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先切词法单元（rust_lex 按字符逐个走，是载入整个工作区最费的一步，全仓约几秒到几十秒），
+  结果只随这份文本变，而点名几行的 row-plan 每趟都是新进程、要把全仓的 .rs 重新切一遍。切出来的 (kinds, texts, lines, documents) 按文本的 sha256 存成一个 zlib 压缩的 json 文件
+  （去重的词表加 base64 的序号表，不用 pickle：缓存目录在可共写的临时目录里；全仓约 20 MB），放 <跨轮缓存目录>/singlefs-rust-lex-cache/<库的内容摘要>/（同产品行为视图那一段的跨轮缓存目录）；
+  FUNCTION_UNITS_LEX_CACHE_DIRECTORY 设了放那里，写 off 不用缓存（自证除缓存那一格外都设 off）。目录名里的库内容摘要把 rust_lex 与它的帮手都罩住：库的内容一变，旧目录整个不再取，
+  只留最近 3 个；文件只看文本内容，不看路径、修改时刻、不设时限；读不了、写坏了、各表对不上的照常现切再存；写不成不影响结果。
+
+跨轮缓存的登记（cross_run_cache_registry；命令行 cross-run-caches）：仓里有意跨轮复用的缓存都登记在这一处（.claude/singlefs-ai-sop/rules/command-safety.md
+  「测试镜像一律放临时目录」末段：放 GATE_CROSS_RUN_TMPDIR 底下或项目定的位置，不放这一趟的 TMPDIR）。一行（名字、放它的脚本、现取它的位置的函数）；
+  现取 = 调那份脚本自己算位置的那一段：python 载入那份脚本调它的函数（crates_mutation_judging_cache_directory 这一类），shell 读那份脚本里恰好一行的双引号赋值、
+  照此刻的环境展开（shell_assignment_row；expand_shell_parameters 只认 $名、${名}、${名:-词}、${名-词}），不在这里另抄一份位置。
+  harness-test-environment 那一行位置分两段算（脚本里先取 GATE_CROSS_RUN_TMPDIR，没设再调 .claude/hooks/lib_work_root.py 的 shared <名>，再接文件名），不是一行赋值，
+  现取 harness_test_environment_run_times_file 逐段从那份脚本里读：「local run_times_file cross_run_cache=」那一行读 GATE_CROSS_RUN_TMPDIR，没设时读脚本里恰好一处
+  「python3 "$STAGE_DIR/../hooks/lib_work_root.py" shared <名>)」取名字、调同一个库（载入这份库所在仓里的 .claude/hooks/lib_work_root.py）的 shared_data_path，
+  「run_times_file=」那一行照这个目录展开成文件；名字、目录、文件名都不在这里抄，哪一段脚本改了写法，对应那一段抛 ValueError、点名那份脚本，自证那一格红。登记的是：本库的 Rust 词法单元缓存
+  与产品行为视图编出的 unit-graph 程序、scripts/mutation/crates-mutation-rows.py 的判法单元指纹缓存、.claude/gate.d/harness-test-environment.sh 记的上一趟各阶段用时、
+  .claude/scripts/lkmm.sh 与 .claude/scripts/fetch-deps.sh 的下载缓存。Rust 一侧 crates/singlefs-verification/src/gpu_unit_checks.rs 的 driver_shader_disk_cache_directory
+  （没设 GATE_CROSS_RUN_TMPDIR 时放家目录的 .cache/singlefs 底下）取位置要编 验证包，不登记。新加一份跨轮缓存，在 cross_run_cache_registry 加一行。
+  自证两格：CROSS_RUN_CACHE_CELL 把本仓 scripts/ 与 .claude/ 拷进临时目录（real_tree）、建空的 .git（在 git 仓里），另建一个空目录当 TMPDIR，摘掉 GATE_CROSS_RUN_TMPDIR
+  与几份缓存自己的改放处变量（FUNCTION_UNITS_LEX_CACHE_DIRECTORY、crates-mutation-rows.py 的 JUDGING_CACHE_DIRECTORY_VARIABLE 指的那个），起子进程跑拷贝里
+  这份库的命令行 cross-run-caches：子进程的 tempfile.gettempdir() 要是那个目录、登记的每一份都算得出、没有一份落在它之下。
+  同一格再用 git 造一个主仓与它的 worktree（git worktree add --detach，worktree 里 .git 是文件），scripts/ 与 .claude/ 拷进 worktree 照样起一趟：
+  照样不落在那一趟的 TMPDIR 之下，头一趟落在 <拷贝>/.git 底下的那几份，这一趟要落在主仓 .git（git common-dir）底下同一相对路径（与主仓共用同一份）。
+  登记表写成函数（cross_run_cache_registry），不写成模块级的表：表里载入 crates-mutation-rows.py 的那一项不随 import 时执行的模块级语句进别的闭包。
+  CROSS_RUN_CACHE_SCAN_CELL 扫本仓 CROSS_RUN_CACHE_SCANNED_DIRECTORIES 下（跳过 fixtures、__pycache__、target、.git）提到 GATE_CROSS_RUN_TMPDIR 的 .py / .sh / .bash：
+  要么是登记表里的脚本，要么在 CROSS_RUN_CACHE_NOT_CACHES 里写明为什么不登记；不登记表里的每一份都在、都还提到它（只缩不涨）；夹具里没登记的一份判得出来。
+  弄坏开关 cross-run-cache-under-tmpdir、cross-run-cache-run-times-old-spelling 与 cross-run-cache-mentions-unscanned 见下面「弄坏开关」。
 
 拒算（3.4，认不出不静默跳过：这一条判定不复用、每趟现判）。形态名：
   Rust   unbalanced-brackets unknown-item cfg-unrecognized include-argument include-missing include-code runtime-path current-exe
@@ -175,6 +320,8 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
     -c 的串、- / /dev/fd/N / bash -s 喂的 here-doc、here-string（含 { … } 3<<'词' 写在组后面的）：正文字面的、或折得出的
       （$变量、$(cat <<'词' …)、$(只打字面行的函数)）当内联脚本：python 的切成单元（不进闭包，穿过它连下去；sys.argv、命令前设的环境变量
       折成那条命令里的词），bash 的切开再认；折不出拒算 inline-script-not-literal。内联 python exec sys.argv[k:] 时第 k 个词起照命令认。
+      拆包切片（a, b = sys.argv[1:3]，下标是不小于 0 的整数字面量、不带步长，上界写了就等于下界加目标个数）逐个对上 a = sys.argv[1]、b = sys.argv[2]，
+      别的序列的切片照同一条对上（paired_elements）；上界对不上、带步长、下标折不出的照旧不对上（该拒算的照拒算）。
     -m <模块>：仓里的连到程序入口；-m unittest / pytest 点名的测试模块整份连上；标准库与外部的不装仓里的代码。
     --version、--help、python3 -V、bash -n：不跑代码。参数位置上光一个解释器名（command -v python3）：不是要跑的命令。
     命令位置（经 env、nice、timeout、sudo、xargs、exec 这几个包装之后）：仓里的脚本连上；折不出的程序词拒算，
@@ -188,113 +335,332 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   文件级的（括号配不上、认不出的条目、语法错）：Rust 在那份文件进了入口的链接集时算进来，Python / shell 在闭包碰到那份文件时算进来；
   单元级的在那个单元进了闭包时算进来。dump 把扫到的全部列出来。
 
-弄坏开关（FUNCTION_UNITS_BREAK=<项>[,<项>…]，只给自证证红用；自证逐个打开、核点名的那几格转红，见 BREAK_CELLS）：
-  rust-open-entry-traits-ignored   去掉 R-开放（入口签名里的 dyn 与 trait 约束不连全部 impl）
-  rust-dyn-traits-open-every-implementation 闭包里单元的 dyn Trait 照旧连这个 trait 的全部 impl（CHA）
-  rust-constants-dropped           const 与 static 单元不进闭包
-  rust-macros-dropped              macro 与 item-macro 单元不进闭包
-  rust-trait-impl-edges-dropped    去掉 R-隐式（类型被点名时给它写的 trait impl）
-  rust-verus-segments-ignored      verus! 里照普通 Rust 切（签名后第一个 { 当函数体）
-  rust-cfg-ignored                 cfg 一律当真
-  rust-doc-comments-kept           文档注释进词法单元
-  wgsl-raw-text                    include_str! 读的 .wgsl 取整份字节、不切单元
-  python-comments-kept             def 的指纹取原文（带注释）
-  python-docstrings-kept           文档串不从指纹里去掉
-  python-docstring-readers-ignored 读 __doc__ 不收文档串数据单元
-  python-getattr-allowed           getattr(x, <变量>) 不拒算
-  python-spec-paths-ignored        spec_from_file_location 不折叠、不拒算
-  python-attributes-unnarrowed     obj.m 连到全部同名方法（不按闭包里出现过的类收窄）
-  shell-heredoc-split              here-doc 正文照样按缩进切
-  shell-names-command-position-only 函数名只在命令位置上才连
-  shell-unfolded-paths-ignored     折不出的路径不拒算
-  shell-raw-text                   脚本体的指纹取原文
-  external-programs-unchecked      闭包里点名的外部程序不要求调用方给
-  rust-format-captures-ignored     串字面量里的 {名}（format! 一族的内联捕获）不算裸名
-  shell-variable-first-line-only   顶层赋值只取第一行（$(cat <<'词' … 词) 的正文不进那个变量单元）
-  tree-copy-tails-ignored          「折不出的目录 + 根里存在的相对路径」（临时树、仓副本里的同一份）不按根里那一份认（shell 与 python）
-  git-repository-paths-unfolded    git rev-parse --show-toplevel / --git-common-dir 不折成根（shell 的 $(…) 与 python 的 subprocess …stdout）
-  python-call-returns-unfolded     不带参数调仓内模块级函数，不按它各处 return 的值折
-  shell-redirect-targets-loaded    重定向的目标当成一条命令留下（写数据的路径被当成装代码）
-  shell-path-arguments-loaded      参数位置上长得像脚本的路径也当装代码
-  python-command-arguments-loaded  subprocess 命令里脚本后面的路径参数也当装代码
-  shell-generated-scripts-ignored  单元自己 printf / echo / cat <<词 写出来再起的脚本不认
-  shell-inline-positionals-ignored bash -c '…' <名字> <参数…> 里的 $1…$9 不换成外面那几个词
-  shell-copied-scripts-ignored     单元自己 cp <源> <它> 拷出来再起的脚本不连到源
-  shell-enclosing-locals-ignored   套在外层函数里的函数看不见外层的 local
-  shell-cd-first-directory-only    cd 过去的目录折出几个时，相对路径只按 target_of 的老办法找一处
-  python-dispatch-tables-ignored   字典字面量里当值写的函数名不连边
-  python-module-constants-unfolded import 进来的仓内模块常量 module.NAME 不折
-  python-getattr-stdlib-refused    getattr(<标准库或外部模块>, 变量) 照样拒算
-  python-subscript-targets-rebind  表[k] = … 当成重新绑定 k
-  python-environment-defaults-unfolded os.environ.get(…) or <缺省> 不按缺省折
-  python-written-scripts-ignored   单元自己 open(…, "w") 写出字面文本再起的脚本不认
-  python-loop-variables-unfolded   for 循环变量不取遍元组 / 列表的元素
-  python-imports-first-directory-only 同一个模块名在 sys.path 插的几个目录里各有一份时只连第一份
-  python-import-names-unfolded     importlib.import_module(<折得出的名字>) 照样拒算
-  python-path-tables-unfolded      路径表（模块级字典字面量）[键] 不折
-  python-comprehension-scope-leaks 推导式里的循环变量算成函数里的赋值
-  python-directory-wildcards-ignored os.path.join(<仓里的目录>, <折不出的文件名>) 起的脚本不连到那个目录里的每一份
-  inline-scripts-ignored           -c 的串、喂给标准输入的脚本不当内联脚本认（回到既不连边也不拒算）
-  shell-later-interpreters-ignored 一条命令里只认第一个解释器
-  shell-substitutions-ignored      命令替换 $( … ) 与进程替换 <( … ) 里的命令不认
-  external-program-words-unfiltered 带空白的串、消息命令（echo / printf / die / bad / howto）后面的词照样当外部程序名
-  python-modules-ignored           python3 -m <模块> 不认
-  shell-unfolded-commands-allowed  命令位置上折不出的程序不拒算
-  shell-wrapped-commands-ignored   包装命令（env、nice、timeout…）后面直接执行的脚本不认
-  shell-command-structure-ignored  [[ … ]]、(( … ))、case 模式、数组字面量照普通命令切，{ … } 后面的重定向不管组里的命令
-  shell-array-commands-unfolded    "${数组[@]}" 当命令时不按字面赋值摊开
-  shell-heredoc-captures-unfolded  $(cat <<'词' …) 与 $(只打字面行的函数) 不折成正文
-  declared-checks-ignored          文件头登记的 check 判据不连、上游 preflight 跑它们的那一处照样拒算
-  inline-argv-commands-ignored     内联 python exec sys.argv[k:] 时不把后面的词当命令
-  python-unfolded-heads-allowed    python 命令位置上折不出的程序不拒算
-  python-commands-literal-only     python 的命令只认字面列表与只赋过一次列表的名字（认不出的不拒算）
-  python-path-programs-refused     shutil.which(…) 与 os.path.join(<折不出的目录>, <根外的字面尾巴>) 起的程序照样拒算
-  python-command-dictionaries-unfolded 命令里的 字典[<字面键>] 不折回字典字面量
-  python-dispatch-calls-ignored    分派表[键](…) 不算对表里那几个函数的调用（参数折不到那一处调用给的实参）
+弄坏开关（FUNCTION_UNITS_BREAK=<项>[,<项>…]，只给自证证红用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认；
+自证逐个打开、核点名的那几格转红，点名的格就是 BREAK_CELLS 里这一项的那几句，自证逐条打「✓ 弄坏开关 <项> 下「<格>」红」）：
+  FUNCTION_UNITS_BREAK=rust-open-entry-traits-ignored  去掉 R-开放（入口签名里的 dyn 与 trait 约束不连全部 impl）
+      「开放入口：参数是 dyn」「R-开放：dyn Trait 只带 Trait 自己的 impl，不带只在 trait 参数里写了它的 impl」
+  FUNCTION_UNITS_BREAK=rust-dyn-traits-open-every-implementation  闭包里单元的 dyn Trait 照旧连这个 trait 的全部 impl（CHA）
+      「dyn 分派：闭包里的 dyn 不连没被点名的另一个 impl，改它不作废」
+  FUNCTION_UNITS_BREAK=rust-constants-dropped  const 与 static 单元不进闭包
+      「关联常量（经泛型）」「函数指针表」「数组长度里的常量」
+  FUNCTION_UNITS_BREAK=rust-macros-dropped  macro 与 item-macro 单元不进闭包
+      「声明宏展开出的函数」「带路径的条目级宏调用定义的枚举：改了作废」
+  FUNCTION_UNITS_BREAK=rust-trait-impl-edges-dropped  去掉 R-隐式（类型被点名时给它写的 trait impl）
+      「运算符重载」「Drop 隐式调用」「关联常量（经泛型）」
+  闭包外的四类边（自证里 closure_edge_cells 那几格，文件头 Rust 闭包「闭包外的四类边」）：
+  FUNCTION_UNITS_BREAK=rust-macro-generated-types-unnamed  条目级宏调用生成的类型不算被点名（改前的样子）
+      「R-宏：条目级宏调用里 enum 定义的类型算被点名，.方法() 连到写给它的 impl，改方法作废」
+  FUNCTION_UNITS_BREAK=rust-macro-rules-literal-names-unlinked  macro_rules! 体里按字面写出的名字不登到调用名下（改前的样子）
+      「R-宏：macro_rules! 体里按字面写出的常量名登到这个宏的每次调用名下，点名它的入口连上调用，改调用体作废」
+  FUNCTION_UNITS_BREAK=rust-global-allocators-unlinked  #[global_allocator] 的 static 不进闭包（改前的样子）
+      「#[global_allocator]：链接集里的分配器 static 进闭包，连上它的 GlobalAlloc impl，改 realloc 作废」
+  FUNCTION_UNITS_BREAK=rust-foreign-self-trait-impls-unlinked  外部类型上的本仓 trait impl 不经 R-方法、R-路径连（改前的样子）
+      「R-方法：本仓 trait 写在外部类型上的 impl（impl Tr for std::time::Duration）经泛型约束调到，方法连上，改它作废」
+  FUNCTION_UNITS_BREAK=rust-build-environment-unlinked  env!("X")（X 不是 cargo 给的）不连构建脚本的 main（改前的样子）
+      「构建脚本经 cargo::rustc-env 交的值：用 env! 读它的单元连到本 crate 构建脚本的 main，改 main 里算的值作废」
+  FUNCTION_UNITS_BREAK=rust-excluded-path-dependencies-dropped  不顺 path 依赖收工作区外的 crate（改前的样子）
+      「工作区外的 path 依赖（根清单 exclude 里）：顺 path 依赖收进来，调到它的函数连上，改它作废」
+  FUNCTION_UNITS_BREAK=rust-outside-crate-names-linked-unimported  别的包里的裸名照旧按同名连进工作区外的 crate，不看引没引进（改前的样子）
+      「工作区外的 crate 按引进的名字连：别的包里只是同名的字段 halted 不连到它的 fn halted，改它键不变；use 引进的 restarts、use 引进的模块下的
+      control::paused、写成路径的 stopped_connections 照连，改它们键变」
+  FUNCTION_UNITS_BREAK=rust-outside-crate-names-linked-across-modules  工作区外 crate 同一个目标里的裸名照旧按同名连到各个模块（改前的样子）
+      「工作区外的 crate 里按模块连：use 引进 log::Log 的只连它、不连 bench 模块里同名的 Log，Worker::launch 自己的名字不连 bench::launch；
+      改 bench 模块里这两样键不变，改 log::Log、改 Worker::launch 键变」
+  FUNCTION_UNITS_BREAK=rust-verus-segments-ignored  verus! 里照普通 Rust 切（签名后第一个 { 当函数体）
+      「verus! 里 ensures 带花括号：下一个函数照样切开，改它作废」「verus! 里够不到的函数改了不作废」
+  FUNCTION_UNITS_BREAK=rust-cfg-ignored  cfg 一律当真
+      「cfg(feature) 关着的单元改了不作废」「认不出的 cfg 谓词拒算」
+  FUNCTION_UNITS_BREAK=rust-doc-comments-kept  文档注释进词法单元
+      「只改文档注释不作废」「改文档注释里的代码块：入口 fn 不作废」
+  FUNCTION_UNITS_BREAK=wgsl-raw-text  include_str! 读的 .wgsl 取整份字节、不切单元
+      「WGSL 只改注释不作废」「WGSL 够不到的函数改了不作废」
+  FUNCTION_UNITS_BREAK=python-comments-kept  def 的指纹取原文（带注释）
+      「python：只改注释不作废」
+  FUNCTION_UNITS_BREAK=python-docstrings-kept  文档串不从指纹里去掉
+      「python：改文档串不作废」
+  FUNCTION_UNITS_BREAK=python-docstring-readers-ignored  读 __doc__ 不收文档串数据单元
+      「python：有单元读 __doc__ 时改文档串作废」
+  FUNCTION_UNITS_BREAK=python-getattr-allowed  getattr(x, <变量>) 不拒算
+      「python：getattr 变量名拒算」
+  FUNCTION_UNITS_BREAK=python-spec-paths-ignored  spec_from_file_location 不折叠、不拒算
+      「python：spec_from_file_location 字面路径折叠出跨模块边」
+  FUNCTION_UNITS_BREAK=python-attributes-unnarrowed  obj.m 连到全部同名方法（不按闭包里出现过的类收窄）
+      「python：obj.方法 按闭包里出现过的类收窄」
+  FUNCTION_UNITS_BREAK=shell-heredoc-split  here-doc 正文照样按缩进切
+      「shell：here-doc 正文里有一行 `};` 不许被切开」
+  FUNCTION_UNITS_BREAK=shell-names-command-position-only  函数名只在命令位置上才连
+      「shell：函数名当参数传照样连上」
+  FUNCTION_UNITS_BREAK=shell-unfolded-paths-ignored  折不出的路径不拒算
+      「shell：`bash "$x"` 折不出拒算」
+  FUNCTION_UNITS_BREAK=shell-raw-text  脚本体的指纹取原文
+      「shell：脚本体只改注释不作废」
+  FUNCTION_UNITS_BREAK=external-programs-unchecked  闭包里点名的外部程序不要求调用方给
+      「键：点名了 cargo 而调用方没给 --external 拒算、给了出键」
+  FUNCTION_UNITS_BREAK=key-entry-units-dropped  键里不出 entry 行（改前的样子：几个入口互相收进对方的闭包时共用一把键）
+      「键：两个互相收进对方闭包的入口，键不同（一个 trait impl 里的两个方法、python 里互相调用的两个 def：闭包的单元多重集相同，键各是各的）」
+  FUNCTION_UNITS_BREAK=key-entry-doctest-owner-chained  entry 行里文档测试照别的单元沿 Unit.container 往外取所挂条目的指纹（改前的样子：改所挂条目的函数体，文档测试入口的键跟着变）
+      「R-结构：文档测试不连所挂的条目与那个模块的 use」
+  FUNCTION_UNITS_BREAK=unit-graph-key-entry-lines-dropped  unit_graph_key（与 unit-graph 对拍的那一把）不出 entry 行（改前的样子：Rust 那一份的 reuse_key 带了，两边的键对不上）
+      「键：unit_graph_key 照 crates/singlefs-unit-graph 的 reuse_key 带 entry 行（数据行之后、工具链行之前，排序去重；impl 方法入口连 impl 头；文档测试入口记所挂条目的全部文档测试、各一行，闭包从它们一起收）」
+      「键：夹具上 unit_graph_key 与 crates/singlefs-unit-graph 的 unit-graph closure 打的键逐字相同（一个 impl 方法入口、一个文档测试入口；Rust 那一侧是录下的键 ENTRY_LINES_RUST_KEYS）」
+  FUNCTION_UNITS_BREAK=rust-doctest-entry-alone  文档测试入口只取交进来的那一个文档测试（改前的样子：Rust 那一份取所挂条目的全部文档测试，entry 行与闭包对不上）
+      「键：unit_graph_key 照 crates/singlefs-unit-graph 的 reuse_key 带 entry 行（数据行之后、工具链行之前，排序去重；impl 方法入口连 impl 头；文档测试入口记所挂条目的全部文档测试、各一行，闭包从它们一起收）」
+      「键：夹具上 unit_graph_key 与 crates/singlefs-unit-graph 的 unit-graph closure 打的键逐字相同（一个 impl 方法入口、一个文档测试入口；Rust 那一侧是录下的键 ENTRY_LINES_RUST_KEYS）」
+  FUNCTION_UNITS_BREAK=cross-run-cache-under-tmpdir  cross_run_cache_directory 没设 GATE_CROSS_RUN_TMPDIR 时放这一趟的 TMPDIR 底下（改前的样子：缓存被一例自证的临时目录带走）
+      「真仓：跨轮缓存登记表（cross_run_cache_registry）里的每一份，在 TMPDIR 指到一个临时目录、GATE_CROSS_RUN_TMPDIR 没设、在 git 仓里（.git 是目录，或 git worktree 里 .git 是文件）时现取的位置都不落在 TMPDIR 之下；worktree 里落在 git 目录底下的几份与主仓共用 common-dir 那一处」
+  FUNCTION_UNITS_BREAK=cross-run-cache-git-directory-only  git_common_directory_of 只认 <仓>/.git 是目录（改前的样子：worktree 里 .git 是文件，本库两份与
+      crates-mutation-rows.py 的判法单元指纹缓存退回这一趟的 TMPDIR、每趟重算）
+      「真仓：跨轮缓存登记表（cross_run_cache_registry）里的每一份，在 TMPDIR 指到一个临时目录、GATE_CROSS_RUN_TMPDIR 没设、在 git 仓里（.git 是目录，或 git worktree 里 .git 是文件）时现取的位置都不落在 TMPDIR 之下；worktree 里落在 git 目录底下的几份与主仓共用 common-dir 那一处」
+  FUNCTION_UNITS_BREAK=cross-run-cache-run-times-old-spelling  harness-test-environment 那一行退回只认「local run_times_file=」起头的旧写法（脚本现在把取目录与赋值拆开，旧写法在脚本里一行都找不到，现取抛 ValueError）
+      「真仓：跨轮缓存登记表（cross_run_cache_registry）里的每一份，在 TMPDIR 指到一个临时目录、GATE_CROSS_RUN_TMPDIR 没设、在 git 仓里（.git 是目录，或 git worktree 里 .git 是文件）时现取的位置都不落在 TMPDIR 之下；worktree 里落在 git 目录底下的几份与主仓共用 common-dir 那一处」
+  FUNCTION_UNITS_BREAK=cross-run-cache-mentions-unscanned  cross_run_cache_mentions 一份都不扫（提到 GATE_CROSS_RUN_TMPDIR 的脚本漏登记也看不出）
+      「真仓：提到 GATE_CROSS_RUN_TMPDIR 的脚本都登记进跨轮缓存表或在不登记表里写明为什么，不登记表里的每一份都在、都还提到它；夹具里没登记的一份判得出来」
+  FUNCTION_UNITS_BREAK=rust-format-captures-ignored  串字面量里的 {名}（format! 一族的内联捕获）不算裸名
+      「format! 串里内联捕获的常量改了作废」「WGSL 够得到的函数改了作废」
+  FUNCTION_UNITS_BREAK=shell-variable-first-line-only  顶层赋值只取第一行（$(cat <<'词' … 词) 的正文不进那个变量单元）
+      「shell：顶层变量里 here-doc 的正文改了，读它的函数作废」
+  FUNCTION_UNITS_BREAK=tree-copy-tails-ignored  「折不出的目录 + 根里存在的相对路径」（临时树、仓副本里的同一份）不按根里那一份认（shell 与 python）
+      「shell：`bash "$tree/<仓里的相对路径>"` 连到仓里那一份」「python：os.path.join(<折不出的目录>, <仓里的相对路径>) 连到仓里那一份」
+  FUNCTION_UNITS_BREAK=git-repository-paths-unfolded  git rev-parse --show-toplevel / --git-common-dir 不折成根（shell 的 $(…) 与 python 的 subprocess …stdout）
+      「shell：git rev-parse --git-common-dir 折成根，经它 source 的库连上」「python：git rev-parse --git-common-dir 经无参函数的返回值折成根，插进 sys.path 的目录不拒算」「preflight 装载器：只拷了 .claude/ 的小树里 source 与 import 都解到树里的规范副本，两份装载器的闭包不拒算」
+  FUNCTION_UNITS_BREAK=python-call-returns-unfolded  不带参数调仓内模块级函数，不按它各处 return 的值折
+      「python：git rev-parse --git-common-dir 经无参函数的返回值折成根，插进 sys.path 的目录不拒算」「preflight 装载器：只拷了 .claude/ 的小树里 source 与 import 都解到树里的规范副本，两份装载器的闭包不拒算」
+  FUNCTION_UNITS_BREAK=shell-redirect-targets-loaded  重定向的目标当成一条命令留下（写数据的路径被当成装代码）
+      「shell：重定向到变量路径不拒算」
+  FUNCTION_UNITS_BREAK=shell-path-arguments-loaded  参数位置上长得像脚本的路径也当装代码
+      「shell：把路径当参数传给自己的函数不拒算」
+  FUNCTION_UNITS_BREAK=python-command-arguments-loaded  subprocess 命令里脚本后面的路径参数也当装代码
+      「python：写数据的路径与传给 subprocess 的参数不拒算」
+  FUNCTION_UNITS_BREAK=shell-generated-scripts-ignored  单元自己 printf / echo / cat <<词 写出来再起的脚本不认
+      「shell：自己用 cat <<词 写出来再起的脚本不拒算、正文里装的连上」
+  FUNCTION_UNITS_BREAK=shell-inline-positionals-ignored  bash -c '…' <名字> <参数…> 里的 $1…$9 不换成外面那几个词
+      「shell：bash -c '…"$1"…' <名字> <路径> 里的 $1 换成那个路径」
+  FUNCTION_UNITS_BREAK=shell-inline-positionals-escapes-ignored  外层 bash -c 的串里转义的 \\$1 与单引号里的 $1 也换成外面那几个词（改前的样子：
+      套着的里层 bash -c "…\\$1…" 拿到的是外层的 $1，内存包装自证里 python3 -c "\\$1" 折成了包装自己的路径、拒算 python-syntax）
+      「shell：bash -c '…' 里套着的里层 bash -c "…\\$1…"：外层只换没转义的 $1…$9，转义的 \\$1 留给里层照它自己的参数折（里层的 $1 是外层的 $2），连到它 import 的仓内模块」
+  FUNCTION_UNITS_BREAK=shell-copied-scripts-ignored  单元自己 cp <源> <它> 拷出来再起的脚本不连到源
+      「shell：自己 cp 出来再起的脚本连到源那一份」
+  FUNCTION_UNITS_BREAK=shell-enclosing-locals-ignored  套在外层函数里的函数看不见外层的 local
+      「shell：套在外层函数里的函数看得见外层的 local」
+  FUNCTION_UNITS_BREAK=shell-cd-first-directory-only  cd 过去的目录折出几个时，相对路径只按 target_of 的老办法找一处
+      「shell：cd 过去的目录折出几个，相对路径在每一个底下都连」
+  FUNCTION_UNITS_BREAK=shell-data-sources-unfollowed  Rust 闭包读到的 shell 脚本只收它自己的字节，不沿 source / . 收（改前的样子）
+      「Rust 闭包读到的 shell 脚本：它 source 进来的文件收成 data-file 单元，改一处读这份脚本的入口键变、读另一份不 source 它的脚本的入口键不变；被 source 的每一份按读这份脚本的那一处记一条数据位置，unit_graph_key（与 crates/singlefs-unit-graph 对拍的那一把）随它变」
+      「Rust 闭包读到的 shell 脚本：. <路径> 照 source 收（路径经 $(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) 赋的变量），改被引的文件键变」
+      「Rust 闭包读到的 shell 脚本：两层（脚本 source 的库再 source 一份）逐层收，改里层那份键变」「Rust 闭包读到的 shell 脚本：source 的路径折不出拒算 shell-path-unfolded」
+  FUNCTION_UNITS_BREAK=shell-data-sources-unsited  Rust 闭包读到的 shell 脚本 source 进来的文件照收进闭包，不按读那份脚本的那一处记 data_sites（改前的样子：
+      对拍的闭包行与 unit_graph_key 不带它们，crates/singlefs-unit-graph 那一份带，门禁 code-tooling 的 function-units-two-implementations-agree 报「只在 Rust 闭包里」）
+      「Rust 闭包读到的 shell 脚本：它 source 进来的文件收成 data-file 单元，改一处读这份脚本的入口键变、读另一份不 source 它的脚本的入口键不变；被 source 的每一份按读这份脚本的那一处记一条数据位置，unit_graph_key（与 crates/singlefs-unit-graph 对拍的那一把）随它变」
+  FUNCTION_UNITS_BREAK=shell-data-sources-nested-unfollowed  Rust 闭包读到的 shell 脚本只收它自己那一层 source 的，被 source 的那几份再 source 的不收
+      「Rust 闭包读到的 shell 脚本：两层（脚本 source 的库再 source 一份）逐层收，改里层那份键变」
+  FUNCTION_UNITS_BREAK=shell-dot-source-unrecognized  . <路径> 不当 source 认（shell 闭包与 Rust 闭包读到的 shell 脚本都波及）
+      「Rust 闭包读到的 shell 脚本：. <路径> 照 source 收（路径经 $(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) 赋的变量），改被引的文件键变」
+  FUNCTION_UNITS_BREAK=shell-data-source-refusals-dropped  Rust 闭包读到的 shell 脚本里 source 的路径折不出不拒算
+      「Rust 闭包读到的 shell 脚本：source 的路径折不出拒算 shell-path-unfolded」
+  FUNCTION_UNITS_BREAK=python-dispatch-tables-ignored  字典字面量里当值写的函数名不连边
+      「python：分派表（字典字面量）里的函数改了作废」
+  FUNCTION_UNITS_BREAK=python-module-constants-unfolded  import 进来的仓内模块常量 module.NAME 不折
+      「python：import 进来的模块常量（module.NAME）折进路径，插进 sys.path 的目录连上」
+  FUNCTION_UNITS_BREAK=python-getattr-stdlib-refused  getattr(<标准库或外部模块>, 变量) 照样拒算
+      「python：getattr(<标准库模块>, 变量名) 不拒算（够不到仓里的代码）」
+  FUNCTION_UNITS_BREAK=python-subscript-targets-rebind  表[k] = … 当成重新绑定 k
+      「python：表[路径] = … 不当成重新绑定路径，spec 载入照样折得出」
+  FUNCTION_UNITS_BREAK=python-environment-defaults-unfolded  os.environ.get(…) or <缺省> 不按缺省折
+      「python：os.environ.get(…) or <缺省路径> 按缺省折，连到那份脚本」
+  FUNCTION_UNITS_BREAK=python-written-scripts-ignored  单元自己 open(…, "w") 写出字面文本再起的脚本不认
+      「python：自己写出字面文本再起的脚本不拒算」
+  FUNCTION_UNITS_BREAK=python-loop-variables-unfolded  for 循环变量不取遍元组 / 列表的元素
+      「python：for 循环变量取遍元组里的目录，插进 sys.path 不拒算、各目录里的同名模块都连」
+  FUNCTION_UNITS_BREAK=python-imports-first-directory-only  同一个模块名在 sys.path 插的几个目录里各有一份时只连第一份
+      「python：for 循环变量取遍元组里的目录，插进 sys.path 不拒算、各目录里的同名模块都连」
+  FUNCTION_UNITS_BREAK=python-import-names-unfolded  importlib.import_module(<折得出的名字>) 照样拒算
+      「python：importlib.import_module(<模块级常量>) 折出模块名」
+  FUNCTION_UNITS_BREAK=python-path-tables-unfolded  路径表（模块级字典字面量）[键] 不折
+      「python：路径表（字典字面量）[键] 取遍表里的路径，spec 载入连上」
+  FUNCTION_UNITS_BREAK=python-comprehension-scope-leaks  推导式里的循环变量算成函数里的赋值
+      「python：推导式里的循环变量不算函数里的赋值，for 取遍元组拼出的脚本连上」
+  FUNCTION_UNITS_BREAK=python-directory-wildcards-ignored  os.path.join(<仓里的目录>, <折不出的文件名>) 起的脚本不连到那个目录里的每一份
+      「python：os.path.join(<仓里的目录>, <折不出的文件名>) 起的脚本连到那个目录里每一份」
+  FUNCTION_UNITS_BREAK=inline-scripts-ignored  -c 的串、喂给标准输入的脚本不当内联脚本认（回到既不连边也不拒算）
+      「shell：python3 -c '<字面串>' 当内联脚本切，sys.argv 折成后面的词，连到它 import 的仓内模块」「shell：python3 - <<'PY' 喂的 here-doc 当内联脚本切，连到它 import 的仓内模块」「shell：python3 -c / bash -c 的串带折不出的展开拒算 inline-script-not-literal」「shell：bash -c "$串" 的串折得出就切开再认，连到它起的脚本」「python：[sys.executable, "-c", <字面串>, …] 当内联脚本切，连到它 import 的仓内模块」「python：-c 的串折不出拒算 inline-script-not-literal」
+  FUNCTION_UNITS_BREAK=shell-later-interpreters-ignored  一条命令里只认第一个解释器
+      「shell：一条命令里第二个解释器（bash 包装脚本 N python3 x.py）照第一个的规则认，连到 x.py」
+  FUNCTION_UNITS_BREAK=shell-substitutions-ignored  命令替换 $( … ) 与进程替换 <( … ) 里的命令不认
+      「shell：起同目录脚本连边（写在命令替换里：x="$(bash 同目录/y.sh)"）」「shell：< <(命令 "$x") 里的命令照命令认，前面那个 < 不吞掉它的第一个词」
+  FUNCTION_UNITS_BREAK=external-program-words-unfiltered  带空白的串、消息命令（echo / printf / die / bad / howto）后面的词照样当外部程序名
+      「shell：die 消息里出现 qemu-system-x86_64 不算外部程序」
+  FUNCTION_UNITS_BREAK=python-modules-ignored  python3 -m <模块> 不认
+      「shell：python3 -m <仓内模块> 连到那份模块的程序入口」「python：-m unittest <测试模块> 整份连上（测试方法改了作废）」
+  FUNCTION_UNITS_BREAK=shell-unfolded-commands-allowed  命令位置上折不出的程序不拒算
+      「shell：命令位置上折不出的程序拒算 shell-command-unfolded」
+  FUNCTION_UNITS_BREAK=shell-wrapped-commands-ignored  包装命令（env、nice、timeout…）后面直接执行的脚本不认
+      「shell：包装命令（timeout 60）后面直接执行的脚本连上」
+  FUNCTION_UNITS_BREAK=shell-command-structure-ignored  [[ … ]]、(( … ))、case 模式、数组字面量照普通命令切，{ … } 后面的重定向不管组里的命令
+      「shell：[[ … || … ]]、(( … ))、case 分支的模式、数组字面量里的词不当命令」「shell：{ python3 /dev/fd/3 …; } 3<<'PY'（重定向写在组后面）照内联脚本切」
+  FUNCTION_UNITS_BREAK=shell-subscript-assignment-split  名字[下标]=值 的下标里有空格时按空格切开，前半截当命令
+      「shell：名字[下标]=值、名字[下标]+=值（下标里带空格与展开）照赋值认、不当命令」
+  FUNCTION_UNITS_BREAK=shell-array-commands-unfolded  "${数组[@]}" 当命令时不按字面赋值摊开
+      「shell："${数组[@]}" 当命令时按数组的字面赋值摊开，连到它起的脚本」
+  FUNCTION_UNITS_BREAK=shell-heredoc-captures-unfolded  $(cat <<'词' …) 与 $(只打字面行的函数) 不折成正文
+      「shell：python3 -c "$(打印正文的函数)" 折出函数打的那几行当内联脚本」
+  FUNCTION_UNITS_BREAK=declared-checks-ignored  文件头登记的 check 判据不连、上游 preflight 跑它们的那一处照样拒算
+      「shell：文件头登记的 check 判据（preflight 开跑前跑）照内联 bash 认，连到它起的脚本」「python：上游 preflight 跑文件头登记的判据（bash -c declaration.command）不拒算，判据从声明它的脚本连」
+  FUNCTION_UNITS_BREAK=inline-argv-commands-ignored  内联 python exec sys.argv[k:] 时不把后面的词当命令
+      「shell：内联 python exec sys.argv[1:] 时后面那几个词照命令认」
+  FUNCTION_UNITS_BREAK=python-unfolded-heads-allowed  python 命令位置上折不出的程序不拒算
+      「python：变量解释器折不出拒算 subprocess-command-unfolded」
+  FUNCTION_UNITS_BREAK=python-commands-literal-only  python 的命令只认字面列表与只赋过一次列表的名字（认不出的不拒算）
+      「python：命令是 [解释器] + 参数（按调用处给的列表折）连到那份脚本」「python：认不出的命令（对象的属性）拒算 subprocess-command-unfolded」
+  FUNCTION_UNITS_BREAK=python-path-programs-refused  shutil.which(…) 与 os.path.join(<折不出的目录>, <根外的字面尾巴>) 起的程序照样拒算
+      「python：shutil.which(…) 与 os.path.join(<折不出的目录>, "bin/x") 起的根外程序不拒算」「python：内联脚本起 sys.argv[k]（取的是起它那份脚本的 "$1"）不拒算：程序是调用处给的词」
+  FUNCTION_UNITS_BREAK=python-command-dictionaries-unfolded  命令里的 字典[<字面键>] 不折回字典字面量
+      「python：命令里的 *选项["键"] 折回调用处给的字典字面量，连到那份脚本」
+  FUNCTION_UNITS_BREAK=python-dispatch-calls-ignored  分派表[键](…) 不算对表里那几个函数的调用（参数折不到那一处调用给的实参）
+      「python：经分派表 表[键](…) 调到的函数，命令参数按那一处调用折」
+  FUNCTION_UNITS_BREAK=python-slice-unpacking-unpaired  a, b = s[k:k+2] 不逐个对上 s[k]、s[k+1]（内联脚本拆包 sys.argv[1:13] 折不出，sys.path.insert 拒算 sys-path-unfolded）
+      「shell：exec python3 -B /dev/fd/3 … 3<<'PY' 里 (目录, 标签) = sys.argv[1:3] 拆包逐个对上，sys.path.insert(0, 目录) 折得出、连到它 import 的仓内模块」
   与 crates/singlefs-unit-graph 对齐的那几条（自证里 ALIGNMENT_FIXTURE 与 CLOSURE_RULES_FIXTURE 那几格）：
-  rust-module-heads-unlinked       单元不连模块头，也不连把它所在文件连进模块树的 mod 声明
-  rust-module-declarations-unlinked 单元不连把它所在文件连进模块树的 mod 声明（模块头照连）
-  rust-use-names-resolved          use 单元里的名字往下解（引进的名字全带进闭包）
-  rust-use-aliases-unresolved      use a::b as c 里用到 c 的不按 b 再解
-  rust-trait-impls-by-trait-arguments R-隐式另按 trait 参数里的类型认 trait impl
-  rust-kind-names-hyphenated       输出行的种类名退回旧拼法（macro、item-macro、mod-decl、extern-block、extern-crate、wgsl-entry、wgsl-fn…）
-  rust-qualified-names-file-local  输出行的限定名退回文件里的嵌套路径（不带 crate、目标与模块路径前缀）
-  rust-doctest-fingerprint-from-rows 文档测试的指纹取代码块原文（随代码块里的注释变）
-  rust-module-heads-dropped        不切模块头（行内模块头与文件开头的 #![…]），模块里的单元也就不连它
-  rust-data-dump-unlisted          dump 不列数据行
-  wgsl-external-names-by-long-identifiers WGSL 外名退回旧口径：串的值与闭包里长于 3 个字符的标识符里出现就算有着落
-  wgsl-external-name-sources-unlinked WGSL 入口的闭包不带给外名着落的 Rust 单元（着落不做成边）
-  rust-escaped-brace-captures-skipped 格式串里转义的 {{ 后面紧跟的捕获（{{{名}}}）不算裸名
-  rust-union-as-keyword            条目级宏调用可能定义的名字里另去掉 union（把上下文关键字当关键字）
+  FUNCTION_UNITS_BREAK=rust-module-heads-unlinked  单元不连模块头，也不连把它所在文件连进模块树的 mod 声明
+      「R-结构：改文件开头的 #![…]，经 mod 声明连进来的子模块里的入口作废」「R-结构：改行内模块头的内属性，只那个模块里的入口作废」
+  FUNCTION_UNITS_BREAK=rust-module-declarations-unlinked  单元不连把它所在文件连进模块树的 mod 声明（模块头照连）
+      「R-结构：改文件开头的 #![…]，经 mod 声明连进来的子模块里的入口作废」
+  FUNCTION_UNITS_BREAK=rust-use-names-resolved  use 单元里的名字往下解（引进的名字全带进闭包）
+      「R-结构：use 引进的名字不往下解，没用到的那个改了不作废」
+  FUNCTION_UNITS_BREAK=rust-use-aliases-unresolved  use a::b as c 里用到 c 的不按 b 再解
+      「R-结构：use a::b as c 之后调 c()，按 b 再解」
+  FUNCTION_UNITS_BREAK=rust-trait-impls-by-trait-arguments  R-隐式另按 trait 参数里的类型认 trait impl
+      「R-隐式：只点名 trait 参数里的类型，那个 trait impl 不进闭包」
+  FUNCTION_UNITS_BREAK=rust-kind-names-hyphenated  输出行的种类名退回旧拼法（macro、item-macro、mod-decl、extern-block、extern-crate、wgsl-entry、wgsl-fn…）
+      「dump：种类名照 crates/singlefs-unit-graph 的拼法（macro_rules、item_macro、mod、mod_head、wgsl_compute）」
+  FUNCTION_UNITS_BREAK=rust-qualified-names-file-local  输出行的限定名退回文件里的嵌套路径（不带 crate、目标与模块路径前缀）
+      「dump：限定名带 crate、目标与模块路径前缀，文档测试写 <模块>::<doctest line 行>」
+  FUNCTION_UNITS_BREAK=rust-doctest-fingerprint-from-rows  文档测试的指纹取代码块原文（随代码块里的注释变）
+      「文档测试：代码块里只改注释指纹不变、改代码指纹变」
+  FUNCTION_UNITS_BREAK=rust-module-heads-dropped  不切模块头（行内模块头与文件开头的 #![…]），模块里的单元也就不连它
+      「模块头：#![…] 与行内模块头切成单元，模块里的单元连它，改内属性作废」
+  FUNCTION_UNITS_BREAK=rust-data-dump-unlisted  dump 不列数据行
+      「dump：include_str! 读的数据文件按读它的那一处列一行 data」
+  FUNCTION_UNITS_BREAK=wgsl-external-names-by-long-identifiers  WGSL 外名退回旧口径：串的值与闭包里长于 3 个字符的标识符里出现就算有着落
+      「WGSL 外名：首段连 _ 落在 macro_rules! 体或串字面量里有着落」「WGSL 外名：只在别的单元的长标识符里出现的拒算」
+  FUNCTION_UNITS_BREAK=wgsl-external-name-sources-unlinked  WGSL 入口的闭包不带给外名着落的 Rust 单元（着落不做成边）
+      「WGSL 外名的着落做成边：给名字的 Rust 单元改了 WGSL 入口作废」
+  FUNCTION_UNITS_BREAK=rust-escaped-brace-captures-skipped  格式串里转义的 {{ 后面紧跟的捕获（{{{名}}}）不算裸名
+      「format! 串里 {{{名}}}（转义的 {{ 后紧跟的捕获）改了作废」
+  FUNCTION_UNITS_BREAK=rust-union-as-keyword  条目级宏调用可能定义的名字里另去掉 union（把上下文关键字当关键字）
+      「条目级宏调用里的 union 算它可能定义的名字」
+  FUNCTION_UNITS_BREAK=rust-assume-specifications-unrecognized  verus! 里的 assume_specification 不算条目起头、不切成单元（带 pub 的拒算 unknown-item，不带 pub 的吞进前一条）
+      「verus!：assume_specification 带属性带 pub、不带 pub 带参数表与 ensures、带泛型参数表三种写法各切成一个单元（种类、名字、起止、按点名路径末段的名字找得到），dump 一条拒算都没有，后面的 spec fn 照旧自成单元」「verus!：点到常量的入口按名字连上它的 assume_specification，改它交回的值形式化键变」
+  FUNCTION_UNITS_BREAK=rust-assume-specification-names-unlinked  assume_specification 不按点名路径末段的名字找（点到那个名字的闭包不收它，改它交回的值键不变）
+      「verus!：assume_specification 带属性带 pub、不带 pub 带参数表与 ensures、带泛型参数表三种写法各切成一个单元（种类、名字、起止、按点名路径末段的名字找得到），dump 一条拒算都没有，后面的 spec fn 照旧自成单元」「verus!：点到常量的入口按名字连上它的 assume_specification，改它交回的值形式化键变」
+  FUNCTION_UNITS_BREAK=rust-dependency-features-from-every-section  解特性时每个链进来的 crate 的普通、dev、build 三段依赖都顺（dev 依赖里才开的特性进了 bin 与别的 crate）
+      「R-目标：入口 crate 的 dev 依赖里才开的特性，不按 cfg(test) 编的 bin 当它没开，集成测试当它开着」「R-目标：经普通依赖链进来的 crate，它的 dev 依赖里开的特性哪个目标都不顺」
+  FUNCTION_UNITS_BREAK=rust-verus-semicolon-split-off  verus! 里 } 之后紧跟的 ; 当下一个条目起头（不进前一个条目，const X: S = S { … }; 的指纹少它）
+      「verus!：} 之后紧跟的 ; 归前一个条目（结构体字面量当初值的 const 与 impl 里的关联 const），指纹是连 ; 在内的词法单元以 0x1f 连的 sha256，后面的条目照旧切开」
+    （这四条在自证里 unit_graph_parity_cells 那几格）
   4-3d（定案 2、3）那几条（自证里 unit_divergence_cells 那几格）：
-  rust-cfg-atoms-unnarrowed        键里的 cfg 退回整套生效 cfg（不按闭包真引到的收窄）
-  rust-cfg-macro-atoms-ignored     cfg 原子只取单元的条件链，不扫词法单元里的 cfg!、语句上的 #[cfg] 与 #[cfg_attr]
-  wgsl-defined-name-suffixes-ignored WGSL 外名不认「常量、静态量、条目级宏调用定义的名字或它以 _ 加外名收尾」这一条
-  wgsl-prefix-remainders-unchecked WGSL 外名的首段规则不核其余那一段
-  wgsl-name-suppliers-not-pulled-in Rust 入口的闭包不把闭包外供外名的单元并进来（着落不做成边）
-  wgsl-modules-per-naming-unit     WGSL 模块退回按点名读 .wgsl 的常量的那个单元一组一组拼
-  rust-trait-self-paths-ignored    trait 成员里的 Self::x 不落到 trait 自己的成员（退回旧口径：落到自身类型名是 trait 名的 impl）
-  rust-doctest-structure-linked    文档测试照普通单元连所挂的条目与那个模块的 use
-  rust-use-self-imports-ignored    use 花括号里的 self 不引进 { 前面那一段
-  rust-open-by-trait-arguments     R-开放另按 trait 参数里的名字找 impl（dyn Sink 带进 impl Wrap<dyn Sink> for H）
-  rust-blanket-impls-ignored       R-方法、R-路径不放行 blanket impl，trait 头进闭包不带它的 blanket impl
+  FUNCTION_UNITS_BREAK=rust-cfg-atoms-unnarrowed  键里的 cfg 退回整套生效 cfg（不按闭包真引到的收窄）
+      「cfg 成分：闭包没引到 gpu 的入口，带不带 gpu 特性两种目标下键相同」
+  FUNCTION_UNITS_BREAK=rust-cfg-macro-atoms-ignored  cfg 原子只取单元的条件链，不扫词法单元里的 cfg!、语句上的 #[cfg] 与 #[cfg_attr]
+      「cfg 成分：闭包里有 cfg!、语句上的 #[cfg] 或 #[cfg_attr] 引到 gpu 的入口，带不带 gpu 特性键不同」
+  FUNCTION_UNITS_BREAK=wgsl-defined-name-suffixes-ignored  WGSL 外名不认「常量、静态量、条目级宏调用定义的名字或它以 _ 加外名收尾」这一条
+      「WGSL 外名：条目级宏调用定义的名字以 _ 加外名收尾就有着落」「WGSL 外名的着落做成边：只靠外名点到的条目级宏调用并进闭包，改它里面的码键变」
+  FUNCTION_UNITS_BREAK=wgsl-prefix-remainders-unchecked  WGSL 外名的首段规则不核其余那一段
+      「WGSL 外名：首段只落在无关的串里、其余那一段哪儿都没有的拒算」
+  （「WGSL 外名的着落做成边：只靠外名点到的…」「WGSL 外名的着落不收测试函数：…」两格，自证判时另关 rust-macro-rules-literal-names-unlinked，只看着落那条边）
+  FUNCTION_UNITS_BREAK=wgsl-name-suppliers-not-pulled-in  Rust 入口的闭包不把闭包外供外名的单元并进来（着落不做成边）
+      「WGSL 外名的着落做成边：只靠外名点到的条目级宏调用并进闭包，改它里面的码键变」
+  FUNCTION_UNITS_BREAK=wgsl-name-suppliers-include-test-code  名字供给者连带 #[test] fn 与 #[cfg(test)] 模块里的单元一起收（改前的样子）
+      「WGSL 外名的着落不收测试函数：串里有外名的 #[test] fn 不并进闭包，改它的函数体键不变，改真给名字的宏调用键变」
+  FUNCTION_UNITS_BREAK=wgsl-modules-per-naming-unit  WGSL 模块退回按点名读 .wgsl 的常量的那个单元一组一组拼
+      「WGSL：闭包读到的几份 .wgsl 合成一个模块，名字跨文件解」
+  FUNCTION_UNITS_BREAK=rust-trait-self-paths-ignored  trait 成员里的 Self::x 不落到 trait 自己的成员（退回旧口径：落到自身类型名是 trait 名的 impl）
+      「R-路径：trait 成员里的 Self::x 落到这个 trait 自己的成员 x」
+  FUNCTION_UNITS_BREAK=rust-doctest-structure-linked  文档测试照普通单元连所挂的条目与那个模块的 use
+      「R-结构：文档测试不连所挂的条目与那个模块的 use」
+  FUNCTION_UNITS_BREAK=rust-use-self-imports-ignored  use 花括号里的 self 不引进 { 前面那一段
+      「R-结构：use a::{self} 引进名字 a，只写 a::f() 的单元连上这条 use」
+  FUNCTION_UNITS_BREAK=rust-open-by-trait-arguments  R-开放另按 trait 参数里的名字找 impl（dyn Sink 带进 impl Wrap<dyn Sink> for H）
+      「R-开放：dyn Trait 只带 Trait 自己的 impl，不带只在 trait 参数里写了它的 impl」
+  FUNCTION_UNITS_BREAK=rust-blanket-impls-ignored  R-方法、R-路径不放行 blanket impl，trait 头进闭包不带它的 blanket impl
+      「R-方法：blanket impl 够得到的方法算边，改它作废」
   4-3h 那两条（自证里 unit_divergence_cells 里 4-3k 那两格之前的两格）：
-  rust-underscore-items-named      const _ / static _ 照名字 _ 进 R-裸名的着落（let _ = …、_ => 里的 _ 把它们拉进闭包）
-  rust-includes-outside-root-refused include_str! 一类读根外的文件一律拒算 include-missing（读得到也拒）
+  FUNCTION_UNITS_BREAK=rust-underscore-items-named  const _ / static _ 照名字 _ 进 R-裸名的着落（let _ = …、_ => 里的 _ 把它们拉进闭包）
+      「R-裸名：const _ 没有名字，let _ 与 _ => 不把 gpu 特性下的 const _ 拉进闭包，带不带 gpu 特性键相同」
+  FUNCTION_UNITS_BREAK=rust-includes-outside-root-refused  include_str! 一类读根外的文件一律拒算 include-missing（读得到也拒）
+      「include_str! 读根外的文件：读得到收成数据单元、改它键变，读不到拒算 include-missing」
   实验准入入口那一条（自证里「Rust：清单目录往上拼出仓根」那一格；admission.py --selftest 拿真仓 scripts/experiment-apparatus/lib.rs 的那一格同样转红）：
-  rust-manifest-directory-reads-unrefused Path::new(env!("CARGO_MANIFEST_DIR")).join(…) 拼出的是目录（仓根这一类）也不拒算 runtime-path（「读路径都不拒算」那种放宽）
+  FUNCTION_UNITS_BREAK=rust-manifest-directory-reads-unrefused  Path::new(env!("CARGO_MANIFEST_DIR")).join(…) 拼出的是目录（仓根这一类）也不拒算 runtime-path（「读路径都不拒算」那种放宽）
+      「Rust：清单目录往上拼出仓根（目录）拒算 runtime-path；点名清单目录里一份文件再往上取仓根的不拒算、那份文件的字节进键」
+  FUNCTION_UNITS_BREAK=rust-manifest-directories-refused  清单目录折出 crates/ 之下的目录也一律拒算 runtime-path（不收成数据目录；改前的样子）
+      「Rust：清单目录折出 crates/ 之下的目录收成数据目录（直接写、绑 let 变量、经私有常量），目录里一份文件改了键变、闭包外的改了键不变；crates/ 整个与变量上接别的方法的拒算 runtime-path」
+  FUNCTION_UNITS_BREAK=rust-manifest-binding-refused-whole  清单目录绑给 let 的，不是能收的目录不跟、有一处用法折不出就整处拒算、一条读都不记（改前的样子）
+      「Rust：清单目录绑给 let 变量的，一处 .join(变量) 折不出、一处折出文件：这个单元拒算 runtime-path、那份文件照记一条 data 读（绑的是清单目录本身与 crates/ 整个都一样）；别名再绑一层、Path::new(别名) 接的链照跟」
+  FUNCTION_UNITS_BREAK=rust-current-exe-refused  Command::new(current_exe()) 的写法一律不认（起了子进程的函数里折不出测试名，拒算 current-exe；改前的样子）
+      「Rust：current_exe() 交给 Command::new 起子进程、--exact 后面点名的测试（常量、参数、字面与常量拼的）连到那条 #[test]，改它的函数体键变、改别的测试键不变；点名不存在的、测试名写在 --exact 前面的照旧拒算 current-exe」
+  FUNCTION_UNITS_BREAK=rust-current-exe-children-unlinked  折得出子进程测试名也不连边（改前不拒算的样子：子进程测试的函数体改了键不变）
+      「Rust：current_exe() 交给 Command::new 起子进程、--exact 后面点名的测试（常量、参数、字面与常量拼的）连到那条 #[test]，改它的函数体键变、改别的测试键不变；点名不存在的、测试名写在 --exact 前面的照旧拒算 current-exe」
+  FUNCTION_UNITS_BREAK=rust-current-exe-path-only-refused  只问路径、同一函数里不起子进程的 current_exe() 也拒算 current-exe（改前的样子）
+      「Rust：current_exe() 只问路径、同一函数里不起 Command 的不拒算：键算得出，改它的函数体键变、改别的测试键不变」
+  FUNCTION_UNITS_BREAK=rust-current-exe-spawn-unrefused  起了子进程的函数里，折不出测试名的 current_exe() 也不拒算 current-exe
+      「Rust：同一函数里起 Command 的 current_exe() 照旧按起自己判：折得出测试名的连边，折不出的（没有 --exact、路径先存进变量再交 Command::new、点名不存在的）拒算 current-exe」
+  FUNCTION_UNITS_BREAK=rust-current-exe-constants-same-file-only  常量名只在起子进程那个单元所在的那一份文件里找（改前的样子；常量定义在同包别的文件里的拒算 current-exe）
+      「Rust：current_exe() 的测试名里的常量定义在同包另一份文件里，--exact 后面用它：连到那条 #[test]、不拒算，改它的函数体键变、改别的测试键不变；同名常量在同包两份文件里值不同的照旧拒算 current-exe」
+  FUNCTION_UNITS_BREAK=closure-directory-lines-span-files  命令行 closure 与 key 把数据目录单元打成它自己那一行（<目录>:1-<文件数>；改前的样子）
+      「命令行 closure：数据目录单元按读它的那一处列（data-directory 加目录、读它的文件与行、目录指纹），不打成 <目录>:1-<文件数>」
+  FUNCTION_UNITS_BREAK=rust-lex-cache-unverified  Rust 词法单元的磁盘缓存文件名只取文本长度（缓存不核内容）
+      「Rust 词法单元的磁盘缓存：同一份文本第二次取缓存、与现切的逐项相同；改一个字符（长度不变）不沿用、切出来的随文本变；缓存文件坏了照常现切」
   4-3k 那两条（自证里 unit_divergence_cells 末尾两格）：
-  rust-blanket-self-parameter-only blanket 退回旧判法：自身类型里头一个名字是泛型参数才算（Box<T>、Option<Box<T>>、Sealed<T> 的 impl 不算）
-  wgsl-other-file-definitions-unlinked WGSL 外名在链接集里别的 include_str! 读进来的 .wgsl 里有定义时，不把读它的 Rust 单元与那份 .wgsl 拉进闭包
+  FUNCTION_UNITS_BREAK=rust-blanket-self-parameter-only  blanket 退回旧判法：自身类型里头一个名字是泛型参数才算（Box<T>、Option<Box<T>>、Sealed<T> 的 impl 不算）
+      「R-方法：自身类型里出现泛型参数的 impl（(T, u32)、[T]、[T; N]、Box<T>、Option<Box<T>>、Sealed<T>）都按 blanket 放行，改 Sealed<T> 那一份作废」
+  FUNCTION_UNITS_BREAK=wgsl-other-file-definitions-unlinked  WGSL 外名在链接集里别的 include_str! 读进来的 .wgsl 里有定义时，不把读它的 Rust 单元与那份 .wgsl 拉进闭包
+      「WGSL 外名在链接集里别的 include_str! 读进来的 .wgsl 里有定义：读它的 Rust 单元与那份 .wgsl 拉进闭包，改那个常量作废」
   import 时执行的模块级语句与不走的子进程边（自证里 import_time_cells 那几格）：
-  python-import-time-statements-ignored 模块有单元进闭包时不收它的模块级 import、赋值、类头与 def 头（C890 的样子）
-  python-def-heads-ignored         不切 def-head（装饰器与缺省值不进闭包）
-  python-import-time-classes-named 只因 import 时执行收进来的类头也算被点名、连方法
-  program-edge-exclusions-ignored  EXCLUDED_PROGRAM_EDGES 登记的子进程边照连
-  program-edge-exclusions-shell-ignored  EXCLUDED_PROGRAM_EDGES 只认 python 单元起的，shell 函数起的照连（内存包装的 broadcast_memory_released 那一条）
-  产品行为视图那两条（自证里 product_view_cells 那几格）：
-  product-view-kept-formal         不剥：产品行为视图照原样那一份（不取 Rust 那一份，规格与证明照进键）
-  product-view-strips-executable-code 剥到执行代码：verus! 块里的单元一律当只给 Verus 看的（被调到的执行代码也不进键）
+  FUNCTION_UNITS_BREAK=python-import-time-statements-ignored  模块有单元进闭包时不收它的模块级 import、赋值、类头与 def 头（C890 的样子）
+      「python：import 时执行的模块级 import、赋值、类头与 def 缺省值改了让程序退出码变的，入口的键都变（键不变而退出码变的必红，对照那一种必须认出）」
+  FUNCTION_UNITS_BREAK=python-def-heads-ignored  不切 def-head（装饰器与缺省值不进闭包）
+      「python：import 时执行的模块级 import、赋值、类头与 def 缺省值改了让程序退出码变的，入口的键都变（键不变而退出码变的必红，对照那一种必须认出）」
+  FUNCTION_UNITS_BREAK=python-import-time-classes-named  只因 import 时执行收进来的类头也算被点名、连方法
+      「python：只因 import 时执行收进来的类头不算被点名，类里的 __init__ 改了不作废」
+  FUNCTION_UNITS_BREAK=python-main-guard-conjunctions-unrecognized  if __name__ == "__main__" and …: 不当 main-guard，留在 module-body（改前的样子：被 import 的模块的自证分支连进闭包）
+      「python：被 import 的模块里 if __name__ == "__main__" and …: 那一段不进闭包（自证分支不收），块外的模块级语句与认不出的形态（带 else、__name__ 那一项不在最左）照收」
+      「真仓：以 scripts/hosts/memory_peaks_lib.py 的 command_key 为判法入口，闭包不收它的自证（run_self_test、self_test_cells），改 self_test_cells 的函数体判法单元指纹不变」
+  FUNCTION_UNITS_BREAK=python-main-guards-last-only  一份文件里几段 main-guard 只留末一段（改前的样子：前面几段被后面的盖掉、哪儿都不收）
+      「python：被起的程序里每一段 main-guard 都收（if __name__ == "__main__" and …: 那一段与后面另一段），起它的参数不是字面量也连自证分支」
+  FUNCTION_UNITS_BREAK=python-main-guard-else-dropped  if __name__ == "__main__": … else: … 连 else 整段当 main-guard（改前的样子：被 import 时 else 那一支哪儿都不收）
+      「python：if __name__ == "__main__": … else: … 被 import 时 else 那一支照收、if 那一支不收；被当程序起时 if 那一支照收」
+  FUNCTION_UNITS_BREAK=program-edge-exclusions-ignored  EXCLUDED_PROGRAM_EDGES 登记的子进程边照连
+      「不走的子进程边（夹具）：登记了的 python 单元起的那一条不连、同一个单元起的另一个程序照连、不登记时那一条照连」
+      「不走的子进程边（夹具）：登记了的 shell 函数起的那一条不连、同一个函数起的另一个程序照连、不登记时那一条照连」
+      「不走的子进程边（真仓 E183 准入）：切边前后少掉的单元都在 admission.py 当程序起的闭包里（只经这条边可达），且确实少了 admission.py」
+  FUNCTION_UNITS_BREAK=program-edge-exclusions-shell-ignored  EXCLUDED_PROGRAM_EDGES 只认 python 单元起的，shell 函数起的照连
+      「不走的子进程边（夹具）：登记了的 shell 函数起的那一条不连、同一个函数起的另一个程序照连、不登记时那一条照连」
+      「不走的子进程边（真仓 E183 准入）：切边前后少掉的单元都在 admission.py 当程序起的闭包里（只经这条边可达），且确实少了 admission.py」
+  FUNCTION_UNITS_BREAK=excluded-edge-exit-unmeasured  改坏被切的程序之后不重跑包装，退出码照改前记
+      「不走的子进程边（夹具）：切了边的程序改坏后包装退出码变了而键不变的必红（对照 leak.py 必须认出），吞掉退出码的 quiet.py 不红」
+  FUNCTION_UNITS_BREAK=admission-edge-admitted-sample  准入异常那几个假准入里多跑一个放行的（退 0、打带 sha256 的 E7INPUT 行），计划往下走、起编译
+      「不走的子进程边（真仓 E183 准入）：准入这条路上的异常（崩、被杀、退 77、退 3、退 0 不打行、打别的行）只让计划那一步退非 0、不起编译、不写计划，读数出不来」
+  FUNCTION_UNITS_BREAK=admission-edge-header-unstripped  判法读产物前不去掉 E7INPUT 行
+      「不走的子进程边（真仓 E183 准入）：准入往标准输出打的只有 E7INPUT 行（键算出、拒算两样），判法读产物前去掉这几行之后读数一行不差」
+  FUNCTION_UNITS_BREAK=admission-edge-reach-unmeasured  不量 admission.py 当程序起的闭包（当它是空的）
+      「不走的子进程边（真仓 E183 准入）：切边前后少掉的单元都在 admission.py 当程序起的闭包里（只经这条边可达），且确实少了 admission.py」
+  FUNCTION_UNITS_BREAK=judging-entry-literals-unfolded  判法入口的登记只认字面量（JUDGING_ENTRIES = A + (...) 折不出）
+      「真仓：判法入口从登记现取（registered_judging_entries），形式化入口与包装入口都在里面、都认得出」「真仓：登记的每个判法入口的闭包都不拒算（拒算的那一路判定一条都写不进库），夹具里的 globals() 查找判得出来」
+  FUNCTION_UNITS_BREAK=judging-entry-refusals-ignored  判法入口闭包里的拒算一条都不报
+      「真仓：登记的每个判法入口的闭包都不拒算（拒算的那一路判定一条都写不进库），夹具里的 globals() 查找判得出来」
+  FUNCTION_UNITS_BREAK=judging-entry-workers-head-word  判法入口拒算的并行进程数照改前的读法取登记文件的头一个词，读不出就不用登记的数（退回 1 个进程；那份文件头一个词是 #，总读不出）
+      「判法入口拒算的并行进程数：没设 SINGLEFS_THREAD_CAP 取登记的每台默认重活线程数（头一行是注释的登记文件照样取到），设了照它，不退回按核数算」
+  产品行为视图那五条（自证里 product_view_cells 那几格）：
+  FUNCTION_UNITS_BREAK=product-view-kept-formal  不剥：产品行为视图照原样那一份（不取 Rust 那一份，规格与证明照进键）
+      「产品行为视图：引理里加一句 assert(true);，产品行为键不变、形式化键变」「产品行为视图：verus! 里执行函数的 ensures 改了，产品行为键不变」
+  FUNCTION_UNITS_BREAK=product-view-strips-executable-code  剥到执行代码：verus! 块里的单元一律当只给 Verus 看的（被调到的执行代码也不进键）
+      「产品行为视图：verus! 里被调到的执行代码改了，产品行为键变」
+  FUNCTION_UNITS_BREAK=product-view-edges-from-the-written-tokens  不用剥过的那一份：有 verus! 块的文件一律照原样那一份（规格与证明里点到的执行侧条目照进闭包）
+      「产品行为视图：只在规格里点到的执行侧条目（ghost 字段的类型、ensures、let ghost、proof 块、循环头里点到的结构体）不进闭包，闭包与 unit-graph 剥完再收的那一份逐个相同」
+  FUNCTION_UNITS_BREAK=product-view-blanking-unverified  剥过的那一份不与 Rust 那一份核就用
+      「产品行为视图：这一份剥出来的与 Rust 那一份交的核不上，照原样那一份收（闭包只多不少，规格里点到的结构体照收）」
+  FUNCTION_UNITS_BREAK=product-view-verifier-attributes-kept  不剥外属性 #[verifier::…] / #[verifier(…)]（Rust 那一份剥了，单元起始行对不上，拒算 product-view-unmatched）
+      「产品行为视图：verus! 里的执行函数只多一行 #[verifier::external_body]，产品行为视图配得上、产品行为键不变」
+      「产品行为视图：没有 verus! 块的文件里的函数只多一行 #[verifier::external_body]，产品行为视图配得上、产品行为键不变」
 
 折叠认的写法（上面各开关管的那几条；推的，没有夹具钉住的不写在这里）：
   临时树、仓副本、worktree 里的「$目录/<相对路径>」「os.path.join(目录, <相对路径>)」按根里同一相对路径那一份认（至少两段、在根里存在）：
@@ -315,13 +681,17 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   shell：eval 的字符串、按变量名间接调用（"${handler}"）只在那个变量的值是本闭包可见的函数名、而这个名字作为一个词出现在闭包里时才连上；
     here-doc 的起止按规范文本里的 <<词 与单独一行的词认，引号里长得像 <<词 而后面又恰好有单独一行同一个词的会多跳一段。
 """
+import array
 import ast
+import base64
 import bisect
 import collections
 import copy
 import fcntl
 import glob
 import hashlib
+import importlib.util
+import json
 import os
 import posixpath
 import re
@@ -332,6 +702,7 @@ import sys
 import tempfile
 import time
 import tomllib
+import zlib
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -347,10 +718,16 @@ UNIT_GRAPH_DIRECTORY_VARIABLE = "FUNCTION_UNITS_UNIT_GRAPH_DIRECTORY"
 UNIT_GRAPH_KEPT_PROGRAMS = 3
 VERUS_GHOST_CODE_UNPARSED = "verus-ghost-code-unparsed"
 BREAK_VARIABLE = "FUNCTION_UNITS_BREAK"
+# 函数里出现这几个词算起了子进程：此时 current_exe() 折不出要点名的那一条测试，拒算 current-exe（文件头「测试二进制起自己」）
+SPAWNING_WORDS = frozenset(("Command", "spawn", "posix_spawn", "fork", "execv", "execve", "execvp"))
 REFUSED_EXIT = 4
 SHELL_TIMEOUT_SECONDS = 600
 SNIPPET_CHARACTERS = 160
 FOLD_LIMIT = 64
+# 清单目录拼出的目录绑到 let 变量、变量的用法再绑到变量，最多跟这么多层，再深的拒算（crates/singlefs-unit-graph 的 DEEPEST_DIRECTORY_BINDING_CHAIN 同值）
+DEEPEST_MANIFEST_BINDING_CHAIN = 4
+# fold_manifest_chain 交出的「这一处折不出」，记成一条 runtime-path 拒算
+MANIFEST_FOLD_REFUSED = (None, None)
 SKIPPED_DIRECTORIES = frozenset((".git", "target", "__pycache__", "node_modules"))
 DEFAULT_SCRIPT_DIRECTORIES = ("scripts", ".claude/gate.d", ".claude/hooks", ".claude/scripts")
 EXTERNAL_PROGRAMS = ("herd7", "busybox", "cargo")
@@ -584,7 +961,7 @@ UNIT_SLOTS = ("language", "kind", "name", "file", "first_line", "last_line", "fi
               "plain", "methods", "qualified", "dyn_traits", "references", "data_references", "refusals",
               "self_types", "trait_name", "is_trait_impl", "blanket", "implicit_keys", "imports", "aliases", "import_glob", "defines",
               "declared", "node", "nodes", "facts", "body", "module", "cache", "full", "header", "module_head", "doc_module", "cfg_leaves",
-              "open_keys", "ghost_only")
+              "open_keys", "ghost_only", "self_path_root")
 
 # 弄坏开关 rust-kind-names-hyphenated 下输出行退回的旧拼法（与 crates/singlefs-unit-graph 对齐之前 python 这一份的写法）
 HYPHENATED_KIND_NAMES = {"macro_rules": "macro", "item_macro": "item-macro", "mod": "mod-decl", "extern_block": "extern-block",
@@ -637,6 +1014,28 @@ def data_file_unit(root, path):
     return Unit("data", "data-file", path, path, 1, max(rows, 1), sha256_bytes(content), data=True)
 
 
+def directory_fingerprint(root, path):
+    """数据目录的指纹：目录下（递归，什么目录都不跳过）全部文件按相对目录的路径排序，每个文件一行「<相对路径>\\t<字节 sha256>\\n」连起来的 sha256 → (指纹, 文件数)。
+    指向目录的符号链接不进去，指向文件的读它指到的内容，断了的不算（crates/singlefs-unit-graph 的 directory_digest 同）。"""
+    top = os.path.join(root, path)
+    entries = []
+    for directory, _names, files in os.walk(top):
+        for name in files:
+            absolute = os.path.join(directory, name)
+            if os.path.islink(absolute) and not os.path.isfile(absolute):
+                continue
+            with open(absolute, "rb") as handle:
+                entries.append((os.path.relpath(absolute, top).replace(os.sep, "/"), sha256_bytes(handle.read())))
+    entries.sort()
+    return sha256_text("".join(f"{relative}\t{digest}\n" for relative, digest in entries)), len(entries)
+
+
+def data_directory_unit(root, path):
+    """数据目录单元：种类 data-directory，限定名与文件都是目录相对根的路径，起止 1-<文件数>（至少 1），指纹 directory_fingerprint。"""
+    fingerprint, count = directory_fingerprint(root, path)
+    return Unit("data", "data-directory", path, path, 1, max(count, 1), fingerprint, data=True)
+
+
 def files_under(root, suffixes, under=None):
     """根下（或 under 给的几处下）后缀对得上的文件，相对根、排好序；跳过 .git、target、__pycache__、node_modules。"""
     tops = [os.path.join(root, place) for place in under] if under else [root]
@@ -683,9 +1082,10 @@ def is_identifier_continue(character):
     return (character.isascii() and (character.isalnum() or character == "_")) or ord(character) >= 0x80
 
 
-def rust_lex(text):
+def rust_lex(text, spans=None, document_spans=None):
     """→ (kinds, texts, lines, documents)；documents 是 [(行, outer|inner, [各行正文], 下一个词法单元的下标, [各行原文])]：
-    各行正文去掉了块注释每行开头的 * 号，各行原文是注释记号之后的原样（与 crates/singlefs-unit-graph 的 documentation_comment_of 同一份，文档测试取它）。"""
+    各行正文去掉了块注释每行开头的 * 号，各行原文是注释记号之后的原样（与 crates/singlefs-unit-graph 的 documentation_comment_of 同一份，文档测试取它）。
+    spans / document_spans 给了列表的，逐个词法单元 / 文档注释往里追加它在 text 里的 (起, 止) 字符下标（剥只给 Verus 看的代码用：verus_ghost_code_blanked）。"""
     kinds, texts, lines, documents = [], [], [], []
     count = len(text)
     newlines = [match.start() for match in re.finditer("\n", text)]
@@ -720,6 +1120,13 @@ def rust_lex(text):
         kinds.append(kind)
         texts.append(text[start:end])
         lines.append(line_at(start))
+        if spans is not None:
+            spans.append((start, end))
+
+    def document(entry, start, end):
+        documents.append(entry)
+        if document_spans is not None:
+            document_spans.append((start, end))
 
     i = 0
     while i < count:
@@ -733,9 +1140,9 @@ def rust_lex(text):
             end = count if end < 0 else end
             body = text[i:end]
             if body.startswith("///") and not body.startswith("////"):
-                documents.append((line_at(i), "outer", [body[3:]], len(texts), [body[3:]]))
+                document((line_at(i), "outer", [body[3:]], len(texts), [body[3:]]), i, end)
             elif body.startswith("//!"):
-                documents.append((line_at(i), "inner", [body[3:]], len(texts), [body[3:]]))
+                document((line_at(i), "inner", [body[3:]], len(texts), [body[3:]]), i, end)
             i = end
             continue
         if character == "/" and following == "*":
@@ -762,7 +1169,7 @@ def rust_lex(text):
                     raw = body[3:-2] if body.endswith("*/") and len(body) >= 5 else ""
                 else:
                     raw = body[3:-2] if body.endswith("*/") and len(body) >= 5 else body[3:]
-                documents.append((line_at(i), style, block_document_rows(body[3:-2]), len(texts), raw.split("\n")))
+                document((line_at(i), style, block_document_rows(body[3:-2]), len(texts), raw.split("\n")), i, j)
             i = j
             continue
         start = i
@@ -778,9 +1185,7 @@ def rust_lex(text):
                 while j < count and is_identifier_continue(text[j]):
                     j += 1
                 # 原始标识符的词按源码原样取、带着 r#（与 Rust 那一份 lexer.rs 同一条：词是源码里的那一段）
-                kinds.append(IDENT)
-                texts.append(text[i:j])
-                lines.append(line_at(i))
+                emit(IDENT, i, j)
                 i = j
                 continue
             end = raw_end(i + 1)
@@ -834,6 +1239,316 @@ def rust_lex(text):
         emit(PUNCT, start, i + 1)
         i += 1
     return kinds, texts, lines, documents
+
+
+# Rust 词法单元的磁盘缓存（文件头「Rust 词法单元的缓存」）
+RUST_LEX_CACHE_FORM = "singlefs-rust-lex-cache-v1"
+RUST_LEX_CACHE_DIRECTORY_NAME = "singlefs-rust-lex-cache"
+RUST_LEX_CACHE_DIRECTORY_VARIABLE = "FUNCTION_UNITS_LEX_CACHE_DIRECTORY"   # 设了放这里；写 off 不用缓存（自证里除缓存那一格外都设它）
+RUST_LEX_CACHE_KEPT_NAMESPACES = 3
+RUST_LEX_CACHE_STATS = {"lexed": 0, "reused": 0}   # 本进程里 rust_lex_cached 现切了几份、取了几份缓存（自证数它）
+_RUST_LEX_CACHE_NAMESPACES = {}
+
+
+def git_common_directory_of(root):
+    """root 这棵工作树的 git common-dir，照 git 自己在盘上的约定读、不起 git：root/.git 是目录就是它；是文件（git worktree、子模块）读它的
+    「gitdir: <路径>」一行（相对 root），那个目录里有 commondir 文件就照它的内容（相对那个目录）找到主仓的 git 目录，没有就是那个目录自己。
+    不是 git 工作树、读不出、指到的目录不在的交 None。scripts/mutation/crates-mutation-rows.py 的 judging_cache_directory 也调它。
+    弄坏开关 cross-run-cache-git-directory-only：只认 root/.git 是目录（改前的样子：worktree 里 .git 是文件，判成不在 git 仓里）。"""
+    dot_git = os.path.join(root, ".git")
+    if os.path.isdir(dot_git):
+        return dot_git
+    if "cross-run-cache-git-directory-only" in active_breaks() or not os.path.isfile(dot_git):
+        return None
+    try:
+        with open(dot_git, encoding="utf-8") as handle:
+            pointer = handle.readline().strip()
+        if not pointer.startswith("gitdir:"):
+            return None
+        git_directory = os.path.normpath(os.path.join(root, pointer[len("gitdir:"):].strip()))
+        common_file = os.path.join(git_directory, "commondir")
+        common = git_directory
+        if os.path.isfile(common_file):
+            with open(common_file, encoding="utf-8") as handle:
+                common = os.path.normpath(os.path.join(git_directory, handle.readline().strip()))
+    except (OSError, UnicodeDecodeError):
+        return None
+    return common if os.path.isdir(common) else None
+
+
+def cross_run_cache_directory(name):
+    """跨轮缓存 name 放哪：设了 GATE_CROSS_RUN_TMPDIR 放它底下；没设放这份库所在仓的 git common-dir 底下（git_common_directory_of；与各道判定库一处，
+    git worktree 里是主仓那一份、与主仓共用；不随这一趟的 TMPDIR 走，跑完不留在那一趟的临时目录里）；这份库不在 git 仓里才放 TMPDIR 底下。"""
+    configured = os.environ.get("GATE_CROSS_RUN_TMPDIR", "").strip()
+    if configured:
+        return os.path.join(configured, name)
+    if "cross-run-cache-under-tmpdir" in active_breaks():
+        return os.path.join(tempfile.gettempdir(), name)   # 弄坏开关：改前的样子，没设 GATE_CROSS_RUN_TMPDIR 就落在这一趟的 TMPDIR 里
+    common = git_common_directory_of(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+    return os.path.join(common if common is not None else tempfile.gettempdir(), name)
+
+
+UNIT_GRAPH_PRODUCT_VIEW_CACHE_DIRECTORY_NAME = "singlefs-unit-graph-product-view"
+
+
+def unit_graph_product_view_cache_directory():
+    """产品行为视图编出的 unit-graph 程序放哪（文件头「判定种类」里「unit-graph 从哪来」）：照 cross_run_cache_directory 放 singlefs-unit-graph-product-view。"""
+    return cross_run_cache_directory(UNIT_GRAPH_PRODUCT_VIEW_CACHE_DIRECTORY_NAME)
+
+
+# ── 跨轮缓存的登记（文件头「跨轮缓存的登记」）──
+
+def crates_mutation_judging_cache_directory():
+    """crates 变异的判法单元指纹缓存放哪：载入这份库所在仓里的 scripts/mutation/crates-mutation-rows.py，调它自己的 judging_cache_directory（不在这里另抄一份）。"""
+    specification = importlib.util.spec_from_file_location("crates_mutation_rows_for_cross_run_caches",
+                                                           os.path.join(LIBRARY_ROOT, "scripts", "mutation", "crates-mutation-rows.py"))
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module.judging_cache_directory(dict(os.environ))
+
+
+SHELL_PARAMETER_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def expand_shell_parameters(text, environment):
+    """双引号串里的参数展开，照 environment 取值：只认 $名、${名}、${名:-词}、${名-词}（词里照样展开）与反斜杠转义；
+    $(…)、反引号、${名:=词} 这类别的写法抛 ValueError（登记的那一行改成了认不出的写法，照新写法改 cross_run_cache_registry）。"""
+    pieces, index = [], 0
+    while index < len(text):
+        character = text[index]
+        if character == "\\" and index + 1 < len(text):
+            pieces.append(text[index + 1])
+            index += 2
+            continue
+        if character == "`" or text.startswith("$(", index):
+            raise ValueError(f"认不出的展开（命令替换）：{text}")
+        if character != "$":
+            pieces.append(character)
+            index += 1
+            continue
+        if text.startswith("${", index):
+            depth, end = 1, index + 2
+            while end < len(text) and depth:
+                if text.startswith("${", end):
+                    depth += 1
+                    end += 2
+                    continue
+                if text[end] == "}":
+                    depth -= 1
+                end += 1
+            if depth:
+                raise ValueError(f"${{ 没有配对的 }}：{text}")
+            inner = text[index + 2:end - 1]
+            matched = SHELL_PARAMETER_NAME.match(inner)
+            if matched is None:
+                raise ValueError(f"认不出的展开（${{{inner}}}）：{text}")
+            name, operator_and_word = matched.group(0), inner[matched.end():]
+            value = environment.get(name)
+            if not operator_and_word:
+                pieces.append(value or "")
+            elif operator_and_word.startswith(":-"):
+                pieces.append(value if value else expand_shell_parameters(operator_and_word[2:], environment))
+            elif operator_and_word.startswith("-"):
+                pieces.append(value if value is not None else expand_shell_parameters(operator_and_word[1:], environment))
+            else:
+                raise ValueError(f"认不出的展开（${{{inner}}}）：{text}")
+            index = end
+            continue
+        matched = SHELL_PARAMETER_NAME.match(text, index + 1)
+        if matched is None:
+            pieces.append(character)
+            index += 1
+            continue
+        pieces.append(environment.get(matched.group(0)) or "")
+        index = matched.end()
+    return "".join(pieces)
+
+
+def shell_assignment_value(relative, prefix, environment=None):
+    """这份库所在仓里 relative 那份 shell 脚本：恰好一行（去掉首尾空白）以 prefix 起头、后面是一个双引号串，照 environment（不给取此刻的环境）展开那个串交回。
+    命中的不是恰好一行、后面不是双引号串、串里有认不出的展开，抛 ValueError。"""
+    with open(os.path.join(LIBRARY_ROOT, relative), encoding="utf-8") as handle:
+        matches = [line.strip()[len(prefix):] for line in handle if line.strip().startswith(prefix)]
+    if len(matches) != 1:
+        raise ValueError(f"{relative} 里以「{prefix}」起头的行有 {len(matches)} 行（要恰好一行）：那份脚本改了写法，照新写法改 cross_run_cache_registry 里它那一行")
+    quoted = matches[0]
+    if len(quoted) < 2 or not quoted.startswith('"') or not quoted.endswith('"'):
+        raise ValueError(f"{relative} 里「{prefix}」后面不是一个双引号串：{quoted}")
+    return expand_shell_parameters(quoted[1:-1], os.environ if environment is None else environment)
+
+
+def shell_assignment_row(name, relative, prefix):
+    """登记表里 shell 那一种的一行：现取 = shell_assignment_value(relative, prefix)。"""
+    return (name, relative, lambda: shell_assignment_value(relative, prefix))
+
+
+HARNESS_TEST_ENVIRONMENT_SCRIPT = ".claude/gate.d/harness-test-environment.sh"
+HARNESS_TEST_ENVIRONMENT_SHARED_ENTRY = re.compile(r'python3 "\$STAGE_DIR/\.\./hooks/lib_work_root\.py" shared ([a-z][a-z0-9-]*)\)"')
+
+
+def work_root_library():
+    """这份库所在仓里的 .claude/hooks/lib_work_root.py（数据根的算法只在它那一处）：按路径载入、不进 sys.modules。"""
+    specification = importlib.util.spec_from_file_location("lib_work_root_for_cross_run_caches",
+                                                           os.path.join(LIBRARY_ROOT, ".claude", "hooks", "lib_work_root.py"))
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def harness_test_environment_run_times_file():
+    """harness-test-environment 记的上一趟各阶段用时放哪：照 HARNESS_TEST_ENVIRONMENT_SCRIPT 此刻的算法逐段取，位置的每一段都读自那份脚本：
+    「local run_times_file cross_run_cache=」那一行读 GATE_CROSS_RUN_TMPDIR（设了取它）；没设时那份脚本里恰好一处 `python3 "$STAGE_DIR/../hooks/lib_work_root.py" shared <名>)"`
+    给出名字，目录交 work_root_library().shared_data_path(<名>)（脚本是调同一个库的同名命令行，.claude/gate.d 的上一层是 .claude，所以是这份库所在仓的 .claude/hooks）；
+    「run_times_file=」那一行照这个目录展开成文件。任何一段在脚本里找不到恰好一处就抛 ValueError（脚本改了写法，照新写法改这个函数）。
+    弄坏开关 cross-run-cache-run-times-old-spelling：退回只认「local run_times_file=」起头的旧写法（现在的脚本里一行都没有，抛 ValueError）。"""
+    if "cross-run-cache-run-times-old-spelling" in active_breaks():
+        return shell_assignment_value(HARNESS_TEST_ENVIRONMENT_SCRIPT, "local run_times_file=")
+    cross_run_cache = shell_assignment_value(HARNESS_TEST_ENVIRONMENT_SCRIPT, "local run_times_file cross_run_cache=")
+    if not cross_run_cache:
+        with open(os.path.join(LIBRARY_ROOT, HARNESS_TEST_ENVIRONMENT_SCRIPT), encoding="utf-8") as handle:
+            entries = HARNESS_TEST_ENVIRONMENT_SHARED_ENTRY.findall(handle.read())
+        if len(entries) != 1:
+            raise ValueError(f"{HARNESS_TEST_ENVIRONMENT_SCRIPT} 里调 lib_work_root.py shared <名> 取目录的写法有 {len(entries)} 处（要恰好一处）："
+                             "那份脚本改了写法，照新写法改 harness_test_environment_run_times_file")
+        cross_run_cache = work_root_library().shared_data_path(entries[0])
+    return shell_assignment_value(HARNESS_TEST_ENVIRONMENT_SCRIPT, "run_times_file=", {"cross_run_cache": cross_run_cache})
+
+
+def cross_run_cache_registry():
+    """仓里有意跨轮复用的缓存（文件头「跨轮缓存的登记」）：[(名字, 放它的脚本, 现取它的位置的函数)]；现取的是那份脚本自己算位置的那一段，不在这里另抄一份位置。
+    写成函数、不写成模块级的表：表里载入 crates-mutation-rows.py 的那一项不随 import 时执行的模块级语句进别的闭包（文件头「Python 闭包」）。"""
+    return (
+        ("Rust 词法单元缓存", "scripts/gate/lib_function_units.py", rust_lex_cache_directory),
+        ("产品行为视图编出的 unit-graph 程序", "scripts/gate/lib_function_units.py", unit_graph_product_view_cache_directory),
+        ("crates 变异的判法单元指纹缓存", "scripts/mutation/crates-mutation-rows.py", crates_mutation_judging_cache_directory),
+        ("harness-test-environment 记的上一趟各阶段用时", HARNESS_TEST_ENVIRONMENT_SCRIPT, harness_test_environment_run_times_file),
+        shell_assignment_row("LKMM 判法取的内核内存模型", ".claude/scripts/lkmm.sh", "CACHE="),
+        shell_assignment_row("取依赖脚本的下载缓存", ".claude/scripts/fetch-deps.sh", "CACHE="),
+    )
+
+
+def cross_run_cache_rows():
+    """→ [(名字, 脚本, 路径或 None, 算不出的原因或 None)]，照 cross_run_cache_registry 的次序、照此刻的环境现取。"""
+    rows = []
+    for name, script, locate in cross_run_cache_registry():
+        try:
+            path, problem = locate(), None
+        except Exception as error:  # 现取的那一段在别的脚本里：载入或调用抛什么都照「算不出」报，不让一份带垮别的几份
+            path, problem = None, f"{type(error).__name__}：{error}"
+        if path is None and problem is None:
+            problem = "取到 None（缓存关着：FUNCTION_UNITS_LEX_CACHE_DIRECTORY=off 这一类改放处变量设着）"
+        rows.append((name, script, path, problem))
+    return rows
+
+
+def print_cross_run_cache_rows():
+    """命令行 cross-run-caches（自证 CROSS_RUN_CACHE_CELL 在拷贝里起它）：先打 tempdir 一行（此刻的 tempfile.gettempdir()），再每份缓存一行，交退出码（有算不出的交 3）。"""
+    print(f"tempdir\t{tempfile.gettempdir()}")
+    rows = cross_run_cache_rows()
+    for name, script, path, problem in rows:
+        print(f"cache\t{name}\t{script}\t{path}" if problem is None else f"refused-cache\t{name}\t{script}\t{problem}")
+    unresolved = [name for name, _script, _path, problem in rows if problem is not None]
+    if unresolved:
+        print(f"  ✗ {len(unresolved)} 份跨轮缓存的位置算不出：{'、'.join(unresolved)}", file=sys.stderr)
+        print("    → 怎么办：看 refused-cache 那几行的原因，照那份脚本此刻的写法改 cross_run_cache_registry 里它那一行", file=sys.stderr)
+        return 3
+    print(f"  ✓ 现取 {len(rows)} 份跨轮缓存的位置（登记表 cross_run_cache_registry）", file=sys.stderr)
+    return 0
+
+
+def rust_lex_cache_directory():
+    """缓存放哪个目录；交 None 是不用缓存。设了 FUNCTION_UNITS_LEX_CACHE_DIRECTORY 取它（off 是不用），没设照 cross_run_cache_directory 放 singlefs-rust-lex-cache。"""
+    configured = os.environ.get(RUST_LEX_CACHE_DIRECTORY_VARIABLE, "").strip()
+    if configured == "off":
+        return None
+    return configured or cross_run_cache_directory(RUST_LEX_CACHE_DIRECTORY_NAME)
+
+
+def rust_lex_cache_namespace():
+    """缓存按「切词法单元的代码」分目录：这份库自己的内容 sha256 加此刻的弄坏开关。库的内容一变（rust_lex 与它的帮手都在里面），旧目录整个不再取。"""
+    breaks = ",".join(sorted(active_breaks()))
+    if breaks not in _RUST_LEX_CACHE_NAMESPACES:
+        with open(os.path.realpath(__file__), "rb") as handle:
+            _RUST_LEX_CACHE_NAMESPACES[breaks] = hashlib.sha256(handle.read() + b"\0" + breaks.encode("utf-8")).hexdigest()[:24]
+    return _RUST_LEX_CACHE_NAMESPACES[breaks]
+
+
+def rust_lex_cache_path(text):
+    """这份文本的缓存文件；不用缓存交 None。文件名是文本的 sha256（只看内容，不看路径与修改时刻）；
+    弄坏开关 rust-lex-cache-unverified：文件名只取文本长度（缓存不核内容）。"""
+    root = rust_lex_cache_directory()
+    if root is None:
+        return None
+    name = f"length-{len(text)}" if "rust-lex-cache-unverified" in active_breaks() else hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()
+    return os.path.join(root, rust_lex_cache_namespace(), name + ".json.z")
+
+
+def load_rust_lex(path):
+    """缓存文件读成 (kinds, texts, lines, documents)；读不了、不是这一版的写法、各表对不上都交 None（照常现切）。"""
+    try:
+        with open(path, "rb") as handle:
+            stored = json.loads(zlib.decompress(handle.read()))
+        if stored["form"] != RUST_LEX_CACHE_FORM:
+            return None
+        kind_names, table = stored["kind_names"], stored["table"]
+        kinds = [kind_names[code] for code in base64.b64decode(stored["kinds"])]
+        text_codes, line_numbers = array.array("I"), array.array("I")
+        text_codes.frombytes(base64.b64decode(stored["texts"]))
+        line_numbers.frombytes(base64.b64decode(stored["lines"]))
+        texts = [table[code] for code in text_codes]
+        documents = [tuple(entry) for entry in stored["documents"]]
+        if not (len(kinds) == len(texts) == len(line_numbers)) or any(len(entry) != 5 for entry in documents):
+            return None
+        return kinds, texts, list(line_numbers), documents
+    except (OSError, ValueError, KeyError, IndexError, TypeError, EOFError, zlib.error):
+        return None
+
+
+def store_rust_lex(path, result):
+    """rust_lex 的结果原子写成缓存文件（同目录排他建临时文件再改名）；新开一个目录时只留最近 RUST_LEX_CACHE_KEPT_NAMESPACES 个；写不成不影响这一趟。"""
+    kinds, texts, lines, documents = result
+    kind_names = sorted(set(kinds))
+    kind_codes = {name: code for code, name in enumerate(kind_names)}
+    table = list(dict.fromkeys(texts))
+    text_codes = {text: code for code, text in enumerate(table)}
+    payload = json.dumps(dict(form=RUST_LEX_CACHE_FORM, kind_names=kind_names, kinds=base64.b64encode(bytes(kind_codes[kind] for kind in kinds)).decode("ascii"),
+                              table=table, texts=base64.b64encode(array.array("I", [text_codes[text] for text in texts]).tobytes()).decode("ascii"),
+                              lines=base64.b64encode(array.array("I", lines).tobytes()).decode("ascii"), documents=documents))
+    directory = os.path.dirname(path)
+    try:
+        fresh = not os.path.isdir(directory)
+        os.makedirs(directory, exist_ok=True)
+        handle, temporary = tempfile.mkstemp(prefix=".partial-", dir=directory)
+        try:
+            with os.fdopen(handle, "wb") as stream:
+                stream.write(zlib.compress(payload.encode("ascii"), 1))
+            os.replace(temporary, path)
+        except BaseException:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+            raise
+        if fresh:
+            root = os.path.dirname(directory)
+            kept = sorted((name for name in os.listdir(root) if os.path.isdir(os.path.join(root, name))),
+                          key=lambda name: os.path.getmtime(os.path.join(root, name)), reverse=True)
+            for name in kept[RUST_LEX_CACHE_KEPT_NAMESPACES:]:
+                shutil.rmtree(os.path.join(root, name), ignore_errors=True)
+    except OSError:
+        return
+
+
+def rust_lex_cached(text):
+    """rust_lex(text) 的磁盘缓存版：→ 与 rust_lex(text) 逐项相同的 (kinds, texts, lines, documents)，每次是新的列表。有缓存取缓存，没有现切再存。"""
+    path = rust_lex_cache_path(text)
+    loaded = load_rust_lex(path) if path is not None else None
+    if loaded is not None:
+        RUST_LEX_CACHE_STATS["reused"] += 1
+        return loaded
+    result = rust_lex(text)
+    RUST_LEX_CACHE_STATS["lexed"] += 1
+    if path is not None:
+        store_rust_lex(path, result)
+    return result
 
 
 def match_brackets(kinds, texts):
@@ -937,7 +1652,11 @@ RUST_QUALIFIERS = frozenset(("async", "unsafe", "default", "safe", "open", "clos
 RUST_ITEM_STARTS = frozenset(("pub", "fn", "struct", "enum", "union", "impl", "trait", "mod", "use", "const", "static", "type",
                               "macro_rules", "extern", "auto")) | RUST_QUALIFIERS
 RUST_NAMED_KINDS = frozenset(("fn", "const", "static", "struct", "enum", "union", "type", "trait", "macro_rules", "broadcast_group"))
+# 按名字找得到时用的是 defines 里那几个名字、不是自己名字的种类（crates/singlefs-unit-graph 的 declared_names）：条目级宏调用与 extern 块
+# 是它里面定义的名字，assume_specification 是方括号里点名路径末段的名字
+RUST_KINDS_DEFINING_NAMES = frozenset(("item_macro", "extern_block", "assume_specification"))
 RUST_TYPE_KINDS = frozenset(("struct", "enum", "union", "type"))
+RUST_TYPE_OR_TRAIT_KINDS = RUST_TYPE_KINDS | {"trait"}   # 前缀::名 的前缀是这几种之一的，名是关联项（RustWorkspace.candidates_seen_from_module）
 # 只是结构、里面的名字不往下解的种类（R-结构；与 crates/singlefs-unit-graph 的 UnitKind::resolves_its_own_names 为假的那几种同一份）
 RUST_STRUCTURE_ONLY_KINDS = frozenset(("use", "mod", "mod_head", "extern_crate"))
 RUST_ITEM_MACROS_HOLDING_ITEMS = frozenset(("thread_local",))
@@ -1073,8 +1792,9 @@ class RustFile:
         self.directory = posixpath.dirname(path)
         self.crate_directory = crate_directory
         self.breaks = active_breaks()
+        self._manifest_constants = None   # manifest_constants 第一次用到时算
         self.source_rows = text.split("\n")
-        self.kinds, self.texts, self.lines, self.documents = rust_lex(text)
+        self.kinds, self.texts, self.lines, self.documents = rust_lex_cached(text)
         self.count = len(self.texts)
         self.units, self.refusals, self.mod_declarations, self.doctests = [], [], [], []
         self.verus_spans = []           # [(verus! 块的 { 下标, 配对的 } 下标)]：产品行为视图认只给 Verus 看的单元用（文件头「判定种类」）
@@ -1212,9 +1932,52 @@ class RustFile:
         text = self.t(c)
         if text == "#" and self.t(c + 1) in ("[", "!"):
             return True
-        if text == ";" or text in RUST_ITEM_STARTS:
+        if text == ";":
+            # ; 本身不是起头：} 之后紧跟的 ; 归前一个条目（const X: S = S { … }; 的指纹带它，crates/singlefs-unit-graph 的 verus_item_starts 同）
+            return "rust-verus-semicolon-split-off" in self.breaks
+        if text in RUST_ITEM_STARTS:
+            return True
+        if self.is_assume_specification_keyword(c):
             return True
         return self.macro_path_at(c) is not None
+
+    def is_assume_specification_keyword(self, c):
+        """c 是 verus! 里 assume_specification 条目的关键字：这个词后面接 [（点名的路径）或 <（泛型参数表）
+        （crates/singlefs-unit-graph 的 is_assume_specification_keyword）。弄坏开关 rust-assume-specifications-unrecognized 下不认。"""
+        return (self.t(c) == "assume_specification" and self.t(c + 1) in ("[", "<")
+                and "rust-assume-specifications-unrecognized" not in self.breaks)
+
+    def assume_specification_target_name(self, after_keyword, end):
+        """assume_specification 之后（可带一段 <…> 泛型参数表）那对方括号里点名的路径，末段的名字（尖括号里的名字不算）：
+        [ singlefs_format::WIDE_CHECKSUM_BYTES ] 交 WIDE_CHECKSUM_BYTES，[ Vec::<Element>::len ] 交 len；
+        认不出那对方括号、方括号里尖括号外一个名字都没有的交 None（crates/singlefs-unit-graph 的 assume_specification_target_name）。"""
+        open_bracket = after_keyword
+        if self.t(after_keyword) == "<":
+            depth, open_bracket = 0, None
+            for position in range(after_keyword, end):
+                if self.t(position) == "<":
+                    depth += 1
+                elif self.t(position) == ">" and (position == 0 or self.t(position - 1) != "-"):
+                    depth -= 1
+                    if depth < 0:
+                        return None
+                    if depth == 0:
+                        open_bracket = position + 1
+                        break
+            if open_bracket is None:
+                return None
+        if self.t(open_bracket) != "[" or open_bracket not in self.pairs:
+            return None
+        angle_depth, last_name = 0, None
+        for position in range(open_bracket + 1, self.pairs[open_bracket]):
+            text = self.t(position)
+            if text == "<":
+                angle_depth += 1
+            elif text == ">" and self.t(position - 1) != "-":
+                angle_depth = max(angle_depth - 1, 0)
+            elif angle_depth == 0 and self.kind(position) == IDENT:
+                last_name = text
+        return last_name
 
     def verus_end(self, k, high):
         """verus! 里一个条目：到下一个同层条目起头之前（; 或 } 之后接条目起头）。"""
@@ -1419,6 +2182,18 @@ class RustFile:
             end = self.verus_end(k, high)
             self.add("broadcast_group", self.t(k + 1), start, end, context, module_path, container, conditions, public or member_visible)
             return end
+        if verus and self.is_assume_specification_keyword(k):
+            # 整条（连属性）一个单元，名字 assume_specification@<关键字那一行>，按点名路径末段的名字找得到它（defines）；
+            # 名字认不出时这份文件里谁连得到它说不全，记文件级拒算（Rust 那一份记 unrecognized-item-start）
+            end = self.verus_end(k, high)
+            target_name = self.assume_specification_target_name(k + 1, end)
+            if target_name is None:
+                self.refusals.append(Refusal("unknown-item", self.path, line, self.row(line)))
+                return end
+            unit = self.add("assume_specification", f"assume_specification@{line}", start, end, context, module_path, container, conditions,
+                            public or member_visible)
+            unit.defines = set() if "rust-assume-specification-names-unlinked" in self.breaks else {target_name}
+            return end
         if word in ("struct", "enum", "union") and self.kind(k + 1) == IDENT:
             end = self.verus_end(k, high) if verus else self.type_end(k + 2, high)
             self.add(word, self.t(k + 1), start, end, context, module_path, container, conditions, public or member_visible)
@@ -1471,7 +2246,7 @@ class RustFile:
     def set_impl_head(self, unit, head):
         unit.self_types, unit.trait_name = head["self_types"], head["trait_name"]
         unit.is_trait_impl, unit.blanket, unit.implicit_keys = head["is_trait_impl"], head["blanket"], head["implicit_keys"]
-        unit.open_keys = head["open_keys"]
+        unit.open_keys, unit.self_path_root = head["open_keys"], head["self_path_root"]
 
     def impl_head(self, keyword, head_end):
         tokens = list(range(keyword + 1, head_end))
@@ -1520,6 +2295,9 @@ class RustFile:
                     trait_arguments.add(text)
         self_names = [self.t(index) for index in self_tokens if self.kind(index) == IDENT and self.t(index) not in SELF_TYPE_SKIPPED]
         self_types = set(self_names)
+        # 自身类型写成路径 a::B 时的头一段（外部类型的 impl 认法用，RustWorkspace.index 的 foreign_trait_impls）；不是路径的是 None
+        first_name = next((index for index in self_tokens if self.kind(index) == IDENT and self.t(index) not in SELF_TYPE_SKIPPED), None)
+        self_path_root = self.t(first_name) if first_name is not None and self.t(first_name + 1) == ":" and self.t(first_name + 2) == ":" else None
         # blanket：自身类型里任何深度出现 impl 的任一类型或常量泛型参数（for T、&T、Box<T>、(T, u32)、[T]、[T; N]、Option<Box<T>>）；全是具体类型的按被点名的类型。
         # 弄坏开关 rust-blanket-self-parameter-only 退回旧判法：自身类型里头一个名字是泛型参数才算（Box<T>、Option<Box<T>> 不算）
         if "rust-blanket-self-parameter-only" in self.breaks:
@@ -1527,7 +2305,7 @@ class RustFile:
         else:
             blanket = split is not None and bool(self_types & generics)
         return {"label": label, "trait_name": trait_name, "is_trait_impl": split is not None, "self_types": self_types,
-                "blanket": blanket,
+                "blanket": blanket, "self_path_root": self_path_root,
                 # R-隐式按自身类型的名字认 trait impl（crates/singlefs-unit-graph 的 implementations_by_self_type_name）：trait 参数里的类型被点名不带进来
                 "implicit_keys": self_types | (trait_arguments if "rust-trait-impls-by-trait-arguments" in self.breaks else set()),
                 # R-开放按 trait 自己的名字找 impl（定案 3：impl Wrap<dyn Sink> for H 不是 Sink 的 impl）；
@@ -1613,13 +2391,202 @@ class RustFile:
                         unit.data_references.append(("bin-executable", value[len("CARGO_BIN_EXE_"):], i))
                     elif value == "OUT_DIR":
                         unit.data_references.append(("out-directory", None, i))
+                    elif value and not value.startswith("CARGO"):
+                        # cargo 不给的变量：值只能来自构建脚本的 cargo::rustc-env（文件头 Rust 闭包「构建脚本交的值」）
+                        unit.data_references.append(("build-environment", value, i))
                     i = close + 1
                     continue
+                if text == "option_env" and self.kind(i + 3) == LITERAL:
+                    value = rust_string_value(self.t(i + 3))
+                    if value and value != "OUT_DIR" and not value.startswith("CARGO"):
+                        unit.data_references.append(("build-environment", value, i))
+                    i = close + 1
+                    continue
+            if kind == IDENT and text in self.manifest_constants()[0] and self.t(i - 1) != "const":
+                self.manifest_constant_use(unit, i)
             if kind == IDENT and text == "current_exe" and self.t(i + 1) == "(":
-                self.refuse(unit, "current-exe", i)
+                child = None if "rust-current-exe-refused" in self.breaks else self.current_exe_child(unit, i)
+                if child is not None:
+                    unit.data_references.append(("current-exe-child", child, i))
+                elif "rust-current-exe-path-only-refused" in self.breaks or (self.starts_a_process(unit) and "rust-current-exe-spawn-unrefused" not in self.breaks):
+                    self.refuse(unit, "current-exe", i)
             if kind == IDENT and text in ("var_os", "var") and self.t(i + 1) == "(" and rust_string_value(self.t(i + 2)) == "CARGO_MANIFEST_DIR":
                 self.refuse(unit, "runtime-path", i)
             i += 1
+
+    # current_exe()：测试二进制起自己（子进程里只跑一条点名的测试）
+
+    def current_exe_child(self, unit, index):
+        """current_exe 这个词在 index。写成 Command::new(…current_exe()…) 后接 .arg(…) / .args([…]) 链、参数里恰好有一个字面 "--exact"、
+        紧跟在它后面的那个参数折得出测试名的，→ 要连的测试：("pieces", 几段)（几段是 ("literal", 串) 与 ("constant", 常量名)：字面串、常量名、
+        全由这两样组成的 format!("…{}…{名}…", …) 与 concat!(…)；常量名在 rust_closure_of 的 constant_string 里解，不在这里找）、("parameter", 函数名, 位置)
+        （名字是本单元这个 fn 自己的参数：rust_closure_of 取闭包里每一处调用它的那个实参各折一遍）；折不出的回 None（拒算 current-exe）。
+        测试名写在 --exact 前面、用 module_path!() 拼的、套着 as_str() 的、在单元里另有 let 绑定的，都折不出。"""
+        j = index
+        while self.t(j - 1) == ":" and self.t(j - 2) == ":" and self.kind(j - 3) == IDENT:
+            j -= 3
+        opening = j - 1
+        if not (self.t(opening) == "(" and self.t(opening - 1) == "new" and self.t(opening - 2) == ":" and self.t(opening - 3) == ":"
+                and self.t(opening - 4) == "Command" and opening in self.pairs):
+            return None
+        arguments, c = [], self.pairs[opening] + 1
+        while self.t(c) == "." and self.kind(c + 1) == IDENT and self.t(c + 2) == "(" and (c + 2) in self.pairs:
+            method, inner_low, inner_close = self.t(c + 1), c + 3, self.pairs[c + 2]
+            if method == "arg":
+                arguments += self.top_level_parts(inner_low, inner_close)
+            elif method == "args":
+                k = inner_low + 1 if self.t(inner_low) == "&" else inner_low
+                if not (self.t(k) == "[" and self.pairs.get(k) == inner_close - 1):
+                    return None
+                arguments += self.top_level_parts(k + 1, inner_close - 1)
+            c = inner_close + 1
+        flags = [position for position, (part_low, part_high) in enumerate(arguments)
+                 if part_high == part_low + 1 and self.kind(part_low) == LITERAL and rust_string_value(self.t(part_low)) == "--exact"]
+        if len(flags) != 1 or flags[0] + 1 >= len(arguments):
+            return None
+        return self.fold_test_name(unit, arguments[flags[0] + 1][0], arguments[flags[0] + 1][1], 0)
+
+    def starts_a_process(self, unit):
+        """这个单元里有没有起子进程的词（SPAWNING_WORDS）。没有的话 current_exe() 只是在问路径，不拒算；单元没有词法范围的按起了算。"""
+        if unit.first_token is None:
+            return True
+        return any(self.kind(i) == IDENT and self.t(i) in SPAWNING_WORDS for i in range(unit.first_token, unit.last_token))
+
+    def fold_test_name(self, unit, low, high, depth):
+        """测试名那一段词法单元 [low, high) → ("pieces", 几段) | ("parameter", 函数名, 位置) | None（折不出）；几段是 ("literal", 串) 与 ("constant", 常量名)。
+        认：串字面量；常量名（只记名字，值在 rust_closure_of 的 constant_string 里解）；concat!(…)；format!("…{}…{名}…", …)（只认 {} 与 {名}，各块都折得出）；
+        本单元这个 fn 的参数名。"""
+        if depth > 6 or low >= high:
+            return None
+        if high == low + 1 and self.kind(low) == LITERAL:
+            value = rust_string_value(self.t(low))
+            return ("pieces", (("literal", value),)) if value is not None else None
+        if self.kind(low) == IDENT and self.t(low + 1) == "!" and self.t(low + 2) == "(" and self.pairs.get(low + 2) == high - 1:
+            return self.fold_test_name_macro(unit, self.t(low), low + 3, high - 1, depth)
+        names = [low]
+        while names[-1] + 3 < high and self.t(names[-1] + 1) == ":" and self.t(names[-1] + 2) == ":" and self.kind(names[-1] + 3) == IDENT:
+            names.append(names[-1] + 3)
+        if self.kind(low) == IDENT and names[-1] + 1 == high:
+            return self.fold_test_name_binding(unit, self.t(names[-1]), depth)
+        return None
+
+    def fold_test_name_macro(self, unit, macro, low, high, depth):
+        parts = self.top_level_parts(low, high)
+        if macro == "concat":
+            pieces = [self.fold_test_name(unit, part_low, part_high, depth + 1) for part_low, part_high in parts]
+            if not pieces or any(piece is None or piece[0] != "pieces" for piece in pieces):
+                return None
+            return ("pieces", tuple(segment for piece in pieces for segment in piece[1]))
+        if macro != "format" or not parts or parts[0][1] != parts[0][0] + 1 or self.kind(parts[0][0]) != LITERAL:
+            return None
+        template = rust_string_value(self.t(parts[0][0]))
+        positional = parts[1:]
+        if template is None or any(part[1] - part[0] >= 3 and self.kind(part[0]) == IDENT and self.t(part[0] + 1) == "=" for part in positional):
+            return None
+        pieces, next_argument = [], 0
+        for found in re.finditer(r"\{\{|\}\}|\{([A-Za-z_][A-Za-z0-9_]*)?\}|[{}]|[^{}]+", template):
+            text = found.group(0)
+            if text in ("{{", "}}"):
+                pieces.append(("literal", text[0]))
+            elif text.startswith("{") and text.endswith("}") and len(text) >= 2:
+                if found.group(1) is None:
+                    if next_argument >= len(positional):
+                        return None
+                    piece = self.fold_test_name(unit, positional[next_argument][0], positional[next_argument][1], depth + 1)
+                    next_argument += 1
+                else:
+                    piece = self.fold_test_name_binding(unit, found.group(1), depth + 1)
+                if piece is None or piece[0] != "pieces":
+                    return None
+                pieces.extend(piece[1])
+            elif text in ("{", "}"):
+                return None
+            else:
+                pieces.append(("literal", text))
+        if next_argument != len(positional):
+            return None
+        return ("pieces", tuple(pieces))
+
+    def fold_test_name_binding(self, unit, name, depth):
+        """一个名字折成什么：单元里另有 let 绑定的 None（折不出）；是本单元这个 fn 的参数的，("parameter", 函数名, 位置)；
+        别的当常量名，("pieces", (("constant", 名),))，值由 rust_closure_of 的 constant_string 解（本单元里的 const，再是同一个包链接集里的常量单元）。"""
+        if unit.first_token is not None and any(
+                self.texts[i] == "let" and (self.t(i + 1) == name or (self.t(i + 1) == "mut" and self.t(i + 2) == name))
+                for i in range(unit.first_token, unit.last_token)):
+            return None
+        position = self.parameter_position(unit, name)
+        return ("parameter", unit.short, position) if position is not None else ("pieces", (("constant", name),))
+
+    def string_constant_in(self, low, high, name):
+        """[low, high) 里第一处 const <名> : … = "…" ; 的串值（普通串字面量，不折表达式）；没有这一处、或写法不是它回 None
+        （crates/singlefs-unit-graph 的 constant_string_value 里 definition_value 同写）。"""
+        if low is None:
+            return None
+        for i in range(low, high):
+            if self.texts[i] == "const" and self.t(i + 1) == name and self.t(i + 2) == ":":
+                equals = next((c for c in range(i + 3, high) if self.texts[c] == "="), None)
+                if equals is not None and self.kind(equals + 1) == LITERAL and self.t(equals + 1)[:1] == '"' and self.t(equals + 2) == ";":
+                    return rust_string_value(self.t(equals + 1))
+                return None
+        return None
+
+    def parameter_position(self, unit, name):
+        """unit 是 fn 单元、<名> 是它的参数（不数 self）时，它是第几个参数（从 0 数）；不是回 None。"""
+        if unit.kind != "fn" or unit.first_token is None:
+            return None
+        i = unit.first_token
+        while i < unit.last_token and self.texts[i] != "fn":
+            i += 1
+        i += 2
+        if self.t(i) == "<":
+            depth = 0
+            while i < unit.last_token:
+                depth += 1 if self.texts[i] == "<" else -1 if self.texts[i] == ">" and self.t(i - 1) != "-" else 0
+                i += 1
+                if depth == 0:
+                    break
+        if self.t(i) != "(" or i not in self.pairs:
+            return None
+        close, parts, start, depth, c = self.pairs[i], [], i + 1, 0, i + 1
+        while c < close:
+            text = self.texts[c]
+            if text in ("(", "[", "{") and c in self.pairs:
+                c = self.pairs[c] + 1
+                continue
+            if text == "<":
+                depth += 1
+            elif text == ">" and self.t(c - 1) != "-":
+                depth -= 1
+            elif text == "," and depth == 0:
+                parts.append((start, c))
+                start = c + 1
+            c += 1
+        parts.append((start, close))
+        count = 0
+        for low, high in parts:
+            words = [self.texts[k] for k in range(low, high) if self.kinds[k] != LIFETIME and self.texts[k] not in ("&", "mut")]
+            if not words or words[0] == "self":
+                continue
+            if len(words) >= 2 and words[0] == name and words[1] == ":":
+                return count
+            count += 1
+        return None
+
+    def call_site_test_names(self, unit, function_name, position):
+        """unit 的词法单元里每一处 <函数名>(…) 调用（不是 fn 定义、不是 .方法 调用）的第 position 个实参折出的测试名的几段 → [几段]（常量名由调用方在 unit 的上下文里解）；
+        有一处折不出（实参不够、又是参数）回 None。"""
+        found = []
+        for i in range(unit.first_token or 0, unit.last_token or 0):
+            if self.texts[i] != function_name or self.t(i + 1) != "(" or (i + 1) not in self.pairs or self.t(i - 1) in ("fn", "."):
+                continue
+            parts = self.top_level_parts(i + 2, self.pairs[i + 1])
+            if position >= len(parts):
+                return None
+            reached = self.fold_test_name(unit, parts[position][0], parts[position][1], 0)
+            if reached is None or reached[0] != "pieces":
+                return None
+            found.append(reached[1])
+        return found
 
     def concat_value(self, low, high):
         """concat!(…) 的参数 → ("path", 相对根的路径) / ("relative", 串) / ("out", None) / None（认不出）。"""
@@ -1693,23 +2660,149 @@ class RustFile:
         self.refuse(unit, "runtime-path", manifest_reads[0])
 
     def runtime_manifest_path(self, unit, environment_index, environment_close):
+        """env!("CARGO_MANIFEST_DIR")（或指到它的私有常量，下标取常量名那一个词）所在的一处（crates/singlefs-unit-graph 的 fold_manifest_directory_read）：
+        Path::new(…) / PathBuf::from(…) 里再接 .join("字面") 链的，交 fold_manifest_chain 折（文件头「数据目录」）：折出文件的收成数据文件（文件的字节进键），
+        crates/ 之下（不含 crates/ 整个）的目录收成数据目录，绑给 let 变量的目录按这个变量每一处用法各折一样；
+        折出来的每一样都记在这一处：读记一条（同一样只记一次），折不出的那一样拒算 runtime-path、别的照收。别的写法拒算 runtime-path。"""
         opening = environment_index - 1
         if self.t(opening) == "(" and self.pairs.get(opening) == environment_close + 1 and self.t(opening - 1) in ("new", "from"):
-            path = self.crate_directory or "."
-            c = environment_close + 2
-            while self.t(c) == "." and self.t(c + 1) == "join" and self.t(c + 2) == "(" and self.kind(c + 3) == LITERAL and self.t(c + 4) == ")":
-                value = rust_string_value(self.t(c + 3))
-                if value is None:
-                    break
-                path = posixpath.normpath(posixpath.join(path, value))
-                c += 5
-            if self.t(c) != "." and not path.startswith("../") and os.path.isfile(os.path.join(self.root, path)):
-                unit.data_references.append(("file", path, environment_index))
-                return
-            # 弄坏开关：拼出的是目录也照放行（目录底下读什么键里都看不见）；平常目录一律拒算，要仓根的点名清单目录里的一份文件再往上取
-            if "rust-manifest-directory-reads-unrefused" in active_breaks() and self.t(c) != "." and os.path.isdir(os.path.join(self.root, path)):
-                return
+            folds = self.fold_manifest_chain(unit, self.crate_directory or ".", environment_close + 2, self.manifest_path_expression_start(opening - 1), 0)
+            recorded = []
+            for fold in folds:
+                if fold == MANIFEST_FOLD_REFUSED:
+                    self.refuse(unit, "runtime-path", environment_index)
+                elif fold not in recorded:
+                    recorded.append(fold)
+            for kind, path in recorded:
+                unit.data_references.append((kind, path, environment_index))
+            return
+        if environment_index in self.manifest_constants()[1]:
+            return   # const <名>: &str = env!("CARGO_MANIFEST_DIR");：常量本身不读什么，用到它的每一处各自折（manifest_constant_use）
         self.refuse(unit, "runtime-path", environment_index)
+
+    def fold_manifest_chain(self, unit, base, chain_start, expression_start, depth):
+        """从 chain_start 起接字面 .join("…") 链拼在 base 后面（crates/singlefs-unit-graph 的 fold_path_chain）→ [("file" 或 "directory", 路径) 或 MANIFEST_FOLD_REFUSED]。
+        链后还接任何方法（.parent()、.join(<不是字面>) 这一类）、折出根外或盘上没有的路径：MANIFEST_FOLD_REFUSED。折出文件：那份文件。
+        折出目录、表达式 [expression_start, 链尾) 又整个是 let <名> [: 类型] = …; 的右边（不论是不是能收的目录）：<名> 每一处用法各折的（fold_manifest_binding_use；
+        后面没用到的照目录本身判），已经跟了 DEEPEST_MANIFEST_BINDING_CHAIN 层的拒算；不绑 let 的目录：在 crates/ 之下的（is_data_directory）收成目录，别的拒算。
+        depth 是已经跟过的 let 层数（env! 那一处是 0）。
+        弄坏开关 rust-manifest-binding-refused-whole：不是能收的目录不跟 let、拒算；有一处用法折不出就整处只交一个 MANIFEST_FOLD_REFUSED（改前的样子）。"""
+        path, c = base, chain_start
+        while self.t(c) == "." and self.t(c + 1) == "join" and self.t(c + 2) == "(" and self.kind(c + 3) == LITERAL and self.t(c + 4) == ")":
+            value = rust_string_value(self.t(c + 3))
+            if value is None:
+                break
+            path = posixpath.normpath(posixpath.join(path, value))
+            c += 5
+        if self.t(c) == "." or path == ".." or path.startswith("../"):
+            return [MANIFEST_FOLD_REFUSED]
+        if os.path.isfile(os.path.join(self.root, path)):
+            return [("file", path)]
+        if not os.path.isdir(os.path.join(self.root, path)):
+            return [MANIFEST_FOLD_REFUSED]
+        # 弄坏开关：env! 那一处拼出的是目录也照放行（目录底下读什么键里都看不见）；平常目录一律拒算，要仓根的点名清单目录里的一份文件再往上取
+        if depth == 0 and "rust-manifest-directory-reads-unrefused" in active_breaks():
+            return []
+        directory_itself = ("directory", path) if self.is_data_directory(path) else MANIFEST_FOLD_REFUSED
+        variable = self.manifest_binding_name(expression_start, c)
+        refused_whole = "rust-manifest-binding-refused-whole" in self.breaks
+        if variable is None or (refused_whole and directory_itself == MANIFEST_FOLD_REFUSED):
+            return [directory_itself]
+        if depth >= DEEPEST_MANIFEST_BINDING_CHAIN:
+            return [MANIFEST_FOLD_REFUSED]
+        uses = self.manifest_binding_uses(variable, c + 1, unit.last_token)
+        if not uses:
+            return [directory_itself]
+        folds = [fold for use_index in uses for fold in self.fold_manifest_binding_use(unit, path, use_index, depth + 1)]
+        if refused_whole and MANIFEST_FOLD_REFUSED in folds:
+            return [MANIFEST_FOLD_REFUSED]
+        return folds
+
+    def is_data_directory(self, path):
+        """折出的路径是不是能收成数据目录的目录：仓内、真是目录、在 crates/ 之下、不是 crates/ 整个。"""
+        if "rust-manifest-directories-refused" in self.breaks:
+            return False
+        return path.startswith("crates/") and not path.startswith("../") and os.path.isdir(os.path.join(self.root, path))
+
+    def manifest_path_expression_start(self, constructor_index):
+        """std::path::Path::new 这类写法起头的那个词法单元：从 new / from 往回跨过 <名字> ::（crates/singlefs-unit-graph 的 path_expression_start）。"""
+        start = constructor_index
+        while self.t(start - 1) == ":" and self.t(start - 2) == ":" and self.kind(start - 3) == IDENT:
+            start -= 3
+        return start
+
+    def manifest_binding_name(self, expression_start, after_expression):
+        """[expression_start, after_expression) 整个是 let [mut] <名> [: 类型] = …; 的右边时交 <名>，别的交 None（crates/singlefs-unit-graph 的 let_binding_name）。"""
+        if self.t(after_expression) != ";" or self.t(expression_start - 1) != "=":
+            return None
+        equals = expression_start - 1
+        let_index = next((position for position in range(equals - 1, -1, -1) if self.texts[position] in ("let", ";", "{", "}", "=")), None)
+        if let_index is None or self.texts[let_index] != "let":
+            return None
+        name_index = let_index + 1
+        if self.t(name_index) == "mut":
+            name_index += 1
+        if self.kind(name_index) != IDENT:
+            return None
+        plain = name_index + 1 == equals
+        typed = self.t(name_index + 1) == ":" and self.t(name_index + 2) != ":"
+        return self.t(name_index) if plain or typed else None
+
+    def manifest_binding_uses(self, variable, low, high):
+        """<变量> 在 [low, high) 里的每一处用法的下标（crates/singlefs-unit-graph 的 uses_of_the_binding）：.<变量> 的字段或方法、<变量>:: 的路径段不算；
+        碰到再 let 这个名字就停（之后是另一个值）。"""
+        uses = []
+        for j in range(low, high):
+            if self.kind(j) != IDENT or self.t(j) != variable:
+                continue
+            previous = self.t(j - 1)
+            if previous == "let" or (previous == "mut" and self.t(j - 2) == "let"):
+                break
+            if previous == "." or (self.t(j + 1) == ":" and self.t(j + 2) == ":"):
+                continue
+            uses.append(j)
+        return uses
+
+    def fold_manifest_binding_use(self, unit, value, use_index, depth):
+        """绑着路径 value 的变量的一处用法（crates/singlefs-unit-graph 的 fold_use_of_a_path）：Path::new(<变量>) / PathBuf::from(<变量>) 之后、
+        或变量本身之后接的字面 .join 链照 fold_manifest_chain 折；变量单独交给别的函数的，折出的就是它绑着的目录。"""
+        if self.t(use_index - 1) == "(" and self.t(use_index - 2) in ("new", "from") and self.t(use_index + 1) == ")":
+            return self.fold_manifest_chain(unit, value, use_index + 2, self.manifest_path_expression_start(use_index - 2), depth)
+        return self.fold_manifest_chain(unit, value, use_index + 1, use_index, depth)
+
+    def manifest_constants(self):
+        """→ ({私有常量名}, {它初始值里那个 env 词的下标})：const <名>: <类型> = env!("CARGO_MANIFEST_DIR"); 初始值整个就是那一个宏、没写 pub 的。
+        公开的常量别的文件也能用到，折不全，照拒算。"""
+        if self._manifest_constants is None:
+            sites = {}   # env 词的下标 → 常量名
+            for i in range(self.count):
+                if not (self.texts[i] == "env" and self.t(i + 1) == "!" and self.t(i + 2) == "(" and self.kind(i + 3) == LITERAL
+                        and rust_string_value(self.t(i + 3)) == "CARGO_MANIFEST_DIR" and self.t(i + 4) == ")" and self.t(i - 1) == "=" and self.t(i + 5) == ";"):
+                    continue
+                j = i - 2
+                while j >= 0 and self.texts[j] not in (";", "{", "}", "]") and self.texts[j] != "const":
+                    j -= 1
+                if self.t(j) != "const" or self.kind(j + 1) != IDENT:
+                    continue
+                before = 0
+                while before < 6 and j - 1 - before >= 0 and self.texts[j - 1 - before] not in (";", "{", "}", "]"):
+                    before += 1
+                if any(self.texts[k] == "pub" for k in range(j - before, j)):
+                    continue
+                sites[i] = self.texts[j + 1]
+            # 串字面量里有 {<名> 的（format! 一族的内联捕获）：名字不经 Path::new 就用到了，照拒算
+            captured = {name for name in sites.values() if any(self.kinds[k] == LITERAL and "{" + name in self.texts[k] for k in range(self.count))}
+            sites = {i: name for i, name in sites.items() if name not in captured}
+            self._manifest_constants = (set(sites.values()), set(sites))
+        return self._manifest_constants
+
+    def manifest_constant_use(self, unit, index):
+        """私有常量（manifest_constants）出现在 Path::new(<常量>) / PathBuf::from(<常量>) 里的，照 env!("CARGO_MANIFEST_DIR") 同一处折；别的写法拒算 runtime-path。"""
+        opening = index - 1
+        if self.t(opening) == "(" and self.pairs.get(opening) == index + 1 and self.t(opening - 1) in ("new", "from"):
+            self.runtime_manifest_path(unit, index, index)
+        else:
+            self.refuse(unit, "runtime-path", index)
 
     # 文档测试（照 crates/singlefs-unit-graph 的 push_documentation_tests 与 rust_code_blocks）
 
@@ -1857,6 +2950,7 @@ class RustCrate:
         self.proc_macro = bool(lib.get("proc-macro") or lib.get("proc_macro"))
         self.features = {name: list(items) for name, items in manifest.get("features", {}).items()}
         self.manifest = manifest
+        self.outside_workspace = False   # discover_rust_crates 顺 path 依赖收进来的工作区外 crate 设真（文件头 Rust 闭包「工作区外的 path 依赖」）
         self.dependencies = {"normal": [], "dev": [], "build": []}
         tables = [manifest] + list(manifest.get("target", {}).values())
         for section, key in (("dependencies", "normal"), ("dev-dependencies", "dev"), ("build-dependencies", "build")):
@@ -1913,10 +3007,25 @@ def discover_rust_crates(root):
     if "package" in manifest:
         directories.insert(0, "")
     shared = workspace.get("dependencies", {}) if workspace else {}
-    crates = []
-    for directory in dict.fromkeys(directories):
+    crates, pending = [], list(dict.fromkeys(directories))
+    known = set(pending)
+    workspace_members = set(pending)
+    follow_path_dependencies = "rust-excluded-path-dependencies-dropped" not in active_breaks()
+    while pending:
+        directory = pending.pop(0)
         crate_manifest = manifest if directory == "" else load_manifest(root, posixpath.join(directory, "Cargo.toml"))
-        crates.append(RustCrate(root, directory, crate_manifest, shared))
+        crate = RustCrate(root, directory, crate_manifest, shared)
+        crate.outside_workspace = directory not in workspace_members
+        crates.append(crate)
+        # 工作区外的 path 依赖（根清单 exclude 里、或没列进 members、落在仓根底下的；文件头 Rust 闭包「工作区外的 path 依赖」）：顺依赖边收成一个 crate，
+        # 调到它的入口照连；落在仓根外的不收。弄坏开关 rust-excluded-path-dependencies-dropped：不收（改前的样子）
+        for dependency in (item for section in ("normal", "dev", "build") for item in crate.dependencies[section]) if follow_path_dependencies else ():
+            place = dependency.directory
+            if (place is None or place in known or place in (".", "..") or place.startswith("../") or posixpath.isabs(place)
+                    or not os.path.isfile(os.path.join(root, place, "Cargo.toml"))):
+                continue
+            known.add(place)
+            pending.append(place)
     return crates
 
 
@@ -2038,6 +3147,7 @@ class RustWorkspace:
         self.files = {}
         self.targets = {}
         self.names_assigned = False
+        self.shell_sources = {}   # 读到的 shell 脚本 → shell_sourced_files 的结果（shell_sourced）
         for crate in self.crates:
             for target in crate_targets(root, crate):
                 self.targets[target.id] = target
@@ -2049,6 +3159,12 @@ class RustWorkspace:
         self.index()
         for path in sorted(self.files):
             self.apply_product_view(self.files[path])
+
+    def shell_sourced(self, path):
+        """shell_sourced_files(根, path)，一个工作区里一份脚本只折一趟（几十个入口读同一份脚本）。"""
+        if path not in self.shell_sources:
+            self.shell_sources[path] = shell_sourced_files(self.root, path)
+        return self.shell_sources[path]
 
     def product_view_lines(self):
         """Rust 那一份产品行为视图的 dump，按文件分好：{文件: ([单元行], [拒算行])}；拿不到交一句原因。一个工作区只取一次。"""
@@ -2063,7 +3179,7 @@ class RustWorkspace:
             grouped = {}
             for line in lines:
                 fields = line.split("\t")
-                if len(fields) < 3 or fields[0] == "data":
+                if len(fields) < 3 or fields[0] in ("data", "data-directory"):
                     continue
                 place = grouped.setdefault(fields[2].rpartition(":")[0], ([], []))
                 if fields[0] == "refused":
@@ -2073,10 +3189,34 @@ class RustWorkspace:
             self.product_view = grouped
         return self.product_view
 
+    def product_view_file(self, rust_file, text, directory):
+        """产品行为视图里有 verus! 块、或写着 #[verifier::…] / #[verifier(…)] 外属性的文件，载入时先照 Rust 那一份的剥法在这里剥一遍（verus_ghost_code_blanked）、
+        重切：重切出来的单元与 Rust 那一份交的这份文件的单元逐个核得上（product_view_agrees）就用剥过的这一份，闭包的边、cfg、数据与文档测试都从剥过的词法单元取
+        （与 unit-graph 剥完再切、再收闭包同一做法）；核不上、Rust 那一份解不开这份文件、拿不到 Rust 那一份的，照原样那一份交给 apply_product_view（文件头「判定种类」）。
+        弄坏开关 product-view-edges-from-the-written-tokens 下一律照原样那一份；product-view-blanking-unverified 下剥过的那一份不核就用。"""
+        breaks = self.breaks
+        if (self.judgment_kind != PRODUCT_BEHAVIOR or not (rust_file.verus_spans or verifier_attribute_token_ranges(rust_file.kinds, rust_file.texts))
+                or breaks & {"product-view-kept-formal", "product-view-strips-executable-code", "product-view-edges-from-the-written-tokens"}):
+            return rust_file
+        blanked_text = verus_ghost_code_blanked(text)
+        if blanked_text is None or blanked_text == text:
+            return rust_file
+        blanked = RustFile(self.root, rust_file.path, blanked_text, directory)
+        if "product-view-blanking-unverified" in breaks:
+            return blanked
+        view = self.product_view_lines()
+        if isinstance(view, str):
+            return rust_file
+        theirs_lines, theirs_refusals = view.get(rust_file.path, ([], []))
+        if any(fields[1] == VERUS_GHOST_CODE_UNPARSED for fields in theirs_refusals):
+            return rust_file
+        return blanked if product_view_agrees(blanked, theirs_lines) else rust_file
+
     def apply_product_view(self, rust_file):
-        """产品行为视图（文件头「判定种类」）：有 verus! 块的文件照 Rust 那一份换指纹、认只给 Verus 看的单元、记配不上的拒算。
-        弄坏开关 product-view-kept-formal 下照原样（不剥）；product-view-strips-executable-code 下 verus! 块里的单元一律当只给 Verus 看的（剥到执行代码）。"""
-        if self.judgment_kind != PRODUCT_BEHAVIOR or not rust_file.verus_spans or "product-view-kept-formal" in self.breaks:
+        """产品行为视图（文件头「判定种类」）：有 verus! 块、或写着 #[verifier::…] / #[verifier(…)] 外属性的文件照 Rust 那一份换指纹、认只给 Verus 看的单元、
+        记配不上的拒算。弄坏开关 product-view-kept-formal 下照原样（不剥）；product-view-strips-executable-code 下 verus! 块里的单元一律当只给 Verus 看的（剥到执行代码）。"""
+        attribute_heads = [hash_index for hash_index, _close in verifier_attribute_token_ranges(rust_file.kinds, rust_file.texts)]
+        if self.judgment_kind != PRODUCT_BEHAVIOR or not (rust_file.verus_spans or attribute_heads) or "product-view-kept-formal" in self.breaks:
             return
         if "product-view-strips-executable-code" in self.breaks:
             for unit in rust_file.units:
@@ -2084,7 +3224,7 @@ class RustWorkspace:
                     unit.ghost_only = True
             return
         view = self.product_view_lines()
-        block_line = rust_file.lines[rust_file.verus_spans[0][0]]
+        block_line = rust_file.lines[rust_file.verus_spans[0][0] if rust_file.verus_spans else attribute_heads[0]]
         if isinstance(view, str):
             rust_file.refusals.append(Refusal("product-view-unavailable", rust_file.path, block_line, snippet_of(view)))
             return
@@ -2156,7 +3296,8 @@ class RustWorkspace:
             crate = self.crate_of_path(path)
             with open(os.path.join(self.root, path), encoding="utf-8", errors="surrogateescape") as handle:
                 text = handle.read()
-            self.files[path] = RustFile(self.root, path, text, crate.directory if crate else posixpath.dirname(path))
+            directory = crate.directory if crate else posixpath.dirname(path)
+            self.files[path] = self.product_view_file(RustFile(self.root, path, text, directory), text, directory)
             if self.names_assigned:
                 self.assign_full_names(self.files[path])
                 self.apply_product_view(self.files[path])
@@ -2206,10 +3347,14 @@ class RustWorkspace:
         self.impls_of_trait = collections.defaultdict(list)
         self.blanket_impls = collections.defaultdict(list)
         self.wgsl_const_file = {}
+        # 用到时才算（names_reaching_outside_crate、candidates_seen_from_module）
+        self.outside_crate_reaching_names, self.outside_crate_module_candidates, self.outside_crate_type_names = {}, {}, {}
+        self.index_macro_and_foreign_edges()
         indexed = set()
         # const _ / static _ 没有名字：R-裸名的着落里不收 _（let _ = …、_ => 里的 _ 不点它；条目级宏调用、extern 块定义的名字里的 _ 同样不收）；
         #   弄坏开关 rust-underscore-items-named 下照收
         underscore_named = "rust-underscore-items-named" in active_breaks()
+        literal_names_linked = "rust-macro-rules-literal-names-unlinked" not in active_breaks()
         for target in self.targets.values():
             names = self.by_name.setdefault(target.id, collections.defaultdict(list))
             for path in target.files:
@@ -2219,10 +3364,14 @@ class RustWorkspace:
                     self.unit_targets[id(unit)].add(target.id)
                     if unit.container is None and unit.kind in RUST_NAMED_KINDS and (unit.short != "_" or underscore_named):
                         names[unit.short].append(unit)
-                    if unit.kind in ("item_macro", "extern_block"):
+                    if unit.kind in RUST_KINDS_DEFINING_NAMES:
                         for name in unit.defines:
                             if name != "_" or underscore_named:
                                 names[name].append(unit)
+                    if unit.kind == "item_macro" and literal_names_linked:
+                        # 宏体里按字面写出的名字登到这次调用名下（文件头 Rust 闭包「条目级宏调用生成的条目」）；调用体里已有的不重登
+                        for name in sorted(self.macro_rules_literal_names.get(unit.short.partition("!@")[0], frozenset()) - set(unit.defines or ())):
+                            names[name].append(unit)
             for path in target.files:
                 if path in indexed:
                     continue
@@ -2250,6 +3399,181 @@ class RustWorkspace:
                         wgsl = [reference[1] for reference in unit.data_references if reference[0] == "wgsl"]
                         if wgsl:
                             self.wgsl_const_file[id(unit)] = wgsl[0]
+
+    def index_macro_and_foreign_edges(self):
+        """文件头 Rust 闭包「条目级宏调用生成的条目」「#[global_allocator]」「外部类型上的 trait impl」那三条要的索引，扫进了目标的每份文件一趟：
+          macro_declared_types   条目级宏调用（id）→ 调用体里跟在 enum / struct / union / type 后面的名字（宏生成的类型）
+          macro_rules_literal_names  宏名 → 同名 macro_rules! 体里展开式顶层跟在 const / static / fn / struct / enum / union / type 后面、按字面写出的名字
+                                 （不是 $ 起头的捕获）
+          global_allocators      带 #[global_allocator] 的 static 单元
+          foreign_trait_impls    自身类型是外部类型、trait 是本仓 trait 的 trait impl（id）：自身类型写成路径、头一段不是 crate / self / super / Self 与本仓
+                                 crate 名的，或自身类型里的名字没有一个是本仓定义的类型（struct、enum、union、type 与宏生成的类型）"""
+        self.macro_declared_types, self.macro_rules_literal_names = {}, collections.defaultdict(set)
+        self.global_allocators, self.foreign_trait_impls = [], set()
+        paths = sorted({path for target in self.targets.values() for path in target.files})
+        type_names, trait_names, impls = set(), set(), []
+        for path in paths:
+            rust_file = self.files[path]
+            for unit in rust_file.units:
+                if unit.first_token is None or unit.kind == "doctest":
+                    continue
+                span = range(unit.first_token, unit.last_token)
+                if unit.kind == "item_macro":
+                    declared = frozenset(rust_file.t(index + 1) for index in span if rust_file.t(index) in ("enum", "struct", "union", "type")
+                                         and rust_file.kind(index + 1) == IDENT and rust_file.t(index + 1) not in RUST_KEYWORDS)
+                    self.macro_declared_types[id(unit)] = declared
+                    type_names |= declared
+                elif unit.kind == "macro_rules":
+                    depth = 0
+                    for index in span:
+                        word = rust_file.t(index)
+                        depth += (word in ("{", "(", "[")) - (word in ("}", ")", "]"))
+                        # 只收展开结果顶层的条目（宏体的括号一层、展开式的括号一层）：impl $name { fn new … } 里的关联项按类型连，不按名字登
+                        if depth != 2 or word not in ("const", "static", "fn", "struct", "enum", "union", "type"):
+                            continue
+                        name_index = index + 2 if word == "static" and rust_file.t(index + 1) == "mut" else index + 1
+                        name = rust_file.t(name_index)
+                        if rust_file.kind(name_index) == IDENT and name not in RUST_KEYWORDS and name != "_":
+                            self.macro_rules_literal_names[unit.short].add(name)
+                elif unit.kind == "static" and any(rust_file.t(index) == "global_allocator" and rust_file.t(index - 1) == "[" and rust_file.t(index - 2) == "#"
+                                                   for index in span):
+                    self.global_allocators.append(unit)
+                elif unit.kind in RUST_TYPE_KINDS:
+                    type_names.add(unit.short)
+                elif unit.kind == "trait":
+                    trait_names.add(unit.short)
+                elif unit.kind == "impl" and unit.is_trait_impl and not unit.blanket:
+                    impls.append(unit)
+        local_roots = {"crate", "self", "super", "Self"} | {crate.lib_name for crate in self.crates}
+        for unit in impls:
+            qualified_outside = unit.self_path_root is not None and unit.self_path_root not in local_roots
+            if unit.trait_name in trait_names and (qualified_outside or not unit.self_types & type_names):
+                self.foreign_trait_impls.add(id(unit))
+
+    def names_reaching_outside_crate(self, crate):
+        """别的包按裸名连得到工作区外这个 crate 的哪些名字（文件头 Rust 闭包「工作区外的 path 依赖」）→ (全收, 名字集)。扫的是这个 crate 以外每个目标的文件：
+        根名是这个 crate 的库名，use / extern crate 语句里出现根名的，它后面的名字都算引进来、也都当根名（引进来的可能是模块或别名）；收到不再变；
+        语句里根名后面有 * 的全收。路径 根名::a::b 里根名后面的段都算；名字后面接 ! 与括号、又是这个 crate 里 macro_rules! 的名字的也算。
+        引进来的名字按整个工作区收、不分模块：经别处 pub use 转出去再 glob 引进来的照样认得。一个 crate 只算一趟。"""
+        cached = self.outside_crate_reaching_names.get(crate.directory)
+        if cached is not None:
+            return cached
+        own_paths = {path for target in self.targets.values() if target.crate is crate for path in target.files}
+        paths = sorted({path for target in self.targets.values() if target.crate is not crate for path in target.files} - own_paths)
+        macro_names = {unit.short for path in own_paths for unit in self.files[path].units if unit.kind == "macro_rules"}
+        statements = []
+        for path in paths:
+            rust_file = self.files[path]
+            texts, kinds = rust_file.texts, rust_file.kinds
+            for index in (i for i, text in enumerate(texts) if text in ("use", "crate") and kinds[i] == IDENT):
+                if texts[index] == "crate" and rust_file.t(index - 1) != "extern":
+                    continue
+                end = index + 1
+                while end < rust_file.count and texts[end] != ";":
+                    end += 1
+                statements.append((rust_file, index + 1, end))
+        roots, every_name = {crate.lib_name}, False
+        grown = True
+        while grown:
+            grown = False
+            for rust_file, low, high in statements:
+                start = next((i for i in range(low, high) if rust_file.kinds[i] == IDENT and rust_file.texts[i] in roots), None)
+                if start is None:
+                    continue
+                for i in range(start + 1, high):
+                    text = rust_file.texts[i]
+                    if text == "*":
+                        every_name = True
+                    elif rust_file.kinds[i] == IDENT and text not in ("self", "super", "crate", "as") and text not in roots:
+                        roots.add(text)
+                        grown = True
+        names = set(roots)
+        for path in paths:
+            rust_file = self.files[path]
+            texts, kinds = rust_file.texts, rust_file.kinds
+            if not (roots | macro_names) & set(texts):
+                continue
+            for index, text in enumerate(texts):
+                if kinds[index] != IDENT:
+                    continue
+                if text in macro_names and rust_file.t(index + 1) == "!" and rust_file.t(index + 2) in ("(", "[", "{"):
+                    names.add(text)
+                if text not in roots:
+                    continue
+                following = index + 1
+                while rust_file.t(following) == ":" and rust_file.t(following + 1) == ":" and rust_file.kind(following + 2) == IDENT:
+                    names.add(texts[following + 2])
+                    following += 3
+        self.outside_crate_reaching_names[crate.directory] = (every_name, frozenset(names))
+        return self.outside_crate_reaching_names[crate.directory]
+
+    def module_of(self, unit, identifier):
+        """单元在目标 identifier 里所在的模块路径：文件在目标模块树里的路径接文件里的行内模块路径。"""
+        return tuple(self.targets[identifier].files[unit.file][0]) + tuple(unit.scope or ())
+
+    def candidates_seen_from_module(self, unit, identifier, name, candidates):
+        """工作区外 crate 的同一个目标里，单元按裸名 name 连得到 candidates 里的哪几份（文件头 Rust 闭包「工作区外的 path 依赖」）：
+        与单元同一模块的；所在模块的 use 引进了 name（或是 glob）、use 路径里有候选所在模块的末段（crate::x 是根模块、super 是上一层）的；
+        单元里写成 前缀::name、前缀是候选所在模块末段（crate、self、super 照算）的。认不出落在哪一份的退回全连：use 或路径点到的模块里一份都没有
+        （经 pub use 转出来的）、前缀不是类型也不是哪一份所在模块、单元里另有 use 语句（函数体里的 use）、name 后面接 !。
+        前缀是类型或 trait（Self、Tr::x）的是关联项，R-路径另管，不按这一处连。哪一样都不沾的（字段名、局部变量）一份都不连。"""
+        key = (id(unit), identifier, name)
+        cached = self.outside_crate_module_candidates.get(key)
+        if cached is not None:
+            return cached
+        own = self.module_of(unit, identifier)
+        modules = {id(candidate): self.module_of(candidate, identifier) for candidate in candidates}
+        seen = {id(candidate) for candidate in candidates if modules[id(candidate)] == own}
+        every = False
+
+        def placed(segments):
+            """路径（不含 name 本身）点到的候选；一份都没点到交 None。"""
+            found = set()
+            for candidate in candidates:
+                module = modules[id(candidate)]
+                if ((module and module[-1] in segments) or (not module and segments[:1] == ["crate"])
+                        or ("super" in segments and module == own[:-1]) or (segments[:1] == ["self"] and module == own)):
+                    found.add(id(candidate))
+            return found or None
+
+        rust_file = self.files[unit.file]
+        for use in self.uses_by_scope.get((unit.file, unit.scope), ()):
+            if use.first_token is None or not (use.import_glob or name in use.imports):
+                continue
+            segments = [rust_file.texts[index] for index in range(use.first_token, use.last_token)
+                        if rust_file.kinds[index] == IDENT and rust_file.texts[index] not in ("use", "pub", "as", name)]
+            hit = placed(segments)
+            if hit is None:
+                every = True
+            else:
+                seen |= hit
+        if unit.first_token is not None and not every:
+            if identifier not in self.outside_crate_type_names:
+                self.outside_crate_type_names[identifier] = frozenset(
+                    short for short, found in self.by_name.get(identifier, {}).items() if any(other.kind in RUST_TYPE_OR_TRAIT_KINDS for other in found))
+            types = self.outside_crate_type_names[identifier]
+            for index in range(unit.first_token, unit.last_token):
+                text = rust_file.texts[index]
+                if text == "use" and rust_file.kinds[index] == IDENT and index != unit.first_token:
+                    every = True
+                    break
+                if text != name or rust_file.kinds[index] != IDENT:
+                    continue
+                if rust_file.t(index + 1) == "!" and rust_file.t(index + 2) in ("(", "[", "{"):
+                    every = True
+                    break
+                if rust_file.t(index - 1) == ":" and rust_file.t(index - 2) == ":" and rust_file.kind(index - 3) == IDENT:
+                    prefix = rust_file.t(index - 3)
+                    if prefix == "Self" or (prefix in types and prefix not in ("crate", "self", "super")):
+                        continue
+                    hit = placed([prefix])
+                    if hit is None:
+                        every = True
+                        break
+                    seen |= hit
+        found = list(candidates) if every else [candidate for candidate in candidates if id(candidate) in seen]
+        self.outside_crate_module_candidates[key] = found
+        return found
 
     def visible(self, target_id, development=False):
         target = self.targets[target_id]
@@ -2284,7 +3608,28 @@ class RustWorkspace:
     def lib_target(self, crate):
         return self.targets.get(f"{crate.label}:lib:{crate.lib_name}")
 
-    def resolve_features(self, linked_crates, entry_crate, requested, no_default):
+    def test_functions(self, target_id):
+        """编译目标里带 #[test] 的 fn 单元：[(libtest 全名, 单元)]，全名 = 文件在目标里的模块路径加单元的限定名。"""
+        cache = self.__dict__.setdefault("_test_functions", {})
+        if target_id not in cache:
+            found = []
+            for path, (module_path, _chain) in sorted(self.targets[target_id].files.items()):
+                for candidate in self.files[path].units:
+                    if candidate.kind == "fn" and any(condition[1] == TEST_ATTRIBUTE_RAW for condition in candidate.conditions or ()):
+                        found.append(("::".join(list(module_path) + [candidate.name]), candidate))
+            cache[target_id] = found
+        return cache[target_id]
+
+    def exact_test(self, full_name, target_id):
+        """同一编译目标里 libtest 全名恰好是 full_name 的 #[test] 单元；不是恰好一个回 None（拒算 current-exe）。"""
+        hits = [candidate for name, candidate in self.test_functions(target_id) if name == full_name]
+        return hits[0] if len(hits) == 1 else None
+
+    def resolve_features(self, linked_crates, entry_crate, requested, no_default, entry_sections):
+        """照 cargo 的特性统一（resolver 2，与 crates/singlefs-unit-graph 的 resolve_features 同一口径）：依赖边上请求的特性，
+        入口那个 crate 只顺 entry_sections 那几段（rust_entry_dependency_sections），别的 crate 只顺普通依赖——它们的 dev 依赖不编，
+        dev 依赖里才开的特性不进 bin 与库目标。弄坏开关 rust-dependency-features-from-every-section 下退回旧口径：每个 crate 每一段都顺。"""
+        every_section = "rust-dependency-features-from-every-section" in active_breaks()
         enabled = {crate.directory: set() for crate in self.crates}
 
         def enable(crate, feature):
@@ -2310,8 +3655,9 @@ class RustWorkspace:
         for crate, feature in requested:
             enable(crate, feature)
         for crate in linked_crates:
-            for section in crate.dependencies.values():
-                for dependency in section:
+            sections = tuple(crate.dependencies) if every_section else entry_sections if crate is entry_crate else ("normal",)
+            for section in sections:
+                for dependency in crate.dependencies[section]:
                     dependency_crate = self.crate_by_directory.get(dependency.directory)
                     if dependency_crate is None or dependency_crate not in linked_crates:
                         continue
@@ -2368,11 +3714,52 @@ class RustWorkspace:
         return unit, owners[0].id
 
 
+def doctest_entry_paths(library, doctest):
+    """能点到这个文档测试的入口路径（不带 crate 名的段，元组），照 crates/singlefs-unit-graph 的 resolve_entry_units 文档测试那一支与 matches_entry_path 认的写法：
+    挂模块的是那个模块在 lib 模块树里的路径；挂条目的是条目的模块路径接条目名，条目是 impl / trait 里的方法时是模块路径、行内模块、类型名、方法名，
+    类型名取 impl 的各个 self 类型与头自己的名字。头一项是门禁 code-tooling 的 function-units-two-implementations-agree 格拼 unit-graph closure 时取的那一种
+    （impl 取排序后头一个 self 类型）。所在文件不在 lib 目标模块树里的交空表（Rust 那一份只认 lib 里的文档测试）。"""
+    placement = library.files.get(doctest.file)
+    if placement is None:
+        return []
+    module_path = list(placement[0])
+    owner = doctest.container
+    if owner is None:
+        return [tuple(module_path + list(doctest.doc_module or ()))]
+    if owner.container is None:
+        return [tuple(module_path + owner.name.split("::"))]
+    head = owner.container
+    named = sorted(head.self_types)[0] if head.kind == "impl" and head.self_types else head.short
+    others = sorted((set(head.self_types or ()) | {head.short}) - {named})
+    return [tuple(module_path + list(owner.scope or ()) + [type_name, owner.short]) for type_name in [named] + others]
+
+
+def doctest_entry_group(workspace, entry):
+    """文档测试入口一起当入口的那一组文档测试单元（rust_closure_of 的入口与 Closure.entry_units）：照 crates/singlefs-unit-graph 的 resolve_entry_units，
+    文档测试目标的入口是所挂条目或模块的路径，解到那个路径点到的条目与模块挂的全部文档测试；这里拿 entry 的头一条入口路径（doctest_entry_paths）
+    在 lib 目标模块树的每份文件里找能被它点到的文档测试，按 Unit.sort_key 排。lib 目标没有、entry 不在里面的，只交 entry 自己。"""
+    crate = workspace.crate_of_path(entry.file)
+    library = workspace.lib_target(crate) if crate is not None else None
+    paths = doctest_entry_paths(library, entry) if library is not None else []
+    if not paths:
+        return [entry]
+    group = [unit for path in sorted(library.files) for unit in workspace.file(path).units
+             if unit.kind == "doctest" and paths[0] in doctest_entry_paths(library, unit)]
+    if not any(unit is entry for unit in group):
+        return [entry]
+    return sorted(group, key=Unit.sort_key)
+
+
 def rust_unit_is_test(workspace, unit, target_id):
-    target = workspace.targets[target_id]
-    if target.kind in ("test", "bench"):
+    if workspace.targets[target_id].kind in ("test", "bench"):
         return True
-    chain = target.files.get(unit.file, ((), []))[1]
+    return rust_unit_is_test_code(workspace, unit, target_id)
+
+
+def rust_unit_is_test_code(workspace, unit, target_id):
+    """单元自己带 #[test]、或它（连同外层的 impl、行内模块与把它所在文件连进来的 mod 声明）带 cfg(test)：只在按测试编时才有的代码。
+    不含整个目标都是测试的目标种类（tests/ 下的集成测试里没有 #[test] 的单元不算）。"""
+    chain = workspace.targets[target_id].files.get(unit.file, ((), []))[1]
     probe = unit
     while probe is not None:
         if any(condition_mentions_test(condition[0]) for condition in probe.conditions):
@@ -2390,12 +3777,14 @@ class Closure:
         self.programs = {}
         self.via = {}
         # Rust 闭包另记（unit_graph_key 照 crates/singlefs-unit-graph 的 reuse_key 算键用）：入口目标的种类、入口目标的生效 cfg 集（无值名字写名字，
-        # 键值写 键="值"）、读数据文件的每一处（文件、行、数据文件、摘要、读它的单元）、每个单元收进来时所在的目标
+        # 键值写 键="值"）、读数据文件或数据目录的每一处（文件、行、数据文件或目录、摘要、读它的单元、种类 data 或 data-directory）、每个单元收进来时所在的目标
         self.entry_target_kind, self.entry_cfg_atoms = None, []
         # 键里的 cfg 成分（「<原子>\t<true|false>」的集合，rust_closure_of 填）；None 是没记（key_cfg_items 退回整套生效 cfg）
         self.cfg_atoms = None
         self.data_sites = set()
         self.unit_targets = {}
+        # 从哪几个入口收的（键里的 entry 行，entry_key_lines）：rust_closure_of、ScriptClosure.run 与 WGSL 点名的入口各记；别处自己拼的闭包不记，不出那几行
+        self.entry_units = []
 
     def add(self, unit, via, rule):
         if id(unit) in self.members:
@@ -2436,8 +3825,9 @@ WGSL_NAME_DEFINING_KINDS = frozenset(("const", "static", "item_macro"))
 
 
 def rust_declared_names(unit):
-    """单元按名字定义的名字（crates/singlefs-unit-graph 的 declared_names）：条目级宏调用与 extern 块是它里面定义的那几个，别的是它自己的名字。"""
-    if unit.kind in ("item_macro", "extern_block"):
+    """单元按名字定义的名字（crates/singlefs-unit-graph 的 declared_names）：条目级宏调用与 extern 块是它里面定义的那几个，
+    assume_specification 是它点名路径末段的名字，别的是它自己的名字。"""
+    if unit.kind in RUST_KINDS_DEFINING_NAMES:
         return unit.defines or set()
     return {unit.short}
 
@@ -2528,10 +3918,39 @@ class WgslNameSources:
         return bool(found), list(found.values())
 
 
-def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False, features=(), no_default_features=False):
-    """从入口收 Rust 闭包（3.3 八条规则），连同入口闭包拼出的 WGSL 模块（3.5）。"""
+def rust_entry_dependency_sections(target_kind, test_compiled):
+    """入口目标顺自己 crate 的哪几段依赖解特性（crates/singlefs-unit-graph 的 dependency_sections_of）：构建脚本只顺 build 依赖；
+    按 cfg(test) 编的 lib 与 bin、集成测试、example、bench、文档测试连 dev 依赖；不按 cfg(test) 编的 lib 与 bin 只顺普通依赖。"""
+    if target_kind == "build":
+        return ("build",)
+    if test_compiled or target_kind in ("test", "bench", "example", "doctest"):
+        return ("normal", "dev")
+    return ("normal",)
+
+
+def entry_names_only_defined(workspace, entry):
+    """入口单元自己的名字在它的词法单元里只出现在定义那一处：交 {名字}，不然交空集（文件头 Rust 闭包「入口名字的定义那一处」）。"""
+    if entry.first_token is None or entry.last_token is None or not entry.short:
+        return frozenset()
+    rust_file = workspace.files[entry.file]
+    occurrences = sum(1 for index in range(entry.first_token, entry.last_token)
+                      if rust_file.kind(index) == IDENT and rust_file.t(index) == entry.short)
+    return frozenset((entry.short,)) if occurrences <= 1 else frozenset()
+
+
+def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False, features=(), no_default_features=False,
+                    entry_definition_name_unresolved=False, stop_at=()):
+    """从入口收 Rust 闭包（3.3 八条规则），连同入口闭包拼出的 WGSL 模块（3.5）。entry_definition_name_unresolved 见文件头 Rust 闭包「入口名字的定义那一处」，
+    stop_at 见同一节「到这些单元就停」。"""
     breaks = active_breaks()
     closure = Closure()
+    stopped_units = {id(unit) for source, unit in stop_at if source is None}
+    stopped_edges = {(id(source), id(unit)) for source, unit in stop_at if source is not None}
+    # 文档测试入口照 crates/singlefs-unit-graph 的 resolve_entry_units：所挂条目或模块的全部文档测试一起当入口、一起记进 entry 行（doctest_entry_group）；
+    # 弄坏开关 rust-doctest-entry-alone：只取交进来的那一个（改前的样子：Rust 那一份记一组、这里记一个，两边的 entry 行与闭包对不上）
+    roots = doctest_entry_group(workspace, entry) if entry.kind == "doctest" and "rust-doctest-entry-alone" not in breaks else [entry]
+    closure.entry_units.extend(roots)
+    entry_unresolved_names = entry_names_only_defined(workspace, entry) if entry_definition_name_unresolved else frozenset()
     target = workspace.targets[target_id]
     test_compiled = rust_unit_is_test(workspace, entry, target_id) if target.kind != "doctest" else False
     linked = set(workspace.visible(target_id, development=test_compiled))
@@ -2540,7 +3959,8 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
     for item in features:
         package, _slash, feature = item.partition("/")
         requested.append((workspace.crate_by_package(package), feature))
-    enabled = workspace.resolve_features(linked_crates, target.crate, requested, no_default_features)
+    enabled = workspace.resolve_features(linked_crates, target.crate, requested, no_default_features,
+                                         rust_entry_dependency_sections(target.kind, test_compiled))
     names, pairs = cfg_entries(([] if no_default_cfg else list(DEFAULT_RUST_CFG)) + list(cfg or ()))
     known_extra = set(names) | {key for key, _value in pairs}
     for crate in workspace.crates:
@@ -2580,11 +4000,19 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
     # blanket impl（impl<T: …> Tr for T）够得到的方法算边（定案 3：python 保持，crates/singlefs-unit-graph 跟着改）；
     # 弄坏开关 rust-blanket-impls-ignored 下 R-方法、R-路径不放行 blanket impl，trait 头进闭包也不带它的 blanket impl（Rust 现在的写法）
     blanket = "rust-blanket-impls-ignored" not in breaks
+    # 文件头 Rust 闭包「条目级宏调用生成的条目」「#[global_allocator]」「外部类型上的 trait impl」：各一个弄坏开关退回改前的样子
+    macro_types_named = "rust-macro-generated-types-unnamed" not in breaks
+    allocators_linked = "rust-global-allocators-unlinked" not in breaks
+    foreign_impls = workspace.foreign_trait_impls if "rust-foreign-self-trait-impls-unlinked" not in breaks else frozenset()
+    # 文件头 Rust 闭包「工作区外的 path 依赖」：别的包按裸名连进来要经 use 或路径；同一个目标里只连所在模块看得见的那几份。各一个弄坏开关退回改前的样子
+    outside_names_imported_only = "rust-outside-crate-names-linked-unimported" not in breaks
+    outside_names_by_module = "rust-outside-crate-names-linked-across-modules" not in breaks
     doctest_structure = "rust-doctest-structure-linked" in breaks
     body_cfg_atoms = "rust-cfg-macro-atoms-ignored" not in breaks
     raw_wgsl = "wgsl-raw-text" in breaks
     pull_suppliers = not ({"wgsl-name-suppliers-not-pulled-in", "wgsl-external-names-by-long-identifiers"} & breaks)
     pull_wgsl_definers = "wgsl-other-file-definitions-unlinked" not in breaks
+    suppliers_skip_test_code = "wgsl-name-suppliers-include-test-code" not in breaks
     modules_per_naming_unit = "wgsl-modules-per-naming-unit" in breaks
     structure_only = RUST_STRUCTURE_ONLY_KINDS - ({"use"} if "rust-use-names-resolved" in breaks else set())
     dropped = set()
@@ -2597,6 +4025,7 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
     wgsl_modules = set()
     wgsl_paths = set()           # 闭包里单元 include_str! / include_bytes! 读的 .wgsl：合成一个模块（design 3.5，与 crates/singlefs-unit-graph 的 wgsl_files 同）
     suppliers_tried = set()
+    pending_children = []        # 起子进程的测试名是参数的：(单元, 函数名, 位置, 目标, current_exe 的词法单元下标)
     data_units = {}
     todo = []
 
@@ -2685,6 +4114,21 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
             i += 1
         return out
 
+    def collect_shell_sources(path, reader, line):
+        """读到的数据文件是 shell 脚本：它（传递地）source / . 进来的文件各收成一个 data-file 单元，折不出的拒算（文件头「Rust 闭包读到的 shell 脚本」）；
+        每读一处这份脚本（reader 那个单元的第 line 行），被 source 的每一份在那一处记一条 data_sites（crates/singlefs-unit-graph 的 follow_shell_sources 同）。
+        弄坏开关 shell-data-sources-unfollowed：一份都不收；shell-data-sources-unsited：照收、不记 data_sites。"""
+        if "shell-data-sources-unfollowed" in breaks or language_of_file(workspace.root, path) != "shell":
+            return
+        sourced, refusals = workspace.shell_sourced(path)
+        closure.refusals.update(refusals)
+        for file in sourced:
+            if file not in data_units:
+                data_units[file] = data_file_unit(workspace.root, file)
+            closure.add(data_units[file], data_units[path], "shell-source")
+            if "shell-data-sources-unsited" not in breaks:
+                closure.data_sites.add((reader.file, line, file, data_units[file].fingerprint, id(reader), "data"))
+
     def collect_data(unit, identifier):
         """这个单元读的数据文件进闭包（一份文件一个 data-file 单元），另按读它的那一处记一条 data_sites（Rust 那一份的数据单元写法，unit_graph_key 用）；
         OUT_DIR 与 CARGO_BIN_EXE_<名> 连到构建脚本与那个 bin 的 main。"""
@@ -2693,8 +4137,25 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
             if kind == "file":
                 if value not in data_units:
                     data_units[value] = data_file_unit(workspace.root, value)
+                line = workspace.files[unit.file].lines[index]
+                collect_shell_sources(value, unit, line)   # 每一处读都记：被 source 的那几份的数据位置落在读这份脚本的那一处
                 closure.add(data_units[value], unit, "data")
-                closure.data_sites.add((unit.file, workspace.files[unit.file].lines[index], value, data_units[value].fingerprint, id(unit)))
+                closure.data_sites.add((unit.file, line, value, data_units[value].fingerprint, id(unit), "data"))
+            elif kind == "current-exe-child":
+                if value[0] == "parameter":
+                    pending_children.append((unit, value[1], value[2], identifier, index))
+                else:
+                    name = folded_test_name(unit, value[1])
+                    test = workspace.exact_test(name, identifier) if name is not None else None
+                    if test is None:
+                        refuse_child(unit, index)
+                    elif "rust-current-exe-children-unlinked" not in breaks:
+                        push_exact(test, identifier, unit, "current-exe-child")
+            elif kind == "directory":
+                if value not in data_units:
+                    data_units[value] = data_directory_unit(workspace.root, value)
+                closure.add(data_units[value], unit, "data")
+                closure.data_sites.add((unit.file, workspace.files[unit.file].lines[index], value, data_units[value].fingerprint, id(unit), "data-directory"))
             elif kind == "wgsl":
                 if raw_wgsl:
                     if value not in data_units:
@@ -2711,6 +4172,15 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                     closure.refusals.update(unit.refusals)
                 for main in mains:
                     push_exact(main, build.id, unit, "out-directory")
+            elif kind == "build-environment":
+                # env!("X") 的 X 不是 cargo 给的：连到本 crate 构建脚本的 main（它经 cargo::rustc-env 交这个值）；没有构建脚本的不连
+                # （值来自编译时的进程环境，不在仓里的代码里）。弄坏开关 rust-build-environment-unlinked：不连（改前的样子）
+                if "rust-build-environment-unlinked" in breaks:
+                    continue
+                build = workspace.targets.get(f"{crate.label}:build:{crate.label}")
+                for main in ([candidate for candidate in workspace.files[build.root_file].units if candidate.kind == "fn" and candidate.short == "main"
+                              and candidate.container is None] if build else []):
+                    push_exact(main, build.id, unit, "build-environment")
             elif kind == "bin-executable":
                 bin_target = workspace.targets.get(f"{crate.label}:bin:{value}")
                 mains = [candidate for candidate in workspace.files[bin_target.root_file].units if candidate.kind == "fn" and candidate.short == "main"
@@ -2722,14 +4192,23 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
 
     if not active(entry, target_id):
         raise UsageError(f"入口 {entry.file}::{entry.name} 在这一组 cfg 下不编（{'、'.join(closure.cfg_lines) or '空'}）：用 --feature <包名>/<特性> 或 --cfg 打开它")
-    todo.append((entry, target_id, None, "entry"))
-    for trait_name in entry_signature_traits(entry) if not no_open else ():
-        dyn_trait(trait_name, target_id, entry)
+    for root in roots:
+        todo.append((root, target_id, None, "entry"))
+        for trait_name in entry_signature_traits(root) if not no_open else ():
+            dyn_trait(trait_name, target_id, root)
+    for allocator in workspace.global_allocators if allocators_linked else ():
+        # #[global_allocator] 的 static 管整个链接出来的程序：链接集里有它所在目标的，它进闭包（连同它的类型、R-隐式带上 GlobalAlloc 的 impl）
+        for owner in sorted(workspace.unit_targets.get(id(allocator), ())):
+            if owner in linked:
+                push_exact(allocator, owner, None, "global-allocator")
 
     def drain():
         while todo:
             unit, identifier, via, rule = todo.pop()
             if (id(unit), identifier) in seen:
+                continue
+            if unit is not entry and (id(unit) in stopped_units or (via is not None and (id(via), id(unit)) in stopped_edges)):
+                # 到这些单元就停（文件头 Rust 闭包那一节）：按边停的不记进 seen，别的单元连到它照连
                 continue
             seen.add((id(unit), identifier))
             if unit.kind in dropped or not active(unit, identifier):
@@ -2755,7 +4234,7 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                 if unit.kind != "doctest" and not no_module_heads and not no_declarations:
                     for declaring in workspace.targets[identifier].declared_by.get(unit.file, ()):
                         push_exact(declaring, identifier, unit, "mod-declaration")
-                references = unit.references or set()
+                references = (unit.references or set()) - (entry_unresolved_names if unit is entry else frozenset())
                 for use in workspace.uses_by_scope.get((unit.file, unit.scope), ()):
                     if use is not unit and (use.import_glob or (use.imports & references)):
                         push(use, identifier, unit, "use")
@@ -2766,12 +4245,27 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                 collect_data(unit, identifier)
                 continue
             visible = workspace.visible(identifier, development=identifier in test_targets)
+            unit_crate = workspace.targets[identifier].crate
             for name in sorted(unit.plain) + alias_originals:
+                if unit is entry and name in entry_unresolved_names:
+                    continue
                 for visible_id in visible:
                     table = workspace.by_name.get(visible_id)
                     if table is None:
                         continue
-                    for candidate in table.get(name, ()):
+                    candidates = table.get(name, ())
+                    visible_crate = workspace.targets[visible_id].crate
+                    if candidates and visible_crate.outside_workspace:
+                        # 工作区外的 crate 按调用关系连（文件头 Rust 闭包「工作区外的 path 依赖」）：从别的包连进来，这个名字要在工作区里经 use 或路径
+                        # 从它引进来过（验证包的 run 字段不连到 prune-server 的 command_line::run）；同一个目标里，只连这个单元所在模块看得见的那几份
+                        # （committer 里 impl 成员 fn run 自己的名字不连到 command_line::run）
+                        if outside_names_imported_only and visible_crate is not unit_crate:
+                            every_name, reaching = workspace.names_reaching_outside_crate(visible_crate)
+                            if not every_name and name not in reaching:
+                                continue
+                        if outside_names_by_module and visible_id == identifier and name not in alias_originals:
+                            candidates = workspace.candidates_seen_from_module(unit, identifier, name, candidates)
+                    for candidate in candidates:
                         if candidate is unit:
                             continue
                         if visible_id != identifier and not candidate.public:
@@ -2781,7 +4275,7 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                 methods_seen.add(name)
                 for member in workspace.members_by_name.get(name, ()):
                     container = member.container
-                    if container.kind == "trait" or (blanket and container.blanket) or (container.self_types & named):
+                    if container.kind == "trait" or (blanket and container.blanket) or (container.self_types & named) or id(container) in foreign_impls:
                         push(member, identifier, unit, f"method {name}")
             own = unit.container
             for qualifier, name in unit.qualified:
@@ -2798,10 +4292,15 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                     elif container.kind == "impl" and qualifier == "Self" and own is not None and (
                             container.self_types & own.self_types if trait_self_paths else container.self_types & (own.self_types or {own.short})):
                         push(member, identifier, unit, f"path Self::{name}")
-                    elif container.kind == "impl" and container.is_trait_impl and container.trait_name == qualifier and ((blanket and container.blanket) or container.self_types & named):
+                    elif container.kind == "impl" and container.is_trait_impl and container.trait_name == qualifier and (
+                            (blanket and container.blanket) or container.self_types & named or id(container) in foreign_impls):
                         push(member, identifier, unit, f"path {qualifier}::{name}")
             if unit.kind in RUST_TYPE_KINDS:
                 name_type(unit.short, identifier, unit)
+            if unit.kind == "item_macro" and macro_types_named:
+                # 条目级宏调用生成的类型算被点名：R-方法、R-隐式照连到写给它的 impl（文件头 Rust 闭包「条目级宏调用生成的条目」）
+                for type_name in sorted(workspace.macro_declared_types.get(id(unit), ())):
+                    name_type(type_name, identifier, unit)
             if unit.kind == "trait":
                 for head in workspace.blanket_impls.get(unit.short, ()) if blanket else ():
                     push_impl(head, identifier, unit, f"blanket {unit.short}")
@@ -2823,6 +4322,88 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                     module_files.discard(workspace.wgsl_const_file[id(unit)])
                 if module_files:
                     wgsl_modules.add(frozenset(module_files))
+
+    def refuse_child(unit, index):
+        rust_file = workspace.files[unit.file]
+        line = rust_file.lines[index]
+        closure.refusals.add(Refusal("current-exe", unit.file, line, rust_file.row(line)))
+
+    def constant_string(context, name):
+        """常量 name 的串值（crates/singlefs-unit-graph 的 constant_string_value）：先找 context 这个单元自己的词法单元里的 const <名>: … = "…";，
+        再找同一个包、在这一次链接集里（同一包的别的 bin 不算）叫这个名字的常量单元（几个都得写成 = "…";、值相同）；找不到、写法不是串字面量或几个值不同回 None。
+        弄坏开关 rust-current-exe-constants-same-file-only：第二步只找 context 所在的那一份文件（改前的样子）。"""
+        found = workspace.files[context.file].string_constant_in(context.first_token, context.last_token, name)
+        if found is not None:
+            return found
+        context_crate = workspace.crate_of_path(context.file)
+        values, searched = set(), set()
+        for candidate_target in sorted(linked):
+            if workspace.targets[candidate_target].kind == "doctest":
+                continue
+            for path in sorted(workspace.targets[candidate_target].files):
+                if path in searched or workspace.crate_of_path(path) is not context_crate:
+                    continue
+                searched.add(path)
+                if path != context.file and "rust-current-exe-constants-same-file-only" in breaks:
+                    continue
+                rust_file = workspace.files[path]
+                for candidate in rust_file.units:
+                    if candidate.kind == "const" and candidate.short == name:
+                        value = rust_file.string_constant_in(candidate.first_token, candidate.last_token, name)
+                        if value is None:
+                            return None
+                        values.add(value)
+        return next(iter(values)) if len(values) == 1 else None
+
+    def folded_test_name(context, pieces):
+        """几段连成测试名：常量名在 context 这个单元里解（constant_string）；有一个解不出回 None。"""
+        texts = []
+        for piece_kind, text in pieces:
+            if piece_kind == "literal":
+                texts.append(text)
+                continue
+            value = constant_string(context, text)
+            if value is None:
+                return None
+            texts.append(value)
+        return "".join(texts)
+
+    def child_tests_of(function_name, position, identifier):
+        """名字是起子进程那个函数的参数：闭包里每一处调用它的那个实参各折一遍 → (对上的 #[test] 单元, 全都折得出又各对上恰好一个)；一处调用都没有也算不行。"""
+        names, complete = set(), True
+        for member in list(closure.order):
+            if member.language != "rust" or member.first_token is None or member.kind == "doctest":
+                continue
+            found = workspace.files[member.file].call_site_test_names(member, function_name, position)
+            if found is None:
+                complete = False
+                continue
+            for pieces in found:
+                name = folded_test_name(member, pieces)
+                if name is None:
+                    complete = False
+                else:
+                    names.add(name)
+        tests = []
+        for name in sorted(names):
+            test = workspace.exact_test(name, identifier)
+            if test is None:
+                complete = False
+            else:
+                tests.append(test)
+        return tests, complete and bool(names)
+
+    def pull_in_child_process_tests():
+        """参数写法的测试名（规则 current-exe-child）：闭包里每一处调用点交的实参对上的 #[test] 单元连进来；每趟 drain 之后、WGSL 供给之前跑。→ 有没有新推进去的。"""
+        if "rust-current-exe-children-unlinked" in breaks:
+            return False
+        pushed = False
+        for _unit, function_name, position, identifier, _index in pending_children:
+            for test in child_tests_of(function_name, position, identifier)[0]:
+                if (id(test), identifier) not in seen:
+                    push_exact(test, identifier, _unit, "current-exe-child")
+                    pushed = True
+        return pushed
 
     def wgsl_module_groups():
         if raw_wgsl:
@@ -2866,6 +4447,8 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                         continue
                     if not pull_suppliers:
                         continue
+                    if suppliers_skip_test_code and rust_unit_is_test_code(workspace, candidate, identifier):
+                        continue
                     defines = candidate.kind in WGSL_NAME_DEFINING_KINDS and any(
                         name_and_underscore_suffixes(name) & unsupplied for name in rust_declared_names(candidate))
                     in_string = not defines and any(
@@ -2879,8 +4462,14 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
         return pushed
 
     drain()
-    while pull_in_wgsl_name_suppliers():
-        drain()
+    while True:
+        if pull_in_child_process_tests() or pull_in_wgsl_name_suppliers():
+            drain()
+            continue
+        break
+    for unit, function_name, position, identifier, index in pending_children:
+        if not child_tests_of(function_name, position, identifier)[1]:
+            refuse_child(unit, index)
     groups = wgsl_module_groups()
     if groups:
         sources = WgslNameSources(workspace, closure.order)
@@ -2891,6 +4480,613 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                 closure.add(member, None, "wgsl-module")
             closure.refusals.update(refusals)
     return closure
+
+
+# 产品行为视图里只给 Verus 看的那几截（crates/singlefs-unit-graph 的 verus_ghost_code.rs 文件头列的那几种；那一份按 verus_syn 的语法树挑，
+# 这里按词法单元认同样的写法，认出来的要逐单元核得上 Rust 那一份才用：RustWorkspace.product_view_file）
+VERUS_GHOST_FUNCTION_MODES = frozenset(("spec", "proof", "axiom"))
+VERUS_SIGNATURE_CLAUSES = frozenset(("requires", "recommends", "ensures", "default_ensures", "returns", "decreases", "opens_invariants",
+                                     "no_unwind", "with", "by", "atomically"))
+VERUS_LOOP_CLAUSES = frozenset(("invariant", "invariant_except_break", "invariant_ensures", "ensures", "decreases"))
+VERUS_GHOST_CALLS = frozenset(("assume", "reveal", "reveal_with_fuel", "hide"))
+VERUS_GHOST_WRAPPERS = frozenset(("Ghost", "Tracked"))
+# verus! 里同层条目的起头词（crates/singlefs-unit-graph 的 is_verus_item_start）
+VERUS_ITEM_START_WORDS = frozenset(("pub", "fn", "spec", "proof", "exec", "open", "closed", "broadcast", "struct", "enum", "union", "impl",
+                                    "trait", "const", "static", "type", "use", "mod", "unsafe", "extern", "macro_rules", "global", "tracked",
+                                    "ghost", "uninterp", "axiom", "async", "default"))
+# 前一个词是这些时后面的 ( 不是调用的实参表
+VERUS_NOT_CALLEES = frozenset(("if", "while", "match", "return", "in", "for", "let", "loop", "else", "move", "mut", "ref", "as", "fn", "impl",
+                               "where", "dyn", "break", "continue", "unsafe", "await", "yield", "box"))
+# 一对 { … } 之后接这些时，它还在循环头的子句里（不是循环体）
+VERUS_CLAUSE_CONTINUATIONS = frozenset((",", "{", ".", "?", "=", "!", "<", ">", "&", "|", "+", "-", "*", "/", "%", "^", "@", "as", "implies",
+                                        "is", "has", "else")) | VERUS_LOOP_CLAUSES
+
+
+class VerusGhostCode:
+    """一份 Rust 文件里每一块 verus! { … } 中只给 Verus 看的那几截（照 crates/singlefs-unit-graph 的 GhostCodeCollector 挑）：
+    spec、proof、axiom 函数与常量整条（连属性与文档注释）、broadcast group、broadcast use、assume_specification；执行函数签名里的规格子句
+    （requires 一族到函数体之前）、具名返回值的「(名:」与「)」、类型是 Ghost<…> / Tracked<…> 的参数；函数体与常量初值里的 proof { … }、assert(…)（连 by …）、
+    assert forall、assume、reveal 一族、let ghost / let tracked、循环头的 invariant 一族与 ensures、decreases、for 循环给迭代器起的名；
+    ghost / tracked 字段与类型是 Ghost<…> / Tracked<…> 的字段，调用、方法调用的实参与结构体字面量、结构体模式里整个是 Ghost(…) / Tracked(…) 的那几样
+    （一列里剥几样时连逗号，照那一份 blank_the_chosen_elements_of_a_list）。宏调用里面不看（verus_syn 不解它）。
+    collect() → [(首词法单元, 末词法单元之后, 连不连紧挨在前面的文档注释)]。"""
+
+    def __init__(self, kinds, texts, pairs):
+        self.kinds, self.texts, self.pairs = kinds, texts, pairs
+        self.count = len(texts)
+        self.openings = {close: opening for opening, close in pairs.items()}
+        self.ranges = []
+
+    def t(self, index):
+        return self.texts[index] if 0 <= index < self.count else ""
+
+    def ident(self, index):
+        return 0 <= index < self.count and self.kinds[index] == IDENT
+
+    def group(self, index):
+        return self.t(index) in ("(", "[", "{") and index in self.pairs
+
+    def blank(self, first, end, with_documents=False):
+        if first < end:
+            self.ranges.append((first, end, with_documents))
+
+    def collect(self):
+        index = 0
+        while index + 2 < self.count:
+            if self.ident(index) and self.t(index) == "verus" and self.t(index + 1) == "!" and self.t(index + 2) == "{" and (index + 2) in self.pairs:
+                close = self.pairs[index + 2]
+                self.items(index + 3, close)
+                index = close + 1
+                continue
+            index += 1
+        return self.ranges
+
+    # 条目
+
+    def is_item_start(self, index):
+        text = self.t(index)
+        if text == "#":
+            return self.t(index + 1) == "["
+        if not self.ident(index):
+            return False
+        if text in VERUS_ITEM_START_WORDS:
+            return True
+        if text == "assume_specification":
+            return self.t(index + 1) in ("[", "<")
+        return self.t(index + 1) == "!" and self.group(index + 2)
+
+    def items(self, low, high):
+        """low..high 里同层的条目：块首，或顶层 ; / } 之后接条目起头词或属性（crates/singlefs-unit-graph 的 verus_item_starts）。"""
+        starts, boundary, index = [], True, low
+        while index < high:
+            if boundary and self.is_item_start(index):
+                starts.append(index)
+            if self.group(index):
+                close = self.pairs[index]
+                boundary = self.t(close) == "}"
+                index = close + 1
+                continue
+            boundary = self.t(index) == ";"
+            index += 1
+        for position, start in enumerate(starts):
+            self.item(start, starts[position + 1] if position + 1 < len(starts) else high)
+
+    def skip_attributes(self, index, end):
+        while index < end and self.t(index) == "#" and self.t(index + 1) == "[" and (index + 1) in self.pairs:
+            index = self.pairs[index + 1] + 1
+        return index
+
+    def skip_visibility(self, index):
+        if self.t(index) == "pub":
+            index += 1
+            if self.t(index) == "(" and index in self.pairs:
+                index = self.pairs[index] + 1
+        return index
+
+    def skip_qualifiers(self, index):
+        """→ (条目关键字的下标, 跳过的修饰词)；照 crates/singlefs-unit-graph 的 skip_qualifiers（verus 为真）。"""
+        skipped = set()
+        while True:
+            word, following = self.t(index), self.t(index + 1)
+            if word == "const":
+                qualifier = following in ("fn", "unsafe", "async", "extern")
+            elif word == "async":
+                qualifier = following in ("fn", "unsafe")
+            elif word == "unsafe":
+                qualifier = following in ("fn", "impl", "trait", "extern", "auto")
+            elif word == "extern":
+                qualifier = following == "fn" or (0 <= index + 1 < self.count and self.kinds[index + 1] == LITERAL and self.t(index + 2) == "fn")
+                if qualifier and following != "fn":
+                    index += 1
+            elif word == "default":
+                qualifier = following in ("fn", "type", "const", "unsafe", "async", "impl")
+            elif word == "safe":
+                qualifier = following in ("fn", "static")
+            elif word == "auto":
+                qualifier = following == "trait"
+            elif word in ("open", "closed", "spec", "proof", "exec", "tracked", "ghost", "uninterp", "axiom"):
+                qualifier = True
+            elif word == "broadcast":
+                qualifier = following in ("proof", "fn", "spec", "axiom", "uninterp", "open", "closed")
+            else:
+                qualifier = False
+            if not qualifier:
+                return index, skipped
+            skipped.add(word)
+            index += 1
+
+    def item(self, start, end):
+        header = self.skip_attributes(start, end)
+        keyword, modes = self.skip_qualifiers(self.skip_visibility(header))
+        word = self.t(keyword)
+        ghost = bool(modes & VERUS_GHOST_FUNCTION_MODES)
+        if word in ("fn", "const", "static") and ghost:
+            self.blank(start, end, True)
+        elif word == "fn":
+            self.function(keyword, end)
+        elif word in ("const", "static"):
+            self.expressions(keyword, end)
+        elif (word == "broadcast" and self.t(keyword + 1) in ("use", "group")) or (word == "assume_specification" and self.t(keyword + 1) in ("[", "<")):
+            self.blank(start, end, True)
+        elif word in ("struct", "union", "enum") and self.ident(keyword + 1):
+            self.data_type(word, keyword, end)
+        elif word in ("impl", "trait"):
+            body = self.first_brace(keyword + 1, end)
+            if body is not None:
+                self.items(body + 1, self.pairs[body])
+        elif word == "mod" and self.t(keyword + 2) == "{" and (keyword + 2) in self.pairs:
+            self.items(keyword + 3, self.pairs[keyword + 2])
+
+    def first_brace(self, low, high):
+        """low 起顶层第一个 {（先遇到 ; 交 None）。"""
+        index = low
+        while index < high:
+            text = self.t(index)
+            if text == "{" and index in self.pairs:
+                return index
+            if text == ";":
+                return None
+            index = self.pairs[index] + 1 if self.group(index) else index + 1
+        return None
+
+    def after_angle_brackets(self, opening, end):
+        """opening 那个 < 配到它的 >，交 > 之后的下标（-> 与 => 的 > 不算）；配不上交 None。"""
+        depth = 0
+        for position in range(opening, end):
+            text = self.t(position)
+            if text == "<":
+                depth += 1
+            elif text == ">" and self.t(position - 1) not in ("-", "="):
+                depth -= 1
+                if depth == 0:
+                    return position + 1
+                if depth < 0:
+                    return None
+        return None
+
+    def single_colon(self, low, high):
+        """low..high 顶层第一个单独的 :（不是 :: 的一半）。"""
+        index = low
+        while index < high:
+            if self.group(index):
+                index = self.pairs[index] + 1
+                continue
+            if self.t(index) == ":" and self.t(index - 1) != ":" and self.t(index + 1) != ":":
+                return index
+            index += 1
+        return None
+
+    def first_word(self, low, high, words):
+        index = low
+        while index < high:
+            if self.group(index):
+                index = self.pairs[index] + 1
+                continue
+            if self.ident(index) and self.t(index) in words and self.t(index - 1) not in (".", ":"):
+                return index
+            index += 1
+        return None
+
+    def elements(self, low, high, types):
+        """low..high 按顶层逗号分开的几样 → [(起, 止, 后面那个逗号的下标或 None)]；types 为真时尖括号里的逗号不算（类型里的 Map<K, V>），
+        否则只有 ::< 起的尖括号（turbofish）里的不算。"""
+        parts, start, index, angles = [], low, low, 0
+        while index < high:
+            text = self.t(index)
+            if self.group(index):
+                index = self.pairs[index] + 1
+                continue
+            if text == "<" and (types or angles > 0 or (self.t(index - 1) == ":" and self.t(index - 2) == ":")):
+                angles += 1
+            elif text == ">" and angles > 0 and self.t(index - 1) not in ("-", "="):
+                angles -= 1
+            elif text == "," and angles == 0:
+                parts.append((start, index, index))
+                start = index + 1
+            index += 1
+        if start < high:
+            parts.append((start, high, None))
+        return parts
+
+    def chosen_elements(self, low, high, is_chosen, types=False, with_documents=False):
+        """一列里剥掉挑中的那几样连它们后面的逗号；挑中的有一样在列尾、后面没有逗号的，留下的那几样里最后一样后面的逗号也剥
+        （crates/singlefs-unit-graph 的 blank_the_chosen_elements_of_a_list：剥完与压根没写那几样时逐个词法单元相同）。"""
+        last_kept_comma, chosen_last_without_comma = None, False
+        for first, end, comma in self.elements(low, high, types):
+            if not is_chosen(first, end):
+                last_kept_comma = comma
+                continue
+            self.blank(first, end, with_documents)
+            if comma is None:
+                chosen_last_without_comma = True
+            else:
+                self.blank(comma, comma + 1)
+        if chosen_last_without_comma and last_kept_comma is not None:
+            self.blank(last_kept_comma, last_kept_comma + 1)
+
+    def is_wrapper_type(self, first, end):
+        """first..end 整个是 Ghost<…> / Tracked<…>：路径（可带 :: 起头）末段是包装名、带尖括号参数，尖括号配到 end 为止。"""
+        index = first + 2 if self.t(first) == ":" and self.t(first + 1) == ":" else first
+        while self.ident(index) and self.t(index + 1) == ":" and self.t(index + 2) == ":":
+            index += 3
+        if not (self.ident(index) and self.t(index) in VERUS_GHOST_WRAPPERS and self.t(index + 1) == "<"):
+            return False
+        return self.after_angle_brackets(index + 1, end) == end
+
+    def is_wrapper_parameter(self, first, end):
+        """类型是 Ghost<…> / Tracked<…> 的参数（连模式）；self 不算。"""
+        index = self.skip_attributes(first, end)
+        colon = self.single_colon(index, end)
+        if colon is None or any(self.t(position) == "self" for position in range(index, colon)):
+            return False
+        return self.is_wrapper_type(colon + 1, end)
+
+    def is_wrapper_field(self, first, end, named):
+        """ghost / tracked 模式的字段，或类型是 Ghost<…> / Tracked<…> 的字段。"""
+        index = self.skip_visibility(self.skip_attributes(first, end))
+        if named:
+            mode = self.t(index) in ("ghost", "tracked") and self.ident(index + 1) and self.t(index + 2) == ":" and self.t(index + 3) != ":"
+            name = index + 1 if mode else index
+            if not (self.ident(name) and self.t(name + 1) == ":"):
+                return False
+            return mode or self.is_wrapper_type(name + 2, end)
+        mode = self.t(index) in ("ghost", "tracked") and index + 1 < end
+        return mode or self.is_wrapper_type(index, end)
+
+    def is_wrapper_call(self, first, end):
+        """first..end 整个是 Ghost(…) / Tracked(…)（可带 turbofish）：不带限定、只有一段路径、恰好一个实参。"""
+        if not (self.ident(first) and self.t(first) in VERUS_GHOST_WRAPPERS):
+            return False
+        index = first + 1
+        if self.t(index) == ":" and self.t(index + 1) == ":" and self.t(index + 2) == "<":
+            index = self.after_angle_brackets(index + 2, end)
+            if index is None:
+                return False
+        if self.t(index) != "(" or self.pairs.get(index) != end - 1:
+            return False
+        return len(self.elements(index + 1, end - 1, False)) == 1
+
+    def is_wrapper_field_value(self, first, end):
+        """结构体字面量里初值、结构体模式里子模式整个是 Ghost(…) / Tracked(…) 的字段。"""
+        return (self.ident(first) and self.t(first + 1) == ":" and self.t(first + 2) != ":"
+                and self.is_wrapper_call(first + 2, end))
+
+    def data_type(self, word, keyword, end):
+        index = keyword + 2
+        if self.t(index) == "<":
+            index = self.after_angle_brackets(index, end)
+            if index is None:
+                return
+        if word == "struct" and self.t(index) == "(" and index in self.pairs:
+            self.fields(index, False)
+            return
+        body = self.first_brace(index, end)
+        if body is None:
+            return
+        if word != "enum":
+            self.fields(body, True)
+            return
+        for first, variant_end, _comma in self.elements(body + 1, self.pairs[body], False):
+            name = self.skip_attributes(first, variant_end)
+            if self.t(name + 1) in ("{", "(") and (name + 1) in self.pairs:
+                self.fields(name + 1, self.t(name + 1) == "{")
+
+    def fields(self, opening, named):
+        self.chosen_elements(opening + 1, self.pairs[opening], lambda first, end: self.is_wrapper_field(first, end, named),
+                             types=True, with_documents=True)
+
+    # 执行函数
+
+    def function(self, keyword, end):
+        index = keyword + 2
+        if self.t(index) == "<":
+            index = self.after_angle_brackets(index, end)
+        if index is None or self.t(index) != "(" or index not in self.pairs:
+            return
+        parameters_close = self.pairs[index]
+        self.chosen_elements(index + 1, parameters_close, self.is_wrapper_parameter, types=True)
+        last = end - 1
+        if self.t(last) == "}" and last in self.openings:
+            body, signature_end = self.openings[last], self.openings[last]
+        elif self.t(last) == ";":
+            body, signature_end = None, last
+        else:
+            return
+        after = parameters_close + 1
+        if self.t(after) == "-" and self.t(after + 1) == ">" and self.t(after + 2) == "(" and (after + 2) in self.pairs:
+            opening = after + 2
+            colon = self.single_colon(opening + 1, self.pairs[opening])
+            if colon is not None:
+                self.blank(opening, colon + 1)
+                self.blank(self.pairs[opening], self.pairs[opening] + 1)
+        clause = self.first_word(after, signature_end, VERUS_SIGNATURE_CLAUSES)
+        if clause is not None:
+            self.blank(clause, signature_end)
+        if body is not None:
+            self.expressions(body + 1, last)
+
+    def statement_end(self, index, high):
+        """index 起顶层第一个 ; 之后（没有就是 high）。"""
+        while index < high:
+            if self.group(index):
+                index = self.pairs[index] + 1
+                continue
+            if self.t(index) == ";":
+                return index + 1
+            index += 1
+        return high
+
+    def after_by(self, index, high):
+        """assert(…) 之后的 by …：by 后面可带 (…)，再带 requires … 与 { … }，或直接 { … }。交整条之后的下标。"""
+        if self.t(index) != "by":
+            return index
+        index += 1
+        if self.t(index) == "(" and index in self.pairs:
+            index = self.pairs[index] + 1
+        if self.t(index) == "requires":
+            while index < high:
+                if self.t(index) == "{" and index in self.pairs:
+                    return self.pairs[index] + 1
+                if self.t(index) == ";":
+                    return index
+                index = self.pairs[index] + 1 if self.group(index) else index + 1
+            return high
+        if self.t(index) == "{" and index in self.pairs:
+            return self.pairs[index] + 1
+        return index
+
+    def assert_forall_end(self, index, high):
+        """assert forall … 到顶层的 ;（不含）或 by { … } 收尾。"""
+        while index < high:
+            text = self.t(index)
+            if text == ";":
+                return index
+            if text == "by":
+                after = index + 1
+                if self.t(after) == "(" and after in self.pairs:
+                    after = self.pairs[after] + 1
+                if self.t(after) == "{" and after in self.pairs:
+                    return self.pairs[after] + 1
+            index = self.pairs[index] + 1 if self.group(index) else index + 1
+        return high
+
+    def ghost_expression_end(self, index, high):
+        """index 起是整条只给 Verus 看的表达式（proof { … }、assert、assert forall、assume、reveal 一族）就交它之后的下标，否则 None。"""
+        text, following = self.t(index), self.t(index + 1)
+        if text == "proof" and following == "{" and (index + 1) in self.pairs:
+            return self.pairs[index + 1] + 1
+        if text == "assert" and following == "(" and (index + 1) in self.pairs:
+            return self.after_by(self.pairs[index + 1] + 1, high)
+        if text == "assert" and following == "forall":
+            return self.assert_forall_end(index + 2, high)
+        if text in VERUS_GHOST_CALLS and following == "(" and (index + 1) in self.pairs:
+            return self.pairs[index + 1] + 1
+        return None
+
+    def ends_a_loop_head(self, close, high):
+        """循环头里一对 { … } 之后接的不像子句的接续（逗号、运算符、子句词……）：它就是循环体。"""
+        following = close + 1
+        return following >= high or self.t(following) not in VERUS_CLAUSE_CONTINUATIONS
+
+    def clause_body(self, clause, high):
+        """clause 起的子句之后那个体的 {（照 ends_a_loop_head 认）；先遇到 ; 或到 high 都没认出交 None。"""
+        index = clause + 1
+        while index < high:
+            if self.t(index) == "{" and index in self.pairs:
+                if self.ends_a_loop_head(self.pairs[index], high):
+                    return index
+                index = self.pairs[index] + 1
+                continue
+            if self.t(index) == ";":
+                return None
+            index = self.pairs[index] + 1 if self.group(index) else index + 1
+        return None
+
+    def loop_head(self, keyword, high):
+        """while / loop / for 的头：for 给迭代器起的名（in 之后的「名:」）与 invariant 一族、ensures、decreases 那几截到循环体之前。"""
+        is_for, index, clause = self.t(keyword) == "for", keyword + 1, None
+        while index < high:
+            text = self.t(index)
+            if (is_for and clause is None and text == "in" and self.ident(index + 1) and self.t(index + 2) == ":"
+                    and self.t(index + 3) != ":"):
+                self.blank(index + 1, index + 3)
+            if clause is None and self.ident(index) and text in VERUS_LOOP_CLAUSES:
+                clause = index
+            if text == "{" and index in self.pairs:
+                if clause is None or self.ends_a_loop_head(self.pairs[index], high):
+                    break
+                index = self.pairs[index] + 1
+                continue
+            if text == ";":
+                return
+            index = self.pairs[index] + 1 if self.group(index) else index + 1
+        else:
+            return
+        if clause is not None:
+            self.blank(clause, index)
+
+    def is_call(self, opening):
+        """opening 那个 ( 是调用或方法调用的实参表：前面是名字（不是关键字、不是 fn 名）、) 或 ]，或 ::<…> 的 >。"""
+        before = self.t(opening - 1)
+        if before in (")", "]"):
+            return True
+        if before == ">":
+            depth, index = 0, opening - 1
+            while index >= 0:
+                if self.t(index) == ">":
+                    depth += 1
+                elif self.t(index) == "<":
+                    depth -= 1
+                    if depth == 0:
+                        return self.t(index - 1) == ":" and self.t(index - 2) == ":"
+                index -= 1
+            return False
+        return self.ident(opening - 1) and before not in VERUS_NOT_CALLEES and self.t(opening - 2) != "fn"
+
+    def expressions(self, low, high):
+        """函数体、常量初值这一段：剥整条只给 Verus 看的表达式与语句（当语句时连分号），循环头的子句，实参与字面量字段里的 Ghost(…) / Tracked(…)。"""
+        index = low
+        while index < high:
+            text = self.t(index)
+            if self.ident(index) and self.t(index + 1) == "!" and self.group(index + 2):
+                index = self.pairs[index + 2] + 1
+                continue
+            if self.ident(index) and self.t(index - 1) not in (".", ":", "fn"):
+                end = self.ghost_expression_end(index, high)
+                if end is None and ((text == "let" and self.t(index + 1) in ("ghost", "tracked"))
+                                    or (text == "broadcast" and self.t(index + 1) == "use")):
+                    end = self.statement_end(index, high)
+                elif end is not None and end < high and self.t(end) == ";" and (index == low or self.t(index - 1) in (";", "{", "}")):
+                    end += 1
+                if end is None and text in ("requires", "ensures"):
+                    # 闭包的 requires / ensures（循环头里的已由 loop_head 剥过，这里再剥一遍是同一截）：到闭包体之前
+                    end = self.clause_body(index, high)
+                if end is not None:
+                    self.blank(index, end)
+                    index = end
+                    continue
+                if text in ("while", "loop", "for"):
+                    self.loop_head(index, high)
+            if self.group(index):
+                close = self.pairs[index]
+                if text == "(" and self.is_call(index):
+                    self.chosen_elements(index + 1, close, self.is_wrapper_call)
+                elif text == "{":
+                    self.chosen_elements(index + 1, close, self.is_wrapper_field_value)
+                self.expressions(index + 1, close)
+                index = close + 1
+                continue
+            index += 1
+
+
+VERIFIER_ATTRIBUTE_HEAD = "verifier"
+OPENING_PUNCTUATION = ("{", "(", "[")
+CLOSING_PUNCTUATION = ("}", ")", "]")
+
+
+def verifier_attribute_token_ranges(kinds, texts):
+    """外属性 #[verifier::…] 与旧写法 #[verifier(…)] 各从 # 到配对的 ] 的词法单元下标区间 [(# 的下标, ] 的下标)]，
+    照 crates/singlefs-unit-graph 的 verifier_attribute_ranges_of：verus! 里外同一套认法；不认的有内属性 #![verifier::…]、#[cfg_attr(…, verifier::…)]、
+    落在别的宏调用与 macro_rules! 的词法单元组里的（左括号前面紧挨 名 !，或 macro_rules ! 名；verus ! { 不算别的宏）、配不上 ] 的。"""
+    if VERIFIER_ATTRIBUTE_HEAD not in texts:
+        return []
+    count = len(texts)
+
+    def punctuation(index, wanted):
+        return 0 <= index < count and kinds[index] == PUNCT and texts[index] == wanted
+
+    def closing_bracket(opening):
+        depth = 0
+        for index in range(opening, count):
+            if kinds[index] != PUNCT:
+                continue
+            if texts[index] in OPENING_PUNCTUATION:
+                depth += 1
+            elif texts[index] in CLOSING_PUNCTUATION:
+                depth -= 1
+                if depth == 0:
+                    return index
+        return None
+
+    def attribute_closing_bracket(hash_index):
+        opens_a_verifier_attribute = (punctuation(hash_index, "#") and punctuation(hash_index + 1, "[") and hash_index + 2 < count
+                                      and kinds[hash_index + 2] == IDENT and texts[hash_index + 2] == VERIFIER_ATTRIBUTE_HEAD
+                                      and ((punctuation(hash_index + 3, ":") and punctuation(hash_index + 4, ":")) or punctuation(hash_index + 3, "(")))
+        return closing_bracket(hash_index + 1) if opens_a_verifier_attribute else None
+
+    def macro_name_opening(opening):
+        if opening >= 2 and punctuation(opening - 1, "!") and kinds[opening - 2] == IDENT:
+            return texts[opening - 2]
+        if (opening >= 3 and kinds[opening - 1] == IDENT and punctuation(opening - 2, "!") and kinds[opening - 3] == IDENT
+                and texts[opening - 3] == "macro_rules"):
+            return "macro_rules"
+        return None
+
+    # 每一层还开着的括号：这一层（连外层）落没落在别的宏的词法单元组里
+    inside_another_macro, ranges, index = [], [], 0
+    while index < count:
+        if not (inside_another_macro and inside_another_macro[-1]):
+            close = attribute_closing_bracket(index)
+            if close is not None:
+                ranges.append((index, close))
+                index = close + 1
+                continue
+        if kinds[index] == PUNCT and texts[index] in OPENING_PUNCTUATION:
+            name = macro_name_opening(index)
+            opens_another_macro = name is not None and (name != "verus" or texts[index] != "{")
+            inside_another_macro.append(bool(inside_another_macro and inside_another_macro[-1]) or opens_another_macro)
+        elif kinds[index] == PUNCT and texts[index] in CLOSING_PUNCTUATION and inside_another_macro:
+            inside_another_macro.pop()
+        index += 1
+    return ranges
+
+
+def verus_ghost_code_blanked(text):
+    """text 里每一块 verus! 中只给 Verus 看的那几截、verus! 里外的 #[verifier::…] / #[verifier(…)] 外属性（verifier_attribute_token_ranges）换成空格
+    （换行留着，行号不变；VerusGhostCode 挑的那几截，各从首词法单元起到末词法单元止，整条剥的连紧挨在前面的文档注释）→ 剥过的源码；
+    括号配不上的交 None（那份文件照原样那一份办）。弄坏开关 product-view-verifier-attributes-kept 下不剥属性。"""
+    spans, document_spans = [], []
+    kinds, texts, _lines, documents = rust_lex(text, spans, document_spans)
+    pairs, _bad = match_brackets(kinds, texts)
+    if pairs is None:
+        return None
+    ranges = VerusGhostCode(kinds, texts, pairs).collect()
+    attributes = [] if "product-view-verifier-attributes-kept" in active_breaks() else [
+        (spans[hash_index][0], spans[close][1]) for hash_index, close in verifier_attribute_token_ranges(kinds, texts)]
+    if not ranges and not attributes:
+        return text
+    leading_documents = {}
+    for (_line, _style, _rows, next_index, _raw), (start, _end) in zip(documents, document_spans):
+        leading_documents[next_index] = min(start, leading_documents.get(next_index, start))
+    characters = list(text)
+    for first, end, with_documents in ranges:
+        start = spans[first][0]
+        if with_documents and first in leading_documents:
+            start = min(start, leading_documents[first])
+        for position in range(start, spans[end - 1][1]):
+            if characters[position] != "\n":
+                characters[position] = " "
+    for start, end in attributes:
+        for position in range(start, end):
+            if characters[position] != "\n":
+                characters[position] = " "
+    return "".join(characters)
+
+
+def product_view_agrees(rust_file, theirs_lines):
+    """剥过的那一份重切出来的单元与 Rust 那一份交的这份文件的单元行逐个相同：种类、文件:起-止、指纹的多重集相同，
+    Rust 那一份的限定名以这一份的嵌套路径收尾（前缀要等模块树连好才有，这里不比；文档测试不比名字）。"""
+    theirs, names = collections.Counter(), {}
+    for line in theirs_lines:
+        kind, name, place, fingerprint = line.split("\t")
+        theirs[(kind, place, fingerprint)] += 1
+        names.setdefault((kind, place, fingerprint), []).append(name)
+    ours = collections.Counter((unit.output_kind(), f"{unit.file}:{unit.first_line}-{unit.last_line}", unit.fingerprint) for unit in rust_file.units)
+    if ours != theirs:
+        return False
+    return all(unit.kind == "doctest" or any(name == unit.name or name.endswith("::" + unit.name)
+                                             for name in names[(unit.output_kind(), f"{unit.file}:{unit.first_line}-{unit.last_line}", unit.fingerprint)])
+               for unit in rust_file.units)
 
 
 class ProductViewUnavailable(Exception):
@@ -2936,7 +5132,7 @@ def built_unit_graph(repository):
         except OSError:
             digest.update(b"<missing>")
         digest.update(b"\0")
-    cache = os.path.join(os.environ.get("GATE_CROSS_RUN_TMPDIR") or tempfile.gettempdir(), "singlefs-unit-graph-product-view")
+    cache = unit_graph_product_view_cache_directory()
     directory = os.path.join(cache, digest.hexdigest())
     program = os.path.join(directory, "unit-graph")
     if os.access(program, os.X_OK):
@@ -2965,7 +5161,8 @@ def build_unit_graph(repository, source, thread_registry, lock_file, cache, dire
         with open(os.path.join(workspace, "Cargo.toml"), "w", encoding="utf-8") as handle:
             handle.write('[workspace]\nmembers = ["crates/singlefs-unit-graph"]\nresolver = "2"\n\n[profile.release]\nopt-level = 3\n'
                          'overflow-checks = true\ndebug-assertions = true\n')
-        completed = subprocess.run(["bash", os.path.join(repository, "scripts", "hosts", "capped.sh"), "default", "cargo", "build", "--release", "--offline",
+        # 直接起 cargo：线程是服务给这一条套的 capped.sh 设好的 CARGO_BUILD_JOBS（capped.sh 只认服务套的那一层）
+        completed = subprocess.run(["cargo", "build", "--release", "--offline",
                                     "--manifest-path", os.path.join(workspace, "Cargo.toml"), "-p", "singlefs-unit-graph", "--bin", "unit-graph"],
                                    capture_output=True, text=True, errors="surrogateescape", stdin=subprocess.DEVNULL,
                                    env=dict(os.environ, CARGO_TARGET_DIR=os.path.join(build, "target")))
@@ -3353,12 +5550,23 @@ def import_bound_names(statement):
     return names
 
 
-def is_main_guard(statement):
+def is_main_name_test(test):
+    return (isinstance(test, ast.Compare) and isinstance(test.left, ast.Name) and test.left.id == "__name__" and len(test.comparators) == 1
+            and isinstance(test.comparators[0], ast.Constant) and test.comparators[0].value == "__main__")
+
+
+def is_main_guard(statement, breaks=frozenset()):
+    """只在这份文件被当程序起时才执行的那一段（文件头「Python 闭包：import 时执行的模块级语句」的 main-guard 两种写法）：
+    if __name__ == "__main__":，与不带 else 的 if __name__ == "__main__" and <别的条件>:（and 从左往右短路，import 时头一项是假的，后面的条件与块都不执行）。
+    and 写法里 __name__ 那一项不在最左、带 else 的认不出，留在 module-body 照收。弄坏开关 python-main-guard-conjunctions-unrecognized：只认头一种（改前的样子）。
+    头一种带 else（或 elif）的照认：PythonModule.split 只把 if 那一支切成 main-guard，else 那一支放进 module-body（被 import 时执行）。"""
     if not isinstance(statement, ast.If):
         return False
     test = statement.test
-    return (isinstance(test, ast.Compare) and isinstance(test.left, ast.Name) and test.left.id == "__name__" and len(test.comparators) == 1
-            and isinstance(test.comparators[0], ast.Constant) and test.comparators[0].value == "__main__")
+    if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.And) and not statement.orelse \
+            and "python-main-guard-conjunctions-unrecognized" not in breaks:
+        test = test.values[0]
+    return is_main_name_test(test)
 
 
 def stored_names(node):
@@ -3417,12 +5625,38 @@ def unique_alternatives(alternatives):
 
 
 def paired_elements(target, value):
-    """a, b = x, y：→ [(名字, 对上的值节点)…]；两边不是等长的元组 / 列表、有 *、目标里有不是名字的 → None。"""
+    """a, b = x, y：→ [(名字, 对上的值节点)…]；两边不是等长的元组 / 列表、有 *、目标里有不是名字的 → None。
+    a, b = s[k:k+2] 照 a = s[k]、b = s[k+1] 对上（sliced_elements；文件头「起代码的写法逐种认」）。"""
+    if isinstance(target, (ast.Tuple, ast.List)) and isinstance(value, ast.Subscript) and isinstance(value.slice, ast.Slice) \
+            and "python-slice-unpacking-unpaired" not in active_breaks():
+        return sliced_elements(target, value)
     if not (isinstance(target, (ast.Tuple, ast.List)) and isinstance(value, (ast.Tuple, ast.List)) and len(target.elts) == len(value.elts)):
         return None
     if any(not isinstance(item, ast.Name) for item in target.elts) or any(isinstance(item, ast.Starred) for item in value.elts):
         return None
     return [(item.id, element) for item, element in zip(target.elts, value.elts)]
+
+
+def sliced_elements(target, value):
+    """a, b = s[k:k+2]：→ [(a, s[k]), (b, s[k+1])]，下标节点是另造的 s[<整数>]（挂在切片节点上，同一处拆包每次交同一批）。
+    下界不写或是不小于 0 的整数字面量、不带步长、上界不写或等于下界加目标个数、目标全是名字，才对上；别的 → None。
+    上界不写时 s 的长度对不上，跑起来就抛 ValueError、走不到后面，所以照对上算。"""
+    bounds, names = value.slice, target.elts
+    if bounds.step is not None or not names or any(not isinstance(item, ast.Name) for item in names):
+        return None
+    lower = 0 if bounds.lower is None else (
+        bounds.lower.value if isinstance(bounds.lower, ast.Constant) and type(bounds.lower.value) is int else None)
+    if lower is None or lower < 0:
+        return None
+    if bounds.upper is not None and not (isinstance(bounds.upper, ast.Constant) and type(bounds.upper.value) is int
+                                         and bounds.upper.value == lower + len(names)):
+        return None
+    elements = getattr(value, "sliced_elements", None)
+    if elements is None:
+        elements = [ast.copy_location(ast.Subscript(value=value.value, slice=ast.copy_location(ast.Constant(value=lower + offset), value),
+                                                    ctx=ast.Load()), value) for offset in range(len(names))]
+        value.sliced_elements = elements   # 不在 _fields 里：ast.dump 与 walk_nodes 都看不见它，指纹不变
+    return [(item.id, element) for item, element in zip(names, elements)]
 
 
 OWN_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
@@ -3591,7 +5825,7 @@ class PythonModule:
             statement = body[0]
             self.docstrings["<module>"] = (statement.value.value, statement.lineno, statement.end_lineno or statement.lineno)
             body = body[1:]
-        rest = []
+        rest, guards = [], []
         for statement in body:
             if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 self.add_unit("def", statement.name, statement, [statement], self.function_fingerprint(statement))
@@ -3620,10 +5854,27 @@ class PythonModule:
                     unit = self.add_unit("import", name, statement, [statement], dump_fingerprint(statement))
                     if name == "*":
                         self.star_imports.append(unit)
-            elif is_main_guard(statement):
-                self.main_guard = self.add_unit("main-guard", "<main-guard>", statement, [statement], dump_fingerprint(statement))
+            elif is_main_guard(statement, self.index.breaks):
+                if statement.orelse and "python-main-guard-else-dropped" not in self.index.breaks:
+                    # 标准写法带 else（或 elif）：只有 if 那一支是 main-guard；else 那一支被 import 时执行，照别的模块级语句进 module-body。
+                    # 弄坏开关 python-main-guard-else-dropped：连 else 整段当 main-guard（改前的样子：被 import 时 else 那一支哪儿都不收）
+                    main_branch = copy.copy(statement)
+                    main_branch.orelse = []
+                    main_branch.end_lineno = statement.body[-1].end_lineno or statement.body[-1].lineno
+                    guards.append(main_branch)
+                    rest.extend(statement.orelse)
+                else:
+                    guards.append(statement)
             else:
                 rest.append(statement)
+        if "python-main-guards-last-only" in self.index.breaks:
+            guards = guards[-1:]
+        if guards:
+            # 一份文件里几段 main-guard 合成一个单元（被当程序起时每一段都执行）：节点是那几段，只有一段时指纹照旧取那一段；
+            # 弄坏开关 python-main-guards-last-only：只留末一段（改前的样子：前面几段被后面的盖掉、哪儿都不收）
+            fingerprint = dump_fingerprint(guards[0]) if len(guards) == 1 else dump_fingerprint(ast.Module(body=guards, type_ignores=[]))
+            self.main_guard = self.add_unit("main-guard", "<main-guard>", guards[0], guards, fingerprint)
+            self.main_guard.last_line = guards[-1].end_lineno or guards[-1].lineno
         module = ast.Module(body=without_docstrings(ast.Module(body=rest, type_ignores=[]), self.keep_docstrings).body, type_ignores=[])
         first = rest[0].lineno if rest else 1
         last = (rest[-1].end_lineno or rest[-1].lineno) if rest else 1
@@ -5755,6 +8006,13 @@ def split_commands(text, redirect_targets_as_commands=False, redirects=None, det
             word.append(text[i:end + 1])
             i = end + 1
             continue
+        if (character == "[" and word and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", "".join(word))
+                and "shell-subscript-assignment-split" not in active_breaks()):
+            end = matching_close(text, i, "[", "]")   # 名字[下标]=值、名字[下标]+=值：下标里有空格也是一个赋值词（bash 照赋值认）
+            if text.startswith(("=", "+="), end + 1):
+                word.append(text[i:end + 1])
+                i = end + 1
+                continue
         if character == "\\" and i + 1 < total:
             if text[i + 1] == "\n":
                 i += 2
@@ -5934,14 +8192,40 @@ INLINE_POSITIONAL = re.compile(r"\$(?:\{([1-9])\}|([1-9]))")
 
 
 def inline_positionals(inline, rest):
-    """bash -c '<串>' <$0> <$1>…：串里的 $1…$9 换成外面那几个词（去掉外层双引号，留在串里原来的引号里；
-    外面没给的、带单引号的照原样留着，照旧折不出）。"""
-    def replace(found):
+    """bash -c '<串>' <$0> <$1>…：串里外层 bash 会展开的 $1…$9 换成外面那几个词（去掉外层双引号，留在串里原来的引号里；
+    外面没给的、带单引号的照原样留着，照旧折不出）。外层不展开的不换：反斜杠转义的（\\$1，串里套着的里层 bash -c "…\\$1…" 留给里层，
+    里层照它自己的参数再换一次）与单引号里的（双引号外的 '…$1…'）照原样留着。
+    弄坏开关 shell-inline-positionals-escapes-ignored：转义的与单引号里的也换（改前的样子，里层的 \\$1 换成外层的 $1）。"""
+    def replacement(found):
         position = int(found.group(1) or found.group(2))
         if position >= len(rest) or "'" in rest[position]:
             return found.group(0)
         return rest[position].replace('"', "")
-    return INLINE_POSITIONAL.sub(replace, inline)
+    if "shell-inline-positionals-escapes-ignored" in active_breaks():
+        return INLINE_POSITIONAL.sub(replacement, inline)
+    out, i, quoted, total = [], 0, False, len(inline)
+    while i < total:
+        character = inline[i]
+        if character == "\\" and i + 1 < total:
+            out.append(inline[i:i + 2])
+            i += 2
+            continue
+        if character == "'" and not quoted:
+            end = inline.find("'", i + 1)
+            end = total - 1 if end < 0 else end
+            out.append(inline[i:end + 1])
+            i = end + 1
+            continue
+        if character == '"':
+            quoted = not quoted
+        found = INLINE_POSITIONAL.match(inline, i) if character == "$" else None
+        if found:
+            out.append(replacement(found))
+            i = found.end()
+            continue
+        out.append(character)
+        i += 1
+    return "".join(out)
 
 
 SHELL_TREE_PREFIX = re.compile(r"^(?:\$\{(?:[A-Za-z_][A-Za-z0-9_]*|[1-9])(?:[:]?[-=?][^{}]*)?\}|\$(?:[A-Za-z_][A-Za-z0-9_]*|[1-9]))(/.+)$")
@@ -6424,7 +8708,7 @@ class ShellIndex:
                 program = external_program_name(literal_word(word), self.breaks)
                 if program is not None:
                     facts.programs.add(program)
-        if first in ("source", ".") and len(words) > 1:
+        if first in (("source",) if "shell-dot-source-unrecognized" in self.breaks else ("source", ".")) and len(words) > 1:
             facts.invocations.append(("source", words[1], facts.directory, None))
             return
         if self.interpreter_runs(words, facts, inputs, prefix):
@@ -6748,11 +9032,12 @@ class ShellIndex:
                 return ("ok", relative)
         return ("missing", None)
 
-    def links(self, unit):
-        """→ [(source|shell|python, [文件…], 拒算或 None)]。"""
+    def links(self, unit, kinds=None):
+        """→ [(source|shell|python, [文件…], 拒算或 None)]。kinds 给了只走这几种写法（起头的与展开出来的都按它挑，结果不进缓存；
+        shell_sourced_files 只走 source：bash -c 这类子进程里的 source 是内联脚本那一种，不在其中）。"""
         if unit.cache is None:
             unit.cache = {}
-        if "links" in unit.cache:
+        if kinds is None and "links" in unit.cache:
             return unit.cache["links"]
         out = []
         shell_file = self.files.get(unit.file)
@@ -6769,12 +9054,15 @@ class ShellIndex:
                  "work": work}
         while work:
             kind, word, directory, extra, generator_line, overlay = work.pop(0)
+            if kinds is not None and kind not in kinds:
+                continue
             self.overlays.append(overlay or {})
             try:
                 self.resolve_invocation(state, kind, word, directory, extra, generator_line, overlay)
             finally:
                 self.overlays.pop()
-        unit.cache["links"] = out
+        if kinds is None:
+            unit.cache["links"] = out
         return out
 
     def row_snippet(self, shell_file, unit, line, word):
@@ -7320,6 +9608,40 @@ def language_of_file(root, path):
     return None
 
 
+def shell_sourced_files(root, path):
+    """shell 脚本 path（相对根）在它自己那个 shell 里（传递地）source / . 进来的仓内文件 → (按路径排的文件元组，不含 path 自己, 拒算列表)
+    （文件头「Rust 闭包读到的 shell 脚本」）。路径照 ShellIndex.links 的折法；每份文件的每个单元都看（读到它的是整份字节，不按调没调到挑），
+    新收进来的那几份接着看，到不再多出文件为止。弄坏开关 shell-data-sources-nested-unfollowed：只看 path 自己那一层；
+    shell-data-source-refusals-dropped：折不出的不拒算。"""
+    breaks = active_breaks()
+    index = ShellIndex(root, [path])
+    files = {path}
+    while True:
+        found, refusals = set(), set()
+        scanned = {path} if "shell-data-sources-nested-unfollowed" in breaks else files
+        for current in sorted(scanned):
+            shell_file = index.files.get(current)
+            if shell_file is None:
+                continue
+            refusals.update(shell_file.refusals)
+            for unit in shell_file.units:
+                if unit.data:
+                    continue
+                for _kind, targets, refusal in index.links(unit, kinds=("source",)):
+                    if refusal is not None:
+                        refusals.add(refusal)
+                    found.update(targets)
+        grown = files | found
+        if grown == files:
+            break
+        index.add(sorted(grown - files))
+        files = grown
+    if "shell-data-source-refusals-dropped" in breaks:
+        refusals = set()
+    ordered = sorted(refusals, key=lambda refusal: (refusal.file, refusal.line, refusal.form, refusal.snippet))
+    return tuple(sorted(files - {path})), ordered
+
+
 # ── python 与 shell 的闭包（两种语言互相连） ────────────────────────────────
 
 def inline_shell_units(cache, script):
@@ -7371,17 +9693,12 @@ def inline_refusals(root, python, shell, scripts, depth=0):
 IMPORT_TIME_RULE = "import-time"
 IMPORT_TIME_CLASS_RULE = "import-time-class"
 # 判法单元闭包不走的子进程边（文件头「不走的子进程边」）：(起它的文件, 起它的单元的限定名, 被起的程序) → 为什么。按实测排：这一条边只打提示、不改结局，
-# 自证 excluded-program-edge-only 那一格核切掉的单元只经这条边可达。与 scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES（按角色排、整份文件）是两种排除。
+# 自证 EXCLUDED_EDGE_PYTHON_CELL 与 EXCLUDED_EDGE_SHELL_CELL 在夹具上证这套机制（自证期间临时登记夹具里的边）。与 scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES
+# （按角色排、整份文件）是两种排除。登记一条边之前先现查起点单元与被起的程序都在；每条登记的边配三格自证（准入边那三格是 ADMISSION_EDGE_*_CELL）。
+ADMISSION_EDGE = ("scripts/experiment-apparatus/e183-capacity-cells.sh", "plan_step", "scripts/gate/admission.py")
 EXCLUDED_PROGRAM_EDGES = {
-    ("scripts/hosts/run-with-memory-cap.sh", "HostLookup.query", "scripts/hosts/host-resources.py"):
-        "内存包装排队时现查别的机器：只往 stderr 打提示、写告警记录，排队、放行与退出码照旧（包装文件头「排队时去找别的机器」「整体兜底」）；"
-        "判法读包装输出之前去掉那几行（verus-proof-check.py、e165-pin-red-examples.py、crates-mutation-rows.py 的 HOST_LOOKUP_LINE）",
-    ("scripts/hosts/run-with-memory-cap.sh", "HostLookup.watch_events", "scripts/hosts/resource_release_broadcast.py"):
-        "内存包装排队时收资源释放广播（follow）：收到了只叫醒 HostLookup 再查一次别的机器，打的行与 HostLookup.query 的同几种行首（HOST_LOOKUP_LINE 照样去掉）；"
-        "follow 起不来、退了、读出异常只打一行，排队、放行与退出码照旧（包装文件头「资源释放广播」，自证 RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=broadcast 那几格）",
-    ("scripts/hosts/run-with-memory-cap.sh", "broadcast_memory_released", "scripts/hosts/resource_release_broadcast.py"):
-        "内存包装退出时发资源释放广播（emit）：输出一行都不进包装的 stdout / stderr、退出码不交回（EXIT trap 里不调 exit），包装的退出码与输出照旧"
-        "（包装文件头「资源释放广播」，自证 RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=broadcast 里「那份库出事」那一格）",
+    ADMISSION_EDGE: "准入是闸：退出码只定跑不跑（77 不跑、3 退 78、别的退 2，都在编译之前），标准输出只有 E7INPUT 行，"
+                    "读产物的判法先 sed '/^E7INPUT /d'；不改读数",
 }
 
 
@@ -7438,6 +9755,7 @@ class ScriptClosure:
                 self.push(shell_file.script_body, via, "program")
 
     def run(self, entries):
+        self.closure.entry_units.extend(entry for entry in entries if entry is not None)
         for entry in entries:
             self.push(entry, None, "entry")
         while self.todo:
@@ -7747,6 +10065,7 @@ def closure_of(root, entry, options=None):
             raise UsageError(f"{path} 里没有 {qualified}")
         sources, workspace, rust = None, None, None
         closure = Closure()
+        closure.entry_units.extend(entries or ())
         if options.rust_strings_entry:
             rust_language, rust_path, rust_qualified = parse_entry(root, options.rust_strings_entry)
             workspace = RustWorkspace(root, options.judgment_kind, options.product_dump)
@@ -7807,6 +10126,17 @@ def closure_of(root, entry, options=None):
     return script.run(entries)
 
 
+def closure_unit_lines(closure):
+    """closure 与 key 命令打的单元行（dump_text）：数据目录单元照 crates/singlefs-unit-graph 按读它的那一处各一行
+    （data-directory\\t<目录>\\t<读它的文件>:<行>-<行>\\t<目录指纹>），别的单元照常。弄坏开关 closure-directory-lines-span-files：
+    数据目录单元打成它自己那一行（<目录>:1-<文件数>，改前的样子）。"""
+    if "closure-directory-lines-span-files" in active_breaks():
+        return [unit.dump_text() for unit in closure.units()]
+    units = [unit for unit in closure.units() if unit.kind != "data-directory"]
+    units += [Unit("data", "data-directory", site[2], site[0], site[1], site[1], site[3], data=True) for site in closure.data_sites if site[5] == "data-directory"]
+    return [unit.dump_text() for unit in sorted(units, key=Unit.sort_key)]
+
+
 def closure_key(closure, toolchain=(), dependencies=(), externals=None, allow_refused=False):
     """→ (键或 None, 拒算列表)。拒算不空时键是 None（allow_refused 只给对照用：照算出键，拒算照样交回）。"""
     externals = dict(externals or {})
@@ -7825,7 +10155,30 @@ def closure_key(closure, toolchain=(), dependencies=(), externals=None, allow_re
     lines += sorted(f"external\t{name}\t{sha}\t{version}" for name, (sha, version) in externals.items())
     lines += sorted(f"unit\t{unit.kind}\t{unit.fingerprint}" for unit in closure.order if not unit.data)
     lines += sorted(f"data\t{unit.kind}\t{unit.fingerprint}" for unit in closure.order if unit.data)
+    lines += entry_key_lines(closure)
     return sha256_text("".join(line + "\n" for line in lines)), ordered
+
+
+def entry_key_lines(closure):
+    """键里的 entry 行（文件头「键」）：closure.entry_units 里每个入口单元连同包它的 impl / trait 头（Unit.container）一层层往外，各取（种类，指纹），
+    一个入口一行、排序去重；不带名字、路径与行号。闭包是单元的多重集，几个入口互相收进对方的闭包（一个 trait impl 里的几个方法经 R-结构、R-隐式，
+    python 里互相调用的两个 def）时闭包一模一样，没有这几行就共用一把键、一份判定（scripts/gate/verus-proof-check.py 的 entry_unit_component 同一种写法）。
+    文档测试取到它自己就停：它的 container 是所挂的条目，rust_closure_of 的 R-结构不连它（另编一个 crate），键里也不带它的正文。
+    没记入口的闭包（别处自己拼的、并起来的）不出这几行。弄坏开关 key-entry-units-dropped：一行都不出（改前的样子）；
+    key-entry-doctest-owner-chained：文档测试照别的单元往外取所挂的条目（改前的样子）。"""
+    if "key-entry-units-dropped" in active_breaks():
+        return []
+    lines = set()
+    for entry in getattr(closure, "entry_units", ()):
+        chain, owner, visited = [], entry, set()
+        while owner is not None and id(owner) not in visited:
+            visited.add(id(owner))
+            chain.append(f"{owner.kind}\t{owner.fingerprint}")
+            if owner.kind == "doctest" and "key-entry-doctest-owner-chained" not in active_breaks():
+                break
+            owner = owner.container
+        lines.add("entry\t" + "\t".join(chain))
+    return sorted(lines)
 
 
 def key_cfg_items(closure, unnarrowed):
@@ -7838,21 +10191,30 @@ def key_cfg_items(closure, unnarrowed):
     return list(narrowed)
 
 
-def unit_graph_key(closure, toolchain=(), lock_lines=()):
-    """照 crates/singlefs-unit-graph 的 reuse_key 算 Rust 闭包的键（两份实现逐入口对拍用；python 这一份自己的复用键仍是 closure_key）→ (键或 None, 拒算)。
-    行以 \\n 连、末尾不带：entry-target-kind\\t<目标种类>、cfg\\t<原子>\\t<true|false>（闭包里各单元真引到的 cfg 原子与它在收那个单元的目标下的真值，
-    排好序；key_cfg_items）、unit\\t<种类>\\t<指纹>（闭包里每个 Rust 与 WGSL 单元，
-    排序）、data\\t<摘要>（每一处读数据文件，排序）、toolchain\\t<行>、lock\\t<行>（调用方给的次序）。闭包里有拒算不交键。"""
-    ordered = sorted(closure.refusals, key=lambda refusal: (refusal.file, refusal.line, refusal.form, refusal.snippet))
-    if ordered:
-        return None, ordered
+def unit_graph_key_lines(closure, toolchain=(), lock_lines=()):
+    """unit_graph_key 取 sha256 的那几行（次序就是 crates/singlefs-unit-graph 的 reuse_key 拼的次序）：entry-target-kind\\t<目标种类>、
+    cfg\\t<原子>\\t<true|false>（闭包里各单元真引到的 cfg 原子与它在收那个单元的目标下的真值，排好序；key_cfg_items）、
+    unit\\t<种类>\\t<指纹>（闭包里每个 Rust 与 WGSL 单元，排序）、data\\t<摘要>（每一处读数据文件，排序）、
+    entry\\t<种类>\\t<指纹>[\\t<种类>\\t<指纹>…]（入口单元自己，entry_key_lines：一个入口一行、排序去重；Rust 那一份的 entry_key_lines 同一种行、同一个位置）、
+    toolchain\\t<行>、lock\\t<行>（调用方给的次序）。弄坏开关 unit-graph-key-entry-lines-dropped：不出 entry 行（改前的样子）。"""
     lines = [f"entry-target-kind\t{closure.entry_target_kind}"]
     lines += [f"cfg\t{atom}" for atom in sorted(key_cfg_items(closure, closure.entry_cfg_atoms))]
     lines += sorted(f"unit\t{unit.kind}\t{unit.fingerprint}" for unit in closure.order if not unit.data)
     lines += sorted(f"data\t{site[3]}" for site in closure.data_sites)
+    if "unit-graph-key-entry-lines-dropped" not in active_breaks():
+        lines += entry_key_lines(closure)
     lines += [f"toolchain\t{line}" for line in toolchain]
     lines += [f"lock\t{line}" for line in lock_lines]
-    return sha256_text("\n".join(lines)), []
+    return lines
+
+
+def unit_graph_key(closure, toolchain=(), lock_lines=()):
+    """照 crates/singlefs-unit-graph 的 reuse_key 算 Rust 闭包的键（两份实现逐入口对拍用；python 这一份自己的复用键仍是 closure_key）→ (键或 None, 拒算)。
+    unit_graph_key_lines 那几行以 \\n 连、末尾不带，取 sha256。闭包里有拒算不交键。"""
+    ordered = sorted(closure.refusals, key=lambda refusal: (refusal.file, refusal.line, refusal.form, refusal.snippet))
+    if ordered:
+        return None, ordered
+    return sha256_text("\n".join(unit_graph_key_lines(closure, toolchain, lock_lines))), []
 
 
 def dump_lines(root, language=None, under=None, judgment_kind=FORMAL_VERIFICATION, product_dump=None):
@@ -7880,13 +10242,14 @@ def dump_lines(root, language=None, under=None, judgment_kind=FORMAL_VERIFICATIO
                 if "rust-data-dump-unlisted" not in active_breaks():
                     # 数据单元照 crates/singlefs-unit-graph 的 dump：每一处读（include_str! 一类与运行期拼得出字面路径的读，.wgsl 不算）一行
                     # data\t<数据文件>\t<读它的文件>:<行>-<行>\t<字节 sha256>
+                    # 读的是目录的（折出 crates/ 之下的目录）写 data-directory\t<目录>\t<读它的文件>:<行>-<行>\t<目录下全部文件的指纹>，指纹见 directory_fingerprint
                     for kind, value, index in unit.data_references or ():
-                        if kind != "file":
+                        if kind not in ("file", "directory"):
                             continue
-                        if value not in data_digests:
-                            data_digests[value] = data_file_unit(root, value).fingerprint
+                        if (kind, value) not in data_digests:
+                            data_digests[(kind, value)] = (data_file_unit(root, value) if kind == "file" else data_directory_unit(root, value)).fingerprint
                         line = rust_file.lines[index]
-                        site = Unit("data", "data", value, unit.file, line, line, data_digests[value], data=True)
+                        site = Unit("data", "data" if kind == "file" else "data-directory", value, unit.file, line, line, data_digests[(kind, value)], data=True)
                         units.append(site)
                         counts["data"] += 1
                 if unit.kind == "extern_block":
@@ -7958,9 +10321,9 @@ def explain_lines(closure):
 # ── V5 / V11 对照（design 报告 2.2 节） ──────────────────────────────────────
 
 CONTROL_ENTRIES = (
-    ("v5_test", "crates/singlefs-harness/tests/new_pool_file_creation_publish.rs::root_slots_system_configurations_and_journal_ring_hold_the_published_state"),
+    ("v5_test", "crates/singlefs-verification/tests/new_pool_file_creation_publish.rs::root_slots_system_configurations_and_journal_ring_hold_the_published_state"),
     ("v11_test", "crates/singlefs-format/src/lib.rs::tests::pointer_record_and_entry_width_literals_equal_the_field_sums_they_stand_for"),
-    ("cpu_judge", "crates/singlefs-checker-tier/src/crash.rs::judge_crash_image"),
+    ("cpu_judge", "crates/singlefs-verification/src/crash.rs::judge_crash_image"),
 )
 CONTROL_VARIANTS = (
     ("V5", "const JOURNAL_PAYLOAD_CHECKSUM_OFFSET: usize = 95;", {"v5_test": "changed", "v11_test": "same", "cpu_judge": "changed"}),
@@ -8806,6 +11169,13 @@ runner="$(find_runner)"
     "s/wrapped.sh": '''#!/usr/bin/env bash
 timeout 60 "$(dirname "${BASH_SOURCE[0]}")/child.sh"
 ''',
+    "s/subscript.sh": '''#!/usr/bin/env bash
+declare -A item
+key="$1" address="$2" value="$3"
+item[$key $address]="$value"
+item[$key]+=" more"
+echo "${item[$key $address]}"
+''',
     "s/structure.sh": '''#!/usr/bin/env bash
 x="$(pick_x)" y="$(pick_y)"
 if [[ -n "$x" || "$y" == ok ]]; then echo yes; fi
@@ -8827,6 +11197,14 @@ code_of() {
 code="$(code_of)"
 python3 -c "$code" "$(dirname "${BASH_SOURCE[0]}")/py"
 ''',
+    "s/nested_inline_positionals.sh": '''#!/usr/bin/env bash
+code_of() {
+  printf '%s\\n' "import sys" "sys.path.insert(0, sys.argv[1])" "import helper_mod" "helper_mod.run()"
+}
+code="$(code_of)"
+here="$(dirname "${BASH_SOURCE[0]}")"
+bash -c 'bash -c "python3 -c \\"\\$1\\" \\"\\$2\\"" inner "$2" "$1"' outer "$here/py" "$code"
+''',
     "s/declared.sh": '''#!/usr/bin/env bash
 # run-condition: check bash "$PREFLIGHT_SCRIPT_DIRECTORY/child.sh" :: 先让同目录的 child.sh 跑通
 echo declared
@@ -8843,6 +11221,32 @@ import sys
 tool = sys.argv[1]
 subprocess.run([tool, "--version"], check=False)
 PY
+''',
+    "s/argv_slice.sh": '''#!/usr/bin/env bash
+here="$(dirname "${BASH_SOURCE[0]}")"
+watch_helper() {
+  exec python3 -B /dev/fd/3 "$here/py" "$1" 3<<'PY'
+import sys
+(directory, label) = sys.argv[1:3]
+sys.path.insert(0, directory)
+import helper_mod
+helper_mod.run()
+PY
+}
+watch_helper sample
+''',
+    "s/argv_slice_mismatched.sh": '''#!/usr/bin/env bash
+here="$(dirname "${BASH_SOURCE[0]}")"
+watch_helper() {
+  exec python3 -B /dev/fd/3 "$here/py" "$1" 3<<'PY'
+import sys
+(directory, label) = sys.argv[1:4]
+sys.path.insert(0, directory)
+import helper_mod
+helper_mod.run()
+PY
+}
+watch_helper sample
 ''',
     "s/group.sh": '''#!/usr/bin/env bash
 here="$(dirname "${BASH_SOURCE[0]}")"
@@ -8895,6 +11299,21 @@ def compare_cell(fixture, entry, path, old, new, want):
         got = "changed" if before != after else "same"
         return got == want, f"期望 {want}，实际 {got}"
     return judge
+
+
+def with_breaks_added(judge, *switches):
+    """这一格在当时设着的弄坏开关之上再打开 switches 判（只看一条边、别的边先关掉的格用）：BREAK_CELLS 轮打开点名的开关时，两样一起开着。"""
+    def judge_with_breaks(work):
+        previous = os.environ.get(BREAK_VARIABLE)
+        os.environ[BREAK_VARIABLE] = ",".join(sorted(active_breaks() | set(switches)))
+        try:
+            return judge(work)
+        finally:
+            if previous is None:
+                os.environ.pop(BREAK_VARIABLE, None)
+            else:
+                os.environ[BREAK_VARIABLE] = previous
+    return judge_with_breaks
 
 
 def refused_cell(fixture, entry, form, edit=None):
@@ -9207,6 +11626,266 @@ def closure_rule_cells():
     ]
 
 
+# 闭包外的四类边（文件头 Rust 闭包「闭包外的四类边」）：每格一个小工作区，改的那一处补边前不在入口的闭包里（键不变），补边后在（键变）；
+# 每格配一个弄坏开关（BREAK_CELLS 里 rust-macro-generated-types-unnamed 到 rust-excluded-path-dependencies-dropped 那六项）退回补边前；
+# 工作区外的 crate 按调用关系连的两格（OUTSIDE_IMPORT_CELL、OUTSIDE_MODULE_CELL）各配 rust-outside-crate-* 一个开关，退回按同名连
+MACRO_EDGE_FIXTURE = {
+    "crates/fmacro/Cargo.toml": '[package]\nname = "fmacro"\n',
+    "crates/fmacro/src/lib.rs": '''macro_rules! listed_enumeration {
+    ($(#[$attribute:meta])* $visibility:vis enum $name:ident { $($variant:ident,)+ }) => {
+        $(#[$attribute])*
+        $visibility enum $name { $($variant,)+ }
+    };
+}
+listed_enumeration! {
+    pub enum Weight {
+        Light,
+        Heavy,
+    }
+}
+impl Weight {
+    pub fn amount(self) -> u32 {
+        match self {
+            Weight::Light => 1,
+            Weight::Heavy => 9,
+        }
+    }
+}
+pub fn heavy_amount() -> u32 {
+    Weight::Heavy.amount()
+}
+macro_rules! code_table {
+    ($($constant:ident = $code:literal,)*) => {
+        $(pub const $constant: u32 = $code;)*
+        pub const EVERY_CODE: &[u32] = &[$($constant,)*];
+    };
+}
+code_table! {
+    CODE_NONE = 0,
+    CODE_FULL = 7,
+}
+pub fn code_count() -> usize {
+    EVERY_CODE.len()
+}
+''',
+}
+MACRO_EDGE_FILE = "crates/fmacro/src/lib.rs"
+ALLOCATOR_EDGE_FIXTURE = {
+    "crates/falloc/Cargo.toml": '[package]\nname = "falloc"\n',
+    "crates/falloc/src/main.rs": '''use std::alloc::{GlobalAlloc, Layout, System};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static GROWTHS: AtomicUsize = AtomicUsize::new(0);
+
+struct CountingAllocator;
+
+unsafe impl GlobalAlloc for CountingAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        unsafe { System.alloc(layout) }
+    }
+    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+        unsafe { System.dealloc(pointer, layout) }
+    }
+    unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+        GROWTHS.fetch_add(1, Ordering::Relaxed);
+        unsafe { System.realloc(pointer, layout, size) }
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: CountingAllocator = CountingAllocator;
+
+fn growths() -> usize {
+    let mut values = Vec::new();
+    values.push(1_u8);
+    GROWTHS.load(Ordering::Relaxed)
+}
+
+fn main() {
+    println!("{}", growths());
+}
+''',
+}
+FOREIGN_IMPL_EDGE_FIXTURE = {
+    "crates/fforeign/Cargo.toml": '[package]\nname = "fforeign"\n',
+    "crates/fforeign/src/lib.rs": '''pub trait Measured {
+    fn measure(&self) -> u64;
+}
+
+impl Measured for std::time::Duration {
+    fn measure(&self) -> u64 {
+        self.as_secs() + 1
+    }
+}
+
+pub fn measure_of<Value>(value: &Value) -> u64
+where
+    Value: Measured,
+{
+    value.measure()
+}
+
+pub fn measured_second() -> u64 {
+    measure_of(&std::time::Duration::from_secs(1))
+}
+''',
+}
+BUILD_ENVIRONMENT_EDGE_FIXTURE = {
+    "crates/fbuild/Cargo.toml": '[package]\nname = "fbuild"\n',
+    "crates/fbuild/build.rs": '''fn reported_features() -> String {
+    String::from("plain")
+}
+
+fn main() {
+    println!("cargo::rustc-env=FBUILD_REPORTED_FEATURES={}", reported_features());
+}
+''',
+    "crates/fbuild/src/lib.rs": '''pub fn reported() -> &'static str {
+    env!("FBUILD_REPORTED_FEATURES")
+}
+''',
+}
+EXCLUDED_PATH_DEPENDENCY_EDGE_FIXTURE = {
+    "Cargo.toml": '[workspace]\nmembers = ["crates/fuser"]\nexclude = ["fservice"]\n',
+    "crates/fuser/Cargo.toml": '[package]\nname = "fuser"\n\n[dependencies]\nfservice = { path = "../../fservice" }\n',
+    "crates/fuser/src/lib.rs": "pub fn stop_count() -> u32 {\n    fservice::stopped_connections()\n}\n",
+    "fservice/Cargo.toml": '[package]\nname = "fservice"\n\n[workspace]\n',
+    "fservice/src/lib.rs": "pub fn stopped_connections() -> u32 {\n    3\n}\n",
+}
+# 工作区外的 crate 按调用关系连（文件头 Rust 闭包「工作区外的 path 依赖」后半）：fuser 只在字段名里写着 halted；fservice 里 log 与 bench 两个模块各有一个 Log，
+# bench 模块里的 fn launch 与 Worker::launch 同名
+OUTSIDE_CRATE_NAME_FIXTURE = {
+    "Cargo.toml": '[workspace]\nmembers = ["crates/fuser"]\nexclude = ["fservice"]\n',
+    "crates/fuser/Cargo.toml": '[package]\nname = "fuser"\n\n[dependencies]\nfservice = { path = "../../fservice" }\n',
+    "crates/fuser/src/lib.rs": '''use fservice::control;
+use fservice::restarts;
+
+pub struct Counters {
+    pub halted: u32,
+}
+
+pub fn served() -> u32 {
+    let counters = Counters { halted: 1 };
+    fservice::stopped_connections() + restarts() + control::paused() + counters.halted
+}
+''',
+    "fservice/Cargo.toml": '[package]\nname = "fservice"\n\n[workspace]\n',
+    "fservice/src/lib.rs": '''pub mod control {
+    pub fn paused() -> u32 {
+        5
+    }
+}
+
+pub mod bench {
+    pub struct Log {
+        pub entries: u64,
+    }
+
+    pub fn launch() -> u32 {
+        7
+    }
+}
+
+pub mod log {
+    pub struct Log {
+        pub entries: u32,
+    }
+}
+
+use log::Log;
+
+pub struct Worker;
+
+impl Worker {
+    fn launch(&self) -> u32 {
+        2
+    }
+}
+
+pub fn stopped_connections() -> u32 {
+    Worker.launch() + Log { entries: 1 }.entries
+}
+
+pub fn restarts() -> u32 {
+    4
+}
+
+pub fn halted() -> u32 {
+    6
+}
+''',
+}
+OUTSIDE_CRATE_NAME_ENTRY = "crates/fuser/src/lib.rs::served"
+OUTSIDE_CRATE_NAME_FILE = "fservice/src/lib.rs"
+OUTSIDE_IMPORT_CELL = ("工作区外的 crate 按引进的名字连：别的包里只是同名的字段 halted 不连到它的 fn halted，改它键不变；"
+                       "use 引进的 restarts、use 引进的模块下的 control::paused、写成路径的 stopped_connections 照连，改它们键变")
+OUTSIDE_MODULE_CELL = ("工作区外的 crate 里按模块连：use 引进 log::Log 的只连它、不连 bench 模块里同名的 Log，Worker::launch 自己的名字不连 bench::launch；"
+                       "改 bench 模块里这两样键不变，改 log::Log、改 Worker::launch 键变")
+
+
+def outside_crate_edit_verdicts(work, edits):
+    """OUTSIDE_CRATE_NAME_FIXTURE 上入口 served 的键：逐个改 edits 里的 (说明, 旧, 新)，每改一处跟前一把比 → ([(说明, changed / same / 拒算)], 改前键)。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, OUTSIDE_CRATE_NAME_FIXTURE)
+    previous, _ = fixture_key(base, OUTSIDE_CRATE_NAME_ENTRY)
+    first, verdicts = previous, []
+    for label, old, new in edits:
+        edit_file(base, OUTSIDE_CRATE_NAME_FILE, old, new)
+        current, refused = fixture_key(base, OUTSIDE_CRATE_NAME_ENTRY)
+        if previous is None or current is None:
+            verdicts.append((label, f"拒算 {sorted(refused)}"))
+        else:
+            verdicts.append((label, "changed" if current != previous else "same"))
+        previous = current
+    return verdicts, first
+
+
+def outside_import_cell(work):
+    """别的包按裸名连进工作区外的 crate 要经 use 或路径：halted 只是 fuser 的字段名，改 fservice 的 fn halted 键不变；
+    use 引进的 restarts、经 use 引进的模块 control 写成 control::paused、写成 fservice::stopped_connections 的，改了键都变。"""
+    verdicts, first = outside_crate_edit_verdicts(work, (("fn halted", "    6\n", "    60\n"), ("fn restarts", "    4\n", "    40\n"),
+                                                         ("control::paused", "        5\n", "        50\n"),
+                                                         ("fn stopped_connections", "Worker.launch() + Log", "Worker.launch() + 1 + Log")))
+    wanted = [("fn halted", "same"), ("fn restarts", "changed"), ("control::paused", "changed"), ("fn stopped_connections", "changed")]
+    return first is not None and verdicts == wanted, f"期望 {wanted}，实际 {verdicts}（改前键 {first}）"
+
+
+def outside_module_cell(work):
+    """工作区外 crate 的同一个目标里按模块连：stopped_connections 经 use log::Log 用 Log，bench 模块里同名的 Log 不连，改它键不变；
+    Worker::launch 自己的名字不连到 bench 模块里的 fn launch，改它键不变；改 log::Log、改 Worker::launch 的体，键都变。"""
+    verdicts, first = outside_crate_edit_verdicts(work, (("bench::Log", "pub entries: u64,", "pub entries: u16,"), ("bench::launch", "        7\n", "        70\n"),
+                                                         ("log::Log", "pub entries: u32,", "pub entries: u8,"), ("Worker::launch", "        2\n", "        20\n")))
+    wanted = [("bench::Log", "same"), ("bench::launch", "same"), ("log::Log", "changed"), ("Worker::launch", "changed")]
+    return first is not None and verdicts == wanted, f"期望 {wanted}，实际 {verdicts}（改前键 {first}）"
+
+
+MACRO_TYPE_EDGE_CELL = "R-宏：条目级宏调用里 enum 定义的类型算被点名，.方法() 连到写给它的 impl，改方法作废"
+MACRO_LITERAL_EDGE_CELL = "R-宏：macro_rules! 体里按字面写出的常量名登到这个宏的每次调用名下，点名它的入口连上调用，改调用体作废"
+ALLOCATOR_EDGE_CELL = "#[global_allocator]：链接集里的分配器 static 进闭包，连上它的 GlobalAlloc impl，改 realloc 作废"
+FOREIGN_IMPL_EDGE_CELL = "R-方法：本仓 trait 写在外部类型上的 impl（impl Tr for std::time::Duration）经泛型约束调到，方法连上，改它作废"
+BUILD_ENVIRONMENT_EDGE_CELL = "构建脚本经 cargo::rustc-env 交的值：用 env! 读它的单元连到本 crate 构建脚本的 main，改 main 里算的值作废"
+EXCLUDED_PATH_DEPENDENCY_EDGE_CELL = "工作区外的 path 依赖（根清单 exclude 里）：顺 path 依赖收进来，调到它的函数连上，改它作废"
+
+
+def closure_edge_cells():
+    return [
+        (MACRO_TYPE_EDGE_CELL, compare_cell(MACRO_EDGE_FIXTURE, f"{MACRO_EDGE_FILE}::heavy_amount", MACRO_EDGE_FILE,
+                                            "Weight::Heavy => 9,", "Weight::Heavy => 8,", "changed")),
+        (MACRO_LITERAL_EDGE_CELL, compare_cell(MACRO_EDGE_FIXTURE, f"{MACRO_EDGE_FILE}::code_count", MACRO_EDGE_FILE,
+                                               "CODE_FULL = 7,", "CODE_FULL = 8,", "changed")),
+        (ALLOCATOR_EDGE_CELL, compare_cell(ALLOCATOR_EDGE_FIXTURE, "crates/falloc/src/main.rs::growths", "crates/falloc/src/main.rs",
+                                           "GROWTHS.fetch_add(1, Ordering::Relaxed);", "GROWTHS.fetch_add(2, Ordering::Relaxed);", "changed")),
+        (FOREIGN_IMPL_EDGE_CELL, compare_cell(FOREIGN_IMPL_EDGE_FIXTURE, "crates/fforeign/src/lib.rs::measured_second", "crates/fforeign/src/lib.rs",
+                                              "self.as_secs() + 1", "self.as_secs() + 2", "changed")),
+        (BUILD_ENVIRONMENT_EDGE_CELL, compare_cell(BUILD_ENVIRONMENT_EDGE_FIXTURE, "crates/fbuild/src/lib.rs::reported", "crates/fbuild/build.rs",
+                                                   'String::from("plain")', 'String::from("gpu")', "changed")),
+        (EXCLUDED_PATH_DEPENDENCY_EDGE_CELL, compare_cell(EXCLUDED_PATH_DEPENDENCY_EDGE_FIXTURE, "crates/fuser/src/lib.rs::stop_count", "fservice/src/lib.rs",
+                                                          "    3\n", "    4\n", "changed")),
+        (OUTSIDE_IMPORT_CELL, outside_import_cell),
+        (OUTSIDE_MODULE_CELL, outside_module_cell),
+    ]
+
+
 # 4-3d：键的 cfg 成分收窄（定案 2）、WGSL 外名的 _ 后缀与供名字的边、trait 成员里的 Self::x、文档测试不连结构、use a::{self}（定案 3）的小工作区；
 # 闭包成员与 crates/singlefs-unit-graph 的 unit-graph closure 逐行核过（报告里有命令与原样输出）
 CFG_ATOMS_FIXTURE = {
@@ -9339,6 +12018,23 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 ''',
 }
 WGSL_SUPPLY_FILE = "crates/fsupply/src/lib.rs"
+# 同一份样本再加一个测试模块：入口是里面一条测试（按测试编，测试单元都编），另一条测试的串里写着外名、函数体读运行期的清单目录（拒算 runtime-path）
+WGSL_TEST_SUPPLIER_FIXTURE = dict(WGSL_SUPPLY_FIXTURE)
+WGSL_TEST_SUPPLIER_FIXTURE[WGSL_SUPPLY_FILE] = WGSL_SUPPLY_FIXTURE[WGSL_SUPPLY_FILE] + '''#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_supplied_kernel_text_is_built() {
+        assert!(!super::supplied_kernel_text().is_empty());
+    }
+    #[test]
+    fn the_words_of_the_failure_points_are_listed() {
+        let words = "FAILURE_POINT_UNREADABLE FAILURE_POINT_NONE";
+        let _root = std::env::var_os("CARGO_MANIFEST_DIR");
+        assert!(!words.is_empty());
+    }
+}
+'''
+WGSL_TEST_SUPPLIER_CELL = "WGSL 外名的着落不收测试函数：串里有外名的 #[test] fn 不并进闭包，改它的函数体键不变，改真给名字的宏调用键变"
 
 
 def wgsl_defined_suffix_cell(work):
@@ -9359,7 +12055,8 @@ def wgsl_prefix_remainder_cell(work):
 
 
 def wgsl_supplier_edge_cell(work):
-    """供外名的条目级宏调用不经任何名字点到（拼内核的函数只用宏体里定义的 GPU_FAILURE_POINTS）：着落做成边，宏调用并进闭包，改它里面的码键变。"""
+    """供外名的条目级宏调用不经调用体里的名字点到（拼内核的函数只用宏体里定义的 GPU_FAILURE_POINTS）：着落做成边，宏调用并进闭包，改它里面的码键变。
+    登记时套 with_breaks_added 关掉宏体字面名字那条边，只看着落。"""
     base = os.path.join(work, "tree")
     write_tree(base, WGSL_SUPPLY_FIXTURE)
     entry = f"{WGSL_SUPPLY_FILE}::supplied_kernel_text"
@@ -9370,6 +12067,23 @@ def wgsl_supplier_edge_cell(work):
     macro_in = any(name.startswith("item_macro failure_points!@") for name in members)
     return macro_in and before is not None and after is not None and before != after, \
         f"闭包里有没有 failure_points! 调用 {macro_in}；改码前键 {before}（拒算 {sorted(before_refused)}）、后 {after}"
+
+
+def wgsl_test_supplier_cell(work):
+    """入口是一条测试，WGSL 外名只有宏调用真给着落；同一模块里另一条测试的串里也写着这两个外名、函数体读运行期的清单目录：
+    测试函数不当名字供给者收（不并进闭包、不带进它的 runtime-path 拒算），键算得出；改那条测试的函数体键不变；改宏调用里的码键变。
+    登记时套 with_breaks_added 关掉宏体字面名字那条边：开着它，宏调用经 GPU_FAILURE_POINTS 进闭包、外名都有着落，供给者一个都不拉，测试函数收不收判不出。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, WGSL_TEST_SUPPLIER_FIXTURE)
+    entry = f"{WGSL_SUPPLY_FILE}::tests::the_supplied_kernel_text_is_built"
+    pulled = "fn tests::the_words_of_the_failure_points_are_listed" in closure_member_names(base, entry)
+    before, before_refused = fixture_key(base, entry)
+    edit_file(base, WGSL_SUPPLY_FILE, 'let words = "FAILURE_POINT_UNREADABLE FAILURE_POINT_NONE";', 'let words = "FAILURE_POINT_UNREADABLE FAILURE_POINT_NONE，改了";')
+    outside, _ = fixture_key(base, entry)
+    edit_file(base, WGSL_SUPPLY_FILE, "GPU_FAILURE_POINT_UNREADABLE = 9,", "GPU_FAILURE_POINT_UNREADABLE = 99,")
+    inside, _ = fixture_key(base, entry)
+    ok = not pulled and before is not None and outside == before and inside is not None and inside != before
+    return ok, (f"测试函数并进了闭包 {pulled}（要没有）；键 {before}（拒算 {sorted(before_refused)}）、改测试函数体后 {outside}（要同前）、改宏调用里的码后 {inside}（要不同）")
 
 
 def wgsl_single_module_cell(work):
@@ -9730,7 +12444,11 @@ def unit_divergence_cells():
         ("cfg 成分：闭包里有 cfg!、语句上的 #[cfg] 或 #[cfg_attr] 引到 gpu 的入口，带不带 gpu 特性键不同", cfg_referenced_cell),
         ("WGSL 外名：条目级宏调用定义的名字以 _ 加外名收尾就有着落", wgsl_defined_suffix_cell),
         ("WGSL 外名：首段只落在无关的串里、其余那一段哪儿都没有的拒算", wgsl_prefix_remainder_cell),
-        ("WGSL 外名的着落做成边：只靠外名点到的条目级宏调用并进闭包，改它里面的码键变", wgsl_supplier_edge_cell),
+        # 这两格只看着落那条边：GPU_FAILURE_POINTS 是宏体展开式顶层按字面写出的名字，宏体字面名字那条边（文件头 Rust 闭包「条目级宏调用生成的条目」）
+        # 也让 failure_points! 调用进闭包，开着它两格的弄坏开关红不了；crates/singlefs-unit-graph 的 unit_graph_wgsl_modules_close_over_compute_entries.rs 同样关它
+        ("WGSL 外名的着落做成边：只靠外名点到的条目级宏调用并进闭包，改它里面的码键变",
+         with_breaks_added(wgsl_supplier_edge_cell, "rust-macro-rules-literal-names-unlinked")),
+        (WGSL_TEST_SUPPLIER_CELL, with_breaks_added(wgsl_test_supplier_cell, "rust-macro-rules-literal-names-unlinked")),
         ("WGSL：闭包读到的几份 .wgsl 合成一个模块，名字跨文件解", wgsl_single_module_cell),
         ("R-路径：trait 成员里的 Self::x 落到这个 trait 自己的成员 x", trait_self_path_cell),
         ("R-结构：文档测试不连所挂的条目与那个模块的 use", doctest_structure_cell),
@@ -9807,6 +12525,114 @@ def shell_folding_cell(work):
     return {"s/lib.sh", "s/child.sh"} <= files and key is not None, f"闭包碰到的文件 {sorted(files)}，拒算 {[refusal.form for refusal in refusals]}"
 
 
+# Rust 闭包读到的 shell 脚本（文件头「Rust 闭包读到的 shell 脚本」）：入口照 gpu_card_configuration.rs 起配置判法的写法拼出脚本路径
+SHELL_DATA_FIXTURE = {
+    "crates/fshell/Cargo.toml": '[package]\nname = "fshell"\n',
+    "crates/fshell/src/lib.rs": '''pub fn runs_the_sourcing_script() -> bool {
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/sourcing.sh");
+    std::process::Command::new("bash").arg(&script).status().is_ok()
+}
+pub fn runs_the_plain_script() -> bool {
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/plain.sh");
+    std::process::Command::new("bash").arg(&script).status().is_ok()
+}
+pub fn runs_the_dotted_script() -> bool {
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/dotted.sh");
+    std::process::Command::new("bash").arg(&script).status().is_ok()
+}
+pub fn runs_the_unfolded_script() -> bool {
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/unfolded.sh");
+    std::process::Command::new("bash").arg(&script).status().is_ok()
+}
+''',
+    "scripts/sourcing.sh": '''#!/usr/bin/env bash
+set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/first.sh"
+first_function
+''',
+    "scripts/lib/first.sh": '''#!/usr/bin/env bash
+first_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$first_directory/second.sh"
+first_function() {
+  echo first
+}
+''',
+    "scripts/lib/second.sh": '''#!/usr/bin/env bash
+second_function() {
+  echo second
+}
+''',
+    "scripts/dotted.sh": '''#!/usr/bin/env bash
+SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIRECTORY/lib/dot-only.sh"
+dot_function
+''',
+    "scripts/lib/dot-only.sh": '''#!/usr/bin/env bash
+dot_function() {
+  echo dot
+}
+''',
+    "scripts/plain.sh": '''#!/usr/bin/env bash
+echo plain
+''',
+    "scripts/unfolded.sh": '''#!/usr/bin/env bash
+library="$1"
+source "$library"
+''',
+}
+SHELL_DATA_FILE = "crates/fshell/src/lib.rs"
+SHELL_DATA_HOST_LINE = "host: x86_64-unknown-linux-gnu"
+SHELL_DATA_SOURCE_CELL = ("Rust 闭包读到的 shell 脚本：它 source 进来的文件收成 data-file 单元，改一处读这份脚本的入口键变、读另一份不 source 它的脚本的入口键不变；"
+                          "被 source 的每一份按读这份脚本的那一处记一条数据位置，unit_graph_key（与 crates/singlefs-unit-graph 对拍的那一把）随它变")
+SHELL_DATA_DOT_CELL = "Rust 闭包读到的 shell 脚本：. <路径> 照 source 收（路径经 $(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd) 赋的变量），改被引的文件键变"
+SHELL_DATA_NESTED_CELL = "Rust 闭包读到的 shell 脚本：两层（脚本 source 的库再 source 一份）逐层收，改里层那份键变"
+SHELL_DATA_UNFOLDED_CELL = "Rust 闭包读到的 shell 脚本：source 的路径折不出拒算 shell-path-unfolded"
+
+
+def shell_data_edit_trip(work, entry, path, old, new):
+    """→ (改前键, 改后键, 改前闭包里经 shell-source 收进来的文件, 改前与改后的 unit_graph_key)。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, SHELL_DATA_FIXTURE)
+    closure = closure_of(base, f"{SHELL_DATA_FILE}::{entry}")
+    sourced = sorted(unit.file for unit in closure.order if closure.via.get(id(unit), (None, ""))[1] == "shell-source")
+    graph_before = unit_graph_key(closure, [SHELL_DATA_HOST_LINE])[0]
+    before = closure_key(closure)[0]
+    edit_file(base, path, old, new)
+    changed = closure_of(base, f"{SHELL_DATA_FILE}::{entry}")
+    return before, closure_key(changed)[0], sourced, (graph_before, unit_graph_key(changed, [SHELL_DATA_HOST_LINE])[0])
+
+
+def shell_data_source_cell(work):
+    before, after, sourced, graphs = shell_data_edit_trip(work, "runs_the_sourcing_script", "scripts/lib/first.sh", "  echo first\n", "  echo first, changed\n")
+    base = os.path.join(work, "tree")
+    plain_after = fixture_key(base, f"{SHELL_DATA_FILE}::runs_the_plain_script")[0]
+    edit_file(base, "scripts/lib/first.sh", "  echo first, changed\n", "  echo first\n")
+    plain_before = fixture_key(base, f"{SHELL_DATA_FILE}::runs_the_plain_script")[0]
+    # 数据位置（data_sites：读它的文件、行、种类）：被 source 的两份都落在 lib.rs 里读 sourcing.sh 的那一处（crates/singlefs-unit-graph 的 follow_shell_sources 同）
+    sites = {site[2]: (site[0], site[1], site[5]) for site in closure_of(base, f"{SHELL_DATA_FILE}::runs_the_sourcing_script").data_sites}
+    reader = sites.get("scripts/sourcing.sh")
+    sited = reader is not None and all(sites.get(path) == reader for path in ("scripts/lib/first.sh", "scripts/lib/second.sh"))
+    ok = ("scripts/lib/first.sh" in sourced and before is not None and after is not None and before != after
+          and plain_before is not None and plain_before == plain_after and sited and graphs[0] is not None and graphs[1] is not None and graphs[0] != graphs[1])
+    return ok, (f"经 shell-source 收进来的 {sourced}（要有 scripts/lib/first.sh）；改它前后键 {before and before[:12]} → {after and after[:12]}（要都有、不同）；"
+                f"读 plain.sh 的入口改前改后 {plain_before and plain_before[:12]} / {plain_after and plain_after[:12]}（要都有、相同）；"
+                f"数据位置 {dict(sorted(sites.items()))}（被 source 的 first.sh、second.sh 要与 sourcing.sh 落在同一处）；"
+                f"unit_graph_key {graphs[0] and graphs[0][:12]} → {graphs[1] and graphs[1][:12]}（要都有、不同）")
+
+
+def shell_data_dot_cell(work):
+    before, after, sourced, _graphs = shell_data_edit_trip(work, "runs_the_dotted_script", "scripts/lib/dot-only.sh", "  echo dot\n", "  echo dot, changed\n")
+    ok = sourced == ["scripts/lib/dot-only.sh"] and before is not None and after is not None and before != after
+    return ok, f"经 shell-source 收进来的 {sourced}（要 [scripts/lib/dot-only.sh]）；改它前后键 {before and before[:12]} → {after and after[:12]}（要都有、不同）"
+
+
+def shell_data_nested_cell(work):
+    before, after, sourced, _graphs = shell_data_edit_trip(work, "runs_the_sourcing_script", "scripts/lib/second.sh", "  echo second\n", "  echo second, changed\n")
+    ok = sourced == ["scripts/lib/first.sh", "scripts/lib/second.sh"] and before is not None and after is not None and before != after
+    return ok, (f"经 shell-source 收进来的 {sourced}（要 [scripts/lib/first.sh, scripts/lib/second.sh]）；改里层 second.sh 前后键 "
+                f"{before and before[:12]} → {after and after[:12]}（要都有、不同）")
+
+
 MANIFEST_ROOT_CELL = "Rust：清单目录往上拼出仓根（目录）拒算 runtime-path；点名清单目录里一份文件再往上取仓根的不拒算、那份文件的字节进键"
 # 实验准入入口（scripts/experiment-apparatus/lib.rs::admit_experiment_run_or_exit）取仓根的两种写法
 MANIFEST_ROOT_FIXTURE = {
@@ -9833,6 +12659,391 @@ def manifest_root_cell(work):
     ok = directory_key is None and "runtime-path" in directory_forms and before is not None and after is not None and before != after
     return ok, (f"往上拼目录的：键{'有' if directory_key else '无'}、拒算 {sorted(directory_forms)}（要拒算 runtime-path）；"
                 f"点名文件的：拒算 {sorted(named_forms)}，改那份文件里一句注释前后键{'相同' if before == after else '不同'}（要算得出且不同）")
+
+
+CURRENT_EXE_FIXTURE = {
+    "crates/fexe/Cargo.toml": '[package]\nname = "fexe"\n',
+    "crates/fexe/src/lib.rs": '''#[cfg(test)]
+mod tests {
+    use std::process::Command;
+    const CHILD_NAME: &str = "the_child_runs_alone";
+    const CHILD_TEST: &str = "tests::the_child_runs_alone";
+    fn run_the_child_by_name(name: &str) {
+        let output = Command::new(std::env::current_exe().expect("路径")).args(["--exact", name, "--nocapture"]).output().expect("起得来");
+        assert!(output.status.success());
+    }
+    #[test]
+    fn the_parent_starts_the_child_by_a_constant() {
+        let output = std::process::Command::new(std::env::current_exe().expect("路径")).args(["--exact", CHILD_TEST]).output().expect("起得来");
+        assert!(output.status.success());
+    }
+    #[test]
+    fn the_parent_starts_the_child_through_a_parameter() {
+        run_the_child_by_name(CHILD_TEST);
+    }
+    #[test]
+    fn the_parent_names_the_child_by_a_format_of_literals_and_constants() {
+        let output = Command::new(std::env::current_exe().expect("路径")).arg("--exact").arg(format!("{}::{CHILD_NAME}", "tests")).output().expect("起得来");
+        assert!(output.status.success());
+    }
+    #[test]
+    fn the_child_runs_alone() {
+        let value = 1;
+        assert_eq!(value, 1);
+    }
+    #[test]
+    fn the_unrelated_test() {
+        let note = 5;
+        assert_eq!(note, 5);
+    }
+    #[test]
+    fn the_parent_asks_for_a_name_nobody_defines() {
+        let _ = Command::new(std::env::current_exe().expect("路径")).args(["--exact", "tests::missing"]).output();
+    }
+    #[test]
+    fn the_parent_names_itself_before_the_exact_flag_by_a_module_path() {
+        let test_name = format!("{}::x", module_path!().split_once("::").expect("包名").1);
+        let _ = Command::new(std::env::current_exe().expect("路径")).args([test_name.as_str(), "--exact"]).output();
+    }
+}
+''',
+}
+CURRENT_EXE_CELL = "Rust：current_exe() 交给 Command::new 起子进程、--exact 后面点名的测试（常量、参数、字面与常量拼的）连到那条 #[test]，改它的函数体键变、改别的测试键不变；点名不存在的、测试名写在 --exact 前面的照旧拒算 current-exe"
+CURRENT_EXE_KEYED = ("the_parent_starts_the_child_by_a_constant", "the_parent_starts_the_child_through_a_parameter",
+                     "the_parent_names_the_child_by_a_format_of_literals_and_constants")
+CURRENT_EXE_REFUSED = ("the_parent_asks_for_a_name_nobody_defines", "the_parent_names_itself_before_the_exact_flag_by_a_module_path")
+
+
+def current_exe_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, CURRENT_EXE_FIXTURE)
+    file = "crates/fexe/src/lib.rs"
+    kept = {name: fixture_key(base, f"{file}::tests::{name}") for name in CURRENT_EXE_KEYED}
+    refused = {name: fixture_key(base, f"{file}::tests::{name}")[1] for name in CURRENT_EXE_REFUSED}
+    reached = {}
+    for name in CURRENT_EXE_KEYED:
+        found = closure_of(base, f"{file}::tests::{name}")
+        reached[name] = {unit.name: found.via.get(id(unit), (None, ""))[1] for unit in found.order}.get("tests::the_child_runs_alone")
+    edit_file(base, file, "        let note = 5;\n        assert_eq!(note, 5);", "        let note = 6;\n        assert_eq!(note, 6);")
+    outside = {name: fixture_key(base, f"{file}::tests::{name}")[0] for name in CURRENT_EXE_KEYED}
+    edit_file(base, file, "        let value = 1;\n        assert_eq!(value, 1);", "        let value = 2;\n        assert_eq!(value, 2);")
+    inside = {name: fixture_key(base, f"{file}::tests::{name}")[0] for name in CURRENT_EXE_KEYED}
+    ok = (all(kept[name][0] is not None for name in CURRENT_EXE_KEYED) and all(rule == "current-exe-child" for rule in reached.values())
+          and all(forms == {"current-exe"} for forms in refused.values())
+          and all(outside[name] == kept[name][0] for name in CURRENT_EXE_KEYED)
+          and all(inside[name] is not None and inside[name] != kept[name][0] for name in CURRENT_EXE_KEYED))
+    return ok, (f"算得出键的入口：{ {name: kept[name][0] is not None for name in CURRENT_EXE_KEYED} }，拒算 {[forms for key, forms in kept.values() if key is None]}；"
+                f"子进程测试进闭包的规则 {reached}（要都是 current-exe-child）；点名不存在的、名字在 --exact 前面的拒算 {refused}（要都是 current-exe）；"
+                f"改无关的测试后键同前：{[outside[name] == kept[name][0] for name in CURRENT_EXE_KEYED]}；改子进程测试的函数体后键都变：{[inside[name] != kept[name][0] for name in CURRENT_EXE_KEYED]}")
+
+
+CURRENT_EXE_CONSTANT_FIXTURE = {
+    "crates/fexec/Cargo.toml": '[package]\nname = "fexec"\n',
+    "crates/fexec/src/lib.rs": '''#[cfg(test)]
+mod names;
+#[cfg(test)]
+mod other_names;
+#[cfg(test)]
+mod tests {
+    use crate::names::{AMBIGUOUS_TEST, CHILD_TEST};
+    #[test]
+    fn the_parent_names_the_child_by_a_constant_from_another_file() {
+        let output = std::process::Command::new(std::env::current_exe().expect("路径")).args(["--exact", CHILD_TEST]).output().expect("起得来");
+        assert!(output.status.success());
+    }
+    #[test]
+    fn the_parent_names_a_constant_defined_twice_with_different_values() {
+        let _ = std::process::Command::new(std::env::current_exe().expect("路径")).args(["--exact", AMBIGUOUS_TEST]).output();
+    }
+    #[test]
+    fn the_child_runs_alone() {
+        let value = 1;
+        assert_eq!(value, 1);
+    }
+    #[test]
+    fn the_unrelated_test() {
+        let note = 5;
+        assert_eq!(note, 5);
+    }
+}
+''',
+    "crates/fexec/src/names.rs": 'pub const CHILD_TEST: &str = "tests::the_child_runs_alone";\npub const AMBIGUOUS_TEST: &str = "tests::the_child_runs_alone";\n',
+    "crates/fexec/src/other_names.rs": 'pub const AMBIGUOUS_TEST: &str = "tests::missing";\n',
+}
+CURRENT_EXE_CONSTANT_CELL = ("Rust：current_exe() 的测试名里的常量定义在同包另一份文件里，--exact 后面用它：连到那条 #[test]、不拒算，改它的函数体键变、改别的测试键不变；"
+                             "同名常量在同包两份文件里值不同的照旧拒算 current-exe")
+
+
+def current_exe_constant_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, CURRENT_EXE_CONSTANT_FIXTURE)
+    file = "crates/fexec/src/lib.rs"
+    keyed, ambiguous = f"{file}::tests::the_parent_names_the_child_by_a_constant_from_another_file", f"{file}::tests::the_parent_names_a_constant_defined_twice_with_different_values"
+    kept, kept_forms = fixture_key(base, keyed)
+    ambiguous_key, ambiguous_forms = fixture_key(base, ambiguous)
+    found = closure_of(base, keyed)
+    reached = {unit.name: found.via.get(id(unit), (None, ""))[1] for unit in found.order}.get("tests::the_child_runs_alone")
+    edit_file(base, file, "        let note = 5;\n        assert_eq!(note, 5);", "        let note = 6;\n        assert_eq!(note, 6);")
+    outside = fixture_key(base, keyed)[0]
+    edit_file(base, file, "        let value = 1;\n        assert_eq!(value, 1);", "        let value = 2;\n        assert_eq!(value, 2);")
+    inside = fixture_key(base, keyed)[0]
+    ok = (kept is not None and reached == "current-exe-child" and ambiguous_key is None and ambiguous_forms == {"current-exe"}
+          and outside == kept and inside is not None and inside != kept)
+    return ok, (f"常量在另一份文件里的入口：键{'有' if kept else '无'}（拒算 {sorted(kept_forms)}）、子进程测试进闭包的规则 {reached}（要 current-exe-child）；"
+                f"同名常量两份值不同的：键{'有' if ambiguous_key else '无'}、拒算 {sorted(ambiguous_forms)}（要无键、拒算 current-exe）；"
+                f"改无关的测试后键同前：{outside == kept}；改子进程测试的函数体后键变：{inside is not None and inside != kept}")
+
+
+CURRENT_EXE_PATH_ONLY_FIXTURE = {
+    "crates/fexp/Cargo.toml": '[package]\nname = "fexp"\n',
+    "crates/fexp/src/lib.rs": '''#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_only_asks_whether_it_has_a_path() {
+        assert!(std::env::current_exe().is_ok());
+    }
+    #[test]
+    fn it_reads_the_size_of_the_file_it_was_started_from() {
+        let started_from = std::env::current_exe().expect("路径");
+        let size = std::fs::metadata(&started_from).expect("读得到").len();
+        assert!(size > 0);
+    }
+    #[test]
+    fn the_unrelated_test() {
+        let note = 5;
+        assert_eq!(note, 5);
+    }
+}
+''',
+}
+CURRENT_EXE_PATH_ONLY_CELL = "Rust：current_exe() 只问路径、同一函数里不起 Command 的不拒算：键算得出，改它的函数体键变、改别的测试键不变"
+CURRENT_EXE_PATH_ONLY_ENTRIES = ("it_only_asks_whether_it_has_a_path", "it_reads_the_size_of_the_file_it_was_started_from")
+
+
+def current_exe_path_only_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, CURRENT_EXE_PATH_ONLY_FIXTURE)
+    file = "crates/fexp/src/lib.rs"
+    kept = {name: fixture_key(base, f"{file}::tests::{name}") for name in CURRENT_EXE_PATH_ONLY_ENTRIES}
+    edit_file(base, file, "        let note = 5;\n        assert_eq!(note, 5);", "        let note = 6;\n        assert_eq!(note, 6);")
+    outside = {name: fixture_key(base, f"{file}::tests::{name}")[0] for name in CURRENT_EXE_PATH_ONLY_ENTRIES}
+    edit_file(base, file, "        assert!(std::env::current_exe().is_ok());", "        assert!(std::env::current_exe().is_err());")
+    edit_file(base, file, "expect(\"读得到\").len();\n        assert!(size > 0);", "expect(\"读得到\").len();\n        assert!(size > 1);")
+    inside = {name: fixture_key(base, f"{file}::tests::{name}")[0] for name in CURRENT_EXE_PATH_ONLY_ENTRIES}
+    ok = (all(kept[name][0] is not None and not kept[name][1] for name in CURRENT_EXE_PATH_ONLY_ENTRIES)
+          and all(outside[name] == kept[name][0] for name in CURRENT_EXE_PATH_ONLY_ENTRIES)
+          and all(inside[name] is not None and inside[name] != kept[name][0] for name in CURRENT_EXE_PATH_ONLY_ENTRIES))
+    return ok, (f"算得出键的入口：{ {name: kept[name][0] is not None for name in CURRENT_EXE_PATH_ONLY_ENTRIES} }，拒算 {[sorted(kept[name][1]) for name in CURRENT_EXE_PATH_ONLY_ENTRIES]}（要都不拒算）；"
+                f"改无关的测试后键同前：{[outside[name] == kept[name][0] for name in CURRENT_EXE_PATH_ONLY_ENTRIES]}；"
+                f"改它们自己的函数体后键都变：{[inside[name] != kept[name][0] for name in CURRENT_EXE_PATH_ONLY_ENTRIES]}")
+
+
+CURRENT_EXE_SPAWN_FIXTURE = {
+    "crates/fexs/Cargo.toml": '[package]\nname = "fexs"\n',
+    "crates/fexs/src/lib.rs": '''#[cfg(test)]
+mod tests {
+    use std::process::Command;
+    #[test]
+    fn it_starts_itself_and_names_the_child() {
+        let output = Command::new(std::env::current_exe().expect("路径")).args(["--exact", "tests::the_child_runs_alone"]).output().expect("起得来");
+        assert!(output.status.success());
+    }
+    #[test]
+    fn it_starts_itself_without_naming_a_test() {
+        let output = Command::new(std::env::current_exe().expect("路径")).output().expect("起得来");
+        assert!(output.status.success());
+    }
+    #[test]
+    fn it_takes_the_path_first_and_hands_it_to_command() {
+        let program = std::env::current_exe().expect("路径");
+        let output = Command::new(program).args(["--exact", "tests::the_child_runs_alone"]).output().expect("起得来");
+        assert!(output.status.success());
+    }
+    #[test]
+    fn it_names_a_test_nobody_defines() {
+        let _ = Command::new(std::env::current_exe().expect("路径")).args(["--exact", "tests::missing"]).output();
+    }
+    #[test]
+    fn the_child_runs_alone() {
+        let value = 1;
+        assert_eq!(value, 1);
+    }
+}
+''',
+}
+CURRENT_EXE_SPAWN_CELL = ("Rust：同一函数里起 Command 的 current_exe() 照旧按起自己判：折得出测试名的连边，"
+                          "折不出的（没有 --exact、路径先存进变量再交 Command::new、点名不存在的）拒算 current-exe")
+CURRENT_EXE_SPAWN_KEYED = "it_starts_itself_and_names_the_child"
+CURRENT_EXE_SPAWN_REFUSED = ("it_starts_itself_without_naming_a_test", "it_takes_the_path_first_and_hands_it_to_command", "it_names_a_test_nobody_defines")
+
+
+def current_exe_spawn_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, CURRENT_EXE_SPAWN_FIXTURE)
+    file = "crates/fexs/src/lib.rs"
+    kept, kept_forms = fixture_key(base, f"{file}::tests::{CURRENT_EXE_SPAWN_KEYED}")
+    refused = {name: fixture_key(base, f"{file}::tests::{name}") for name in CURRENT_EXE_SPAWN_REFUSED}
+    found = closure_of(base, f"{file}::tests::{CURRENT_EXE_SPAWN_KEYED}")
+    reached = {unit.name: found.via.get(id(unit), (None, ""))[1] for unit in found.order}.get("tests::the_child_runs_alone")
+    edit_file(base, file, "        let value = 1;\n        assert_eq!(value, 1);", "        let value = 2;\n        assert_eq!(value, 2);")
+    inside = fixture_key(base, f"{file}::tests::{CURRENT_EXE_SPAWN_KEYED}")[0]
+    ok = (kept is not None and reached == "current-exe-child" and inside is not None and inside != kept
+          and all(key is None and forms == {"current-exe"} for key, forms in refused.values()))
+    return ok, (f"点名了测试的入口：键{'有' if kept else '无'}（拒算 {sorted(kept_forms)}）、子进程测试进闭包的规则 {reached}（要 current-exe-child）、改子进程测试的函数体后键变：{inside is not None and inside != kept}；"
+                f"没点名、路径先存变量、点名不存在的：{ {name: (key is not None, sorted(forms)) for name, (key, forms) in refused.items()} }（要都无键、拒算 current-exe）")
+
+
+MANIFEST_DIRECTORY_FIXTURE = {
+    "crates/fdir/Cargo.toml": '[package]\nname = "fdir"\n',
+    "crates/fdir/rules/first.txt": "rule one\n",
+    "crates/fdir/rules/nested/second.txt": "rule two\n",
+    "crates/fdir/src/lib.rs": '''use std::path::Path;
+const MANIFEST: &str = env!("CARGO_MANIFEST_DIR");
+pub fn unrelated_value() -> u32 {
+    1
+}
+pub fn count_rules_directly() -> usize {
+    std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("rules")).expect("列得了").count()
+}
+pub fn count_rules_by_variable() -> usize {
+    let rules = Path::new(env!("CARGO_MANIFEST_DIR")).join("rules");
+    std::fs::read_dir(&rules).expect("列得了").count()
+}
+pub fn count_rules_by_constant() -> usize {
+    let root = Path::new(MANIFEST);
+    let nested = root.join("rules").join("nested");
+    std::fs::read_dir(nested).expect("列得了").count()
+}
+pub fn count_every_crate() -> usize {
+    std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("..")).expect("列得了").count()
+}
+pub fn count_by_climbing_from_a_variable() -> usize {
+    let rules = Path::new(env!("CARGO_MANIFEST_DIR")).join("rules");
+    std::fs::read_dir(rules.parent().expect("有上一级")).expect("列得了").count()
+}
+''',
+}
+MANIFEST_DIRECTORY_CELL = "Rust：清单目录折出 crates/ 之下的目录收成数据目录（直接写、绑 let 变量、经私有常量），目录里一份文件改了键变、闭包外的改了键不变；crates/ 整个与变量上接别的方法的拒算 runtime-path"
+MANIFEST_DIRECTORY_ENTRIES = ("count_rules_directly", "count_rules_by_variable", "count_rules_by_constant")
+
+
+def manifest_directory_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, MANIFEST_DIRECTORY_FIXTURE)
+    file = "crates/fdir/src/lib.rs"
+    kept, problems = {}, []
+    for name in MANIFEST_DIRECTORY_ENTRIES:
+        closure = closure_of(base, f"{file}::{name}")
+        key, _forms = fixture_key(base, f"{file}::{name}")
+        kept[name] = key
+        if key is None or "data-directory" not in {unit.kind for unit in closure.order}:
+            problems.append(f"{name}：键{'有' if key else '无'}、闭包里{'有' if any(unit.kind == 'data-directory' for unit in closure.order) else '没有'}数据目录")
+    refused = {name: fixture_key(base, f"{file}::{name}")[1] for name in ("count_every_crate", "count_by_climbing_from_a_variable")}
+    edit_file(base, file, "    1\n}", "    2\n}")
+    outside = {name: fixture_key(base, f"{file}::{name}")[0] for name in MANIFEST_DIRECTORY_ENTRIES}
+    edit_file(base, "crates/fdir/rules/nested/second.txt", "rule two", "rule two, changed")
+    inside = {name: fixture_key(base, f"{file}::{name}")[0] for name in MANIFEST_DIRECTORY_ENTRIES}
+    ok = (not problems and all(forms == {"runtime-path"} for forms in refused.values()) and outside == kept
+          and all(inside[name] is not None and inside[name] != kept[name] for name in MANIFEST_DIRECTORY_ENTRIES))
+    return ok, (f"没算出键或闭包里没有数据目录：{problems}；crates/ 整个与变量上接 .parent() 的拒算 {refused}（要都是 runtime-path）；"
+                f"改闭包外的函数后键同前：{outside == kept}；改目录里一份文件后三个入口的键都变：{[inside[name] != kept[name] for name in MANIFEST_DIRECTORY_ENTRIES]}")
+
+
+# prune-server/src/preflight.rs 的写法：清单目录绑给 let，一处 .join(参数) 折不出，一处 .join("…") 折出一份文件（crates/singlefs-unit-graph 的 fold_path_chain 逐处折）
+MANIFEST_BINDING_FIXTURE = {
+    "crates/fpre/Cargo.toml": '[package]\nname = "fpre"\n',
+    "crates/fpre/tools/check.py": "print('check')\n",
+    "crates/fpre/src/lib.rs": '''use std::path::Path;
+pub fn check_from_the_manifest_directory(source_relative_to_manifest: &str) -> usize {
+    let manifest_directory = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let source = manifest_directory.join(source_relative_to_manifest);
+    let script = manifest_directory
+        .join("tools")
+        .join("check.py");
+    source.as_os_str().len() + script.as_os_str().len()
+}
+pub fn check_from_the_crates_directory(source_relative_to_manifest: &str) -> usize {
+    let crates_directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let source = crates_directory.join(source_relative_to_manifest);
+    let script = crates_directory.join("fpre").join("tools/check.py");
+    source.as_os_str().len() + script.as_os_str().len()
+}
+pub fn check_through_an_alias() -> usize {
+    let tools: std::path::PathBuf = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools");
+    let renamed = tools;
+    let script = Path::new(renamed).join("check.py");
+    script.as_os_str().len()
+}
+''',
+}
+MANIFEST_BINDING_CELL = ("Rust：清单目录绑给 let 变量的，一处 .join(变量) 折不出、一处折出文件：这个单元拒算 runtime-path、那份文件照记一条 data 读"
+                         "（绑的是清单目录本身与 crates/ 整个都一样）；别名再绑一层、Path::new(别名) 接的链照跟")
+# 入口 → (env! 那一行, 要不要拒算)：每个入口都只读 crates/fpre/tools/check.py 一份，读记在 env! 那一行
+MANIFEST_BINDING_ENTRIES = {"check_from_the_manifest_directory": (3, True), "check_from_the_crates_directory": (11, True), "check_through_an_alias": (17, False)}
+
+
+def manifest_binding_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, MANIFEST_BINDING_FIXTURE)
+    file = "crates/fpre/src/lib.rs"
+    digest = sha256_bytes(MANIFEST_BINDING_FIXTURE["crates/fpre/tools/check.py"].encode("utf-8"))
+    reads = sorted(line for line in dump_lines(base, "rust")[0] if line.startswith(("data\t", "data-directory\t")))
+    want_reads = sorted(f"data\tcrates/fpre/tools/check.py\t{file}:{line}-{line}\t{digest}" for line, _refused in MANIFEST_BINDING_ENTRIES.values())
+    keys = {name: fixture_key(base, f"{file}::{name}") for name in MANIFEST_BINDING_ENTRIES}
+    wrong = {name: (key is not None, sorted(forms)) for name, (key, forms) in keys.items()
+             if (key is None, forms) != (MANIFEST_BINDING_ENTRIES[name][1], {"runtime-path"} if MANIFEST_BINDING_ENTRIES[name][1] else set())}
+    ok = reads == want_reads and not wrong
+    return ok, (f"dump 的数据读 {reads}（要 {want_reads}）；键与拒算对不上的入口 (有没有键, 拒算) {wrong}"
+                f"（要 check_from_the_manifest_directory、check_from_the_crates_directory 无键、拒算 runtime-path，check_through_an_alias 有键、不拒算）")
+
+
+RUST_LEX_CACHE_CELL = "Rust 词法单元的磁盘缓存：同一份文本第二次取缓存、与现切的逐项相同；改一个字符（长度不变）不沿用、切出来的随文本变；缓存文件坏了照常现切"
+
+
+def rust_lex_cache_cell(work):
+    """缓存放在这一格自己的目录里（FUNCTION_UNITS_LEX_CACHE_DIRECTORY 临时换成它）：同一份文本头一趟现切、第二趟取缓存且与 rust_lex 现切的逐项相同；
+    换一份同样长、差一个字符的文本：现切、与它的 rust_lex 逐项相同、与头一份不同（弄坏开关 rust-lex-cache-unverified 下文件名只取长度，这里沿用了头一份）；
+    缓存文件写坏了：照常现切、结果同前。"""
+    first_text = "pub fn answer() -> u32 {\n    // note\n    /// documented\n    41 + 1\n}\n"
+    second_text = first_text.replace("41", "43")
+    previous = os.environ.get(RUST_LEX_CACHE_DIRECTORY_VARIABLE)
+    os.environ[RUST_LEX_CACHE_DIRECTORY_VARIABLE] = os.path.join(work, "rust-lex-cache")
+
+    def trip(text):
+        before = dict(RUST_LEX_CACHE_STATS)
+        result = rust_lex_cached(text)
+        return result, RUST_LEX_CACHE_STATS["lexed"] - before["lexed"], RUST_LEX_CACHE_STATS["reused"] - before["reused"]
+    try:
+        first, second = trip(first_text), trip(first_text)
+        changed, changed_again = trip(second_text), trip(second_text)
+        with open(rust_lex_cache_path(first_text), "w", encoding="utf-8") as handle:
+            handle.write("{broken")   # 不是 zlib 压缩的 json
+        damaged = trip(first_text)
+    finally:
+        if previous is None:
+            os.environ.pop(RUST_LEX_CACHE_DIRECTORY_VARIABLE, None)
+        else:
+            os.environ[RUST_LEX_CACHE_DIRECTORY_VARIABLE] = previous
+    direct_first, direct_second = rust_lex(first_text), rust_lex(second_text)
+    ok = (direct_second != direct_first and first == (direct_first, 1, 0) and second == (direct_first, 0, 1) and changed == (direct_second, 1, 0)
+          and changed_again == (direct_second, 0, 1) and damaged == (direct_first, 1, 0))
+    return ok, (f"头一趟 (现切 {first[1]}、取缓存 {first[2]}，同 rust_lex {first[0] == direct_first})、第二趟 ({second[1]}、{second[2]}，{second[0] == direct_first})、"
+                f"换文本 ({changed[1]}、{changed[2]}，同它的 rust_lex {changed[0] == direct_second})、再一趟 ({changed_again[1]}、{changed_again[2]}，{changed_again[0] == direct_second})、"
+                f"缓存文件写坏 ({damaged[1]}、{damaged[2]}，{damaged[0] == direct_first})（要 头一趟 (1、0)、第二趟 (0、1)、换文本 (1、0)、再一趟 (0、1)、写坏 (1、0)，结果都同现切）")
+
+
+DIRECTORY_CLOSURE_LINE_CELL = "命令行 closure：数据目录单元按读它的那一处列（data-directory 加目录、读它的文件与行、目录指纹），不打成 <目录>:1-<文件数>"
+
+
+def directory_closure_line_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, MANIFEST_DIRECTORY_FIXTURE)
+    file = "crates/fdir/src/lib.rs"
+    closure = closure_of(base, f"{file}::count_rules_directly")
+    got = [line for line in closure_unit_lines(closure) if line.startswith("data-directory\t")]
+    line = next(number for number, text in enumerate(MANIFEST_DIRECTORY_FIXTURE[file].splitlines(), 1) if 'join("rules")' in text)
+    want = [f"data-directory\tcrates/fdir/rules\t{file}:{line}-{line}\t{directory_fingerprint(base, 'crates/fdir/rules')[0]}"]
+    return got == want, f"打出的数据目录行 {got}（要 {want}）"
 
 
 def no_refusal_cell(fixture, entry):
@@ -9893,6 +13104,17 @@ def preflight_loader_cell(work):
     return True, ""
 
 
+def selftest_git_steps(work, steps):
+    """自证造 git 仓：逐条起 git <step>（不读系统与用户的 git 配置，HOME 指 work，提交人写死）→ 头一条退非 0 的那一句，全退 0 交 None。"""
+    environment = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": work, "LC_ALL": "C", "GIT_CONFIG_NOSYSTEM": "1"}
+    git = ["git", "-c", "user.name=selftest", "-c", "user.email=selftest@example.invalid", "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
+    for step in steps:
+        completed = subprocess.run(git + step, env=environment, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
+        if completed.returncode != 0:
+            return f"git {' '.join(step[:3])} 退 {completed.returncode}：{completed.stderr.strip()[:200]}"
+    return None
+
+
 def preflight_worktree_cell(work):
     """git worktree 里没有规范副本（.gitignore 挡着）：source / import 两份装载器都解到主仓那一份。"""
     canonical = sys.modules["project_preflight"].shared_preflight_directory()
@@ -9902,13 +13124,10 @@ def preflight_worktree_cell(work):
     loader_tree(main, canonical)
     with open(os.path.join(main, ".gitignore"), "w", encoding="utf-8") as handle:
         handle.write("/.claude/singlefs-ai-sop/\n")
-    environment = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": work, "LC_ALL": "C", "GIT_CONFIG_NOSYSTEM": "1"}
-    git = ["git", "-c", "user.name=selftest", "-c", "user.email=selftest@example.invalid", "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
-    for step in (["init", "-q", main], ["-C", main, "add", ".gitignore", ".claude/scripts"], ["-C", main, "commit", "-q", "-m", "loaders"],
-                 ["-C", main, "worktree", "add", "-q", "--detach", linked]):
-        completed = subprocess.run(git + step, env=environment, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
-        if completed.returncode != 0:
-            return False, f"git {' '.join(step[:3])} 退 {completed.returncode}：{completed.stderr.strip()[:200]}"
+    problem = selftest_git_steps(work, (["init", "-q", main], ["-C", main, "add", ".gitignore", ".claude/scripts"],
+                                        ["-C", main, "commit", "-q", "-m", "loaders"], ["-C", main, "worktree", "add", "-q", "--detach", linked]))
+    if problem is not None:
+        return False, problem
     if os.path.exists(os.path.join(linked, ".claude", "singlefs-ai-sop")):
         return False, "worktree 里不该有规范副本，样本没造对"
     want = os.path.realpath(os.path.join(main, ".claude", "singlefs-ai-sop", "scripts", "preflight.py"))
@@ -9942,12 +13161,34 @@ JUDGING_ENTRY_TOKEN = re.compile(r'"judge:([^"$\s]+?|\.claude/gate\.d/\$STAGE_NA
 
 
 def module_literal(root, path, name):
-    """root 里 path 那份 python 的模块级赋值 name 的字面值（ast.literal_eval）；找不到抛 FunctionUnitsError。"""
+    """root 里 path 那份 python 的模块级赋值 name 的字面值：字面量，或由它前面模块级字面量赋值的名字与 + 拼成的式子（JUDGING_ENTRIES = A + (...)）；
+    找不到、折不出抛 FunctionUnitsError（弄坏开关 judging-entry-literals-unfolded 下只认字面量）。"""
     with open(os.path.join(root, path), encoding="utf-8") as handle:
         tree = ast.parse(handle.read(), filename=path)
+    known = {}
+
+    def fold(node):
+        if "judging-entry-literals-unfolded" in active_breaks():
+            return ast.literal_eval(node)
+        if isinstance(node, ast.Name) and node.id in known:
+            return known[node.id]
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            return fold(node.left) + fold(node.right)
+        return ast.literal_eval(node)
+
     for statement in tree.body:
-        if isinstance(statement, ast.Assign) and any(isinstance(target, ast.Name) and target.id == name for target in statement.targets):
-            return ast.literal_eval(statement.value)
+        names = [target.id for target in statement.targets if isinstance(target, ast.Name)] if isinstance(statement, ast.Assign) else []
+        if not names:
+            continue
+        try:
+            value = fold(statement.value)
+        except (ValueError, TypeError, SyntaxError, RecursionError) as error:
+            if name in names:
+                raise FunctionUnitsError(f"{path} 里模块级的 {name} 折不成字面值（只认字面量、前面模块级字面量的名字与 +）：{error}") from error
+            continue
+        known.update((target, value) for target in names)
+        if name in names:
+            return value
     raise FunctionUnitsError(f"{path} 里没有模块级的 {name}（判法入口的登记挪了：照文件头「判法入口的登记」改 registered_judging_entries）")
 
 
@@ -9993,20 +13234,44 @@ IMPORT_TIME_EDITS = (
 IMPORT_TIME_CONTROL = ("程序入口（main-guard）", "tool/entry.py", "    sys.exit(judge())\n", "    sys.exit(judge() + 3)\n")
 IMPORT_TIME_EXIT_CELL = "python：import 时执行的模块级 import、赋值、类头与 def 缺省值改了让程序退出码变的，入口的键都变（键不变而退出码变的必红，对照那一种必须认出）"
 IMPORT_TIME_CLASS_CELL = "python：只因 import 时执行收进来的类头不算被点名，类里的 __init__ 改了不作废"
-REAL_CUT_CELL = "真仓：不走 EXCLUDED_PROGRAM_EDGES 登记的那几条子进程边（内存包装起 host-resources.py、resource_release_broadcast.py），少掉的单元只经那几条边可达（把被起的程序都当另几个根一起收，与不切的逐个相同）"
-REAL_ENTRIES_CELL = "真仓：判法入口从登记现取（registered_judging_entries），形式化入口与包装入口都在里面、都认得出"
+EXCLUDED_EDGE_PYTHON_CELL = "不走的子进程边（夹具）：登记了的 python 单元起的那一条不连、同一个单元起的另一个程序照连、不登记时那一条照连"
+EXCLUDED_EDGE_SHELL_CELL = "不走的子进程边（夹具）：登记了的 shell 函数起的那一条不连、同一个函数起的另一个程序照连、不登记时那一条照连"
+# 每个入口单元起两个程序：hint 是自证期间登记成不走的那一条，kept 不登记；EXCLUDED_PROGRAM_EDGES 平时的内容不进这一格
+EXCLUDED_EDGE_FIXTURE = {
+    "tool/entry.py": ("import os\nimport subprocess\nimport sys\n\nHERE = os.path.dirname(os.path.abspath(__file__))\n\n\n"
+                      "def judge():\n    subprocess.run([sys.executable, os.path.join(HERE, \"kept.py\")], check=False)\n"
+                      "    return subprocess.run([sys.executable, os.path.join(HERE, \"hint.py\")], check=False)\n"),
+    "tool/kept.py": "def work():\n    return 1\n\n\nif __name__ == \"__main__\":\n    work()\n",
+    "tool/hint.py": "def work():\n    return 2\n\n\nif __name__ == \"__main__\":\n    work()\n",
+    "tool/run.sh": '''#!/usr/bin/env bash
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+launch() {
+  bash "$here/kept.sh"
+  bash "$here/hint.sh"
+}
+launch
+''',
+    "tool/kept.sh": "#!/usr/bin/env bash\necho kept\n",
+    "tool/hint.sh": "#!/usr/bin/env bash\necho hint\n",
+}
+EXCLUDED_EDGE_PYTHON_ENTRY = "tool/entry.py::judge"
+EXCLUDED_EDGE_SHELL_ENTRY = "tool/run.sh::launch"
+EXCLUDED_EDGE_FIXTURE_EDGES = {
+    ("tool/entry.py", "judge", "tool/hint.py"): "夹具：python 单元起的程序，只打提示",
+    ("tool/run.sh", "launch", "tool/hint.sh"): "夹具：shell 函数起的程序，只打提示",
+}
+REAL_ENTRIES_CELL = "真仓：判法入口从登记现取（registered_judging_entries），形式化入口在里面、都认得出"
 REAL_TREE_IGNORED = shutil.ignore_patterns("__pycache__", "fixtures", "kb", "target")
 REAL_FORMAL_SCRIPT = "scripts/gate/verus-proof-check.py"
-REAL_WRAPPER_ENTRY = "scripts/mutation/broad-mutation.py::Runner.escalate_step"   # 升档那一步经内存包装起命令：闭包里有包装与它排队时载入的模块
-# 真仓上的四格：(格名, 入口取哪一个, 文件, 原文, 改成)；原文在那份文件里要恰好一次，对不上这一格红、出路是照新原文改这里
+# 真仓上的三格，入口都是形式化入口（check_proof 经 reuse_checks.ReuseSentinel 等点到 lib_reuse_checks.py，那份模块因此被载入）：
+# (格名, 文件, 原文, 改成)；原文在那份文件里要恰好一次，对不上这一格红、出路是照新原文改这里
 REAL_IMPORT_TIME_EDITS = (
-    ("真仓：改 .claude/hooks/lib_long_run.py 一个模块级 import，形式化入口的键变", "formal", ".claude/hooks/lib_long_run.py", "\nimport re\n", "\nimport re, json\n"),
-    ("真仓：改 scripts/hosts/memory_peaks_lib.py 的 import subprocess，包装入口的键变", "wrapper", "scripts/hosts/memory_peaks_lib.py",
-     "\nimport subprocess\n", "\nimport subprocess, shlex\n"),
-    ("真仓：改 scripts/hosts/host-dispatch.py 的一个类头（SelftestWorld），包装入口的键变", "wrapper", "scripts/hosts/host-dispatch.py",
-     "\nclass SelftestWorld:\n", "\nclass SelftestWorld:\n    IMPORT_TIME_SELFTEST = 1\n"),
-    ("真仓：改一个没人调的 def 的缺省值（scripts/hosts/host-dispatch.py 的 decide），包装入口的键变", "wrapper", "scripts/hosts/host-dispatch.py",
-     "def decide(settings, request, prediction, peer, plan=False):", "def decide(settings, request, prediction, peer, plan=None):"),
+    ("真仓：改 scripts/gate/lib_reuse_checks.py 一个模块级 import，形式化入口的键变", "scripts/gate/lib_reuse_checks.py", "\nimport re\n", "\nimport re, json\n"),
+    ("真仓：改 scripts/gate/lib_reuse_checks.py 的一个类头（ReuseSentinel），形式化入口的键变", "scripts/gate/lib_reuse_checks.py",
+     "\nclass ReuseSentinel:\n", "\nclass ReuseSentinel:\n    IMPORT_TIME_SELFTEST = 1\n"),
+    ("真仓：改一个没人调的 def 的缺省值（scripts/gate/lib_reuse_checks.py 的 write_target_last_run），形式化入口的键变", "scripts/gate/lib_reuse_checks.py",
+     'def write_target_last_run(script_key, target, exit_code, test_filter="", target_file=""):',
+     'def write_target_last_run(script_key, target, exit_code, test_filter=None, target_file=""):'),
 )
 LIBRARY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 _REAL_IMPORT_TIME_RESULTS = {}
@@ -10040,33 +13305,34 @@ def import_time_exit_cell(work):
     return blind == want, f"键不变而退出码变的（要恰好是对照那一种 {want}）：{blind}；{'；'.join(lines)}"
 
 
-def real_tree(work):
-    """本仓的 scripts/ 与 .claude/（不带 fixtures、kb、__pycache__）拷进临时目录：改真文件的几格在拷贝上改，不碰本仓。"""
-    tree = os.path.join(work, "real")
+def real_tree(work, tree=None):
+    """本仓的 scripts/ 与 .claude/（不带 fixtures、kb、__pycache__）拷进临时目录（tree 没给是 <work>/real；给了的拷进它底下，它可以已经在）：
+    改真文件的几格在拷贝上改，不碰本仓。"""
+    tree = tree or os.path.join(work, "real")
     for top in ("scripts", ".claude"):
         shutil.copytree(os.path.join(LIBRARY_ROOT, top), os.path.join(tree, top), ignore=REAL_TREE_IGNORED, symlinks=True)
     return tree
 
 
 def real_entries(root):
-    """(形式化入口, 包装入口)：都从登记现取；形式化入口取 verus-proof-check.py 登记的头一个，包装入口要在登记里。"""
+    """形式化入口：从登记现取，取 verus-proof-check.py 登记的头一个。"""
     entries = registered_judging_entries(root)
     formal = next((entry for entry in entries if entry.startswith(REAL_FORMAL_SCRIPT + "::")), None)
-    if formal is None or REAL_WRAPPER_ENTRY not in entries:
-        raise AssertionError(f"登记现取的 {len(entries)} 个判法入口里没有 {REAL_FORMAL_SCRIPT} 的入口或 {REAL_WRAPPER_ENTRY}：{entries}")
-    return formal, REAL_WRAPPER_ENTRY
+    if formal is None:
+        raise AssertionError(f"登记现取的 {len(entries)} 个判法入口里没有 {REAL_FORMAL_SCRIPT} 的入口：{entries}")
+    return formal
 
 
 def real_import_time_results():
-    """真仓四格一起量（一棵拷贝、两个入口的原键各算一次）：{格名: (通过, 说明)}；同一个进程、同一组弄坏开关只量一次。"""
+    """真仓三格一起量（一棵拷贝、形式化入口的原键算一次）：{格名: (通过, 说明)}；同一个进程、同一组弄坏开关只量一次。"""
     breaks = os.environ.get(BREAK_VARIABLE, "")
     if breaks not in _REAL_IMPORT_TIME_RESULTS:
         results = {}
         with tempfile.TemporaryDirectory(prefix="function-units-real-tree-") as work:
             tree = real_tree(work)
-            entries = dict(zip(("formal", "wrapper"), real_entries(tree)))
-            base_keys = {role: closure_key(closure_of(tree, entry), allow_refused=True)[0] for role, entry in entries.items()}
-            for name, role, path, old, new in REAL_IMPORT_TIME_EDITS:
+            entry = real_entries(tree)
+            base_key = closure_key(closure_of(tree, entry), allow_refused=True)[0]
+            for name, path, old, new in REAL_IMPORT_TIME_EDITS:
                 absolute = os.path.join(tree, path)
                 with open(absolute, encoding="utf-8") as handle:
                     original = handle.read()
@@ -10076,11 +13342,11 @@ def real_import_time_results():
                 with open(absolute, "w", encoding="utf-8") as handle:
                     handle.write(original.replace(old, new))
                 try:
-                    key = closure_key(closure_of(tree, entries[role]), allow_refused=True)[0]
+                    key = closure_key(closure_of(tree, entry), allow_refused=True)[0]
                 finally:
                     with open(absolute, "w", encoding="utf-8") as handle:
                         handle.write(original)
-                results[name] = (key != base_keys[role], f"{entries[role]} 的键改前 {base_keys[role]}、改后 {key}")
+                results[name] = (key != base_key, f"{entry} 的键改前 {base_key}、改后 {key}")
         _REAL_IMPORT_TIME_RESULTS[breaks] = results
     return _REAL_IMPORT_TIME_RESULTS[breaks]
 
@@ -10091,52 +13357,865 @@ def real_import_time_cell(name):
     return judge
 
 
-def real_cut_cell(work):
-    """形式化入口：不切（弄坏开关 program-edge-exclusions-ignored）的闭包、切了的闭包、切了之后把登记的每个被起的程序都当另一个根一起收的闭包；
-    少掉的不空、切了的闭包里没有被起的程序的单元、一起收的与不切的逐个相同（少掉的单元只经登记的那几条边可达）。"""
-    tree = real_tree(work)
-    formal, _wrapper = real_entries(tree)
-    targets = sorted({target for _source, _unit_name, target in EXCLUDED_PROGRAM_EDGES})
-    edges = "；".join(f"{source} 的 {unit_name} 起 {target}" for source, unit_name, target in sorted(EXCLUDED_PROGRAM_EDGES))
-    language, path, qualified = parse_entry(tree, formal)
+def excluded_edge_cell(entry, hint, kept):
+    """夹具上证 EXCLUDED_PROGRAM_EDGES 的机制：入口单元起 hint 与 kept 两个程序。不登记时两个都进闭包；自证期间临时把夹具里 hint 那一条边登记进表
+    （EXCLUDED_EDGE_FIXTURE_EDGES），登记了的 hint 不进闭包、没登记的 kept 照进；跑完把表还原。弄坏开关 program-edge-exclusions-ignored 下登记了也照连，
+    program-edge-exclusions-shell-ignored 下 shell 函数起的登记了也照连。"""
+    def judge(work):
+        base = os.path.join(work, "tree")
+        write_tree(base, EXCLUDED_EDGE_FIXTURE)
 
-    def members(extra=(), uncut=False):
-        previous = os.environ.get(BREAK_VARIABLE)
-        if uncut:
-            os.environ[BREAK_VARIABLE] = ",".join(item for item in [previous, "program-edge-exclusions-ignored"] if item)
+        def closure_files():
+            return {unit.file for unit in closure_of(base, entry).order}
+
+        uncut = closure_files()
+        registered = dict(EXCLUDED_PROGRAM_EDGES)
+        EXCLUDED_PROGRAM_EDGES.update(EXCLUDED_EDGE_FIXTURE_EDGES)
         try:
-            under = [place for place in DEFAULT_SCRIPT_DIRECTORIES if os.path.isdir(os.path.join(tree, place))]
-            script = ScriptClosure(tree, list(dict.fromkeys(under + [posixpath.dirname(path) or "."])))
-            module = script.python.module(path)
-            starts = [unit for unit in module.units if unit.name == qualified and not unit.data]
-            for target in extra:
-                script.push_program(target, None)
-            return {unit.text() for unit in script.run(starts).order}
+            cut = closure_files()
         finally:
-            if previous is None:
-                os.environ.pop(BREAK_VARIABLE, None)
-            else:
-                os.environ[BREAK_VARIABLE] = previous
+            EXCLUDED_PROGRAM_EDGES.clear()
+            EXCLUDED_PROGRAM_EDGES.update(registered)
+        ok = {hint, kept} <= uncut and kept in cut and hint not in cut
+        return ok, (f"{entry}：不登记时 {sorted(uncut & {hint, kept})}、登记 {hint} 那一条边之后 {sorted(cut & {hint, kept})}"
+                    f"（要：不登记时 {sorted({hint, kept})} 都在，登记之后只剩 {kept}）")
+    return judge
 
-    cut, uncut, joint = members(), members(uncut=True), members(extra=targets)
-    lost = uncut - cut
-    targets_left = {target: sum(1 for line in cut if f"\t{target}:" in line) for target in targets}
-    targets_lost = {target: sum(1 for line in lost if f"\t{target}:" in line) for target in targets}
-    ok = bool(lost) and not any(targets_left.values()) and all(targets_lost.values()) and joint == uncut
-    return ok, (f"{formal}：不切 {len(uncut)} 个、切了 {len(cut)} 个、少掉 {len(lost)} 个；切了还剩的被起程序单元 {targets_left}、少掉的里各有 {targets_lost}；"
-                f"把 {'、'.join(targets)} 当另几个根一起收比不切多 {len(joint - uncut)} 个、少 {len(uncut - joint)} 个（边：{edges}）")
+
+# 「键不变而退出码变」必红那一格（夹具）：quiet.py 与 leak.py 都起 hint.py，两条边自证期间都登记成不走；改坏 hint.py 之后
+# quiet.py 吞掉它的退出码、leak.py 把它的退出码当自己的。两个的键都不变，退出码只有 leak.py 变，判法必须认出 leak.py
+EXCLUDED_EDGE_EXIT_CELL = "不走的子进程边（夹具）：切了边的程序改坏后包装退出码变了而键不变的必红（对照 leak.py 必须认出），吞掉退出码的 quiet.py 不红"
+EXCLUDED_EDGE_EXIT_HEAD = "import os\nimport subprocess\nimport sys\n\nHERE = os.path.dirname(os.path.abspath(__file__))\n\n\n"
+EXCLUDED_EDGE_EXIT_LAUNCH = "subprocess.run([sys.executable, os.path.join(HERE, \"hint.py\")], check=False)"
+EXCLUDED_EDGE_EXIT_FIXTURE = {
+    "tool/hint.py": "def work():\n    return 0\n\n\nif __name__ == \"__main__\":\n    work()\n",
+    "tool/quiet.py": EXCLUDED_EDGE_EXIT_HEAD + f"def run():\n    {EXCLUDED_EDGE_EXIT_LAUNCH}\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(run())\n",
+    "tool/leak.py": EXCLUDED_EDGE_EXIT_HEAD + f"def run():\n    return {EXCLUDED_EDGE_EXIT_LAUNCH}.returncode\n\n\nif __name__ == \"__main__\":\n    sys.exit(run())\n",
+}
+EXCLUDED_EDGE_EXIT_WRAPPERS = ("tool/quiet.py", "tool/leak.py")
+EXCLUDED_EDGE_EXIT_EDGES = {(wrapper, "run", "tool/hint.py"): "夹具：自证期间登记成不走" for wrapper in EXCLUDED_EDGE_EXIT_WRAPPERS}
+EXCLUDED_EDGE_EXIT_EDIT = ("tool/hint.py", "    work()\n", "    raise RuntimeError(\"selftest\")\n")
+
+
+def excluded_edge_exit_cell(work):
+    """自证期间临时登记 EXCLUDED_EDGE_EXIT_EDGES；每个包装在原树与改坏 hint.py 的树上各量（键、python3 <包装> 的退出码），
+    退出码变了而键不变的记下，要恰好是 leak.py。弄坏开关 excluded-edge-exit-unmeasured 下改坏之后不重跑、退出码照改前记。"""
+    base, edited = os.path.join(work, "base"), os.path.join(work, "edited")
+    write_tree(base, EXCLUDED_EDGE_EXIT_FIXTURE)
+    write_tree(edited, EXCLUDED_EDGE_EXIT_FIXTURE)
+    edit_file(edited, *EXCLUDED_EDGE_EXIT_EDIT)
+    registered = dict(EXCLUDED_PROGRAM_EDGES)
+    EXCLUDED_PROGRAM_EDGES.update(EXCLUDED_EDGE_EXIT_EDGES)
+    blind, lines = [], []
+    try:
+        for wrapper in EXCLUDED_EDGE_EXIT_WRAPPERS:
+            entry = f"{wrapper}::run"
+            before_key = closure_key(closure_of(base, entry), allow_refused=True)[0]
+            after_key = closure_key(closure_of(edited, entry), allow_refused=True)[0]
+            before_exit = run_fixture_program(base, wrapper)
+            after_exit = before_exit if "excluded-edge-exit-unmeasured" in active_breaks() else run_fixture_program(edited, wrapper)
+            lines.append(f"{wrapper}：退出码 {before_exit}→{after_exit}，键{'变' if after_key != before_key else '不变'}")
+            if after_exit != before_exit and after_key == before_key:
+                blind.append(wrapper)
+    finally:
+        EXCLUDED_PROGRAM_EDGES.clear()
+        EXCLUDED_PROGRAM_EDGES.update(registered)
+    want = ["tool/leak.py"]
+    return blind == want, f"键不变而退出码变的（要恰好是 {want}）：{blind}；{'；'.join(lines)}"
+
+
+# 登记的准入边（ADMISSION_EDGE）的三格，都在本仓上量（准入异常那一格起本仓的跑法脚本，只走到计划那一步、编译换成假的）
+ADMISSION_EDGE_KEY = "E183/h2"
+ADMISSION_EDGE_ANOMALY_CELL = ("不走的子进程边（真仓 E183 准入）：准入这条路上的异常（崩、被杀、退 77、退 3、退 0 不打行、打别的行）"
+                               "只让计划那一步退非 0、不起编译、不写计划，读数出不来")
+ADMISSION_EDGE_STRIP_CELL = "不走的子进程边（真仓 E183 准入）：准入往标准输出打的只有 E7INPUT 行（键算出、拒算两样），判法读产物前去掉这几行之后读数一行不差"
+ADMISSION_EDGE_REACH_CELL = "不走的子进程边（真仓 E183 准入）：切边前后少掉的单元都在 admission.py 当程序起的闭包里（只经这条边可达），且确实少了 admission.py"
+# 准入异常那一格的假准入：(名, 正文)。每个都先在 ADMISSION_EDGE_MARK 指的文件里记一笔，证明计划那一步真问到了它
+ADMISSION_EDGE_ANOMALIES = (
+    ("崩（抛异常）", "raise RuntimeError(\"selftest\")\n"),
+    ("被 SIGKILL 杀", "import signal\nos.kill(os.getpid(), signal.SIGKILL)\n"),
+    ("退 77", "import sys\nsys.exit(77)\n"),
+    ("退 3", "import sys\nsys.exit(3)\n"),
+    ("退 0 什么都不打", "pass\n"),
+    ("退 0 打别的行", "print(\"selftest junk\")\n"),
+)
+# 弄坏开关 admission-edge-admitted-sample 下多跑的那一个：放行，计划往下走、起编译，这一格必须红
+ADMISSION_EDGE_ADMITTED = ("放行（弄坏开关 admission-edge-admitted-sample 加的）",
+                           "print(\"E7INPUT name=input_fingerprint key=E183/h2 sha256=\" + \"0123456789abcdef\" * 4 + \" units=2\")\n")
+ADMISSION_EDGE_MARK_LINE = "import os\nopen(os.environ[\"ADMISSION_EDGE_MARK\"], \"w\").write(\"asked\")\n"
+ADMISSION_EDGE_FAKE_CARGO = "#!/usr/bin/env bash\necho \"$*\" >> \"$ADMISSION_EDGE_CARGO_CALLS\"\nexit 1\n"
+ADMISSION_EDGE_DROPPED_VARIABLES = ("CARGO_TARGET_DIR", "MULTI_HOST_RUN_PEER_SCRATCH")
+ADMISSION_EDGE_READINGS = ("E7RESULT name=selftest_reading value=1", "E7RESULT name=done emitted=1")
+
+
+def admission_edge_anomaly_cell(work):
+    """每个假准入各起一次本仓跑法脚本的计划那一步（服务给的变量清掉、只设计划那一步要的；运行根、计划目录、产物目录都在临时目录；
+    PATH 最前面放记一笔就退 1 的假 cargo）。每一个都要：问到了准入、退非 0、计划目录空、没起编译、没出产物。"""
+    script = os.path.join(LIBRARY_ROOT, ADMISSION_EDGE[0])
+    if not os.path.isfile(script):
+        return False, f"{ADMISSION_EDGE[0]} 不在：准入边的起点没了，从 EXCLUDED_PROGRAM_EDGES 删掉这一条、连同这三格"
+    fakes = os.path.join(work, "fakes")
+    os.makedirs(fakes)
+    cargo = os.path.join(fakes, "cargo")
+    with open(cargo, "w", encoding="utf-8") as handle:
+        handle.write(ADMISSION_EDGE_FAKE_CARGO)
+    os.chmod(cargo, 0o755)
+    samples = ADMISSION_EDGE_ANOMALIES + ((ADMISSION_EDGE_ADMITTED,) if "admission-edge-admitted-sample" in active_breaks() else ())
+    clean = {name: value for name, value in os.environ.items()
+             if not name.endswith("_BREAK") and not name.startswith("TASK_SERVER_") and name not in ADMISSION_EDGE_DROPPED_VARIABLES}
+    unasked, leaked, lines = [], [], []
+    for number, (name, body) in enumerate(samples):
+        cell = os.path.join(work, f"sample-{number}")
+        plan, scratch, product = (os.path.join(cell, part) for part in ("plan", "tmp", "product"))
+        os.makedirs(plan)
+        os.makedirs(scratch)
+        admission, mark, calls = (os.path.join(cell, part) for part in ("admission.py", "asked", "cargo-calls"))
+        with open(admission, "w", encoding="utf-8") as handle:
+            handle.write(ADMISSION_EDGE_MARK_LINE + body)
+        environment = dict(clean, PATH=fakes + os.pathsep + clean.get("PATH", ""), TASK_SERVER_SHARD_PHASE="plan",
+                           TASK_SERVER_SHARD_PLAN_DIRECTORY=plan, E183_RUN_ROOT=os.path.join(cell, "run-root"), E183_PRODUCT_DIRECTORY=product,
+                           E183_ADMISSION_SCRIPT=admission, ADMISSION_EDGE_MARK=mark, ADMISSION_EDGE_CARGO_CALLS=calls, TMPDIR=scratch)
+        try:
+            completed = subprocess.run(["bash", script, "run"], env=environment, capture_output=True, text=True, timeout=120)
+            exit_code, said = completed.returncode, (completed.stdout + completed.stderr).strip().splitlines()[-1:]
+        except subprocess.TimeoutExpired:
+            exit_code, said = None, ["120 秒没退"]
+        planned = sorted(os.listdir(plan))
+        produced = os.path.isdir(product) and bool(os.listdir(product))
+        compiled = os.path.exists(calls)
+        lines.append(f"{name}：退 {exit_code}，计划目录 {planned or '空'}，{'起了编译' if compiled else '没起编译'}，{'出了产物' if produced else '没出产物'}，末行 {said}")
+        if not os.path.exists(mark):
+            unasked.append(name)
+        elif exit_code in (0, None) or planned or compiled or produced:
+            leaked.append(name)
+    return not unasked and not leaked, (f"没问到准入的（跑法脚本在问准入之前就退了，这一格量不到）：{unasked}；往下走了的：{leaked}"
+                                        f"（要都空）；{'；'.join(lines)}")
+
+
+def admission_edge_strip_cell(_work):
+    """载入本仓 admission.py（另起一份模块），实验键换成假的（键算出、拒算两样；不收闭包、不起 rustc）、「输入没变」换成一律变了，
+    起 command_experiment 收它的标准输出：每一行都要以 E7INPUT 起头；接上假读数过判法去头的那条命令（admission.py 的 REPLAY_STRIP_HEADER_COMMAND），
+    剩下的要与假读数逐行相同。弄坏开关 admission-edge-header-unstripped 下不去头。"""
+    import contextlib
+    import io
+    import types
+    path = os.path.join(LIBRARY_ROOT, ADMISSION_EDGE[2])
+    specification = importlib.util.spec_from_file_location("admission_for_excluded_edge_selftest", path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    module.judge_inputs_unchanged = lambda _root, _key, _fingerprint: (False, "（自证：不比上一份产物）")
+    problems, lines = [], []
+    for label, key in (("键算出", "ab" * 32), ("拒算", None)):
+        fake = types.SimpleNamespace(key=key, composition=[], refusals=["selftest-form\tselftest.py:1\tselftest"])
+        module.experiment_key = lambda _root, _key, fake=fake: (fake, "自证假键")
+        printed, messages = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(printed), contextlib.redirect_stderr(messages):
+            exit_code = module.command_experiment([LIBRARY_ROOT, ADMISSION_EDGE_KEY])
+        header = printed.getvalue().splitlines()
+        composed = "".join(line + "\n" for line in header + list(ADMISSION_EDGE_READINGS))
+        if "admission-edge-header-unstripped" in active_breaks():
+            stripped = composed
+        else:
+            stripped = subprocess.run(["sh", "-c", module.REPLAY_STRIP_HEADER_COMMAND], input=composed, capture_output=True, text=True,
+                                      timeout=60).stdout
+        stray = [line for line in header if not line.startswith(module.HEADER_PREFIX)]
+        lines.append(f"{label}：退 {exit_code}，打了 {header}，不以 E7INPUT 起头的 {stray}，去头之后 {stripped.splitlines()}")
+        if exit_code != module.EXIT_ADMITTED or not header or stray or stripped.splitlines() != list(ADMISSION_EDGE_READINGS):
+            problems.append(f"{label}（准入的说明末行 {messages.getvalue().strip().splitlines()[-1:]}）")
+    return not problems, f"判错的：{problems}（要空；去头之后要恰好是 {list(ADMISSION_EDGE_READINGS)}）；{'；'.join(lines)}"
+
+
+def admission_edge_reach_cell(work):
+    """本仓 scripts/ 与 .claude/ 的拷贝上收跑法脚本整份的闭包：登记着（切边）与临时摘掉这一条（不切）各一次，少掉的单元都要在
+    admission.py 当程序起的闭包里，少掉的里面要有 admission.py 的单元，切边之后不许多出单元。弄坏开关 admission-edge-reach-unmeasured 下
+    不量 admission.py 的闭包（当它是空的）。"""
+    tree = real_tree(work)
+    entry, _unit, program = ADMISSION_EDGE
+
+    def names(closure):
+        return {(unit.file, unit.name) for unit in closure.order}
+
+    cut_closure = closure_of(tree, entry)
+    cut = names(cut_closure)
+    registered = dict(EXCLUDED_PROGRAM_EDGES)
+    EXCLUDED_PROGRAM_EDGES.pop(ADMISSION_EDGE, None)
+    try:
+        uncut = names(closure_of(tree, entry))
+    finally:
+        EXCLUDED_PROGRAM_EDGES.clear()
+        EXCLUDED_PROGRAM_EDGES.update(registered)
+    reach = set() if "admission-edge-reach-unmeasured" in active_breaks() else names(closure_of(tree, program))
+    removed, added = uncut - cut, cut - uncut
+    outside = sorted(removed - reach)
+    cut_program = any(file == program for file, _name in removed)
+    return cut_program and not outside and not added, (
+        f"{entry}：不切 {len(uncut)} 个单元、切边 {len(cut)} 个，少掉 {len(removed)} 个（{'有' if cut_program else '没有'} {program} 的单元），"
+        f"少掉的不在 {program} 当程序起的闭包里的 {len(outside)} 个 {outside[:5]}，切边后多出的 {sorted(added)[:5]}；切边后拒算 {len(cut_closure.refusal_list())} 处 "
+        f"{[refusal.text() for refusal in cut_closure.refusal_list()[:3]]}（要：有 {program} 的单元、另两样都空）")
+
+
+# main-guard 的两种写法与几段合一（文件头「Python 闭包：import 时执行的模块级语句」；欠账 C947）那三格
+MAIN_GUARD_IMPORT_CELL = ("python：被 import 的模块里 if __name__ == \"__main__\" and …: 那一段不进闭包（自证分支不收），"
+                          "块外的模块级语句与认不出的形态（带 else、__name__ 那一项不在最左）照收")
+MAIN_GUARD_PROGRAM_CELL = "python：被起的程序里每一段 main-guard 都收（if __name__ == \"__main__\" and …: 那一段与后面另一段），起它的参数不是字面量也连自证分支"
+MAIN_GUARD_REAL_CELL = ("真仓：以 scripts/hosts/memory_peaks_lib.py 的 command_key 为判法入口，闭包不收它的自证（run_self_test、self_test_cells），"
+                        "改 self_test_cells 的函数体判法单元指纹不变")
+# library.py 照 memory_peaks_lib.py 的写法：if __name__ == "__main__" and globals().get("__file__"): 里按 sys.argv 分派到自证；
+# fallback.py 是认不出、要照收的两种（带 else、__name__ 那一项不在最左）；twice.py 有两段 main-guard
+MAIN_GUARD_FIXTURE = {
+    "tool/library.py": ("import sys\n\nHOOKS = []\nLIMIT = 3\n\n\ndef work():\n    return LIMIT\n\n\ndef registered():\n    return 1\n\n\n"
+                        "def self_check():\n    return 0\n\n\nHOOKS.append(registered)\n\n"
+                        "if __name__ == \"__main__\" and globals().get(\"__file__\"):\n    if sys.argv[1:] == [\"--selftest\"]:\n"
+                        "        sys.exit(self_check())\n    sys.exit(work())\n"),
+    "tool/fallback.py": ("def flag():\n    return False\n\n\ndef otherwise():\n    return 1\n\n\ndef leftover():\n    return 2\n\n\n"
+                         "def value():\n    return 0\n\n\nif __name__ == \"__main__\" and flag():\n    value()\nelse:\n    otherwise()\n\n"
+                         "if flag() and __name__ == \"__main__\":\n    leftover()\n"),
+    "tool/twice.py": ("import sys\n\n\ndef early():\n    return 1\n\n\ndef late():\n    return 2\n\n\n"
+                      "if __name__ == \"__main__\" and len(sys.argv) > 1:\n    early()\n\nif __name__ == \"__main__\":\n    late()\n"),
+    "tool/user.py": "import fallback\nimport library\n\n\ndef judge():\n    return library.work() + fallback.value()\n",
+    "tool/launcher.py": ("import os\nimport subprocess\nimport sys\n\nHERE = os.path.dirname(os.path.abspath(__file__))\n\n\n"
+                         "def launch(flag):\n    subprocess.run([sys.executable, os.path.join(HERE, \"twice.py\")], check=False)\n"
+                         "    return subprocess.run([sys.executable, os.path.join(HERE, \"library.py\"), flag], check=False).returncode\n"),
+}
+MAIN_GUARD_REAL_LIBRARY = "scripts/hosts/memory_peaks_lib.py"
+MAIN_GUARD_REAL_ENTRY = f"{MAIN_GUARD_REAL_LIBRARY}::command_key"   # 峰值表的键：库里不碰自证的一个函数；做入口时库的 module-body 照收、main-guard 不收
+MAIN_GUARD_REAL_SELFTEST_UNITS = ("run_self_test", "self_test_cells")
+MAIN_GUARD_REAL_EDITED = "self_test_cells"   # 改它的函数体：它只经 main-guard 里的 run_self_test 到，闭包不收它，指纹就不变
+
+
+def main_guard_closure_names(closure):
+    return {(unit.file, unit.name) for unit in closure.order}
+
+
+def main_guard_fixture_cell(entry, wanted, unwanted):
+    """夹具上收 entry 的闭包：wanted 里的（文件, 限定名）都要在，unwanted 里的一个都不许在。"""
+    def judge(work):
+        base = os.path.join(work, "tree")
+        write_tree(base, MAIN_GUARD_FIXTURE)
+        names = main_guard_closure_names(closure_of(base, entry))
+        missing, extra = sorted(set(wanted) - names), sorted(set(unwanted) & names)
+        return not missing and not extra, f"{entry} 的闭包里缺 {missing}、多 {extra}（要：{sorted(wanted)} 都在，{sorted(unwanted)} 都不在）"
+    return judge
+
+
+def merged_judging_closure(root, entries):
+    """crates 变异判法那一套入口（JUDGING_ENTRIES）从一个 ScriptClosure 一起收：lib_mutation_units.judging_units 逐个入口各收再合起来，
+    一起收只多不少（类与属性的收窄跨入口共用），这里不含的单元逐个入口收也不含。"""
+    parsed = [parse_entry(root, entry) for entry in entries]
+    for entry, (language, _path, qualified) in zip(entries, parsed):
+        if language != "python" or not qualified:
+            raise AssertionError(f"crates 变异的判法入口 {entry} 不是 python 的 <文件>::<限定名>")
+    under = [place for place in DEFAULT_SCRIPT_DIRECTORIES if os.path.isdir(os.path.join(root, place))]
+    script = ScriptClosure(root, list(dict.fromkeys(under + [posixpath.dirname(path) or "." for _language, path, _qualified in parsed])))
+    units = []
+    for _language, path, qualified in parsed:
+        module = script.python.module(path)
+        found = [unit for unit in module.units if unit.name == qualified and not unit.data] if module is not None else []
+        if len(found) != 1:
+            raise AssertionError(f"{path} 里限定名 {qualified} 命中 {len(found)} 个单元（要恰好一个）")
+        script.closure.refusals.update(module.refusals)
+        units += found
+    return script.run(units)
+
+
+def judging_units_fingerprint(closure):
+    """照 lib_mutation_units.judging_units 的口径：闭包里的单元按（文件, 种类, 限定名, 起行）去重，（种类, 指纹）的多重集排好连起来取 sha256。"""
+    members = {(unit.file, unit.kind, unit.name, unit.first_line): unit for unit in closure.order}
+    return sha256_text("".join(sorted(f"{unit.kind}\t{unit.fingerprint}\n" for unit in members.values())))
+
+
+def via_chain(closure, unit):
+    """闭包里一个单元经哪几步收进来（closure.via 一路往回到入口；内联脚本的单元不在 via 里，走到它为止）：诊断用。"""
+    steps, seen = [f"{unit.file}:{unit.name}"], set()
+    while id(unit) in closure.via and id(unit) not in seen:
+        seen.add(id(unit))
+        via, rule = closure.via[id(unit)]
+        if via is None:
+            break
+        steps.append(f"←{rule}— {via.file}:{via.name}")
+        unit = via
+    return " ".join(steps)
+
+
+def body_statement_inserted(text, name):
+    """text 里模块级 def name 的函数体头一句之前插一句赋值（这个单元的指纹变）→ 改过的原文；找不到这个 def、函数体与 def 在同一行、插完解不开交 None。"""
+    for node in ast.parse(text).body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name and node.body[0].lineno > node.lineno:
+            rows = text.split("\n")
+            row = rows[node.body[0].lineno - 1]
+            rows.insert(node.body[0].lineno - 1, row[:len(row) - len(row.lstrip())] + "selftest_inserted = 1")
+            edited = "\n".join(rows)
+            try:
+                ast.parse(edited)
+            except SyntaxError:
+                return None
+            return edited
+    return None
+
+
+def main_guard_real_cell(work):
+    """真仓拷贝上，以 memory_peaks_lib.py 的 command_key 为判法入口收闭包：它的 run_self_test、self_test_cells 不许在（自证只在库末尾 main-guard 里，
+    入口在库里时库的 module-body 照收、main-guard 不收）；再改拷贝里 self_test_cells 的函数体，判法单元指纹不变。"""
+    tree = real_tree(work)
+    entries = [MAIN_GUARD_REAL_ENTRY]
+    closure = merged_judging_closure(tree, entries)
+    notes = [f"入口 {MAIN_GUARD_REAL_ENTRY} 收 {len(closure.order)} 个单元"]
+    unwanted = [unit for unit in closure.order if unit.file == MAIN_GUARD_REAL_LIBRARY and unit.name in MAIN_GUARD_REAL_SELFTEST_UNITS]
+    for unit in sorted(unwanted, key=Unit.sort_key):
+        notes.append(f"不该在的 {unit.file}:{unit.name} 的来路 {via_chain(closure, unit)}")
+    path = os.path.join(tree, MAIN_GUARD_REAL_LIBRARY)
+    with open(path, encoding="utf-8") as handle:
+        edited = body_statement_inserted(handle.read(), MAIN_GUARD_REAL_EDITED)
+    if edited is None:
+        return False, "；".join(notes + [f"{MAIN_GUARD_REAL_LIBRARY} 里找不到能插一句的模块级 def {MAIN_GUARD_REAL_EDITED}：照新原文改 MAIN_GUARD_REAL_EDITED"])
+    before = judging_units_fingerprint(closure)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(edited)
+    after = judging_units_fingerprint(merged_judging_closure(tree, entries))
+    notes.append(f"改拷贝里 {MAIN_GUARD_REAL_LIBRARY} 的 {MAIN_GUARD_REAL_EDITED}：判法单元指纹 {before}→{after}")
+    return not unwanted and before == after, "；".join(notes)
 
 
 def real_entries_cell(work):
     tree = real_tree(work)
     entries = registered_judging_entries(tree)
-    formal, wrapper = real_entries(tree)
+    formal = real_entries(tree)
     unknown = []
     for entry in entries:
         language, path, qualified = parse_entry(tree, entry)
         if not os.path.isfile(os.path.join(tree, path)):
             unknown.append(entry)
-    return not unknown and len(entries) > 2, f"登记现取 {len(entries)} 个判法入口（形式化入口 {formal}、包装入口 {wrapper}），文件不在的 {unknown}"
+    return not unknown and len(entries) > 2, f"登记现取 {len(entries)} 个判法入口（形式化入口 {formal}），文件不在的 {unknown}"
+
+
+REAL_JUDGING_CLOSURES_CELL = "真仓：登记的每个判法入口的闭包都不拒算（拒算的那一路判定一条都写不进库），夹具里的 globals() 查找判得出来"
+JUDGING_REFUSAL_FIXTURE = {"tool/judge.py": 'def verdict(row):\n    original = globals()["verdict"]\n    return original is not None and row\n\n\ndef judge(row):\n    return verdict(row)\n'}
+
+
+def judging_entry_refusals_of(job):
+    """(入口, 拒算行)：一个入口的闭包里算进判法单元指纹的拒算——crates 变异的入口全算，别的入口去掉 lib_verdict_library.py 的 NOT_JUDGING_FILES 那几份
+    （照 judging_unit_key 与 lib_mutation_units.judging_units 的口径；弄坏开关 judging-entry-refusals-ignored 下一条都不报）。"""
+    root, entry, not_judging = job
+    closure = closure_of(root, entry)
+    if "judging-entry-refusals-ignored" in active_breaks():
+        return entry, []
+    return entry, sorted(refusal.text() for refusal in closure.refusals if refusal.file not in not_judging)
+
+
+def judging_entry_refusal_workers(environment, registration_file=None):
+    """judging_entry_refusals 开几个进程：这份库所在仓的 scripts/hosts/heavy_threads.py 的 default_heavy_threads（SINGLEFS_THREAD_CAP 设了照它，
+    没设取登记的每台默认重活线程数 .claude/heavy-thread-default；取法只在那一处，这里不另解析；按路径载入、不进 sys.modules），
+    取不到照它抛 HeavyThreadDefaultError，不退回按核数算。registration_file 只给自证换登记文件。
+    弄坏开关 judging-entry-workers-head-word：照改前的读法取登记文件的头一个词，读不出就不用登记的数（改前退回按核数算；这里退回 1 个进程，
+    不调取核数的函数，门禁 code-tooling 的 heavy-thread-defaults 格不许）。那份文件头一个词是 #，总是读不出。"""
+    if "judging-entry-workers-head-word" in active_breaks():
+        try:
+            with open(registration_file or os.path.join(LIBRARY_ROOT, ".claude", "heavy-thread-default"), encoding="utf-8") as handle:
+                return int(handle.read().split()[0])
+        except (OSError, ValueError, IndexError):
+            return 1
+    specification = importlib.util.spec_from_file_location("heavy_threads_for_judging_entry_refusals",
+                                                           os.path.join(LIBRARY_ROOT, "scripts", "hosts", "heavy_threads.py"))
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return int(module.default_heavy_threads(environment, registration_file=registration_file))
+
+
+def judging_entry_refusals(root, entries, not_judging_by_entry):
+    """{入口: 拒算行}，只列有拒算的；按每台默认重活线程数并行（judging_entry_refusal_workers；一个入口要几秒到十几秒）。"""
+    import concurrent.futures
+    workers = judging_entry_refusal_workers(os.environ)
+    jobs = [(root, entry, not_judging_by_entry.get(entry, ())) for entry in entries]
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, min(workers, len(jobs)))) as pool:
+        results = list(pool.map(judging_entry_refusals_of, jobs))
+    return {entry: refusals for entry, refusals in results if refusals}
+
+
+def real_judging_closures_cell(work):
+    tree = real_tree(work)
+    entries = registered_judging_entries(tree)
+    not_judging = tuple(module_literal(tree, "scripts/crash/lib_verdict_library.py", "NOT_JUDGING_FILES"))
+    mutation_entries = set(module_literal(tree, "scripts/mutation/crates-mutation-rows.py", "JUDGING_ENTRIES"))
+    real = judging_entry_refusals(tree, entries, {entry: () if entry in mutation_entries else not_judging for entry in entries})
+    fixture = os.path.join(work, "fixture")
+    write_tree(fixture, JUDGING_REFUSAL_FIXTURE)
+    probe = judging_entry_refusals(fixture, ["tool/judge.py::judge"], {})
+    probe_forms = {line.split("\t")[1] for lines in probe.values() for line in lines}
+    return not real and probe_forms == {"globals-lookup"}, (f"真仓 {len(entries)} 个判法入口里拒算的 {len(real)} 个：{real}（照拒算那一行改成算得出键的写法：拒算的判定不入库、下一趟照判）；"
+                                      f"夹具里 globals() 查找判出 {probe}（要判出一条）")
+
+
+# 跨轮缓存的登记（文件头「跨轮缓存的登记」）那两格
+CROSS_RUN_CACHE_CELL = ("真仓：跨轮缓存登记表（cross_run_cache_registry）里的每一份，在 TMPDIR 指到一个临时目录、GATE_CROSS_RUN_TMPDIR 没设、在 git 仓里"
+                        "（.git 是目录，或 git worktree 里 .git 是文件）时现取的位置都不落在 TMPDIR 之下；worktree 里落在 git 目录底下的几份与主仓共用 common-dir 那一处")
+CROSS_RUN_CACHE_SCAN_CELL = ("真仓：提到 GATE_CROSS_RUN_TMPDIR 的脚本都登记进跨轮缓存表或在不登记表里写明为什么，不登记表里的每一份都在、都还提到它；"
+                             "夹具里没登记的一份判得出来")
+CROSS_RUN_CACHE_PROBE_SECONDS = 300
+CROSS_RUN_CACHE_MENTION = "GATE_CROSS_RUN_TMPDIR"
+CROSS_RUN_CACHE_SCANNED_DIRECTORIES = ("scripts", ".claude/gate.d", ".claude/scripts", ".claude/hooks", "task-server", "prune-server")
+CROSS_RUN_CACHE_SCANNED_SUFFIXES = (".py", ".sh", ".bash")
+CROSS_RUN_CACHE_SKIPPED_DIRECTORIES = frozenset(("fixtures", "__pycache__", "target", ".git", "node_modules"))
+# 提到 GATE_CROSS_RUN_TMPDIR 而不往那里放跨轮缓存的脚本：{路径: 为什么不登记}；只缩不涨，指不到的、不再提到它的这一格判红
+CROSS_RUN_CACHE_NOT_CACHES = {
+    "scripts/hosts/test-environment-check.py": "只把它当 gate.sh 开跑前的临时目录、在那里扫残留，不往里放跨轮的东西",
+    "scripts/kb/verify-citations.sh": "文本缓存每趟自己 mktemp -d、跑完连目录删；这个名字只出现在弄坏开关（改前的样子）与自证里",
+}
+CROSS_RUN_CACHE_SCAN_FIXTURE = {
+    "scripts/sample/keeps-cache.sh": '#!/usr/bin/env bash\ncache_directory="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/sample-cache"\nmkdir -p "$cache_directory"\n',
+    "scripts/sample/plain.sh": "#!/usr/bin/env bash\necho plain\n",
+}
+
+
+def cross_run_cache_layout(work, tree, label):
+    """另建空目录 <work>/<label> 当 TMPDIR，摘掉 GATE_CROSS_RUN_TMPDIR 与几份缓存自己的改放处变量，起子进程跑 tree 里这份库的命令行 cross-run-caches
+    → (过没过, 说明, {名字: 现取的路径})：子进程退 0、它的 tempfile.gettempdir() 是那个目录、登记的每一份都算得出、没有一份落在它之下才算过。"""
+    temporary = os.path.join(work, label)
+    os.makedirs(temporary)
+    overrides = {"GATE_CROSS_RUN_TMPDIR", RUST_LEX_CACHE_DIRECTORY_VARIABLE,
+                 module_literal(tree, "scripts/mutation/crates-mutation-rows.py", "JUDGING_CACHE_DIRECTORY_VARIABLE")}
+    environment = {name: value for name, value in os.environ.items() if name not in overrides}
+    environment["TMPDIR"] = temporary
+    work_root = work_root_library()
+    # 拷贝里没有 multi-host.env：数据根没经环境给时，把本仓多机配置的位置带过去（harness-test-environment 那一份缓存放数据根下）
+    environment.setdefault(work_root.MULTI_HOST_CONFIGURATION_VARIABLE, work_root.multi_host_configuration_path(os.environ))
+    try:
+        completed = subprocess.run([sys.executable, "-B", os.path.join(tree, "scripts", "gate", "lib_function_units.py"), "cross-run-caches"],
+                                   capture_output=True, text=True, errors="surrogateescape", env=environment, stdin=subprocess.DEVNULL,
+                                   timeout=CROSS_RUN_CACHE_PROBE_SECONDS)
+    except subprocess.TimeoutExpired:
+        return False, f"{label}：子进程 {CROSS_RUN_CACHE_PROBE_SECONDS} 秒没退（拷贝里的这份库或它载入的 crates-mutation-rows.py 卡住）", {}
+    output = completed.stdout.splitlines()
+    temporary_root = os.path.realpath(temporary)
+    seen_tempdirs = [line.split("\t", 1)[1] for line in output if line.startswith("tempdir\t")]
+    rows = [fields for fields in (line.split("\t", 3) for line in output if line.startswith(("cache\t", "refused-cache\t"))) if len(fields) == 4]
+
+    def under_temporary(path):
+        resolved = os.path.realpath(path)
+        return resolved == temporary_root or resolved.startswith(temporary_root + os.sep)
+
+    under = [f"{name}（{script}）→ {path}" for kind, name, script, path in rows if kind == "cache" and under_temporary(path)]
+    refused = [f"{name}（{script}）：{reason}" for kind, name, script, reason in rows if kind == "refused-cache"]
+    registered = [name for name, _script, _locate in cross_run_cache_registry()]
+    tempdir_held = len(seen_tempdirs) == 1 and os.path.realpath(seen_tempdirs[0]) == temporary_root
+    ok = completed.returncode == 0 and tempdir_held and [fields[1] for fields in rows] == registered and not under and not refused
+    listed = "；".join(f"{name} → {path}" for _kind, name, _script, path in rows)
+    return ok, (f"{label}：子进程退 {completed.returncode}；它的 tempfile.gettempdir() {seen_tempdirs}（要恰好一行 {temporary_root}）；"
+                f"现取 {len(rows)} 份（登记 {len(registered)} 份）：{listed}；落在 TMPDIR 之下的 {under}；算不出的 {refused}；"
+                f"stderr 末尾：{completed.stderr.strip()[-300:]}"), {name: path for kind, name, _script, path in rows if kind == "cache"}
+
+
+def cross_run_cache_cell(work):
+    """两趟 cross_run_cache_layout：本仓 scripts/ 与 .claude/ 拷进临时目录（real_tree）、建空的 .git 起一趟；git 造一个主仓与它的 worktree
+    （worktree 里 .git 是文件），拷进 worktree 再起一趟。两趟都要过；头一趟落在 <拷贝>/.git 底下的那几份（至少一份），第二趟要落在主仓 .git
+    （git common-dir）底下同一相对路径。弄坏开关 cross-run-cache-under-tmpdir 下 cross_run_cache_directory 放回 TMPDIR，两趟都有落进去的；
+    cross-run-cache-git-directory-only 下只认 .git 是目录，worktree 那一趟本库两份与 crates-mutation-rows.py 那一份落进那一趟的 TMPDIR；都判错。"""
+    tree = real_tree(work)
+    os.makedirs(os.path.join(tree, ".git"))
+    plain_ok, plain_detail, plain_paths = cross_run_cache_layout(work, tree, "tmpdir")
+    main, linked = os.path.join(work, "worktree-main"), os.path.join(work, "worktree-linked")
+    problem = selftest_git_steps(work, (["init", "-q", main], ["-C", main, "commit", "-q", "--allow-empty", "-m", "base"],
+                                        ["-C", main, "worktree", "add", "-q", "--detach", linked]))
+    if problem is not None:
+        return False, f"{plain_detail}；造 worktree：{problem}"
+    if not os.path.isfile(os.path.join(linked, ".git")):
+        return False, f"{plain_detail}；git worktree add 造出的 {linked}/.git 不是文件，样本没造对"
+    real_tree(work, linked)
+    linked_ok, linked_detail, linked_paths = cross_run_cache_layout(work, linked, "worktree-tmpdir")
+    plain_git, main_git = os.path.realpath(os.path.join(tree, ".git")), os.path.realpath(os.path.join(main, ".git"))
+    in_git = {name: os.path.relpath(os.path.realpath(path), plain_git) for name, path in plain_paths.items()
+              if os.path.realpath(path).startswith(plain_git + os.sep)}
+    unshared = sorted(f"{name} → {linked_paths.get(name)}（要 {os.path.join(main_git, relative)}）" for name, relative in in_git.items()
+                      if name not in linked_paths or os.path.realpath(linked_paths[name]) != os.path.join(main_git, relative))
+    ok = plain_ok and linked_ok and bool(in_git) and not unshared
+    return ok, (f"{plain_detail}；{linked_detail}；.git 是目录那一趟落在 .git 底下的 {sorted(in_git)}（要至少一份）；"
+                f"worktree 那一趟没落到主仓 common-dir 同一处的 {unshared}")
+
+
+def cross_run_cache_mentions(root):
+    """root 下 CROSS_RUN_CACHE_SCANNED_DIRECTORIES 里（跳过 CROSS_RUN_CACHE_SKIPPED_DIRECTORIES）提到 GATE_CROSS_RUN_TMPDIR 的 .py / .sh / .bash，相对 root、排好序。
+    弄坏开关 cross-run-cache-mentions-unscanned：交空表。"""
+    if "cross-run-cache-mentions-unscanned" in active_breaks():
+        return []
+    found = []
+    for top in CROSS_RUN_CACHE_SCANNED_DIRECTORIES:
+        for directory, subdirectories, names in os.walk(os.path.join(root, top)):
+            subdirectories[:] = sorted(name for name in subdirectories if name not in CROSS_RUN_CACHE_SKIPPED_DIRECTORIES)
+            for name in sorted(names):
+                if not name.endswith(CROSS_RUN_CACHE_SCANNED_SUFFIXES):
+                    continue
+                path = os.path.join(directory, name)
+                try:
+                    with open(path, "rb") as handle:
+                        mentioned = CROSS_RUN_CACHE_MENTION.encode("ascii") in handle.read()
+                except OSError:
+                    continue
+                if mentioned:
+                    found.append(os.path.relpath(path, root))
+    return sorted(found)
+
+
+def cross_run_cache_scan_cell(work):
+    """本仓里提到 GATE_CROSS_RUN_TMPDIR 的脚本都是登记表里的、或在 CROSS_RUN_CACHE_NOT_CACHES 里写明为什么不登记；不登记表里的每一份都在、都还提到它；
+    夹具里一份没登记的（scripts/sample/keeps-cache.sh）判得出来。弄坏开关 cross-run-cache-mentions-unscanned 下一份都扫不出，这一格判错。"""
+    registered = {script for _name, script, _locate in cross_run_cache_registry()}
+    mentioned = cross_run_cache_mentions(LIBRARY_ROOT)
+    unaccounted = [path for path in mentioned if path not in registered and path not in CROSS_RUN_CACHE_NOT_CACHES]
+    stale = [path for path in sorted(CROSS_RUN_CACHE_NOT_CACHES) if path not in mentioned]
+    fixture = os.path.join(work, "fixture")
+    write_tree(fixture, CROSS_RUN_CACHE_SCAN_FIXTURE)
+    probe = cross_run_cache_mentions(fixture)
+    ok = not unaccounted and not stale and probe == ["scripts/sample/keeps-cache.sh"]
+    return ok, (f"本仓提到 {CROSS_RUN_CACHE_MENTION} 的 {len(mentioned)} 份：{mentioned}；没登记也没写明为什么的 {unaccounted}"
+                f"（往 cross_run_cache_registry 加一行，或不是缓存的写进 CROSS_RUN_CACHE_NOT_CACHES）；不登记表里指不到或不再提到它的 {stale}（删掉那一行）；"
+                f"夹具里扫出 {probe}（要恰好 scripts/sample/keeps-cache.sh）")
+
+
+# 两个互相收进对方闭包的入口（键里的 entry 行，entry_key_lines）：一个 trait impl 里的两个方法（方法连 impl 头、impl 头点名类型、类型照 R-隐式收它的
+# trait impl 全部成员，两个方法收到的单元一模一样；core 的 impl BlockDevice for FileBackedBlockDevice 的样子），与 python 里互相调用的两个 def
+ENTRY_UNIT_KEY_CELL = "键：两个互相收进对方闭包的入口，键不同（一个 trait impl 里的两个方法、python 里互相调用的两个 def：闭包的单元多重集相同，键各是各的）"
+ENTRY_UNIT_KEY_RUST_FILE = "crates/fsiblings/src/lib.rs"
+ENTRY_UNIT_KEY_FIXTURE = {
+    "crates/fsiblings/Cargo.toml": '[package]\nname = "fsiblings"\n',
+    ENTRY_UNIT_KEY_RUST_FILE: '''pub trait SampleStore {
+    fn fill(&self, count: u64) -> u64;
+    fn width(&self) -> u64;
+}
+
+pub struct SampleDevice {
+    pub width: u64,
+}
+
+impl SampleStore for SampleDevice {
+    fn fill(&self, count: u64) -> u64 {
+        count.min(self.width)
+    }
+
+    fn width(&self) -> u64 {
+        self.width
+    }
+}
+''',
+    "tool/pair.py": "def ping(count):\n    return pong(count - 1) if count > 0 else 0\n\n\ndef pong(count):\n    return ping(count - 1) if count > 0 else 1\n",
+}
+ENTRY_UNIT_KEY_PAIRS = (
+    ("Rust", (f"{ENTRY_UNIT_KEY_RUST_FILE}::<impl SampleStore for SampleDevice>::fill", f"{ENTRY_UNIT_KEY_RUST_FILE}::<impl SampleStore for SampleDevice>::width")),
+    ("python", ("tool/pair.py::ping", "tool/pair.py::pong")),
+)
+
+
+def entry_unit_key_cell(work):
+    """每一对入口先核夹具造对了（两个闭包的单元多重集相同），再核两把键都算得出、不相同。弄坏开关 key-entry-units-dropped 下键里不出 entry 行，两把键相同，这一格判错。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, ENTRY_UNIT_KEY_FIXTURE)
+    problems, lines = [], []
+    for language, entries in ENTRY_UNIT_KEY_PAIRS:
+        closures = [closure_of(base, entry) for entry in entries]
+        multisets = [sorted(f"{unit.kind}\t{unit.fingerprint}" for unit in closure.order) for closure in closures]
+        keys = [closure_key(closure)[0] for closure in closures]
+        lines.append(f"{language}：两个闭包{'相同' if multisets[0] == multisets[1] else '不同'}（各 {len(multisets[0])}、{len(multisets[1])} 个单元），键 {keys}")
+        if multisets[0] != multisets[1]:
+            problems.append(f"{language} 两个入口的闭包不同：夹具没造出互相收进对方闭包的样子，照 {entries} 的闭包改夹具")
+        elif None in keys:
+            problems.append(f"{language} 两个入口的键算不出")
+        elif keys[0] == keys[1]:
+            problems.append(f"{language} 两个入口的键相同：键里没有入口单元自己（entry_key_lines）")
+    return not problems, "；".join(problems + lines)
+
+
+# unit_graph_key 的 entry 行（照 crates/singlefs-unit-graph 的 reuse_key 与 entry_key_lines）：一个 trait impl 里的方法入口（entry 行连 impl 头），
+# 一个挂了两个文档测试的条目（文档测试入口记所挂条目的全部文档测试，照 Rust 那一份 resolve_entry_units 文档测试那一支）
+ENTRY_LINES_SHAPE_CELL = ("键：unit_graph_key 照 crates/singlefs-unit-graph 的 reuse_key 带 entry 行（数据行之后、工具链行之前，排序去重；impl 方法入口连 impl 头；"
+                          "文档测试入口记所挂条目的全部文档测试、各一行，闭包从它们一起收）")
+ENTRY_LINES_RUST_KEYS_CELL = ("键：夹具上 unit_graph_key 与 crates/singlefs-unit-graph 的 unit-graph closure 打的键逐字相同"
+                              "（一个 impl 方法入口、一个文档测试入口；Rust 那一侧是录下的键 ENTRY_LINES_RUST_KEYS）")
+ENTRY_LINES_FILE = "crates/fentrylines/src/lib.rs"
+ENTRY_LINES_METHOD = "<impl Shape for Square>::area"
+ENTRY_LINES_HOST_LINE = "host: x86_64-unknown-linux-gnu"
+ENTRY_LINES_FIXTURE = {
+    "crates/fentrylines/Cargo.toml": '[package]\nname = "fentrylines"\nversion = "0.1.0"\nedition = "2021"\n',
+    ENTRY_LINES_FILE: '''pub trait Shape {
+    fn area(&self) -> u64;
+}
+
+pub struct Square {
+    pub side: u64,
+}
+
+impl Shape for Square {
+    fn area(&self) -> u64 {
+        self.side * self.side
+    }
+}
+
+/// Twice the value.
+///
+/// ```
+/// assert_eq!(fentrylines::documented(2), 4);
+/// ```
+///
+/// ```
+/// assert_eq!(fentrylines::documented(3), 6);
+/// ```
+pub fn documented(value: u64) -> u64 {
+    value * 2
+}
+''',
+}
+# Rust 那一侧录下的键（unit-graph closure 打的 key 行）：ENTRY_LINES_FIXTURE 用 write_tree 写出成一棵树（<根>），带 entry 行的那一版 crates/singlefs-unit-graph 编的
+#   unit-graph closure <根> fentrylines::Square::area --toolchain-line 'host: x86_64-unknown-linux-gnu'               → "impl-method"
+#   unit-graph closure <根> fentrylines::documented --target doctest --toolchain-line 'host: x86_64-unknown-linux-gnu'  → "doctest"
+# 还没录的写 None（那一格判红、说明里打出 python 这一边的键）。夹具或 Rust 那一份的键的写法改了就重录。
+ENTRY_LINES_RUST_KEYS = {
+    "impl-method": "e74ceaa6abb0198ba10e62a909dccfc1e321557f4775cae362a3481a5a8762e7",
+    "doctest": "3597d88a25cc2c3fad7d6f222e704d2ea205ccd9fe3c41ab81451c81391e6670",
+}
+
+
+def entry_lines_closures(work):
+    """写出 ENTRY_LINES_FIXTURE → (documented 挂的文档测试单元（按 Unit.sort_key）, {"impl-method" / "doctest": (入口单元, 闭包)})；
+    文档测试入口取头一个文档测试。夹具里 documented 挂的不是两个就抛 AssertionError。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, ENTRY_LINES_FIXTURE)
+    workspace = RustWorkspace(base)
+    doctests = sorted((unit for unit in workspace.file(ENTRY_LINES_FILE).units if unit.kind == "doctest"), key=Unit.sort_key)
+    if len(doctests) != 2:
+        raise AssertionError(f"夹具里 documented 要挂两个文档测试，实际 {[unit.name for unit in doctests]}：照 ENTRY_LINES_FIXTURE 改")
+    closures = {}
+    for label, qualified in (("impl-method", ENTRY_LINES_METHOD), ("doctest", doctests[0].name)):
+        unit, target_id = workspace.find_entry(ENTRY_LINES_FILE, qualified, None)
+        closures[label] = (unit, rust_closure_of(workspace, unit, target_id))
+    return doctests, closures
+
+
+def entry_lines_shape_cell(work):
+    """两个入口的 unit_graph_key_lines：entry 行在 entry-target-kind、cfg、unit、data 行之后、toolchain 行之前，排好序、不重；
+    impl 方法入口一行（fn 连 impl 头）；文档测试入口两行（各是一个 doctest），Closure.entry_units 恰好是那两个文档测试、闭包里两个都在。"""
+    doctests, closures = entry_lines_closures(work)
+    problems, notes = [], []
+    want_kinds = {"impl-method": [["fn", "impl"]], "doctest": [["doctest"], ["doctest"]]}
+    for label, (_unit, closure) in closures.items():
+        lines = unit_graph_key_lines(closure, [ENTRY_LINES_HOST_LINE])
+        entry_positions = [index for index, line in enumerate(lines) if line.startswith("entry\t")]
+        entry_rows = [lines[index] for index in entry_positions]
+        before = [index for index, line in enumerate(lines) if line.startswith(("entry-target-kind\t", "cfg\t", "unit\t", "data\t"))]
+        after = [index for index, line in enumerate(lines) if line.startswith("toolchain\t")]
+        kinds = [row.split("\t")[1::2] for row in entry_rows]
+        notes.append(f"{label}：entry 行的种类链 {kinds}，在第 {entry_positions} 行（共 {len(lines)} 行）")
+        if kinds != want_kinds[label]:
+            problems.append(f"{label} 的 entry 行种类链要 {want_kinds[label]}")
+        if entry_positions and not (max(before) < min(entry_positions) and max(entry_positions) < min(after)):
+            problems.append(f"{label} 的 entry 行不在数据行之后、工具链行之前")
+        if entry_rows != sorted(set(entry_rows)):
+            problems.append(f"{label} 的 entry 行没排序去重")
+    doctest_closure = closures["doctest"][1]
+    recorded = sorted(unit.name for unit in doctest_closure.entry_units)
+    collected = [unit.name for unit in doctests if id(unit) not in doctest_closure.members]
+    if recorded != sorted(unit.name for unit in doctests) or collected:
+        problems.append(f"文档测试入口记的入口 {recorded}，要 documented 挂的全部 {[unit.name for unit in doctests]}；闭包里缺 {collected}")
+    return not problems, "；".join(problems + notes)
+
+
+def entry_lines_rust_keys_cell(work):
+    """两个入口的 unit_graph_key 与 ENTRY_LINES_RUST_KEYS 录下的 Rust 键逐字相同；还没录的判红，说明里打出 python 这一边的键。"""
+    _doctests, closures = entry_lines_closures(work)
+    problems, notes = [], []
+    for label, (_unit, closure) in closures.items():
+        key, refusals = unit_graph_key(closure, [ENTRY_LINES_HOST_LINE])
+        recorded = ENTRY_LINES_RUST_KEYS.get(label)
+        notes.append(f"{label}：python {key or '拒算：' + '；'.join(refusal.text() for refusal in refusals[:2])}，Rust 录下的 {recorded}")
+        if recorded is None:
+            problems.append(f"{label} 的 Rust 键还没录（照 ENTRY_LINES_RUST_KEYS 上面的注释用 unit-graph closure 录）")
+        elif key != recorded:
+            problems.append(f"{label} 两份的键不同")
+    return not problems, "；".join(problems + notes)
+
+
+# 标准写法的 main-guard 带 else：if 那一支是 main-guard，else 那一支在被 import 时执行、进 module-body
+MAIN_GUARD_ELSE_CELL = ("python：if __name__ == \"__main__\": … else: … 被 import 时 else 那一支照收、if 那一支不收；被当程序起时 if 那一支照收")
+MAIN_GUARD_ELSE_FIXTURE = {
+    "tool/either.py": ("import sys\n\n\ndef main_work():\n    return 1\n\n\ndef imported_work():\n    return 2\n\n\ndef value():\n    return 0\n\n\n"
+                       "if __name__ == \"__main__\":\n    sys.exit(main_work())\nelse:\n    imported_work()\n"),
+    "tool/importer.py": "import either\n\n\ndef judge():\n    return either.value()\n",
+    "tool/runner.py": ("import os\nimport subprocess\nimport sys\n\nHERE = os.path.dirname(os.path.abspath(__file__))\n\n\n"
+                       "def run():\n    return subprocess.run([sys.executable, os.path.join(HERE, \"either.py\")], check=False).returncode\n"),
+}
+
+
+def main_guard_else_cell(work):
+    """import either 的 judge：imported_work（else 那一支调的）在、main_work（if 那一支调的）与 <main-guard> 不在；
+    起 either.py 的 run：main_work 在（if 那一支照旧是 main-guard、当程序起时连）。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, MAIN_GUARD_ELSE_FIXTURE)
+    imported = main_guard_closure_names(closure_of(base, "tool/importer.py::judge"))
+    launched = main_guard_closure_names(closure_of(base, "tool/runner.py::run"))
+    missing = sorted({("tool/either.py", "imported_work"), ("tool/either.py", "value")} - imported)
+    extra = sorted({("tool/either.py", "main_work"), ("tool/either.py", "<main-guard>")} & imported)
+    unlaunched = sorted({("tool/either.py", "main_work"), ("tool/either.py", "<main-guard>")} - launched)
+    return not missing and not extra and not unlaunched, (f"被 import 时闭包里缺 {missing}、多 {extra}；被当程序起时缺 {unlaunched}")
+
+
+# 判法入口拒算的并行进程数（judging_entry_refusal_workers）
+JUDGING_ENTRY_WORKERS_CELL = ("判法入口拒算的并行进程数：没设 SINGLEFS_THREAD_CAP 取登记的每台默认重活线程数（头一行是注释的登记文件照样取到），"
+                              "设了照它，不退回按核数算")
+
+
+def judging_entry_workers_cell(work):
+    """自证造一份登记文件（头一行注释，再一行「7  # 理由」）：没设 SINGLEFS_THREAD_CAP 取到 7，设成 3 取到 3；真仓的登记照样取得到。"""
+    registered = 7
+    path = os.path.join(work, "heavy-thread-default")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(f"# 自证造的登记：头一个词是 #\n{registered}  # 自证样本\n")
+    unset = judging_entry_refusal_workers({}, registration_file=path)
+    capped = judging_entry_refusal_workers({"SINGLEFS_THREAD_CAP": "3"}, registration_file=path)
+    real = judging_entry_refusal_workers({})
+    return unset == registered and capped == 3 and real >= 1, (f"没设 SINGLEFS_THREAD_CAP 取到 {unset}（要登记的 {registered}）、"
+                                                              f"设成 3 取到 {capped}、真仓的登记取到 {real}")
+
+
+# verus! 里的 assume_specification（与 crates/singlefs-unit-graph 的
+# tests/unit_graph_verus_assume_specifications_are_units_in_the_formal_view_and_blanked_in_the_product_view.rs 同一份夹具、同一套期望）
+ASSUME_SPECIFICATION_FILE = "crates/fassume/src/lib.rs"
+ASSUME_SPECIFICATION_FIXTURE = {
+    "crates/fassume/Cargo.toml": '[package]\nname = "fassume"\nversion = "0.1.0"\nedition = "2021"\n',
+    ASSUME_SPECIFICATION_FILE: '''pub const LIMIT_IN_BYTES: u64 = 32;
+
+pub fn width_of(value: u64) -> u64 {
+    value + 1
+}
+
+pub fn judge_limit() -> u64 {
+    LIMIT_IN_BYTES
+}
+
+verus! {
+
+#[allow(unsafe_code, reason = "夹具：Verus 把 assume_specification 展开成 unsafe fn 声明")]
+pub assume_specification[ crate::LIMIT_IN_BYTES ] -> (limit: u64) returns 32u64;
+
+assume_specification[ width_of ](value: u64) -> (width: u64)
+    ensures width == value + 1;
+
+pub assume_specification<Element>[ Vec::<Element>::len ](vector: &Vec<Element>) -> (length: usize);
+
+pub open spec fn spec_limit() -> u64 {
+    32
+}
+
+}
+''',
+    "Cargo.lock": "# 夹具不解析依赖\n",
+}
+ASSUME_SPECIFICATION_FORMS_CELL = ("verus!：assume_specification 带属性带 pub、不带 pub 带参数表与 ensures、带泛型参数表三种写法各切成一个单元"
+                                   "（种类、名字、起止、按点名路径末段的名字找得到），dump 一条拒算都没有，后面的 spec fn 照旧自成单元")
+ASSUME_SPECIFICATION_KEY_CELL = "verus!：点到常量的入口按名字连上它的 assume_specification，改它交回的值形式化键变"
+
+
+def assume_specification_forms_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, ASSUME_SPECIFICATION_FIXTURE)
+    unit_lines, refusal_lines, _counts = dump_lines(base, "rust")
+    units = [unit for unit in RustWorkspace(base).files[ASSUME_SPECIFICATION_FILE].units]
+    got = [(unit.short, unit.first_line, unit.last_line, sorted(rust_declared_names(unit)), unit.public)
+           for unit in units if unit.kind == "assume_specification"]
+    want = [("assume_specification@14", 13, 14, ["LIMIT_IN_BYTES"], True), ("assume_specification@16", 16, 17, ["width_of"], False),
+            ("assume_specification@19", 19, 19, ["len"], True)]
+    dumped = [line.split("\t")[0] for line in unit_lines if line.startswith("assume_specification\t")]
+    spec_function = [(unit.first_line, unit.last_line) for unit in units if unit.kind == "fn" and unit.short == "spec_limit"]
+    ok = not refusal_lines and got == want and len(dumped) == len(want) and spec_function == [(21, 23)]
+    return ok, f"拒算 {refusal_lines}；assume_specification 单元 {got}（要 {want}）；dump 里 {len(dumped)} 行；spec_limit 起止 {spec_function}"
+
+
+# 只在 dev 依赖里开的特性（crates/singlefs-unit-graph 的 resolve_features：入口 crate 照目标种类顺 dev 依赖，别的 crate 只顺普通依赖）：
+# fbin 的普通依赖不开 counters、dev 依赖开；fhelper 同样只在 dev 依赖里开，fvia 只经普通依赖链到 fhelper
+FEATURE_SECTIONS_FIXTURE = {
+    "crates/fcore/Cargo.toml": '[package]\nname = "fcore"\n\n[features]\ncounters = []\n',
+    "crates/fcore/src/lib.rs": '''pub fn count() -> u32 {
+    counted_value()
+}
+#[cfg(feature = "counters")]
+fn counted_value() -> u32 {
+    1
+}
+#[cfg(not(feature = "counters"))]
+fn counted_value() -> u32 {
+    0
+}
+''',
+    "crates/fbin/Cargo.toml": ('[package]\nname = "fbin"\n\n[dependencies]\nfcore = { path = "../fcore" }\n\n'
+                               '[dev-dependencies]\nfcore = { path = "../fcore", features = ["counters"] }\n'),
+    "crates/fbin/src/main.rs": "fn main() {\n    let _ = fcore::count();\n}\n",
+    "crates/fbin/tests/counting.rs": "#[test]\nfn counting_sees_the_counters() {\n    assert_eq!(fcore::count(), 1);\n}\n",
+    "crates/fhelper/Cargo.toml": ('[package]\nname = "fhelper"\n\n[dependencies]\nfcore = { path = "../fcore" }\n\n'
+                                  '[dev-dependencies]\nfcore = { path = "../fcore", features = ["counters"] }\n'),
+    "crates/fhelper/src/lib.rs": "pub fn helped() -> u32 {\n    fcore::count()\n}\n",
+    "crates/fvia/Cargo.toml": '[package]\nname = "fvia"\n\n[dependencies]\nfhelper = { path = "../fhelper" }\n',
+    "crates/fvia/tests/via.rs": "#[test]\nfn via_the_helper() {\n    let _ = fhelper::helped();\n}\n",
+}
+FEATURE_SECTIONS_COUNTED_LINE = 4   # crates/fcore/src/lib.rs 里 cfg(feature = "counters") 那一份 counted_value 起的行（单元从属性起）
+FEATURE_SECTIONS_UNCOUNTED_LINE = 8   # cfg(not(feature = "counters")) 那一份起的行
+FEATURE_SECTIONS_ENTRY_CRATE_CELL = "R-目标：入口 crate 的 dev 依赖里才开的特性，不按 cfg(test) 编的 bin 当它没开，集成测试当它开着"
+FEATURE_SECTIONS_LINKED_CRATE_CELL = "R-目标：经普通依赖链进来的 crate，它的 dev 依赖里开的特性哪个目标都不顺"
+
+
+def counted_value_lines(base, entry):
+    """入口闭包里 crates/fcore 的 counted_value 是哪一份（起行）与闭包的 cfg 行里有没有 fcore 的 counters。"""
+    closure = closure_of(base, entry)
+    lines = sorted(unit.first_line for unit in closure.order if unit.file == "crates/fcore/src/lib.rs" and unit.short == "counted_value")
+    return lines, 'feature="counters"@fcore' in closure.cfg_lines
+
+
+def feature_sections_entry_crate_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, FEATURE_SECTIONS_FIXTURE)
+    binary = counted_value_lines(base, "crates/fbin/src/main.rs::main")
+    test = counted_value_lines(base, "crates/fbin/tests/counting.rs::counting_sees_the_counters")
+    ok = binary == ([FEATURE_SECTIONS_UNCOUNTED_LINE], False) and test == ([FEATURE_SECTIONS_COUNTED_LINE], True)
+    return ok, f"bin 入口 {binary}（要 [{FEATURE_SECTIONS_UNCOUNTED_LINE}] 不开）、集成测试入口 {test}（要 [{FEATURE_SECTIONS_COUNTED_LINE}] 开着）"
+
+
+def feature_sections_linked_crate_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, FEATURE_SECTIONS_FIXTURE)
+    via = counted_value_lines(base, "crates/fvia/tests/via.rs::via_the_helper")
+    return via == ([FEATURE_SECTIONS_UNCOUNTED_LINE], False), f"经 fhelper 的集成测试入口 {via}（要 [{FEATURE_SECTIONS_UNCOUNTED_LINE}] 不开）"
+
+
+# verus! 里 } 之后紧跟的 ;（结构体字面量当初值的 const、impl 里的关联 const）：unit-graph 的 verus_item_starts 不拿 ; 当起头，; 归前一个条目、进它的指纹
+VERUS_SEMICOLON_FILE = "crates/fsemicolon/src/lib.rs"
+VERUS_SEMICOLON_CONSTANT = "pub const ORIGIN: Pair = Pair { left: 0, right: 0 };"
+VERUS_SEMICOLON_ASSOCIATED = "pub const UNIT: Pair = Pair { left: 1, right: 1 };"
+VERUS_SEMICOLON_FIXTURE = {
+    "crates/fsemicolon/Cargo.toml": '[package]\nname = "fsemicolon"\n',
+    VERUS_SEMICOLON_FILE: (f"verus! {{\npub struct Pair {{\n    pub left: u64,\n    pub right: u64,\n}}\n{VERUS_SEMICOLON_CONSTANT}\n"
+                           f"impl Pair {{\n    {VERUS_SEMICOLON_ASSOCIATED}\n}}\npub fn total(pair: Pair) -> u64 {{\n    pair.left + pair.right\n}}\n}}\n"),
+    "Cargo.lock": "# 夹具不解析依赖\n",
+}
+VERUS_SEMICOLON_CELL = ("verus!：} 之后紧跟的 ; 归前一个条目（结构体字面量当初值的 const 与 impl 里的关联 const），指纹是连 ; 在内的词法单元以 0x1f 连的 sha256，"
+                        "后面的条目照旧切开")
+
+
+def verus_semicolon_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, VERUS_SEMICOLON_FIXTURE)
+    unit_lines, refusal_lines, _counts = dump_lines(base, "rust")
+    units = RustWorkspace(base).files[VERUS_SEMICOLON_FILE].units
+    got = sorted((unit.kind, unit.short, unit.first_line, unit.last_line, unit.fingerprint) for unit in units if unit.kind in ("const", "fn"))
+    want = sorted([("const", "ORIGIN", 6, 6, sha256_text("\x1f".join(rust_lex(VERUS_SEMICOLON_CONSTANT)[1]))),
+                   ("const", "UNIT", 8, 8, sha256_text("\x1f".join(rust_lex(VERUS_SEMICOLON_ASSOCIATED)[1]))),
+                   ("fn", "total", 10, 12, sha256_text("\x1f".join(rust_lex("pub fn total(pair: Pair) -> u64 {\n    pair.left + pair.right\n}")[1])))])
+    return not refusal_lines and got == want, f"拒算 {refusal_lines}；const 与 fn 单元 {[item[:4] + (item[4][:12],) for item in got]}（要 {[item[:4] + (item[4][:12],) for item in want]}）"
+
+
+def unit_graph_parity_cells():
+    """与 crates/singlefs-unit-graph 对齐的 assume_specification 切分、dev 依赖特性与 verus! 里 } 之后的 ; 那几格（BREAK_CELLS 里各配弄坏开关）。"""
+    return [
+        (VERUS_SEMICOLON_CELL, verus_semicolon_cell),
+        (ASSUME_SPECIFICATION_FORMS_CELL, assume_specification_forms_cell),
+        (ASSUME_SPECIFICATION_KEY_CELL, compare_cell(ASSUME_SPECIFICATION_FIXTURE, f"{ASSUME_SPECIFICATION_FILE}::judge_limit", ASSUME_SPECIFICATION_FILE,
+                                                     "returns 32u64;", "returns 33u64;", "changed")),
+        (FEATURE_SECTIONS_ENTRY_CRATE_CELL, feature_sections_entry_crate_cell),
+        (FEATURE_SECTIONS_LINKED_CRATE_CELL, feature_sections_linked_crate_cell),
+    ]
 
 
 def import_time_cells():
@@ -10144,7 +14223,26 @@ def import_time_cells():
         (IMPORT_TIME_EXIT_CELL, import_time_exit_cell),
         (IMPORT_TIME_CLASS_CELL, compare_cell(IMPORT_TIME_FIXTURE, IMPORT_TIME_ENTRY, "tool/helper.py", "        self.value = 1\n", "        self.value = 2\n", "same")),
         (REAL_ENTRIES_CELL, real_entries_cell),
-    ] + [(name, real_import_time_cell(name)) for name, _role, _path, _old, _new in REAL_IMPORT_TIME_EDITS] + [(REAL_CUT_CELL, real_cut_cell)]
+        (REAL_JUDGING_CLOSURES_CELL, real_judging_closures_cell),
+    ] + [(name, real_import_time_cell(name)) for name, _path, _old, _new in REAL_IMPORT_TIME_EDITS] + [
+        (EXCLUDED_EDGE_PYTHON_CELL, excluded_edge_cell(EXCLUDED_EDGE_PYTHON_ENTRY, "tool/hint.py", "tool/kept.py")),
+        (EXCLUDED_EDGE_SHELL_CELL, excluded_edge_cell(EXCLUDED_EDGE_SHELL_ENTRY, "tool/hint.sh", "tool/kept.sh")),
+        (EXCLUDED_EDGE_EXIT_CELL, excluded_edge_exit_cell),
+        (ADMISSION_EDGE_ANOMALY_CELL, admission_edge_anomaly_cell),
+        (ADMISSION_EDGE_STRIP_CELL, admission_edge_strip_cell),
+        (ADMISSION_EDGE_REACH_CELL, admission_edge_reach_cell),
+        (MAIN_GUARD_IMPORT_CELL, main_guard_fixture_cell(
+            "tool/user.py::judge",
+            (("tool/library.py", "work"), ("tool/library.py", "LIMIT"), ("tool/library.py", "registered"),
+             ("tool/fallback.py", "otherwise"), ("tool/fallback.py", "leftover")),
+            (("tool/library.py", "self_check"), ("tool/library.py", "<main-guard>")))),
+        (MAIN_GUARD_PROGRAM_CELL, main_guard_fixture_cell(
+            "tool/launcher.py::launch",
+            (("tool/library.py", "self_check"), ("tool/library.py", "work"), ("tool/twice.py", "early"), ("tool/twice.py", "late")), ())),
+        (MAIN_GUARD_REAL_CELL, main_guard_real_cell),
+        (MAIN_GUARD_ELSE_CELL, main_guard_else_cell),
+        (JUDGING_ENTRY_WORKERS_CELL, judging_entry_workers_cell),
+    ]
 
 
 # 产品行为视图（文件头「判定种类」）那几格：Rust 那一份的替身是「照 crates/singlefs-unit-graph 的剥法手工剥过的拷贝（剥掉的换成空格、换行留着）
@@ -10327,8 +14425,133 @@ def product_view_program_cell(work):
                 f"产品行为视图的 dump 里还列着只给 Verus 看的 {ghost_listed}")
 
 
+# 只在规格里点到的执行侧条目（HeaderModel 只出现在 ghost 字段的类型、ensures、let ghost、proof 块与循环头里）：unit-graph 剥完再切、再收闭包，
+# 闭包里没有它；手工剥过的拷贝照原样切出来的 dump 当 Rust 那一份，照原样收它的闭包当 Rust 那一份的闭包
+PRODUCT_VIEW_EDGES_FILE = "crates/fghostedges/src/lib.rs"
+PRODUCT_VIEW_EDGES_ENTRY = f"{PRODUCT_VIEW_EDGES_FILE}::caller"
+PRODUCT_VIEW_EDGES_SOURCE = """verus! {
+pub struct HeaderModel {
+    pub width: nat,
+}
+pub open spec fn spec_header(width: u64) -> HeaderModel {
+    HeaderModel { width: width as nat }
+}
+pub struct Recorded {
+    pub width: u64,
+    pub history: Ghost<Seq<HeaderModel>>,
+}
+pub fn parse_header(width: u64) -> (parsed: Recorded)
+    ensures
+        spec_header(width) == (HeaderModel { width: parsed.width as nat }),
+{
+    let ghost before = spec_header(width);
+    proof {
+        assert(before.width == width as nat);
+    }
+    let mut total = 0u64;
+    while total < width
+        invariant
+            total <= width,
+            spec_header(total) == if total == 0 { HeaderModel { width: 0 } } else { spec_header(total) },
+        decreases width - total,
+    {
+        total = total + 1;
+    }
+    Recorded { width: total, history: Ghost(Seq::empty()) }
+}
+} // verus!
+pub fn caller() -> u64 {
+    parse_header(3).width
+}
+"""
+# 照 crates/singlefs-unit-graph 的剥法要剥的那几截：spec 函数整条、ghost 字段连逗号、具名返回值的「(名:」与「)」、ensures、let ghost、proof 块、
+# 循环头的 invariant 与 decreases、字面量里列尾的 Ghost(…) 字段连它前面那个逗号
+PRODUCT_VIEW_EDGES_GHOST_PIECES = (
+    "pub open spec fn spec_header(width: u64) -> HeaderModel {\n    HeaderModel { width: width as nat }\n}",
+    "pub history: Ghost<Seq<HeaderModel>>,",
+    "(parsed: ",
+    ")\n    ensures\n        spec_header(width) == (HeaderModel { width: parsed.width as nat }),",
+    "let ghost before = spec_header(width);",
+    "proof {\n        assert(before.width == width as nat);\n    }",
+    "invariant\n            total <= width,\n            spec_header(total) == if total == 0 { HeaderModel { width: 0 } } else { spec_header(total) },\n"
+    "        decreases width - total,",
+    ", history: Ghost(Seq::empty())",
+)
+PRODUCT_VIEW_EDGES_CELL = ("产品行为视图：只在规格里点到的执行侧条目（ghost 字段的类型、ensures、let ghost、proof 块、循环头里点到的结构体）不进闭包，"
+                           "闭包与 unit-graph 剥完再收的那一份逐个相同")
+PRODUCT_VIEW_UNVERIFIED_CELL = "产品行为视图：这一份剥出来的与 Rust 那一份交的核不上，照原样那一份收（闭包只多不少，规格里点到的结构体照收）"
+
+
+def product_view_edges_closures(work, extra_pieces=()):
+    """→ (产品行为视图下入口的闭包行, Rust 那一份的替身：手工剥过的拷贝照原样收的闭包行)；extra_pieces 是 Rust 那一份另剥的几截（这一份认不出的写法）。"""
+    blanked = PRODUCT_VIEW_EDGES_SOURCE
+    for piece in PRODUCT_VIEW_EDGES_GHOST_PIECES + tuple(extra_pieces):
+        if blanked.count(piece) != 1:
+            raise AssertionError(f"要剥的「{piece[:40]}」命中 {blanked.count(piece)} 次（要恰好一次）")
+        blanked = blanked.replace(piece, "".join(character if character == "\n" else " " for character in piece))
+    fixture = {"crates/fghostedges/Cargo.toml": '[package]\nname = "fghostedges"\n', "Cargo.lock": "# 夹具不解析依赖\n"}
+    blanked_base, base = os.path.join(work, "blanked"), os.path.join(work, "tree")
+    write_tree(blanked_base, dict(fixture, **{PRODUCT_VIEW_EDGES_FILE: blanked}))
+    write_tree(base, dict(fixture, **{PRODUCT_VIEW_EDGES_FILE: PRODUCT_VIEW_EDGES_SOURCE}))
+    unit_lines, refusal_lines, _counts = dump_lines(blanked_base, "rust")
+    options = Options()
+    options.judgment_kind, options.product_dump = PRODUCT_BEHAVIOR, unit_lines + refusal_lines
+    product = closure_of(base, PRODUCT_VIEW_EDGES_ENTRY, options)
+    expected = closure_of(blanked_base, PRODUCT_VIEW_EDGES_ENTRY)
+    return (sorted(unit.dump_text() for unit in product.order), sorted(refusal.form for refusal in product.refusals),
+            sorted(unit.dump_text() for unit in expected.order))
+
+
+def closure_names(lines):
+    return sorted(line.split("\t")[1].rsplit("::", 1)[-1] for line in lines)
+
+
+def product_view_edges_cell(work):
+    product, forms, expected = product_view_edges_closures(work)
+    ok = product == expected and not forms and "HeaderModel" not in closure_names(product) and "Recorded" in closure_names(product)
+    return ok, f"产品行为视图的闭包 {closure_names(product)}（拒算 {forms}）；unit-graph 剥完再收的 {closure_names(expected)}"
+
+
+def product_view_unverified_cell(work):
+    product, forms, expected = product_view_edges_closures(work, ("total = total + 1;",))
+    names = closure_names(product)
+    ok = not forms and "HeaderModel" in names and set(closure_names(expected)) <= set(names)
+    return ok, f"产品行为视图的闭包 {names}（拒算 {forms}，要有 HeaderModel、不拒算）；Rust 那一份剥完再收的 {closure_names(expected)}"
+
+
+# 外属性 #[verifier::…]：Rust 那一份剥掉它（verus! 里外都剥），打头的属性一剥，单元的起始行往下挪；这一份照同一套词法剥了再切，两边的起止才对得上
+PRODUCT_VIEW_ATTRIBUTE_LINE = "#[verifier::external_body]"
+PRODUCT_VIEW_ATTRIBUTE_INSIDE_CELL = "产品行为视图：verus! 里的执行函数只多一行 #[verifier::external_body]，产品行为视图配得上、产品行为键不变"
+PRODUCT_VIEW_ATTRIBUTE_OUTSIDE_CELL = "产品行为视图：没有 verus! 块的文件里的函数只多一行 #[verifier::external_body]，产品行为视图配得上、产品行为键不变"
+
+
+def product_view_attribute_cell(inside_verus):
+    """函数头上只多一行 PRODUCT_VIEW_ATTRIBUTE_LINE：Rust 那一份的替身是把这一行换成空格的拷贝照原样切出的 dump；产品行为键改前改后相同且都不拒算，
+    形式化键变（属性进形式化的键）。inside_verus 为真加在 verus! 里被调到的 helper 上，否则加在没有 verus! 块的 crate 的 plain 上。"""
+    def judge(work):
+        original, blanked = product_view_files()
+        file, head, entry = ((PRODUCT_VIEW_FILE, "fn helper(x: u64) -> u64 {\n", PRODUCT_VIEW_ENTRY) if inside_verus
+                             else ("crates/fplain/src/lib.rs", "pub fn plain() -> u32 {\n", "crates/fplain/src/lib.rs::plain"))
+        if original[file].count(head) != 1 or blanked[file].count(head) != 1:
+            raise AssertionError(f"产品行为视图样本里「{head.strip()}」命中 {original[file].count(head)} 次（要恰好一次）")
+        edited = dict(original, **{file: original[file].replace(head, f"{PRODUCT_VIEW_ATTRIBUTE_LINE}\n{head}")})
+        edited_blanked = dict(blanked, **{file: blanked[file].replace(head, f"{' ' * len(PRODUCT_VIEW_ATTRIBUTE_LINE)}\n{head}")})
+        before, before_forms = product_view_key(work, original, product_view_dump_of(work, blanked), entry=entry)
+        after, after_forms = product_view_key(work, edited, product_view_dump_of(work, edited_blanked), entry=entry)
+        formal_before, _ = product_view_key(work, original, None, FORMAL_VERIFICATION, entry)
+        formal_after, _ = product_view_key(work, edited, None, FORMAL_VERIFICATION, entry)
+        ok = before is not None and before == after and formal_before is not None and formal_after is not None and formal_before != formal_after
+        return ok, (f"产品行为键改前 {before}、改后 {after}（拒算 {sorted(before_forms | after_forms)}，要不拒算、键相同）；"
+                    f"形式化键改前 {formal_before}、改后 {formal_after}（要变）")
+    return judge
+
+
 def product_view_cells():
     return [
+        (PRODUCT_VIEW_ATTRIBUTE_INSIDE_CELL, product_view_attribute_cell(True)),
+        (PRODUCT_VIEW_ATTRIBUTE_OUTSIDE_CELL, product_view_attribute_cell(False)),
+        (PRODUCT_VIEW_EDGES_CELL, product_view_edges_cell),
+        (PRODUCT_VIEW_UNVERIFIED_CELL, product_view_unverified_cell),
         (PRODUCT_VIEW_LEMMA_CELL, product_view_lemma_cell),
         (PRODUCT_VIEW_ENSURES_CELL, product_view_compare_cell(("        r == doubled(x),", "        r == doubled(x) + 0,"), "same")),
         (PRODUCT_VIEW_EXECUTABLE_CELL, product_view_compare_cell(("    x + 0\n", "    x + 1\n"), "changed")),
@@ -10353,6 +14576,18 @@ def selftest_cells():
                                          ("crates/fextra/src/lib.rs", '#[cfg(feature = "fast")]', "#[cfg(accessible(fast))]"))),
         ("括号配不上的文件整份拒算", rust_unbalanced_cell),
         (MANIFEST_ROOT_CELL, manifest_root_cell),
+        (MANIFEST_DIRECTORY_CELL, manifest_directory_cell),
+        (MANIFEST_BINDING_CELL, manifest_binding_cell),
+        (SHELL_DATA_SOURCE_CELL, shell_data_source_cell),
+        (SHELL_DATA_DOT_CELL, shell_data_dot_cell),
+        (SHELL_DATA_NESTED_CELL, shell_data_nested_cell),
+        (SHELL_DATA_UNFOLDED_CELL, refused_cell(SHELL_DATA_FIXTURE, f"{SHELL_DATA_FILE}::runs_the_unfolded_script", "shell-path-unfolded")),
+        (CURRENT_EXE_CELL, current_exe_cell),
+        (CURRENT_EXE_CONSTANT_CELL, current_exe_constant_cell),
+        (CURRENT_EXE_PATH_ONLY_CELL, current_exe_path_only_cell),
+        (CURRENT_EXE_SPAWN_CELL, current_exe_spawn_cell),
+        (DIRECTORY_CLOSURE_LINE_CELL, directory_closure_line_cell),
+        (RUST_LEX_CACHE_CELL, rust_lex_cache_cell),
         ("WGSL 里没定义、Rust 串里也没有的名字拒算", wgsl_undefined_cell),
         ("dump 的单元行形态（带路径的宏、verus! 两个 fn、impl 头与方法）", rust_dump_cell),
         ("python：只改注释不作废", compare_cell(PYTHON_FIXTURE, "pkg/a.py::entry", "pkg/a.py", "    # 只是注释\n", "    # 只是注释，改了措辞\n", "same")),
@@ -10396,6 +14631,9 @@ def selftest_cells():
                                                                 'print("library changed")', "changed")),
         ("键：工具链行进键", key_toolchain_cell),
         ("键：点名了 cargo 而调用方没给 --external 拒算、给了出键", key_external_cell),
+        (ENTRY_UNIT_KEY_CELL, entry_unit_key_cell),
+        (ENTRY_LINES_SHAPE_CELL, entry_lines_shape_cell),
+        (ENTRY_LINES_RUST_KEYS_CELL, entry_lines_rust_keys_cell),
         ("shell：`bash \"$tree/<仓里的相对路径>\"` 连到仓里那一份", compare_cell(SHELL_FIXTURE, "s/copies.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
         ("python：os.path.join(<折不出的目录>, <仓里的相对路径>) 连到仓里那一份", compare_cell(PYTHON_FIXTURE, "pkg/d.py::run_copy", "pkg/c.py", "    return 5",
                                                                                 "    return 50", "changed")),
@@ -10416,14 +14654,22 @@ def selftest_cells():
                                                                                      "    return 7", "    return 70", "changed")),
         ("preflight 装载器：只拷了 .claude/ 的小树里 source 与 import 都解到树里的规范副本，两份装载器的闭包不拒算", preflight_loader_cell),
         ("preflight 装载器：worktree 里没有规范副本时 source 与 import 解到主仓那一份", preflight_worktree_cell),
+        (CROSS_RUN_CACHE_CELL, cross_run_cache_cell),
+        (CROSS_RUN_CACHE_SCAN_CELL, cross_run_cache_scan_cell),
     ]
     cells += [(name, judge) for name, judge in silent_form_cells()]
     cells += alignment_cells()
     cells += closure_rule_cells()
+    cells += closure_edge_cells()
     cells += unit_divergence_cells()
+    cells += unit_graph_parity_cells()
     cells += import_time_cells()
     cells += product_view_cells()
     return cells
+
+
+NESTED_POSITIONALS_CELL = ("shell：bash -c '…' 里套着的里层 bash -c \"…\\$1…\"：外层只换没转义的 $1…$9，转义的 \\$1 留给里层照它自己的参数折"
+                           "（里层的 $1 是外层的 $2），连到它 import 的仓内模块")
 
 
 def silent_form_cells():
@@ -10434,6 +14680,8 @@ def silent_form_cells():
         ("shell：python3 -c '<字面串>' 当内联脚本切，sys.argv 折成后面的词，连到它 import 的仓内模块", compare_cell(SHELL_FIXTURE, "s/inline_python.sh", *helper)),
         ("shell：python3 - <<'PY' 喂的 here-doc 当内联脚本切，连到它 import 的仓内模块", compare_cell(SHELL_FIXTURE, "s/heredoc_python.sh", *helper)),
         ("shell：{ python3 /dev/fd/3 …; } 3<<'PY'（重定向写在组后面）照内联脚本切", compare_cell(SHELL_FIXTURE, "s/group.sh", *helper)),
+        ("shell：exec python3 -B /dev/fd/3 … 3<<'PY' 里 (目录, 标签) = sys.argv[1:3] 拆包逐个对上，sys.path.insert(0, 目录) 折得出、连到它 import 的仓内模块", compare_cell(SHELL_FIXTURE, "s/argv_slice.sh", *helper)),
+        ("shell：内联 python 拆包 sys.argv[1:4] 给两个名字（上界对不上）不对上，照旧拒算 sys-path-unfolded", refused_cell(SHELL_FIXTURE, "s/argv_slice_mismatched.sh", "sys-path-unfolded")),
         ("shell：python3 -c / bash -c 的串带折不出的展开拒算 inline-script-not-literal", refused_cell(SHELL_FIXTURE, "s/inline_expanded.sh", INLINE_FORM)),
         ("shell：bash -c \"$串\" 的串折得出就切开再认，连到它起的脚本", compare_cell(SHELL_FIXTURE, "s/inline_bash_folded.sh", *child)),
         ("shell：一条命令里第二个解释器（bash 包装脚本 N python3 x.py）照第一个的规则认，连到 x.py", compare_cell(SHELL_FIXTURE, "s/second.sh", "s/py/tool.py",
@@ -10445,8 +14693,10 @@ def silent_form_cells():
         ("shell：命令位置上折不出的程序拒算 shell-command-unfolded", refused_cell(SHELL_FIXTURE, "s/head.sh", "shell-command-unfolded")),
         ("shell：包装命令（timeout 60）后面直接执行的脚本连上", compare_cell(SHELL_FIXTURE, "s/wrapped.sh", *child)),
         ("shell：[[ … || … ]]、(( … ))、case 分支的模式、数组字面量里的词不当命令", no_refusal_cell(SHELL_FIXTURE, "s/structure.sh")),
+        ("shell：名字[下标]=值、名字[下标]+=值（下标里带空格与展开）照赋值认、不当命令", no_refusal_cell(SHELL_FIXTURE, "s/subscript.sh")),
         ("shell：\"${数组[@]}\" 当命令时按数组的字面赋值摊开，连到它起的脚本", compare_cell(SHELL_FIXTURE, "s/array.sh", *child)),
         ("shell：python3 -c \"$(打印正文的函数)\" 折出函数打的那几行当内联脚本", compare_cell(SHELL_FIXTURE, "s/capture.sh", *helper)),
+        (NESTED_POSITIONALS_CELL, compare_cell(SHELL_FIXTURE, "s/nested_inline_positionals.sh", *helper)),
         ("shell：文件头登记的 check 判据（preflight 开跑前跑）照内联 bash 认，连到它起的脚本", compare_cell(SHELL_FIXTURE, "s/declared.sh", *child)),
         ("shell：内联 python exec sys.argv[1:] 时后面那几个词照命令认", compare_cell(SHELL_FIXTURE, "s/argv_exec.sh", *child)),
         ("python：[sys.executable, \"-c\", <字面串>, …] 当内联脚本切，连到它 import 的仓内模块", compare_cell(PYTHON_FIXTURE, "pkg/m.py::run_inline", "pkg/b.py",
@@ -10478,6 +14728,20 @@ BREAK_CELLS = (
     ("rust-verus-segments-ignored", ("verus! 里 ensures 带花括号：下一个函数照样切开，改它作废", "verus! 里够不到的函数改了不作废")),
     ("rust-cfg-ignored", ("cfg(feature) 关着的单元改了不作废", "认不出的 cfg 谓词拒算")),
     ("rust-manifest-directory-reads-unrefused", (MANIFEST_ROOT_CELL,)),
+    ("rust-manifest-directories-refused", (MANIFEST_DIRECTORY_CELL,)),
+    ("rust-manifest-binding-refused-whole", (MANIFEST_BINDING_CELL,)),
+    ("shell-data-sources-unfollowed", (SHELL_DATA_SOURCE_CELL, SHELL_DATA_DOT_CELL, SHELL_DATA_NESTED_CELL, SHELL_DATA_UNFOLDED_CELL)),
+    ("shell-data-sources-unsited", (SHELL_DATA_SOURCE_CELL,)),
+    ("shell-data-sources-nested-unfollowed", (SHELL_DATA_NESTED_CELL,)),
+    ("shell-dot-source-unrecognized", (SHELL_DATA_DOT_CELL,)),
+    ("shell-data-source-refusals-dropped", (SHELL_DATA_UNFOLDED_CELL,)),
+    ("rust-current-exe-refused", (CURRENT_EXE_CELL,)),
+    ("rust-current-exe-children-unlinked", (CURRENT_EXE_CELL,)),
+    ("rust-current-exe-constants-same-file-only", (CURRENT_EXE_CONSTANT_CELL,)),
+    ("rust-current-exe-path-only-refused", (CURRENT_EXE_PATH_ONLY_CELL,)),
+    ("rust-current-exe-spawn-unrefused", (CURRENT_EXE_SPAWN_CELL,)),
+    ("closure-directory-lines-span-files", (DIRECTORY_CLOSURE_LINE_CELL,)),
+    ("rust-lex-cache-unverified", (RUST_LEX_CACHE_CELL,)),
     ("rust-doc-comments-kept", ("只改文档注释不作废", "改文档注释里的代码块：入口 fn 不作废")),
     ("wgsl-raw-text", ("WGSL 只改注释不作废", "WGSL 够不到的函数改了不作废")),
     ("python-comments-kept", ("python：只改注释不作废",)),
@@ -10491,6 +14755,14 @@ BREAK_CELLS = (
     ("shell-unfolded-paths-ignored", ("shell：`bash \"$x\"` 折不出拒算",)),
     ("shell-raw-text", ("shell：脚本体只改注释不作废",)),
     ("external-programs-unchecked", ("键：点名了 cargo 而调用方没给 --external 拒算、给了出键",)),
+    ("key-entry-units-dropped", (ENTRY_UNIT_KEY_CELL,)),
+    ("key-entry-doctest-owner-chained", ("R-结构：文档测试不连所挂的条目与那个模块的 use",)),
+    ("unit-graph-key-entry-lines-dropped", (ENTRY_LINES_SHAPE_CELL, ENTRY_LINES_RUST_KEYS_CELL)),
+    ("rust-doctest-entry-alone", (ENTRY_LINES_SHAPE_CELL, ENTRY_LINES_RUST_KEYS_CELL)),
+    ("cross-run-cache-under-tmpdir", (CROSS_RUN_CACHE_CELL,)),
+    ("cross-run-cache-git-directory-only", (CROSS_RUN_CACHE_CELL,)),
+    ("cross-run-cache-run-times-old-spelling", (CROSS_RUN_CACHE_CELL,)),
+    ("cross-run-cache-mentions-unscanned", (CROSS_RUN_CACHE_SCAN_CELL,)),
     ("rust-format-captures-ignored", ("format! 串里内联捕获的常量改了作废", "WGSL 够得到的函数改了作废")),
     ("shell-variable-first-line-only", ("shell：顶层变量里 here-doc 的正文改了，读它的函数作废",)),
     ("tree-copy-tails-ignored", ("shell：`bash \"$tree/<仓里的相对路径>\"` 连到仓里那一份", "python：os.path.join(<折不出的目录>, <仓里的相对路径>) 连到仓里那一份")),
@@ -10504,6 +14776,7 @@ BREAK_CELLS = (
     ("python-command-arguments-loaded", ("python：写数据的路径与传给 subprocess 的参数不拒算",)),
     ("shell-generated-scripts-ignored", ("shell：自己用 cat <<词 写出来再起的脚本不拒算、正文里装的连上",)),
     ("shell-inline-positionals-ignored", ("shell：bash -c '…\"$1\"…' <名字> <路径> 里的 $1 换成那个路径",)),
+    ("shell-inline-positionals-escapes-ignored", (NESTED_POSITIONALS_CELL,)),
     ("shell-copied-scripts-ignored", ("shell：自己 cp 出来再起的脚本连到源那一份",)),
     ("shell-enclosing-locals-ignored", ("shell：套在外层函数里的函数看得见外层的 local",)),
     ("shell-cd-first-directory-only", ("shell：cd 过去的目录折出几个，相对路径在每一个底下都连",)),
@@ -10534,6 +14807,7 @@ BREAK_CELLS = (
     ("shell-wrapped-commands-ignored", ("shell：包装命令（timeout 60）后面直接执行的脚本连上",)),
     ("shell-command-structure-ignored", ("shell：[[ … || … ]]、(( … ))、case 分支的模式、数组字面量里的词不当命令",
                                          "shell：{ python3 /dev/fd/3 …; } 3<<'PY'（重定向写在组后面）照内联脚本切")),
+    ("shell-subscript-assignment-split", ("shell：名字[下标]=值、名字[下标]+=值（下标里带空格与展开）照赋值认、不当命令",)),
     ("shell-array-commands-unfolded", ("shell：\"${数组[@]}\" 当命令时按数组的字面赋值摊开，连到它起的脚本",)),
     ("shell-heredoc-captures-unfolded", ("shell：python3 -c \"$(打印正文的函数)\" 折出函数打的那几行当内联脚本",)),
     ("declared-checks-ignored", ("shell：文件头登记的 check 判据（preflight 开跑前跑）照内联 bash 认，连到它起的脚本",
@@ -10545,6 +14819,7 @@ BREAK_CELLS = (
                                       "python：内联脚本起 sys.argv[k]（取的是起它那份脚本的 \"$1\"）不拒算：程序是调用处给的词")),
     ("python-command-dictionaries-unfolded", ("python：命令里的 *选项[\"键\"] 折回调用处给的字典字面量，连到那份脚本",)),
     ("python-dispatch-calls-ignored", ("python：经分派表 表[键](…) 调到的函数，命令参数按那一处调用折",)),
+    ("python-slice-unpacking-unpaired", ("shell：exec python3 -B /dev/fd/3 … 3<<'PY' 里 (目录, 标签) = sys.argv[1:3] 拆包逐个对上，sys.path.insert(0, 目录) 折得出、连到它 import 的仓内模块",)),
     ("rust-kind-names-hyphenated", ("dump：种类名照 crates/singlefs-unit-graph 的拼法（macro_rules、item_macro、mod、mod_head、wgsl_compute）",)),
     ("rust-qualified-names-file-local", ("dump：限定名带 crate、目标与模块路径前缀，文档测试写 <模块>::<doctest line 行>",)),
     ("rust-doctest-fingerprint-from-rows", ("文档测试：代码块里只改注释指纹不变、改代码指纹变",)),
@@ -10559,12 +14834,21 @@ BREAK_CELLS = (
     ("rust-use-names-resolved", ("R-结构：use 引进的名字不往下解，没用到的那个改了不作废",)),
     ("rust-use-aliases-unresolved", ("R-结构：use a::b as c 之后调 c()，按 b 再解",)),
     ("rust-trait-impls-by-trait-arguments", ("R-隐式：只点名 trait 参数里的类型，那个 trait impl 不进闭包",)),
+    ("rust-macro-generated-types-unnamed", (MACRO_TYPE_EDGE_CELL,)),
+    ("rust-macro-rules-literal-names-unlinked", (MACRO_LITERAL_EDGE_CELL,)),
+    ("rust-global-allocators-unlinked", (ALLOCATOR_EDGE_CELL,)),
+    ("rust-foreign-self-trait-impls-unlinked", (FOREIGN_IMPL_EDGE_CELL,)),
+    ("rust-build-environment-unlinked", (BUILD_ENVIRONMENT_EDGE_CELL,)),
+    ("rust-excluded-path-dependencies-dropped", (EXCLUDED_PATH_DEPENDENCY_EDGE_CELL,)),
+    ("rust-outside-crate-names-linked-unimported", (OUTSIDE_IMPORT_CELL,)),
+    ("rust-outside-crate-names-linked-across-modules", (OUTSIDE_MODULE_CELL,)),
     ("rust-cfg-atoms-unnarrowed", ("cfg 成分：闭包没引到 gpu 的入口，带不带 gpu 特性两种目标下键相同",)),
     ("rust-cfg-macro-atoms-ignored", ("cfg 成分：闭包里有 cfg!、语句上的 #[cfg] 或 #[cfg_attr] 引到 gpu 的入口，带不带 gpu 特性键不同",)),
     ("wgsl-defined-name-suffixes-ignored", ("WGSL 外名：条目级宏调用定义的名字以 _ 加外名收尾就有着落",
                                             "WGSL 外名的着落做成边：只靠外名点到的条目级宏调用并进闭包，改它里面的码键变")),
     ("wgsl-prefix-remainders-unchecked", ("WGSL 外名：首段只落在无关的串里、其余那一段哪儿都没有的拒算",)),
     ("wgsl-name-suppliers-not-pulled-in", ("WGSL 外名的着落做成边：只靠外名点到的条目级宏调用并进闭包，改它里面的码键变",)),
+    ("wgsl-name-suppliers-include-test-code", (WGSL_TEST_SUPPLIER_CELL,)),
     ("wgsl-modules-per-naming-unit", ("WGSL：闭包读到的几份 .wgsl 合成一个模块，名字跨文件解",)),
     ("rust-trait-self-paths-ignored", ("R-路径：trait 成员里的 Self::x 落到这个 trait 自己的成员 x",)),
     ("rust-doctest-structure-linked", ("R-结构：文档测试不连所挂的条目与那个模块的 use",)),
@@ -10575,13 +14859,30 @@ BREAK_CELLS = (
     ("rust-includes-outside-root-refused", ("include_str! 读根外的文件：读得到收成数据单元、改它键变，读不到拒算 include-missing",)),
     ("rust-blanket-self-parameter-only", ("R-方法：自身类型里出现泛型参数的 impl（(T, u32)、[T]、[T; N]、Box<T>、Option<Box<T>>、Sealed<T>）都按 blanket 放行，改 Sealed<T> 那一份作废",)),
     ("wgsl-other-file-definitions-unlinked", ("WGSL 外名在链接集里别的 include_str! 读进来的 .wgsl 里有定义：读它的 Rust 单元与那份 .wgsl 拉进闭包，改那个常量作废",)),
+    ("rust-assume-specifications-unrecognized", (ASSUME_SPECIFICATION_FORMS_CELL, ASSUME_SPECIFICATION_KEY_CELL)),
+    ("rust-assume-specification-names-unlinked", (ASSUME_SPECIFICATION_FORMS_CELL, ASSUME_SPECIFICATION_KEY_CELL)),
+    ("rust-dependency-features-from-every-section", (FEATURE_SECTIONS_ENTRY_CRATE_CELL, FEATURE_SECTIONS_LINKED_CRATE_CELL)),
+    ("rust-verus-semicolon-split-off", (VERUS_SEMICOLON_CELL,)),
     ("python-import-time-statements-ignored", (IMPORT_TIME_EXIT_CELL,)),
     ("python-def-heads-ignored", (IMPORT_TIME_EXIT_CELL,)),
     ("python-import-time-classes-named", (IMPORT_TIME_CLASS_CELL,)),
-    ("program-edge-exclusions-ignored", (REAL_CUT_CELL,)),
-    ("program-edge-exclusions-shell-ignored", (REAL_CUT_CELL,)),
+    ("python-main-guard-conjunctions-unrecognized", (MAIN_GUARD_IMPORT_CELL, MAIN_GUARD_REAL_CELL)),
+    ("python-main-guards-last-only", (MAIN_GUARD_PROGRAM_CELL,)),
+    ("python-main-guard-else-dropped", (MAIN_GUARD_ELSE_CELL,)),
+    ("program-edge-exclusions-ignored", (EXCLUDED_EDGE_PYTHON_CELL, EXCLUDED_EDGE_SHELL_CELL, ADMISSION_EDGE_REACH_CELL)),
+    ("program-edge-exclusions-shell-ignored", (EXCLUDED_EDGE_SHELL_CELL, ADMISSION_EDGE_REACH_CELL)),
+    ("excluded-edge-exit-unmeasured", (EXCLUDED_EDGE_EXIT_CELL,)),
+    ("admission-edge-admitted-sample", (ADMISSION_EDGE_ANOMALY_CELL,)),
+    ("admission-edge-header-unstripped", (ADMISSION_EDGE_STRIP_CELL,)),
+    ("admission-edge-reach-unmeasured", (ADMISSION_EDGE_REACH_CELL,)),
+    ("judging-entry-literals-unfolded", (REAL_ENTRIES_CELL, REAL_JUDGING_CLOSURES_CELL)),
+    ("judging-entry-refusals-ignored", (REAL_JUDGING_CLOSURES_CELL,)),
+    ("judging-entry-workers-head-word", (JUDGING_ENTRY_WORKERS_CELL,)),
     ("product-view-kept-formal", (PRODUCT_VIEW_LEMMA_CELL, PRODUCT_VIEW_ENSURES_CELL)),
     ("product-view-strips-executable-code", (PRODUCT_VIEW_EXECUTABLE_CELL,)),
+    ("product-view-edges-from-the-written-tokens", (PRODUCT_VIEW_EDGES_CELL,)),
+    ("product-view-blanking-unverified", (PRODUCT_VIEW_UNVERIFIED_CELL,)),
+    ("product-view-verifier-attributes-kept", (PRODUCT_VIEW_ATTRIBUTE_INSIDE_CELL, PRODUCT_VIEW_ATTRIBUTE_OUTSIDE_CELL)),
 )
 
 
@@ -10608,6 +14909,7 @@ def with_break(switch, judge):
 def selftest():
     started = time.monotonic()
     failures, checked = [], 0
+    os.environ[RUST_LEX_CACHE_DIRECTORY_VARIABLE] = "off"   # 词法单元缓存只在它自己那一格用（那一格临时换一个目录）；别的格都现切，弄坏开关也只波及那一格
     if active_breaks():
         print(f"  ℹ {BREAK_VARIABLE}={os.environ.get(BREAK_VARIABLE)} 设着：点名的那几格本来就该红")
     cells = selftest_cells()
@@ -10717,8 +15019,8 @@ def main(arguments):
             root, entry = positional
             closure = closure_of(root, entry, options)
             if command == "closure":
-                for unit in closure.units():
-                    print(unit.dump_text())
+                for line in closure_unit_lines(closure):
+                    print(line)
                 refusals = closure.refusal_list()
                 for refusal in refusals:
                     print(refusal.text())
@@ -10732,11 +15034,13 @@ def main(arguments):
                     print(refusal.text())
                 return REFUSED_EXIT
             print(f"key\t{key}")
-            for unit in closure.units():
-                print(unit.dump_text())
+            for line in closure_unit_lines(closure):
+                print(line)
             return 0
         if command == "controls" and len(positional) == 1:
             return run_controls(positional[0])
+        if command == "cross-run-caches" and not positional:
+            return print_cross_run_cache_rows()
         if command == "entries" and len(positional) == 1:
             entries = registered_judging_entries(positional[0])
             for entry in entries:
@@ -10746,7 +15050,8 @@ def main(arguments):
         raise UsageError(f"认不出的用法：{' '.join(arguments)}")
     except UsageError as error:
         print(f"  ✗ 用法错：{error}", file=sys.stderr)
-        print("    → 怎么办：照文件头「用法」一段给参数（dump <根> | closure <根> <入口> | key <根> <入口> | controls <根> | entries <根> | --selftest）", file=sys.stderr)
+        print("    → 怎么办：照文件头「用法」一段给参数（dump <根> | closure <根> <入口> | key <根> <入口> | controls <根> | entries <根> | cross-run-caches | --selftest）",
+              file=sys.stderr)
         return 2
     except (FunctionUnitsError, OSError) as error:
         print(f"  ✗ 算不出：{error}", file=sys.stderr)
@@ -10754,6 +15059,39 @@ def main(arguments):
         return 3
 
 
+BREAK_VARIABLES = ("FUNCTION_UNITS_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/gate/lib_function_units.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

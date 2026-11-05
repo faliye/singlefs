@@ -159,14 +159,32 @@ fn bench(tree: &Tree, keys: &[u64]) -> u64 {
     elapsed_nanoseconds
 }
 
+/// 登记的每格查找次数；不给参数就是它。
+const REGISTERED_LOOKUP_COUNT: usize = 2_000_000;
+
+/// 与登记规模不同的参数就是缩过规模的一趟：config 行接这一段，产物不当正式产物。
+/// 每项是（名字，这一趟的值，登记的值）；全部等于登记值时不接。
+fn reduced_scale_note(scales: &[(&str, u64, u64)]) -> String {
+    let registered_values: Vec<String> = scales
+        .iter()
+        .filter(|(_, actual, registered)| actual != registered)
+        .map(|(name, _, registered)| format!("registered_{name}={registered}"))
+        .collect();
+    if registered_values.is_empty() {
+        String::new()
+    } else {
+        format!(" reduced=yes {} not_official_product=yes", registered_values.join(" "))
+    }
+}
+
 fn main() {
-    let lookup_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(2_000_000);
+    let lookup_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(REGISTERED_LOOKUP_COUNT);
     let rounds = 3;
     let mut emitter = Emitter::new();
     let mut output = String::new();
     let mut say = |line: String| { output.push_str(&line); output.push('\n'); };
 
-    say(emitter.emit_raw(&format!("name=config iters={lookup_count} rounds={rounds} line_bytes={CACHE_LINE_BYTES} node_hdr={NODE_HEADER_BYTES}")));
+    say(emitter.emit_raw(&format!("name=config iters={lookup_count} rounds={rounds} line_bytes={CACHE_LINE_BYTES} node_hdr={NODE_HEADER_BYTES}{}", reduced_scale_note(&[("iterations", lookup_count as u64, REGISTERED_LOOKUP_COUNT as u64)]))));
 
     // 条目宽度：16=key+8B 指针（ext2 级）；24=E17 的缓冲条目；
     // 32=ZFS 那个 256 位槽；40≈本工程指针头部；67=头部+2 副本；111=头部+4+2 条带六列
@@ -294,5 +312,15 @@ mod tests {
         let deep = Tree::new(1 << 20, 16, 4096);
         assert_eq!(shallow.depth, 1);
         assert!(deep.depth >= 3, "深树的层数只有 {}", deep.depth);
+    }
+
+    /// 给了缩规模的查找次数，config 行要写缩过、不当正式产物；登记规模不加这一段。
+    #[test]
+    fn reduced_lookup_count_is_marked_and_registered_one_is_not() {
+        assert_eq!(reduced_scale_note(&[("iterations", REGISTERED_LOOKUP_COUNT as u64, REGISTERED_LOOKUP_COUNT as u64)]), "");
+        assert_eq!(
+            reduced_scale_note(&[("iterations", 1000, REGISTERED_LOOKUP_COUNT as u64)]),
+            " reduced=yes registered_iterations=2000000 not_official_product=yes"
+        );
     }
 }

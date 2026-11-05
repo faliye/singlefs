@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # admission: always 判的是此刻这棵树的源文件与编译目录里的源码戳，上一次的结论不替这一次作保
-# run-condition: command python3 rsync
+# run-condition: command python3 rsync git
 """换了源码却没重编的拦法：复用编译目录之前，把内容或 mtime 与上一次留下的样子不一样的源文件 touch 到此刻，cargo 下一次就重编它们。
 
 为什么：cargo 按 mtime 判本地包新不新鲜（源文件比上一次编的 dep-info 新才重编）。往一份已经编过的副本树里 rsync -a 铺新源码，
@@ -19,23 +19,35 @@ CPU 一侧用的是旧 walk.rs 编出来的库（records/2026-09-30-里程碑三
       仓根 .gitignore 的 target/ 管的就是任意一层，scripts/experiment-apparatus/target 这类编译目录动辄几十 G，与 refresh 不进的目录同一批）把源树拷进副本：
       按内容比，内容变了的才拷、拷过去的 mtime 是此刻，没变的不动；再对副本做一次 refresh（拷之前被别人 rsync -a 过的也一并补上）。
       手敲 rsync -a 之后跑 refresh 同样拦得住，只是 rsync -a 把 touch 过的文件改回旧 mtime，下一次 refresh 会再 touch 它们、多重编一次。
+      副本在 git 工作树里、而 git status --porcelain 在副本那一段（含没跟踪的文件）不空的，拒写、一个字节不拷：sync 按内容整份覆写，
+      会冲掉别人在那棵树里没提交的改动；git status 本身退非 0（判不了）照拒。副本不在任何 git 工作树里、或在而干净的，照拷。
   source-stamp.py --selftest
   source-stamp.py --write-selftest-cargo <路径>   只给自证（这一份与 scripts/gate/merge-and-verify.sh 的）：写一份照 mtime 判新不新鲜的假 cargo
 编译目录：--target-dir 给了用它；不给用 CARGO_TARGET_DIR（相对路径按树根算）；都没有用 <树>/target。
 源文件：--include 给了就是点名的那几处（文件或目录），不给是树根的 Cargo.toml、Cargo.lock、.cargo/ 与 crates/ 里存在的那几处；
   目录里的每个普通文件都算，不进名叫 .git、target、target-*、__pycache__ 的目录。
 输出：一行 SOURCE_STAMP touched=<touch 了几个> files=<源文件几个> reason=<first-use|changed|fresh-target|unchanged> stamp=<戳的路径>；touch 的逐个列在它前面。
-退出码：0 刷新完；1 刷新不成（树不在、读写不了、rsync 退非 0），没 touch 完的不算数；2 用法错。
+退出码：0 刷新完；1 刷新不成（树不在、读写不了、rsync 退非 0，或 sync 的副本是有未提交改动的 git 工作树），没 touch 完的不算数；2 用法错。
 
 弄坏开关 SOURCE_STAMP_BREAK=<项>（只给 --selftest 证红用，逗号连几个；在 --selftest 之外设了就拒、退 2）。项名、弄坏哪一处、打开后红在哪几格
   （格名是「✗ 自证 <格名>：」里的那一段；末尾那一轮照 SWITCH_EXPECTED_CELLS 逐个核）：
-  no-touch            refresh 只写戳、一个都不 touch          refresh-rebuilds、first-use-touches-all、failed-build-then-resync
+  SOURCE_STAMP_BREAK=no-touch  refresh 只写戳、一个都不 touch
+      「✗ 自证 refresh-rebuilds：」、「✗ 自证 first-use-touches-all：」、「✗ 自证 failed-build-then-resync：」
                       （sync-rebuilds 不红：sync 拷过去的文件 mtime 本来就是此刻）
-  content-only        只比内容摘要，不比 mtime                 failed-build-then-resync
-  trust-missing-stamp 编译目录有东西而没有戳时一个都不 touch    first-use-touches-all
-  sync-plain-rsync    sync 退回 rsync -a（带源树的旧 mtime）、拷完不做 refresh   sync-rebuilds
-  touch-everything    每次都把源文件全部 touch                 unchanged-not-touched、fresh-target、sync-rebuilds
-  sync-copies-build-directories  sync 照改前只排除树根那一层的 target、target-*，下面几层的编译目录照拷   sync-skips-build-directories
+  SOURCE_STAMP_BREAK=content-only  只比内容摘要，不比 mtime
+      「✗ 自证 failed-build-then-resync：」
+  SOURCE_STAMP_BREAK=trust-missing-stamp  编译目录有东西而没有戳时一个都不 touch
+      「✗ 自证 first-use-touches-all：」
+  SOURCE_STAMP_BREAK=sync-plain-rsync  sync 退回 rsync -a（带源树的旧 mtime）、拷完不做 refresh
+      「✗ 自证 sync-rebuilds：」
+  SOURCE_STAMP_BREAK=touch-everything  每次都把源文件全部 touch
+      「✗ 自证 unchanged-not-touched：」、「✗ 自证 fresh-target：」、「✗ 自证 sync-rebuilds：」
+  SOURCE_STAMP_BREAK=sync-copies-build-directories  sync 照改前只排除树根那一层的 target、target-*，下面几层的编译目录照拷
+      「✗ 自证 sync-skips-build-directories：」
+  SOURCE_STAMP_BREAK=sync-dirty-worktree-unchecked  sync 照改前不核副本是不是有未提交改动的 git 工作树，照拷
+      「✗ 自证 sync-refuses-dirty-worktree：」
+  SOURCE_STAMP_BREAK=sync-worktree-refused-even-clean  副本在 git 工作树里就拒，干净的也拒
+      「✗ 自证 sync-clean-worktree-allowed：」
 另有一格 stale-reproduced 不经这份脚本、只 rsync -a 再编，核的是假 cargo 真会被旧 mtime 骗（复现那一次的样子）：它红说明样本不成立。
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
@@ -62,6 +74,13 @@ STAMP_HEADER = [
 EXIT_REFUSED = 1
 EXIT_USAGE = 2
 BREAK_VARIABLE = "SOURCE_STAMP_BREAK"
+# sync 核副本那棵 git 工作树时不跟调用方的这几个 git 变量走（不然判的是调用方指的那个仓，不是副本自己的）；拒绝说明里列出的未提交改动至多几行
+GIT_ENVIRONMENT_IGNORED = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
+DIRTY_ENTRIES_SHOWN = 5
+
+
+class DirtyWorktreeRefused(OSError):
+    """sync 的副本是有未提交改动的 git 工作树（或 git status 判不了）：一个字节都没拷。"""
 
 
 def broken(item):
@@ -179,13 +198,38 @@ def refresh(tree, target, includes, say):
     return touched
 
 
+def dirty_worktree_problem(copy):
+    """副本落在 git 工作树里、git status --porcelain 在副本那一段（含没跟踪的）不空：交拒绝原因；副本还不在、不在工作树里、或干净的交 None。
+    git status 退非 0 判不了，照拒（文件头 sync）。"""
+    if not os.path.isdir(copy) or broken("sync-dirty-worktree-unchecked"):
+        return None
+    environment = {name: value for name, value in os.environ.items() if name not in GIT_ENVIRONMENT_IGNORED}
+    toplevel = subprocess.run(["git", "-C", copy, "rev-parse", "--show-toplevel"], capture_output=True, text=True, env=environment, stdin=subprocess.DEVNULL)
+    if toplevel.returncode != 0:
+        return None
+    worktree = toplevel.stdout.strip()
+    status = subprocess.run(["git", "-C", copy, "status", "--porcelain", "--", "."], capture_output=True, text=True, env=environment, stdin=subprocess.DEVNULL)
+    if status.returncode != 0:
+        return f"副本 {copy} 在 git 工作树 {worktree} 里，git status 退 {status.returncode}，判不了有没有未提交的改动：{status.stderr.strip()[-200:]}"
+    entries = [line for line in status.stdout.splitlines() if line.strip()]
+    if not entries and broken("sync-worktree-refused-even-clean"):
+        entries = ["（弄坏开关 sync-worktree-refused-even-clean：干净的也拒）"]
+    if not entries:
+        return None
+    shown = "；".join(entries[:DIRTY_ENTRIES_SHOWN]) + (f"；…共 {len(entries)} 处" if len(entries) > DIRTY_ENTRIES_SHOWN else "")
+    return f"副本 {copy} 在 git 工作树 {worktree} 里，有 {len(entries)} 处未提交的改动（{shown}）：sync 按内容整份覆写，会冲掉它们"
+
+
 def sync(source, copy, target, includes, say):
-    """文件头 sync：rsync -a 拷进副本，再 refresh。"""
+    """文件头 sync：rsync -a 拷进副本，再 refresh。副本是有未提交改动的 git 工作树就拒，一个字节不拷。"""
     source, copy = os.path.realpath(source), os.path.realpath(copy)
     if os.path.commonpath((source, copy)) in (source, copy):
         raise OSError("源树与副本不能相同或互相包含；请选择源树之外的独立副本目录")
     if not os.path.isdir(source):
         raise OSError(f"源树 {source} 不在")
+    problem = dirty_worktree_problem(copy)
+    if problem:
+        raise DirtyWorktreeRefused(problem)
     os.makedirs(copy, exist_ok=True)
     # --no-times --checksum：按内容比，只拷内容变了的，拷过去的 mtime 是此刻（不带源树的旧 mtime）；没变的不动、mtime 照旧，cargo 不白重编
     times = ["-a"] if broken("sync-plain-rsync") else ["-a", "--no-times", "--checksum"]
@@ -344,6 +388,49 @@ def selftest_cells(root):
     check("sync-skips-build-directories", not copied_build_directories and not missing_sources,
           f"sync 之后副本里不该有编译目录、源文件都该在，实际拷过去的编译目录 {copied_build_directories or '无'}，没拷过去的源文件 {missing_sources or '无'}")
 
+    def worktree_scene(name, dirty):
+        """源树（lib.rs 返回 2）与一棵提交过的 git 工作树副本（lib.rs 返回 1）；dirty 时副本里 lib.rs 另有一处没提交的改动（返回 33）。"""
+        base = os.path.join(root, name)
+        source, worktree = os.path.join(base, "source"), os.path.join(base, "worktree")
+        write(source, "Cargo.toml", "[workspace]\n", OLD_MTIME_SECONDS)
+        write(source, "crates/demo/src/lib.rs", "pub fn f() -> u32 { 2 }\n", OLD_MTIME_SECONDS)
+        write(worktree, "Cargo.toml", "[workspace]\n", OLD_MTIME_SECONDS)
+        write(worktree, "crates/demo/src/lib.rs", "pub fn f() -> u32 { 1 }\n", OLD_MTIME_SECONDS)
+        environment = {key: value for key, value in os.environ.items() if key not in GIT_ENVIRONMENT_IGNORED}
+        for git_arguments in (["init", "-q"], ["add", "-A"],
+                              ["-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest", "-c", "commit.gpgsign=false",
+                               "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", "基准"]):
+            subprocess.run(["git", "-C", worktree, *git_arguments], check=True, capture_output=True, env=environment, stdin=subprocess.DEVNULL)
+        if dirty:
+            # 长度与 mtime 都换掉：git 按 stat 认改没改，同长同 mtime 的改动它看不见
+            write(worktree, "crates/demo/src/lib.rs", "pub fn f() -> u32 { 33 }\n", OLD_MTIME_SECONDS + 50)
+        return source, worktree
+
+    def sync_refusal(source, worktree):
+        try:
+            sync(source, worktree, os.path.join(worktree, "target"), DEFAULT_INCLUDES, quiet)
+        except DirtyWorktreeRefused as error:
+            return str(error)
+        return None
+
+    def library_text(worktree):
+        with open(os.path.join(worktree, "crates/demo/src/lib.rs"), encoding="utf-8") as handle:
+            return handle.read()
+
+    # sync-refuses-dirty-worktree：副本是一棵 git 工作树、lib.rs 有没提交的改动 ⇒ sync 拒写（说未提交），lib.rs 还是那份没提交的内容
+    source, worktree = worktree_scene("sync-refuses-dirty-worktree", dirty=True)
+    refusal = sync_refusal(source, worktree)
+    kept = library_text(worktree)
+    check("sync-refuses-dirty-worktree", refusal is not None and "未提交" in refusal and "{ 33 }" in kept,
+          f"副本是有未提交改动的 git 工作树，sync 应当拒写、lib.rs 照留没提交的那一份，实际拒绝说明「{refusal}」，lib.rs 是「{kept.strip()}」")
+
+    # sync-clean-worktree-allowed：副本是一棵干净的 git 工作树 ⇒ 照拷，lib.rs 换成源树那一份
+    source, worktree = worktree_scene("sync-clean-worktree-allowed", dirty=False)
+    refusal = sync_refusal(source, worktree)
+    copied = library_text(worktree)
+    check("sync-clean-worktree-allowed", refusal is None and "{ 2 }" in copied,
+          f"副本是干净的 git 工作树，sync 应当照拷，实际拒绝说明「{refusal}」，lib.rs 是「{copied.strip()}」")
+
     # first-use-touches-all：副本编过、编译目录里没有戳（头一次用）⇒ 判不了哪些编过，全 touch，编出来的是此刻的源码
     source, copy = scene("first-use-touches-all")
     rsync(source, copy)
@@ -394,6 +481,8 @@ SWITCH_EXPECTED_CELLS = {   # 文件头「弄坏开关」那一段，两处要�
     "sync-plain-rsync": ["sync-rebuilds"],
     "touch-everything": ["unchanged-not-touched", "fresh-target", "sync-rebuilds"],
     "sync-copies-build-directories": ["sync-skips-build-directories"],
+    "sync-dirty-worktree-unchecked": ["sync-refuses-dirty-worktree"],
+    "sync-worktree-refused-even-clean": ["sync-clean-worktree-allowed"],
 }
 
 
@@ -431,7 +520,7 @@ def selftest():
     if switch_failures:
         print("  → 怎么办：照上面那几个开关看它在代码里弄坏的那一处还在不在判法上；改了判法就改 SWITCH_EXPECTED_CELLS 与文件头的表")
         return 1
-    print(f"  ✓ source-stamp.py 自证通过（查了 {checked} 格：只 rsync -a 会被旧 mtime 骗、rsync -a 之后 refresh 一次就重编换了内容的、sync 入口只重编内容变了的、sync 不拷下面几层的编译目录、"
+    print(f"  ✓ source-stamp.py 自证通过（查了 {checked} 格：只 rsync -a 会被旧 mtime 骗、rsync -a 之后 refresh 一次就重编换了内容的、sync 入口只重编内容变了的、sync 不拷下面几层的编译目录、sync 不往有未提交改动的 git 工作树里写（干净的照拷）、"
           f"没有戳时全 touch、编不过又被改回旧 mtime 的再 touch、没改的不 touch、编译目录不在只写戳；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 
@@ -484,6 +573,12 @@ def main(arguments):
             refresh(tree, target_directory(tree, target, os.environ), includes, say)
         else:
             sync(os.path.abspath(positional[0]), tree, target_directory(tree, target, os.environ), includes, say)
+    except DirtyWorktreeRefused as error:
+        print(f"  ✗ source-stamp.py sync 拒写，一个字节没拷：{error}", file=sys.stderr)
+        print("  → 怎么办：换一个不在 git 工作树里的新副本目录（草稿目录下新建一个空目录）再 sync；确要往这棵树里拷，先把那几处改动提交，"
+              "或用 python3 scripts/agents/copy-originals.py copy <草稿目录> <文件>… 留底之后让改它们的那一方自己处置，git status 在副本那一段为空了再跑；"
+              "要撤自己的改动用 git apply -R 撤自己那几块，别整份覆盖", file=sys.stderr)
+        return EXIT_REFUSED
     except OSError as error:
         print(f"  ✗ source-stamp.py {action} 没做成：{error}", file=sys.stderr)
         print("  → 怎么办：看树与编译目录在不在、可不可写；没做成之前别复用这个编译目录去编（换一个新编译目录，或修好再跑这一条）", file=sys.stderr)

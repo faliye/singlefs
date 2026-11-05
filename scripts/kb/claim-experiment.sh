@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
-# run-condition: command git python3
+# run-condition: command git python3 flock
 # 取实验号并当场占住：查号与建第一个文件在同一步里做，建文件用排他方式（noclobber）。
 #
 #   bash scripts/kb/claim-experiment.sh --next              # 打印下一个没人用的实验号
@@ -48,12 +48,26 @@ PRE_REGISTRY_DIRECTORIES=$'research/prompts\te-number-names\t# 改前写死的�
 # 给定的这一棵加上同一个仓的其余工作树，一行一个根；清单读不出（在 git 仓里而 git 失败）退 1，不在 git 仓里只给这一棵。
 worktree_roots() {
   local root="$1" listing line path
+  if [[ "$root" == *$'\n'* ]]; then
+    echo '  ✗ 工作树根路径含换行，逐行查号接口无法表示；没占号' >&2
+    echo '    → 将工作树迁到不含换行的路径后重跑' >&2
+    return 1
+  fi
   printf '%s\n' "$root"
   [[ "${CLAIM_EXPERIMENT_BREAK:-}" == worktrees-skipped ]] && return 0
   git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  if ! listing="$(git -C "$root" worktree list --porcelain 2>/dev/null)"; then
-    echo "  ✗ $root 在 git 仓里，但 git worktree list 读不出工作树清单，不知道别的工作树用了哪些号" >&2
-    echo "    → 在仓里单跑 git worktree list --porcelain 看它报什么；修好之前不取号，免得和别的工作树撞号" >&2
+  if ! listing="$(git -C "$root" worktree list --porcelain -z | python3 -c '
+import sys
+entries = [entry for entry in sys.stdin.buffer.read().split(b"\0") if entry.startswith(b"worktree ")]
+if any(b"\n" in entry for entry in entries):
+    print("  ✗ 工作树根路径含换行，逐行查号接口无法表示", file=sys.stderr)
+    print("     → 怎么办：把那棵工作树挪到不含换行的路径（git worktree move），再起同一条命令", file=sys.stderr)
+    sys.exit(1)
+for entry in entries:
+    sys.stdout.buffer.write(entry + b"\n")
+')"; then
+    echo "  ✗ $root 的工作树清单读取或路径检查失败，不知道别的工作树用了哪些号" >&2
+    echo "    → 检查 git worktree list --porcelain -z 的错误或含换行的工作树路径；修好之前不取号，免得撞号" >&2
     return 1
   fi
   while IFS= read -r line; do
@@ -98,17 +112,31 @@ next_number() {
   local used highest
   used="$(used_numbers "$1")" || return 1
   highest="$(tail -1 <<<"$used")"
-  echo "E$(( ${highest:-0} + 1 ))"
+  python3 -c 'import sys; print("E" + str(int(sys.argv[1] or "0") + 1))' "$highest"
 }
 
-claim() {
+claim() (
+  # 所有工作树共用 Git 公共目录中的锁；锁覆盖查号与建文件两步。
+  # 非 Git 的自证树在自己的根下锁。子 shell 退出即释放文件描述符。
+  local lock_root lock_fd
+  lock_root="$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || lock_root="$1"
+  if ! exec {lock_fd}>"$lock_root/claim-experiment.lock"; then
+    echo '  ✗ 建不了实验号锁；没占号' >&2
+    echo '    → 检查仓根与 Git 公共目录的权限后重跑' >&2
+    return 3
+  fi
+  flock -x "$lock_fd" || return 3
+  claim_locked "$@"
+)
+
+claim_locked() {
   local root="$1" tag="$2" short_name="$3" number file used used_count tree_count
   if [[ ! "$tag" =~ ^E([0-9]+)$ ]]; then
     echo "  ✗ 实验号要写成 E<数字>，拿到的是「$tag」"
     echo "    → 例：bash scripts/kb/claim-experiment.sh E139 某某的代价；不知道用几号先跑 --next"
     return 2
   fi
-  number="${BASH_REMATCH[1]}"
+  number="$(python3 -c 'import sys; print(int(sys.argv[1]))' "${BASH_REMATCH[1]}")" || return 2
   if [[ -z "$short_name" ]]; then
     echo "  ✗ 没给简称"
     echo "    → 简称写进跑前登记的标题；编号在别处引用时要带着它"
@@ -134,7 +162,7 @@ claim() {
 }
 
 # 自证的临时树用的目录登记：与仓里那份同样五处，自证不依赖仓里那份的内容。
-SELFTEST_REGISTRY=$'research\te-number-names\t# 样本：跑前登记与产物\nscripts\te-number-names\t# 样本：实验源码与变异表\ncrates/singlefs-checker-tier/src/bin\te-number-names\t# 样本：入库装置\n.claude/kb/experiments\tnumber-names\t# 样本：实验页\n.claude/kb/experiments.md\tindex-rows\t# 样本：实验索引'
+SELFTEST_REGISTRY=$'research\te-number-names\t# 样本：跑前登记与产物\nscripts\te-number-names\t# 样本：实验源码与变异表\ncrates/singlefs-verification/src/bin\te-number-names\t# 样本：入库装置\n.claude/kb/experiments\tnumber-names\t# 样本：实验页\n.claude/kb/experiments.md\tindex-rows\t# 样本：实验索引'
 
 # 自证的一条失败：失败行带 ✗（门禁 break-switch-replay 格只在带 ✗ 的行里找点名的项），下一行写怎么办。
 selftest_fail() {
@@ -199,9 +227,9 @@ selftest() {
   [[ $rc_other_second -eq 0 ]] || { selftest_fail "E14 两棵里都没人用，另一棵没占成（退 $rc_other_second）"; return 1; }
 
   # 目录登记：入库装置目录里的 E40 被拒；登记里加一行 notes 之后 notes 下的 E50 被拒、--next 从 E41 涨到 E51；登记不在时拒绝给号。
-  mkdir -p "$registry_root/crates/singlefs-checker-tier/src/bin" "$registry_root/notes"
+  mkdir -p "$registry_root/crates/singlefs-verification/src/bin" "$registry_root/notes"
   write_selftest_registry "$registry_root"
-  : > "$registry_root/crates/singlefs-checker-tier/src/bin/e40_sample.rs"
+  : > "$registry_root/crates/singlefs-verification/src/bin/e40_sample.rs"
   : > "$registry_root/notes/e50-sample.md"
   next_before="$(next_number "$registry_root" 2>/dev/null)"
   claim "$registry_root" E40 样本 >/dev/null 2>&1; rc_bin=$?

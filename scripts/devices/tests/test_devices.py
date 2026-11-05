@@ -103,7 +103,11 @@ remove_dm owned
         (self.root / 'scripts/experiment-apparatus').mkdir()
         hosts = self.root / 'scripts/hosts'
         hosts.mkdir()
-        (hosts / 'capped.sh').write_text('exit 0\n')
+        # 任务里面再套一层 capped.sh 会被拒（只认服务起尝试时套的那一层）：替身照样退 2，e152-run.sh 套了它就编不过、到不了附加根
+        (hosts / 'capped.sh').write_text('echo nested-capped-refused >&2; exit 2\n')
+        cargo = self.root / 'mock/cargo'
+        cargo.write_text('#!/bin/bash\nexit 0\n')
+        cargo.chmod(0o755)
         (devices / 'vm-kernel.sh').write_text('echo /fake/kernel\n')
         (devices / 'e152-stage-root.sh').write_text('echo reached-staging >&2; exit 17\n')
         result = self.bash('bash "$1" "$2"', [devices / 'e152-run.sh', self.root / 'out'])

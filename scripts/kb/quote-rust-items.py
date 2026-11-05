@@ -46,6 +46,14 @@ def strip_code(line: str, state: dict) -> str:
                 continue
             i += 1
             continue
+        if state.get("raw") is not None:
+            ending = '"' + state['raw']
+            if line.startswith(ending, i):
+                i += len(ending)
+                state['raw'] = None
+            else:
+                i += 1
+            continue
         if state["string"]:
             if c == "\\":
                 i += 2
@@ -58,14 +66,23 @@ def strip_code(line: str, state: dict) -> str:
             break
         if c == "/" and nxt == "*":
             state["block"] += 1
+            out.append(' ')
             i += 2
+            continue
+        raw = re.match(r'(?:br|cr|r)(#*)"', line[i:])
+        if raw and (i == 0 or not (line[i - 1].isalnum() or line[i - 1] == '_')):
+            state['raw'] = raw.group(1)
+            out.append(' ')
+            i += len(raw.group(0))
             continue
         if c == '"':
             state["string"] = True
             i += 1
             continue
-        if c == "'" and re.match(r"'(\\.|[^\\'])'", line[i:]):
-            i += len(re.match(r"'(\\.|[^\\'])'", line[i:]).group(0))
+        character = re.match(r"'(?:\\(?:u\{[0-9a-fA-F_]+\}|x[0-9a-fA-F]{2}|.)|[^\\'])'", line[i:]) if c == "'" else None
+        if character:
+            i += len(character.group(0))
+            out.append(' ')
             continue
         out.append(c)
         i += 1
@@ -81,7 +98,9 @@ def header_pattern(name: str):
 
 def find_item(lines, name):
     pattern = header_pattern(name)
-    starts = [index for index, line in enumerate(lines) if pattern.search(line)]
+    state = {"block": 0, "string": False}
+    codes = [strip_code(line, state) for line in lines]
+    starts = [index for index, line in enumerate(codes) if pattern.search(line)]
     if not starts:
         return None, 3
     if len(starts) > 1:
@@ -91,21 +110,37 @@ def find_item(lines, name):
     first = start
     while first > 0 and re.match(r"^\s*(///|//!|#\[|#!\[)", lines[first - 1]):
         first -= 1
-    state = {"block": 0, "string": False}
-    depth = 0
+    stack = []
     opened = False
+    header_angles = 0
+    in_contract = False
+    # 常量、静态量和类型别名允许块表达式，直到最外层分号才结束。
+    semicolon_item = re.match(
+        r'^\s*(?:pub(?:\([^)]*\))?\s+)?(?:const|static|type)\s+' + re.escape(name) + r'\b', codes[start]) is not None
     for index in range(start, len(lines)):
-        code = strip_code(lines[index], state)
-        if not opened and ";" in code and "{" not in code:
-            return (first, index), 0
-        for c in code:
-            if c == "{":
-                depth += 1
-                opened = True
-            elif c == "}":
-                depth -= 1
-                if opened and depth == 0:
+        code = codes[index]
+        # Verus 函数的契约位于签名和函数体之间，其中的 < 是比较。
+        if not opened and not stack and not header_angles and re.match(
+                r'^\s*(?:requires|ensures|recommends|decreases|opens_invariants|no_unwind)\b', code):
+            in_contract = True
+        for offset, c in enumerate(code):
+            # 项头的泛型参数可含块表达式。只在普通括号外跟踪尖括号，
+            # 不把函数体中的比较/移位或返回类型箭头当作泛型分隔符。
+            if not semicolon_item and not in_contract and not opened and not stack and c == '<':
+                header_angles += 1
+            elif not semicolon_item and not in_contract and not opened and not stack and c == '>' and (offset == 0 or code[offset - 1] != '-'):
+                header_angles = max(0, header_angles - 1)
+            elif c in '([{':
+                if c == '{' and not stack and not header_angles:
+                    opened = True
+                stack.append(c)
+            elif c in ')]}':
+                if not stack or stack.pop() != {')': '(', ']': '[', '}': '{'}[c]:
+                    return None, 3
+                if c == '}' and opened and not stack and not semicolon_item:
                     return (first, index), 0
+            elif c == ';' and not stack and not header_angles:
+                return (first, index), 0
     return None, 3
 
 
@@ -135,7 +170,7 @@ def quote(specs):
             return 3, ""
         first, last = found
         body = "\n".join(lines[first:last + 1])
-        if "\n".join(text.split("\n")[first:last + 1]) != body:
+        if path.read_text(encoding="utf-8") != text:
             print(f"  ✗ {spec} 回读与源文件那几行不符", file=sys.stderr)
             print("     → 怎么办：源文件在抽的途中被改了，等它停下再抽。", file=sys.stderr)
             return 5, ""

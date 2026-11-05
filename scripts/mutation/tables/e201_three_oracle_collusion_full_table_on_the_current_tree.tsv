@@ -1,0 +1,52 @@
+# E201（三oracle合谋今树整表） 研究一侧的变异表（跑前登记第九节 V1–V14）。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。
+# 经 scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/mutation_driver.py 跑（mutate.sh 只跑 cargo）；入库装置不改，不加装置一侧的行。
+# 分类表与两张对应表是数据（.tsv），变异只改 .py；V3、V5 改的是读表之后用表的那一处（配键、取类）。
+V1 红的计数逐值比	        return is_positive(r1_value) != is_positive(today_value)	        return r1_value != today_value
+V2 红的计数取是否大于 1	return str(int(value) > 0).lower() if value.lstrip("-").isdigit() else value	return str(int(value) > 1).lower() if value.lstrip("-").isdigit() else value
+V3 配键丢掉流	    key_names = classes.keys.get((product, kind), ())	    key_names = tuple(name for name in classes.keys.get((product, kind), ()) if name != "stream")
+V4 只在一边的键不当一格	            tally.decision_changed += 1\n            cells.append(Cell(product, kind, key, PRESENCE_FIELD,	            tally.decision_changed += 0\n            [].append(Cell(product, kind, key, PRESENCE_FIELD,
+V5 判定词字段归钉值格	        return fields.get(name, fields.get("*"))	        return CLASS_PINNED if name in ("verdict", "q1", "q2", "q3") else fields.get(name, fields.get("*"))
+V6 G2 比名字不比变异行	get("mutation_line_sha256") != self.inputs.t2_rows.get(row, {}).get("mutation_line_sha256")	get("mutated_row_name") != self.inputs.t2_rows.get(row, {}).get("mutated_row_name")
+V7 G4 比整份文件	            outcomes.append(HIT if reference != [unit.fingerprint] else MISS)	            outcomes.append(HIT if open(os.path.join(self.inputs.reference_root, mutation.file), encoding="utf-8").read() != text else MISS)
+V8 G4 不标参照近似	                notes.append(f"reference_approximate:{mutation.file}")	                pass
+V9 G6 的 RefFS 列不查 RefFS 入口	    for column in (COLUMN_CRASH_JUDGE, COLUMN_REFERENCE_FILESYSTEM, COLUMN_O3_STRICT, COLUMN_O3_PROVISIONAL):	    for column in (COLUMN_CRASH_JUDGE, COLUMN_O3_STRICT, COLUMN_O3_PROVISIONAL):
+V10 漏判取批 2	    return frozenset(row for row in members if not column_red(counts, row, streams, batch, field_names))	    return frozenset(row for row in members if not column_red(counts, row, streams, BATCHES[1], field_names))
+V11 多了按个数	    more = missed_today - missed_r1	    more = frozenset(sorted(missed_today)[len(missed_r1):])
+V12 D 不要求 r1 计入分母	        elif not counted(r1_categories, row, reading, batch):	        elif False:
+V13 键不含改坏用的变异行	f"list_line={row.list_line}", f"mutation_line={row.mutation_line_sha256}",	f"list_line={row.list_line}",
+V14 哨兵不挑	    sentinels = tuple(sorted(order[:sentinel_count(len(reusable))]))	    sentinels = tuple(sorted(order[:0]))
+# 登记修订 3 补的 24 条（登记落地清单上一段写「无用例」的那几行，每条改坏一处判法、红在 test_*.py 里点名那一格；名字以「落地」起头，不另编号）。
+落地 拷树不排除 target	["rsync", "-a", "--exclude", "target", source + "/", os.path.join(destination, entry) + "/"]	["rsync", "-a", source + "/", os.path.join(destination, entry) + "/"]
+落地 改动清单只记第一行	*SYNCED_ENTRIES).splitlines())	*SYNCED_ENTRIES).splitlines()[:1])
+落地 T3 不看装置退出码	if result.get("status") != "ok" or result.get("device_exit") not in ("0", "3"):	if result.get("status") != "ok":
+落地 宽归因只数新出的单元	if before.get(key) != fingerprint))	if key not in before))
+落地 Z1 不比交回值	return export_differences(first, second, stream_names, Z1_FILES) + return_values(first, second, stream_names)	return export_differences(first, second, stream_names, Z1_FILES)
+落地 逐文件比不比内容	os.path.exists(other) and sha256_file(one) == sha256_file(other)):	os.path.exists(other)):
+落地 Z3 不核快照摘要	if row_driver.snapshot_digest(tree)[0] != record["tree_inputs"]["snapshot_digest"]:	if False:
+落地 片收尾不核	    problems = shard_check_problems(record, tree)\n    lines.result(f"name=shard_check moment=end	    problems = []\n    lines.result(f"name=shard_check moment=end
+落地 Z4 编后不核重编	elif freshness[package]:	elif False:
+落地 Z4 合并不查没核过的行	if fields.get("status") == driver.STATUS_OK and fields.get(driver.REBUILD_CHECK_FIELD, "-") in ("", "-"):	if False:
+落地 Z6 不解 gz	opener = gzip.open if file.endswith(".gz") else open	opener = open
+落地 S1 S3 S5 不判	checks.append((clause, not bad, ",".join(bad)))	checks.append((clause, True, ",".join(bad)))
+落地 S4 认退 3	all(entry.get("exit") in ("0",) for entry in baselines.values())	all(entry.get("exit") in ("0", "3") for entry in baselines.values())
+落地 S2 只看有没有那一行	checks.append(("S2", s2 == "-", s2))	checks.append(("S2", s2 != "missing", s2))
+落地 S2 导出没跑成当相同	        return ["dump_failed"]	        return []
+落地 S6 编不过照跑	if compile_exit != 0:  # 停机 S6：计划拷进来的树编不过	if False:  # 停机 S6：计划拷进来的树编不过
+落地 S6 合并不判	checks.append(("S6", not stops, ",".join(stops)))	checks.append(("S6", True, ",".join(stops)))
+落地 S7 两台不同当相同	    cross = "differs" if differing else "same"	    cross = "same"
+落地 K3 panic 不核截在第 3 次调用	 and last_call == PANIC_CONTROL_CALL and judged == 1	 and judged == 1
+落地 K3 装置计数不核精确数	return str(observed), observed == expected	return str(observed), observed >= expected
+落地 K2 空变异触达不算	failing += reds + touched	failing += reds
+落地 F3 不收 ran 是 false 的行	            not_run.add(int(fields["row"]))	            pass
+落地 A7 不比	return [] if full == stored else [f"{number}:stored_row_differs"]	return []
+落地 Z6 不数第二次基线	("baseline.device.out", "baseline", "baseline-second.device.out", "baseline-second", "empty", "controls")	("baseline.device.out", "baseline", "empty", "controls")
+# 登记修订 5 补的改动清单那一条（S6 在任务 5503 打中：拷树漏 prune-server；改回不含 prune-server 的写法）
+落地 改动清单漏 prune-server	"--", *SYNCED_ENTRIES).splitlines())	"--", "crates", "Cargo.toml", "Cargo.lock", ".cargo").splitlines())
+# 登记修订 6 补的建上级目录两条（S6 在任务 5606 打中：拷树漏 .claude/heavy-thread-default；去掉单个文件条目先建上级目录那一句）
+落地 计划拷树单个文件不建上级目录	            os.makedirs(os.path.dirname(copied_file), exist_ok=True)	            pass
+落地 线道树同步单个文件不建上级目录	            os.makedirs(os.path.dirname(destination), exist_ok=True)	            pass
+# 拷贝范围改取 scripts/hosts/lib_repository_copy.py 的闭包之后补的 4 条（两份 SYNCED_ENTRIES 改回只有共用清单、两处入口不交多机配置；登记的修订待补）
+落地 计划拷树不走共用库的闭包	SYNCED_ENTRIES = lib_repository_copy.copy_closure(REPOSITORY_ROOT).entries	SYNCED_ENTRIES = lib_repository_copy.COMMON_ENTRIES
+落地 线道树同步不走共用库的闭包	SYNCED_ENTRIES = lib_repository_copy.copy_closure(e171_research_side.REPOSITORY_ROOT).entries	SYNCED_ENTRIES = lib_repository_copy.COMMON_ENTRIES
+落地 入口不交多机配置	    os.environ.update(lib_repository_copy.environment_for_commands_in_the_copy(REPOSITORY_ROOT, os.environ))	    pass
+落地 逐行驱动不交多机配置	    os.environ.update(lib_repository_copy.environment_for_commands_in_the_copy(e171_research_side.REPOSITORY_ROOT, os.environ))	    pass

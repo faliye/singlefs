@@ -9,19 +9,16 @@
 //!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-one     第一段：X4（坏镜像全表、只跑写路径）
 //!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-two     第二段：X2 与 X3 的漏活（每次扫描都读）
 //!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-three   第三段：X3 的崩溃那一半（F12 全部崩溃支）
-//!   python3 scripts/experiments/device-code-key.py run . --binary e178-leaf-and-record-death-counts --entry e7_index_bench::segment_four_item_lines \
-//!       --when-refused=--no-reuse -- segment-four [--shard i/k] [--no-reuse]
-//!                                                                                  第四段：登记修订 2 的两条新底座臂（B-stub、B-tsz），读写项库
-//!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-four --no-reuse [--shard i/k]
-//!                                                                                  第四段每项现判、不读不写项库（复跑表那一行）
+//!   python3 scripts/experiment-apparatus/device-code-key.py run . --binary e178-leaf-and-record-death-counts --entry e7_index_bench::segment_four_item_lines \
+//!       -- segment-four                                                           第四段：登记修订 2 的两条新底座臂（B-stub、B-tsz），读写项库
 //! 线程数取环境变量 E178_THREADS（没设取 SINGLEFS_THREAD_CAP，都没设取登记的重活默认并行度 .claude/heavy-thread-default），产物按工作项的次序输出，与线程数无关。
 //! 第四段的分片、续跑与多机（登记修订 2 之十三、修订 4 之五）：997 个工作项，每项一把项键 = sha256（入口 `segment_four_item_lines` 的代码键
-//! 与这一项 `{item:?}` 的全部字段值）；代码键由取键脚本 `scripts/experiments/device-code-key.py` 算（单元闭包、工具链行、闭包点到的依赖行），
-//! 经 `--code-key-file` 交进来。项库在环境变量 E178_SEGMENT_FOUR_LIBRARY（默认 ~/.local/share/singlefs/experiments/e178/segment-four）：
-//! 每项算完原子写进 `items/<项键>.out`（键行、parameters、meta、产物行、done 行），组成清单存 `codes/<代码键>.txt`，不分片的那一趟拼完重写
-//! `index.tsv`（项名 → 项键，只当索引）。同一条命令重起，项键相同的项读回不重算；项名、序号、标签都不进键。`--shard i/k` 只算序号 mod k = i 的项、
-//! 只落项文件、不拼产物；不带 `--shard` 时补算缺的项，997 项齐了按项的次序拼出产物打到 stdout。`--no-reuse` 不读项库（给了代码键时项文件照写）。
-//! 旧项目录（变量 E178_SEGMENT_FOUR_ITEMS）弃用：设了它就报错退 2。
+//! 与这一项 `{item:?}` 的全部字段值）；代码键由取键脚本 `scripts/experiment-apparatus/device-code-key.py` 算（单元闭包、工具链行、闭包点到的依赖行），
+//! 经 `--code-key-file` 交进来。项库是 prune-server 里的那一份判定库（.claude/rules/verification.md「判定库只有一份」）：装置不开本地库目录，
+//! 读写经 `device-code-key.py run` 开的两根管道转给服务（`device_library/relay.rs` 文件头；族与种类在 device-code-key.py 文件头「判定库的转交」），
+//! 服务连不上照转回的退出码退（75），不退回本地文件。每项算完写进 `items/<项键>.out` 那一条（键行、parameters、meta、产物行、done 行），
+//! 组成清单存 `codes/<代码键>.txt`，不分片的那一趟拼完重写 `index.tsv`（项名 → 项键，只当索引）。同一条命令重起，项键相同的项读回不重算；
+//! 项名、序号、标签都不进键。补算缺的项，997 项齐了按项的次序拼出产物打到 stdout；要两台分判，由统一任务服务分片。
 //! 产物是 `E7RESULT` 行，收尾 `E7RESULT name=done emitted=N`（N 把 config 行与 done 行都算进去）。
 //!
 //! 登记没写死、装置取了一个读法的几格（报告与实验页逐条列，交主 agent 认）：
@@ -6198,38 +6195,35 @@ fn sha256_hex(message: &[u8]) -> String {
     state.iter().map(|word| format!("{word:08x}")).collect()
 }
 
-/// 第四段跑法的选项（登记修订 4 之五）：分片 (i, k)、读不读项库、项库（`None` 是没给代码键：只认 `--no-reuse`，不读不写库）、
-/// 这一趟写进库的项文件逐行记到哪个文件（`--written-list`：取键脚本在装置退出之后再取一次键，两次不等时照它删）。
+/// 第四段跑法的选项（登记修订 4 之五）：项库。项键对得上的项一律读回，没有不读库的跑法。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SegmentFourOptions {
-    shard: Option<(usize, usize)>,
-    reuse: bool,
-    library: Option<SegmentFourLibrary>,
-    written_list: Option<std::path::PathBuf>,
+    library: SegmentFourLibrary,
 }
 
-/// 项库（默认 `~/.local/share/singlefs/experiments/e178/segment-four/`）与这一趟的代码键：取键脚本 `scripts/experiments/device-code-key.py`
+/// 项库（prune-server 里这个装置那一种，经 `device_library` 转交）与这一趟的代码键：取键脚本 `scripts/experiment-apparatus/device-code-key.py`
 /// 打的组成清单里 `code_key` 那一行；清单原文照存进 `codes/<代码键>.txt`（只给「变了的单元」那一句用），取键那天与机器只进项文件的 meta 行。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SegmentFourLibrary {
-    directory: std::path::PathBuf,
+    store: DeviceLibrary,
     code_key: String,
     composition: String,
     judged: String,
     host: String,
 }
 
+/// 项库里的相对键（`device_library/relay.rs` 文件头「相对键」）。
 impl SegmentFourLibrary {
-    fn item_path(&self, item_key: &str) -> std::path::PathBuf {
-        self.directory.join("items").join(format!("{item_key}.out"))
+    fn item_path(&self, item_key: &str) -> String {
+        format!("items/{item_key}.out")
     }
 
-    fn composition_path(&self, code_key: &str) -> std::path::PathBuf {
-        self.directory.join("codes").join(format!("{code_key}.txt"))
+    fn composition_path(&self, code_key: &str) -> String {
+        format!("codes/{code_key}.txt")
     }
 
-    fn index_path(&self) -> std::path::PathBuf {
-        self.directory.join("index.tsv")
+    fn index_path(&self) -> String {
+        "index.tsv".to_string()
     }
 }
 
@@ -6239,7 +6233,7 @@ const COMPOSITION_FORM_LINE: &str = "form\tdevice-code-key-v1";
 const SEGMENT_FOUR_ENTRY_SUFFIX: &str = "::segment_four_item_lines";
 
 /// 读组成清单：第一行是 form，恰好一行 code_key（入口是 `segment_four_item_lines`，键是十六进制），judged 与 host 两行可缺（缺写 `-`）。
-fn segment_four_library_from_composition(directory: std::path::PathBuf, composition: &str) -> Result<SegmentFourLibrary, String> {
+fn segment_four_library_from_composition(store: DeviceLibrary, composition: &str) -> Result<SegmentFourLibrary, String> {
     if composition.lines().next() != Some(COMPOSITION_FORM_LINE) {
         return Err("--code-key-file 不是 device-code-key.py 打的组成清单（第一行不是 form\tdevice-code-key-v1）".to_string());
     }
@@ -6256,7 +6250,7 @@ fn segment_four_library_from_composition(directory: std::path::PathBuf, composit
     if code_key.is_empty() || !code_key.chars().all(|character| character.is_ascii_hexdigit()) {
         return Err(format!("组成清单里的代码键不是十六进制：{code_key}"));
     }
-    Ok(SegmentFourLibrary { directory, code_key: (*code_key).to_string(), composition: composition.to_string(), judged: field("judged"), host: field("host") })
+    Ok(SegmentFourLibrary { store, code_key: (*code_key).to_string(), composition: composition.to_string(), judged: field("judged"), host: field("host") })
 }
 
 /// 项名：序号加几何，只留字母、数字与连字符。只给 `index.tsv` 当索引（数键对不上的项、给人看），不进键、读回不经它。
@@ -6278,9 +6272,10 @@ fn segment_four_item_header(item_key: &str, code_key: &str) -> String {
     format!("key item_key={item_key} code_key={code_key}")
 }
 
-/// 读回一个项文件：第一行是给的键行，第二、三行是 parameters 与 meta（跳过、不比），末行 `done` 报的行数对得上才算数；不然交回 None（现判）。
-fn read_back_the_item(path: &std::path::Path, header: &str) -> Option<Vec<String>> {
-    let contents = std::fs::read_to_string(path).ok()?;
+/// 读回一个项文件（库里那一条的内容，不在是 None）：第一行是给的键行，第二、三行是 parameters 与 meta（跳过、不比），末行 `done` 报的行数对得上才算数；
+/// 不然交回 None（现判）。
+fn read_back_the_item(contents: Option<String>, header: &str) -> Option<Vec<String>> {
+    let contents = contents?;
     let mut lines: Vec<String> = contents.lines().map(str::to_string).collect();
     if lines.first().map(String::as_str) != Some(header) {
         return None;
@@ -6304,29 +6299,11 @@ fn segment_four_item_file_text(header: &str, item: SegmentFourItem, meta: &str, 
     text
 }
 
-/// 临时文件名的序号：同一个进程里几个线程同时写库，各用各的临时文件。
-static TEMPORARY_FILE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
-
-/// 原子落盘：同目录临时文件写完、fsync、改名，再 fsync 目录（目录不在先建）。
-fn write_text_atomically(final_path: &std::path::Path, text: &str) -> std::io::Result<()> {
-    use std::io::Write;
-    let directory = final_path.parent().expect("库里的文件都在某个目录下");
-    std::fs::create_dir_all(directory)?;
-    let file_name = final_path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
-    let sequence = TEMPORARY_FILE_SEQUENCE.fetch_add(1, Ordering::SeqCst);
-    let temporary_path = directory.join(format!(".{file_name}.tmp-{}-{sequence}", std::process::id()));
-    {
-        let mut file = std::fs::File::create(&temporary_path)?;
-        file.write_all(text.as_bytes())?;
-        file.sync_all()?;
-    }
-    std::fs::rename(&temporary_path, final_path)?;
-    std::fs::File::open(directory)?.sync_all()
-}
-
 /// 项库的 `index.tsv`：`<项名>\t<项键>`，上一趟拼完时写的；不在、读不出交空表。只给人看与数键对不上的项，读回不经它。
 fn read_the_index(library: &SegmentFourLibrary) -> BTreeMap<String, String> {
-    std::fs::read_to_string(library.index_path())
+    library
+        .store
+        .read(&library.index_path())
         .unwrap_or_default()
         .lines()
         .filter_map(|line| line.split_once('\t'))
@@ -6339,9 +6316,9 @@ fn count_mismatched_keys(previous_index: &BTreeMap<String, String>, current: &[(
     length_as_u64(current.iter().filter(|(name, item_key)| previous_index.get(name).is_some_and(|previous_key| previous_key != item_key)).count())
 }
 
-/// 项文件第一行里记的代码键；文件不在、第一行认不出交 None。
-fn code_key_recorded_in(path: &std::path::Path) -> Option<String> {
-    let contents = std::fs::read_to_string(path).ok()?;
+/// 项文件（库里那一条的内容）第一行里记的代码键；不在、第一行认不出交 None。
+fn code_key_recorded_in(contents: Option<String>) -> Option<String> {
+    let contents = contents?;
     let header = contents.lines().next()?;
     header.split(' ').find_map(|field| field.strip_prefix("code_key=")).map(str::to_string)
 }
@@ -6396,7 +6373,7 @@ fn changed_units_sentence(library: &SegmentFourLibrary, previous_index: &BTreeMa
     let mut unreadable = 0_u64;
     for (name, item_key) in current {
         let Some(previous_key) = previous_index.get(name).filter(|previous_key| *previous_key != item_key) else { continue };
-        match code_key_recorded_in(&library.item_path(previous_key)) {
+        match code_key_recorded_in(library.store.read(&library.item_path(previous_key))) {
             Some(code_key) => {
                 previous_code_keys.insert(code_key);
             }
@@ -6410,79 +6387,49 @@ fn changed_units_sentence(library: &SegmentFourLibrary, previous_index: &BTreeMa
             "代码键没变：键对不上的那几项是项的参数变了".to_string()
         };
     };
-    match std::fs::read_to_string(library.composition_path(previous_code_key)) {
-        Ok(previous) => changed_units_between(&previous, &library.composition),
-        Err(_) => format!("上一趟的组成清单 codes/{previous_code_key}.txt 不在库里，说不出变了哪些单元"),
+    match library.store.read(&library.composition_path(previous_code_key)) {
+        Some(previous) => changed_units_between(&previous, &library.composition),
+        None => format!("上一趟的组成清单 codes/{previous_code_key}.txt 不在库里，说不出变了哪些单元"),
     }
 }
 
-/// 写进 meta 行的跑法：full、no-reuse、shard-<i>/<k>，不复用的分片接 `,no-reuse`。
-fn segment_four_how(options: &SegmentFourOptions) -> String {
-    match (options.shard, options.reuse) {
-        (None, true) => "full".to_string(),
-        (None, false) => "no-reuse".to_string(),
-        (Some((index, count)), true) => format!("shard-{index}/{count}"),
-        (Some((index, count)), false) => format!("shard-{index}/{count},no-reuse"),
-    }
-}
-
-/// 一趟第四段算下来的项：每项的行（分片之外的是 None）、现判数、复用数、键对不上的项数与那一句（没有键对不上的是 None）。
+/// 一趟第四段算下来的项：每项的行、现判数、复用数、键对不上的项数与那一句（没有键对不上的是 None）。
 struct SegmentFourItemsOutcome {
-    item_lines: Vec<Option<Vec<String>>>,
+    item_lines: Vec<Vec<String>>,
     computed: u64,
     reused: u64,
     mismatched: u64,
     changed_units: Option<String>,
 }
 
-/// 算（或按项键读回）给定的项：分片之外的项不碰。有项库时：组成清单存进 `codes/`；复用时按项键找 `items/<项键>.out`，读不回的现判、
-/// 原子写回、把文件路径记进 `--written-list`；不分片的那一趟拼完重写 `index.tsv`。没有项库（没给代码键）时每项现判、一个文件都不写。
+/// 算（或按项键读回）给定的项：组成清单存进 `codes/`；按项键找 `items/<项键>.out`，读不回的现判、
+/// 写回库里（服务确认落盘才算这一项做完）；拼完重写 `index.tsv`。
 fn compute_or_reuse_the_items(items: &[SegmentFourItem], threads: usize, options: &SegmentFourOptions) -> SegmentFourItemsOutcome {
-    use std::io::Write;
-    let previous_index = options.library.as_ref().map(read_the_index).unwrap_or_default();
-    if let Some(library) = &options.library {
-        write_text_atomically(&library.composition_path(&library.code_key), &library.composition).expect("组成清单写得进项库的 codes/");
-    }
-    let written_list = options.written_list.as_ref().map(|path| {
-        Mutex::new(std::fs::OpenOptions::new().create(true).append(true).open(path).expect("--written-list 给的文件打得开"))
-    });
-    let meta = options.library.as_ref().map(|library| format!("meta judged={} how={} host={}", library.judged, segment_four_how(options), library.host));
+    let library = &options.library;
+    let previous_index = read_the_index(library);
+    library.store.write(&library.composition_path(&library.code_key), &library.composition);
+    let meta = format!("meta judged={} how=full host={}", library.judged, library.host);
     let positions: Vec<usize> = (0..items.len()).collect();
     let outcomes = run_in_parallel(&positions, threads, |position| {
-        if let Some((shard_index, shard_count)) = options.shard {
-            if position % shard_count != shard_index {
-                return (None, false, None);
-            }
-        }
         let item = items[position];
-        let (Some(library), Some(meta)) = (&options.library, &meta) else {
-            return (Some(segment_four_item_lines(item)), false, None);
-        };
         let name = segment_four_item_name(position, item);
         let item_key = segment_four_item_key(&library.code_key, item);
         let path = library.item_path(&item_key);
-        if options.reuse {
-            if let Some(item_lines) = read_back_the_item(&path, &segment_four_item_header(&item_key, &library.code_key)) {
-                return (Some(item_lines), true, Some((name, item_key)));
-            }
+        if let Some(item_lines) = read_back_the_item(library.store.read(&path), &segment_four_item_header(&item_key, &library.code_key)) {
+            return (item_lines, true, (name, item_key));
         }
         let item_lines = segment_four_item_lines(item);
-        let text = segment_four_item_file_text(&segment_four_item_header(&item_key, &library.code_key), item, meta, &item_lines);
-        write_text_atomically(&path, &text).expect("项文件写得进项库的 items/");
-        if let Some(list) = &written_list {
-            writeln!(list.lock().expect("记写过的项文件的锁没有中毒"), "{}", path.display()).expect("--written-list 写得进去");
-        }
-        (Some(item_lines), false, Some((name, item_key)))
+        let text = segment_four_item_file_text(&segment_four_item_header(&item_key, &library.code_key), item, &meta, &item_lines);
+        library.store.write(&path, &text);
+        (item_lines, false, (name, item_key))
     });
-    let computed = length_as_u64(outcomes.iter().filter(|(item_lines, reused, _)| item_lines.is_some() && !reused).count());
+    let computed = length_as_u64(outcomes.iter().filter(|(_, reused, _)| !reused).count());
     let reused = length_as_u64(outcomes.iter().filter(|(_, reused, _)| *reused).count());
-    let current: Vec<(String, String)> = outcomes.iter().filter_map(|(_, _, named_key)| named_key.clone()).collect();
+    let current: Vec<(String, String)> = outcomes.iter().map(|(_, _, named_key)| named_key.clone()).collect();
     let mismatched = count_mismatched_keys(&previous_index, &current);
-    let changed_units = options.library.as_ref().filter(|_| mismatched > 0).map(|library| changed_units_sentence(library, &previous_index, &current));
-    if let (Some(library), None) = (&options.library, options.shard) {
-        let index: String = current.iter().map(|(name, item_key)| format!("{name}\t{item_key}\n")).collect();
-        write_text_atomically(&library.index_path(), &index).expect("index.tsv 写得进项库");
-    }
+    let changed_units = (mismatched > 0).then(|| changed_units_sentence(library, &previous_index, &current));
+    let index: String = current.iter().map(|(name, item_key)| format!("{name}\t{item_key}\n")).collect();
+    library.store.write(&library.index_path(), &index);
     SegmentFourItemsOutcome { item_lines: outcomes.into_iter().map(|(item_lines, _, _)| item_lines).collect(), computed, reused, mismatched, changed_units }
 }
 
@@ -7030,111 +6977,63 @@ fn segment_four_summary_lines(items: &[SegmentFourItem], item_lines: &[Vec<Strin
     lines
 }
 
-/// 第四段入口：补算没落盘的项；带 `--shard` 只落项文件、打一行进度；不带时 997 项齐了拼产物。成功句打到 stderr（产物与续跑无关）：
-/// 有项库时「现判、复用、键对不上」三个数（登记修订 4 之五），键对不上 > 0 时下一行写变了的单元；没项库时写没入库。
+/// 第四段入口：补算没落盘的项，997 项齐了拼产物。成功句打到 stderr（产物与续跑无关）：
+/// 「现判、复用、键对不上」三个数（登记修订 4 之五），键对不上 > 0 时下一行写变了的单元。
 fn run_segment_four(threads: usize, options: &SegmentFourOptions) -> Vec<String> {
     let items = segment_four_items();
     let outcome = compute_or_reuse_the_items(&items, threads, options);
-    let shard_text = options.shard.map_or_else(|| "不分片".to_string(), |(index, count)| format!("{index}/{count}"));
-    match &options.library {
-        Some(library) => {
-            eprintln!(
-                "segment-four: 现判 {}、复用 {}、键对不上 {} 项（共 {} 项，分片 {shard_text}，库 {}）",
-                outcome.computed,
-                outcome.reused,
-                outcome.mismatched,
-                items.len(),
-                library.directory.display()
-            );
-            if let Some(sentence) = &outcome.changed_units {
-                eprintln!("segment-four: {sentence}");
-            }
-        }
-        None => eprintln!(
-            "segment-four: 现判 {}、复用 {}、没入库（没给代码键：--no-reuse 不读不写库；共 {} 项，分片 {shard_text}）",
-            outcome.computed,
-            outcome.reused,
-            items.len()
-        ),
+    eprintln!(
+        "segment-four: 现判 {}、复用 {}、键对不上 {} 项（共 {} 项，库 prune-server，经 device-code-key.py 转交）",
+        outcome.computed,
+        outcome.reused,
+        outcome.mismatched,
+        items.len()
+    );
+    if let Some(sentence) = &outcome.changed_units {
+        eprintln!("segment-four: {sentence}");
     }
-    if options.shard.is_some() {
-        return vec![format!("name=shard_progress computed={} reused={} items={}", outcome.computed, outcome.reused, items.len())];
-    }
-    let complete: Vec<Vec<String>> = outcome.item_lines.into_iter().map(|lines| lines.expect("不分片时每一项都算过或读回")).collect();
-    assemble_segment_four(&items, &complete)
+    assemble_segment_four(&items, &outcome.item_lines)
 }
 
-/// 第四段参数解析要读的环境（单测换成假的，不动进程的环境变量）：项库目录（`E178_SEGMENT_FOUR_LIBRARY`）、
-/// 旧项目录的变量（`E178_SEGMENT_FOUR_ITEMS`）设没设、HOME。
+/// 第四段参数解析要读的环境（单测换成假的，不动进程的环境变量）：转交判定库的口子（device-code-key.py run 放进环境的两根管道接得上是 Ok，
+/// 不然是为什么）。
 struct SegmentFourEnvironment {
-    library_directory: Option<std::ffi::OsString>,
-    old_items_variable_is_set: bool,
-    home: std::ffi::OsString,
+    store: Result<DeviceLibrary, String>,
 }
 
 impl SegmentFourEnvironment {
     fn of_this_process() -> SegmentFourEnvironment {
-        SegmentFourEnvironment {
-            library_directory: std::env::var_os("E178_SEGMENT_FOUR_LIBRARY"),
-            old_items_variable_is_set: std::env::var_os("E178_SEGMENT_FOUR_ITEMS").is_some(),
-            home: std::env::var_os("HOME").unwrap_or_default(),
-        }
+        SegmentFourEnvironment { store: DeviceLibrary::from_environment() }
     }
 }
 
-/// `segment-four` 的参数（登记修订 4 之六第 5 条）：`--shard i/k`、`--no-reuse`、`--code-key-file <组成清单>`、`--written-list <文件>`。
-/// 不给 `--code-key-file` 只认 `--no-reuse`（每项现判、不读不写库，产物照打）；设了旧变量 `E178_SEGMENT_FOUR_ITEMS` 报错（旧项目录弃用）。
+/// `segment-four` 的参数（登记修订 4 之六第 5 条）：`--code-key-file <组成清单>`（必给）。
+/// 要接得上转交判定库的管道（经 device-code-key.py run 起）。
 fn segment_four_options_from(arguments: &[String], environment: &SegmentFourEnvironment) -> Result<SegmentFourOptions, String> {
-    if environment.old_items_variable_is_set {
-        return Err("E178_SEGMENT_FOUR_ITEMS 是旧项目录的变量：旧项目录弃用（登记修订 4 之五），项库改取 E178_SEGMENT_FOUR_LIBRARY".to_string());
-    }
-    let mut shard = None;
-    let mut reuse = true;
     let mut code_key_file: Option<std::path::PathBuf> = None;
-    let mut written_list: Option<std::path::PathBuf> = None;
     let mut remaining = arguments.iter();
     while let Some(argument) = remaining.next() {
         match argument.as_str() {
-            "--no-reuse" => reuse = false,
-            "--shard" => {
-                let value = remaining.next().ok_or("--shard 后面缺 i/k")?;
-                let (index, count) = value.split_once('/').ok_or("--shard 的值写成 i/k")?;
-                let index: usize = index.parse().map_err(|_| "--shard 的 i 不是数")?;
-                let count: usize = count.parse().map_err(|_| "--shard 的 k 不是数")?;
-                if count == 0 || index >= count {
-                    return Err("--shard 要 0 ≤ i < k".to_string());
-                }
-                shard = Some((index, count));
-            }
             "--code-key-file" => code_key_file = Some(std::path::PathBuf::from(remaining.next().ok_or("--code-key-file 后面缺文件")?)),
-            "--written-list" => written_list = Some(std::path::PathBuf::from(remaining.next().ok_or("--written-list 后面缺文件")?)),
             other => return Err(format!("认不得的参数：{other}")),
         }
     }
-    let directory = environment.library_directory.as_ref().map_or_else(
-        || std::path::PathBuf::from(&environment.home).join(".local/share/singlefs/experiments/e178/segment-four"),
-        std::path::PathBuf::from,
-    );
-    let library = match &code_key_file {
-        Some(path) => {
-            let composition = std::fs::read_to_string(path).map_err(|error| format!("读不了 --code-key-file {}：{error}", path.display()))?;
-            Some(segment_four_library_from_composition(directory, &composition)?)
-        }
-        None => None,
+    let Some(path) = &code_key_file else {
+        return Err("没给 --code-key-file：读写项库要经 scripts/experiment-apparatus/device-code-key.py run 起".to_string());
     };
-    if library.is_none() && reuse {
-        return Err("没给 --code-key-file 时只认 --no-reuse（每项现判、不读不写库）；要读写项库，经 scripts/experiments/device-code-key.py run 起".to_string());
-    }
-    if library.is_none() && written_list.is_some() {
-        return Err("--written-list 要与 --code-key-file 一起给".to_string());
-    }
-    Ok(SegmentFourOptions { shard, reuse, library, written_list })
+    let composition = std::fs::read_to_string(path).map_err(|error| format!("读不了 --code-key-file {}：{error}", path.display()))?;
+    let library = segment_four_library_from_composition(environment.store.clone()?, &composition)?;
+    Ok(SegmentFourOptions { library })
 }
 
 // 写成 `#[path] mod` 而不是条目级 `include!`：`unit-graph` 把条目级 `include!` 记成拒算，入口闭包的键就算不出（登记修订 4 之六第 2 条）。
 #[path = "heavy_threads_default/threads.rs"]
 mod heavy_threads_default;
 use heavy_threads_default::default_heavy_threads;
+// 判定库的口子（文件头「第四段的分片、续跑与多机」），同样写成 `#[path] mod`。
+#[path = "device_library/relay.rs"]
+mod device_library;
+use device_library::DeviceLibrary;
 
 /// 线程数：`E178_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，都没设取登记的重活默认并行度（`.claude/heavy-thread-default`）。
 fn threads_from_the_environment() -> usize {
@@ -7151,7 +7050,7 @@ fn main() {
     let mode = arguments.get(1).cloned().unwrap_or_default();
     let threads = threads_from_the_environment();
     let usage = "用法：e178-leaf-and-record-death-counts segment-one | segment-two | segment-three \
-                 | segment-four [--shard i/k] [--no-reuse] [--code-key-file <组成清单> --written-list <文件>]（读写项库经 scripts/experiments/device-code-key.py run 起）";
+                 | segment-four --code-key-file <组成清单>（读写项库经 scripts/experiment-apparatus/device-code-key.py run 起）";
     let emitted_lines = match mode.as_str() {
         "segment-one" => run_segment_one(threads),
         "segment-two" => run_segment_two(threads),
@@ -7779,22 +7678,21 @@ mod tests {
         }
     }
 
-    /// 单测自己的项库：临时目录下按测试名与进程号分开，组成清单照 device-code-key.py 打的那几行写（一行 code_key）。
-    fn test_library(test_name: &str, code_key: &str) -> SegmentFourLibrary {
-        let directory = std::env::temp_dir().join(format!("e178-segment-four-{test_name}-{}", std::process::id()));
+    /// 单测自己的项库：给的那一份内存库（几把代码键共用一份就传同一份），组成清单照 device-code-key.py 打的那几行写（一行 code_key）。
+    fn test_library(store: &DeviceLibrary, code_key: &str) -> SegmentFourLibrary {
         let composition = format!(
             "{COMPOSITION_FORM_LINE}\njudged\t2026-10-15\nhost\t本机\ncode_key\te7_index_bench::segment_four_item_lines\t{code_key}\n\
              unit\te7_index_bench::segment_four_item_lines\tfn\te7_index_bench::<bin>::segment_four_item_lines\tscripts/experiments/e178.rs:1-2\t{code_key}\n"
         );
-        segment_four_library_from_composition(directory, &composition).expect("单测写的组成清单读得出")
+        segment_four_library_from_composition(store.clone(), &composition).expect("单测写的组成清单读得出")
     }
 
-    fn library_options(library: &SegmentFourLibrary, reuse: bool) -> SegmentFourOptions {
-        SegmentFourOptions { shard: None, reuse, library: Some(library.clone()), written_list: None }
+    fn library_options(library: &SegmentFourLibrary) -> SegmentFourOptions {
+        SegmentFourOptions { library: library.clone() }
     }
 
     fn item_files_in(library: &SegmentFourLibrary) -> usize {
-        std::fs::read_dir(library.directory.join("items")).map_or(0, |entries| entries.filter_map(Result::ok).filter(|entry| entry.file_name().to_string_lossy().ends_with(".out")).count())
+        library.store.count_entries("items/", ".out")
     }
 
     /// 登记修订 4 之六单测表「项键随代码键变」（M27 抓）：同一项、两个代码键 → 项键不等；项键的绝对值另由 python 的 hashlib 算出钉住。
@@ -7828,24 +7726,23 @@ mod tests {
     /// 「项键不看序号与名字」（M24 抓）：清单前插一项再跑，原有各项全部复用，只现判插进来的那一项。
     #[test]
     fn inserting_an_item_in_front_reuses_every_item_already_judged() {
-        let library = test_library("insert-in-front", "a1");
-        let first = compute_or_reuse_the_items(&[small_rewrite_item(3), small_rewrite_item(4)], 2, &library_options(&library, true));
-        let second = compute_or_reuse_the_items(&[small_rewrite_item(5), small_rewrite_item(3), small_rewrite_item(4)], 2, &library_options(&library, true));
-        std::fs::remove_dir_all(&library.directory).expect("删得掉测试自己建的项库");
+        let library = test_library(&DeviceLibrary::in_memory(), "a1");
+        let first = compute_or_reuse_the_items(&[small_rewrite_item(3), small_rewrite_item(4)], 2, &library_options(&library));
+        let second = compute_or_reuse_the_items(&[small_rewrite_item(5), small_rewrite_item(3), small_rewrite_item(4)], 2, &library_options(&library));
         assert_eq!((first.computed, first.reused), (2, 0));
         assert_eq!((second.computed, second.reused), (1, 2), "前插一项之后，原有两项的项键不变、读回");
     }
 
-    /// 「别的代码键写的项不读回」（M25 抓）：代码键 A 下写库、B 下再跑 → 全部现判，A 写的项文件留着（库里两份并存）。
+    /// 「别的代码键写的项不读回」（M25 抓）：代码键 A 下写库、B 下再跑（同一份库） → 全部现判，A 写的项留着（库里两份并存）。
     #[test]
     fn items_written_under_another_code_key_are_not_read_back() {
-        let library_a = test_library("other-code-key", "a1");
-        let library_b = test_library("other-code-key", "b2");
+        let store = DeviceLibrary::in_memory();
+        let library_a = test_library(&store, "a1");
+        let library_b = test_library(&store, "b2");
         let items = [small_rewrite_item(3), small_rewrite_item(4)];
-        compute_or_reuse_the_items(&items, 2, &library_options(&library_a, true));
-        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_b, true));
+        compute_or_reuse_the_items(&items, 2, &library_options(&library_a));
+        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_b));
         let files = item_files_in(&library_b);
-        std::fs::remove_dir_all(&library_b.directory).expect("删得掉测试自己建的项库");
         assert_eq!((second.computed, second.reused), (2, 0), "B 下不读 A 写的项");
         assert_eq!(files, 4, "A 写的两份留着，B 又写了两份");
     }
@@ -7853,93 +7750,77 @@ mod tests {
     /// 「键对不上的项数」（M26 抓）：代码键 A 跑完、B 再跑 → 成功句报键对不上 = 项数，那一句点名变了的单元。
     #[test]
     fn a_second_code_key_reports_every_item_as_mismatched() {
-        let library_a = test_library("mismatched", "a1");
-        let library_b = test_library("mismatched", "b2");
+        let store = DeviceLibrary::in_memory();
+        let library_a = test_library(&store, "a1");
+        let library_b = test_library(&store, "b2");
         let items = [small_rewrite_item(3), small_rewrite_item(4)];
-        let first = compute_or_reuse_the_items(&items, 2, &library_options(&library_a, true));
-        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_b, true));
-        std::fs::remove_dir_all(&library_b.directory).expect("删得掉测试自己建的项库");
+        let first = compute_or_reuse_the_items(&items, 2, &library_options(&library_a));
+        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_b));
         assert_eq!(first.mismatched, 0, "空库上第一趟没有上一趟可比");
         assert_eq!(second.mismatched, 2);
         let sentence = second.changed_units.expect("键对不上时有那一句");
         assert!(sentence.contains("改了 e7_index_bench::<bin>::segment_four_item_lines"), "{sentence}");
     }
 
-    /// 续跑（修订 2 之十三、修订 4 之六单测表「续跑拼出同一份产物」）：小输入上关掉复用跑一遍、再开着复用跑一遍，拼出的产物逐行相同，
-    /// 第二遍全是复用；关掉复用那一遍照样按项键写回；分片只碰自己那几项。
+    /// 续跑（修订 2 之十三、修订 4 之六单测表「续跑拼出同一份产物」）：小输入上第一遍现判、第二遍全读回，两遍拼出的产物逐行相同；现判的照样按项键写回。
     #[test]
     fn resuming_from_the_item_files_assembles_the_same_product() {
         let items = vec![small_rewrite_item(3), SegmentFourItem::DirectRollbackConstruction];
-        let library = test_library("resume", "c3");
-        let fresh = compute_or_reuse_the_items(&items, 2, &library_options(&library, false));
+        let library = test_library(&DeviceLibrary::in_memory(), "c3");
+        let fresh = compute_or_reuse_the_items(&items, 2, &library_options(&library));
         let files_after_fresh = item_files_in(&library);
-        let reused = compute_or_reuse_the_items(&items, 1, &library_options(&library, true));
-        let shard_options = SegmentFourOptions { shard: Some((1, 2)), reuse: true, library: Some(library.clone()), written_list: None };
-        let shard = compute_or_reuse_the_items(&items, 1, &shard_options);
-        std::fs::remove_dir_all(&library.directory).expect("删得掉测试自己建的项库");
+        let reused = compute_or_reuse_the_items(&items, 1, &library_options(&library));
         assert_eq!((fresh.computed, fresh.reused, reused.computed, reused.reused), (2, 0, 0, 2));
-        assert_eq!(files_after_fresh, 2, "--no-reuse 不读库，现判的照样按项键写回");
-        assert!(shard.item_lines[0].is_none() && shard.item_lines[1].is_some());
-        let fresh_lines: Vec<Vec<String>> = fresh.item_lines.into_iter().map(|lines| lines.expect("每项都算了")).collect();
-        let reused_lines: Vec<Vec<String>> = reused.item_lines.into_iter().map(|lines| lines.expect("每项都读回了")).collect();
-        assert_eq!(assemble_segment_four(&items, &fresh_lines), assemble_segment_four(&items, &reused_lines));
+        assert_eq!(files_after_fresh, 2, "现判的照样按项键写回");
+        assert_eq!(assemble_segment_four(&items, &fresh.item_lines), assemble_segment_four(&items, &reused.item_lines));
     }
 
-    fn test_environment(library_directory: &std::path::Path, old_items_variable_is_set: bool) -> SegmentFourEnvironment {
-        SegmentFourEnvironment {
-            library_directory: Some(library_directory.as_os_str().to_os_string()),
-            old_items_variable_is_set,
-            home: std::ffi::OsString::from("/nonexistent-home"),
-        }
+    /// 没经 device-code-key.py run 起的样子：环境里没有转交判定库的管道。
+    fn test_environment_without_relay() -> SegmentFourEnvironment {
+        SegmentFourEnvironment { store: Err("环境里没有 DEVICE_LIBRARY_REQUEST_FD：读写判定库要经 scripts/experiment-apparatus/device-code-key.py run 起".to_string()) }
     }
 
     fn parse_with(arguments: &[&str], environment: &SegmentFourEnvironment) -> Result<SegmentFourOptions, String> {
         segment_four_options_from(&arguments.iter().map(|argument| (*argument).to_string()).collect::<Vec<String>>(), environment)
     }
 
-    /// 「不给代码键只认 --no-reuse、不写库」：不给 --code-key-file 带 --no-reuse → 每项现判、库目录没建；不带 --no-reuse → 参数解析报错，出路点名取键脚本。
+    /// 「不给代码键就拒」：不给 --code-key-file → 参数解析报错（不碰转交的管道），出路点名取键脚本。
     #[test]
-    fn without_a_code_key_only_no_reuse_is_accepted_and_nothing_is_written() {
-        let directory = std::env::temp_dir().join(format!("e178-segment-four-no-code-key-{}", std::process::id()));
-        let environment = test_environment(&directory, false);
-        let options = parse_with(&["--no-reuse"], &environment).expect("不给代码键带 --no-reuse 要认");
-        assert!(options.library.is_none());
-        let outcome = compute_or_reuse_the_items(&[small_rewrite_item(3)], 1, &options);
-        assert_eq!((outcome.computed, outcome.reused, outcome.mismatched), (1, 0, 0));
-        assert!(!directory.exists(), "没给代码键时一个文件都不写、库目录也不建");
-        let refused = parse_with(&[], &environment).expect_err("不给代码键又不带 --no-reuse 要报错");
+    fn without_a_code_key_the_arguments_are_refused() {
+        let refused = parse_with(&[], &test_environment_without_relay()).expect_err("不给代码键要报错");
         assert!(refused.contains("device-code-key.py run"), "{refused}");
-        assert!(parse_with(&["--no-reuse", "--written-list", "/nonexistent"], &environment).is_err(), "--written-list 要与代码键一起给");
     }
 
-    /// 「旧变量退 2」：设了 E178_SEGMENT_FOUR_ITEMS → 参数解析报错（main 照它退 2），说旧项目录弃用。
+    /// 「给了代码键就要转交的管道」：带 --code-key-file 却没经 device-code-key.py run 起（环境里没有管道） → 参数解析报错（main 照它退 2），不退回本地库。
     #[test]
-    fn the_old_items_directory_variable_is_refused() {
-        let directory = std::env::temp_dir().join(format!("e178-segment-four-old-variable-{}", std::process::id()));
-        let refused = parse_with(&["--no-reuse"], &test_environment(&directory, true)).expect_err("旧变量设了要报错");
-        assert!(refused.contains("旧项目录弃用"), "{refused}");
+    fn a_code_key_without_the_relay_is_refused() {
+        let composition_path = std::env::temp_dir().join(format!("e178-segment-four-relay-missing-{}.txt", std::process::id()));
+        std::fs::write(&composition_path, format!("{COMPOSITION_FORM_LINE}\ncode_key\te7_index_bench::segment_four_item_lines\ta1\n")).expect("写得进测试的组成清单");
+        let refused = parse_with(&["--code-key-file", &composition_path.to_string_lossy()], &test_environment_without_relay());
+        std::fs::remove_file(&composition_path).expect("删得掉测试的组成清单");
+        let refused = refused.expect_err("没有转交的管道要报错");
+        assert!(refused.contains("device-code-key.py run"), "{refused}");
     }
 
+    /// 认不出的选项报错（用一个从没用过的名字）。
     #[test]
-    fn segment_four_arguments_take_a_shard_and_refuse_a_wrong_one() {
-        let environment = test_environment(&std::env::temp_dir().join("e178-segment-four-arguments-unused"), false);
-        assert_eq!(parse_with(&["--shard", "1/3", "--no-reuse"], &environment).map(|options| (options.shard, options.reuse)), Ok((Some((1, 3)), false)));
-        assert!(parse_with(&["--shard", "3/3", "--no-reuse"], &environment).is_err());
-        assert!(parse_with(&["--shard"], &environment).is_err());
-        assert!(parse_with(&["--bogus"], &environment).is_err());
+    fn an_unrecognized_argument_is_refused() {
+        let environment = test_environment_without_relay();
+        let refused = parse_with(&["--never-used-option"], &environment).expect_err("认不出的选项要报错");
+        assert!(refused.contains("认不得的参数"), "{refused}");
     }
 
     /// 组成清单读法：第一行不是 form、code_key 不是恰好一行、入口不是 segment_four_item_lines，都报错；judged 与 host 读进 meta 用。
     #[test]
     fn the_composition_needs_the_form_line_and_exactly_one_entry_key() {
-        let directory = std::env::temp_dir().join("e178-segment-four-composition-unused");
-        let library = test_library("composition", "segment_four_code_key");
-        assert_eq!((library.code_key.as_str(), library.judged.as_str(), library.host.as_str()), ("segment_four_code_key", "2026-10-15", "本机"));
-        let entry_line = "code_key\te7_index_bench::segment_four_item_lines\tsegment_four_code_key\n";
-        assert!(segment_four_library_from_composition(directory.clone(), entry_line).is_err(), "缺 form 行");
-        assert!(segment_four_library_from_composition(directory.clone(), &format!("{COMPOSITION_FORM_LINE}\n")).is_err(), "缺 code_key 行");
-        assert!(segment_four_library_from_composition(directory.clone(), &format!("{COMPOSITION_FORM_LINE}\n{entry_line}{entry_line}")).is_err(), "两行 code_key");
-        assert!(segment_four_library_from_composition(directory, &format!("{COMPOSITION_FORM_LINE}\ncode_key\te7_index_bench::main\tsegment_four_code_key\n")).is_err(), "入口不对");
+        let store = DeviceLibrary::in_memory();
+        let library = test_library(&store, "abcdef0123456789");
+        assert_eq!((library.code_key.as_str(), library.judged.as_str(), library.host.as_str()), ("abcdef0123456789", "2026-10-15", "本机"));
+        let entry_line = "code_key\te7_index_bench::segment_four_item_lines\tabcdef0123456789\n";
+        assert!(segment_four_library_from_composition(store.clone(), entry_line).is_err(), "缺 form 行");
+        assert!(segment_four_library_from_composition(store.clone(), &format!("{COMPOSITION_FORM_LINE}\n")).is_err(), "缺 code_key 行");
+        assert!(segment_four_library_from_composition(store.clone(), &format!("{COMPOSITION_FORM_LINE}\n{entry_line}{entry_line}")).is_err(), "两行 code_key");
+        assert!(segment_four_library_from_composition(store, &format!("{COMPOSITION_FORM_LINE}\ncode_key\te7_index_bench::main\tabcdef0123456789\n")).is_err(), "入口不对");
     }
 }
 
@@ -7960,7 +7841,7 @@ fn repository_root() -> std::path::PathBuf {
 fn preflight() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let root = repository_root();
-    let source = root.join("scripts/experiments/e178_leaf_and_record_death_counts.rs");
+    let source = root.join("scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs");
     let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = std::process::Command::new("python3");
     command.arg(&script).arg("check").arg(&source);

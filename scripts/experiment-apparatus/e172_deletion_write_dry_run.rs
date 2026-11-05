@@ -1,5 +1,7 @@
 //! E172（删除写出的字节的干跑）：第 1 次跑前登记 `research/prompts/e172-preregistration.md`，
-//! 第 2 次重跑登记 `research/prompts/e172-r2-prereg.md`（这一份按它第五节 5.8 改1–改15 改过）。
+//! 第 2 次重跑登记 `research/prompts/e172-r2-prereg.md`（按它第五节 5.8 改1–改15 改过），
+//! 第 3 次重跑登记 `research/prompts/e172-r3-prereg.md`（按它第五节 5.8 改16–改30 加了退役项：标签 6 式子的退役份额、
+//! 退役容器 tr@0、退役记录、退役树根 tr、树表第 12 条、水位 65549，与 harness 钉值层、判别臂 R-ret、PC-J/K/L）。
 //!
 //! 研究侧独立解码器：不 `use` 任何 `singlefs-*` crate、不 include E142 的源码。读 `crates/` 侧只读导出
 //! `deletion_write_dump` 的两份输出文件（不带参数的 H1、H2 一份，`--history h3` 一份），把窗口里每个写区域按
@@ -10,7 +12,7 @@
 //!
 //! 退出码：0 = 跑完（判定写在产物行里，不进退出码）；2 = 命令行不对或导出读不了。
 
-// admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
+// admission: always 输入变没变由 main 里的 admit_experiment_run_or_exit 照 stage-inputs.tsv 的 E172 行判（输入没变退 77），这一层每次放行
 // run-condition: command python3
 use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet};
@@ -31,14 +33,14 @@ const ROOT_RING_SLOT_SPACING_BYTES: u64 = 4096;
 const ROOT_RECORD_SLOT_BYTES: usize = 512;
 /// layout/01 第 44、162 行：区域归属 0 / 1 / 0。
 const ROOT_RING_REGION_DEVICES: [u32; 3] = [0, 1, 0];
-/// layout/01 第 365–383 行按行累加：根记录 457 字节，其后到 512 槽末是补齐（第 377 行）。
-const ROOT_RECORD_FIELD_BYTES: usize = 457;
+/// layout/01 第 372–388 行按行累加：根记录 466 字节（回收门槛 t 428、钉槽 p 436 在分配记录树根指针之后），其后到 512 槽末是补齐（第 380 行）。
+const ROOT_RECORD_FIELD_BYTES: usize = 466;
 /// layout/01 第 45 行：journal 环从 16 MiB 起、长 768 MiB、记录 4096；第 319 行：记录 n 落 `(计数器 − 1) × 4096`。
 const JOURNAL_RING_START_BYTES: u64 = 16 * 1_048_576;
 const JOURNAL_RING_BYTES: u64 = 768 * 1_048_576;
 const JOURNAL_RECORD_BYTES: usize = 4096;
-/// layout/01 第 357 行：记录头 487；第 361 行：点名项 56。
-const JOURNAL_HEADER_BYTES: usize = 487;
+/// layout/01 第 360 行：记录头合计 496（第 362 行逐个偏移：回收门槛 t 463、钉槽 p 471、fsid 472、MAC 480，到 496 为止）；第 364 行：点名项 56。
+const JOURNAL_HEADER_BYTES: usize = 496;
 const JOURNAL_NAMED_ITEM_BYTES: usize = 56;
 /// layout/01 第 46 行：单元区起始槽号 50176；落点粒度 16384（第 34–35 行）。
 const UNIT_AREA_START_SLOT: u64 = 50176;
@@ -90,6 +92,9 @@ const TREE_TABLE_ENTRY_BYTES: usize = 200;
 const DELETED_INODES_ENTRY_BYTES: usize = 8;
 const TOMBSTONE_RECORD_BYTES: usize = 40;
 const INSTANCE_TABLE_RECORD_BYTES: usize = 88;
+/// layout/03 第 21 行（「退役容器」那一行）与第 66–80 行（「五、退役记录」）：退役容器的打包记录类型 3、退役记录 34 字节。
+const RETIREMENT_PACKED_RECORD_TYPE: u64 = 3;
+const RETIREMENT_RECORD_BYTES: usize = 34;
 
 /// layout/01 第 48 行与 layout/03 第 19 行：树 ID。
 const EXTENT_TREE: u64 = 65536;
@@ -101,7 +106,13 @@ const DELETED_INODES_TREE: u64 = 65544;
 const TOMBSTONE_TREE: u64 = 65545;
 const LINEAGE_TREE: u64 = 65546;
 const LOGGED_OPERATIONS_TREE: u64 = 65547;
-const TREE_IDENTIFIER_WATERMARK_AFTER_THE_FIRST_FILE: u64 = 65548;
+/// layout/03 第 23 行（「树表退役树条目」那一行）：退役树的树 ID 65548、种类码 13，头 ID 写 inode 树的树 ID（同墓碑树）。
+const RETIREMENT_TREE: u64 = 65548;
+const RETIREMENT_TREE_KIND_CODE: u64 = 13;
+/// layout/01 第 378 行（「树 ID 水位」那一行）与 layout/03 第 22–23 行：第一个文件版本那次发布之后水位 65549（退役树占到 65548）。
+const TREE_IDENTIFIER_WATERMARK_AFTER_THE_FIRST_FILE: u64 = 65549;
+/// layout/01 第 80、392 行：树表第 1 版 12 条（layout/03 第 22 行「树表 7 → 11 条（再加退役树一条为 12）」）。
+const TREE_TABLE_ENTRIES_AFTER_THE_FIRST_FILE: usize = 12;
 
 /// layout/01 第 109、175、338、369 行：四种 magic。
 const SYSTEM_CONFIGURATION_MAGIC: &[u8; 4] = b"SFSB";
@@ -112,9 +123,14 @@ const ROOT_RECORD_MAGIC: &[u8; 4] = b"SFSR";
 /// 跑前登记第六节 L03-2 与第七节 A-content：被删文件 = 两个满净荷加半个。
 const DELETED_INODE: u64 = 1;
 const EXPECTED_FILE_BYTES: u64 = 2 * DATA_UNIT_PAYLOAD_CAPACITY + DATA_UNIT_PAYLOAD_CAPACITY / 2;
-/// layout/03 第 20 行：标签 6 式子里的副本数与 41（⌈2 × 16384 ÷ 815⌉）。
+/// layout/03 第 24 行（「记账标签 6 的值」那一行）：标签 6 式子里的副本数与 41（⌈2 × 16384 ÷ 815⌉）。
 const ACCOUNTING_COPIES: u64 = 2;
 const PER_LIVE_OBJECT_TOMBSTONE_BYTES: u64 = 41;
+/// layout/03 第 24 行：每条 inode 记录（含 nlink = 0 的）的退役份额 35 = ⌈32768 ÷ 959⌉（每份副本）。
+const PER_INODE_RECORD_RETIREMENT_BYTES: u64 = 35;
+/// `crates/singlefs-verification/tests/unlink_idempotence_criteria_and_rollback_to_the_emptied_version.rs` 第 198 行钉的五个值，只抄数、不引 `crates/`：
+/// 删除之前、意图、3 → 2、2 → 1、最后一批（跑前登记 e172-r3 第一节 1.2 那张表）。
+const HARNESS_PINNED_TAG_SIX_VALUES: [u64; 5] = [196_760, 196_678, 196_678, 196_678, 196_608];
 
 /// layout/01 第 158 行的偏移表：整槽校验和 155（宽 32，CRC32C 4 + 28 零，第 99、118 行）、T_time 433（宽 4，第 149 行）。
 const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
@@ -782,8 +798,9 @@ fn decode_system_configuration(bytes: &[u8], coverage: &mut CoverageMap, failure
 }
 
 fn decode_root_record(bytes: &[u8], coverage: &mut CoverageMap, failures: &mut Vec<String>, locations: &mut Vec<LocationEntry>) -> RootRecord {
-    // layout/01 第 365–383 行按行累加：flags 20、实例代号 24、checkpoint_txg 28、树表单元指针 36、树 ID 水位 122、回退下界 F 130、
-    // 自证校验和 138、实例表单元指针 170、中央映射树根指针 256、分配记录树根指针 342（layout/02 第 15 行「偏移 342」同值）。
+    // layout/01 第 372–388 行按行累加：flags 20、实例代号 24、checkpoint_txg 28、树表单元指针 36、树 ID 水位 122、回退下界 F 130、
+    // 自证校验和 138、实例表单元指针 170、中央映射树根指针 256、分配记录树根指针 342（layout/02 第 15 行「偏移 342」同值）、
+    // 回收门槛 t 428、钉槽 p 436、算法类型 437、nonce 438、MAC 450，到 466 为止。
     if !whole_slot_checksum_holds(bytes, 138) {
         failures.push("根记录自证校验和不对".to_string());
     }
@@ -806,8 +823,9 @@ fn decode_root_record(bytes: &[u8], coverage: &mut CoverageMap, failures: &mut V
 }
 
 fn decode_journal_record(bytes: &[u8], coverage: &mut CoverageMap, failures: &mut Vec<String>, locations: &mut Vec<LocationEntry>) -> JournalRecord {
-    // layout/01 第 359 行：类型 4、记录长度 8、点名项数 12、jsn 16（实例代号 16、计数器 20）、checkpoint_txg 26、头校验和 46、
-    // 载荷校验和 95、新根段 99（树表 99、映射根 185、水位 271、F 279、实例表 287、分配记录树根 373、卸载记号 459）；点名项第 361 行。
+    // layout/01 第 362 行：类型 4、记录长度 8、点名项数 12、jsn 16（实例代号 16、计数器 20）、checkpoint_txg 26、头校验和 46、
+    // 载荷校验和 95、新根段 99（树表 99、映射根 185、水位 271、F 279、实例表 287、分配记录树根 373、卸载记号 459、回收门槛 t 463、钉槽 p 471）、
+    // fsid 472、MAC 480，到 496 为止；点名项第 364 行。
     if !whole_slot_checksum_holds(bytes, 46) {
         failures.push("journal 记录头校验和不对".to_string());
     }
@@ -881,12 +899,18 @@ fn claim_index_node_entries(node: &IndexNode, entries_offset: usize, coverage: &
             }
             (0, TREE_TABLE_ENTRY_BYTES) => {
                 let tree = read_u64(entry, 0);
-                let class = if (DELETED_INODES_TREE..=LOGGED_OPERATIONS_TREE).contains(&tree) { ByteClass::LayoutThreeCell } else { ByteClass::LayoutOneCell };
+                // layout/03 第 22–23 行登记的五条：`deleted_inodes`、墓碑树、谱系树、logged_ops 与退役树（65544..=65548）。
+                let class = if (DELETED_INODES_TREE..=RETIREMENT_TREE).contains(&tree) { ByteClass::LayoutThreeCell } else { ByteClass::LayoutOneCell };
                 coverage.claim(start, end, class);
                 pointer_at(14, NODE_POINTER_BYTES);
             }
             (DELETED_INODES_TREE, DELETED_INODES_ENTRY_BYTES) => coverage.claim(start, end, ByteClass::LayoutThreeCell),
             (TOMBSTONE_TREE, INODE_INTERNAL_ENTRY_BYTES) => {
+                coverage.claim(start, end, ByteClass::LayoutThreeCell);
+                pointer_at(34, NODE_POINTER_BYTES);
+            }
+            // layout/03 第 21 行「树根与墓碑树同形：码 2 根、条目宽 120」：条目照墓碑树根那一种认领，子指针在偏移 34。
+            (RETIREMENT_TREE, INODE_INTERNAL_ENTRY_BYTES) => {
                 coverage.claim(start, end, ByteClass::LayoutThreeCell);
                 pointer_at(34, NODE_POINTER_BYTES);
             }
@@ -908,6 +932,7 @@ fn claim_container_records(container: &PackedContainer, coverage: &mut CoverageM
                 }
             }
             (1, TOMBSTONE_RECORD_BYTES) => coverage.claim(start, end, ByteClass::LayoutThreeCell),
+            (RETIREMENT_PACKED_RECORD_TYPE, RETIREMENT_RECORD_BYTES) => coverage.claim(start, end, ByteClass::LayoutThreeCell),
             (4, INSTANCE_TABLE_RECORD_BYTES) => {
                 coverage.claim(start, end, ByteClass::LayoutOneCell);
                 if record[0] == 1 && record[1] == 1 {
@@ -1128,7 +1153,13 @@ fn role_identity_of(region: &DecodedRegion, is_tree_root: bool) -> RoleIdentity 
 }
 
 /// 解码器独立认出的角色映回 `TransactionUnit::tag` 的写法（layout/03 第 47 行列的角色名）；只用来对拍（S3）与 R3.c 报名字。
-fn role_name_of(identity: &RoleIdentity, region: &DecodedRegion, inode_container_numbers: &[u64], tombstone_container_numbers: &[u64]) -> String {
+fn role_name_of(
+    identity: &RoleIdentity,
+    region: &DecodedRegion,
+    inode_container_numbers: &[u64],
+    tombstone_container_numbers: &[u64],
+    retirement_container_numbers: &[u64],
+) -> String {
     let rank_among = |numbers: &[u64], number: u64| numbers.iter().position(|candidate| *candidate == number).unwrap_or(usize::MAX);
     match (identity.unit_type_tag, identity.tree_identifier, identity.is_tree_root) {
         (1, _, _) => "t1".to_string(),
@@ -1158,6 +1189,9 @@ fn role_name_of(identity: &RoleIdentity, region: &DecodedRegion, inode_container
         (2, DELETED_INODES_TREE, _) => "td".to_string(),
         (3, TOMBSTONE_TREE, _) => format!("tt@{}", rank_among(tombstone_container_numbers, identity.container_number)),
         (2, TOMBSTONE_TREE, _) => "tt".to_string(),
+        // layout/03 第 52 行角色名：tr@叶序 退役容器、tr 退役树根；叶序照墓碑容器那一种，取退役树根条目里的容器号排序。
+        (3, RETIREMENT_TREE, _) => format!("tr@{}", rank_among(retirement_container_numbers, identity.container_number)),
+        (2, RETIREMENT_TREE, _) => "tr".to_string(),
         (3, 0, _) => "ti".to_string(),
         (tag, tree, _) => format!("unknown@{tag}.{tree}.{}", identity.level),
     }
@@ -1324,8 +1358,13 @@ fn analyze_segment(segment: &ExportSegment, operations: &[WindowOperation], stat
         DecodedBody::IndexNode(node) if node.tree_identifier == TOMBSTONE_TREE => Some(node),
         _ => None,
     });
+    let retirement_root_in_segment = regions.iter().find_map(|region| match &region.body {
+        DecodedBody::IndexNode(node) if node.tree_identifier == RETIREMENT_TREE => Some(node),
+        _ => None,
+    });
     let inode_container_numbers = container_numbers_of_root(inode_root_in_segment.or_else(|| state.latest_node(INODE_TREE, true)));
     let tombstone_container_numbers = container_numbers_of_root(tombstone_root_in_segment.or_else(|| state.latest_node(TOMBSTONE_TREE, true)));
+    let retirement_container_numbers = container_numbers_of_root(retirement_root_in_segment.or_else(|| state.latest_node(RETIREMENT_TREE, true)));
     let segment_locations: Vec<LocationEntry> = regions.iter().flat_map(|region| region.locations_inside.iter().copied()).collect();
     let mut units = Vec::new();
     let mut unreferenced_units = Vec::new();
@@ -1350,7 +1389,7 @@ fn analyze_segment(segment: &ExportSegment, operations: &[WindowOperation], stat
         let Some(first_copy) = copies.iter().find(|copy| copy.device == 0).or(copies.first()) else { continue };
         let is_tree_root = root_locations.contains(&(first_copy.device, slot));
         let identity = role_identity_of(first_copy, is_tree_root);
-        let role_name = role_name_of(&identity, first_copy, &inode_container_numbers, &tombstone_container_numbers);
+        let role_name = role_name_of(&identity, first_copy, &inode_container_numbers, &tombstone_container_numbers, &retirement_container_numbers);
         units.push(UnitRole { identity, role_name, slot, copy_on_first_device: (*first_copy).clone() });
     }
     SegmentAnalysis {
@@ -1474,9 +1513,9 @@ fn expected_journal_offset_assuming_counter_equals_txg(txg: u64) -> u64 {
     JOURNAL_RING_START_BYTES + (txg - 1) * u64_of(JOURNAL_RECORD_BYTES)
 }
 
-/// A-系统配置：槽世代号 mkfs 1、取号 2、暖机 3 / 4、新池新建文件 5、顺序写 6 ⇒ txg t 的那次发布写世代号 t + 2，槽 = 世代号 mod 2（layout/01 第 95、117 行）。
+/// A-系统配置：槽世代号 mkfs 1、取号两轮 2 / 3、暖机 4 / 5、新池新建文件 6 ⇒ txg t 的那次发布写世代号 t + 3，槽 = 世代号 mod 2（layout/01 第 97、119、399 行）。
 fn expected_system_configuration_for_txg_in_the_first_instance(txg: u64) -> (u64, u64) {
-    let generation = txg + 2;
+    let generation = txg + 3;
     (generation, (generation % 2) * u64_of(SYSTEM_CONFIGURATION_SLOT_BYTES))
 }
 
@@ -1502,15 +1541,19 @@ impl DeletedRecordLeaf {
     }
 }
 
-/// 上一版（`state`）里装着被删记录的那片 inode 叶：哪一支，与叶里别的记录的 inode 号（升序）。
-fn deleted_record_leaf_of_version(state: &VersionState) -> (DeletedRecordLeaf, Vec<u64>) {
+/// 这一版（`state`）inode 树根条目指着的叶里装着被删记录的那一片（L03-7 选支与 L03-16 的身份期望都从它取）。
+fn inode_leaf_holding_the_deleted_record(state: &VersionState) -> Option<&PackedContainer> {
     let live_containers = container_numbers_of_root(state.latest_node(INODE_TREE, true));
-    let leaf = state
+    state
         .latest_containers(INODE_TREE, 2)
         .into_iter()
         .filter(|container| live_containers.contains(&container.container_number))
-        .find(|container| container.records.iter().any(|record| read_u64(record, 0) == DELETED_INODE));
-    let Some(leaf) = leaf else { return (DeletedRecordLeaf::NotFound, Vec::new()) };
+        .find(|container| container.records.iter().any(|record| read_u64(record, 0) == DELETED_INODE))
+}
+
+/// 上一版（`state`）里装着被删记录的那片 inode 叶：哪一支，与叶里别的记录的 inode 号（升序）。
+fn deleted_record_leaf_of_version(state: &VersionState) -> (DeletedRecordLeaf, Vec<u64>) {
+    let Some(leaf) = inode_leaf_holding_the_deleted_record(state) else { return (DeletedRecordLeaf::NotFound, Vec::new()) };
     let mut other_inodes: Vec<u64> = leaf.records.iter().map(|record| read_u64(record, 0)).filter(|inode| *inode != DELETED_INODE).collect();
     other_inodes.sort_unstable();
     let branch = if other_inodes.is_empty() { DeletedRecordLeaf::OnlyTheDeletedRecord } else { DeletedRecordLeaf::BesideOtherRecords };
@@ -1545,7 +1588,14 @@ fn registered_roles(publish_kind: &str, data_units_after: u64, deleted_record_le
             }
             roles.push("t4");
             roles.extend(allocation);
-            roles.extend(["t6", "t7", "t8"]);
+            roles.push("t6");
+            // layout/03 第 60 行（最后一批那一行）：那片叶删空、身份消失 ⇒ 退役树开第一片容器、写根，排在 t6 之后、t7 之前；
+            // 叶里还有别的记录时那一片照写（t3）、不写退役单元（跑前登记 e172-r3 第五节 5.8 改18）。
+            match deleted_record_leaf {
+                DeletedRecordLeaf::OnlyTheDeletedRecord | DeletedRecordLeaf::NotFound => roles.extend(["tr@0", "tr"]),
+                DeletedRecordLeaf::BesideOtherRecords => {}
+            }
+            roles.extend(["t7", "t8"]);
         }
         (false, _) => return None,
     }
@@ -1613,8 +1663,98 @@ fn tombstone_internal_levels(state: &VersionState) -> u64 {
     }
 }
 
-fn expected_committed_reservation(tombstone_levels: u64, live_inodes: u64) -> u64 {
-    ACCOUNTING_COPIES * ((2 + tombstone_levels + 1) * SLOT_BYTES + PER_LIVE_OBJECT_TOMBSTONE_BYTES * live_inodes)
+/// layout/03 第 24 行：n_记录 = 这一版 inode 树里全部记录数（含 nlink = 0 的）。
+fn inode_record_count(state: &VersionState) -> u64 {
+    u64_of(inode_records_of_version(state).len())
+}
+
+/// layout/03 第 24 行：H_退役 = 现行那一版退役树的内部层数（零根与只有根时 0；根直接管容器时层级 1 ⇒ 0）。
+fn retirement_internal_levels(state: &VersionState) -> u64 {
+    match tree_table_root_is_zero(state, RETIREMENT_TREE) {
+        Some(false) => state.latest_node(RETIREMENT_TREE, true).map(|retirement_root| u64::from(retirement_root.level).saturating_sub(1)).unwrap_or(0),
+        Some(true) | None => 0,
+    }
+}
+
+/// 现行那一版退役树里的退役记录数：退役树根条目指着的退役容器里的记录（树表里根指针置零 ⇒ 0；R-traj 那一列）。
+fn retirement_record_count_of_version(state: &VersionState) -> u64 {
+    if tree_table_root_is_zero(state, RETIREMENT_TREE) != Some(false) {
+        return 0;
+    }
+    let live_containers = container_numbers_of_root(state.latest_node(RETIREMENT_TREE, true));
+    state
+        .latest_containers(RETIREMENT_TREE, RETIREMENT_PACKED_RECORD_TYPE)
+        .into_iter()
+        .filter(|container| live_containers.contains(&container.container_number))
+        .map(|container| u64_of(container.records.len()))
+        .sum()
+}
+
+/// 标签 6 式子里退役那一份算不算（跑前登记 e172-r3 第一节 1.2 判别臂：去掉退役项那一份把三槽与 35 × n_记录 置零）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RetirementShare {
+    Included,
+    Removed,
+}
+
+/// R-ret 判别臂「去掉退役项」那一份用的是哪一种（第九节 M31 的锚点：改成 `Included` 判别臂就退化成被测臂）。
+const DISCRIMINATING_ARM_RETIREMENT_SHARE: RetirementShare = RetirementShare::Removed;
+
+/// layout/03 第 24 行：副本数 × ((2 + H_墓碑 + 1 + 2 + H_退役 + 1) × 16384 + 41 × n_live + 35 × n_记录)。
+fn expected_committed_reservation(tombstone_levels: u64, retirement_levels: u64, live_inodes: u64, inode_records: u64, retirement_share: RetirementShare) -> u64 {
+    let retirement_slots = match retirement_share {
+        RetirementShare::Included => 2 + retirement_levels + 1,
+        RetirementShare::Removed => 0,
+    };
+    let retirement_record_bytes = match retirement_share {
+        RetirementShare::Included => PER_INODE_RECORD_RETIREMENT_BYTES * inode_records,
+        RetirementShare::Removed => 0,
+    };
+    ACCOUNTING_COPIES * ((2 + tombstone_levels + 1 + retirement_slots) * SLOT_BYTES + PER_LIVE_OBJECT_TOMBSTONE_BYTES * live_inodes + retirement_record_bytes)
+}
+
+/// R-ret 的两份期望（带退役项的、判别臂那一份），由同一个式子函数在同一份解码读数上算。
+fn retirement_arm_expectations(tombstone_levels: u64, retirement_levels: u64, live_inodes: u64, inode_records: u64) -> (u64, u64) {
+    (
+        expected_committed_reservation(tombstone_levels, retirement_levels, live_inodes, inode_records, RetirementShare::Included),
+        expected_committed_reservation(tombstone_levels, retirement_levels, live_inodes, inode_records, DISCRIMINATING_ARM_RETIREMENT_SHARE),
+    )
+}
+
+/// 删除类发布按「这一版之后剩下几个数据单元」分的四种（3 单元文件、批大小 1；跑前登记 e172-r3 第一节 1.2 那张表的四行）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DeletionPublish {
+    Intent,
+    BatchLeavingTwoUnits,
+    BatchLeavingOneUnit,
+    FinalBatch,
+}
+
+impl DeletionPublish {
+    fn name(self) -> &'static str {
+        match self {
+            DeletionPublish::Intent => "intent",
+            DeletionPublish::BatchLeavingTwoUnits => "three_to_two",
+            DeletionPublish::BatchLeavingOneUnit => "two_to_one",
+            DeletionPublish::FinalBatch => "final",
+        }
+    }
+}
+
+/// 一次删除类发布是四种里的哪一种：意图看导出的发布种类，批看解码出的这一版剩下的数据单元数。
+fn deletion_publish_of(segment: &SegmentAnalysis, after: &VersionState) -> Option<DeletionPublish> {
+    if !segment.is_deletion_publish {
+        return None;
+    }
+    if segment.label_kind() == "unlink_intent" {
+        return Some(DeletionPublish::Intent);
+    }
+    match data_units_of_version(after) {
+        Some(2) => Some(DeletionPublish::BatchLeavingTwoUnits),
+        Some(1) => Some(DeletionPublish::BatchLeavingOneUnit),
+        Some(0) => Some(DeletionPublish::FinalBatch),
+        Some(_) | None => None,
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1722,12 +1862,21 @@ fn container_written_in(analysis: &SegmentAnalysis, tree: u64, packed_record_typ
 
 /// 跑前登记第六节 6.1 的 L03-1 到 L03-14：一次删除类发布一组行。
 /// 交回只记、不判的 L03-7 行（`name=l03_7_branch`、`name=l03_7_record`）。
-fn judge_layout_three_cells(history: &HistoryExport, analysis: &SegmentAnalysis, before: &VersionState, after: &VersionState, rows: &mut Vec<CellRow>) -> Vec<String> {
+fn judge_layout_three_cells(
+    history: &HistoryExport,
+    analysis: &SegmentAnalysis,
+    before: &VersionState,
+    after: &VersionState,
+    deletion_publishes: &[(DeletionPublish, u64)],
+    rows: &mut Vec<CellRow>,
+) -> Vec<String> {
     let txg = analysis.label_txg();
     let publish_kind = analysis.label_kind();
     let is_intent = publish_kind == "unlink_intent";
     let data_units_after = data_units_of_version(after).unwrap_or(u64::MAX);
     let is_final = !is_intent && data_units_after == 0;
+    // 退役单元只在「那片叶删空、身份消失」的那一次发布里写（layout/03 第 21 行「有退役记录的那次发布（叶删空摘掉…）」，与 L03-7 第一支同一个条件）。
+    let empties_the_leaf = is_final && matches!(deleted_record_leaf_of_version(before).0, DeletedRecordLeaf::OnlyTheDeletedRecord | DeletedRecordLeaf::NotFound);
     let mut builder = CellRowBuilder { rows, history: history.name.clone(), txg, publish_kind: publish_kind.clone(), leaf_branch_records: Vec::new() };
     let inode_records_now = records_written_in(analysis, INODE_TREE, 2);
     let record_now = record_of_inode(&inode_records_now, DELETED_INODE);
@@ -1809,8 +1958,90 @@ fn judge_layout_three_cells(history: &HistoryExport, analysis: &SegmentAnalysis,
         ));
     }
     judge_queue_and_tombstone_cells(analysis, after, is_intent, is_final, &mut builder, tombstone_record);
-    judge_tree_table_accounting_and_watermark_cells(analysis, after, is_final, &mut builder);
+    judge_tree_table_accounting_and_watermark_cells(analysis, after, is_final, empties_the_leaf, &mut builder);
+    judge_retirement_cells(analysis, before, empties_the_leaf, expected_retirement_death_txg(deletion_publishes), &mut builder);
     builder.leaf_branch_records
+}
+
+/// layout/03 第 74 行（退役记录偏移 26）：死亡 txg = 身份消失那次发布（最后一批）的 checkpoint_txg，明写不取 unlink 意图那次（第九节 M41 的锚点）。
+fn expected_retirement_death_txg(deletion_publishes: &[(DeletionPublish, u64)]) -> Option<u64> {
+    deletion_publishes.iter().find(|(publish, _)| *publish == DeletionPublish::FinalBatch).map(|(_, txg)| *txg)
+}
+
+/// 跑前登记 e172-r3 第六节 6.1 的 L03-15（退役容器）、L03-16（退役记录）、L03-17（退役树根）：一次删除类发布一组行。
+/// 每一次都报 L03-16 `retirement_records_written`（写了的那一次期望 1、别的期望 0），三段历史在这一格上都有命中（R1.b）。
+fn judge_retirement_cells(analysis: &SegmentAnalysis, before: &VersionState, empties_the_leaf: bool, expected_death_txg: Option<u64>, builder: &mut CellRowBuilder<'_>) {
+    let retirement_container = container_written_in(analysis, RETIREMENT_TREE, RETIREMENT_PACKED_RECORD_TYPE);
+    let retirement_root = index_node_written_in(analysis, RETIREMENT_TREE);
+    let retirement_records = records_written_in(analysis, RETIREMENT_TREE, RETIREMENT_PACKED_RECORD_TYPE);
+    builder.push("L03-16", "retirement_records_written", usize::from(empties_the_leaf), retirement_records.len());
+    if !empties_the_leaf {
+        builder.push("L03-15", "retirement_container_written", "false", retirement_container.is_some());
+        builder.push("L03-17", "retirement_root_written", "false", retirement_root.is_some());
+        return;
+    }
+    let containers_written = analysis.units.iter().filter(|unit| unit.identity.unit_type_tag == 3 && unit.identity.tree_identifier == RETIREMENT_TREE).count();
+    builder.push("L03-15", "retirement_containers_written", 1, containers_written);
+    builder.push(
+        "L03-15",
+        "retirement_container",
+        format!("code3/type{RETIREMENT_PACKED_RECORD_TYPE}/width{RETIREMENT_RECORD_BYTES}/birth_tree{RETIREMENT_TREE}/records_at{PACKED_UNIT_RECORDS_OFFSET}/container1/count1"),
+        retirement_container.map_or_else(
+            || "absent".to_string(),
+            |(_, container)| {
+                format!(
+                    "code3/type{}/width{}/birth_tree{}/records_at{PACKED_UNIT_RECORDS_OFFSET}/container{}/count{}",
+                    container.packed_record_type, container.record_width, container.birth_tree, container.container_number, container.record_count
+                )
+            },
+        ),
+    );
+    // L03-16：身份四格的期望取上一版装着被删记录的那片 inode 叶的码 3 头（条件是条款的输入，同 L03-7 的取法）。
+    let leaf_before = inode_leaf_holding_the_deleted_record(before);
+    let record = retirement_records.first();
+    let leaf_field = |value: fn(&PackedContainer) -> u64| leaf_before.map_or_else(|| "absent".to_string(), |leaf| value(leaf).to_string());
+    builder.push("L03-16", "birth_tree", leaf_field(|leaf| leaf.birth_tree), field_text(record, 0, 8));
+    builder.push("L03-16", "packed_record_type", leaf_field(|leaf| leaf.packed_record_type), field_text(record, 8, 2));
+    builder.push("L03-16", "container_number", leaf_field(|leaf| leaf.container_number), field_text(record, 10, 8));
+    builder.push("L03-16", "container_birth", leaf_field(|leaf| leaf.container_birth), field_text(record, 18, 8));
+    builder.push("L03-16", "death_txg", expected_death_txg.map_or_else(|| "absent".to_string(), |txg| txg.to_string()), field_text(record, 26, 8));
+    let retirement_container_locations: Vec<String> = analysis
+        .regions
+        .iter()
+        .filter(|region| matches!(&region.body, DecodedBody::PackedContainer(container) if container.birth_tree == RETIREMENT_TREE))
+        .map(|region| format!("{}:{}", region.device, region.slot()))
+        .collect();
+    builder.push(
+        "L03-17",
+        "retirement_root",
+        format!(
+            "tag2/tree{RETIREMENT_TREE}/key_width8/width120/count1/separator1/birth_tree{RETIREMENT_TREE}/type{RETIREMENT_PACKED_RECORD_TYPE}/container1/children{}",
+            retirement_container_locations.join(",")
+        ),
+        retirement_root.map_or_else(|| "absent".to_string(), internal_root_summary),
+    );
+}
+
+/// 墓碑树根与退役树根同形（layout/03 第 21 行）：头里的树 ID、key 宽、条目宽、条目数，与首条条目的分隔 key、身份引用三段、子指针的两份落点。
+fn internal_root_summary(node: &IndexNode) -> String {
+    let entry = node.entries.first().cloned().unwrap_or_else(|| vec![0; INODE_INTERNAL_ENTRY_BYTES]);
+    let children = block_pointer_of(&entry[34..34 + NODE_POINTER_BYTES])
+        .locations
+        .iter()
+        .map(|location| format!("{}:{}", location.device, location.slot))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "tag2/tree{}/key_width{}/width{}/count{}/separator{}/birth_tree{}/type{}/container{}/children{children}",
+        node.tree_identifier,
+        node.key_width,
+        node.entry_width,
+        node.entry_count,
+        read_u64(&entry, 0),
+        read_u64(&entry, 8),
+        read_u16(&entry, 16),
+        read_u64(&entry, 18)
+    )
 }
 
 /// 三个时间秒都写同一个值时的期望写法（与 `times_text` 同形）。
@@ -1918,29 +2149,7 @@ fn judge_queue_and_tombstone_cells(
             "L03-11",
             "tombstone_root",
             format!("tag2/tree{TOMBSTONE_TREE}/key_width8/width120/count1/separator1/birth_tree{TOMBSTONE_TREE}/type1/container1/children{}", tombstone_container_locations.join(",")),
-            tombstone_root.map_or_else(
-                || "absent".to_string(),
-                |node| {
-                    let entry = node.entries.first().cloned().unwrap_or_else(|| vec![0; INODE_INTERNAL_ENTRY_BYTES]);
-                    let children = block_pointer_of(&entry[34..34 + NODE_POINTER_BYTES])
-                        .locations
-                        .iter()
-                        .map(|location| format!("{}:{}", location.device, location.slot))
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    format!(
-                        "tag2/tree{}/key_width{}/width{}/count{}/separator{}/birth_tree{}/type{}/container{}/children{children}",
-                        node.tree_identifier,
-                        node.key_width,
-                        node.entry_width,
-                        node.entry_count,
-                        read_u64(&entry, 0),
-                        read_u64(&entry, 8),
-                        read_u16(&entry, 16),
-                        read_u64(&entry, 18)
-                    )
-                },
-            ),
+            tombstone_root.map_or_else(|| "absent".to_string(), internal_root_summary),
         );
     } else {
         builder.push("L03-10", "tombstone_container_written", "false", tombstone_container.is_some());
@@ -1948,15 +2157,24 @@ fn judge_queue_and_tombstone_cells(
     }
 }
 
-fn judge_tree_table_accounting_and_watermark_cells(analysis: &SegmentAnalysis, after: &VersionState, is_final: bool, builder: &mut CellRowBuilder<'_>) {
+fn judge_tree_table_accounting_and_watermark_cells(analysis: &SegmentAnalysis, after: &VersionState, is_final: bool, empties_the_leaf: bool, builder: &mut CellRowBuilder<'_>) {
     let tree_table = index_node_written_in(analysis, 0);
-    builder.push("L03-12", "entry_count", 11, tree_table.map_or_else(|| "absent".to_string(), |node| node.entry_count.to_string()));
+    builder.push("L03-12", "entry_count", TREE_TABLE_ENTRIES_AFTER_THE_FIRST_FILE, tree_table.map_or_else(|| "absent".to_string(), |node| node.entry_count.to_string()));
+    // layout/01 第 419 行：树表码 2 头的 key 区间 [extent 树的树 ID, 末条退役树的树 ID]。
+    builder.push(
+        "L03-12",
+        "tree_table_key_range",
+        format!("{EXTENT_TREE}/{RETIREMENT_TREE}"),
+        tree_table.map_or_else(|| "absent".to_string(), |node| format!("{}/{}", read_u64(&node.key_range_low, 0), read_u64(&node.key_range_high, 0))),
+    );
     let entries = tree_table.map(tree_table_entries_of).unwrap_or_default();
+    // 退役树的根指针：只有「那片叶删空」的最后一批之后不是零（layout/03 第 23 行「零根」起，第 21 行「有退役记录的那次发布」写根）。
     for (tree, kind_code, head_identifier, root_is_zero) in [
         (DELETED_INODES_TREE, 9, INODE_TREE, is_final),
         (TOMBSTONE_TREE, 10, INODE_TREE, false),
         (LINEAGE_TREE, 11, 0, true),
         (LOGGED_OPERATIONS_TREE, 12, 0, true),
+        (RETIREMENT_TREE, RETIREMENT_TREE_KIND_CODE, INODE_TREE, !empties_the_leaf),
     ] {
         let entry = entries.iter().find(|entry| entry.tree == tree);
         builder.push(
@@ -1970,11 +2188,13 @@ fn judge_tree_table_accounting_and_watermark_cells(analysis: &SegmentAnalysis, a
         );
     }
     let tombstone_levels = tombstone_internal_levels(after);
+    let retirement_levels = retirement_internal_levels(after);
     let live_inodes = live_inode_count(after);
+    let inode_records = inode_record_count(after);
     builder.push(
         "L03-13",
-        &format!("committed_reservation_h{tombstone_levels}_live{live_inodes}"),
-        expected_committed_reservation(tombstone_levels, live_inodes),
+        &format!("committed_reservation_tombstone_levels{tombstone_levels}_retirement_levels{retirement_levels}_live{live_inodes}_records{inode_records}"),
+        expected_committed_reservation(tombstone_levels, retirement_levels, live_inodes, inode_records, RetirementShare::Included),
         accounting_value(after, 6).map_or_else(|| "absent".to_string(), |value| value.to_string()),
     );
     let root_watermark = analysis.root_records.first().map_or_else(|| "absent".to_string(), |(_, _, record)| record.watermark.to_string());
@@ -2523,6 +2743,26 @@ struct HistoryJudgement {
     time_threshold_rows: Vec<TimeThresholdRow>,
     /// 导出的 `name=impl_config` 那一行（R6.b 要意图与顺序写两个时间）。
     configuration: BTreeMap<String, String>,
+    /// 每次删除类发布一行：解出的标签 6 与式子的四个输入（A-tag6、P-pin、R-ret 都从它算；跑前登记 e172-r3 第六节 6.2）。
+    tag_six_rows: Vec<TagSixRow>,
+}
+
+/// 一次删除类发布之后那一版的标签 6 读数与式子的四个输入（都从解码的那一版现读）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct TagSixRow {
+    publish: DeletionPublish,
+    txg: u64,
+    actual: Option<u64>,
+    tombstone_levels: u64,
+    retirement_levels: u64,
+    live_inodes: u64,
+    inode_records: u64,
+}
+
+impl TagSixRow {
+    fn actual_text(&self) -> String {
+        self.actual.map_or_else(|| "absent".to_string(), |value| value.to_string())
+    }
 }
 
 /// R1.t（跑前登记 e172-r2 第六节 6.2）：窗口里每一次系统配置槽写，偏移 433 起 4 字节小端解出的 T_time。
@@ -2632,9 +2872,27 @@ fn judge_history(history: &HistoryExport) -> HistoryJudgement {
     let mut role_notation_only_differences = Vec::new();
     let mut key_range_lines = Vec::new();
     let mut leaf_branch_records = Vec::new();
+    let mut tag_six_rows = Vec::new();
+    let deletion_publishes: Vec<(DeletionPublish, u64)> = analysis
+        .segments
+        .iter()
+        .zip(&analysis.states_after)
+        .filter_map(|(segment, after)| deletion_publish_of(segment, after).map(|publish| (publish, segment.label_txg())))
+        .collect();
     for (segment_index, segment) in analysis.segments.iter().enumerate() {
         let before = &analysis.states_before[segment_index];
         let after = &analysis.states_after[segment_index];
+        if let Some(publish) = deletion_publish_of(segment, after) {
+            tag_six_rows.push(TagSixRow {
+                publish,
+                txg: segment.label_txg(),
+                actual: accounting_value(after, 6),
+                tombstone_levels: tombstone_internal_levels(after),
+                retirement_levels: retirement_internal_levels(after),
+                live_inodes: live_inode_count(after),
+                inode_records: inode_record_count(after),
+            });
+        }
         structure_failures.extend(segment.structure_failures.iter().map(|failure| format!("history={} {failure}", history.name)));
         if let Some((decoded, exported, is_equal, differs_only_in_index_notation)) = role_name_comparison(segment) {
             let text = format!("history={} txg={} decoded={} exported={}", history.name, segment.label_txg(), decoded.join(","), exported.join(","));
@@ -2645,7 +2903,7 @@ fn judge_history(history: &HistoryExport) -> HistoryJudgement {
             }
         }
         if segment.is_deletion_publish {
-            leaf_branch_records.extend(judge_layout_three_cells(history, segment, before, after, &mut cell_rows));
+            leaf_branch_records.extend(judge_layout_three_cells(history, segment, before, after, &deletion_publishes, &mut cell_rows));
             segment_rows.extend(segment_row_of(&history.name, segment, before, after));
         }
         if segment.label_kind() == "unlink_intent" {
@@ -2663,6 +2921,11 @@ fn judge_history(history: &HistoryExport) -> HistoryJudgement {
                 history.name,
                 segment.label_txg()
             ));
+        }
+        // L03-17：退役树根的层级与 key 区间只记值（跑前登记 e172-r3 第五节 5.8 改24，同 R7 那一类）；容器号从 1 起（layout/03 第 21 行）。
+        if segment.is_deletion_publish {
+            let retirement_space = [(1, u64::MAX), (0, u64::MAX)];
+            key_range_lines.extend(key_range_line(&history.name, segment, RETIREMENT_TREE, "tr", &retirement_space).map(|(line, _)| line));
         }
     }
     let tiling_failures = tiling_failures(history, &analysis);
@@ -2684,6 +2947,7 @@ fn judge_history(history: &HistoryExport) -> HistoryJudgement {
         leaf_branch_records,
         time_threshold_rows,
         configuration: history.configuration.clone(),
+        tag_six_rows,
     }
 }
 
@@ -2744,7 +3008,16 @@ enum PositiveControl {
     RewriteIntentTimeThresholdAsSeconds,
     /// PC-I：H3 意图那次 t3 里 1 号记录三个时间秒改成顺序写的时间、重封码 3 载荷校验和。
     CopySequentialWriteTimeIntoTheIntentRecord,
+    /// PC-J：退役容器里第一条退役记录偏移 26 起的死亡 txg 加 1、重封码 3 载荷校验和（跑前登记 e172-r3 第五节 5.4）。
+    BumpRetirementDeathTxg,
+    /// PC-K：意图那次记账树叶里标签 6 那一行的 value 减 70（= 2 × 35，一条记录的退役份额）、重封码 2 载荷 CRC。
+    ReduceIntentTagSixByOneRecordsRetirementShare,
+    /// PC-L：退役树根首条条目偏移 0 起的分隔 key（容器号）1 改成 2、重封码 2 载荷 CRC。
+    BumpRetirementRootSeparator,
 }
+
+/// PC-K 从意图那一版标签 6 里减掉的字节数：一条记录的退役份额 × 副本数（跑前登记 e172-r3 第五节 5.4「减 70（= 2 × 35）」）。
+const POSITIVE_CONTROL_TAG_SIX_REDUCTION_BYTES: u64 = 70;
 
 /// PC-F、PC-G 改坏之后预期的那一次归错（跑前登记 e172-r2 第五节 5.4 表「改坏之后预期红在哪」）：从原样导出算出来。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2756,7 +3029,7 @@ struct ExpectedMisattribution {
 }
 
 impl PositiveControl {
-    const EVERY_CONTROL: [PositiveControl; 8] = [
+    const EVERY_CONTROL: [PositiveControl; 11] = [
         PositiveControl::FlipIntentNlink,
         PositiveControl::NonzeroDeletedInodesPadding,
         PositiveControl::BumpTombstoneDeathTxg,
@@ -2765,9 +3038,12 @@ impl PositiveControl {
         PositiveControl::ShiftMountSegmentEndToItsLastWrite,
         PositiveControl::RewriteIntentTimeThresholdAsSeconds,
         PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord,
+        PositiveControl::BumpRetirementDeathTxg,
+        PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare,
+        PositiveControl::BumpRetirementRootSeparator,
     ];
-    /// 跑前登记 e172-r2 第五节 5.4：适用的（对照, 历史）对共 18 个。
-    const APPLICABLE_PAIRS_EXPECTED: usize = 18;
+    /// 跑前登记 e172-r3 第五节 5.4：适用的（对照, 历史）对共 25 个（第 2 次的 18 个加 PC-J 2、PC-K 3、PC-L 2）。
+    const APPLICABLE_PAIRS_EXPECTED: usize = 25;
     fn name(self) -> &'static str {
         match self {
             PositiveControl::FlipIntentNlink => "PC-A",
@@ -2778,6 +3054,24 @@ impl PositiveControl {
             PositiveControl::ShiftMountSegmentEndToItsLastWrite => "PC-G",
             PositiveControl::RewriteIntentTimeThresholdAsSeconds => "PC-H",
             PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord => "PC-I",
+            PositiveControl::BumpRetirementDeathTxg => "PC-J",
+            PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare => "PC-K",
+            PositiveControl::BumpRetirementRootSeparator => "PC-L",
+        }
+    }
+    /// 第 2 行射程外的两条（目标行是附带的 R8.c，跑前登记 e172-r3 第五节 5.4）：没转红只作废 R8.c 那几行。
+    fn is_in_row_two_scope(self) -> bool {
+        match self {
+            PositiveControl::ShiftMountSegmentEndOneStepLater | PositiveControl::ShiftMountSegmentEndToItsLastWrite => false,
+            PositiveControl::FlipIntentNlink
+            | PositiveControl::NonzeroDeletedInodesPadding
+            | PositiveControl::BumpTombstoneDeathTxg
+            | PositiveControl::DropIntentFirstBarrier
+            | PositiveControl::RewriteIntentTimeThresholdAsSeconds
+            | PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord
+            | PositiveControl::BumpRetirementDeathTxg
+            | PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare
+            | PositiveControl::BumpRetirementRootSeparator => true,
         }
     }
     /// 目标行是绿的（`true`）还是红的。
@@ -2792,6 +3086,12 @@ impl PositiveControl {
             PositiveControl::ShiftMountSegmentEndOneStepLater | PositiveControl::ShiftMountSegmentEndToItsLastWrite => judgement.misattributed_writes() == 0,
             PositiveControl::RewriteIntentTimeThresholdAsSeconds => judgement.time_threshold_rows_not_expected().is_empty(),
             PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord => judgement.intent_times_row().is_some_and(|row| row.discriminable && row.is_equal()),
+            PositiveControl::BumpRetirementDeathTxg => judgement.first_cell_row("L03-16", "death_txg").is_some_and(CellRow::is_equal),
+            PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare => {
+                let readings = judgement.intent_tag_six_readings();
+                readings.anchor_equal() && readings.clause_equal() && readings.pin_equal()
+            }
+            PositiveControl::BumpRetirementRootSeparator => judgement.first_cell_row("L03-17", "retirement_root").is_some_and(CellRow::is_equal),
         }
     }
     /// 改坏之后目标行红、而且红在预期的那一处（`baseline` 是原样导出上的判定，`expected` 是 PC-F、PC-G 预期的那一次归错）。
@@ -2825,6 +3125,20 @@ impl PositiveControl {
                 let sequential = history.configuration.get("sequential_write_time_seconds").map_or("", String::as_str);
                 corrupted.intent_times_row().is_some_and(|row| !row.is_equal() && row.actual == three_equal_times_text(sequential))
             }
+            // 死亡 txg 那一行不等、L03-16 别的行照旧相等。
+            PositiveControl::BumpRetirementDeathTxg => {
+                let death_txg_red = corrupted.first_cell_row("L03-16", "death_txg").is_some_and(|row| !row.is_equal());
+                let others_still_equal = corrupted.cell_rows.iter().filter(|row| row.cell == "L03-16" && row.field != "death_txg").all(CellRow::is_equal);
+                death_txg_red && others_still_equal
+            }
+            // 意图那一版 A-tag6、L03-13、钉值层（H1、H2）三处都不等、解出的 = 期望 − 70；R-ret 判别臂那一份照旧不等。
+            PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare => {
+                let readings = corrupted.intent_tag_six_readings();
+                readings.anchor_reduced() && readings.clause_reduced() && readings.pin_reduced() && !readings.discriminating_arm_equal()
+            }
+            PositiveControl::BumpRetirementRootSeparator => {
+                corrupted.first_cell_row("L03-17", "retirement_root").is_some_and(|row| !row.is_equal() && row.actual.contains("/separator2/"))
+            }
         }
     }
     fn applies_to(self, history: &HistoryExport) -> bool {
@@ -2833,11 +3147,15 @@ impl PositiveControl {
                 history.segments.iter().any(|segment| segment.publish_kind() == "mount_writes_before_its_first_publish")
             }
             PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord => history.configuration.contains_key("intent_write_time_seconds"),
+            // 只在窗口里写过退役单元的历史上适用（H1、H2；H3 的叶里还有 2 号、不写退役记录，第四节第 8 条）：按字节认，不按历史名。
+            PositiveControl::BumpRetirementDeathTxg => history_writes_a_retirement_unit(history, 3),
+            PositiveControl::BumpRetirementRootSeparator => history_writes_a_retirement_unit(history, 2),
             PositiveControl::FlipIntentNlink
             | PositiveControl::NonzeroDeletedInodesPadding
             | PositiveControl::BumpTombstoneDeathTxg
             | PositiveControl::DropIntentFirstBarrier
-            | PositiveControl::RewriteIntentTimeThresholdAsSeconds => true,
+            | PositiveControl::RewriteIntentTimeThresholdAsSeconds
+            | PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare => true,
         }
     }
     /// 不适用时报的原因（`name=r_pc … applies=false reason=`）。
@@ -2845,11 +3163,83 @@ impl PositiveControl {
         match self {
             PositiveControl::ShiftMountSegmentEndOneStepLater | PositiveControl::ShiftMountSegmentEndToItsLastWrite => "no_mount_writes_before_its_first_publish",
             PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord => "impl_config_without_intent_write_time_seconds",
+            PositiveControl::BumpRetirementDeathTxg => "no_retirement_container_written",
+            PositiveControl::BumpRetirementRootSeparator => "no_retirement_root_written",
             PositiveControl::FlipIntentNlink
             | PositiveControl::NonzeroDeletedInodesPadding
             | PositiveControl::BumpTombstoneDeathTxg
             | PositiveControl::DropIntentFirstBarrier
-            | PositiveControl::RewriteIntentTimeThresholdAsSeconds => "always_applies",
+            | PositiveControl::RewriteIntentTimeThresholdAsSeconds
+            | PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare => "always_applies",
+        }
+    }
+}
+
+/// 窗口里有没有一次写是退役树的单元（码 3 看偏移 43 的出生树，码 2 看偏移 42 的树 ID；同 `decode_unit` 的读法）。
+fn history_writes_a_retirement_unit(history: &HistoryExport, unit_type_tag: u8) -> bool {
+    let tree_offset = if unit_type_tag == 3 { 43 } else { 42 };
+    history.operations.iter().any(|operation| {
+        matches!(operation, WindowOperation::Write(write)
+            if write.bytes.len() >= NODE_BYTES && &write.bytes[0..4] == UNIT_MAGIC && write.bytes[6] == unit_type_tag && read_u64(&write.bytes, tree_offset) == RETIREMENT_TREE)
+    })
+}
+
+/// PC-K 的目标行：意图那一版的 A-tag6、L03-13、钉值层与 R-ret 判别臂那一份，各是（期望，解出的）。
+struct IntentTagSixReadings {
+    anchor: (Option<u64>, Option<u64>),
+    clause: (Option<u64>, Option<u64>),
+    /// 钉值层只比 H1、H2；别的历史这一格是 `None`（不比）。
+    pin: Option<(Option<u64>, Option<u64>)>,
+    discriminating_arm: (Option<u64>, Option<u64>),
+}
+
+impl IntentTagSixReadings {
+    fn pair_equal(pair: (Option<u64>, Option<u64>)) -> bool {
+        pair.0.is_some() && pair.0 == pair.1
+    }
+    fn pair_reduced(pair: (Option<u64>, Option<u64>)) -> bool {
+        pair.0.and_then(|expected| expected.checked_sub(POSITIVE_CONTROL_TAG_SIX_REDUCTION_BYTES)).is_some_and(|reduced| Some(reduced) == pair.1)
+    }
+    fn anchor_equal(&self) -> bool {
+        Self::pair_equal(self.anchor)
+    }
+    fn clause_equal(&self) -> bool {
+        Self::pair_equal(self.clause)
+    }
+    fn pin_equal(&self) -> bool {
+        self.pin.is_none_or(Self::pair_equal)
+    }
+    fn anchor_reduced(&self) -> bool {
+        Self::pair_reduced(self.anchor)
+    }
+    fn clause_reduced(&self) -> bool {
+        Self::pair_reduced(self.clause)
+    }
+    fn pin_reduced(&self) -> bool {
+        self.pin.is_none_or(Self::pair_reduced)
+    }
+    fn discriminating_arm_equal(&self) -> bool {
+        Self::pair_equal(self.discriminating_arm)
+    }
+}
+
+impl HistoryJudgement {
+    fn first_cell_row(&self, cell: &str, field: &str) -> Option<&CellRow> {
+        self.cell_rows.iter().find(|row| row.cell == cell && row.field == field)
+    }
+    fn intent_tag_six_readings(&self) -> IntentTagSixReadings {
+        let intent = self.tag_six_rows.iter().find(|row| row.publish == DeletionPublish::Intent);
+        let actual = intent.and_then(|row| row.actual);
+        let clause_row = self.cell_rows.iter().find(|row| row.cell == "L03-13" && row.publish_kind == "unlink_intent");
+        let without_retirement = intent.map(|row| retirement_arm_expectations(row.tombstone_levels, row.retirement_levels, row.live_inodes, row.inode_records).1);
+        IntentTagSixReadings {
+            anchor: (registered_committed_reservation_of_publish(&self.name, DeletionPublish::Intent), actual),
+            clause: (
+                clause_row.and_then(|row| row.expected.parse::<u64>().ok()),
+                clause_row.and_then(|row| row.actual.parse::<u64>().ok()),
+            ),
+            pin: history_is_compared_with_the_harness_pins(&self.name).then(|| (harness_pinned_value(harness_index_of(DeletionPublish::Intent)), actual)),
+            discriminating_arm: (without_retirement, actual),
         }
     }
 }
@@ -2903,10 +3293,43 @@ fn corrupted_copy(history: &HistoryExport, control: PositiveControl) -> Option<H
             copy.operations.retain(|operation| !first_barrier_steps.contains(&operation.step()));
             touched += first_barrier_steps.len();
         }
+        // PC-J、PC-L：窗口里每一份退役单元（两块盘各一份；这三段历史里只有最后一批写它们）。
+        PositiveControl::BumpRetirementDeathTxg | PositiveControl::BumpRetirementRootSeparator => {
+            for operation in &mut copy.operations {
+                let WindowOperation::Write(write) = operation else { continue };
+                if write.bytes.len() < NODE_BYTES || &write.bytes[0..4] != UNIT_MAGIC {
+                    continue;
+                }
+                let bytes = &mut write.bytes;
+                match (control, bytes[6]) {
+                    (PositiveControl::BumpRetirementDeathTxg, 3) if read_u64(bytes, 43) == RETIREMENT_TREE => {
+                        // layout/03 第 74 行：第一条退役记录偏移 26 起 8 字节是死亡 txg。
+                        let death_offset = PACKED_UNIT_RECORDS_OFFSET + 26;
+                        let bumped = read_u64(bytes, death_offset) + 1;
+                        bytes[death_offset..death_offset + 8].copy_from_slice(&bumped.to_le_bytes());
+                        let checksum = castagnoli_crc32(&bytes[PACKED_UNIT_PLAINTEXT_HEADER_BYTES..]);
+                        bytes[89..93].copy_from_slice(&checksum.to_le_bytes());
+                        touched += 1;
+                    }
+                    (PositiveControl::BumpRetirementRootSeparator, 2) if read_u64(bytes, 42) == RETIREMENT_TREE => {
+                        let key_width = usize::from(bytes[51]);
+                        let header_end = index_node_header_bytes(key_width);
+                        let entries_offset = header_end + RESERVED_NONCE_MAC_ALGORITHM_BYTES;
+                        let bumped_separator = read_u64(bytes, entries_offset) + 1;
+                        bytes[entries_offset..entries_offset + 8].copy_from_slice(&bumped_separator.to_le_bytes());
+                        let checksum = castagnoli_crc32(&bytes[header_end..]);
+                        bytes[76 + 2 * key_width..80 + 2 * key_width].copy_from_slice(&checksum.to_le_bytes());
+                        touched += 1;
+                    }
+                    _ => {}
+                }
+            }
+        }
         PositiveControl::FlipIntentNlink
         | PositiveControl::NonzeroDeletedInodesPadding
         | PositiveControl::BumpTombstoneDeathTxg
-        | PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord => {
+        | PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord
+        | PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare => {
             let sequential_seconds = history.configuration.get("sequential_write_time_seconds").and_then(|text| text.parse::<u64>().ok());
             for operation in &mut copy.operations {
                 let WindowOperation::Write(write) = operation else { continue };
@@ -2956,6 +3379,26 @@ fn corrupted_copy(history: &HistoryExport, control: PositiveControl) -> Option<H
                         }
                         let checksum = castagnoli_crc32(&bytes[PACKED_UNIT_PLAINTEXT_HEADER_BYTES..]);
                         bytes[89..93].copy_from_slice(&checksum.to_le_bytes());
+                    }
+                    // 记账条目：key 打头 2 字节是统计标签，value 在条目偏移 22（layout/01 第 303–305 行；同 `accounting_value`）。
+                    PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare if unit_type_tag == 2 && read_u64(bytes, 42) == ACCOUNTING_TREE => {
+                        let key_width = usize::from(bytes[51]);
+                        let header_end = index_node_header_bytes(key_width);
+                        let entries_offset = header_end + RESERVED_NONCE_MAC_ALGORITHM_BYTES;
+                        let entry_count = usize_of(read_u16(bytes, 82 + 2 * key_width));
+                        let entry_width = usize_of(read_u16(bytes, 84 + 2 * key_width));
+                        for entry_index in 0..entry_count {
+                            let entry_start = entries_offset + entry_index * entry_width;
+                            if entry_start + entry_width > NODE_BYTES || read_u16(bytes, entry_start) != 6 {
+                                continue;
+                            }
+                            let value_offset = entry_start + 22;
+                            let reduced = read_u64(bytes, value_offset).saturating_sub(POSITIVE_CONTROL_TAG_SIX_REDUCTION_BYTES);
+                            bytes[value_offset..value_offset + 8].copy_from_slice(&reduced.to_le_bytes());
+                            touched += 1;
+                        }
+                        let checksum = castagnoli_crc32(&bytes[header_end..]);
+                        bytes[76 + 2 * key_width..80 + 2 * key_width].copy_from_slice(&checksum.to_le_bytes());
                     }
                     _ => {}
                 }
@@ -3016,14 +3459,11 @@ fn expected_misattribution_of(history: &HistoryExport, baseline: &HistoryJudgeme
         }),
         PositiveControl::ShiftMountSegmentEndToItsLastWrite => {
             let last_write_step = last_write_step_of(history, mount_segment)?;
-            let is_system_configuration_write = history.operations.iter().any(|operation| {
-                matches!(operation, WindowOperation::Write(write) if write.step == last_write_step && region_kind_of(write) == RegionKind::SystemConfigurationSlot)
-            });
             let original_attribution = baseline.attribution_rows.iter().find(|row| row.step == last_write_step).map(|row| row.decoded.clone());
             Some(ExpectedMisattribution {
                 step: last_write_step,
                 exported_segment: format!("{next_kind}_txg{next_txg}"),
-                decoded: if is_system_configuration_write { Some(WriteAttribution::InstanceAcquisition) } else { original_attribution },
+                decoded: original_attribution,
                 forbidden_decoded: Some(WriteAttribution::Publish(*next_txg)),
             })
         }
@@ -3032,7 +3472,10 @@ fn expected_misattribution_of(history: &HistoryExport, baseline: &HistoryJudgeme
         | PositiveControl::BumpTombstoneDeathTxg
         | PositiveControl::DropIntentFirstBarrier
         | PositiveControl::RewriteIntentTimeThresholdAsSeconds
-        | PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord => None,
+        | PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord
+        | PositiveControl::BumpRetirementDeathTxg
+        | PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare
+        | PositiveControl::BumpRetirementRootSeparator => None,
     }
 }
 
@@ -3096,7 +3539,9 @@ fn anchor_lines_of_history(judgement: &HistoryJudgement) -> Vec<(String, bool)> 
             lines.push(anchor_line("A-size", history, &format!("txg={txg}"), size, field_text(record.as_ref(), 40, 8)));
             lines.push(anchor_line("A-blocks", history, &format!("txg={txg}"), size.div_ceil(512), field_text(record.as_ref(), 48, 8)));
         }
-        let registered_tag_six = registered_committed_reservation_of_history(history).map_or_else(|| "unknown_history".to_string(), |value| value.to_string());
+        let registered_tag_six = deletion_publish_of(segment, after)
+            .and_then(|publish| registered_committed_reservation_of_publish(history, publish))
+            .map_or_else(|| "unknown_publish".to_string(), |value| value.to_string());
         lines.push(anchor_line("A-tag6", history, &format!("txg={txg}"), registered_tag_six, accounting_value(after, 6).map_or_else(|| "absent".to_string(), |value| value.to_string())));
         if history == "h1" || history == "h3" {
             let mut journal_actual: Vec<String> = segment.journal_records.iter().map(|(device, offset, _)| format!("{device}:{offset}")).collect();
@@ -3125,13 +3570,37 @@ fn anchor_lines_of_history(judgement: &HistoryJudgement) -> Vec<(String, bool)> 
     lines
 }
 
-/// 跑前登记 e172-r2 第七节 A-tag6：按历史名分的字面常量，不由解码的 n_live 现算（第五节 5.8 改9）。
-fn registered_committed_reservation_of_history(history: &str) -> Option<u64> {
-    match history {
-        "h1" | "h2" => Some(98_304),
-        "h3" => Some(98_386),
+/// 跑前登记 e172-r3 第七节 7.1 A-tag6：按（历史，删除类发布）分的字面常量，不由解码的 n_live、n_记录 现算（第五节 5.8 改25）。
+/// H1 / H2：n_live 0、n_记录 1，最后一批 0 与 0；H3：n_live 1、n_记录 2，最后一批 1 与 1；两个 H 都是 0。
+fn registered_committed_reservation_of_publish(history: &str, publish: DeletionPublish) -> Option<u64> {
+    match (history, publish) {
+        ("h1" | "h2", DeletionPublish::Intent | DeletionPublish::BatchLeavingTwoUnits | DeletionPublish::BatchLeavingOneUnit) => Some(196_678),
+        ("h1", DeletionPublish::FinalBatch) => Some(196_608),
+        ("h2", DeletionPublish::FinalBatch) => Some(196_608),
+        ("h3", DeletionPublish::Intent | DeletionPublish::BatchLeavingTwoUnits | DeletionPublish::BatchLeavingOneUnit) => Some(196_830),
+        ("h3", DeletionPublish::FinalBatch) => Some(196_760),
         _ => None,
     }
+}
+
+/// 钉值层（跑前登记 e172-r3 第一节 1.2 那张表）：每种删除类发布对 harness 第 198 行的第几格（从 1 数，第 1 格是删除之前那一版、在窗口外）。
+fn harness_index_of(publish: DeletionPublish) -> usize {
+    match publish {
+        DeletionPublish::Intent => 2,
+        DeletionPublish::BatchLeavingTwoUnits => 3,
+        DeletionPublish::BatchLeavingOneUnit => 4,
+        DeletionPublish::FinalBatch => 5,
+    }
+}
+
+/// harness 第 198 行第 `harness_index` 格（从 1 数）钉的值。
+fn harness_pinned_value(harness_index: usize) -> Option<u64> {
+    harness_index.checked_sub(1).and_then(|position| HARNESS_PINNED_TAG_SIX_VALUES.get(position)).copied()
+}
+
+/// 钉值层只拿与 harness 那条用例同一种历史（H1）和同几何的挂载续做（H2）比；H3 不比（第一节 1.2）。
+fn history_is_compared_with_the_harness_pins(history: &str) -> bool {
+    history == "h1" || history == "h2"
 }
 
 /// H2 的 A-txg（第 1 次登记第七节）：意图 5；续做三批的 txg 连着、第一批 = 挂载最后一次暖机 txg + 1。
@@ -3167,13 +3636,25 @@ fn trajectory_lines(judgement: &HistoryJudgement) -> Vec<String> {
         let data_units = data_units_of_version(after).unwrap_or(u64::MAX);
         let tag_six = accounting_value(after, 6).unwrap_or(u64::MAX);
         let tag_four = accounting_value(after, 4).unwrap_or(u64::MAX);
+        // 跑前登记 e172-r3 第五节 5.8 改29：标签 6 式子的三个新输入逐版照报。
+        let inode_records = inode_record_count(after);
+        let retirement_records = retirement_record_count_of_version(after);
+        let retirement_levels = retirement_internal_levels(after);
         lines.push(format!(
-            "name=r_traj history={} txg={} publish={} deleted_inodes={queue} data_units={data_units} tag6={tag_six} tag4={tag_four}",
+            "name=r_traj history={} txg={} publish={} deleted_inodes={queue} data_units={data_units} tag6={tag_six} tag4={tag_four} inode_records={inode_records} retirement_records={retirement_records} retirement_levels={retirement_levels}",
             judgement.name,
             segment.label_txg(),
             segment.label_kind()
         ));
-        for (series_name, value) in [("deleted_inodes", queue), ("data_units", data_units), ("tag6", tag_six), ("tag4", tag_four)] {
+        for (series_name, value) in [
+            ("deleted_inodes", queue),
+            ("data_units", data_units),
+            ("tag6", tag_six),
+            ("tag4", tag_four),
+            ("inode_records", inode_records),
+            ("retirement_records", retirement_records),
+            ("retirement_levels", retirement_levels),
+        ] {
             series.entry(series_name).or_default().push(value);
         }
     }
@@ -3193,8 +3674,9 @@ fn trajectory_lines(judgement: &HistoryJudgement) -> Vec<String> {
 // 产物：全部判定行（不带 E7RESULT 前缀；main 交 Emitter 打）。
 // ---------------------------------------------------------------------------------------------
 
-const LAYOUT_THREE_CELLS: [&str; 14] = [
-    "L03-1", "L03-2", "L03-3", "L03-4", "L03-5", "L03-6", "L03-7", "L03-8", "L03-9", "L03-10", "L03-11", "L03-12", "L03-13", "L03-14",
+const LAYOUT_THREE_CELLS: [&str; 17] = [
+    "L03-1", "L03-2", "L03-3", "L03-4", "L03-5", "L03-6", "L03-7", "L03-8", "L03-9", "L03-10", "L03-11", "L03-12", "L03-13", "L03-14", "L03-15", "L03-16",
+    "L03-17",
 ];
 
 /// V6（跑前登记 e172-r2 第十一节）：四个参数；H3 带 `intent_write_time_seconds=` 且 = `sequential_write_time_seconds=` + 60，H1、H2 不带这一格。
@@ -3268,6 +3750,7 @@ fn report_lines(export_texts: &[&str; 2]) -> Vec<String> {
         ("A-capacity", "tombstone_container_records", 815, tombstone_container_capacity()),
         ("A-capacity", "deleted_inodes_root_entries", 2031, deleted_inodes_root_capacity()),
         ("A-capacity", "tombstone_root_entry_bytes", 120, tombstone_root_entry_bytes()),
+        ("A-capacity", "retirement_container_records", 959, retirement_container_capacity()),
     ] {
         lines.push(anchor_line(anchor, "all", detail, expected, actual).0);
     }
@@ -3315,6 +3798,7 @@ fn report_lines(export_texts: &[&str; 2]) -> Vec<String> {
     }
     let mut controls_holding = 0usize;
     let mut controls_run = 0usize;
+    let mut controls_failed_in_row_two_scope = 0usize;
     let mut controls_failed_by_history: Vec<String> = Vec::new();
     for (history, judgement) in histories.iter().zip(&judgements) {
         let mut failed_here = 0usize;
@@ -3324,20 +3808,25 @@ fn report_lines(export_texts: &[&str; 2]) -> Vec<String> {
                 controls_run += 1;
                 controls_holding += usize::from(holds);
                 failed_here += usize::from(!holds);
+                controls_failed_in_row_two_scope += usize::from(!holds && control.is_in_row_two_scope());
             }
             lines.push(line);
         }
         controls_failed_by_history.push(format!("positive_controls_failed_{}={failed_here}", history.name));
     }
     lines.extend(row_two_lines(&judgements));
+    lines.extend(row_c775_lines(&judgements, controls_failed_in_row_two_scope));
     let branch_check = leaf_branch_check(&judgements);
     lines.push(branch_check.0);
+    let retirement_check = retirement_unit_history_check(&judgements);
+    lines.push(retirement_check.0);
     lines.push(format!(
-        "name=verdict check=stops s2_structure_failures={} s3_role_mismatches={} s3_index_notation_only={} s3_l03_7_second_branch_not_exactly_h3={} s4_tiling_failures={}",
+        "name=verdict check=stops s2_structure_failures={} s3_role_mismatches={} s3_index_notation_only={} s3_l03_7_second_branch_not_exactly_h3={} stop_retirement_unit_histories_not_registered={} s4_tiling_failures={}",
         stop_counts.0,
         stop_counts.1,
         stop_counts.2,
         usize::from(!branch_check.1),
+        usize::from(!retirement_check.1),
         stop_counts.3
     ));
     let void_text: Vec<String> = void_flags.iter().map(|(key, value)| format!("{key}={value}")).collect();
@@ -3494,7 +3983,8 @@ fn row_three_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
 }
 
 /// R3.d 的期望（跑前登记 e172-r2 第六节 6.2）：H1 = layout/03 第 59 行四串首尾相接；H3 = 每盘单元数 13、12、11、11 四串首尾相接。
-const WINDOW_UNITS_PER_DELETION_PUBLISH: [(&str, [usize; 4]); 2] = [("h1", [13, 12, 11, 10]), ("h3", [13, 12, 11, 11])];
+/// 跑前登记 e172-r3 第七节 A-roles-final：H1 最后一批 12（多 tr@0、tr，少 t3），整窗四串 26、24、22、24；H3 照旧。
+const WINDOW_UNITS_PER_DELETION_PUBLISH: [(&str, [usize; 4]); 2] = [("h1", [13, 12, 11, 12]), ("h3", [13, 12, 11, 11])];
 
 fn window_string_of(judgement: &HistoryJudgement, units_per_publish: &[usize]) -> (String, String, bool) {
     let operations: Vec<OperationView> = judgement.analysis.segments.iter().flat_map(|segment| segment.operations.iter().cloned()).collect();
@@ -3604,7 +4094,7 @@ fn row_four_and_five_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
     lines.push(format!("name=verdict row=4 pairs_with_unique_roles={pairs_with_unique_roles} unique_units_without_basis={without_basis}"));
     // R5.a（附带，不进任何判定）：H1 最后一批与 2 → 1 那一批的角色集合差（两个方向）。
     if let Some((two_to_one, final_batch, only_two_to_one, only_final)) = session.and_then(final_batch_difference) {
-        let row_five_h1_matches = only_two_to_one == ["t3"] && only_final.is_empty();
+        let row_five_h1_matches = matches_the_registered_final_batch_difference(&only_two_to_one, &only_final);
         lines.push(format!(
             "name=r5a history=h1 two_to_one_txg={} final_txg={} only_in_two_to_one={} only_in_final={} matches_registered={row_five_h1_matches} incidental=true",
             two_to_one.label_txg(),
@@ -3629,7 +4119,7 @@ fn row_four_and_five_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
             names_text(&only_final)
         ));
         // 判别力自证（第八节 8.2 第 3 行）：H1 的期望（2 → 1 独有 = {t3}、最后一批独有为空）拿去判 H3。
-        let h1_expectation_green_on_h3 = only_two_to_one == ["t3"] && only_final.is_empty();
+        let h1_expectation_green_on_h3 = matches_the_registered_final_batch_difference(&only_two_to_one, &only_final);
         lines.push(format!(
             "name=r5b_discrimination history=h3 h1_expectation_green={h1_expectation_green_on_h3} h3_expectation_green={row_five_h3_matches} exactly_one_green={}",
             h1_expectation_green_on_h3 != row_five_h3_matches
@@ -3637,6 +4127,16 @@ fn row_four_and_five_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
     }
     lines.push(format!("name=verdict row=5 h3_final_writes_t3={final_writes_inode_leaf} h3_matches_registered={row_five_h3_matches}"));
     lines
+}
+
+/// R5.a 的登记差（layout/03 第 60 行，那片叶删空那一支）：2 → 1 独有 = {t3}，最后一批独有 = {tr, tr@0}；
+/// 由 `registered_roles` 的两份角色集合现算（跑前登记 e172-r3 改18 之后最后一批多了退役单元，第 2 次的「最后一批独有为空」跟着变）。
+fn matches_the_registered_final_batch_difference(only_two_to_one: &[String], only_final: &[String]) -> bool {
+    let two_to_one: BTreeSet<&str> = registered_roles("unlink_batch", 1, DeletedRecordLeaf::OnlyTheDeletedRecord).unwrap_or_default().into_iter().collect();
+    let final_batch: BTreeSet<&str> = registered_roles("unlink_batch", 0, DeletedRecordLeaf::OnlyTheDeletedRecord).unwrap_or_default().into_iter().collect();
+    let expected_only_two_to_one: Vec<&str> = two_to_one.difference(&final_batch).copied().collect();
+    let expected_only_final: Vec<&str> = final_batch.difference(&two_to_one).copied().collect();
+    only_two_to_one == expected_only_two_to_one.as_slice() && only_final == expected_only_final.as_slice()
 }
 
 fn names_text(names: &[String]) -> String {
@@ -3731,6 +4231,173 @@ fn row_six_seven_eight_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
     lines
 }
 
+/// S3 另加的一条（跑前登记 e172-r3 第十一节 S3）：写了退役单元的历史恰是 H1、H2。
+fn retirement_unit_history_check(judgements: &[HistoryJudgement]) -> (String, bool) {
+    let mut histories: Vec<&str> = judgements
+        .iter()
+        .filter(|judgement| judgement.analysis.segments.iter().any(|segment| segment.units.iter().any(|unit| unit.identity.tree_identifier == RETIREMENT_TREE)))
+        .map(|judgement| judgement.name.as_str())
+        .collect();
+    histories.sort_unstable();
+    let matches_the_registered_histories = histories == ["h1", "h2"];
+    (
+        format!(
+            "name=retirement_unit_histories histories={} matches_registered={matches_the_registered_histories}",
+            if histories.is_empty() { "none".to_string() } else { histories.join(",") }
+        ),
+        matches_the_registered_histories,
+    )
+}
+
+/// 几何敏感性（跑前登记 e172-r3 第八节 8.2 第 2、4 行）：A-tag6 的两套常量互判（H1 的拿去判 H3、H3 的拿去判 H1），
+/// 钉值层 H2 对 H1 逐版同不同值。
+fn tag_six_geometry_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
+    let mut lines = Vec::new();
+    let named = |name: &str| judgements.iter().find(|judgement| judgement.name == name);
+    for (history, other_history) in [("h1", "h3"), ("h3", "h1")] {
+        let Some(judgement) = named(history) else { continue };
+        let all_equal_to = |constants_of: &str| {
+            !judgement.tag_six_rows.is_empty()
+                && judgement.tag_six_rows.iter().all(|row| {
+                    let registered = registered_committed_reservation_of_publish(constants_of, row.publish);
+                    registered.is_some() && registered == row.actual
+                })
+        };
+        let own_green = all_equal_to(history);
+        let other_green = all_equal_to(other_history);
+        lines.push(format!(
+            "name=a_tag6_geometry history={history} own_constants_green={own_green} constants_of={other_history} other_constants_green={other_green} exactly_one_green={}",
+            own_green != other_green
+        ));
+    }
+    if let (Some(session), Some(continuation)) = (named("h1"), named("h2")) {
+        for publish in [DeletionPublish::Intent, DeletionPublish::BatchLeavingTwoUnits, DeletionPublish::BatchLeavingOneUnit, DeletionPublish::FinalBatch] {
+            let actual_of = |judgement: &HistoryJudgement| judgement.tag_six_rows.iter().find(|row| row.publish == publish).and_then(|row| row.actual);
+            let (session_actual, continuation_actual) = (actual_of(session), actual_of(continuation));
+            lines.push(format!(
+                "name=harness_pin_geometry publish={} session_actual={} continuation_actual={} same_value={}",
+                publish.name(),
+                optional_text(session_actual),
+                optional_text(continuation_actual),
+                session_actual.is_some() && session_actual == continuation_actual
+            ));
+        }
+    }
+    lines
+}
+
+/// 几何敏感性（跑前登记 e172-r3 第八节 8.2 第 1 行）：最后一批的两套角色期望（那片叶删空：含 tr@0、tr 不含 t3；叶里还有别的记录：含 t3 不含 tr）
+/// 都拿去判 H1 与 H3 的最后一批；恰一套判绿才说明这一格分得出两种形状。
+fn final_batch_role_geometry_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
+    let mut lines = Vec::new();
+    for history in ["h1", "h3"] {
+        let Some(judgement) = judgements.iter().find(|judgement| judgement.name == history) else { continue };
+        let Some((_, final_batch)) = deletion_segment_with_units_after(judgement, "unlink_batch", 0) else { continue };
+        let verbatim = compares_role_names_verbatim(history);
+        let comparable = |role: &str| if verbatim { role.to_string() } else { role_name_without_allocation_ordinal(role) };
+        let mut actual: Vec<String> = final_batch.role_names().iter().map(|role| comparable(role)).collect();
+        actual.sort();
+        let green_for = |leaf: DeletedRecordLeaf| {
+            let mut expected: Vec<String> = registered_roles("unlink_batch", 0, leaf).unwrap_or_default().iter().map(|role| comparable(role)).collect();
+            expected.sort();
+            expected == actual
+        };
+        let only_record_green = green_for(DeletedRecordLeaf::OnlyTheDeletedRecord);
+        let other_records_green = green_for(DeletedRecordLeaf::BesideOtherRecords);
+        lines.push(format!(
+            "name=r3_geometry_roles history={history} txg={} only_record_green={only_record_green} other_records_green={other_records_green} exactly_one_green={}",
+            final_batch.label_txg(),
+            only_record_green != other_records_green
+        ));
+    }
+    lines
+}
+
+/// `retirement_cells_not_equal` 数的那几格（跑前登记 e172-r3 第六节 6.2）：L03-12 的条目数、key 区间与退役树那一条，L03-13 到 L03-17。
+fn is_retirement_cell_row(row: &CellRow) -> bool {
+    match row.cell {
+        "L03-13" | "L03-14" | "L03-15" | "L03-16" | "L03-17" => true,
+        "L03-12" => row.field == "entry_count" || row.field == "tree_table_key_range" || row.field == format!("tree{RETIREMENT_TREE}"),
+        _ => false,
+    }
+}
+
+fn optional_text(value: Option<u64>) -> String {
+    value.map_or_else(|| "absent".to_string(), |value| value.to_string())
+}
+
+/// 问题单第 2 行（C775）的量：钉值层 P-pin、判别臂 R-ret、条款层的计数，各报各的（跑前登记 e172-r3 第五节 5.8 改26、改27、改30，第六节 6.2）。
+fn row_c775_lines(judgements: &[HistoryJudgement], positive_controls_failed_in_scope: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut pin_not_equal = 0usize;
+    let mut committed_reservation_anchor_not_equal = 0usize;
+    let mut clause_not_equal = 0usize;
+    let mut retirement_cells_not_equal = 0usize;
+    let mut retirement_arm_not_discriminating = 0usize;
+    let mut retirement_arm_both_expectations_equal = 0usize;
+    let mut per_history: Vec<String> = Vec::new();
+    for judgement in judgements {
+        let history = judgement.name.as_str();
+        let compared_with_pins = history_is_compared_with_the_harness_pins(history);
+        let mut pin_not_equal_here = 0usize;
+        for row in &judgement.tag_six_rows {
+            if compared_with_pins {
+                let harness_index = harness_index_of(row.publish);
+                let pinned = harness_pinned_value(harness_index);
+                let equal = pinned.is_some() && pinned == row.actual;
+                pin_not_equal_here += usize::from(!equal);
+                lines.push(format!(
+                    "name=harness_pin history={history} txg={} publish={} harness_index={harness_index} pinned={} actual={} equal={equal}",
+                    row.txg,
+                    row.publish.name(),
+                    optional_text(pinned),
+                    row.actual_text()
+                ));
+            }
+            let registered = registered_committed_reservation_of_publish(history, row.publish);
+            committed_reservation_anchor_not_equal += usize::from(!(registered.is_some() && registered == row.actual));
+            let (with_retirement, without_retirement) = retirement_arm_expectations(row.tombstone_levels, row.retirement_levels, row.live_inodes, row.inode_records);
+            let with_equal = Some(with_retirement) == row.actual;
+            let without_equal = Some(without_retirement) == row.actual;
+            let discriminating = !without_equal;
+            retirement_arm_not_discriminating += usize::from(!discriminating);
+            retirement_arm_both_expectations_equal += usize::from(with_equal && without_equal);
+            lines.push(format!(
+                "name=r_ret history={history} txg={} publish={} with_retirement={with_retirement} without_retirement={without_retirement} actual={} with_equal={with_equal} without_equal={without_equal} discriminating={discriminating}",
+                row.txg,
+                row.publish.name(),
+                row.actual_text()
+            ));
+        }
+        // 删除之前那一版（harness 第 1 格）不在窗口里，每段历史报一行（跑前登记 e172-r3 第五节 5.8 改26）。
+        lines.push(format!("name=harness_pin_out_of_window history={history} harness_index=1 pinned={} in_window=false", optional_text(harness_pinned_value(1))));
+        if compared_with_pins {
+            pin_not_equal += pin_not_equal_here;
+            per_history.push(format!("pin_not_equal_{history}={pin_not_equal_here}"));
+        }
+        let final_row_beside_another_record = judgement.tag_six_rows.iter().find(|row| history == "h3" && row.publish == DeletionPublish::FinalBatch);
+        if let Some(final_row) = final_row_beside_another_record {
+            lines.push(format!(
+                "name=harness_pin_same_value history=h3 txg={} actual={} same_value_as_harness_first={}",
+                final_row.txg,
+                final_row.actual_text(),
+                final_row.actual.is_some() && final_row.actual == harness_pinned_value(1)
+            ));
+        }
+        clause_not_equal += judgement.cell_rows.iter().filter(|row| row.discriminable && !row.is_equal()).count();
+        let retirement_here = judgement.cell_rows.iter().filter(|row| is_retirement_cell_row(row) && !row.is_equal()).count();
+        retirement_cells_not_equal += retirement_here;
+        per_history.push(format!("retirement_cells_not_equal_{history}={retirement_here}"));
+    }
+    lines.extend(tag_six_geometry_lines(judgements));
+    lines.extend(final_batch_role_geometry_lines(judgements));
+    lines.push(format!(
+        "name=verdict row=c775 pin_not_equal={pin_not_equal} committed_reservation_anchor_not_equal={committed_reservation_anchor_not_equal} clause_not_equal={clause_not_equal} retirement_cells_not_equal={retirement_cells_not_equal} retirement_arm_not_discriminating={retirement_arm_not_discriminating} retirement_arm_both_expectations_equal={retirement_arm_both_expectations_equal} positive_controls_failed_in_scope={positive_controls_failed_in_scope} {}",
+        per_history.join(" ")
+    ));
+    lines
+}
+
 fn row_two_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
     let mut lines = Vec::new();
     let mut unregistered_total = 0u64;
@@ -3768,6 +4435,11 @@ fn row_two_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
 
 fn main() {
     preflight();
+    // 准入（`.claude/gate.d/stage-inputs.tsv` 的 E172 行，判法在 `scripts/gate/admission.py`；跑前登记 e172-r3 第十一节 11.3）：
+    // 输入自上次产物以来没变就不重跑（退 77）；放行时输入指纹打在产物最前面。
+    for admission_header_line in e7_index_bench::admit_experiment_run_or_exit("E172") {
+        println!("{admission_header_line}");
+    }
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let [first_export_path, second_export_path] = arguments.as_slice() else {
         eprintln!("用法：e172-deletion-write-dry-run <H1H2 导出文件> <H3 导出文件>，收到 {arguments:?}");
@@ -3802,6 +4474,11 @@ fn tombstone_root_entry_bytes() -> usize {
     8 + 26 + NODE_POINTER_BYTES
 }
 
+/// A-容量：layout/03 第 21 行 ⌊(32768 − 136) ÷ 34⌋ = 959（退役容器装的记录条数）。
+fn retirement_container_capacity() -> usize {
+    (DATA_UNIT_BYTES - PACKED_UNIT_RECORDS_OFFSET) / RETIREMENT_RECORD_BYTES
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3810,8 +4487,9 @@ mod tests {
     /// 入库的两份导出（`research/results/` 下的文件名）。跑前登记 e172-r2 第九节原写「找不到就判红，不跳过」；
     /// `research/` 可以整个删掉，用户 2026-10-18 定别的实验的产物缺了报本次未跑：读不到时用到它们的单测逐份报一行本次未跑、照常返回。
     /// 路径写成字面的 `concat!`（写法与为什么见 `e7_index_bench::ARCHIVED_PRODUCT_NOT_RUN_MARKER`）。
-    const H1H2_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r2-deletion-write-dump-h1h2-2026-10-05.out");
-    const H3_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r2-deletion-write-dump-h3-2026-10-05.out");
+    /// 第 3 次重跑登记 `research/prompts/e172-r3-prereg.md` 第五节 5.7 第 1 步的两份导出（主 agent 跑、入库）。
+    const H1H2_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r3-deletion-write-dump-h1h2-2026-11-02.out");
+    const H3_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r3-deletion-write-dump-h3-2026-11-02.out");
 
     struct ExportFixture {
         export_files: Vec<ExportFile>,
@@ -3903,10 +4581,15 @@ mod tests {
         assert_eq!(tombstone_root_entry_bytes(), 120);
     }
 
+    /// 跑前登记 e172-r3 第七节 7.1 A-tag6 的四个值（带退役项），与判别臂那一份（去掉退役项，即第 2 次装置的 98304 / 98386）。
     #[test]
-    fn committed_reservation_formula_gives_98304_without_live_inodes_and_98386_with_one() {
-        assert_eq!(expected_committed_reservation(0, 0), 98_304);
-        assert_eq!(expected_committed_reservation(0, 1), 98_386);
+    fn committed_reservation_formula_with_retirement_gives_196678_196608_196830_and_196760() {
+        assert_eq!(expected_committed_reservation(0, 0, 0, 1, RetirementShare::Included), 196_678);
+        assert_eq!(expected_committed_reservation(0, 0, 0, 0, RetirementShare::Included), 196_608);
+        assert_eq!(expected_committed_reservation(0, 0, 1, 2, RetirementShare::Included), 196_830);
+        assert_eq!(expected_committed_reservation(0, 0, 1, 1, RetirementShare::Included), 196_760);
+        assert_eq!(expected_committed_reservation(0, 0, 0, 1, RetirementShare::Removed), 98_304);
+        assert_eq!(expected_committed_reservation(0, 0, 1, 2, RetirementShare::Removed), 98_386);
     }
 
     #[test]
@@ -3923,13 +4606,13 @@ mod tests {
         assert_eq!(expected_root_slot(13), (1, 4_210_688));
         assert_eq!(expected_journal_offset_assuming_counter_equals_txg(5), 16_793_600);
         assert_eq!(expected_journal_offset_assuming_counter_equals_txg(8), 16_805_888);
-        assert_eq!(expected_system_configuration_for_txg_in_the_first_instance(5), (7, 4096));
-        assert_eq!(expected_system_configuration_for_txg_in_the_first_instance(6), (8, 0));
+        assert_eq!(expected_system_configuration_for_txg_in_the_first_instance(5), (8, 0));
+        assert_eq!(expected_system_configuration_for_txg_in_the_first_instance(6), (9, 4096));
     }
 
     #[test]
     fn layout_field_tables_tile_their_registered_totals() {
-        let root_record_widths = [4usize, 16, 4, 4, 8, 86, 8, 8, 32, 86, 86, 86, 1, 12, 16];
+        let root_record_widths = [4usize, 16, 4, 4, 8, 86, 8, 8, 32, 86, 86, 86, 8, 1, 1, 12, 16];
         assert_eq!(root_record_widths.iter().sum::<usize>(), ROOT_RECORD_FIELD_BYTES);
         let index_node_header_widths_without_key_range = [4usize, 2, 1, 1, 2, 32, 8, 1, 1, 8, 8, 4, 4, 4, 2, 2, 2];
         assert_eq!(index_node_header_widths_without_key_range.iter().sum::<usize>(), INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE);
@@ -4102,17 +4785,22 @@ mod tests {
         assert_eq!(cell_row("h1", 8, "L03-7", "inode_root_key_range").expected, "0/0");
     }
 
+    /// L03-13 每一版的期望一栏按带退役项的式子（第 2 次断言过的 98304 / 98386 读数是退役树加进之前的，期望改了跟着改；不把 r3 的读数写成断言）。
     #[test]
-    fn committed_reservation_rows_read_98304_in_every_h1_deletion_version_and_expect_98386_in_every_h3_one() {
+    fn committed_reservation_rows_expect_the_formula_with_retirement_in_every_deletion_version() {
         return_not_run_unless_exports_present!();
-        for txg in [5u64, 6, 7, 8] {
-            let row = judgement_named("h1").cell_rows.iter().find(|row| row.txg == txg && row.cell == "L03-13").expect("每一版一行");
-            assert_eq!(row.expected, "98304");
-            assert!(row.is_equal(), "{row:?}");
-        }
-        for txg in [6u64, 7, 8, 9] {
-            let row = judgement_named("h3").cell_rows.iter().find(|row| row.txg == txg && row.cell == "L03-13").expect("每一版一行");
-            assert_eq!(row.expected, "98386");
+        for (history, txg, expected) in [
+            ("h1", 5u64, "196678"),
+            ("h1", 6, "196678"),
+            ("h1", 7, "196678"),
+            ("h1", 8, "196608"),
+            ("h3", 6, "196830"),
+            ("h3", 7, "196830"),
+            ("h3", 8, "196830"),
+            ("h3", 9, "196760"),
+        ] {
+            let row = judgement_named(history).cell_rows.iter().find(|row| row.txg == txg && row.cell == "L03-13").expect("每一版一行");
+            assert_eq!(row.expected, expected, "{row:?}");
         }
     }
 
@@ -4134,13 +4822,23 @@ mod tests {
     #[test]
     fn final_batch_drops_exactly_the_inode_leaf_container_against_the_two_to_one_batch() {
         return_not_run_unless_exports_present!();
-        assert!(line_starting_with("name=r5a ").contains("only_in_two_to_one=t3 only_in_final=none matches_registered=true"));
+        assert!(line_starting_with("name=r5a ").contains(" only_in_two_to_one=t3 "));
+    }
+
+    /// R5.a 的登记差由 `registered_roles` 现算：2 → 1 独有 t3，最后一批独有 tr、tr@0（第 2 次那一种「最后一批独有为空」不再算登记的）。
+    #[test]
+    fn registered_final_batch_difference_is_the_inode_leaf_against_the_retirement_container_and_root() {
+        let names = |roles: &[&str]| roles.iter().map(|role| (*role).to_string()).collect::<Vec<String>>();
+        assert!(matches_the_registered_final_batch_difference(&names(&["t3"]), &names(&["tr", "tr@0"])));
+        assert!(!matches_the_registered_final_batch_difference(&names(&["t3"]), &names(&[])));
     }
 
     #[test]
     fn queue_and_tombstone_roots_record_an_entry_key_range_reading() {
         return_not_run_unless_exports_present!();
-        let readings: Vec<&String> = fixture().lines.iter().filter(|line| line.starts_with("name=r7 history=h1")).collect();
+        // 第 3 次起最后一批另有一行 `role=tr`（L03-17 只记值），这里只看意图那一次的 td 与 tt。
+        let readings: Vec<&String> =
+            fixture().lines.iter().filter(|line| line.starts_with("name=r7 history=h1") && (line.contains(" role=td ") || line.contains(" role=tt "))).collect();
         assert_eq!(readings.len(), 2);
         assert!(readings[0].contains("role=td level=0 key_range=1..1 entry_keys=1..1 reading=entry_key_range"), "{}", readings[0]);
         assert!(readings[1].contains("role=tt level=1 key_range=1..1 entry_keys=1..1 reading=entry_key_range"), "{}", readings[1]);
@@ -4156,8 +4854,8 @@ mod tests {
         assert_eq!(acquisition_writes, 2);
     }
 
-    /// 每一条对照在它适用的每一段历史上都先绿后红（跑前登记 e172-r2 第五节 5.4：适用的对共 18 个，不再有例外）；
-    /// 不适用的只出现在表里写了不适用的那几对上。
+    /// 每一条对照在它适用的每一段历史上都先绿后红（跑前登记 e172-r3 第五节 5.4：适用的对共 25 个）；
+    /// 不适用的只出现在表里写了不适用的那几对上（PC-J、PC-L 在 H3 上不适用：H3 不写退役单元）。
     #[test]
     fn every_positive_control_turns_its_target_red_on_every_history_it_applies_to() {
         return_not_run_unless_exports_present!();
@@ -4175,9 +4873,9 @@ mod tests {
                 }
             }
         }
-        assert_eq!(held, 18);
+        assert_eq!(held, 25);
         assert_eq!(held, PositiveControl::APPLICABLE_PAIRS_EXPECTED);
-        assert_eq!(not_applicable, ["PC-F@h1", "PC-G@h1", "PC-I@h1", "PC-I@h2", "PC-F@h3", "PC-G@h3"]);
+        assert_eq!(not_applicable, ["PC-F@h1", "PC-G@h1", "PC-I@h1", "PC-I@h2", "PC-F@h3", "PC-G@h3", "PC-J@h3", "PC-L@h3"]);
     }
 
     /// PC-C 只重封了墓碑容器自己的载荷校验和：父指针（墓碑树根条目、映射、journal 点名项）里那 4 字节整单元校验和照样对不上，S2 那一格要红。
@@ -4195,7 +4893,12 @@ mod tests {
     #[test]
     fn h1_window_string_is_the_four_registered_strings_end_to_end() {
         return_not_run_unless_exports_present!();
-        assert!(line_starting_with("name=r3d history=h1 ").ends_with("equal=true"), "{}", line_starting_with("name=r3d history=h1 "));
+        // 跑前登记 e172-r3 第七节 A-roles-final：H1 最后一批 12 个单元（多 tr@0、tr），整窗四串 26、24、22、24；只钉期望一栏。
+        assert!(
+            line_starting_with("name=r3d history=h1 ").starts_with("name=r3d history=h1 expected=26+2+1+2+24+2+1+2+22+2+1+2+24+2+1+2 actual="),
+            "{}",
+            line_starting_with("name=r3d history=h1 ")
+        );
         // H3 那一行只钉期望一栏：13、12、11、11 四串首尾相接。
         assert!(
             line_starting_with("name=r3d history=h3 ").starts_with("name=r3d history=h3 expected=26+2+1+2+24+2+1+2+22+2+1+2+22+2+1+2 actual="),
@@ -4284,15 +4987,23 @@ mod tests {
         assert!(line_starting_with("name=r3_geometry history=h3 ").contains(" expectations_differ=true "));
     }
 
-    /// T7：H3 的 A-tag6 期望一栏是 98386（按历史名分的字面常量）。
+    /// T7（跑前登记 e172-r3 改成按版本）：A-tag6 是按（历史，删除类发布）分的字面常量（第七节 7.1）；H3 那四行的期望一栏照它。
     #[test]
-    fn h3_committed_reservation_anchor_expects_98386() {
+    fn committed_reservation_anchor_constants_follow_the_registered_value_of_each_publish() {
+        for history in ["h1", "h2"] {
+            for publish in [DeletionPublish::Intent, DeletionPublish::BatchLeavingTwoUnits, DeletionPublish::BatchLeavingOneUnit] {
+                assert_eq!(registered_committed_reservation_of_publish(history, publish), Some(196_678), "{history} {publish:?}");
+            }
+            assert_eq!(registered_committed_reservation_of_publish(history, DeletionPublish::FinalBatch), Some(196_608), "{history}");
+        }
+        for publish in [DeletionPublish::Intent, DeletionPublish::BatchLeavingTwoUnits, DeletionPublish::BatchLeavingOneUnit] {
+            assert_eq!(registered_committed_reservation_of_publish("h3", publish), Some(196_830), "{publish:?}");
+        }
+        assert_eq!(registered_committed_reservation_of_publish("h3", DeletionPublish::FinalBatch), Some(196_760));
+        assert_eq!(registered_committed_reservation_of_publish("h4", DeletionPublish::Intent), None);
         return_not_run_unless_exports_present!();
-        assert_eq!(registered_committed_reservation_of_history("h3"), Some(98_386));
-        assert_eq!(registered_committed_reservation_of_history("h1"), Some(98_304));
-        assert_eq!(registered_committed_reservation_of_history("h2"), Some(98_304));
-        for txg in [6u64, 7, 8, 9] {
-            assert!(line_starting_with(&format!("name=anchor anchor=A-tag6 history=h3 txg={txg} ")).contains(" expected=98386 "));
+        for (txg, expected) in [(6u64, 196_830u64), (7, 196_830), (8, 196_830), (9, 196_760)] {
+            assert!(line_starting_with(&format!("name=anchor anchor=A-tag6 history=h3 txg={txg} ")).contains(&format!(" expected={expected} ")));
         }
     }
 
@@ -4379,10 +5090,10 @@ mod tests {
         return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=anchor anchor=A-txg history=h3 deletion_publishes ").contains(" expected=6,7,8,9 "));
         for (txg, root, journal, generation, slot) in [
-            (6u64, "0:1056768", 16_797_696u64, 8u64, 0u64),
-            (7, "1:4202496", 16_801_792, 9, 4096),
-            (8, "0:7348224", 16_805_888, 10, 0),
-            (9, "0:1060864", 16_809_984, 11, 4096),
+            (6u64, "0:1056768", 16_797_696u64, 9u64, 4096u64),
+            (7, "1:4202496", 16_801_792, 10, 0),
+            (8, "0:7348224", 16_805_888, 11, 4096),
+            (9, "0:1060864", 16_809_984, 12, 0),
         ] {
             assert!(line_starting_with(&format!("name=anchor anchor=A-root-slot history=h3 txg={txg} ")).contains(&format!(" expected={root} ")));
             assert!(line_starting_with(&format!("name=anchor anchor=A-journal history=h3 txg={txg} ")).contains(&format!(" expected=0:{journal},1:{journal} ")));
@@ -4390,6 +5101,312 @@ mod tests {
                 line_starting_with(&format!("name=anchor anchor=A-system-configuration history=h3 txg={txg} "))
                     .contains(&format!(" expected=0:{slot}:generation{generation},1:{slot}:generation{generation} "))
             );
+        }
+    }
+
+    // ---- 跑前登记 e172-r3 第五节 5.8 新加的 T14–T24 ----
+
+    /// T14：H_退役 = 1、n_live = 0、n_记录 = 1 ⇒ 229446（第七节 7.2 A-arith；退役三槽那一项的取样点）。
+    #[test]
+    fn committed_reservation_with_one_retirement_level_and_one_dead_record_is_229446() {
+        assert_eq!(expected_committed_reservation(0, 1, 0, 1, RetirementShare::Included), 229_446);
+    }
+
+    /// T15：H_墓碑 = 1、n_live = n_记录 = 1 ⇒ 229528。
+    #[test]
+    fn committed_reservation_with_one_tombstone_level_and_one_live_record_is_229528() {
+        assert_eq!(expected_committed_reservation(1, 0, 1, 1, RetirementShare::Included), 229_528);
+    }
+
+    /// T16：n_live = 0、n_记录 = 1 ⇒ 196678；n_live = 1、n_记录 = 0 ⇒ 196690（41 与 35 两个系数互换就分得开）。
+    #[test]
+    fn live_and_record_coefficients_are_told_apart_by_196678_and_196690() {
+        assert_eq!(expected_committed_reservation(0, 0, 0, 1, RetirementShare::Included), 196_678);
+        assert_eq!(expected_committed_reservation(0, 0, 1, 0, RetirementShare::Included), 196_690);
+    }
+
+    fn synthetic_region(body: DecodedBody) -> DecodedRegion {
+        DecodedRegion {
+            step: 0,
+            device: 0,
+            offset: 0,
+            bytes: Vec::new(),
+            region_kind: RegionKind::Unit,
+            body,
+            structure_failures: Vec::new(),
+            coverage: CoverageMap::new(0),
+            locations_inside: Vec::new(),
+        }
+    }
+
+    fn synthetic_container(birth_tree: u64, packed_record_type: u64, record_width: usize, record_count: usize) -> PackedContainer {
+        PackedContainer {
+            birth_tree,
+            packed_record_type,
+            container_number: 1,
+            container_birth: 0,
+            record_count,
+            record_width,
+            birth_txg: 8,
+            records: vec![vec![0; record_width]; record_count],
+        }
+    }
+
+    /// T17：合成单元 (码 3, 退役树) 与 (码 2, 退役树) 认成 `tr@0` 与 `tr`；墓碑树的照旧是 `tt@0` 与 `tt`。
+    #[test]
+    fn retirement_container_and_root_units_are_named_tr_at_0_and_tr() {
+        let container = synthetic_region(DecodedBody::PackedContainer(synthetic_container(RETIREMENT_TREE, RETIREMENT_PACKED_RECORD_TYPE, RETIREMENT_RECORD_BYTES, 1)));
+        let root_node = |tree_identifier: u64| IndexNode {
+            tree_identifier,
+            level: 1,
+            key_width: 8,
+            key_range_low: vec![0; 8],
+            key_range_high: vec![0; 8],
+            birth_txg: 8,
+            entry_count: 0,
+            entry_width: INODE_INTERNAL_ENTRY_BYTES,
+            entries: Vec::new(),
+        };
+        let root = synthetic_region(DecodedBody::IndexNode(root_node(RETIREMENT_TREE)));
+        let name_of = |region: &DecodedRegion| role_name_of(&role_identity_of(region, true), region, &[], &[1], &[1]);
+        assert_eq!(name_of(&container), "tr@0");
+        assert_eq!(name_of(&root), "tr");
+        let tombstone_container = synthetic_region(DecodedBody::PackedContainer(synthetic_container(TOMBSTONE_TREE, 1, TOMBSTONE_RECORD_BYTES, 1)));
+        let tombstone_root = synthetic_region(DecodedBody::IndexNode(root_node(TOMBSTONE_TREE)));
+        assert_eq!(name_of(&tombstone_container), "tt@0");
+        assert_eq!(name_of(&tombstone_root), "tt");
+    }
+
+    /// T18：最后一批两支——那片叶只装被删那一条：含 tr@0、tr，不含 t3，12 个，次序照 layout/03 第 60 行；另有记录：含 t3，不含 tr，11 个。
+    #[test]
+    fn final_batch_roles_take_the_retirement_units_when_the_leaf_empties_and_the_inode_leaf_when_other_records_remain() {
+        let emptied = registered_roles("unlink_batch", 0, DeletedRecordLeaf::OnlyTheDeletedRecord).expect("最后一批有登记");
+        assert_eq!(emptied, ["t2", "t4", "t5@0.0.61", "t5@0.1.61", "t5@1.0.0", "t5@1.1.0", "t5", "t6", "tr@0", "tr", "t7", "t8"]);
+        let beside = registered_roles("unlink_batch", 0, DeletedRecordLeaf::BesideOtherRecords).expect("最后一批有登记");
+        assert!(beside.contains(&"t3"));
+        assert!(!beside.contains(&"tr") && !beside.contains(&"tr@0"));
+        assert_eq!(beside.len(), 11);
+        assert_eq!(expected_count_text(emptied.len()), "24+2+1+2");
+    }
+
+    /// T19：R-ret 的两份期望由同一个式子算（第七节 7.1 四个取样点），两份恒不同；导出上三段历史共 12 行，期望两栏照取样点。
+    #[test]
+    fn retirement_arm_rows_report_both_expectations_for_every_deletion_version() {
+        assert_eq!(retirement_arm_expectations(0, 0, 0, 1), (196_678, 98_304));
+        assert_eq!(retirement_arm_expectations(0, 0, 0, 0), (196_608, 98_304));
+        assert_eq!(retirement_arm_expectations(0, 0, 1, 2), (196_830, 98_386));
+        assert_eq!(retirement_arm_expectations(0, 0, 1, 1), (196_760, 98_386));
+        return_not_run_unless_exports_present!();
+        let rows: Vec<&String> = fixture().lines.iter().filter(|line| line.starts_with("name=r_ret ")).collect();
+        assert_eq!(rows.len(), 12, "{rows:?}");
+        for (history, publish, with_retirement, without_retirement) in [
+            ("h1", "intent", 196_678u64, 98_304u64),
+            ("h1", "final", 196_608, 98_304),
+            ("h2", "final", 196_608, 98_304),
+            ("h3", "two_to_one", 196_830, 98_386),
+            ("h3", "final", 196_760, 98_386),
+        ] {
+            let row = rows
+                .iter()
+                .find(|line| line.starts_with(&format!("name=r_ret history={history} ")) && line.contains(&format!(" publish={publish} ")))
+                .unwrap_or_else(|| panic!("{history} {publish} 没有 R-ret 行"));
+            assert!(row.contains(&format!(" with_retirement={with_retirement} without_retirement={without_retirement} ")), "{row}");
+        }
+    }
+
+    /// T20：钉值层的对法——意图、3 → 2、2 → 1 对第 2–4 格（196678），最后一批对第 5 格（196608），第 1 格 196760 在窗口外；
+    /// 导出上 H1、H2 各 4 行、`pinned` 一栏照它，各有一行 `in_window=false`。
+    #[test]
+    fn harness_pin_rows_compare_the_session_and_continuation_histories_with_the_pinned_value_of_each_publish() {
+        let pinned_of = |publish: DeletionPublish| harness_pinned_value(harness_index_of(publish));
+        assert_eq!(pinned_of(DeletionPublish::Intent), Some(196_678));
+        assert_eq!(pinned_of(DeletionPublish::BatchLeavingTwoUnits), Some(196_678));
+        assert_eq!(pinned_of(DeletionPublish::BatchLeavingOneUnit), Some(196_678));
+        assert_eq!(pinned_of(DeletionPublish::FinalBatch), Some(196_608));
+        assert_eq!(harness_index_of(DeletionPublish::Intent), 2);
+        assert_eq!(harness_pinned_value(1), Some(196_760));
+        assert_eq!(harness_pinned_value(0), None);
+        assert_eq!(harness_pinned_value(6), None);
+        assert!(history_is_compared_with_the_harness_pins("h1") && history_is_compared_with_the_harness_pins("h2"));
+        assert!(!history_is_compared_with_the_harness_pins("h3"));
+        return_not_run_unless_exports_present!();
+        for history in ["h1", "h2"] {
+            let rows: Vec<&String> = fixture().lines.iter().filter(|line| line.starts_with(&format!("name=harness_pin history={history} "))).collect();
+            assert_eq!(rows.len(), 4, "{rows:?}");
+            let pinned_column: Vec<bool> = rows.iter().map(|line| line.contains(" pinned=196678 ")).collect();
+            assert_eq!(pinned_column, [true, true, true, false], "{rows:?}");
+            assert!(rows[3].contains(" publish=final harness_index=5 pinned=196608 "), "{}", rows[3]);
+            assert!(line_starting_with(&format!("name=harness_pin_out_of_window history={history} ")).ends_with(" harness_index=1 pinned=196760 in_window=false"));
+        }
+        assert!(!fixture().lines.iter().any(|line| line.starts_with("name=harness_pin history=h3 ")));
+        assert!(line_starting_with("name=harness_pin_same_value history=h3 ").contains(" same_value_as_harness_first="));
+    }
+
+    /// T21：死亡 txg 的期望取最后一批（身份消失那一次）的 txg；PC-J 的副本恰改了每盘一份退役记录的死亡 txg（加 1），码 3 载荷校验和过。
+    #[test]
+    fn retirement_death_txg_expects_the_final_batch_txg_and_the_death_txg_control_bumps_one_record_per_copy() {
+        let publishes = [
+            (DeletionPublish::Intent, 5u64),
+            (DeletionPublish::BatchLeavingTwoUnits, 6),
+            (DeletionPublish::BatchLeavingOneUnit, 7),
+            (DeletionPublish::FinalBatch, 8),
+        ];
+        assert_eq!(expected_retirement_death_txg(&publishes), Some(8));
+        assert_eq!(expected_retirement_death_txg(&publishes[..3]), None);
+        return_not_run_unless_exports_present!();
+        assert_eq!(cell_row("h1", 8, "L03-16", "death_txg").expected, "8");
+        let history = history_named("h1");
+        let corrupted = corrupted_copy(history, PositiveControl::BumpRetirementDeathTxg).expect("H1 写了退役容器");
+        let changed: Vec<(&RegionWrite, &RegionWrite)> = history
+            .operations
+            .iter()
+            .zip(&corrupted.operations)
+            .filter_map(|(original, copy)| match (original, copy) {
+                (WindowOperation::Write(original_write), WindowOperation::Write(copy_write)) if original_write.bytes != copy_write.bytes => Some((original_write, copy_write)),
+                (WindowOperation::Write(_) | WindowOperation::Barrier { .. }, WindowOperation::Write(_) | WindowOperation::Barrier { .. }) => None,
+            })
+            .collect();
+        assert_eq!(changed.len(), 2);
+        let death_offset = PACKED_UNIT_RECORDS_OFFSET + 26;
+        for (original, copy) in changed {
+            assert_eq!(read_u64(&copy.bytes, death_offset), read_u64(&original.bytes, death_offset) + 1);
+            assert!(crc_matches(&copy.bytes[PACKED_UNIT_PLAINTEXT_HEADER_BYTES..], read_u32(&copy.bytes, 89)));
+        }
+    }
+
+    /// T22：PC-K 的副本里意图那次 t6 的标签 6 恰少 70、PC-L 的副本里退役树根首条分隔 key 为 2，两份码 2 载荷 CRC 都过。
+    #[test]
+    fn tag_six_control_reduces_the_intent_value_by_70_and_separator_control_bumps_the_retirement_separator_to_2_with_resealed_checksums() {
+        return_not_run_unless_exports_present!();
+        let history = history_named("h1");
+        let accounting_entries = |bytes: &[u8]| -> Vec<(u64, u64)> {
+            let key_width = usize::from(bytes[51]);
+            let entries_offset = index_node_header_bytes(key_width) + RESERVED_NONCE_MAC_ALGORITHM_BYTES;
+            let entry_count = usize_of(read_u16(bytes, 82 + 2 * key_width));
+            (0..entry_count).map(|entry_index| entries_offset + entry_index * ACCOUNTING_ENTRY_BYTES).map(|start| (read_u16(bytes, start), read_u64(bytes, start + 22))).collect()
+        };
+        let payload_crc_holds = |bytes: &[u8]| {
+            let key_width = usize::from(bytes[51]);
+            crc_matches(&bytes[index_node_header_bytes(key_width)..], read_u32(bytes, 76 + 2 * key_width))
+        };
+        for (control, tree) in [(PositiveControl::ReduceIntentTagSixByOneRecordsRetirementShare, ACCOUNTING_TREE), (PositiveControl::BumpRetirementRootSeparator, RETIREMENT_TREE)] {
+            let corrupted = corrupted_copy(history, control).expect("H1 有目标单元");
+            let mut changed = 0usize;
+            for (original, copy) in history.operations.iter().zip(&corrupted.operations) {
+                let (WindowOperation::Write(original_write), WindowOperation::Write(copy_write)) = (original, copy) else { continue };
+                if original_write.bytes == copy_write.bytes {
+                    continue;
+                }
+                changed += 1;
+                assert_eq!(read_u64(&copy_write.bytes, 42), tree);
+                assert!(payload_crc_holds(&copy_write.bytes), "{}", control.name());
+                if tree == ACCOUNTING_TREE {
+                    let before: Vec<(u64, u64)> = accounting_entries(&original_write.bytes);
+                    let after: Vec<(u64, u64)> = accounting_entries(&copy_write.bytes);
+                    let tag_six = |entries: &[(u64, u64)]| entries.iter().find(|(tag, _)| *tag == 6).map(|(_, value)| *value).expect("有标签 6");
+                    assert_eq!(tag_six(&after) + POSITIVE_CONTROL_TAG_SIX_REDUCTION_BYTES, tag_six(&before));
+                } else {
+                    let entries_offset = index_node_header_bytes(usize::from(copy_write.bytes[51])) + RESERVED_NONCE_MAC_ALGORITHM_BYTES;
+                    assert_eq!(read_u64(&copy_write.bytes, entries_offset), 2);
+                }
+            }
+            assert_eq!(changed, 2, "{}", control.name());
+        }
+    }
+
+    /// T23：树表 12 条 × 200 = 2400、退役容器装 959 条、水位 = 退役树的树 ID + 1（第七节 A-arith、A-tree-table）；
+    /// 导出上 L03-12 条目数期望一栏 12、水位期望一栏 65549，退役树那一条期望 `root_zero=false` 只出现在 H1、H2 的最后一批。
+    #[test]
+    fn tree_table_expects_twelve_entries_watermark_65549_and_a_retirement_root_only_after_the_emptying_batch() {
+        assert_eq!(TREE_TABLE_ENTRIES_AFTER_THE_FIRST_FILE * TREE_TABLE_ENTRY_BYTES, 2400);
+        assert_eq!(retirement_container_capacity(), 959);
+        assert_eq!(TREE_IDENTIFIER_WATERMARK_AFTER_THE_FIRST_FILE, RETIREMENT_TREE + 1);
+        return_not_run_unless_exports_present!();
+        let mut nonzero_root_versions = Vec::new();
+        for judgement in &fixture().judgements {
+            for row in judgement.cell_rows.iter().filter(|row| row.cell == "L03-12" && row.field == "entry_count") {
+                assert_eq!(row.expected, "12", "{row:?}");
+            }
+            for row in judgement.cell_rows.iter().filter(|row| row.cell == "L03-14") {
+                assert_eq!(row.expected, "65549", "{row:?}");
+            }
+            for row in judgement.cell_rows.iter().filter(|row| row.cell == "L03-12" && row.field == "tree65548") {
+                if row.expected.ends_with("/root_zerofalse") {
+                    nonzero_root_versions.push(format!("{}@{}", row.history, row.publish_kind));
+                }
+            }
+        }
+        assert_eq!(nonzero_root_versions, ["h1@unlink_batch", "h2@mount_continuation_unlink_batch"]);
+    }
+
+    /// T24：合成码 3 单元（打包记录类型 3、记录宽 34、两条记录）经 `claim_container_records` 之后，那 68 字节全归 layout/03 格。
+    #[test]
+    fn retirement_records_in_a_synthetic_code_three_unit_are_claimed_as_layout_three_cells() {
+        let container = synthetic_container(RETIREMENT_TREE, RETIREMENT_PACKED_RECORD_TYPE, RETIREMENT_RECORD_BYTES, 2);
+        let mut coverage = CoverageMap::new(DATA_UNIT_BYTES);
+        let mut locations = Vec::new();
+        claim_container_records(&container, &mut coverage, &mut locations);
+        let records_end = PACKED_UNIT_RECORDS_OFFSET + 2 * RETIREMENT_RECORD_BYTES;
+        assert_eq!(records_end, 204);
+        assert!(coverage.classes[PACKED_UNIT_RECORDS_OFFSET..records_end].iter().all(|class| *class == ByteClass::LayoutThreeCell));
+        assert!(coverage.classes[records_end..].iter().all(|class| *class == ByteClass::Unclaimed));
+        assert!(locations.is_empty());
+    }
+
+    /// 修订 2：合成退役树根（码 2、条目宽 120、一条条目）的条目整条归 layout/03 格，偏移 34 的子指针进父指针核对。
+    #[test]
+    fn retirement_root_entries_are_claimed_as_layout_three_cells_with_their_child_pointer() {
+        let mut entry = vec![0u8; INODE_INTERNAL_ENTRY_BYTES];
+        entry[34] = 1;
+        let node = IndexNode {
+            tree_identifier: RETIREMENT_TREE,
+            level: 1,
+            key_width: 8,
+            key_range_low: vec![0; 8],
+            key_range_high: vec![0; 8],
+            birth_txg: 8,
+            entry_count: 1,
+            entry_width: INODE_INTERNAL_ENTRY_BYTES,
+            entries: vec![entry],
+        };
+        let entries_offset = index_node_header_bytes(8) + RESERVED_NONCE_MAC_ALGORITHM_BYTES;
+        let mut coverage = CoverageMap::new(NODE_BYTES);
+        let mut locations = Vec::new();
+        claim_index_node_entries(&node, entries_offset, &mut coverage, &mut locations);
+        let entries_end = entries_offset + INODE_INTERNAL_ENTRY_BYTES;
+        assert!(coverage.classes[entries_offset..entries_end].iter().all(|class| *class == ByteClass::LayoutThreeCell));
+        assert_eq!(locations.len(), 2);
+    }
+
+    /// L03-15、L03-16、L03-17 的期望一栏只在那片叶删空的最后一批写退役单元；第 3 次新加的几种行都在产物里（不钉读数）。
+    #[test]
+    fn retirement_cells_expect_a_container_record_and_root_only_in_the_batch_that_empties_the_leaf() {
+        return_not_run_unless_exports_present!();
+        assert_eq!(
+            cell_row("h1", 8, "L03-15", "retirement_container").expected,
+            "code3/type3/width34/birth_tree65548/records_at136/container1/count1"
+        );
+        assert_eq!(cell_row("h1", 8, "L03-16", "retirement_records_written").expected, "1");
+        assert!(cell_row("h1", 8, "L03-17", "retirement_root").expected.starts_with("tag2/tree65548/key_width8/width120/count1/separator1/birth_tree65548/type3/container1/children"));
+        for (history, txg) in [("h1", 5u64), ("h1", 7), ("h3", 9)] {
+            assert_eq!(cell_row(history, txg, "L03-16", "retirement_records_written").expected, "0");
+            assert_eq!(cell_row(history, txg, "L03-15", "retirement_container_written").expected, "false");
+            assert_eq!(cell_row(history, txg, "L03-17", "retirement_root_written").expected, "false");
+        }
+        for prefix in [
+            "name=retirement_unit_histories ",
+            "name=a_tag6_geometry history=h1 ",
+            "name=a_tag6_geometry history=h3 ",
+            "name=r3_geometry_roles history=h1 ",
+            "name=r3_geometry_roles history=h3 ",
+            "name=harness_pin_geometry publish=final ",
+            "name=verdict row=c775 ",
+        ] {
+            let _ = line_starting_with(prefix);
+        }
+        let trajectory = line_starting_with("name=r_traj history=h1 ");
+        for column in [" inode_records=", " retirement_records=", " retirement_levels="] {
+            assert!(trajectory.contains(column), "{trajectory}");
         }
     }
 }

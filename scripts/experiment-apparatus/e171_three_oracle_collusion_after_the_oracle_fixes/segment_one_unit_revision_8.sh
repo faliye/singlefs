@@ -2,14 +2,15 @@
 # E171 第 1 次重跑第一段·修订 8 那一趟：第 0–10 步的一个单元（登记 research/prompts/e171-r1-prereg.md 修订 8 第 8.4 节步表与「单元」）。
 # 由 segment_one_units_revision_8.py 起：bash <这一份> <单元名>，环境变量由它给（下面「环境」）；退 0 是这个单元绿，别的是红（判法不过、装置退码不对）。
 # 每个单元的身子照修订 6 那一趟的多机跑法 run_segment_one_on_the_revision_6_tree_multi_host.sh（ec89ec78…，仓里那份 567a8682… 只差两行路径）同一步那几行，
-# 判法、阈值、线程、内存一个字不动；改的只有修订 8 第 8.4 节步表写的几处：
+# 判法、阈值、线程一个字不动（内存包装与各步的内存上限已删，额度由任务服务给；各读数进程外面的线程包装也删了，线程数变量由单元编排
+# 设成这个单元分到的线程，等于 THREADS，E171 第 2 次重跑登记修订 8）；改的只有修订 8 第 8.4 节步表写的几处：
 #   第 0 步冻结树产物换成 frozen_tree_lines_revision_8.py step-0；前提（快照摘要 H3、二进制 H7、S16 ②、H8、Z2）由单元编排每次起跑与续跑核，不再要 S15 要比的旧导出；
 #   新加第 2b 步（第 2 步导出的拷贝上 E170 导出装置 bad-states-second-run，种子 85441ae491419411），第 3 步 O3、第 4 步 o3-p1 改用它；
 #   第 1、6、7、10 步之后不接 S15 ⑤④⑥⑤④（对修订 8 那一趟不设，第 8.6 节），那几种比法改在两趟之间出对照（contrast_revision_6_against_revision_8.py）；
 #   第 6、10 步 q5 states= 的期望取 H14；快照摘要核对另核树里 crates/mutations.tsv 等于 H8（作废 Z5，第 8.6 节）；
 #   第 3、4 步每项、第 10 步每次各一个单元；第 9 步的 Z1 与第 10 步的 Z7 各成一个小单元（它们要等两边都绿，第 9 步装置那一趟与第 7 步同时起）；
 #   单元自己写出的产物名与导出目录都接 TAG（没做完重跑时是 -attempt<N>，第 8.4 节「续跑」）；依赖的单元的名字由编排给，已带它们自己的 TAG。
-# 环境：REPO RESEARCH PREFIX SUFFIX TAG DUMPS TREE BIN E170_BIN SNAPSHOT_DIGEST MUTATIONS_SHA256 CONFIG THREADS CAP_SMALL CAP_LARGE WORK_ROOT
+# 环境：REPO RESEARCH PREFIX SUFFIX TAG DUMPS TREE BIN E170_BIN SNAPSHOT_DIGEST MUTATIONS_SHA256 CONFIG THREADS WORK_ROOT
 #   UNIT_LOG（这个单元这一次的日志文件）UNIT_PRODUCTS（逐行追加「产物<TAB>行数」）UNIT_DIRECTORIES（逐行追加这个单元写出的导出目录，相对仓根）
 #   依赖的名字：S2_BASELINE S2_E170_EXPORT E170_SECOND_RUN BASELINE_RUN1 BASELINE_RUN2 Q5_MAIN_RUN_1 Q5_MAIN_RUN_2；H14：Q5_REVERSE_STATES Q5_MAIN_STATES
 #   PRINT_ONLY=1：只打出这个单元会跑的每一条命令（装置、判法、拷贝），一条都不跑（干跑 PLAN_ONLY 用）。
@@ -23,8 +24,6 @@ S2_COMPARE=/home/fy5090/.local/share/singlefs/work/e171-r1-segment1-rev6/s2_comp
 E170_SEED=85441ae491419411
 PRINT_ONLY=${PRINT_ONLY:-0}
 EXPECTED_EXIT=0
-export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="同一会话派出去的几个执行员各跑各的装置"
-export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="E171 第一段修订 8 树：流三在里面的那几趟峰值表里没有这条命令，上限按登记推的给"
 export PYTHONDONTWRITEBYTECODE=1
 
 say() { echo "$(TZ=Asia/Tokyo date +%F) [$UNIT] $*" | tee -a "$UNIT_LOG"; }
@@ -56,25 +55,23 @@ freeze_check() {  # 作废 Z2：O3 冻结行
   [ "$differences" = "0" ] || stop "O3 冻结行对不上（Z2）：$differences 处"
 }
 
-# device_step <步名> <内存上限> <装置的路径> <装置参数…>：同修订 6 跑法；交回装置的退出码（250–254 是包装自己的结局，直接红）。PRINT_ONLY 时交回 EXPECTED_EXIT
+# device_step <步名> <装置的路径> <装置参数…>：同修订 6 跑法；交回装置的退出码。PRINT_ONLY 时交回 EXPECTED_EXIT
 device_step() {
-  local name=$1 cap=$2 binary=$3; shift 3
+  local name=$1 binary=$2; shift 2
   local product timing code
   product=$(own "$name"); timing=$(own_timing "$name")
   refuse_existing "$product"; refuse_existing "$timing"
   if [ "$PRINT_ONLY" = 1 ]; then
-    show nice -n 19 bash scripts/hosts/run-with-memory-cap.sh "$cap" bash scripts/hosts/capped.sh "$THREADS" python3 -B "$TIMING" run -- "$binary" "$@"
+    show nice -n 19 python3 -B "$TIMING" run -- "$binary" "$@"
     echo "    → 产物 $product，计时 $timing"; return "$EXPECTED_EXIT"
   fi
   snapshot_check
-  nice -n 19 bash scripts/hosts/run-with-memory-cap.sh "$cap" bash scripts/hosts/capped.sh "$THREADS" \
-    python3 -B "$TIMING" run -- "$binary" "$@" > "$UNIT_LOG.$name.stdout" 2> "$UNIT_LOG.$name.stderr"
+  nice -n 19 python3 -B "$TIMING" run -- "$binary" "$@" > "$UNIT_LOG.$name.stdout" 2> "$UNIT_LOG.$name.stderr"
   code=$?
   ( set -o noclobber; grep '^E7RESULT' "$UNIT_LOG.$name.stdout" > "$product"; grep '^E7TIMING' "$UNIT_LOG.$name.stdout" > "$timing" )
   note_product "$product"; note_product "$timing"
   snapshot_check
   say "  $name 退出码 $code，产物 $product（$(grep -c '' "$product") 行），计时 $(tail -n 1 "$timing")"
-  if [ "$code" -ge 250 ] && [ "$code" -le 254 ]; then stop "$name 撞了内存包装自己的结局 $code（Z3：那一次不算，交主 agent 重跑）"; fi
   return "$code"
 }
 
@@ -106,7 +103,7 @@ unit_step_0() {
   frozen=$(own frozen-tree); refuse_existing "$frozen"
   logged python3 -B "$JUDGE" step-0 --config "$CONFIG" --output "$frozen" || stop "S16 ①②③、A12、Z5 或 H7、H8 触发（见 $frozen 的 verdict 行）"
   note_product "$frozen"
-  device_step stream-constants "$CAP_SMALL" "$BIN" stream-constants --streams 1,2,3
+  device_step stream-constants "$BIN" stream-constants --streams 1,2,3
   [ $? -eq 0 ] || stop "stream-constants 退出码不是 0（S1 有不过的，看 name=s1 行）"
   must python3 -B "$CHECK" verdict "$(own stream-constants)" s1_failed_checks=0
   for stream in new_pool_file_creation fixed_script_through_e_then_unmount first_file_unlinked_then_inodes_across_one_leaf; do
@@ -114,7 +111,7 @@ unit_step_0() {
   done
   must python3 -B "$CHECK" line "$(own stream-constants)" s1 check=third_stream_split_publish local='Some(234)' holds=true
   note_directory "$DUMPS/s3-s11-baseline-stream-1-with-probe$TAG"
-  device_step s3-s11-baseline-stream-1-with-probe "$CAP_SMALL" "$BIN" baseline --streams 1 --writable-mount-probe --output-directory "$DUMPS/s3-s11-baseline-stream-1-with-probe$TAG"
+  device_step s3-s11-baseline-stream-1-with-probe "$BIN" baseline --streams 1 --writable-mount-probe --output-directory "$DUMPS/s3-s11-baseline-stream-1-with-probe$TAG"
   [ $? -eq 0 ] || stop "S3/S11 自检那一趟退出码不是 0"
   must python3 -B "$CHECK" verdict "$(own s3-s11-baseline-stream-1-with-probe)" s1_failed_checks=0 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 \
     s3_o2_judgement_mismatches=0 s9_failed_checks=0 streams_not_exported=0 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o1_reference_filesystem_red_states=0 \
@@ -126,7 +123,7 @@ unit_step_0() {
 unit_step_1() {
   local stem=s2-device-baseline-streams-1-2
   note_directory "$DUMPS/$stem$TAG"
-  device_step "$stem" "$CAP_SMALL" "$BIN" baseline --streams 1,2 --output-directory "$DUMPS/$stem$TAG"
+  device_step "$stem" "$BIN" baseline --streams 1,2 --output-directory "$DUMPS/$stem$TAG"
   [ $? -eq 0 ] || stop "装置退出码不是 0"
   must python3 -B "$CHECK" verdict "$(own $stem)" s1_failed_checks=0 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 \
     s3_o2_judgement_mismatches=0 s9_failed_checks=0 streams_not_exported=0 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 \
@@ -137,7 +134,7 @@ unit_step_1() {
 # ───── 第 2 步：E170 导出装置 dump（修订 8 树编的），与第 1 步逐文件比（S2） ─────
 unit_step_2() {
   note_directory "$DUMPS/s2-e170-export$TAG"
-  device_step s2-e170-export-dump "$CAP_SMALL" "$E170_BIN" dump --output-directory "$DUMPS/s2-e170-export$TAG"
+  device_step s2-e170-export-dump "$E170_BIN" dump --output-directory "$DUMPS/s2-e170-export$TAG"
   [ $? -eq 0 ] || stop "E170 导出装置退出码不是 0（3 是 S6：跑不起来，交主 agent）"
   refuse_existing "$(own s2)"
   must python3 -B "$S2_COMPARE" "$DUMPS/s2-e170-export$TAG" "$DUMPS/$S2_BASELINE" "$(own s2)"
@@ -151,7 +148,7 @@ unit_step_2b() {
   refuse_existing "$directory"
   x cp -r "$DUMPS/$S2_E170_EXPORT" "$directory" || stop "拷第 2 步导出没成"
   note_directory "$directory"
-  device_step e170-bad-states-second-run "$CAP_SMALL" "$E170_BIN" bad-states-second-run --dump-directory "$directory" --seed-hex "$E170_SEED"
+  device_step e170-bad-states-second-run "$E170_BIN" bad-states-second-run --dump-directory "$directory" --seed-hex "$E170_SEED"
   [ $? -eq 0 ] || stop "E170 导出装置 bad-states-second-run 退出码不是 0"
   refuse_existing "$(own e170-bad-states-second-run-p1-f-base-digest)"
   must python3 -B "$JUDGE" p1f-base-digest --directory "$directory" --output "$(own e170-bad-states-second-run-p1-f-base-digest)"
@@ -159,7 +156,7 @@ unit_step_2b() {
 }
 
 # ───── 第 3 步：阳性对照，基线那一趟（登记 5.2、第七节 A8）；十项各一个单元 ─────
-control() {  # control <步名> <内存上限> <装置参数…>：期望退 0
+control() {  # control <步名> <装置参数…>：期望退 0
   local name=$1
   note_directory "$DUMPS/$name$TAG"
   device_step "$@"; [ $? -eq 0 ] || stop "$name 装置退出码不是 0"
@@ -167,34 +164,34 @@ control() {  # control <步名> <内存上限> <装置参数…>：期望退 0
 unit_step_3() {
   case "$1" in
     o1-comparison)
-      control positive-control-o1-comparison "$CAP_SMALL" "$BIN" baseline --streams 2 --positive-control O1-对拍 --output-directory "$DUMPS/positive-control-o1-comparison$TAG"
+      control positive-control-o1-comparison "$BIN" baseline --streams 2 --positive-control O1-对拍 --output-directory "$DUMPS/positive-control-o1-comparison$TAG"
       must python3 -B "$CHECK" verdict "$(own positive-control-o1-comparison)" o1_comparison_red_calls=1 s3_o2_judgement_mismatches=0 ;;
     o1-comparison-unmount)
-      control positive-control-o1-comparison-unmount "$CAP_SMALL" "$BIN" baseline --streams 2 --positive-control O1-对拍-卸载 --output-directory "$DUMPS/positive-control-o1-comparison-unmount$TAG"
+      control positive-control-o1-comparison-unmount "$BIN" baseline --streams 2 --positive-control O1-对拍-卸载 --output-directory "$DUMPS/positive-control-o1-comparison-unmount$TAG"
       must python3 -B "$CHECK" verdict "$(own positive-control-o1-comparison-unmount)" o1_comparison_red_calls=1 s3_o2_judgement_mismatches=0
       must python3 -B "$CHECK" line "$(own positive-control-o1-comparison-unmount)" call stream=fixed_script_through_e_then_unmount label=unmount o1_comparison=prefix:disagrees ;;
     o2)
-      control positive-control-o2 "$CAP_SMALL" "$BIN" baseline --streams 1 --positive-control O2 --output-directory "$DUMPS/positive-control-o2$TAG"
+      control positive-control-o2 "$BIN" baseline --streams 1 --positive-control O2 --output-directory "$DUMPS/positive-control-o2$TAG"
       must python3 -B "$CHECK" verdict "$(own positive-control-o2)" o2_red_states=1 s3_o2_judgement_mismatches=0 ;;
     return-value)
-      control positive-control-return-value "$CAP_SMALL" "$BIN" baseline --streams 2 --positive-control 交回值 --output-directory "$DUMPS/positive-control-return-value$TAG"
+      control positive-control-return-value "$BIN" baseline --streams 2 --positive-control 交回值 --output-directory "$DUMPS/positive-control-return-value$TAG"
       must python3 -B "$CHECK" calls_differ "$(dep "$S2_BASELINE")" "$(own positive-control-return-value)" return_value_sha256 fixed_script_through_e_then_unmount 2
       must python3 -B "$CHECK" call_o1 "$(own positive-control-return-value)" fixed_script_through_e_then_unmount 2 agrees ;;
     memory-object)
-      control positive-control-memory-object "$CAP_SMALL" "$BIN" baseline --streams 2 --positive-control 内存对象 --output-directory "$DUMPS/positive-control-memory-object$TAG"
+      control positive-control-memory-object "$BIN" baseline --streams 2 --positive-control 内存对象 --output-directory "$DUMPS/positive-control-memory-object$TAG"
       must python3 -B "$CHECK" calls_differ "$(dep "$S2_BASELINE")" "$(own positive-control-memory-object)" memory_objects_sha256 fixed_script_through_e_then_unmount 2 ;;
     panic)
       # 基线模式下流二截在第 3 次调用，S1 的段长、写数那几条对不上本地常量，装置退 3（第一段报告第 8 节：登记预期内）
       note_directory "$DUMPS/positive-control-panic$TAG"
       EXPECTED_EXIT=3
-      device_step positive-control-panic "$CAP_SMALL" "$BIN" baseline --streams 2 --positive-control panic --output-directory "$DUMPS/positive-control-panic$TAG"
+      device_step positive-control-panic "$BIN" baseline --streams 2 --positive-control panic --output-directory "$DUMPS/positive-control-panic$TAG"
       [ $? -eq 3 ] || stop "panic 对照预期退 3（截断的流对不上 S1 本地常量）"
       EXPECTED_EXIT=0
       must python3 -B "$CHECK" line "$(own positive-control-panic)" stream ending=prefix:stopped_by_a_panic:call_3 exported=true \
         comparison_judged_calls_before_the_first_panic=1 sampled_states='>0'
       must python3 -B "$CHECK" verdict "$(own positive-control-panic)" s3_o2_judgement_mismatches=0 streams_not_exported=0 ;;
     witness)
-      control positive-control-witness "$CAP_SMALL" "$BIN" baseline --streams 1 --writable-mount-probe --positive-control 见证 --output-directory "$DUMPS/positive-control-witness$TAG"
+      control positive-control-witness "$BIN" baseline --streams 1 --writable-mount-probe --positive-control 见证 --output-directory "$DUMPS/positive-control-witness$TAG"
       must python3 -B "$CHECK" verdict "$(own positive-control-witness)" counter_branch_states=1 counter_branch_states_judged_legal=0 \
         witness_refusals_without_either_branch=0 counter_branch_states_that_mounted=0 ;;
     o3-p1)
@@ -202,7 +199,7 @@ unit_step_3() {
       local product
       product=$(own positive-control-o3-p1); refuse_existing "$product"
       freeze_check
-      logged nice -n 19 bash scripts/hosts/run-with-memory-cap.sh "$CAP_SMALL" bash scripts/hosts/capped.sh "$THREADS" python3 -B "$RESEARCH/o3_bad_image_judge.py" control \
+      logged nice -n 19 python3 -B "$RESEARCH/o3_bad_image_judge.py" control \
         --repo-root "$REPO" --dumps "$DUMPS/$S2_BASELINE" --e170-dumps "$DUMPS/$E170_SECOND_RUN" --row-name P1-F --output "$product" \
         || stop "O3 阳性对照没跑完（日志 $UNIT_LOG）"
       note_product "$product"
@@ -210,10 +207,10 @@ unit_step_3() {
       must python3 -B "$CHECK" line "$product" o3_control_verdict strict=not_in base_digest_matches=true red_strict=true ;;
     o1-crash-judge)
       # 流三在里面的两样（每条流批 1 第一个读回了文件的态各一，恰 3 态）
-      control positive-control-o1-crash-judge "$CAP_LARGE" "$BIN" baseline --streams 1,2,3 --positive-control O1-崩溃判官 --output-directory "$DUMPS/positive-control-o1-crash-judge$TAG"
+      control positive-control-o1-crash-judge "$BIN" baseline --streams 1,2,3 --positive-control O1-崩溃判官 --output-directory "$DUMPS/positive-control-o1-crash-judge$TAG"
       must python3 -B "$CHECK" verdict "$(own positive-control-o1-crash-judge)" o1_crash_judge_red_states=3 o1_reference_filesystem_red_states=0 s3_o2_judgement_mismatches=0 ;;
     reference-filesystem)
-      control positive-control-reference-filesystem "$CAP_LARGE" "$BIN" baseline --streams 1,2,3 --positive-control RefFS --output-directory "$DUMPS/positive-control-reference-filesystem$TAG"
+      control positive-control-reference-filesystem "$BIN" baseline --streams 1,2,3 --positive-control RefFS --output-directory "$DUMPS/positive-control-reference-filesystem$TAG"
       must python3 -B "$CHECK" verdict "$(own positive-control-reference-filesystem)" o1_reference_filesystem_red_states=3 o1_crash_judge_red_states=0 s3_o2_judgement_mismatches=0 ;;
     *) stop "第 3 步没有这一项：$1" ;;
   esac
@@ -224,7 +221,7 @@ empty_control() {  # empty_control <名> <对照> <驱动另加的参数…>
   local slug=$1 control_name=$2; shift 2
   note_directory "$DUMPS/empty-control-$slug$TAG"
   driver_step "empty-control-$slug-driver" "$(dep_timing "$S2_BASELINE")" --empty-mutation --keep-dumps --positive-control "$control_name" \
-    --lanes 1 --threads "$THREADS" --memory-cap "$CAP_SMALL" --output-root "$REPO/$DUMPS/empty-control-$slug$TAG" "$@"
+    --lanes 1 --threads "$THREADS" --output-root "$REPO/$DUMPS/empty-control-$slug$TAG" "$@"
   [ $? -eq 0 ] || stop "empty-control-$slug 驱动退出码不是 0"
   must python3 -B "$CHECK" rows "$(own "empty-control-$slug-driver")"
   EMPTY_DEVICE_OUT="$DUMPS/empty-control-$slug$TAG/row-0/device.out"
@@ -259,18 +256,18 @@ unit_step_4() {
 }
 
 # ───── 第 5 步：O3 基线（冻结的 v2-487 执行器判第 1 步导出的流一、流二） ─────
-run_executor() {  # run_executor <产物步名> <导出目录> <流,…> <内存上限>
+run_executor() {  # run_executor <产物步名> <导出目录> <流,…>
   local product streams_python
   product=$(own "$1"); refuse_existing "$product"
   streams_python=$(printf "'%s'," ${3//,/ })
   freeze_check
-  logged python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor('$REPO', '$REPO/$2', [$streams_python], $THREADS, '$REPO/$product', '$4', '$UNIT_LOG.$1.log'); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" \
+  logged python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor('$REPO', '$REPO/$2', [$streams_python], $THREADS, '$REPO/$product', '$UNIT_LOG.$1.log'); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" \
     || stop "执行器没退 0（日志 $UNIT_LOG.$1.log）"
   note_product "$product"
   freeze_check
 }
 unit_step_5() {
-  run_executor o3-baseline-streams-1-2 "$DUMPS/$S2_BASELINE" new_pool_file_creation,fixed_script_through_e_then_unmount "$CAP_SMALL"
+  run_executor o3-baseline-streams-1-2 "$DUMPS/$S2_BASELINE" new_pool_file_creation,fixed_script_through_e_then_unmount
   must python3 -B "$CHECK" o3 "$(own o3-baseline-streams-1-2)" new_pool_file_creation,fixed_script_through_e_then_unmount
 }
 
@@ -278,7 +275,7 @@ unit_step_5() {
 unit_step_6() {
   local stem=q5-reverse-at-the-return-point-of-call-2
   note_directory "$DUMPS/q5-reverse$TAG"
-  device_step "$stem" "$CAP_SMALL" "$BIN" confirmed-loss-form --truncate-at-the-return-point --output-directory "$DUMPS/q5-reverse$TAG"
+  device_step "$stem" "$BIN" confirmed-loss-form --truncate-at-the-return-point --output-directory "$DUMPS/q5-reverse$TAG"
   [ $? -eq 0 ] || stop "装置退出码不是 0（3：S1、S3、S13 或 q5_not_run，看 verdict 行）"
   must python3 -B "$CHECK" verdict "$(own $stem)" s1_failed_checks=0 s3_o2_judgement_mismatches=0 s4_digest_mismatches=0 s13=false unattributed_panic_states=0
   must python3 -B "$CHECK" line "$(own $stem)" q5_shape confirmed_call_returned_before_the_truncation=true in_flight_call_returned=false
@@ -295,13 +292,13 @@ baseline_checks() {  # 阴性（A1 的 O1 三列与 O2）、S1、S3、S5、S9、
 }
 unit_step_7() {  # 不接 S15 ⑥⑤；A1 照旧（baseline_checks）。同时在跑的单元由编排在这一单元绿时另记一行进它的 -timing 产物（只描述）
   note_directory "$DUMPS/baseline-run1$TAG"
-  device_step baseline-run1 "$CAP_LARGE" "$BIN" baseline --streams 1,2,3 --writable-mount-probe --output-directory "$DUMPS/baseline-run1$TAG"
+  device_step baseline-run1 "$BIN" baseline --streams 1,2,3 --writable-mount-probe --output-directory "$DUMPS/baseline-run1$TAG"
   local code=$?
   [ "$code" -eq 0 ] || stop "装置退出码 $code 不是 0（3：停机条款，看 verdict 行）"
   baseline_checks baseline-run1
 }
 unit_step_8() {
-  run_executor o3-baseline-run1 "$DUMPS/$BASELINE_RUN1" new_pool_file_creation,fixed_script_through_e_then_unmount,first_file_unlinked_then_inodes_across_one_leaf "$CAP_LARGE"
+  run_executor o3-baseline-run1 "$DUMPS/$BASELINE_RUN1" new_pool_file_creation,fixed_script_through_e_then_unmount,first_file_unlinked_then_inodes_across_one_leaf
   if [ "$PRINT_ONLY" = 1 ]; then
     show python3 -B "$CHECK" o3 "$(own o3-baseline-run1)" new_pool_file_creation,fixed_script_through_e_then_unmount
     show python3 -B "$CHECK" o3 "$(own o3-baseline-run1)" first_file_unlinked_then_inodes_across_one_leaf; return 0
@@ -313,7 +310,7 @@ unit_step_8() {
 }
 unit_step_9() {
   note_directory "$DUMPS/baseline-run2$TAG"
-  device_step baseline-run2 "$CAP_LARGE" "$BIN" baseline --streams 1,2,3 --writable-mount-probe --output-directory "$DUMPS/baseline-run2$TAG"
+  device_step baseline-run2 "$BIN" baseline --streams 1,2,3 --writable-mount-probe --output-directory "$DUMPS/baseline-run2$TAG"
   [ $? -eq 0 ] || stop "装置退出码不是 0"
   baseline_checks baseline-run2
 }
@@ -327,7 +324,7 @@ unit_step_10() {  # unit_step_10 <1|2>
   local run=$1 directory product
   if [ "$run" = 1 ]; then directory=$DUMPS/q5-main$TAG; else directory=$DUMPS/q5-main-run-2$TAG; fi
   note_directory "$directory"
-  device_step "$Q5_MAIN-run-$run" "$CAP_SMALL" "$BIN" confirmed-loss-form --output-directory "$directory"
+  device_step "$Q5_MAIN-run-$run" "$BIN" confirmed-loss-form --output-directory "$directory"
   [ $? -eq 0 ] || stop "第 $run 次退出码不是 0（3：S13、S1、S3 或 q5_not_run，看 verdict 行）"
   product=$(own "$Q5_MAIN-run-$run")
   must python3 -B "$CHECK" verdict "$product" s1_failed_checks=0 s3_o2_judgement_mismatches=0 s4_digest_mismatches=0 s13=false unattributed_panic_states=0
@@ -349,7 +346,7 @@ unit_research_mutations() {
   product=$(own research-mutations); refuse_existing "$product"
   x mkdir -p "$WORK_ROOT"
   [ "$PRINT_ONLY" = 1 ] && show cd "$RESEARCH"
-  ( { [ "$PRINT_ONLY" = 1 ] || cd "$RESEARCH"; } && logged nice -n 19 bash "$REPO/scripts/hosts/capped.sh" "$THREADS" python3 -B mutation_driver.py \
+  ( { [ "$PRINT_ONLY" = 1 ] || cd "$RESEARCH"; } && logged nice -n 19 python3 -B mutation_driver.py \
       --table "$REPO/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv" --scratch "$WORK_ROOT" --output "$REPO/$product" ) \
     || stop "研究一侧变异表没过（见 $product 的 verdict 行）"
   note_product "$product"

@@ -29,7 +29,7 @@
 6 目标是仓里的 .md，新行带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法）；
 7 目标在仓里（任何后缀），新行带会话号（ListAgents 列的会话名）。2–7 都是原文件没动、没留临时文件。
 
-写 .md 之前判新行（退出码 6）：目标是仓里的 .md 时，锚点定位成功之后、写之前（干跑也判），用 write-guard.sh 与门禁 doc-text 同一份判据
+写 .md、.json、.txt 之前判新行（退出码 6）：目标是仓里这几种后缀时，锚点定位成功之后、写之前（干跑也判），用 write-guard.sh 与门禁 doc-text 同一份判据
 （.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 调它）判 --line 给的新行；带钟点、时区词、时间戳的拒绝，逐处列出行号与形态与出路。
 别的后缀、仓外、排除前缀下的文件不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 clock-times 格兜底。
 
@@ -128,15 +128,25 @@ def anchor_hints(lines, anchor, where, literal, matched):
 def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_root=None):
     if BROKEN == "literal-as-regex":   # 弄坏开关：--<where>-literal 照旧按正则认
         literal = False
-    before = digest(path)
-    text = open(path, encoding="utf-8").read()
+    with open(path, 'rb') as handle:
+        original = handle.read()
+    before = hashlib.sha256(original).hexdigest()
+    text = original.decode('utf-8')
+    # 匹配逻辑行，写回保留各行原有的换行符；CRLF 的 CR 不能进入正则的行尾。
+    pieces = re.split(r'(\r\n|\r|\n)', text)
+    lines, endings = pieces[::2], pieces[1::2] + ['']
+    text = '\n'.join(lines)
     if absent:
-        hits = len(re.findall(absent, text, re.M))
+        try:
+            hits = len(re.findall(absent, text, re.M))
+        except re.error as error:
+            print(f'  ✗ --absent 不是合法正则：{error}')
+            print('     → 怎么办：修正 --absent 后重跑，没写文件')
+            return 3
         if hits:
             print("  ✗ %s 里已经有 %d 处命中 --absent 的内容，不重复插" % (path, hits))
             print("     → 怎么办：先看那几处是不是你要插的这一行；确实要再插一行就换一个 --absent，或者去掉它。")
             return 2
-    lines = text.split("\n")
     try:
         matched = [index for index, value in enumerate(lines) if (anchor in value if literal else re.search(anchor, value))]
     except re.error as error:
@@ -162,6 +172,12 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_r
             print("  ✗ " + "\n".join(refusal))
             print("  → 怎么办：新行里的会话号换成「别的会话」这类不带号的说法，事情与日期照留，再插")
             return 7
+    ending = endings[matched[0]] or next((value for value in endings if value), '\n')
+    if at == len(lines):
+        endings[-1] = ending
+        endings.append('')
+    else:
+        endings.insert(at, ending)
     lines.insert(at, line)
     if dry_run:
         print("  （干跑）会插在 %s:%d，锚点是第 %d 行" % (path, at + 1, matched[0] + 1))
@@ -174,7 +190,8 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_r
             raise ChangedSinceRead(digest_now)
 
     try:
-        notes = replace_file_contents_by_rename(path, "\n".join(lines), check_before_rename=verify_unchanged_since_read)
+        notes = replace_file_contents_by_rename(path, ''.join(value + ending for value, ending in zip(lines, endings)),
+                                                check_before_rename=verify_unchanged_since_read)
     except ChangedSinceRead as changed:
         print("  ✗ 读到写之间 %s 被改过（sha256 %s → %s），没写" % (path, before[:12], changed.digest_now[:12]))
         print("     → 怎么办：别的会话刚写过这份文件，重跑一次本命令；手里那份内容已经不是要改的那一份了。")
@@ -235,8 +252,14 @@ def problems_with_clock_guard(work):
     code, said = run("| C | 用户 2026-10-14 定 |")
     if code != 0 or open(notes, encoding="utf-8").read() != "| A | 一 |\n| C | 用户 2026-10-14 定 |\n| B | 二 |\n":
         problems.append("写 .md：只写日期的新行本该放行（退出码 0），实际 %d：%r" % (code, said))
+    # 范围：.json、.txt 与 .md 同判（带紧凑时间戳的新行拒）
+    for label, path in ((".txt 目标", os.path.join(root, "records", "notes.txt")), (".json 目标", os.path.join(root, "records", "notes.json"))):
+        reset(path)
+        code, said = run(glue(("| C | 运行目录 ", stamp, " |")), path=path)
+        if code != 6:
+            problems.append("写 .md：%s的新行带紧凑时间戳本该退出码 6，实际 %d：%r" % (label, code, said))
     # 范围：别的后缀与仓外不判（带紧凑时间戳的新行照插）
-    for label, path in ((".txt 目标", os.path.join(root, "records", "notes.txt")), ("仓外的 .md", os.path.join(work, "outside.md"))):
+    for label, path in ((".tsv 目标", os.path.join(root, "records", "notes.tsv")), ("仓外的 .md", os.path.join(work, "outside.md"))):
         reset(path)
         code, said = run(glue(("| C | 运行目录 ", stamp, " |")), path=path)
         if code != 0:
@@ -352,11 +375,8 @@ def selftest():
         # 写前复核：让 digest 在读之后返回不同的值，模拟别的会话在这中间写过
         global digest
         original = digest
-        state = {"n": 0}
-
         def racing(p):
-            state["n"] += 1
-            return original(p) if state["n"] == 1 else "0" * 64
+            return "0" * 64
         digest = racing
         code = insert(path, r"^### 已还清", "before", "| E | 五 |", None, False)
         digest = original
@@ -391,7 +411,7 @@ def selftest():
     print("  ✓ 自检：正常插入判绿、重复插入被 --absent 挡、锚点不唯一拒绝并列出每一处的行号、"
           "锚点带括号命中 0 次时点出元字符并给 --before-literal 与转义好的写法、--before-literal 按字面插成、读到写之间被改过拒绝且不写也不留临时文件；"
           "写仓里的 .md 之前判新行：带紧凑时间戳、带日期时区词时分、带光秃时区词的拒绝（6，干跑也拒）并点名形态、行号与出路且不写文件，"
-          "8 位数字后跟 T 但不是时间戳、只写日期、.txt 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 6，理由不是钟点），入口退出码 6；"
+          "8 位数字后跟 T 但不是时间戳、只写日期、.json、.txt 与 .md 同判，.tsv 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 6，理由不是钟点），入口退出码 6；"
           "写任何后缀的仓内文件之前判新行里的会话号：.md 与 .py 目标带会话名的拒绝（7，干跑也拒）并点名行号与出路「别的会话」且不写文件，干净的新行、.py 里带放行标记的一行、"
           "排除前缀下的文件、仓外的文件放行，假仓里没有共用库时读不到会话号判据按拒绝办（退出码 7），入口退出码 7；"
           "换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、"
@@ -428,6 +448,39 @@ def main(argv, notation_root=None):
     return insert(arguments.file, anchor, where, arguments.line, arguments.absent, arguments.dry_run, literal=literal, notation_root=notation_root)
 
 
+BREAK_VARIABLES = ("INSERT_ROW_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行里有 --selftest；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or "--selftest" in arguments or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/insert-row.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     preflight(__file__)
     sys.exit(main(sys.argv[1:]))

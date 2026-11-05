@@ -7,9 +7,9 @@
 
 1. 与「所属日期」相同的行内日期删掉：所属日期是文件名里的日期（records/2026-09-24-….md）与最近一个带日期的标题；
    路径、产物名、引名（「」『』与英语 "…"、“…” 四种引号里的）、紧跟「：」当小节名用的日期不动（判法与 history-consolidate.py 同一份）。
-2. 同一份文件里同一日期、同一级的标题出现第二次，第二个小节并进第一个：内容原样接在第一个小节末尾，
+2. 同一父节里同一日期、同一级的标题出现第二次，第二个小节并进第一个：内容原样接在第一个小节末尾，
    第二个标题日期之后的字（「第二批」这类）留成一行粗体。
-3. `--drop-history`：文末的历史节整个删掉（只有决策与实验有历史，别的文件的历史靠 git）。
+3. `--drop-history`：删除文末的历史节（只有决策与实验有历史，别的文件的历史靠 git）。
 
 历史节：整行是「## <历史版本的某种语言写法>」的那一行起到文末。三种写法取自翻译术语表（.claude/kb/translation-glossary.md，
 本仓那一份；`DOC_CONSOLIDATE_GLOSSARY` 指别的路径时读它）中文列是「历史版本」的那一行：`## 历史版本`、`## <English 列>`、`## <日本語列>`，
@@ -28,12 +28,13 @@
 对迁过的文件拒跑（migrate）：同一份文件迁第二次，丢失核对拿的「改前」已经是上一趟迁出来（或迁到一半丢了东西）的正文，丢掉的东西永远核不出来，
 而第二趟的 --out 若指回它自己，原文件就被盖掉了。所以 migrate 每次真改了东西（输出与输入不同）就把输出正文的 sha256 记进台账，
 下一趟的输入正文的 sha256 在台账里就是「迁过的文件」，拒跑：不整理它、不写 --out、不碰它，退出码 4，打 ✗ 加 → 出路。
-  怎么认迁过的：台账 `${DOC_CONSOLIDATE_LEDGER:-~/.local/share/singlefs/doc-consolidate-migrated.tsv}`，一行 `<输出正文的 sha256>\t<文件名>`，
+  怎么认迁过的：台账 `${DOC_CONSOLIDATE_LEDGER:-<数据根>/doc-consolidate-migrated.tsv}`（数据根取 .claude/hooks/lib_work_root.py 的 shared_data_path，两台同一份），一行 `<输出正文的 sha256>\t<文件名>`，
     认的是正文的 sha256，不认路径：文件改过（哪怕改一个字）就不再是迁出来的那一份；原文件（迁之前的那一份）重新迁不拒。
     `DOC_CONSOLIDATE_LEDGER` 设成空串或 off：台账关掉，不查也不记（门禁 doc-text 的 date-once 格干跑用它：干跑不留台账）。
   出路：要改它的内容，直接定点改（scripts/kb/replace-once.py），不再迁；真要重迁，对迁之前的那一份（git show <提交>:<路径>）重新 migrate。
   只记 migrate 真改了东西的那一趟，也包括丢失核对报了丢失（退 3）的那一趟：那时 --out 已经写出去了。
-退出码：migrate 0 迁好且丢失核对绿（或没有可迁的）、1 用法错、3 丢失核对找不到东西、4 拒跑（输入是迁过的文件）、5 认不出历史节（术语表读不到或没有「历史版本」那一行）；
+  台账存在却读不了（路径类型、权限或编码错误）时拒绝，不把读取失败当成「没迁过」，--out 不写。
+退出码：migrate 0 迁好且丢失核对绿（或没有可迁的）、1 用法错、3 丢失核对找不到东西、4 拒跑（输入是迁过的文件或台账读不了）、5 认不出历史节（术语表读不到或没有「历史版本」那一行）；
 loss-check 0 / 1 / 3 / 5；--selftest 0 / 1 / 2（弄坏开关取值认不得）。
 
 弄坏开关（只给 --selftest 证红用，migrate 与 loss-check 不认）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句冒号前的名字，
@@ -49,7 +50,6 @@ loss-check 0 / 1 / 3 / 5；--selftest 0 / 1 / 2（弄坏开关取值认不得）
       不设开关时 --selftest 也把这个开关打开一次，核那一格红（没红的那一项是 弄坏开关 history-heading-chinese-only）
 """
 import argparse
-import collections
 import hashlib
 import importlib.util
 import os
@@ -72,7 +72,7 @@ HEADING_RE = re.compile(r'^(#{1,6})\s+(.*)$')
 HISTORY_TERM = '历史版本'     # 术语表里中文列是它的那一行给三种语言的历史节标题
 CHINESE_HISTORY_HEADING = '## ' + HISTORY_TERM
 LEDGER_VARIABLE = 'DOC_CONSOLIDATE_LEDGER'
-DEFAULT_LEDGER = '~/.local/share/singlefs/doc-consolidate-migrated.tsv'
+LEDGER_ENTRY = 'doc-consolidate-migrated.tsv'   # 没设 DOC_CONSOLIDATE_LEDGER 时取数据根下的这一项（.claude/hooks/lib_work_root.py 的 shared_data_path，两台读同一份）
 REFUSED_EXIT = 4        # migrate 的输入是迁过的文件：拒跑
 GLOSSARY_EXIT = 5       # 认不出历史节：术语表读不到或没有「历史版本」那一行
 GLOSSARY_VARIABLE = 'DOC_CONSOLIDATE_GLOSSARY'
@@ -83,6 +83,10 @@ HISTORY_HEADING_BREAK_MODE = 'history-heading-chinese-only'
 
 class GlossaryError(Exception):
     """认不出历史节：术语表读不到，或没有中文列是「历史版本」的那一行。不退回只认中文。"""
+
+
+class LedgerError(Exception):
+    """台账存在却读不了，不能按「没迁过」处理。"""
 
 
 _trilingual = None
@@ -148,104 +152,48 @@ def glossary_problem_exit(error):
 def split_history(lines):
     """历史节之前的正文与历史节（整行是三种语言的历史节标题之一的那一行起到文末）。认不出历史节抛 GlossaryError。"""
     headings = history_headings()
+    flags = fenced_flags(lines)
     for index, line in enumerate(lines):
-        if line.strip() in headings:
+        if not flags[index] and line.strip() in headings:
             return lines[:index], lines[index:]
     return lines, []
 
 
-def fenced_flags(lines):
-    flags = []
-    inside = False
-    for line in lines:
-        if line.startswith('```') or line.startswith('~~~'):
-            inside = not inside
-            flags.append(True)
-            continue
-        flags.append(inside)
-    return flags
+fenced_flags = history.fenced_flags
 
 
 def merge_same_date_headings(lines, report):
-    """同一份文件里同一日期、同一级的第二个小节并进第一个。"""
-    flags = fenced_flags(lines)
-    headings = []  # (index, level, date, rest)
-    for index, line in enumerate(lines):
-        if flags[index]:
-            continue
-        match = HEADING_RE.match(line)
-        if not match:
-            continue
-        text = match.group(2)
-        date = DATE_RE.match(text.strip())
-        if date:
-            headings.append((index, len(match.group(1)), date.group(0), text.strip()[len(date.group(0)):].strip(' ：:—-')))
-    if not headings:
-        return lines
-    # 每个小节的范围：到下一个同级或更高级标题之前
-    def section_end(start_index, level):
-        for later in range(start_index + 1, len(lines)):
-            if flags[later]:
-                continue
-            match = HEADING_RE.match(lines[later])
-            if match and len(match.group(1)) <= level:
-                return later
-        return len(lines)
-    first_by_key = {}
-    moves = []  # (from_start, from_end, into_end, extra_title)
-    for index, level, date, rest in headings:
-        key = (level, date)
-        if key not in first_by_key:
-            first_by_key[key] = (index, level)
-            continue
-        moves.append((index, section_end(index, level), key, rest))
-    if not moves:
-        return lines
-    removed = set()
-    appended = collections.defaultdict(list)
-    for start, end, key, rest in moves:
-        body = lines[start + 1:end]
-        while body and not body[-1].strip():
-            body.pop()
-        chunk = ([f'**{rest}**'] if rest else []) + body
-        appended[key] += [''] + chunk
-        removed.update(range(start, end))
-        report['sections_merged'] += 1
-    out = []
-    for index, line in enumerate(lines):
-        if index in removed:
-            continue
-        out.append(line)
-        # 第一个小节的末尾：它的范围结束前一行
-    # 把并进去的内容插到第一个小节末尾
-    result = []
-    index = 0
-    inserted = set()
-    while index < len(lines):
-        if index in removed:
-            index += 1
-            continue
-        result.append(lines[index])
-        for key, (first_index, level) in first_by_key.items():
-            if key in inserted or first_index != index:
-                continue
-            end = section_end(first_index, level)
-            # 收集第一个小节自己的内容，再接并入的
-            own = []
-            walk = first_index + 1
-            while walk < end:
-                if walk not in removed:
-                    own.append(lines[walk])
-                walk += 1
-            while own and not own[-1].strip():
-                own.pop()
-            result += own + appended.get(key, []) + ['']
-            inserted.add(key)
-            index = end
-            break
-        else:
-            index += 1
-    return result
+    """同一父节里同一日期、同一级的小节合并，递归处理子节且保留全部正文。"""
+    def merge_level(part):
+        flags = fenced_flags(part)
+        heads = [(i, HEADING_RE.match(line)) for i, line in enumerate(part) if not flags[i]]
+        heads = [(i, match) for i, match in heads if match]
+        if not heads:
+            return part
+        level = min(len(match.group(1)) for _, match in heads)
+        starts = [i for i, match in heads if len(match.group(1)) == level]
+        result = part[:starts[0]]
+        chunks, first = [], {}
+        for position, start in enumerate(starts):
+            end = starts[position + 1] if position + 1 < len(starts) else len(part)
+            title = HEADING_RE.match(part[start]).group(2).strip()
+            date = DATE_RE.match(title)
+            key = date.group(0) if date else None
+            body = part[start + 1:end]
+            if key is not None and key in first:
+                rest = title[len(key):].strip(' ：:—-')
+                chunks[first[key]][1].extend([''] + ([f'**{rest}**'] if rest else []) + body)
+                report['sections_merged'] += 1
+            else:
+                if key is not None:
+                    first[key] = len(chunks)
+                chunks.append((part[start], list(body)))
+        for heading, body in chunks:
+            result.append(heading)
+            result.extend(merge_level(body))
+        return result
+
+    return merge_level(lines)
 
 
 MACHINE_READ_RE = re.compile(r'20\d\d-\d\d-\d\d\s*(?:改了|不受影响)|改新池新建文件的字节：|动不动格式：|回看')
@@ -299,11 +247,21 @@ def migrate_document(text, file_date, drop_history, break_mode=None):
 
 
 def ledger_file():
-    """台账路径；DOC_CONSOLIDATE_LEDGER 设成空串或 off 就关掉（返回 None），不查也不记。"""
+    """台账路径；DOC_CONSOLIDATE_LEDGER 设成空串或 off 就关掉（返回 None），不查也不记；没设取数据根下的 LEDGER_ENTRY，取不到抛 LedgerError。"""
     configured = os.environ.get(LEDGER_VARIABLE)
     if configured is not None and configured.strip().lower() in ('', 'off'):
         return None
-    return os.path.expanduser(configured or DEFAULT_LEDGER)
+    if configured:
+        return os.path.expanduser(configured)
+    try:
+        specification = importlib.util.spec_from_file_location('lib_work_root_for_doc_consolidate',
+                                                               os.path.join(REPOSITORY_ROOT, '.claude', 'hooks', 'lib_work_root.py'))
+        module = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(module)
+        return module.shared_data_path(LEDGER_ENTRY)
+    except (OSError, ImportError, AttributeError, ValueError) as error:
+        raise LedgerError(f'取不到迁移台账的位置（数据根下的 {LEDGER_ENTRY}，.claude/hooks/lib_work_root.py：{error}）；'
+                          f'修好那份库（还没有 shared_data_path 的先把那一版换上），或设 {LEDGER_VARIABLE} 指到台账') from error
 
 
 def text_digest(text):
@@ -318,8 +276,10 @@ def was_migrated(text):
     try:
         with open(path, encoding='utf-8') as handle:
             return any(line.split('\t', 1)[0] == text_digest(text) for line in handle)
-    except OSError:
+    except FileNotFoundError:
         return False
+    except (OSError, UnicodeDecodeError) as error:
+        raise LedgerError(f'读不了迁移台账 {path}：{error}') from error
 
 
 def record_migrated(after_text, name):
@@ -624,7 +584,13 @@ def main():
             sys.exit(1)
         path = arguments.files[0]
         before_text = open(path, encoding='utf-8').read()
-        if was_migrated(before_text):
+        try:
+            migrated = was_migrated(before_text)
+        except LedgerError as error:
+            print(f'✗ {error}，无法确认是否迁过，输出没写')
+            print('  → 核对台账路径、权限与编码，恢复可读的台账后重跑')
+            sys.exit(REFUSED_EXIT)
+        if migrated:
             print(f'✗ 拒跑：{path} 是上一趟 migrate 迁出来的（正文的 sha256 在台账里），再迁一次，丢失核对拿被改过的正文当「改前」，丢掉的东西核不出来；没整理它，--out 没写，它一个字没动')
             print('  → 怎么办：要改它的内容，直接定点改（scripts/kb/replace-once.py），不再迁；真要重迁，对迁之前的那一份（git show <提交>:<路径> 取出来）重新 migrate；'
                   f'台账在 {ledger_file()}（{LEDGER_VARIABLE} 指别处，设成 off 关掉）')
@@ -675,5 +641,38 @@ def main():
     sys.exit(1)
 
 
+BREAK_VARIABLES = ("DOC_CONSOLIDATE_BREAK",)
+
+
+def inside_selftest():
+    """往上数这个进程的祖先，有一个的命令行里带 --selftest（自证起的子进程，含别的脚本的自证起它的）就是 True。"""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                if b"--selftest" in handle.read().split(b"\0"):
+                    return True
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                pid = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+    return False
+
+
+def settle_break_switches(arguments):
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    放行：命令行里有 --selftest；祖先里有自证（inside_selftest）。
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
+    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
+    if not setting or "--selftest" in arguments or inside_selftest():
+        return None
+    print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
+    print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/doc-consolidate.py --selftest", file=sys.stderr)
+    return 2
+
+
 if __name__ == '__main__':
+    refused = settle_break_switches(sys.argv[1:])
+    if refused is not None:
+        sys.exit(refused)
     main()

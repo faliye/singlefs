@@ -2173,46 +2173,6 @@ mod tests {
         assert_eq!(ancestry_of(&ancestry_table, 1), vec![(1, u64::MAX)]);
     }
 
-    /// 调试用：打印神谕臂在混合世界上对不上的根与 key。
-    #[test]
-    #[ignore]
-    fn debug_mixed_oracle() {
-        let seed: u64 = std::env::var("E104_SEED").ok().and_then(|environment_text| environment_text.parse().ok()).unwrap_or(1);
-        let replica_count_from_environment: u8 = std::env::var("E104_W").ok().and_then(|environment_text| environment_text.parse().ok()).unwrap_or(1);
-        let rounds: u32 = std::env::var("E104_ROUNDS").ok().and_then(|environment_text| environment_text.parse().ok()).unwrap_or(60);
-        let (world, _) = world_mixed(seed, WorldConfiguration { replica_count: replica_count_from_environment, ..WorldConfiguration::FULL }, rounds);
-        println!("inst={} txg={} watermarks={:?} ancestry={:?} scrub_wm={}", world.instance, world.txg, world.watermarks, world.ancestry, world.scrub_watermark);
-        let roots: Vec<&View> = world.head_views.values().chain(world.snapshots.iter()).collect();
-        let arm = if std::env::var("E104_ARM").ok().as_deref() == Some("full") { FULL } else { ORACLE };
-        for root_view in roots {
-            let rebuilt = rebuild_root(&world, root_view, arm);
-            for (root_key, location) in &root_view.data {
-                match rebuilt.data.get(root_key) { None => println!("root tree={} txg={} LOST {root_key:?} loc={location} on_disk={} unit={:?} in_alloc={}", root_view.tree, root_view.txg, world.disk.contains_key(location), world.disk.get(location).map(|unit| (unit.key, unit.writer, unit.birth, unit.write_sequence)), root_view.referenced_locations.contains(location)), Some(rebuilt_location) if rebuilt_location != location => println!("WRONG {root_key:?}"), _ => {} }
-            }
-            for (resurrected_key, location) in &rebuilt.data { if !root_view.data.contains_key(resurrected_key) {
-                println!("root tree={} txg={} RESURRECTED {resurrected_key:?} at loc={location} unit={:?}", root_view.tree, root_view.txg, world.disk.get(location).map(|unit| (unit.writer, unit.birth, unit.write_sequence)));
-                for (disk_location, unit) in &world.disk { if unit.key == *resurrected_key { println!("    version loc={disk_location} writer={} birth={} wseq={:?} referenced={}", unit.writer, unit.birth, unit.write_sequence, world.referenced_by_root(*disk_location)); } }
-                for (disk_location, unit) in &world.disk { if let Payload::Tombstones(tombstone_records) = &unit.payload { for tombstone_record in tombstone_records { if let TombstoneRecord::Kill { key, death, death_txg } = tombstone_record { if key == resurrected_key { println!("    tomb in loc={disk_location} cont={:?} birth={} wseq={:?} referenced={} death={death:?} death_txg={death_txg}", unit.key, unit.birth, unit.write_sequence, world.referenced_by_root(*disk_location)); } } } } }
-                for (head_tree, head) in world.heads.iter() { if let Some((container_key, container_location, tombstone_records)) = &head.open_tombstone_container { if tombstone_records.iter().any(|tombstone_record| matches!(tombstone_record, TombstoneRecord::Kill { key, .. } if key == resurrected_key)) { println!("    open tomb of head {head_tree}: {container_key:?} loc={container_location}"); } } for (container_key, container_location, tombstone_records) in &head.closed_tombstone_containers { if tombstone_records.iter().any(|tombstone_record| matches!(tombstone_record, TombstoneRecord::Kill { key, .. } if key == resurrected_key)) { println!("    closed tomb of head {head_tree}: {container_key:?} loc={container_location}"); } } }
-            } }
-            for (inode_number, (container_key, container_location, inode_version)) in &root_view.inodes {
-                match rebuilt.inodes.get(inode_number) { None => {
-                    println!("root tree={} txg={} LOST inode {inode_number} cont={container_key:?} loc={container_location} on_disk={} unit={:?} in_alloc={}", root_view.tree, root_view.txg, world.disk.contains_key(container_location), world.disk.get(container_location).map(|unit| (unit.key, unit.birth, unit.write_sequence)), root_view.referenced_locations.contains(container_location));
-                    for (disk_location, unit) in &world.disk { if unit.key == *container_key { println!("    cont version loc={disk_location} birth={} wseq={:?} referenced={} in_root_alloc={} recs={:?}", unit.birth, unit.write_sequence, world.referenced_by_root(*disk_location), root_view.referenced_locations.contains(disk_location), match &unit.payload { Payload::Inodes(inode_map) => inode_map.keys().collect::<Vec<_>>(), _ => vec![] }); } }
-                    for (disk_location, unit) in &world.disk { if let Payload::Tombstones(tombstone_records) = &unit.payload { for tombstone_record in tombstone_records { if let TombstoneRecord::Retire { retired_container, at_txg } = tombstone_record { if retired_container == container_key { println!("    retire rec in loc={disk_location} tomb={:?} birth={} wseq={:?} referenced={} in_root_alloc={} at_txg={at_txg}", unit.key, unit.birth, unit.write_sequence, world.referenced_by_root(*disk_location), root_view.referenced_locations.contains(disk_location)); } } } } }
-                    for (head_tree, head) in world.heads.iter() { for container in &head.containers { if container.key == *container_key { println!("    head {head_tree} cont loc={} dirty={} shared={}", container.location, container.dirty, container.shared); } } }
-                }, Some(rebuilt_version) if rebuilt_version != inode_version => println!("WRONG inode {inode_number}"), _ => {} }
-            }
-            for inode_number in rebuilt.inodes.keys() { if !root_view.inodes.contains_key(inode_number) {
-                println!("root tree={} txg={} RESURRECTED inode {inode_number}", root_view.tree, root_view.txg);
-                if root_view.txg == 79 && root_view.tree == 1 {
-                    for (disk_location, unit) in &world.disk { if let Payload::Inodes(inode_map) = &unit.payload { if inode_map.contains_key(inode_number) { println!("    cont version loc={disk_location} key={:?} writer={} birth={} wseq={:?} referenced={} live_cont={}", unit.key, unit.writer, unit.birth, unit.write_sequence, world.referenced_by_root(*disk_location), world.heads.values().any(|head| head.containers.iter().any(|container| container.key == unit.key))); } } }
-                    for (disk_location, unit) in &world.disk { if let Payload::Tombstones(tombstone_records) = &unit.payload { for tombstone_record in tombstone_records { if let TombstoneRecord::Retire { retired_container, at_txg } = tombstone_record { if world.disk.values().any(|other_unit| other_unit.key == *retired_container && matches!(&other_unit.payload, Payload::Inodes(inode_map) if inode_map.contains_key(inode_number))) { println!("    retire rec in loc={disk_location} cont={retired_container:?} at_txg={at_txg} referenced={}", world.referenced_by_root(*disk_location)); } } } } }
-                }
-            } }
-        }
-    }
-
     /// 确定性：同一种子两次跑逐字节相同。
     #[test]
     fn deterministic() {

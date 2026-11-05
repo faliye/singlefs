@@ -1,0 +1,30 @@
+m1_allocator_copy_drops_a_bitmap	    3 * unit_area_slots + 5 * segments_of(unit_area_slots)	    2 * unit_area_slots + 5 * segments_of(unit_area_slots)
+m2_linear_find_skips_the_step_that_finds	.map_or(table_length, |position| position + 1)	.map_or(table_length, |position| position)
+m3_lg_rounds_down	    u64::from(u64::BITS - value.leading_zeros())	    u64::from(u64::BITS - value.leading_zeros()).saturating_sub(1)
+m4_levels_64_counts_the_boundary_twice	    while 64_u64.pow(level) < value {	    while 64_u64.pow(level) <= value {
+m5_alpha_forgets_the_low_end	    (high_quantity / low_quantity).ln() / (high_position / low_position).ln()	    (high_quantity / low_quantity).ln() / high_position.ln()
+m6_b4_second_segment_ignores_the_cheaper_functions	                segment != "between" || called_before_the_between_segment.contains(row);	                segment != "between";
+m7_bands_swapped	    } else if alpha <= 0.25 {	    } else if alpha <= 0.5 {
+m8_inclusion_check_dropped	    exclusive_sum_nanos <= segment_nanos	    exclusive_sum_nanos <= segment_nanos + 1000
+m9_tau_from_the_smallest_point	max_by_key(|(steps, _)| *steps)	min_by_key(|(steps, _)| *steps)
+m10_user_scale_forgets_the_start_slot	    USER_SCALE_DEVICE_SLOTS - UNIT_AREA_START_SLOT	    USER_SCALE_DEVICE_SLOTS
+m11_bitmap_memory_one_word_per_segment	        segment_summaries: 3 * summary_words(memory_input.segments_per_disk) * 8 * DISKS,	        segment_summaries: 3 * memory_input.segments_per_disk * 8 * DISKS,
+m12_positive_control_keeps_the_settling_copy_cheap	    let retired_round_copy = today_whole_copy_in_a_round;	    let retired_round_copy = 0;
+m13_user_scale_forgets_the_base	    let mut total = base;	    let mut total = 0.0;
+m14_reconciliation_forgets_the_step_that_finds	"inodes_with_an_extent_entry_set" => Some(calls * (1 + number(state, "other_files")?)),	"inodes_with_an_extent_entry_set" => Some(calls * number(state, "other_files")?),
+m15_reconciliation_upper_bound_excludes_the_bound	Relation::AtMost => steps <= expected,	Relation::AtMost => steps < expected,
+m16_reconciliation_equals_accepts_more	Relation::Equals => steps == expected,	Relation::Equals => steps >= expected,
+m17_reconciliation_forgets_the_calls	"cluster_segment_sum" => Some(calls * number(state, "cluster_segments")?),	"cluster_segment_sum" => Some(number(state, "cluster_segments")?),
+m18_void_8_needs_no_full_rounds	.filter(|(_, (taken, _))| *taken < ROUNDS)	.filter(|(_, (taken, _))| *taken < 1)
+m19_void_8_drops_nothing	        kind == "overwrite"	        kind == "no_such_kind"
+m20_f6_with_no_cells_is_called_checked	(!checks.is_empty()).then(|| checks.iter().any(|ok| !*ok))	Some(checks.iter().any(|ok| !*ok))
+m21_f5_reads_the_other_arm	Some(narrowed_summary == Summary::GrowsOnSomeAxis),	Some(by_delta_summary == Summary::GrowsOnSomeAxis),
+m22_f2_reads_the_other_arm	Some(by_delta_summary == Summary::GrowsOnSomeAxis),	Some(narrowed_summary == Summary::GrowsOnSomeAxis),
+m23_f1_fires_on_any_cell	.all(|one_cell| *one_cell == FormulaCell::AtLeastOneMillisecond),	.any(|one_cell| *one_cell == FormulaCell::AtLeastOneMillisecond),
+m24_f3_reads_the_wrong_band	if verdict == "GrowsWithTheAxis" {	if verdict == "unstable" {
+m25_stop_3_compares_the_wrong_way	timing_fields.get(field) != Some(value)	timing_fields.get(field) == Some(value)
+m26_stop_4_needs_both_to_fail	if !had_caller || !entered_the_judge {	if !had_caller && !entered_the_judge {
+m27_the_narrow_arm_forgets_the_segment_before_the_landing	const SEGMENTS_BEFORE_THE_SECOND_JUDGEMENT: [&str; 2] = ["caller", "before_landing"];	const SEGMENTS_BEFORE_THE_SECOND_JUDGEMENT: [&str; 2] = ["caller", "caller"];
+m28_second_segment_nanos_drop_the_unimproved_rows	nanos += own;	nanos += 0.0;
+m29_user_scale_ignores_an_unread_point	Err(point_gaps) => gaps.push(format!("{point}:{}", point_gaps.join("|"))),	Err(_point_gaps) => {}
+m30_user_scale_nanos_accept_fewer_rounds	if usable.len() as u64 != ROUNDS {	if usable.len() as u64 > ROUNDS {

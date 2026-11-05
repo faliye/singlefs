@@ -6,7 +6,7 @@ scripts/mutation/mutate.sh 只跑 cargo，这一侧照 E170 的先例自己写�
 收尾在一份新副本上重跑基线，核「已还原，基线仍全绿」，并核本目录在跑前跑后逐字节相同。结局符号照 .claude/rules/mutation-sampling.md：
 ✅ 抓到、⏭ 无效、❌ 没红、⏱ 超时。结果行不带耗时，两次跑逐字节相同。
 
-跑法（在本目录，经 run-with-memory-cap.sh 与 capped.sh）：
+跑法（在本目录，整条命令交 `task-server/task submit --`）：
   python3 mutation_driver.py --table <变异表> --scratch <草稿目录> --output <新文件>
 """
 

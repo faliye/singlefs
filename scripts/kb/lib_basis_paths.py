@@ -8,8 +8,8 @@
 这一批自己新写的判决与证据（还没提交的新文件）照例是写回的依据，不拦。
 
 判法（只判路径，不判路径里的内容）：依据文字里每个从仓根起、带至少一层目录、末段带后缀的路径，
-  ① 登记在 `.claude/batch-scope`（这一批的改动范围，一行一条路径，路径之后是理由），或调用方显式放行
-     （--allow-uncommitted <路径>；以 / 结尾的写目录，放行目录底下的）：放行；
+  ① 登记在 `.claude/batch-scope`（这一批的改动范围，一行一条路径，路径之后是理由；常设登记，门禁 doc-process-records 的 batch-scope 格核）：放行。
+     没有调用方单次放行的口子；
   ② 已跟踪、工作区与暂存区都和 HEAD 相同：放行；
   ③ 已跟踪、工作区或暂存区与 HEAD 不同（含暂存的新文件、工作区删掉的文件）、又不在 ①：判红；
      例外：写了行号的，那几行在 HEAD 那一版里存在、且工作区与暂存区那一版的同一行与 HEAD 逐字相同，放行（别人改的是文件里别的地方）；
@@ -17,6 +17,7 @@
   ⑤ HEAD、暂存区与工作区里都没有的：不判（早已归档的产物、写错的路径各有别的检查管；这里只拦「依据是别人没提交的改动」）。
 不判的写法：带 < > * { } $ 的占位与通配、URL、绝对路径与 ~ 开头的路径、没有目录层的裸文件名（只写文件名的引用当已归档的东西，照 `.claude/agent-common.md`「规则怎么读」一节）。
 仓根不是 git 仓、HEAD 不存在时没法核：依据里有路径就判红（不静默放行）。
+未显式放行的已跟踪文件带 assume-unchanged 或 skip-worktree 时也判红：Git 可能跳过工作区差异，先核对并清除标记再查。
 
 弄坏开关：这份库没有；两个调用方各有「不核依据」的开关（KB_SPEC_CHECK_BREAK=basis-unchecked、STALE_CANDIDATES_BREAK=provenance-unchecked）。
 """
@@ -25,9 +26,11 @@ import re
 import subprocess
 
 BATCH_SCOPE = ".claude/batch-scope"
-# 路径：至少一层目录、末段带字母起头的后缀；前面不许紧挨路径字符、冒号、<>*{}~$（URL、绝对路径、占位的一段）
+# 仓根下的首级目录沿用 ASCII 形态，后续目录和文件名允许中文。
+# 首级不吞掉紧邻的中文叙述；文件名止于 ASCII 扩展名，保留「scripts/x.py中的实现」里的路径。
+# 前面不许紧挨 ASCII 路径字符、冒号、<>*{}~$（URL、绝对路径、占位的一段）。
 PATH_WITH_LINES = re.compile(
-    r"(?<![A-Za-z0-9_.\-/:<>*{}~$])((?:[A-Za-z0-9_.\-]+/)+[A-Za-z0-9_\-][A-Za-z0-9_.\-]*)(?![A-Za-z0-9_\-<>*{}$/])"
+    r"(?<![A-Za-z0-9_.\-/:<>*{}~$])([A-Za-z0-9_.\-]+/(?:[\w.\-]+/)*[\w\-][\w.\-]*\.[A-Za-z][A-Za-z0-9]{0,7})(?![A-Za-z0-9_\-<>*{}$/]|\.[\w.\-])"
     r"(?::(\d+)(?:[-–](\d+))?)?")
 SUFFIX = re.compile(r"\.[A-Za-z][A-Za-z0-9]{0,7}$")
 
@@ -77,7 +80,7 @@ class CommittedState:
         self.usable = probe.returncode == 0
 
     def _git(self, *arguments):
-        return subprocess.run(["git", "-C", self.root, "-c", "core.quotepath=false", *arguments], capture_output=True,
+        return subprocess.run(["git", "--literal-pathspecs", "-C", self.root, "-c", "core.quotepath=false", *arguments], capture_output=True,
                               env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
 
     def head_lines(self, path):
@@ -85,6 +88,10 @@ class CommittedState:
         key = ("head", path)
         if key not in self.cache:
             shown = self._git("show", f"HEAD:{path}")
+            if shown.returncode != 0:
+                listed = self._git("ls-tree", "-z", "HEAD", "--", path)
+                if listed.returncode != 0 or listed.stdout:
+                    raise RuntimeError(f'{path} 的 HEAD 内容读取失败，无法确认依据状态')
             self.cache[key] = None if shown.returncode != 0 else _split_lines(shown.stdout)
         return self.cache[key]
 
@@ -98,6 +105,8 @@ class CommittedState:
         key = ("index", path)
         if key not in self.cache:
             shown = self._git("show", f":{path}")
+            if shown.returncode != 0 and self.tracked(path):
+                raise RuntimeError(f'{path} 的暂存区内容读取失败，无法确认依据状态')
             self.cache[key] = None if shown.returncode != 0 else _split_lines(shown.stdout)
         return self.cache[key]
 
@@ -113,16 +122,28 @@ class CommittedState:
         """暂存区里有这个路径（已跟踪）。"""
         key = ("tracked", path)
         if key not in self.cache:
-            self.cache[key] = bool(self._git("ls-files", "-z", "--", path).stdout)
+            listed = self._git("ls-files", "-z", "--", path)
+            if listed.returncode != 0:
+                raise RuntimeError(f'{path} 的 git ls-files 失败，无法确认依据状态')
+            self.cache[key] = bool(listed.stdout)
         return self.cache[key]
 
     def differs(self, path):
         """工作区或暂存区的这个路径与 HEAD 不同：(工作区不同, 暂存区不同)。"""
         key = ("differs", path)
         if key not in self.cache:
-            worktree = self._git("diff", "--quiet", "--no-ext-diff", "HEAD", "--", path).returncode == 1
-            staged = self._git("diff", "--quiet", "--no-ext-diff", "--cached", "--", path).returncode == 1
-            self.cache[key] = (worktree, staged)
+            worktree = self._git("diff", "--quiet", "--no-ext-diff", "HEAD", "--", path)
+            staged = self._git("diff", "--quiet", "--no-ext-diff", "--cached", "--", path)
+            for result in (worktree, staged):
+                if result.returncode not in (0, 1):
+                    raise RuntimeError(f'{path} 的 git diff 失败（退出码 {result.returncode}），无法确认依据状态')
+            flags = self._git("ls-files", "-v", "-z", "--", path)
+            if flags.returncode != 0:
+                raise RuntimeError(f'{path} 的 git ls-files 失败，无法确认依据状态')
+            if any(entry[:1].islower() or entry[:1] == b'S' for entry in flags.stdout.split(b'\0') if entry):
+                raise RuntimeError(f'{path} 设置了 assume-unchanged 或 skip-worktree，git diff 可能跳过工作区改动；'
+                                   '先核对文件并清除相应标记，再检查依据状态')
+            self.cache[key] = (worktree.returncode == 1, staged.returncode == 1)
         return self.cache[key]
 
 
@@ -143,42 +164,44 @@ def _lines_unchanged(committed, path, start, end):
     return True
 
 
-def basis_check(root, text, allowed=(), committed=None):
-    """依据文字 text 里的路径：(问题说明表, 未跟踪的新文件表)。问题表空表示过；allowed 是显式放行的路径；committed 可传 CommittedState 复用缓存。"""
+def basis_check(root, text, committed=None):
+    """依据文字 text 里的路径：(问题说明表, 未跟踪的新文件表)。问题表空表示过；committed 可传 CommittedState 复用缓存。"""
     cited = paths_cited(text)
     if not cited:
         return [], []
     committed = committed or CommittedState(root)
     if not committed.usable:
         return [f"{root} 不是 git 仓或没有提交，核不了依据里的路径 {'、'.join(path for path, _, _ in cited[:5])} 在不在 HEAD 里"], []
-    scope = batch_scope_paths(root) | set(allowed)
-    directories = tuple(entry for entry in allowed if entry.endswith("/"))   # --allow-uncommitted research/prompts/ 放行那个目录下的
+    scope = batch_scope_paths(root)
     problems, untracked = [], []
     for path, start, end in cited:
-        if path in scope or (directories and path.startswith(directories)):
+        if path in scope:
             continue
         shown = f"{path}:{start}{'-' + str(end) if end is not None else ''}" if start is not None else path
-        if committed.head_lines(path) is None:
-            if committed.tracked(path):
-                problems.append(f"{shown} 是暂存区里的新文件（HEAD 里没有，别的会话暂存的改动；也没登记在 {BATCH_SCOPE}）")
-            elif committed.worktree_lines(path) is not None and path not in untracked:
-                untracked.append(path)
-            continue
-        worktree_differs, staged_differs = committed.differs(path)
-        if not (worktree_differs or staged_differs):
-            continue
-        where = "工作区与暂存区" if worktree_differs and staged_differs else ("工作区" if worktree_differs else "暂存区")
-        if start is None:
-            problems.append(f"{shown} 已跟踪，{where}那一版与 HEAD 不同（别的会话还没提交的改动，路径没登记在 {BATCH_SCOPE}）")
-        elif not _lines_unchanged(committed, path, start, end):
-            problems.append(f"{shown} 引的那几行在 {where}那一版里与 HEAD 不同、或 HEAD 那一版没有（HEAD 那一版有 {committed.line_count(path)} 行，"
-                            f"路径没登记在 {BATCH_SCOPE}）")
+        try:
+            if committed.head_lines(path) is None:
+                if committed.tracked(path):
+                    problems.append(f"{shown} 是暂存区里的新文件（HEAD 里没有，别的会话暂存的改动；也没登记在 {BATCH_SCOPE}）")
+                elif committed.worktree_lines(path) is not None and path not in untracked:
+                    untracked.append(path)
+                continue
+            worktree_differs, staged_differs = committed.differs(path)
+            if not (worktree_differs or staged_differs):
+                continue
+            where = "工作区与暂存区" if worktree_differs and staged_differs else ("工作区" if worktree_differs else "暂存区")
+            if start is None:
+                problems.append(f"{shown} 已跟踪，{where}那一版与 HEAD 不同（别的会话还没提交的改动，路径没登记在 {BATCH_SCOPE}）")
+            elif not _lines_unchanged(committed, path, start, end):
+                problems.append(f"{shown} 引的那几行在 {where}那一版里与 HEAD 不同、或 HEAD 那一版没有（HEAD 那一版有 {committed.line_count(path)} 行，"
+                                f"路径没登记在 {BATCH_SCOPE}）")
+        except (OSError, RuntimeError) as error:
+            problems.append(f'{shown}：{error}')
     return problems, untracked
 
 
-def uncommitted_problems(root, text, allowed=(), committed=None):
+def uncommitted_problems(root, text, committed=None):
     """basis_check 的问题表（旧入口，不要未跟踪名单的调用方用）。"""
-    return basis_check(root, text, allowed, committed)[0]
+    return basis_check(root, text, committed)[0]
 
 
 def untracked_note(untracked):
@@ -190,4 +213,4 @@ def untracked_note(untracked):
 
 ADVICE = ("引 HEAD 里已有的版本（`git show HEAD:<路径>` 读到的），或这一批自己新写、还没跟踪的文件；"
           "这份改动属于这一批的，把路径登记进 .claude/batch-scope（触发文件才行）；"
-          "确认那份文件这一批会一起提交的，调用时加 --allow-uncommitted <路径>；别的会话还没提交的改动不当依据，等它提交再写")
+          "别的会话还没提交的改动不当依据，等它提交再写")

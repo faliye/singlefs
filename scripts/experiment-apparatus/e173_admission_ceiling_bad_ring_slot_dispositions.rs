@@ -10,7 +10,9 @@
 //!   每记一条根之后待回收里释放代不高于门槛 max(F_生效, 环里最旧有效根) 的转成空闲；抬 F 那一串回收出来的扣到这一串做完才放开。
 //! - 准入：用户发布要求 空闲 − P保留 ≥ d + c；空发布（抬 F 那一串、推空）只要求 空闲 ≥ c；一次准入最多 B = 4 + 2 k_tol = 8 次发布。
 //!
-//! 子命令：`checks` 跑登记第十一节的对拍与第七节的锚点、第五节的阳性对照；`first` 是第一段（补 Q1）；`second` 是第二段（补 Q2）。
+//! 子命令：`checks` 跑登记第十一节的对拍与第七节的锚点、第五节的阳性对照；`first` 是第一段（补 Q1）；`second` 是第二段（补 Q2）；
+//! `checkpoint-cost-reserve` 是第一次重跑的第二段（重跑登记 `research/prompts/e173-r1-prereg.md`：保留池按第一段在真盘面上量出的 κ_G 现算，
+//! 代码读法 P = κ_G、条款读法 P = 10 + 7 κ_G，c 取同一几何的 c实_G；另跑保留池改回 10 + 7 c实 的判别力对照）。前三个模式的输出不随它变（重跑登记停机条款 S1）。
 
 // admission: always 独立手写的计数模型，每次现算；不读 crates/，只读自己的常量
 // run-condition: command python3
@@ -677,11 +679,19 @@ impl SpaceBook {
 
 // ── 池的松紧（登记第五节「池」） ────────────────────────────────────────────────────────
 
-/// 保留池的两种读法（登记第五节「准入」：代码读法 c，条款读法 10 + 7 c）。
+/// 保留池的读法。原登记第五节「准入」的两种：代码读法 c，条款读法 10 + 7 c。
+/// 重跑登记 `research/prompts/e173-r1-prereg.md` 第五节「第二段的两条臂」另加两种按 ckpt_cost 现算的（κ_G 与 c实_G 是第一段在那个几何上量出来的数，
+/// 常量表 [`CHECKPOINT_COST_GEOMETRIES`]），与第十二节修订加的判别力对照（保留池改回 10 + 7 c实）；这三种只在 `checkpoint-cost-reserve` 模式里用。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum ReserveReading {
     CodeReadingOneEmptyPublish,
     ClauseReadingTenPlusSevenEmptyPublishes,
+    /// 代码读法（现算）：P代 = κ_G。
+    CheckpointCostCodeReading { pool_size: SampledPoolSize, checkpoint_cost_blocks: i64 },
+    /// 条款读法（现算）：P条 = 2 × 5 + (B − 1) × κ_G = 10 + 7 κ_G（D16 已定项 1「`df`」那一行，c_max 照 D28 已定项 4 末条取 κ_G）。
+    CheckpointCostClauseReading { pool_size: SampledPoolSize, checkpoint_cost_blocks: i64 },
+    /// 判别力对照：同一个几何、同一个 c实，保留池改回 10 + 7 c实（原装置条款读法那一式）；读数必须与按 κ_G 的两条臂不同。
+    RevertedToTenPlusSevenActualEmptyPublishes { pool_size: SampledPoolSize, checkpoint_cost_blocks: i64 },
 }
 
 impl ReserveReading {
@@ -689,17 +699,82 @@ impl ReserveReading {
         match self {
             Self::CodeReadingOneEmptyPublish => "code",
             Self::ClauseReadingTenPlusSevenEmptyPublishes => "clause",
+            Self::CheckpointCostCodeReading { .. } => "ckpt-code",
+            Self::CheckpointCostClauseReading { .. } => "ckpt-clause",
+            Self::RevertedToTenPlusSevenActualEmptyPublishes { .. } => "reverted-10+7c",
         }
     }
 
     /// 条款读法：2 × 5 + (B − 1) × c_max（D16 已定项 1「`df`」那一行；登记 A2：c_max = 5 / 10 时 45 / 80）。
     fn reserve_blocks(self, metadata_blocks: i64) -> i64 {
+        let empty_publishes_of_one_admission = i64::try_from(PUBLISHES_PER_ADMISSION_AT_MOST - 1).expect("B");
         match self {
             Self::CodeReadingOneEmptyPublish => metadata_blocks,
             Self::ClauseReadingTenPlusSevenEmptyPublishes => {
                 2 * 5 + i64::try_from(PUBLISHES_PER_ADMISSION_AT_MOST - 1).expect("B") * metadata_blocks
             }
+            Self::CheckpointCostCodeReading { checkpoint_cost_blocks, .. } => checkpoint_cost_blocks,
+            Self::CheckpointCostClauseReading { checkpoint_cost_blocks, .. } => 2 * 5 + empty_publishes_of_one_admission * checkpoint_cost_blocks,
+            Self::RevertedToTenPlusSevenActualEmptyPublishes { .. } => 2 * 5 + empty_publishes_of_one_admission * metadata_blocks,
         }
+    }
+
+    /// 按 ckpt_cost 现算的三种带着几何的池大小；原两种没有这一维，交回空串（产物行里不多打字段，原三个模式的输出逐字节不变，停机条款 S1）。
+    fn pool_size_label(self) -> &'static str {
+        match self {
+            Self::CodeReadingOneEmptyPublish | Self::ClauseReadingTenPlusSevenEmptyPublishes => "",
+            Self::CheckpointCostCodeReading { pool_size, .. }
+            | Self::CheckpointCostClauseReading { pool_size, .. }
+            | Self::RevertedToTenPlusSevenActualEmptyPublishes { pool_size, .. } => pool_size.label(),
+        }
+    }
+
+    /// 键后面多打的几个字段：池大小与 κ_G（原两种交回空串）。
+    fn extra_key_fields(self) -> String {
+        match self {
+            Self::CodeReadingOneEmptyPublish | Self::ClauseReadingTenPlusSevenEmptyPublishes => String::new(),
+            Self::CheckpointCostCodeReading { pool_size, checkpoint_cost_blocks }
+            | Self::CheckpointCostClauseReading { pool_size, checkpoint_cost_blocks }
+            | Self::RevertedToTenPlusSevenActualEmptyPublishes { pool_size, checkpoint_cost_blocks } => {
+                format!(" pool_size={} kappa={checkpoint_cost_blocks}", pool_size.label())
+            }
+        }
+    }
+}
+
+/// 第一段量过的三档池大小（重跑登记第一节「几何」）：G-min、两块各 1 GiB、两块各 4 GiB。G-min 带它取到的每块盘 MiB 数。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum SampledPoolSize {
+    SmallestCompleting { mebibytes: u64 },
+    OneGibibyte,
+    FourGibibytes,
+}
+
+impl SampledPoolSize {
+    /// 与第一段产物 `name=geometry` 行的 `pool_size=` 同一写法（入库装置 `PoolSize::label`）。
+    fn label(self) -> &'static str {
+        match self {
+            Self::SmallestCompleting { mebibytes: 32 } => "g_min_32mib", // naming-lint:external 第一段入库装置 PoolSize::label 定的几何写法，读它的产物要逐字一样
+            Self::SmallestCompleting { mebibytes: 64 } => "g_min_64mib", // naming-lint:external 第一段入库装置 PoolSize::label 定的几何写法，读它的产物要逐字一样
+            Self::SmallestCompleting { mebibytes: 128 } => "g_min_128mib", // naming-lint:external 第一段入库装置 PoolSize::label 定的几何写法，读它的产物要逐字一样
+            Self::SmallestCompleting { mebibytes: 256 } => "g_min_256mib", // naming-lint:external 第一段入库装置 PoolSize::label 定的几何写法，读它的产物要逐字一样
+            Self::SmallestCompleting { mebibytes: 512 } => "g_min_512mib", // naming-lint:external 第一段入库装置 PoolSize::label 定的几何写法，读它的产物要逐字一样
+            Self::SmallestCompleting { .. } => panic!("G-min 只在 32、64、128、256、512 MiB 里取（重跑登记第五节「G-min 的找法」）"),
+            Self::OneGibibyte => "g_1", // naming-lint:external 第一段入库装置 PoolSize::label 定的几何写法，读它的产物要逐字一样
+            Self::FourGibibytes => "g_4", // naming-lint:external 第一段入库装置 PoolSize::label 定的几何写法，读它的产物要逐字一样
+        }
+    }
+
+    /// 从第一段产物的几何写法 `s<S>_<池大小>` 读回 (S, 池大小)；认不出的交回 None。
+    fn of_the_geometry_label(geometry_label: &str) -> Option<(u64, Self)> {
+        let (slots_text, pool_text) = geometry_label.strip_prefix('s')?.split_once('_')?;
+        let slots_per_region = slots_text.parse::<u64>().ok()?;
+        let pool_size = match pool_text {
+            "g_1" => Self::OneGibibyte,
+            "g_4" => Self::FourGibibytes,
+            other => Self::SmallestCompleting { mebibytes: other.strip_prefix("g_min_")?.strip_suffix("mib")?.parse::<u64>().ok()? },
+        };
+        Some((slots_per_region, pool_size))
     }
 }
 
@@ -1793,6 +1868,8 @@ struct CellSummary {
     non_empty_slot_positions: usize,
     crossed_at_non_empty_slot_positions: Aggregate,
     baseline_rejected: i64,
+    /// 去掉读故障那一次第一次被拒落在第几次请求（从 0 数；一次都没拒是 None）。重跑登记第六节 Z3 要报；原模式不打印它。
+    baseline_first_rejected_request: Option<usize>,
 }
 
 impl CellSummary {
@@ -1806,7 +1883,14 @@ impl CellSummary {
             non_empty_slot_positions: 0,
             crossed_at_non_empty_slot_positions: Aggregate::empty(),
             baseline_rejected,
+            baseline_first_rejected_request: None,
         }
+    }
+
+    fn with_the_baseline(key: CellKey, expected_positions: usize, baseline: &MountRun) -> Self {
+        let mut summary = Self::new(key, expected_positions, count_as_i64(rejected_count(baseline)));
+        summary.baseline_first_rejected_request = baseline.requests.iter().position(|request| !request.accepted);
+        summary
     }
 
     fn add_position(&mut self, position: usize, metrics: &PositionMetrics, slot_holds_a_non_empty_root: bool) {
@@ -1922,8 +2006,8 @@ fn run_a_group(group: &GroupSettings) -> GroupResult {
     };
     let baseline_not_merged = run_a_mount(&history, None, group.pool, arm_of(AllZeroSlotDisposition::NotMerged), Controls::none(), false);
     let baseline_merged = run_a_mount(&history, None, group.pool, arm_of(AllZeroSlotDisposition::Merged), Controls::none(), false);
-    let mut not_merged = CellSummary::new(key_of(AllZeroSlotDisposition::NotMerged), positions.len(), count_as_i64(rejected_count(&baseline_not_merged)));
-    let mut merged = CellSummary::new(key_of(AllZeroSlotDisposition::Merged), positions.len(), count_as_i64(rejected_count(&baseline_merged)));
+    let mut not_merged = CellSummary::with_the_baseline(key_of(AllZeroSlotDisposition::NotMerged), positions.len(), &baseline_not_merged);
+    let mut merged = CellSummary::with_the_baseline(key_of(AllZeroSlotDisposition::Merged), positions.len(), &baseline_merged);
     let mut pair = ZeroSlotPairComparison {
         positions: 0,
         identical_positions: 0,
@@ -2002,11 +2086,16 @@ fn pool_settings_list() -> Vec<PoolSettings> {
 
 /// 第一段（补 Q1）：H1–H4 × e / g × P1 / P2 / T1 / T2 × 三种池 × 四条 Q1 臂，Q2 固定在全零不并（登记第五节「分段」）。
 fn groups_of_the_first_segment() -> Vec<GroupSettings> {
+    stuck_ceiling_groups_over(&pool_settings_list())
+}
+
+/// 第一段那一组格（e / g 读坏），池取 `pools`（原第一段是 [`pool_settings_list`]，`checkpoint-cost-reserve` 模式是按几何现算的那一张）。
+fn stuck_ceiling_groups_over(pools: &[PoolSettings]) -> Vec<GroupSettings> {
     let mut groups = Vec::new();
     for family in FAMILIES_WITH_A_FAULT_TO_INJECT {
         for kind in [ReadFaultKind::DeviceError, ReadFaultKind::GarbageBytes] {
             for persistence in FAULT_PERSISTENCES {
-                for pool in pool_settings_list() {
+                for pool in pools.iter().copied() {
                     for stuck_ceiling in StuckCeilingDisposition::every_arm() {
                         groups.push(GroupSettings { family, fault_kind: Some(kind), persistence: Some(persistence), pool, stuck_ceiling });
                     }
@@ -2019,10 +2108,15 @@ fn groups_of_the_first_segment() -> Vec<GroupSettings> {
 
 /// 第二段（补 Q2）：z 与 H5 进来，两条 Q2 臂 × 四条 Q1 臂。H5 不注读故障（洞里真是全零）。
 fn groups_of_the_second_segment() -> Vec<GroupSettings> {
+    zero_slot_groups_over(&pool_settings_list())
+}
+
+/// 第二段那一组格（z 与 H5），池取 `pools`。
+fn zero_slot_groups_over(pools: &[PoolSettings]) -> Vec<GroupSettings> {
     let mut groups = Vec::new();
     for family in FAMILIES_WITH_A_FAULT_TO_INJECT {
         for persistence in FAULT_PERSISTENCES {
-            for pool in pool_settings_list() {
+            for pool in pools.iter().copied() {
                 for stuck_ceiling in StuckCeilingDisposition::every_arm() {
                     groups.push(GroupSettings {
                         family,
@@ -2035,7 +2129,7 @@ fn groups_of_the_second_segment() -> Vec<GroupSettings> {
             }
         }
     }
-    for pool in pool_settings_list() {
+    for pool in pools.iter().copied() {
         for stuck_ceiling in StuckCeilingDisposition::every_arm() {
             groups.push(GroupSettings { family: HistoryFamily::YoungRingWithCrashHoles, fault_kind: None, persistence: None, pool, stuck_ceiling });
         }
@@ -2092,7 +2186,7 @@ fn label_of_the_fault_kind(kind: Option<ReadFaultKind>) -> &'static str {
 
 fn render_the_key(key: &CellKey) -> String {
     format!(
-        "family={} kind={} persistence={} S={} c_max={} reserve={} pool={} q1={} q2={}",
+        "family={} kind={} persistence={} S={} c_max={} reserve={} pool={} q1={} q2={}{}",
         key.family.label(),
         label_of_the_fault_kind(key.fault_kind),
         label_of_the_persistence(key.persistence),
@@ -2101,7 +2195,8 @@ fn render_the_key(key: &CellKey) -> String {
         key.reserve_reading.label(),
         key.fullness.label(),
         key.arm.stuck_ceiling.label(),
-        key.arm.all_zero_slot.label()
+        key.arm.all_zero_slot.label(),
+        key.reserve_reading.extra_key_fields()
     )
 }
 
@@ -2159,6 +2254,8 @@ struct PointKey {
     slots_per_region: u64,
     reserve: &'static str,
     metadata_blocks: i64,
+    /// 按 ckpt_cost 现算的那几种读法带的池大小；原两种是空串（排在最后一个字段，原模式的点的次序不变）。
+    pool_size: &'static str,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -2186,6 +2283,7 @@ fn collect_the_points(cells: &[&CellSummary], settings: &JudgmentSettings<'_>) -
             slots_per_region: cell.key.slots_per_region,
             reserve: cell.key.reserve_reading.label(),
             metadata_blocks: cell.key.metadata_blocks,
+            pool_size: cell.key.reserve_reading.pool_size_label(),
         };
         let totals = points.entry(key).or_default();
         totals.cells += 1;
@@ -2221,13 +2319,14 @@ fn emit_a_judgment(emitter: &mut Emitter, segment: &str, cells: &[&CellSummary],
         emit(
             emitter,
             format!(
-                "name=judgment segment={segment} id={} scope={} arm={} S={} reserve={} c_max={} observed_maximum={} cells_hit={} cells={} cells_not_applicable={} cells_with_path_evidence={} hit={} no_hit_claim={no_hit_claim}",
+                "name=judgment segment={segment} id={} scope={} arm={} S={} reserve={} c_max={}{} observed_maximum={} cells_hit={} cells={} cells_not_applicable={} cells_with_path_evidence={} hit={} no_hit_claim={no_hit_claim}",
                 settings.judgment_label,
                 settings.scope,
                 key.arm,
                 key.slots_per_region,
                 key.reserve,
                 key.metadata_blocks,
+                if key.pool_size.is_empty() { String::new() } else { format!(" pool_size={}", key.pool_size) },
                 totals.observed_maximum.map_or("none".to_string(), |value| value.to_string()),
                 totals.cells_hit,
                 totals.cells,
@@ -2343,35 +2442,83 @@ fn admission_path_evidence(cell: &CellSummary) -> i64 {
     maximum_of(cell, "raise_sequences").max(maximum_of(cell, "cap_blocked")).max(maximum_of(cell, "empties"))
 }
 
+/// Q1 的一条判定：哪些格进来（范围）、每格的值、路径证据。第一段与 `checkpoint-cost-reserve` 模式共用这一张表，
+/// 后者的读法分辨格（重跑登记第六节 Z1）逐格拿同一个值判打不打中。
+struct StuckCeilingJudgment {
+    judgment_label: &'static str,
+    scope: &'static str,
+    belongs_to_the_scope: fn(&CellSummary) -> bool,
+    value: fn(&CellSummary) -> Option<i64>,
+    path_evidence: fn(&CellSummary) -> i64,
+}
+
+fn persistent_near_full(cell: &CellSummary) -> bool {
+    is_a_persistent_fault(cell) && cell.key.fullness.is_nearly_full()
+}
+
+fn transient_near_full(cell: &CellSummary) -> bool {
+    is_a_transient_fault(cell) && cell.key.fullness.is_nearly_full()
+}
+
+fn roomy_pool(cell: &CellSummary) -> bool {
+    cell.key.fullness == PoolFullness::Roomy
+}
+
+fn empty_pushing_arm_near_full(cell: &CellSummary) -> bool {
+    is_an_empty_pushing_arm(cell) && cell.key.fullness.is_nearly_full()
+}
+
+fn every_cell(_: &CellSummary) -> bool {
+    true
+}
+
+fn extra_rejected_maximum(cell: &CellSummary) -> Option<i64> {
+    Some(maximum_of(cell, "extra_rejected"))
+}
+
+fn non_empty_slot_positions_of(cell: &CellSummary) -> i64 {
+    count_as_i64(cell.non_empty_slot_positions)
+}
+
+fn raise_sequences_of(cell: &CellSummary) -> i64 {
+    maximum_of(cell, "raise_sequences")
+}
+
+fn empties_of(cell: &CellSummary) -> i64 {
+    maximum_of(cell, "empties")
+}
+
+/// 登记第六节 Q1-1 到 Q1-6，次序就是产物里判定行的次序。
+const STUCK_CEILING_JUDGMENTS: [StuckCeilingJudgment; 15] = [
+    StuckCeilingJudgment { judgment_label: "Q1-1", scope: "persistent_near_full", belongs_to_the_scope: persistent_near_full, value: extra_rejected_maximum, path_evidence: admission_path_evidence },
+    StuckCeilingJudgment { judgment_label: "Q1-1b", scope: "persistent_near_full", belongs_to_the_scope: persistent_near_full, value: |cell| Some(positive_positions_of(cell, "all_enospc")), path_evidence: admission_path_evidence },
+    StuckCeilingJudgment { judgment_label: "Q1-2", scope: "every_persistence_every_pool", belongs_to_the_scope: every_cell, value: crossed_at_non_empty_slots, path_evidence: non_empty_slot_positions_of },
+    StuckCeilingJudgment { judgment_label: "Q1-2b", scope: "every_persistence_every_pool", belongs_to_the_scope: every_cell, value: |cell| Some(maximum_of(cell, "over_truth")), path_evidence: raise_sequences_of },
+    StuckCeilingJudgment { judgment_label: "Q1-3", scope: "empty_pushing_arms_near_full", belongs_to_the_scope: empty_pushing_arm_near_full, value: |cell| Some(maximum_of(cell, "empty_refusals")), path_evidence: empties_of },
+    StuckCeilingJudgment { judgment_label: "Q1-3-raise-refused-after-empty", scope: "empty_pushing_arms_near_full", belongs_to_the_scope: empty_pushing_arm_near_full, value: |cell| Some(maximum_of(cell, "raise_refused_after_empty")), path_evidence: empties_of },
+    StuckCeilingJudgment { judgment_label: "Q1-3-empties-in-one-admission", scope: "empty_pushing_arms_near_full", belongs_to_the_scope: empty_pushing_arm_near_full, value: |cell| Some(maximum_of(cell, "empties_max_in_admission")), path_evidence: empties_of },
+    StuckCeilingJudgment { judgment_label: "Q1-3-empties-in-one-mount", scope: "empty_pushing_arms_near_full", belongs_to_the_scope: empty_pushing_arm_near_full, value: |cell| Some(maximum_of(cell, "empties")), path_evidence: empties_of },
+    StuckCeilingJudgment { judgment_label: "Q1-3-empty-blocks-in-one-mount", scope: "empty_pushing_arms_near_full", belongs_to_the_scope: empty_pushing_arm_near_full, value: |cell| Some(maximum_of(cell, "empty_blocks")), path_evidence: empties_of },
+    StuckCeilingJudgment { judgment_label: "Q1-4-extra-rejected", scope: "transient_near_full", belongs_to_the_scope: transient_near_full, value: extra_rejected_maximum, path_evidence: admission_path_evidence },
+    StuckCeilingJudgment { judgment_label: "Q1-4-crossed", scope: "transient_every_pool", belongs_to_the_scope: is_a_transient_fault, value: crossed_at_non_empty_slots, path_evidence: non_empty_slot_positions_of },
+    StuckCeilingJudgment { judgment_label: "Q1-5-extra-rejected", scope: "roomy", belongs_to_the_scope: roomy_pool, value: extra_rejected_maximum, path_evidence: admission_path_evidence },
+    StuckCeilingJudgment { judgment_label: "Q1-5-crossed", scope: "roomy", belongs_to_the_scope: roomy_pool, value: crossed_at_non_empty_slots, path_evidence: non_empty_slot_positions_of },
+    StuckCeilingJudgment { judgment_label: "Q1-6-cap-active", scope: "every_persistence_every_pool", belongs_to_the_scope: every_cell, value: |cell| Some(maximum_of(cell, "cap_active")), path_evidence: raise_sequences_of },
+    StuckCeilingJudgment { judgment_label: "Q1-6-cap-blocked", scope: "every_persistence_every_pool", belongs_to_the_scope: every_cell, value: |cell| Some(maximum_of(cell, "cap_blocked")), path_evidence: raise_sequences_of },
+];
+
 /// 第一段的判定：Q1-1 到 Q1-6（登记第六节）。
 fn emit_the_first_segment_judgments(emitter: &mut Emitter, tally: &mut RunTally, results: &[GroupResult]) {
-    let segment = "first";
+    emit_the_stuck_ceiling_judgments(emitter, tally, "first", results);
+}
+
+/// Q1 的判定，`segment` 是产物行里的段名（原第一段 `first`；`checkpoint-cost-reserve` 模式里 `ckpt-first`）。
+fn emit_the_stuck_ceiling_judgments(emitter: &mut Emitter, tally: &mut RunTally, segment: &str, results: &[GroupResult]) {
     let cells: Vec<&CellSummary> = results.iter().map(|result| &result.not_merged).collect();
-    let select = |keep: &dyn Fn(&CellSummary) -> bool| -> Vec<&CellSummary> { cells.iter().copied().filter(|cell| keep(cell)).collect() };
-    let persistent_near_full = select(&|cell| is_a_persistent_fault(cell) && cell.key.fullness.is_nearly_full());
-    let transient_near_full = select(&|cell| is_a_transient_fault(cell) && cell.key.fullness.is_nearly_full());
-    let transient_any_pool = select(&|cell| is_a_transient_fault(cell));
-    let roomy = select(&|cell| cell.key.fullness == PoolFullness::Roomy);
-    let pushing_near_full = select(&|cell| is_an_empty_pushing_arm(cell) && cell.key.fullness.is_nearly_full());
-    let everything = select(&|_| true);
-    let extra_rejected = |cell: &CellSummary| Some(maximum_of(cell, "extra_rejected"));
-    let crossed_non_empty = |cell: &CellSummary| crossed_at_non_empty_slots(cell);
-    let non_empty_slots = |cell: &CellSummary| count_as_i64(cell.non_empty_slot_positions);
-    judge(emitter, tally, segment, "Q1-1", "persistent_near_full", &persistent_near_full, &extra_rejected, &admission_path_evidence);
-    judge(emitter, tally, segment, "Q1-1b", "persistent_near_full", &persistent_near_full, &|cell| Some(positive_positions_of(cell, "all_enospc")), &admission_path_evidence);
-    judge(emitter, tally, segment, "Q1-2", "every_persistence_every_pool", &everything, &crossed_non_empty, &non_empty_slots);
-    judge(emitter, tally, segment, "Q1-2b", "every_persistence_every_pool", &everything, &|cell| Some(maximum_of(cell, "over_truth")), &|cell| maximum_of(cell, "raise_sequences"));
-    judge(emitter, tally, segment, "Q1-3", "empty_pushing_arms_near_full", &pushing_near_full, &|cell| Some(maximum_of(cell, "empty_refusals")), &|cell| maximum_of(cell, "empties"));
-    judge(emitter, tally, segment, "Q1-3-raise-refused-after-empty", "empty_pushing_arms_near_full", &pushing_near_full, &|cell| Some(maximum_of(cell, "raise_refused_after_empty")), &|cell| maximum_of(cell, "empties"));
-    judge(emitter, tally, segment, "Q1-3-empties-in-one-admission", "empty_pushing_arms_near_full", &pushing_near_full, &|cell| Some(maximum_of(cell, "empties_max_in_admission")), &|cell| maximum_of(cell, "empties"));
-    judge(emitter, tally, segment, "Q1-3-empties-in-one-mount", "empty_pushing_arms_near_full", &pushing_near_full, &|cell| Some(maximum_of(cell, "empties")), &|cell| maximum_of(cell, "empties"));
-    judge(emitter, tally, segment, "Q1-3-empty-blocks-in-one-mount", "empty_pushing_arms_near_full", &pushing_near_full, &|cell| Some(maximum_of(cell, "empty_blocks")), &|cell| maximum_of(cell, "empties"));
-    judge(emitter, tally, segment, "Q1-4-extra-rejected", "transient_near_full", &transient_near_full, &extra_rejected, &admission_path_evidence);
-    judge(emitter, tally, segment, "Q1-4-crossed", "transient_every_pool", &transient_any_pool, &crossed_non_empty, &non_empty_slots);
-    judge(emitter, tally, segment, "Q1-5-extra-rejected", "roomy", &roomy, &extra_rejected, &admission_path_evidence);
-    judge(emitter, tally, segment, "Q1-5-crossed", "roomy", &roomy, &crossed_non_empty, &non_empty_slots);
-    judge(emitter, tally, segment, "Q1-6-cap-active", "every_persistence_every_pool", &everything, &|cell| Some(maximum_of(cell, "cap_active")), &|cell| maximum_of(cell, "raise_sequences"));
-    judge(emitter, tally, segment, "Q1-6-cap-blocked", "every_persistence_every_pool", &everything, &|cell| Some(maximum_of(cell, "cap_blocked")), &|cell| maximum_of(cell, "raise_sequences"));
+    for judgment in &STUCK_CEILING_JUDGMENTS {
+        let cells_in_the_scope: Vec<&CellSummary> = cells.iter().copied().filter(|cell| (judgment.belongs_to_the_scope)(cell)).collect();
+        judge(emitter, tally, segment, judgment.judgment_label, judgment.scope, &cells_in_the_scope, &judgment.value, &judgment.path_evidence);
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2451,19 +2598,25 @@ impl ZeroSlotTotals {
 
 /// 第二段的判定：Q2-1（越过数与少掉的状态数，两条 Q2 臂比）、Q2-2（全零并的一次挂载全 ENOSPC，z 族与 H5 并排）、Q2-3（回退候选数）。
 fn emit_the_second_segment_judgments(emitter: &mut Emitter, tally: &mut RunTally, results: &[GroupResult]) {
-    let mut totals: BTreeMap<(&'static str, &'static str, u64, &'static str, i64), ZeroSlotTotals> = BTreeMap::new();
+    emit_the_zero_slot_judgments(emitter, tally, "second", results);
+}
+
+/// Q2 的判定，`segment` 是产物行里的段名（原第二段 `second`；`checkpoint-cost-reserve` 模式里 `ckpt-second`）。
+fn emit_the_zero_slot_judgments(emitter: &mut Emitter, tally: &mut RunTally, segment: &str, results: &[GroupResult]) {
+    let mut totals: BTreeMap<(&'static str, &'static str, u64, &'static str, i64, &'static str), ZeroSlotTotals> = BTreeMap::new();
     for result in results {
         let key = &result.not_merged.key;
         let scope = if key.fault_kind.is_some() { "z_h1_to_h4" } else { "h5_holes" };
         totals
-            .entry((scope, key.arm.stuck_ceiling.label(), key.slots_per_region, key.reserve_reading.label(), key.metadata_blocks))
+            .entry((scope, key.arm.stuck_ceiling.label(), key.slots_per_region, key.reserve_reading.label(), key.metadata_blocks, key.reserve_reading.pool_size_label()))
             .or_insert_with(ZeroSlotTotals::start)
             .add(result);
     }
     const ZERO_SLOT_JUDGMENT_LABELS: [&str; 4] = ["Q2-1-not-merged-has-more", "Q2-1-merged-has-more", "Q2-2-merged-all-enospc", "Q2-2-merged-all-enospc-beyond-not-merged"];
     let mut hits_by_scope_and_arm: BTreeMap<(&'static str, &'static str), [(usize, usize); 4]> = BTreeMap::new();
     let mut observed_maxima: BTreeMap<(&'static str, &'static str), [i64; 4]> = BTreeMap::new();
-    for ((scope, arm, slots_per_region, reserve, metadata_blocks), total) in &totals {
+    for ((scope, arm, slots_per_region, reserve, metadata_blocks, pool_size), total) in &totals {
+        let pool_size_field = if pool_size.is_empty() { String::new() } else { format!(" pool_size={pool_size}") };
         let hit_not_merged_more = total.cells_where_not_merged_has_more >= 1;
         let hit_merged_more = total.cells_where_merged_has_more >= 1;
         // 登记第六节 Q2-2 的字面读法：全零并自己的一次挂载全 ENOSPC（对去掉读故障那一次）≥ 1 个位置；与全零不并并排看。
@@ -2490,7 +2643,7 @@ fn emit_the_second_segment_judgments(emitter: &mut Emitter, tally: &mut RunTally
         emit(
             emitter,
             format!(
-                "name=q2_comparison segment=second scope={scope} arm={arm} S={slots_per_region} reserve={reserve} c_max={metadata_blocks} cells={} \
+                "name=q2_comparison segment={segment} scope={scope} arm={arm} S={slots_per_region} reserve={reserve} c_max={metadata_blocks}{pool_size_field} cells={} \
                  cells_where_not_merged_has_more={} cells_where_merged_has_more={} largest_crossed_excess_of_not_merged={} largest_lost_excess_of_not_merged={} \
                  crossed_maximum_not_merged={} crossed_maximum_merged={} lost_maximum_not_merged={} lost_maximum_merged={} \
                  all_enospc_positions_not_merged={} all_enospc_positions_merged={} extra_rejected_maximum_not_merged={} extra_rejected_maximum_merged={} \
@@ -2532,7 +2685,7 @@ fn emit_the_second_segment_judgments(emitter: &mut Emitter, tally: &mut RunTally
                 .filter(|((hit_scope, _), _)| *hit_scope == scope)
                 .map(|((_, arm), counters)| (*arm, (counters[index].0, counters[index].1, Some(observed_maxima[&(scope, *arm)][index]))))
                 .collect();
-            emit_the_threshold_shift_check(emitter, tally, "second", &format!("{judgment_label}@{scope}"), &per_arm);
+            emit_the_threshold_shift_check(emitter, tally, segment, &format!("{judgment_label}@{scope}"), &per_arm);
         }
     }
     for ((scope, arm), counters) in &hits_by_scope_and_arm {
@@ -2541,7 +2694,7 @@ fn emit_the_second_segment_judgments(emitter: &mut Emitter, tally: &mut RunTally
             let stability = if hit_points == points { "stable_hit" } else if hit_points == 0 { "stable_no_hit" } else { "unstable" };
             emit(
                 emitter,
-                format!("name=stability segment=second id={judgment_label} scope={scope} arm={arm} hit_points={hit_points} points={points} stability={stability}"),
+                format!("name=stability segment={segment} id={judgment_label} scope={scope} arm={arm} hit_points={hit_points} points={points} stability={stability}"),
             );
         }
     }
@@ -3041,7 +3194,7 @@ fn check_the_segment(results: &[GroupResult], zero_slot_arms_must_agree_for: &dy
         the_two_zero_slot_arms_agree_where_they_must: true,
         baselines_agree_across_arms: true,
     };
-    let mut baselines: BTreeMap<(HistoryFamily, u64, i64, &'static str, &'static str), Vec<(bool, u64, i64, usize)>> = BTreeMap::new();
+    let mut baselines: BTreeMap<(HistoryFamily, u64, i64, &'static str, &'static str, &'static str), Vec<(bool, u64, i64, usize)>> = BTreeMap::new();
     for result in results {
         for cell in [&result.not_merged, &result.merged] {
             checks.cells += 1;
@@ -3063,7 +3216,7 @@ fn check_the_segment(results: &[GroupResult], zero_slot_arms_must_agree_for: &dy
         let key = result.not_merged.key;
         if key.family != HistoryFamily::YoungRingWithCrashHoles {
             checks.the_two_zero_slot_arms_agree_where_they_must &= result.baselines_of_the_two_zero_slot_arms_are_identical;
-            let baseline_key = (key.family, key.slots_per_region, key.metadata_blocks, key.reserve_reading.label(), key.fullness.label());
+            let baseline_key = (key.family, key.slots_per_region, key.metadata_blocks, key.reserve_reading.label(), key.fullness.label(), key.reserve_reading.pool_size_label());
             match baselines.get(&baseline_key) {
                 None => {
                     baselines.insert(baseline_key, result.baseline_signature.clone());
@@ -3145,14 +3298,23 @@ fn run_the_second_segment(emitter: &mut Emitter, tally: &mut RunTally) {
     emit_the_config(emitter, "second");
     let groups = groups_of_the_second_segment();
     let results = run_groups_in_parallel(&groups);
-    for result in &results {
-        emit(emitter, render_a_cell("second", &result.not_merged));
-        emit(emitter, render_a_cell("second", &result.merged));
+    emit_the_zero_slot_cells(emitter, "second", &results);
+    // 不并什么都不并（登记第十节 F5）：Q1 不并臂上两条 Q2 臂在每个位置上逐项相同。
+    let checks = check_the_segment(&results, &|stuck_ceiling| stuck_ceiling == StuckCeilingDisposition::DoNotMergeTheBadSlots);
+    emit_the_second_segment_judgments(emitter, tally, &results);
+    emit_the_segment_verdict(emitter, tally, "second", checks);
+}
+
+/// 第二段那一组格的格行与两条 Q2 臂的并排行。
+fn emit_the_zero_slot_cells(emitter: &mut Emitter, segment: &str, results: &[GroupResult]) {
+    for result in results {
+        emit(emitter, render_a_cell(segment, &result.not_merged));
+        emit(emitter, render_a_cell(segment, &result.merged));
         let pair = &result.pair;
         emit(
             emitter,
             format!(
-                "name=q2_pair segment=second {} positions={} identical_positions={} not_merged_crossed_more={} merged_crossed_more={} not_merged_lost_more={} merged_lost_more={} largest_crossed_excess_of_not_merged={} largest_lost_excess_of_not_merged={} positions_merged_rejects_more={} largest_rejected_excess_of_merged={} positions_merged_is_all_enospc_against_not_merged={}",
+                "name=q2_pair segment={segment} {} positions={} identical_positions={} not_merged_crossed_more={} merged_crossed_more={} not_merged_lost_more={} merged_lost_more={} largest_crossed_excess_of_not_merged={} largest_lost_excess_of_not_merged={} positions_merged_rejects_more={} largest_rejected_excess_of_merged={} positions_merged_is_all_enospc_against_not_merged={}",
                 render_the_pair_key(&result.not_merged.key),
                 pair.positions,
                 pair.identical_positions,
@@ -3168,15 +3330,11 @@ fn run_the_second_segment(emitter: &mut Emitter, tally: &mut RunTally) {
             ),
         );
     }
-    // 不并什么都不并（登记第十节 F5）：Q1 不并臂上两条 Q2 臂在每个位置上逐项相同。
-    let checks = check_the_segment(&results, &|stuck_ceiling| stuck_ceiling == StuckCeilingDisposition::DoNotMergeTheBadSlots);
-    emit_the_second_segment_judgments(emitter, tally, &results);
-    emit_the_segment_verdict(emitter, tally, "second", checks);
 }
 
 fn render_the_pair_key(key: &CellKey) -> String {
     format!(
-        "family={} kind={} persistence={} S={} c_max={} reserve={} pool={} q1={}",
+        "family={} kind={} persistence={} S={} c_max={} reserve={} pool={} q1={}{}",
         key.family.label(),
         label_of_the_fault_kind(key.fault_kind),
         label_of_the_persistence(key.persistence),
@@ -3184,8 +3342,599 @@ fn render_the_pair_key(key: &CellKey) -> String {
         key.metadata_blocks,
         key.reserve_reading.label(),
         key.fullness.label(),
-        key.arm.stuck_ceiling.label()
+        key.arm.stuck_ceiling.label(),
+        key.reserve_reading.extra_key_fields()
     )
+}
+
+// ── `checkpoint-cost-reserve` 模式：按 ckpt_cost 现算的保留池（重跑登记 `research/prompts/e173-r1-prereg.md` 第五节「第二段的两条臂」、第六节 Y1、Z1、Z3） ──
+
+/// 第一段量出来的一个几何：S、池大小、c实_G（暖机与卸载那一串取得出的空发布新占固定点槽数的最大值）、
+/// κ_G（重跑登记修订 4：接在有树那几版后面的发布上核心层 κ 的最小值）。每一行抄自第一段产物的 `name=x3_reserve_fit` 行
+/// （`kappa_of_the_geometry=minimum_on_versions_with_trees`，行号写在 `product_line`），开跑先逐行比那份产物（停机条款 S5）。
+/// S = 4 的几何另带第七节 B9 的期望（`first_request.py 4 <c实_G> 8 <P>` 的输出换成本装置的读数写法，修订里贴原样输出）。
+#[derive(Clone, Copy, Debug)]
+struct CheckpointCostGeometry {
+    slots_per_region: u64,
+    pool_size: SampledPoolSize,
+    largest_actual_empty_publish_slots: i64,
+    checkpoint_cost_slots: i64,
+    product_line: usize,
+    first_request_under_the_code_reading: Option<&'static str>,
+    first_request_under_the_clause_reading: Option<&'static str>,
+}
+
+impl CheckpointCostGeometry {
+    fn label(self) -> String {
+        format!("s{}_{}", self.slots_per_region, self.pool_size.label())
+    }
+}
+
+/// 第一段产物（入库装置 `crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs` 的输出，相对仓根）。
+/// 没有第一段产物时是 None：模式开跑时停机条款 S5 停在「没有第一段产物」。
+const SEGMENT_ONE_PRODUCT: Option<&str> = Some("research/results/e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out");
+
+/// S = 4 的几何上第一次请求的期望（重跑登记第七节 B9）：`first_request.py 4 <c实_G> 8 <P>` 输出 `user_room=free-P` 与 `need` 两个数，
+/// 本装置的读数写法是发成之后的空闲 − P = user_room − need（修订 12 同一口径：c = 5、P = 45 时 63 − 13 = 50）。
+/// c实_G = 6 时 66 − 14 = 52，c实_G = 10 时 78 − 18 = 60；两种读法的 user_room 相同（P 只改空闲，不改空闲 − P）。
+const FIRST_REQUEST_ON_THE_SMALL_EMPTY_PUBLISH_GEOMETRIES: &str = "accepted=true ceiling=47 sequence_publishes=3 floor=47 free_above_reserve_after=52";
+const FIRST_REQUEST_ON_THE_LARGE_EMPTY_PUBLISH_GEOMETRY: &str = "accepted=true ceiling=47 sequence_publishes=3 floor=47 free_above_reserve_after=60";
+
+/// 第一段量过的 9 个几何，每行抄自 `SEGMENT_ONE_PRODUCT` 的 `name=x3_reserve_fit … kappa_of_the_geometry=minimum_on_versions_with_trees` 那一行
+/// （行号在 `product_line`；G-min 在三个 S 上都找得到：S = 4、8 取 64 MiB，S = 16 取 128 MiB，失败条款 F6 没触发）。
+/// 开跑先逐行比那份产物（停机条款 S5）。
+const CHECKPOINT_COST_GEOMETRIES: &[CheckpointCostGeometry] = &[
+    CheckpointCostGeometry {
+        slots_per_region: 4,
+        pool_size: SampledPoolSize::SmallestCompleting { mebibytes: 64 },
+        largest_actual_empty_publish_slots: 6,
+        checkpoint_cost_slots: 18,
+        product_line: 3299,
+        first_request_under_the_code_reading: Some(FIRST_REQUEST_ON_THE_SMALL_EMPTY_PUBLISH_GEOMETRIES),
+        first_request_under_the_clause_reading: Some(FIRST_REQUEST_ON_THE_SMALL_EMPTY_PUBLISH_GEOMETRIES),
+    },
+    CheckpointCostGeometry {
+        slots_per_region: 4,
+        pool_size: SampledPoolSize::OneGibibyte,
+        largest_actual_empty_publish_slots: 6,
+        checkpoint_cost_slots: 130,
+        product_line: 3322,
+        first_request_under_the_code_reading: Some(FIRST_REQUEST_ON_THE_SMALL_EMPTY_PUBLISH_GEOMETRIES),
+        first_request_under_the_clause_reading: Some(FIRST_REQUEST_ON_THE_SMALL_EMPTY_PUBLISH_GEOMETRIES),
+    },
+    CheckpointCostGeometry {
+        slots_per_region: 4,
+        pool_size: SampledPoolSize::FourGibibytes,
+        largest_actual_empty_publish_slots: 10,
+        checkpoint_cost_slots: 543,
+        product_line: 3345,
+        first_request_under_the_code_reading: Some(FIRST_REQUEST_ON_THE_LARGE_EMPTY_PUBLISH_GEOMETRY),
+        first_request_under_the_clause_reading: Some(FIRST_REQUEST_ON_THE_LARGE_EMPTY_PUBLISH_GEOMETRY),
+    },
+    CheckpointCostGeometry {
+        slots_per_region: 8,
+        pool_size: SampledPoolSize::SmallestCompleting { mebibytes: 64 },
+        largest_actual_empty_publish_slots: 6,
+        checkpoint_cost_slots: 18,
+        product_line: 3368,
+        first_request_under_the_code_reading: None,
+        first_request_under_the_clause_reading: None,
+    },
+    CheckpointCostGeometry {
+        slots_per_region: 8,
+        pool_size: SampledPoolSize::OneGibibyte,
+        largest_actual_empty_publish_slots: 6,
+        checkpoint_cost_slots: 130,
+        product_line: 3391,
+        first_request_under_the_code_reading: None,
+        first_request_under_the_clause_reading: None,
+    },
+    CheckpointCostGeometry {
+        slots_per_region: 8,
+        pool_size: SampledPoolSize::FourGibibytes,
+        largest_actual_empty_publish_slots: 10,
+        checkpoint_cost_slots: 543,
+        product_line: 3414,
+        first_request_under_the_code_reading: None,
+        first_request_under_the_clause_reading: None,
+    },
+    CheckpointCostGeometry {
+        slots_per_region: 16,
+        pool_size: SampledPoolSize::SmallestCompleting { mebibytes: 128 },
+        largest_actual_empty_publish_slots: 6,
+        checkpoint_cost_slots: 26,
+        product_line: 3437,
+        first_request_under_the_code_reading: None,
+        first_request_under_the_clause_reading: None,
+    },
+    CheckpointCostGeometry {
+        slots_per_region: 16,
+        pool_size: SampledPoolSize::OneGibibyte,
+        largest_actual_empty_publish_slots: 6,
+        checkpoint_cost_slots: 130,
+        product_line: 3460,
+        first_request_under_the_code_reading: None,
+        first_request_under_the_clause_reading: None,
+    },
+    CheckpointCostGeometry {
+        slots_per_region: 16,
+        pool_size: SampledPoolSize::FourGibibytes,
+        largest_actual_empty_publish_slots: 10,
+        checkpoint_cost_slots: 543,
+        product_line: 3483,
+        first_request_under_the_code_reading: None,
+        first_request_under_the_clause_reading: None,
+    },
+];
+
+/// 第一段产物里一个几何的 (S, 池大小写法, κ_G, c实_G, 行号)：只认 `name=x3_reserve_fit` 里 `kappa_of_the_geometry=minimum_on_versions_with_trees` 的行。
+fn checkpoint_cost_rows_of_the_segment_one_product(product: &str) -> Vec<(String, i64, i64, usize)> {
+    let mut rows = Vec::new();
+    for (line_index, line) in product.lines().enumerate() {
+        if !line.starts_with("E7RESULT name=x3_reserve_fit ") || !line.contains(" kappa_of_the_geometry=minimum_on_versions_with_trees ") {
+            continue;
+        }
+        let field = |name: &str| line.split(' ').find_map(|token| token.strip_prefix(name)).map(str::to_string);
+        let geometry = field("geometry=");
+        let kappa = field("kappa=").and_then(|text| text.parse::<i64>().ok());
+        let largest = field("largest_actual_empty_publish_slots=").and_then(|text| text.parse::<i64>().ok());
+        if let (Some(geometry), Some(kappa), Some(largest)) = (geometry, kappa, largest) {
+            rows.push((geometry, kappa, largest, line_index + 1));
+        }
+    }
+    rows
+}
+
+/// 停机条款 S5：常量表与第一段产物逐行比。交回对不上的那几处（空表示对得上）。
+fn segment_one_mismatches(table: &[CheckpointCostGeometry], product: &str) -> Vec<String> {
+    let product_rows = checkpoint_cost_rows_of_the_segment_one_product(product);
+    let mut mismatches = Vec::new();
+    for row in table {
+        let label = row.label();
+        match product_rows.iter().find(|(geometry, ..)| *geometry == label) {
+            None => mismatches.push(format!("{label}:not_in_the_product")),
+            Some((_, kappa, largest, line_number)) => {
+                if *kappa != row.checkpoint_cost_slots {
+                    mismatches.push(format!("{label}:kappa_table={}_product={kappa}", row.checkpoint_cost_slots));
+                }
+                if *largest != row.largest_actual_empty_publish_slots {
+                    mismatches.push(format!("{label}:actual_empty_publish_table={}_product={largest}", row.largest_actual_empty_publish_slots));
+                }
+                if *line_number != row.product_line {
+                    mismatches.push(format!("{label}:line_table={}_product={line_number}", row.product_line));
+                }
+            }
+        }
+    }
+    for (geometry, ..) in &product_rows {
+        match SampledPoolSize::of_the_geometry_label(geometry) {
+            None => mismatches.push(format!("{geometry}:unrecognized_geometry")),
+            Some((slots_per_region, pool_size)) => {
+                if !table.iter().any(|row| row.slots_per_region == slots_per_region && row.pool_size == pool_size) {
+                    mismatches.push(format!("{geometry}:not_in_the_table"));
+                }
+            }
+        }
+    }
+    mismatches
+}
+
+/// 一个几何上的三种保留池读法：代码读法（现算）、条款读法（现算）、判别力对照（改回 10 + 7 c实）。
+fn checkpoint_cost_readings_of(row: CheckpointCostGeometry) -> [ReserveReading; 3] {
+    let (pool_size, checkpoint_cost_blocks) = (row.pool_size, row.checkpoint_cost_slots);
+    [
+        ReserveReading::CheckpointCostCodeReading { pool_size, checkpoint_cost_blocks },
+        ReserveReading::CheckpointCostClauseReading { pool_size, checkpoint_cost_blocks },
+        ReserveReading::RevertedToTenPlusSevenActualEmptyPublishes { pool_size, checkpoint_cost_blocks },
+    ]
+}
+
+/// 这个模式的池：每个几何 × 三种读法 × 三种池松紧；c 取 c实_G（原模型的 c 那一项，覆盖写的元数据那一半同样取它，第六节 X5 报差多少）。
+fn checkpoint_cost_pool_settings(table: &[CheckpointCostGeometry]) -> Vec<PoolSettings> {
+    let mut pool_settings = Vec::new();
+    for row in table.iter().copied() {
+        for reserve_reading in checkpoint_cost_readings_of(row) {
+            for fullness in POOL_FULLNESSES {
+                pool_settings.push(PoolSettings {
+                    geometry: RingGeometry { slots_per_region: row.slots_per_region },
+                    metadata_blocks: row.largest_actual_empty_publish_slots,
+                    reserve_reading,
+                    fullness,
+                });
+            }
+        }
+    }
+    pool_settings
+}
+
+/// 一格在一种保留池读法下的读数（Z1、Z3 与判别力对照逐格比的那几样）。
+#[derive(Clone, Debug)]
+struct ReadingsOfACell {
+    slots_per_region: u64,
+    pool_size: &'static str,
+    fullness: PoolFullness,
+    /// 除保留池读法之外的全部读数：每个量的聚合、六条轨迹、读坏槽住着非空根的位置与那几处的越过数、零点被拒次数。
+    readings: (BTreeMap<&'static str, Aggregate>, [TrajectoryAggregate; TRAJECTORY_SERIES], usize, Aggregate, i64),
+    /// Y1 每一行在这一格上打不打中（Q1 那几行逐格取，Q2 那几行按两条 Q2 臂并排的一组取、记在全零不并那一格上）。
+    verdict_hits_by_row: Vec<(String, bool)>,
+    baseline_rejected: i64,
+    baseline_first_rejected_request: Option<usize>,
+}
+
+/// 格的键去掉保留池读法那一维：两种读法下的同一格用它配对。
+fn cell_key_without_the_reserve(key: &CellKey) -> String {
+    format!(
+        "family={} kind={} persistence={} S={} metadata_blocks={} pool_size={} pool={} q1={} q2={}",
+        key.family.label(),
+        label_of_the_fault_kind(key.fault_kind),
+        label_of_the_persistence(key.persistence),
+        key.slots_per_region,
+        key.metadata_blocks,
+        key.reserve_reading.pool_size_label(),
+        key.fullness.label(),
+        key.arm.stuck_ceiling.label(),
+        key.arm.all_zero_slot.label()
+    )
+}
+
+fn readings_of_a_cell(cell: &CellSummary, verdict_hits_by_row: Vec<(String, bool)>) -> ReadingsOfACell {
+    ReadingsOfACell {
+        slots_per_region: cell.key.slots_per_region,
+        pool_size: cell.key.reserve_reading.pool_size_label(),
+        fullness: cell.key.fullness,
+        readings: (cell.quantities.clone(), cell.trajectories, cell.non_empty_slot_positions, cell.crossed_at_non_empty_slot_positions, cell.baseline_rejected),
+        verdict_hits_by_row,
+        baseline_rejected: cell.baseline_rejected,
+        baseline_first_rejected_request: cell.baseline_first_rejected_request,
+    }
+}
+
+/// Q1 那几行在一格上的打中：不在那一行范围里的格不算，值取不到（读坏槽没住非空根）的不算。
+fn stuck_ceiling_hits_of_a_cell(cell: &CellSummary) -> Vec<(String, bool)> {
+    STUCK_CEILING_JUDGMENTS
+        .iter()
+        .filter(|judgment| (judgment.belongs_to_the_scope)(cell))
+        .filter_map(|judgment| (judgment.value)(cell).map(|value| (judgment.judgment_label.to_string(), value > 0)))
+        .collect()
+}
+
+/// Q2 那几行在一组（两条 Q2 臂并排）上的打中，范围（z 读坏或 H5 的洞）写进行名。
+fn zero_slot_hits_of_a_group(result: &GroupResult) -> Vec<(String, bool)> {
+    let pair = &result.pair;
+    let scope = if result.not_merged.key.fault_kind.is_some() { "z_h1_to_h4" } else { "h5_holes" };
+    [
+        ("Q2-1-not-merged-has-more", pair.not_merged_crossed_more + pair.not_merged_lost_more > 0),
+        ("Q2-1-merged-has-more", pair.merged_crossed_more + pair.merged_lost_more > 0),
+        ("Q2-2-merged-all-enospc", result.merged.quantity("all_enospc").positive_positions > 0),
+        ("Q2-2-merged-all-enospc-beyond-not-merged", pair.positions_merged_is_all_enospc_against_not_merged > 0),
+    ]
+    .into_iter()
+    .map(|(label, hit)| (format!("{label}@{scope}"), hit))
+    .collect()
+}
+
+/// 两组格按保留池读法分开：读法的产物写法 → (去掉读法的格键 → 读数)。
+fn readings_by_reserve(stuck_ceiling_results: &[GroupResult], zero_slot_results: &[GroupResult]) -> BTreeMap<&'static str, BTreeMap<String, ReadingsOfACell>> {
+    let mut by_reserve: BTreeMap<&'static str, BTreeMap<String, ReadingsOfACell>> = BTreeMap::new();
+    let mut insert = |cell: &CellSummary, group_of_cells: &str, verdict_hits_by_row: Vec<(String, bool)>| {
+        let previous = by_reserve
+            .entry(cell.key.reserve_reading.label())
+            .or_default()
+            .insert(format!("{} cells={group_of_cells}", cell_key_without_the_reserve(&cell.key)), readings_of_a_cell(cell, verdict_hits_by_row));
+        assert!(previous.is_none(), "一种读法下同一格只出现一次");
+    };
+    for result in stuck_ceiling_results {
+        insert(&result.not_merged, "stuck_ceiling", stuck_ceiling_hits_of_a_cell(&result.not_merged));
+    }
+    for result in zero_slot_results {
+        insert(&result.not_merged, "zero_slot", zero_slot_hits_of_a_group(result));
+        insert(&result.merged, "zero_slot", Vec::new());
+    }
+    by_reserve
+}
+
+/// Y1 里「多拒或多卡」的那四行（重跑登记第六节 Z1 门槛：Q1-1、Q1-1b、Q1-3、Q2-2；Q2-2 连原登记修订五补的「全零并比不并多卡」那一条）。
+fn is_a_refusal_row(row_label: &str) -> bool {
+    row_label == "Q1-1" || row_label == "Q1-1b" || row_label == "Q1-3" || row_label.starts_with("Q2-2-")
+}
+
+/// 一个几何上两种读法的分辨格数（重跑登记第六节 Z1）：配上对的格数、只代码读法打中、只条款读法打中、两边都打中。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct ReadingSplit {
+    cells: usize,
+    only_code_hit: usize,
+    only_clause_hit: usize,
+    both_hit: usize,
+}
+
+/// Z1：逐格比代码读法与条款读法下 Y1 每一行打不打中，按 (行, S, 池大小) 数；另交回配不上对的格数（应为 0）。
+fn reading_splits(code: &BTreeMap<String, ReadingsOfACell>, clause: &BTreeMap<String, ReadingsOfACell>) -> (BTreeMap<(String, u64, &'static str), ReadingSplit>, usize) {
+    let mut splits: BTreeMap<(String, u64, &'static str), ReadingSplit> = BTreeMap::new();
+    let mut unpaired = clause.keys().filter(|key| !code.contains_key(*key)).count();
+    for (key, code_cell) in code {
+        let Some(clause_cell) = clause.get(key) else {
+            unpaired += 1;
+            continue;
+        };
+        for (row_label, code_hit) in &code_cell.verdict_hits_by_row {
+            let Some(clause_hit) = clause_cell.verdict_hits_by_row.iter().find(|(label, _)| label == row_label).map(|(_, hit)| *hit) else {
+                unpaired += 1;
+                continue;
+            };
+            let split = splits.entry((row_label.clone(), code_cell.slots_per_region, code_cell.pool_size)).or_default();
+            split.cells += 1;
+            split.only_code_hit += usize::from(*code_hit && !clause_hit);
+            split.only_clause_hit += usize::from(clause_hit && !*code_hit);
+            split.both_hit += usize::from(*code_hit && clause_hit);
+        }
+    }
+    (splits, unpaired)
+}
+
+/// Z1 的判定（重跑登记第六节 Z1 门槛与判定）与它的判别力自证（第八节：门槛挪到观测到的最大值 + 1 必须由真转假）。
+fn emit_the_reading_splits(emitter: &mut Emitter, tally: &mut RunTally, by_reserve: &BTreeMap<&'static str, BTreeMap<String, ReadingsOfACell>>) {
+    let empty = BTreeMap::new();
+    let code = by_reserve.get("ckpt-code").unwrap_or(&empty);
+    let clause = by_reserve.get("ckpt-clause").unwrap_or(&empty);
+    let (splits, unpaired) = reading_splits(code, clause);
+    tally.self_check(unpaired == 0 && !code.is_empty(), "V2_z1_cells_do_not_pair_up");
+    let mut only_code_in_refusal_rows_largest = 0usize;
+    let (mut only_code_in_refusal_rows, mut only_code_anywhere, mut only_clause_anywhere) = (0usize, 0usize, 0usize);
+    for ((row_label, slots_per_region, pool_size), split) in &splits {
+        emit(
+            emitter,
+            format!(
+                "name=z1_reading_split id={row_label} S={slots_per_region} pool_size={pool_size} cells={} only_code_hit={} only_clause_hit={} both_hit={} refusal_row={}",
+                split.cells,
+                split.only_code_hit,
+                split.only_clause_hit,
+                split.both_hit,
+                yes_no(is_a_refusal_row(row_label))
+            ),
+        );
+        if is_a_refusal_row(row_label) {
+            only_code_in_refusal_rows += split.only_code_hit;
+            only_code_in_refusal_rows_largest = only_code_in_refusal_rows_largest.max(split.only_code_hit);
+        }
+        only_code_anywhere += split.only_code_hit;
+        only_clause_anywhere += split.only_clause_hit;
+    }
+    let near_full_code_cells_with_path_evidence = code
+        .values()
+        .filter(|cell| cell.fullness.is_nearly_full() && cell.readings.2 > 0 && cell.readings.0.get("cap_active").is_some_and(|aggregate| aggregate.maximum > 0))
+        .count();
+    emit(
+        emitter,
+        format!(
+            "name=z1_summary cells_paired={} unpaired={unpaired} only_code_hit_in_refusal_rows={only_code_in_refusal_rows} only_code_hit_anywhere={only_code_anywhere} only_clause_hit_anywhere={only_clause_anywhere} \
+             code_reading_rejects_or_sticks_more={} readings_indistinguishable={} clause_reading_worse_on_some_row={} near_full_code_cells_with_cap_active_and_a_non_empty_bad_slot={near_full_code_cells_with_path_evidence}",
+            code.len(),
+            yes_no(only_code_in_refusal_rows > 0),
+            yes_no(only_code_anywhere == 0 && only_clause_anywhere == 0),
+            yes_no(only_clause_anywhere > 0)
+        ),
+    );
+    let per_judgment = BTreeMap::from([("all_geometries", (usize::from(only_code_in_refusal_rows > 0), 1usize, Some(count_as_i64(only_code_in_refusal_rows_largest))))]);
+    emit_the_threshold_shift_check(emitter, tally, "checkpoint-cost-reserve", "Z1-code-rejects-or-sticks-more", &per_judgment);
+}
+
+/// Z3 一个 (S, 池大小, 池松紧) 上的数：配上对的格、只代码读法零点被拒、只条款读法零点被拒、两边都拒、两边各自第一次被拒最早落在第几次请求。
+type ZeroPointCounts = BTreeMap<(u64, &'static str, &'static str), (usize, usize, usize, usize, Option<usize>, Option<usize>)>;
+
+/// Z3：零点（去掉读故障那一次）的被拒次数，两种读法逐格比，按 (S, 池大小, 池松紧) 数。
+fn emit_the_zero_point_comparison(emitter: &mut Emitter, tally: &mut RunTally, by_reserve: &BTreeMap<&'static str, BTreeMap<String, ReadingsOfACell>>) {
+    let empty = BTreeMap::new();
+    let code = by_reserve.get("ckpt-code").unwrap_or(&empty);
+    let clause = by_reserve.get("ckpt-clause").unwrap_or(&empty);
+    let counts = zero_point_counts(code, clause);
+    let (mut code_only_total, mut clause_only_total, mut code_only_largest) = (0usize, 0usize, 0usize);
+    for ((slots_per_region, pool_size, fullness), (cells, code_only, clause_only, both, code_first, clause_first)) in &counts {
+        emit(
+            emitter,
+            format!(
+                "name=z3_zero_point S={slots_per_region} pool_size={pool_size} pool={fullness} cells={cells} code_rejects_clause_does_not={code_only} clause_rejects_code_does_not={clause_only} both_reject={both} \
+                 code_first_rejected_request={} clause_first_rejected_request={}",
+                code_first.map_or("none".to_string(), |request| request.to_string()),
+                clause_first.map_or("none".to_string(), |request| request.to_string())
+            ),
+        );
+        code_only_total += code_only;
+        clause_only_total += clause_only;
+        code_only_largest = code_only_largest.max(*code_only);
+    }
+    emit(
+        emitter,
+        format!(
+            "name=z3_summary code_rejects_more_without_a_read_fault={} clause_rejects_more_without_a_read_fault={} cells_code_only={code_only_total} cells_clause_only={clause_only_total}",
+            yes_no(code_only_total > 0),
+            yes_no(clause_only_total > 0)
+        ),
+    );
+    let per_judgment = BTreeMap::from([("all_geometries", (usize::from(code_only_total > 0), 1usize, Some(count_as_i64(code_only_largest))))]);
+    emit_the_threshold_shift_check(emitter, tally, "checkpoint-cost-reserve", "Z3-code-rejects-more-at-the-zero-point", &per_judgment);
+}
+
+fn zero_point_counts(code: &BTreeMap<String, ReadingsOfACell>, clause: &BTreeMap<String, ReadingsOfACell>) -> ZeroPointCounts {
+    let mut counts: ZeroPointCounts = BTreeMap::new();
+    for (key, code_cell) in code {
+        let Some(clause_cell) = clause.get(key) else {
+            continue;
+        };
+        let entry = counts.entry((code_cell.slots_per_region, code_cell.pool_size, code_cell.fullness.label())).or_insert((0, 0, 0, 0, None, None));
+        entry.0 += 1;
+        entry.1 += usize::from(code_cell.baseline_rejected > 0 && clause_cell.baseline_rejected == 0);
+        entry.2 += usize::from(clause_cell.baseline_rejected > 0 && code_cell.baseline_rejected == 0);
+        entry.3 += usize::from(code_cell.baseline_rejected > 0 && clause_cell.baseline_rejected > 0);
+        entry.4 = entry.4.into_iter().chain(code_cell.baseline_first_rejected_request).min();
+        entry.5 = entry.5.into_iter().chain(clause_cell.baseline_first_rejected_request).min();
+    }
+    counts
+}
+
+/// 判别力对照（重跑登记第十二节修订，派发提示「保留池改回 10 + 7c 时新臂读数必与按 ckpt_cost 的不同」）：保留池改回 10 + 7 c实 的那一臂，
+/// 逐格与按 κ_G 的两条臂比读数（除读法之外的全部读数）与 Y1 判定，按 (S, 池大小) 数不同的格；交回每条被比的臂有没有一格不同。
+fn emit_the_reverted_reserve_discrimination(emitter: &mut Emitter, tally: &mut RunTally, by_reserve: &BTreeMap<&'static str, BTreeMap<String, ReadingsOfACell>>) {
+    let empty = BTreeMap::new();
+    let reverted = by_reserve.get("reverted-10+7c").unwrap_or(&empty);
+    for against in ["ckpt-code", "ckpt-clause"] {
+        let counts = reverted_reserve_differences(reverted, by_reserve.get(against).unwrap_or(&empty));
+        let mut cells_with_differing_readings = 0usize;
+        for ((slots_per_region, pool_size), (cells, differing_readings, differing_verdicts)) in &counts {
+            emit(
+                emitter,
+                format!(
+                    "name=discrimination_reverted_reserve against={against} S={slots_per_region} pool_size={pool_size} cells={cells} cells_with_differing_readings={differing_readings} cells_with_a_differing_verdict={differing_verdicts}"
+                ),
+            );
+            cells_with_differing_readings += differing_readings;
+        }
+        let compared_cells: usize = counts.values().map(|(cells, ..)| cells).sum();
+        tally.self_check(compared_cells == reverted.len() && !reverted.is_empty(), "V2_reverted_reserve_cells_do_not_pair_up");
+        emit(
+            emitter,
+            format!(
+                "name=discrimination_reverted_reserve_summary against={against} cells={compared_cells} cells_with_differing_readings={cells_with_differing_readings} reverted_reserve_readings_differ={}",
+                yes_no(cells_with_differing_readings > 0)
+            ),
+        );
+    }
+}
+
+/// 按 (S, 池大小)：配上对的格、读数不同的格、Y1 判定不同的格。
+fn reverted_reserve_differences(reverted: &BTreeMap<String, ReadingsOfACell>, compared: &BTreeMap<String, ReadingsOfACell>) -> BTreeMap<(u64, &'static str), (usize, usize, usize)> {
+    let mut counts: BTreeMap<(u64, &'static str), (usize, usize, usize)> = BTreeMap::new();
+    for (key, reverted_cell) in reverted {
+        let Some(compared_cell) = compared.get(key) else {
+            continue;
+        };
+        let entry = counts.entry((reverted_cell.slots_per_region, reverted_cell.pool_size)).or_insert((0, 0, 0));
+        entry.0 += 1;
+        entry.1 += usize::from(reverted_cell.readings != compared_cell.readings);
+        entry.2 += usize::from(reverted_cell.verdict_hits_by_row != compared_cell.verdict_hits_by_row);
+    }
+    counts
+}
+
+/// 第一次请求那一步的读数（第七节 B8、B9）：发成时写上限、那一串发了几次、F、发成之后空闲 − P；被拒时写拒因。
+fn first_request_reading(history: &PoolAfterHistory, settings: PoolSettings, arm: Arm) -> String {
+    let mut session = start_a_session(history, None, settings, arm, Controls::none(), false);
+    let record = session.run_one_request();
+    if !record.accepted {
+        return format!("accepted=false rejection={}", record.rejection.map_or("none", RejectionReason::label));
+    }
+    match session.ledger.raises.first() {
+        None => format!("accepted=true raises=0 floor={} free_above_reserve_after={}", record.floor_after, record.free_above_the_reserve_after),
+        Some(raise) => format!(
+            "accepted=true ceiling={} sequence_publishes={} floor={} free_above_reserve_after={}",
+            raise.truth_ceiling, raise.publishes, record.floor_after, record.free_above_the_reserve_after
+        ),
+    }
+}
+
+/// PC5（重跑登记第五节「阳性对照」、第七节 B8）：不读几何常量表，κ = 5、c = 5、d = 8、S = 4、H1、近满 k = 0、不注读故障、每一对臂。
+/// 代码读法 P = κ = 5：那一串落不了点、拒因「抬 F 那一串自己取不到落点」；条款读法 P = 10 + 7 × 5 = 45 与改回 10 + 7c 的 P = 45：
+/// 一串抬 F（53、54、55）之后发成，上限 47、F 47、发成之后空闲 − P = 63 − 13 = 50（原登记 B5 那一行同一组数）。
+fn emit_the_checkpoint_cost_positive_control(emitter: &mut Emitter, tally: &mut RunTally) {
+    let geometry = geometry_of_the_control_pools();
+    let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
+    let (pool_size, checkpoint_cost_blocks) = (SampledPoolSize::FourGibibytes, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
+    let chain_lands = "accepted=true ceiling=47 sequence_publishes=3 floor=47 free_above_reserve_after=50";
+    for (reserve_reading, expected) in [
+        (ReserveReading::CheckpointCostCodeReading { pool_size, checkpoint_cost_blocks }, "accepted=false rejection=raise_no_placement"),
+        (ReserveReading::CheckpointCostClauseReading { pool_size, checkpoint_cost_blocks }, chain_lands),
+        (ReserveReading::RevertedToTenPlusSevenActualEmptyPublishes { pool_size, checkpoint_cost_blocks }, chain_lands),
+    ] {
+        let settings = PoolSettings { geometry, metadata_blocks: METADATA_BLOCKS_OF_THE_CONTROL_POOLS, reserve_reading, fullness: PoolFullness::NearlyFullWithNoSpareOverwrite };
+        for arm in every_arm_pair() {
+            let label = format!("PC5_{}_P{}_{}", reserve_reading.label(), settings.reserve_blocks(), label_of_the_arm(arm));
+            emit_a_check(emitter, tally, false, &label, first_request_reading(&history, settings, arm), expected.to_string());
+        }
+    }
+}
+
+/// PC6（第七节 B9）：每个 S = 4 的几何上，两条读法、每一对臂的第一次请求等于常量表里抄下的 `first_request.py` 的期望。
+fn emit_the_geometry_first_requests(emitter: &mut Emitter, tally: &mut RunTally, table: &[CheckpointCostGeometry]) {
+    for row in table.iter().copied().filter(|row| row.slots_per_region == SLOTS_PER_REGION_OF_THE_CONTROL_POOLS) {
+        let geometry = RingGeometry { slots_per_region: row.slots_per_region };
+        let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, row.largest_actual_empty_publish_slots);
+        let [code_reading, clause_reading, _] = checkpoint_cost_readings_of(row);
+        for (reserve_reading, expected) in [(code_reading, row.first_request_under_the_code_reading), (clause_reading, row.first_request_under_the_clause_reading)] {
+            let settings = PoolSettings { geometry, metadata_blocks: row.largest_actual_empty_publish_slots, reserve_reading, fullness: PoolFullness::NearlyFullWithNoSpareOverwrite };
+            for arm in every_arm_pair() {
+                let label = format!("PC6_{}_{}_{}", row.label(), reserve_reading.label(), label_of_the_arm(arm));
+                emit_a_check(emitter, tally, false, &label, first_request_reading(&history, settings, arm), expected.unwrap_or("expectation_missing").to_string());
+            }
+        }
+    }
+}
+
+/// `checkpoint-cost-reserve` 模式（重跑登记第五节「第二段」、第十一节 S5）：先比几何常量表与第一段产物，对不上就停；
+/// 再跑 PC5、PC6，再把第一段与第二段那两组格在每个几何 × 三种读法上各跑一遍。按 κ_G 的两条臂进 Y1 判定行与 Z1、Z3；
+/// 改回 10 + 7c 那一臂只进格行与判别力对照。
+fn run_the_checkpoint_cost_reserve_mode(emitter: &mut Emitter, tally: &mut RunTally) {
+    emit(
+        emitter,
+        format!(
+            "name=config segment=checkpoint-cost-reserve geometries={} segment_one_product={} data_blocks_per_overwrite={DATA_BLOCKS_PER_OVERWRITE} admission_budget={PUBLISHES_PER_ADMISSION_AT_MOST} requests_per_mount=2*3S+{REQUESTS_PER_MOUNT_BASE} reserve_readings=ckpt-code:kappa,ckpt-clause:10+7kappa,reverted-10+7c:10+7c metadata_blocks=largest_actual_empty_publish_slots pools=near0,near2,roomy threads={}",
+            CHECKPOINT_COST_GEOMETRIES.len(),
+            SEGMENT_ONE_PRODUCT.unwrap_or("none"),
+            worker_thread_count()
+        ),
+    );
+    let mismatches = match SEGMENT_ONE_PRODUCT {
+        None => vec!["no_segment_one_product".to_string()],
+        Some(product) => match std::fs::read_to_string(repository_root().join(product)) {
+            Ok(text) => segment_one_mismatches(CHECKPOINT_COST_GEOMETRIES, &text),
+            Err(_) => vec!["segment_one_product_unreadable".to_string()],
+        },
+    };
+    tally.halt_check(mismatches.is_empty(), "S5_geometry_table_differs_from_the_segment_one_product");
+    emit(emitter, format!("name=s5_geometry_table mismatches={} list={}", mismatches.len(), if mismatches.is_empty() { "none".to_string() } else { mismatches.join(",") }));
+    if !mismatches.is_empty() {
+        emit(emitter, format!("name=stop clause=s5 halt_conditions={}", tally.halt_conditions.join(",")));
+        return;
+    }
+    emit_the_checkpoint_cost_positive_control(emitter, tally);
+    emit_the_geometry_first_requests(emitter, tally, CHECKPOINT_COST_GEOMETRIES);
+    let pools = checkpoint_cost_pool_settings(CHECKPOINT_COST_GEOMETRIES);
+    let (reverted_pools, judged_pools): (Vec<PoolSettings>, Vec<PoolSettings>) =
+        pools.into_iter().partition(|pool| matches!(pool.reserve_reading, ReserveReading::RevertedToTenPlusSevenActualEmptyPublishes { .. }));
+    let stuck_ceiling_results = run_groups_in_parallel(&stuck_ceiling_groups_over(&judged_pools));
+    let zero_slot_results = run_groups_in_parallel(&zero_slot_groups_over(&judged_pools));
+    let reverted_stuck_ceiling_results = run_groups_in_parallel(&stuck_ceiling_groups_over(&reverted_pools));
+    let reverted_zero_slot_results = run_groups_in_parallel(&zero_slot_groups_over(&reverted_pools));
+    for (segment, stuck_results, zero_results) in [
+        ("ckpt-first", &stuck_ceiling_results, &zero_slot_results),
+        ("reverted-first", &reverted_stuck_ceiling_results, &reverted_zero_slot_results),
+    ] {
+        for result in stuck_results.iter() {
+            emit(emitter, render_a_cell(segment, &result.not_merged));
+        }
+        let zero_segment = if segment == "ckpt-first" { "ckpt-second" } else { "reverted-second" };
+        emit_the_zero_slot_cells(emitter, zero_segment, zero_results);
+    }
+    emit_the_stuck_ceiling_judgments(emitter, tally, "ckpt-first", &stuck_ceiling_results);
+    emit_the_zero_slot_judgments(emitter, tally, "ckpt-second", &zero_slot_results);
+    let by_reserve = {
+        let mut merged_readings = readings_by_reserve(&stuck_ceiling_results, &zero_slot_results);
+        merged_readings.extend(readings_by_reserve(&reverted_stuck_ceiling_results, &reverted_zero_slot_results));
+        merged_readings
+    };
+    emit_the_reading_splits(emitter, tally, &by_reserve);
+    emit_the_zero_point_comparison(emitter, tally, &by_reserve);
+    emit_the_reverted_reserve_discrimination(emitter, tally, &by_reserve);
+    // 第一段那一组没有读回全零的槽，两条 Q2 臂在每条 Q1 臂上都必须逐项相同；第二段那一组只在不并臂上必须相同（原登记 F5）。
+    let every_arm_must_agree: fn(StuckCeilingDisposition) -> bool = |_| true;
+    let only_the_unmerged_arm_must_agree: fn(StuckCeilingDisposition) -> bool = |stuck_ceiling| stuck_ceiling == StuckCeilingDisposition::DoNotMergeTheBadSlots;
+    for (segment, results, zero_slot_arms_must_agree_for) in [
+        ("ckpt-first", &stuck_ceiling_results, every_arm_must_agree),
+        ("ckpt-second", &zero_slot_results, only_the_unmerged_arm_must_agree),
+        ("reverted-first", &reverted_stuck_ceiling_results, every_arm_must_agree),
+        ("reverted-second", &reverted_zero_slot_results, only_the_unmerged_arm_must_agree),
+    ] {
+        let checks = check_the_segment(results, &zero_slot_arms_must_agree_for);
+        emit_the_segment_verdict(emitter, tally, segment, checks);
+    }
 }
 
 /// 准入用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
@@ -3234,12 +3983,13 @@ fn main() {
         Some("checks") => run_the_checks(&mut emitter, &mut tally),
         Some("first") => run_the_first_segment(&mut emitter, &mut tally),
         Some("second") => run_the_second_segment(&mut emitter, &mut tally),
+        Some("checkpoint-cost-reserve") => run_the_checkpoint_cost_reserve_mode(&mut emitter, &mut tally),
         Some(other) => {
-            eprintln!("不认识的子命令：{other}（可用：checks、first、second）");
+            eprintln!("不认识的子命令：{other}（可用：checks、first、second、checkpoint-cost-reserve）");
             std::process::exit(2);
         }
         None => {
-            eprintln!("要一个子命令：checks、first、second");
+            eprintln!("要一个子命令：checks、first、second、checkpoint-cost-reserve");
             std::process::exit(2);
         }
     }
@@ -3681,5 +4431,224 @@ mod boundary_readings {
         let with_fault = make_run(vec![accepted.clone(), accepted.clone(), accepted.clone(), accepted.clone(), rejected]);
         let metrics = metrics_of(&with_fault, &baseline);
         assert_eq!((metrics.extra_rejected, metrics.first_extra_step, metrics.accepted_after_the_first_extra, metrics.all_enospc), (1, 4, 0, 1));
+    }
+}
+
+#[cfg(test)]
+mod checkpoint_cost_reserve_readings {
+    use super::*;
+
+    fn geometry_row(slots_per_region: u64, pool_size: SampledPoolSize, largest_actual_empty_publish_slots: i64, checkpoint_cost_slots: i64, product_line: usize) -> CheckpointCostGeometry {
+        CheckpointCostGeometry {
+            slots_per_region,
+            pool_size,
+            largest_actual_empty_publish_slots,
+            checkpoint_cost_slots,
+            product_line,
+            first_request_under_the_code_reading: None,
+            first_request_under_the_clause_reading: None,
+        }
+    }
+
+    /// 场景：κ = 529、c实 = 5（两块 4 GiB 盘上 K1 那一项的量级，`reserve_fit.py 5 529` 那一组）。
+    /// 预期：代码读法 P = 529，条款读法 P = 10 + 7 × 529 = 3713，改回 10 + 7c 的 P = 45；原两种读法不带池大小、键后面不多打字段。
+    #[test]
+    fn checkpoint_cost_readings_take_kappa_ten_plus_seven_kappa_and_ten_plus_seven_actual_empty_publishes() {
+        let [code_reading, clause_reading, reverted_reading] = checkpoint_cost_readings_of(geometry_row(4, SampledPoolSize::FourGibibytes, 5, 529, 1));
+        assert_eq!(code_reading.reserve_blocks(5), 529, "代码读法 P代 = κ_G");
+        assert_eq!(clause_reading.reserve_blocks(5), 10 + 3703, "条款读法 P条 = 10 + 7 × 529（reserve_fit.py 5 529 的 reading=clause P=3713）");
+        assert_eq!(reverted_reading.reserve_blocks(5), 10 + 35, "改回 10 + 7c：c实 = 5 时 45");
+        assert_eq!((code_reading.label(), clause_reading.label(), reverted_reading.label()), ("ckpt-code", "ckpt-clause", "reverted-10+7c"));
+        assert_eq!(code_reading.extra_key_fields(), " pool_size=g_4 kappa=529");
+        for old_reading in RESERVE_READINGS {
+            assert_eq!((old_reading.pool_size_label(), old_reading.extra_key_fields()), ("", String::new()), "原两种读法的产物行不变（停机条款 S1）");
+        }
+    }
+
+    /// 场景：一个几何 κ = 14、c实 = 3。预期：池的 c 取 c实 = 3（不是 κ），每种读法 × 三种池松紧各一份，共 9 份。
+    #[test]
+    fn checkpoint_cost_pools_take_the_actual_empty_publish_as_the_metadata_blocks() {
+        let pools = checkpoint_cost_pool_settings(&[geometry_row(8, SampledPoolSize::SmallestCompleting { mebibytes: 64 }, 3, 14, 1)]);
+        assert_eq!(pools.len(), 9);
+        assert!(pools.iter().all(|pool| pool.metadata_blocks == 3 && pool.geometry.slots_per_region == 8), "c 取 c实_G、S 取几何的 S");
+        assert_eq!(pools.iter().filter(|pool| pool.reserve_blocks() == 14).count(), 3, "代码读法 P = κ = 14 的三份");
+    }
+
+    /// 场景：PC5（第七节 B8）——κ = 5、c = 5、S = 4、H1、近满 k = 0、不注读故障，八对臂 × 三种读法。
+    /// 预期：P = 5 那一串落不了点被拒，P = 45 一串抬 F 之后发成（上限 47、F 47、空闲 − P 50）；24 格全对、没有作废。
+    #[test]
+    fn positive_control_reproduces_the_first_request_at_reserve_five_and_forty_five_on_every_arm() {
+        let mut emitter = Emitter::new();
+        let mut tally = RunTally::default();
+        emit_the_checkpoint_cost_positive_control(&mut emitter, &mut tally);
+        assert_eq!((tally.self_checks_passed, tally.void_conditions.clone()), (24, Vec::<String>::new()));
+    }
+
+    fn segment_one_product_text() -> String {
+        [
+            "E7RESULT name=config section=segment-one",
+            "E7RESULT name=x3_reserve_fit geometry=s4_g_4 kappa_of_the_geometry=minimum_on_versions_with_trees kappa=529 largest_actual_empty_publish_slots=5 code_reserve=529 clause_reserve=3713 code_empty_publishes_held=105 clause_empty_publishes_held=742",
+            "E7RESULT name=x3_reserve_fit geometry=s4_g_4 kappa_of_the_geometry=maximum_on_versions_with_trees kappa=531 largest_actual_empty_publish_slots=5 code_reserve=531 clause_reserve=3727 code_empty_publishes_held=106 clause_empty_publishes_held=745",
+            "E7RESULT name=x3_reserve_fit geometry=s16_g_min_32mib kappa_of_the_geometry=minimum_on_versions_with_trees kappa=14 largest_actual_empty_publish_slots=3 code_reserve=14 clause_reserve=108 code_empty_publishes_held=4 clause_empty_publishes_held=36",
+        ]
+        .join("\n")
+    }
+
+    /// 场景：第一段产物两行（取最小 κ 的那一种），常量表照抄、改一个数、少一行。
+    /// 预期：照抄对得上；κ 改一个数、行号写错、少一行各报一处对不上（停机条款 S5）。
+    #[test]
+    fn the_geometry_table_is_checked_against_the_segment_one_product() {
+        let product = segment_one_product_text();
+        let copied = [geometry_row(4, SampledPoolSize::FourGibibytes, 5, 529, 2), geometry_row(16, SampledPoolSize::SmallestCompleting { mebibytes: 32 }, 3, 14, 4)];
+        assert_eq!(segment_one_mismatches(&copied, &product), Vec::<String>::new());
+        let one_number_off = [geometry_row(4, SampledPoolSize::FourGibibytes, 5, 530, 2), copied[1]];
+        assert_eq!(segment_one_mismatches(&one_number_off, &product), vec!["s4_g_4:kappa_table=530_product=529".to_string()]);
+        let wrong_line = [geometry_row(4, SampledPoolSize::FourGibibytes, 5, 529, 3), copied[1]];
+        assert_eq!(segment_one_mismatches(&wrong_line, &product), vec!["s4_g_4:line_table=3_product=2".to_string()]);
+        assert_eq!(segment_one_mismatches(&copied[..1], &product), vec!["s16_g_min_32mib:not_in_the_table".to_string()]);
+    }
+
+    /// 场景：第一段产物的几何写法。预期：三档池大小与 S 都读得回、与 [`SampledPoolSize::label`] 往返一致；认不出的写法交回 None。
+    #[test]
+    fn geometry_labels_of_the_segment_one_product_read_back_to_the_pool_sizes() {
+        for (expected, label) in [
+            ((8, SampledPoolSize::OneGibibyte), "s8_g_1"),
+            ((4, SampledPoolSize::FourGibibytes), "s4_g_4"),
+            ((16, SampledPoolSize::SmallestCompleting { mebibytes: 128 }), "s16_g_min_128mib"),
+        ] {
+            assert_eq!(SampledPoolSize::of_the_geometry_label(label), Some(expected));
+            assert_eq!(format!("s{}_{}", expected.0, expected.1.label()), label);
+        }
+        for unrecognized in ["s8_g_7", "x8_g_1", "s8_g_min_mib"] {
+            assert_eq!(SampledPoolSize::of_the_geometry_label(unrecognized), None, "{unrecognized}");
+        }
+    }
+
+    fn readings_with(slots_per_region: u64, baseline_rejected: i64, verdict_hits_by_row: &[(&str, bool)]) -> ReadingsOfACell {
+        ReadingsOfACell {
+            slots_per_region,
+            pool_size: "g_4",
+            fullness: PoolFullness::NearlyFullWithNoSpareOverwrite,
+            readings: (BTreeMap::new(), [TrajectoryAggregate::empty(); TRAJECTORY_SERIES], 0, Aggregate::empty(), baseline_rejected),
+            verdict_hits_by_row: verdict_hits_by_row.iter().map(|(label, hit)| (label.to_string(), *hit)).collect(),
+            baseline_rejected,
+            baseline_first_rejected_request: (baseline_rejected > 0).then_some(0),
+        }
+    }
+
+    /// 场景：一格上 Q1-1 代码读法打中、条款读法不打中；另一格 Q1-2 两边都打中。
+    /// 预期：Q1-1 那一个几何「只代码读法打中」1、「只条款读法打中」0；Q1-2「两边都打中」1；全部配得上对。
+    #[test]
+    fn reading_splits_count_the_code_only_hit_in_its_own_column() {
+        let code = BTreeMap::from([("cell".to_string(), readings_with(4, 0, &[("Q1-1", true), ("Q1-2", true)]))]);
+        let clause = BTreeMap::from([("cell".to_string(), readings_with(4, 0, &[("Q1-1", false), ("Q1-2", true)]))]);
+        let (splits, unpaired) = reading_splits(&code, &clause);
+        assert_eq!(unpaired, 0);
+        assert_eq!(splits[&("Q1-1".to_string(), 4, "g_4")], ReadingSplit { cells: 1, only_code_hit: 1, only_clause_hit: 0, both_hit: 0 });
+        assert_eq!(splits[&("Q1-2".to_string(), 4, "g_4")], ReadingSplit { cells: 1, only_code_hit: 0, only_clause_hit: 0, both_hit: 1 });
+    }
+
+    /// 场景：零点两种读法都不拒，读坏之下代码读法拒 1 次（`rejected` 那个量最大 1）；另一格零点只有代码读法拒、第一次落在第 0 次请求。
+    /// 预期：Z3 只数零点——第一格不算，第二格算「只代码读法零点被拒」1、代码读法第一次被拒落在 0、条款读法 none。
+    #[test]
+    fn the_zero_point_comparison_counts_the_baseline_and_not_the_run_with_the_read_fault() {
+        let mut rejected_under_the_fault = readings_with(4, 0, &[]);
+        let mut rejected_once = Aggregate::empty();
+        rejected_once.add(1, 1);
+        rejected_under_the_fault.readings.0.insert("rejected", rejected_once);
+        let code = BTreeMap::from([("fault_only".to_string(), rejected_under_the_fault), ("zero_point".to_string(), readings_with(8, 1, &[]))]);
+        let clause = BTreeMap::from([("fault_only".to_string(), readings_with(4, 0, &[])), ("zero_point".to_string(), readings_with(8, 0, &[]))]);
+        let counts = zero_point_counts(&code, &clause);
+        assert_eq!(counts[&(4, "g_4", "near0")], (1, 0, 0, 0, None, None), "读坏之下的被拒不进 Z3");
+        assert_eq!(counts[&(8, "g_4", "near0")], (1, 1, 0, 0, Some(0), None));
+    }
+
+    /// 场景：改回 10 + 7c 那一臂与代码读法在一格上读数相同、在另一格上 Q1-1 的判定不同。
+    /// 预期：判别力对照数出 2 格里 1 格读数不同、1 格 Y1 判定不同，摘要写「读数不同」。
+    #[test]
+    fn the_reverted_reserve_discrimination_counts_cells_whose_readings_differ() {
+        let reverted = BTreeMap::from([("same".to_string(), readings_with(4, 0, &[("Q1-1", false)])), ("differs".to_string(), readings_with(4, 0, &[("Q1-1", true)]))]);
+        let mut differing = readings_with(4, 1, &[("Q1-1", false)]);
+        differing.readings.4 = 1;
+        let code = BTreeMap::from([("same".to_string(), readings_with(4, 0, &[("Q1-1", false)])), ("differs".to_string(), differing)]);
+        assert_eq!(reverted_reserve_differences(&reverted, &code), BTreeMap::from([((4, "g_4"), (2, 1, 1))]));
+        let by_reserve = BTreeMap::from([("reverted-10+7c", reverted), ("ckpt-code", code.clone()), ("ckpt-clause", code)]);
+        let mut emitter = Emitter::new();
+        let mut tally = RunTally::default();
+        emit_the_reverted_reserve_discrimination(&mut emitter, &mut tally, &by_reserve);
+        assert_eq!((tally.self_checks_passed, tally.void_conditions.len()), (2, 0), "两条被比的臂都配得上对");
+    }
+
+    /// 场景：抄进常量表的 9 个几何（第一段产物 2026-11-02 那份）。
+    /// 预期：S 取 4、8、16 各三个池大小；κ_G 与 c实_G 是产物抄下的数（`reserve_fit.py` 的 B11 读数：18/6 装 3 次、130/6 装 21 次、543/10 装 54 次、26/6 装 4 次）；
+    /// 只有 S = 4 的三行带第一次请求的期望（B9）；行号两两不同且递增。
+    #[test]
+    fn the_registered_geometry_table_holds_the_nine_geometries_of_the_segment_one_product() {
+        let table: Vec<(u64, &str, i64, i64, usize)> = CHECKPOINT_COST_GEOMETRIES
+            .iter()
+            .map(|row| (row.slots_per_region, row.pool_size.label(), row.largest_actual_empty_publish_slots, row.checkpoint_cost_slots, row.product_line))
+            .collect();
+        assert_eq!(
+            table,
+            vec![
+                (4, "g_min_64mib", 6, 18, 3299),
+                (4, "g_1", 6, 130, 3322),
+                (4, "g_4", 10, 543, 3345),
+                (8, "g_min_64mib", 6, 18, 3368),
+                (8, "g_1", 6, 130, 3391),
+                (8, "g_4", 10, 543, 3414),
+                (16, "g_min_128mib", 6, 26, 3437),
+                (16, "g_1", 6, 130, 3460),
+                (16, "g_4", 10, 543, 3483),
+            ]
+        );
+        let held: Vec<i64> = CHECKPOINT_COST_GEOMETRIES.iter().map(|row| row.checkpoint_cost_slots / row.largest_actual_empty_publish_slots).collect();
+        assert_eq!(held, vec![3, 21, 54, 3, 21, 54, 4, 21, 54], "⌊κ_G ÷ c实_G⌋ 等于 reserve_fit.py 的 empties_held（第七节 B11）");
+        for row in CHECKPOINT_COST_GEOMETRIES {
+            assert_eq!(row.first_request_under_the_code_reading.is_some(), row.slots_per_region == 4, "只有 S = 4 的几何带 B9 的期望：{}", row.label());
+            assert_eq!(row.first_request_under_the_clause_reading, row.first_request_under_the_code_reading, "两种读法的 空闲 − P 相同");
+        }
+        assert!(CHECKPOINT_COST_GEOMETRIES.windows(2).all(|pair| pair[0].product_line < pair[1].product_line));
+    }
+
+    /// 场景：G-4、S = 4 那一行（κ_G = 543、c实_G = 10），第七节 B9 的 `first_request.py 4 10 8 543` 与 `… 3811`。
+    /// 预期：代码读法 P = 543、条款读法 P = 10 + 7 × 543 = 3811、判别力对照 P = 10 + 7 × 10 = 80；
+    /// 第一次请求在一串抬 F（上限 47、三次发布）之后发成，发成之后 空闲 − P = 78 − 18 = 60（`first_request.py` 的 `user_room=78 need=18`）；
+    /// 代码读法的 P 若取 c（MR9）或 c 若取 κ（MR11），P = 10 或 c = 543 都装不下三次空发布，被拒。
+    #[test]
+    fn the_four_gibibyte_geometry_at_four_slots_pins_the_reserve_and_the_first_request_to_the_registered_values() {
+        let row = CHECKPOINT_COST_GEOMETRIES[2];
+        assert_eq!((row.slots_per_region, row.pool_size, row.largest_actual_empty_publish_slots, row.checkpoint_cost_slots), (4, SampledPoolSize::FourGibibytes, 10, 543));
+        let [code_reading, clause_reading, reverted_reading] = checkpoint_cost_readings_of(row);
+        assert_eq!(
+            (code_reading.reserve_blocks(10), clause_reading.reserve_blocks(10), reverted_reading.reserve_blocks(10)),
+            (543, 3811, 80),
+            "reserve_fit.py 10 543 的 reading=code P=543、reading=clause P=3811；改回 10 + 7c 是 80"
+        );
+        let geometry = RingGeometry { slots_per_region: 4 };
+        let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, 10);
+        for (reserve_reading, expected_reserve) in [(code_reading, 543), (clause_reading, 3811)] {
+            let settings = PoolSettings { geometry, metadata_blocks: 10, reserve_reading, fullness: PoolFullness::NearlyFullWithNoSpareOverwrite };
+            assert_eq!(settings.reserve_blocks(), expected_reserve, "池里的 P：{}", reserve_reading.label());
+            for arm in every_arm_pair() {
+                assert_eq!(
+                    first_request_reading(&history, settings, arm),
+                    "accepted=true ceiling=47 sequence_publishes=3 floor=47 free_above_reserve_after=60",
+                    "{} {}",
+                    reserve_reading.label(),
+                    label_of_the_arm(arm)
+                );
+            }
+        }
+    }
+
+    /// 场景：三个 S = 4 的几何 × 两种读法 × 八对臂，每一格的第一次请求对常量表里抄下的 B9 期望。
+    /// 预期：48 格全对、没有作废（运行时 PC6 同一件事；这里在产物之前就核装置的读数写法与 `first_request.py` 一致）。
+    #[test]
+    fn the_geometry_first_requests_of_the_three_four_slot_geometries_equal_the_registered_readings_on_every_arm() {
+        let mut emitter = Emitter::new();
+        let mut tally = RunTally::default();
+        emit_the_geometry_first_requests(&mut emitter, &mut tally, CHECKPOINT_COST_GEOMETRIES);
+        assert_eq!((tally.self_checks_passed, tally.void_conditions.clone()), (3 * 2 * 8, Vec::<String>::new()));
     }
 }

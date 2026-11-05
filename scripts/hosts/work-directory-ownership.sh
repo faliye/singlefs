@@ -29,11 +29,16 @@
 #   --dry-run：只列，一项不删、不写日志。
 # 退出码：0 做完（清盘时没有一项删失败）；1 show 没有归属文件、清盘有删失败的；2 参数不对、取不到会话号或工作根、认领别的会话的目录。
 #
-# 弄坏开关（只给自证判红用；几个用逗号连，不认识的项名拒绝）：WORK_DIRECTORY_OWNERSHIP_BREAK=
-#   delete-unowned     没有归属文件的目录也当成自己的删：自证「sweep:没有归属文件的目录留着、列出名字大小与建于」红
-#   skip-log           删之前不写日志：自证「sweep:删前日志逐项带 du -sh 的大小」「sweep:日志里删前那一行排在删了那一行之前」两格红
-#   ignore-open-files  不看 /proc，有进程开着文件的也删：自证「sweep:有进程开着文件的目录不删、列出进程号」红
-#   dry-run-deletes    --dry-run 照真删：自证「sweep --dry-run:一项不删、不写日志、列出会删的」红
+# 弄坏开关 WORK_DIRECTORY_OWNERSHIP_BREAK=<项>（只给自证判红用；几个用逗号连，不认识的项名拒绝）。开关仅在 --selftest 与它建的临时标记所标识的子进程里生效；普通运行设了开关直接拒绝（一切之前退 2、点名变量只在自证里认）。
+# 打开后自证哪几格红（失败行「✗ 自证格不对：<格名>（应当是 …，实际 …）」）：
+#   WORK_DIRECTORY_OWNERSHIP_BREAK=delete-unowned  没有归属文件的目录也当成自己的删
+#       「✗ 自证格不对：sweep:没有归属文件的目录留着、列出名字大小与建于」
+#   WORK_DIRECTORY_OWNERSHIP_BREAK=skip-log  删之前不写日志
+#       「✗ 自证格不对：sweep:删前日志逐项带 du -sh 的大小」、「✗ 自证格不对：sweep:日志里删前那一行排在删了那一行之前」
+#   WORK_DIRECTORY_OWNERSHIP_BREAK=ignore-open-files  不看 /proc，有进程开着文件的也删
+#       「✗ 自证格不对：sweep:有进程开着文件的目录不删、列出进程号」
+#   WORK_DIRECTORY_OWNERSHIP_BREAK=dry-run-deletes  --dry-run 照真删
+#       「✗ 自证格不对：sweep --dry-run:一项不删、不写日志、列出会删的」
 # 开关仅在 --selftest 与它建的临时标记所标识的子进程里生效；普通运行设了开关直接拒绝。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"

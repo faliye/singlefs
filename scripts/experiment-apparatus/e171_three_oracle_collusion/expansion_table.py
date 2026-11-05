@@ -61,7 +61,7 @@ def expansion_rows(table_text: str, first_number: int = FIRST_EXPANSION_ROW_NUMB
 
 
 def selected_row_line(row: SelectedRow) -> str:
-    """与 `bad-implementations-117.tsv` 同一个六列格式（`bad_implementation_table.read_selected_rows` 读得进）。"""
+    """与 `bad-implementations-step-8.tsv` 同一个六列格式（`bad_implementation_table.read_selected_rows` 读得进）。"""
     return f"{row.number}\t{row.slice_number}\t{row.file}\t{row.group_index}\t{row.name}\t{row.line_digest_prefix}\n"
 
 
