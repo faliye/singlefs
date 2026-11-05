@@ -1,0 +1,18 @@
+# task-server 的用户级 systemd 单元模板：python3 task-server/control install 照它填 @PYTHON@、@SERVER_SCRIPT@、@MULTI_HOST_CONFIG@（装的时候读的那一份多机配置），写进 ${XDG_CONFIG_HOME:-~/.config}/systemd/user/。
+# 停这个单元只停服务（KillMode=process）；每一次尝试起在各自的 singlefs-task-*.service 单元里，服务重启不杀它们。
+# 开机不自起、起来之后被杀自己拉起（用户定：「开机不自启动。 但是启动后要有恢复能力。」）：没有 [Install]，control install 只 start、不 enable；
+# 进程不是被 systemctl stop 停掉的（被 earlyoom 杀、崩了、退了）隔 RestartSec 秒由 systemd 拉起，systemctl stop（control stop）停的不拉起。
+[Unit]
+Description=singlefs task-server
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=@PYTHON@ -B @SERVER_SCRIPT@ serve
+Environment=SINGLEFS_MULTI_HOST_CONFIG=@MULTI_HOST_CONFIG@
+KillMode=process
+TimeoutStopSec=30
+Restart=always
+RestartSec=3
+# 不自启动（用户：「不是开启自启动，而是派任务失败后，检测如果没有启动就报错提醒」）：服务没起时客户端 submit / wait / status 报错点名
+# 「task-server 没起」并给起法 python3 task-server/control start，客户端不悄悄重试、不自己拉起（拉起只由 systemd 在被杀时做）

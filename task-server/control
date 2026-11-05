@@ -1,0 +1,457 @@
+#!/usr/bin/env python3
+"""task-server 的装与查（路径、依赖、库与错误类型写在 task_server_lib.py 文件头）。task-server 没有自己的配置文件：调度资源照多机配置 multi-host.env。
+
+  python3 task-server/control install --dry-run   只打要做的每一步（多机配置、目录、签名密钥、单元文件的全文、systemctl 的几条），一个文件不写、一条 systemctl 不起；退 0
+  python3 task-server/control install             必须依赖不在、多机配置不在退 78（出路写装法与 cp multi-host.env.example multi-host.env；不替用户拷模板）；
+                                                  建状态目录、日志、尝试、分片、运行时与编译目录（700），排他新建签名密钥（600，已在的不动）；照模板写用户级单元
+                                                  ${XDG_CONFIG_HOME:-~/.config}/systemd/user/singlefs-task-server.service（钉住这一次读的多机配置的路径），
+                                                  systemctl --user daemon-reload、start（不 enable：开机不自起；单元带 Restart=always：起来之后被杀、崩了由 systemd 拉起，control stop 停的不拉起；没起时客户端报错点名）；回读 /health 到回 ok 才退 0，INSTALL_READBACK_SECONDS 秒里没回 ok 退 1。
+                                                  NFS 共享：写单元之前判前三项、回读到 /health 回 ok 之后判四项，不过退 78（--dry-run 只打前三项的结论）
+                                                  多机配置的 HOSTS 与 SHARED_DATA_ROOT（task_server_lib.py 文件头「主机」「共享数据根」）：NFS 前三项之后判，不过退 78
+                                                  （--dry-run 同样判、同样退 78：取不到数据根就算不出分片目录）；出路点名往 multi-host.env 写哪一行
+                                                  单元已经在跑的不重起：改过单元之后 control stop、control start 才换上
+  python3 task-server/control check               fastapi、uvicorn 在不在，多机配置在不在，服务通不通（/health 回 ok：库写得进、派活没有判排头能起却连着几轮没起成、看进展没报；task_server.py 文件头「接口」），NFS 共享四项（task_server_lib.py 文件头「NFS 共享」），
+                                                  多机配置的 HOSTS 与 SHARED_DATA_ROOT，逐样判：都过退 0；缺一样退 78、出路写全（NFS 的指 task-server/README.md「## NFS 共享」）；
+                                                  服务暂停着另打一行「暂停中（原因：…，起于…）、在跑 N 个」（/health 的 pause 栏；放行了会话的写「…）、放行会话 <号>、在跑 N 个、别的会话在跑 M 个」），不判「派活判排头能起却没起成」、不看进展，暂停不让它退非 0
+  python3 task-server/control start               起之前判 NFS 共享前三项与多机配置的 HOSTS、SHARED_DATA_ROOT（不过退 78、不起）；
+                                                  systemctl --user start 之后回读 is-active 的输出与 /health，都对再判 NFS 共享四项，
+                                                  都过退 0；回读不对退 1，NFS 不过退 78
+  python3 task-server/control stop                systemctl --user stop 之后回读 is-active 的输出（inactive、failed 才算停了）与单元 cgroup.procs 的内容（空才算），都对退 0，不对退 1；
+                                                  停服务不停在跑的任务（它们在各自的单元里）
+  python3 task-server/control clear-queue         服务停着才动（在跑退 1）：库拷一份 .before-clear-<时刻>，删 tasks 与 attempts 的全部行、回读为 0 才退 0；history 不动
+  python3 task-server/control pin-cap [--] <命令…>     给这条命令钉内存上限（task_server.py 文件头 ②「内存」的钉值：取多机配置 SLICE_MEMORY_CAP_BY_HOST 里派到的那一台那一项，每次定额度现读，
+                                                  不记字面的数；键照 scripts/hosts/memory_peaks_lib.py 的 command_key 换算）；经服务的 POST /pins 写（服务在跑时也能用，
+                                                  不绕过服务写库），写完经 POST /pins/show 回读钉上了才退 0；已钉的照退 0、说原来就钉着
+  python3 task-server/control unpin-cap [--] <命令…>   撤掉这条命令的钉值；回读撤掉了才退 0（原来没钉的照退 0、说原来就没钉）
+  python3 task-server/control pause [--reason <一句>] [--allow-session <会话号>]   暂停排队（task_server.py 文件头 ⑤「暂停」）：服务照收提交、照答 status / wait / log / cancel，排队线程不起任何新尝试
+                                                  （插空、分片的子任务与估算子任务、重试重排回队的都不起），在跑的照跑到结局；暂停态记在服务的库里，服务重启后照旧暂停，直到 resume。
+                                                  --reason 写一句原因（至多 200 字）。经服务的 POST /pause 写，写完回读 /health 是暂停才退 0；已经暂停着的照退 0、说原来就暂停着，不改原因与起点。
+                                                  --allow-session 放行一个会话：暂停着，这个会话交的任务（已经排着的、之后交的、分片的子任务、估算子任务、重试重排回队的）照常排、照常起，别的会话的照旧排着不起；
+                                                  会话号就是 task status 打的那一栏「会话 <号>」（task-server/task:393 打的 session，服务照 task_server_lib.py:2387 的 session_of_peer 从调用进程的
+                                                  祖先环境读 CLAUDE_CODE_SESSION_ID 取，POST /tasks 时记进任务的 session，task_server.py:4871）：要放行谁，就在那个会话里跑 python3 task-server/task status 抄第一行的号。
+                                                  已经暂停着再 pause --allow-session <另一个会话> 照退 0，换放行的会话（原因与起点不改），说明写换了谁；不带 --allow-session 的 pause 不动放行；resume 连放行一起清掉。
+                                                  放行的会话记在同一份带签名的暂停态里，服务重启后照旧；写完回读 /health 的放行会话与要的一样才退 0。
+                                                  只许本机起服务的那个用户发：服务认调用方的 uid 是不是它自己的（task_server.py:5300 的 peer_of，POST /tasks、/pins 同一处），不是回 403。
+                                                  用在换 prune-server 的二进制、清判定库旧行这类要一段没有别的会话的任务在跑的空档的活：pause --allow-session <做活的会话>，等 control check 报别的会话在跑 0 个，做活，resume；
+                                                  不放行谁的 pause（要一段什么任务都不在跑的空档）：等 control check 报在跑 0 个
+  python3 task-server/control resume              放开暂停，排着的任务照常起；经 POST /resume 写，写完回读 /health 不是暂停才退 0；本来没暂停的照退 0、说原来就没暂停
+  python3 task-server/control watch               每 WATCH_SECONDS 秒查一次：服务不通、库写不进（/health 的试写失败）、派活判排头能起却一直没起成或看进展报某台放得下却一直没起（/health 的 problem；判不能起的、队空不动、暂停中不算）、单元不在（is-active 的输出不是在跑）、
+                                                  NFS 共享前三项不过（两向探针不每轮做）、第二台用不了满 PEER_UNAVAILABLE_WATCH_SECONDS 秒（/health 的 peer 一栏，原因照它打），
+                                                  判出一样就打出来退 1；第二台那一趟没跑成（peer-run-failed，服务照重试的规矩重排）打一行「!」不退；
+                                                  一直好就一直查（主 agent 用 run_in_background 起它盯着，退出即处置）；
+                                                  盯的只是服务的健康，不盯任务：排队过久、超过预计、换卡重排、清场没收尾、分片推不动由 task wait 自己报（task 文件头 wait 那一段）；
+                                                  服务暂停着照样盯服务通不通、库写不写得进、单元在不在、NFS、第二台（暂停是人要的状态，不是问题）
+退出码：0 成了；1 回读不对或 watch 判出了问题；2 用法错，或只在自证里认的变量设在了别处；78 运行条件不满足（出路写在 stderr）。
+弄坏开关读在 task_server_lib.py 的 broken（开关表在那份文件头）：check-deps-skipped、watch-blind、dry-run-writes、install-readback-skipped、stop-exit-status-only、
+start-readback-skipped、start-exit-status-ignored、data-root-key-unchecked（task_server_lib.py 的 require_configured_data_root）、watch-skips-while-paused。
+"""
+import os
+import sys
+
+sys.dont_write_bytecode = True
+SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, SCRIPT_DIRECTORY)
+import task_server_lib as lib  # noqa: E402
+
+import subprocess  # noqa: E402
+import time  # noqa: E402
+
+INSTALL_READBACK_SECONDS = 30.0
+FAST_INSTALL_READBACK_SECONDS = 2.0
+START_READBACK_SECONDS = 30.0
+WATCH_SECONDS = 30.0
+FAST_WATCH_SECONDS = 0.5
+PEER_UNAVAILABLE_WATCH_SECONDS = 180.0   # 第二台用不了满这么久 watch 才退 1（余量查不成这类一两轮就好的不叫醒人；task_server.py 的 note_peer 当场写告警）
+FAST_PEER_UNAVAILABLE_WATCH_SECONDS = 1.0
+STOPPED_STATES = ("inactive", "failed")
+
+
+def systemctl():
+    return lib.selftest_override("TASK_SERVER_CONTROL_SYSTEMCTL") or "systemctl"
+
+
+def run_systemctl(*arguments, timeout=120):
+    try:
+        completed = subprocess.run([systemctl(), "--user", *arguments], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return 127, "", f"{type(error).__name__}: {error}"
+    return completed.returncode, completed.stdout.strip(), completed.stderr.strip()
+
+
+def unit_active_state():
+    """is-active 打的状态（照输出判，不看退出码：activating、deactivating 也退非 0）。"""
+    _, output, _ = run_systemctl("is-active", lib.UNIT_NAME, timeout=30)
+    return output.splitlines()[-1].strip() if output else "（没打状态）"
+
+
+def unit_processes():
+    _, group, _ = run_systemctl("show", "-p", "ControlGroup", "--value", lib.UNIT_NAME, timeout=30)
+    if not group:
+        return []
+    try:
+        with open(os.path.join("/sys/fs/cgroup" + group, "cgroup.procs"), encoding="utf-8") as handle:
+            return handle.read().split()
+    except FileNotFoundError:
+        return []
+    except OSError:
+        return None
+
+
+def unit_path():
+    config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(config_home, "systemd", "user", lib.UNIT_NAME)
+
+
+def render_unit(configuration_path):
+    with open(lib.UNIT_TEMPLATE, encoding="utf-8") as handle:
+        text = handle.read()
+    for name, value in (("PYTHON", sys.executable), ("SERVER_SCRIPT", lib.SERVER_SCRIPT), ("MULTI_HOST_CONFIG", configuration_path)):
+        text = text.replace(f"@{name}@", value)
+    return text
+
+
+def say(line):
+    print(line, flush=True)
+
+
+def fail(line, next_step, code):
+    print(f"  ✗ {line}", file=sys.stderr)
+    print(f"  → 怎么办：{next_step}", file=sys.stderr)
+    return code
+
+
+def health_or_none(configuration):
+    try:
+        return lib.require_server(configuration, timeout=5.0)
+    except lib.Unavailable:
+        return None
+
+
+def install(dry_run):
+    writing = not dry_run or lib.broken("dry-run-writes")
+    missing = lib.missing_modules()
+    if missing and not dry_run:
+        print(f"  ✗ 必须依赖的 python 模块不在：{'、'.join(missing)}", file=sys.stderr)
+        print(f"  → 怎么办：{lib.INSTALL_PACKAGES}；装好再跑 {lib.INSTALL_COMMAND}", file=sys.stderr)
+        return lib.RUN_CONDITION_EXIT
+    say(f"  · 必须依赖：{'都在' if not missing else '不在 ' + '、'.join(missing) + '（' + lib.INSTALL_PACKAGES + '）'}")
+    try:
+        configuration = lib.read_configuration()
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, "task-server/control install")
+    say(f"  · 多机配置 {configuration.path} 在（task-server 照它调度资源，不另有配置文件）；路径：状态 {configuration.state_directory}、"
+        f"socket {configuration.socket}、密钥 {configuration.signing_key_file}、编译目录 {configuration.build_directory}")
+    nfs = lib.nfs_share_report(configuration.path, probe=False)   # 写单元之前判前三项（task_server_lib.py 文件头「NFS 共享」）；两向探针等服务起来之后回读时做
+    say(f"  · NFS 共享（前三项）：{nfs_summary(nfs)}")
+    if not nfs["ok"] and writing:
+        lib.report_unavailable_and_exit(lib.Unavailable(f"NFS 共享判不过：{nfs['problem']}", nfs["next_step"]), "task-server/control install")
+    peer, data_root = require_multi_host_keys_or_exit(configuration, "task-server/control install")
+    say(f"  · 多机配置的 {lib.HOSTS_KEY}：第二台是 {lib.HOSTS_KEY} 里的另一项（不是本机网卡地址的那一个）；{lib.DATA_ROOT_KEY}：{data_root or '没判（弄坏开关 data-root-key-unchecked）'}")
+    for directory in (configuration.state_directory, configuration.logs_directory, configuration.attempts_directory, configuration.shards_directory,
+                      configuration.runtime_directory, configuration.build_directory):
+        say(f"  · 目录 {directory}（700）：{'已在' if os.path.isdir(directory) else ('建' if writing else '会建')}")
+        if writing:
+            lib.ensure_private_directory(directory)
+    key_present = os.path.isfile(configuration.signing_key_file)
+    say(f"  · 签名密钥 {configuration.signing_key_file}（600）：{'已在，不动' if key_present else ('排他新建' if writing else '会排他新建')}")
+    if writing:
+        lib.create_signing_key(configuration.signing_key_file)
+    unit_text = render_unit(configuration.path)
+    say(f"  · 用户级单元 {unit_path()}：{'写' if writing else '会写'}成下面这样")
+    for line in unit_text.splitlines():
+        say(f"      {line}")
+    say(f"  · {'跑' if writing else '会跑'}：systemctl --user daemon-reload；systemctl --user start {lib.UNIT_NAME}（不 enable：不自启动）；回读 /health 到回 ok")
+    if not writing:
+        say("  ✓ --dry-run：只打了要做的事，一个文件没写、systemctl 一条没起")
+        return 0
+    lib.ensure_private_directory(os.path.dirname(unit_path()))
+    temporary = unit_path() + ".partial"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        handle.write(unit_text)
+    os.replace(temporary, unit_path())
+    for arguments in (("daemon-reload",), ("start", lib.UNIT_NAME)):
+        code, _, error = run_systemctl(*arguments)
+        if code != 0:
+            return fail(f"systemctl --user {' '.join(arguments)} 退 {code}：{error}", f"看 systemctl --user status {lib.UNIT_NAME}；修好再跑 {lib.INSTALL_COMMAND}", 1)
+    if lib.broken("install-readback-skipped"):
+        say("  ✓ 装好了（弄坏开关 install-readback-skipped：没回读）")
+        return 0
+    deadline = time.monotonic() + (FAST_INSTALL_READBACK_SECONDS if lib.fast() else INSTALL_READBACK_SECONDS)
+    while time.monotonic() < deadline:
+        health = health_or_none(configuration)
+        if health is not None:
+            nfs = require_nfs_or_exit(configuration, "task-server/control install")
+            say(f"  ✓ 装好了：{lib.UNIT_NAME} 在跑，/health 回 ok（进程 {health.get('pid')}，库标签 {health.get('tag')}）；NFS 共享 {nfs_summary(nfs)}")
+            return 0
+        time.sleep(0.2)
+    return fail(f"装好了但服务没回话：/health 在限时里一直不通（is-active 打的是「{unit_active_state()}」）",
+                f"看 journalctl --user -u {lib.UNIT_NAME} -n 100；修好之后 python3 task-server/control check 回读到退 0", 1)
+
+
+def check():
+    try:
+        if not lib.broken("check-deps-skipped"):
+            lib.require_modules()
+        configuration = lib.read_configuration()
+        health = lib.require_server(configuration)
+        nfs = lib.require_nfs_share(configuration, probe=True)
+        _, data_root = lib.require_multi_host_keys(configuration)
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, "task-server/control check")
+    peer = health.get("peer") or {}
+    say(f"  ✓ task-server 通：fastapi、uvicorn 在，多机配置 {configuration.path} 在，socket {configuration.socket}，库 {configuration.database}；"
+        f"在排 {health.get('queued')} 个、在跑 {health.get('running')} 个，排队线程 {health.get('scheduler_seconds_since_tick')} 秒前动过；NFS 共享 {nfs_summary(nfs)}；"
+        f"共享数据根 {data_root or '没判（弄坏开关 data-root-key-unchecked）'}；"
+        f"第二台{'用得了' if peer.get('available', True) else '此刻用不了：' + str(peer.get('why'))}")
+    if health.get("paused"):   # 暂停是人要的状态：不让 check 退非 0（服务那一侧暂停中也不判「判能起却没起成」、不看进展）
+        say(f"  · {(health.get('pause') or {}).get('text') or '暂停中'}")
+    return 0
+
+
+PAUSE_OPTIONS = ("--reason", "--allow-session")
+
+
+def pause_options(words):
+    """pause 后面的选项：--reason <一句>、--allow-session <会话号>，各至多一次、次序随意，每个都要带值（--allow-session 的值不许空）；写得不对交 None。"""
+    found = {}
+    for position in range(0, len(words), 2):
+        name = words[position]
+        if name not in PAUSE_OPTIONS or name in found or position + 1 >= len(words):
+            return None
+        found[name] = words[position + 1]
+    if "--allow-session" in found:
+        found["--allow-session"] = found["--allow-session"].strip()
+        if not found["--allow-session"]:
+            return None
+    return found
+
+
+def pause_or_resume(pausing, reason="", allow_session=""):
+    """pause / resume（文件头）：经 POST /pause、/resume 写，写完回读 /health 的 paused 与要的一样才退 0；给了 allow_session 的，回读的放行会话也要是它。
+    服务通不通只看连不连得上，不看 /health 是否 ok（服务不健康时人更要能暂停它）。"""
+    what = "pause" if pausing else "resume"
+    try:
+        lib.require_modules()
+        configuration = lib.read_configuration()
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, f"task-server/control {what}")
+    try:
+        status, reply = lib.call_server(configuration.socket, "POST", "/pause" if pausing else "/resume",
+                                        {"reason": reason, "allow_session": allow_session} if pausing else {})
+        health_status, health = lib.call_server(configuration.socket, "GET", "/health", timeout=10.0)
+    except lib.ServerUnreachable as error:
+        lib.report_unavailable_and_exit(lib.unreachable_error(configuration, str(error)), f"task-server/control {what}")
+    if status != 200:
+        return fail(f"服务回 HTTP {status}：{reply.get('detail', reply)}", f"看 journalctl --user -u {lib.UNIT_NAME} -n 100；403 是调用方的 uid 不是服务自己的（只许起服务的那个用户发）", 1)
+    if health_status != 200 or bool(health.get("paused")) != pausing:
+        return fail(f"{what} 之后回读不对：/health 的 paused 是 {health.get('paused')}（HTTP {health_status}），要的是 {pausing}",
+                    f"看 journalctl --user -u {lib.UNIT_NAME} -n 100；把这一行交主 agent", 1)
+    shown = health.get("pause") or {}
+    text = shown.get("text", "")
+    if pausing and allow_session and shown.get("allow_session") != allow_session:
+        return fail(f"pause 之后回读不对：/health 的放行会话是「{shown.get('allow_session')}」，要的是「{allow_session}」",
+                    f"看 journalctl --user -u {lib.UNIT_NAME} -n 100；暂停记录校验不过的不换放行（task_server.py 文件头 ⑤「暂停」），先 python3 task-server/control resume 再 pause", 1)
+    if pausing and reply.get("changed"):
+        if allow_session:
+            say(f"  ✓ 暂停了：{text}；服务照收提交，除放行的会话 {allow_session} 之外不起新任务，在跑的照跑到结局。要空档的活：等 python3 task-server/control check 报别的会话在跑 0 个，"
+                "做活，python3 task-server/control resume")
+        else:
+            say(f"  ✓ 暂停了：{text}；服务照收提交，不起新任务，在跑的照跑到结局。要空档的活：等 python3 task-server/control check 报在跑 0 个，做活，python3 task-server/control resume")
+    elif pausing and reply.get("allow_changed"):
+        say(f"  ✓ 原来就暂停着，换了放行的会话：{reply.get('allow_before') or '没有'} → {allow_session}（原因与起点不改）：{text}")
+    elif pausing:
+        say(f"  ✓ 原来就暂停着：{text}（原因与起点不改；要换原因先 python3 task-server/control resume 再 pause，要换放行的会话再 pause --allow-session <会话号>）")
+    elif reply.get("changed"):
+        say(f"  ✓ 放开了（暂停时的原因：{reply.get('reason') or '没写'}）；排着的任务照常起，/health 回读不是暂停")
+    else:
+        say("  ✓ 原来就没暂停")
+    return 0
+
+
+def nfs_summary(report):
+    """NFS 共享结论的一句（task_server_lib.nfs_share_report）：每个根各项过没过；不过的那一句。"""
+    if not report["ok"]:
+        return f"不过：{report['problem']}"
+    roots = "；".join(f"{entry['root']}（" + "、".join(f"{name}{'过' if entry.get(key) == lib.NFS_PASSED else '没判'}" for key, name in lib.NFS_ITEMS) + "）"
+                     for entry in report["roots"])
+    return f"过：{roots or '没判（弄坏开关 nfs-unchecked）'}"
+
+
+def require_multi_host_keys_or_exit(configuration, who):
+    """多机配置的 HOSTS 与 SHARED_DATA_ROOT 判不过退 78（task_server_lib.py 的 require_multi_host_keys；出路点名往 multi-host.env 写哪一行）；判得过交 (第二台, 数据根)。"""
+    try:
+        return lib.require_multi_host_keys(configuration)
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, who)
+
+
+def require_nfs_or_exit(configuration, who, probe=True):
+    """NFS 共享判不过退 78（出路指 task-server/README.md「## NFS 共享」）；判得过交那份结论。"""
+    try:
+        return lib.require_nfs_share(configuration, probe=probe)
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, who)
+
+
+def start():
+    try:
+        lib.require_modules()
+        configuration = lib.read_configuration()
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, "task-server/control start")
+    require_nfs_or_exit(configuration, "task-server/control start", probe=False)   # 起之前判前三项：不过服务起来也会退 78，不起它
+    require_multi_host_keys_or_exit(configuration, "task-server/control start")   # HOSTS 与 SHARED_DATA_ROOT 同样起之前判
+    code, _, error = run_systemctl("start", lib.UNIT_NAME)
+    if code != 0 and not lib.broken("start-exit-status-ignored"):
+        return fail(f"systemctl --user start {lib.UNIT_NAME} 退 {code}：{error}", f"没装就 {lib.INSTALL_COMMAND}；装了看 journalctl --user -u {lib.UNIT_NAME} -n 100", 1)
+    if lib.broken("start-readback-skipped"):
+        say(f"  ✓ {lib.UNIT_NAME} 起了（弄坏开关 start-readback-skipped：没回读）")
+        return 0
+    deadline = time.monotonic() + (FAST_INSTALL_READBACK_SECONDS if lib.fast() else START_READBACK_SECONDS)
+    while time.monotonic() < deadline:
+        if unit_active_state() == "active" and health_or_none(configuration) is not None:
+            nfs = require_nfs_or_exit(configuration, "task-server/control start")
+            say(f"  ✓ {lib.UNIT_NAME} 在跑，/health 回 ok；NFS 共享 {nfs_summary(nfs)}")
+            return 0
+        time.sleep(0.2)
+    return fail(f"起了但回读不对：is-active 打的是「{unit_active_state()}」、/health {'不通' if health_or_none(configuration) is None else '通'}",
+                f"看 journalctl --user -u {lib.UNIT_NAME} -n 100", 1)
+
+
+def stop():
+    code, _, error = run_systemctl("stop", lib.UNIT_NAME, timeout=180)
+    if lib.broken("stop-exit-status-only"):
+        return code
+    state = unit_active_state()
+    processes = unit_processes()
+    if code != 0 or state not in STOPPED_STATES or processes is None or processes:
+        return fail(f"停了但回读不对：systemctl stop 退 {code}{('（' + error + '）') if error else ''}、is-active 打的是「{state}」、"
+                    f"cgroup 里进程 {'读不到' if processes is None else len(processes)} 个", f"看 systemctl --user status {lib.UNIT_NAME}；再停一次，还停不下就把这一行交主 agent", 1)
+    say(f"  ✓ {lib.UNIT_NAME} 停了（is-active 打「{state}」、cgroup 里没有进程）；在跑的任务在各自的单元里接着跑")
+    return 0
+
+
+def clear_queue():
+    """服务停着时清掉库里的队列：tasks 与 attempts 两张表的全部行；history（用时与峰值记录）、操作与告警记录不动。先把库拷一份 .before-clear-<时刻> 再删。"""
+    import shutil
+    import sqlite3
+    state = unit_active_state()
+    if state not in STOPPED_STATES:
+        return fail(f"服务还在（is-active 打的是「{state}」）：在跑时清库会和它写的撞上", "先 python3 task-server/control stop，清完再 control start", 1)
+    configuration = lib.read_configuration()
+    backup = f"{configuration.database}.before-clear-{time.strftime('%Y%m%d%H%M%S')}"
+    shutil.copy2(configuration.database, backup)
+    os.chmod(backup, 0o600)
+    connection = sqlite3.connect(configuration.database, timeout=30, isolation_level=None)
+    connection.execute("BEGIN IMMEDIATE")
+    counts = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in ("tasks", "attempts")}
+    for table in ("tasks", "attempts"):
+        connection.execute(f"DELETE FROM {table}")
+    connection.execute("COMMIT")
+    left = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in ("tasks", "attempts")}
+    connection.close()
+    if any(left.values()):
+        return fail(f"删了但回读还剩 {left}", f"库原样在 {backup}；把这一行交主 agent", 1)
+    say(f"  ✓ 清了队列：tasks {counts['tasks']} 行、attempts {counts['attempts']} 行，回读都是 0；history 没动；清之前的库拷在 {backup}")
+    return 0
+
+
+def pin_cap(command, pinned):
+    """pin-cap / unpin-cap：经服务写钉值、回读（文件头那两行）。"""
+    what = "pin-cap" if pinned else "unpin-cap"
+    if not command:
+        return fail(f"{what} 没给命令", f"写成 python3 task-server/control {what} [--] <命令…>（与 task-server/task submit -- 后面那条一样）", lib.USAGE_EXIT)
+    try:
+        lib.require_modules()
+        configuration = lib.read_configuration()
+        lib.require_server(configuration)
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, f"task-server/control {what}")
+    try:
+        status, reply = lib.call_server(configuration.socket, "POST", "/pins", {"command": command, "pinned": pinned})
+        shown_status, shown = lib.call_server(configuration.socket, "POST", "/pins/show", {"command": command})
+    except lib.ServerUnreachable as error:
+        lib.report_unavailable_and_exit(lib.unreachable_error(configuration, str(error)), f"task-server/control {what}")
+    if status != 200 or shown_status != 200:
+        return fail(f"服务回 HTTP {status} / {shown_status}：{reply.get('detail', reply)}", f"看 journalctl --user -u {lib.UNIT_NAME} -n 100", 1)
+    if bool(shown.get("pinned")) != pinned:
+        return fail(f"{what} 之后回读不对：命令键「{shown.get('command_key')}」{'没钉上' if pinned else '还钉着'}", f"看 journalctl --user -u {lib.UNIT_NAME} -n 100；把这一行交主 agent", 1)
+    value = lib.pinned_caps_text(shown)
+    if pinned:
+        say(f"  ✓ {'钉上了' if reply.get('changed') else '原来就钉着'}：命令键「{shown.get('command_key')}」的内存上限取多机配置 {shown.get('source')} 里派到的那一台那一项（此刻 {value}），"
+            "每次定额度现读；回读钉着")
+    else:
+        say(f"  ✓ {'撤掉了' if reply.get('changed') else '原来就没钉'}：命令键「{shown.get('command_key')}」照记录定额度；回读没钉")
+    return 0
+
+
+def watch():
+    try:
+        lib.require_modules()
+        configuration = lib.read_configuration()
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, "task-server/control watch")
+    interval = FAST_WATCH_SECONDS if lib.fast() else WATCH_SECONDS
+    peer_patience = FAST_PEER_UNAVAILABLE_WATCH_SECONDS if lib.fast() else PEER_UNAVAILABLE_WATCH_SECONDS
+    say(f"  · 盯着 task-server：每 {interval} 秒查一次服务通不通、库写不写得进、派活判能起却一直没起成与看进展、单元 {lib.UNIT_NAME} 在不在、NFS 共享前三项、"
+        f"第二台用不用得了（用不了满 {peer_patience:.0f} 秒退）")
+    reported_run_failure = None
+    paused_seen = False   # 上一次读到 /health 时服务是不是暂停着：暂停是人要的状态，照样盯（只有弄坏开关 watch-skips-while-paused 下暂停着就不盯）
+    while True:
+        problems = []
+        try:
+            status, health = lib.call_server(configuration.socket, "GET", "/health", timeout=10.0)
+            paused_seen = bool(health.get("paused"))
+            if status != 200 or not health.get("ok"):
+                problems.append(f"服务回话了但不健康：{health.get('problem') or health}")
+            peer = health.get("peer") or {}
+            since = peer.get("since")
+            if peer.get("available") is False and isinstance(since, (int, float)) and time.time() - since >= peer_patience:
+                problems.append(f"第二台用不了已 {time.time() - since:.0f} 秒：{peer.get('why')}（派得到第二台的这时只派本机）")
+            failure = peer.get("last_run_failure") or {}
+            if failure and failure.get("time") != reported_run_failure and not lib.broken("watch-blind"):
+                reported_run_failure = failure.get("time")
+                print(f"  ! task-server：第二台那一趟没跑成：{failure.get('why')}（服务照重试的规矩重排；连着出就照那一句修第二台）", flush=True)
+        except lib.ServerUnreachable as error:
+            problems.append(f"服务不通（{configuration.socket}：{error}）")
+        nfs = lib.nfs_share_report(configuration.path, probe=False)
+        if not nfs["ok"]:
+            problems.append(f"NFS 共享判不过：{nfs['problem']}（出路：{nfs['next_step']}）")
+        state = unit_active_state()
+        if state not in lib.RUNNING_UNIT_STATES:
+            problems.append(f"单元 {lib.UNIT_NAME} 不在（is-active 打的是「{state}」）")
+        if paused_seen and lib.broken("watch-skips-while-paused"):
+            problems = []
+        if problems and not lib.broken("watch-blind"):
+            for problem in problems:
+                print(f"  ✗ task-server：{problem}", flush=True)   # gate-lint:detail
+            print(f"  → 怎么办：python3 task-server/control check 看卡在哪；起不来看 journalctl --user -u {lib.UNIT_NAME} -n 100；"
+                  f"NFS 共享与第二台挂载照 {lib.NFS_README} 修，第二台用不了照上面那一句修（连法、双机开关）；"
+                  "在跑的任务在各自的单元里接着跑，修好之后服务对回它们", flush=True)
+            return 1
+        time.sleep(interval)
+
+
+def main(arguments):
+    lib.refuse_selftest_variables_or_continue()
+    if arguments in (["install"], ["install", "--dry-run"]):
+        return install(arguments == ["install", "--dry-run"])
+    if arguments[:1] in (["pin-cap"], ["unpin-cap"]):
+        command = arguments[2:] if arguments[1:2] == ["--"] else arguments[1:]
+        return pin_cap(command, arguments[0] == "pin-cap")
+    if arguments[:1] == ["pause"]:
+        options = pause_options(arguments[1:])
+        if options is not None:
+            return pause_or_resume(True, options.get("--reason", ""), options.get("--allow-session", ""))
+    elif arguments == ["resume"]:
+        return pause_or_resume(False)
+    commands = {"check": check, "start": start, "stop": stop, "watch": watch, "clear-queue": clear_queue}
+    if len(arguments) == 1 and arguments[0] in commands:
+        return commands[arguments[0]]()
+    return fail(f"认不出「{' '.join(arguments)}」",
+                "写成 python3 task-server/control install [--dry-run] | check | start | stop | watch | clear-queue | pin-cap [--] <命令…> | "
+                "unpin-cap [--] <命令…> | pause [--reason <一句，带空格要加引号>] [--allow-session <会话号>] | resume", lib.USAGE_EXIT)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
