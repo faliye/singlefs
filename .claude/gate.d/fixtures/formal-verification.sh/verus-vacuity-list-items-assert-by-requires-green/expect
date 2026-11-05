@@ -1,0 +1,4 @@
+exit=0
+want=proof	verus-proof	整格（成项 1 个：exec fn 1；不成项的 spec fn 0 个：没有）；空真跳过 assert-by requires 1 处（属于 assert(…) by (…)，在那一处先证出来，不是外层函数的前提）：crates/singlefs-replay-prefix/src/lib.rs:18
+want=vacuity:singlefs_replay_prefix::halve_within#1	verus-vacuity	crates/singlefs-replay-prefix/src/lib.rs fn halve_within
+want=键对不上共

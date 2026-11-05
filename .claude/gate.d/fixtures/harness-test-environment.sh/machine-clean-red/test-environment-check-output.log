@@ -10,5 +10,6 @@
   ✓ 宿主盘·ext4 错误计数：查了 1 个 ext4（nvme0n1p2），errors_count 都是 0
   ! 宿主盘·内核日志：没查成（没查（journalctl 与 dmesg 都读不到：权限不够））
      → 怎么办：把本用户加进 systemd-journal 组，或给 journalctl 读内核日志的权限，再跑一次
-  - 宿主盘·SMART：没跑（没给 --smart）
-  汇总：查了 10 类；✓ 7 类，判红 1 类（临时目录残留），没查成 1 类（宿主盘·内核日志（没查（journalctl 与 dmesg 都读不到：权限不够））），没跑 1 类（宿主盘·SMART（没给 --smart））
+  ✓ 宿主盘·SMART：查了 1 块盘，都正常
+       nvme0n1：critical_warning=0，media_errors=0
+  汇总：查了 10 类；✓ 8 类，判红 1 类（临时目录残留），没查成 1 类（宿主盘·内核日志（没查（journalctl 与 dmesg 都读不到：权限不够））），没跑 0 类

@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：prune-server-selftest
+want=prune-server 自证：20 格都过（PRUNE_SERVER_SELFTEST cells=20 passed=20 failed=0 failed_cells=-，退 0）
+want=prune-server-selftest：绿

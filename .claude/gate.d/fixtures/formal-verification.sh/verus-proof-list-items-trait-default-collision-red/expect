@@ -1,0 +1,5 @@
+exit=1
+want=交给 --verify-function 的 *::LIMIT 在这个模块的 Verus 可点名函数表里命中 2 项
+want=const Limited::LIMIT（crates/singlefs-replay-prefix/src/lib.rs:11）
+want=const Ordinal::LIMIT（crates/singlefs-replay-prefix/src/lib.rs:15）
+want=列不出 Verus 那几格的项：scripts/gate/verus-proof-check.py list-items 退 1

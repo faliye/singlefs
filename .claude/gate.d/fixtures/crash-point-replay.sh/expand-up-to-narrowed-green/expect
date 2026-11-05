@@ -1,0 +1,10 @@
+exit=3
+want=样本档：
+want=第 1 节（stream=clean-stream states=100）：signatures=0 red_states=0 states=100
+want=crash-case:clean-stream 判绿
+want=crash-case:no-enumeration 判绿
+want=✓ 崩溃状态块：现判 3、复用 0、拒算 0、本次未跑 0
+want=缩过域、不算门禁通过：SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6
+want=逐格：crash-case-replay：绿
+want=退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

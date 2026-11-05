@@ -1,0 +1,6 @@
+exit=1
+want=.claude/kb/tooling.md:4: .claude/rules/sample-rule.md「跑批脚本不许吞掉单轮失败」在那份文件里一处都找不到：最像的是那份文件第 5 行的句子「跑批脚本不许把单轮的失败吞掉（`|| true` 那种）」，照它改小节名或改写那一句
+want=.claude/kb/tooling.md:5: .claude/rules/sample-rule.md「从来没有写过的一句话」在那份文件里一处都找不到：那份文件里没有，改写那一句或删去
+want=  kb 小节：扫 1 份 kb 中文页，判了 3 处（滞后 0 处、保留 0 处）；文件找不到没判 0 处；小节滞后表 0 行（没有小节滞后表）
+want=治理文档与 kb 里有指不到的指向（上面逐条列出）
+want=  governance-refs：红（退出 1）

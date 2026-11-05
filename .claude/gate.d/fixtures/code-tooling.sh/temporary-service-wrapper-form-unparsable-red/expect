@@ -1,0 +1,4 @@
+exit=1
+want=✗ 要临时服务的自证的整条写法有 1 处对不上包装的用法
+want=整条该是「python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <解释器> <脚本> --selftest」
+want=runner 表（样本根的 .selftest-runners 第 2 条）：原文「python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --memory 4G --」，包装的解析认不出 --memory 4G（认不出的参数退 2）

@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=crates/singlefs-core/src/block_device.rs:9 的 // SAFETY: 注释没写出它依赖的前提：没提到hal
+want=第 6 段登记的词（hal、适配器）这个函数里每一处都要提到
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（unsafe-allowances）
+want=→ unsafe-allowances：
+want=bash .claude/gate.d/code-source-discipline.sh --check unsafe-allowances

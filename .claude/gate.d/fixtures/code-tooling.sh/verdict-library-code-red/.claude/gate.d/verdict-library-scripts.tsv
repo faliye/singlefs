@@ -1,0 +1,4 @@
+# 样本：两行 prune-server，一行第三列还写库根的 git common-dir
+scripts/sample/silent.sh	bash scripts/sample/silent.sh --selftest	prune-server（unit-verdicts 族，样本）	reuse-three-questions
+scripts/sample/local.py	python3 scripts/sample/local.py --selftest	prune-server（verdict-library 族，样本）	reuse-three-questions
+scripts/sample/old_root.sh	bash scripts/sample/old_root.sh --selftest	<库根的 git common-dir>/singlefs-unit-verdicts/sample/	reuse-three-questions

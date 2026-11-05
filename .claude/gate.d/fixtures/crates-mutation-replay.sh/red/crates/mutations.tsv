@@ -1,0 +1,6 @@
+# 门禁 crates-mutation-replay 的判别力样本（红）：只动注释的一行、编不过的一行、两行基线不绿
+# 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
+comment-only	crates/tiny/src/lib.rs	// 门禁 crates-mutation-replay 的判别力样本	// 变异只动注释	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+compile-error	crates/tiny/src/lib.rs	    left + right	    left + missing_identifier	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+ambiguous-name	crates/tiny/src/lib.rs	    value * 2	    value * 3	-p tiny --lib -- doubles_three_to_six	doubles_three_to_six
+reads-outside	crates/tiny/src/lib.rs	pub const ANSWER: &str = "42";	pub const ANSWER: &str = "43";	-p tiny --lib -- reads_the_answer_from_outside_the_copy	reads_the_answer_from_outside_the_copy

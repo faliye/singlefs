@@ -1,0 +1,4 @@
+# 记红、撤绿、下趟现判：库单测在不带特性那一趟判红、照键记红，带特性那一趟同一把键查库答「上次判红」、现判它；判的是 crash-case-replay 格（判红交不交 --red-names）。门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 feature-gated-tests：expect 里写着带特性那一趟（逐格那一行写到 feature-gated-tests）
+crash-case-replay
+feature-gated-tests

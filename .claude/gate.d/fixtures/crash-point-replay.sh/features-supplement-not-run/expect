@@ -1,0 +1,17 @@
+exit=3
+want=样本档：
+want=· 判绿记库：RECORD recorded=1 changed=0 refused=0
+want=· feature-gated-tests：不带特性那一趟打了 NOT_RUN_ 的测试函数由这一趟补判，另带上它们所在的测试目标：--test enumeration
+want=现判 crates/singlefs-verification/tests/enumeration.rs::enumeration_default_shape（库里没有这一条）
+want=复用 crates/singlefs-verification/tests/enumeration.rs::enumeration_plain_check
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-verification --features gpu --lib --test gpu_pair --test enumeration -- --nocapture --test-threads 1
+want=--skip enumeration_plain_check
+want=· feature-gated-tests：带 gpu 特性那一趟要上卡，显卡是 task-server 交的 192.0.2.1:0:8G（清场归 task-server，这里不另套清场包装）
+want=· 判绿记库：RECORD recorded=2 changed=0 refused=0
+want=· 不带特性那一趟（tests/enumeration.rs）报的本次未跑由带特性那一趟补判到了：NOT_RUN_GPU_FEATURE_NOT_COMPILED_IN test=crash_state_enumeration::default_batch reason=多机配置写了 ENABLE_GPU=1，这一趟没编进 gpu 特性（样本）（tests/enumeration.rs::enumeration_default_shape 判绿）
+want=✓ feature-gated-tests：1 个挂特性的测试文件（特性 gpu）每个都编进来、跑到了用例，共 1 条
+want=逐格：crash-case-replay：绿；feature-gated-tests：绿
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=feature-gated-tests 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的验证包那一步，不许记成通过）
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的验证包那一步，不许记成通过）

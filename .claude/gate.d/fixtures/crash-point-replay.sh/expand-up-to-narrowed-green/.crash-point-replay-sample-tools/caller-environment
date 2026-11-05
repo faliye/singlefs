@@ -1,0 +1,2 @@
+# 当作调用方的环境导出：缩崩溃域的展开深度变量设了 6，这一趟是缩过域的
+SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6

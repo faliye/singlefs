@@ -1,0 +1,5 @@
+exit=0
+want=proof	verus-proof	整格（成项 2 个：exec fn 2；不成项的 spec fn 2 个：singlefs_replay_prefix::issued、singlefs_replay_prefix::Store::put）
+want=proof:singlefs_replay_prefix::Shelf::put	verus-proof	exec fn crates/singlefs-replay-prefix/src/lib.rs:25
+want=proof:singlefs_replay_prefix::clamp_to_limit	verus-proof	exec fn crates/singlefs-replay-prefix/src/lib.rs:30
+want=键对不上共

@@ -1,0 +1,7 @@
+exit=1
+want=4 处项目脚本直接起 multi-host-run.sh --peer 往第二台起活
+want=scripts/experiment-apparatus/driver.sh:4  「bash scripts/hosts/multi-host-run.sh --peer
+want=scripts/experiment-apparatus/driver.sh:5  「bash "$MULTI_HOST_RUN" --peer -- true」
+want=scripts/experiment-apparatus/driver.py:4  「return ["bash", context.multi_host_run, "--peer"]
+want=.claude/gate.d/fixtures/sample-stage/case/setup.sh:3  「bash scripts/hosts/multi-host-run.sh --peer -- true」
+want=照 task-server/task_server_lib.py 文件头「分片」改

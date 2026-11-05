@@ -1,0 +1,15 @@
+exit=1
+want=滞后表 .claude/gate.d/owed-refs-paid-lag.tsv 有 10 处不对
+want=owed-refs-paid-lag.tsv:3 有 3 列，要四列
+want=owed-refs-paid-lag.tsv:4 第二列「20」不是 C<编号> 的写法
+want=owed-refs-paid-lag.tsv:5 第四列要以 # 起头、写为什么还没改（至少 4 个字）
+want=owed-refs-paid-lag.tsv:6 锚只有 11 个字，要那一行里至少 12 个字的原文
+want=owed-refs-paid-lag.tsv:7 与第 2 行登记的是同一条（路径、C 号、锚都相同）
+want=owed-refs-paid-lag.tsv:8 登记的路径不在：.claude/kb/decisions/09-不在的样本决策.md
+want=owed-refs-paid-lag.tsv:9 锚在 .claude/kb/decisions/01-样本决策.md 里命中 0 行，要恰好一行
+want=owed-refs-paid-lag.tsv:10 锚在 .claude/kb/decisions/01-样本决策.md 里命中 2 行（第 15、19 行），要恰好一行
+want=owed-refs-paid-lag.tsv:11 锚命中的 .claude/kb/decisions/01-样本决策.md:11 里没有 C21
+want=owed-refs-paid-lag.tsv:12 C10 已不在 .claude/kb/checks-owed.md 的已还清表里
+want=样本只跑 .gate-cells 点名的格：owed-refs-paid
+want=  owed-refs-paid：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（owed-refs-paid）

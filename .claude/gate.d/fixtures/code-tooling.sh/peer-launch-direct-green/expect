@@ -1,0 +1,2 @@
+exit=0
+want=项目脚本里没有直接起 multi-host-run.sh --peer 的：扫了 3 份（scripts 2、.claude/gate.d 1）

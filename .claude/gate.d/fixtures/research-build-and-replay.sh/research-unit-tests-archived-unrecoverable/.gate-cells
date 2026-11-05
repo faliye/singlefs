@@ -1,0 +1,2 @@
+# 单测按字面 concat! 读的留存产物树里没有、git 历史里也没有：这一格判红「取不回」，一个 cargo test 都不起
+research-unit-tests

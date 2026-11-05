@@ -1,1 +1,1 @@
-pub use singlefs_checker_tier::gpu_unit_checks;
+pub use singlefs_verification::gpu_unit_checks;

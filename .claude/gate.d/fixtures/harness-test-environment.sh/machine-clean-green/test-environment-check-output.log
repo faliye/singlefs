@@ -7,5 +7,6 @@
   ✓ 宿主盘·剩余空间：查了 1 个文件系统，剩余都不低于 10% 且不低于 50 GiB
   ✓ 宿主盘·ext4 错误计数：查了 1 个 ext4（nvme0n1p2），errors_count 都是 0
   ✓ 宿主盘·内核日志：journalctl -k -b -p err 共 171 行，没有落在宿主盘栈上的块设备错误
-  - 宿主盘·SMART：没跑（没给 --smart）
-  汇总：查了 10 类；✓ 9 类，判红 0 类，没查成 0 类，没跑 1 类（宿主盘·SMART（没给 --smart））
+  ✓ 宿主盘·SMART：查了 1 块盘，都正常
+       nvme0n1：critical_warning=0，media_errors=0
+  汇总：查了 10 类；✓ 10 类，判红 0 类，没查成 0 类，没跑 0 类

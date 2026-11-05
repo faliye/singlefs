@@ -1,0 +1,3 @@
+exit=1
+want=列不出可点名的项：crates/singlefs-replay-prefix/src/lib.rs 第 17 行的 requires 找不到函数体的 {
+want=列不出 Verus 那几格的项：scripts/gate/verus-proof-check.py list-items 退 1

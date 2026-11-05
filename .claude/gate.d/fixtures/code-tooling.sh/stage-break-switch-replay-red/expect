@@ -1,6 +1,6 @@
 exit=1
 want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
-want=! 本次未跑：heavy-stage.sh：样本档登记成 samples-heavy，复跑起真重活，归提交时那一趟
+want=! 本次未跑：unregistered-stage.sh：样本档没登记（要登记成 samples 或 samples:<假工具目录>），复跑的范围不含它
 want=sample-stage.sh:6 SAMPLE_STAGE_BREAK=swallow-red：点名的与实测判错的不等（点了没错：sample-green；错了没点：sample-red）
 want=sample-stage.sh:8 SAMPLE_STAGE_BREAK=unnamed 缺点名的项
 want=.claude/gate.d/stage-break-switch-replay-exempt.tsv:2 sample-stage.sh SAMPLE_STAGE_BREAK=gone-switch：那一道的头注里已经没有这一条

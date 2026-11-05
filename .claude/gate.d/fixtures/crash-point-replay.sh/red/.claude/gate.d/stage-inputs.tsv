@@ -1,0 +1,4 @@
+crash-point-replay.sh	tests-of:singlefs-verification	command=cargo command=rustc	# 样本：本阶段那一行（入口是 验证包的测试函数）
+crash-case:two-signatures	-	test=singlefs-verification:two_signatures:two_signatures_full	# 样本
+crash-case:unfinished	-	test=singlefs-verification:unfinished:unfinished_full	# 样本
+crash-case:many-signatures	-	test=singlefs-verification:many_signatures:many_signatures_full	# 样本

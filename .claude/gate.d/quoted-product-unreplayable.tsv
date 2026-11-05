@@ -1,0 +1,9 @@
+# 进不了 replay.sh 复跑表的产物登记表：门禁 doc-experiments 的 quoted-result-lines 格读它，实验页整行抄的 E7RESULT 行除了在 replay.sh 登记着的产物里找，也在这里登记的产物里逐字找。
+# 写法（制表符分隔，三列，一行一份产物）：<产物文件名，research/results/ 下的 .out 或 .out.gz，树里没有的在版本库历史里找><TAB><怎么跑出的><TAB><为什么进不了复跑表>
+# 怎么跑出的写清命令与跑法（哪个脚本、哪一步、经谁分片），为什么写清 replay.sh 装不下它的哪一点（跑法分片、产物带挂钟这类）并点名写死这一点的跑前登记；任何一列空着判红。
+# 产物名在树里和版本库历史里都找不到判红（改了名或删了，改或删这一行）。能进 replay.sh 复跑表的不登这里：登记表只放行「整行抄的行去哪份产物里找」，不放行没写复跑命令（那是 repro-command-unreproducible.tsv 按页登记的事）。
+# 登记表不在当没有登记；没登记的产物照旧只认 replay.sh。
+e183-capacity-read-cache-reserve-and-sweep-costs-h2-2026-11-03.out	bash scripts/experiment-apparatus/e183-capacity-cells.sh run，经统一任务服务按分片声明拆成计划、5 片、合并三步跑出，产物最前面接准入 admission.py experiment E183/h2 的 E7INPUT 行	一趟要分 5 片跑数小时、两台都可能派到，replay.sh 是一条任务里整份跑，装不下这种跑法；产物带挂钟字段，逐字节比不了；跑前登记 research/prompts/e183-r2-prereg.md 5.6 第 2 条写死不加复跑表行
+e199-transaction-output-copy-call-sites-2026-11-04.out	执行员草稿里的 call_sites.py（源码整份抄在产物文件头以「#| 」起头的行里）在 2026-11-04 那一棵树的主工作区仓根起 python3 -I，三条 grep 现跑，再按文件与所在函数归类	三条 grep 读的是起它那一刻的 crates/ 源码，树一改命中数就变（2026-11-05 改动之后由 469 + 150 + 5 变成 487 + 153 + 5），replay.sh 的 exact 比对不上；第四份登记 research/prompts/e199-preregistration-r4.md 第五节「丙调用点清单」把它定成只当命中数与规模
+e199-transaction-output-copy-call-sites-read-2026-11-05-r2.out	执行员逐处读码（重读，整份换第一份）：读法写在执行员草稿 e199-runner-call-sites-reread/calls/ 下的 callgraph.py、compact.py、reread_judgments.py，generate_reread.py 拼成逐处一行，不起项目代码	逐处读码是人读出来的判断，没有能复跑的程序；第四份登记 research/prompts/e199-preregistration-r4.md 第五节「丙调用点清单」写死交付形态是逐处一行、由主 agent 照「谁核」取法抽查核
+e199-transaction-output-copy-call-sites-check-2026-11-05.out	主 agent 照第四份登记第五节「谁核」三条取法逐处读码，把读到的 read_class、holds、change 与第二份清单比，一处一行，不起项目代码	这是主 agent 读码的记录，没有能复跑的程序，也不是装置产物；第四份登记 research/prompts/e199-preregistration-r4.md 第五节「谁核」写死它不进 replay.sh

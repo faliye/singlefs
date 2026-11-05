@@ -1,0 +1,4 @@
+exit=75
+want=✗ 复跑没判：prune-server 不可用（replay.sh 退 75，原因在上面），这一格退 75
+want=experiment-replay：prune-server 不可用（退出 75）
+want=── 汇总：research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）

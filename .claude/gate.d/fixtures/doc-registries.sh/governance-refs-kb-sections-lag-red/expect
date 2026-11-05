@@ -1,0 +1,11 @@
+exit=1
+want=.claude/gate.d/dead-section-lag.tsv:3: .claude/kb/tooling.md 的现状文字里已经没有找不到的 .claude/rules/sample-rule.md「先写会红的检查」
+want=.claude/gate.d/dead-section-lag.tsv:4: .claude/kb/tooling.md 的现状文字里已经没有找不到的 .claude/rules/sample-rule.md「载体不再引的一句」
+want=.claude/gate.d/dead-section-lag.tsv:5: 比 gate 基准 HEAD 那一版多这一行（.claude/kb/tooling.md 里的 .claude/rules/sample-rule.md「新写的旧说法」）：只缩不涨，新写的找不到的小节当场照红行的出路改
+want=.claude/gate.d/dead-section-lag.tsv:6: 有 2 列
+want=.claude/gate.d/dead-section-lag.tsv:7: 第三列要以 # 起头
+want=.claude/gate.d/dead-section-lag.tsv:8: 与第 2 行登记的是同一条
+want=.claude/gate.d/dead-path-kept.tsv:2: .claude/kb/tooling.md 的现状文字里已经没有找不到的 .claude/rules/sample-rule.md「样例规则」
+want=.claude/gate.d/dead-path-kept.tsv:3: 与滞后表 .claude/gate.d/dead-section-lag.tsv 第 2 行登记的是同一对
+want=  kb 小节：扫 1 份 kb 中文页，判了 3 处（滞后 1 处、保留 1 处）
+want=  governance-refs：红（退出 1）

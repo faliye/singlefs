@@ -1,0 +1,4 @@
+# 样本的要临时服务的自证登记表：一份 required，两份 own-server（一份在 runner 表里包着只为交二进制，一份在 runner 表里裸写）
+scripts/gate/sample-required-wrapped.py	required	# 样本：自证开跑先要临时服务，runner 表里写成了包装写法
+scripts/gate/sample-own-server-wrapped.py	own-server	# 样本：自证自己起真服务，runner 表里包着只为交二进制
+scripts/gate/sample-own-server-bare.py	own-server	# 样本：自证自己起真服务，runner 表里裸写；不要求包装

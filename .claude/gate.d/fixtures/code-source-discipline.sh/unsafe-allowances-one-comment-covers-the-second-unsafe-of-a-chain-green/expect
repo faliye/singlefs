@@ -1,0 +1,10 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=crates/ 里放开 unsafe 的地方与登记表对上：扫了 1 个 crate、2 个 .rs、登记表 2 行、放开 1 处、unsafe 2 处、bin 根 1 个（登记了的 1 个）
+want=singlefs-verification 根 forbid、放开 0 处、unsafe 0 处、1 个 .rs、登记 1 行
+want=singlefs-verification/src/bin/e900_thread_clock.rs 根 deny、放开 1 处、unsafe 2 处、1 个 .rs、登记 1 行
+want=登记了但仓里没有的 crate 0 个：无
+want=include! 与 #[path] 点到、没有哪个 crate 当 .rs 扫的文件另扫了 0 份
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：绿
+want=code-source-discipline.sh：1 格里 1 格绿（unsafe-allowances），0 格本次未跑（无）

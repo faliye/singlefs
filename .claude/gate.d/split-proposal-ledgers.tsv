@@ -1,0 +1,8 @@
+# 拆分提案账本登记：subagent 与协作工具的欠账往哪一份追加（现行）、哪几份封存不再改。门禁 doc-process-records 的 deferred-items-registered、
+# ledger-section-numbers、sealed-ledgers-unchanged 三格都读被判的根里的这一份；换账本只改这一张表（再新建一份时，旧的现行那一行改成封存、记下它此刻的 sha256）。
+# 一行一份，四段用制表符分隔：角色（current 或 sealed）、从仓根起的路径（records/ 下的 .md）、封存时内容的 sha256（current 那一行写 -）、为什么（8 个字以上）。
+# current 恰好一行；sealed 行的次序就是 deferred-items-registered 找节号时在现行那份之后挨个找的次序（新封存的写在前面）。
+# 封存那几份的 sha256 由 sealed-ledgers-unchanged 逐份比；对不上就是封存之后又被改了，照它的出路把那份恢复成封存时那一版，新内容往现行那一份追加。
+current	records/2026-10-29-subagent拆分提案.md	-	用户 2026-10-31 定「新建一份 没做完的都放到新的里面。 以后过去的两版作为历史封存」，新欠账往这一份末尾追加
+sealed	records/2026-10-23-subagent拆分提案.md	943ba3e7358b25f303c47e1d744005e903a296f306897b8c41a1e82386c7fe7c	用户 2026-10-31 定两版封存当历史；判为做完之外的 59 节已照原节号抄进现行那一份
+sealed	records/2026-09-16-subagent拆分提案.md	8ffa5c1260c421e9f03e644f569813c19bba41a0a860643afd7bb2225d1848da	用户 2026-10-31 定两版封存当历史；它是 2026-10-23 那份拆出来之前的登记处

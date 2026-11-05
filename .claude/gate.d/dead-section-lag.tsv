@@ -1,0 +1,32 @@
+# kb 里找不到的 `文件「小节」` 的滞后表：门禁 doc-registries 的 governance-refs 格（.claude/gate.d/lib-governance-refs.py 的 ③ 扩到 kb）此刻就判红、当场改不完的存量，一行一处（载体与引用成对）。
+# 写法（制表符分隔，三列）：<载体路径，相对仓根><TAB><文件>「<小节>」（照红行里的写法）<TAB># <为什么还没改，至少 4 个字>
+# 按（载体, 第二列）认，不按行号：同一份载体里同一处引用出现几次，一行全罩住。那份载体的现状文字里已经没有这一处找不到的（小节找得到了，或那一句改了、删了、挪进历史节），判红「这一行该删」。
+# 只缩不涨：与 gate 基准那一版按（载体, 第二列）比，基准里没有的行判红。照红行冒号后面给的最像的标题或句子改好一处（那份文件里没有的改写那一句或删去），就在同一次改动里删它那一行。
+# 照规矩该留的（句子本身说那一句已改掉、抄下来的当时的原文）不登这里，登可以增长的保留表 dead-path-kept.tsv（第二列同样写 <文件>「<小节>」）；同一对不许两张表都登。
+.claude/kb/checks-owed.md	.claude/singlefs-ai-sop/rules/show-me-test.md「跑批脚本不许吞掉单轮失败」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/checks-owed.md	.claude/singlefs-ai-sop/rules/show-me-test.md「判据的搜索范围写窄一点，对象就会全被第一步跳过」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/checks-owed.md	.claude/singlefs-ai-sop/rules/evidence-discipline.md「引用别家实现时必须同时写下一处已知差异」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/checks-owed.md	crates/singlefs-checker/invariants/01-块自描述.md「nonce 代号必须放明文头、无密钥可读」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/checks-owed.md	.claude/singlefs-ai-sop/rules/sop-first.md「先有脚本、后有被测对象，是正常的」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/checks-owed.md	.claude/singlefs-ai-sop/rules/test-discipline.md「失败条款的前件可以写反，写反之后它永远不触发」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/decisions/02-RAID条带策略.md	.claude/singlefs-ai-sop/rules/evidence-discipline.md「新立一条判据，当场拿它回扫已有的条目」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/decisions/06-快照实现模型.md	.claude/rules/format-evolution.md「第一个外部用户出现前磁盘格式是软的」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/decisions/13-验证路线.md	records/2026-10-13-复用键与全仓改名.md「2026-10-15 用户定：提交与重跑无关，重跑只跟代码变化走」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/decisions/15-格式冻结政策.md	.claude/singlefs-ai-sop/rules/show-me-test.md「不按来源区分，只按证据区分」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/decisions/16-发布语义.md	.claude/rules/three-way-inference.md「闸判红之后那一轮作废」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/decisions/17-实现分层与第三方管道.md	.claude/singlefs-ai-sop/rules/show-me-test.md「不按来源区别对待」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/decisions/23-journal的角色与格式.md	.claude/singlefs-ai-sop/rules/evidence-discipline.md「校验的两条路径不许共享同一段代码」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/decisions/24-后台重活能不能卸给GPU.md	.claude/singlefs-ai-sop/rules/evidence-discipline.md「校验的两条路径不许共享同一段代码」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/experiments/100-系统配置的三段几何.md	.claude/rules/fs-design.md「用错了能不能变成挂不上」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/experiments/130-每头一份livelist过不过有界销毁.md	.claude/singlefs-ai-sop/rules/test-discipline.md「失败条款的前件可以写反」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/experiments/31-AAD缺快照维.md	decisions/06-快照实现模型.md「已定（2026-08-29，用户定案）：取多可写头」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/experiments/43-扩展点字节上限.md	.claude/singlefs-ai-sop/rules/test-discipline.md「等价变异分开记」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/experiments/48-根环几何的可行点.md	.claude/singlefs-ai-sop/rules/test-discipline.md「改了判据就是新实验」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/experiments/95-老化的节点布局臂.md	.claude/singlefs-ai-sop/rules/show-me-test.md「坑在建模口径上，检查要立在装置之间」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/milestone/02-second-txn.md	.claude/kb/tooling.md「超时当判据的跑法，在这台机器上被并发污染」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/milestone/02-second-txn.md	records/2026-10-13-复用键与全仓改名.md「2026-10-15 批3」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/milestone/03-third-txn.md	records/2026-10-13-复用键与全仓改名.md「2026-10-18 会话收尾」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/prior-art.md	.claude/singlefs-ai-sop/rules/test-discipline.md「模型对拍」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/prior-art.md	.claude/singlefs-ai-sop/rules/evidence-discipline.md「没有任何现役实现走 X 这条路」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/verification-build.md	.claude/singlefs-ai-sop/rules/test-discipline.md「崩溃一致性只能靠崩溃点重放验证」	# 2026-11-01 建表时登记的存量（那份文件里已经没有这一句），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）
+.claude/kb/verification-build.md	records/2026-10-13-复用键与全仓改名.md「2026-10-15 批3」	# 2026-11-01 建表时登记的存量（原文措辞或小节名改了，最像的那一条还在），下一批照红行的出路逐处改（records/2026-11-01-服务描述与历史腐烂.md 课题 4）

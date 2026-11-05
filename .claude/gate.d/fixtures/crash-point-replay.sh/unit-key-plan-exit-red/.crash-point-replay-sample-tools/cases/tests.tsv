@@ -1,0 +1,4 @@
+src/lib.rs	-	none
+tests/setting.rs	test_t	ok
+tests/setting.rs	test_u	ok
+tests/setting.rs	test_v	ok

@@ -1,5 +1,0 @@
-[package]
-name = "sample-tier-bridge"
-
-[dependencies]
-singlefs-checker-tier = { path = "../singlefs-checker-tier" }

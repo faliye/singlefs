@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=── 复用三问：first 那一趟（stage-break-switch-replay）
+want=全部复用，这一格一条都没起
+want=· 按条复用：3 条开关（2 道阶段），现判 2、复用 1、拒算 0
+want=REUSE_SELFTEST script=.claude/gate.d/code-tooling.sh same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=3 affected=2
+want=stage-break-switch-replay：绿

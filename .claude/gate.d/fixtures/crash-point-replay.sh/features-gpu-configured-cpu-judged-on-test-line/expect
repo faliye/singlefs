@@ -1,0 +1,18 @@
+exit=1
+want=· 判绿记库：RECORD recorded=2 changed=0 refused=0
+want=· feature-gated-tests 按条复用：--lib 与挂特性的 2 个测试目标里 5 条编得进的测试函数，现判 4、复用 1、拒算 0
+want=复用 crates/singlefs-verification/src/lib.rs::tests::shared_check
+want=tests/gpu_pair.rs：test gpu_pair_cpu_judged ... CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本 threads=4
+want=tests/gpu_stream.rs：test gpu_stream_second ... CRASH_POINT_REPLAY_PARALLEL_START states=8
+want=· feature-gated-tests：判段判在 CPU 的记号 2 处：归到测试函数的 2 处（那几条照键记红、撤绿，下一趟现判），归不到测试函数、只归到测试二进制的 0 处（无：这几个二进制里判绿的这一趟都不记）
+want=· 判绿不记库 2 条（这一趟现判、按条记库不认的；下一趟照跑）：
+want=不记 crates/singlefs-verification/tests/gpu_pair.rs::gpu_pair_cpu_judged（这一段打了 判段判在 CPU 的一行，认作它打的
+want=不记 crates/singlefs-verification/tests/gpu_stream.rs::gpu_stream_second（这一段打了 判段判在 CPU 的一行，认作它打的
+want=· 判红记库：2 条记红、撤掉同一把键原有的绿，下一趟照现判（RECORD recorded=2 changed=0 refused=0 red=2
+want=· 判绿记库（feature-gated-tests 这一趟判红）：判绿的 2 条照键记库（RECORD recorded=2 changed=0 refused=0 red=2
+want=✗ feature-gated-tests：带 gpu 特性那一趟判在 CPU：多机配置
+want=日志里有 2 处判段判在 CPU（上面列了前 20 处）
+want=· feature-gated-tests：带 gpu 特性那一趟要上卡，显卡是 task-server 交的 192.0.2.1:0:8G（清场归 task-server，这里不另套清场包装）
+want=逐格：crash-case-replay：绿；feature-gated-tests：红
+want=✗ 有 1 格判红：feature-gated-tests（各自的出路在上面）
+want=feature-gated-tests：红

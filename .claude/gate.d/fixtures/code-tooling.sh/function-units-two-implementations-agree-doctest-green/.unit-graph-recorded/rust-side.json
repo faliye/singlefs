@@ -1,0 +1,38 @@
+{
+"closures": {
+"closure\tfdocsample::documented\t--target\tdoctest\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"doctest\tfdocsample::documented::<doctest line 3>\tcrates/fdocsample/src/lib.rs:3-5\t29f639486e631a6ec9834abaab69f2a31137957063630162d07cbd57294aa313",
+"doctest\tfdocsample::documented::<doctest line 7>\tcrates/fdocsample/src/lib.rs:7-9\t28159050d3a1e96ea0764a1c2caa7b8a207e4cfaf1b280417d6564899a27e8c0",
+"fn\tfdocsample::documented\tcrates/fdocsample/src/lib.rs:10-12\tfbc1b40bbe89177e2ddafbd829fad5dafc302cb76c818ae8cb3ce625c3273241",
+"key\tf98ae3438c5cd3b4a657c3c325859792a84f7078117bb98073dc08e9af4bfd53"
+]
+},
+"closure\tfdocsample::documented\t--target\tdoctest\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"doctest\tfdocsample::documented::<doctest line 3>\tcrates/fdocsample/src/lib.rs:3-5\t29f639486e631a6ec9834abaab69f2a31137957063630162d07cbd57294aa313",
+"doctest\tfdocsample::documented::<doctest line 7>\tcrates/fdocsample/src/lib.rs:7-9\t28159050d3a1e96ea0764a1c2caa7b8a207e4cfaf1b280417d6564899a27e8c0",
+"fn\tfdocsample::documented\tcrates/fdocsample/src/lib.rs:10-12\tfbc1b40bbe89177e2ddafbd829fad5dafc302cb76c818ae8cb3ce625c3273241",
+"key\tf98ae3438c5cd3b4a657c3c325859792a84f7078117bb98073dc08e9af4bfd53"
+]
+},
+"dump\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"doctest\tfdocsample::documented::<doctest line 3>\tcrates/fdocsample/src/lib.rs:3-5\t29f639486e631a6ec9834abaab69f2a31137957063630162d07cbd57294aa313",
+"doctest\tfdocsample::documented::<doctest line 7>\tcrates/fdocsample/src/lib.rs:7-9\t28159050d3a1e96ea0764a1c2caa7b8a207e4cfaf1b280417d6564899a27e8c0",
+"fn\tfdocsample::documented\tcrates/fdocsample/src/lib.rs:10-12\tfbc1b40bbe89177e2ddafbd829fad5dafc302cb76c818ae8cb3ce625c3273241"
+]
+}
+},
+"dump": {
+"exit": 0,
+"lines": [
+"doctest\tfdocsample::documented::<doctest line 3>\tcrates/fdocsample/src/lib.rs:3-5\t29f639486e631a6ec9834abaab69f2a31137957063630162d07cbd57294aa313",
+"doctest\tfdocsample::documented::<doctest line 7>\tcrates/fdocsample/src/lib.rs:7-9\t28159050d3a1e96ea0764a1c2caa7b8a207e4cfaf1b280417d6564899a27e8c0",
+"fn\tfdocsample::documented\tcrates/fdocsample/src/lib.rs:10-12\tfbc1b40bbe89177e2ddafbd829fad5dafc302cb76c818ae8cb3ce625c3273241"
+]
+}
+}

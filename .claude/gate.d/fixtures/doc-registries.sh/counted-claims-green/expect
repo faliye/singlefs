@@ -1,0 +1,6 @@
+exit=0
+want=✓ 登记的能数的数都与现数相等（核了 4 行、3 份文件、起了 3 条命令；登记表 .claude/gate.d/counted-claims.tsv）
+want=README.md:3 6；README.en.md:3 6；NOTES.md:3 6；NOTES.md:3 4
+want=样本只跑 .gate-cells 点名的格：counted-claims
+want=  counted-claims：绿
+want=doc-registries.sh：1 格里 1 格绿（counted-claims），0 格本次未跑（无）

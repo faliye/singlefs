@@ -1,0 +1,9 @@
+exit=1
+want=登记表 .claude/gate.d/quoted-product-unreplayable.tsv 有 1 处写得不对：
+want=第 3 行：e99-sample-2026-11-03-gone.out 在 research/results/ 与版本库历史里都找不到
+want=一行一份产物，<产物文件名><TAB><怎么跑出的><TAB><为什么进不了复跑表>
+want=样本只跑 .gate-cells 点名的格：quoted-result-lines
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（quoted-result-lines）
+want=→ quoted-result-lines：打开这个实验复跑命令登记的那份产物
+want=bash .claude/gate.d/doc-experiments.sh --check quoted-result-lines

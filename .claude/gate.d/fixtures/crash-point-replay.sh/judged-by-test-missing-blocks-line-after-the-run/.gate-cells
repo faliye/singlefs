@@ -1,0 +1,3 @@
+# 登记了 red-blocks=judged-by-test 的崩溃枚举用例 这一趟里 cargo test 退 0 而日志里没有 CRASH_CASE_BLOCKS 行：块那一行仍要在（crash-case-blocks --ran 退 4），判红；
+# 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 实验页与产物（十三格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记、点名的路径找得到、跑前登记的并行与挂钟、重跑登记的比对对象表与机读登记逐行对得上且在单元表与复跑表里找得到）
+# gate-stage: 实验页与产物（十五格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记、点名的路径找得到、跑前登记的并行与挂钟、跑前登记里走崩溃判段的装置带 gpu 特性、判段入口表与源码同步、重跑登记的比对对象表与机读登记逐行对得上且在单元表与复跑表里找得到）
 # gate-fixture: yes
 # gate-category: 文档类
 # 不声明 gate-covers：未实现清单（.claude/gate-not-implemented.tsv）里的两项判被测代码的行为，这一道只判文本。
-# gate-similar: checker-tier-research-build-and-replay.sh 它的 experiment-replay 格按 scripts/experiment-apparatus/replay.sh 登记表逐条复跑装置、逐字节比产物，要编译、归重型；这一道只读登记表、实验页与产物的文本，判产物有没有被点名、判决行的 false 有没有被解释、整行抄的产物行找不找得到，不跑装置
+# gate-similar: research-build-and-replay.sh 它的 experiment-replay 格按 scripts/experiment-apparatus/replay.sh 登记表逐条复跑装置、逐字节比产物，要编译；这一道只读登记表、实验页与产物的文本，判产物有没有被点名、判决行的 false 有没有被解释、整行抄的产物行找不找得到，不跑装置
 # gate-similar: doc-registries.sh 它的 experiment-refs 格判全 kb 里的实验号引用有定义，对象是引用；audit-contradictions 格核欠账表与里程碑收口表的引文在 kb 里找得到，方向是记录到 kb；segment-registry 格拿段序列登记表与 E142 的产物逐字比，对象是一份登记表。这一道判实验页、实验索引与产物本身，实验与决策之间的双向登记归这里的 decision-links 格，quoted-result-lines 格方向是 kb 与 research 正文到产物，multipath-registry 格还着 C48 可机检的那一半而不判欠账表本身
 # gate-similar: doc-process-records.sh 也用 gate 取法的改动范围、也读 research/prompts/，但它判三方与同步留下的记录写没写、点没点名；这一道判产物与依据落没落进仓、新判决回看没回看决策、上一轮记录归没归档
 # gate-similar: code-source-discipline.sh 它判每个实验二进制都有变异表、变异条目锚得住、钉绝对值的断言与读数纪律，对象是实验源码与变异表的内容；这一道的 evidence-in-repo 格只看这一轮改过的装置与变异表有没有一份不比它旧的产物
-# gate-similar: code-tooling.sh 它的 change-range-single-source 格判各阶段取改动范围只经 changed-paths.sh 一份取法；这里是那份取法的使用者之一，改动范围在这一道里只取一次、八格共用
+# gate-similar: code-tooling.sh 它的 change-range-single-source 格判各阶段取改动范围只经 changed-paths.sh 一份取法；这里是那份取法的使用者之一，改动范围在这一道里只取一次、九格共用
+# gate-similar: doc-registries.sh 它的 governance-refs 格（判法 lib-governance-refs.py 的 ② 扩到 kb）只判 kb 中文现状文字（历史版本节、变更史、英日页与代码围栏除外）反引号里以仓根目录起头的全部路径，不在就红、只 research/ 下进过 git 的放行；这里的 cited-paths-exist 格判 kb 全文（含历史版本节与英日页，反引号内外都认）里实验产物、变异表、实验源码三类路径，树里或历史里有就放。判的文字段与判法都不同，只在中文现状文字里这三类上重叠（research/ 那一类两边都是历史里有就放，另两类那边更严），不并
+# gate-similar: doc-experiments.sh 自己的 repro-command 格已有「产物逐字节复跑不了」登记表 .claude/gate.d/repro-command-unreproducible.tsv，按实验页登记、只放行「没写复跑命令」；quoted-result-lines 格读的 .claude/gate.d/quoted-product-unreplayable.tsv 按产物文件名登记、放行的是「整行抄的行去哪份产物里找」。键（页 / 产物）、列（页与原因 / 产物、怎么跑出的、为什么进不了复跑表）与放行的判据都不同，并成一张表一行要同时答两件事，不并
 #
 # 格名表（不给 --check 就按这个次序全跑）：
 # gate-cell: index-sync 实验索引行与正文标题说的是不是同一件事
@@ -24,6 +26,8 @@
 # gate-cell: multipath-registry 多条路径互证的实验，路径与共用项要登记且指得到
 # gate-cell: cited-paths-exist kb 全部正文点名的实验产物、变异表、实验源码路径，在树里或版本库历史里找得到
 # gate-cell: preregistration-parallelism 这次改动新建或改动的 E186 起的跑前登记有「并行与挂钟」一节，独立单位、线程、串行与为什么、预计挂钟、预计在用核数五样写全，预计挂钟与态数乘单态耗时差不到一个数量级
+# gate-cell: preregistration-judge-features 这次改动新建或改动的跑前登记里命令位置上（围栏里的行、行首是命令的行、表格里整格是命令的格；行文里内嵌的不判）起装置的 cargo run / cargo test，反斜杠续行先并成一条（shell 注释不续行），点名的 --bin（cargo test 另认 --test）目标走崩溃判段（源文件调了 crash_amplification、crash_state_enumeration 的判段入口，别名导入照认）的特性要带 gpu
+# gate-cell: judge-entries-in-sync 判段入口表 JUDGE_ENTRIES 与 crash_amplification.rs、crash_state_enumeration.rs 里认出的公开判段入口逐个相同
 # gate-cell: replay-comparison-units 重跑登记的比对对象逐行登记在机读表里：登记出处在、单元名在单元表出处里恰好出现一次、复跑驱动在 replay.sh 里且产物名相符；重跑登记里表头逐字的比对对象表与机读表逐行对得上
 #
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码经 lib/stage-cells.sh；每格自己打判定行（成功行报查了多少项，红行带出路）。
@@ -43,7 +47,22 @@
 # 第四行欠在开着的 C92 不报）。
 # preregistration-parallelism-wallclock-red / -wallclock-green：真仓 E186、E187、E197 的「## 十四、并行与挂钟」逐字抄进同号登记（红的各改坏一个数），判预计挂钟与态数乘单态耗时（放了什么写在那一格的注释里）。
 # preregistration-parallelism-quantities-section-red / -quantities-section-green：「预计挂钟：」里的态数与第六节写的对不上的、对得上的与认不出的（放了什么写在那一格的注释里）。
+# preregistration-judge-features-red / -green：跑前登记里起走崩溃判段的装置二进制没带 / 带了 gpu 特性（放了什么写在那一格的注释里）；
+# preregistration-judge-features-prose-green：没带 gpu 的几处都不在命令位置（行文里内嵌、标签之后、表格里夹着字、围栏里的输出行），不判。
+# preregistration-judge-features-continued-red / -continued-green：围栏里的命令反斜杠续行，--bin 拆到下一行没带 gpu / --features gpu 拆到下一行；
+# preregistration-judge-features-alias-red：别名导入之后调判段入口没带 gpu 判红、只取崩溃点不调判段入口的不报（放了什么写在那一格的注释里）。
+# preregistration-judge-features-comment-swallows-red / -comment-hides-red / -comment-control-red：围栏里以反斜杠收尾的 shell 注释行不续行，下一行没带 gpu 的命令照判红
+#   （前两份改前并进注释、退 77 / 判绿；第三份注释不以反斜杠收尾，是对照）；preregistration-judge-features-trailing-comment-red：命令行尾注释里写的 --features gpu 不算带了；
+# preregistration-judge-features-continued-outside-fence-red：围栏外行首是命令的行以反斜杠续行，--bin 拆到下一行没带 gpu，并成一条判红；
+# preregistration-judge-features-spellings-green：-Fgpu 与 --features "lookup-work-counters gpu" 都算带了 gpu；preregistration-judge-features-test-target-red：cargo test 只点名 --test、测试目标调判段入口没带 gpu 判红。
+# preregistration-judge-features-list-item-trailing-comment-red / -table-cell-trailing-comment-red：列表项里行首是命令的行 / 表格整格的命令，行尾 shell 注释里写的 --features gpu 截掉、不算带了，判红
+#   （d137-ledger-defs-r3 攻方 C3 的两个世界）。
+# judge-entries-in-sync-green / -red / -stale-red：判段入口表与两份判段源文件逐个相同 / 源码里多一个公开入口 / 表里的一个名字在源码里不再公开（放了什么写在那一格的注释里）。
+# judge-entries-in-sync-array-parameter-new-entry-red / -array-parameter-on-the-path-green / -cycle-new-entry-after-red：签名里带 [u8; 32] 的新公开入口判红 / 判段路径上的私有函数签名里带数组照连边、判绿 /
+#   新公开入口与表里的入口互相调、写在它后面照判红（d137-ledger-defs-r3 攻方 C1、C2 的世界，放了什么写在那一格的注释里）。
 # experiment-orphans-registry-red：样本根的目录登记末尾加一行 notes，notes/ 下的号与只登了索引行的号判成孤儿（登记里加一行，这一格跟着认）。
+# experiment-orphans-model-directory-green / -sibling-red：三方腿的模型目录（research/prompts/ 直接底下名字以 -model 结尾的目录）里攻方造的假 e990 样本不算用过的号，只有 kb 页的 E99 一个号，判绿 /
+#   模型目录外同名形态的照算（research/prompts/ 底下的、research/results/ 底下的 -model 目录里的、research/prompts/ 更深一层的 -model 目录里的），红行点名这三处，模型目录里的假样本同在样本里。
 # 按编号取实验页的四份（实验页有中文原文 <号>-<名>.md 与译文 <号>-<名>.en.md / .ja.md，中文的索引与产物取中文原文，判法 lib-item-ref-status.py 的 numbered_files）：
 # index-sync-translation-green / -red（索引结论列的数在中文原文里、译文里没有 / 只在英语译文里有），
 # verdict-false-named-translation-green（E174 的中文原文没有「## 历史版本」、正文点了 false 字段的名，两份译文排在前面：绿；改前取到 .en.md、崩在 split_page 的拆包上）、
@@ -52,6 +71,10 @@
 # 三格读它们都是解压后读、判据不变：verdict-false-named-gz-green / -gz-red（解压内容里的 false 字段点了名 / 没点名，红行点名 .out.gz 与解压内容里的行号）、
 # quoted-result-lines-gz-green / -gz-red（整行抄的产物行在解压内容里逐字找得到 / 有一行不在，红的汇总句数「有 1 行」）、
 # repro-command-gz-green / -gz-red（页点名 .out.gz 产物并写了 cargo run / 点名了却只提到变异脚本）。
+# 纯 Python 装置的复跑行与产物逐字节复跑不了的登记表五份（脚本与装置目录由每份的 setup.sh 造出来，样本里不放 .py / .sh）：
+# repro-command-apparatus-green / -apparatus-red（复跑行点名的脚本都在 / 点名的脚本或装置目录不在）、
+# repro-command-unreproducible-green（没写复跑命令的页登记了、放行）/ -unreproducible-page-missing-red（登记行指到不存在的实验页）/ -unreproducible-reason-empty-red（登记行没写原因）。
+# 整行抄的行去进不了 replay.sh 复跑表的登记产物里找的五份样本（replay.sh 骨架只登记 E99 的一份产物，另有分片跑出的产物不在 replay.sh 里；setup.sh 与 quoted-result-lines-red 同一写法，实验页停在未跟踪状态）：quoted-result-lines-unreplayable-green / -mistyped-red / -unlisted-red / -product-missing-red / -reason-empty-red（各放了什么写在那一格的注释里）。
 # cited-paths-exist 认 .out.gz 存放的两份样本（setup.sh 同样 gzip -n -9）：cited-paths-exist-gz-green（点名 .out，树里只有 .out.gz；另一份只在历史里有 .out.gz）、
 # cited-paths-exist-gz-red（点名的 .out 树里与历史里 .out 与 .out.gz 都没有，另一份有 .out.gz 的点名了 .out，只报前一个）。
 # 压成 .out.gz 之后点名与归档的四份样本（setup.sh 同样 gzip -n -9）：results-cited-gz-green（树里只有 .out.gz，一页点名 .out、一页点名 .out.gz，都算点名）、
@@ -62,14 +85,23 @@
 #     archive-past-rounds-red、cited-paths-exist-gz-red、cited-paths-exist-red、decision-links-language-switch-red
 #     decision-links-moved-and-switch-red、decision-links-pending-base-unreadable-red、decision-links-progress-mark-red、decision-links-red
 #     decision-links-switch-inserted-red、evidence-in-repo-red、evidence-in-repo-worktree-red、experiment-orphans-red
-#     experiment-orphans-registry-red、index-sync-red、index-sync-translation-red、multipath-registry-red
+#     experiment-orphans-registry-red、experiment-orphans-model-directory-sibling-red、index-sync-red、index-sync-translation-red、multipath-registry-red
 #     preregistration-parallelism-red、preregistration-parallelism-wallclock-red、quoted-result-lines-archived-gz-red、quoted-result-lines-gz-red
-#     preregistration-parallelism-quantities-section-red
+#     preregistration-parallelism-quantities-section-red、preregistration-judge-features-red
+#     preregistration-judge-features-continued-red、preregistration-judge-features-alias-red
+#     preregistration-judge-features-comment-swallows-red、preregistration-judge-features-comment-hides-red、preregistration-judge-features-comment-control-red
+#     preregistration-judge-features-trailing-comment-red、preregistration-judge-features-continued-outside-fence-red、preregistration-judge-features-test-target-red
+#     judge-entries-in-sync-red、judge-entries-in-sync-stale-red、judge-entries-in-sync-array-parameter-new-entry-red、judge-entries-in-sync-cycle-new-entry-after-red
+#     preregistration-judge-features-list-item-trailing-comment-red、preregistration-judge-features-table-cell-trailing-comment-red
 #     quoted-result-lines-history-added-red、quoted-result-lines-moved-and-edited-red、quoted-result-lines-moved-unregistered-red、quoted-result-lines-red
+#     quoted-result-lines-unreplayable-mistyped-red、quoted-result-lines-unreplayable-product-missing-red
+#     quoted-result-lines-unreplayable-reason-empty-red、quoted-result-lines-unreplayable-unlisted-red
 #     replay-comparison-units-exclusion-owed-red、replay-comparison-units-red、replay-comparison-units-rekey-red、replay-comparison-units-table-red
-#     repro-command-gz-red、repro-command-red、results-cited-gz-red、results-cited-red
+#     repro-command-apparatus-red、repro-command-gz-red、repro-command-red
+#     repro-command-unreproducible-page-missing-red、repro-command-unreproducible-reason-empty-red
+#     results-cited-gz-red、results-cited-red
 #     verdict-false-named-gz-red、verdict-false-named-no-history-red、verdict-false-named-red、verdict-false-named-zero
-#   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本十三格全跑
+#   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本十五格全跑
 #     archive-past-rounds-green、archive-past-rounds-red、cited-paths-exist-green、cited-paths-exist-gz-green
 #     cited-paths-exist-gz-red、cited-paths-exist-red、decision-links-deleted-product-green、decision-links-formatting-green
 #     decision-links-green、decision-links-language-switch-green、decision-links-language-switch-red、decision-links-moved-and-switch-green
@@ -77,22 +109,29 @@
 #     decision-links-progress-mark-red、decision-links-red、decision-links-switch-inserted-green、decision-links-switch-inserted-red
 #     decision-links-translation-green、evidence-in-repo-green、evidence-in-repo-red、evidence-in-repo-worktree-green
 #     evidence-in-repo-worktree-red、experiment-orphans-green、experiment-orphans-red、experiment-orphans-registry-red
+#     experiment-orphans-model-directory-green、experiment-orphans-model-directory-sibling-red
 #     index-sync-green、index-sync-red、index-sync-translation-green、index-sync-translation-red
 #     multipath-registry-green、multipath-registry-red、preregistration-parallelism-green、preregistration-parallelism-red
 #     preregistration-parallelism-wallclock-green、preregistration-parallelism-wallclock-red、quoted-result-lines-archived-gz-green、quoted-result-lines-archived-gz-red
 #     preregistration-parallelism-quantities-section-green、preregistration-parallelism-quantities-section-red
+#     preregistration-judge-features-green、preregistration-judge-features-red、preregistration-judge-features-prose-green
+#     preregistration-judge-features-continued-green、preregistration-judge-features-continued-red、preregistration-judge-features-alias-red
+#     preregistration-judge-features-comment-swallows-red、preregistration-judge-features-comment-hides-red、preregistration-judge-features-comment-control-red
+#     preregistration-judge-features-trailing-comment-red、preregistration-judge-features-continued-outside-fence-red、preregistration-judge-features-spellings-green
+#     preregistration-judge-features-test-target-red、judge-entries-in-sync-green、judge-entries-in-sync-red、judge-entries-in-sync-stale-red
+#     judge-entries-in-sync-array-parameter-new-entry-red、judge-entries-in-sync-array-parameter-on-the-path-green、judge-entries-in-sync-cycle-new-entry-after-red
+#     preregistration-judge-features-list-item-trailing-comment-red、preregistration-judge-features-table-cell-trailing-comment-red
 #     quoted-result-lines-green、quoted-result-lines-gz-green、quoted-result-lines-gz-red、quoted-result-lines-history-added-red
 #     quoted-result-lines-history-old-green、quoted-result-lines-moved-and-edited-red、quoted-result-lines-moved-history-green、quoted-result-lines-moved-unregistered-red
+#     quoted-result-lines-unreplayable-green、quoted-result-lines-unreplayable-mistyped-red、quoted-result-lines-unreplayable-product-missing-red
+#     quoted-result-lines-unreplayable-reason-empty-red、quoted-result-lines-unreplayable-unlisted-red
 #     quoted-result-lines-red、replay-comparison-units-exclusion-owed-red、replay-comparison-units-green、replay-comparison-units-red
 #     replay-comparison-units-rekey-red、replay-comparison-units-table-green、replay-comparison-units-table-red、replay-comparison-units-zero
-#     repro-command-green、repro-command-gz-green、repro-command-gz-red、repro-command-red
+#     repro-command-apparatus-green、repro-command-apparatus-red、repro-command-green、repro-command-gz-green、repro-command-gz-red、repro-command-red
+#     repro-command-unreproducible-green、repro-command-unreproducible-page-missing-red、repro-command-unreproducible-reason-empty-red
 #     results-cited-green、results-cited-gz-green、results-cited-gz-history-green、results-cited-gz-red
 #     results-cited-red、verdict-false-named-green、verdict-false-named-gz-green、verdict-false-named-gz-red
 #     verdict-false-named-no-history-red、verdict-false-named-red、verdict-false-named-translation-green、verdict-false-named-zero
-#   GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1  verdict-false-named 把每个 false 字段都当成已点名（变量名不以 _BREAK 收尾）
-#     verdict-false-named-gz-red
-#     verdict-false-named-no-history-red
-#     verdict-false-named-red
 #   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py：按编号取实验页不分语言、取排序后的第一个命中（改前的取法，取到 <号>-<名>.en.md）
 #     index-sync-translation-green
 #     index-sync-translation-red
@@ -159,6 +198,56 @@
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=parallelism-quantities-section-unchecked  preregistration-parallelism 「预计挂钟：」的态数不与第六节比（不判红，也不报本次未判）
 #     preregistration-parallelism-quantities-section-green
 #     preregistration-parallelism-quantities-section-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-features-unchecked  preregistration-judge-features 不看特性，走判段的命令一律当带了 gpu
+#     preregistration-judge-features-alias-red
+#     preregistration-judge-features-comment-control-red
+#     preregistration-judge-features-comment-hides-red
+#     preregistration-judge-features-comment-swallows-red
+#     preregistration-judge-features-continued-outside-fence-red
+#     preregistration-judge-features-continued-red
+#     preregistration-judge-features-list-item-trailing-comment-red
+#     preregistration-judge-features-red
+#     preregistration-judge-features-table-cell-trailing-comment-red
+#     preregistration-judge-features-test-target-red
+#     preregistration-judge-features-trailing-comment-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-binaries-all-counted  preregistration-judge-features 不读源文件，点名 --bin 的命令一律当走判段
+#     preregistration-judge-features-alias-red
+#     preregistration-judge-features-green
+#     preregistration-judge-features-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-commands-anywhere  preregistration-judge-features 不认命令位置，行文里内嵌的 cargo run / cargo test 也判（改前的认法）
+#     preregistration-judge-features-prose-green
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=continuation-unjoined  preregistration-judge-features 不并反斜杠续行，逐行认命令（围栏里与围栏外都不并；拆到下一行的 --bin 漏判、--features 误红）
+#     preregistration-judge-features-continued-green
+#     preregistration-judge-features-continued-outside-fence-red
+#     preregistration-judge-features-continued-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-by-module-marker  preregistration-judge-features 照改前按源文件里有没有 crash_amplification:: 或 crash_state_enumeration:: 认走判段（别名导入漏判、只取崩溃点的误判）
+#     preregistration-judge-features-alias-red
+#     preregistration-judge-features-continued-red
+#     preregistration-judge-features-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=shell-comments-ignored  preregistration-judge-features 不认 shell 注释（改前的认法）：以反斜杠收尾的注释行照续行、续行接到整行注释照并、命令行尾的注释照当命令的一部分
+#     preregistration-judge-features-comment-hides-red
+#     preregistration-judge-features-comment-swallows-red
+#     preregistration-judge-features-list-item-trailing-comment-red
+#     preregistration-judge-features-table-cell-trailing-comment-red
+#     preregistration-judge-features-trailing-comment-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=features-spelling-narrow  preregistration-judge-features 照改前认特性：命令按空白切词、不认引号，-F 只认与值分开写的（-Fgpu、--features "lookup-work-counters gpu" 误红）
+#     preregistration-judge-features-spellings-green
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=test-targets-unjudged  preregistration-judge-features 照改前只认 --bin，cargo test 只点名 --test 的不判（只报数）
+#     preregistration-judge-features-test-target-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=trailing-comments-kept-outside-fence  preregistration-judge-features 照改前只截围栏里命令行尾的 shell 注释（列表项里行首是命令的行、表格整格的命令里，注释里写的 --features gpu 算带了）
+#     preregistration-judge-features-list-item-trailing-comment-red
+#     preregistration-judge-features-table-cell-trailing-comment-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-new-unreported  judge-entries-in-sync 不报源码里认出而 JUDGE_ENTRIES 里没有的入口
+#     judge-entries-in-sync-array-parameter-new-entry-red
+#     judge-entries-in-sync-cycle-new-entry-after-red
+#     judge-entries-in-sync-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-stale-unreported  judge-entries-in-sync 不报 JUDGE_ENTRIES 里有而源码里认不出的名字
+#     judge-entries-in-sync-stale-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-header-after-any-semicolon  judge-entries-in-sync 照改前切函数单元：表头从上一个分号或右花括号算起，方括号里的也算（签名里带 [u8; N] 的函数不进单元）
+#     judge-entries-in-sync-array-parameter-new-entry-red
+#     judge-entries-in-sync-array-parameter-on-the-path-green
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-cycle-memoized  judge-entries-in-sync 照改前递归走图、记住每个单元的结果，环上截断时算出的「走不到」也记住（结局随函数在文件里的先后翻）
+#     judge-entries-in-sync-cycle-new-entry-after-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=gz-read-raw  verdict-false-named 与 quoted-result-lines 读 .out.gz 不解压、按原字节读
 #     quoted-result-lines-archived-gz-green
 #     quoted-result-lines-archived-gz-red
@@ -166,6 +255,12 @@
 #     quoted-result-lines-gz-red
 #     verdict-false-named-gz-green
 #     verdict-false-named-gz-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=named-check-skipped  verdict-false-named 把每个 false 字段都当成已点名
+#     verdict-false-named-gz-red
+#     verdict-false-named-no-history-red
+#     verdict-false-named-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=on-request-unreported  evidence-in-repo 的成功句之后不报这一趟放过了哪几个按要求才跑的实验
+#     evidence-in-repo-green
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=gz-citation-unmatched  results-cited 第一道要正文逐字点名 .out.gz、第三道只查原样的 .out（不查树里、HEAD 里、历史里的 .out.gz）
 #     cited-paths-exist-gz-green
 #     cited-paths-exist-gz-red
@@ -174,9 +269,32 @@
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=archived-gz-not-searched  quoted-result-lines 去历史里找归档产物时只认 .out 收尾的路径
 #     quoted-result-lines-archived-gz-green
 #     quoted-result-lines-archived-gz-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unreplayable-registry-ignored  quoted-result-lines 不读 .claude/gate.d/quoted-product-unreplayable.tsv，登记了的产物照旧只认 replay.sh
+#     quoted-result-lines-unreplayable-green
+#     quoted-result-lines-unreplayable-mistyped-red
+#     quoted-result-lines-unreplayable-product-missing-red
+#     quoted-result-lines-unreplayable-reason-empty-red
+#     quoted-result-lines-unreplayable-unlisted-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unreplayable-product-existence-unchecked  quoted-result-lines 不查登记表里的产物在不在（树里与历史里都找不到也当在）
+#     quoted-result-lines-unreplayable-product-missing-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unreplayable-reason-unchecked  quoted-result-lines 不查登记行的怎么跑出的、为什么进不了复跑表两列写没写
+#     quoted-result-lines-unreplayable-reason-empty-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=gz-name-not-product  repro-command 不把 .out.gz 当产物名（只认 .out 收尾的）
 #     repro-command-gz-green
 #     repro-command-gz-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=apparatus-lines-unrecognized  repro-command 不认起 scripts/experiment-apparatus/ 下 python3 或 bash 脚本的复跑行（改前：只认 cargo run 与 replay.sh、vm-bench.sh）
+#     repro-command-apparatus-green
+#     repro-command-apparatus-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=apparatus-script-existence-unchecked  repro-command 不查复跑行点名的脚本与装置目录在不在，点名了就算存在
+#     repro-command-apparatus-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unreproducible-registry-ignored  repro-command 不读 .claude/gate.d/repro-command-unreproducible.tsv，登记了的页照判
+#     repro-command-unreproducible-green
+#     repro-command-unreproducible-page-missing-red
+#     repro-command-unreproducible-reason-empty-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unreproducible-page-existence-unchecked  repro-command 不查登记行指到的实验页在不在
+#     repro-command-unreproducible-page-missing-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unreproducible-reason-unchecked  repro-command 不查登记行有没有写原因
+#     repro-command-unreproducible-reason-empty-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=cited-path-gz-unmatched  cited-paths-exist 点名 <名>.out 只查原样的名字、不查压成 <名>.out.gz 的存放（树里、历史里）
 #     cited-paths-exist-gz-green
 #     cited-paths-exist-gz-red
@@ -220,7 +338,7 @@
 #   LAG_BASELINE_BREAK=moved-only-kept  归 lib-lag-baseline.py：与基准只差登记搬迁的文件与行照旧算改动（这一道开头经 changed-paths.sh 取的改动范围与新增行、quoted-result-lines 历史节的新增行都不剔）
 #     quoted-result-lines-moved-history-green
 #
-#   bash .claude/gate.d/doc-experiments.sh [项目根]                              十三格按格名表的次序全跑
+#   bash .claude/gate.d/doc-experiments.sh [项目根]                              十五格按格名表的次序全跑
 #   bash .claude/gate.d/doc-experiments.sh --list                                逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-experiments.sh --check <格名>[,<格名>…] [项目根]     只跑点名的格
 #   格名写错、给了两个项目根、认不出的选项、进不去项目根都退 2。
@@ -239,8 +357,8 @@ LIB_LAG_BASELINE="$STAGE_DIR/lib-lag-baseline.py"
 # 实验号住在哪（目录登记 .claude/gate.d/experiment-number-directories.tsv 的读法）：experiment-orphans 调它，scripts/kb/claim-experiment.sh 的查号调同一份
 LIB_EXPERIMENT_NUMBER_DIRECTORIES="$SCRIPT_REPOSITORY_ROOT/scripts/kb/lib_experiment_number_directories.py"
 source "$STAGE_DIR/lib/stage-cells.sh"
-# 要「这次改动」的八格：选中的格里有它们之一，才去取改动范围
-CHANGE_RANGE_CELLS=" results-cited evidence-in-repo decision-links quoted-result-lines archive-past-rounds multipath-registry preregistration-parallelism replay-comparison-units "
+# 要「这次改动」的九格：选中的格里有它们之一，才去取改动范围
+CHANGE_RANGE_CELLS=" results-cited evidence-in-repo decision-links quoted-result-lines archive-past-rounds multipath-registry preregistration-parallelism preregistration-judge-features replay-comparison-units "
 
 stage_cell index-sync cell_index_sync "实验索引行与正文标题说的是不是同一件事" \
   "以正文标题为准改 .claude/kb/experiments.md 的索引行（作废、状态词、结论列的数跟着正文），两边一一对应"
@@ -253,11 +371,11 @@ stage_cell decision-links cell_decision_links "决策与实验双向登记，实
 stage_cell verdict-false-named cell_verdict_false_named "实验产物判决行里的 false 字段有没有被实验页点名" \
   "在实验页那一次跑的历史条目里点名这个 false 字段并写明为什么是 false；replay.sh 登记表读不到行就先修表的形状"
 stage_cell repro-command cell_repro_command "跑过的实验有没有留下复跑命令" \
-  "在实验页正文的口径一节补一句复跑命令（格式与别处一致）；原始输出确实没留的写明「原始输出未留存」"
+  "在实验页正文的口径一节补一句复跑命令（格式与别处一致；纯 Python 或 bash 的装置写起它的 task-server/task submit 整条，点名的脚本要在仓里）；原始输出确实没留的写明「原始输出未留存」；产物逐字节复跑不了的在 .claude/gate.d/repro-command-unreproducible.tsv 登一行（页文件名、原因）"
 stage_cell experiment-orphans cell_experiment_orphans "目录登记列的各处出现过的实验号在 kb 里有没有正文" \
   "给这个实验号建正文 .claude/kb/experiments/<号>-*.md（测什么 / 判据 / 失败条款 / 口径 / 复跑命令），并登记进 experiments.md 的索引表；实验号住在哪几处照 .claude/gate.d/experiment-number-directories.tsv，写法在它的文件头"
 stage_cell quoted-result-lines cell_quoted_result_lines "kb 与 research 正文里整行抄的产物行（含历史节里这次新增的行），产物里逐字找得到" \
-  "打开这个实验复跑命令登记的那份产物，把对应的 E7RESULT 行原样抄回来，别手改数；产物换了就连同引它的正文一起换"
+  "打开这个实验复跑命令登记的那份产物，把对应的 E7RESULT 行原样抄回来，别手改数；产物换了就连同引它的正文一起换；这一轮分片跑出、进不了 replay.sh 复跑表的产物，在 .claude/gate.d/quoted-product-unreplayable.tsv 登一行（产物名、怎么跑出的、为什么进不了复跑表）"
 stage_cell archive-past-rounds cell_archive_past_rounds "上一轮及更早的实验记录已经归档进版本库，工作区里不留" \
   "照这一格打出来的基准跑 python3 scripts/kb/archive-past-rounds.py --apply 删掉上一轮的记录（不带基准会把这一次提交要带的也删掉）"
 stage_cell multipath-registry cell_multipath_registry "多条路径互证的实验，路径与共用项要登记且指得到" \
@@ -266,6 +384,10 @@ stage_cell cited-paths-exist cell_cited_paths_exist "kb 全部正文点名的实
   "补回那份文件；或把那一行改成写明「原件未留存、从哪次提交取」；或改成现存的路径（移过位置的用 git log --all --diff-filter=A --name-only -- '*<文件名>' 找新路径）"
 stage_cell preregistration-parallelism cell_preregistration_parallelism "这次改动新建或改动的 E186 起的跑前登记有「并行与挂钟」一节，独立单位、线程、串行与为什么、预计挂钟、预计在用核数五样写全，预计挂钟与态数乘单态耗时差不到一个数量级" \
   "照 .claude/agents/experiment-designer.md「登记的固定节名」的「## 十四、并行与挂钟」一行在登记里补这一节，五个标签行各一行（「独立单位：」「线程：」「串行：」「预计挂钟：」「预计在用核数：」，冒号后至少 8 个字，两行预计要带数、推的写依据）；预计挂钟与态数乘单态耗时差一个数量级以上的，照设计员定义第 3a 步现算后改挂钟或改错了的数，并行跑的写成式子「<态数> × <单态耗时> ÷ <并行数> ≈ <挂钟>」"
+stage_cell preregistration-judge-features cell_preregistration_judge_features "这次改动新建或改动的跑前登记里命令位置上（围栏里的行、行首是命令的行、表格里整格是命令的格；行文里内嵌的不判）起装置的 cargo run / cargo test，反斜杠续行先并成一条（shell 注释不续行），点名的 --bin（cargo test 另认 --test）目标走崩溃判段（源文件调了 crash_amplification、crash_state_enumeration 的判段入口，别名导入照认）的特性要带 gpu" \
+  "照 .claude/agents/experiment-designer.md 写起法：走到崩溃判段的装置二进制，登记里的 cargo run / cargo test 带 --features gpu（经 task-server/task submit 交，清场由服务做）；认不出的命令写成 -p <包名> --bin <名>（cargo test 也可 --test <名>）"
+stage_cell judge-entries-in-sync cell_judge_entries_in_sync "判段入口表 JUDGE_ENTRIES 与 crash_amplification.rs、crash_state_enumeration.rs 里认出的公开判段入口逐个相同" \
+  "源码里新加的公开判段入口把名字加进 .claude/gate.d/doc-experiments.sh 的 JUDGE_ENTRIES（方法写类型名）；表里认不出的，改名的换成新名字、删了或不再走判段的从表里删；认法在这一格函数上方的注释"
 stage_cell replay-comparison-units cell_replay_comparison_units "重跑登记的比对对象逐行登记在机读表里：登记出处在、单元名在单元表出处里恰好出现一次、复跑驱动在 replay.sh 里且产物名相符；重跑登记里表头逐字的比对对象表与机读表逐行对得上" \
   "照 .claude/gate.d/replay-comparison-units.tsv 文件头的列义补齐或改正那一行（单元名照单元表里的字符串字面量逐字抄，复跑驱动与产物名照 scripts/experiment-apparatus/replay.sh 复跑表那一行抄）；确实没有复跑行的写 none:理由（复跑写 none: 的行与基准那一版比只缩不涨，新登记的比对对象要在 replay.sh 补驱动行）；重跑登记比对对象表里的每一行要有一行登记对上，单元表里没有单元的在那份文件头写一行「# 不登记的比对对象：<登记出处> #<号>：<理由>」"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
@@ -293,7 +415,7 @@ ROOT="${root_argument:-$SCRIPT_REPOSITORY_ROOT}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 ROOT="$(pwd)"
 
-# ── 改动范围：经共用库 scripts/gate/changed-paths.sh 只取一次（基准 gate_diff_base gate），八格共用。
+# ── 改动范围：经共用库 scripts/gate/changed-paths.sh 只取一次（基准 gate_diff_base gate），九格共用。
 # 各格在自己的子 shell 里跑，所以在父进程里取、落进文件，各格只读。按 --check 选中的格判要不要取；样本根的 .gate-cells 在这之后才生效，那时按全部格取。
 # 取新增行失败时：results-cited 与 quoted-result-lines 退回全量判，evidence-in-repo 判红。
 # 没有上游、也没设 GATE_BASE 时基准是 HEAD，窗口只含工作区与暂存区：已提交没推的那几次不在里面。
@@ -463,7 +585,7 @@ cell_results_cited() {
   failed=0
   missing=()
   # replay.sh 登记的入库产物（复跑行经 lib-lag-baseline.py 的 replay-rows 取，与 verdict-false-named、quoted-result-lines、replay-comparison-units 三格同一份读法，
-  # 行形状与 checker-tier-research-build-and-replay.sh 的 experiment-replay 格相同；这里取第 4 列的文件名）：名字像逐轮中间件（*.r<一位数>.out）的，登记了照样要被点名；
+  # 行形状与 research-build-and-replay.sh 的 experiment-replay 格相同；这里取第 4 列的文件名）：名字像逐轮中间件（*.r<一位数>.out）的，登记了照样要被点名；
   # 读不了 replay.sh 时这种名字的产物全会被当成中间件跳过，所以有这种产物就判红。
   REPLAY_TABLE=scripts/experiment-apparatus/replay.sh
   replay_table_readable=1
@@ -653,7 +775,7 @@ cell_results_cited() {
 # 判据一里只能比 mtime 的那几份（产物在、实验键没判出对不上）不判，逐份列成本次未跑并报进 $GATE_NOT_RUN_FILE；别的照判，
 # 所以提交路径上判据二照样判得到。全是要比 mtime 的、判据二又没有 .md 时退 77。
 #
-# 管不到：产物对不对得上源码（归 checker-tier-research-build-and-replay.sh 的逐字节复跑，它不看变异表的重跑日志）；
+# 管不到：产物对不对得上源码（归 research-build-and-replay.sh 的逐字节复跑，它不看变异表的重跑日志）；
 #   replay.sh 的登记行指没指到最新那份；句子是说做法还是引依据只按形状认（「草稿放 /tmp/…」不算，「报告原件在 /tmp/…，已转存」照样红）；
 #   已提交的 prompts 文件后来加进的 /tmp 依据。
 #
@@ -952,7 +1074,7 @@ if not changed_sources:
 print(f"    没判 {skipped_prompt_files} 份 {prompts_dir} 下这一轮没新写的 .md（登记在 .claude/doc-lint-exclude 的原样保存证据，改不得）")
 if comment_only_sources:
     print(f"    没判 {len(comment_only_sources)} 份只改了 // 注释的装置源码（碰不到产物，不要求重跑）：{'、'.join(comment_only_sources)}")
-if on_request_not_run:
+if on_request_not_run and os.environ.get("EXPERIMENT_PAGES_AND_PRODUCTS_BREAK", "") != "on-request-unreported":
     print(f"    没要求重跑 {len(on_request_not_run)} 份按要求才跑的实验（装置比产物新，实验页写明了没有正式跑）：{'、'.join(on_request_not_run)}")
 if fingerprint_matched:
     print(f"    按实验键判 {len(fingerprint_matched)} 份（登记了准入，产物头记的实验键与今天的相同，修改时刻不作数）：{'、'.join(fingerprint_matched)}")
@@ -1671,15 +1793,15 @@ rows = [(row.experiment, row.product) for row in (lag_baseline.replay_rows(repla
 if not rows:
     print(f"  ✗ 从 {replay_path} 一行都没读到——登记表的格式变了？")
     print("     → 怎么办：这一格靠 '编号|二进制|参数|产物|exact/timing' 这个形状取行（取法在 .claude/gate.d/lib-lag-baseline.py 的 replay_rows，")
-    print("               与门禁 checker-tier-research-build-and-replay.sh 的 experiment-replay 格同一个形状），改表格式要同时改这两处。")
+    print("               与门禁 research-build-and-replay.sh 的 experiment-replay 格同一个形状），改表格式要同时改这两处。")
     sys.exit(1)
 
 RESULTS_DIR = 'research/results'
 EXP_DIR = '.claude/kb/experiments'
 VERDICT_PREFIX = 'E7RESULT name=verdict '
-skip_named_check = os.environ.get('GATE_VERDICT_FALSE_SKIP_NAMED_CHECK') == '1'
+skip_named_check = os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK') == 'named-check-skipped'
 
-missing_files = []      # 登记了却在 research/results/ 下找不到文件（多半是已归档，见 checker-tier-research-build-and-replay.sh 复跑里「产物已归档」那一档）
+missing_files = []      # 登记了却在 research/results/ 下找不到文件（多半是已归档，见 research-build-and-replay.sh 复跑里「产物已归档」那一档）
 checked_files = 0
 verdict_lines = 0
 false_fields = []       # (exp, product, lineno, field)
@@ -1810,19 +1932,71 @@ PY
 
 # ── 格 repro-command：跑过的实验有没有留下复跑命令
 #
-# 判据：实验页点名了 research/results/ 里的产物，就要写出怎么把它跑出来：一条 `cargo run --release --bin X`，
-# 或者点名复跑入口 scripts/experiment-apparatus/replay.sh / scripts/devices/vm-bench.sh；提到 mutate.sh 这类别的脚本不算，它们跑不出那份产物。
+# 判据：实验页点名了 research/results/ 里的产物，就要写出怎么把它跑出来，三种写法认其一：
+#   一，一条 `cargo run --release --bin X`，或者点名复跑入口 scripts/experiment-apparatus/replay.sh / scripts/devices/vm-bench.sh；
+#   二，起 scripts/experiment-apparatus/ 下 python3 或 bash 脚本的复跑行（纯 Python 的装置没有 cargo run）。认三种行：
+#      `… -- python3|bash [-选项…] [<占位>/]scripts/experiment-apparatus/…/X.py|X.sh`（脚本写全路径，含 E200（修订6近似树重跑）页那行 `<仓根>/scripts/…`）、
+#      `… --cwd scripts/experiment-apparatus/<装置目录> -- python3|bash [-选项…] X.py|X.sh`（脚本相对 --cwd）、
+#      `… --cwd scripts/experiment-apparatus/<装置目录> -- python3 [-选项…] -m <模块> …`（只点名装置目录，跑单测这类）。
+#      页里这样的行点名的脚本与装置目录都要在仓里存在，至少一行点名的是存在的脚本文件（只有 -m 行不够）；有一个不存在判红，红行点名页与路径。
+#      提到 mutate.sh 这类别的脚本、只写路径不写 python3 / bash 起它的，不算复跑行。
+#   三，产物逐字节复跑不了的页登记进 .claude/gate.d/repro-command-unreproducible.tsv（一行一页：实验页文件名、制表符、原因），登记了的页不判；
+#      登记表在页上抄的产物行仍归 quoted-result-lines 判，这里只放行「没写复跑命令」。登记行指到 kb/experiments/ 下不存在的页、没写原因判红。登记表不在当没有登记。
 # 写明「原始输出未留存」的页不判、成功行列名。读不了的页判红（grep 出错与「没点产物」不是一回事）；一页 .md 都没有、或没有一页点产物，退 77。
+# 成功行报点了产物的页数、未留存的页、靠装置复跑行过的页、登记表登了几页与其中靠登记放行的页。
 # 样本：repro-command-red 里一页点了产物却只提到变异脚本；repro-command-green 里一页写了 cargo run、一页写明原始输出未留存。
+# repro-command-apparatus-green：页一用 E200（修订6近似树重跑）页那几种行（--cwd 加 -m 单测、--cwd 加脚本名、带占位的全路径 bash 脚本、全路径 python3），页二用裸起 `python3 -B <全路径>`，脚本都在；
+# repro-command-apparatus-red：页一的复跑行一条点名的脚本在、两条不在，页二点名的装置目录不在（红行点名页与不存在的路径，不报「没写复跑命令」）。
+# repro-command-unreproducible-green：一页没写复跑命令但登记了、一页写了 cargo run；
+# repro-command-unreproducible-page-missing-red：登记行指到不存在的实验页；repro-command-unreproducible-reason-empty-red：登记行没写原因。
+# 弄坏开关：apparatus-lines-unrecognized、apparatus-script-existence-unchecked、unreproducible-registry-ignored、
+# unreproducible-page-existence-unchecked、unreproducible-reason-unchecked（逐条说明和判错的样本在文件头开关表）。
 cell_repro_command() {
   EXP_DIR=.claude/kb/experiments
+  UNREPRODUCIBLE=.claude/gate.d/repro-command-unreproducible.tsv
   [[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，这一格跳过"; exit 77; }
   PRODUCT_RE='research/results/[A-Za-z0-9._-]+\.out(\.gz)?'
   # 弄坏开关 gz-name-not-product：.out.gz 不算产物名，只认以 .out 收尾的名字（点名 .gz 产物的页不再算点了产物）
   if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" == gz-name-not-product ]]; then PRODUCT_RE='research/results/[A-Za-z0-9._-]+\.out([^.A-Za-z0-9_-]|$)'; fi
   REPRO_RE='cargo run --release --bin |scripts/(experiment-apparatus/replay|devices/vm-bench)\.sh'
+  # 装置复跑行的三种写法（判据二）；检查顺序：全路径、--cwd 加脚本名、--cwd 加 -m
+  SP='[[:space:]]'
+  APPARATUS_DIRECTORY_RE='scripts/experiment-apparatus/[A-Za-z0-9._/-]+'
+  LAUNCH_PATH_RE="(python3|bash)(${SP}+-[A-Za-z]+)*${SP}+(<[^>]*>/)?(${APPARATUS_DIRECTORY_RE}\\.(py|sh))(${SP}|\$)"
+  LAUNCH_CWD_FILE_RE="--cwd${SP}+(${APPARATUS_DIRECTORY_RE})${SP}+--${SP}+(python3|bash)(${SP}+-[A-Za-z]+)*${SP}+([A-Za-z0-9._/-]+\\.(py|sh))(${SP}|\$)"
+  LAUNCH_CWD_MODULE_RE="--cwd${SP}+(${APPARATUS_DIRECTORY_RE})${SP}+--${SP}+python3${SP}+(-[A-Za-z]+${SP}+)*-m${SP}"
 
-  bad=(); unreadable=(); exempt=(); pointing=0
+  # 登记表：一行一页，页文件名在 $EXP_DIR 下要在、原因要写
+  declare -A registered=()
+  registry_rows=0; registry_errors=()
+  if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" != unreproducible-registry-ignored && -e "$UNREPRODUCIBLE" ]]; then
+    if [[ ! -r "$UNREPRODUCIBLE" ]]; then
+      echo "  ✗ 登记表 $UNREPRODUCIBLE 读不了，登记了谁都没判"
+      echo "  → 怎么办：修好权限再跑；读不了的登记表不能当成没有登记。"
+      exit 1
+    fi
+    registry_line=0
+    while IFS=$'\t' read -r registry_page registry_reason _ || [[ -n "$registry_page" ]]; do
+      registry_line=$((registry_line + 1))
+      [[ "$registry_page" =~ ^${SP}*$ || "$registry_page" == \#* ]] && continue
+      registry_rows=$((registry_rows + 1))
+      if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" != unreproducible-page-existence-unchecked && ! -e "$EXP_DIR/$registry_page" ]]; then
+        registry_errors+=("第 ${registry_line} 行：${registry_page} 不是 $EXP_DIR 下的实验页")
+      fi
+      if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" != unreproducible-reason-unchecked && "${registry_reason:-}" =~ ^${SP}*$ ]]; then
+        registry_errors+=("第 ${registry_line} 行：${registry_page} 没写原因")
+      fi
+      registered["$registry_page"]=1
+    done < "$UNREPRODUCIBLE"
+  fi
+  if ((${#registry_errors[@]})); then
+    echo "  ✗ 登记表 $UNREPRODUCIBLE 有 ${#registry_errors[@]} 处写得不对："
+    printf '      %s\n' "${registry_errors[@]}"
+    echo "  → 怎么办：一行一页，<实验页文件名><TAB><产物逐字节复跑不了的原因>（写法在登记表文件头）；页改了名或删了，改这一行或删这一行。"
+    exit 1
+  fi
+
+  bad=(); unreadable=(); exempt=(); registry_exempt=(); apparatus_ok=(); apparatus_missing=(); pointing=0
   for f in "$EXP_DIR"/*.md; do
     # 一页 .md 都没有时通配原样留下，grep 找不到它会退 2、被当成「读不了的页」：那是无对象可判，不是读不了
     [[ -e "$f" || -L "$f" ]] || continue
@@ -1832,7 +2006,32 @@ cell_repro_command() {
     pointing=$((pointing + 1))
     if grep -qF '原始输出未留存' "$f"; then exempt+=("$(basename "$f")"); continue; fi
     grep -qE "$REPRO_RE" "$f" && continue
-    bad+=("$(basename "$f")")
+    page_name="$(basename "$f")"
+    if [[ -n "${registered[$page_name]:-}" ]]; then registry_exempt+=("$page_name"); continue; fi
+    # 起 scripts/experiment-apparatus/ 下脚本的复跑行：点名的脚本文件、装置目录都要在
+    found_files=0; missing_paths=()
+    if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" != apparatus-lines-unrecognized ]]; then
+      while IFS= read -r line; do
+        target=""; target_kind=file
+        if [[ "$line" =~ $LAUNCH_PATH_RE ]]; then target="${BASH_REMATCH[4]}"
+        elif [[ "$line" =~ $LAUNCH_CWD_FILE_RE ]]; then target="${BASH_REMATCH[1]%/}/${BASH_REMATCH[4]}"
+        elif [[ "$line" =~ $LAUNCH_CWD_MODULE_RE ]]; then target="${BASH_REMATCH[1]%/}"; target_kind=directory
+        else continue; fi
+        if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" == apparatus-script-existence-unchecked ]]; then
+          present=1
+        elif [[ "$target_kind" == file && -f "$target" ]] || [[ "$target_kind" == directory && -d "$target" ]]; then
+          present=1
+        else
+          present=0
+        fi
+        if ((present == 0)); then missing_paths+=("$target")
+        elif [[ "$target_kind" == file ]]; then found_files=$((found_files + 1))
+        fi
+      done < <(grep -hE 'scripts/experiment-apparatus/' "$f")
+    fi
+    if ((${#missing_paths[@]})); then apparatus_missing+=("${page_name}：${missing_paths[*]}"); continue; fi
+    if ((found_files > 0)); then apparatus_ok+=("$page_name"); continue; fi
+    bad+=("$page_name")
   done
 
   if ((${#unreadable[@]})); then
@@ -1842,35 +2041,51 @@ cell_repro_command() {
     exit 1
   fi
 
-  if ((${#bad[@]})); then
-    echo "  ✗ 这些实验点了产物却没写复跑命令，读的人只能靠反推："
-    printf '      %s\n' "${bad[@]}"
-    echo "  → 怎么办：在正文的口径一节补一句，格式与别处一致——"
-    echo "    代码 \`scripts/experiment-apparatus/eNN_xxx.rs\`（\`cargo run --release --bin eNN-xxx\`），"
-    echo "    原始输出 \`research/results/eNN-xxx-YYYY-MM-DD.out\`。"
-    echo "    多次运行拼起来的产物，要把那个循环也写出来（种子、参数各扫了哪些值）。"
-    echo "    要真设备 / 虚机因而没留产物的，正文写明「原始输出未留存」，这一格就不管它。"
-    echo "    复跑入口只认 cargo run --release --bin 与 scripts/experiment-apparatus/replay.sh、scripts/devices/vm-bench.sh；提到 mutate.sh 这类别的脚本不算。"
+  if ((${#apparatus_missing[@]} || ${#bad[@]})); then
+    if ((${#apparatus_missing[@]})); then
+      echo "  ✗ 这些实验页的复跑行点名了仓里不存在的脚本或装置目录，照着跑不起来："
+      printf '      %s\n' "${apparatus_missing[@]}"
+      echo "  → 怎么办：脚本或装置目录改了名、搬了或删了，把复跑行改成现存的路径（搬迁登记在 .claude/gate.d/path-moves.tsv）；"
+      echo "    脚本确实没了、产物也复跑不了的，照下面登记表那条处理。"
+    fi
+    if ((${#bad[@]})); then
+      echo "  ✗ 这些实验点了产物却没写复跑命令，读的人只能靠反推："
+      printf '      %s\n' "${bad[@]}"
+      echo "  → 怎么办：在正文的口径一节补一句，格式与别处一致——"
+      echo "    代码 \`scripts/experiment-apparatus/eNN_xxx.rs\`（\`cargo run --release --bin eNN-xxx\`），"
+      echo "    原始输出 \`research/results/eNN-xxx-YYYY-MM-DD.out\`。"
+      echo "    纯 Python 或 bash 的装置，写起它的整条命令：\`task-server/task submit -- python3 scripts/experiment-apparatus/eNN_xxx/xxx.py …\`，"
+      echo "    或带装置目录的 \`task-server/task submit --cwd scripts/experiment-apparatus/eNN_xxx -- python3 xxx.py …\`；点名的脚本要在仓里。"
+      echo "    多次运行拼起来的产物，要把那个循环也写出来（种子、参数各扫了哪些值）。"
+      echo "    要真设备 / 虚机因而没留产物的，正文写明「原始输出未留存」，这一格就不管它。"
+      echo "    产物逐字节复跑不了的（配置行带输出目录、计数随回收变这类），在 $UNREPRODUCIBLE 加一行：<实验页文件名><TAB><原因>。"
+      echo "    复跑入口只认 cargo run --release --bin、scripts/experiment-apparatus/replay.sh、scripts/devices/vm-bench.sh，以及起 scripts/experiment-apparatus/ 下 python3 或 bash 脚本的复跑行；提到 mutate.sh 这类别的脚本不算。"
+    fi
     exit 1
   fi
   if ((pointing == 0)); then
     echo "  ⊘ 本次无对象可判：$EXP_DIR 下没有一页点到 research/results/ 里的产物"
     exit 77
   fi
-  echo "  ✓ 点了产物的实验都写了复跑命令（点了产物的 ${pointing} 页里判了 $((pointing - ${#exempt[@]})) 页）"
+  echo "  ✓ 点了产物的实验都写了复跑命令（点了产物的 ${pointing} 页里判了 $((pointing - ${#exempt[@]} - ${#registry_exempt[@]})) 页）"
   echo "    写明「原始输出未留存」不判的 ${#exempt[@]} 页：${exempt[*]:-（没有）}"
+  echo "    靠起 scripts/experiment-apparatus/ 下脚本的复跑行放行的 ${#apparatus_ok[@]} 页：${apparatus_ok[*]:-（没有）}"
+  echo "    登记表 $UNREPRODUCIBLE 登了 ${registry_rows} 页，其中靠登记放行的 ${#registry_exempt[@]} 页：${registry_exempt[*]:-（没有）}"
 }
 
 # ── 格 experiment-orphans：目录登记列的各处出现过的实验号在 kb 里有没有正文
 #
-# 判据：目录登记 .claude/gate.d/experiment-number-directories.tsv 列的每一处（research/、scripts/、入库装置 crates/singlefs-checker-tier/src/bin/、
+# 判据：目录登记 .claude/gate.d/experiment-number-directories.tsv 列的每一处（research/、scripts/、入库装置 crates/singlefs-verification/src/bin/、
 # kb 实验页与索引行；名字形态写在登记文件头）出现过的实验号，kb/experiments/ 里都要有对应编号的正文：跑过的东西没入库，
 # 会以「我们量过」的形式活在对话里，谁也复核不了。results-cited 格按名字排除的（*local* 这类）也在这里判到。
 # 读法只有一份（scripts/kb/lib_experiment_number_directories.py），scripts/kb/claim-experiment.sh 的查号读同一份登记：实验号住进新地方，登记里加一行，两处跟着认。
 # 射程逐处报：登记了而不在的列进成功行；登记不在、写坏，或哪个目录读不了，判红——射程静默缩小与判过了在输出里长得一样。
-# 样本：experiment-orphans-red 里 scripts/experiment-apparatus/ 与 crates/singlefs-checker-tier/src/bin/ 下各一个 kb 里没有正文的实验号；
+# 样本：experiment-orphans-red 里 scripts/experiment-apparatus/ 与 crates/singlefs-verification/src/bin/ 下各一个 kb 里没有正文的实验号；
 # experiment-orphans-green 里的实验号都有正文；experiment-orphans-registry-red 的登记末尾加了一行 notes，notes/ 下的号与只登了索引行的号都判成孤儿。
 # 弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-registry-ignored：不读登记、退回改前写死的四个目录，experiment-orphans-registry-red 判错。
+# 三方腿的模型目录（research/prompts/ 直接底下名字以 -model 结尾的目录）读法里不往里走：腿在里面造的样本世界不是实验（登记文件头写着这一条）。
+# experiment-orphans-model-directory-green 里模型目录中的假 e990 样本不算、只剩 kb 有正文的 E99；experiment-orphans-model-directory-sibling-red 里模型目录外同名形态的照算。
+# 这一条读法的弄坏开关归读法那份库（scripts/kb/lib_experiment_number_directories.py 的自证，开关名与红的格写在它文件头），不在这一道设：库的守卫平常跑设了就拒，样本根里设上只会让整格报「没扫全」。
 cell_experiment_orphans() {
   EXP_DIR=.claude/kb/experiments
   REGISTRY=.claude/gate.d/experiment-number-directories.tsv
@@ -1882,7 +2097,7 @@ cell_experiment_orphans() {
   registry_source="$REGISTRY"; registry_text=""; registry_label="目录登记 $REGISTRY"
   if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" == orphans-registry-ignored ]]; then
     registry_source="-"; registry_label="改前写死的四个目录"
-    registry_text=$'research\te-number-names\t# 改前写死的那一组\nscripts/experiment-apparatus\te-number-names\t# 改前写死的那一组\nscripts/mutation/tables\te-number-names\t# 改前写死的那一组\ncrates/singlefs-checker-tier/src/bin\te-number-names\t# 改前写死的那一组'
+    registry_text=$'research\te-number-names\t# 改前写死的那一组\nscripts/experiment-apparatus\te-number-names\t# 改前写死的那一组\nscripts/mutation/tables\te-number-names\t# 改前写死的那一组\ncrates/singlefs-verification/src/bin\te-number-names\t# 改前写死的那一组'
   elif [[ ! -f "$REGISTRY" ]]; then
     echo "  ✗ 目录登记 $REGISTRY 不在：不知道实验号住在哪几处，这一格什么都没扫"
     echo "  → 怎么办：从 git 找回这份登记（git log --diff-filter=D --name-only -- $REGISTRY）；写法在它自己的文件头。"
@@ -1948,6 +2163,16 @@ cell_experiment_orphans() {
 #   与 changed-paths.sh 的 gate_added_lines 给正文剔的同一种；未跟踪的页整份也逐行过一遍）：quoted-result-lines-moved-history-green 历史节里那一行只换了路径，不判、判绿；
 #   quoted-result-lines-moved-unregistered-red（没登记）、quoted-result-lines-moved-and-edited-red（登记了又多写一段）照判、判红在那一行。
 #   弄坏开关 LAG_BASELINE_BREAK=moved-only-kept 下 quoted-result-lines-moved-history-green 判红。
+# 进不了 replay.sh 复跑表的产物（分片跑出、一趟数小时这类 replay.sh 一条任务里整份跑装不下的跑法）登记在 .claude/gate.d/quoted-product-unreplayable.tsv
+#   （三列：产物名、怎么跑出的、为什么进不了复跑表）：这次改动新增或改写的行除了对照 replay.sh 登记着的产物，也在这里登记的产物里逐字找
+#   （树里没有的去历史里取）；没登记的产物照旧只认 replay.sh。一列空着、产物名在树里与历史里都找不到判红；登记表不在当没有登记。
+#   红行里「只在没在 replay.sh 登记的产物里有」那一句按该实验在 replay.sh 登记着什么分别说明：登记着别的产物，那几份可能是旧一轮的；
+#   两种出路（回去抄登记着的那份、把这一轮的产物登记进这张表）都点名。
+#   样本（放了什么写在样本的 setup.sh 与页里）：quoted-result-lines-unreplayable-green（登记了，整行抄的行在登记的产物里逐字找得到，复跑表里那份的行也照认）、
+#   -mistyped-red（登记了但抄错一字）、-unlisted-red（产物在树里、复跑表与登记表都没有它）、-product-missing-red（登记行指到树里与历史里都没有的产物）、
+#   -reason-empty-red（登记行没写为什么进不了复跑表）。
+#   弄坏开关 unreplayable-registry-ignored（不读登记表）、unreplayable-product-existence-unchecked（不查登记的产物在不在）、
+#   unreplayable-reason-unchecked（不查三列写没写全）；各自判错的样本在文件头开关表。
 cell_quoted_result_lines() {
   [[ -d .claude/kb ]] || { echo "  ! 找不到 .claude/kb，这一格无对象可判"; exit 77; }
 
@@ -2076,13 +2301,16 @@ if not quoted:
 REPLAY = 'scripts/experiment-apparatus/replay.sh'
 registered = None
 registered_experiments = set()
+registered_by_experiment = {}   # 实验号（大写）-> replay.sh 为它登记着的产物名
 if os.path.isfile(REPLAY):
     replay_rows = lag_baseline.replay_rows(REPLAY) or []
     registered = {row.product for row in replay_rows}
     registered_experiments = {row.experiment.upper() for row in replay_rows}
+    for row in replay_rows:
+        registered_by_experiment.setdefault(row.experiment.upper(), set()).add(row.product)
 if scope != '全量' and not registered:
     print(f'  ✗ 读不到 {REPLAY} 的登记表（文件不在，或一行 编号|二进制|参数|产物|exact/timing 都没读到），分不出哪些产物是这一轮登记的')
-    print('     → 怎么办：登记表是新抄的产物行唯一的对照；它挪了地方或改了格式，就同步改这一格（与 verdict-false-named 格、门禁 checker-tier-research-build-and-replay.sh 的 experiment-replay 格同一份形状）。')
+    print('     → 怎么办：登记表是新抄的产物行唯一的对照；它挪了地方或改了格式，就同步改这一格（与 verdict-false-named 格、门禁 research-build-and-replay.sh 的 experiment-replay 格同一份形状）。')
     sys.exit(1)
 
 BREAK = os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '')
@@ -2101,13 +2329,36 @@ def product_text(name, raw_bytes):
     return raw_bytes.decode('utf-8', errors='ignore')
 
 
+# 进不了 replay.sh 复跑表的产物登记表（一行一份产物：产物名、怎么跑出的、为什么进不了复跑表）：这里登记的产物里也逐字找整行抄的行。
+# 表不在当没有登记；弄坏开关 unreplayable-registry-ignored 不读它。
+UNREPLAYABLE = '.claude/gate.d/quoted-product-unreplayable.tsv'
+unreplayable = {}   # 产物名 -> (怎么跑出的, 为什么进不了复跑表, 登记表里的行号)
+unreplayable_errors = []   # (行号, 说明)
+if BREAK != 'unreplayable-registry-ignored' and os.path.exists(UNREPLAYABLE):
+    try:
+        with open(UNREPLAYABLE, encoding='utf-8') as registry_handle:
+            registry_text = registry_handle.read()
+    except OSError as problem:
+        print(f'  ✗ 登记表 {UNREPLAYABLE} 读不了（{problem}），登记了的产物谁都没判')
+        print('     → 怎么办：修好权限再跑；读不了的登记表不能当成没有登记。')
+        sys.exit(1)
+    for registry_line, registry_row in enumerate(registry_text.split('\n'), 1):
+        if not registry_row.strip() or registry_row.startswith('#'):
+            continue
+        registry_columns = [column.strip() for column in registry_row.split('\t')] + ['', '']
+        registry_name, registry_how, registry_why = registry_columns[0], registry_columns[1], registry_columns[2]
+        blank = [label for label, value in (('怎么跑出的', registry_how), ('为什么进不了复跑表', registry_why)) if not value]
+        if blank and BREAK != 'unreplayable-reason-unchecked':
+            unreplayable_errors.append((registry_line, f'第 {registry_line} 行：{registry_name} 没写{"、".join(blank)}'))
+        unreplayable[registry_name] = (registry_how, registry_why, registry_line)
+
 products = sorted(glob.glob('research/results/*.out') + glob.glob('research/results/*.out.gz'))
 product_lines = set()
 registered_lines = set()
 line_sources = {}
 for product in products:
     base_prod = os.path.basename(product)
-    is_registered = registered is not None and base_prod in registered
+    is_registered = (registered is not None and base_prod in registered) or base_prod in unreplayable
     m_exp = re.match(r'^e(\d+)', base_prod)
     if m_exp and ('E' + m_exp.group(1)) not in registered_experiments:
         is_registered = True
@@ -2123,6 +2374,7 @@ for product in products:
 # 树里找不到就去版本库历史里找：产物按归档规则删进了 git，历史引文当时逐字是对的；少了这一段，这道检查会退化成「抓归档过的产物」。
 # 引文与归档那一刻的产物字节不符照样红。
 archived_count = 0
+archived_found_names = set()   # 在版本库历史里取到字节的产物文件名（登记表里的产物树里没有时，靠它认「历史里有」）
 # 归档的产物可以是 .out，也可以是压成 .out.gz 入库的（取出来经 product_text 解压，与树里的同一处）；弄坏开关 archived-gz-not-searched：只认 .out 收尾的路径，历史里只有 .out.gz 的算找不到
 ARCHIVED_SUFFIXES = ('.out',) if BREAK == 'archived-gz-not-searched' else ('.out', '.out.gz')
 
@@ -2153,6 +2405,7 @@ def archived_product_lines(only_names=None):
             archived = blob_lines(entry, '%s^:%s' % (commit, entry))
             if archived is not None:
                 archived_count += 1
+                archived_found_names.add(os.path.basename(entry))
                 lines |= archived
     # 正在归档的：HEAD 里还在、工作区里已经删了的产物（这一批照归档规则删上一轮的产物，删除还没提交，
     # git log --diff-filter=D 还找不到它）。它们的字节就在 HEAD 里，与已提交的归档是同一件事。
@@ -2164,8 +2417,26 @@ def archived_product_lines(only_names=None):
             archived = blob_lines(entry, 'HEAD:%s' % entry)
             if archived is not None:
                 archived_count += 1
+                archived_found_names.add(os.path.basename(entry))
                 lines |= archived
     return lines
+
+# 登记表里的产物：树里有的，行已经在上面的循环里并进登记着的产物的行；树里没有的去历史里取，都找不到判红（改了名或删了）
+if unreplayable:
+    off_tree = set(unreplayable) - {os.path.basename(product) for product in products}
+    if off_tree:
+        registered_lines |= archived_product_lines(only_names=off_tree)
+        if BREAK != 'unreplayable-product-existence-unchecked':
+            for name in sorted(off_tree - archived_found_names):
+                line_in_registry = unreplayable[name][2]
+                unreplayable_errors.append((line_in_registry, f'第 {line_in_registry} 行：{name} 在 research/results/ 与版本库历史里都找不到'))
+if unreplayable_errors:
+    print(f'  ✗ 登记表 {UNREPLAYABLE} 有 {len(unreplayable_errors)} 处写得不对：')
+    for _line, text in sorted(unreplayable_errors):
+        print(f'      {text}')  # gate-lint:detail
+    print('     → 怎么办：一行一份产物，<产物文件名><TAB><怎么跑出的><TAB><为什么进不了复跑表>（写法在登记表文件头）；')
+    print('               产物改了名或删了，改这一行或删这一行；写不出怎么跑出的、为什么进不了复跑表的，说明它能进 replay.sh 复跑表，别登记在这里。')
+    sys.exit(1)
 
 if scope == '全量':
     compared_lines = product_lines
@@ -2181,19 +2452,30 @@ if missing:
     missing = [item for item in missing if item[2] not in compared_lines]
 if missing:
     compared_what = (f'research/results/ 的 {len(products)} 份产物' if scope == '全量'
-                     else f'{REPLAY} 登记着的 {len(registered)} 份产物')
+                     else f'{REPLAY} 登记着的 {len(registered)} 份产物'
+                     + (f'与 {UNREPLAYABLE} 登记的 {len(unreplayable)} 份产物' if unreplayable else ''))
     print(f'  ✗ {scope} kb 正文与历史节里有 {len(missing)} 行整行抄的产物行，在 {compared_what}里一份都找不到：')
     for path, number, stripped in missing:
         print(f'     {path}:{number}  {stripped[:160]}')  # gate-lint:detail
         unregistered = sorted(line_sources.get(stripped, ()))
         if unregistered:
-            print(f'       只在没在 replay.sh 登记的产物里有（{"、".join(unregistered[:3])}）：那是旧一轮的，登记的已经换了')  # gate-lint:detail
+            siblings = set()
+            for unregistered_name in unregistered:
+                unregistered_experiment = re.match(r'^e(\d+)', unregistered_name)
+                if unregistered_experiment:
+                    siblings |= registered_by_experiment.get('E' + unregistered_experiment.group(1), set())
+            sibling_text = (f'；replay.sh 为这个实验登记着 {"、".join(sorted(siblings)[:3])}，正文该抄的若是登记着的那份，回去抄它的行'
+                            if siblings else '')
+            print(f'       只在没在 replay.sh 登记的产物里有（{"、".join(unregistered[:3])}）：它们没进 replay.sh 的登记，也没进 {UNREPLAYABLE}{sibling_text}')  # gate-lint:detail
     print('     → 怎么办：打开这个实验复跑命令登记的那份产物，把对应的行原样抄回来，别手改数；')
     print('               正文里照这几行写的结论句一起回对。产物确实没留存，就删掉这几行并写明「原始输出未留存」。')
+    print(f'               正文抄的就是这一轮跑出的产物、只是 replay.sh 起不了它的跑法（分片跑这类）：在 {UNREPLAYABLE} 登一行（产物名、怎么跑出的、为什么进不了复跑表），整行抄的行就在它里面找。')
     sys.exit(1)
 compared_count = len(products) if scope == '全量' else len(registered)
 print(f'  ✓ {scope} kb 正文与历史节里整行抄的产物行都在产物里逐字找得到（判了 {len(quoted)} 行，对照 {compared_count} 份'
       + ('产物）' if scope == '全量' else '登记着的产物）'))
+if unreplayable:
+    print(f'     另认 {UNREPLAYABLE} 登记的 {len(unreplayable)} 份进不了复跑表的产物（{"、".join(sorted(unreplayable)[:3])}）')
 judged = {(path, number) for path, number, _ in quoted}
 skipped = {}
 for path, number, _ in all_quoted:
@@ -2568,7 +2850,7 @@ PY
 # 起判：号不小于 186 的才判，E185 及以前的登记不回补这一节（不设排除表：号以下的一律不判，号以上的没有例外）。
 #   重跑登记（e<号>-r<n>-prereg.md）不判：差分重跑照设计员定义只写三样、其余「同上一次登记」，这一节跟着原登记走。
 #   这次改动里一份要判的都没有：退 77（无对象可判），成功句与无对象句逐个列出号小于 186 不判的那几份。
-# 管不到：写的数对不对、装置是不是照它实现、串行的理由成不成立——靠三方与运行时的核数告警（scripts/hosts/core_usage.py）；
+# 管不到：写的数对不对、装置是不是照它实现、串行的理由成不成立——靠三方与 task-server 记进 task status 的每次尝试平均在用核数；
 #   单态耗时只读「预计挂钟：」那一行，写在第六节或别的行、这一行里没重写的不读；态数只与第六节比，第九节（变异条数）这类别的节里写的不比；
 #   第六节里同一个量词写着几个数的，有一个同值就算对上；「每」认的量词按开头相同配对，配错了靠 review；
 #   没写除数的并行（「按 31 线程并行约 5 分钟」）按串行乘积比，一个数量级的余量盖得住的照绿。
@@ -2865,6 +3147,596 @@ if problems or mismatched or states_mismatched:
     sys.exit(1)
 states_text = f"；态数与第六节比了 {states_compared} 个" + (f"，本次未判 {len(states_unjudged)} 份：{'；'.join(states_unjudged)}" if states_unjudged else "")
 print(f"  ✓ 跑前登记的「并行与挂钟」：查了 {len(judged)} 份（{'、'.join(judged)}），五样都写全了{old_text}{wallclock_text}{unjudged_text}{states_text}")
+PY
+}
+
+# ── 格 preregistration-judge-features：跑前登记里起走崩溃判段的装置二进制，特性要带 gpu
+# 为什么：E161 第 3 次重跑照登记原样起可行性档，没带 gpu 特性，多机配置开着 GPU 时判段只录不判、退 77（records/2026-10-29-subagent拆分提案.md 第一百二十六节 ③）。
+# 对象：这次改动新建或改动的跑前登记，research/prompts/ 下名字以 e<号> 起头、带 prereg 的 .md（e<号>-preregistration.md、e<号>-r<n>-prereg.md、e<号>-preregistration-r<n>.md，重跑登记也判）。
+# 判据：登记里每一处在命令位置上的 `cargo run` / `cargo test`（命令截到反引号、没转义的竖线、分号、& 或 ` -- ` 为止，-- 之后是给二进制的参数）：
+#   命令位置只认三种（command_spans）：代码围栏里的行；行首就是命令的行（去掉缩进、引用号 >、列表记号之后，行首是命令、或行首那一对反引号里是命令）；
+#   表格里整格只有一对反引号、反引号里是命令的格。「是命令」= 去掉开头的 $ 提示符之后以 ASCII 的命令字起头（字母、数字、_ . / ~ $ 引号、左括号），
+#   而且从命令起头到这一处 cargo 之间（引号里的去掉）没有汉字与全角标点。行文里内嵌的（「36G 下 `cargo run --bin …` 的 352 秒」这类）、
+#   标签之后的（「- 可行性档：`cargo run …`」）、表格里夹着字的、围栏里以汉字或 ✓ 起头的输出行都不判，只报数。
+#   以没转义的反斜杠收尾的行（shell 续行）先与下一行并成一条再认：围栏里的行与围栏外行首是命令的行（不含表格行）都并，接连几行续行都并，
+#   围栏收尾那一行不并进来；点名的行号是头一行的。shell 注释照 bash 认（引号外、行首或空白之后的 # 起到行尾）：注释里的反斜杠不续行，
+#   续行接到整行注释就断（注释那一行单独认）；命令那一段（围栏里的行、行首是命令的行、表格整格的命令）行尾的注释截掉、不当命令的参数
+#   （「# 以后加 --features gpu」不算带了），注释里写的 cargo 不判也不计数。
+#   命令那一截照 shell 切词（引号里的空白不切），引号没配对的退回按空白切。
+#   ① 点名了 --bin <名>（--bin=<名>）的才判，cargo test 另认 --test <名>（--test=<名>，测试目标）；一条命令点名几个目标逐个判；都没点名的不判、只报数；
+#   ② 目标的源文件按包认：-p / --package 给了包名的取那个包，没给的在全部包里找同名、同种（bin 或 test）的目标，恰好一个才算认得；
+#      包与目标的清单读被判的根里的 crates/*/Cargo.toml 与 scripts/experiment-apparatus/Cargo.toml（[package] 的 name、[[bin]] 与 [[test]] 的 name 与 path，
+#      外加 src/bin/<名>.rs、src/bin/<名>/main.rs、tests/<名>.rs、tests/<名>/main.rs 的自动发现）；
+#   ③ 源文件调了判段入口的算走崩溃判段：提到判段模块 JUDGE_MODULES（crash_amplification、crash_state_enumeration）之一（整词，路径、导入、`use … as <别名>` 的别名导入都算），
+#      又写着判段入口表 JUDGE_ENTRIES 里的名字（整词，经别名写成 <别名>::<入口> 的照认）。判段入口是这两个模块里照多机配置选判段去路的公开入口
+#      （配置开了 GPU 而没编进 gpu 特性时只录不判、打 NOT_RUN）；只取崩溃点、只在 CPU 上取样、只用常量的（crash_points_of_the_steps、plan_crash_points、
+#      sample_crash_states_on_the_cpu 这类）不算。JUDGE_ENTRIES 与两个模块里的公开判段入口是不是逐个相同，由 judge-entries-in-sync 格判；
+#   ④ 走判段的，特性（--features <值> / --features=<值> / -F <值> / -F<值>，可写几次、取并集，逗号或空白分隔；--all-features 算带上）里没有 gpu（或 <包>/gpu）判红，
+#      点名登记的行与命令。scripts/hosts/compile-then-swap.py 收同一套写法，执行员照登记原样给。
+# 认不出的（目标在清单里找不到、没给包名而几个包都有同名的目标、源文件读不出）报「本次未判」并点名，往 $GATE_NOT_RUN_FILE 报一行，不算绿。
+# 这次改动里没有跑前登记、或登记里一条点名 --bin / --test 的 cargo run / cargo test 都没有：退 77；全部认不出：退 77 并报本次未判。
+# 管不到的：判段入口写在 bin 引的别的模块里而 bin 的源文件自己没写判段模块与入口名字的（只读 bin 的那一份源文件）；入口名只出现在注释里也当调了（不剥注释，多要 gpu 不漏判）；
+#   入口本身再起一个别名（use …::run_from_environment as 别名）之后调别名的照认（导入那一行写着入口名）；命令拼在变量里的；起法是不是经清场、
+#   NOT_RUN_ 行有没有核（跑前登记该写的另两样，归设计员定义与执行员交回）；派发闸那一支用户定不动，不在这里判。
+# 样本：preregistration-judge-features-red（e990 列表行首的 cargo run 起走判段的 bin 没带特性、e991 表格整格的 cargo test 带了 lookup-work-counters 没带 gpu，两处判红；
+#   同一份里不走判段的 bin 不带特性不报）；preregistration-judge-features-green（e992 三处走判段的 bin 各用 --features lookup-work-counters,gpu、--features=gpu、-F gpu，
+#   不走判段的 bin 不带特性、-- 之后的「--bin」不当 cargo 的参数，判了 3 条；另一条 bin 在清单里找不到，报本次未判 1 条）；
+#   preregistration-judge-features-prose-green（e993 里行文内嵌、标签之后、表格里夹着字、围栏里 ✓ 起头的四处起走判段的 bin 都没带 gpu，不在命令位置、不判；
+#   围栏里一条带 gpu 的判了 1 条，判绿报「不在命令位置的 4 条不判」）；
+#   preregistration-judge-features-continued-red（围栏里 --bin 续行到下一行、没带 gpu，并成一条判红；攻方模型 research/prompts/d137-ledger-defs-r1-opus-model/ 的 continued-bin-on-next-line 世界）、
+#   preregistration-judge-features-continued-green（--bin 在头一行、--features gpu 续行到下一行，并成一条判绿；同一模型的 continued-features-on-next-line 世界）；
+#   preregistration-judge-features-alias-red（use crash_amplification as amplification 之后调 amplification::run_from_environment、没带 gpu 判红；
+#   同一份里只从 crash_state_enumeration:: 取崩溃点、不调判段入口的 bin 不带 gpu 不报；同一模型的 alias-import-judge 与 marker-without-judge 两个世界）；
+#   d137-ledger-defs-r2 攻方模型 research/prompts/d137-ledger-defs-r2-opus-model/ 的三个世界原样做成三份：preregistration-judge-features-comment-swallows-red
+#   （围栏里注释行以反斜杠收尾、下一行没带 gpu：改前并进注释退 77，现在判红，第 7 行）、-comment-hides-red（同一围栏另一条带 gpu 的判绿、被注释挡住的那一条没带 gpu：
+#   改前整格判绿，现在判红，第 8 行）、-comment-control-red（注释不以反斜杠收尾的对照，改前改后都判红）；preregistration-judge-features-trailing-comment-red
+#   （命令行尾注释里写着 --features gpu，截掉之后没带 gpu，判红）；preregistration-judge-features-continued-outside-fence-red（列表项里缩进的命令行，--bin 续行到下一行、
+#   没带 gpu：改前围栏外不并、退 77，现在并成一条判红；辩方报告的 C3）；preregistration-judge-features-spellings-green（-Fgpu、--features "lookup-work-counters gpu"
+#   两条走判段的都算带了 gpu，判了 2 条；辩方报告的 C1、C2）；preregistration-judge-features-test-target-red（cargo test 只点名 --test，测试目标调判段入口、没带 gpu，判红；辩方报告的 C4）；
+#   d137-ledger-defs-r3 攻方模型 research/prompts/d137-ledger-defs-r3-opus-model/ 的两个世界原样做成两份：preregistration-judge-features-list-item-trailing-comment-red
+#   （列表项下缩进、行首是命令的一行，行尾注释写着 --features gpu：改前围栏外不截、判绿，现在第 7 行判红；世界 prereg-list-item-trailing-comment）、
+#   preregistration-judge-features-table-cell-trailing-comment-red（表格整格反引号里的同一条命令：改前判绿，现在第 7 行判红；世界 prereg-table-cell-trailing-comment）。
+# 弄坏开关见文件头 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK 的 judge-features-unchecked、judge-binaries-all-counted、judge-commands-anywhere、continuation-unjoined、judge-by-module-marker、
+# shell-comments-ignored、features-spelling-narrow、test-targets-unjudged、trailing-comments-kept-outside-fence 九项。
+# 退役判据：崩溃判段不再挂 gpu 特性（判段的 GPU 路径一律编进去）时删掉这一格。
+JUDGE_MODULES="crash_amplification crash_state_enumeration"
+JUDGE_ENTRIES="run_from_environment run_from_environment_with_observers GivenStatesEngine judging_test_not_run_without_the_gpu_feature judge_not_run_in_this_binary
+  enumerate_crash_states enumerate_crash_states_selecting enumerate_crash_states_versions enumerate_crash_states_selecting_versions
+  enumerate_crash_states_with_expansion enumerate_crash_states_with_every_kind_of_observer crash_point_replay_judge_not_run_line"
+cell_preregistration_judge_features() {
+  ((in_git_work_tree)) || { echo "  ! $ROOT 不是 git 仓，分不出哪些登记是这次改动新建或改动的，这一格无对象可判"; exit 77; }
+  if ((! changed_paths_library_loaded || ! changed_paths_ok)); then
+    echo "  ✗ 取不到这次改动的路径（scripts/gate/changed-paths.sh 读不到，或它的 gate_changed_paths 失败）"
+    echo "     → 怎么办：看上面 changed-paths.sh 打的错误，修好再单跑这一格（bash .claude/gate.d/doc-experiments.sh --check preregistration-judge-features）"
+    exit 1
+  fi
+  python3 - "$SHARED_CHANGED_PATHS" "$JUDGE_MODULES" "$JUDGE_ENTRIES" "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" <<'PY'
+import glob, os, re, shlex, sys, tomllib
+
+changed_file, modules, entries, broken = sys.argv[1], sys.argv[2].split(), sys.argv[3].split(), sys.argv[4].split(",")
+MODULE_WORD = re.compile(r"\b(?:" + "|".join(map(re.escape, modules)) + r")\b")
+ENTRY_WORD = re.compile(r"\b(" + "|".join(map(re.escape, entries)) + r")\b")
+NAME = re.compile(r"research/prompts/e[0-9]+[^/]*prereg[^/]*\.md")
+CARGO = re.compile(r"(?<![\w-])cargo\s+(?:\+\S+\s+)?(?P<command>run|test)(?![\w-])")
+COMMAND_END = re.compile(r"`|\\?\||;|&|\s--(?:\s|$)")
+FENCE = re.compile(r"^\s*(```|~~~)")
+# 命令位置（判据在这一格函数上方的注释）：行首去掉的缩进、引用号与列表记号；命令起头的提示符；命令以哪些字起头；从起头到 cargo 之间不许有的字（汉字与全角标点）
+LINE_MARKERS = re.compile(r"[ \t]*(?:>[ \t]*)*(?:[-*+][ \t]+|[0-9]+[.)][ \t]+)?")
+PROMPT = re.compile(r"\$[ \t]+")
+COMMAND_START = re.compile(r"[A-Za-z0-9_./~$'\"(]")
+QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+PROSE_CHARACTER = re.compile(r"[⺀-￿]")
+TABLE_CELL_CODE = re.compile(r"\|[ \t]*`([^`|]+)`[ \t]*(?=\|)")
+
+
+def command_spans(line, in_fence):
+    """这一行里在命令位置上的几段 → [(命令起头的位置, 命令截止的位置)]；判据在这一格函数上方的注释。"""
+    candidates = []
+    if in_fence:
+        candidates.append((len(line) - len(line.lstrip()), len(line)))
+    elif line.lstrip().startswith("|"):
+        candidates.extend((found.start(1), found.end(1)) for found in TABLE_CELL_CODE.finditer(line))
+    else:
+        start = LINE_MARKERS.match(line).end()
+        if line.startswith("`", start):
+            closing = line.find("`", start + 1)
+            candidates.append((start + 1, closing if closing > start else len(line)))
+        else:
+            candidates.append((start, len(line)))
+    spans = []
+    for start, end in candidates:
+        prompt = PROMPT.match(line, start)
+        start = prompt.end() if prompt else start
+        if start < end and COMMAND_START.match(line, start):
+            spans.append((start, end))
+    return spans
+
+
+def in_command_position(line, spans, position):
+    """这一处 cargo 落在某一段命令里，且从那一段起头到它之间（引号里的去掉）没有汉字与全角标点。"""
+    if "judge-commands-anywhere" in broken:
+        return True
+    return any(start <= position < end and not PROSE_CHARACTER.search(QUOTED.sub("", line[start:position]))
+               for start, end in spans)
+
+
+def shell_comment_start(line):
+    """这一行 shell 注释从哪起（引号外、行首或空白之后的 #）；没有注释交回 None。弄坏开关 shell-comments-ignored 下一律当没有注释（改前的认法）。"""
+    if "shell-comments-ignored" in broken:
+        return None
+    quote, index = None, 0
+    while index < len(line):
+        character = line[index]
+        if quote == "'":
+            quote = None if character == "'" else quote
+        elif character == "\\":
+            index += 2
+            continue
+        elif quote == '"':
+            quote = None if character == '"' else quote
+        elif character in "'\"":
+            quote = character
+        elif character == "#" and (index == 0 or line[index - 1] in " \t"):
+            return index
+        index += 1
+    return None
+
+
+def comment_line(line):
+    """整行是 shell 注释（去掉缩进之后以 # 起头）：续行接到它就断，它自己也不续行（bash 里注释到行尾为止，注释里的反斜杠不是续行）。"""
+    return shell_comment_start(line) is not None and not line[:shell_comment_start(line)].strip()
+
+
+def continued(line):
+    """行尾是没转义的反斜杠（shell 的续行），而且这个反斜杠不在注释里。"""
+    return shell_comment_start(line) is None and (len(line) - len(line.rstrip("\\"))) % 2 == 1
+
+
+def judge_entries_called(source_text):
+    """源文件调了的判段入口（判据 ③）：提到两个模块之一（路径、导入、别名导入都算），又写着判段入口表里的名字；没调交回空表。"""
+    if "judge-by-module-marker" in broken:
+        return [f"{module}::" for module in modules if f"{module}::" in source_text]
+    if not MODULE_WORD.search(source_text):
+        return []
+    return sorted(set(ENTRY_WORD.findall(source_text)))
+
+
+def manifests():
+    """→ {(包名, 目标种类 bin 或 test, 目标名): 源文件路径}：读 crates/*/Cargo.toml 与 scripts/experiment-apparatus/Cargo.toml
+    （[[bin]]、[[test]] 的 name 与 path，外加 src/bin/ 与 tests/ 下的自动发现）。"""
+    found = {}
+    for manifest in sorted(glob.glob("crates/*/Cargo.toml")) + ["scripts/experiment-apparatus/Cargo.toml"]:
+        if not os.path.isfile(manifest):
+            continue
+        try:
+            with open(manifest, "rb") as handle:
+                parsed = tomllib.load(handle)
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        package = parsed.get("package", {}).get("name")
+        if not package:
+            continue
+        directory = os.path.dirname(manifest)
+        for kind, folder in (("bin", "src/bin"), ("test", "tests")):
+            for source in glob.glob(os.path.join(directory, folder, "*.rs")):
+                found[(package, kind, os.path.basename(source)[:-3])] = source
+            for source in glob.glob(os.path.join(directory, folder, "*", "main.rs")):
+                found[(package, kind, os.path.basename(os.path.dirname(source)))] = source
+            for target in parsed.get(kind, []):
+                if target.get("name") and target.get("path"):
+                    found[(package, kind, target["name"])] = os.path.normpath(os.path.join(directory, target["path"]))
+    return found
+
+
+def command_words(tail):
+    """命令那一截照 shell 切词（引号里的空白不切，「--features "lookup-work-counters gpu"」是一个值）；引号没配对的退回按空白切。
+    弄坏开关 features-spelling-narrow 下照改前按空白切。"""
+    if "features-spelling-narrow" in broken:
+        return tail.split()
+    try:
+        return shlex.split(tail, comments=False, posix=True)
+    except ValueError:
+        return tail.split()
+
+
+def command_options(command, tail):
+    """cargo run / cargo test 之后那一截 → (包名或 None, [(目标种类, 目标名)], 特性集合, 带了 --all-features 吗)。
+    目标：--bin <名>（--bin=<名>）；cargo test 另认 --test <名>（--test=<名>），弄坏开关 test-targets-unjudged 下照改前不认。
+    特性：--features <值>、--features=<值>、-F <值>、-F<值>，可写几次、取并集，值里逗号与空白都算分隔；弄坏开关 features-spelling-narrow 下 -F 只认与值分开写的。"""
+    words = command_words(tail)
+    narrow = "features-spelling-narrow" in broken
+    target_options = {"--bin": "bin"}
+    if command == "test" and "test-targets-unjudged" not in broken:
+        target_options["--test"] = "test"
+    package = None
+    targets, features, all_features = [], set(), False
+    index = 0
+    while index < len(words):
+        word = words[index]
+        following = words[index + 1] if index + 1 < len(words) else ""
+        if word in ("-p", "--package"):
+            package, index = following, index + 2
+            continue
+        if word.startswith("--package="):
+            package = word.split("=", 1)[1]
+        elif word.startswith("-p") and len(word) > 2:
+            package = word[2:]
+        elif word in target_options:
+            targets.append((target_options[word], following))
+            index += 2
+            continue
+        elif "=" in word and word.split("=", 1)[0] in target_options:
+            option, name = word.split("=", 1)
+            targets.append((target_options[option], name))
+        elif word in ("--features", "-F"):
+            features.update(item for item in re.split(r"[,\s]+", following.strip("'\"")) if item)
+            index += 2
+            continue
+        elif word.startswith("--features="):
+            features.update(item for item in re.split(r"[,\s]+", word.split("=", 1)[1].strip("'\"")) if item)
+        elif word.startswith("-F") and len(word) > 2 and not narrow:
+            features.update(item for item in re.split(r"[,\s]+", word[2:].strip("'\"")) if item)
+        elif word == "--all-features":
+            all_features = True
+        index += 1
+    return package, targets, features, all_features
+
+
+with open(changed_file, encoding="utf-8") as handle:
+    changed = sorted({line.strip() for line in handle if line.strip()})
+registrations = [path for path in changed if NAME.fullmatch(path) and os.path.isfile(path)]
+if not registrations:
+    print("  ! 这次改动里没有新建或改动的跑前登记（research/prompts/e<号>…prereg….md），这一格无对象可判")
+    sys.exit(77)
+binaries = manifests()
+judged, problems, unknown, other, without_binary, not_command_position = [], [], [], [], 0, 0
+for path in registrations:
+    lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
+    in_fence = False
+    following = 0
+    while following < len(lines):
+        line = lines[following]
+        following += 1
+        number = following
+        if FENCE.match(line):
+            in_fence = not in_fence
+            continue
+        # 反斜杠续行的几行并成一条再认（判据 ①）：围栏里的行与围栏外行首是命令的行都并，行号记头一行；
+        # shell 注释不续行、续行接到整行注释就断（comment_line）；弄坏开关 continuation-unjoined 照改前逐行认
+        joinable = in_fence or (not line.lstrip().startswith("|") and bool(command_spans(line, False)))
+        while (joinable and "continuation-unjoined" not in broken and continued(line)
+               and following < len(lines) and not FENCE.match(lines[following]) and not comment_line(lines[following])):
+            line = line[:-1] + lines[following]
+            following += 1
+        # 命令那一段（围栏里的行、行首是命令的行、表格整格的命令）行尾的 shell 注释截掉，注释里的字不当命令的参数，注释里的 cargo 不判也不计数；
+        # 弄坏开关 trailing-comments-kept-outside-fence 照改前只截围栏里的
+        spans, comment_regions = [], []
+        for start, end in command_spans(line, in_fence):
+            cut = in_fence or "trailing-comments-kept-outside-fence" not in broken
+            comment = shell_comment_start(line[start:end]) if cut else None
+            if comment is not None:
+                comment_regions.append((start + comment, end))
+                end = start + comment
+            spans.append((start, end))
+        for found in CARGO.finditer(line):
+            if any(comment_from <= found.start() < comment_to for comment_from, comment_to in comment_regions):
+                continue
+            if not in_command_position(line, spans, found.start()):
+                not_command_position += 1
+                continue
+            span_end = next((end for start, end in spans if start <= found.start() < end), len(line))
+            tail = line[found.end():span_end]
+            end = COMMAND_END.search(tail)
+            tail = tail[:end.start()] if end else tail
+            package, targets, features, all_features = command_options(found.group("command"), tail)
+            written = " ".join(f"cargo {found.group('command')}{tail}".split())
+            if not targets:
+                without_binary += 1
+                continue
+            where = f"{path}:{number}"
+            for kind, target in targets:
+                candidates = [source for (owner, owned_kind, name), source in binaries.items()
+                              if owned_kind == kind and name == target and (package is None or owner == package)]
+                if len(candidates) != 1:
+                    reason = f"清单里找不到这个 {kind}" if not candidates else f"没给包名，{len(candidates)} 个包都有同名的 {kind}"
+                    unknown.append(f"{where}（--{kind} {target}：{reason}）")
+                    continue
+                try:
+                    source_text = open(candidates[0], encoding="utf-8", errors="replace").read()
+                except OSError:
+                    unknown.append(f"{where}（--{kind} {target}：源文件 {candidates[0]} 读不出）")
+                    continue
+                called = judge_entries_called(source_text)
+                if not called and "judge-binaries-all-counted" not in broken:
+                    other.append(f"{where}（{target}）")
+                    continue
+                judged.append(where)
+                has_gpu = all_features or any(feature == "gpu" or feature.endswith("/gpu") for feature in features)
+                if not has_gpu and "judge-features-unchecked" not in broken:
+                    carried = "、".join(sorted(features)) if features else "无"
+                    problems.append(f"{where}：「{written}」起的 {target}（{candidates[0]}）调了判段入口 {'、'.join(called) or '（弄坏开关下一律算）'}，"
+                                    f"特性没带 gpu（带的：{carried}）")
+unknown_text = f"；认不出、本次未判 {len(unknown)} 条：{'、'.join(unknown)}" if unknown else ""
+other_text = f"；不走判段的 {len(other)} 条不判：{'、'.join(other)}" if other else ""
+position_text = f"；不在命令位置（行文里内嵌、标签之后、表格里夹着字、围栏里的输出行）的 {not_command_position} 条不判"
+if unknown:
+    print(f"  ! 起装置的命令本次未判 {len(unknown)} 条：{'、'.join(unknown)}")
+    print("     要这一格判它：命令写 -p <包名> --bin <名>（cargo test 也可 --test <名>），目标要在被判的根的 crates/*/Cargo.toml 或 scripts/experiment-apparatus/Cargo.toml 的清单里（[[bin]]、[[test]]，或 src/bin/、tests/ 下）")
+    not_run_file = os.environ.get("GATE_NOT_RUN_FILE")
+    if not_run_file:
+        with open(not_run_file, "a", encoding="utf-8") as handle:
+            handle.write(f"doc-experiments.sh preregistration-judge-features：起装置的命令本次未判 {len(unknown)} 条（{'、'.join(unknown)}）\n")
+if problems:
+    for problem in problems:
+        print(f"  ✗ {problem}")   # gate-lint:detail
+    print(f"  ✗ 这次改动的跑前登记里 {len(problems)} 条起走崩溃判段的装置命令没带 gpu 特性（走判段的判了 {len(judged)} 条）")
+    print("     → 怎么办：照 .claude/agents/experiment-designer.md 写起法：装置走到崩溃判段（crash_amplification / crash_state_enumeration 的判段）的，"
+          "cargo run / cargo test 带 --features gpu（经 task-server/task submit 交，清场由服务做），登记里写核 NOT_RUN_ 0 行；改完单跑这一格（bash .claude/gate.d/doc-experiments.sh --check preregistration-judge-features）")
+    sys.exit(1)
+if not judged and not other:
+    print(f"  ! 这次改动的跑前登记（{len(registrations)} 份）里没有认得出的、点名 --bin 或 --test 的 cargo run / cargo test（没点名 --bin 或 --test 的 {without_binary} 条），"
+          f"这一格无对象可判{unknown_text}{position_text}")
+    sys.exit(77)
+print(f"  ✓ 跑前登记里起走崩溃判段的装置命令都带了 gpu 特性：查了 {len(registrations)} 份，走判段的 {len(judged)} 条"
+      f"{('（' + '、'.join(judged) + '）') if judged else ''}{other_text}；没点名 --bin 或 --test 的 {without_binary} 条{unknown_text}{position_text}")
+PY
+}
+
+# ── 格 judge-entries-in-sync：判段入口表 JUDGE_ENTRIES 与两份判段源文件里的公开判段入口逐个相同
+# 为什么：preregistration-judge-features 只认 JUDGE_ENTRIES 里的名字，两个模块里新加了公开入口而表没跟上，走判段的装置就漏判（d137-ledger-defs-r2 辩方 A2，判决「采，记欠账」，同一件里另立这一格）。
+# 对象：被判的根里 JUDGE_SOURCES 那两份源文件（crash_amplification.rs、crash_state_enumeration.rs）此刻的全文，不看这次改动范围；两份都不在退 77。
+# 认法（公开的判段入口）：
+#   ① 切函数单元：去掉注释（// 与可嵌套的 /* */）、把串、原始串、字节串与字符字面量涂成空白之后配花括号；花括号前面那一截表头从方括号与圆括号外的
+#      上一个分号或右花括号之后算起（签名里数组类型 [u8; N] 的分号在方括号里，不算）；文件顶层与行内 mod 里的 fn 各一个单元，
+#      inherent impl（impl <类型> {…}，不带 for）里的 fn 记在那个类型下；函数体里嵌套的 fn 并进外层。#[cfg(test)] 的模块、带 #[test] 或 #[cfg(test)] 的 fn、
+#      trait 的实现（impl … for …）里的方法不算。
+#   ② 判段去路的记号：函数体（去掉注释、字面量照留）里有 cfg!(feature = "gpu")（这份二进制编没编进 gpu 特性，判段照它选去路），或调 judge_not_run_without_the_gpu_feature（判段不跑的原因）。
+#   ③ 调用边只在这两份源文件的单元之间连：裸名 <名>( 与路径末段连到同名的自由函数；<类型>::<名> 与 Self::<名> 连到那个类型下的同名方法；.<名> 连到任一类型下的同名方法。
+#   ④ 公开（可见性正是 pub，pub(crate) 这类不算）、顺调用边走得到带记号的单元（自己带记号也算）的，是公开的判段入口：自由函数记函数名，方法记它所在的类型名
+#      （装置写 <类型>::<方法>，preregistration-judge-features 按类型名认）。走得到的单元从带记号的单元沿调用边倒着一次走全，环上的单元与函数在文件里的先后都不改结局。
+# 判据：④ 认出的名字集合与 JUDGE_ENTRIES 逐个相同。源码里认出而表里没有的（新加的入口）判红，点名文件、行与限定名；表里有而源码里认不出的
+#   （改了名、删了、不再公开、走不到记号）判红，点名那个名字。
+# 管不到的：入口经别的模块（gpu_card_configuration.rs 这类）选去路、两份源文件里没有记号的；宏展开出来的函数；调用写在宏参数之外的别处（函数指针存进表再调）——
+#   这几种 ③ 连不上边，漏判。认出的多了（.<名> 连到同名方法）只会多报、不漏。
+# 样本：judge-entries-in-sync-green（两份源文件里恰好是表里那 13 个入口；另有只在注释里写 cfg!(feature = "gpu") 的公开函数、#[cfg(test)] 模块里调判段的公开函数、
+#   不调记号的公开纯函数 judge_not_run_without_the_gpu_feature，都不算入口）；judge-entries-in-sync-red（同一份再加一个调 enumerate_crash_states 的公开函数，表里没有，判红）；
+#   judge-entries-in-sync-stale-red（crash_point_replay_judge_not_run_line 改成不公开，表里有、源码里认不出，判红）；
+#   d137-ledger-defs-r3 攻方模型 research/prompts/d137-ledger-defs-r3-opus-model/ 的三个世界原样做成三份：judge-entries-in-sync-array-parameter-new-entry-red
+#   （green 那两份源文件末尾加签名里带 [u8; 32] 的公开入口 enumerate_crash_states_keyed_by_the_plan，经 enumerate_crash_states 走到判段：改前不进单元、判绿，现在第 49 行判红；
+#   世界 sync-array-parameter-new-entry）、judge-entries-in-sync-array-parameter-on-the-path-green（路径上的私有函数 enumerate_crash_states_through_the_library 签名里带
+#   [u8; 32]：改前断边、七个入口报认不出，现在判绿；世界 sync-array-parameter-on-the-path）、judge-entries-in-sync-cycle-new-entry-after-red（新公开入口
+#   enumerate_crash_states_one_more_round 与 enumerate_crash_states 互相调、写在它后面：改前记住环上的「走不到」、判绿，现在第 49 行判红；世界 sync-cycle-new-entry-after）。
+# 弄坏开关见文件头 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK 的 judge-entries-new-unreported、judge-entries-stale-unreported、judge-entries-header-after-any-semicolon、
+# judge-entries-cycle-memoized 四项。
+# 退役判据：preregistration-judge-features 退役时一起删。
+JUDGE_SOURCES="crates/singlefs-verification/src/crash_amplification.rs crates/singlefs-verification/src/crash_state_enumeration.rs"
+cell_judge_entries_in_sync() {
+  python3 - "$JUDGE_SOURCES" "$JUDGE_ENTRIES" "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" <<'PY'
+import os, re, sys
+
+sources, entries, broken = sys.argv[1].split(), set(sys.argv[2].split()), sys.argv[3].split(",")
+IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+RAW_STRING = re.compile(r'(?:b|c|br|cr)?r(#*)"')
+ROUTE_MARKER = re.compile(r'cfg!\s*\(\s*feature\s*=\s*"gpu"\s*\)|\bjudge_not_run_without_the_gpu_feature\s*\(')
+TEST_ATTRIBUTE = re.compile(r"#\s*\[\s*(?:cfg\s*\(\s*test\s*\)|test)\s*\]")
+CALL = re.compile(r"(?:(\.)\s*|\b(Self|[A-Z][A-Za-z0-9_]*)\s*::\s*)?\b([a-z_][A-Za-z0-9_]*)\b")
+
+
+def blank(text, start, end):
+    return "".join(character if character == "\n" else " " for character in text[start:end])
+
+
+def lex(text):
+    """认法 ①：→ (去掉注释的原文, 去掉注释、字面量涂成空白的代码)，两份与原文等长、换行留在原处。"""
+    without_comments, code = [], []
+    position, count = 0, len(text)
+
+    def word_before(index):
+        return index > 0 and (text[index - 1].isalnum() or text[index - 1] == "_")
+
+    def keep(end, literal):
+        without_comments.append(text[position:end] if literal else blank(text, position, end))
+        code.append(blank(text, position, end))
+        return end
+
+    while position < count:
+        character = text[position]
+        if text.startswith("//", position):
+            end = text.find("\n", position)
+            position = keep(count if end < 0 else end, False)
+            continue
+        if text.startswith("/*", position):
+            depth, end = 1, position + 2
+            while end < count and depth:
+                if text.startswith("/*", end):
+                    depth, end = depth + 1, end + 2
+                elif text.startswith("*/", end):
+                    depth, end = depth - 1, end + 2
+                else:
+                    end += 1
+            position = keep(end, False)
+            continue
+        raw = RAW_STRING.match(text, position) if character in "bcr" and not word_before(position) else None
+        if raw:
+            end = text.find('"' + raw.group(1), raw.end())
+            position = keep(count if end < 0 else end + 1 + len(raw.group(1)), True)
+            continue
+        if character == '"' or (character in "bc" and text.startswith('"', position + 1) and not word_before(position)):
+            end = text.index('"', position) + 1
+            while end < count and text[end] != '"':
+                end += 2 if text[end] == "\\" else 1
+            position = keep(min(end + 1, count), True)
+            continue
+        if character == "'":
+            end = position + 1   # 生命周期：只跳过引号
+            if text.startswith("\\", position + 1):
+                end = position + 2
+                while end < count and text[end] != "'":
+                    end += 2 if text[end] == "\\" else 1
+                end = min(end + 1, count)
+            elif position + 2 < count and text[position + 2] == "'":
+                end = position + 3
+            if end > position + 1:
+                position = keep(end, True)
+                continue
+        identifier = IDENTIFIER.match(text, position) if (character.isalpha() or character == "_") else None
+        end = identifier.end() if identifier else position + 1
+        without_comments.append(text[position:end])
+        code.append(text[position:end])
+        position = end
+    return "".join(without_comments), "".join(code)
+
+
+def header_start(code, low, brace):
+    """认法 ①：花括号前面那一截表头从哪起——往回找方括号与圆括号外的上一个分号或右花括号，表头从它之后算；没有就从 low 起。
+    弄坏开关 judge-entries-header-after-any-semicolon 下照改前不看括号（签名里 [u8; N] 的分号也算，表头里认不出 fn）。"""
+    if "judge-entries-header-after-any-semicolon" in broken:
+        return max(low, code.rfind(";", low, brace) + 1, code.rfind("}", low, brace) + 1)
+    depth = 0
+    for index in range(brace - 1, low - 1, -1):
+        character = code[index]
+        if character in ")]":
+            depth += 1
+        elif character in "([":
+            depth -= 1
+        elif character in ";}" and depth <= 0:
+            return index + 1
+    return low
+
+
+def function_units(path):
+    """认法 ①：→ [{name, owner, public, test, line, code, marked}]；owner 是 inherent impl 的类型名，自由函数是 None。"""
+    text = open(path, encoding="utf-8", errors="replace").read()
+    without_comments, code = lex(text)
+    pairs, stack = {}, []
+    for index, character in enumerate(code):
+        if character == "{":
+            stack.append(index)
+        elif character == "}" and stack:
+            pairs[stack.pop()] = index
+    found = []
+
+    def scan(low, high, owner, test_scope):
+        position = low
+        while position < high:
+            brace = code.find("{", position, high)
+            if brace < 0:
+                return
+            header_from = header_start(code, position, brace)
+            header, closing = code[header_from:brace], pairs.get(brace, high)
+            test = test_scope or bool(TEST_ATTRIBUTE.search(header))
+            function = re.search(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)", header)
+            implementation = re.search(r"(?:^|\s|\])impl\b(.*)$", header, re.S)
+            if function:
+                visibility = header[:function.start()].split("]")[-1]
+                found.append({"name": function.group(1), "owner": owner, "test": test,
+                              "public": bool(re.search(r"\bpub\b(?!\s*\()", visibility)),
+                              "line": text.count("\n", 0, header_from + function.start()) + 1, "code": code[brace:closing + 1],
+                              "marked": bool(ROUTE_MARKER.search(without_comments[brace:closing + 1]))})
+            elif implementation:
+                rest = implementation.group(1).strip()
+                if rest.startswith("<"):
+                    depth = 0
+                    for cut, character in enumerate(rest):
+                        depth += {"<": 1, ">": -1}.get(character, 0)
+                        if depth == 0:
+                            rest = rest[cut + 1:]
+                            break
+                if re.search(r"\bfor\b", rest):
+                    scan(brace + 1, closing, None, True)
+                else:
+                    type_name = re.match(r"\s*(?:[A-Za-z_][A-Za-z0-9_]*::)*([A-Za-z_][A-Za-z0-9_]*)", rest)
+                    scan(brace + 1, closing, type_name.group(1) if type_name else None, test)
+            elif re.search(r"\bmod\s+[A-Za-z_][A-Za-z0-9_]*\s*$", header):
+                scan(brace + 1, closing, None, test)
+            position = closing + 1
+
+    scan(0, len(code), None, False)
+    for unit in found:
+        unit["path"] = path
+    return found
+
+
+present = [path for path in sources if os.path.isfile(path)]
+if not present:
+    print(f"  ! 被判的根里两份判段源文件（{'、'.join(sources)}）都不在，这一格无对象可判")
+    sys.exit(77)
+units = [unit for path in present for unit in function_units(path) if not unit["test"]]
+free_functions, methods = {}, {}
+for unit in units:
+    (free_functions if unit["owner"] is None else methods).setdefault(unit["name"], []).append(unit)
+
+
+def callees(unit):
+    """认法 ③。"""
+    found = []
+    for match in CALL.finditer(unit["code"]):
+        dot, qualifier, name = match.groups()
+        if dot or qualifier:
+            owner = unit["owner"] if qualifier == "Self" else qualifier
+            found += [method for method in methods.get(name, []) if dot or method["owner"] == owner]
+        else:
+            found += free_functions.get(name, [])
+    return found
+
+
+reaches = {}
+
+
+def reaches_route(unit, visiting):
+    """弄坏开关 judge-entries-cycle-memoized 下的改前走法：递归、记住每个单元的结果，环上截断时算出的「走不到」也记住（结局随先后翻）。"""
+    if id(unit) in reaches:
+        return reaches[id(unit)]
+    if id(unit) in visiting:
+        return False
+    visiting.add(id(unit))
+    result = unit["marked"] or any(reaches_route(callee, visiting) for callee in callees(unit))
+    visiting.discard(id(unit))
+    reaches[id(unit)] = result
+    return result
+
+
+def units_reaching_route():
+    """认法 ④：顺调用边走得到带记号的单元（自己带记号也算）→ 它们的 id 集合。从带记号的单元沿调用边倒着一次走全，
+    环与函数在文件里的先后都不改结局。"""
+    if "judge-entries-cycle-memoized" in broken:
+        return {id(unit) for unit in units if unit["public"] and reaches_route(unit, set())}
+    callers = {}
+    for unit in units:
+        for callee in callees(unit):
+            callers.setdefault(id(callee), []).append(unit)
+    pending = [unit for unit in units if unit["marked"]]
+    reached = {id(unit) for unit in pending}
+    while pending:
+        for caller in callers.get(id(pending.pop()), []):
+            if id(caller) not in reached:
+                reached.add(id(caller))
+                pending.append(caller)
+    return reached
+
+
+reaching = units_reaching_route()
+recognized = {}
+for unit in units:
+    if unit["public"] and id(unit) in reaching:
+        qualified = f"{unit['owner']}::{unit['name']}" if unit["owner"] else unit["name"]
+        recognized.setdefault(unit["owner"] or unit["name"], []).append(f"{unit['path']}:{unit['line']} {qualified}")
+new_entries = [] if "judge-entries-new-unreported" in broken else sorted(set(recognized) - entries)
+stale_entries = [] if "judge-entries-stale-unreported" in broken else sorted(entries - set(recognized))
+for name in new_entries:
+    print(f"  ✗ 源码里的公开判段入口 {name}（{'、'.join(recognized[name])}）不在 JUDGE_ENTRIES 里")   # gate-lint:detail
+for name in stale_entries:
+    print(f"  ✗ JUDGE_ENTRIES 里的 {name} 在两份判段源文件里认不出是公开的判段入口（没有这个公开的函数或类型方法，或走不到判段去路的记号）")   # gate-lint:detail
+marked = sum(unit["marked"] for unit in units)
+public = sum(unit["public"] for unit in units)
+if new_entries or stale_entries:
+    print(f"  ✗ 判段入口表 JUDGE_ENTRIES 与两份判段源文件对不上：源码里有、表里没有的 {len(new_entries)} 个，表里有、源码里认不出的 {len(stale_entries)} 个"
+          f"（扫了 {len(units)} 个函数单元，公开的 {public} 个，带判段去路记号的 {marked} 个）")
+    print("     → 怎么办：源码里新加的入口把名字加进 .claude/gate.d/doc-experiments.sh 的 JUDGE_ENTRIES（方法写类型名）；表里认不出的，改名的换成新名字、"
+          "删了或不再走判段的从表里删；认法在这一格函数上方的注释。改完单跑这一格（bash .claude/gate.d/doc-experiments.sh --check judge-entries-in-sync）")
+    sys.exit(1)
+print(f"  ✓ 判段入口表 JUDGE_ENTRIES 的 {len(entries)} 个名字与两份判段源文件里认出的公开判段入口逐个相同"
+      f"（扫了 {len(present)} 份、{len(units)} 个函数单元，公开的 {public} 个，带判段去路记号的 {marked} 个）")
 PY
 }
 

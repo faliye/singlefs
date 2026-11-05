@@ -1,0 +1,15 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：account-quota
+want=这次改动新加的 10 行写了账号切换或用量限额，在 9 份文件里
+want=.claude/hooks/sample-guard.sh:4  限额·通知重置时刻
+want=.claude/hooks/sample-guard.sh:5  限额·通知重置时刻
+want=scripts/sample.py:2  限额·写明哪种
+want=.claude/gate.d/sample-stage.sh:2  账号切换·名词
+want=.claude/rules/sample.md:2  限额·写明哪种
+want=.claude/agents/sample.md:2  账号切换·动词
+want=.claude/main-agent.md:2  限额·窗口
+want=.claude/agent-common.md:2  限额·会话周上限
+want=task-server/sample.py:2  账号切换·英文
+want=prune-server/src/sample.rs:2  限额·窗口
+want=删掉这句。子 agent 因此停下的，只写「中途停下没交回」
+want=doc-text.sh：1 格里 1 格红（account-quota）

@@ -1,0 +1,11 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：dated-status
+want=滞后表 .claude/gate.d/dated-status-lag.tsv 有 7 处写得不对
+want=第 3 行：锚在 .claude/kb/milestone/01-样本里程碑.md 里命中 0 行，要恰好一行
+want=第 4 行：锚在 .claude/kb/milestone/01-样本里程碑.md 里命中 2 行，要恰好一行（第 5、6 行）
+want=第 5 行：登记的路径不在：.claude/kb/milestone/09-不在的页.md
+want=第 6 行：锚只有 4 个字，要那一行里至少 12 个字的原文
+want=第 7 行：有 2 列，要三列
+want=第 8 行：第三列要以 # 起头、写为什么还没改（至少 4 个字）
+want=第 9 行：与第 2 行登记的是同一条（路径与锚都相同）
+want=doc-text.sh：1 格里 1 格红（dated-status）

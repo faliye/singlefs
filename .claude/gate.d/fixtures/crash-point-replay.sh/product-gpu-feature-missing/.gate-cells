@@ -1,0 +1,5 @@
+# 产品 GPU 包的 [features] 里没有 tests-on-a-real-gpu（改名或删了而这一格还认旧名）：判红，出路写三处一起改
+# 另点 crash-case-replay、feature-gated-tests：expect 的逐格那一行写着 crash-case-replay 与 feature-gated-tests 两格
+product-gpu-real-card-tests
+crash-case-replay
+feature-gated-tests

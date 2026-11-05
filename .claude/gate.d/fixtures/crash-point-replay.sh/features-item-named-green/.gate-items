@@ -1,0 +1,2 @@
+# 样本点名的项（门禁文件头「逐项点名」：stage-selftest.sh 起样本只给根，样本根的 .gate-items 当作命令行上的 --item）
+feature-gated:store_only.rs

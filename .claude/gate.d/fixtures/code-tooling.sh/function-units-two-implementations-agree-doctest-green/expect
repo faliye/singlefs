@@ -1,0 +1,4 @@
+exit=0
+want=登记入口 1 个（scripts/mutation/mutation-prune.py 1 个），闭包与键逐个相同；产品行为视图那一趟 dump 比了
+want=、登记入口 1 个，闭包与键逐个相同；解不成 Rust 入口的 0 个
+want=function-units-two-implementations-agree：绿

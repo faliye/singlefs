@@ -1,0 +1,2 @@
+# 保留表与两种自动跳过的绿样本（setup.sh 建 git 仓）：保留表登记了的、git 历史命令 -- 之后的、同一行写着后继文件名的搬迁行都不红。只跑 governance-refs
+governance-refs

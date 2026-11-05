@@ -23,8 +23,11 @@ cat > records/2026-09-16-subagent拆分提案.md <<'SPLIT'
 |---|---|---|---|
 | ② | 样本现象二 | 样本检查二 | 下一批工具改动 |
 SPLIT
-cp records/2026-09-16-subagent拆分提案.md records/2026-10-23-subagent拆分提案.md   # 欠账那份：开着的节照原节号抄过去
+cp records/2026-09-16-subagent拆分提案.md records/2026-10-29-subagent拆分提案.md   # 现行账本：开着的节照原节号抄过去
 printf '# 样本调度记录\n\n- 基准里早就有的旧行。\n' > records/2026-10-22-样本调度.md
+mkdir -p .claude/gate.d
+printf 'current\trecords/2026-10-29-subagent拆分提案.md\t-\t样本的现行账本，新欠账往这一份末尾追加\n' > .claude/gate.d/split-proposal-ledgers.tsv
+printf 'sealed\trecords/2026-09-16-subagent拆分提案.md\t%s\t样本里封存的那一份，当历史出处\n' "$(sha256sum < records/2026-09-16-subagent拆分提案.md | cut -d' ' -f1)" >> .claude/gate.d/split-proposal-ledgers.tsv
 git add -A
 git commit -qm '基准：欠账表、拆分提案、一份调度记录'
 cat >> records/2026-10-22-样本调度.md <<'NEW'

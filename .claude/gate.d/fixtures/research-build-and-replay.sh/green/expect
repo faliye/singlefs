@@ -1,0 +1,4 @@
+exit=0
+want=样本 replay.sh 收到：（表里 3 行）
+want=── 汇总：research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=experiment-replay：绿

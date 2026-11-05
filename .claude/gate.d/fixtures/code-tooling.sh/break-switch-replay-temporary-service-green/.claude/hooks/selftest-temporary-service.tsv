@@ -1,0 +1,2 @@
+# 样本的要临时服务的自证登记表：一份 required，源码里不写临时服务核对的函数名，只靠这张表认
+scripts/gate/needs-service.py	required	# 样本：不在包装底下退 2，复跑要包一层起

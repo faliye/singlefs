@@ -1,0 +1,5 @@
+exit=2
+want=✗ 判的根是样本（
+want=没有临时 prune-server（PRUNE_SERVER_TEMPORARY_SERVICE_SOCKET 没设）
+want=→ 怎么办：样本档整条套临时服务起
+want=python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh .claude/gate.d --item code-tooling.sh

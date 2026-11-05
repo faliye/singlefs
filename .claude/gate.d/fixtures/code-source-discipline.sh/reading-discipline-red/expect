@@ -1,7 +1,7 @@
 exit=1
 want=样本只跑 .gate-cells 点名的格：reading-discipline
 want=C59（种子折叠成同一个状态）：2 处违规没有登记在豁免表里
-want=crates/singlefs-checker-tier/src/bin/e2_sample.rs:5    seed | 1
+want=crates/singlefs-verification/src/bin/e2_sample.rs:5    seed | 1
 want=读不出基准 HEAD 里的 .claude/gate.d/experiment-seed-fold-lag.tsv（git show 退 128），「只缩不涨」这一条没比
 want=scripts/experiment-apparatus/e8_seed_and_readings.rs:17    seed | 1
 want=C60（恒定读数没有故障注入自证）：1 处违规没有登记在豁免表里

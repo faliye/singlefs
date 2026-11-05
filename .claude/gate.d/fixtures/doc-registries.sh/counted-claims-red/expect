@@ -1,0 +1,13 @@
+exit=1
+want=.claude/gate.d/counted-claims.tsv:2 NOTES.md:3 正文写 7，现数 9；出路：正文改成 9，或登记表的命令改对
+want=.claude/gate.d/counted-claims.tsv:3 的定位正则在 NOTES.md 里命中 2 次（第 4 行、第 8 行），要恰好一次；正则改窄到只罩那一句
+want=.claude/gate.d/counted-claims.tsv:4 的定位正则在 NOTES.md 里命中 0 次，要恰好一次
+want=.claude/gate.d/counted-claims.tsv:5 NOTES.md:5 数的命令退 3（样本：故意退 3）：bash count-sample-items.sh broken
+want=.claude/gate.d/counted-claims.tsv:6 NOTES.md:6 数的命令打的不是一个十进制整数：「五个」
+want=.claude/gate.d/counted-claims.tsv:7 有 3 列，要四列
+want=.claude/gate.d/counted-claims.tsv:8 指的 MISSING.md 不在
+want=.claude/gate.d/counted-claims.tsv:9 NOTES.md 的定位正则有 0 个捕获组，要恰好一个
+want=登记的能数的数有 8 行没核过（登记 9 行、2 份文件，核过 1 行）
+want=样本只跑 .gate-cells 点名的格：counted-claims
+want=  counted-claims：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（counted-claims）

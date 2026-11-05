@@ -1,0 +1,2 @@
+# 当作调用方的环境导出：一个登记过的改判定域的变量（admission.py DOMAIN_ENVIRONMENT_VARIABLES），带特性那一趟的 cargo 前面会清掉它
+SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=3

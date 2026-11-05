@@ -1,0 +1,3 @@
+# 样本登记表：产物名、怎么跑出的、为什么进不了复跑表（制表符分隔）
+e99-sample-2026-11-03-sharded.out	bash scripts/experiment-apparatus/e99-cells.sh run，经服务分 5 片跑出	分片跑法 replay.sh 装不下，产物带挂钟字段逐字节比不了
+e99-sample-2026-11-03-gone.out	bash scripts/experiment-apparatus/e99-cells.sh run，经服务分 5 片跑出	分片跑法 replay.sh 装不下

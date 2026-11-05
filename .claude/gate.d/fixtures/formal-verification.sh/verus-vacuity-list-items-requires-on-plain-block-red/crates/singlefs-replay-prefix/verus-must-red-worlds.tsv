@@ -1,0 +1,2 @@
+# 样本用的必红世界表：变异名、文件、原文、替换文、proof_errors=<证明错条数>、landing=<落点>（列项只列名字，不起 Verus）
+半值放宽	crates/singlefs-replay-prefix/src/lib.rs	    let result = value / 2;	    let result = value + 1;	proof_errors=1	landing=halve_plain

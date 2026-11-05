@@ -1,0 +1,8 @@
+exit=1
+want=4 处还写着退役的名字
+want=scripts/hosts/uses_old.sh:2  OLD_SAMPLE_LIBRARY_ROOT
+want=scripts/hosts/uses_old.sh:3  OLD_SAMPLE_LIBRARY_ROOT
+want=scripts/gate/uses_old.py:3  --sample-old-option
+want=.claude/hooks/sample_hook.sh:2  OLD_REFUSED_VARIABLE
+want=OLD_SAMPLE_LIBRARY_ROOT：删掉：样本的出路，库名固定
+want=OLD_REFUSED_VARIABLE：删掉：样本的出路，不留设了就拒

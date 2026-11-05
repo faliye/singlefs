@@ -1,0 +1,3 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：第二条起的脚本源码里调 selftest_service_problem（只在临时 prune-server 上跑），却裸写：整格判红、一条都不起、点名该写成的包装写法
+bash scripts/gate/sample-pass-a.sh --selftest
+python3 scripts/gate/sample-needs-temporary-service.py --selftest

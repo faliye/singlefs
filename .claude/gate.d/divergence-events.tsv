@@ -1,4 +1,4 @@
-# 同源性计数器的事件表（checks-owed C191；D13 已定项 13「冲突 2」）：门禁 checker-tier-formal-verification 的 same-origin-counter 格读它，判法在那一道文件头。
+# 同源性计数器的事件表（checks-owed C191；D13 已定项 13「冲突 2」）：门禁 formal-verification 的 same-origin-counter 格读它，判法在那一道文件头。
 # 要观测的是「两条本该独立的腿，有没有从来不一致、或一致地错」：累计 ≥ 5 次不一致而判「spec 错」的次数是 0，说明两者实际同源，处置是把那两条腿合并、预算移给穷举（D13 已定项 13）。
 # 一行一条，制表符分隔，第一段是种类：
 #   对<TAB>对名<TAB>spec 一方<TAB>model 一方<TAB>已立|未立<TAB>说明

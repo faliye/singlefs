@@ -1,0 +1,5 @@
+# 产品 GPU 包的真显卡对拍：一个对拍目标的用例全是 ignored（cargo 输出里它跑到 0 条），记本次未跑、不判红
+# 另点 crash-case-replay、feature-gated-tests：expect 的逐格那一行写着 crash-case-replay 与 feature-gated-tests 两格
+product-gpu-real-card-tests
+crash-case-replay
+feature-gated-tests

@@ -1,0 +1,12 @@
+# 样本：owed-refs-paid 的滞后表。一行「<路径><TAB>C<编号><TAB><行内锚><TAB># <为什么还没改>」，只缩不涨
+.claude/kb/decisions/01-样本决策.md	C20	C20（样本已还的甲）——样本判决之后写回	# 样本：开工快照里，判决之后写回
+.claude/kb/decisions/01-样本决策.md	C20	C20（样本已还的甲）——样本判决之后写回
+.claude/kb/decisions/01-样本决策.md	20	C20（样本已还的甲）——样本判决之后写回	# 样本：C 号写法不对
+.claude/kb/decisions/01-样本决策.md	C20	C20（样本已还的甲）——样本判决之后写回	# 短
+.claude/kb/decisions/01-样本决策.md	C20	C20（样本已还的甲）	# 样本：锚太短
+.claude/kb/decisions/01-样本决策.md	C20	C20（样本已还的甲）——样本判决之后写回	# 样本：开工快照里，判决之后写回
+.claude/kb/decisions/09-不在的样本决策.md	C20	C20（样本已还的甲）——样本判决之后写回	# 样本：登记的路径不在
+.claude/kb/decisions/01-样本决策.md	C20	C20（样本已还的甲）——样本找不到的锚	# 样本：锚在文件里找不到
+.claude/kb/decisions/01-样本决策.md	C21	——两行同写的样本句子。	# 样本：锚命中两行
+.claude/kb/decisions/01-样本决策.md	C21	——样本还开着的这一笔照常欠着	# 样本：那一行里没有这个号
+.claude/kb/decisions/01-样本决策.md	C10	——样本还开着的这一笔照常欠着	# 样本：这个号还开着

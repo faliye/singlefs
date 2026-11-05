@@ -1,0 +1,3 @@
+# 样本复跑登记表：两份脚本，alpha 两条开关、beta 一条
+scripts/gate/alpha.py	30	# 样本：复用三问只改它头注里一条开关点名的项的写法
+scripts/gate/beta.py	30	# 样本：一条开关，复用三问里它的键一趟都不变

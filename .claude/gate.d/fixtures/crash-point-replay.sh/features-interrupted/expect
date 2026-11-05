@@ -1,0 +1,5 @@
+exit=1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]
+want=✗ feature-gated-tests：带特性那一趟 cargo test 退 143（上面是它的尾部与全部红的用例、测试目标）
+want=逐格：crash-case-replay：绿；feature-gated-tests：红
+want=feature-gated-tests：红

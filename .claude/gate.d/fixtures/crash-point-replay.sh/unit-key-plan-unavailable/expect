@@ -1,0 +1,5 @@
+exit=75
+want=✗ crash-point-replay.sh 的 crash-case-replay 格：prune-server 不可用（scripts/gate/admission.py test-plan 退 75：✗ 样本档造的服务不可用：
+want=✗ crash-case-replay 这一格没判：prune-server 不可用（上面那一句）；这一格就此收尾，别的格照跑（不是红，也不算通过）
+want=✗ prune-server 不可用：1 格连不上判定库、没判：crash-case-replay（不是红，也不算通过）
+want=→ 怎么办：python3 prune-server/control check 看服务在不在、起没起来，起不来报给主 agent

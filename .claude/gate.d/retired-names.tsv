@@ -1,0 +1,44 @@
+# 退役的名字：scripts/、.claude/gate.d/、.claude/hooks/、.claude/scripts/、crates/、prune-server/ 里的代码、注释、出路文字与登记表都不许再出现（门禁 code-tooling 的 retired-names 格判，
+#   判法与样本写在 code-tooling.sh 里那一格函数上方的注释）。没有放行：「设了就拒」的拒绝分支也不留。搬迁登记表 path-moves.tsv 记的是旧路径，那一格不扫它。
+# 列（制表符隔开）：名字<TAB>种类<TAB>出路
+#   名字照字面认，大小写不论不放宽：名字前一个字符不是字母、数字、_ 与 -，后一个字符不是字母、数字、_ 与 -（--library-root 里的 library-root 不另算一处）。
+#   种类只给人看：变量、参数、子命令、目录名、错误种类、特性、脚本名。出路是看到它之后改成什么，红句原样打。
+#   名单只收已经退役、现行代码不再认的名字；还在用的不登。
+SINGLEFS_VERDICT_LIBRARY_ROOT	变量	删掉：判定库只有 prune-server 那一份，各族库名固定、库根不进键（.claude/rules/verification.md「判定库只有一份」）；取不到库名、服务连不上整趟退出
+--library-root	参数	删掉：同上，调用方不给库根
+library-root	子命令	删掉：同上，不再有打库根的子命令
+--verdict-library	参数	删掉：库名在判法里固定，调用方不给库的位置
+--verdict-library-route	参数	删掉：判定库只走服务，派哪台由 task-server 定，不按路线判
+SINGLEFS_VERDICT_LIBRARY_SERVICE	变量	删掉：读写判定库只有经服务这一条路，不设开关
+GATE_LKMM_VERDICT_LIBRARY	变量	删掉：门禁 lkmm 不认这个变量，也不留设了就拒
+GATE_FORMAL_VERDICT_LIBRARY	变量	删掉：门禁 formal-verification 不认这个变量，也不留设了就拒
+GATE_QEMU_VERDICT_LIBRARY	变量	删掉：门禁 qemu-device-streams 不认这个变量，也不留设了就拒
+SINGLEFS_CRASH_AMPLIFICATION_LIBRARY	变量	删掉：崩溃判定只在 prune-server 里，引擎经客户端直接读写
+SINGLEFS_CRASH_AMPLIFICATION_IMPORT	变量	删掉：两片都直接写服务，没有导入
+GATE_MUTATION_CRASH_LIBRARY_HOME	变量	删掉：变异复跑带崩溃判定库的测试各对自己起的临时 prune-server 跑
+--import-results	参数	删掉：两片都直接写服务，没有导入
+crash-state-verdicts	目录名	删掉：本机长期崩溃库已迁进服务，代码与说明不再点名它
+layout-5	目录名	删掉：旧布局的库已迁进服务
+LibraryDirectoryAlreadyExists	错误种类	删掉：引擎不建本地库目录
+library-for-peer	目录名	删掉：第二台在同一棵共享树里跑，不另给第二台拷库
+SINGLEFS_GPU_CARDS_CONFIG	变量	删掉：显卡由 task-server 分（GPU_CARDS_BY_PRIORITY），不为退役变量单留清除或拒绝
+GPU_COMPUTATION_CLASSES	变量	删掉：同上
+singlefs-formal-verdicts	目录名	删掉：形式化验证的旧本地库，代码与说明不再点名它（判定在 verdict-library 族 singlefs-formal-unit-verdicts）
+singlefs-mutation-rows	目录名	删掉：变异行的旧本地库，判定在 mutation-units 族
+singlefs-mutation-row-timings	目录名	删掉：变异行用时的旧本地目录，用时表在共享根的 mutation-run-records
+PEER_SSH_HOST	变量	删掉：多机配置写 HOSTS；分片配置核不认这个键，也不留设了就拒
+GATE_MUTATION_START_OVER	变量	删掉：只写不读，不为退役变量单留清除或拒绝
+SINGLEFS_CRASH_LIBRARY_WRITE_ONLY	变量	删掉：只写不读已经没有了，verdict_store.rs 不认这个变量，也不留设了就拒
+verdict-store	特性	删掉：验证包没有这个特性，判定存储与 prune-server 客户端一律编；--features 里去掉它（剩 gpu 写 gpu，剩空整段去掉），登记表的 features= 同样去掉
+SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE	变量	删掉：两台对称，哪一台是自己只照多机配置的 HOSTS 与这一台网卡上的地址认（scripts/hosts/multi_host_addresses.py 的 resolve），卡的台标签写 HOSTS 里那一台的地址；不为退役变量单留清除（env -u、清掉的变量名单）或拒绝（交任务时那一处拒在 task-server/，不在这一格的射程里）
+prune-server-import	脚本名	删掉：导入工具已整份删、本地旧库不再导入（判定库只有 prune-server 那一份）；点名它的 runner 表、自证登记与说明一并删
+SINGLEFS_GATE_FULL	变量	删掉：门禁只有一种跑法，不指定范围就是判全部；要重判同一把键走复用哨兵强制现判那一路
+GATE_REPLAY_FULL	变量	删掉：实验复跑不指定范围就跑表里全部行，不再有慢实验跳过的跑法
+SINGLEFS_CRASH_CASE_BLOCKS_QUERY	变量	删掉：崩溃枚举用例按块复用，不再有只查块键的跑法
+quick_tier_expansion	函数名	删掉：展开按枚举成员取名 in_place_subsets_with_copy_on_write_none_or_all_expansion
+quick-tier-test-functions	判定种类	删掉：判定种类改叫 <阶段文件名>:test-functions
+collect-quick	子命令	删掉：改叫 collect
+last-full	子命令	删掉：不再有「上一次全量」的标记
+lib_heavy_tests	库名	删掉：改叫 lib_project_code_runs
+heavy-test-guard	脚本名	删掉：改叫 project-code-guard
+light-selftest-guard	脚本名	删掉：改叫 selftest-process-guard

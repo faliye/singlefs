@@ -1,0 +1,6 @@
+# 样本登记表：四列用制表符分隔（路径、定位正则、数的命令、说明）；注释行与空行不算登记
+
+README.md	`IMPLEMENTED_INVARIANTS` 有 ([0-9]+) 项	bash count-sample-items.sh invariants	中文 README 的代码清单项数
+README.en.md	`IMPLEMENTED_INVARIANTS` contains ([0-9]+) entries	bash count-sample-items.sh invariants	英语译文同一个数，与上一行共用一条命令
+NOTES.md	checker 判 ([0-9]+) 条不变量	bash count-sample-items.sh rows | wc -l	经管道数行，输出带空白
+NOTES.md	崩溃放量的 ([0-9]+) 项	bash count-sample-items.sh items	输出前后带空白

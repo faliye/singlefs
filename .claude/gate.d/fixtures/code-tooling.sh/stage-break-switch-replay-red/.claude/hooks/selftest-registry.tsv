@@ -1,3 +1,2 @@
 # 样本登记表
-.claude/gate.d/sample-stage.sh	samples-light	# 样本：只读 verdict 文件
-.claude/gate.d/heavy-stage.sh	samples-heavy	# 样本：当它起真重活
+.claude/gate.d/sample-stage.sh	samples	# 样本：只读 verdict 文件

@@ -1,0 +1,14 @@
+# verus! 外面的 trait impl 的登记式放过表：门禁 formal-verification 的 verus-proof 格（scripts/gate/verus-proof-check.py 的 region_problems ③）照它放过。
+# 被验区域里声明的 trait 与类型，在 crate 的 src 里 verus! 外面有 impl <Trait> for <类型>（cfg(test) 下的不算）的判红；这张表里登记的那几个暂时放过，
+# 放过的照旧在成功句里逐个点名「契约没证、靠信任」，这一格不算绿到底：那几个 impl 的方法 Verus 不看，trait 的 ensures 在它们身上没人核。
+# 一行一条，制表符分隔，五段：
+#   <trait 的全路径 <crate>::<模块>::<trait>>	<实现类型的名字（impl 头里 for 后面那个，不带路径与泛型参数）>	<所在文件（相对仓根）>	<哪一簇会把它挪进 verus!>	<为什么此刻放过（至少 8 个字）>
+# 判法：所在文件、trait 名（全路径的最后一段）、实现类型三样对上的 impl 放过；trait 是被验区域里的，全路径要与它的相同。
+# 判红：这一行的 impl 已经挪进 verus! 里（删行）、在那份文件里找不到（删行或照现在的写法改）、文件不在登记的哪个 crate 里、写坏了（不是五段）。
+#   impl 还在外面而它的 trait 与类型此刻都不在被验区域里的（那一簇的补丁还没打上）不红、没放过什么，成功句点名。
+# 只缩不涨：与 gate 基准（scripts/gate/changed-paths.sh 的 gate_diff_base gate）那一版的这张表比，键是前三段，基准里没有的行判红；
+#   基准里还没有这张表（初次登记）、被判的根不在 git 仓里不比（成功句写明没比）；取法是 .claude/gate.d/lib-lag-baseline.py 的 gate_base_of 与 baseline_rows。
+#   新写的 impl 不往这里登记：挪进 verus! 里证出来；表里的 impl 挪进去之后删掉那一行。
+# 初次登记（里程碑四出口 5 块设备那一簇把 BlockDevice 放进 verus!）：mounted_session.rs 里两个 impl 在不碰清单里，排在「会话丢弃与实例表清扫」那一簇挪。
+singlefs_core::block_device::BlockDevice	DeviceKeepingWritesInMemory	crates/singlefs-core/src/mounted_session.rs	会话丢弃与实例表清扫	mounted_session.rs 这一轮在不碰清单里，挪进 verus! 要那一簇先交它；在那之前发布装配经泛型调到它时，靠的是没证过的 ensures
+singlefs_core::block_device::BlockDevice	DeviceReadOnceInThisMount	crates/singlefs-core/src/mounted_session.rs	会话丢弃与实例表清扫	mounted_session.rs 这一轮在不碰清单里，挪进 verus! 要那一簇先交它；在那之前发布装配经泛型调到它时，靠的是没证过的 ensures

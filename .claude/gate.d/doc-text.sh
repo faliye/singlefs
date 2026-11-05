@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改了中文就三份同进同出（只改译文的放行）、译文照翻译术语表用词、译文里不残留超量没译的中文、译文与中文逐段比内容量不漏段不压成摘要；这次改动新加到记录、kb 页与三方判决正文的行里不写账号切换与用量限额；这次改动新加的行里不写不归本项目的目录名与根下系统目录的占用；这次改动里的文本文件（工作区与暂存区里的版本）是合法 UTF-8
+# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改了中文就三份同进同出（只改译文的放行）、译文照翻译术语表用词、译文里不残留超量没译的中文、译文与中文逐段比内容量不漏段不压成摘要；这次改动新加到记录、kb 页、三方判决正文与代码治理文件的行里不写账号与额度方面的运营细节和解析限额通知的正则；这次改动新加的行里不写不归本项目的目录名与根下系统目录的占用；这次改动里的文本文件（工作区与暂存区里的版本）是合法 UTF-8；登记的 kb 目录里的中文页在历史节之前不写带日期的现状句（滞后表登记的存量放过，滞后表只缩不涨）
 # gate-fixture: yes
 # gate-category: 文档类
 # 不声明 gate-covers：.claude/gate-not-implemented.tsv 的两项判被测代码的行为，这一道只判文本写法。
@@ -10,6 +10,7 @@
 # gate-similar: .claude/singlefs-ai-sop/scripts/i18n-sync.sh 它判上游各语言仓之间的同步（兄弟目录里的仓、清单、溯源哈希）；trilingual-* 六格判本仓里登记的英、中、日三份文件，对象与输入都不同，不并进它
 # gate-similar: .claude/singlefs-ai-sop/scripts/link-targets.py 它读到不是 UTF-8 的 markdown 时把那份判红（读不了、里面的链接没查），范围是全仓的 .md、判的是链接指不指得到；utf8-valid 一格判这次改动里每份文本文件（含暂存区里与工作区不同的那一版）的字节本身合不合法，范围与对象都不同，沿用本道已有的改动范围取法与路径打码，不另立门禁
 # gate-similar: .claude/hooks/write-guard.sh 它在 Write / Edit 当场判写进的内容（lib-forbidden-notations.py 的禁用写法），不读本机目录与放行表，也不看这一次改动划出的新加行；out-of-project-names 一格也不并进同一道的 private-values 格：词源（家目录与仓的上一级目录现读、第二台私有名单）、只在像目录的上下文里判、放行表连同它要有脚本引到、私有名单不在时照判别的来源而不是整格 77，判法与出路都不同，只共用新加行的取法与路径打码（PRIVATE_VALUES_LIBRARY 的 added_lines、shown_path）
+# gate-similar: .claude/singlefs-ai-sop/scripts/doc-lint.sh 它也扫 .claude/kb-directories 登记的 kb 目录，判的是位置指代、时间指代、自称、编号简称与历史节收尾，不判带日期的现状句；上游副本不许加本工程的判据，滞后表与 gate 基准比的只缩不涨也是本仓的读法（lib-lag-baseline.py），dated-status 一格不并进它，只照它读 kb 目录登记（上游 lib.sh 的 kb_directories，同一份判法）
 #
 # gate-cell: prime-marks 撇号类角标
 # gate-cell: clock-times 描述里的钟点、时区词与时间戳
@@ -23,9 +24,10 @@
 # gate-cell: trilingual-untranslated 三语文件的英语、日语译文去掉反引号、引文、链接目标与路径之后，一行里不残留超量没译的中文（英语数汉字，日语数日语不用的简体字），与中文那一份某一行逐字相同而去段后还剩中文的行也不许有
 # gate-cell: trilingual-omission 三语文件的英语、日语译文与中文逐段配对比内容量（表格行按首列编号配对，其余按节内次序）：过短（漏了一段、压成摘要）、过长（对错了段）与配不上的段（段数不同的节、编号行缺一边）都不许有
 # gate-cell: private-values 这次改动新加的行与改动的文件名里不出现本机私有配置 multi-host.env 里的值（8 个字以上的词）与本机主机名
-# gate-cell: account-quota 这次改动新加到 records/、.claude/kb/ 与三方判决正文的行里不写账号切换、会话或周限额、额度重置这类用量限额（显卡额度、内存上限、空间配额不在内）
+# gate-cell: account-quota 这次改动新加到 records/、.claude/kb/、三方判决正文，与钩子、脚本、门禁、规则、定义、task-server、prune-server（样本除外）的行里不写账号与额度方面的运营细节，也不写解析限额通知的正则（词表在 cell_account_quota；显卡额度、内存上限、空间配额不在内）
 # gate-cell: out-of-project-names 这次改动新加的行里不写不归本项目的目录名（本机家目录、仓的上一级目录与第二台私有名单里的条目名，只在像目录的上下文里判）与根下系统目录的占用；放行表 .claude/out-of-project-paths 每一条要有 git 跟踪的脚本引到
 # gate-cell: utf8-valid 这次改动（暂存区或工作区相对基准）里的文本文件是合法 UTF-8：非法的点名文件、工作区还是暂存区、第一处坏字节的偏移
+# gate-cell: dated-status 登记的 kb 目录里的中文页在「## 历史版本」之前不写带日期的现状句（「现状（日期」与「日期 现状」两种）；滞后表 dated-status-lag.tsv 登记的放过，滞后表写对了、与 gate 基准那一版比只缩不涨
 # 格结构经 lib/stage-cells.sh。
 #
 # ── prime-marks、clock-times、session-names ──
@@ -98,9 +100,13 @@
 # 配置在哪：SINGLEFS_MULTI_HOST_CONFIG 设了照它；没设取 git common-dir 的上一层（主工作树的根，在 --staged 的临时 worktree 里也读得到主工作树那一份）下的 multi-host.env，
 #   不在 git 仓里取被判的根下的 multi-host.env（找法同 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_multi_host_configuration_file）。
 #   被判的根是样本（不是这道阶段所在的仓、也没设 GATE_STAGED_FROM）时只认样本根下的 multi-host.env 与 .private-values-hostname（本机主机名的替身），不读环境变量，样本不随调用方的配置变。
-# 取哪些词：每个键的值按 shell 的写法切词（再按 , ; @ 切一遍），只取 8 个字以上的长词（PEER_MEMORY_CAP、ENABLE_ACROSS_MACHINES、ENABLE_GPU 三个键与 systemctl、is-active 这类命令里的通用词不取）；
+# 取哪些词：每个键的值按 shell 的写法切词（再按 , ; @ 切一遍），只取 8 个字以上的长词（SLICE_MEMORY_CAP_BY_HOST、ENABLE_ACROSS_MACHINES、ENABLE_GPU 三个键与 systemctl、is-active 这类命令里的通用词不取）；
+#   按台的键（BY_HOST_KEYS：CARGO_BIN_DIRECTORY_BY_HOST、BUILD_ROOT_BY_HOST，每项 <地址>=<值>）每项从第一个 = 切开，只取值那一截（再按 , ; @ 切一遍）：地址照 HOSTS 取，整项不取；
 #   本机主机名取 hostname（短于 8 个字、或就是 localhost 的不取）。门槛 8 个字照攻方的量：4–7 个字的词（清场命令里的选项、显卡配置里的机器标签）在冻结副本里各命中 221–2001 份文件，
 #   8 个字以上的只命中两份真泄漏（research/prompts/m3-defs-b3-r1-opus-output.md「E3」）。
+#   共享根里的路径不取：NFS_SHARED_ROOTS 冒号隔开的各段（绝对路径，根目录 / 不算）是两台挂在同一绝对路径上、进仓的文字本来就写着的路径；哪个键的词（冒号隔开的每一段）
+#   是某一段本身或在它下面（按整级目录比），就不当私有值（SHARED_DATA_ROOT 这类键，与 NFS_SHARED_ROOTS 自己），成功句「没判的」里报个数与键名。按值判，不按键名列豁免。
+#   纯数字与容量（60G、1.5GiB）不取，IPv4 地址（四段数字，HOSTS 里的第二台）照取。
 # 判什么：这一次改动新加的行（scripts/gate/changed-paths.sh 的 gate 取法的基准到工作区；新文件整份都算新加），行里有任何一个长词（逐字、区分大小写的子串）就红。
 #   不判全仓：旧行里已有的两处不是这一次加的，判全仓就一直红，那两处的去向交用户。
 #   未跟踪的新文件整份逐行读，不截断；大到没法整份比（超过 1 GiB）的判红、出路是拆小或去掉重复内容。前 8 KiB 里有 NUL 的文件仍按二进制整份跳过，在「没判的」里报个数。
@@ -117,17 +123,20 @@
 # 管不到的：换了写法的值（大小写、拆开写、换成别称）、用户原话里的别称（不在配置里）、commit message（提交之后才有，要另挂 commit-msg 钩子）、不足 8 个字的值。
 #   词源只有 multi-host.env 与 hostname：~/.config/singlefs/ 下的清场脚本里的词没并进来（并入前要在真树上整仓逐行量新增命中，新增为 0 才并；上一次量出来不是 0，没并）。
 # ── account-quota ──
-# 记录、kb 页与三方判决正文里不写账号切换与用量限额（用户 2026-10-18：「改一下 doc-lint 账号切换  限额 这种就不要记了」）：撞了哪种额度、换没换账号、额度什么时候重置，
+# 记录、kb 页、三方判决正文、代码与治理文件里不写账号切换与用量限额（用户 2026-10-18：「改一下 doc-lint 账号切换  限额 这种就不要记了」）：撞了哪种额度、换没换账号、额度什么时候重置， account-quota:allow 词表与样本说明
 # 这些是子 agent 停下的原因，不是要留下的事实；子 agent 因此停下的，只写「中途停下没交回」。
 # 落点在这一道而不是上游 scripts/doc-lint.sh：那一份只扫 kb 目录，不扫 records/ 与 research/prompts/；这一道本来就有判「这次改动新加的行」的格（private-values）。
-# 射程：这次改动新加的行（scripts/gate/changed-paths.sh 的 gate 取法的基准到工作区；未跟踪的新文件整份都算新加；旧行不报），只看三类文件：
-#   records/ 与 .claude/kb/ 下的 .md、research/prompts/ 顶层的 *-main-verification.md（三方判决正文）。
-#   research/prompts/ 里别的文件（_*-appendix.md、_*-background.md、_*-body.md、*-snapshot/ 下的副本）是从仓里抄给云端腿读的，抄进来的旧话不算这一次写的，不判。
-#   .claude/rules/、.claude/agents/、钩子与脚本不在射程里（派发闸「限额窗口已判」这类放行行是闸的功能，写在定义与钩子里）。
+# 射程：这次改动新加的行（scripts/gate/changed-paths.sh 的 gate 取法的基准到工作区；未跟踪的新文件整份都算新加；旧行不报），看两类文件：
+#   ① 记录与三方判决正文：records/ 与 .claude/kb/ 下的 .md、research/prompts/ 顶层的 *-main-verification.md。
+#      research/prompts/ 里别的文件（_*-appendix.md、_*-background.md、_*-body.md、*-snapshot/ 下的副本）是从仓里抄给云端腿读的，抄进来的旧话不算这一次写的，不判。
+#   ② 代码与治理文件（用户 2026-11-05：「以后不要在本地写这样的东西」「加门禁 禁止写这样的东西」）：.claude/hooks/、scripts/、.claude/gate.d/、.claude/rules/、.claude/agents/、
+#      .claude/main-agent.md、.claude/agent-common.md、task-server/、prune-server/ 下的文本文件，不限后缀（含 .py、.sh、.rs、.tsv；二进制整份跳过）；
+#      .claude/gate.d/fixtures/ 除外（样本要造这些话才能证红）。仓里不写按用量限额挑模型、拦派发的东西：解析限额通知的正则、按通知拦派发的放行行都不进仓。 account-quota:allow 词表与样本说明
+#      代码里为了造限额通知而写的字面、词表与出路说明本身，在那一行写 account-quota:allow <理由>（注释里写，理由至少 4 个字）。
 # 词表在 cell_account_quota 的 python 里，STRICT 与 BARE 两张表，唯一一处，每条写明键（红行点名它）和拦什么：
-#   明说层（STRICT）：句子里写明哪个账号、哪一种限额（会话、周、每周、五小时、Opus、Sonnet、Haiku、Claude、API、账号、订阅后面接限额或额度），或是限额通知原文，
-#     或「切换账号」「换了账号」「账号切换」「另一个账号」，或「限额窗口」「额度窗口」「会话上限」「周上限」，命中就红，不看同一行别的词。
-#   裸词层（BARE）：没写是哪一种的「撞限额」「撞了额度」「限额撞顶」「额度恢复」「额度重置」「被额度打断」「额度用完」「用量限额」「用量上限」；命中处前后 24 个字内有显卡、GPU、显存、内存、线程、
+#   明说层（STRICT）：句子里写明哪个账号、哪一种限额（会话、周、每周、五小时、Opus、Sonnet、Haiku、Claude、API、账号、订阅后面接限额或额度），或是限额通知原文（含 resets 后接月份缩写、日、十二小时制钟点和括号里时区缩写的那一形态，与解析它的正则），
+#     或「切换账号」「换了账号」「账号切换」「另一个账号」，或「限额窗口」「额度窗口」「会话上限」「周上限」，命中就红，不看同一行别的词。 account-quota:allow 词表与样本说明
+#   裸词层（BARE）：没写是哪一种的「撞限额」「撞了额度」「限额撞顶」「额度恢复」「额度重置」「被额度打断」「额度用完」「用量限额」「用量上限」；命中处前后 24 个字内有显卡、GPU、显存、内存、线程、 account-quota:allow 词表与样本说明
 #     账上、磁盘、空间、inode、文件系统、存储、quota 或「数字加 G / GiB / GB / MiB / MB」的放过（只看命中处附近，不看整行）：那是显卡额度、内存额度、空间配额、账上多少 G 这类算力与空间资源的正常用法。
 #   不在词表里的：「额度」「限额」「上限」「配额」单独出现（显卡额度、GPU_CARDS_BY_PRIORITY 的额度、内存上限、空间配额）；「欠账号」（欠账编号）；「换号」「重写换号」（版本号）；
 #     「账户」；「限流」单独出现（只有跟在「撞」后面才算）。
@@ -334,6 +343,8 @@
 #     private-values-no-config
 #     private-values-nul-head-green
 #     private-values-red
+#     private-values-shared-root-address-red
+#     private-values-shared-root-green
 #     private-values-siblings-red
 #     private-values-symlink-dangling-red
 #     private-values-symlink-mount-red
@@ -346,6 +357,7 @@
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-whole-tree  不限新加的行、逐份文件整份比
 #     private-values-green
 #     private-values-nul-head-green
+#     private-values-shared-root-green
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-hostname-skipped  不取本机主机名
 #     private-values-green
 #     private-values-nul-head-green
@@ -354,6 +366,7 @@
 #     private-values-big-untracked-red
 #     private-values-filename-and-content-red
 #     private-values-red
+#     private-values-shared-root-address-red
 #     private-values-symlink-dangling-red
 #     private-values-symlink-mount-red
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-big-file-truncated  未跟踪文件只读前 8 MiB、超大也不判红（改前的样子）
@@ -388,10 +401,27 @@
 #     private-values-symlink-mount-red
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-unreadable-raises  读文件不包异常（改前的样子：读不了就让格崩，python 回溯把带假仓路径的原路径打出来）
 #     private-values-unreadable-red
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-shared-roots-judged  共享根（NFS_SHARED_ROOTS 各段）里的路径也当私有值（改前的样子）
+#     private-values-shared-root-address-red
+#     private-values-shared-root-green
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-addresses-skipped  IPv4 地址当纯数字跳过、不取（改前的样子）
+#     private-values-shared-root-address-red
+#     private-values-shared-root-green
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-by-host-unsplit  按台的键照别的键取整项（<地址>=<值> 整串），不从第一个 = 切出值（假第二台的编译根取不到）
+#     private-values-clock-snippet-red
+#     private-values-cross-segment-red
+#     private-values-red
+#     private-values-siblings-red
+#     private-values-symlink-dangling-red
+#     private-values-unreadable-red
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-unjudged  account-quota 不判、记无对象可判
+#     account-quota-code-green
+#     account-quota-code-red
 #     account-quota-green
 #     account-quota-red
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-words-skipped  词表与放行标记整个不判（没有这一格的样子）
+#     account-quota-code-green
+#     account-quota-code-red
 #     account-quota-green
 #     account-quota-red
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-strict-only  裸词层不判
@@ -400,12 +430,23 @@
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-resource-unexempt  裸词层不看资源词
 #     account-quota-green
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-records-only  射程缩到只有 records/
+#     account-quota-code-green
+#     account-quota-code-red
 #     account-quota-green
 #     account-quota-red
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-code-unscoped  射程里没有代码与治理文件（改前的样子：只判 records/、.claude/kb/ 与三方判决正文）
+#     account-quota-code-green
+#     account-quota-code-red
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-notice-form-skipped  限额通知里 resets 后接月日与钟点、括号时区的那一形态不判
+#     account-quota-code-green
+#     account-quota-code-red
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-whole-tree  不限新加的行、整份比
+#     account-quota-code-green
+#     account-quota-code-red
 #     account-quota-green
 #     account-quota-red
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-marker-ignored  不认放行标记
+#     account-quota-code-green
 #     account-quota-green
 #     account-quota-red
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-reasonless-allowed  没写理由的标记也放行
@@ -529,6 +570,13 @@
 #   GATE_TEXT_NOTATIONS_BREAK=out-of-project-names-deep-segment-judged  路径深层段照按名字类带容量判
 #     out-of-project-names-deep-green
 #     out-of-project-names-deep-red
+#   GATE_TEXT_NOTATIONS_BREAK=dated-status-lag-unread  dated-status 不读滞后表（命中的一律判红，表写没写对、涨没涨都不判）
+#     dated-status-green
+#     dated-status-lag-growth-red
+#     dated-status-lag-table-red
+#   GATE_TEXT_NOTATIONS_BREAK=dated-status-growth-unjudged  dated-status 不拿滞后表与 gate 基准那一版比（滞后表涨了也不红）
+#     dated-status-green
+#     dated-status-lag-growth-red
 #   LIB_FORBIDDEN_NOTATIONS_BREAK 认 lib-forbidden-notations.py 的形态键与判据行键（关掉那一形态或那一条判据行），另认几项把判法退回旧样子：
 #   LIB_FORBIDDEN_NOTATIONS_BREAK=prime-marks  关掉撇号类角标这一形态（它只有同名的一条判据行）
 #     prime-marks-red
@@ -593,12 +641,13 @@
 #     session-names-green
 #   CONTEXT 与 ALLOW 设成 prime-marks、CONTEXT 设成 session-names 在这一道的样本上不判错（那两种形态没有上下文规则，prime-marks 的样本里没有放行标记）。
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0
-#     account-quota-red、clock-times-mountinfo-red、clock-times-red、date-once-history-translations-red
-#     date-once-red、date-once-unjudgeable-red、out-of-project-names-allowed-red、out-of-project-names-deep-red
+#     account-quota-code-red、account-quota-red、clock-times-mountinfo-red、clock-times-red、date-once-history-translations-red
+#     date-once-red、date-once-unjudgeable-red、dated-status-lag-growth-red、dated-status-lag-table-red、dated-status-red
+#     out-of-project-names-allowed-red、out-of-project-names-deep-red
 #     out-of-project-names-forms-red、out-of-project-names-private-red、out-of-project-names-red、out-of-project-names-root-red
 #     out-of-project-names-table-red、prime-marks-red、private-values-big-untracked-red、private-values-clock-snippet-red
 #     private-values-cross-segment-red、private-values-date-once-path-red、private-values-filename-and-content-red、private-values-filename-only-red
-#     private-values-red、private-values-siblings-red、private-values-symlink-dangling-red、private-values-symlink-mount-red
+#     private-values-red、private-values-shared-root-address-red、private-values-siblings-red、private-values-symlink-dangling-red、private-values-symlink-mount-red
 #     private-values-too-big-red、private-values-unreadable-red、session-names-red、term-renames-line-exempt-red
 #     term-renames-red、trilingual-changed-together-red、trilingual-files-no-registry-red、trilingual-files-red
 #     trilingual-files-registry-red、trilingual-glossary-longer-word-red、trilingual-glossary-longer-words-table-red、trilingual-glossary-marker-red
@@ -608,15 +657,16 @@
 #     trilingual-untranslated-exempt-table-red、trilingual-untranslated-identical-red、trilingual-untranslated-japanese-red、utf8-valid-chunk-red
 #     utf8-valid-red、utf8-valid-staged-red
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
-#     account-quota-green、account-quota-red、clock-times-green、clock-times-mountinfo-red
+#     account-quota-code-green、account-quota-code-red、account-quota-green、account-quota-red、clock-times-green、clock-times-mountinfo-red
 #     clock-times-red、date-once-green、date-once-history-translations-green、date-once-history-translations-red
-#     date-once-red、date-once-unjudgeable-red、out-of-project-names-allowed-red、out-of-project-names-deep-green
+#     date-once-red、date-once-unjudgeable-red、dated-status-green、dated-status-lag-growth-red、dated-status-lag-table-red、dated-status-red
+#     out-of-project-names-allowed-red、out-of-project-names-deep-green
 #     out-of-project-names-deep-red、out-of-project-names-forms-green、out-of-project-names-forms-red、out-of-project-names-green
 #     out-of-project-names-no-private-list、out-of-project-names-private-red、out-of-project-names-red、out-of-project-names-root-red
 #     out-of-project-names-table-red、prime-marks-green、prime-marks-red、private-values-big-untracked-red
 #     private-values-clock-snippet-red、private-values-cross-segment-red、private-values-date-once-path-red、private-values-filename-and-content-red
 #     private-values-filename-only-red、private-values-green、private-values-no-config、private-values-nul-head-green
-#     private-values-red、private-values-siblings-red、private-values-symlink-dangling-red、private-values-symlink-mount-red
+#     private-values-red、private-values-shared-root-address-red、private-values-shared-root-green、private-values-siblings-red、private-values-symlink-dangling-red、private-values-symlink-mount-red
 #     private-values-too-big-red、private-values-unreadable-red、session-names-green、session-names-red
 #     term-renames-green、term-renames-line-exempt-green、term-renames-line-exempt-red、term-renames-red
 #     trilingual-changed-together-green、trilingual-changed-together-red、trilingual-changed-together-translation-only-green、trilingual-changed-together-unrun
@@ -640,7 +690,27 @@
 # 一份文本文件都没判到（没有 git 仓、改动里没有文本文件）：退 77，不判绿。
 # 弄坏开关 utf8-valid-lenient、utf8-valid-index-unjudged、utf8-valid-chunk-carry-dropped 只在样本根里认（PRIVATE_IN_SAMPLE，与 private-values 认样本同一种判法）；真仓里设了它，这一格打一行说明、照常判。
 # 管不到的：合法 UTF-8 但内容是乱码（拿 Latin-1 当 UTF-8 存回去恰好合法的）；没有 NUL、又不在后缀名单里的二进制（会被当文本判，非法就红，出路是把后缀补进名单或登记成二进制）；提交说明。
-# 样本：fixtures/doc-text.sh/ 下七十九份，每份样本根放 .gate-cells 只点名它判的那一格（trilingual-* 三十份的现场都由 setup.sh 现造，日期取真实发生过的日子；private-values-siblings-red 与 private-values-unreadable-red 点名四格）：
+#
+# ── dated-status ──
+# 带日期的现状快照会停在写下那一天：之后状态变了没人改它（规则 .claude/singlefs-ai-sop/rules/kb-discipline.md「带日期的现状快照也是历史，会停在那一天」）。
+# 对象：登记的 kb 目录（上游 .claude/singlefs-ai-sop/scripts/lib.sh 的 kb_directories 读 .claude/kb-directories，与上游 doc-lint.sh 同一份判法；登记写坏了判红；没有登记表取 .claude/kb）
+#   下（含子目录）的中文 .md：不含 .en.md、.ja.md 译文（kb 的译文另起了名的也以这两个后缀收尾，lib-trilingual.py 的 language_paths），不含 decisions-history.md、experiments-history.md、INDEX.md。
+#   每份只看「## 历史版本」那一行之前，历史节里的旧样子不判。
+# 判什么：一行里有「现状（YYYY-MM-DD」（现状与括号之间可夹 **，括号可以是半角）或「YYYY-MM-DD 现状」（中间至多一个空格），逐行打「路径:行号  片段」判红；
+#   「2026-09-17 跑了一次」这种日期跟着事件的句子不判。
+# 滞后表 .claude/gate.d/dated-status-lag.tsv（被判的根下）：一行「<路径><TAB><行内锚><TAB># <为什么还没改>」，锚是那一行里至少 12 个字的原文，理由至少 4 个字；
+#   命中的行落在某一条登记里（同一路径、那一行含锚）就不红，成功句报「滞后 N 行」。表不在就是没有登记，命中的一律红。
+#   表自己判红的：列数不是三列、锚不到 12 个字、理由没写或不到 4 个字、同一条登记两次、登记的路径不在、锚在那份文件里命中的不是恰好一行；
+#   登记里指的那一行已经不是带日期的现状句（改好了没删行）只打一行「!」提醒删掉，不判红。
+#   只缩不涨：与 gate 基准（scripts/gate/changed-paths.sh 的 gate_diff_base gate）那一版按（路径、锚）比，基准那一版里没有的行判红（锚改了也算涨）；
+#   基准那一版经 lib-lag-baseline.py 的 baseline_rows 取（登记的搬迁照换算）：基准里没有这张表（初次登记）不比，git 取不到判红，被判的根不在 git 仓里不比、成功句写明没比。
+# 一份中文 kb 页都没扫到：退 77。红行路径与片段经 private-values 那一份打码（PRIVATE_VALUES_LIBRARY 的 shown_path、shown_text、snippet_bounds）。
+# 不并进同一道的 date-once 格：那一格只判这次改动碰到的记录与 kb 页、判的是正文重复所属标题的日期与同日第二个小节，交 doc-consolidate.py 干跑；这一格判全部 kb 中文页此刻的样子，
+#   日期与标题无关、只认「现状」挨着日期的两种形态，还有滞后表。不并进 clock-times 格：那一格判全仓的钟点、时区词与时间戳，日期本身不判。
+# 弄坏开关 dated-status-lag-unread、dated-status-growth-unjudged 只在样本根上认（stage_cells_run 开头那一判拦真仓）。
+# 管不到的：不带「现状」二字的带日期现状句（「截至 2026-09-17 已落地」「2026-09-17 时三条全过」这类，要靠人把日期删掉再读）；英语、日语译文里的同类句子；
+#   滞后表登记了之后那一行事实又变了（锚还在就照放过，靠写回员现查改）。
+# 样本：fixtures/doc-text.sh/ 下八十三份，每份样本根放 .gate-cells 只点名它判的那一格（trilingual-* 三十份的现场都由 setup.sh 现造，日期取真实发生过的日子；private-values-siblings-red 与 private-values-unreadable-red 点名四格）：
 #   date-once-red       setup.sh 建 git 仓；这一轮往记录正文加一行带文件名日期的话、往实验页加第二个同日 `### ` 小节，逐份点名判红
 #   date-once-green     同一基准；加的行只带别的日期、加的小节是另一天，判绿
 #   date-once-history-translations-green  setup.sh 建 git 仓；两份变更史与 INDEX.md 连同英日译文九份，这一轮各加同一天在另一节的一块（INDEX 是同一天的第二个小节）与一行重复所属日期的话，
@@ -727,9 +797,9 @@
 #                       一份前 8 KiB 里有 NUL 的 .img；点名 private-values、clock-times、prime-marks、session-names 四格：private-values 与 clock-times 红，prime-marks 与 session-names 绿；
 #                       四格输出里路径都只剩「research/results/〔文件名含私有值〕/…」（clock-times 红行、两格的「二进制：」行），输出里不出现假仓路径
 #   private-values-symlink-dangling-red  同一份假配置；setup.sh 放一份干净的新日志与一个未跟踪的符号链接，链接文字是第二台的假仓路径（本机不存在，坏链接）：
-#                       判红，点名链接与键名 PEER_REPOSITORY_DIRECTORY，输出里不出现假仓路径
+#                       判红，点名链接与键名 BUILD_ROOT_BY_HOST，输出里不出现假仓路径
 #   private-values-symlink-mount-red  同一份假配置；setup.sh 在样本里被 git 忽略的 mnt/ 下建以假第二台主机名命名的挂载点（目标存在、内容干净），放一个指到它的未跟踪符号链接：
-#                       判红，点名链接与键名 PEER_SSH_HOST、QUIESCE_STOP_COMMAND，输出里不出现假主机名
+#                       判红，点名链接与键名 HOSTS、QUIESCE_STOP_COMMAND，输出里不出现假主机名
 #   private-values-unreadable-red  同一份假配置；setup.sh 造从第二台 tar 过来的产物目录（假仓路径整段成了本地路径的一部分），里面一份权限 000 的 .out，另有一份干净的新日志；
 #                       点名四格：private-values 判红、列成「读不了」一类、路径打码，没有回溯；prime-marks、clock-times、session-names 绿，「读不了」清单里路径打码
 #                       （以 root 跑时权限 000 也读得到，这一份判不出，不以 root 跑样本档）
@@ -737,11 +807,19 @@
 #                       红行里的路径只剩「records/〔文件名含私有值〕」，输出里不出现假主机名
 #   private-values-clock-snippet-red  同一份假配置；setup.sh 建 git 仓（expect、setup.sh 与假配置被 .gitignore 挡在扫描之外），记录里两行时间戳的前 20 个字
 #                       落在假仓路径、假第二台主机名中间：clock-times 判红，两行片段都从值的开头起、整值打成「〔私有值〕」，输出里不出现半截的假值
-#   account-quota-red   setup.sh 建 git 仓，基准里一份记录（另带一行旧话「撞了限额」，不报）、一份 kb 页、一份判决正文都干净；这一轮往三份里加写了账号切换与用量限额的行，
-#                       另放一份未跟踪的新记录，词表里每一条各一行（切换账号、换了账号、另一个账号、switched the account、撞了周额度、撞会话限流、撞限额、额度恢复、通知原文、限额窗口、用量限额、额度用完、被额度打断），
-#                       外加一行写了放行标记却没写理由的；射程之外的两份未跟踪文件（_ 开头的附录、.claude/rules 下的页）带同样的话，不报；逐处点名「文件:行」与判据名判红，共 14 行
+#   private-values-shared-root-green  另一份假配置：HOSTS 是两个假 IPv4 地址，NFS_SHARED_ROOTS 两段假共享根，SHARED_DATA_ROOT 是其中一段；setup.sh 建 git 仓提交一版干净的记录，
+#                       这一轮往记录加四行：数据根本身、数据根下面的路径、另一段共享根各一行，一行没有私有值；判绿，报对着 2 个长词判了（两个地址）、共享根下的路径 2 个
+#   private-values-shared-root-address-red  同一份假配置；这一轮往记录加三行：数据根一行（不报）、第二台的假地址一行、一行没有私有值：判红，只点名地址那一行与键名 HOSTS（「新加的 1 行」）
+#   account-quota-red   setup.sh 建 git 仓，基准里一份记录（另带一行旧话「撞了限额」，不报）、一份 kb 页、一份判决正文都干净；这一轮往三份里加写了账号切换与用量限额的行， account-quota:allow 词表与样本说明
+#                       另放一份未跟踪的新记录，词表里每一条各一行（切换账号、换了账号、另一个账号、switched the account、撞了周额度、撞会话限流、撞限额、额度恢复、通知原文、限额窗口、用量限额、额度用完、被额度打断）， account-quota:allow 词表与样本说明
+#                       外加一行写了放行标记却没写理由的；射程之外的两份未跟踪文件（_ 开头的附录、门禁样本目录下的文件）带同样的话，不报；逐处点名「文件:行」与判据名判红，共 14 行
 #   account-quota-green 同一基准；这一轮加的行只有显卡额度、GPU_CARDS_BY_PRIORITY 的额度、内存上限与内存额度、空间配额、欠账号、「换号」、「中途停下没交回」，命中处附近有资源词的裸词命中三行
-#                       （撞额度：账上 8G、显卡额度重置、显存用量上限），带理由的放行标记一行；射程之外的未跟踪文件（附录、snapshot 副本、规则页）带「切换账号」「撞了周额度」，不报，判绿
+#                       （撞额度：账上 8G、显卡额度重置、显存用量上限），带理由的放行标记一行；射程之外的未跟踪文件（附录、snapshot 副本、门禁样本目录下的文件）带「切换账号」「撞了周额度」，不报，判绿 account-quota:allow 词表与样本说明
+#   account-quota-code-red   setup.sh 建 git 仓，基准里钩子、脚本、门禁、规则、定义、主 agent 定义、共用约束、task-server、prune-server 各一份都干净（钩子里另有一行旧的解析限额通知的正则，不报）；
+#                       这一轮往钩子里加两行（解析限额通知的正则、通知原样），往另外八份里各加一行，射程之外的两份未跟踪文件（crates/ 下的源码、门禁样本目录下的文件）带同样的话；
+#                       逐处点名「文件:行」与判据名判红，共 10 行、9 份文件，不点名射程之外的两份
+#   account-quota-code-green 同一基准；这一轮钩子里解析限额通知的正则一行带了理由的放行标记、另一行干净，脚本里加一行显卡额度与内存上限，射程之外的两份未跟踪文件带同样的话：
+#                       判绿，报查了 2 份文本文件的 3 行、放行标记 1 行
 #
 #   out-of-project-names-red  样本根放替身（.out-of-project-home、-parent、-root、-private-names，假家目录与假上一级目录的条目名），setup.sh 建 git 仓；这一轮往记录加七行：
 #                       反引号加容量、只有反引号、不带反引号加容量、家目录路径段两行（~/、$HOME/、/home/<用户>/）、上一级目录路径段（../、~/<上一级>/），外加一行只说本项目目录与总可用量的；
@@ -766,8 +844,16 @@
 #                       ../singlefs… 底下与根下系统目录底下的深层段是那个小写词、带容量，判绿并报放过 1 处（.local 那一段落在放行路径里）
 #   out-of-project-names-deep-red  同一套替身与放行表：那个小写词单独带容量，~/<名>、/home/<用户>/<名>、~/<上一级>/<名> 带容量（第一段，照判带容量），
 #                       ~/<家目录条目名>/sub/<名> 与 ../<上一级条目名>/docs/<名> 带容量（深层段不判带容量，第一段由路径段判红），逐行点名判红，共 6 行
+#   dated-status-red    样本根照真仓形态放 .claude/kb-directories（.claude/kb 与 crates/sample-checker/invariants 两行）与 .claude/history-carriers，不建 git 仓、没有滞后表：
+#                       里程碑页正文「**现状（2026-09-17 落地）**：」、实验页正文「2026-09-14 现状：」、不变量页表格行里「**2026-09-23 现状**（」三行逐行点名判红；
+#                       不判的：实验页「## 历史版本」里的同形句、事件句「2026-09-17 跑了一次」、不带日期的「现状：」、英语译文、实验变更史与 INDEX.md 里的同形句、records/ 下的同形句（不在登记目录里）
+#   dated-status-green  同一套页与登记目录，setup.sh 建 git 仓：基准里滞后表登记那三行；这一轮把里程碑那一行改成现值、删掉滞后表里它那一行（只缩），
+#                       判绿并报滞后 2 行、与基准比没涨；历史节里的同形句与事件句照旧不判
+#   dated-status-lag-growth-red  setup.sh 建 git 仓：基准里里程碑页两行现状句、滞后表只登记一行；这一轮往滞后表加另一行：点名新加的那一行（滞后表比基准多 1 行）判红，两行命中都算滞后
+#   dated-status-lag-table-red   不建 git 仓：一份页一行现状句，滞后表一行写对、另七行各错一处（锚在文件里找不到、锚命中两行、登记的路径不在、锚不到 12 个字、只有两列、理由不到 4 个字、
+#                       与写对的那一行重复登记）：逐行点名行号判红，写对的那一行照放过
 #
-#   bash .claude/gate.d/doc-text.sh [项目根]                                     十五格都跑
+#   bash .claude/gate.d/doc-text.sh [项目根]                                     十六格都跑
 #   bash .claude/gate.d/doc-text.sh --list                                       逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-text.sh --check <格名>[,<格名>…] [项目根]            只跑点名的格
 #   bash .claude/gate.d/doc-text.sh --check out-of-project-names --all-lines [项目根]  回扫：全仓 git 跟踪的文本文件整份判，只报每份的命中处数（只读）
@@ -791,7 +877,8 @@ import re, shlex, socket
 
 FILE_NAME_MASK = "〔文件名含私有值〕"          # 红行里路径的哪一段含私有值，那一段打成这个，值不打印
 VALUE_MASK = "〔私有值〕"                     # 行文片段里的私有值打成这个
-SKIPPED_KEYS = {"PEER_MEMORY_CAP", "ENABLE_ACROSS_MACHINES", "ENABLE_GPU"}
+SKIPPED_KEYS = {"SLICE_MEMORY_CAP_BY_HOST", "ENABLE_ACROSS_MACHINES", "ENABLE_GPU"}
+BY_HOST_KEYS = {"CARGO_BIN_DIRECTORY_BY_HOST", "BUILD_ROOT_BY_HOST"}   # 每项 <地址>=<值>：只取值那一截（文件头「private-values」取哪些词）
 COMMON_WORDS = {"ssh", "sudo", "systemctl", "--user", "bash", "stop", "start", "is-active", "--quiet", "-o", "BatchMode=yes", "BatchMode",
                 "true", "false", "&&", "||", "env", "sh", "-c", "exec", "test", "status", "is-enabled", "!", "nvidia-smi", "grep", "-q"}
 HOSTNAME_KEY = "本机 hostname"
@@ -812,12 +899,38 @@ def split_words(text, depth=0):
     return pieces
 
 
+SHARED_ROOTS_KEY = "NFS_SHARED_ROOTS"           # 两台同一绝对路径的共享根，冒号隔开；落在它某一段下的路径不是私有值
+IPV4_ADDRESS = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
+
+
+def shared_roots(entries):
+    """NFS_SHARED_ROOTS 的各段（绝对路径、去掉结尾的 /；空段与根目录 / 不算，免得把所有绝对路径都放过）；没写这个键就是空表。"""
+    roots = []
+    for key, value in entries:
+        if key != SHARED_ROOTS_KEY:
+            continue
+        for word in split_words(value):
+            for segment in word.split(":"):
+                segment = segment.rstrip("/")
+                if segment.startswith("/") and segment not in roots:
+                    roots.append(segment)
+    return roots
+
+
+def under_shared_root(word, roots):
+    """词是共享根里的路径：冒号隔开的每一段（只有一段的就是整词）都是某个共享根本身或在它下面（按整级目录比，/srv/data-root-other 不算在 /srv/data-root 下）。"""
+    segments = [segment.rstrip("/") for segment in word.split(":")]
+    return bool(roots) and all(any(segment == root or segment.startswith(root + "/") for root in roots) for segment in segments)
+
+
 def load_private_targets(configuration_path, hostname_path, broken):
-    """取私有词：(词表 [(键名, 词)], 不足门槛没取的词数 {键名: 个数}, 配置里取到的词数, 本机主机名那一句说明, 门槛字数)；读不了配置抛 OSError。"""
+    """取私有词：(词表 [(键名, 词)], 不足门槛没取的词数 {键名: 个数}, 配置里取到的词数, 本机主机名那一句说明, 门槛字数, 共享根下没取的词数 {键名: 个数})；读不了配置抛 OSError。"""
     minimum_length = 4 if broken == "private-values-short-words" else 8   # 攻方量过：4–7 个字的词各命中 221–2001 份文件，8 个字以上的只命中两份真泄漏
     targets = []              # (键名, 词)
     short_words = {}          # 键名 → 不足门槛没取的词数
+    shared_words = {}         # 键名 → 落在共享根下、不当私有值的词数
     configuration_text = open(configuration_path, encoding="utf-8", errors="replace").read()
+    entries = []              # (键名, 值)：先读全，NFS_SHARED_ROOTS 写在哪一行都认
     for line in configuration_text.split("\n"):
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -826,15 +939,32 @@ def load_private_targets(configuration_path, hostname_path, broken):
         key = key.strip()
         if key.startswith("export "):
             key = key[len("export "):].strip()
+        entries.append((key, value.strip()))
+    roots = [] if broken == "private-values-shared-roots-judged" else shared_roots(entries)
+    for key, value in entries:
         if key in SKIPPED_KEYS:
             continue
-        for word in split_words(value.strip()):
-            # 显卡先后与额度（local:0:24G,peer:1:8G 这种）整串不当私有值，只取逗号、分号、冒号、@ 切开的各段（都短，实际取不到）；别的键整词与切开的各段都取
-            for piece in (set(re.split(r"[,;:@]", word)) if key.startswith("GPU_CARDS") else {word, *re.split(r"[,;@]", word)}):
+        for word in split_words(value):
+            # 显卡先后与额度（<地址>:0:24G,<地址>:1:8G 这种）整串不当私有值，只取逗号、分号、冒号、@ 切开的各段（都短，实际取不到）；
+            # 按台的键每项只取第一个 = 之后的值那一截与它切开的各段（弄坏开关 private-values-by-host-unsplit 下照别的键取整项）；别的键整词与切开的各段都取
+            if key.startswith("GPU_CARDS"):
+                pieces = set(re.split(r"[,;:@]", word))
+            elif key in BY_HOST_KEYS and broken != "private-values-by-host-unsplit":
+                host_value = word.split("=", 1)[1] if "=" in word else ""
+                pieces = {host_value, *re.split(r"[,;@]", host_value)}
+            else:
+                pieces = {word, *re.split(r"[,;@]", word)}
+            for piece in pieces:
                 piece = piece.strip()
-                if not piece or piece in COMMON_WORDS or piece.startswith("-") or piece.isdigit() or re.fullmatch(r"[0-9.]+[GMK]?i?B?", piece):
+                # 纯数字与容量（60G、1.5GiB）不取；IPv4 地址（HOSTS 里的第二台）也是数字与点，照取，不当容量跳过
+                numeric = piece.isdigit() or re.fullmatch(r"[0-9.]+[GMK]?i?B?", piece)
+                if numeric and IPV4_ADDRESS.fullmatch(piece) and broken != "private-values-addresses-skipped":
+                    numeric = None
+                if not piece or piece in COMMON_WORDS or piece.startswith("-") or numeric:
                     continue
-                if len(piece) < minimum_length:
+                if under_shared_root(piece, roots):
+                    shared_words[key] = shared_words.get(key, 0) + 1
+                elif len(piece) < minimum_length:
                     short_words[key] = short_words.get(key, 0) + 1
                 elif (key, piece) not in targets:
                     targets.append((key, piece))
@@ -850,7 +980,7 @@ def load_private_targets(configuration_path, hostname_path, broken):
         for name in judged_names:
             targets.append((HOSTNAME_KEY, name))
         hostname_note = "本机主机名判了" if judged_names else f"本机主机名没判（短于 {minimum_length} 个字或是 localhost）"
-    return targets, short_words, configuration_word_count, hostname_note, minimum_length
+    return targets, short_words, configuration_word_count, hostname_note, minimum_length, shared_words
 
 
 def shown_path(path, targets, broken):
@@ -990,12 +1120,14 @@ stage_cell trilingual-omission cell_trilingual_omission "三语文件的英语�
   "照点名的那一段把译文对齐中文：过短的补上漏的那一段、把压成摘要的照中文逐句译回去，过长的多半对错了段、照中文那一段改；段数不同的节照中文逐段对齐，编号行补上缺的那一行或删掉多出来的（判法与门槛在 lib-trilingual.py 文件头「判法细节」的 omission 一段）"
 stage_cell private-values cell_private_values "这次改动新加的行与改动的文件名里不出现本机私有配置 multi-host.env 里的值（8 个字以上的词）与本机主机名" \
   "把命中的词换成「第二台」「本机」这类说法（红行列的是文件、行号与键名，值不打印，路径里含值的那一段打成「〔文件名含私有值〕」；文件名含值的改名；要引整句的，整句里的值也换掉；超大的未跟踪文件拆小）；值不要进仓、不要进日志原样输出，用到它的命令照 multi-host.env 的键名写"
-stage_cell account-quota cell_account_quota "这次改动新加到 records/、.claude/kb/ 与三方判决正文的行里不写账号切换、会话或周限额、额度重置这类用量限额（显卡额度、内存上限、空间配额不在内）" \
-  "删掉这句；子 agent 因此停下的，只写「中途停下没交回」，不写撞了哪种额度、换没换账号、什么时候重置；用户原话里带这些词、要原样留的，那一行末尾写「account-quota:allow <理由>」（理由至少 4 个字）"
+stage_cell account-quota cell_account_quota "这次改动新加到 records/、.claude/kb/、三方判决正文，与钩子、脚本、门禁、规则、定义、task-server、prune-server（样本除外）的行里不写账号与额度方面的运营细节，也不写解析限额通知的正则（词表在 cell_account_quota；显卡额度、内存上限、空间配额不在内）" \
+  "删掉这句；子 agent 因此停下的，只写「中途停下没交回」，不写额度与账号方面的细节；代码里不写按限额通知挑模型、拦派发的东西（解析通知的正则、按通知拦派发的放行行）；用户原话里带这些词、要原样留的，那一行末尾写「account-quota:allow <理由>」（理由至少 4 个字，代码里写在注释里）"
 stage_cell out-of-project-names cell_out_of_project_names "这次改动新加的行里不写不归本项目的目录名（本机家目录、仓的上一级目录与第二台私有名单里的条目名，只在像目录的上下文里判）与根下系统目录的占用；放行表 .claude/out-of-project-paths 每一条要有 git 跟踪的脚本引到" \
   "改成不指名的说法（例「根分区其余不归 singlefs」），要说空间只说本项目自己的目录与总的可用量；singlefs 自己读的仓外路径登记进放行表 .claude/out-of-project-paths（一行「<路径>  # 理由」，理由至少 8 个字，要有 git 跟踪的 .sh、.py、.rs 字面引到它），只放行那条路径本身"
 stage_cell utf8-valid cell_utf8_valid "这次改动（暂存区或工作区相对基准）里的文本文件是合法 UTF-8：非法的点名文件、工作区还是暂存区、第一处坏字节的偏移" \
   "照红行的文件、版本（工作区或暂存区）、字节偏移和行号，把那一处按字符定点改回来（Edit 或 scripts/kb/replace-once.py；shell 的 paste -d、cut -c、head -c 这类按字节切的命令会把多字节字符切坏，改文本别用）；暂存区里坏而工作区已修好的，git add 重新暂存；确实是二进制的，补进 cell_utf8_valid 的后缀名单"
+stage_cell dated-status cell_dated_status "登记的 kb 目录里的中文页在「## 历史版本」之前不写带日期的现状句（「现状（日期」与「日期 现状」两种）；滞后表 dated-status-lag.tsv 登记的放过，滞后表写对了、与 gate 基准那一版比只缩不涨" \
+  "删掉日期、把事实现查后改成现值；那一天的样子要留就进 ## 历史版本（登记在 .claude/history-carriers 的文件）；存量还没改完的照 .claude/gate.d/dated-status-lag.tsv 的写法登记（只缩不涨，新写的句子不许往里加），改好一行就删它那一行"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument="" out_of_project_all_lines=0
@@ -1016,6 +1148,8 @@ if (( out_of_project_all_lines )) && [[ "${STAGE_CELLS_SELECTED[*]}" != out-of-p
 fi
 ROOT="${root_argument:-$REPO_ROOT}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级。"; exit 2; }
+# 根写成相对路径时换成绝对路径：各格里还要 cd "$ROOT"，此刻已在根里，相对路径再 cd 一次就进不去（任务 3316：--check private-values <样本的相对路径>）
+ROOT="$PWD"
 
 # scan_form <形态键>：按 lib-forbidden-notations.py 里那一形态扫全仓文本，退出码 0 没有违例、1 有违例（或读不到库）、77 一份文本文件都没扫到
 scan_form() {
@@ -1371,7 +1505,7 @@ if size_limit_path:
 
 
 try:
-    targets, short_words, configuration_word_count, hostname_note, MINIMUM_LENGTH = private_values.load_private_targets(configuration_path, hostname_path, broken)
+    targets, short_words, configuration_word_count, hostname_note, MINIMUM_LENGTH, shared_words = private_values.load_private_targets(configuration_path, hostname_path, broken)
 except OSError as error:
     fail(f"读不了 {configuration_path}：{error}", "看它的权限；这一格要读它里面每个键的值（只比对，不打印）。")
 if not targets:
@@ -1503,7 +1637,8 @@ short_keys = "、".join(sorted(short_words)) or "无"
 print(f"  ✓ 查了这次改动里 {files_judged} 份文本文件新加的 {lines_judged} 行：对着 multi-host.env 的 {configuration_word_count} 个长词（{MINIMUM_LENGTH} 个字以上）与{hostname_note}，没有一处命中")
 if links_judged:
     print(f"     符号链接 {links_judged} 个：比了路径与链接文字（不跟进去），没有一处命中")
-print(f"     没判的：不足 {MINIMUM_LENGTH} 个字的词 {short_total} 个（键 {short_keys}）、二进制 {len(binary_files)} 份")
+print(f"     没判的：不足 {MINIMUM_LENGTH} 个字的词 {short_total} 个（键 {short_keys}）、二进制 {len(binary_files)} 份；"
+      f"共享根下的路径 {sum(shared_words.values())} 个（键 {'、'.join(sorted(shared_words)) or '无'}，NFS_SHARED_ROOTS 某一段本身或在它下面，两台同一绝对路径，不是私有值）")
 PY
   rm -f "$changed_file"
   exit "$python_rc"
@@ -1543,40 +1678,45 @@ HEAD_BYTES = 8192
 # ── 词表（唯一一处）：逐条写明拦什么 ──
 # 两层。
 #   明说层（STRICT）：句子里写明了是哪个账号、哪一种限额（会话、周、Opus、用量、账号……），或是限额通知的原文，命中就红，不看同一行里还有什么词。
-#   裸词层（BARE）：「撞限额」「额度恢复」这类没写是哪一种额度的说法；命中处前后 24 个字内有算力资源的词（RESOURCE_WORDS：显卡、显存、内存、线程、账上、磁盘、空间、quota……）的放过，
+#   裸词层（BARE）：「撞限额」「额度恢复」这类没写是哪一种额度的说法；命中处前后 24 个字内有算力资源的词（RESOURCE_WORDS：显卡、显存、内存、线程、账上、磁盘、空间、quota……）的放过， account-quota:allow 词表与样本说明
 #     那是显卡额度、内存额度、空间配额这类正常用法。只有「额度」「限额」两个词单独出现、没有上面这些动词与限定词的，不在词表里，不判。
 # 键是红行里点名的判据名；改词表只改这一处。
 SCOPE = r"(?:会话|周|每周|五小时|5\s?小时|Opus|Sonnet|Haiku|Claude|API|账号|帐号|订阅)"
 ACCOUNT = r"(?<!欠)[账帐]号"       # 「欠账号」「欠账号 C820」是欠账编号，不是账号
 STRICT = [
-    ("账号切换·动词", "拦「切换账号」「换了账号」「换成别的账号」这类动作：切换、切到、换到、换成、轮换、更换、换（了）后六个字以内跟着账号。不拦「欠账号」",
+    ("账号切换·动词", "拦「切换账号」「换了账号」「换成别的账号」这类动作：切换、切到、换到、换成、轮换、更换、换（了）后六个字以内跟着账号。不拦「欠账号」",  # account-quota:allow 词表与出路说明
      r"(?:切换|切到|换到|换成|轮换|更换|换)(?:了)?[^，。；！？\n「」]{0,6}?" + ACCOUNT),
-    ("账号切换·名词", "拦「账号切换」「账号额度」「另一个账号」「备用账号」「别的账号」这类名词写法",
+    ("账号切换·名词", "拦「账号切换」「账号额度」「另一个账号」「备用账号」「别的账号」这类名词写法",  # account-quota:allow 词表与出路说明
      ACCOUNT + r"(?:切换|轮换|额度|限额|用量|被限)|(?:另一个|别的|备用|第二个|不同的?)" + ACCOUNT),
-    ("账号切换·英文", "拦 switched the account、account switch",
+    ("账号切换·英文", "拦 switched the account、account switch",  # account-quota:allow 词表与出路说明
      r"(?i:switch(?:ed|ing)?\s+(?:the\s+)?account|account\s+switch)"),
-    ("限额·写明哪种", "拦「会话限额」「周限额」「每周额度」「Opus 周额度」「账号额度」「订阅限额」：会话、周、每周、五小时、Opus、Sonnet、Haiku、Claude、API、账号、订阅后面直接接限额或额度（中间可隔空白与「用量」）",
+    ("限额·写明哪种", "拦「会话限额」「周限额」「每周额度」「Opus 周额度」「账号额度」「订阅限额」：会话、周、每周、五小时、Opus、Sonnet、Haiku、Claude、API、账号、订阅后面直接接限额或额度（中间可隔空白与「用量」）",  # account-quota:allow 词表与出路说明
      SCOPE + r"\s*(?:用量)?\s*(?:限额|额度)"),
-    ("限额·窗口", "拦「限额窗口」「额度窗口」（含派发闸的放行行「限额窗口已判」被抄进记录）",
+    ("限额·窗口", "拦「限额窗口」「额度窗口」（含派发闸的放行行「限额窗口已判」被抄进记录）",  # account-quota:allow 词表与出路说明
      r"(?:限额|额度)窗口"),
-    ("限额·会话周上限", "拦「会话上限」「周上限」",
+    ("限额·会话周上限", "拦「会话上限」「周上限」",  # account-quota:allow 词表与出路说明
      r"(?:会话|周)上限"),
-    ("限额·撞会话周限流", "拦「撞会话限流」「撞了周限流」：撞或碰、会话或周、限流",
+    ("限额·撞会话周限流", "拦「撞会话限流」「撞了周限流」：撞或碰、会话或周、限流",  # account-quota:allow 词表与出路说明
      r"(?:撞|碰)(?:到|上|了|过)*\s*" + SCOPE + r"\s*限流"),
-    ("限额·通知原文", "拦限额通知的原文：You've hit your … limit、usage limit、session limit、weekly limit",
-     r"(?i:you(?:'|’)ve hit your|usage limit|session limit|weekly limit)"),
+    ("限额·通知原文", "拦限额通知的原文：You've hit your … limit、usage limit、session limit、weekly limit",  # account-quota:allow 词表与出路说明
+     r"(?i:you(?:'|’)ve hit your|usage limit|session limit|weekly limit)"),  # account-quota:allow 词表与出路说明
+    ("限额·通知重置时刻", "拦限额通知里 resets 后接月份缩写、日、十二小时制钟点和括号里的时区缩写（原样或解析它的正则：钟点写成 am 与 pm 的二选一、或 [ap]m，后面跟着括号）",  # account-quota:allow 词表本身
+     r"(?i:resets\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s?[ap]\.?m\.?\s*\([A-Za-z][A-Za-z0-9_/+\-]{1,}\)"
+     r"|resets\b[^\n]{0,80}?(?:am\|pm|\[ap\]m)[^\n]{0,40}?\\?\()"),
 ]
+if broken == "account-quota-notice-form-skipped":            # 弄坏：限额通知的重置时刻那一形态不判
+    STRICT = [entry for entry in STRICT if entry[0] != "限额·通知重置时刻"]
 BARE = [
-    ("限额·撞", "拦「撞限额」「撞了额度」「碰到限流」「限额撞顶」「额度见底」：撞或碰（后面可接到、上、了、过）加用量、使用（可无）加限额、额度、限流；限额或额度后面接撞顶、到顶、见底、耗尽、用尽、耗光",
+    ("限额·撞", "拦「撞限额」「撞了额度」「碰到限流」「限额撞顶」「额度见底」：撞或碰（后面可接到、上、了、过）加用量、使用（可无）加限额、额度、限流；限额或额度后面接撞顶、到顶、见底、耗尽、用尽、耗光",  # account-quota:allow 词表与出路说明
      r"(?:撞|碰)(?:到|上|了|过)*(?:用量|使用)?(?:限额|额度|限流)|(?:限额|额度)(?:撞顶|到顶|见底|耗尽|用尽|耗光)"),
-    ("限额·重置恢复", "拦「额度重置」「限额恢复」「额度刷新」「恢复了额度」「重置限额」：限额或额度后面接重置、刷新、恢复、解除、复位，或前面接重置、刷新、恢复（可带了）",
+    ("限额·重置恢复", "拦「额度重置」「限额恢复」「额度刷新」「恢复了额度」「重置限额」：限额或额度后面接重置、刷新、恢复、解除、复位，或前面接重置、刷新、恢复（可带了）",  # account-quota:allow 词表与出路说明
      r"(?:限额|额度)(?:重置|刷新|恢复|解除|复位)|(?:重置|刷新|恢复)(?:了)?(?:限额|额度)"),
-    ("限额·打断", "拦「被额度打断」「限额中断」「限额续做」「限额暂停」：被（用量）额度或限额后面接打断、卡住、停，或额度、限额后面接打断、暂停、中断、续做",
+    ("限额·打断", "拦「被额度打断」「限额中断」「限额续做」「限额暂停」：被（用量）额度或限额后面接打断、卡住、停，或额度、限额后面接打断、暂停、中断、续做",  # account-quota:allow 词表与出路说明
      r"被(?:用量)?(?:额度|限额)(?:打断|卡住|停)|(?:额度|限额)(?:打断|暂停|中断|续做)"),
-    ("限额·用完", "拦「额度用完」「限额用光」「用完了额度」「耗尽限额」",
+    ("限额·用完", "拦「额度用完」「限额用光」「用完了额度」「耗尽限额」",  # account-quota:allow 词表与出路说明
      r"(?:额度|限额)(?:用完|用光)|(?:用完|用光|耗尽)了?(?:限额|额度)"),
-    ("用量限额·额度", "拦「用量限额」「用量额度」「使用限额」「使用额度」「用量上限」",
-     r"(?:用量|使用)(?:限额|额度)|用量上限"),
+    ("用量限额·额度", "拦「用量限额」「用量额度」「使用限额」「使用额度」「用量上限」",  # account-quota:allow 词表与出路说明
+     r"(?:用量|使用)(?:限额|额度)|用量上限"),  # account-quota:allow 词表与出路说明
 ]
 # 命中处前后 RESOURCE_WINDOW 个字内有这些词，裸词层的命中放过（显卡额度、内存额度、空间配额、账上多少 G 这类算力与空间资源的正常用法）；
 # 只看命中处附近、不看整行：一行里别处提到线程上限、草稿目录多少 G，不能把同一行里的模型限额放过去（对着仓里量过，整行放过的三行里有两行其实是模型限额）
@@ -1592,11 +1732,19 @@ if broken == "account-quota-resource-unexempt":              # 弄坏：裸词�
     RESOURCE_WORDS = re.compile(r"(?!)")
 
 
+CODE_DIRECTORIES = (".claude/hooks/", "scripts/", ".claude/gate.d/", ".claude/rules/", ".claude/agents/", "task-server/", "prune-server/")
+CODE_FILES = (".claude/main-agent.md", ".claude/agent-common.md")
+SAMPLES_DIRECTORY = ".claude/gate.d/fixtures/"          # 门禁样本要造这些话才能证红，不判
+
+
 def in_scope(path):
-    """射程：records/ 与 .claude/kb/ 下的 .md，research/prompts/ 顶层的 *-main-verification.md（三方判决正文）。
+    """射程：records/ 与 .claude/kb/ 下的 .md，research/prompts/ 顶层的 *-main-verification.md（三方判决正文），
+    加上代码与治理文件：CODE_DIRECTORIES 下的文本文件（不限后缀；样本目录除外）与 CODE_FILES 两份。
     prompts 里别的文件（_*-appendix.md、_*-background.md、_*-body.md、*-snapshot/ 下的副本）是从仓里抄来给云端腿读的，抄进来的旧话不算这一次写的，不判。"""
     if broken == "account-quota-records-only":                # 弄坏：只判 records/
         return path.startswith("records/") and path.endswith(".md")
+    if broken != "account-quota-code-unscoped" and not path.startswith(SAMPLES_DIRECTORY) and (path in CODE_FILES or path.startswith(CODE_DIRECTORIES)):
+        return True                                           # 弄坏 account-quota-code-unscoped：代码与治理文件不在射程里（改前的样子）
     if not path.endswith(".md"):
         return False
     if path.startswith("records/") or path.startswith(".claude/kb/"):
@@ -1703,12 +1851,12 @@ for path in changed_paths:
         unreadable.append((path, error))
 
 if findings:
-    print(f"  ✗ 这次改动新加的 {len(findings)} 行写了账号切换或用量限额，在 {len({path for path, _, _, _ in findings})} 份文件里（只判这次新加的行；旧行不报）：")   # gate-lint:summary
+    print(f"  ✗ 这次改动新加的 {len(findings)} 行写了账号切换或用量限额，在 {len({path for path, _, _, _ in findings})} 份文件里（只判这次新加的行；旧行不报）：")  # account-quota:allow 词表与出路说明   # gate-lint:summary
     for path, number, key, snippet in findings[:200]:
         print(f"      {shown_path(path)}:{number}  {key}  …{private_values.shown_text(snippet, masking_targets)}…")   # gate-lint:detail
     if len(findings) > 200:
         print(f"      （另有 {len(findings) - 200} 行没列出）")   # gate-lint:detail
-    print("     → 怎么办：删掉这句。子 agent 因此停下的，只写「中途停下没交回」，不写是撞了哪种额度、换没换账号、什么时候重置；")
+    print("     → 怎么办：删掉这句。子 agent 因此停下的，只写「中途停下没交回」，不写是撞了哪种额度、换没换账号、什么时候重置；")  # account-quota:allow 词表与出路说明
     print("               用户原话里带这些词、要原样留的，那一行末尾写「account-quota:allow <理由>」（理由至少 4 个字）；显卡额度、内存上限、空间配额这类不是这一条，命中处前后 24 个字内有显卡、内存、线程这类资源词的裸词命中本来就放过。")
 if reasonless:
     print(f"  ✗ 这次改动新加的 {len(reasonless)} 行写了 account-quota:allow 却没写理由（理由至少 4 个字，写不出理由的就是该删的）：")   # gate-lint:summary
@@ -1723,9 +1871,9 @@ if unreadable:
 if findings or reasonless or unreadable:
     sys.exit(1)
 if lines_judged == 0:
-    print(f"  ! 这次改动没有新加到 records/、.claude/kb/ 与 research/prompts/*-main-verification.md 的行（改动范围 {len(changed_paths)} 个路径，二进制 {len(binary_files)} 份），这一格本次无对象可判（这不是通过）")
+    print(f"  ! 这次改动没有新加到射程内（records/、.claude/kb/、research/prompts/*-main-verification.md，与钩子、脚本、门禁、规则、定义、task-server、prune-server）的行（改动范围 {len(changed_paths)} 个路径，二进制 {len(binary_files)} 份），这一格本次无对象可判（这不是通过）")
     sys.exit(77)
-print(f"  ✓ 查了这次改动里 {files_judged} 份记录、kb 页与判决正文新加的 {lines_judged} 行：没有账号切换、用量限额的写法")
+print(f"  ✓ 查了这次改动里 {files_judged} 份文本文件新加的 {lines_judged} 行（记录、kb 页、判决正文，与代码和治理文件）：没有账号切换、用量限额的写法")  # account-quota:allow 词表与出路说明
 print(f"     放过的：带理由的放行标记 {allowed_lines} 行、命中处附近有显卡内存这类资源词的裸词命中 {exempt_lines} 行；没判的：二进制 {len(binary_files)} 份")
 PY
   rm -f "$changed_file"
@@ -1880,6 +2028,8 @@ home_bare = "(?:~|\\$HOME|\\$\\{HOME\\}|" + re.escape(home) + "|/home/[^/\\s`'\"
 parent_alternatives = [BOUNDARY + re.escape(parent)]
 if parent.startswith(home.rstrip("/") + "/"):
     parent_alternatives.append(HOME_PREFIX + re.escape(parent[len(home.rstrip("/")) + 1:]))
+elif not in_sample and re.match(r"^/home/[^/]+/.+", parent):
+    parent_alternatives.append(HOME_PREFIX + re.escape(parent.split("/", 3)[3]))
 PARENT_PREFIX = "(?:" + "|".join(parent_alternatives) + ")/|(?<![A-Za-z0-9_+-])\\.\\./"
 # singlefs 自己的路径（仓自己、上游 singlefs-ai-sop-*、家目录下 singlefs- 开头的）整段放过：~/<上一级>/singlefs 里那个上一级目录名不算命中
 own_names = "singlefs[" + NAME_CHARACTERS + "]*" + ("" if repository_name.startswith("singlefs") else "|" + re.escape(repository_name))
@@ -2377,6 +2527,220 @@ PY
     printf '%s\n' "$python_output" | python3 -c 'import sys, types; library = types.ModuleType("lib_private_values"); exec(compile(sys.argv[1], "private-values-library", "exec"), library.__dict__); library.shown_lines_main(sys.argv[2:], sys.stdin, sys.stdout)' \
       "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" "$text_notations_break" lines
   fi
+  exit "$python_rc"
+}
+
+# 判法与滞后表的写法在文件头「dated-status」一段。kb 目录登记只经上游 lib.sh 的 kb_directories 读（它 set -euo pipefail，放进单独的 bash 里起，不带进这一道）。
+cell_dated_status() {
+  local base="" registry_errors kb_listing python_rc=0
+  cd "$ROOT" || exit 1
+  private_value_sources
+  registry_errors="$(mktemp "${TMPDIR:-/tmp}/dated-status.XXXXXX")" || { echo "  ✗ 建不了放 kb 目录登记报错的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
+  if ! kb_listing="$(bash -c 'source "$1" && kb_directories "$2"' dated-status "$REPO_ROOT/.claude/singlefs-ai-sop/scripts/lib.sh" "$(pwd)" 2>"$registry_errors")"; then
+    echo "  ✗ 读不出 kb 目录登记 .claude/kb-directories（上游 lib.sh 的 kb_directories 报错，原文在下面）"   # gate-lint:summary
+    sed 's/^/      /' "$registry_errors"
+    echo "     → 怎么办：照报错改 .claude/kb-directories：一行一条「<相对项目根的目录>  # 为什么」，目录要在，理由不许省（.claude/singlefs-ai-sop/rules/kb-discipline.md 开头一段）。"
+    rm -f "$registry_errors"
+    exit 1
+  fi
+  rm -f "$registry_errors"
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    base="$(gate_diff_base gate)"
+  fi
+  python3 - "$(pwd)" "$kb_listing" "$base" "$STAGE_DIR/lib-lag-baseline.py" "$text_notations_break" "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" <<'PY' || python_rc=$?
+import importlib.util, os, re, sys, types
+
+root, kb_listing, base, lag_baseline_path, broken, private_values_source, configuration_path, hostname_path = sys.argv[1:9]
+private_values = types.ModuleType("lib_private_values")      # 路径与片段打码的共用函数（doc-text.sh 的 PRIVATE_VALUES_LIBRARY，与别的格同一份）
+exec(compile(private_values_source, "private-values-library", "exec"), private_values.__dict__)
+masking_targets = []
+if configuration_path:
+    try:
+        masking_targets = private_values.load_private_targets(configuration_path, hostname_path, broken)[0]
+    except OSError:
+        masking_targets = []
+
+def shown_path(path):
+    return private_values.shown_path(path, masking_targets, broken)
+
+def shown_snippet(line, start, end):
+    start, end = private_values.snippet_bounds(line, max(0, start), min(len(line), end), masking_targets)
+    return private_values.shown_text(line[start:end].strip(), masking_targets)
+
+LAG_TABLE = ".claude/gate.d/dated-status-lag.tsv"
+DEFAULT_KB_DIRECTORY = ".claude/kb"                       # 没有 .claude/kb-directories 时的 kb 目录（kb-discipline.md 开头一段）
+HISTORY_HEADING = re.compile(r"^## 历史版本\s*$")
+NOT_JUDGED_NAMES = ("decisions-history.md", "experiments-history.md", "INDEX.md")
+TRANSLATION_SUFFIXES = (".en.md", ".ja.md")
+DATED_STATUS_FORMS = (                                   # 两种带日期的现状句，红行报第一处命中的那一种
+    ("现状（日期", re.compile(r"现状(?:\*\*)?\s*[（(]\s*[0-9]{4}-[0-9]{2}-[0-9]{2}")),
+    ("日期 现状", re.compile(r"(?<![0-9])[0-9]{4}-[0-9]{2}-[0-9]{2} ?(?:\*\*)?现状")),
+)
+MINIMUM_ANCHOR_CHARACTERS = 12
+MINIMUM_REASON_CHARACTERS = 4
+LISTED_FINDINGS = 200
+
+# ── 扫哪些页 ──
+kb_directories = [os.path.relpath(line, root) for line in kb_listing.split("\n") if line.strip()]
+if not kb_directories and os.path.isdir(DEFAULT_KB_DIRECTORY):
+    kb_directories = [DEFAULT_KB_DIRECTORY]
+judged_files, skipped_translations, skipped_named = [], 0, 0
+for directory in kb_directories:
+    for current, subdirectories, names in os.walk(directory):
+        subdirectories.sort()
+        for name in sorted(names):
+            if not name.endswith(".md"):
+                continue
+            if name.endswith(TRANSLATION_SUFFIXES):
+                skipped_translations += 1
+                continue
+            if name in NOT_JUDGED_NAMES:
+                skipped_named += 1
+                continue
+            path = os.path.normpath(os.path.join(current, name))
+            if os.path.isfile(path) and path not in judged_files:
+                judged_files.append(path)
+
+# ── 逐份找命中：只看「## 历史版本」之前 ──
+hits = []            # (路径, 行号, 那一行, 形态名, 命中起点, 命中终点)
+lines_judged = 0
+unreadable = []
+for path in judged_files:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            text_lines = handle.read().split("\n")
+    except OSError as error:
+        unreadable.append((path, error))
+        continue
+    for number, line in enumerate(text_lines, 1):
+        if HISTORY_HEADING.match(line):
+            break
+        lines_judged += 1
+        for form_name, pattern in DATED_STATUS_FORMS:
+            found = pattern.search(line)
+            if found:
+                hits.append((path, number, line, form_name, found.start(), found.end()))
+                break
+
+# ── 滞后表：读、核写法、与 gate 基准那一版比 ──
+table_problems = []  # (表的行号, 一句问题)
+growth = []          # (表的行号, 路径, 锚)
+lag_rows = []        # 写对了的登记 (表的行号, 路径, 锚)
+table_rows = 0
+base_note = ""
+spec = importlib.util.spec_from_file_location("lib_lag_baseline", lag_baseline_path)
+lag_baseline = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(lag_baseline)
+file_lines_cache = {}
+def lines_of(path):
+    if path not in file_lines_cache:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            file_lines_cache[path] = handle.read().split("\n")
+    return file_lines_cache[path]
+
+if broken == "dated-status-lag-unread":
+    print("  ! 弄坏开关 dated-status-lag-unread：不读滞后表，命中的一律判红")
+    base_note = "弄坏开关 dated-status-lag-unread：没读滞后表"
+elif os.path.isfile(LAG_TABLE):
+    with open(LAG_TABLE, encoding="utf-8", errors="replace") as handle:
+        current_rows = lag_baseline.content_rows(handle.read())
+    table_rows = len(current_rows)
+    seen_keys = {}
+    for row_number, columns in current_rows:
+        if len(columns) != 3:
+            table_problems.append((row_number, f"有 {len(columns)} 列，要三列：<路径><TAB><行内锚><TAB># <为什么还没改>"))
+            continue
+        path, anchor, reason = columns[0].strip(), columns[1].strip(), columns[2].strip()
+        if not reason.startswith("#") or len(reason.lstrip("#").strip()) < MINIMUM_REASON_CHARACTERS:
+            table_problems.append((row_number, f"第三列要以 # 起头、写为什么还没改（至少 {MINIMUM_REASON_CHARACTERS} 个字）"))
+            continue
+        if len(anchor) < MINIMUM_ANCHOR_CHARACTERS:
+            table_problems.append((row_number, f"锚只有 {len(anchor)} 个字，要那一行里至少 {MINIMUM_ANCHOR_CHARACTERS} 个字的原文"))
+            continue
+        if (path, anchor) in seen_keys:
+            table_problems.append((row_number, f"与第 {seen_keys[(path, anchor)]} 行登记的是同一条（路径与锚都相同）"))
+            continue
+        seen_keys[(path, anchor)] = row_number
+        if not os.path.isfile(path):
+            table_problems.append((row_number, f"登记的路径不在：{shown_path(path)}"))
+            continue
+        try:
+            anchored = [number for number, line in enumerate(lines_of(path), 1) if anchor in line]
+        except OSError as error:
+            table_problems.append((row_number, f"读不了登记的文件 {shown_path(path)}（{error.strerror}）"))
+            continue
+        if len(anchored) != 1:
+            table_problems.append((row_number, f"锚在 {shown_path(path)} 里命中 {len(anchored)} 行，要恰好一行" + (f"（第 {'、'.join(map(str, anchored[:5]))} 行）" if anchored else "")))
+            continue
+        lag_rows.append((row_number, path, anchor))
+    if broken == "dated-status-growth-unjudged":
+        base_note = "弄坏开关 dated-status-growth-unjudged：没与 gate 基准比"
+    elif not base:
+        base_note = "被判的根不在 git 仓里，滞后表没与 gate 基准比"
+    else:
+        base_rows, problem = lag_baseline.baseline_rows(base, LAG_TABLE, cwd=root)
+        if problem is not None:
+            table_problems.append((0, f"与 gate 基准比不了：{problem.sentence()}"))
+        elif base_rows is None:
+            base_note = f"gate 基准 {base} 里还没有滞后表（初次登记），不比"
+        else:
+            base_keys = {(columns[0].strip(), columns[1].strip()) for _number, columns in base_rows if len(columns) >= 2}
+            for row_number, columns in current_rows:
+                if len(columns) >= 2 and (columns[0].strip(), columns[1].strip()) not in base_keys:
+                    growth.append((row_number, columns[0].strip(), columns[1].strip()))
+            base_note = f"与 gate 基准 {base} 那一版比没涨（基准 {len(base_rows)} 行，此刻 {table_rows} 行）"
+else:
+    base_note = "没有滞后表"
+
+lagged, findings = [], []
+for hit in hits:
+    path, number, line = hit[0], hit[1], hit[2]
+    if any(row_path == path and anchor in line for _row, row_path, anchor in lag_rows):
+        lagged.append(hit)
+    else:
+        findings.append(hit)
+hit_lines = {(hit[0], hit[1]) for hit in hits}
+stale_rows = [row for row in lag_rows if (row[1], next(number for number, line in enumerate(lines_of(row[1]), 1) if row[2] in line)) not in hit_lines]
+
+failed = False
+if findings:
+    failed = True
+    print(f"  ✗ {len(findings)} 行带日期的现状句不在滞后表里，在 {len({hit[0] for hit in findings})} 份 kb 中文页的历史节之前：")   # gate-lint:summary
+    for path, number, line, form_name, start, end in findings[:LISTED_FINDINGS]:
+        print(f"      {shown_path(path)}:{number}  {form_name}  …{shown_snippet(line, start - 10, end + 24)}…")   # gate-lint:detail
+    if len(findings) > LISTED_FINDINGS:
+        print(f"      （另有 {len(findings) - LISTED_FINDINGS} 行没列出）")   # gate-lint:detail
+    print("     → 怎么办：删掉日期，把那一句的事实现查一次（verify-before-claiming.md）改成现值；那一天的样子要留就写进「## 历史版本」（只有登记在 .claude/history-carriers 的文件有这一节），")
+    print("               没登记的文件不留历史，经过靠 git。规则：.claude/singlefs-ai-sop/rules/kb-discipline.md「带日期的现状快照也是历史，会停在那一天」。")
+if table_problems:
+    failed = True
+    print(f"  ✗ 滞后表 {LAG_TABLE} 有 {len(table_problems)} 处写得不对：")   # gate-lint:summary
+    for row_number, sentence in table_problems:
+        print(f"      {'第 ' + str(row_number) + ' 行：' if row_number else ''}{sentence}")   # gate-lint:detail
+    print(f"     → 怎么办：一行「<路径><TAB><那一行里至少 {MINIMUM_ANCHOR_CHARACTERS} 个字、在文件里只出现一次的原文><TAB># <为什么还没改，至少 {MINIMUM_REASON_CHARACTERS} 个字>」；")
+    print("               路径不在或锚找不到的多半是那一行已经改好或文件搬了家，删掉这一行；锚命中几行的换一段更长、只出现一次的原文。")
+if growth:
+    failed = True
+    print(f"  ✗ 滞后表比 gate 基准 {base} 那一版多 {len(growth)} 行（只缩不涨；路径或锚改了也算新加）：")   # gate-lint:summary
+    for row_number, path, anchor in growth:
+        print(f"      第 {row_number} 行：{shown_path(path)}  …{private_values.shown_text(anchor, masking_targets)}…")   # gate-lint:detail
+    print("     → 怎么办：新写的带日期现状句当场改成现值，不往滞后表里加；那一行改过字、锚对不上了的，在同一次改动里把那一句改成现值、删掉它那一行，不改锚。")
+if unreadable:
+    failed = True
+    print(f"  ✗ {len(unreadable)} 份 kb 中文页读不了，这几份没判：")   # gate-lint:summary
+    for path, error in unreadable:
+        print(f"      {shown_path(path)}（{error.strerror}）")   # gate-lint:detail
+    print("     → 怎么办：给自己补上读权限（chmod u+r）再跑这一格。")
+for row_number, path, anchor in stale_rows:
+    print(f"  ! 滞后表第 {row_number} 行指的那一行（{shown_path(path)}）已经不是带日期的现状句，删掉这一行（只缩不涨，删了不用补）")
+if failed:
+    sys.exit(1)
+if not judged_files:
+    print(f"  ! 登记的 kb 目录（{'、'.join(kb_directories) or '没有'}）下没有中文 .md，这一格本次无对象可判（这不是通过）")
+    sys.exit(77)
+print(f"  ✓ 带日期的现状句：扫了 {len(kb_directories)} 个 kb 目录里 {len(judged_files)} 份中文页历史节之前的 {lines_judged} 行，命中 {len(hits)} 行，不在滞后表里的 0 行；滞后 {len(lagged)} 行（滞后表 {table_rows} 行，{base_note}）")
+print(f"     没扫的：译文 {skipped_translations} 份、两份变更史与 INDEX.md {skipped_named} 份")
+PY
   exit "$python_rc"
 }
 

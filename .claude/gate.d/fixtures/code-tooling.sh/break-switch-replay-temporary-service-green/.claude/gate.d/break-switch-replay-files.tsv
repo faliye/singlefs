@@ -1,0 +1,2 @@
+# 样本复跑登记表：一份只在临时 prune-server 上跑的自证（样本根的要临时服务的表里登记成 required），复跑要包一层起
+scripts/gate/needs-service.py	30	# 样本：不在包装底下退 2，包着起一条开关红在点名的失败行上

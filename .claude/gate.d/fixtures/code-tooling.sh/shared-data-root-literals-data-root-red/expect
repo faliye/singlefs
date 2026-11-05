@@ -1,0 +1,8 @@
+exit=1
+want=6 处经 ~ 或 $HOME 取了数据根下共享的那几项
+want=scripts/hosts/data_root.sh:3  数据根本身经 ~ 或 $HOME 取
+want=scripts/hosts/data_root.sh:4  数据根下名单外的一项
+want=scripts/hosts/data_root.sh:5  运行记录按台取
+want=scripts/hosts/data_root.sh:6  运行记录按台取
+want=scripts/gate/data_root.py:3  运行记录按台取
+want=scripts/gate/data_root.py:4  数据根本身经 ~ 或 $HOME 取

@@ -1,0 +1,14 @@
+[package]
+name = "tiny-mutation-sample"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lints.rust]
+warnings = "deny"
+
+[[bin]]
+name = "tiny-bench"
+path = "tiny_bench.rs"
+
+[workspace]

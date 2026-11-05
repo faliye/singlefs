@@ -1,0 +1,2 @@
+.claude/kb  # 样本：决策、实验、里程碑仍留在这里；登记是替换不是追加，要它仍被扫到就得显式列出来
+crates/sample-checker/invariants  # 样本：不变量清单按类拆开挪到 checker 旁边

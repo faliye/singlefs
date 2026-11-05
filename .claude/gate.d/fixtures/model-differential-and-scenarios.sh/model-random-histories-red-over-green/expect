@@ -1,0 +1,8 @@
+exit=1
+want=· 样本档：上一版（.unit-verdict-sample/prior）这一格照判绿记进这一版的判定库
+want=· 单元键：要现判（全量：只写不读）
+want=这一段却没有「模型对拍 N 步」那一行：「随机历史」（用例 random_histories_end_only_in_known_red_forms_and_exercise_every_operation）
+want=· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟这一格现判（RECORD recorded=0 changed=0 refused=0 red=1
+want=· 样本档：判红记库之后同一把键再算一次计划：judge（上次判红（
+want=样本只跑 .gate-cells 点名的格：model-random-histories
+want=model-random-histories：红（退出 1）

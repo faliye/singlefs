@@ -1,0 +1,5 @@
+# 样本：一行好的、一行指向不存在的文件、一行锚串一处都不命中、最后一行是基准之后才加的（setup.sh 提交基准时去掉它）
+scripts/agents/text_reader.py:startswith("~/.local/share/singlefs/work/")  # 样本：认会话记录里的路径文字
+scripts/hosts/gone.sh:$HOME/.local/share/singlefs/work  # 样本：指向不存在的文件
+scripts/hosts/home_literal.sh:no-such-anchor  # 样本：锚串一处都不命中
+scripts/agents/text_reader.py:startswith("~/.local/share/singlefs/last-runs/")  # 样本：基准之后才加的一行 grown-row

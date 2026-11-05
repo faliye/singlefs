@@ -1,0 +1,2 @@
+# 样本：一行，锚串落在认路径文字的那一行上
+scripts/agents/text_reader.py:startswith("~/.local/share/singlefs/work/")  # 样本：认会话记录里的路径文字

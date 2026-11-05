@@ -1,0 +1,2 @@
+# 滞后表 dead-path-lag.tsv 的红样本（setup.sh 建 git 仓）：该删的两行、比基准涨的一行、写得不对的三行逐条点名。只跑 governance-refs
+governance-refs

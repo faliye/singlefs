@@ -1,0 +1,4 @@
+# 样本：两行 prune-server，一行「不算：」
+scripts/sample/clean.sh	bash scripts/sample/clean.sh --selftest	prune-server（unit-verdicts 族，样本）	reuse-three-questions
+scripts/sample/clean.py	python3 scripts/sample/clean.py --selftest	prune-server（verdict-library 族，样本）	reuse-three-questions
+scripts/sample/clean_mention.sh	-	不算：样本，只提到别人的复用	-

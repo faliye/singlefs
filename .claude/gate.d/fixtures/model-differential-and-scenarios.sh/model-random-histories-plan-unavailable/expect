@@ -1,0 +1,5 @@
+exit=75
+want=✗ model-differential-and-scenarios.sh 的 model-random-histories 格：prune-server 不可用（scripts/gate/admission.py verdict-plan 退 75：✗ 样本档造的服务不可用：
+want=✗ 「随机历史」这一格没判：prune-server 不可用（上面那一句），没起 cargo，这一格退 75
+want=model-random-histories：prune-server 不可用（退出 75）
+want=✗ model-differential-and-scenarios.sh：prune-server 不可用：1 格里 1 格连不上判定库、没判（model-random-histories），这一道退 75

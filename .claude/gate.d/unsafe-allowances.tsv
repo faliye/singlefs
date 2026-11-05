@@ -1,26 +1,67 @@
-# crates/ 下每个 crate 放开 unsafe 的地方，一个 crate 一行。
+# crates/ 下每个 crate 根放开 unsafe 的地方，一处放开一行：没有放开的根一行；放开了的根每个放开的项一行，项里几处 unsafe 合写在那一行。
+# 根有两种：crate 的库根 src/lib.rs（tests/、benches/ 与 src/ 下不归 bin 根的文件都算它这一份），与 cargo 自动认的每个 bin 根
+# （src/main.rs、src/bin/<名>.rs、src/bin/<名>/main.rs；后两种都连同 src/bin/<名>/ 下的全部文件，src/bin/<名>.rs 的 mod 照 cargo 的规矩就从那个目录找）；
+# 每个根各有自己的级别，bin 根不跟库根。include!("…") 与 #[path = "…"] 点到的文件（不看扩展名）算进写着它的那份文件的根。
 # 门禁 code-source-discipline（.claude/gate.d/code-source-discipline.sh）的 unsafe-allowances 那一格读这张表。
 #
-# 六段，制表符分隔（# 开头的行与空行不算）：
-#   1 crate 目录名（crates/ 下一级）
-#   2 crate 根（src/lib.rs）允许写的级别：forbid，或 forbid,deny（写了 deny 才可以有放开）
-#   3 唯一放开 unsafe 的文件；没有放开写 -
-#   4 唯一放开 unsafe 的函数名；没有放开写 -
-#   5 理由：为什么非放开不可、不放开的替代为什么不行；放开了的行必填、不少于 20 个字，没有放开写 -
-#   6 出处：谁哪天定的；放开了的行必填，写仓里真有的文件路径，或「用户 YYYY-MM-DD 弹窗定」加那份记录的路径，
+# 八段，制表符分隔（# 开头的行与空行不算）：
+#   1 根：库根写 crate 目录名（crates/ 下一级）；bin 根写 <crate 目录名>/<bin 根相对 crate 目录的路径>，例如 singlefs-verification/src/bin/<名>.rs
+#   2 这个根允许写的级别：forbid，或 forbid,deny（写了 deny 才可以有放开）；同一个根的几行写成一样
+#   3 放开 unsafe 的文件（要在第 1 段那个根里）；没有放开写 -
+#   4 放开 unsafe 的项；没有放开写 -；同一个根里一项只登一行。三种写法：
+#       函数写函数名；
+#       直接写在 impl 块里的方法写 <类型>::<方法>（trait impl 也按实现它的类型认，trait 名不进键：两个类型各实现一次同一个 trait，同名方法是两个键）；
+#       impl 块本身（unsafe impl 的项头那一处）写 impl <Trait> for <类型>，固有 impl 写 impl <类型>；
+#     类型与 trait 都取路径的最后一节、去掉 <…>。
+#     同一份文件里几个方法写出来的 <类型>::<方法> 一样（同一个类型的几个 impl 块里有同名的方法，例 impl Reader<u8> 与 impl Reader<u16> 各有 read），
+#     这几个都改写全写，不再认短的那一种：固有 impl 里的写 <内联模块路径::><类型连同 <…> 里的实参>::<方法>，例 Reader<u16>::read；
+#     trait impl 里的写 <<内联模块路径::><类型连同实参> as <Trait 连同实参>>::<方法>，例 <Reader<u16> as Clock<u8>>::read；
+#     实参照源码原样、去掉全部空白，路径只留最后一节；只有写在内联 mod 块（mod 名 { … }）里的 impl 才带模块路径。登了短的那一种，门禁在放开那一处点名该写的全写
+#   5 这一项里 unsafe 关键字几处（正整数）：unsafe 块、unsafe fn 签名、unsafe impl 项头各算一处；方法登了自己那一行的，它里面的几处不再算进 impl 块那一行；
+#     不带 unsafe 写的外层属性 #[no_mangle]、#[export_name = …]、#[link_section = …] 也各算这一项里的一处（2021 版这样写，unsafe_code 这条 lint 照样报；
+#     写成 #[unsafe(no_mangle)] 的照里面那个 unsafe 关键字算，不重数），它的 SAFETY 注释写在属性上方
+#   6 这一项里每一处 unsafe 上方的 // SAFETY: 注释都要提到的词，| 分隔（不分大小写按字面认；文件描述符、偏移、长度三个词另认同义写法，
+#     见门禁里的 SAFETY_WORD_SYNONYMS）；从那几处 SAFETY 注释里取它真写着的前提；没有放开写 -
+#   7 理由：为什么非放开不可、不放开的替代为什么不行；放开了的行必填、不少于 20 个字，没有放开写 -
+#   8 出处：谁哪天定的；放开了的行必填，写仓里真有的文件路径，或「用户 YYYY-MM-DD 弹窗定」加那份记录的路径，
 #     路径指向不存在的文件门禁判红；没有放开写 -
 #
-# 判法：根写 forbid 时这个 crate 里 allow(unsafe_code) 与 unsafe 关键字都是 0 处；
-# 根写 deny 时 allow(unsafe_code) 恰好 1 处、紧挨着第 4 段那个函数、在第 3 段那个文件里，
-# 函数里 unsafe 关键字恰好 1 处、上方连着的 // 注释里有一行 // SAFETY:，且那段注释写出依赖的前提（提到文件描述符、偏移、长度）。
-# crates/ 下出现这张表里没有的 crate 判红；这张表里的 crate 目录不在仓里，这一格跳过那一行。
+# 判法（逐个根）：根写 forbid 时这个根里 allow(unsafe_code) 与 unsafe 关键字都是 0 处；
+# 根写 deny 时 allow(unsafe_code) 的个数等于这个根登记的行数，每一处紧挨着某一行第 4 段那一项（中间隔着别的属性、注释照认）、在那一行第 3 段那个文件里，
+# 登记的每一项上恰好一处；每一项里 unsafe 关键字恰好第 5 段那么多处（项从项头算起，unsafe、pub 这类限定词算进去；几行都罩住的一处归范围最小的那一行），
+# 每一处所在那条语句（或项）的开头一行上方连着的 // 注释里有一行 // SAFETY:（中间隔着独占几行的属性照往上找），且那段注释提到第 6 段的每个词。
+# 语句开头：上一行以 = ( [ 或运算符收尾没收完的、这一行以 . 起头接着方法链的，都算同一条语句的续行；SAFETY 写在语句开头上方，写在链中间、续行上方的不认。
+# 只认真写着的 // 注释：字符串字面量里顶格写的 // SAFETY: 不算；行按 \n 数，U+2028 这类不算换行。
+# 按设计不算的两样（门禁有样本钉着）：
+#   宏不展开：宏定义里写一处 unsafe 块、调几次，都只算定义处那一个关键字，第 5 段登 1 处，SAFETY 注释写在定义处。展开出来的几处是同一段代码、
+#     前提由定义处那一段写清，按调用次数数会让同一段代码随调用点增减改登记；宏是不是真的每次都只展开成那一段，靠 review。
+#   一条语句共用一段注释：同一条语句里几处 unsafe（续行上接着的第二个 unsafe 块），都认语句开头上方那一段 SAFETY 注释，不要求各写一段；
+#     第 5 段照写出来的关键字数（两处登 2）。那一段注释要把几处的前提都写到（第 6 段的词每一处都照判），写全没有靠 review。
+# 这张表里没有的 bin 根照 forbid 判：不写级别也行，写了 deny、有 allow(unsafe_code) 或 unsafe 关键字都判红。
+# 同一个（根，项）登两行、同一个根的几行第 2 段不一样、第 1 段登记的 bin 根在 crate 里不是 bin 根（文件不在、写法不对），判红。
+# crates/ 下出现这张表里没有库根那一行的 crate 判红；这张表里的 crate 目录不在仓里，这一格跳过那几行。
 #
 # 增一处放开：改这张表的行并走三方（.claude/rules/three-way-inference.md），不改门禁的判法。
-singlefs-core	forbid,deny	crates/singlefs-core/src/block_device.rs	punch_hole_keeping_the_file_length	文件后端写零改成打洞，调 fallocate(2) 的 FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE（libc 0.2.189 已在锁文件里），只在这一个函数放开；不放开的路是有的：带安全封装的 rustix 在本机 cargo 缓存里（能否离线解析没核），纯标准库的「记写过的区间」零 unsafe、调查员量的效果与打洞相同——用户 2026-09-30 三选一选了打洞，2026-10-01 在知道这两条零 unsafe 的路之后弹窗仍选「照旧：core 里一处 unsafe」；同日定「立，恰好一处」「只在「不支持」（EOPNOTSUPP / ENOSYS）时退回逐块写零，别的错照报」	用户 2026-10-01 弹窗定 records/2026-09-30-里程碑三开工第一轮.md
-singlefs-format	forbid	-	-	-	-
-singlefs-checker	forbid	-	-	-	-
-singlefs-checker-tier	forbid	-	-	-	-
-singlefs-harness	forbid	-	-	-	-
-singlefs-replay-prefix	forbid	-	-	-	-
-singlefs-reference-filesystem	forbid	-	-	-	-
-singlefs-unit-graph	forbid	-	-	-	-
+singlefs-core	forbid,deny	crates/singlefs-core/src/block_device.rs	punch_hole_keeping_the_file_length	1	文件描述符|偏移|长度	文件后端写零改成打洞，调 fallocate(2) 的 FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE（libc 0.2.189 已在锁文件里），只在这一个函数放开；不放开的路是有的：带安全封装的 rustix 在本机 cargo 缓存里（能否离线解析没核），纯标准库的「记写过的区间」零 unsafe、调查员量的效果与打洞相同——用户 2026-09-30 三选一选了打洞，2026-10-01 在知道这两条零 unsafe 的路之后弹窗仍选「照旧：core 里一处 unsafe」；同日定「立，恰好一处」「只在「不支持」（EOPNOTSUPP / ENOSYS）时退回逐块写零，别的错照报」	用户 2026-10-01 弹窗定 records/2026-09-30-里程碑三开工第一轮.md
+singlefs-core	forbid,deny	crates/singlefs-core/src/checksum.rs	crc32_castagnoli_on_route	1	register_after_the_bytes|SSE4.2|CrcInstructionDetected	调带 #[target_feature(enable = "sse4.2")] 的函数要 unsafe；std 没有「查过特性再调」的安全封装	用户 2026-10-26 弹窗定 records/2026-10-19-里程碑四GPU垃圾回收开工.md
+singlefs-background-gpu	forbid,deny	crates/singlefs-background-gpu/src/background_gpu.rs	largest_device_local_memory_heap	2	hal|适配器	wgpu 不报显存，只能经 hal 层拿 Vulkan 实例与物理设备句柄去读内存堆；wgpu 与 ash 都没有安全的封装	research/prompts/m4-gpugc-unsafe-gate-r1-main-verification.md
+singlefs-background-gpu	forbid,deny	crates/singlefs-background-gpu/src/background_gpu.rs	host_cpu_time_of_this_thread	1	栈帧|初始化过|没有别的引用	std 没有线程 CPU 钟，只能调 clock_gettime(2)	research/prompts/m4-gpugc-unsafe-gate-r1-main-verification.md
+singlefs-background-gpu	forbid,deny	crates/singlefs-background-gpu/src/background_gpu.rs	monotonic_raw_time_now	1	栈帧|初始化过|没有别的引用	std 的 Instant 读 CLOCK_MONOTONIC、跟着 NTP 调频走，std 没有读 CLOCK_MONOTONIC_RAW 的写法，只能调 clock_gettime(2)；E202（GPU与CPU两种模式GC对照组）装置的挂钟要拿来与线程 CPU 钟比大小	research/prompts/e202-preregistration.md
+singlefs-background-gpu	forbid,deny	crates/singlefs-background-gpu/src/background_gpu.rs	with_the_address_space_capped_beyond_the_present_size	3	rlimit	std 没有 getrlimit/setrlimit，只能调 libc；只在用例自己起的子进程里压本进程的地址空间；读 /proc/self/limits 再起 prlimit 子进程也压得了，但每条用例多起一个外部程序、第二台有没有 prlimit 没核，判决 Q2 照留	research/prompts/m4-gpugc-unsafe-gate-r1-main-verification.md
+singlefs-background-gpu	forbid,deny	crates/singlefs-background-gpu/tests/checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs	free_device_local_bytes_of_the_card	2	hal|适配器	wgpu 不报空闲显存，只能经 hal 层拿 Vulkan 实例与物理设备句柄去读 VK_EXT_memory_budget；wgpu 与 ash 都没有安全的封装	research/prompts/m4-gpugc-unsafe-gate-r1-main-verification.md
+singlefs-format	forbid	-	-	-	-	-	-
+singlefs-checker	forbid	-	-	-	-	-	-
+singlefs-verification	forbid	-	-	-	-	-	-
+singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	forbid,deny	crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	nanoseconds_of_the_cpu_clock	1	栈帧|timespec|这一次调用	std 没有线程 CPU 钟与进程 CPU 钟，只能经 libc 调 clock_gettime(2)；已有依赖里只有 libc，没有带安全封装的 rustix 或 nix（锁文件里都没有）	records/2026-10-19-里程碑四GPU垃圾回收开工.md
+singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	forbid,deny	crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	RawWallClockReading::now	1	栈帧|timespec|这一次调用	std 的 Instant 读 CLOCK_MONOTONIC，受 NTP 调速、比 CLOCK_MONOTONIC_RAW 慢约 7 ppm，长批上会误触停机条款第 6 条（登记第十二节 12.4）；读 CLOCK_MONOTONIC_RAW 只能经 libc 调 clock_gettime(2)，产品 GPU 包的 monotonic_raw_time_now 读同一个钟，但 验证包加这条依赖会把 wgpu 拉进它的编译闭包、破坏 验证包的依赖边界	research/prompts/m4-gpugc-unsafe-gate-r1-main-verification.md
+singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	forbid,deny	crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	drop_the_page_cache_of_the_file	1	文件描述符|偏移|长度|不传指针	std 没有 posix_fadvise，只扔一个文件的页缓存只能经 libc 调 posix_fadvise(2) 的 POSIX_FADV_DONTNEED；已有依赖没有安全封装，写 /proc/sys/vm/drop_caches 要 root、扔的是全机的缓存；起 dd iflag=nocache count=0 子进程也只扔这一个文件，但计时的准备里每次多起一个外部程序	research/prompts/m4-gpugc-unsafe-gate-r1-main-verification.md
+singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	forbid,deny	crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	HardwareCrc::crc	2	sse4.2|when_the_instructions_are_present	写法乙要量装置自己的单路与三路交错两种 crc32q 写法，两个函数带 target_feature 属性（sse4.2），从没开这个特性的函数里调只能写 unsafe；std 没有查过特性再调的安全封装，crates 的 crc32_castagnoli 只有一种写法、替不了这两臂	records/2026-10-19-里程碑四GPU垃圾回收开工.md
+singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	forbid,deny	crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	pin_this_thread_to	1	栈帧|128 字节|进程号 0|对齐	std 没有把线程绑到核上的接口，只能经 libc 调 sched_setaffinity(2)；已有依赖没有安全封装，本线程的线程号读 /proc/thread-self 的链接就有，起 taskset 子进程也绑得了，但每次多起一个外部程序、第二台有没有 taskset 没核	research/prompts/m4-gpugc-unsafe-gate-r1-main-verification.md
+singlefs-replay-prefix	forbid	-	-	-	-	-	-
+singlefs-reference-filesystem	forbid	-	-	-	-	-	-
+singlefs-unit-graph	forbid	-	-	-	-	-	-
+singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	forbid,deny	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	impl GlobalAlloc for CountingAllocator	1	System|原子|线程本地|析构	GlobalAlloc 是 unsafe trait，挂计数分配器只能写 unsafe impl；判决 research/prompts/m3-close-b19-reason-r3-main-verification.md 第二节 Q5：E183 离不开：量的是一次调用前后线程本地的 Layout 字节，VmHWM 是页粒度，`Cargo.lock` 与本机缓存里没有安全计数库	用户 2026-11-03 弹窗定 records/2026-10-18-里程碑三收尾与近期欠账.md
+singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	forbid,deny	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	CountingAllocator::alloc	2	layout|System	GlobalAlloc::alloc 的签名要求 unsafe fn，转给 System 要调它的 unsafe 方法；判决 research/prompts/m3-close-b19-reason-r3-main-verification.md 第二节 Q5：E183 离不开：量的是一次调用前后线程本地的 Layout 字节，VmHWM 是页粒度，`Cargo.lock` 与本机缓存里没有安全计数库	用户 2026-11-03 弹窗定 records/2026-10-18-里程碑三收尾与近期欠账.md
+singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	forbid,deny	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	CountingAllocator::alloc_zeroed	2	layout|System	GlobalAlloc::alloc_zeroed 的签名要求 unsafe fn，转给 System 要调它的 unsafe 方法；判决 research/prompts/m3-close-b19-reason-r3-main-verification.md 第二节 Q5：E183 离不开：量的是一次调用前后线程本地的 Layout 字节，VmHWM 是页粒度，`Cargo.lock` 与本机缓存里没有安全计数库	用户 2026-11-03 弹窗定 records/2026-10-18-里程碑三收尾与近期欠账.md
+singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	forbid,deny	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	CountingAllocator::dealloc	2	pointer|layout|System	GlobalAlloc::dealloc 的签名要求 unsafe fn，还给 System 要调它的 unsafe 方法；判决 research/prompts/m3-close-b19-reason-r3-main-verification.md 第二节 Q5：E183 离不开：量的是一次调用前后线程本地的 Layout 字节，VmHWM 是页粒度，`Cargo.lock` 与本机缓存里没有安全计数库	用户 2026-11-03 弹窗定 records/2026-10-18-里程碑三收尾与近期欠账.md
+singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	forbid,deny	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	CountingAllocator::realloc	2	pointer|layout|new_size|System	GlobalAlloc::realloc 的签名要求 unsafe fn，转给 System 要调它的 unsafe 方法；判决 research/prompts/m3-close-b19-reason-r3-main-verification.md 第二节 Q5：E183 离不开：量的是一次调用前后线程本地的 Layout 字节，VmHWM 是页粒度，`Cargo.lock` 与本机缓存里没有安全计数库	用户 2026-11-03 弹窗定 records/2026-10-18-里程碑三收尾与近期欠账.md

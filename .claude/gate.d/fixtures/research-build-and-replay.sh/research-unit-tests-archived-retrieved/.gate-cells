@@ -1,0 +1,2 @@
+# 单测按字面 concat! 读的留存产物只在 git 历史里：这一格从 git 历史取回、单测读得到，判绿
+research-unit-tests

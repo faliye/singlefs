@@ -1,0 +1,2 @@
+# 验证包依赖 rocksdb、假 cargo 不带 rocksdb-prebuilt.py 认的标记：起 cargo 之前 entry 判红、退 1，算给崩溃枚举用例那一格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

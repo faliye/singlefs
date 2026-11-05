@@ -1,0 +1,8 @@
+exit=1
+want=── 同键现判那一趟（样本 .lkmm-key-samples/change.sh 改过之后，GATE_LKMM_BREAK=reuse-lookup-skipped
+want=litmus/publish.litmus  期望 Never，实际 Sometimes
+want=── 同键现判那一趟之后照常读库再跑一趟（样本 .lkmm-key-samples/full-round-then-reread
+want=· herd7:publish.litmus：红，现判（上次判红
+want=· herd7:publish-nofence.litmus：绿，复用（
+want=litmus-verdicts：红（退出 1）
+want=lkmm.sh：1 格里 1 格红（litmus-verdicts）

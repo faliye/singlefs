@@ -1,0 +1,6 @@
+exit=1
+want=样本档：
+want=── crash-case-provenance（只读树）
+want=项 plain-stream：它的崩溃枚举用例调 enumerate_crash_states，来历表 crates/singlefs-verification/src/crash_point_replay_provenance.rs 的 PROVENANCE_OF_THE_FLOWS 里没有 enumeration_of_the_item("<流名>", "plain-stream", …) 这一行
+want=逐格：crash-case-provenance：红
+want=只重跑红的格：bash .claude/gate.d/crash-point-replay.sh --check crash-case-provenance

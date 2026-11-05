@@ -1,0 +1,4 @@
+exit=1
+want=第 2 行不是六段
+want=要六段制表符分隔
+want=verus-must-red-worlds：红（退出 1）

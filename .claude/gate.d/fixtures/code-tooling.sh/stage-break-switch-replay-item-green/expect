@@ -1,0 +1,6 @@
+exit=0
+want=只跑 样本根的 .gate-items 点名的项：stage-break-switch-replay 1 项
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=· 按条复用：1 条开关（1 道阶段），现判 1、复用 0、拒算 0
+want=门禁阶段的弄坏开关复跑：复跑了 1 条开关（1 道阶段：sample-stage.sh）
+want=stage-break-switch-replay：绿

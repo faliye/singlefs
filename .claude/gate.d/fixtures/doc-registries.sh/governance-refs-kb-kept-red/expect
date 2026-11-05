@@ -1,0 +1,10 @@
+exit=1
+want=.claude/gate.d/dead-path-kept.tsv:3: 与滞后表 .claude/gate.d/dead-path-lag.tsv 第 2 行登记的是同一对（.claude/kb/tooling.md 里的 scripts/kb/both-tables.py）：两张表只登一张
+want=.claude/gate.d/dead-path-kept.tsv:4: 第三列要以 # 起头、写它属于哪种（
+want=.claude/kb/tooling.md:5: `scripts/kb/short-reason.py` 里的 scripts/kb/short-reason.py 在仓里不存在：从没进过 git
+want=.claude/gate.d/dead-path-kept.tsv:5: .claude/kb/tooling.md 里的 scripts/kb/now-built.py 此刻在了：建好了或回来了，删这一行
+want=.claude/gate.d/dead-path-kept.tsv:6: .claude/kb/tooling.md 的现状文字里已经不引 scripts/kb/no-longer-cited.py
+want=  kb 路径：扫 1 份 kb 中文页，判了 4 处（research/ 进过 git 放行 0 处、滞后 0 处、保留 2 处）
+want=照规矩该留旧路径的（将来落点、句子说它不在、抄下来的命令或输出、仓外副本里的路径），登进 .claude/gate.d/dead-path-kept.tsv
+want=治理文档与 kb 里有指不到的指向（上面逐条列出）
+want=  governance-refs：红（退出 1）

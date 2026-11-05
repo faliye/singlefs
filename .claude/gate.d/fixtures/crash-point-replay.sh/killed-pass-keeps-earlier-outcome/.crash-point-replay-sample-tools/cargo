@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# crash-point-replay「每一趟当场写结局」样本的假 cargo（样本档）：-V 打版本；test 不带 --features 打 cases/default-pass.log，
+# 带 --features <特性> 打 cases/feature-pass.<特性，逗号换成 +>.log、退出码照同名 .exit（没有就 0）；没有那一份日志退 101。别的一律退 101。
+# 同名 .term-parent 在、又不是查库那一趟（没设 SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1）时：打完日志给起它的阶段（父进程）发 TERM、退 143，
+#   照内存包装撞顶时 systemd 停整个 scope 的样子，阶段跟着被停；发之前核父进程的命令行里有这一道阶段的文件名，不是就一个信号都不发、退 101。
+# 每次起都先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+# 登记的崩溃枚举用例那一趟（不带 --lib、最后一个 --test 的目标有 cases/<目标>.log）：先打收到的参数，再打那一份日志、退出码照同名 .exit（没有就 0）；
+# 设了 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE 而 cases/<目标>.findings.tsv 在时追加进去。没有那一份日志的往下走别的日志
+last_test=""
+previous_word=""
+for word in "$@"; do
+  if [[ "$previous_word" == --test ]]; then last_test="$word"; fi
+  previous_word="$word"
+done
+if [[ -n "$last_test" && " $* " != *" --lib "* && -f "$here/cases/$last_test.log" ]]; then
+  echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+  if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE:-}" && -f "$here/cases/$last_test.findings.tsv" ]]; then
+    cat "$here/cases/$last_test.findings.tsv" >> "$SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE" || exit 101
+  fi
+  cat "$here/cases/$last_test.log"
+  exit "$(cat "$here/cases/$last_test.exit" 2>/dev/null || echo 0)"
+fi
+features=""
+previous=""
+for word in "$@"; do
+  if [[ "$previous" == --features ]]; then features="$word"; fi
+  previous="$word"
+done
+log="$here/cases/default-pass.log"
+if [[ -n "$features" ]]; then log="$here/cases/feature-pass.${features//,/+}.log"; fi
+[[ -f "$log" ]] || { echo "样本里没有这组特性的日志：${log##*/}（参数：$*）"; exit 101; }
+# 收到的参数打成一行 CRASH_POINT_REPLAY_PROGRESS（阶段只转出这一类行），expect 靠它核阶段真的把哪些参数交给了 cargo
+echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+cat "$log"
+if [[ -f "${log%.log}.term-parent" && "${SINGLEFS_CRASH_CASE_BLOCKS_QUERY:-}" != 1 ]]; then
+  parent_command="$(tr '\0' ' ' < "/proc/$PPID/cmdline" 2>/dev/null)"
+  if [[ "$parent_command" != *crash-point-replay.sh* ]]; then
+    echo "样本的假 cargo：父进程 $PPID 不是这一道阶段（命令行：${parent_command:-读不到}），不发 TERM、退 101"
+    exit 101
+  fi
+  kill -s TERM "$PPID"
+  exit 143
+fi
+exit "$(cat "${log%.log}.exit" 2>/dev/null || echo 0)"

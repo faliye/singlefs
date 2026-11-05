@@ -1,0 +1,8 @@
+exit=1
+want=✗ 封存的 records/2026-10-23-subagent拆分提案.md 封存之后被改了：此刻 sha256 8db520933909c62eca91aa146524bb5239b10a0be897e1f80a96690eeeef2fb6，登记的是 f2e4eb84cb3ef492742a15114367459c7433540a3dc173c6ec7be6c5c2007897
+want=✗ 封存的 2 份拆分提案里 1 份封存之后被改了或不在了
+want=封存账本不改，往现行账本追加
+want=要记的新内容写进现行账本 records/2026-10-29-subagent拆分提案.md
+want=样本只跑 .gate-cells 点名的格：sealed-ledgers-unchanged
+want=doc-process-records.sh：1 格里 1 格红（sealed-ledgers-unchanged）
+want=bash .claude/gate.d/doc-process-records.sh --check sealed-ledgers-unchanged

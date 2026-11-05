@@ -1,0 +1,7 @@
+exit=1
+want=research/prompts/e990-preregistration.md:6：「cargo run --release -p singlefs-verification --bin e990_judge_sample」起的 e990_judge_sample（crates/singlefs-verification/src/bin/e990_judge_sample.rs）调了判段入口 run_from_environment，特性没带 gpu（带的：无）
+want=这次改动的跑前登记里 1 条起走崩溃判段的装置命令没带 gpu 特性（走判段的判了 1 条）
+want=样本只跑 .gate-cells 点名的格：preregistration-judge-features
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（preregistration-judge-features）
+want=bash .claude/gate.d/doc-experiments.sh --check preregistration-judge-features

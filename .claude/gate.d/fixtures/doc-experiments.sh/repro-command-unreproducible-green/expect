@@ -1,0 +1,6 @@
+exit=0
+want=点了产物的实验都写了复跑命令（点了产物的 2 页里判了 1 页）
+want=登记表 .claude/gate.d/repro-command-unreproducible.tsv 登了 1 页，其中靠登记放行的 1 页：90-造树产物逐字节复跑不了.md
+want=样本只跑 .gate-cells 点名的格：repro-command
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（repro-command），0 格本次未跑（无）

@@ -1,0 +1,4 @@
+exit=2
+want=✗ --item 点名的 feature-gated 项不在可点的项里：feature-gated:no_such_file.rs
+want=feature-gated:lib  --lib
+want=feature-gated:store_only.rs  whole-file sample-store

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 决策文档与变更史（二十格：决策与分项的状态、索引与登记表对正文、未定项回看、写频率、候选代号复用、依据块里的推论判决与三方腿况、变更史条目与形状）
+# gate-stage: 决策文档与变更史（二十一格：决策与分项的状态、索引与登记表对正文、未定项回看、写频率、候选代号复用、依据块里的推论判决与三方腿况、变更史条目与形状、欠段引已还清的欠账）
 # gate-fixture: yes
 # gate-category: 文档类
 # gate-similar: history-ordinal.sh 它也读变更史的条目标题、也只判这一轮新增的，但判的是「（其 N）」撞号，住在上游副本里由上游门禁管，项目本地改不了它
-# gate-similar: doc-registries.sh 它从欠账表、收口表与总审核出发判表本身的形状与账的去向，判字段与布局登记表（字节表「指向」列点名的分项存不存在、字段投影与加和、认购表求和不超预留），它的 decision-refs 那一格判 kb 全文引用的 D 号有定义、不看分项号与状态；这里的 user-verdict-owed 那一格方向相反，从决策正文里的「待用户复核」出发去欠账表找一笔未还的账，item-ref-status 那一格判引用写的已定 / 未定与正文分项表相符，判的对象都是决策正文、索引页、冻结层归属登记表与变更史
+# gate-similar: doc-registries.sh 它从欠账表、收口表与总审核出发判表本身的形状与账的去向，判字段与布局登记表（字节表「指向」列点名的分项存不存在、字段投影与加和、认购表求和不超预留），它的 decision-refs 那一格判 kb 全文引用的 D 号有定义、不看分项号与状态；这里的 user-verdict-owed 那一格方向相反，从决策正文里的「待用户复核」出发去欠账表找一笔未还的账，item-ref-status 那一格判引用写的已定 / 未定与正文分项表相符，判的对象都是决策正文、索引页、冻结层归属登记表与变更史；owed-refs-paid 那一格也读欠账表（与它同一份 lib-owed.py 的分界），对象是决策中文正文的欠段，与 user-verdict-owed 同一批对象、同一张表，所以放在这里；它的 table-shape、closeout-collects-open、paid-cited-tests 三格对象是欠账表自己与里程碑收口表，不读决策正文
 # gate-similar: doc-process-records.sh 它从三方轮的判决、材料与快照出发，判一批工作留没留过程记录（判决点名、轮次收尾）；这里 inference-needs-verdict 与 three-way-leg-record 两格方向相反，从决策分项依据块里的「是推论」「三方」字样出发去找 research/ 下存在的判决或腿输出，对象是决策正文不是过程记录
 # gate-similar: code-source-discipline.sh 它的 clause-enums 格也读 .claude/gate.d/ 下一张登记表、去决策分项里找逐字的串，但比对的另一边是代码里的枚举；这里格「同一结构的写频率只有一个量级」两边都在决策正文里（句子写的频率与登记的量级），不碰代码
 #
@@ -31,9 +31,10 @@
 # gate-cell: candidate-codes 同一份决策里，同一个候选代号（甲乙丙丁… 或单个大写字母）不许出现在两个分项的候选表里
 # gate-cell: inference-needs-verdict 决策分项依据块里自陈是推论的条目（是推论、是推的、只走了本地腿、没走三方），要指到一份存在的 research/prompts/*-main-verification.md
 # gate-cell: three-way-leg-record 决策分项依据块里写了「三方」的条目，要指到 research/ 下存在的判决或腿输出，或写明腿况缺失且不写阴性结论
+# gate-cell: owed-refs-paid 决策中文正文「**欠**：」行里引的 C 号（紧跟在别的 C 号后面的全角括注里的不算）已在 checks-owed.md 的已还清表里，而同一行里这个号每一处到下一处引账或分号的那一截连同它前面 12 个字都没写已还清、还清、销账；决策中文正文欠段之外与里程碑页中文正文的现状句里引的已还清的账，那一句写了欠、待、没做、记在 C<编号> 这类现欠说法而没写已还、还清、销账、已关、做完这类写法的也判红；滞后表 owed-refs-paid-lag.tsv 登记的放过，滞后表写对了、与 gate 基准那一版比只缩不涨
 #
 # 用法：
-#   bash .claude/gate.d/doc-decisions.sh [项目根]                                       二十格都跑；项目根不给取本脚本往上两级
+#   bash .claude/gate.d/doc-decisions.sh [项目根]                                       二十一格都跑；项目根不给取本脚本往上两级
 #   bash .claude/gate.d/doc-decisions.sh --list                                         逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-decisions.sh --check <格名>[,<格名>…] [项目根]              只跑点名的格，按格名表的次序
 #   bash .claude/gate.d/doc-decisions.sh --write [--check decision-items-sync] [项目根]  重写 decisions.md 的分项清单生成块与索引表「状态」「进度」两列，写完回读判一遍
@@ -61,6 +62,7 @@
 #   entry-added-moved-and-edited-red        现场同 entry-added-moved-only-not-run（搬迁登记了），另把一行正文改了：决策正文改了 14 行，entry-added 红
 #   settled-same-file-item-heading-red / -green  settled-same-file 的分项定案标题样本：本次提交在未定项一节之前新增 `#### 已定项 2：丙问题`；
 #                                           红的那份未定项一字未动、索引页待议节补了复核注，红在那条未定项上；绿的那份未定项与待议节都补了复核注，绿
+#   settled-same-file-bare-settled-heading-not-run  本次提交只新增了光秃秃的 `### 已定（2026-10-13）：丙问题`（不是首行登记标题的 `—— 已定`，也不是 `已定项 N：…`）：格不认它，退 77「本次 diff 没有新增「已定」小节」
 #   history-loss-red / history-loss-green   基准里一块带一个数：整理时弄丢了判红；整理成一条结论、数都在判绿
 #   history-loss-moved-commit-ref-green     tools/old-rig 搬到 tools/new-rig 并登记，变更史一块里「改前」行留着 `git show 31e47115:tools/old-rig/run.sh`、「依据」行换成新路径：
 #                                           换算基准那一版时提交引用后面的路径不换，与改后逐字相同，判绿
@@ -109,6 +111,28 @@
 #   item-ref-status-translation-first-line-green  D941 的英语译文首行用单破折号、日语译文用冒号没有破折号：item-ref-status 绿（改前报「2 份首行读不出」）
 #   kb-shape-translation-first-line-green   kb-shape-translation-green 的四份译文首行写成各自的语言（`— Settled`、`—— 確定` 这类）：kb-shape 绿，第 5 段报「译文 4 份只按语言判编号连号」
 #                                           （改前第 5 段拿中文的状态词判译文的标题，四份都报「标题缺状态」）
+#   欠段引已还清的欠账那一格（owed-refs-paid，判据写在这一格函数上方的注释），十二份都只跑 owed-refs-paid；带 setup.sh 的两份建 git 仓，其余不是 git 仓：
+#   owed-refs-paid-red                      欠段引一个已还清的 C 什么都没说、一个夹在不紧跟 C 号的括注里（「C10（…）：…（归 C21（…））」）、一个「已还清」写在下一个 C 号之后，
+#                                           三处逐处点名判红；同一行里开着的 C10、C11 与「## 历史版本」之后引的已还清不点名
+#   owed-refs-paid-green                    欠段写「无。」、同一截写了「已还清」、「还清」写在前面 12 个字里、同一截写「销账」、历史版本节里引的、英语译文里引的：判绿，
+#                                           报「扫 1 份中文正文、4 行欠段、5 个 C 号；其中引已还清的 3 个…」
+#   owed-refs-paid-heading-missing-red      checks-owed.md 的「已还清」标题写成「已经还了」：整格红在「里认不出「已还清」标题」
+#   owed-refs-paid-abbreviation-parenthesis-green  开着的账的登记简称里提到已还清的号（「C40（C30 作废之后…）」，同一行前面另有一个号；嵌套括号「C42（归 C31（…）与 C30 的继任）」）：
+#                                           紧跟在 C 号后面那一对配平的全角括注里的 4 个号不算引账，判绿
+#   owed-refs-paid-same-line-mark-green     一行里先列「C45（…）、C46（…）、C47（…）」、后补「其中 C46（…） 已还清」：C46 前一截没写还清也放过，判绿
+#   owed-refs-paid-same-line-unmarked-red   同一句、后补那一截不写「已还清」：C46 一行两次都没说还清，点名一处判红
+#   owed-refs-paid-lag-green                setup.sh 建 git 仓：基准里滞后表登记两处，这一轮改好一处、删了它那一行（只缩）；剩下那一处照登记放过：判绿、报「滞后 1 处」
+#   owed-refs-paid-lag-growth-red           setup.sh 建 git 仓：这一轮新写一处引已还清的欠段、往滞后表加了罩它的一行：滞后表比基准多 1 行，判红
+#   owed-refs-paid-lag-anchor-wrong-red     滞后表那一行的锚抄错一个字：锚命中 0 行判红，罩不住的那一处也判红
+#   owed-refs-paid-lag-table-red            滞后表一行写对、另十行各错一处（列数、C 号写法、理由太短、锚太短、重复、路径不在、锚命中 0 行、锚命中两行、那一行里没有这个号、这个号还开着）：
+#                                           逐行点名判红；写对的那一行照罩住判红的那一处
+#   owed-refs-paid-status-sentence-red      现状句把已还清的号当现欠：决策欠段之外的两行（一句「…的检查记在 C20」、一行两句「这一格待 C21…补上；…已还清的另说」，还清写在别的句里不算）
+#                                           与里程碑页两行（「C22 那一格还没做」「仍欠 C20 那一条变异」）四处逐处点名判红；欠段写「无。」、围栏里与「## 历史版本」之后引的、
+#                                           里程碑译文里引的不判，报「扫 2 份中文正文、5 句引账、5 个 C 号」
+#   owed-refs-paid-status-sentence-green    决策欠段之外：那一句写了「已还清」、写了「已销账」、只在开着的 C10 的简称括注里提到 C21 的各一行，「只欠…记在 C21」一行由滞后表收着；
+#                                           写「已还」的历史引用（「当时欠的那一格记在 C23…，2026-10-01 已还，立成 D8」）、只提到不当现欠的（「检查照 C20 那一格落在门禁里」）、
+#                                           现欠的词只在登记简称括注里的（「C24（等待复核时欠着的样本账）」）、只带「欠账表」「等待」与不跟 C 号的「记在」的各一行；
+#                                           里程碑页「C22 已还清」一行、开着的 C10 一行、围栏里的一行不判：判绿，报「10 句引账、10 个 C 号；其中引已还清的 8 个：那一句写了…之一的 4 个，没写现欠说法的 3 个；滞后 1 处」
 # 弄坏开关（样本自检时设进环境）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/doc-decisions.sh/ 下的目录名，
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库：红格按绿记、整道退 0
@@ -119,6 +143,8 @@
 #       inference-needs-verdict-red、three-way-leg-record-red、write-frequency-red、freeze-layer-membership-translation-red、kb-shape-translation-red、
 #       item-ref-status-history-section-red、item-ref-status-orphan-translation-red、history-loss-base-unreadable-red（期望退出 1，实测 0）
 #       entry-added-moved-unregistered-red、entry-added-moved-and-edited-red、history-loss-moved-unregistered-red、history-loss-moved-and-edited-red、shape-moved-unregistered-red、shape-moved-and-edited-red（期望退出 1，实测 0）
+#       owed-refs-paid-red、owed-refs-paid-heading-missing-red、owed-refs-paid-same-line-unmarked-red、owed-refs-paid-lag-growth-red、owed-refs-paid-lag-anchor-wrong-red、
+#       owed-refs-paid-lag-table-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
@@ -138,6 +164,10 @@
 #       shape-moved-unregistered-red、shape-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；shape-moved-only-green（期望退出 0，实测 1）
 #       cross-decision-status-ledger-green、cross-decision-status-relaxed-green、decision-items-sync-translation-green、evidence-pointer-history-green、
 #       inference-needs-verdict-green、three-way-leg-record-green（期望退出 0，实测 1）
+#       owed-refs-paid-red、owed-refs-paid-heading-missing-red、owed-refs-paid-same-line-unmarked-red、owed-refs-paid-lag-growth-red、owed-refs-paid-lag-anchor-wrong-red、
+#       owed-refs-paid-lag-table-red（输出里找不到「样本只跑 .gate-cells 点名的格：owed-refs-paid」）；
+#       owed-refs-paid-green、owed-refs-paid-abbreviation-parenthesis-green、owed-refs-paid-same-line-mark-green、owed-refs-paid-lag-green、owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#       owed-refs-paid-status-sentence-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）
 #   STAGE_CELLS_BREAK=check-ignored  归共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
@@ -157,6 +187,9 @@
 #       shape-moved-unregistered-red、shape-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；shape-moved-only-green（期望退出 0，实测 1）
 #       cross-decision-status-ledger-green、cross-decision-status-relaxed-green、decision-items-sync-translation-green、evidence-pointer-history-green、
 #       inference-needs-verdict-green、three-way-leg-record-green（期望退出 0，实测 1）
+#       owed-refs-paid-red、owed-refs-paid-heading-missing-red、owed-refs-paid-same-line-unmarked-red、owed-refs-paid-lag-growth-red、owed-refs-paid-lag-anchor-wrong-red、
+#       owed-refs-paid-lag-table-red、owed-refs-paid-status-sentence-red（输出里找不到「样本只跑 .gate-cells 点名的格：owed-refs-paid」）；
+#       owed-refs-paid-green、owed-refs-paid-abbreviation-parenthesis-green、owed-refs-paid-same-line-mark-green、owed-refs-paid-lag-green、owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
 #   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py（设进环境，被各格起的 python 继承）：按编号取文件不分语言、取排序后的第一个命中（改前的取法，取到 <号>-<名>.en.md），
 #                                       heads_for_referrer 不筛语言（读不出首行的译文也算这一格的对象）；same_language_files 不筛语言、files_by_language 并成一组
 #                                       （kb-shape 第 7 段拿中文索引去对译文，第 5 段把三语的号并成一个列表判连号）
@@ -194,7 +227,7 @@
 #   DOC_DECISIONS_BREAK=settled-item-self-open  settled-item-self-open 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「已定项的正文没有把已经定了的东西说成未定…」）；settled-item-self-open-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=settled-ref-says-open  settled-ref-says-open 格不跑、按判过了记
-#       decision-documents-green（输出里找不到「扫了 29 个文件、43 处已定项引用，没有一处紧跟着说它没…」）；decision-documents-some-cells-not-run（输出里找不到「  settled-ref-says-open：本次未跑」）；
+#       decision-documents-green（输出里找不到「扫了 29 个文件、44 处已定项引用，没有一处紧跟着说它没…」）；decision-documents-some-cells-not-run（输出里找不到「  settled-ref-says-open：本次未跑」）；
 #       settled-ref-says-open-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=stale-open-items  stale-open-items 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「没有未定项被别处的更新甩在后面…」）；decision-documents-some-cells-not-run（输出里找不到「  stale-open-items：本次未跑」）；
@@ -203,8 +236,8 @@
 #       decision-documents-green（输出里找不到「同文件的未定项与索引页的待议节都被回头看过…」）；decision-documents-some-cells-not-run（输出里找不到「  settled-same-file：本次未跑」）；
 #       settled-same-file-item-heading-green（输出里找不到「本次定案之后，同文件的未定项与索引页的待议节都被回头看过…」）；
 #       settled-same-file-item-heading-red、settled-same-file-red（期望退出 1，实测 0）
-#   DOC_DECISIONS_BREAK=settled-item-heading-unrecognised  settled-same-file 退回老的小节标题正则，不认 `#### 已定项 N：…` 与 `#### 已定项 N（…）`
-#       settled-same-file-item-heading-red（期望退出 1，实测 77：本次 diff 没有新增「已定」小节）；settled-same-file-item-heading-green（期望退出 0，实测 77）
+#   DOC_DECISIONS_BREAK=settled-item-heading-unrecognised  settled-same-file 退回只认 `—— 已定` 的小节标题正则，不认 `#### 已定项 N：…` 与 `#### 已定项 N（…）`
+#       settled-same-file-item-heading-red（期望退出 1，实测 77：本次 diff 没有新增「已定」小节）；settled-same-file-item-heading-green（期望退出 0，实测 77）；decision-documents-green（输出里找不到「同文件的未定项与索引页的待议节都被回头看过…」与「14 格里 13 格绿…」）
 #   DOC_DECISIONS_BREAK=freeze-layer-membership  freeze-layer-membership 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「冻结层归属登记表判过了…」）；decision-documents-some-cells-not-run（输出里找不到「  freeze-layer-membership：本次未跑」）；
 #       freeze-layer-membership-red、freeze-layer-membership-translation-red（期望退出 1，实测 0）；freeze-layer-membership-translation-green（输出里找不到「冻结层归属登记表判过了…」）
@@ -311,6 +344,42 @@
 #       three-way-leg-record-green（期望退出 0，实测 1）
 #   DOC_DECISIONS_BREAK=three-way-leg-negated-judged  「没有走三方论证」也算在说跑过三方
 #       three-way-leg-record-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-table-unread  owed-refs-paid 不读已还清表（当它是空的），欠段引的账全放行，滞后表登记的号也都算「已不在已还清表里」
+#       owed-refs-paid-red、owed-refs-paid-same-line-unmarked-red（期望退出 1，实测 0）；owed-refs-paid-lag-green（期望退出 0，实测 1）；
+#       owed-refs-paid-green、owed-refs-paid-same-line-mark-green（输出里找不到「✓ 决策正文的欠段没有把已还清的账当开着的（扫 1 份中文正文、…」）；
+#       owed-refs-paid-lag-anchor-wrong-red（输出里找不到「✗ .claude/kb/decisions/01-样本决策.md:7 C20（样本已还的甲）」）；
+#       owed-refs-paid-lag-table-red（输出里找不到「滞后表 .claude/gate.d/owed-refs-paid-lag.tsv 有 10 处不对」）；
+#       owed-refs-paid-status-sentence-red（期望退出 1，实测 0）；owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-abbreviation-parenthesis-counted  owed-refs-paid 紧跟在 C 号后面的全角括注里的 C 号照样算引账（改前的认法）
+#       owed-refs-paid-abbreviation-parenthesis-green、owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-same-line-other-mark-ignored  owed-refs-paid 每一处只看自己那一截，同一行里同一个号另一截写了已还清不算（改前的判法）
+#       owed-refs-paid-same-line-mark-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-lag-unread  owed-refs-paid 不读滞后表（判红的处一律红，表写没写对、涨没涨都不判）
+#       owed-refs-paid-lag-green（期望退出 0，实测 1）；
+#       owed-refs-paid-green、owed-refs-paid-abbreviation-parenthesis-green（输出里找不到「别的 C 号简称括注里的 C 号 0 个不算引账；滞后表 0 行（没有滞后表）」，后一份是 4 个）；
+#       owed-refs-paid-lag-anchor-wrong-red、owed-refs-paid-lag-table-red（输出里找不到「滞后表 .claude/gate.d/owed-refs-paid-lag.tsv 有 …处不对」）；
+#       owed-refs-paid-lag-growth-red（输出里找不到「滞后表比 gate 基准 HEAD 那一版多 1 行…」）；
+#       owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-lag-growth-unjudged  owed-refs-paid 滞后表不与 gate 基准那一版比（滞后表涨了也不红）
+#       owed-refs-paid-lag-growth-red（期望退出 1，实测 0）；
+#       owed-refs-paid-lag-green（输出里找不到「别的 C 号简称括注里的 C 号 0 个不算引账；滞后表 1 行（与 gate 基准 HEAD 那一版比没涨…」）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-status-sentences-skipped  owed-refs-paid 现状句不判（退回只判欠段）
+#       owed-refs-paid-status-sentence-red（期望退出 1，实测 0）；
+#       owed-refs-paid-status-sentence-green（输出里找不到「现状句：扫 2 份中文正文（决策 1 份的欠段之外、里程碑页 1 份），10 句引账…」）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-status-marks-ignored  owed-refs-paid 现状句里写了已还、还清这些写明已还的写法也照红
+#       owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-status-whole-line  owed-refs-paid 现状句整行算一句（同一行别的句里写了还清也算写了）
+#       owed-refs-paid-status-sentence-red（输出里找不到「✗ .claude/kb/decisions/01-样本决策.md:6 C21（样本已还的乙）」）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-status-owed-words-ignored  owed-refs-paid 现状句不看现欠说法，引已还清的账、那一句没写已还就红（改前的判法）
+#       owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-status-old-marks  owed-refs-paid 现状句只认改前的三个词（已还清、还清、销账）算写明已还，「已还」「做完」这类不认
+#       owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-status-claims-in-abbreviation  owed-refs-paid 现状句登记简称括注里的「欠」「待」也算现欠说法
+#       owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-status-not-claims-counted  owed-refs-paid 现状句「欠账表」「等待」这类词不先剔掉，里面的「欠」「待」照算现欠说法
+#       owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=owed-refs-paid-status-ledgered-in-unseen  owed-refs-paid 现状句「记在 C<编号>」不算现欠说法
+#       owed-refs-paid-status-sentence-red（输出里找不到「✗ .claude/kb/decisions/01-样本决策.md:5 C20（样本已还的甲）」）
 set -uo pipefail
 # 路径要在 cd 之前算：$0 是相对路径时，cd 进项目根之后就指不到了
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -322,6 +391,19 @@ STAGE_RELATIVE_PATH=".claude/gate.d/$(basename "${BASH_SOURCE[0]}")"
 LIB_ITEM_REF_STATUS="$GATE_DIRECTORY/lib-item-ref-status.py"
 # 挂账表与基准那一版比：取基准那一版的三种结局（有表、没有表、git 取不到）经它（DECISION_EVIDENCE_SOURCE 的 base_ledger_text，路径由环境变量 LIB_LAG_BASELINE 给）
 LIB_LAG_BASELINE="$GATE_DIRECTORY/lib-lag-baseline.py"
+# 格 owed-refs-paid（判据在那一格函数上方的注释）：欠账表开着 / 已还清的分界只读这一份；同一截前面看几个字、认哪几个词算写明了还清；滞后表与基准那一版比经上面的 LIB_LAG_BASELINE
+LIB_OWED="$GATE_DIRECTORY/lib-owed.py"
+OWED_REFS_PAID_PREFIX_CHARACTERS=12
+OWED_REFS_PAID_MARKS="已还清 还清 销账"
+# 格 owed-refs-paid 的滞后表（被判的根下）与锚至少几个字；写法在那张表的文件头与这一格函数上方的注释
+OWED_REFS_PAID_LAG_TABLE=.claude/gate.d/owed-refs-paid-lag.tsv
+# 格 owed-refs-paid 的现状句另扫的里程碑页（被判的根下；以数字起头的中文正文，译文不扫）
+OWED_REFS_PAID_MILESTONE_DIRECTORY=.claude/kb/milestone
+# 格 owed-refs-paid 的现状句：一句里带哪个词算把账当现欠（「记在 C<编号>」另由格里的正则认）、带哪个词算写明已还、哪几个带「欠」「待」的词先剔掉不算说法
+OWED_REFS_PAID_STATUS_OWED_WORDS="欠 待 没做 未做 还开着 仍开着"
+OWED_REFS_PAID_STATUS_PAID_MARKS="已还 还清 销账 已关 关账 做完 已做 已完成"
+OWED_REFS_PAID_STATUS_NOT_CLAIMS="欠账表 等待 对待 期待 看待"
+OWED_REFS_PAID_LAG_ANCHOR_CHARACTERS=12
 LIB_CHANGED_PATHS="$REPO_ROOT/scripts/gate/changed-paths.sh"
 # 生成器按本脚本所在的仓取、不按项目根：样本根里没有 .claude/scripts/（坑见格 blocking-verdict）
 GENERATOR="$REPO_ROOT/.claude/scripts/gen-decision-items.py"
@@ -374,6 +456,8 @@ stage_cell inference-needs-verdict judge_inference_needs_verdict "决策分项�
   "在红行点名的那一条里写上判决文件（在树里，或在 git 历史里取得回来）；推论还没走三方的先走一轮三方，别先登挂账表 .claude/gate.d/decision-evidence-lag.tsv；改好的存量要把罩它的那一行挂账行删掉（改 gate.d 归工具实现员）"
 stage_cell three-way-leg-record judge_three_way_leg_record "决策分项依据块里写了「三方」的条目，要指到 research/ 下存在的判决或腿输出，或写明腿况缺失且不写阴性结论" \
   "在红行点名的那一条里点名那一轮的判决或腿输出；取不回来的写明腿况缺失（没有腿况记录），并去掉「都没找到」「构造不出」这类阴性写法；改好的存量要把罩它的那一行挂账行删掉（.claude/gate.d/decision-evidence-lag.tsv，改 gate.d 归工具实现员）"
+stage_cell owed-refs-paid judge_owed_refs_paid "决策中文正文「**欠**：」行里引的 C 号（紧跟在别的 C 号后面的全角括注里的不算）已在 checks-owed.md 的已还清表里，而同一行里这个号每一处到下一处引账或分号的那一截连同它前面 12 个字都没写已还清、还清、销账；决策中文正文欠段之外与里程碑页中文正文的现状句里引的已还清的账，那一句写了欠、待、没做、记在 C<编号> 这类现欠说法而没写已还、还清、销账、已关、做完这类写法的也判红；滞后表 owed-refs-paid-lag.tsv 登记的放过，滞后表写对了、与 gate 基准那一版比只缩不涨" \
+  "把那个 C<编号>（简称）连同只说它的那一截从 **欠**： 行里去掉（去掉后这一行没有别的 C 号就写 **欠**：无。）；现状句写的是历史就在那一句写明已还，写的是现状就去掉把它当现欠的说法；那笔账其实没还清就把 checks-owed.md 那一行挪回欠着的那张表；要留着这一处引用就在同一截写明已还清；那份决策这一轮不许改的（在一轮还没判决的三方的开工快照里），照 .claude/gate.d/owed-refs-paid-lag.tsv 文件头的写法登记一行（只缩不涨，改 gate.d 归工具实现员），改好就删它那一行（判据在 doc-decisions.sh 里这一格函数上方的注释）"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 write_mode=0; root_argument=""
@@ -1579,7 +1663,7 @@ grid_stale_open_items() (
 )
 
 # ════ 格「定了新东西没回看同文件未定项」════
-# 这一轮在一份决策里新增了「已定」小节标题（`—— 已定`、`已定（…）`，或分项定案的 `已定项 N：…` / `已定项 N（…）`），而同文件还开着的未定项（「### 未定项」与「### 还要回答的」两节）一条都没碰、
+# 这一轮在一份决策里新增了「已定」小节标题（首行登记标题的 `—— 已定`，或分项定案的 `已定项 N：…` / `已定项 N（…）`），而同文件还开着的未定项（「### 未定项」与「### 还要回答的」两节）一条都没碰、
 # 索引页 decisions.md 还悬着的「## 待议」节一个字没动：判红，要一次回头看。
 # 与格「未定项被别处定了」是两把尺：那一格跨文件看历史，这一格同文件看这一轮的 diff。按历史判会在每个有已定小节又有未定项的决策上恒红。
 # 「碰没碰」按条目块判（表格行一行一条，列表项到下一条分项或标题之前，与 OPEN_ITEM_REVIEW_SOURCE 同口径）；待议按那一节判（`## 待议` 到下一个 `## `），索引页别处动过不算。
@@ -1608,7 +1692,7 @@ grid_settled_same_file() (
   settled_files=()
   while IFS= read -r f; do
     [[ -n "$f" ]] || continue
-    # 只认新增行里的小节标题：`## D1 简称 —— 已定` / `### 未定项 3 —— 已定` / `### 已定（…）` / `#### 已定项 12：名字` / `#### 已定项 12（名字）`；未跟踪的文件整份算新增
+    # 只认新增行里的小节标题：`## D1 简称 —— 已定` / `### 未定项 3 —— 已定` / `#### 已定项 12：名字` / `#### 已定项 12（名字）`；未跟踪的文件整份算新增
     # 不接 `| grep -q`：pipefail 下前段吃 SIGPIPE，命中会被读成没命中
     added_out="$(gate_added_lines "$BASE" "$f")" || {
       echo "  ✗ 取不到 $f 这次新增了哪些行（基准 $BASE）"
@@ -1616,11 +1700,11 @@ grid_settled_same_file() (
       exit 1
     }
     added_text="$(cut -f2- <<<"$added_out")"
-    # 新分项的定案标题写作 `#### 已定项 N：名字`（format-evolution.md「决策正文只写现状」）；老写法 `—— 已定` 与 `已定（` 照认
-    # 开关 settled-item-heading-unrecognised 退回不认「已定项 N」的老正则（样本自检用）
-    settled_heading_pattern='^#{2,4} .*—— 已定|^#{2,4} 已定[（(]|^#{2,4} 已定项[[:space:]]*[0-9]+[[:space:]]*(：|:|（|\()'
+    # 决策文件首行的登记标题写作 `## D<n> 简称 —— 已定`，新分项的定案标题写作 `#### 已定项 N：名字`（format-evolution.md「决策正文只写现状」），两种都认
+    # 开关 settled-item-heading-unrecognised 退回不认「已定项 N」（样本自检用）
+    settled_heading_pattern='^#{2,4} .*—— 已定|^#{2,4} 已定项[[:space:]]*[0-9]+[[:space:]]*(：|:|（|\()'
     if [[ "$BREAK_SWITCH" == settled-item-heading-unrecognised ]]; then
-      settled_heading_pattern='^#{2,4} .*—— 已定|^#{2,4} 已定[（(]'
+      settled_heading_pattern='^#{2,4} .*—— 已定'
     fi
     if grep -qE "$settled_heading_pattern" <<<"$added_text"; then
       settled_files+=("$f")
@@ -3690,6 +3774,388 @@ print(f'     材料文件：树里 {in_tree} 个名字，只在 git 历史里取
 PY
 )
 
+# ════ 格「欠段引的欠账已还清」════
+# 决策中文正文的 `**欠**：` 行引了一笔已经挪进 checks-owed.md「已还清」表的账、又没说它还清了，读的人会把还清的账当开着的
+# （records/2026-10-30-知识腐烂治理按现状.md「现状」表第 2 行；records/2026-10-23-项目进度与知识腐烂审计-深入复核.md R22–R29 是同类）。
+# 判据：.claude/kb/decisions/ 下以数字起头的中文正文（<号>-<名>.md，不含 .en.md、.ja.md），「## 历史版本」那一行之前、以 `**欠**：` 起头的行里，
+#   每个 C<编号>（按整个号认，C1 不命中 C10）算一处引账；紧跟在另一个 C<编号> 后面那一对配平的全角括号里的不算：那是别的账照抄的登记简称
+#   （「C177（C34 作废之后被解锁的三处没复核）」里的 C34，records/2026-10-30-知识腐烂治理按现状.md「批 2」），括号没配平的不跳过。
+#   引的账在已还清表里（分界照 lib-owed.py 的 read_owed_table）时，取从这个编号起、到这一行里下一处引账或分号（；或 ;）为止的那一截，连同它前面 OWED_REFS_PAID_PREFIX_CHARACTERS 个字；
+#   同一行里这个号的每一处都这样取，任一处写了 OWED_REFS_PAID_MARKS 里的哪一个词，这一行里它的每一处都放过（先列「C445（…）、C446（…）」、后补「其中 C446（…） 已还清」的写法）；
+#   一处都没写，判红，一行一个号打一处「路径:行号 C<编号>（简称）」。
+#   checks-owed.md 不在、或认不出「已还清」标题（paid_heading_found 为假），整格红；一份中文正文都没有，退 77。
+# 现状句（射程扩到欠段之外，records/2026-10-29-subagent拆分提案.md 第一百五十四节 ①）：决策中文正文里欠段之外的行，与 OWED_REFS_PAID_MILESTONE_DIRECTORY 下以数字起头的
+#   中文正文（不含 .en.md、.ja.md）的每一行，「## 历史版本」那一行之前、围栏代码块之外，按 。；;！？!? 切句；引账的认法与欠段相同（别的 C 号简称括注里的不算），
+#   一句里引的账在已还清表里、那一句把它当现欠、又没写明已还，判红，一行一个号打一处（同一行几句都这样的报几句）。表格行整行算一句（竖线不切）。
+#   当现欠：那一句（去掉每个 C 号后面配平的全角简称括注，再去掉 OWED_REFS_PAID_STATUS_NOT_CLAIMS 里的词：欠账表、等待、对待、期待、看待）
+#     带 OWED_REFS_PAID_STATUS_OWED_WORDS 里的一个词（欠、待、没做、未做、还开着、仍开着；还欠、仍欠、只欠、待补、还没做都含在里面），或写着「记在 C<编号>」（记在与号之间只隔空白）。
+#   写明已还：那一句（去掉句里每个 C 号在 checks-owed.md 登记的简称原文，简称里的字不算写明）带 OWED_REFS_PAID_STATUS_PAID_MARKS 里的一个词
+#     （已还、还清、销账、已关、关账、做完、已做、已完成；已还清含在已还里）。写明已还的不红，两样都带也不红；不带现欠说法的只是提到这笔账，不判。
+#   与欠段共用滞后表（同一路径、锚命中的那一行、同一个 C 号就放过）；红行另起一句汇总，成功句另起一行「现状句：…」报扫了几份、几句、没写现欠说法的几个、滞后几处。
+#   管不到的：句子里写的是别的意思而恰好带了那几个词的（「还清之前」照放过，「欠」「待」说的是同一句里别的号也照红）；只写简称不写号的；只靠前后文说现欠、那一句里没有那几个词的。
+# 滞后表 OWED_REFS_PAID_LAG_TABLE（被判的根下）：一行「<路径><TAB>C<编号><TAB><行内锚><TAB># <为什么还没改>」，锚是那一行里至少 OWED_REFS_PAID_LAG_ANCHOR_CHARACTERS 个字的原文，理由至少 4 个字；
+#   判红的一处落在某一条登记里（同一路径、锚恰好命中的那一行、同一个 C 号）就不红，成功句报「滞后 N 处」。表不在就是没有登记，判红的一律红。
+#   收的是当场改不了的存量（那份决策在一轮还没判决的三方的开工快照里这类），不收新写的。
+#   表自己判红的：列数不是四列、C 号写法不对、理由没写或不到 4 个字、锚不到 OWED_REFS_PAID_LAG_ANCHOR_CHARACTERS 个字、同一条登记两次、登记的路径不在、
+#   锚在那份文件里命中的不是恰好一行、锚命中的那一行里没有这个 C 号、这个 C 号已不在已还清表里；登记的那一处此刻不红（改好了没删行）只打一行「!」提醒删掉，不判红。
+#   只缩不涨：与 gate 基准（scripts/gate/changed-paths.sh 的 gate_diff_base gate）那一版按（路径、C 号、锚）比，基准那一版里没有的行判红（锚改了也算涨）；
+#   基准那一版经 lib-lag-baseline.py 的 baseline_rows 取（与 doc-text.sh 的 dated-status 格同一种取法，登记的搬迁照换算）：
+#   基准里没有这张表（初次登记）不比，git 取不到判红，被判的根不在 git 仓里不比，成功句写明比没比。
+# 管不到的：接在 `**欠**：` 行下面的续行；写成「C 374」或只写简称的引用；还开着的账在欠段里写错了状态（归别的格与人）；
+#   紧跟在别的 C 号后面的括注里真在引一笔已还清的账（照判据当简称跳过）。
+# 样本（文件头「样本」一段逐份写了放了什么）：owed-refs-paid-red、owed-refs-paid-green、owed-refs-paid-heading-missing-red 判同一截与整格的分界；
+#   owed-refs-paid-abbreviation-parenthesis-green 判简称括注；owed-refs-paid-same-line-mark-green、owed-refs-paid-same-line-unmarked-red 判同一行里同一个号；
+#   owed-refs-paid-lag-green、owed-refs-paid-lag-growth-red、owed-refs-paid-lag-anchor-wrong-red、owed-refs-paid-lag-table-red 判滞后表；
+#   owed-refs-paid-status-sentence-red、owed-refs-paid-status-sentence-green 判现状句。
+# 弄坏开关（DOC_DECISIONS_BREAK 的值，打开后判错的样本在文件头开关表）：owed-refs-paid-table-unread 不读已还清表（当它是空的）；
+#   owed-refs-paid-abbreviation-parenthesis-counted 别的 C 号简称括注里的 C 号照样算引账；owed-refs-paid-same-line-other-mark-ignored 每一处只看自己那一截；
+#   owed-refs-paid-lag-unread 不读滞后表；owed-refs-paid-lag-growth-unjudged 滞后表不与 gate 基准那一版比；
+#   owed-refs-paid-status-sentences-skipped 现状句不判（退回只判欠段）；owed-refs-paid-status-marks-ignored 现状句写了已还也照红；
+#   owed-refs-paid-status-whole-line 现状句整行算一句（同一行别的句里写了还清也算写了）；owed-refs-paid-status-owed-words-ignored 不看现欠说法；
+#   owed-refs-paid-status-old-marks 只认已还清、还清、销账；owed-refs-paid-status-claims-in-abbreviation 简称括注里的词也算现欠说法；
+#   owed-refs-paid-status-not-claims-counted 不先剔掉欠账表、等待这类词；owed-refs-paid-status-ledgered-in-unseen「记在 C<编号>」不算现欠说法。
+grid_owed_refs_paid() (
+  [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions，这一格无对象可判"; exit 77; }
+  load_diff_base
+  python3 - .claude/kb/decisions .claude/kb/checks-owed.md "$LIB_OWED" "$LIB_LAG_BASELINE" "$BREAK_SWITCH" "$OWED_REFS_PAID_PREFIX_CHARACTERS" "$OWED_REFS_PAID_MARKS" \
+    "$OWED_REFS_PAID_LAG_TABLE" "$OWED_REFS_PAID_LAG_ANCHOR_CHARACTERS" "$diff_base" "$OWED_REFS_PAID_MILESTONE_DIRECTORY" \
+    "$OWED_REFS_PAID_STATUS_OWED_WORDS" "$OWED_REFS_PAID_STATUS_PAID_MARKS" "$OWED_REFS_PAID_STATUS_NOT_CLAIMS" <<'PY'
+import importlib.util, os, re, sys
+
+(decisions_directory, owed_path, owed_library_path, lag_baseline_library_path, BREAK, prefix_characters, marks_text,
+ lag_table_path, lag_anchor_characters, diff_base, milestone_directory,
+ status_owed_words_text, status_paid_marks_text, status_not_claims_text) = sys.argv[1:15]
+prefix_characters = int(prefix_characters)
+lag_anchor_characters = int(lag_anchor_characters)
+paid_marks = marks_text.split()
+status_owed_words = status_owed_words_text.split()
+status_paid_marks = paid_marks if BREAK == "owed-refs-paid-status-old-marks" else status_paid_marks_text.split()
+status_not_claims = status_not_claims_text.split()
+
+
+def load_library(module_name, library_path):
+    library_spec = importlib.util.spec_from_file_location(module_name, library_path)
+    library = importlib.util.module_from_spec(library_spec)
+    library_spec.loader.exec_module(library)
+    return library
+
+
+owed_library = load_library("owed", owed_library_path)
+lag_baseline = load_library("lag_baseline", lag_baseline_library_path)
+
+OWED_LINE_PREFIX = "**欠**："
+OWED_NUMBER = re.compile(r"(?<![A-Za-z0-9_])C[0-9]+(?![0-9])")
+OWED_NUMBER_SPELLING = re.compile(r"C[0-9]+")
+SEGMENT_END = re.compile(r"[；;]")
+NUMBERED_ORIGINAL = re.compile(r"^[0-9]+-.*\.md$")
+TRANSLATION_SUFFIXES = (".en.md", ".ja.md")
+ABBREVIATION_OPENING, ABBREVIATION_CLOSING = "（", "）"
+LAG_COLUMNS = 4
+LAG_REASON_CHARACTERS = 4
+# 现状句按这几个标点切句；围栏代码块里的行不判
+STATUS_SENTENCE_END = re.compile(r"[。；;！？!?]")
+STATUS_FENCE = re.compile(r"^\s*(```|~~~)")
+# 现状句里「记在 C<编号>」算把那一笔账当现欠（「记在变更史」这类不跟号的不算）
+STATUS_LEDGERED_IN = re.compile(r"记在\s*C[0-9]")
+
+
+def abbreviation_spans(line, numbers):
+    """紧跟在每个 C 号后面那一对配平的全角括号：[(开括号的位置, 闭括号的位置)]；到行尾都没配平的不算。"""
+    spans = []
+    for number in numbers:
+        if not line.startswith(ABBREVIATION_OPENING, number.end()):
+            continue
+        depth = 0
+        for position in range(number.end(), len(line)):
+            if line[position] == ABBREVIATION_OPENING:
+                depth += 1
+            elif line[position] == ABBREVIATION_CLOSING:
+                depth -= 1
+                if depth == 0:
+                    spans.append((number.end(), position))
+                    break
+    return spans
+
+
+def owed_references(line):
+    """(这一行里算引账的 C 号, 落在别的 C 号简称括注里而跳过的个数)。"""
+    numbers = list(OWED_NUMBER.finditer(line))
+    if BREAK == "owed-refs-paid-abbreviation-parenthesis-counted":
+        return numbers, 0
+    spans = abbreviation_spans(line, numbers)
+    counted = [number for number in numbers if not any(opening < number.start() < closing for opening, closing in spans)]
+    return counted, len(numbers) - len(counted)
+
+
+def status_claims_owed(line, sentence_start, sentence_end):
+    """这一句把账当现欠没有：简称括注（连括号）与 OWED_REFS_PAID_STATUS_NOT_CLAIMS 的词剔掉之后，带现欠的词或「记在 C<编号>」。"""
+    if BREAK == "owed-refs-paid-status-owed-words-ignored":
+        return True
+    spans = [] if BREAK == "owed-refs-paid-status-claims-in-abbreviation" else abbreviation_spans(line, list(OWED_NUMBER.finditer(line)))
+    claim_text = "".join(character for position, character in enumerate(line[sentence_start:sentence_end], sentence_start)
+                         if not any(opening <= position <= closing for opening, closing in spans))
+    if BREAK != "owed-refs-paid-status-not-claims-counted":
+        for word in status_not_claims:
+            claim_text = claim_text.replace(word, "")
+    if any(word in claim_text for word in status_owed_words):
+        return True
+    return BREAK != "owed-refs-paid-status-ledgered-in-unseen" and STATUS_LEDGERED_IN.search(claim_text) is not None
+
+
+def status_marks_paid(sentence):
+    """这一句写明已还没有：句里每个 C 号在欠账表登记的简称原文剔掉之后（简称里的「已还」不是写明），带 OWED_REFS_PAID_STATUS_PAID_MARKS 的词。"""
+    if BREAK == "owed-refs-paid-status-marks-ignored":
+        return False
+    for code in {found.group(0) for found in OWED_NUMBER.finditer(sentence)}:
+        registered_name = paid_names.get(code) or owed_table.open_names.get(code)
+        if registered_name:
+            sentence = sentence.replace(registered_name, "")
+    return any(mark in sentence for mark in status_paid_marks)
+
+
+originals = sorted(name for name in os.listdir(decisions_directory)
+                   if NUMBERED_ORIGINAL.match(name) and not name.endswith(TRANSLATION_SUFFIXES))
+translations = sorted(name for name in os.listdir(decisions_directory)
+                      if NUMBERED_ORIGINAL.match(name) and name.endswith(TRANSLATION_SUFFIXES))
+if not originals:
+    print(f"  ! {decisions_directory} 下没有以数字起头的中文正文，这一格无对象可判")
+    sys.exit(77)
+owed_table = owed_library.read_owed_table(owed_path)
+if not owed_table.file_found or not owed_table.paid_heading_found:
+    print(f"  ✗ {owed_path} {'不在' if not owed_table.file_found else '里认不出「已还清」标题'}，分不出欠段引的账哪些已还清")
+    print(f"     → 怎么办：欠账表按 lib-owed.py 的分界读（一行只写「已还清」的标题之后是已还清表）；标题改了就改回，表搬了家就照 .claude/rules/path-moves.md 改这一格的路径。")
+    sys.exit(1)
+paid_names = {} if BREAK == "owed-refs-paid-table-unread" else owed_table.paid_names
+
+# ── 逐行找判红的处：一处 = (路径, 行号, C 号, 这一行里它没写还清的几次) ──
+owed_line_count = reference_count = skipped_count = paid_reference_count = 0
+marked_in_segment = marked_elsewhere_in_line = 0
+red_places = []
+for name in originals:
+    path = os.path.join(decisions_directory, name)
+    with open(path, encoding="utf-8") as decision_file:
+        for line_number, line in enumerate(decision_file, 1):
+            if owed_library.HISTORY_HEADING.match(line):
+                break
+            if not line.startswith(OWED_LINE_PREFIX):
+                continue
+            owed_line_count += 1
+            references, skipped = owed_references(line)
+            reference_count += len(references)
+            skipped_count += skipped
+            segment_marks = {}
+            for index, number in enumerate(references):
+                code = number.group(0)
+                if code not in paid_names:
+                    continue
+                paid_reference_count += 1
+                segment_end = references[index + 1].start() if index + 1 < len(references) else len(line)
+                semicolon = SEGMENT_END.search(line, number.end(), segment_end)
+                if semicolon:
+                    segment_end = semicolon.start()
+                judged_text = line[max(0, number.start() - prefix_characters):segment_end]
+                segment_marks.setdefault(code, []).append(any(mark in judged_text for mark in paid_marks))
+            for code, marks in segment_marks.items():
+                marked_in_segment += marks.count(True)
+                unmarked = marks.count(False)
+                if not unmarked:
+                    continue
+                if any(marks) and BREAK != "owed-refs-paid-same-line-other-mark-ignored":
+                    marked_elsewhere_in_line += unmarked
+                    continue
+                red_places.append((path, line_number, code, unmarked))
+
+# ── 现状句：决策中文正文欠段之外的行与里程碑页中文正文的每一行，按句判（判据在这一格函数上方的注释「现状句」一段）──
+milestone_originals = (sorted(name for name in os.listdir(milestone_directory)
+                              if NUMBERED_ORIGINAL.match(name) and not name.endswith(TRANSLATION_SUFFIXES))
+                       if os.path.isdir(milestone_directory) else [])
+status_files = ([(os.path.join(decisions_directory, name), True) for name in originals]
+                + [(os.path.join(milestone_directory, name), False) for name in milestone_originals])
+status_sentence_count = status_reference_count = status_paid_count = status_marked_count = status_unclaimed_count = 0
+status_red_places = []
+if BREAK != "owed-refs-paid-status-sentences-skipped":
+    for path, owed_lines_judged_elsewhere in status_files:
+        in_fence = False
+        with open(path, encoding="utf-8") as status_file:
+            for line_number, line in enumerate(status_file, 1):
+                if owed_library.HISTORY_HEADING.match(line):
+                    break
+                if STATUS_FENCE.match(line):
+                    in_fence = not in_fence
+                    continue
+                if in_fence or (owed_lines_judged_elsewhere and line.startswith(OWED_LINE_PREFIX)):
+                    continue
+                references, _skipped = owed_references(line)
+                if not references:
+                    continue
+                unmarked_codes = {}
+                # 句的边界（弄坏开关 owed-refs-paid-status-whole-line 下整行算一句）；每处引账按位置归进它所在的那一句
+                ends = [] if BREAK == "owed-refs-paid-status-whole-line" else [found.end() for found in STATUS_SENTENCE_END.finditer(line)]
+                starts = [0] + ends
+                sentence_codes = {}
+                for number in references:
+                    index = sum(1 for end in ends if end <= number.start())
+                    sentence_codes.setdefault(index, []).append(number.group(0))
+                for index, codes in sorted(sentence_codes.items()):
+                    sentence_start = starts[index]
+                    sentence_end = ends[index] if index < len(ends) else len(line)
+                    status_sentence_count += 1
+                    status_reference_count += len(codes)
+                    if not any(code in paid_names for code in codes):
+                        continue
+                    marked = status_marks_paid(line[sentence_start:sentence_end])
+                    claimed = status_claims_owed(line, sentence_start, sentence_end)
+                    for code in codes:
+                        if code not in paid_names:
+                            continue
+                        status_paid_count += 1
+                        if marked:
+                            status_marked_count += 1
+                        elif not claimed:
+                            status_unclaimed_count += 1
+                        else:
+                            unmarked_codes[code] = unmarked_codes.get(code, 0) + 1
+                for code, unmarked in unmarked_codes.items():
+                    status_red_places.append((path, line_number, code, unmarked))
+red_places.extend(status_red_places)
+
+# ── 滞后表：读、核写法、与 gate 基准那一版比 ──
+lag_problems = []    # 一句一处
+lag_covers = {}      # 写对了的登记：(路径, 行号, C 号) -> 表的行号
+lag_growth = []      # (表的行号, 路径, C 号, 锚)
+lag_row_count = 0
+lag_note = ""
+if BREAK == "owed-refs-paid-lag-unread":
+    print(f"  ! 弄坏开关 owed-refs-paid-lag-unread：不读滞后表 {lag_table_path}，判红的处一律红")
+    lag_note = "弄坏开关 owed-refs-paid-lag-unread：没读滞后表"
+elif not os.path.isfile(lag_table_path):
+    lag_note = "没有滞后表"
+else:
+    with open(lag_table_path, encoding="utf-8", errors="replace") as lag_file:
+        lag_entries = lag_baseline.content_rows(lag_file.read())
+    lag_row_count = len(lag_entries)
+    first_entry_of = {}
+    registered_lines = {}
+    for entry_number, columns in lag_entries:
+        place = f"{lag_table_path}:{entry_number}"
+        if len(columns) != LAG_COLUMNS:
+            lag_problems.append(f"{place} 有 {len(columns)} 列，要四列：<路径><TAB>C<编号><TAB><行内锚><TAB># <为什么还没改>")
+            continue
+        registered_path, code, anchor, reason = (column.strip() for column in columns)
+        if not OWED_NUMBER_SPELLING.fullmatch(code):
+            lag_problems.append(f"{place} 第二列「{code}」不是 C<编号> 的写法")
+            continue
+        if not reason.startswith("#") or len(reason.lstrip("#").strip()) < LAG_REASON_CHARACTERS:
+            lag_problems.append(f"{place} 第四列要以 # 起头、写为什么还没改（至少 {LAG_REASON_CHARACTERS} 个字）")
+            continue
+        if len(anchor) < lag_anchor_characters:
+            lag_problems.append(f"{place} 锚只有 {len(anchor)} 个字，要那一行里至少 {lag_anchor_characters} 个字的原文")
+            continue
+        entry_key = (os.path.normpath(registered_path), code, anchor)
+        if entry_key in first_entry_of:
+            lag_problems.append(f"{place} 与第 {first_entry_of[entry_key]} 行登记的是同一条（路径、C 号、锚都相同）")
+            continue
+        first_entry_of[entry_key] = entry_number
+        if not os.path.isfile(registered_path):
+            lag_problems.append(f"{place} 登记的路径不在：{registered_path}")
+            continue
+        if registered_path not in registered_lines:
+            with open(registered_path, encoding="utf-8", errors="replace") as registered_file:
+                registered_lines[registered_path] = registered_file.read().split("\n")
+        anchored = [number for number, text in enumerate(registered_lines[registered_path], 1) if anchor in text]
+        if len(anchored) != 1:
+            shown = f"（第 {'、'.join(map(str, anchored[:5]))} 行）" if anchored else ""
+            lag_problems.append(f"{place} 锚在 {registered_path} 里命中 {len(anchored)} 行{shown}，要恰好一行")
+            continue
+        anchored_text = registered_lines[registered_path][anchored[0] - 1]
+        if code not in {found.group(0) for found in OWED_NUMBER.finditer(anchored_text)}:
+            lag_problems.append(f"{place} 锚命中的 {registered_path}:{anchored[0]} 里没有 {code}")
+            continue
+        if code not in paid_names:
+            lag_problems.append(f"{place} {code} 已不在 {owed_path} 的已还清表里（挪回了欠着的表，或表里没有这一笔）")
+            continue
+        lag_covers[(os.path.normpath(registered_path), anchored[0], code)] = entry_number
+    if BREAK == "owed-refs-paid-lag-growth-unjudged":
+        lag_note = "弄坏开关 owed-refs-paid-lag-growth-unjudged：没与 gate 基准比"
+    elif not diff_base:
+        lag_note = "被判的根不在 git 仓里，滞后表没与 gate 基准比"
+    else:
+        base_entries, base_problem = lag_baseline.baseline_rows(diff_base, lag_table_path, cwd=os.getcwd())
+        if base_problem is not None:
+            lag_problems.append(f"与 gate 基准比不了：{base_problem.sentence()}")
+        elif base_entries is None:
+            lag_note = f"gate 基准 {diff_base} 里还没有滞后表（初次登记），不比"
+        else:
+            base_keys = {(os.path.normpath(columns[0].strip()), columns[1].strip(), columns[2].strip())
+                         for _number, columns in base_entries if len(columns) >= 3}
+            for entry_number, columns in lag_entries:
+                if len(columns) >= 3:
+                    grown = (os.path.normpath(columns[0].strip()), columns[1].strip(), columns[2].strip())
+                    if grown not in base_keys:
+                        lag_growth.append((entry_number,) + grown)
+            lag_note = f"与 gate 基准 {diff_base} 那一版比没涨（基准 {len(base_entries)} 行，此刻 {lag_row_count} 行）"
+
+findings, lagged, status_findings, status_lagged = [], [], [], []
+status_keys = {(os.path.normpath(path), line_number, code) for path, line_number, code, _unmarked in status_red_places}
+for red_place in red_places:
+    key = (os.path.normpath(red_place[0]), red_place[1], red_place[2])
+    if key in status_keys:
+        (status_lagged if key in lag_covers else status_findings).append(red_place)
+    else:
+        (lagged if key in lag_covers else findings).append(red_place)
+red_keys = {(os.path.normpath(path), line_number, code) for path, line_number, code, _unmarked in red_places}
+
+failed = False
+if status_findings:
+    failed = True
+    for path, line_number, code, unmarked in status_findings:
+        print(f"  ✗ {path}:{line_number} {code}（{paid_names[code]}）" + (f"，这一行里 {unmarked} 句都把它当现欠" if unmarked > 1 else ""))  # gate-lint:detail
+    print(f"  ✗ 决策正文欠段之外与里程碑页的现状句里有 {len(status_findings)} 处引的账在 {owed_path} 的已还清表里、那一句把它当现欠"
+          f"（写了{'、'.join(status_owed_words)}或「记在 C<编号>」）又没写{'、'.join(status_paid_marks)}之一"
+          f"（扫 {len(status_files)} 份中文正文、{status_sentence_count} 句引账、{status_reference_count} 个 C 号；滞后表收着的 {len(status_lagged)} 处不算）")  # gate-lint:summary
+    print("     → 怎么办：那一句写的是历史（当时欠、后来还了），就在那一句写明已还（「C<编号>（简称） 已还」）；写的是现状，就去掉把它当现欠的说法；"
+          "那笔账其实没还清，就把 checks-owed.md 那一行挪回欠着的那张表；"
+          "那份 kb 这一轮不许改的，照 .claude/gate.d/owed-refs-paid-lag.tsv 文件头登记一行（只缩不涨，判据在 doc-decisions.sh 里这一格函数上方的注释「现状句」一段）")
+if findings:
+    failed = True
+    for path, line_number, code, unmarked in findings:
+        print(f"  ✗ {path}:{line_number} {code}（{paid_names[code]}）" + (f"，这一行里 {unmarked} 次都没说还清" if unmarked > 1 else ""))  # gate-lint:detail
+    print(f"  ✗ 决策正文的欠段里有 {len(findings)} 处引的账在 {owed_path} 的已还清表里、同一行里它的哪一截都没说还清了"
+          f"（扫 {len(originals)} 份中文正文、{owed_line_count} 行欠段、{reference_count} 个 C 号；滞后表收着的 {len(lagged)} 处不算）")  # gate-lint:summary
+    print("     → 怎么办：把那个 C<编号>（简称）连同只说它的那一截（括注、顿号、分号）从 **欠**： 行里去掉，去掉后这一行没有别的 C 号就写 **欠**：无。；")
+    print("               那笔账其实没还清，就把 checks-owed.md 那一行挪回欠着的那张表；要留着这一处引用，就在同一截写明已还清（判据在 doc-decisions.sh 里这一格函数上方的注释）")
+if lag_problems:
+    failed = True
+    print(f"  ✗ 滞后表 {lag_table_path} 有 {len(lag_problems)} 处不对：")  # gate-lint:summary
+    for problem in lag_problems:
+        print(f"     {problem}")  # gate-lint:detail
+    print(f"     → 怎么办：一行「<路径><TAB>C<编号><TAB><那一行里至少 {lag_anchor_characters} 个字、在文件里只出现一次的原文><TAB># <为什么还没改，至少 {LAG_REASON_CHARACTERS} 个字>」；")
+    print("               路径不在、锚找不到、那一行里没有这个号、号已挪回欠着的表的，多半是那一处已经改好或文件搬了家，删掉这一行；锚命中几行的换一段更长、只出现一次的原文。")
+if lag_growth:
+    failed = True
+    print(f"  ✗ 滞后表比 gate 基准 {diff_base} 那一版多 {len(lag_growth)} 行（只缩不涨；路径、C 号或锚改了也算新加）：")  # gate-lint:summary
+    for entry_number, path, code, anchor in lag_growth:
+        print(f"     {lag_table_path}:{entry_number} {path} {code}  …{anchor}…")  # gate-lint:detail
+    print("     → 怎么办：新写的欠段当场照判据改（去掉那一截或写明已还清），不往滞后表里加；那一行改过字、锚对不上了的，在同一次改动里把那一处改好、删掉它那一行，不改锚。")
+for (path, line_number, code), entry_number in sorted(lag_covers.items(), key=lambda item: item[1]):
+    if (path, line_number, code) not in red_keys:
+        print(f"  ! 滞后表第 {entry_number} 行登记的 {path}:{line_number} {code} 此刻不红，删掉这一行（只缩不涨，删了不用补）")
+if failed:
+    sys.exit(1)
+print(f"  ✓ 决策正文的欠段没有把已还清的账当开着的（扫 {len(originals)} 份中文正文、{owed_line_count} 行欠段、{reference_count} 个 C 号；"
+      f"其中引已还清的 {paid_reference_count} 个：同一截写了{'、'.join(paid_marks)}之一的 {marked_in_segment} 个，"
+      f"同一行里同一个号另一截写了的 {marked_elsewhere_in_line} 个；滞后 {len(lagged)} 处）")
+print(f"    别的 C 号简称括注里的 C 号 {skipped_count} 个不算引账；滞后表 {lag_row_count} 行（{lag_note}）")
+print(f"    没扫的：译文 {len(translations)} 份（以数字起头的 .en.md、.ja.md，欠段只认中文原文）")
+if BREAK == "owed-refs-paid-status-sentences-skipped":
+    print("    现状句：弄坏开关 owed-refs-paid-status-sentences-skipped，没判")
+else:
+    print(f"    现状句：扫 {len(status_files)} 份中文正文（决策 {len(originals)} 份的欠段之外、里程碑页 {len(milestone_originals)} 份），{status_sentence_count} 句引账、"
+          f"{status_reference_count} 个 C 号；其中引已还清的 {status_paid_count} 个：那一句写了{'、'.join(status_paid_marks)}之一的 {status_marked_count} 个，"
+          f"没写现欠说法的 {status_unclaimed_count} 个；滞后 {len(status_lagged)} 处")
+PY
+)
+
 # ════ 登记的格函数：弄坏开关点名这一格就不跑、按判过了记，否则调这一格的判法 ════
 # 前十四格的 stdin 接 /dev/null，与它们原先在后台跑时读到的一样。
 break_skips() {
@@ -3718,6 +4184,7 @@ judge_history_loss()            { break_skips history-loss;            cell_hist
 judge_candidate_codes()         { grid_candidate_codes </dev/null; }
 judge_inference_needs_verdict() { break_skips inference-needs-verdict; grid_inference_needs_verdict </dev/null; }
 judge_three_way_leg_record()    { break_skips three-way-leg-record;    grid_three_way_leg_record </dev/null; }
+judge_owed_refs_paid()          { grid_owed_refs_paid </dev/null; }
 
 # ════ --write：在子 shell 里重写 decision-items-sync 的两块投影，写完回读判一遍 ════
 if ((write_mode)); then

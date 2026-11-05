@@ -1,0 +1,3 @@
+# 样本用的登记表：bin 根登一行，放开的函数上有不带 unsafe 的 #[no_mangle]，算 1 处
+singlefs-verification	forbid	-	-	-	-	-	-
+singlefs-verification/src/bin/e900_thread_clock.rs	forbid,deny	crates/singlefs-verification/src/bin/e900_thread_clock.rs	exported_thread_clock_reading	1	符号名|只有这一处定义	样本的理由：std 没有线程 CPU 钟，不放开就只能读 /proc 里按滴答计的粗读数	用户 2026-11-03 弹窗定 records/sample-decision.md

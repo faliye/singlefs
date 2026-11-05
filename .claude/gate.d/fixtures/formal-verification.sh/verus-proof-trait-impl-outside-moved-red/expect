@@ -1,0 +1,3 @@
+exit=1
+want=verus-trait-impls-outside-lag.tsv 第 2 行登记放过的 singlefs_replay_prefix::Device for BadDevice（crates/singlefs-replay-prefix/src/lib.rs）已经挪进 verus! 里了
+want=verus-proof：红（退出 1）

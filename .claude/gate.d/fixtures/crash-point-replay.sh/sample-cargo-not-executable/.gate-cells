@@ -1,0 +1,2 @@
+# 样本档标记目录里的假 cargo 不可执行、退 2，算给崩溃枚举用例那一格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

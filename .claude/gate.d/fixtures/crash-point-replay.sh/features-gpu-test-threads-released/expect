@@ -1,0 +1,12 @@
+exit=3
+want=样本档：
+want=── feature-gated-tests：带特性那一趟（特性从 crates/singlefs-verification/tests 下 2 个挂特性的测试文件现读）：cargo test --release -p singlefs-verification --features gpu,sample-store --lib --test gpu_pair -- --nocapture --test-threads 1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-verification --features gpu,sample-store --lib --test gpu_pair -- --nocapture --test-threads 1
+want=── feature-gated-tests：放开 --test-threads 1 的 GPU 测试目标另起一趟（它的测试按显存额度排队，测试线程取每台默认重活线程数（scripts/hosts/heavy-threads.sh 的 heavy_thread_default）：
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-verification --features gpu,sample-store --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- --nocapture --test-threads
+want=✓ feature-gated-tests：2 个挂特性的测试文件（特性 gpu,sample-store）每个都编进来、跑到了用例，共 3 条
+want=逐格：crash-case-replay：绿；feature-gated-tests：绿
+want=· feature-gated-tests：带 gpu 特性那一趟要上卡，显卡是 task-server 交的 192.0.2.1:0:8G（清场归 task-server，这里不另套清场包装）
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=feature-gated-tests 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的验证包那一步，不许记成通过）
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的验证包那一步，不许记成通过）

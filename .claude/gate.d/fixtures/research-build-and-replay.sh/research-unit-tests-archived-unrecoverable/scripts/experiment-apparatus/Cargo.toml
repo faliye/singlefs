@@ -1,0 +1,10 @@
+[package]
+name = "tiny"
+version = "0.1.0"
+edition = "2021"
+
+# 文档测试会多出一个「test result」批次，关掉它
+[lib]
+doctest = false
+
+[workspace]

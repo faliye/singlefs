@@ -1,0 +1,8 @@
+exit=1
+want=✗ crash-point-replay.sh 的 crash-case-replay 格：prune-server 不可用（scripts/gate/admission.py test-plan 退 75：✗ 样本档造的服务不可用：
+want=✗ crash-case-replay 这一格没判：prune-server 不可用（上面那一句）；这一格就此收尾，别的格照跑（不是红，也不算通过）
+want=样本展开上限 的出处路径 crates/no-such-file.rs 不在仓里
+want=· 逐格：crash-case-replay：prune-server 不可用；
+want=；crash-knobs：红
+want=✗ 有 1 格判红：crash-knobs（各自的出路在上面）
+want=另有 1 格 prune-server 不可用、没判：crash-case-replay

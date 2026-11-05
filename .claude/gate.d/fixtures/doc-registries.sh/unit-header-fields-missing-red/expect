@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unit-header-fields
+want=.claude/kb/layout/01-first-txn.md:36 的 unit-header-fields 标记下面紧跟的不是表
+want=.claude/kb/layout/01-first-txn.md 里没有树表单元的头字段表（表前一行写 <!-- unit-header-fields: 树表单元 码 2[ key-width=<key 宽>] -->）
+want=.claude/kb/layout/01-first-txn.md:24「载荷 CRC（只对码 1，偏移 101）」的宽「随算法」读不出
+want=单元头字段表与 D18 对不上 3 处（比了 0 张表）
+want=unit-header-fields：红（退出 1）

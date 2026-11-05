@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：private-values
+want=查了这次改动里 1 份文本文件新加的 4 行：对着 multi-host.env 的 2 个长词
+want=共享根下的路径 2 个（键 NFS_SHARED_ROOTS、SHARED_DATA_ROOT
+want=doc-text.sh：1 格里 1 格绿（private-values），0 格本次未跑（无）

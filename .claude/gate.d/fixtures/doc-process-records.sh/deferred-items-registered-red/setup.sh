@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 红样本：基准与绿样本相同（欠账表 C10 开着、C11 已还清，拆分提案历史那份九十节有 ② ③、九十四节只有正文，欠账那份照抄它，research/notes.md 30 行）；
+# 红样本：基准与绿样本相同（欠账表 C10 开着、C11 已还清，拆分提案封存那份九十节有 ② ③、九十四节只有正文，现行账本照抄它，research/notes.md 30 行）；
 # 提交之后往调度记录追加七行带延后类词的：一行写 C10（指得到，不报），六行逐个报：没写登记、C99 欠账表里没有、「九十节 ⑤」那一节没有这一行、
 # 写了「拆分提案」的「第九十节」有行首序号却没写哪一行、research/notes.md:99 超过行数、gone.md:3 文件不在树里。
 set -euo pipefail
@@ -34,9 +34,12 @@ cat > records/2026-09-16-subagent拆分提案.md <<'SPLIT'
 
 - 欠：样本里只写正文、没有行首序号的一节。
 SPLIT
-cp records/2026-09-16-subagent拆分提案.md records/2026-10-23-subagent拆分提案.md   # 欠账那份：开着的节照原节号抄过去
+cp records/2026-09-16-subagent拆分提案.md records/2026-10-29-subagent拆分提案.md   # 现行账本：开着的节照原节号抄过去
 seq 1 30 | sed 's/^/样本第 /; s/$/ 行/' > research/notes.md
 printf '# 样本调度记录\n\n- 延后：基准里早就有的旧行，没写登记，这一次没改它，不判。\n' > records/2026-10-22-样本调度.md
+mkdir -p .claude/gate.d
+printf 'current\trecords/2026-10-29-subagent拆分提案.md\t-\t样本的现行账本，新欠账往这一份末尾追加\n' > .claude/gate.d/split-proposal-ledgers.tsv
+printf 'sealed\trecords/2026-09-16-subagent拆分提案.md\t%s\t样本里封存的那一份，当历史出处\n' "$(sha256sum < records/2026-09-16-subagent拆分提案.md | cut -d' ' -f1)" >> .claude/gate.d/split-proposal-ledgers.tsv
 git add -A
 git commit -qm '基准：欠账表、拆分提案、一份调度记录'
 cat >> records/2026-10-22-样本调度.md <<'NEW'

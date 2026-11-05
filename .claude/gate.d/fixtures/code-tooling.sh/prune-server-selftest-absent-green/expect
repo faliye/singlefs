@@ -1,0 +1,4 @@
+exit=77
+want=样本只跑 .gate-cells 点名的格：prune-server-selftest
+want=被判的根里没有 prune-server/Cargo.toml（判定库服务），这一格无对象可判
+want=prune-server-selftest：本次未跑

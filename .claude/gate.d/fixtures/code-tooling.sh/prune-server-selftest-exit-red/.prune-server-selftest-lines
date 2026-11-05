@@ -1,0 +1,2 @@
+  ✓ 自证 batched-point-read
+PRUNE_SERVER_SELFTEST cells=20 passed=20 failed=0 failed_cells=-

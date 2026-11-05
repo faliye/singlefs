@@ -1,0 +1,4 @@
+# prune-server 不可用与真红同一趟：.unit-verdict-sample/plan-failure 写 exit-75，crash-case-replay 的 test-plan 退 75（这一格不起 cargo）；
+# crash-knobs 读样本的 .claude/gate.d/crash-knobs.tsv，出处路径不在、判红。整道退 1，两格都报
+crash-case-replay
+crash-knobs

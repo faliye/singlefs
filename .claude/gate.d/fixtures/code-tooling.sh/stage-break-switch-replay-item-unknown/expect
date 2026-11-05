@@ -1,0 +1,4 @@
+exit=2
+want=✗ 样本根的 .gate-items 点名的项不在可点的项里：「sample-stage.sh:SAMPLE_STAGE_BREAK=nope」；一格都没跑
+want=stage-break-switch-replay  sample-stage.sh
+want=stage-break-switch-replay  sample-stage.sh:SAMPLE_STAGE_BREAK=flip-green

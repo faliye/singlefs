@@ -1,0 +1,21 @@
+exit=3
+want=样本档：
+want=· 样本档：上一版（.unit-verdict-sample/prior）的 8 条测试函数照判绿记进这一版的判定库
+want=复用 crates/singlefs-verification/tests/setting.rs::test_v
+want=现判 crates/singlefs-verification/tests/setting.rs::test_u（键对不上（上一次
+want=变了 1 处：变了 fn crates/singlefs-verification/tests/setting.rs::test_u）
+want=现判 crates/singlefs-verification/tests/setting.rs::test_t（键对不上（上一次
+want=变了 1 处：变了 fn crates/singlefs-verification/tests/setting.rs::observe）
+want=复用 crates/singlefs-verification/tests/states.rs::f1_first
+want=复用 crates/singlefs-verification/tests/states.rs::f1_last
+want=变了 1 处：变了 fn crates/singlefs-verification/tests/states.rs::middle_state）
+want=现判 crates/singlefs-verification/tests/history.rs::h2_test（键对不上（上一次
+want=复用 crates/singlefs-verification/tests/history.rs::h3_test
+want=· 按条复用：验证包 8 条编得进的测试函数，现判 4、复用 4、拒算 0；这一组特性下不编 0 条
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-verification --lib --tests -- --nocapture
+want=--skip f1_first --skip f1_last --skip h3_test --skip test_v
+want=· 判绿记库：RECORD recorded=4 changed=0 refused=0
+want=验证包 现判 4、复用 4、拒算 0、本次未跑 0；跑了的 4 个测试二进制 4 条通过、0 条 ignored
+want=逐格：crash-case-replay：绿；feature-gated-tests：无对象可判
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的验证包那一步，不许记成通过）

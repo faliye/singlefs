@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# crash-point-replay 判别力样本的假 cargo（样本档，登记了 red-blocks=judged-by-test 的用例与没登记的用例各一条）：-V 打版本；
+# test 先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>（阶段只转出这一类行，expect 靠它核交给 cargo 的参数），
+# 再照 cases/<测试目标>.log 打日志，退出码照同名 .exit（没有就 0）；没有那一份日志退 101。别的一律退 101。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+# 登记的崩溃枚举用例那一趟（不带 --lib、最后一个 --test 的目标有 cases/<目标>.log）：先打收到的参数，再打那一份日志、退出码照同名 .exit（没有就 0）；
+# 设了 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE 而 cases/<目标>.findings.tsv 在时追加进去。没有那一份日志的往下走别的日志
+last_test=""
+previous_word=""
+for word in "$@"; do
+  if [[ "$previous_word" == --test ]]; then last_test="$word"; fi
+  previous_word="$word"
+done
+if [[ -n "$last_test" && " $* " != *" --lib "* && -f "$here/cases/$last_test.log" ]]; then
+  echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+  if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE:-}" && -f "$here/cases/$last_test.findings.tsv" ]]; then
+    cat "$here/cases/$last_test.findings.tsv" >> "$SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE" || exit 101
+  fi
+  cat "$here/cases/$last_test.log"
+  exit "$(cat "$here/cases/$last_test.exit" 2>/dev/null || echo 0)"
+fi
+target=""
+previous=""
+for word in "$@"; do
+  if [[ "$previous" == --test ]]; then target="$word"; fi
+  previous="$word"
+done
+[[ -n "$target" && -f "$here/cases/$target.log" ]] || { echo "样本里没有测试目标 $target 的日志"; exit 101; }
+echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+cat "$here/cases/$target.log"
+exit "$(cat "$here/cases/$target.exit" 2>/dev/null || echo 0)"

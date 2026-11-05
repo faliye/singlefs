@@ -1,0 +1,2 @@
+# 样本登记表
+.claude/gate.d/sleepy-stage.sh	samples	# 样本：先睡 2 秒再读 verdict 文件

@@ -1,0 +1,7 @@
+# 用例日志里的覆盖行与计数行让覆盖、ignore、0 次三格判绿，样本档退 3（expect 里逐格写了按设计不绿的理由）；
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 crash-case-replay：覆盖、ignore、0 次三格读 crash-case-replay 那一趟的行
+crash-flow-coverage
+crash-ignored-nodes
+invariant-zero-evaluations
+crash-case-replay

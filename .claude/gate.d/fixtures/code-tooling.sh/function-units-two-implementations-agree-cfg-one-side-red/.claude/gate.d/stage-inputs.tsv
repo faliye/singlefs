@@ -1,0 +1,2 @@
+# 样本的准入登记表：function-units-two-implementations-agree 格只读第二列里写成 <文件>.rs::<限定名> 的入口
+function-units-sample	crates/fsample/src/lib.rs::entry	-	# 样本：Rust 那一侧录的是特性开着的闭包，入口里挂在特性下的那一条单元只在 Rust 闭包里

@@ -1,0 +1,9 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs (target/release/deps/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state-0000000000000011)
+
+running 2 tests
+test crash_judge_gpu_agrees_on_the_first_sample_state ... ok
+test crash_judge_gpu_agrees_on_the_second_sample_state ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

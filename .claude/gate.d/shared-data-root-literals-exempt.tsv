@@ -1,0 +1,5 @@
+# 门禁 code-tooling 的 shared-data-root-literals 格的排除表：被判的写法确实不是取数据根下共享的那几项、或这一轮还改不了的，逐行登记。
+# 写法：<路径>:<锚串>  # 理由（锚串与 # 之间至少两个空格，理由至少 4 个字）；那份文件里含锚串的被判行不算。指向不存在的文件、锚串一处被判行都不命中，都判红。
+# 只缩不涨：与改动范围的基准那一版比，基准里没有的「路径:锚串」判红。改成经 .claude/hooks/lib_work_root.py 取之后删掉那一行。
+scripts/agents/agent-cost.py:path.startswith("~/.local/share/singlefs/work/")  # 认会话记录里写的路径文字（normalize_path 先把 /home/<用户>/ 与 $HOME/ 换成 ~/ 再比），不是取目录
+scripts/agents/dispatch-prompt.py:SELFTEST_SCRATCH = "~/.local/share/singlefs/work/dispatch-prompt-selftest"  # 自检往派发提示骨架里填的草稿目录文字（--check 不建锁、目录不用在），不是取目录

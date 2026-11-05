@@ -1,0 +1,2 @@
+alpha-stage.sh ALPHA_STAGE_BREAK=flip-green
+alpha-stage.sh ALPHA_STAGE_BREAK=swallow-red

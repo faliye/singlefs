@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 绿样本：基准提交里有欠账表（C10 开着、C11 已还清）、拆分提案历史那份（九十节有 ② ③ 两行，九十四节只有正文）与照抄它的欠账那份、research/notes.md（30 行）与一份调度记录；
-# 提交之后往调度记录追加：C10、欠账那份的 records/2026-10-23-subagent拆分提案.md:8、「九十节 ③」、写了「拆分提案」的「第九十四节」、research/notes.md:12 各指一行（判了 5 行，都指得到；
+# 绿样本：基准提交里有欠账表（C10 开着、C11 已还清）、拆分提案封存那份（九十节有 ② ③ 两行，九十四节只有正文）与照抄它的现行账本、research/notes.md（30 行）与一份调度记录；
+# 提交之后往调度记录追加：C10、现行账本的 records/2026-10-29-subagent拆分提案.md:8、「九十节 ③」、写了「拆分提案」的「第九十四节」、research/notes.md:12 各指一行（判了 5 行，都指得到；
 # 已还清的 C11 不再算登记，那一种在 deferred-items-registered-pointers-red 里）；
 # 另有词只在「」里的一行、围栏里的一行、往拆分提案九十节加的新一行（登记处本身）不判，没带延后类词的一行与基准里的旧行不判。
 set -euo pipefail
@@ -35,14 +35,17 @@ cat > records/2026-09-16-subagent拆分提案.md <<'SPLIT'
 
 - 欠：样本里只写正文、没有行首序号的一节。
 SPLIT
-cp records/2026-09-16-subagent拆分提案.md records/2026-10-23-subagent拆分提案.md   # 欠账那份：开着的节照原节号抄过去
+cp records/2026-09-16-subagent拆分提案.md records/2026-10-29-subagent拆分提案.md   # 现行账本：开着的节照原节号抄过去
 seq 1 30 | sed 's/^/样本第 /; s/$/ 行/' > research/notes.md
 printf '# 样本调度记录\n\n- 延后：基准里早就有的旧行，没写登记，这一次没改它，不判。\n' > records/2026-10-22-样本调度.md
+mkdir -p .claude/gate.d
+printf 'current\trecords/2026-10-29-subagent拆分提案.md\t-\t样本的现行账本，新欠账往这一份末尾追加\n' > .claude/gate.d/split-proposal-ledgers.tsv
+printf 'sealed\trecords/2026-09-16-subagent拆分提案.md\t%s\t样本里封存的那一份，当历史出处\n' "$(sha256sum < records/2026-09-16-subagent拆分提案.md | cut -d' ' -f1)" >> .claude/gate.d/split-proposal-ledgers.tsv
 git add -A
 git commit -qm '基准：欠账表、拆分提案、一份调度记录'
 cat >> records/2026-10-22-样本调度.md <<'NEW'
 - 延后：C10 那一条留到下一轮再做。
-- 下一批：照 records/2026-10-23-subagent拆分提案.md:8 那一行补上。
+- 下一批：照 records/2026-10-29-subagent拆分提案.md:8 那一行补上。
 | ③ 的检查 | 下轮开 | 九十节 ③ |
 - 留给下一轮：登在 `records/2026-09-16-subagent拆分提案.md` 第九十四节。
 - 下一个题目：research/notes.md:12 那一段。

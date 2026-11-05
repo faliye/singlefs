@@ -1,0 +1,2 @@
+# 样本根的逐项点名（当作命令行上的 --item）：两道小阶段三条开关里只点 sample-stage.sh 的 flip-green 一条
+sample-stage.sh:SAMPLE_STAGE_BREAK=flip-green

@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unit-header-fields
+want=.claude/kb/layout/01-first-txn.md:18「五元组 · 对象 ID」的指向没点名 D18 已定项 3
+want=.claude/kb/layout/01-first-txn.md:52 从偏移 88 起的是「载荷 CRC（偏移 92）」，D18 定的是「出生序号」
+want=.claude/kb/layout/01-first-txn.md:36（树表单元，码 2） D18 定的「预留位」从偏移 102 起（宽 29），表里没有从 102 起的一行
+want=.claude/kb/layout/01-first-txn.md:36（树表单元，码 2） 表里逐行加起来到 127，D18 已定项 7 加已定项 18 码 2 定的头到 131
+want=单元头字段表与 D18 对不上 9 处（比了 2 张表）
+want=unit-header-fields：红（退出 1）

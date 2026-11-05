@@ -1,0 +1,16 @@
+exit=1
+want=没红
+want=comment-only
+want=无效
+want=compile-error
+want=计数：抓到 0 条、没红 1 条、无效 1 条、锚点失效 0 行（共 4 条）
+want=临时目录：2 条变异各一个自己的 TMPDIR，每条结束时不论退出码都整个删掉了
+want=基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 2 行，基线不绿 2 行（按 cargo 参数分 1 批；共 4 行）
+want=有几行基线不绿（基线不绿 2 行
+want=覆盖：这一趟记了 0 份（点名测试执行过的单元，基线按它复用），已有、沿用 0 份，没记成 0 份
+want=· 拒算（照跑、不复用）：crates/mutations.tsv:3 comment-only：被改坏的单元：原文（crates/tiny/src/lib.rs 第 1–1 行）不落在任何单元上
+want=· 拒算（照跑、不复用）：crates/mutations.tsv:5 ambiguous-name：点名的测试 doubles_three_to_six 在选中的目标里对上 2 个 #[test] 单元
+want=复用：现判 2 条、复用 0 条、拒算 2 条、本次未跑 0 条
+want=ambiguous-name：基线不绿——点名的测试 doubles_three_to_six 在没改坏的副本上对上了 2 个不同的用例
+want=reads-outside：基线不绿——点名的测试 reads_the_answer_from_outside_the_copy 在没改坏的副本上的结果是 FAILED
+want=crates-mutation-replay.sh：1 格里 1 格红（crates-mutation-rows）

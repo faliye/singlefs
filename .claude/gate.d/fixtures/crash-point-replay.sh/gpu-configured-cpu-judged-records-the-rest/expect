@@ -1,0 +1,18 @@
+exit=1
+want=库与别的二进制：CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本 threads=4
+want=tests/mixed_stream.rs：CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本 threads=4
+want=· crash-case-replay：判段判在 CPU 的记号 2 处：归到测试函数的 1 处（那几条照键记红、撤绿，下一趟现判），归不到测试函数、只归到测试二进制的 1 处（tests/mixed_stream.rs：这几个二进制里判绿的这一趟都不记）
+want=· 判绿不记库 4 条（这一趟现判、按条记库不认的；下一趟照跑）：
+want=不记 crates/singlefs-verification/tests/mixed_stream.rs::mixed_settled（这个测试二进制打了判段判在 CPU 的一行、归不到哪一条测试函数
+want=· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟照现判（RECORD recorded=2 changed=0 refused=0 red=1
+want=· 判绿记库（crash-case-replay 这一趟判红）：判绿的 2 条照键记库（RECORD recorded=2 changed=0 refused=0 red=1
+want=✗ 验证包不带 gpu 特性那一趟：多机配置
+want=日志里有 2 处判段判在 CPU（上面列了前 20 处），配了 GPU 不退回 CPU
+want=· feature-gated-tests 按条复用：--lib 与挂特性的 1 个测试目标里 3 条编得进的测试函数，现判 2、复用 1、拒算 0
+want=现判 crates/singlefs-verification/src/lib.rs::tests::cpu_judged_check（上次判红（
+want=复用 crates/singlefs-verification/src/lib.rs::tests::settled_check
+want=--skip other_green --skip tests::settled_check
+want=· 判绿记库：RECORD recorded=1 changed=0 refused=0
+want=逐格：crash-case-replay：红；feature-gated-tests：绿
+want=✗ 有 1 格判红：crash-case-replay（各自的出路在上面）
+want=crash-case-replay：红

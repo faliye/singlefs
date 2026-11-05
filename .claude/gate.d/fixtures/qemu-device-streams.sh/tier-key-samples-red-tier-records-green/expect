@@ -1,0 +1,15 @@
+exit=1
+want=六档照预录输出逐档判两段判据、一档判完就记
+want=direct 盘 1：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行
+want=· qemu:direct 判红记库：记红、撤掉同一把键原有的绿，下一趟这一档现判
+want=· raise-rollback-floor：两段判据（虚机输出、设备侧日志）都过
+want=· 头一趟记下 5 档，判红 1 档（direct）
+want=── 第二趟（样本 .qemu-key-samples/change.sh 改过之后）
+want=· direct：现判（上次判红
+want=· skip-new-pool-file-creation-barrier：复用（
+want=· raise-rollback-floor：复用（
+want=· 按档：现判 1、复用 5
+want=✗ QEMU 真设备：判了 6 档，1 档判红（direct）；判绿的 5 档（skip-new-pool-file-creation-barrier page-cache file-overwrite second-instance raise-rollback-floor）照键记下 5 档
+want=direct：bash .claude/gate.d/qemu-device-streams.sh --item direct
+want=device-streams：红（退出 1）
+want=qemu-device-streams.sh：1 格里 1 格红（device-streams）

@@ -1,0 +1,3 @@
+exit=1
+want=✗ 单测要读的 research/results/sample-product.out 不在树里，git 历史里也取不回
+want=research-build-and-replay.sh：1 格里 1 格红（research-unit-tests）

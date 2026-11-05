@@ -1,0 +1,2 @@
+两条之一_加改成减	    left + right	    left - right
+两条之二_改加法并让加倍没人调	    left + right\n}\n\nfn main() {\n    println!("{}", double(add(2, 2)));	    left + right + 1\n}\n\nfn main() {\n    println!("{}", add(2, 2));

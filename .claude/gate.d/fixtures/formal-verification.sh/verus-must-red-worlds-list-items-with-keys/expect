@@ -1,0 +1,14 @@
+exit=0
+want=toolchain	verus-toolchain-pinned
+want=ITEM_PLAN item=toolchain to_judge=1 reusable=0
+want=ITEM_PLAN item=proof to_judge=1 reusable=0
+want=ITEM_PLAN item=proof:singlefs_replay_prefix::clamp_to_limit to_judge=1 reusable=0
+want=ITEM_PLAN item=proof:singlefs_replay_prefix::smaller_of_two to_judge=1 reusable=0
+want=ITEM_PLAN item=vacuity:singlefs_replay_prefix::clamp_to_limit#1 to_judge=1 reusable=0
+want=ITEM_PLAN item=vacuity:singlefs_replay_prefix::smaller_of_two#1 to_judge=1 reusable=0
+want=ITEM_PLAN item=must-red:夹到上限时返回原值 to_judge=1 reusable=0
+want=ITEM_PLAN item=table to_judge=1 reusable=0
+want=ITEM_PLAN item=pinned:20 to_judge=1 reusable=0
+want=ITEM_PLAN item=pinned:21 to_judge=1 reusable=0
+want=ITEM_PLAN item=pinned:22 to_judge=1 reusable=0
+want=按项机读：ITEM_PLAN 11 行，与项数 11 相同

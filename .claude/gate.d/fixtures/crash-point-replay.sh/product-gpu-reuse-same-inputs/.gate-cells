@@ -1,0 +1,5 @@
+# 复用三问（同一份输入再跑一趟）：上一版与这一版逐字相同，三条对拍都有键相同的判定，全部复用、现判 0、不起 cargo、不经清场
+# 另点 crash-case-replay、feature-gated-tests：expect 的逐格那一行写着 crash-case-replay 与 feature-gated-tests 两格
+product-gpu-real-card-tests
+crash-case-replay
+feature-gated-tests

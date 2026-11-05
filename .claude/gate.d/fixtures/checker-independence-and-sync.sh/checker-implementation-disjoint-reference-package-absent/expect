@@ -1,0 +1,5 @@
+exit=1
+want=crates/singlefs-reference-filesystem 不在，crates/*/Cargo.toml 里也没有包叫 `singlefs-reference-filesystem` 或依赖它
+want=没有 crates/singlefs-reference-filesystem/Cargo.toml
+want=路径对不上 ⑤ ⑥ 就没有对象可判，所以判红。
+want=checker-implementation-disjoint：红（退出 1）

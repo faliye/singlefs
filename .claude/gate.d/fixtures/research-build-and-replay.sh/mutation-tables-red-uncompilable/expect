@@ -1,0 +1,6 @@
+exit=1
+want=scripts/mutation/tables/tiny_bench.tsv：⏭  [两条之二_引了没有的名字] 变异导致编译失败
+want=研究侧变异表有 1 条没被测试抓到或编不过、0 张表没判完
+want=改那一行替换文
+want=── 汇总：research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=research-build-and-replay.sh：1 格里 1 格红（mutation-tables）

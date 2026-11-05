@@ -4,7 +4,7 @@
 set -e
 git init -q .
 git config user.email t@example.com; git config user.name t
-mkdir -p records .claude/kb research/prompts .claude/rules research/prompts/sample-snapshot
+mkdir -p records .claude/kb research/prompts .claude/gate.d/fixtures/sample/green research/prompts/sample-snapshot
 cat > records/2026-09-24-样本调度.md <<'X'
 # 样本调度（2026-09-24）
 
@@ -24,7 +24,7 @@ git add -A && git commit -qm base
 cat >> records/2026-09-24-样本调度.md <<'X'
 - 显卡额度按优先级先后分，GPU_CARDS_BY_PRIORITY 的额度写在本机配置里。
 - 内存上限 12G，内存额度不够时不再起新的一件。
-- 与变异轻型撞额度：账上 8G 加回收不掉的 2G。
+- 与一趟变异撞额度：账上 8G 加回收不掉的 2G。
 - 显卡额度重置后再分。
 - 空间配额超了就拒绝写。
 - 欠账号 C820 到 C829 留给另一条分支；快照换号不换号全仓没写。
@@ -43,6 +43,6 @@ X
 cat > research/prompts/sample-snapshot/copy.md <<'X'
 - 快照副本里的旧话：切换账号后续做。
 X
-cat > .claude/rules/sample.md <<'X'
-- 规则页里的话：撞了周额度。
+cat > .claude/gate.d/fixtures/sample/green/expect <<'X'
+- 样本目录里的话：撞了周额度。
 X

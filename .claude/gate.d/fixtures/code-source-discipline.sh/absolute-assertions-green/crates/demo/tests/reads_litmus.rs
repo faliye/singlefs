@@ -1,4 +1,4 @@
-// 门禁 code-source-discipline 的判别力样本：逃出 crates/ 的相对路径指到 litmus/（门禁 checker-tier-crates-mutation-replay 的拷贝范围里有它），不判红。
+// 门禁 code-source-discipline 的判别力样本：逃出 crates/ 的相对路径指到 litmus/（门禁 crates-mutation-replay 的拷贝范围里有它），不判红。
 // 注释里写的 "../../fixture-data/answer.txt" 不算；#[path = …] 指的是编译期带进来的源文件，也不算。
 #[path = "../../helpers-outside-the-copy/mod.rs"]
 mod helpers_outside_the_copy;

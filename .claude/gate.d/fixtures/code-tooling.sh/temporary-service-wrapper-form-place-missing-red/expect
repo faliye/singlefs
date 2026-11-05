@@ -1,0 +1,5 @@
+exit=1
+want=✗ 要临时服务的自证的整条写法有 2 处对不上包装的用法
+want=整条该是「python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <解释器> <脚本> --selftest」
+want=拒绝说明（.claude/hooks/lib_project_code_runs.py:4 temporary_service_command("scripts/gate/sample-script.py")）：原文「（没有）」，这一处没有写出整条包装写法
+want=拒绝说明（.claude/hooks/lib_project_code_runs.py:4 temporary_service_command("scripts/gate/sample-script.sh")）：原文「（没有）」，这一处没有写出整条包装写法

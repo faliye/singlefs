@@ -1,0 +1,18 @@
+# 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
+M_分配代取发布代	crates/demo/src/lib.rs	    transaction_generation\n}	    transaction_generation - 1\n}	-p demo	published_generation_is_the_transaction_generation
+M_点名标了 ignore 的用例带了开关	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_renamed(	-p demo --test heavy -- --include-ignored slow_heavy	slow_heavy_case
+M_库里筛选词对得上	crates/demo/src/lib.rs	assert_eq!(super::published_generation(1), 1);	assert_eq!(super::published_generation(1), 2);	-p demo --lib -- tests::lib_case	lib_case
+M_改litmus文件	litmus/sample.litmus	exists (x=1)	exists (x=0)	-p demo --test reads_litmus	reads_the_litmus_directory
+M_删掉litmus里的写	litmus/sample.litmus	 WRITE_ONCE(*x, 1);		-p demo --test reads_litmus	reads_the_litmus_directory
+M_宏展开出来的测试	crates/demo/tests/generated.rs	generated_case!(generated_by_a_macro_case);		-p demo --test generated	generated_by_a_macro_case
+M_独立工程的库里的用例	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_in_lib(	--manifest-path crates/standalone/Cargo.toml --lib	standalone_lib_case
+M_独立工程的集成测试用等号写法	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_in_integration(	--manifest-path=crates/standalone/Cargo.toml --test standalone_integration	standalone_integration_case
+M_目录名与包名不同的工作区成员	crates/renamed-dir/src/lib.rs	pub fn renamed_member_value(	pub fn renamed_member_value_renamed(	-p renamed-package --lib	renamed_member_case
+M_独立工程写成了包名	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_for_package_name(	-p standalone-project --lib	standalone_lib_case
+M_路径在仓根之外	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_for_outside_path(	--manifest-path ../outside-project/Cargo.toml --lib	standalone_lib_case
+M_路径指到的不是清单文件	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_for_wrong_file_name(	--manifest-path crates/standalone/src/lib.rs --lib	standalone_lib_case
+M_路径指到的文件不在	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_for_missing_file(	--manifest-path crates/standalone-gone/Cargo.toml --lib	standalone_lib_case
+M_包名与路径并写	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_for_package_and_path(	-p demo --manifest-path crates/standalone/Cargo.toml --lib	standalone_lib_case
+M_路径写了两次	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_for_path_twice(	--manifest-path crates/standalone/Cargo.toml --manifest-path=crates/renamed-dir/Cargo.toml --lib	standalone_lib_case
+M_路径后面没写	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_for_path_without_value(	--lib --manifest-path	standalone_lib_case
+M_独立工程里找不到点名的测试	crates/standalone/src/lib.rs	pub fn standalone_value(	pub fn standalone_value_renamed_for_absent_test(	--manifest-path crates/standalone/Cargo.toml --lib	absent_in_standalone_case

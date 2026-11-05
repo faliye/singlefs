@@ -1,0 +1,10 @@
+exit=1
+want=.claude/gate.d/dead-path-lag.tsv:6: 有 2 列，要三列：<载体路径><TAB><不在的路径><TAB># <理由>
+want=.claude/gate.d/dead-path-lag.tsv:7: 第三列要以 # 起头、写为什么还没改（至少 4 个字）
+want=.claude/gate.d/dead-path-lag.tsv:8: 与第 2 行登记的是同一条（载体与路径都相同）
+want=.claude/gate.d/dead-path-lag.tsv:3: .claude/kb/tooling.md 里的 scripts/kb/now-present.py 此刻在了，这一行该删
+want=.claude/gate.d/dead-path-lag.tsv:4: .claude/kb/tooling.md 的现状文字里已经不引 scripts/kb/no-longer-cited.py
+want=.claude/gate.d/dead-path-lag.tsv:5: 比 gate 基准 HEAD 那一版多这一行（.claude/kb/tooling.md 里的 scripts/kb/new-lagging.py）：只缩不涨
+want=  kb 路径：扫 1 份 kb 中文页，判了 3 处（research/ 进过 git 放行 0 处、滞后 2 处、保留 0 处）
+want=治理文档与 kb 里有指不到的指向（上面逐条列出）
+want=  governance-refs：红（退出 1）

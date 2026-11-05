@@ -1,0 +1,4 @@
+# 登记的崩溃枚举用例（plain_stream_full）与放量分项（amplified_plain_stream_is_clean，登记在合表第三栏、放量入口 scripts/crash/crash-amplification.sh 的 ITEMS 里）
+# 在按条复用那一趟里经 --skip 排掉、交按块那一路；判的是 crash-case-replay 格，样本档退 3（expect 里写了按设计不绿的理由）；
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

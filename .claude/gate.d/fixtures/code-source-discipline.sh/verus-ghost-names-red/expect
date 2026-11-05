@@ -1,0 +1,9 @@
+exit=1
+want=✗ .claude/gate.d/verus-pins.tsv:4 登记的被验 crate 目录 crates/gone 不在
+want=✗ crates/self-defined-wrappers/src/lib.rs:3 定义了名叫 Ghost 的 struct（被验 crate 里的同名类型，单元图会当 vstd 的幽灵包装剔出键）
+want=✗ crates/self-defined-wrappers/src/lib.rs:5 定义了名叫 Tracked 的 type（被验 crate 里的同名类型，单元图会当 vstd 的幽灵包装剔出键）
+want=✗ crates/renamed-wrappers/src/lib.rs:1 把 crate::holder::Holder 改名成 Tracked（不是 vstd 的同名类型，单元图会当幽灵包装剔出键）
+want=✗ crates/renamed-wrappers/src/lib.rs:2 把 crate::wrap::Wrapper 改名成 Ghost（不是 vstd 的同名类型，单元图会当幽灵包装剔出键）
+want=✗ 被验 crate 里有 5 处自己定义或改名出 Ghost / Tracked（查了 3 个登记的 crate、2 份 .rs）
+want=样本只跑 .gate-cells 点名的格：verus-ghost-names
+want=verus-ghost-names：红

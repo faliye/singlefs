@@ -1,0 +1,3 @@
+# 样本的入口登记表（写法同仓里那一份的表头）
+mount_writable	样本：可写挂载
+publish_first_file	样本：首个文件版本的发布

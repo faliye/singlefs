@@ -1,0 +1,5 @@
+exit=0
+want=判段入口表 JUDGE_ENTRIES 的 13 个名字与两份判段源文件里认出的公开判段入口逐个相同（扫了 2 份、20 个函数单元，公开的 17 个，带判段去路记号的 4 个）
+want=样本只跑 .gate-cells 点名的格：judge-entries-in-sync
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（judge-entries-in-sync），0 格本次未跑（无）

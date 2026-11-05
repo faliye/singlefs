@@ -1,0 +1,4 @@
+# 样本的要临时服务的自证登记表：文件头写整条的写法（下面一行是被比对的原文），required 一份、own-server 一份
+#   python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <解释器> <脚本> --selftest
+scripts/gate/sample-required.py	required	# 样本：自证开跑先要临时服务
+scripts/gate/sample-own-server.py	own-server	# 样本：自证自己起真服务

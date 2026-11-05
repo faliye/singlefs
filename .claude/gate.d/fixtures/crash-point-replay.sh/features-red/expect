@@ -1,0 +1,8 @@
+exit=1
+want=找不到 GPU 适配器（样本：这条用例没接 NOT_RUN_NO_GPU_ADAPTER 的约定）
+want=✗ feature-gated-tests：带特性那一趟 cargo test 退 101（上面是它的尾部与全部红的用例、测试目标）
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]
+want=逐格：crash-case-replay：绿；feature-gated-tests：红
+want=✗ 有 1 格判红：feature-gated-tests（各自的出路在上面）
+want=只重跑红的格：bash .claude/gate.d/crash-point-replay.sh --check feature-gated-tests [项目根]
+want=feature-gated-tests：红

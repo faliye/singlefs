@@ -1,0 +1,58 @@
+{
+"closures": {
+"closure\tfdirsample::count_rules\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"use\tfdirsample::use@1\tcrates/fdirsample/src/lib.rs:1-1\tce745999a4d6be58466fd1bdafdc28d612edd7a64956eb6811f9009d5ff1e35c",
+"fn\tfdirsample::count_rules\tcrates/fdirsample/src/lib.rs:3-5\tb6ee4f67658ced5006386beb0888709273031f00ceeafc94cc197efc463d43b6",
+"data-directory\tcrates/fdirsample/rules\tcrates/fdirsample/src/lib.rs:4-4\te04cf97c4f67bb6c10d11a0fd556eee547f602742b68b4fc6ba89da17d8dea52",
+"key\t84d53c7c09630ed3f8f3f422052cac932c7843147c0a0fff35cbfe5e2ca57e80"
+]
+},
+"closure\tfdirsample::count_rules\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"use\tfdirsample::use@1\tcrates/fdirsample/src/lib.rs:1-1\tce745999a4d6be58466fd1bdafdc28d612edd7a64956eb6811f9009d5ff1e35c",
+"fn\tfdirsample::count_rules\tcrates/fdirsample/src/lib.rs:3-5\tb6ee4f67658ced5006386beb0888709273031f00ceeafc94cc197efc463d43b6",
+"data-directory\tcrates/fdirsample/rules\tcrates/fdirsample/src/lib.rs:4-4\te04cf97c4f67bb6c10d11a0fd556eee547f602742b68b4fc6ba89da17d8dea52",
+"key\t84d53c7c09630ed3f8f3f422052cac932c7843147c0a0fff35cbfe5e2ca57e80"
+]
+},
+"closure\tfdirsample::table\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"fn\tfdirsample::table\tcrates/fdirsample/src/lib.rs:7-9\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fdirsample/src/table.txt\tcrates/fdirsample/src/lib.rs:8-8\tedeaaff3f1774ad2888673770c6d64097e391bc362d7d6fb34982ddf0efd18cb",
+"key\t488113686826fb732931bffb40703af93b7d99a4b805f146ab5ccfcafb3fce3d"
+]
+},
+"closure\tfdirsample::table\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"fn\tfdirsample::table\tcrates/fdirsample/src/lib.rs:7-9\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fdirsample/src/table.txt\tcrates/fdirsample/src/lib.rs:8-8\tedeaaff3f1774ad2888673770c6d64097e391bc362d7d6fb34982ddf0efd18cb",
+"key\t488113686826fb732931bffb40703af93b7d99a4b805f146ab5ccfcafb3fce3d"
+]
+},
+"dump\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"use\tfdirsample::use@1\tcrates/fdirsample/src/lib.rs:1-1\tce745999a4d6be58466fd1bdafdc28d612edd7a64956eb6811f9009d5ff1e35c",
+"fn\tfdirsample::count_rules\tcrates/fdirsample/src/lib.rs:3-5\tb6ee4f67658ced5006386beb0888709273031f00ceeafc94cc197efc463d43b6",
+"data-directory\tcrates/fdirsample/rules\tcrates/fdirsample/src/lib.rs:4-4\te04cf97c4f67bb6c10d11a0fd556eee547f602742b68b4fc6ba89da17d8dea52",
+"fn\tfdirsample::table\tcrates/fdirsample/src/lib.rs:7-9\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fdirsample/src/table.txt\tcrates/fdirsample/src/lib.rs:8-8\tedeaaff3f1774ad2888673770c6d64097e391bc362d7d6fb34982ddf0efd18cb"
+]
+}
+},
+"dump": {
+"exit": 0,
+"lines": [
+"use\tfdirsample::use@1\tcrates/fdirsample/src/lib.rs:1-1\tce745999a4d6be58466fd1bdafdc28d612edd7a64956eb6811f9009d5ff1e35c",
+"fn\tfdirsample::count_rules\tcrates/fdirsample/src/lib.rs:3-5\tb6ee4f67658ced5006386beb0888709273031f00ceeafc94cc197efc463d43b6",
+"data-directory\tcrates/fdirsample/rules\tcrates/fdirsample/src/lib.rs:4-4\te04cf97c4f67bb6c10d11a0fd556eee547f602742b68b4fc6ba89da17d8dea52",
+"fn\tfdirsample::table\tcrates/fdirsample/src/lib.rs:7-9\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fdirsample/src/table.txt\tcrates/fdirsample/src/lib.rs:8-8\tedeaaff3f1774ad2888673770c6d64097e391bc362d7d6fb34982ddf0efd18cb"
+]
+}
+}

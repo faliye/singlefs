@@ -1,1 +1,1 @@
-scripts/gate/no-line.sh	light	# 样本：只退 0
+scripts/gate/no-line.sh	selftest	# 样本：只退 0

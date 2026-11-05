@@ -1,0 +1,3 @@
+# 一格里分几趟 cargo：不带特性那一趟绿，登记了 red-blocks=judged-by-test 的那条实跑时阶段被停（退 143）；判的是 crash-case-replay 格每一趟当场写结局，
+# 不算这一格的红样本也不算绿样本；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

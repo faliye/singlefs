@@ -1,0 +1,2 @@
+# 别的 C 号登记简称括注里提到已还清的号，不算引账：只跑 owed-refs-paid
+owed-refs-paid

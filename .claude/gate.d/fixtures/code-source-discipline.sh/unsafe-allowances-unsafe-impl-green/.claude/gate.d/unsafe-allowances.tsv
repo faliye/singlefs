@@ -1,0 +1,5 @@
+# 样本用的登记表：bin 根 e900_counting_allocator.rs 登 unsafe impl 一行、两个方法各一行（方法写 <类型>::<方法>）
+singlefs-verification	forbid	-	-	-	-	-	-
+singlefs-verification/src/bin/e900_counting_allocator.rs	forbid,deny	crates/singlefs-verification/src/bin/e900_counting_allocator.rs	impl GlobalAlloc for CountingAllocator	1	System|原子	样本的理由：量的是每次分配的 Layout 字节，只有挂全局分配器拿得到，GlobalAlloc 是 unsafe trait	用户 2026-11-03 弹窗定 records/sample-decision.md
+singlefs-verification/src/bin/e900_counting_allocator.rs	forbid,deny	crates/singlefs-verification/src/bin/e900_counting_allocator.rs	CountingAllocator::alloc	2	layout|System	样本的理由：GlobalAlloc::alloc 的签名要求 unsafe fn，转给 System 要调它的 unsafe 方法	用户 2026-11-03 弹窗定 records/sample-decision.md
+singlefs-verification/src/bin/e900_counting_allocator.rs	forbid,deny	crates/singlefs-verification/src/bin/e900_counting_allocator.rs	CountingAllocator::dealloc	2	pointer|layout|System	样本的理由：GlobalAlloc::dealloc 的签名要求 unsafe fn，还给 System 要调它的 unsafe 方法	用户 2026-11-03 弹窗定 records/sample-decision.md

@@ -1,4 +1,0 @@
-exit=0
-want=research 构建与单测全绿：1 个测试批次、共 1 个单测
-want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
-want=research-unit-tests：绿

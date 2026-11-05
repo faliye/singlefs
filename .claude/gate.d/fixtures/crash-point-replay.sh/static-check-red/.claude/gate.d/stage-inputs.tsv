@@ -1,0 +1,2 @@
+crash-point-replay.sh	tests-of:singlefs-verification	command=cargo command=rustc	# 样本：本阶段那一行（入口是 验证包的测试函数）
+crash-case:registered-stream	-	test=singlefs-verification:full_streams:registered_stream_full	# 样本：登记了的那一条；同文件的 forgot_to_register_full 故意不登记

@@ -16,12 +16,12 @@
   冒号后面是 <填 …> 这类占位的（尖括号不进路径，取出来是空的）不认。
   围栏代码块照 CommonMark 认（里面的行不认）：起头一行前面至多三个空格（四个以上是缩进代码块，不算围栏），``` 或 ~~~ 至少三个；
   反引号围栏的起头行在语言名的位置不许再有反引号（那是行内代码，不开块）；收尾一行前面至多三个空格，同一种字符、不比起头短、后面只有空白（后面接语言名之类的字不收尾）；
-  没收尾的围栏一直到文末，里面的行也不认。列表项与引用块里的围栏不单独认；派发闸 ⑭⑮ 的 without_code_blocks 只遮闭合了的围栏，没闭合的照判，这一份没闭合的遮到文末，两处在没闭合上不同。
+  没收尾的围栏一直到文末，里面的行也不认。列表项与引用块里的围栏不单独认；派发闸的 without_code_blocks（⑤ ⑪ ⑰ ⑱ ⑲ 遮代码块用）只遮闭合了的围栏，没闭合的照判，这一份没闭合的遮到文末，两处在没闭合上不同。
   句中、列表里的说法一律不认：「，草稿目录 <别处>」「- 草稿目录 <别处>」是在转述别的子 agent 的目录，「草稿目录在 <路径>」不是骨架那一行。
   照骨架写的提示都有那一行；没有那一行的提示，五处各按自己的规矩办：派发闸 ⑰ 只判不带目录的裸文件名、⑯ 不建锁；
   完工清理闸只判 claim 认领的目录；交回闸 ⑥ 只看提示点名的规格文件与提示正文；看门狗报取不到 progress.md、不猜别处。
 scratch_directories：scratch_line_values 取到的路径经同目录 lib_work_root.py 的 expand_written_path（~/、$HOME/、$SINGLEFS_WORK_ROOT/）
-  展开成绝对路径（normpath），写相对路径的按仓根（这份文件往上三层，repository_root）解，不按调用时的当前目录；只留落在工作根或过渡期旧根（lib_work_root.py 的 scratch_roots）底下的，根本身不算；
+  展开成绝对路径（normpath），写相对路径的按仓根（这份文件往上三层，repository_root）解，不按调用时的当前目录；只留落在工作根（lib_work_root.py 的 scratch_roots；会话临时目录根 /tmp/claude-<uid> 不算）底下的，根本身不算；
   include_roots 为真时根本身也算（只给派发闸的弄坏开关 writer-lock-root-locked 用）。读不到 lib_work_root.py 时抛异常，调用方按读不到这份库办。
 
 用法：
@@ -44,9 +44,10 @@ scratch_directories：scratch_line_values 取到的路径经同目录 lib_work_r
       「✗ 自检：波浪号围栏照认、收尾要同一种字符」
       「✗ 自检：缩进 3 格的围栏照认」
       「✗ 自检：缩进 4 格的收尾不算收尾，围栏一直到文末」
-  LIB_PROMPT_SCRATCH_LINE_BREAK=roots-unfiltered  scratch_directories 不看落没落在工作根或过渡期旧根底下（根本身与根外都留）
+  LIB_PROMPT_SCRATCH_LINE_BREAK=roots-unfiltered  scratch_directories 不看落没落在工作根底下（根本身与根外都留）
       「✗ 自检：工作根本身不算草稿目录」
-      「✗ 自检：工作根与旧根之外的目录不算」
+      「✗ 自检：工作根之外的目录不算」
+      「✗ 自检：会话临时目录根 /tmp/claude-<uid> 底下的不认」
       「✗ 自检：相对路径按仓根解，不按调用时的当前目录（当前目录在工作根）」
   LIB_PROMPT_SCRATCH_LINE_BREAK=fence-info-with-backtick  反引号围栏的起头行在语言名的位置有反引号也当围栏起头（改前的认法）
       「✗ 自检：反引号围栏的起头行在语言名的位置有反引号，那是行内代码，不开块」
@@ -61,6 +62,8 @@ scratch_directories：scratch_line_values 取到的路径经同目录 lib_work_r
   LIB_PROMPT_SCRATCH_LINE_BREAK=relative-by-cwd  写相对路径的按调用时的当前目录解，不按仓根（改前的认法）
       「✗ 自检：相对路径按仓根解，不按调用时的当前目录（当前目录在仓外）」
       「✗ 自检：相对路径按仓根解，不按调用时的当前目录（当前目录在工作根）」
+  SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  同目录 lib_work_root.py 的开关：scratch_roots 另认会话临时目录根（撤掉之前的放行）
+      「✗ 自检：会话临时目录根 /tmp/claude-<uid> 底下的不认」
 """
 import importlib.util
 import os
@@ -89,7 +92,7 @@ def broken(item):
 
 
 def work_root_library():
-    """同目录的 lib_work_root.py（工作根与过渡期旧根只在那里定义），按这份文件所在的目录导入一次。"""
+    """同目录的 lib_work_root.py（工作根与会话临时目录根只在那里定义），按这份文件所在的目录导入一次。"""
     if not WORK_ROOT_LIBRARY:
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib_work_root.py")
         specification = importlib.util.spec_from_file_location("lib_work_root_for_prompt_scratch_line", path)
@@ -143,7 +146,7 @@ def scratch_line_values(prompt):
 
 
 def scratch_directories(prompt, include_roots=False):
-    """scratch_line_values 取到的路径展开成绝对路径，只留工作根或过渡期旧根底下的（根本身不算，include_roots 为真时也算），按次序、去重。"""
+    """scratch_line_values 取到的路径展开成绝对路径，只留工作根底下的（根本身不算，include_roots 为真时也算），按次序、去重。"""
     work_roots = work_root_library()
     roots = [root.rstrip("/") for root in work_roots.scratch_roots()]
     found = []
@@ -181,7 +184,7 @@ def fence_lines_by_reference(samples):
 
 def selftest():
     work_roots = work_root_library()
-    root, legacy = work_roots.configured_work_root(), work_roots.legacy_root()
+    root, session_temporary_root = work_roots.configured_work_root(), work_roots.claude_session_temporary_root()
     home = os.path.expanduser("~")
     written_root = "~" + root[len(home):] if root.startswith(home + "/") else root
     mine, other = f"{root}/b10-selftest-mine", f"{root}/b10-selftest-previous"
@@ -226,10 +229,10 @@ def selftest():
         ("相对路径按仓根解，不按调用时的当前目录（当前目录在工作根）", relative_from_work_root, (probe_expected, [mine])),
         ("几行都认、按次序去重", scratch_line_values(f"草稿目录：{mine}\n草稿目录：{other}\n草稿目录：{mine}\n"), [mine, other]),
         ("~ 写法展开成绝对路径", scratch_directories(f"草稿目录：{written_root}/b10-selftest-mine/\n"), [mine]),
-        ("过渡期旧根底下的认", scratch_directories(f"草稿目录：{legacy}/b10-selftest-legacy\n"), [f"{legacy}/b10-selftest-legacy"]),
+        ("会话临时目录根 /tmp/claude-<uid> 底下的不认", scratch_directories(f"草稿目录：{session_temporary_root}/b10-selftest-session-temporary\n"), []),
         ("工作根本身不算草稿目录", scratch_directories(f"草稿目录：{root}/\n"), []),
         ("工作根本身在 include_roots 下算", scratch_directories(f"草稿目录：{root}/\n", include_roots=True), [root]),
-        ("工作根与旧根之外的目录不算", scratch_directories("草稿目录：/var/b10-selftest-elsewhere\n"), []),
+        ("工作根之外的目录不算", scratch_directories("草稿目录：/var/b10-selftest-elsewhere\n"), []),
     ]
     failures = [(label, want, got) for label, got, want in cells if got != want]
     reference = fence_lines_by_reference(fence_samples)
@@ -242,7 +245,7 @@ def selftest():
         return 1
     print(f"  ✓ lib_prompt_scratch_line 自检通过（查了 {len(cells) + (0 if reference is None else len(fence_samples))} 格）：只认行首「草稿目录：」一行（全角半角冒号、反引号、末尾标点都照认），"
           "转述里的、列表与粗体起头的、「草稿目录在」、占位、围栏代码块（照 CommonMark，没收尾的到文末）里的都不认；展开 ~ 之后写相对路径的按仓根解，"
-          "只留工作根与过渡期旧根底下的，根本身不算" + ("" if reference is not None else "；本机没装 markdown-it-py，与它比围栏行的那几格没查"))
+          "只留工作根底下的（会话临时目录根底下的不认），根本身不算" + ("" if reference is not None else "；本机没装 markdown-it-py，与它比围栏行的那几格没查"))
     return 0
 
 

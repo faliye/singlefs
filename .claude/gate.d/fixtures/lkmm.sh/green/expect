@@ -1,0 +1,6 @@
+exit=77
+want=LKMM 通过（1 条 Never：每条都有内容对得上的对照组，1 条绑到代码、0 条声明不对应代码；共 2 条 Sometimes
+want=· 按条：现判 4、复用 0
+want=假 herd7（样本 .lkmm-fake-herd7）：3 份 litmus 全过，没起过真 herd7，这一格本次未跑
+want=litmus-verdicts：本次未跑
+not-green-by-design=litmus-verdicts 样本经假 herd7 跑（.lkmm-fake-herd7），没起过真 herd7，绿的一侧只能记本次未跑

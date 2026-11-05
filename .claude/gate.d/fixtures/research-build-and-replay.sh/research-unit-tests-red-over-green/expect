@@ -1,0 +1,9 @@
+exit=1
+want=· 样本：上一版（.unit-verdict-sample/prior）tiny 的 3 条测试函数照判绿记进这一版的判定库
+want=· 单测按条复用：3 条编得进的测试函数，现判 3、复用 0、拒算 0
+want=research 的构建或单测没过（cargo test 退出码 101）
+want=· 判红记库（tiny）：1 条记红、撤掉同一把键原有的绿，下一趟这几条现判（RECORD recorded=0 changed=0 refused=0 red=1
+want=· 样本档：判红记库之后再算一次计划（tiny）：复用 2 条
+want=现判 tiny/src/lib.rs::tests::passes_until_the_switch_file_appears（上次判红（
+want=── 汇总：research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=research-build-and-replay.sh：1 格里 1 格红（research-unit-tests）

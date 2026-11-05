@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：dated-status
+want=滞后表比 gate 基准 HEAD 那一版多 1 行（只缩不涨；路径或锚改了也算新加）
+want=第 3 行：.claude/kb/milestone/02-样本里程碑.md  …样本对比跑完一臂，另两臂还没跑…
+want=→ 怎么办：新写的带日期现状句当场改成现值，不往滞后表里加
+want=doc-text.sh：1 格里 1 格红（dated-status）

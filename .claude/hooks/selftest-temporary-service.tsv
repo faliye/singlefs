@@ -1,0 +1,42 @@
+# 要在临时 prune-server 底下起的自证：一行一份。
+# 写法：<相对仓根的路径><空白><判定><空白># <理由>（理由至少 4 个字；判法在 .claude/hooks/lib_project_code_runs.py 的 temporary_service_table_at）。
+#   required   这份脚本的 --selftest 开跑先调客户端 selftest_service_problem（scripts/prune-server/prune_server_client.py），环境里没有临时服务的标记
+#              PRUNE_SERVER_TEMPORARY_SERVICE_SOCKET 就退 2、什么都不判（自证不写真服务）：必须写成包装写法
+#              python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <解释器> <脚本> --selftest
+#              （整条不带 --server-binary：包装前的赋值与任务环境里也没有 PRUNE_SERVER_BINARY 时，任务服务把这条命令认成会编的，两台都给编译目录，包装现编一遍 prune-server（认法在 task-server/task_server.py）；不经任务服务起、没有 CARGO_TARGET_DIR 时退 2，不现编；自己编了、两台都读得到的二进制才另加 --server-binary，写在整条之外）；
+#              裸写的 --selftest 在执行前被 project-code-guard.sh 拒，拒绝说明给整条写法（同上这一形，不带 --server-binary，lib_project_code_runs.py 的 temporary_service_bare_selftest）
+#   own-server 源码里出现 selftest_service_problem 这几个字，但 --selftest 自己用 --server-binary 或 PRUNE_SERVER_BINARY 起真 prune-server，不因环境里没有临时服务的标记退 2
+#              （二进制都没给、也没有任务服务给的 CARGO_TARGET_DIR 时退 2、不现编）；
+#              门禁 code-tooling 的 runner 表包着它只为把二进制交下去，不是它要临时服务。登记在这里是为了让下面「两边对一遍」的判法认得它不是漏登
+# 键认的是本仓里那份文件，同 selftest-registry.tsv：命令词解析后的真实路径要正是 <仓根>/<键>；每一行的键都要同时登记在 selftest-registry.tsv 里。
+# 对一遍（lib_project_code_runs.py 的 temporary_service_table_problems，两份钩子自证里各有一格核仓里这张表）：
+#   ① 每一行的文件在、也登记在 selftest-registry.tsv；required 行的源码里出现 selftest_service_problem；
+#   ② selftest-registry.tsv 里非门禁阶段的每一行，源码里出现 selftest_service_problem 的，这里要有一行（required 或 own-server）。
+# 新写了调 selftest_service_problem 的自证，先在 selftest-registry.tsv 登记，再来这里加一行 required；自证只用自己起的临时服务的写 own-server。
+# 派发提示骨架（scripts/agents/dispatch-prompt.py）按 required 行给子 agent 拼整条命令。
+scripts/crash/crash-amplification-item.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/crash/crash-amplification-lib.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/crash/crash-amplification-two-hosts.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/crash/crash-amplification.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/crash/crash-flow-coverage.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/crash/crash-point-replay-shard-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/crash/crash-point-replay.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/crash/lib_verdict_library.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/device-code-key.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e165-pin-red-examples.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e182-single-device-long-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e182-single-device-units-kept-long-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e184-segment-one-long-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/replay.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/gate/admission.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/gate/lib_reuse_checks.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/gate/lkmm-selftest.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/gate/merge-and-verify.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/gate/verus-proof-check.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/mutation/broad-mutation.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/mutation/crates-mutation-rows.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/mutation/mutate.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/mutation/mutation-shard-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/mutation/tests/test_audit_regressions.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/prune-server/prune_server_client_selftest.py	own-server	# --selftest 每格自己起一份真 prune-server（二进制取 --server-binary 或 PRUNE_SERVER_BINARY），不因没有临时服务的标记退 2；runner 表包着它只为交二进制
+scripts/prune-server/prune-server-load-simulation.py	own-server	# --selftest 自己起两份真 prune-server（二进制取 --server-binary 或 PRUNE_SERVER_BINARY），只有压测用法才调 selftest_service_problem；runner 表包着它只为交二进制

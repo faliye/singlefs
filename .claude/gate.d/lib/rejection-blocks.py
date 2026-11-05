@@ -18,7 +18,7 @@ checker-independence-and-sync 的 layout-checker-sync。两格原来各写一份
   REJECTION_BLOCKS_BREAK=summaries-only  只打「✗ 摘要」，不打明细
       checker-independence-and-sync.sh/layout-checker-sync-first-registration-changed-value、
       checker-independence-and-sync.sh/layout-checker-sync-red（输出里找不到「改值 SAMPLE_UNIT_BYTES：16384 → 3…」）；
-      code-source-discipline.sh/reading-discipline-red（输出里找不到「crates/singlefs-checker-tier/s…」）
+      code-source-discipline.sh/reading-discipline-red（输出里找不到「crates/singlefs-verification/s…」）
   REJECTION_BLOCKS_BREAK=silent  一块都不打
       checker-independence-and-sync.sh/layout-checker-sync-first-registration-changed-value、
       checker-independence-and-sync.sh/layout-checker-sync-red（输出里找不到「格式常量在这次改动里变了」）；

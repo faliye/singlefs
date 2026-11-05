@@ -1,0 +1,8 @@
+exit=1
+want=✗ .claude/kb/decisions/01-样本决策.md:7 C20（样本已还的甲）
+want=✗ .claude/kb/decisions/01-样本决策.md:11 C21（样本已还的乙）
+want=✗ .claude/kb/decisions/01-样本决策.md:15 C22（样本已还的丙）
+want=决策正文的欠段里有 3 处引的账在 .claude/kb/checks-owed.md 的已还清表里、同一行里它的哪一截都没说还清了（扫 1 份中文正文、3 行欠段、5 个 C 号；滞后表收着的 0 处不算）
+want=样本只跑 .gate-cells 点名的格：owed-refs-paid
+want=  owed-refs-paid：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（owed-refs-paid）

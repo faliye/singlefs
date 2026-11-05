@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unit-header-fields
+want=.claude/kb/layout/01-first-txn.md:20「五元组 · 锚点偏移」不在 D18 已定项 3 的五元组 ['单元类型标签', '树 ID', '对象 ID', '对象出生代'] 里
+want=单元头字段表与 D18 对不上 1 处（比了 2 张表）
+want=unit-header-fields：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（unit-header-fields）

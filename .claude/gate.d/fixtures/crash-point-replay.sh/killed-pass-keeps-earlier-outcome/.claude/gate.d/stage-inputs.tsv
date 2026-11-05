@@ -1,0 +1,2 @@
+crash-point-replay.sh	tests-of:singlefs-verification	command=cargo command=rustc	# 样本：本阶段那一行（入口是 验证包的测试函数）
+crash-case:fault-injection-given-states	-	test=singlefs-verification:fault_injection_given_states:fault_injection_given_states_full features=sample-store red-blocks=judged-by-test	# 样本：故障注入之后的红块由用例自己认下，按退出码判

@@ -1,0 +1,8 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=✓ 4 个实验二进制都有成形的变异表，4 条变异的原文各命中源码一次
+want=crates/mutations.tsv 1 条的原文各命中源码一次
+want=变异表 1 行改的文件都在里面
+want=点名的测试都够得着被改坏的函数（判了 1 行、没判 0 行，豁免 0 行，截过闭包 0 行
+want=mutation-tables：绿
+want=code-source-discipline.sh：1 格里 1 格绿（mutation-tables），0 格本次未跑（无）

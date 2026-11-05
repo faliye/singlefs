@@ -1,0 +1,9 @@
+# 出口 4 那五格各犯一次（StepKind 多一个没被罩住的成员、多一个按段登记的节点、一对新的评估 0 次、用例没有必红变异、旋钮出处不在、读库输出块行数对不上），
+# 六格都判红、整道退 1；expect 里逐格写「<格名>：红」。门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 crash-case-replay：覆盖、ignore、0 次三格读 crash-case-replay 那一趟的行
+crash-flow-coverage
+crash-ignored-nodes
+invariant-zero-evaluations
+crash-case-must-red
+crash-knobs
+crash-case-replay

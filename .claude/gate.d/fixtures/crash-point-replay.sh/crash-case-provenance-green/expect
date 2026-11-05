@@ -1,0 +1,6 @@
+exit=3
+want=样本档：
+want=── crash-case-provenance（只读树）
+want=逐格：crash-case-provenance：绿
+want=退 3 不退 0
+not-green-by-design=crash-case-provenance 样本档整道退 3 不退 0（这一格只读树、判绿了，可整道没跑过真的崩溃点重放，不许记成通过）

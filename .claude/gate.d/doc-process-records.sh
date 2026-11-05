@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树）里的三方留痕与同步记录，上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 三方论证与阶段同步有没有留下该留的记录：批次范围、判决点名、正文前提、轮次收尾、同步记录、里程碑收口时的欠账、调度记录里延后项的登记、欠账那份的节号
+# gate-stage: 三方论证与阶段同步有没有留下该留的记录：批次范围、判决点名、正文前提、轮次收尾、同步记录、里程碑收口时的欠账、欠账去向的写法、调度记录里延后项的登记、现行账本的节号、封存账本没被改
 # gate-fixture: yes
 # gate-category: 文档类
 # gate-similar: doc-experiments.sh 它的 evidence-in-repo 格也用 gate 取法的改动范围、也读 research/prompts/，但判产物与依据落没落进仓（/tmp 路径、产物新不新），不判三方与同步留下的记录；并进来会让八格之外多一种对象（research/results/ 的产物）
@@ -19,11 +19,13 @@
 # gate-cell: knowledge-sync 改了规则、agent、hook、门禁、脚本或实现之后，有没有写阶段同步记录
 # gate-cell: agent-def-adversarial-review 改过的 agent 定义与共用约束有没有走过三方审核
 # gate-cell: milestone-close-owed 段表写了收口的里程碑，欠账表开着的那张表里没有一行的前置点名它
+# gate-cell: owed-destination-form 欠账表开着的行，「去向：」之后开头是三种落点之一（里程碑文件、「里程碑<号>」、「未排」），落点点名的里程碑文件都在
 # gate-cell: deferred-items-registered records/ 下这次新增的带延后类词的行，同一行写着指得到的登记（C 号、拆分提案的节号与行首序号、文件:行或登记处表里的流程文件）
-# gate-cell: ledger-section-numbers 欠账那份拆分提案的「## <节号>、」标题不重号，每个节号在「## 索引」表里恰好一行
+# gate-cell: ledger-section-numbers 现行账本（拆分提案账本登记表里 current 那一份）的「## <节号>、」标题不重号，每个节号在「## 索引」表里恰好一行
+# gate-cell: sealed-ledgers-unchanged 拆分提案账本登记表里封存的那几份，内容与登记的 sha256 相同（封存之后没被改）
 # 格结构经 lib/stage-cells.sh；每格的成功行报它查了多少项。
 #
-#   bash .claude/gate.d/doc-process-records.sh [项目根]                              十一格都跑
+#   bash .claude/gate.d/doc-process-records.sh [项目根]                              十三格都跑
 #   bash .claude/gate.d/doc-process-records.sh --list                                逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-process-records.sh --check <格名>[,<格名>…] [项目根]     只跑点名的格（例：材料员开工只跑 implementation-premise）
 #
@@ -31,7 +33,7 @@
 #   gate 取法（含工作区、暂存区与未跟踪）：verdict-names-local-samples、code-round-snapshot 只用其中新增的，crates-adversarial-review、knowledge-sync、agent-def-adversarial-review 用全部；
 #   head 取法（基准 HEAD）：batch-scope；
 #   gate_added_lines（同步记录这一轮新增的行）：knowledge-sync；gate_added_lines（records/ 下这一轮新增的 .md 行）：deferred-items-registered。
-# 被判的根不是 git 仓时，用改动范围的七格退 77；implementation-premise、abandoned-rounds、milestone-close-owed 与 ledger-section-numbers 只看树，照判。
+# 被判的根不是 git 仓时，用改动范围的七格退 77；implementation-premise、abandoned-rounds、milestone-close-owed、owed-destination-form 与 ledger-section-numbers 只看树，照判。
 # 「新写的判决」各格同一个认法：相对基准新增（git diff --diff-filter=A）、暂存区新增、未跟踪；被改过的旧判决（路径改写、补一句）不算。
 #
 # ── batch-scope ──
@@ -75,13 +77,13 @@
 # 这次改动里每个产品代码的 crates/*/src/*.rs 文件，都要在这一次改动新写的某份 research/prompts/*-main-verification.md 里按路径点名；
 #   「点名」只认判决里「## 这一轮被判过的文件」一节底下的路径，正文别处提到同一个路径不算（判据与写法见下面「点名一节」）；
 #   点名了而那一轮开工快照记的哈希与此刻的内容对不上的（判决之后又改过）也不算，判据在「点名一节」⑥。
-# 测试代码不判：TEST_CODE_SOURCES 那四个包（harness 档 crates/singlefs-harness/、checker 档 crates/singlefs-checker-tier/、池级 checker crates/singlefs-checker/、函数单元图 crates/singlefs-unit-graph/）的 src 从对象里去掉，
+# 测试代码不判：TEST_CODE_SOURCES 那三个包（验证包 crates/singlefs-verification/、池级 checker crates/singlefs-checker/、函数单元图 crates/singlefs-unit-graph/）的 src 从对象里去掉，
 #   成功行与无对象那一行逐个报出去掉的；crates/*/tests/ 与 crates/mutations.tsv 不是 crates/*/src/*.rs，本来就不在对象里。
 # 只改了注释的产品代码文件不走三方：判法是规范副本的 scripts/comment-only-change.py（去掉注释与空白之后代码词元与基准逐个相同，
 #   文档注释里会编成 doctest 的代码块、文档注释与 // SAFETY: 注释的增删照代码算；上游 show-me-test 用同一份），摘出去的逐个报出来；判法判不了就红。
 # 没有产品代码的 crates/*/src 改动（或都只改了注释）：退 77。管不到的：点名了判得对不对；产品代码包 src 里的 #[cfg(test)] 模块按路径分不出来，照判。
 # 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
-#   CRATES_ADVERSARIAL_REVIEW_BREAK=test-code-counted  测试代码那四个包的 src 也算对象、要点名
+#   CRATES_ADVERSARIAL_REVIEW_BREAK=test-code-counted  测试代码那三个包的 src 也算对象、要点名
 #       crates-adversarial-review-test-code-only（期望退出 77，实测 1）
 #   CRATES_ADVERSARIAL_REVIEW_BREAK=exempt-hash-ignored  user_exemption_reason 不核内容哈希，豁免表里有这条路径就算豁免
 #       crates-adversarial-review-exempt-stale-red（期望退出 1，实测 0）
@@ -134,7 +136,7 @@
 # 规则：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」。快照形态：research/prompts/<轮>-snapshot/ 目录，
 # 里面 crates-sha256.txt（sha256sum 格式：64 位十六进制哈希、两个空格、仓根相对路径）与 kb-sha256.txt；判决里写一行「开工快照」指到那个目录。
 # 对象：这次改动新写的 research/prompts/*-main-verification.md（取法与 crates-adversarial-review 同一个函数 new_verdict_paths）里，
-#   按路径点名了至少一份产品代码 crates/*/src/*.rs 的判决。点名的认法：正文里匹配 crates/<包>/src/<…>.rs 的字面路径，TEST_CODE_SOURCES 那四个包的 src 不算；
+#   按路径点名了至少一份产品代码 crates/*/src/*.rs 的判决。点名的认法：正文里匹配 crates/<包>/src/<…>.rs 的字面路径，TEST_CODE_SOURCES 那三个包的 src 不算；
 #   只点 kb 的推论轮、只点测试代码的、通配写法（crates/*/src/*.rs）的判决不判，成功行与无对象那一行逐份报出。早先的判决（不在新增里的）不判。
 # 判据，每份判决三条，缺一样就红，理由点名判决与缺的东西：
 #   ① 正文出现 research/prompts/<轮>-snapshot/，轮名取判决文件名去掉 -main-verification.md；
@@ -180,18 +182,16 @@
 #      取到的那一行里有这一轮的名字、除这一轮外没有别的轮名、有一句「」括起来的 6 个字以上的用户原话）。
 #      「别的轮名」= 仓里认得的轮名全集（research/prompts/ 下 _<轮>-body.md、<轮>-snapshot/、<轮>-main-verification.md 的轮名，加登记表第一列的轮名）
 #      ∪ 形如 <名>-r<数字> 的写法（不看仓里有没有它的材料）。
-#      不要求出处的只有库里写死的旧行名单（LEGACY_SOURCELESS_ROUNDS：c196-r1、d16-item1-r2、c364-r3、smalldata-ttime-r1，出处这条规矩立起来之前登记、没有出处可补；只缩不涨，不按日期判）；
-#      这一格与派发闸 ⑥ 用同一张名单，名单外的行一律要出处。
+#      每一行都要出处，不按日期、不按轮名免；这一格与派发闸 ⑥ 用同一份判法。
 #   发过腿、没有判决、也没登记 ⇒ 红。登记表写坏（不是四列、有空列、日期不是 YYYY-MM-DD、同一轮登记两行）、出处收不了（没写、指不到、同一行有别的轮名……）、
 #   登记了认不出的轮、登记了已经有判决的轮 ⇒ 也红。没有 research/prompts/、或认不出一个发过腿的轮：退 77。
-# 不判的，成功行逐个列出前缀：腿提示是旧形态的轮（<题>-local.md、<题>-forward-sonnet.md / -reverse-opus.md）与轮名不以 -r<N> 结尾的；
-#   它们都早于判决文件，判决写进 kb、形态不一，按 ② 认会把任意一句提到材料的话读成判决。
+# 文件名不是 ① 那五种形态之一的，不算发过腿：不判，也不报。
 # 归档进版本库的腿文件由 git log 取：不在 git 仓里只看树；git log 失败判红，不退回只看树（那样归档的轮次整批消失）。
 #   git log 列出的被删文件同样只认 research/prompts/ 顶层：子目录里被删的（腿在 <轮>-<模型>-model/ 里造的门禁样本、<轮>-snapshot/ 里抄的文件）
 #   名字再像轮次文件也不算发过腿（弄坏开关 ABANDONED_ROUNDS_BREAK=archived-subdirectories-read 退回改前的读法：取 basename、不限顶层）。
 # 管不到的：判决写得对不对、登记的理由真不真、出处那句话是不是用户为这一轮说的（靠主 agent 核）；② 的第二种只认同一小节里既点名又有 **判决，否定词只认紧跟在「**判决」后面的那三个，「**判决**：这一轮先不判」这类别的说法照算判过，
 #   「**判决**：未判的那一格补上之后过」这种以否定词起头而其实判过的照算没判（改写那一句）；
-#   新轮既不写正文、腿提示又用了五种之外的名字，落进不判的那一列而不红。
+#   新轮既不写正文、腿提示又用了五种之外的名字，不算发过腿而不红。
 #
 # ── knowledge-sync ──
 # 判阶段同步记录的形式（阶段任务结束时主 agent 判完每处命中写的那份）。判据：
@@ -253,28 +253,50 @@
 # 判法只在 scripts/kb/milestone-close-owed-check.py（取这一道脚本所在仓里那一份，不取项目根：样本根里放不了坏的），这一格调它的 --closed：
 #   ① 里程碑文件 .claude/kb/milestone/<两位号>-<名>-txn.md（译文不算）的段表（表头第一格「段」、有「状态」列）里有一行状态以「结束」或「已完结」起头，算收口；
 #      没有段表的不算，照文件现状读、不看历史（细则在那份脚本文件头「判法」）。
-#   ② 收口的每个里程碑：.claude/kb/checks-owed.md 开着的那张表（「已还清」整行标题之前，切法同 lib-owed.py）里，前置一格里第一个「去向：」之后那一段
-#      （「去向：」之前的说明与出处、整格没写「去向：」的都不算）点名它的行数为 0；认「里程碑<号>」（阿拉伯或中文数字，「里程碑三二·5」拆出项号）与「<两位号>-*-txn.md」两种写法，带日期的文件名里的不算。
+#   ② 收口的每个里程碑：.claude/kb/checks-owed.md 开着的那张表（「已还清」整行标题之前，切法同 lib-owed.py）里，前置一格里第一个「去向：」之后那一段（去向段）
+#      开头的落点点名它的行数为 0。落点认三种：里程碑文件 `.claude/kb/milestone/<两位号>-<名>-txn.md`（目录与反引号可省）、「里程碑<号>」（阿拉伯或中文数字，
+#      「里程碑三二·5」拆出项号）、「未排」（不点名）；①② 后面可接作业点，几个落点用「、」连写在开头算几个，第一个不是落点的字之后都是说明，说明里的号与文件名不算
+#      （用户 2026-10-28 定法，细则在那份脚本文件头「判法」的「落点」）；「去向：」之前的说明与出处、整格没写「去向：」的都不算。
 #      不为 0 逐行列出编号、简称与点名处的原文，判红。
 #   没有一个里程碑的段表写了收口：退 77。收口之前先手跑 python3 scripts/kb/milestone-close-owed-check.py <号>（不看收没收口，照判）。
-# 管不到的：前置里点名它的那一句是去向还是旁及（「挪出里程碑三」也算点名，要改写成不点名它）；段表之外别处写的收口（文件头「状态：判定结束」）不认。
-# 弄坏开关在那份脚本里（MILESTONE_CLOSE_OWED_BREAK，一次设一个，它的自证逐项钉住）。红在这一格的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
-#   MILESTONE_CLOSE_OWED_BREAK=file-form-ignored  不认里程碑文件名那种写法
-#       milestone-close-owed-red（输出里找不到「…有 3 行的前置」）
-#   MILESTONE_CLOSE_OWED_BREAK=item-suffix-kept  「里程碑三二·5」不拆项号
-#       milestone-close-owed-red（输出里找不到「…有 3 行的前置」）
+# 管不到的：去向段开头不是落点的行这一格不点名任何里程碑，归 owed-destination-form 格判红；段表之外别处写的收口（文件头「状态：判定结束」）不认。
+# 弄坏开关在那份脚本里（MILESTONE_CLOSE_OWED_BREAK，一次设一个，它的自证逐项钉住）。判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首；
+# 去向写法那一格的样本也列在这里，开关是同一份脚本的）：
+#   MILESTONE_CLOSE_OWED_BREAK=file-form-ignored  不认里程碑文件名那种落点
+#       milestone-close-owed-red（输出里找不到「…有 3 行的前置」）、owed-destination-form-green（期望退出 0，实测 1）
+#   MILESTONE_CLOSE_OWED_BREAK=item-suffix-kept  「里程碑三二·5」不拆项号，号认不出就不是落点
+#       milestone-close-owed-red（输出里找不到「…有 3 行的前置」）、owed-destination-form-green（期望退出 0，实测 1）、
+#       owed-destination-form-red（输出里找不到「欠账表开着的 4 行里写了「去向：」的 3 行：2 行去向段开头不是三种落点之一…」）
 #   MILESTONE_CLOSE_OWED_BREAK=status-ignored  不看段表，每个里程碑都判
 #       milestone-close-owed-green（期望退出 0，实测 1）、milestone-close-owed-no-object（期望退出 77，实测 1）
 #     这一格的红样本在这个开关下照红（多判出里程碑四、十三也满足它的 want），不算它的证据
-#   MILESTONE_CLOSE_OWED_BREAK=filename-dates-counted  带日期的文件名里的「里程碑三」也算点名
-#       milestone-close-owed-green（期望退出 0，实测 1）、milestone-close-owed-red（输出里找不到「…有 3 行的前置」）
-#   MILESTONE_CLOSE_OWED_BREAK=whole-row-scanned  整行都看，不只看前置那一格（出处一格里的「里程碑三二·4」也算）
+#   MILESTONE_CLOSE_OWED_BREAK=whole-row-scanned  整行都看、任何一处都算点名（出处一格里的「里程碑三二·4」也算）
 #       milestone-close-owed-green（期望退出 0，实测 1）、milestone-close-owed-red（输出里找不到「…有 3 行的前置」）
 #   MILESTONE_CLOSE_OWED_BREAK=paid-rows-counted  「已还清」之后的行也算欠着的
-#       milestone-close-owed-green（期望退出 0，实测 1）、milestone-close-owed-red（输出里找不到「…有 3 行的前置」）
-#   MILESTONE_CLOSE_OWED_BREAK=prerequisite-whole-cell  前置那一格整格都看，不只看「去向：」之后（收窄之前的读法）
+#       milestone-close-owed-green（期望退出 0，实测 1）、milestone-close-owed-red（输出里找不到「…有 3 行的前置」）、
+#       owed-destination-form-green（期望退出 0，实测 1）、owed-destination-form-red（输出里找不到「欠账表开着的 4 行里写了「去向：」的 3 行…」）
+#   MILESTONE_CLOSE_OWED_BREAK=prerequisite-whole-cell  前置那一格整格都看、任何一处都算点名（收窄到「去向：」之后之前的读法）
 #       milestone-close-owed-green（期望退出 0，实测 1）
-#   paid-heading-optional 只在那份脚本的自证里有格（样本的欠账表都有「已还清」标题）
+#   MILESTONE_CLOSE_OWED_BREAK=form-unchecked  --destination-form 不判去向段开头是不是落点
+#       owed-destination-form-red（期望退出 1，实测 0）
+#   paid-heading-optional、whole-segment-scanned、landing-file-unchecked 只在那份脚本的自证里有格（样本的欠账表都有「已还清」标题；
+#     样本里去向段开头之后的说明都没写里程碑三；样本的落点文件都在）
+#
+# ── owed-destination-form ──
+# 为什么：用户 2026-10-28：「其中 155 行已挪去别的里程碑，只是写法检查认不出； 这个问题要修复。写法要可以检查的出。」
+#   milestone-close-owed 格只认去向段开头的落点，开头写成「挪出里程碑三，归 …」「（从里程碑三挪来）…」的行它不点名任何里程碑，得有一格逼着把开头写成落点。
+# 判法与 milestone-close-owed 同一份脚本（scripts/kb/milestone-close-owed-check.py，取法同上），这一格调它的 --destination-form：
+#   对象：.claude/kb/checks-owed.md 开着的那张表里写了「去向：」的行（切法同 lib-owed.py；切不成六格的取整行里第一个「去向：」之后那一段）。
+#   ① 去向段开头（跳过空白）是三种落点之一：里程碑文件 `.claude/kb/milestone/<两位号>-<名>-txn.md`（目录与反引号可省，可带 .en / .ja）、
+#      「里程碑<号>」（「里程碑三二·5」号是三、项二·5）、「未排」起头；不是的逐行列编号、简称与去向段开头 30 字，判红。
+#   ② ①② 两种落点点名的里程碑在 .claude/kb/milestone/ 下找得到那份文件（「里程碑<号>」按号找 <两位号>-*-txn.md，文件落点按写的文件名找）；找不到的逐处列出，判红。
+#   成功行报判了几行、三种形态各几行（按开头第一个落点算）、没写「去向：」的几行（只报数，不判红）。
+#   树里没有欠账表、或开着的行一行写了「去向：」的都没有：退 77。认不出「已还清」标题：红。
+# 没并进已有的格：doc-registries 的 table-shape 格也判欠账表的行，但只判格数与「已还」字样，切法是它自己的一份；closeout-collects-open 判里程碑收口表收没收全欠账号，
+#   deferred-items-registered 判 records/ 下延后行的登记，对象都不是去向段；落点的认法要与 milestone-close-owed 格点名的认法是同一份，判法放在同一份脚本里。
+# 管不到的：落点是不是这件事真该去的地方、作业点（「四·1」「「节名」八·4」）在那份里程碑文件里有没有；没写「去向：」的行该不该写。
+# 弄坏开关在那份脚本里（MILESTONE_CLOSE_OWED_BREAK，判错的样本列在上面 milestone-close-owed 那一段；form-unchecked 是这一格自己的）。
+# 退役判据：欠账表不再用「去向：」写落点（改成单独一列或别的登记处）时删掉这一格。
 #
 # ── deferred-items-registered ──
 # 为什么：.claude/main-agent.md「一轮怎么开、怎么收」第 2 条要延后的当时就登记、调度记录里写「延后」的那一行同时写出登的那一行的编号或 文件:行；
@@ -284,25 +306,27 @@
 #   名词「延后项」（「延后项无去向」「### 延后项的登记」；前面紧挨「进」的「进延后项」「记进延后项」是把这一件延后，照旧算），
 #   与带「N/M」统计数的同一个分句里的「延后」（「延后当时就登进欠账表的 6/54」；分句按逗号、句号、分号、冒号与表格竖线切，只管「延后」这一个词）。
 #   不判的：词只在「」或反引号里（引规则、引原话）、只在点话题、在围栏代码块里、在标题行上（行首 0–3 个空格之后 1–6 个井号再接空白或行尾；
-#   延后什么写在节里的行上）、在两份拆分提案里（欠账那份 records/2026-10-23-subagent拆分提案.md 是第 2 条点名的登记处本身，历史那份 records/2026-09-16-subagent拆分提案.md
-#   是它拆出来之前的登记处，两份的编号小节里的行就是登记）。
+#   延后什么写在节里的行上）、在拆分提案账本登记表 LEDGER_REGISTRY（被判的根里的 .claude/gate.d/split-proposal-ledgers.tsv）登记的几份里
+#   （current 那一份是现行账本，第 2 条点名的登记处本身；sealed 那几份是封存的旧账本，它们的编号小节里的行就是登记）。
 #   行号按正文逐字找，同样的行取下一处没报过的。
 # 判据：同一行写着下面四种之一、且至少一处指得到，算登记了：
 #   ① C 号（C<数字>）：.claude/kb/checks-owed.md 开着的那张表里有一行以「| C<数字> |」起头（开着与已还清的切法经 lib-owed.py，OWED_LIBRARY；
 #      已还清表里的 C 号不算，红行写明它已还清；认不出「已还清」标题时照那份库的读法全文都当开着的）；
-#   ② 拆分提案的节号与行首序号：行里写了「拆分提案」时认「第<节号>节」后 16 个字以内的行首序号（①…㊿，可以几个连写），没写时只认节号后面紧跟序号的写法
-#      （「九十节 ㉟」「第九十节（行首序号 ②、③）」）；那一节（「## <节号>、」标题）在、那一节里有行首是那个序号的一行（「| ③ |」）。
-#      先在欠账那份里找，没有再到历史那份里找：两份里同号的节任一份有那个序号就算指得到，两份都没有那一节（或都没有那个序号）才算指不到，原因里点名两份；
-#      写了「拆分提案」而只写节号的，那一节一行带行首序号的行都没有（只有正文）才算指得到，欠账那份有这一节就看它、没有看历史那份；节号认汉字与阿拉伯数字；「九十节各行」这种不点序号的不算；
+#   ② 拆分提案的节号与行首序号：行里写了「拆分提案」时，紧跟在「拆分提案」之后的那一个「第<节号>节」（中间只许隔路径尾巴 .md 与 :行号、收尾的反引号、
+#      「（2026-10-23 份）」这类括注与空白）认它后面 16 个字以内的行首序号（①…㊿，可以几个连写）；同一行别处的「第<节号>节」与没写「拆分提案」的行一样，只认节号后面紧跟序号的写法
+#      （「九十节 ㉟」「第九十节（行首序号 ②、③）」），说别的文件的「登记的第五节」不当拆分提案的节号；那一节（「## <节号>、」标题）在、那一节里有行首是那个序号的一行（「| ③ |」）。
+#      先在现行账本里找，没有再照登记表 sealed 行的次序到封存的几份里找：同号的节任一份有那个序号就算指得到，几份都没有那一节（或都没有那个序号）才算指不到，原因里点名登记的每一份；
+#      写了「拆分提案」而只写节号的，那一节一行带行首序号的行都没有（只有正文）才算指得到，看照这个次序头一份有这一节的；节号认汉字与阿拉伯数字；「九十节各行」这种不点序号的不算；
 #   ③ 文件:行（<路径>:<行号>，可带 -<行号>）：路径从仓根起、文件在树里、行号不超过它的行数。只写文件名的找不到，不算；
-#      指到这一行自己（同一份文件、行号或区间罩住这一行）的不算；records/ 下只认两份拆分提案，指到别的记录（调度记录、审计记录）的不算——那里是写延后的地方，不是登记处；
+#      指到这一行自己（同一份文件、行号或区间罩住这一行）的不算；records/ 下只认登记表里的几份拆分提案，指到别的记录（调度记录、审计记录）的不算——那里是写延后的地方，不是登记处；
 #   ④ 登记处：表格行里，带延后类词的那一格之后的某一格（去向格）点名了登记处表 DEFERRAL_REGISTRY_TABLE（.claude/gate.d/deferral-registries.tsv）
 #      登记的一份文件（从仓根起的全路径，可在反引号里，前后不接路径里的字）。登记处是「照它做就一定会做到」的提交时那一套流程，写哪几份在表里，不在判法里写死。
 #      不是表格行、或只在延后类词那一格与它之前（被延后的那件事本身）点名的，不算。
 #      表一份一行「<从仓根起的路径><TAB><为什么它本身就是登记处，8 个字以上>」，井号起头的是注释；不是两段、文件不在树里、理由不到 8 个字、同一份登记两次的，
 #      逐行点名、那一行不当登记处认，这一格红。表不在时一份登记处都没有（点名流程文件的行照「没写」报）。
 # 写了而一处都指不到的，逐处点名为什么指不到；一处都没写的，点名「没写」。都红。
-# 这一轮 records/ 下新增的 .md 行里一行带延后类词的都没有（或都不判）而登记处表没写坏：退 77。欠账表或两份拆分提案里任一份读不到：红，点名读不到的那几份（C 号与节号判不了；欠账那份读不到不退回只认历史那份）。
+# 这一轮 records/ 下新增的 .md 行里一行带延后类词的都没有（或都不判）而登记处表没写坏：退 77。欠账表或登记表里的任一份拆分提案读不到：红，点名读不到的那几份（C 号与节号判不了；现行账本读不到不退回只认封存的）。
+# 登记表不在或写坏了（判据在「sealed-ledgers-unchanged」那一段的登记表一节）：红，逐行报，这一格不判。
 # 管不到的：登的那一行是不是真在讲这件事（编号指得到就算；登记处只看去向格点没点名，不看那一格是不是真在说「照它跑」）；只写文件名、写成「第 N 行」的出处；
 #   别的说法的延后（「推迟」「以后再」「进欠账」「要等」，不在词表里）；「延后项」与统计数旁边另写了真延后、却只用这两种说法的（「进延后项」除外）；
 #   「留给」当「交给这一轮已排定的下一步、保留给某人当场用」讲、「下一批」当「这一次就派出去的那一批」讲、把延后的提前做的，照样判（文字分不出，改写那一行）；
@@ -313,15 +337,17 @@
 #       deferred-items-registered-pointers-red（期望退出 1，实测 0）
 #   DEFERRED_ITEMS_BREAK=quotes-counted  「」与反引号里的词也算这一行在说延后
 #       deferred-items-registered-green（期望退出 0，实测 1）
-#   DEFERRED_ITEMS_BREAK=registry-rows-judged  历史那份拆分提案里新增的行也照判
+#   DEFERRED_ITEMS_BREAK=registry-rows-judged  封存的拆分提案里新增的行也照判
 #       deferred-items-registered-green（期望退出 0，实测 1）
-#   DEFERRED_ITEMS_BREAK=ledger-rows-judged  欠账那份拆分提案不当登记处，它里面新增的行也照判
+#   DEFERRED_ITEMS_BREAK=ledger-rows-judged  现行账本不当登记处，它里面新增的行也照判
 #       deferred-items-registered-ledger-green（期望退出 0，实测 1）
-#   DEFERRED_ITEMS_BREAK=ledger-ignored  只认历史那份：节号只在历史那份里找，欠账那份不读、读不到也不报
+#   DEFERRED_ITEMS_BREAK=ledger-ignored  只认封存的：节号只在封存的几份里找，现行账本不读、读不到也不报
 #       deferred-items-registered-ledger-green（期望退出 0，实测 1）、deferred-items-registered-ledger-missing-red（期望退出 1，实测 0）
-#   DEFERRED_ITEMS_BREAK=ledger-missing-tolerated  欠账那份读不到时当空的、退回只认历史那份，不报读不到
+#   DEFERRED_ITEMS_BREAK=ledger-missing-tolerated  现行账本读不到时当空的、退回只认封存的，不报读不到
 #       deferred-items-registered-ledger-missing-red（期望退出 1，实测 0）
-#   DEFERRED_ITEMS_BREAK=history-fallback-dropped  欠账那份里找不到的节与序号不再到历史那份里找
+#   DEFERRED_ITEMS_BREAK=history-fallback-dropped  现行账本里找不到的节与序号不再到封存的几份里找
+#       deferred-items-registered-ledger-green（期望退出 0，实测 1）
+#   DEFERRED_ITEMS_BREAK=sealed-chain-cut  只到登记表头一份封存的里找，后面几份封存的不读
 #       deferred-items-registered-ledger-green（期望退出 0，实测 1）
 #   DEFERRED_ITEMS_BREAK=fenced-lines-judged  围栏代码块里的行也照判
 #       deferred-items-registered-green（期望退出 0，实测 1）
@@ -347,25 +373,47 @@
 #       deferred-items-registered-pointers-red（输出里找不到「…:5：带「下一批」，写的登记指不到——文件:行「records/2026-10-22-样本调度.md:3」指不到」）
 #   DEFERRED_ITEMS_BREAK=self-pointer-accepted  文件:行指到这一行自己不另判（落到 records/ 那一条照红，原因不再是「指的是这一行自己」）
 #       deferred-items-registered-pointers-red（输出里找不到「…:6：…「records/2026-10-22-样本调度.md:6」指不到：指的是这一行自己」）
+#   DEFERRED_ITEMS_BREAK=split-proposal-section-anywhere  行里写了「拆分提案」时整行每个「第<节号>节」都照拆分提案的节号认（判据 ② 收窄之前的认法）
+#       deferred-items-registered-section-scope-green（期望退出 0，实测 1）
 # 退役判据：.claude/main-agent.md 第 2 条不再要求调度记录里的延后行写登记编号时删掉这一格。
 #
 # ── ledger-section-numbers ──
-# 为什么：几个会话同时往欠账那份 records/2026-10-23-subagent拆分提案.md 追加，节号撞过三次（那份第一百一十节）；deferred-items-registered 按「第<节号>节」找节，
-#   撞号时找到哪一节由次序定。对象只有这一份（LEDGER_PROPOSAL），只看树、不用改动范围，不在 git 仓里也照判；树里没有这份：退 77。
+# 为什么：几个会话同时往账本末尾追加，节号撞过（2026-10-23 那份撞了五十六、一百四十、一百四十二、一百四十三、一百四十四、一百四十八，索引还缺行）；
+#   deferred-items-registered 按「第<节号>节」找节，撞号时找到哪一节由次序定。
+# 对象只有现行账本一份（登记表 LEDGER_REGISTRY 里 current 那一行），只看树、不用改动范围，不在 git 仓里也照判；树里没有这份：退 77。封存的几份不判（一字不改，里面的重号照原样留着）。
 # 判据（围栏代码块里的行不算）：
 #   ① 有「## 索引」一节（标题一行逐字，行尾空白不碍）；
-#   ② 每个「## <节号>、」标题（节号是汉字数字）只出现一次；
-#   ③ 每个节号在「## 索引」一节的表里恰好一行：行首「| <节号>」起头的行，第一格节号后面接的括注（「一百（历史那份里的第二个九十七）」）不碍；
+#   ② 每个「## <节号>、」标题（节号是汉字数字，后面接括注「## 一百六十七、（2026-10-23 那份里的第二个五十六）…」不碍）只出现一次；
+#   ③ 每个节号在「## 索引」一节的表里恰好一行：行首「| <节号>」起头的行，第一格节号后面接的括注（「一百六十七（2026-10-23 那份里的第二个五十六）」）不碍；
 #   ④ 索引表里每一行的节号都有对应的「## <节号>、」一节。
-#   例外：历史上已经重号、照原样留着的节登记在 LEDGER_DUPLICATE_SECTIONS（<节号>:<份数>，今天只有两个五十六），标题与索引行都要正好那个份数；
-#   登记的节号在这份里一节都没有、或份数对不上，照红（例外过时要删）。例外表只缩不涨：新撞的号改号，不往表里加。
-# 管不到的：节号是不是按次序接着编（跳号不判）、索引表其余几列写得对不对、历史那份 records/2026-09-16-subagent拆分提案.md（一字不改，里面的重号不判）。
+#   没有例外：撞了的号改成下一个空号，索引同步改。
+# 登记表不在或写坏了：红，逐行报，这一格不判（判据在「sealed-ledgers-unchanged」那一段的登记表一节）。
+# 管不到的：节号是不是按次序接着编（跳号不判）、索引表其余几列写得对不对、标题写成「## 一百七十三 、」「## 173、」这类认不出节号的（不算一节，也就不核索引）。
 # 弄坏开关 LEDGER_SECTION_NUMBERS_BREAK=<项>，一次设一个（只在样本根上认，经共用库那一判）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   LEDGER_SECTION_NUMBERS_BREAK=duplicate-headings-tolerated  不判标题重号（判据 ②）
 #       ledger-section-numbers-duplicate-red（期望退出 1，实测 0）
 #   LEDGER_SECTION_NUMBERS_BREAK=index-unchecked  不核索引表（判据 ③ ④）
 #       ledger-section-numbers-index-missing-red（期望退出 1，实测 0）
-# 退役判据：欠账那份不再往末尾追加新节（并回 kb 或换成别的登记处）时删掉这一格。
+# 退役判据：现行账本不再往末尾追加新节（并回 kb 或换成别的登记处）时删掉这一格。
+#
+# ── sealed-ledgers-unchanged ──
+# 为什么：用户 2026-10-31 定「新建一份 没做完的都放到新的里面。 以后过去的两版作为历史封存」：records/2026-09-16-subagent拆分提案.md 与
+#   records/2026-10-23-subagent拆分提案.md 两版封存不再改，新欠账往现行账本 records/2026-10-29-subagent拆分提案.md 追加。没有检查拦，往旧那份追加的照样会写进去。
+# 登记表 LEDGER_REGISTRY（被判的根里的 .claude/gate.d/split-proposal-ledgers.tsv；deferred-items-registered、ledger-section-numbers 与这一格三格读同一份，
+#   父进程里读一次）：一行一份，四段用制表符分隔「<角色><TAB><从仓根起的路径><TAB><封存时内容的 sha256><TAB><为什么>」，井号起头的与空行不算。
+#   角色只认 current 与 sealed；路径在 records/ 下、以 .md 结尾；current 那一行 sha256 写「-」，sealed 行写 64 位小写十六进制；为什么 8 个字以上；
+#   同一份不登两次；current 恰好一行。表不在、或有一行不合，三格都红，逐行报（那一行不认）。
+#   sealed 行的次序就是 deferred-items-registered 在现行账本之后找节号的次序（新封存的写在前面）。
+# 对象：登记表里每一行 sealed。判据：那份文件在树里，内容的 sha256 与登记的相同。不看 git、不看改动范围：封存之后无论哪一次改动碰了它，此刻的内容都对不上。
+#   用 sha256 不用「与 gate 基准比」：账本换代的那一次提交本来就要动旧那份（抄节、写去向），与基准比会把这一次判红；登记的 sha256 是封存那一刻的内容，之后改一个字都对不上。
+# 一行 sealed 都没有：退 77。
+# 管不到的：登记表里的 sha256 本身被改成新内容的（重新封存要用户定，靠 review 看登记表的 diff）；现行账本写了什么（那是别几格的事）。
+# 弄坏开关 DOC_PROCESS_RECORDS_BREAK=<项>，一次设一个（只在样本根上认，经共用库那一判）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   DOC_PROCESS_RECORDS_BREAK=sealed-hash-unchecked  封存的那几份只看在不在树里，不比 sha256
+#       sealed-ledgers-unchanged-red（期望退出 1，实测 0）
+#   DOC_PROCESS_RECORDS_BREAK=ledger-registry-unchecked  登记表的行不核（段数、角色、路径、sha256 写法、理由、重复、current 恰好一行），sealed 行照收、current 取头一行
+#       sealed-ledgers-unchanged-registry-red（期望退出 1，实测 0）
+# 退役判据：封存的几份整份删出仓（只留在 git 历史里）时删掉这一格。
 #
 # ── 样本 ──
 # fixtures/doc-process-records.sh/ 下每格一对，各放 .gate-cells 只点名它那一格；setup.sh 里给别的格补的东西不碍事。
@@ -391,7 +439,7 @@
 #   crates-adversarial-review-snapshot-green  一份在那一节里点名、那一轮开工快照 crates-sha256.txt 记的哈希与此刻对得上；另一份点名它的判决那一轮没有快照，判绿、报 1 个对得上并列出没比的那一份
 #   crates-adversarial-review-snapshot-stale-red  同一轮点名两份，快照记的是返回 2 那一版，判决之后 lib.rs 又改成返回 3：判红只列 lib.rs（写清单与两边的哈希），kept.rs 对得上不列
 #   crates-adversarial-review-snapshot-stale-exempt-green  同 snapshot-stale-red 的现场，.claude/crates-review-exempt 按改后那一版的哈希登记了 lib.rs，判绿报 1 个豁免
-#   crates-adversarial-review-test-code-only  只改了 harness 档、checker 档与池级 checker 三个包的 src、另有 crates/*/tests/ 与 crates/mutations.tsv，没有判决，退 77 逐个报出不判的
+#   crates-adversarial-review-test-code-only  只改了验证包与池级 checker 两个包的 src、另有 crates/*/tests/ 与 crates/mutations.tsv，没有判决，退 77 逐个报出不判的
 #   crates-adversarial-review-comment-only  两份产品代码只改了注释（行注释、行尾注释、文档注释的文字），没有判决，退 77 逐个报出只改注释的
 #   crates-adversarial-review-comment-and-code-red  一份只改注释、一份改了字符串里的 //、一份改了文档注释里的 doctest，都没有判决，判红只列后两份
 #   code-round-snapshot-red         新判决点名两份产品代码文件、快照清单只列了一份，判红只列缺的那一份
@@ -401,19 +449,19 @@
 #   implementation-premise-red      没有 crates/ 的正文、标题没日期的正文、缺开工快照，逐个点名判红
 #   implementation-premise-green    判绿，报查了几份、没查哪一份
 #   abandoned-rounds-red            发了腿没判决没登记的轮、只在 kb 里被提到的轮、写坏与说反话的登记，另有 setup.sh 建的缺旧树对象的 git 仓，判红
-#   abandoned-rounds-green          判决文件、kb 小节判决、登记撂下各一轮与三个旧形态前缀，判绿报对数（登记撂下那一行是库里旧行名单里的 c364-r3、没有出处，不要求）
-#   abandoned-rounds-source-red     没写出处的行（2026-10-13）、出处那一行同时写着别的轮名、出处指到 research/ 下这一轮自己的材料、「」里的原话不到 6 个字、没写出处而日期是 2026-10-11 的行（不在旧行名单里，不按日期免）、
+#   abandoned-rounds-green          判决文件、kb 小节判决、登记撂下各一轮，判绿报对数（登记撂下那一行 c364-r3 的出处是 records/halt.md 第 1 行）
+#   abandoned-rounds-source-red     没写出处的行（2026-10-13）、出处那一行同时写着别的轮名、出处指到 research/ 下这一轮自己的材料、「」里的原话不到 6 个字、没写出处而日期是 2026-10-11 的行（不按日期免）、
 #                                   出处那一行另写着仓里认得而不以 -r<数字> 结尾的别的轮名 close-b1（research/prompts/_close-b1-body.md）、出处那一行另写着形如 <名>-r<数字> 而仓里没有任何它的材料的别的轮名 ghost-r2，
 #                                   〔〕里的原话改了一个字、在出处文件里找不到而行号提示那一行（第 3 行）没有这一轮名字的 gone-r1，
 #                                   〔〕里的原话在出处文件里命中两次而行号提示（第 9 行）不在其中的 twice-r1，只写行号没带〔〕原话的 plain-r1，
 #                                   〔〕写的是转述、行号提示的第 10 行有这一轮的名字与「」原话而去掉改名与日期之后对不上的 misread-r1，
-#                                   十一行逐行点名判红；另有一行名单里的 d16-item1-r2 没出处，不点名
+#                                   另有没写出处的 d16-item1-r2，十二行逐行点名判红
 #   abandoned-rounds-source-green   四行带合格出处（「第 N 行」与「:N」两种写法，另一行的出处那一行写着 m3-close-b1：仓里没有它的任何材料、也不是 -r<数字> 形，不当别的轮名；
 #                                   drift-r1 写的是第 2 行，〔〕原话在第 5 行：出处那份记录前面插过行，原话恰好找到一次照收，成功行后面报挪到第几行；
 #                                   pinned-r1 的〔〕原话在第 6、7 行各一次、行号提示写第 7 行；reworded-r1 的〔〕是改名前的原话（样本根的 .claude/kb/term-renames.md 登记了这次改名），
 #                                   dated-r1 的〔〕带着第 9 行后来删掉的日期，两行原话都找不到而去掉新旧名与日期之后落在行号提示那一行里；
 #                                   三行照提示取那一行收，成功行后面报照提示取的三行）、
-#                                   一行旧行名单里的 c196-r1 没出处，判绿报对数与出处查了几行
+#                                   c196-r1 的出处是 records/halt.md 第 10 行，判绿报对数与出处查了几行
 #   abandoned-rounds-source-date-parentheses-green  两行的〔〕带着登记时写在括号里的日期：bracketed-date-r1 那一行的全角括号连日期被 date-once 的出路（doc-consolidate.py migrate）删了，
 #                                   halfwidth-date-r1 那一行的半角括号连日期是手删的；两行原话都找不到，去掉日期、空白与逗号、剩下的空括号之后落在行号提示那一行里，
 #                                   照提示取那一行收，判绿报对数与照提示取的两行
@@ -444,38 +492,47 @@
 #   milestone-close-owed-green      里程碑三的段表写了已完结，开着的五行去向都是别的里程碑（十三、四、十四带项号、文件名 04-*），「去向：」之后带日期的文件名、
 #                                   前置格里「去向：」之前与出处一格里的「里程碑三」不算，判绿报对数
 #   milestone-close-owed-no-object  两份里程碑文件的段表都没写收口，开着的账点名里程碑三也不判，退 77
+#   owed-destination-form-red       开着的四行：去向段开头写「挪出里程碑三，归 …」与「（从里程碑三挪来）…」的两行逐行报，开头是「里程碑八一·1」后接括注的、没写「去向：」的不报，
+#                                   已还清那张表里的一行不判，判红报「写了「去向：」的 3 行：2 行去向段开头不是三种落点之一」
+#   owed-destination-form-green     开着的六行：文件落点后接作业点与「从里程碑三挪来」的括注、号带项号后接括注、「、」连写的两个落点（作业点里的节名带里程碑四）、
+#                                   「未排」起头、「去向：」之前写说明的各一行，没写「去向：」的一行只报数；已还清那张表里写坏的一行不判，判绿报三种形态各几行
 #   deferred-items-registered-red   往调度记录追加七行带延后类词的：一行写开着的 C10 不报，六行逐个报（没写登记、C99 欠账表里没有、「九十节 ⑤」那一节没有这一行、
 #                                   写了「拆分提案」的「第九十节」有行首序号却没写哪一行、research/notes.md:99 超过行数、gone.md:3 不在树里）
-#   deferred-items-registered-green 往调度记录追加五行，C10、欠账那份的 records/2026-10-23-subagent拆分提案.md:8、「九十节 ③」、写了「拆分提案」的只有正文的「第九十四节」、research/notes.md:12 各指一行，判绿报「判了 5 行」；
-#                                   词只在「」里的一行、围栏里的一行、往拆分提案九十节加的一行（登记处本身）与基准里的旧行不判
+#   deferred-items-registered-green 往调度记录追加五行，C10、现行账本的 records/2026-10-29-subagent拆分提案.md:8、「九十节 ③」、写了「拆分提案」的只有正文的「第九十四节」、research/notes.md:12 各指一行，判绿报「判了 5 行」；
+#                                   词只在「」里的一行、围栏里的一行、往封存那份的九十节加的一行（登记处本身）与基准里的旧行不判
 #   deferred-items-registered-topic-green  追加七行：两行标题、两行只把「延后项」当话题名词、一行只在报统计数（「延后项无去向 8/54」「延后当时就登进欠账表的 6/54」）不判，
 #                                   一行写 C10 照判，判绿报「判了 1 行」，不判的里只在点话题的 4 行、标题 1 行
 #   deferred-items-registered-topic-red    追加六行，一行写 C10 不报，五行逐个报：「进延后项」、「延后项」旁边另有「下一批」、「延后到」、井号后面没空格的「#延后」、统计数旁边的「下一批」
 #   deferred-items-registered-registry-green  登记处表两行（staged-gate.md、commit-stages.md）写对，两行表格的去向格各点名一份（一份在反引号里），一行写 C10，判绿报「判了 3 行」
 #   deferred-items-registered-registry-red    登记处表四行写坏逐行报（文件不在树里、理由太短、只有一段、登记两次）；追加八行，去向格点名 staged-gate.md 的一行不报，
 #                                   七行逐个报：「九十节各行」、没登记的流程文件、登记处只在延后类词那一格之前、不是表格行、staged-gate.md.old、表里写坏了那一行的两份
-#   deferred-items-registered-ledger-green  追加四行各指一处：只在欠账那份的「第一百零二节 ①」、只在历史那份的「第三十节 ①」、两份都有九十七节而 ④ 只在历史那份的
-#                                   「第九十七节 ④」、写了「拆分提案」的只有正文的欠账那份「第一百零三节」，判绿报「判了 4 行」；往欠账那份新登一节带「下一批」的一行（登记处本身）不判
-#   deferred-items-registered-ledger-red    追加三行，一行写 C10 不报，两行逐个报：「第一百零九节 ①」两份都没有那一节、「九十节 ⑦」两份的九十节都没有这一行，原因里点名两份
-#   deferred-items-registered-ledger-missing-red  没有欠账那份，追加一行「九十节 ②」（历史那份里指得到），照实报读不到欠账那份、红
-#   deferred-items-registered-pointers-red  追加五行：已还清的 C11、文件:行指到同一份调度记录的别一行（records/ 下不是拆分提案）、文件:行指到这一行自己，三行逐个报；
-#                                   指欠账那份 records/2026-10-23-subagent拆分提案.md:8 的一行与写开着的 C10 的一行不报
-#   ledger-section-numbers-green    欠账那份：两个五十六（例外表登记的 2 处，索引两行）、索引第一格带括注的「一百（…）」、围栏里的标题与表格行不算，判绿报节号、标题与索引行数
+#   deferred-items-registered-ledger-green  账本登记表：现行 2026-10-29、封存 2026-10-23（在前）与 2026-09-16。追加五行各指一处：只在现行账本的「第一百零二节 ①」、
+#                                   只在头一份封存的「第一百一十节 ①」、只在后一份封存的「第三十节 ①」、现行与后一份封存都有九十七节而 ④ 只在后一份封存的「第九十七节 ④」、
+#                                   写了「拆分提案」的只有正文的现行账本「第一百零三节」，判绿报「判了 5 行」；往现行账本新登一节带「下一批」的一行（登记处本身）不判
+#   deferred-items-registered-ledger-red    追加三行，一行写 C10 不报，两行逐个报：「第一百零九节 ①」登记的两份都没有那一节、「九十节 ⑦」两份的九十节都没有这一行，原因里点名登记的两份
+#   deferred-items-registered-ledger-missing-red  登记表点名的现行账本不在树里，追加一行「九十节 ②」（封存那份里指得到），照实报读不到现行账本、红
+#   deferred-items-registered-pointers-red  追加五行：已还清的 C11、文件:行指到同一份调度记录的别一行（records/ 下不是登记的拆分提案）、文件:行指到这一行自己，三行逐个报；
+#                                   指现行账本 records/2026-10-29-subagent拆分提案.md:8 的一行与写开着的 C10 的一行不报
+#   deferred-items-registered-section-scope-green  现行账本有一百零六节 ①、没有第五节、第三节；追加三行：「登记的第五节」写在「拆分提案第一百零六节 ①」前面 16 个字以内、
+#                                   「拆分提案第一百零六节 ①，登记第五节」、「拆分提案（2026-10-29 份）第一百零六节 ①，判决的第三节」，只核一百零六节，判绿报「判了 3 行」
+#   ledger-section-numbers-green    现行账本 records/2026-10-29-subagent拆分提案.md：标题与索引第一格都带括注的「一百六十七（2026-10-23 那份里的第二个五十六）」、
+#                                   索引第一格带括注的「一百（…）」、围栏里的标题与表格行不算，判绿报节号、标题与索引行数
 #   ledger-section-numbers-duplicate-red  另一个会话同时追加，「## 一百零三、」写了两处（索引一行），判红报重号的两行
 #   ledger-section-numbers-index-missing-red  「## 一百零四、」没在索引表占号、索引表多一行没有对应一节的「一百零九」，判红逐处报
+#   sealed-ledgers-unchanged-green  登记表一行现行、两行封存，两份封存的内容与登记的 sha256 相同，判绿报「封存的 2 份」
+#   sealed-ledgers-unchanged-red    同一张登记表，2026-10-23 那份封存之后末尾又追加了一节，判红点名它、报两个 sha256，出路写「封存账本不改，往现行账本追加」；2026-09-16 那份对得上、不报
+#   sealed-ledgers-unchanged-registry-red  登记表写坏五行逐行报（两行 current、认不得的角色、只有三段、理由不到 8 个字、同一份登了两次），封存那份的 sha256 本身对得上
 # 登记行判法的弄坏开关在 .claude/hooks/lib_abandoned_rounds.py（LIB_ABANDONED_ROUNDS_BREAK，一次设一个；派发闸的自检也带着）。红在这一格的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   columns-unchecked        不核四列不空                     abandoned-rounds-red（输出里找不到「不是四列、或有空列」）
 #   date-unchecked           不核日期是 YYYY-MM-DD            abandoned-rounds-red（输出里找不到「日期不是 YYYY-MM-DD」）
 #   duplicate-unchecked      同一轮两行也不拒                 abandoned-rounds-red（输出里找不到「dup-r1（第 」）
-#   source-optional          出处一概不要求                   abandoned-rounds-source-red（输出里找不到「这些行的出处收不了」）、abandoned-rounds-source-green（输出里找不到「登记表 8 行：…出处按派发闸 ⑥ 同一份判法查了 7 行」）、
+#   source-optional          出处一概不要求                   abandoned-rounds-source-red（输出里找不到「这些行的出处收不了」）、abandoned-rounds-source-green（输出里找不到「登记表 8 行：…出处按派发闸 ⑥ 同一份判法查了 8 行」）、
 #                                                             abandoned-rounds-source-date-parentheses-green（输出里找不到「登记表 2 行：…出处按派发闸 ⑥ 同一份判法查了 2 行」）
 #   other-round-name-ok      出处那一行有别的轮名也收         abandoned-rounds-source-red（输出里找不到「除这一轮外还有别的轮名 other-r1」）
 #   other-name-by-form       别的轮名的全集退回只认登记表里的名字（仓里的 _<轮>-body.md 等材料不算；-r<数字> 形照认）  abandoned-rounds-source-red（输出里找不到「named-r1：第 7 行的出处…除这一轮外还有别的轮名 close-b1」）
 #   other-form-ignored       别的轮名不认 -r<数字> 形，只认仓里认得的全集（改前的判法）  abandoned-rounds-source-red（输出里找不到「formonly-r1：第 8 行的出处…除这一轮外还有别的轮名 ghost-r2」）
-#   legacy-by-date           免出处退回按日期（早于 2026-10-12 的行不要求）  abandoned-rounds-source-red（输出里找不到「datedold-r1：第 6 行没有出处」）
 #   source-any-path          出处不限 records/                abandoned-rounds-source-red（输出里找不到「ownbody-r1：第 4 行没有出处」）
 #   quote-short-ok           「」里一个字也算原话             abandoned-rounds-source-red（输出里找不到「至少 6 个字」）
-#   source-required-always   旧行名单里的行也要求出处         abandoned-rounds-green、abandoned-rounds-source-green（期望退出 0，实测 1）
 #   line-unread              不找〔〕原话、不取那一行，整份文件里找   abandoned-rounds-source-red（输出里找不到「除这一轮外还有别的轮名 other-r1」「至少 6 个字」）、
 #                                                             abandoned-rounds-source-green（输出里找不到「出处行号对不上而〔〕原话恰好找到一次、照收的 1 行」）、
 #                                                             abandoned-rounds-source-date-parentheses-green（输出里找不到「出处〔〕原话命中几处或找不到、照行号提示取那一行照收的 2 行」）
@@ -499,24 +556,26 @@
 #   STAGE_CELLS_BREAK=red-swallowed  红格按绿记、整道退 0
 #       abandoned-rounds-red、abandoned-rounds-source-red、agent-def-adversarial-review-red、agent-def-adversarial-review-section-moved-red、batch-scope-red、code-round-snapshot-no-snapshot-red、code-round-snapshot-red、crates-adversarial-review-comment-and-code-red、crates-adversarial-review-exempt-stale-red、
 #       crates-adversarial-review-pending-grown-red、crates-adversarial-review-pending-table-red、crates-adversarial-review-red、crates-adversarial-review-section-edges-red、crates-adversarial-review-section-moved-red、implementation-premise-red、
-#       knowledge-sync-red、verdict-names-local-samples-missing-clean-sample、verdict-names-local-samples-red、abandoned-rounds-archived-top-level-red、milestone-close-owed-red、deferred-items-registered-red、deferred-items-registered-topic-red、deferred-items-registered-registry-red、
+#       knowledge-sync-red、verdict-names-local-samples-missing-clean-sample、verdict-names-local-samples-red、abandoned-rounds-archived-top-level-red、milestone-close-owed-red、owed-destination-form-red、deferred-items-registered-red、deferred-items-registered-topic-red、deferred-items-registered-registry-red、
 #       deferred-items-registered-ledger-red、deferred-items-registered-ledger-missing-red、batch-scope-stale-red、
 #       crates-adversarial-review-section-negated-red、agent-def-adversarial-review-section-negated-red、abandoned-rounds-kb-negated-red、
 #       ledger-section-numbers-duplicate-red、ledger-section-numbers-index-missing-red、deferred-items-registered-pointers-red、
-#       crates-adversarial-review-snapshot-stale-red、agent-def-adversarial-review-snapshot-stale-red（期望退出 1，实测 0）
-#   STAGE_CELLS_BREAK=marker-ignored  不认样本根的 .gate-cells，每份样本十一格全跑
+#       crates-adversarial-review-snapshot-stale-red、agent-def-adversarial-review-snapshot-stale-red、sealed-ledgers-unchanged-red、sealed-ledgers-unchanged-registry-red（期望退出 1，实测 0）
+#   STAGE_CELLS_BREAK=marker-ignored  不认样本根的 .gate-cells，每份样本十三格全跑
 #       abandoned-rounds-green、abandoned-rounds-red、abandoned-rounds-source-date-parentheses-green、abandoned-rounds-source-green、abandoned-rounds-source-red、agent-def-adversarial-review-green、agent-def-adversarial-review-pending-green、agent-def-adversarial-review-red、agent-def-adversarial-review-section-green、agent-def-adversarial-review-section-moved-red、batch-scope-green、
 #       batch-scope-red、code-round-snapshot-green、code-round-snapshot-no-object、code-round-snapshot-no-snapshot-red、code-round-snapshot-red、crates-adversarial-review-comment-and-code-red、crates-adversarial-review-comment-only、crates-adversarial-review-exempt-green、crates-adversarial-review-exempt-stale-red、crates-adversarial-review-green、
 #       crates-adversarial-review-pending-green、crates-adversarial-review-pending-grown-red、crates-adversarial-review-pending-table-red、crates-adversarial-review-red、crates-adversarial-review-section-edges-red、crates-adversarial-review-section-green、crates-adversarial-review-section-moved-red、crates-adversarial-review-test-code-only、implementation-premise-green、implementation-premise-red、
 #       knowledge-sync-green、knowledge-sync-old-record-green、knowledge-sync-red、verdict-names-local-samples-green、verdict-names-local-samples-missing-clean-sample、
 #       verdict-names-local-samples-red、abandoned-rounds-archived-subdirectory-green、abandoned-rounds-archived-top-level-red、
-#       milestone-close-owed-red、milestone-close-owed-green、milestone-close-owed-no-object、deferred-items-registered-red、deferred-items-registered-green、
+#       milestone-close-owed-red、milestone-close-owed-green、milestone-close-owed-no-object、owed-destination-form-red、owed-destination-form-green、
+#       deferred-items-registered-red、deferred-items-registered-green、
 #       deferred-items-registered-topic-green、deferred-items-registered-topic-red、deferred-items-registered-registry-green、deferred-items-registered-registry-red、
 #       deferred-items-registered-ledger-green、deferred-items-registered-ledger-red、deferred-items-registered-ledger-missing-red、
 #       crates-adversarial-review-section-negated-red、agent-def-adversarial-review-section-negated-red、abandoned-rounds-kb-negated-red、ledger-section-numbers-green、
 #       ledger-section-numbers-duplicate-red、ledger-section-numbers-index-missing-red、deferred-items-registered-pointers-red、
 #       crates-adversarial-review-snapshot-green、crates-adversarial-review-snapshot-stale-red、crates-adversarial-review-snapshot-stale-exempt-green、
-#       agent-def-adversarial-review-snapshot-stale-red、agent-def-adversarial-review-snapshot-green（输出里找不到「样本只跑 .gate-cells 点名的格：…」）；
+#       agent-def-adversarial-review-snapshot-stale-red、agent-def-adversarial-review-snapshot-green、
+#       sealed-ledgers-unchanged-green、sealed-ledgers-unchanged-red、sealed-ledgers-unchanged-registry-red、deferred-items-registered-section-scope-green（输出里找不到「样本只跑 .gate-cells 点名的格：…」）；
 #       batch-scope-stale-pruned-green（期望退出 0，实测 1）；batch-scope-stale-red（输出里找不到「样本只跑 .gate-cells 点名的格：batch-scope」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -531,8 +590,8 @@ source "$STAGE_DIR/lib/stage-cells.sh"
 TRIGGER_TABLE=".claude/gate.d/knowledge-sync-triggers.tsv"
 PREMISE_CUTOFF="2026-09-17"
 SIDE_AND_SNAPSHOT_CUTOFF="2026-09-28"
-# crates-adversarial-review 格不判的测试代码：harness 档包、checker 档包与池级 checker 的 src（.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）
-TEST_CODE_SOURCES='^crates/(singlefs-harness|singlefs-checker-tier|singlefs-checker|singlefs-unit-graph)/src/'
+# crates-adversarial-review 格不判的测试代码：验证包、池级 checker 与函数单元图的 src（.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）
+TEST_CODE_SOURCES='^crates/(singlefs-verification|singlefs-checker|singlefs-unit-graph)/src/'
 # 判决里认点名的那一节（crates-adversarial-review 与 agent-def-adversarial-review 两格共用）：标题一行逐字是它，判决里别处提到路径不算点名
 REVIEWED_SECTION_HEADING="## 这一轮被判过的文件"
 # 那一节里写了这些否定词之一的行不算点名（文件头「点名一节」判据 ⑤），空白分隔；加词之前先量真仓判决的那一节会多红几行
@@ -557,11 +616,15 @@ stage_cell knowledge-sync check_knowledge_sync "改了规则、agent、hook、�
 stage_cell agent-def-adversarial-review check_agent_def_adversarial_review "改过的 agent 定义与共用约束有没有走过三方审核" \
   "走一轮三方（.claude/rules/three-way-inference.md），判决落 research/prompts/<轮>-main-verification.md，判决里写一节「## 这一轮被判过的文件」（标题逐字、二级标题），节里按路径列出改过的每一份；只认这一节，正文别处提到路径不算；用户逐次豁免的登记进 .claude/agent-def-review-exempt；判决之后又改过的（那一轮开工快照的 sha256 与此刻的内容对不上）再开一轮，或照 .claude/agent-def-review-exempt 按内容哈希登记豁免"
 stage_cell milestone-close-owed check_milestone_close_owed "段表写了收口的里程碑，欠账表开着的那张表里没有一行的前置点名它" \
-  "收口之前把点名它的那几行逐行了结：做完的挪进 .claude/kb/checks-owed.md 的「已还清」，没做完的把去向改到还开着的里程碑（前置里不再写这个里程碑的号或文件名）；改不了的就别收口，把段表那一格的「结束 / 已完结」撤回；改完跑 python3 scripts/kb/milestone-close-owed-check.py <号> 到绿"
+  "收口之前把点名它的那几行逐行了结：做完的挪进 .claude/kb/checks-owed.md 的「已还清」，没做完的把去向改到还开着的里程碑（「去向：」之后开头的落点不再写这个里程碑的号或文件名，挪出来的经过写在落点之后）；改不了的就别收口，把段表那一格的「结束 / 已完结」撤回；改完跑 python3 scripts/kb/milestone-close-owed-check.py <号> 到绿"
+stage_cell owed-destination-form check_owed_destination_form "欠账表开着的行，「去向：」之后开头是三种落点之一（里程碑文件、「里程碑<号>」、「未排」），落点点名的里程碑文件都在" \
+  "把去向段开头改成三种落点之一，说明挪到落点之后：① .claude/kb/milestone/<两位号>-<名>-txn.md（反引号可有可无）后接作业点（「四·1」「「节名」八·4」）；② 「里程碑<号>」后接作业点（「里程碑三二·5」）；③ 「未排」起头；几个落点用「、」连写在开头；落点的文件找不到的核号与文件名；改完跑 python3 scripts/kb/milestone-close-owed-check.py --destination-form 到绿"
 stage_cell deferred-items-registered check_deferred_items_registered "records/ 下这次新增的带延后类词的行，同一行写着指得到的登记（C 号、拆分提案的节号与行首序号、文件:行或登记处表里的流程文件）" \
-  "照 .claude/main-agent.md「一轮怎么开、怎么收」第 2 条在同一行写登记的编号或 文件:行：先在 .claude/kb/checks-owed.md、里程碑收口表、决策正文或 records/2026-10-23-subagent拆分提案.md 的编号小节登一行（records/2026-09-16-subagent拆分提案.md 里已有的节照旧认），再在调度记录那一行写开着的 C<号>、「第<节号>节 <行首序号>」或从仓根起的 <路径>:<行号>（records/ 下只认两份拆分提案，不指这一行自己）；去向是提交时那一套流程的，表格行的去向格点名 .claude/gate.d/deferral-registries.tsv 登记的那份文件；指不到的照红行写的原因改"
-stage_cell ledger-section-numbers check_ledger_section_numbers "欠账那份拆分提案的「## <节号>、」标题不重号，每个节号在「## 索引」表里恰好一行" \
-  "新登一节先在 records/2026-10-23-subagent拆分提案.md 的「## 索引」表插一行占号（scripts/kb/insert-row.py），取下一个没用过的节号再写「## <节号>、」标题；撞了号的改成下一个空号、索引表里同步改；索引里多出的、少了的照红行补删；历史上已经重号的节只登记在这一格的 LEDGER_DUPLICATE_SECTIONS，不往里加"
+  "照 .claude/main-agent.md「一轮怎么开、怎么收」第 2 条在同一行写登记的编号或 文件:行：先在 .claude/kb/checks-owed.md、里程碑收口表、决策正文或现行账本（.claude/gate.d/split-proposal-ledgers.tsv 里 current 那一份）的编号小节登一行（封存的几份里已有的节照旧认，不往封存的里加），再在调度记录那一行写开着的 C<号>、「第<节号>节 <行首序号>」或从仓根起的 <路径>:<行号>（records/ 下只认登记表里的拆分提案，不指这一行自己）；去向是提交时那一套流程的，表格行的去向格点名 .claude/gate.d/deferral-registries.tsv 登记的那份文件；指不到的照红行写的原因改"
+stage_cell ledger-section-numbers check_ledger_section_numbers "现行账本（拆分提案账本登记表里 current 那一份）的「## <节号>、」标题不重号，每个节号在「## 索引」表里恰好一行" \
+  "新登一节用 python3 scripts/kb/ledger-append-section.py --title '<标题（含日期）>' --body-file <正文文件>：它读 .claude/gate.d/split-proposal-ledgers.tsv 里 current 那一份，现取最大节号加一，「## 索引」表末行与末尾的「## <节号>、」一节一次写入，两个会话同时追加时后到的退 4、重跑取下一个号；不手写新节的标题；撞了号的改成下一个空号、索引表里同步改；索引里多出的、少了的照红行补删"
+stage_cell sealed-ledgers-unchanged check_sealed_ledgers_unchanged "拆分提案账本登记表里封存的那几份，内容与登记的 sha256 相同（封存之后没被改）" \
+  "封存账本不改，往现行账本追加：把红行点名的那份恢复成封存时那一版（git log -- <路径> 找到内容的 sha256 与登记表那一行相同的提交，git show <提交>:<路径> > <路径>），要记的新内容写进 .claude/gate.d/split-proposal-ledgers.tsv 里 current 那一份；登记表写坏的照红行逐行改"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -601,11 +664,10 @@ MILESTONE_CLOSE_CHECK="$(cd "$STAGE_DIR/../.." && pwd)/scripts/kb/milestone-clos
 DEFERRAL_WORDS="延后 下轮开 下一轮开 下一批 留给 下一个题目"
 # deferred-items-registered 格认的登记处表（文件头「deferred-items-registered」判据 ④）：提交时那一套流程的文件，一份一行带理由，不在判法里写死
 DEFERRAL_REGISTRY_TABLE=".claude/gate.d/deferral-registries.tsv"
-# ledger-section-numbers 格判的那份（文件头「ledger-section-numbers」）与它历史上已经重号、照原样留着的节：<节号>:<标题与索引行各该有几处>，空白分隔；只缩不涨
-LEDGER_PROPOSAL="records/2026-10-23-subagent拆分提案.md"
+# 拆分提案账本登记表（现行一份、封存几份；文件头「sealed-ledgers-unchanged」）：deferred-items-registered、ledger-section-numbers、sealed-ledgers-unchanged 三格都读被判的根里的这一份，换账本只改它
+LEDGER_REGISTRY=".claude/gate.d/split-proposal-ledgers.tsv"
 # deferred-items-registered 格认 C 号只认开着的：欠账表开着与已还清的切法只在这一份（取这一道脚本所在仓里那一份，不取项目根：样本根里放不了坏的）
 OWED_LIBRARY="$STAGE_DIR/lib-owed.py"
-LEDGER_DUPLICATE_SECTIONS="五十六:2"
 # 挂账表与基准那一版比（只缩不涨）：取基准那一版与切表行的读法只在这一份（与 doc-experiments、code-source-discipline、code-tooling 几处同一份）
 LAG_BASELINE_LIBRARY="$STAGE_DIR/lib-lag-baseline.py"
 # shellcheck source=../../scripts/gate/changed-paths.sh
@@ -658,6 +720,94 @@ load_added_records_directory_lines() {
 not_git_repository() {
   echo "  ! $ROOT 不是 git 仓，这一格无对象可判"
   return 77
+}
+
+# ── 拆分提案账本登记表：父进程里读一次（各格在自己的子 shell 里跑，子 shell 里读的传不回父进程），用它的三格各自报 ledger_registry_problems ──
+# 写法与判据在文件头「sealed-ledgers-unchanged」的登记表一节；弄坏开关 DOC_PROCESS_RECORDS_BREAK=ledger-registry-unchecked 下不核行，sealed 照收、current 取头一行。
+# 读出来一行一条：「current<TAB>路径」「sealed<TAB>路径<TAB>sha256」「problem<TAB>哪一行、哪里不合」。
+current_ledger=""; sealed_ledgers=(); sealed_ledger_digests=(); ledger_registry_problems=()
+if ledger_registry_rows="$(python3 - "$LEDGER_REGISTRY" "${DOC_PROCESS_RECORDS_BREAK:-}" <<'PY'
+import re, sys
+
+path, broken = sys.argv[1], sys.argv[2]
+unchecked = broken == "ledger-registry-unchecked"
+DIGEST = re.compile(r"[0-9a-f]{64}")
+MINIMUM_REASON_CHARACTERS = 8
+try:
+    with open(path, encoding="utf-8") as handle:
+        rows = handle.read().split("\n")
+except FileNotFoundError:
+    print(f"problem\t{path} 不在：现行账本与封存的几份都登记在被判的根里的这一份")
+    sys.exit(0)
+except (OSError, UnicodeDecodeError) as error:
+    print(f"problem\t读不了 {path}（{error}）")
+    sys.exit(0)
+current, seen = [], set()
+for number, row in enumerate(rows, 1):
+    if not row.strip() or row.startswith("#"):
+        continue
+    fields = [field.strip() for field in row.split("\t")]
+    where = f"{path}:{number}"
+    if unchecked:
+        if fields[0] == "current" and len(fields) > 1:
+            current.append((where, fields[1]))
+        elif fields[0] == "sealed" and len(fields) > 2:
+            print(f"sealed\t{fields[1]}\t{fields[2]}")
+        continue
+    if len(fields) != 4:
+        print(f"problem\t{where}：不是「角色<TAB>路径<TAB>sha256<TAB>为什么」四段（读出 {len(fields)} 段）")
+        continue
+    role, ledger, digest, reason = fields
+    if role not in ("current", "sealed"):
+        print(f"problem\t{where}：角色「{role}」认不得（只认 current 与 sealed）")
+    elif not (ledger.startswith("records/") and ledger.endswith(".md")):
+        print(f"problem\t{where}：{ledger} 不是 records/ 下的 .md（写从仓根起的路径）")
+    elif role == "current" and digest != "-":
+        print(f"problem\t{where}：current 那一行的 sha256 写「-」（现行账本还在追加，不封存），读出「{digest}」")
+    elif role == "sealed" and not DIGEST.fullmatch(digest):
+        print(f"problem\t{where}：sealed 行的 sha256 要写 64 位小写十六进制（sha256sum < {ledger} 的头一段），读出「{digest}」")
+    elif len(reason) < MINIMUM_REASON_CHARACTERS:
+        print(f"problem\t{where}：{ledger} 的为什么不到 {MINIMUM_REASON_CHARACTERS} 个字")
+    elif ledger in seen:
+        print(f"problem\t{where}：{ledger} 登了两次")
+    else:
+        seen.add(ledger)
+        if role == "current":
+            current.append((where, ledger))
+        else:
+            print(f"sealed\t{ledger}\t{digest}")
+if current and (unchecked or len(current) == 1):
+    print(f"current\t{current[0][1]}")
+elif not current:
+    print("problem\t没有 current 那一行：现行账本恰好登一份")
+else:
+    print(f"problem\tcurrent 登了 {len(current)} 行（{'、'.join(where for where, _ledger in current)}）：现行账本恰好登一份")
+PY
+)"; then
+  while IFS= read -r ledger_registry_row; do
+    case "$ledger_registry_row" in
+      current$'\t'*) current_ledger="${ledger_registry_row#current$'\t'}" ;;
+      sealed$'\t'*)
+        ledger_registry_row="${ledger_registry_row#sealed$'\t'}"
+        sealed_ledgers+=("${ledger_registry_row%%$'\t'*}")
+        sealed_ledger_digests+=("${ledger_registry_row#*$'\t'}") ;;
+      problem$'\t'*) ledger_registry_problems+=("${ledger_registry_row#problem$'\t'}") ;;
+    esac
+  done <<<"$ledger_registry_rows"
+else
+  ledger_registry_problems+=("读 $LEDGER_REGISTRY 的 python 退了非 0（报错在上面），现行账本与封存的几份一份都没认出来")
+fi
+
+# 登记表有不合的行：逐行报、退 1；没有：退 0、什么都不打。用它的三格开头先调。
+report_ledger_registry_problems() {
+  ((${#ledger_registry_problems[@]})) || return 0
+  local problem
+  for problem in "${ledger_registry_problems[@]}"; do
+    echo "  ✗ $problem"   # gate-lint:detail
+  done
+  echo "  ✗ 拆分提案账本登记表 $LEDGER_REGISTRY 有 ${#ledger_registry_problems[@]} 处不合，现行账本与封存的几份认不准，这一格没判"
+  echo "     → 怎么办：照这道门禁文件头「sealed-ledgers-unchanged」的登记表一节逐行改：「current 或 sealed<TAB>records/<名>.md<TAB>sha256（current 写 -）<TAB>为什么（8 个字以上）」，current 恰好一行、同一份不登两次"
+  return 1
 }
 
 # ── batch-scope ──────────────────────────────────────────────────────────────
@@ -1258,7 +1408,7 @@ report_comment_only_sources() {
 report_test_code_sources() {
   local listed="$1" listed_count="$2" path
   ((listed_count)) || return 0
-  echo "    不判的测试代码 ${listed_count} 个（harness 档包、checker 档包与池级 checker 三个包的 src，改完直接测、不走三方：.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）："
+  echo "    不判的测试代码 ${listed_count} 个（验证包、池级 checker 与函数单元图的 src，改完直接测、不走三方：.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）："
   while IFS= read -r path; do
     [[ -n "$path" ]] && printf '      %s\n' "$path"
   done <<<"$listed"
@@ -1481,8 +1631,6 @@ dispatch_forms = (
     re.compile(r"^" + round_name + r"-local-attack\.md$"),
     re.compile(r"^" + round_name + r"-local-defense\.md$"),
 )
-legacy_body_form = re.compile(r"^_(?P<prefix>.+)-body\.md$")
-legacy_leg_form = re.compile(r"^(?P<prefix>[^_].*?)(?:(?:-(?:forward|reverse|attack|defense|admission|ledger))?-(?:opus|sonnet)|-local|-local-attack|-local-defense)\.md$")
 
 # 树上现有的，加上归档进版本库的那些：只看树的话，一轮的腿文件一被归档，撂下登记表里那一行就报「认不出它发过腿」。
 archived_names = set()
@@ -1510,7 +1658,6 @@ if inside_repository:
 prompt_files = sorted(set(name for name in os.listdir(prompts_dir)
                           if os.path.isfile(os.path.join(prompts_dir, name))) | archived_names)
 dispatch_files_by_round = {}
-unrecognized_files = []
 for name in prompt_files:
     matched_round = None
     for form in dispatch_forms:
@@ -1520,15 +1667,6 @@ for name in prompt_files:
             break
     if matched_round is not None:
         dispatch_files_by_round.setdefault(matched_round, []).append(name)
-    elif legacy_body_form.match(name) or legacy_leg_form.match(name):
-        unrecognized_files.append(name)
-
-legacy_prefixes = set()
-for name in unrecognized_files:
-    match = legacy_body_form.match(name) or legacy_leg_form.match(name)
-    prefix = match.group("prefix")
-    if prefix not in dispatch_files_by_round:
-        legacy_prefixes.add(prefix)
 
 if not dispatch_files_by_round:
     print(f"  ! {prompts_dir} 下没有一个文件名认得出发过腿的轮次（_<轮>-body.md、<轮>-opus.md、<轮>-sonnet.md、<轮>-local-attack.md、<轮>-local-defense.md），这一格无对象可判")
@@ -1657,7 +1795,7 @@ if duplicated_registrations:
     print("     → 怎么办：合成一行，理由与去向写在同一行里。")
 if source_problem_rows:
     failed = True
-    print(f"  ✗ {registry_path} 这些行的出处收不了（派发闸 ⑥ 读同一张表、判同一份，不收就是红；只有库里旧行名单 {'、'.join(abandoned_library.LEGACY_SOURCELESS_ROUNDS)} 里的行不要出处，别的行都要）：")  # gate-lint:summary
+    print(f"  ✗ {registry_path} 这些行的出处收不了（派发闸 ⑥ 读同一张表、判同一份，不收就是红；每一行都要出处）：")  # gate-lint:summary
     for entry in source_problem_rows:
         print(f"     {entry}")  # gate-lint:detail
     print("     → 怎么办：在那一行里写出处「records/<文件>.md 第 N 行〔<那一行里含这一轮名字的一段原话，逐字照抄>〕」（或 records/<文件>.md:N〔…〕）：〔〕里的原话在 records/ 下那份现存文件里要恰好找到一次"
@@ -1682,8 +1820,8 @@ if failed:
 
 checked = len(dispatch_files_by_round)
 print(f"  ✓ 发过腿的三方轮次都有判决或撂下登记（查了 {checked} 轮：判决文件 {len(verdict_file_rounds)} 轮、kb 小节里的判决 {len(kb_verdict_rounds)} 轮、登记撂下 {len(abandoned_rounds)} 轮）")
-sourced_rows = sum(1 for row in registry_rows if abandoned_library.source_required(row, library_modes))
-print(f"    登记表 {len(registry_rows)} 行：形状与同一轮重复都查了，出处按派发闸 ⑥ 同一份判法查了 {sourced_rows} 行，{len(registry_rows) - sourced_rows} 行在旧行名单里、不要求出处")
+sourced_rows = len(registry_rows) if abandoned_library.source_required(library_modes) else 0
+print(f"    登记表 {len(registry_rows)} 行：形状与同一轮重复都查了，出处按派发闸 ⑥ 同一份判法查了 {sourced_rows} 行")
 moved_rows = [f"{row.name}：出处 {registry_judgement.moved[row.number][0]} 写的第 {registry_judgement.moved[row.number][1]} 行，原话现在在第 {registry_judgement.moved[row.number][2]} 行"
               for row in registry_rows if row.number in registry_judgement.moved]
 if moved_rows:
@@ -1692,10 +1830,6 @@ hinted_rows = [f"{row.name}：出处 {registry_judgement.hinted[row.number][0]} 
                for row in registry_rows if row.number in registry_judgement.hinted]
 if hinted_rows:
     print(f"    出处〔〕原话命中几处或找不到、照行号提示取那一行照收的 {len(hinted_rows)} 行（取到的那一行是不是用户为这一轮说的，靠主 agent 核）：{'；'.join(hinted_rows)}")
-if legacy_prefixes:
-    print(f"    没判 {len(legacy_prefixes)} 个前缀（腿提示是旧形态：<题>-local.md、<题>-forward-sonnet.md 这类，或轮名不以 -r<N> 结尾）：{'、'.join(sorted(legacy_prefixes))}")
-else:
-    print("    没判 0 个前缀")
 PY
 }
 
@@ -2108,27 +2242,42 @@ check_milestone_close_owed() {
   python3 "$MILESTONE_CLOSE_CHECK" --closed "$ROOT"
 }
 
+# ── owed-destination-form ───────────────────────────────────────────────────
+# 判据在文件头「owed-destination-form」；判法与弄坏开关都在 $MILESTONE_CLOSE_CHECK（与 milestone-close-owed 同一份），这里只调它的 --destination-form、照它的退出码（0 绿、1 红、77 无对象、2 用法错按红）
+check_owed_destination_form() {
+  if [[ ! -f "$MILESTONE_CLOSE_CHECK" ]]; then
+    echo "  ✗ 判法 $MILESTONE_CLOSE_CHECK 不在，判不了欠账表的去向写法"
+    echo "     → 怎么办：那份脚本随仓走，从 git 找回再跑；判法只在那一份，别在这一格里另抄"
+    return 1
+  fi
+  python3 "$MILESTONE_CLOSE_CHECK" --destination-form "$ROOT"
+}
+
 # ── deferred-items-registered ───────────────────────────────────────────────
 # 判据在文件头「deferred-items-registered」；词表是上面的 DEFERRAL_WORDS，弄坏开关 DEFERRED_ITEMS_BREAK 写在文件头那一段
 check_deferred_items_registered() {
   ((inside_git)) || { not_git_repository; return; }
+  report_ledger_registry_problems || return 1
   load_added_records_directory_lines || {
     echo "  ✗ 取不到 records/ 下这一轮新增了哪些行（基准 $gate_base）"
     echo "     → 怎么办：按上面 git 的报错修好仓库状态再跑；取不到新增行时延后项登没登记没法判，不是通过。"
     return 1
   }
   # 新增行经进程替换当文件传：当成一个命令行参数传时，单个参数超过 128 KiB 就起不来（Linux 的 MAX_ARG_STRLEN）。
-  python3 - <(printf '%s\n' "$added_records_directory_lines") "$DEFERRAL_WORDS" "${DEFERRED_ITEMS_BREAK:-}" "$DEFERRAL_REGISTRY_TABLE" "$OWED_LIBRARY" <<'PY'
+  # 封存的几份照登记表的次序一行一份传进去
+  python3 - <(printf '%s\n' "$added_records_directory_lines") "$DEFERRAL_WORDS" "${DEFERRED_ITEMS_BREAK:-}" "$DEFERRAL_REGISTRY_TABLE" "$OWED_LIBRARY" \
+    "$current_ledger" "$(printf '%s\n' ${sealed_ledgers[@]+"${sealed_ledgers[@]}"})" <<'PY'
 import importlib.util, os, re, sys
 
 added_file, words_text, broken, REGISTRY_TABLE, OWED_LIBRARY = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+CURRENT_LEDGER = sys.argv[6]
+SEALED_LEDGERS = [path for path in sys.argv[7].split("\n") if path]
 sys.dont_write_bytecode = True
 DEFERRAL_WORDS = [word for word in words_text.split() if word]
 CHECKS_OWED = ".claude/kb/checks-owed.md"
-# 两份拆分提案：欠账那份（开着的节与新欠账）先找，没有再找历史那份（一字不改，做完的节照旧指得到）；两份都是登记处
-SPLIT_PROPOSAL_LEDGER = "records/2026-10-23-subagent拆分提案.md"
-SPLIT_PROPOSAL = "records/2026-09-16-subagent拆分提案.md"
-BOTH_PROPOSALS = f"{SPLIT_PROPOSAL_LEDGER} 与 {SPLIT_PROPOSAL}"
+# 登记表里的几份拆分提案：现行账本（开着的节与新欠账）先找，没有再照登记表的次序找封存的（一字不改，做完的节照旧指得到）；几份都是登记处
+ALL_LEDGERS = [CURRENT_LEDGER] + SEALED_LEDGERS
+ALL_LEDGERS_TEXT = "、".join(ALL_LEDGERS)
 # 「延后项」是在说「延后的那几件」这个话题（「延后项无去向 8/54」），不是在延后什么；「进延后项」「记进延后项」是把这一件延后，照旧算
 DEFERRAL_NOUN = re.compile(r"延后项" if "into-noun-skipped" in broken else r"(?<!进)延后项")
 HEADING = re.compile(r"^ {0,3}#{1,6}(?:[ \t]|$)")
@@ -2150,6 +2299,8 @@ C_NUMBER = re.compile(r"(?<![A-Za-z0-9_])C([0-9]+)(?![0-9])")
 SECTION_ITEMS = re.compile(rf"第\s*(?P<section>[零〇一二两三四五六七八九十百]+|[0-9]+)\s*节(?:[^{CIRCLED}\n。；]{{0,16}}?(?P<items>[{CIRCLED}](?:\s*[、，,和与及]?\s*[{CIRCLED}])*))?")
 # 行里没写「拆分提案」时只认节号后面紧跟行首序号的写法（「九十节 ㉟」「第九十节（行首序号 ②、③）」），别的文档的「第三节 … ①」不当成它
 SECTION_ITEMS_BARE = re.compile(rf"(?<![零〇一二两三四五六七八九十百0-9])第?\s*(?P<section>[零〇一二两三四五六七八九十百]+|[0-9]+)\s*节\s*(?:[（(]\s*)?(?:行首序号\s*)?(?P<items>[{CIRCLED}](?:\s*[、，,和与及]?\s*[{CIRCLED}])*)")
+# 「拆分提案」之后到它的节号之间许隔的：路径尾巴 .md 与 :行号、收尾的反引号、「（2026-10-23 份）」这类括注、空白；同一行别处的「第 N 节」说的是别的文件
+SPLIT_PROPOSAL_ANCHOR = re.compile(r"拆分提案(?:\.md(?::[0-9]+)?)?`?(?:\s*[（(][^（()）\n]{0,40}[）)])*\s*")
 FILE_LINE = re.compile(r"(?P<path>(?:\.{0,2}/)?[\w.\-一-鿿]+(?:/[\w.\-一-鿿]+)*\.[A-Za-z0-9]+):(?P<line>[0-9]+)(?:[-–](?P<end>[0-9]+))?")
 FENCE = re.compile(r"^\s*(```|~~~)")
 
@@ -2226,10 +2377,11 @@ def section_items(lines):
     return items
 
 
-proposal_lines = read_lines(SPLIT_PROPOSAL)
-proposal_items = section_items(proposal_lines)
-# 欠账那份读不到就照实报（不退回只认历史那份）；ledger-ignored 不读它，ledger-missing-tolerated 读不到当空的、不报
-ledger_lines = [] if "ledger-ignored" in broken else read_lines(SPLIT_PROPOSAL_LEDGER)
+# 封存的几份照登记表的次序读；sealed-chain-cut 只读头一份
+sealed_lines = {path: read_lines(path) for path in SEALED_LEDGERS[:1 if "sealed-chain-cut" in broken else None]}
+sealed_items = [section_items(lines) for lines in sealed_lines.values()]
+# 现行账本读不到就照实报（不退回只认封存的）；ledger-ignored 不读它，ledger-missing-tolerated 读不到当空的、不报
+ledger_lines = [] if "ledger-ignored" in broken else read_lines(CURRENT_LEDGER)
 if ledger_lines is None and "ledger-missing-tolerated" in broken:
     ledger_lines = []
 ledger_items = section_items(ledger_lines)
@@ -2275,6 +2427,19 @@ def registry_named(text):
             if re.search(rf"(?<![\w./\-一-鿿]){re.escape(path)}(?![\w./\-一-鿿])", later)]
 
 
+def section_matches(text):
+    """→ 这一行里当拆分提案节号认的命中，按出现次序（文件头判据 ②）：紧跟「拆分提案」的那一个照 SECTION_ITEMS 认，别处照 SECTION_ITEMS_BARE 认。"""
+    if "拆分提案" not in text:
+        return list(SECTION_ITEMS_BARE.finditer(text))
+    if "split-proposal-section-anywhere" in broken:
+        return list(SECTION_ITEMS.finditer(text))
+    anchored = [match for match in (SECTION_ITEMS.match(text, anchor.end()) for anchor in SPLIT_PROPOSAL_ANCHOR.finditer(text)) if match]
+    spans = [match.span() for match in anchored]
+    elsewhere = [match for match in SECTION_ITEMS_BARE.finditer(text)
+                 if not any(start < match.end() and match.start() < end for start, end in spans)]
+    return sorted(anchored + elsewhere, key=lambda match: match.start())
+
+
 def pointers(text, own_path, own_number):
     """→ [(写法, 指得到吗, 原文, 指不到的原因)]；own_path、own_number 是这一行自己（行号找不到时 own_number 是 None）。"""
     found = []
@@ -2288,21 +2453,21 @@ def pointers(text, own_path, own_number):
         else:
             why = f"{CHECKS_OWED} 里没有「| C{number} |」这一行"
         found.append(("C 号", ok, match.group(0), why))
-    for match in (SECTION_ITEMS if "拆分提案" in text else SECTION_ITEMS_BARE).finditer(text):
+    for match in section_matches(text):
         section = chinese_number(match.group("section"))
-        # 先找欠账那份，没有再找历史那份：序号在两份同号的节里任一份有就算指得到（历史那份里重号的节在欠账那份里改了号）
-        sources = (ledger_items,) if "history-fallback-dropped" in broken else (ledger_items, proposal_items)
+        # 先找现行账本，没有再照登记表的次序找封存的：序号在几份同号的节里任一份有就算指得到（封存的里重号的节在现行账本里改了号）
+        sources = (ledger_items,) if "history-fallback-dropped" in broken else (ledger_items, *sealed_items)
         present = [items_by_section[section] for items_by_section in sources if section in items_by_section]
         items = re.findall(f"[{CIRCLED}]", match.group("items") or "")
         if not present:
-            found.append(("拆分提案节号", False, f"第{match.group('section')}节", f"{BOTH_PROPOSALS} 里都没有第 {section} 节"))
+            found.append(("拆分提案节号", False, f"第{match.group('section')}节", f"{ALL_LEDGERS_TEXT} 里都没有第 {section} 节"))
         elif not items:
-            rows = present[0]   # 只写节号的：欠账那份有这一节就看它，没有看历史那份
+            rows = present[0]   # 只写节号的：看照现行、封存次序头一份有这一节的
             ok = not rows
             found.append(("拆分提案节号", ok, f"第{match.group('section')}节", "" if ok else f"那一节有行首序号（{len(rows)} 行），要写是哪一行"))
         for item in items if present else ():
             ok = any(item in rows for rows in present)
-            found.append(("拆分提案节号与序号", ok, f"第{match.group('section')}节 {item}", "" if ok else f"{BOTH_PROPOSALS} 的第 {section} 节里都没有行首是「{item}」的一行"))
+            found.append(("拆分提案节号与序号", ok, f"第{match.group('section')}节 {item}", "" if ok else f"{ALL_LEDGERS_TEXT} 的第 {section} 节里都没有行首是「{item}」的一行"))
     for match in FILE_LINE.finditer(text):
         path, number = match.group("path"), int(match.group("line"))
         last = int(match.group("end")) if match.group("end") else number
@@ -2312,10 +2477,10 @@ def pointers(text, own_path, own_number):
                 and "self-pointer-accepted" not in broken):
             found.append(("文件:行", False, match.group(0), "指的是这一行自己"))
             continue
-        # records/ 下只认两份拆分提案：调度记录与别的记录是写延后的地方，不是登记处（弄坏开关 records-pointers-accepted 下不判这一样）
-        if (target.startswith("records/") and target not in (SPLIT_PROPOSAL_LEDGER, SPLIT_PROPOSAL)
+        # records/ 下只认登记表里的拆分提案：调度记录与别的记录是写延后的地方，不是登记处（弄坏开关 records-pointers-accepted 下不判这一样）
+        if (target.startswith("records/") and target not in ALL_LEDGERS
                 and "records-pointers-accepted" not in broken):
-            found.append(("文件:行", False, match.group(0), f"records/ 下只认两份拆分提案（{BOTH_PROPOSALS}），别的记录不是登记处"))
+            found.append(("文件:行", False, match.group(0), f"records/ 下只认登记表里的拆分提案（{ALL_LEDGERS_TEXT}），别的记录不是登记处"))
             continue
         lines = read_lines(path) if os.path.isfile(path) else None
         ok = lines is not None and 1 <= number <= len(lines) - (1 if lines and lines[-1] == "" else 0)
@@ -2346,9 +2511,9 @@ for path, text in added:
         elif any(word in text for word in DEFERRAL_WORDS):
             skipped_quoted += 1
         continue
-    if ((path == SPLIT_PROPOSAL and "registry-rows-judged" not in broken)
-            or (path == SPLIT_PROPOSAL_LEDGER and "ledger-rows-judged" not in broken)):
-        skipped_registry += 1   # 两份拆分提案本身是登记处（编号小节），它们里面的行不判
+    if ((path in SEALED_LEDGERS and "registry-rows-judged" not in broken)
+            or (path == CURRENT_LEDGER and "ledger-rows-judged" not in broken)):
+        skipped_registry += 1   # 登记表里的拆分提案本身是登记处（编号小节），它们里面的行不判
         continue
     lines = file_cache.setdefault(path, read_lines(path) or [])
     start = used.get((path, text), 0)
@@ -2375,8 +2540,8 @@ for path, text in added:
         problems.append(f"{where}：带「{'」「'.join(words)}」，写的登记指不到——{detail}")
     else:
         problems.append(f"{where}：带「{'」「'.join(words)}」，同一行没写 C 号、拆分提案的节号与行首序号、文件:行或登记处")
-if owed_lines is None or proposal_lines is None or ledger_lines is None:
-    missing = [path for path, lines in ((CHECKS_OWED, owed_lines), (SPLIT_PROPOSAL_LEDGER, ledger_lines), (SPLIT_PROPOSAL, proposal_lines)) if lines is None]
+missing = [path for path, lines in ((CHECKS_OWED, owed_lines), (CURRENT_LEDGER, ledger_lines), *sealed_lines.items()) if lines is None]
+if missing:
     print(f"  ✗ 读不到 {'、'.join(missing)}：C 号与拆分提案的节号指不指得到判不了")
     print("     → 怎么办：从 git 找回那份文件（git log --diff-filter=D --name-only -- <路径>），修好再单跑这一格（bash .claude/gate.d/doc-process-records.sh --check deferred-items-registered）")
     sys.exit(1)
@@ -2397,8 +2562,8 @@ if problems:
         print(f"  ✗ {problem}")   # gate-lint:detail
     print(f"  ✗ records/ 下这次新增的带延后类词的行里 {len(problems)} 行没登记去向（判了 {len(judged)} 行）")
     print("     → 怎么办：照 .claude/main-agent.md「一轮怎么开、怎么收」第 2 条在同一行写登记的编号或 文件:行"
-          f"（.claude/kb/checks-owed.md 开着的 C 号、{SPLIT_PROPOSAL_LEDGER} 的「第<节号>节 <行首序号>」（新欠账登这份；{SPLIT_PROPOSAL} 里已有的节照旧认）、"
-          "或从仓根起的 <路径>:<行号>（records/ 下只认两份拆分提案，不指这一行自己）），先在那里登一行再写延后；"
+          f"（.claude/kb/checks-owed.md 开着的 C 号、现行账本 {CURRENT_LEDGER} 的「第<节号>节 <行首序号>」（新欠账登这份；封存的 {'、'.join(SEALED_LEDGERS) or '无'} 里已有的节照旧认，不往里加）、"
+          "或从仓根起的 <路径>:<行号>（records/ 下只认登记表里的拆分提案，不指这一行自己）），先在那里登一行再写延后；"
           f"去向是提交时那一套流程的，同一行点名 {REGISTRY_TABLE} 里登记的那份文件（写全路径）")
     sys.exit(1)
 if registry_problems:
@@ -2408,16 +2573,13 @@ PY
 }
 
 # ── ledger-section-numbers ──────────────────────────────────────────────────
-# 判据在文件头「ledger-section-numbers」；只看树，不用改动范围
+# 判据在文件头「ledger-section-numbers」；只看树，不用改动范围；判的是登记表里 current 那一份
 check_ledger_section_numbers() {
-  python3 - "$LEDGER_PROPOSAL" "$LEDGER_DUPLICATE_SECTIONS" "${LEDGER_SECTION_NUMBERS_BREAK:-}" <<'PY'
+  report_ledger_registry_problems || return 1
+  python3 - "$current_ledger" "${LEDGER_SECTION_NUMBERS_BREAK:-}" <<'PY'
 import collections, re, sys
 
-path, duplicates_text, broken = sys.argv[1], sys.argv[2], sys.argv[3]
-allowed = {}   # 历史上已经重号的节：节号 → 标题与索引行各该有几处
-for entry in duplicates_text.split():
-    section, _, count = entry.partition(":")
-    allowed[section] = int(count)
+path, broken = sys.argv[1], sys.argv[2]
 try:
     with open(path, encoding="utf-8") as handle:
         lines = handle.read().split("\n")
@@ -2431,7 +2593,7 @@ except (OSError, UnicodeDecodeError) as error:
 
 NUMERALS = "零〇一二两三四五六七八九十百千"
 HEADING = re.compile(rf"^##\s+([{NUMERALS}]+)、")
-INDEX_ROW = re.compile(rf"^\|\s*([{NUMERALS}]+)")   # 第一格以节号起头（「一百（历史那份里的第二个九十七）」只取「一百」）；表头「节号」与分隔行不是
+INDEX_ROW = re.compile(rf"^\|\s*([{NUMERALS}]+)")   # 第一格以节号起头（「一百六十七（2026-10-23 那份里的第二个五十六）」只取「一百六十七」）；表头「节号」与分隔行不是
 FENCE = re.compile(r"^ {0,3}(```|~~~)")
 headings = collections.defaultdict(list)     # 节号 → 标题所在的行号
 index_rows = collections.defaultdict(list)   # 节号 → 索引表里的行号
@@ -2463,38 +2625,66 @@ problems = []
 if not index_seen:
     problems.append("没有「## 索引」一节（文件开头那张一节一行的表）")
 for section, numbers in headings.items():
-    want = allowed.get(section, 1)
-    if len(numbers) != want and "duplicate-headings-tolerated" not in broken:
-        if section in allowed:
-            problems.append(f"「## {section}、」标题 {len(numbers)} 处（{at(numbers)}），例外表 LEDGER_DUPLICATE_SECTIONS 登记的是 {want} 处")
-        else:
-            problems.append(f"「## {section}、」标题重号 {len(numbers)} 处（{at(numbers)}）")
+    if len(numbers) != 1 and "duplicate-headings-tolerated" not in broken:
+        problems.append(f"「## {section}、」标题重号 {len(numbers)} 处（{at(numbers)}）")
     if index_seen and "index-unchecked" not in broken:
         rows = index_rows.get(section, [])
         if not rows:
             problems.append(f"节号 {section}（标题在{at(numbers)}）在索引表里没有一行")
-        elif len(rows) != want:
-            problems.append(f"节号 {section} 在索引表里有 {len(rows)} 行（{at(rows)}），该是 {want} 行")
+        elif len(rows) != 1:
+            problems.append(f"节号 {section} 在索引表里有 {len(rows)} 行（{at(rows)}），该是 1 行")
 if "index-unchecked" not in broken:
     for section, rows in index_rows.items():
         if section not in headings:
             problems.append(f"索引表{at(rows)}的节号 {section} 没有对应的「## {section}、」一节")
-for section, want in allowed.items():
-    if section not in headings:
-        problems.append(f"例外表 LEDGER_DUPLICATE_SECTIONS 登记的 {section} 在这份里一节都没有（例外过时，删掉那一项）")
 
 if problems:
     for problem in problems:
         print(f"  ✗ {path}：{problem}")   # gate-lint:detail
     print(f"  ✗ {path} 的节号与索引有 {len(problems)} 处对不上（{len(headings)} 个节号）")
-    print("     → 怎么办：新登一节先在「## 索引」表插一行占号（scripts/kb/insert-row.py），取下一个没用过的节号再写标题；撞了号的改成下一个空号、索引表同步改；"
-          "索引里少的补一行、多的删掉；历史上已经重号的节只登记在 LEDGER_DUPLICATE_SECTIONS（只缩不涨）")
+    print("     → 怎么办：新登一节用 python3 scripts/kb/ledger-append-section.py --title '<标题（含日期）>' --body-file <正文文件>（现取最大节号加一，索引行与节一次写入），不手写新节的标题；撞了号的改成下一个空号、索引表同步改；"
+          "索引里少的补一行、多的删掉；没有例外，撞了的一律改号")
     sys.exit(1)
 heading_count = sum(len(numbers) for numbers in headings.values())
 row_count = sum(len(rows) for rows in index_rows.values())
-kept = "、".join(f"{section} {want} 处" for section, want in sorted(allowed.items()))
-print(f"  ✓ {path}：{len(headings)} 个节号（标题 {heading_count} 处、索引表 {row_count} 行）不重号、各在索引表里一行；照例外表认的历史重号：{kept or '无'}")
+print(f"  ✓ {path}：{len(headings)} 个节号（标题 {heading_count} 处、索引表 {row_count} 行）不重号、各在索引表里一行")
 PY
+}
+
+# ── sealed-ledgers-unchanged ────────────────────────────────────────────────
+# 判据在文件头「sealed-ledgers-unchanged」；只看树与登记表，不用改动范围
+check_sealed_ledgers_unchanged() {
+  report_ledger_registry_problems || return 1
+  if ((${#sealed_ledgers[@]} == 0)); then
+    echo "  ! 登记表 $LEDGER_REGISTRY 里没有 sealed 行，这一格无对象可判"
+    return 77
+  fi
+  local index ledger digest actual changed=0
+  for index in "${!sealed_ledgers[@]}"; do
+    ledger="${sealed_ledgers[$index]}"
+    digest="${sealed_ledger_digests[$index]}"
+    if [[ ! -f "$ledger" ]]; then
+      echo "  ✗ 封存的 $ledger 不在树里（登记的 sha256 $digest）"   # gate-lint:detail
+      changed=$((changed + 1))
+      continue
+    fi
+    # 弄坏开关 DOC_PROCESS_RECORDS_BREAK=sealed-hash-unchecked：只看在不在，不比 sha256
+    [[ "${DOC_PROCESS_RECORDS_BREAK:-}" == sealed-hash-unchecked ]] && continue
+    # 从标准输入读：文件名带反斜杠时 sha256sum 会在输出行首加一个反斜杠
+    actual="$(sha256sum < "$ledger")"
+    actual="${actual%% *}"
+    if [[ "$actual" != "$digest" ]]; then
+      echo "  ✗ 封存的 $ledger 封存之后被改了：此刻 sha256 $actual，登记的是 $digest"   # gate-lint:detail
+      changed=$((changed + 1))
+    fi
+  done
+  if ((changed)); then
+    echo "  ✗ 封存的 ${#sealed_ledgers[@]} 份拆分提案里 $changed 份封存之后被改了或不在了"
+    echo "     → 怎么办：封存账本不改，往现行账本追加：把上面点名的那份恢复成封存时那一版（git log -- <路径> 找到内容的 sha256 与登记的相同的提交，git show <提交>:<路径> > <路径>），"
+    echo "        要记的新内容写进现行账本 ${current_ledger:-（登记表里 current 那一份）}；用户定了重新封存的，才改 $LEDGER_REGISTRY 里那一行的 sha256"
+    return 1
+  fi
+  echo "  ✓ 封存的 ${#sealed_ledgers[@]} 份拆分提案（${sealed_ledgers[*]}）内容都与登记的 sha256 相同；新内容往现行账本 $current_ledger 追加"
 }
 
 # ── 改动范围在父进程里按选中的格预取：各格在自己的子 shell 里跑，子 shell 里取的传不回父进程，也传不到别的格 ──

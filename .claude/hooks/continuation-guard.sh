@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（SendMessage）：给一个已经交回过、或被中断过（撞限额、被停、报错）的子 agent 发消息之前拦一道。
+# PreToolUse hook（SendMessage）：给一个已经交回过、或被中断过（失败、被停、报错）的子 agent 发消息之前拦一道。
 #
 # 为什么：交回之后不续做，新活一律新派。用户 2026-09-24 问「启动subagent的时候 为什么会复用 id呢 很奇怪 这个能禁止复用吗」，
 # 选的是「交回之后不许续做」；还没交回的（在干活、或结束本轮去等自己后台任务的）照旧放行，整点询问与纠正要送得到。
-# 中断过的不续：2026-09-19 实测，E155 第二次跑的执行员撞限额之后被续做，上下文涨到 95 万，380 次调用平均每次 62.6 万、
+# 中断过的不续：2026-09-19 实测，E155 第二次跑的执行员失败之后被续做，上下文涨到 95 万，380 次调用平均每次 62.6 万、
 # 累计读缓存 2.36 亿、整份重写两次共 123.5 万，真正的输出 2.9 万。用户定：「以后这样被中断的 subagent 都应该新开，
 # 但是新开的时候要保证上下文和成果物的接续；如果接续会导致主 agent 的上下文膨胀，那么干脆就重开」。
 #
@@ -42,7 +42,7 @@
 #       子会话记录不在、主会话里最近一次通知是 failed：拒（「应当返回 2，实际 0」）
 #       子会话记录不在、主会话里有交回消息：拒（「应当返回 2，实际 0」）
 #       子会话记录不在时拒绝说明写上下文与续做次数取不到（「应当返回 True，实际 False」）
-#       撞过限额（failed）的上下文小也不续（「应当返回 2，实际 0」）
+#       失败（failed）的上下文小也不续（「应当返回 2，实际 0」）
 #       被停（killed）的不续（「应当返回 2，实际 0」）
 #       已交回（SubagentHandback 送达）的不续（「应当返回 2，实际 0」）
 #       共用样本：先被拒、后来送达的不续（「应当返回 2，实际 0」）
@@ -256,7 +256,7 @@ def decide(hook_input, unjudged=None):
     else:
         sizes = (f"它最后一次调用的上下文 {'取不到' if last_context is None else f'{last_context / 10000:.1f} 万'}，"
                  f"已被续做 {'取不到' if continuations is None else f'{continuations} 次'}")
-    reason = (f"✗ 子 agent {recipient} 最近一次任务通知是 {status}（撞限额、被停或报错），中断过的不续，新开一个接着做（{sizes}）。\n")
+    reason = (f"✗ 子 agent {recipient} 最近一次任务通知是 {status}（失败、被停或报错），中断过的不续，新开一个接着做（{sizes}）。\n")
     return 2, (reason +
                "→ 怎么办：不续这一个。跑 `python3 scripts/agents/agent-handover.py --agent "
                f"{recipient} --out <交接摘要.md>` 从它的会话记录里抽出派发提示、续做消息、写过的文件、跑过的命令与它最后说的话；"
@@ -355,7 +355,7 @@ def selftest(hook_dir):
             case("子会话记录不在、主会话里有交回消息：拒", "efef6161abab7171", "再补一件", 2),
             ("子会话记录不在时拒绝说明写上下文与续做次数取不到", True, missing_record_message_says_unavailable()),
             case("收件人是名字不是 id", "reviewer", "接着做", 0),
-            case("撞过限额（failed）的上下文小也不续", "gggg7777hhhh8888", "限额重置了，接着做", 2),
+            case("失败（failed）的上下文小也不续", "gggg7777hhhh8888", "重试一下，接着做", 2),
             case("failed 之后又 completed 的放行", "iiii9999jjjj0000", "接着做", 0),
             case("被停（killed）的不续", "kkkk1212llll3434", "接着做", 2),
             case("已交回（SubagentHandback 送达）的不续", "mmmm1313nnnn1414", "再补一件", 2),

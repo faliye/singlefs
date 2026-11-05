@@ -1,0 +1,2 @@
+# 样本的要临时服务的自证登记表：第二条 runner 的脚本 required（自证开跑先要临时服务），runner 表里却裸写
+scripts/gate/sample-needs-temporary-service.py	required	# 样本：自证开跑先要临时服务，runner 表里却裸写

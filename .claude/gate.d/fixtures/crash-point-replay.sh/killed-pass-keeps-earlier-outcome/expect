@@ -1,0 +1,8 @@
+exit=143
+want=样本档：
+want=· crash-case-replay：不带特性那一趟收尾，当场写结局：cargo 退 0；test result 汇总行 2 行（合计通过 2、失败 0、ignored 0；FAILED 的汇总行 0 行）；FAILED 的测试函数 0 条；整份输出：
+want=/crash-point-replay-passes.
+want=· crash-case:fault-injection-given-states 开跑（
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release -p singlefs-verification --features sample-store --test fault_injection_given_states 
+want=--exact fault_injection_given_states_full --nocapture
+# 不带特性那一趟绿、实跑那一趟的假 cargo 把阶段停了（退 143，整格没收尾）：不带特性那一趟的结局已经当场打在输出里；弄坏开关 pass-outcome-at-cell-end 下等整格收尾才打，这一行没有

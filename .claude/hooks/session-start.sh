@@ -14,7 +14,26 @@
 # 判不了的照「放行但必记检出」：输入不是 JSON 对象（解不开、顶层不是对象）、补提示的时候抛异常，照常退 0、不补提示，stderr 写一行，
 #   检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的 default_detections_path，写法在它的 record_unjudged_pass）追加一行、结局「只记」，
 #   findings 以「开会话提示没判、照常放行」起头；读不到 lib_work_root.py 时 stderr 另说一句没记成。
-#   SESSION_START_BREAK=input-unrecorded（输入不是 JSON 对象时只打 stderr、不记）、=exception-unrecorded（抛异常不接住、照原样抛出）各让自检里对应的那一格红。
+# 弄坏开关 SESSION_START_BREAK=<项>（只给 --selftest 证红用；平常跑设了就在读 hook 的 JSON 之前退 2、点名变量只在自证里认，自证起的钩子子进程由 SESSION_START_SELFTEST_MARK 认），
+# 打开后自证哪几格红（失败行「✗ 自检：<格名>：…」）：
+#   SESSION_START_BREAK=input-unrecorded  输入不是 JSON 对象时只打 stderr、不记检出
+#       「✗ 自检：坏 JSON 照常退 0、记一条检出」、「✗ 自检：JSON 数组照常退 0、记一条检出」
+#   SESSION_START_BREAK=exception-unrecorded  补提示的时候抛异常不接住、照原样抛出（进程退 1，不补提示、不记检出）
+#       「✗ 自检：补提示的时候抛异常照常退 0、记一条检出」
+#   SESSION_START_BREAK=keepscratch  自证的临时目录走回 mkdtemp 不删
+#       「✗ 自检：通过那条路上临时目录没删」、「✗ 自检：red 那条路上临时目录没删」、「✗ 自检：crash 那条路上临时目录没删」
+#   SESSION_START_BREAK=skip-oom  内存 OOM 那一段整个不补
+#       「✗ 自检：startup 且近几小时有 OOM」、「✗ 自检：resume 且近几小时有 OOM」、「✗ 自检：杀得多时逐条列最大的、其余合计」、「✗ 自检：只有自检故意造的 OOM 不算事故」、
+#       「✗ 自检：看得到内核日志、没有 OOM」、「✗ 自检：只有显卡驱动报的显存不够」、「✗ 自检：内存 OOM 与显存不够一起」、「✗ 自检：权限不够看不到内核日志」、
+#       「✗ 自检：连一条内核消息都读不出」、「✗ 自检：重启之前那一次开机里的也读到」、「✗ 自检：journalctl 出错」、「✗ 自检：没有 journalctl」
+#   SESSION_START_BREAK=unreadable-as-clean  读不到内核日志（权限不够、一条消息都读不出）也当成没有 OOM
+#       「✗ 自检：权限不够看不到内核日志」、「✗ 自检：连一条内核消息都读不出」
+#   SESSION_START_BREAK=count-selftest-kills  run-with-memory-cap.sh --selftest 故意造的 OOM 也算事故
+#       「✗ 自检：startup 且近几小时有 OOM」、「✗ 自检：resume 且近几小时有 OOM」、「✗ 自检：只有自检故意造的 OOM 不算事故」、「✗ 自检：内存 OOM 与显存不够一起」
+#   SESSION_START_BREAK=skip-gpu-oom  显卡驱动报的显存不够那一段不补
+#       「✗ 自检：只有显卡驱动报的显存不够」、「✗ 自检：内存 OOM 与显存不够一起」、「✗ 自检：重启之前那一次开机里的也读到」
+#   SESSION_START_BREAK=current-boot-only  近几小时只读这一次开机的内核日志（journalctl -k），不读重启之前那一次
+#       「✗ 自检：重启之前那一次开机里的也读到」
 #
 # 为什么：2026-09-25 两次整机 OOM 把 Claude Code 会话拖垮，第一次崩了之后主 agent 没查 `journalctl -k` 就照原样重派同一步，
 # 第二次 OOM 就是这样来的（records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。会话崩了再起，是 startup 或 resume。
@@ -163,7 +182,7 @@ def gpu_memory_report(hours, events):
         f"  - " + "、".join(f"{gpu} ×{count}" for gpu, count in sorted(counts.items())) + f"；头一次 {moment_text(min(event['moment'] for event in events))}，"
         f"末一次 {moment_text(max(event['moment'] for event in events))}",
         "- 怎么办：先查那段时间谁在用卡（经 scripts/hosts/run-with-memory-cap.sh 起、命令退出之后认出显存不够的那几条退 245；同一段时间的 Killed process 行也看一眼），"
-        "查清之前别照原样重派同一件活；要上卡的经 scripts/hosts/host-dispatch.py --gpu 按各台显存余量派。"])
+        "查清之前别照原样重派同一件活；要上卡的经 task-server/task submit -- <命令> 交（哪台、哪几张卡、显存额度由服务分）。"])
 
 
 def format_size(kibibytes):
@@ -222,7 +241,7 @@ def oom_report(hours):
     if selftest_kills:
         lines.append(f"- 另有 {len(selftest_kills)} 次是 run-with-memory-cap.sh --selftest 故意造的（cgroup 名带 {SELFTEST_CGROUP_MARK}），不算事故、不列")
     lines.append("- 怎么办：先查这几个进程是谁起的、为什么涨（进程名对上是哪个实验二进制或测试，去派它的子 agent 的会话记录与变异表里找那一步），"
-                 "查清之前别照原样重派同一件活；重派时让那一步经 scripts/hosts/run-with-memory-cap.sh 带上限跑。")
+                 "查清之前别照原样重派同一件活；重派时整条经 task-server/task submit 交，上限由服务定。")
     if gpu_text:
         lines.append(gpu_text)
     return "\n".join(lines)
@@ -314,6 +333,7 @@ def write_fake_journalctl(directory, recent_output, probe_output, stderr_text=""
 
 def selftest(hook_dir):
     """主体在 selftest_in；临时目录由共用库建（通过、判红、抛异常都删），那三格也由它判。"""
+    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 自证起的钩子子进程（环境原样继承）靠它认：弄坏开关只在自证里认
     library_path = os.path.join(hook_dir, "lib_selftest_scratch.py")
     try:
         library_specification = importlib.util.spec_from_file_location("lib_selftest_scratch", library_path)
@@ -486,7 +506,23 @@ def selftest_in(hook_dir, work):
     return 0
 
 
+# 弄坏开关只在自证里认：命令行不是单独一个 --selftest、也不是自证起的子进程（SESSION_START_SELFTEST_MARK 对得上）而 SESSION_START_BREAK 非空，
+# 读 hook 的 JSON 之前就退 2、点名变量只在自证里认，不管值是什么（SessionStart 的退 2 只把 stderr 给用户看，不拦会话）。
+SELFTEST_MARK_VARIABLE = "SESSION_START_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "session-start.sh --selftest 起的子进程"
+
+def refuse_break_outside_selftest(arguments):
+    if not BROKEN_JUDGEMENT or arguments == ["--selftest"] or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    print(f"  ✗ {HOOK_NAME}：SESSION_START_BREAK={BROKEN_JUDGEMENT} 是弄坏开关，只在自证（{HOOK_NAME} --selftest）里认，平常跑设了就拒，这一次没补提示", file=sys.stderr)
+    print(f"     → 怎么办：去掉 SESSION_START_BREAK 再跑；要证红就跑 SESSION_START_BREAK=<项> bash .claude/hooks/{HOOK_NAME} --selftest", file=sys.stderr)
+    return 2
+
+
 hook_dir = sys.argv[1]
+refused = refuse_break_outside_selftest(sys.argv[2:])
+if refused is not None:
+    sys.exit(refused)
 if len(sys.argv) > 2 and sys.argv[2] == "--selftest":
     sys.exit(selftest(hook_dir))
 sys.exit(hook_main(sys.stdin.buffer.read(), hook_dir))

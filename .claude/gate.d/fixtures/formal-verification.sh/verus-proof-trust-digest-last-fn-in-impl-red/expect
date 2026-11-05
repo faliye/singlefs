@@ -1,0 +1,3 @@
+exit=1
+want=external_body singlefs_replay_prefix::Shown::show 登记的规格原文 sha256 是 e3b0c44298fc…，现算的是 fa1807b07c6e455e6f323612ddae097e66ced2f67a83bcb4ffe13a488eaace16
+want=verus-proof：红（退出 1）

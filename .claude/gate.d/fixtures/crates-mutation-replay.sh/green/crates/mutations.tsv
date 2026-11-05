@@ -1,0 +1,8 @@
+# 门禁 crates-mutation-replay 的判别力样本（绿）：五条变异各自红在点名的测试上
+# 其中一条改 litmus/sample.litmus（拷贝范围要含 litmus/），一条替换文空着（删掉 add_twice 里第二次相加）
+# 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
+add-becomes-sub	crates/tiny/src/lib.rs	    left + right	    left - right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+add-becomes-multiply	crates/tiny/src/lib.rs	    left + right	    left * right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+divide-no-longer-panics	crates/tiny/src/lib.rs	    dividend / divisor	    dividend.checked_div(divisor).unwrap_or(0)	-p tiny --lib -- dividing_by_zero_panics	dividing_by_zero_panics
+litmus-write-changed	litmus/sample.litmus	WRITE_ONCE(*x, 1)	WRITE_ONCE(*x, 2)	-p tiny --lib -- litmus_sample_writes_one	litmus_sample_writes_one
+second-addition-deleted	crates/tiny/src/lib.rs	    total += value;\n		-p tiny --lib -- adding_three_twice_gives_six	adding_three_twice_gives_six

@@ -1,0 +1,5 @@
+exit=1
+want=✗ .claude/rules/basename-only.md：CLAUDE.md 登记了它，.claude/agents/*.md 与 .claude/agent-common.md 里一份都没按路径点名
+want=✗ .claude/rules/once-only.md：CLAUDE.md 登记了它，.claude/agents/*.md 与 .claude/agent-common.md 里一份都没按路径点名
+want=✗ 2 条规则没有一份定义点名（查了 4 条规则、2 份定义）
+want=rules-named-by-definitions：红

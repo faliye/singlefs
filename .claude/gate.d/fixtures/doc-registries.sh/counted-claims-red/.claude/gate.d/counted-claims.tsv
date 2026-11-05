@@ -1,0 +1,10 @@
+# 样本登记表：四列用制表符分隔（路径、定位正则、数的命令、说明）；八行各错一样，末行写对
+NOTES.md	样本判 ([0-9]+) 条不变量	bash count-sample-items.sh invariants	正文写 7、现数 9
+NOTES.md	样本放量 ([0-9]+) 项	bash count-sample-items.sh items	正则命中两次
+NOTES.md	样本没有的 ([0-9]+) 句	bash count-sample-items.sh items	正则命中 0 次
+NOTES.md	出错的命令数 ([0-9]+) 处	bash count-sample-items.sh broken	命令打的数与正文相同、却退 3
+NOTES.md	乱打的数 ([0-9]+) 个	bash count-sample-items.sh garbage	命令打的不是整数
+NOTES.md	写对的 ([0-9]+) 份	bash count-sample-items.sh right
+MISSING.md	不在的文件 ([0-9]+) 份	bash count-sample-items.sh right	指的文件不在
+NOTES.md	写对的 [0-9]+ 份	bash count-sample-items.sh right	正则没有捕获组
+NOTES.md	写对的 ([0-9]+) 份	bash count-sample-items.sh right	写对的一行，不许点名

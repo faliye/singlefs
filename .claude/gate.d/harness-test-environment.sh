@@ -4,10 +4,10 @@
 # gate-stage: 跑完测试之后机器还干不干净（残留测试设备、临时目录残留、宿主盘）
 # gate-fixture: yes
 # gate-category: harness 类
-# gate-similar: harness-model-differential-and-scenarios.sh 同属 harness 类，它跑 crates/singlefs-harness 的测试并判模型对拍；这一道不跑测试，判的是测试跑完之后留在机器上的东西
+# gate-similar: model-differential-and-scenarios.sh 同属 harness 类，它跑 crates/singlefs-verification 的测试并判模型对拍；这一道不跑测试，判的是测试跑完之后留在机器上的东西
 # gate-similar: code-tooling.sh 它的 research-script-selftests 格只跑 test-environment-check.py 的 --selftest（判别力），不看这台机器此刻的样子；它的 stage-order 格只判这一道的文件名排在跑测试的阶段之后，不读机器；这里在真机上判
-# gate-similar: checker-tier-crash-point-replay.sh 它跑崩溃点重放时自己建镜像、自己收拾，判的是重放的结局；机器上残不残留、宿主盘好不好，由这一道在全部跑测试的阶段之后统一判
-# gate-similar: checker-tier-qemu-device-streams.sh 它起 QEMU、判设备流的结局；带 singlefs 的 qemu 进程跑完还在不在，由这一道判
+# gate-similar: crash-point-replay.sh 它跑崩溃点重放时自己建镜像、自己收拾，判的是重放的结局；机器上残不残留、宿主盘好不好，由这一道在全部跑测试的阶段之后统一判
+# gate-similar: qemu-device-streams.sh 它起 QEMU、判设备流的结局；带 singlefs 的 qemu 进程跑完还在不在，由这一道判
 # gate-similar: gate.sh 上游「跑完没留下临时文件」那一段在全部阶段跑完之后判 gate.sh 发给这一轮的 TMPDIR 里剩下的每一项（名字不限 singlefs-*）；它判绿时这一轮的 TMPDIR 下没有剩东西，这里对那个目录的 singlefs-* 也必然判绿，所以在 gate.sh 里时临时目录残留那一类不再扫它。它看不见的 /tmp 与别处的 singlefs-*、loop / dm / 挂载、qemu 进程与宿主盘仍归这一道
 #
 # 格名表（--list 打它，--check machine-clean 只跑这一格，格名写错退 2）：
@@ -20,7 +20,8 @@
 #
 # 判据：`scripts/hosts/test-environment-check.py check` 汇总行里「判红 N 类」不是 0 红，「没查成 N 类」不是 0 也红，
 # 汇总行读不到也红；真跑时它的退出码（1 有判红、3 只有没查成、0 干净）与汇总对不上，红。
-# 射程：只看机器此刻的样子，不查这一轮有没有重新 mkfs（那由用例的排他创建守）。不给 --smart，SMART 由它逐个列为没跑。
+# 射程：只看机器此刻的样子，不查这一轮有没有重新 mkfs（那由用例的排他创建守）。SMART 一律查：宿主盘·SMART 是唯一没查成的一类（smartctl 与 nvme 不在、或 sudo 不通）时，
+# 这一格退 77 报本次未跑，不记通过、也不记红；别的类没查成、或 SMART 与别的类一起没查成，照旧红。
 # 在 gate.sh 里（GATE_NOT_RUN_FILE 所在的目录正是此刻的 TMPDIR，gate.sh 把这一轮的临时目录发给各阶段的那一份）：把这个 TMPDIR 交给
 # --gate-run-temporary-directory，临时目录残留那一类不扫它，由上游「跑完没留下临时文件」判；loop / dm / 挂载与宿主盘照旧算它。单跑时不交。
 # GATE_CROSS_RUN_TMPDIR 设了（gate.sh 设它：开跑前的那个 TMPDIR）就交给 --cross-run-temporary-directory：临时目录残留那一类另扫它，
@@ -28,7 +29,7 @@
 #
 # 上一趟门禁留下的残留（C474）：上游 gate.sh 不能改，开跑时刻只能由这一格往上找祖先里的 gate.sh 读出来，那个数只活在一次运行里。
 # 这一格每趟（读得到祖先 gate.sh 的启动时刻时）调 `python3 $SCRIPT record-run-start` 把它写进跨趟的文件
-# `${GATE_CROSS_RUN_TMPDIR:-$HOME/.local/share/singlefs/cross-run-cache}/gate-run-times`（current=本趟、previous=上一趟，同目录临时文件改名换上），
+# `${GATE_CROSS_RUN_TMPDIR:-<数据根>/cross-run-cache}/gate-run-times`（数据根取 .claude/hooks/lib_work_root.py、两台同一份；current=本趟、previous=上一趟，同目录临时文件改名换上），
 # 然后开跑前先预演一次 `clean --refuse-too-recent --run-times-file <它> [--produced-after <本趟开跑>] --temporary-directory <check 扫的各目录>`：
 # 脚本退 4（还有「太新、这一趟清不掉」的项：名字里没有 pid、没有进程开着、不到 10 分钟没改，且不在 [上一趟开跑, 本趟开跑) 里）就拒绝开跑、退 1，
 # 逐项报还要等多少秒；退 0 就接着跑 check。落在 [上一趟开跑, 本趟开跑) 里的不算太新：那是上一趟留下的，人跑 `clean --run-times-file <它> --yes` 删得掉
@@ -48,6 +49,8 @@
 #   machine-clean-cross-run-green  放一份只核参数的替身：GATE_CROSS_RUN_TMPDIR 设了该带 --cross-run-temporary-directory <它>、没设不带，
 #                        对上了报判红 0 类，判绿
 #   machine-clean-too-recent-red  替身的 clean 预演退 4、报一项太新还要等 N 秒：这一格拒绝开跑、退 1、点名那一项和还要等多久，不往下跑 check
+#   machine-clean-smart-red  录好的输出里宿主盘·SMART 判红 1 类（其余都查过）：红，点名机器上还有宿主盘异常
+#   machine-clean-smart-unchecked  录好的输出里只有宿主盘·SMART 没查成（其余都查过、判红 0 类）：退 77，本次未跑，不记红也不记通过
 #   machine-clean-too-recent-green  替身核预演参数（--refuse-too-recent、--run-times-file 指到上面那份文件、--temporary-directory 给了）与 record-run-start
 #                        的参数（在 gate.sh 里该调、单跑不调），对上了预演退 0、check 判红 0 类，判绿
 # 脚本与录好的输出都没有：判红，不当跳过。
@@ -55,9 +58,12 @@
 # 门禁 code-tooling 的 stage-break-switch-replay 格逐条复跑，比点名的与实测判错的）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0（共用库别的项见那份文件头）
 #     machine-clean-red
+#     machine-clean-smart-red
 #     machine-clean-too-recent-red
 #   HARNESS_TEST_ENVIRONMENT_BREAK=too-recent-allowed  预演退 4 也不拒绝开跑，照往下跑 check
 #     machine-clean-too-recent-red
+#   HARNESS_TEST_ENVIRONMENT_BREAK=smart-unchecked-as-red  宿主盘·SMART 单独没查成也按没查成红（不退 77）
+#     machine-clean-smart-unchecked
 #   HARNESS_TEST_ENVIRONMENT_BREAK=cross-run-unscanned  GATE_CROSS_RUN_TMPDIR 设了也不交 --cross-run-temporary-directory
 #     machine-clean-cross-run-green（只在喂样本的环境里设了 GATE_CROSS_RUN_TMPDIR 时判错；没设时这一道本来就不交，那份样本照样判绿）
 #   HARNESS_TEST_ENVIRONMENT_BREAK=gate-run-scanned  在 gate.sh 里也不交 --gate-run-temporary-directory
@@ -140,8 +146,15 @@ collect_clean_directories() {
 
 # ── machine-clean ──
 cell_machine_clean() {
-  local script_rc started summary red_classes unchecked_summary unchecked_classes failed expected_rc
-  local run_times_file="${GATE_CROSS_RUN_TMPDIR:-$HOME/.local/share/singlefs/cross-run-cache}/gate-run-times"
+  local script_rc started summary red_classes unchecked_summary unchecked_classes failed expected_rc smart_only_unchecked=0 unchecked_lines
+  local run_times_file cross_run_cache="${GATE_CROSS_RUN_TMPDIR:-}"
+  # 没设 GATE_CROSS_RUN_TMPDIR：数据根下的 cross-run-cache（.claude/hooks/lib_work_root.py，两台同一份）；打出来的不是这一项（库跑不起来、还是没有 shared 子命令的那一版）就停
+  if [[ -z "$cross_run_cache" ]] && { ! cross_run_cache="$(python3 "$STAGE_DIR/../hooks/lib_work_root.py" shared cross-run-cache)" || [[ "$cross_run_cache" != /*/cross-run-cache ]]; }; then
+    echo "  ✗ 取不到数据根下的 cross-run-cache（.claude/hooks/lib_work_root.py shared cross-run-cache 打的是「$cross_run_cache」），门禁开跑时刻没处记"
+    echo "     → 怎么办：修好 .claude/hooks/lib_work_root.py（还没有 shared 子命令的先把那一版换上），或设 GATE_CROSS_RUN_TMPDIR 指到跨趟目录"
+    exit 1
+  fi
+  run_times_file="$cross_run_cache/gate-run-times"
   # 样本根放了 .gate-run-simulated：模拟在 gate.sh 里（文件头「样本」一段）。只在样本根上认（判据与共用库认样本根的 .gate-cells 相同），
   # 环境里已有 GATE_NOT_RUN_FILE（真在 gate.sh 里）时不动它。simulated_directory 不加 local：EXIT 的 trap 在这一格的子 shell 退出时才跑，那时函数已经返回
   simulated_directory=""
@@ -233,6 +246,11 @@ cell_machine_clean() {
     exit 1
   fi
   failed=0
+  # 没查成的类只有宿主盘·SMART 一类：不记红，这一格退 77（最后报）
+  if [[ "$unchecked_classes" != 0 && "${HARNESS_TEST_ENVIRONMENT_BREAK:-}" != smart-unchecked-as-red ]]; then
+    unchecked_lines="$(grep -E '^ *! ' "$log")"
+    if [[ -n "$unchecked_lines" && "$(grep -cv '宿主盘·SMART' <<<"$unchecked_lines")" == 0 ]]; then smart_only_unchecked=1; fi
+  fi
   if [[ "$red_classes" != 0 ]]; then
     grep -E '✗|→|汇总：' "$log" | head -40
     echo "  ✗ 机器上还有测试残留或宿主盘异常（判红 $red_classes 类，上面是逐类的判定）"
@@ -241,7 +259,7 @@ cell_machine_clean() {
     echo "               宿主盘那几类（只读挂载、剩余空间、ext4 错误计数、内核日志）不是 clean 能修的，要人看。"
     failed=1
   fi
-  if [[ "$unchecked_classes" != 0 ]]; then
+  if [[ "$unchecked_classes" != 0 && "$smart_only_unchecked" == 0 ]]; then
     grep -E '^ *!|→|汇总：' "$log" | head -40
     echo "  ✗ 环境检查有 $unchecked_classes 类没查成，分不出机器那几样干不干净（上面「!」开头的是哪几类、为什么）"
     echo "     → 怎么办：按每一类后面那句「怎么办」补上它缺的（权限、工具、读得到内核日志）再跑；"
@@ -260,6 +278,11 @@ cell_machine_clean() {
   fi
   if ((failed)); then
     exit 1
+  fi
+  if ((smart_only_unchecked)); then
+    grep -E '^ *!|→|汇总：' "$log" | head -40
+    echo "  ! 宿主盘·SMART 没查成，其余各类都查过且判红 0 类：宿主盘自己的记录这一次没看，这一格本次未跑（不记通过）"
+    exit 77
   fi
   tail -1 "$log"
 }

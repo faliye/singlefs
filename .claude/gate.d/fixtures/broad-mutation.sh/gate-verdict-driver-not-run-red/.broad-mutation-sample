@@ -1,0 +1,1 @@
+# 样本标记：门禁 broad-mutation 在被判的根里见到它才进样本模式（阶段文件头「样本」）；这一份不写 scenario：驱动与 --summary 都是 .broad-sample/ 下现成的 driver.sh、summary.sh

@@ -1,0 +1,2 @@
+# 两种自动跳过的红样本（setup.sh 建 git 仓）：git 命令 -- 之前的照判、同一行没写后继文件名的照判（后继与旧路径同名的不因旧路径自己算数），跳过的两处各计 1。只跑 governance-refs
+governance-refs

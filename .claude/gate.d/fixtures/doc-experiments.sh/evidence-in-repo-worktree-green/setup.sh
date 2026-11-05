@@ -15,7 +15,7 @@ printf '# 笔记\n\n还没有要记的。\n\n## 历史版本\n' > .origin-reposi
 git -C .origin-repository add -A
 git -C .origin-repository commit -qm base
 git -C .origin-repository worktree add -q "$here/linked-checkout" -b linked
-cp -a linked-checkout/. .
+cp -dR --preserve=timestamps,links linked-checkout/. .
 rm -rf linked-checkout
 administrative_directory="$(sed -n 's/^gitdir: //p' .git)"
 printf '%s\n' "$here/.git" > "$administrative_directory/gitdir"

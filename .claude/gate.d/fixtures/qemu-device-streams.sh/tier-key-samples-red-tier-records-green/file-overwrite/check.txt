@@ -1,0 +1,5 @@
+E7RESULT name=host_rerun mode=file-overwrite windows=mkfs,instance_acquisition,warm_up,new_pool_file_creation,file_overwrite operations_by_window=23+4+18+35+35
+E7RESULT name=device_log device=0 declared_entries=445 expected_writes=45 expected_flushes=17 observed_writes=45 observed_flushes=17 zero_fills=4 zero_fill_bytes=805404672 trailing_flushes=0 expected_events_by_window=mkfs:14,instance_acquisition:2,warm_up:10,new_pool_file_creation:19,file_overwrite:17 divergence_window=none divergence=none
+E7RESULT name=device_log device=1 declared_entries=443 expected_writes=44 expected_flushes=16 observed_writes=44 observed_flushes=16 zero_fills=4 zero_fill_bytes=805404672 trailing_flushes=0 expected_events_by_window=mkfs:12,instance_acquisition:2,warm_up:10,new_pool_file_creation:17,file_overwrite:19 divergence_window=none divergence=none
+E7RESULT name=device_log_verdict matches=true
+E7RESULT name=done emitted=5

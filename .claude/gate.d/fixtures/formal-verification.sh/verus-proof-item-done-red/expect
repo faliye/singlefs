@@ -1,0 +1,7 @@
+exit=1
+want=ITEM_DONE item=proof:singlefs_replay_prefix::clamp_to_limit seconds=
+want= judged=1 reused=0 exit=1
+want=ITEM_DONE item=proof:singlefs_replay_prefix::smaller_of_two seconds=
+want= judged=1 reused=0 exit=0
+want=ITEM_DONE item=proof seconds=
+want=verus-proof：红

@@ -1,0 +1,7 @@
+exit=1
+want=滞后表比 gate 基准 HEAD 那一版多 1 行（只缩不涨；路径、C 号或锚改了也算新加）
+want=.claude/gate.d/owed-refs-paid-lag.tsv:3 .claude/kb/decisions/01-样本决策.md C21  …C21（样本已还的乙）——这一轮新写的样本欠段…
+want=→ 怎么办：新写的欠段当场照判据改
+want=样本只跑 .gate-cells 点名的格：owed-refs-paid
+want=  owed-refs-paid：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（owed-refs-paid）

@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=── 复用三问：unit 那一趟（break-switch-replay）
+want=全部复用，这一格一条都没起
+want=现判 1、复用 4、拒算 0；起 1 份
+want=REUSE_SELFTEST script=.claude/gate.d/code-tooling.sh same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=5 affected=1
+want=break-switch-replay：绿

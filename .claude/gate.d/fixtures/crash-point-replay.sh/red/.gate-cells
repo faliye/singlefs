@@ -1,0 +1,2 @@
+# 发现日志判红（带红状态的签名、没跑完的那一节、签名多到截断），判的是崩溃枚举用例那一格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

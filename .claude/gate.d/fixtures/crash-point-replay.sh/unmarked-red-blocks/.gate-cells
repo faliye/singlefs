@@ -1,0 +1,3 @@
+# 这一趟里没登记 red-blocks=judged-by-test 的用例块那一行有红（red=2）：照旧判红；同一份登记里带标记的那条同样 red=2、cargo test 退 0，判绿。判的是 crash-case-replay 格；
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

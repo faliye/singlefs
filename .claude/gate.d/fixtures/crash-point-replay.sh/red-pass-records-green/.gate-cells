@@ -1,0 +1,4 @@
+# 一趟里有红也照键记绿：不带特性那一趟库单测 red_check 判红、green_check 判绿，red_check 照键记红、green_check 照键记绿（同一次 verdict-record）；带特性那一趟 green_check 照键复用、经 --skip 不跑，只现判 red_check（上次判红）与挂特性的 store_only_quick；判的是 crash-case-replay 格（判红那一趟判绿的记不记库）。门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 feature-gated-tests：expect 里写着带特性那一趟（逐格那一行写到 feature-gated-tests）
+crash-case-replay
+feature-gated-tests

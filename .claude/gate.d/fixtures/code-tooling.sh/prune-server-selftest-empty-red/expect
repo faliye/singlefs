@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：prune-server-selftest
+want=prune-server --selftest 的输出：末行 cells=0：一格都没跑
+want=prune-server 自证没过：0 格里红 0 格（无）、1 处输出不对（退 0）
+want=prune-server-selftest：红（退出 1）

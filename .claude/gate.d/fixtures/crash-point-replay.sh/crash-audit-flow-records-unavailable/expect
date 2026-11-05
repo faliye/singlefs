@@ -1,0 +1,10 @@
+exit=75
+want=样本档：
+want=✗ crash-flow-coverage 这一格没判：prune-server 不可用（crash-flow-coverage.py collect 退 75（不带特性那一趟）
+want=✗ crash-ignored-nodes 这一格没判：prune-server 不可用（crash-flow-coverage.py collect 退 75（不带特性那一趟）
+want=✗ invariant-zero-evaluations 这一格没判：prune-server 不可用（crash-flow-coverage.py collect 退 75（不带特性那一趟）
+want=✓ 1 条崩溃枚举用例在 crates/mutations.tsv 里都有点名它的测试目标的变异行
+want=✓ 旋钮登记表 .claude/gate.d/crash-knobs.tsv 的 1 个旋钮都写了取值与依据、出处路径都在
+want=crash-flow-coverage：prune-server 不可用；crash-ignored-nodes：prune-server 不可用；invariant-zero-evaluations：prune-server 不可用；crash-case-must-red：绿；crash-knobs：绿
+want=✗ prune-server 不可用：3 格连不上判定库、没判：crash-flow-coverage crash-ignored-nodes invariant-zero-evaluations（不是红，也不算通过）
+want=修好再只重跑这几格：bash .claude/gate.d/crash-point-replay.sh --check crash-case-replay,feature-gated-tests,crash-flow-coverage,crash-ignored-nodes,invariant-zero-evaluations [项目根]

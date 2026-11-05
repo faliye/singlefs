@@ -1,0 +1,4 @@
+  ✓ 自证 batched-point-read
+  ✓ 自证 prefix-scan
+  ✓ 自证 group-commit-coalesces-syncs
+PRUNE_SERVER_SELFTEST cells=20 passed=20 failed=0 failed_cells=-

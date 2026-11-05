@@ -1,0 +1,2 @@
+exit=0
+want=✓ 要临时服务的自证的整条写法各处逐字相同（前缀「python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --」，不带 --server-binary），包装的解析收得下：登记表文件头 1 条、拒绝说明 2 条、骨架 1 条、客户端文件头 1 条（另有用法行 1 行）、自证登记表 2 条、runner 表 2 条、门禁的包装前缀常量 1 条

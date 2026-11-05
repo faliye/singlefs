@@ -1,0 +1,5 @@
+# 产品 GPU 包的真显卡对拍：调用方环境里没有 task-server 交的卡（没放 caller-environment），对拍那一趟不起、判红
+# 另点 crash-case-replay、feature-gated-tests：expect 的逐格那一行写着 crash-case-replay 与 feature-gated-tests 两格
+product-gpu-real-card-tests
+crash-case-replay
+feature-gated-tests

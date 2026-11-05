@@ -1,0 +1,8 @@
+exit=3
+want=样本点名 .gate-items 里的项：feature-gated:store_only.rs
+want=· feature-gated-tests：只编、只跑 --item 点名的 1 项：feature-gated:store_only.rs
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-verification --features gpu,sample-accelerator,sample-store --test store_only -- --nocapture --test-threads 1
+want=ITEM_DONE item=feature-gated:store_only.rs seconds=0 judged=1 reused=0 exit=0
+want=✓ feature-gated-tests：1 个挂特性的测试文件（特性 gpu,sample-accelerator,sample-store）每个都编进来、跑到了用例，共 1 条
+want=逐格：feature-gated-tests：绿
+not-green-by-design=feature-gated-tests 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的验证包那一步，不许记成通过）

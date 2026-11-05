@@ -1,0 +1,5 @@
+exit=0
+want=── 第 2 趟（样本 .formal-sample/run-twice
+want=ITEM_DONE item=proof:singlefs_replay_prefix::clamp_to_limit seconds=0.0 judged=0 reused=1 exit=0
+want=ITEM_DONE item=proof:singlefs_replay_prefix::smaller_of_two seconds=0.0 judged=0 reused=1 exit=0
+want=verus-proof：绿

@@ -1,0 +1,24 @@
+# kb 里照规矩该留旧路径的不在路径的保留表：门禁 doc-registries 的 governance-refs 格（.claude/gate.d/lib-governance-refs.py 的 ② 扩到 kb）登记了的不判红，可以增长。
+# 写法（制表符分隔，三列）：<载体路径，相对仓根><TAB><不在的路径，照红行里的写法><TAB># <理由，至少 8 个字，写它属于哪种>
+# 哪种：决策或计划里定的将来落点、句子本身说它不在、抄下来的当时的命令或输出、相对仓外副本的路径。要改的不在路径不登这里，当场改成后继或改写那一句。
+# 按（载体, 路径）认，不按行号。登记的路径此刻在了判红「建好了或回来了，删这一行」；那份载体的现状文字里已经不引它判红「这一行该删」；与滞后表 dead-path-lag.tsv 同一对不许两张表都登。
+.claude/kb/decisions/15-格式冻结政策.md	.claude/kb/golden-images.toml	# 决策定的将来落点：黄金镜像回归还没做，清单还没建
+.claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md	crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs	# 相对仓外副本的路径：装置放在冻结副本 e175-frozen-crates-2/repo/ 里
+.claude/kb/experiments/34-根环槽几何.md	scripts/agents/ask-local.sh	# 抄下来的当时的命令：句子写明脚本已删与取回法
+.claude/kb/milestone/03-third-txn.md	.claude/gate-directory	# 句子本身说它不在：门禁与钩子挪进 scripts/ 还没做
+.claude/kb/milestone/04-fourth-txn.md	crates/singlefs-checker-tier/src/bin/e10_aging_compaction_crates_arm.rs	# 登记里定的将来实现臂：句子写明还没有
+.claude/kb/experiments/200-修订6近似树重跑.md	crates/singlefs-harness/tests/model_compares_inode_creations_across_two_inode_leaf_containers.rs	# 句子本身说它不在：钉值表记的是近似树甲乙里都没有这份测试文件
+.claude/kb/milestone/03-third-txn.md	scripts/hosts/host-resources.py	# 抄下来的当时的做法：第 11 行记的是 2026-10-09 那时上限默认取它的预测值，脚本 2026-10-31 已删（预测归 task-server），改成后继就成假话
+.claude/kb/checks-owed.md	.claude/handover	# 句子本身说它不在：C433 记的是 2026-09-21 那 67 份删除被别的提交带走的事
+.claude/kb/checks-owed.md	.claude/kb/invariants.md	# 抄下来的当时的命令：C254 抄的是那时对单文件清单跑的 grep，句子写明已拆到 crates/singlefs-checker/invariants/
+.claude/kb/checks-owed.md	records/2026-01-01-临时实测.md	# 抄下来的当时的做法：C510 记的是 2026-09-23 带一份临时文件跑门禁、0 道点名它，那份文件只在那一趟存在
+.claude/kb/checks-owed.md	scripts/crash/corruption-check.py	# 句子本身说它不在：C285、C421、C505 作废的理由就是对象随本地模型腿删于 1b6f9865
+.claude/kb/checks-owed.md	scripts/gate.sh	# 相对仓外副本的路径：C454 说的是上游 singlefs-ai-sop 仓里的 scripts/gate.sh，本仓副本在 .claude/singlefs-ai-sop/ 下
+.claude/kb/checks-owed.md	scripts/gate/change-touches-crates.sh	# 句子本身说它不在：C8 写明按 HEAD 比的那条路已删
+.claude/kb/checks-owed.md	scripts/gate/lib_source_digest.py	# 句子本身说它不在：C800 写明按文件算摘要的那份已删、换成函数单元
+.claude/kb/checks-owed.md	scripts/gate/stage-must-run.sh	# 句子本身说它不在：C8 写明按树比的那条路已删
+.claude/kb/checks-owed.md	scripts/kb/oov-check.py	# 句子本身说它不在：C169、C285 作废的理由就是对象随本地模型腿删于 1b6f9865
+.claude/kb/checks-owed.md	scripts/relay-timing-lint.py	# 句子本身说它不在：C382 记的是 2026-09-18 那时它是别的会话还没提交的文件
+.claude/kb/checks-owed.md	scripts/rewrite-moved-paths.py	# 句子本身说它不在：C428 销账的理由就是它删于 8186d5b5
+.claude/kb/checks-owed.md	scripts/shell-lint.sh	# 相对仓外副本的路径：C384 说的是上游 SOP 0.0.52 的 scripts/shell-lint.sh，本仓副本在 .claude/singlefs-ai-sop/ 下
+.claude/kb/checks-owed.md	prior-art.md「72 条承重引用」	# 句子本身说它已改掉：C44 记的是 2026-09-21 把 prior-art.md 的「72 条承重引用」改成 89 条这件事，换成今天的原文就成假话

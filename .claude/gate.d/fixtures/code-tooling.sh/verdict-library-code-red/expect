@@ -1,0 +1,11 @@
+exit=1
+want=1 行写了判定库而第三列不是 prune-server
+want=.claude/gate.d/verdict-library-scripts.tsv 第 4 行 scripts/sample/old_root.sh
+want=4 处带判定库的脚本取不到库还照跑、不记
+want=scripts/sample/silent.sh:6  库没处放
+want=scripts/sample/silent.sh:8  一行都不复用
+want=scripts/sample/silent.sh:10  现判不记
+want=scripts/sample/silent.sh:15  没有库
+want=2 处第三列写 prune-server 的脚本里还有本地库读写
+want=scripts/sample/local.py:4  common-dir 拼库目录（python）
+want=scripts/sample/local.py:5  本地 RocksDB 或 sqlite

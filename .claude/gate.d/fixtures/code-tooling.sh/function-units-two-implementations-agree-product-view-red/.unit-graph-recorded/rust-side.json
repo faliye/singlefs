@@ -9,7 +9,7 @@
 "fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
 "const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
 "fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
-"key\tc5c4aabeb2cee0f6cd2907e2309546c5a5ffb8f0f59fe0c5aec0159d5159eaef"
+"key\t6dbeeb68a826f1a0b0a50441a50be756bb7825120b8f532cb4aff579259aec0a"
 ]
 },
 "closure\tfsample::entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
@@ -21,7 +21,7 @@
 "fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
 "const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
 "fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
-"key\tc5c4aabeb2cee0f6cd2907e2309546c5a5ffb8f0f59fe0c5aec0159d5159eaef"
+"key\t6dbeeb68a826f1a0b0a50441a50be756bb7825120b8f532cb4aff579259aec0a"
 ]
 },
 "closure\tfsample::heaviest\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
@@ -41,7 +41,7 @@
 "impl\tfsample::<impl Weigh for Option < Box < T > >>\tcrates/fsample/src/lib.rs:38-38\t2bb897cf50cdc25818f5eeecd9a2cc33976910b7507bbcd6da9294f6cfb7f860",
 "fn\tfsample::<impl Weigh for Option < Box < T > >>::weigh\tcrates/fsample/src/lib.rs:39-44\t8341cf4ce44c156206261b132092c285e314e9a5807a2e4c2ed9dc8bbcbfaf3f",
 "fn\tfsample::heaviest\tcrates/fsample/src/lib.rs:46-48\tc1ac83e2fbecdf87ffbc01e95f3f0884a16a89ffd339d0abb47a93d329938626",
-"key\t904f76530dab3a6d6cb9b040e5a35a9a69d5de0b991d2207b2e0d767b0fdefea"
+"key\t3dcafce8a4854c422261260742ef50c7cd712559c557b06861143c13545e9f10"
 ]
 },
 "closure\tfsample::heaviest\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
@@ -61,7 +61,7 @@
 "impl\tfsample::<impl Weigh for Option < Box < T > >>\tcrates/fsample/src/lib.rs:38-38\t2bb897cf50cdc25818f5eeecd9a2cc33976910b7507bbcd6da9294f6cfb7f860",
 "fn\tfsample::<impl Weigh for Option < Box < T > >>::weigh\tcrates/fsample/src/lib.rs:39-44\t8341cf4ce44c156206261b132092c285e314e9a5807a2e4c2ed9dc8bbcbfaf3f",
 "fn\tfsample::heaviest\tcrates/fsample/src/lib.rs:46-48\tc1ac83e2fbecdf87ffbc01e95f3f0884a16a89ffd339d0abb47a93d329938626",
-"key\t904f76530dab3a6d6cb9b040e5a35a9a69d5de0b991d2207b2e0d767b0fdefea"
+"key\t3dcafce8a4854c422261260742ef50c7cd712559c557b06861143c13545e9f10"
 ]
 },
 "closure\tfsample::kernel_text\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
@@ -73,7 +73,7 @@
 "const\tfsample::SHARED_SOURCE\tcrates/fsample/src/lib.rs:50-50\t91053f68448d52ed5f87ac3c6150350a83af8e083e2e754e699fcb59e9351c14",
 "fn\tfsample::kernel_text\tcrates/fsample/src/lib.rs:51-53\t0f2352b4e1bc0623f9587de97931fa1252b358207fa1aa53ddeb7f01272684fe",
 "wgsl_const\tfsample::shared.wgsl::SHARED_LIMIT\tcrates/fsample/src/shared.wgsl:1-1\t4eddcfd008102a39ae81b0bd64530071c5fd4b4017e353e0d4cdf54cf5e72e75",
-"key\t532b8cb86bea4f39f5e1345cf08ece8691c61306b1d928812f016cfaa3ff14a1"
+"key\ta588a0b6f21b051ede6d7a3ce576b1751e278aa335b2c24dc686a36b018c0637"
 ]
 },
 "closure\tfsample::kernel_text\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
@@ -85,7 +85,7 @@
 "const\tfsample::SHARED_SOURCE\tcrates/fsample/src/lib.rs:50-50\t91053f68448d52ed5f87ac3c6150350a83af8e083e2e754e699fcb59e9351c14",
 "fn\tfsample::kernel_text\tcrates/fsample/src/lib.rs:51-53\t0f2352b4e1bc0623f9587de97931fa1252b358207fa1aa53ddeb7f01272684fe",
 "wgsl_const\tfsample::shared.wgsl::SHARED_LIMIT\tcrates/fsample/src/shared.wgsl:1-1\t4eddcfd008102a39ae81b0bd64530071c5fd4b4017e353e0d4cdf54cf5e72e75",
-"key\t532b8cb86bea4f39f5e1345cf08ece8691c61306b1d928812f016cfaa3ff14a1"
+"key\ta588a0b6f21b051ede6d7a3ce576b1751e278aa335b2c24dc686a36b018c0637"
 ]
 },
 "closure\tfsample::main\t--target\tbin:fsample\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
@@ -98,7 +98,7 @@
 "const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
 "fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
 "fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4",
-"key\tb59afd6a1052225478d864a785711af59af0c4bd74e0b3d2d2dd9566637e7abe"
+"key\t2fd07b17ed1371188a364c4b878ce28cc4bd88ca23d2f906ecfb2951855ffdbf"
 ]
 },
 "closure\tfsample::main\t--target\tbin:fsample\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
@@ -111,7 +111,7 @@
 "const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
 "fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
 "fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4",
-"key\tb59afd6a1052225478d864a785711af59af0c4bd74e0b3d2d2dd9566637e7abe"
+"key\t2fd07b17ed1371188a364c4b878ce28cc4bd88ca23d2f906ecfb2951855ffdbf"
 ]
 },
 "closure\tfsample::proven_entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
@@ -122,7 +122,7 @@
 "fn\tfsample::lemma_doubled_is_even\tcrates/fsample/src/lib.rs:58-63\t000761acf3b7d88b23510ad55c268c4462495b4151c407b73e21e85cfefa0e27",
 "fn\tfsample::scaled\tcrates/fsample/src/lib.rs:64-74\t5c82d371ba7711ba96c13691c8e792ed1d5bae660164fd4722ce5239a6cd7122",
 "fn\tfsample::proven_entry\tcrates/fsample/src/lib.rs:76-78\tc65c06c2bf9f2f1c1099aadfb9d652b53d915f392285a39c80612af15efbfd3a",
-"key\tbffe064d6be37d5d1ad3d84ba3170aff4b5fd39c983fbd9bc5d44b7be48c0c18"
+"key\tf380ce3162a207b33e371837d32f496639d36cbd4d6465b2bacd63250b7af73b"
 ]
 },
 "closure\tfsample::proven_entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
@@ -131,7 +131,7 @@
 "mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
 "fn\tfsample::scaled\tcrates/fsample/src/lib.rs:64-74\t07c2c39d56e8f85ea1c89533d174bb035a694d306f655a9fea106888ecb07fab",
 "fn\tfsample::proven_entry\tcrates/fsample/src/lib.rs:76-78\tc65c06c2bf9f2f1c1099aadfb9d652b53d915f392285a39c80612af15efbfd3a",
-"key\t57ce8f873f3196769a46f065e7f2d7e1c40a0f70d8687e3a9ae3a3783afe645f"
+"key\tbc3a3ba73d130dda13d00260e05ad2ea9699af51696fd0bae7d93cd0ebd4582b"
 ]
 },
 "closure\tfsample::table\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
@@ -140,7 +140,7 @@
 "mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
 "fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
 "data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
-"key\t4b38617aff14aaaca75d2b157a63e8e98a70414d1a3a6d56f77843a2cb780f5b"
+"key\t1a0106e1a502249741c376572bab1edd7727e6cc90c8c1fbff0bedeeb14a0cd3"
 ]
 },
 "closure\tfsample::table\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
@@ -149,7 +149,7 @@
 "mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
 "fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
 "data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
-"key\t4b38617aff14aaaca75d2b157a63e8e98a70414d1a3a6d56f77843a2cb780f5b"
+"key\t1a0106e1a502249741c376572bab1edd7727e6cc90c8c1fbff0bedeeb14a0cd3"
 ]
 },
 "dump\t--judgment-kind\tproduct-behavior": {

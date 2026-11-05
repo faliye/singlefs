@@ -1,0 +1,38 @@
+{
+"closures": {
+"closure\tfsample::entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:2-9\t879782ef91e07d1397a8f5252dcd4be1d3fa0498a3b4e2820666023eafa8a08c",
+"fn\tfsample::gpu_boost\tcrates/fsample/src/lib.rs:10-13\t596e13ce30fdada44393f23883b7ef3b212dafc108eb8356004f2031c08490e9",
+"key\tf08d767c7929f52705632a4ff9747d7a50c41c5afc229cdc7a1df9be879ccd0b"
+]
+},
+"closure\tfsample::entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:2-9\t879782ef91e07d1397a8f5252dcd4be1d3fa0498a3b4e2820666023eafa8a08c",
+"fn\tfsample::gpu_boost\tcrates/fsample/src/lib.rs:10-13\t596e13ce30fdada44393f23883b7ef3b212dafc108eb8356004f2031c08490e9",
+"key\tf08d767c7929f52705632a4ff9747d7a50c41c5afc229cdc7a1df9be879ccd0b"
+]
+},
+"dump\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:2-9\t879782ef91e07d1397a8f5252dcd4be1d3fa0498a3b4e2820666023eafa8a08c",
+"fn\tfsample::gpu_boost\tcrates/fsample/src/lib.rs:10-13\t596e13ce30fdada44393f23883b7ef3b212dafc108eb8356004f2031c08490e9"
+]
+}
+},
+"dump": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:2-9\t879782ef91e07d1397a8f5252dcd4be1d3fa0498a3b4e2820666023eafa8a08c",
+"fn\tfsample::gpu_boost\tcrates/fsample/src/lib.rs:10-13\t596e13ce30fdada44393f23883b7ef3b212dafc108eb8356004f2031c08490e9"
+]
+}
+}

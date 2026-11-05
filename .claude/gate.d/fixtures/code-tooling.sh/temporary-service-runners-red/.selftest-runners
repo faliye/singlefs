@@ -1,0 +1,5 @@
+# 样本的 runner 表：裸写一条（表里是 required）、包装对的两条、包装而表里没有这一行的一条；表里 required 的另一份在 runner 表里一条都没有
+python3 scripts/gate/sample-required-bare.py --selftest
+python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-required-wrapped.py --selftest
+python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-own-server-wrapped.py --selftest
+python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-unregistered-wrapped.py --selftest

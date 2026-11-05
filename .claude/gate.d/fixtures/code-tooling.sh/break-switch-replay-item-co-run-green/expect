@@ -1,0 +1,6 @@
+exit=0
+want=只跑 样本根的 .gate-items 点名的项：break-switch-replay 1 项
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=· 按条复用：1 份脚本、2 条判定（基准趟 1 条、开关 1 条），现判 2、复用 0、拒算 0；起 1 份（陪跑 2 条
+want=脚本与钩子的弄坏开关复跑：复跑了 3 条开关（1 份）
+want=break-switch-replay：绿

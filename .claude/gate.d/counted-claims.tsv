@@ -1,0 +1,12 @@
+# 文档里写死的能数的数（条数、项数）登记表：门禁 doc-registries 的 counted-claims 格逐行核，写法与判法在 doc-registries.sh 里那一格函数上方的注释。
+# 四列用制表符分隔：从仓根起的路径、定位正则（python re，恰好一个捕获组抓那个十进制数，在那份文件里要恰好命中一次）、数的命令（在仓根经 bash -o pipefail -c 起，标准输出去掉空白之后是一个十进制整数）、说明。
+# 一行一份文件：同一个数在几份译文里各写一次的，每份各登一行、各写各语言的正则；同一份文件里同一个数写了两处的，两处各登一行。
+# 加一行之前先在仓根把那条命令手跑一遍，数对了再登；# 起头的行与空行不算登记。
+CLAUDE.md	checker 判 ([0-9]+) 条不变量	grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '	池级 checker 判的不变量条数：不变量清单里状态写已实现的行，I-8.4 不算
+CLAUDE.md	崩溃放量的 ([0-9]+) 项	bash scripts/crash/crash-amplification.sh --list-items | wc -l	崩溃放量登记表的分项数（--list-items 只读登记表，不起 cargo）
+README.md	`IMPLEMENTED_INVARIANTS` 有 ([0-9]+) 项	grep -o -E 'IMPLEMENTED_INVARIANTS: \[&str; [0-9]+' crates/singlefs-checker/src/image.rs | grep -o -E '[0-9]+$'	池级 checker 代码清单 IMPLEMENTED_INVARIANTS 的项数（数组长度）
+README.md	完整判过 ([0-9]+) 项	grep -o -E 'IMPLEMENTED_INVARIANTS: \[&str; [0-9]+' crates/singlefs-checker/src/image.rs | grep -o -E '[0-9]+$'	同一行里同一个数的第二处
+README.en.md	`IMPLEMENTED_INVARIANTS` contains ([0-9]+) entries	grep -o -E 'IMPLEMENTED_INVARIANTS: \[&str; [0-9]+' crates/singlefs-checker/src/image.rs | grep -o -E '[0-9]+$'	英语译文的同一个数
+README.en.md	all ([0-9]+) are fully judged	grep -o -E 'IMPLEMENTED_INVARIANTS: \[&str; [0-9]+' crates/singlefs-checker/src/image.rs | grep -o -E '[0-9]+$'	英语译文同一行里同一个数的第二处
+README.ja.md	`IMPLEMENTED_INVARIANTS` は ([0-9]+) 項目	grep -o -E 'IMPLEMENTED_INVARIANTS: \[&str; [0-9]+' crates/singlefs-checker/src/image.rs | grep -o -E '[0-9]+$'	日语译文的同一个数
+README.ja.md	([0-9]+) 項目すべて	grep -o -E 'IMPLEMENTED_INVARIANTS: \[&str; [0-9]+' crates/singlefs-checker/src/image.rs | grep -o -E '[0-9]+$'	日语译文同一行里同一个数的第二处

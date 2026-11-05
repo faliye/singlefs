@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# crash-point-replay 逐项点名样本的假 cargo（样本档）：-V 打版本；test 带 --features <特性> 打 cases/feature-pass.<特性，逗号换成 +>.log 里
+# 收到的 --lib（unittests src/lib.rs 那一段）与 --test <名>（tests/<名>.rs 那一段）点到的那几段（cargo 段头「Running …」起到下一段；段头之前的编译行照打），
+# 退出码照同名 .exit（没有就 0）；没有那一份日志退 101。不带 --features 的退 101（这份样本只跑带特性那一格）。
+# 每次起都先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>（expect 靠它核阶段只把点名的测试目标交给了 cargo）。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+features=""
+targets=" "
+previous=""
+for word in "$@"; do
+  [[ "$word" == -- ]] && break
+  [[ "$previous" == --features ]] && features="$word"
+  [[ "$word" == --lib ]] && targets+="src/lib.rs "
+  [[ "$previous" == --test ]] && targets+="tests/$word.rs "
+  previous="$word"
+done
+[[ -n "$features" ]] || { echo "这份样本只跑带特性那一格，没收到 --features（参数：$*）"; exit 101; }
+log="$here/cases/feature-pass.${features//,/+}.log"
+[[ -f "$log" ]] || { echo "样本里没有这组特性的日志：${log##*/}（参数：$*）"; exit 101; }
+echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+awk -v targets="$targets" '
+  /^[[:space:]]*Running / {
+    source = $2; if (source == "unittests") source = $3
+    keep = index(targets, " " source " ") > 0
+    started = 1
+  }
+  !started || keep { print }
+' "$log"
+exit "$(cat "${log%.log}.exit" 2>/dev/null || echo 0)"

@@ -1,0 +1,4 @@
+exit=1
+want=✗ 这几条自证只在临时 prune-server 上跑（.claude/hooks/selftest-temporary-service.tsv 登记成 required：开跑先调 selftest_service_problem，裸跑退 2），runner 表里却是裸写的
+want=「python3 scripts/gate/sample-needs-temporary-service.py --selftest」该写成「python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-needs-temporary-service.py --selftest」
+want=→ 怎么办：照上面逐条改成包装写法（不写 --server-binary：二进制由这一格一趟取一份交给每一条）；这一格一条都没起

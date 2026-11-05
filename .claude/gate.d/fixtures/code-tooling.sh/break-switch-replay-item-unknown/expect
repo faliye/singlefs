@@ -1,0 +1,4 @@
+exit=2
+want=✗ 样本根的 .gate-items 点名的项不在可点的项里：「scripts/gate/okay.py:OKAY_BREAK=nope」；一格都没跑
+want=break-switch-replay  scripts/gate/okay.py
+want=break-switch-replay  scripts/gate/okay.py:OKAY_BREAK=drop

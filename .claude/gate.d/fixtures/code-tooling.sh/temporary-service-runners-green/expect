@@ -1,0 +1,2 @@
+exit=0
+want=✓ 要临时服务的表与 runner 表两边对齐：表里 required 1 份都在 runner 表里写成包装写法，own-server 2 份不要求包装；runner 表 4 条，套包装的 2 条都在表里

@@ -4,7 +4,7 @@
 set -euo pipefail
 prior=.unit-verdict-sample/prior
 mkdir -p "$prior"
-cp -a scripts "$prior/"
+cp -dR --preserve=timestamps,links scripts "$prior/"
 python3 -c '
 import sys
 path, old, new = sys.argv[1:4]

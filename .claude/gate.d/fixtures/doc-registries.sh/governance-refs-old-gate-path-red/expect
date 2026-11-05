@@ -1,0 +1,6 @@
+exit=1
+want=.claude/agents/sample.md:7: 用旧编号称呼门禁（…
+want=：47 号今天是门禁 code-tooling 的 research-script-selftests、research-script-selftest-coverage 格
+want=扫 1 份治理文档：门禁号 0 处、路径 0 处、小节 0 处；没判 0 处；跳过 0 处
+want=治理文档与 kb 里有指不到的指向（上面逐条列出）
+want=  governance-refs：红（退出 1）

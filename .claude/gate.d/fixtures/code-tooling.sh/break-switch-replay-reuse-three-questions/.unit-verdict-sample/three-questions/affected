@@ -1,0 +1,3 @@
+scripts/gate/alpha.py 基准趟
+scripts/gate/alpha.py ALPHA_BREAK=drop
+scripts/gate/alpha.py ALPHA_BREAK=swap

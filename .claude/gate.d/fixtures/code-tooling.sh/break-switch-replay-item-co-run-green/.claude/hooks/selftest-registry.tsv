@@ -1,0 +1,3 @@
+# 样本登记表
+scripts/gate/tally.py	selftest	# 样本：自证只在内存里判
+scripts/gate/okay.py	selftest	# 样本：自证只在内存里判

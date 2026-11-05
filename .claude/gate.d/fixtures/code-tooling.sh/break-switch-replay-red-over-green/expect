@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=· 样本：上一版（.unit-verdict-sample/prior）的 4 条照判绿记进这一版样本的判定库
+want=scripts/gate/flaky.py FLAKY_BREAK=swap：不符
+want=· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟这几条现判
+want=· 样本档：判红记库之后再算一次计划：复用 3 条、现判 1 条
+want=现判「scripts/gate/flaky.py FLAKY_BREAK=swap」：上次判红
+want=break-switch-replay：红（退出 1）

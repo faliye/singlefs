@@ -1,0 +1,2 @@
+# ② 扩到 kb 认 .out.gz 存放的绿样本（setup.sh 建 git 仓）：点名 .out 而树里只有 .out.gz 的、只在历史里有 .out.gz 的都不红。只跑 governance-refs
+governance-refs

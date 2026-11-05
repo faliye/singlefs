@@ -1,0 +1,2 @@
+# 样本根的逐项点名：点了 okay.py 文件头里没有的一条开关，必须退 2、一格都不跑
+scripts/gate/okay.py:OKAY_BREAK=nope

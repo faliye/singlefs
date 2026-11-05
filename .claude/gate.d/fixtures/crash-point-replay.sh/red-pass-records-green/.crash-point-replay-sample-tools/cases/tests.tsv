@@ -1,0 +1,6 @@
+plain	src/lib.rs	tests::red_check	FAILED	line	-
+plain	src/lib.rs	tests::green_check	ok	line	-
+feature	src/lib.rs	tests::red_check	ok	line	-
+feature	src/lib.rs	tests::green_check	ok	line	-
+plain	tests/store_only.rs	-	ok	line	-
+feature	tests/store_only.rs	store_only_quick	ok	line	-

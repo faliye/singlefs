@@ -1,7 +1,0 @@
-[package]
-name = "singlefs-checker-tier"
-version = "0.0.0"
-edition = "2021"
-
-[features]
-gpu = []

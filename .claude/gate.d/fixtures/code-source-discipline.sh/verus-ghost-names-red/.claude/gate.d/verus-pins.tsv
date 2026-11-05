@@ -1,0 +1,4 @@
+# 样本登记表：只放 crate 行
+crate	crates/self-defined-wrappers	1
+crate	crates/renamed-wrappers	1	cargo
+crate	crates/gone	1

@@ -1,0 +1,10 @@
+exit=1
+want=✗ .claude/kb/decisions/01-样本决策.md:5 C20（样本已还的甲）
+want=✗ .claude/kb/decisions/01-样本决策.md:6 C21（样本已还的乙）
+want=✗ .claude/kb/milestone/04-样本里程碑.md:3 C22（样本已还的丙）
+want=✗ .claude/kb/milestone/04-样本里程碑.md:4 C20（样本已还的甲）
+want=决策正文欠段之外与里程碑页的现状句里有 4 处引的账在 .claude/kb/checks-owed.md 的已还清表里、那一句把它当现欠（写了欠、待、没做、未做、还开着、仍开着或「记在 C<编号>」）又没写已还、还清、销账、已关、关账、做完、已做、已完成之一（扫 2 份中文正文、5 句引账、5 个 C 号；滞后表收着的 0 处不算）
+want=→ 怎么办：那一句写的是历史（当时欠、后来还了），就在那一句写明已还
+want=样本只跑 .gate-cells 点名的格：owed-refs-paid
+want=  owed-refs-paid：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（owed-refs-paid）

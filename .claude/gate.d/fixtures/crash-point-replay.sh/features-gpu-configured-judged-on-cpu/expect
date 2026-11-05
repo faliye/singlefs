@@ -1,0 +1,7 @@
+exit=1
+want=tests/gpu_pair.rs：CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=gpu_not_enabled_in_the_configuration threads=4
+want=✗ feature-gated-tests：带 gpu 特性那一趟判在 CPU：多机配置
+want=· feature-gated-tests：带 gpu 特性那一趟要上卡，显卡是 task-server 交的 192.0.2.1:0:8G（清场归 task-server，这里不另套清场包装）
+want=逐格：crash-case-replay：绿；feature-gated-tests：红
+want=✗ 有 1 格判红：feature-gated-tests（各自的出路在上面）
+want=feature-gated-tests：红

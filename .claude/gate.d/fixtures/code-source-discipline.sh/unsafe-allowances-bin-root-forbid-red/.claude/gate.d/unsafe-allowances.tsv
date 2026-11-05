@@ -1,0 +1,3 @@
+# 样本用的登记表：bin 根 e900_thread_clock.rs 只登了 forbid 一行，源码里这个根却写了 deny、放开一个函数
+singlefs-verification	forbid	-	-	-	-	-	-
+singlefs-verification/src/bin/e900_thread_clock.rs	forbid	-	-	-	-	-	-

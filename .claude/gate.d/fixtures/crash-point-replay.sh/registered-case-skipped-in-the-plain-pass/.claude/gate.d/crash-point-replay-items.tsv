@@ -1,0 +1,2 @@
+# 样本的崩溃点重放合表（开跑前的静态判据 crash-case-check.py --only placement 读它：每条 crash-case: 与每个放量分项恰好被一项点名）
+plain-stream	crash-case:plain-stream	amplified-plain-stream	# 样本

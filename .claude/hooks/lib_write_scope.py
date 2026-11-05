@@ -1,7 +1,7 @@
 """写范围表（agent-write-scope.tsv）的读法与判法：write-guard.sh（Write / Edit / MultiEdit）、bash-command-detector.sh（Bash 里的写）与 runner-dispatch-guard.sh（派发提示里点名的路径）用同一份，不各抄一份。
 
 表的写法在 agent-write-scope.tsv 文件头：三列用制表符分隔（agent 名、路径模式、出处），路径模式相对仓根，以 / 开头的是绝对路径，** 跨目录、* 不跨目录，
-以 $SINGLEFS_WORK_ROOT/ 开头的由 lib_work_root.py 展开成工作根与过渡期旧根各一条。模式里只有 ** 与 * 两个元字符，别的字符一律 re.escape。
+以 $SINGLEFS_WORK_ROOT/ 开头的由 lib_work_root.py 展开成工作根那一条（会话临时目录根 /tmp/claude-<uid> 不展开，写不进）。模式里只有 ** 与 * 两个元字符，别的字符一律 re.escape。
 
   load_scopes(table_path) -> {agent 名: [路径模式…]}                                读表；读不了抛 OSError
   expanded_scope_patterns(patterns, work_roots, anchored=True) -> [展开后的模式…]    work_roots 是 lib_work_root 模块，读不到时给 None（$ 起头的模式丢掉，按拒判）
@@ -34,7 +34,7 @@ def load_scopes(table_path):
 
 
 def expanded_scope_patterns(patterns, work_roots, anchored=True):
-    """写范围表里的模式：$SINGLEFS_WORK_ROOT/ 起头的展开成工作根与过渡期旧根各一条；读不到 lib_work_root.py（work_roots 是 None）时这样的模式丢掉（按拒判）。"""
+    """写范围表里的模式：$SINGLEFS_WORK_ROOT/ 起头的展开成工作根那一条；读不到 lib_work_root.py（work_roots 是 None）时这样的模式丢掉（按拒判）。"""
     expanded = []
     for pattern in patterns:
         if pattern.startswith("$"):
@@ -77,7 +77,7 @@ def landing_forms(raw_absolute, lexical_only=False):
 
 
 def resolved_pattern(pattern):
-    """绝对模式的字面前缀（第一个 * 之前那一段里最后一个 / 之前的目录）解开符号链接之后的写法：模式里的根（工作根、旧根）本身是链接时，解开了的落点也对得上。"""
+    """绝对模式的字面前缀（第一个 * 之前那一段里最后一个 / 之前的目录）解开符号链接之后的写法：模式里的根（工作根）本身是链接时，解开了的落点也对得上。"""
     star = pattern.find("*")
     static = pattern if star == -1 else pattern[:star]
     cut = static.rfind("/")

@@ -1,0 +1,8 @@
+exit=1
+want=· 单测按条复用：3 条编得进的测试函数，现判 3、复用 0、拒算 0
+want=research 的构建或单测没过（cargo test 退出码 101）
+want=· 判红记库（tiny）：1 条记红、撤掉同一把键原有的绿，下一趟这几条现判
+want=· 判绿记库（tiny）：RECORD recorded=2
+want=· 样本档：判红记库之后再算一次计划（tiny）：复用 2 条
+want=现判 tiny/src/lib.rs::tests::fails_on_purpose（上次判红（
+want=research-build-and-replay.sh：1 格里 1 格红（research-unit-tests）

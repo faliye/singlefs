@@ -1,0 +1,4 @@
+exit=0
+want=proof:singlefs_core::assume_specification[singlefs_format::SLOT_BYTES]	verus-proof	assume_specification crates/singlefs-core/src/lib.rs:20
+want=  · verus-proof：键对不上 0 条、无记录 2 条、键相同 0 条、拒算 0 条
+want=  · 键对不上共 0 条（3 格比了 4 项

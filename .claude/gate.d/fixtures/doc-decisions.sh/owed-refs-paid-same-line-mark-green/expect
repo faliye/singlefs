@@ -1,0 +1,5 @@
+exit=0
+want=✓ 决策正文的欠段没有把已还清的账当开着的（扫 1 份中文正文、1 行欠段、7 个 C 号；其中引已还清的 2 个：同一截写了已还清、还清、销账之一的 1 个，同一行里同一个号另一截写了的 1 个；滞后 0 处）
+want=样本只跑 .gate-cells 点名的格：owed-refs-paid
+want=  owed-refs-paid：绿
+want=doc-decisions.sh：1 格里 1 格绿（owed-refs-paid），0 格本次未跑（无）

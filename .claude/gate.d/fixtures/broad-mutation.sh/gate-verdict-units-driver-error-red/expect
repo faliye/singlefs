@@ -1,0 +1,4 @@
+exit=1
+want=广谱变异提交门禁判红：此刻源码上 4 条里 1 条沿用不了也没现判、0 条没红、0 个单元没记清单
+want=NO_CONCLUSION 2 driver-error crates/singlefs-core/src/lib.rs:5:5: replace helper -> u32 with 0
+want=broad-mutation.sh：1 格里 1 格红（gate-verdict）

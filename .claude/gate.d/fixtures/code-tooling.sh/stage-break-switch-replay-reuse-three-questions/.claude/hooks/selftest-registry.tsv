@@ -1,0 +1,3 @@
+# 样本登记表
+.claude/gate.d/alpha-stage.sh	samples	# 样本：只读 verdict 文件
+.claude/gate.d/beta-stage.sh	samples	# 样本：只读 verdict 文件

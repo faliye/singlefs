@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=crates/mutations.tsv 这 1 行点名的测试够不着被改坏的函数
+want=crates/mutations.tsv:3 M_没有测试调到的函数（closure）：被改坏的 crates/singlefs-verification/src/crash_amplification.rs::
+want=never_called_by_the_test
+want=换成调得到被改坏函数的用例，或删掉这一行
+want=mutation-tables：红（退出 1）

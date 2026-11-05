@@ -3,7 +3,7 @@
 # run-condition: command python3
 # PreToolUse hook（AskUserQuestion）：弹窗问句里把推出来的话写成事实的，执行前拒绝（退出 2，stderr 写是哪一句与出路）。
 # hook-events: PreToolUse
-# gate-similar: runner-dispatch-guard.sh 同样在 PreToolUse 上逐句判一段给人看的中文、引号里的片段换成占位不判；但它挂 Agent|Task、判派发提示里有没有点名岔路、「重型测试：不跑」一行、定义要的输入这类固定标签行，这里挂 AskUserQuestion、判断言词加出处，两边的句子判据没有一条相同。引号遮掉那一步两边各一份、写法不同（它逐字符用栈、不遮反引号，这里先遮反引号再按成对的引号反复替换）；抽成共用模块要改 runner-dispatch-guard.sh，这一次不碰别的钩子，交主 agent 定要不要抽
+# gate-similar: runner-dispatch-guard.sh 同样在 PreToolUse 上逐句判一段给人看的中文、引号里的片段换成占位不判；但它挂 Agent|Task、判派发提示里有没有点名岔路、定义要的输入这类固定标签行，这里挂 AskUserQuestion、判断言词加出处，两边的句子判据没有一条相同。引号遮掉那一步两边各一份、写法不同（它逐字符用栈、不遮反引号，这里先遮反引号再按成对的引号反复替换）；抽成共用模块要改 runner-dispatch-guard.sh，这一次不碰别的钩子，交主 agent 定要不要抽
 # gate-similar: write-guard.sh 同样在执行前按字面拒一类写法（撇号类角标），但挂 Write|Edit、判的是落进文件的字与写哪个文件；弹窗问句不落盘，它看不见，并进去要让它多认一个工具、多一套与写文件无关的判据
 # gate-similar: continuation-guard.sh 挂 PreToolUse[SendMessage]，判收件的子 agent 在会话记录里交回过没有、被中断过没有；这里判弹窗里的句子，两边的对象与输入没有交集
 # gate-overlap:copy-kept continuation-guard.sh main() 那十行是钩子入口（认 --selftest、从 stdin 读 hook 的 JSON、拒绝时把说明写进 stderr），不带判据；抽成共用模块要同时改 continuation-guard.sh 与 runner-dispatch-guard.sh，这一次的任务不许碰别的钩子，交主 agent 定要不要抽

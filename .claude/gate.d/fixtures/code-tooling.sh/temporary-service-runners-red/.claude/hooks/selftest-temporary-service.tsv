@@ -1,0 +1,5 @@
+# 样本的要临时服务的自证登记表：四行，一份 required 而 runner 表裸写，一份 required 而 runner 表里没有，一份 required 且写成包装写法，一份 own-server 包着
+scripts/gate/sample-required-bare.py	required	# 样本：自证开跑先要临时服务，runner 表里却裸写
+scripts/gate/sample-required-absent.py	required	# 样本：自证开跑先要临时服务，runner 表里一条都没有
+scripts/gate/sample-required-wrapped.py	required	# 样本：自证开跑先要临时服务，runner 表里写成了包装写法（对的，不点名）
+scripts/gate/sample-own-server-wrapped.py	own-server	# 样本：自证自己起真服务，runner 表里包着只为交二进制（不点名）

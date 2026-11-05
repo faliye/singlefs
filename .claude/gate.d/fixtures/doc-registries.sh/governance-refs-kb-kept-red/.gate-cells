@@ -1,0 +1,2 @@
+# 保留表 dead-path-kept.tsv 的红样本（setup.sh 建 git 仓）：两张表都登的、理由太短的、路径在了的、载体不再引的四行逐条点名，登对了的一行不红。只跑 governance-refs
+governance-refs

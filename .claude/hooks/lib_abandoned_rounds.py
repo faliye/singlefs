@@ -25,8 +25,7 @@
      判决文件只认 <轮>-main-verification.md 这一种文件名（ROUND_MATERIAL_FORMS）。
      出处只认 records/ 下的文件：这一轮自己的材料、规则与定义文件、仓外路径都不认。那句话是不是用户为这一轮说的，钩子认不出，靠主 agent 核。
 
-不要求出处的只有 LEGACY_SOURCELESS_ROUNDS 点名的几行（出处这条规矩立起来之前登记的，没有出处可补；名单写死在这一份里，只缩不涨，不按日期判）：
-门禁 abandoned-rounds 格与派发闸 ⑥ 用同一张名单，名单外的行一律要出处。形状与重复两样不分名单。
+每一行都要出处，不按日期、不按轮名免；形状与重复两样同样每一行都判。
 
 接口：
   read_rows(项目根) → (行列表, 读不了的原因或 None)；表不在是 ([], None)；空行与 # 开头的行不算
@@ -37,26 +36,41 @@
 
 弄坏开关 LIB_ABANDONED_ROUNDS_BREAK=<项>（逗号连几个；认不出的值抛 ValueError）。打开后红在哪几格写在两个用它的文件头
 （runner-dispatch-guard.sh 的自检格、doc-process-records.sh 的样本）：
-  columns-unchecked        不核四列不空
-  date-unchecked           不核日期是 YYYY-MM-DD
-  duplicate-unchecked      同一轮有两行也不拒
-  source-optional          出处一概不要求：没写出处也收
-  source-required-always   名单里的旧行也要求出处（LEGACY_SOURCELESS_ROUNDS 不起作用）
-  legacy-by-date           免出处退回按日期判：日期早于 LEGACY_DATE_BEFORE 的行不要求出处（名单不起作用）
-  other-name-by-form       别的轮名的全集退回只认登记表里出现过的轮名（仓里的 _<轮>-body.md、<轮>-snapshot/、<轮>-main-verification.md 不算；<名>-r<数字> 形照认）
-  other-form-ignored       别的轮名不认 <名>-r<数字> 形，只认仓里认得的全集（改前的判法：仓里没有材料的 other-r2 不当别的轮名）
-  other-round-name-ok      出处那一行里有别的轮名也收
-  line-number-read         退回按行号读：取出处写的第 N 行判，〔〕里的原话不要求也不找（改前的判法：出处那份文件前面插一行，登记就失效）
-  line-hint-ignored        不看行号提示：原话命中几处、或找不到，一律不收（改前的判法：出处那份记录追加一行抄了原话的补记、照术语改名换字、删日期，登记就失效）
-  hint-line-unmatched      原话找不到时不比〔〕与提示那一行，提示那一行有这一轮的名字就取它（改前的判法：〔〕写转述、行号写到同一轮另一句带名字与「」原话的话，照收）
-  empty-parentheses-kept   比〔〕与提示那一行时，去掉日期、空白与逗号之后剩下的空括号「（）」「()」留着不去（改前的判法：出处那一行的日期写在括号里、照 date-once 连括号删掉，登记就失效）；
+  LIB_ABANDONED_ROUNDS_BREAK=columns-unchecked  不核四列不空
+      「✗ 自检：快照:登记行不是四列（门禁也判红），不收」、「✗ 自检：快照:写坏的登记行在说明里点名第几行」
+  LIB_ABANDONED_ROUNDS_BREAK=date-unchecked  不核日期是 YYYY-MM-DD
+      「✗ 自检：快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收」
+  LIB_ABANDONED_ROUNDS_BREAK=duplicate-unchecked  同一轮有两行也不拒
+      「✗ 自检：快照:同一轮登记两行（两行出处都合格，门禁也判红），不收」
+  LIB_ABANDONED_ROUNDS_BREAK=source-optional  出处一概不要求：没写出处也收
+      「✗ 自检：快照:登记行没有出处，照拒」、「✗ 自检：快照:出处没写行号，照拒」、「✗ 自检：快照:出处的行号超出文件、〔〕原话也找不到，照拒」、「✗ 自检：快照:〔〕里的原话在出处文件里找不到（被删或改了字），照拒」、「✗ 自检：快照:〔〕里的原话在出处文件里命中两次，照拒」、「✗ 自检：快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒」、「✗ 自检：快照:出处没带〔〕原话，照拒」、「✗ 自检：快照:那一行没有这一轮的名字（引无关的一句），照拒」、「✗ 自检：快照:那一行是别的轮的叫停原话，照拒」、「✗ 自检：快照:原话不到 6 个字，照拒」、「✗ 自检：快照:那一行没有「」括的原话，照拒」、「✗ 自检：快照:那一行的名字是更长的另一轮名（前后连着轮名字符），照拒」、「✗ 自检：快照:出处点名的文件不在，照拒」、「✗ 自检：快照:出处指这一轮自己的正文，照拒」、「✗ 自检：快照:出处指这一轮自己的 halted 文件，照拒」、「✗ 自检：快照:出处指规则文件，照拒」、「✗ 自检：快照:出处路径里有 ..（解到仓内别处），照拒」、「✗ 自检：快照:出处用 .. 指到仓外，照拒」、「✗ 自检：快照:出处是 records/ 下指到仓外的符号链接，照拒」、「✗ 自检：快照:出处从 research/ 起头 .. 到仓外，照拒」、「✗ 自检：快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒」、「✗ 自检：快照:出处那一行同时写着登记表里别的轮名，照拒」、「✗ 自检：快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒」、「✗ 自检：快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒」、「✗ 自检：快照:出处没写，2026-10-12 的行照拒（门禁同样判红）」、「✗ 自检：快照:出处没写，2026-10-11 的行也照拒（不按日期免；门禁同样判红）」、「✗ 自检：快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）」、「✗ 自检：快照:原话找不到、命中两次、没带原话的拒绝说明写了原因」、「✗ 自检：快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上」
+  LIB_ABANDONED_ROUNDS_BREAK=other-name-by-form  别的轮名的全集退回只认登记表里出现过的轮名（仓里的 _<轮>-body.md、<轮>-snapshot/、<轮>-main-verification.md 不算；<名>-r<数字> 形照认）
+      「✗ 自检：快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒」
+  LIB_ABANDONED_ROUNDS_BREAK=other-form-ignored  别的轮名不认 <名>-r<数字> 形，只认仓里认得的全集（改前的判法：仓里没有材料的 other-r2 不当别的轮名）
+      「✗ 自检：快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒」
+  LIB_ABANDONED_ROUNDS_BREAK=other-round-name-ok  出处那一行里有别的轮名也收
+      「✗ 自检：快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒」、「✗ 自检：快照:出处那一行同时写着登记表里别的轮名，照拒」、「✗ 自检：快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒」、「✗ 自检：快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒」
+  LIB_ABANDONED_ROUNDS_BREAK=line-number-read  退回按行号读：取出处写的第 N 行判，〔〕里的原话不要求也不找（改前的判法：出处那份文件前面插一行，登记就失效）
+      「✗ 自检：快照:出处的行号对不上而〔〕原话恰好找到一次（行号只当提示），放行」、「✗ 自检：快照:〔〕里的原话在出处文件里命中两次，照拒」、「✗ 自检：快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒」、「✗ 自检：快照:出处没带〔〕原话，照拒」、「✗ 自检：快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）」、「✗ 自检：快照:原话找不到、命中两次、没带原话的拒绝说明写了原因」、「✗ 自检：快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上」
+  LIB_ABANDONED_ROUNDS_BREAK=line-hint-ignored  不看行号提示：原话命中几处、或找不到，一律不收（改前的判法：出处那份记录追加一行抄了原话的补记、照术语改名换字、删日期，登记就失效）
+      「✗ 自检：快照:〔〕里的原话命中两次而行号提示落在其中一处，取那一行，放行」、「✗ 自检：快照:〔〕是改名前的原话、行号提示那一行照改名表换了词，取那一行，放行」、「✗ 自检：快照:〔〕带着记录里后来删掉的日期，取行号提示那一行，放行」、「✗ 自检：快照:〔〕带着写在全角括号里、记录里后来连括号删掉的日期，取行号提示那一行，放行」、「✗ 自检：快照:〔〕带着写在半角括号里、记录里后来连括号删掉的日期，取行号提示那一行，放行」、「✗ 自检：快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上」
+  LIB_ABANDONED_ROUNDS_BREAK=hint-line-unmatched  原话找不到时不比〔〕与提示那一行，提示那一行有这一轮的名字就取它（改前的判法：〔〕写转述、行号写到同一轮另一句带名字与「」原话的话，照收）
+      「✗ 自检：快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒」、「✗ 自检：快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上」
+  LIB_ABANDONED_ROUNDS_BREAK=empty-parentheses-kept  比〔〕与提示那一行时，去掉日期、空白与逗号之后剩下的空括号「（）」「()」留着不去（改前的判法：出处那一行的日期写在括号里、照 date-once 连括号删掉，登记就失效）；
+      「✗ 自检：快照:〔〕带着写在全角括号里、记录里后来连括号删掉的日期，取行号提示那一行，放行」、「✗ 自检：快照:〔〕带着写在半角括号里、记录里后来连括号删掉的日期，取行号提示那一行，放行」
                            门禁 doc-process-records 的样本与派发闸的自检都有格（派发闸是「〔〕带着写在全角 / 半角括号里、记录里后来连括号删掉的日期」两格）
-  source-any-path          出处不限 records/：research/、.claude/ 起头的也收，真路径只要在仓根之内
-  source-escapes           不核出处路径里的 .. 与解到真路径后是否还在 records/ 之内
-  line-unread              不找〔〕里的原话、不取那一行，整份文件里找名字与「」原话（别的轮名那一条跟着不看；〔〕原话不要求）
-  name-substring           这一轮的名字按子串找，不看前后连着的轮名字符
-  round-name-unchecked     那一行里不必有这一轮的名字
-  quote-short-ok           「」里的原话一个字也收，不要求至少 6 个字
+  LIB_ABANDONED_ROUNDS_BREAK=source-any-path  出处不限 records/：research/、.claude/ 起头的也收，真路径只要在仓根之内
+      「✗ 自检：快照:出处指这一轮自己的正文，照拒」、「✗ 自检：快照:出处指这一轮自己的 halted 文件，照拒」、「✗ 自检：快照:出处指规则文件，照拒」
+  LIB_ABANDONED_ROUNDS_BREAK=source-escapes  不核出处路径里的 .. 与解到真路径后是否还在 records/ 之内
+      「✗ 自检：快照:出处路径里有 ..（解到仓内别处），照拒」、「✗ 自检：快照:出处用 .. 指到仓外，照拒」、「✗ 自检：快照:出处是 records/ 下指到仓外的符号链接，照拒」、「✗ 自检：快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）」
+  LIB_ABANDONED_ROUNDS_BREAK=line-unread  不找〔〕里的原话、不取那一行，整份文件里找名字与「」原话（别的轮名那一条跟着不看；〔〕原话不要求）
+      「✗ 自检：快照:出处的行号超出文件、〔〕原话也找不到，照拒」、「✗ 自检：快照:〔〕里的原话在出处文件里找不到（被删或改了字），照拒」、「✗ 自检：快照:〔〕里的原话在出处文件里命中两次，照拒」、「✗ 自检：快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒」、「✗ 自检：快照:出处没带〔〕原话，照拒」、「✗ 自检：快照:那一行没有这一轮的名字（引无关的一句），照拒」、「✗ 自检：快照:原话不到 6 个字，照拒」、「✗ 自检：快照:那一行没有「」括的原话，照拒」、「✗ 自检：快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒」、「✗ 自检：快照:出处那一行同时写着登记表里别的轮名，照拒」、「✗ 自检：快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒」、「✗ 自检：快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒」、「✗ 自检：快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）」、「✗ 自检：快照:原话找不到、命中两次、没带原话的拒绝说明写了原因」、「✗ 自检：快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上」、「✗ 自检：快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因」
+  LIB_ABANDONED_ROUNDS_BREAK=name-substring  这一轮的名字按子串找，不看前后连着的轮名字符
+      「✗ 自检：快照:那一行的名字是更长的另一轮名（前后连着轮名字符），照拒」
+  LIB_ABANDONED_ROUNDS_BREAK=round-name-unchecked  那一行里不必有这一轮的名字
+      「✗ 自检：快照:那一行没有这一轮的名字（引无关的一句），照拒」、「✗ 自检：快照:那一行是别的轮的叫停原话，照拒」、「✗ 自检：快照:那一行的名字是更长的另一轮名（前后连着轮名字符），照拒」、「✗ 自检：快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）」
+  LIB_ABANDONED_ROUNDS_BREAK=quote-short-ok  「」里的原话一个字也收，不要求至少 6 个字
+      「✗ 自检：快照:原话不到 6 个字，照拒」
 后六项在派发闸里也可以用 RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-<项> 打开（派发闸把它们并进 modes 传进来）。
 """
 import os
@@ -66,15 +80,12 @@ import sys
 sys.dont_write_bytecode = True
 
 BREAK_VARIABLE = "LIB_ABANDONED_ROUNDS_BREAK"
-KNOWN_BREAK_MODES = ("columns-unchecked", "date-unchecked", "duplicate-unchecked", "source-optional", "source-required-always", "legacy-by-date", "other-name-by-form",
+KNOWN_BREAK_MODES = ("columns-unchecked", "date-unchecked", "duplicate-unchecked", "source-optional", "other-name-by-form",
                      "other-form-ignored", "other-round-name-ok", "line-number-read", "line-hint-ignored", "source-any-path", "source-escapes", "line-unread", "name-substring",
                      "round-name-unchecked", "quote-short-ok", "hint-line-unmatched", "empty-parentheses-kept")
 TABLE_PATH = os.path.join("research", "prompts", "abandoned-rounds.tsv")   # 叫停的轮只在这一处登记
 COLUMNS = 4                                                                # 轮名、日期、为什么撂下、去向（制表符分隔，四列不空）
 DATE_FORM = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
-# 出处这条规矩（用户 2026-10-12 那一批把 ⑥ 改读这张表）立起来之前登记、没有出处可补的旧行：只这几个轮名不要求出处，只缩不涨（新行一律要出处，不按日期判）
-LEGACY_SOURCELESS_ROUNDS = ("c196-r1", "d16-item1-r2", "c364-r3", "smalldata-ttime-r1")
-LEGACY_DATE_BEFORE = "2026-10-12"                                          # 只有弄坏开关 legacy-by-date 下还在用：改前按日期免出处的界线
 # 登记行里的出处：records/ 下的 .md 加行号（「第 N 行」或 :N），后面紧跟〔〕括的一段原话（照抄那一行里含这一轮名字的一段）。
 # 路径前面不连着路径字符，research/../records/x.md 这类拼出来的不认；路径里的 .. 留给后面核
 SOURCE_CHARACTERS = r"[^\s`'\"，。；：、（）()「」『』“”,;*<>]*?"
@@ -319,15 +330,10 @@ def source_problem(project_root, round_name, source_path, line_number, excerpt, 
     return None, located, hint_reason
 
 
-def source_required(row, modes):
-    """这一行要不要出处：名单（LEGACY_SOURCELESS_ROUNDS）里的旧行不要，别的一律要；弄坏开关 legacy-by-date 下退回按日期免。"""
-    if "source-optional" in modes:
-        return False
-    if "legacy-by-date" in modes:
-        return not row.date.strip() < LEGACY_DATE_BEFORE
-    if row.name in LEGACY_SOURCELESS_ROUNDS and "source-required-always" not in modes:
-        return False
-    return True
+def source_required(modes):
+    """这一行要不要出处：每一行都要；只有弄坏开关 source-optional 下一概不要。"""
+    return "source-optional" not in modes
+
 
 
 def row_source_problem(project_root, row, known_names, modes):
@@ -363,7 +369,7 @@ def judge_table(project_root, rows, modes=None, only_names=None):
             shape[row.number] = problem
     duplicates = duplicated_rounds(judged, shape, modes)
     for row in judged:
-        if row.number in shape or not source_required(row, modes):
+        if row.number in shape or not source_required(modes):
             continue
         problem, movement, hint = row_source_problem(project_root, row, known_names, modes)
         if problem is not None:
@@ -388,9 +394,14 @@ def round_problem(judgement, round_name):
 
 def main(argv):
     arguments = list(argv)
+    if os.environ.get(BREAK_VARIABLE):
+        # 命令行入口没有自证：弄坏开关只在用这份库的两处的自证里认（文件头「弄坏开关」），直接执行设了就拒，不管值是什么
+        print(f"  ✗ {BREAK_VARIABLE}={os.environ[BREAK_VARIABLE]} 是弄坏开关，只在用这份库的自证（runner-dispatch-guard.sh --selftest 与门禁 doc-process-records 的样本）里认，直接执行设了就拒，这一趟什么都没做", file=sys.stderr)
+        print(f"     → 怎么办：去掉 {BREAK_VARIABLE} 再跑；要证红就跑 {BREAK_VARIABLE}=<项> bash .claude/hooks/runner-dispatch-guard.sh --selftest", file=sys.stderr)
+        return 2
     if len(arguments) != 1:
         print("  ✗ 用法：lib_abandoned_rounds.py <项目根>", file=sys.stderr)
-        print("     → 怎么办：项目根是有 research/prompts/abandoned-rounds.tsv 的目录；不要求出处的只有 LEGACY_SOURCELESS_ROUNDS 点名的旧行，门禁格与派发闸 ⑥ 同一套", file=sys.stderr)
+        print("     → 怎么办：项目根是有 research/prompts/abandoned-rounds.tsv 的目录；每一行都要出处，门禁格与派发闸 ⑥ 同一套", file=sys.stderr)
         return 2
     try:
         judgement_modes = breaks()

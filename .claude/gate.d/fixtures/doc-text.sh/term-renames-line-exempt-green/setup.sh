@@ -22,5 +22,5 @@ printf '%s\n' '# 判别力样本的改名登记表' '' '<!-- term-renames:table 
 printf '%s\n' "用户原话「${old_chinese}要改名」，原样留着" '树表每层 134 棵，第 1 层 2 个；外层 16.33 ms，内部层 110 个孩子' \
   '中等负载崩溃点剪枝穷举测试与系统配置照新名写' > records/quote.md
 printf '%s\n' 'multi-host.env' > .gitignore
-printf '%s\n' "PEER_REPOSITORY_DIRECTORY=/home/peer/${old_chinese}" "# ${old_layer_one} 常规" > multi-host.env
+printf '%s\n' "BUILD_ROOT_BY_HOST=sample-peer-box-17=/home/peer/${old_chinese}" "# ${old_layer_one} 常规" > multi-host.env
 git add -A && git commit -qm base

@@ -1,0 +1,4 @@
+# 多机配置没开 GPU：库单测在不带特性那一趟判段判在 CPU 而判绿，照键记库，带特性那一趟照键复用它，样本档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格（记不记库）；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 feature-gated-tests：expect 里写着带特性那一趟（逐格那一行写到 feature-gated-tests）
+crash-case-replay
+feature-gated-tests

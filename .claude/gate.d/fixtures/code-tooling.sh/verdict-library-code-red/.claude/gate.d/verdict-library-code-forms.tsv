@@ -1,0 +1,17 @@
+# 带判定库的脚本里不许有的写法（门禁 code-tooling 的 verdict-library-code 格读；判法与样本写在 code-tooling.sh 里那一格函数上方的注释）。
+# 列（制表符隔开）：种类<TAB>名字<TAB>正则<TAB># 说明
+#   种类 silent-run：取不到判定库就照跑、不记、不复用的那一类分支（.claude/rules/verification.md「判定库只有一份」：取不到库名、服务连不上一律退出）；
+#     查登记表 verdict-library-scripts.tsv 里第三列写了一份库（不以「不算：」「无判定库：」起头）的每一行点名的那一份。
+#   种类 local-library：判定存在 prune-server 之外（git 目录下的库目录、按 git common-dir 拼的库目录、本地 RocksDB 与 sqlite）；
+#     只查第三列以 prune-server 起头的那几行点名的那一份。
+#   正则照 python 的 re 逐行搜，只搜代码：出路文字照算（红句里说出这一种分支，分支就还在），注释与文档串不算，脚本文件头开关表里登记的弄坏开关护着的分支放过；名字进红句。
+silent-run	库没处放	判定库没处放	# 取不到库就往下跑的那一句
+silent-run	没给库	没给判定库	# 判法不给库就照跑的原因句与说明
+silent-run	没有库	没有判定库	# 被判的根取不到库就照跑的原因句与说明
+silent-run	不读不写	(?<!不建)不读不写(?![库真])	# 取不到库就不读不写照跑；「本地不建不读不写」「不读不写库」「不读不写真服务」不算
+silent-run	现判不记	现判、不(?:记|入库)	# 取不到库就全部现判、不记
+silent-run	一行都不复用	一行都不复用、也不记	# 复跑表取不到库就整趟不复用、不记
+local-library	git 目录下的库	\.git/singlefs-	# 判定库目录写在 git 目录下
+local-library	common-dir 拼库目录（shell）	--git-common-dir[^\n]*?/singlefs-	# 同一行里取 git common-dir 再接 singlefs- 起头的库目录
+local-library	common-dir 拼库目录（python）	join\([^)\n]*common[^)\n]*["']singlefs-	# os.path.join(<common…>, "singlefs-…")
+local-library	本地 RocksDB 或 sqlite	\b(?:import|from)\s+(?:rocksdict|rocksdb|plyvel)\b|sqlite3\.connect\(	# python 里自己开库

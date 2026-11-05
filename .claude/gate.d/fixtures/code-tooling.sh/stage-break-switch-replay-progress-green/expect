@@ -1,0 +1,11 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=stage-break-switch-replay 开跑：2 条开关（1 道阶段）
+want=stage-break-switch-replay 进度（第 1 次报，间隔 1 秒）：2 条里判完
+want=stage-break-switch-replay 跑得最久的一趟：sleepy-stage.sh SLEEPY_STAGE_BREAK=
+want=stage-break-switch-replay 内存：此刻后代进程
+want=stage-break-switch-replay 第 1 / 2 条对上：sleepy-stage.sh SLEEPY_STAGE_BREAK=
+want=stage-break-switch-replay 第 2 / 2 条对上：sleepy-stage.sh SLEEPY_STAGE_BREAK=
+want=stage-break-switch-replay 逐条进度 2 行、派出去 2 条；内存采了
+want=门禁阶段的弄坏开关复跑：复跑了 2 条开关（1 道阶段：sleepy-stage.sh），判错的样本与文件头点名的逐条相等；本次未跑 0 项
+want=stage-break-switch-replay：绿

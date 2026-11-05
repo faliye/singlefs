@@ -1,0 +1,4 @@
+# 样本的 runner 表：required 的包着（整条不带 --server-binary），own-server 的一份包着，另有一条不用临时服务的裸写
+python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-required.py --selftest
+python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-own-server.py --selftest
+bash scripts/gate/sample-plain.sh --selftest

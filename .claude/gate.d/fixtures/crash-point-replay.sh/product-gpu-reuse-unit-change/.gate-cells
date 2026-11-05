@@ -1,0 +1,5 @@
+# 复用三问（改闭包里一个函数单元）：上一版只差 weighted_sum_of 的函数体，只有引它的 the_two_kernels_confirm_every_entry 现判，另两条复用并经 --skip 跳过
+# 另点 crash-case-replay、feature-gated-tests：expect 的逐格那一行写着 crash-case-replay 与 feature-gated-tests 两格
+product-gpu-real-card-tests
+crash-case-replay
+feature-gated-tests

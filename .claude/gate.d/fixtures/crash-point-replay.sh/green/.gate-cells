@@ -1,0 +1,2 @@
+# 发现日志 0 个签名、一条用例不走发现日志，样本档判绿退 3（expect 里写了按设计不绿的理由），判的是崩溃枚举用例那一格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

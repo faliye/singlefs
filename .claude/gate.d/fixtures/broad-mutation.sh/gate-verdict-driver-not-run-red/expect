@@ -1,0 +1,4 @@
+exit=1
+want=先起驱动剪枝跑
+want=驱动剪枝跑退 1（不是 0）：没判到此刻清单的全部条，不往下读 --summary
+want=broad-mutation.sh：1 格里 1 格红（gate-verdict）

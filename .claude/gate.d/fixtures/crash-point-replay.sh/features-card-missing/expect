@@ -1,0 +1,5 @@
+exit=1
+want=✗ feature-gated-tests：带 gpu 特性那一趟要上卡，环境里却没有 task-server 交的显卡（GPU_CARDS_BY_PRIORITY），这一趟没起
+want=→ 怎么办：这道门禁经 task-server/task submit -- bash .claude/gate.d/crash-point-replay.sh … 交
+want=逐格：crash-case-replay：绿；feature-gated-tests：红
+want=feature-gated-tests：红

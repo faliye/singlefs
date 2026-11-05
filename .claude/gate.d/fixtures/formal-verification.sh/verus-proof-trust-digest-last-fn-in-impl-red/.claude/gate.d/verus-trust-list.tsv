@@ -1,0 +1,3 @@
+# 样本用的信任清单（格式照仓里 .claude/gate.d/verus-trust-list.tsv 的文件头）：Shown::show 那一行登的是空串的 sha256（改前的取法在 impl 里最后一个 fn 上取到的）
+vstd	0.0.0-2026-09-20-0158	068cac977afcf0f5d5b736f8fa3ceb79114a1f3634c59ba6671331a99dd022ac	样本：vstd 整体登记
+external_body	crates/singlefs-replay-prefix/src/lib.rs	singlefs_replay_prefix::Shown::show	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	shown_matches_its_argument	样本：函数体不验，规格是返回值等于参数

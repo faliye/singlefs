@@ -1,0 +1,4 @@
+# 不带特性那一趟退 101、红的测试目标落在 cargo 输出的尾巴之外：判红，抄出 FAILED 的测试函数名与 panic 段；判的是 crash-case-replay 格。门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 feature-gated-tests：expect 里写着带特性那一趟（逐格那一行写到 feature-gated-tests）
+crash-case-replay
+feature-gated-tests

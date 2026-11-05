@@ -1,0 +1,3 @@
+# 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
+M_计数函数加一改成加二	crates/singlefs-verification/src/crash_amplification.rs	{ value + 1 }	{ value + 2 }	-p singlefs-verification --lib -- reaches_the_counted_function	reaches_the_counted_function
+M_没有测试调到的函数	crates/singlefs-verification/src/crash_amplification.rs	{ value * 2 }	{ value * 3 }	-p singlefs-verification --lib -- reaches_the_counted_function	reaches_the_counted_function

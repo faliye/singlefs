@@ -1,0 +1,13 @@
+exit=1
+want=10 处 cp 带了保留权限
+want=scripts/hosts/copy_tree.sh:3  -a
+want=scripts/hosts/copy_tree.sh:4  -rp
+want=scripts/hosts/copy_tree.sh:5  --archive
+want=scripts/hosts/copy_tree.sh:6  --preserve=mode,timestamps
+want=scripts/hosts/copy_tree.sh:7  --preserve
+want=scripts/hosts/copy_tree.sh:8  -p
+want=scripts/gate/copy_tree.py:4  -a
+want=scripts/gate/copy_tree.py:5  --preserve=all
+want=task-server/sample_server:3  -pR
+want=.claude/gate.d/fixtures/sample-stage/case/setup.sh:3  -a
+want=要时间戳的写 --preserve=timestamps

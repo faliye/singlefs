@@ -1,0 +1,2 @@
+# 样本用的登记表：读内存堆那个函数两处 unsafe
+singlefs-core	forbid,deny	crates/singlefs-core/src/block_device.rs	largest_device_local_memory_heap	2	hal|适配器	样本的理由：wgpu 不报显存，只能经 hal 层拿物理设备句柄去读内存堆	用户 2026-11-03 弹窗定 records/sample-decision.md

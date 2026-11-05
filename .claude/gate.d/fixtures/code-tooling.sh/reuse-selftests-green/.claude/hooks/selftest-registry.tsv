@@ -1,1 +1,1 @@
-scripts/gate/with-line.sh	light	# 样本：只 echo 一行
+scripts/gate/with-line.sh	selftest	# 样本：只 echo 一行

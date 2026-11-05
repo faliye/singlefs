@@ -1,0 +1,4 @@
+# 按测试函数不记：一段三条里打了 NOT_RUN_ 的那一条、结果行打散而认不出结局的那一条不记，别的照记，样本档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 feature-gated-tests：expect 里写着带特性那一趟（逐格那一行写到 feature-gated-tests）
+crash-case-replay
+feature-gated-tests

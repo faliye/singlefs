@@ -1,0 +1,7 @@
+exit=1
+want=.claude/kb/tooling.md:3: `git log scripts/kb/before-dash.py -- scripts/kb/after-dash.py` 里的 scripts/kb/before-dash.py 在仓里不存在：从没进过 git
+want=.claude/kb/tooling.md:4: `scripts/kb/moved-away.py` 里的 scripts/kb/moved-away.py 在仓里不存在：改成 scripts/kb/moved-here.py（改名：改名链
+want=.claude/kb/tooling.md:5: `scripts/kb/fixtures/table.tsv` 里的 scripts/kb/fixtures/table.tsv 在仓里不存在：改成 scripts/kb/table.tsv（改名：改名链
+want=  kb 路径：扫 1 份 kb 中文页，判了 3 处（research/ 进过 git 放行 0 处、滞后 0 处、保留 0 处）；跳过相对简写 0 处、被 .gitignore 挡着 0 处、仓外或带占位 0 处、git 历史命令里 -- 之后 1 处、说搬迁的行 1 处
+want=治理文档与 kb 里有指不到的指向（上面逐条列出）
+want=  governance-refs：红（退出 1）

@@ -1,0 +1,7 @@
+exit=3
+want=样本档：
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-verification --lib --tests -- --nocapture --exact --skip amplified_plain_stream_is_clean --skip plain_stream_full
+want=✓ crash-case:plain-stream 判绿（
+want=逐格：crash-case-replay：绿
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

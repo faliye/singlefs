@@ -39,14 +39,16 @@
 #   自证在临时目录里搭的小仓（阶段的副本就在这棵树里，被判的根就是阶段所在的仓：scripts/mutation/mutation-shard-run.sh --selftest 的场景）另认一种：
 #   根里的 .gate-break-sample 第一行逐字是 STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE 接这个根的 pwd -P，也没设 GATE_STAGED_FROM。
 #   空文件、第一行写的是别的路径（小仓整棵拷到别处、拷进真仓）的照拒；打一行「是自证搭的小仓，认环境里的弄坏开关」。
-#   不 source 这份库跑格的阶段（checker-tier-crash-point-replay）在 cd 到根之后自己调这一个函数。
+#   不 source 这份库跑格的阶段（门禁 crash-point-replay）在 cd 到根之后自己调这一个函数。
 #
 # stage_cells_run：每格的退出码写进临时目录，全部跑完按登记次序回读（份数对不上判红）。
 #   汇总逐格一行「<格名>：绿 / 红（退出 N）/ 本次未跑」。
-#   有一格红（退出码既不是 0 也不是 77）⇒ 整道退 1，红格逐格接它登记的出路，末了给只重跑红格的 --check 命令；
+#   有一格红（退出码不是 0、77、75）⇒ 整道退 1，红格逐格接它登记的出路，末了给只重跑红格的 --check 命令；
+#   没有红、有格退 75（prune-server 不可用：判定库连不上，scripts/prune-server/prune_server_client.py 文件头「退出码」）⇒ 整道退 75，
+#   汇总写「prune-server 不可用」、出路写 python3 prune-server/control check 与报给主 agent、给只重跑这几格的 --check 命令；它与「有红」分开，有一格真红仍整道退 1；
 #   跑到的格全退 77 ⇒ 整道退 77，不记通过；否则退 0。
-#   退 77 的格逐格往 $GATE_NOT_RUN_FILE 报一行（这个变量不在时不写）。
-#   上次红的清单：汇总之后把红的格名写进 ~/.local/share/singlefs/last-runs/.claude__gate.d__<阶段文件名>.tsv（一行一格，全绿写空文件；
+#   退 77 与退 75 的格逐格往 $GATE_NOT_RUN_FILE 报一行（这个变量不在时不写）。
+#   上次红的清单：汇总之后把红的格名写进 <数据根>/last-runs/.claude__gate.d__<阶段文件名>.tsv（数据根取 .claude/hooks/lib_work_root.py、两台同一份；一行一格，全绿写空文件；
 #   写法、原子写与 SINGLEFS_LAST_RUNS_DIRECTORY 照 scripts/gate/lib_reuse_checks.py 文件头「三」；.claude/hooks/run-scope-guard.sh 的拒绝说明读它）。
 #   给了 --check 或样本根 .gate-cells 点名的，只换这一趟跑到的格、别的格上一次的照留；被判的根是样本（与 .gate-cells 同一条判据）时不写，
 #   除非显式设了 SINGLEFS_LAST_RUNS_DIRECTORY（自证用）。写不成只 warn 一句，不改这一道的判定。
@@ -71,6 +73,7 @@
 #                             break-own-repository-marked、break-own-repository-marked-staged、break-own-repository-elsewhere 判错
 #   own-repository-any-marker  阶段所在的仓里有 .gate-break-sample 就认，不看第一行   break-own-repository、break-own-repository-elsewhere 判错
 #   own-repository-refused     阶段所在的仓一律不认（改前的样子：自证搭的小仓也拒）   break-own-repository-marked 判错
+#   unavailable-as-red  格退 75 照红记、整道退 1（改前的样子）                         unavailable 判错
 
 declare -ga STAGE_CELLS_NAMES=()
 declare -gA STAGE_CELLS_FUNCTION=() STAGE_CELLS_TITLE=() STAGE_CELLS_HOWTO=()
@@ -276,7 +279,7 @@ stage_cells_write_last_run() {
 
 stage_cells_run() {
   local root="${1:-.}" scratch name function_name cell_exit index=0 collected=0
-  local green=() red=() not_run=()
+  local green=() red=() not_run=() unavailable=()
   local -A verdict_of=()
   stage_cells_refuse_unsampled_break_switches "$root"
   stage_cells_apply_sample_marker "$root"
@@ -309,6 +312,8 @@ stage_cells_run() {
     index=$((index + 1))
     if [[ "$cell_exit" == 77 ]]; then
       not_run+=("$name"); verdict_of[$name]="本次未跑"
+    elif [[ "$cell_exit" == 75 && "${STAGE_CELLS_BREAK:-}" != unavailable-as-red ]]; then
+      unavailable+=("$name"); verdict_of[$name]="prune-server 不可用（退出 75）"
     elif [[ "$cell_exit" == 0 || "${STAGE_CELLS_BREAK:-}" == red-swallowed ]]; then
       green+=("$name"); verdict_of[$name]="绿"
     else
@@ -326,9 +331,12 @@ stage_cells_run() {
     for name in ${not_run[@]+"${not_run[@]}"}; do
       printf '%s 的 %s 格本次无对象可判（%s），原因见这一道输出里那一格的末行\n' "$STAGE_CELLS_STAGE_NAME" "$name" "${STAGE_CELLS_TITLE[$name]}" >> "$GATE_NOT_RUN_FILE"
     done
+    for name in ${unavailable[@]+"${unavailable[@]}"}; do
+      printf '%s 的 %s 格没判：prune-server 不可用（退出 75）\n' "$STAGE_CELLS_STAGE_NAME" "$name" >> "$GATE_NOT_RUN_FILE"
+    done
   fi
 
-  stage_cells_write_last_run ${red[@]+"${red[@]}"}
+  stage_cells_write_last_run ${red[@]+"${red[@]}"} ${unavailable[@]+"${unavailable[@]}"}
 
   if ((collected != ${#STAGE_CELLS_SELECTED[@]})); then
     printf '  ✗ %s：派出去 %s 格，只收回 %s 份退出码\n' "$STAGE_CELLS_STAGE_NAME" "${#STAGE_CELLS_SELECTED[@]}" "$collected"
@@ -347,7 +355,15 @@ stage_cells_run() {
       done
     fi
     printf '     → 改完只重跑红的格：bash .claude/gate.d/%s --check %s\n' "$STAGE_CELLS_STAGE_NAME" "$rerun"
+    ((${#unavailable[@]})) && printf '     → 另有 %s 格 prune-server 不可用、没判（%s）：python3 prune-server/control check 看服务，起不来报给主 agent\n' "${#unavailable[@]}" "${unavailable[*]}"
     exit 1
+  fi
+  if ((${#unavailable[@]})); then
+    local unavailable_rerun=""
+    for name in "${unavailable[@]}"; do unavailable_rerun+="${unavailable_rerun:+,}$name"; done
+    printf '  ✗ %s：prune-server 不可用：%s 格里 %s 格连不上判定库、没判（%s），这一道退 75（不是红，也不算通过）\n' "$STAGE_CELLS_STAGE_NAME" "${#STAGE_CELLS_SELECTED[@]}" "${#unavailable[@]}" "${unavailable[*]}"
+    printf '     → 怎么办：python3 prune-server/control check 看服务在不在、起没起来，起不来报给主 agent；修好之后只重跑这几格：bash .claude/gate.d/%s --check %s\n' "$STAGE_CELLS_STAGE_NAME" "$unavailable_rerun"
+    exit 75
   fi
   if ((${#green[@]} == 0)) && [[ "${STAGE_CELLS_BREAK:-}" != not-run-as-pass ]]; then
     printf '  ! %s：跑到的 %s 格都本次无对象可判，这一道本次未跑（不记通过）\n' "$STAGE_CELLS_STAGE_NAME" "${#not_run[@]}"
@@ -455,6 +471,15 @@ stage_cells_selftest() {
     output_has "→ alpha：甲的出路：改甲"; output_has "--check alpha"
   fi
   sample_case odd-exit 1 "alpha beta gamma" OUTCOME_ALPHA=2 -- "$sample_root"
+  # 一格退 75（prune-server 不可用）⇒ 整道 75、汇总写不可用；一格 75 一格红 ⇒ 整道 1（文件头「stage_cells_run」）
+  if sample_case unavailable 75 "alpha beta gamma" OUTCOME_BETA=75 GATE_NOT_RUN_FILE="$scratch/not-run" -- "$sample_root"; then
+    output_has "beta：prune-server 不可用（退出 75）"; output_has "prune-server 不可用：3 格里 1 格连不上判定库"; output_has "python3 prune-server/control check"
+    output_has "--check beta"
+    grep -q '的 beta 格没判：prune-server 不可用' "$scratch/not-run" || case_wrong "\$GATE_NOT_RUN_FILE 里该有 beta 格没判那一行"
+  fi
+  if sample_case unavailable-with-red 1 "alpha beta gamma" OUTCOME_ALPHA=1 OUTCOME_BETA=75 -- "$sample_root"; then
+    output_has "alpha：红（退出 1）"; output_has "beta：prune-server 不可用（退出 75）"; output_has "另有 1 格 prune-server 不可用、没判（beta）"
+  fi
   if sample_case all-not-run 77 "alpha beta gamma" OUTCOME_ALPHA=77 OUTCOME_BETA=77 OUTCOME_GAMMA=77 GATE_NOT_RUN_FILE="$scratch/not-run" -- "$sample_root"; then
     if [[ "$(grep -c '格本次无对象可判' "$scratch/not-run")" != 3 ]]; then case_wrong "\$GATE_NOT_RUN_FILE 里该有 3 行本次未跑，实有 $(grep -c '格本次无对象可判' "$scratch/not-run")"; fi
   fi
@@ -505,7 +530,7 @@ stage_cells_selftest() {
   local breaks_proven=0 breaks_missed=() break_name
   if ((wrong == 0)) && [[ -z "$nested" && -z "${STAGE_CELLS_BREAK:-}" ]]; then
     for break_name in list-empty check-ignored unknown-accepted marker-everywhere marker-ignored red-swallowed not-run-as-pass shared-shell not-run-unreported generic-howto last-run-unwritten break-honored-everywhere \
-        own-repository-any-marker own-repository-refused; do
+        own-repository-any-marker own-repository-refused unavailable-as-red; do
       if STAGE_CELLS_BREAK="$break_name" bash "$library_under_test" --selftest-nested >/dev/null 2>&1; then
         breaks_missed+=("$break_name")
       else

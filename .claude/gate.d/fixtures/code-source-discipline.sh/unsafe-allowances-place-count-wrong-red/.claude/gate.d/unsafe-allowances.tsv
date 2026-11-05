@@ -1,0 +1,3 @@
+# 样本用的登记表：两行的 unsafe 处数登反了，总数照样是 3
+singlefs-core	forbid,deny	crates/singlefs-core/src/block_device.rs	punch_hole_keeping_the_file_length	2	文件描述符|偏移|长度	样本的理由：std 没有 fallocate 的安全封装，不放开就只能继续逐块写零	用户 2026-09-30 弹窗定 records/sample-decision.md
+singlefs-core	forbid,deny	crates/singlefs-core/src/block_device.rs	largest_device_local_memory_heap	1	hal|适配器	样本的理由：wgpu 不报显存，只能经 hal 层拿物理设备句柄去读内存堆	用户 2026-11-03 弹窗定 records/sample-decision.md

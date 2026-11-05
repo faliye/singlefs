@@ -9,6 +9,7 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
 - excluded_prefixes：(路径前缀, 理由)，相对仓根；这些文件里这一形态是被测输入或只能在上游改，不判。
 - allow_suffixes：哪几种后缀的文件认逐行的放行标记（一行里写「# <形态键>:allow <理由>」，Rust 写「//」，理由至少 4 个字）；
   空的就是这一形态不认放行标记。
+- judged_suffixes：这一形态只判哪几种后缀的文件（不分大小写）；空的就是什么后缀都判。调用方没给 relative_path 的照判。
 - clean：成功行「查了 N 份文本文件，」后面接的话。
 - excluded_label：成功行「没扫的：」里这一形态排除掉的那几份怎么说（{count} 处填份数）。
 - finding：判红汇总行「N 」后面接的话。
@@ -38,7 +39,22 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
   前后不挨 ASCII 字母数字与下划线（「AMD」「amps」「ppm」这类词不算）；前面是英文月日（外部限额通知的原样）的照判。
 会话号（session-names）：ListAgents 列的会话名，本仓与上游三语仓的目录名后面跟「-」与 2 到 6 位小写十六进制；
 后面紧跟 . - } / 或 ASCII 字母数字的（mktemp 模板、临时目录名、更长的标识符）不算。改过标题的会话（「会话「<标题>」」）认不出：
-同一个写法在仓里也用来引一句话、说一种读法，机器分不开，靠写的人。
+同一个写法在仓里也用来引一句话、说一种读法，机器分不开，靠写的人。只写两位短号（「87」「7a」）不算会话号，也不算批次代号。
+
+批次代号（batch-codes）：拿来当名字用的批次与运行代号，只判 .md、.tsv、.txt。判据行四条：
+- batch-code-suffixed：一到两位数字、一个小写字母、短横、一到两位数字（「24c-1」「22c-2」）；字母是 e 的不算（1e-6 这类指数）。
+- batch-code-lettered：两位数字加一个小写字母（「22a」「24c」「10q」），字母不在 UNIT_LETTERS 里（b d g h k m p s t w x 是单位、倍数、天数、
+  分辨率与 sed 的 p 这一类，「16k」「64x」「30d」「60s」不判；这几个字母的批号只在挨着「批」「批次」「batch」时判，见下一条）。
+- batch-code-labeled：挨着批次词的「数字加字母」：「批 / 批次 / batch(es)」后面跟的（「批次 24c」「批 3c」「batch 10k」）与后面跟「批」的（「第 10h 批」「10k 批」）。
+- batch-code-stem：天干编号的批号，前面要有批次词：「第 <数> 批 <天干>」（「第十五批乙二」「第 56 批乙」「第 3 批丁 1」）与「批 / 批次 <数> <天干>」（「批 10 甲」「批次 4-3 己」）。
+  不带批次词的「15 乙一」不判：「出口 4 甲一」「已定项 1 甲」「C554 乙」这类候选与臂的名字是同一个写法。地支（「辰」）不在内（「未」「午」与常用字分不开）。
+这四条前后都不挨 ASCII 字母数字、- . / 与省略号，前面另不挨 :（标识符、路径、文件名、带连字符的目录名、哈希的截断「…162d」、「文件:行号」不算），
+后面不接「.字母数字」（扩展名）与「:数字」（行号）。
+一位数字加一个字母（「7a」「3d」）是许可的会话短号，四条都不判（批次词后面的除外）；三位以上数字加字母（「143k」「140n」）不判。
+上下文规则（batch_code_is_not_code）放过：反引号里的（代码）、紧跟在「=」（可隔空白）后面的产物字段值、紧挨在 " ' , ; 后面的代码字面与参数
+（sed 的「11,15p」）、算式里的（前面是 + * / × ÷ ( < > ≤ ≥ ~ ≈ ^，或后面是 + * / × ÷ ) < > ≤ ≥ ^ ;，可隔空白：「135 + 140n」「31u) / 32u」）。
+不认放行标记；排除的是上游副本、门禁与钩子的样本目录、变异表 crates/mutations.tsv（源码原文列里有 WGSL 的「31u」这类字面，名字列的批号是变异行的键）。
+管不到的：中文数字或全角数字写的代号；三位以上数字的；不带批次词、字母在 UNIT_LETTERS 里的（「10h」「10k」单写）；不带批次词的天干编号；改了写法的代号（「第二十四批丙一」之外的自造写法）。
 
 
 上下文规则放过长得像钟点、其实不是的冒号对（不挨日期时区的钟点那一行）：
@@ -70,6 +86,14 @@ ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（
   打开时 doc-text.sh 的 clock-times-green、session-names-green 样本与 write-guard.sh --selftest 里带放行标记的格必须判红。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=<形态键>：那几种形态的 excluded_prefixes 不生效。
   打开时 doc-text.sh 那一形态的绿样本（prime-marks-green、clock-times-green、session-names-green）里落在排除前缀下的放行格必须判红，证排除前缀只放过登记的那几处。
+- 批次代号一形态（还没有 doc-text.sh 的格，判红的格在 write-guard.sh --selftest 与 bash-command-detector.sh --selftest 里）：
+  LIB_FORBIDDEN_NOTATIONS_BREAK=batch-codes 关掉整形态、=batch-code-suffixed / batch-code-lettered / batch-code-labeled / batch-code-stem 关掉一条判据行，
+  write-guard.sh --selftest 里点名那一条的「批次代号:」拒绝格必须判红；LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=batch-codes 时「批次代号上下文:」几格必须判红；
+  LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=batch-codes 时「批次代号:变异表放行」必须判红。
+  =batch-codes 时 bash-command-detector.sh --selftest 里写批次代号的四格「字面写入:」、scripts/kb/ 三份定点写入脚本自证里「写会话号：.md 目标的新串带」起头的两行也红。
+  同一个变量另认一项 judged-suffixes-ignored：judged_suffixes 不生效，什么后缀都判（退回没有这一键的样子）；打开时 write-guard.sh --selftest 的
+  「批次代号:.py 不判」「批次代号:.sh 不判」两格、bash-command-detector.sh --selftest 的「字面写入:写进 .py 的批次代号不判（批次代号只判 .md、.tsv、.txt）」、
+  三份定点写入脚本自证里「写会话号：.py 目标的新串带代号」那一行必须判红。
 """
 import os
 import re
@@ -108,6 +132,21 @@ ZONE_WORD = rf'(?<![{ASCII_WORD}]){ZONE}(?![{ASCII_WORD}])'
 TWELVE_HOUR = rf'(?<![{ASCII_WORD}:.])\d{{1,2}}(?::{MINUTE_VALUE})? ?[AaPp]\.?[Mm]\.?(?![{ASCII_WORD}])'
 # 会话号：本仓与上游三语仓的目录名，后面跟 - 与 2 到 6 位小写十六进制；后面紧跟 . - } / 的是 mktemp 模板、路径里的临时目录名，不算
 SESSION_NAME = rf'(?<![{ASCII_WORD}\-])singlefs(?:-ai-sop(?:-zh|-en|-ja)?)?-[0-9a-f]{{2,6}}(?![{ASCII_WORD}.\-}}/])'
+# 批次代号：前后不挨 ASCII 字母数字、- . / 与省略号，前面另不挨 :（标识符、路径、带连字符的目录名、哈希的截断、「文件:行号」），后面不接扩展名与「:行号」
+BATCH_CODE_BEFORE = rf'(?<![{ASCII_WORD}\-./:…])'
+BATCH_CODE_AFTER = rf'(?![{ASCII_WORD}\-/]|\.[{ASCII_WORD}]|:\d)'
+UNIT_LETTERS = 'bdghkmpstwx'   # 跟在两位数字后面多半是单位、倍数、天数、分辨率或 sed 的 p：不挨批次词时不判
+CODE_LETTERS = ''.join(letter for letter in 'abcdefghijklmnopqrstuvwxyz' if letter not in UNIT_LETTERS)
+HEAVENLY_STEMS = '甲乙丙丁戊己庚辛壬癸'
+CHINESE_NUMERALS = '一二三四五六七八九十百零两'
+BATCH_CODE_SUFFIXED = rf'{BATCH_CODE_BEFORE}\d{{1,2}}(?!e-)[a-z]-\d{{1,2}}{BATCH_CODE_AFTER}'
+BATCH_CODE_LETTERED = rf'{BATCH_CODE_BEFORE}\d{{2}}[{CODE_LETTERS}]{BATCH_CODE_AFTER}'
+BATCH_CODE_LABELED = (rf'(?:(?<![{ASCII_WORD}])批次?\s*|(?<![{ASCII_WORD}])[Bb]atch(?:es)?\s+){BATCH_CODE_BEFORE}\d{{1,3}}[a-z]{BATCH_CODE_AFTER}'
+                      rf'|{BATCH_CODE_BEFORE}\d{{1,3}}[a-z]\s*批')
+BATCH_CODE_STEM = (rf'(?:第\s*[\d{CHINESE_NUMERALS}]+\s*批\s*|(?<![{ASCII_WORD}])批次?\s*\d{{1,3}}(?:-\d{{1,2}})?\s*)'
+                   rf'[{HEAVENLY_STEMS}][{CHINESE_NUMERALS}\d]?')
+FORMULA_BEFORE = re.compile(r'[+*/×÷(<>≤≥~≈^]\s*$')
+FORMULA_AFTER = re.compile(r'\s*[+*/×÷)<>≤≥^;]')
 
 # 上下文规则用的：紧挨在冒号对前面、说明它是代码或产物字段的字符
 CODE_CHARACTERS_BEFORE = ('=', '[', '{', ',', '>', '"', "'", '+', '-', '.')
@@ -170,6 +209,17 @@ def field_value(line, match):
     return line[:match.start()].endswith('=')
 
 
+def batch_code_is_not_code(line, match):
+    """批次代号四条判据行的上下文规则：True 是这一处按上下文不是批次代号——反引号里的、「=」（可隔空白）后面的字段值、
+    紧挨在 " ' , ; 后面的代码字面与参数、算式里的。"""
+    before = line[:match.start()]
+    if before.count('`') % 2 == 1:
+        return True
+    if re.search(r'=\s*$', before) or before.endswith(('"', "'", ',', ';')):
+        return True
+    return FORMULA_BEFORE.search(before) is not None or FORMULA_AFTER.match(line[match.end():]) is not None
+
+
 UPSTREAM_COPY = '.claude/singlefs-ai-sop/'
 C510_REASON = 'c510 那一轮论证的就是按哪个时区取日期，时区词与钟点是被测算法本身'
 
@@ -185,6 +235,7 @@ FORMS = (
             ('research/prompts/m3-defs-b6-r2-opus-model/out/', '三方腿探针跑 doc-text 的原样输出，引了这一格成功句里举的角标例子；冻结证据不改'),
         ),
         'allow_suffixes': (),
+        'judged_suffixes': (),
         'clean': f'没有角标写法（{MARKS_SHOWN}）',
         'excluded_label': '排除前缀下 {count} 份（上游副本 ' + UPSTREAM_COPY + '，与腿的探针输出 research/prompts/m3-defs-b6-r2-opus-model/out/）',
         'finding': f'行用了角标写法（{MARKS_SHOWN}）',
@@ -289,8 +340,14 @@ FORMS = (
             ('research/prompts/c510-r1-main-checks/c510-date-gate-r1-local-attack-output-s2.md', C510_REASON),
             ('research/prompts/c510-r1-main-checks/c510-date-gate-r1-local-attack-translation-audit.md', C510_REASON),
             ('research/prompts/c510-date-gate-r1-verifier-output.md', C510_REASON),
+            ('research/prompts/crash-slice-false-resume-candidates.tsv', '冻结证据：回扫候选表，抄了旧记录带时间戳的原文'),
+            ('research/prompts/d165-valves-r1-sonnet-output.md', '冻结证据：腿的模型报告，时间戳是被测输入'),
+            ('research/prompts/m3-close-b19-code-r3-sonnet-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/m3-close-b19-design-r2-sonnet-output.md', '冻结证据：腿的模型报告，时间戳是被测输入'),
+            ('records/2026-11-02-文档代码逐项审核-', '过程记录与审核产物，原始日志与台账里的时间戳是被测输入'),
         ),
         'allow_suffixes': ('.sh', '.py', '.rs'),
+        'judged_suffixes': (),
         'clean': '描述里没有钟点、时区词与时间戳',
         'excluded_label': '钟点的排除前缀下 {count} 份（钟点是被测输入，或上游副本）',
         'finding': '行在描述里写了钟点、时区词或时间戳',
@@ -359,16 +416,45 @@ FORMS = (
             (UPSTREAM_COPY, '上游副本，只能在上游改'),
         ),
         'allow_suffixes': ('.sh', '.py', '.rs'),
+        'judged_suffixes': (),
         'clean': '没有会话号',
         'excluded_label': '会话号的排除前缀下 {count} 份（门禁样本或上游副本）',
         'finding': '行写了会话号',
         'detail_shows_pattern': False,
         'snippet_to_match_end': True,
         'remedy': (
-            '会话号（ListAgents 列的「目录名-十六进制」）不写进仓：标签式的「（会话 <号>，<日期>）」只留日期，'
-            '当主语用的写成「别的会话」「SOP 会话」「发版会话」这类不带号的说法，事情与日期照留；',
+            '会话号（ListAgents 列的「目录名-十六进制」全名）不写进仓：非写不可就只写后面的两位短号（例「87」），'
+            '或写成「别的会话」「SOP 会话」「发版会话」这类不带号的说法；标签式的「（会话 <号>，<日期>）」只留日期，事情与日期照留；',
             '改过标题的会话（「会话「<标题>」」）门禁认不出，照同样的写法改；',
             '.sh、.py、.rs 里代码真要用这些字面（解析 ListAgents 输出的正则、造会话号的自检输入），在那一行写「# session-names:allow <理由>」，理由不许省。',
+        ),
+    },
+    {
+        'key': 'batch-codes',
+        'name': '批次代号',
+        'patterns': (
+            ('batch-code-suffixed', '数字加字母加短横序号的代号', re.compile(BATCH_CODE_SUFFIXED), batch_code_is_not_code),
+            ('batch-code-lettered', '两位数字加字母的代号', re.compile(BATCH_CODE_LETTERED), batch_code_is_not_code),
+            ('batch-code-labeled', '挨着批次词的数字加字母', re.compile(BATCH_CODE_LABELED), batch_code_is_not_code),
+            ('batch-code-stem', '天干编号的批号', re.compile(BATCH_CODE_STEM), batch_code_is_not_code),
+        ),
+        'excluded_prefixes': (
+            (UPSTREAM_COPY, '上游副本，只能在上游改'),
+            ('.claude/gate.d/fixtures/', '门禁样本：批次代号是被测输入'),
+            ('.claude/hooks/fixtures/', '钩子样本：派发闸自证读的真派发提示原样，提示里的批号是被测输入'),
+            ('crates/mutations.tsv', '变异表：源码原文那几列里有 WGSL 的「31u」这类字面，名字列里的批号是变异行的键，改名照变异表的改名办'),
+        ),
+        'allow_suffixes': (),
+        'judged_suffixes': ('.md', '.tsv', '.txt'),
+        'clean': '描述里没有批次代号',
+        'excluded_label': '批次代号的排除前缀下 {count} 份（上游副本、样本目录与变异表）',
+        'finding': '行写了批次代号',
+        'detail_shows_pattern': True,
+        'snippet_to_match_end': True,
+        'remedy': (
+            '写成那一批做了什么事（例「24c-1 交回」写成「配置判法那一份补丁交回」、「批 10 甲」写成「GPU 判器那一批」），不用代号；',
+            '命中的其实不是代号（单位、算式、产物字段、代码字面），改 .claude/gate.d/lib-forbidden-notations.py 里批次代号的上下文规则或 UNIT_LETTERS；'
+            '代码字面放进反引号；整份是被测输入的，登记进那一形态的 excluded_prefixes 并写明理由。',
         ),
     },
 )
@@ -409,9 +495,19 @@ def judged_patterns(form_key):
             for index, (key, name, pattern, not_violation) in enumerate(FORMS_BY_KEY[form_key]['patterns']) if key not in skipped]
 
 
+def outside_judged_suffixes(form_key, relative_path):
+    """这份文件的后缀不在这一形态的 judged_suffixes 里（不分大小写）：不判。judged_suffixes 空着、没给 relative_path 的照判；
+    弄坏开关 LIB_FORBIDDEN_NOTATIONS_BREAK=judged-suffixes-ignored 时一律照判。"""
+    suffixes = FORMS_BY_KEY[form_key]['judged_suffixes']
+    if not suffixes or not relative_path or 'judged-suffixes-ignored' in environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK'):
+        return False
+    return not relative_path.lower().endswith(suffixes)
+
+
 def line_hits(form_key, line, relative_path, patterns):
-    """一行里这一形态的违例，按位置排、互不重叠：[(列, 判据行名字, 命中的串)]。同一位置几行都中，取排在前面的那一行。"""
-    if allowed_by_marker(form_key, line, relative_path):
+    """一行里这一形态的违例，按位置排、互不重叠：[(列, 判据行名字, 命中的串)]。同一位置几行都中，取排在前面的那一行。
+    后缀不在 judged_suffixes 里的文件、带放行标记的行交空表。"""
+    if outside_judged_suffixes(form_key, relative_path) or allowed_by_marker(form_key, line, relative_path):
         return []
     candidates = [(candidate.start(), index, candidate.end(), name, candidate.group(0))
                   for index, key, name, pattern, not_violation in patterns for candidate in pattern.finditer(line)

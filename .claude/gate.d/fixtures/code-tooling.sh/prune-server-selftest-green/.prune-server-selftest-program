@@ -1,0 +1,9 @@
+# 门禁 code-tooling 的 prune-server-selftest 格的样本用的假自证：只认 --selftest，把同目录 .prune-server-selftest-lines 的内容打到标准输出，
+# 再退同目录 .prune-server-selftest-exit 里写的码；不编、不起服务、不碰 RocksDB。
+import os, sys
+if sys.argv[1:] != ["--selftest"]:
+    print("样本里的假自证只认 --selftest", file=sys.stderr)
+    sys.exit(2)
+here = os.path.dirname(os.path.abspath(__file__))
+sys.stdout.write(open(os.path.join(here, ".prune-server-selftest-lines"), encoding="utf-8").read())
+sys.exit(int(open(os.path.join(here, ".prune-server-selftest-exit"), encoding="utf-8").read().strip()))

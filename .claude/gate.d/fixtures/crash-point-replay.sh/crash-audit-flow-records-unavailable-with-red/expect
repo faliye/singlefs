@@ -1,0 +1,8 @@
+exit=1
+want=样本档：
+want=✗ crash-flow-coverage 这一格没判：prune-server 不可用（crash-flow-coverage.py collect 退 75（不带特性那一趟）
+want=样本展开上限 的出处路径 crates/no-such-file.rs 不在仓里
+want=crash-flow-coverage：prune-server 不可用；crash-ignored-nodes：prune-server 不可用；invariant-zero-evaluations：prune-server 不可用；crash-case-must-red：绿；crash-knobs：红
+want=✗ 有 1 格判红：crash-knobs（各自的出路在上面）
+want=另有 3 格 prune-server 不可用、没判：crash-flow-coverage crash-ignored-nodes invariant-zero-evaluations
+want=只重跑红的格：bash .claude/gate.d/crash-point-replay.sh --check crash-case-replay,feature-gated-tests,crash-flow-coverage,crash-ignored-nodes,invariant-zero-evaluations,crash-knobs [项目根]

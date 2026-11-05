@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：unit-header-fields
+want=单元头字段表与 D18 对得上（比了 2 张表、33 个字段的偏移与名字、五元组 5 项）
+want=doc-registries.sh：1 格里 1 格绿（unit-header-fields），0 格本次未跑（无）

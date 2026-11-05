@@ -1,0 +1,4 @@
+exit=2
+want=✗ 样本根的 .gate-items 点名的项不在可点的项里：「scripts/gate/sample-pass-z.sh」；一格都没跑
+want=research-script-selftests  scripts/gate/sample-pass-a.sh
+want=research-script-selftests  scripts/gate/sample-pass-c.py

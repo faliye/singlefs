@@ -2,4 +2,4 @@
 name = "sample-gpu-judge-bridge"
 
 [dependencies]
-singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-verification = { path = "../singlefs-verification" }

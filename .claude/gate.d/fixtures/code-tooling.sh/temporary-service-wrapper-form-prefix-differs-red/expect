@@ -1,0 +1,4 @@
+exit=1
+want=✗ 要临时服务的自证的整条写法有 1 处对不上包装的用法
+want=整条该是「python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <解释器> <脚本> --selftest」
+want=骨架（scripts/agents/dispatch-prompt.py:2 TEMPORARY_SERVICE_WRAPPER）：原文「python3 prune-server/prune_server_client_selftest.py --with-temporary-service --」，前缀与包装用法行写的不同

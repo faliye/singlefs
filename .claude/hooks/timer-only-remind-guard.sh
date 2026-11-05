@@ -5,8 +5,7 @@
 # 用户 2026-10-14 定：「禁止其他的设置时间的防止，仅仅允许这一个」「这是本工程的定时脚本 放到本工程来」。主 agent 与子 agent 一样拒。
 # hook-events: PreToolUse:CronCreate PreToolUse:ScheduleWakeup PreToolUse:RemoteTrigger PreToolUse:Skill PreToolUse:Monitor PreToolUse:Bash
 # gate-similar: bash-command-detector.sh 同挂 PreToolUse[Bash]、同用 lib_shell_words.py 切词，它的 ② 拒前台没超时的等待循环、记 run_in_background 里的等待循环；这里判的是「循环或单条 sleep 之外只剩 echo 之类的闹钟写法」，并且还要管 Monitor 与五个非 Bash 的工具，那个文件只挂 Bash、已有 3000 多行，并进去要给它加工具挂载、改它的 matcher 与自证，两边的判据（等条件成立 / 等时间到）也没有一条相同
-# gate-similar: heavy-test-guard.sh 同挂 PreToolUse[Bash]、同用 lib_shell_words.py；它只判重型测试与内存包装，与定时无关
-# gate-similar: host-resources-reminder.sh 同挂 PreToolUse[Bash]；它认重活出资源提醒从不拒，这里拒定时的别的办法
+# gate-similar: project-code-guard.sh 同挂 PreToolUse[Bash]、同用 lib_shell_words.py；它判的是不是不经 task-server 跑项目代码，与定时无关
 # gate-similar: remind-rearm-stop-guard.sh 同属「只许 remind.sh 定时」，但挂 Stop 管 remind.sh 登记的循环提醒到点之后重起；事件和输入都不同
 #
 # 拒的（每一种在自证里各有一个样本）：
@@ -17,7 +16,7 @@
 #     `until [ "$(date +%H%M)" = 1530 ]; do sleep 30; done; echo wake`（`[` / `test` 的参数里有 date 或 SECONDS 才算时间比较）。
 #     crontab（除 -l 之外）、at、batch、带 --on-* 或 OnCalendar= / OnActiveSec= 属性的 systemd-run、对 *.timer 的 systemctl start / enable / restart。
 # 不拒的：sleep 之外还有别的真活（`until ! kill -0 <pid>; do sleep 20; done`、`sleep 600; cat log`、`until grep -q DONE log; do sleep 30; done`、`until [ -f 旗标 ]; do …`）、
-#   不到 TIMER_MINIMUM_SECONDS 的有限 sleep、`proc.py wait`、看门狗 watch.sh、`detached-run.sh watch`、Monitor 盯日志（`tail -f … | grep`）、remind.sh 自己的命令、
+#   不到 TIMER_MINIMUM_SECONDS 的有限 sleep、`proc.py wait`、看门狗 watch.sh、Monitor 盯日志（`tail -f … | grep`）、remind.sh 自己的命令、
 #   引号里和 heredoc 正文里当数据写的、脚本文件里的 sleep（`bash x.sh` 起的脚本不读进去）。
 # 判不到的：变量里拼出来的命令、eval、python 的 time.sleep 加 print、脚本文件里的 sleep、MCP 工具提供的定时器。
 # 判不了的照「放行但必记检出」：输入不是 JSON 对象（解不开、顶层不是对象）、读不到 lib_shell_words.py、Bash / Monitor 的 command 不是字符串、命令切不开、
@@ -27,24 +26,43 @@
 #
 #   timer-only-remind-guard.sh --selftest   在内存里判造出来的 hook JSON，再起一次进程核退出码与 stderr；末尾逐个打开弄坏开关核它红在点名的格
 # 弄坏开关 TIMER_ONLY_REMIND_GUARD_BREAK=<项>（只给证红用，逗号连几个；平常跑时不认）。项名、弄坏哪一处、打开后红在哪一格（格名是「✗ 自证 <格名>：」里的那一段）：
-#   allow-cron-tools     CronCreate、ScheduleWakeup、RemoteTrigger 放行                     tools
-#   allow-skills         loop、schedule 技能放行                                           skills
-#   ignore-monitor       Monitor 的命令不判                                                monitor
-#   allow-sleep-echo     sleep 加 echo 的单条闹钟放行                                      sleep-echo
-#   allow-infinite-loop  无限循环里的 sleep 放行                                           sleep-loop
-#   allow-date-test      按时刻比较的 until 放行                                           date-loop
-#   allow-system-timers  crontab、at、systemd-run 的定时属性放行                           system-timers
-#   refuse-wait-pid      有 sleep 就拒（连等进程结束的循环也拒）                             wait-pid
-#   refuse-real-work     长 sleep 后面接真活也拒                                           sleep-then-work
-#   refuse-short         不到阈值的有限 sleep 也拒                                          short-sleep
-#   refuse-remind        连 remind.sh 自己的命令也拒                                       remind-start
-#   refuse-log-watch     Monitor 盯日志的命令也拒                                          log-watch
-#   no-next-step         拒绝信息里不写出路                                                next-step
-#   input-unrecorded     输入不是 JSON 对象时只打 stderr、不记检出（改前连 stderr 也不打）   input-recorded
-#   library-unrecorded   读不到 lib_shell_words.py 时只打 stderr、不记检出（同上）          library-recorded
-#   command-shape-unrecorded  command 不是字符串时只打 stderr、不记检出（同上）            command-shape-recorded
-#   split-unrecorded     命令切不开时只打 stderr、不记检出（同上）                         split-recorded
-#   exception-unrecorded 判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，照常放行）   exception-recorded
+# 平常跑设了 TIMER_ONLY_REMIND_GUARD_BREAK 就在一切之前退 2、点名变量只在自证里认；自证起的子进程由 TIMER_ONLY_REMIND_GUARD_SELFTEST_MARK 认。
+#   TIMER_ONLY_REMIND_GUARD_BREAK=allow-cron-tools  CronCreate、ScheduleWakeup、RemoteTrigger 放行
+#       「✗ 自证 tools：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=allow-skills  loop、schedule 技能放行
+#       「✗ 自证 skills：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=ignore-monitor  Monitor 的命令不判
+#       「✗ 自证 monitor：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=allow-sleep-echo  sleep 加 echo 的单条闹钟放行
+#       「✗ 自证 sleep-echo：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=allow-infinite-loop  无限循环里的 sleep 放行
+#       「✗ 自证 sleep-loop：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=allow-date-test  按时刻比较的 until 放行
+#       「✗ 自证 date-loop：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=allow-system-timers  crontab、at、systemd-run 的定时属性放行
+#       「✗ 自证 system-timers：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=refuse-wait-pid  有 sleep 就拒（连等进程结束的循环也拒）
+#       「✗ 自证 wait-pid：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=refuse-real-work  长 sleep 后面接真活也拒
+#       「✗ 自证 sleep-then-work：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=refuse-short  不到阈值的有限 sleep 也拒
+#       「✗ 自证 short-sleep：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=refuse-remind  连 remind.sh 自己的命令也拒
+#       「✗ 自证 remind-start：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=refuse-log-watch  Monitor 盯日志的命令也拒
+#       「✗ 自证 log-watch：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=no-next-step  拒绝信息里不写出路
+#       「✗ 自证 next-step：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=input-unrecorded  输入不是 JSON 对象时只打 stderr、不记检出（改前连 stderr 也不打）
+#       「✗ 自证 input-recorded：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=library-unrecorded  读不到 lib_shell_words.py 时只打 stderr、不记检出（同上）
+#       「✗ 自证 library-recorded：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=command-shape-unrecorded  command 不是字符串时只打 stderr、不记检出（同上）
+#       「✗ 自证 command-shape-recorded：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=split-unrecorded  命令切不开时只打 stderr、不记检出（同上）
+#       「✗ 自证 split-recorded：」
+#   TIMER_ONLY_REMIND_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，照常放行）
+#       「✗ 自证 exception-recorded：」
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON。
@@ -275,7 +293,7 @@ CELLS = [
     ("remind-start", [], [("remind.sh start", bash('bash scripts/agents/remind.sh start --every 30 --message "sleep 1500; echo wake" --name a', run_in_background=True)),
                           ("remind.sh stop", bash("bash scripts/agents/remind.sh stop --name a"))]),
     ("log-watch", [], [("tail -f 管 grep", monitor("tail -f /tmp/x.log | grep --line-buffered ERROR")), ("看门狗", bash("bash scripts/agents/watch.sh", run_in_background=True)),
-                       ("detached-run watch", bash("bash scripts/hosts/detached-run.sh watch", run_in_background=True)), ("缓存计时脚本", bash("bash scripts/agents/cache-keepalive.sh 230", run_in_background=True))]),
+                       ("缓存计时脚本", bash("bash scripts/agents/cache-keepalive.sh 230", run_in_background=True))]),
     ("data-not-command", [], [("echo 里的字", bash('echo "sleep 1500; echo wake"')), ("git 提交说明", bash('git commit -m "sleep 1500; echo wake"')),
                               ("heredoc 数据", bash("cat > /tmp/x.txt <<'EOF'\nsleep 1500; echo wake\nEOF")), ("grep 的参数", bash("grep -rn 'sleep 1500' scripts")),
                               ("普通命令", bash("ls -l && git status --short")), ("坏输入没有 command", {"tool_name": "Bash", "tool_input": {}})]),
@@ -388,8 +406,24 @@ def selftest_cells(hook_dir):
     shutil.rmtree(scratch, ignore_errors=True)
     return failures, checked
 
+# 弄坏开关只在自证里认：自证自带开关轮（--selftest 自己逐个设 TIMER_ONLY_REMIND_GUARD_BREAK 起 --selftest-cells），起这些轮的 --selftest 先设标记；
+# 没有标记而变量非空（含 --selftest 本身：开关轮由它自己逐个设，外面设了没有用），读 hook 的 JSON 与一切参数之前就退 2、点名变量只在自证里认，不管值是什么。
+SELFTEST_MARK_VARIABLE = "TIMER_ONLY_REMIND_GUARD_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "timer-only-remind-guard.sh --selftest 起的各轮"
+
+def refuse_break_outside_selftest():
+    value = os.environ.get(BREAK_VARIABLE, "")
+    if not value or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    print(f"✗ {HOOK_NAME}：{BREAK_VARIABLE}={value} 是弄坏开关，只在自证（{HOOK_NAME} --selftest 起的各轮）里认，平常跑设了就拒，这一次没判", file=sys.stderr)
+    print(f"→ 怎么办：去掉 {BREAK_VARIABLE} 再跑；要证红直接跑 bash .claude/hooks/{HOOK_NAME} --selftest（自证自己逐个打开弄坏开关，外面不用设）", file=sys.stderr)
+    return 2
+
 def main():
     hook_dir = sys.argv[1]
+    refused = refuse_break_outside_selftest()
+    if refused is not None:
+        return refused
     if sys.argv[2:] == ["--selftest-cells"]:
         failures, checked = selftest_cells(hook_dir)
         if failures:
@@ -399,6 +433,7 @@ def main():
         print(f"✓ 各格都对（判了 {checked} 个样本）")
         return 0
     if sys.argv[2:] == ["--selftest"]:
+        os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 起的各轮与 selftest_cells 起的钩子子进程（环境原样继承）靠它认
         hook = os.path.join(hook_dir, "timer-only-remind-guard.sh")
         clean = {key: value for key, value in os.environ.items() if key != BREAK_VARIABLE}
         completed = subprocess.run(["bash", hook, "--selftest-cells"], capture_output=True, text=True, env=clean)

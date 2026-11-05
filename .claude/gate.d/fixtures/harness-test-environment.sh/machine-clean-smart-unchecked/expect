@@ -1,0 +1,5 @@
+exit=77
+want=宿主盘·SMART 没查成
+want=这一格本次未跑
+want=样本只跑 .gate-cells 点名的格：machine-clean
+want=machine-clean：本次未跑

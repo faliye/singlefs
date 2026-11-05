@@ -1,0 +1,2 @@
+# 样本：搬迁登记表的旧路径一栏记着搬走之前的名字，这一格不扫它（弄坏开关 retired-moves-table-scanned 下它被点名）
+scripts/hosts/OLD_SAMPLE_LIBRARY_ROOT	scripts/hosts/current_name	2026-11-05	records/sample.md

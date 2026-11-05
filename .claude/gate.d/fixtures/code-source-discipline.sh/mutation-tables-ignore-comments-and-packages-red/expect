@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=crates/mutations.tsv 这些行点名的测试标了 #[ignore]，cargo test 参数里却没有 --include-ignored
+want=crates/mutations.tsv:10 M_点名的标了 ignore 的用例注释夹在属性之间：点名的 interleaved_slow_case 标了 #[ignore]，cargo test 参数「-p demo --test interleaved」里没有 --include-ignored
+want=crates/mutations.tsv 这些行点名的测试在 cargo test 参数选的目标里找不到
+want=crates/mutations.tsv:11 M_点名的用例两个包里都没有：点名的测试 absent_from_both_packages_case 在 crates/demo 的
+want=、crates/retry 的
+want=mutation-tables：红（退出 1）

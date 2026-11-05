@@ -1,0 +1,9 @@
+exit=1
+want=✗ .claude/gate.d/split-proposal-ledgers.tsv:4：角色「archived」认不得（只认 current 与 sealed）
+want=✗ .claude/gate.d/split-proposal-ledgers.tsv:5：不是「角色<TAB>路径<TAB>sha256<TAB>为什么」四段（读出 3 段）
+want=✗ .claude/gate.d/split-proposal-ledgers.tsv:6：records/2026-10-23-subagent拆分提案.md 的为什么不到 8 个字
+want=✗ .claude/gate.d/split-proposal-ledgers.tsv:8：records/2026-09-16-subagent拆分提案.md 登了两次
+want=✗ current 登了 2 行（.claude/gate.d/split-proposal-ledgers.tsv:2、.claude/gate.d/split-proposal-ledgers.tsv:3）：现行账本恰好登一份
+want=✗ 拆分提案账本登记表 .claude/gate.d/split-proposal-ledgers.tsv 有 5 处不合，现行账本与封存的几份认不准，这一格没判
+want=样本只跑 .gate-cells 点名的格：sealed-ledgers-unchanged
+want=doc-process-records.sh：1 格里 1 格红（sealed-ledgers-unchanged）

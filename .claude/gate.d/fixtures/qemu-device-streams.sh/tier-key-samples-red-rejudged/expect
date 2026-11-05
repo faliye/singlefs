@@ -1,0 +1,10 @@
+exit=77
+want=· 键样本：page-cache 这一档照判红退出那一条路记红（.qemu-key-samples/red-tiers）
+want=· qemu:page-cache 判红记库：记红、撤掉同一把键原有的绿，下一趟这一档现判
+want=── 第二趟（样本 .qemu-key-samples/change.sh 改过之后）
+want=· page-cache：现判（上次判红
+want=· direct：复用（
+want=· raise-rollback-floor：复用（
+want=· 按档：现判 1、复用 5
+want=device-streams：本次未跑
+not-green-by-design=device-streams 键样本只判键（.qemu-prerecorded 与 .qemu-key-samples），没起虚机不算真跑过 QEMU，绿的一侧只能记本次未跑

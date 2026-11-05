@@ -1,0 +1,13 @@
+exit=1
+want=样本档：
+want=test tests::red_check ... FAILED
+want=· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟照现判（RECORD recorded=1 changed=0 refused=0 red=1
+want=· 判绿记库（crash-case-replay 这一趟判红）：判绿的 1 条照键记库（RECORD recorded=1 changed=0 refused=0 red=1
+want=· feature-gated-tests 按条复用：--lib 与挂特性的 1 个测试目标里 3 条编得进的测试函数，现判 2、复用 1、拒算 0
+want=复用 crates/singlefs-verification/src/lib.rs::tests::green_check
+want=现判 crates/singlefs-verification/src/lib.rs::tests::red_check（上次判红（
+want=--skip tests::green_check
+want=· 判绿记库：RECORD recorded=2 changed=0 refused=0
+want=逐格：crash-case-replay：红；feature-gated-tests：绿
+want=✗ 有 1 格判红：crash-case-replay
+want=crash-case-replay：红

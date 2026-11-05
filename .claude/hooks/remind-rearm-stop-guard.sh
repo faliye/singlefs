@@ -11,7 +11,7 @@
 # 登记目录与 remind.sh 同一份：${REMIND_STATE_ROOT:-~/.local/state/singlefs/reminders}/<会话号>/，会话号取 hook 输入的 session_id；只看这个会话的，不碰别的会话的登记。
 # 认「在等」：判法与 remind.sh 共用 .claude/hooks/lib_remind_waiter.py——<名字>.pid 一行「<进程号> <启动时刻>」，进程活着、启动时刻与登记相同、
 #   命令真是 bash …/remind.sh（解释器之后的脚本参数以 remind.sh 结尾）三样都对才算；进程号被复用、无关进程参数里带 remind.sh、
-#   旧登记没有启动时刻的，都按没人在等，交出重起命令。once=1 的登记不管。
+#   登记里没有启动时刻的，都按没人在等，交出重起命令。once=1 的登记不管。
 # 读不到 lib_remind_waiter.py 时判不了：照常放行（退 0），往 stderr 写一句，往检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的默认）
 #   记一条（结局只记，会话号从 hook 输入里取、读不出写「读不到」）；两样都取不到或写不进去时 stderr 另说一句没记上。
 # 已经因为这个钩子拦过一次（hook 输入 stop_hook_active 为真）还没重起的，放行，免得卡死；下一轮结束时照样再拦。
@@ -22,18 +22,31 @@
 #
 #   remind-rearm-stop-guard.sh --selftest   在临时登记目录里喂造出来的 hook JSON，末尾逐个打开弄坏开关核它红在点名的格
 # 弄坏开关 REMIND_REARM_STOP_BREAK=<项>（只给证红用，逗号连几个）。项名、弄坏哪一处、打开后红在哪一格（格名是「✗ 自证 <格名>：」里的那一段）：
-#   ignore-once         once=1 的登记也当要重起                 once
-#   ignore-waiting      不看有没有进程在等                       waiting
-#   trust-pid-file      进程号文件在就当在等（不核进程活着、启动时刻与命令）     stale-pid
-#   identity-by-name    认在等退回只看进程活着、命令行任意位置含 remind.sh       unrelated-argument、start-time-mismatch、legacy-registration
-#   ignore-active       stop_hook_active 为真时仍然拦             active
-#   all-sessions        不按会话号分，读所有会话的登记             other-session
-#   first-only          只交出第一条要重起的命令                   several
-#   failure-unrecorded  读不到 lib_remind_waiter.py 时只打 stderr、不记检出（改前的样子）     library-unreadable、library-unreadable-default-path
-#   input-unrecorded    输入不是 JSON 对象时只打 stderr、不记检出（改前连 stderr 也不打）      bad-input-recorded
-#   session-unrecorded  认不出会话号时只打 stderr、不记检出（同上）                           session-unrecognized-recorded
-#   settings-unrecorded 登记读不了时只打 stderr、不记检出（同上）                             settings-unreadable-recorded
-#   exception-unrecorded  判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，不拦、不记检出）   exception-recorded
+# 平常跑设了 REMIND_REARM_STOP_BREAK 就在一切之前退 2、点名变量只在自证里认；自证起的子进程由 REMIND_REARM_STOP_SELFTEST_MARK 认。
+#   REMIND_REARM_STOP_BREAK=ignore-once  once=1 的登记也当要重起
+#       「✗ 自证 once：」
+#   REMIND_REARM_STOP_BREAK=ignore-waiting  不看有没有进程在等
+#       「✗ 自证 waiting：」
+#   REMIND_REARM_STOP_BREAK=trust-pid-file  进程号文件在就当在等（不核进程活着、启动时刻与命令）
+#       「✗ 自证 stale-pid：」
+#   REMIND_REARM_STOP_BREAK=identity-by-name  认在等退回只看进程活着、命令行任意位置含 remind.sh
+#       「✗ 自证 unrelated-argument：」、「✗ 自证 start-time-mismatch：」
+#   REMIND_REARM_STOP_BREAK=ignore-active  stop_hook_active 为真时仍然拦
+#       「✗ 自证 active：」
+#   REMIND_REARM_STOP_BREAK=all-sessions  不按会话号分，读所有会话的登记
+#       「✗ 自证 other-session：」
+#   REMIND_REARM_STOP_BREAK=first-only  只交出第一条要重起的命令
+#       「✗ 自证 several：」
+#   REMIND_REARM_STOP_BREAK=failure-unrecorded  读不到 lib_remind_waiter.py 时只打 stderr、不记检出（改前的样子）
+#       「✗ 自证 library-unreadable：」、「✗ 自证 library-unreadable-default-path：」
+#   REMIND_REARM_STOP_BREAK=input-unrecorded  输入不是 JSON 对象时只打 stderr、不记检出（改前连 stderr 也不打）
+#       「✗ 自证 bad-input-recorded：」
+#   REMIND_REARM_STOP_BREAK=session-unrecorded  认不出会话号时只打 stderr、不记检出（同上）
+#       「✗ 自证 session-unrecognized-recorded：」
+#   REMIND_REARM_STOP_BREAK=settings-unrecorded  登记读不了时只打 stderr、不记检出（同上）
+#       「✗ 自证 settings-unreadable-recorded：」
+#   REMIND_REARM_STOP_BREAK=exception-unrecorded  判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，不拦、不记检出）
+#       「✗ 自证 exception-recorded：」
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON。
@@ -227,7 +240,7 @@ def selftest_cells(hook_dir, root):
 
     def register(session, name, once, restart, identity=None):
         # 登记里的 every=30 与 restart 里的 --every 数字都只是样本值：钩子不读也不假设任何周期，只看登记在不在（once=）、进程活没活
-        # identity 是 <名字>.pid 那一行：「<进程号> <启动时刻>」，旧登记只有进程号
+        # identity 是 <名字>.pid 那一行：「<进程号> <启动时刻>」
         directory = os.path.join(root, session)
         os.makedirs(directory, exist_ok=True)
         with open(os.path.join(directory, name + ".conf"), "w") as handle:
@@ -304,12 +317,6 @@ def selftest_cells(hook_dir, root):
         reason = blocked_reason(output) or ""
         check("start-time-mismatch", code == 0 and "bash /x/remind.sh start --every 30 --message 辛 --name a" in reason,
               f"登记的启动时刻与进程 {waiter.pid} 此刻的对不上，应当判没人在等、交出重起命令，实际退 {code}，输出：{output!r}")
-        # 旧登记只有进程号、没有启动时刻：照拦
-        register("s-legacy", "a", 0, "bash /x/remind.sh start --every 30 --message 壬 --name a", identity=str(waiter.pid))
-        code, output = feed({"session_id": "s-legacy"})
-        reason = blocked_reason(output) or ""
-        check("legacy-registration", code == 0 and "bash /x/remind.sh start --every 30 --message 壬 --name a" in reason,
-              f"旧登记只有进程号 {waiter.pid}、没有启动时刻，应当判没人在等、交出重起命令，实际退 {code}，输出：{output!r}")
     finally:
         stop_holder(waiter)
     # 已经拦过一次：放行
@@ -424,12 +431,13 @@ def selftest_run_cells(hook_dir):
 
 BREAK_TABLE = [("ignore-once", ("once",)), ("ignore-waiting", ("waiting",)), ("trust-pid-file", ("stale-pid",)),
                ("ignore-active", ("active",)), ("all-sessions", ("other-session",)), ("first-only", ("several",)),
-               ("identity-by-name", ("unrelated-argument", "start-time-mismatch", "legacy-registration")),
+               ("identity-by-name", ("unrelated-argument", "start-time-mismatch")),
                ("failure-unrecorded", ("library-unreadable", "library-unreadable-default-path")),
                ("input-unrecorded", ("bad-input-recorded",)), ("session-unrecorded", ("session-unrecognized-recorded",)),
                ("settings-unrecorded", ("settings-unreadable-recorded",)), ("exception-unrecorded", ("exception-recorded",))]
 
 def selftest(hook_dir):
+    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 起的各轮与它们底下起的钩子子进程（环境原样继承）靠它认：弄坏开关只在自证里认
     hook = os.path.join(hook_dir, "remind-rearm-stop-guard.sh")
     clean = {key: value for key, value in os.environ.items() if key != BREAK_VARIABLE}
     completed = subprocess.run(["bash", hook, "--selftest-cells"], capture_output=True, text=True, env=clean)
@@ -451,9 +459,25 @@ def selftest(hook_dir):
     print(f"✓ remind-rearm-stop-guard.sh 自证：各格都对，{len(BREAK_TABLE)} 个弄坏开关各红在点名的格")
     return 0
 
+# 弄坏开关只在自证里认：自证自带开关轮（--selftest 自己逐个设 REMIND_REARM_STOP_BREAK 起 --selftest-cells），起这些轮的 --selftest 先设标记；
+# 没有标记而变量非空（含 --selftest 本身：开关轮由它自己逐个设，外面设了没有用），读 hook 的 JSON 与一切参数之前就退 2、点名变量只在自证里认，不管值是什么。
+SELFTEST_MARK_VARIABLE = "REMIND_REARM_STOP_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "remind-rearm-stop-guard.sh --selftest 起的各轮"
+
+def refuse_break_outside_selftest():
+    value = os.environ.get(BREAK_VARIABLE, "")
+    if not value or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    print(f"✗ {HOOK_NAME}：{BREAK_VARIABLE}={value} 是弄坏开关，只在自证（{HOOK_NAME} --selftest 起的各轮）里认，平常跑设了就拒，这一次没判", file=sys.stderr)
+    print(f"→ 怎么办：去掉 {BREAK_VARIABLE} 再跑；要证红直接跑 bash .claude/hooks/{HOOK_NAME} --selftest（自证自己逐个打开弄坏开关，外面不用设）", file=sys.stderr)
+    return 2
+
 def main():
     global waiter_library
     hook_dir = sys.argv[1]
+    refused = refuse_break_outside_selftest()
+    if refused is not None:
+        return refused
     try:
         waiter_library = load_waiter_library(hook_dir)
     except (ImportError, OSError, SyntaxError) as error:

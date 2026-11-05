@@ -1,0 +1,6 @@
+exit=1
+want=Verus 被信号停了（退 -9，信号 9），这一次的输出不算判定
+want=→ 怎么办：这一次是外面停了 Verus：查是谁在那一刻停了它
+want=→ verus-proof：
+want=✗ 行写「被信号停了」的是外面停了它：查是谁在那一刻停了它（同一时刻的 ps、journalctl --user、看门狗的记录），这一次的输出不算判定，不改证明或实现
+want=verus-proof：红（退出 1）

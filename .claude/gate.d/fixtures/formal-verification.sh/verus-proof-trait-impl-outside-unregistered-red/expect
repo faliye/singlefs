@@ -1,0 +1,4 @@
+exit=1
+want=verus! 外面有 trait impl：crates/singlefs-replay-prefix/src/lib.rs:31 <impl Device for WorseDevice>
+want=verus-trait-impls-outside-lag.tsv 只缩不涨
+want=verus-proof：红（退出 1）

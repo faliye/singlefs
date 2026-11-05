@@ -14,8 +14,9 @@
   record_unreadable 往检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的 default_detections_path）追加一行、结局「只记」，看门狗据此报给主 agent。
   没给 unreadable 的照旧只记进 notes、快照目录列不出照旧抛出。
 放行行（ruled_snapshot_conflicts）：一行以「快照冲突已判：<轮名> <理由>」开头（行首可以有列表记号与粗体星号），理由非空、不是 <理由> 这种占位；只认这一行，不跨到下一行。
-  派发闸在派发提示里找，apply-writer-patch.py 认命令行 --snapshot-ruled 给的那几句。
-拒绝说明（refusal_text）：逐轮列撞了的文件（至多 SNAPSHOT_CONFLICTS_SHOWN_LIMIT 个），出路三条：等判决写完、单起一行写放行行、用户已叫停的在登记表收掉。
+  只有派发闸认，在派发提示里找；apply-writer-patch.py 不认放行行（交进来的放行集合是空的，补丁撞快照一律拒）。
+拒绝说明（refusal_text）：逐轮列撞了的文件（至多 SNAPSHOT_CONFLICTS_SHOWN_LIMIT 个），出路三条：等判决写完、单起一行写放行行、用户已叫停的在登记表收掉；
+  apply-writer-patch.py 取它的列表，「→ 怎么办」那一行换成自己的两条出路（等判决写完、叫停的轮登记进登记表），不写放行行。
 
 弄坏开关：调用方传进来 broken(<名>) → 真假（派发闸传 RUNNER_DISPATCH_GUARD_BREAK 那一份，名字与它文件头那几项相同：snapshot-body-optional、snapshot-closed-round-open、
   snapshot-abandoned-ignored、snapshot-abandoned-unchecked、snapshot-loose-lines、snapshot-no-normalize、snapshot-unreadable-aborts、snapshot-unreadable-denies、
@@ -50,7 +51,7 @@ NONE_WORDS = {"", "无", "没有", "无。", "-", "—", "空", "none"}
 ABANDONED_ROUNDS_TABLE = abandoned_library.TABLE_PATH if abandoned_library is not None else os.path.join("research", "prompts", "abandoned-rounds.tsv")
 SNAPSHOT_HALTED_SUFFIX = "-halted.md"   # 已撤的一支：文件还在时只在拒绝说明里提醒改道，不认
 DETECTIONS_VARIABLE = "AGENT_HOOK_DETECTIONS"   # 检出记录的位置；没设取同目录 lib_work_root.py 的 default_detections_path
-UNREADABLE_FINDING_PREFIX = "快照清单读不了、照常放行"   # 检出记录里每条发现的起头（看门狗不把它算进只记不叫醒的那一类，照报给主 agent）
+UNREADABLE_FINDING_PREFIX = "快照清单读不了、照常放行"   # 检出记录里每条发现的起头（在看门狗只记不叫醒的那一类里：scripts/agents/agent-watch.py 的 UNJUDGED_DETECTION_PREFIXES，只记进报告、不叫醒主 agent）
 
 
 def never(_name):

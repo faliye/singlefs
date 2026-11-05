@@ -1,0 +1,7 @@
+exit=1
+want=✗ runner 表与要临时服务的表 .claude/hooks/selftest-temporary-service.tsv 有 3 处对不上（runner 表 4 条取自 样本根的 .selftest-runners
+want=其中套包装的 3 条；表里 required 3 份、own-server 1 份
+want=「python3 scripts/gate/sample-required-bare.py --selftest」裸写，表里是 required：该写成「python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-required-bare.py --selftest」
+want=scripts/gate/sample-required-absent.py：表里是 required，runner 表里一条都没有
+want=「python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-unregistered-wrapped.py --selftest」写成了包装写法，表里没有这一行
+want=own-server 的不要求包装

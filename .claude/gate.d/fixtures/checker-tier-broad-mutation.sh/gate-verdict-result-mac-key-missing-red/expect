@@ -1,4 +1,0 @@
-exit=1
-want=广谱变异判定库里有 6 行不是驱动用这台机器的密钥写的
-want=校验不了：密钥
-want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

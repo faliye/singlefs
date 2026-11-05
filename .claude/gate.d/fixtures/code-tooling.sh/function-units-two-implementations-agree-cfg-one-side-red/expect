@@ -1,0 +1,4 @@
+exit=1
+want=crates/fsample/src/lib.rs::entry 只在 Rust 闭包里：fn	fsample::gpu_boost	crates/fsample/src/lib.rs:
+want=  ✗ crates/fsample/src/lib.rs::entry：闭包两份不同（Rust 3 个、python 2 个；只在 Rust 里 1 个、只在 python 里 0 个）
+want=function-units-two-implementations-agree：红（退出 1）

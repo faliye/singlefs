@@ -1,0 +1,4 @@
+exit=75
+want=✗ research-build-and-replay.sh 的 research-unit-tests 格：prune-server 不可用（scripts/gate/admission.py test-plan 退 75：✗ 样本档造的服务不可用：
+want=✗ research-unit-tests 这一格没判：prune-server 不可用（上面那一句），没起 cargo test，这一格退 75
+want=research-unit-tests：prune-server 不可用（退出 75）

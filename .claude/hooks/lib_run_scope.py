@@ -1,9 +1,60 @@
 """run-scope-guard.sh 的判法：起验证脚本的命令要带范围声明 SINGLEFS_RUN_SCOPE，种类与范围要与命令的形状对得上。
 
 认法、要声明与不要声明的形态、拒绝说明的样子、检出记录、罩不住的写法与弄坏开关都写在 run-scope-guard.sh 的文件头，这里不另抄。
-切词、剥前缀与包装用同目录的 lib_shell_words.py；剥 flock、/usr/bin/time、detached-run.sh start、gpu-quiesce-run.sh 这一类，
-认门禁阶段、认 cargo 的子命令用 lib_heavy_tests.py（按文件路径导入，不另写一份）。
+切词、剥前缀与包装用同目录的 lib_shell_words.py；剥 flock、/usr/bin/time、gpu-quiesce-run.sh 这一类，
+认门禁阶段、认 cargo 的子命令用 lib_project_code_runs.py（按文件路径导入，不另写一份）。
 用法：python3 lib_run_scope.py <钩子目录> [--selftest]，由 run-scope-guard.sh 起；hook 的 JSON 从标准输入读。
+弄坏开关与自证格（同一张表也写在 run-scope-guard.sh 文件头，自证末了的开关轮核表里的格与 BREAK_SWITCH_CELLS 逐格相等；这里照抄一份给门禁 code-tooling 的 break-switch-headers 格读，改了一起改）。
+平常跑设了 RUN_SCOPE_GUARD_BREAK 就在一切之前退 2、点名变量只在自证里认（本份的命令行入口与入口脚本开头那一道同一个判法）：
+   RUN_SCOPE_GUARD_BREAK=declaration-optional  没带声明也放
+       红：「门禁整道：没带声明拒」「崩溃点重放不指定范围跑：没带声明拒」「崩溃放量全部分项：没带声明拒」「崩溃放量双机驱动：没带声明拒」「replay.sh 全部实验：没带声明拒」「gate-staged.sh 没带声明拒」「cargo test 整工作区：没带声明拒」「task-server 提交的门禁整道：没带声明拒」「task-server 提交的 cargo test 整工作区：没带声明拒」「bash -c 里的门禁没带声明拒」「here-string 喂给 bash 的 cargo test 整工作区：没带声明拒」「printf 经管道喂给 bash 的门禁：没带声明拒」「echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒」「capped.sh 包着的 cargo test 没带声明拒」「env 带别的变量、没带声明拒」「nice 与 timeout 包着、没带声明拒」「flock 包着的门禁没带声明拒」「gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒」「/usr/bin/time 包着的 cargo test 没带声明拒」「驱动脚本里一行缺声明拒」「外面带声明、驱动脚本里一行缺声明拒」「驱动脚本再起驱动脚本、里面缺声明拒」「直接执行的驱动脚本缺声明拒」「同一条命令里 heredoc 写出的驱动脚本缺声明拒」「入口：没带声明拒（退出码 2）」「入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法」「入口：拒绝说明附上次红的清单」「入口：没有上次红的记录时照写」「入口：被拒的记一行（session_id、范围声明被拒、outcome 被拒）」
+   RUN_SCOPE_GUARD_BREAK=segments-unchecked  不核四段齐不齐、值空不空、写没写两次、种类认不认得
+       红：「声明缺段：没写为什么拒」「声明值空：范围一段是空的拒」「声明写两次：种类写两次拒」「声明种类认不出拒」
+   RUN_SCOPE_GUARD_BREAK=kind-unchecked  不核声明的种类与命令的形状
+       红：「门禁 --item 声明成 whole：种类对不上拒」「merge-and-verify 声明成 items：种类对不上拒」「cargo test 整包声明成 target：种类对不上拒」
+   RUN_SCOPE_GUARD_BREAK=count-unchecked  不核范围一段的数（items、target）与整轮整包（whole）
+       红：「门禁 --check 两格写成 1 格：范围数对不上拒」「whole 范围没写整轮或整包拒」「cargo test 两个目标写成 3 个：范围数对不上拒」「cargo test --exact 两个测试写成 1 个：范围数对不上拒」「崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）」「merge-and-verify 点名两项写成 1 项：范围数对不上拒」
+   RUN_SCOPE_GUARD_BREAK=reason-unchecked  不核为什么一段的字数
+       红：「gate.sh 为什么只写验证拒」「为什么太短拒」「为什么只写要跑验证拒」
+   RUN_SCOPE_GUARD_BREAK=subagent-submissions-allowed  子 agent 经 task-server/task submit 交的验证命令不按 lib_project_code_runs.subagent_task_server_refusal 拒（改前许子 agent 自己交的样子）
+       红：「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」
+   RUN_SCOPE_GUARD_BREAK=scripts-unread  命令位置上执行的驱动脚本不读进去
+       红：「驱动脚本里一行缺声明拒」「外面带声明、驱动脚本里一行缺声明拒」「驱动脚本再起驱动脚本、里面缺声明拒」「直接执行的驱动脚本缺声明拒」「同一条命令里 heredoc 写出的驱动脚本缺声明拒」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
+   RUN_SCOPE_GUARD_BREAK=wrappers-opaque  flock、/usr/bin/time、gpu-quiesce-run.sh 不剥，里面那条不判
+       红：「flock 包着的门禁没带声明拒」「gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒」「/usr/bin/time 包着的 cargo test 没带声明拒」
+   RUN_SCOPE_GUARD_BREAK=allowed-unrecorded  放行的不记进检出记录
+       红：「入口：放行的记进检出记录（四段与命令）」
+   RUN_SCOPE_GUARD_BREAK=last-runs-unread  拒绝说明不读上次红的清单
+       红：「入口：拒绝说明附上次红的清单」
+   RUN_SCOPE_GUARD_BREAK=query-forms-declared  只查清单、自证、只编不跑、只列用例的写法也要声明
+       红：「门禁 --list 不要声明」「门禁 --selftest 不要声明」「崩溃点重放 --list-items 不要声明」「replay.sh --admission-only 不要声明」「replay.sh --list-items 不要声明」「cargo test --no-run 不要声明」「cargo test -- --list 不要声明」「merge-and-verify --list-items 不要声明」
+   RUN_SCOPE_GUARD_BREAK=replay-list-items-declared  replay.sh 的 --list-items 也要声明（改前的写法）
+       红：「replay.sh --list-items 不要声明」
+   RUN_SCOPE_GUARD_BREAK=merge-items-as-whole  merge-and-verify 带 --item 也当 whole（改前的写法：挑项的写法也按整轮声明）
+       红：「merge-and-verify 点名两项：声明成 items 放」
+   RUN_SCOPE_GUARD_BREAK=merge-list-items-declared  merge-and-verify 的 --list-items 也要声明
+       红：「merge-and-verify --list-items 不要声明」
+   RUN_SCOPE_GUARD_BREAK=tooling-scripts-read  仓里的工具脚本（scripts/、.claude/ 下）也读进去
+       红：「仓里的工具脚本不读：放行」
+   RUN_SCOPE_GUARD_BREAK=cargo-targets-as-whole  cargo test 点名目标的也当整包
+       红：「cargo test 两个目标、带对的声明：放」「cargo test --lib --exact 两个测试、带对的声明：放」「子 agent cargo test 点名目标、带对的声明：放」「capped.sh 外面带声明放」「驱动脚本里每一行都带声明：放」
+   RUN_SCOPE_GUARD_BREAK=template-keeps-declaration  照抄模板时不摘命令开头已有的那份声明（照抄出来两份，bash 取后一份）
+       红：「入口：命令开头已有声明时模板只留一份」
+   RUN_SCOPE_GUARD_BREAK=failure-unrecorded  判不了的几样（hook 输入不是 JSON 对象、判的时候出异常、喂给 shell 的不是字面、读不到判法文件）只打 stderr 或什么都不说、不记检出（改前的样子）
+       红：「入口：hook 输入不是 JSON 对象（坏 JSON、数组）放行、stderr 写诊断、各记一条检出」「入口：判的时候抛异常放行、stderr 报一句、记一条检出」「入口：here-string 喂给 bash 的是变量放行、记一条检出」「入口：判法文件读不到时记一条检出（结局只记、会话号照输入）」「入口：判法文件读不到、没设 AGENT_HOOK_DETECTIONS 时记进 lib_work_root.py 的默认位置」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
+   RUN_SCOPE_GUARD_BREAK=judge-crash-unrecorded  判法文件在而没跑完（导入就出错、被信号停掉，退 0 与 2 以外的码）时只打 stderr、不记检出（改前的样子：exec 判法，退几都照常放行）
+       红：「入口：判法文件在而导入就出错时放行、stderr 报一句、记一条检出（结局只记、会话号照输入）」
+   RUN_SCOPE_GUARD_BREAK=driver-unread-unrecorded  读不了、太大的驱动脚本静默不读、不交判不了的说明（改前的样子）
+       红：「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
+   切词那一份的开关 LIB_SHELL_WORDS_BREAK=shell-standard-input-unread（lib_shell_words.py：here-string 与管道喂给 shell 的文本不当命令再切、也不交判不了的说明）下也红，不在开关轮里：
+       红：「here-string 喂给 bash 的 cargo test 整工作区：没带声明拒」「printf 经管道喂给 bash 的门禁：没带声明拒」「echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒」「入口：here-string 喂给 bash 的是变量放行、记一条检出」
+   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest  平常跑（不是 --selftest、也不是自证起的子进程）设了开关也照认、不拒（改前的样子）；它是关守卫项，只在单独一项时认，与别的项同写照拒
+       红：「入口：平常跑设了弄坏开关退 2、点名它只在自证里认」「入口：标记文件内容对不上照拒」
+   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest-with-others  带标记的自证子进程里，关守卫项与别的项同写也照认（改前的样子：honor-outside-selftest 写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
+       红：「入口：关守卫项与别的项同写：带标记的子进程里也退 2、点名它」
+   RUN_SCOPE_GUARD_BREAK=task-server-submissions-unread  task-server/task submit -- 之后那一条不判（当名单上的客户端放过去）
+       红：「task-server 提交的门禁整道：没带声明拒」「task-server 提交的 cargo test 整工作区：没带声明拒」「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」
+   开关与红的格以 lib_run_scope.py 的 BREAK_SWITCH_CELLS 为准，开关轮核每个开关名都写在这一段里。
 """
 import importlib.util
 import json
@@ -23,7 +74,7 @@ sys.dont_write_bytecode = True
 HOOK_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 GUARD_SCRIPT_NAME = "run-scope-guard.sh"
 DECLARATION_VARIABLE = "SINGLEFS_RUN_SCOPE"
-SCOPE_KINDS = ("whole", "items", "quick", "target")
+SCOPE_KINDS = ("whole", "items", "target")
 SEGMENT_KEYS = ("种类", "跑什么", "范围", "为什么")
 SEGMENT_START = re.compile(r"^(种类|跑什么|范围|为什么)\s*=\s*(.*)$", re.S)
 REASON_MINIMUM_CHARACTERS = 12
@@ -31,9 +82,9 @@ REASON_MINIMUM_CHARACTERS = 12
 REASON_FILLER_WORDS = ("确认一下", "跑一下", "跑一遍", "要跑", "验证", "看看")
 COMMIT_WHOLE_REASON = "提交前整轮"
 WHOLE_RANGE_WORDS = ("整轮", "整包")
-KIND_DESCRIPTIONS = {"whole": "整轮（whole）", "items": "点名的几项（items）", "quick": "轻型（quick）", "target": "点名的测试目标（target）"}
+KIND_DESCRIPTIONS = {"whole": "整轮（whole）", "items": "点名的几项（items）", "target": "点名的测试目标（target）"}
 LAST_RUNS_VARIABLE = "SINGLEFS_LAST_RUNS_DIRECTORY"
-DEFAULT_LAST_RUNS_DIRECTORY = "~/.local/share/singlefs/last-runs"
+LAST_RUNS_ENTRY = "last-runs"   # 没设 SINGLEFS_LAST_RUNS_DIRECTORY 时取数据根下的这一项（同目录 lib_work_root.py 的 shared_data_path，两台读同一份）
 DETECTIONS_VARIABLE = "AGENT_HOOK_DETECTIONS"
 MAXIMUM_SCRIPT_DEPTH = 6
 MAXIMUM_SCRIPT_BYTES = 1 << 20
@@ -48,10 +99,10 @@ STAGE_QUERY_ARGUMENTS = frozenset({"--list", "--list-items", "--selftest", "--he
 CRASH_REPLAY_QUERY_ARGUMENTS = frozenset({"--list-items", "--selftest", "--help", "-h"})
 CRASH_AMPLIFICATION_QUERY_ARGUMENTS = frozenset({"--list-items", "--selftest", "--help", "-h"})
 SELFTEST_ONLY_QUERY_ARGUMENTS = frozenset({"--selftest", "--help", "-h"})
+MERGE_QUERY_ARGUMENTS = frozenset({"--list-items", "--selftest", "--help", "-h"})
 REPLAY_QUERY_ARGUMENTS = frozenset({"--selftest", "--admission-only", "--list-items", "--help", "-h"})
-# 崩溃放量的分项驱动与双机驱动带一个值的选项（照两份的用法行）
-CRASH_DRIVER_OPTIONS_WITH_VALUE = frozenset({"--test-filter", "--library", "--expand-up-to", "--threads", "--memory-cap", "--peer-memory-cap", "--label",
-                                             "--host-weights", "--local-states-per-second"})
+# 崩溃放量的分项驱动与双机驱动带一个值的选项（照两份的用法行：分项驱动 --test-filter、--label，双机驱动 --test-filter、--label、--skip）
+CRASH_DRIVER_OPTIONS_WITH_VALUE = frozenset({"--test-filter", "--label", "--skip"})
 CARGO_NAMED_TARGET_OPTIONS = ("--test", "--bin", "--example", "--bench")
 CARGO_SINGLE_TARGET_FLAGS = ("--lib", "--doc")
 CARGO_EVERY_TARGET_FLAGS = frozenset({"--tests", "--bins", "--examples", "--benches", "--all-targets"})
@@ -61,19 +112,22 @@ GATE_WHOLE_LOCATIONS = (".claude/singlefs-ai-sop/scripts", ".claude/scripts")
 BREAK_VARIABLE_NAME = "RUN_SCOPE_GUARD_BREAK"
 # 弄坏开关 → 打开后红的自证格，写全（文件头「弄坏开关」一段逐项照这张表写；开关轮核红的格与这里逐格相等，并核每个开关名都写在 run-scope-guard.sh 文件头里）
 BREAK_SWITCH_CELLS = {
-    "declaration-optional": ["门禁整道：没带声明拒", "崩溃点重放剪枝跑：没带声明拒", "崩溃放量全部分项：没带声明拒", "崩溃放量双机驱动：没带声明拒", "replay.sh 全部实验：没带声明拒", "gate-staged.sh 没带声明拒", "cargo test 整工作区：没带声明拒", "bash -c 里的门禁没带声明拒", "here-string 喂给 bash 的 cargo test 整工作区：没带声明拒", "printf 经管道喂给 bash 的门禁：没带声明拒", "echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒", "capped.sh 包着的 cargo test 没带声明拒", "env 带别的变量、没带声明拒", "nice 与 timeout 包着、没带声明拒", "flock 包着的门禁没带声明拒", "gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", "detached-run.sh start 包着的门禁没带声明拒", "/usr/bin/time 包着的 cargo test 没带声明拒", "驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "detached-run.sh start 起驱动脚本、里面缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒", "入口：没带声明拒（退出码 2）", "入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法", "入口：拒绝说明附上次红的清单", "入口：没有上次红的记录时照写", "入口：被拒的记一行（session_id、范围声明被拒、outcome 被拒）"],
+    "declaration-optional": ["门禁整道：没带声明拒", "崩溃点重放不指定范围跑：没带声明拒", "崩溃放量全部分项：没带声明拒", "崩溃放量双机驱动：没带声明拒", "replay.sh 全部实验：没带声明拒", "gate-staged.sh 没带声明拒", "cargo test 整工作区：没带声明拒", "task-server 提交的门禁整道：没带声明拒", "task-server 提交的 cargo test 整工作区：没带声明拒", "bash -c 里的门禁没带声明拒", "here-string 喂给 bash 的 cargo test 整工作区：没带声明拒", "printf 经管道喂给 bash 的门禁：没带声明拒", "echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒", "capped.sh 包着的 cargo test 没带声明拒", "env 带别的变量、没带声明拒", "nice 与 timeout 包着、没带声明拒", "flock 包着的门禁没带声明拒", "gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", "/usr/bin/time 包着的 cargo test 没带声明拒", "驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒", "入口：没带声明拒（退出码 2）", "入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法", "入口：拒绝说明附上次红的清单", "入口：没有上次红的记录时照写", "入口：被拒的记一行（session_id、范围声明被拒、outcome 被拒）"],
     "segments-unchecked": ["声明缺段：没写为什么拒", "声明值空：范围一段是空的拒", "声明写两次：种类写两次拒", "声明种类认不出拒"],
-    "kind-unchecked": ["门禁 --item 声明成 whole：种类对不上拒", "门禁 --quick 声明成 items：种类对不上拒", "merge-and-verify 声明成 items：种类对不上拒", "cargo test 整包声明成 target：种类对不上拒"],
-    "count-unchecked": ["门禁 --check 两格写成 1 格：范围数对不上拒", "whole 范围没写整轮或整包拒", "cargo test 两个目标写成 3 个：范围数对不上拒", "cargo test --exact 两个测试写成 1 个：范围数对不上拒"],
+    "kind-unchecked": ["门禁 --item 声明成 whole：种类对不上拒", "merge-and-verify 声明成 items：种类对不上拒", "cargo test 整包声明成 target：种类对不上拒"],
+    "count-unchecked": ["门禁 --check 两格写成 1 格：范围数对不上拒", "whole 范围没写整轮或整包拒", "cargo test 两个目标写成 3 个：范围数对不上拒", "cargo test --exact 两个测试写成 1 个：范围数对不上拒", "崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）", "merge-and-verify 点名两项写成 1 项：范围数对不上拒"],
     "reason-unchecked": ["gate.sh 为什么只写验证拒", "为什么太短拒", "为什么只写要跑验证拒"],
-    "subagent-whole-allowed": ["子 agent 起崩溃点重放剪枝跑、带对的声明：whole 拒", "子 agent 起整道门禁、带对的声明：whole 拒", "入口：子 agent whole 拒、说明写交回主 agent", "入口：命令开头已有声明时模板只留一份"],
-    "scripts-unread": ["驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "detached-run.sh start 起驱动脚本、里面缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒",
+    "subagent-submissions-allowed": ["子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）", "子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）",
+                                     "入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回", "入口：命令开头已有声明时模板只留一份"],
+    "scripts-unread": ["驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒",
                        "入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）"],
-    "wrappers-opaque": ["flock 包着的门禁没带声明拒", "gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", "detached-run.sh start 包着的门禁没带声明拒", "/usr/bin/time 包着的 cargo test 没带声明拒", "detached-run.sh start 起驱动脚本、里面缺声明拒"],
+    "wrappers-opaque": ["flock 包着的门禁没带声明拒", "gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", "/usr/bin/time 包着的 cargo test 没带声明拒"],
     "allowed-unrecorded": ["入口：放行的记进检出记录（四段与命令）"],
     "last-runs-unread": ["入口：拒绝说明附上次红的清单"],
-    "query-forms-declared": ["门禁 --list 不要声明", "门禁 --selftest 不要声明", "崩溃点重放 --list-items 不要声明", "replay.sh --admission-only 不要声明", "replay.sh --list-items 不要声明", "cargo test --no-run 不要声明", "cargo test -- --list 不要声明"],
+    "query-forms-declared": ["门禁 --list 不要声明", "门禁 --selftest 不要声明", "崩溃点重放 --list-items 不要声明", "replay.sh --admission-only 不要声明", "replay.sh --list-items 不要声明", "cargo test --no-run 不要声明", "cargo test -- --list 不要声明", "merge-and-verify --list-items 不要声明"],
     "replay-list-items-declared": ["replay.sh --list-items 不要声明"],
+    "merge-items-as-whole": ["merge-and-verify 点名两项：声明成 items 放"],
+    "merge-list-items-declared": ["merge-and-verify --list-items 不要声明"],
     "tooling-scripts-read": ["仓里的工具脚本不读：放行"],
     "cargo-targets-as-whole": ["cargo test 两个目标、带对的声明：放", "cargo test --lib --exact 两个测试、带对的声明：放", "子 agent cargo test 点名目标、带对的声明：放", "capped.sh 外面带声明放", "驱动脚本里每一行都带声明：放"],
     "template-keeps-declaration": ["入口：命令开头已有声明时模板只留一份"],
@@ -84,12 +138,15 @@ BREAK_SWITCH_CELLS = {
     "driver-unread-unrecorded": ["入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）"],
     "honor-outside-selftest": ["入口：平常跑设了弄坏开关退 2、点名它只在自证里认", "入口：标记文件内容对不上照拒"],
     "honor-outside-selftest-with-others": ["入口：关守卫项与别的项同写：带标记的子进程里也退 2、点名它"],
+    "task-server-submissions-unread": ["task-server 提交的门禁整道：没带声明拒", "task-server 提交的 cargo test 整工作区：没带声明拒",
+                                       "子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）", "子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）",
+                                       "入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回", "入口：命令开头已有声明时模板只留一份"],
 }
 # 弄坏开关只在自证里认：自证起的入口靠这个变量指到自证建的标记文件、内容逐字是 SELFTEST_MARK_CONTENT 才认开关（同一句写在 run-scope-guard.sh 那一段守卫里）
 SELFTEST_MARK_VARIABLE = "RUN_SCOPE_GUARD_SELFTEST_MARK"
 SELFTEST_MARK_CONTENT = "run-scope-guard.sh --selftest 起的子进程"
 
-heavy_tests = None
+project_code_runs = None
 shell_words = None
 
 
@@ -103,18 +160,18 @@ def guard_switch_on(name):
 
 
 def load_judging_libraries(hook_directory):
-    """按文件路径导入 lib_heavy_tests.py（它再导入同目录的 lib_shell_words.py）。读不到或导入出错照抛，由调用方放行并报一句。"""
-    global heavy_tests, shell_words
-    if heavy_tests is None:
-        spec = importlib.util.spec_from_file_location("lib_heavy_tests", os.path.join(hook_directory, "lib_heavy_tests.py"))
+    """按文件路径导入 lib_project_code_runs.py（它再导入同目录的 lib_shell_words.py）。读不到或导入出错照抛，由调用方放行并报一句。"""
+    global project_code_runs, shell_words
+    if project_code_runs is None:
+        spec = importlib.util.spec_from_file_location("lib_project_code_runs", os.path.join(hook_directory, "lib_project_code_runs.py"))
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        heavy_tests, shell_words = module, module.shell_words
-    return heavy_tests
+        project_code_runs, shell_words = module, module.shell_words
+    return project_code_runs
 
 
 class RunShape(NamedTuple):
-    kind: str            # whole / items / quick / target
+    kind: str            # whole / items / target
     what: str            # 这条命令跑的是什么（给 agent 看的一句）
     count: int | None    # items 与 target 的 N
     unit: str            # N 的单位：格、项、个实验、个测试目标、个测试
@@ -128,6 +185,7 @@ class FoundRun(NamedTuple):
     words: list          # 剥掉前缀与包装之后的那一条
     shape: RunShape
     declaration: str | None   # 这一条看得到的 SINGLEFS_RUN_SCOPE；没有是 None
+    client_refusal: str | None = None   # 经 task-server/task submit 交给服务的那一条：lib_project_code_runs.subagent_task_server_refusal 对交它的那一条客户端命令的说明（子 agent 照它拒）
 
 
 class ScanState:
@@ -171,11 +229,8 @@ def stage_run_shape(stage, arguments):
     if query_form(rest, STAGE_QUERY_ARGUMENTS):
         return None
     key = f".claude/gate.d/{stage}"
-    cells = sorted(heavy_tests.checked_cells(rest) or set())
+    cells = sorted(project_code_runs.checked_cells(rest) or set())
     items = named_option_values(rest, "--item")
-    if "--quick" in rest:
-        named = f"，另点名 {len(items)} 项 {'、'.join(items)}" if items else ""
-        return RunShape("quick", f"门禁 {stage} 的轻型（--quick）{named}", None, "", "轻型核心部分" + (f"加点名的 {len(items)} 项" if items else ""), key, "stage")
     if cells or items:
         parts = ([f"格 {'、'.join(cells)}"] if cells else []) + ([f"项 {'、'.join(items)}"] if items else [])
         unit = "格" if cells and not items else "项"
@@ -191,15 +246,9 @@ def crash_run_shape(name, arguments):
         if query_form(rest, CRASH_REPLAY_QUERY_ARGUMENTS):
             return None
         items = named_option_values(rest, "--item")
-        if "--quick" in rest:
-            return RunShape("quick", "崩溃点重放入口的轻型（--quick，每次跑全部项的核心部分）", None, "", "轻型核心部分", key, "crash")
         if items:
-            how = "全量（--full）" if "--full" in rest else "逐条"
-            return RunShape("items", f"崩溃点重放入口{how}点名的项 {'、'.join(items)}", len(items), "项", counted_text(len(items), "项"), key, "crash")
-        if "--backlog" in rest:
-            return RunShape("whole", "崩溃点重放入口的积压跑法（--backlog，照积压登记表取件）", None, "", "整轮", key, "crash")
-        how = "全量（--full，只写不读）" if "--full" in rest else "剪枝跑全部项"
-        return RunShape("whole", f"崩溃点重放入口的重型{how}", None, "", "整轮", key, "crash")
+            return RunShape("items", f"崩溃点重放入口点名的项 {'、'.join(items)}", len(items), "项", counted_text(len(items), "项"), key, "crash")
+        return RunShape("whole", "崩溃点重放入口不指定范围跑全部项", None, "", "整轮", key, "crash")
     if name == "crash-amplification.sh":
         if query_form(rest, CRASH_AMPLIFICATION_QUERY_ARGUMENTS):
             return None
@@ -237,8 +286,23 @@ def replay_run_shape(arguments):
     return RunShape("whole", "实验复跑的全部实验（不带实验号）", None, "", "整轮", key, "replay")
 
 
+def merge_run_shape(arguments):
+    """合入后验证：带 --item（给几次取并集，--item=X 也认）是 items，范围数是点名的项数；带 --list-items 只列这一趟可点的项，是问询、不要声明；都不带是 whole。
+    弄坏开关 merge-items-as-whole 下带 --item 也当 whole，merge-list-items-declared 下 --list-items 也要声明。"""
+    rest = without_force(arguments)
+    key = "scripts/gate/merge-and-verify.sh"
+    query_arguments = MERGE_QUERY_ARGUMENTS - {"--list-items"} if guard_switch_on("merge-list-items-declared") else MERGE_QUERY_ARGUMENTS
+    if query_form(rest, query_arguments):
+        return None
+    items = [] if guard_switch_on("merge-items-as-whole") else named_option_values(rest, "--item")
+    if items:
+        return RunShape("items", f"合入后验证点名的项 {'、'.join(items)}（测试那一步只跑点名的测试目标；打补丁、fmt、clippy、build 与 验证包照旧）",
+                        len(items), "项", counted_text(len(items), "项"), key, "merge")
+    return RunShape("whole", "合入后验证（打补丁、编、跑补丁改到的包与依赖它们的包的测试与 fmt、clippy、build）", None, "", "整轮", key, "merge")
+
+
 def cargo_run_shape(arguments, directory):
-    command = heavy_tests.cargo_subcommand(arguments, directory)
+    command = project_code_runs.cargo_subcommand(arguments, directory)
     if command is None or command.subcommand not in ("test", "t"):
         return None
     rest = command.rest
@@ -246,7 +310,7 @@ def cargo_run_shape(arguments, directory):
     before, after = rest[:separator], rest[separator + 1:]
     if "--no-run" in before and not guard_switch_on("query-forms-declared"):
         return None
-    if heavy_tests.libtest_lists_only(after) and not guard_switch_on("query-forms-declared"):
+    if project_code_runs.libtest_lists_only(after) and not guard_switch_on("query-forms-declared"):
         return None
     packages, targets, filters, every_target, whole_workspace = [], [], [], False, False
     position = 0
@@ -273,7 +337,7 @@ def cargo_run_shape(arguments, directory):
             every_target = True
         elif word in CARGO_WHOLE_WORKSPACE_FLAGS:
             whole_workspace = True
-        elif word in heavy_tests.CARGO_TEST_OPTIONS_WITH_VALUE:
+        elif word in project_code_runs.CARGO_TEST_OPTIONS_WITH_VALUE:
             position += 2
             continue
         elif not word.startswith("-"):
@@ -282,7 +346,7 @@ def cargo_run_shape(arguments, directory):
     position = 0
     while position < len(after):
         word = after[position]
-        if word in heavy_tests.LIBTEST_OPTIONS_WITH_VALUE:
+        if word in project_code_runs.LIBTEST_OPTIONS_WITH_VALUE:
             position += 2
             continue
         if not word.startswith("-"):
@@ -305,28 +369,25 @@ def cargo_run_shape(arguments, directory):
 
 def run_shape_of(words, directory):
     """剥完包装的一条命令是不是要声明的验证脚本：是就交 RunShape，不是（或是只查清单的写法）交 None。"""
-    if not words or heavy_tests.ENVIRONMENT_ASSIGNMENT_WORD.match(words[0]):
+    if not words or project_code_runs.ENVIRONMENT_ASSIGNMENT_WORD.match(words[0]):
         return None
     word, arguments = words[0], words[1:]
     name = os.path.basename(word)
-    stage = heavy_tests.gate_stage_name(word, directory)
+    stage = project_code_runs.gate_stage_name(word, directory)
     if stage is not None:
         return stage_run_shape(stage, arguments)
     if name in ("crash-point-replay.sh", "crash-amplification.sh", "crash-amplification-item.sh", "crash-amplification-two-hosts.sh") \
-            and heavy_tests.located_in(word, directory, "scripts/crash"):
+            and project_code_runs.located_in(word, directory, "scripts/crash"):
         return crash_run_shape(name, arguments)
-    if name == "replay.sh" and heavy_tests.located_in(word, directory, "scripts/experiment-apparatus"):
+    if name == "replay.sh" and project_code_runs.located_in(word, directory, "scripts/experiment-apparatus"):
         return replay_run_shape(arguments)
-    if name == "merge-and-verify.sh" and heavy_tests.located_in(word, directory, "scripts/gate"):
-        if query_form(without_force(arguments), SELFTEST_ONLY_QUERY_ARGUMENTS):
-            return None
-        return RunShape("whole", "合入后验证（打补丁、编、跑补丁改到的包与依赖它们的包的测试与 fmt、clippy、build）", None, "", "整轮",
-                        "scripts/gate/merge-and-verify.sh", "merge")
-    if name == "gate-staged.sh" and heavy_tests.located_in(word, directory, "scripts/gate"):
+    if name == "merge-and-verify.sh" and project_code_runs.located_in(word, directory, "scripts/gate"):
+        return merge_run_shape(arguments)
+    if name == "gate-staged.sh" and project_code_runs.located_in(word, directory, "scripts/gate"):
         if query_form(without_force(arguments), SELFTEST_ONLY_QUERY_ARGUMENTS):
             return None
         return RunShape("whole", "提交前的整轮门禁（gate-staged.sh 起整轮 gate.sh --staged）", None, "", "整轮", "scripts/gate/gate-staged.sh", "gate-whole")
-    if name == "gate.sh" and any(heavy_tests.located_in(word, directory, location) for location in GATE_WHOLE_LOCATIONS):
+    if name == "gate.sh" and any(project_code_runs.located_in(word, directory, location) for location in GATE_WHOLE_LOCATIONS):
         return RunShape("whole", "整轮门禁 gate.sh", None, "", "整轮", ".claude/singlefs-ai-sop/scripts/gate.sh", "gate-whole")
     if name == "cargo":
         return cargo_run_shape(arguments, directory)
@@ -362,7 +423,7 @@ def parse_scope_declaration(text):
             problems.append(f"「{key}」一段是空的")
     kind = segments.get("种类")
     if kind and kind not in SCOPE_KINDS:
-        problems.append(f"种类「{kind}」认不出，只认 whole、items、quick、target")
+        problems.append(f"种类「{kind}」认不出，只认 whole、items、target")
     return ScopeDeclaration(segments, problems)
 
 
@@ -373,12 +434,14 @@ def reason_character_count(reason):
     return sum(1 for character in reason if unicodedata.category(character)[0] in ("L", "N"))
 
 
-def scope_problems(shape, declaration_text, agent_type):
-    """这一条要声明的命令哪里不合：交回一串说明，空的是放行。"""
+def scope_problems(shape, declaration_text, agent_type, client_refusal=None):
+    """这一条要声明的命令哪里不合：交回一串说明，空的是放行。client_refusal 是交它的那一条客户端命令照 lib_project_code_runs.subagent_task_server_refusal 判出的说明
+    （经 task-server/task submit 交的才有）：子 agent 交的照它拒，种类不论（用户 2026-11-01 定子 agent 一律不往统一任务服务交任务，
+    records/2026-10-29-subagent拆分提案.md 第一百七十四节；判定与 project-code-guard.sh 的 ② 是同一处，这里不另写）。子 agent 直接起的验证命令这里只判声明，
+    直接跑项目代码由 project-code-guard.sh 的 ① 拒。弄坏开关 subagent-submissions-allowed 下子 agent 交的不拒（改前许子 agent 自己交的样子）。"""
     problems = []
-    if agent_type and shape.kind == "whole" and not guard_switch_on("subagent-whole-allowed"):
-        problems.append(f"子 agent 不跑整轮：这一条是{shape.what}。交回主 agent——在交回报告「要主 agent 跑的命令」一节写明这条命令、四段声明与为什么要整轮；"
-                        "自己只跑点名的格、项或测试目标")
+    if agent_type and client_refusal and not guard_switch_on("subagent-submissions-allowed"):
+        problems.append(f"子 agent 不往统一任务服务交任务：这一条经 {client_refusal} 交的是{shape.what}。{project_code_runs.SUBAGENT_HAND_BACK_WAY_OUT}")
     if declaration_text is None:
         if not guard_switch_on("declaration-optional"):
             problems.append("没带范围声明")
@@ -554,10 +617,19 @@ def scope_runs_in_text(text, directory, environment=None, frames=(), script=None
             line_numbers = numbered.get(key, [])
             here = frames + ((script, line_numbers[occurrence] if occurrence < len(line_numbers) else None),)
         remember_heredoc_writes(command, state)
+        # 经 task-server/task submit 交给服务的那一条（lib_project_code_runs.task_server_submission）：照一条命令接着判，声明认 submit 前面写的
+        # （客户端把 SINGLEFS_RUN_SCOPE 当白名单变量带进任务）与 `--` 之后 env 写的（run-scope-guard.sh 文件头「经 task-server 提交」）
+        submitted = None if guard_switch_on("task-server-submissions-unread") else project_code_runs.task_server_submission(command.words, command.directory, command.launcher)
+        if submitted is not None:
+            submitted_words, submitted_directory = submitted
+            client_refusal = project_code_runs.subagent_task_server_refusal(command.words, command.directory, command.launcher)
+            found += [run._replace(client_refusal=client_refusal)
+                      for run in scope_runs_in_text(shlex.join(submitted_words), submitted_directory or command.directory, command.environment, here, None, state)]
+            continue
         launched = None
         if not guard_switch_on("wrappers-opaque"):
-            launched = (heavy_tests.command_under_launcher(command.words, command.directory)
-                        or heavy_tests.command_under_gpu_quiesce(command.words, command.directory))
+            launched = (project_code_runs.command_under_launcher(command.words, command.directory)
+                        or project_code_runs.command_under_gpu_quiesce(command.words, command.directory))
         if launched is not None:
             inner_words, inner_directory = launched
             inner_start = shell_words.resolve_path(command.directory, inner_directory) if inner_directory else command.directory
@@ -581,7 +653,13 @@ def scope_runs_in_text(text, directory, environment=None, frames=(), script=None
 
 
 def last_runs_path(script_key):
-    directory = os.environ.get(LAST_RUNS_VARIABLE) or os.path.expanduser(DEFAULT_LAST_RUNS_DIRECTORY)
+    """上次红的清单：SINGLEFS_LAST_RUNS_DIRECTORY 设了放它底下，没设是数据根下的 last-runs；同目录 lib_work_root.py 读不到、取不到时抛它的异常。"""
+    directory = os.environ.get(LAST_RUNS_VARIABLE)
+    if not directory:
+        if HOOK_DIRECTORY not in sys.path:
+            sys.path.insert(0, HOOK_DIRECTORY)
+        import lib_work_root
+        directory = lib_work_root.shared_data_path(LAST_RUNS_ENTRY)
     return os.path.join(directory, script_key.replace("/", "__") + ".tsv")
 
 
@@ -589,7 +667,10 @@ def last_red_lines(shape):
     """上次这一道红的清单（给拒绝说明用的几行）。"""
     if shape.script_key is None:
         return ["上次红的：cargo test 没有清单文件，从上次的日志取：python3 scripts/gate/rerun-failed-tests.py <上次日志> -p <包>"]
-    path = last_runs_path(shape.script_key)
+    try:
+        path = last_runs_path(shape.script_key)
+    except (ImportError, OSError, ValueError) as error:
+        return [f"上次红的：取不到上次红的清单在哪（同目录 lib_work_root.py 读不到或取不到数据根：{error!r}）"]
     if guard_switch_on("last-runs-unread"):
         return [f"上次红的：没有上次红的记录（{path}）"]
     try:
@@ -620,12 +701,13 @@ NARROWING_LINES = (
     "  门禁：bash .claude/gate.d/<阶段>.sh --check <格>[,<格>…]（格名用 --list 列）；有逐项的门禁写 --item <项>（--list-items 列）",
     "  崩溃入口：bash scripts/crash/crash-point-replay.sh --item <项>（--list-items 列）；崩溃放量 scripts/crash/crash-amplification.sh --item <分项>",
     "  cargo test：cargo test -p <包> --test <目标> -- <测试名> --exact；上次红的用 python3 scripts/gate/rerun-failed-tests.py <上次日志> -p <包> 打出只重跑它们的命令",
-    "  merge-and-verify：挑包在脚本里做（只跑补丁改到的包与依赖它们的包，--all-packages 才全跑），种类照旧写 whole；为什么写明这一批补丁碰了哪些包",
+    "  merge-and-verify：挑包在脚本里做（只跑补丁改到的包与依赖它们的包，--all-packages 才全跑），不带 --item 种类写 whole，为什么写明这一批补丁碰了哪些包；"
+    "红了只重跑红的写 --skip-apply --item <包>:<目标根文件>（--list-items 列），种类 items，范围写项数",
 )
 DECLARATION_RULE_LINES = (
     f"→ 声明写在命令开头：{DECLARATION_VARIABLE}='种类=…; 跑什么=…; 范围=…; 为什么=…'，四段用 ; 隔、各段 键=值；"
-    "种类 whole（不带 --item / --check 的整轮、cargo test 整包或整工作区、merge-and-verify、整轮门禁）、items（带 --item / --check、replay.sh 带实验号）、"
-    "quick（带 --quick）、target（cargo test 带 --test / --bin / --lib 目标、崩溃放量的分项与双机驱动）；"
+    "种类 whole（不带 --item / --check 的整轮、cargo test 整包或整工作区、不带 --item 的 merge-and-verify、整轮门禁）、items（带 --item / --check、merge-and-verify 带 --item、replay.sh 带实验号）、"
+    "target（cargo test 带 --test / --bin / --lib 目标、崩溃放量的分项与双机驱动）；"
     "范围：items 写「N 格 / N 项」、target 写「N 个测试目标」（带 --exact 筛选词的写「N 个测试」），N 是阿拉伯数字、等于点名的个数，whole 写「整轮」或「整包」；"
     f"为什么至少 {REASON_MINIMUM_CHARACTERS} 个字，只写「要跑」「验证」不算；整轮门禁的为什么写「提交前整轮」就放。驱动脚本里每一条验证命令那一行各自带声明。",
 )
@@ -667,7 +749,7 @@ def decide_scope(hook_input, project_root):
     runs = scope_runs_in_text(command_text, directory, state=state)
     refused, allowed = [], []
     for found in runs:
-        problems = scope_problems(found.shape, found.declaration, agent_type)
+        problems = scope_problems(found.shape, found.declaration, agent_type, found.client_refusal)
         (refused if problems else allowed).append((found, problems) if problems else found)
     if refused:
         return ScopeDecision(2, refusal_text(refused, command_text), allowed, refused, state.unjudged)
@@ -788,13 +870,18 @@ def build_selftest_tree(work):
         return path
     declared_stage = scope_text("whole", "门禁 doc-text 全部格", "整轮", "提交之前补跑这一道，看全仓文字的格是不是都绿")
     write("drivers/missing.sh", "#!/usr/bin/env bash\necho 开跑\nbash .claude/gate.d/doc-text.sh .\n"
-                                f"{scope_text('target', 'cargo test 一个目标', '1 个测试目标')} cargo test -p singlefs-harness --test model_contract\n")
+                                f"{scope_text('target', 'cargo test 一个目标', '1 个测试目标')} cargo test -p singlefs-verification --test model_contract\n")
     write("drivers/declared.sh", f"#!/usr/bin/env bash\n{declared_stage} bash .claude/gate.d/doc-text.sh .\n"
-                                 f"{scope_text('target', 'cargo test 一个目标', '1 个测试目标')} cargo test -p singlefs-harness --test model_contract\n")
+                                 f"{scope_text('target', 'cargo test 一个目标', '1 个测试目标')} cargo test -p singlefs-verification --test model_contract\n")
     write("drivers/direct.sh", "#!/usr/bin/env bash\ncargo test --workspace\n", executable=True)
     write("drivers/outer.sh", "#!/usr/bin/env bash\nbash drivers/missing.sh\n")
     write("repo/.claude/hooks/placeholder", "仓的样子：这一层带 .claude/hooks/\n")
     write("repo/scripts/tool.sh", "#!/usr/bin/env bash\ncargo test --workspace\n")
+    # 提交客户端：与本仓那一份逐字节相同（lib_project_code_runs.task_server_submission 只认这样的）
+    client = os.path.join(os.path.dirname(os.path.dirname(HOOK_DIRECTORY)), "task-server", "task")
+    if os.path.isfile(client):
+        os.makedirs(os.path.join(work, "task-server"), exist_ok=True)
+        shutil.copyfile(client, os.path.join(work, "task-server", "task"))
 
 
 def selftest_cells(work):
@@ -802,28 +889,33 @@ def selftest_cells(work):
     sub = "implementation-writer"
     whole_stage = scope_text("whole", "门禁 doc-text 全部格", "整轮")
     two_cells = "bash .claude/gate.d/code-tooling.sh --check agent-write-scope,research-script-selftests ."
-    quick_mutation = "bash scripts/hosts/run-with-memory-cap.sh 4G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick --item row-a ."
     cells = [
         # 门禁阶段
         ("门禁整道：没带声明拒", None, "bash .claude/gate.d/doc-text.sh .", 2),
         ("门禁整道：带对的声明放", None, f"{whole_stage} bash .claude/gate.d/doc-text.sh .", 0),
         ("门禁 --check 两格写成 2 格：放", None, f"{scope_text('items', '门禁 code-tooling 两格', '2 格')} {two_cells}", 0),
         ("门禁 --check 两格写成 1 格：范围数对不上拒", None, f"{scope_text('items', '门禁 code-tooling 两格', '1 格')} {two_cells}", 2),
-        ("门禁 --item 声明成 items：放", None, f"{scope_text('items', '形式化点名 proof', '1 项')} bash .claude/gate.d/checker-tier-formal-verification.sh --item proof .", 0),
-        ("门禁 --item 声明成 whole：种类对不上拒", None, f"{scope_text('whole', '形式化', '整轮')} bash .claude/gate.d/checker-tier-formal-verification.sh --item proof .", 2),
-        ("门禁 --quick 声明成 quick：放", sub, f"{scope_text('quick', 'crates 变异轻型', '轻型核心部分加 1 项')} {quick_mutation}", 0),
-        ("门禁 --quick 声明成 items：种类对不上拒", sub, f"{scope_text('items', 'crates 变异轻型', '1 项')} {quick_mutation}", 2),
+        ("门禁 --item 声明成 items：放", None, f"{scope_text('items', '形式化点名 proof', '1 项')} bash .claude/gate.d/formal-verification.sh --item proof .", 0),
+        ("门禁 --item 声明成 whole：种类对不上拒", None, f"{scope_text('whole', '形式化', '整轮')} bash .claude/gate.d/formal-verification.sh --item proof .", 2),
+        ("门禁 --item 一项声明成 items：放", sub,
+         f"{scope_text('items', 'crates 变异点名一项', '1 项')} bash .claude/gate.d/crates-mutation-replay.sh --item row-a .", 0),
         ("门禁 --list 不要声明", None, "bash .claude/gate.d/code-tooling.sh --list", 0),
         ("门禁 --selftest 不要声明", sub, "bash .claude/gate.d/code-tooling.sh --selftest", 0),
         ("whole 范围没写整轮或整包拒", None, f"{scope_text('whole', '门禁 doc-text', '全部')} bash .claude/gate.d/doc-text.sh .", 2),
         # 崩溃入口
-        ("崩溃点重放剪枝跑：没带声明拒", None, "bash scripts/crash/crash-point-replay.sh", 2),
+        ("崩溃点重放不指定范围跑：没带声明拒", None, "bash scripts/crash/crash-point-replay.sh", 2),
         ("崩溃点重放两项：带对的声明放", None, f"{scope_text('items', '崩溃点重放两项', '2 项')} bash scripts/crash/crash-point-replay.sh --item a --item b", 0),
         ("崩溃点重放 --list-items 不要声明", sub, "bash scripts/crash/crash-point-replay.sh --list-items", 0),
-        ("子 agent 起崩溃点重放剪枝跑、带对的声明：whole 拒", sub, f"{scope_text('whole', '崩溃点重放', '整轮')} bash scripts/crash/crash-point-replay.sh", 2),
-        ("子 agent 起崩溃点重放轻型、带对的声明：放", sub,
-         f"{scope_text('quick', '崩溃点重放轻型', '轻型核心部分')} bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/crash/crash-point-replay.sh --quick", 0),
+        ("子 agent 起崩溃点重放点名一项、带对的声明：放", sub,
+         f"{scope_text('items', '崩溃点重放点名一项', '1 项')} bash scripts/crash/crash-point-replay.sh --item fixed-script", 0),
         ("崩溃放量一个分项：带对的声明放", None, f"{scope_text('items', '崩溃放量一个分项', '1 项')} bash scripts/crash/crash-amplification.sh --item tree-split-streams", 0),
+        # 指定范围的参数也能缩崩溃域：带 --item 时另加展开深度参数（--crash-expand-up-to <N>）照 items 声明放，深度的值不当项名
+        ("崩溃点重放点名一项另加展开深度：带对的声明放", None,
+         f"{scope_text('items', '崩溃点重放点名一项', '1 项')} bash scripts/crash/crash-point-replay.sh --item fixed-script --crash-expand-up-to 3", 0),
+        ("崩溃放量点名一个分项另加展开深度：带对的声明放", None,
+         f"{scope_text('items', '崩溃放量一个分项', '1 项')} bash scripts/crash/crash-amplification.sh --crash-expand-up-to 3 --item tree-split-streams", 0),
+        ("崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）", None,
+         f"{scope_text('items', '崩溃点重放点名两项', '2 项')} bash scripts/crash/crash-point-replay.sh --item fixed-script --crash-expand-up-to 3", 2),
         ("崩溃放量全部分项：没带声明拒", None, "bash scripts/crash/crash-amplification.sh", 2),
         ("崩溃放量分项驱动：带对的声明放", None,
          f"{scope_text('target', '分项驱动一个目标', '1 个测试目标')} bash scripts/crash/crash-amplification-item.sh crash_amplification_fixed_script --threads 8", 0),
@@ -836,9 +928,17 @@ def selftest_cells(work):
         ("merge-and-verify 声明成 whole：放", None,
          f"{scope_text('whole', '合入后验证', '整轮', '这一批三份补丁碰了 harness 与 core 两个包，脚本只挑这两个包与依赖它们的包')} bash scripts/gate/merge-and-verify.sh p1 p2", 0),
         ("merge-and-verify 声明成 items：种类对不上拒", None, f"{scope_text('items', '合入后验证', '2 项')} bash scripts/gate/merge-and-verify.sh p1 p2", 2),
+        # 带 --item（也认 --item=X）是 items，范围数是点名的项数；带 --list-items 是问询，不要声明（弄坏开关 merge-items-as-whole、merge-list-items-declared 下这两格红）
+        ("merge-and-verify 点名两项：声明成 items 放", None,
+         f"{scope_text('items', '合入后验证点名两项', '2 项', '上次红了这两个测试目标，只重跑它们看改后是不是转绿')} "
+         "bash scripts/gate/merge-and-verify.sh --skip-apply --item alpha:src/lib.rs --item=alpha:tests/beta.rs", 0),
+        ("merge-and-verify 点名两项写成 1 项：范围数对不上拒", None,
+         f"{scope_text('items', '合入后验证点名两项', '1 项', '上次红了这两个测试目标，只重跑它们看改后是不是转绿')} "
+         "bash scripts/gate/merge-and-verify.sh --skip-apply --item alpha:src/lib.rs --item=alpha:tests/beta.rs", 2),
+        ("merge-and-verify --list-items 不要声明", sub, "bash scripts/gate/merge-and-verify.sh --list-items --with-keys p1", 0),
         ("gate-staged.sh 为什么写提交前整轮：放", None,
-         f"{DECLARATION_VARIABLE}='种类=whole; 跑什么=提交前门禁; 范围=整轮; 为什么=提交前整轮' SINGLEFS_HEAVY_TESTS=commit bash scripts/gate/gate-staged.sh", 0),
-        ("gate-staged.sh 没带声明拒", None, "SINGLEFS_HEAVY_TESTS=commit bash scripts/gate/gate-staged.sh", 2),
+         f"{DECLARATION_VARIABLE}='种类=whole; 跑什么=提交前门禁; 范围=整轮; 为什么=提交前整轮' bash scripts/gate/gate-staged.sh", 0),
+        ("gate-staged.sh 没带声明拒", None, "bash scripts/gate/gate-staged.sh", 2),
         ("gate.sh 为什么写提交前整轮：放", None,
          f"{DECLARATION_VARIABLE}='种类=whole; 跑什么=整轮门禁; 范围=整轮; 为什么=提交前整轮' bash .claude/singlefs-ai-sop/scripts/gate.sh --staged", 0),
         ("gate.sh 为什么只写验证拒", None, f"{DECLARATION_VARIABLE}='种类=whole; 跑什么=整轮门禁; 范围=整轮; 为什么=验证' bash .claude/singlefs-ai-sop/scripts/gate.sh --staged", 2),
@@ -846,18 +946,18 @@ def selftest_cells(work):
         ("cargo test 整工作区：没带声明拒", None, "cargo test --workspace", 2),
         ("cargo test 整工作区：带对的声明放", None, f"{scope_text('whole', 'cargo test 整工作区', '整轮', '提交之前整工作区跑一遍，确认全部测试二进制都绿')} cargo test --workspace", 0),
         ("cargo test 两个目标、带对的声明：放", None,
-         f"{scope_text('target', 'harness 两个目标', '2 个测试目标')} cargo test -p singlefs-harness --test model_contract --test scenarios", 0),
+         f"{scope_text('target', 'harness 两个目标', '2 个测试目标')} cargo test -p singlefs-verification --test model_contract --test scenarios", 0),
         ("cargo test 两个目标写成 3 个：范围数对不上拒", None,
-         f"{scope_text('target', 'harness 两个目标', '3 个测试目标')} cargo test -p singlefs-harness --test model_contract --test scenarios", 2),
+         f"{scope_text('target', 'harness 两个目标', '3 个测试目标')} cargo test -p singlefs-verification --test model_contract --test scenarios", 2),
         ("cargo test --lib --exact 两个测试、带对的声明：放", None,
          f"{scope_text('target', 'unit-graph 库单测两条', '2 个测试')} cargo test -p singlefs-unit-graph --lib -- keys::first keys::second --exact", 0),
         ("cargo test --exact 两个测试写成 1 个：范围数对不上拒", None,
          f"{scope_text('target', 'unit-graph 库单测两条', '1 个测试')} cargo test -p singlefs-unit-graph --lib -- keys::first keys::second --exact", 2),
-        ("cargo test 整包声明成 target：种类对不上拒", None, f"{scope_text('target', 'harness', '1 个测试目标')} cargo test -p singlefs-harness", 2),
+        ("cargo test 整包声明成 target：种类对不上拒", None, f"{scope_text('target', 'harness', '1 个测试目标')} cargo test -p singlefs-verification", 2),
         ("子 agent cargo test 点名目标、带对的声明：放", sub,
-         f"{scope_text('target', 'harness 一个目标', '1 个测试目标')} bash scripts/hosts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test model_contract", 0),
-        ("cargo test --no-run 不要声明", sub, "cargo test -p singlefs-harness --no-run", 0),
-        ("cargo test -- --list 不要声明", sub, "cargo test -p singlefs-harness --test model_contract -- --list", 0),
+         f"{scope_text('target', 'harness 一个目标', '1 个测试目标')} bash scripts/hosts/run-with-memory-cap.sh 4G cargo test -p singlefs-verification --test model_contract", 0),
+        ("cargo test --no-run 不要声明", sub, "cargo test -p singlefs-verification --no-run", 0),
+        ("cargo test -- --list 不要声明", sub, "cargo test -p singlefs-verification --test model_contract -- --list", 0),
         ("cargo build 不要声明", sub, "cargo build --offline --all-targets", 0),
         # 包装
         ("bash -c 里的门禁没带声明拒", None, "bash -c 'bash .claude/gate.d/doc-text.sh .'", 2),
@@ -867,9 +967,9 @@ def selftest_cells(work):
         ("printf 经管道喂给 bash 的门禁：没带声明拒", None, "printf 'bash .claude/gate.d/doc-text.sh .\\n' | bash", 2),
         ("echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒", None, "echo 'cargo test --workspace' | sh", 2),
         ("here-string 外面带声明放", None, f"{whole_stage} bash <<< 'bash .claude/gate.d/doc-text.sh .'", 0),
-        ("capped.sh 包着的 cargo test 没带声明拒", sub, "bash scripts/hosts/capped.sh 31 cargo test -p singlefs-harness --test model_contract", 2),
+        ("capped.sh 包着的 cargo test 没带声明拒", sub, "bash scripts/hosts/capped.sh 31 cargo test -p singlefs-verification --test model_contract", 2),
         ("capped.sh 外面带声明放", sub,
-         f"{scope_text('target', 'harness 一个目标', '1 个测试目标')} bash scripts/hosts/capped.sh 31 cargo test -p singlefs-harness --test model_contract", 0),
+         f"{scope_text('target', 'harness 一个目标', '1 个测试目标')} bash scripts/hosts/capped.sh 31 cargo test -p singlefs-verification --test model_contract", 0),
         ("env 带别的变量、没带声明拒", None, "env FOO=1 bash .claude/gate.d/doc-text.sh .", 2),
         ("env 的参数里带声明放", None, f"env {whole_stage} bash .claude/gate.d/doc-text.sh .", 0),
         ("nice 与 timeout 包着、没带声明拒", None, "nice -n 19 timeout 600 bash .claude/gate.d/doc-text.sh .", 2),
@@ -877,13 +977,9 @@ def selftest_cells(work):
         ("同一段命令前面 export 声明放", None, f"export {whole_stage}; bash .claude/gate.d/doc-text.sh .", 0),
         ("flock 包着的门禁没带声明拒", None, "flock /tmp/run-scope-sample.lock bash .claude/gate.d/doc-text.sh .", 2),
         ("flock 外面带声明放", None, f"{whole_stage} flock /tmp/run-scope-sample.lock bash .claude/gate.d/doc-text.sh .", 0),
-        ("gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", None, "bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/crash/crash-point-replay.sh --quick", 2),
+        ("gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", None, "bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/crash/crash-point-replay.sh --item fixed-script", 2),
         ("gpu-quiesce-run.sh 外面带声明放", None,
-         f"{scope_text('quick', '崩溃点重放轻型', '轻型核心部分')} bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/crash/crash-point-replay.sh --quick", 0),
-        ("detached-run.sh start 包着的门禁没带声明拒", None,
-         "bash scripts/hosts/detached-run.sh start --wall-clock within-2h --label doc-text -- bash .claude/gate.d/doc-text.sh .", 2),
-        ("detached-run.sh start 外面带声明放", None,
-         f"{whole_stage} bash scripts/hosts/detached-run.sh start --wall-clock within-2h --label doc-text -- bash .claude/gate.d/doc-text.sh .", 0),
+         f"{scope_text('items', '崩溃点重放点名一项', '1 项')} bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/crash/crash-point-replay.sh --item fixed-script", 0),
         ("/usr/bin/time 包着的 cargo test 没带声明拒", None, "/usr/bin/time -v cargo test --workspace", 2),
         # 驱动脚本
         ("驱动脚本里一行缺声明拒", None, "bash drivers/missing.sh", 2),
@@ -891,8 +987,6 @@ def selftest_cells(work):
         ("外面带声明、驱动脚本里一行缺声明拒", None, f"{whole_stage} bash drivers/missing.sh", 2),
         ("驱动脚本再起驱动脚本、里面缺声明拒", None, "bash drivers/outer.sh", 2),
         ("直接执行的驱动脚本缺声明拒", None, "./drivers/direct.sh", 2),
-        ("detached-run.sh start 起驱动脚本、里面缺声明拒", None,
-         "bash scripts/hosts/detached-run.sh start --wall-clock over-2h --label verify -- bash drivers/missing.sh", 2),
         ("同一条命令里 heredoc 写出的驱动脚本缺声明拒", None, "cat > drivers/written.sh <<'EOF'\ncargo test --workspace\nEOF\nbash drivers/written.sh", 2),
         ("同一条命令里 heredoc 写出的驱动脚本带声明：放", None,
          f"cat > drivers/written-ok.sh <<'EOF'\n{whole_stage} bash .claude/gate.d/doc-text.sh .\nEOF\nbash drivers/written-ok.sh", 0),
@@ -910,9 +1004,20 @@ def selftest_cells(work):
         ("为什么里自带分号接到上一段：放", None,
          f"{scope_text('whole', '门禁 doc-text', '整轮', '提交之前补跑; 看全仓文字的格是不是都绿')} bash .claude/gate.d/doc-text.sh .", 0),
         # 子 agent 与别的命令
-        ("子 agent 起整道门禁、带对的声明：whole 拒", sub, f"{whole_stage} bash .claude/gate.d/doc-text.sh .", 2),
+        # 子 agent 直接起的验证命令这里只判声明（直接跑项目代码由 project-code-guard.sh 的 ① 拒）；经 submit 交的照 lib_project_code_runs.subagent_task_server_refusal 拒
+        ("子 agent 直接起整道门禁、带对的声明：放（直接跑由 ① 拒）", sub, f"{whole_stage} bash .claude/gate.d/doc-text.sh .", 0),
         ("子 agent 起门禁两格、带对的声明：放", sub, f"{scope_text('items', '门禁 code-tooling 两格', '2 格')} {two_cells}", 0),
         ("不是验证脚本的命令：放", sub, "ls -la && bash .claude/hooks/run-scope-guard.sh --selftest", 0),
+        # 经 task-server/task submit 交给服务的那一条照判，声明写在 submit 前面或 -- 之后 env 里（样本树里放一份与本仓逐字节相同的客户端；开关 task-server-submissions-unread 下「拒」的三格红）
+        ("task-server 提交的门禁整道：没带声明拒", None, "task-server/task submit -- bash .claude/gate.d/doc-text.sh .", 2),
+        ("task-server 提交的门禁整道、submit 前面带对的声明：放", None, f"{whole_stage} task-server/task submit -- bash .claude/gate.d/doc-text.sh .", 0),
+        ("task-server 提交的门禁整道、-- 之后 env 里带对的声明：放", None, f"task-server/task submit -- env {whole_stage} bash .claude/gate.d/doc-text.sh .", 0),
+        ("task-server 提交的 cargo test 整工作区：没带声明拒", None, "task-server/task submit -- cargo test --workspace", 2),
+        ("子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）", sub,
+         f"{scope_text('whole', '崩溃点重放', '整轮')} task-server/task submit -- bash scripts/crash/crash-point-replay.sh", 2),
+        ("子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）", sub,
+         f"{scope_text('target', 'harness 一个目标', '1 个测试目标')} task-server/task submit -- cargo test -p singlefs-verification --test model_contract", 2),
+        ("task-server/task wait 不要声明", sub, "task-server/task wait 7", 0),
     ]
     return cells
 
@@ -929,6 +1034,9 @@ def selftest_judge_cells(work):
         except Exception as error:
             got = f"抛了 {error!r}"
         results.append((label, want, got))
+    # 带一个值的选项照两份驱动的用法行（CRASH_DRIVER_OPTIONS_WITH_VALUE）：--skip 的值不当测试目标
+    skipped = run_shape_of(["scripts/crash/crash-amplification-two-hosts.sh", "--skip", "crash_amplification_slow_case", "crash_amplification_fixed_script"], work)
+    results.append(("崩溃放量双机驱动：--skip 的值不当测试目标", "崩溃放量双机驱动起测试目标 crash_amplification_fixed_script", skipped.what if skipped else None))
     return results
 
 
@@ -957,9 +1065,10 @@ def selftest_entry_cells(work, guard_script):
     results.append(("入口：拒绝说明附上次红的清单", True, "clock-times、prime-marks" in refused.stderr))
     no_record = feed("bash .claude/gate.d/doc-experiments.sh .")
     results.append(("入口：没有上次红的记录时照写", True, "没有上次红的记录" in no_record.stderr))
-    sub_whole = feed(f"{scope_text('whole', '门禁 doc-text 全部格', '整轮')} bash .claude/gate.d/doc-text.sh .", "implementation-writer")
-    results.append(("入口：子 agent whole 拒、说明写交回主 agent", (2, True), (sub_whole.returncode, "交回主 agent" in sub_whole.stderr)))
-    template_lines = [line for line in sub_whole.stderr.splitlines() if line.startswith(f"  {DECLARATION_VARIABLE}=")]
+    sub_submitted = feed(f"{scope_text('whole', '门禁 doc-text 全部格', '整轮')} task-server/task submit -- bash .claude/gate.d/doc-text.sh .", "implementation-writer")
+    results.append(("入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回", (2, True),
+                    (sub_submitted.returncode, "写进报告「要主 agent 跑的命令」一节交回" in sub_submitted.stderr)))
+    template_lines = [line for line in sub_submitted.stderr.splitlines() if line.startswith(f"  {DECLARATION_VARIABLE}=")]
     results.append(("入口：命令开头已有声明时模板只留一份", [1], [line.count(f"{DECLARATION_VARIABLE}=") for line in template_lines]))
     if os.path.exists(detections):
         os.remove(detections)
@@ -1194,8 +1303,37 @@ def selftest(hook_directory):
         shutil.rmtree(work, ignore_errors=True)
 
 
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在自证里认（与入口脚本开头那一道同一个判法，免得直接起这份库绕过它）：参数不是单独一个 --selftest、自证标记文件对不上而 RUN_SCOPE_GUARD_BREAK 非空，
+    交回拒绝的几行（点名变量、说它只在自证里认）；关守卫项 honor-outside-selftest 单独一项时放行，与别的项同写照拒（带标记又同写着 honor-outside-selftest-with-others 的除外）；放行交回空表。"""
+    value = os.environ.get(BREAK_VARIABLE_NAME, "")
+    if not value or arguments == ["--selftest"]:
+        return []
+    mark = os.environ.get(SELFTEST_MARK_VARIABLE, "")
+    marked = False
+    if mark and os.path.isfile(mark):
+        with open(mark, encoding="utf-8", errors="replace") as handle:
+            marked = handle.read().rstrip("\n") == SELFTEST_MARK_CONTENT
+    items = [item for item in value.split(",") if item]
+    guard_off = "honor-outside-selftest" in items
+    others = [item for item in items if item != "honor-outside-selftest"]
+    lenient = "honor-outside-selftest-with-others" in others
+    if guard_off and others and not (marked and lenient):
+        return [f"  ✗ {BREAK_VARIABLE_NAME}={value}：关守卫项 honor-outside-selftest 只在它是唯一一项时认，与别的项（{'、'.join(others)}）同写照拒；弄坏开关只在自证里认",
+                f"  → 怎么办：去掉 {BREAK_VARIABLE_NAME} 再跑；要证红就跑 {BREAK_VARIABLE_NAME}=<项> bash .claude/hooks/run-scope-guard.sh --selftest"]
+    if not marked and not (guard_off and not others):
+        return [f"  ✗ {BREAK_VARIABLE_NAME}={value} 是弄坏开关，只在自证（run-scope-guard.sh --selftest 与它起的子进程）里认；平常跑设了就拒，这一趟什么都没做",
+                f"  → 怎么办：去掉 {BREAK_VARIABLE_NAME} 再跑；要证红就跑 {BREAK_VARIABLE_NAME}=<项> bash .claude/hooks/run-scope-guard.sh --selftest"]
+    return []
+
+
 def main():
     hook_directory = sys.argv[1] if len(sys.argv) > 1 else HOOK_DIRECTORY
+    refusal = refuse_break_outside_selftest(sys.argv[2:])
+    if refusal:
+        for line in refusal:
+            print(line, file=sys.stderr)
+        return 2
     if len(sys.argv) > 2 and sys.argv[2] == "--selftest":
         return selftest(hook_directory)
     return hook_main(hook_directory)

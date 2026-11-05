@@ -1,0 +1,9 @@
+# 同 crash-audit-cells-green 一棵树，标记目录另放 collect-unreachable：备覆盖行时 collect 连不上 prune-server、退 75，
+# 覆盖、ignore、0 次三格记不可用、不判红，整道退 75。门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 crash-case-replay、crash-case-must-red、crash-knobs：覆盖、ignore、0 次三格读 crash-case-replay 那一趟的行，expect 的逐格那一行另写必红世界与旋钮两格绿
+crash-flow-coverage
+crash-ignored-nodes
+invariant-zero-evaluations
+crash-case-replay
+crash-case-must-red
+crash-knobs

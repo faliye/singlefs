@@ -1,0 +1,3 @@
+# 样本登记表
+.claude/gate.d/sample-stage.sh	samples	# 样本：只读 verdict 文件
+.claude/gate.d/other-stage.sh	samples	# 样本：只读 verdict 文件（没被点名，不该复跑）

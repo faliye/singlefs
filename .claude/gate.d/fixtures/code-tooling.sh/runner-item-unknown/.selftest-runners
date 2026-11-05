@@ -1,0 +1,3 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：可点的项只有 a 与 c 两份
+bash scripts/gate/sample-pass-a.sh --selftest
+python3 scripts/gate/sample-pass-c.py --selftest

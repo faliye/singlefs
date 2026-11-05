@@ -5,4 +5,4 @@
 set -e
 mkdir -p .claude records
 printf '.claude/kb  # 样本\n\377\n' > .claude/kb-directories
-printf '# 样本总审核\n\n判别力样本，不是真的总审核记录。\n' > records/2026-01-01-总审核.md
+printf '# 样本总审核\n\n判别力样本，不是真的总审核记录。\n' > records/2026-11-01-总审核.md

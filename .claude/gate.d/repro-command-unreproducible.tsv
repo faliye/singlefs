@@ -1,0 +1,5 @@
+# 产物逐字节复跑不了的实验页登记表：门禁 doc-experiments 的 repro-command 格读它，登记了的页点了 research/results/ 里的产物却没写复跑命令也不判红。
+# 写法（制表符分隔，两列，一行一页）：<实验页文件名，kb/experiments/ 下的原文或译文，一页一行><TAB><原因>
+# 原因写清为什么重跑出来的产物和留存的不会逐字节相同（配置行带输出目录、计数随回收变这类），空着判红；页文件名在 kb/experiments/ 下不存在判红（页改了名或删了，改或删这一行）。
+# 能写出复跑命令的页不登这里：纯 Python 或 bash 装置的复跑行（起 scripts/experiment-apparatus/ 下脚本的 task-server/task submit 整条）本身就放行；原始输出没留的页写明「原始输出未留存」。
+# 登记只放行这一格的「没写复跑命令」；页上整行抄的产物行仍由 quoted-result-lines 格逐字对照产物。

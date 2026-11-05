@@ -1,0 +1,8 @@
+exit=1
+want=✗ .claude/kb/decisions/01-样本决策.md:7 C20（样本已还的甲）
+want=决策正文的欠段里有 1 处引的账在 .claude/kb/checks-owed.md 的已还清表里、同一行里它的哪一截都没说还清了（扫 1 份中文正文、1 行欠段、2 个 C 号；滞后表收着的 0 处不算）
+want=滞后表 .claude/gate.d/owed-refs-paid-lag.tsv 有 1 处不对
+want=.claude/gate.d/owed-refs-paid-lag.tsv:2 锚在 .claude/kb/decisions/01-样本决策.md 里命中 0 行，要恰好一行
+want=样本只跑 .gate-cells 点名的格：owed-refs-paid
+want=  owed-refs-paid：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（owed-refs-paid）

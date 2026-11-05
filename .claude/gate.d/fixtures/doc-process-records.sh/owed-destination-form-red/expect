@@ -1,0 +1,8 @@
+exit=1
+want=欠账表开着的 4 行里写了「去向：」的 3 行：2 行去向段开头不是三种落点之一，0 处落点点名的里程碑文件找不到
+want=✗ C9821（样本先写挪出）：去向段开头不是三种落点之一：「挪出里程碑三，归
+want=✗ C9822（样本括注起头）：去向段开头不是三种落点之一：「（从里程碑三挪来）里程碑八一·1」
+want=把去向段开头改成三种落点之一，说明挪到落点之后
+want=样本只跑 .gate-cells 点名的格：owed-destination-form
+want=doc-process-records.sh：1 格里 1 格红（owed-destination-form）
+want=bash .claude/gate.d/doc-process-records.sh --check owed-destination-form

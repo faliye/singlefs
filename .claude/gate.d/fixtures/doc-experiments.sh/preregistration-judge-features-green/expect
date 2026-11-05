@@ -1,0 +1,6 @@
+exit=0
+want=起装置的命令本次未判 1 条：research/prompts/e992-preregistration.md:9（--bin e992_gone：清单里找不到这个 bin）
+want=跑前登记里起走崩溃判段的装置命令都带了 gpu 特性：查了 1 份，走判段的 3 条（research/prompts/e992-preregistration.md:5、research/prompts/e992-preregistration.md:6、research/prompts/e992-preregistration.md:7）；不走判段的 1 条不判：research/prompts/e992-preregistration.md:8（e992_counts_only）；没点名 --bin 或 --test 的 1 条；认不出、本次未判 1 条：research/prompts/e992-preregistration.md:9（--bin e992_gone：清单里找不到这个 bin）
+want=样本只跑 .gate-cells 点名的格：preregistration-judge-features
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（preregistration-judge-features），0 格本次未跑（无）

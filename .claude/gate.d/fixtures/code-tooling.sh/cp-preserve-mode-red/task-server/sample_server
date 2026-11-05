@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# 样本：不带后缀、#! 起 bash 的文件照扫
+cp -pR first second

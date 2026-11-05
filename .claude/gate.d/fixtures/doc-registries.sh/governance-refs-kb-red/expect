@@ -1,0 +1,10 @@
+exit=1
+want=.claude/kb/tooling.md:3: `scripts/kb/old-name.py` 里的 scripts/kb/old-name.py 在仓里不存在：改成 scripts/kb/new-name.py（改名：改名链
+want=.claude/kb/tooling.md:4: `scripts/kb/retired-tool.py` 里的 scripts/kb/retired-tool.py 在仓里不存在：删于
+want=（删 retired-tool：判法并进门禁）；现状句改写或删去，说那一次的事件句写成 `
+want=^:scripts/kb/retired-tool.py`
+want=.claude/kb/tooling.md:5: `research/prompts/never-written-prereg.md` 里的 research/prompts/never-written-prereg.md 在仓里不存在：从没进过 git
+want=crates/sample/invariants/01-样例类.md:3: `crates/sample/src/gone.rs` 里的 crates/sample/src/gone.rs 在仓里不存在：从没进过 git
+want=  kb 路径：扫 2 份 kb 中文页，判了 4 处（research/ 进过 git 放行 0 处、滞后 0 处、保留 0 处）
+want=治理文档与 kb 里有指不到的指向（上面逐条列出）
+want=  governance-refs：红（退出 1）

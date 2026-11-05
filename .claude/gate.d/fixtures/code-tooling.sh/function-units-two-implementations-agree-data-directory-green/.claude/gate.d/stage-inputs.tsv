@@ -1,0 +1,2 @@
+# 样本的准入登记表：function-units-two-implementations-agree 格只读第二列里写成 <文件>.rs::<限定名> 的入口
+function-units-sample	crates/fdirsample/src/lib.rs::count_rules crates/fdirsample/src/lib.rs::table	-	# 样本：读数据目录与读数据文件的两个入口，闭包里数据行的种类（data、data-directory）两份逐字相同

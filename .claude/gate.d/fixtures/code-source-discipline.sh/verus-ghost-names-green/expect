@@ -1,0 +1,4 @@
+exit=0
+want=✓ 被验 crate 里没有自己定义或改名出的 Ghost / Tracked：查了 1 个登记的 crate、1 份 .rs
+want=样本只跑 .gate-cells 点名的格：verus-ghost-names
+want=verus-ghost-names：绿

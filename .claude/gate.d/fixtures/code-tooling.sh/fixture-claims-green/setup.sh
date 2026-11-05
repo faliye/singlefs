@@ -16,3 +16,5 @@ printf '# 样本\n' > records/2026-08-25-样本.md
 # 拿 2026-08-01 当它比会误判，所以判的是「整月都在区间外」才红
 mkdir -p .claude/kb/decisions-history
 printf '# 样本\n' > .claude/kb/decisions-history/2026-08.md
+# 工具版本串里的日期是那一版工具的发布日（比沙箱起点早 7 天以上）：不判，成功句报不判的个数；弄坏开关 tool-version-dates-judged 下判红
+printf 'rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\n' > .claude/gate.d/fixtures/50-good.sh/green/rustc-version

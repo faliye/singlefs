@@ -1,0 +1,4 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：prune-server-selftest
+want=prune-server --selftest 的输出：末行不是恰好一行 PRUNE_SERVER_SELFTEST（实有 0 行，最后一行是「✓ 自证 batched-point-read」）
+want=prune-server-selftest：红（退出 1）

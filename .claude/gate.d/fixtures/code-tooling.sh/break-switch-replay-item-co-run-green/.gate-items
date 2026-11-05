@@ -1,0 +1,2 @@
+# 样本根的逐项点名（当作命令行上的 --item）：只点 tally.py 的一条开关；那一份照整份起（另两条陪跑），okay.py 不起
+scripts/gate/tally.py:TALLY_BREAK=prefix

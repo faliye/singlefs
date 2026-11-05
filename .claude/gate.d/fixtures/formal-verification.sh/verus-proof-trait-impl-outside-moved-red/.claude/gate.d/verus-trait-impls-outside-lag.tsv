@@ -1,0 +1,2 @@
+# 样本用的放过表（格式照仓里 .claude/gate.d/verus-trait-impls-outside-lag.tsv 的文件头）：BadDevice 这一行在核里已经挪进 verus!
+singlefs_replay_prefix::Device	BadDevice	crates/singlefs-replay-prefix/src/lib.rs	样本：挪进 verus! 的那一簇	样本：这一簇还没把它挪进 verus!

@@ -1,0 +1,1 @@
+这个文件在：假 cargo 实跑 fault-injection-given-states 那一趟打完日志给起它的阶段发 TERM（照内存包装撞顶停整个 scope 的样子）。

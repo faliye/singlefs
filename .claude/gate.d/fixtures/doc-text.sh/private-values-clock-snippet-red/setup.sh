@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 从第二台进度日志抄来的两句：时间戳前 20 个字落在假私有值中间（样本的 multi-host.env 里 PEER_REPOSITORY_DIRECTORY 与 PEER_SSH_HOST，编的），clock-times 红；
+# 从第二台进度日志抄来的两句：时间戳前 20 个字落在假私有值中间（样本的 multi-host.env 里 BUILD_ROOT_BY_HOST 那一项的值与 HOSTS，编的），clock-times 红；
 # 片段两头挪到值的边上、整值打码，红行里不出现半截的假值。建 git 仓只为让 expect、setup.sh 与假配置被 .gitignore 挡在扫描之外。
 set -e
 git init -q .

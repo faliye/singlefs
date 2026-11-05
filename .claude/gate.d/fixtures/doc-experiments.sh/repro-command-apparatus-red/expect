@@ -1,0 +1,10 @@
+exit=1
+want=这些实验页的复跑行点名了仓里不存在的脚本或装置目录，照着跑不起来：
+want=91-点名的装置目录不在.md：scripts/experiment-apparatus/e91_gone
+want=92-点名的脚本不存在.md：scripts/experiment-apparatus/e92_sample/gone_driver.py scripts/experiment-apparatus/e92_sample/removed.py
+want=把复跑行改成现存的路径
+want=样本只跑 .gate-cells 点名的格：repro-command
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（repro-command）
+want=→ repro-command：在实验页正文的口径一节补一句复跑命令
+want=bash .claude/gate.d/doc-experiments.sh --check repro-command

@@ -1,0 +1,9 @@
+exit=3
+want=样本档：
+want=本次未跑（这不是通过）：验证包不带特性那一趟（tests/plain_stream.rs）报了本次未跑：NOT_RUN_GPU_FEATURE_NOT_COMPILED_IN test=plain_stream_quick reason=多机配置写了 ENABLE_GPU=1，这一趟没编进 gpu 特性（样本）
+want=✓ feature-gated-tests：3 个挂特性的测试文件（特性 gpu,sample-accelerator,sample-store）每个都编进来、跑到了用例，共 5 条
+want=逐格：crash-case-replay：绿；不带特性那一趟有 1 处本次未跑；feature-gated-tests：绿
+want=· feature-gated-tests：带 gpu 特性那一趟要上卡，显卡是 task-server 交的 192.0.2.1:0:8G（清场归 task-server，这里不另套清场包装）
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=feature-gated-tests 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的验证包那一步，不许记成通过）
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的验证包那一步，不许记成通过）

@@ -1,0 +1,2 @@
+# 调用方环境里设了 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6（.crash-point-replay-sample-tools/caller-environment）：缩过域的那一趟判绿，成功句写缩过域、不算门禁通过，不写 all-green；样本档判绿退 3（expect 里写了按设计不绿的理由），判的是崩溃枚举用例那一格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

@@ -1,0 +1,4 @@
+exit=0
+want=✓ 封存的 2 份拆分提案（records/2026-10-23-subagent拆分提案.md records/2026-09-16-subagent拆分提案.md）内容都与登记的 sha256 相同；新内容往现行账本 records/2026-10-29-subagent拆分提案.md 追加
+want=样本只跑 .gate-cells 点名的格：sealed-ledgers-unchanged
+want=doc-process-records.sh：1 格里 1 格绿（sealed-ledgers-unchanged），0 格本次未跑（无）

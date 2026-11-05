@@ -1,0 +1,11 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=.claude/gate.d/unsafe-allowances.tsv:2 登记的 crates/singlefs-core/src/block_device.rs 的 punch_hole_keeping_the_file_length 上放开 unsafe_code 的属性 2 处，应当恰好 1 处
+want=crates/singlefs-core/src/block_device.rs:4
+want=crates/singlefs-core/src/block_device.rs:5
+want=.claude/gate.d/unsafe-allowances.tsv:3 登记的 crates/singlefs-core/src/block_device.rs 的 largest_device_local_memory_heap 上放开 unsafe_code 的属性 0 处，应当恰好 1 处
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（unsafe-allowances）
+want=→ unsafe-allowances：
+want=bash .claude/gate.d/code-source-discipline.sh --check unsafe-allowances

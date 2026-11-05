@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：prune-server-selftest
+want=prune-server 自证的格 batched-point-read 红了
+want=prune-server 自证没过：20 格里红 1 格（batched-point-read）、0 处输出不对（退 1）
+want=prune-server-selftest：红（退出 1）

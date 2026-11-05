@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：dated-status
+want=3 行带日期的现状句不在滞后表里，在 3 份 kb 中文页的历史节之前
+want=.claude/kb/experiments/01-样本实验.md:3  日期 现状
+want=.claude/kb/milestone/02-样本里程碑.md:5  现状（日期
+want=crates/sample-checker/invariants/I-1-样本.md:5  日期 现状
+want=→ 怎么办：删掉日期，把那一句的事实现查一次
+want=doc-text.sh：1 格里 1 格红（dated-status）
+want=bash .claude/gate.d/doc-text.sh --check dated-status

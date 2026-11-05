@@ -7,13 +7,11 @@
 # （逐个列文件，加出路）作为提醒交给发命令的一方（hookSpecificOutput.additionalContext，同一段另作 systemMessage 给人看）；
 # 只检出、只报告，从不拒、不改任何索引。判法与自证格在检查脚本里；这里只管认命令、找仓、转述。
 # hook-events: PostToolUse:Bash
-# gate-similar: host-resources-reminder.sh 同样认命令位置上的命令（lib_shell_words.py）、只提醒不拒、把结论交 additionalContext；它挂 PreToolUse[Bash]，在命令之前查各台资源，这里挂 PostToolUse[Bash]，要等提交做完才有 HEAD 可比，触发点不同，并不进去会让「之前」与「之后」两个事件挤在一个入口里
 # gate-similar: bash-command-detector.sh 同用 lib_shell_words.py 切词；它在执行前判命令的形状（没超时的等待循环、放出追踪）记检出或拒，不看命令做完之后仓里的状态
-# gate-similar: heavy-test-guard.sh 在执行前按命令文本拒重型测试，与索引无关；这里命令做完才查
+# gate-similar: project-code-guard.sh 在执行前按命令文本拒不经 task-server 跑项目代码，与索引无关；这里命令做完才查
 # gate-similar: timer-only-remind-guard.sh 同挂 Bash 这一个工具，但挂 PreToolUse，判的是定时办法，与提交无关
 # gate-similar: pattern-process-guard.sh 上游 SOP 的钩子，只判按模式找进程的写法，上游副本也不归本仓改
 # gate-similar: session-start.sh 开会话时打一次本机状态；这里在每次提交之后现查共用索引，触发点不同
-# gate-overlap:copy-kept host-resources-reminder.sh 自证末尾「逐个弄坏开关、起 --selftest-cells、核红在点名的格」的轮次样板各份各有自己的开关表与格名；抽成共用库要改 host-resources-reminder.sh 的自证，不在这一批的范围
 # gate-similar: scripts/gate/stage-mine.py 管提交之前「只暂存这一轮的块」，不看提交之后共用索引与 HEAD 的差；判法在 scripts/gate/shared-index-stale-check.py，这个钩子只是把它挂到提交之后自动跑
 #
 # 认法：lib_shell_words.commands_at_command_position 切出命令位置上的每一条命令（前缀、包装、cd 照它），命令词是 git（取文件名），
@@ -31,19 +29,28 @@
 #
 #   shared-index-stale-reminder.sh --selftest   在临时目录里造小仓、喂造出来的 hook JSON；末尾逐个打开弄坏开关核它红在点名的格
 # 弄坏开关 SHARED_INDEX_STALE_REMINDER_BREAK=<项>（只给证红用，逗号连几个）。项名、弄坏哪一处、打开后红在哪几格（格名是「✗ 自证 <格名>：」里的那一段）：
-#   ignore-commit        git commit 一律不认                          commit-stale、commit-with-dash-c、commit-after-cd、commit-in-bash-c
-#   remind-everything    哪条命令都查                                 not-commit
-#   ignore-dash-c        -C 的值当成子命令                             commit-with-dash-c
-#   ignore-directory     不跟 -C 与 cd，一律取 hook 输入的 cwd           commit-with-dash-c、commit-after-cd
-#   refuse-command       检出了就拒（退 2）                           commit-stale、commit-with-dash-c、commit-after-cd、commit-in-bash-c
-#   silent-on-unfinished 检查脚本到点没查完、起不来、退别的码时退回静默（stderr 不写、检出不记）   check-timeout、check-exit-code
-#   input-unrecorded     输入不是 JSON 对象时退回静默（stderr 不写、检出不记，改前的样子）      bad-json-recorded
-#   exception-unrecorded 判的时候出错时只打 stderr、不记检出（改前的样子）                   exception-recorded
+# 平常跑设了 SHARED_INDEX_STALE_REMINDER_BREAK 就在一切之前退 2、点名变量只在自证里认；自证起的子进程由 SHARED_INDEX_STALE_REMINDER_SELFTEST_MARK 认。
+#   SHARED_INDEX_STALE_REMINDER_BREAK=ignore-commit  git commit 一律不认
+#       「✗ 自证 commit-stale：」、「✗ 自证 commit-with-dash-c：」、「✗ 自证 commit-after-cd：」、「✗ 自证 commit-in-bash-c：」
+#   SHARED_INDEX_STALE_REMINDER_BREAK=remind-everything  哪条命令都查
+#       「✗ 自证 not-commit：」
+#   SHARED_INDEX_STALE_REMINDER_BREAK=ignore-dash-c  -C 的值当成子命令
+#       「✗ 自证 commit-with-dash-c：」
+#   SHARED_INDEX_STALE_REMINDER_BREAK=ignore-directory  不跟 -C 与 cd，一律取 hook 输入的 cwd
+#       「✗ 自证 commit-with-dash-c：」、「✗ 自证 commit-after-cd：」
+#   SHARED_INDEX_STALE_REMINDER_BREAK=refuse-command  检出了就拒（退 2）
+#       「✗ 自证 commit-stale：」、「✗ 自证 commit-with-dash-c：」、「✗ 自证 commit-after-cd：」、「✗ 自证 commit-in-bash-c：」
+#   SHARED_INDEX_STALE_REMINDER_BREAK=silent-on-unfinished  检查脚本到点没查完、起不来、退别的码时退回静默（stderr 不写、检出不记）
+#       「✗ 自证 check-timeout：」、「✗ 自证 check-exit-code：」
+#   SHARED_INDEX_STALE_REMINDER_BREAK=input-unrecorded  输入不是 JSON 对象时退回静默（stderr 不写、检出不记，改前的样子）
+#       「✗ 自证 bad-json-recorded：」
+#   SHARED_INDEX_STALE_REMINDER_BREAK=exception-unrecorded  判的时候出错时只打 stderr、不记检出（改前的样子）
+#       「✗ 自证 exception-recorded：」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
-# python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（同 host-resources-reminder.sh）。
+# python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
 import concurrent.futures, importlib.util, json, os, shlex, shutil, subprocess, sys, tempfile
 from datetime import datetime, timezone
@@ -326,6 +333,7 @@ def cells_in_scratch(hook_dir):
         shutil.rmtree(root, ignore_errors=True)
 
 def selftest(hook_dir):
+    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 起的各轮与 feed 起的钩子子进程（环境原样继承）靠它认：弄坏开关只在自证里认
     failures, checked = cells_in_scratch(hook_dir)
     if failures:
         print(f"  ✗ shared-index-stale-reminder.sh 自证 {len(failures)} 格不对（查了 {checked} 格）：{'、'.join(failures)}")
@@ -357,8 +365,24 @@ def selftest(hook_dir):
           f"弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 
+# 弄坏开关只在自证里认：自证自带开关轮（--selftest 自己逐个设 SHARED_INDEX_STALE_REMINDER_BREAK 起 --selftest-cells），起这些轮的 --selftest 先设标记；
+# 没有标记而变量非空（含 --selftest 本身：开关轮由它自己逐个设，外面设了没有用），读 hook 的 JSON 与一切参数之前就退 2、点名变量只在自证里认，不管值是什么。
+SELFTEST_MARK_VARIABLE = "SHARED_INDEX_STALE_REMINDER_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "shared-index-stale-reminder.sh --selftest 起的各轮"
+
+def refuse_break_outside_selftest():
+    value = os.environ.get(BREAK_VARIABLE, "")
+    if not value or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    print(f"  ✗ {HOOK_NAME}：{BREAK_VARIABLE}={value} 是弄坏开关，只在自证（{HOOK_NAME} --selftest 起的各轮）里认，平常跑设了就拒，这一条命令没判", file=sys.stderr)
+    print(f"     → 怎么办：去掉 {BREAK_VARIABLE} 再跑；要证红直接跑 bash .claude/hooks/{HOOK_NAME} --selftest（自证自己逐个打开弄坏开关，外面不用设）", file=sys.stderr)
+    return 2
+
 def main():
     hook_dir = sys.argv[1]
+    refused = refuse_break_outside_selftest()
+    if refused is not None:
+        return refused
     if sys.argv[2:] == ["--selftest"]:
         return selftest(hook_dir)
     if sys.argv[2:] == ["--selftest-cells"]:

@@ -1,0 +1,3 @@
+# 样本复跑登记表：okay 一条开关照常红在点名的那一格，flaky 一条开关在样本根有 .red-switch 时红在没点名的一格
+scripts/gate/okay.py	30	# 样本：开关红在点名的失败行上
+scripts/gate/flaky.py	30	# 样本：这一趟判红，照同一把键记红、撤绿

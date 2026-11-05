@@ -1,0 +1,4 @@
+# 样本的拆分提案账本登记表：一份现行、两份封存（sha256 是样本里两份封存账本封存时的内容）
+current	records/2026-10-29-subagent拆分提案.md	-	样本的现行账本，新欠账往这一份末尾追加
+sealed	records/2026-10-23-subagent拆分提案.md	f2e4eb84cb3ef492742a15114367459c7433540a3dc173c6ec7be6c5c2007897	样本里第二版封存，没做完的节已抄进现行账本
+sealed	records/2026-09-16-subagent拆分提案.md	647f67a525ffb76ec0e67fbde2bb22d698422ca9914cdb42702d19171ad44496	样本里最早那一版封存，当历史出处

@@ -1,0 +1,5 @@
+exit=0
+want=都登记在 .claude/gate.d/verus-trait-impls-outside-lag.tsv 里放过、这一格不算绿到底
+want=singlefs_replay_prefix::Device for BadDevice（crates/singlefs-replay-prefix/src/lib.rs:24，契约没证、靠信任，归「样本：挪进 verus! 的那一簇」挪进 verus!）
+want=放过表：被判的根不在 git 仓里，没与 gate 基准比
+want=verus-proof：绿

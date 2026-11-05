@@ -1,0 +1,2 @@
+# 样本根的逐项点名（当作命令行上的 --item）：三条自证里只点 c 那一份
+scripts/gate/sample-pass-c.py

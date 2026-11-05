@@ -1,0 +1,16 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=crates/mutations.tsv 这些行 cargo test 参数里点名的包认不出来
+want=crates/mutations.tsv:11 M_独立工程写成了包名：-p standalone-project 不是工作区成员
+want=不在工作区的独立工程用 --manifest-path <它的 Cargo.toml>
+want=crates/mutations.tsv:12 M_路径在仓根之外：--manifest-path ../outside-project/Cargo.toml 解到仓根之外
+want=crates/mutations.tsv:13 M_路径指到的不是清单文件：--manifest-path crates/standalone/src/lib.rs 的文件名不是 Cargo.toml
+want=crates/mutations.tsv:14 M_路径指到的文件不在：--manifest-path crates/standalone-gone/Cargo.toml 指的文件不在
+want=crates/mutations.tsv:15 M_包名与路径并写：同一行既写了 -p demo 又写了 --manifest-path crates/standalone/Cargo.toml
+want=crates/mutations.tsv:16 M_路径写了两次：--manifest-path 写了不止一次（crates/standalone/Cargo.toml、crates/renamed-dir/Cargo.toml）
+want=crates/mutations.tsv:17 M_路径后面没写：--manifest-path 后面没写路径
+want=crates/mutations.tsv 这些行点名的测试在 cargo test 参数选的目标里找不到
+want=crates/mutations.tsv:18 M_独立工程里找不到点名的测试：点名的测试 absent_in_standalone_case 在 crates/standalone 的 --lib（
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=mutation-tables：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（mutation-tables）

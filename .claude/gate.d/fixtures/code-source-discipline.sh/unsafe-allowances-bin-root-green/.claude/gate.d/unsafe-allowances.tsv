@@ -1,0 +1,3 @@
+# 样本用的登记表：验证包库根 forbid；bin 根 e900_thread_clock.rs 单独登 deny、放开一个函数；e901_plain_report.rs 没登记
+singlefs-verification	forbid	-	-	-	-	-	-
+singlefs-verification/src/bin/e900_thread_clock.rs	forbid,deny	crates/singlefs-verification/src/bin/e900_thread_clock.rs	read_the_thread_clock	1	栈帧|这一次调用	样本的理由：std 没有线程 CPU 钟，不放开就只能读 /proc 里按滴答计的粗读数	用户 2026-11-03 弹窗定 records/sample-decision.md

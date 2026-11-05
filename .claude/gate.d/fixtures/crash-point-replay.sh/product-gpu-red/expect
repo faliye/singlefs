@@ -1,0 +1,12 @@
+exit=1
+want=── product-gpu-real-card-tests：cargo test --release -p singlefs-background-gpu --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --test-threads 1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]
+want=test the_table_kernel_agrees_with_the_cpu ... FAILED
+want=· product-gpu-real-card-tests：红的测试目标 1 个、FAILED 的测试函数 1 条
+want=· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟照现判（RECORD recorded=2 changed=0 refused=0 red=1
+want=· 判绿记库（product-gpu-real-card-tests 这一趟判红）：判绿的 2 条照键记库（RECORD recorded=2 changed=0 refused=0 red=1
+want=✗ product-gpu-real-card-tests：真显卡对拍那一趟 cargo test 退 101（上面是它的尾部与全部红的用例、测试目标）：有卡的机器上对拍判红
+want=逐格：crash-case-replay：绿；feature-gated-tests：无对象可判；product-gpu-real-card-tests：红
+want=✗ 有 1 格判红：product-gpu-real-card-tests（各自的出路在上面）
+want=只重跑红的格：bash .claude/gate.d/crash-point-replay.sh --check product-gpu-real-card-tests [项目根]
+want=product-gpu-real-card-tests：红

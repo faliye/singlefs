@@ -1,0 +1,5 @@
+# 样本的 runner 表：required 的包着；own-server 的一份包着、一份裸写（源码里有临时服务核对的函数名，但它自己起真服务，裸跑不退 2）；另有一条不在表里的裸写
+python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-required-wrapped.py --selftest
+python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/sample-own-server-wrapped.py --selftest
+python3 scripts/gate/sample-own-server-bare.py --selftest
+bash scripts/gate/sample-plain.sh --selftest

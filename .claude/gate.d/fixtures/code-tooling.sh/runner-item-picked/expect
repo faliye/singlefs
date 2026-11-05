@@ -1,0 +1,7 @@
+exit=0
+want=只跑 样本根的 .gate-items 点名的项：research-script-selftests 1 项
+want=样本只跑 .gate-cells 点名的格：research-script-selftests
+want=· 只跑点名的 1 份脚本的自证：表里 3 条留 1 条
+want=· 按条复用：表里 1 条自证
+want=research 脚本的自证都通过（这一格跑了 1 条
+want=research-script-selftests：绿

@@ -1,0 +1,5 @@
+exit=0
+want=跑前登记里起走崩溃判段的装置命令都带了 gpu 特性：查了 1 份，走判段的 2 条（research/prompts/e990-preregistration.md:6、research/prompts/e990-preregistration.md:7）；没点名 --bin 或 --test 的 0 条；不在命令位置（行文里内嵌、标签之后、表格里夹着字、围栏里的输出行）的 0 条不判
+want=样本只跑 .gate-cells 点名的格：preregistration-judge-features
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（preregistration-judge-features），0 格本次未跑（无）

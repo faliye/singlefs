@@ -1,0 +1,3 @@
+exit=0
+want=✓ CLAUDE.md 登记的规则都至少被一份定义点名：查了 4 条规则、2 份定义，被点名最少的一条 1 份
+want=rules-named-by-definitions：绿

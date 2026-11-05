@@ -1,0 +1,4 @@
+exit=0
+want=ITEM_PLAN item=proof:singlefs_replay_prefix::clamp_to_limit to_judge=1 reusable=0
+want=  · 键对不上共 0 条（1 格比了 1 项
+want=按项机读：ITEM_PLAN 1 行，与点名项数 1 相同

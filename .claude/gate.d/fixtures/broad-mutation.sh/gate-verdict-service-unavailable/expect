@@ -1,0 +1,4 @@
+exit=75
+want=驱动 --summary 退 75：prune-server 不可用
+want=gate-verdict：prune-server 不可用（退出 75）
+want=broad-mutation.sh：prune-server 不可用：1 格里 1 格连不上判定库

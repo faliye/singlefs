@@ -1,6 +1,6 @@
-# Verus 的登记表：门禁 checker-tier-formal-verification 的四格 Verus 判法（scripts/gate/verus-proof-check.py）从这里取钉住的版本、被验的 crate、核与必红世界表。
+# Verus 的登记表：门禁 formal-verification 的四格 Verus 判法（scripts/gate/verus-proof-check.py）从这里取钉住的版本、被验的 crate、核与必红世界表。
 # 一行一条，制表符分隔，第一段是种类：
-#   release	<Verus 发布 tag>	<它出自的提交（40 位）>	<发布包 zip 的 sha256：本机那一份放在安装目录旁、名叫 verus.zip，在就核，不在只报一句>	<安装目录，相对 ${XDG_DATA_HOME:-~/.local/share}；SINGLEFS_VERUS_ROOT 盖过它>
+#   release	<Verus 发布 tag>	<它出自的提交（40 位）>	<发布包 zip 的 sha256：本机那一份放在安装目录旁、名叫 verus.zip，在就核，不在只报一句>	<安装目录，起头的 singlefs/formal-tools/ 是共享数据根下的 formal-tools（.claude/hooks/lib_work_root.py 的 shared_data_path，两台同一个绝对路径读同一份，不经 ~ 与 $HOME）；写绝对路径就是它自己；SINGLEFS_VERUS_ROOT 盖过它>
 #   package	<crates.io 包名>	<版本>	<包里 .cargo_vcs_info.json 的 git.sha1>	<它的 path_in_vcs>	<包源码的内容指纹：去掉顶层 Cargo.toml、Cargo.toml.orig、.cargo_vcs_info.json、.cargo-ok，算法见 verus-proof-check.py 文件头>
 #   crate	<被验的 crate 目录>	<Verus 验整个 crate 时 verified 的登记数：加减了证明就照判定行改这个数，改动说明写加减了哪几个>[	cargo]
 #     可以多行，一个 crate 一行、各有各的登记数，四格逐个 crate 判；第四段不写是直接起 verus（crate 只依赖 vstd），写 cargo 是经 cargo verus focus 验（可以有别的依赖，
@@ -33,12 +33,52 @@ package	verus_prettyplease	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929f
 # 2026-10-24：加入无 requires 的非空重放与不动点构造见证，78 + 1 = 79；选段增强贪心契约不增加义务数。
 # 2026-10-24 GC 扩展：九条新增义务（协议保持/历史归纳/崩溃幂等/读者保护/撕裂拒绝/回收核与见证），79 + 9 = 88。
 # 2026-10-26 里程碑四出口 5 第一批：gc_ring_interval_proofs（区间版根环、两层 F、G7）新核，gc_crash_proofs 换成门槛引理、P4 改区间；88 − 9（旧的同一逻辑版本模型九条）+ 3（gc_crash_proofs 新三条）+ 8（P4 区间版净增）+ 23（新核：20 个 proof fn、3 个带 decreases 的 spec fn）= 113（实现员在草稿副本里直接起 Verus 现量）。
-crate	crates/singlefs-replay-prefix	113
+# 2026-10-28 里程碑四出口 5：整理的发布只带持久 F（用户 2026-10-26 定），G7 连崩溃；113 + 3（gc_ring_interval_proofs 新三个 proof fn：lemma_a_compaction_publish_over_a_floor_raised_only_in_memory_loses_one_candidate_across_a_crash、lemma_a_floor_moving_up_by_at_most_one_keeps_the_correspondence、lemma_a_crash_of_both_keeps_the_relation；lemma_the_compaction_relation_counts 改名 lemma_corresponding_floors_count，数不变）= 116（实现员在草稿副本里直接起 Verus 现量）。
+# 2026-10-28 文件区间核：两个产品入口、一个边界见证、两个分区引理，116 + 5 = 121（Verus --no-cheating --rlimit 10 实测）。
+# 2026-10-28 unlink 分批核 unlink_proofs：两个产品入口（next_unlink_batch、size_after_an_unlink_batch）、一个带 decreases 的 spec fn（unlink_plan）、五个 proof fn（计划形状、步数、续做计划相等、每个单元恰好释放一次、删除批只重写截口那一串）、一个边界见证，共 9 项、13 条义务（另 4 条是 nonlinear_arith 的 assert by），121 + 13 = 134（Verus --rlimit 10 整 crate 实测）。
+# 2026-10-29 文件区间复核续补：checked_write_end、payload_length_from_start 两个产品入口及声明长度单调/截断前缀两个引理，134 + 4 = 138（整 crate Verus --no-cheating --rlimit 10 实测）。
+# 2026-10-29 单元取整核：units_covering_size、units_for_sequential_write、rounded_size_fits 与单调引理，共四个函数和一条 nonlinear_arith 义务，138 + 5 = 143（整 crate --no-cheating --rlimit 10 实测）。
+# 2026-10-29 部分写计划核：三个产品函数与两个区间语义引理，143 + 5 = 148（整 crate --no-cheating --rlimit 10 实测）。
+# 同批继续补字节定位：unit_containing_byte 与其中的区间包含 nonlinear_arith 子证明再加 2 条，148 + 2 = 150（整 crate 实测）。
+# 单元地址换算与写交集组合：新增两个 exec fn、一个地址界限引理及其 nonlinear_arith 子证明，150 → 154。
+# 2026-10-31 G7 整理那一步加门（D 簇）：gc_ring_interval_proofs 新引理 lemma_a_compaction_publish_is_refused_while_the_head_is_ahead_of_the_last_root，154 + 1 = 155（推的，合入后以形式化验证的现量为准）。
+crate	crates/singlefs-replay-prefix	155
 kernel	crates/singlefs-replay-prefix/src/lib.rs
 kernel	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs
 kernel	crates/singlefs-replay-prefix/src/gc_crash_proofs.rs
+kernel	crates/singlefs-replay-prefix/src/file_range_proofs.rs
+kernel	crates/singlefs-replay-prefix/src/partial_write_proofs.rs
 kernel	crates/singlefs-replay-prefix/src/gc_ring_interval_proofs.rs
+kernel	crates/singlefs-replay-prefix/src/unlink_proofs.rs
 must-red-worlds	crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+# 2026-10-29 里程碑四出口 5 规格底座：singlefs-core 接 vstd、经 cargo verus focus 验它的被验区域（用户 2026-10-26 定「core 直验，连胶水一起证」）。
+# 16 = 11（address.rs 十个地址类型与 system_configuration.rs 的 InodeRecordTruncationFieldsOfThePool 各一条 derive(Clone)）+ 2（first_file_byte、to_device_offset）
+# + 1（DataUnitIndexInFile::FIRST，带值的 const 自己算一条）+ 2（verified_model.rs 里 SLOT_BYTES、MAPPING_KEY_BYTES 两条 assume_specification 各算一条）；
+# verified_model.rs 只有 spec 类型与不带 decreases 的 spec fn，不添义务（实现员在草稿副本里直接起 cargo verus focus 现量：16 verified, 0 errors）。
+# 2026-10-29 第一波四簇合入后，主 agent 在主工作区上直接起 cargo verus focus -p singlefs-core 现量：711 verified, 0 errors（16 + 块设备 42 + 编解码 300 + 编解码续做 110 + 容器小树 243）。
+# 2026-10-31 容器小树准入之前的代价（B 簇两件）：container_tree 删 3 项（children_count_sum_of_the_first、ContainerTreeShape::children_of、ContainerTreeShape::ancestors_of_containers），加 16 项（ContainerTreeShape 的 children_of_every_node、node_counts、ancestor_suffix_starts_of_the_rightmost_containers、ancestors_of_the_rightmost_containers；ContainerTreeNodeCounts 的 clone、root_level、root_position、is_the_root、has_a_node_at；ContainerTreeAfterThisPublish 的 first_rewritten_container、rightmost_count_of_the_rewritten_containers；引理 lemma_no_ancestor_among_the_first、lemma_rightmost_containers_hold_exactly_the_ones_from_their_first、lemma_rewritten_containers_are_the_rightmost_ones、lemma_no_containers_have_no_ancestors、lemma_a_node_over_a_marked_child_is_an_ancestor：lemma_node_is_marked_by_its_children 从孩子推到节点那一半拆出来，整 crate 一起验时它在 rlimit 10 上验不过），实现员在副本上起 cargo verus focus -p singlefs-core --offline -- --rlimit 10 现量：726 verified, 0 errors。
+# 2026-10-31 D 簇 verified_model.rs 加见证 witness_the_root_ring_shape_keeps_a_root_above_the_floor_and_fits_the_window，726 + 1 = 727（推的，合入后以形式化验证的现量为准）。
+# 2026-11-01 删兼容旧版本代码第 4 批：system_configuration.rs 的 InodeRecordTruncationFieldsOfThePool（连同它唯一的 verus! 块）与 InodeRecord::truncation_field_fits_the_pool 删掉，727 − 2 = 725（推的，合入后以形式化验证的现量为准）；那份文件不再有被验区域，kernel 行删掉。
+crate	crates/singlefs-core	725	cargo
+kernel	crates/singlefs-core/src/address.rs
+kernel	crates/singlefs-core/src/verified_model.rs
+# 2026-10-29 里程碑四出口 5 第一波四簇（块设备信任边界、编解码与记录格式两位、容器小树）的被验文件；core 那一行的登记数等主 agent 在合入后的主工作区上直接起 Verus 现量再改。
+kernel	crates/singlefs-core/src/block_device.rs
+kernel	crates/singlefs-core/src/bytes.rs
+kernel	crates/singlefs-core/src/checksum.rs
+kernel	crates/singlefs-core/src/logged_operations.rs
+kernel	crates/singlefs-core/src/pointer.rs
+kernel	crates/singlefs-core/src/records.rs
+kernel	crates/singlefs-core/src/root_record.rs
+kernel	crates/singlefs-core/src/unit.rs
+kernel	crates/singlefs-core/src/journal.rs
+kernel	crates/singlefs-core/src/container_tree.rs
+kernel	crates/singlefs-core/src/deleted_inodes.rs
+kernel	crates/singlefs-core/src/inode_tree.rs
+kernel	crates/singlefs-core/src/lineage_tree.rs
+kernel	crates/singlefs-core/src/retirement_tree.rs
+kernel	crates/singlefs-core/src/tombstone_tree.rs
+must-red-worlds	crates/singlefs-core/verus-must-red-worlds.tsv
 # rlimit 取 10，就是 Verus 0.2026.09.20 不给 --rlimit 时的默认值：今天的核与必红世界表都是在默认值上验的（实现员 4-1 的报告 /tmp/claude-1000/m3-verus-core-4-1/report.md
 # 第 62 行起的命令不带 --rlimit；同一份第 105 行：主循环 --rlimit 5 验得过、3 验不过），10 是验得过的最小值 5 的两倍，写死之后不随 Verus 改默认值漂。
 # 必红世界表第五段一律写 proof_errors=M：M 是一行改坏之后的证明错条数，就是 error 起头的报错除去含 Resource limit (rlimit) exceeded 的

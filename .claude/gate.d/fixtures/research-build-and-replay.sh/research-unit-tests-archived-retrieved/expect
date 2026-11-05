@@ -1,0 +1,4 @@
+exit=0
+want=· 单测要读的 research/results/sample-product.out 不在树里，从 git 历史取回（git show
+want=research 构建与单测全绿
+want=research-unit-tests：绿

@@ -1,0 +1,4 @@
+# 样本：三个退役的名字（列的写法同真仓那一份）
+OLD_SAMPLE_LIBRARY_ROOT	变量	删掉：样本的出路，库名固定
+--sample-old-option	参数	删掉：样本的出路，调用方不给库的位置
+OLD_REFUSED_VARIABLE	变量	删掉：样本的出路，不留设了就拒

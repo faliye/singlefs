@@ -1,0 +1,4 @@
+exit=0
+want=  kb 路径：扫 1 份 kb 中文页，判了 2 处（research/ 进过 git 放行 1 处、滞后 0 处、保留 0 处）；跳过相对简写 0 处
+want=  共查 2 项（门禁号 0 + 路径 0 + 小节 0 + 门禁全名 0 + 格名 0 + kb 路径 2 + kb 小节 0）
+want=  governance-refs：绿

@@ -1,0 +1,7 @@
+# 样本用的登记表：core 库根 deny，两个类型的 unsafe impl 与同名方法各登一行（方法写 <类型>::<方法>，不撞「同一个函数只登一行」）
+singlefs-core	forbid,deny	crates/singlefs-core/src/allocators.rs	impl GlobalAlloc for CountingAllocator	1	System	样本的理由：GlobalAlloc 是 unsafe trait，挂计数分配器只能写 unsafe impl	用户 2026-11-03 弹窗定 records/sample-decision.md
+singlefs-core	forbid,deny	crates/singlefs-core/src/allocators.rs	CountingAllocator::alloc	2	layout|System	样本的理由：GlobalAlloc::alloc 的签名要求 unsafe fn，转给 System 要调它的 unsafe 方法	用户 2026-11-03 弹窗定 records/sample-decision.md
+singlefs-core	forbid,deny	crates/singlefs-core/src/allocators.rs	CountingAllocator::dealloc	2	pointer|layout|System	样本的理由：GlobalAlloc::dealloc 的签名要求 unsafe fn，还给 System 要调它的 unsafe 方法	用户 2026-11-03 弹窗定 records/sample-decision.md
+singlefs-core	forbid,deny	crates/singlefs-core/src/allocators.rs	impl GlobalAlloc for TracingAllocator	1	System	样本的理由：GlobalAlloc 是 unsafe trait，挂计数分配器只能写 unsafe impl	用户 2026-11-03 弹窗定 records/sample-decision.md
+singlefs-core	forbid,deny	crates/singlefs-core/src/allocators.rs	TracingAllocator::alloc	2	layout|System	样本的理由：GlobalAlloc::alloc 的签名要求 unsafe fn，转给 System 要调它的 unsafe 方法	用户 2026-11-03 弹窗定 records/sample-decision.md
+singlefs-core	forbid,deny	crates/singlefs-core/src/allocators.rs	TracingAllocator::dealloc	2	pointer|layout|System	样本的理由：GlobalAlloc::dealloc 的签名要求 unsafe fn，还给 System 要调它的 unsafe 方法	用户 2026-11-03 弹窗定 records/sample-decision.md

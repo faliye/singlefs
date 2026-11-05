@@ -1,0 +1,2 @@
+# 合表一项 plain-stream 的崩溃枚举用例调 enumerate_crash_states，只读树的来历表核对（crash-case-check.py --only provenance）；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-provenance

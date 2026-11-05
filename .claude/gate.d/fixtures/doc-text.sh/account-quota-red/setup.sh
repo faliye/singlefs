@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # 基准里一份记录、一份 kb 页、一份三方判决正文都干净（记录里另有一行旧话，带「撞了限额」，基准里就有，不报）；
 # 这一轮往三份里各加写了账号切换、用量限额的行，另放一份未跟踪的新记录，判红：只点名这一轮新加的行。
-# 射程之外的两份未跟踪文件（research/prompts 里喂云端腿的 _ 开头附录、.claude/rules 下的规则页）也带同样的话，不报。
+# 射程之外的两份未跟踪文件（research/prompts 里喂云端腿的 _ 开头附录、门禁样本目录下的文件）也带同样的话，不报。
 set -e
 git init -q .
 git config user.email t@example.com; git config user.name t
-mkdir -p records .claude/kb research/prompts .claude/rules
+mkdir -p records .claude/kb research/prompts .claude/gate.d/fixtures/sample/red
 cat > records/2026-09-24-样本调度.md <<'X'
 # 样本调度（2026-09-24）
 
@@ -51,6 +51,6 @@ X
 cat > research/prompts/_sample-r1-appendix.md <<'X'
 - 抄给云端腿读的旧话：撞了周额度。
 X
-cat > .claude/rules/sample.md <<'X'
-- 规则页里的话：撞了周额度。
+cat > .claude/gate.d/fixtures/sample/red/expect <<'X'
+- 样本目录里的话：撞了周额度。
 X

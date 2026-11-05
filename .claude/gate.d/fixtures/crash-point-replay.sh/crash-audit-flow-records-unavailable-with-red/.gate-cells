@@ -1,0 +1,9 @@
+# 不可用与真红同一趟：标记目录放 collect-unreachable，覆盖、ignore、0 次三格记不可用；crash-knobs 读样本的 .claude/gate.d/crash-knobs.tsv，
+# 出处路径不在、判红。整道退 1，两样都报。门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 crash-case-replay、crash-case-must-red：覆盖、ignore、0 次三格读 crash-case-replay 那一趟的行，expect 的逐格那一行另写必红世界那一格绿
+crash-flow-coverage
+crash-ignored-nodes
+invariant-zero-evaluations
+crash-knobs
+crash-case-replay
+crash-case-must-red

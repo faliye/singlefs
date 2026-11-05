@@ -1,0 +1,5 @@
+# 样本的工作区：成员是 crates/demo 与目录名和包名不同的 crates/renamed-dir（包名 renamed-package）；
+# crates/standalone 是被 exclude 掉的独立工程，自己的 Cargo.toml 带空的 [workspace]，只能用 --manifest-path 点名。
+[workspace]
+members = ["crates/demo", "crates/renamed-dir"]
+exclude = ["crates/standalone"]

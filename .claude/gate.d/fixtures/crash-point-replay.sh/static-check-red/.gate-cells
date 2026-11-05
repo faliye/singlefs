@@ -1,0 +1,2 @@
+# 开跑前的静态判据判红（调了 enumerate_crash_states 而没登记 crash-case: 的用例、没声明模块的测试文件），判的是崩溃枚举用例那一格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

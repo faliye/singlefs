@@ -1,0 +1,3 @@
+//! 验证包模块：无（样本：假 cargo 照 .crash-point-replay-sample-tools/cases/ 打日志，用例不导入 验证包模块）
+#[test]
+fn unfinished_full() {}

@@ -1,0 +1,4 @@
+# 多机配置开了 GPU、不带特性那一趟判段判在 CPU：照旧判红，同一趟的判定照记（判在 CPU 归得到的那一条记红，归不到的整个二进制不记，别的判绿的记绿），判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+# 另点 feature-gated-tests：expect 里写着带特性那一趟（逐格那一行写到 feature-gated-tests）
+crash-case-replay
+feature-gated-tests

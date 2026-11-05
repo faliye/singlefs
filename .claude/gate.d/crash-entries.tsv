@@ -1,9 +1,11 @@
 # 崩溃流入口登记表（K1 乙：入口一律经 CrashPointRecorder 设点，入口名登记在这张表；里程碑三出口 4、六·1；用户 2026-10-20 定，
 # 原话在 records/2026-10-18-里程碑三收尾与近期欠账.md「用户 2026-10-19 弹窗定出口 4 七条」那一条）。
 # 一行一个入口，两列用制表符分隔：入口名（覆盖行 CRASH_FLOW_COVERAGE 的 entry= 那个值，只用字母、数字、_.:-）、说明（这个入口做哪件写路径上的事）。
-# 覆盖表的行就是这张表，列是 crates/singlefs-harness/src/segments.rs 的 StepKind 成员；门禁 checker-tier-crash-point-replay 的 crash-flow-coverage 格判：
-# 日志里出现这张表外的入口红、这张表里的入口在判的那个域里一条覆盖行都没有红、StepKind 有成员没被任何一条流罩住红（判法 scripts/crash/crash-flow-coverage.py 文件头）。
-# 初值取自 2026-10-20 源码里 CrashPointRecorder 的 step / record_span 字面给出的入口名（crates/singlefs-checker-tier/tests/common_crash_points/mod.rs 与两份测试文件）；
+# 覆盖表的行就是这张表，列是 crates/singlefs-verification/src/segments.rs 的 StepKind 成员；门禁 crash-point-replay 的 crash-flow-coverage 格判：
+# 覆盖行里出现这张表外的入口红、这张表里的入口一条覆盖行都没有红、StepKind 有成员没被任何一条流罩住红（判法 scripts/crash/crash-flow-coverage.py 文件头）。
+# 用例枚举时拼的入口名（<流>::<标签>）同样要登记：数据取自不指定范围的崩溃点重放门禁那一趟的覆盖行（门禁打的 CRASH_FLOW_RECORDS_FILE 那一行点名的记录文件，
+# 覆盖表 python3 scripts/crash/crash-flow-coverage.py table <根> <记录文件> 的「登记表外」行就是缺的名字）。
+# 初值取自 2026-10-20 源码里 CrashPointRecorder 的 step / record_span 字面给出的入口名（crates/singlefs-verification/tests/common_crash_points/mod.rs 与两份测试文件）；
 # crates 那一批把入口改经 CrashPointRecorder 设点、打出真行之后照真行核一遍，新入口在这里加一行。
 acquire_instance_and_warm_up	取号写行暖机：取实例号、写实例表那一行与暖机的写
 publish_first_file	首个文件版本的发布
@@ -17,3 +19,73 @@ sequential_write	顺序写一个文件（多记录发布这一类）
 publish_unlink_through_the_session	经会话删第一个文件的发布
 publish_unlink_intent	删除：写意图的那一次发布
 publish_unlink_step	删除：分批回收的那几次发布
+destroy_snapshot_through_the_session	经会话销毁快照的写流
+e161_crates_comparison	实验161 crates比对流写路径
+extension	单元扩容写流
+findings_new_pool_file_creation_stream	新池建文件流发现日志写路径
+fixed_script::residual_record_seeded	固定脚本残留记录打底写流
+fixed_script::stale_tail_with_a_reused_named_unit	固定脚本陈旧尾与命名单元复用写流
+formatted_pool_mount::outside_the_unit_segment	格式化池单元段外挂载写流
+history_before_sigma	sigma发布前的历史写流
+last-fitting-unit-then-refusal-and-unmount-on-a-nearly-full-pool	近满池最后装入单元后拒写与卸载写流
+multi_record_publish::between_the_records	多记录发布两记录之间的写流
+multi_record_publish::root_persisted_count::114	多记录发布根持久化计数114写流
+multi_record_publish::root_persisted_count::6	多记录发布根持久化计数6写流
+new_pool_file_creation::barrier_removed_before_the_root_slot	新池建文件根槽前屏障移除写流
+position_addressed::AllocationRecordTreeTwoLeavesPerDevice::small_segments	小段每设备两叶分配记录树位置寻址写流
+position_addressed::ExtentInlineToLowerSegment::small_segments	小段内联范围向下层段位置寻址写流
+position_addressed::ExtentLowerSegmentBackToInline::small_segments	小段下层段范围回退内联位置寻址写流
+position_addressed::ExtentLowerSegmentGrowsToTwoLevels::small_segments	小段下层段范围长到两级位置寻址写流
+position_addressed::VersionWithoutFileRowPublishWithItsOwnTree::small_segments	小段无文件行版本带独立树发布位置寻址写流
+position_addressed_AllocationRecordTreeTwoLeavesPerDevice	每设备两叶分配记录树位置寻址写流
+position_addressed_ExtentInlineToLowerSegment	内联范围向下层段位置寻址写流
+position_addressed_ExtentLowerSegmentBackToInline	下层段范围回退内联位置寻址写流
+position_addressed_ExtentLowerSegmentGrowsToTwoLevels	下层段范围长到两级位置寻址写流
+position_addressed_VersionWithoutFileRowPublishWithItsOwnTree	无文件行版本带独立树发布位置寻址写流
+publish_compaction_batch	发布压缩批写流
+publish_compaction_final_batch	发布压缩最终批写流
+publish_compaction_issue	发布压缩下发写流
+publish_create_snapshot	发布创建快照写流
+publish_new_inodes	发布新建inode写流
+publish_new_inodes_through_the_session	经会话发布新建inode写流
+publish_overwrite_of_an_inode	发布覆盖写inode写流
+publish_overwrite_under_the_snapshot	快照下发布覆盖写写流
+publish_sequential_write_of_an_inode	发布顺序写inode写流
+publish_snapshot_destruction_intent	发布快照销毁意图写流
+publish_snapshot_destruction_step	发布快照销毁回收步写流
+publish_unlink_intent_of_an_inode	发布删除inode意图写流
+publish_unlink_intent_under_the_snapshot	快照下发布删除意图写流
+publish_unlink_step_of_an_inode	发布删除inode回收步写流
+publish_unlink_step_under_the_snapshot	快照下发布删除回收步写流
+raise_rollback_floor_pushed_by_the_session	经会话推进抬回退下限写流
+raise_rollback_floor_to_the_admission_ceiling	抬回退下限至准入上限写流
+record_spill_over::share_with_every_judge_conclusion_reused	记录溢出跨判定复用写流
+record_spill_over::two_records_whole_or_not_at_all	两条记录全有或全无溢出写流
+segments_per_device::barriers::device_one_misses_one_barrier	设备一漏一次屏障写流
+segments_per_device::barriers::every_device_barriers	所有设备均有屏障写流
+segments_per_device::torn_system_configuration_rotation	系统配置撕裂轮转写流
+sigma_publish	sigma发布写流
+three-generation-mount-fork	三代挂载分叉写流
+tree-split-and-shrink	树分裂与收缩写流
+tree_split::AccountingLeafSplit::small_segments	小段计费树叶分裂写流
+tree_split::AccountingRootSplit::small_segments	小段计费树根分裂写流
+tree_split::CentralMappingEmptyLeafDropped::small_segments	小段中央映射空叶丢弃写流
+tree_split::CentralMappingLeafSplit::small_segments	小段中央映射叶分裂写流
+tree_split::CentralMappingRootLowered::small_segments	小段中央映射根降低写流
+tree_split::CentralMappingRootSplit::small_segments	小段中央映射根分裂写流
+tree_split::CentralMappingTwoLevelsSplitInARow::small_segments	小段中央映射两级连续分裂写流
+tree_split_AccountingLeafSplit	计费树叶分裂写流
+tree_split_AccountingRootSplit	计费树根分裂写流
+tree_split_CentralMappingEmptyLeafDropped	中央映射空叶丢弃写流
+tree_split_CentralMappingLeafSplit	中央映射叶分裂写流
+tree_split_CentralMappingRootLowered	中央映射根降低写流
+tree_split_CentralMappingRootSplit	中央映射根分裂写流
+tree_split_CentralMappingTwoLevelsSplitInARow	中央映射两级连续分裂写流
+truncate_an_inode_other_than_the_first_into_a_unit_then_extend	截断非首inode至单元内后扩容写流
+truncation_at_the_admission_edge	准入边缘截断写流
+truncation_batch	截断分批写流
+truncation_intent	截断意图写流
+truncation_last_batch	截断末批写流
+unlink-merging-inode-leaf-containers	合并inode叶容器删除写流
+unlink_after_multi_record::under_the_plan::multi_record	计划下多记录发布后删除之多记录写流
+unlink_after_multi_record::under_the_plan::unlink	计划下多记录发布后删除之删除写流

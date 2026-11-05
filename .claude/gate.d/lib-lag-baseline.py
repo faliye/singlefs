@@ -23,11 +23,12 @@
     （review-section-pending.tsv，check_review_pending_table，经 baseline_rows）；
     门禁 code-source-discipline 的 mutation-tables 格（mutation-duplicates-lag.tsv，baseline_text）与 reading-discipline 格（两张豁免表，baseline_rows）；
     门禁 checker-independence-and-sync 的 layout-checker-sync 格（格式定义，baseline_text）；
-    门禁 code-tooling 的 heavy-thread-defaults 格（.claude/heavy-thread-exempt，命令行 show）与 long-run-header-exempt 格
-    （经 .claude/hooks/lib_long_run.py 的 exempt-check --base：它在 exempt_main 里调 baseline_text，同一处另调 effective_moves、baseline_file_bytes
-    按搬迁之前的路径到基准里取那份脚本、rewrite_moved_bytes 换算之后再比）。
+    门禁 code-tooling 的 heavy-thread-defaults 格（.claude/heavy-thread-exempt，命令行 show）；
+    门禁 formal-verification 的 verus-proof 格（判法 scripts/gate/verus-proof-check.py 的 trait_impl_lag_growth：verus! 外面 trait impl 的
+    登记式放过表 verus-trait-impls-outside-lag.tsv，经 gate_base_of 取基准、baseline_rows 取基准那一版的行）。
     取到的全文都照下面「搬迁登记」换算过。
-  切内容行（content_rows）：multipath-registry、replay-comparison-units、mutation-tables、reading-discipline 四格与点名一节挂账表那一处读此刻的表。
+  切内容行（content_rows）：multipath-registry、replay-comparison-units、mutation-tables、reading-discipline 四格与点名一节挂账表那一处读此刻的表，
+    verus-proof-check.py 的 read_trait_impls_outside_lag 读此刻的放过表。
   复跑表的行（replay_rows；命令行 replay-rows）：门禁 doc-experiments 的 results-cited 格（命令行）、verdict-false-named、quoted-result-lines、
     replay-comparison-units 三格。
   搬迁那一层（下面「搬迁登记」一节）：命令行 moved-only-filter、moved-lines-filter 由 scripts/gate/changed-paths.sh 的 gate_drop_moved_only、
@@ -36,10 +37,10 @@
     path_move_report：门禁 code-tooling 的 change-range-single-source 格；
     path_moves：E171 冻结的两份 O3 判法 scripts/experiment-apparatus/e171_three_oracle_collusion/frozen_o3.py 与
     scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_o3.py（读被判的仓里那一份，没有再取所在仓的），
-    两份都另调 rewrite_moved_bytes 倒推搬迁之前的内容；后一份同一目录的 fake_multi_host_run.py 把这一份连同 path-moves.tsv 链进假的第二台；
+    两份都另调 rewrite_moved_bytes 倒推搬迁之前的内容；
     path_moves、rewrite_moved_paths、rewrite_moved_bytes、moved_prefix_pattern：scripts/agents/snapshot-tree.py 按全部登记行（不只生效的）反着换（MovesBack、moves_back_for），
     开工快照倒推不出时把清单与 diff 里的新前缀换回旧前缀再倒推一次。
-  自证（命令行 --selftest）：门禁 code-tooling 的 research-script-selftests 格（SELFTEST_RUNNERS），.claude/hooks/selftest-registry.tsv 里登记成 light。
+  自证（命令行 --selftest）：门禁 code-tooling 的 research-script-selftests 格（SELFTEST_RUNNERS），.claude/hooks/selftest-registry.tsv 里登记。
 注释行的认法并进来时变了（content_rows）：multipath-registry、replay-comparison-units、mutation-tables、reading-discipline 四处改前只认行首 `#` 是注释，
   缩进之后才是 `#` 的行、首列为空而第二列以 `#` 起头的行（行首是制表符），改前进各格的形状判法、判形状错（列数不对、有空格子），并进来之后当注释静默跳过。
   方向是跳过、不报形状错：跳过一行只让豁免少一行、基准少一行，判得更严，丢的只是那一行的形状报错，不放过违例。doc-process-records 改前就去掉行首空白再认 `#`，没变；
@@ -106,7 +107,7 @@ scripts/gate/admission.py 另读复跑表（按 TABLE 那一段取复用键）�
   BaselineProblem.sentence(stderr_limit=80)：「取不到基准 <基准> 里的 <路径>（git ls-tree 退 N：<stderr 前若干字>）」或「读不出基准 …（git show 退 N：…）」；
     stderr_limit 给 None 时不带「：<stderr>」那一段（code-source-discipline 的 reading-discipline 格把 stderr 另起一行列）。
   replay_rows(path) → [ReplayRow(实验号, 第 2 列, 参数, 产物, 方式)] 或 None（文件不在或读不了）：整份文件里每一行整行形如
-    「E<数字>|<第 2 列>|<参数>|<产物>|exact 或 timing」的算复跑行（与门禁 checker-tier-research-build-and-replay 的 experiment-replay 格同一个形状），别的行不算。
+    「E<数字>|<第 2 列>|<参数>|<产物>|exact 或 timing」的算复跑行（与门禁 research-build-and-replay 的 experiment-replay 格同一个形状），别的行不算。
   path_moves(cwd=None) → ([PathMove(行号, 旧前缀, 新前缀, 日期, 出处)], [问题句])：读搬迁登记表的全部行；弄坏开关 path-moves-ignored 下交 ([], [])。
   effective_moves(base, cwd=None) → ([PathMove], 问题或 None)：此刻生效的登记行（见「搬迁登记」）；登记表写坏了交 PathMovesProblem，git 取不到交 BaselineProblem。
     effective_among(base, moves, cwd=None, tree=None, registered=None) 同一种判法，作用在给定的登记行上（tree 给了就不另起 git，registered 给了就不再取基准那一版的登记表）。
@@ -148,7 +149,7 @@ scripts/gate/admission.py 另读复跑表（按 TABLE 那一段取复用键）�
       取文件（「✗ 自证失败：搬迁登记：文件按搬迁之前的路径取、换算之后与搬完的相同」）、只用生效的行（「✗ 自证失败：搬迁登记：门禁只用此刻生效的行…」）、
       写坏的登记表（「✗ 自证失败：搬迁登记：写坏的登记表交问题句」）、实据与窗口那几项（「搬迁登记：此刻生效的行要有搬迁实据…」「搬迁登记：生效窗口跟着 gate 基准走…」
       「搬迁登记：生效窗口，提交进基准之后…」「搬迁登记：旧名字重新用起来…」「搬迁登记：新行插在老行前面…」）、仓根起的前缀（「搬迁登记：换算只认仓根起的前缀…」）；
-      门禁 code-tooling 的样本 heavy-thread-defaults-moved-green（期望退出 0，实测 1：排除表涨了）与 long-run-header-exempt-moved-green（期望退出 0，实测 1：豁免表涨了）；
+      门禁 code-tooling 的样本 heavy-thread-defaults-moved-green（期望退出 0，实测 1：排除表涨了）；
       只差搬迁那几项也红（「✗ 自证失败：只差搬迁：改名的、原地换了路径的…」「只差搬迁：新增行剔掉…」「只差搬迁：命令行 moved-only-filter 与 moved-lines-filter」
       「只差搬迁：登记表写坏了照没有登记时交回…」「只差搬迁：新增行按 diff 的位置配对…」「只差搬迁：整份搬进别的按路径管的类（含 .claude/gate.d/ 顶层、.claude/singlefs-ai-sop/rules/）照算改动…」「只差搬迁：改了路径的文件只在恰好换前缀时剔…」），
       scripts/gate/changed-paths.sh 的自证「搬迁：只差登记搬迁的文件不算改动」「搬迁：新增行剔掉只差搬迁的行」「搬迁：换算只认仓根起的前缀…」「搬迁：搬迁已提交、有上游没推…」四项红；
@@ -1542,7 +1543,7 @@ def selftest_row(old, new):
 def selftest_copy(directory, base_root, name):
     """把 base_root 那个临时仓整份拷成 directory 下的 name，交它的 SelftestRepository。"""
     target = os.path.join(directory, name)
-    subprocess.run(["cp", "-a", base_root, target], check=True)
+    subprocess.run(["cp", "-dR", "--preserve=timestamps,links", base_root, target], check=True)
     return SelftestRepository(target, fresh=False)
 
 
@@ -1866,7 +1867,7 @@ def governed_moves_selftest(check):
         repository.write(".claude/rules/draft.md", "# 草稿\n见 drafts/agents/reviewer.md\n")
         repository.write(".claude/rules/old-group/x.md", "# 规则\n")
         repository.write("drafts/gates/check.sh", "#!/usr/bin/env bash\necho 检查\n")
-        repository.write("drafts/sop/shared.md", "# 草稿\n不许跑重型测试\n")
+        repository.write("drafts/sop/shared.md", "# 草稿\n不许改共享规则\n")
         repository.write(".claude/gate.d/fixtures/old-sample/case.txt", "样本\n")
         repository.write("records/2026-01-01-搬迁.md", "# 搬迁\n")
         repository.commit("基准")
@@ -1886,7 +1887,7 @@ def governed_moves_selftest(check):
                  ".claude/gate.d/fixtures/old-sample/case.txt", ".claude/gate.d/fixtures/new-sample/case.txt"]
         moved, problem = moved_only_paths("HEAD", paths, cwd=directory)
         lines = [(".claude/kb/draft.md", "# 草稿", 1), (".claude/kb/draft.md", "见 .claude/agents/reviewer.md", 2), (".claude/agents/reviewer.md", "name: reviewer", 2),
-                 (".claude/gate.d/check.sh", "echo 检查", 2), (".claude/singlefs-ai-sop/rules/shared.md", "不许跑重型测试", 2)]
+                 (".claude/gate.d/check.sh", "echo 检查", 2), (".claude/singlefs-ai-sop/rules/shared.md", "不许改共享规则", 2)]
         kept, lines_problem = drop_moved_lines("HEAD", lines, cwd=directory)
         check("只差搬迁：整份搬进别的按路径管的类（含 .claude/gate.d/ 顶层、.claude/singlefs-ai-sop/rules/）照算改动、新增行一条不剔，同一类里只换了目录的、gate.d 子目录里改名的照剔",
               moved == {".claude/rules/old-group/x.md", ".claude/rules/new-group/x.md", ".claude/gate.d/fixtures/old-sample/case.txt", ".claude/gate.d/fixtures/new-sample/case.txt"}

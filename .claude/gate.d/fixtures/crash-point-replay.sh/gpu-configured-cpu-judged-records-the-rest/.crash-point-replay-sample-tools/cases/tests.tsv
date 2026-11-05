@@ -1,0 +1,8 @@
+both	src/lib.rs	tests::settled_check	ok	line	-
+both	src/lib.rs	tests::cpu_judged_check	ok	line	CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本 threads=4
+plain	tests/mixed_stream.rs	mixed_settled	ok	line	-
+plain	tests/mixed_stream.rs	mixed_cpu_judged	ok	line	CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本 threads=4
+plain	tests/mixed_stream.rs	mixed_running	ok	line	-
+plain	tests/other_stream.rs	other_green	ok	line	-
+plain	tests/store_only.rs	-	ok	line	-
+feature	tests/store_only.rs	store_only_quick	ok	line	-

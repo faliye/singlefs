@@ -1,0 +1,27 @@
+   Compiling singlefs-verification v0.0.0 (样本)
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/singlefs_verification-0000000000000010)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/gpu_pair.rs (target/release/deps/gpu_pair-0000000000000011)
+
+running 2 tests
+test gpu_pair_on_the_gpu ... CRASH_POINT_REPLAY_JUDGE route=gpu cards_used=1 blocks=1 states=4 red_states=0 compile_seconds=0.0 judge_seconds=0.0 states_per_second=4
+ok
+test gpu_pair_cpu_judged ... 样本：这一条起跑之后先打一行自己的字
+CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本 threads=4
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gpu_stream.rs (target/release/deps/gpu_stream-0000000000000012)
+
+running 2 tests
+CRASH_POINT_REPLAY_PARALLEL_START states=8 slices=1 worker_threads=4 configured_worker_threads=4 worker_threads_source=样本 resumed_slices=0 freshly_run_slices=1 judge=cpu library=样本 item=样本 imported_blocks=0
+test gpu_stream_first ... ok
+test gpu_stream_second ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

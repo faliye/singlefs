@@ -1,0 +1,5 @@
+E7RESULT name=host_rerun mode=skip-new-pool-file-creation-barrier windows=mkfs,instance_acquisition,warm_up,new_pool_file_creation operations_by_window=23+4+18+35
+E7RESULT name=device_log device=0 declared_entries=427 expected_writes=31 expected_flushes=14 observed_writes=31 observed_flushes=13 zero_fills=4 zero_fill_bytes=805404672 trailing_flushes=0 expected_events_by_window=mkfs:14,instance_acquisition:2,warm_up:10,new_pool_file_creation:19 divergence_window=new_pool_file_creation divergence=at=38program=Some(Flush)device=Some(Write{offset:DeviceOffsetInBytes(16785408),length:4096,content_hash:6197177816517356652})
+E7RESULT name=device_log device=1 declared_entries=424 expected_writes=29 expected_flushes=12 observed_writes=29 observed_flushes=12 zero_fills=4 zero_fill_bytes=805404672 trailing_flushes=0 expected_events_by_window=mkfs:12,instance_acquisition:2,warm_up:10,new_pool_file_creation:17 divergence_window=none divergence=none
+E7RESULT name=device_log_verdict matches=false
+E7RESULT name=done emitted=5

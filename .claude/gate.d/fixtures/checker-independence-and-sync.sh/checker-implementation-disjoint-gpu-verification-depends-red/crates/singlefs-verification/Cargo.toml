@@ -1,0 +1,13 @@
+[package]
+name = "singlefs-verification"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
+wgpu = { version = "=30.0.1", default-features = false, optional = true }
+singlefs-background-gpu = { path = "../singlefs-background-gpu" }
+
+[dev-dependencies]
+product = { package = "singlefs-background-gpu", path = "../singlefs-background-gpu" }
