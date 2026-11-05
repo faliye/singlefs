@@ -90,42 +90,106 @@ pub fn gpu_device_identifier_of_the_pci_bus_address(pci_bus_address: &str) -> Gp
     GpuDeviceIdentifier::of_opaque_bytes(pci_bus_address.as_bytes().to_vec())
 }
 
-/// 第 2 条「本机全部独立显卡」：只留独立显卡，按 PCI 总线地址的字典序排。
+/// 第 2 条「本机全部独立显卡」：只留独立显卡，按 PCI 总线地址的字典序排；每一张都要交得成（[`discrete_gpus_of_the_enumeration_under_the_named`]
+/// 不给点名的那一种）。
 ///
 /// # Errors
 /// [`DiscreteGpuListRefused`] 的三种，都只看独立显卡；不算显卡的适配器缺什么都不管。
 pub fn discrete_gpus_of_the_enumeration(
     adapters: &[EnumeratedAdapterDescription],
 ) -> Result<Vec<DiscreteGpuOnThisHost>, DiscreteGpuListRefused> {
+    discrete_gpus_of_the_enumeration_under_the_named(adapters, None).map(|listed| listed.listed)
+}
+
+/// 一次枚举交成的卡清单：收进来的独显（按总线地址排），与给了 `background_gpu_devices` 时没点名、交不成一张卡而没收进来的那几张（各带原因，按枚举的次序）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiscreteGpusOfTheEnumeration {
+    pub listed: Vec<DiscreteGpuOnThisHost>,
+    pub unnamed_left_off_the_list: Vec<DiscreteGpuListRefused>,
+}
+
+/// 一张独显在这一组点名下算不算参与的：参与的交不成就拒，不参与的交不成就不收、报出来。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ParticipationUnderTheNamedDevices {
+    /// 没给 `background_gpu_devices`（本机全部独显都参与），或给了而点了它。
+    Participates,
+    /// 给了 `background_gpu_devices` 而没点它（没有总线地址的卡点不到它）。
+    NotNamed,
+}
+
+/// 同 [`discrete_gpus_of_the_enumeration`]，只差一处（第 2 条「点名了就只用点名的卡」）：给了 `background_gpu_devices`（`named_devices`）时只判点名的卡，
+/// 没点名的独显缺总线地址、缺设备本地堆、与别的独显报了同一个总线地址，都不拒、不收进清单，原因报在
+/// [`DiscreteGpusOfTheEnumeration::unnamed_left_off_the_list`] 里（同一个地址报了两次的，那个地址上的几张都不收，报一次）。
+///
+/// # Errors
+/// 参与的卡（没给点名时是每一张独显，给了时是点名的那几张）有 [`DiscreteGpuListRefused`] 的三种之一。
+pub fn discrete_gpus_of_the_enumeration_under_the_named(
+    adapters: &[EnumeratedAdapterDescription],
+    named_devices: Option<&[GpuDeviceIdentifier]>,
+) -> Result<DiscreteGpusOfTheEnumeration, DiscreteGpuListRefused> {
     let mut discrete_gpus: Vec<DiscreteGpuOnThisHost> = Vec::new();
+    let mut unnamed_left_off_the_list = Vec::new();
+    // 没点名而报了两次的总线地址：这个地址上后来的几张也不收。
+    let mut unnamed_addresses_reported_twice: Vec<GpuDeviceIdentifier> = Vec::new();
     for (position_in_the_enumeration, adapter) in adapters.iter().enumerate() {
         if !adapter.device_kind.counts_as_a_background_gpu() {
             continue;
         }
+        let identifier = gpu_device_identifier_of_the_pci_bus_address(&adapter.pci_bus_address);
+        let participation = match named_devices {
+            None => ParticipationUnderTheNamedDevices::Participates,
+            Some(named_devices)
+                if !adapter.pci_bus_address.is_empty() && named_devices.contains(&identifier) =>
+            {
+                ParticipationUnderTheNamedDevices::Participates
+            }
+            Some(_named_devices) => ParticipationUnderTheNamedDevices::NotNamed,
+        };
+        let refused_or_left_off = |refused: DiscreteGpuListRefused,
+                                   left_off: &mut Vec<DiscreteGpuListRefused>|
+         -> Result<(), DiscreteGpuListRefused> {
+            match participation {
+                ParticipationUnderTheNamedDevices::Participates => Err(refused),
+                ParticipationUnderTheNamedDevices::NotNamed => {
+                    left_off.push(refused);
+                    Ok(())
+                }
+            }
+        };
         if adapter.pci_bus_address.is_empty() {
-            return Err(
+            refused_or_left_off(
                 DiscreteGpuListRefused::DiscreteGpuWithoutAPciBusAddressIsNotSupported {
                     name: adapter.name.clone(),
                 },
-            );
+                &mut unnamed_left_off_the_list,
+            )?;
+            continue;
         }
         let Some(total_memory) = adapter.device_local_memory else {
-            return Err(
+            refused_or_left_off(
                 DiscreteGpuListRefused::DiscreteGpuWithoutADeviceLocalMemoryHeapIsNotSupported {
                     name: adapter.name.clone(),
                 },
-            );
+                &mut unnamed_left_off_the_list,
+            )?;
+            continue;
         };
-        let identifier = gpu_device_identifier_of_the_pci_bus_address(&adapter.pci_bus_address);
-        if discrete_gpus
+        if unnamed_addresses_reported_twice.contains(&identifier) {
+            continue;
+        }
+        if let Some(already_listed) = discrete_gpus
             .iter()
-            .any(|already_listed| already_listed.identifier == identifier)
+            .position(|already_listed| already_listed.identifier == identifier)
         {
-            return Err(
+            refused_or_left_off(
                 DiscreteGpuListRefused::PciBusAddressReportedByTwoDiscreteGpusIsNotSupported {
                     pci_bus_address: adapter.pci_bus_address.clone(),
                 },
-            );
+                &mut unnamed_left_off_the_list,
+            )?;
+            discrete_gpus.remove(already_listed);
+            unnamed_addresses_reported_twice.push(identifier);
+            continue;
         }
         discrete_gpus.push(DiscreteGpuOnThisHost {
             position_in_the_enumeration,
@@ -136,7 +200,31 @@ pub fn discrete_gpus_of_the_enumeration(
         });
     }
     discrete_gpus.sort_by(|left, right| left.pci_bus_address.cmp(&right.pci_bus_address));
-    Ok(discrete_gpus)
+    Ok(DiscreteGpusOfTheEnumeration {
+        listed: discrete_gpus,
+        unnamed_left_off_the_list,
+    })
+}
+
+/// 此刻一次枚举里在的独显（有总线地址的）各自的标识，按枚举的次序：挂着切换那一刻现查卡清单（第 4 条「切换那一刻……GPU 不在……就拒绝切换」）读它，
+/// 挂载之后掉了的卡不在里面。
+#[must_use]
+pub fn identifiers_of_the_discrete_gpus_in_the_enumeration(
+    adapters: &[EnumeratedAdapterDescription],
+) -> Vec<GpuDeviceIdentifier> {
+    adapters
+        .iter()
+        .filter(|adapter| {
+            adapter.device_kind.counts_as_a_background_gpu() && !adapter.pci_bus_address.is_empty()
+        })
+        .map(|adapter| gpu_device_identifier_of_the_pci_bus_address(&adapter.pci_bus_address))
+        .collect()
+}
+
+/// 此刻本机在的独显各自的标识（挂着切换那一刻现查）：产品经 wgpu 现枚举一次（外壳 `background_gpu` 里那一份），测试换成假的。
+/// 枚举不成（等 wgpu 超过上限）时交回空：一张都不在，切换照「GPU 不在」拒。
+pub trait DiscreteGpusPresentNow {
+    fn identifiers_of_the_discrete_gpus_present_now(&self) -> Vec<GpuDeviceIdentifier>;
 }
 
 /// 同一次枚举交成核心层的卡清单（`GpuInventory`）：挂载那一刻的校验读它，之后取参与的卡读的也是它。
@@ -367,7 +455,7 @@ mod tests {
     }
 
     #[test]
-    fn a_discrete_gpu_without_a_pci_bus_address_is_refused() {
+    fn one_discrete_gpu_without_a_pci_bus_address_is_refused() {
         let adapters = vec![adapter("no address", AdapterDeviceKind::DiscreteGpu, "", 8)];
         assert_eq!(
             discrete_gpus_of_the_enumeration(&adapters),
@@ -380,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn a_discrete_gpu_without_a_device_local_memory_heap_is_refused() {
+    fn one_discrete_gpu_without_a_device_local_memory_heap_is_refused() {
         let mut no_heap = adapter("no heap", AdapterDeviceKind::DiscreteGpu, "0000:01:00.0", 8);
         no_heap.device_local_memory = None;
         assert_eq!(
@@ -490,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn a_memory_limit_count_different_from_the_participating_gpus_refuses_the_mount() {
+    fn the_memory_limit_count_different_from_the_participating_gpus_refuses_the_mount() {
         assert_eq!(
             participating_gpus_admitted_by_the_mount_checks(
                 &BackgroundGpuSelection {
@@ -511,7 +599,7 @@ mod tests {
     }
 
     #[test]
-    fn a_memory_limit_above_the_total_memory_of_its_gpu_refuses_the_mount() {
+    fn one_memory_limit_above_the_total_memory_of_its_gpu_refuses_the_mount() {
         assert_eq!(
             participating_gpus_admitted_by_the_mount_checks(
                 &BackgroundGpuSelection {
@@ -604,6 +692,133 @@ mod tests {
         assert!(
             participating.iter().all(|gpu| gpu.memory_limit.is_none()),
             "不给上限就不设限"
+        );
+    }
+
+    /// 第 2 条「点名了就只用点名的卡」：只点名一张好卡，同一次枚举里没点名的独显一张没报总线地址、一张读不到设备本地堆、两张报了同一个总线地址——
+    /// 都不拒，只收点名的那张，没收的那几张各带原因报出来（攻方探针 T1-2 那一种，改前整张清单交不成、拒挂）。
+    #[test]
+    fn unnamed_discrete_gpus_that_cannot_be_listed_are_left_off_without_refusing_the_named_card() {
+        let mut without_a_heap = adapter(
+            "unnamed card without a heap",
+            AdapterDeviceKind::DiscreteGpu,
+            "0000:21:00.0",
+            8,
+        );
+        without_a_heap.device_local_memory = None;
+        let adapters = vec![
+            adapter(
+                "named card",
+                AdapterDeviceKind::DiscreteGpu,
+                "0000:01:00.0",
+                8,
+            ),
+            adapter(
+                "unnamed card without an address",
+                AdapterDeviceKind::DiscreteGpu,
+                "",
+                8,
+            ),
+            without_a_heap,
+            adapter(
+                "unnamed card seen by one driver",
+                AdapterDeviceKind::DiscreteGpu,
+                "0000:41:00.0",
+                16,
+            ),
+            adapter(
+                "unnamed card seen by another driver",
+                AdapterDeviceKind::DiscreteGpu,
+                "0000:41:00.0",
+                16,
+            ),
+        ];
+        let named = [gpu_device_identifier_of_the_pci_bus_address("0000:01:00.0")];
+        let listed = discrete_gpus_of_the_enumeration_under_the_named(&adapters, Some(&named))
+            .expect("点名的那张交得成：没点名的交不成也不拒");
+        assert_eq!(
+            listed,
+            DiscreteGpusOfTheEnumeration {
+                listed: vec![DiscreteGpuOnThisHost {
+                    position_in_the_enumeration: 0,
+                    identifier: gpu_device_identifier_of_the_pci_bus_address("0000:01:00.0"),
+                    pci_bus_address: "0000:01:00.0".to_string(),
+                    name: "named card".to_string(),
+                    total_memory: GpuMemoryInBytes(8 * GIBIBYTE),
+                }],
+                unnamed_left_off_the_list: vec![
+                    DiscreteGpuListRefused::DiscreteGpuWithoutAPciBusAddressIsNotSupported {
+                        name: "unnamed card without an address".to_string(),
+                    },
+                    DiscreteGpuListRefused::DiscreteGpuWithoutADeviceLocalMemoryHeapIsNotSupported {
+                        name: "unnamed card without a heap".to_string(),
+                    },
+                    DiscreteGpuListRefused::PciBusAddressReportedByTwoDiscreteGpusIsNotSupported {
+                        pci_bus_address: "0000:41:00.0".to_string(),
+                    },
+                ],
+            },
+            "只收点名的那张；没点名的三种都不拒、不收，各报一次"
+        );
+        assert_eq!(
+            discrete_gpus_of_the_enumeration_under_the_named(&adapters, None),
+            Err(
+                DiscreteGpuListRefused::DiscreteGpuWithoutAPciBusAddressIsNotSupported {
+                    name: "unnamed card without an address".to_string(),
+                }
+            ),
+            "没给点名时每一张都参与：同一次枚举照旧拒"
+        );
+    }
+
+    /// 点名的那张自己缺设备本地堆：照旧拒（判的是参与的卡）。
+    #[test]
+    fn one_named_discrete_gpu_without_a_device_local_memory_heap_is_still_refused() {
+        let mut named_without_a_heap = adapter(
+            "named card",
+            AdapterDeviceKind::DiscreteGpu,
+            "0000:01:00.0",
+            8,
+        );
+        named_without_a_heap.device_local_memory = None;
+        let named = [gpu_device_identifier_of_the_pci_bus_address("0000:01:00.0")];
+        assert_eq!(
+            discrete_gpus_of_the_enumeration_under_the_named(&[named_without_a_heap], Some(&named)),
+            Err(
+                DiscreteGpuListRefused::DiscreteGpuWithoutADeviceLocalMemoryHeapIsNotSupported {
+                    name: "named card".to_string()
+                }
+            )
+        );
+    }
+
+    /// 第 4 条「切换那一刻……GPU 不在……就拒绝切换」：现查的那一次枚举里在的独显才算在；挂载之后掉了的卡、集显、没有总线地址的都不在。
+    #[test]
+    fn only_discrete_gpus_with_a_bus_address_in_the_enumeration_count_as_present() {
+        let adapters = vec![
+            adapter(
+                "integrated graphics",
+                AdapterDeviceKind::IntegratedGpu,
+                "0000:00:02.0",
+                2,
+            ),
+            adapter(
+                "card still here",
+                AdapterDeviceKind::DiscreteGpu,
+                "0000:41:00.0",
+                16,
+            ),
+            adapter(
+                "card without an address",
+                AdapterDeviceKind::DiscreteGpu,
+                "",
+                8,
+            ),
+        ];
+        assert_eq!(
+            identifiers_of_the_discrete_gpus_in_the_enumeration(&adapters),
+            vec![gpu_device_identifier_of_the_pci_bus_address("0000:41:00.0")],
+            "挂载时在的「0000:01:00.0」这一次没枚举到：不算在"
         );
     }
 }

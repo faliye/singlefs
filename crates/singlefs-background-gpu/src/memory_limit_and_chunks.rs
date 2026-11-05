@@ -4,6 +4,11 @@
 //! 切法是纯函数（[`chunks_that_fit_on_the_gpu`]）；外壳每建一个缓冲先在这张卡的账上记下（[`GpuMemoryAccount::hold`]），
 //! 记下之后超过上限就断言：切批算对了就走不到那一步，走到了是切批的 bug，不带着超限往下跑。
 //!
+//! 一条自己就装不进一段时把它切成几片逐片交（用户 2026-10-28 定「装不下应该自适应的分片，缩小逐次进行」，原话在
+//! `records/2026-10-19-里程碑四GPU垃圾回收开工.md` 末尾「用户定案（弹窗两次）」那一行）：[`pieces_cut_to_fit_on_the_gpu`] 按输入字节切，
+//! 每片单独成一段装得下；连最小的一片（一个字节的输入加这一段的固定占用）都装不下才交回 [`SmallestPieceLargerThanTheRoom`]，
+//! 调用方照「连一片都装不下就不用这张卡」办。各段每段都交一份的表（区域扫描的映射、选段打分的记录表）大到装不下时的切法在各段自己的模块里。
+//!
 //! 等一段的提交超过上限（这一批按出错交回）之后，GPU 上可能还在跑它：wgpu 留着被提交用到的缓冲直到提交做完，卡上的显存照旧占着。
 //! 所以这一段的账不在交回出错时放，记成这张卡上还在跑的那次提交（[`SubmissionOfTheChunk`]、[`GpuMemoryAccount::settle_the_chunk_after_its_submission`]），
 //! 等它的完成信号来了才放；下一次在这张卡上切段交活之前，先在上限之内等它做完
@@ -71,9 +76,24 @@ impl ChunkBoundsOfAGpu {
             largest_entry_count_per_dispatch: self.largest_entry_count_per_dispatch,
         }
     }
+
+    /// 卡上此刻空闲的显存比剩下的地方少（建缓冲显存不足，第 3 条「卡上此刻空闲的不到这个数也照常跑，只用空闲的那些」）时，显存那一项压到至多
+    /// `bytes_at_most`：给了上限的取两者小的，不给上限的取它。绑定上限与派发上限不变。
+    #[must_use]
+    pub fn with_the_memory_limit_at_most(self, bytes_at_most: u64) -> Self {
+        Self {
+            memory_limit: Some(GpuMemoryInBytes(
+                self.memory_limit.map_or(bytes_at_most, |memory_limit| {
+                    memory_limit.0.min(bytes_at_most)
+                }),
+            )),
+            largest_storage_binding_in_bytes: self.largest_storage_binding_in_bytes,
+            largest_entry_count_per_dispatch: self.largest_entry_count_per_dispatch,
+        }
+    }
 }
 
-/// 一条单独就装不进一段：条款只写了「一批放不下就切成几次交」，单个条目放不下怎么办没写，第一版不支持。
+/// 一条单独就装不进一段（[`chunks_that_fit_on_the_gpu`] 不切单条；要切单条的用 [`pieces_cut_to_fit_on_the_gpu`]）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EntryLargerThanAChunkOnTheGpu {
     pub entry_position: usize,
@@ -124,6 +144,107 @@ pub fn chunks_that_fit_on_the_gpu(
         chunks.push(chunk_start..entry_input_lengths_in_bytes.len());
     }
     Ok(chunks)
+}
+
+/// 一条里的一片：这一条在批里的位置，与这一片罩住的输入字节（从这一条的头一个字节数起，左闭右开）。没切的那一条是罩住它全部字节的一片。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PieceOfAnEntry {
+    pub entry_position: usize,
+    pub input_bytes: std::ops::Range<u64>,
+}
+
+impl PieceOfAnEntry {
+    #[must_use]
+    pub fn input_byte_count(&self) -> u64 {
+        self.input_bytes.end - self.input_bytes.start
+    }
+}
+
+/// 一张卡此刻剩下的地方连最小的一片都装不下：`entry_position` 是要切的那一条在批里的位置，`smallest_piece_bytes` 是最小的一片
+/// （一个字节的输入，补到一个整字）连同一段的固定占用合占的字节数，即这张卡至少要剩这么多。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SmallestPieceLargerThanTheRoom {
+    pub entry_position: usize,
+    pub smallest_piece_bytes: u64,
+}
+
+/// 一片单独成一段时，它的输入最多几个字节装得下 `bounds`：按显存上限扣掉一段的固定占用与一条的固定占用、按绑定上限，取 4 的整数倍
+/// （输入缓冲按整字建，[`input_buffer_bytes`]）。一个字节的一片都装不下交回 `None`。
+fn largest_piece_input_bytes(footprint: ChunkFootprint, bounds: ChunkBoundsOfAGpu) -> Option<u64> {
+    let one_entry_fits_the_binding_and_the_dispatch = footprint
+        .bytes_per_entry_in_the_largest_entry_buffer
+        <= bounds.largest_storage_binding_in_bytes
+        && bounds.largest_entry_count_per_dispatch >= 1;
+    if !one_entry_fits_the_binding_and_the_dispatch {
+        return None;
+    }
+    let input_room_under_the_memory_limit = match bounds.memory_limit {
+        Some(memory_limit) => memory_limit.0.checked_sub(
+            footprint.bytes_per_chunk_besides_the_entries
+                + footprint.bytes_per_entry_besides_its_input,
+        )?,
+        None => u64::MAX,
+    };
+    let largest_input_bytes = input_room_under_the_memory_limit
+        .min(bounds.largest_storage_binding_in_bytes)
+        / GPU_BUFFER_ALIGNMENT_IN_BYTES
+        * GPU_BUFFER_ALIGNMENT_IN_BYTES;
+    (largest_input_bytes >= GPU_BUFFER_ALIGNMENT_IN_BYTES).then_some(largest_input_bytes)
+}
+
+/// 把一批切成相连的几段，每段是几片；装得下的一条整条是一片，单独成一段都装不下的一条从头切成几片，每片取单独成一段装得下的最大字节数
+/// （4 的整数倍），最后一片是余下的。片按批里的次序、一条之内按字节的次序排，再照 [`chunks_that_fit_on_the_gpu`] 从前往后贪心装段：
+/// 每一片单独成一段都装得下，所以装段不会失败。整条都装得下的批与 [`chunks_that_fit_on_the_gpu`] 切出同样的段。空批交回空。
+///
+/// # Errors
+/// 某一条要切而连一个字节的一片都装不下（[`SmallestPieceLargerThanTheRoom`]），一段都不交。
+pub fn pieces_cut_to_fit_on_the_gpu(
+    entry_input_lengths_in_bytes: &[u64],
+    footprint: ChunkFootprint,
+    bounds: ChunkBoundsOfAGpu,
+) -> Result<Vec<Vec<PieceOfAnEntry>>, SmallestPieceLargerThanTheRoom> {
+    let largest_piece = largest_piece_input_bytes(footprint, bounds);
+    let mut pieces: Vec<PieceOfAnEntry> = Vec::with_capacity(entry_input_lengths_in_bytes.len());
+    for (entry_position, input_bytes) in entry_input_lengths_in_bytes.iter().copied().enumerate() {
+        let whole_entry_fits =
+            chunks_that_fit_on_the_gpu(&[input_bytes], footprint, bounds).is_ok();
+        if whole_entry_fits {
+            pieces.push(PieceOfAnEntry {
+                entry_position,
+                input_bytes: 0..input_bytes,
+            });
+            continue;
+        }
+        let Some(largest_piece_bytes) = largest_piece else {
+            return Err(SmallestPieceLargerThanTheRoom {
+                entry_position,
+                smallest_piece_bytes: footprint.bytes_held_by_a_chunk(1, 1),
+            });
+        };
+        assert!(
+            largest_piece_bytes < input_bytes,
+            "最大的一片装得下而整条装不下：整条比最大的一片长"
+        );
+        let mut piece_start = 0;
+        while piece_start < input_bytes {
+            let piece_end = input_bytes.min(piece_start + largest_piece_bytes);
+            pieces.push(PieceOfAnEntry {
+                entry_position,
+                input_bytes: piece_start..piece_end,
+            });
+            piece_start = piece_end;
+        }
+    }
+    let piece_lengths: Vec<u64> = pieces
+        .iter()
+        .map(PieceOfAnEntry::input_byte_count)
+        .collect();
+    let chunks = chunks_that_fit_on_the_gpu(&piece_lengths, footprint, bounds)
+        .expect("每一片单独成一段都装得下：整条装得下的是整条，切开的每片不超过最大的一片");
+    Ok(chunks
+        .into_iter()
+        .map(|chunk| pieces[chunk].to_vec())
+        .collect())
 }
 
 /// 一段的提交等完之后，它的缓冲在卡上还占不占显存。
@@ -179,9 +300,19 @@ pub struct GpuMemoryAccount<Submission> {
 impl<Submission> GpuMemoryAccount<Submission> {
     #[must_use]
     pub fn with_nothing_held(memory_limit: Option<GpuMemoryInBytes>) -> Self {
+        Self::with_the_bytes_leaked_by_earlier_mounts(memory_limit, 0)
+    }
+
+    /// 这个进程里此前几次挂载在这张卡上泄漏了 `bytes_leaked_by_earlier_mounts` 字节（丢后台 GPU 时还在跑的提交，设备不析构，显存不还）：
+    /// 这一次的账从它起，这一次挂载里一直记着、不放（第 3 条「任何时刻都不许比它多」：泄漏的那一片仍占着这张卡）。
+    #[must_use]
+    pub fn with_the_bytes_leaked_by_earlier_mounts(
+        memory_limit: Option<GpuMemoryInBytes>,
+        bytes_leaked_by_earlier_mounts: u64,
+    ) -> Self {
         Self {
             memory_limit,
-            bytes_held: 0,
+            bytes_held: bytes_leaked_by_earlier_mounts,
             submission_running_past_its_wait: None,
         }
     }
@@ -194,6 +325,12 @@ impl<Submission> GpuMemoryAccount<Submission> {
     #[must_use]
     pub fn memory_limit(&self) -> Option<GpuMemoryInBytes> {
         self.memory_limit
+    }
+
+    /// 这张卡上记着一次等超过上限、还没在 GPU 上做完的提交：丢后台 GPU 时这张卡的设备与队列不析构（析构要等队列空，不带上限）。
+    #[must_use]
+    pub fn has_a_submission_running_past_its_wait(&self) -> bool {
+        self.submission_running_past_its_wait.is_some()
     }
 
     /// 换上切换给的上限（第 1、3 条：从下一批起照它，外壳在两批之间调）。账不清：还占着的字节、等超过上限还在跑的那次提交照旧记着，
@@ -270,7 +407,7 @@ impl<Submission> GpuMemoryAccount<Submission> {
     ///
     /// # Errors
     /// 等满上限还没做完 ⇒ [`GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit`]；看的时候报的出错照原样交回。两种都不放账。
-    fn wait_for_the_submission_running_past_its_wait(
+    pub fn wait_for_the_submission_running_past_its_wait(
         &mut self,
         deadline: &GpuWaitDeadline,
         clock: &impl MonotonicClock,
@@ -293,6 +430,26 @@ impl<Submission> GpuMemoryAccount<Submission> {
         Ok(())
     }
 
+    /// 在这张卡上交活之前调（第 3、4 条）：这张卡上还有一次等超过上限、没做完的提交的，先在 `deadline` 之内等它做完、放掉它的账，
+    /// 交回此刻剩下的界（`bounds` 的显存上限扣掉此刻还占着的），调用方按它切这一批分到这张卡的几条。
+    ///
+    /// # Errors
+    /// 等不到它做完：同 [`Self::wait_for_the_submission_running_past_its_wait`]，账照旧记着。
+    pub fn room_once_the_submission_running_past_its_wait_completed(
+        &mut self,
+        deadline: &GpuWaitDeadline,
+        clock: &impl MonotonicClock,
+        check_once_waiting_at_most: impl FnMut(&Submission, Duration) -> CompletionCheck<()>,
+        bounds: ChunkBoundsOfAGpu,
+    ) -> Result<ChunkBoundsOfAGpu, GpuFailureCause> {
+        self.wait_for_the_submission_running_past_its_wait(
+            deadline,
+            clock,
+            check_once_waiting_at_most,
+        )?;
+        Ok(bounds.with_the_room_left_after(self.bytes_held))
+    }
+
     /// 这张卡分到的几条（按批里的次序给每条的输入字节数）切段，在交这几段之前调（第 3、4 条）：分到了活而这张卡上还有一次等超过上限、
     /// 没做完的提交，先在 `deadline` 之内等它做完、放掉它的账，再按上限扣掉此刻还占着的切（[`chunks_that_fit_on_the_gpu`]）；
     /// 没分到活的不等（这一批不在这张卡上交活）。
@@ -312,18 +469,16 @@ impl<Submission> GpuMemoryAccount<Submission> {
         if entry_input_lengths_in_bytes.is_empty() {
             return Ok(Vec::new());
         }
-        self.wait_for_the_submission_running_past_its_wait(
-            deadline,
-            clock,
-            check_once_waiting_at_most,
-        )
-        .map_err(ChunksNotCutOnTheGpu::EarlierSubmissionStillRunning)?;
-        chunks_that_fit_on_the_gpu(
-            entry_input_lengths_in_bytes,
-            footprint,
-            bounds.with_the_room_left_after(self.bytes_held),
-        )
-        .map_err(ChunksNotCutOnTheGpu::EntryLargerThanAChunk)
+        let room = self
+            .room_once_the_submission_running_past_its_wait_completed(
+                deadline,
+                clock,
+                check_once_waiting_at_most,
+                bounds,
+            )
+            .map_err(ChunksNotCutOnTheGpu::EarlierSubmissionStillRunning)?;
+        chunks_that_fit_on_the_gpu(entry_input_lengths_in_bytes, footprint, room)
+            .map_err(ChunksNotCutOnTheGpu::EntryLargerThanAChunk)
     }
 }
 
@@ -338,7 +493,9 @@ fn failure_of_waiting_for_the_earlier_submission(cause: GpuFailureCause) -> GpuF
         | GpuFailureCause::WaitForTheSubmissionFailed { .. }
         | GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit { .. }
         | GpuFailureCause::ReadbackMappingFailed { .. }
-        | GpuFailureCause::KernelLeftAnUnrecognizedVerdictWord(..)) => reported_by_the_wait,
+        | GpuFailureCause::KernelLeftAnUnrecognizedVerdictWord(..)
+        | GpuFailureCause::OutOfMemoryCreatingTheBuffers { .. }
+        | GpuFailureCause::UnusableAfterResubmissions { .. }) => reported_by_the_wait,
     }
 }
 
@@ -457,7 +614,7 @@ mod tests {
     /// 第 3 条在等超时之后：一段的提交等超过上限、这一批按出错交回之后，GPU 上可能还在跑它，这一段的缓冲照旧占着卡上的显存。
     /// 账上照旧记着它，这期间切批扣掉它；完成信号来了才放。
     #[test]
-    fn a_chunk_whose_wait_timed_out_stays_held_until_its_submission_completes_on_the_gpu() {
+    fn the_chunk_whose_wait_timed_out_stays_held_until_its_submission_completes_on_the_gpu() {
         let (mut account, clock) =
             account_after_a_chunk_whose_wait_timed_out(Duration::from_secs(107));
         assert_eq!(
@@ -501,7 +658,7 @@ mod tests {
     /// 第 3、4 条：前一次等超时的那次提交还没在 GPU 上做完时，下一批不在这张卡上交活：切段之前在上限之内等它，等满上限还没做完就交回出错，
     /// 一段都不切，它的账照旧记着。
     #[test]
-    fn a_gpu_whose_timed_out_submission_is_still_running_gets_no_chunk_of_the_next_batch() {
+    fn the_gpu_whose_timed_out_submission_is_still_running_gets_no_chunk_of_the_next_batch() {
         let (mut account, clock) =
             account_after_a_chunk_whose_wait_timed_out(Duration::from_secs(200));
         let chunks = account.chunks_cut_once_the_submission_running_past_its_wait_completed(
@@ -544,7 +701,7 @@ mod tests {
 
     /// 这一批没分到这张卡的活：不在这张卡上交活，就不等它前一次超时的那次提交；一段不切，账照旧记着。
     #[test]
-    fn a_gpu_given_no_entries_of_the_next_batch_does_not_wait_for_its_timed_out_submission() {
+    fn the_gpu_given_no_entries_of_the_next_batch_does_not_wait_for_its_timed_out_submission() {
         let (mut account, clock) =
             account_after_a_chunk_whose_wait_timed_out(Duration::from_secs(107));
         let chunks = account.chunks_cut_once_the_submission_running_past_its_wait_completed(
@@ -582,7 +739,7 @@ mod tests {
     }
 
     #[test]
-    fn a_batch_that_does_not_fit_the_memory_limit_is_cut_into_chunks_that_each_fit() {
+    fn the_batch_that_does_not_fit_the_memory_limit_is_cut_into_chunks_that_each_fit() {
         let lengths = [100_u64, 100, 100, 100, 100];
         // 两条一段：输入 200 字节、条目 80、参数 16，合 296；三条要 444
         let memory_limit_in_bytes = 300;
@@ -607,7 +764,7 @@ mod tests {
     }
 
     #[test]
-    fn a_chunk_exactly_at_the_memory_limit_is_kept_whole() {
+    fn the_chunk_exactly_at_the_memory_limit_is_kept_whole() {
         // 两条 100 字节：200 + 80 + 16 = 296，正好等于上限也算装得下
         assert_eq!(
             chunks_that_fit_on_the_gpu(&[100, 100], FOOTPRINT_UNDER_TEST, bounds(Some(296))),
@@ -774,5 +931,112 @@ mod tests {
         let mut account = GpuMemoryAccount::<SubmissionNamedByTheTest>::with_nothing_held(None);
         account.hold(u64::MAX / 2);
         assert_eq!(account.bytes_held(), u64::MAX / 2);
+    }
+
+    /// 整条都装得下的批：每条一片，切出的段与不切单条的切法相同。
+    #[test]
+    fn the_batch_whose_entries_each_fit_is_cut_like_the_chunks_with_one_whole_piece_per_entry() {
+        let lengths = [100_u64, 100, 100, 100, 100];
+        let pieces =
+            pieces_cut_to_fit_on_the_gpu(&lengths, FOOTPRINT_UNDER_TEST, bounds(Some(300)))
+                .expect("单条 156 字节装得下");
+        assert_eq!(
+            pieces,
+            vec![
+                vec![
+                    PieceOfAnEntry {
+                        entry_position: 0,
+                        input_bytes: 0..100
+                    },
+                    PieceOfAnEntry {
+                        entry_position: 1,
+                        input_bytes: 0..100
+                    }
+                ],
+                vec![
+                    PieceOfAnEntry {
+                        entry_position: 2,
+                        input_bytes: 0..100
+                    },
+                    PieceOfAnEntry {
+                        entry_position: 3,
+                        input_bytes: 0..100
+                    }
+                ],
+                vec![PieceOfAnEntry {
+                    entry_position: 4,
+                    input_bytes: 0..100
+                }],
+            ]
+        );
+    }
+
+    /// 用户 2026-10-28 定「装不下应该自适应的分片」：一条 4096 字节的单独成一段都装不下 1024 字节的上限，切成每片 968 字节
+    /// （1024 扣掉一段 16、一条 40）的几片，最后一片是余下的；前后装得下的整条照常，片按批里的次序、一条之内按字节的次序排，每段都不超上限。
+    #[test]
+    fn an_entry_larger_than_the_memory_limit_is_cut_into_pieces_that_each_fit() {
+        let lengths = [10_u64, 4096, 10];
+        let memory_limit_in_bytes = 1024;
+        let chunks = pieces_cut_to_fit_on_the_gpu(
+            &lengths,
+            FOOTPRINT_UNDER_TEST,
+            bounds(Some(memory_limit_in_bytes)),
+        )
+        .expect("最小的一片装得下");
+        let pieces_in_order: Vec<(usize, std::ops::Range<u64>)> = chunks
+            .iter()
+            .flatten()
+            .map(|piece| (piece.entry_position, piece.input_bytes.clone()))
+            .collect();
+        assert_eq!(
+            pieces_in_order,
+            vec![
+                (0, 0..10),
+                (1, 0..968),
+                (1, 968..1936),
+                (1, 1936..2904),
+                (1, 2904..3872),
+                (1, 3872..4096),
+                (2, 0..10),
+            ],
+            "4096 字节切成四片 968 与一片 224"
+        );
+        for chunk in &chunks {
+            let input_bytes: u64 = chunk.iter().map(PieceOfAnEntry::input_byte_count).sum();
+            let held = FOOTPRINT_UNDER_TEST
+                .bytes_held_by_a_chunk(input_bytes, u64::try_from(chunk.len()).expect("小数"));
+            assert!(
+                held <= memory_limit_in_bytes,
+                "每一段合占 {held} 字节不超过上限"
+            );
+        }
+    }
+
+    /// 连一个字节的一片都装不下：交回要切的那一条与最小的一片合占多少（这张卡至少要剩这么多）。
+    #[test]
+    fn the_memory_limit_below_the_smallest_piece_reports_how_much_the_smallest_piece_needs() {
+        let smallest_piece_bytes = FOOTPRINT_UNDER_TEST.bytes_held_by_a_chunk(1, 1);
+        assert_eq!(smallest_piece_bytes, 4 + 40 + 16);
+        assert_eq!(
+            pieces_cut_to_fit_on_the_gpu(
+                &[0, 4096],
+                FOOTPRINT_UNDER_TEST,
+                bounds(Some(smallest_piece_bytes - 1))
+            ),
+            Err(SmallestPieceLargerThanTheRoom {
+                entry_position: 0,
+                smallest_piece_bytes,
+            }),
+            "空的那一条也占一个整字，装不下"
+        );
+        assert!(
+            pieces_cut_to_fit_on_the_gpu(
+                &[4096],
+                FOOTPRINT_UNDER_TEST,
+                bounds(Some(smallest_piece_bytes))
+            )
+            .is_ok(),
+            "正好装得下最小的一片：切成 1024 片"
+        );
     }
 }

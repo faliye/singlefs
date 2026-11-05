@@ -3,6 +3,8 @@
 // 头校验和与载荷校验和按字节查 256 项余式表算 CRC-32C；解出来的映射 key 再从头到尾走一遍条目表，看有哪几条的位置项指着这个落点、这把 key 在不在表里。
 // 偏移与宽度是这一份自己照字节表写的（D18（块里携带什么信息） 已定项 7、11、18），不读别处；与 CPU 参照（核心层）的对拍在 GPU 用例里。
 // 另一份（region_record_kernel_searching_sorted_indexes.wgsl）逐位移算校验和、在两张排好序的索引上二分查；两份只共用缓冲布局，布局由 src/region_record_kernels.rs 定。
+// 一个单元切成几片时（src/region_record_kernels.rs 文件头「一个单元切成几片」）：头一片之后的那几片只接着算载荷 CRC 的寄存器、交回寄存器；
+// 头一片照常解头、查映射，载荷 CRC 从全 1 起喂头一片里载荷的字节，再按查表喂之后那么多个 0 字节、异或带进来的那几字节的寄存器，取反。
 
 struct ChunkParametersForTheWalk {
     record_count: u32,
@@ -19,6 +21,10 @@ struct RecordDescriptorForTheWalk {
     device: u32,
     slot_low: u32,
     slot_high: u32,
+    piece_kind: u32,
+    unit_bytes_after_this_piece: u32,
+    register_of_the_walk: u32,
+    register_of_the_other_kernel: u32,
 }
 
 struct MappingEntryForTheWalk {
@@ -59,6 +65,9 @@ const KIND_HEADER_KEY_DISAGREES_WITH_THE_LOCATION: u32 = 3u;
 const KIND_DEVICE_READ_FAILED: u32 = 4u;
 const KIND_SPAN_IS_NOT_A_UNIT_FOOTPRINT: u32 = 5u;
 const KIND_REFUSED_BY_THE_PARSER: u32 = 6u;
+const KIND_REGISTER_AFTER_THE_PIECE: u32 = 7u;
+// 描述里这一片是单元头一片之后的一片（别的值是从单元头起的一片）：与 src/region_record_kernels.rs 同值。
+const PIECE_AFTER_THE_HEAD_OF_THE_UNIT: u32 = 1u;
 const NOT_REFUSED: u32 = 0xFFFFFFFFu;
 const REFUSED_TOO_SHORT: u32 = 0u;
 const REFUSED_BAD_MAGIC: u32 = 1u;
@@ -103,6 +112,14 @@ struct RefusalOfTheWalk {
     refusal_detail: u32,
 }
 
+// 交给这一调用的单元：从单元头起的那一片在输入里的起点与字节数，单元在这一片之后还有几个字节，与之后那几字节从 0 起算完的寄存器（没切开的是 0 与 0）。
+struct UnitPieceOfTheWalk {
+    start: u32,
+    bytes_in_this_piece: u32,
+    bytes_after_this_piece: u32,
+    register_of_the_bytes_after: u32,
+}
+
 struct ParsedHeaderOfTheWalk {
     refusal: RefusalOfTheWalk,
     class_tag: u32,
@@ -134,6 +151,24 @@ fn crc32c_over_the_unit_by_table(first: u32, past_the_end: u32, zeroed_first: u3
         crc_register = (crc_register >> 8u) ^ remainder_table_of_the_walk[(crc_register ^ byte_value) & 0xFFu];
     }
     return crc_register ^ 0xFFFFFFFFu;
+}
+
+// 寄存器（不取反、不带全 1 初值）按查表喂 [first, past_the_end) 那几个单元字节之后的值。
+fn register_by_table_after_unit_bytes(register_before: u32, first: u32, past_the_end: u32) -> u32 {
+    var crc_register = register_before;
+    for (var byte_address = first; byte_address < past_the_end; byte_address = byte_address + 1u) {
+        crc_register = (crc_register >> 8u) ^ remainder_table_of_the_walk[(crc_register ^ unit_byte_at(byte_address)) & 0xFFu];
+    }
+    return crc_register;
+}
+
+// 寄存器按查表喂 zero_byte_count 个 0 字节之后的值（不读输入）。
+fn register_by_table_after_zero_bytes(register_before: u32, zero_byte_count: u32) -> u32 {
+    var crc_register = register_before;
+    for (var fed = 0u; fed < zero_byte_count; fed = fed + 1u) {
+        crc_register = (crc_register >> 8u) ^ remainder_table_of_the_walk[crc_register & 0xFFu];
+    }
+    return crc_register;
 }
 
 fn not_refused() -> RefusalOfTheWalk {
@@ -173,9 +208,13 @@ fn refusal_of_the_common_prefix(unit_start: u32, expected_class_tag: u32, header
     return not_refused();
 }
 
-// 载荷 CRC 罩 [header_end, 单元末尾)，存在 payload_crc_offset；之后是 29 字节预留位，全 0 才过。
-fn refusal_of_the_payload_and_reserved_bytes(unit_start: u32, unit_bytes: u32, header_end: u32, payload_crc_offset: u32) -> RefusalOfTheWalk {
-    let computed_payload_crc = crc32c_over_the_unit_by_table(unit_start + header_end, unit_start + unit_bytes, 0u, 0u);
+// 载荷 CRC 罩 [header_end, 单元末尾)，存在 payload_crc_offset；之后是 29 字节预留位，全 0 才过。单元切开时这一片之后的字节不在输入里：
+// 喂完这一片里载荷的字节，再喂那么多个 0 字节、异或它们从 0 起算完的寄存器（CRC 寄存器更新对寄存器与字节是线性的）。
+fn refusal_of_the_payload_and_reserved_bytes(unit: UnitPieceOfTheWalk, header_end: u32, payload_crc_offset: u32) -> RefusalOfTheWalk {
+    let unit_start = unit.start;
+    let register_over_this_piece = register_by_table_after_unit_bytes(0xFFFFFFFFu, unit_start + header_end, unit_start + unit.bytes_in_this_piece);
+    let register_over_the_payload = register_by_table_after_zero_bytes(register_over_this_piece, unit.bytes_after_this_piece) ^ unit.register_of_the_bytes_after;
+    let computed_payload_crc = register_over_the_payload ^ 0xFFFFFFFFu;
     if (unit_u32_at(unit_start + payload_crc_offset) != computed_payload_crc) {
         return RefusalOfTheWalk(REFUSED_PAYLOAD_CHECKSUM_MISMATCH, 0u);
     }
@@ -204,7 +243,9 @@ fn key_with_unit_bytes(key_before: array<u32, 7>, key_position: u32, unit_addres
     return key_after;
 }
 
-fn parsed_index_node_header(unit_start: u32, unit_bytes: u32) -> ParsedHeaderOfTheWalk {
+fn parsed_index_node_header(unit: UnitPieceOfTheWalk) -> ParsedHeaderOfTheWalk {
+    let unit_start = unit.start;
+    let unit_bytes = unit.bytes_in_this_piece + unit.bytes_after_this_piece;
     if (unit_bytes != INDEX_NODE_BYTES_OF_THE_WALK) {
         return refused_header(RefusalOfTheWalk(REFUSED_TOO_SHORT, 0u));
     }
@@ -214,7 +255,7 @@ fn parsed_index_node_header(unit_start: u32, unit_bytes: u32) -> ParsedHeaderOfT
     if (prefix_refusal.refusal_code != NOT_REFUSED) {
         return refused_header(prefix_refusal);
     }
-    let payload_refusal = refusal_of_the_payload_and_reserved_bytes(unit_start, unit_bytes, header_end, header_end - 10u);
+    let payload_refusal = refusal_of_the_payload_and_reserved_bytes(unit, header_end, header_end - 10u);
     if (payload_refusal.refusal_code != NOT_REFUSED) {
         return refused_header(payload_refusal);
     }
@@ -249,12 +290,14 @@ fn parsed_index_node_header(unit_start: u32, unit_bytes: u32) -> ParsedHeaderOfT
     return parsed;
 }
 
-fn parsed_packed_unit_header(unit_start: u32, unit_bytes: u32) -> ParsedHeaderOfTheWalk {
+fn parsed_packed_unit_header(unit: UnitPieceOfTheWalk) -> ParsedHeaderOfTheWalk {
+    let unit_start = unit.start;
+    let unit_bytes = unit.bytes_in_this_piece + unit.bytes_after_this_piece;
     let prefix_refusal = refusal_of_the_common_prefix(unit_start, CLASS_TAG_PACKED, PACKED_UNIT_HEADER_END);
     if (prefix_refusal.refusal_code != NOT_REFUSED) {
         return refused_header(prefix_refusal);
     }
-    let payload_refusal = refusal_of_the_payload_and_reserved_bytes(unit_start, unit_bytes, PACKED_UNIT_HEADER_END, 89u);
+    let payload_refusal = refusal_of_the_payload_and_reserved_bytes(unit, PACKED_UNIT_HEADER_END, 89u);
     if (payload_refusal.refusal_code != NOT_REFUSED) {
         return refused_header(payload_refusal);
     }
@@ -290,18 +333,20 @@ fn parsed_packed_unit_header(unit_start: u32, unit_bytes: u32) -> ParsedHeaderOf
 }
 
 // 两槽的单元先当码 1 数据单元解；共同前缀判出类标签是 3 时改当码 3 打包记录单元解（同核心层的区域扫描）。
-fn parsed_two_slot_unit_header(unit_start: u32, unit_bytes: u32) -> ParsedHeaderOfTheWalk {
+fn parsed_two_slot_unit_header(unit: UnitPieceOfTheWalk) -> ParsedHeaderOfTheWalk {
+    let unit_start = unit.start;
+    let unit_bytes = unit.bytes_in_this_piece + unit.bytes_after_this_piece;
     if (unit_bytes != TWO_SLOT_UNIT_BYTES_OF_THE_WALK) {
         return refused_header(RefusalOfTheWalk(REFUSED_TOO_SHORT, 0u));
     }
     let prefix_refusal = refusal_of_the_common_prefix(unit_start, CLASS_TAG_DATA, DATA_UNIT_HEADER_END);
     if (prefix_refusal.refusal_code == REFUSED_WRONG_UNIT_CLASS && unit_byte_at(unit_start + 6u) == CLASS_TAG_PACKED) {
-        return parsed_packed_unit_header(unit_start, unit_bytes);
+        return parsed_packed_unit_header(unit);
     }
     if (prefix_refusal.refusal_code != NOT_REFUSED) {
         return refused_header(prefix_refusal);
     }
-    let payload_refusal = refusal_of_the_payload_and_reserved_bytes(unit_start, unit_bytes, DATA_UNIT_HEADER_END, 101u);
+    let payload_refusal = refusal_of_the_payload_and_reserved_bytes(unit, DATA_UNIT_HEADER_END, 101u);
     if (payload_refusal.refusal_code != NOT_REFUSED) {
         return refused_header(payload_refusal);
     }
@@ -375,6 +420,17 @@ fn classify_records_walking_the_mapping_in_table_order(
     }
     let descriptor = descriptors_of_the_records[record_position];
     var outcome: RecordOutcomeOfTheWalk;
+    // 单元头一片之后的一片：从带进来的寄存器接着按查表喂这一片的字节，交回寄存器
+    if (descriptor.piece_kind == PIECE_AFTER_THE_HEAD_OF_THE_UNIT) {
+        outcome.outcome_kind = KIND_REGISTER_AFTER_THE_PIECE;
+        outcome.detail_word = register_by_table_after_unit_bytes(
+            descriptor.register_of_the_walk,
+            descriptor.byte_offset,
+            descriptor.byte_offset + descriptor.byte_length,
+        );
+        outcomes_of_the_walk[record_position] = outcome;
+        return;
+    }
     if (descriptor.span_slots != 1u && descriptor.span_slots != 2u) {
         outcome.outcome_kind = KIND_SPAN_IS_NOT_A_UNIT_FOOTPRINT;
         outcome.detail_word = descriptor.span_slots;
@@ -386,11 +442,17 @@ fn classify_records_walking_the_mapping_in_table_order(
         outcomes_of_the_walk[record_position] = outcome;
         return;
     }
+    let unit = UnitPieceOfTheWalk(
+        descriptor.byte_offset,
+        descriptor.byte_length,
+        descriptor.unit_bytes_after_this_piece,
+        descriptor.register_of_the_walk,
+    );
     var parsed: ParsedHeaderOfTheWalk;
     if (descriptor.span_slots == 1u) {
-        parsed = parsed_index_node_header(descriptor.byte_offset, descriptor.byte_length);
+        parsed = parsed_index_node_header(unit);
     } else {
-        parsed = parsed_two_slot_unit_header(descriptor.byte_offset, descriptor.byte_length);
+        parsed = parsed_two_slot_unit_header(unit);
     }
     if (parsed.refusal.refusal_code != NOT_REFUSED) {
         outcome.outcome_kind = KIND_REFUSED_BY_THE_PARSER;

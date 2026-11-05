@@ -1,8 +1,8 @@
-//! 本包端到端用例共用的搭建：两块内存里的稀疏盘上 mkfs → 取号 → 暖机 → 新池新建文件（同 `crates/singlefs-harness/tests/common/mod.rs` 的
+//! 本包端到端用例共用的搭建：两块内存里的稀疏盘上 mkfs → 取号 → 暖机 → 新池新建文件（同 `crates/singlefs-verification/tests/common/mod.rs` 的
 //! `build_pool` 那一串，参数也照它的 `parameters`），另一次挂载里顺序写第一个文件 [`DATA_UNITS_WRITTEN_IN_AN_EARLIER_MOUNT`] 个数据单元、
 //! 会话丢掉（「进程退出」）。这份字节拷成几个池，各自重挂、装上整理只供测试的开关，推一趟整理到停，用例逐项比。
-//! 本包不依赖 harness 档（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ⑧ 条判产品 GPU 包与 checker 档两边闭包的交集，
-//! harness 档在 checker 档的闭包里），所以盘与搭建在这里另写一份，只用核心层。
+//! 本包不依赖验证包（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ⑧ 条判产品 GPU 包与验证包两边闭包的交集），
+//! 所以盘与搭建在这里另写一份，只用核心层。
 //! 盘按 512 字节扇区存（没写过的读回 0），改盘的每个动作（写、写零、discard、屏障）按先后记进这个池两块盘共用的录制流；重挂之前换一条空的流，
 //! 用例比的是重挂之后的那一段。
 #![allow(dead_code, reason = "几份测试文件各自 mod 进来，只用到其中一部分")]
@@ -33,15 +33,15 @@ use singlefs_core::transaction::{
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 
-/// 每块盘的字节数（同 harness 档 `build_pool` 的镜像）。
+/// 每块盘的字节数（同验证包 `build_pool` 的镜像）。
 pub const DEVICE_BYTES: u64 = 4 << 30;
 /// 内存盘的扇区，也是物理块大小。
 const SECTOR_BYTES: u64 = 512;
 pub const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-bggpu-1";
 pub const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
-/// 新池新建文件那一份内容的字节数（同 harness 档 `build_pool` 的 3000 字节）。
+/// 新池新建文件那一份内容的字节数（同验证包 `build_pool` 的 3000 字节）。
 const FIRST_FILE_BYTES: usize = 3000;
-/// 另一次挂载里顺序写第一个文件的数据单元数（同 harness 档 `compaction_batches_on_the_gpu_path_through_the_background_gpu_compute.rs`）。
+/// 另一次挂载里顺序写第一个文件的数据单元数（同验证包 `compaction_batches_on_the_gpu_path_through_the_background_gpu_compute.rs`）。
 pub const DATA_UNITS_WRITTEN_IN_AN_EARLIER_MOUNT: usize = 40;
 /// 整理一批至多搬几个（只供测试的开关；产品路径批大小条款没写）。
 pub const UNITS_PER_BATCH: usize = 2;
@@ -317,7 +317,7 @@ fn default_journal_ring_bytes() -> u64 {
             .0
 }
 
-/// mkfs 参数（同 harness 档 `common::parameters`，fsid 换成本包的）。
+/// mkfs 参数（同验证包 `common::parameters`，fsid 换成本包的）。
 pub fn parameters() -> MakeFilesystemParameters {
     MakeFilesystemParameters {
         filesystem_identifier: FILESYSTEM_IDENTIFIER,
@@ -368,7 +368,7 @@ pub fn pool_after_a_sequential_write_in_an_earlier_mount() -> PoolOnMemoryDevice
         genesis.instance_table_placement(),
         genesis.tree_table_genesis_placement(),
     );
-    // mkfs 同一个进程里接着写的会话：装上 mkfs 刚写下的根环（同 harness 档 `build_pool`）。
+    // mkfs 同一个进程里接着写的会话：装上 mkfs 刚写下的根环（同验证包 `build_pool`）。
     allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(
         &parameters,
         &genesis,

@@ -16,7 +16,10 @@
 //!   开算之前整块填 [`LIVE_SLOT_OUTCOME_NOT_WRITTEN_FILL_WORD`]：核没写到的那一段读回来判定字认不得，按 GPU 出错交回。
 //!
 //! 记录一条都没有时绑定 2、3 照样各放一项全 0 的（wgpu 不许长度为 0 的绑定），条数照参数里的数。
-//! 整份记录表每段都交一份（同区域扫描那一段的整份映射）：一批按段切，记录表不切。
+//! 整份记录表每段都交一份（同区域扫描那一段的整份映射）：一批按段切。整份记录表连同一个段都装不下这张卡此刻剩下的地方时，
+//! 记录表按记录的次序切成相连的几片，每片单独建两张表、照它切段逐段交，各片数出的活槽数逐段相加（[`live_slot_plan_on_a_gpu`]、
+//! [`live_slots_summed_over_the_record_slices`]；用户 2026-10-28 定「装不下应该自适应的分片」）：一段的活槽数是每条记录罩住它的槽数之和，
+//! 按记录切开再加不改它；核不改。两份核数出的各自加各自的。
 
 use singlefs_core::address::SlotNumber;
 use singlefs_core::allocator::AllocationRecord;
@@ -27,8 +30,12 @@ use singlefs_core::compaction_plan::{
 };
 use singlefs_core::logged_operations::CompactionRegion;
 
+use std::ops::Range;
+
 use crate::checksum_kernels::UnrecognizedVerdictWord;
-use crate::memory_limit_and_chunks::ChunkFootprint;
+use crate::memory_limit_and_chunks::{
+    chunks_that_fit_on_the_gpu, ChunkBoundsOfAGpu, ChunkFootprint, SmallestPieceLargerThanTheRoom,
+};
 use crate::two_kernel_reconciliation::{
     ConsecutiveUncertaintyCounts, ReconciledBatch, TwoKernelOutcomesOfAnEntry,
 };
@@ -145,13 +152,184 @@ impl AllocationRecordTablesForTheKernels {
 pub fn live_slot_chunk_footprint(
     record_tables: &AllocationRecordTablesForTheKernels,
 ) -> ChunkFootprint {
+    live_slot_chunk_footprint_of_record_table_bytes(record_tables.bytes_on_the_gpu())
+}
+
+/// 同 [`live_slot_chunk_footprint`]，记录表的两个缓冲按合占的字节数给。
+#[must_use]
+pub fn live_slot_chunk_footprint_of_record_table_bytes(record_table_bytes: u64) -> ChunkFootprint {
     ChunkFootprint {
-        bytes_per_chunk_besides_the_entries: LIVE_SLOT_PARAMETER_BUFFER_BYTES
-            + record_tables.bytes_on_the_gpu(),
+        bytes_per_chunk_besides_the_entries: LIVE_SLOT_PARAMETER_BUFFER_BYTES + record_table_bytes,
         bytes_per_entry_besides_its_input: LIVE_SLOT_OUTCOME_AND_READBACK_BUFFERS
             * LIVE_SLOT_OUTCOME_BYTES,
         bytes_per_entry_in_the_largest_entry_buffer: LIVE_SLOT_OUTCOME_BYTES,
     }
+}
+
+/// `record_count` 条记录的记录表交给核时两个缓冲合占的字节数与大的那一个的字节数（按 [`AllocationRecordTablesForTheKernels`] 的建法：
+/// 没有记录时各放一项）。
+#[must_use]
+pub fn record_table_bytes_of(record_count: u64) -> (u64, u64) {
+    let record_words = ALLOCATION_RECORD_WORDS_AS_U64 * record_count.max(1);
+    let sorted_position_words = record_count.max(1);
+    (
+        4 * (record_words + sorted_position_words),
+        4 * record_words.max(sorted_position_words),
+    )
+}
+
+const ALLOCATION_RECORD_WORDS_AS_U64: u64 = 5;
+
+/// 选段打分一段里最小的一片在卡上合占的字节数：一个段连同只有一条记录的记录表。
+#[must_use]
+pub fn bytes_of_the_smallest_live_slot_piece() -> u64 {
+    live_slot_chunk_footprint_of_record_table_bytes(record_table_bytes_of(1).0)
+        .bytes_held_by_a_chunk(SEGMENT_BOUND_BYTES, 1)
+}
+
+/// 记录表的一片（按记录的次序相连的几条）与这张卡上这一片之下段切成的几段（按这张卡分到的段里的位置）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordSliceWithItsChunks {
+    pub records: Range<usize>,
+    pub segment_chunks: Vec<Range<usize>>,
+}
+
+/// 一张卡上选段打分这一批分到它的 `segment_count` 个段怎么切（交之前算完）：整份记录表（`record_count` 条）连同段装得下就是一片整份记录表、
+/// 段照常切；装不下就把记录表按记录的次序切成相连的几片，每片取连同一个段单独成一段装得下、两个缓冲装得进绑定上限的最多条数，
+/// 每片照它的大小切段。没有段交回空。
+///
+/// # Errors
+/// 连只有一条记录的那一片连同一个段都装不下（[`SmallestPieceLargerThanTheRoom`]，`entry_position` 是 0）。
+pub fn live_slot_plan_on_a_gpu(
+    record_count: usize,
+    segment_count: usize,
+    room: ChunkBoundsOfAGpu,
+) -> Result<Vec<RecordSliceWithItsChunks>, SmallestPieceLargerThanTheRoom> {
+    if segment_count == 0 {
+        return Ok(Vec::new());
+    }
+    let record_count_wide = u64::try_from(record_count).expect("装得进 u64");
+    let fits = |records_in_the_slice: u64| -> bool {
+        let (table_bytes, largest_table_bytes) = record_table_bytes_of(records_in_the_slice);
+        largest_table_bytes <= room.largest_storage_binding_in_bytes
+            && chunks_that_fit_on_the_gpu(
+                &[SEGMENT_BOUND_BYTES],
+                live_slot_chunk_footprint_of_record_table_bytes(table_bytes),
+                room,
+            )
+            .is_ok()
+    };
+    let records_per_slice = if fits(record_count_wide) {
+        record_count_wide.max(1)
+    } else {
+        // 记录表每多一条，两个缓冲合占多 24 字节、大的那一个多 20 字节：按显存上限与绑定上限各自的余量现算最多几条，再核一遍。
+        let (table_bytes_of_one_record, largest_table_bytes_of_one_record) =
+            record_table_bytes_of(1);
+        let one_segment_without_the_table = live_slot_chunk_footprint_of_record_table_bytes(0)
+            .bytes_held_by_a_chunk(SEGMENT_BOUND_BYTES, 1);
+        let records_under_the_memory_limit = room.memory_limit.map_or(u64::MAX, |memory_limit| {
+            memory_limit.0.saturating_sub(one_segment_without_the_table) / table_bytes_of_one_record
+        });
+        let records_under_the_binding =
+            room.largest_storage_binding_in_bytes / largest_table_bytes_of_one_record;
+        let records_per_slice = records_under_the_memory_limit.min(records_under_the_binding);
+        if records_per_slice == 0 || !fits(records_per_slice) {
+            return Err(SmallestPieceLargerThanTheRoom {
+                entry_position: 0,
+                smallest_piece_bytes: bytes_of_the_smallest_live_slot_piece(),
+            });
+        }
+        records_per_slice
+    };
+    let records_per_slice =
+        usize::try_from(records_per_slice).expect("一片的条数不超过记录数，装得进 usize");
+    let segment_bound_lengths = vec![SEGMENT_BOUND_BYTES; segment_count];
+    let mut slices = Vec::new();
+    let mut slice_start = 0;
+    loop {
+        let slice_end = record_count.min(slice_start + records_per_slice);
+        let (table_bytes, _largest_table_bytes) =
+            record_table_bytes_of(u64::try_from(slice_end - slice_start).expect("装得进 u64"));
+        let segment_chunks = chunks_that_fit_on_the_gpu(
+            &segment_bound_lengths,
+            live_slot_chunk_footprint_of_record_table_bytes(table_bytes),
+            room,
+        )
+        .expect("一个段连同这一片记录表单独成一段装得下：片的条数按它取");
+        slices.push(RecordSliceWithItsChunks {
+            records: slice_start..slice_end,
+            segment_chunks,
+        });
+        slice_start = slice_end;
+        if slice_start >= record_count {
+            break;
+        }
+    }
+    Ok(slices)
+}
+
+/// 一张卡上这一批分到它的段照 [`live_slot_plan_on_a_gpu`] 切好的几片记录表、几段逐段交两份核（`both_kernel_live_slots_of_a_chunk`，
+/// 交它这一段的段、这一片的记录与这一片的两张表，交回这一段每段两份的活槽数，逐条走遍记录那一份在前），各片数出的逐段相加，两份各加各的。
+/// 交回每段两份的活槽数，按 `segments` 的次序。
+///
+/// # Errors
+/// 某一段交不成：照原样交回，后面的段不交。
+///
+/// # Panics
+/// 一片之下的几段没有一段不漏地罩住 `segments`；一段交回的段数与它的段数不等；相加超出 `u64`（活槽数不超过记录数乘 65535）。
+pub fn live_slots_summed_over_the_record_slices<SubmissionFailure>(
+    allocation_records: &[AllocationRecord],
+    segments: &[ClusterSegmentEntryKey],
+    slices: &[RecordSliceWithItsChunks],
+    mut both_kernel_live_slots_of_a_chunk: impl FnMut(
+        &[ClusterSegmentEntryKey],
+        &[AllocationRecord],
+        &AllocationRecordTablesForTheKernels,
+    ) -> Result<Vec<(u64, u64)>, SubmissionFailure>,
+) -> Result<Vec<(u64, u64)>, SubmissionFailure> {
+    let mut live_slots_per_segment = vec![(0_u64, 0_u64); segments.len()];
+    for slice in slices {
+        let records_of_the_slice = &allocation_records[slice.records.clone()];
+        let record_tables =
+            AllocationRecordTablesForTheKernels::of_the_allocation_records(records_of_the_slice);
+        let mut segments_counted = 0;
+        for segment_chunk in &slice.segment_chunks {
+            assert_eq!(
+                segment_chunk.start, segments_counted,
+                "一片之下的几段按段的次序首尾相接"
+            );
+            let chunk_live_slots = both_kernel_live_slots_of_a_chunk(
+                &segments[segment_chunk.clone()],
+                records_of_the_slice,
+                &record_tables,
+            )?;
+            assert_eq!(
+                chunk_live_slots.len(),
+                segment_chunk.len(),
+                "两份核每段各交一个数"
+            );
+            for (summed, (walking, searching)) in live_slots_per_segment[segment_chunk.clone()]
+                .iter_mut()
+                .zip(chunk_live_slots)
+            {
+                summed.0 = summed
+                    .0
+                    .checked_add(walking)
+                    .expect("活槽数之和不超过记录数乘 65535，装得进 u64");
+                summed.1 = summed
+                    .1
+                    .checked_add(searching)
+                    .expect("活槽数之和不超过记录数乘 65535，装得进 u64");
+            }
+            segments_counted = segment_chunk.end;
+        }
+        assert_eq!(
+            segments_counted,
+            segments.len(),
+            "一片之下的几段罩住每一个段"
+        );
+    }
+    Ok(live_slots_per_segment)
 }
 
 /// 每个段的上下界：头一个槽与这一段之后第一个槽，取核心层一个整段的整理区域的形状。
@@ -459,7 +637,7 @@ mod tests {
 
     /// 第 8 条：两份核对中间那一段数得不一样，这一轮不确定、不问 CPU；下一轮又不一样，交 CPU 参照现判，按核心层数的那个数。
     #[test]
-    fn a_segment_counted_differently_by_the_two_kernels_is_uncertain_once_and_judged_by_the_cpu_reference_the_next_round(
+    fn the_segment_counted_differently_by_the_two_kernels_is_uncertain_once_and_judged_by_the_cpu_reference_the_next_round(
     ) {
         let unit_area = unit_area_of_three_segments();
         let segments = cluster_segment_entry_keys_of_the_unit_area(unit_area);
@@ -573,6 +751,123 @@ mod tests {
                 && !WALKING_EVERY_RECORD_KERNEL_SOURCE
                     .contains(SEARCHING_SORTED_RECORDS_KERNEL_ENTRY_POINT),
             "两份核不互相引用"
+        );
+    }
+
+    /// 记录表两个缓冲的字节数按条数现算，与真建出来的相同（没有记录时各放一项）。
+    #[test]
+    fn record_table_bytes_counted_from_the_record_count_match_the_tables_built() {
+        for record_count in 0_usize..6 {
+            let records: Vec<AllocationRecord> = (0..record_count)
+                .map(|position| {
+                    record(
+                        UNIT_AREA_DEVICE,
+                        100 + u64::try_from(position).expect("小数"),
+                        1,
+                        false,
+                    )
+                })
+                .collect();
+            let tables = AllocationRecordTablesForTheKernels::of_the_allocation_records(&records);
+            assert_eq!(
+                record_table_bytes_of(u64::try_from(record_count).expect("小数")),
+                (tables.bytes_on_the_gpu(), tables.largest_buffer_bytes()),
+                "{record_count} 条"
+            );
+        }
+    }
+
+    /// 用户 2026-10-28 定「装不下应该自适应的分片」：上限 128 字节（一个段 80 字节加两条记录 48 字节）装不下整份记录表加一个段，
+    /// 记录表按记录切成每片两条、各片逐段数（两份核在 CPU 上的替身照核心层数这一片记录）再相加，与 CPU 参照对整份记录逐段相同。
+    #[test]
+    fn the_record_table_cut_into_slices_under_a_small_memory_limit_sums_to_the_cpu_reference() {
+        let unit_area = unit_area_of_three_segments();
+        let segments = cluster_segment_entry_keys_of_the_unit_area(unit_area);
+        let segment_slots = segments[1].start_slot.0 - segments[0].start_slot.0;
+        let start = segments[0].start_slot.0;
+        let records = vec![
+            record(UNIT_AREA_DEVICE, start + 3, 2, false),
+            record(UNIT_AREA_DEVICE, start - 2, 4, false),
+            record(OTHER_DEVICE, start + 5, 2, false),
+            record(UNIT_AREA_DEVICE, start + segment_slots - 1, 3, false),
+            record(UNIT_AREA_DEVICE, start + segment_slots + 7, 1, true),
+            record(UNIT_AREA_DEVICE, start + segment_slots + 7, 2, false),
+            record(UNIT_AREA_DEVICE, start + 2 * segment_slots + 1, 200, false),
+        ];
+        let room = ChunkBoundsOfAGpu {
+            memory_limit: Some(singlefs_core::background_compute::GpuMemoryInBytes(128)),
+            largest_storage_binding_in_bytes: 1 << 30,
+            largest_entry_count_per_dispatch: 1 << 20,
+        };
+        let plan = live_slot_plan_on_a_gpu(records.len(), segments.len(), room)
+            .expect("128 字节装得下最小的一片");
+        assert_eq!(
+            plan.iter()
+                .map(|slice| slice.records.clone())
+                .collect::<Vec<_>>(),
+            vec![0..2, 2..4, 4..6, 6..7],
+            "每片两条"
+        );
+        let summed = live_slots_summed_over_the_record_slices(
+            &records,
+            &segments,
+            &plan,
+            |chunk_segments, records_of_the_slice, _record_tables| {
+                let counted_in_the_slice =
+                    cpu_reference_live_slots(records_of_the_slice, unit_area);
+                Ok::<_, ()>(
+                    chunk_segments
+                        .iter()
+                        .map(|segment| {
+                            let segment_position = segments
+                                .iter()
+                                .position(|every_segment| every_segment == segment)
+                                .expect("段取自这块单元区");
+                            (
+                                counted_in_the_slice[segment_position],
+                                counted_in_the_slice[segment_position],
+                            )
+                        })
+                        .collect(),
+                )
+            },
+        )
+        .expect("替身不出错");
+        let reference = cpu_reference_live_slots(&records, unit_area);
+        assert!(
+            reference
+                .iter()
+                .filter(|live_slots| **live_slots > 0)
+                .count()
+                >= 2,
+            "参照里活槽不为 0 的段够多：{reference:?}"
+        );
+        assert_eq!(
+            summed,
+            reference
+                .iter()
+                .map(|live_slots| (*live_slots, *live_slots))
+                .collect::<Vec<_>>(),
+            "各片相加，两份照样逐段与 CPU 参照相同"
+        );
+    }
+
+    /// 连只有一条记录的那一片加一个段都装不下：报最小的一片要多少字节，不 panic。
+    #[test]
+    fn the_memory_limit_below_the_smallest_live_slot_piece_reports_how_much_it_needs() {
+        let room = ChunkBoundsOfAGpu {
+            memory_limit: Some(singlefs_core::background_compute::GpuMemoryInBytes(
+                bytes_of_the_smallest_live_slot_piece() - 1,
+            )),
+            largest_storage_binding_in_bytes: 1 << 30,
+            largest_entry_count_per_dispatch: 1 << 20,
+        };
+        assert_eq!(
+            live_slot_plan_on_a_gpu(7, 3, room),
+            Err(SmallestPieceLargerThanTheRoom {
+                entry_position: 0,
+                smallest_piece_bytes: bytes_of_the_smallest_live_slot_piece(),
+            })
         );
     }
 }

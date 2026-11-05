@@ -3,6 +3,8 @@
 // 校验和逐位移算 CRC-32C、不查表；映射反查在落点索引上二分找这个落点的第一项、往后读完同一落点的那几项（按条目序号升序，即条目表的次序），
 // 在按 key 排的序号上二分找头里那把 key。偏移与宽度是这一份自己照字节表写的（D18（块里携带什么信息） 已定项 7、11、18），不读别处。
 // 另一份（region_record_kernel_walking_the_mapping.wgsl）查表算校验和、逐条走条目表；两份只共用缓冲布局，布局由 src/region_record_kernels.rs 定。
+// 一个单元切成几片时（src/region_record_kernels.rs 文件头「一个单元切成几片」）：头一片之后的那几片只接着逐位移算载荷 CRC 的寄存器、交回寄存器；
+// 头一片照常逐关核，载荷 CRC 从全 1 起喂头一片里载荷的字节，再逐位移喂之后那么多个 0 字节、异或带进来的那几字节的寄存器，取反。
 
 struct SearchChunkParameters {
     number_of_records: u32,
@@ -19,6 +21,10 @@ struct SearchRecordDescriptor {
     device_of_the_record: u32,
     slot_low_word: u32,
     slot_high_word: u32,
+    which_piece: u32,
+    length_of_the_unit_after_this_piece: u32,
+    register_word_of_the_other_kernel: u32,
+    register_word_of_the_search: u32,
 }
 
 struct SearchMappingEntry {
@@ -65,6 +71,9 @@ const OUTCOME_KEY_DISAGREES_WITH_THE_LOCATION: u32 = 3u;
 const OUTCOME_READ_FAILED: u32 = 4u;
 const OUTCOME_SPAN_NOT_A_UNIT: u32 = 5u;
 const OUTCOME_PARSER_REFUSED: u32 = 6u;
+const OUTCOME_REGISTER_AFTER_THE_PIECE: u32 = 7u;
+// 描述里这一片是单元头一片之后的一片（别的值是从单元头起的一片）：与 src/region_record_kernels.rs 同值。
+const WHICH_PIECE_FOLLOWS_THE_HEAD: u32 = 1u;
 const PARSER_ACCEPTED: u32 = 0xFFFFFFFFu;
 const PARSER_TOO_SHORT: u32 = 0u;
 const PARSER_BAD_MAGIC: u32 = 1u;
@@ -95,6 +104,14 @@ struct UnitLayoutToSearch {
     header_end: u32,
     payload_crc_at: u32,
     tag_copy_at: u32,
+}
+
+// 交给这一调用的单元：从单元头起的那一片在输入里的起点与长度，单元在这一片之后还有多长，与之后那几字节从 0 起算完的寄存器（没切开的是 0 与 0）。
+struct UnitToSearch {
+    start: u32,
+    length_in_this_piece: u32,
+    length_after_this_piece: u32,
+    register_of_what_follows: u32,
 }
 
 struct HeaderVerdictOfTheSearch {
@@ -186,7 +203,9 @@ fn layout_of_a_packed_unit() -> UnitLayoutToSearch {
 }
 
 // 逐关核：magic、版本、类标签、flags、头校验和、载荷校验和、预留位、类标签副本。全过交回 PARSER_ACCEPTED。
-fn checks_shared_by_every_unit_class(start: u32, unit_length: u32, unit_layout: UnitLayoutToSearch) -> HeaderVerdictOfTheSearch {
+// 载荷校验和：喂完这一片里载荷的字节，再逐位移喂这一片之后那么多个 0 字节、异或它们从 0 起算完的寄存器（单元没切开时两样都是 0）。
+fn checks_shared_by_every_unit_class(unit: UnitToSearch, unit_layout: UnitLayoutToSearch) -> HeaderVerdictOfTheSearch {
+    let start = unit.start;
     if (little_endian_value_of_bytes(start, 4u) != UNIT_MAGIC_BYTES_AS_A_WORD) {
         return rejected_header(PARSER_BAD_MAGIC, 0u);
     }
@@ -203,7 +222,8 @@ fn checks_shared_by_every_unit_class(start: u32, unit_length: u32, unit_layout: 
     if (!header_checksum_field_holds(start, unit_layout.header_end)) {
         return rejected_header(PARSER_HEADER_CRC_MISMATCH, 0u);
     }
-    let payload_register = register_after_unit_bytes(0xFFFFFFFFu, start + unit_layout.header_end, start + unit_length);
+    let register_through_this_piece = register_after_unit_bytes(0xFFFFFFFFu, start + unit_layout.header_end, start + unit.length_in_this_piece);
+    let payload_register = register_after_zero_bytes(register_through_this_piece, unit.length_after_this_piece) ^ unit.register_of_what_follows;
     if (little_endian_value_of_bytes(start + unit_layout.payload_crc_at, 4u) != ~payload_register) {
         return rejected_header(PARSER_PAYLOAD_CRC_MISMATCH, 0u);
     }
@@ -241,12 +261,14 @@ fn key_words_of_the_fields(tag: u32, field_starts: vec4<u32>, field_widths: vec4
     return words;
 }
 
-fn verdict_on_an_index_node(start: u32, unit_length: u32) -> HeaderVerdictOfTheSearch {
+fn verdict_on_an_index_node(unit: UnitToSearch) -> HeaderVerdictOfTheSearch {
+    let start = unit.start;
+    let unit_length = unit.length_in_this_piece + unit.length_after_this_piece;
     if (unit_length != BYTES_OF_AN_INDEX_NODE) {
         return rejected_header(PARSER_TOO_SHORT, 0u);
     }
     let unit_layout = layout_of_an_index_node(start);
-    var verdict = checks_shared_by_every_unit_class(start, unit_length, unit_layout);
+    var verdict = checks_shared_by_every_unit_class(unit, unit_layout);
     if (verdict.refusal_code != PARSER_ACCEPTED) {
         return verdict;
     }
@@ -278,9 +300,11 @@ fn verdict_on_an_index_node(start: u32, unit_length: u32) -> HeaderVerdictOfTheS
     return verdict;
 }
 
-fn verdict_on_a_packed_unit(start: u32, unit_length: u32) -> HeaderVerdictOfTheSearch {
+fn verdict_on_a_packed_unit(unit: UnitToSearch) -> HeaderVerdictOfTheSearch {
+    let start = unit.start;
+    let unit_length = unit.length_in_this_piece + unit.length_after_this_piece;
     let unit_layout = layout_of_a_packed_unit();
-    var verdict = checks_shared_by_every_unit_class(start, unit_length, unit_layout);
+    var verdict = checks_shared_by_every_unit_class(unit, unit_layout);
     if (verdict.refusal_code != PARSER_ACCEPTED) {
         return verdict;
     }
@@ -310,15 +334,17 @@ fn verdict_on_a_packed_unit(start: u32, unit_length: u32) -> HeaderVerdictOfTheS
     return verdict;
 }
 
-fn verdict_on_a_two_slot_unit(start: u32, unit_length: u32) -> HeaderVerdictOfTheSearch {
+fn verdict_on_a_two_slot_unit(unit: UnitToSearch) -> HeaderVerdictOfTheSearch {
+    let start = unit.start;
+    let unit_length = unit.length_in_this_piece + unit.length_after_this_piece;
     if (unit_length != BYTES_OF_A_DATA_OR_PACKED_UNIT) {
         return rejected_header(PARSER_TOO_SHORT, 0u);
     }
     let unit_layout = layout_of_a_data_unit();
-    var verdict = checks_shared_by_every_unit_class(start, unit_length, unit_layout);
+    var verdict = checks_shared_by_every_unit_class(unit, unit_layout);
     // 类标签是 3：当码 3 重解（核心层区域扫描的读法）
     if (verdict.refusal_code == PARSER_WRONG_CLASS && extractBits(verdict.refusal_detail, 8u, 8u) == TAG_OF_A_PACKED_UNIT) {
-        return verdict_on_a_packed_unit(start, unit_length);
+        return verdict_on_a_packed_unit(unit);
     }
     if (verdict.refusal_code != PARSER_ACCEPTED) {
         return verdict;
@@ -382,6 +408,23 @@ fn classify_records_searching_the_sorted_mapping_indexes(@builtin(global_invocat
     }
     let record = record_descriptors_to_search[record_number];
     var outcome: SearchRecordOutcome;
+    // 单元头一片之后的一片：从带进来的寄存器接着逐位移喂这一片的字节，交回寄存器
+    if (record.which_piece == WHICH_PIECE_FOLLOWS_THE_HEAD) {
+        outcome.kind_of_the_outcome = OUTCOME_REGISTER_AFTER_THE_PIECE;
+        outcome.first_detail = register_after_unit_bytes(
+            record.register_word_of_the_search,
+            record.first_byte,
+            record.first_byte + record.length_in_bytes,
+        );
+        outcomes_of_the_search[record_number] = outcome;
+        return;
+    }
+    let unit_of_the_record = UnitToSearch(
+        record.first_byte,
+        record.length_in_bytes,
+        record.length_of_the_unit_after_this_piece,
+        record.register_word_of_the_search,
+    );
     var header: HeaderVerdictOfTheSearch;
     switch (record.span_in_slots) {
         case 1u: {
@@ -390,7 +433,7 @@ fn classify_records_searching_the_sorted_mapping_indexes(@builtin(global_invocat
                 outcomes_of_the_search[record_number] = outcome;
                 return;
             }
-            header = verdict_on_an_index_node(record.first_byte, record.length_in_bytes);
+            header = verdict_on_an_index_node(unit_of_the_record);
         }
         case 2u: {
             if (record.read_succeeded == 0u) {
@@ -398,7 +441,7 @@ fn classify_records_searching_the_sorted_mapping_indexes(@builtin(global_invocat
                 outcomes_of_the_search[record_number] = outcome;
                 return;
             }
-            header = verdict_on_a_two_slot_unit(record.first_byte, record.length_in_bytes);
+            header = verdict_on_a_two_slot_unit(unit_of_the_record);
         }
         default: {
             outcome.kind_of_the_outcome = OUTCOME_SPAN_NOT_A_UNIT;

@@ -1,13 +1,13 @@
 //! 产品 GPU 包对核心层 `BackgroundGpuCompute` 的实现（`background_gpu_compute::BackgroundGpuComputeThroughBothKernels`）里不要 GPU 的那一半：
 //! 两份核那一层换成在 CPU 上算的替身（[`BothKernelsComputedOnTheCpu`]，两份「核」都照本包的 CPU 参照算，按条目键点名的几条让后一份算得不一样，
 //! 可注入某一段交不成），比对、连续不确定计数、判定与出错的映射都走产品那一份代码。
-//! 对拍的另一边是核心层测试用的假实现（`crates/singlefs-harness/tests/common_background_gpu_compute/mod.rs`，经 `#[path]` 引进来，它只依赖核心层）：
+//! 对拍的另一边是核心层测试用的假实现（`crates/singlefs-verification/tests/common_background_gpu_compute/mod.rs`，经 `#[path]` 引进来，它只依赖核心层）：
 //! 小输入上同样注入「这几条两份核判得不一样」「这一段出错」，三段逐轮交回的判定逐条相同（D26（后台整理与放置回收） 已定项 13 第 4、8 条）。
 //! 另有一趟整理到停：同一历史的两个池，一个选 `cpu`、一个选 `gpu` 递进这份实现（背后是 CPU 替身），发的每一版、录制流、停在哪逐项相同。
 //! 设置（D26 已定项 13 第 1–3 条）：核心层交来的每一组转到两份核那一层，挂载那一刻交一次、切换只在生效的那一批开头交，一批之内不交；
 //! 交新设置不清三段的连续不确定计数（第 8 条）。出错（第 4 条）：报给核心层的错带着卡与原因。
 //! 卡清单照本包开卡之后那一份答（`gpus_of_this_host::DiscreteGpusAfterTheOpening`）：挂载那一刻没开成而跳过的卡，挂着切换点到它照第 4 条拒。
-#[path = "../../singlefs-harness/tests/common_background_gpu_compute/mod.rs"]
+#[path = "../../singlefs-verification/tests/common_background_gpu_compute/mod.rs"]
 mod common_background_gpu_compute;
 mod common_pool_on_memory_devices;
 
@@ -19,7 +19,8 @@ use common_background_gpu_compute::CpuBackedBackgroundGpuComputeForTests;
 use common_pool_on_memory_devices::pool_after_a_sequential_write_in_an_earlier_mount;
 use singlefs_background_gpu::adapter_inventory::DiscreteGpuOnThisHost;
 use singlefs_background_gpu::background_gpu::{
-    ChecksumBatchFailed, GpuFailureCause, LiveSlotBatchFailed, RegionRecordBatchFailed,
+    BatchNotSplitOverTheGpus, ChecksumBatchFailed, GpuFailureCause, LiveSlotBatchFailed,
+    RegionRecordBatchFailed, SmallestPieceNotHeldOnTheGpu,
 };
 use singlefs_background_gpu::background_gpu_compute::{
     core_failure_of_the_gpu, BackgroundGpuComputeThroughBothKernels, BothKernelsOfTheThreeSegments,
@@ -41,17 +42,22 @@ use singlefs_core::allocator::{AllocationRecord, AllocationRecordQuarantineMark,
 use singlefs_core::background_compute::{
     admit_background_compute_settings_with_the_gpu_compute,
     admit_gpu_settings_against_the_inventory, AdmittedGpuSettings, BackgroundComputeBackend,
-    BackgroundComputeOfThisMount, BackgroundComputePathTaken, BackgroundComputeSettings,
-    BackgroundComputeSettingsRefused, BackgroundGpuCompute, BackgroundGpuComputeFailed,
-    BackgroundGpuComputeHandle, ClusterSegmentEntryKey, GpuDeviceIdentifier,
-    GpuDeviceNotOpenedAtTheMount, GpuEntryCounts, GpuEntryDecision, GpuInventory, GpuMemoryInBytes,
+    BackgroundComputeError, BackgroundComputeOfThisMount, BackgroundComputePathTaken,
+    BackgroundComputeSettings, BackgroundComputeSettingsRefused, BackgroundGpuCompute,
+    BackgroundGpuComputeFailed, BackgroundGpuComputeHandle, BackgroundTask,
+    BackgroundTaskAfterTheComputeError, BackgroundTaskStoppedAfterAComputeError,
+    ClusterSegmentEntryKey, GpuComputedSegment, GpuDeviceIdentifier, GpuDeviceNotOpenedAtTheMount,
+    GpuEntryCounts, GpuEntryDecision, GpuInventory, GpuLeftOutUnderItsMemoryLimit,
+    GpuMemoryInBytes, GpuSubmissionsOfOneSegment, GpuSubmissionsOfTheBatch,
     InputNotSupportedOnTheGpu, RegionRecordEntryKey, RegionRecordToClassifyOnTheGpu,
-    UnitChecksumOutcome, UnitChecksumToVerifyOnTheGpu, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
+    SubmissionWaitedForPastTheLimit, UnitChecksumOutcome, UnitChecksumToVerifyOnTheGpu,
+    BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
 };
 use singlefs_core::compaction_plan::{
-    cluster_segment_entry_keys_of_the_unit_area, UnitAreaOfOneDevice,
+    cluster_segment_entry_keys_of_the_unit_area, CompactionRunStop, UnitAreaOfOneDevice,
 };
 use singlefs_core::logged_operations::CompactionRegion;
+use singlefs_core::mounted_session::CompactionRunOutcome;
 use singlefs_core::pointer::{LocationEntry, PointerHead};
 use singlefs_core::records::mapping_key_for_data;
 use singlefs_core::region_scan::{
@@ -111,6 +117,13 @@ struct InjectedIntoTheKernelsOnTheCpu {
     unit_checksum_batch_failure: Option<ChecksumBatchFailed>,
     region_record_batch_failure: Option<RegionRecordBatchFailed>,
     live_slot_batch_failure: Option<LiveSlotBatchFailed>,
+    /// 此刻这组设置下一批分不到卡上时答的那一种（`BothKernelsOfTheThreeSegments::batch_not_split_over_the_gpus_under_the_settings_in_use`）；
+    /// 三段照产品那一层一样，分不到卡上就一段都不算、交回它。
+    batch_not_split_over_the_gpus: Option<BatchNotSplitOverTheGpus>,
+    /// 下一次收到核心层转来的设置时换成「此刻这组设置下一批分不到卡上」的那一种：模拟挂着切到一组一张卡都用不上的设置。
+    batch_not_split_over_the_gpus_once_the_next_settings_arrive: Option<BatchNotSplitOverTheGpus>,
+    /// 每一批算完之后核心层来取的「三段各自在卡上是怎么交的」：替身每次都交回这一份（用例照它核核心层记没记进那一批的记账）。
+    submissions_reported_after_each_batch: GpuSubmissionsOfTheBatch,
 }
 
 impl InjectedIntoTheKernelsOnTheCpu {
@@ -123,6 +136,9 @@ impl InjectedIntoTheKernelsOnTheCpu {
             unit_checksum_batch_failure: None,
             region_record_batch_failure: None,
             live_slot_batch_failure: None,
+            batch_not_split_over_the_gpus: None,
+            batch_not_split_over_the_gpus_once_the_next_settings_arrive: None,
+            submissions_reported_after_each_batch: GpuSubmissionsOfTheBatch::default(),
         }
     }
 }
@@ -153,6 +169,22 @@ impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
         units: &[UnitChecksumToVerify<'_, RegionRecordEntryKey>],
     ) -> Result<Vec<(ChecksumKernelOutcome, ChecksumKernelOutcome)>, ChecksumBatchFailed> {
         let mut injected = self.injected.lock().expect("用例没在别处 panic 过");
+        match &injected.batch_not_split_over_the_gpus {
+            None => {}
+            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch { device, cause }) => {
+                return Err(ChecksumBatchFailed::GpuFailed {
+                    device: device.clone(),
+                    cause: cause.clone(),
+                });
+            }
+            Some(BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out)) => {
+                return Err(
+                    ChecksumBatchFailed::EveryParticipatingGpuLeftOutUnderItsMemoryLimit(
+                        gpus_left_out.clone(),
+                    ),
+                );
+            }
+        }
         injected
             .events
             .push(EventOfTheKernelsOnTheCpu::SegmentComputed);
@@ -186,6 +218,22 @@ impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
         mapping_entries: &[CentralMappingEntry],
     ) -> Result<Vec<(AllocationInRegion, AllocationInRegion)>, RegionRecordBatchFailed> {
         let mut injected = self.injected.lock().expect("用例没在别处 panic 过");
+        match &injected.batch_not_split_over_the_gpus {
+            None => {}
+            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch { device, cause }) => {
+                return Err(RegionRecordBatchFailed::GpuFailed {
+                    device: device.clone(),
+                    cause: cause.clone(),
+                });
+            }
+            Some(BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out)) => {
+                return Err(
+                    RegionRecordBatchFailed::EveryParticipatingGpuLeftOutUnderItsMemoryLimit(
+                        gpus_left_out.clone(),
+                    ),
+                );
+            }
+        }
         injected
             .events
             .push(EventOfTheKernelsOnTheCpu::SegmentComputed);
@@ -230,6 +278,22 @@ impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
         segments: &[ClusterSegmentEntryKey],
     ) -> Result<Vec<(u64, u64)>, LiveSlotBatchFailed> {
         let mut injected = self.injected.lock().expect("用例没在别处 panic 过");
+        match &injected.batch_not_split_over_the_gpus {
+            None => {}
+            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch { device, cause }) => {
+                return Err(LiveSlotBatchFailed::GpuFailed {
+                    device: device.clone(),
+                    cause: cause.clone(),
+                });
+            }
+            Some(BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out)) => {
+                return Err(
+                    LiveSlotBatchFailed::EveryParticipatingGpuLeftOutUnderItsMemoryLimit(
+                        gpus_left_out.clone(),
+                    ),
+                );
+            }
+        }
         injected
             .events
             .push(EventOfTheKernelsOnTheCpu::SegmentComputed);
@@ -251,13 +315,36 @@ impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
     }
 
     fn use_the_settings_from_the_next_batch(&mut self, settings: &AdmittedGpuSettings) {
-        self.injected
-            .lock()
-            .expect("用例没在别处 panic 过")
+        let mut injected = self.injected.lock().expect("用例没在别处 panic 过");
+        injected
             .events
             .push(EventOfTheKernelsOnTheCpu::SettingsReceived(
                 settings.clone(),
             ));
+        if let Some(not_split) = injected
+            .batch_not_split_over_the_gpus_once_the_next_settings_arrive
+            .take()
+        {
+            injected.batch_not_split_over_the_gpus = Some(not_split);
+        }
+    }
+
+    fn batch_not_split_over_the_gpus_under_the_settings_in_use(
+        &self,
+    ) -> Option<BatchNotSplitOverTheGpus> {
+        self.injected
+            .lock()
+            .expect("用例没在别处 panic 过")
+            .batch_not_split_over_the_gpus
+            .clone()
+    }
+
+    fn take_the_submissions_of_the_batch(&mut self) -> GpuSubmissionsOfTheBatch {
+        self.injected
+            .lock()
+            .expect("用例没在别处 panic 过")
+            .submissions_reported_after_each_batch
+            .clone()
     }
 }
 
@@ -542,7 +629,7 @@ fn decisions_over_three_rounds_agree_with_the_fake_of_the_core_on_every_segment(
 /// 第 4 条：这一轮某一段交不成（GPU 出错、两种超时）时三段各自报成核心层的 `GpuFailed`，计数不动：前一轮不确定的那一条，出错之后再不确定一轮
 /// 就按 CPU 判（出错那一轮不算一轮、也不清零），与核心层测试用的假实现逐轮相同。第一版不支持的输入报成 `InputNotSupportedOnTheGpu`。
 #[test]
-fn a_batch_that_fails_on_the_gpu_or_times_out_is_reported_as_gpu_failed_and_leaves_the_consecutive_counts(
+fn the_batch_that_fails_on_the_gpu_or_times_out_is_reported_as_gpu_failed_and_leaves_the_consecutive_counts(
 ) {
     let inputs = small_inputs_of_the_three_segments();
     let named = entries_named_in_each_segment(&inputs);
@@ -619,23 +706,22 @@ fn a_batch_that_fails_on_the_gpu_or_times_out_is_reported_as_gpu_failed_and_leav
     let (mut implementation, injected) = implementation_over_kernels_on_the_cpu();
     {
         let mut injected = injected.lock().expect("用例没在别处 panic 过");
-        injected.unit_checksum_batch_failure =
-            Some(ChecksumBatchFailed::UnitLargerThanAChunkOnTheGpu {
-                device: card.clone(),
-                entry_position: 0,
-                unit_bytes: 1 << 20,
-            });
+        let smallest_piece_not_held = |smallest_piece_bytes: u64| SmallestPieceNotHeldOnTheGpu {
+            device: card.clone(),
+            entry_position: 0,
+            memory_limit: Some(GpuMemoryInBytes(50)),
+            smallest_piece_bytes,
+        };
+        injected.unit_checksum_batch_failure = Some(
+            ChecksumBatchFailed::GpuCannotHoldTheSmallestPiece(smallest_piece_not_held(64)),
+        );
         injected.region_record_batch_failure =
-            Some(RegionRecordBatchFailed::RecordLargerThanAChunkOnTheGpu {
-                device: card.clone(),
-                entry_position: 0,
-                unit_bytes: 32 << 10,
-            });
-        injected.live_slot_batch_failure =
-            Some(LiveSlotBatchFailed::SegmentLargerThanAChunkOnTheGpu {
-                device: card,
-                entry_position: 0,
-            });
+            Some(RegionRecordBatchFailed::GpuCannotHoldTheSmallestPiece(
+                smallest_piece_not_held(32 << 10),
+            ));
+        injected.live_slot_batch_failure = Some(
+            LiveSlotBatchFailed::GpuCannotHoldTheSmallestPiece(smallest_piece_not_held(104)),
+        );
     }
     let entry_larger_than_a_chunk = |input_bytes: u64| {
         BackgroundGpuComputeFailed::InputNotSupportedOnTheGpu(
@@ -649,11 +735,11 @@ fn a_batch_that_fails_on_the_gpu_or_times_out_is_reported_as_gpu_failed_and_leav
     assert_eq!(
         one_round_of_the_three_segments(&mut implementation, &inputs),
         DecisionsOfTheThreeSegments {
-            unit_checksums: Err(entry_larger_than_a_chunk(1 << 20)),
+            unit_checksums: Err(entry_larger_than_a_chunk(64)),
             region_records: Err(entry_larger_than_a_chunk(32 << 10)),
-            live_slots: Err(entry_larger_than_a_chunk(16)),
+            live_slots: Err(entry_larger_than_a_chunk(104)),
         },
-        "一张卡都没交活的第一版不支持的输入：报出哪张卡、哪一条、多少字节"
+        "一张卡连最小的一片都装不下（一张卡都没交活）：报出哪张卡、哪一条、最小的一片多少字节"
     );
 }
 
@@ -696,7 +782,7 @@ fn the_core_admits_gpu_settings_against_the_inventory_the_implementation_answers
 /// 挂载时给了卡列表、没点名的那张卡没开成而被跳过；挂着切换点到它（点名它，或不给卡列表、本机全部独显都参与）照拒，校验同挂载那一刻，
 /// 生效的与待生效的都不动，实现只收到挂载那一组。经核心层的切换入口与产品那一份实现（两份核那一层是 CPU 替身）走。
 #[test]
-fn a_switch_to_a_card_not_opened_at_the_mount_is_refused() {
+fn the_switch_to_a_card_not_opened_at_the_mount_is_refused() {
     let injected = Arc::new(Mutex::new(InjectedIntoTheKernelsOnTheCpu::nothing()));
     let cause_at_the_mount = GpuFailureCause::DeviceOrPipelineDidNotStart {
         reason: "起不了设备：造出来的坏卡".to_string(),
@@ -784,7 +870,7 @@ fn a_switch_to_a_card_not_opened_at_the_mount_is_refused() {
 /// D26 已定项 13「两份实现在测试里对拍」的不起卡那一半：同一历史的两个池，一个重挂选 `cpu`、一个选 `gpu` 递进产品那一份实现（背后是 CPU 替身），
 /// 各推一趟整理到停。两趟发的每一版、录制流、盘上字节、停在哪、搬了几批、整理观测与 discard 逐项相同；`gpu` 那一趟每一批走 GPU、三段都算了、全部确认。
 #[test]
-fn a_compaction_run_through_the_implementation_over_kernels_on_the_cpu_ends_exactly_as_the_cpu_path(
+fn the_compaction_run_through_the_implementation_over_kernels_on_the_cpu_ends_exactly_as_the_cpu_path(
 ) {
     let history = pool_after_a_sequential_write_in_an_earlier_mount();
     let mut cpu_pool = history.copied_with_an_empty_stream();
@@ -856,7 +942,7 @@ fn a_compaction_run_through_the_implementation_over_kernels_on_the_cpu_ends_exac
     );
     let mut entries_of_the_run: BTreeMap<&str, GpuEntryCounts> = BTreeMap::new();
     for batch in &gpu_run.background_compute_of_each_batch {
-        let BackgroundComputePathTaken::Gpu(gpu_work) = batch.path_taken else {
+        let BackgroundComputePathTaken::Gpu(gpu_work) = &batch.path_taken else {
             panic!("gpu 那一趟每一批走 GPU：{batch:?}");
         };
         for (segment_name, counts) in [
@@ -968,7 +1054,7 @@ fn settings_handed_over_between_two_rounds_reach_the_kernels_and_keep_the_consec
 /// 第 1 条「从下一批开始生效；一批之内不换」，经核心层走：选 `gpu` 挂载那一刻核心层把挂载那一组交给实现；头一批读完设置、开算之前请求切换
 /// （等的上限与显存上限都换了），头一批算的每一段都在切换那一组交过来之前，切换那一组在下一批开头、开算之前交过来，一趟里只交这两次。
 #[test]
-fn a_switch_requested_in_the_middle_of_a_batch_reaches_the_kernels_only_at_the_start_of_the_next_batch(
+fn the_switch_requested_in_the_middle_of_a_batch_reaches_the_kernels_only_at_the_start_of_the_next_batch(
 ) {
     let history = pool_after_a_sequential_write_in_an_earlier_mount();
     let mut gpu_pool = history.copied_with_an_empty_stream();
@@ -1056,4 +1142,284 @@ fn a_switch_requested_in_the_middle_of_a_batch_reaches_the_kernels_only_at_the_s
             .all(|batch| matches!(batch.path_taken, BackgroundComputePathTaken::Gpu(_))),
         "每一批都走 GPU"
     );
+}
+
+/// 用户 2026-10-28 定「在间隔内重试三次，如果gpu无法用就报警」：丙段交回「这张卡重交 3 次都等超过上限」（两份核那一层是 CPU 替身），
+/// 经产品那一份实现报给核心层是「这张卡用不了」那一个成员，带卡、重交了几次、等的上限与最后那一次是这一批的那一次提交；整理这一批放弃、
+/// 一个写都没发、停着，`stopped_after_a_compute_error` 读得出它。
+#[test]
+fn the_gpu_unusable_after_its_resubmissions_stops_the_compaction_reporting_the_card_resubmissions_and_wait_limit(
+) {
+    let mut pool = pool_after_a_sequential_write_in_an_earlier_mount();
+    let (implementation, injected) = implementation_over_kernels_on_the_cpu();
+    injected
+        .lock()
+        .expect("用例没在别处 panic 过")
+        .live_slot_batch_failure = Some(LiveSlotBatchFailed::GpuFailed {
+        device: card_of_the_test_double(),
+        cause: GpuFailureCause::UnusableAfterResubmissions {
+            resubmissions: 3,
+            last_cause: Box::new(GpuFailureCause::WaitForTheGpuExceededTheLimit {
+                wait_limit: BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
+            }),
+        },
+    });
+    let mut session = pool.remounted_with_compaction_forced_to_start(
+        settings_on_the_card_of_the_test_double(None, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT),
+        Some(BackgroundGpuComputeHandle::of_an_implementation(
+            implementation,
+        )),
+    );
+    let run = session.run_compaction(&mut pool.devices).expect("整理一趟");
+    assert!(
+        matches!(
+            run.outcome,
+            CompactionRunOutcome::Stopped(
+                CompactionRunStop::BatchAbandonedAfterABackgroundComputeError {
+                    task_after_the_error: BackgroundTaskAfterTheComputeError::LeftStopped
+                }
+            )
+        ) && run.versions_published.is_empty(),
+        "这一批放弃、一个写都没发、整理停下：{:?}",
+        run.outcome
+    );
+    assert_eq!(
+        session.background_compute().stopped_after_a_compute_error(),
+        &[BackgroundTaskStoppedAfterAComputeError {
+            task: BackgroundTask::CompactionRelocation,
+            error: BackgroundComputeError::GpuSegmentFailed {
+                segment: GpuComputedSegment::LiveSlotsPerClusterSegment,
+                failure: BackgroundGpuComputeFailed::GpuUnusableAfterResubmissions {
+                    device: card_of_the_test_double(),
+                    resubmissions: 3,
+                    wait_limit: BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
+                    last_submission_waited_for:
+                        SubmissionWaitedForPastTheLimit::SubmissionOfThisBatch,
+                },
+            },
+            batches_compensated_on_the_cpu: 0,
+        }],
+        "停着那一态报的是「这张卡用不了」：卡、重交 3 次、等的上限、最后那一次是这一批的提交"
+    );
+}
+
+/// 用户 2026-10-28 定「不能因为装不下就拒绝」「连一片都装不下就不用这张卡」：挂载选 `gpu`，两份核那一层答「参与的卡一张都不剩」（显存上限装不下最小的一片）：
+/// 挂载照常做成，挂载那一刻整理就记成出错停着、读得出原因（「参与的卡一张都不剩」，带那张卡、上限与至少要多少），不等头一批；之后一趟整理停在此前出错停着上、
+/// 一个写都不发，两份核那一层一段都没算。
+#[test]
+fn the_mount_whose_participating_gpus_are_all_left_out_under_their_memory_limit_starts_with_the_compaction_stopped(
+) {
+    let mut pool = pool_after_a_sequential_write_in_an_earlier_mount();
+    let (implementation, injected) = implementation_over_kernels_on_the_cpu();
+    let gpus_left_out = vec![GpuLeftOutUnderItsMemoryLimit {
+        device: card_of_the_test_double(),
+        memory_limit: GpuMemoryInBytes(64),
+        smallest_piece_bytes: 976,
+        bytes_already_held_on_the_device: 0,
+    }];
+    injected
+        .lock()
+        .expect("用例没在别处 panic 过")
+        .batch_not_split_over_the_gpus = Some(
+        BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out.clone()),
+    );
+    let mut session = pool.remounted_with_compaction_forced_to_start(
+        settings_on_the_card_of_the_test_double(None, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT),
+        Some(BackgroundGpuComputeHandle::of_an_implementation(
+            implementation,
+        )),
+    );
+    assert_eq!(
+        session.background_compute().stopped_after_a_compute_error(),
+        &[BackgroundTaskStoppedAfterAComputeError {
+            task: BackgroundTask::CompactionRelocation,
+            error: BackgroundComputeError::GpuUnusableUnderTheSettingsHandedIn {
+                failure:
+                    BackgroundGpuComputeFailed::EveryParticipatingGpuLeftOutUnderItsMemoryLimit {
+                        gpus_left_out,
+                    },
+            },
+            batches_compensated_on_the_cpu: 0,
+        }],
+        "挂载那一刻就停着、读得出原因：参与的卡一张都不剩"
+    );
+    let run = session.run_compaction(&mut pool.devices).expect("整理一趟");
+    assert!(
+        matches!(
+            run.outcome,
+            CompactionRunOutcome::Stopped(
+                CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError
+            )
+        ) && run.versions_published.is_empty()
+            && run.background_compute_of_each_batch.is_empty(),
+        "停着而占用不超过阈值：一个写都不发、一批都不开：{:?}",
+        run.outcome
+    );
+    assert!(
+        injected
+            .lock()
+            .expect("用例没在别处 panic 过")
+            .events
+            .iter()
+            .all(|event| matches!(event, EventOfTheKernelsOnTheCpu::SettingsReceived(_))),
+        "两份核那一层只收到挂载那一组设置，一段都没算"
+    );
+}
+
+/// 用户 2026-10-28 定「不能因为装不下就拒绝」：挂着切到一组一张卡都用不上的设置（显存上限 64 字节，两份核那一层收到这一组之后答「参与的卡一张都不剩」），
+/// 切换照收；切换生效的那一批开头整理当场停着，报的成员与挂载那一刻一张都用不上时相同
+/// （`the_mount_whose_participating_gpus_are_all_left_out_under_their_memory_limit_starts_with_the_compaction_stopped`）。那一批不开、
+/// 一趟停在此前出错停着上，切换之前那一批照常走 GPU；两份核那一层收到切换那一组之后一段都没算。
+#[test]
+fn the_switch_to_settings_whose_participating_gpus_are_all_left_out_stops_the_compaction_at_the_next_batch_as_at_the_mount(
+) {
+    let mut pool = pool_after_a_sequential_write_in_an_earlier_mount();
+    let (implementation, injected) = implementation_over_kernels_on_the_cpu();
+    let memory_limit_holding_no_piece = GpuMemoryInBytes(64);
+    let gpus_left_out = vec![GpuLeftOutUnderItsMemoryLimit {
+        device: card_of_the_test_double(),
+        memory_limit: memory_limit_holding_no_piece,
+        smallest_piece_bytes: 976,
+        bytes_already_held_on_the_device: 0,
+    }];
+    let mut session = pool.remounted_with_compaction_forced_to_start(
+        settings_on_the_card_of_the_test_double(None, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT),
+        Some(BackgroundGpuComputeHandle::of_an_implementation(
+            implementation,
+        )),
+    );
+    assert!(
+        session
+            .background_compute()
+            .stopped_after_a_compute_error()
+            .is_empty(),
+        "挂载那一组用得上：挂载那一刻没停着"
+    );
+    let mut batches_begun = 0_usize;
+    let mut switch_in_the_middle_of_the_first_batch =
+        |background_compute: &mut BackgroundComputeOfThisMount| {
+            batches_begun += 1;
+            if batches_begun == 1 {
+                background_compute
+                    .request_switch_from_the_next_batch(
+                        settings_on_the_card_of_the_test_double(
+                            Some(memory_limit_holding_no_piece),
+                            BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
+                        ),
+                        None,
+                    )
+                    .expect("上限不超过那张卡的显存总量：切换照收，不因为装不下就拒");
+                injected
+                    .lock()
+                    .expect("用例没在别处 panic 过")
+                    .batch_not_split_over_the_gpus_once_the_next_settings_arrive = Some(
+                    BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out.clone()),
+                );
+            }
+        };
+    let run = session
+        .run_compaction_calling_a_test_only_hook_in_the_middle_of_each_batch(
+            &mut pool.devices,
+            &mut switch_in_the_middle_of_the_first_batch,
+        )
+        .expect("整理一趟");
+    assert!(
+        matches!(
+            run.outcome,
+            CompactionRunOutcome::Stopped(
+                CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError
+            )
+        ) && run.background_compute_of_each_batch.len() == 1
+            && matches!(
+                run.background_compute_of_each_batch[0].path_taken,
+                BackgroundComputePathTaken::Gpu(_)
+            ),
+        "切换之前那一批走 GPU；切换生效的那一批开头停着、不开：{:?}，{:?}",
+        run.outcome,
+        run.background_compute_of_each_batch
+    );
+    assert_eq!(
+        session.background_compute().stopped_after_a_compute_error(),
+        &[BackgroundTaskStoppedAfterAComputeError {
+            task: BackgroundTask::CompactionRelocation,
+            error: BackgroundComputeError::GpuUnusableUnderTheSettingsHandedIn {
+                failure:
+                    BackgroundGpuComputeFailed::EveryParticipatingGpuLeftOutUnderItsMemoryLimit {
+                        gpus_left_out,
+                    },
+            },
+            batches_compensated_on_the_cpu: 0,
+        }],
+        "切换生效的那一批开头停着，成员与挂载那一刻一张都用不上时相同"
+    );
+    let events = injected
+        .lock()
+        .expect("用例没在别处 panic 过")
+        .events
+        .clone();
+    let switch_received_at = events
+        .iter()
+        .rposition(|event| matches!(event, EventOfTheKernelsOnTheCpu::SettingsReceived(_)))
+        .expect("收到过设置");
+    assert!(
+        switch_received_at > 0
+            && events[switch_received_at + 1..].is_empty()
+            && events[1..switch_received_at].contains(&EventOfTheKernelsOnTheCpu::SegmentComputed),
+        "切换之前那一批算过段；切换那一组交过来之后一段都没算：{events:?}"
+    );
+}
+
+/// 判决 m4-gpugc-code-r1 第三节第 8 条：一批三段在卡上是怎么交的（交了几片、重交了几次、显存不足重切了几次、用了哪几张卡）随那一批的记账报出来——
+/// 核心层每一批算完之后经实现取一次（`BackgroundGpuCompute::take_the_submissions_of_the_batch`，产品那一份转给两份核那一层），记进
+/// `GpuWorkOfTheBatch::submissions_on_the_gpus`。替身每次都交回同一份，选 `gpu` 推一趟整理：每一批的记账里都是它，逐项相同。
+#[test]
+fn the_submissions_on_the_gpus_of_each_batch_are_recorded_in_the_accounting_of_the_batch() {
+    let history = pool_after_a_sequential_write_in_an_earlier_mount();
+    let mut gpu_pool = history.copied_with_an_empty_stream();
+    drop(history);
+    let (implementation, injected) = implementation_over_kernels_on_the_cpu();
+    let submissions_reported = GpuSubmissionsOfTheBatch {
+        unit_checksum_verification: GpuSubmissionsOfOneSegment {
+            submissions_completed: 2,
+            pieces_submitted: 5,
+            resubmissions_after_timeouts: 1,
+            recuts_after_running_out_of_memory: 1,
+            devices_given_work: vec![card_of_the_test_double()],
+        },
+        region_record_classification: GpuSubmissionsOfOneSegment {
+            submissions_completed: 1,
+            pieces_submitted: 3,
+            resubmissions_after_timeouts: 0,
+            recuts_after_running_out_of_memory: 0,
+            devices_given_work: vec![card_of_the_test_double()],
+        },
+        live_slots_per_cluster_segment: GpuSubmissionsOfOneSegment::default(),
+    };
+    injected
+        .lock()
+        .expect("用例没在别处 panic 过")
+        .submissions_reported_after_each_batch = submissions_reported.clone();
+    let mut gpu_session = gpu_pool.remounted_with_compaction_forced_to_start(
+        settings_on_the_card_of_the_test_double(None, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT),
+        Some(BackgroundGpuComputeHandle::of_an_implementation(
+            implementation,
+        )),
+    );
+    let gpu_run = gpu_session
+        .run_compaction(&mut gpu_pool.devices)
+        .expect("整理一趟");
+    assert!(
+        !gpu_run.background_compute_of_each_batch.is_empty(),
+        "这一趟至少算了一批：{:?}",
+        gpu_run.outcome
+    );
+    for batch in &gpu_run.background_compute_of_each_batch {
+        let BackgroundComputePathTaken::Gpu(gpu_work) = &batch.path_taken else {
+            panic!("选 gpu 的一批走 GPU：{batch:?}");
+        };
+        assert_eq!(
+            gpu_work.submissions_on_the_gpus, submissions_reported,
+            "每一批的记账带着实现交回的那一份"
+        );
+    }
 }
