@@ -1,0 +1,1316 @@
+#!/usr/bin/env python3
+"""prune-server 的装、起、停、查与监听（服务本身的用法、协议、故障行写在 src/bin/prune_server.rs、src/protocol.rs、src/fault_log.rs 文件头；
+装法与出了问题怎么处置写在 README.md）。
+
+派到哪台都只管服务那台的单元。每个子命令先判服务在不在这台：取多机配置的 PRUNE_SERVER_TCP_ADDRESS（<IP>:<端口>，IPv6 写 [<IP>]:<端口>，
+不写主机名）的 IP，与多机配置的共用取法（scripts/hosts/multi_host_addresses.py 的 resolve：整份配置判过才给主机数组 HOSTS 里这一台与第二台的地址，
+认自己照这一台网卡上的地址；这里不另判）给的两个地址比：是这一台那一项就在这台照下面的做法做；是第二台那一项，就经 ssh 直连那个 IP（用户名照这台的 ~/.ssh/config，
+这里不写），在那台同一绝对路径的仓里起同一条 python3 <仓根>/prune-server/control <同样的参数>，对端的标准输出与标准错误原样打出来、退它的退出码
+（两台在共享的活树里，仓的绝对路径相同）。下面几样不过的退 78、出路写在 stderr：
+  · 多机配置里要有 PRUNE_SERVER_TCP_ADDRESS（判不了服务在哪台）；
+  · 共用取法要取得到地址：配置整份判不过（HOSTS 没写、PRUNE_SERVER_TCP_ADDRESS 的 IP 不在 HOSTS 里、缺别的键都算）就退 78，原因照抄判法的那一句，不补缺省；
+  · 经 ssh 之前，这一条不是别的那台转来的（转去时带 PRUNE_SERVER_CONTROL_FORWARDED=1；两台都不认那个 IP 是自己的，就是配置错了，不来回转）。
+install --binary 转去时，二进制的路径（解开符号链接之后）要在多机配置 NFS_SHARED_ROOTS 某一段下、这台读得到（两台同一绝对路径），
+不是就退 78；那台读不到同样退 78。watch 转去时照样前台、按行转打（ssh 带 ServerAliveInterval），对端退出就退它的退出码；
+ssh 断了或连不上（ssh 退 255）按「服务不通」报、退 1，别的子命令 ssh 退 255 退 78；那台的 watch 读到标准输入的尽头（这台的 watch 退了、ssh 断了）就退出。
+
+  python3 prune-server/control install --dry-run [--binary <编好的 prune-server>]
+                                                只打要做的每一步（多机配置、二进制、库、目录、单元文件的全文、systemctl 的几条），
+                                                一个文件不写、一条 systemctl 不起；退 0
+  python3 prune-server/control install [--binary <编好的 prune-server>]
+                                                多机配置里没有 PRUNE_SERVER_TCP_ADDRESS、二进制没给又没装过，退 78（出路写编法）；
+                                                给了 --binary 就拷成 ~/.local/share/singlefs/prune-server/bin/prune-server（755，回读 sha256）；
+                                                建状态目录 ~/.local/state/singlefs/prune-server 与它下面的 stops/（700）；服务的库是状态目录下的 library
+                                                （服务头一次起时建，只有默认列族，src/storage.rs 文件头）；
+                                                照模板写用户级单元 ${XDG_CONFIG_HOME:-~/.config}/systemd/user/singlefs-prune-server.service，
+                                                systemctl --user daemon-reload、start（开机不自起、不 enable；单元带 Restart=always，不是 systemctl stop 停掉的
+                                                由 systemd 隔 RestartSec 秒拉起，模板文件头）；回读服务通不通（admin health）到通了才退 0，
+                                                限时里不通退 1。单元已经在跑的不重起：换了二进制或单元之后 control stop、control start 才换上
+  python3 prune-server/control start            systemctl --user start 之后回读 is-active 的输出与服务通不通，都对退 0，不对退 1
+  python3 prune-server/control stop             不等在跑的读写：先叫服务宣布停服务（服务给连着的客户端各发一帧「服务停了」，客户端退 75 不再重试），
+                                                打出发通知之前连着的客户端（主机、任务号、第几次、进程号）并排他写进状态目录 stops/ 下的停服务记录，
+                                                再 systemctl --user stop（SIGTERM 立刻结束进程；systemctl stop 停的 systemd 不拉起，不 disable，开机照起）；
+                                                回读 is-active 的输出（inactive、failed 才算停了）与单元 cgroup.procs 的内容（空才算），隔单元的 RestartSec
+                                                加一秒再回读一次 is-active（仍要是 inactive、failed：没被拉起），都对退 0，不对退 1；服务本来就不通的，清单写「拿不到」照停
+  python3 prune-server/control check            二进制在不在、多机配置里有没有 PRUNE_SERVER_TCP_ADDRESS、服务通不通，逐样判：
+                                                都过退 0；缺一样退 78、出路写全；另打库目录（单元 ExecStart 的 --state-directory 下的 library）
+  python3 prune-server/control watch            每 WATCH_SECONDS 秒查一次：单元不在跑（is-active 的输出不是 active）、服务不通、故障日志里有这次 watch
+                                                起之后新增的故障行，判出一样就打出来退 1（出了什么、故障行原文、此刻连着的客户端、每个任务号的
+                                                task-server/task status 查法）；一直好就一直查（主 agent 用 run_in_background 起它，退出即处置）
+  python3 prune-server/control --selftest       这份文件自己的自证（下面「自己的自证」），不起真 ssh、真 systemctl、真服务；全过退 0，有格红退 1
+  python3 prune-server/control drop-oversized-values [--dry-run]
+                                                离线清掉一把键单独一帧也读不回的整值（服务停着时；认法、输出与退出码在 src/bin/prune_server.rs 文件头
+                                                drop-oversized-values 那一条）。单元在跑（is-active 的输出不是 inactive、failed）退 78、出路写先 control stop；
+                                                单元文件读不了、ExecStart 的二进制不能执行退 78；二进制与状态目录都取装好的单元文件 ExecStart
+                                                （头一个词、--state-directory），起 <二进制> drop-oversized-values --state-directory <状态目录> [--dry-run]，
+                                                它的标准输出与标准错误原样打、退它的退出码。次序：control stop → 这一条带 --dry-run（只打清单）→
+                                                不带 --dry-run（删掉、同步、逐把点读核没了）→ 再带 --dry-run（oversized_rows=0）→ control start → control check
+退出码：0 成了；1 回读不对或 watch 判出了问题；2 用法错，或只在自证里认的变量设在了别处；78 运行条件不满足（出路写在 stderr）；
+经 ssh 转去的退那台的退出码；drop-oversized-values 起了二进制的退二进制的退出码。
+自证（prune-server --selftest 的 control-install-start-stop-check、stop-lists-connected-clients 与 watch-reports-* 几格）设
+PRUNE_SERVER_CONTROL_SELFTEST_ROOT=<临时目录>：路径都换到它底下，systemctl 换成它底下的 fake-systemctl，cgroup 根换成它底下的 cgroup/，
+回读与监听的间隔变短；只有这时才认弄坏开关 PRUNE_SERVER_BREAK（表在 src/break_switches.rs），这份文件读的几项：
+control-dry-run-writes、control-install-readback-skipped、control-start-readback-skipped、control-stop-readback-skipped、
+control-stop-record-skipped、watch-ignores-unit-state、watch-ignores-health、watch-ignores-fault-log、watch-counts-old-fault-lines、
+control-check-omits-library。那几格的多机配置要整份判得过（共用取法照判），写 HOSTS=127.0.0.1 192.0.2.1、PRUNE_SERVER_TCP_ADDRESS=127.0.0.1:0
+与判法要的别的键（NFS_SHARED_ROOTS 指自证根），回环在 lo 上、每一台都有，判成这台。ssh 一律换成自证根下的 fake-ssh。
+
+自己的自证（python3 prune-server/control --selftest）：每格在临时目录里造一份自证根（整份判得过的多机配置：这一台写 127.0.0.1（每一台的 lo 上都有），
+第二台与别的地址用文档段 192.0.2.x（哪一台的网卡上都没有），共用取法照真的判法判、不换网卡地址；
+fake-ssh 把收到的参数逐次记进 fake/ssh-calls.log、打一行标准输出一行标准错误、隔 fake/ssh-delay 秒再打一行、退 fake/ssh-exit），
+起这份文件的子进程，核退出码、输出与 fake-ssh 收到的主机与命令行；各格并行，末行 PRUNE_SERVER_CONTROL_SELFTEST cells=<格数> failed=<红的格数>。
+弄坏开关 PRUNE_SERVER_CONTROL_BREAK（逗号连几项；只在自证里认：只交给点名的那几格的子进程，别处设了退 2，认不出的项退 2）：
+  PRUNE_SERVER_CONTROL_BREAK=host-never-local  判本机那一步总当不是这台
+      local-address-runs-here（✗ local-address-runs-here：install --dry-run 退 78）
+  PRUNE_SERVER_CONTROL_BREAK=host-always-local  判本机那一步总当是这台
+      remote-address-forwarded-over-ssh（✗ remote-address-forwarded-over-ssh：stop 退 1）
+  PRUNE_SERVER_CONTROL_BREAK=address-missing-assumed-local  多机配置里没有 PRUNE_SERVER_TCP_ADDRESS 时当服务在这台
+      address-missing-refused（✗ address-missing-refused：install --dry-run 退 0）
+  PRUNE_SERVER_CONTROL_BREAK=addresses-unavailable-assumed-local  共用取法取不到地址（配置判不过）时当服务在这台
+      hosts-missing-refused（✗ hosts-missing-refused：stop 退 1）、address-outside-hosts-refused（✗ address-outside-hosts-refused：stop 退 1）、
+      shared-judge-refusal-stops-here（✗ shared-judge-refusal-stops-here：install --dry-run 退 0）
+  PRUNE_SERVER_CONTROL_BREAK=forwarded-loop-unchecked  别的那台转来的也照样再转
+      forwarded-loop-refused（✗ forwarded-loop-refused：stop 退 0）
+  PRUNE_SERVER_CONTROL_BREAK=forwarded-exit-dropped  经 ssh 时丢掉对端的退出码（只分零与非零，非零一律退 1）
+      remote-address-forwarded-over-ssh（✗ remote-address-forwarded-over-ssh：stop 退 1）
+  PRUNE_SERVER_CONTROL_BREAK=binary-shared-root-unchecked  install --binary 转去时不核路径在不在共享根下
+      install-binary-shared-root（✗ install-binary-shared-root：共享根外的 --binary 退 5）
+  PRUNE_SERVER_CONTROL_BREAK=forwarded-watch-buffered  watch 转去时把对端的输出攒到它退出才打
+      watch-forwarded-streams-lines（✗ watch-forwarded-streams-lines：头一行在退出前不到 1 秒才到）
+  PRUNE_SERVER_CONTROL_BREAK=ssh-failure-passed-through  ssh 退 255 原样退 255，不按服务不通报
+      ssh-failure-reported（✗ ssh-failure-reported：watch 退 255）
+  PRUNE_SERVER_CONTROL_BREAK=forwarded-watch-ignores-hangup  转来的 watch 不看标准输入的尽头，发起那台退了也一直查
+      forwarded-watch-exits-on-hangup（✗ forwarded-watch-exits-on-hangup：关了标准输入 10 秒还没退）
+  PRUNE_SERVER_CONTROL_BREAK=unit-restart-omitted  写出的单元去掉 Restart=、RestartSec= 两行（模板不写自己拉起）
+      install-enables-restarting-unit（✗ install-enables-restarting-unit：单元里没有 Restart=always）
+  PRUNE_SERVER_CONTROL_BREAK=drop-oversized-unit-state-unchecked  drop-oversized-values 不判单元在不在跑
+      drop-oversized-refused-while-running（✗ drop-oversized-refused-while-running：单元在跑时退 4）
+这两条之外，stop-stays-stopped（stop 之后隔一阵再回读仍 inactive；假 systemctl 在 stop 之后又把单元拉起时 stop 退 1）、
+drop-oversized-runs-installed-binary（单元停着时起单元 ExecStart 的二进制、--state-directory 取单元的、--dry-run 照传、退它的退出码）、
+drop-oversized-forwarded-over-ssh（服务在第二台时经 ssh 转去同一条）三格没有专门的开关。
+"""
+import concurrent.futures
+import hashlib
+import importlib.util
+import ipaddress
+import json
+import os
+import select
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+
+sys.dont_write_bytecode = True
+SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+REPOSITORY = os.path.dirname(SCRIPT_DIRECTORY)
+UNIT_NAME = "singlefs-prune-server.service"
+UNIT_TEMPLATE = os.path.join(SCRIPT_DIRECTORY, "singlefs-prune-server.service.in")
+NETWORK_ADDRESS_KEY = "PRUNE_SERVER_TCP_ADDRESS"
+MULTI_HOST_CONFIGURATION_VARIABLE = "SINGLEFS_MULTI_HOST_CONFIG"
+SELFTEST_ROOT_VARIABLE = "PRUNE_SERVER_CONTROL_SELFTEST_ROOT"
+BREAK_VARIABLE = "PRUNE_SERVER_BREAK"
+FAULT_LINE_PREFIX = "PRUNE_SERVER_FAULT"
+CLIENT_LINE_PREFIX = "PRUNE_SERVER_CLIENT "
+HEALTH_LINE_PREFIX = "PRUNE_SERVER_HEALTH ok"
+FAULT_LOG_FILE_NAME = "faults.log"
+STOP_RECORD_DIRECTORY_NAME = "stops"
+LIBRARY_DIRECTORY_NAME = "library"
+RUN_CONDITION_EXIT = 78
+USAGE_EXIT = 2
+INSTALL_READBACK_SECONDS = 30.0
+START_READBACK_SECONDS = 30.0
+FAST_READBACK_SECONDS = 3.0
+WATCH_SECONDS = 60.0
+FAST_WATCH_SECONDS = 0.3
+# stop 之后隔单元的 RestartSec 加这么多秒再回读一次 is-active（核没被拉起）；自证里只隔 FAST_RESTART_SETTLE_SECONDS
+RESTART_SETTLE_MARGIN_SECONDS = 1.0
+FAST_RESTART_SETTLE_SECONDS = 0.3
+ADMIN_TIMEOUT_SECONDS = 10.0
+STOPPED_STATES = ("inactive", "failed")
+RUNNING_STATES = ("active", "reloading")
+BUILD_COMMAND = ("task-server/task submit --cwd <仓根>/prune-server -- cargo build --release --offline --bin prune-server；"
+                 "task-server/task wait <号> 的末行 build=<目录>，二进制是 <目录>/release/prune-server（README.md「装」）")
+# 多机配置的主机数组（各台有线直连段的 IP，一行空格分隔）；哪一项是这一台、哪一项是第二台只经共用取法取（文件头），这里只在拒绝的出路与自证的配置里点名
+HOSTS_KEY = "HOSTS"
+MULTI_HOST_ADDRESSES = os.path.join(REPOSITORY, "scripts", "hosts", "multi_host_addresses.py")
+SHARED_ROOTS_KEY = "NFS_SHARED_ROOTS"
+FORWARDED_VARIABLE = "PRUNE_SERVER_CONTROL_FORWARDED"
+CONTROL_BREAK_VARIABLE = "PRUNE_SERVER_CONTROL_BREAK"
+CONTROL_SCRIPT = os.path.join(REPOSITORY, "prune-server", "control")
+SSH_FAILURE_EXIT = 255
+SSH_OPTIONS = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+SSH_WATCH_OPTIONS = ("-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4")
+
+
+class Paths:
+    """这一次用的路径：平常是用户目录下的固定位置，自证时都在 PRUNE_SERVER_CONTROL_SELFTEST_ROOT 底下。"""
+
+    def __init__(self):
+        root = os.environ.get(SELFTEST_ROOT_VARIABLE)
+        self.is_selftest = bool(root)
+        home = os.path.expanduser("~")
+        if root:
+            self.state_directory = os.path.join(root, "state")
+            self.binary = os.path.join(root, "bin", "prune-server")
+            self.unit_file = os.path.join(root, "systemd", UNIT_NAME)
+            self.socket = os.path.join(root, "run", "server.sock")
+            self.configuration = os.path.join(root, "multi-host.env")
+            self.systemctl = os.path.join(root, "fake-systemctl")
+            self.cgroup_root = os.path.join(root, "cgroup")
+            self.ssh = os.path.join(root, "fake-ssh")
+        else:
+            config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
+            runtime = os.environ.get("XDG_RUNTIME_DIR") or ""
+            self.state_directory = os.path.join(home, ".local", "state", "singlefs", "prune-server")
+            self.binary = os.path.join(home, ".local", "share", "singlefs", "prune-server", "bin", "prune-server")
+            self.unit_file = os.path.join(config_home, "systemd", "user", UNIT_NAME)
+            self.socket = os.path.join(runtime, "singlefs-prune-server", "server.sock") if runtime else ""
+            self.configuration = os.environ.get(MULTI_HOST_CONFIGURATION_VARIABLE) or os.path.join(REPOSITORY, "multi-host.env")
+            self.systemctl = "systemctl"
+            self.cgroup_root = "/sys/fs/cgroup"
+            self.ssh = "ssh"
+        self.fault_log = os.path.join(self.state_directory, FAULT_LOG_FILE_NAME)
+        self.stop_records = os.path.join(self.state_directory, STOP_RECORD_DIRECTORY_NAME)
+
+    def readback_seconds(self, normal):
+        return FAST_READBACK_SECONDS if self.is_selftest else normal
+
+
+def broken(name):
+    """弄坏开关：只在自证（设了 PRUNE_SERVER_CONTROL_SELFTEST_ROOT）时认。"""
+    if not os.environ.get(SELFTEST_ROOT_VARIABLE):
+        return False
+    return name in [item.strip() for item in os.environ.get(BREAK_VARIABLE, "").split(",")]
+
+
+def control_broken(name):
+    """这份文件自己的自证的弄坏开关（文件头「自己的自证」）：只在自证根里认。"""
+    if not os.environ.get(SELFTEST_ROOT_VARIABLE):
+        return False
+    return name in [item.strip() for item in os.environ.get(CONTROL_BREAK_VARIABLE, "").split(",")]
+
+
+def say(line):
+    print(line, flush=True)
+
+
+def fail(line, next_step, code):
+    print(f"  ✗ {line}", file=sys.stderr, flush=True)
+    print(f"  → 怎么办：{next_step}", file=sys.stderr, flush=True)
+    return code
+
+
+def run_systemctl(paths, *arguments, timeout=120):
+    try:
+        completed = subprocess.run([paths.systemctl, "--user", *arguments], capture_output=True, text=True,
+                                   stdin=subprocess.DEVNULL, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return 127, "", f"{type(error).__name__}: {error}"
+    return completed.returncode, completed.stdout.strip(), completed.stderr.strip()
+
+
+def unit_active_state(paths):
+    """is-active 打的状态（照输出判，不看退出码：activating、deactivating 也退非 0）。"""
+    _, output, _ = run_systemctl(paths, "is-active", UNIT_NAME, timeout=30)
+    return output.splitlines()[-1].strip() if output else "（没打状态）"
+
+
+def unit_processes(paths):
+    """单元 cgroup.procs 里的进程号；单元没有 cgroup 是空表，读不了回 None（照内容判空不空）。"""
+    _, group, _ = run_systemctl(paths, "show", "-p", "ControlGroup", "--value", UNIT_NAME, timeout=30)
+    if not group:
+        return []
+    try:
+        with open(os.path.join(paths.cgroup_root + group, "cgroup.procs"), encoding="utf-8") as handle:
+            return handle.read().split()
+    except FileNotFoundError:
+        return []
+    except OSError:
+        return None
+
+
+def configuration_value(path, key):
+    """多机配置里一个键的值（写法照 multi-host.env.example：KEY=值，不做 shell 展开，两头成对的引号去一层）；文件不在回 None、键不在回空串。"""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return None
+    found = ""
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        name, value = stripped.split("=", 1)
+        if name.strip() == key:
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            found = value
+    return found
+
+
+def admin(paths, action):
+    """起 <二进制> admin <action>：回 (退出码, 标准输出的行, 标准错误)。"""
+    if not os.path.isfile(paths.binary):
+        return 127, [], f"二进制 {paths.binary} 不在"
+    try:
+        completed = subprocess.run([paths.binary, "admin", action, "--socket", paths.socket, "--spawned-by-parent"],
+                                   capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=ADMIN_TIMEOUT_SECONDS)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return 127, [], f"{type(error).__name__}: {error}"
+    return completed.returncode, completed.stdout.splitlines(), completed.stderr.strip()
+
+
+def health(paths):
+    """服务通不通：(通没通, 说明)。"""
+    code, lines, error = admin(paths, "health")
+    if code == 0 and any(line.startswith(HEALTH_LINE_PREFIX) for line in lines):
+        return True, next(line for line in lines if line.startswith(HEALTH_LINE_PREFIX))
+    return False, f"admin health 退 {code}：{error or '（没有标准错误）'}"
+
+
+def client_lines(paths, action):
+    """列连着的客户端（action 是 connected-clients 或 announce-stop）：(拿没拿到, PRUNE_SERVER_CLIENT 行, 拿不到的原因)。"""
+    code, lines, error = admin(paths, action)
+    if code != 0:
+        return False, [], f"admin {action} 退 {code}：{error or '（没有标准错误）'}"
+    return True, [line for line in lines if line.startswith(CLIENT_LINE_PREFIX)], ""
+
+
+def line_field(line, name):
+    for field in line.split():
+        if field.startswith(name + "="):
+            return field[len(name) + 1:]
+    return ""
+
+
+def task_numbers(lines):
+    """行里 task= 的值（去重、保持先后），不在 task-server 里跑的 `-` 不算。"""
+    numbers = []
+    for line in lines:
+        number = line_field(line, "task")
+        if number and number != "-" and number not in numbers:
+            numbers.append(number)
+    return numbers
+
+
+def timestamp_text():
+    """零时区的时刻，ISO 8601 写法，与服务的故障行同一种。"""
+    now = time.time()
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(now)) + f".{int(now * 1000) % 1000:03d}Z"
+
+
+def ensure_private_directory(path):
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    os.chmod(path, 0o700)
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def install_binary(source, target):
+    """拷成 target（同目录临时文件再换上，755），回读 sha256；回 (成了没有, 说明)。"""
+    os.makedirs(os.path.dirname(target), mode=0o755, exist_ok=True)
+    temporary = target + ".partial"
+    with open(source, "rb") as reader, open(temporary, "wb") as writer:
+        for chunk in iter(lambda: reader.read(1 << 20), b""):
+            writer.write(chunk)
+        writer.flush()
+        os.fsync(writer.fileno())
+    os.chmod(temporary, 0o755)
+    os.replace(temporary, target)
+    expected, actual = file_sha256(source), file_sha256(target)
+    if expected != actual:
+        return False, f"拷完回读 sha256 对不上：源 {expected}、装好的 {actual}"
+    return True, f"sha256 {actual}"
+
+
+def render_unit(paths):
+    with open(UNIT_TEMPLATE, encoding="utf-8") as handle:
+        text = handle.read()
+    for name, value in (("BINARY", paths.binary), ("STATE_DIRECTORY", paths.state_directory),
+                        ("SOCKET", paths.socket), ("MULTI_HOST_CONFIG", paths.configuration)):
+        text = text.replace(f"@{name}@", value)
+    if control_broken("unit-restart-omitted"):
+        text = "".join(line for line in text.splitlines(keepends=True) if not line.startswith(("Restart=", "RestartSec=")))
+    return text
+
+
+def install(dry_run, binary_source):
+    paths = Paths()
+    writing = not dry_run or broken("control-dry-run-writes")
+    address = configuration_value(paths.configuration, NETWORK_ADDRESS_KEY)
+    if not address:
+        what = "不在" if address is None else f"里没有 {NETWORK_ADDRESS_KEY}"
+        say(f"  · 多机配置 {paths.configuration}：{what}")
+        if not dry_run:
+            return fail(f"多机配置 {paths.configuration} {what}", f"在仓根 multi-host.env 加一行 {NETWORK_ADDRESS_KEY}=<本机在有线直连段上的地址>:<端口>（模板 multi-host.env.example）", RUN_CONDITION_EXIT)
+    else:
+        say(f"  · 多机配置 {paths.configuration}：TCP 地址 {NETWORK_ADDRESS_KEY}={address}")
+    if not paths.socket:
+        return fail("XDG_RUNTIME_DIR 没设，算不出 socket 路径", "在用户会话里跑（loginctl enable-linger 之后 systemd --user 会设它）", RUN_CONDITION_EXIT)
+    if binary_source:
+        if not os.path.isfile(binary_source) and os.environ.get(FORWARDED_VARIABLE):
+            return fail(f"服务这台读不到 --binary 给的 {binary_source}（发起那台在共享根下读得到）",
+                        f"在这台核多机配置 {SHARED_ROOTS_KEY} 的各段挂没挂上（stat -f -c %T -- <那一段>/. 读到 nfs），挂好再从发起那台跑同一条命令", RUN_CONDITION_EXIT)
+        if not os.path.isfile(binary_source):
+            return fail(f"--binary 给的 {binary_source} 不在", f"先编：{BUILD_COMMAND}", RUN_CONDITION_EXIT)
+        say(f"  · 二进制：{'拷' if writing else '会拷'} {binary_source} → {paths.binary}（755，回读 sha256）")
+        if writing:
+            copied, detail = install_binary(binary_source, paths.binary)
+            if not copied:
+                return fail(detail, "再跑一次 install；还不对就把这一行交主 agent", 1)
+            say(f"    回读：{detail}")
+    elif os.path.isfile(paths.binary):
+        say(f"  · 二进制 {paths.binary}：已在，不动（换新的写 --binary <编好的 prune-server>）")
+    else:
+        say(f"  · 二进制 {paths.binary}：不在，也没给 --binary")
+        if not dry_run:
+            return fail(f"二进制 {paths.binary} 不在，也没给 --binary", f"先编：{BUILD_COMMAND}；再 python3 prune-server/control install --binary <那个二进制>", RUN_CONDITION_EXIT)
+    say(f"  · 库：{os.path.join(paths.state_directory, LIBRARY_DIRECTORY_NAME)}（服务自己那一份，不在就由服务头一次起时建）")
+    for directory in (paths.state_directory, paths.stop_records):
+        say(f"  · 目录 {directory}（700）：{'已在' if os.path.isdir(directory) else ('建' if writing else '会建')}")
+        if writing:
+            ensure_private_directory(directory)
+    unit_text = render_unit(paths)
+    say(f"  · 用户级单元 {paths.unit_file}：{'写' if writing else '会写'}成下面这样")
+    for line in unit_text.splitlines():
+        say(f"      {line}")
+    say(f"  · {'跑' if writing else '会跑'}：systemctl --user daemon-reload；systemctl --user start {UNIT_NAME}"
+        f"（随开机自起；不是 systemctl stop 停掉的由 systemd 照单元的 Restart= 拉起）；回读服务通不通（admin health）")
+    if not writing:
+        say("  ✓ --dry-run：只打了要做的事，一个文件没写、systemctl 一条没起")
+        return 0
+    os.makedirs(os.path.dirname(paths.unit_file), mode=0o700, exist_ok=True)
+    temporary = paths.unit_file + ".partial"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        handle.write(unit_text)
+    os.replace(temporary, paths.unit_file)
+    for arguments in (("daemon-reload",), ("start", UNIT_NAME)):
+        code, _, error = run_systemctl(paths, *arguments)
+        if code != 0:
+            return fail(f"systemctl --user {' '.join(arguments)} 退 {code}：{error}", f"看 systemctl --user status {UNIT_NAME}；修好再跑 python3 prune-server/control install", 1)
+    if broken("control-install-readback-skipped"):
+        say("  ✓ 装好了（弄坏开关 control-install-readback-skipped：没回读）")
+        return 0
+    deadline = time.monotonic() + paths.readback_seconds(INSTALL_READBACK_SECONDS)
+    detail = ""
+    while time.monotonic() < deadline:
+        reachable, detail = health(paths)
+        if reachable:
+            say(f"  ✓ 装好了：{UNIT_NAME} 在跑，服务通（{detail}）")
+            return 0
+        time.sleep(0.2)
+    return fail(f"装好了但服务不通：{detail}（is-active 打的是「{unit_active_state(paths)}」）",
+                f"看 journalctl --user -u {UNIT_NAME} -n 100；修好之后 python3 prune-server/control check 回读到退 0", 1)
+
+
+def start():
+    paths = Paths()
+    code, _, error = run_systemctl(paths, "start", UNIT_NAME)
+    if code != 0:
+        return fail(f"systemctl --user start {UNIT_NAME} 退 {code}：{error}", f"没装就 python3 prune-server/control install；装了看 journalctl --user -u {UNIT_NAME} -n 100", 1)
+    if broken("control-start-readback-skipped"):
+        say(f"  ✓ {UNIT_NAME} 起了（弄坏开关 control-start-readback-skipped：没回读）")
+        return 0
+    deadline = time.monotonic() + paths.readback_seconds(START_READBACK_SECONDS)
+    state, detail = "", ""
+    while time.monotonic() < deadline:
+        state = unit_active_state(paths)
+        reachable, detail = health(paths)
+        if state == "active" and reachable:
+            say(f"  ✓ {UNIT_NAME} 在跑（is-active 打「active」），服务通（{detail}）")
+            return 0
+        time.sleep(0.2)
+    return fail(f"起了但回读不对：is-active 打的是「{state}」、服务{'通' if detail.startswith(HEALTH_LINE_PREFIX) else '不通：' + detail}",
+                f"看 journalctl --user -u {UNIT_NAME} -n 100", 1)
+
+
+def write_stop_record(paths, clients_known, lines, problem):
+    """排他新建一份停服务记录（stops/stop-<时刻>-<进程号>.txt）；回它的路径。"""
+    ensure_private_directory(paths.stop_records)
+    moment = timestamp_text()
+    name = "stop-" + moment.replace(":", "").replace("-", "").replace(".", "") + f"-{os.getpid()}.txt"
+    path = os.path.join(paths.stop_records, name)
+    body = [f"prune-server 停服务记录", f"时刻 {moment}", f"发起 prune-server/control stop（进程 {os.getpid()}）"]
+    if clients_known:
+        body.append(f"停之前连着的客户端 {len(lines)} 个：")
+        body.extend(lines)
+    else:
+        body.append(f"连着的客户端拿不到：{problem}")
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(body) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    return path
+
+
+def print_task_queries(numbers):
+    for number in numbers:
+        say(f"  · 任务 {number}：task-server/task status {number}（看是哪个会话交的，请它取消、等修好重起之后重交）")
+
+
+def stop():
+    paths = Paths()
+    clients_known, lines, problem = client_lines(paths, "announce-stop")
+    if clients_known:
+        say(f"  · 宣布了停服务（服务给连着的客户端各发了一帧「服务停了」，它们退 75 不再重试）；停之前连着的客户端 {len(lines)} 个：")
+        for line in lines:
+            say(f"      {line}")
+    else:
+        say(f"  · 连着的客户端拿不到（服务不通，照停）：{problem}")
+    if not broken("control-stop-record-skipped"):
+        say(f"  · 停服务记录：{write_stop_record(paths, clients_known, lines, problem)}")
+    code, _, error = run_systemctl(paths, "stop", UNIT_NAME, timeout=60)
+    if broken("control-stop-readback-skipped"):
+        return 0 if code == 0 else 1
+    state = unit_active_state(paths)
+    processes = unit_processes(paths)
+    if code != 0 or state not in STOPPED_STATES or processes is None or processes:
+        return fail(f"停了但回读不对：systemctl stop 退 {code}{('（' + error + '）') if error else ''}、is-active 打的是「{state}」、"
+                    f"cgroup 里进程 {'读不到' if processes is None else len(processes)} 个",
+                    f"看 systemctl --user status {UNIT_NAME}；再停一次，还停不下就把这一行交主 agent", 1)
+    settle = FAST_RESTART_SETTLE_SECONDS if paths.is_selftest else unit_restart_seconds(paths) + RESTART_SETTLE_MARGIN_SECONDS
+    time.sleep(settle)
+    later_state = unit_active_state(paths)
+    if later_state not in STOPPED_STATES:
+        return fail(f"停了之后又被拉起：隔 {settle} 秒再回读 is-active 打的是「{later_state}」",
+                    f"看 journalctl --user -u {UNIT_NAME} -n 100 是谁起的它；再跑一次 python3 prune-server/control stop，还被拉起就把这一行交主 agent", 1)
+    say(f"  ✓ {UNIT_NAME} 停了（is-active 打「{state}」、cgroup 里没有进程；隔 {settle} 秒再回读仍是「{later_state}」，没被拉起）")
+    print_task_queries(task_numbers(lines))
+    return 0
+
+
+def unit_service_value(paths, key):
+    """装好的单元文件里 <key>= 一行的值（多行取最后一行，没有回空串）：(值, None)；单元文件读不了回 (None, 原因)。"""
+    try:
+        with open(paths.unit_file, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError as error:
+        return None, f"单元文件 {paths.unit_file} 读不了（{type(error).__name__}: {error}）"
+    value = ""
+    for line in lines:
+        if line.startswith(key + "="):
+            value = line[len(key) + 1:]
+    return value, None
+
+
+def unit_restart_seconds(paths):
+    """装好的单元文件的 RestartSec=（写成整数秒，可带 s）；没写、读不了或写成别的样子回 0。"""
+    value, _ = unit_service_value(paths, "RestartSec")
+    text = (value or "").strip().removesuffix("s")
+    return int(text) if text.isdigit() else 0
+
+
+def unit_library(paths):
+    """装好的单元 ExecStart 的 --state-directory 下的库目录：(库目录, 说明)；单元文件读不了回 (None, 原因)。"""
+    command, problem = unit_service_value(paths, "ExecStart")
+    if command is None:
+        return None, problem
+    words = command.split()
+    flag = "--state-directory"
+    if flag in words and words.index(flag) + 1 < len(words):
+        state_directory = words[words.index(flag) + 1]
+        origin = f"单元文件 {paths.unit_file} 的 {flag}"
+    else:
+        state_directory = paths.state_directory
+        origin = f"单元文件 {paths.unit_file} 没写 {flag}，取缺省的状态目录"
+    return os.path.join(state_directory, LIBRARY_DIRECTORY_NAME), origin
+
+
+def drop_oversized_values(dry_run):
+    """服务停着时起装好的二进制的 drop-oversized-values（文件头）：单元在跑退 78；二进制与状态目录取单元文件 ExecStart；退它的退出码。"""
+    paths = Paths()
+    state = unit_active_state(paths)
+    if state not in STOPPED_STATES and not control_broken("drop-oversized-unit-state-unchecked"):
+        return fail(f"单元 {UNIT_NAME} 不是停着的（is-active 打的是「{state}」），服务开着库时 drop-oversized-values 打不开它",
+                    "先 python3 prune-server/control stop，回读停了再跑同一条；跑完 python3 prune-server/control start", RUN_CONDITION_EXIT)
+    command, problem = unit_service_value(paths, "ExecStart")
+    words = (command or "").split()
+    if not words:
+        return fail(f"取不到装好的二进制：{problem or f'单元文件 {paths.unit_file} 里没有 ExecStart='}",
+                    "先 python3 prune-server/control install --binary <编好的 prune-server>（README.md「装」），装好再跑同一条", RUN_CONDITION_EXIT)
+    binary = words[0]
+    if not (os.path.isfile(binary) and os.access(binary, os.X_OK)):
+        return fail(f"单元文件 {paths.unit_file} ExecStart 的二进制 {binary} 不在或不能执行",
+                    f"先 python3 prune-server/control install --binary <编好的 prune-server>（编法：{BUILD_COMMAND}），装好再跑同一条", RUN_CONDITION_EXIT)
+    library, origin = unit_library(paths)
+    arguments = [binary, "drop-oversized-values", "--state-directory", os.path.dirname(library)] + (["--dry-run"] if dry_run else [])
+    say(f"  · 单元 is-active 打「{state}」；二进制取单元 ExecStart，状态目录取{origin}：起 {' '.join(shlex.quote(word) for word in arguments)}")
+    try:
+        code = subprocess.run(arguments, stdin=subprocess.DEVNULL).returncode
+    except OSError as error:
+        return fail(f"起不了 {binary}：{type(error).__name__}: {error}", "python3 prune-server/control check 看二进制；修好再跑同一条", RUN_CONDITION_EXIT)
+    return 128 - code if code < 0 else code
+
+
+def check():
+    paths = Paths()
+    problems = []
+    if not broken("control-check-omits-library"):
+        library, origin = unit_library(paths)
+        say(f"  · 库目录 {library}；{origin}" if library is not None else f"  · 库目录：读不到，{origin}")
+    if not (os.path.isfile(paths.binary) and os.access(paths.binary, os.X_OK)):
+        problems.append((f"二进制 {paths.binary} 不在或不能执行", f"先编：{BUILD_COMMAND}；再 python3 prune-server/control install --binary <那个二进制>"))
+    address = configuration_value(paths.configuration, NETWORK_ADDRESS_KEY)
+    if not address:
+        problems.append((f"多机配置 {paths.configuration} {'不在' if address is None else '里没有 ' + NETWORK_ADDRESS_KEY}",
+                         f"在仓根 multi-host.env 加一行 {NETWORK_ADDRESS_KEY}=<本机在有线直连段上的地址>:<端口>"))
+    reachable, detail = health(paths)
+    if not reachable:
+        problems.append((f"服务不通：{detail}", f"没装就 python3 prune-server/control install；装了看 journalctl --user -u {UNIT_NAME} -n 100"))
+    if problems:
+        for line, next_step in problems:
+            fail(line, next_step, RUN_CONDITION_EXIT)
+        return RUN_CONDITION_EXIT
+    say(f"  ✓ prune-server 通：二进制 {paths.binary}，TCP 地址 {address}，socket {paths.socket}，{detail}；"
+        f"单元 is-active 打「{unit_active_state(paths)}」")
+    return 0
+
+
+def new_fault_lines(paths, offset):
+    """故障日志从 offset 往后的完整行里的故障行：(新的 offset, 故障行)。文件变短了（换了一份）从头读。"""
+    try:
+        size = os.path.getsize(paths.fault_log)
+    except FileNotFoundError:
+        return 0, []
+    if size < offset:
+        offset = 0
+    if size == offset:
+        return offset, []
+    with open(paths.fault_log, "rb") as handle:
+        handle.seek(offset)
+        chunk = handle.read(size - offset)
+    complete = chunk[: chunk.rfind(b"\n") + 1]
+    lines = [line for line in complete.decode("utf-8", "replace").splitlines() if line.startswith(FAULT_LINE_PREFIX)]
+    return offset + len(complete), lines
+
+
+def watch():
+    paths = Paths()
+    interval = FAST_WATCH_SECONDS if paths.is_selftest else WATCH_SECONDS
+    offset = 0
+    if not broken("watch-counts-old-fault-lines"):
+        try:
+            offset = os.path.getsize(paths.fault_log)
+        except FileNotFoundError:
+            offset = 0
+    say(f"  · 盯着 prune-server：每 {interval} 秒查一次单元 {UNIT_NAME} 在不在跑、服务通不通、故障日志 {paths.fault_log} 里新增的故障行"
+        f"（从第 {offset} 字节往后）")
+    while True:
+        problems, fault_lines = [], []
+        if not broken("watch-ignores-unit-state"):
+            state = unit_active_state(paths)
+            if state not in RUNNING_STATES:
+                problems.append(f"单元 {UNIT_NAME} 不在跑（is-active 打的是「{state}」）")
+        if not broken("watch-ignores-health"):
+            reachable, detail = health(paths)
+            if not reachable:
+                problems.append(f"服务不通：{detail}")
+        if not broken("watch-ignores-fault-log"):
+            offset, fault_lines = new_fault_lines(paths, offset)
+            if fault_lines:
+                problems.append(f"故障日志 {paths.fault_log} 里新增 {len(fault_lines)} 行故障")
+        if problems:
+            for problem in problems:
+                print(f"  ✗ prune-server：{problem}", flush=True)   # gate-lint:detail
+            for line in fault_lines:
+                say(f"  · 故障行：{line}")
+            clients_known, lines, problem = client_lines(paths, "connected-clients")
+            if clients_known:
+                say(f"  · 此刻连着的客户端 {len(lines)} 个：")
+                for line in lines:
+                    say(f"      {line}")
+            else:
+                say(f"  · 此刻连着的客户端：拿不到（{problem}）")
+            print_task_queries(task_numbers(lines + fault_lines))
+            say("  → 怎么办：照 prune-server/README.md「出了问题怎么处置」：是服务自身的缺陷就 python3 prune-server/control stop、"
+                "照客户端清单通知会话取消、修、python3 prune-server/control start、再起 watch、通知可以重交")
+            return 1
+        if os.environ.get(FORWARDED_VARIABLE) and not control_broken("forwarded-watch-ignores-hangup"):
+            if standard_input_ended(interval):
+                return fail("转来这条 watch 的那一端断了（标准输入读到了尽头：发起那台的 control watch 退了或 ssh 断了）",
+                            "要接着盯就在发起那台再起 python3 prune-server/control watch", 1)
+        else:
+            time.sleep(interval)
+
+
+def standard_input_ended(seconds):
+    """等 seconds 秒，其间标准输入读到尽头回 True（转来的 watch 靠它知道发起那一端没了）；读到的内容丢掉。"""
+    deadline = time.monotonic() + seconds
+    descriptor = sys.stdin.fileno()
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        readable, _, _ = select.select([descriptor], [], [], remaining)
+        if readable and os.read(descriptor, 4096) == b"":
+            return True
+
+
+def address_host(address):
+    """PRUNE_SERVER_TCP_ADDRESS 的 IP（<IP>:<端口>，IPv6 写 [<IP>]:<端口>）；主机部分不是 IP 字面量回 None。"""
+    if address.startswith("["):
+        host = address[1:address.find("]")] if "]" in address else ""
+    else:
+        host = address.rsplit(":", 1)[0]
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        return None
+
+
+def load_multi_host_addresses():
+    """多机配置的共用取法（文件头）：按文件路径导入 scripts/hosts/multi_host_addresses.py（它只用标准库）。"""
+    specification = importlib.util.spec_from_file_location("multi_host_addresses", MULTI_HOST_ADDRESSES)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def service_host(paths):
+    """服务在哪台：回 ("here", None) 在这台；("there", IP 文本) 在第二台、经 ssh 去；("refused", 退出码) 判不了或不许转，出路已打。
+    这一台与第二台的地址只经共用取法取（文件头），这里不读网卡、不另判主机数组。"""
+    address = configuration_value(paths.configuration, NETWORK_ADDRESS_KEY)
+    if not address:
+        if control_broken("address-missing-assumed-local"):
+            return "here", None
+        what = "不在" if address is None else f"里没有 {NETWORK_ADDRESS_KEY}"
+        return "refused", fail(f"多机配置 {paths.configuration} {what}，判不了服务在哪台",
+                               f"在仓根 multi-host.env 加一行 {NETWORK_ADDRESS_KEY}=<服务那台在有线直连段上的 IP>:<端口>（模板 multi-host.env.example）",
+                               RUN_CONDITION_EXIT)
+    host = address_host(address)
+    if host is None:
+        return "refused", fail(f"多机配置的 {NETWORK_ADDRESS_KEY}={address} 主机部分不是 IP",
+                               f"写成 {NETWORK_ADDRESS_KEY}=<IP>:<端口>（IPv6 写 [<IP>]:<端口>），不写主机名", RUN_CONDITION_EXIT)
+    if control_broken("host-always-local"):
+        return "here", None
+    multi_host_addresses = load_multi_host_addresses()
+    try:
+        addresses = multi_host_addresses.resolve(paths.configuration)
+    except multi_host_addresses.AddressesUnavailable as error:
+        if control_broken("addresses-unavailable-assumed-local"):
+            return "here", None
+        return "refused", fail(f"取不到主机数组里这一台与第二台的地址，判不了 {NETWORK_ADDRESS_KEY} 的 {host} 在哪台：{error}",
+                               f"{multi_host_addresses.HOWTO}；{HOSTS_KEY} 要含服务那台的 {host}", RUN_CONDITION_EXIT)
+    if host == ipaddress.ip_address(addresses.this) and not control_broken("host-never-local"):
+        return "here", None
+    if os.environ.get(FORWARDED_VARIABLE) and not control_broken("forwarded-loop-unchecked"):
+        return "refused", fail(f"这一条是别的那台经 ssh 转来的，可 {NETWORK_ADDRESS_KEY} 的 {host} 也不是这台（主机数组里这一台是 {addresses.this}，两台都不认它）",
+                               f"核多机配置的 {NETWORK_ADDRESS_KEY} 写的是不是服务那台在有线直连段上的 IP、{HOSTS_KEY} 里那一项是不是那台网卡上的地址；改对再跑",
+                               RUN_CONDITION_EXIT)
+    if host != ipaddress.ip_address(addresses.peer):
+        return "refused", fail(f"{NETWORK_ADDRESS_KEY} 的 {host} 既不是主机数组里的这一台（{addresses.this}）也不是第二台（{addresses.peer}）",
+                               f"把 {NETWORK_ADDRESS_KEY} 改成 {HOSTS_KEY} 里服务那台的 IP", RUN_CONDITION_EXIT)
+    return "there", str(host)
+
+
+def shared_binary_refusal(paths, host, binary):
+    """install --binary 转去之前：路径要在 NFS_SHARED_ROOTS 某一段下、这台读得到；不对回 78（出路已打），对了回 0。"""
+    if control_broken("binary-shared-root-unchecked"):
+        return 0
+    roots = configuration_value(paths.configuration, SHARED_ROOTS_KEY) or ""   # 共用取法判过整份配置，这一键必写（判法文件头「NFS 共享的根」）
+    segments = [os.path.normpath(segment) for segment in roots.split(":") if segment.startswith("/")]
+    if not any(os.path.commonpath([binary, segment]) == segment for segment in segments):
+        return fail(f"--binary {binary} 不在共享根（{SHARED_ROOTS_KEY}={roots}）下，服务那台 {host} 同一路径上读不到",
+                    f"把编好的 prune-server 拷到共享根某一段下，再 python3 prune-server/control install --binary <那个路径>", RUN_CONDITION_EXIT)
+    if not (os.path.isfile(binary) and os.access(binary, os.R_OK)):
+        return fail(f"--binary {binary} 在这台就读不到", f"先编：{BUILD_COMMAND}；拷到共享根下再给它的路径", RUN_CONDITION_EXIT)
+    return 0
+
+
+def forward(paths, host, arguments):
+    """经 ssh 到服务那台 host，在同一绝对路径的仓里起同一条 control：对端的输出原样打、退它的退出码（ssh 自己失败另报）。"""
+    is_watch = arguments[:1] == ["watch"]
+    if arguments[:1] == ["install"] and "--binary" in arguments:
+        refused = shared_binary_refusal(paths, host, arguments[arguments.index("--binary") + 1])
+        if refused:
+            return refused
+    environment = [f"{FORWARDED_VARIABLE}=1"]
+    if os.environ.get(MULTI_HOST_CONFIGURATION_VARIABLE) and not paths.is_selftest:
+        environment.append(f"{MULTI_HOST_CONFIGURATION_VARIABLE}={paths.configuration}")
+    remote = " ".join([f"cd {shlex.quote(REPOSITORY)} && exec env", *(shlex.quote(item) for item in environment),
+                       "python3", shlex.quote(CONTROL_SCRIPT), *(shlex.quote(item) for item in arguments)])
+    command = [paths.ssh, *SSH_OPTIONS, *(SSH_WATCH_OPTIONS if is_watch else ("-n",)), host, remote]
+    print(f"  · 服务在 {host} 那台（多机配置 {NETWORK_ADDRESS_KEY}），不是这台：经 ssh 在那台起 control {' '.join(arguments)}",
+          file=sys.stderr, flush=True)
+    buffered = is_watch and control_broken("forwarded-watch-buffered")
+    try:
+        process = subprocess.Popen(command, stdin=subprocess.PIPE if is_watch else subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE if buffered else None, stderr=subprocess.PIPE if buffered else None)
+    except OSError as error:
+        return fail(f"起不了 ssh（{paths.ssh}）：{type(error).__name__}: {error}", "这台要有 ssh 客户端；装好再跑同一条命令", RUN_CONDITION_EXIT)
+
+    def pass_signal(number, _frame):
+        process.send_signal(number)
+    for number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(number, pass_signal)
+    if buffered:
+        output, error_output = process.communicate()
+        sys.stdout.buffer.write(output)
+        sys.stdout.flush()
+        sys.stderr.buffer.write(error_output)
+        sys.stderr.flush()
+    code = process.wait()
+    if process.stdin:
+        process.stdin.close()
+    if code < 0:
+        return 128 - code
+    if code == SSH_FAILURE_EXIT and not control_broken("ssh-failure-passed-through"):
+        if is_watch:
+            return fail(f"prune-server 服务不通：ssh 到服务那台 {host} 断了或连不上（ssh 退 255）",
+                        f"ssh -o BatchMode=yes {host} true 看连不连得上；连得上再起 python3 prune-server/control watch，"
+                        "连不上照 prune-server/README.md「出了问题怎么处置」", 1)
+        return fail(f"ssh 到服务那台 {host} 连不上（ssh 退 255），control {' '.join(arguments)} 没在那台起成",
+                    f"ssh -o BatchMode=yes {host} true 要退 0（免密；用户名照这台的 ~/.ssh/config）；修好再跑同一条命令", RUN_CONDITION_EXIT)
+    if control_broken("forwarded-exit-dropped"):
+        return 0 if code == 0 else 1
+    return code
+
+
+def parse_arguments(arguments):
+    """→ (在这台做的那一步, 转去时带的参数)；认不出回 (None, None)。--binary 在这台取绝对路径，转去时取解开符号链接之后的。"""
+    if arguments[:1] == ["install"]:
+        rest = arguments[1:]
+        dry_run = "--dry-run" in rest
+        rest = [word for word in rest if word != "--dry-run"]
+        head = ["install"] + (["--dry-run"] if dry_run else [])
+        if rest == []:
+            return (lambda: install(dry_run, None)), head
+        if len(rest) == 2 and rest[0] == "--binary":
+            return (lambda: install(dry_run, os.path.abspath(rest[1]))), head + ["--binary", os.path.realpath(rest[1])]
+    if arguments[:1] == ["drop-oversized-values"] and arguments[1:] in ([], ["--dry-run"]):
+        return (lambda: drop_oversized_values(arguments[1:] == ["--dry-run"])), list(arguments)
+    commands = {"start": start, "stop": stop, "check": check, "watch": watch}
+    if len(arguments) == 1 and arguments[0] in commands:
+        return commands[arguments[0]], list(arguments)
+    return None, None
+
+
+# ── 自己的自证（文件头「自己的自证」）
+SELFTEST_SUMMARY_PREFIX = "PRUNE_SERVER_CONTROL_SELFTEST"
+SELFTEST_RUN_SECONDS = 60
+SELFTEST_HANGUP_SECONDS = 10
+SELFTEST_STREAM_GAP_SECONDS = 1.5
+LOCAL_ADDRESS = "127.0.0.1"     # 每一台的 lo 上都有：共用取法照真的网卡地址认它是这一台
+REMOTE_ADDRESS = "192.0.2.9"    # 文档段（RFC 5737）的地址，哪一台的网卡上都没有：当第二台
+OTHER_ADDRESS = "192.0.2.6"
+# 共用取法的判法要整份判得过的那几个键（照 scripts/hosts/multi_host_addresses.py 自证的配置）；NFS_SHARED_ROOTS 指自证根（这一台已在的目录）
+SELFTEST_BASE_CONFIGURATION = (("QUIESCE_STOP_COMMAND", ""), ("QUIESCE_STOPPED_CHECK_COMMAND", ""), ("QUIESCE_START_COMMAND", ""),
+                               ("QUIESCE_STARTED_CHECK_COMMAND", ""), ("ENABLE_ACROSS_MACHINES", "0"), ("ENABLE_GPU", "0"))
+# 判法的按台的三个键（scripts/crash/crash-point-replay-shard-configuration-check.sh 文件头「按台的三个键」）：主机数组里每一台各一项 <地址>=<值>，照这一格的主机数组写
+SELFTEST_BY_HOST_VALUES = (("CARGO_BIN_DIRECTORY_BY_HOST", "/selftest/cargo"), ("BUILD_ROOT_BY_HOST", "/selftest/builds"), ("SLICE_MEMORY_CAP_BY_HOST", "2G"))
+# 自证起的子进程不带这几个：别的脚本的弄坏开关与换网卡地址的变量会改共用取法的判法
+SELFTEST_DROPPED_VARIABLES = ("MULTI_HOST_CONFIGURATION_BREAK", "MULTI_HOST_ADDRESSES_BREAK", "CONFIGURATION_SELFTEST_LOCAL_ADDRESSES")
+FAKE_REMOTE_FIRST = "fake-remote stdout first"
+FAKE_REMOTE_LAST = "fake-remote stdout last"
+FAKE_REMOTE_ERROR = "fake-remote stderr"
+FAKE_SSH = """#!{python}
+import json, os, sys, time
+root = os.path.dirname(os.path.abspath(__file__))
+def setting(name, default):
+    try:
+        with open(os.path.join(root, "fake", name), encoding="utf-8") as handle:
+            return handle.read().strip()
+    except FileNotFoundError:
+        return default
+with open(os.path.join(root, "fake", "ssh-calls.log"), "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(sys.argv[1:]) + "\\n")
+print({first!r}, flush=True)
+print({error!r}, file=sys.stderr, flush=True)
+time.sleep(float(setting("ssh-delay", "0")))
+print({last!r}, flush=True)
+sys.exit(int(setting("ssh-exit", "0")))
+"""
+FAKE_SYSTEMCTL = """#!/bin/sh
+[ "$1" = --user ] && shift
+case "$1" in is-active) echo active ;; esac
+exit 0
+"""
+FAKE_BINARY = """#!/bin/sh
+[ "$1" = admin ] && [ "$2" = health ] && echo "PRUNE_SERVER_HEALTH ok fake" && exit 0
+[ "$1" = admin ] && [ "$2" = connected-clients ] && exit 0
+exit 1
+"""
+# 记状态的假 systemctl（单元自己拉起、stop、drop-oversized-values 那几格）：调用逐行记进 fake/systemctl-calls.log，单元状态在 fake/unit-state；
+# 有 fake/restarted-after-stop 时 stop 之后头一次 is-active 打 inactive、之后打 active（当单元停了又被拉起）
+FAKE_SYSTEMCTL_STATEFUL = """#!/bin/sh
+root="$(cd "$(dirname "$0")" && pwd)"
+printf '%s\\n' "$*" >> "$root/fake/systemctl-calls.log"
+[ "$1" = --user ] && shift
+processes="$root/cgroup/fake.slice/cgroup.procs"
+case "$1" in
+  daemon-reload|enable) exit 0 ;;
+  start) echo active > "$root/fake/unit-state"; echo 4242 > "$processes"; exit 0 ;;
+  stop)
+    echo inactive > "$root/fake/unit-state"; : > "$processes"
+    [ -f "$root/fake/restarted-after-stop" ] && echo 1 > "$root/fake/restart-pending"
+    exit 0 ;;
+  is-active)
+    state="$(cat "$root/fake/unit-state" 2>/dev/null || echo inactive)"
+    if [ -f "$root/fake/restart-pending" ]; then rm -f "$root/fake/restart-pending"; echo active > "$root/fake/unit-state"; fi
+    echo "$state"
+    [ "$state" = active ] ;;
+  show) echo /fake.slice; exit 0 ;;
+  *) echo "假 systemctl 认不得：$*" >&2; exit 1 ;;
+esac
+"""
+# 记参数的假二进制：drop-oversized-values 把参数记进 <自证根>/fake/binary-calls.log、打一行、退 FAKE_DROP_EXIT
+FAKE_DROP_LINE = "PRUNE_SERVER_DROP_OVERSIZED_VALUES mode=fake"
+FAKE_DROP_EXIT = 4
+FAKE_BINARY_RECORDING = f"""#!/bin/sh
+root="$(cd "$(dirname "$0")/.." && pwd)"
+[ "$1" = admin ] && [ "$2" = health ] && echo "PRUNE_SERVER_HEALTH ok fake" && exit 0
+[ "$1" = admin ] && [ "$2" = connected-clients ] && exit 0
+if [ "$1" = drop-oversized-values ]; then
+  printf '%s\\n' "$*" >> "$root/fake/binary-calls.log"
+  echo "{FAKE_DROP_LINE}"
+  exit {FAKE_DROP_EXIT}
+fi
+exit 1
+"""
+# 单元的 RestartSec 上限：拉起要落在容错客户端一轮重连（至多 120 秒，src/reliable_client.rs 的 ReconnectPolicy）里，开库另要时间
+RESTART_SECONDS_CEILING = 30
+# 每条弄坏开关只交给这几格的子进程（文件头开关表点名的项）
+SELFTEST_SWITCH_CELLS = {
+    "host-never-local": ("local-address-runs-here",),
+    "host-always-local": ("remote-address-forwarded-over-ssh",),
+    "address-missing-assumed-local": ("address-missing-refused",),
+    "addresses-unavailable-assumed-local": ("hosts-missing-refused", "address-outside-hosts-refused", "shared-judge-refusal-stops-here"),
+    "forwarded-loop-unchecked": ("forwarded-loop-refused",),
+    "forwarded-exit-dropped": ("remote-address-forwarded-over-ssh",),
+    "binary-shared-root-unchecked": ("install-binary-shared-root",),
+    "forwarded-watch-buffered": ("watch-forwarded-streams-lines",),
+    "ssh-failure-passed-through": ("ssh-failure-reported",),
+    "forwarded-watch-ignores-hangup": ("forwarded-watch-exits-on-hangup",),
+    "unit-restart-omitted": ("install-enables-restarting-unit",),
+    "drop-oversized-unit-state-unchecked": ("drop-oversized-refused-while-running",),
+}
+
+
+class SelftestWorld:
+    """一格的自证根：整份判得过的多机配置（configuration 里的键盖过基础那几个）、fake-ssh（要的话再有 fake-systemctl 与假二进制）。"""
+
+    def __init__(self, base, cell, configuration, switches, ssh_exit=0, ssh_delay=0.0, serving=False, recording=False):
+        self.root = tempfile.mkdtemp(prefix=f"{cell}-", dir=base)
+        self.switches = switches
+        os.makedirs(os.path.join(self.root, "fake"))
+        self.write_configuration(configuration)
+        self.write("fake/ssh-exit", f"{ssh_exit}\n")
+        self.write("fake/ssh-delay", f"{ssh_delay}\n")
+        values = {"python": sys.executable, "first": FAKE_REMOTE_FIRST, "last": FAKE_REMOTE_LAST, "error": FAKE_REMOTE_ERROR}
+        self.write("fake-ssh", FAKE_SSH.format(**values), executable=True)
+        if serving:
+            self.write("fake-systemctl", FAKE_SYSTEMCTL, executable=True)
+            self.write("bin/prune-server", FAKE_BINARY, executable=True)
+        if recording:
+            self.write("fake-systemctl", FAKE_SYSTEMCTL_STATEFUL, executable=True)
+            self.write("bin/prune-server", FAKE_BINARY_RECORDING, executable=True)
+            self.write("cgroup/fake.slice/cgroup.procs", "")
+
+    def write_configuration(self, configuration):
+        given = dict(configuration)
+        # 主机数组没写的那几格（判缺键 HOSTS 的）照缺省的两台写按台的键：缺键那一句在核按台的键之前
+        hosts = (given.get(HOSTS_KEY) or f"{LOCAL_ADDRESS} {REMOTE_ADDRESS}").split()
+        by_host = tuple((key, " ".join(f"{host}={value}" for host in hosts)) for key, value in SELFTEST_BY_HOST_VALUES)
+        entries = [(key, value) for key, value in SELFTEST_BASE_CONFIGURATION + by_host + ((SHARED_ROOTS_KEY, self.root),) if key not in given]
+        self.write("multi-host.env", "# 自证用的多机配置\n" + "".join(f"{key}={value}\n" for key, value in entries + list(configuration)))
+
+    def write(self, relative, text, executable=False):
+        path = os.path.join(self.root, relative)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        if executable:
+            os.chmod(path, 0o755)
+        return path
+
+    def environment(self, extra=None):
+        environment = {name: value for name, value in os.environ.items()
+                       if name not in (BREAK_VARIABLE, CONTROL_BREAK_VARIABLE, FORWARDED_VARIABLE, MULTI_HOST_CONFIGURATION_VARIABLE) + SELFTEST_DROPPED_VARIABLES}
+        environment[SELFTEST_ROOT_VARIABLE] = self.root
+        if self.switches:
+            environment[CONTROL_BREAK_VARIABLE] = ",".join(self.switches)
+        environment.update(extra or {})
+        return environment
+
+    def command(self, arguments):
+        return [sys.executable, os.path.realpath(__file__), *arguments]
+
+    def run(self, arguments, extra=None):
+        """→ (退出码, 标准输出, 标准错误)。"""
+        try:
+            completed = subprocess.run(self.command(arguments), capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                                       env=self.environment(extra), timeout=SELFTEST_RUN_SECONDS)
+        except subprocess.TimeoutExpired as error:
+            return None, str(error.stdout or ""), f"{SELFTEST_RUN_SECONDS} 秒没跑完"
+        return completed.returncode, completed.stdout, completed.stderr
+
+    def ssh_calls(self):
+        try:
+            with open(os.path.join(self.root, "fake", "ssh-calls.log"), encoding="utf-8") as handle:
+                return [json.loads(line) for line in handle if line.strip()]
+        except FileNotFoundError:
+            return []
+
+
+def remote_words(call):
+    """fake-ssh 收到的最后一个参数（远端那条命令）按 shell 拆开。"""
+    return shlex.split(call[-1]) if call else []
+
+
+def expected_remote_words(arguments):
+    return ["cd", REPOSITORY, "&&", "exec", "env", f"{FORWARDED_VARIABLE}=1", "python3", CONTROL_SCRIPT, *arguments]
+
+
+def expect(problems, condition, text):
+    if not condition:
+        problems.append(text)
+
+
+def expect_refused(problems, world, result, arguments, words):
+    code, _, error = result
+    expect(problems, code == RUN_CONDITION_EXIT, f"{' '.join(arguments)} 退 {code}，该退 {RUN_CONDITION_EXIT}；标准错误：{error.strip()}")
+    for word in words:
+        expect(problems, word in error, f"{' '.join(arguments)} 的标准错误里没有「{word}」：{error.strip()}")
+    expect(problems, not world.ssh_calls(), f"{' '.join(arguments)} 不该起 ssh，fake-ssh 收到了 {world.ssh_calls()}")
+
+
+def host_configuration(address, hosts=(LOCAL_ADDRESS, REMOTE_ADDRESS)):
+    """服务地址写 address:7000，主机数组写 hosts（空就不写这一键）。"""
+    configuration = [(NETWORK_ADDRESS_KEY, f"{address}:7000")] if address else []
+    return configuration + ([(HOSTS_KEY, " ".join(hosts))] if hosts else [])
+
+
+def remote_configuration(hosts=(LOCAL_ADDRESS, REMOTE_ADDRESS)):
+    return host_configuration(REMOTE_ADDRESS, hosts)
+
+
+def cell_local_address_runs_here(base, switches):
+    world = SelftestWorld(base, "local", host_configuration(LOCAL_ADDRESS), switches)
+    code, output, error = world.run(["install", "--dry-run"])
+    problems = []
+    expect(problems, code == 0, f"install --dry-run 退 {code}，该退 0；标准错误：{error.strip()}")
+    expect(problems, "--dry-run：只打了要做的事" in output, f"install --dry-run 没在这台做（没有「--dry-run：只打了要做的事」）：{output.strip()[-300:]}")
+    expect(problems, not world.ssh_calls(), f"地址是主机数组里这一台那一项，不该起 ssh，fake-ssh 收到了 {world.ssh_calls()}")
+    return problems
+
+
+def cell_remote_address_forwarded_over_ssh(base, switches):
+    world = SelftestWorld(base, "remote", remote_configuration(), switches, ssh_exit=5)
+    code, output, error = world.run(["stop"])
+    problems = []
+    expect(problems, code == 5, f"stop 退 {code}，该带回对端的 5；标准错误：{error.strip()}")
+    for line in (FAKE_REMOTE_FIRST, FAKE_REMOTE_LAST):
+        expect(problems, line in output, f"标准输出里没有对端的「{line}」：{output.strip()}")
+    expect(problems, FAKE_REMOTE_ERROR in error, f"标准错误里没有对端的「{FAKE_REMOTE_ERROR}」：{error.strip()}")
+    calls = world.ssh_calls()
+    expect(problems, len(calls) == 1, f"fake-ssh 该收到 1 次，收到 {len(calls)} 次：{calls}")
+    if calls:
+        call = calls[0]
+        expect(problems, len(call) >= 2 and call[-2] == REMOTE_ADDRESS, f"ssh 连的该是 {REMOTE_ADDRESS}（不带用户名），收到的参数：{call}")
+        expect(problems, "BatchMode=yes" in call and "-n" in call, f"ssh 该带 -o BatchMode=yes 与 -n：{call}")
+        expect(problems, remote_words(call) == expected_remote_words(["stop"]),
+               f"远端命令该是 {expected_remote_words(['stop'])}，收到 {remote_words(call)}")
+    return problems
+
+
+def cell_hosts_missing_refused(base, switches):
+    world = SelftestWorld(base, "hosts-missing", remote_configuration(hosts=()), switches)
+    problems = []
+    expect_refused(problems, world, world.run(["stop"]), ["stop"], ["缺键 HOSTS"])
+    return problems
+
+
+def cell_address_outside_hosts_refused(base, switches):
+    world = SelftestWorld(base, "outside-hosts", remote_configuration(hosts=(LOCAL_ADDRESS, OTHER_ADDRESS)), switches)
+    problems = []
+    expect_refused(problems, world, world.run(["stop"]), ["stop"], [f"「{REMOTE_ADDRESS}」不在 HOSTS 里"])
+    return problems
+
+
+def cell_shared_judge_refusal_stops_here(base, switches):
+    """地址是这一台，可配置别处判不过（多了一个判法不认得的键）：照共用取法的拒绝退 78，不在这台做。"""
+    world = SelftestWorld(base, "judge-refusal", host_configuration(LOCAL_ADDRESS) + [("SELFTEST_UNKNOWN_KEY", "1")], switches)
+    problems = []
+    expect_refused(problems, world, world.run(["install", "--dry-run"]), ["install", "--dry-run"], ["SELFTEST_UNKNOWN_KEY 不认得"])
+    return problems
+
+
+def cell_address_missing_refused(base, switches):
+    world = SelftestWorld(base, "address-missing", host_configuration(None), switches)
+    problems = []
+    expect_refused(problems, world, world.run(["install", "--dry-run"]), ["install", "--dry-run"], [NETWORK_ADDRESS_KEY])
+    return problems
+
+
+def cell_forwarded_loop_refused(base, switches):
+    world = SelftestWorld(base, "loop", remote_configuration(), switches, ssh_exit=5)
+    problems = []
+    expect_refused(problems, world, world.run(["stop"], {FORWARDED_VARIABLE: "1"}), ["stop"], ["转来"])
+    return problems
+
+
+def cell_install_binary_shared_root(base, switches):
+    problems = []
+    world = SelftestWorld(base, "binary", remote_configuration(), switches, ssh_exit=5)
+    shared = os.path.join(world.root, "shared")
+    outside = os.path.realpath(world.write("outside/prune-server", "fake binary\n"))
+    inside = os.path.realpath(world.write("shared/build/prune-server", "fake binary\n"))
+    world.write_configuration(remote_configuration() + [(SHARED_ROOTS_KEY, shared)])
+    expect_refused(problems, world, world.run(["install", "--binary", outside]), ["install", "--binary", outside], [SHARED_ROOTS_KEY])
+    code, _, error = world.run(["install", "--binary", inside])
+    expect(problems, code == 5, f"共享根下的 --binary 该转去、带回对端的 5，退了 {code}：{error.strip()}")
+    calls = world.ssh_calls()
+    expect(problems, len(calls) == 1 and remote_words(calls[0]) == expected_remote_words(["install", "--binary", inside]),
+           f"远端命令该是 {expected_remote_words(['install', '--binary', inside])}，fake-ssh 收到 {calls}")
+    return problems
+
+
+def cell_watch_forwarded_streams_lines(base, switches):
+    world = SelftestWorld(base, "watch-stream", remote_configuration(), switches,
+                          ssh_exit=1, ssh_delay=SELFTEST_STREAM_GAP_SECONDS)
+    process = subprocess.Popen(world.command(["watch"]), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               env=world.environment())
+    arrivals = []
+    error_lines = []
+    error_reader = threading.Thread(target=lambda: error_lines.extend(process.stderr), daemon=True)
+    error_reader.start()
+    for line in process.stdout:
+        arrivals.append((time.monotonic(), line.decode("utf-8", "replace").rstrip("\n")))
+    try:
+        code = process.wait(timeout=SELFTEST_RUN_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        code = None
+    ended = time.monotonic()
+    error_reader.join(timeout=5)
+    problems = []
+    expect(problems, code == 1, f"watch 该带回对端的 1，退了 {code}：{b''.join(error_lines).decode('utf-8', 'replace').strip()}")
+    first = [moment for moment, line in arrivals if line == FAKE_REMOTE_FIRST]
+    expect(problems, [line for _, line in arrivals if line in (FAKE_REMOTE_FIRST, FAKE_REMOTE_LAST)] == [FAKE_REMOTE_FIRST, FAKE_REMOTE_LAST],
+           f"对端的两行该先后都到，到的是 {[line for _, line in arrivals]}")
+    if first:
+        expect(problems, ended - first[0] >= 1.0, f"头一行在退出前 {ended - first[0]:.2f} 秒才到（对端隔 {SELFTEST_STREAM_GAP_SECONDS} 秒打下一行），没按行转打")
+    calls = world.ssh_calls()
+    expect(problems, len(calls) == 1 and "-n" not in calls[0] and "ServerAliveInterval=15" in calls[0],
+           f"watch 的 ssh 不带 -n、带 ServerAliveInterval=15，fake-ssh 收到 {calls}")
+    return problems
+
+
+def cell_ssh_failure_reported(base, switches):
+    world = SelftestWorld(base, "ssh-failure", remote_configuration(), switches, ssh_exit=SSH_FAILURE_EXIT)
+    problems = []
+    code, _, error = world.run(["watch"])
+    expect(problems, code == 1 and "服务不通" in error, f"watch 的 ssh 退 255 该报服务不通、退 1，退了 {code}：{error.strip()}")
+    code, _, error = world.run(["stop"])
+    expect(problems, code == RUN_CONDITION_EXIT and "ssh -o BatchMode=yes" in error,
+           f"stop 的 ssh 退 255 该退 {RUN_CONDITION_EXIT}、出路写 ssh 怎么核，退了 {code}：{error.strip()}")
+    return problems
+
+
+def cell_forwarded_watch_exits_on_hangup(base, switches):
+    world = SelftestWorld(base, "hangup", host_configuration(LOCAL_ADDRESS), switches, serving=True)
+    process = subprocess.Popen(world.command(["watch"]), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               env=world.environment({FORWARDED_VARIABLE: "1"}))
+    problems = []
+    time.sleep(SELFTEST_STREAM_GAP_SECONDS)
+    if process.poll() is not None:
+        output, error = process.communicate()
+        return [f"转来的 watch 在单元在跑、服务通时就退了 {process.returncode}：{output.decode('utf-8', 'replace').strip()} {error.decode('utf-8', 'replace').strip()}"]
+    try:
+        # 不先自己 close()：communicate 没给 input 时会关标准输入，先关了它再 flush 会抛 ValueError
+        output, error = process.communicate(timeout=SELFTEST_HANGUP_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+        return [f"关了标准输入 {SELFTEST_HANGUP_SECONDS} 秒还没退"]
+    text = error.decode("utf-8", "replace")
+    expect(problems, process.returncode == 1 and "断了" in text, f"关了标准输入该报那一端断了、退 1，退了 {process.returncode}：{text.strip()}")
+    return problems
+
+
+def file_text(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read()
+    except FileNotFoundError:
+        return ""
+
+
+def cell_install_enables_restarting_unit(base, switches):
+    """install 写出的单元带 Restart=always 与不超过上限的 RestartSec，只 start、不 enable（开机不自起），单元里没有 [Install]。"""
+    world = SelftestWorld(base, "install-restart", host_configuration(LOCAL_ADDRESS), switches, recording=True)
+    code, output, error = world.run(["install"])
+    problems = []
+    expect(problems, code == 0, f"install 退 {code}，该退 0；标准错误：{error.strip()}；标准输出末尾：{output.strip()[-300:]}")
+    unit_lines = file_text(os.path.join(world.root, "systemd", UNIT_NAME)).splitlines()
+    expect(problems, "Restart=always" in unit_lines, f"单元里没有 Restart=always：{unit_lines}")
+    restart = [line[len("RestartSec="):] for line in unit_lines if line.startswith("RestartSec=")]
+    expect(problems, len(restart) == 1 and restart[0].isdigit() and 0 < int(restart[0]) <= RESTART_SECONDS_CEILING,
+           f"单元该有一行 RestartSec=<1 到 {RESTART_SECONDS_CEILING} 的整秒数>，有的是 {restart}")
+    calls = file_text(os.path.join(world.root, "fake", "systemctl-calls.log")).splitlines()
+    start_line, enable_line = f"--user start {UNIT_NAME}", f"--user enable {UNIT_NAME}"
+    expect(problems, start_line in calls and enable_line not in calls, f"install 该只 start、不 enable（开机不自起），systemctl 的调用：{calls}")
+    expect(problems, "[Install]" not in unit_lines, f"单元里不该有 [Install]（开机不自起）：{unit_lines}")
+    return problems
+
+
+def cell_stop_stays_stopped(base, switches):
+    """stop 之后隔一阵再回读仍 inactive 退 0；假 systemctl 在 stop 之后又把单元拉起时 stop 退 1。"""
+    problems = []
+    for restarted in (False, True):
+        world = SelftestWorld(base, "stop-stays", host_configuration(LOCAL_ADDRESS), switches, recording=True)
+        world.write("fake/unit-state", "active\n")
+        if restarted:
+            world.write("fake/restarted-after-stop", "")
+        code, output, error = world.run(["stop"])
+        calls = file_text(os.path.join(world.root, "fake", "systemctl-calls.log")).splitlines()
+        expect(problems, f"--user stop {UNIT_NAME}" in calls and not any(" kill " in f" {line} " or " disable " in f" {line} " for line in calls),
+               f"stop 该用 systemctl stop（不 kill、不 disable），systemctl 的调用：{calls}")
+        if restarted:
+            expect(problems, code == 1 and "又被拉起" in error, f"stop 之后单元又被拉起时 stop 该退 1、说「又被拉起」，退了 {code}：{error.strip()}")
+        else:
+            is_active_after_stop = calls[calls.index(f"--user stop {UNIT_NAME}"):].count(f"--user is-active {UNIT_NAME}") if f"--user stop {UNIT_NAME}" in calls else 0
+            expect(problems, code == 0 and "没被拉起" in output, f"stop 该退 0、说「没被拉起」，退了 {code}：{output.strip()[-300:]} {error.strip()}")
+            expect(problems, is_active_after_stop >= 2, f"stop 之后该回读 is-active 两次（立刻一次、隔一阵一次），回读了 {is_active_after_stop} 次：{calls}")
+    return problems
+
+
+def drop_world(base, cell, switches, unit_state):
+    """drop-oversized-values 那几格的自证根：单元状态是 unit_state，单元文件的 ExecStart 指 <根>/installed/prune-server、--state-directory 指 <根>/unit-state
+    （都不是 Paths 的缺省位置，证明是从单元文件取的）。"""
+    world = SelftestWorld(base, cell, host_configuration(LOCAL_ADDRESS), switches, recording=True)
+    world.write("installed/prune-server", FAKE_BINARY_RECORDING, executable=True)
+    world.write("fake/unit-state", f"{unit_state}\n")
+    world.write(f"systemd/{UNIT_NAME}", "[Service]\n"
+                f"ExecStart={world.root}/installed/prune-server serve --spawned-by-parent --socket {world.root}/run/server.sock "
+                f"--state-directory {world.root}/unit-state --multi-host-configuration {world.root}/multi-host.env\n")
+    return world
+
+
+def cell_drop_oversized_refused_while_running(base, switches):
+    world = drop_world(base, "drop-running", switches, "active")
+    code, _, error = world.run(["drop-oversized-values", "--dry-run"])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT and "control stop" in error,
+           f"单元在跑时 drop-oversized-values 该退 {RUN_CONDITION_EXIT}、出路写 control stop，退了 {code}：{error.strip()}")
+    calls = file_text(os.path.join(world.root, "fake", "binary-calls.log"))
+    expect(problems, not calls, f"单元在跑时不该起二进制，它收到了：{calls.strip()}")
+    return problems
+
+
+def cell_drop_oversized_runs_installed_binary(base, switches):
+    world = drop_world(base, "drop-stopped", switches, "inactive")
+    problems = []
+    state_directory = os.path.join(world.root, "unit-state")
+    for arguments, expected in ((["drop-oversized-values", "--dry-run"], f"drop-oversized-values --state-directory {state_directory} --dry-run"),
+                                (["drop-oversized-values"], f"drop-oversized-values --state-directory {state_directory}")):
+        before = file_text(os.path.join(world.root, "fake", "binary-calls.log")).splitlines()
+        code, output, error = world.run(arguments)
+        received = file_text(os.path.join(world.root, "fake", "binary-calls.log")).splitlines()[len(before):]
+        expect(problems, code == FAKE_DROP_EXIT, f"{' '.join(arguments)} 该退二进制的 {FAKE_DROP_EXIT}，退了 {code}：{error.strip()}")
+        expect(problems, FAKE_DROP_LINE in output, f"{' '.join(arguments)} 该原样打出二进制的「{FAKE_DROP_LINE}」：{output.strip()[-300:]}")
+        expect(problems, received == [expected], f"{' '.join(arguments)} 起二进制的参数该是「{expected}」，收到 {received}")
+    return problems
+
+
+def cell_drop_oversized_forwarded_over_ssh(base, switches):
+    world = SelftestWorld(base, "drop-remote", remote_configuration(), switches, ssh_exit=5)
+    code, _, error = world.run(["drop-oversized-values", "--dry-run"])
+    problems = []
+    expect(problems, code == 5, f"drop-oversized-values --dry-run 该转去、带回对端的 5，退了 {code}：{error.strip()}")
+    calls = world.ssh_calls()
+    expected = expected_remote_words(["drop-oversized-values", "--dry-run"])
+    expect(problems, len(calls) == 1 and calls[0][-2] == REMOTE_ADDRESS and remote_words(calls[0]) == expected,
+           f"该经 ssh 到 {REMOTE_ADDRESS} 起 {expected}，fake-ssh 收到 {calls}")
+    return problems
+
+
+SELFTEST_CELLS = {
+    "local-address-runs-here": cell_local_address_runs_here,
+    "remote-address-forwarded-over-ssh": cell_remote_address_forwarded_over_ssh,
+    "hosts-missing-refused": cell_hosts_missing_refused,
+    "address-outside-hosts-refused": cell_address_outside_hosts_refused,
+    "shared-judge-refusal-stops-here": cell_shared_judge_refusal_stops_here,
+    "address-missing-refused": cell_address_missing_refused,
+    "forwarded-loop-refused": cell_forwarded_loop_refused,
+    "install-binary-shared-root": cell_install_binary_shared_root,
+    "watch-forwarded-streams-lines": cell_watch_forwarded_streams_lines,
+    "ssh-failure-reported": cell_ssh_failure_reported,
+    "forwarded-watch-exits-on-hangup": cell_forwarded_watch_exits_on_hangup,
+    "install-enables-restarting-unit": cell_install_enables_restarting_unit,
+    "stop-stays-stopped": cell_stop_stays_stopped,
+    "drop-oversized-refused-while-running": cell_drop_oversized_refused_while_running,
+    "drop-oversized-runs-installed-binary": cell_drop_oversized_runs_installed_binary,
+    "drop-oversized-forwarded-over-ssh": cell_drop_oversized_forwarded_over_ssh,
+}
+
+
+def selftest():
+    if os.environ.get(BREAK_VARIABLE):
+        return fail(f"{BREAK_VARIABLE} 管的是 prune-server --selftest 起的那几格，这份文件自己的自证不认", f"不设 {BREAK_VARIABLE} 再跑；弄坏这里的判法用 {CONTROL_BREAK_VARIABLE}", USAGE_EXIT)
+    switches = [item.strip() for item in os.environ.get(CONTROL_BREAK_VARIABLE, "").split(",") if item.strip()]
+    unknown = [item for item in switches if item not in SELFTEST_SWITCH_CELLS]
+    if unknown:
+        return fail(f"{CONTROL_BREAK_VARIABLE} 里认不出 {'、'.join(unknown)}", f"认得的：{'、'.join(SELFTEST_SWITCH_CELLS)}（文件头「自己的自证」）", USAGE_EXIT)
+    dangling = sorted({cell for cells in SELFTEST_SWITCH_CELLS.values() for cell in cells} - set(SELFTEST_CELLS))
+    if dangling:
+        return fail(f"开关表点名的格 {'、'.join(dangling)} 不在格表里", "改 SELFTEST_SWITCH_CELLS 与 SELFTEST_CELLS 对上", 1)
+    base = os.path.realpath(tempfile.mkdtemp(prefix="prune-server-control-selftest-"))
+    results = {}
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(SELFTEST_CELLS)) as pool:
+            futures = {name: pool.submit(function, base, [item for item in switches if name in SELFTEST_SWITCH_CELLS[item]])
+                       for name, function in SELFTEST_CELLS.items()}
+            for name, future in futures.items():
+                try:
+                    results[name] = future.result()
+                except Exception as error:   # 一格自己崩了算红，不吃掉
+                    results[name] = [f"这一格自己崩了：{type(error).__name__}: {error}"]
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    failed = [name for name in SELFTEST_CELLS if results.get(name) != []]
+    for name in SELFTEST_CELLS:
+        if name in failed:
+            print(f"  ✗ {name}：{'；'.join(results.get(name) or ['没有结果'])}", flush=True)   # gate-lint:detail
+        else:
+            say(f"  ✓ {name}")
+    say(f"{SELFTEST_SUMMARY_PREFIX} cells={len(SELFTEST_CELLS)} failed={len(failed)} break={','.join(switches) or '-'}")
+    return 1 if failed or len(results) != len(SELFTEST_CELLS) else 0
+
+
+def main(arguments):
+    if arguments == ["--selftest"]:
+        return selftest()
+    for variable in (BREAK_VARIABLE, CONTROL_BREAK_VARIABLE):
+        if os.environ.get(variable) and not os.environ.get(SELFTEST_ROOT_VARIABLE):
+            return fail(f"{variable} 只在自证里认（设了 {SELFTEST_ROOT_VARIABLE} 时，或 --selftest）", f"不设 {variable} 再跑", USAGE_EXIT)
+    here, forwarded_arguments = parse_arguments(arguments)
+    if here is None:
+        return fail(f"认不出「{' '.join(arguments)}」",
+                    "写成 python3 prune-server/control install [--dry-run] [--binary <编好的 prune-server>] | start | stop | check | watch"
+                    " | drop-oversized-values [--dry-run] | --selftest", USAGE_EXIT)
+    paths = Paths()
+    place, value = service_host(paths)
+    if place == "refused":
+        return value
+    if place == "there":
+        return forward(paths, value, forwarded_arguments)
+    return here()
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

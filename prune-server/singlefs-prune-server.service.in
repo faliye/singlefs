@@ -1,0 +1,18 @@
+# prune-server 的用户级 systemd 单元模板：python3 prune-server/control install 照它填 @BINARY@、@STATE_DIRECTORY@、@SOCKET@、
+# @MULTI_HOST_CONFIG@（装的时候读的那一份多机配置），写进 ${XDG_CONFIG_HOME:-~/.config}/systemd/user/。
+# --spawned-by-parent：准入由起它的一方判过（control 自己是 python，服务头上的运行条件只有 python3），服务起来时不再去仓里找 preflight.py。
+# 停：control stop 先叫服务宣布停服务、记下客户端清单，再 systemctl stop；SIGTERM 立刻结束进程，不等在跑的读写
+# （写都是同步落盘之后才回确认的，没确认的留在客户端的追加日志里）。
+# 起来之后被杀自己拉起、开机不自起（用户定：「开机不自启动。 但是启动后要有恢复能力。」）：进程不是被 systemctl stop 停掉的
+# （被 earlyoom 杀、崩了、退了），隔 RestartSec 秒由 systemd 拉起，要落在容错客户端重连的窗口里（src/reliable_client.rs 的 ReconnectPolicy，一轮至多 120 秒）；
+# 单元没有 [Install]，control install 只 start、不 enable；systemctl stop 停的不拉起。
+[Unit]
+Description=singlefs prune-server
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=@BINARY@ serve --spawned-by-parent --socket @SOCKET@ --state-directory @STATE_DIRECTORY@ --multi-host-configuration @MULTI_HOST_CONFIG@
+Restart=always
+RestartSec=3
+TimeoutStopSec=5

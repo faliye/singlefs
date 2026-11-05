@@ -1,0 +1,42 @@
+# prune-server：判定库服务的原型（records/2026-11-01-判定库服务化.md 批次 2）。
+# 服务是 RocksDB 的唯一持有者，开 unix socket 与 TCP 两处监听，协议是长度前缀的二进制帧；压测器是同一工程里的另一个二进制。
+# 独立工程：下面的空 [workspace] 让它自己是工作区根，不进仓根工作区（仓根 Cargo.toml 的 members 是逐个列的，不列它）。
+[package]
+name = "prune-server"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+# 版本钉成 =0.25.0、默认特性（验证包经 path 依赖 prune-server 编进去的就是这一份 RocksDB）：Cargo.lock 拷自仓根，
+# librocksdb-sys 与压缩库的版本与仓根逐个相同，才链得上 scripts/hosts/rocksdb-prebuilt.py 编好的预编库（四个环境变量 ROCKSDB_LIB_DIR、ROCKSDB_STATIC、
+# SNAPPY_LIB_DIR、SNAPPY_STATIC 只走进程环境，取法见那份脚本文件头「入口怎么拿到取值」）。bindgen 要的 BINDGEN_EXTRA_CLANG_ARGS 由仓根 .cargo/config.toml 给。
+rocksdb = { version = "=0.25.0" }
+# 压测器装 SIGTERM / SIGINT 的处理、给子进程设父进程退出时的信号、读时钟滴答数；与仓根 Cargo.lock 里已有的 libc 同一份。
+libc = "0.2"
+
+[[bin]]
+name = "prune-server"
+path = "src/bin/prune_server.rs"
+
+[[bin]]
+name = "prune-server-bench"
+path = "src/bin/prune_server_bench.rs"
+
+# 编码纪律里能交给 clippy 的那几条（.claude/singlefs-ai-sop/scripts/check.sh 的 CODE_DISCIPLINE_LINTS），这个工程不经 check.sh，写在这里由 cargo clippy 带上。
+[lints.clippy]
+wildcard_enum_match_arm = "deny"
+allow_attributes_without_reason = "deny"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+cast_possible_wrap = "deny"
+undocumented_unsafe_blocks = "deny"
+shadow_unrelated = "deny"
+
+# 与仓根 Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕；debug_assert! 在 release 下也开。
+[profile.release]
+opt-level = 3
+overflow-checks = true
+debug-assertions = true
