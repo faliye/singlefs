@@ -1,0 +1,1284 @@
+{
+  "at": "2026-11-05",
+  "source": ".claude/gate.d/lib-forbidden-notations.py",
+  "sha256": "8fb18e3074e443e8bf46f68d90fb52a6b87dbeedb6ad98d8fd086a0a1b088dc6",
+  "read_ranges": [
+    [
+      1,
+      547
+    ]
+  ],
+  "full_text_read": true,
+  "full_semantic_signoff": false,
+  "patterns": [
+    {
+      "form": "prime-marks",
+      "key": "prime-marks",
+      "line": 231,
+      "source": "('prime-marks', '撇号类角标', re.compile('[' + re.escape(PRIME_MARKS) + ']'), None)",
+      "comparison": "5个码位一致；ASCII单引号不在字符集。文件头称只排上游，实际另排冻结输出，说明范围待同步。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "date-clock",
+      "line": 253,
+      "source": "('date-clock', '日期后面跟钟点', re.compile(rf'{DATE} ?(?:{ZONE} ?)?{CLOCK_RANGE}'), field_value)",
+      "comparison": "DATE/CLOCK_RANGE和field_value对应；只核格式，不当成合法日期验证。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "zone-clock",
+      "line": 254,
+      "source": "('zone-clock', '时区后面跟钟点', re.compile(rf'{ZONE} ?{NEXT_DAY}{CLOCK_RANGE}'), None)",
+      "comparison": "ZONE/NEXT_DAY/CLOCK_RANGE对应。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "clock-zone",
+      "line": 255,
+      "source": "('clock-zone', '钟点后面跟时区', re.compile(rf'{CLOCK_RANGE} ?{ZONE}'), None)",
+      "comparison": "CLOCK_RANGE/ZONE对应。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "x-wildcard",
+      "line": 256,
+      "source": "('x-wildcard', '带 x 通配的钟点', re.compile(r'(?<![\\w:])(?:\\d{1,2}|\\dx):(?:\\dx|xx)'), None)",
+      "comparison": "小时和分钟通配分支对应；具体非法值边界未穷举。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "bare-z",
+      "line": 257,
+      "source": "('bare-z', '不带日期的 Z 钟点', re.compile(r'(?<![\\w:`])\\d{1,2}:\\d\\d(?::\\d\\d)?Z(?!\\w)'), None)",
+      "comparison": "无日期Z形式及前后边界对应。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "date-zone-hour",
+      "line": 258,
+      "source": "('date-zone-hour', '日期或时区后面跟「N 点 / N 时」', re.compile(rf'(?:{DATE}|{ZONE})\\s*(?:{ZONE}\\s*)?{NEXT_DAY}{HOUR}'), None)",
+      "comparison": "日期/时区/次日/HOUR及中文后缀排除对应。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "date-zone-period",
+      "line": 259,
+      "source": "('date-zone-period', '日期或时区后面跟时段词', re.compile(rf'(?:{DATE}(?:\\s*{ZONE})?|{ZONE})[\\s（(，]*{NEXT_DAY}{PERIOD}'), None)",
+      "comparison": "日期/时区后空白左括号逗号/次日/时段对应。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "period-hour",
+      "line": 260,
+      "source": "('period-hour', '时段词后面跟钟点', re.compile(rf'{PERIOD}\\s*(?:{HOUR}|{CLOCK})'), None)",
+      "comparison": "时段后HOUR或CLOCK对应。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "hour-suffix",
+      "line": 261,
+      "source": "('hour-suffix', '「N 点前后」这类钟点', re.compile(r'(?<![第\\d])(?<!第 )\\d{1,2}\\s*(?:点(?:前后|左右|许|半|钟)|时许)'), None)",
+      "comparison": "点前后/左右/许/半/钟、时许对应；第及第空格排除，更多空白形式待核。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "twelve-hour",
+      "line": 262,
+      "source": "('twelve-hour', '十二小时制钟点', re.compile(TWELVE_HOUR), None)",
+      "comparison": "一到两位数字、可选分钟和空格、am/pm大小写可选点对应；不证明小时值合法。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "bare-clock",
+      "line": 263,
+      "source": "('bare-clock', '不挨日期时区的钟点', re.compile(BARE_CLOCK), bare_clock_is_not_clock)",
+      "comparison": "小时0-23分钟0-59及多项上下文逐分支相符；同句编号豁免是明示边界。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "iso-timestamp",
+      "line": 264,
+      "source": "('iso-timestamp', 'ISO 时间戳', re.compile(ISO_TIMESTAMP), field_value)",
+      "comparison": "T式前缀与field_value对应，整串尾界/秒合法性未核。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "iso-compact-timestamp",
+      "line": 265,
+      "source": "('iso-compact-timestamp', 'ISO 紧凑时间戳', re.compile(ISO_COMPACT_TIMESTAMP), None)",
+      "comparison": "候选：带连字符DATE不验月日范围，与29-31/122-123行承诺冲突；任务7187。",
+      "status": "discrepancy_A54_reproduced",
+      "runtime": "7187",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "clock-times",
+      "key": "zone-word",
+      "line": 266,
+      "source": "('zone-word', '时区词', re.compile(ZONE_WORD), None)",
+      "comparison": "两个大写缩写及ASCII边界对应。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "session-names",
+      "key": "session-names",
+      "line": 372,
+      "source": "('session-names', '会话号', re.compile(SESSION_NAME), None)",
+      "comparison": "仓名与SOP语言后缀、2-6位十六进制、结束排除对应；下划线另排，文档范围待精查。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "batch-codes",
+      "key": "batch-code-suffixed",
+      "line": 436,
+      "source": "('batch-code-suffixed', '数字加字母加短横序号的代号', re.compile(BATCH_CODE_SUFFIXED), batch_code_is_not_code)",
+      "comparison": "1-2位短横编号与排除e对应；共同前后边界与上下文另核。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "batch-codes",
+      "key": "batch-code-lettered",
+      "line": 437,
+      "source": "('batch-code-lettered', '两位数字加字母的代号', re.compile(BATCH_CODE_LETTERED), batch_code_is_not_code)",
+      "comparison": "两位加非UNIT_LETTERS对应。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "batch-codes",
+      "key": "batch-code-labeled",
+      "line": 438,
+      "source": "('batch-code-labeled', '挨着批次词的数字加字母', re.compile(BATCH_CODE_LABELED), batch_code_is_not_code)",
+      "comparison": "候选：数字{1,3}接受三位，53/57行称三位以上不判；任务7187。",
+      "status": "discrepancy_A54_reproduced",
+      "runtime": "7187",
+      "whole_claim_pass": false
+    },
+    {
+      "form": "batch-codes",
+      "key": "batch-code-stem",
+      "line": 439,
+      "source": "('batch-code-stem', '天干编号的批号', re.compile(BATCH_CODE_STEM), batch_code_is_not_code)",
+      "comparison": "天干与批次词对应；中文数字已在CHINESE_NUMERALS接受，57行管不到中文数字表述需进一步区分范围。",
+      "status": "static_correspondence_bounded",
+      "runtime": "not executed in this continuation",
+      "whole_claim_pass": false
+    }
+  ],
+  "exclusions": [
+    {
+      "form": "prime-marks",
+      "line": 234,
+      "source": "(UPSTREAM_COPY, '上游副本，只能在上游改')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "prime-marks",
+      "line": 235,
+      "source": "('research/prompts/m3-defs-b6-r2-opus-model/out/', '三方腿探针跑 doc-text 的原样输出，引了这一格成功句里举的角标例子；冻结证据不改')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 269,
+      "source": "('.claude/hooks/session-start.sh', '自检用的假 journalctl 行与它打出来的期望输出，钟点是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 270,
+      "source": "('research/prompts/_gate-shrink-r1-diff.md', '冻结证据：那一轮改动前后的 diff，旧文里的时区词是被改掉的原文')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 271,
+      "source": "('research/prompts/gate-shrink-r2-sync-evidence/changes-scoped.md', '冻结证据：逐条抄录改前旧文（「旧：」行），钟点与时区词是被改掉的原文')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 272,
+      "source": "('research/prompts/abandoned-floor-r1-opus-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 273,
+      "source": "('research/prompts/c245-r3-opus-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 274,
+      "source": "('research/prompts/closeout-recheck-2026-09-28/', '冻结证据：收口复核留的 diff，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 275,
+      "source": "('research/prompts/k3-9-barrier-r1-opus-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 276,
+      "source": "('research/prompts/unreadable-at-mount-r1-opus-model/runs/', '冻结证据：腿的运行日志，内存包装打出的 ISO 时间戳是原样输出')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 277,
+      "source": "('research/prompts/unreadable-at-mount-r2-opus-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 278,
+      "source": "('.claude/gate.d/fixtures/', '门禁样本：造现场的 touch -d、GIT_COMMITTER_DATE 与门禁打出来的期望输出')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 279,
+      "source": "('research/prompts/m3-defs-b6-r2-opus-model/', '冻结证据：腿的模型目录，喂样本的 setup.sh 与它的输出里的 ISO 时间戳是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 280,
+      "source": "('research/prompts/m3-defs-b9-r1-opus-model/', '冻结证据：腿的模型目录，喂样本的 setup.sh、样本与输出里的 ISO 时间戳是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 281,
+      "source": "('research/prompts/m3-defs-b9-r2-opus-model/', '冻结证据：腿的模型目录，探针脚本里的时间戳是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 282,
+      "source": "('research/prompts/m3-defs-b9-r1-opus-output.md', '冻结证据：腿的报告，抄了它模型输出里的时间戳')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 283,
+      "source": "('research/prompts/m3-admission-r1-main-verification.md', '冻结证据：那一轮的判决，记了冻结副本被别的会话通删与改动的钟点')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 284,
+      "source": "('research/prompts/m3-close-noncode-candidates.tsv', '冻结证据：回扫候选表整行抄录记录里的旧文，旧文带钟点')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 285,
+      "source": "('research/prompts/m3-close-noncode-sync.md', '冻结证据：阶段同步记录整行抄录记录里的旧文，旧文带钟点')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 286,
+      "source": "('research/prompts/agentdef-r2-main-verification.md', '冻结证据：那一轮的判决，里面「决策号:行号」写法的冒号对（决策 06 的第 42 行）不是钟点，同一句里没有「文件:行号」可认')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 287,
+      "source": "('research/results/e142-mutate-r25-s1-2026-10-13.log', '实验产物：变异驱动的原样输出带时间戳，复跑要逐字相同')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 288,
+      "source": "('research/results/e71-accounting-keys-single-generation-mutations-2026-10-20.log', '实验产物：变异驱动的原样输出，内存包装报的上一次峰值带量的时间戳')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 289,
+      "source": "('.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/', '钩子样本：派发闸自证读的真派发提示原样，提示里抄的钟点与时间戳是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 290,
+      "source": "('research/prompts/_rot-defs-r2-background.md', '冻结证据：那一轮的材料原样贴了 git log 输出，Date 行带提交的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 291,
+      "source": "('research/prompts/_rot-defs-r2-body.md', '冻结证据：那一轮的材料原样贴了 git log 输出，Date 行带提交的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 292,
+      "source": "('research/prompts/apparatus-rename-r1-opus-model/attack_samples.py', '冻结证据：腿的探针，造样本提交的 GIT_AUTHOR_DATE 是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 293,
+      "source": "('research/prompts/batch-2026-10-21-facts.tsv', '冻结证据：那一批的事实表，举了被误判成钟点的设备号写法，不是钟点')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 294,
+      "source": "('research/prompts/batch-2026-10-21-judge-6.md', '冻结证据：那一批的判决，「文件:行号」写法的冒号对不是钟点，同一句里没有带后缀的文件名可认')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 295,
+      "source": "('research/prompts/landing-audit-r1-opus-model/tools/outcome_check.py', '冻结证据：腿的工具，按会话记录的时区切天，时区词是代码字面')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 296,
+      "source": "('research/prompts/landing-audit-r1-snapshot/judged-vs-index.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里带时区词的代码')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 297,
+      "source": "('research/prompts/landing-audit-r2-opus-model/', '冻结证据：腿的模型目录，会话记录的原样导出与探针里的时间戳、时区词是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 298,
+      "source": "('research/prompts/landing-audit-r2-opus-output.md', '冻结证据：腿的报告，论证的就是按哪个时区切天')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 299,
+      "source": "('research/prompts/landing-audit-r2-snapshot/judged-vs-index.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里带时区词的代码')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 300,
+      "source": "('research/prompts/landing-audit-r3-opus-model/', '冻结证据：腿的模型目录，会话记录的原样导出、真派发提示与探针里的时间戳、时区词是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 301,
+      "source": "('research/prompts/landing-audit-r3-opus-output.md', '冻结证据：腿的报告，论证的就是按哪个时区切天，抄了窗口边界的时间戳')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 302,
+      "source": "('research/prompts/landing-audit-r3-snapshot/judged-vs-index.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里带时区词的代码')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 303,
+      "source": "('research/prompts/landing-audit-r4-opus-model/probes/naming_probe.py', '冻结证据：腿的探针，造会话记录的时间戳是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 304,
+      "source": "('research/prompts/landing-audit-r4-snapshot/judged-vs-head.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词与运行目录名')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 305,
+      "source": "('research/prompts/apparatus-rename-r2-snapshot/judged-vs-head.diff', '冻结证据：那一轮开工快照的 diff，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 306,
+      "source": "('research/prompts/apparatus-rename-r2-opus-model/attack_samples.py', '冻结证据：腿的探针，造样本提交的 GIT_AUTHOR_DATE 是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 307,
+      "source": "('research/prompts/apparatus-rename-r2-sonnet-model/tools/probe_h3.py', '冻结证据：腿的探针，样本行里的钟点是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 308,
+      "source": "('research/prompts/landing-audit-r5-opus-model/', '冻结证据：腿的模型目录，被判钩子的原件、会话记录导出与探针里的时间戳、时区词是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 309,
+      "source": "('research/prompts/landing-audit-r5-snapshot/judged-vs-head.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词与运行目录名')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 310,
+      "source": "('research/prompts/landing-audit-r6-opus-model/', '冻结证据：腿的模型目录，被判钩子的原件、探针与它的输出里的时间戳、时区词是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 311,
+      "source": "('research/prompts/landing-audit-r6-opus-output.md', '冻结证据：腿的报告，抄了探针输出里按时区切日期的汇总行')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 312,
+      "source": "('research/prompts/landing-audit-r6-snapshot/judged-vs-head.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词、运行目录名与真派发提示')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 313,
+      "source": "('research/prompts/m3-close-c506-r2-opus-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 314,
+      "source": "('research/prompts/m3-close-c656-r1-opus-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 315,
+      "source": "('research/prompts/m3-close-c656-r2-sonnet-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 316,
+      "source": "('research/prompts/m3-close-reuse-closure-r1-opus-model/', '冻结证据：腿的模型目录，造现场的时间戳与内存包装打出的起跑时间戳是被测输入与原样输出')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 317,
+      "source": "('research/prompts/m3-close-reuse-closure-r2-opus-model/', '冻结证据：腿的模型目录，造现场的时间戳与内存包装打出的起跑时间戳是被测输入与原样输出')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 318,
+      "source": "('research/prompts/m4-c860-r1-opus-s2-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 319,
+      "source": "('research/prompts/m4-c860-r1-sonnet-model/patch/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 320,
+      "source": "('research/prompts/m4-i315-r1-sonnet-model/probes/instrumentation.patch', '冻结证据：腿的探针补丁，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 321,
+      "source": "('research/prompts/m4-publish-lookup-code-r1-snapshot/reversal/b6-c860/', '冻结证据：那一轮回滚核对留的 diff 与说明，diff 头与说明里是拷贝时的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 322,
+      "source": "('research/prompts/m4-publish-lookup-code-r2-opus-model/out/runs-logs/', '冻结证据：腿的运行日志，内存包装报的上一次峰值带量的时间戳，是原样输出')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 323,
+      "source": "('research/prompts/m4-publish-lookup-followup-code-r1-opus-model/tools/probe.patch', '冻结证据：腿的探针补丁，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 324,
+      "source": "('research/prompts/subagent-landing-audit-2026-10-22/', '冻结证据：那一次落地审计的逐组记录，抄了会话记录里的钟点、运行目录名与按时区切天的原文')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 325,
+      "source": "('research/prompts/apparatus-rename-r3-opus-model/attack_samples.py', '冻结证据：腿的探针，造样本提交的 GIT_AUTHOR_DATE 是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 326,
+      "source": "('research/prompts/landing-audit-r7-snapshot/', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词、运行目录名与真派发提示')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 327,
+      "source": "('research/prompts/landing-audit-r7-sonnet-output.md', '冻结证据：腿的报告，抄了报告里的时间戳与钟点')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 328,
+      "source": "('research/prompts/m3-close-gov-b17-r2-opus-output.md', '冻结证据：腿的报告，抄了 stat 机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 329,
+      "source": "('research/prompts/m3-close-gov-b17-r3-opus-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 330,
+      "source": "(UPSTREAM_COPY, '上游副本，只能在上游改')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 331,
+      "source": "('research/prompts/_c510-date-gate-r1-appendix.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 332,
+      "source": "('research/prompts/_c510-date-gate-r1-attack-output.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 333,
+      "source": "('research/prompts/_c510-date-gate-r1-background.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 334,
+      "source": "('research/prompts/_c510-date-gate-r1-body.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 335,
+      "source": "('research/prompts/_c510-date-gate-r1-checklist.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 336,
+      "source": "('research/prompts/_c510-date-gate-r1-forward-output.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 337,
+      "source": "('research/prompts/_c510-date-gate-r1-local-attack-output.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 338,
+      "source": "('research/prompts/c510-r1-main-checks/c510-date-gate-r1-local-attack.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 339,
+      "source": "('research/prompts/c510-r1-main-checks/c510-date-gate-r1-local-attack-output-s1.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 340,
+      "source": "('research/prompts/c510-r1-main-checks/c510-date-gate-r1-local-attack-output-s2.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 341,
+      "source": "('research/prompts/c510-r1-main-checks/c510-date-gate-r1-local-attack-translation-audit.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 342,
+      "source": "('research/prompts/c510-date-gate-r1-verifier-output.md', C510_REASON)",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 343,
+      "source": "('research/prompts/crash-slice-false-resume-candidates.tsv', '冻结证据：回扫候选表，抄了旧记录带时间戳的原文')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 344,
+      "source": "('research/prompts/d165-valves-r1-sonnet-output.md', '冻结证据：腿的模型报告，时间戳是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 345,
+      "source": "('research/prompts/m3-close-b19-code-r3-sonnet-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 346,
+      "source": "('research/prompts/m3-close-b19-design-r2-sonnet-output.md', '冻结证据：腿的模型报告，时间戳是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "clock-times",
+      "line": 347,
+      "source": "('records/2026-11-02-文档代码逐项审核-', '过程记录与审核产物，原始日志与台账里的时间戳是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 375,
+      "source": "('.claude/gate.d/fixtures/', '门禁样本：会话号是被测输入，由 setup.sh 拆开拼出')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 376,
+      "source": "('research/prompts/m3-admission-r1-main-verification.md', '冻结证据：那一轮的判决，点名了改动冻结副本的会话')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 377,
+      "source": "('research/prompts/m3-close-noncode-candidates.tsv', '冻结证据：回扫候选表整行抄录记录里的旧文，旧文带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 378,
+      "source": "('research/prompts/m3-close-noncode-sync.md', '冻结证据：阶段同步记录整行抄录记录里的旧文，旧文带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 379,
+      "source": "('research/prompts/m3-close-noncode-judge-f14-f27.md', '冻结证据：那一轮逐行判决抄录记录里的旧文，旧文带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 380,
+      "source": "('research/prompts/m3-defs-b3-r3-sonnet-output.md', '冻结证据：腿的报告，引了派发提示里的会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 381,
+      "source": "('research/prompts/m3-defs-b3-r3-sonnet-model/', '冻结证据：腿的模型目录，探针脚本里的会话号是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 382,
+      "source": "('research/prompts/_m3-close-c409-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 383,
+      "source": "('research/prompts/_m3-close-c656-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 384,
+      "source": "('research/prompts/_m3-close-c656-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 385,
+      "source": "('research/prompts/_m3-close-c656-r3-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 386,
+      "source": "('research/prompts/_m3-close-c693-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 387,
+      "source": "('research/prompts/_m3-close-c693-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 388,
+      "source": "('research/prompts/_m3-close-c693-r3-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 389,
+      "source": "('research/prompts/_m3-close-rootring-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 390,
+      "source": "('research/prompts/_m3-close-rootring-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 391,
+      "source": "('research/prompts/_m3-close-rootring-r3-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 392,
+      "source": "('research/prompts/_m3-close-sysconf-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 393,
+      "source": "('research/prompts/_m3-close-sysconf-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 394,
+      "source": "('research/prompts/_m3-close-sysconf-r3-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 395,
+      "source": "('research/prompts/landing-audit-r2-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 396,
+      "source": "('research/prompts/landing-audit-r3-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 397,
+      "source": "('research/prompts/landing-audit-r4-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 398,
+      "source": "('research/prompts/landing-audit-r5-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 399,
+      "source": "('research/prompts/landing-audit-r6-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 400,
+      "source": "('research/prompts/landing-audit-r6-sonnet-model/inputs/dispatch-record.md', '冻结证据：腿的模型目录里拷的调度记录当时那一版，带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 401,
+      "source": "('research/prompts/subagent-landing-audit-2026-10-22/no-effect.md', '冻结证据：那一批交回报告的归档，引了别的会话的会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 402,
+      "source": "('research/prompts/subagent-landing-audit-2026-10-22/b9-watch-cost.md', '冻结证据：那一批交回报告的归档，引了别的会话的会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 403,
+      "source": "('research/prompts/_m3-multi-file-unlink-r1-appendix.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 404,
+      "source": "('research/prompts/_m3-multi-file-unlink-r1-background.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 405,
+      "source": "('research/prompts/_rot-defs-r2-appendix.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 406,
+      "source": "('research/prompts/_rot-defs-r2-background.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 407,
+      "source": "('research/prompts/_rot-defs-r3-appendix.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 408,
+      "source": "('research/prompts/_rot-defs-r3-background.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 409,
+      "source": "('research/prompts/_m4-batch2-code-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 410,
+      "source": "('research/prompts/_m4-c860-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 411,
+      "source": "('research/prompts/_m4-gc-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 412,
+      "source": "('research/prompts/_m4-segment-code-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 413,
+      "source": "('research/prompts/_m4-snapshot-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 414,
+      "source": "('research/prompts/_m4-trunc-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 415,
+      "source": "('research/prompts/_m4-trunc-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "session-names",
+      "line": 416,
+      "source": "(UPSTREAM_COPY, '上游副本，只能在上游改')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "batch-codes",
+      "line": 442,
+      "source": "(UPSTREAM_COPY, '上游副本，只能在上游改')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "batch-codes",
+      "line": 443,
+      "source": "('.claude/gate.d/fixtures/', '门禁样本：批次代号是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "batch-codes",
+      "line": 444,
+      "source": "('.claude/hooks/fixtures/', '钩子样本：派发闸自证读的真派发提示原样，提示里的批号是被测输入')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    },
+    {
+      "form": "batch-codes",
+      "line": 445,
+      "source": "('crates/mutations.tsv', '变异表：源码原文那几列里有 WGSL 的「31u」这类字面，名字列里的批号是变异行的键，改名照变异表的改名办')",
+      "text_read": true,
+      "exclusion_reason_verified": false,
+      "status": "historical_reason_and_target_pending"
+    }
+  ],
+  "other_claims": [
+    {
+      "claim": "首命中/全部命中按位置排序、同起点优先表序、不重叠",
+      "status": "static_match",
+      "evidence": "507-547"
+    },
+    {
+      "claim": "后缀范围不分大小写；缺路径仍判",
+      "status": "static_match",
+      "evidence": "498-504"
+    },
+    {
+      "claim": "前缀排除按startswith，表项理由逐份核",
+      "status": "implementation_read_reasons_pending",
+      "evidence": "469-473;excluded_prefixes"
+    },
+    {
+      "claim": "逐行标记只在登记后缀、理由至少4字符",
+      "status": "static_match_bounded",
+      "evidence": "476-483;不是代码语法解析器，空白也计字符"
+    },
+    {
+      "claim": "开关每次现读、逗号分隔",
+      "status": "static_match",
+      "evidence": "465-466;judged_patterns"
+    },
+    {
+      "claim": "反引号内批号放行",
+      "status": "discrepancy_A54_reproduced",
+      "evidence": "212-220仅反引号数奇偶；双反引号代码跨度待7187",
+      "runtime": "7187 single/double tick controls"
+    },
+    {
+      "claim": "判据库弄坏开关写错则拒绝",
+      "status": "candidate_discrepancy",
+      "evidence": "lib_notation_check:30,96；判据库未验证未知键，没有执行专项输入"
+    },
+    {
+      "claim": "全部历史排除理由正确",
+      "status": "pending",
+      "evidence": "未因文件读完就签理由正确"
+    }
+  ],
+  "runtime": {
+    "task": 7187,
+    "exit_code": 0,
+    "complete_log_read": true,
+    "task_clean": true,
+    "source_hash_unchanged": true,
+    "limits": "8 targeted inputs only;not complete gate/hook runtime"
+  }
+}

@@ -1,0 +1,5 @@
+tests/plain.rs::passes_0	reuse	k0	sample:test:plain	tests/plain.rs	passes_0	键相同
+tests/plain.rs::passes_1	reuse	k1	sample:test:plain	tests/plain.rs	passes_1	键相同
+tests/live_tree.rs::reads_the_live_tree	refused	-	sample:test:live_tree	tests/live_tree.rs	reads_the_live_tree	拒算：闭包读运行期拼出的路径（样本）
+tests/live_files.rs::reads_a_file_named_at_run_time	refused	-	sample:test:live_files	tests/live_files.rs	reads_a_file_named_at_run_time	拒算：闭包读运行期拼出的路径（样本）
+PLAN judge=0 reuse=2 refused=2 not-compiled=0 registered=0 ignored=0 library=/sample

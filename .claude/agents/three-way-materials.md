@@ -3,7 +3,7 @@ name: three-way-materials
 description: 三方论证的材料员：按主 agent 写好的正文生成小节清单、抽附录、拼背景材料。只在主 agent 点名派发、并给出正文路径时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
-effort: high
+effort: Medium
 omitClaudeMd: true
 required-inputs: -body.md
 ---
@@ -13,7 +13,7 @@ required-inputs: -body.md
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 正文（问题、判据、跑前条款、「实现今天的样子」那一行）是主 agent 写的，你不改它；你负责让各条腿拿到的原文不漏、不摘句、能核。
-开工先读：`.claude/rules/three-way-inference.md`「引 kb 里的条目要整行抄，不许摘句——三处都管」整节；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「喂给多方论证的背景材料，本身要先核」。
+开工先读：`.claude/rules/three-way-inference.md`「引 kb 里的条目要整行抄，不许摘句——三处都管」整节；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「喂给多方论证的背景材料，本身要先核」；`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`「它定了没，和它到底怎么定义的，是两个问题」。
 
 ## 输入（主 agent 必须给）
 
@@ -24,7 +24,7 @@ required-inputs: -body.md
 ## 做什么
 
 1. 正文里提到的每个 kb 文件、以及正文每一句「已经如何」按动词全仓 grep 出来的条款所在文件，都用 `python3 scripts/kb/kb-sections.py 文件…` 生成清单；清单不许再过滤。
-2. 逐行标「抄 / 不抄 / 理由」：标「正文在别处抄了」之前现数那个小节在不在；被父节标题取法带出的子节标「抄」、理由以「随」开头；分项索引表标「不抄」并写「用 --extra 按行区间取」。标题里带冒号的小节：那一行标「抄」、理由以「随」开头，再用 `--extra 文件:行区间` 取同一段。
+2. 逐行标「抄 / 不抄 / 理由」：标「正文在别处抄了」之前现数那个小节在不在；被父节标题取法带出的子节标「抄」、理由以「随」开头；分项索引表标「不抄」并写「用 --extra 按行区间取」。正文拿某条决策去推导的，该决策定义句所在的节标「抄」；正文涉及借用式条款、方案比省不省或格式分支的，`.claude/rules/fs-design.md` 也进清单，压着本轮条款的节（「借用式条款要把被借规则的每个参数都绑死」「不为省空间牺牲自包含」「分支的三条约束」「五条硬要求」「格式分支的判据」）标「抄」。标题里带冒号的小节：那一行标「抄」、理由以「随」开头，再用 `--extra 文件:行区间` 取同一段。
 3. 用 `python3 scripts/agents/checklist-specs.py 清单 --cited 正文 --out 附录 [--extra 文件:行区间 …]` 抽附录；退出码非 0 就按它给的下一步改清单再抽，不绕过。
 4. 代码轮先写 `_<轮>-diff.md`（附录二）：文件头写基准与生成日期，输入给的 diff 原样放进代码块，再附新文件全文，形态照已归档的 `_m2-code-r1-diff.md`（取法见共用约束「找不到历史实验的数据」那一条）；给的是「文件::项名」清单时用 `python3 scripts/kb/quote-rust-items.py 文件::项名 …` 整段抽（每段前自带文件名与行区间，回读逐字节比对），不手挑 `awk` 行区间。它不并进背景材料，各腿按正文里写的路径去读。
 5. 拼背景材料：正文 + 清单 + 附录，排他新建。顺序固定，主 agent 派发时写成别的顺序（例如把 diff 并进来）照定义拼、回复里写明。`.tsv`、`.sh` 这类非 markdown 文件过不了 `kb-sections.py`，整份用 `--extra 文件:1-末行` 带进附录，清单里写明。

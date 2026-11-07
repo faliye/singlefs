@@ -1,0 +1,17 @@
+exit=1
+want=11 处建仓副本的写法没经 scripts/hosts/lib_repository_copy.py
+want=scripts/hosts/hand_copy.sh:3  rsync 的拷源点名 Cargo.toml、Cargo.lock、.cargo、crates
+want=scripts/hosts/hand_copy.sh:4  cp 的拷源点名 .claude
+want=scripts/hosts/hand_copy.sh:5  rsync 的拷源点名 ./（整个工作区）
+want=scripts/hosts/hand_copy.sh:6  cp 的拷源点名 $REPOSITORY_ROOT（整个仓根）
+want=scripts/gate/hand_copy.py:3  shutil.copytree 的拷源点名 crates
+want=scripts/gate/hand_copy.py:4  shutil.copy2 的拷源点名 Cargo.lock
+want=scripts/gate/hand_copy.py:5  rsync 的拷源点名 prune-server
+want=scripts/gate/hand_copy.py:6  git archive 的路径点名 crates、Cargo.toml
+want=scripts/gate/hand_copy.py:8  赋给 COPIED_ENTRIES 的手抄清单点名 crates、.cargo、prune-server、Cargo.lock
+want=.claude/hooks/hook_copy.sh:2  cp 的拷源点名 .claude
+want=.claude/gate.d/stage_copy.sh:2  rsync 的拷源点名 .claude
+want=第 3 行指向不存在的文件：scripts/hosts/gone.sh
+want=第 4 行的锚串「no-such-anchor」在 scripts/hosts/hand_copy.sh 里一处被判行都不命中
+want=排除表涨了
+want=第 5 行 scripts/hosts/grown_copy.sh:"$repository_root/crates"

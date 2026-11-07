@@ -1,0 +1,16 @@
+== 任务 6067 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-6067.attempt-1.log（共 15 行，下面是整份）
+AUDIT_HEADING tool=append-record case=paragraph expected_refusal=False actual_refusal=False message=None
+AUDIT_HEADING tool=append-record case=heading expected_refusal=True actual_refusal=True message='文本第 1 行是一、二级标题「## real heading」'
+AUDIT_HEADING tool=append-record case=simple_fence expected_refusal=False actual_refusal=False message=None
+AUDIT_HEADING tool=append-record case=shorter_inner_fence expected_refusal=False actual_refusal=True message='文本第 3 行是一、二级标题「## still code」'
+AUDIT_HEADING tool=append-record case=indented_heading expected_refusal=True actual_refusal=False message=None
+AUDIT_HEADING tool=append-record case=indented_code_then_heading expected_refusal=True actual_refusal=False message=None
+AUDIT_HEADING tool=ledger-append-section case=paragraph expected_refusal=False actual_refusal=False message=None
+AUDIT_HEADING tool=ledger-append-section case=heading expected_refusal=True actual_refusal=True message='正文第 1 行是一、二级标题「## real heading」，会拆出别的节'
+AUDIT_HEADING tool=ledger-append-section case=simple_fence expected_refusal=False actual_refusal=False message=None
+AUDIT_HEADING tool=ledger-append-section case=shorter_inner_fence expected_refusal=False actual_refusal=True message='正文第 3 行是一、二级标题「## still code」，会拆出别的节'
+AUDIT_HEADING tool=ledger-append-section case=indented_heading expected_refusal=True actual_refusal=False message=None
+AUDIT_HEADING tool=ledger-append-section case=indented_code_then_heading expected_refusal=True actual_refusal=False message=None
+AUDIT_HEADING source=scripts/kb/append-record.py sha256=01f0ca1d1524eb7e3cba367cb5cefd17a5505d04b623a2ad67b88bac943d52db
+AUDIT_HEADING source=scripts/kb/ledger-append-section.py sha256=2eb054635357f962a4940243a66f70360bae9f2559f1ff46fde1ccc1179242f7
+AUDIT_HEADING scenarios=12 discrepancies=6 record_writes=0

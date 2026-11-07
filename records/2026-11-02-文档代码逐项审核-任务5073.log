@@ -1,0 +1,32 @@
+== 任务 5073 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-5073.attempt-1.log（共 31 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.2
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-5073-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+  ✓ 绿：自比：窄读 40 格、宽读 62 格与四条条款全部相同，判不翻（登记 5.2 自比；变异 M1、M7）
+  ✓ 绿：每类换一个词：恰好那一格不同、判翻并点名（登记 5.2；变异 M1、M7）
+  ✓ 绿：只改数值字段不翻（登记 5.2；变异 M2）
+  ✓ 绿：少一格、多一格报键不齐（登记 5.2；变异 M3、M4）
+  ✓ 绿：推出的条款换边（登记 5.2）
+  ✓ 绿：F6 第二条的边界 0.500000 与 0.499999（登记 5.2；变异 M5）
+  ✓ 绿：F1 要两行都是 overlap 且 above_fraction 都小于 0.5（变异 M6）
+  ✓ 绿：行首 E7RESULT 有没有都认（登记 5.2；变异 M8）
+  ✓ 绿：建快照流全量的现算值是 16842815，不是旧数（变异 M9）
+  ✓ 绿：anchor_recompute 比 actual 与 expected，条款锚只比 actual
+  ✓ 绿：整式路在旧段形上算回登记写死的旧数（登记 5.2 现算路的对照）
+  ✓ 绿：整式路在新段形上的数与增量路相同
+  ✓ 绿：作废类行的计数
+  ✓ 绿：没写完的产物不比（登记 XR4）
+  ✓ 绿：经文件端到端，用法错与读不了退 2
+  ✓ 绿：改前产物在时：sha256、950 行、自比 40 与 62 格
+自证 16 项，红 0 项
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=8.9 seconds=6.7 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=8.9
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-5073-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=9.3 seconds=0.4 exit=0

@@ -1,0 +1,32 @@
+== 任务 7187 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-7187.attempt-1.log（共 31 行，下面是整份）
+AUDIT_DECLARATION case=required exit=5 output=False
+quote-kb: 正文提到了 1 个 kb 文件，清单里没有它们的小节清单：
+    .claude/kb/checks-owed.md（正文里的 C1 引出）
+  → 怎么办：给每个文件各生成一张清单、接到清单末尾（照抄，一行一个文件）：
+      python3 /home/fy5090/code/singlefs/scripts/kb/kb-sections.py .claude/kb/checks-owed.md >> checklist.md
+    接上的那几张「抄 / 不抄」「理由」两列是空的：逐行标「抄」或「不抄」（不抄写理由），标完重跑同一条命令（C234）；
+    清单是 three-way-materials.py 生成的，就不用手接：改好别处之后跑它给的 --resume 那一条，它补上缺的几张（默认全抄）再接着做附录、背景材料与快照
+AUDIT_DECLARATION case=declared_outside exit=0 output=True
+  ✓ 1 段整抄进 /tmp/singlefs-run-with-memory-cap-1248896-GQaUwM/audit-declarations-i_t8l6jm/declared_outside.md，回读逐字节一致，清单里标「抄」的每一节都在，正文提到的每个 kb 文件都有清单
+AUDIT_DECLARATION case=triple_fenced exit=5 output=False
+quote-kb: 正文提到了 1 个 kb 文件，清单里没有它们的小节清单：
+    .claude/kb/checks-owed.md（正文里的 C1 引出）
+  → 怎么办：给每个文件各生成一张清单、接到清单末尾（照抄，一行一个文件）：
+      python3 /home/fy5090/code/singlefs/scripts/kb/kb-sections.py .claude/kb/checks-owed.md >> checklist.md
+    接上的那几张「抄 / 不抄」「理由」两列是空的：逐行标「抄」或「不抄」（不抄写理由），标完重跑同一条命令（C234）；
+    清单是 three-way-materials.py 生成的，就不用手接：改好别处之后跑它给的 --resume 那一条，它补上缺的几张（默认全抄）再接着做附录、背景材料与快照
+AUDIT_DECLARATION case=tilde_fenced exit=0 output=True
+  ✓ 1 段整抄进 /tmp/singlefs-run-with-memory-cap-1248896-GQaUwM/audit-declarations-i_t8l6jm/tilde_fenced.md，回读逐字节一致，清单里标「抄」的每一节都在，正文提到的每个 kb 文件都有清单
+AUDIT_DECLARATION case=long_fenced exit=0 output=True
+  ✓ 1 段整抄进 /tmp/singlefs-run-with-memory-cap-1248896-GQaUwM/audit-declarations-i_t8l6jm/long_fenced.md，回读逐字节一致，清单里标「抄」的每一节都在，正文提到的每个 kb 文件都有清单
+AUDIT_NOTATION case=valid_compact hit=True shapes=['ISO 紧凑时间戳']
+AUDIT_NOTATION case=invalid_compact hit=False shapes=[]
+AUDIT_NOTATION case=invalid_hyphenated hit=True shapes=['ISO 紧凑时间戳']
+AUDIT_NOTATION case=short_batch hit=True shapes=['挨着批次词的数字加字母']
+AUDIT_NOTATION case=long_bare_batch hit=False shapes=[]
+AUDIT_NOTATION case=long_labeled_batch hit=True shapes=['挨着批次词的数字加字母']
+AUDIT_NOTATION case=inline_code hit=False shapes=[]
+AUDIT_NOTATION case=double_tick_code hit=True shapes=['两位数字加字母的代号']
+AUDIT_DECLARATION source=scripts/kb/quote-kb.py sha256=3a5c44d556ae8c955dd556b8f157eccefd3c4733975628609c0d412a362428cd
+AUDIT_DECLARATION source=.claude/gate.d/lib-forbidden-notations.py sha256=8fb18e3074e443e8bf46f68d90fb52a6b87dbeedb6ad98d8fd086a0a1b088dc6
+AUDIT_DECLARATION temporary_materials_removed=true

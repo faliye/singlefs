@@ -9,8 +9,8 @@
 # gate-overlap:copy-kept continuation-guard.sh main() 那十行是钩子入口（认 --selftest、从 stdin 读 hook 的 JSON、拒绝时把说明写进 stderr），不带判据；抽成共用模块要同时改 continuation-guard.sh 与 runner-dispatch-guard.sh，这一次的任务不许碰别的钩子，交主 agent 定要不要抽
 # gate-overlap:copy-kept runner-dispatch-guard.sh 同 continuation-guard.sh 那一条：main() 入口十行三个钩子各一份，抽共用模块要改它，这一次不碰别的钩子
 #
-# 为什么：2026-09-23 主 agent 问用户 alloc-basis 岔路 7 时写「可达状态里 defer 一项不可能为 0……重新搭环境也造不出来」，后半句是推的；
-# 用户据此定了案，2026-09-25 E156 第 3 次重跑在可达状态上读到 0（records/2026-09-16-subagent拆分提案.md 第四十节第 25 行）。
+# 为什么：主 agent 问用户 alloc-basis 岔路 7 时写「可达状态里 defer 一项不可能为 0……重新搭环境也造不出来」，后半句是推的；
+# 而 E156 第 3 次重跑在可达状态上读到 0（records/2026-09-16-subagent拆分提案.md 第四十节第 25 行）。
 # main-agent.md「一轮怎么开、怎么收」第 5 条要弹窗里每句事实写出处、推的写明「推的，没量过」；这道闸让两样都没写的断言句送不到用户面前。
 #
 # 判法：扫 tool_input.questions 里每一问的 question 与每个 options[].description（header、label 不扫），按句切——
@@ -26,18 +26,18 @@
 #      name= 开头的产物行；「实测」「量过」「产物」「输出」前后 MEASUREMENT_WINDOW 个字以内带着一个数或路径，
 #      而且那个数或路径与这个词之间没有隔着断言词（「输出一定为 0」里 0 与「输出」之间隔着「一定」，不算）。
 #   ①有、②③都没有的句子逐句列出，退出 2；一句都没有就放行。
-# 判不了的照「放行但必记检出」（用户 2026-10-23 定，records/2026-10-23-subagent拆分提案.md 第九十四节）：输入不是 JSON 对象（解不开、顶层不是对象）、
+# 判不了的照「放行但必记检出」（records/2026-10-23-subagent拆分提案.md 第九十四节）：输入不是 JSON 对象（解不开、顶层不是对象）、
 #   tool_input.questions 不是列表、判的时候抛异常，照常退 0，stderr 写一行卡在哪，检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的
 #   default_detections_path；写法在它的 record_unjudged_pass）追加一行、结局「只记」，findings 以「弹窗闸没判、照常放行」起头；读不到 lib_work_root.py 时 stderr 另说一句没记成。
 # 弄坏开关只在自证里认：平常跑（不是 --selftest，也不是自证起的子进程）设了 ASK_USER_CLAIM_GUARD_BREAK 就退 2，stderr 点名它只在自证里认；
 #   自证起的子进程由环境里的 ASK_USER_CLAIM_GUARD_SELFTEST_MARK 认（指的那份文件在、内容是 SELFTEST_MARK_CONTENT）。
 # 逐项写开关名、弄坏哪一处、打开后自证哪几项红（「」里是失败行「✗ 自检：」之后那一段的开头）：
-#   ASK_USER_CLAIM_GUARD_BREAK=input-unrecorded  输入不是 JSON 对象时只放行、不记检出（改前的样子）
+#   ASK_USER_CLAIM_GUARD_BREAK=input-unrecorded  输入不是 JSON 对象时只放行、不记检出
 #       「stdin：坏 JSON 放行并记一条检出（结局只记、会话号读不到）」
 #       「stdin：JSON 数组放行并记一条检出（结局只记、会话号读不到）」
-#   ASK_USER_CLAIM_GUARD_BREAK=questions-unrecorded  tool_input.questions 不是列表时只放行、不记检出（改前的样子）
+#   ASK_USER_CLAIM_GUARD_BREAK=questions-unrecorded  tool_input.questions 不是列表时只放行、不记检出
 #       「stdin：questions 不是列表放行并记一条检出（结局只记、会话号照输入）」
-#   ASK_USER_CLAIM_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住，照原样抛出（改前的样子：进程退 1，Claude Code 照常放行、不记检出）
+#   ASK_USER_CLAIM_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住，照原样抛出（进程退 1，Claude Code 照常放行、不记检出）
 #       「判的时候抛异常放行并记一条检出（结局只记、会话号照输入）」
 # 管不到的：出处是不是真的、数是不是那个产物里的、「推的」写得如不如实——这几样靠人（verify-before-claiming.md）；
 #   换个说法（「肯定」「绝对」「百分之百」）就过去了，词表只认上面九个；出处写在前一句、断言写在后一句的照拒。
@@ -328,7 +328,7 @@ def selftest(hook_dir):
     return 0
 
 def unjudged_pass(hook_input, problem, switch, hook_dir):
-    """判不了：照「放行但必记检出」stderr 写一行、检出记录追加一行（结局只记），交退出码 0。弄坏开关 switch 下只打 stderr、不记（改前的样子）。"""
+    """判不了：照「放行但必记检出」stderr 写一行、检出记录追加一行（结局只记），交退出码 0。弄坏开关 switch 下只打 stderr、不记。"""
     print(f"! {HOOK_NAME}：{problem}，这一次没判、照常放行", file=sys.stderr)
     if broken(switch):
         return 0
@@ -361,7 +361,7 @@ def judge_input(raw, hook_dir):
     try:
         code, message = decide(hook_input)
     except Exception as error:
-        if broken("exception-unrecorded"):   # 弄坏开关：不接住，照原样抛出（改前的样子）
+        if broken("exception-unrecorded"):   # 弄坏开关：不接住，照原样抛出
             raise
         return unjudged_pass(hook_input, f"判的时候抛异常（{type(error).__name__}: {error}）", "exception-unrecorded", hook_dir)
     if code:

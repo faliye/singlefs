@@ -646,3 +646,6 @@ crates/singlefs-harness/tests/zero_unit_publishes_are_compared_with_what_the_row
 .claude/gate.d/fixtures/checker-tier-lkmm.sh	.claude/gate.d/fixtures/lkmm.sh	2026-11-05	records/2026-11-05-删轻型并入重型.md
 .claude/gate.d/fixtures/checker-tier-crates-mutation-replay.sh	.claude/gate.d/fixtures/crates-mutation-replay.sh	2026-11-05	records/2026-11-05-删轻型并入重型.md
 .claude/gate.d/fixtures/checker-tier-broad-mutation.sh	.claude/gate.d/fixtures/broad-mutation.sh	2026-11-05	records/2026-11-05-删轻型并入重型.md
+.claude/gate.d/harness-test-environment.sh	.claude/gate.d/test-environment.sh	2026-11-06	records/2026-11-05-删轻型并入重型.md
+.claude/gate.d/fixtures/harness-test-environment.sh	.claude/gate.d/fixtures/test-environment.sh	2026-11-06	records/2026-11-05-删轻型并入重型.md
+scripts/experiment-apparatus/device_library/relay.rs	crates/singlefs-device-library/src/lib.rs	2026-11-06	records/2026-11-06-门禁判定全部入库.md

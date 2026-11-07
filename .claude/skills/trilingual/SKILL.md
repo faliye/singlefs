@@ -33,7 +33,7 @@ description: 改 singlefs 里登记为三语的文件（仓根 README、briefs/ 
 扫仓的门禁只在提交时跑；暂存之后、跑整轮之前要单看三语六格，照 `.claude/skills/gate/staged-gate.md` 带前缀与范围声明只点这几格：
 
 ```bash
-SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-text.sh 的 trilingual 六格; 范围=6 格; 为什么=暂存了三语文件，整轮之前先看三语六格' SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/doc-text.sh --check trilingual-files,trilingual-structure,trilingual-changed-together,trilingual-glossary,trilingual-untranslated,trilingual-omission
+SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-text.sh 的 trilingual 六格; 范围=6 格; 为什么=暂存了三语文件，整轮之前先看三语六格' task-server/task submit -- bash .claude/gate.d/doc-text.sh --check trilingual-files,trilingual-structure,trilingual-changed-together,trilingual-glossary,trilingual-untranslated,trilingual-omission
 ```
 
 | 红的格 | 怎么办 |

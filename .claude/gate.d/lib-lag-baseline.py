@@ -41,13 +41,13 @@
     path_moves、rewrite_moved_paths、rewrite_moved_bytes、moved_prefix_pattern：scripts/agents/snapshot-tree.py 按全部登记行（不只生效的）反着换（MovesBack、moves_back_for），
     开工快照倒推不出时把清单与 diff 里的新前缀换回旧前缀再倒推一次。
   自证（命令行 --selftest）：门禁 code-tooling 的 research-script-selftests 格（SELFTEST_RUNNERS），.claude/hooks/selftest-registry.tsv 里登记。
-注释行的认法并进来时变了（content_rows）：multipath-registry、replay-comparison-units、mutation-tables、reading-discipline 四处改前只认行首 `#` 是注释，
-  缩进之后才是 `#` 的行、首列为空而第二列以 `#` 起头的行（行首是制表符），改前进各格的形状判法、判形状错（列数不对、有空格子），并进来之后当注释静默跳过。
-  方向是跳过、不报形状错：跳过一行只让豁免少一行、基准少一行，判得更严，丢的只是那一行的形状报错，不放过违例。doc-process-records 改前就去掉行首空白再认 `#`，没变；
-  doc-decisions 的挂账表不经 content_rows（只取全文，行照它自己的读法切），没变；decision-links 的待回填清单经 content_rows 之后再照它的形状正则
-  （E<号> 或 D<号> 后接空白）认行，`#` 起头的行不管缩没缩进都配不上那个正则，并进来前后认出的行相同。
+注释行的认法（content_rows）：multipath-registry、replay-comparison-units、mutation-tables、reading-discipline 四处共用，
+  缩进之后才是 `#` 的行、首列为空而第二列以 `#` 起头的行（行首是制表符）当注释静默跳过，不进各格的形状判法（进去会判形状错：列数不对、有空格子）。
+  方向是跳过、不报形状错：跳过一行只让豁免少一行、基准少一行，判得更严，丢的只是那一行的形状报错，不放过违例。doc-process-records 去掉行首空白再认 `#`；
+  doc-decisions 的挂账表不经 content_rows（只取全文，行照它自己的读法切）；decision-links 的待回填清单经 content_rows 之后再照它的形状正则
+  （E<号> 或 D<号> 后接空白）认行，`#` 起头的行不管缩没缩进都配不上那个正则，经不经 content_rows 认出的行相同。
 路径按当前目录算：ls-tree 的路径与 show 的 <基准>:./<路径> 都相对当前目录（调用方给 cwd 就是 cwd），被判的根是别的仓里的一个子目录时，
-  取到的是这个子目录里的那一份，不会读到外面那个仓根上同名的表（门禁 doc-decisions 的挂账表原来就这样取）。
+  取到的是这个子目录里的那一份，不会读到外面那个仓根上同名的表（门禁 doc-decisions 的挂账表同样这样取）。
 scripts/gate/admission.py 另读复跑表（按 TABLE 那一段取复用键），不归这一份。
 
 搬迁登记（目录或文件搬了家、改了名，表里换成新路径的行不算新增）：
@@ -142,7 +142,7 @@ scripts/gate/admission.py 另读复跑表（按 TABLE 那一段取复用键）�
       门禁 code-source-discipline 的样本 reading-discipline-red（输出里找不到「读不出基准 HEAD 里的 .claude/gate.d/experiment-seed-fold-lag.tsv（git show 退 128）」）；
       门禁 doc-experiments 的样本 decision-links-pending-base-unreadable-red（输出里找不到「[待回填] 读不出基准 HEAD 里的 .claude/decision-links-pending（git show 退 128」）；
       门禁 doc-decisions 的样本 evidence-ledger-base-unreadable-red（期望退出 1，实测 0）
-  LAG_BASELINE_BREAK=show-root-relative  baseline_text() 的 git show 照仓根算路径（<基准>:<路径>，改前的写法），ls-tree 仍按当前目录：被判的根是子目录时读到仓根上同名的那一份
+  LAG_BASELINE_BREAK=show-root-relative  baseline_text() 的 git show 照仓根算路径（<基准>:<路径>），ls-tree 仍按当前目录：被判的根是子目录时读到仓根上同名的那一份
       子目录里按当前目录取（「✗ 自证失败：子目录里按当前目录取」）
   LAG_BASELINE_BREAK=path-moves-ignored  不读搬迁登记表：baseline_text() 不换前缀、不按搬迁之前的路径取，path_moves() 交空表
       搬迁登记换前缀（「✗ 自证失败：搬迁登记：旧前缀换成新前缀，只按前缀边界换」）、按搬迁之前的路径取表（「✗ 自证失败：搬迁登记：按搬迁之前的路径取表」）、
@@ -155,7 +155,7 @@ scripts/gate/admission.py 另读复跑表（按 TABLE 那一段取复用键）�
       scripts/gate/changed-paths.sh 的自证「搬迁：只差登记搬迁的文件不算改动」「搬迁：新增行剔掉只差搬迁的行」「搬迁：换算只认仓根起的前缀…」「搬迁：搬迁已提交、有上游没推…」四项红；
       门禁 doc-decisions 的样本 entry-added-moved-only-not-run（期望退出 77，实测 1）、shape-moved-only-green（期望退出 0，实测 1），
       门禁 doc-experiments 的样本 quoted-result-lines-moved-history-green（期望退出 0，实测 1）
-  LAG_BASELINE_BREAK=commit-ref-rewritten  rewrite_moved_paths() 连「<提交哈希>:」后面的路径也换（改前的换法）
+  LAG_BASELINE_BREAK=commit-ref-rewritten  rewrite_moved_paths() 连「<提交哈希>:」后面的路径也换
       提交引用（「✗ 自证失败：搬迁登记：提交引用后面的路径不换」）、只差搬迁（「✗ 自证失败：只差搬迁：改名的、原地换了路径的…」、「只差搬迁：命令行 moved-only-filter 与 moved-lines-filter」）；
       门禁 doc-decisions 的样本 history-loss-moved-commit-ref-green（期望退出 0，实测 1）
   LAG_BASELINE_BREAK=moved-only-kept  moved_only_paths() 一条都不剔、drop_moved_lines() 原样交回：与基准只差登记搬迁的文件与行照旧算改动
@@ -1463,7 +1463,7 @@ def moved_only_selftest(check):
         write("staged.md", "见 tools/new-rig/run.sh\n暂存区里多一行\n")
         run_git("add", "staged.md")
         write("staged.md", "见 tools/new-rig/run.sh\n")
-        write("partial.md", "见 tools/new-rig/run.sh 与 tools/old-rig/data.txt\n")   # 只换了一半（第一轮 G2-1 的形状）：照算改动
+        write("partial.md", "见 tools/new-rig/run.sh 与 tools/old-rig/data.txt\n")   # 只换了一半：照算改动
         paths = ["tools/new-rig/run.sh", "tools/old-rig/run.sh", "tools/old-rig/data.txt", "tools/new-rig/data.txt", "notes.md",
                  "mixed.md", "mode.sh", "staged.md", "partial.md", PATH_MOVES_TABLE]
         moved_expected = {"tools/new-rig/run.sh", "tools/old-rig/run.sh", "tools/old-rig/data.txt", "tools/new-rig/data.txt", "notes.md"}
@@ -1555,8 +1555,8 @@ def problem_whats(root):
 def path_move_evidence_selftest(check):
     """此刻生效的行要有搬迁实据（move_evidence）：临时 git 仓里提交 scripts/old-rig 下三份文件、点名它的 docs/howto.md、写着 build/ 的 .gitignore
     与一张已有一行（scripts/ancient-rig → scripts/old-rig，基准里旧前缀下没有文件，不生效）的登记表，在几份副本上各造一种局面，path_move_report 交基准 HEAD 判：
-    真搬迁（三份里两份只换了路径）照过、点名它的 docs/howto.md 剔出改动范围；搬丢一份的、落点在被 .gitignore 忽略的目录里的（第二轮 H1-3）判红；
-    换实现的（旧目录删掉、新目录里同名文件是另一份实现，第二轮辩方）实据照过，换了的那几份文件照算改动、新增行一条不剔。"""
+    真搬迁（三份里两份只换了路径）照过、点名它的 docs/howto.md 剔出改动范围；搬丢一份的、落点在被 .gitignore 忽略的目录里的判红；
+    换实现的（旧目录删掉、新目录里同名文件是另一份实现）实据照过，换了的那几份文件照算改动、新增行一条不剔。"""
     with tempfile.TemporaryDirectory() as directory:
         base_root = os.path.join(directory, "base")
         os.makedirs(base_root)
@@ -1618,10 +1618,10 @@ def path_move_evidence_selftest(check):
 
 
 def path_move_occupied_selftest(check):
-    """不在基准那一版登记表里的新行必须此刻生效，否则登记表那一格判红「这一行不是一次搬迁」（第三轮 J1-C）：
+    """不在基准那一版登记表里的新行必须此刻生效，否则登记表那一格判红「这一行不是一次搬迁」：
     基准里两份实现 tools/real-a、tools/real-b 与起 A 的 ops/launch.sh、limits/config.py 一行 RETRIES = 3。
-    deleted：删掉 tools/real-a、ops/launch.sh 改成起 B，登记 tools/real-a → tools/real-b（第一轮 G1-2）；
-    parent：两个目录都不动，ops/launch.sh 改成起 B，登记 tools/real-a → tools/real-b 与 not-on-disk → tools（第一轮 G1-1）；
+    deleted：删掉 tools/real-a、ops/launch.sh 改成起 B，登记 tools/real-a → tools/real-b；
+    parent：两个目录都不动，ops/launch.sh 改成起 B，登记 tools/real-a → tools/real-b 与 not-on-disk → tools；
     token：limits/config.py 改成 RETRIES = 4，登记 3 → 4（单个词当前缀，旧前缀下基准里没有文件）。
     三种都一行不生效：起它的改动（ops/launch.sh、limits/config.py）照算改动、新增行照留，登记表那一格判红，问题句点名是哪一条条件不满足。"""
     with tempfile.TemporaryDirectory() as directory:
@@ -1662,7 +1662,7 @@ def path_move_occupied_selftest(check):
 def path_move_window_selftest(check):
     """生效窗口（提交之后这一行对门禁不再起作用）：临时 git 仓里先提交 scripts/old-rig、点名它的 docs/howto.md 与 records/log.md 里一行抄下来的
     git log 命令（留旧路径），再 git mv 到 scripts/new-rig、改 docs/howto.md、登记，连同登记表一起提交（模拟「这一批提交之后」，基准里已经是新前缀）。
-    此刻：这一行不生效；baseline_text 交出的 records/log.md 原样（旧路径不被换走）；有人把留旧路径的那一行改成新路径，照算改动、新增行照留（第二轮 H1-4 的另一半）；
+    此刻：这一行不生效；baseline_text 交出的 records/log.md 原样（旧路径不被换走）；有人把留旧路径的那一行改成新路径，照算改动、新增行照留；
     钉值那一侧读的 path_moves 照旧有这一行。"""
     with tempfile.TemporaryDirectory() as directory:
         repository = SelftestRepository(directory)
@@ -1693,7 +1693,7 @@ def path_move_window_selftest(check):
 
 
 def path_move_reused_name_selftest(check):
-    """旧名字重新用起来（第二轮 H1-4）：临时 git 仓里先把 scripts/old-rig 搬到 scripts/new-rig、登记并提交；再把 tools/new-thing 搬进空出来的 scripts/old-rig，
+    """旧名字重新用起来：临时 git 仓里先把 scripts/old-rig 搬到 scripts/new-rig、登记并提交；再把 tools/new-thing 搬进空出来的 scripts/old-rig，
     lag.tsv 里那一行跟着换路径、登记 tools/new-thing → scripts/old-rig。提交之前与提交之后（工作区一个字节不改）各取一次基准那一版的 lag.tsv：都要与此刻逐字相同（不判涨）。"""
     with tempfile.TemporaryDirectory() as directory:
         repository = SelftestRepository(directory)
@@ -1721,7 +1721,7 @@ def path_move_reused_name_selftest(check):
 
 
 def path_move_reordered_selftest(check):
-    """登记行换次序、再起一个中间目录（第二轮辩方的无序键）：临时 git 仓里 rig-x → rig-a、rig-a → rig-b 两次真搬迁都已提交，docs/note.md 留一行指 rig-x/foo.sh 的旧说法；
+    """登记行换次序、再起一个中间目录：临时 git 仓里 rig-x → rig-a、rig-a → rig-b 两次真搬迁都已提交，docs/note.md 留一行指 rig-x/foo.sh 的旧说法；
     此刻把两行换次序、另起一个 rig-a/foo.sh、docs/note.md 那一行改指 rig-a/foo.sh：两行都不生效，docs/note.md 照算改动、新增行照留。"""
     with tempfile.TemporaryDirectory() as directory:
         repository = SelftestRepository(directory)
@@ -1747,7 +1747,7 @@ def path_move_reordered_selftest(check):
 
 
 def path_move_inserted_row_selftest(check):
-    """新行插在已提交的老行前面（第二轮 H1-1）：临时 git 仓里 old-b → tools/real-b 已搬迁、登记并提交，基准里另有 tools/real-a 与起它的 ops/launch.sh；
+    """新行插在已提交的老行前面：临时 git 仓里 old-b → tools/real-b 已搬迁、登记并提交，基准里另有 tools/real-a 与起它的 ops/launch.sh；
     此刻删掉 tools/real-a、ops/launch.sh 改成起 B，在老行前面插一行 tools/real-a → old-b。老行不生效，新行生效而 old-b 下什么都没有：登记表判红，ops/launch.sh 照算改动。"""
     with tempfile.TemporaryDirectory() as directory:
         repository = SelftestRepository(directory)
@@ -1775,7 +1775,7 @@ def path_move_inserted_row_selftest(check):
 
 def path_move_chain_selftest(check):
     """此刻生效的行不许串：临时 git 仓里 old/x/f.sh、old/y/g.sh 搬成 new/x/f.sh、new/y/g.sh，另拷一份 other/f.sh，登记 old → new 与 old/x → other：
-    两行都生效、实据都齐，只红在「串了」。另一份副本造来回登记（第二轮 H1-2）：tools/live → build/out、build/out → tools/live，什么都没搬，红在实据。"""
+    两行都生效、实据都齐，只红在「串了」。另一份副本造来回登记：tools/live → build/out、build/out → tools/live，什么都没搬，红在实据。"""
     with tempfile.TemporaryDirectory() as directory:
         base_root = os.path.join(directory, "base")
         os.makedirs(base_root)
@@ -1814,7 +1814,7 @@ def path_move_chain_selftest(check):
 def moved_lines_position_selftest(check):
     """新增行按 diff 的位置配对（drop_moved_lines）：临时 git 仓里把 scripts/old-rig 搬到 scripts/new-rig、docs/old 搬到 docs/new；
     原地留着旧行又在别的节加一行换算之后的同文行、整份搬了家又把行挪到别的节、原地留着旧行又多写一行新前缀的拷贝，这几行照算新增；原地只换了路径的那一行剔掉。
-    另造两种：同一块里删加条数相等、挪了节的那一行与被删的旧行不在同一个位置（第二轮 H1-6），删加条数不等的块里换算之后相同的那一行，都照算新增。"""
+    另造两种：同一块里删加条数相等、挪了节的那一行与被删的旧行不在同一个位置，删加条数不等的块里换算之后相同的那一行，都照算新增。"""
     with tempfile.TemporaryDirectory() as directory:
         repository = SelftestRepository(directory)
         repository.write("scripts/old-rig/x.sh", "echo x\n")
@@ -1856,8 +1856,8 @@ def moved_lines_position_selftest(check):
 
 def governed_moves_selftest(check):
     """整份搬家而新旧路径的按路径管的类不同（moved_only_paths、drop_moved_lines）：临时 git 仓里用单文件登记把 drafts/agents/reviewer.md 搬进 .claude/agents/、
-    research/proto/fast_path.rs 搬进 crates/core/src/、.claude/rules/draft.md 搬进 .claude/kb/（第二轮辩方：跨管辖类单文件搬家）、
-    drafts/gates/check.sh 搬进 .claude/gate.d/ 顶层、drafts/sop/shared.md 搬进 .claude/singlefs-ai-sop/rules/（第三轮 J2-5：这两处也是按路径起作用的类），
+    research/proto/fast_path.rs 搬进 crates/core/src/、.claude/rules/draft.md 搬进 .claude/kb/（跨管辖类单文件搬家）、
+    drafts/gates/check.sh 搬进 .claude/gate.d/ 顶层、drafts/sop/shared.md 搬进 .claude/singlefs-ai-sop/rules/（这两处也是按路径起作用的类），
     再把 .claude/rules/old-group 整个目录在同一类里改名、.claude/gate.d/fixtures/old-sample 在 gate.d 的子目录里改名（子目录不算 gate.d 那一类）；
     跨类的五对新旧路径照算改动、新增行一条不剔，同一类里只换了目录的、子目录里改名的照剔。"""
     with tempfile.TemporaryDirectory() as directory:
@@ -1897,7 +1897,7 @@ def governed_moves_selftest(check):
 
 def renamed_files_selftest(check):
     """改了路径的文件只在恰好换前缀时剔（move_source、move_target）：临时 git 仓里用单文件登记把 .claude/agents/reviewer.md.draft 改名成 .claude/agents/reviewer.md、
-    crates/core/src/fast_path.rs.txt 改名成 crates/core/src/fast_path.rs（第二轮 H1-5：同一类里从挑不中的名字改成挑得中的名字），
+    crates/core/src/fast_path.rs.txt 改名成 crates/core/src/fast_path.rs（同一类里从挑不中的名字改成挑得中的名字），
     再用目录登记把 tools/old-rig 搬到 tools/new-rig（文件名不变）：换了文件名的两对照算改动、新增行一条不剔，只换了目录的照剔。"""
     with tempfile.TemporaryDirectory() as directory:
         repository = SelftestRepository(directory)
@@ -1923,7 +1923,7 @@ def renamed_files_selftest(check):
 
 
 def path_move_anchor_selftest(check):
-    """换算只认仓根起的前缀（第三轮 J1-A）：前缀紧挨在 / 后面时，/ 前面要是 ./ 与 ../、$变量/、${变量}/、<仓根>/、本仓的绝对路径；
+    """换算只认仓根起的前缀：前缀紧挨在 / 后面时，/ 前面要是 ./ 与 ../、$变量/、${变量}/、<仓根>/、本仓的绝对路径；
     别的目录名后面的同名段（vendor/tools、$FROZEN/tree/tools）不换。文本层逐种认；再在临时 git 仓里登记 docs → manual（真搬迁），
     另把没登记的 tools/docs/run.sh 换成 tools/manual/run.sh 的另一份实现、排除表那一行与调用方跟着改：表的基准那一版、调用方、新增行都不被当成只差搬迁。"""
     with tempfile.TemporaryDirectory() as directory:
@@ -1969,7 +1969,7 @@ def path_move_anchor_selftest(check):
 
 
 def path_move_base_row_selftest(check):
-    """基准那一版登记表里已有的行不再生效（第三轮 Y，关睡着的老行醒来）：临时 git 仓里 rig → rig2 真搬迁、登记并提交；之后 rig2 又改名 rig3、
+    """基准那一版登记表里已有的行不再生效（关睡着的老行醒来）：临时 git 仓里 rig → rig2 真搬迁、登记并提交；之后 rig2 又改名 rig3、
     旧名字 rig 下另起一份新东西 rig/new.sh，排除表 exempt.tsv 提交时写 rig/new.sh。基准是这一次提交：基准树满足「旧前缀下有文件、新前缀下没有文件」，
     可那一行已在基准那一版的登记表里，不生效：登记表那一格不红，没改的表不被换成 rig2/new.sh、不判涨。"""
     with tempfile.TemporaryDirectory() as directory:
@@ -1995,7 +1995,7 @@ def path_move_base_row_selftest(check):
 
 
 def path_move_base_shape_selftest(check):
-    """生效窗口跟着 gate 基准走，基准不总是 HEAD（第三轮 J1-B、J3）：临时 git 仓有上游（本地的裸仓），基准提交 rig → … 推上去，
+    """生效窗口跟着 gate 基准走，基准不总是 HEAD：临时 git 仓有上游（本地的裸仓），基准提交 rig → … 推上去，
     搬迁（git mv、登记、点名它的 docs/howto.md 一起改）提交而不推。三种基准各判一次：
     ① 仓有上游、搬迁已提交没推：基准取上游的 merge-base，这一行生效、实据齐、docs/howto.md 剔出改动范围；
     ② GATE_BASE=HEAD~1（gate.sh --staged 推完之后里层的基准）：同样生效；

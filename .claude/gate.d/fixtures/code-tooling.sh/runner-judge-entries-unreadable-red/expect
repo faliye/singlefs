@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：research-script-selftests
+want=✗ 判法那几个函数取不出：
+want=.selftest-judge-guard.py 的 SELFTEST_JUDGE_ENTRIES 读不出（找不到顶层一句 SELFTEST_JUDGE_ENTRIES = (…)）
+want=! 按条复用算不出（判法那几个函数取不出（上面那一句））：这一趟表里每一条都现判、一条都不记库
+want=✗ research 脚本的自证这一格判红：按条复用失灵（上面「按条复用失灵」那一句点名了哪一条哨兵、或 admission.py 退了几）；表里 3 条照旧全部现判跑完、都过了

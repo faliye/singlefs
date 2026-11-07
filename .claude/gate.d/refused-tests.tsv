@@ -1,0 +1,8 @@
+# 拒算的测试函数登记表：测试函数的单元键算不出（闭包读活树、读运行时拼出的仓根路径这类），按条复用那一趟照跑、不复用、不入库。
+# 新写的测试默认要算得出单元键；断言就是关于真仓、非读活树不可的才登记。每加一行由主 agent 在合入后验证之后二次确认，实现员不登记。
+# 一行一条，制表符分隔两段，再加可选的一段 # 说明：
+#   ① 测试函数全名：admission.py test-plan 第一列的写法（crash-point-replay.sh --list-items --with-keys 逐条列的就是它）
+#   ② 为什么非读活树不可：至少 8 个字
+# 只缩不涨：已经不拒算的行删掉（门禁 code-source-discipline 的 refused-tests 格判，拒算的测试函数不在表里也判红）。
+# 现读此刻的拒算清单与每条是否已登记：python3 scripts/gate/refused-test-registry.py list
+# 判法在 scripts/gate/refused-test-registry.py。

@@ -11,6 +11,3 @@ scripts/hosts/multi-host-run.sh:--memory-cap 256M  # 不碰（别的会话的改
 scripts/hosts/multi-host-run.sh:--memory-cap 2G --label peer-too-big  # 不碰（别的会话的改动）；自证格：比配置大要被拒的输入
 
 # 改不成现算的：上限是实验参数、进了驱动的算术，或要交给不认 auto 的 multi-host-run.sh --memory-cap
-scripts/experiment-apparatus/e185-r2-segment-run.sh:E185_MEMORY_CAP=40G  # 装置自己读来算预算的上限，跑前登记写定（外层 46G、E185_MEMORY_CAP=40G），不是内存包装的上限
-scripts/experiment-apparatus/e185-r3-segment-run.sh:E185_MEMORY_CAP=40G  # 装置自己读来算预算的上限，跑前登记写定（外层 46G、E185_MEMORY_CAP=40G），不是内存包装的上限
-scripts/experiment-apparatus/e185-r4-segment-run.sh:E185_MEMORY_CAP=${E185_MEMORY_CAP:-40G}  # 装置自己读来算预算的上限，跑前登记写定（外层 46G、E185_MEMORY_CAP=40G），不是内存包装的上限

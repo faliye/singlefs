@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：function-units-two-implementations-agree
+want=· 样本：上一版（.unit-verdict-sample/prior）的 2 条照判绿记进这一版样本的判定库
+want=· 按条复用：2 条（两份实现对拍的两半），现判 2、复用 0、拒算 0
+want=  ✗ crates/fsample/src/lib.rs::entry：闭包相同、键不同（Rust 6dbeeb68a826f1a0b0a50441a50be756bb7825120b8f532cb4aff579259aec0b，python 6dbeeb68a826f1a0b0a50441a50be756bb7825120b8f532cb4aff579259aec0a）
+want=· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟这几条现判
+want=· 样本档：判红记库之后再算一次计划：复用 1 条、现判 1 条
+want=现判「登记入口的闭包与键逐个相同」：上次判红
+want=function-units-two-implementations-agree：红（退出 1）

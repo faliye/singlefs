@@ -1,0 +1,3 @@
+# 样本登记表
+scripts/gate/alpha.sh	selftest	# 样本：只打一行
+scripts/gate/broken.sh	selftest	# 样本：只打一行

@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：entry-scripts
+want=── 复用三问：first 那一趟（entry-scripts）
+want=全部复用，这一格一份都没读
+want=· 按条复用：2 条登记的入口脚本，现判 1、复用 1、拒算 0
+want=REUSE_SELFTEST script=.claude/gate.d/code-tooling.sh same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=2 affected=1
+want=entry-scripts：绿

@@ -1,0 +1,37 @@
+== 任务 6619 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-6619.attempt-1.log（共 36 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.2
+MULTI_HOST_RUN_CLEANUP time_us=1793842635907392 pid=3971264 label=task-b0f6b921-6619-1 status=pending reason=starting
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-6619-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+  ✓ 自检：反向核对——「不抄」的小节没被带进附录时是绿的，被行区间连带带进去时判红（C320）
+  ✓ 自检：反向核对按文件收窄，不同文件里同名的通用小标题不会互相误报
+  ✓ 自检：清单一行「不抄」、理由说正文在某个节里抄了——出口里有那一节时绿，没有时判红（main 退 8）；没点名的、没声称抄过的不判（C234 「不抄」理由那一条）
+  ✓ 自检：三种取法（含带代码块的条款）都逐字节一致，且抄漏一行时判红
+  ✓ 自检：裸标题与同前缀的带括注标题并存时，精确匹配取到裸标题那一节
+  ✓ 自检：标题带半角冒号的 `文件@标题` 与正则带冒号的 `文件~正则` 照取、回读逐字节一致、节边界对得上，`文件:A-B` 照旧认
+  ✓ 自检：节边界另算一遍（C264）——干净时 pick() 与 kb-sections.py 对得上；pick() 不跳围栏时旧回读比对仍绿、新比对红、main 退 7；`#123` 这类井号后无空格的行两边都不当标题
+  ✓ 自检：代码栅栏里的 `#` 行不被当成标题，整节取全
+  ✓ 自检：正文只按路径引 kb 文件（没有编号）而清单里没有它时 --cited 退 5，补上小节清单才退 0（C234 按路径引的那一型）
+  ✓ 自检：--cited 不把 doc-lint:not-numbers 声明的记号当编号（E1 不拉、E165 照拉），围栏里的声明不算
+  ✓ 自检：同号有中英日三份时，--cited 的严格读法只认中文那一份、清单里没有它就要求补，宽读法照旧三份都给
+  ✓ 自检：不变量清单按类拆开时，--cited 把 I-7.4 与 I-8.3 指到各自的类文件，不带 README.md
+  ✓ 自检：退 5 的说明点出引出那份文件的编号、给照抄的 kb-sections.py 命令、写明逐行标抄不抄，不在的文件单说
+  ✓ 自检：类号找不到类文件时退回 README.md，退 5 的说明点名是退回的
+  ✓ 自检：I 号的载体只认不变量目录里的中文类文件，同类表行出现在实验页、决策页与译文里不拉它们
+  ✓ 自检：登记位写成 ./ 开头、/ 结尾、中间重复 / 的，规整成相对仓根的写法、去重
+  ✓ 自检：登记位写成绝对路径、走出仓、仓根本身的行被拒，stderr 逐行点名并给出路，同一行只报一次
+  ✓ 自检：清单标「抄」而附录里没有时判红（C262）
+  ✓ 自检：临时目录在通过、判红、抛异常三条路上都删了（3 格：通过那条路 TMPDIR 指进探查目录，另两条拉起子进程走）
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=31997952
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=9.7 seconds=7.5 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=9.7
+MULTI_HOST_RUN_CLEANUP time_us=1793842643412840 pid=3971264 label=task-b0f6b921-6619-1 status=confirmed reason=processes-gone
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-6619-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=10.2 seconds=0.5 exit=0

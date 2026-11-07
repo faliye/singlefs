@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # task-server-cargo-family: -p singlefs-unit-graph --release
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 只读仓里的 Rust 源码、测试文件名、kb 文本、登记表与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 代码类的源码纪律：名字不只由空泛词拼成、测试文件与 #[test] 函数不按里程碑、欠账号起名；kb 登记的格式常量、条文集合与 feature bit 位号与代码逐个对得上；实验二进制有成形的变异表且锚点唯一、有钉绝对值的断言、种子不折叠与读数不恒为字面量 0；crates/ 里放开 unsafe 的地方与登记表逐处对上；不走 GPU 的计算与豁免表逐项对上；崩溃点重放的按段登记成形；代码里我们自己的名字不带序号与位置词；被验 crate 里不自定义、不改名出 Ghost / Tracked
+# run-condition: none 只读仓里的 Rust 源码、测试文件名、kb 文本、登记表与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求；refused-tests 格另起 admission.py 的 test-plan 算键、读判定库，连不上或算不出报本次未跑
+# gate-stage: 代码类的源码纪律：名字不只由空泛词拼成、测试文件与 #[test] 函数不按里程碑、欠账号起名；kb 登记的格式常量、条文集合与 feature bit 位号与代码逐个对得上；实验二进制有成形的变异表且锚点唯一、有钉绝对值的断言、种子不折叠与读数不恒为字面量 0；crates/ 里放开 unsafe 的地方与登记表逐处对上；不走 GPU 的计算与豁免表逐项对上；崩溃点重放的按段登记成形；代码里我们自己的名字不带序号与位置词；被验 crate 里不自定义、不改名出 Ghost / Tracked；拒算的测试函数与登记表逐条对上
 # gate-fixture: yes
 # gate-category: 代码类
 # gate-similar: doc-text.sh 也是全仓扫写法，但判的是登记过的禁用写法与改过名的术语的旧名，对象是全部文本文件；这里的 vague-names 与 test-file-names 两格判 .rs 里声明的名字由哪些词拼成、测试文件叫什么；ordinal-names 格判 crates/、scripts/、.claude/gate.d、.claude/hooks 下 .rs、.sh、.py 里的标识符、环境变量名与文件名按词边界含不含词表里的序号与位置词，注释与字符串先剥掉，不判文本（注释与文档里的旧名归 doc-text 的 term-renames 格，只认登记过的）
 # gate-similar: model-differential-and-scenarios.sh 也调 scripts/crash/crash-case-check.py，但调的是 one-scenario 那一样、判用例里面的循环，归 harness 类；这里的 test-file-names 格只调 file-names 那一样，判的是文件名
-# gate-similar: .claude/singlefs-ai-sop/scripts/naming-lint.sh 是上游的命名纪律，判单字母与常见缩写、词表写死在上游；空泛词表是本项目定的，上游这一批不发版，先放项目本地；序号与位置词表（ordinal-names 格）同样是本项目 2026-10-13 定的，而且要判 .sh、.py，上游那份只扫 .rs
+# gate-similar: .claude/singlefs-ai-sop/scripts/naming-lint.sh 是上游的命名纪律，判单字母与常见缩写、词表写死在上游；空泛词表是本项目定的，上游这一批不发版，先放项目本地；序号与位置词表（ordinal-names 格）同样是本项目自己的，而且要判 .sh、.py，上游那份只扫 .rs
 # gate-similar: doc-registries.sh 它判欠账表的形状、里程碑收口表收全开着的欠账号、总审核记录每行有去向，读 kb 与 records/；这里的 kb 对账三格拿登记表把决策分项正文里的名字与 Rust 枚举变体配对、把 format-const 标记的值与源码 const 比、把 feature bit 位号与代码常量比，reading-discipline 格按同一份 lib-owed.py 只判两张豁免表挂的欠账号还开着，对象是实验二进制源码；它判 kb 里字段表、字节布局表、段序列登记表与里程碑各步之间的对账，field-table-sums 那一格也经 lib-format-const.py 读标记，判的是字段表加和与结构总宽，不读代码；这里的 format-constants 格拿标记的值与 scripts/experiment-apparatus/、research/、crates/ 源码里的 const 比、旧值字面串不许留，不做算术；它的 declared-counts 那一格也按 lib-owed.py 读欠账表，只数得出欠着多少条；这里只拿开着的编号核豁免表
 # gate-similar: checker-independence-and-sync.sh 它也经 lib-format-const.py 读标记、按 lib-owed.py 判布局滞后登记表点名的欠账号还开着，看的是这次改动里布局常量变了 checker 跟没跟；这里看此刻两边的值相等，对象是实验二进制源码与变异表
 # gate-similar: crates-mutation-replay.sh 它按 crates/mutations.tsv 逐条改坏源码再跑点名的测试，要编译、跑几个钟头；这里的 mutation-tables 格经同一个模块 scripts/mutation/crates-mutation-rows.py 的 static-check 只做静态判，不跑变异
 # gate-similar: doc-experiments.sh 它的 evidence-in-repo 格看这一轮改过的装置与变异表在 research/results/ 里有没有一份不比它旧的产物；这里判变异表本身成不成形、锚点对不对，与实验源码里的断言和读数，不看产物
+# gate-similar: crash-point-replay.sh 它按条复用时对拒算的测试函数只报条数与理由、照跑不复用，不核有没有登记；这里的 refused-tests 格拿同一份 admission.py test-plan 的拒算行核登记表 refused-tests.tsv（拒算而没登记、登记了而不再拒算都红），判法放在 scripts/gate/refused-test-registry.py，不并进那一道（那一道的格判的是测试跑得过不过）
 #
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十六格按下面的次序全跑，格名写错退 2）：
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十七格按下面的次序全跑，格名写错退 2）：
 # gate-cell: vague-names 函数名与类型名不只由空泛词拼成
 # gate-cell: test-file-names 测试文件名不按里程碑、步号起
 # gate-cell: test-function-names #[test] 函数名不按里程碑、步号、欠账号起
@@ -30,6 +31,7 @@
 # gate-cell: ordinal-names 代码里我们自己的名字（函数、变量、常量、模块、测试、环境变量、文件与目录）不带序号与位置词
 # gate-cell: data-names 字符串字面量（元组首列、=> 右侧、键= 的键名）与 kb 表格里名字形态的串也按命名纪律判：单字母、没登记的缩写判红
 # gate-cell: verus-ghost-names 被验 crate（verus-pins.tsv 登记的）里不自己定义名叫 Ghost / Tracked 的类型，也不把 vstd 之外的东西 use … as 改名成这两个名字
+# gate-cell: refused-tests 验证包里拒算的测试函数（单元键算不出、按条复用时照跑不复用）与拒算登记表逐条对上：拒算而没登记、登记了而已经不拒算都判红
 #   vague-names          词表 .claude/naming-vague-words，还没改完的文件 .claude/naming-vague-exclude
 #   test-file-names      跑 scripts/crash/crash-case-check.py --only file-names
 #   test-function-names  跑 scripts/crash/crash-case-check.py --only test-names；立账时已在的存量 .claude/gate.d/test-function-names-exempt.tsv
@@ -46,6 +48,7 @@
 #   ordinal-names        词表 .claude/naming-ordinal-tokens，还没改完的文件 .claude/naming-ordinal-exclude；扫 crates/、scripts/、.claude/gate.d、.claude/hooks 下 git 列出的 .rs、.sh、.py
 #   data-names           scripts/experiment-apparatus/*.rs 与 crates/*/src/**/*.rs 的字符串字面量、.claude/kb/**/*.md 的表格单元格（经 scripts/gate/data-name-lint.py，判法在它文件头）；登记表 .claude/abbreviations，存量排除表 .claude/data-name-lint-exclude
 #   verus-ghost-names    .claude/gate.d/verus-pins.tsv 的 crate 行登记的目录，src/ 下全部 .rs
+#   refused-tests        .claude/gate.d/refused-tests.tsv 与 admission.py test-plan 对验证包不带特性那一趟打的 refused 行（判法在 scripts/gate/refused-test-registry.py 文件头）
 # 每格的判据、射程、管不到的写在它自己那一段注释里。
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、汇总与退出码在共用库 lib/stage-cells.sh。
 # 规则：.claude/rules/verification.md「门禁的结构」「门禁管哪一半」。
@@ -57,7 +60,7 @@
 #   STAGE_CELLS_BREAK=red-swallowed  共用库吞红：红格按绿记、整道退 0
 #       absolute-assertions-red、clause-enums-red、crash-point-replay-segments-red、data-names-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、gpu-exemptions-red、
 #       mutation-tables-duplicates-lag-red、mutation-tables-red、mutation-tables-undefined-identifier-red、ordinal-names-red、reading-discipline-red、test-file-names-red、test-function-names-red、crate-sources-reachable-red、
-#       mutation-tables-ignore-comments-and-packages-red、mutation-tables-manifest-path-red、mutation-tables-reachability-red、
+#       mutation-tables-ignore-comments-and-packages-red、mutation-tables-manifest-path-red、mutation-tables-reachability-red、mutation-tables-release-red、
 #       unsafe-allowances-no-safety-red、unsafe-allowances-other-crate-red、unsafe-allowances-reason-empty-red、unsafe-allowances-root-blank-red、
 #       unsafe-allowances-safety-vague-red、unsafe-allowances-source-missing-red、unsafe-allowances-two-allows-red、unsafe-allowances-wrong-function-red、
 #       unsafe-allowances-place-count-wrong-red、unsafe-allowances-one-place-no-safety-red、unsafe-allowances-one-place-word-missing-red、unsafe-allowances-allow-count-short-red、
@@ -69,20 +72,20 @@
 #       unsafe-allowances-raw-c-string-hides-unsafe-red、unsafe-allowances-include-of-a-non-rs-file-red、unsafe-allowances-path-attribute-to-a-non-rs-file-red、
 #       unsafe-allowances-no-mangle-without-the-keyword-red、unsafe-allowances-bin-helper-directory-unregistered-red、
 #       unsafe-allowances-same-method-name-registered-without-type-arguments-red、
-#       feature-bits-trilingual-red、feature-bits-two-originals-red、verus-ghost-names-red、
+#       feature-bits-trilingual-red、feature-bits-two-originals-red、verus-ghost-names-red、refused-tests-red、
 #       vague-names-red（期望退出 1，实测 0）
-#   STAGE_CELLS_BREAK=marker-ignored  共用库不认 .gate-cells：每份样本十六格都跑
+#   STAGE_CELLS_BREAK=marker-ignored  共用库不认 .gate-cells：每份样本十七格都跑
 #       absolute-assertions-green、clause-enums-green、crash-point-replay-segments-green、data-names-green、feature-bits-green、format-constants-green、gpu-exemptions-green、
 #       mutation-tables-duplicates-lag-green、mutation-tables-green、mutation-tables-inline-module-literals-green、ordinal-names-green、reading-discipline-green、
-#       mutation-tables-ignore-comments-and-packages-green、mutation-tables-manifest-path-green、mutation-tables-reachability-green、
+#       mutation-tables-ignore-comments-and-packages-green、mutation-tables-manifest-path-green、mutation-tables-reachability-green、mutation-tables-release-green、
 #       clause-enums-trilingual-green、feature-bits-trilingual-green、format-constants-trilingual-green、
 #       test-file-names-green、test-function-names-green、crate-sources-reachable-green、unsafe-allowances-deny-one-green、unsafe-allowances-green、unsafe-allowances-several-rows-green、unsafe-allowances-statement-continued-green、
 #       unsafe-allowances-bin-root-green、unsafe-allowances-unsafe-impl-green、unsafe-allowances-same-method-two-types-green、
 #       unsafe-allowances-no-mangle-registered-green、unsafe-allowances-bin-helper-directory-registered-green、unsafe-allowances-unsafe-below-the-first-line-of-a-method-chain-green、
 #       unsafe-allowances-same-method-name-in-two-inherent-impls-green、unsafe-allowances-macro-expands-three-unsafe-for-one-keyword-green、
-#       unsafe-allowances-one-comment-covers-the-second-unsafe-of-a-chain-green、verus-ghost-names-green、vague-names-green（期望退出 0，实测 1）；absolute-assertions-red、
+#       unsafe-allowances-one-comment-covers-the-second-unsafe-of-a-chain-green、verus-ghost-names-green、refused-tests-green、vague-names-green（期望退出 0，实测 1）；absolute-assertions-red、
 #       clause-enums-red、crash-point-replay-segments-red、data-names-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、
-#       mutation-tables-duplicates-lag-red、mutation-tables-red、mutation-tables-undefined-identifier-red、mutation-tables-ignore-comments-and-packages-red、mutation-tables-manifest-path-red、mutation-tables-reachability-red、
+#       mutation-tables-duplicates-lag-red、mutation-tables-red、mutation-tables-undefined-identifier-red、mutation-tables-ignore-comments-and-packages-red、mutation-tables-manifest-path-red、mutation-tables-reachability-red、mutation-tables-release-red、
 #       ordinal-names-red、reading-discipline-red、test-file-names-red、test-function-names-red、crate-sources-reachable-red、
 #       unsafe-allowances-no-safety-red、unsafe-allowances-other-crate-red、unsafe-allowances-reason-empty-red、unsafe-allowances-root-blank-red、
 #       unsafe-allowances-safety-vague-red、unsafe-allowances-source-missing-red、unsafe-allowances-two-allows-red、unsafe-allowances-wrong-function-red、
@@ -97,7 +100,7 @@
 #       unsafe-allowances-same-method-name-registered-without-type-arguments-red、
 #       feature-bits-trilingual-red、feature-bits-two-originals-red、verus-ghost-names-red、
 #       vague-names-red（输出里找不到「样本只跑 .gate-cells 点名的格：…」）；
-#       gpu-exemptions 一格的红样本 expect 不要那一句，十六格都跑照样退 1、点名的红照样报出来，判得对，不在名单里
+#       gpu-exemptions、refused-tests 两格的红样本 expect 不要那一句，十七格都跑照样退 1、点名的红照样报出来，判得对，不在名单里
 #   GATE_VAGUE_NAMES_BREAK=trait-methods-judged  vague-names 把 trait 块里的方法也判
 #       vague-names-green（期望退出 0，实测 1）
 #   GATE_READING_DISCIPLINE_BREAK=reading-writes-unseen  reading-discipline 不认字段简写初始化与经方法调用结果写字段，把这两种写过的读数也当恒为 0
@@ -194,7 +197,7 @@
 #   GATE_UNSAFE_ALLOWANCES_BREAK=continuation-lines-ignored  unsafe-allowances ④ 不跳同一条语句的续行，只认 unsafe 那一行上方连着的注释
 #       unsafe-allowances-statement-continued-green、unsafe-allowances-unsafe-below-the-first-line-of-a-method-chain-green、
 #       unsafe-allowances-one-comment-covers-the-second-unsafe-of-a-chain-green（期望退出 0，实测 1）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=bin-roots-in-library  unsafe-allowances 不认 bin 根（bin_roots_of 一个都不交），src/bin/ 下的文件全算进库根那一份（改前的数法）
+#   GATE_UNSAFE_ALLOWANCES_BREAK=bin-roots-in-library  unsafe-allowances 不认 bin 根（bin_roots_of 一个都不交），src/bin/ 下的文件全算进库根那一份
 #       unsafe-allowances-bin-root-green、unsafe-allowances-unsafe-impl-green、unsafe-allowances-no-mangle-registered-green、
 #       unsafe-allowances-bin-helper-directory-registered-green、unsafe-allowances-unsafe-below-the-first-line-of-a-method-chain-green、
 #       unsafe-allowances-same-method-name-in-two-inherent-impls-green、unsafe-allowances-macro-expands-three-unsafe-for-one-keyword-green、
@@ -210,37 +213,37 @@
 #       unsafe-allowances-no-mangle-without-the-keyword-red、unsafe-allowances-bin-helper-directory-unregistered-red（期望退出 1，实测 0）
 #   GATE_UNSAFE_ALLOWANCES_BREAK=registered-bin-root-unchecked  unsafe-allowances 登记表第 1 段点名的 bin 根在 crate 里不是 bin 根，不判、那几行不管
 #       unsafe-allowances-bin-root-not-found-red（期望退出 1，实测 0）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=signature-outside-body  unsafe-allowances ③ 登记的项从 { 起算（改前只认函数体），unsafe fn 签名与 unsafe impl 项头里的 unsafe 落在外面
+#   GATE_UNSAFE_ALLOWANCES_BREAK=signature-outside-body  unsafe-allowances ③ 登记的项从 { 起算，unsafe fn 签名与 unsafe impl 项头里的 unsafe 落在外面
 #       unsafe-allowances-unsafe-impl-green、unsafe-allowances-same-method-two-types-green、unsafe-allowances-no-mangle-registered-green（期望退出 0，实测 1）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=methods-keyed-by-name  unsafe-allowances impl 块里的方法只按方法名认（改前的键），登记表写的 <类型>::<方法> 对不上
+#   GATE_UNSAFE_ALLOWANCES_BREAK=methods-keyed-by-name  unsafe-allowances impl 块里的方法只按方法名认，登记表写的 <类型>::<方法> 对不上
 #       unsafe-allowances-unsafe-impl-green、unsafe-allowances-same-method-two-types-green、
 #       unsafe-allowances-same-method-name-in-two-inherent-impls-green（期望退出 0，实测 1）；
 #       unsafe-allowances-same-method-name-registered-without-type-arguments-red（输出里找不到「crates/singlefs-verification/src/bin/e900_thread_clock.rs:18 放开…」）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=outermost-holder  unsafe-allowances ③ 几行都罩住同一处 unsafe 时取表里靠前的那一行（改前），方法里的 unsafe 记到它所在的 impl 块那一行
+#   GATE_UNSAFE_ALLOWANCES_BREAK=outermost-holder  unsafe-allowances ③ 几行都罩住同一处 unsafe 时取表里靠前的那一行，方法里的 unsafe 记到它所在的 impl 块那一行
 #       unsafe-allowances-unsafe-impl-green、unsafe-allowances-same-method-two-types-green（期望退出 0，实测 1）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=attributes-not-skipped  unsafe-allowances ④ 往上找 SAFETY 注释碰到属性就停（改前），写在 #[allow(unsafe_code, …)] 上方的不认
+#   GATE_UNSAFE_ALLOWANCES_BREAK=attributes-not-skipped  unsafe-allowances ④ 往上找 SAFETY 注释碰到属性就停，写在 #[allow(unsafe_code, …)] 上方的不认
 #       unsafe-allowances-unsafe-impl-green、unsafe-allowances-no-mangle-registered-green（期望退出 0，实测 1）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=lines-split-at-unicode-separators  unsafe-allowances ④ 找 SAFETY 注释的那一份按 splitlines() 切行（改前），U+2028 这类也算换行，与 line_of 的行号错开
+#   GATE_UNSAFE_ALLOWANCES_BREAK=lines-split-at-unicode-separators  unsafe-allowances ④ 找 SAFETY 注释的那一份按 splitlines() 切行，U+2028 这类也算换行，与 line_of 的行号错开
 #       unsafe-allowances-line-separator-in-a-comment-red（期望退出 1，实测 0）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=safety-read-from-raw-lines  unsafe-allowances ④ 找 SAFETY 注释读原文的行（改前），字符串字面量里顶格的 // SAFETY: 也当注释
+#   GATE_UNSAFE_ALLOWANCES_BREAK=safety-read-from-raw-lines  unsafe-allowances ④ 找 SAFETY 注释读原文的行，字符串字面量里顶格的 // SAFETY: 也当注释
 #       unsafe-allowances-safety-line-inside-a-string-red（期望退出 1，实测 0）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=c-string-prefix-unknown  unsafe-allowances 抹字符串不认 cr 前缀（改前只认 br），cr"\" 失步、吞掉后面的 unsafe
+#   GATE_UNSAFE_ALLOWANCES_BREAK=c-string-prefix-unknown  unsafe-allowances 抹字符串不认 cr 前缀（只认 br），cr"\" 失步、吞掉后面的 unsafe
 #       unsafe-allowances-raw-c-string-hides-unsafe-red（期望退出 1，实测 0）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=included-files-unscanned  unsafe-allowances 不追 include! 与 #[path] 点到的文件（改前只扫 .rs）
+#   GATE_UNSAFE_ALLOWANCES_BREAK=included-files-unscanned  unsafe-allowances 不追 include! 与 #[path] 点到的文件（只扫 .rs）
 #       unsafe-allowances-include-of-a-non-rs-file-red、unsafe-allowances-path-attribute-to-a-non-rs-file-red（期望退出 1，实测 0）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=exported-symbol-attributes-unseen  unsafe-allowances ② 不数不带 unsafe 的 #[no_mangle]、#[export_name]、#[link_section]（改前）
+#   GATE_UNSAFE_ALLOWANCES_BREAK=exported-symbol-attributes-unseen  unsafe-allowances ② 不数不带 unsafe 的 #[no_mangle]、#[export_name]、#[link_section]
 #       unsafe-allowances-no-mangle-without-the-keyword-red（期望退出 1，实测 0）；unsafe-allowances-no-mangle-registered-green（期望退出 0，实测 1）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=bin-helper-directory-in-library  unsafe-allowances src/bin/<名>.rs 只管它自己（改前），旁边 src/bin/<名>/ 下的文件归了库根
+#   GATE_UNSAFE_ALLOWANCES_BREAK=bin-helper-directory-in-library  unsafe-allowances src/bin/<名>.rs 只管它自己，旁边 src/bin/<名>/ 下的文件归了库根
 #       unsafe-allowances-bin-helper-directory-registered-green（期望退出 0，实测 1）；
 #       unsafe-allowances-bin-helper-directory-unregistered-red（输出里找不到「singlefs-verification/src/bin/e900_thread_clock.rs 的 unsafe 关键字 1 处…」）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=chain-lines-not-continued  unsafe-allowances ④ 找语句开头时不认以 . 起头的方法链续行（改前），unsafe 在链的第二行就找不到 let 上方的注释
+#   GATE_UNSAFE_ALLOWANCES_BREAK=chain-lines-not-continued  unsafe-allowances ④ 找语句开头时不认以 . 起头的方法链续行，unsafe 在链的第二行就找不到 let 上方的注释
 #       unsafe-allowances-unsafe-below-the-first-line-of-a-method-chain-green（期望退出 0，实测 1）
-#   GATE_UNSAFE_ALLOWANCES_BREAK=colliding-methods-keyed-alike  unsafe-allowances 同一份文件里撞了的 <类型>::<方法> 不改用全写（改前），登记行只认得到最靠前的那个
+#   GATE_UNSAFE_ALLOWANCES_BREAK=colliding-methods-keyed-alike  unsafe-allowances 同一份文件里撞了的 <类型>::<方法> 不改用全写，登记行只认得到最靠前的那个
 #       unsafe-allowances-same-method-name-in-two-inherent-impls-green（期望退出 0，实测 1）；
 #       unsafe-allowances-same-method-name-registered-without-type-arguments-red（输出里找不到「crates/singlefs-verification/src/bin/e900_thread_clock.rs:18 放开…」）
-#   test-file-names、test-function-names、crash-point-replay-segments、gpu-exemptions 几格的判法开关（CRASH_CASE_CHECK_BREAK、CRASH_POINT_REPLAY_ITEMS_BREAK、
-#   GPU_EXEMPTIONS_CHECK_BREAK）不在这里列：判法脚本平常跑时设了开关整份退 2（只在 --selftest 里认），在样本上证不了；
-#   开关表在 scripts/crash/crash-case-check.py、scripts/crash/lib_crash_point_replay_items.py、scripts/crash/gpu-exemptions-check.py 文件头，
+#   test-file-names、test-function-names、crash-point-replay-segments、gpu-exemptions、refused-tests 几格的判法开关（CRASH_CASE_CHECK_BREAK、CRASH_POINT_REPLAY_ITEMS_BREAK、
+#   GPU_EXEMPTIONS_CHECK_BREAK、REFUSED_TEST_REGISTRY_BREAK）不在这里列：判法脚本平常跑时设了开关整份退 2（只在 --selftest 里认），在样本上证不了；
+#   开关表在 scripts/crash/crash-case-check.py、scripts/crash/lib_crash_point_replay_items.py、scripts/crash/gpu-exemptions-check.py、scripts/gate/refused-test-registry.py 文件头，
 #   由判法脚本的 --selftest 证红（lib_crash_point_replay_items.py 那几条归 crash-case-check.py --selftest）
 #   GATE_ORDINAL_NAMES_BREAK=compound-names-unseen  ordinal-names 只认整名等于词表里的词，不按词边界认复合名
 #       ordinal-names-green（期望退出 0，实测 1）；ordinal-names-red（输出里找不到「crates/demo/src/main.rs:1 名字 enumerate_」）
@@ -275,11 +278,11 @@
 #       mutation-tables-red（输出里找不到「M_库里点名只在集成测试里的用例」那一条）
 #   GATE_MUTATION_TABLES_BREAK=named-test-definitions-only  mutation-tables 点名的测试只认 fn <名> 的定义（宏展开出来的认不出）
 #       mutation-tables-green、mutation-tables-inline-module-literals-green、mutation-tables-ignore-comments-and-packages-green（期望退出 0，实测 1）
-#   GATE_MUTATION_TABLES_BREAK=comment-lines-as-attributes  mutation-tables 判 #[ignore] 时把 fn 上面的注释行与行尾注释也当属性（改前的判法）
+#   GATE_MUTATION_TABLES_BREAK=comment-lines-as-attributes  mutation-tables 判 #[ignore] 时把 fn 上面的注释行与行尾注释也当属性
 #       mutation-tables-ignore-comments-and-packages-green（期望退出 0，实测 1）
-#   GATE_MUTATION_TABLES_BREAK=one-package-per-row  mutation-tables 一行只认整串 cargo 参数里最靠前的那一个 -p（改前的判法）
+#   GATE_MUTATION_TABLES_BREAK=one-package-per-row  mutation-tables 一行只认整串 cargo 参数里最靠前的那一个 -p
 #       mutation-tables-ignore-comments-and-packages-green（期望退出 0，实测 1）；mutation-tables-ignore-comments-and-packages-red（输出里找不到「、crates/retry 的」）
-#   GATE_MUTATION_TABLES_BREAK=package-directory-from-name  mutation-tables 包目录不读仓根 Cargo.toml 的 [workspace] members、按 crates/<包名> 硬拼（改前的判法；-p 点到非成员的也照拼）
+#   GATE_MUTATION_TABLES_BREAK=package-directory-from-name  mutation-tables 包目录不读仓根 Cargo.toml 的 [workspace] members、按 crates/<包名> 硬拼（-p 点到非成员的也照拼）
 #       mutation-tables-manifest-path-green（期望退出 0，实测 1：第 9 行 -p renamed-package 的包在 crates/renamed-dir，按 crates/renamed-package 找不到）；
 #       mutation-tables-manifest-path-red（输出里找不到「-p standalone-project 不是工作区成员」）
 #   GATE_MUTATION_TABLES_BREAK=non-member-package-unjudged  mutation-tables 成员照读，-p 点到非成员的不判红、退回按 crates/<包名> 硬拼
@@ -299,11 +302,11 @@
 #   GATE_MUTATION_TABLES_BREAK=manifest-path-not-a-package  mutation-tables 判完 --manifest-path 的路径之后不把那份 Cargo.toml 所在的目录当包目录：点名的测试不在那里找
 #       mutation-tables-manifest-path-green（输出里找不到「--manifest-path 指到的都是仓内的 Cargo.toml（2 行）」）；
 #       mutation-tables-manifest-path-red（输出里找不到「M_独立工程里找不到点名的测试：点名的测试 absent_in_standalone_case 在 crates/standalone 的 --lib（」）
-#   GATE_MUTATION_TABLES_BREAK=inline-module-literals-counted  mutation-tables 配内联 mod 的花括号时不抹注释、字符串、原始串与字符字面量（改前的判法）
+#   GATE_MUTATION_TABLES_BREAK=inline-module-literals-counted  mutation-tables 配内联 mod 的花括号时不抹注释、字符串、原始串与字符字面量
 #       mutation-tables-inline-module-literals-green（期望退出 0，实测 1）
-#   GATE_MUTATION_TABLES_BREAK=undefined-identifiers-ignored  mutation-tables 不读 static-check 的 UNDEFINED 行（改前的判法：替换文引了 crates 里找不到定义的标识符也不判红）
+#   GATE_MUTATION_TABLES_BREAK=undefined-identifiers-ignored  mutation-tables 不读 static-check 的 UNDEFINED 行（替换文引了 crates 里找不到定义的标识符也不判红）
 #       mutation-tables-undefined-identifier-red（期望退出 1，实测 0）
-#   GATE_MUTATION_TABLES_BREAK=duplicate-key-with-test  mutation-tables 把点名的测试也算进 crates/mutations.tsv 重复行的键（改前的判法）
+#   GATE_MUTATION_TABLES_BREAK=duplicate-key-with-test  mutation-tables 把点名的测试也算进 crates/mutations.tsv 重复行的键
 #       mutation-tables-red（输出里找不到「crates/mutations.tsv 第 13、14 行」）
 #   GATE_MUTATION_TABLES_BREAK=research-duplicates-unchecked  mutation-tables 不判研究变异表里除变异名外各列全同的行
 #       mutation-tables-red（输出里找不到「scripts/mutation/tables/e1_sample.tsv 第 3、4 行」）；mutation-tables-duplicates-lag-green（期望退出 0，实测 1）；
@@ -314,6 +317,8 @@
 #       mutation-tables-duplicates-lag-red（输出里找不到「相对基准那一版多出一组」）；mutation-tables-duplicates-lag-green（输出里找不到「1 张研究变异表里没有两行…重复行滞后 2 组…」）
 #   GATE_MUTATION_TABLES_BREAK=reachability-lines-unread  mutation-tables 不读 static-check 的可达性行（UNREACHABLE、REACHABILITY_UNJUDGED 不进红句，REACHABILITY_CHECKED、REACHABILITY_NOT_JUDGED 不进成功句）
 #       mutation-tables-reachability-red（期望退出 1，实测 0）；mutation-tables-reachability-green（输出里找不到「点名的测试都够得着被改坏的函数（判了 1 行」）
+#   GATE_MUTATION_TABLES_BREAK=release-lines-unread  mutation-tables 不读 static-check 的 RELEASE 行（命中重测试目标而第五段没写 --release 的行不判红，成功句里没有 release 那半句）
+#       mutation-tables-release-red（期望退出 1，实测 0）；mutation-tables-release-green（输出里找不到「命中重测试目标的行第五段都写了 --release（判了 7 行」）
 #   GATE_VERUS_GHOST_NAMES_BREAK=definitions-unseen  verus-ghost-names 不判名叫 Ghost / Tracked 的类型定义
 #       verus-ghost-names-red（输出里找不到「crates/self-defined-wrappers/src/lib.rs:3 定义了名叫 Ghost 的 struct」）
 #   GATE_VERUS_GHOST_NAMES_BREAK=renames-unseen  verus-ghost-names 不判 use … as Ghost / Tracked
@@ -324,12 +329,17 @@
 #       verus-ghost-names-green（期望退出 0，实测 1）
 # absolute-assertions 没有弄坏开关，mutation-tables 别的几样与 reading-discipline（只有共用库那两项）判别力靠各自的样本。
 #
-#   bash .claude/gate.d/code-source-discipline.sh [项目根]                                十六格都跑
+#   bash .claude/gate.d/code-source-discipline.sh [项目根]                                十七格都跑
 #   bash .claude/gate.d/code-source-discipline.sh --list                                  逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/code-source-discipline.sh --check <格名>[,<格名>…] [项目根]         只跑点名的格
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ code-source-discipline.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_NAME="$(basename "$0")"
 STAGE_DIRECTORY="$(cd "$(dirname "$0")" && pwd)"
 # 共用模块在这份阶段所在的仓里（样本目录里没有 scripts/）：cd 进被判的仓之前取
@@ -375,6 +385,8 @@ stage_cell data-names cell_data_names "字符串字面量（元组首列、=> �
   "名字写全，或把缩写登记进 .claude/abbreviations（一行 <缩写>  # 全称与含义）；已经落进留存产物、改名要连产物一起重跑的存量登记进 .claude/data-name-lint-exclude（一行 <路径>:<串>  # 理由），排除表里已经没有违规的行与指向不存在路径的行删掉，排除只缩不涨；判法与开关在 scripts/gate/data-name-lint.py 文件头"
 stage_cell verus-ghost-names cell_verus_ghost_names "被验 crate（verus-pins.tsv 登记的）里不自己定义名叫 Ghost / Tracked 的类型，也不把 vstd 之外的东西 use … as 改名成这两个名字" \
   "给自定义的类型、改名的东西换一个说出它是什么的名字（Ghost / Tracked 只留给 vstd 的那两个，函数单元图按名字认它们）；判据在 code-source-discipline.sh 里这一格函数上方的注释"
+stage_cell refused-tests cell_refused_tests "验证包里拒算的测试函数（单元键算不出、按条复用时照跑不复用）与拒算登记表逐条对上：拒算而没登记、登记了而已经不拒算都判红" \
+  "新出现的拒算先改测试让单元键算得出（不读活树、不读运行时拼出的仓根路径）；断言就是关于真仓、非读活树不可的，交主 agent 二次确认，确认了由主 agent 在 .claude/gate.d/refused-tests.tsv 加一行「测试函数全名<TAB>为什么非读活树不可」（实现员不登记）；表里已经不拒算的行删掉；现读每条的状态跑 python3 scripts/gate/refused-test-registry.py list"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -911,7 +923,7 @@ PY
 #   ① 记账表的（类别，位号）集合与已定项 4 登记表逐行对得上，且记账表的「语义一句话」逐字包含登记表同一位的「含义」；
 #   ② 每张位图内位号严格递增、不跳号（已分配的位必须是 0..n-1）；
 #   ③ `crates/*/src/**/*.rs` 里名字带 INCOMPAT / COMPAT_RO / COMPAT 段的常量，值解得出位号的，那个位号必须在记账表里；
-# 格式锁定之前位号可回收、可重排（用户定），不判「位用过不许回收」；同一个（类别，位号）出现两行时，位号不再严格递增，由 ② 报。
+# 格式锁定之前位号可回收、可重排，不判「位用过不许回收」；同一个（类别，位号）出现两行时，位号不再严格递增，由 ② 报。
 # 射程：③ 只认写在一行里、值是位掩码字面量的常量声明。值由别的常量合成的（`SUPPORTED_INCOMPAT_BITS`）、声明跨行的，
 # 解不出位号，逐个列进成功那句的「没判位号的」名单。不经具名常量的裸字面量（直接写 `0x01`）不在射程里，靠 review。
 # 样本：red 的记账表跳号、同一位登记两行不同语义、多出一位登记表里没有，代码样本又引用了表里没有的一位，①②③ 都必须报出来（同一位两行由 ② 报次序不对）；
@@ -1285,9 +1297,15 @@ PY
 #     样本 mutation-tables-reachability-green：照 mutation-tables-green 拷来，crates/mutations.tsv 换成一行（改 counted，点名的测试调得到它），
 #     crates 下加 singlefs-verification 一个小包，放着选路表、截断表、豁免表点名的那几个函数（空函数体），所以这一格不是「本次未判」；
 #     mutation-tables-reachability-red 是它的整份拷贝，变异表多第 3 行（改 never_called_by_the_test，点名的测试调不到它：closure）。
+#   重测试目标只许 release：static-check 的 RELEASE 行（命中重测试目标而第五段没写 --release / --profile release 的行，判法在 scripts/mutation/lib_release_only_tests.py，
+#     命中的两样是 gpu 特性与 .claude/gate.d/stage-inputs.tsv 的 crash-case: 行登记的测试目标；登记表读本模块所在那一份仓的，样本根里没有）逐行进红句，点名行号、变异名与依据；
+#     成功句报「命中重测试目标的行第五段都写了 --release（判了 N 行」，N 是表的行数（static-check 每行都判）。登记表读不了 static-check 打 ERROR、退 2，照「没跑完」判红。
+#     弄坏开关 GATE_MUTATION_TABLES_BREAK=release-lines-unread 不读 RELEASE 行：样本 mutation-tables-release-red 判绿、mutation-tables-release-green 成功句里没有 release 那半句，两份样本都判错。
+#     样本 mutation-tables-release-green：照 mutation-tables-green 拷来，crates/mutations.tsv 多第 8 行（-p demo --features gpu --release --lib，点名 lib_case）；
+#     mutation-tables-release-red 是同一份拷贝，第 8 行第五段不写 --release（-p demo --features gpu --lib），只这一样判红。
 # 另判四样那一道不判的：重复行——「文件、原文、替换文」三样逐字全同的几行判红（点名的测试、cargo 参数不同也算：一处改法留一行），
 #   逐组列行号与变异名，组里 cargo 参数也全同的另注一句；变异名相同的两行另判（按名字分格的报告把两条并成一格）。
-#   弄坏开关 GATE_MUTATION_TABLES_BREAK=duplicate-key-with-test 照改前的判法把点名的测试也算进重复的键：red 样本第 13、14 行那一组（点名的测试不同）找不到；
+#   弄坏开关 GATE_MUTATION_TABLES_BREAK=duplicate-key-with-test 把点名的测试也算进重复的键：red 样本第 13、14 行那一组（点名的测试不同）找不到；
 # 滞后表：两侧的重复行里还不能删的组（有装置或名单按名字引着、臂表与键表按臂或键登记）登记在 .claude/gate.d/mutation-duplicates-lag.tsv（写法在它的表头），
 #   登记的组不判红，成功句前逐组列名、成功句报「重复行滞后 N 组」。判红的：一行不是四列或有空格子；表那一列不是 crates/mutations.tsv、也不是 scripts/mutation/tables/<表名>.tsv，
 #   或那张表不在；名字在那张表第一列里找不到；名字此刻不是同一组（三样不全同 / 除变异名外各列不全同）；那一组里还有没登记的名字；名字在表里不唯一、对上不止一组；
@@ -1308,11 +1326,11 @@ PY
 #   mutation-tables-manifest-path-red 是它的整份拷贝，多第 11 至 18 行各判红一样：-p 点非成员、路径在仓根之外、文件名不是 Cargo.toml、文件不在、-p 与 --manifest-path 并写、--manifest-path 写两次、后面没写路径、
 #   独立工程里找不到点名的测试。别的 mutation-tables 样本各加了一份只列自己用到的包的工作区 Cargo.toml 与成员的 Cargo.toml。
 # #[ignore]、筛选词、点名的测试在不在选的目标里这三样的包取 cargo 参数在 `--` 之前点名的全部包（-p、--package，空格隔开或写 =；--manifest-path 同理）：一行写了几个 -p，点名的测试落在其中任一个包里就算在。
-#   弄坏开关 GATE_MUTATION_TABLES_BREAK=one-package-per-row 退回改前、只认最靠前的那一个 -p：样本 mutation-tables-ignore-comments-and-packages-green
+#   弄坏开关 GATE_MUTATION_TABLES_BREAK=one-package-per-row 只认最靠前的那一个 -p：样本 mutation-tables-ignore-comments-and-packages-green
 #   第 9 行（-p demo -p retry --lib，点名的测试只在 retry 里）判红、整格退 1，mutation-tables-ignore-comments-and-packages-red 第 11 行的报告里没有 retry 那一个包。
 # 点名的测试标了 #[ignore] 而参数里没有 --include-ignored：只认 fn 上面的属性行（每行去掉行尾 // 起的注释），夹在属性之间的注释行照样认得出下面的 fn，
 #   但注释行与行尾注释里写的 #[ignore] 不算标了；管不到：属性的字符串值里写的 #[ignore]、跨行的属性。
-#   弄坏开关 GATE_MUTATION_TABLES_BREAK=comment-lines-as-attributes 退回改前、注释行也算属性：样本 mutation-tables-ignore-comments-and-packages-green
+#   弄坏开关 GATE_MUTATION_TABLES_BREAK=comment-lines-as-attributes 注释行也算属性：样本 mutation-tables-ignore-comments-and-packages-green
 #   第 8 行（点名的 commented_ignore_case 只在注释里写着 #[ignore]）判红、整格退 1；
 # `--` 之后的筛选词一个都筛不到点名的测试（libtest 比的是完整测试名：模块路径由点名的函数在哪个文件、套在哪几层内联 mod 里算出；
 #   配 `mod 名 {` 与花括号之前先把注释、字符串、原始串与字符字面量抹成空白，串里的 `mod tests {` 与落单的花括号不算。
@@ -1481,7 +1499,7 @@ def masked_comments_and_literals(text):
         position = end
 def enclosing_inline_modules(text):
     """(偏移, 那一刻套着的内联 mod 名单) 的有序表：按 `mod 名 {` 与花括号配平；注释、字符串、原始串与字符字面量先抹掉再配
-    （弄坏开关 GATE_MUTATION_TABLES_BREAK=inline-module-literals-counted 退回改前：直接扫原文，串里的 `mod tests {` 与落单花括号照配）。"""
+    （弄坏开关 GATE_MUTATION_TABLES_BREAK=inline-module-literals-counted 下直接扫原文，串里的 `mod tests {` 与落单花括号照配）。"""
     events, stack, depth = [], [], 0
     if "inline-module-literals-counted" not in os.environ.get("GATE_MUTATION_TABLES_BREAK", ""):
         text = masked_comments_and_literals(text)
@@ -1500,7 +1518,7 @@ def enclosing_inline_modules(text):
 comment_lines_as_attributes = "comment-lines-as-attributes" in os.environ.get("GATE_MUTATION_TABLES_BREAK", "")
 def attribute_code(lines_above):
     """fn 上面那一串（属性行与夹在中间的注释行）里只留属性行，每行去掉行尾 `//` 起的注释：注释行（`//`、`///`）与行尾注释里写的 `#[ignore]` 不算标了 ignore
-    （弄坏开关 GATE_MUTATION_TABLES_BREAK=comment-lines-as-attributes 退回改前：整串原样交回，注释行里的 `#[ignore]` 也算）。"""
+    （弄坏开关 GATE_MUTATION_TABLES_BREAK=comment-lines-as-attributes 下整串原样交回，注释行里的 `#[ignore]` 也算）。"""
     if comment_lines_as_attributes:
         return lines_above
     return "\n".join(line.split("//", 1)[0] for line in lines_above.split("\n") if line.lstrip().startswith("#["))
@@ -1630,8 +1648,8 @@ def packages_of(arguments):
       --manifest-path <路径>、--manifest-path=<路径>    取那份 Cargo.toml 所在的目录当包目录（manifest_package_directory），独立工程用它点名
     同一行既带 -p 又带 --manifest-path、带两次 --manifest-path、--manifest-path 后面没写路径的判问题；有问题的写法不再往下解目录。
     弄坏开关 GATE_MUTATION_TABLES_BREAK：
-      one-package-per-row  退回改前：只认整串参数里最靠前的那一个 `-p <包>`
-      package-directory-from-name  包目录不读仓根 Cargo.toml、按 crates/<包名> 硬拼（改前的判法，-p 点到非成员也照拼）
+      one-package-per-row  只认整串参数里最靠前的那一个 `-p <包>`
+      package-directory-from-name  包目录不读仓根 Cargo.toml、按 crates/<包名> 硬拼（-p 点到非成员也照拼）
       non-member-package-unjudged  成员照读，-p 点到非成员的不判问题，退回按 crates/<包名> 硬拼
       package-and-manifest-path-together-allowed、manifest-path-twice-allowed、manifest-path-without-value-unjudged  各不判其中一样"""
     before_separator = arguments[:arguments.index("--")] if "--" in arguments else arguments
@@ -1681,7 +1699,7 @@ def packages_of(arguments):
                             "不在工作区的独立工程用 --manifest-path <它的 Cargo.toml>")
     return list(dict.fromkeys(from_names + from_manifests)), problems, from_names, from_manifests
 rows, _malformed = mutation_rows.read_table("crates/mutations.tsv")
-# 弄坏开关 duplicate-key-with-test：照改前的判法把点名的测试也算进重复的键（同一处改法点名两条不同测试的几行就放过去了）
+# 弄坏开关 duplicate-key-with-test：把点名的测试也算进重复的键（同一处改法点名两条不同测试的几行就放过去了）
 duplicate_key_with_test = "duplicate-key-with-test" in os.environ.get("GATE_MUTATION_TABLES_BREAK", "")
 rows_with_member_packages = rows_with_manifest_paths = 0
 for row in rows:
@@ -1742,7 +1760,7 @@ PY
   crates_exit_code=$?
 fi
 # ── 门禁 crates-mutation-replay 派活之前判的那几样与拷贝范围：共用模块的 static-check 逐处打
-# MALFORMED / ANCHOR / NAME / ROW / STRAY / LITERAL / UNDEFINED，末尾 COPIED、IDENTIFIERS_CHECKED 与 CHECKED；退 0 一处都没有、退 1 有、别的退出码是它自己没判完（ERROR 行是原因）
+# MALFORMED / ANCHOR / NAME / ROW / STRAY / LITERAL / UNDEFINED / RELEASE，末尾 COPIED、IDENTIFIERS_CHECKED 与 CHECKED；退 0 一处都没有、退 1 有、别的退出码是它自己没判完（ERROR 行是原因）
 scope_report=""; scope_exit_code=0
 if [[ -f "$MUTATION_ROWS_MODULE" ]]; then
   scope_report="$(python3 "$MUTATION_ROWS_MODULE" static-check "$ROOT")" || scope_exit_code=$?
@@ -1757,10 +1775,16 @@ mapfile -t crates_names < <(grep $'^NAME\t' <<<"$scope_report")
 mapfile -t scope_rows < <(grep $'^ROW\t' <<<"$scope_report")
 mapfile -t crates_stray < <(grep $'^STRAY\t' <<<"$scope_report")
 mapfile -t scope_literals < <(grep $'^LITERAL\t' <<<"$scope_report")
-# 替换文引了 crates 里找不到定义的标识符（文件头这一格「替换文引的标识符」）；弄坏开关 undefined-identifiers-ignored 退回改前：不读这种行
+# 替换文引了 crates 里找不到定义的标识符（文件头这一格「替换文引的标识符」）；弄坏开关 undefined-identifiers-ignored：不读这种行
 crates_undefined=()
 if [[ "${GATE_MUTATION_TABLES_BREAK:-}" != *undefined-identifiers-ignored* ]]; then
   mapfile -t crates_undefined < <(grep $'^UNDEFINED\t' <<<"$scope_report")
+fi
+# 命中重测试目标而第五段没写 --release（文件头这一格「重测试目标只许 release」）；弄坏开关 release-lines-unread：不读这种行，成功句里也不打 release 那半句
+crates_release=(); release_lines_read=""
+if [[ "${GATE_MUTATION_TABLES_BREAK:-}" != *release-lines-unread* ]]; then
+  mapfile -t crates_release < <(grep $'^RELEASE\t' <<<"$scope_report")
+  release_lines_read=1
 fi
 scope_identifiers="$(sed -n 's/^IDENTIFIERS_CHECKED\t//p' <<<"$scope_report")"
 # 点名的测试够不着被改坏的函数（文件头这一格「点名测试够不着被改坏的函数」）：static-check 在 scope_report 里一律判，UNREACHABLE 与 REACHABILITY_UNJUDGED 进红句，
@@ -1929,7 +1953,7 @@ if [[ "$scope_exit_code" -ne 0 && "$scope_exit_code" -ne 1 ]] || [[ -z "$scope_c
   script_failures+=("门禁 crates-mutation-replay 派活之前那几样与拷贝范围的检查没跑完（scripts/mutation/crates-mutation-rows.py static-check 退出码 ${scope_exit_code}，CHECKED 行「${scope_checked}」；${scope_errors[*]:-没报原因}）")
 fi
 
-if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#crates_dup[@]} + ${#crates_dup_changes[@]} + ${#research_duplicates[@]} + ${#lag_problems[@]} + ${#crates_ignored[@]} + ${#crates_filter[@]} + ${#crates_missing_tests[@]} + ${#stray_rows[@]} + ${#crates_stray[@]} + ${#crates_malformed[@]} + ${#crates_names[@]} + ${#anchor_unreadable[@]} + ${#script_failures[@]} + ${#scope_rows[@]} + ${#scope_literals[@]} + ${#crates_undefined[@]} + ${#crates_packages[@]} + ${#scope_unreachable[@]} + ${#scope_reachability_unjudged[@]})); then
+if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#crates_dup[@]} + ${#crates_dup_changes[@]} + ${#research_duplicates[@]} + ${#lag_problems[@]} + ${#crates_ignored[@]} + ${#crates_filter[@]} + ${#crates_missing_tests[@]} + ${#stray_rows[@]} + ${#crates_stray[@]} + ${#crates_malformed[@]} + ${#crates_names[@]} + ${#anchor_unreadable[@]} + ${#script_failures[@]} + ${#scope_rows[@]} + ${#scope_literals[@]} + ${#crates_undefined[@]} + ${#crates_release[@]} + ${#crates_packages[@]} + ${#scope_unreachable[@]} + ${#scope_reachability_unjudged[@]})); then
   if ((${#script_failures[@]})); then
     echo "  ✗ 锚点或拷贝范围检查的 python 没跑完，这一段等于没判："
     printf '      %s\n' "${script_failures[@]}"
@@ -2079,6 +2103,14 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} +
     echo "    → 怎么办：替换文引了已删或改名的标识符：改那一行的替换文（换成今天源码里还在的名字，或照今天的代码重写这一处改法），"
     echo "      改完单跑 python3 scripts/mutation/crates-mutation-rows.py static-check . 看那一行不再报 UNDEFINED，再单跑那一行证明点名的测试红（scripts/mutation/prove-red.sh）。"
   fi
+  if ((${#crates_release[@]})); then
+    echo "  ✗ crates/mutations.tsv 这 ${#crates_release[@]} 行命中重测试目标（gpu 特性、登记的崩溃枚举用例目标）而第五段没写 --release（门禁 crates-mutation-replay 与证红照补 --release 起，表上写的参数与真跑的不一致）："
+    while IFS=$'\t' read -r _ lineno name basis; do
+      printf '      crates/mutations.tsv:%s %s：%s\n' "$lineno" "$name" "$basis"   # gate-lint:detail
+    done < <(printf '%s\n' "${crates_release[@]}")
+    echo "    → 怎么办：第五段补上 --release（插在第一个 -- 之前；--profile release 也算写了），判法在 scripts/mutation/lib_release_only_tests.py；"
+    echo "      改完单跑 python3 scripts/mutation/crates-mutation-rows.py static-check . 看那一行不再报 RELEASE，再单跑那一行证明点名的测试红（scripts/mutation/prove-red.sh）。"
+  fi
   if ((${#scope_unreachable[@]})); then
     echo "  ✗ crates/mutations.tsv 这 ${#scope_unreachable[@]} 行点名的测试够不着被改坏的函数（closure：点名测试的单元闭包里根本没有被改坏的单元；gpu-route：开 GPU 时点名测试走 GPU 判段，被改坏的单元只在 GPU 路上不走的 CPU 判器入口后面；改了它测试照样过，这一行等于没判）："
     while IFS=$'\t' read -r _ lineno name route mutated test cargo_arguments; do
@@ -2103,6 +2135,9 @@ crates_summary+="；门禁 crates-mutation-replay 的拷贝范围（${scope_copi
 if [[ -n "$scope_identifiers" ]]; then
   IFS=$'\t' read -r identifiers_judged identifiers_unjudged <<<"$scope_identifiers"
   crates_summary+="；替换文引的标识符判了 ${identifiers_judged} 行、都找得到定义（没判 ${identifiers_unjudged} 行：文件不是 .rs 或锚点失效）"
+fi
+if [[ -n "$release_lines_read" && -f crates/mutations.tsv ]]; then
+  crates_summary+="；命中重测试目标的行第五段都写了 --release（判了 ${scope_row_count} 行：gpu 特性、登记的崩溃枚举用例目标）"
 fi
 if [[ -n "$scope_reachability_checked" ]]; then
   IFS=$'\t' read -r reachability_judged reachability_unjudged reachability_exempt reachability_cut _reachability_rest <<<"$scope_reachability_checked"
@@ -2544,7 +2579,7 @@ PY
 #     要么都写、要么都是 -；几处是正整数；必须提到的词按 | 切开，每个词都不空；
 #   - 同一个（根，项）登两行判红（没有放开的那一行项写 -，同一个根写两行这种也红）；
 #   - 同一个根的几行第 2 段不一样判红（各段写 - 的那一行与放开的行并存就是这一种）；
-#   - 放开了的行，第 7 段理由不是 - 且不少于 20 个字，第 8 段出处是仓里真有的文件路径、或「用户 YYYY-MM-DD 弹窗定」加那个路径；
+#   - 放开了的行，第 7 段理由不是 - 且不少于 20 个字，第 8 段出处是仓里真有的文件路径、或「用户 YYYY-MM-DD 弹窗定」加那个路径；history-kept: 出处栏认的写法本身，按格式占位写
 #     没放开的行两段都写 -。只判理由在、够长，出处判文件存在。
 # 再扫 crates/<crate>/ 下所有 .rs（跳过 target/），先抹掉注释与字符串（行号不变），按根分开（bin_roots_of）：
 #   bin 根是 cargo 自动认的二进制目标根 src/main.rs、src/bin/<名>.rs、src/bin/<名>/main.rs；src/main.rs 只管它自己，
@@ -2677,7 +2712,7 @@ def blank(piece):
 
 
 RAW_STRING_OPEN = re.compile(r'r(#*)"')
-# 原始字符串 r"…" 前面可以紧挨着的一个前缀字母：b（字节串 br"…"）与 c（C 字符串 cr"…"）。弄坏开关 c-string-prefix-unknown 下只认 b（改前）：
+# 原始字符串 r"…" 前面可以紧挨着的一个前缀字母：b（字节串 br"…"）与 c（C 字符串 cr"…"）。弄坏开关 c-string-prefix-unknown 下只认 b：
 # cr"\" 里的 \ 被当成转义，抹字符串失步、吞掉后面的代码。
 RAW_STRING_PREFIXES = "b" if BREAK == "c-string-prefix-unknown" else "bc"
 
@@ -2779,7 +2814,7 @@ BIN_ROOT_DIRECTORY_MAIN = re.compile(r"src/bin/[^/]+/main\.rs")
 def bin_roots_of(relative_paths):
     """crate 目录下（相对路径）的 bin 根：{根文件: 这个根管的文件}。src/main.rs 只管它自己；src/bin/<名>.rs 管它自己与 src/bin/<名>/ 下的全部
     （它的 mod 照 cargo 的规矩从那个目录找；同一个目录里另有 src/bin/<名>/main.rs 时那个目录归后者）；src/bin/<名>/main.rs 管 src/bin/<名>/ 下的全部。
-    弄坏开关 bin-roots-in-library 下一个都不认（改前全算进库根）；bin-helper-directory-in-library 下 src/bin/<名>.rs 只管它自己（改前）。"""
+    弄坏开关 bin-roots-in-library 下一个都不认（全算进库根）；bin-helper-directory-in-library 下 src/bin/<名>.rs 只管它自己。"""
     if BREAK == "bin-roots-in-library":
         return {}
     roots = {}
@@ -2858,10 +2893,10 @@ def written_type(text):
 
 def items_of(cleaned):
     """一份抹过注释与字符串的文件里的 impl 块与函数，每项 {"key", "start", "body", "end"}：key 是登记表第 4 段的写法，start 是项头起点，
-    body 是 { 的位置（没有函数体的声明是 None），end 是项尾之后。弄坏开关 methods-keyed-by-name 下方法也只按方法名认（改前的键）。
+    body 是 { 的位置（没有函数体的声明是 None），end 是项尾之后。弄坏开关 methods-keyed-by-name 下方法也只按方法名认。
     同一份文件里几个方法的 <类型>::<方法> 一样（同一个类型的几个 impl 块里同名的方法）时，这几个都改用全写：
     <内联模块路径::><类型连同实参>::<方法>，trait impl 里的写成 <<内联模块路径::><类型连同实参> as <Trait 连同实参>>::<方法>；
-    弄坏开关 colliding-methods-keyed-alike 下不改（改前：撞了的几个同一个键，登记表那一行只认得到最靠前的那个）。"""
+    弄坏开关 colliding-methods-keyed-alike 下不改（撞了的几个同一个键，登记表那一行只认得到最靠前的那个）。"""
     modules = []
     for match in INLINE_MODULE.finditer(cleaned):
         modules.append((match.group(1), match.end() - 1, closing_brace(cleaned, match.end() - 1)))
@@ -2913,7 +2948,7 @@ def items_of(cleaned):
 
 
 def item_span(item):
-    """登记的一项管的范围 [起, 止)：从项头起到项尾。弄坏开关 signature-outside-body 下从 { 起（改前只认函数体，签名与 impl 项头落在外面）。"""
+    """登记的一项管的范围 [起, 止)：从项头起到项尾。弄坏开关 signature-outside-body 下从 { 起（签名与 impl 项头落在外面）。"""
     if BREAK == "signature-outside-body":
         return None if item["body"] is None else (item["body"], item["end"])
     return item["start"], item["end"]
@@ -2921,7 +2956,7 @@ def item_span(item):
 
 def attribute_lines(cleaned):
     """独占几行的外层属性（同一行上属性前后没有别的代码）占的行号（从 1 数）：找 SAFETY 注释时隔着它们往上找。
-    弄坏开关 attributes-not-skipped 下一行都不算（改前碰到属性就停）。"""
+    弄坏开关 attributes-not-skipped 下一行都不算（碰到属性就停）。"""
     lines = set()
     if BREAK == "attributes-not-skipped":
         return lines
@@ -2937,7 +2972,7 @@ def attribute_lines(cleaned):
 def statement_start_line(cleaned_lines, unsafe_line):
     """unsafe 所在那条语句的开头一行（从 0 数）：从 unsafe 那一行往上，上一行抹掉注释与字符串之后以 STATEMENT_CONTINUES 结尾的，
     或这一行以 CHAIN_CONTINUES 起头的（方法链接着上面那一段；中间只有注释与空行的照跳过），算同一条语句的续行，一并跳过接着往上。
-    弄坏开关 continuation-lines-ignored 下两种都不跳；chain-lines-not-continued 下不认以 . 起头的那一种（改前）。"""
+    弄坏开关 continuation-lines-ignored 下两种都不跳；chain-lines-not-continued 下不认以 . 起头的那一种。"""
     start = unsafe_line - 1
     while BREAK != "continuation-lines-ignored" and start > 0:
         if STATEMENT_CONTINUES.search(cleaned_lines[start - 1]):
@@ -2981,7 +3016,7 @@ def safety_word_pattern(word):
 
 def registered_row_holding(allowance_rows, spans, path, position):
     """unsafe 关键字（path 文件里的 position 处）落在哪一行登记的项里：几行都罩住它的取范围最小的那一行（方法先于它所在的 impl 块）；
-    不在任何一行里返回 None。弄坏开关 outermost-holder 下取表里靠前的那一行（改前的取法）。"""
+    不在任何一行里返回 None。弄坏开关 outermost-holder 下取表里靠前的那一行。"""
     covering = []
     for row in allowance_rows:
         span = spans.get((row["file"], row["function"]))
@@ -3187,8 +3222,8 @@ def judge_root(label, crate_name, root_path, files, rows, registered):
         if path not in skipped_by_path:
             skipped_by_path[path] = attribute_lines(files[path][1])
         if path not in comment_lines_by_path:
-            # 弄坏开关 safety-read-from-raw-lines 下读原文（改前：字符串里顶格的 // SAFETY: 也当注释）；
-            # lines-split-at-unicode-separators 下按 splitlines() 切（改前：U+2028 这类也算换行，与 line_of 按 \n 数的行号错开）。
+            # 弄坏开关 safety-read-from-raw-lines 下读原文（字符串里顶格的 // SAFETY: 也当注释）；
+            # lines-split-at-unicode-separators 下按 splitlines() 切（U+2028 这类也算换行，与 line_of 按 \n 数的行号错开）。
             text = files[path][0] if BREAK == "safety-read-from-raw-lines" else strip_comments_and_strings(files[path][0], keep_line_comments=True)
             comment_lines_by_path[path] = text.splitlines() if BREAK == "lines-split-at-unicode-separators" else text.split("\n")
         comment = safety_comment(comment_lines_by_path[path], files[path][1].split("\n"), line, skipped_by_path[path])
@@ -3246,7 +3281,7 @@ for name in crate_names:
     crate_count += 1
     bin_roots = bin_roots_of(sorted(os.path.relpath(path, crate_directory) for path in files))
     # 每份文件归哪个根（库根是 None）；include! 与 #[path] 点到的文件归写着它的那份文件的根，一并扫：
-    # 点到的是哪个 crate 都扫的 .rs 不再扫第二遍，点到而不在的跳过（编译过不了的写法归编译器）。弄坏开关 included-files-unscanned 下一份都不追（改前只扫 .rs）。
+    # 点到的是哪个 crate 都扫的 .rs 不再扫第二遍，点到而不在的跳过（编译过不了的写法归编译器）。弄坏开关 included-files-unscanned 下一份都不追（只扫 .rs）。
     owner = {os.path.join(crate_directory, member): root for root, members in bin_roots.items() for member in members}
     pending = [] if BREAK == "included-files-unscanned" else sorted(files)
     while pending:
@@ -3297,7 +3332,7 @@ print(f"  ✓ crates/ 里放开 unsafe 的地方与登记表对上：扫了 {cra
 PY
 }
 
-# ── 格 gpu-exemptions：不走 GPU 的计算与豁免表逐项对上（欠账 C626（走 GPU 的计算类没有登记），判决 m3-crash-enumeration-merge-r3 第三节 J5）
+# ── 格 gpu-exemptions：不走 GPU 的计算与豁免表逐项对上（欠账 C626（走 GPU 的计算类没有登记））
 # 判法只在 scripts/crash/gpu-exemptions-check.py check：豁免表 .claude/gate.d/gpu-exemptions.tsv 每一行四段（截名、代码标记名、为什么上不了 GPU、
 # 用户点头日期），crates/ 下 .rs 里每一处 // gpu-exempt: <截名> 都有表行、每一行都有标记。被判的根里没有 crates/：这一格本次无对象可判。
 # 管不到的：一截计算真在不在 GPU 上跑、标记写没写在真不走 GPU 的那一截上、为什么写得对不对，靠 review 与用户点头。
@@ -3309,7 +3344,7 @@ cell_gpu_exemptions() {
   python3 "$STAGE_REPOSITORY/scripts/crash/gpu-exemptions-check.py" check "$ROOT"
 }
 
-# ── 格 crash-point-replay-segments：崩溃点重放的按段登记成形（判决 m3-crash-enumeration-merge-r3 第三节 J10、M4 第 15 条）
+# ── 格 crash-point-replay-segments：崩溃点重放的按段登记成形
 # 判法只在 scripts/crash/lib_crash_point_replay_items.py segments（两个入口 scripts/crash/crash-point-replay.sh、scripts/crash/crash-amplification.sh 开跑前调同一份）：
 # .claude/gate.d/crash-point-replay-segments.tsv 每一行五段（项名、流名、段号、段写数、段写表摘要），项名在合表 .claude/gate.d/crash-point-replay-items.tsv 里，
 # 流名匹配 ^[A-Za-z][A-Za-z0-9_]*$（引擎按它取这条流的行），段号与段写数是非负整数且段写数大于 0，摘要是 64 位小写十六进制，同一（流名，段号）只一行。
@@ -3341,7 +3376,7 @@ cell_crate_sources_reachable() {
   python3 "$STAGE_REPOSITORY/scripts/gate/crate-sources-reachable.py" "${directories[@]}"
 }
 
-# ── 格 ordinal-names：代码里我们自己的名字不带序号与位置词（用户 2026-10-13 定，records/2026-10-13-复用键与全仓改名.md）
+# ── 格 ordinal-names：代码里我们自己的名字不带序号与位置词（records/2026-10-13-复用键与全仓改名.md）
 # 判据：git 列出的 crates/、scripts/、.claude/gate.d、.claude/hooks 下每一份 .rs、.sh、.py（这几处里的样本也算），下面三样名字按词边界含了
 #   词表 .claude/naming-ordinal-tokens 里的一个词，判违规，逐处列「文件:行 种类 名字（含 词）」：
 #   ① 文件名与它上面每一级目录名（目录名的违规记在那一级目录的路径上，同一个目录只报一次）；
@@ -3875,6 +3910,22 @@ if problems:
     sys.exit(1)
 print(f"  ✓ 被验 crate 里没有自己定义或改名出的 Ghost / Tracked：查了 {len(rows)} 个登记的 crate、{scanned} 份 .rs")
 PY
+}
+
+# ── 格 refused-tests：验证包里拒算的测试函数与拒算登记表逐条对上
+# 判法只在 scripts/gate/refused-test-registry.py check（它文件头写取法、完整性闸与弄坏开关）：照门禁 crash-point-replay 的 crash-case-replay 格同一套起法跑
+# admission.py test-functions-request 与 test-plan（验证包不带特性那一趟、--exclude-registered），逐条拒算行（单元键算不出：闭包读活树、读运行时拼出的仓根路径这类，按条复用时
+# 照跑、不复用、不入库）与登记表 .claude/gate.d/refused-tests.tsv 比：拒算的测试函数不在表里判红；表里登了而已经不拒算的判红（只缩不涨）；理由至少 8 个字，同一个测试函数不登两行。
+# 登记由主 agent 在合入后验证之后二次确认再写，实现员不登记（.claude/main-agent.md「合入后验证之后判新出现的拒算」）。
+# 样本根里放 .refused-tests-listing.tsv（照 test-plan 标准输出的写法造的文件）的，样本根（不是这道阶段所在的仓、也不是 --staged 的临时树）拿它当计划输出，不起 admission.py。
+# 取不到清单（判定库服务连不上、test-plan 没打完、条数对不上）：这一格本次未跑（退 77），不当通过。
+# 管不到的：该不该拒算（要不要二次确认通过）靠主 agent 的二次确认；挂特性的测试文件、产品 GPU 包与别的包里的 #[test] 的拒算不取。
+cell_refused_tests() {
+  local -a sample_plan=()
+  if [[ -f "$ROOT/.refused-tests-listing.tsv" && "$(pwd -P)" != "$STAGE_CELLS_STAGE_REPOSITORY" && -z "${GATE_STAGED_FROM:-}" ]]; then
+    sample_plan=(--plan "$ROOT/.refused-tests-listing.tsv")
+  fi
+  python3 "$STAGE_REPOSITORY/scripts/gate/refused-test-registry.py" check "$ROOT" ${sample_plan[@]+"${sample_plan[@]}"}
 }
 
 stage_cells_run "$ROOT"

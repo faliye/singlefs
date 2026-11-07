@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：comment-history
+want=豁免表 .claude/gate.d/comment-history-exempt.tsv 有 4 处写得不对：
+want=第 3 行：scripts/demo/ok-words.py 与第 2 行重复登记
+want=第 4 行：第二列要以 # 起头、写为什么整份不判（至少 8 个字）
+want=第 5 行：登记的路径不在判法射程里的文件中：scripts/demo/gone.py
+want=第 6 行：有 3 列，要两列：<路径><TAB># <理由>
+want=2 份文件的注释里写了历史，共 2 行
+want=doc-text.sh：1 格里 1 格红（comment-history）

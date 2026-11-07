@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：comment-history
+want=滞后表比 gate 基准 HEAD 那一版涨了 1 处（只缩不涨；路径改了也算新加）：
+want=第 3 行：crates/demo/src/b.rs  基准里没有这一行
+want=→ 怎么办：新写的历史写法当场改成现状
+want=doc-text.sh：1 格里 1 格红（comment-history）

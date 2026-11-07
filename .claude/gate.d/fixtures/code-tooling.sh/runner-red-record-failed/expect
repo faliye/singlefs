@@ -1,0 +1,9 @@
+exit=1
+want=· 样本：上一版（.unit-verdict-sample/prior）的 2 条自证照判绿记进这一版样本的判定库
+want=bash scripts/gate/sample-flaky-b.sh --selftest 没过（退出码 1）
+want=记红没成，交 plan-failure 判、撤同一把键原有的绿
+want=按条复用失灵：判红没记进判定库：bash scripts/gate/sample-flaky-b.sh --selftest（键
+want=同一把键原有的绿已撤掉 1 条，下一趟这几条现判
+want=· 样本档：判红记库之后再算一次计划：复用 1 条、现判 1 条
+want=现判「bash scripts/gate/sample-flaky-b.sh --selftest」：库里没有这一条
+want=runner 表 2 条里 1 条没过

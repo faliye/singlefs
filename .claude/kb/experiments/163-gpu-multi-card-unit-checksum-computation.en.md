@@ -2,7 +2,7 @@
 
 [中文](163-GPU多卡算单元校验和.md) · **English** · [日本語](163-GPUマルチカードによるユニットチェックサム計算.ja.md)
 
-Pre-run registration `e163-preregistration.md`; issue sheet `m2-gpu-multicard-r1-forks.md` (M1, M2, M3). The apparatus is an independent hand-written model that shares no code with `crates/`: `scripts/experiment-apparatus/e163_gpu_multicard_crc32c.rs`, bin `e163-gpu-multicard-crc32c`, hung on the feature `e163-gpu` that is not enabled by default (`wgpu = "=30.0.1"` with only `vulkan`/`wgsl`/`std` enabled, `pollster = "=1.0.1"`); the research-unit-tests cell of the gate checker-tier-research-build-and-replay does not compile it. All 10 unit tests pass (`cargo test --release --features e163-gpu --bin e163-gpu-multicard-crc32c`).
+Pre-run registration `e163-preregistration.md`; issue sheet `m2-gpu-multicard-r1-forks.md` (M1, M2, M3). The apparatus is an independent hand-written model that shares no code with `crates/`: `scripts/experiment-apparatus/e163_gpu_multicard_crc32c.rs`, bin `e163-gpu-multicard-crc32c`, hung on the feature `e163-gpu` that is not enabled by default (`wgpu = "=30.0.1"` with only `vulkan`/`wgsl`/`std` enabled, `pollster = "=1.0.1"`); the research-unit-tests cell of the gate research-build-and-replay does not compile it. All 10 unit tests pass (`cargo test --release --features e163-gpu --bin e163-gpu-multicard-crc32c`).
 
 ### What this section did
 
@@ -116,9 +116,9 @@ Cross-path assertions: the unit test `gpu_matches_cpu_reference_on_anchor_vector
 
 | Decision item | Relation | Review |
 |---|---|---|
-| D13 (Verification Route) settled item 5 | Preparation | 2026-10-11 unaffected: only wording changed (time words, positional references and self-reference), conclusions, numbers and artifacts unchanged |
-| D18 (Information Carried in a Block) settled item 17 | Preparation | 2026-10-11 unaffected: only wording changed (time words, positional references and self-reference), conclusions, numbers and artifacts unchanged |
-| D24 (Offloading Heavy Background Work to GPU) | Not affected | 2026-10-11 unaffected: only wording changed (time words, positional references and self-reference), conclusions, numbers and artifacts unchanged |
+| D13 (Verification Route) settled item 5 | Preparation | 2026-11-05 unaffected: the rename only changes wording; conclusions, numbers, and artifacts unchanged; previously, 2026-10-11 unaffected: only wording changed (time words, positional references and self-reference), conclusions, numbers and artifacts unchanged |
+| D18 (Information Carried in a Block) settled item 17 | Preparation | 2026-11-05 unaffected: the rename only changes wording; conclusions, numbers, and artifacts unchanged; previously, 2026-10-11 unaffected: only wording changed (time words, positional references and self-reference), conclusions, numbers and artifacts unchanged |
+| D24 (Offloading Heavy Background Work to GPU) | Not affected | 2026-11-05 unaffected: the rename only changes wording; conclusions, numbers, and artifacts unchanged; previously, 2026-10-11 unaffected: only wording changed (time words, positional references and self-reference), conclusions, numbers and artifacts unchanged |
 
 ## Historical Versions
 

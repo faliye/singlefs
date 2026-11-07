@@ -1,0 +1,4 @@
+exit=1
+want=tests/live_files.rs::reads_a_file_named_at_run_time 拒算（闭包读运行期拼出的路径（样本）），.claude/gate.d/refused-tests.tsv 里没有这一行
+want=拒算的测试函数与登记表 .claude/gate.d/refused-tests.tsv 有 1 处对不上
+want=refused-tests：红

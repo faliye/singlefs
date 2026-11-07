@@ -8,10 +8,10 @@
 **来源固定点与复核机制**：承重引用的源码与文献固定在本机
 `~/code/fs-refs/`——`linux-6.17/fs/bcachefs/`（kernel.org 的 `linux-6.17.tar.xz`，260 个文件）、
 `zfs/`（OpenZFS master，`git log -1` = `58d73c9`，2026-08-27）、
-`docs/` 下 7 份文献（RFC 8439、NIST SP 800-38B / 800-38D、DJB *Cryptography in NaCl*、
+`docs/` 下 7 份 PDF（NIST SP 800-38B / 800-38D、DJB *Cryptography in NaCl*、
 OSTEP 第 45 章、BetrFS FAST 2017 / 2018、NetApp FAST'20；取回方式与 sha256 见
-`scripts/kb/fetch-refs.sh`，抽取器 `scripts/kb/pdf-text.py`）。
-**89 条**承重引用做成了可重跑的逐字断言（`scripts/kb/verify-citations.sh`，这个数由它自己末行报出来：`bash scripts/kb/verify-citations.sh` 的「结果：N 条命中」，别手数——源码里 `^(ck|ckn|ckdoc|ckdocn)` 的行还含 11 条只在 `--selftest` 里跑的合成断言）；其中 38 条核的是本机内核树、不是固定点树（C44（引用核到的不是固定点树）），
+`scripts/kb/fetch-refs.sh`，抽取器 `scripts/kb/pdf-text.py`），与 `docs/rfc8439.txt`（RFC 8439，不归 fetch-refs.sh，取得方式与校验边界见 `scripts/kb/verify-citations.sh` 的树登记表）。
+**89 条**承重引用做成了可重跑的逐字断言（`scripts/kb/verify-citations.sh`，这个数由它自己末行报出来：`bash scripts/kb/verify-citations.sh` 的「结果：N 条命中」，别手数——源码里另有 22 条只在 `--selftest` 里跑的合成断言，在 `selftest_assertions` 的几张表里）；其中 38 条核的是本机内核树、不是固定点树（C44（引用核到的不是固定点树）），
 挂在门禁阶段「外部引用还核得动吗」（`.claude/gate.d/doc-registries.sh` 的 citations 格）——**源码树不在也判红**，
 「跳过」正是让上一批文献无声蒸发的那个行为。
 ⚠️ **ZFS On-Disk Specification 没收**：它用 CID 双字节字体，`pdf-text.py` 抽出乱码 ⇒

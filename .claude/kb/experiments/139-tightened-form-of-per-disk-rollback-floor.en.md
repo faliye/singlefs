@@ -1,4 +1,4 @@
-## E139 Tightened Form of Per-Disk Rollback Floor — Run (2026-09-12); Rerun 1 Run (2026-10-04, Reclamation Threshold Changed to One-Ring Window); Rerun 2 Run (2026-10-05, Candidate Floor Adding System Configuration F, Reclamation Threshold and Other Five Locations Returning to Whole Ring)
+## E139 Tightened Form of Per-Disk Rollback Floor — Run (2026-09-12); Rerun 1 Run (2026-10-04, Reclamation Threshold Changed to One-Ring Window); Rerun 2 Run (2026-10-05, Candidate Floor Adding System Configuration F, Reclamation Threshold and Other Five Locations Returning to Whole Ring); Rerun 3 Run (2026-10-29, Reclamation Threshold Changed to How `crates/` Writes It Today)
 
 [中文](139-按盘回退下界的收严形态.md) · **English** · [日本語](139-ディスク別ロールバック下限の厳格形態.ja.md)
 
@@ -25,7 +25,7 @@ cd scripts/experiment-apparatus && cargo test --release --bin e139_tightened_flo
 ```
 Code: `scripts/experiment-apparatus/e139_tightened_floor.rs` (adapted from source of E138 (Per-Disk Rollback Floor and Space Requirements for Pushing Empty)),
 raw output: `e139-tightened-floor-2026-09-12.out` (second run, 901 lines, final line `emitted=901`; native release ~67 seconds).
-`replay.sh` registration row points to Rerun 2 artifact `e139-tightened-floor-2026-10-05.out` (6271 lines, exit code 0): deleting rows starting with `name=f_`, `name=verdict_f_` and 2230 lines following `name=done` matches Rerun 1 artifact `e139-tightened-floor-2026-10-04.out` (2231 lines, native release ~190 seconds, preserved without deletion) line-by-line; Rerun 1 artifact deleting new arm rows (starting with `name=w_` and `name=verdict_window`) and 900 lines following `name=done` matches that report verbatim; old arm rows transcribed verbatim in "Verdict" and "Cost" sections can all be found in all three artifacts.
+`replay.sh` apparatus row points to Rerun 3 artifact `e139-tightened-floor-2026-10-29.out` (8250 lines); another row, `driver_e139`, compares today's apparatus with the rows newly added in Rerun 3 deleted against the Rerun 2 artifact (see the "Rerun 3" section); Rerun 2 artifact `e139-tightened-floor-2026-10-05.out` (6271 lines, exit code 0): deleting rows starting with `name=f_`, `name=verdict_f_` and 2230 lines following `name=done` matches Rerun 1 artifact `e139-tightened-floor-2026-10-04.out` (2231 lines, native release ~190 seconds, preserved without deletion) line-by-line; Rerun 1 artifact deleting new arm rows (starting with `name=w_` and `name=verdict_window`) and 900 lines following `name=done` matches that report verbatim; old arm rows transcribed verbatim in "Verdict" and "Cost" sections can all be found in all three artifacts.
 
 ### Rerun 1 (Reclamation Threshold Changed to One-Ring Window)
 
@@ -521,9 +521,112 @@ Mutation table `scripts/mutation/tables/e139_tightened_floor.tsv` has 42 rows (s
 7. The reservation sweep family was not added for the new arms, marked "unrun after sufficient for judgment"; unit test K15 pinning "RGall_Q with CF disabled is field-by-field equal to original G2S" is an internal equivalence archive within the apparatus, not a differential against `crates/`.
 8. Readings P and Q did not diverge on this artifact (see the row "RGall and RGall_Q (Readings P and Q)" in the "Readings" table); this does not indicate that the unwritten cell in clauses can remain unwritten.
 
+### Rerun 3 (Reclamation Threshold Changed to How `crates/` Writes It Today)
+
+Rerun registration `e139-r3-prereg.md` (written before the apparatus changes; its "Revisions" section is left empty, the section 6 criteria and section 10 failure clauses untouched). Run on 2026-10-29, artifact `e139-tightened-floor-2026-10-29.out` (8250 lines, last line `E7RESULT name=done emitted=8250`, `grep -c '^E7RESULT'` also 8250; the first start exited 251 from the memory wrapper without running a line, that empty output does not count, the restarted run finished); apparatus `scripts/experiment-apparatus/e139_tightened_floor.rs` changed in place (6341 lines, the arms and rows of Rerun 2 and earlier untouched).
+It adds CG, three changes following the reclamation threshold of today's `crates/singlefs-core/`: CG-F takes F_effective after recovery as the maximum of the F carried by the newest valid root on each surviving disk, the F carried by abandoned roots and the system configuration F; the F term takes min(F_effective, m) on the spot and holds the rest until a root of this instance has landed on every surviving disk; CG-P pins a slot that fails self-test at the smallest txg in [0, min(3S, first_txg)) that falls on it; CG-R does not recompute F or add pins at an administrator rollback.
+Tested arms `RGall_core_gate` (RGall plus CG) and `RGall_Q_core_gate`, each with a shortened positive control `RGall_core_gate_short`, `RGall_Q_core_gate_short`, enter every cell the RGall family enters; two reservation-sweep families (CG on and off) and a line-by-line comparison are added.
+Question list `m3-close-b19-e139-forks.md`, one row: under today's threshold, A arm G2S is still the choice under the registered criteria / B switch to another arm; on any class-A row, a judgement bit of `RGall_core_gate` going from 0 to 1 against the same-key `RGall_ring_all` row means B.
+
+Invalidation clauses matched first: V1 (the binary built from the source before the change, sha256 `6a548796727764ea51d1d84ead35d73701f4fcd394cfa8d6345c474299c97352`, outputs sha256 `f4c079adc75abcd8c44765c160088c0a2650746a05619af8c07ba56662575135`, same as the Rerun 2 artifact) passed; V2 judged on the entire artifact (working directory the repository root):
+
+```bash
+grep -v -E 'name=(core_gate_|verdict_core_gate_|done )' research/results/e139-tightened-floor-2026-10-29.out > new-without-core-gate.out
+git show 841b3beabb98:research/results/e139-tightened-floor-2026-10-05.out | grep -v 'name=done ' > second-without-done.out
+diff new-without-core-gate.out second-without-done.out | grep -c '^[<>]'
+```
+
+```text
+0
+```
+
+After deleting the rows newly added in Rerun 3 and `name=done`, the new artifact matches the Rerun 2 artifact line by line (class-B and class-C rows ran unchanged under the new threshold); after appending `name=done` with the count of the remaining rows, the whole file is byte-for-byte the Rerun 2 artifact (sha256 the same as in V1), and `driver_e139` in `replay.sh` replays exactly this comparison. V3 (70 `#[test]`, 69 pass, 1 pre-existing `#[ignore]` rehearsal) passed; V4 not triggered (the restarted run exited 0); V5, V6, V7 not triggered (each in the readings table).
+
+**Readings** (read row by row per registration section 6, each row reporting its own; whether these numbers can overturn or establish D16 (Publish Semantics) settled item 1 is not judged here, that is inference and goes through the three-way process):
+
+| Section 6 | Quantity | Reading | Pre-run clause |
+|---|---|---|---|
+| 1 | Pre-change reproduction | sha256 equal | Passed, V1 not triggered |
+| 2 | Old-row regression | 0 rows differ | Passed, V2 not triggered |
+| 3 | Unit tests | 70 `#[test]`, 69 pass, 1 ignored; the newly added Kc1, Kcg1–Kcg6, Kcg2n, Kcg5f, K-pc, K-eq and the verdict self-test `flip_verdict_turns_on_a_single_pair` all pass | Passed, V3 and F6 not triggered |
+| 4 | CG reached | Over all `core_gate_` rows, of 2791302 samples d ≠ 0 in 12628 (d > 0 12512, peak 45; d < 0 116, minimum −7), dF ≠ 0 in 14080, pin effective in 480, held portion waiting in 0. By class: `activation_crash_no_loss` d > 0 10976, dF 10976; `disk_stuck_h3` (disk 0 stuck) d > 0 1536, dF 3104; `torn_newest` d < 0 116, pin effective 480; the other 12 classes are 0 in all four. Of the 175 result rows of `RGall_core_gate`, 17 are reached (`activation_crash_no_loss` 12, `torn_newest` 3, `disk_stuck_h3` 2) | F1, F2 not triggered; held portion waiting 0: the m < F_effective shape (unit test Kcg4) is not reached in the artifact |
+| 5 | Discriminative power | 611 pairs for each tested arm, 110 pairs each with some field different (220 in total), all in the `trajectory` and `attribution` row classes (fields such as blocks held after recovery and fake candidates under the old floor); 0 pairs differ among the result rows that carry the five judgement counts | Passed (≥ 1 pair), F1 not triggered |
+| 6 | Line-by-line comparison and flips | `RGall_core_gate` against `RGall_ring_all`, 611 pairs: 0 pairs with any of the five counts changed, 0 pairs with a judgement bit 0 → 1, 0 pairs 1 → 0, 8 pairs with both sides 1 | 0 flips; F3, F9 triggered (row 7); F4 covers the `activation_faults` class (row 10) |
+| 7 | Absolute count of red | 8 rows of `RGall_core_gate` with a bit at 1, all on the write-after-delete-failed bit (`write_after_delete_failed` > 0): `near_full` S = 4, 16 × two cost pairs, 4 rows (`write_after_delete_failed` 48 / 72), `cost_growth` grown to c_max at S = 4, 16 × two cost pairs, 4 rows (16 / 24); same values on the same-key `RGall_ring_all` rows; 0 rows with any of the four bits fake candidates, unrecoverable, false ENOSPC or minimum retention at 1 | F3 triggered: 0 flips while 8 rows are red, and these 8 rows were already red in the Rerun 2 artifact |
+| 8 | Flips under reading Q | `RGall_Q_core_gate` against `RGall_Q_ring_all`, 611 pairs: 0 flips, 0 reverse, 8 pairs with both sides 1 (the same rows as reading P) | F5 not triggered |
+| 9 | Reservation sweep | 60 rows (two arms × two cost pairs × 15 steps), 0 rows differ | Passed, V7 not triggered |
+| 10 | Positive control | The two `_short` arms: fake candidates > 0 in all 4 `steady` rows and all 4 `torn_newest` rows; in `activation_faults` 12 of 24 rows are 0, all at S = 16 (the 12 rows at S = 4 are 12–1240) | F4 triggered, covering only `activation_faults`: "no flip" in that class is not adopted; `steady` is not hit, so no "cannot judge" |
+| 11 | Incidental: cost and trajectory | Fields as in Rerun 2 (`core_gate_trajectory`, `core_gate_attribution`); what differs from the old side are the blocks held after recovery (`pinned_after_recovery_*`, e.g. in the `activation_faults` S = 4 row with 1 failure the minimum goes 52 → 13) and the fake candidates under the old floor `fakes_with_the_old_floor` (8 `activation_crash_no_loss` rows 0 → 2–661, while fake candidates under CF stay 0, the shape of unit test K-pc in the artifact) | Report numbers only |
+| 12 | Incidental: bound and stalls | 0 result-row pairs with any field different: `max_publications` and `stalls` equal to the old side row by row | Report numbers only |
+| 13 | Incidental: the opposing arm `G2R_core_gate` | Not run after judgement was reached: row 6 has 0 flips, and the registration runs it only when B is judged | — |
+
+Verdict rows transcribed verbatim from `e139-tightened-floor-2026-10-29.out` (`grep -n 'name=verdict' research/results/e139-tightened-floor-2026-10-29.out` gives 416 rows; the 297 already in Rerun 2 were compared together with V2 and are identical, not copied again; `verdict_core_gate_*` has 119 rows, of which the 108 `discrimination_class` rows split the row 5 numbers by class and are not copied again):
+
+```text
+E7RESULT name=verdict_core_gate_reserve_sweep rows_compared=60 rows_differing=0
+E7RESULT name=verdict_core_gate_positive_control class=activation_faults rows=24 rows_with_zero_fake_candidates=12
+E7RESULT name=verdict_core_gate_positive_control class=steady rows=4 rows_with_zero_fake_candidates=0
+E7RESULT name=verdict_core_gate_positive_control class=torn_newest rows=4 rows_with_zero_fake_candidates=0
+E7RESULT name=verdict_core_gate_reach rows=382 gate_difference_samples=2791302 gate_difference_positive=12512 gate_difference_max=45 gate_difference_max_after_supply=45 gate_difference_min=-7 gate_difference_last_max=44 gate_difference_nonzero=12628 gate_difference_negative=116 floor_term_difference_nonzero=14080 pin_effective=480 held_waiting=0
+E7RESULT name=verdict_core_gate_flips old_arm=RGall_Q_ring_all pairs_compared=611 pairs_with_a_differing_field=110 pairs_with_counts_changed=0 flipped_bits=0 pairs_with_a_flip=0 reverse_bits=0 pairs_both_red=8 new_red_rows_c3f=0 new_red_rows_c3u=0 new_red_rows_c4=0 new_red_rows_c5=8 new_red_rows_c7=0
+E7RESULT name=verdict_core_gate_flips old_arm=RGall_Q_short pairs_compared=6 pairs_with_a_differing_field=0 pairs_with_counts_changed=0 flipped_bits=0 pairs_with_a_flip=0 reverse_bits=0 pairs_both_red=2 new_red_rows_c3f=2 new_red_rows_c3u=0 new_red_rows_c4=0 new_red_rows_c5=0 new_red_rows_c7=0
+E7RESULT name=verdict_core_gate_flips old_arm=RGall_ring_all pairs_compared=611 pairs_with_a_differing_field=110 pairs_with_counts_changed=0 flipped_bits=0 pairs_with_a_flip=0 reverse_bits=0 pairs_both_red=8 new_red_rows_c3f=0 new_red_rows_c3u=0 new_red_rows_c4=0 new_red_rows_c5=8 new_red_rows_c7=0
+E7RESULT name=verdict_core_gate_flips old_arm=RGall_short pairs_compared=6 pairs_with_a_differing_field=0 pairs_with_counts_changed=0 flipped_bits=0 pairs_with_a_flip=0 reverse_bits=0 pairs_both_red=2 new_red_rows_c3f=2 new_red_rows_c3u=0 new_red_rows_c4=0 new_red_rows_c5=0 new_red_rows_c7=0
+E7RESULT name=verdict_core_gate_pairing old_lines_without_partner=0 core_gate_lines_without_partner=0 duplicate_keys=0 pairs_differing_in_worlds_without_recovery=0
+E7RESULT name=verdict_core_gate_clauses tested_arm_pairs=611 tested_arm_flipped_bits=0 tested_arm_pairs_with_a_flip=0 zero_counting_reading_pairs=611 zero_counting_reading_pairs_with_a_flip=0 discrimination_pairs_differing=220 gate_difference_nonzero_samples=12628 floor_term_difference_nonzero_samples=14080 pin_effective_samples=480 tested_arm_red_rows=8 steady_control_rows_with_zero_fakes=0 other_control_rows_with_zero_fakes=12 tested_arm_pairs_both_red=8 old_lines_without_partner=0 core_gate_lines_without_partner=0 duplicate_keys=0 reserve_sweep_rows_differing=0 pairs_differing_in_worlds_without_recovery=0
+```
+
+`pairs_both_red=2` and `new_red_rows_c3f=2` on the `RGall_short` and `RGall_Q_short` rows are the fake candidates a positive control should have (`steady` S = 4, 16). Where the 8 red rows come from (working directory `research`):
+
+```bash
+grep -E '^E7RESULT name=(f|core_gate)_(near_full|cost_growth) arm=RGall_(ring_all|core_gate) ' results/e139-tightened-floor-2026-10-29.out | grep -v 'within_declared=0' | awk '{w=0;k="";for(i=2;i<=NF;i++){if($i ~ /^(name|arm|s|c0|c_max|grown_to)=/)k=k" "$i; if($i ~ /^write_after_delete_failed=/)w=$i}; print k, w}'
+```
+
+```text
+ name=f_near_full arm=RGall_ring_all s=1 c0=1 c_max=5 write_after_delete_failed=0
+ name=f_near_full arm=RGall_ring_all s=1 c0=5 c_max=10 write_after_delete_failed=0
+ name=f_near_full arm=RGall_ring_all s=4 c0=1 c_max=5 write_after_delete_failed=48
+ name=f_near_full arm=RGall_ring_all s=4 c0=5 c_max=10 write_after_delete_failed=72
+ name=f_near_full arm=RGall_ring_all s=16 c0=1 c_max=5 write_after_delete_failed=48
+ name=f_near_full arm=RGall_ring_all s=16 c0=5 c_max=10 write_after_delete_failed=72
+ name=f_cost_growth arm=RGall_ring_all s=4 c0=1 c_max=5 grown_to=5 write_after_delete_failed=16
+ name=f_cost_growth arm=RGall_ring_all s=4 c0=5 c_max=10 grown_to=10 write_after_delete_failed=24
+ name=f_cost_growth arm=RGall_ring_all s=16 c0=1 c_max=5 grown_to=5 write_after_delete_failed=16
+ name=f_cost_growth arm=RGall_ring_all s=16 c0=5 c_max=10 grown_to=10 write_after_delete_failed=24
+ name=core_gate_near_full arm=RGall_core_gate s=1 c0=1 c_max=5 write_after_delete_failed=0
+ name=core_gate_near_full arm=RGall_core_gate s=1 c0=5 c_max=10 write_after_delete_failed=0
+ name=core_gate_near_full arm=RGall_core_gate s=4 c0=1 c_max=5 write_after_delete_failed=48
+ name=core_gate_near_full arm=RGall_core_gate s=4 c0=5 c_max=10 write_after_delete_failed=72
+ name=core_gate_near_full arm=RGall_core_gate s=16 c0=1 c_max=5 write_after_delete_failed=48
+ name=core_gate_near_full arm=RGall_core_gate s=16 c0=5 c_max=10 write_after_delete_failed=72
+ name=core_gate_cost_growth arm=RGall_core_gate s=4 c0=1 c_max=5 grown_to=5 write_after_delete_failed=16
+ name=core_gate_cost_growth arm=RGall_core_gate s=4 c0=5 c_max=10 grown_to=10 write_after_delete_failed=24
+ name=core_gate_cost_growth arm=RGall_core_gate s=16 c0=1 c_max=5 grown_to=5 write_after_delete_failed=16
+ name=core_gate_cost_growth arm=RGall_core_gate s=16 c0=5 c_max=10 grown_to=10 write_after_delete_failed=24
+```
+
+These 8 rows have the same mechanism as the G2S "write after delete failed" cells of original registration criterion 5 (blocks deleted this time come back only after 3 more state-changing windows; the two `near_full` S = 16 cells, 48 / 72, equal the two G2S rows in the "Costs" section), and have nothing to do with the threshold.
+
+**Failure and invalidation clauses at a glance** (registration sections 10 and 11, each judged on the artifact): F1 not triggered (d ≠ 0 in 12628 samples, discriminative power 220 pairs); F2 not triggered (dF ≠ 0 14080, pin effective 480); F3 triggered (0 flips, 8 red rows); F4 triggered, covering only `activation_faults` (12 positive-control rows at S = 16 are 0); F5 not triggered; F6 none (unit tests Kc1, Kcg2 pass); F7 not triggered (bits at 1 occur only on the 8 `near_full` and `cost_growth` rows, at the four geometry points H1, H2, H3 and fill all five bits are 0 on both sides, 0 places differ from the original sampling point; the S row only judges when a flip happens at one S, and the artifact has no flips; the write-after-delete-failed bit of `near_full` is 0 at S = 1 and 1 at S = 4, 16, the same on old and new sides); F8 not triggered (no flips); F9 triggered (8 pairs with both sides 1, not counted as flips, same as F3); V1–V7 not triggered.
+
+**Judgement of the question-list row**: judgement reached, no flip — `RGall_core_gate` flips 0 of 611 class-A pairs, so not B; per F3 recorded as "no flip, the premise of A has a separate gap" (the 8 red rows are write-after-delete failures the G2S family already had in the Rerun 2 artifact); "no flip" in the `activation_faults` class is not adopted per F4. The second segment `G2R_core_gate` is marked "not run after judgement was reached".
+
+**Unit tests and mutations**: 70 `#[test]` (Rerun 3 added 14, `core_gate_tests::`), 69 pass, 1 `#[ignore]`. Mutation table `scripts/mutation/tables/e139_tightened_floor.tsv` has 53 rows (41 plus MG1–MG12), `mutate.sh` ran the whole table in one go: caught 53, invalid 0, not red 0; the count line has memory ceiling 0, timeout 0, could not queue 0, squeezed out by the total cap 0, out of video memory 0, anchor broken 0; it ends with "restored, baseline still all green". The conclusion only says "all 53 mutations caught". The comparison verdict carries one mutation, MG11 (the flip verdict also counting 1 → 0 as a flip); row assembly and the other verdict rows carry no mutations, and rely on V2, V5 and a separate count written by the runner that pairs by order of appearance (611 pairs, 110 differing, 0 flips, 8 with both sides 1, the same as the verdict rows).
+
+**Against D16 (Publish Semantics) settled item 1** (comparison only, the decision body is not changed; whether and how to change it is up to the main agent): the settlement sentence "the effective value after recovery is still taken the apparatus's old way … this sentence still does not match what runs in the apparatus word for word, the trade-off is owed in C660 (Sentence in per-disk rollback floor settlement does not match apparatus)" — this time the CG arm's reclamation threshold follows today's `crates/` (difference ③ is removed on the `core_gate_` rows, and torn slots are additionally pinned by CG-P), and none of the 611 class-A pairs flips; whether that sentence changes and how C660 closes is up to the main agent.
+
+**What Rerun 3 cannot answer**:
+
+1. Counting model (as in Reruns 1 and 2); the differences newly added in registration section 11 stand: ⑭ (the apparatus loses a disk, `crates/` does not mount with one disk missing), ⑮ (the apparatus has no warm-up), ⑯ (the apparatus's administrator rollback opens a new instance); the unreadable, read-back-all-zero and reread branches of `crates/` are not reachable in the apparatus.
+2. CG is reached on only 17 of 175 result rows; "no flip" in the other classes means CG took no value at allocation (by the registered d, dF and pin), not "changed and still no flip". In the trajectory rows of `activation_faults` and `skip_then_raise` the blocks held after recovery differ between old and new while d is 0; the cause was not separately checked.
+3. The held portion never waited in the artifact (`held_waiting=0`); CG-F's "min(F_effective, m) on the spot" was measured only in unit test Kcg4.
+4. The `activation_faults` positive control cannot see a threshold set too high at S = 16 (F4); "no flip" in that class is not adopted.
+5. The 8 red rows have nothing to do with the threshold (F3); the literal of A, "still the choice under the registered criteria", already fails on those write-after-delete-failed cells under original registration criterion 5, and goes to the main agent.
+6. `G2R_core_gate` was not run after judgement was reached, so the "switch to another arm" side has no reading this time.
+
 ### This Is a Counting Model, Not an Implementation
 
-No I/O, random source is hardcoded seed ⇒ running N times is necessarily byte-for-byte identical. Evidence strength derives from **55 unit tests + 42 mutations all caught** (subsequently deduplicated by deleting M16 which was completely identical to M11, current table has 41 rows) (`scripts/mutation/tables/e139_tightened_floor.tsv`; at first run 21 and 16, Rerun 1 added 15 and 10, Rerun 2 added 19 and 16, see "Rerun 1" and "Rerun 2");
+No I/O, random source is hardcoded seed ⇒ running N times is necessarily byte-for-byte identical. Evidence strength derives from **70 unit tests (69 run, 1 `#[ignore]` rehearsal) + 53 mutations all caught** (`scripts/mutation/tables/e139_tightened_floor.tsv`; at first run 21 and 16, Rerun 1 added 15 and 10, Rerun 2 added 19 and 16 (subsequently deduplicated by deleting M16 which was completely identical to M11), Rerun 3 added 14 and 12, see "Rerun 1", "Rerun 2" and "Rerun 3");
 mutation M13 (upper bound under state-count reading counting empty roots too) did not turn red on any unit test in Round 1, classified per `.claude/rules/mutation-sampling.md` as sampling point insensitive — original unit tests sampled only on rings without push-empty, where both upper bounds had identical values;
 caught after adding unit test `forced_pressure_keeps_four_states_for_states_arm` that raises once more after push-empty roots enter ring. Version 1 of M14 caused tested code not to terminate (region numbers never matching), caught after changing to "failure strikes region 2".
 Two cross-apparatus gates (locked block count of E123 (Trade-off Costs Between K and Rollback Depth), N − K of E92 (Worst-Case Block Reuse Delay Requirements)), sharing identical values with E138 (Per-Disk Rollback Floor and Space Requirements for Pushing Empty).
@@ -637,11 +740,16 @@ D16 (Publish Semantics) settled item 1 Round 4 three-way argument (`research/pro
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D16 (Publish Semantics) settled item 1 | Supports | 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
-| D3 (Space Allocation) settled item 9 | Supports | 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
-| D23 (Journal Role & Format) | Does not affect | 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D16 (Publish Semantics) settled item 1 | Supports | 2026-10-30 changed: Rerun 3 is read as no flip (0 of 611 class-A pairs flip), and the settlement sentence "the effective value after recovery is still taken the apparatus's old way …" drops the owed-check wording (C660 (Sentence in per-disk rollback floor settlement does not match apparatus)) and now says the CG arm follows how `crates/` takes it today; prior review 2026-10-29 unaffected: under today's `crates/` reclamation threshold Rerun 3 flips 0 of 611 class-A pairs, the arm the settlement takes is unchanged; the sentence in the settlement "the effective value after recovery is still taken the apparatus's old way" now stands differently to the apparatus, whether to change it is up to the main agent; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D3 (Space Allocation) settled item 9 | Supports | 2026-10-29 unaffected: the 8 rows of write-after-delete failure in Rerun 3 were already in the Rerun 2 artifact and keep the same values under the new threshold; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D23 (Journal Role & Format) | Does not affect | 2026-10-29 unaffected: Rerun 3 only swaps the reclamation threshold and does not touch the journal; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
 
 ## Historical Versions
+
+### 2026-10-29
+- Rerun 3 (reclamation threshold changed to how `crates/` writes it today): apparatus added the three CG changes, two tested arms and two positive-control arms, two reservation-sweep families and the line-by-line comparison, 14 unit tests, 12 mutations; new artifact `e139-tightened-floor-2026-10-29.out`, the `replay.sh` apparatus row now points to it, plus one `driver_e139` row comparing against the Rerun 2 artifact; body gained a "Rerun 3" section, the title, the replay paragraph and the unit test and mutation counts in "This Is a Counting Model" changed to 70 and 53; three rows of "Affected Decisions" reviewed.
+  - **Basis**: rerun registration `e139-r3-prereg.md`; question list `m3-close-b19-e139-forks.md`; artifact `e139-tightened-floor-2026-10-29.out`; debt C660 (Sentence in per-disk rollback floor settlement does not match apparatus).
+  - **Before**: `git show 59ce5a865:.claude/kb/experiments/139-按盘回退下界的收严形态.md` (no "Rerun 3" section, 55 unit tests, 41 mutations, `replay.sh` points to `e139-tightened-floor-2026-10-05.out`).
 
 ### 2026-10-05
 - Rerun 2 (candidate floor adding system configuration F, reclamation threshold and five other locations returning to whole ring): apparatus added clause-form candidate floor CF, four `Arm::WholeRing` arms (RGall, RGall_Q, two `_short`), `disk_stuck` world and sampling of three cost items, 19 unit tests, 16 mutations; new artifact `e139-tightened-floor-2026-10-05.out`, `replay.sh` registration row redirected to it; body added section "Rerun 2", unit tests and mutation counts in "This Is a Counting Model" updated to 55 and 42; in Rerun 1 section, rollback candidate set row and item 3 of "What Rerun 1 Cannot Answer" changed from "apparatus candidate set is no larger than clause's, fake candidates leaning low" to "no smaller, leaning high" with counts (direction originally inverted); identical updates made in direction summary; reviews updated in "Affected Decisions" and added D23 (Journal Role & Format) row.

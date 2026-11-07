@@ -34,6 +34,11 @@
 D13（验证路线） 已定项 9 三层表的三档：层 0 冒烟 → 冒烟层，层 1 常规 → 常规层，层 2 全量 → 大负载层；散落的「层 0」仍按 2026-10-12 那一节换成崩溃点重放。英文标识符（layer0_enumeration、checker-tier-layer0-replay、record 这类）这一轮不动。
 英文标识符改名那一批（`records/2026-10-13-复用键与全仓改名.md#3`，依赖表第 8 行）把上一句说不动的英文标识符也改了，用户原话「函数名不得以 layer0 或者类似的名字命名，必须要能看出功能和作用」：crates、脚本与门禁、文档三路改完，旧名逐个登在下面表里（裸词 `layer0`、`LAYER0`、`Layer0` 不登；实验装置、留存产物与原样引文里的照原样留，按 `.claude/term-rename-exempt` 登记）。这一批的行都写成正则：名字照字面起头，前后不紧挨 ASCII 字母、数字与下划线（名字带连字符的，连字符也算词里的字），判法同词边界，中文字紧挨着也打。不写成 `\b` 起头，是因为 `\b` 起头的行让全仓扫一遍慢得多：E178（叶容器与记录死亡的计数） 产物 `e178-leaf-and-record-death-counts-segment-two.out` 的前 2 000 000 字上，原有 56 行 0.19 秒，加这 234 行照字面起头 0.71 秒，写成词边界 2.96 秒。
 
+## 轻重快慢分档 → 一个门禁；两个验证包并成一个（2026-11-05 起）
+
+用户定（原话在 `records/2026-11-05-删轻型并入重型.md` 第 108 行）：门禁只有一个，分不指定范围与指定范围两种跑法，不再分轻重快慢。跟着改名的是判定种类（`<阶段文件名>:quick-tier-test-functions` → `<阶段文件名>:test-functions`，`scripts/gate/admission.py` 的 `quick-tier-request` → `test-functions-request`）、甲二展开的函数名（照枚举成员 `InPlaceSubsetsWithCopyOnWriteNoneOrAll` 取名）与三份钩子（连同各自的弄坏开关变量），旧名逐个登在下面表里。
+用户又定（原话在同一记录第 286、287、307 行）：两个验证代码包并成一个，包名 `singlefs-verification`，目录 `crates/singlefs-verification`；说包就写「验证包」，说提交时那六道门禁就写「提交时的六道门禁」或点名门禁，合入后验证里的那一步写「验证包那一步」。旧包叫法「harness 档」「checker 档」登在下面表里；两个旧包目录与门禁文件改名是路径搬迁，照 `.claude/rules/path-moves.md` 登记，不进这张表。
+
 <!-- term-renames:table -->
 一行一对，`scripts/kb/sweep-term.py` 按这张表换、按这张表查；**加一行就自动受门禁管**。
 「匹配」写 `整串`、`词边界` 或 `正则`：`词边界` 用在缩写上，免得打中别的词里的那几个字母；同一个串在别处是另一个量时写 `正则`，「旧」一列写一条 Python 正则，只打这一个概念的写法（例 `(?<![每第内外里叶二])(?<![0-9] )层 1(?![0-9])` 打「层 1 常规」，不打「每层 134」「第 1 层 2 个」「外层 16.33 ms」），竖线写成 `\|`，不用捕获组，「新」一列照字面换上，写法的全部限制在 `scripts/kb/sweep-term.py` 文件头。长的写在前面，免得短的先把长的吃掉一半。
@@ -97,7 +102,7 @@ D13（验证路线） 已定项 9 三层表的三档：层 0 冒烟 → 冒烟�
 | 层 2 全量 | 大负载层 | 整串 | 同表第三档的标签 |
 | `(?<![第每各叶外内深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?1(?![0-9.])(?! ?常规)` | 常规层 | 正则 | 中文术语：三层表第二档单独写时；不打「第 1 层 1」「每层 1」这类树层，带「常规」的由上一行换 |
 | `(?<![第每各叶外内深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?2(?![0-9.])(?! ?全量)` | 大负载层 | 正则 | 中文术语：三层表第三档单独写时；不打树层，带「全量」的由上一行换 |
-| `checker-tier-layer0-replay(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]checker-tier-layer0-replay)` | checker-tier-crash-point-replay | 正则 | 门禁名、阶段文件名与样本目录名 |
+| `checker-tier-layer0-replay(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]checker-tier-layer0-replay)` | crash-point-replay | 正则 | 门禁名、阶段文件名与样本目录名 |
 | `layer0-shard-configuration-check(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-shard-configuration-check)` | crash-point-replay-shard-configuration-check | 正则 | 两台分片配置判法的脚本名 |
 | `layer0-shard-run(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-shard-run)` | crash-point-replay-shard-run | 正则 | 崩溃点重放双机分片包装的脚本名（已删的 `layer0-shard-run-selftest.sh` 不打，它没有新名） |
 | `layer0-sample-tools(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-sample-tools)` | crash-point-replay-sample-tools | 正则 | 门禁样本根里放假工具的目录名（`.layer0-sample-tools`） |
@@ -106,7 +111,7 @@ D13（验证路线） 已定项 9 三层表的三档：层 0 冒烟 → 冒烟�
 | src/layer0_library.rs | src/crash_library.rs | 整串 | `Cargo.toml` 注释里引的判定库源文件 |
 | `layer0_enumeration(?![A-Za-z0-9_])(?<![A-Za-z0-9_]layer0_enumeration)` | crash_state_enumeration | 正则 | 模块名、`.rs` 文件名、判定库类名与清单种类（`CrashLibraryClass::name`、`MANIFEST_KIND`） |
 | `layer0_progress(?![A-Za-z0-9_])(?<![A-Za-z0-9_]layer0_progress)` | crash_point_replay_progress | 正则 | 模块名与 `.rs` 文件名 |
-| `layer0-enumeration-library(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-enumeration-library)` | crash-state-verdicts | 正则 | 判定库里崩溃枚举用例那一类的子目录名；几类测试合成一份库之后，那一份的目录名是 `crash-state-verdicts`（`crates/singlefs-checker-tier/src/crash_library.rs` 的 `CRASH_LIBRARY_DIRECTORY_NAME`） |
+| `layer0-enumeration-library(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-enumeration-library)` | crash-state-verdicts | 正则 | 判定库里崩溃枚举用例那一类的旧子目录名；几类测试合成一份本地库之后，那一份的目录名是 `crash-state-verdicts`；2026-11-02 崩溃判定库改成只走 prune-server，代码里不再拼本地库目录，常量 `CRASH_LIBRARY_DIRECTORY_NAME` 删了（`crates/singlefs-verification/src/crash_library.rs` 文件头） |
 | `layer0-replay(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-replay)` | crash-case-replay | 正则 | 崩溃点重放门禁的格名（门禁名那一行在前，先换掉长的） |
 | `LAYER0_CELL_NAME(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LAYER0_CELL_NAME)` | CRASH_CASE_REPLAY_CELL_NAME | 正则 | 阶段里的格名常量 |
 | `LAYER0_CELL_TITLE(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LAYER0_CELL_TITLE)` | CRASH_CASE_REPLAY_CELL_TITLE | 正则 | 阶段里的格标题常量 |
@@ -331,6 +336,17 @@ D13（验证路线） 已定项 9 三层表的三档：层 0 冒烟 → 冒烟�
 | `layer0-shape(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-shape)` | crash-case-shape | 正则 | 两份崩溃放量脚本自证里的样本文件名 |
 | `layer0_shape(?![A-Za-z0-9_])(?<![A-Za-z0-9_]layer0_shape)` | crash_case_shape | 正则 | 两份崩溃放量脚本自证里的变量名 |
 | `STUB_CASE_SHAPE=layer0(?![A-Za-z0-9_])(?<![A-Za-z0-9_]STUB_CASE_SHAPE=layer0)` | STUB_CASE_SHAPE=crash-case | 正则 | 两份崩溃放量脚本自证里假用例的形态 |
+| `harness ?档包?` | 验证包 | 正则 | 并包之前 `crates/singlefs-harness` 那个包（并进 `crates/singlefs-verification`）的叫法；「harness 档包」连「包」一起换，免得换成「验证包包」 |
+| `(?<!池级 )checker ?档包?` | 验证包 | 正则 | 并包之前 `crates/singlefs-checker-tier` 那个包（并进 `crates/singlefs-verification`）的叫法；不打「池级 checker」（`crates/singlefs-checker`，是另一个包）；「checker 档包」连「包」一起换 |
+| `quick_tier_expansion(?![A-Za-z0-9_])(?<![A-Za-z0-9_]quick_tier_expansion)` | in_place_subsets_with_copy_on_write_none_or_all_expansion | 正则 | 甲二展开的函数名（`crash::quick_tier_expansion`），照枚举成员 `InPlaceSubsetsWithCopyOnWriteNoneOrAll` 取名 |
+| `quick-tier-test-functions(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]quick-tier-test-functions)` | test-functions | 正则 | 判定种类名的后半（`<阶段文件名>:quick-tier-test-functions`） |
+| `quick-tier-request(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]quick-tier-request)` | test-functions-request | 正则 | `scripts/gate/admission.py` 的请求名 |
+| `heavy-test-guard(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]heavy-test-guard)` | project-code-guard | 正则 | 钩子名（`.claude/hooks/heavy-test-guard.sh` 改名为 `project-code-guard.sh`） |
+| `lib_heavy_tests(?![A-Za-z0-9_])(?<![A-Za-z0-9_]lib_heavy_tests)` | lib_project_code_runs | 正则 | 钩子共用库（`.claude/hooks/lib_heavy_tests.py` 改名为 `lib_project_code_runs.py`） |
+| `light-selftest-guard(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]light-selftest-guard)` | selftest-process-guard | 正则 | 自证进程闸（`scripts/gate/light-selftest-guard.py` 改名为 `selftest-process-guard.py`） |
+| `HEAVY_TEST_GUARD_BREAK(?![A-Za-z0-9_])(?<![A-Za-z0-9_]HEAVY_TEST_GUARD_BREAK)` | PROJECT_CODE_GUARD_BREAK | 正则 | 钩子 `project-code-guard.sh` 的弄坏开关变量 |
+| `LIB_HEAVY_TESTS_BREAK(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LIB_HEAVY_TESTS_BREAK)` | LIB_PROJECT_CODE_RUNS_BREAK | 正则 | 钩子共用库 `lib_project_code_runs.py` 的弄坏开关变量 |
+| `LIGHT_SELFTEST_GUARD_BREAK(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LIGHT_SELFTEST_GUARD_BREAK)` | SELFTEST_PROCESS_GUARD_BREAK | 正则 | 自证进程闸 `selftest-process-guard.py` 的弄坏开关变量 |
 
 **跟着改的文件名**：`crates/singlefs-core/src/superblock.rs` → `system_configuration.rs`；五个实验装置、五张变异表、五个留存产物
 （E100（系统配置的三段几何）、E115（系统配置字段表的完备性与字节预算）、E124（系统配置字段表按 D18 已定项 14 重算）、E126（系统配置槽宽四条候选的代价）、E147（系统配置字段表按新池新建文件字节表重算））。搬迁怎么做见 [.claude/rules/path-moves.md](../rules/path-moves.md)「怎么做」那一节。

@@ -1,0 +1,5 @@
+# 记红没成、下一趟不复用旧绿：库里有上一版照判绿记进来的 shared_check，不带特性那一趟（.unit-verdict-sample/red-over-green：计划不读库）同一把键现判红、
+# 记红没成（.unit-verdict-sample/red-record-failure），plan-failure 带 --red 撤掉那条绿；带特性那一趟同一把键查库答「库里没有这一条」、现判它。判的是 crash-case-replay 格
+# 另点 feature-gated-tests：expect 里写着带特性那一趟（逐格那一行写到 feature-gated-tests）
+crash-case-replay
+feature-gated-tests

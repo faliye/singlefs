@@ -4,13 +4,13 @@
 # PreToolUse hook（Write、Edit、MultiEdit：.claude/settings.json 里注册在 matcher "Write|Edit|MultiEdit" 上）：写文件之前的十道判定（一至五、七至十写在下面，六是语法检查、写在 --selftest 那一段），合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
 #
 # 一、整份覆盖未跟踪文件（只管 Write）：仓里已存在、又没进 git 的文件，拒绝用 Write 整份覆盖。
-#    为什么：几个会话同时在一个仓里干活。2026-09-11 一个会话用 Write 新建 `research/prompts/e137-preregistration.md`，
+#    为什么：几个会话同时在一个仓里干活。一个会话用 Write 新建 `research/prompts/e137-preregistration.md`，
 #    另一个会话几分钟前刚写了同名的未提交文件，Write 回报「updated」就把它盖了——没进过 git，事后只能从对话记录里重放复原。
 #    放行：目标不存在；目标已被 git 跟踪（盖了还能从 git 找回）；目标在仓外（scratchpad 之类）。
 # 二、项目 subagent 的写范围（Write、Edit、MultiEdit）：项目定义的 subagent 写文件时，目标必须落在它登记的写范围里。
-#    为什么：执行类 agent 越界写，不该等人翻 diff 才发现（records/2026-09-16-subagent拆分提案.md 第五节，用户 2026-09-17 定走项目 settings hook）。
+#    为什么：执行类 agent 越界写，不该等人翻 diff 才发现（records/2026-09-16-subagent拆分提案.md 第五节；走项目 settings hook）。
 #    输入里没有 agent_type（主 agent）放行；agent_type 没有项目定义（`.claude/agents/<名>.md` 不在：内置类型、插件带来的、定义已删的旧实例）只许写工作根
-#    （BUILTIN_AGENT_SCOPE，展开同表里的 $SINGLEFS_WORK_ROOT/** 那一行：只有工作根），仓里与别处（会话临时目录根 /tmp/claude-<uid> 在内）一律拒（用户 2026-10-26 定「只许写草稿目录」；
+#    （BUILTIN_AGENT_SCOPE，展开同表里的 $SINGLEFS_WORK_ROOT/** 那一行：只有工作根），仓里与别处（会话临时目录根 /tmp/claude-<uid> 在内）一律拒（只许写草稿目录；
 #    records/2026-10-23-subagent拆分提案.md 第十七节 ①、第十九节 ④）；有项目定义而表里没有它的写范围，拒绝；
 #    目标的落点命中它的任一模式才放行：落点规整 .. 并逐段解开符号链接，目标不存在时解到最深的已存在那一层再接上剩下的段（写范围里建一个指向范围外的链接、
 #    经它写进去的照拒；与 bash-command-detector.sh ⑫ 同口径，认法在 lib_write_scope.py 的 landing_forms / landings_out_of_scope）。
@@ -20,11 +20,11 @@
 #    读不到那份库时，这样的模式按拒判，拒绝信息点名那份库。
 # 三、撇号类角标（Write、Edit、MultiEdit）：Write 的 content、Edit 的 new_string、MultiEdit 每一处的 new_string 里
 #    出现撇号类字符之一就拒绝；只在 old_string 里出现（删掉它的改动）放行，ASCII 单引号不判。主 agent 与所有子 agent 一样判，目标在不在仓里都判。
-#    为什么：门禁 doc-text 只在收尾跑整轮门禁时判，2026-09-24 实验设计员照样把这类名字写进三份重跑登记、执行员又抄进源码。
+#    为什么：门禁 doc-text 只在收尾跑整轮门禁时判，写的当下拦不住，这类名字会被写进重跑登记、再被抄进源码。
 #    字符集与 doc-text 同一份：../gate.d/lib-forbidden-notations.py 的 PRIME_MARKS，不在这里另抄；读不到就拒绝（不静默放行）。
 # 四、先编后换（Write、Edit、MultiEdit）：experiment-runner（名单是 COMPILE_FIRST_AGENTS）写主工作区 crates/ 下的 .rs（改已有的、新建的都算）一律拒绝，
 #    出路是在草稿目录的副本里改，把 scripts/hosts/compile-then-swap.py 那一条（`task-server/task submit -- python3 scripts/hosts/compile-then-swap.py …`）写进报告「要主 agent 跑的命令」一节，
-#    由主 agent 交服务编过再整份换进来（子 agent 不往统一任务服务交任务，用户 2026-11-01 定）。排在写范围那一道之前判，拒绝信息给的是这条出路。
+#    由主 agent 交服务编过再整份换进来（子 agent 不往统一任务服务交任务）。排在写范围那一道之前判，拒绝信息给的是这条出路。
 #    implementation-writer、主 agent、别的 agent 不判；草稿目录里的副本与 crates/ 下不是 .rs 的（crates/mutations.tsv）不判。
 #    为什么：执行员直接在主工作区改入库装置，改到一半编不过，别的会话带 --all-targets 的编译一起卡住
 #    （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 51 行）。Bash 里的同一类写法归 bash-command-detector.sh 的 ⑨。
@@ -45,12 +45,12 @@
 #    以空格或制表符收尾就拒绝；主 agent 与所有子 agent 一样判，目标在不在仓里都判。.md / .mdx 目标与 Write 不判。
 #    为什么：Edit 在 .md / .mdx 以外的目标上先去掉 new_string 每一行行尾的空格与制表符，钩子拿到的已是去过的 new_string，old_string 原样。
 #    old_string 收尾的空白在文件里照样命中、被换掉，new_string 里对应的那一个却没了，紧跟着的字就粘上来。
-#    2026-10-01 把钩子收到的输入落盘核过：.txt 目标 old_string、new_string 都以「declared = 」收尾，
-#    钩子收到的 old_string 带着那个空格、new_string 没有，落盘成「declared =foo」；门禁注释精简那一批因此把
-#    doc-decisions.sh 的 `python3 - "$DEC"` 改成 `python3 -"$DEC"`（records/2026-10-01-门禁注释精简.md「第 3 批」件一）。
+#    钩子收到的输入落盘核过：.txt 目标 old_string、new_string 都以「declared = 」收尾，
+#    钩子收到的 old_string 带着那个空格、new_string 没有，落盘成「declared =foo」，
+#    例如把 doc-decisions.sh 的 `python3 - "$DEC"` 写成 `python3 -"$DEC"`（records/2026-10-01-门禁注释精简.md）。
 #    看 old_string 而不看 new_string：new_string 收尾的空白到不了钩子，判它一次都拦不到；old_string 收尾的空白钩子看得到，粘连只在它那里发生。
 #    .md / .mdx 不判：同一次核查里 .md、.mdx、.MD 目标的 new_string 行尾空白原样到了钩子、原样落盘，在那里以空白收尾的框选写得对。
-#    后缀只认这两个：2026-10-03 拿 Edit 在草稿目录里各改一份 .md、.MD、.markdown、.mdown、.mkd、.txt（new_string 头一行以两个空格收尾），
+#    后缀只认这两个：拿 Edit 在草稿目录里各改一份 .md、.MD、.markdown、.mdown、.mkd、.txt（new_string 头一行以两个空格收尾），
 #    落盘只有 .md、.MD 留着那两个空格，.markdown、.mdown、.mkd 与 .txt 一样去掉了，所以它们照判、不并进 TRAILING_BLANK_EXEMPT_SUFFIXES。
 #    不判 old_string 中间行的行尾空白：new_string 那一行去掉的空白后面是换行，不会把两个词粘起来。
 #    出路：把框选范围收到不以空白结尾（多框到下一个非空白字符，或止于行尾）；确实要删行尾空白的，用 Bash 跑 scripts/kb/replace-once.py。
@@ -84,7 +84,7 @@
 # 照常退 0，stderr 写一行可定位的诊断（钩子名、哪一处、输入的前 200 字节），检出记录追加一行（findings 以「写闸没判全」起头，outcome 只记；
 # 被拒的那一行 outcome 被拒）；输入读不出会话号的，session_id 写「读不到」。
 # 这份源码里撇号类字符一律写成转义、lib-forbidden-notations.py 里用码位拼（门禁 doc-text 也扫它们）；改带转义的那几行用 Bash 里的 python，反斜杠拿 chr(92) 拼：
-# 2026-09-24 写这一道时实测，Write 的 content 里写的反斜杠 u 转义落盘成了字符本身，这道闸也会拒这样的写。
+# Write 的 content 里写的反斜杠 u 转义落盘成了字符本身，这道闸也会拒这样的写。
 #
 #   write-guard.sh             # 从 stdin 读 hook 的 JSON
 #   write-guard.sh --selftest  # 走一遍各道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1、WRITE_GUARD_DISABLE_COMPILE_FIRST=1、
@@ -94,10 +94,12 @@
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK=first-hit-only（库的 all_hits 只交第一处）时「钟点:两处都报（行号与总数）」「会话号:两处都报（行号与总数）」两格红；
 #                              # 批次代号（七里的另一判）：WRITE_GUARD_BREAK=batch-codes-unjudged（这一判不判）与 LIB_FORBIDDEN_NOTATIONS_BREAK=batch-codes（库里整形态不判）时
 #                              #   「批次代号:」起头的拒绝几格红；库的判据行键一次关一条时点名那一条的格红：batch-code-suffixed「批次代号:数字加字母加短横序号」「批次代号:.tsv 也判」、
-#                              #   batch-code-lettered「批次代号:两位数字加字母当名字用」、batch-code-labeled「批次代号:批次词后面跟一位数字加字母」「批次代号:单位字母的批号挨着批字」、
+#                              #   batch-code-lettered「批次代号:两位数字加字母当名字用」「批次代号:配不上对的反引号不开代码段」、batch-code-labeled「批次代号:批次词后面跟一位数字加字母」「批次代号:单位字母的批号挨着批字」、
 #                              #   batch-code-stem「批次代号:第几批加天干」「批次代号:批加数字加天干」；LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=batch-codes 时「批次代号上下文:」起头的几格红；
 #                              #   LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=batch-codes 时「批次代号:变异表放行」红；LIB_FORBIDDEN_NOTATIONS_BREAK=judged-suffixes-ignored 时
 #                              #   「批次代号:.py 不判」「批次代号:.sh 不判」两格红；
+#                              # LIB_FORBIDDEN_NOTATIONS_BREAK=batch-code-labeled-three-digits（库里挨着批次词的三位数字加字母也判）时「批次代号:批次词后面的三位数字加字母放行」「批次代号:三位数字加字母挨着批字放行」两格红；
+#                              # LIB_FORBIDDEN_NOTATIONS_BREAK=code-span-backtick-parity（库里反引号只数前面的奇偶、不按代码段配对）时「批次代号上下文:双反引号代码段里的放行」「批次代号:配不上对的反引号不开代码段」两格红；
 #                              # 第二道里工作根那一条模式的三样各一个弄坏开关，打开时点名的几项红：
 #                              #   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown（工作根退回会话临时目录根，lib_work_root.py）：「范围:工作根下的报告目录」「先编后换:experiment-runner 改草稿目录里的副本放行」
 #                              #     「stdin:实现员写工作根下的报告」「stdin:七次拒绝都落进检出记录」（多出一次拒绝）「范围:内置 agent 写工作根放行」
@@ -105,10 +107,10 @@
 #                              #   SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted（写范围另认会话临时目录根，撤掉之前的放行）：「范围:会话临时目录根下写拒（scratchpad 之外）」「范围:会话临时目录根下的 scratchpad 里写拒」
 #                              #   WRITE_GUARD_BREAK=scope-root-unanchored（展开时根后面不带 /）：「范围:工作根同名前缀的兄弟目录」
 #                              # 没有项目定义的 agent 只许写工作根（第二道）：
-#                              #   WRITE_GUARD_BREAK=builtin-agents-unscoped（没有项目定义的 agent 一概放行，改前的样子）：「范围:内置 agent 写仓里拒」「范围:内置 agent 写仓外别处拒」
+#                              #   WRITE_GUARD_BREAK=builtin-agents-unscoped（没有项目定义的 agent 一概放行）：「范围:内置 agent 写仓里拒」「范围:内置 agent 写仓外别处拒」
 #                              #     「范围:定义已删的旧实例写仓里拒」「stdin:内置 agent 写仓里拒」
 #                              # 写范围表里 kb-scribe 的不变量清单两行（下一层与各层子目录）与 experiment-runner 的重跑比对对象登记一行：
-#                              #   WRITE_GUARD_BREAK=scope-new-rows-dropped（自检用的表副本去掉这三行，退回加行之前的表）：「范围:kb-scribe 写不变量清单的 .md」「范围:kb-scribe 写不变量清单子目录里的 .md」「范围:experiment-runner 写重跑比对对象登记」
+#                              #   WRITE_GUARD_BREAK=scope-new-rows-dropped（自检用的表副本去掉这三行、experiment-runner 跑前登记那一行退回只认 e*-preregistration.md，退回加行与放宽之前的表）：「范围:kb-scribe 写不变量清单的 .md」「范围:kb-scribe 写不变量清单子目录里的 .md」「范围:experiment-runner 写重跑比对对象登记」「范围:experiment-runner 带轮号的跑前登记」
 #                              # 紧凑时间戳（五里的 ISO 基本格式写法）有三个开关，打开时点名的几格红（格名都以「紧凑时间戳:」起头，另有「stdin:」两格）：
 #                              #   WRITE_GUARD_BREAK=compact-timestamp-skipped（本钩子把命中的「ISO 紧凑时间戳」形态丢掉不报）：拒绝的几例（Write、Edit、MultiEdit、路径里、带冒号的时分、
 #                              #     带连字符的日期、带小数秒与偏移）与「stdin:Write 写进紧凑时间戳拒绝（退出码 2）」「stdin:紧凑时间戳的拒绝点名形态与那一处」
@@ -117,6 +119,7 @@
 #                              #     （月份越界、钟点越界、年不是 20 开头、全是 9、前面挨着字母；钟点只有三位与小写 t 两例在这个开关下仍放行），
 #                              #     以及「紧凑时间戳:8 位日期、T、带冒号的时分」「紧凑时间戳:带连字符的日期加连写钟点」两例（退回的写法认不出这两种）、
 #                              #     「紧凑时间戳:Write / Edit / MultiEdit 写进仓里拒绝并点名形态与那一处」三格与「stdin:紧凑时间戳的拒绝点名形态与那一处」（退回的写法报出来的串少了末尾的 Z）
+#                              #   LIB_FORBIDDEN_NOTATIONS_BREAK=compact-hyphenated-date-loose（库里带连字符的日期不核月日）：「紧凑时间戳:带连字符的日期月份越界放行」「紧凑时间戳:带连字符的日期日越界放行」两格
 #                              # 第六道：写进 .claude/hooks/、.claude/gate.d/、.claude/scripts/、scripts/ 下的 .sh 先过 bash -n（写临时文件、起 bash）、.py 先过 ast 解析（本进程里 ast.parse，不写临时文件、不起子进程），
 #                              # 语法错的拒（带语法错误的钩子一上线，每一次 Bash 调用都收到它的报错）；
 #                              # WRITE_GUARD_BREAK=python-syntax-subprocess（.py 也退回另起 python3 判）时「语法:写坏的 .py 在本进程里判，不起 python 子进程」一格红；
@@ -154,33 +157,33 @@
 #                              #   foreign-holder-unnamed（回执对不上的拒绝不去记录里找持锁者）：「写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」
 #                              #     「stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」
 #                              #   replace-temp-kept（接手换锁失败不删自己建的临时文件）：「写者锁:换锁时锁内容写不进 JSON，抛异常且不留临时文件」「写者锁:换锁时锁的位置被目录占着，抛异常且不留临时文件」
-#                              #   unreadable-lock-absent（锁文件在而判不了的当没有锁，改前的样子）：「写者锁:锁文件不是 JSON 拒」「写者锁:锁缺 nonce 拒」「写者锁:锁缺 dispatched_at 拒」
+#                              #   unreadable-lock-absent（锁文件在而判不了的当没有锁）：「写者锁:锁文件不是 JSON 拒」「写者锁:锁缺 nonce 拒」「写者锁:锁缺 dispatched_at 拒」
 #                              #     「写者锁:锁缺 prompt_sha256 拒」「写者锁:锁的位置是目录拒」「写者锁:判不了的锁的拒绝点名那份锁与出路」「stdin:坏锁拒绝（退出码 2）」「stdin:坏锁的拒绝点名那份锁与出路」
-#                              #   missing-receipt-claims（派发回执读不到时照旧先到先得认领，改前的样子）：「写者锁:回执还没落盘的乙先写放行、不认领、记一处没判全」
+#                              #   missing-receipt-claims（派发回执读不到时照旧先到先得认领）：「写者锁:回执还没落盘的乙先写放行、不认领、记一处没判全」
 #                              #     「写者锁:真持锁者回执还没落盘时第一次写也放行、不认领」「写者锁:回执落盘之后持锁者写拿到锁」「写者锁:持锁者认领之后，回执一直没落盘的乙写被拒」
 #                              #     「写者锁:认领之后持锁者续写放行」「stdin:回执还没落盘的写放行、不认领，stderr 一行并记一条检出（结局只记）」
-#                              #   exclusive-temp-kept（排他建锁、建认领时 JSON 写到一半抛异常留下临时文件，改前的样子）：「写者锁:排他建锁时锁内容写不进 JSON，抛异常、不留临时文件也不留锁」
+#                              #   exclusive-temp-kept（排他建锁、建认领时 JSON 写到一半抛异常留下临时文件）：「写者锁:排他建锁时锁内容写不进 JSON，抛异常、不留临时文件也不留锁」
 #                              #     「写者锁:认领时认领内容写不进 JSON，抛异常、不留临时文件也不留认领」
-#                              #   takeover-sweeps-new-claims（接手换上之后删掉所有 nonce 不同的认领与认领的临时文件，改前的样子）：
+#                              #   takeover-sweeps-new-claims（接手换上之后删掉所有 nonce 不同的认领与认领的临时文件）：
 #                              #     「写者锁:两次接手交错（A 换锁、B 换锁并认领、A 清理）之后 B 的认领还在，第三个认领不成，旧认领删掉」「写者锁:接手不删别的进程正在写的认领临时文件」
-#                              #   broken-claim-absent（认领文件在而判不了的当没有认领，改前的样子）：「写者锁:认领文件判不了的拒绝点名那份认领文件与出路」
+#                              #   broken-claim-absent（认领文件在而判不了的当没有认领）：「写者锁:认领文件判不了的拒绝点名那份认领文件与出路」
 #                              #     「写者锁:认领文件判不了的不另建一份、不改它」「stdin:坏认领文件拒绝并点名那份认领文件（退出码 2）」
 #                              # 落点（第二道与 landing_target）：WRITE_GUARD_BREAK=landing-lexical-only（退回只按字面规整、不解符号链接）时
 #                              #   「范围:范围内的链接指到范围外，经它写拒」「范围:范围内的链接指到范围外，经它写不存在的子目录拒」「范围:范围内的链接指到仓里范围外拒」
 #                              #   「范围:范围内的悬空链接指到范围外拒」「覆盖:仓外的链接指到仓里未跟踪的文件，Write 拒」「先编后换:仓外的链接指到主工作区的入库装置拒」
 #                              #   「stdin:范围内的链接指到范围外拒（退出码 2）」与「范围:范围外的链接指回范围内放行」（字面路径在范围外，只认字面就拒）红
 #                              #   （「范围:范围内的链接指到范围内放行」在开关下照样绿）；
-#                              # 判不了照常放行而记检出：WRITE_GUARD_BREAK=unparsable-input-silent（输入不是合法 JSON 对象时静默退 0，改前的样子）时
+#                              # 判不了照常放行而记检出：WRITE_GUARD_BREAK=unparsable-input-silent（输入不是合法 JSON 对象时静默退 0）时
 #                              #   「stdin:坏 JSON 的 stderr 有诊断」「stdin:坏 JSON 记一条检出（结局只记、会话号读不到）」「stdin:坏 JSON 里按字面找得到的会话号与类型照抄」
 #                              #   「stdin:JSON 数组记一条检出」红（「stdin:坏 JSON 放行（退出码 0）」照样绿）；
-#                              #   WRITE_GUARD_BREAK=unjudged-not-recorded（判不了的只打 stderr、不记检出，改前的样子）时
+#                              #   WRITE_GUARD_BREAK=unjudged-not-recorded（判不了的只打 stderr、不记检出）时
 #                              #   「写者锁:读不到库时记一处没判全」「写者锁:自己出错时记一处没判全」「stdin:写者锁自己出错放行并记一条检出（结局只记）」
 #                              #   「写者锁:回执还没落盘的乙先写放行、不认领、记一处没判全」「写者锁:真持锁者回执还没落盘时第一次写也放行、不认领」
 #                              #   「stdin:回执还没落盘的写放行、不认领，stderr 一行并记一条检出（结局只记）」红；
-#                              #   WRITE_GUARD_BREAK=syntax-unreadable-unrecorded（第六道 Edit 的目标在而读不了时静默放行，改前的样子）时「语法:改一份读不了的脚本照常放行、记一处没判全」红
-#                              # 先编后换的出路（第四道）：WRITE_GUARD_BREAK=compile-first-capped-hint（出路退回 capped.sh <线程上限> 直接起 compile-then-swap.py，改前的样子）时
+#                              #   WRITE_GUARD_BREAK=syntax-unreadable-unrecorded（第六道 Edit 的目标在而读不了时静默放行）时「语法:改一份读不了的脚本照常放行、记一处没判全」红
+#                              # 先编后换的出路（第四道）：WRITE_GUARD_BREAK=compile-first-capped-hint（出路写 capped.sh <线程上限> 直接起 compile-then-swap.py）时
 #                              #   「stdin:先编后换的出路经 task-server 提交、不写 capped.sh 直接起」红
-#                              # 第十道（往现行账本追加节标题）：WRITE_GUARD_BREAK=ledger-append-ignored（判到该拒的也放行，改前的样子）时
+#                              # 第十道（往现行账本追加节标题）：WRITE_GUARD_BREAK=ledger-append-ignored（判到该拒的也放行）时
 #                              #   「账本追加:Edit 往现行账本追加节标题拒」「账本追加:MultiEdit 往现行账本追加节标题拒」「账本追加:Write 往现行账本追加节标题拒」
 #                              #   「账本追加:拒绝点名新脚本、账本与出路」「stdin:往现行账本追加节标题拒（退出码 2）」「stdin:往现行账本追加节标题的拒绝点名新脚本与出路」红
 set -uo pipefail
@@ -188,7 +191,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON。
-# 写成 `python3 - <<PY` 时程序占了标准输入，JSON 读不到，判定一律放行——2026-09-17 写范围闸实测撞到的。
+# 写成 `python3 - <<PY` 时程序占了标准输入，JSON 读不到，判定一律放行。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
 import importlib.util, json, os, re, shutil, subprocess, sys, tempfile, time
 from datetime import datetime, timezone
@@ -233,7 +236,7 @@ def absolute_target(hook_input, project_root):
 UNJUDGED = []   # 这一次调用里判不了、照常放行的几处：入口逐条已打过 stderr，收尾记一条检出（结局只记）
 
 def note_unjudged(text):
-    """判不了、照常放行的一处：stderr 写一行，记进 UNJUDGED 等入口记检出。弄坏开关 WRITE_GUARD_BREAK=unjudged-not-recorded 下只打 stderr（改前的样子）。"""
+    """判不了、照常放行的一处：stderr 写一行，记进 UNJUDGED 等入口记检出。弄坏开关 WRITE_GUARD_BREAK=unjudged-not-recorded 下只打 stderr。"""
     print(f"! write-guard.sh：{text}", file=sys.stderr)
     if os.environ.get("WRITE_GUARD_BREAK") != "unjudged-not-recorded":
         UNJUDGED.append(text)
@@ -243,7 +246,7 @@ def landing_lexical_only():
 
 def landing_target(hook_input, project_root):
     """这一次写最终落在哪：absolute_target 规整 .. 之后逐段解开符号链接（目标不存在时解到最深的已存在那一层，lib_write_scope.landing_forms）。
-    取的是 landing_forms 里「先规整 .. 再解开」那一种（工具先规整路径再打开）；解不开时交字面那一份并记一处没判全；弄坏开关 WRITE_GUARD_BREAK=landing-lexical-only 下交字面那一份（改前的样子）。"""
+    取的是 landing_forms 里「先规整 .. 再解开」那一种（工具先规整路径再打开）；解不开时交字面那一份并记一处没判全；弄坏开关 WRITE_GUARD_BREAK=landing-lexical-only 下交字面那一份。"""
     absolute = absolute_target(hook_input, project_root)
     if not absolute or landing_lexical_only():
         return absolute
@@ -300,7 +303,7 @@ def decide_scope(hook_input, project_root, table_path):
     if not agent_type:
         return 0, None
     defined = os.path.isfile(os.path.join(project_root, ".claude", "agents", f"{agent_type}.md"))
-    if not defined and os.environ.get("WRITE_GUARD_BREAK") == "builtin-agents-unscoped":   # 弄坏开关：没有项目定义的一概放行（改前的样子）
+    if not defined and os.environ.get("WRITE_GUARD_BREAK") == "builtin-agents-unscoped":   # 弄坏开关：没有项目定义的一概放行
         return 0, None
     if os.environ.get("WRITE_GUARD_DISABLE_SCOPE") == "1":
         return 0, None
@@ -692,7 +695,7 @@ def edited_content(hook_input, target):
         return None
     try:
         text = open(target, encoding="utf-8", errors="replace").read()
-    except OSError as error:   # 在而读不了：改完之后的内容算不出，语法这一道判不了，记一处没判全（弄坏开关 syntax-unreadable-unrecorded 下静默放行，改前的样子）
+    except OSError as error:   # 在而读不了：改完之后的内容算不出，语法这一道判不了，记一处没判全（弄坏开关 syntax-unreadable-unrecorded 下静默放行）
         if os.environ.get("WRITE_GUARD_BREAK") != "syntax-unreadable-unrecorded":
             note_unjudged(f"{target} 读不了（{type(error).__name__}: {error.strerror or error}），改完之后的内容算不出，语法这一次没判、照常放行")
         return None
@@ -724,7 +727,7 @@ def decide_shell_syntax(hook_input, project_root):
     content = edited_content(hook_input, target)
     if content is None:
         return 0, None
-    if checker is None and os.environ.get("WRITE_GUARD_BREAK") == "python-syntax-subprocess":   # 弄坏开关：.py 也退回另起 python3 的旧做法
+    if checker is None and os.environ.get("WRITE_GUARD_BREAK") == "python-syntax-subprocess":   # 弄坏开关：.py 也另起 python3
         checker = [sys.executable, "-c", PYTHON_SYNTAX_CHECK]
     detail = python_syntax_error(content, relative) if checker is None else syntax_error_by_checker(checker, content, os.path.splitext(target)[1], relative)
     if detail is None:
@@ -861,6 +864,9 @@ def selftest(hook_dir):
         if os.environ.get("WRITE_GUARD_BREAK") == "scope-new-rows-dropped":   # 弄坏开关：表副本退回没有这两行的样子
             with open(table, encoding="utf-8") as table_source:
                 kept_rows = [row for row in table_source if not row.startswith(("kb-scribe\tcrates/singlefs-checker/invariants/", "experiment-runner\t.claude/gate.d/replay-comparison-units.tsv\t"))]
+            # 跑前登记那一行退回只认原登记的写法（放宽到带轮号之前的样子）
+            kept_rows = [row.replace("experiment-runner\tresearch/prompts/e*-preregistration*.md\t", "experiment-runner\tresearch/prompts/e*-preregistration.md\t", 1)
+                         for row in kept_rows]
             with open(table, "w", encoding="utf-8") as table_target:
                 table_target.writelines(kept_rows)
         def case(label, tool_name, agent, path, want):
@@ -942,6 +948,9 @@ def selftest(hook_dir):
             case("范围:范围外的链接指回范围内放行", "Edit", "implementation-writer", f"{outside_directory}/back/a.rs", 0),
             case("覆盖:仓外的链接指到仓里未跟踪的文件，Write 拒", "Write", None, f"{outside_directory}/untracked-link", 2),
             case("范围:experiment-runner 登记", "Edit", "experiment-runner", f"{work}/research/prompts/e12-preregistration.md", 0),
+            # 带轮号的跑前登记（e<号>-preregistration-r<N>.md）同样放行；同一目录里别的文件照拒（WRITE_GUARD_BREAK=scope-new-rows-dropped 下放行那一格红）
+            case("范围:experiment-runner 带轮号的跑前登记", "Edit", "experiment-runner", f"{work}/research/prompts/e12-preregistration-r4.md", 0),
+            case("范围:experiment-runner research/prompts 下不是跑前登记的文件", "Edit", "experiment-runner", f"{work}/research/prompts/e12-verdict.md", 2),
             case("范围:experiment-runner 三方正文", "Edit", "experiment-runner", f"{work}/research/prompts/_e12-body.md", 2),
             case("范围:experiment-runner replay.sh", "Edit", "experiment-runner", f"{work}/scripts/experiment-apparatus/replay.sh", 0),
             case("范围:experiment-runner mutate.sh", "Edit", "experiment-runner", f"{work}/scripts/mutation/mutate.sh", 2),
@@ -1186,7 +1195,11 @@ def selftest(hook_dir):
                              target=".claude/hooks/parse.py"),
             clock_case("紧凑时间戳:仓外草稿目录放行", f"{new_root}/x/progress.md", {"content": compact_sample + "\n"}, None),
         ]
-        cases += compact_cases + compact_lookalike_cases + compact_pass_cases
+        compact_hyphenated_lookalike_cases = [   # LIB_FORBIDDEN_NOTATIONS_BREAK=compact-hyphenated-date-loose 时这两格红（compact-timestamp-loose 下照放行）
+            clock_shape_case("紧凑时间戳:带连字符的日期月份越界放行", glued("编号 2026-13-01", "T1234"), None),
+            clock_shape_case("紧凑时间戳:带连字符的日期日越界放行", glued("编号 2026-10-32", "T1234"), None),
+        ]
+        cases += compact_cases + compact_lookalike_cases + compact_pass_cases + compact_hyphenated_lookalike_cases
         # 七里的另一判，批次代号：拒绝的几格判的是拒绝的那一道（「写了批次代号」）；WRITE_GUARD_BREAK=batch-codes-unjudged 或 LIB_FORBIDDEN_NOTATIONS_BREAK=batch-codes 时
         # 拒绝的几格红，库的判据行键一次关一条时点名那一条的格红（文件头）；放行的几格分别靠判据行的边界、上下文规则、排除前缀与只判 .md、.tsv、.txt
         batch_shape = "写了批次代号"
@@ -1199,6 +1212,9 @@ def selftest(hook_dir):
             clock_shape_case("批次代号:第几批加天干", "第十五批乙二交回", batch_shape),
             clock_shape_case("批次代号:批加数字加天干", "批 10 甲交回", batch_shape),
             clock_shape_case("批次代号:批次词后面的两位代号", "批次 24c 的补丁", batch_shape),
+            clock_shape_case("批次代号:配不上对的反引号不开代码段", "孤零零一个 ` 号后面的 22c 交回", batch_shape),
+            clock_shape_case("批次代号:批次词后面的三位数字加字母放行", "截止批 123c 交回", None),
+            clock_shape_case("批次代号:三位数字加字母挨着批字放行", "123c 批交回", None),
             clock_shape_case("批次代号:两位会话短号放行", "已告诉 87、7a、e2、ed", None),
             clock_shape_case("批次代号:单位、倍数与指数放行", "16k 块、64x 加速、30d 清空、60s 超时、1e-6 的期望", None),
             clock_shape_case("批次代号:路径、标识符与文件行号放行", "path-move-6b/result.md、m3-batch10z-c、a.md:12a、e165", None),
@@ -1210,6 +1226,7 @@ def selftest(hook_dir):
         ]
         batch_context_cases = [   # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=batch-codes 时这几格红
             clock_shape_case("批次代号上下文:反引号里的放行", "格里写 `10q` 的样子", None),
+            clock_shape_case("批次代号上下文:双反引号代码段里的放行", "格里写 ``10q`` 的样子", None),
             clock_shape_case("批次代号上下文:字段值放行", "活槽 = 64f 时", None),
             clock_shape_case("批次代号上下文:算式放行", "13 + 22n 个槽，(w + 31u) / 32u", None),
             clock_shape_case("批次代号上下文:引号与逗号后面的代码字面放行", 'key "22c" 与名单 a,22e', None),
@@ -1533,7 +1550,7 @@ def selftest(hook_dir):
                 ]
                 # 两次接手交错：A 换上锁之后、清理旧认领之前，B 换上自己的锁、B 的子 agent 认领（replace_lock 的 after_replace 造这一刻），A 再清理。
                 # 改后 A 只删换锁之前列过的认领：B 的认领还在、第三个子 agent 认领不成，别的进程正在写的认领临时文件也还在；
-                # LIB_WRITER_LOCK_BREAK=takeover-sweeps-new-claims（改前：换上之后删掉所有 nonce 不同的认领）下这两格红：
+                # LIB_WRITER_LOCK_BREAK=takeover-sweeps-new-claims（换上之后删掉所有 nonce 不同的认领）下这两格红：
                 #     「✗ 自检：写者锁:两次接手交错（A 换锁、B 换锁并认领、A 清理）之后 B 的认领还在，第三个认领不成，旧认领删掉」
                 #     「✗ 自检：写者锁:接手不删别的进程正在写的认领临时文件」
 
@@ -1715,7 +1732,7 @@ try:
     hook_input = json.loads(raw.decode("utf-8"))
     if not isinstance(hook_input, dict):
         raise ValueError(f"顶层是 {type(hook_input).__name__}，不是对象")
-except ValueError as error:   # 判不了：照常放行，打诊断并记一条检出（弄坏开关 unparsable-input-silent 下静默放行，改前的样子）
+except ValueError as error:   # 判不了：照常放行，打诊断并记一条检出（弄坏开关 unparsable-input-silent 下静默放行）
     if os.environ.get("WRITE_GUARD_BREAK") != "unparsable-input-silent":
         identity, text = unparsable_input_entry(raw, f"{type(error).__name__}: {error}")
         note_unjudged(text)

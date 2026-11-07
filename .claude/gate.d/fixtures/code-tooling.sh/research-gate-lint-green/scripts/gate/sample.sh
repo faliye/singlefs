@@ -6,3 +6,5 @@ cd "$(dirname "$0")" || die "进不去 $(dirname "$0")" "从仓根照用法起"
 here="$(cd "$(dirname "$0")" && pwd)"
 ( cd "$here" \
   && ls >/dev/null )
+# cd 自己就是条件：if 判它的退出码，进不去走 then 那一支，不算裸 cd
+if ! cd "$here/sub"; then die "进不去 $here/sub" "先建它再跑"; fi

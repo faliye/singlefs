@@ -172,12 +172,9 @@ Code `scripts/experiment-apparatus/e58_csum_grain.rs` (8 unit tests, 10 mutation
 **Re-run** (5 rounds = 5 seeds, test file path read from environment variable, forbidden from repository commit):
 
 ```bash
-cd scripts/experiment-apparatus && cargo build --release --bin e58-csum-grain
-for s in 1 2 3 4 5; do
-  ./target/release/e58-csum-grain "${E58_IMG:-${TMPDIR:-/tmp}/e58.img}" $s none 4096 8192
-done                        # Artifact e58-csum-grain-2026-08-31.out
-./target/release/e58-csum-grain "${E58_IMG:-${TMPDIR:-/tmp}/e58.img}" 1 nodirect 4096 8192   # Negative control, run twice
-./target/release/e58-csum-grain "${E58_IMG:-${TMPDIR:-/tmp}/e58.img}" 7 none 16384 8192      # Robustness
+task-server/task submit -- bash -c 'for s in 1 2 3 4 5; do cargo run --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e58-csum-grain -- "${E58_IMG:-$TMPDIR/e58.img}" $s none 4096 8192; done > research/results/e58-csum-grain-<YYYY-MM-DD>.out'
+task-server/task submit -- bash -c 'cargo run --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e58-csum-grain -- "${E58_IMG:-$TMPDIR/e58.img}" 1 nodirect 4096 8192'   # Negative control, run twice
+task-server/task submit -- bash -c 'cargo run --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e58-csum-grain -- "${E58_IMG:-$TMPDIR/e58.img}" 7 none 16384 8192'      # Robustness
 ```
 
 Raw outputs `e58-csum-grain-2026-08-31.out` (5 rounds),
@@ -257,13 +254,13 @@ Four points from local leg judged individually:
 
 | Decision Item | Relationship | Retrospective |
 |---|---|---|
-| D4 (Checksum Location) settled item 1 | Supports | 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
-| D4 (Checksum Location) settled item 8 | Supports | 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
-| D4 (Checksum Location) settled item 7 | Supports | 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
-| D4 (Checksum Location) settled item 3 | Preparation | 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
-| D8 (Core Index Structure) settled item 2 | Does not affect | 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
-| D21 (Boundary Between Authoritative and Derived States) | Does not affect | 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
-| D25 (Target Workload Priority) | Does not affect | 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
+| D4 (Checksum Location) settled item 1 | Supports | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
+| D4 (Checksum Location) settled item 8 | Supports | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
+| D4 (Checksum Location) settled item 7 | Supports | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
+| D4 (Checksum Location) settled item 3 | Preparation | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
+| D8 (Core Index Structure) settled item 2 | Does not affect | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
+| D21 (Boundary Between Authoritative and Derived States) | Does not affect | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
+| D25 (Target Workload Priority) | Does not affect | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual switch row was added; previously, 2026-10-11 unaffected: wording only (temporal terms, locational references, self-referential terms), conclusions, figures, and artifacts unchanged |
 
 ## Historical Versions
 

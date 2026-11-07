@@ -1,0 +1,54 @@
+# 代码与脚本注释里历史写法的滞后表：门禁 doc-text 的 comment-history 格此刻就判红、当场改不完的存量，一份文件一行（判据：.claude/agent-common.md「代码与脚本的注释、说明只写现状，不写历史」那一条）。
+# 写法（制表符分隔，三列）：<路径，相对仓根，要是判法射程里的文件><TAB><此刻命中的行数，正整数><TAB># <为什么还没改，至少 4 个字>
+# 初始表按此刻命中现算：python3 scripts/gate/comment-history-check.py --lag-table <根> [--out <文件>]；逐行看命中：python3 scripts/gate/comment-history-check.py --list <根>。
+# 读它的是 .claude/gate.d/doc-text.sh 的 comment-history 格：文件命中数大于登记数判红（列出那份文件的全部命中），小于登记数也判红（改小到现数，不留余量给新写的），不在表里的文件命中数要是 0；
+#   列数不对、路径不在、数不是正整数、理由不到 4 个字、重复、路径在豁免表里，都判红。
+# 只缩不涨：与 gate 基准那一版按路径比，基准里没有的行判红、数比基准大判红；基准里整张表还不存在的那一次只判写法、不判涨。
+# 改净一份文件就删它那一行；新写的历史写法当场改成现状，不往这里加。
+.claude/gate.d/crash-point-replay.sh	58	# 存量，改净后删这一行
+.claude/gate.d/doc-process-records.sh	40	# 存量，改净后删这一行
+crates/singlefs-background-gpu/src/adapter_inventory.rs	2	# 存量，改净后删这一行
+crates/singlefs-background-gpu/src/background_gpu_compute.rs	8	# 存量，改净后删这一行
+crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs	6	# 存量，改净后删这一行
+crates/singlefs-background-gpu/src/checksum_kernels.rs	2	# 存量，改净后删这一行
+crates/singlefs-background-gpu/src/gpus_of_this_host.rs	28	# 存量，改净后删这一行
+crates/singlefs-background-gpu/src/live_slot_kernels.rs	2	# 存量，改净后删这一行
+crates/singlefs-background-gpu/src/region_record_kernels.rs	5	# 存量，改净后删这一行
+crates/singlefs-background-gpu/src/two_kernel_reconciliation.rs	1	# 存量，改净后删这一行
+crates/singlefs-core/src/instance_table_sweep.rs	11	# 存量，改净后删这一行
+crates/singlefs-core/src/mount.rs	198	# 存量，改净后删这一行
+crates/singlefs-core/src/mounted_session.rs	77	# 存量，改净后删这一行
+crates/singlefs-core/src/recovery.rs	44	# 存量，改净后删这一行
+crates/singlefs-core/src/transaction.rs	145	# 存量，改净后删这一行
+prune-server/README.md	1	# 存量，改净后删这一行
+prune-server/control	2	# 存量，改净后删这一行
+prune-server/src/bin/prune_server.rs	9	# 存量，改净后删这一行
+prune-server/src/break_switches.rs	9	# 存量，改净后删这一行
+prune-server/src/fault_proxy.rs	1	# 存量，改净后删这一行
+prune-server/src/lib.rs	1	# 存量，改净后删这一行
+prune-server/src/oversized_values.rs	1	# 存量，改净后删这一行
+prune-server/src/protocol.rs	6	# 存量，改净后删这一行
+prune-server/src/reliable_client.rs	9	# 存量，改净后删这一行
+prune-server/src/segmented_values.rs	1	# 存量，改净后删这一行
+prune-server/src/selftest_library_layout_cells.rs	1	# 存量，改净后删这一行
+prune-server/src/server.rs	2	# 存量，改净后删这一行
+prune-server/src/storage.rs	3	# 存量，改净后删这一行
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/spec_gaps.py	1	# 存量，改净后删这一行
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/spec_gaps.py	1	# 存量，改净后删这一行
+scripts/experiment-apparatus/e170_second_run_o3_spec_executor/spec_gaps.py	1	# 存量，改净后删这一行
+scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_487/spec_gaps.py	1	# 存量，改净后删这一行
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/list_check.py	2	# 存量，改净后删这一行
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py	1	# 存量，改净后删这一行
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py	6	# 存量，改净后删这一行
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_11.py	3	# 存量，改净后删这一行
+scripts/experiment-apparatus/e185_r4_baseline_rejudge.py	1	# 存量，改净后删这一行
+scripts/experiment-apparatus/e203-admission-scan-cost-run.sh	1	# 存量，改净后删这一行
+scripts/prune-server/prune_server_client.py	33	# 存量，改净后删这一行
+scripts/prune-server/prune_server_client_selftest.py	2	# 存量，改净后删这一行
+task-server/README.md	5	# 存量，改净后删这一行
+task-server/attempt_runner.py	6	# 存量，改净后删这一行
+task-server/task	1	# 存量，改净后删这一行
+task-server/task_server.py	149	# 存量，改净后删这一行
+task-server/task_server_lib.py	142	# 存量，改净后删这一行
+task-server/task_server_selftest.py	41	# 存量，改净后删这一行
+task-server/tests/test_cleanup_protocol.py	1	# 存量，改净后删这一行

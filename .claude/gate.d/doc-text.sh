@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改了中文就三份同进同出（只改译文的放行）、译文照翻译术语表用词、译文里不残留超量没译的中文、译文与中文逐段比内容量不漏段不压成摘要；这次改动新加到记录、kb 页、三方判决正文与代码治理文件的行里不写账号与额度方面的运营细节和解析限额通知的正则；这次改动新加的行里不写不归本项目的目录名与根下系统目录的占用；这次改动里的文本文件（工作区与暂存区里的版本）是合法 UTF-8；登记的 kb 目录里的中文页在历史节之前不写带日期的现状句（滞后表登记的存量放过，滞后表只缩不涨）
+# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改了中文就三份同进同出（只改译文的放行）、译文照翻译术语表用词、译文里不残留超量没译的中文、译文与中文逐段比内容量不漏段不压成摘要；这次改动新加到记录、kb 页、三方判决正文与代码治理文件的行里不写账号与额度方面的运营细节和解析限额通知的正则；这次改动新加的行里不写不归本项目的目录名与根下系统目录的占用；这次改动里的文本文件（工作区与暂存区里的版本）是合法 UTF-8；登记的 kb 目录里的中文页在历史节之前不写带日期的现状句（滞后表登记的存量放过，滞后表只缩不涨）；代码与脚本的注释、文件头、文档串与 README 里不写历史（日期、出处、改动经过；特殊缘由写 history-kept 标记，存量登记在滞后表，滞后表只缩不涨）
 # gate-fixture: yes
 # gate-category: 文档类
 # 不声明 gate-covers：.claude/gate-not-implemented.tsv 的两项判被测代码的行为，这一道只判文本写法。
@@ -28,6 +28,7 @@
 # gate-cell: out-of-project-names 这次改动新加的行里不写不归本项目的目录名（本机家目录、仓的上一级目录与第二台私有名单里的条目名，只在像目录的上下文里判）与根下系统目录的占用；放行表 .claude/out-of-project-paths 每一条要有 git 跟踪的脚本引到
 # gate-cell: utf8-valid 这次改动（暂存区或工作区相对基准）里的文本文件是合法 UTF-8：非法的点名文件、工作区还是暂存区、第一处坏字节的偏移
 # gate-cell: dated-status 登记的 kb 目录里的中文页在「## 历史版本」之前不写带日期的现状句（「现状（日期」与「日期 现状」两种）；滞后表 dated-status-lag.tsv 登记的放过，滞后表写对了、与 gate 基准那一版比只缩不涨
+# gate-cell: comment-history 代码与脚本的注释、文件头、文档串与 README 里不写历史（日期、出处、改动经过）；特殊缘由在那一行写 history-kept 标记，存量登记在滞后表 comment-history-lag.tsv，滞后表写对了、与 gate 基准那一版比只缩不涨
 # 格结构经 lib/stage-cells.sh。
 #
 # ── prime-marks、clock-times、session-names ──
@@ -67,7 +68,7 @@
 #   不数链接目标 ](…) 里的，链接文字照数：译文链的是译文另起的文件名，中文文件名里的 I-3.1 在日语文件名里写成 I-3-1）、
 #   Markdown 链接目标 ](目标) 的集合、围栏外各级标题的个数、围栏外 | 起头的表格行个数、围栏代码块个数。缺份的组不比，归 files。
 # changed-together：基准取 scripts/gate/changed-paths.sh 的 gate 取法（gate_diff_base gate 与 gate_changed_paths … untracked，阶段里不再抄一遍）；
-#   碰了一组里的中文那一份，英语、日语两份都要碰，删掉的也算碰；中文那一份没碰、只碰了译文的组放行（用户 2026-10-23 定「只在中文变了时要求同改」，
+#   碰了一组里的中文那一份，英语、日语两份都要碰，删掉的也算碰；中文那一份没碰、只碰了译文的组放行（只在中文变了时要求同改，
 #   译得对不对归 structure、glossary、untranslated 三格），成功那句与红的汇总另报放行几组；一组都没碰到、或不在 git 仓里：退 77。
 # glossary：翻译术语表 .claude/kb/translation-glossary.md，表上方单独一行 <!-- trilingual-glossary --> 紧挨着表，表头
 #   | 中文 | English | 日本語 | 说明 / Note / 注 |。表本身：每行四列、前三列不空、中文列不重复、说明列空着或恰好三段（用 <br> 分隔、每段不空）。
@@ -123,13 +124,13 @@
 # 管不到的：换了写法的值（大小写、拆开写、换成别称）、用户原话里的别称（不在配置里）、commit message（提交之后才有，要另挂 commit-msg 钩子）、不足 8 个字的值。
 #   词源只有 multi-host.env 与 hostname：~/.config/singlefs/ 下的清场脚本里的词没并进来（并入前要在真树上整仓逐行量新增命中，新增为 0 才并；上一次量出来不是 0，没并）。
 # ── account-quota ──
-# 记录、kb 页、三方判决正文、代码与治理文件里不写账号切换与用量限额（用户 2026-10-18：「改一下 doc-lint 账号切换  限额 这种就不要记了」）：撞了哪种额度、换没换账号、额度什么时候重置， account-quota:allow 词表与样本说明
+# 记录、kb 页、三方判决正文、代码与治理文件里不写账号切换与用量限额：撞了哪种额度、换没换账号、额度什么时候重置， account-quota:allow 词表与样本说明
 # 这些是子 agent 停下的原因，不是要留下的事实；子 agent 因此停下的，只写「中途停下没交回」。
 # 落点在这一道而不是上游 scripts/doc-lint.sh：那一份只扫 kb 目录，不扫 records/ 与 research/prompts/；这一道本来就有判「这次改动新加的行」的格（private-values）。
 # 射程：这次改动新加的行（scripts/gate/changed-paths.sh 的 gate 取法的基准到工作区；未跟踪的新文件整份都算新加；旧行不报），看两类文件：
 #   ① 记录与三方判决正文：records/ 与 .claude/kb/ 下的 .md、research/prompts/ 顶层的 *-main-verification.md。
 #      research/prompts/ 里别的文件（_*-appendix.md、_*-background.md、_*-body.md、*-snapshot/ 下的副本）是从仓里抄给云端腿读的，抄进来的旧话不算这一次写的，不判。
-#   ② 代码与治理文件（用户 2026-11-05：「以后不要在本地写这样的东西」「加门禁 禁止写这样的东西」）：.claude/hooks/、scripts/、.claude/gate.d/、.claude/rules/、.claude/agents/、
+#   ② 代码与治理文件：.claude/hooks/、scripts/、.claude/gate.d/、.claude/rules/、.claude/agents/、
 #      .claude/main-agent.md、.claude/agent-common.md、task-server/、prune-server/ 下的文本文件，不限后缀（含 .py、.sh、.rs、.tsv；二进制整份跳过）；
 #      .claude/gate.d/fixtures/ 除外（样本要造这些话才能证红）。仓里不写按用量限额挑模型、拦派发的东西：解析限额通知的正则、按通知拦派发的放行行都不进仓。 account-quota:allow 词表与样本说明
 #      代码里为了造限额通知而写的字面、词表与出路说明本身，在那一行写 account-quota:allow <理由>（注释里写，理由至少 4 个字）。
@@ -141,8 +142,8 @@
 #   不在词表里的：「额度」「限额」「上限」「配额」单独出现（显卡额度、GPU_CARDS_BY_PRIORITY 的额度、内存上限、空间配额）；「欠账号」（欠账编号）；「换号」「重写换号」（版本号）；
 #     「账户」；「限流」单独出现（只有跟在「撞」后面才算）。
 # 放行：行里写「account-quota:allow <理由>」（理由至少 4 个字）整行放过，md 里也认；没写理由的标记不放过，另报一类红行。用在用户原话里带这些词、要原样留的地方，和引用 three-way-inference.md 那条规则标题的地方。
-# 误伤面（2026-10-19 对着当时工作区里射程内 719 份文件、12 万行量的）：词表命中 72 行，逐行读过，没有一行是显卡、内存或空间配额的用法；资源词放过 1 行（撞额度：账上 8G，内存额度）。
-#   裸词层最初是整行有资源词就放，量出来放过 3 行里有 2 行其实是模型限额（行里别处提到线程上限、草稿目录多少 G），所以改成只看命中处前后 24 个字。
+# 误伤面（对着射程内 719 份文件、12 万行量的）：词表命中 72 行，逐行读过，没有一行是显卡、内存或空间配额的用法；资源词放过 1 行（撞额度：账上 8G，内存额度）。
+#   裸词层只看命中处前后 24 个字里有没有资源词，不看整行：整行有资源词就放的话，行里别处提到线程上限、草稿目录多少 G 的模型限额会被放过。
 #   会误伤的：整份搬家后算新加的旧页里带这些词的行、测试代码里为了造限额通知而写的字面；出路都是删掉这句，或写 account-quota:allow。
 #   漏过的：换了写法的说法（「登录失效」「额度吃紧」「服务端过载」）、命中处附近恰好有资源词的裸词命中（「内存」「线程」离得近的模型限额）、射程之外的文件。
 # 没有 git 仓、这次改动没有新加到射程内的行：退 77，不判绿。
@@ -195,9 +196,9 @@
 #     date-once-red
 #     date-once-unjudgeable-red
 #     private-values-date-once-path-red
-#   GATE_TEXT_NOTATIONS_BREAK=date-once-exit-ignored  date-once 不收干跑的退出码（改前的样子）：干跑出错的那一份读不到摘要、当干跑 0 处
+#   GATE_TEXT_NOTATIONS_BREAK=date-once-exit-ignored  date-once 不收干跑的退出码：干跑出错的那一份读不到摘要、当干跑 0 处
 #     date-once-unjudgeable-red
-#   GATE_TEXT_NOTATIONS_BREAK=date-once-history-translations-judged  date-once 退回只排除中文那三份（两份变更史与 INDEX.md），英日译文照判（改前的样子）
+#   GATE_TEXT_NOTATIONS_BREAK=date-once-history-translations-judged  date-once 只排除中文那三份（两份变更史与 INDEX.md），英日译文照判
 #     date-once-history-translations-green
 #     date-once-history-translations-red
 #   GATE_TEXT_NOTATIONS_BREAK=term-renames-unjudged  term-renames 不调 sweep-term、记无对象可判
@@ -289,11 +290,11 @@
 #     trilingual-structure-red
 #   LIB_TRILINGUAL_BREAK=fence-blind  围栏里的行也当正文数标题与表格行
 #     trilingual-structure-green
-#   LIB_TRILINGUAL_BREAK=link-target-ids-counted  编号集合也数链接目标 ](…) 里的编号（改前的样子）
+#   LIB_TRILINGUAL_BREAK=link-target-ids-counted  编号集合也数链接目标 ](…) 里的编号
 #     trilingual-structure-link-target-red
 #   LIB_TRILINGUAL_BREAK=partial-ignored  碰了一份就当三份都碰了
 #     trilingual-changed-together-red
-#   LIB_TRILINGUAL_BREAK=translation-only-required  只碰了译文（中文那一份没碰）的组也要三份都碰（改前的样子）
+#   LIB_TRILINGUAL_BREAK=translation-only-required  只碰了译文（中文那一份没碰）的组也要三份都碰
 #     trilingual-changed-together-red
 #     trilingual-changed-together-translation-only-green
 #   LIB_TRILINGUAL_BREAK=glossary-marker-ignored  找不到标记不报
@@ -324,7 +325,7 @@
 #     trilingual-glossary-longer-word-green
 #     trilingual-glossary-longer-word-red
 #     trilingual-glossary-longer-words-table-red
-#   LIB_TRILINGUAL_BREAK=glossary-renames-columns-counted  改名登记表的旧名、新名两列也算用到术语（改前的样子）
+#   LIB_TRILINGUAL_BREAK=glossary-renames-columns-counted  改名登记表的旧名、新名两列也算用到术语
 #     trilingual-glossary-renames-columns-red
 #   LIB_TRILINGUAL_BREAK=omission-ratio-ignored  trilingual-omission 不比内容量
 #     trilingual-omission-english-red
@@ -369,7 +370,7 @@
 #     private-values-shared-root-address-red
 #     private-values-symlink-dangling-red
 #     private-values-symlink-mount-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-big-file-truncated  未跟踪文件只读前 8 MiB、超大也不判红（改前的样子）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-big-file-truncated  未跟踪文件只读前 8 MiB、超大也不判红
 #     private-values-big-untracked-red
 #     private-values-too-big-red
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-names-unjudged  不比文件名
@@ -384,27 +385,27 @@
 #     private-values-filename-only-red
 #     private-values-siblings-red
 #     private-values-unreadable-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-siblings-unmasked  prime-marks / clock-times / session-names 三格打路径与行文片段不打码（改前的样子）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-siblings-unmasked  prime-marks / clock-times / session-names 三格打路径与行文片段不打码
 #     private-values-clock-snippet-red
 #     private-values-siblings-red
 #     private-values-unreadable-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-snippet-cut  三格的行文片段照命中位置前 20 后 10 个字直接截，不挪到私有值的边上（改前的样子）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-snippet-cut  三格的行文片段照命中位置前 20 后 10 个字直接截，不挪到私有值的边上
 #     private-values-clock-snippet-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-date-once-term-renames-unmasked  date-once 的红行与 term-renames 转出的 sweep-term 输出原样打路径（改前的样子）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-date-once-term-renames-unmasked  date-once 的红行与 term-renames 转出的 sweep-term 输出原样打路径
 #     private-values-date-once-path-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-path-by-segment  路径打码退回逐段比（改前的判法：哪一段含整个值才打码，值带 / 跨几段时一段都不含）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-path-by-segment  路径打码逐段比（哪一段含整个值才打码，值带 / 跨几段时一段都不含）
 #     private-values-cross-segment-red
 #     private-values-siblings-red
 #     private-values-unreadable-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-links-followed  不判符号链接（改前的样子：跟着链接走，坏链接整份跳过、好链接读它指到的内容）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-links-followed  不判符号链接：跟着链接走，坏链接整份跳过、好链接读它指到的内容
 #     private-values-symlink-dangling-red
 #     private-values-symlink-mount-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-unreadable-raises  读文件不包异常（改前的样子：读不了就让格崩，python 回溯把带假仓路径的原路径打出来）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-unreadable-raises  读文件不包异常：读不了就让格崩，python 回溯把带假仓路径的原路径打出来
 #     private-values-unreadable-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-shared-roots-judged  共享根（NFS_SHARED_ROOTS 各段）里的路径也当私有值（改前的样子）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-shared-roots-judged  共享根（NFS_SHARED_ROOTS 各段）里的路径也当私有值
 #     private-values-shared-root-address-red
 #     private-values-shared-root-green
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-addresses-skipped  IPv4 地址当纯数字跳过、不取（改前的样子）
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-addresses-skipped  IPv4 地址当纯数字跳过、不取
 #     private-values-shared-root-address-red
 #     private-values-shared-root-green
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-by-host-unsplit  按台的键照别的键取整项（<地址>=<值> 整串），不从第一个 = 切出值（假第二台的编译根取不到）
@@ -434,7 +435,7 @@
 #     account-quota-code-red
 #     account-quota-green
 #     account-quota-red
-#   GATE_TEXT_NOTATIONS_BREAK=account-quota-code-unscoped  射程里没有代码与治理文件（改前的样子：只判 records/、.claude/kb/ 与三方判决正文）
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-code-unscoped  射程里没有代码与治理文件：只判 records/、.claude/kb/ 与三方判决正文
 #     account-quota-code-green
 #     account-quota-code-red
 #   GATE_TEXT_NOTATIONS_BREAK=account-quota-notice-form-skipped  限额通知里 resets 后接月日与钟点、括号时区的那一形态不判
@@ -577,6 +578,33 @@
 #   GATE_TEXT_NOTATIONS_BREAK=dated-status-growth-unjudged  dated-status 不拿滞后表与 gate 基准那一版比（滞后表涨了也不红）
 #     dated-status-green
 #     dated-status-lag-growth-red
+#   COMMENT_HISTORY_CHECK_BREAK 认 scripts/gate/comment-history-check.py 文件头的开关（comment-history 一格的判法在那份脚本里，这一格起它时环境原样带进去；下面十二条列出样本能证红的，另五条只在那份脚本自己的自证里复跑）：
+#   COMMENT_HISTORY_CHECK_BREAK=marker-ignored  comment-history 不认 history-kept 标记：标记行照样按命中算
+#     comment-history-green
+#     comment-history-marker-short-red
+#   COMMENT_HISTORY_CHECK_BREAK=marker-reason-unchecked  标记理由不核长度，写什么都放过
+#     comment-history-marker-short-red
+#   COMMENT_HISTORY_CHECK_BREAK=docstrings-skipped  不取 Python 文档串
+#     comment-history-python-docstring-red
+#   COMMENT_HISTORY_CHECK_BREAK=path-dates-flagged  日期不核前后字符，路径与文件名里的日期也判
+#     comment-history-green
+#   COMMENT_HISTORY_CHECK_BREAK=strings-as-comments  字符串里的注释符也当注释
+#     comment-history-strings-green
+#   COMMENT_HISTORY_CHECK_BREAK=lag-growth-unjudged  comment-history 的滞后表不与 gate 基准那一版比（滞后表涨了也不红）
+#     comment-history-lag-growth-red
+#   COMMENT_HISTORY_CHECK_BREAK=lag-slack-allowed  命中少于登记的不判红
+#     comment-history-lag-slack-red
+#   COMMENT_HISTORY_CHECK_BREAK=lag-table-form-unchecked  滞后表的行不核写法，只取能取到的路径与数
+#     comment-history-lag-table-red
+#   COMMENT_HISTORY_CHECK_BREAK=exempt-table-form-unchecked  豁免表的行不核写法，路径在射程里就放过
+#     comment-history-exempt-table-red
+#   COMMENT_HISTORY_CHECK_BREAK=exempt-table-ignored  不读豁免表
+#     comment-history-green
+#     comment-history-exempt-table-red
+#   COMMENT_HISTORY_CHECK_BREAK=shebang-unscoped  没有后缀的 shebang 脚本不在射程里
+#     comment-history-shebang-red
+#   COMMENT_HISTORY_CHECK_BREAK=readme-fences-judged  README 的围栏代码块里也判
+#     comment-history-green
 #   LIB_FORBIDDEN_NOTATIONS_BREAK 认 lib-forbidden-notations.py 的形态键与判据行键（关掉那一形态或那一条判据行），另认几项把判法退回旧样子：
 #   LIB_FORBIDDEN_NOTATIONS_BREAK=prime-marks  关掉撇号类角标这一形态（它只有同名的一条判据行）
 #     prime-marks-red
@@ -621,9 +649,9 @@
 #   LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose  紧凑时间戳那一条判据行退回「8 位数字加 T 加 4 到 6 位数字」、不核日期钟点的范围与前后字符
 #     clock-times-green
 #     clock-times-red
-#   LIB_FORBIDDEN_NOTATIONS_BREAK=numbered-pairs-whole-line  编号对的上下文规则退回按整行读（改前的样子：同一行里有「文件:行号」或越界冒号对，整行的冒号对都放过）
+#   LIB_FORBIDDEN_NOTATIONS_BREAK=numbered-pairs-whole-line  编号对的上下文规则按整行读（同一行里有「文件:行号」或越界冒号对，整行的冒号对都放过）
 #     clock-times-red
-#   LIB_FORBIDDEN_NOTATIONS_BREAK=mountinfo-device-numbers  mountinfo 一行里的主:次设备号不放过（改前的样子，当钟点判）
+#   LIB_FORBIDDEN_NOTATIONS_BREAK=mountinfo-device-numbers  mountinfo 一行里的主:次设备号不放过（当钟点判）
 #     clock-times-green
 #   同一个变量的 first-hit-only（只交最靠前的一处）在这一道的样本上不判错，证红的是 .claude/hooks/write-guard.sh --selftest。
 #   下面三个变量名不以 _BREAK 收尾，值写形态键，照同样写法列出判错的样本：
@@ -641,6 +669,9 @@
 #     session-names-green
 #   CONTEXT 与 ALLOW 设成 prime-marks、CONTEXT 设成 session-names 在这一道的样本上不判错（那两种形态没有上下文规则，prime-marks 的样本里没有放行标记）。
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0
+#     comment-history-exempt-table-red、comment-history-lag-count-red、comment-history-lag-growth-red、comment-history-lag-slack-red、comment-history-lag-table-red
+#     comment-history-marker-short-red、comment-history-python-docstring-red、comment-history-readme-red、comment-history-rust-doc-red
+#     comment-history-rust-line-date-red、comment-history-shebang-red、comment-history-shell-red、comment-history-wgsl-red
 #     account-quota-code-red、account-quota-red、clock-times-mountinfo-red、clock-times-red、date-once-history-translations-red
 #     date-once-red、date-once-unjudgeable-red、dated-status-lag-growth-red、dated-status-lag-table-red、dated-status-red
 #     out-of-project-names-allowed-red、out-of-project-names-deep-red
@@ -657,6 +688,10 @@
 #     trilingual-untranslated-exempt-table-red、trilingual-untranslated-identical-red、trilingual-untranslated-japanese-red、utf8-valid-chunk-red
 #     utf8-valid-red、utf8-valid-staged-red
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
+#     comment-history-exempt-table-red、comment-history-green、comment-history-lag-count-red、comment-history-lag-green、comment-history-lag-growth-red
+#     comment-history-lag-slack-red、comment-history-lag-table-red、comment-history-marker-short-red、comment-history-python-docstring-red、comment-history-readme-red
+#     comment-history-rust-doc-red、comment-history-rust-line-date-red、comment-history-shebang-red、comment-history-shell-red、comment-history-strings-green
+#     comment-history-wgsl-red
 #     account-quota-code-green、account-quota-code-red、account-quota-green、account-quota-red、clock-times-green、clock-times-mountinfo-red
 #     clock-times-red、date-once-green、date-once-history-translations-green、date-once-history-translations-red
 #     date-once-red、date-once-unjudgeable-red、dated-status-green、dated-status-lag-growth-red、dated-status-lag-table-red、dated-status-red
@@ -697,7 +732,7 @@
 #   下（含子目录）的中文 .md：不含 .en.md、.ja.md 译文（kb 的译文另起了名的也以这两个后缀收尾，lib-trilingual.py 的 language_paths），不含 decisions-history.md、experiments-history.md、INDEX.md。
 #   每份只看「## 历史版本」那一行之前，历史节里的旧样子不判。
 # 判什么：一行里有「现状（YYYY-MM-DD」（现状与括号之间可夹 **，括号可以是半角）或「YYYY-MM-DD 现状」（中间至多一个空格），逐行打「路径:行号  片段」判红；
-#   「2026-09-17 跑了一次」这种日期跟着事件的句子不判。
+#   「2026-09-17 跑了一次」这种日期跟着事件的句子不判。  history-kept: 例句里的日期是被测的数据形态
 # 滞后表 .claude/gate.d/dated-status-lag.tsv（被判的根下）：一行「<路径><TAB><行内锚><TAB># <为什么还没改>」，锚是那一行里至少 12 个字的原文，理由至少 4 个字；
 #   命中的行落在某一条登记里（同一路径、那一行含锚）就不红，成功句报「滞后 N 行」。表不在就是没有登记，命中的一律红。
 #   表自己判红的：列数不是三列、锚不到 12 个字、理由没写或不到 4 个字、同一条登记两次、登记的路径不在、锚在那份文件里命中的不是恰好一行；
@@ -708,9 +743,24 @@
 # 不并进同一道的 date-once 格：那一格只判这次改动碰到的记录与 kb 页、判的是正文重复所属标题的日期与同日第二个小节，交 doc-consolidate.py 干跑；这一格判全部 kb 中文页此刻的样子，
 #   日期与标题无关、只认「现状」挨着日期的两种形态，还有滞后表。不并进 clock-times 格：那一格判全仓的钟点、时区词与时间戳，日期本身不判。
 # 弄坏开关 dated-status-lag-unread、dated-status-growth-unjudged 只在样本根上认（stage_cells_run 开头那一判拦真仓）。
-# 管不到的：不带「现状」二字的带日期现状句（「截至 2026-09-17 已落地」「2026-09-17 时三条全过」这类，要靠人把日期删掉再读）；英语、日语译文里的同类句子；
+# 管不到的：不带「现状」二字的带日期现状句（「截至 2026-09-17 已落地」「2026-09-17 时三条全过」这类，要靠人把日期删掉再读）；英语、日语译文里的同类句子；  history-kept: 例句里的日期是被测的数据形态
 #   滞后表登记了之后那一行事实又变了（锚还在就照放过，靠写回员现查改）。
-# 样本：fixtures/doc-text.sh/ 下八十三份，每份样本根放 .gate-cells 只点名它判的那一格（trilingual-* 三十份的现场都由 setup.sh 现造，日期取真实发生过的日子；private-values-siblings-red 与 private-values-unreadable-red 点名四格）：
+#
+# ── comment-history ──
+# 代码与脚本的注释、文件头与 README 写成了改动经过，没有别的门禁管（判据：.claude/agent-common.md「代码与脚本的注释、说明只写现状，不写历史」那一条）。
+# 判法整份在 scripts/gate/comment-history-check.py，这一格只调它、退出码原样交回（不另写一份）：词表、射程、取哪些文本、特殊缘由标记、豁免表与滞后表的写法、成功句与弄坏开关都写在那份脚本的文件头；
+#   python3 scripts/gate/comment-history-check.py --list <根> 逐行打全部命中，--lag-table <根> 按此刻命中现算滞后表。
+# 射程：被判的根下 crates/、scripts/、task-server/、prune-server/、.claude/hooks/、.claude/gate.d/、.claude/scripts/ 里 git 跟踪的与未跟踪而未忽略的 .rs、.wgsl、.py、.sh、
+#   首行是 sh、bash、python shebang 的无后缀脚本与 README.md（根不是 git 仓时按目录遍历同一射程）；.claude/gate.d/fixtures/ 与 target/ 不判；
+#   取注释、Python 文档串与 README 全文（围栏代码块不判），字符串里的 // 与 # 不算注释。
+# 特殊缘由：那一行的注释里写 history-kept 标记加至少 8 个字的理由，那一行放过；理由不够长的判红并点名。
+# 豁免表 .claude/gate.d/comment-history-exempt.tsv：一行「<路径><TAB># <理由，至少 8 个字>」，整份文件不判，只收主题就是历史词表的文件，存量不往里放；
+#   滞后表 .claude/gate.d/comment-history-lag.tsv：一行「<路径><TAB><命中行数><TAB># <理由，至少 4 个字>」，文件命中比登记多、比登记少、不在表里的文件有命中，都判红；
+#   与 gate 基准那一版比只缩不涨（基准里没有的行、数比基准大都判红；基准里整张表还不存在的那一次只判写法、不判涨）；被判的根不是 git 仓时不比、成功句写明没比。
+# 成功句报扫了多少份文件、多少行注释、命中几行，其中按标记放过几行、滞后几行；射程里一份文件都没有退 77，不判绿。
+# 弄坏开关 COMMENT_HISTORY_CHECK_BREAK 只在样本根上认（stage_cells_run 开头那一判拦真仓，那份脚本自己也只在样本根与自证里认），开关表在上面「弄坏开关」那一段。
+# 管不到的：字符串、测试输入里写的历史词；不在词表里的历史说法（靠 review）；注释里写在围栏之外的缩进代码块。
+# 样本：fixtures/doc-text.sh/ 下一百零三份，每份样本根放 .gate-cells 只点名它判的那一格（trilingual-* 三十份的现场都由 setup.sh 现造，日期取真实发生过的日子；private-values-siblings-red 与 private-values-unreadable-red 点名四格）：
 #   date-once-red       setup.sh 建 git 仓；这一轮往记录正文加一行带文件名日期的话、往实验页加第二个同日 `### ` 小节，逐份点名判红
 #   date-once-green     同一基准；加的行只带别的日期、加的小节是另一天，判绿
 #   date-once-history-translations-green  setup.sh 建 git 仓；两份变更史与 INDEX.md 连同英日译文九份，这一轮各加同一天在另一节的一块（INDEX 是同一天的第二个小节）与一行重复所属日期的话，
@@ -777,7 +827,7 @@
 #   trilingual-untranslated-identical-green  英语、日语两份各有六行与中文逐字相同：只有数和拉丁字母的表格行与分隔行，中文只在反引号、「」、链接目标、HTML 注释里的四行；
 #                       日语另有照抄的标题「概要」（只用日语也用的汉字）；判绿，报放过 13 行
 #   trilingual-untranslated-exempt-table-red  排除登记表五处写错（页不在、只有一列、理由太短、同一份登记两次、登记了译文那一份），译文都已译好，逐行点名判红
-#   trilingual-omission-english-red    英语那份「背景」一节漏了中文第二段（中文 3 段、英语 2 段）、「回看」表 D4 那一行漏了 2026-10-21 那一块（比值 0.41，门槛那一档）、
+#   trilingual-omission-english-red    英语那份「背景」一节漏了中文第二段（中文 3 段、英语 2 段）、「回看」表 D4 那一行漏了其中一个日期的那一块（比值 0.41，门槛那一档）、
 #                       「欠账」表首列编号 C12 那一行整行没有，三类各点名一处判红；日语那份译全
 #   trilingual-omission-japanese-red   日语那份段数、列表项、表格行都与中文相同，两段与两个列表项压成一句大意（比值 0.19–0.31）、一个表格行比值 0.89（门槛那一档），逐段点名判红；英语那份译全
 #   trilingual-omission-green          两组译全：中文切换行下面不空行、中文段落折行、列表续行、中文多一段跨空行的 HTML 注释、围栏里三份行数不同、反引号与链接目标里的长串中文、
@@ -845,21 +895,46 @@
 #   out-of-project-names-deep-red  同一套替身与放行表：那个小写词单独带容量，~/<名>、/home/<用户>/<名>、~/<上一级>/<名> 带容量（第一段，照判带容量），
 #                       ~/<家目录条目名>/sub/<名> 与 ../<上一级条目名>/docs/<名> 带容量（深层段不判带容量，第一段由路径段判红），逐行点名判红，共 6 行
 #   dated-status-red    样本根照真仓形态放 .claude/kb-directories（.claude/kb 与 crates/sample-checker/invariants 两行）与 .claude/history-carriers，不建 git 仓、没有滞后表：
-#                       里程碑页正文「**现状（2026-09-17 落地）**：」、实验页正文「2026-09-14 现状：」、不变量页表格行里「**2026-09-23 现状**（」三行逐行点名判红；
-#                       不判的：实验页「## 历史版本」里的同形句、事件句「2026-09-17 跑了一次」、不带日期的「现状：」、英语译文、实验变更史与 INDEX.md 里的同形句、records/ 下的同形句（不在登记目录里）
+#                       里程碑页正文「**现状（2026-09-17 落地）**：」、实验页正文「2026-09-14 现状：」、不变量页表格行里「**2026-09-23 现状**（」三行逐行点名判红；  history-kept: 引的是样本输入里的日期
+#                       不判的：实验页「## 历史版本」里的同形句、事件句「2026-09-17 跑了一次」、不带日期的「现状：」、英语译文、实验变更史与 INDEX.md 里的同形句、records/ 下的同形句（不在登记目录里）  history-kept: 引的是样本输入里的日期
 #   dated-status-green  同一套页与登记目录，setup.sh 建 git 仓：基准里滞后表登记那三行；这一轮把里程碑那一行改成现值、删掉滞后表里它那一行（只缩），
 #                       判绿并报滞后 2 行、与基准比没涨；历史节里的同形句与事件句照旧不判
 #   dated-status-lag-growth-red  setup.sh 建 git 仓：基准里里程碑页两行现状句、滞后表只登记一行；这一轮往滞后表加另一行：点名新加的那一行（滞后表比基准多 1 行）判红，两行命中都算滞后
 #   dated-status-lag-table-red   不建 git 仓：一份页一行现状句，滞后表一行写对、另七行各错一处（锚在文件里找不到、锚命中两行、登记的路径不在、锚不到 12 个字、只有两列、理由不到 4 个字、
 #                       与写对的那一行重复登记）：逐行点名行号判红，写对的那一行照放过
+#   comment-history-green  setup.sh 造豁免表，不建 git 仓：射程里各类文件（.rs、.wgsl、.py、.sh、没有后缀的 sh 脚本、README.md）都只写现状，注释里提到带日期的路径与文件名（路径里的日期是名字不判），
+#                       三行带够长标记的放过（.rs 注释、.sh 行尾注释、README 正文），README 围栏里写着词表里的词不判，豁免表里那份整份只讲这些词的 .py 不判；
+#                       射程外写着词表里的词的（docs/ 下的 .rs、根下 README.md、.txt、没有 shebang 的无后缀文件）不判：判绿，报命中 3 行、按标记放过 3 行
+#   comment-history-strings-green  不建 git 仓：.rs、.py、.sh 里字符串、原始字符串、字符字面量、三引号字符串里的 // 与 # 后面跟着词表里的词，shell 里的 ${#x}、$#、${x#y} 的 #，都不是注释：判绿，报命中 0 行
+#   comment-history-lag-green  setup.sh 建 git 仓：基准里两份 .rs 各有命中、滞后表登记两行；这一轮把第二份改净、删掉它那一行（只缩）：判绿，报滞后 2 行、与基准比没涨（基准 2 行，此刻 1 行）
+#   comment-history-rust-line-date-red  .rs 行注释里写了带日期的一句：点名「文件:行」与那个日期，判红
+#   comment-history-rust-doc-red  .rs 的 //! 与 /// 文档注释、块注释里各写了一处词表里的词：逐行点名（共 3 行），判红
+#   comment-history-python-docstring-red  .py 只有文档串里写了词表里的词（没有 # 注释）：点名文档串里那一行的行号，判红（不取文档串时判绿）
+#   comment-history-shell-red  .sh 的注释写了谁定的那一形态（日期夹在中间）：点名命中的整段，判红
+#   comment-history-shebang-red  没有后缀、首行是 python shebang 的脚本，# 注释里写了词表里的词：判红（脚本不在射程里时一份文件都没有，退 77）
+#   comment-history-readme-red  README.md 正文写了按轮次点名的一句，围栏里是干净的：判红
+#   comment-history-wgsl-red  .wgsl 行注释写了词表里的词：判红
+#   comment-history-marker-short-red  .py 一行注释写了带日期的话、标记理由只有 3 个字：不放过，点名行号与理由，判红（标记不认时红在另一条上，标记理由不核时判绿）
+#   comment-history-lag-growth-red  setup.sh 建 git 仓：基准里滞后表只登记一份 .rs；这一轮往表里加第二份：点名新加的那一行（滞后表比基准多 1 行）判红，两份的命中都算滞后
+#   comment-history-lag-count-red  setup.sh 造滞后表，不建 git 仓：一份 .rs 命中 3 行而滞后表只登记 2 行，另一份命中 1 行没登记：两份各把全部命中列出（共 4 行），判红
+#   comment-history-lag-slack-red  setup.sh 造滞后表，不建 git 仓：一份 .rs 命中 2 行而滞后表登记 3 行：点名改小到 2，判红
+#   comment-history-lag-table-red  setup.sh 造滞后表，不建 git 仓：滞后表一行写对、另六行各错一处（重复登记、只有两列、数不是整数、理由不到 4 个字、路径不在、数是 0），逐行点名行号判红；
+#                       两份因登记行写错没生效，它们的命中一并判红，写对的那一份照放过
+#   comment-history-exempt-table-red  setup.sh 造豁免表，不建 git 仓：豁免表一行写对、另四行各错一处（重复登记、理由不到 8 个字、路径不在、三列），逐行点名行号判红；
+#                       两份因登记行写错没生效，它们的命中一并判红，写对的那一份照放过
 #
-#   bash .claude/gate.d/doc-text.sh [项目根]                                     十六格都跑
+#   bash .claude/gate.d/doc-text.sh [项目根]                                     十七格都跑
 #   bash .claude/gate.d/doc-text.sh --list                                       逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-text.sh --check <格名>[,<格名>…] [项目根]            只跑点名的格
 #   bash .claude/gate.d/doc-text.sh --check out-of-project-names --all-lines [项目根]  回扫：全仓 git 跟踪的文本文件整份判，只报每份的命中处数（只读）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ doc-text.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 source "$STAGE_DIR/lib/stage-cells.sh"
@@ -988,7 +1063,7 @@ def shown_path(path, targets, broken):
     重叠的并成一段）打成 FILE_NAME_MASK，值不打印。没有词表（没有 multi-host.env）原样交回。"""
     if broken == "private-values-path-printed":      # 弄坏：路径原样打
         return path
-    if broken == "private-values-path-by-segment":      # 弄坏：改前的逐段比，值带 `/` 跨了几段时哪一段都不含整串，整条路径连值原样打出
+    if broken == "private-values-path-by-segment":      # 弄坏：逐段比，值带 `/` 跨了几段时哪一段都不含整串，整条路径连值原样打出
         return "/".join(FILE_NAME_MASK if any(word in part for _key, word in targets) else part for part in path.split("/"))
     spans = []
     for _key, word in targets:
@@ -1128,6 +1203,8 @@ stage_cell utf8-valid cell_utf8_valid "这次改动（暂存区或工作区相�
   "照红行的文件、版本（工作区或暂存区）、字节偏移和行号，把那一处按字符定点改回来（Edit 或 scripts/kb/replace-once.py；shell 的 paste -d、cut -c、head -c 这类按字节切的命令会把多字节字符切坏，改文本别用）；暂存区里坏而工作区已修好的，git add 重新暂存；确实是二进制的，补进 cell_utf8_valid 的后缀名单"
 stage_cell dated-status cell_dated_status "登记的 kb 目录里的中文页在「## 历史版本」之前不写带日期的现状句（「现状（日期」与「日期 现状」两种）；滞后表 dated-status-lag.tsv 登记的放过，滞后表写对了、与 gate 基准那一版比只缩不涨" \
   "删掉日期、把事实现查后改成现值；那一天的样子要留就进 ## 历史版本（登记在 .claude/history-carriers 的文件）；存量还没改完的照 .claude/gate.d/dated-status-lag.tsv 的写法登记（只缩不涨，新写的句子不许往里加），改好一行就删它那一行"
+stage_cell comment-history cell_comment_history "代码与脚本的注释、文件头、文档串与 README 里不写历史（日期、出处、改动经过）；特殊缘由在那一行写 history-kept 标记，存量登记在滞后表 comment-history-lag.tsv，滞后表写对了、与 gate 基准那一版比只缩不涨" \
+  "改成只写现状：删掉日期、出处与改动经过，要指依据写现行登记位的编号与名字；历史进 commit message、.claude/kb/decisions-history.md、experiments-history.md 或 records/（.claude/agent-common.md「代码与脚本的注释、说明只写现状，不写历史」）；特殊缘由在那一行注释里写 history-kept: <理由，至少 8 个字>；存量改不完的照 .claude/gate.d/comment-history-lag.tsv 的写法登记（只缩不涨，新写的不许往里加）；逐行看命中：python3 scripts/gate/comment-history-check.py --list <根>"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument="" out_of_project_all_lines=0
@@ -1213,7 +1290,7 @@ for relative_path in candidate_paths:
         with open(relative_path, 'rb') as handle:
             content = handle.read()
     except OSError as error:
-        if broken == 'private-values-unreadable-raises':   # 弄坏：改前的样子，读不了就让格崩
+        if broken == 'private-values-unreadable-raises':   # 弄坏：读不了就让格崩
             raise
         unreadable_files.append((relative_path, error))
         continue
@@ -1486,7 +1563,7 @@ exec(compile(private_values_source, "private-values-library", "exec"), private_v
 HOSTNAME_KEY = private_values.HOSTNAME_KEY
 FILE_NAME_MASK = private_values.FILE_NAME_MASK
 HEAD_BYTES = 8192                           # 前 8 KiB 里有 NUL 的文件按二进制整份跳过
-TRUNCATED_BYTES = 8 * 1024 * 1024           # 只有弄坏开关 private-values-big-file-truncated 才用：改前的样子，未跟踪文件只读前 8 MiB
+TRUNCATED_BYTES = 8 * 1024 * 1024           # 只有弄坏开关 private-values-big-file-truncated 才用：未跟踪文件只读前 8 MiB
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
@@ -1595,7 +1672,7 @@ for path in changed_paths:
             if keys:
                 findings.append((path, number, keys, [word for key, word in targets if word in text]))
     except OSError as error:
-        if broken == "private-values-unreadable-raises":   # 弄坏：改前的样子，读不了就让格崩，回溯里带原路径
+        if broken == "private-values-unreadable-raises":   # 弄坏：读不了就让格崩，回溯里带原路径
             raise
         unreadable.append((path, error))
 
@@ -1744,7 +1821,7 @@ def in_scope(path):
     if broken == "account-quota-records-only":                # 弄坏：只判 records/
         return path.startswith("records/") and path.endswith(".md")
     if broken != "account-quota-code-unscoped" and not path.startswith(SAMPLES_DIRECTORY) and (path in CODE_FILES or path.startswith(CODE_DIRECTORIES)):
-        return True                                           # 弄坏 account-quota-code-unscoped：代码与治理文件不在射程里（改前的样子）
+        return True                                           # 弄坏 account-quota-code-unscoped：代码与治理文件不在射程里
     if not path.endswith(".md"):
         return False
     if path.startswith("records/") or path.startswith(".claude/kb/"):
@@ -2741,6 +2818,16 @@ if not judged_files:
 print(f"  ✓ 带日期的现状句：扫了 {len(kb_directories)} 个 kb 目录里 {len(judged_files)} 份中文页历史节之前的 {lines_judged} 行，命中 {len(hits)} 行，不在滞后表里的 0 行；滞后 {len(lagged)} 行（滞后表 {table_rows} 行，{base_note}）")
 print(f"     没扫的：译文 {skipped_translations} 份、两份变更史与 INDEX.md {skipped_named} 份")
 PY
+  exit "$python_rc"
+}
+
+# ── comment-history ──
+# 判法整份在 scripts/gate/comment-history-check.py（文件头「comment-history」一段写判据、两张表的写法与弄坏开关）；这一格只起它、退出码原样交回。
+# 被判的根给它当参数；环境里的弄坏开关 COMMENT_HISTORY_CHECK_BREAK 原样带进去（stage_cells_run 开头已拦真仓）。
+cell_comment_history() {
+  local python_rc=0
+  cd "$ROOT" || exit 1
+  python3 "$REPO_ROOT/scripts/gate/comment-history-check.py" "$ROOT" || python_rc=$?
   exit "$python_rc"
 }
 

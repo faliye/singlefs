@@ -1,0 +1,41 @@
+# 门禁 code-tooling 的 repository-copy-closure 格的排除表：拷源点名了仓根条目、确实不是建仓副本的，或这一批还改不了的，逐处登记。
+# 写法：<路径>:<锚串>  # 理由（锚串与 # 之间至少两个空格，理由至少 4 个字）；那份文件里含锚串的被判行不算。指向不存在的文件、锚串一处被判行都不命中，都判红。
+# 只缩不涨：与改动范围的基准那一版比，基准里没有的「路径:锚串」判红。改成经 scripts/hosts/lib_repository_copy.py（shell 经 minimal-copy.py）拷之后删掉那一行。
+scripts/crash/crash-amplification.sh:"$repository_root/.claude/gate.d/crash-point-replay-items.tsv"  # 自证造按段登记的小根，只要合表这一份数据，不是编译副本
+scripts/crash/crash-amplification-lib.sh:includes = ("Cargo.toml", "Cargo.lock", ".cargo", "crates")  # 算源码摘要的范围（判一趟编的是不是这一份源码），不是拷贝清单
+scripts/crash/crash-point-replay.sh:"$root/crates/singlefs-verification/Cargo.toml" "$work/root-crate-manifest.toml"  # 自证给假仓的包清单留一份底稿、跑完照它换回，不是建副本
+scripts/crash/crash-point-replay.sh:"$unit_root/.claude/gate.d/crash-point-replay-segments.tsv" "$work/unit-segments-plain.tsv"  # 自证给按段登记文件留一份底稿，不是建副本
+scripts/devices/e152-run.sh:"$REPOSITORY/scripts/devices/vm-bench.sh" "$REPOSITORY/scripts/devices/e152-stage-root.sh"  # 起跑时钉住要调的两份测试台脚本（别的会话中途改原件不影响这一趟），不是仓副本
+scripts/experiment-apparatus/e10-aging-compaction-run.sh:"$real_root/scripts/hosts/heavy-threads.sh" "$tree/scripts/hosts/"  # 自证搭的小树只放被测脚本 source 的那一份，.claude 符号链接回真仓
+scripts/experiment-apparatus/e165-pin-red-examples.py:shutil.copyfile(os.path.join(REPOSITORY_ROOT, relative), os.path.join(copy_root, relative))  # 自证拷的是判法单元闭包算出的成员文件（改一份看键变不变），不是编译副本
+scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh:FIXED_COPY_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo"  # 弄坏开关 fixedcopylist 下照拷的那几样（改前写死的清单），正常路径取 copy_closure
+scripts/experiment-apparatus/e203_admission_scan_cost_counters.py:COPIED_DIRECTORIES = ("crates", ".cargo", "prune-server")  # 要改、这一批不碰（E203 那一路的会话正改着这份）：计数构建的仓副本手抄清单，交那一路改成经 copy_closure 加 copy_entries
+scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py:SYNCED_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates", THREAD_REGISTRY_ENTRY)  # E171 冻结装置：线道树同步的范围照跑前登记写死，不改
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py:SNAPSHOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates")  # E171 冻结装置（修订 8 的冻结树），快照范围照登记写死，不改
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py:SYNCED_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates")  # E171 冻结装置：线道树同步的范围照跑前登记写死，不改
+scripts/experiment-apparatus/e184-segment-one-long-run.sh:"$real_root/scripts/hosts/heavy-threads.sh" "$tree/scripts/hosts/"  # 自证搭的小树只放被测脚本 source 的那一份，.claude 符号链接回真仓
+scripts/experiment-apparatus/replay.sh:cp -- .claude/heavy-thread-default "$1/.claude/heavy-thread-default"  # copy_thread_registry_into：只给弄坏开关 copy-list-fixed 那一支与 thread-registry-copied 自证格用，正常路径经 replay_copy_closure_into
+scripts/experiment-apparatus/replay.sh:rsync -a --exclude target Cargo.toml Cargo.lock .cargo crates "$1/"  # 弄坏开关 copy-list-fixed 那一支（改前写死的清单），只在自证里走
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/attribution.py:"archive", REFERENCE_COMMIT, "crates", "Cargo.toml", "Cargo.lock"  # E201 归因的参照树从固定的历史提交导出，闭包算的是此刻的工作区；装置冻结
+scripts/gate/apply-writer-patch.py:STATIC_CHECK_TREE_PATHS = ("crates", "litmus", "Cargo.toml", "Cargo.lock", ".cargo")  # 弄坏开关 static-check-path-dependencies-skipped 下临时树里只放这几样（改前的样子），正常路径取 copy_closure
+scripts/gate/lib_function_units.py:shutil.copytree(os.path.join(root, "crates"), os.path.join(copy_root, "crates")  # 要改、这一批不改：对照键的临时树手抄 crates 与两份清单，与 build_unit_graph 的编译工作区及其缓存键、code-tooling.sh function-units 那一格同一份手抄，三处一起改
+scripts/gate/merge-and-verify.sh:cp --preserve=timestamps "$stale_tree/crates/demo/src/lib.rs" "$stale_source/crates/demo/src/lib.rs"  # 自证在假仓里换一份源文件造旧修改时刻，不是建副本
+scripts/gate/staged-tree-worktree.sh:"$SCRIPT_REPOSITORY/.claude/scripts/preflight.sh" "$SCRIPT_REPOSITORY/.claude/scripts/project_preflight.py"  # 自证搭要提交的样本仓，放被测脚本 source 的两份 preflight 垫片
+scripts/gate/staged-tree-worktree.sh:"$SCRIPT_REPOSITORY/.claude/singlefs-ai-sop/scripts/." "$root/.claude/singlefs-ai-sop/scripts/"  # 自证样本仓里放被 .gitignore 挡着的规范副本，验 create 把它补进检出的树
+scripts/gate/verus-proof-check.py:shutil.copy2(os.path.join(root, "Cargo.lock"), os.path.join(work, "Cargo.lock"))  # 要改、这一批不改：copy_crate 另写了一份 path 依赖闭包（不认 include_str!），改它判法单元的键跟着变、形式化判定要重验（推的），交主 agent 定随哪一批改
+scripts/gate/verus-proof-check.py:shutil.copy2(os.path.join(root, "Cargo.lock"), os.path.join(copy, "Cargo.lock"))  # 要改、这一批不改：MIR 比对那一段给 crate 副本补锁文件，与 copy_crate 一起改
+scripts/hosts/multi-host-run.sh:"$repository_root/.claude/scripts/" "$template/.claude/scripts/"  # 要改、这一批不碰（别的批次在改这份）：自证小仓的模板手抄目录，与 mutation-shard-run.sh 同一份写法一起改
+scripts/hosts/multi-host-run.sh:"$repository_root/.claude/hooks/lib_work_root.py" "$template/.claude/hooks/lib_work_root.py"  # 要改、这一批不碰（别的批次在改这份）：自证小仓的模板手抄单份文件，与 mutation-shard-run.sh 一起改
+scripts/hosts/multi-host-run.sh:"$repository_root/scripts/" "$template/scripts/"  # 要改、这一批不碰（别的批次在改这份）：自证小仓的模板整份拷脚本目录，与 mutation-shard-run.sh 一起改
+scripts/hosts/rocksdb-prebuilt.py:shutil.copyfile(os.path.join(root, "Cargo.lock"), os.path.join(project, "Cargo.lock"))  # 只拷锁文件给预编库的独立小工程钉依赖版本，不是仓副本
+scripts/hosts/source-stamp.py:DEFAULT_INCLUDES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates")  # refresh 默认比对的源文件范围（编译目录的源码戳），不是拷贝清单
+scripts/kb/lib_notation_check.py:shutil.copyfile(library_file(repository_root()), destination)  # 自证把真判据库抄进假仓，单份文件、不是仓副本
+scripts/mutation/crates-mutation-rows.py:copied = ["crates", "Cargo.toml", "Cargo.lock", "litmus"]  # 自证里判「拷贝范围」那一格的输入样例；这份别的会话正改着，这一批不碰
+scripts/mutation/mutate.sh:rsync -a --exclude target ./ "$(copy_directory_of 1)/"  # 只拷起它的那一个工作区，工作区外的闭包经 lib_repository_copy.py link-into 链回仓里，已走共用库
+scripts/mutation/mutation-shard-run.sh:"$repository_root/.claude/scripts/" "$template/.claude/scripts/"  # 要改、这一批不改：自证小仓的模板手抄目录，与 multi-host-run.sh 同一份写法一起改成只拷场景起的脚本的闭包
+scripts/mutation/mutation-shard-run.sh:"$repository_root/.claude/gate.d/crates-mutation-replay.sh" "$repository_root/.claude/gate.d/stage-inputs.tsv"  # 要改、这一批不改：自证小仓的模板手抄门禁与登记表，与 multi-host-run.sh 一起改
+scripts/mutation/mutation-shard-run.sh:"$repository_root/.claude/heavy-thread-default" "$template/.claude/"  # 要改、这一批不改：自证小仓的模板手抄登记文件，与 multi-host-run.sh 一起改
+scripts/mutation/mutation-shard-run.sh:"$repository_root/.claude/gate.d/lib/" "$template/.claude/gate.d/lib/"  # 要改、这一批不改：自证小仓的模板手抄门禁共用库，与 multi-host-run.sh 一起改
+scripts/mutation/mutation-shard-run.sh:"$repository_root/scripts/" "$template/scripts/"  # 要改、这一批不改：自证小仓的模板整份拷脚本目录，与 multi-host-run.sh 一起改
+scripts/mutation/mutation-shard-run.sh:"$repository_root/.claude/hooks/lib_work_root.py" "$template/.claude/hooks/"  # 要改、这一批不改：自证小仓的模板手抄单份文件（判法单元闭包要它），与 multi-host-run.sh 一起改
+.claude/gate.d/code-tooling.sh:cp --preserve=timestamps "$STAGE_REPOSITORY/.claude/heavy-thread-default" "$build_home/workspace/.claude/"  # 要改、这一批只许动这一道新加的一格：编 unit-graph 的工作区手抄 crate 与登记文件，与 lib_function_units.py 的 build_unit_graph 一起改

@@ -114,15 +114,12 @@
 | 形式化验证 | formal verification | 形式検証 | |
 | 广谱变异 | broad mutation | 広域ミューテーション | |
 | 变异表 | mutation table | ミューテーション表 | |
-| harness 档 | harness tier | harness 層 | |
-| checker 档 | checker tier | checker 層 | |
-| 快档 | quick tier | クイック層 | |
-| 慢档用例 | slow-tier case | スロー層ケース | |
+| 验证包 | verification crate | 検証クレート | `crates/singlefs-verification`<br>`crates/singlefs-verification`<br>`crates/singlefs-verification` |
+| 不指定范围 | unscoped run | 範囲指定なし | 门禁照单元键判全部项的那种跑法<br>the gate run that judges every item by its unit keys<br>ゲートがユニットキーで全項目を判定する走らせ方 |
+| 指定范围 | scoped run | 範囲指定あり | 用 `--item`、`--check` 这类参数点名要判的项<br>items named with arguments such as `--item` and `--check`<br>`--item`、`--check` などの引数で判定する項目を名指しする |
 | 全量 | full run | フル実行 | |
 | 崩溃全量 | crash full run | クラッシュフル実行 | |
 | 剪枝 | pruning | 枝刈り | |
-| 轻型 | light tier | ライト層 | |
-| 重型 | heavy tier | ヘビー層 | |
 | 本次未跑 | not run this time | 今回未実行 | |
 | 清场 | quiesce | 静止化 | 起 GPU 之前停掉占卡的服务<br>stop the services holding the GPUs before a GPU run<br>GPU を使う前に GPU を占有しているサービスを止める |
 | 显卡 | GPU card | GPU カード | |
@@ -173,6 +170,7 @@
 | 核心索引结构 | core index structure | コアインデックス構造 | D8（核心索引结构） 的简称<br>short name of that decision<br>その決定の略称 |
 | 加密 | encryption | 暗号化 | D9（加密） 的简称<br>short name of that decision<br>その決定の略称 |
 | 格式冻结政策 | format freeze policy | フォーマット凍結ポリシー | D15（格式冻结政策） 的简称<br>short name of that decision<br>その決定の略称 |
+| 格式锁定 | format freeze | フォーマット凍結 | 里程碑 17 收尾之后用户点名的那一次显式锁定提交，之前不存在；不是决策简称「格式冻结政策」<br>the one explicit lock commit the user names after milestone 17 closes, and none exists before then; not the decision short name "format freeze policy"<br>マイルストーン 17 の完了後にユーザーが指名する明示的な 1 回のロックコミットで、それ以前には存在しない；決定の略称「フォーマット凍結ポリシー」とは別 |
 | 发布语义 | publish semantics | パブリッシュセマンティクス | D16（发布语义） 的简称<br>short name of that decision<br>その決定の略称 |
 | 块里携带什么信息 | information carried in a block | ブロックに含める情報 | D18（块里携带什么信息） 的简称<br>short name of that decision<br>その決定の略称 |
 | 后台整理与放置回收 | background compaction and placement reclamation | バックグラウンド整理と配置回収 | D26（后台整理与放置回收） 的简称<br>short name of that decision<br>その決定の略称 |
@@ -191,3 +189,7 @@
 | 补写例外 | rewrite exception | 補い書き例外 | |
 | 历史版本 | Historical Versions | 履歴バージョン | |
 | 覆盖号 | coverage id | カバレッジ識別子 | |
+| 挂载参数 | mount parameter | マウントパラメータ | |
+| 正常卸载 | normal unmount | 正常アンマウント | |
+| 回扫员 | sweeper | 再走査担当 | |
+| 编译目录 | build directory | ビルドディレクトリ | |

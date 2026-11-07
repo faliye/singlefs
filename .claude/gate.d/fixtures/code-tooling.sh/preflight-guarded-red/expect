@@ -1,0 +1,3 @@
+exit=1
+want=unguarded.sh:6：source preflight 之后没有守卫
+want=门禁结构不对：gate-structure-check.py 退 1

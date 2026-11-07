@@ -42,9 +42,9 @@
 #       「✗ 自证 commit-stale：」、「✗ 自证 commit-with-dash-c：」、「✗ 自证 commit-after-cd：」、「✗ 自证 commit-in-bash-c：」
 #   SHARED_INDEX_STALE_REMINDER_BREAK=silent-on-unfinished  检查脚本到点没查完、起不来、退别的码时退回静默（stderr 不写、检出不记）
 #       「✗ 自证 check-timeout：」、「✗ 自证 check-exit-code：」
-#   SHARED_INDEX_STALE_REMINDER_BREAK=input-unrecorded  输入不是 JSON 对象时退回静默（stderr 不写、检出不记，改前的样子）
+#   SHARED_INDEX_STALE_REMINDER_BREAK=input-unrecorded  输入不是 JSON 对象时静默（stderr 不写、检出不记）
 #       「✗ 自证 bad-json-recorded：」
-#   SHARED_INDEX_STALE_REMINDER_BREAK=exception-unrecorded  判的时候出错时只打 stderr、不记检出（改前的样子）
+#   SHARED_INDEX_STALE_REMINDER_BREAK=exception-unrecorded  判的时候出错时只打 stderr、不记检出
 #       「✗ 自证 exception-recorded：」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -186,7 +186,7 @@ def main_hook(hook_dir):
         unreadable = None if isinstance(hook_input, dict) else f"输入顶层是 {type(hook_input).__name__}，不是 JSON 对象"
     except Exception as error:
         hook_input, unreadable = {}, f"输入不是合法的 JSON（{type(error).__name__}: {error}；前 200 字节：{raw[:200].decode('utf-8', 'replace')!r}）"
-    if unreadable:   # 判不了：照常放行，stderr 写一行、记一条检出（弄坏开关 input-unrecorded 下什么都不说，改前的样子）
+    if unreadable:   # 判不了：照常放行，stderr 写一行、记一条检出（弄坏开关 input-unrecorded 下什么都不说）
         if not broken("input-unrecorded"):
             problem = f"{unreadable}，这条命令是不是 git commit 没判；手动检查：python3 scripts/gate/shared-index-stale-check.py --repo <仓>"
             print(f"  ! {HOOK_NAME}：{problem}", file=sys.stderr)
@@ -196,7 +196,7 @@ def main_hook(hook_dir):
         message, problems = remind(hook_input, hook_dir)
     except Exception as error:   # 共用模块读不到、切词抛的：什么都不提醒
         print(f"  ! shared-index-stale-reminder.sh 没判成（{error!r}）", file=sys.stderr)
-        if not broken("exception-unrecorded"):   # 弄坏开关：只打 stderr、不记检出（改前的样子）
+        if not broken("exception-unrecorded"):   # 弄坏开关：只打 stderr、不记检出
             record_unfinished(hook_input, hook_dir, f"判的时候出错（{type(error).__name__}: {error}），这条命令是不是 git commit、共用索引过没过期都没判；"
                                                     "手动检查：python3 scripts/gate/shared-index-stale-check.py --repo <仓>")
         return 0

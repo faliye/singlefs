@@ -1,0 +1,182 @@
+{
+  "at": "2026-11-05",
+  "sources": [
+    {
+      "path": "scripts/kb/lib_markdown.py",
+      "sha256": "74af1e4af7a37c7bcd91bd021cc1cdb2d68942522fb254a12b1050cd30a06e01",
+      "read_ranges": [
+        [
+          1,
+          33
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "limits": "顶层围栏字符/长度/关闭/信息串/0-3缩进/未闭合到末尾均与各分支对应；明确不解析容器。"
+    },
+    {
+      "path": "scripts/kb/lib_atomic_replace.py",
+      "sha256": "61ab6aa21ca42bc185e2948e6841450dbc9d3e549dea472be996b43cdf8fed6a",
+      "read_ranges": [
+        [
+          1,
+          434
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "limits": "全文已读，正常路径与六格自证对应；A45受控交错已复现。清理失败/改名后的异常保证仍待核。"
+    },
+    {
+      "path": "scripts/kb/lib_basis_paths.py",
+      "sha256": "64a13bdcfc43651bad159d53b868fb7a1ecf014b18222fd5034adbe15833e538",
+      "read_ranges": [
+        [
+          1,
+          216
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "limits": "全文已读，依据路径五分支、HEAD/索引/工作区比较、行号例外与索引隐藏标记逐分支核；A48函数说明反向。调用者单次放行参数与自证运行待核。",
+      "revalidations": [
+        {
+          "at": "2026-11-05",
+          "sha256": "4bba51d9b6c4c73eb86968e66323211c7701e1d83c819aee461652bdfab4a061",
+          "read_ranges": [
+            [
+              1,
+              216
+            ]
+          ],
+          "limits": "局部保证与A48重核相同，其他变动语义保留待核，不覆盖旧摘要。"
+        }
+      ]
+    },
+    {
+      "path": ".claude/hooks/lib_selftest_scratch.py",
+      "sha256": "58cb250070e4799a87345ea1e8538b8c1e58e60fe95c91c832ebd551ce0f1f1c",
+      "read_ranges": [
+        [
+          1,
+          134
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "limits": "全文已读：TemporaryDirectory、TMPDIR恢复、red/crash子进程标记和残留检查、合并退出码对应。一般清理故障与任意信号路径未测。"
+    },
+    {
+      "path": ".claude/scripts/project_preflight.py",
+      "sha256": "a1eb438734b0c923ba46fe9bf936db9b3da7dfd7ca6211a15862aafb150cc719",
+      "read_ranges": [
+        [
+          1,
+          54
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "limits": "全文已读：本树优先/主仓回退/无副本拒绝的加载分支对应；规范副本本身未审。",
+      "revalidations": [
+        {
+          "at": "2026-11-05",
+          "sha256": "ca42161086b563de4613582e7c0765a7b215dc7e82c4069cd0dcb4059087d7d8",
+          "read_ranges": [
+            [
+              1,
+              54
+            ]
+          ],
+          "limits": "局部保证与A48重核相同，其他变动语义保留待核，不覆盖旧摘要。"
+        }
+      ]
+    },
+    {
+      "path": "scripts/kb/lib_notation_check.py",
+      "sha256": "919dc8228888d585089a2389207b259f12dd437b4ac0a24ae794f4011114ab33",
+      "read_ranges": [
+        [
+          1,
+          224
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "limits": "全文已读；20个共用判据另列文本判据条款.json；未知开关文档声明待核。"
+    }
+  ],
+  "claims": [
+    {
+      "tool": "lib_markdown",
+      "claim": "Fences track character,length,indentation and valid closing",
+      "status": "static_match",
+      "evidence": "advance_fence/fenced_flags;33lines",
+      "limits": "Top-level only; no container parser"
+    },
+    {
+      "tool": "lib_atomic_replace",
+      "claim": "Resolve symlink,refuse hardlink/read-only/nonregular;write temp/fsync/rename",
+      "status": "static_match_bounded",
+      "evidence": "replace_file_contents_by_rename",
+      "limits": "Concurrent retarget and filesystem errors not exhaustively tested"
+    },
+    {
+      "tool": "lib_atomic_replace",
+      "claim": "Digest callback guarantees exclusive conditional replacement",
+      "status": "not_a_library_claim",
+      "evidence": "No mutual exclusion promised by library;ledger overstatement A45",
+      "limits": "Do not transfer caller guarantee to library"
+    },
+    {
+      "tool": "lib_atomic_replace",
+      "claim": "Any failure leaves original unchanged and removes temporary file",
+      "status": "discrepancy_A49_reproduced",
+      "evidence": "7184 real postrename directoryfsync injectedKeyboardInterrupt propagates with NEW;filefsyncEIOcontrol retains OLD",
+      "limits": "No actual signal/powerloss test; cleanup failure branch remains pending"
+    },
+    {
+      "tool": "lib_basis_paths",
+      "claim": "Five path-state cases and line-specific exception",
+      "status": "static_match_bounded",
+      "evidence": "basis_check/CommittedState/_lines_unchanged",
+      "limits": "Real concurrent mutations can invalidate cached state;not a transaction"
+    },
+    {
+      "tool": "lib_basis_paths",
+      "claim": "Missing worktree/index versions skipped",
+      "status": "discrepancy_A48",
+      "evidence": "doc151 vs branch162",
+      "limits": "Code refuses;file header consistent with refusal"
+    },
+    {
+      "tool": "lib_basis_paths",
+      "claim": "Reject assume-unchanged/skip-worktree when not explicitly allowed",
+      "status": "static_match_bounded",
+      "evidence": "differs checks ls-files -v flag before cache",
+      "limits": "CLI callers and runtime samples pending"
+    },
+    {
+      "tool": "lib_selftest_scratch",
+      "claim": "Three paths checked and combined into final exit",
+      "status": "static_match_bounded",
+      "evidence": "run_with_scratch/child_path_problems/merged_exit_code",
+      "limits": "Quote selftest task6619 queued; do not claim all error paths"
+    },
+    {
+      "tool": "project_preflight",
+      "claim": "Imports do not launch subprocess;lookup deferred to invocation",
+      "status": "static_match_bounded",
+      "evidence": "module globals only realpath;subprocess inside shared_preflight_directory",
+      "limits": "Filesystem realpath resolves symlinks;does not read preflight source at import"
+    },
+    {
+      "tool": "lib_notation_check",
+      "claim": "Use target repository library and refuse loading failures",
+      "status": "static_match_bounded",
+      "evidence": "form_refusal:81-100",
+      "limits": "Onlyscopedload/refusal;whole forbidden-notations library pending"
+    }
+  ],
+  "runtime_updated_at": "2026-11-05"
+}

@@ -3,11 +3,10 @@
 # run-condition: command python3
 # PreToolUse hook（SendMessage）：给一个已经交回过、或被中断过（失败、被停、报错）的子 agent 发消息之前拦一道。
 #
-# 为什么：交回之后不续做，新活一律新派。用户 2026-09-24 问「启动subagent的时候 为什么会复用 id呢 很奇怪 这个能禁止复用吗」，
-# 选的是「交回之后不许续做」；还没交回的（在干活、或结束本轮去等自己后台任务的）照旧放行，整点询问与纠正要送得到。
-# 中断过的不续：2026-09-19 实测，E155 第二次跑的执行员失败之后被续做，上下文涨到 95 万，380 次调用平均每次 62.6 万、
-# 累计读缓存 2.36 亿、整份重写两次共 123.5 万，真正的输出 2.9 万。用户定：「以后这样被中断的 subagent 都应该新开，
-# 但是新开的时候要保证上下文和成果物的接续；如果接续会导致主 agent 的上下文膨胀，那么干脆就重开」。
+# 为什么：交回之后不续做，新活一律新派（不复用交回过的子 agent）；还没交回的（在干活、或结束本轮去等自己后台任务的）照旧放行，整点询问与纠正要送得到。
+# 中断过的不续：失败之后被续做的执行员，上下文会涨到近百万、每次调用都重读整份缓存，真正的输出只占零头。
+# 被中断的 subagent 一律新开，新开的时候要保证上下文和成果物的接续；
+# 如果接续会导致主 agent 的上下文膨胀，那么干脆就重开。
 #
 # 判法：下面两条任一成立就拒绝。先看主会话记录（hook 输入的 transcript_path）里这个收件人最近一次任务通知与交回消息，
 # 再看它在本会话 subagents 目录里的会话记录（`<会话目录>/subagents/agent-<id>.jsonl`，按 agent id 找）；子 agent 的会话记录不在（被挪走、删掉、
@@ -18,8 +17,7 @@
 #      不是错误（is_error 不为真，内容也不是 {"success":false,…} 那种没送出；被交回闸拒之后再没送达的不算，先被拒、后来送达的算）。
 #      这一认法只在 scripts/agents/subagent_transcript.py 的 handback_delivered 一处（看门狗 agent-watch.py 与结局账 agent-cost.py 取的是同一份）；
 #      读不到那份库时这一支不判、放行，stderr 写「读不到共用模块」（主会话记录里的交回消息与 ② 照判）。
-#   ② 中断过：本会话记录里它最近一次任务通知是 failed 或 killed。中断过的不留「只差收尾」的口子（用户 2026-09-19：
-#      「按照你现在的方法实际上也是在让上下文白白膨胀，没有意义」）。
+#   ② 中断过：本会话记录里它最近一次任务通知是 failed 或 killed。中断过的不留「只差收尾」的口子（续做只会让上下文白白膨胀）。
 # 两条的出路都是新派一个同类 agent：派发提示指到它的报告与产物；要它会话里的进度，用 scripts/agents/agent-handover.py
 # 从会话记录里抽出来给新 agent 读。
 # 判不了的照「放行但必记检出」：输入不是合法的 JSON 对象（解不开、不是 JSON、顶层不是对象）照常退 0，stderr 写一行可定位的诊断（钩子名、哪一处、输入的前 200 字节），
@@ -28,9 +26,9 @@
 # 读得懂而判不全的同样照「放行但必记检出」：主会话记录不在（transcript_path 没给或不是文件）、读不到 scripts/agents/subagent_transcript.py、判的时候抛异常，
 #   放行时 stderr 写一句、检出记录追加一行（findings 以「续做闸没判全」起头、outcome 只记，record_unjudged）；拒的那一次照拒，不另记。
 #
-# 上下文多大不拦（用户 2026-09-19：「不应该限制 280K，这个不可理。检测的看门狗不应该有终止的权利，subagent 也不应该有超过了
-# token 终止的逻辑，应该告诉主 agent 看看任务是不是异常，如果不是就继续跑」）：看门狗报「上下文过大」，主 agent 看任务有没有异常，
-# 没有就接着跑、接着续。这里原先还按上下文 40 万拒绝续做，那天主 agent 据此停掉了一个 28 万、任务并无异常的 agent。
+# 上下文多大不拦：检测的看门狗没有终止的权利，subagent 也没有超过了
+# token 就终止的逻辑，应该告诉主 agent 看看任务是不是异常，不是就继续跑：看门狗报「上下文过大」，主 agent 看任务有没有异常，
+# 没有就接着跑、接着续。
 #
 #   continuation-guard.sh             # 从 stdin 读 hook 的 JSON
 #   continuation-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝
@@ -57,7 +55,7 @@
 #   CONTINUATION_GUARD_BREAK=ignore-main-handback  handback_in_session_transcript() 不看主会话记录里的交回消息，只看子 agent 自己的会话记录
 #       主会话已有交回消息、子 agent 记录里还没有：拒（「应当返回 2，实际 0」）
 #       子会话记录不在、主会话里有交回消息：拒（「应当返回 2，实际 0」）
-#   CONTINUATION_GUARD_BREAK=missing-record-passes  decide() 找不到子 agent 的会话记录就放行，不看主会话里的任务通知与交回消息（改前的样子）
+#   CONTINUATION_GUARD_BREAK=missing-record-passes  decide() 找不到子 agent 的会话记录就放行，不看主会话里的任务通知与交回消息
 #       子会话记录不在、主会话里最近一次通知是 failed：拒（「应当返回 2，实际 0」）
 #       子会话记录不在、主会话里有交回消息：拒（「应当返回 2，实际 0」）
 #       子会话记录不在时拒绝说明写上下文与续做次数取不到（「应当返回 True，实际 False」）
@@ -67,19 +65,19 @@
 #       已交回（SubagentHandback 送达）的不续（「应当返回 2，实际 0」）
 #       共用样本：先被拒、后来送达的不续（「应当返回 2，实际 0」）
 #       stdin:已交回的续做（「应当返回 2，实际 0」）
-#   CONTINUATION_GUARD_BREAK=unparsable-input-silent  main() 读不出输入（不是合法的 JSON 对象）时静默放行，不打诊断、不记检出（改前的样子）
+#   CONTINUATION_GUARD_BREAK=unparsable-input-silent  main() 读不出输入（不是合法的 JSON 对象）时静默放行，不打诊断、不记检出
 #       stdin:坏 JSON 的 stderr 有诊断（「应当返回 True，实际 False」）
 #       stdin:坏 JSON 记一条检出（结局只记、会话号读不到）（「应当返回 (1, '只记', '读不到', True)，实际 (0, None, None, False)」）
 #       stdin:JSON 数组照常放行并记一条检出（「应当返回 (0, 2)，实际 (0, 0)」）
-#   CONTINUATION_GUARD_BREAK=library-unread-unrecorded  读不到 scripts/agents/subagent_transcript.py 时只打 stderr、不记检出（改前的样子）
+#   CONTINUATION_GUARD_BREAK=library-unread-unrecorded  读不到 scripts/agents/subagent_transcript.py 时只打 stderr、不记检出
 #       「读不到共用模块时放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 …」
-#   CONTINUATION_GUARD_BREAK=transcript-missing-unrecorded  主会话记录不在时照常放行、不记检出（改前的样子）
+#   CONTINUATION_GUARD_BREAK=transcript-missing-unrecorded  主会话记录不在时照常放行、不记检出
 #       「主会话记录不在时放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 …」
-#   CONTINUATION_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，放行、不记检出）
+#   CONTINUATION_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住、照原样抛出（进程退 1，放行、不记检出）
 #       「判的时候抛异常时放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 …」
-#   CONTINUATION_GUARD_BREAK=honor-outside-selftest  平常跑设了弄坏开关也照认，不拒（改前的样子）；关守卫项只在单独一项时认，与别的项同写照拒（records/2026-10-23-subagent拆分提案.md 第一百二十二节 ②）
+#   CONTINUATION_GUARD_BREAK=honor-outside-selftest  平常跑设了弄坏开关也照认，不拒；关守卫项只在单独一项时认，与别的项同写照拒（records/2026-10-23-subagent拆分提案.md 第一百二十二节 ②）
 #       平常跑设了弄坏开关：退 2 并点名只在自证里认（「应当返回 (2, True)，实际 (0, False)」）
-#   CONTINUATION_GUARD_BREAK=honor-outside-selftest-with-others  带标记的自证子进程里，关守卫项与别的项同写也照认（改前的样子：honor-outside-selftest 写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
+#   CONTINUATION_GUARD_BREAK=honor-outside-selftest-with-others  带标记的自证子进程里，关守卫项与别的项同写也照认（honor-outside-selftest 写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
 #       「关守卫项与别的项同写：带标记的子进程里也退 2 并点名它 应当返回 (2, True)，实际 (0, False)」
 # 送达的认法在 scripts/agents/subagent_transcript.py，它的开关（开关表在它的文件头）打开后这里红的项：
 #   SUBAGENT_TRANSCRIPT_BREAK=refused-counts-delivered  被交回闸拒的交回也算送达
@@ -114,13 +112,13 @@ SELFTEST_MARK_VARIABLE = "CONTINUATION_GUARD_SELFTEST_MARK"
 SELFTEST_MARK_CONTENT = "continuation-guard-selftest"
 
 # 关守卫项（records/2026-10-23-subagent拆分提案.md 第一百二十二节 ②）：只在它是唯一一项时认；与别的项同写照拒并点名它（带标记的自证子进程里也拒）。
-#   GUARD_OFF_WITH_OTHERS_ITEM 是它的弄坏开关：带标记的自证子进程里同写着它时，同写的关守卫项照认（改前的样子）
+#   GUARD_OFF_WITH_OTHERS_ITEM 是它的弄坏开关：带标记的自证子进程里同写着它时，同写的关守卫项照认
 GUARD_OFF_ITEM = "honor-outside-selftest"
 GUARD_OFF_WITH_OTHERS_ITEM = "honor-outside-selftest-with-others"
 
 def refuse_break_outside_selftest():
     """弄坏开关只在自证里认：平常跑（不是 --selftest，也不是自证起的子进程）设了 CONTINUATION_GUARD_BREAK 就退 2，点名变量只在自证里认；
-    没设、--selftest、标记文件在而内容对得上的返回 0。关守卫项 honor-outside-selftest 单独一项时不拒（改前的样子）；与别的项同写一律拒、点名它
+    没设、--selftest、标记文件在而内容对得上的返回 0。关守卫项 honor-outside-selftest 单独一项时不拒；与别的项同写一律拒、点名它
     （带标记的子进程里同写着 honor-outside-selftest-with-others 的除外）。"""
     value = os.environ.get("CONTINUATION_GUARD_BREAK", "")
     if not value or (len(sys.argv) > 2 and sys.argv[2] == "--selftest"):
@@ -192,7 +190,7 @@ def latest_task_status(session_transcript, recipient):
         except ValueError:
             continue
         # 只认真正的任务通知：origin 是 task-notification 的消息、排队的附件、队列操作。主 agent 自己的命令与回复里也可能写着
-        # 「<task-id>…</task-id>…<status>failed</status>」（2026-09-19 实测：一条 grep 命令的文本让被停的 agent 读成了 failed）。
+        # 「<task-id>…</task-id>…<status>failed</status>」（一条 grep 命令的文本会让被停的 agent 读成 failed）。
         is_notification = ((record.get("origin") or {}).get("kind") == "task-notification"
                            or record.get("type") == "queue-operation"
                            or (record.get("attachment") or {}).get("type") == "queued_command")
@@ -233,7 +231,7 @@ def decide(hook_input, unjudged=None):
     if not recipient:
         return 0, None
     path = subagent_transcript_path(hook_input, recipient)
-    if path is None and os.environ.get("CONTINUATION_GUARD_BREAK") == "missing-record-passes":   # 弄坏开关：改前的样子，子会话记录不在就放行
+    if path is None and os.environ.get("CONTINUATION_GUARD_BREAK") == "missing-record-passes":   # 弄坏开关：子会话记录不在就放行
         return 0, None
     session_transcript = hook_input.get("transcript_path")
     if (not session_transcript or not os.path.isfile(str(session_transcript))) and unjudged is not None:
@@ -332,7 +330,7 @@ def selftest(hook_dir):
                                      notification("iiii9999jjjj0000", "failed"), notification("iiii9999jjjj0000", "completed"),
                                      notification("kkkk1212llll3434", "killed"), notification("mmmm1313nnnn1414", "completed"),
                                      notification("uuuu2121vvvv2222", "completed"), fake_command]) + "\n")
-        # 主会话那一侧已经收到交回消息、子 agent 自己的会话记录里还没落下交回结果（2026-09-26 那一次：交回之后 5 秒就续做）
+        # 主会话那一侧已经收到交回消息、子 agent 自己的会话记录里还没落下交回结果（例如交回之后 5 秒就续做）
         write_agent("wwww3131xxxx3232", 1000, 0)
         with open(session_transcript, "a") as handle:
             handle.write(json.dumps({"type": "user", "content": '<agent-message from="wwww3131xxxx3232">\n[Subagent hand-back] 报告'}) + "\n")
@@ -513,7 +511,7 @@ def main():
         hook_input = json.loads(raw.decode("utf-8"))
         if not isinstance(hook_input, dict):
             raise ValueError(f"顶层是 {type(hook_input).__name__}，不是对象")
-    except ValueError as error:   # 判不了：照常放行，打诊断并记一条检出（弄坏开关 unparsable-input-silent 下静默放行，改前的样子）
+    except ValueError as error:   # 判不了：照常放行，打诊断并记一条检出（弄坏开关 unparsable-input-silent 下静默放行）
         if os.environ.get("CONTINUATION_GUARD_BREAK") != "unparsable-input-silent":
             report_unparsable_input(raw, f"{type(error).__name__}: {error}", hook_dir)
         return 0
@@ -521,12 +519,12 @@ def main():
 
 def judge(hook_input, hook_dir):
     """读得懂的 hook 输入 → 退出码。放行而有判不了的几处、或判的时候抛异常，照「放行但必记检出」stderr 写一句、检出记录追加一行（record_unjudged）；
-    各处的弄坏开关下那一处不记（改前的样子；exception-unrecorded 下照原样抛出）。"""
+    各处的弄坏开关下那一处不记（exception-unrecorded 下照原样抛出）。"""
     unjudged = []
     try:
         code, message = decide(hook_input, unjudged)
     except Exception as error:
-        if os.environ.get("CONTINUATION_GUARD_BREAK") == "exception-unrecorded":   # 弄坏开关：不接住，照原样抛出（改前的样子：进程退 1，放行、不记检出）
+        if os.environ.get("CONTINUATION_GUARD_BREAK") == "exception-unrecorded":   # 弄坏开关：不接住，照原样抛出（进程退 1，放行、不记检出）
             raise
         code, message = 0, None
         unjudged = [("exception-unrecorded", f"判的时候抛异常（{type(error).__name__}: {error}），这一次没判")]

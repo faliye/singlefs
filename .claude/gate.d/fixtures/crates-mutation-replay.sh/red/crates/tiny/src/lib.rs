@@ -9,7 +9,7 @@ pub fn add(left: u32, right: u32) -> u32 {
     left + right
 }
 
-/// 基线不绿那一条改坏的就是它：点名的测试读的 fixture-data/answer.txt 在样本仓里有，crates-mutation-replay 每片只拷登记的路径、副本里没有它，
+/// 基线不绿那一条改坏的就是它：点名的测试读的 fixture-data/answer.txt 在样本仓里有，crates-mutation-replay 每片只拷登记的路径与闭包认得出的仓根文件、副本里没有它，
 /// 没改坏的副本上那条测试就红；crates-mutation-replay 要先在基线上判出来、记「基线不绿」，不许把改坏之后的红算成抓到
 pub const ANSWER: &str = "42";
 
@@ -43,7 +43,9 @@ mod tests {
 
     #[test]
     fn reads_the_answer_from_outside_the_copy() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixture-data/answer.txt");
+        // 路径逐段拼：拷贝范围的闭包（scripts/hosts/lib_repository_copy.py 的 copy_closure，带测试代码扫）认得出以 ../ 起头的串字面量，
+        // 认得出就把 fixture-data/answer.txt 拷进每片的副本、基线就绿了；逐段拼的它认不出（它文件头「管不到的」），副本里才缺这份文件
+        let path = ["..", "..", "fixture-data", "answer.txt"].iter().fold(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")), |path, part| path.join(part));
         let text = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("读不了 {}：{error}", path.display()));
         assert_eq!(text.trim(), super::ANSWER);
     }

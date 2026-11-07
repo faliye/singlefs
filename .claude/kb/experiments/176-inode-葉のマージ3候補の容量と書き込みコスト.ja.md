@@ -40,18 +40,16 @@
 ```
 # リポジトリルート。モデルは crates/ に依存せず、SINGLEFS_THREAD_CAP は時間のみ影響し出力は不変
 cd /home/fy5090/code/singlefs/scripts/experiment-apparatus
-bash ../hosts/capped.sh 8 cargo build --release --bin e176-inode-leaf-merge-capacity-and-rewrites
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-one
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-two
+../../task-server/task submit -- cargo run --release -p e7-index-bench --bin e176-inode-leaf-merge-capacity-and-rewrites -- segment-one
+../../task-server/task submit -- cargo run --release -p e7-index-bench --bin e176-inode-leaf-merge-capacity-and-rewrites -- segment-two
 # 登録された再実行（segment-one、segment-two）
 cd ../.. && bash scripts/experiment-apparatus/replay.sh E176
 # 突き合わせ（独立 manifest、crates/ のパス依存は読み取り専用）
 cd scripts/experiment-apparatus
-bash ../hosts/capped.sh 8 cargo build --release --manifest-path e176_crates_oracle/Cargo.toml --target-dir target
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-crates-oracle
+../../task-server/task submit -- cargo run --release --manifest-path e176_crates_oracle/Cargo.toml -p e176-crates-oracle --bin e176-inode-leaf-merge-crates-oracle
 # 単体テスト22件、変異16件
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites
-MUTATE_JOBS=4 MUTATE_CARGO_JOBS=2 MUTATE_MEMORY_MAX=4G bash ../mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites e176_inode_leaf_merge_capacity_and_rewrites.rs ../mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv
+../../task-server/task submit -- cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites
+../../task-server/task submit -- bash ../mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites e176_inode_leaf_merge_capacity_and_rewrites.rs ../mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv
 ```
 
 第1段は8スレッド約16秒、1スレッド約23秒。第2段はそれぞれ約19秒・25秒（メモリ制限ラッパー含む）、突き合わせは8スレッド約23秒。
@@ -642,7 +640,7 @@ Q2p、Q2c、Q3 は「借用量」に対して不安定である（M3 に関わ�
 
 | 決定項目 | 関係 | 再確認 |
 |---|---|---|
-| D8 (コアインデックス構造)確定項目6 | 支持 | 2026-10-17 は文言・成果物参照・パス・数値の同期のみで結論・数・成果物は不変。2026-10-11 も時間語・位置指示・自称の文言変更のみで不変。 |
+| D8 (コアインデックス構造)確定項目6 | 支持 | 2026-11-03 影響なし：再実行コマンドの書き方だけを変更した。結論・数・成果物は不変。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-17 は文言・成果物参照・パス・数値の同期のみで結論・数・成果物は不変。2026-10-11 も時間語・位置指示・自称の文言変更のみで不変。 |
 
 ## 履歴バージョン
 

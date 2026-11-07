@@ -1,0 +1,328 @@
+{
+  "at": "2026-11-03",
+  "scope": "Every substantive paragraph of experiment-apparatus README; expanded claims only. Other documentation remains in repository inventory. No paragraph is marked wholly complete.",
+  "sha256": "5cb431e9b315a0df2e66d9c05b8fff71e37c533d1f97ad74de52c0492d784cdd",
+  "rows": [
+    {
+      "id": "EXP-README-03",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 3,
+      "text": "实验装置的 crate：`Cargo.toml` 在这一层，一个实验一个或几个 `e<编号>_<简称>.rs` 目标，自带清单或多份源码的实验各占一层子目录。复跑入口是 `replay.sh`（在仓根跑，`bash scripts/experiment-apparatus/replay.sh <实验号>`）；每一趟编进它在 `${TMPDIR:-/tmp}` 下自己建的编译目录、跑完删（调用方设了 `CARGO_TARGET_DIR` 的照它编、不删；它文件头「编译目录」），不往 `scripts/experiment-apparatus/target/` 编。",
+      "subclaims": [
+        {
+          "claim": "默认与自定义编译目录",
+          "status": "matched_static",
+          "evidence": "replay.sh:1575-1648; run-build-directory.sh:53-92",
+          "limits": "清理失败路径已读，信号和持有文件场景未实跑"
+        },
+        {
+          "claim": "每份实验目标的组织与归属",
+          "status": "pending",
+          "evidence": "",
+          "limits": "须逐份核 Cargo 目标、模块和包含关系"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-05",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 5,
+      "text": "- 编译与单测：`task-server/task submit -- cargo test --manifest-path scripts/experiment-apparatus/Cargo.toml`（整条命令交 task-server，内存额度、线程与挑机器由服务定，命令里不套内存包装）；变异在这一层起：`task-server/task submit --cwd scripts/experiment-apparatus -- bash ../mutation/mutate.sh <bin 名> <源文件> ../mutation/tables/<表>`。装置与长跑脚本同理：整条命令交服务，脚本里不再自己套内存包装、写死上限（`replay.sh` 与各长跑脚本的起法见各自文件头）。",
+      "subclaims": [
+        {
+          "claim": "清单与提交命令",
+          "status": "partial",
+          "evidence": "scripts/experiment-apparatus/Cargo.toml:1-34; mutate.sh",
+          "limits": "清单存在；尚未逐项执行文档命令或核所有脚本内存包装"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-06",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 6,
+      "text": "- 每一份 `.rs` 都要是某个目标，或经 `#[path]`、`mod`、`include!` 被引到；没有着落的由门禁 code-source-discipline 的 crate-sources-reachable 格判红。",
+      "subclaims": [
+        {
+          "claim": "源文件可达门禁的入口",
+          "status": "partial",
+          "evidence": ".claude/gate.d/code-source-discipline.sh:2745",
+          "limits": "已定位调用，尚未逐函数核可达解析器与全部源码"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-07",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 7,
+      "text": "- 产物不放这里：写进 `research/results/`，编译目录 `target/` 不进 git。",
+      "subclaims": [
+        {
+          "claim": "产物目录与 target 不入 git",
+          "status": "pending",
+          "evidence": "",
+          "limits": "须核所有写入入口与忽略规则"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-08",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 8,
+      "text": "- 计时实验（`replay.sh` 复跑表里判据写 `timing` 的行）的收尾行写成 `E7RESULT name=done emitted=N loadavg1=<1 分钟负载> cpus=<在线 CPU 数>`，两个字段装置从 `/proc/loadavg` 与 `available_parallelism` 取、不进 `emitted`；`loadavg1 / cpus` 超过 `REPLAY_TIMING_LOAD_RATIO`（默认 0.5）的那一行 `replay.sh` 记「本次不判」，没有这两个字段的判红，存量登记在 `.claude/gate.d/timing-load-field-lag.tsv`（只缩不涨）。约定全文在 `replay.sh` 文件头「计时行的负载关」。",
+      "subclaims": [
+        {
+          "claim": "负载阈值、最大段值、严格大于与缺字段滞后例外",
+          "status": "matched_static",
+          "evidence": "replay.sh:315-397,3852-3864",
+          "limits": "尚未逐个确认装置输出 /proc/loadavg 和 CPU 字段；滞后表只缩不涨历史尚未核"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-09",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 9,
+      "text": "- `long-run-lib/binary-identity.sh` 是长跑脚本共用的库（`e10-aging-compaction-run.sh`、`e180-reading-shards.sh`、`e181-landing-check-long-run.sh`、`e182-single-device-long-run.sh`、`e182-single-device-units-kept-long-run.sh`、`e183-sweep-history-shards.sh`、`e184-segment-one-long-run.sh` 都 source 它，不单独起）：开跑时把装置二进制拷一份进私有目录、每片每段按这份拷贝起，每片旁记下打它的装置 sha256，续跑只沿用同一版的片、不同的作废重跑，合并产物之前再核一遍；用法与函数清单在它的文件头。",
+      "subclaims": [
+        {
+          "claim": "一趟内固定二进制",
+          "status": "partial",
+          "evidence": "long-run-lib/binary-identity.sh:1-120; e180-reading-shards.sh:180-246",
+          "limits": "库已全文读；七个入口调用定位完成，但所有调用链未全审"
+        },
+        {
+          "claim": "所有七份均以二进制摘要决定跨趟复用",
+          "status": "mismatch",
+          "evidence": "A24",
+          "limits": "两个 E182 明确按函数闭包键复用而不另记二进制摘要"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-10",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 10,
+      "text": "- `replay.sh` 按行复用：每一行按装置源码、复跑表那一行、留存产物与工具链算一把键（`scripts/gate/admission.py replay-row-inputs`），判定库在 prune-server 里（族 unit-verdicts、种类 replay-row，经 `scripts/gate/admission.py library-files` 读写，本地不建库），键相同、判过的那一行不跑、记「复用」；`--full` 只记不读；服务连不上整趟退 75。留存产物已归档的行逐行报「已归档、只跑不比」。约定全文在 `replay.sh` 文件头「按行复用」。",
+      "subclaims": [
+        {
+          "claim": "按行键读取三种可复用结论与记红撤绿",
+          "status": "matched_static",
+          "evidence": "replay.sh:3790-4019",
+          "limits": "并发写回与服务原子性未核"
+        },
+        {
+          "claim": "行键包含全部应有输入",
+          "status": "pending",
+          "evidence": "scripts/gate/admission.py:3242",
+          "limits": "待逐字段核算法"
+        },
+        {
+          "claim": "服务错误 75 与中转目录",
+          "status": "matched_static",
+          "evidence": "replay.sh:3631-3705,1596-1617",
+          "limits": "未实跑服务断连；只写不读不等于越过准入，见 A23"
+        },
+        {
+          "claim": "已归档逐行说明",
+          "status": "matched_static",
+          "evidence": "replay.sh:3865-3874",
+          "limits": "最终统计与逐条区间断言仍待核"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-11",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 11,
+      "text": "- `e182-single-device-long-run.sh`、`e182-single-device-units-kept-long-run.sh` 的片结果库同样在 prune-server 里（种类 `e182-single-device`、`e182-single-device-units-kept`）：装置读写目录，脚本每一趟开一个中转目录，开跑前从服务拉、跑着时定时并回、跑完并回并删掉；约定在两份脚本文件头「片结果库」。",
+      "subclaims": [
+        {
+          "claim": "两种 E182 片库、中转目录、定期并回",
+          "status": "partial",
+          "evidence": "e182-single-device*-long-run.sh:440-491",
+          "limits": "已核 fetch、周期调用与模式，merge_transit、异常恢复、最终清理还待核"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-12",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 12,
+      "text": "- `e185_r1_compare.py`：E185（GC一批搬迁的挂钟拆分）第 1 次重跑 C 组的比法，只读前、后各两份产物，算一批 CPU 随池大小的指数、前后是不是同一份活、前后比与岔路量并列；用法、门槛与退出码在文件头。单测 `python3 scripts/experiment-apparatus/e185_r1_compare_test.py`；变异表 `e185_r1_compare.mutations.tsv` 九行，原文在脚本里各命中一次，由执行员在草稿目录里逐行改坏副本跑单测（不走 `mutate.sh`，它只管 Rust）。",
+      "subclaims": [
+        {
+          "claim": "E185 r1 四份输入、指数、同一份活、比例与岔路输出",
+          "status": "matched_static",
+          "evidence": "e185_r1_compare.py:1-623",
+          "limits": "全文读并追分支；真实历史输入、原始规格和边界异常未全核"
+        },
+        {
+          "claim": "九条变异且锚点唯一",
+          "status": "matched_mechanical",
+          "evidence": "e185_r1_compare.mutations.tsv:1-9",
+          "limits": "展开字面换行后每个原文恰好命中一次；变异尚未执行"
+        },
+        {
+          "claim": "自证入口",
+          "status": "matched_runtime",
+          "evidence": "task 5075",
+          "limits": "任务 5075 退出 0，分别 16/23/15 项的原脚本自证已执行；历史输入缺失跳过分支未发生。变异未执行。"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-13",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 13,
+      "text": "- `e184_r2_verdict_compare.py`：E184（常规层与大负载层的代价计数）第 2 次重跑第一段的逐格比，只读改前、改后两份产物，逐格比判定词（窄读 40 格、宽读加负载 22 格与四条推出的条款）、按第七节新数核锚；输出行形与退出码在文件头。单测 `python3 scripts/experiment-apparatus/e184_r2_verdict_compare_test.py`；变异表 `e184_r2_verdict_compare.mutations.tsv` 九行。",
+      "subclaims": [
+        {
+          "claim": "E184 r2 字段与四条派生规则、十项重算",
+          "status": "matched_static",
+          "evidence": "e184_r2_verdict_compare.py:1-373",
+          "limits": "40/62 格是预期产物规模，代码未硬性限定数量；历史产物仍待核"
+        },
+        {
+          "claim": "九条变异",
+          "status": "matched_mechanical",
+          "evidence": "e184_r2_verdict_compare.mutations.tsv:1-9",
+          "limits": "锚点各一处，未跑变异"
+        },
+        {
+          "claim": "自证入口",
+          "status": "matched_runtime",
+          "evidence": "task 5073",
+          "limits": "任务 5073 退出 0，分别 16/23/15 项的原脚本自证已执行；历史输入缺失跳过分支未发生。变异未执行。"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-14",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 14,
+      "text": "- `e185-r2-segment-run.sh`：E185（GC一批搬迁的挂钟拆分）第 2 次重跑一段的跑法（`geometry-check`、`wall-clock`、`stage-split` 三选一）：写输入清单、编一次装置、跑那一段，产物写进 `research/results/`；经 `task-server/task submit -- env E185_RUN_DATE=<日期> bash scripts/experiment-apparatus/e185-r2-segment-run.sh <段>` 交，哪台由服务按余量定（`task-server/task_server.py` 文件头 ② 排队的「机器」：没有只派一台的名单）；派到第二台时在同一个绝对路径的共享树里跑（`scripts/hosts/multi-host-run.sh` 文件头「带 --peer」），产物直接写进这棵树的 `research/results/`，两台读的是同一份，不用另取。",
+      "subclaims": [
+        {
+          "claim": "E185 r2 三段选择、输入清单、一次构建、输出目录",
+          "status": "matched_static",
+          "evidence": "e185-r2-segment-run.sh:1-146",
+          "limits": "未启动计时装置或操作真实设备"
+        },
+        {
+          "claim": "README 完整命令可用性",
+          "status": "mismatch",
+          "evidence": "A25",
+          "limits": "缺必填 --disk-model；报告原行号需按现行文档定位"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-15",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 15,
+      "text": "- `e185-r4-segment-run.sh`：E185（GC一批搬迁的挂钟拆分）第 4 次重跑一段的跑法（`host-cpu-drift-control`、`cpu-writings` 二选一）：核装置 sha256 与登记第十二节相同、当天已有完整产物就不重跑、写输入清单、在这一趟自己的编译目录里编一次装置（控漂移段带 `gpu` 特性）、跑那一段（控漂移段经 `gpu-quiesce-run.sh` 起卡）；起法、长活声明、准入与退出码写在文件头。重判段是同目录的 `e185_r4_baseline_rejudge.py`（只读五份产物做算术，单测 `python3 scripts/experiment-apparatus/e185_r4_baseline_rejudge_test.py`，变异表 `e185_r4_baseline_rejudge.mutations.tsv` 二十二行，由执行员在草稿目录里逐行改坏副本跑单测）。",
+      "subclaims": [
+        {
+          "claim": "E185 r4 两段、gpu 特性、当天已有 done 产物不重跑",
+          "status": "matched_static",
+          "evidence": "e185-r4-segment-run.sh:1-163",
+          "limits": "已有产物判断只看末行；未运行 GPU，任务服务实际清场链待核"
+        },
+        {
+          "claim": "E185 r4 重判算术与退出分支",
+          "status": "matched_static",
+          "evidence": "e185_r4_baseline_rejudge.py:1-773",
+          "limits": "逐函数读完；与当时 Rust 算法、原始数据和注册稿仍待逐条比"
+        },
+        {
+          "claim": "二十二条变异",
+          "status": "matched_mechanical",
+          "evidence": "e185_r4_baseline_rejudge.mutations.tsv:1-22",
+          "limits": "展开换行后各一处，未跑变异"
+        },
+        {
+          "claim": "自证入口",
+          "status": "matched_runtime",
+          "evidence": "task 5074",
+          "limits": "任务 5074 退出 0，分别 16/23/15 项的原脚本自证已执行；历史输入缺失跳过分支未发生。变异未执行。"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-16",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 16,
+      "text": "- `e185-r3-segment-run.sh`：E185（GC一批搬迁的挂钟拆分）第 3 次重跑一段的跑法（`host-cpu-per-submission`、`recompute-disagreement`、`function-split` 三选一）：核装置 sha256 与登记第十二节相同、写输入清单、在这一趟自己的编译目录里编一次装置（前两段带 `gpu` 特性）、跑那一段（前两段经 `gpu-quiesce-run.sh` 起卡），产物写进 `research/results/`，同一天再跑加 `-2`、`-3`；前两段在本机先后跑，第三段（附带）在第二台，起法、准入与退出码写在文件头。",
+      "subclaims": [
+        {
+          "claim": "E200 T1-T5 构造与历史输入",
+          "status": "partial",
+          "evidence": "build_approximate_tree.py:1-590; e200-preregistration.md:34-44,326-344",
+          "limits": "基础路径、固定产物摘要/行数、输入表 11 项相符；T3 取版证据缺 blob 号见 A27；未重跑全历史 blob 搜索"
+        },
+        {
+          "claim": "拷好两个二进制并正确报告成功",
+          "status": "mismatch",
+          "evidence": "A26; task 5080",
+          "limits": "两个复制失败仍报 compiled=true 已用临时替身复现"
+        },
+        {
+          "claim": "Q1/Q2 输出、变异与测试入口",
+          "status": "partial",
+          "evidence": "approximate_tree_lines.py:1-181; mutation_driver.py:1-147",
+          "limits": "判法与入口已读；Q1 全部断言、现有单测和八条变异实跑待核"
+        },
+        {
+          "claim": "E200 第一段单测、八条变异及后续阶段范围",
+          "status": "partial",
+          "evidence": "task 5263: 38 tests pass, 8 mutations caught; E200 revision 2 stops later stages; A28",
+          "limits": "M45 不符合登记；两份树产物的 600 条文件记录另存逐行证据，历史 today 版本与搜索穷尽性仍待核"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-17",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 17,
+      "text": "- `e200_revision_6_segment_one_on_an_approximate_tree/`：E200（修订6近似树重跑） 研究一侧（Python 与 shell，不与 `crates/` 共用代码）。`build_approximate_tree.py` 照跑前登记 T1–T5 从 git 造近似树（树、研究一侧与逐文件清单写进工作根下的新目录）；`approximate_tree_lines.py` 出 Q1 那几行与 Q2-编那几行；`compile_in_the_approximate_tree.sh` 在近似树里 release 编 E171、E170 两个装置（编译目录取服务给的 `CARGO_TARGET_DIR`，编完把二进制拷进树里 `target/release/`）。单测 `python3 -m unittest test_build_approximate_tree`（在那个目录起，只用自己建的临时 git 仓）；变异表 `scripts/mutation/tables/e200_revision_6_segment_one_on_an_approximate_tree.tsv` 经同目录 `mutation_driver.py` 跑（照抄 E171（三oracle合谋测试） 那一份，只换单测模块）。起法、产物与退出码在各自文件头，都整条交 `task-server/task submit`。",
+      "subclaims": [
+        {
+          "claim": "E200 近似树构造、清单、Q1/Q2、构建和变异入口",
+          "status": "pending",
+          "evidence": "",
+          "limits": "待核各脚本与当时登记 T1-T5"
+        }
+      ],
+      "whole_paragraph_complete": false
+    },
+    {
+      "id": "EXP-README-NEW-18",
+      "document": "scripts/experiment-apparatus/README.md",
+      "line": 18,
+      "text": "- `e201_three_oracle_collusion_full_table_on_the_current_tree/`：E201（三oracle合谋今树整表） 研究一侧（Python，不与 `crates/` 共用代码，E171（三oracle合谋测试） 研究一侧只 import 不改）。入口 `full_table_run.py run`（经服务分片三步：计划拷此刻主工作区的树、各片编装置跑基线与分到的行并把每行结论写进 prune-server、合并出 T1–T3 与逐格比、归因、Q2、整表矩阵）；`current_tree_row_driver.py` 照抄 E171 的逐行驱动（不套 nice、带 gpu 特性）；`contrast_against_r1.py`、`attribution.py`、`q2_misses.py`、`whole_table_matrix.py` 各管一样读数；读法 7 的分类表与归因 G5、G7 的两张对应表是同目录三份 `.tsv`（sha256 钉在代码里）。单测 `python3 -B -m unittest test_contrast_against_r1 test_q2_misses test_attribution test_whole_table_matrix test_current_tree_row_driver test_full_table_run`（在那个目录起）；自证 `python3 full_table_run.py --selftest`；变异表 `scripts/mutation/tables/e201_three_oracle_collusion_full_table_on_the_current_tree.tsv` 经同目录 `mutation_driver.py` 跑。",
+      "subclaims": [
+        {
+          "claim": "新增段落全部断言",
+          "status": "pending",
+          "evidence": "",
+          "limits": "审核期间并行加入，未逐项核实现"
+        }
+      ],
+      "whole_paragraph_complete": false
+    }
+  ]
+}

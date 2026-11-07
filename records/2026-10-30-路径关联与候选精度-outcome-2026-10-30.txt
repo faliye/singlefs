@@ -1,0 +1,57 @@
+## 按结局桶（2026-10-30 起、到 2026-10-30 为止，124 个，折算合计 418.17 百万）
+桶                                        个数     花费占比  说明
+written-landed                           48    46.1%  写了、不低于 70% 的行进了提交或工作树
+written-partial                           3     3.9%  写了、30% 到 70%
+verdict-archived                         12    13.4%  三方腿、交回点名的 -output.md 在仓、同轮有判决
+three-way-report-or-verdict-missing       2     3.8%  三方腿、交回点名的 -output.md 不在仓或同轮没有判决
+report-used-by-main                      50    23.2%  只交报告、交回后主 agent 点到
+report-used-by-later-sub                  0     0.0%  只交报告、只有后来的子 agent 点到
+report-unreferenced                       0     0.0%  只交报告、没人点到
+written-overwritten                       0     0.0%  写了、低于 30%、主 agent 点到过
+written-unused                            0     0.0%  写了、低于 30%、没人点到
+cut-by-usage-limit                        8     9.6%  没交回、用量撞顶
+cut-by-api-error                          0     0.0%  没交回、API 错
+stopped-salvaged                          1     0.0%  没交回、被停掉、后来有人点到
+stopped-abandoned                         0     0.0%  没交回、被停掉、没人点到
+in-flight                                 0     0.0%  没交回、还在跑
+
+## 并成调度记录「按结局分」那张表的五行
+行                                               个数     花费占比
+写了东西、不低于 70% 的行进了提交或工作树                     48    46.1%
+写了东西、30% 到 70%                               3     3.9%
+三方腿                                         12    13.4%
+只交报告、交回后主 agent 有动作点到                       50    23.2%
+看起来没效果的几桶                                    8     9.6%
+其余（three-way-report-or-verdict-missing、cut-by-api-error、stopped-salvaged、in-flight）     3     3.8%
+
+## 按类型 × 结局桶（个数，花费占全部的比例）
+  clerk                     report-used-by-main                       6     2.1%
+  clerk                     written-landed                            4     0.7%
+  clerk                     written-partial                           1     0.6%
+  experiment-designer       written-partial                           1     0.3%
+  experiment-runner         report-used-by-main                       1     0.1%
+  experiment-runner         written-landed                            1     0.2%
+  implementation-writer     written-landed                           20    17.8%
+  implementation-writer     report-used-by-main                       4     2.3%
+  implementation-writer     cut-by-usage-limit                        2     5.6%
+  implementation-writer     written-partial                           1     3.0%
+  investigator              report-used-by-main                       5     4.8%
+  kb-scribe                 report-used-by-main                       9     1.5%
+  kb-scribe                 written-landed                            1     0.1%
+  mutation-triage           report-used-by-main                       1     0.3%
+  sweep                     report-used-by-main                       6     2.2%
+  three-way-attack          verdict-archived                          7     5.6%
+  three-way-attack          cut-by-usage-limit                        1     0.3%
+  three-way-attack          three-way-report-or-verdict-missing       1     1.9%
+  three-way-defense         verdict-archived                          2     2.9%
+  three-way-forward         verdict-archived                          3     4.9%
+  three-way-forward         cut-by-usage-limit                        1     0.3%
+  three-way-forward         three-way-report-or-verdict-missing       1     1.8%
+  tooling-writer            written-landed                           22    27.3%
+  tooling-writer            report-used-by-main                      18     9.8%
+  tooling-writer            cut-by-usage-limit                        4     3.4%
+  tooling-writer            stopped-salvaged                          1     0.0%
+
+## 描述带返工字样（REWORK_WORDS，词表在文件头）的派发：33 个，占个数 26.6%，占花费 27.6%
+## 没交回的 9 个，按截断原因：用量撞顶 8、停掉 1
+  ✓ 查了 124 个子 agent（--since 2026-10-30、--until 2026-10-30（含那一天），日期按东京日期（Asia/Tokyo）切天，按首条记录的时刻筛），逐个归了结局桶；这份输出也落进了 records/2026-10-30-路径关联与候选精度-outcome-2026-10-30.txt（排他新建，回读与标准输出逐字相同）

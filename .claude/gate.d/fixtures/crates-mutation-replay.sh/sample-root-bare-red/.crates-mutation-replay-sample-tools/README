@@ -1,0 +1,2 @@
+crates-mutation-replay 样本档的标记：这个目录在样本根上，门禁就不起真 cargo，改用 scripts/mutation/crates-mutation-rows.py 的 sample-tools 子命令现写的假 cargo 与假 llvm 工具。
+假 cargo 按 crates/tiny/src/lib.rs 里 `// TEST <名字> NEEDS|READS|FILES|NOTRUN …` 与 `// COMPILE-ERROR-IF <原文>` 几行判每条测试、每处替换文的红绿（写法在 crates-mutation-rows.py 里 FAKE_CARGO 头上）。

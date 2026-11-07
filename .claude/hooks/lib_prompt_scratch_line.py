@@ -49,17 +49,17 @@ scratch_directories：scratch_line_values 取到的路径经同目录 lib_work_r
       「✗ 自检：工作根之外的目录不算」
       「✗ 自检：会话临时目录根 /tmp/claude-<uid> 底下的不认」
       「✗ 自检：相对路径按仓根解，不按调用时的当前目录（当前目录在工作根）」
-  LIB_PROMPT_SCRATCH_LINE_BREAK=fence-info-with-backtick  反引号围栏的起头行在语言名的位置有反引号也当围栏起头（改前的认法）
+  LIB_PROMPT_SCRATCH_LINE_BREAK=fence-info-with-backtick  反引号围栏的起头行在语言名的位置有反引号也当围栏起头
       「✗ 自检：反引号围栏的起头行在语言名的位置有反引号，那是行内代码，不开块」
       「✗ 自检：围栏行与 markdown-it-py 的 commonmark 预设认的一致」（本机装了 markdown-it-py 才查）
-  LIB_PROMPT_SCRATCH_LINE_BREAK=unclosed-fence-read  没收尾的围栏不遮到文末，里面的行照认（改前的认法）
+  LIB_PROMPT_SCRATCH_LINE_BREAK=unclosed-fence-read  没收尾的围栏不遮到文末，里面的行照认
       「✗ 自检：没收尾的围栏一直到文末，里面的行不认」
       「✗ 自检：收尾行后面接了字不算收尾，围栏一直到文末」
       「✗ 自检：围栏行与 markdown-it-py 的 commonmark 预设认的一致」（本机装了 markdown-it-py 才查）
       「✗ 自检：没收尾的围栏之前的那一行照认」
       「✗ 自检：收尾比起头短不算收尾，围栏一直到文末」
       「✗ 自检：缩进 4 格的收尾不算收尾，围栏一直到文末」
-  LIB_PROMPT_SCRATCH_LINE_BREAK=relative-by-cwd  写相对路径的按调用时的当前目录解，不按仓根（改前的认法）
+  LIB_PROMPT_SCRATCH_LINE_BREAK=relative-by-cwd  写相对路径的按调用时的当前目录解，不按仓根
       「✗ 自检：相对路径按仓根解，不按调用时的当前目录（当前目录在仓外）」
       「✗ 自检：相对路径按仓根解，不按调用时的当前目录（当前目录在工作根）」
   SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  同目录 lib_work_root.py 的开关：scratch_roots 另认会话临时目录根（撤掉之前的放行）

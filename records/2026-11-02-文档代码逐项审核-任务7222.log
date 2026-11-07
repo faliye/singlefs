@@ -1,0 +1,19 @@
+== 任务 7222 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-7222.attempt-1.log（共 18 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=3.5
+MULTI_HOST_RUN_CLEANUP time_us=1793858967846853 pid=1377288 label=task-b0f6b921-7222-1 status=pending reason=starting
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 29M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-7222-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=400441 read=yes
+  ✓ 引文复核自证通过（查了 26 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格、文本缓存跑完连目录删、平常跑设了弄坏开关退 2、关守卫项与别的项同写照拒、钉零命中数成 0 三格、取数命令坏了判红四格、缺省取共享数据根下的两棵树两格）
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=400441 read=no
+MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=15941632
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=11.7 seconds=8.2 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=11.7
+MULTI_HOST_RUN_CLEANUP time_us=1793858976088025 pid=1377288 label=task-b0f6b921-7222-1 status=confirmed reason=processes-gone
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-7222-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=12.4 seconds=0.7 exit=0

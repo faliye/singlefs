@@ -11,11 +11,11 @@
 #
 # 触发文件的清单不在这里，在 .claude/gate.d/knowledge-sync-triggers.tsv，knowledge-sync 格与 batch-scope 格都读那一份。
 
-crates/singlefs-checker-tier/src/crash_judge_tables.rs	# 组合掩码 u64、一个落点 64 次写；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
+crates/singlefs-verification/src/crash_judge_tables.rs	# 组合掩码 u64、一个落点 64 次写；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
 .claude/agent-common.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 .claude/gate.d/code-tooling.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 .claude/gate.d/crash-point-replay-items.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
-.claude/gate.d/crates-mutation-light-rows.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/crates-mutation-light-rows.tsv	# 2026-11-05 删轻型并入重型：这份轻型行表删掉（records/2026-11-05-删轻型并入重型.md）
 .claude/gate.d/doc-decisions.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 .claude/gate.d/doc-experiments.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 .claude/gate.d/doc-text.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
@@ -23,11 +23,11 @@ crates/singlefs-checker-tier/src/crash_judge_tables.rs	# 组合掩码 u64、一�
 .claude/gate.d/stage-inputs.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 .claude/gate.d/stage-owners.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 .claude/hooks/bash-command-detector.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
-.claude/hooks/heavy-test-guard.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
-.claude/hooks/lib_heavy_tests.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/project-code-guard.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/lib_project_code_runs.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 .claude/hooks/selftest-registry.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 .claude/settings.json	# 2026-10-12 工具与治理批合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
-crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-verification/src/bin/new_pool_file_creation_on_device.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 crates/singlefs-core/src/allocator.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 crates/singlefs-core/src/make_filesystem.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 crates/singlefs-core/src/mounted_read.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
@@ -42,23 +42,17 @@ scripts/crash/crash-point-replay-shard-run.sh	# 2026-10-12 工具与治理批：
 scripts/crash/crash-point-replay.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 scripts/experiment-apparatus/replay.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 scripts/gate/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
-scripts/gate/gate-staged-selftest.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 scripts/gate/merge-and-verify.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 scripts/hosts/detached-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
 scripts/gate/gate-staged.sh	# 复用键重做批 4：删过渡期死脚本与 gate-staged.sh 三改（records/2026-10-13-复用键与全仓改名.md「2026-10-15 验证段第一步判红、两条定案、4-3 四批派出」一节）
-crates/singlefs-core/src/extent_tree.rs	#2026-10-18 收尾提交：复用键、函数单元复用、崩溃点重放全量修补与知识腐烂治理这一批碰到的触发文件
-.claude/gate.d/lib-item-ref-status.py  # item-ref-status 认变更史 ## D<n>（简称） 节标题、孤立译文不顶替中文原文（records/2026-10-21-doc门禁违规修复.md 第二轮第 3 行）
 .claude/hooks/lib_two_logs_guard.py  # 日志两份的钩子判法（第二轮第 2 行）
 .claude/hooks/two-logs-guard.sh  # 日志两份的钩子：拒绝把门禁、测试、入口脚本的输出 > 到 .log（第二轮第 2 行）
 scripts/gate/large-file-check.py  # 提交门禁单文件 100 MiB 上限的判法（第二轮第 1 行）
 scripts/hosts/README.md  # 登记 two-logs.sh（第二轮第 2 行）
-scripts/hosts/two-logs.sh  # 日志两份的共用包装（第二轮第 2 行）
 scripts/hosts/two_logs.py  # 日志两份的共用包装实现（第二轮第 2 行）
 CLAUDE.md  # 阶段同步 batch-2026-10-21：当前里程碑改成「共享与回收」、崩溃放量项数改成 24（records/2026-10-21-doc门禁违规修复.md 第二轮）
 scripts/experiment-apparatus/e187_quarantine_mark_cost.rs  # E187（隔离落盘代价）计数模型装置，m4-i315-r2 用户定「建丙的计数模型再定」（records/2026-10-13-里程碑四预开发.md）
-scripts/experiment-apparatus/Cargo.toml  # 登记 E187（隔离落盘代价）装置二进制 e187-quarantine-mark-cost（records/2026-10-13-里程碑四预开发.md）
 scripts/mutation/tables/e187_quarantine_mark_cost.tsv  # E187（隔离落盘代价）装置的变异表（records/2026-10-13-里程碑四预开发.md）
-crates/singlefs-core/src/allocation_record_tree.rs  # 里程碑三收尾批 13 C867：读者拒宽于字段表的条目（records/2026-10-18-里程碑三收尾与近期欠账.md 批 13）
 crates/singlefs-core/src/records.rs  # 里程碑三收尾批 13 C867：读者拒宽于字段表的条目、拒绝成员改名（records/2026-10-18-里程碑三收尾与近期欠账.md 批 13）
 scripts/agents/watch.conf  # 里程碑三收尾批 12 工具批：看门狗内存峰值告警按上限五成（records/2026-10-18-里程碑三收尾与近期欠账.md 批 12）
 scripts/kb/quote-kb.py  # 里程碑三收尾批 12 工具批：quote-kb 认带冒号的标题（records/2026-10-18-里程碑三收尾与近期欠账.md 批 12）
@@ -66,7 +60,6 @@ scripts/kb/quote-kb.py  # 里程碑三收尾批 12 工具批：quote-kb 认带�
 .claude/agents/experiment-runner.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/agents/implementation-writer.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/agents/kb-scribe.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/agents/sweep.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/agents/three-way-attack.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/agents/three-way-defense.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/agents/three-way-forward.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -75,71 +68,35 @@ scripts/kb/quote-kb.py  # 里程碑三收尾批 12 工具批：quote-kb 认带�
 .claude/gate.d/break-switch-outside-selftest-pending.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/break-switch-replay-files.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/checker-independence-and-sync.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/checker-tier-broad-mutation.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/checker-tier-crash-point-replay.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/checker-tier-crates-mutation-replay.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/checker-tier-formal-verification.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/checker-tier-lkmm.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/checker-tier-qemu-device-streams.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/checker-tier-research-build-and-replay.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/clause-enum-pairs.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+.claude/gate.d/broad-mutation.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+.claude/gate.d/crash-point-replay.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+.claude/gate.d/crates-mutation-replay.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+.claude/gate.d/formal-verification.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+.claude/gate.d/lkmm.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+.claude/gate.d/qemu-device-streams.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+.claude/gate.d/research-build-and-replay.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/code-source-discipline.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/crash-point-replay-segments.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/decision-evidence-lag.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/deferral-registries.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/divergence-events.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/doc-process-records.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/doc-registries.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/entry-scripts.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/experiment-number-directories.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/field-pointer-blanks.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/harness-model-differential-and-scenarios.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+.claude/gate.d/model-differential-and-scenarios.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/harness-test-environment.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/lib-governance-refs.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/lib-lag-baseline.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/lib-trilingual.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/mount-transparency-d13-rows-without-bytes.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/mutation-duplicates-lag.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/path-moves.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/replay-comparison-units.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/stage-break-switch-replay-exempt.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/test-function-names-exempt.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/trilingual-glossary-longer-words.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/gate.d/trilingual-untranslated-exempt.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/gate.d/verus-pins.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/agent-write-scope.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/completion-cleanup-guard.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/continuation-guard.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a0a2dfee322e26786.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a28fe10b58d88beec.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a303d33b0ccd5e68f.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a3652270eb80e4fd0-delivery-colon.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a3652270eb80e4fd0-section-colon.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a3652270eb80e4fd0.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a42154ccf8829dc32.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a4737c6f3660f4f7e-own-result.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a4737c6f3660f4f7e.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a61301bfaed0a3433.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a75e9e30847f57bcd-forbidden-own.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a75e9e30847f57bcd.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a77dffd2065a0ba7e.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a789e7091d91430aa.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a86c5c8fb8ec28789.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a8a3bd6f093e19673.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a8afb2185cfa840cc.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a9717cf07fb6e7c21.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/aa9ec3423c1f54bba-own-result.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/aa9ec3423c1f54bba.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/ab7f880bc2d28e03a.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/sources.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/handback-guard.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/lib_long_run.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/lib_prompt_scratch_line.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/lib_remind_waiter.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/lib_run_scope.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/lib_shell_words.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/lib_snapshot_conflicts.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/hooks/lib_three_way_legs.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/lib_workspace_cargo_lock.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/lib_write_scope.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/hooks/lib_writer_lock.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -153,75 +110,58 @@ scripts/kb/quote-kb.py  # 里程碑三收尾批 12 工具批：quote-kb 认带�
 .claude/rules/test-script-discipline.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/rules/three-way-inference.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 .claude/rules/verification.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bad_disk_input.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e182_unreadable_abandoned_root_forks.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e184_regular_layer_cost_counts.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e184_regular_layer_cost_counts_write_dump.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/bin/e197_scan_journal_glue_memory_by_device_count.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_amplification.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_facts.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_given_states.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_identity.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_injection.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_checker.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_checker_scan_rebuild.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_common.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_conclusions.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_dispatch.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_gpu.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_library.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_point_replay_provenance.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/crash_state_enumeration.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/device_log.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/judging_units_entries.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/lib.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-checker-tier/src/verdict_store.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/bin/e197_scan_journal_glue_memory_by_device_count.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_amplification.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_facts.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_identity.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_injection.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_checker.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_checker_common.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_checker_scan.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_checker_scan_rebuild.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_common.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_conclusions.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_dispatch.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_gpu.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_judge_recovery.wgsl	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_point_replay_provenance.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/crash_state_enumeration.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/judging_units_entries.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/lib.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/verdict_store.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-checker/src/image.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-checker/src/lib.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-checker/src/walk.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/admission.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/block_device.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-core/src/code_two_tree.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/compaction_plan.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/journal.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/mount.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-core/src/region_scan.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/root_record.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-core/src/root_ring.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/system_configuration.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/truncate.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-core/src/unit.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-format/src/lib.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-harness/src/fault_injection.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-harness/src/history.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-harness/src/lib.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-harness/src/model.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-harness/src/model_comparison.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-harness/src/mount_transparency.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-harness/src/temporary_files.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/history.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/model.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/model_comparison.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+crates/singlefs-verification/src/mount_transparency.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-replay-prefix/src/README.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-replay-prefix/src/gc_crash_proofs.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-replay-prefix/src/lib.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-unit-graph/src/build_features.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-unit-graph/src/closure.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-unit-graph/src/entry_groups.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 crates/singlefs-unit-graph/src/lib.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-crates/singlefs-unit-graph/src/manifest.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/README.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/agents/README.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/agents/agent-cost.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -229,17 +169,13 @@ scripts/agents/cite-check.py	# 2026-10-24 审计与文档门禁治理：对照 2
 scripts/agents/copy-originals.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/agents/dispatch-prompt.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/agents/remind.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/agents/snapshot-tree.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/agents/subagent_transcript.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/agents/three-way-materials.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/agents/three-way-rerun-template.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/crash/README.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/crash/check-segment-registry-product-sample.txt	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/crash/check-segment-registry.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/crash/cpu-judging-sites-check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/crash/crash-amplification-item.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/crash/crash-amplification-lib.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/crash/crash-case-check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/crash/crash-flow-coverage.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/crash/crash-point-replay-shard-configuration-check.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/crash/gpu-exemptions-check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -248,13 +184,12 @@ scripts/devices/e152-run.sh	# 2026-10-24 审计与文档门禁治理：对照 20
 scripts/experiment-apparatus/README.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/device-code-key.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e10-aging-compaction-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e116_pack_settle.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e157_parallel_line_one_clauses.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e165-pin-red-examples.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e171_three_oracle_collusion/frozen_o3.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_columns.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_multi_host_run.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_multi_host_run.py	# E171（三oracle合谋测试）删余：这一批删掉它（没有调用方）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_multi_host_run.sh	# E171（三oracle合谋测试）删余：这一批删掉它（没有调用方）
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_o3.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/peer_side.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -272,7 +207,6 @@ scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_11.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_default_threads.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_frozen_o3.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e180-reading-shards.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e181-landing-check-long-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e182-single-device-long-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -280,30 +214,14 @@ scripts/experiment-apparatus/e182-single-device-units-kept-long-run.sh	# 2026-10
 scripts/experiment-apparatus/e183-capacity-cells.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e183-sweep-history-shards.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e184-segment-one-long-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e184_r2_verdict_compare.mutations.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e184_r2_verdict_compare.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e184_r2_verdict_compare_test.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e185-r2-segment-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e185-r3-segment-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e185-r4-segment-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e185_r1_compare.mutations.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e185_r1_compare.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e185_r1_compare_test.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e185_r4_baseline_rejudge.mutations.tsv	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e185_r4_baseline_rejudge.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e185_r4_baseline_rejudge_test.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e197_scan_journal_glue_memory_by_device_count/drive.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/e197_scan_journal_glue_memory_by_device_count/report.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e43_extension_point_budget.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/e49_chain_width.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiment-apparatus/lib.rs	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/experiment-apparatus/long-run-lib/binary-identity.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiments/README.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/test_default_threads.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/gate/admission.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/apply-writer-patch.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/baseline-diff.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/gate/changed-paths.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/data-name-lint.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/gate-structure-check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/hook-swap.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -311,7 +229,6 @@ scripts/gate/lib_function_units.py	# 2026-10-24 审计与文档门禁治理：�
 scripts/gate/lib_rebuilt_packages.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/lkmm-selftest.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/stage-mine.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/gate/staged-tree-worktree.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/test-targets-parallel.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/verus-proof-check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/gate/wallclock-assert-lint.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -320,13 +237,11 @@ scripts/hosts/clean-session-scratch.py	# 2026-10-24 审计与文档门禁治理�
 scripts/hosts/core_usage.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/hosts/host-dispatch.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/hosts/host-resources.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/hosts/multi-host-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/hosts/peer-host-lib.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/hosts/resource_release_broadcast.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/hosts/rocksdb-prebuilt.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/hosts/run-build-directory.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/hosts/run-with-memory-cap.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/hosts/run_build_directory.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/hosts/test-environment-check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/kb/README.md	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/kb/archive-past-rounds.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -341,7 +256,6 @@ scripts/kb/lib_basis_paths.py	# 2026-10-24 审计与文档门禁治理：对照 
 scripts/kb/lib_experiment_number_directories.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/kb/lib_notation_check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/kb/migrate-changelog-format.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/kb/milestone-close-owed-check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/kb/move-directory-in-use-check.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/kb/replace-batch.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/kb/replace-once.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
@@ -349,88 +263,286 @@ scripts/kb/stale-candidates.py	# 2026-10-24 审计与文档门禁治理：对照
 scripts/kb/sweep-term.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/kb/verify-citations.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/mutation/broad-mutation.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/mutation/crates-mutation-light-rows.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/mutation/crates-mutation-rows.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/mutation/mutate.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/mutation/mutation-prune.py	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-scripts/mutation/mutation-shard-run.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
 scripts/mutation/prove-red.sh	# 2026-10-24 审计与文档门禁治理：对照 2026-10-23 审计复核修复与六道 doc 门禁全绿对齐（records/2026-10-23-项目进度与知识腐烂审计-深入复核.md）
-.claude/agents/clerk.md	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-.claude/agents/investigator.md	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-.claude/agents/mutation-triage.md	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-.claude/gate.d/checker-direction-entries.tsv	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 .claude/gate.d/cpu-judging-sites.tsv	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 .claude/gate.d/hardcoded-quota-exempt.tsv	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-.claude/gate.d/timing-load-field-lag.tsv	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-.claude/gate.d/unreachable-claims-stock.tsv	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 .claude/gate.d/verdict-library-scripts.tsv	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 .claude/gate.d/verus-trust-list.tsv	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-.claude/hooks/ask-user-claim-guard.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 .claude/hooks/host-resources-reminder.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-.claude/hooks/lib_work_root.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 .claude/hooks/session-start.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 .claude/hooks/timer-only-remind-guard.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/adapter_inventory.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/background_gpu.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/background_gpu_compute.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-background-gpu/src/checksum_kernel_bitwise.wgsl	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-background-gpu/src/checksum_kernel_table_driven.wgsl	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/checksum_kernels.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/gpus_of_this_host.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-background-gpu/src/lib.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-background-gpu/src/live_slot_kernel_searching_sorted_records.wgsl	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-background-gpu/src/live_slot_kernel_walking_every_record.wgsl	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/live_slot_kernels.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/memory_limit_and_chunks.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/region_record_kernel_searching_sorted_indexes.wgsl	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/region_record_kernel_walking_the_mapping.wgsl	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/region_record_kernels.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-background-gpu/src/two_kernel_reconciliation.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-background-gpu/src/waiting_for_the_gpu.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-background-gpu/src/work_split_by_measured_cost.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-checker-tier/src/bin/crash_full_run_backlog.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-checker-tier/src/crash_full_run_backlog.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-checker/src/rebuild.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
+crates/singlefs-background-gpu/src/measured_host_cpu_time_per_submission.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
+crates/singlefs-verification/src/crash_full_run_backlog.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-core/src/background_compute.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-core/src/checksum.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-core/src/lib.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-core/src/write_request_split.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-harness/src/memory_pool.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-harness/src/read_tally.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-harness/src/reference_filesystem_translation.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-harness/src/verification_read.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-reference-filesystem/src/lib.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
+crates/singlefs-verification/src/memory_pool.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
+crates/singlefs-verification/src/reference_filesystem_translation.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
+crates/singlefs-verification/src/verification_read.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-replay-prefix/src/gc_ring_interval_proofs.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-unit-graph/src/bin/unit_graph.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-crates/singlefs-unit-graph/src/sha256.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-unit-graph/src/units.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-unit-graph/src/verus_ghost_code.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 crates/singlefs-unit-graph/src/workspace.rs	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/agents/tests/README.md	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/agents/tests/test_agents.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/README.md	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/devices/dm-owned.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/e125-zoned-wp-probe.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/e129-tear-injector.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/e129-thin-neighbour.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/e129-thin-rmw.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/e152-stage-root.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/e34-iomin-probe.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/devices/snapshot-check.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/stripe-map-probe.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/devices/tests/test_devices.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/devices/vm-bench.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/vm-geom.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/devices/vm-kernel.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/gate/checker-direction-overlap.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/gate/lib_workspace_lock.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/gate/rerun-failed-tests.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
-scripts/gate/tests/test_review_regressions.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/hosts/memory_peaks_lib.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/hosts/minimal-copy.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/hosts/source-stamp.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/hosts/tests/test_review_regressions.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/hosts/work-directory-ownership.sh	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
 scripts/mutation/lib_mutation_units.py	# 2026-10-26 里程碑四与防丢提交批次触发文件登记（records/2026-10-26-里程碑四防丢提交.md）
+.claude/gate.d/doc-registries.sh	# 2026-10-30 知识腐烂治理：能数的数与决策欠段引已还清欠账两格（records/2026-10-30-知识腐烂治理按现状.md）
+.claude/gate.d/doc-text.sh	# 2026-10-30 知识腐烂治理：带日期的现状句一格（records/2026-10-30-知识腐烂治理按现状.md）
+CLAUDE.md	# 2026-10-30 知识腐烂治理：不变量条数与放量分项数按现数改（records/2026-10-30-知识腐烂治理按现状.md）
+.claude/gate.d/counted-claims.tsv	# 2026-10-30 知识腐烂治理：三格的门禁、登记表、滞后表与归属（records/2026-10-30-知识腐烂治理按现状.md）
+.claude/gate.d/dated-status-lag.tsv	# 2026-10-30 知识腐烂治理：三格的门禁、登记表、滞后表与归属（records/2026-10-30-知识腐烂治理按现状.md）
+.claude/gate.d/owed-refs-paid-lag.tsv	# 2026-10-30 知识腐烂治理：三格的门禁、登记表、滞后表与归属（records/2026-10-30-知识腐烂治理按现状.md）
+scripts/kb/stale-candidates-record-carriers.tsv	# 2026-10-30 路径关联与候选精度：候选表登记、后继脚本、路径门禁的两张表、三语 kb 不在路径改写（records/2026-10-30-路径关联与候选精度.md）
+scripts/kb/path-successor.py	# 2026-10-30 路径关联与候选精度：候选表登记、后继脚本、路径门禁的两张表、三语 kb 不在路径改写（records/2026-10-30-路径关联与候选精度.md）
+.claude/gate.d/dead-path-lag.tsv	# 2026-10-30 路径关联与候选精度：候选表登记、后继脚本、路径门禁的两张表、三语 kb 不在路径改写（records/2026-10-30-路径关联与候选精度.md）
+.claude/gate.d/dead-path-kept.tsv	# 2026-10-30 路径关联与候选精度：候选表登记、后继脚本、路径门禁的两张表、三语 kb 不在路径改写（records/2026-10-30-路径关联与候选精度.md）
+.claude/gate.d/dead-section-lag.tsv	# 2026-11-01 服务描述与历史腐烂：governance-refs 的小节引用扩到 kb，存量登这张只缩不涨的表（records/2026-11-01-服务描述与历史腐烂.md）
+.claude/gate.d/split-proposal-ledgers.tsv	# 2026-10-31 一百三十七节那一轮：subagent 拆分提案切到新账本、两版旧账本封存，门禁 doc-process-records 的 sealed-ledgers-unchanged 格读它（records/2026-10-29-一百三十七节那一轮调度记录.md）
+crates/singlefs-verification/src/gpu_unit_checks.rs	# 服务描述与历史腐烂那一批：旧起法改成经 task-server/task submit 交（records/2026-11-01-服务描述与历史腐烂.md），crates 补丁只改注释与报错消息
+crates/singlefs-verification/src/heavy_threads.rs	# 服务描述与历史腐烂那一批：旧起法改成经 task-server/task submit 交（records/2026-11-01-服务描述与历史腐烂.md），crates 补丁只改注释
+scripts/devices/build-patched-qemu.sh	# 服务描述与历史腐烂那一批：旧起法改成经 task-server/task submit 交（records/2026-11-01-服务描述与历史腐烂.md），文件头与起法
+scripts/hosts/heavy_threads.py	# 服务描述与历史腐烂那一批：旧起法改成经 task-server/task submit 交（records/2026-11-01-服务描述与历史腐烂.md），文件头改成现状
+scripts/hosts/heavy-threads.sh	# 服务描述与历史腐烂那一批：旧起法改成经 task-server/task submit 交（records/2026-11-01-服务描述与历史腐烂.md），文件头改成现状
+.claude/agents/clerk.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/agents/investigator.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/agents/mutation-triage.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/agents/three-way-materials.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/crash-knobs.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/e165-pinned-red-examples.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/gpu-exemptions.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/quoted-product-unreplayable.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/repro-command-unreproducible.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/retired-names-refusals.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/retired-names.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/shared-data-root-literals-exempt.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/test-function-names-exempt.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/unsafe-allowances.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/verdict-library-code-forms.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/gate.d/verus-trait-impls-outside-lag.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/hooks/lib_abandoned_rounds.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/hooks/lib_work_root.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/rules/artifact-line-pointer.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/rules/directory-layout.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/rules/exhaustive-interleaving.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/rules/mutation-sampling.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/rules/service-stop-readback.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+.claude/rules/timer-only-remind.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-background-gpu/src/lib.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-background-gpu/src/work_split_by_measured_cost.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-verification/src/bin/crash_library_reader.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-verification/src/crash_library.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-verification/src/crash_point_replay_progress.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-verification/src/gpu_card_configuration.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/address.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/bytes.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/container_tree.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/deleted_inodes.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/inode_tree.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/instance_table.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/instance_table_sweep.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/lib.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/lineage_tree.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/logged_operations.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/pointer.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/retirement_tree.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/tombstone_tree.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/unlink.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-core/src/verified_model.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-verification/src/gpu_memory_ledger.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-replay-prefix/src/file_range_proofs.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-replay-prefix/src/partial_write_proofs.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-replay-prefix/src/unlink_proofs.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-unit-graph/src/conditional_compilation.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-unit-graph/src/lock_file.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-unit-graph/src/output.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-unit-graph/src/rust_items.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-unit-graph/src/shell_sources.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-unit-graph/src/wgsl.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/agents/agent-handover.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/agents/checklist-specs.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/agents/lib_session_directory.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/crash/crash-case-check.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/crash/lib_crash_point_replay_items.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/crash/lib_verdict_library.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/devices/qemu-blklogwrites-check.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+crates/singlefs-device-library/src/lib.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e139_tightened_floor.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e162_crash_verdict_block_store.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e165-compare-kill-bounds.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e16_fifth_run_peak_under_today_widths.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor/comparator_q3_bad_states.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor/executor_main.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor/mutation_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/comparator_bad_image_judge.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/executor_main.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_three.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/witness_reference.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/executor_main.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_one_b_anchors_and_freeze.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_second_run_o3_spec_executor/comparator_q3_bad_states.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_second_run_o3_spec_executor/executor_main.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_second_run_o3_spec_executor/mutation_driver_with_batch_and_bad_state_checks.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_487/executor_main.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-4-only.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-8.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion/comparator.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion/expansion_table.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion/freeze-path-only-changes.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion/mutation_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion/o3_bad_image_judge.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion/test_collusion_pipeline.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-step-4-only.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-step-8.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/bad_implementation_table.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/contrast_revision_6_against_revision_8.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/contrast_segment_two_revision_10.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/count_reusable_units.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/cross_host_o3_check.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/device_timing.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_row_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_task_server.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/freeze-path-only-changes.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/list_check.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/mutation_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/o3_bad_image_judge.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/removal_effect.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library_root.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_10_placeholders.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_11_placeholders.json	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_placeholders.json	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_placeholders.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_8.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_10.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/s2_compare.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_comparator.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_8.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_two_comparator.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/shard_relay.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_list_check.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_mutation_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_removal_effect.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_revision_10.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_revision_11.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_revision_8.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_row_time_limit.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_segment_two.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_symmetric_hosts.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_thread_shares.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e172_deletion_write_dry_run.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e176_crates_oracle/Cargo.toml	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/approximate_tree_lines.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/build_approximate_tree.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/compile_in_the_approximate_tree.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/mutation_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/result_lines.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/test_build_approximate_tree.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/attribution.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/cell_classes.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/contrast_against_r1.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/current_tree_row_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/device_function_map.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/e171_research_side.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/full_table_run.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/mutation_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/q2_misses.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/research_function_map.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/test_attribution.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/test_contrast_against_r1.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/test_current_tree_row_driver.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/test_full_table_run.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/test_q2_misses.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/test_whole_table_matrix.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/whole_table_matrix.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/e56-sweep.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/experiment-apparatus/on-request-experiments.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/admission.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/changed-paths.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/closeout-status.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/crate-sources-reachable.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/directory-layout-check.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/lib_libtest_result_lines.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/lib_reuse_checks.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/selftest-process-guard.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/shared-index-stale-check.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/gate/staged-tree-worktree.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/hosts/compile-then-swap.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/hosts/gpu-card-health.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/hosts/multi-host-run.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/hosts/multi_host_addresses.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/hosts/target-prune.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/append-record.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/decision-slim-check.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/fetch-refs.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/ledger-append-section.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/lib_atomic_replace.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/lib_markdown.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/milestone-close-owed-check.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/pdf-text.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/quote-rust-items.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/relabel-item.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/kb/tests/test_review_regressions.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/README.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/broad-mutation-ignored-exclusions.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/crates-mutation-light-rows.py	# 2026-11-05 删轻型并入重型：这份轻型行脚本删掉（records/2026-11-05-删轻型并入重型.md）
+scripts/mutation/crates-mutation-rows.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/mutation-shard-run.sh	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e139_tightened_floor.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e158_arms.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e16_fifth_run_peak_under_today_widths.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_announcement.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_library_root.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_preconditions.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_threads_and_contrast.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_list_removal.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_8.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e172_deletion_write_dry_run.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e173_admission_ceiling_bad_ring_slot_dispositions.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e174_lease_drop_wait_memory_return.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e178_leaf_and_record_death_counts.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e200_revision_6_segment_one_on_an_approximate_tree.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tables/e201_three_oracle_collusion_full_table_on_the_current_tree.tsv	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/mutation/tests/test_audit_regressions.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/prune-server/README.md	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/prune-server/prune-server-load-simulation.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/prune-server/prune_server_client.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）
+scripts/prune-server/prune_server_client_selftest.py	# 全量门禁实跑与崩溃放量状态库核账（records/2026-11-03-全量重型门禁实跑与崩溃放量状态库核账报告.md）

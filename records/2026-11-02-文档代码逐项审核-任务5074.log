@@ -1,0 +1,39 @@
+== 任务 5074 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-5074.attempt-1.log（共 38 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.3
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-5074-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+  ✓ 绿：R4J1 重判的等号在 losing 那一侧
+  ✓ 绿：R4J2 重判读 c_rt 那一列、不读 c_floor
+  ✓ 绿：R4J3 ρ 是本机 ÷ 量阶段 CPU 的那一台
+  ✓ 绿：R4J4 换到本机的门槛只乘一次 ρ
+  ✓ 绿：R4J5 候选 B 的不赔标下界
+  ✓ 绿：R4J6 乙段增量为负的点 C 写 not_run
+  ✓ 绿：R4J7 c_rt 来源读控漂移段受控臂
+  ✓ 绿：R4J8 变没变比的是 judgement
+  ✓ 绿：R4J9 输入 sha256 对不上就停（K-S5）
+  ✓ 绿：R4J10 线程钟那一半的行数要对（K-S3）
+  ✓ 绿：R4J11 B7 的两条边含在带里
+  ✓ 绿：R4J12 旋钮翻面两端都要有判定
+  ✓ 绿：R4J13 阳性对照红的写法整段作废
+  ✓ 绿：R4J14 直接算那一端取写法 X 那一列
+  ✓ 绿：R4J15 合成产物上逐行复现、改一行判定就停（PR1、K-S3）
+  ✓ 绿：R4J16 D5 数的是每张卡 judgement 列的 unstable
+  ✓ 绿：R4J17 L1 只数从不赔变赔的
+  ✓ 绿：R4J18 B5、B6 按写法与卡数变成赔与不稳定的
+  ✓ 绿：R4J19 ρ 与 r3 打出的不同就停（K-S4）
+  ✓ 绿：V166 系数不乘选段
+  ✓ 绿：V167 写法甲的系数恒为 1
+  ✓ 绿：V168 D 的门槛不含签发
+  ✓ 绿：PR1 三份已有产物在时逐行复现 r3 第一段 2684 行
+自证 23 项，红 0 项
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=9.0 seconds=6.8 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=9.0
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-5074-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=9.4 seconds=0.4 exit=0

@@ -1,0 +1,16 @@
+== 任务 6618 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-6618.attempt-1.log（共 15 行，下面是整份）
+AUDIT_QUOTE case=complete_control exit=0 output_exists=True required_A_body_present=True
+  ✓ 2 段整抄进 output.md，回读逐字节一致，清单里标「抄」的每一节都在，正文提到的每个 kb 文件都有清单
+AUDIT_QUOTE case=missing_control exit=4 output_exists=False required_A_body_present=False
+quote-kb: 清单标了「抄」而附录里没有 1 节：
+    .claude/kb/a.md：## Shared
+  → 把缺的那几节补进取法（优先用 文件@标题），或者把清单那一行改成「不抄」并写理由
+AUDIT_QUOTE case=other_file_same_heading exit=0 output_exists=True required_A_body_present=False
+  ✓ 1 段整抄进 output.md，回读逐字节一致，清单里标「抄」的每一节都在，正文提到的每个 kb 文件都有清单
+AUDIT_QUOTE case=heading_without_body exit=0 output_exists=True required_A_body_present=False
+  ✓ 2 段整抄进 output.md，回读逐字节一致，清单里标「抄」的每一节都在，正文提到的每个 kb 文件都有清单
+AUDIT_QUOTE case=heading_inside_other_file_code exit=0 output_exists=True required_A_body_present=False
+  ✓ 1 段整抄进 output.md，回读逐字节一致，清单里标「抄」的每一节都在，正文提到的每个 kb 文件都有清单
+AUDIT_QUOTE source=scripts/kb/quote-kb.py sha256=3a5c44d556ae8c955dd556b8f157eccefd3c4733975628609c0d412a362428cd
+AUDIT_QUOTE source=scripts/kb/kb-sections.py sha256=1aa10e1113b08094be615e3ea79917b65dff0eaf6238fd49b1416c3ff9e07104
+AUDIT_QUOTE cases=5 controls=2 discrepancies=3 temporary_materials_removed=true

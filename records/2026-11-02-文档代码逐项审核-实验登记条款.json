@@ -1,0 +1,178 @@
+{
+  "at": "2026-11-05",
+  "sources": [
+    {
+      "path": "scripts/kb/claim-experiment.sh",
+      "sha256": "654b6e26c5773728b4c3ac98aeb7cf016e9b9e292f68146ab44a5b2b57d37683",
+      "read_ranges": [
+        [
+          1,
+          253
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false
+    },
+    {
+      "path": "scripts/kb/lib_experiment_number_directories.py",
+      "sha256": "a47fdee398d3d8b9d1e405db9930a3f71679fa50c06a95dadb21d578f40d8cf8",
+      "read_ranges": [
+        [
+          1,
+          286
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false
+    },
+    {
+      "path": ".claude/gate.d/experiment-number-directories.tsv",
+      "sha256": "3c25f9d5c304bdaca6dc928fe2916842d496f5df0e1f34f0a8bfb45d9908c78c",
+      "read_ranges": [
+        [
+          1,
+          19
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false
+    }
+  ],
+  "claims": [
+    {
+      "claim": "占号登记取本棵，全部工作树均按同一登记查号",
+      "status": "static_match",
+      "evidence": "claim-experiment.sh:92-107;registry头第3行",
+      "limits": "其他树有新增未进本棵登记的路径按明示范围不保证"
+    },
+    {
+      "claim": "Git公共目录flock覆盖查号与排他建文件",
+      "status": "static_match_runtime_pending7229",
+      "evidence": "claim-experiment.sh:117-156",
+      "limits": "协作调用间互斥；任意外部写入不受此锁约束"
+    },
+    {
+      "claim": "前导零统一后比较与写文件",
+      "status": "static_match_runtime_pending7229",
+      "evidence": "claim-experiment.sh:138,145,150",
+      "limits": "E019与E19由既有回归核"
+    },
+    {
+      "claim": "工作树名含换行拒绝，不静默少查",
+      "status": "static_match_runtime_pending7229",
+      "evidence": "claim-experiment.sh:49-77",
+      "limits": "普通空格由NUL输出保留；不声称全部特殊路径都验证"
+    },
+    {
+      "claim": "--next全部工作树最大值加一",
+      "status": "static_match",
+      "evidence": "claim-experiment.sh:110-115",
+      "limits": "查询本身不保留编号，后续占号会再查"
+    },
+    {
+      "claim": "登记列数、理由、形态、路径、重复、空表拒绝",
+      "status": "static_match_bounded",
+      "evidence": "lib_experiment_number_directories.py:67-95",
+      "limits": "只按字面路径判重；路径别名和符号链接未全面验证"
+    },
+    {
+      "claim": "目录/索引形态不符拒绝；缺登记位置列absent",
+      "status": "static_match",
+      "evidence": "lib_experiment_number_directories.py:106-137",
+      "limits": "代码类型检查对应；权限/并发变更待进一步运行"
+    },
+    {
+      "claim": "号按数值与路径排序，前导零去掉",
+      "status": "static_match",
+      "evidence": "lib_experiment_number_directories.py:122,134,137",
+      "limits": "全部文件名含制表符或换行时输出边界仍待核"
+    },
+    {
+      "claim": "跳target和research/prompts直接子层model，目录名本身可计号",
+      "status": "static_match_bounded",
+      "evidence": "lib_experiment_number_directories.py:117-124",
+      "limits": "作用在逐层遍历中的子目录；登记直接指向被剪目录的情形仍待核"
+    },
+    {
+      "claim": "目录库普通CLI拒绝弄坏开关",
+      "status": "static_match",
+      "evidence": "lib_experiment_number_directories.py:140-147,272-278",
+      "limits": "直接import的调用者自行承担守卫；本条不扩张到import"
+    },
+    {
+      "claim": "声明自证表与真实登记同样五处",
+      "status": "discrepancy_A58_static",
+      "evidence": "claim-experiment.sh:163-164;registry六行",
+      "limits": "生产查号读现行六行，不能据此判生产漏扫"
+    },
+    {
+      "claim": "孤儿格与占号共读一库一表",
+      "status": "static_match",
+      "evidence": "doc-experiments.sh:358,2090-2112;claim-experiment.sh:43,83-87",
+      "limits": "只签这两个调用点"
+    },
+    {
+      "claim": "孤儿格要求对应实验正文",
+      "status": "discrepancy_A59_reproduced",
+      "evidence": "task7228:2controls+3falsegreen;doc-experiments.sh:2094",
+      "limits": "只选一格，不宣称整个门禁均通过"
+    },
+    {
+      "claim": "孤儿格无实验号退77、扫描失败退1",
+      "status": "static_match",
+      "evidence": "doc-experiments.sh:2106-2112,2136-2139",
+      "limits": "相应分支未在7228全部执行"
+    }
+  ],
+  "registry_rows": [
+    {
+      "line": 14,
+      "text": "research\te-number-names\t# 跑前登记、重跑登记与三方材料（research/prompts/），实验产物（research/results/，含子目录）",
+      "status": "path_and_form_correspondence_only",
+      "actual_all_names_semantics_pending": true
+    },
+    {
+      "line": 15,
+      "text": "scripts\te-number-names\t# 实验装置（scripts/experiment-apparatus/）、变异表（scripts/mutation/tables/）与别处带实验号的脚本（scripts/devices/ 下的探针）",
+      "status": "path_and_form_correspondence_only",
+      "actual_all_names_semantics_pending": true
+    },
+    {
+      "line": 16,
+      "text": "crates/singlefs-checker-tier/src/bin\te-number-names\t# 登记里写死成入库装置的实验，装置住在 验证包里（e165_replay_bounded_enumeration.rs 这类）",
+      "status": "path_and_form_correspondence_only",
+      "actual_all_names_semantics_pending": true
+    },
+    {
+      "line": 17,
+      "text": "crates/singlefs-background-gpu/src/bin\te-number-names\t# 登记里写死成入库装置的实验，装置住在产品 GPU 包里（e202_gpu_cpu_gc_comparison.rs 这类）",
+      "status": "path_and_form_correspondence_only",
+      "actual_all_names_semantics_pending": true
+    },
+    {
+      "line": 18,
+      "text": ".claude/kb/experiments\tnumber-names\t# 实验页：<号>-<简称>.md 与两份译文",
+      "status": "path_and_form_correspondence_only",
+      "actual_all_names_semantics_pending": true
+    },
+    {
+      "line": 19,
+      "text": ".claude/kb/experiments.md\tindex-rows\t# 实验索引表：只登了索引行、页还没建的号也算用过",
+      "status": "path_and_form_correspondence_only",
+      "actual_all_names_semantics_pending": true
+    }
+  ],
+  "runtime": [
+    {
+      "task": 7228,
+      "exit_code": 0,
+      "complete_log_read": true,
+      "task_clean": true,
+      "log": "records/2026-11-02-文档代码逐项审核-任务7228.log",
+      "source_hashes_unchanged": true
+    }
+  ],
+  "pending_tests": [
+    7229
+  ]
+}

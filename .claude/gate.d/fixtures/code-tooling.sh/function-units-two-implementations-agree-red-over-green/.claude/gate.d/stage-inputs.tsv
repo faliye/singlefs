@@ -1,0 +1,2 @@
+# 样本的准入登记表：function-units-two-implementations-agree 格只读第二列里写成 <文件>.rs::<限定名> 的入口
+function-units-sample	crates/fsample/src/lib.rs::entry crates/fsample/src/lib.rs::table crates/fsample/src/main.rs::main	-	# 样本：两份实现逐个比闭包与键的入口

@@ -96,7 +96,7 @@
 #       direct-divergence-red（direct 的 check.txt 里盘 1 那一行改成 device=2、退出码仍是 0：判绿退 77，expect 里那几条 want 找不到）
 #       green（少了逐盘读的那几项检查，「123 项检查全过」那条 want 找不到）
 #       tier-key-samples-red-tier-records-green（direct 判绿、六档都记，第二趟「现判 0、复用 6」、退 77：「· direct：现判（上次判红」「· 按档：现判 1、复用 5」找不到）
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=e142-product-read  让反向链的对照退回改之前的取法（从 scripts/experiment-apparatus/replay.sh 的 @driver_e142 那一行取产物名、读 research/results/<名> 的 name=root_record）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=e142-product-read  让反向链的对照从 scripts/experiment-apparatus/replay.sh 的 @driver_e142 那一行取产物名、读 research/results/<名> 的 name=root_record
 #       red、green、back-chain-pin-missing-red、direct-divergence-red、mkfs-segments-red、segments-step-red（样本里都没有 research/、也没有 replay.sh，
 #       取对照那一步当场红在「解析不出产物文件」：green 期望退出 77、实测 1，别的几份 expect 里的 want 对不上）
 #       tier-key-samples-guest-dispatch、tier-key-samples-guest-function、tier-key-samples-init-heredoc、tier-key-samples-kernel-byte、tier-key-samples-manifest-differs、
@@ -105,7 +105,7 @@
 #       tier-key-samples-red-tier-records-green（同样当场红：退 1，红句是「解析不出产物文件」，expect 里的 want 对不上）
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=mkfs-compare-skipped  让 path=mkfs 那一行与布局表八「mkfs 种根」登记值的比对跳过
 #       mkfs-segments-red（样本登记行换成真仓现行那一行：段序列 2+12+1+1+1+4、27 次操作、4117 个崩溃状态、种类多最前一段 [zero_fill×2,barrier×2]；
-#       虚机输出是 2026-10-02 录的 12+1+1+1+4、23 次操作、4114 个崩溃状态：判绿退 77，「mkfs 段序列与登记表不一致」那条 want 对不上）
+#       虚机输出是录好的 12+1+1+1+4、23 次操作、4114 个崩溃状态：判绿退 77，「mkfs 段序列与登记表不一致」那条 want 对不上）
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=segments-diff-skipped  让虚机输出与布局表八 path= 那几处登记（path=mkfs 之外那几行）逐字比对那一步跳过
 #       segments-step-red（只摆 direct 一档，direct/out.txt 里 path=transaction 那一行的段序列 24+2+1+2 改成 23+2+1+2、登记行都不动：判绿退 77，
 #       「段序列（path=mkfs 之外那几行）与布局表八登记的不一致」那条 want 对不上）
@@ -116,7 +116,7 @@
 #       tier-key-samples-three-questions（期望退出 77，实测 1；REUSE_SELFTEST 那一行找不到）
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-without-main  让来宾程序单元只从这一档的入口起算、不收 main
 #       tier-key-samples-guest-dispatch（只改 main 的参数解析，六档都报复用：「· direct：现判」「· 按档：现判 6、复用 0」找不到）
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-with-listing-lines  让开跑前的清单退回改前的取法（vm-bench.sh 标准输出里抬头那几行留在清单里）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-with-listing-lines  让开跑前的清单取成带抬头行的样子（vm-bench.sh 标准输出里抬头那几行留在清单里）
 #       tier-key-samples-manifest-recorded（头一趟六档都报「清单不同……没记」，第二趟「现判 6、复用 0」：「· 头一趟记下 6 档」找不到）
 #       tier-key-samples-manifest-differs（「· 头一趟记下 5 档」「· direct：复用」「· 按档：现判 1、复用 5」找不到）
 #       tier-key-samples-red-tier-records-green（判绿的五档清单都不同、一档都没记：「· 头一趟记下 5 档」「· raise-rollback-floor：复用（」找不到）
@@ -126,9 +126,9 @@
 #       tier-key-samples-three-questions（复用三问 ① 与复用哨兵都红：期望退出 77，实测 1）
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=rocksdb-entry-unchecked  让起 cargo 之前判 RocksDB 预编库取值那一步（下面「RocksDB 预编库的取值」）跳过
 #       rocksdb-entry-refused（往下走判前置，红在别处：「rocksdb-prebuilt entry：」找不到）
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=red-tier-stops-the-rest  让一档红就整道退出、判绿的等全部档都绿才记（改前的样子：后面几档不判，判绿的一档都不记）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=red-tier-stops-the-rest  让一档红就整道退出、判绿的等全部档都绿才记（后面几档不判，判绿的一档都不记）
 #       tier-key-samples-red-tier-records-green（头一趟判到 direct 就退 1：「· 头一趟记下 5 档」「· raise-rollback-floor：复用（」「· 按档：现判 1、复用 5」找不到）
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=red-not-recorded  让判红的那一档不记红、不撤同一把键原有的绿（改前的样子：红了整趟不记）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=red-not-recorded  让判红的那一档不记红、不撤同一把键原有的绿（红了整趟不记）
 #       tier-key-samples-red-rejudged（第二趟 page-cache 也照头一趟的绿复用：「· qemu:page-cache 判红记库」「· page-cache：现判（上次判红」「· 按档：现判 1、复用 5」找不到）
 #       tier-key-samples-red-tier-records-green（direct 没记红，第二趟答「现判（无记录」：「· qemu:direct 判红记库」「· direct：现判（上次判红」找不到）
 # RocksDB 预编库的取值：真跑（不放 .qemu-prerecorded）在判前置、查判定库与两条 cargo build 之前先跑 scripts/hosts/rocksdb-prebuilt.py entry（这台装了、
@@ -145,6 +145,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ qemu-device-streams.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 ADMISSION_MODULE="$STAGE_REPOSITORY/scripts/gate/admission.py"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
@@ -458,7 +463,7 @@ registered_reading_text() {
   printf 'back_chain\t%s\nmkfs\t%s\n' "$EXPECTED_BACK_CHAIN" "$EXPECTED_MKFS_SEGMENTS_LINE"
 }
 # 现取对照的登记值，写进 EXPECTED_*；取不出判红。开虚机之前调一次，键样本每趟算键之前再调（样本的改动可能动到登记）。
-# 弄坏开关 e142-product-read：反向链退回从 replay.sh 指的 E142 产物里取（改之前的取法），样本里没有 research/，当场红
+# 弄坏开关 e142-product-read：反向链改从 replay.sh 指的 E142 产物里取，样本里没有 research/，当场红
 SEGMENT_REGISTRY_SCRIPT="$STAGE_REPOSITORY/scripts/crash/check-segment-registry.py"
 BACK_CHAIN_PINNING_TEST="crates/singlefs-verification/tests/new_pool_file_creation_publish.rs"
 BACK_CHAIN_PINNING_CONSTANT="E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION"
@@ -630,7 +635,7 @@ record_tier() { # record_tier <档> <一句判定> <跑法>
   ((status == 0)) || echo "  ! qemu:$1 判绿了，没记进判定库 $verdict_library：下一趟这一档照跑"
 }
 # record_red_tier <档> <一句判定>：判红的那一档照键记红、撤掉同一把键原有的绿（lib_verdict_library.py record-red；文件头「复用」），下一趟这一档现判、原因以「上次判红」起头。
-# 预录档（只判、不查库也不记库）、这一档的组成表还没写的不记。弄坏开关 red-not-recorded 下不记（改前的样子：红了整趟不记，同一把键原有的绿留着照复用）
+# 预录档（只判、不查库也不记库）、这一档的组成表还没写的不记。弄坏开关 red-not-recorded 下不记（红了整趟不记，同一把键原有的绿留着照复用）
 record_red_tier() {
   local run="键样本"
   [[ -n "${verdict_library:-}" && -n "${keys_directory:-}" && -f "$keys_directory/$1.tsv" ]] || return 0
@@ -654,7 +659,7 @@ record_red_of_failed_tier() {
 # 清单的条目，/bench 那一行的内容换成占位：被测二进制由「来宾程序单元」管。run_one 拷出来的清单（VM_INITRAMFS_MANIFEST）只有条目，直接用它；
 manifest_without_bench() { awk -F'\t' 'BEGIN { OFS = "\t" } $1 == "bench" { $4 = "<被测二进制，见来宾程序单元>" } { print }' "$1"; }
 # vm-bench.sh --initramfs-manifest 的标准输出前面还有它的抬头与「✓ 内核 …」这几行和 kernel、qemu 两行，只取 entry<TAB> 开头的条目。
-# 弄坏开关 manifest-with-listing-lines：退回改前的取法（只去掉 entry 前缀与 kernel、qemu 两行，抬头那几行留在清单里，跑完核清单永远不同、一档都不记）
+# 弄坏开关 manifest-with-listing-lines：清单只去掉 entry 前缀与 kernel、qemu 两行，抬头那几行留在清单里，跑完核清单永远不同、一档都不记
 manifest_entries_of_listing() {
   if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == manifest-with-listing-lines ]]; then
     sed 's/^entry\t//' "$1" | grep -v -e '^kernel	' -e '^qemu	' | manifest_without_bench -
@@ -691,7 +696,7 @@ tier_sentinel_outcome() { if [[ " ${forced_modes[*]-} " == *" $1 "* ]]; then pri
 # （record_tiers_after_run：<清单目录>/<档>/initramfs.manifest 与算键的那一份核一遍，对不上不记），红的档当场照键记红（judging_tier 设成那一档、
 # 调 EXIT 陷阱调的同一个 record_red_of_failed_tier）；一档红不挡后面的档判与记。有判定库（verdict_library）的才记，预录档只判；
 # 有复用哨兵状态（tier_sentinel_state）的逐档报结局。交出：checks、judged_tiers、recorded_total、green_modes、red_modes 与两张名单（调用方先清零）。
-# 弄坏开关 red-tier-stops-the-rest：一档红就整道退出、判绿的等全部档都绿才记（改前的样子）
+# 弄坏开关 red-tier-stops-the-rest：一档红就整道退出、判绿的等全部档都绿才记
 judge_and_record_tiers() {
   local runs="$1" version="$2" mode tier_red tier_checks state_file geometry bytes physical minimum name value
   local -a disks=() deferred_green=()

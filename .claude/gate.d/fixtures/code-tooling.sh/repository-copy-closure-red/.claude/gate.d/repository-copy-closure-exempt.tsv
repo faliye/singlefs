@@ -1,0 +1,5 @@
+# 样本的排除表：一行放行 exempt_copy.sh，另三行各错一样（指向不存在的文件、锚串不命中、基准里没有）
+scripts/hosts/exempt_copy.sh:"$repository_root/scripts/"  # 样本：自证搭的小仓要整份脚本目录
+scripts/hosts/gone.sh:crates  # 样本：指向不存在的文件
+scripts/hosts/hand_copy.sh:no-such-anchor  # 样本：锚串一处被判行都不命中
+scripts/hosts/grown_copy.sh:"$repository_root/crates"  # 样本：基准里没有这一行（grown-row）

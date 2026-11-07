@@ -1,0 +1,11 @@
+exit=1
+want=  ✗ 撞名 private_twin：2 份定义在 2 个模块里（编译目标 demo:lib:demo）
+want=       fn journal  crates/demo/src/journal.rs:1
+want=       fn ledger  crates/demo/src/ledger.rs:1
+want=  ✗ 撞名 shared_inline：2 份定义在 2 个模块里（编译目标 demo:lib:demo）
+want=       fn inline_pair::reading  crates/demo/src/lib.rs:6
+want=       fn inline_pair::writing  crates/demo/src/lib.rs:9
+want=  ✗ 撞名 helper_twin：2 份定义在 2 个模块里（编译目标 demo:lib:demo），只在测试里
+want=       fn inventory::tests  crates/demo/src/inventory.rs:3
+want=       fn journal::tests  crates/demo/src/journal.rs:5
+want=3 处撞名（产品代码 2 处，只在测试里 1 处，逐处列在上面）

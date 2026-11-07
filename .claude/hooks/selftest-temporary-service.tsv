@@ -17,6 +17,11 @@
 scripts/crash/crash-amplification-item.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/crash/crash-amplification-lib.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/crash/crash-amplification-two-hosts.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_11.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_11.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_11.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/gate/selftest-process-guard.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/crash/crash-amplification.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/crash/crash-flow-coverage.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/crash/crash-point-replay-shard-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
@@ -27,7 +32,21 @@ scripts/experiment-apparatus/e165-pin-red-examples.py	required	# 开跑先调客
 scripts/experiment-apparatus/e182-single-device-long-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/experiment-apparatus/e182-single-device-units-kept-long-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/experiment-apparatus/e184-segment-one-long-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e203-admission-scan-cost-run.sh	required	# 开跑先经同目录 e203_admission_scan_cost_library.py 调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/experiment-apparatus/replay.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e10-aging-compaction-run.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e181-landing-check-long-run.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e185-r2-segment-run.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e185-r3-segment-run.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e185-r4-segment-run.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_three.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_known_bad_recopy_check.py	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_q5_record_path_counts.py	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_replay_result_lines.py	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_one_b_anchors_and_freeze.py	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/experiment-apparatus/long_run_item_verdicts.py	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/gate/admission.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/gate/lib_reuse_checks.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/gate/lkmm-selftest.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
@@ -37,6 +56,7 @@ scripts/mutation/broad-mutation.py	required	# 开跑先调客户端 selftest_ser
 scripts/mutation/crates-mutation-rows.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/mutation/mutate.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/mutation/mutation-shard-run.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
+scripts/mutation/prove-red.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/mutation/tests/test_audit_regressions.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/prune-server/prune_server_client_selftest.py	own-server	# --selftest 每格自己起一份真 prune-server（二进制取 --server-binary 或 PRUNE_SERVER_BINARY），不因没有临时服务的标记退 2；runner 表包着它只为交二进制
 scripts/prune-server/prune-server-load-simulation.py	own-server	# --selftest 自己起两份真 prune-server（二进制取 --server-binary 或 PRUNE_SERVER_BINARY），只有压测用法才调 selftest_service_problem；runner 表包着它只为交二进制

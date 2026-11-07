@@ -1,0 +1,1 @@
+# 记红没成：scripts/gate/admission.py verdict-record 见了这份文件，当这一趟判红的几条都没记进判定库（文件头「按条复用失灵」），退 1；记绿照常

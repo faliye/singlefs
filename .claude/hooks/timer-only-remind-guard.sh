@@ -2,7 +2,7 @@
 # admission: always Claude Code 每一次调用相关工具都要现判这一次的工具名与命令文本，上一次的结论不替这一次作保
 # run-condition: command python3
 # PreToolUse hook（CronCreate、ScheduleWakeup、RemoteTrigger、Skill、Monitor、Bash）：本工程设定时只许 scripts/agents/remind.sh 这一个办法，别的在执行前拒绝（退出 2，stderr 写原因与出路）。
-# 用户 2026-10-14 定：「禁止其他的设置时间的防止，仅仅允许这一个」「这是本工程的定时脚本 放到本工程来」。主 agent 与子 agent 一样拒。
+# 只许用本工程的定时脚本，禁止其他的设置定时的办法。主 agent 与子 agent 一样拒。
 # hook-events: PreToolUse:CronCreate PreToolUse:ScheduleWakeup PreToolUse:RemoteTrigger PreToolUse:Skill PreToolUse:Monitor PreToolUse:Bash
 # gate-similar: bash-command-detector.sh 同挂 PreToolUse[Bash]、同用 lib_shell_words.py 切词，它的 ② 拒前台没超时的等待循环、记 run_in_background 里的等待循环；这里判的是「循环或单条 sleep 之外只剩 echo 之类的闹钟写法」，并且还要管 Monitor 与五个非 Bash 的工具，那个文件只挂 Bash、已有 3000 多行，并进去要给它加工具挂载、改它的 matcher 与自证，两边的判据（等条件成立 / 等时间到）也没有一条相同
 # gate-similar: project-code-guard.sh 同挂 PreToolUse[Bash]、同用 lib_shell_words.py；它判的是不是不经 task-server 跑项目代码，与定时无关
@@ -53,7 +53,7 @@
 #       「✗ 自证 log-watch：」
 #   TIMER_ONLY_REMIND_GUARD_BREAK=no-next-step  拒绝信息里不写出路
 #       「✗ 自证 next-step：」
-#   TIMER_ONLY_REMIND_GUARD_BREAK=input-unrecorded  输入不是 JSON 对象时只打 stderr、不记检出（改前连 stderr 也不打）
+#   TIMER_ONLY_REMIND_GUARD_BREAK=input-unrecorded  输入不是 JSON 对象时只打 stderr、不记检出
 #       「✗ 自证 input-recorded：」
 #   TIMER_ONLY_REMIND_GUARD_BREAK=library-unrecorded  读不到 lib_shell_words.py 时只打 stderr、不记检出（同上）
 #       「✗ 自证 library-recorded：」
@@ -61,7 +61,7 @@
 #       「✗ 自证 command-shape-recorded：」
 #   TIMER_ONLY_REMIND_GUARD_BREAK=split-unrecorded  命令切不开时只打 stderr、不记检出（同上）
 #       「✗ 自证 split-recorded：」
-#   TIMER_ONLY_REMIND_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，照常放行）
+#   TIMER_ONLY_REMIND_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住、照原样抛出（进程退 1，照常放行）
 #       「✗ 自证 exception-recorded：」
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -205,7 +205,7 @@ def refusal_text(reason):
 
 def record_unjudged(hook_dir, hook_input, problem, switch):
     """判不了、照常放行的这一次：stderr 写一行，照「放行但必记检出」往检出记录追加一行（lib_work_root.py 的 record_unjudged_pass，结局只记）。
-    弄坏开关 switch 下只打 stderr、不记（改前是连 stderr 也不打）；读不到 lib_work_root.py、写不进去时 stderr 说一句没记成。"""
+    弄坏开关 switch 下只打 stderr、不记；读不到 lib_work_root.py、写不进去时 stderr 说一句没记成。"""
     print(f"! {HOOK_NAME}：{problem}，这一次没判、照常放行", file=sys.stderr)
     if broken(switch):
         return
@@ -244,7 +244,7 @@ def judge_raw(raw, hook_dir):
     try:
         reason = refusal_reason(shell_words, hook_input, unjudged)
     except Exception as error:
-        if broken("exception-unrecorded"):   # 弄坏开关：不接住，照原样抛出（改前的样子：进程退 1，照常放行、不记检出）
+        if broken("exception-unrecorded"):   # 弄坏开关：不接住，照原样抛出（进程退 1，照常放行、不记检出）
             raise
         record_unjudged(hook_dir, hook_input, f"判的时候抛异常（{type(error).__name__}: {error}）", "exception-unrecorded")
         return 0

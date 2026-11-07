@@ -9,7 +9,7 @@ decisions-history.md、experiments-history.md、CHANGELOG.md 三种变更史；r
 只扫治理文档的三类（原样）：
   ① 门禁号：「门禁 65 号」「54、55、57、59 号」这类两位数加「号」，门禁目录里要有 <号>-*.sh。
      「、」或「/」连着的每个号都判（「20 / 21 号」判 20 与 21）；前面紧挨「第」「月」「日」（可隔空白）的不算门禁号（「第 13 号」「9 月 23 号」），
-     紧挨「-」「–」的也不算（「2026-09-26 号」；「54–59 号」这种区间写法不判，要判就逐个写出来）。
+     紧挨「-」「–」的也不算（「2026-09-26 号」；「54–59 号」这种区间写法不判，要判就逐个写出来）。history-kept: 日期格式的举例，是被判的写法本身
      门禁目录取本文件所在的目录，不取被扫的仓根：样本目录里没有门禁脚本。去编号之前的旧号不归这一条，归 ⑤。
   ② 反引号里的仓内路径：反引号里按空白切开的每个词（命令里的脚本路径也算），ASCII 写成、中间带 `/`、
      而且第一段在解析基准下现存、或末段带常见的文件扩展名（`origin/master`、`text/plain` 两样都不满足，不算仓内路径）。
@@ -30,7 +30,7 @@ decisions-history.md、experiments-history.md、CHANGELOG.md 三种变更史；r
      红行接出路（nearest_text）：那份文件里与小节名最像的标题或句子（小节名的字至少 NEAREST_MINIMUM_SHARE 按次序落在里面，取比例最高的，
      同分先取标题、再取短的）；一条都够不上写「那份文件里没有，改写那一句或删去」。
 
-扫现状文字的两类（2026-09-28 门禁去编号之后加，判决 research/prompts/gate-shrink-r1-main-verification.md 第 4 问「按全名指门禁从此没人判」）：
+扫现状文字的两类（按全名指门禁，门禁没了就没人判）：
   ④ 按全名指门禁与格：门禁一律按门禁目录顶层的文件名去掉 .sh 称呼。
      「门禁 <名>」（名是小写字母、数字与连字符、至少带一个连字符，可带 .sh、可套反引号）里的名要是门禁目录顶层的一道门禁，
      或上游规范副本 .claude/singlefs-ai-sop/scripts/ 下的一份脚本（共享门禁的阶段，「门禁 doc-lint」这类）；
@@ -41,7 +41,7 @@ decisions-history.md、experiments-history.md、CHANGELOG.md 三种变更史；r
      「NN 号」「门禁 NN」两种写法先把带目录的文件路径与「日期-」起头的记录文件名遮掉再找（`records/2026-09-28-门禁59号提速与双机分片.md`
      这种文件名里的号不是在称呼门禁；① 同样遮）；「gate.d/NN-」那一种就是路径，不遮。
      OLD_GATES 照调度记录 records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」那张表，外加表里漏了的 96 号
-     （实验源码纪律，第一轮并进 33 号，今天是 code-source-discipline 的 reading-discipline 格）；
+     （实验源码纪律，对应 code-source-discipline 的 reading-discipline 格）；
      表里点名的门禁与格本身也现判：指到门禁目录里不在的门禁或格，这一段自己判红（门禁再改名时这张表要跟着改）。
 
 ② 扩到 kb 的现状文字（不变量清单在登记的 kb 目录里，一起扫）：
@@ -124,6 +124,8 @@ python 起不来时退 2（打不开脚本），参数认不出也退 2。调用
   nested-quotes-kept    『』不当装饰去掉：governance-refs-kb-sections-green 里嵌套引号那一处判红
   short-names-kept      编号后面的（简称）不去掉：governance-refs-kb-sections-green 里「I-1（块自描述） 块自描述」判红
   placeholders-literal  脚本输出句里的占位字母照字面比：governance-refs-kb-sections-green 里「结果：N 条命中」判红
+  hyphenless-names-skipped  ④ 的全名与「X 的 Y 格」只认带连字符的名字（不带连字符的 lkmm 一处都不数、不判）：
+                        governance-refs-red 里「README.md:4: 「lkmm 的 no-such-cell 格」」那一行 want 找不到，governance-refs-green 的全名、格名处数对不上
   section-lag-unread    不读小节滞后表：governance-refs-kb-sections-green 里登记了的那一处判红，governance-refs-kb-sections-lag-red 里小节滞后表那几行 want 找不到，
                         governance-refs-green、governance-refs-kb-sections-red 的「小节滞后表 0 行（没有小节滞后表）」找不到
   （doc-registries.sh 文件头的开关清单逐条点名每个开关下判错的样本，以那一份为准）
@@ -163,7 +165,11 @@ GATE_NUMBER = re.compile(r"(?<![0-9A-Za-z.\-–])((?:[0-9]{2}\s*[、/]\s*)*[0-9]
 NOT_A_GATE_BEFORE = re.compile(r"(第|月|日)\s*$")
 GATE_WORD_NUMBER = re.compile(r"门禁\s*`?([0-9]{2})(?![0-9])")
 OLD_GATE_PATH = re.compile(r"gate\.d/(?:fixtures/)?([0-9]{2})-")
-NAME = r"[0-9a-z][a-z0-9]*(?:-[a-z0-9]+)+"
+# 门禁全名：一般写法要带连字符（免得把「门禁 59」这类数、散字当名字）；门禁目录里不带连字符的那几道（lkmm）照文件名逐个认。
+#   弄坏开关 hyphenless-names-skipped 下只认带连字符的
+HYPHENLESS_GATE_NAMES = [] if BROKEN == "hyphenless-names-skipped" else sorted(
+    name[:-len(".sh")] for name in os.listdir(GATE_DIRECTORY) if re.fullmatch(r"[a-z][a-z0-9]*\.sh", name) and os.path.isfile(os.path.join(GATE_DIRECTORY, name)))
+NAME = r"(?:" + "".join(re.escape(name) + "|" for name in HYPHENLESS_GATE_NAMES) + r"[0-9a-z][a-z0-9]*(?:-[a-z0-9]+)+)"
 GATE_BY_NAME = re.compile(rf"门禁\s*`?({NAME})(?:\.sh)?`?(?![A-Za-z0-9_-])")
 CELL_OF_GATE = re.compile(rf"(?<![A-Za-z0-9_-])({NAME})(?:\.sh)?`?\s*的\s*`?([a-z0-9][a-z0-9-]*)`?\s*(?:那一|这一)?格")
 BACKTICK = re.compile(r"`([^`\n]+)`")
@@ -266,7 +272,7 @@ OLD_GATES = {
                                                        "model-unit-area-wall-admission-judged")),
     75: ("doc-experiments", ("decision-links",)),
     76: ("doc-registries", ("second-txn-hooks",)),
-    77: ("harness-test-environment", ("machine-clean",)),
+    77: ("test-environment", ("machine-clean",)),
     78: ("doc-registries", ("paid-cited-tests",)),
     79: ("doc-registries", ("tree-table-reserve",)),
     80: ("code-source-discipline", ("absolute-assertions",)),

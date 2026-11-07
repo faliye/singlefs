@@ -12,7 +12,7 @@
   名字                          归类  为什么
   work                          共享  工作根（见下）：草稿、报告、补丁、日志、实验的片与运行目录（崩溃放量的运行目录是它下面的 crash-amplification），派到哪台跑的都要两台读得到
   last-runs                     共享  每道门禁与入口跑完写的上次红的清单，范围声明闸的拒绝说明读它
-  cross-run-cache               共享  门禁开跑时刻文件 gate-run-times（门禁 harness-test-environment 的 machine-clean 格写、读）
+  cross-run-cache               共享  门禁开跑时刻文件 gate-run-times（门禁 test-environment 的 machine-clean 格写、读）
   broad-mutation-units          共享  广谱变异的库目录（判定表、清单表、覆盖表），提交门禁 broad-mutation 读它的汇总
   reuse                         共享  E171（三oracle合谋测试）装置的复用库
   gate-staged-logs              共享  scripts/gate/gate-staged.sh 的两份日志
@@ -51,7 +51,7 @@
   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown  work_root() 交回会话临时目录根（工作根退回撤之前的位置），scratch_roots() 与 mention_prefix_pattern() 只认它、不认工作根
       「✗ 自检：范围:内置 agent 写工作根放行」、「✗ 自检：范围:工作根下的报告目录」、「✗ 自检：范围:会话临时目录根下写拒（scratchpad 之外）」、「✗ 自检：范围:会话临时目录根下的 scratchpad 里写拒」、「✗ 自检：先编后换:experiment-runner 改草稿目录里的副本放行」、「✗ 自检：行尾空白:子 agent 写仓外文件也判」、「✗ 自检：stdin:实现员写工作根下的报告」、「✗ 自检：stdin:七次拒绝都落进检出记录」、「✗ 自检：写者锁:持锁者第一次写放行」、「✗ 自检：写者锁:持锁者续写放行」、「✗ 自检：写者锁:持锁者写子目录放行」、「✗ 自检：写者锁:拒绝说明点名持锁者与出路」、「✗ 自检：写者锁:回执还没落盘的乙先写放行、不认领、记一处没判全」、「✗ 自检：写者锁:真持锁者回执还没落盘时第一次写也放行、不认领」、「✗ 自检：写者锁:回执落盘之后持锁者写拿到锁」、「✗ 自检：写者锁:认领之后持锁者续写放行」、「✗ 自检：写者锁:主 agent 不判」、「✗ 自检：写者锁:没有锁的目录不判」、「✗ 自检：写者锁:主 agent 写坏锁的目录不判」、「✗ 自检：写者锁:判不了的锁的拒绝点名那份锁与出路」、「✗ 自检：写者锁:认领文件判不了的拒绝点名那份认领文件与出路」、「✗ 自检：写者锁:草稿根自己下面直接写不判」、「✗ 自检：写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」、「✗ 自检：写者锁:回执对不上又找不到持锁者的回执时，拒绝写锁登记的提示 sha256 前几位」、「✗ 自检：写者锁:子目录锁的持有者写自己的子目录放行」、「✗ 自检：写者锁:父目录锁的持有者写父目录放行（认领父目录）」、「✗ 自检：写者锁:父目录认领之后，子目录锁的持有者写自己的子目录仍放行」、「✗ 自检：写者锁:读不到库时记一处没判全」、「✗ 自检：写者锁:自己出错时记一处没判全」、「✗ 自检：stdin:第二个写者的拒绝点名持锁者、锁的目录与出路」、「✗ 自检：stdin:持锁者放行」、「✗ 自检：stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」、「✗ 自检：stdin:坏锁的拒绝点名那份锁与出路」、「✗ 自检：stdin:坏认领文件拒绝并点名那份认领文件（退出码 2）」、「✗ 自检：stdin:回执还没落盘的写放行、不认领，stderr 一行并记一条检出（结局只记）」、「✗ 自检：stdin:写者锁自己出错放行并记一条检出（结局只记）」
       （各份自证里「工作根下」那几格红）
-  SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  scratch_roots()（连同 is_under_scratch_root 与写范围的 $SINGLEFS_WORK_ROOT/）另认会话临时目录根，即撤掉之前的放行
+  SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  scratch_roots()（连同 is_under_scratch_root 与写范围的 $SINGLEFS_WORK_ROOT/）另认会话临时目录根
       「✗ 自检：范围:会话临时目录根下写拒（scratchpad 之外）」、「✗ 自检：范围:会话临时目录根下的 scratchpad 里写拒」
       （各份自证里「会话临时目录根下」写、认草稿目录与报告「拒」或「不认」的那几格红）
   SINGLEFS_WORK_ROOT_BREAK=session-temporary-mentions-unseen  mention_prefix_pattern() 不挑会话临时目录根底下的路径
@@ -62,19 +62,19 @@
       「✗ lib_work_root 自证：共享的名字：交数据根下那一项」、「✗ lib_work_root 自证：命令行：data-root 与 shared <名> 照环境打」、
       「✗ lib_work_root 自证：命令行：不带参数照旧打工作根」、「✗ lib_work_root 自证：数据根：两样都有时 SINGLEFS_DATA_ROOT 盖过配置」
       （本库自己的 --selftest；用它的别的自证不设 SINGLEFS_DATA_ROOT 的不红）
-  SINGLEFS_WORK_ROOT_BREAK=data-root-home-fallback  SINGLEFS_DATA_ROOT 与多机配置的 SHARED_DATA_ROOT 都没有时退回家目录下的 .local/share/singlefs（改前的样子：第二台落进它本地那一份）
+  SINGLEFS_WORK_ROOT_BREAK=data-root-home-fallback  SINGLEFS_DATA_ROOT 与多机配置的 SHARED_DATA_ROOT 都没有时退回家目录下的 .local/share/singlefs（第二台落进它本地那一份）
       「✗ lib_work_root 自证：数据根：变量与配置都没有时报错、不补缺省」、「✗ lib_work_root 自证：命令行：变量与配置都没有时 data-root 退 2、标准输出空、说出路」
       （本库自己的 --selftest）
   SINGLEFS_WORK_ROOT_BREAK=data-root-configuration-unchecked  多机配置的 SHARED_DATA_ROOT 不核在不在 NFS_SHARED_ROOTS 某一段下
       「✗ lib_work_root 自证：数据根：配置的 SHARED_DATA_ROOT 不在 NFS_SHARED_ROOTS 任何一段下不收」
       （本库自己的 --selftest）
-  SINGLEFS_WORK_ROOT_BREAK=trailing-comment-kept  configuration_values() 不去多机配置行尾的「 # …」注释（改前的样子：带注释的 NFS_SHARED_ROOTS 把数据根判成不在共享根下）
+  SINGLEFS_WORK_ROOT_BREAK=trailing-comment-kept  configuration_values() 不去多机配置行尾的「 # …」注释（带注释的 NFS_SHARED_ROOTS 把数据根判成不在共享根下）
       「✗ lib_work_root 自证：数据根：多机配置的行尾注释去掉再判（NFS_SHARED_ROOTS 与 SHARED_DATA_ROOT 都带）」
       （本库自己的 --selftest）
   SINGLEFS_WORK_ROOT_BREAK=per-host-entry-accepted  shared_data_path() 不核名字，按台的与认不出的名字也交数据根下那一项
       「✗ lib_work_root 自证：按台的名字与认不出的名字不收」、「✗ lib_work_root 自证：命令行：shared 后面给按台的名字退 2 并点名出路」
       （本库自己的 --selftest）
-  SINGLEFS_WORK_ROOT_BREAK=formal-tools-per-host  shared_data_path("formal-tools") 照改前当按台的名字拒（Verus 与 z3 落进各台家目录下那一份）
+  SINGLEFS_WORK_ROOT_BREAK=formal-tools-per-host  shared_data_path("formal-tools") 当按台的名字拒（Verus 与 z3 落进各台家目录下那一份）
       「✗ lib_work_root 自证：共享的名字：formal-tools 交数据根下那一项（Verus 与 z3 两台同一个绝对路径读同一份）」、「✗ lib_work_root 自证：共享的名字：交数据根下那一项」
       （本库自己的 --selftest）
 不认识的值抛 ValueError，免得拼错的开关被当成「没开」。
@@ -160,7 +160,7 @@ def multi_host_configuration_path(environment):
 def configuration_values(path):
     """多机配置里一行一个 KEY=值的那几行 → {键: 值}（值先去掉行尾「 # …」注释、再去掉两头成对的一层引号，同一个键取头一行，
     同 scripts/gate/admission.py 的 configuration_value 与 task-server/task_server_lib.py 的 configured_value 去行尾注释的写法）；
-    文件不在交空表，在而读不了抛 DataRootUnconfigured。弄坏开关 trailing-comment-kept 下照改前不去行尾注释。"""
+    文件不在交空表，在而读不了抛 DataRootUnconfigured。弄坏开关 trailing-comment-kept 下不去行尾注释。"""
     if not os.path.isfile(path):
         return {}
     try:

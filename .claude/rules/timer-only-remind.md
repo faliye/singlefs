@@ -20,7 +20,7 @@
 
 ## 不是定时的等待照旧
 
-等一个进程结束（`until ! kill -0 <pid>; do sleep 20; done`、`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`）、看门狗 `scripts/agents/watch.sh`、`scripts/hosts/detached-run.sh watch`、Monitor 盯日志（`tail -f <日志> | grep --line-buffered <模式>`）、脚本里面的 `sleep` 不在拒绝范围。
+等一个进程结束（`until ! kill -0 <pid>; do sleep 20; done`、`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`）、看门狗 `scripts/agents/watch.sh`、Monitor 盯日志（`tail -f <日志> | grep --line-buffered <模式>`）、脚本里面的 `sleep` 不在拒绝范围。
 
 ## 门禁管哪一半
 

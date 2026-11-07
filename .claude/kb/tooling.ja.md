@@ -36,12 +36,17 @@
 
 ゲート層における全リングゼロクリア所要時間、コールド再起動リカバリ所要時間、クラッシュポイント再生2ストリームの実経過時間、E152 (マイルストーン別の六ファイルシステムとのファイル性能比較) および6種との全比較数値はいずれもローカルマシンの数値である（C486 (全リングゼロクリアの 55 秒とコールド再オープンの 17 秒が未監視)）。
 
-## タイムアウト下限をアイドル状態のマシンで調整すると、「マシンが他タスクで高負荷」を「変異を検出できない」と誤認する
+## プロジェクトのコードを走らせるコマンドは必ず task-server 経由で投入する
+
+- 統一タスクサービス（`task-server/`）は、プロジェクトのコードを走らせるタスク（ビルド、テスト、ゲート、実験、自己検証。CPU、GPU を問わない）を起動する唯一の入口である：ホスト、メモリ割り当て、スレッド、GPU カードと静止化、待ち行列の順番はすべてサービスが決め、投入時には受け付けない。使い方、判定法、拒否リストは `task-server/README.md` にあり、二重には写さない。
+- 呼び出し側はクライアント `task-server/task` の六つのサブコマンドを使う：`submit [--cwd <目录>] -- <命令…>` で投入してタスク番号を表示する；`wait <号>` で結果まで待つ（末行 `TASK_SERVER_RESULT …`、終了コードはタスクのもの）；`status [<号>]` で待機中・実行中と待っている理由を見る；`log <号>` で最後の試行のログを見る；`cancel <号>` で止める；`clean <号>` でそのタスクが残したビルドディレクトリを削除する（二台目のその回のビルドディレクトリは `multi-host-run.sh` が走り終えたときに自分で消し、`clean` は扱わない）。コマンドにラッパーを付けず、リソース引数を書かない。書けばその場で拒否される（`task-server/README.md`「提交写法」）。
+- サブ agent はタスクを一切投入しない：`submit`、`wait`、`cancel`、`clean` はメイン agent だけが起動し、サブ agent は走らせたいものを報告に書いてメイン agent に渡す（ユーザーが 2026-11-01 に決定、`records/2026-10-29-subagent拆分提案.md` 第一百七十四節）。
+- 問題が起きたときに見る場所：結果は `wait` 末行の `type=`（エラー種別と終了コードの表は `task-server/task_server_lib.py` ファイル先頭の「错误类型」）；待ったまま起動しないものは `task-server/task status <号>` の「在等：…」；失敗した実行は `task-server/task log <号>`（`--all` で全体）；`wait` が 78 で終わるのはサービスにつながらないときで、まず `task-server/task status <号>` でタスクがまだあるかを見て、投入し直さない。
+
+## 変異ツール：並列度はコア数を超えず、制限時間は設けず、止まったものは統一タスクサービスが判定する
 
 - 並列度に対象ユニット自身が占有するコア数を掛けた値が、コア総数を超えてはならない。本リポジトリで cargo-mutants を実行する際は `--jobs 1` を使用する。
-- タイムアウト下限は負荷がかかったマシンで調整する。正確に調整できない場合はタイムアウトを設定しない。
-- タイムアウトに達した項目は単独で列挙し、検出・未検出（赤にならない）・無効のいずれの列にも合算しない。報告時は4つの数値をすべて報告する。
-- 下限値にはマシンの計測条件を付記する（「リポジトリ内の性能数値は本マシン上でのみ成立する。引用にはマシンの計測条件を付記すること」の節を参照）。
+- `scripts/mutation/mutate.sh`、`scripts/mutation/broad-mutation.py`、`scripts/mutation/mutation-prune.py` は一件の変異にも一つのステップにも制限時間を設けず、タイムアウトという結末もない：コマンド全体が統一タスクサービス（`task-server/`）の一つのタスクで、止まったものと無限ループはサービスが判定して止め、`stalled` と記録して投入したセッションに差し戻す（判定法は `task-server/README.md`）。
 
 ## 変異件数はソースコードに伴って変動するため、KB 内で固定値として書き固めてはならない
 
@@ -105,7 +110,7 @@ cargo mutants --list --package singlefs-core | wc -l
 |---|---|
 | バージョン | rustc 1.98.0 / cargo 1.98.0 |
 | インストール方法 | rustup、`--profile minimal --default-toolchain stable`、ホストの `~/.cargo` に導入 |
-| 追加ターゲット | `x86_64-unknown-linux-musl`。実験バイナリ（`scripts/experiment-apparatus/` 配下のパッケージ）を静的リンクでコンパイルし、VM の busybox initramfs 上で実行する。checker 層の実デバイスバイナリ `new_pool_file_creation_on_device` はこれを使用せず（checker 層はデフォルトで RocksDB の C++ をビルドするが、本ホストには musl の C/C++ コンパイラがない）、`--target x86_64-unknown-linux-gnu` に `+crt-static` を付与して static-pie としてビルドする（コマンドは `.claude/gate.d/checker-tier-qemu-device-streams.sh` を参照） |
+| 追加ターゲット | `x86_64-unknown-linux-musl`。実験バイナリ（`scripts/experiment-apparatus/` 配下のパッケージ）を静的リンクでコンパイルし、VM の busybox initramfs 上で実行する。検証クレートの実デバイスバイナリ `new_pool_file_creation_on_device` はこれを使用せず（検証クレートはデフォルトで RocksDB の C++ をビルドするが、本ホストには musl の C/C++ コンパイラがない）、`--target x86_64-unknown-linux-gnu` に `+crt-static` を付与して static-pie としてビルドする（コマンドは `.claude/gate.d/qemu-device-streams.sh` を参照） |
 | コンポーネント | `rustfmt` + `clippy`（`--profile minimal` には含まれないため個別導入が必要） |
 | **PATH** | rustup の shim シンボリックリンクが PATH 上のユーザー単位の実行ファイルディレクトリに配置されている（cargo / rustc / rustup / rustdoc / rustfmt / cargo-fmt / cargo-clippy）。ゲートおよびスクリプトは `bash -c` で起動され シェルの起動ファイルを読み込まないため、PATH は dotfile 変更に依存しない |
 | release オーバーフロー検査 | ルートの `Cargo.toml` および `scripts/experiment-apparatus/Cargo.toml` の `[profile.release]` に `overflow-checks = true` を設定済み。profile はワークスペースルートでのみ認識され、メンバーの manifest に記述しても効果がない |
@@ -118,9 +123,9 @@ librocksdb-sys の C++（`librocksdb.a` と `libsnappy.a`）はホストごと�
 |---|---|
 | `key` | このホストの現時点のキー（各構成要素）とプリビルトライブラリのディレクトリを表示する。ビルドはしない |
 | `env` | プリビルトライブラリが存在し一致するとき、4 行の `export` を出力する（`eval` 用）。存在しなければ終了コード 1 で、標準出力は空 |
-| `build` | プリビルトライブラリがなければ一度だけビルドする。ロックを取る：複数のプロセスが同時に来ても一度だけビルドし、後から来たものはロックを待ってビルド済みを確認すると終了コード 0 で終わる。本物の cargo を起動する重い作業で、`bash scripts/hosts/capped.sh <N>` 経由で起動する |
+| `build` | プリビルトライブラリがなければ一度だけビルドする。ロックを取る：複数のプロセスが同時に来ても一度だけビルドし、後から来たものはロックを待ってビルド済みを確認すると終了コード 0 で終わる。本物の cargo を起動する重い作業で、`task-server/task submit -- python3 scripts/hosts/rocksdb-prebuilt.py build` で投入する（`task-server/README.md`） |
 | `install` | `build` を行い、続けてこのホストの 3 か所の環境の供給元を書き込み、ユーザー単位の systemd マネージャーの現在の環境を更新し、最後に `check` を実行する。こちらも重い作業 |
-| `check` | このホストを判定する：2 つのワークスペース（`crates/singlefs-checker-tier/Cargo.toml` と `scripts/experiment-apparatus/Cargo.toml`）の依存が一致し、プリビルトライブラリが存在して一致し、3 か所の環境の供給元と現在のプロセス環境の値がいずれもプリビルトライブラリと一致し、cargo 設定にこの 4 つの変数が書かれていない |
+| `check` | このホストを判定する：2 つのワークスペース（`crates/singlefs-verification/Cargo.toml` と `scripts/experiment-apparatus/Cargo.toml`）の依存が一致し、プリビルトライブラリが存在して一致し、3 か所の環境の供給元と現在のプロセス環境の値がいずれもプリビルトライブラリと一致し、cargo 設定にこの 4 つの変数が書かれていない |
 | `audit-target <ビルドディレクトリ>…` | ビルドディレクトリを判定する：librocksdb-sys のビルドスクリプトがそのとき受け取った値がこのホストのプリビルトライブラリか、`out/` にその場でビルドされた C++ がないか、同じキーの下で何種類の値が見られたか。ビルドスクリプトの記録が 1 つも見つからなければ終了コード 77（今回は未判定） |
 | `entry [--cargo C]` | cargo を起動する入口の冒頭で呼ぶ軽い判定（誰が呼ぶか、値が欠けたときの対処は「cargo を起動する入口」の段落に書いてある） |
 
@@ -132,11 +137,11 @@ librocksdb-sys の C++（`librocksdb.a` と `libsnappy.a`）はホストごと�
 |---|---|
 | `~/.config/singlefs/rocksdb-prebuilt.env` | 唯一の値の供給元：4 行の `export` と `unset ROCKSDB_COMPILE`、`unset SNAPPY_COMPILE`。手で編集せず、変えたら `install` をやり直す |
 | `~/.bashrc` の先頭のひとまとまり（3 行、`# >>> singlefs rocksdb-prebuilt >>>` から `# <<< singlefs rocksdb-prebuilt <<<` まで） | その env ファイルを `source` する。対話判定より前に置かれているので、対話シェル、そこから起動したセッション、ssh で起動した非対話コマンドのいずれも読み込める |
-| `~/.config/environment.d/60-singlefs-rocksdb-prebuilt.conf` | ユーザー単位の systemd マネージャーが起動するユニット（`scripts/hosts/detached-run.sh` で起動した長時間ジョブ）が読む。`install` は `systemctl --user set-environment` も実行し、いま動いているマネージャーにその場で値を反映させる |
+| `~/.config/environment.d/60-singlefs-rocksdb-prebuilt.conf` | ユーザー単位の systemd マネージャーが起動するユニット（task-server が試行ごとに起動するユニット、`task-server/README.md`）が読む。`install` は `systemctl --user set-environment` も実行し、いま動いているマネージャーにその場で値を反映させる |
 
 **4 つの変数はプロセス環境だけで渡す**：`.cargo/config.toml` やほかの層の cargo 設定の `[env]` には書かない（書いてあると `check` が赤と判定する。理由は `.cargo/config.toml` 冒頭のコメントにある）。`ROCKSDB_COMPILE` と `SNAPPY_COMPILE` は一切設定しない。1 にするとビルドディレクトリでその場でビルドされる。
 
-**cargo を起動する入口**：ゲートのステージ、クラッシュとミューテーションのドライバ、`merge-and-verify.sh`、`admission.py` が渡すコマンド、二台目の側は、いずれも冒頭で `entry` を呼ぶ。判定するのは 3 点だけ：このホストに導入済みであること（プリビルトライブラリが存在して一致する。2 つのライブラリの sha256 は計算しない）、現在のプロセス環境の 4 つの値がプリビルトライブラリと一致すること、`ROCKSDB_COMPILE` と `SNAPPY_COMPILE` が設定されていないこと。3 か所の環境の供給元は判定しない（それは `check` の仕事）。値が欠けている、または一致しないときは、入口がその場で拒否し、cargo を一切起動せず、失敗した項目ごとに対処を書き出す。対処：現在のプロセスに値がない場合は、新しいセッションを開く（`install` の後に起動したログインシェルは `~/.bashrc` の先頭のひとまとまりを読む）か、コマンドの前に `eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"` を付ける。このホストにまだ導入していない場合は、先に `bash scripts/hosts/capped.sh <N> python3 scripts/hosts/rocksdb-prebuilt.py install` を実行する。ビルド対象のツリーに rocksdb に依存するワークスペースがない場合（librocksdb-sys をビルドできない。ゲートのサンプルや自己検証の小さなリポジトリはたいていこれ）、`entry` は判定せず終了コード 0 で終わる。
+**cargo を起動する入口**：ゲートのステージ、クラッシュとミューテーションのドライバ、`merge-and-verify.sh`、`admission.py` が渡すコマンド、二台目の側は、いずれも冒頭で `entry` を呼ぶ。判定するのは 3 点だけ：このホストに導入済みであること（プリビルトライブラリが存在して一致する。2 つのライブラリの sha256 は計算しない）、現在のプロセス環境の 4 つの値がプリビルトライブラリと一致すること、`ROCKSDB_COMPILE` と `SNAPPY_COMPILE` が設定されていないこと。3 か所の環境の供給元は判定しない（それは `check` の仕事）。値が欠けている、または一致しないときは、入口がその場で拒否し、cargo を一切起動せず、失敗した項目ごとに対処を書き出す。対処：現在のプロセスに値がない場合は、新しいセッションを開く（`install` の後に起動したログインシェルは `~/.bashrc` の先頭のひとまとまりを読む）か、コマンドの前に `eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"` を付ける。このホストにまだ導入していない場合は、先に `task-server/task submit -- python3 scripts/hosts/rocksdb-prebuilt.py install` を投入する（`task-server/README.md`）。ビルド対象のツリーに rocksdb に依存するワークスペースがない場合（librocksdb-sys をビルドできない。ゲートのサンプルや自己検証の小さなリポジトリはたいていこれ）、`entry` は判定せず終了コード 0 で終わる。
 
 ## VM ベンチマークハーネス（E7 (オフラインインデックスharness)で使用）
 
@@ -191,7 +196,8 @@ librocksdb-sys の C++（`librocksdb.a` と `libsnappy.a`）はホストごと�
 
 ## scripts/mutation/mutate.sh の結末分類
 
-- 結末：`✅ [検出]`（赤になった）/ `❌ [未検出]`（テストの盲点）/ `⏭ 変異によるコンパイル失敗（無効な変異。盲点にも命中にも計上しない）`。その他に `⏱ [タイムアウト]`、`🧱 [メモリ上限衝突]`、パッケージング順待ち不能、全体メモリ上限による圧殺、VRAM 不足、およびアンカー破損（`⚓ [アンカー破損]`：原文の完全一致がちょうど1回でなかった行は実行せず判定ライブラリに入れない。他の行は通常通り実行され、ラウンド全体は終了コード 3 を返す）の各分類があり、それぞれ単独で列挙する（全結末は `scripts/mutation/mutate.sh` のファイルヘッダーおよび `--selftest` を参照）。
+- 結末：`✅ [検出]`（赤になった）/ `❌ [未検出]`（テストの盲点）/ `⏭ 変異によるコンパイル失敗（無効な変異。盲点にも命中にも計上しない）`。その他に `💥`（テストプロセスが最後まで走らなかった）、`⚠️`（テストプロセスが失敗を報告したのに、失敗したテスト名を一つも拾えなかった：名前を拾う規則の盲点）、およびアンカー破損（`⚓ [アンカー破損]`：原文の完全一致がちょうど1回でなかった行は実行せず判定ライブラリに入れない。他の行は通常通り実行され、ラウンド全体は終了コード 3 を返す）の各分類があり、それぞれ単独で列挙する。最後の「计数：」（計数）行は検出、未検出、無効、走り切らず、名前拾いの盲点、アンカー破損の六欄を報告する（全結末は `scripts/mutation/mutate.sh` のファイルヘッダーおよび `--selftest` を参照）。
+- 上限と制限時間：cargo test（基準線、各変異、復元後の一回）は毎回直接起動し、メモリ上限も制限時間も設けない；`mutate.sh` 全体を統一タスクサービス（`task-server/`）に一つのタスクとして投入する：メモリ上限はサービスが記録に基づいて与え、当たれば拡大して並べ直す；無限ループする変異はサービスがタスク全体を止める（記録より大幅に長く走り、ログが丸 10 分伸びないときに止めて差し戻す）（`scripts/mutation/mutate.sh` のファイルヘッダー「上限、限时与卡住」）。
 - 判定ツールを変更した場合は、正解が判明しているデータセット全体でリグレッションテストを行い、新たに追加した数項目のみで済ませてはならない。
 
 ## 複数セッションで単一リポジトリを共用する場合のステージングとコミット手順
@@ -229,7 +235,7 @@ librocksdb-sys の C++（`librocksdb.a` と `libsnappy.a`）はホストごと�
 | code-source-discipline の format-constants スロット（フォーマット定数） | KB タグの値変更後、`scripts/experiment-apparatus/**/*.rs` および `crates/**/*.rs` 内のすべての同名 `const` が追従しなければならない（`research/` 配下は凍结された証拠のみを保持し、走査されるが `.claude/format-constants-exclude` により個別許可される）。`stale=` 列の旧値文字列が KB 本文内に再出現してはならない | 他箇所で依然として正当に出現している文字列（`base = 95` など）を `stale=` に追加してはならない |
 | clippy shadow_unrelated | 同一テスト関数内で2回目の `let reader = …` / `let segments = …` が赤と判定される。rustfmt の再フォーマット後に正規表現置換を行うと後半の修正漏れが発生する | 各 reader / セグメント / レポートに異なる命名を行う（`extent_reader`、`warm_up_segments`、`control_report` など） |
 | naming-lint | 「英字 + 数字」が単一英字として扱われる：read_u48 が赤、テスト名が a_ で始まると赤。全リポジトリの .rs を走査し、`research/prompts` 内のクラウドアシスタントが書いたモデルソースコードも走査対象となる | `read_six_byte_unsigned` と記述する。`research/prompts` は `.claude/naming-lint-exclude` に登録済み（証拠ディレクトリのため回収対象外）。アシスタントのモデルコードを他ディレクトリに記述した場合は通常通り検査される |
-| checker-tier-crash-point-replay（クラッシュポイント再生フル実行） | テストケースに `#[ignore]` が付与され `crates/singlefs-checker-tier/tests/` に配置されている（D13 (検証ルート) 確定項目 15）。`cargo test -p singlefs-checker-tier` で数件の ignored が報告されるのは正常動作である。harness 層の `cargo test -p singlefs-harness` からは到達できない | ゲートの `--full` は release 下で再利用判定に基づき1件ずつ実行する（クイック層ではフル実行をしない）。フル実行の最中に `CARGO_TARGET_DIR` を変更することで、他のテストを同時にコンパイル可能 |
+| crash-point-replay（クラッシュポイント再生） | クラッシュ列挙ケースは `crates/singlefs-verification/tests/` に配置され、`.claude/gate.d/stage-inputs.tsv` の `crash-case:` 行として登録され、`#[ignore]` は付けない（D13 (検証ルート) 確定項目 15） | ゲート crash-point-replay に投入する：ケースごとの一回は登録されたケースを `--skip` で除外し、登録されたケースはクラッシュ状態ブロックのユニットキーに従って1件ずつ判定する（ブロックキーが同じものは再利用し、欠けているものはその場で判定する）。実行中に `CARGO_TARGET_DIR` を変更することで、他のテストを同時にコンパイル可能 |
 | 変異証明 | rustfmt 後、複数行にわたる呼び出しの文字列全体一致が「不一致」となる | 「キー文字列を含む行を探し、`);` で終わる行までを削除する」手順で行う。変更後は復元し、ファイルが原文とバイト単位で完全一致することを `assert` する |
 | checker の新規判定 | 対象が同一検査を既に通過した後にのみ判定を行う判定ロジックは、決して赤（エラー）にならない | 新規判定には必ず既知の不良イメージ（`checker_known_bad_images.rs` の形式）を用意し、クリーンなイメージがすべて緑になることだけを確認してはならない |
 | 一括定点置換 | 1件ずつディスクに書き込むと、1箇所のアンカー不一致で中途半端な変更が残存する | `scripts/kb/replace-batch.py` を使用する：すべての置換がメモリ上で「ちょうど1回一致」することを確認してからディスクに書き込む |

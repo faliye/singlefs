@@ -13,7 +13,7 @@ required-inputs: 判决|规格, 草稿目录, 报告
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 两段活在一个 agent 里做：先照判决起草规格（第 0 步），规格过了 `scripts/kb/kb-spec-check.py` 再照规格写。主 agent 给了现成规格的跳过第 0 步。写的时候不补内容、不做判断：规格里没写的句子一个字不加；规格与原文对不上（旧串不唯一、找不到）就停下报告；规格点名的文件不在你的写范围里（例如 `CLAUDE.md`），也停下报告，不按规格硬写。规格里的目标文件不存在（被搬、被改名、被拆）时，整份不写，停下：报告「找不到的目标」一节逐条写规格里的文件与旧串，以及 `git log --diff-filter=DR --name-only -- <文件名>` 和 `grep -rnF <旧串的一段>` 查到的新位置（查不到写查不到），交回；不跳过那一条、不照新位置自己改。
-开工先读：`.claude/singlefs-ai-sop/skills/decide/SKILL.md`；`.claude/singlefs-ai-sop/rules/kb-discipline.md`；`.claude/rules/format-evolution.md`「硬约束」与「决策正文只写现状，依据写成指针；决策与实验双向登记」两节；`.claude/rules/changelog-format.md`；`.claude/singlefs-ai-sop/rules/writing-discipline.md`。
+开工先读：`.claude/singlefs-ai-sop/skills/decide/SKILL.md`；`.claude/singlefs-ai-sop/rules/kb-discipline.md`；`.claude/rules/format-evolution.md`「硬约束」与「决策正文只写现状，依据写成指针；决策与实验双向登记」两节；`.claude/rules/changelog-format.md`；`.claude/rules/path-moves.md`「改一个全仓术语：正文之外还有五处会红」（规格是改术语的）：写回员只做其中写在 `.claude/kb/` 里的几处（kb 里编号的简称、简称宽度、规格给的实验页回看行），分项清单的重生成照第 2 步写进报告；`git mv` 改文件名、kb 之外的编号引用、`.claude/term-rename-exempt` 这类写范围外的，逐条列给主 agent，不自己改；`.claude/singlefs-ai-sop/rules/writing-discipline.md`。
 
 ## 输入（主 agent 必须给）
 
@@ -28,12 +28,12 @@ required-inputs: 判决|规格, 草稿目录, 报告
 ## 做什么
 
 0. 起草规格（给了判决时）：逐条读判决里那一条的定案句与它点名的 kb 条款，每条给目标文件、旧串（原文整行，`grep -cF` 恰好 1 次，贴命令与输出）、新串、依据（判决文件与行号，或用户定案的出处）；新串里的编号一律写成「编号（简称）」，简称照登记位逐字抄；动了某条分项「**依据**」段、增删了引的实验号的，同一份规格里给那个实验页 `### 影响的决策` 表的配对行；翻分项状态的，给门禁 doc-decisions 的 kb-shape、blocking-verdict 两格要的句子；写变更史的，给条目整段，形态照 `.claude/rules/changelog-format.md`。规格写成 `<草稿目录>/spec.json`（`scripts/kb/kb-spec-check.py` 文件头「规格的两种写法」的 JSON 写法）与同内容的 `spec.md`，跑 `python3 scripts/kb/kb-spec-check.py <草稿目录>/spec.json`，红了改规格原文直到绿、贴末行；改不绿的、判决里有两种读法的、定案句与 kb 现文互相矛盾的，不替主 agent 选，写进报告「要主 agent 判的点」并停在写之前交回。
-1. 开工时先记下规格点名的文件、`.claude/kb/decisions.md`、`.claude/kb/decisions-history.md` 的 `sha256sum`（这是开工时的，不是派发前的；文件带别的会话没提交的改动时照记）。把规格写成 `scripts/kb/replace-batch.py` 的规格文件（放草稿目录）；规格里每个文件路径先喂写范围闸（`printf '{"tool_name":"Edit","agent_type":"kb-scribe","tool_input":{"file_path":"<路径>"}}' | AGENT_HOOK_DETECTIONS=<草稿目录>/precheck.jsonl bash .claude/hooks/write-guard.sh`；检出记录指到草稿），有一条退出码 2 就整份不写、停下报告；再 `--dry-run` 核全部恰好命中一次，然后不带 `--dry-run` 实写并回读。用它，不用逐条 Edit。
-2. 决策变更史：条目写进 `.claude/kb/decisions-history.md` 对应决策的 `## D<n>（简称）` 节里，形态照 `.claude/rules/changelog-format.md`（按日期分块、同一节同一天只一块、每条变更一个 `- ` 列表项、正文缩进两格放在项下、正文里不写与所属标题相同的日期；一条改动点名几条决策的，只在规格点名的第一条决策的节里写全文，别的节写一行「- 见 D<n>（简称） 节同日条目「摘要」」）。规格改了某条决策的状态或分项计数时，同一次一并跑 `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync`（它刷新哪些生成行以那道门禁文件头为准；派发提示写「并行写回」的，这个 `--write` 由主 agent 在全部交回后跑一次）。跑前跑后各 `git diff -- .claude/kb/decisions-history.md` 一次，只核新增的行：新增的行里有这一轮之外的条目就停下交回，不自己收拾。
-3. 分项翻状态：`python3 scripts/kb/relabel-item.py D<n> <k> --dry-run` 先看，给它列出的文件各记一次 `sha256sum`，再实跑；把它列出的「要人看」原样交主 agent，不自己改那些句子。它改写了 `research/**/*.rs` 的，把改到的实验源码逐个列给主 agent；`--dry-run` 列出要改写 `crates/**/*.rs` 的，停在实跑之前，把那些文件与引用逐个列给主 agent（并进实现批），不实跑；预演列出的文件里带别的会话没提交改动的（`git status --porcelain` 里有它），也逐个列给主 agent。然后 `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync`。
+1. 开工时先记下规格点名的文件、`.claude/kb/decisions.md`、`.claude/kb/decisions-history.md` 的 `sha256sum`（这是开工时的，不是派发前的；文件带别的会话没提交的改动时照记）。把规格写成 `scripts/kb/replace-batch.py` 的规格文件（放草稿目录）；规格里每个文件路径先对着写范围表核：`grep -P '^kb-scribe\t' .claude/hooks/agent-write-scope.tsv` 读出你那几行的路径模式（`**` 跨目录、`*` 不跨目录，`$SINGLEFS_WORK_ROOT/` 是工作根），每个路径都要落在其中一行里；有一个落不进就整份不写、停下报告，命令与输出原样写进报告；再 `--dry-run` 核全部恰好命中一次，然后不带 `--dry-run` 实写并回读。用它，不用逐条 Edit。
+2. 决策变更史：条目写进 `.claude/kb/decisions-history.md` 对应决策的 `## D<n>（简称）` 节里，形态照 `.claude/rules/changelog-format.md`（按日期分块、同一节同一天只一块、每条变更一个 `- ` 列表项、正文缩进两格放在项下、正文里不写与所属标题相同的日期；一条改动点名几条决策的，只在规格点名的第一条决策的节里写全文，别的节写一行「- 见 D<n>（简称） 节同日条目「摘要」」）。规格改了某条决策的状态或分项计数时，把 `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' task-server/task submit -- bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync` 写进报告「要主 agent 跑的命令」一节（共用约束「不做」一节「子 agent 不交任务」；它刷新哪些生成行以那道门禁文件头为准），跑完看 `TASK_SERVER_RESULT` 末行的 `exit=` 与 `git diff -- .claude/kb/decisions.md` 新增的行；几个写回员并行的，主 agent 在全部交回后交一次。写之前与写之后各 `git diff -- .claude/kb/decisions-history.md` 一次，只核新增的行：新增的行里有这一轮之外的条目就停下交回，不自己收拾。
+3. 分项翻状态：`python3 scripts/kb/relabel-item.py D<n> <k> --dry-run` 先看，给它列出的文件各记一次 `sha256sum`，再实跑；把它列出的「要人看」原样交主 agent，不自己改那些句子。它改写了 `research/**/*.rs` 的，把改到的实验源码逐个列给主 agent；`--dry-run` 列出要改写 `crates/**/*.rs` 的，停在实跑之前，把那些文件与引用逐个列给主 agent（并进实现批），不实跑；预演列出的文件里带别的会话没提交改动的（`git status --porcelain` 里有它），也逐个列给主 agent。然后照第 2 步把 `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' task-server/task submit -- bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync` 写进报告「要主 agent 跑的命令」一节。
    3b. 规格里决策那几处与实验页那几行是一批，一起写、一起回读，不分两次。**判一个实验撑不撑一条分项不在你的活里**，规格没写的关系一个字不加。
-   新立分项、改索引行这类不翻状态的规格不走第 3 步，写完正文自己跑一次 `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync` 再往下。
-4. 门禁阶段交回前不跑，由提交前主 agent 照 `.claude/skills/gate/staged-gate.md` 跑的 `scripts/gate/gate-staged.sh`（它起的整轮 `gate.sh`）判（共用约束 `.claude/agent-common.md`「门禁」一节）；第 2、3 步里的 `--write` 是写回流程的生成一步，照跑。
+   新立分项、改索引行这类不翻状态的规格不走第 3 步，写完正文照第 2 步把 `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' task-server/task submit -- bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync` 写进报告「要主 agent 跑的命令」一节。
+4. 门禁阶段交回前不跑，由提交前主 agent 照 `.claude/skills/gate/staged-gate.md` 跑的 `scripts/gate/gate-staged.sh`（它起的整轮 `gate.sh`）判（共用约束 `.claude/agent-common.md`「门禁」一节）；第 2、3 步里的 `--write` 是写回流程的生成一步，照第 2 步写进报告、由主 agent 交。
 5. 收尾再记一次每个被改文件的 `sha256sum`，报告里列全部改过的文件与开工时、收尾时两次哈希。
 
 ## 写范围
@@ -46,8 +46,8 @@ required-inputs: 判决|规格, 草稿目录, 报告
 
 ## 产出
 
-- 报告：规格文件路径与 `sha256sum`、`kb-spec-check.py` 的原样末行、要主 agent 判的点、「找不到的目标」一节（没有就写 0 条）、`replace-batch.py` 原样输出、`relabel-item.py` 改了哪些文件与「要人看」清单、第 2、3 步 `--write` 的原样末行与退出码、改过的全部文件与前后 sha256。
+- 报告：规格文件路径与 `sha256sum`、`kb-spec-check.py` 的原样末行、要主 agent 判的点、「找不到的目标」一节（没有就写 0 条）、`replace-batch.py` 原样输出、`relabel-item.py` 改了哪些文件与「要人看」清单、写范围核对的命令与输出、「要主 agent 跑的命令」一节（第 2、3 步的 `--write`，每条写跑完看哪几行）、改过的全部文件与前后 sha256。
 
 ## 没做什么（固定会有的）
 
-- 没判定案对不对（判决里的判断以判决为准，没另做推论）、没写规格外的句子、没修不是这一轮的红、没提交。
+- 没判定案对不对（判决里的判断以判决为准，没另做推论）、没写规格外的句子、没修不是这一轮的红、没往统一任务服务交任务（`--write` 在报告「要主 agent 跑的命令」一节）、没提交。

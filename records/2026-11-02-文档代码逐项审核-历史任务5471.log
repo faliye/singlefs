@@ -1,0 +1,106 @@
+== 任务 5471 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-5471.attempt-1.log（共 105 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+  · ⑤ 命令里有 cargo：第二台起它之前先判第二台的 RocksDB 预编库取值（scripts/hosts/rocksdb-prebuilt.py entry），判红退 78、命令不跑
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.4
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-5471-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+  ✓ rocksdb-prebuilt entry：查了 4 项，进程环境的取值是这台的预编库（/home/faliye/.local/share/singlefs/rocksdb-prebuilt/librocksdb-sys-0.19.0+11.8.1/67873f27d6329162/lib）
+   Compiling libc v0.2.189
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling pkg-config v0.3.34
+   Compiling proc-macro2 v1.0.107
+   Compiling glob v0.3.4
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling regex-syntax v0.8.11
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.3
+   Compiling minimal-lexical v0.2.1
+   Compiling vcpkg v0.2.15
+   Compiling bindgen v0.72.1
+   Compiling either v1.18.0
+   Compiling shlex v1.3.0
+   Compiling bitflags v2.13.2
+   Compiling rustc-hash v2.1.3
+   Compiling rustflags v0.1.7
+   Compiling libloading v0.8.9
+   Compiling itertools v0.13.0
+   Compiling clang-sys v1.9.1
+   Compiling nom v7.1.3
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=3492453 read=yes
+   Compiling syn v2.0.119
+   Compiling jobserver v0.1.35
+   Compiling regex-automata v0.4.18
+   Compiling cc v1.5.1
+   Compiling cexpr v0.6.0
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling lz4-sys v1.11.1+lz4-1.10.0
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling libz-sys v1.1.29
+   Compiling regex v1.13.1
+   Compiling librocksdb-sys v0.19.0+11.8.1
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=42624529 read=yes
+   Compiling rocksdb v0.25.0
+   Compiling prune-server v0.1.0 (/home/fy5090/code/singlefs/prune-server)
+    Finished `release` profile [optimized] target(s) in 9.36s
+MULTI_HOST_RUN_PEER_CPU poll=3 usage_usec=68476377 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=4 usage_usec=71526498 read=yes
+  ✓ 自证 batched-point-read：一帧 103 个键（3 个不在）读回逐个对上；RocksDB 数到 multi_get 1 次、103 个键
+  ✓ 自证 prefix-scan：前缀 scan/alpha/ 只回它下面的 5 条（不越到 scan/alphabet）、上限 3 时标截断、用别的表的名义扫回同样 5 条（三张表同一个键空间）
+  ✓ 自证 tcp-route-from-configuration：TCP 地址取自多机配置的 PRUNE_SERVER_TCP_ADDRESS（127.0.0.1:38101），经 TCP 成批写、成批点读、前缀扫、统计都对
+  ✓ 自证 missing-tcp-address-refused：多机配置里没有 PRUNE_SERVER_TCP_ADDRESS 时服务退 5、点名这个键
+  ✓ 自证 pipelined-out-of-order：先发的帧（序号 1）被服务压后 400 毫秒，回应按 [2, 1] 乱序到达，按序号认领到各自的值
+  ✓ 自证 frame-length-rejected：声称 4 GiB 与短于帧头的两种帧都回序号 0 的帧长度拒绝、随后关连接；新连接照常可用
+  ✓ 自证 unknown-operation-rejected：操作码 0x7F 回状态 2 的拒绝，同一条连接接着能用
+  ✓ 自证 malformed-payload-rejected：个数对不上、帧尾多字节、认不得的表三种都回状态 1，被拒的写一条都没落库，连接接着能用
+  ✓ 自证 single-library-holder：同一个库目录第二个服务打不开库、退 3，头一个照常回话
+  ✓ 自证 bench-rate-judgment：达标判法 6 例与百分位 4 例都对（达标线 95%）
+  ✓ 自证 bench-runs-every-mode：6 种负载都跑通（fault-injection 3 秒带 3 次故障，其余各 1 秒）、末行字段齐、压测库删掉（达到/目标每秒态数与结局：full-block 2560.0/2560 met、small-block-per-frame 600.0/600 met、small-block-batched 600.0/600 met、recording 600.0/600 met、two-routes 1200.0/1200 met、fault-injection 600.0/600 met）
+  ✓ 自证 bench-interrupted-removes-library：压测器收了 SIGTERM：停下、删压测库、停掉它起的服务、末行 result=failed、退 3
+  ✓ 自证 fault-injection-bench-finishes：带故障的压测出了末行 result=met、faults=3、fault_recovery_max_ms=267.9；追加日志整理 24 次、重写 13644506 字节 ≤ 追加 16607955 字节的两倍加门槛；进度 10 行，阶段依次 before-disconnect→disconnect-mid-frame→before-server-kill→server-kill-recovering→before-duplicates→faults-done→draining
+  ✓ 自证 replay-after-disconnect-and-server-kill：断在帧中间与吞掉回应再断各一次，客户端重连 2 次、重发 32 帧，40 帧 200 个键逐个对上、每帧改写的键是最后一帧；确认过的 30 帧 kill -9 之后一个不少；写到第 20 帧时 kill -9、重起，客户端重连 1 次、重发 4 帧，60 帧 300 个键逐个对上
+  ✓ 自证 delay-jitter-duplicate-tolerated：两个方向每帧延迟 0 到 15 毫秒、注入迟到的重复 18 次：30 帧 150 个键对上，逐帧改写的键是最后一帧，服务去重 18 次，客户端丢掉重复回应 17 次，没卡住
+  ✓ 自证 half-open-connection-recovered：TCP keepalive 读回 KeepaliveSettings { idle: 10s, interval: 5s, count: 3 }；连接转满 5 帧后半开，客户端帧超时 1 次、重连 1 次，15 帧 75 个键对上
+  ✓ 自证 server-kill-while-client-writes：kill -9 再重起之后接着写两帧 4 MiB：客户端看到连接断了（发帧失败：Broken pipe (os error 32)）、重连 1 次、重发 0 帧，两帧逐字节读回对上
+  ✓ 自证 reconnect-gives-up-at-limit：服务停了：写与读各重连 9 次到上限、回「连不上服务」（读不当成键不在）；间隔翻倍、有抖动（毫秒：[32, 58, 116, 288, 430, 824, 1913, 1136]；[35, 65, 108, 305, 386, 999, 1503, 1758]）；重开客户端从追加日志重放那一帧、库里读得到
+  ✓ 自证 busy-backpressure-bounded：服务每组提交多等 40 毫秒、待处理上限 6 帧：3 个客户端收到忙 741 次、每次至少等服务给的 30 毫秒再重发（741 次重发，最少多等 945.73µs），待处理峰值 6，60 帧全部落库
+  ✓ 自证 claim-exclusive-and-lease-expiry：甲认领 claim/01 到 20、乙认领 11 到 30 同时发：重叠的 10 把键每把恰好一个认领到、另一个看到持有者；写了结论的回「已有结论」；持有者 kill -9 后剩余租期 9976 毫秒内回「别人持有」，过了之后别人认领到
+  ✓ 自证 group-commit-coalesces-syncs：一帧 100 条写（跨录入、事实两张表）只同步 1 次 WAL、写 101 个键（100 条加一条请求号记录），读回逐条对上；8 条连接并发写 128 帧全部确认，RocksDB 数到写 512 个键、同步 WAL 1 次（一帧一同步该是 128 次）
+  ✓ 自证 bench-environment-judgment：环境判法 6 例、loadavg 解析、diskstats 的 io_ticks 解析与忙度换算都对（loadavg 46.46 / 59.98、阈值 16 判不干净）
+  ✓ 自证 control-install-start-stop-check：install --dry-run 不写不起；服务不通时 install 退 1、通时退 0、单元 ExecStart 不带 --library；start 回读 is-active 打 failed 退 1、正常退 0；check 退 0、打出状态目录下的库目录；stop 回读 cgroup.procs 有进程退 1、正常退 0
+  ✓ 自证 stop-lists-connected-clients：两个带不同任务号的客户端连着时 stop：清单 2 行，任务号、第几次、进程号、主机名都对，停服务记录 stop-20261103T011607489Z-2473949.txt 里同样两行
+  ✓ 自证 intentional-stop-fails-clients-fast：宣布停服务再 SIGTERM：客户端 0.1 秒内退 75（限时 15 秒）、说「服务停了」、不重试
+  ✓ 自证 unannounced-server-death-bounded：服务 kill -9 不重起：客户端重连 6 秒到上限，5.9 秒时退 75、说「连不上」
+  ✓ 自证 fault-line-on-server-error：存储写失败（自证造的）：故障日志新增 1 行，种类、时刻、服务进程号、连接号、走哪条、主机、任务号、第几次、客户端进程号、说明都齐
+  ✓ 自证 watch-reports-unit-not-running：单元 is-active 打 inactive：watch 退 1，打出「不在跑」与此刻连着的客户端
+  ✓ 自证 watch-reports-server-unreachable：服务被 kill -9（单元还说 active）：watch 退 1，打出「服务不通」，客户端清单写「拿不到」
+  ✓ 自证 watch-reports-new-fault-line：起之前就有一行故障时 watch 不退；新增一行后退 1，打出故障行原文、连着的客户端与 task-server/task status 303
+  ✓ 自证 client-write-timeout-when-peer-stops-reading：代理一个字节都不读时，8 MiB 的写帧在写超时 2 秒处出错（发帧失败：Resource temporarily unavailable (os error 11)）、重连 1 次重放落库，共 4.1 秒
+  ✓ 自证 tcp-proxy-server-kill-client-fails：经 TCP 代理 kill -9 服务：客户端的写出错、重连到 8 秒上限，7.6 秒时回「连不上」（退 75），没堵在写里（写超时设的是 90 秒）
+  ✓ 自证 single-library-layout：不带 --library 开的是状态目录下的 library；三张表的名义互读同一行、认领不分表、空前缀扫只回写的 3 条、写 0xF0 起头的键被拒；停服务直接开库：只有 default，行是写的 3 条加请求号 1 行（0xF0）、认领 1 行（0xF1），共 5 行
+  ✓ 自证 library-refuses-mismatched：库里另有列族（extra-family）退 6 点名那个列族、列族不变；比较器不同退 6 说选项与库对不上；有文件没有 CURRENT 的目录退 6、没在里面建库；库被另一个服务开着退 3 点名 LOCK
+  ✓ 自证 library-opens-under-low-descriptor-soft-limit：样本库 307 个文件（300 个 SST）：软上限压到 128、硬上限 65535 时服务开得了、就绪后软上限是 65535、点读最后一个 SST 里的行对上；软上限与硬上限都压到 128 时退 8、标准错误写「文件数上限不够：要 …、硬上限 128」与出路
+  ✓ 自证 journal-high-water-survives-compaction：全确认之后整理、重开：新写分到请求号 2（整理之前用到 1），服务照新写落库；低号没确认、高号确认了之后整理、重开：重放请求号 1，新写分到请求号 3，两条都落库
+  ✓ 自证 write-ahead-log-sync-failure-never-acknowledged：内建造错点造的同步 WAL 失败：写回存储出错、服务退 7；故障没解除时重起重发同一请求照回存储出错、再退；同步恢复之后重发才回做完、读得到，再重发回「早已生效」。真实 fdatasync 失败那条输入本次未跑（没设 PRUNE_SERVER_SELFTEST_WRAPPER_COMPILER）
+  ✓ 自证 unread-responses-bounded：小请求读 1 MiB 的值、只发不收 64 次：写出队峰值 3159496 字节（上界 6291456），别的客户端照常读写；写期限 3 秒到了慢连接被关、额度放回到 9 字节
+  ✓ 自证 incomplete-frames-bounded：额度 1024 字节、待处理 1 帧：4 条半帧连接，帧体分配峰值 16777216 字节（上界 16778240）；半帧与逐字节慢发的连接在 1500 毫秒的期限后被关（5 条）；连接数满了拒掉 1 条；之后照常读写
+  ✓ 自证 journal-lock-survives-compaction：第二个打开者卡在开文件与加锁之间、第一个整理（改名换上新文件）之后放行：被同一把锁挡住（追加日志 /tmp/singlefs-run-with-memory-cap-2467801-GML6lw/prune-selftest-2472960-0/locked.journal 被别的客户端开着（flock：Resource temporarily unavailable (os error 11)）；同一份日志只许一个客户端用）
+  ✓ 自证 claim-response-within-frame-limit：255 字节身份的「别人持有」一帧至多 253240 个；混合认领照常；260001 个键的认领（回应会越过帧长上限）整帧回状态 1、说明写了上限，里面的空闲键没被认领
+  ✓ 自证 connect-bounded-by-reconnect-total：重连总时长上限 600 毫秒：unix 连接队列满 583 毫秒回「连不上」、调用方要停 330 毫秒回「要停」、TCP 握手不完成 601 毫秒回「连不上」、连上不读不回 602 毫秒回「连不上」
+  ✓ 自证 oversize-frame-reported-at-once：键长 67108865 字节的一条：容错客户端 35 毫秒回协议错、追加日志里没有这一帧；一问一答的客户端当场回错，同一条连接随后照常读写
+  ✓ 自证 cell-runs-alone-in-own-process：这一格在进程 2473083 里单独跑，父进程是跑格的进程 2472474：别的格起子进程时复制不到这个进程的描述符
+  ✓ prune-server 自证 44 格全绿
+PRUNE_SERVER_SELFTEST cells=44 passed=44 failed=0 failed_cells=-
+311ff38effa0477965c47860833ef9ec35a8ed3b078b834a6edc5084796007e5  /home/fy5090/.local/share/singlefs/work/prune-server-install/prune-server
+target=第二台的目录/builds/task-b0f6b921-5471-1/target
+MULTI_HOST_RUN_PEER_CPU poll=5 usage_usec=71526498 read=no
+MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=1129619456
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=247834133
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=26.8 seconds=24.4 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=26.8
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-5471-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=27.3 seconds=0.4 exit=0

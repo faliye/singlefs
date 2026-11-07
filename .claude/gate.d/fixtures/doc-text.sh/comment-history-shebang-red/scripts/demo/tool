@@ -1,0 +1,3 @@
+#!/usr/bin/env python3
+# 曾经只认 --bin
+print(1)

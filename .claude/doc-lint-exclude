@@ -4,4 +4,5 @@ research/prompts/  # 当时原样发给模型的提示，与 research/results/ �
 .claude/gate.d/fixtures/doc-decisions.sh/  # 门禁 doc-decisions 的判别力样本：正文里故意写「此前写的是 X」这类历史陈述，造了带登记标题的样本决策、欠账号与冻结层登记表，与真表同号不同名，扫它只会报本来就要它红的违规与登记冲突
 .claude/gate.d/fixtures/doc-registries.sh/  # 门禁 doc-registries 的判别力样本：造的欠账表、收口表、总审核记录、带登记标题的样本决策与欠账行，合成的最小 layout 表只有「八、」一节、没有历史节，与真表同号不同名，扫它只会报登记冲突与 kb 形状
 .claude/gate.d/fixtures/doc-experiments.sh/  # 门禁 doc-experiments 的判别力样本：造了带登记标题的 E98、E9001 样本实验页，与真表同号不同名，扫它只会报登记冲突
+.claude/gate.d/fixtures/doc-text.sh/  # 门禁 doc-text 的判别力样本：dated-status 几格造了带登记标题的 E1 样本实验页与实验变更史，date-once 几格在 setup.sh 里现写 D1、D2 样本决策，与真表同号不同名，扫它只会报登记冲突
 .claude/gate.d/fixtures/code-source-discipline.sh/  # 门禁 code-source-discipline 的判别力样本：造了带登记标题的 D99 样本决策，扫它只会报登记冲突

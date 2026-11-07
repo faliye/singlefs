@@ -1,0 +1,519 @@
+{
+  "at": "2026-11-04",
+  "scope": "Two append tools and their README rows; not a full audit of imported libraries",
+  "complete_document_review": false,
+  "claims": [
+    {
+      "tool": "append-record",
+      "claim": "Target must resolve under records and be existing md",
+      "status": "static_match",
+      "evidence_and_limits": "record_target:86-100 uses realpath plus directory separator and isfile",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "append-record",
+      "claim": "Relative paths from current directory; uppercase md and links resolving inward accepted",
+      "status": "static_match",
+      "evidence_and_limits": "record_target plus problems_with_target_checks:265; tests read not executed",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "append-record",
+      "claim": "Nonempty UTF8/LF record and appended text",
+      "status": "static_match",
+      "evidence_and_limits": "text_problem:103,plan:120,append_text:160; Unicode errors rejected8",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "append-record",
+      "claim": "No H1/H2 outside fenced code",
+      "status": "discrepancy",
+      "evidence_and_limits": "A44; task6067 reproduced; see runtime_results",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "append-record",
+      "claim": "Add missing terminal newline; otherwise concatenate without implicit blank line",
+      "status": "static_match",
+      "evidence_and_limits": "plan:128-133",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "append-record",
+      "claim": "Notation checking also in dry-run with final line numbers",
+      "status": "static_match",
+      "evidence_and_limits": "notation_refusal:136 before dry_run; first_line from plan",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "append-record",
+      "claim": "Digest changed before pre-rename callback rejects4",
+      "status": "static_match",
+      "evidence_and_limits": "append_text verify_unchanged_since_read; intentional check/rename gap documented",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "append-record",
+      "claim": "Unknown or out-of-selftest break switches rejected",
+      "status": "static_match",
+      "evidence_and_limits": "settle_break_switches:447; imported API permits test arguments by design",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "append-record",
+      "claim": "Own selftests fully prove every declared boundary",
+      "status": "pending_runtime_and_coverage",
+      "evidence_and_limits": "Bodies read; simple fence cases only; no complete failure-injection run",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "Exactly one current row in four-column registry",
+      "status": "static_match",
+      "evidence_and_limits": "current_ledger:126-142; Unicode failure handling pending",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "Registry path is actually confined to records",
+      "status": "pending_counterexample",
+      "evidence_and_limits": "current_ledger only lexical startswith records/ and endswith.md; normalization/symlink escape not checked; no write attempted",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "Next number from both headings and index, emits1..9999 Chinese numeral",
+      "status": "partial_static_match",
+      "evidence_and_limits": "plan:193-225; numeral conversion and2999sampleloop read; malformed numeral grammar and all9999 values not verified",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "Ignore fenced code while numbering and checking body headings",
+      "status": "discrepancy",
+      "evidence_and_limits": "A44; scan:150 also Boolean fence toggle, numbering consequences not run",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "New index row and whole section one replacement",
+      "status": "static_match",
+      "evidence_and_limits": "plan constructs complete text; append_section calls one replace function",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "Two concurrent appenders cannot both succeed; duplicate gate covers gap",
+      "status": "discrepancy",
+      "evidence_and_limits": "A45; real hash callback before unconditional os.replace; task6068 reproduced; see runtime_results",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "Guard only new index/section for forbidden notations",
+      "status": "static_match",
+      "evidence_and_limits": "notation_refusal:227 checks row and section with actual line numbers",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "Existing selftest concurrency scenario exercises arbitrary scheduling",
+      "status": "overbroad_coverage",
+      "evidence_and_limits": "barrier_enter serializes entire writes byPID after both read; no two successful checks-before-writes; A45",
+      "whole_paragraph_verified": false
+    },
+    {
+      "tool": "ledger-append-section",
+      "claim": "All exit-code and cleanup claims for every error",
+      "status": "pending",
+      "evidence_and_limits": "Normal paths read; invalid UTF8 and replacement callback IO errors require targeted verification",
+      "whole_paragraph_verified": false
+    }
+  ],
+  "sources": [
+    {
+      "path": "scripts/kb/append-record.py",
+      "sha256": "01f0ca1d1524eb7e3cba367cb5cefd17a5505d04b623a2ad67b88bac943d52db",
+      "full_text_read_ranges": [
+        [
+          1,
+          468
+        ]
+      ],
+      "functions": [
+        {
+          "name": "Refused",
+          "line": 69,
+          "end_line": 75,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "ChangedSinceRead",
+          "line": 78,
+          "end_line": 83,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "record_target",
+          "line": 86,
+          "end_line": 100,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "text_problem",
+          "line": 103,
+          "end_line": 117,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "plan",
+          "line": 120,
+          "end_line": 133,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "notation_refusal",
+          "line": 136,
+          "end_line": 146,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "append_text",
+          "line": 149,
+          "end_line": 198,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "append_record",
+          "line": 201,
+          "end_line": 208,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "make_root",
+          "line": 216,
+          "end_line": 224,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "write",
+          "line": 227,
+          "end_line": 230,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "read",
+          "line": 233,
+          "end_line": 235,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "quietly",
+          "line": 238,
+          "end_line": 243,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_plain_append",
+          "line": 246,
+          "end_line": 262,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_target_checks",
+          "line": 265,
+          "end_line": 297,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_refused_inputs",
+          "line": 300,
+          "end_line": 324,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_notation_guard",
+          "line": 327,
+          "end_line": 346,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_interleaved_write",
+          "line": 349,
+          "end_line": 361,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_write_back",
+          "line": 364,
+          "end_line": 365,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_entry",
+          "line": 368,
+          "end_line": 387,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "selftest",
+          "line": 390,
+          "end_line": 416,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "main",
+          "line": 419,
+          "end_line": 444,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "settle_break_switches",
+          "line": 447,
+          "end_line": 460,
+          "text_read": true,
+          "semantic_signoff": false
+        }
+      ]
+    },
+    {
+      "path": "scripts/kb/ledger-append-section.py",
+      "sha256": "2eb054635357f962a4940243a66f70360bae9f2559f1ff46fde1ccc1179242f7",
+      "full_text_read_ranges": [
+        [
+          1,
+          585
+        ]
+      ],
+      "functions": [
+        {
+          "name": "Refused",
+          "line": 77,
+          "end_line": 83,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "ChangedSinceRead",
+          "line": 86,
+          "end_line": 91,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "parse_numeral",
+          "line": 94,
+          "end_line": 106,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "numeral_text",
+          "line": 109,
+          "end_line": 123,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "current_ledger",
+          "line": 126,
+          "end_line": 147,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "scan",
+          "line": 150,
+          "end_line": 172,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "body_problem",
+          "line": 175,
+          "end_line": 190,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "plan",
+          "line": 193,
+          "end_line": 224,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "notation_refusal",
+          "line": 227,
+          "end_line": 238,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "barrier_enter",
+          "line": 241,
+          "end_line": 253,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "barrier_leave",
+          "line": 256,
+          "end_line": 257,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "append_section",
+          "line": 260,
+          "end_line": 315,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "sample_ledger",
+          "line": 325,
+          "end_line": 328,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "make_root",
+          "line": 331,
+          "end_line": 341,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "run_append",
+          "line": 344,
+          "end_line": 348,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "read",
+          "line": 351,
+          "end_line": 353,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_numbers",
+          "line": 356,
+          "end_line": 366,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_plain_append",
+          "line": 369,
+          "end_line": 388,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_index_longer_than_headings",
+          "line": 391,
+          "end_line": 397,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_refused_inputs",
+          "line": 400,
+          "end_line": 439,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_notation_guard",
+          "line": 442,
+          "end_line": 459,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_concurrent_appends",
+          "line": 462,
+          "end_line": 489,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "problems_with_write_back",
+          "line": 492,
+          "end_line": 496,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "selftest",
+          "line": 499,
+          "end_line": 525,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "main",
+          "line": 528,
+          "end_line": 562,
+          "text_read": true,
+          "semantic_signoff": false
+        },
+        {
+          "name": "settle_break_switches",
+          "line": 568,
+          "end_line": 577,
+          "text_read": true,
+          "semantic_signoff": false
+        }
+      ]
+    }
+  ],
+  "pending_tests": [],
+  "runtime_results": [
+    {
+      "exit": 0,
+      "result": "A44 reproduced:12 scenarios,6 control matches,6 discrepancies; zero record writes",
+      "source_unchanged": true,
+      "cleanup": "task clean complete",
+      "task": 6067,
+      "log": "records/2026-11-02-文档代码逐项审核-任务6067.log",
+      "log_sha256": "9fc4b78817fda96446904764d6c2a7d1aaeb9cdb141c9cbfd329e1c00293be2e",
+      "log_fully_read": true
+    },
+    {
+      "exit": 0,
+      "result": "A45 controlled lost update:both digest checks pass,exits[0,0],bodyA lost,bodyB present,headings/index[1,2]",
+      "source_unchanged": true,
+      "cleanup": "temporary ledger removed; task clean complete",
+      "limits": "Two threads schedule actual functions; not a real ledger multi-process workload or frequency estimate",
+      "task": 6068,
+      "log": "records/2026-11-02-文档代码逐项审核-任务6068.log",
+      "log_sha256": "43ee111a33d71bc672f0ac8438fe9b1464bf07705d3e88ff7e03ae3689a22587",
+      "log_fully_read": true
+    }
+  ]
+}

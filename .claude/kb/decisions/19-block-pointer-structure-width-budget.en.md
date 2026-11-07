@@ -152,7 +152,7 @@ Value follows settled items 4 / 5: position entry × w replicas (28 bytes when w
 - D16 (Publish Semantics) settled item 5 closing sentence "one transaction writes at most one unit of user data" is read as covering all Code 1 units (preallocations, truncated tail units, punch hole ends, reflink copies on both sides count), preferably incorporated into that statement.
 - Birth sequence number serves only as one segment of key, not for multi-version selection at fixed points—using it for selection falls into "sequence number for distinguishing stale replicas" rejected in D18 (Information Carried in a Block) settled item 1; D18 (Information Carried in a Block) settled item 1 owes a scope note following write sequence precedent.
 
-**Scope**: Governs which segments comprise key and value and their widths, not padding or total entry width (settled item 10), classes contained (settled item 8), or birth sequence allocation (settled item 9). Lands in D15 (Format Freeze Policy) Layer 2. Uniqueness of Code 1 half relies on deduction that "Code 1 write sequence is already unique version identifier", built on transaction subdivision discipline in D16 (Publish Semantics) settled item 5 tail (paired with D23 (Journal Role & Format) settled item 7 one transaction number per record); that section closed review on 2026-09-13 with C123 (user settlement modified without review), subdivision discipline unchanged, deduction holds; remaining contradictions logged in C310 (Txn Split Discipline Conflicts With Record Count Measurement Basis). Recorded provisionally: chosen based on existing cost and performance numbers, reopenable upon new counter-evidence, not a proven unique solution.
+**Scope**: Governs which segments comprise key and value and their widths, not padding or total entry width (settled item 10), classes contained (settled item 8), or birth sequence allocation (settled item 9). Lands in D15 (Format Freeze Policy) Layer 2. Uniqueness of Code 1 half relies on deduction that "Code 1 write sequence is already unique version identifier", built on transaction subdivision discipline in D16 (Publish Semantics) settled item 5 tail (paired with D23 (Journal Role & Format) settled item 7 one transaction number per record); that section closed review on 2026-09-13 with C123 (user settlement modified without review) (that owed check has been repaid), subdivision discipline unchanged, deduction holds; remaining contradictions logged in C310 (Txn Split Discipline Conflicts With Record Count Measurement Basis). Recorded provisionally: chosen based on existing cost and performance numbers, reopenable upon new counter-evidence, not a proven unique solution.
 
 **Basis**:
 
@@ -162,7 +162,7 @@ Value follows settled items 4 / 5: position entry × w replicas (28 bytes when w
 - E136 (Cost Rows for Mapping Key Forks): four missing cost numbers before user settlement—adding 4 bytes to Code 2 header drops zero fanout under three real header widths of D18 (Information Carried in a Block) settled item 14, mapping tree height differs by one layer only in a narrow pool scale range.
 - Verdicts of three debate rounds and process in changelog; user settlement, verbatim words in changelog.
 
-**Owed**: C288 (collateral changes from mapped key settlement did not land in other decisions), C289 (unwritten which field code 2 birth tree takes), C163 (identical write sequence across fixed point rounds defeats tie-breaking), C286 (whether remount after read-only takes a new instance generation), C287 (Switch adopts transactions of open checkpoint then crashes), C310 (Txn Split Discipline Conflicts With Record Count Measurement Basis).
+**Owed**: C288 (collateral changes from mapped key settlement did not land in other decisions), C289 (unwritten which field code 2 birth tree takes), C286 (whether remount after read-only takes a new instance generation), C287 (Switch adopts transactions of open checkpoint then crashes), C310 (Txn Split Discipline Conflicts With Record Count Measurement Basis).
 
 #### Settled Item 7: Pointer Header Carries Birth (Tree, TXG), 8 Bytes Each
 
@@ -201,7 +201,7 @@ Value follows settled items 4 / 5: position entry × w replicas (28 bytes when w
 - Verdict in `m2-lines234-code-r1-main-verification.md` 2026-09-23 on whether tree nodes fall back via mapping: counter-proving leg tested same corruption where data unit read back correct bytes via extra hop, whereas extent tree root made `open_pool_for_read` unmountable for entire pool.
 - Verdict `research/prompts/m4-gc-r1-main-verification.md` section 3 G3: write path, reconstruction, and checker refactored per "mapping is unique entrance" (Option B), parent rewrites write mapping placement, checker and GPU judge treat position entries as hints only. Section 7 user settlement "if inappropriate, illogical, or unnatural, refactor", verbatim words in changelog.
 
-**Owed**: C293 (two items undercounted by E137 after all pointers enter mapping), C292 (The Reason Why the Code-2 Identity Segment Has Zero Consumers No Longer Holds), C248 (bootstrap exemption of tree table units unwritten) (merged from C280 (Central Mapping Has No Clause for Which Unit Classes It Contains)).
+**Owed**: C293 (two items undercounted by E137 after all pointers enter mapping), C292 (The Reason Why the Code-2 Identity Segment Has Zero Consumers No Longer Holds), C248 (bootstrap exemption of tree table units unwritten).
 
 #### Settled Item 9: How Birth Sequence Numbers Are Allocated and in What Order
 
@@ -268,7 +268,7 @@ Value follows settled items 4 / 5: position entry × w replicas (28 bytes when w
 - E81 (Fixed Point of Commits): origin of reading "dirty nodes COW only once per publish", and basis for fixed point convergence under this reading; applying it to Code 2 and Code 3 eliminates multi-version same-key loss within same checkpoint.
 - User settlement, verbatim words in changelog.
 
-**Owed**: C352 (settlement of writing mapping entries day-1 lacks awakeners for reopening conditions), C163 (identical write sequence across fixed point rounds defeats tie-breaking).
+**Owed**: C352 (settlement of writing mapping entries day-1 lacks awakeners for reopening conditions).
 
 #### Settled Item 13: Block Pointer Split into Two Sections
 

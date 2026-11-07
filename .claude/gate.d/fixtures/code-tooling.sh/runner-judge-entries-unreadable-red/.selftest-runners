@@ -1,0 +1,4 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：三条都退 0；样本根的 .selftest-judge-guard.py 顶替守卫，里面没有判法名单那一句：读不出，这一格照旧全部现判跑完、判红
+bash scripts/gate/sample-pass-a.sh --selftest
+python3 scripts/gate/sample-pass-c.py --selftest
+bash scripts/gate/sample-pass-d.sh --selftest

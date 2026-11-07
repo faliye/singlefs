@@ -1,0 +1,74 @@
+## 按结局桶（2026-10-29 起、到 2026-11-02 为止，615 个，折算合计 2378.97 百万）
+桶                                        个数     花费占比  说明
+written-landed                          215    46.1%  写了、不低于 70% 的行进了提交或工作树
+written-partial                          45     9.8%  写了、30% 到 70%
+verdict-archived                         39     6.5%  三方腿、交回点名的 -output.md 在仓、同轮有判决
+three-way-report-or-verdict-missing       0     0.0%  三方腿、交回点名的 -output.md 不在仓或同轮没有判决
+report-used-by-main                     238    28.1%  只交报告、交回后主 agent 点到
+report-used-by-later-sub                  1     0.0%  只交报告、只有后来的子 agent 点到
+report-unreferenced                       1     0.0%  只交报告、没人点到
+written-overwritten                      36     5.1%  写了、低于 30%、主 agent 点到过
+written-unused                            0     0.0%  写了、低于 30%、没人点到
+cut-by-api-error                          1     0.1%  没交回、API 错
+stopped-salvaged                         26     3.3%  没交回、中途停下、后来有人点到
+stopped-abandoned                         7     0.9%  没交回、中途停下、没人点到
+in-flight                                 6     0.1%  没交回、还在跑
+
+## 并成调度记录「按结局分」那张表的五行
+行                                               个数     花费占比
+写了东西、不低于 70% 的行进了提交或工作树                    215    46.1%
+写了东西、30% 到 70%                              45     9.8%
+三方腿                                         39     6.5%
+只交报告、交回后主 agent 有动作点到                      238    28.1%
+看起来没效果的几桶                                   45     6.0%
+其余（three-way-report-or-verdict-missing、cut-by-api-error、stopped-salvaged、in-flight）    33     3.5%
+
+## 按类型 × 结局桶（个数，花费占全部的比例）
+  clerk                     report-used-by-main                      23     1.9%
+  clerk                     written-landed                            5     0.2%
+  clerk                     stopped-abandoned                         5     0.3%
+  clerk                     written-partial                           1     0.1%
+  clerk                     written-overwritten                       1     0.1%
+  clerk                     report-used-by-later-sub                  1     0.0%
+  experiment-designer       written-landed                            5     0.6%
+  experiment-designer       report-used-by-main                       2     0.2%
+  experiment-designer       written-partial                           1     0.1%
+  experiment-designer       stopped-salvaged                          1     0.1%
+  experiment-runner         written-landed                           12     2.7%
+  experiment-runner         report-used-by-main                       3     0.1%
+  experiment-runner         written-partial                           1     0.2%
+  experiment-runner         stopped-salvaged                          1     0.3%
+  experiment-runner         in-flight                                 1     0.0%
+  implementation-writer     written-landed                           80    18.2%
+  implementation-writer     report-used-by-main                      19     2.2%
+  implementation-writer     written-overwritten                      11     1.7%
+  implementation-writer     written-partial                          10     1.9%
+  implementation-writer     stopped-salvaged                          5     1.6%
+  implementation-writer     in-flight                                 2     0.0%
+  implementation-writer     cut-by-api-error                          1     0.1%
+  investigator              report-used-by-main                      28     2.9%
+  investigator              written-landed                            3     0.5%
+  investigator              written-partial                           2     0.2%
+  investigator              written-overwritten                       1     0.1%
+  investigator              stopped-salvaged                          1     0.1%
+  kb-scribe                 report-used-by-main                      23     1.2%
+  kb-scribe                 written-landed                            7     0.5%
+  mutation-triage           report-used-by-main                       2     0.2%
+  sweep                     report-used-by-main                      12     1.1%
+  three-way-attack          verdict-archived                         21     3.1%
+  three-way-attack          stopped-salvaged                          2     0.1%
+  three-way-defense         verdict-archived                          7     1.0%
+  three-way-forward         verdict-archived                         11     2.3%
+  three-way-forward         stopped-salvaged                          2     0.1%
+  tooling-writer            report-used-by-main                     126    18.3%
+  tooling-writer            written-landed                          103    23.5%
+  tooling-writer            written-partial                          30     7.4%
+  tooling-writer            written-overwritten                      23     3.2%
+  tooling-writer            stopped-salvaged                         14     1.1%
+  tooling-writer            in-flight                                 3     0.1%
+  tooling-writer            stopped-abandoned                         2     0.7%
+  tooling-writer            report-unreferenced                       1     0.0%
+
+## 描述带返工字样（REWORK_WORDS，词表在文件头）的派发：108 个，占个数 17.6%，占花费 16.6%
+## 没交回的 40 个，按截断原因：API 错 1、停掉 33、还在跑 6
+  ✓ 查了 615 个子 agent（--since 2026-10-29、--until 2026-11-02（含那一天），日期按东京日期（Asia/Tokyo）切天，按首条记录的时刻筛），逐个归了结局桶；这份输出也落进了 /home/fy5090/code/singlefs/records/2026-10-29-一百三十七节那一轮-outcome-2026-11-02.txt（排他新建，回读与标准输出逐字相同）

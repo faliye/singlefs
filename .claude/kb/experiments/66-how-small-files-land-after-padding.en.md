@@ -188,10 +188,7 @@ Code `scripts/experiment-apparatus/e66_small_files.rs` (7 unit tests, 7 mutation
 **Rerun**:
 
 ```bash
-cd scripts/experiment-apparatus && cargo build --release --bin e66-small-files
-for s in 1 2 3 4 5; do
-  ./target/release/e66-small-files "${E66_IMG:-${TMPDIR:-/tmp}/e66.img}" $s 1024 8192
-done                        # Artifact e66-small-files-2026-08-31.out
+task-server/task submit -- bash -c 'for s in 1 2 3 4 5; do cargo run --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e66-small-files -- "${E66_IMG:-$TMPDIR/e66.img}" $s 1024 8192; done > research/results/e66-small-files-<YYYY-MM-DD>.out'
 ```
 
 ⚠️ **Artifacts from the first three runs were not retained**: reruns after fixing harness reused the same filename
@@ -246,11 +243,11 @@ and that `extent` point read should read a full 32 KiB (D4 (Checksum Location) s
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D4 (Checksum Location) settled item 2 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D4 (Checksum Location) settled item 3 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D4 (Checksum Location) settled item 7 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D14 (Dual-Track: Large/Small Files & Persistent/Transient) settled item 3 | Prepares material | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D8 (Core Index Structure) settled item 2 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D4 (Checksum Location) settled item 2 | Supports | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D4 (Checksum Location) settled item 3 | Supports | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D4 (Checksum Location) settled item 7 | Supports | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D14 (Dual-Track: Large/Small Files & Persistent/Transient) settled item 3 | Prepares material | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D8 (Core Index Structure) settled item 2 | Does not affect | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

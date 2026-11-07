@@ -1,0 +1,31 @@
+== 任务 5075 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-5075.attempt-1.log（共 30 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.2
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-5075-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+  ✓ 绿：指数函数锚点
+  ✓ 绿：第一批是搬了 K 个单元的那一批
+  ✓ 绿：剔除作废轮
+  ✓ 绿：门槛两条边含在哪一侧
+  ✓ 绿：只取内存臂
+  ✓ 绿：同一份活要比释放前读盘核那一栏
+  ✓ 绿：每轮指数按同轮配对
+  ✓ 绿：中位不是平均
+  ✓ 绿：判别力自证：门槛挪到两个量到的指数之间
+  ✓ 绿：读不到不当 0
+  ✓ 绿：缺的一侧报本次未跑
+  ✓ 绿：前的产物 sha256 不对就停
+  ✓ 绿：前后端到端
+  ✓ 绿：输入清单与后的产物不能是上一趟的
+  ✓ 绿：上一趟真产物在时锚点与行数
+自证 15 项，红 0 项
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=9.0 seconds=6.8 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=9.0
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-5075-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=9.4 seconds=0.4 exit=0

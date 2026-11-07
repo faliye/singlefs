@@ -1,0 +1,82 @@
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+  · ⑤ 命令里有 cargo：第二台起它之前先判第二台的 RocksDB 预编库取值（scripts/hosts/rocksdb-prebuilt.py entry），判红退 78、命令不跑
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=3.0
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-3995-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+  ✓ rocksdb-prebuilt entry：查了 4 项，进程环境的取值是这台的预编库（/home/faliye/.local/share/singlefs/rocksdb-prebuilt/librocksdb-sys-0.19.0+11.8.1/67873f27d6329162/lib）
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=144227 read=yes
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling libc v0.2.189
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+   Compiling singlefs-format v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-reference-filesystem)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=10231169 read=yes
+   Compiling synstructure v0.13.2
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+MULTI_HOST_RUN_PEER_CPU poll=3 usage_usec=21422982 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=4 usage_usec=37311099 read=yes
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-replay-prefix)
+MULTI_HOST_RUN_PEER_CPU poll=5 usage_usec=43838919 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=6 usage_usec=48982453 read=yes
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+MULTI_HOST_RUN_PEER_CPU poll=7 usage_usec=62817761 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=8 usage_usec=72098827 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=9 usage_usec=85254878 read=yes
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 52.78s
+     Running tests/system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery.rs (第二台的目录/builds/task-b0f6b921-3995-1/target/debug/deps/system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery-b43442ebe24033b0)
+
+running 9 tests
+test a_slot_carrying_a_value_the_reader_refuses_found_while_reading_every_spacing_refuses_the_pool_in_both_the_checker_and_recovery ... ok
+test only_self_verified_slots_that_are_not_choosable_found_while_reading_every_spacing_choose_nothing_in_both_the_checker_and_recovery ... ok
+test slots_of_equal_generation_found_at_several_spacings_resolve_to_the_smaller_offset_in_both_the_checker_and_recovery ... ok
+test a_slot_whose_in_flight_limit_is_off_by_one_and_whose_generation_is_lower_found_while_reading_every_spacing_refuses_the_pool_in_both_the_checker_and_recovery ... ok
+test a_slot_whose_in_flight_limit_is_off_by_one_and_whose_spacing_is_not_its_offset_found_while_reading_every_spacing_refuses_the_pool_in_both_the_checker_and_recovery ... ok
+test slots_found_at_several_spacings_resolve_to_the_highest_generation_in_both_the_checker_and_recovery ... ok
+test remaking_the_filesystem_with_another_io_min_leaves_no_slot_one_of_the_earlier_pool_for_either_reader ... ok
+test a_self_verified_slot_whose_recorded_spacing_is_not_its_own_offset_is_taken_by_neither_the_checker_nor_recovery ... ok
+test an_io_min_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192 ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/writes_by_inode_number_of_several_files.rs (第二台的目录/builds/task-b0f6b921-3995-1/target/debug/deps/writes_by_inode_number_of_several_files-730797169cf25677)
+
+running 10 tests
+test the_space_admission_counts_the_units_of_another_inode_as_it_counts_the_first_files ... ok
+test a_write_to_another_inode_being_deleted_is_refused_by_both_entries_before_anything_reaches_the_disk ... ok
+test writing_one_inode_leaves_the_data_units_and_extent_lower_nodes_of_the_other_files_untouched_on_disk ... ok
+MULTI_HOST_RUN_PEER_CPU poll=10 usage_usec=99020947 read=yes
+test the_writes_by_structure_kind_of_another_inode_are_counted_as_the_first_files_are ... ok
+test a_data_write_to_an_inode_created_after_the_first_file_was_deleted_is_refused_before_anything_reaches_the_disk ... ok
+test a_write_to_an_inode_number_that_is_not_in_the_inode_tree_is_refused_before_anything_reaches_the_disk ... ok
+test writing_a_file_after_the_first_file_emptied_the_upper_segment_replaces_the_zero_entry_root ... ok
+MULTI_HOST_RUN_PEER_CPU poll=11 usage_usec=124846318 read=yes
+test unlink_while_a_file_other_than_the_first_holds_data_units_deletes_it_and_then_the_first_file ... ok
+test a_write_to_an_inode_past_the_first_upper_leaf_grows_the_upper_segment_and_every_file_reads_back_after_a_remount ... ok
+MULTI_HOST_RUN_PEER_CPU poll=12 usage_usec=128863754 read=yes
+test two_inodes_overwritten_in_turn_across_two_writable_remounts_each_read_back_what_was_last_written_to_it ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.12s
+
+MULTI_HOST_RUN_PEER_CPU poll=13 usage_usec=128863754 read=no
+MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=4294967296
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=1978297006
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=77.0 seconds=74.0 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=77.0
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-3995-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=77.8 seconds=0.8 exit=0

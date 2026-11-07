@@ -25,7 +25,7 @@
 #     （在工作根下；它所在的那个工作根下一层目录有归属文件的，要是本会话的）。主 agent 的别的目录、兄弟子 agent 的目录不判。
 #   主 agent 另判服务给的编译目录（task-server 每次尝试的 CARGO_TARGET_DIR，跑完留给提交它的 agent 用 task-server/task clean <号> 删；用户「你通知完成，
 #     编译资源和生成物让对应的agent或者subagent去删」，records/2026-10-30-编译绕过内存总上限.md「补测试那件交回」那一节）：算本会话的全部任务；
-#     子 agent 不判这一样（用户 2026-11-01 定子 agent 一律不往统一任务服务交任务、task clean 也不起，交任务、删编译目录的只剩主 agent）。
+#     子 agent 不判这一样（子 agent 一律不往统一任务服务交任务、task clean 也不起，交任务、删编译目录的只剩主 agent）。
 #     那个任务（分片的按父任务）已有结局、尝试记的编译目录还在盘上的列进单子，删法 `task-server/task clean <号>`，不直接 rm（项目代码闸照拒直接删）。在排、在跑的不列。
 #     读法：服务库只读打开（sqlite3 的 mode=ro；库的位置取 task-server/task_server_lib.py 的 read_configuration，读不了取 default_values），
 #     按会话号取 tasks 与 attempts 两张表。不用 task-server/task status --json：不带号只列在排、在跑与完成了没人取的，wait 取过结局的正是要列的那几个却不在里面；
@@ -56,7 +56,7 @@
 #       数据根下一层那一个）本身不按名字认成旧文件库，里面照看。
 #     归属按点名认：路径本身或它的上层目录（到锚点为止，锚点本身不算）出现在自己会话记录里某条 Bash 命令的文字里，就是自己的
 #       （主 agent 看主会话记录，子 agent 看它自己的；读法与上面认领、运行目录同一份 session-transcript.py 的 tool_calls；
-#       创建时间与调用时间窗重叠不算）。只读命令不算点到（用户 2026-11-02 定「排掉只读命令」）：命令按 |、||、&&、;、&、括号与换行切成段，
+#       创建时间与调用时间窗重叠不算）。只读命令不算点到：命令按 |、||、&&、;、&、括号与换行切成段，
 #       一段的命令词（跳过起头的 NAME=值，取最后一节文件名）在 READ_ONLY_COMMANDS 里的（ls、du、stat、find、cat、head、tail、less、grep、rg、wc、
 #       sha256sum、md5sum、diff、cmp、file、readlink、realpath、tree、df；find 带 FIND_MODIFYING_PREDICATES 之一（-delete、-exec、-execdir）的不算只读），
 #       那一段里的路径不算点到；mv、cp、tar、rsync、ln、mkdir、rm 这类改动命令，与把路径当参数交给脚本或程序的，照算。命令拆成词（shlex，拆不开照空白与 shell 符号切），
@@ -86,7 +86,7 @@
 #   声明了的那一棵里仓副本、库拷贝、旧文件库与库备份不列，编译目录照列（编译目录不能声明成交付物）；路径落到那个目录外、种类不认得、理由太短的行不算，列进拦下的说明。
 # 拦下：Stop 与 SubagentStop 打 {"decision": "block", "reason": …}；PreToolUse 退 2、说明写 stderr。说明逐个列种类、路径与 du -sh 的大小
 #   （du 合起来最多 DU_TIMEOUT_SECONDS 秒，量不出写「?」）和删法。
-# 拦过一次、续跑回来（stop_hook_active 为真）还是同一张单（一个都没删）：放行，把单子作 systemMessage 交给用户定（免得卡死）；单子变了照拦。PreToolUse 每次都拦。
+# 拦过一次、续跑回来（stop_hook_active 为真）还是同一张单（一个都没删）：放行，把单子作 systemMessage 交给用户处置（免得卡死）；单子变了照拦。PreToolUse 每次都拦。
 #   拦下的单记在 <工作根>/completion-cleanup-guard/<会话号>-<main 或子 agent 号>.json。
 # 判不了（输入不是 JSON 对象、认不出会话号、找不到会话记录、会话记录在而读不了、导入不了共用模块、自己出错）：照「放行但必记检出」放行，stderr 写一句「没判」（输入读不出的带输入的前 200 字节），
 #   检出记录（AGENT_HOOK_DETECTIONS，没设取 lib_work_root.py 的 default_detections_path）追加一行、结局「只记」，findings 以「完工清理闸没判、照常放行」起头，
@@ -168,7 +168,7 @@
 #       「✗ 自证 subagent-assigned-directory-left：」
 #       「✗ 自证 subagent-assigned-relative-by-repository-root：」
 #       「✗ 自证 subagent-assigned-shared-reading：」
-#   COMPLETION_CLEANUP_BREAK=prompt-scratch-relative-by-cwd  「草稿目录：」写相对路径的按钩子此刻的当前目录解，不按仓根（改前的样子）
+#   COMPLETION_CLEANUP_BREAK=prompt-scratch-relative-by-cwd  「草稿目录：」写相对路径的按钩子此刻的当前目录解，不按仓根
 #       「✗ 自证 subagent-assigned-relative-by-repository-root：」
 #       「✗ 自证 subagent-assigned-relative-not-by-cwd：」
 #   COMPLETION_CLEANUP_BREAK=run-windows-ignored  运行目录不认归属，全算自己的
@@ -204,23 +204,23 @@
 #       「✗ 自证 prune-state-library-copy-blocked：」
 #   COMPLETION_CLEANUP_BREAK=scratchpad-ignored  主 agent 不判本会话的临时草稿目录
 #       「✗ 自证 main-scratchpad-copy-left：」
-#   COMPLETION_CLEANUP_BREAK=unjudged-pass-silent  没判全的放行不打、不记检出（改前的样子：没扫完的几处只进拦下时的单子）
+#   COMPLETION_CLEANUP_BREAK=unjudged-pass-silent  没判全的放行不打、不记检出（没扫完的几处只进拦下时的单子）
 #       「✗ 自证 truncated-scan-pass-reported：」
 #       「✗ 自证 birth-unknown-pass-reported：」
 #       「✗ 自证 unreadable-directory-pass-reported：」
 #       「✗ 自证 work-root-unlisted-pass-reported：」
-#   COMPLETION_CLEANUP_BREAK=unjudged-skip-silent  判不了的放行只在 stderr 写那一句、不记检出（改前的样子）
+#   COMPLETION_CLEANUP_BREAK=unjudged-skip-silent  判不了的放行只在 stderr 写那一句、不记检出
 #       「✗ 自证 unjudged-skip-recorded：」
 #       「✗ 自证 self-error-pass-recorded：」
-#   COMPLETION_CLEANUP_BREAK=unreadable-directory-unnoted  扫的时候读不了的目录静默跳过，不进没判全的几处（改前的样子）
+#   COMPLETION_CLEANUP_BREAK=unreadable-directory-unnoted  扫的时候读不了的目录静默跳过，不进没判全的几处
 #       「✗ 自证 unreadable-directory-pass-reported：」
-#   COMPLETION_CLEANUP_BREAK=work-root-unlisted-unnoted  工作根在而列不出时当作本会话没认领任何目录，不进没判全的几处（改前的样子）
+#   COMPLETION_CLEANUP_BREAK=work-root-unlisted-unnoted  工作根在而列不出时当作本会话没认领任何目录，不进没判全的几处
 #       「✗ 自证 work-root-unlisted-pass-reported：」
-#   COMPLETION_CLEANUP_BREAK=transcript-unreadable-unnoted  会话记录在而读不了时不当判不了，照常判（读它的共用模块交空表，什么都认不出、放行；改前的样子）
+#   COMPLETION_CLEANUP_BREAK=transcript-unreadable-unnoted  会话记录在而读不了时不当判不了，照常判（读它的共用模块交空表，什么都认不出、放行）
 #       「✗ 自证 transcript-unreadable-skip-reported：」
 #   COMPLETION_CLEANUP_BREAK=service-builds-ignored  不认服务给的编译目录
 #       「✗ 自证 main-service-build-left：」
-#   COMPLETION_CLEANUP_BREAK=service-build-removal-by-rm  服务给的编译目录删法退回 rm -rf（改前的样子：照别的编译目录写）
+#   COMPLETION_CLEANUP_BREAK=service-build-removal-by-rm  服务给的编译目录删法用 rm -rf（照别的编译目录写）
 #       「✗ 自证 main-service-build-left：」
 #   COMPLETION_CLEANUP_BREAK=service-builds-session-unchecked  别的会话提交的任务的编译目录也列
 #       「✗ 自证 other-session-service-build-ignored：」
@@ -232,9 +232,9 @@
 #       「✗ 自证 run-root-default-under-work-root：」
 #   COMPLETION_CLEANUP_BREAK=guard-off  平常跑设了弄坏开关也不拒；它是关守卫项，只在它是唯一一项时认，与别的项同写照拒并点名它
 #       「✗ 自证 break-switch-refused-outside-selftest：」
-#   COMPLETION_CLEANUP_BREAK=guard-off-with-others  关守卫项与别的项同写也照认（改前的样子：guard-off 写在哪一项都认；只在自证进程本身里调守卫时认，平常跑同写照拒）
+#   COMPLETION_CLEANUP_BREAK=guard-off-with-others  关守卫项与别的项同写也照认（guard-off 写在哪一项都认；只在自证进程本身里调守卫时认，平常跑同写照拒）
 #       「✗ 自证 guard-off-combined-refused-in-process：」
-#   COMPLETION_CLEANUP_BREAK=data-root-leftovers-unseen  迁库遗留不看数据根与崩溃放量的家目录（改前的样子：数据根下的旧库与备份不在射程里）
+#   COMPLETION_CLEANUP_BREAK=data-root-leftovers-unseen  迁库遗留不看数据根与崩溃放量的家目录（数据根下的旧库与备份不在射程里）
 #       「✗ 自证 data-root-family-library-blocked：」
 #       「✗ 自证 relative-after-cd-attributed：」
 #       「✗ 自证 library-archive-blocked：」
@@ -243,7 +243,7 @@
 #       「✗ 自证 data-root-leftover-not-declarable：」
 #       「✗ 自证 subagent-leftover-by-own-commands：」
 #       「✗ 自证 read-only-mentions-not-attributed：」
-#   COMPLETION_CLEANUP_BREAK=prune-state-directory-unseen  迁库遗留不看判定库服务的状态目录（改前的样子）
+#   COMPLETION_CLEANUP_BREAK=prune-state-directory-unseen  迁库遗留不看判定库服务的状态目录
 #       「✗ 自证 prune-state-library-copy-blocked：」
 #       「✗ 自证 unit-file-state-directory-read：」
 #   COMPLETION_CLEANUP_BREAK=service-library-listed  服务自己那份库也照迁库遗留判
@@ -260,7 +260,7 @@
 #   COMPLETION_CLEANUP_BREAK=leftover-unjudged-unnoted  种类名读不出、数据根取不到、control 载不进、单元文件读不了时不记没判全
 #       「✗ 自证 species-unreadable-pass-reported：」
 #       「✗ 自证 data-root-unconfigured-pass-reported：」
-#   COMPLETION_CLEANUP_BREAK=no-owner-directories-skipped  工作根下没写归属文件的目录不判（改前的样子）
+#   COMPLETION_CLEANUP_BREAK=no-owner-directories-skipped  工作根下没写归属文件的目录不判
 #       「✗ 自证 no-owner-mentioned-copy-blocked：」
 #       「✗ 自证 no-owner-unmentioned-reported-not-blocked：」
 #   COMPLETION_CLEANUP_BREAK=owned-directories-leftover-scanned  工作根下有归属文件的目录（别的会话的也算）也按迁库遗留判
@@ -279,7 +279,7 @@
 #       「✗ 自证 anchor-mentions-not-attributed：」
 #       「✗ 自证 subagent-leftover-by-own-commands：」
 #       「✗ 自证 read-only-mentions-not-attributed：」
-#   COMPLETION_CLEANUP_BREAK=read-only-mentions-counted  只读命令（READ_ONLY_COMMANDS）那一段里的路径也算点到（改前的样子：ls、du 读一眼也算本会话的）
+#   COMPLETION_CLEANUP_BREAK=read-only-mentions-counted  只读命令（READ_ONLY_COMMANDS）那一段里的路径也算点到（ls、du 读一眼也算本会话的）
 #       「✗ 自证 read-only-mentions-not-attributed：」
 #   COMPLETION_CLEANUP_BREAK=leftover-mentions-session-level  子 agent 把主会话记录里的命令点到的也算自己的
 #       「✗ 自证 subagent-leftover-by-own-commands：」
@@ -427,7 +427,7 @@ SHELL_PUNCTUATION = "();<>|&\n"   # 换行也切出来：命令按段判只读�
 LOOSE_WORDS = re.compile(r"([;&|()\n]+)|[ \t\r\f\v<>`'\"]+")   # 拆不开时的切法：段的分隔留作一个词，别的符号丢掉
 SEGMENT_SEPARATOR = re.compile(r"[;&|()\n]+")
 DIRECTORY_CHANGERS = ("cd", "pushd")
-# 命令词是这几样的那一段里的路径不算点到（用户 2026-11-02 定「排掉只读命令」：看一眼的不算本会话的）
+# 命令词是这几样的那一段里的路径不算点到（看一眼的不算本会话的）
 READ_ONLY_COMMANDS = frozenset(("ls", "du", "stat", "find", "cat", "head", "tail", "less", "grep", "rg", "wc", "sha256sum", "md5sum",
                                 "diff", "cmp", "file", "readlink", "realpath", "tree", "df"))
 FIND_MODIFYING_PREDICATES = frozenset(("-delete", "-exec", "-execdir"))   # find 带这几样会删、会起别的命令，不算只读
@@ -438,7 +438,7 @@ def broken(item):
 
 
 GUARD_OFF_ITEM = "guard-off"                         # 关守卫项：只在它是唯一一项时认
-GUARD_OFF_LENIENT_ITEM = "guard-off-with-others"     # 弄坏开关：自证进程本身里调守卫时，关守卫项与别的项同写也照认（改前的样子）
+GUARD_OFF_LENIENT_ITEM = "guard-off-with-others"     # 弄坏开关：自证进程本身里调守卫时，关守卫项与别的项同写也照认
 
 
 def refuse_break_outside_selftest(value=None, arguments=None):
@@ -534,7 +534,7 @@ def scratchpad_root():
 
 def main_roots(session, main_transcript, notes=None):
     """主 agent 判的目录：[(目录, 它的认领目录或 None, 下一层不看的名字)]。工作根在而列不出（读不了）时本会话认领的目录一个都没判，
-    给了 notes 的往里记一句（照「放行但必记检出」；弄坏开关 work-root-unlisted-unnoted 下不记，改前的样子）；工作根不在的照旧什么都不记。"""
+    给了 notes 的往里记一句（照「放行但必记检出」；弄坏开关 work-root-unlisted-unnoted 下不记）；工作根不在的照旧什么都不记。"""
     roots = []
     base = work_root()
     try:
@@ -716,7 +716,7 @@ def scan(root, max_depth, exempt, skipped_names, budget, wanted=None, skip=None)
         try:
             entries = list(os.scandir(path))
         except OSError as error:
-            if not broken("unreadable-directory-unnoted"):   # 读不了的目录里有没有副本没判：记下来，放行时照「放行但必记检出」报（改前的样子：静默跳过）
+            if not broken("unreadable-directory-unnoted"):   # 读不了的目录里有没有副本没判：记下来，放行时照「放行但必记检出」报（静默跳过）
                 budget.setdefault("unreadable", []).append(f"{path}（{type(error).__name__}: {error.strerror or error}）")
             continue
         here_exempt = inside_exempt or path in exempt
@@ -1643,7 +1643,7 @@ def decide(hook_input):
         return {"action": "skip", "text": "认不出会话号或子 agent 号"}
     if not own_transcript or not os.path.isfile(own_transcript) or (role == "main" and not main_transcript.endswith(".jsonl")):
         return {"action": "skip", "text": f"找不到会话记录（{own_transcript or '输入里没有'}）"}
-    if not os.access(own_transcript, os.R_OK) and not broken("transcript-unreadable-unnoted"):   # 在而读不了：读它的共用模块静默交空表，认领与草稿目录都认不出（改前的样子：当没有、照常放行）
+    if not os.access(own_transcript, os.R_OK) and not broken("transcript-unreadable-unnoted"):   # 在而读不了：读它的共用模块静默交空表，认领与草稿目录都认不出（当没有、照常放行）
         return {"action": "skip", "text": f"会话记录 {own_transcript} 在而读不了，认领与派发提示点名的草稿目录都认不出"}
     now = time.time()
     calls, _ = module("session_transcript").tool_calls(own_transcript)
@@ -1698,7 +1698,7 @@ def decide(hook_input):
 
 def report_unjudged_pass(hook_input, notes, stream, detections_path=None):
     """放行而没判全（扫到上限没看完、运行目录取不到创建时间）：照「放行但必记检出」往 stream 逐条打出、检出记录追加一行（结局「只记」），看门狗据此报给主 agent。
-    detections_path 不给取 AGENT_HOOK_DETECTIONS，没设取 lib_work_root.py 的 default_detections_path。交打出的行数；弄坏开关 unjudged-pass-silent 下不打、不记（改前的样子）。"""
+    detections_path 不给取 AGENT_HOOK_DETECTIONS，没设取 lib_work_root.py 的 default_detections_path。交打出的行数；弄坏开关 unjudged-pass-silent 下不打、不记。"""
     if not notes or broken("unjudged-pass-silent"):
         return 0
     recorded = record_detection(hook_input, [f"{UNJUDGED_FINDING_PREFIX}：{note}" for note in notes], detections_path)
@@ -1735,7 +1735,7 @@ def record_detection(hook_input, findings, detections_path=None):
 
 def report_unjudged(hook_input, text, stream, detections_path=None):
     """判不了（输入不是 JSON 对象、认不出会话号、找不到会话记录、导入不了共用模块、自己出错）：照「放行但必记检出」往 stream 打一句「没判」、
-    检出记录追加一行（结局「只记」，findings 以 UNJUDGED_SKIP_PREFIX 起头），看门狗据此报给主 agent。弄坏开关 unjudged-skip-silent 下只打那一句、不记（改前的样子）。"""
+    检出记录追加一行（结局「只记」，findings 以 UNJUDGED_SKIP_PREFIX 起头），看门狗据此报给主 agent。弄坏开关 unjudged-skip-silent 下只打那一句、不记。"""
     if broken("unjudged-skip-silent"):
         print(f"! 完工清理闸：{text}，这一次没判（放行）", file=stream)
         return
@@ -2403,7 +2403,7 @@ def selftest_cells():
               outcome.get("action") == "pass" and f"工作根 {s.work} 列不出" in text and len(entries) == 1 and entries[0].get("outcome") == "只记",
               f"工作根 {s.work} 列不出应当放行，打出那一句、检出记录多一行，实际 {outcome}，打出 {text!r}，检出 {entries}")
         # 会话记录在而读不了（chmod 成 000）：判不了，照「放行但必记检出」走 skip（入口记检出那一步由 unjudged-skip-recorded 那一格核）
-        s = scenario("transcript-unreadable")   # 没有残留：改前读不了的会话记录被当成空的，照常放行、不记（有残留时后面读后台任务那一步抛异常，走「自己出错」那一支）
+        s = scenario("transcript-unreadable")   # 没有残留：弄坏开关下读不了的会话记录被当成空的，照常放行、不记（有残留时后面读后台任务那一步抛异常，走「自己出错」那一支）
         s.owned("w-unreadable-transcript")
         os.chmod(s.main_transcript, 0)
         try:
@@ -2758,7 +2758,14 @@ def selftest():
         print(completed.stdout + completed.stderr)
         print("→ 怎么办：先让 --selftest-cells 不带弄坏开关跑绿，再回来跑 --selftest")
         return 1
-    workers = max(1, min(8, os.cpu_count() or 1))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HOOK_DIR)), "scripts", "hosts"))
+    import heavy_threads   # 开关轮的并行度取每台默认重活线程数（.claude/heavy-thread-default），不按核数另定
+    try:
+        workers = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        print(f"✗ 自证：取不到每台默认重活线程数，开关轮没起：{error}")
+        print(f"→ 怎么办：{error.howto}")
+        return 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         results = list(pool.map(lambda pair: (pair, run_switch(pair[0])), BREAK_TABLE))
     failed = 0

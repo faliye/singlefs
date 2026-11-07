@@ -41,7 +41,7 @@
 #   按 crate 归堆派（增量编译的命中率才稳），活动态领（等分之下拿到几十秒重测试的那一片会独自拖住整道），上一次用时 ≥ GATE_MUTATION_LONG_ROW_SECONDS（默认 300）秒的先派。
 #   工作进程数取 ① 每台默认重活线程数（设了 GATE_MUTATION_WORKERS 就顶掉 ①）、② 这一趟要现跑的条数、③ 编译目录所在的盘放得下几个工作进程的两份编译目录（下面「磁盘余量」）、
 #   ④ 这一条拿到的内存上限 ÷ 那个编译并行度下每个工作进程的实测峰值（上限取 TASK_SERVER_MEMORY_CAP_BYTES，没有读仓根多机配置 SLICE_MEMORY_CAP_BY_HOST 里这一台那一项，再没有读自己 scope 的 memory.max；
-#   memory.max 是有限值就是硬顶（前两级取到的值比它大取它，两者取小），是 max 或读不到不收窄、前两级也没有这一项不收）的小者、至少 1；撞内存上限由服务放大重排、从头跑，所以不能按线程数开满。
+#   memory.max 是有限值就是硬顶（前两级取到的值比它大取它，两者取小），是 max 或读不到不收窄、前两级也没有这一项不收）的小者、至少 1（④ 是 0，即上限装不下一个工作进程量到的峰值，整道按撞内存上限退 250，见「上限、限时与卡住」）；撞内存上限由服务放大重排、从头跑，所以不能按线程数开满。
 #   每个工作进程的峰值由门禁自己量：每个工作进程里一条采样线程量它整棵进程树（cargo、rustc、测试、临时 prune-server）的 RssAnon + RssShmem + VmPTE 加总，
 #   按编译并行度记进多机配置 NFS_SHARED_ROOTS 点名的共享根下的运行记录（worker-peaks/<编译并行度>/，两台同一份；判样本根时不记）；④ 排在最后、按 ①②③ 的小者当天花板，
 #   每试一个进程数 n 就照 n 算编译并行度、取那个编译并行度下最新几份实测的最大，满足 n × 峰值 ≤ 上限的最大 n 才开；没有实测（或记录读不了）取保守值 = 上限本身，只开 1 个。
@@ -65,7 +65,7 @@
 #   ⚠️ stdout 里的判定与进程数无关：按变异表的行号排序再打，GATE_MUTATION_WORKERS=1 与 =8 逐字相同（并发之后重新证红的那一半）；进度、前移只进 stderr；
 #   复用了多少进 stdout 的「复用：」「覆盖：」两行、抓到那一行末尾的「（现判：<栏>）」「（复用）」或「（拒算）」与成功句末尾「；这一趟现判 …」，比判定时去掉这几处。
 #
-# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨轮复用）：GATE_MUTATION_TARGET_DIR 设了用它（调用方给的，跑完不删）；没设时共用模块在这一趟自己的运行目录
+# 编译目录（自己用完自己删，不跨轮复用）：GATE_MUTATION_TARGET_DIR 设了用它（调用方给的，跑完不删）；没设时共用模块在这一趟自己的运行目录
 #   （$TMPDIR 下的 singlefs-mutation-replay-*）里建 build/singlefs-crates-mutation-target，分片各加 -w<片号>、记覆盖的再加 -coverage、先编一份依赖的 -seed 几份都在那个 build 里，
 #   正常结束、判红、被 TERM / HUP 停都删掉（删之前核没有进程开着里面的文件，有就不删、整道判红）。
 #   只在 crates-mutation-rows.py 的 default_shared_target_directory 与 run_pool 里算，这里不另算（它文件头「编译目录」）。
@@ -91,8 +91,12 @@
 # 临时目录：每条变异与每批基线各一个 TMPDIR，结束时不论退出码（含被信号杀掉的测试进程）都整个删掉：被杀的测试 Drop 守卫不跑，镜像会堆在里面；
 #   全部判完总目录下还剩哪一条的目录，整道判红。
 #
-# 上限、限时与卡住（records/2026-10-30-编译绕过内存总上限.md SC02，用户定「照字面全删」「两样都交服务」）：每条 cargo test 直接起，不套内存包装、不设上限、不限时；
+# 上限、限时与卡住（records/2026-10-30-编译绕过内存总上限.md）：每条 cargo test 直接起，不套内存包装、不设上限、不限时；
 #   这一道整条经 task-server/task submit 交，内存上限由统一任务服务按记录给、撞了放大重排，死循环的变异由服务按「日志与 CPU 都不涨」停整条任务。
+#   撞内存上限（任务 7498 那一类）：服务给的上限装不下一个工作进程量到的峰值时，共用模块派活之前退 250（crates-mutation-rows.py 文件头「内存上限」的「撞内存上限」），
+#   这一格照 250 退、整道也照 250 退（格汇总把红格并成 1，这里另记一个标记、汇总之后照它退 250），服务照错误类型表 memory-cap-hit 那一行加额度重排；
+#   分片驱动起的各片（GATE_MUTATION_ROW_SELECTION）不经格汇总，模块的 250 原样交出去。
+#   底座读数：共用模块往 stderr 打一行 MUTATION_BASE_READING（父进程自己的用量、先编一份依赖那一步父进程整棵树的峰值），读法在它文件头「内存上限」的「底座读数」。
 #   不判「内存撞顶」「超时」「显存不够」：显存不够而红的照抓到记。判法在 crates-mutation-rows.py 文件头同名一段。
 #
 # 基线（判法见 crates-mutation-rows.py 文件头「基线」）：点名的测试在没改坏的副本上本来就红时，改坏之后照样红、记「抓到」什么都没证明，
@@ -107,7 +111,7 @@
 #   执行过的单元另记在覆盖记录里（-C instrument-coverage、llvm-profdata、llvm-cov，工具不对整道判红），基线 ok 那一条按它复用、不按整树快照。
 #   键对不上的现判，按栏报数（行新加、判法单元变了、被改坏的单元变了、点名测试的闭包变了、原文或替换文变了、工具链或依赖变了、上次没判成抓到、一律现判），
 #   stderr 逐行写变了哪几个单元；算不出键的那一行拒算（点名的测试认不出单元、闭包里有认不出的形态），每趟照跑。成功句末尾报「现判 N、复用 M、拒算 R、本次未跑 K」。
-#   撞键就拒算（用户 2026-10-29 定）：表里两行以上算出同一把行键（两份内容相同的函数各改一处、点名同一条测试），这几行拒算、照跑、不复用，
+#   撞键就拒算：表里两行以上算出同一把行键（两份内容相同的函数各改一处、点名同一条测试），这几行拒算、照跑、不复用，
 #   stderr 逐行与成功句末尾报「拒算（行键撞键：与第 N 行同键）」；--item 与分片只判选中的行时，撞键照整张表判。
 #   判法与弄坏开关 row-key-collision-unrefused 在 crates-mutation-rows.py 文件头「行键」，自证在它的 --selftest；本道样本不判这一条。
 #   键、库的存放、复用判据写在 crates-mutation-rows.py 文件头「复用」「判法单元」「行键」「判定库」「复用判据」。只读看这一趟会怎么判：python3 scripts/mutation/crates-mutation-rows.py plan <根>；
@@ -133,7 +137,12 @@
 #       green（期望退出 0，实测 1）
 #   GATE_MUTATION_BREAK=notrunasmissed  把本次未跑当没红记
 #       not-run（期望退出 0，实测 1）
-#   复用、续跑、只改一行只跑那一行、单元键的每一样（第二轮复查 controls 路的 S34、S30、N33、N34、N45，被改坏的单元、点名测试的闭包、V5 那一类常量）、
+#   GATE_MUTATION_BREAK=sample-service-unchecked  样本根不核在不在临时 prune-server 底下，裸跑照判、判定写进真服务
+#       sample-root-bare-red（期望退出 2，实测 1）
+#   GATE_MUTATION_BREAK=sample-cargo-log-unset  样本档换上假 cargo 时不设 FAKE_CARGO_LOG（假 cargo 每起一次先往它追加一行，没设就抛 KeyError 退 1，基线一行都绿不了）
+#       red（输出里找不到「计数：抓到 0 条、没红 1 条、无效 1 条、锚点失效 0 行（共 4 条）」）、
+#       green（期望退出 0，实测 1）、not-run（期望退出 0，实测 1）
+#   复用、续跑、只改一行只跑那一行、单元键的每一样（controls 路的 S34、S30、N33、N34、N45，被改坏的单元、点名测试的闭包、V5 那一类常量）、
 #   基线按执行过的单元复用、判法单元指纹、久的先派、选行这几样要连跑好几趟，在 scripts/mutation/crates-mutation-rows.py --selftest 里
 #   用假 cargo、假 llvm 工具跑（门禁 code-tooling 替它复跑），弄坏开关 baseline-by-tree-snapshot、judge-units-whole-file、
 #   mutated-unit-ignored、test-closure-ignored、rowkeywithouttoolchain、coveragenotrecorded、llvmversionunchecked、timingsignored、nobaseline、
@@ -148,7 +157,7 @@
 #   产品 GPU 包 singlefs-background-gpu 真显卡对拍的 tests-on-a-real-gpu；点名的测试没卡时打 NOT_RUN_NO_GPU_ADAPTER 后返回成功，记本次未跑（同上「本次未跑」）。
 #   弄坏开关 GATE_MUTATION_BREAK=product-gpu-feature-unquiesced 让 tests-on-a-real-gpu 不当上卡的特性认，crates-mutation-rows.py --selftest 里
 #   「产品 GPU 包（--features tests-on-a-real-gpu）的行：…」两格必须判错；本道样本不判这一条（样本用假 cargo、没有显卡）。
-#   开 GPU 时崩溃判段那几行补 gpu 特性（用户 2026-10-13 定「配 GPU 必用 GPU，不降级」；crates-mutation-rows.py 文件头同名一段）：多机配置写了 ENABLE_GPU=1 时，
+#   开 GPU 时崩溃判段那几行补 gpu 特性（配 GPU 必用 GPU，不降级；crates-mutation-rows.py 文件头同名一段）：多机配置写了 ENABLE_GPU=1 时，
 #   点名测试的单元闭包够得着 crash_state_enumeration 或 crash_amplification 的选路函数、cargo 参数没开 gpu 的行，这一趟补上 gpu 特性起（照上面不另套清场、交多机配置），
 #   键照补了之后的特性算；变异表那一行不动，stderr 一行点名补了哪几行。弄坏开关 GATE_MUTATION_BREAK=gpu-route-feature-unadded（不补），
 #   自证在 crates-mutation-rows.py --selftest「开 GPU 时点名测试走崩溃判段的那一行补 gpu 特性」那一格；本道样本不判这一条（样本 crate 里没有那两处选路函数）。
@@ -166,9 +175,10 @@
 # 样本（fixtures/crates-mutation-replay.sh/；各放 .gate-cells 点名 crates-mutation-rows，setup.sh 在样本目录里 git init；
 #   样本根放 .crates-mutation-replay-sample-tools/（标记，里面一个说明文件）：起 cargo 的是 crates-mutation-rows.py sample-tools 现写的假 cargo 与假 llvm 工具，
 #   不编译；样本 crate 里 `// TEST <名字> NEEDS|READS|FILES|NOTRUN …` 与 `// COMPILE-ERROR-IF <原文>` 几行说每条测试、每处替换文的红绿（写法见 FAKE_CARGO 头上的说明）；
+#   假 cargo 每起一次先往 $FAKE_CARGO_LOG 追加一行（FAKE_CARGO 头上那一句，没设它就退 1），格里把它设成放假工具那个临时目录里的 cargo-calls.log，随那个目录删；
 #   只在样本根上进样本档：根不是本阶段所在的仓、也没设 GATE_STAGED_FROM）：
 #   red      只改注释的一行（原文不落在任何单元上，拒算）照跑记「没红」；替换文编不过的一行记「无效」；
-#            点名的测试读 fixture-data/answer.txt（样本仓里有、不在拷贝范围里）的一行与只写名字、两个模块各有一个同名用例的一行都报「基线不绿」
+#            点名的测试读 fixture-data/answer.txt（样本仓里有、不在拷贝范围里：测试里路径逐段拼，拷贝范围的闭包只认 ../ 起头的串字面量，认不出它）的一行与只写名字、两个模块各有一个同名用例的一行都报「基线不绿」
 #            （基线那一行报 2 行 ok、2 行不绿）；「临时目录」那一行报 2 条都删掉了；计数行里没红、无效各数各的；
 #            只改注释的那一行与同名用例的那一行拒算，stderr 逐行写为什么
 #   工作进程数不在样本里判：样本根上的工作进程不写峰值记录（crates-mutation-rows.py 的 worker_peaks_recorded_for），有内存上限时开几个随样本读到的运行记录里
@@ -178,9 +188,21 @@
 #            5 行 4 条点名测试（两行同点 adds_two_and_three_to_five），「覆盖：」那一行报记了 4 份、没记成 0 份；按行键：5 行各一把键、库是空的，
 #            「复用：」那一行报现判 5 条、复用 0 条、拒算 0 条，5 条都在「行新加」那一栏，stderr 逐行写现判的原因
 #   not-run  一条点名的测试只打 NOT_RUN_NO_GPU_ADAPTER 那一行就返回、一条正常变异：报本次未跑 1 条、抓到 1 条、这一格绿，成功句末尾报本次未跑 1 条
+#   sample-root-bare-red  样本根放 .sample-environment-bare（造出不在临时 prune-server 底下的样子）：退 2、一行都不判，点名没有临时 prune-server 并给包装写法
+#            （下面「样本根只在临时 prune-server 底下判」；red、green、not-run 都在临时服务底下被喂，它们就是这一判的绿侧）
+# 样本根只在临时 prune-server 底下判（mutation_sample_service_check，在格汇总之前）：样本根上的判定库没有命名空间，不在临时服务底下就写进真服务，
+#   prune-server 的二进制也不由包装交下来（PRUNE_SERVER_BINARY），这一格就在样本根里现编一份（cwd 是样本根，读不到仓根 .cargo/config.toml 的 BINDGEN_EXTRA_CLANG_ARGS，
+#   librocksdb-sys 编不过，整格在「编不出 prune-server」那一步红、一行都没判）。所以样本根上开跑先调客户端的 selftest_service_problem（只看环境、不连服务），
+#   不在临时服务底下退 2，拒绝说明给整条写法：python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh .claude/gate.d --item crates-mutation-replay.sh。
+#   真仓、--staged 的临时树（GATE_STAGED_FROM）与 --list-items 不判这一条。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ crates-mutation-replay.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
 stage_cell crates-mutation-rows cell_crates_mutation_rows "crates/mutations.tsv 每条改坏一处、点名的测试都红，基线在没改坏的副本上绿" \
@@ -221,7 +243,7 @@ cd "$ROOT" 2>/dev/null || exit 2
 MUTATION_TABLE="crates/mutations.tsv"
 
 # 临时文件的清理只有这一处：--item 的选行文件与本次未跑的记录文件放在同一个 EXIT trap 里删；格在子 shell 里跑、各自要设一次同一个 trap，
-# 单设一个 trap 会盖掉另一个（改前 --item 的选行文件就靠父进程那一个 trap，格里再设一个就是两个各管一半）。
+# 单设一个 trap 会盖掉另一个。
 gate_temporary_files_remove() {
   local leftover=()
   if [[ -n "${not_run_record:-}" ]]; then leftover+=("$not_run_record"); fi
@@ -254,8 +276,9 @@ prune_server_binary_for_mutation_runs() {
     echo "     → 怎么办：照上面那几行的出路修（开新会话，或命令前 eval \"\$(python3 scripts/hosts/rocksdb-prebuilt.py env)\"），再跑。"
     return 1
   fi
-  if ! CARGO_TARGET_DIR="$prune_server_build_directory/target" \
-      cargo build --release --offline --manifest-path "$STAGE_REPOSITORY/prune-server/Cargo.toml" --bin prune-server >"$prune_server_build_directory/build.log" 2>&1 \
+  # 在这一道所在的仓根里编：cargo 从起它的目录往上找 .cargo/config.toml（[env] BINDGEN_EXTRA_CLANG_ARGS，librocksdb-sys 靠它），被判的根是别处时读不到
+  if ! (cd "$STAGE_REPOSITORY" && CARGO_TARGET_DIR="$prune_server_build_directory/target" \
+      cargo build --release --offline --manifest-path "$STAGE_REPOSITORY/prune-server/Cargo.toml" --bin prune-server >"$prune_server_build_directory/build.log" 2>&1) \
       || [[ ! -x "$prune_server_build_directory/target/release/prune-server" ]]; then
     echo "  ✗ 编不出 prune-server（cargo build --release --offline --manifest-path prune-server/Cargo.toml --bin prune-server）：$(tail -n 3 "$prune_server_build_directory/build.log" | tr '\n' ' ' | cut -c1-300)"
     echo "     → 怎么办：照报错修 prune-server/（归工具实现员），再跑这一格。"
@@ -338,6 +361,11 @@ if [[ -d "$PWD/.crates-mutation-replay-sample-tools" && -z "${GATE_STAGED_FROM:-
   PATH="$sample_tools_directory:$PATH"
   GATE_MUTATION_LLVM_TOOLS="$sample_tools_directory"
   export PATH GATE_MUTATION_LLVM_TOOLS
+  # 假 cargo 每起一次先往 FAKE_CARGO_LOG 追加一行，没设就退 1（基线、变异一条都判不了）；弄坏开关 sample-cargo-log-unset 下不设
+  if [[ ",${GATE_MUTATION_BREAK:-}," != *",sample-cargo-log-unset,"* ]]; then
+    FAKE_CARGO_LOG="$sample_tools_directory/cargo-calls.log"
+    export FAKE_CARGO_LOG
+  fi
   echo "  ! 样本档：$PWD/.crates-mutation-replay-sample-tools 在，起 cargo 的是 $sample_tools_directory 里的假 cargo 与假 llvm 工具（不编译）；这一趟不算真跑过变异表"
 fi
 python3 - "$ROOT" "$MUTATION_ROWS_MODULE" <<'PY'
@@ -351,6 +379,8 @@ specification.loader.exec_module(module)
 sys.exit(module.run_stage(sys.argv[1]))
 PY
 module_exit=$?
+# 撞内存上限（文件头「上限、限时与卡住」）：留标记，格汇总之后整道照 250 退
+if [[ "$module_exit" == 250 && -n "${memory_cap_hit_directory:-}" ]]; then : > "$memory_cap_hit_directory/memory-cap-hit"; fi
 unset GATE_MUTATION_NOT_RUN_RECORD
 not_run_count="$(grep -c . "$not_run_record" 2>/dev/null)" || not_run_count=0
 # 分片驱动起的各片（GATE_MUTATION_ROW_SELECTION 不是 --item 换成的）不转：分出去的行由之后整张那一趟再判、再报
@@ -376,9 +406,35 @@ fi
 exit "$module_exit"
 }
 
+# 样本根只在临时 prune-server 底下判（文件头同名一段）。样本根的认法与格里换假工具那一处相同；.sample-environment-bare 在样本根上时按「环境里什么都没设」答
+mutation_sample_service_check() {
+  [[ -d "$PWD/.crates-mutation-replay-sample-tools" && -z "${GATE_STAGED_FROM:-}" && "$(pwd -P)" != "$(cd "$STAGE_REPOSITORY" && pwd -P)" ]] || return 0
+  [[ ",${GATE_MUTATION_BREAK:-}," == *",sample-service-unchecked,"* ]] && return 0
+  local service_problem
+  if ! service_problem="$(python3 -c 'import os, sys; sys.path.insert(0, sys.argv[1]); import prune_server_client; print(prune_server_client.selftest_service_problem({} if os.path.isfile(sys.argv[2]) else None))' \
+        "$STAGE_REPOSITORY/scripts/prune-server" "$PWD/.sample-environment-bare" 2>&1)" || [[ -n "$service_problem" ]]; then
+    echo "  ✗ 判的根是样本（$PWD），不在临时 prune-server 底下：${service_problem:-读不了 scripts/prune-server/prune_server_client.py}；样本的判定会写进真服务，一行都没判"
+    echo "     → 怎么办：样本档整条套临时服务起（交任务服务时前面加 task-server/task submit --）：python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh .claude/gate.d --item crates-mutation-replay.sh"
+    echo "       包装交下 PRUNE_SERVER_BINARY，这一格不再自己编 prune-server；单跑某一份样本根时，把 bash .claude/gate.d/crates-mutation-replay.sh <样本根> 接在同一个包装的 -- 后面。"
+    exit 2
+  fi
+}
+mutation_sample_service_check
+
 # 分片驱动起的各片不经格汇总，照驱动的约定退（文件头 GATE_MUTATION_ROW_SELECTION 那一条）
 if [[ -n "${GATE_MUTATION_ROW_SELECTION:-}" && -z "$item_selection_file" ]]; then
   ( cell_crates_mutation_rows )
   exit $?
 fi
-stage_cells_run "$ROOT"
+# 格汇总把撞内存上限的那一格（退 250）也并成红、整道退 1；撞了就照 250 退，服务按 memory-cap-hit 加额度重排（文件头「上限、限时与卡住」）
+memory_cap_hit_directory="$(mktemp -d)" || { echo "  ✗ 建不了放撞内存上限标记的临时目录，一行都没判"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
+( stage_cells_run "$ROOT" )
+stage_exit=$?
+if [[ -e "$memory_cap_hit_directory/memory-cap-hit" ]]; then
+  rm -rf -- "${memory_cap_hit_directory:?}"
+  echo "  ✗ 撞内存上限：服务给的上限装不下一个工作进程的峰值（上面那一格的红句），这一道照统一任务服务错误类型表里 memory-cap-hit 那一行退 250"
+  echo "     → 怎么办：经 task-server/task submit 交的由服务加额度重排，不用改命令；手跑的给更大的内存上限再跑。"
+  exit 250
+fi
+rm -rf -- "${memory_cap_hit_directory:?}"
+exit "$stage_exit"

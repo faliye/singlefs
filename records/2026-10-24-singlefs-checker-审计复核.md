@@ -1,6 +1,6 @@
 # 恢复 checker 复核报告
 
-初次审计：2026-10-23；本次复核整理：当日。对象：`crates/singlefs-checker` 当前工作区源码，包含未提交修改。源码摘要见 [source-sha256.txt](../research/prompts/recovery-audit-checker-2026-10-24/evidence/source-sha256.txt)。本轮审计没有修改产品源码或既有测试；所有因果对照仅发生在新建的临时源码副本中。
+初次审计：2026-10-23；本次复核整理：当日。对象：`crates/singlefs-checker` 当前工作区源码，包含未提交修改。源码摘要见 [source-sha256.txt](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-2026-10-24/evidence/source-sha256.txt`)。本轮审计没有修改产品源码或既有测试；所有因果对照仅发生在新建的临时源码副本中。
 
 本报告取代上一轮仓根 `audits/2026-10-23-checker/REPORT.md` 中 F01、F02 的结论。checker-tier 的版本身份、缓存、撕裂模型和形式化证明复核见 [对应 crate 的报告](2026-10-24-singlefs-checker-tier-审计复核.md)。
 
@@ -18,10 +18,10 @@ P1/P2 是修复顺序。这里没有声称已复现产品写者正常工作时�
 ## 运行方法与证据
 
 ```bash
-python3 research/prompts/recovery-audit-checker-2026-10-24/verify_audit.py
+python3 `git show 59ce5a86550d:research/prompts/recovery-audit-checker-2026-10-24/verify_audit.py`
 ```
 
-脚本会复制 checker 源码，在临时副本中追加 [节点引用对照](../research/prompts/recovery-audit-checker-2026-10-24/node_reference_controls.rs) 和 [完整镜像及 journal 对照](../research/prompts/recovery-audit-checker-2026-10-24/recovery_image_and_journal_controls.rs)。用例不被 Cargo 自动收进产品测试；脚本负责明确装入。它依赖本机 Rust 和现有离线 cargo 依赖缓存，编译产物复用仓库 target。
+脚本会复制 checker 源码，在临时副本中追加 [节点引用对照](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-2026-10-24/node_reference_controls.rs`) 和 [完整镜像及 journal 对照](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-2026-10-24/recovery_image_and_journal_controls.rs`)。用例不被 Cargo 自动收进产品测试；脚本负责明确装入。它依赖本机 Rust 和现有离线 cargo 依赖缓存，编译产物复用仓库 target。
 
 本次执行顺序：
 
@@ -29,7 +29,7 @@ python3 research/prompts/recovery-audit-checker-2026-10-24/verify_audit.py
 2. 临时副本中仅补缓存命中时的出生身份、预期树 ID 检查：相同 4 项测试通过，其断言要求错误引用被发现。
 3. 恢复临时副本原逻辑：相同 4 项测试再次通过，其断言要求重新观察到原来的漏检。
 
-“审计测试通过”表示观察结果符合报告中预期，不表示产品缺陷已经修复。每轮均另验合法原镜像和恢复后的原输入没有违例。原始输出见 [reference-and-journal-recheck.log](../research/prompts/recovery-audit-checker-2026-10-24/evidence/reference-and-journal-recheck.log)。临时对照不是正式修复方案。
+“审计测试通过”表示观察结果符合报告中预期，不表示产品缺陷已经修复。每轮均另验合法原镜像和恢复后的原输入没有违例。原始输出见 [reference-and-journal-recheck.log](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-2026-10-24/evidence/reference-and-journal-recheck.log`)。临时对照不是正式修复方案。
 
 ## C01：缓存命中错误地免除了新引用的检查
 

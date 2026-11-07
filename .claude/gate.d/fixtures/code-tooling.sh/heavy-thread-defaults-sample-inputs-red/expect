@@ -1,0 +1,8 @@
+exit=1
+want=5 处自己定并行度默认值的写法没经登记位取
+want=scripts/hosts/near_capped.py:5  capped.sh <数字>  「
+want=scripts/hosts/near_dict.py:2  写死的线程数默认  「
+want=scripts/hosts/near_core.py:3  cpu_count  「
+want=scripts/experiment-apparatus/near_suffix.py:2  读自己的线程变量 SAMPLE_SUFFIX_THREADS：capped.sh 不设它
+want=scripts/experiment-apparatus/near_path.py:3  读自己的线程变量 SAMPLE_FILE_WORKERS：capped.sh 不设它
+want=heavy-thread-defaults：红（退出 1）

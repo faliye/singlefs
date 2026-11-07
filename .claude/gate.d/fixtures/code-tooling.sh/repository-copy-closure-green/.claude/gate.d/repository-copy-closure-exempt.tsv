@@ -1,0 +1,2 @@
+# 样本的排除表：一行放行 exempt_copy.sh
+scripts/hosts/exempt_copy.sh:"$repository_root/scripts/"  # 样本：自证搭的小仓要整份脚本目录

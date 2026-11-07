@@ -26,12 +26,12 @@
 #      scripts/agents/cite-check.py（--root 那一棵，--unchanged-since 取这个子 agent 会话记录第一条的时刻），有对不上的拒；交回里一份报告都没点名也拒；
 #      $SINGLEFS_WORK_ROOT/、${SINGLEFS_WORK_ROOT}/ 起头的先照同目录 lib_work_root.py 展开成工作根再认（拆分提案第九十节 ㉞）；只写相对路径（前面没有树根，或 ./）的，
 #      这个子 agent 在别的登记过的工作树里干过活（会话记录里工具调用的参数与 cwd 点名到那一棵）、那一棵里有这份的按那一棵核，没有而项目根下有的按项目根，
-#      哪一棵都没有的拒（拆分提案第九十节 ㉟；改前按项目根、文件不在时 cite-check 退 2 放行）；
+#      哪一棵都没有的拒（拆分提案第九十节 ㉟）；
 #      找不到它的会话记录（认不出开工时刻）就不判这一条，stderr 写一句；
 #   ③ kb-scribe / experiment-runner：交回正文与它点名的报告文件（research/prompts/、工作根或会话临时目录根 /tmp/claude-<uid> 下的 .md；两个根怎么认只在同目录 lib_work_root.py）里，以 ✓ 起头的行没有数字、
 #      或写「查了 0 项」这类零项的，拒，逐行列出——绿行要连它报的查了多少项一起贴，0 项或没有数的按没判写。
 #   ⑤ implementation-writer / experiment-runner / tooling-writer（拆分提案第九十节 ⑥，共用约束「门禁」一节「命名检查交主 agent 跑」）：它自己的会话记录里
-#      用 Edit / Write / MultiEdit 改成了 crates/ 或 scripts/ 下的 .rs（工具结果不是错误），或 Bash 里写了这样的 .rs（输出重定向 >、>>、>|、&> 的目标，tee 的文件参数，
+#      用 Edit / Write / MultiEdit 写了 crates/ 或 scripts/ 下的 .rs（工具结果不是错误），或 Bash 里写了这样的 .rs（输出重定向 >、>>、>|、&> 的目标，tee 的文件参数，
 #      cp / mv 的目标：目标是 .rs，或目标是目录、来源是 .rs；-t 照认；目标里的变量照这一段赋过的值展开；拆分提案第九十节 ㉕；同一条里先算写、再算命名检查；
 #      目标以命令替换起头、接着 /crates/ 或 /scripts/ 的按仓根展开：$(pwd) 取命令当时的目录，$(git rev-parse --show-toplevel) 与别的写法取命令当时的目录往上第一层带 .git 的，
 #      找不到取项目根，拆分提案第一百二十二节 ⑪），
@@ -39,7 +39,7 @@
 #      提示里没有这一行的，取交回正文点名的）里，标题含「要主 agent 跑的命令」的那几节（sections_titled，到同级或更高一级的下一个标题为止）没把那棵树的两条命名检查都写上：
 #      门禁 code-source-discipline.sh 的 `--check` 点名的格含 vague-names、test-file-names、ordinal-names、data-names 四格、后面跟着根；上游 naming-lint.sh 后面跟着根
 #      （NAMING_STAGE_IN_REPORT、NAMING_LINT_IN_REPORT；根照 resolved 展开 ~、$HOME、$SINGLEFS_WORK_ROOT 起头的写法，相对路径从项目根起，真实路径与那棵树相同才算）。
-#      用户 2026-11-01 定子 agent 一律不往统一任务服务交任务（records/2026-10-29-subagent拆分提案.md 第一百七十四节），命名检查由主 agent 交：只看报告里写没写，
+#      子 agent 一律不往统一任务服务交任务（records/2026-10-29-subagent拆分提案.md 第一百七十四节），命名检查由主 agent 交：只看报告里写没写，
 #      不看会话记录里跑没跑过。读不了的报告按那一节没写算。改动所在的树没有 .git 的（rsync 拷的副本）照仓根判：那一节两条的根要填仓根
 #      （共用约束写明 <根> 填仓根、两条交主 agent 在补丁打进主工作区后跑）。
 #      拒了就逐棵树列出最后改的 .rs、缺哪一条、读的是哪几份报告，给出两条命令原样（NAMING_SUBMIT_COMMANDS，<根> 填那棵树），出路是写进那一节再交回。
@@ -76,10 +76,10 @@
 #       超过上限的项目子 agent（「应当返回 2，实际 0」）
 #       走真实 stdin 入口：超长交回（「应当返回 2，实际 0」）
 #       超长交回的拒绝说明写明报告文件名（没给报告路径写草稿目录的 result.md，三方腿写 research/prompts/<轮>-*-output.md）（「应当返回 True，实际 False」）
-#   HANDBACK_GUARD_BREAK=limit-hint-unnamed  ① 超长的拒绝说明退回改前那一句（只写「没给就写进草稿目录」，不写 result.md 与三方腿的文件名）
+#   HANDBACK_GUARD_BREAK=limit-hint-unnamed  ① 超长的拒绝说明只写一句（「没给就写进草稿目录」，不写 result.md 与三方腿的文件名）
 #       超长交回的拒绝说明写明报告文件名（没给报告路径写草稿目录的 result.md，三方腿写 research/prompts/<轮>-*-output.md）（「应当返回 True，实际 False」）
 #   HANDBACK_GUARD_BREAK=no-cite  decide() 不判 ② 三方腿与核查员的引文
-#       攻方腿引文行号错（「应当返回 2，实际 0」）
+#       三方里攻方那一路的引文行号错（「应当返回 2，实际 0」）
 #       核查员没点名报告（「应当返回 2，实际 0」）
 #       三方腿报告路径:只点名子目录下的 -output.md 不认，按没点名报告拒（「应当返回 True，实际 False」）
 #       三方腿报告路径:只点名没填的 <轮> 占位不认，按没点名报告拒（「应当返回 True，实际 False」）
@@ -164,13 +164,13 @@
 #       「rsync 副本里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
 #   HANDBACK_GUARD_BREAK=naming-any-file  naming_source_tree() 不看后缀，crates/ 或 scripts/ 下改什么文件都要命名检查
 #       只改 .md 放行（「应当返回 0，实际 2」）
-#   HANDBACK_GUARD_BREAK=naming-rsync-copy-unjudged  naming_source_tree() 没有 .git 的副本（rsync 拷的）不判（改前的样子）
+#   HANDBACK_GUARD_BREAK=naming-rsync-copy-unjudged  naming_source_tree() 没有 .git 的副本（rsync 拷的）不判
 #       「rsync 副本里改了 .rs、报告没列两条命名检查拒 应当返回 2，实际 0」
 #       「rsync 副本里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
-#   HANDBACK_GUARD_BREAK=naming-substitution-target-unexpanded  bash_rs_writes() 目标以命令替换起头的照旧不算（改前：$(git rev-parse --show-toplevel)/crates/…rs 认不出落点）
+#   HANDBACK_GUARD_BREAK=naming-substitution-target-unexpanded  bash_rs_writes() 目标以命令替换起头的照旧不算（$(git rev-parse --show-toplevel)/crates/…rs 认不出落点）
 #       Bash 里 cp 写到 $(git rev-parse --show-toplevel)/crates/…rs、报告没写命名检查拒（「应当返回 2，实际 0」）
 #       Bash 里 > 重定向写到 "$(pwd)/crates/…rs"、报告没写命名检查拒（「应当返回 2，实际 0」）
-#   HANDBACK_GUARD_BREAK=naming-bash-writes-ignored  bash_rs_writes() 一个都不认（改前：Bash 里 mv、cp、重定向、tee 写的 .rs 不算改动）
+#   HANDBACK_GUARD_BREAK=naming-bash-writes-ignored  bash_rs_writes() 一个都不认（Bash 里 mv、cp、重定向、tee 写的 .rs 不算改动）
 #       Bash 里 mv 写进 crates/ 的 .rs、报告没写命名检查拒（「应当返回 2，实际 0」）
 #       Bash 里 cp 到 crates/ 下的目录、来源是 .rs，报告没写命名检查拒（「应当返回 2，实际 0」）
 #       Bash 里 > 重定向写 .rs、报告没写命名检查拒（「应当返回 2，实际 0」）
@@ -179,10 +179,10 @@
 #       Bash 里 cp 写到 $(git rev-parse --show-toplevel)/crates/…rs、报告没写命名检查拒（「应当返回 2，实际 0」）
 #       Bash 里 > 重定向写到 "$(pwd)/crates/…rs"、报告没写命名检查拒（「应当返回 2，实际 0」）
 #       「没判全:⑤ 切不开写 .rs 的 Bash 命令记一处（rs-split） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=leg-report-relative-root-only  leg_reports_named() 只写相对路径的报告一律按项目根（改前：干活的那棵 worktree 不看，找不到也不拒）
+#   HANDBACK_GUARD_BREAK=leg-report-relative-root-only  leg_reports_named() 只写相对路径的报告一律按项目根（干活的那棵 worktree 不看，找不到也不拒）
 #       三方腿报告路径:别的 worktree 里干活、相对路径写的报告按那一棵核、引文对不上拒（「应当返回 2，实际 0」）
 #       三方腿报告路径:相对路径写的报告在干活的那一棵与项目根下都找不到拒、拒绝说明写明找不到（「应当返回 (2, True)，实际 (0, False)」）
-#   HANDBACK_GUARD_BREAK=leg-report-work-root-token-kept  work_root_tokens_expanded() 不展开 $SINGLEFS_WORK_ROOT/（改前：② 认不出这种写法）
+#   HANDBACK_GUARD_BREAK=leg-report-work-root-token-kept  work_root_tokens_expanded() 不展开 $SINGLEFS_WORK_ROOT/（② 认不出这种写法）
 #       三方腿报告路径:$SINGLEFS_WORK_ROOT/ 起头的 worktree 报告照 lib_work_root.py 展开认、引文对上放行（「应当返回 (0, False)，实际 (2, True)」）
 #       三方腿报告路径:$SINGLEFS_WORK_ROOT/ 起头的 worktree 报告引文对不上按引文拒（不按没点名报告拒）（「应当返回 (2, False)，实际 (2, True)」）
 #   HANDBACK_GUARD_BREAK=no-landing-checklist  decide() 不判 ⑦ 执行员的登记落地清单
@@ -195,7 +195,7 @@
 #       执行员没有登记落地清单的拒绝说明写出那一节与出路（「应当返回 True，实际 False」）
 #   HANDBACK_GUARD_BREAK=landing-exemption-ignored  landing_problems() 只修锚点、只补落产物的派发也判
 #       执行员只补落产物的派发不判登记落地清单（「应当返回 0，实际 2」）
-#   HANDBACK_GUARD_BREAK=landing-exemption-substring  landing_exempted() 退回改前：整份提示里有「只修锚点」「只补落产物」几个字就算豁免，不看行首标签与整句
+#   HANDBACK_GUARD_BREAK=landing-exemption-substring  landing_exempted() 整份提示里有「只修锚点」「只补落产物」几个字就算豁免，不看行首标签与整句
 #       执行员提示句中写「不是只补落产物」不算豁免、照判登记落地清单（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=landing-applies-always  landing_problems() 没写装置、没落产物的执行员也判
 #       执行员这一段没写装置、没落产物（只写实验页）不判登记落地清单（「应当返回 0，实际 2」）
@@ -204,9 +204,9 @@
 #       执行员登记落地清单的文件在副本与主工作区里都找不到拒（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=landing-case-unchecked  landing_problems() 不 grep 清单里的用例名
 #       执行员登记落地清单的用例名 grep 不到拒（「应当返回 2，实际 0」）
-#   HANDBACK_GUARD_BREAK=honor-break-outside-selftest  main() 平常跑设了弄坏开关也照认、照常判（改前的样子）
+#   HANDBACK_GUARD_BREAK=honor-break-outside-selftest  main() 平常跑设了弄坏开关也照认、照常判
 #       平常跑设了 HANDBACK_GUARD_BREAK 退 2、点名它只在自证里认（「应当返回 (2, True)，实际 (0, False)」）
-#   HANDBACK_GUARD_BREAK=leg-report-subdirectory-kept  leg_reports_named() 退回改前这里自己的一份认法（子目录、<轮> 占位都认），不调 lib_three_way_legs.py
+#   HANDBACK_GUARD_BREAK=leg-report-subdirectory-kept  leg_reports_named() 用这里自己的一份认法（子目录、<轮> 占位都认），不调 lib_three_way_legs.py
 #       三方腿报告路径:只点名子目录下的 -output.md 不认，按没点名报告拒（「应当返回 True，实际 False」）
 #       三方腿报告路径:只点名没填的 <轮> 占位不认，按没点名报告拒（「应当返回 True，实际 False」）
 #       三方腿报告路径:只点名仓外同名的 …/research/prompts/r1-opus-output.md 不认，按没点名报告拒（「应当返回 True，实际 False」）
@@ -252,7 +252,7 @@
 #       写回员规格目标不在、只在报告别的节提到拒（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=scribe-section-unread  missing_targets_listed() 不读「找不到的目标」一节，目标不在一律拒
 #       写回员规格目标不在、报告「找不到的目标」一节写了它放行（「应当返回 0，实际 2」）
-#   HANDBACK_GUARD_BREAK=leg-types-hardcoded  citation_checked_agents() 不读定义 frontmatter 的 leg: three-way，退回改前写死的四种（三种腿加没有定义的 three-way-verifier）
+#   HANDBACK_GUARD_BREAK=leg-types-hardcoded  citation_checked_agents() 不读定义 frontmatter 的 leg: three-way，用写死的四种（三种腿加没有定义的 three-way-verifier）
 #       三方腿类型表:样本仓读到的类型与 frontmatter 逐个相同（「应当返回 ['sample-leg', 'three-way-defense', 'three-way-forward']，实际 ['three-way-attack', 'three-way-defense', 'three-way-forward', 'three-way-verifier']」）
 #       三方腿类型表:本仓读到的类型与 frontmatter 逐个相同、至少登记了一种（「应当返回 (['three-way-attack', 'three-way-defense', 'three-way-forward'], True)，实际 (['three-way-attack', 'three-way-defense', 'three-way-forward', 'three-way-verifier'], True)」）
 #       三方腿类型表:样本仓登记的 sample-leg 没点名报告拒（「应当返回 2，实际 0」）
@@ -268,43 +268,43 @@
 #       写回员规格目标不在、只在报告别的节提到拒（「应当返回 2，实际 0」）
 #       写回员自己起草的 spec.json 目标不在拒（「应当返回 2，实际 0」）
 #       写回员目标不在的拒绝说明列出文件与出路（「应当返回 True，实际 False」）
-#   HANDBACK_GUARD_BREAK=leg-types-unrecorded  citation_checked_agents() 读不到 lib_three_way_legs.py 时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=leg-types-unrecorded  citation_checked_agents() 读不到 lib_three_way_legs.py 时只打 stderr、不记进没判全的几处
 #       「没判全:读不到 lib_three_way_legs.py记一处（leg-types） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=leg-definitions-unrecorded  citation_checked_agents() 有定义读不了（三方腿类型表读不全）时只打 stderr、不记进没判全的几处（改前的样子：静默跳过那一份）
+#   HANDBACK_GUARD_BREAK=leg-definitions-unrecorded  citation_checked_agents() 有定义读不了（三方腿类型表读不全）时只打 stderr、不记进没判全的几处（静默跳过那一份）
 #       「没判全:② 有一份定义读不了记一处（leg-definitions） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=citation-transcript-unrecorded  citation_since() 找不到这个子 agent 的会话记录时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=citation-transcript-unrecorded  citation_since() 找不到这个子 agent 的会话记录时只打 stderr、不记进没判全的几处
 #       「没判全:② 找不到会话记录、认不出开工时刻记一处（citation-transcript） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=cite-check-unrecorded  run_cite_check() cite-check 跑不起来、超时、退 0 与 1 以外的码时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=cite-check-unrecorded  run_cite_check() cite-check 跑不起来、超时、退 0 与 1 以外的码时只打 stderr、不记进没判全的几处
 #       「没判全:② cite-check 退别的码记一处（cite-check） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=green-report-unrecorded  green_count_problems() 点名的报告读不了时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=green-report-unrecorded  green_count_problems() 点名的报告读不了时只打 stderr、不记进没判全的几处
 #       「没判全:③ 点名的报告读不了记一处（green-report） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=background-transcript-unrecorded  background_problems() 找不到这个子 agent 自己的会话记录时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=background-transcript-unrecorded  background_problems() 找不到这个子 agent 自己的会话记录时只打 stderr、不记进没判全的几处
 #       「没判全:④ 找不到自己的会话记录记一处（background-transcript） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=background-unrecorded  background_problems() 读不到 agent-watch.py 或它抛异常时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=background-unrecorded  background_problems() 读不到 agent-watch.py 或它抛异常时只打 stderr、不记进没判全的几处
 #       「没判全:④ 读不到 agent-watch.py记一处（background） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=rs-split-unrecorded  bash_rs_writes() 切不开一条 Bash 命令时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=rs-split-unrecorded  bash_rs_writes() 切不开一条 Bash 命令时只打 stderr、不记进没判全的几处
 #       「没判全:⑤ 切不开写 .rs 的 Bash 命令记一处（rs-split） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=naming-transcript-unrecorded  naming_problems() 找不到这个子 agent 自己的会话记录时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=naming-transcript-unrecorded  naming_problems() 找不到这个子 agent 自己的会话记录时只打 stderr、不记进没判全的几处
 #       「没判全:⑤ 找不到自己的会话记录记一处（naming-transcript） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=project-code-library-unrecorded  project_code_runs_library() 导入不了 lib_project_code_runs.py 时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=project-code-library-unrecorded  project_code_runs_library() 导入不了 lib_project_code_runs.py 时只打 stderr、不记进没判全的几处
 #       「没判全:⑤ 导入不了 lib_project_code_runs.py记一处（project-code-library） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=scratch-line-unrecorded  prompt_scratch_directories() 读不到 lib_prompt_scratch_line.py 或它抛异常时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=scratch-line-unrecorded  prompt_scratch_directories() 读不到 lib_prompt_scratch_line.py 或它抛异常时只打 stderr、不记进没判全的几处
 #       「没判全:⑥ 读不到 lib_prompt_scratch_line.py记一处（scratch-line） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=scribe-transcript-unrecorded  scribe_target_problems() 找不到写回员自己的会话记录时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=scribe-transcript-unrecorded  scribe_target_problems() 找不到写回员自己的会话记录时只打 stderr、不记进没判全的几处
 #       「没判全:⑥ 找不到写回员自己的会话记录记一处（scribe-transcript） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=kb-spec-unrecorded  scribe_target_problems() 导入不了 kb-spec-check.py 时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=kb-spec-unrecorded  scribe_target_problems() 导入不了 kb-spec-check.py 时只打 stderr、不记进没判全的几处
 #       「没判全:⑥ 导入不了 kb-spec-check.py记一处（kb-spec） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=spec-unreadable-unrecorded  scribe_spec_entries() 规格读不了时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=spec-unreadable-unrecorded  scribe_spec_entries() 规格读不了时只打 stderr、不记进没判全的几处
 #       「没判全:⑥ 草稿目录里的规格读不了记一处（spec-unreadable） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=landing-transcript-unrecorded  landing_problems() 找不到执行员自己的会话记录时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=landing-transcript-unrecorded  landing_problems() 找不到执行员自己的会话记录时只打 stderr、不记进没判全的几处
 #       「没判全:⑦ 找不到执行员自己的会话记录记一处（landing-transcript） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=landing-split-unrecorded  landing_applies() 切不开一条 Bash 命令时只打 stderr、不记进没判全的几处（改前的样子）
+#   HANDBACK_GUARD_BREAK=landing-split-unrecorded  landing_applies() 切不开一条 Bash 命令时只打 stderr、不记进没判全的几处
 #       「没判全:⑦ 切不开那一条 Bash 命令记一处（landing-split） 应当返回 True，实际 False」
-#   HANDBACK_GUARD_BREAK=input-unrecorded  main() 读不懂 hook 的 JSON（坏 JSON、顶层不是对象）时只打 stderr、不记检出（改前的样子）
+#   HANDBACK_GUARD_BREAK=input-unrecorded  main() 读不懂 hook 的 JSON（坏 JSON、顶层不是对象）时只打 stderr、不记检出
 #       「走真实 stdin 入口：坏 JSON 放行并记一条检出（结局只记、会话号读不到） 应当返回 (0, 1, '只记', '读不到')，实际 …」
-#   HANDBACK_GUARD_BREAK=exception-unrecorded  judge() 判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，放行、不记检出）
+#   HANDBACK_GUARD_BREAK=exception-unrecorded  judge() 判的时候抛异常不接住、照原样抛出（进程退 1，放行、不记检出）
 #       「入口:判的时候抛异常放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 …」
-#   HANDBACK_GUARD_BREAK=work-root-unrecorded  judge() 读不到 lib_work_root.py 时只打 stderr、不记检出（改前的样子）
+#   HANDBACK_GUARD_BREAK=work-root-unrecorded  judge() 读不到 lib_work_root.py 时只打 stderr、不记检出
 #       「入口:读不到 lib_work_root.py 放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 …」
 #   LIB_PROMPT_SCRATCH_LINE_BREAK=label-anywhere（同目录 lib_prompt_scratch_line.py：「草稿目录」在一行里哪都认）  ⑥ 把列表里转述的「- 草稿目录：」也当本提示的草稿目录
 #       写回员提示里列表起头的「- 草稿目录：」是转述，不在那里找起草的规格（「应当返回 0，实际 2」）
@@ -320,10 +320,10 @@ import json, os, re, shlex, shutil, subprocess, sys, tempfile
 from datetime import datetime, timezone
 
 HANDBACK_CHARACTER_LIMIT = int(os.environ.get("HANDBACK_CHARACTER_LIMIT", "4000"))
-CITATION_CHECKED_AGENTS_BEFORE_REGISTRY = {"three-way-forward", "three-way-attack", "three-way-defense", "three-way-verifier"}   # 改前写死的那一份：只有弄坏开关 leg-types-hardcoded 下还在用
+CITATION_CHECKED_AGENTS_BEFORE_REGISTRY = {"three-way-forward", "three-way-attack", "three-way-defense", "three-way-verifier"}   # 写死的那一份：只有弄坏开关 leg-types-hardcoded 下还在用
 GREEN_COUNT_CHECKED_AGENTS = {"kb-scribe", "experiment-runner"}
 # ② 三方腿报告路径的认法只在同目录 lib_three_way_legs.py 的 leg_report_mentions_in_trees（与派发闸 ⑰ 共用，判决 landing-audit-r4 K2-5：占位与子目录下的不认）；
-# 改前这里自己的一份连子目录、占位都认，只有弄坏开关 leg-report-subdirectory-kept 下还在用
+# 这里自己的一份连子目录、占位都认，只有弄坏开关 leg-report-subdirectory-kept 下还在用
 LEG_REPORT_MENTION_BEFORE_LIBRARY = re.compile(r"research/prompts/[^\s`'\"，。；：、（）()「」]+-output\.md")
 try:   # 工作根与会话临时目录根的唯一定义：同目录的 lib_work_root.py（读不到时那两处下的报告认不出、不判，stderr 写一句）
     sys.dont_write_bytecode = True
@@ -392,7 +392,7 @@ SCRIBE_DRAFTED_SPECIFICATIONS = ("spec.json", "spec.md")
 MARKDOWN_HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.*)$")
 PROMPT_LABEL_LINE_START = r"^[ \t>*_\-]*"
 SPECIFICATION_SUFFIXES = (".json", ".md", ".txt")
-# ① 拒绝说明改前的写法（没写报告文件名，辩方 landing-audit-r2 正推 8）：只有弄坏开关 limit-hint-unnamed 下还在用
+# ① 拒绝说明没写报告文件名的写法：只有弄坏开关 limit-hint-unnamed 下还在用
 LIMIT_HINT_BEFORE = "→ 怎么办：全文写进报告文件（派发提示给的报告路径；没给就写进草稿目录），交回只写结论、报告路径与 sha256sum（.claude/agent-common.md「报告」一节）。"
 # 弄坏开关只在自证里认（.claude/gate.d/break-switch-outside-selftest-pending.tsv 文件头的改法）：--selftest 与它起的子进程（带这份标记）认，平常跑设了就拒
 SELFTEST_MARK_VARIABLE = "HANDBACK_GUARD_SELFTEST_MARK"
@@ -405,7 +405,7 @@ UNJUDGED_SITES = ("input", "exception", "work-root", "leg-types", "leg-definitio
 
 
 def note_unjudged(site, message):
-    """判不了而放行的一处：stderr 照原样写 message，记进 UNJUDGED 等入口记检出。弄坏开关 HANDBACK_GUARD_BREAK=<site>-unrecorded 下只打 stderr（改前的样子）。"""
+    """判不了而放行的一处：stderr 照原样写 message，记进 UNJUDGED 等入口记检出。弄坏开关 HANDBACK_GUARD_BREAK=<site>-unrecorded 下只打 stderr。"""
     print(message, file=sys.stderr)
     if BROKEN != f"{site}-unrecorded":
         UNJUDGED.append((site, message.strip().removeprefix("! handback-guard：").removeprefix("! handback-guard ")))
@@ -446,7 +446,7 @@ def is_project_agent(agent_type, project_root):
 
 def citation_checked_agents(project_root):
     """② 要核引文的三方腿类型：项目根下定义 frontmatter 写了 leg: three-way 的（lib_three_way_legs.py 的 three_way_leg_types）。
-    读不到那份库交空集、stderr 写一句；弄坏开关 leg-types-hardcoded 下退回改前写死的四种。"""
+    读不到那份库交空集、stderr 写一句；弄坏开关 leg-types-hardcoded 下用写死的四种。"""
     if BROKEN == "leg-types-hardcoded":
         return frozenset(CITATION_CHECKED_AGENTS_BEFORE_REGISTRY)
     if three_way_legs is None:
@@ -483,7 +483,7 @@ def resolved(path, project_root):
 
 def work_root_tokens_expanded(text):
     """文字里的 $SINGLEFS_WORK_ROOT/、${SINGLEFS_WORK_ROOT}/ 换成展开后的工作根（同目录 lib_work_root.py 的 expand_written_path 那一种解法）；读不到那份库原样交回。
-    弄坏开关 leg-report-work-root-token-kept 下不换（改前：② 认不出这种写法）。"""
+    弄坏开关 leg-report-work-root-token-kept 下不换（② 认不出这种写法）。"""
     if work_roots is None or BROKEN == "leg-report-work-root-token-kept":
         return text
     variable = re.escape(work_roots.WORK_ROOT_VARIABLE)
@@ -519,7 +519,7 @@ def leg_reports_named(message, project_root, hook_input=None):
     → [(那一棵, research/prompts/…-output.md)]，去重排序；读不到那份库交空表。$SINGLEFS_WORK_ROOT/ 起头的照 lib_work_root.py 展开再认（work_root_tokens_expanded）。
     只写相对路径（前面没有树根，或 ./）的：这个子 agent 在别的登记过的工作树里干过活、那一棵里有这份的，按那一棵（agent_working_trees，最后干活的那一棵先）；
     都没有而项目根下有的按项目根；哪一棵都没有的，那一棵记 None（citation_problems 按找不到拒）。
-    弄坏开关 leg-report-subdirectory-kept 下退回改前这里自己的一份，leg-report-outside-root-kept 下仓外同名的也认成项目根那一份，
+    弄坏开关 leg-report-subdirectory-kept 下用这里自己的一份，leg-report-outside-root-kept 下仓外同名的也认成项目根那一份，
     leg-report-worktrees-unread 下只认项目根，leg-report-git-directory-trusted 下另认带 .git 的目录，leg-report-relative-root-only 下相对路径一律按项目根（找不到也不拒）。"""
     root = os.path.normpath(project_root)
     if BROKEN == "leg-report-subdirectory-kept":
@@ -793,7 +793,7 @@ def naming_source_tree(path, project_root):
     """改的文件是某棵树里 crates/ 或 scripts/ 下的 .rs 时交 (那棵树的根, 判不判)；不是交 None。
     主工作区（project_root）与带 .git 的副本（git worktree）判那棵树；没有 .git 的副本（rsync 拷的）照仓根判：交 (project_root, 判)，
     报告里两条的根要填仓根（共用约束「命名检查交主 agent 跑」：rsync 副本里改的 <根> 填仓根，主 agent 在补丁打进主工作区之后交）。
-    弄坏开关 naming-any-file 下不看后缀，naming-rsync-copy-unjudged 下没有 .git 的副本不判（改前的样子）。"""
+    弄坏开关 naming-any-file 下不看后缀，naming-rsync-copy-unjudged 下没有 .git 的副本不判。"""
     if not isinstance(path, str) or not path or (not path.endswith(".rs") and BROKEN != "naming-any-file"):
         return None
     absolute = os.path.normpath(path if os.path.isabs(path) else os.path.join(project_root, path))
@@ -1088,7 +1088,7 @@ def landing_applies(records, heavy):
 
 
 def landing_exempted(prompt):
-    """⑦ 派发提示是不是只修锚点、只补落产物的那两种：行首标签与整句才认（LANDING_EXEMPT_LINE）。弄坏开关 landing-exemption-substring 下退回改前：整份提示里有那几个字就算。"""
+    """⑦ 派发提示是不是只修锚点、只补落产物的那两种：行首标签与整句才认（LANDING_EXEMPT_LINE）。弄坏开关 landing-exemption-substring 下整份提示里有那几个字就算。"""
     if BROKEN == "landing-exemption-substring":
         return any(mark in prompt for mark in LANDING_EXEMPT_MARKS)
     return LANDING_EXEMPT_LINE.search(prompt) is not None
@@ -1349,7 +1349,7 @@ def selftest(hook_dir):
             case("起过的后台任务都跑完了", "sweep", "交回", 0, "a3"),
             case("主 agent 不判后台任务", None, "交回", 0, None),
         ]
-        # 三方腿类型表（拆分提案第九十节 ⑯）：② 读到的类型集合与登记处（定义 frontmatter 的 leg: three-way 一行）逐个相同。样本仓里的登记故意与改前写死的四种不同：
+        # 三方腿类型表（拆分提案第九十节 ⑯）：② 读到的类型集合与登记处（定义 frontmatter 的 leg: three-way 一行）逐个相同。样本仓里的登记故意与写死的四种不同：
         # 攻方没登记、辩方的值带行尾注释、另登记一种不以 three-way 起头的 sample-leg、核查员写 leg: other、材料员没登记、正文里写的不算；本仓按 frontmatter 现扫，至少要有一种。
         # 再经 decide 判一遍：样本仓里 sample-leg 没点名报告拒、没登记的攻方不核引文（开关 leg-types-hardcoded 下样本仓那三格红）
         # 三方腿报告路径一处认（判决 landing-audit-r4 K2-5）：子目录下的、没填的 <轮> 占位都不认，交回里只点名这种的按没点名报告拒；
@@ -1891,7 +1891,7 @@ def main():
 
 def judge(hook_input, hook_dir):
     """读得懂的 hook 输入 → 退出码。放行而有判不了的几处（UNJUDGED）照「放行但必记检出」记一条检出；判的时候抛异常照常放行、同样记
-    （弄坏开关 exception-unrecorded 下照原样抛出，改前的样子）。"""
+    （弄坏开关 exception-unrecorded 下照原样抛出）。"""
     project_root = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(os.path.dirname(hook_dir))
     cite_check = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "scripts", "agents", "cite-check.py")
     if work_roots is None:

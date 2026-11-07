@@ -39,16 +39,16 @@ Deterministic model: each history ran twice in the same process and was compared
 ```
 # Repository root; model is in scripts/experiment-apparatus/ (independent of crates/). E177_THREADS defaults to 8 and affects wall clock only, not output
 cd /home/fy5090/code/singlefs/scripts/experiment-apparatus
-bash ../hosts/capped.sh 8 cargo build --release --bin e177-per-tree-resurrection-without-tombstones
-E177_THREADS=8 bash ../hosts/run-with-memory-cap.sh 8G bash ../hosts/capped.sh 8 cargo run -q --release --bin e177-per-tree-resurrection-without-tombstones -- segment-one
+../../task-server/task submit -- cargo build --release --bin e177-per-tree-resurrection-without-tombstones
+../../task-server/task submit -- env E177_THREADS=8 cargo run -q --release --bin e177-per-tree-resurrection-without-tombstones -- segment-one
 # Run only the H-ring anchor
-bash ../hosts/run-with-memory-cap.sh 8G bash ../hosts/capped.sh 8 cargo run -q --release --bin e177-per-tree-resurrection-without-tombstones -- anchor
+../../task-server/task submit -- cargo run -q --release --bin e177-per-tree-resurrection-without-tombstones -- anchor
 # Registered replay (scripts/experiment-apparatus/replay.sh entry: segment-one)
 cd ../.. && bash scripts/experiment-apparatus/replay.sh E177
 # 23 unit tests and 17 mutations
 cd scripts/experiment-apparatus
-bash ../hosts/run-with-memory-cap.sh 8G bash ../hosts/capped.sh 8 cargo test --release --bin e177-per-tree-resurrection-without-tombstones
-MUTATE_JOBS=4 MUTATE_MEMORY_MAX=4G bash ../mutation/mutate.sh e177-per-tree-resurrection-without-tombstones e177_per_tree_resurrection_without_tombstones.rs ../mutation/tables/e177_per_tree_resurrection_without_tombstones.tsv
+../../task-server/task submit -- cargo test --release --bin e177-per-tree-resurrection-without-tombstones
+../../task-server/task submit -- bash ../mutation/mutate.sh e177-per-tree-resurrection-without-tombstones e177_per_tree_resurrection_without_tombstones.rs ../mutation/tables/e177_per_tree_resurrection_without_tombstones.tsv
 ```
 
 | File | Contents |
@@ -171,7 +171,7 @@ Candidates are drawn from the “extent / inode / dirent / reverse index / free 
 | Candidate | Writer in `crates/` (registration 13.2 `grep -rln -i '<名>' crates/*/src --include=*.rs`) | Key and on-disk carrier in knowledge base (registration 13.2 `grep -rn '<名>' .claude/kb/decisions/ .claude/kb/layout/`) | Verdict |
 |---|---|---|---|
 | dirent | `grep -rln -i 'dirent\|目录项' crates/*/src --include=*.rs` has zero hits | Only key encoding `(parent_inode, name)` (dirent entry in `.claude/kb/decisions/08-核心索引结构.md` settled item 5: “whiteout deletion accepted, but batch deletion must use intent log”); no unit class, container shape or record field table | not measurable |
-| reverse index | One hit, `crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:2439`, a documentation comment, not a node writer | No key (line 229 only requires the deduplication window be bounded by `T_dirty` when the key is defined); only entry seq width is fixed (line 227) | not measurable |
+| reverse index | One hit, `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:2439`, a documentation comment, not a node writer | No key (line 229 only requires the deduplication window be bounded by `T_dirty` when the key is defined); only entry seq width is fixed (line 227) | not measurable |
 | free space | Zero hits | Appears only in lists (D8 settled item 14; D21 settled item 18, “the bytewise comparison table is only for rebutting ‘we are extravagant’”) | not measurable |
 | LRU | Both hits are letters within `FaultLocalRule` (`e165_replay_bounded_enumeration.rs`, `e156_allocation_basis_counts.rs`), not LRU | No key; only seq width and ε = 0 fixed (lines 227, 365) | not measurable |
 
@@ -262,7 +262,7 @@ The 14,243 matching rows by type: PC1 4,881; PC1_tombstoned (arm B identified by
 | Stop S-ring1, S-ring4 | Not triggered | Executor revision 2 checks 3 and 4, before apparatus |
 | Stop S-ring2 | Not triggered | Eight anchor rows all `holds=true` |
 | Stop S-ring3 | Not triggered: none of 102 G-ring simulations failed to find placement or exceeded occupancy cap | `grep 'name=simulation' <产物> \| grep -v 'does_not_fit_at=none' \| wc -l` gives `0`; likewise zero `exceeded_the_premise_at` rows |
-| Stop E172 (Dry Run of Bytes Written by Deletion) export comparison | Not compared as written: export is older than `crates/` (previous executor report section three); main agent must rerun `deletion_write_dump` in the heavy tier | Revision 1 section 12.10 |
+| Stop E172 (Dry Run of Bytes Written by Deletion) export comparison | Not compared as written: export is older than `crates/` (previous executor report section three); main agent must rerun `deletion_write_dump` | Revision 1 section 12.10 |
 
 ### Unit tests and mutations
 
@@ -310,12 +310,12 @@ Cross-path assertions: path 1 against 2 is pinned at `:3873 cross_check_the_unit
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D18 (Information Carried in a Block) settled item 8 | Evidence preparation | 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
-| D18 (Information Carried in a Block) settled item 10 | Evidence preparation | 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
-| D18 (Information Carried in a Block) settled item 24 | Evidence preparation | 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
-| D8 (Core Index Structure) settled item 6 | Support | 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
-| D8 (Core Index Structure) settled item 9 | Unaffected | 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
-| D21 (Boundary Between Authoritative and Derived States) settled item 9 | Unaffected | 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
+| D18 (Information Carried in a Block) settled item 8 | Evidence preparation | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
+| D18 (Information Carried in a Block) settled item 10 | Evidence preparation | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
+| D18 (Information Carried in a Block) settled item 24 | Evidence preparation | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
+| D8 (Core Index Structure) settled item 6 | Support | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
+| D8 (Core Index Structure) settled item 9 | Unaffected | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
+| D21 (Boundary Between Authoritative and Derived States) settled item 9 | Unaffected | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-18 unaffected: readings now explicitly cite Q13 verdict field F9_flips_with_geometry=false, and two path/conclusion rows replace “same file” with file path; conclusions and numbers unchanged |
 
 ## Historical Versions
 

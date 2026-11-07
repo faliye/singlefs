@@ -1,0 +1,9 @@
+== 任务 6068 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-6068.attempt-1.log（共 8 行，下面是整份）
+AUDIT_LEDGER digest_check_passed writer=A
+AUDIT_LEDGER digest_check_passed writer=B
+  ✓ 追加了第 二 节到 /tmp/singlefs-run-with-memory-cap-3927160-34r0tV/audit-ledger-race-uqwb9epn/repo/records/ledger.md：索引行在第 8 行，节从第 14 行起；写前复核 sha256 15b4499fb379 未变，改名换上新 inode
+  节号：二
+  ✓ 追加了第 二 节到 /tmp/singlefs-run-with-memory-cap-3927160-34r0tV/audit-ledger-race-uqwb9epn/repo/records/ledger.md：索引行在第 8 行，节从第 14 行起；写前复核 sha256 15b4499fb379 未变，改名换上新 inode
+  节号：二
+AUDIT_LEDGER exits=[0, 0] body_A_present=False body_B_present=True headings=[1, 2] indexed=[1, 2]
+AUDIT_LEDGER source_sha256=2eb054635357f962a4940243a66f70360bae9f2559f1ff46fde1ccc1179242f7 lost_update_reproduced=true temporary_ledger_removed=true

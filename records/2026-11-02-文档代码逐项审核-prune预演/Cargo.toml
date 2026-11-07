@@ -1,0 +1,10 @@
+[package]
+name = "singlefs-document-audit-prune-dry-run"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+prune-server = { path = "../../prune-server" }

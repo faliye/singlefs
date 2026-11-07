@@ -29,6 +29,7 @@
 #                        记红、撤绿、下趟现判：cargo test 退非 0 时，输出里 FAILED 的测试函数（结果行与末尾 failures: 名单）按（目标根文件，libtest 全名）
 #                        对到计划里 judge 的那一行，research_unit_tests_record_red 逐包经 admission.py verdict-record --red-names 照计划里的键记红、撤掉同一把键原有的绿
 #                        （打一行「· 判红记库（<包>）：…」），下一趟这几条现判、原因以「上次判红」起头；拒算的没有键，不记；
+#                        记红没成（verdict-record 退非 0）带 --red 交 admission.py plan-failure：它判失灵、撤掉这几把键原有的绿（撤不掉说整道判红），下一趟不复用那几条旧绿；
 #                        有红照记：同一趟里判绿的照键记绿（research_unit_tests_record_green_of_red_run，打一行「· 判绿记库（<包>）：…」），下一趟只现判红的那几条，整格照旧判红；
 #                        结局认不出、结果行与汇总行对不上的那个二进制照旧一条都不记；
 #                        成功句报「单测按条：现判 N、复用 M、拒算 R」，红句另列红的那几条这一趟为什么现判（变了的单元）。
@@ -68,7 +69,7 @@
 #                        这一格读每张表末尾「计数：」那一行，逐张报「现判 N 条、复用 M 条、拒算 R 条」，成功句报合计与「本次未跑 K 张表」；
 #                        红的那一条另报 mutate.sh 写的「现判：[<名>] <原因>」（键对不上时是变了的单元）。
 #                        编译目录一个、这一趟自己的：这一格的临时目录（mktemp -d）里的 target/，各表串行增量编（编译产物，不是判定库；每张表的 mutate.sh 自己再按它的工作进程数各编各的副本），收尾连同临时目录删
-#                        （用户 2026-10-23 定案「自己用完自己删」，不跨轮复用）。
+#                        （自己用完自己删，不跨轮复用）。
 #                        挂了 required-features 的 bin 由 mutate.sh 带上 --features；E162 的 rocksdb 要的 BINDGEN_EXTRA_CLANG_ARGS 没设时取
 #                        scripts/crash/crash-amplification-lib.sh 的 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS（与 门禁 crash-point-replay 带特性那一趟同一处）。
 # 格结构经 lib/stage-cells.sh。
@@ -111,6 +112,9 @@
 #                              照这一版逐字拷一份上一版进 .unit-verdict-sample/prior/（三条照判绿记进库，同一把键），.unit-verdict-sample/red-over-green 在：这一格把计划里键相同的复用行改成现判行（样本根不抽复用哨兵，同键现判由这一格自己在样本档上做：research_unit_tests_plan 的 force_judge），
 #                              三条照样现判，第三条判红、照键记红盖掉绿（「· 判红记库（tiny）：1 条记红…」），样本档接着照常再算一次计划：复用 2 条、现判第三条、
 #                              原因以「上次判红」起头，退 1
+#   research-unit-tests-red-record-failed  记红没成、下一趟不复用旧绿：同 research-unit-tests-red-over-green，另放 .unit-verdict-sample/red-record-failure
+#                              （admission.py verdict-record 照它当判红没记成、退 1）：plan-failure 带 --red 判失灵、撤掉第三条那条绿（「同一把键原有的绿已撤掉 1 条」），
+#                              样本档接着再算一次计划：复用 2 条、现判第三条、原因「库里没有这一条」，退 1
 #   research-unit-tests-red-records-green  有红照记：research 小工作区（一个 lib 两条单测、tests/ 下一个集成测试二进制一条单测），setup.sh git init、没有上一版；
 #                              lib 里一条单测总判红、另一条与集成测试那一条判绿（集成测试的二进制排在 lib 后面，不带 --no-fail-fast 它不跑）。
 #                              .unit-verdict-sample/reread-after-red 在：判红那一条照键记红，判绿的两条照键记绿（「· 判绿记库（tiny）：RECORD recorded=2」），
@@ -133,55 +137,76 @@
 #   mutation-tables 的样本里按条判定库与编译目录都是这一格自己的临时目录，跑完删；run-twice 那两份第二趟读第一趟记的。mutation-tables 五份经 mutate.sh 调假 cargo test 一个小 bin；
 #   research-unit-tests-unit-key 的判定在临时 prune-server 里这一份样本的命名空间（样本档在临时服务底下起，setup.sh git init 只给它一棵 git 树），临时服务收尾即删；
 #   wallclock-asserts-registered 两份只读样本里的 .rs，不起 cargo。
-# 弄坏开关归共用库：STAGE_CELLS_BREAK=red-swallowed 让三份红样本整道退 0；=marker-ignored 让每份样本三格都跑，
-#   research-unit-tests-green 里复跑那一格对着没有表的 replay.sh 判红。
-# 这一道自己的弄坏开关 RESEARCH_BUILD_AND_REPLAY_BREAK=<项>（逐项写开关名、弄坏哪一处、打开后哪份样本红）：
-#   not-caught-ignored  mutation-tables 不看 mutate.sh 退 1（没红）与 ❌ 行，没被测试抓到的表也当绿（改前只编不跑的样子）
+# 弄坏开关（打开后样本判错；一条开关一行「变量=值」，下面逐行点名判错的样本，括号里是那一份出不来的那一句；
+# 门禁 code-tooling 的 stage-break-switch-replay 格逐条设上、经 stage-selftest.sh 喂这一道的全部样本，判错的样本要与点名的相等）：
+#   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0（期望退 1 的样本都实得退 0）
+#     experiment-replay-rocksdb-entry-refused、mutation-tables-red-not-caught、mutation-tables-red-uncompilable、red、research-unit-tests-archived-unrecoverable、
+#     research-unit-tests-plan-exit-red、research-unit-tests-plan-sentinel-red、research-unit-tests-red、research-unit-tests-red-over-green、
+#     research-unit-tests-red-record-failed、research-unit-tests-red-records-green、wallclock-asserts-registered-red、wallclock-single-thread-red
+#   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的四格都跑（汇总那句「跑了 1 格（样本根的 .gate-cells 点名）」与红句「1 格里 1 格红」找不到；
+#     树里没有 replay.sh 表的样本，复跑那一格读不到一行实验而判红，期望退 0 或 75 的实得退 1）
+#     experiment-replay-unavailable、green、mutation-tables-deny-green、mutation-tables-green、mutation-tables-red-not-caught、mutation-tables-red-uncompilable、
+#     mutation-tables-row-key、red、replay-load-skipped、research-unit-tests-archived-retrieved、research-unit-tests-archived-unrecoverable、research-unit-tests-green、
+#     research-unit-tests-plan-unavailable、research-unit-tests-red、research-unit-tests-red-over-green、research-unit-tests-red-record-failed、research-unit-tests-red-records-green、
+#     research-unit-tests-unit-key、wallclock-asserts-registered-green、wallclock-asserts-registered-red、wallclock-single-thread-green、wallclock-single-thread-red
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=not-caught-ignored  mutation-tables 不看 mutate.sh 退 1（没红）与 ❌ 行，没被测试抓到的表也当绿（只编不跑）
 #       mutation-tables-red-not-caught（期望退 1、输出里有「[两条之二_加改成乘] 一个测试都没红」，实得退 0）
-#   invalid-rows-ignored  mutation-tables 不看 ⏭ 行（替换文编不过），退 0 的表里有 ⏭ 也当绿
-#       mutation-tables-red-uncompilable（期望退 1、输出里有「[两条之二_引了没有的名字] 编不过」，实得退 0）
-#   no-cap-lints  mutation-tables 起 mutate.sh 时，PATH 前面放一个垫片 cargo（这一格自己的临时目录里）：它先 env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS 再交给真 cargo，
-#       mutate.sh 带的 --cap-lints warn 不管放在 RUSTFLAGS 还是 CARGO_ENCODED_RUSTFLAGS 里都到不了 rustc（改前的跑法）。
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=invalid-rows-ignored  mutation-tables 不看 ⏭ 行（替换文编不过），退 0 的表里有 ⏭ 也当绿
+#       mutation-tables-red-uncompilable（期望退 1、输出里有「[两条之二_引了没有的名字] 变异导致编译失败」，实得退 0）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=no-cap-lints  mutation-tables 起 mutate.sh 时，PATH 前面放一个垫片 cargo（这一格自己的临时目录里）：它先 env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS 再交给真 cargo，
+#       mutate.sh 带的 --cap-lints warn 不管放在 RUSTFLAGS 还是 CARGO_ENCODED_RUSTFLAGS 里都到不了 rustc。
 #       不靠设 CARGO_ENCODED_RUSTFLAGS：mutate.sh 看见它就把 cap 接进去，那一招顶不掉了。mutate.sh 自己的 MUTATE_BREAK 只在它的 --selftest 起的子进程里认，门禁里设了它 mutate.sh 退 2（要保留），所以样本上证红用这一个
 #       mutation-tables-deny-green（期望退 0，实得退 1、输出里有「[两条之二_改加法并让加倍没人调] 变异导致编译失败」）
-#   skip-filter-dropped  research-unit-tests 起 cargo test 时不传 --skip：登记了的挂钟断言在门禁的负载下照跑，输出里出现它们的 test … ok / FAILED 行，这一格红
-#       「登记了却跑了：--skip 没生效」。样本档里 research-unit-tests 两份样本的小仓没有登记位，登记数是 0、没有 --skip 可丢，看不出这一项，样本上证不了红；只靠真仓真跑：
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=skip-filter-dropped  research-unit-tests 起 cargo test 时不传 --skip：登记了的挂钟断言在门禁的负载下照跑，输出里出现它们的 test … ok / FAILED 行，这一格红「登记了却跑了：--skip 没生效」
+#       wallclock-single-thread-green（期望退 0，实得退 1、输出里有「登记了却跑了」：第一趟没跳过小仓里登记了的那条挂钟断言，它在第一趟里照跑）、
+#       wallclock-single-thread-red（输出里找不到「在单线程那一趟里红了」：那条断言在第一趟里先红，退 1、红句是「research 的构建或单测没过」）。
+#       别的 research-unit-tests 样本的小仓没有登记位，登记数是 0、没有 --skip 可丢，判不出这一项；真仓真跑：
 #       RESEARCH_BUILD_AND_REPLAY_BREAK=skip-filter-dropped bash .claude/gate.d/research-build-and-replay.sh --check research-unit-tests
-#       必须退 1、输出里有「登记了却跑了」。wallclock-asserts-registered 格不起 cargo，不受影响。
-#   archived-restore-skipped  research-unit-tests 不从 git 历史取回单测读的留存产物（改前读不到就记本次未跑的样子）
+#       退 1、输出里有「登记了却跑了」。wallclock-asserts-registered 格不起 cargo，不受影响。
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=archived-restore-skipped  research-unit-tests 不从 git 历史取回单测读的留存产物（读不到就记本次未跑）
 #       research-unit-tests-archived-retrieved（期望退 0，实得退 1：单测读不到 sample-product.out）、research-unit-tests-archived-unrecoverable（退出码仍是 1：单测读不到文件红了，但没有「✗ 单测要读的 … 取不回」那一句）
-#   archived-unrecoverable-ignored  research-unit-tests 取不回的留存产物不打 ✗、不判红，往下照跑（只打一行 · 说取不回）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=archived-unrecoverable-ignored  research-unit-tests 取不回的留存产物不打 ✗、不判红，往下照跑（只打一行 · 说取不回）
 #       research-unit-tests-archived-unrecoverable（输出里找不到「✗ 单测要读的 research/results/sample-product.out 不在树里，git 历史里也取不回」；往下照跑的单测读不到文件，退出码仍是 1）
-#   wallclock-single-run-dropped  research-unit-tests 不另起单线程那一趟（改前记挂钟断言本次未跑的样子）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=wallclock-single-run-dropped  research-unit-tests 不另起单线程那一趟（记挂钟断言本次未跑）
 #       wallclock-single-thread-red（期望退 1、输出里点名那条挂钟断言红在单线程那一趟，实得退 0）、
 #       wallclock-single-thread-green（成功行里找不到「挂钟断言 1 条在单线程那一趟跑了」：单线程那一趟没起，这句不报）
-#   replay-reuse-unreported  experiment-replay 不读 replay.sh 的 REPLAY_TOTAL 行，复用数不报（改前的样子）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=replay-reuse-unreported  experiment-replay 不读 replay.sh 的 REPLAY_TOTAL 行，复用数不报
 #       experiment-replay-reused（输出里找不到「复跑：现判 1 行、复用 2 行、拒算 0 行、负载高没判 0 行」）
-#   row-key-with-product-name  experiment-replay 给 replay.sh 设 ADMISSION_BREAK=row-key-with-product-name：复跑表每一行的行键另加产物文件名（改名就作废）。
-#       样本上证不了（要真的 replay.sh 与 research 工作区）；同一个开关在 python3 scripts/gate/admission.py --selftest 的「复跑表行键」R03 那一格转红
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=row-key-with-product-name  experiment-replay 给 replay.sh 设 ADMISSION_BREAK=row-key-with-product-name：复跑表每一行的行键另加产物文件名（改名就作废）。
+#       样本上证不了（要真的 replay.sh 与 research 工作区；点名的样本集合是空的）；同一个开关在 python3 scripts/gate/admission.py --selftest 的「复跑表行键」R03 那一格转红
 #       （只改产物文件名、内容不变的那一行期望复用、实得现判）
-#   mutation-key-whole-table  mutation-tables 给 mutate.sh 的按条判定库按整张表的 sha256 分开放（改前按表一项的样子：表里改一条，整张表的条都作废）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=mutation-key-whole-table  mutation-tables 给 mutate.sh 的按条判定库按整张表的 sha256 分开放（表里改一条，整张表的条都作废）
 #       mutation-tables-row-key（输出里找不到第二趟的「现判 1 条、复用 1 条」：第 1 条没改也被判成现判）
-#   unit-tests-without-library  research-unit-tests 的计划里键相同的复用行一律改成现判行（一条都不复用，改前没有库的样子）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=unit-tests-without-library  research-unit-tests 的计划里键相同的复用行一律改成现判行（一条都不复用）
 #       research-unit-tests-unit-key（输出里找不到「现判 1、复用 2」：只加了一条单测，另两条也现判）
-#   red-run-green-not-recorded  research-unit-tests 在 cargo test 退非 0 的那一趟不记判绿的（改前的样子：有一条红，判完的绿一条都不记，下一趟全部现判）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=red-run-green-not-recorded  research-unit-tests 在 cargo test 退非 0 的那一趟不记判绿的（有一条红，判完的绿一条都不记，下一趟全部现判）
 #       research-unit-tests-red-records-green（输出里找不到「· 判绿记库（tiny）：RECORD recorded=2」，再算一次计划答的是「复用 0 条」而不是「复用 2 条」）
-#   fail-fast  research-unit-tests 起 cargo test 不带 --no-fail-fast（改前的样子：lib 那个二进制红了，集成测试的二进制不跑、不记）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=fail-fast  research-unit-tests 起 cargo test 不带 --no-fail-fast（lib 那个二进制红了，集成测试的二进制不跑、不记）
 #       research-unit-tests-red-records-green（输出里找不到「· 判绿记库（tiny）：RECORD recorded=2」，实得 recorded=1；再算一次计划答「复用 1 条」）
-#   red-not-recorded  research-unit-tests 判红时不交 verdict-record --red-names（改前的样子：只记绿，判红的不记红、不撤同一把键原有的绿）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=red-not-recorded  research-unit-tests 判红时不交 verdict-record --red-names（只记绿，判红的不记红、不撤同一把键原有的绿）
 #       research-unit-tests-red-over-green（输出里找不到「· 判红记库（tiny）：1 条记红」，再算一次计划答的是「复用 3 条」而不是第三条「上次判红」）
 #       research-unit-tests-red-records-green（输出里找不到「· 判红记库（tiny）：1 条记红」，再算一次计划里红的那一条现判的原因不是「上次判红」）
-#   rocksdb-entry-unchecked  experiment-replay 起 replay.sh 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#       research-unit-tests-red-record-failed（不交红的就没有记红没成那一句、不撤绿：再算一次计划答的是「复用 3 条」）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=red-record-failure-kept-green  research-unit-tests 记红没成只打一行「!」、不交 plan-failure（同一把键原有的绿留着，下一趟照复用）
+#       research-unit-tests-red-record-failed（输出里找不到「同一把键原有的绿已撤掉 1 条」，再算一次计划答的是「复用 3 条」而不是第三条「库里没有这一条」）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=rocksdb-entry-unchecked  experiment-replay 起 replay.sh 之前不调 scripts/hosts/rocksdb-prebuilt.py entry
 #       experiment-replay-rocksdb-entry-refused（期望退 1、输出里有「rocksdb-prebuilt entry：」，实得退 0：假 replay.sh 照起了）
-#   replay-unavailable-as-red  experiment-replay 把 replay.sh 退 75 照别的非 0 判红（改前的样子：服务不可用当成复跑红了）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=replay-unavailable-as-red  experiment-replay 把 replay.sh 退 75 照别的非 0 判红（服务不可用当成复跑红了）
 #       experiment-replay-unavailable（期望退 75，实得退 1）
-# admission.py 的 ADMISSION_BREAK=plan-unavailable-as-failure（计划退 75 照复用失灵判红，改前的样子）：
+#   ADMISSION_BREAK=plan-unavailable-as-failure  归 scripts/gate/admission.py：计划退 75 照复用失灵判红
 #       research-unit-tests-plan-unavailable（期望退 75，实得退 1）
-# admission.py 的 ADMISSION_BREAK=plan-failure-not-red（按条复用失灵也不判红，改前退回全部现判的样子）：
+#   ADMISSION_BREAK=plan-failure-not-red  归 scripts/gate/admission.py：按条复用失灵也不判红（退回全部现判）
 #       research-unit-tests-plan-exit-red、research-unit-tests-plan-sentinel-red（期望退 1，实得退 0）
+#   ADMISSION_BREAK=red-record-failure-swallowed  归 scripts/gate/admission.py：记红没成只打一行 !、照退 0，plan-failure 不撤绿
+#       research-unit-tests-red-record-failed（输出里找不到「同一把键原有的绿已撤掉 1 条」，再算一次计划答的是「复用 3 条」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ research-build-and-replay.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_DIR="$(cd "$(dirname "$0")" && pwd)"
 STAGE_REPOSITORY="$(cd "$STAGE_DIR/../.." && pwd)"
 STAGE_NAME="$(basename "$0")"
@@ -340,7 +365,7 @@ research_plan_tokens=(--root "$R" --profile release --token "judge:scripts/gate/
 # （按「每次提交删上一次的实验记录」归档进了版本库）的，开 test-plan 之前先从 git 历史取回、放回原处：git log --all --diff-filter=D 找最近一次删它的提交，
 # git show <提交>^:research/results/<名>；放回的名字记进 <草稿目录>/restored-products.list，收尾由 research_remove_restored_products 删掉。
 # 取不回的逐个打 ✗ 点名，整格判红（单测读不到输入不算过，没有「本次未跑」的一档）。
-# 弄坏开关 archived-restore-skipped：不取回（改前读不到就记本次未跑的样子）；archived-unrecoverable-ignored：取不回也不判红、往下照跑。
+# 弄坏开关 archived-restore-skipped：不取回（读不到就记本次未跑）；archived-unrecoverable-ignored：取不回也不判红、往下照跑。
 research_restore_archived_products() { # <草稿目录>
   local output rc ignore_mode=fail
   research_build_broken archived-restore-skipped && return 0
@@ -498,8 +523,10 @@ research_unit_plan_failure_verdict() {
 
 # research_unit_tests_record_red <草稿目录> <cargo test 的输出文件>：cargo test 退非 0 的那一趟（文件头 research-unit-tests「记红、撤绿、下趟现判」）：输出里 FAILED 的测试函数
 # （结果行与末尾 failures: 名单）按（目标根文件，libtest 全名）对到计划里 judge 的那一行，逐包经 admission.py verdict-record --red-names 照计划里的键记红、
-# 撤掉同一把键原有的绿。拒算的没有键，不记；记不下只打一行「!」（这一格已经判红），复用哨兵报的失灵照 research_unit_plan_failure_verdict 打出路。
-# 弄坏开关 red-not-recorded 下不交（改前的样子：只记绿，判红的不撤同一把键原有的绿）
+# 撤掉同一把键原有的绿。拒算的没有键，不记；记不下的带 --red 交 research_unit_plan_failure_verdict（这一格已经判红）：记红没成由 admission.py plan-failure
+# 判失灵、撤掉这几把键原有的绿（撤不掉说整道判红，它文件头「按条复用失灵」），复用哨兵报的失灵照打出路。
+# 弄坏开关 red-not-recorded 下不交（只记绿，判红的不撤同一把键原有的绿）；red-record-failure-kept-green 下记红没成只打一行「!」、不交 plan-failure
+# （同一把键原有的绿留着，下一趟照复用）
 research_unit_tests_record_red() {
   local scratch="$1" output_file="$2" package record_exit red_count
   research_build_broken red-not-recorded && return 0
@@ -545,16 +572,21 @@ PY
          --how "cargo test --release（research 工作区，$package）" >"$scratch/red-record.$package.out" 2>&1; then record_exit=0; else record_exit=$?; fi
     if ((record_exit == 0)); then
       echo "  · 判红记库（$package）：${red_count} 条记红、撤掉同一把键原有的绿，下一趟这几条现判（$(tail -n 1 "$scratch/red-record.$package.out")）"
-    else
+    elif research_build_broken red-record-failure-kept-green; then
+      # 弄坏开关：记红没成只打一行「!」、不交 plan-failure，同一把键原有的绿留着、下一趟照复用
       echo "  ! 判红记库（$package）：admission.py verdict-record 没成（$(tail -n 2 "$scratch/red-record.$package.out" | tr '\n' ' ')），红的没记下、同一把键原有的绿还在"
-      research_unit_plan_failure_verdict verdict-record "$record_exit" "$scratch/red-record.$package.out" || :
+    else
+      # 记红没成（admission.py 文件头「按条复用失灵」）：带 --red 交 plan-failure，它判失灵、撤掉这几把键原有的绿（撤不掉说整道判红）；这一格已经判红
+      echo "  · 判红记库（$package）：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$scratch/red-record.$package.out" | tr '\n' ' ' | cut -c1-300)），记红没成，交 plan-failure 判、撤同一把键原有的绿"
+      research_unit_plan_failure_verdict verdict-record "$record_exit" --red "$ROOT" "$STAGE_NAME:research-unit-tests" "$scratch/plan.$package" "$scratch/red.$package" \
+        "$scratch/red-record.$package.out" || :
     fi
   done
 }
 
 # research_unit_tests_record_green_of_red_run <草稿目录> <cargo test 的输出文件>：cargo test 退非 0 的那一趟（文件头 research-unit-tests「有红照记」），
 # 同一趟里判绿的测试函数照键记绿，与全绿那一趟同一个 research_unit_tests_record（结局认不出、结果行与汇总行对不上的那个二进制整段不记）。
-# 不记的另有：登记了的挂钟断言（<草稿目录>/wallclock.names 里的）。弄坏开关 red-run-green-not-recorded 下不记（改前的样子：有红就一条绿都不记）
+# 不记的另有：登记了的挂钟断言（<草稿目录>/wallclock.names 里的）。弄坏开关 red-run-green-not-recorded 下不记（有红就一条绿都不记）
 research_unit_tests_record_green_of_red_run() {
   local scratch="$1" output_file="$2"
   research_build_broken red-run-green-not-recorded && return 0
@@ -662,7 +694,7 @@ cell_research_unit_tests() {
   fi
   output_file="$scratch/cargo-test.out"
   if ((first_pass_needed)); then
-    # --no-fail-fast：一个测试二进制红了，后面的二进制照跑，判完的照键记（文件头「有红照记」）；弄坏开关 fail-fast 下不带（改前的样子）
+    # --no-fail-fast：一个测试二进制红了，后面的二进制照跑，判完的照键记（文件头「有红照记」）；弄坏开关 fail-fast 下不带
     local -a fail_fast_option=(--no-fail-fast)
     research_build_broken fail-fast && fail_fast_option=()
     (cd "$R" && cargo test --release --all-features ${fail_fast_option[@]+"${fail_fast_option[@]}"} ${skip_arguments[@]+"${skip_arguments[@]}"}) >"$output_file" 2>&1
@@ -712,7 +744,7 @@ cell_research_unit_tests() {
     : >"$output_file"; b=0; n=0
   fi
   # 登记了的挂钟断言另起一趟单线程跑（文件头 research-unit-tests 那一段）：红判红；登记名在那一趟的输出里没有 test … ok 行（那一趟没起或没跑到）也判红。
-  # 它们每趟都量，不记进判定库。弄坏开关 wallclock-single-run-dropped：这一趟不起（改前记本次未跑的样子）。
+  # 它们每趟都量，不记进判定库。弄坏开关 wallclock-single-run-dropped：这一趟不起（记本次未跑）。
   if ((${#registered_wallclock[@]} > 0)) && ! research_build_broken wallclock-single-run-dropped; then
     single_output="$scratch/wallclock-single-thread.out"
     if ((plan_ok)); then single_names=("${wallclock_exact[@]}"); single_exact=(--exact); else single_names=("${registered_wallclock[@]}"); fi
@@ -816,7 +848,7 @@ run_replay() {
       if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then printf '%s\n' "$STAGE_NAME 的 experiment-replay 格：复跑整趟本次不判（${why_not_judged}）" >> "$GATE_NOT_RUN_FILE"; fi
       exit 77 ;;
     75)
-      # replay.sh 退 75：它按行复用的判定库在 prune-server 里，服务不可用（它文件头「按行复用」）；不判红也不判绿。弄坏开关 replay-unavailable-as-red 下照红（改前的样子）
+      # replay.sh 退 75：它按行复用的判定库在 prune-server 里，服务不可用（它文件头「按行复用」）；不判红也不判绿。弄坏开关 replay-unavailable-as-red 下照红
       if research_build_broken replay-unavailable-as-red; then exit 1; fi
       echo "  ✗ 复跑没判：prune-server 不可用（replay.sh 退 75，原因在上面），这一格退 75"
       echo "     → 怎么办：python3 prune-server/control check 看服务，修好、重起之后只重跑这一格：bash .claude/gate.d/${STAGE_NAME} --check experiment-replay"
@@ -893,7 +925,7 @@ cell_mutation_tables() {
       && chmod +x "$scratch/no-cap-bin/cargo" || { echo "  ✗ 弄坏开关 no-cap-lints 建不了垫片 cargo"; echo "     → 怎么办：看自证临时目录能不能写、PATH 上有没有 cargo，修好再跑自证"; exit 1; }
     broken_environment=("PATH=$scratch/no-cap-bin:$PATH")
   fi
-  # 弄坏开关 mutation-key-whole-table（文件头）：按条判定库按整张表的 sha256 分开放（改前那种按表一项的样子：表里改一条，整张表的条都作废）
+  # 弄坏开关 mutation-key-whole-table（文件头）：按条判定库按整张表的 sha256 分开放（表里改一条，整张表的条都作废）
   if research_build_broken mutation-key-whole-table; then
     library_root_for_break="$scratch/singlefs-mutate-library-by-table"   # 弄坏开关只在样本根上认（共用库 lib/stage-cells.sh），样本的库都在这一格的临时目录里"
   fi

@@ -4,4 +4,5 @@
 # 模式匹配到的以 .en.md、.ja.md 结尾的文件是译文，不算中文那一份。登记表指不到任何文件的行判红。怎么改三语文件照 .claude/skills/trilingual/SKILL.md。
 README.md  # 仓根 README：面向使用者的入口，中文为默认版本，英语在 README.en.md，日语在 README.ja.md
 briefs/*.md  # 项目简报：每份 YYYY-MM-DD.md 是中文版本，英语 YYYY-MM-DD.en.md，日语 YYYY-MM-DD.ja.md
+task-server/README.md  # 统一任务服务的说明：中文为默认版本，英语在 README.en.md，日语在 README.ja.md
 .claude/kb/**/*.md  # kb 全部文档（含子目录）：改 kb 要三语一起改，用户 2026-10-19 定

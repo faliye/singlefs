@@ -40,18 +40,16 @@
 ```
 # 仓根；模型在 scripts/experiment-apparatus/（不依赖 crates/），线程数读 SINGLEFS_THREAD_CAP（capped.sh 设），只影响挂钟、不影响输出
 cd /home/fy5090/code/singlefs/scripts/experiment-apparatus
-bash ../hosts/capped.sh 8 cargo build --release --bin e176-inode-leaf-merge-capacity-and-rewrites
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-one
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-two
+../../task-server/task submit -- cargo run --release -p e7-index-bench --bin e176-inode-leaf-merge-capacity-and-rewrites -- segment-one
+../../task-server/task submit -- cargo run --release -p e7-index-bench --bin e176-inode-leaf-merge-capacity-and-rewrites -- segment-two
 # 登记的复跑（scripts/experiment-apparatus/replay.sh 两行：segment-one、segment-two）
 cd ../.. && bash scripts/experiment-apparatus/replay.sh E176
 # 对拍（独立 manifest，以路径依赖只读引 crates/；replay.sh 不编它）
 cd scripts/experiment-apparatus
-bash ../hosts/capped.sh 8 cargo build --release --manifest-path e176_crates_oracle/Cargo.toml --target-dir target
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-crates-oracle
+../../task-server/task submit -- cargo run --release --manifest-path e176_crates_oracle/Cargo.toml -p e176-crates-oracle --bin e176-inode-leaf-merge-crates-oracle
 # 单测 22 条与变异表 16 条
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites
-MUTATE_JOBS=4 MUTATE_CARGO_JOBS=2 MUTATE_MEMORY_MAX=4G bash ../mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites e176_inode_leaf_merge_capacity_and_rewrites.rs ../mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv
+../../task-server/task submit -- cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites
+../../task-server/task submit -- bash ../mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites e176_inode_leaf_merge_capacity_and_rewrites.rs ../mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv
 ```
 
 第一段约 16 秒（8 个线程）、23 秒（1 个线程）；第二段约 19 秒（8 个线程）、25 秒（1 个线程，都含内存包装）；对拍约 23 秒（8 个线程）。产物：
@@ -642,7 +640,7 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D8（核心索引结构） 已定项 6 | 支撑 | 2026-10-17 不受影响：这一轮只同步措辞、产物指针、路径与数，结论、数与产物不变；此前 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D8（核心索引结构） 已定项 6 | 支撑 | 2026-11-03 不受影响：只改复跑写法，结论、数与产物都不变；此前 2026-11-01 不受影响：只改复跑起法；此前 2026-10-17 不受影响：这一轮只同步措辞、产物指针、路径与数，结论、数与产物不变；此前 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
 
 ## 历史版本
 

@@ -1,0 +1,8 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：function-units-two-implementations-agree
+want=── 复用三问：first 那一趟（function-units-two-implementations-agree）
+want=  ✓ 两份实现对拍：两条判定都有键相同、判过绿的判定，全部复用，这一格没编 unit-graph、一条都没比
+want=· 按条复用：2 条（两份实现对拍的两半），现判 1、复用 1、拒算 0
+want=  ✓ 两份实现对拍：dump 那一条复用（键相同、库里判过绿）；登记入口 5 个（stage-inputs.tsv 5 个），闭包与键逐个相同；
+want=REUSE_SELFTEST script=.claude/gate.d/code-tooling.sh same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=2 affected=1
+want=function-units-two-implementations-agree：绿

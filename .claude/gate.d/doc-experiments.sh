@@ -52,20 +52,20 @@
 # preregistration-judge-features-continued-red / -continued-green：围栏里的命令反斜杠续行，--bin 拆到下一行没带 gpu / --features gpu 拆到下一行；
 # preregistration-judge-features-alias-red：别名导入之后调判段入口没带 gpu 判红、只取崩溃点不调判段入口的不报（放了什么写在那一格的注释里）。
 # preregistration-judge-features-comment-swallows-red / -comment-hides-red / -comment-control-red：围栏里以反斜杠收尾的 shell 注释行不续行，下一行没带 gpu 的命令照判红
-#   （前两份改前并进注释、退 77 / 判绿；第三份注释不以反斜杠收尾，是对照）；preregistration-judge-features-trailing-comment-red：命令行尾注释里写的 --features gpu 不算带了；
+#   （第三份注释不以反斜杠收尾，是对照）；preregistration-judge-features-trailing-comment-red：命令行尾注释里写的 --features gpu 不算带了；
 # preregistration-judge-features-continued-outside-fence-red：围栏外行首是命令的行以反斜杠续行，--bin 拆到下一行没带 gpu，并成一条判红；
 # preregistration-judge-features-spellings-green：-Fgpu 与 --features "lookup-work-counters gpu" 都算带了 gpu；preregistration-judge-features-test-target-red：cargo test 只点名 --test、测试目标调判段入口没带 gpu 判红。
-# preregistration-judge-features-list-item-trailing-comment-red / -table-cell-trailing-comment-red：列表项里行首是命令的行 / 表格整格的命令，行尾 shell 注释里写的 --features gpu 截掉、不算带了，判红
-#   （d137-ledger-defs-r3 攻方 C3 的两个世界）。
+# preregistration-judge-features-list-item-trailing-comment-red / -table-cell-trailing-comment-red：列表项里行首是命令的行 / 表格整格的命令，行尾 shell 注释里写的 --features gpu 截掉、不算带了，判红。
 # judge-entries-in-sync-green / -red / -stale-red：判段入口表与两份判段源文件逐个相同 / 源码里多一个公开入口 / 表里的一个名字在源码里不再公开（放了什么写在那一格的注释里）。
 # judge-entries-in-sync-array-parameter-new-entry-red / -array-parameter-on-the-path-green / -cycle-new-entry-after-red：签名里带 [u8; 32] 的新公开入口判红 / 判段路径上的私有函数签名里带数组照连边、判绿 /
-#   新公开入口与表里的入口互相调、写在它后面照判红（d137-ledger-defs-r3 攻方 C1、C2 的世界，放了什么写在那一格的注释里）。
+#   新公开入口与表里的入口互相调、写在它后面照判红（放了什么写在那一格的注释里）。
 # experiment-orphans-registry-red：样本根的目录登记末尾加一行 notes，notes/ 下的号与只登了索引行的号判成孤儿（登记里加一行，这一格跟着认）。
-# experiment-orphans-model-directory-green / -sibling-red：三方腿的模型目录（research/prompts/ 直接底下名字以 -model 结尾的目录）里攻方造的假 e990 样本不算用过的号，只有 kb 页的 E99 一个号，判绿 /
+# experiment-orphans-model-directory-green / -sibling-red：三方腿的模型目录（research/prompts/ 直接底下名字以 -model 结尾的目录）里的假 e990 样本不算用过的号，只有 kb 页的 E99 一个号，判绿 /
 #   模型目录外同名形态的照算（research/prompts/ 底下的、research/results/ 底下的 -model 目录里的、research/prompts/ 更深一层的 -model 目录里的），红行点名这三处，模型目录里的假样本同在样本里。
+# experiment-orphans-page-directory-red / -page-binary-red / -empty-page-red：E42 有产物，kb/experiments/ 里同号的只有目录、只有 .bin、只有只含换行的 .md，都不算正文，判 E42 没有正文。
 # 按编号取实验页的四份（实验页有中文原文 <号>-<名>.md 与译文 <号>-<名>.en.md / .ja.md，中文的索引与产物取中文原文，判法 lib-item-ref-status.py 的 numbered_files）：
 # index-sync-translation-green / -red（索引结论列的数在中文原文里、译文里没有 / 只在英语译文里有），
-# verdict-false-named-translation-green（E174 的中文原文没有「## 历史版本」、正文点了 false 字段的名，两份译文排在前面：绿；改前取到 .en.md、崩在 split_page 的拆包上）、
+# verdict-false-named-translation-green（E174 的中文原文没有「## 历史版本」、正文点了 false 字段的名，两份译文排在前面：绿）、
 # verdict-false-named-no-history-red（中文原文没有历史节也没点名、英语译文点了名：红，不崩）。
 # 产物只以 .out.gz 存在（超过单文件推送上限、压成 .gz 入库的）的六份样本：每份的 setup.sh 把样本里的 .out 用 gzip -n -9 压成 .out.gz 并删掉原文件，
 # 三格读它们都是解压后读、判据不变：verdict-false-named-gz-green / -gz-red（解压内容里的 false 字段点了名 / 没点名，红行点名 .out.gz 与解压内容里的行号）、
@@ -85,7 +85,8 @@
 #     archive-past-rounds-red、cited-paths-exist-gz-red、cited-paths-exist-red、decision-links-language-switch-red
 #     decision-links-moved-and-switch-red、decision-links-pending-base-unreadable-red、decision-links-progress-mark-red、decision-links-red
 #     decision-links-switch-inserted-red、evidence-in-repo-red、evidence-in-repo-worktree-red、experiment-orphans-red
-#     experiment-orphans-registry-red、experiment-orphans-model-directory-sibling-red、index-sync-red、index-sync-translation-red、multipath-registry-red
+#     experiment-orphans-registry-red、experiment-orphans-model-directory-sibling-red、experiment-orphans-page-directory-red、experiment-orphans-page-binary-red
+#     experiment-orphans-empty-page-red、index-sync-red、index-sync-translation-red、multipath-registry-red
 #     preregistration-parallelism-red、preregistration-parallelism-wallclock-red、quoted-result-lines-archived-gz-red、quoted-result-lines-gz-red
 #     preregistration-parallelism-quantities-section-red、preregistration-judge-features-red
 #     preregistration-judge-features-continued-red、preregistration-judge-features-alias-red
@@ -110,6 +111,7 @@
 #     decision-links-translation-green、evidence-in-repo-green、evidence-in-repo-red、evidence-in-repo-worktree-green
 #     evidence-in-repo-worktree-red、experiment-orphans-green、experiment-orphans-red、experiment-orphans-registry-red
 #     experiment-orphans-model-directory-green、experiment-orphans-model-directory-sibling-red
+#     experiment-orphans-page-directory-red、experiment-orphans-page-binary-red、experiment-orphans-empty-page-red
 #     index-sync-green、index-sync-red、index-sync-translation-green、index-sync-translation-red
 #     multipath-registry-green、multipath-registry-red、preregistration-parallelism-green、preregistration-parallelism-red
 #     preregistration-parallelism-wallclock-green、preregistration-parallelism-wallclock-red、quoted-result-lines-archived-gz-green、quoted-result-lines-archived-gz-red
@@ -132,7 +134,7 @@
 #     results-cited-green、results-cited-gz-green、results-cited-gz-history-green、results-cited-gz-red
 #     results-cited-red、verdict-false-named-green、verdict-false-named-gz-green、verdict-false-named-gz-red
 #     verdict-false-named-no-history-red、verdict-false-named-red、verdict-false-named-translation-green、verdict-false-named-zero
-#   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py：按编号取实验页不分语言、取排序后的第一个命中（改前的取法，取到 <号>-<名>.en.md）
+#   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py：按编号取实验页不分语言、取排序后的第一个命中（取到 <号>-<名>.en.md）
 #     index-sync-translation-green
 #     index-sync-translation-red
 #     verdict-false-named-no-history-red
@@ -147,20 +149,20 @@
 #     decision-links-no-experiment-green
 #     decision-links-progress-mark-green
 #     decision-links-translation-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=progress-mark-counted  decision-links 量索引表定案格的字数时把行末「**进度：…**」也算进去
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=progress-mark-counted  decision-links 量索引表里写结论那一格的字数时把行末「**进度：…**」也算进去
 #     decision-links-progress-mark-green
 #     decision-links-progress-mark-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=deleted-products-counted  decision-links 把这次改动里删掉的 research/results/e<号>… 也算「产物变了」
 #     decision-links-deleted-product-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=read-translations  decision-links 的决策正文与实验页连译文一起读（改前）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=read-translations  decision-links 的决策正文与实验页连译文一起读
 #     decision-links-translation-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=language-switch-counted  decision-links 退回把实验页顶上第三行的语言切换行也算正文（改前）：只改了、只新插了这一行的页照「正文改了」要回看
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=language-switch-counted  decision-links 把实验页顶上第三行的语言切换行也算正文：只改了、只新插了这一行的页照「正文改了」要回看
 #     decision-links-language-switch-green
 #     decision-links-moved-and-switch-green
 #     decision-links-switch-inserted-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=inserted-switch-counted  decision-links 去掉切换行时留着紧跟它的空行（改前：只认两版第三行都是切换行、只是改了）：新插切换行加一个空行的页照「正文改了」要回看
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=inserted-switch-counted  decision-links 去掉切换行时留着紧跟它的空行（只认两版第三行都是切换行、只是改了）：新插切换行加一个空行的页照「正文改了」要回看
 #     decision-links-switch-inserted-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=moves-not-rewritten  decision-links 比两版正文时基准那一版不照此刻生效的搬迁登记换算（改前：git show 原样读）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=moves-not-rewritten  decision-links 比两版正文时基准那一版不照此刻生效的搬迁登记换算（git show 原样读）
 #     decision-links-moved-and-switch-green
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-added-lines-skipped  quoted-result-lines 退回历史节整节不判
 #     quoted-result-lines-history-added-red
@@ -214,27 +216,27 @@
 #     preregistration-judge-features-alias-red
 #     preregistration-judge-features-green
 #     preregistration-judge-features-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-commands-anywhere  preregistration-judge-features 不认命令位置，行文里内嵌的 cargo run / cargo test 也判（改前的认法）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-commands-anywhere  preregistration-judge-features 不认命令位置，行文里内嵌的 cargo run / cargo test 也判
 #     preregistration-judge-features-prose-green
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=continuation-unjoined  preregistration-judge-features 不并反斜杠续行，逐行认命令（围栏里与围栏外都不并；拆到下一行的 --bin 漏判、--features 误红）
 #     preregistration-judge-features-continued-green
 #     preregistration-judge-features-continued-outside-fence-red
 #     preregistration-judge-features-continued-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-by-module-marker  preregistration-judge-features 照改前按源文件里有没有 crash_amplification:: 或 crash_state_enumeration:: 认走判段（别名导入漏判、只取崩溃点的误判）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-by-module-marker  preregistration-judge-features 按源文件里有没有 crash_amplification:: 或 crash_state_enumeration:: 认走判段（别名导入漏判、只取崩溃点的误判）
 #     preregistration-judge-features-alias-red
 #     preregistration-judge-features-continued-red
 #     preregistration-judge-features-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=shell-comments-ignored  preregistration-judge-features 不认 shell 注释（改前的认法）：以反斜杠收尾的注释行照续行、续行接到整行注释照并、命令行尾的注释照当命令的一部分
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=shell-comments-ignored  preregistration-judge-features 不认 shell 注释：以反斜杠收尾的注释行照续行、续行接到整行注释照并、命令行尾的注释照当命令的一部分
 #     preregistration-judge-features-comment-hides-red
 #     preregistration-judge-features-comment-swallows-red
 #     preregistration-judge-features-list-item-trailing-comment-red
 #     preregistration-judge-features-table-cell-trailing-comment-red
 #     preregistration-judge-features-trailing-comment-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=features-spelling-narrow  preregistration-judge-features 照改前认特性：命令按空白切词、不认引号，-F 只认与值分开写的（-Fgpu、--features "lookup-work-counters gpu" 误红）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=features-spelling-narrow  preregistration-judge-features 认特性时命令按空白切词、不认引号，-F 只认与值分开写的（-Fgpu、--features "lookup-work-counters gpu" 误红）
 #     preregistration-judge-features-spellings-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=test-targets-unjudged  preregistration-judge-features 照改前只认 --bin，cargo test 只点名 --test 的不判（只报数）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=test-targets-unjudged  preregistration-judge-features 只认 --bin，cargo test 只点名 --test 的不判（只报数）
 #     preregistration-judge-features-test-target-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=trailing-comments-kept-outside-fence  preregistration-judge-features 照改前只截围栏里命令行尾的 shell 注释（列表项里行首是命令的行、表格整格的命令里，注释里写的 --features gpu 算带了）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=trailing-comments-kept-outside-fence  preregistration-judge-features 只截围栏里命令行尾的 shell 注释（列表项里行首是命令的行、表格整格的命令里，注释里写的 --features gpu 算带了）
 #     preregistration-judge-features-list-item-trailing-comment-red
 #     preregistration-judge-features-table-cell-trailing-comment-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-new-unreported  judge-entries-in-sync 不报源码里认出而 JUDGE_ENTRIES 里没有的入口
@@ -243,10 +245,10 @@
 #     judge-entries-in-sync-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-stale-unreported  judge-entries-in-sync 不报 JUDGE_ENTRIES 里有而源码里认不出的名字
 #     judge-entries-in-sync-stale-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-header-after-any-semicolon  judge-entries-in-sync 照改前切函数单元：表头从上一个分号或右花括号算起，方括号里的也算（签名里带 [u8; N] 的函数不进单元）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-header-after-any-semicolon  judge-entries-in-sync 切函数单元时表头从上一个分号或右花括号算起，方括号里的也算（签名里带 [u8; N] 的函数不进单元）
 #     judge-entries-in-sync-array-parameter-new-entry-red
 #     judge-entries-in-sync-array-parameter-on-the-path-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-cycle-memoized  judge-entries-in-sync 照改前递归走图、记住每个单元的结果，环上截断时算出的「走不到」也记住（结局随函数在文件里的先后翻）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=judge-entries-cycle-memoized  judge-entries-in-sync 递归走图、记住每个单元的结果，环上截断时算出的「走不到」也记住（结局随函数在文件里的先后翻）
 #     judge-entries-in-sync-cycle-new-entry-after-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=gz-read-raw  verdict-false-named 与 quoted-result-lines 读 .out.gz 不解压、按原字节读
 #     quoted-result-lines-archived-gz-green
@@ -282,7 +284,7 @@
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=gz-name-not-product  repro-command 不把 .out.gz 当产物名（只认 .out 收尾的）
 #     repro-command-gz-green
 #     repro-command-gz-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=apparatus-lines-unrecognized  repro-command 不认起 scripts/experiment-apparatus/ 下 python3 或 bash 脚本的复跑行（改前：只认 cargo run 与 replay.sh、vm-bench.sh）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=apparatus-lines-unrecognized  repro-command 不认起 scripts/experiment-apparatus/ 下 python3 或 bash 脚本的复跑行（只认 cargo run 与 replay.sh、vm-bench.sh）
 #     repro-command-apparatus-green
 #     repro-command-apparatus-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=apparatus-script-existence-unchecked  repro-command 不查复跑行点名的脚本与装置目录在不在，点名了就算存在
@@ -315,9 +317,9 @@
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=comparison-lag-growth-unchecked  replay-comparison-units 不拿登记表与基准那一版比（复跑写 none: 的行只缩不涨不判）
 #     replay-comparison-units-red
 #     replay-comparison-units-rekey-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=comparison-none-key-pair  replay-comparison-units 的只缩不涨退回按（登记出处，留存产物名）成对比（改前的键），换实验号、换单元名借同一对键照绿
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=comparison-none-key-pair  replay-comparison-units 的只缩不涨按（登记出处，留存产物名）成对比，换实验号、换单元名借同一对键照绿
 #     replay-comparison-units-rekey-red
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=comparison-table-unchecked  replay-comparison-units 不解析重跑登记里的比对对象表、不与登记表逐行对（改前的盲区）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=comparison-table-unchecked  replay-comparison-units 不解析重跑登记里的比对对象表、不与登记表逐行对
 #     replay-comparison-units-exclusion-owed-red
 #     replay-comparison-units-table-green
 #     replay-comparison-units-table-red
@@ -326,11 +328,15 @@
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=comparison-exclusions-ignored  replay-comparison-units 不把登记表文件头「不登记的比对对象」那几行算点名（写法照判，只是不拿来放过表里的行）
 #     replay-comparison-units-exclusion-owed-red
 #     replay-comparison-units-table-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=comparison-exclusion-owed-unchecked  replay-comparison-units 不判点名不登记的理由指没指到开着的欠账（改前）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=comparison-exclusion-owed-unchecked  replay-comparison-units 不判点名不登记的理由指没指到开着的欠账
 #     replay-comparison-units-exclusion-owed-red
 #     replay-comparison-units-table-green
-#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-registry-ignored  experiment-orphans 不读目录登记，退回改前写死的四个目录（不看 kb 索引行，也不认登记里新加的一处）
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-registry-ignored  experiment-orphans 不读目录登记，用写死的四个目录（不看 kb 索引行，也不认登记里新加的一处）
 #     experiment-orphans-registry-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-page-shape-ignored  experiment-orphans 的「有正文」只看 kb/experiments/ 底下条目名的数字前缀（同号的目录、.bin、空 .md 都算有正文）
+#     experiment-orphans-empty-page-red
+#     experiment-orphans-page-binary-red
+#     experiment-orphans-page-directory-red
 #   滞后表、豁免表与基准比的取法与复跑表的读法在 lib-lag-baseline.py（decision-links、multipath-registry、replay-comparison-units 三格取基准那一版，
 #   results-cited、verdict-false-named、quoted-result-lines、replay-comparison-units 四格读复跑表）；它的开关在这一道会红的样本：
 #   LAG_BASELINE_BREAK=unreadable-as-absent  归 lib-lag-baseline.py：git 取不到基准那一版当成「基准里没有这张表」，decision-links 把待回填清单整张算新加
@@ -345,6 +351,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ doc-experiments.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 
 STAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_REPOSITORY_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
@@ -482,8 +493,8 @@ def unspace(s):
     return re.sub(r"(?<=\d)[ 　](?=\d\d\d)", "", s)
 
 bodies = {}
-# 每个实验号只取一份正文：索引是中文，取中文原文（numbered_files）。改前按 glob 不排序的次序逐份覆盖，
-# 留下哪一份（中文还是哪份译文）看目录项的次序。只有译文、没有中文原文的号照旧算「有正文」（取那份译文），缺中文原文归 doc-text 的 trilingual-files
+# 每个实验号只取一份正文：索引是中文，取中文原文（numbered_files），不按 glob 不排序的次序逐份覆盖
+# （那样留下哪一份，中文还是哪份译文，看目录项的次序）。只有译文、没有中文原文的号照旧算「有正文」（取那份译文），缺中文原文归 doc-text 的 trilingual-files
 all_pages = sorted(glob.glob(os.path.join(exp_dir, "*.md")))
 for n in sorted({int(os.path.basename(p).split("-")[0]) for p in all_pages}):
     found = (item_ref_status.numbered_files(exp_dir, n, idx_path)
@@ -1107,7 +1118,7 @@ PY
 #   认不出标题的实验页（首个二级标题不是「## E<号> 」）与决策文件（不是「## D<号> 」）判红，不静默跳过；
 #   ⑤ 取某一页的新增行时 git diff 失败，判红，不当成那一页没改。
 #   ⑦ 瘦身形态（待回填清单之外的决策）：首行 `## D<号> 简称 —— 状态` 后面不带括注；分项标题不带日期；
-#      每个已定项有「**定案**：」「**射程**：」「**依据**：」「**欠**：」四块；索引表的定案格不带日期、不超过 100 字
+#      每个已定项有「**定案**：」「**射程**：」「**依据**：」「**欠**：」四块（history-kept: 块标签是被判的 kb 页里的原文）；索引表里写结论的那一格不带日期、不超过 100 字
 #      （行末「**状态：…**」「**进度：…**」两个规范标记与未定项登记行那两句判定不算字数、不判日期）。
 #   ⑧ 有实验才有决策：已定项的依据段至少引一个实验，或写「无实验：理由」（理由至少八个字）；
 #      成功行报出写「无实验」的已定项有几个。「无实验：」到行尾是理由，理由里点名的实验（`E<号>（`）不算这条分项引的依据，
@@ -1148,7 +1159,7 @@ PY
 # 报「这次改动触发回看 0 处」；弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=deleted-products-counted 下删除照旧算产物变了，判红在「没回看」。
 # 决策正文与实验页只读中文原文（lib-item-ref-status.py 的 originals_only）：译文的首行、分项小节、依据段与「影响的决策」表头是各自的语言。
 # decision-links-translation-green 是 decision-links-no-experiment-green 加上 D1、E5 的英语与日语译文（首行写成各自的语言，日语那两份没有 `## D1 ` / `## E5 ` 的空格），
-# 必须判绿、报数同那一份；弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=read-translations 照改前连译文一起读，判红在「认不出标题」「没有表」。
+# 必须判绿、报数同那一份；弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=read-translations 连译文一起读，判红在「认不出标题」「没有表」。
 # decision-links-pending-base-unreadable-red 的现场与 decision-links-green 相同，setup.sh 末尾删掉基准那一版待回填清单的对象：判红在「读不出基准 HEAD 里的
 # .claude/decision-links-pending（git show 退 128」；弄坏开关 LAG_BASELINE_BREAK=unreadable-as-absent 下当成基准里没有这张清单，红在「新加了」，那一条 want 找不到。
 cell_decision_links() {
@@ -1191,7 +1202,7 @@ lag_baseline_spec = importlib.util.spec_from_file_location('lag_baseline', os.en
 lag_baseline = importlib.util.module_from_spec(lag_baseline_spec)
 lag_baseline_spec.loader.exec_module(lag_baseline)
 # 决策正文与实验页只读中文原文（lib-item-ref-status.py 的 originals_only）：译文的首行、分项小节、依据段与「影响的决策」表头都是各自的语言，
-# 读进来就报「认不出标题」「没有表」，读得出的还靠文件名排序让中文那份最后覆盖。弄坏开关 read-translations 照改前连译文一起读
+# 读进来就报「认不出标题」「没有表」，读得出的还靠文件名排序让中文那份最后覆盖。弄坏开关 read-translations 连译文一起读
 read_translations = os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '') == 'read-translations'
 changed = {line for line in open(sys.argv[4], encoding='utf-8').read().split('\n') if line}
 kb = os.path.join(root, '.claude', 'kb')
@@ -1388,7 +1399,7 @@ for decision, info in sorted(decisions.items()):
             else:
                 bad('没有实验', f'{where}：D{decision} 已定项 {item_number} 的依据一个实验都没引——有实验才有决策；实在没有可量的，写「无实验：理由」')
     for kind, item_number, cell in info['index_cells']:
-        # 定案格里这几样规范标记不算字数、不判日期：「**状态：…**」是 doc-decisions.sh 要的检索标记，「**进度：…**」是行末三选一的进度标记
+        # 写结论的那一格里这几样规范标记不算字数、不判日期：「**状态：…**」是 doc-decisions.sh 要的检索标记，「**进度：…**」是行末三选一的进度标记
         # （.claude/rules/format-evolution.md「决策正文只写现状」）；「改新池新建文件的字节：…」「动不动格式：…」是 doc-decisions.sh 的
         # blocking-verdict 格要写在登记行里、必须带日期的两句。弄坏开关 progress-mark-counted 下「**进度：…**」照算字数
         without_marks = cell
@@ -1564,7 +1575,7 @@ def base_title(rel, number=None):
 def baseline_page_text(rel):
     """基准那一版实验页的全文，照此刻生效的搬迁登记把旧前缀换成新前缀（lib-lag-baseline.py 的 baseline_text：只按路径前缀换，
     提交引用后面的不换，页自己搬了家就按搬迁之前的路径取）；基准里没有这一页交 None，git 取不到或登记表写坏了报一条并交 None（按正文改了判）。
-    弄坏开关 moves-not-rewritten 退回不换算（改前：git show 原样读）。"""
+    弄坏开关 moves-not-rewritten 不换算（git show 原样读）。"""
     if os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '') == 'moves-not-rewritten':
         shown = git('show', f'{base}:{rel}')
         return shown.stdout if shown.returncode == 0 else None
@@ -1624,8 +1635,8 @@ LANGUAGE_SWITCH = re.compile(
 def body_without_language_switch(lines):
     """历史版本之前、影响的决策一节之外的正文行；顶上第三行是认得出的语言切换行时先去掉它，连同紧跟它的那一个空行
     （旧版没有切换行、新版在第三行插进切换行加一个空行的，两版这样去掉之后逐字相同）；没有切换行的什么都不去，认不出的照旧算正文。
-    弄坏开关 language-switch-counted 退回不去掉（改前：切换行算正文）；inserted-switch-counted 退回只去掉切换行、留着紧跟的空行
-    （改前：只认两版第三行都是切换行、只是改了）。"""
+    弄坏开关 language-switch-counted 不去掉（切换行算正文）；inserted-switch-counted 只去掉切换行、留着紧跟的空行
+    （只认两版第三行都是切换行、只是改了）。"""
     breaking = os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '')
     if breaking != 'language-switch-counted' and len(lines) > 2 and LANGUAGE_SWITCH.fullmatch(lines[2].rstrip()):
         trailing_blank = breaking != 'inserted-switch-counted' and len(lines) > 3 and not lines[3].strip()
@@ -1832,7 +1843,7 @@ for exp, product in rows:
 
 def experiment_page(exp, product):
     # 实验页文件名有的补零（08-、09-），有的不补：两种都认（numbered_files）。产物不带语言，取中文原文；
-    # 改前取排序后的第一个，取到的是 <号>-<名>.en.md，那份没有「## 历史版本」，split_page 当场崩
+    # 取排序后的第一个会取到 <号>-<名>.en.md，那份没有「## 历史版本」，split_page 当场崩
     matches = item_ref_status.numbered_files(EXP_DIR, int(exp[1:]), os.path.join(RESULTS_DIR, product))
     return matches[0] if matches else None
 
@@ -1843,7 +1854,7 @@ def split_page(text):
     idx = text.find(marker)
     body = text if idx < 0 else text[:idx]
     if idx < 0:
-        # 改前这一支只交回两样，调用方按三样拆包：没有历史节的实验页（中文原文少了这一节、或取到了译文）让整格崩在 ValueError 上
+        # 这一支交回三样，调用方按三样拆包：只交两样，没有历史节的实验页（中文原文少了这一节、或取到了译文）会让整格崩在 ValueError 上
         return body, '', ''
     tail = text[idx + len(marker):]
     head_match = re.search(r'^### .*$', tail, re.M)
@@ -2075,14 +2086,18 @@ cell_repro_command() {
 
 # ── 格 experiment-orphans：目录登记列的各处出现过的实验号在 kb 里有没有正文
 #
-# 判据：目录登记 .claude/gate.d/experiment-number-directories.tsv 列的每一处（research/、scripts/、入库装置 crates/singlefs-verification/src/bin/、
-# kb 实验页与索引行；名字形态写在登记文件头）出现过的实验号，kb/experiments/ 里都要有对应编号的正文：跑过的东西没入库，
-# 会以「我们量过」的形式活在对话里，谁也复核不了。results-cited 格按名字排除的（*local* 这类）也在这里判到。
+# 判据：目录登记 .claude/gate.d/experiment-number-directories.tsv 列的每一处（research/、scripts/、入库装置的两处 crates/singlefs-verification/src/bin/ 与
+# 产品 GPU 包的 crates/singlefs-background-gpu/src/bin/、kb 实验页与索引行；名字形态写在登记文件头，以登记为准）出现过的实验号，kb/experiments/ 里都要有对应编号的正文：
+# 跑过的东西没入库，会以「我们量过」的形式活在对话里，谁也复核不了。results-cited 格按名字排除的（*local* 这类）也在这里判到。
+# 「有正文」只认 kb/experiments/ 这一层名字是「<号>-<简称>.md」的普通文件（号可带前导 0，译文 .en.md / .ja.md 也算），且有一个非空白字符：
+# 同号的目录、别的后缀（.bin 这类）、符号链接、空的或只有空白的 .md 都不算。正文写得全不全不归这一格（各节的判法在别的格）。
 # 读法只有一份（scripts/kb/lib_experiment_number_directories.py），scripts/kb/claim-experiment.sh 的查号读同一份登记：实验号住进新地方，登记里加一行，两处跟着认。
 # 射程逐处报：登记了而不在的列进成功行；登记不在、写坏，或哪个目录读不了，判红——射程静默缩小与判过了在输出里长得一样。
 # 样本：experiment-orphans-red 里 scripts/experiment-apparatus/ 与 crates/singlefs-verification/src/bin/ 下各一个 kb 里没有正文的实验号；
 # experiment-orphans-green 里的实验号都有正文；experiment-orphans-registry-red 的登记末尾加了一行 notes，notes/ 下的号与只登了索引行的号都判成孤儿。
-# 弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-registry-ignored：不读登记、退回改前写死的四个目录，experiment-orphans-registry-red 判错。
+# 弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-registry-ignored：不读登记、用写死的四个目录，experiment-orphans-registry-red 判错。
+# experiment-orphans-page-directory-red / -page-binary-red / -empty-page-red：E42 有产物，kb/experiments/ 里同号的只有目录 42-placeholder/、只有 42.bin、只有只含换行的 42-空白.md，
+# 三份都判 E42 没有正文。弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-page-shape-ignored：「有正文」只看条目名的数字前缀，这三份判错。
 # 三方腿的模型目录（research/prompts/ 直接底下名字以 -model 结尾的目录）读法里不往里走：腿在里面造的样本世界不是实验（登记文件头写着这一条）。
 # experiment-orphans-model-directory-green 里模型目录中的假 e990 样本不算、只剩 kb 有正文的 E99；experiment-orphans-model-directory-sibling-red 里模型目录外同名形态的照算。
 # 这一条读法的弄坏开关归读法那份库（scripts/kb/lib_experiment_number_directories.py 的自证，开关名与红的格写在它文件头），不在这一道设：库的守卫平常跑设了就拒，样本根里设上只会让整格报「没扫全」。
@@ -2091,7 +2106,15 @@ cell_experiment_orphans() {
   REGISTRY=.claude/gate.d/experiment-number-directories.tsv
   [[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，这一格跳过"; exit 77; }
 
-  have=$(ls "$EXP_DIR" | grep -oE '^[0-9]+' | sed 's/^0*//' | sort -un)
+  if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" == orphans-page-shape-ignored ]]; then   # 弄坏开关：只看条目名的数字前缀
+    have=$(ls "$EXP_DIR" | grep -oE '^[0-9]+' | sed 's/^0*//' | sort -un)
+  else
+    have=$(for page in "$EXP_DIR"/*; do
+             [[ "${page##*/}" =~ ^([0-9]+)-.*\.md$ && -f "$page" && ! -L "$page" ]] || continue
+             number="${BASH_REMATCH[1]}"
+             if grep -q '[^[:space:]]' -- "$page"; then echo "$((10#$number))"; fi
+           done | sort -un)
+  fi
   listing_file="$(mktemp)"; errors_file="$(mktemp)"
   trap 'rm -f "$listing_file" "$errors_file"' EXIT
   registry_source="$REGISTRY"; registry_text=""; registry_label="目录登记 $REGISTRY"
@@ -2847,7 +2870,7 @@ PY
 #   在第六节里按同一份读法（segment_counts）找「<数><量词>」，前面紧挨「第」的是序号、不算：有同值而量词互为开头的算对上；没有同值、有量词逐字相同的算对不上，判红，
 #   点名两边的原文与第六节的行号；第六节里没有同值也没有同量词的、态数没写量词的（「960 × 10000 × …」）算认不出，报「态数与第六节的比对本次未判」并点名，
 #   往 $GATE_NOT_RUN_FILE 报一行，不算绿，也不判红。
-# 起判：号不小于 186 的才判，E185 及以前的登记不回补这一节（不设排除表：号以下的一律不判，号以上的没有例外）。
+# 起判：号不小于 186 的才判，E185 以下的登记不回补这一节（不设排除表：号以下的一律不判，号以上的没有例外）。
 #   重跑登记（e<号>-r<n>-prereg.md）不判：差分重跑照设计员定义只写三样、其余「同上一次登记」，这一节跟着原登记走。
 #   这次改动里一份要判的都没有：退 77（无对象可判），成功句与无对象句逐个列出号小于 186 不判的那几份。
 # 管不到：写的数对不对、装置是不是照它实现、串行的理由成不成立——靠三方与 task-server 记进 task status 的每次尝试平均在用核数；
@@ -3177,32 +3200,32 @@ PY
 # 这次改动里没有跑前登记、或登记里一条点名 --bin / --test 的 cargo run / cargo test 都没有：退 77；全部认不出：退 77 并报本次未判。
 # 管不到的：判段入口写在 bin 引的别的模块里而 bin 的源文件自己没写判段模块与入口名字的（只读 bin 的那一份源文件）；入口名只出现在注释里也当调了（不剥注释，多要 gpu 不漏判）；
 #   入口本身再起一个别名（use …::run_from_environment as 别名）之后调别名的照认（导入那一行写着入口名）；命令拼在变量里的；起法是不是经清场、
-#   NOT_RUN_ 行有没有核（跑前登记该写的另两样，归设计员定义与执行员交回）；派发闸那一支用户定不动，不在这里判。
+#   NOT_RUN_ 行有没有核（跑前登记该写的另两样，归设计员定义与执行员交回）；派发闸那一支不动，不在这里判。
 # 样本：preregistration-judge-features-red（e990 列表行首的 cargo run 起走判段的 bin 没带特性、e991 表格整格的 cargo test 带了 lookup-work-counters 没带 gpu，两处判红；
 #   同一份里不走判段的 bin 不带特性不报）；preregistration-judge-features-green（e992 三处走判段的 bin 各用 --features lookup-work-counters,gpu、--features=gpu、-F gpu，
 #   不走判段的 bin 不带特性、-- 之后的「--bin」不当 cargo 的参数，判了 3 条；另一条 bin 在清单里找不到，报本次未判 1 条）；
 #   preregistration-judge-features-prose-green（e993 里行文内嵌、标签之后、表格里夹着字、围栏里 ✓ 起头的四处起走判段的 bin 都没带 gpu，不在命令位置、不判；
 #   围栏里一条带 gpu 的判了 1 条，判绿报「不在命令位置的 4 条不判」）；
-#   preregistration-judge-features-continued-red（围栏里 --bin 续行到下一行、没带 gpu，并成一条判红；攻方模型 research/prompts/d137-ledger-defs-r1-opus-model/ 的 continued-bin-on-next-line 世界）、
-#   preregistration-judge-features-continued-green（--bin 在头一行、--features gpu 续行到下一行，并成一条判绿；同一模型的 continued-features-on-next-line 世界）；
+#   preregistration-judge-features-continued-red（围栏里 --bin 续行到下一行、没带 gpu，并成一条判红）、
+#   preregistration-judge-features-continued-green（--bin 在头一行、--features gpu 续行到下一行，并成一条判绿）；
 #   preregistration-judge-features-alias-red（use crash_amplification as amplification 之后调 amplification::run_from_environment、没带 gpu 判红；
-#   同一份里只从 crash_state_enumeration:: 取崩溃点、不调判段入口的 bin 不带 gpu 不报；同一模型的 alias-import-judge 与 marker-without-judge 两个世界）；
-#   d137-ledger-defs-r2 攻方模型 research/prompts/d137-ledger-defs-r2-opus-model/ 的三个世界原样做成三份：preregistration-judge-features-comment-swallows-red
-#   （围栏里注释行以反斜杠收尾、下一行没带 gpu：改前并进注释退 77，现在判红，第 7 行）、-comment-hides-red（同一围栏另一条带 gpu 的判绿、被注释挡住的那一条没带 gpu：
-#   改前整格判绿，现在判红，第 8 行）、-comment-control-red（注释不以反斜杠收尾的对照，改前改后都判红）；preregistration-judge-features-trailing-comment-red
+#   同一份里只从 crash_state_enumeration:: 取崩溃点、不调判段入口的 bin 不带 gpu 不报）；
+#   注释行挡住命令的几份：preregistration-judge-features-comment-swallows-red
+#   （围栏里注释行以反斜杠收尾、下一行没带 gpu：判红，第 7 行）、-comment-hides-red（同一围栏另一条带 gpu 的判绿、被注释挡住的那一条没带 gpu：
+#   判红，第 8 行）、-comment-control-red（注释不以反斜杠收尾的对照，判红）；preregistration-judge-features-trailing-comment-red
 #   （命令行尾注释里写着 --features gpu，截掉之后没带 gpu，判红）；preregistration-judge-features-continued-outside-fence-red（列表项里缩进的命令行，--bin 续行到下一行、
-#   没带 gpu：改前围栏外不并、退 77，现在并成一条判红；辩方报告的 C3）；preregistration-judge-features-spellings-green（-Fgpu、--features "lookup-work-counters gpu"
-#   两条走判段的都算带了 gpu，判了 2 条；辩方报告的 C1、C2）；preregistration-judge-features-test-target-red（cargo test 只点名 --test，测试目标调判段入口、没带 gpu，判红；辩方报告的 C4）；
-#   d137-ledger-defs-r3 攻方模型 research/prompts/d137-ledger-defs-r3-opus-model/ 的两个世界原样做成两份：preregistration-judge-features-list-item-trailing-comment-red
-#   （列表项下缩进、行首是命令的一行，行尾注释写着 --features gpu：改前围栏外不截、判绿，现在第 7 行判红；世界 prereg-list-item-trailing-comment）、
-#   preregistration-judge-features-table-cell-trailing-comment-red（表格整格反引号里的同一条命令：改前判绿，现在第 7 行判红；世界 prereg-table-cell-trailing-comment）。
+#   没带 gpu：并成一条判红）；preregistration-judge-features-spellings-green（-Fgpu、--features "lookup-work-counters gpu"
+#   两条走判段的都算带了 gpu，判了 2 条）；preregistration-judge-features-test-target-red（cargo test 只点名 --test，测试目标调判段入口、没带 gpu，判红）；
+#   行尾注释里写 --features gpu 的两份：preregistration-judge-features-list-item-trailing-comment-red
+#   （列表项下缩进、行首是命令的一行，行尾注释写着 --features gpu：第 7 行判红）、
+#   preregistration-judge-features-table-cell-trailing-comment-red（表格整格反引号里的同一条命令：第 7 行判红）。
 # 弄坏开关见文件头 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK 的 judge-features-unchecked、judge-binaries-all-counted、judge-commands-anywhere、continuation-unjoined、judge-by-module-marker、
 # shell-comments-ignored、features-spelling-narrow、test-targets-unjudged、trailing-comments-kept-outside-fence 九项。
 # 退役判据：崩溃判段不再挂 gpu 特性（判段的 GPU 路径一律编进去）时删掉这一格。
 JUDGE_MODULES="crash_amplification crash_state_enumeration"
 JUDGE_ENTRIES="run_from_environment run_from_environment_with_observers GivenStatesEngine judging_test_not_run_without_the_gpu_feature judge_not_run_in_this_binary
   enumerate_crash_states enumerate_crash_states_selecting enumerate_crash_states_versions enumerate_crash_states_selecting_versions
-  enumerate_crash_states_with_expansion enumerate_crash_states_with_every_kind_of_observer crash_point_replay_judge_not_run_line"
+  enumerate_crash_states_with_expansion enumerate_crash_states_with_every_kind_of_observer enumerate_crash_states_with_attached_observers crash_point_replay_judge_not_run_line"
 cell_preregistration_judge_features() {
   ((in_git_work_tree)) || { echo "  ! $ROOT 不是 git 仓，分不出哪些登记是这次改动新建或改动的，这一格无对象可判"; exit 77; }
   if ((! changed_paths_library_loaded || ! changed_paths_ok)); then
@@ -3261,7 +3284,7 @@ def in_command_position(line, spans, position):
 
 
 def shell_comment_start(line):
-    """这一行 shell 注释从哪起（引号外、行首或空白之后的 #）；没有注释交回 None。弄坏开关 shell-comments-ignored 下一律当没有注释（改前的认法）。"""
+    """这一行 shell 注释从哪起（引号外、行首或空白之后的 #）；没有注释交回 None。弄坏开关 shell-comments-ignored 下一律当没有注释。"""
     if "shell-comments-ignored" in broken:
         return None
     quote, index = None, 0
@@ -3330,7 +3353,7 @@ def manifests():
 
 def command_words(tail):
     """命令那一截照 shell 切词（引号里的空白不切，「--features "lookup-work-counters gpu"」是一个值）；引号没配对的退回按空白切。
-    弄坏开关 features-spelling-narrow 下照改前按空白切。"""
+    弄坏开关 features-spelling-narrow 下按空白切。"""
     if "features-spelling-narrow" in broken:
         return tail.split()
     try:
@@ -3341,7 +3364,7 @@ def command_words(tail):
 
 def command_options(command, tail):
     """cargo run / cargo test 之后那一截 → (包名或 None, [(目标种类, 目标名)], 特性集合, 带了 --all-features 吗)。
-    目标：--bin <名>（--bin=<名>）；cargo test 另认 --test <名>（--test=<名>），弄坏开关 test-targets-unjudged 下照改前不认。
+    目标：--bin <名>（--bin=<名>）；cargo test 另认 --test <名>（--test=<名>），弄坏开关 test-targets-unjudged 下不认。
     特性：--features <值>、--features=<值>、-F <值>、-F<值>，可写几次、取并集，值里逗号与空白都算分隔；弄坏开关 features-spelling-narrow 下 -F 只认与值分开写的。"""
     words = command_words(tail)
     narrow = "features-spelling-narrow" in broken
@@ -3402,14 +3425,14 @@ for path in registrations:
             in_fence = not in_fence
             continue
         # 反斜杠续行的几行并成一条再认（判据 ①）：围栏里的行与围栏外行首是命令的行都并，行号记头一行；
-        # shell 注释不续行、续行接到整行注释就断（comment_line）；弄坏开关 continuation-unjoined 照改前逐行认
+        # shell 注释不续行、续行接到整行注释就断（comment_line）；弄坏开关 continuation-unjoined 逐行认
         joinable = in_fence or (not line.lstrip().startswith("|") and bool(command_spans(line, False)))
         while (joinable and "continuation-unjoined" not in broken and continued(line)
                and following < len(lines) and not FENCE.match(lines[following]) and not comment_line(lines[following])):
             line = line[:-1] + lines[following]
             following += 1
         # 命令那一段（围栏里的行、行首是命令的行、表格整格的命令）行尾的 shell 注释截掉，注释里的字不当命令的参数，注释里的 cargo 不判也不计数；
-        # 弄坏开关 trailing-comments-kept-outside-fence 照改前只截围栏里的
+        # 弄坏开关 trailing-comments-kept-outside-fence 只截围栏里的
         spans, comment_regions = [], []
         for start, end in command_spans(line, in_fence):
             cut = in_fence or "trailing-comments-kept-outside-fence" not in broken
@@ -3483,7 +3506,7 @@ PY
 }
 
 # ── 格 judge-entries-in-sync：判段入口表 JUDGE_ENTRIES 与两份判段源文件里的公开判段入口逐个相同
-# 为什么：preregistration-judge-features 只认 JUDGE_ENTRIES 里的名字，两个模块里新加了公开入口而表没跟上，走判段的装置就漏判（d137-ledger-defs-r2 辩方 A2，判决「采，记欠账」，同一件里另立这一格）。
+# 为什么：preregistration-judge-features 只认 JUDGE_ENTRIES 里的名字，两个模块里新加了公开入口而表没跟上，走判段的装置就漏判。
 # 对象：被判的根里 JUDGE_SOURCES 那两份源文件（crash_amplification.rs、crash_state_enumeration.rs）此刻的全文，不看这次改动范围；两份都不在退 77。
 # 认法（公开的判段入口）：
 #   ① 切函数单元：去掉注释（// 与可嵌套的 /* */）、把串、原始串、字节串与字符字面量涂成空白之后配花括号；花括号前面那一截表头从方括号与圆括号外的
@@ -3501,11 +3524,10 @@ PY
 # 样本：judge-entries-in-sync-green（两份源文件里恰好是表里那 13 个入口；另有只在注释里写 cfg!(feature = "gpu") 的公开函数、#[cfg(test)] 模块里调判段的公开函数、
 #   不调记号的公开纯函数 judge_not_run_without_the_gpu_feature，都不算入口）；judge-entries-in-sync-red（同一份再加一个调 enumerate_crash_states 的公开函数，表里没有，判红）；
 #   judge-entries-in-sync-stale-red（crash_point_replay_judge_not_run_line 改成不公开，表里有、源码里认不出，判红）；
-#   d137-ledger-defs-r3 攻方模型 research/prompts/d137-ledger-defs-r3-opus-model/ 的三个世界原样做成三份：judge-entries-in-sync-array-parameter-new-entry-red
-#   （green 那两份源文件末尾加签名里带 [u8; 32] 的公开入口 enumerate_crash_states_keyed_by_the_plan，经 enumerate_crash_states 走到判段：改前不进单元、判绿，现在第 49 行判红；
-#   世界 sync-array-parameter-new-entry）、judge-entries-in-sync-array-parameter-on-the-path-green（路径上的私有函数 enumerate_crash_states_through_the_library 签名里带
-#   [u8; 32]：改前断边、七个入口报认不出，现在判绿；世界 sync-array-parameter-on-the-path）、judge-entries-in-sync-cycle-new-entry-after-red（新公开入口
-#   enumerate_crash_states_one_more_round 与 enumerate_crash_states 互相调、写在它后面：改前记住环上的「走不到」、判绿，现在第 49 行判红；世界 sync-cycle-new-entry-after）。
+#   签名带数组与调用成环的三份：judge-entries-in-sync-array-parameter-new-entry-red
+#   （green 那两份源文件末尾加签名里带 [u8; 32] 的公开入口 enumerate_crash_states_keyed_by_the_plan，经 enumerate_crash_states 走到判段：第 49 行判红）、judge-entries-in-sync-array-parameter-on-the-path-green（路径上的私有函数 enumerate_crash_states_through_the_library 签名里带
+#   [u8; 32]：判绿）、judge-entries-in-sync-cycle-new-entry-after-red（新公开入口
+#   enumerate_crash_states_one_more_round 与 enumerate_crash_states 互相调、写在它后面：第 49 行判红）。
 # 弄坏开关见文件头 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK 的 judge-entries-new-unreported、judge-entries-stale-unreported、judge-entries-header-after-any-semicolon、
 # judge-entries-cycle-memoized 四项。
 # 退役判据：preregistration-judge-features 退役时一起删。
@@ -3589,7 +3611,7 @@ def lex(text):
 
 def header_start(code, low, brace):
     """认法 ①：花括号前面那一截表头从哪起——往回找方括号与圆括号外的上一个分号或右花括号，表头从它之后算；没有就从 low 起。
-    弄坏开关 judge-entries-header-after-any-semicolon 下照改前不看括号（签名里 [u8; N] 的分号也算，表头里认不出 fn）。"""
+    弄坏开关 judge-entries-header-after-any-semicolon 下不看括号（签名里 [u8; N] 的分号也算，表头里认不出 fn）。"""
     if "judge-entries-header-after-any-semicolon" in broken:
         return max(low, code.rfind(";", low, brace) + 1, code.rfind("}", low, brace) + 1)
     depth = 0
@@ -3684,7 +3706,7 @@ reaches = {}
 
 
 def reaches_route(unit, visiting):
-    """弄坏开关 judge-entries-cycle-memoized 下的改前走法：递归、记住每个单元的结果，环上截断时算出的「走不到」也记住（结局随先后翻）。"""
+    """弄坏开关 judge-entries-cycle-memoized 下的走法：递归、记住每个单元的结果，环上截断时算出的「走不到」也记住（结局随先后翻）。"""
     if id(unit) in reaches:
         return reaches[id(unit)]
     if id(unit) in visiting:
@@ -3743,7 +3765,7 @@ PY
 # ── 格 replay-comparison-units：重跑登记的比对对象，在单元表与 replay.sh 里都找得到，与重跑登记里的比对对象表逐行对得上
 #
 # 还着 .claude/kb/milestone/03-third-txn.md「待优化：流程、门禁与装置上踩过的坑」第 3 行改法的后半句（另立一条检查：每份重跑登记的比对对象表里的每条正式跑，
-# 在单元表和 replay.sh 里都找得到）。比对对象表在各份重跑登记里是散文表、写法各不相同，所以先立固定形态再立格（用户 2026-10-22 定）：
+# 在单元表和 replay.sh 里都找得到）。比对对象表在各份重跑登记里是散文表、写法各不相同，所以先立固定形态再立格：
 # 机读登记 .claude/gate.d/replay-comparison-units.tsv，一行一个比对对象，六列（实验号、登记出处、单元名、单元表出处、留存产物名、复跑），列义写在那份文件头。
 # 登记行由执行员在实现单元、登记复跑的同一次改动里加（阶段归属表这一格那一行）。
 # 重跑登记里的比对对象表有固定形态（.claude/agents/experiment-designer.md 第 1 步）：表头一行逐字是
@@ -3802,7 +3824,7 @@ COLUMNS = 6
 
 def none_identity(experiment, registration, unit, product):
     """复跑写 none: 的一行在「只缩不涨」里的键：（实验号，登记出处，单元名，留存产物名）。
-    弄坏开关 comparison-none-key-pair 退回改前的（登记出处，留存产物名）：换实验号、换单元名借同一对键照绿。"""
+    弄坏开关 comparison-none-key-pair 按（登记出处，留存产物名）成对：换实验号、换单元名借同一对键照绿。"""
     if "comparison-none-key-pair" in broken:
         return (registration, product)
     return (experiment, registration, unit, product)

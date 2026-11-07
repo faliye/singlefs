@@ -1,0 +1,3 @@
+# 记红没成、下一趟不复用旧绿：同 reuse-selftests-red-over-green（上一版把两行记成绿，这一趟同键现判，broken.sh 判红），另放 .unit-verdict-sample/red-record-failure：
+# 记红没成，plan-failure 带 --red 撤掉 broken.sh 那条绿，再算一次计划答「库里没有这一条」
+reuse-selftests

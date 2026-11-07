@@ -1,0 +1,13 @@
+exit=1
+want=✗ 登记表 .claude/memory-bounded-parallelism.tsv 有 9 处不对：
+want=第 3 行不是六列（入口、每件峰值、出处、件数从哪来、底座、理由，制表符分隔、每列都不空）：分出 5 列
+want=第 4 行的入口 scripts/experiment-apparatus/gone_run.sh：仓根下没有这份文件
+want=第 5 行的入口 cargo:demo:missing_target：包 demo（crates/demo）里没有叫 missing_target 的目标
+want=第 6 行的每件峰值「6.8G」或底座「0」不是整数字节数
+want=第 7 行的出处「量的」没点到任务号
+want=第 8 行的件数从哪来「by-memory」不是 item-plan、fixed:<正整数>、argument:<选项名> 三种之一
+want=✗ 2 份文件里按内存上限定开几个进程或线程，所在入口没登记在 .claude/memory-bounded-parallelism.tsv
+want=crates/demo/src/lease.rs:2  按内存定并发的函数
+want=scripts/experiment-apparatus/unregistered_run.sh:4  内存上限与并发数同在一行
+want=✗ 登记表里 1 个入口罩着的文件里已经没有按内存定并发的写法
+want=第 9 行 scripts/hosts/plain_run.sh（入口文件 scripts/hosts/plain_run.sh

@@ -35,7 +35,7 @@ VM_DISKS=4 VM_DISK_MB=64 bash scripts/devices/vm-bench.sh <静态二进制>
 |---|---|---|
 | **KVM 可读写** | `id -nG \| grep -w kvm`，再实测 `[ -r /dev/kvm ] && [ -w /dev/kvm ]` | 本机靠 **`kvm` 组成员身份**拿权限。不满足就 `sudo usermod -aG kvm $USER`（口令在 `.env` 的 `SUDO_PASS_A`）；当前 shell 用 `sg kvm -c '<命令>'` 立即取得，新会话自动带上 |
 | **内核镜像可读** | `bash scripts/devices/vm-kernel.sh --check` | 跑 `bash scripts/devices/vm-kernel.sh`，它打印一个可用路径；必要时用 `.env` 里的口令从 `/boot` 复制一份到 `TMPDIR` 并 chown。要量时间就跑 `bash scripts/devices/vm-kernel.sh --release $(uname -r)`：它只认 `/boot/vmlinuz-<版本>`，复制成 `TMPDIR` 下的 `singlefs-vmlinuz-<版本>`，不会先撞上 lockdep 那个 |
-| **二进制是静态的** | `file <二进制>` | 实验二进制用 `--target x86_64-unknown-linux-musl` 编，musl 目标已装（`rustup target list --installed`）；带 RocksDB 的 checker 档二进制用 `--target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]'` 编成 static-pie（`.claude/gate.d/checker-tier-qemu-device-streams.sh`） |
+| **二进制是静态的** | `file <二进制>` | 实验二进制用 `--target x86_64-unknown-linux-musl` 编，musl 目标已装（`rustup target list --installed`）；带 RocksDB 的验证包二进制用 `--target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]'` 编成 static-pie（`.claude/gate.d/qemu-device-streams.sh`） |
 
 ⚠️ **判断 KVM 前置一律查组并实测读写，不许查 ACL，也不许用 `setfacl` 去补。**
 `/dev/kvm` 带 `TAG+="uaccess"`（`/usr/lib/udev/rules.d/70-uaccess.rules:48`），
@@ -124,7 +124,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 
 `VM_BLKLOGWRITES_DIR=<目录>` 时，`vm-bench.sh` 在每块盘前面套一层 QEMU 的 `blklogwrites` 过滤节点（本机 QEMU 8.2.2 带这个驱动，2026-09-14 现查）。
 来宾发到盘上的每个写（带数据）与每个 FLUSH 按 dm-log-writes 格式记进 `<目录>/log<d>.img`；数据盘也放在同一个目录（`disk<d>.img`），跑完不删。
-录制在来宾之外，与被测程序自己的录制器不共享代码。解析与比对在 `crates/singlefs-checker-tier/src/device_log.rs`，判据在门禁 checker-tier-qemu-device-streams（`.claude/gate.d/checker-tier-qemu-device-streams.sh`）。
+录制在来宾之外，与被测程序自己的录制器不共享代码。解析与比对在 `crates/singlefs-verification/src/device_log.rs`，判据在门禁 qemu-device-streams（`.claude/gate.d/qemu-device-streams.sh`）。
 
 ⚠️ **blklogwrites 一支只用打了补丁的 QEMU**：本机系统 QEMU 8.2.2（Ubuntu `1:8.2.2+ds-0ubuntu1.18`）的 `block/blklogwrites.c` 写日志条目时，把数据的全部 iovec 接在 2 段条目头后面（`qemu_iovec_init(&log_qiov, niov + 2)`）；数据段数到 1023 以上时日志那一笔超过 IOV_MAX = 1024，宿主 `pwritev` 回 EINVAL，来宾拿到 EIO。mkfs 按 4 MiB 一块写零、virtio-blk 把相邻请求合并成 1024 段时就会撞上，现象是 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`。2026-10-01 实测：6 台虚机并行，原样 QEMU 两轮 12 / 12 在 mkfs 报 EIO，补好的两轮 0 / 12；qemu-io 直接交 1023 段，原样报 `writev failed: Invalid argument`，1022 段过；上游 master 同一行没改，没向上游报。补丁在 `scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch`（段数加 2 超过 IOV_MAX 时先拷进一块连续缓冲区再记日志）；`scripts/devices/build-patched-qemu.sh` 取同版本的 Ubuntu 源码、打补丁、装进私有目录（默认 `~/.local/share/singlefs/qemu`），仓根 `qemu.env`（git 忽略，模板 `qemu.env.example`）写一行 `SINGLEFS_QEMU_HOME=<绝对路径>`。`vm-bench.sh` 只在 `VM_BLKLOGWRITES_DIR` 那一支读它，开跑前用 `scripts/devices/qemu-blklogwrites-check.sh` 核 1022 / 1023 / 1024 / 2048 段，配置缺或核不过就拒绝跑、不退回系统 QEMU；别的分支照用系统 QEMU，被测条件不变。换机器或系统 QEMU 升级之后，先重跑 `build-patched-qemu.sh`。
 
@@ -134,7 +134,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 | 来宾 `/sys/block/<名>/stat` 的写请求数 = 程序的写数 + FLUSH 数（盘 0：23 + 12 = 35） | 比对用写扇区数（= 字节 ÷ 512）与 FLUSH 数；FLUSH 数是 stat 的下标 15，不是 14（14 是 discard 耗时，读它会得到 0） |
 | 走页缓存时设备侧的写被合并 | m1（32 KiB）与 m2（16 KiB）回写成一个 48 KiB 的写；这是阳性对照判红的地方 |
 
-⚠️ **日志盘要装得下全部写的数据**：`log<d>.img` 的大小取 `VM_LOG_MB`（MiB），`vm-bench.sh` 自己的默认是 256。mkfs 按 4 MiB 一块写零 768 MiB 之后，每块盘的日志实用约 770 MiB（2026-09-27 实测，VM_DISKS=2、每盘 4096 MiB，六档都在 769–771 MiB）；256 MiB 时 direct、file-overwrite、second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`；page-cache、skip-new-pool-file-creation-barrier、raise-rollback-floor 三档那一次没报，为什么没查。门禁 checker-tier-qemu-device-streams 因此默认传 `VM_LOG_MB=4096`（一块数据盘的大小，镜像是稀疏文件，只占真写进去的那些）；别处开 blklogwrites 模式的，照写的数据量设 `VM_LOG_MB`。把那次 EIO 归给日志盘太小，这一归因没复核：同一句 `run_failed step=mkfs … I/O error` 也是 blklogwrites 超过 IOV_MAX 那个缺陷的症状，三档报、三档没报的形状与并发下随机撞上相容（推的，没量过）。
+⚠️ **日志盘要装得下全部写的数据**：`log<d>.img` 的大小取 `VM_LOG_MB`（MiB），`vm-bench.sh` 自己的默认是 256。mkfs 按 4 MiB 一块写零 768 MiB 之后，每块盘的日志实用约 770 MiB（2026-09-27 实测，VM_DISKS=2、每盘 4096 MiB，六档都在 769–771 MiB）；256 MiB 时 direct、file-overwrite、second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`；page-cache、skip-new-pool-file-creation-barrier、raise-rollback-floor 三档那一次没报，为什么没查。门禁 qemu-device-streams 因此默认传 `VM_LOG_MB=4096`（一块数据盘的大小，镜像是稀疏文件，只占真写进去的那些）；别处开 blklogwrites 模式的，照写的数据量设 `VM_LOG_MB`。把那次 EIO 归给日志盘太小，这一归因没复核：同一句 `run_failed step=mkfs … I/O error` 也是 blklogwrites 超过 IOV_MAX 那个缺陷的症状，三档报、三档没报的形状与并发下随机撞上相容（推的，没量过）。
 
 ⚠️ 这一档验的是「程序发出的写与 FLUSH 在虚拟设备上原样到达、次序不变」，不是真盘的持久语义：`cache=none` 下设备侧 FLUSH 映射成宿主上的 `fdatasync`，宿主盘自己的缓存不在射程里。
 

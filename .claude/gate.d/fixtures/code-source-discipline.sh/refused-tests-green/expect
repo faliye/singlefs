@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：refused-tests
+want=✓ 拒算的测试函数与登记表逐条对上：拒算 2 条、登记表 2 行
+want=refused-tests：绿

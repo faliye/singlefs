@@ -1,0 +1,4 @@
+# 样本：一份假自证打三问都过的规范输出，一份不打（判红）
+# scan: scripts/gate/*.sh
+scripts/gate/alpha.sh	bash scripts/gate/alpha.sh --selftest	样本里的假库	reuse-three-questions
+scripts/gate/broken.sh	bash scripts/gate/broken.sh --selftest	样本里的假库	reuse-three-questions

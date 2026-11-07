@@ -165,6 +165,12 @@
 #   lib_project_code_runs.py 的 PRODUCT_GPU_FEATURE、crates-mutation-rows.py 的 GPU_TEST_FEATURES）。
 #   起法：cargo test --release --no-fail-fast -p singlefs-background-gpu --features tests-on-a-real-gpu --test <目标>… -- --nocapture --test-threads 1（不带 --lib：库单测不上卡，归不带特性那一趟），
 #   上 task-server 交的卡（与 feature-gated-tests 带 gpu 特性那一趟同一套，require_service_card；环境里没有那张卡就判红、这一趟不起）。
+#   卡数：服务照命令位置上起的脚本的文件头交卡，这一道文件头没写「# task-server-gpu-cards:」，交一张；要两张、三张卡的对拍目标在测试源文件头写「// task-server-gpu-cards: <张数>」，
+#   服务只在单交那个目标（cargo test -p <包> --test <目标>）时照它分同一台的几张。所以对拍那一趟开跑前逐个目标读这一行（读法同服务：product_gpu_target_rows 的第三列），
+#   与交来的卡数比（GPU_CARDS_BY_PRIORITY 是用空格接的几项，一项一张）：要的比拿到的多的目标不起、不进按条复用的计划，逐个报一行本次未跑
+#   「产品 GPU 包对拍目标 <目标>（<源文件>）声明 N 张、拿到 M 张，提交时单交：…」（往 $GATE_NOT_RUN_FILE 记一行，不判红），提交时由主 agent 照
+#   .claude/skills/crash-test/commit-stages.md 第 2d 步逐个单交；够的照常跑，跑法不变。一个目标都起不了的不起 cargo、这一格记本次未跑。
+#   样本 product-gpu-fewer-cards-than-declared（一个目标声明 3 张、交 1 张：它本次未跑，另两个照跑）、product-gpu-declared-cards-handed-over（声明 2 张、交 2 张：照跑）钉这一条。
 #   对拍测试的 CPU 一侧读 SINGLEFS_CRASH_JUDGE_CPU_THREADS（没设取本机可用并行度），这个参数只管同时起几个测试。
 #   按条复用：每条对拍测试函数各一条判定，种类同 验证包那两趟（<阶段文件名>:test-functions，同一份库，admission.py test-plan 的包参数取产品 GPU 包），键相同的经 --exact --skip 跳过，
 #   一条都不用现判就不起 cargo；判绿的照键记库，打了 NOT_RUN_ 的那一条不记（lib_libtest_result_lines.py 的 recordable_results）。复用三问（reuse-three-questions）在三份样本里问：
@@ -270,11 +276,17 @@
 #   features-item-named-green、features-item-unknown  逐项点名（文件头「逐项点名」，样本根的 .gate-items）：点 feature-gated:store_only.rs 只编、只跑 tests/store_only.rs（不带 --lib，特性照整格那一组），
 #                                    它的 ITEM_DONE 与 features-green 整格那一趟里同一项那一行逐字相同（点名单跑一项与它在整格里跑的判定相同）；点 tests/ 里没有的文件退 2、列出可点的项
 #   red-outside-the-tail、red-pass-records-green、red-rejudged-next-pass  整包那一趟判红（红的目标在尾巴之外）；记红、撤绿、下趟现判
+#   red-record-failed-next-pass-rejudged  记红没成、下一趟不复用旧绿：上一版照判绿记进 shared_check 同一把键的绿；.unit-verdict-sample/red-over-green 让不带特性那一趟
+#                                    的计划不读库（ADMISSION_BREAK=verdict-lookup-skipped）、上一版只在这一趟记一次，shared_check 现判红；.unit-verdict-sample/red-record-failure
+#                                    让 admission.py verdict-record 记红没成、退 1，plan-failure 带 --red 判失灵、撤掉那条绿（「同一把键原有的绿已撤掉 1 条」）；
+#                                    带特性那一趟同一把键查库答「库里没有这一条」、现判它
 #   unit-key-samples-green、unit-key-samples-red  按条复用（对照样本 S17、N19、F1、H2、H3）：要现判的恰好是 test_t、test_u、f1_middle、h2_test，复用的是 test_v、f1_first、f1_last、h3_test，假 cargo 照收到的 --skip 只打要现判的结果行；后一份让 test_t 判 FAILED
 #   unit-key-plan-exit-red、unit-key-plan-sentinel-red、unit-key-plan-unavailable、unit-key-plan-unavailable-with-red  按条复用失灵：test-plan 退 1、哨兵报复用失灵判红；退 75 判不可用、整道退 75（另有真红时退 1）
 #   unit-key-gpu-switch-not-in-key、unit-key-not-run-withheld-per-test  GPU 开没开不进键；按测试函数不记（打了 NOT_RUN_ 的那一条、结果行被打散认不出结局的那几条）
 #   product-gpu-green、product-gpu-red、product-gpu-no-card、product-gpu-card-missing、product-gpu-zero-tests、product-gpu-no-target、product-gpu-feature-missing、product-gpu-reuse-same-inputs、product-gpu-reuse-unrelated-change、product-gpu-reuse-unit-change
 #                                    产品 GPU 包那一格的样本：三条对拍判绿并记库；判红；没卡逐条记本次未跑；环境里没有卡判红；跑到 0 条；没有目标挂特性；包里没有这个特性判红；复用三问
+#   product-gpu-fewer-cards-than-declared、product-gpu-declared-cards-handed-over  卡数：一个对拍目标文件头声明 3 张、服务交 1 张，它不起、报本次未跑（声明 3 张、拿到 1 张，提交时单交），
+#                                    另两个照跑、判绿记库；一个目标声明 2 张、服务交 2 张，三条对拍照跑、判绿记库
 #   四份 features-* 的 tests/ 里挂特性的写法各有一处：整份 #![cfg(feature)]、折成几行的 #![cfg(all(…))]、逐条 #[cfg(feature)]，
 #   与一个只在 // 注释里出现的特性名（读进来就找不到那组特性的日志）。样本里的特性 sample-store、sample-accelerator 是造出来的（验证包只有 gpu 一个特性）。
 # 弄坏开关（只给证红用）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/crash-point-replay.sh/ 下的目录名，
@@ -301,8 +313,12 @@
 #       unit-key-plan-unavailable（期望退出 75，实测 1）；unit-key-plan-unavailable-with-red（输出里找不到「✗ crash-case-replay 这一格没判：prune-server 不可用（上面那一句）；这一格就此收尾…」）
 #   GATE_CRASH_POINT_REPLAY_BREAK=plan-unavailable-exits-at-once  plan-failure 退 75 当场整道退 75，后面的格不跑、已判红的格被吞（改前的样子）
 #       unit-key-plan-unavailable-with-red（期望退出 1，实测 75）；unit-key-plan-unavailable（输出里找不到「✗ crash-case-replay 这一格没判：prune-server 不可用（上面那一句）；这一格就此收尾…」）
-#   admission.py 的 ADMISSION_BREAK=plan-failure-not-red  按条复用失灵也不判红（改前整包那一趟退回全部现判、不判红的样子）
+#   ADMISSION_BREAK=plan-failure-not-red  归 scripts/gate/admission.py：按条复用失灵也不判红（改前整包那一趟退回全部现判、不判红的样子）
 #       unit-key-plan-exit-red、unit-key-plan-sentinel-red（期望退出 1，实测 3：流程判绿）
+#   ADMISSION_BREAK=red-record-failure-swallowed  归 scripts/gate/admission.py：记红没成只打一行 !、照退 0，plan-failure 不撤绿（改前的样子）
+#       red-record-failed-next-pass-rejudged（输出里找不到「同一把键原有的绿已撤掉 1 条」：带特性那一趟照复用上一版那条绿）
+#   GATE_CRASH_POINT_REPLAY_BREAK=red-record-failure-kept-green  记红没成只打一行「!」、不交 plan-failure（改前的样子：同一把键原有的绿留着，下一趟照复用）
+#       red-record-failed-next-pass-rejudged（输出里找不到「同一把键原有的绿已撤掉 1 条」与「现判 …shared_check（库里没有这一条」：带特性那一趟照复用上一版那条绿）
 #   GATE_CRASH_POINT_REPLAY_BREAK=no-findings-file  不设 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE
 #       green（期望退出 3，实测 1）；red（输出里找不到「第 1 节…」）
 #   GATE_CRASH_POINT_REPLAY_BREAK=ignore-unfinished  没有 summary 的节当跑完了
@@ -317,11 +333,11 @@
 #       features-green、features-gpu-not-run、features-red、features-interrupted、features-zero、features-gpu-configured-green、features-supplement-not-run、
 #       features-shared-library、features-red-pass-records-green、features-gpu-configured-judged-on-cpu、features-red-outside-the-tail、
 #       features-gpu-configured-cpu-judged-records-the-rest、features-gpu-configured-cpu-judged-on-test-line、cpu-judged-green-recorded、gpu-configured-cpu-judged-not-recorded、
-#       gpu-configured-cpu-judged-records-the-rest、red-outside-the-tail、red-pass-records-green、red-rejudged-next-pass（带特性那一趟没起：输出里找不到它的结局句、期望退出 1 实测 3，或补判的结论报本次未跑）；
+#       gpu-configured-cpu-judged-records-the-rest、red-outside-the-tail、red-pass-records-green、red-rejudged-next-pass、red-record-failed-next-pass-rejudged（带特性那一趟没起：输出里找不到它的结局句、期望退出 1 实测 3，或补判的结论报本次未跑）；
 #       features-item-named-green（输出里找不到「sample-cargo-arguments: … --test store_only …」）；
 #       features-domain-variable-cleared、features-gpu-test-threads-released（带特性那一趟没起：输出里找不到它那一趟的 sample-cargo-arguments 行）
 #   GATE_CRASH_POINT_REPLAY_BREAK=features-not-from-source  特性不从源码读、写死 sample-store,gpu（假 cargo 没有这组特性的日志、退 101）
-#       features-gpu-not-run、features-green、features-zero（期望退出 3，实测 1）；features-interrupted、features-red、features-red-outside-the-tail、red-outside-the-tail、red-rejudged-next-pass、
+#       features-gpu-not-run、features-green、features-zero（期望退出 3，实测 1）；features-interrupted、features-red、features-red-outside-the-tail、red-outside-the-tail、red-rejudged-next-pass、red-record-failed-next-pass-rejudged、
 #       red-pass-records-green、features-red-pass-records-green、features-shared-library、cpu-judged-green-recorded、features-gpu-configured-green、features-item-named-green、
 #       features-domain-variable-cleared、features-gpu-configured-cpu-judged-on-test-line、features-gpu-configured-cpu-judged-records-the-rest、features-gpu-configured-judged-on-cpu、
 #       features-gpu-test-threads-released、features-supplement-not-run（带特性那一趟找不到这组特性的日志）
@@ -336,9 +352,11 @@
 #   GATE_CRASH_POINT_REPLAY_BREAK=gpu-test-threads-unset  特性里有 gpu 也不加 --test-threads 1（照改前，测试线程取 RUST_TEST_THREADS 即登记值）
 #       features-green、features-item-named-green、features-gpu-test-threads-released（输出里找不到「…-- --nocapture --test-threads 1」）；features-supplement-not-run（输出里找不到「sample-cargo-arguments: … --features gpu …」）
 #   GATE_CRASH_POINT_REPLAY_BREAK=product-gpu-cell-skipped  要现判的也不起产品 GPU 包的对拍那一趟（日志空着、退出码当 0）
-#       product-gpu-green、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-unit-change（输出里找不到「sample-cargo-arguments: test --release --no-fail-fast -p singlefs-background-gpu…」）；product-gpu-red（期望退出 1，实测 3）
+#       product-gpu-green、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-unit-change、product-gpu-fewer-cards-than-declared、product-gpu-declared-cards-handed-over
+#       （输出里找不到「sample-cargo-arguments: test --release --no-fail-fast -p singlefs-background-gpu…」）；product-gpu-red（期望退出 1，实测 3）
 #   GATE_CRASH_POINT_REPLAY_BREAK=product-gpu-test-threads-unset  产品 GPU 包的对拍那一趟不加 --test-threads 1（几个对拍测试各占卡的显存，并行起会互相抢）
-#       product-gpu-green、product-gpu-red、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-unit-change（输出里找不到「…-- --nocapture --test-threads 1」）
+#       product-gpu-green、product-gpu-red、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-unit-change、product-gpu-fewer-cards-than-declared、product-gpu-declared-cards-handed-over
+#       （输出里找不到「…-- --nocapture --test-threads 1」）
 #   GATE_CRASH_POINT_REPLAY_BREAK=product-gpu-exit-ignored  产品 GPU 包的对拍那一趟 cargo test 退非 0 当成跑过
 #       product-gpu-red（期望退出 1，实测 3）
 #   GATE_CRASH_POINT_REPLAY_BREAK=product-gpu-not-run-ignored  不读产品 GPU 包对拍打的 NOT_RUN_NO_GPU_ADAPTER
@@ -346,16 +364,25 @@
 #   GATE_CRASH_POINT_REPLAY_BREAK=product-gpu-zero-ignored  不判产品 GPU 包的对拍目标跑到 0 条
 #       product-gpu-zero-tests（输出里找不到「本次未跑（这不是通过）：产品 GPU 包 crates/singlefs-background-gpu/tests/two_kernels_reconcile.rs 挂特性…」）
 #   GATE_CRASH_POINT_REPLAY_BREAK=product-gpu-targets-by-file-name  对拍目标按文件名认（只认 tests/checksum 起头的），不按包与特性认
-#       product-gpu-green、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-same-inputs、product-gpu-reuse-unrelated-change、product-gpu-reuse-unit-change、product-gpu-red（cfg 挂特性的 two_kernels_reconcile 认不到）
+#       product-gpu-green、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-same-inputs、product-gpu-reuse-unrelated-change、product-gpu-reuse-unit-change、product-gpu-red、
+#       product-gpu-declared-cards-handed-over（cfg 挂特性的 two_kernels_reconcile 认不到）；product-gpu-fewer-cards-than-declared（另认不到同样只靠 cfg 挂特性、声明 3 张的 three_cards_reconcile，
+#       输出里找不到「产品 GPU 包对拍目标 three_cards_reconcile（…声明 3 张、拿到 1 张，提交时单交」）
+#   GATE_CRASH_POINT_REPLAY_BREAK=product-gpu-card-count-unchecked  产品 GPU 包的对拍那一趟不比目标文件头声明的张数与交来的卡数，卡不够的目标也起
+#       product-gpu-fewer-cards-than-declared（输出里找不到「── product-gpu-real-card-tests：cargo test … --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --test-threads 1」：
+#       声明 3 张的 three_cards_reconcile 也进了 --test、只拿到 1 张卡就起）
 #   GATE_CRASH_POINT_REPLAY_BREAK=card-missing-unrefused  要上卡的一趟环境里没有 task-server 交的 GPU_CARDS_BY_PRIORITY 也照起（require_service_card 不判红）
 #       features-card-missing、product-gpu-card-missing（期望退出 1，实测 3）
 #   GATE_CRASH_POINT_REPLAY_BREAK=sample-caller-configuration-kept  样本档里准入模块照旧读调用方环境里 SINGLEFS_MULTI_HOST_CONFIG 指的多机配置（read_crash_case_command 不 -u 它；改前的样子）
 #       crash-audit-caller-gpu-configuration-green（期望退出 3，实测 1）
 #   GATE_CRASH_POINT_REPLAY_BREAK=service-card-not-forwarded  task-server 交的卡不交给这一道自己起的那两趟 cargo（env 里 -u GPU_CARDS_BY_PRIORITY）
-#       features-green、features-red、features-interrupted、features-supplement-not-run、product-gpu-green、product-gpu-red、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-unit-change
-#       （输出里找不到「sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]」：假 cargo 收到的是 cards=[unset]）
+#       features-green、features-red、features-interrupted、features-supplement-not-run、product-gpu-green、product-gpu-red、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-unit-change、
+#       product-gpu-fewer-cards-than-declared（输出里找不到「sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]」：假 cargo 收到的是 cards=[unset]）；
+#       product-gpu-declared-cards-handed-over（输出里找不到「sample-cargo-gpu: cards=[192.0.2.1:0:8G 192.0.2.1:1:8G] quiesced-by-the-stage=[]」）
 #   GATE_CRASH_POINT_REPLAY_BREAK=stage-quiesces-by-itself  要上卡的一趟照改前自己套 scripts/crash/gpu-quiesce-run.sh（清场归 task-server 之前的样子；清场配置是草稿目录里只写假清场命令的一份）
-#       同上九份样本（输出里找不到「sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]」：假 cargo 收到的是 quiesced-by-the-stage=[yes]）
+#       features-green、features-red、features-interrupted、features-supplement-not-run、product-gpu-green、product-gpu-red、product-gpu-no-card、product-gpu-zero-tests、product-gpu-reuse-unit-change、
+#       product-gpu-fewer-cards-than-declared、product-gpu-declared-cards-handed-over、features-gpu-configured-cpu-judged-on-test-line、features-gpu-configured-cpu-judged-records-the-rest、
+#       features-gpu-configured-green、features-gpu-configured-judged-on-cpu、features-gpu-not-run、features-gpu-test-threads-released、features-item-named-green、features-red-outside-the-tail、features-zero、
+#       red-outside-the-tail（输出里找不到「sample-cargo-gpu: cards=[…] quiesced-by-the-stage=[]」：假 cargo 收到的是 quiesced-by-the-stage=[yes]）
 #   GATE_CRASH_POINT_REPLAY_BREAK=red-tail-only  按条复用两趟判红时照改前只打 cargo 输出的尾巴 40 行与「^test … FAILED$」那一条 grep：不抄红的测试目标里 FAILED 的测试函数名与 panic 段、不留整份输出
 #       product-gpu-red（输出里找不到「· product-gpu-real-card-tests：红的测试目标 1 个、FAILED 的测试函数 1 条」）；
 #       features-red-outside-the-tail（输出里找不到「· feature-gated-tests：红的测试目标 1 个、FAILED 的测试函数 1 条…」）；
@@ -384,7 +411,7 @@
 #       unmarked-red-blocks（输出里找不到「✗ 1 条崩溃枚举用例判红：crash-case:plain-stream（这一趟判绿 1 条」：带标记的那条也判红）
 #   GATE_CRASH_POINT_REPLAY_BREAK=ran-for-every-case  每条用例块那一行都带 --ran（没登记 red-blocks=judged-by-test 的用例块那一行有红也不判红）
 #       unmarked-red-blocks（期望退出 1，实测 3）
-#   admission.py 的 ADMISSION_BREAK=ran-blocks-line-optional  crash-case-blocks --ran 没有那一行也退 0
+#   ADMISSION_BREAK=ran-blocks-line-optional  归 scripts/gate/admission.py：crash-case-blocks --ran 没有那一行也退 0
 #       judged-by-test-missing-blocks-line、judged-by-test-missing-blocks-line-after-the-run（期望退出 1，实测 3）
 #   GATE_CRASH_POINT_REPLAY_BREAK=gpu-switch-in-key  按条复用的几趟每条测试函数的键照改前另加 line:enable-gpu=<多机配置的 ENABLE_GPU>（样本档拿上一版算键时取上一版那一趟的配置）
 #       unit-key-gpu-switch-not-in-key（输出里找不到「· 按条复用：验证包 3 条编得进的测试函数，现判 0、复用 3…」：上一版在 ENABLE_GPU=0 下记的判定这一版对不上键）
@@ -414,6 +441,7 @@
 #   scripts/crash/crash-flow-coverage.py 平常跑时设了开关整份退 2（只在 --selftest 里认），在样本上证不了；开关表在它们文件头，由它们的 --selftest 证红
 #   GATE_CRASH_POINT_REPLAY_BREAK=red-not-recorded  按条复用的几趟判红时不把 FAILED 的测试函数交 verdict-record --red-names（改前的样子：门禁判红的不记红、不撤同一把键原有的绿），判绿的照记
 #       red-rejudged-next-pass（输出里找不到「· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟照现判（RECORD recorded=0 changed=0 refused=0…」）；
+#       red-record-failed-next-pass-rejudged（不交红的就没有记红没成那一句、不撤绿：带特性那一趟照复用上一版那条绿）；
 #       red-pass-records-green、features-red-pass-records-green、product-gpu-red（输出里找不到「· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟照现判（RECORD recorded=…」）；
 #       gpu-configured-cpu-judged-records-the-rest、features-gpu-configured-cpu-judged-records-the-rest、features-gpu-configured-cpu-judged-on-test-line（同一句：判段判在 CPU 归得到的那几条没记红）
 #   GATE_CRASH_POINT_REPLAY_BREAK=plain-pass-red-withholds-green  crash-case-replay 格不带特性那一趟 cargo test 退非 0 时照改前不认结局、判绿的一条都不记（只记红）
@@ -461,6 +489,11 @@ PRODUCT_GPU_FEATURE_NAME="tests-on-a-real-gpu"
 crash_point_replay_selected_cells=()
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ crash-point-replay.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 # 弄坏开关只在样本根上认（C622）：判法只在共用库一处（lib/stage-cells.sh 的 stage_cells_refuse_unsampled_break_switches，
 # 它文件头「弄坏开关只在样本根上认」）。这一道不经共用库跑格，只 source 它取这一个函数（cd 之前 source，库按本阶段的路径认阶段所在的仓），cd 到根之后调。
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
@@ -1041,8 +1074,14 @@ plan_tests() {
   crash_point_replay_plan_tokens "$crash_point_replay_stage_repository" "$crash_point_replay_gpu_configured"
   local -a tokens=("${crash_point_replay_plan_token_arguments[@]}")
   [[ "$crash_point_replay_break" == setting-file-whole-closure ]] && break_setting=("ADMISSION_BREAK=test-key-with-whole-file")
+  # 样本档带 .unit-verdict-sample/red-over-green（文件头「样本档」）：库里已有上一版照判绿记进来的同一把键，不带特性那一趟（crash-case-replay 格）的计划不读库、
+  #   一律现判（ADMISSION_BREAK=verdict-lookup-skipped，样本根不抽复用哨兵），上一版也只在这一趟记一次；带特性那一趟照常查库，看判红那一趟记下了什么
+  local plain_red_over_green=0
+  [[ "$crash_point_replay_sample_mode" == 1 && -f "$PWD/.unit-verdict-sample/red-over-green" && ${#feature_options[@]} -eq 0 && -z "${plan_package:-}" ]] \
+    && plain_red_over_green=1 && break_setting=("ADMISSION_BREAK=verdict-lookup-skipped")
   plan_judge=0; plan_reuse=0; plan_refused=0; plan_not_compiled=0; plan_problem=""; plan_failure=()
-  if [[ "$crash_point_replay_sample_mode" == 1 && -d "$PWD/.unit-verdict-sample/prior" ]]; then
+  if [[ "$crash_point_replay_sample_mode" == 1 && -d "$PWD/.unit-verdict-sample/prior" ]] \
+       && { ((plain_red_over_green)) || [[ ! -f "$PWD/.unit-verdict-sample/red-over-green" ]]; }; then
     seed_prior_verdicts "$kind" ${feature_options[@]+"${feature_options[@]}"} || return 1
   fi
   if env ${break_setting[@]+"${break_setting[@]}"} python3 "$crash_point_replay_admission_module" test-plan "$ROOT" "$kind" "${plan_package:-singlefs-verification}" "$plan_file" \
@@ -1238,8 +1277,10 @@ record_green_tests() {
 #   经 admission.py verdict-record --red-names 照计划里的键记红、撤掉同一把键原有的绿（拒算的没有键，verdict-record 不记），下一趟这几条现判、原因以「上次判红」起头。
 #   给了 <清单文件>（这一趟 account_test_results 认成了）：同一趟判绿的经 green_names_of_pass 取名单、交同一次 verdict-record 照键记绿（文件头「复用」：
 #   只认有明确结局行的；编不过、一条结局行都没有的，名单是空的，一条都不记）；没给的（认不成，或弄坏开关 *-red-withholds-green 下调用处不给）判绿的一条都不记。
-#   打「· 判红记库：…」与「· 判绿记库（<格名> 这一趟判红）：…」各一行；记不下只打一行「!」（这一格已经判红），复用哨兵报的失灵照 plan_failure_verdict 打出路。
-#   弄坏开关 red-not-recorded 下不交红的（改前的样子：门禁判红的不撤同一把键原有的绿），判绿的照记
+#   打「· 判红记库：…」与「· 判绿记库（<格名> 这一趟判红）：…」各一行；记不下的交 plan_failure_verdict（这一格已经判红）：交了红的带 --red，
+#   记红没成由 admission.py plan-failure 判失灵、撤掉这几把键原有的绿（撤不掉说整道判红，它文件头「按条复用失灵」），复用哨兵报的失灵照打出路。
+#   弄坏开关 red-not-recorded 下不交红的（改前的样子：门禁判红的不撤同一把键原有的绿），判绿的照记；
+#   red-record-failure-kept-green 下记红没成只打一行「!」、不交 plan-failure（改前的样子：同一把键原有的绿留着，下一趟照复用）
 record_red_tests() {
   local kind="$1" plan_file="$2" plan_output="$3" red_rows="$4" cell="$5" how="$6" accounting="${7:-}" red_names="$crash_point_replay_scratch_directory/red-names.$5"
   local green_names="$crash_point_replay_scratch_directory/red-names.$5.green" red_count=0 green_count=0 record_exit
@@ -1265,10 +1306,17 @@ record_red_tests() {
   if ((record_exit == 0)); then
     (( red_count > 0 )) && echo "  · 判红记库：${red_count} 条记红、撤掉同一把键原有的绿，下一趟照现判（$(tail -n 1 "$red_names.record")）"
     (( green_count > 0 )) && echo "  · 判绿记库（$cell 这一趟判红）：判绿的 ${green_count} 条照键记库（$(tail -n 1 "$red_names.record")）"
-  else
+  elif [[ "$crash_point_replay_break" == red-record-failure-kept-green ]] && (( red_count > 0 )); then
+    # 弄坏开关：改前的样子，记红没成只打一行「!」、不交 plan-failure，同一把键原有的绿留着、下一趟照复用
     echo "  ! 判红记库：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$red_names.record" | tr '\n' ' ' | cut -c1-300)），红的没记下、同一把键原有的绿还在；判绿的 ${green_count} 条也没记下，下一趟照跑"
+  else
+    echo "  · 判红记库：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$red_names.record" | tr '\n' ' ' | cut -c1-300)）；判绿的 ${green_count} 条照它报的记没记，下一趟照判；红的 ${red_count} 条交 plan-failure 判、撤同一把键原有的绿"
+    # 记红没成（admission.py 文件头「按条复用失灵」）：带 --red 交 plan-failure，它判失灵、撤掉这几把键原有的绿（撤不掉说整道判红）；
     # 这一格已经判红：记库那一步 prune-server 不可用也照红算（crash_point_replay_red_regardless_cells），不当只是不可用
-    plan_failure_verdict "$cell" verdict-record "$record_exit" "$red_names.record" || crash_point_replay_red_regardless_cells+=("$cell")
+    local -a red_withdrawal=()
+    (( red_count > 0 )) && red_withdrawal=(--red "$ROOT" "$kind" "$plan_file" "$red_names")
+    plan_failure_verdict "$cell" verdict-record "$record_exit" ${red_withdrawal[@]+"${red_withdrawal[@]}"} "$red_names.record" \
+      || crash_point_replay_red_regardless_cells+=("$cell")
   fi
   return 0
 }
@@ -2470,8 +2518,10 @@ run_feature_gated_tests_pass() {
 }
 
 # ── 产品 GPU 包带 tests-on-a-real-gpu 的真显卡对拍（product-gpu-real-card-tests 格；文件头「product-gpu-real-card-tests 格」）─────────
-# product_gpu_target_rows <包目录> <特性>：这个包里开了这个特性才编的测试目标，一个一行「目标名<TAB>源文件（包目录起）」，照目标名排序：Cargo.toml 的 [[test]] 里
+# product_gpu_target_rows <包目录> <特性>：这个包里开了这个特性才编的测试目标，一个一行「目标名<TAB>源文件（包目录起）<TAB>它要几张卡」，照目标名排序：Cargo.toml 的 [[test]] 里
 # required-features 有这个特性的（源文件取它的 path，没写取 tests/<名>.rs），加 tests/ 顶层每个 .rs（// 起头的行不读）里 cfg 写了 feature = "<特性>" 的。按包与特性认，不按文件名写死。
+# 要几张卡照统一任务服务单交「cargo test -p <包> --test <目标>」时的认法（文件头「product-gpu-real-card-tests 格」里卡数那一段）：读 tests/<目标>.rs 与 tests/<目标>/main.rs 里在的那几份，
+# 前 DECLARED_SOURCE_HEADER_LINES 行里以 DECLARED_SOURCE_GPU_CARDS_MARK 起头的那一行写的张数取最大，都没写是一张；写的不是一个正整数的当读不了（退 6，点名哪一份写了什么）。
 # 退出码：0 有（逐行打）、3 包不在（没有 Cargo.toml）、4 包的 [features] 里没有这个特性、5 包有这个特性而没有测试目标挂它、6 读不了（原因打在标准错误）。
 product_gpu_target_rows() {
   python3 - "$1" "$2" <<'PYTHON_PRODUCT_GPU_TARGETS'
@@ -2479,6 +2529,32 @@ import pathlib
 import re
 import sys
 import tomllib
+
+# 统一任务服务读测试源文件头张数声明的那两样（task-server 的服务库 DECLARED_HEADER_LINES、DECLARED_SOURCE_GPU_CARDS_MARK，读法是它的 declared_header_words 与 declared_gpu_cards）：
+# 这一格判「服务单交这个目标时交几张」，读法要与服务的相同
+DECLARED_SOURCE_HEADER_LINES = 60
+DECLARED_SOURCE_GPU_CARDS_MARK = "// task-server-gpu-cards:"
+
+
+def declared_cards(package_directory, name):
+    """这个测试目标单交时服务交几张卡：tests/<名>.rs 与 tests/<名>/main.rs 里在的那几份文件头声明的最大值，都没写是一张；写坏的抛 ValueError。"""
+    wanted = 1
+    for source in (package_directory / "tests" / f"{name}.rs", package_directory / "tests" / name / "main.rs"):
+        if not source.is_file():
+            continue
+        with source.open(encoding="utf-8", errors="replace") as handle:
+            for _ in range(DECLARED_SOURCE_HEADER_LINES):
+                line = handle.readline()
+                if not line:
+                    break
+                if line.startswith(DECLARED_SOURCE_GPU_CARDS_MARK):
+                    words = line[len(DECLARED_SOURCE_GPU_CARDS_MARK):].split()
+                    if len(words) != 1 or not words[0].isdigit() or int(words[0]) < 1:
+                        raise ValueError(f"{source} 文件头的张数声明写成「{' '.join(words)}」，要写一个正整数（统一任务服务照它分卡，写坏了单交时服务记 run-condition-unmet）")
+                    wanted = max(wanted, int(words[0]))
+                    break
+    return wanted
+
 
 package_directory, feature = pathlib.Path(sys.argv[1]), sys.argv[2]
 manifest = package_directory / "Cargo.toml"
@@ -2497,13 +2573,14 @@ try:
         code = "\n".join(line for line in path.read_text(encoding="utf-8").splitlines() if not line.lstrip().startswith("//"))
         if attribute.search(code):
             targets.setdefault(path.stem, f"tests/{path.name}")
+    cards = {name: declared_cards(package_directory, name) for name in targets}
 except (OSError, ValueError) as error:
     print(f"{type(error).__name__}: {error}", file=sys.stderr)
     sys.exit(6)
 if not targets:
     sys.exit(5)
 for name, source in sorted(targets.items()):
-    print(f"{name}\t{source}")
+    print(f"{name}\t{source}\t{cards[name]}")
 PYTHON_PRODUCT_GPU_TARGETS
 }
 
@@ -2557,9 +2634,10 @@ run_product_gpu_real_card_cell() {
   local log="$crash_point_replay_scratch_directory/$PRODUCT_GPU_PACKAGE_NAME-real-card.log" accounting="$crash_point_replay_scratch_directory/product-gpu.accounting"
   local plan_file="$crash_point_replay_scratch_directory/product-gpu.plan" plan_output="$crash_point_replay_scratch_directory/product-gpu.plan.out"
   local listing listing_exit=0 row kind cell_exit=0 plan_ok=1 plan_red=0 ran=1 ran_total=0 count file_name not_run_total gpu_where gpu_line
+  local target_name target_source target_cards handed_over_cards
   local plan_package="$PRODUCT_GPU_PACKAGE_NAME"   # plan_tests 与 seed_prior_verdicts 读它：算产品 GPU 包的键
-  local -a target_rows=() target_arguments=() zero_files=() gpu_not_run=() gpu_test_arguments=(--test-threads 1) cleared_environment=(-u SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE)
-  local -a feature_roots=()
+  local -a listed_rows=() target_rows=() target_arguments=() zero_files=() gpu_not_run=() gpu_test_arguments=(--test-threads 1) cleared_environment=(-u SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE)
+  local -a feature_roots=() short_of_cards=() handed_over_card_words=()
   if listing="$(product_gpu_target_rows "$package_directory" "$feature" 2>"$scratch/product-gpu.targets.err")"; then
     :
   else
@@ -2585,17 +2663,34 @@ run_product_gpu_real_card_cell() {
       echo "                对拍测试整个撤了，就把这一格与那几处一起撤；改完只重跑这一格：bash .claude/gate.d/crash-point-replay.sh --check $cell"
       return 1 ;;
     *)
-      echo "  ✗ $cell：读不出 $package_directory 里哪几个测试目标挂 $feature（$(tail -n 1 "$scratch/product-gpu.targets.err" 2>/dev/null)）"
-      echo "     → 怎么办：看上面那句里点名的文件（多半 Cargo.toml 写坏了或测试文件不是 UTF-8），修好之后只重跑这一格：bash .claude/gate.d/crash-point-replay.sh --check $cell"
+      echo "  ✗ $cell：读不出 $package_directory 里哪几个测试目标挂 $feature、各要几张卡（$(tail -n 1 "$scratch/product-gpu.targets.err" 2>/dev/null)）"
+      echo "     → 怎么办：看上面那句里点名的文件（多半 Cargo.toml 写坏了、测试文件不是 UTF-8，或测试文件头的「// task-server-gpu-cards: <张数>」写的不是一个正整数），修好之后只重跑这一格：bash .claude/gate.d/crash-point-replay.sh --check $cell"
       return 1 ;;
   esac
-  mapfile -t target_rows <<< "$listing"
-  for row in "${target_rows[@]}"; do
-    target_arguments+=(--test "${row%%$'\t'*}")
-    feature_roots+=("${row#*$'\t'}")
-  done
+  mapfile -t listed_rows <<< "$listing"
   [[ "$crash_point_replay_break" == product-gpu-test-threads-unset ]] && gpu_test_arguments=()
   require_service_card "$cell" "真显卡对拍那一趟" || return 1
+  # 卡数（文件头「product-gpu-real-card-tests 格」里卡数那一段）：服务交的 GPU_CARDS_BY_PRIORITY 是几项用空格接的一串、一项一张卡；目标要的张数比它多的不起，
+  #   逐个记本次未跑、提交时单交，target_rows 只留起得了的「目标名<TAB>源文件」。弄坏开关 product-gpu-card-count-unchecked 下不比张数、卡不够的目标也起
+  read -r -a handed_over_card_words <<< "${GPU_CARDS_BY_PRIORITY:-}"
+  handed_over_cards=${#handed_over_card_words[@]}
+  for row in "${listed_rows[@]}"; do
+    IFS=$'\t' read -r target_name target_source target_cards <<< "$row"
+    if (( target_cards > handed_over_cards )) && [[ "$crash_point_replay_break" != product-gpu-card-count-unchecked ]]; then
+      short_of_cards+=("$target_name")
+      crash_point_replay_report_not_run "产品 GPU 包对拍目标 $target_name（$package_directory/$target_source）声明 $target_cards 张、拿到 $handed_over_cards 张，提交时单交：这一趟不起它（服务照这道门禁交卡，照测试文件头的张数分卡只在单交这个目标时），照 .claude/skills/crash-test/commit-stages.md 第 2d 步交 task-server/task submit -- cargo test --release -p $package --features $feature --test $target_name -- --test-threads 1"
+      continue
+    fi
+    target_rows+=("$target_name"$'\t'"$target_source")
+    target_arguments+=(--test "$target_name")
+    feature_roots+=("$target_source")
+  done
+  if (( ${#target_rows[@]} == 0 )); then
+    product_gpu_cell_state="有 ${#short_of_cards[@]} 处本次未跑"
+    echo "  ! $cell 不算全绿：${#listed_rows[@]} 个对拍测试目标（特性 $feature）要的卡都比拿到的 $handed_over_cards 张多，这一趟没起 cargo；卡不够没起、提交时单交的目标 ${#short_of_cards[@]} 个（${short_of_cards[*]}）"
+    echo "     → 照 .claude/skills/crash-test/commit-stages.md 第 2d 步在提交时逐个单交（服务照测试文件头的张数挑凑得出这么多张空卡的一台、整组分卡）"
+    return 0
+  fi
   crash_point_replay_feature_pass_cleared_environment
   cleared_environment=("${crash_point_replay_feature_cleared_environment[@]}")
   crash_point_replay_test_functions_environment=("${cleared_environment[@]}")   # 同 run_feature_gated_tests_cell：test-functions-request 在交给 cargo 的同一份环境里起
@@ -2689,11 +2784,12 @@ run_product_gpu_real_card_cell() {
     echo "     → 怎么办：照那一句的出路修 scripts/gate/admission.py 点名的那一段，再只跑这一格：bash .claude/gate.d/crash-point-replay.sh --check $cell；不能复用就判红，不退回全部现判当绿"
     return 1
   fi
-  not_run_total=$(( ${#zero_files[@]} + ${#gpu_not_run[@]} ))
+  not_run_total=$(( ${#zero_files[@]} + ${#gpu_not_run[@]} + ${#short_of_cards[@]} ))
   if (( not_run_total > 0 )); then
     product_gpu_cell_state="有 ${not_run_total} 处本次未跑"
-    echo "  ! $cell 不算全绿：${#target_rows[@]} 个对拍测试目标（特性 $feature）跑到 ${ran_total} 条，本次未跑 ${not_run_total} 处：编进来 0 条的目标 ${#zero_files[@]} 个（${zero_files[*]:-无}），没卡没跑的对拍 ${#gpu_not_run[@]} 条"
+    echo "  ! $cell 不算全绿：${#target_rows[@]} 个对拍测试目标（特性 $feature）跑到 ${ran_total} 条，本次未跑 ${not_run_total} 处：编进来 0 条的目标 ${#zero_files[@]} 个（${zero_files[*]:-无}），没卡没跑的对拍 ${#gpu_not_run[@]} 条$( ((${#short_of_cards[@]})) && printf '；卡不够没起、提交时单交的目标 %s 个（%s）' "${#short_of_cards[@]}" "${short_of_cards[*]}")"
     echo "     → 编进来 0 条的给它补不标 ignored 的对拍用例；没卡没跑的在有卡的机器上补跑：bash .claude/gate.d/crash-point-replay.sh --check $cell"
+    ((${#short_of_cards[@]})) && echo "     → 卡不够没起的照 .claude/skills/crash-test/commit-stages.md 第 2d 步在提交时逐个单交（服务照测试文件头的张数挑凑得出这么多张空卡的一台、整组分卡）"
   else
     product_gpu_cell_state="绿"
     echo "  ✓ $cell：${#target_rows[@]} 个对拍测试目标（特性 $feature）每个都跑到了用例，共 ${ran_total} 条（含复用；$( (( plan_ok )) && printf '按条：%s' "$(plan_report "$plan_output.kept" 0)" || printf '按条复用算不出，全部现判')）"

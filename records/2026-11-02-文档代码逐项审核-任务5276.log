@@ -1,0 +1,50 @@
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+  · ⑤ 命令里有 cargo：第二台起它之前先判第二台的 RocksDB 预编库取值（scripts/hosts/rocksdb-prebuilt.py entry），判红退 78、命令不跑
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.7
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-5276-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+  ✓ rocksdb-prebuilt entry：查了 4 项，进程环境的取值是这台的预编库（/home/faliye/.local/share/singlefs/rocksdb-prebuilt/librocksdb-sys-0.19.0+11.8.1/67873f27d6329162/lib）
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling libc v0.2.189
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling singlefs-format v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-reference-filesystem)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker)
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=1855456 read=yes
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-replay-prefix)
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=20492500 read=yes
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+MULTI_HOST_RUN_PEER_CPU poll=3 usage_usec=31380706 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=4 usage_usec=42916264 read=yes
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.52s
+     Running tests/checker_known_bad_images.rs (第二台的目录/builds/task-b0f6b921-5276-1/target/debug/deps/checker_known_bad_images-a9943ad83d2e86a9)
+
+running 1 test
+test record_widened_exactly_over_a_walked_one_slot_neighbor_without_its_own_record_reddens_only_the_span_and_the_walked_reference_start_invariants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 297 filtered out; finished in 0.21s
+
+MULTI_HOST_RUN_PEER_CPU poll=5 usage_usec=42916264 read=no
+MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=2516287488
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=1888750460
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=26.9 seconds=24.2 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=26.9
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-5276-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=27.5 seconds=0.5 exit=0

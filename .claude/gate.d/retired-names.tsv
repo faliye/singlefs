@@ -35,10 +35,10 @@ prune-server-import	脚本名	删掉：导入工具已整份删、本地旧库�
 SINGLEFS_GATE_FULL	变量	删掉：门禁只有一种跑法，不指定范围就是判全部；要重判同一把键走复用哨兵强制现判那一路
 GATE_REPLAY_FULL	变量	删掉：实验复跑不指定范围就跑表里全部行，不再有慢实验跳过的跑法
 SINGLEFS_CRASH_CASE_BLOCKS_QUERY	变量	删掉：崩溃枚举用例按块复用，不再有只查块键的跑法
-quick_tier_expansion	函数名	删掉：展开按枚举成员取名 in_place_subsets_with_copy_on_write_none_or_all_expansion
-quick-tier-test-functions	判定种类	删掉：判定种类改叫 <阶段文件名>:test-functions
+in_place_subsets_with_copy_on_write_none_or_all_expansion	函数名	删掉：展开按枚举成员取名 in_place_subsets_with_copy_on_write_none_or_all_expansion
+test-functions	判定种类	删掉：判定种类改叫 <阶段文件名>:test-functions
 collect-quick	子命令	删掉：改叫 collect
 last-full	子命令	删掉：不再有「上一次全量」的标记
-lib_heavy_tests	库名	删掉：改叫 lib_project_code_runs
-heavy-test-guard	脚本名	删掉：改叫 project-code-guard
-light-selftest-guard	脚本名	删掉：改叫 selftest-process-guard
+lib_project_code_runs	库名	删掉：改叫 lib_project_code_runs
+project-code-guard	脚本名	删掉：改叫 project-code-guard
+selftest-process-guard	脚本名	删掉：改叫 selftest-process-guard

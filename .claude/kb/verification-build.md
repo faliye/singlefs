@@ -2,9 +2,9 @@
 
 **中文** · [English](verification-build.en.md) · [日本語](verification-build.ja.md)
 
-**口径**：2026-09-03 调研立档，2026-09-14 按代码现状改写（现查 `ls crates/`、根 `Cargo.toml` 的 workspace、`gate.sh` 的未实现清单与门禁 checker-tier-crash-point-replay 与 checker-tier-qemu-device-streams的 `gate-covers` 头）。
-**现状**：`crates/` 下八个 crate——`singlefs-format`（格式常量）、`singlefs-core`（mkfs、分配器、事务层、journal、恢复）、`singlefs-replay-prefix`（恢复取 journal 前缀、择根、扫环建表的纯函数核与它的 Verus 证明，另有 `compaction_plan_proofs.rs` 证整理计划的选段健全、计划健全、进展与抽象恒等，只依赖 `vstd`，`singlefs-core` 依赖它）、`singlefs-reference-filesystem`（RefFS，语义级的参照文件系统，不依赖别的 crate，`singlefs-harness` 与 `singlefs-checker-tier` 依赖它）、`singlefs-unit-graph`（函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹、收调用闭包、算复用键，只用 std、不依赖工作区任何 crate，`singlefs-checker-tier` 的库与 `build.rs` 依赖它，`build.rs` 经它按 `judging_units_entries.rs` 算判器组单元键）、`singlefs-harness`（harness 档：录制器、内存池、理想模型、随机历史、故障注入设备与日常用例）、`singlefs-checker`（池级 checker，只依赖 `singlefs-format`）、`singlefs-checker-tier`（checker 档：崩溃点重放引擎、记录核对器、注入战役、QEMU 设备日志比对与装置二进制，D13（验证路线） 已定项 15）；新池新建文件从 mkfs 到恢复跑通，崩溃点重放在门禁 checker-tier-crash-point-replay（登记的崩溃枚举用例（条数用 `grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 现数，正文不抄数），其中新池新建文件流是新池新建文件的全部 16 777 268 个崩溃状态（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES`；每次写只取两态的闭式是 16 777 243），覆盖写固定脚本流是里程碑「覆盖写、释放、回退与复用」步 0 那条固定脚本到 E 再正常卸载的全部 1 678 377 220 个崩溃状态（`crash_enumeration_fixed_script_stream.rs` 的 `FULL_STATES_THROUGH_THE_UNMOUNT`）），QEMU 真设备在门禁 checker-tier-qemu-device-streams（两块 virtio 盘上跑新池新建文件、发布 B、第二个实例、发布 D 与抬 F，六个模式并行各起一台虚机）。
-门禁末尾的未实现清单有四项：共享的「最终判据」「命名纪律（shell）」，与 `.claude/gate-not-implemented.tsv` 登记的「崩溃点重放」「模型对拍」（后两项由门禁 checker-tier-crash-point-replay 与 harness-model-differential-and-scenarios 头部的 `gate-covers` 声明覆盖，那一阶段跑了且通过才换成「由哪个阶段覆盖」）；崩溃点重放由 checker-tier-crash-point-replay 覆盖，射程是登记的崩溃枚举用例（条数用 `grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 现数）；QEMU 真实负载由门禁 checker-tier-qemu-device-streams 覆盖，射程到新池新建文件、发布 B、第二个实例、发布 D 与抬 F，没有崩溃注入；模型对拍由门禁 harness-model-differential-and-scenarios 覆盖，射程是随机历史那五段取样点。
+**口径**：2026-09-03 调研立档，2026-09-14 按代码现状改写（现查 `ls crates/`、根 `Cargo.toml` 的 workspace、`gate.sh` 的未实现清单与门禁 crash-point-replay 与 qemu-device-streams的 `gate-covers` 头）。
+**现状**：`crates/` 下八个 crate——`singlefs-format`（格式常量）、`singlefs-core`（mkfs、分配器、事务层、journal、恢复）、`singlefs-replay-prefix`（恢复取 journal 前缀、择根、扫环建表的纯函数核与它的 Verus 证明，另有 `compaction_plan_proofs.rs` 证整理计划的选段健全、计划健全、进展与抽象恒等，只依赖 `vstd`，`singlefs-core` 依赖它）、`singlefs-reference-filesystem`（RefFS，语义级的参照文件系统，不依赖别的 crate，验证包（`crates/singlefs-verification`）依赖它）、`singlefs-unit-graph`（函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹、收调用闭包、算复用键，只用 std、不依赖工作区任何 crate，`singlefs-verification` 的库与 `build.rs` 依赖它，`build.rs` 经它按 `judging_units_entries.rs` 算判器组单元键）、`singlefs-verification`（验证包：录制器、内存池、理想模型、随机历史、故障注入设备、日常用例、崩溃点重放引擎、记录核对器、注入战役、QEMU 设备日志比对与装置二进制，D13（验证路线） 已定项 15）、`singlefs-checker`（池级 checker，只依赖 `singlefs-format`）、`singlefs-background-gpu`（产品的后台 GPU 路径，D26（后台整理与放置回收） 已定项 13，依赖 `singlefs-core`）；新池新建文件从 mkfs 到恢复跑通，崩溃点重放在门禁 crash-point-replay（登记的崩溃枚举用例（条数用 `grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 现数，正文不抄数），其中新池新建文件流是新池新建文件的全部 16 777 268 个崩溃状态（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES`；每次写只取两态的闭式是 16 777 243），覆盖写固定脚本流是里程碑「覆盖写、释放、回退与复用」步 0 那条固定脚本到 E 再正常卸载的全部 1 678 377 220 个崩溃状态（`crash_enumeration_fixed_script_stream.rs` 的 `FULL_STATES_THROUGH_THE_UNMOUNT`）），QEMU 真设备在门禁 qemu-device-streams（两块 virtio 盘上跑新池新建文件、发布 B、第二个实例、发布 D 与抬 F，六个模式并行各起一台虚机）。
+门禁末尾的未实现清单有四项：共享的「最终判据」「命名纪律（shell）」，与 `.claude/gate-not-implemented.tsv` 登记的「崩溃点重放」「模型对拍」（后两项由门禁 crash-point-replay 与 model-differential-and-scenarios 头部的 `gate-covers` 声明覆盖，那一阶段跑了且通过才换成「由哪个阶段覆盖」）；崩溃点重放由 crash-point-replay 覆盖，射程是登记的崩溃枚举用例（条数用 `grep -c '^crash-case:' .claude/gate.d/stage-inputs.tsv` 现数）；QEMU 真实负载由门禁 qemu-device-streams 覆盖，射程到新池新建文件、发布 B、第二个实例、发布 D 与抬 F，没有崩溃注入；模型对拍由门禁 model-differential-and-scenarios 覆盖，射程是随机历史那五段取样点。
 这份文档原是「三样怎么落地」的调研：每一样要消费哪些已定条款、被哪些未定项挡着、能从仓里复用什么、第一版最小该做到哪；各节里写着做到了哪一步，第六节是当时挡在代码前面、只有用户能定的几个问题。
 
 ⚠️ **「推荐的落地顺序」一节是推论**，2026-09-03 走过一轮三方对抗（腿况与判决在同一节里），
@@ -22,7 +22,7 @@
 不在用户点名的三样里，但它是第四条前置链：它要 checker 判镜像、要事务层当被测对象。
 O3（独立规约执行器）（用另一种语言、只照 decisions 与 invariants 的文字重新推导的规约执行器）
 也不在三样里，它是 D13（验证路线） 已定项 6 三个 oracle 里离代码最远的一个，落地顺序放在最后一步。
-记录核对器（语义入参是崩溃前镜像、记录流、持久集合（这个崩溃状态里哪几次写落了盘）与崩溃后的两份镜像（崩溃态那份与恢复后那份，只读恢复时两份相同），D13（验证路线） 已定项 7 故意不给编号；代码入口是 `crates/singlefs-checker-tier/src/crash.rs` 的 `check_records_against`）
+记录核对器（语义入参是崩溃前镜像、记录流、持久集合（这个崩溃状态里哪几次写落了盘）与崩溃后的两份镜像（崩溃态那份与恢复后那份，只读恢复时两份相同），D13（验证路线） 已定项 7 故意不给编号；代码入口是 `crates/singlefs-verification/src/crash.rs` 的 `check_records_against`）
 同样不在三样里，却是崩溃点重放的第二个判决器——没有它，「根在案而记录缺席」那 7 类状态
 （E77（发布的持久顺序））只能靠 checker 的单镜像判据间接发现。
 
@@ -46,7 +46,7 @@ O3（独立规约执行器）（用另一种语言、只照 decisions 与 invari
 当时另有五处只定了形态没定宽度（系统配置槽轮换字段、指针内联的诞生 txg、记账树节点头基础字节、
 journal 事务边界字段、树表单元自己的头）；[layout/01-first-txn.md](layout/01-first-txn.md) 正文里已没有标半定的行（`grep 半定` 在它里面零命中）。
 
-**当时不被这四处挡住的那几样，2026-09-14 都已写出**：块设备抽象与写请求录制器（`singlefs-core` 的 `block_device`、`singlefs-harness`）、崩溃状态枚举器（`singlefs-harness` 的 `segments`、`singlefs-checker-tier` 的 `crash`）、checker 与已知坏镜像（`singlefs-checker` 的 `walk::check_pool_image`，坏镜像在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`）、自证单元（根记录 466 字节、journal 记录头 496 字节，D22（单元原子性怎么合成） 已定项 7 与 D23（journal 的角色与格式） 已定项 4）的实现一份、checker 一份解析器。
+**当时不被这四处挡住的那几样，2026-09-14 都已写出**：块设备抽象与写请求录制器（`singlefs-core` 的 `block_device`、`singlefs-verification`）、崩溃状态枚举器（`singlefs-verification` 的 `segments` 与 `crash`）、checker 与已知坏镜像（`singlefs-checker` 的 `walk::check_pool_image`，坏镜像在 `crates/singlefs-verification/tests/checker_known_bad_images.rs`）、自证单元（根记录 466 字节、journal 记录头 496 字节，D22（单元原子性怎么合成） 已定项 7 与 D23（journal 的角色与格式） 已定项 4）的实现一份、checker 一份解析器。
 
 ## 三、每一样的第一版范围
 
@@ -68,7 +68,7 @@ journal 事务边界字段、树表单元自己的头）；[layout/01-first-txn.
 | 发布 | 持久顺序恒为「单元/节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）」（D16（发布语义）已定项 7）；每次发布 checkpoint_txg + 1（D16（发布语义）已定项 6）；根记录 466 字节、恒走树表单元间接层（D22（单元原子性怎么合成）已定项 7） |
 | 恢复 | 先逐个验证全部根槽候选再择新，平局按实例代号（D22（单元原子性怎么合成）已定项 7）；全环扫描、不许先信 tail（D23（journal 的角色与格式）已定项 3）；前缀五条口径，缺一不可——jsn 严格连续、`(实例代号, checkpoint_txg)` 大于根的水位、提交标记齐全、施加前逐项验证点名单元（一个点名单元的两份都验过才施加）、施加的单位是一次发布：一次发布整体施加或整体不施加（D23（journal 的角色与格式）已定项 14；第五条出自 D16（发布语义） 已定项 4）。 |
 
-**第一版就要带的运行时计数与准入自证**（2026-09-13 随三笔欠账登记；四行里三行已有实现——取号序计数 `transaction::count_key_order_mismatches`（在 `crates/singlefs-core`、新池新建文件上恒 0）、准入读数对分配器的槽数（C318（影子账隔离的单元没进准入不等式） 2026-09-28 还清，`crates/singlefs-core/src/admission.rs` 的 `available_on_each_device`，用例在 `crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs`）、每次发布的写调用数与写字节（最后一行）——整理落点那一行还没有（整理已进 core 代码但产品路径在批大小条款没定处停下，C146（无空段时的回落政策全仓无定义） ① 仍开着）；模型里先做成会红的形态，实现照抄口径）：
+**第一版就要带的运行时计数与准入自证**（2026-09-13 随三笔欠账登记；四行里三行已有实现——取号序计数 `transaction::count_key_order_mismatches`（在 `crates/singlefs-core`、新池新建文件上恒 0）、准入读数对分配器的槽数（C318（影子账隔离的单元没进准入不等式） 2026-09-28 还清，`crates/singlefs-core/src/admission.rs` 的 `available_on_each_device`，用例在 `crates/singlefs-verification/tests/admission_formula_on_the_mounted_state.rs`）、每次发布的写调用数与写字节（最后一行）——整理落点那一行还没有（整理已进 core 代码但产品路径在批大小条款没定处停下，C146（无空段时的回落政策全仓无定义） ① 仍开着）；模型里先做成会红的形态，实现照抄口径）：
 
 | 量 | 口径 | 非 0 / 不等就红 | 模型里的形态 |
 |---|---|---|---|
@@ -127,7 +127,7 @@ C47（根槽没按判定宽度对齐）的偏移半个槽镜像，是这份语�
 只有真设备答得了；本机与虚机内核都带这个模块（见「环境现查」）。
 
 **枚举照 E77（发布的持久顺序）的模型**（撕裂子集不枚举，D13（验证路线）已定项 4 已定；⚠️ 撕裂态并进「未持久」来计数，那些撕裂字节样式也必须真的写成镜像喂给 checker 的扫描方向——头落了、载荷没落的那一格正是 I-1.2（块头写序已发布）要抓的，「并进一格计数」不许被读成「不生成这种镜像」）：屏障把写请求流切成段，崩溃状态 = 前若干段全持久 + 当前段任意子集持久 + 之后段全没持久。
-D16（发布语义）已定项 7 的两道屏障加根槽 FUA 把一次发布切成三段，新池新建文件按设备录、段内任意整写子集，状态数是 16 777 268（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES`；每次写只取两态是 16 777 243；门禁 checker-tier-crash-point-replay 的 `--full` 在 release 下逐条跑），
+D16（发布语义）已定项 7 的两道屏障加根槽 FUA 把一次发布切成三段，新池新建文件按设备录、段内任意整写子集，状态数是 16 777 268（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES`；每次写只取两态是 16 777 243；门禁 crash-point-replay 不指定范围那一趟在 release 下逐条跑），
 **崩溃点重放不抽样、全量枚举**。E77（发布的持久顺序）已有可直接抬进来的三段代码：枚举器 `crash_states`、
 恢复模型 `recover`、以及**不共享恢复代码**的审计 `audit`——审计与被审计分开这条纪律在那里已经踩过一次坑
 （不验证的重放自称成功，被变异测试当场抓到）。
@@ -137,7 +137,7 @@ D16（发布语义）已定项 7 的两道屏障加根槽 FUA 把一次发布切
 harness 要按自己的写流另算闭式（反推腿指出）。
 
 **每个崩溃状态跑三件事**：实现自己的恢复 → checker（一元判决）→ 记录核对器（二元判决，
-对拍崩溃前镜像、记录流、持久集合与崩溃后的两份镜像）。三者各自独立，缺一样就有一类错误没人看。三件都接上了：恢复 + oracle、池级 checker（`crates/singlefs-checker` 的 `walk::check_pool_image`，条数是 `IMPLEMENTED_INVARIANTS` 的长度，计数口径在 `crates/singlefs-checker/invariants/README.md`「状态」一节；最初的 29 条是：第一版 23 条加 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）、I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变）、I-5.4（分配记录罩住的槽互不相交））、记录核对器（`crates/singlefs-checker-tier` 的 `crash::check_records`），崩溃点重放全量在门禁 checker-tier-crash-point-replay。
+对拍崩溃前镜像、记录流、持久集合与崩溃后的两份镜像）。三者各自独立，缺一样就有一类错误没人看。三件都接上了：恢复 + oracle、池级 checker（`crates/singlefs-checker` 的 `walk::check_pool_image`，条数是 `IMPLEMENTED_INVARIANTS` 的长度，计数口径在 `crates/singlefs-checker/invariants/README.md`「状态」一节；最初的 29 条是：第一版 23 条加 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）、I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变）、I-5.4（分配记录罩住的槽互不相交））、记录核对器（`crates/singlefs-verification` 的 `crash::check_records`），崩溃点重放在门禁 crash-point-replay。
 
 **harness 自己要证明会红的用例，仓里已经点名了九条**（[checks-owed.md](checks-owed.md) 把它们的前置都写成崩溃点重放 harness，没有哪一条是可选的）：
 
@@ -153,13 +153,13 @@ harness 要按自己的写流另算闭式（反推腿指出）。
 | 关掉「`R` 在意图期内不可作分配目的地」那条保护（D26（后台整理与放置回收） 已定项 1 第 3 条），跑一批整理 | 意图完成时 `R` 内出现本批整理自己写出的落点（C146（无空段时的回落政策全仓无定义） ①）、且全空段的净增量塌向 0（C243（停机谓词那个量从来没有过轨迹） 的判别力自证）；打开必须恢复。E151（用户数据落点的到达序与容器臂） 第六次跑的两条臂就是这一对；要等整理进第一版之后崩溃点重放脚本才有对象 | C146（无空段时的回落政策全仓无定义）、C243（停机谓词那个量从来没有过轨迹），2026-09-13 |
 | 放开对被抛弃的根的保护：分配器按 R_old 的账把只被被抛弃的根引用的单元当空闲发出去（影子账关掉） | 两格都必须红：① 回退那次发布崩在单元写完之后、记录之前 ⇒ 恢复挂上最新那个根，它引用的单元已被复用（I-7.4（近 K 代块未被复用） 红）；② 回退确认之后复用、再让回退实例的根全读不出（无暖机一个故障、暖机之后四个）⇒ 恢复挂上被抛弃的根，同一判决。影子账打开 ⇒ 两格 0 违例。E150（回退复用被抛弃的根引用的单元） 计数模型：基线 3 / 5 个崩溃状态违例、影子账与墓碑都 0 | C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元），2026-09-13 用户取影子账；E150（回退复用被抛弃的根引用的单元） |
 
-2026-09-14 当天的现状：「harness 自己要证明会红的用例」那张表的第一条（摘掉根槽前的屏障）已做成用例（`crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker`）；第二条只做了「验证开着、坏事务被挡在重建的根外面」那一半（`recovery_reads_the_created_file_after_reopen.rs` 的 `named_unit_verification_keeps_a_damaged_transaction_out_of_the_rebuilt_root`）；其余七条要的覆盖写、释放、多次挂载、回退当天还不在崩溃点重放的负载里。2026-09-17 起覆盖写、释放、多次挂载、回退都已进崩溃点重放覆盖写固定脚本流，每条必红用例的现状见 `.claude/kb/milestone/02-second-txn.md` 步 0 与增补 2 收口表第 22 行。
+2026-09-14 当天的现状：「harness 自己要证明会红的用例」那张表的第一条（摘掉根槽前的屏障）已做成用例（`crates/singlefs-verification/tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker`）；第二条只做了「验证开着、坏事务被挡在重建的根外面」那一半（`recovery_reads_the_created_file_after_reopen.rs` 的 `named_unit_verification_keeps_a_damaged_transaction_out_of_the_rebuilt_root`）；其余七条要的覆盖写、释放、多次挂载、回退当天还不在崩溃点重放的负载里。2026-09-17 起覆盖写、释放、多次挂载、回退都已进崩溃点重放覆盖写固定脚本流，每条必红用例的现状见 `.claude/kb/milestone/02-second-txn.md` 步 0 与增补 2 收口表第 22 行。
 
 ⚠️ **崩溃点重放的负载不能只是「新池新建文件」**（2026-09-14 的负载还只有它）：mkfs 之后写一个文件并发布一次，数据侧一个块都不释放，
 C22（刚释放的块立即重分配）与 C80（记账更新必须原子地随根发布）两条用例没有东西可抓
 （三方对抗里本地腿与正推腿各自指出）。崩溃点重放的固定负载要含覆盖写、释放、回退与复用——覆盖写同一个文件，
 造出一次释放、一次延迟重用与一次记账变更；C42（残留记录冒充合法前缀）还要「崩溃 → 恢复 → 少量续写 → 再崩」，
-所以崩溃点重放的固定脚本是三次发布夹一次恢复：mkfs、发布 A（写文件）、发布 B（覆盖写）、在 B 的每个崩溃点恢复、再发布 C（短）、在 C 的每个崩溃点恢复。2026-09-17 起崩溃点重放覆盖写固定脚本流已含覆盖写、释放、重开写行、回退、抬 F 与复用（固定脚本到发布 E，门禁 checker-tier-crash-point-replay 全量），「崩溃 → 恢复 → 少量续写 → 再崩」那条链由崩溃注入战役接上（`crates/singlefs-checker-tier/tests/crash_injection_campaign.rs`：每个崩溃状态上起可写挂载、发一次布，可写挂载途中的取号、写行、暖机三段各摆一个二次崩溃，阶段与计数在 `crates/singlefs-checker-tier/src/crash_injection.rs`）；残留记录冒充合法前缀的会红反例仍欠（C42（残留记录冒充合法前缀） 还开着），现状见 `.claude/kb/milestone/02-second-txn.md` 步 0 与增补 2 收口表第 22、23 行。
+所以崩溃点重放的固定脚本是三次发布夹一次恢复：mkfs、发布 A（写文件）、发布 B（覆盖写）、在 B 的每个崩溃点恢复、再发布 C（短）、在 C 的每个崩溃点恢复。2026-09-17 起崩溃点重放覆盖写固定脚本流已含覆盖写、释放、重开写行、回退、抬 F 与复用（固定脚本到发布 E，门禁 crash-point-replay 不指定范围那一趟），「崩溃 → 恢复 → 少量续写 → 再崩」那条链由崩溃注入战役接上（`crates/singlefs-verification/tests/crash_injection_campaign.rs`：每个崩溃状态上起可写挂载、发一次布，可写挂载途中的取号、写行、暖机三段各摆一个二次崩溃，阶段与计数在 `crates/singlefs-verification/src/crash_injection.rs`）；残留记录冒充合法前缀的会红反例仍欠（C42（残留记录冒充合法前缀） 还开着），现状见 `.claude/kb/milestone/02-second-txn.md` 步 0 与增补 2 收口表第 22、23 行。
 **基镜像要能预置**（反推腿指出）：录制器只录本次跑的写，环里「上一条时间线的残留」不会自己出现，harness 得能把一条残留记录种进基镜像。
 屏障与空发布相关的用例在只有 mkfs 与空发布时就能跑，释放、重用、残留三类要等到发布 B 与 C。**C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 那两格还要一次管理员回退**：发布 C 之后回退到 A 的根、再发布 D，第 ① 格枚举回退那次发布的崩溃点，第 ② 格在 D 之后按故障组合让回退实例的根读不出——崩溃点重放的固定脚本因此是 mkfs、A、B、C、回退到 A、D（2026-09-13 随 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 定案登记）；固定脚本再往后走到抬 F 之后复用的发布 E，见 `.claude/kb/milestone/02-second-txn.md` 步 0 现状。
 
@@ -167,7 +167,7 @@ C22（刚释放的块立即重分配）与 C80（记账更新必须原子地随�
 C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失败模型例外）与 D20（承重面：单元的原子性与自包含）
 推论三第 3 问要的撕裂注入——`dm-flakey` 造不出撕裂，用户态录制器倒是能按 `physical_block_size` 粒度造，
 但那是模型不是设备。
-2026-09-14 起虚机档有了第一个被测对象（门禁 checker-tier-qemu-device-streams）：新池新建文件在两块真 virtio 盘上跑，设备侧日志（QEMU blklogwrites）与程序的录制流逐项比，漏一道屏障与走页缓存两个对照都判红；C6（块层语义假设写错） 在虚机档上的「崩溃测试必须变红」那一半（拿设备侧日志重建崩溃状态再跑记录核对器，`crates/singlefs-checker-tier/src/device_log.rs` 现只与录制流逐项比；模型层摘掉根槽前那道屏障、崩溃点重放里记录核对器判红已有）、C16（管道声明失败模型例外） 的撕裂注入仍欠。
+2026-09-14 起虚机档有了第一个被测对象（门禁 qemu-device-streams）：新池新建文件在两块真 virtio 盘上跑，设备侧日志（QEMU blklogwrites）与程序的录制流逐项比，漏一道屏障与走页缓存两个对照都判红；C6（块层语义假设写错） 在虚机档上的「崩溃测试必须变红」那一半（拿设备侧日志重建崩溃状态再跑记录核对器，`crates/singlefs-verification/src/device_log.rs` 现只与录制流逐项比；模型层摘掉根槽前那道屏障、崩溃点重放里记录核对器判红已有）、C16（管道声明失败模型例外） 的撕裂注入仍欠。
 
 ## 四、仓里现成能抬走的
 
@@ -217,7 +217,7 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 | 第 2 问 | **checker 与被测实现允许共享什么** | **已定（2026-09-03，用户按三方对抗定案）**：只共享一份从 kb 生成的常量模块，其余（newtype、解析、校验和、遍历、记账）各写一份；判定宽度由 checker 自己探测再与系统配置比对，探不到就报「声明值，未探测」。生成一份与手抄两份都抓不住「kb 里就写错的值」，那一类另立 C94（登记的格式常量与后来的定案对不上） | D13（验证路线）已定项 5 |
 | 第 3 问 | **第一版的运行载体** | **已定（2026-09-03，用户按三方对抗定案）**：纯用户态库 + 块设备抽象（文件与 `O_DIRECT` 裸设备两个后端），第一版不挂载；FUSE 等目录与 POSIX 面出现后再加，内核模块暂不做。两条骑手：录制钩子挂在块设备接口而不是操作 API；库落在 `crates/` 下受 Show me test 管 | D17（实现分层与第三方管道）已定项 5 |
 | 第 4 问 | **D3（空间分配）已定项 7 与已定项 3 同名**：两者都叫「分配记录的载体形态」，已定项 3 已定「住独立 keyspace 的 btree，key 是落点，value 是分配代」，已定项 7 却把「住哪、key 怎么编码」重新列成候选 | kb 里同一个事实两处说法（`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 4 条）；条目宽度与 key 各段的编码宽度已由 D3（空间分配） 已定项 7 定（2026-09-03：key = 设备身份 4 + 16 KiB 槽号 6，条目 20 字节） | 两项已不同名（已定项 3「载体形态」、已定项 7「盘上编码与宽度」），这一问已关 |
-| 第 5 问 | **crate 布局与命名**：核心、checker、harness、记录核对器各一个 crate，根 `Cargo.toml` 做 workspace | 工程约定，不是格式决策；门禁的「Show me test」按 `crates/*/src/` 认代码，所以路径必须落在那里；2026-09-14 落地为四个 crate（`singlefs-format`、`singlefs-core`、`singlefs-harness`、`singlefs-checker`），记录核对器住在 checker 档包里（`crates/singlefs-checker-tier` 的 `crash::check_records`），根 `Cargo.toml` 做 workspace | 记在「推荐的落地顺序」里，不立分项 |
+| 第 5 问 | **crate 布局与命名**：核心、checker、harness、记录核对器各一个 crate，根 `Cargo.toml` 做 workspace | 工程约定，不是格式决策；门禁的「Show me test」按 `crates/*/src/` 认代码，所以路径必须落在那里；2026-09-14 落地为四个 crate（`singlefs-format`、`singlefs-core`、`singlefs-harness`、`singlefs-checker`；`singlefs-harness` 2026-11-05 并进验证包 `crates/singlefs-verification`），记录核对器住在验证包里（`crates/singlefs-verification` 的 `crash::check_records`），根 `Cargo.toml` 做 workspace | 记在「推荐的落地顺序」里，不立分项 |
 | 第 6 问 | **常规层的挂钟预算 `T1`（常规层 挂钟预算）** | D13（验证路线） 已定项 11 一处说「现在就该定」，另一处说「一个都不许现在写进 kb」；冒烟层全量枚举不需要它，第一版用不到 | 等常规层出现时再定 |
 | 第 7 问 | **journal 记录头到底几字节**：D23（journal 的角色与格式）正文一处说 78（已定项 4，也是门禁登记的格式常量），一处说两笔已定增量落地后 91，一处说三笔落地后 95；[layout/01-first-txn.md](layout/01-first-txn.md) 把反向链 4 字节、载荷校验和 4 字节列成头之外的独立行，事务边界字段宽度未定 | 2026-09-12 时：三个数说的是同一个「头」在不同落地程度下的宽度，但登记成常量的只有 78；实现与 checker 各自照 78 写会一起漏掉提交标记与载荷校验和，而 D23（journal 的角色与格式）已定项 13 明令载荷校验和住头里、受头校验和覆盖。反推腿由此构造出一条 4Kn 上撕裂记录静默嫁接的路径，前提正是漏掉载荷校验和。另外全仓登记成 format-const 的常量 2026-09-12 现查有 24 处（`grep -rn 'format-const:' .claude/kb/`），[layout/01-first-txn.md](layout/01-first-txn.md) 里的宽度登记齐了没有没人数过 | 已收口：记录头 496 字节 = 十个基础字段 78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 373（= 树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4 + 回收门槛 t 8 + 钉槽 p 1） + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4、已定项 15），78 与 496 分两个名字登记成 format-const（`JOURNAL_HEADER_TEN_FIELD_BYTES`、`JOURNAL_HEADER_BYTES`） |
 | 第 8 问 | **五元组 33 字节的分字段宽度**：单元类型标签、树 ID、对象 ID、对象出生代、锚点偏移各占几字节，全仓只有 33 这个总数（D18（块里携带什么信息）已定项 3、E85（单元头的字段表）） | 实现与 checker 共用一份常量时只能各自「发明」同一个切法，I-1.1（块头自述逻辑地址）与 I-1.3（块头树 ID 一致）就退化成两边按同一偏移读写的同义反复（反推腿指出） | 报给用户；[layout/01-first-txn.md](layout/01-first-txn.md) 那一行已拆成五行；**已定（2026-09-04，用户定案）：1 + 8 + 8 + 8 + 8**，权威记录在 D18（块里携带什么信息） 已定项 3 |
@@ -235,7 +235,7 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 | 5 | 记录核对器接进每个崩溃状态、最小 RefFS、模型对拍阶段 | 三个判决器凑齐，才谈得上「三 oracle 合谋测试」；fsync 的持久性承诺由 RefFS 的崩溃语义定义（D17（实现分层与第三方管道） 已定项 4，2026-09-13） |
 | 6 | O3（独立规约执行器）：把 [invariants/README.md](../../crates/singlefs-checker/invariants/README.md) 与 decisions 的文字用另一种语言写成状态谓词，对同一批崩溃状态独立判一遍；同步开始统计它与 RefFS 的不一致事件（D13（验证路线） 已定项 13「冲突 2」要求的同源性观测） | 它是 D13（验证路线） 已定项 6 三个 oracle 里最后一个，2026-09-03 之前在任何计划里都没被点名（三方对抗的正推腿指出） |
 
-2026-09-14 现状：里程碑「新池新建文件」步 0–7 做完（[milestone/01-first-txn.md](milestone/01-first-txn.md)），覆盖了「推荐的落地顺序」那张表的第 0、2、3 步、第 1 步的大部分（门禁的未实现清单没改成按不变量逐条报）与第 4 步里的第一个真事务，第 5 步的记录核对器已接进崩溃点重放的每个崩溃状态；覆盖写事务、第 7 步的 crash refinement、第 5 步的 RefFS、第 6 步的 O3（独立规约执行器） 在这一天都还没有代码（当日 `grep -rn RefFs crates/` 零命中）。（覆盖写事务 2026-09-16 起有代码：里程碑「覆盖写、释放、回退与复用」步 1 / 步 2，`crates/singlefs-core` 的 `publish_overwrite` 与 `release`。现状：第 7 步 crash refinement 的取前缀、择根、扫环三截进了 Verus（`crates/singlefs-replay-prefix`）；第 5 步的 RefFS 有语义级的第一版 `crates/singlefs-reference-filesystem`，崩溃注入与故障注入的调用点已接；第 6 步的 O3（独立规约执行器） 有第一版 Python 执行器（E170（O3规约执行器第一版）），没接进崩溃点重放（C447（规约执行器没接进崩溃点重放与 RefFS 比对））。）
+现状：里程碑「新池新建文件」步 0–7 做完（[milestone/01-first-txn.md](milestone/01-first-txn.md)），覆盖了「推荐的落地顺序」那张表的第 0、2、3 步、第 1 步的大部分（门禁的未实现清单没改成按不变量逐条报）与第 4 步里的第一个真事务，第 5 步的记录核对器已接进崩溃点重放的每个崩溃状态；覆盖写事务有代码（里程碑「覆盖写、释放、回退与复用」步 1 / 步 2，`crates/singlefs-core` 的 `publish_overwrite` 与 `release`）；第 7 步 crash refinement 的取前缀、择根、扫环三截进了 Verus（`crates/singlefs-replay-prefix`）；第 5 步的 RefFS 有语义级的第一版 `crates/singlefs-reference-filesystem`，崩溃注入与故障注入的调用点已接；第 6 步的 O3（独立规约执行器） 有第一版 Python 执行器（E170（O3规约执行器第一版）），没接进崩溃点重放（C447（规约执行器没接进崩溃点重放与 RefFS 比对））。
 
 ### 三方对抗（2026-09-03）
 
@@ -256,7 +256,7 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 3. **不采纳，但结论反过来用**：反推腿说 P3 只对自证单元枚举撕裂、而根槽宽恰等于探测值使那个例外为空，是「破」。核对 D22（单元原子性怎么合成）已定项 21 与 D23（journal 的角色与格式）已定项 13 之后，结论是**每一类单元都有整单元校验和**——有父指针的靠父指针里的校验和，自证的靠头校验和加头内的载荷校验和加代号——撕裂态与「没持久」在 2 的 32 次方分之一之外不可区分，所以 harness **不需要枚举撕裂子集**。三条腿对「并格成立」一致。反推腿那条 4Kn 撕裂记录静默嫁接的路径，成立的前提是实现漏写载荷校验和，那是第 7 问的口径问题，不是模型问题。⇒ D13（验证路线）已定项 4 据此收窄为：只枚举「哪些整写持久了」，接受 2 的 32 次方分之一的并格；未持久位置的内容取该位置的旧内容，并真的生成镜像喂给 checker 的扫描方向；镜像双写按设备算。** 用户按实验定案**，权威记录在 D13（验证路线）已定项 4。
 4. **提案被打掉的部分**：第 3、4 步原来的完成判据「五条自证用例全红」不可满足——两条按字面不会红、两条在单次发布上没东西可抓。改成七条用例各自挂在能触发它的那次发布上。
 
-## 八、崩溃点重放：崩溃放量的流程与用户定的两档
+## 八、崩溃点重放：崩溃放量的流程与用户定案
 
 改崩溃点重放（崩溃枚举用例、崩溃放量流水线、判定库、GPU 判器）之前先读这一节；合并两套装置的形态以设计轮第三轮判决 `research/prompts/m3-crash-enumeration-merge-r3-main-verification.md` 第三节（j1–j14）为准，第三轮正文 `_m3-crash-enumeration-merge-r3-body.md` 只当来历。
 
@@ -264,11 +264,11 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 
 | 段 | 做什么 | 出处 |
 |---|---|---|
-| 录入段 | CPU 在内存池上把测试流真跑一遍，录下每一次块写（写表）；每条流只跑一次，这是唯一一次跑 Rust 写路径。把流程输入（基础镜像、写表、分段与展开、被判根、版本表、崩溃点）、事实表、配了 GPU 时的判表（打包字与按发布分的态数表）都写进这一类的 RocksDB 库、登清单。只录不判 | `crates/singlefs-checker-tier/src/crash_amplification.rs` 文件头第 2 条「先录后核」与「录入段」那一节；`crash_library.rs` 的 `two_stages`、`RunStage`（选段开关 `SINGLEFS_CRASH_AMPLIFICATION_STAGE`）、`StageOutcome` |
+| 录入段 | CPU 在内存池上把测试流真跑一遍，录下每一次块写（写表）；每条流只跑一次，这是唯一一次跑 Rust 写路径。把流程输入（基础镜像、写表、分段与展开、被判根、版本表、崩溃点）、事实表、配了 GPU 时的判表（打包字与按发布分的态数表）都写进 prune-server 那一份判定库（测试的类只当索引）、登清单。只录不判 | `crates/singlefs-verification/src/crash_amplification.rs` 文件头第 2 条「先录后核」与「录入段」那一节；`crash_library.rs` 的 `two_stages`、`RunStage`（选段开关 `SINGLEFS_CRASH_AMPLIFICATION_STAGE`）、`StageOutcome` |
 | 判段 | 只从库里读回（核摘要），按块判：配置开了 GPU 由 GPU 判器逐状态判（恢复看 journal 与不看 journal 各一遍、七类 oracle、池级 checker、记录核对器，恢复与 checker 是 WGSL 照 Rust 另写的一份）；没开由 CPU 判器 `judge_crash_image` 判（调 `singlefs-core` 的 `recover` 与池级 checker 的 `check_pool_image`）。结论按块存进库；开了 GPU 而卡用不上就报错，不退回 CPU；一趟里不许 CPU 判一遍、GPU 又判一遍同一批状态 | `crash_judge_gpu.rs` 文件头的模块说明；`crash.rs` 的 `judge_crash_image_against_the_version_table`；`verdict_store.rs` 文件头的模块说明；`crash_amplification.rs` 里 `ComputedOn` 那一段 |
 | 核对 | 第 ② 段从库里读回事实表逐状态核（开 GPU 在卡上 `crash_verify_gpu`，没开用 CPU 参照 `verify_states_from_facts`）；第 ③ 段把判段的结论与核对的结论逐状态比，对不上判红 | `crash_verify_gpu.rs` 文件头的模块说明；`crash_amplification.rs`「第 ③ 段」那一节 |
-| GPU 与 CPU 判器的一致 | 不在流水线里判。快档里两条独立的对拍用例各经自己那一类的库：GPU 判器与 CPU 判器逐状态对拍（`tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`，判表对拍那一类）、GPU 核对内核与 CPU 参照对拍（`tests/crash_facts_gpu_verifier_agrees_with_the_cpu_reference.rs`，事实表对拍那一类） | 两份测试文件的文件头 |
-| 库 | 家目录 `${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}` 下一份长期库，跑完不删、下一趟复用：块键只由内容定（判器单元闭包、段写表与起步镜像摘要、段展开、工具链、解析出的闭包真引到的依赖版本），崩溃放量、崩溃枚举用例、给定状态表、两种对拍、流水线单元测试各自要哪些块只是索引，同一块全仓只判一次；库目录名固定，不带测试类与存法名。没有临时库；钉「空库起跑」那一套账的用例在一次性副本里建库，不清长期库。崩溃枚举用例并进同一套：进度文件与双机账本没有了，分片、导入、续跑都走库，双机经崩溃放量的双机驱动（`scripts/crash/crash-point-replay-shard-run.sh`） | `crash_library.rs` 的 `CrashLibraryClass`；`crash_state_enumeration.rs` 文件头 |
+| GPU 与 CPU 判器的一致 | 不在流水线里判。两条独立的对拍用例各以自己那一类经 prune-server 那一份判定库：GPU 判器与 CPU 判器逐状态对拍（`tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`，判表对拍那一类）、GPU 核对内核与 CPU 参照对拍（`tests/crash_facts_gpu_verifier_agrees_with_the_cpu_reference.rs`，事实表对拍那一类） | 两份测试文件的文件头 |
+| 库 | 判定都在 prune-server 那一份判定库里（`.claude/rules/verification.md`「判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB」），跑完不删、下一趟复用：块键只由内容定（判器单元闭包、段写表与起步镜像摘要、段展开、工具链、解析出的闭包真引到的依赖版本），崩溃放量、崩溃枚举用例、给定状态表、两种对拍、流水线单元测试各自要哪些块只是索引，同一块全仓只判一次；本机不开库、不设选库的开关与变量，测试的类只进报的名字。真任务没有临时库；钉「空库起跑」那一套账的用例在临时 prune-server 里各开一段名字空间、从空库起，不写真服务。崩溃放量家目录 `${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}` 下的运行目录 `runs/<标签>/` 只放日志。崩溃枚举用例并进同一套：进度文件与双机账本没有了，分片、续跑都走库；双机经崩溃点重放的分片包装（`scripts/crash/crash-point-replay-shard-run.sh`）交崩溃放量的分片驱动（`scripts/crash/crash-amplification-two-hosts.sh`），两片判的块都直接写进服务那一份，不拷库、不取回、不导入 | `crash_library.rs` 文件头与 `CrashLibraryClass`；`crash_state_enumeration.rs` 文件头；`scripts/crash/crash-amplification-two-hosts.sh` 文件头「判定库」 |
 
 ### 用户定的（2026-10-11，原话在 `records/2026-10-11-崩溃放量两段与脚本审计.md`「用户定案（原话）」）
 
@@ -295,12 +295,7 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 | 判在哪 | 照用户配置走：没配 GPU 由 CPU 判；配了分片就分片跑；有 GPU 就用 GPU 判。用户确认的流程：「每一次 数据都是 内存中模拟跑出来的  对拍的时候有GPU用的GPU，没有就用的CPU」 |
 | 走 GPU | 测试能走 GPU 的必须走 GPU，不走的要有明确登记的豁免（登记表 `.claude/gate.d/gpu-exemptions.tsv`，门禁 code-source-discipline 的 gpu-exemptions 格判；C626（走 GPU 的计算类没有登记） 已还清，用户定这一项不得欠账） |
 | GPU 豁免表 | `.claude/gate.d/gpu-exemptions.tsv` 每一行用户点头；是十行：可写挂载、续做、挂载途中二次崩溃、与理想模型比、见证判据 W、RefFS 比较、观察者对恢复报告的断言、坏盘输入里被测的池级 checker、坏盘输入里被测的实现恢复读路、实验量的是 CPU 判器本身。记录核对器判镜像、上 GPU、不在表里（门禁 code-source-discipline 的 gpu-exemptions 格，代码标记 `// gpu-exempt: <截名>`） |
-| 两档 | 轻型：谁跑见「轻型谁跑」一行，有两个目标——守住系统核心代码不红（固定的核心部分，每次都跑）、测当前功能改到的代码（可变部分，跑的人按这一次的改动点名），所以每次的轻型是可定制的；剪枝与重型同一份库、同一套单元键（D13（验证路线） 已定项 17）——「没有剪枝」由 2026-10-15 主 agent 定案取代，出处 `ledger.md`「二、主 agent 定的」第 9 条 ①。重型：总门闸，验证全体，提交时看它；耗时长，所以有剪枝、逐条、全量三种跑法可选。崩溃、形式化、变异三样都分这两档 |
-| 两档的关系 | 轻型必须是重型的子集：先写重型的测试，再把关键步骤拿出来放进轻型；轻型登记的每一行都写明取自重型的哪一项 |
-| 重型红了 | 必须修好或者查清原因，红着不提交 |
-| 轻型的去向 | 轻型是代码变化大时为日常开发另开的闸；代码与剪枝稳定之后删掉，日常验证改用重型的剪枝与逐条跑。事务功能做全之前算不稳定，什么时候算稳定由用户判 |
-| 轻型谁跑 | 子 agent 前台 240 秒上限不改；实现员与调查员交回前只跑前台跑得完的（harness、fmt、clippy、形式化轻型），崩溃与变异两条轻型写进报告交回主 agent，由主 agent 在它的副本里跑（用户弹窗选「不改上限，轻型交回主 agent 跑」） |
-| 轻型变异的核心部分 | 只取改坏对象在 `crates/singlefs-core/src/` 下的行，每个测试目标一行，现有 166 行（`grep -vcE '^(#|$)' .claude/gate.d/crates-mutation-light-rows.tsv` 现数；生成登记表时是 171 行；用户弹窗选「只取核心代码」）；可变部分用 `--quick --item` 加 |
+| 门禁红了 | 必须修好或者查清原因，红着不提交 |
 | 提交前 | 必须判完：要真跑 Rust 实现的检查（逐状态可写挂载、续做这一类）提交前也要跑；对照可以跳过，跳过要用户授权 |
 | 可写挂载 | 挂在标准前缀上，共享前缀的每个状态都做，不得例外 |
 | 前缀共享 | 多记录流的 B、C 两步挪进公共模块设点，删除流共享这段前缀 |
@@ -311,5 +306,12 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 
 | 项 | 定案 |
 |---|---|
-| 反向判据的 N | N = 5（D23（journal 的角色与格式） 已定项 1 反向判据的 N）；一次全量验证 = 一个里程碑出口那一趟崩溃全量（`.claude/kb/milestone/04-fourth-txn.md` 出口 10 定的分段跑）。原话：「N=5，每个里程碑出口那趟算一次」 |
+| 反向判据的 N | N = 5（D23（journal 的角色与格式） 已定项 1 反向判据的 N）；一次全量验证 = 一个里程碑出口那一趟不指定范围的崩溃点重放与崩溃放量（`.claude/kb/milestone/04-fourth-txn.md` 出口 10 定的分段跑）。原话：「N=5，每个里程碑出口那趟算一次」 |
 | 计数 | 每个里程碑出口落一行计数、门禁一格读它；这一半还没做，C397（反向判据的事件数没人计） 留开着 |
+
+### 用户定的（2026-11-05，原话在 `records/2026-11-05-删轻型并入重型.md` 第 108 行与第 133 行）
+
+| 项 | 定案 |
+|---|---|
+| 一个门禁、两种跑法 | 只有一个门禁：门禁自己选不指定范围与指定范围两种跑法。不指定范围的照单元键判全部项，提交时跑；指定范围的用 `--item`、`--check` 这类参数点名要判的项（写法与谁来交在 `.claude/rules/verification.md`「一个门禁：两种跑法」）。崩溃、形式化、变异三样都只走这一个门禁，不分档；2026-10-10 那张表原有的分档几行由这一条替掉。原话：「以后都是一个门禁。 门禁自己选 指定了范围 和不指定范围 两个类型。 没有轻重了」 |
+| 指定范围可以缩崩溃域 | 用户弹窗选「允许缩域」：崩溃点重放与崩溃放量的指定范围可以把崩溃域往小缩，缩过域的那一趟不算门禁通过；写法在 `.claude/rules/verification.md`「一个门禁：两种跑法」的「缩域」一条 |

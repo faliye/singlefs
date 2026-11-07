@@ -159,11 +159,11 @@ D6 (Snapshot Implementation Model) governs which on-disk mechanism implements sn
 | "Must be birth txg + deadlist" | That is an **instance** of D5 (Snapshot / Space Accounting Mechanism); criteria require only predicate consistency of condition 1 |
 | "Adding another format branch" | Zero current cost before freeze (`.claude/rules/format-evolution.md` explicitly states this freedom "must be fully used"), and project has already spent format branches: D12 (Target Media) |
 | "Separator key sensitivity" | **Sensitivity is a function of encoding, not btree property**: replacing dirent name component with hash leaves both properties D8 (Core Index Structure) relies upon unaffected. ⚠️ This is reasoning, unverified in this project, without accounting hash encoding costs on readdir order and collision handling |
-| "Total verification volume too large / gates cannot finish" | D13 (Verification Route) settled item 9 placed unbounded verification volume into full run tier; wall clock constrains only quick tier |
+| "Total verification volume too large / gates cannot finish" | D13 (Verification Route) settled item 9: the unscoped run judges everything by unit keys, and wall-clock time is no reason to narrow it |
 
 **Scope**: Governs prohibiting these six from serving as rejection rationales, not whether they are valid in their own right—"never post-hoc traversal" remains valid on runtime decision path; this item merely forbids using it to reject candidate snapshot implementation models.
 
-**Basis**: No experiment: Counterexamples to the six are settled clauses and existing exemptions (three traversal exemptions, I-3.5 (precision of the reference interval) "both must exist", pre-freeze format freedom, full run tier), not measurable quantities; the one requiring measurement (hash encoding cost on readdir ordering and collisions) is self-acknowledged as uncalculated, requiring experiments before use. 2026-08-26 three-way argument settled this table, process in history.
+**Basis**: No experiment: Counterexamples to the six are settled clauses and existing exemptions (three traversal exemptions, I-3.5 (precision of the reference interval) "both must exist", pre-freeze format freedom, the unscoped run), not measurable quantities; the one requiring measurement (hash encoding cost on readdir ordering and collisions) is self-acknowledged as uncalculated, requiring experiments before use. 2026-08-26 three-way argument settled this table, process in history.
 
 **Owed**: None.
 

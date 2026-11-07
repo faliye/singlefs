@@ -2,7 +2,7 @@
 
 审计日期：当日。对象：`/home/fy5090/code/singlefs/crates/singlefs-harness` 当前工作区，包含已有未提交修改；不是仅审查 HEAD 或某次提交的差异。本轮只新增审计材料，没有修改产品实现和既有测试，也没有执行提交。
 
-方法参照 [checker 审计目录](../research/prompts/recovery-audit-checker-2026-10-24/README.md) 与 [checker-tier 复核报告](2026-10-24-singlefs-checker-tier-审计复核.md)：保留可执行探针、源码摘要、原始日志，区分实现错误、接口条件、明示范围及尚未证明的影响。没有把上一轮 checker/checker-tier 的问题重复算成 harness 新问题。
+方法参照 [checker 审计目录](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-2026-10-24/README.md`) 与 [checker-tier 复核报告](2026-10-24-singlefs-checker-tier-审计复核.md)：保留可执行探针、源码摘要、原始日志，区分实现错误、接口条件、明示范围及尚未证明的影响。没有把上一轮 checker/checker-tier 的问题重复算成 harness 新问题。
 
 ## 结论
 
@@ -30,18 +30,18 @@ core 扫描/重放胶水 → singlefs-replay-prefix 形式化核
 
 定向阅读了 `history.rs`、`model.rs`、`model_comparison.rs`、`fault_injection.rs`、`memory_pool.rs`、`mount_transparency.rs`、`reference_filesystem_translation.rs`、`segments.rs`、`lib.rs`、`read_tally.rs` 的相关路径，并追查 core 中的设备接口、恢复调用及形式化核。`gpu_memory_ledger.rs` 的显存调度和所有集成用例没有逐行穷尽审查，因此本报告不提供整个 crate 无缺陷的背书。
 
-审计材料集中于 [recovery-audit-harness-2026-10-24](../research/prompts/recovery-audit-harness-2026-10-24/README.md)：
+审计材料集中于 [recovery-audit-harness-2026-10-24](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/README.md`)：
 
-- [公开 API 探针](../research/prompts/recovery-audit-harness-2026-10-24/probes.rs)：H01–H03 的正反对照。
-- [重放脚本](../research/prompts/recovery-audit-harness-2026-10-24/verify_audit.py)：临时 Cargo 工程、两次独立测试进程、结束时核对源码未变。
-- [探针日志](../research/prompts/recovery-audit-harness-2026-10-24/evidence/probes.log)、[库测试日志](../research/prompts/recovery-audit-harness-2026-10-24/evidence/library-tests.log)、[恢复集成测试日志](../research/prompts/recovery-audit-harness-2026-10-24/evidence/recovery-integration-tests.log)。
-- [源码 SHA-256](../research/prompts/recovery-audit-harness-2026-10-24/evidence/source-sha256.txt)：相关六个 crate 的 Rust 源文件，排除 audits 文件；不是工作区所有文件的摘要。
-- [本轮 Verus JSON](../research/prompts/recovery-audit-harness-2026-10-24/evidence/formal-kernel.json) 与 [stderr](../research/prompts/recovery-audit-harness-2026-10-24/evidence/formal-kernel.stderr)。
+- [公开 API 探针](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/probes.rs`)：H01–H03 的正反对照。
+- [重放脚本](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/verify_audit.py`)：临时 Cargo 工程、两次独立测试进程、结束时核对源码未变。
+- [探针日志](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/probes.log`)、[库测试日志](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/library-tests.log`)、[恢复集成测试日志](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/recovery-integration-tests.log`)。
+- [源码 SHA-256](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/source-sha256.txt`)：相关六个 crate 的 Rust 源文件，排除 audits 文件；不是工作区所有文件的摘要。
+- [本轮 Verus JSON](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/formal-kernel.json`) 与 [stderr](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/formal-kernel.stderr`)。
 
 探针重放：
 
 ```bash
-python3 research/prompts/recovery-audit-harness-2026-10-24/verify_audit.py
+python3 `git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/verify_audit.py`
 ```
 
 脚本需要本地 Rust 和离线依赖缓存，编译产物放在仓库 target，临时工程结束后清理。它不改产品文件、不接入产品自动测试，也不要求 GPU 或 RocksDB 判定库。
@@ -224,7 +224,7 @@ H03 重新追查到 `history.rs:7666`，现有冷启动执行器传递正确的 
 
 ### 临时源码副本的因果对照
 
-新增 [verify_recheck.py](../research/prompts/recovery-audit-harness-2026-10-24/verify_recheck.py)，复制 harness 的源码及编译期线程登记文件，仅修改临时副本。审计程序通过路径依赖链接这个副本，core 等依赖仍使用工作区源码。对照补丁全文保留于 [temporary-control.patch](../research/prompts/recovery-audit-harness-2026-10-24/evidence/temporary-control.patch)。
+新增 [verify_recheck.py](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/verify_recheck.py`)，复制 harness 的源码及编译期线程登记文件，仅修改临时副本。审计程序通过路径依赖链接这个副本，core 等依赖仍使用工作区源码。对照补丁全文保留于 [temporary-control.patch](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/temporary-control.patch`)。
 
 临时补丁只做三件事：给读日志包装补 discard 转发；给三个包装补四个专用接口转发；在 Publishes 分支拒绝需要读回结果的答案。**这是定位因果的实验修改，不是正式修复方案**：尤其没有完成转发后的故障注入与观测计数契约，不能将它直接作为产品补丁落地。
 
@@ -236,8 +236,8 @@ H03 重新追查到 `history.rs:7666`，现有冷启动执行器传递正确的 
 
 三轮各 3 项审计测试通过，合计 9 次；每一轮的断言分别要求观察到原缺口、定向翻转、原缺口重现。三轮中直接内层、合法冷启动观测的正对照仍通过；真正的 Failed 读回仍被拒绝。由此排除了“计数假设备所有接口都返回同样内容”“模型所有输入一律接受”“临时补检查把合法输入也一律判红”等解释。
 
-完整执行记录见 [causal-recheck.log](../research/prompts/recovery-audit-harness-2026-10-24/evidence/causal-recheck.log)。复核使用独立 `target/harness-causal-recheck`，避免与其他任务争用构建锁。
+完整执行记录见 [causal-recheck.log](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/causal-recheck.log`)。复核使用独立 `target/harness-causal-recheck`，避免与其他任务争用构建锁。
 
-复核搭建过程也保留记录：首次临时副本缺少 `include_str!` 所需的线程登记文件，未进入测试，见 [initial-setup-error](../research/prompts/recovery-audit-harness-2026-10-24/evidence/causal-recheck-initial-setup-error.log)；之后一次共享 target 运行在等待编译锁时主动终止，见 [shared-target-interrupted](../research/prompts/recovery-audit-harness-2026-10-24/evidence/causal-recheck-shared-target-interrupted.log)。二者均不计为产品测试失败或有效对照结果。
+复核搭建过程也保留记录：首次临时副本缺少 `include_str!` 所需的线程登记文件，未进入测试，见 [initial-setup-error](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/causal-recheck-initial-setup-error.log`)；之后一次共享 target 运行在等待编译锁时主动终止，见 [shared-target-interrupted](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/causal-recheck-shared-target-interrupted.log`)。二者均不计为产品测试失败或有效对照结果。
 
-复核的 [源码摘要](../research/prompts/recovery-audit-harness-2026-10-24/evidence/recheck-source-sha256.txt) 与首轮 434 个相关 Rust 文件一致，三轮完成后脚本再次确认这些产品源码未变。原报告 292 项库测试、82 项集成测试及 Verus 78/0 的记录重新核对无误；此次补做的是上述因果实验，没有把旧日志冒充再次执行完整测试或再次运行 Verus。
+复核的 [源码摘要](../`git show 59ce5a86550d:research/prompts/recovery-audit-harness-2026-10-24/evidence/recheck-source-sha256.txt`) 与首轮 434 个相关 Rust 文件一致，三轮完成后脚本再次确认这些产品源码未变。原报告 292 项库测试、82 项集成测试及 Verus 78/0 的记录重新核对无误；此次补做的是上述因果实验，没有把旧日志冒充再次执行完整测试或再次运行 Verus。

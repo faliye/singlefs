@@ -1,4 +1,56 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(bash scripts/devices/vm-kernel.sh*)",
+      "Bash(scripts/devices/vm-kernel.sh*)",
+      "Bash(bash scripts/devices/vm-bench.sh*)",
+      "Bash(scripts/devices/vm-bench.sh*)",
+      "Bash(bash scripts/devices/vm-geom.sh*)",
+      "Bash(scripts/devices/vm-geom.sh*)",
+      "Bash(bash .claude/scripts/qemu.sh*)",
+      "Bash(.claude/scripts/qemu.sh*)",
+      "Bash(GATE_QEMU=1 bash .claude/scripts/gate.sh*)",
+      "Bash(qemu-system-x86_64 *)",
+      "Bash(qemu-img *)",
+      "Bash(kvm *)",
+      "Bash(lsblk*)",
+      "Bash(blkid*)",
+      "Bash(findmnt*)",
+      "Bash(losetup -a*)",
+      "Bash(losetup -l*)",
+      "Bash(truncate *)",
+      "Bash(fallocate *)",
+      "Bash(dd *)",
+      "Bash(parted *)",
+      "Bash(sfdisk *)",
+      "Bash(sgdisk *)",
+      "Bash(fdisk *)",
+      "Bash(wipefs *)",
+      "Bash(mkfs.ext4 *)",
+      "Bash(sudo -n losetup *)",
+      "Bash(sudo -n dmsetup *)",
+      "Bash(sudo -n mount /dev/loop*)",
+      "Bash(sudo -n mount -o * /dev/loop*)",
+      "Bash(sudo -n mount /dev/mapper/*)",
+      "Bash(sudo -n mount -o * /dev/mapper/*)",
+      "Bash(sudo -n umount /tmp/*)",
+      "Bash(sudo -n umount /dev/loop*)",
+      "Bash(sudo -n umount /dev/mapper/*)",
+      "Bash(python3 .claude/singlefs-ai-sop/scripts/proc.py stop *)",
+      "Bash(task-server/task submit -- python3 scripts/gate/hook-swap.py *)",
+      "Bash(python3 scripts/kb/replace-once.py .claude/hooks/lib_project_code_runs.py *)",
+      "Bash(python3 scripts/hosts/minimal-copy.py*)",
+      "Bash(python3 scripts/hosts/lib_repository_copy.py entries*)"
+    ],
+    "deny": [
+      "Bash(*losetup -D*)",
+      "Bash(*losetup --detach-all*)",
+      "Bash(*dmsetup remove_all*)",
+      "Bash(*/dev/nvme0*)",
+      "Bash(*/dev/disk/by-*)",
+      "Bash(*udisksctl power-off*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -32,12 +84,7 @@
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/heavy-test-guard.sh"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/host-resources-reminder.sh",
-            "timeout": 40
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/project-code-guard.sh"
           },
           {
             "type": "command",
@@ -45,7 +92,7 @@
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/two-logs-guard.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/root-entry-guard.sh"
           }
         ]
       },
@@ -94,6 +141,24 @@
             "timeout": 120
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/root-entry-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task|SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/borrowed-convention-guard.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -104,6 +169,10 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/shared-index-stale-reminder.sh",
             "timeout": 40
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/root-entry-guard.sh"
           }
         ]
       }

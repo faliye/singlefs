@@ -1,0 +1,5 @@
+== 任务 5924 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-5924.attempt-1.log（共 4 行，下面是整份）
+A31 install_exit=0 output_promises_autostart=true enable_called=false install_section=false
+A33 show_failed=false stop_exit=1 remaining_fake_pid=4242 claimed_empty=false
+A33 show_failed=true stop_exit=0 remaining_fake_pid=4242 claimed_empty=true
+AUDIT sources_unchanged=true control_sha256=97c9f2a7478cc87b9b62e17094dbbfc815e605d6373792e35e6cde29edec0651 temporary_roots_removed=true

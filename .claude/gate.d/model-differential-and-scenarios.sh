@@ -12,7 +12,7 @@
 # gate-similar: crates-mutation-replay.sh 它按 crates/mutations.tsv 把点名 random_histories 的变异逐条施加再跑，证明模型对拍自己会红；这里在不改代码的仓上判模型对拍跑了、每段都判过
 # gate-similar: research-build-and-replay.sh 也跑 cargo test --release，但编的是 research 工作区的实验，不跑 crates/singlefs-verification 的测试二进制
 # gate-similar: checker-independence-and-sync.sh 它的 checker-implementation-disjoint 格判三个包之间的依赖方向与共享代码，对象是 Cargo.toml 与 use 语句；这里判的是 验证包用例本身的粒度与对拍
-# gate-similar: harness-test-environment.sh 同属 harness 类，判的是跑完测试之后机器干不干净，读宿主状态，不读测试源码也不跑 cargo
+# gate-similar: test-environment.sh 同属 harness 类，判的是跑完测试之后机器干不干净，读宿主状态，不读测试源码也不跑 cargo
 #
 # gate-cell: one-scenario 验证包一条用例一个场景
 # gate-cell: model-random-histories 模型对拍：随机历史
@@ -50,7 +50,8 @@
 #   改一格用例自己闭包里的函数只作废那一格；拒算的照跑、不记库。
 #   记红、撤绿、下趟现判：这一格现判而判红（cargo test 退非 0，或跑过了而那一段没有「模型对拍 N 步」、步数为 0）的，
 #   model_record_red 经 admission.py verdict-record --red-names 照计划里的键记红、撤掉同一把键原有的绿（打一行「· 判红记库：…」），下一趟这一格现判、原因以「上次判红」起头；
-#   拒算的没有键，不记。
+#   拒算的没有键，不记。记红没成（verdict-record 退非 0）交 admission.py plan-failure 带 --red：它判失灵、撤掉同一把键原有的绿（撤不掉说整道判红），
+#   下一趟这一格现判、不复用那条旧绿（admission.py 文件头「按条复用失灵」）；这一格照判红。
 #   每格末行报「单元键：现判 N、复用 M、拒算 R、本次未跑 K」。
 #   按条复用失灵（verdict-plan 退非 0、退 0 而没打 PLAN、它或 verdict-record 的复用哨兵报「复用失灵」「判定不稳」「强制现判没起作用」）：判法只在
 #   scripts/gate/admission.py 的 plan-failure（文件头「按条复用失灵」）；它判失灵，那一格照旧现判跑完、结论判红。不比树、不比 HEAD，不问 stage-must-run.sh 与 change-touches-crates.sh；
@@ -89,6 +90,9 @@
 #                                           .unit-verdict-sample/red-over-green 在：这一格把计划答的复用改成现判（库里有同一把键的绿也现判），假 cargo 打的随机历史那一段
 #                                           没有「模型对拍」那一行，判红、照键记红（「· 判红记库：1 条记红…」，盖掉那把键的绿）；样本档接着再算一次计划，
 #                                           这一格答「现判」、原因以「上次判红」起头（「· 样本档：判红记库之后同一把键再算一次计划」那一行），退 1
+#   model-random-histories-red-record-failed       记红没成、下一趟不复用旧绿：同 red-over-green，另放 .unit-verdict-sample/red-record-failure（admission.py verdict-record
+#                                           照它当判红没记成、退 1）；plan-failure 带 --red 判失灵、撤掉上一版记进来的那条绿（「同一把键原有的绿已撤掉 1 条」），
+#                                           样本档接着再算一次计划，这一格答「judge（库里没有这一条）」，退 1
 #
 # 弄坏开关（打开后样本判错；每条下面逐行点名判错的样本，括号里是那一份出不来的那一句）：
 #   （one-scenario 格的判法 scripts/crash/crash-case-check.py 自己的开关由它的 --selftest 证，不在这里点名）
@@ -97,19 +101,23 @@
 #     model-reuse-sampling-red（退 0）
 #   GATE_MODEL_DIFFERENTIAL_BREAK=one-key-for-every-cell  六格共用一份输入（每格的键另加整份 random_histories.rs）
 #     model-unit-key-one-cell（「复用」那五句：只改了一格的函数，六格一起作废）
-#   GATE_MODEL_DIFFERENTIAL_BREAK=seed-record-in-scratch  样本档拿上一版记库没记成时，照改前把出路指到这一格草稿目录里的 seed.record（不拷到 TMPDIR，格收尾时随 EXIT trap 删掉）
+#   GATE_MODEL_DIFFERENTIAL_BREAK=seed-record-in-scratch  样本档拿上一版记库没记成时，把出路指到这一格草稿目录里的 seed.record（不拷到 TMPDIR，格收尾时随 EXIT trap 删掉）
 #     model-random-histories-seed-record-kept-red（「/model-differential-seed.」：出路指的是草稿目录里那一份，格收尾时报它已经不在了）
-#   GATE_MODEL_DIFFERENTIAL_BREAK=red-not-recorded  这一格判红时不交 verdict-record --red-names（改前的样子：只记绿，判红的不记红、不撤同一把键原有的绿）
+#   GATE_MODEL_DIFFERENTIAL_BREAK=red-not-recorded  这一格判红时不交 verdict-record --red-names（只记绿，判红的不记红、不撤同一把键原有的绿）
 #     model-random-histories-red-over-green（输出里找不到「· 判红记库：1 条记红」，再算一次计划答的是「复用」而不是「上次判红」）
+#   GATE_MODEL_DIFFERENTIAL_BREAK=red-record-failure-kept-green  记红没成只打一行「!」、不交 plan-failure（同一把键原有的绿留着，下一趟照复用）
+#     model-random-histories-red-record-failed（输出里找不到「同一把键原有的绿已撤掉 1 条」，再算一次计划答的是「reuse」而不是「judge（库里没有这一条）」）
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0
 #     model-allocation-record-wall-red、model-random-histories-plan-exit-red、model-random-histories-plan-sentinel-red、model-random-histories-red
-#     model-random-histories-red-over-green、model-random-histories-renamed-red、model-random-histories-seed-record-kept-red、model-reuse-sampling-red、model-rollback-sampling-red
+#     model-random-histories-red-over-green、model-random-histories-red-record-failed、model-random-histories-renamed-red、model-random-histories-seed-record-kept-red、model-reuse-sampling-red、model-rollback-sampling-red
 #     model-unit-area-wall-admission-judged-red、model-unit-area-wall-red、one-scenario-red
-#   ADMISSION_BREAK=plan-unavailable-as-failure  归 scripts/gate/admission.py：计划退 75 照复用失灵判红（改前的样子）
+#   ADMISSION_BREAK=plan-unavailable-as-failure  归 scripts/gate/admission.py：计划退 75 照复用失灵判红
 #     model-random-histories-plan-unavailable（退 1）
 #   ADMISSION_BREAK=plan-failure-not-red  归 scripts/gate/admission.py：按条复用失灵也不判红
 #     model-random-histories-plan-exit-red（退 0）
 #     model-random-histories-plan-sentinel-red（退 0）
+#   ADMISSION_BREAK=red-record-failure-swallowed  归 scripts/gate/admission.py：记红没成只打一行 !、照退 0，plan-failure 不撤绿
+#     model-random-histories-red-record-failed（输出里找不到「同一把键原有的绿已撤掉 1 条」，再算一次计划答的是「reuse」）
 #
 #   bash .claude/gate.d/model-differential-and-scenarios.sh [项目根]                          七格都跑
 #   bash .claude/gate.d/model-differential-and-scenarios.sh --list                            逐行打格名与判什么，不跑格
@@ -117,6 +125,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ model-differential-and-scenarios.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 STAGE_NAME="$(basename "$0")"
@@ -244,7 +257,7 @@ model_seed_prior_verdict() {
     # scratch 随调用方的 EXIT trap 删掉：判红时把 seed.record 拷到 TMPDIR 下留着，出路指那一份（样本档里格收尾核它还在，文件头「样本」）
     local kept_record
     if [[ "${GATE_MODEL_DIFFERENTIAL_BREAK:-}" == seed-record-in-scratch ]]; then
-      kept_record="$scratch/seed.record"   # 弄坏开关：改前的样子，出路指草稿目录里那一份、格收尾时被删
+      kept_record="$scratch/seed.record"   # 弄坏开关：出路指草稿目录里那一份、格收尾时被删
     else
       kept_record="$(mktemp "${TMPDIR:-/tmp}/model-differential-seed.XXXXXX.record")" && cp -- "$scratch/seed.record" "$kept_record" || kept_record="（没留下：拷不出来）"
     fi
@@ -255,10 +268,12 @@ model_seed_prior_verdict() {
 }
 
 # model_record_red <种类> <决定> <计划输出> <跑法> <格名>：这一格现判而判红（文件头「复用」记红、撤绿、下趟现判）：请求里的名字照计划里的键经 admission.py
-# verdict-record --red-names 记红，盖掉同一把键原有的绿。不是现判的（复用的不会走到这里，拒算的没有键）不记；记不下只打一行「!」（这一格已经判红）。
-# 弄坏开关 GATE_MODEL_DIFFERENTIAL_BREAK=red-not-recorded 下不交（改前的样子：只记绿，判红的不撤同一把键原有的绿）
+# verdict-record --red-names 记红，盖掉同一把键原有的绿。不是现判的（复用的不会走到这里，拒算的没有键）不记。
+# 记红没成（verdict-record 退非 0）交 admission.py plan-failure 带 --red：它判失灵、撤掉同一把键原有的绿，撤不掉说整道判红（文件头「复用」）；这一格照判红。
+# 弄坏开关 GATE_MODEL_DIFFERENTIAL_BREAK=red-not-recorded 下不交（只记绿，判红的不撤同一把键原有的绿）；
+#   =red-record-failure-kept-green 下记红没成只打一行「!」、不交 plan-failure（同一把键原有的绿留着，下一趟照复用）
 model_record_red() {
-  local kind="$1" decision="$2" plan_output="$3" how="$4" cell="$5" record_exit
+  local kind="$1" decision="$2" plan_output="$3" how="$4" cell="$5" record_exit failure_exit
   [[ "${GATE_MODEL_DIFFERENTIAL_BREAK:-}" == red-not-recorded ]] && return 0
   [[ -n "$plan_output" && "$decision" == judge ]] || return 0
   cut -f1 "$scratch/request" > "$scratch/red.names"
@@ -267,9 +282,18 @@ model_record_red() {
        >"$scratch/red.record" 2>&1; then record_exit=0; else record_exit=$?; fi
   if ((record_exit == 0)); then
     echo "  · 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟这一格现判（$(tail -n 1 "$scratch/red.record")）"
-  else
+  elif [[ "${GATE_MODEL_DIFFERENTIAL_BREAK:-}" == red-record-failure-kept-green ]]; then
     echo "  ! 判红记库：admission.py verdict-record 没成（$(tail -n 2 "$scratch/red.record" | tr '\n' ' ')），同一把键原有的绿还在"
-    python3 "$ADMISSION" plan-failure "$STAGE_NAME 的 $cell 格" verdict-record "$record_exit" "$scratch/red.record" || :
+  else
+    echo "  · 判红记库：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$scratch/red.record" | tr '\n' ' ' | cut -c1-300)），记红没成，交 plan-failure 判、撤同一把键原有的绿"
+    if python3 "$ADMISSION" plan-failure "$STAGE_NAME 的 $cell 格" verdict-record "$record_exit" --red "$ROOT" "$kind" "$scratch/plan" "$scratch/red.names" "$scratch/red.record"; then
+      failure_exit=0
+    else
+      failure_exit=$?
+    fi
+    if ((failure_exit == 75)); then
+      echo "  ! 判红记库时 prune-server 不可用（上面那一句）：这一格照判红；同一把键原有的绿撤不了，服务好了之后下一趟会照复用它，修好这一格之前不当它绿过"
+    fi
   fi
 }
 

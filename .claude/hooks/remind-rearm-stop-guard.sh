@@ -3,7 +3,7 @@
 # run-condition: command python3
 # Stop hook：主 agent 要结束这一轮时，看这个会话登记着的循环提醒（scripts/agents/remind.sh start 不带 --once 登记的）有没有进程在等；
 # 有登记、没在等的，拦下结束（decision=block），把登记里照原样重起的命令（restart= 那一行）交给主 agent，让它用 Bash 的 run_in_background 重起、再结束这一轮。
-# 这就是「提醒到点之后自启动」那一步（用户 2026-10-14 定：「你让脚本定时提醒 你不需要挂了 脚本到时间提醒 然后自启动」「没有 --once 的时候就无限自启动或者被关闭」）。
+# 这就是「提醒到点之后自启动」那一步（脚本到时间提醒、然后自启动；没有 --once 的时候就无限自启动或者被关闭）。
 # hook-events: Stop
 # gate-similar: 无 同挂 Stop 事件的只有上游 .claude/singlefs-ai-sop/scripts/claude-hooks/gate-reuse-check.sh（收工时自检新建的门禁与钩子，本仓没注册）；它读 git 里的新文件，这里读提醒的登记目录与 /proc，判的对象不同
 # gate-similar: timer-only-remind-guard.sh 同属「只许 remind.sh 定时」这一件事，但挂 PreToolUse 在执行前拒别的定时办法；这里挂 Stop 管 remind.sh 登记的循环提醒到点之后重起，事件和判的对象都不同，并进去要让一个文件同时挂两个事件、读两份互不相干的输入
@@ -37,15 +37,15 @@
 #       「✗ 自证 other-session：」
 #   REMIND_REARM_STOP_BREAK=first-only  只交出第一条要重起的命令
 #       「✗ 自证 several：」
-#   REMIND_REARM_STOP_BREAK=failure-unrecorded  读不到 lib_remind_waiter.py 时只打 stderr、不记检出（改前的样子）
+#   REMIND_REARM_STOP_BREAK=failure-unrecorded  读不到 lib_remind_waiter.py 时只打 stderr、不记检出
 #       「✗ 自证 library-unreadable：」、「✗ 自证 library-unreadable-default-path：」
-#   REMIND_REARM_STOP_BREAK=input-unrecorded  输入不是 JSON 对象时只打 stderr、不记检出（改前连 stderr 也不打）
+#   REMIND_REARM_STOP_BREAK=input-unrecorded  输入不是 JSON 对象时只打 stderr、不记检出
 #       「✗ 自证 bad-input-recorded：」
 #   REMIND_REARM_STOP_BREAK=session-unrecorded  认不出会话号时只打 stderr、不记检出（同上）
 #       「✗ 自证 session-unrecognized-recorded：」
 #   REMIND_REARM_STOP_BREAK=settings-unrecorded  登记读不了时只打 stderr、不记检出（同上）
 #       「✗ 自证 settings-unreadable-recorded：」
-#   REMIND_REARM_STOP_BREAK=exception-unrecorded  判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，不拦、不记检出）
+#   REMIND_REARM_STOP_BREAK=exception-unrecorded  判的时候抛异常不接住、照原样抛出（进程退 1，不拦、不记检出）
 #       「✗ 自证 exception-recorded：」
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -201,7 +201,7 @@ def judge_raw(raw, hook_dir):
     try:
         output = decide(hook_input, unjudged)
     except Exception as error:
-        if broken("exception-unrecorded"):   # 弄坏开关：不接住，照原样抛出（改前的样子：进程退 1，不拦、不记检出）
+        if broken("exception-unrecorded"):   # 弄坏开关：不接住，照原样抛出（进程退 1，不拦、不记检出）
             raise
         report_unjudged(hook_dir, hook_input, f"判的时候抛异常（{type(error).__name__}: {error}），循环提醒有没有进程在等没判；手动看：bash scripts/agents/remind.sh list",
                         "exception-unrecorded")
@@ -213,7 +213,7 @@ def judge_raw(raw, hook_dir):
     return 0
 
 def report_unjudged(hook_dir, hook_input, problem, switch):
-    """判不了的一处：stderr 写一行，检出记录记一行（record_unjudged）；弄坏开关 switch 下只打 stderr、不记（改前连 stderr 也不打）。"""
+    """判不了的一处：stderr 写一行，检出记录记一行（record_unjudged）；弄坏开关 switch 下只打 stderr、不记。"""
     print(f"  ! {HOOK_NAME}：{problem}，照常放行", file=sys.stderr)
     if not broken(switch):
         record_unjudged(hook_dir, hook_input, problem)
@@ -488,7 +488,7 @@ def main():
         problem = (f"读不到 {hook_dir}/lib_remind_waiter.py（{error!r}），这一次判不了循环提醒有没有进程在等，照常放行；"
                    f"手动看：bash scripts/agents/remind.sh list")
         print(f"  ! remind-rearm-stop-guard.sh：{problem}", file=sys.stderr)
-        if not broken("failure-unrecorded"):   # 弄坏开关：只打 stderr、不记检出（改前的样子）
+        if not broken("failure-unrecorded"):   # 弄坏开关：只打 stderr、不记检出
             record_unjudged(hook_dir, read_hook_input(), problem)
         return 0
     if sys.argv[2:] == ["--selftest"]:

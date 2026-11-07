@@ -25,16 +25,16 @@
 运行：
 
 ```bash
-python3 research/prompts/recovery-audit-checker-tier-2026-10-24/verify_audit.py --verus
+python3 `git show 59ce5a86550d:research/prompts/recovery-audit-checker-tier-2026-10-24/verify_audit.py` --verus
 ```
 
 脚本创建临时 cargo 工程，调用当前 crate 的公开 API。在三个独立进程中分别运行全部断言，每个进程的缓存对照都使用独立的一次性 RocksDB 库。环境通过既有守卫恢复，不污染用户的长期判定库。`--verus` 另外运行整个形式化核。
 
-- [探针源码](../research/prompts/recovery-audit-checker-tier-2026-10-24/verdict_encoding_and_torn_state_probes.rs)
-- [完整日志](../research/prompts/recovery-audit-checker-tier-2026-10-24/evidence/verdict-and-torn-model-recheck.log)
-- [实际测试消费者中逐字抽取的覆盖方法](../research/prompts/recovery-audit-checker-tier-2026-10-24/evidence/coverage-method-extracted.rs)
-- [本轮 Verus JSON](../research/prompts/recovery-audit-checker-tier-2026-10-24/evidence/formal-kernel-recheck.json)
-- [本轮 Verus stderr](../research/prompts/recovery-audit-checker-tier-2026-10-24/evidence/formal-kernel-recheck.stderr)
+- [探针源码](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-tier-2026-10-24/verdict_encoding_and_torn_state_probes.rs`)
+- [完整日志](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-tier-2026-10-24/evidence/verdict-and-torn-model-recheck.log`)
+- [实际测试消费者中逐字抽取的覆盖方法](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-tier-2026-10-24/evidence/coverage-method-extracted.rs`)
+- [本轮 Verus JSON](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-tier-2026-10-24/evidence/formal-kernel-recheck.json`)
+- [本轮 Verus stderr](../`git show 59ce5a86550d:research/prompts/recovery-audit-checker-tier-2026-10-24/evidence/formal-kernel-recheck.stderr`)
 
 本轮没有运行完整 GPU 卡上对拍、全部变异战役和所有 ignored 全量历史。因此不会把对结论编码的 CPU 端证明，冒充 GPU 上已产生错误恢复结果的实测。
 

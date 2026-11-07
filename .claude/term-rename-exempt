@@ -34,36 +34,36 @@ records/2026-10-01-对接上游测试脚本规范.md:「术语改名「轻用例
 records/2026-09-03-验证三件套落地调研.md:「sb_set_blocksize` 对大」  # Linux 内核函数名（`block/bdev.c` 里的 `sb_` 前缀），不是本项目的 superblock；sb_ → system_configuration_ 那次全仓改名误伤了它，2026-10-11 知识腐烂治理第二轮改回
 # 「层 0」→ 崩溃点重放（2026-10-12）：下面几行是按整份或按行留旧名的
 records/2026-10-01-对接上游测试脚本规范.md  # 当时的定义与欠账原文照录了好几遍（分层表里「层 0」那一档的 C409 行、射程原句各逐字出现两次），按行锚定不了；别的行已换成新名
-.claude/gate.d/checker-tier-crash-point-replay.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+.claude/gate.d/crash-point-replay.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 .claude/gate.d/crash-point-replay-items.tsv  # 登记表的数据行：脚本按列读、样本按字面比，不动；注释行已换
-.claude/gate.d/fixtures/checker-tier-crash-point-replay.sh/green/expect  # 门禁样本：期望输出与样本 kb 是那道门禁判法的输入，换样本要连判法一起改
+.claude/gate.d/fixtures/crash-point-replay.sh/green/expect  # 门禁样本：期望输出与样本 kb 是那道门禁判法的输入，换样本要连判法一起改
 .claude/gate.d/fixtures/doc-registries.sh/field-registry-green/.claude/kb/layout/01-first-txn.md  # 门禁样本：期望输出与样本 kb 是那道门禁判法的输入，换样本要连判法一起改
 .claude/gate.d/fixtures/doc-registries.sh/second-txn-hooks-red/.claude/kb/layout/01-first-txn.md  # 门禁样本：期望输出与样本 kb 是那道门禁判法的输入，换样本要连判法一起改
 .claude/gate.d/fixtures/doc-registries.sh/segment-registry-red/.claude/kb/layout/01-first-txn.md  # 门禁样本：期望输出与样本 kb 是那道门禁判法的输入，换样本要连判法一起改
 .claude/gate.d/stage-inputs.tsv  # 登记表的数据行：脚本按列读、样本按字面比，不动；注释行已换
 .claude/gate.d/stage-owners.tsv  # 登记表的数据行：脚本按列读、样本按字面比，不动；注释行已换
-.claude/hooks/heavy-test-guard.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-.claude/hooks/lib_heavy_tests.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+.claude/hooks/project-code-guard.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+.claude/hooks/lib_project_code_runs.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 .claude/hooks/runner-dispatch-guard.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 .claude/hooks/selftest-registry.tsv  # 登记表的数据行：脚本按列读、样本按字面比，不动；注释行已换
 crates/mutations.tsv  # 变异名与按名字引它的表：名字是标识，判定库按名字复用、别的表按名字点名，改名要连判定库一起作废
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-checker-tier/src/crash_state_enumeration.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/src/lib.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_acquisition_barrier.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_floor_raise_pushed_by_admission.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_position_addressed_trees.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_record_spill_over_stream.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_tree_split_streams.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_enumeration_writable_mount_of_a_formatted_pool.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-crates/singlefs-checker-tier/tests/crash_segments_per_device_and_torn_in_place_overwrites.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-verification/src/crash_state_enumeration.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/src/lib.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_acquisition_barrier.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_fixed_script_stream.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_floor_raise_pushed_by_admission.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_multi_record_publish_stream.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_position_addressed_trees.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_record_spill_over_stream.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_tree_split_streams.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_enumeration_writable_mount_of_a_formatted_pool.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
+crates/singlefs-verification/tests/crash_segments_per_device_and_torn_in_place_overwrites.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 records/2026-09-27-同步远端冲突块.md  # 整份是 2026-09-27 当时冲突块的原样照录（代码、钩子用例、定义原文），换了就成假话
 research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-arm-n15.out  # E142（新池新建文件的干跑） 的留存产物：装置源码没改、复跑仍要逐字节相同，产物照 .claude/rules/path-moves.md「留存产物分两类」不动
 scripts/agents/agent-watch.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
@@ -86,12 +86,12 @@ scripts/experiment-apparatus/e170_second_run_o3_spec_executor/crash_image.py  # 
 scripts/experiment-apparatus/e170_second_run_o3_spec_executor/synthetic_pool_for_tests.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_487/crash_image.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_487/synthetic_pool_for_tests.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-117.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-expansion-164.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-8.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-4-only.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e171_three_oracle_collusion/baseline_checks.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e171_three_oracle_collusion/collusion_matrix.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-117.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-expansion-164.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-step-8.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-step-4-only.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/gate/admission.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 scripts/gate/apply-writer-patch.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 scripts/kb/stale-candidates-benchmark-facts.tsv  # 登记表的数据行：脚本按列读、样本按字面比，不动；注释行已换
@@ -274,8 +274,8 @@ records/2026-10-17-全仓知识腐烂治理.md:「旧 invariants.md、layout、m
 records/2026-10-17-全仓知识腐烂治理.md:「四份文件残留旧文件名 `invariants.md`」  # 记回扫员查出旧文件名残留这件事本身
 records/2026-10-17-全仓知识腐烂治理.md:「那一句又被改名工具改坏，改回」  # 记主 agent 把 Linux 内核函数名（`block/bdev.c` 的 `sb_` 前缀）改回去这件事本身，换成新名这句就成假话
 records/2026-10-13-里程碑四预开发.md:「里程碑三开工会话 回：table-shape 四行」  # 记里程碑三开工会话那次英文标识符改名本身的一行，列的是旧名 → 新名对照，换成新名就成假话
-.claude/kb/decisions-history.en.md:「gate checker-tier-crash-point-replay (`.claude/gate.d/checker-tier-layer0-replay.sh`) all green the same day.」  # 变更史引当时门禁脚本的历史文件名，换成新名就不是改前原文
-.claude/kb/decisions-history.ja.md:「ゲート checker-tier-crash-point-replay（`.claude/gate.d/checker-tier-layer0-replay.sh`）は同日すべて緑。」  # 变更史引当时门禁脚本的历史文件名，换成新名就不是改前原文
+.claude/kb/decisions-history.en.md:「(`.claude/gate.d/checker-tier-layer0-replay.sh`) all green the same day.」  # 变更史引当时门禁脚本的历史文件名，换成新名就不是改前原文
+.claude/kb/decisions-history.ja.md:「（`.claude/gate.d/checker-tier-layer0-replay.sh`）は同日すべて緑。」  # 变更史引当时门禁脚本的历史文件名，换成新名就不是改前原文
 .claude/kb/experiments-history.en.md:「comment above that line cited `layer0-shard-run.sh:155` (that line number no longer」  # 引的是当时那份脚本注释的原文，换成新名就不是原文
 .claude/kb/experiments-history.en.md:「comment changed to cite the `run_on_peer` function of `layer0-shard-run.sh` (the same way」  # 引的是当时那份脚本注释的原文，换成新名就不是原文
 .claude/kb/experiments-history.ja.md:「その行の上のコメントは `layer0-shard-run.sh:155` を引いていた」  # 引的是当时那份脚本注释的原文，换成新名就不是原文
@@ -283,3 +283,55 @@ records/2026-10-13-里程碑四预开发.md:「里程碑三开工会话 回：ta
 records/2026-10-19-文档普查报告核实与修复.md:「有 R 行或登记过改名的 15 处照改（`55-qemu-device-streams.sh` 样本目录、`layer0-shard-configuration-check.sh`、`layer0-shard-run.sh`」  # 记历史改名处置过程列出的被改文件名，换成新名就成假话
 crates/singlefs-core/src/transaction.rs:「let first_transaction_of_the_batch = previous.highest_transaction_number_in_this_instance + 1;」  # 局部变量说的是这一批的第一个事务号，不是改过名的「新池新建文件」那个概念
 crates/singlefs-core/src/transaction.rs:「transaction: first_transaction_of_the_batch,」  # 同一个局部变量的引用，不是改过名的「新池新建文件」那个概念
+records/2026-10-30-路径关联与候选精度.md:「`crates/singlefs-core/src/superblock.rs` 对 `system_configuration.rs` 重合 76%」  # 记的是那一天拿后继原型量删掉的旧文件，旧路径是被量的对象本身，换成新名就成了新文件对自己
+records/2026-10-29-subagent拆分提案.md:「checker-tier-layer0-replay.sh」  # 记录当时执行命令的字面原文（先改名为 checker-tier-crash-point-replay.sh，并包后去前缀为 crash-point-replay.sh），换成新名就成了假话
+records/2026-11-02-文档代码逐项审核-E200产物逐行.json  # E200 逐行审核过程记录，包含被审核产物原文中的旧路径
+# 2026-11-05 两个验证包并成 singlefs-verification：历史类 kb 页里照规矩留旧叫法「harness 档」「checker 档」的几行（换成「验证包」就不是当时的事实）
+.claude/kb/experiments-history.md:「一半与五行装置变异未跑（checker 档），L3 与 P1b 够」  # 变更史的历史行：记的是并包前那个包当时的叫法，换成「验证包」就不是当时说的那件事（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/experiments-history.md:「变异与第一段产物都没跑（checker 档），状态「进行中（装置）」  # 变更史的历史行：记的是并包前那个包当时的叫法，换成「验证包」就不是当时说的那件事（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/experiments-history.md:「跑过的记载。单测按包算 checker 档，归主 agent 带前」  # 变更史的历史行：记的是并包前那个包当时的叫法，换成「验证包」就不是当时说的那件事（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/experiments-history.md:「# 仓根。编与单测（checker 档，主 agent 带前缀」  # 变更史的历史行：记的是并包前那个包当时的叫法，换成「验证包」就不是当时说的那件事（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/milestone/02-second-txn.md:「ication.md`「checker 档自己分快档与全量」  # 已结束里程碑页的历史行：引的是当时规则小节的标题原文与当时的包叫法，换了就不是原文（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/milestone/02-second-txn.md:「例钉住，这一格站住（进 harness 档）；节点以操作为主切分这」  # 已结束里程碑页的历史行：引的是当时规则小节的标题原文与当时的包叫法，换了就不是原文（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/milestone/03-third-txn.md:「cc0d2f 上就有）：checker 档快档 3 条红（`cra」  # 已结束里程碑页的历史行：记的是并包前那个包当时的叫法，换成「验证包」就不是当时说的那件事（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/milestone/03-third-txn.md:「第 29–31 批两条 checker 档红的二分结论因此作废（记」  # 已结束里程碑页的历史行：记的是并包前那个包当时的叫法，换成「验证包」就不是当时说的那件事（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/milestone/03-third-txn.md:「n/`）的内联单测不在 checker 档快档里，装置改动交回时也」  # 已结束里程碑页的历史行：记的是并包前那个包当时的叫法，换成「验证包」就不是当时说的那件事（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/milestone/03-third-txn.md:「09-30 广谱变异与 harness 档在 24G 的内存包装里」  # 已结束里程碑页的历史行：记的是并包前那个包当时的叫法，换成「验证包」就不是当时说的那件事（kb-experiments 写回员 kept-old-names.tsv 登记）
+.claude/kb/checks-owed.md:「同 checker-tier-layer0-replay」  # C433 引的是当时 .claude/batch-scope 的原文，换成新门禁名就不是原文了（one-gate-kb-ledger-owed-2 写回员登记）
+.claude/kb/checks-owed.md:「checker 档测试开引擎而没设一次性库」  # C955 出处逐字引的记录原话，换了就不是原话（one-gate-kb-ledger-owed-2 写回员登记）
+.claude/kb/checks-owed.en.md:「同 checker-tier-layer0-replay」  # C433 引的是当时 .claude/batch-scope 的原文，换成新门禁名就不是原文了（one-gate-kb-ledger-owed-2 写回员登记）
+.claude/kb/checks-owed.en.md:「checker 档测试开引擎而没设一次性库」  # C955 出处逐字引的记录原话，换了就不是原话（one-gate-kb-ledger-owed-2 写回员登记）
+.claude/kb/checks-owed.ja.md:「同 checker-tier-layer0-replay」  # C433 引的是当时 .claude/batch-scope 的原文，换成新门禁名就不是原文了（one-gate-kb-ledger-owed-2 写回员登记）
+.claude/kb/checks-owed.ja.md:「checker 档测试开引擎而没设一次性库」  # C955 出处逐字引的记录原话，换了就不是原话（one-gate-kb-ledger-owed-2 写回员登记）
+.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a4737c6f3660f4f7e.txt  # 派发闸自证 ⑳ 读的真派发提示，逐字节拷自归档的 landing-audit-r3 提示（sha256 钉在 sources.tsv），里面的「checker 档」是当时的原话，改一个字就不是原样输入
+.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a4737c6f3660f4f7e-own-result.txt  # 同上一行那份提示改一处的变体（sources.tsv 钉 sha256），「checker 档」是当时的原话
+.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a86c5c8fb8ec28789.txt  # 派发闸自证 ⑳ 读的真派发提示，逐字节拷自归档的 landing-audit-r3 提示（sha256 钉在 sources.tsv），「checker 档测试」是当时的原话
+.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/aa9ec3423c1f54bba.txt  # 派发闸自证 ⑳ 读的真派发提示，逐字节拷自归档的 landing-audit-r3 提示（sha256 钉在 sources.tsv），「checker 档」是当时的原话
+.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/aa9ec3423c1f54bba-own-result.txt  # 同上一行那份提示改一处的变体（sources.tsv 钉 sha256），「checker 档」是当时的原话
+.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/a9717cf07fb6e7c21.txt  # 派发闸自证 ⑳ 读的真派发提示，逐字节拷自归档的 landing-audit-r3 提示（sha256 钉在 sources.tsv），「两档」「checker 档」是当时的原话
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py:「RefFS 是 checker 档包的正式依赖」  # 判的是修订 8 冻结树（并包之前），这句注释是原样抄来的 GREPS 的一部分，换成验证包就成假话
+.claude/kb/milestone/02-second-txn.en.md:「ication.md`「checker 档自己分快档与全量」  # 已结束里程碑页的历史行：引的是 973e1f585 那一版规则小节的标题原文，换了就不是原文（与中文那一份同一处，中文已登记）
+.claude/kb/milestone/02-second-txn.ja.md:「ication.md`「checker 档自己分快档与全量」  # 已结束里程碑页的历史行：引的是 973e1f585 那一版规则小节的标题原文，换了就不是原文（与中文那一份同一处，中文已登记）
+records/2026-11-05-删轻型并入重型.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-11-02-文档代码逐项审核-里程碑二快照条款.json  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-09-30-里程碑三开工第一轮.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-09-16-subagent拆分提案.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-29-一百三十七节那一轮调度记录.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-29-subagent拆分提案.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-11-02-文档代码逐项审核-prune历史条款.json  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-11-01-判定库服务化.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-26-subagent欠账清理.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-23-subagent拆分提案.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-31-删兼容旧版本代码.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+.claude/gate.d/path-moves.tsv  # 搬迁登记表自己：旧前缀一列就是被搬走的旧路径
+records/2026-10-31-task-server巡检.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-18-里程碑三收尾与近期欠账.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+scripts/experiment-apparatus/e203_admission_scan_cost.rs:「3 个有条目的号 × (1 + 最高层 2)」  # 这里的「最高层 2」是 3 个号加最高层号的计数式里的层数，不是已改名的层名
+records/2026-10-29-崩溃轻型与重型同一套逻辑.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-23-实验装置目录改名.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-22-子agent结果落地审计.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-13-复用键与全仓改名.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+records/2026-10-01-门禁注释精简.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
+.claude/kb/experiments-history.md:「heavy-test-guard.sh」  # 变更史里记当时的文件名
+.claude/kb/experiments-history.en.md:「heavy-test-guard.sh」  # 变更史里记当时的文件名
+.claude/kb/experiments-history.ja.md:「heavy-test-guard.sh」  # 变更史里记当时的文件名

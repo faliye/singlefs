@@ -1,0 +1,670 @@
+{
+  "at": "2026-11-03",
+  "document": "research/prompts/e200-preregistration.md",
+  "sha256": "80a13bdc428e41ef46de7c3741f24fdc06fe9d826d8c6b04bd7af8fd3bcdb3f9",
+  "scope": "All table body rows and T1-T5 bullets in this preregistration, including quoted historical rows; other prose not implied complete. Each partial result is bounded.",
+  "whole_document_complete": false,
+  "rows": [
+    {
+      "line": 24,
+      "clause": "Q1：今天能从 git 造出的、离修订 6 树（快照摘要 `7726cdd6…`）最近的那棵树，与修订 6 树差在哪几份文件",
+      "text": "| Q1：今天能从 git 造出的、离修订 6 树（快照摘要 `7726cdd6…`）最近的那棵树，与修订 6 树差在哪几份文件 | 列出的差别只在装置与研究一侧；差别伸进 `crates/` 的产品代码或池级 checker | 近似树与修订 6 那一趟留存产物里记的 13 份文件 sha256 逐份比，对不上的那几份落在哪个包 | 13 份逐份比完、每份写出近似树取的是哪一版（提交号）与它的 sha256 | 开着 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 25,
+      "clause": "Q2：在近似树上重跑修订 6 那一趟第一段之后，E171 第 2 次重跑登记第六节「现状·逐格」里 r1 第一段那一半的对照 ②③（e171-r1 登记第 8.5 节第 2 条：第 1、6、7、10 步之后那几份对照产物，两棵树的逐文件差表）出不出得来、与修订 8 那一趟并排差在哪几格",
+      "text": "| Q2：在近似树上重跑修订 6 那一趟第一段之后，E171 第 2 次重跑登记第六节「现状·逐格」里 r1 第一段那一半的对照 ②③（e171-r1 登记第 8.5 节第 2 条：第 1、6、7、10 步之后那几份对照产物，两棵树的逐文件差表）出不出得来、与修订 8 那一趟并排差在哪几格 | 出得来、差的格都落在 Q1 列的差别能解释的地方；出得来、有差的格 Q1 列的差别解释不了；出不来 | 近似树上那一趟各步产物与修订 8 那一趟逐格并排时，差的格的位置与 Q1 差表的对应 | 近似树那一趟第一段第 0–13 步跑完、对照产物两份都写出、逐格并排完 | 开着 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 36,
+      "clause": "T1",
+      "text": "   - T1 路径集：`31e47115…` 树里 `Cargo.toml`、`Cargo.lock`、`crates/`（不进 `target/`）下名字以 `.rs` 结尾或以 `Cargo.` 起头的 270 份，并上 94 行里 `A_`、`AM`、`??` 起头的 14 份 `.rs`，共 284 份（本设计员现算，命令在第十三节）；另带 `.cargo/` 下全部与 `crates/mutations.tsv`（不进快照摘要，进逐文件表）。份数不是 284 走停机 S40。",
+      "status": "partial",
+      "evidence": "build_approximate_tree.digest_path_set/extra_paths；270+14 路径集独立重算；task 5263 PathSetStops",
+      "limits": "实际搜索缺失文件的穷尽性未证明"
+    },
+    {
+      "line": 37,
+      "clause": "T2",
+      "text": "   - T2 不在 94 行里的路径：取 `31e47115…` 那一版，记 `exact_head`（新树就是这一版，按构造相同）。",
+      "status": "matched_bounded",
+      "evidence": "choose_tree_version；task 5263 outside-status 对照及 M43",
+      "limits": "仅核定义和临时仓，历史各路径未逐条证明为何不在状态集"
+    },
+    {
+      "line": 38,
+      "clause": "T3",
+      "text": "   - T3 在 94 行里、有钉值的路径（第 2 条那 15 份里落在 94 行的）：候选 blob 是 `git log --all`（含 stash 与 `git reflog --all` 点到的提交）里这条路径的每一版，加 `git fsck --unreachable --no-reflogs` 列出的每个悬空 blob；按内容 sha256 找等于钉值的那一个，找到记 `exact_pinned`（写 blob 号与出处提交，悬空的写 `unreachable`）。",
+      "status": "mismatch",
+      "evidence": "A27：Choice/manifest 丢弃 blob 对象号；task 5263 钉值与悬空对象场景通过",
+      "limits": "没有证明历史搜索穷尽"
+    },
+    {
+      "line": 39,
+      "clause": "T4",
+      "text": "   - T4 装置文件：T3 找不到时，取 `ab35105f…`（提交 `f8a9ddaab`），删掉它对修订 6 树装置那一块差的七行（E171 第 1 次重跑修订 8 第 8.11 节第 4 条：两份的 `diff -u` 只一块 `@@ -3475,6 +3475,13 @@`，第 29 批四行与第 10g 批三行相邻并成一块，即 `ab35105f…` 的第 3478–3484 行；删之前核这七行里含 `SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults`）。删完 sha256 等于 `67e7a549…` 记 `exact_reconstructed`，不等记 `approximate_device`、照用。E170 导出装置照 T2、T3、T5 取，不另造。",
+      "status": "matched_bounded",
+      "evidence": "remove_device_block；task 5263 P42、M46/M47；两份历史记录由原 blob 独立删七行后摘要相符",
+      "limits": "未编译真实近似树"
+    },
+    {
+      "line": 40,
+      "clause": "T5",
+      "text": "   - T5 在 94 行里、没有钉值或 T3 找不到的路径：取 `31e47115…` 之后第一次改它的那一版——在 `31e47115…` 的后代提交里，按提交时刻取最早一个、这条路径的 blob 与 `31e47115…` 那一版不同的提交，记 `approximate_first_commit`（写提交号）；新文件（`A_`、`AM`、`??`）取最早加它的那一个提交。后代里一次都没改过（或从没加过）的，取 `31e47115…` 那一版、记 `approximate_head`（新文件记 `missing`，走停机 S40）。",
+      "status": "partial",
+      "evidence": "choose_tree_version/first_change/first_addition；task 5263 早/晚后代、甲乙、新文件与 missing 场景",
+      "limits": "历史各文件是否最早后代尚未独立逐条枚举"
+    },
+    {
+      "line": 89,
+      "clause": "现状·逐格",
+      "text": "| 现状·逐格 | 现状整表段：上一次登记修订 8 第 8.5 节、修订 10 第 10.5 节那两份对照产物的每一格，r1 修订 6 那一趟对 r2 那一趟；每一格不同的，列出差出来的行，每行归一类：被撤（R）、改引（乙）、树变了（其余） | 描述量；不并进 Q1-撤项的判定；差只来自 R 的格另标 | Q1 够判条件「与 r1 的结论逐格对比」 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 95,
+      "clause": "5",
+      "text": "| 5 | `e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3-2026-10-07.out` | `40ee800a8681caf503c05131fbd05fcdba7a9514a38178660c55195330b1cabc` | 811 | `replay.sh` 第 1827 行（`driver_e171_r1_s1_revision_6_comparator`）；现状整表段照上一次登记修订 8 第 8.5 节的对照脚本比 | `e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-s1-comparator.out` | 现状·逐格（r1 第一段那一半） |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 138,
+      "clause": "Q1",
+      "text": "| Q1 | **只在装置与研究一侧**。支持它的人会要求：找版本不只翻提交历史，悬空 blob、reflog、stash 一起找（T3）；装置对的是修订 6 树那一份 `67e7a549…`，不是新树的 `b1457bc6…`，且先试 T4 的复原；研究一侧照算进「差别」，不算进产品代码 | **伸进产品代码或池级 checker**。支持它的人会要求：只认内容 sha256 逐字节相等，不做任何去空白、去注释的归一；`…-r6-r3.out` 那两份 `tree=` 钉值（`allocator.rs` 在 `singlefs-core`）一起比；没钉 sha256、按 T5 近似的文件照列份数与所在包，不藏；第三种（只伸进别的验证包）不并进候选一 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 139,
+      "clause": "Q2",
+      "text": "| Q2 | **出得来、差的格都由 Q1 解释**。支持它的人会要求：归因按步、按对照·修订 6 那一步的产物逐字相同不相同判（第一节读法 8），不按「看起来像」；归不了的格单列，不算进候选二 | **出得来、有格 Q1 解释不了**。支持它的人会要求：② 的比法逐字照修订 6 第 6.6 节 S15 ④⑤⑥ 的触发观测原文重写，不另立比法；对照·修订 6 去掉的只有耗时字段与路径、趟名这几样占位，别的字段一个不去 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 140,
+      "clause": "Q2（第三个候选）",
+      "text": "| Q2（第三个候选） | **出不来**。支持它的人会要求：写不出的原因分三种各报（近似树造不成或编不过；近似那一趟停在哪一步、哪条停机或作废；修订 8 那一趟没跑或导出不在），不合成一个「出不来」 | 同上两格 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 146,
+      "clause": "P40",
+      "text": "| P40 | 造树（T2–T5 各一格） | 临时 git 仓：一份钉值路径的那一版只作悬空 blob 在；一份钉值路径哪儿都没有；一份没钉值路径在两个后代提交里各改一次；一份新文件在后代里加两次；一份后代里没改过 | 依次记 `exact_pinned`（`unreachable`）、落到 T5、取较早那一提交、取最早加它的那一提交、`approximate_head` |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 TreeVersionChoice/HeadVariant/PathSetStops",
+      "limits": "临时 Git 仓阳性对照"
+    },
+    {
+      "line": 147,
+      "clause": "P41",
+      "text": "| P41 | Q1 判法三种结局 | 手造逐份表：只装置不等；`singlefs-core` 一份不等；只 `singlefs-harness` 一份不等 | 依次判候选一、候选二、第三种 |",
+      "status": "partial",
+      "evidence": "task 5263 Q1Candidate 三种分类通过；A28 同长文件对照未按登记实现",
+      "limits": "分类与内容长度判别力分开记"
+    },
+    {
+      "line": 148,
+      "clause": "P42",
+      "text": "| P42 | T4 删七行 | 手造一份文件，第 3478–3484 行是一块带那个枚举名的七行 | 删完 sha256 等于用例另算的期望；七行里没有那个名字时退出、报停机 S44 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 DeviceBlockRemoval 与 M46/M47",
+      "limits": "直接函数异常已核，未把所有 CLI 失败格式算作已核"
+    },
+    {
+      "line": 149,
+      "clause": "P43",
+      "text": "| P43 | ② 的三种比法（S15 ④⑤⑥ 照原文重写，各一格） | 每种比法手造两份导出：逐字节相同一对；④ 在 `states.tsv` 改一个字节；⑤ 在流一某一次调用的内存对象里多一处不同；⑥ 在流三第一处不同提到「写 txg 26 那条根的那次调用」之前 | 相同那一对报 0 处不同；三处改动各报在点名的那一格 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 150,
+      "clause": "P44",
+      "text": "| P44 | Q2 归因三种 | 手造：第 k 步产物两趟相同、② 有一格不同；第 k 步产物不同、Q1 有一份不等；第 k 步产物不同、Q1 一份不等都没有、T4 T5 一份近似都没记 | 依次判「Q1 解释不了」「Q1 能解释」、报停机 S43 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 151,
+      "clause": "P45",
+      "text": "| P45 | 对照·修订 6 的归一 | 两行只差耗时字段与 `-r6-r3` 趟名；两行差一个计数字段 | 前一对相同，后一对不同 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 152,
+      "clause": "P46",
+      "text": "| P46 | E171 自己的阳性对照 | E171 第 1 次重跑第 3、4 步十项，在近似树上照原判法与 A8 精确数跑 | 照 E171 的 F1；不过的那一项走作废 Z41 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 176,
+      "clause": "第一段",
+      "text": "| 第一段 | 写造树与第 0 步判法、单测、变异；主 agent 交造树与 Q1 比对；树里 release 编两个 bin（只编，看编不编得过） | Q1 全部；Q2 的「出不来」里「造不成或编不过」那一种 | Q1 够判（13 份逐份比完）。编不过的，Q2 也够判（候选三，那一种） |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 177,
+      "clause": "第二段",
+      "text": "| 第二段 | 写跑法与对照·修订 6；主 agent 交近似树上第一段第 0–13 步；出对照·修订 6 | Q2 的归因依据（各步两趟同不同） | Q2 不够判：还差修订 8 那一趟。近似那一趟停机或作废的，Q2 够判（候选三，那一种） |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 178,
+      "clause": "第三段",
+      "text": "| 第三段 | 修订 8 那一趟第一段跑完之后：写 ② ③ 与归因；出对照·修订 8 与归因 | Q2 | 够判 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 188,
+      "clause": "Q1-逐份",
+      "text": "| Q1-逐份 | 第一节读法 2 的 13 份加两份 `tree=` 钉值：每份写路径、所属类（读法 3）、目标 sha256、近似树取的哪一版（记号、提交号或 blob 号）与它的 sha256、相等否 | 读法 3：不等的全在装置与研究一侧（含一份不等都没有）→ 候选一；有一份不等落在产品代码与池级 checker → 候选二；只多出别的验证包 → 第三种 | Q1：`allocator.rs`、`singlefs-checker` 的 `image.rs`、`walk.rs` 三份里有一份不等即翻向候选二 |",
+      "status": "mismatch",
+      "evidence": "A27 缺 blob 号；q1_lines 正常比较 SHA-256，M45 见 A28",
+      "limits": "真实 Q1 产物按修订 2 不出"
+    },
+    {
+      "line": 189,
+      "clause": "Q1-装置",
+      "text": "| Q1-装置 | T3 找没找到 `67e7a549…`；没找到时 T4 删七行之后的 sha256、等不等于 `67e7a549…`；另报与 `b1457bc6…` 等不等 | 描述（装置落在第一类，不翻候选） | Q1（13 份里装置那一份的「取哪一版」） |",
+      "status": "matched_bounded",
+      "evidence": "build 中 name=device；历史两份 exact_reconstructed 摘要复算",
+      "limits": "描述字段；未重跑完整历史搜索"
+    },
+    {
+      "line": 190,
+      "clause": "Q1-研究一侧",
+      "text": "| Q1-研究一侧 | 研究一侧 JSON 十一份逐份：取的哪一版、sha256、相等否；`unrecorded` 的几份另列 | 描述（落在第二类，不翻候选） | Q1（候选一字面里的「研究一侧」） |",
+      "status": "partial",
+      "evidence": "q1_lines/research_side_pins/choose_research_version；38 条单测对应场景",
+      "limits": "today 历史八条记录尚无法确认，见逐行表"
+    },
+    {
+      "line": 191,
+      "clause": "Q1-未钉",
+      "text": "| Q1-未钉 | 94 行里不在钉值里的路径：按记号（`exact_pinned`、`approximate_first_commit`、`approximate_head`）与读法 3 的四类数份数，逐份列路径与提交号 | 描述，不进候选的判定；与 Q1-逐份并列交 | Q1（「差别」里看不见的那一半有多大） |",
+      "status": "partial",
+      "evidence": "q1_lines tally；task 5263 Q1Lines unpinned 场景",
+      "limits": "历史逐类计数完整性仍待独立复核"
+    },
+    {
+      "line": 192,
+      "clause": "Q1-全树",
+      "text": "| Q1-全树 | 近似树的快照摘要与份数，对 `7726cdd6…` / 284 | 相等 → 另写「近似树在 `.rs` 与 `Cargo.*` 上就是修订 6 树」；不等 → 照 Q1-逐份 | Q1：相等时 Q1-逐份必全等（不全等走停机 S40，判法自相矛盾） |",
+      "status": "matched_bounded",
+      "evidence": "snapshot_digest/q1_lines；WholeTree 两对照通过；甲乙从文件记录重算总摘要相符",
+      "limits": "不证明记录之外有无未列文件、原目录与清单字节相符"
+    },
+    {
+      "line": 193,
+      "clause": "Q2-编",
+      "text": "| Q2-编 | 近似树里 release 编 E171 与 E170 两个装置 bin 的退出码与诊断末 20 行 | 有一个非 0 → Q2 候选三（造不成或编不过） | Q2：编不过即翻向候选三 |",
+      "status": "mismatch",
+      "evidence": "A26 两种临时复制场景；CompileLines 3 条现有测试通过",
+      "limits": "E200 修订 2 明确真实编译未试"
+    },
+    {
+      "line": 194,
+      "clause": "Q2-各步",
+      "text": "| Q2-各步 | 近似那一趟第 0–13 步每个单元：绿 / 红、触发的条款（E171 的作废停机原文，与本登记 Z40–Z43、S40–S45） | 第 1、6、7、10 步有一个单元没绿（停机或作废） → Q2 候选三（近似那一趟停在哪一步）；别的步没绿只描述 | Q2：② 要的四步有一步出不来即翻向候选三 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 195,
+      "clause": "对照·修订 6",
+      "text": "| 对照·修订 6 | 第一节读法 7：第 1、6、7、10 步各产物 `E7RESULT` 行归一后逐行比、两趟比对器产物逐格比、第 0 步钉值逐项比；每步报同的行数、不同的行数与逐行原文 | 描述；第 1、6、7、10 步的同不同进 Q2-归因 | Q2（归因依据） |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 196,
+      "clause": "对照·修订 8 ②",
+      "text": "| 对照·修订 8 ② | 第一节读法 7 的 ②：每步、每种比法（S15 ④⑤⑥ 原文）逐格报近似那一趟与修订 8 那一趟同不同 | 描述；不同的格进 Q2-归因 | Q2：一格不同都没有时 Q2 判候选一（没有要解释的差） |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 197,
+      "clause": "对照·修订 8 ③",
+      "text": "| 对照·修订 8 ③ | 近似树对现状树逐文件差表，每行带近似树里的记号 | 描述，不进 Q2 判定 | Q2（够判条件「两份都写出」的一部分） |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 198,
+      "clause": "Q2-归因",
+      "text": "| Q2-归因 | 第一节读法 8：② 每一格不同，归「Q1 解释不了」「Q1 能解释」 | 全是「Q1 能解释」→ 候选一；有一格「Q1 解释不了」→ 候选二 | Q2：有一格解释不了即翻向候选二 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 199,
+      "clause": "附带（够判后不跑）",
+      "text": "| 附带（够判后不跑） | 近似那一趟对修订 8 那一趟的比对器逐格（① 那一种）；两趟第 11–13 步各行耗时（④ 那一种） | 照数报 | 不对应任何一行 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 214,
+      "clause": "K40",
+      "text": "| K40 | 修订 6 树快照摘要 `7726cdd6c439f0bc9e39799755a53ebcfb3f57fe96b06daf13c1317ae81be5f4`、284 份 | E171 第 1 次重跑修订 8 第 8.5 节「「修订 6 那一趟」是修订 6 树（`7726cdd6…`）」；修订 6 第 6.3 节 |",
+      "status": "partial",
+      "evidence": "旧冻结树产物记7726cdd6与284；新装置常量相同",
+      "limits": "未重建原修订6树"
+    },
+    {
+      "line": 215,
+      "clause": "K41",
+      "text": "| K41 | 修订 6 树装置 `67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156`；`ab35105f861d509457296741d2c60515a3a94b9fefe77944f03d1b358afd45df` 是它加第 29 批四行与第 10g 批三行 | 修订 8 第 8.3 节表「装置四处的 sha256」一行与第 8.1 节「`ab35105f…` 是……」一句 |",
+      "status": "partial",
+      "evidence": "原存档装置钉值67e7a549；f8a9ddaab内容ab35105f；删7行吻合",
+      "limits": "历史两份源树原件未取得"
+    },
+    {
+      "line": 216,
+      "clause": "K42",
+      "text": "| K42 | 新树 HEAD `31e47115471ba5502a4531d25dffcc921be36899`、未提交改动 94 行 | E171 第 2 次重跑修订 5 第 5.1 条 |",
+      "status": "matched_bounded",
+      "evidence": "基线Git对象与旧冻结产物HEAD、94行状态已核",
+      "limits": "历史执行真实性另待核"
+    },
+    {
+      "line": 217,
+      "clause": "K43",
+      "text": "| K43 | 修订 6 那一趟产物的趟名：第 0–10 步后缀 `-r6-r3`，第 11–13 步 `-r6-r3-resume2` | 修订 8 第 8.5 节首段 |",
+      "status": "pending",
+      "evidence": "冻结树的第0步后缀已见",
+      "limits": "第1–13步各份产物尚未逐项核后缀"
+    },
+    {
+      "line": 223,
+      "clause": "A40",
+      "text": "| A40 | T1 路径集：`31e47115…` 里 `.rs` 与 `Cargo.*` 270 份 + 94 行里新加的 `.rs` 14 份 = 284，两组交集 0 | `git ls-tree -r --name-only` 过滤后 `wc -l`；`comm -12` |",
+      "status": "matched_bounded",
+      "evidence": "Git 基线按 T1 独立筛得270、新增14、交集0",
+      "limits": "仅集合与份数"
+    },
+    {
+      "line": 224,
+      "clause": "A41",
+      "text": "| A41 | 94 行按状态 `M_` 73、`A_` 11、`_M` 4、`MM` 3、`AM` 2、`??` 1；`.rs` 与 `Cargo.*` 89 份 | `cut -c1-2 \\| sort \\| uniq -c`；`grep -c -E` |",
+      "status": "matched_bounded",
+      "evidence": "冻结产物94行逐条解析：73 M_、11 A_、4 _M、3 MM、AM 共 2 条、1 ??；89 .rs/Cargo.*",
+      "limits": "独立读取历史产物，不证明装置运行环境"
+    },
+    {
+      "line": 225,
+      "clause": "A42",
+      "text": "| A42 | 新树产物 125 行、sha256 `b720e5d28dcaead6e7c7262fd82185856e869385dad30674bf9689cb658f24c6`；修订 6 那一趟第 0 步产物 62 行、sha256 `786e48010de9622d623198da5eabecba9694afd3ca73bf71cee2e3f241ca4b90`；`key=file_sha256` 各 13 行与 2 行 | `git show 04ceaa904^:… \\| sha256sum`、`wc -l`、`grep -c` |",
+      "status": "matched_bounded",
+      "evidence": "两份 Git 冻结产物内容摘要、125/62 行、13/2 钉值行",
+      "limits": "历史输入文本"
+    },
+    {
+      "line": 226,
+      "clause": "A43",
+      "text": "| A43 | `ab35105f…` 在提交 `f8a9ddaab`、12 645 行；`crash_amplification::` 与 `crash_state_enumeration::` 0 处 | `git show f8a9ddaab:<装置> \\| sha256sum`、`wc -l`、`grep -c` |",
+      "status": "matched_bounded",
+      "evidence": "Git f8a9ddaab 装置摘要ab35105f、12645行、两前缀0处",
+      "limits": "不证明所有调用不间接触发崩溃路径"
+    },
+    {
+      "line": 227,
+      "clause": "A44",
+      "text": "| A44 | 15 份钉值按读法 3 分：装置 1、产品代码与池级 checker 3（`allocator.rs`、`image.rs`、`walk.rs`）、别的验证包 11、研究一侧 0 | 照第四节第 4 条那几行的路径数 |",
+      "status": "matched_bounded",
+      "evidence": "独立按登记路径前缀将两份冻结产物15行分类：装置1、产品3、别的验证11、研究0",
+      "limits": "仅15行分类；不证明未钉路径内容"
+    },
+    {
+      "line": 228,
+      "clause": "A45",
+      "text": "| A45 | 问题单 sha256 `9a4ff2c5132e8c1f…`（全值在第一节）、12 行 | `sha256sum`、`wc -l` |",
+      "status": "matched_bounded",
+      "evidence": "问题单12行；按原始引用行还原两行定案状态后摘要9a4ff2c5相符",
+      "limits": "当前摘要57e9b6e0是后续定案版本，不当历史错误"
+    },
+    {
+      "line": 238,
+      "clause": "判决",
+      "text": "| 判决 | 主取样点 | 方向相反的取样点 | 怎么报 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 240,
+      "clause": "Q1",
+      "text": "| Q1 | 近似树甲：T5 取 `31e47115…` 之后第一次改它的那一版 | 近似树乙：T5 一律取 `31e47115…` 那一版（新文件照取最早加它的那一版，否则编不起来） | Q1-逐份与 Q1-全树两棵各报；钉值文件 T3 找不到时两种取法都不等于钉值，所以 Q1 的候选在两点上同判（推的），照实报两点 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 241,
+      "clause": "Q2 的归因依据",
+      "text": "| Q2 的归因依据 | 近似树甲上第 0–13 步 | 近似树乙只编、只跑第 0、1 步（流一流二，约 25 分钟，推的） | 第 1 步对照·修订 6 两棵树各报同不同；判得不同记「不稳定」并列 |",
+      "status": "pending",
+      "evidence": "全文已读，尚未逐项验证此行所有断言",
+      "limits": "不能以已读代替审核通过"
+    },
+    {
+      "line": 251,
+      "clause": "M40",
+      "text": "| M40 | T3 的候选 blob | 不收悬空 blob | P40 第一格：原式 `exact_pinned`（`unreachable`），变异落到 T5 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 该条锚点唯一、编译有效、单测抓到；表中替换与登记该行语义逐项对应",
+      "limits": "只覆盖该条变异，不推导全部判法正确"
+    },
+    {
+      "line": 252,
+      "clause": "M41",
+      "text": "| M41 | T5 取哪一个后代提交 | 取最晚的 | P40 第三格：原式取较早那一提交，变异取较晚那一个 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 该条锚点唯一、编译有效、单测抓到；表中替换与登记该行语义逐项对应",
+      "limits": "只覆盖该条变异，不推导全部判法正确"
+    },
+    {
+      "line": 253,
+      "clause": "M42",
+      "text": "| M42 | T5 的新文件 | 取最晚加它的提交 | P40 第四格 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 该条锚点唯一、编译有效、单测抓到；表中替换与登记该行语义逐项对应",
+      "limits": "只覆盖该条变异，不推导全部判法正确"
+    },
+    {
+      "line": 254,
+      "clause": "M43",
+      "text": "| M43 | T2 取哪一版 | 取今天 HEAD 那一版，不取 `31e47115…` | P40 另加一格「不在 94 行、后代里改过」：原式取 `31e47115…` 那一版，变异取后代那一版 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 该条锚点唯一、编译有效、单测抓到；表中替换与登记该行语义逐项对应",
+      "limits": "只覆盖该条变异，不推导全部判法正确"
+    },
+    {
+      "line": 255,
+      "clause": "M44",
+      "text": "| M44 | 读法 3 的类 | `crates/singlefs-core/` 不算产品代码 | P41 第二格：原式候选二，变异第三种 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 该条锚点唯一、编译有效、单测抓到；表中替换与登记该行语义逐项对应",
+      "limits": "只覆盖该条变异，不推导全部判法正确"
+    },
+    {
+      "line": 256,
+      "clause": "M45",
+      "text": "| M45 | Q1-逐份「相等」 | 只比文件长度 | P41 另加一格「钉值文件与目标同长不同内容」：原式不等，变异相等 |",
+      "status": "mismatch",
+      "evidence": "task 5263 该条锚点唯一、编译有效、单测抓到；A28 摘要长度≠文件长度",
+      "limits": "只覆盖该条变异，不推导全部判法正确"
+    },
+    {
+      "line": 257,
+      "clause": "M46",
+      "text": "| M46 | T4 删哪几行 | 第 3477–3483 行（差一） | P42 第一格：sha256 与期望不同 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 该条锚点唯一、编译有效、单测抓到；表中替换与登记该行语义逐项对应",
+      "limits": "只覆盖该条变异，不推导全部判法正确"
+    },
+    {
+      "line": 258,
+      "clause": "M47",
+      "text": "| M47 | T4 的名字核对 | 不核 | P42 第二格：原式退出报停机 S44，变异照删 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 该条锚点唯一、编译有效、单测抓到；表中替换与登记该行语义逐项对应",
+      "limits": "只覆盖该条变异，不推导全部判法正确"
+    },
+    {
+      "line": 259,
+      "clause": "M48",
+      "text": "| M48 | ② 的 ④ 比法 | 不比 `states.tsv` | P43 ④ 那一格：原式报 1 处，变异报 0 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 260,
+      "clause": "M49",
+      "text": "| M49 | ② 的 ⑥ 比法 | 第一处不同取最后一处 | P43 ⑥ 那一格：报的位置不同 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 261,
+      "clause": "M50",
+      "text": "| M50 | 读法 8 的归类 | 第 k 步两趟相同记「Q1 能解释」 | P44 第一格：原式「Q1 解释不了」，变异「Q1 能解释」 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 262,
+      "clause": "M51",
+      "text": "| M51 | 读法 8 的停机 | 不判停机 S43 | P44 第三格：原式报 S43，变异记「Q1 能解释」 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 263,
+      "clause": "M52",
+      "text": "| M52 | 对照·修订 6 的归一 | 去掉全部数字字段 | P45 后一对：原式不同，变异相同 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 271,
+      "clause": "F40",
+      "text": "| F40 | 近似树上 E171 的阳性对照不过：近似那一趟第 3 或第 4 步那一列照 E171 的 F1 整轮作废；Q2 记候选三（近似那一趟停在第 3 或第 4 步），不拿那一趟的第 1、6、7、10 步去归因 | 第 3、4 步任一项单元红在 E171 F1 点名的那种（A8 精确数不符或该红的没红） |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 272,
+      "clause": "F41",
+      "text": "| F41 | 近似那一趟自己不确定：Q2-归因记「不够判」，不判候选一、二 | 近似那一趟 E171 作废 Z1（第 7、9 步逐字节）或 Z7（第 10 步两次逐字节）判法退 1 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 273,
+      "clause": "F42",
+      "text": "| F42 | Q1 的钉值不够描述差别：Q1 判候选一，而对照·修订 6 第 1 步（只跑流一流二）就有一行不同。照最弱读法记 Q1 那一判在 Q2 上不成立，并列出 Q1-未钉里第 1 步编得到的那几份（`singlefs-harness` 与 `singlefs-core` 下 T5 近似的） | Q1-逐份判候选一，且对照·修订 6 第 1 步不同的行数 ≥ 1 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 281,
+      "clause": "Z40",
+      "text": "| Z40 | 跑的不是造出来的那棵近似树（E171 作废 Z5 的这一趟读法） | 某次起跑、续跑时近似树的快照摘要或逐文件清单与造树那一刻记下的不同；或某个单元的二进制 sha256 不是第 0 步记的那一个 |",
+      "status": "partial",
+      "evidence": "tree_against_manifest/Q1Lines；A26构建复制例外",
+      "limits": "起跑/续跑和二进制约束按修订1第8条留后段，修订2停止"
+    },
+    {
+      "line": 282,
+      "clause": "Z41",
+      "text": "| Z41 | 本实验自己的判法没证明会红 | P40–P45 单测有一格红，或第九节变异有一条没被抓或无效；这期间出的对照与归因产物作废 |",
+      "status": "partial",
+      "evidence": "task5263：38通过、8抓到；A28登记变异不同",
+      "limits": "不能记整条判别力要求满足"
+    },
+    {
+      "line": 283,
+      "clause": "Z42",
+      "text": "| Z42 | 对照·修订 6 读的不是修订 6 那一趟的产物 | 执行员第一次从 `git show 04ceaa904^:` 取每份产物时记下 sha256 与行数，之后每次读之前核，不同；或取的产物名不带 `-r6-r3`（或 `-r6-r3-resume2`） |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 284,
+      "clause": "Z43",
+      "text": "| Z43 | 对照·修订 8 读的不是修订 8 那一趟 | 读的导出根、产物前缀与 E171 第 2 次重跑那一次拍树宣布行与 H16 记的不同 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 292,
+      "clause": "S40",
+      "text": "| S40 | 近似树的路径集或判法自相矛盾 | T1 份数不是 284；T5 有一份新文件记 `missing`；Q1-全树相等而 Q1-逐份有一份不等 |",
+      "status": "matched_bounded",
+      "evidence": "task 5263 两种缺失/份数场景、WholeTree矛盾场景；甲乙产物missing/S40/built=false",
+      "limits": "原始 missing 的全球负面搜索结论未验证"
+    },
+    {
+      "line": 293,
+      "clause": "S41",
+      "text": "| S41 | E171 的本地常量在近似树上不成立 | 第 0 步 `stream-constants --streams 1,2,3` 编不过、退非 0、`holds=false` ≥ 1 行或 `s1_failed_checks` ≠ 0。不重取常量（那是改装置），Q2 记候选三（停在第 0 步） |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 294,
+      "clause": "S42",
+      "text": "| S42 | 第 2 步 E170 导出对不上近似树上的装置 | E171 的 S2 原文触发 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 295,
+      "clause": "S43",
+      "text": "| S43 | 归因自相矛盾 | 第一节读法 8 末种：第 k 步两趟不同，而 Q1 一份不等都没有、T4 T5 一份近似都没记 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    },
+    {
+      "line": 296,
+      "clause": "S44",
+      "text": "| S44 | T4 删的不是那一块 | `ab35105f…` 第 3478–3484 行里没有 `SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults` |",
+      "status": "matched_bounded",
+      "evidence": "remove_device_block；DeviceBlockRemoval缺枚举名对照和M47",
+      "limits": "函数层；所有CLI异常路径仍待核"
+    },
+    {
+      "line": 297,
+      "clause": "S45",
+      "text": "| S45 | 近似树上逐行要的东西不齐 | A12 十二项（E171 原判法）不过；或第一段 16 行（E171 `STEP_ROWS` 之并）在近似树的 `crates/mutations.tsv` 里按名字取不到或锚点不是恰 1 次。照 E171 修订 8 第 8.3 节 H9 的办法：执行员起跑前交主 agent 定照不照跑 |",
+      "status": "not_run_by_registered_stop",
+      "evidence": "第十二节修订1第8条与修订2第3/4条：第二三段停下；第一段两份历史冻结输入的Z42类似校验另已核",
+      "limits": "未实施/未跑已明确记录，不能标通过；不是因本次审核而省略"
+    }
+  ],
+  "a44_independent_rows": [
+    {
+      "path": "crates/singlefs-harness/src/model.rs",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-harness/src/model_comparison.rs",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-harness/tests/model_compares_inode_creations_across_two_inode_leaf_containers.rs",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-harness/src/mount_transparency.rs",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash_injection.rs",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-checker/src/image.rs",
+      "class": "product",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-checker/src/walk.rs",
+      "class": "product",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-reference-filesystem/src/lib.rs",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-harness/src/reference_filesystem_translation.rs",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-checker-tier/Cargo.toml",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "Cargo.lock",
+      "class": "other_verification",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs",
+      "class": "device",
+      "product": "frozen-tree.out"
+    },
+    {
+      "path": "crates/singlefs-core/src/allocator.rs",
+      "class": "product",
+      "product": "frozen-tree-r6-r3.out"
+    },
+    {
+      "path": "crates/singlefs-harness/tests/common/mod.rs",
+      "class": "other_verification",
+      "product": "frozen-tree-r6-r3.out"
+    }
+  ]
+}

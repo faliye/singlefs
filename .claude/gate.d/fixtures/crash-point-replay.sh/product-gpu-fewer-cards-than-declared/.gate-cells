@@ -1,0 +1,5 @@
+# 产品 GPU 包的真显卡对拍、卡数：三个对拍目标里 three_cards_reconcile 文件头声明 3 张、服务只交 1 张，它不起、报本次未跑（提交时单交）；另两个目标三条用例照跑、判绿记库
+# 另点 crash-case-replay、feature-gated-tests：expect 的逐格那一行写着 crash-case-replay 与 feature-gated-tests 两格
+product-gpu-real-card-tests
+crash-case-replay
+feature-gated-tests

@@ -14,7 +14,7 @@ The user settled one exit on 2026-10-22:
 
 | # | Exit | Belongs to which item |
 |---|---|---|
-| 1 | Crash full run: finish what is new, then catch up on the backlog, at least 10 billion states per milestone (settled by user on 2026-10-22). Run in two stages (recording stage on CPU, judging stage on GPU, all observers attached), without narrowing the enumeration domain, all 0 red. ① First run the crash streams new in this milestone and the blocks whose unit key changed; ② then catch up from the backlog registry (set up in Milestone 4), at least 5 billion states, in registry order, resuming where the previous run stopped. When new and backlog together exceed 10 billion states, this milestone runs at least 10 billion states and the part of the new work that does not fit goes to the end of the backlog registry; when together they come to less than 10 billion, run all of it. On red, pin it back into the quick tier per the "A red in a full run is pinned back into the quick tier" section of `.claude/rules/test-script-discipline.md`, fix it, then rerun. | Crash full run (cross-milestone) |
+| 1 | Unscoped run of crash-point replay and crash amplification: finish judging what is new and keep judging what has never been judged, at least 10 billion states per milestone (settled by user on 2026-10-22). Run in two stages (recording stage on CPU, judging stage on GPU, all observers attached), without narrowing the enumeration domain, all 0 red. The gate selects the blocks to judge by unit key itself: ① the crash streams new in this milestone and the blocks whose unit key changed; ② blocks never judged under the current key, at least 5 billion states. When the two together exceed 10 billion states, this milestone judges at least 10 billion states; when together they come to less than 10 billion, judge all of it. The state count is the states actually judged by the unscoped runs in this milestone. On red, pin it into a case per the "A red from the gate is pinned into a case that can be rejudged on its own" section of `.claude/rules/test-script-discipline.md`, fix it, then rerun. | Crash-point replay and crash amplification (cross-milestone) |
 
 Exits and to what layer the POSIX surface is implemented are left to user decision in Stage 0. Candidate exits inferred by the main agent (inferred, unmeasured):
 
@@ -50,7 +50,7 @@ Exits and to what layer the POSIX surface is implemented are left to user decisi
 
 ## II. Implementation and Differential Testing
 
-- **Existing in repo**: Operation enum of RefFS contains only five types: creating first file, overwrite, explicit publish, fsync, rollback (`enum Operation` in `crates/singlefs-reference-filesystem/src/lib.rs`); ideal model in `crates/singlefs-harness/src/model.rs`.
+- **Existing in repo**: Operation enum of RefFS contains only five types: creating first file, overwrite, explicit publish, fsync, rollback (`enum Operation` in `crates/singlefs-reference-filesystem/src/lib.rs`); ideal model in `crates/singlefs-verification/src/model.rs`.
 - **Work items**:
 
 | # | Description | Backing clauses and owed checks | Acceptance | Dependencies |

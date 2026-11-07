@@ -52,7 +52,7 @@ kb-shape section 7 **independently counts the body text** to compare—if the ge
 | D13 (Verification Route) | Settled 18 / Unsettled 0 | Implement all three verification classes; RefFS taken to extreme, self-contained persistence and crash semantics; crash refinement tests "one publish + one crash + one recovery" first | [13-Verification Route.en.md](decisions/13-verification-route.en.md) | Implemented 9 / Unimplemented 6 / No code object 3 |
 | D14 (Dual-Track: Large/Small Files & Persistent/Transient) | Settled 6 / Unsettled 0 | Adopts allocator hints + inlining, no format-level second track | [14-Dual-Track: Large/Small Files & Persistent/Transient.en.md](decisions/14-dual-track-large-small-files-persistent-transient.en.md) | Implemented 3 / Unimplemented 0 / No code object 3 |
 | D15 (Format Freeze Policy) | Settled 11 / Unsettled 0 | Freeze is gate-arbitrated commit, freezing 4 layers sequentially; pre-freeze checklist uses each unsettled item's "format modifying" statement, not decision names; default padding width 0; `spec_hash` always computed over the full projection of the kb field tables, never switched to Rust structs | [15-Format Freeze Policy.en.md](decisions/15-format-freeze-policy.en.md) | Implemented 3 / Unimplemented 3 / No code object 5 |
-| D16 (Publish Semantics) | Settled 17 / Unsettled 0 | Batched root publication; each publish increments checkpoint_txg; persistence ordering uses two barriers + pre-replay validation; journal format is independent freeze component | [16-Publish Semantics.en.md](decisions/16-publish-semantics.en.md) | Implemented 10 / Unimplemented 6 / No code object 1 |
+| D16 (Publish Semantics) | Settled 17 / Unsettled 0 | Batched root publication; each publish increments checkpoint_txg; persistence ordering uses two barriers + pre-replay validation; journal format is independent freeze component | [16-Publish Semantics.en.md](decisions/16-publish-semantics.en.md) | Implemented 12 / Unimplemented 4 / No code object 1 |
 | D17 (Implementation Layering & Third-Party Pipeline) | Settled 8 / Unsettled 0 | Waistline below commit protocol; conformance suite ships source + validator | [17-Implementation Layering & Third-Party Pipeline.en.md](decisions/17-implementation-layering-third-party-pipeline.en.md) | Implemented 4 / Unimplemented 3 / No code object 1 |
 | D18 (Information Carried in a Block) | Settled 24 / Unsettled 0 | Three criteria; data blocks carry plaintext self-describing headers; unit header field tables classified; unit registry (packed record is Code 3); tombstones use range-packed shared units | [18-Information Carried in a Block.en.md](decisions/18-information-carried-in-a-block.en.md) | Implemented 16 / Unimplemented 4 / No code object 4 |
 | D19 (Block Pointer Structure & Width Budget) | Settled 15 / Unsettled 0 | Pointers split into two sections; carries dev; fixed width; position entry 14 bytes; position authority hybrid; mapping key reuses write sequence key by class; all pointers enter mapping; header carries birth (tree, txg) | [19-Block Pointer Structure & Width Budget.en.md](decisions/19-block-pointer-structure-width-budget.en.md) | Implemented 14 / Unimplemented 1 |
@@ -256,7 +256,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 12. Conflict 1: Checker as specification vs sharing tools across verification paths —— Settled · Implemented
   - 13. Conflict 2: Refinement specification vs differential model —— Settled · No code object
   - 14. Linkage with other decisions —— Settled · No code object
-  - 15. Two tiers of verification code —— Settled · Implemented
+  - 15. One verification crate, one gate, two ways to run —— Settled · Implemented
   - 16. Slicing and state width for segment-registered state tracking —— Settled · Unimplemented
   - 17. Unit of reallocation judgment —— Settled · Unimplemented
   - 18. How the GC identity property is proven, and down to which layer —— Settled · Unimplemented
@@ -281,7 +281,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 11. Two failure checks required for freeze validation —— Settled · Unimplemented
 - **D16 (Publish Semantics)** —— Settled (17 items, 0 unsettled)
   - 1. Dimension of defer window —— Settled · Unimplemented
-  - 2. Checkpoint trigger criteria —— Settled · Unimplemented
+  - 2. Checkpoint trigger criteria —— Settled · Implemented
   - 3. Freeze layer assignment for journal in D15 (Format Freeze Policy) —— Settled · Unimplemented
   - 4. Second replay implementation for the record checker —— Settled · Implemented
   - 5. Calibration of T_time and T_dirty, and measurement basis of the loss window —— Settled · Unimplemented
@@ -289,7 +289,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 7. Persistence ordering of publication —— Settled · Implemented
   - 8. Whether new instance must write current instance root to two disks first —— Settled · Implemented
   - 9. Whether empty publication writes units —— Settled · Implemented
-  - 10. Publication granularity —— Settled · Unimplemented
+  - 10. Publication granularity —— Settled · Implemented
   - 11. Whether root publication can bypass journal —— Settled · Implemented
   - 12. Validity semantics of intermediate states —— Settled · Implemented
   - 13. Ownership of this journal replay implementation —— Settled · Implemented

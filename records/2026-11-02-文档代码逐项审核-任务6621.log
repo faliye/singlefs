@@ -1,0 +1,4 @@
+== 任务 6621 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-6621.attempt-1.log（共 3 行，下面是整份）
+  ✗ /tmp/singlefs-run-with-memory-cap-3972101-xygrPG/tmpvhzqfu4_/sample.rs 里名叫 outer 的项不止一个
+     → 怎么办：换一个唯一的名字（例：impl 块写 `impl 类型名`，或直接取外层的函数），不猜是哪一个。
+  ✓ 自证：按名字抽出函数（带文档注释与属性、跳过字符串与注释里的括号）、impl 块与常量；同名不止一个判红

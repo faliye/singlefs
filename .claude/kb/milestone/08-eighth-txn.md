@@ -18,7 +18,7 @@
 
 | # | 出口 | 归哪一项 |
 |---|---|---|
-| 1 | 崩溃全量：新增的跑完，另补积压，每个里程碑至少 100 亿态（用户 2026-10-22 定）。照两段跑（录入在 CPU、判在 GPU，观察者挂全），不缩枚举域，全部 0 红。① 这一里程碑新增的崩溃流与单元键变了的块先跑；② 再从积压登记表（里程碑四立的）里补跑，至少 50 亿态，按登记表的次序接着上一次停下的地方。新增与积压合起来多于 100 亿态时，这一里程碑至少跑 100 亿态，新增跑不完的那一截进积压登记表末尾；合起来不足 100 亿时全部跑完。红了照 `.claude/rules/test-script-discipline.md`「全量的红，钉回快档」钉回快档、修好再跑。 | 崩溃全量（跨里程碑） |
+| 1 | 崩溃点重放与崩溃放量不指定范围那一趟：新增的判完，从没判过的接着判，每个里程碑至少 100 亿态（用户 2026-10-22 定）。照两段跑（录入在 CPU、判在 GPU，观察者挂全），不缩枚举域，全部 0 红。门禁照单元键自己选要判的块：① 这一里程碑新增的崩溃流与单元键变了的块；② 当前键下从没判过的块，至少 50 亿态。两样合起来多于 100 亿态时，这一里程碑至少判 100 亿态；合起来不足 100 亿时全部判完。态数按这一里程碑里不指定范围那几趟实际判过的态现数。红了照 `.claude/rules/test-script-discipline.md`「门禁出的红，钉成能单点复判的用例」钉成用例、修好再跑。 | 崩溃点重放与崩溃放量（跨里程碑） |
 
 出口、哪几个作业点进出口，段 0 交用户定。主 agent 推的候选（推的，没量过）：
 
@@ -59,7 +59,7 @@
 
 ## 一　write buffer 前端与节点缓存
 
-- **仓里已有的**：D8（核心索引结构） 已定项 12「一棵树只准一级：走前端的三棵树 ε 恒 0、写一律进前端、发布前排空到叶；第一版两级都不开」；D8（核心索引结构） 已定项 15「节点缓存必须抗扫描；条目必须是幂等完整值、不许是增量 Δ；条目必须自带序号 `seq`，这是格式要求」；D8（核心索引结构） 已定项 10「第一版记账直落记账树叶、不走前端」；D8（核心索引结构） 已定项 14「一套 btree 实现 + 多个独立 keyspace + 两个前端（write buffer、key cache）」。`grep -rli 'write_buffer\|message_buffer' crates/*/src` 零命中；节点缓存只在池级 checker 的 `crates/singlefs-checker/src/walk.rs` 里有，核心层没有。欠账：C15（write buffer 混入 Δ）、C162（seq 进 value 之后四个实验的数要重算）、C348（T_dirty 按什么算没有口径）、C53（缓存声明与常驻集不符）、C345（反向索引 / LRU 的陈旧检出没有时间线索）、C383（同一次发布里同 key 的中间态折叠没有检查）（C344（单调统计量的点删遇墓碑没有会红的检查） 并进它）。
+- **仓里已有的**：D8（核心索引结构） 已定项 12「一棵树只准一级：走前端的三棵树 ε 恒 0、写一律进前端、发布前排空到叶；第一版两级都不开」；D8（核心索引结构） 已定项 15「节点缓存必须抗扫描；条目必须是幂等完整值、不许是增量 Δ；条目必须自带序号 `seq`，这是格式要求」；D8（核心索引结构） 已定项 10「第一版记账直落记账树叶、不走前端」；D8（核心索引结构） 已定项 14「一套 btree 实现 + 多个独立 keyspace + 两个前端（write buffer、key cache）」。`grep -rli 'write_buffer\|message_buffer' crates/*/src` 零命中；节点缓存只在池级 checker 的 `crates/singlefs-checker/src/walk.rs` 里有，核心层没有。欠账：C15（write buffer 混入 Δ）、C162（seq 进 value 之后四个实验的数要重算）、C348（T_dirty 按什么算没有口径）、C53（缓存声明与常驻集不符）、C345（反向索引 / LRU 的陈旧检出没有时间线索）、C383（同一次发布里同 key 的中间态折叠没有检查）（C344（单调统计量的点删遇墓碑没有会红的检查） 已销账，并进它）。
 - **作业点**：
 
 | # | 做什么 | 压着的条款与欠账 | 验收 | 依赖 |
@@ -96,7 +96,7 @@
 
 ## 四　冷读与 RefFS 不按 size 展开
 
-- **仓里已有的**（2026-10-22 现查）：合法变长到 K12 上限（N 的上限是 ⌈N ÷ 净荷⌉ × 净荷不溢出 u64，`research/prompts/m4-trunc-r1-main-verification.md` K12）之内的大 size（例 2⁴⁰ 字节，盘上仍只占几个单元）之后，核心层冷走读 `walk_to_file` 与冷恢复 `recover` 把整份内容交成一个向量、洞补 0 到 size（`crates/singlefs-core/src/recovery.rs` 的 `content_padded_with_the_hole_up_to_the_size`），参照实现 RefFS 把截断施加成整份 `resize`（`crates/singlefs-reference-filesystem/src/lib.rs` 里截断那一处 `truncated.resize(`），进程中止。核心层 `mount.rs`、`mounted_session.rs` 里零处调 `recover(&` 与 `walk_to_file(`，冷读的调用方在 checker 档、harness 档与 `recovery.rs` 自己里，挂载那一路不受影响。随机历史的截断目标至多现在的 size 加 4 个净荷（`crates/singlefs-harness/src/history.rs` 的 `new_size_in_bytes`），三方对拍碰不到大变长。用户 2026-10-22 定这一版不改、放进这个优化里程碑，原话「这个没必要管就按照现在的方式读。 之后会优化 没有必要现在优化。 肯定不可能现在这种方式冷读」「现在这个样子冷读肯定是不行的 放到后面的优化里程碑里面」（判决 `research/prompts/m4-validate-code-r1-main-verification.md` 第四节第二行与「用户定案」一节）。欠账：C878（冷读与 RefFS 按 size 整份分配内存）。
+- **仓里已有的**（2026-10-22 现查）：合法变长到 K12 上限（N 的上限是 ⌈N ÷ 净荷⌉ × 净荷不溢出 u64，`research/prompts/m4-trunc-r1-main-verification.md` K12）之内的大 size（例 2⁴⁰ 字节，盘上仍只占几个单元）之后，核心层冷走读 `walk_to_file` 与冷恢复 `recover` 把整份内容交成一个向量、洞补 0 到 size（`crates/singlefs-core/src/recovery.rs` 的 `content_padded_with_the_hole_up_to_the_size`），参照实现 RefFS 把截断施加成整份 `resize`（`crates/singlefs-reference-filesystem/src/lib.rs` 里截断那一处 `truncated.resize(`），进程中止。核心层 `mount.rs`、`mounted_session.rs` 里零处调 `recover(&` 与 `walk_to_file(`，冷读的调用方在验证包与 `recovery.rs` 自己里，挂载那一路不受影响。随机历史的截断目标至多现在的 size 加 4 个净荷（`crates/singlefs-verification/src/history.rs` 的 `new_size_in_bytes`），三方对拍碰不到大变长。用户 2026-10-22 定这一版不改、放进这个优化里程碑，原话「这个没必要管就按照现在的方式读。 之后会优化 没有必要现在优化。 肯定不可能现在这种方式冷读」「现在这个样子冷读肯定是不行的 放到后面的优化里程碑里面」（判决 `research/prompts/m4-validate-code-r1-main-verification.md` 第四节第二行与「用户定案」一节）。欠账：C878（冷读与 RefFS 按 size 整份分配内存）。
 - **作业点**：
 
 | # | 做什么 | 压着的条款与欠账 | 验收 | 依赖 |
@@ -104,6 +104,6 @@
 | 四·1 | 随机历史加一档大变长：截断目标跨过冷读与 RefFS 会整份分配的量级（size 超过冷读进程的内存上限） | C878（冷读与 RefFS 按 size 整份分配内存）；`research/prompts/m4-validate-code-r1-main-verification.md` 第四节 | 跑前登记写死这一档的 size 与内存上限；这一档在今天的冷走读、冷恢复与 RefFS 上红（进程中止） | 无 |
 | 四·2 | 冷走读、冷恢复与 RefFS 改成不按 size 展开的表示 | C878（冷读与 RefFS 按 size 整份分配内存） | 大 size 下三处读得出、答得对、不中止；四·1 那一档在改后绿 | 四·1 |
 
-- **开工前要先定的**：不按 size 展开的表示取哪一种。判决第四节列了三个候选（零轮）：冷走读、冷恢复与 RefFS 不再交整份字节、交「单元内容加尾部洞长」；把 K12 的上限收窄到装得下的数；冷读遇到超界的 size 交类型化拒绝。判决推荐交「单元内容加尾部洞长」、K12 的上限不动、读的一侧改表示（推的，改动范围没量）。这一种要改 API，波及调用 `recover(&` 的 checker 档与 harness 档（`grep -rln 'recover(&' --include=*.rs crates` 命中 89 个文件，多数是测试，逐处没核）。
+- **开工前要先定的**：不按 size 展开的表示取哪一种。判决第四节列了三个候选（零轮）：冷走读、冷恢复与 RefFS 不再交整份字节、交「单元内容加尾部洞长」；把 K12 的上限收窄到装得下的数；冷读遇到超界的 size 交类型化拒绝。判决推荐交「单元内容加尾部洞长」、K12 的上限不动、读的一侧改表示（推的，改动范围没量）。这一种要改 API，波及调用 `recover(&` 的验证包（`grep -rln 'recover(&' --include=*.rs crates` 命中 89 个文件，多数是测试，逐处没核）。
 
 **不在出口**：并行提交本身（里程碑六；零·2 判出它有错的照零·3 重构）、journal 环与根环的几何（里程碑九 [09-ninth-txn.md](09-ninth-txn.md)）、目录（里程碑十一）。

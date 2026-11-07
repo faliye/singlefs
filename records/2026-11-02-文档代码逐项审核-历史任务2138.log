@@ -1,0 +1,82 @@
+== 任务 2138 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-2138.attempt-1.log（共 81 行，下面是整份）
+   Compiling libc v0.2.189
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling pkg-config v0.3.34
+   Compiling proc-macro2 v1.0.107
+   Compiling glob v0.3.4
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling minimal-lexical v0.2.1
+   Compiling regex-syntax v0.8.11
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.3
+   Compiling either v1.18.0
+   Compiling vcpkg v0.2.15
+   Compiling bindgen v0.72.1
+   Compiling rustc-hash v2.1.3
+   Compiling shlex v1.3.0
+   Compiling bitflags v2.13.2
+   Compiling rustflags v0.1.7
+   Compiling libloading v0.8.9
+   Compiling itertools v0.13.0
+   Compiling clang-sys v1.9.1
+   Compiling nom v7.1.3
+   Compiling regex-automata v0.4.18
+   Compiling syn v2.0.119
+   Compiling jobserver v0.1.35
+   Compiling cc v1.5.1
+   Compiling cexpr v0.6.0
+   Compiling regex v1.13.1
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling libz-sys v1.1.29
+   Compiling lz4-sys v1.11.1+lz4-1.10.0
+   Compiling librocksdb-sys v0.19.0+11.8.1
+   Compiling rocksdb v0.25.0
+   Compiling prune-server v0.1.0 (/home/fy5090/code/singlefs/prune-server)
+    Finished `release` profile [optimized] target(s) in 11.10s
+     Running `/home/fy5090/.local/share/singlefs/task-server-builds/task-b0f6b921-2138-1/target/release/prune-server-bench --mode full-block --target-states-per-second 80000 --duration-seconds 60`
+PRUNE_SERVER_BENCH_LIBRARY /tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2709753-1793481871225899294
+PRUNE_SERVER_BENCH_STARTED server_process=2711590 unix=/tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2709753-1793481871225899294/server.sock tcp=127.0.0.1:35773 worker_threads=32
+PRUNE_SERVER_BENCH_ROUTE route=unix target_states_per_second=80000 achieved_states_per_second=80827.7 blocks=74 frames_sent=148 frames_answered=148 records=9699328 p50_ms=34.410 p99_ms=11109.571 reconnections=0 duplicate_responses=0 busy_responses=0 failure=none
+PRUNE_SERVER_BENCH_SERVER_COUNTERS rocksdb.wal.synced=77 rocksdb.number.multiget.get=74 rocksdb.number.multiget.keys.read=4849664 rocksdb.number.keys.read=74 rocksdb.number.keys.written=4849738 rocksdb.number.db.seek=1 rocksdb.wal.bytes=645009742 prune-server.frames.handled=149 prune-server.busy.rejections=0 prune-server.duplicate.requests=0 prune-server.group.commits=67 prune-server.pending.peak=8 prune-server.pending.limit=8192 prune-server.wal.sync.count=67 prune-server.wal.sync.p50.microseconds=2821 prune-server.wal.sync.p99.microseconds=6339897 prune-server.wal.sync.maximum.microseconds=6339897
+PRUNE_SERVER_BENCH mode=full-block target_states_per_second=80000 achieved_states_per_second=80827.7 frames_per_second=2.5 p50_ms=34.410 p99_ms=11109.571 server_peak_rss_mib=1431.2 server_cpu_seconds=5.99 records_per_second=161655.5 layout=per-state states_per_block=65536 batch_blocks=1 batch_milliseconds=20 duration_seconds=60 elapsed_seconds=60.000 routes=unix required_percent=95 load_average_start=8.14 load_average_end=5.92 load_average_threshold=16.00 disk_device=nvme0n1p2 disk_busy_percent=39.8 wal_syncs=67 wal_sync_p50_ms=2.821 wal_sync_p99_ms=6339.897 wal_sync_max_ms=6339.897 faults=0 fault_recovery_max_ms=none client_reconnections=0 duplicate_responses=0 busy_responses=0 result=met
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `/home/fy5090/.local/share/singlefs/task-server-builds/task-b0f6b921-2138-1/target/release/prune-server-bench --mode small-block-per-frame --target-states-per-second 78000 --duration-seconds 60`
+PRUNE_SERVER_BENCH_LIBRARY /tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2718709-1793481932698132615
+PRUNE_SERVER_BENCH_STARTED server_process=2718726 unix=/tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2718709-1793481932698132615/server.sock tcp=127.0.0.1:39887 worker_threads=32
+PRUNE_SERVER_BENCH_ROUTE route=unix target_states_per_second=78000 achieved_states_per_second=77995.2 blocks=779990 frames_sent=1559980 frames_answered=1559980 records=9359880 p50_ms=0.895 p99_ms=105.512 reconnections=0 duplicate_responses=0 busy_responses=0 failure=none
+PRUNE_SERVER_BENCH_SERVER_COUNTERS rocksdb.wal.synced=15657 rocksdb.number.multiget.get=779990 rocksdb.number.multiget.keys.read=4679940 rocksdb.number.keys.read=779990 rocksdb.number.keys.written=5459930 rocksdb.number.db.seek=1 rocksdb.wal.bytes=660839282 prune-server.frames.handled=1559981 prune-server.busy.rejections=0 prune-server.duplicate.requests=0 prune-server.group.commits=15646 prune-server.pending.peak=257 prune-server.pending.limit=8192 prune-server.wal.sync.count=15646 prune-server.wal.sync.p50.microseconds=736 prune-server.wal.sync.p99.microseconds=5765 prune-server.wal.sync.maximum.microseconds=152063
+PRUNE_SERVER_BENCH mode=small-block-per-frame target_states_per_second=78000 achieved_states_per_second=77995.2 frames_per_second=25998.4 p50_ms=0.895 p99_ms=105.512 server_peak_rss_mib=174.8 server_cpu_seconds=15.61 records_per_second=155990.3 layout=per-state states_per_block=6 batch_blocks=1 batch_milliseconds=20 duration_seconds=60 elapsed_seconds=60.003 routes=unix required_percent=95 load_average_start=5.92 load_average_end=4.60 load_average_threshold=16.00 disk_device=nvme0n1p2 disk_busy_percent=48.4 wal_syncs=15646 wal_sync_p50_ms=0.736 wal_sync_p99_ms=5.765 wal_sync_max_ms=152.063 faults=0 fault_recovery_max_ms=none client_reconnections=0 duplicate_responses=0 busy_responses=0 result=met
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `/home/fy5090/.local/share/singlefs/task-server-builds/task-b0f6b921-2138-1/target/release/prune-server-bench --mode small-block-batched --target-states-per-second 78000 --duration-seconds 60 --batch-blocks 512 --batch-milliseconds 20`
+PRUNE_SERVER_BENCH_LIBRARY /tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2725439-1793481992854245612
+PRUNE_SERVER_BENCH_STARTED server_process=2725454 unix=/tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2725439-1793481992854245612/server.sock tcp=127.0.0.1:38163 worker_threads=32
+PRUNE_SERVER_BENCH_ROUTE route=unix target_states_per_second=78000 achieved_states_per_second=77992.0 blocks=780000 frames_sent=5160 frames_answered=5160 records=9360000 p50_ms=3.635 p99_ms=97.525 reconnections=0 duplicate_responses=0 busy_responses=0 failure=none
+PRUNE_SERVER_BENCH_SERVER_COUNTERS rocksdb.wal.synced=2494 rocksdb.number.multiget.get=2580 rocksdb.number.multiget.keys.read=4680000 rocksdb.number.keys.read=2580 rocksdb.number.keys.written=4682580 rocksdb.number.db.seek=1 rocksdb.wal.bytes=622596216 prune-server.frames.handled=5161 prune-server.busy.rejections=0 prune-server.duplicate.requests=0 prune-server.group.commits=2483 prune-server.pending.peak=15 prune-server.pending.limit=8192 prune-server.wal.sync.count=2483 prune-server.wal.sync.p50.microseconds=1008 prune-server.wal.sync.p99.microseconds=61030 prune-server.wal.sync.maximum.microseconds=150068
+PRUNE_SERVER_BENCH mode=small-block-batched target_states_per_second=78000 achieved_states_per_second=77992.0 frames_per_second=86.0 p50_ms=3.635 p99_ms=97.525 server_peak_rss_mib=174.7 server_cpu_seconds=12.15 records_per_second=155984.0 layout=per-state states_per_block=6 batch_blocks=512 batch_milliseconds=20 duration_seconds=60 elapsed_seconds=60.006 routes=unix required_percent=95 load_average_start=4.60 load_average_end=11.71 load_average_threshold=16.00 disk_device=nvme0n1p2 disk_busy_percent=12.0 wal_syncs=2483 wal_sync_p50_ms=1.008 wal_sync_p99_ms=61.030 wal_sync_max_ms=150.068 faults=0 fault_recovery_max_ms=none client_reconnections=0 duplicate_responses=0 busy_responses=0 result=met
+    Finished `release` profile [optimized] target(s) in 0.02s
+     Running `/home/fy5090/.local/share/singlefs/task-server-builds/task-b0f6b921-2138-1/target/release/prune-server-bench --mode recording --target-states-per-second 78000 --duration-seconds 60 --batch-blocks 512 --batch-milliseconds 20`
+PRUNE_SERVER_BENCH_LIBRARY /tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2729135-1793482053101861878
+PRUNE_SERVER_BENCH_STARTED server_process=2729153 unix=/tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2729135-1793482053101861878/server.sock tcp=127.0.0.1:35661 worker_threads=32
+PRUNE_SERVER_BENCH_ROUTE route=unix target_states_per_second=78000 achieved_states_per_second=77995.7 blocks=780000 frames_sent=2599 frames_answered=2599 records=1560000 p50_ms=3.608 p99_ms=167.781 reconnections=0 duplicate_responses=0 busy_responses=0 failure=none
+PRUNE_SERVER_BENCH_SERVER_COUNTERS rocksdb.wal.synced=2497 rocksdb.number.multiget.get=0 rocksdb.number.multiget.keys.read=0 rocksdb.number.keys.read=2599 rocksdb.number.keys.written=1562599 rocksdb.number.db.seek=1 rocksdb.wal.bytes=107797291 prune-server.frames.handled=2600 prune-server.busy.rejections=0 prune-server.duplicate.requests=0 prune-server.group.commits=2495 prune-server.pending.peak=32 prune-server.pending.limit=8192 prune-server.wal.sync.count=2495 prune-server.wal.sync.p50.microseconds=827 prune-server.wal.sync.p99.microseconds=79242 prune-server.wal.sync.maximum.microseconds=855642
+PRUNE_SERVER_BENCH mode=recording target_states_per_second=78000 achieved_states_per_second=77995.7 frames_per_second=43.3 p50_ms=3.608 p99_ms=167.781 server_peak_rss_mib=91.8 server_cpu_seconds=3.05 records_per_second=25998.6 layout=per-state states_per_block=6 batch_blocks=512 batch_milliseconds=20 duration_seconds=60 elapsed_seconds=60.003 routes=unix required_percent=95 load_average_start=11.71 load_average_end=11.00 load_average_threshold=16.00 disk_device=nvme0n1p2 disk_busy_percent=11.0 wal_syncs=2495 wal_sync_p50_ms=0.827 wal_sync_p99_ms=79.242 wal_sync_max_ms=855.642 faults=0 fault_recovery_max_ms=none client_reconnections=0 duplicate_responses=0 busy_responses=0 result=met
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `/home/fy5090/.local/share/singlefs/task-server-builds/task-b0f6b921-2138-1/target/release/prune-server-bench --mode two-routes --target-states-per-second 160000 --duration-seconds 60 --batch-blocks 512 --batch-milliseconds 20`
+PRUNE_SERVER_BENCH_LIBRARY /tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2734577-1793482113198179910
+PRUNE_SERVER_BENCH_STARTED server_process=2734593 unix=/tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2734577-1793482113198179910/server.sock tcp=127.0.0.1:40945 worker_threads=32
+PRUNE_SERVER_BENCH_ROUTE route=unix target_states_per_second=80000 achieved_states_per_second=71368.5 blocks=760720 frames_sent=4804 frames_answered=4804 records=10650080 p50_ms=4.445 p99_ms=6835.443 reconnections=0 duplicate_responses=0 busy_responses=0 failure=none
+PRUNE_SERVER_BENCH_ROUTE route=tcp target_states_per_second=80000 achieved_states_per_second=71368.5 blocks=760720 frames_sent=4808 frames_answered=4808 records=10650080 p50_ms=4.443 p99_ms=6852.569 reconnections=0 duplicate_responses=0 busy_responses=0 failure=none
+PRUNE_SERVER_BENCH_SERVER_COUNTERS rocksdb.wal.synced=3165 rocksdb.number.multiget.get=4806 rocksdb.number.multiget.keys.read=9128640 rocksdb.number.keys.read=4806 rocksdb.number.keys.written=12176326 rocksdb.number.db.seek=1 rocksdb.wal.bytes=1424341014 prune-server.frames.handled=9613 prune-server.busy.rejections=0 prune-server.duplicate.requests=0 prune-server.group.commits=3140 prune-server.pending.peak=211 prune-server.pending.limit=8192 prune-server.wal.sync.count=3140 prune-server.wal.sync.p50.microseconds=1052 prune-server.wal.sync.p99.microseconds=119052 prune-server.wal.sync.maximum.microseconds=2971461
+PRUNE_SERVER_BENCH mode=two-routes target_states_per_second=160000 achieved_states_per_second=142737.1 frames_per_second=150.3 p50_ms=4.443 p99_ms=6850.252 server_peak_rss_mib=475.4 server_cpu_seconds=22.74 records_per_second=333053.2 layout=per-state states_per_block=6 batch_blocks=512 batch_milliseconds=20 duration_seconds=60 elapsed_seconds=63.954 routes=unix+tcp required_percent=95 load_average_start=11.00 load_average_end=10.49 load_average_threshold=16.00 disk_device=nvme0n1p2 disk_busy_percent=41.2 wal_syncs=3140 wal_sync_p50_ms=1.052 wal_sync_p99_ms=119.052 wal_sync_max_ms=2971.461 faults=0 fault_recovery_max_ms=none client_reconnections=0 duplicate_responses=0 busy_responses=0 result=missed
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `release` profile [optimized] target(s) in 2.65s
+     Running `/home/fy5090/.local/share/singlefs/task-server-builds/task-b0f6b921-2138-1/target/release/prune-server-bench --mode fault-injection --target-states-per-second 78000 --duration-seconds 60 --batch-blocks 512 --batch-milliseconds 20`
+PRUNE_SERVER_BENCH_LIBRARY /tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2709744-1793482180611306080
+PRUNE_SERVER_BENCH_STARTED server_process=2746146 unix=/tmp/singlefs-run-with-memory-cap-2709709-YYPl72/prune-server-bench-2709744-1793482180611306080/server.sock tcp=127.0.0.1:36119 worker_threads=32
+run-with-memory-cap: 包装退 143（命令判红、被信号杀、撞了上限或超时，不是 0）：这一条命令的临时目录留着看现场：/tmp/singlefs-run-with-memory-cap-2709709-YYPl72
+run-with-memory-cap: → 看完自己删（rm -rf /tmp/singlefs-run-with-memory-cap-2709709-YYPl72）；同一个 /tmp 下这样留着的只留最近 3 个，更早的由之后留现场的那一条包装删掉

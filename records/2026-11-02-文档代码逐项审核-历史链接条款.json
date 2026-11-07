@@ -1,0 +1,1016 @@
+{
+  "at": "2026-11-05",
+  "m2_r1_original_commit": "d2aeb7de07baeb190b2372f27d01c191eb783f63",
+  "invariants_sha256": "8597d8d2ee9f8354091da41a84851d954ad120f01bdbc71f51a541d2cc40b541",
+  "claims": [
+    {
+      "document_line": 29,
+      "statement": "release-generation term occurs only in I-7.4 in then-current invariants",
+      "historical_matching_lines": [
+        {
+          "line": 50,
+          "text": "| I-7.4 | 近 K 代块未被复用 | 回退候选集里每一个根（按实例表判仍然有效 ∧ txg ≥ F_生效，D23（journal 的角色与格式） 已定项 14）所引用的块，其物理范围均未被重新分配给其他对象、也未被清扫抹头。**「K 代」2026-09-13 起就指这个候选集**：平时回退下界 F 不动时是整个根环，盘紧时抬 F 缩到最近 4 个可退到的状态、且每块盘上最新的持久有效根都在内（D16（发布语义） 已定项 1）；原「K 是运行时策略、下限 ≥ 2」作废。[decisions.md](decisions.md) D22（单元原子性怎么合成）：**根环深度是块重用延迟的上界**（D22（单元原子性怎么合成）同时明令块复用的界不能是格式常量），不满足则环里的旧根是假的回退候选。「有效」按 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3 的回退候选集判：(i, T) 有效 ⟺ 实例表无 i 的行，或有行 (i, Ti, Wi) 且 T ≤ Ti——被抛弃时间线的根不在候选集里，这只管回退目标的选择；它们引用的块在离开根环之前同样不许重新分配、不许抹头（2026-09-13 用户定案，C314（回退可以复用被抛弃的根引用的单元） 取影子账，D23（journal 的角色与格式） 已定项 14）。崩溃后 defer 队列的内存态丢失，接手的是清扫准入「释放代 ≤ max(F_生效, 环里最旧有效根)」那条闸（谓词由 D16（发布语义） 已定项 1 给，2026-09-13；有效性按实例表判），保护宽度随之变 | 未实现 |"
+        }
+      ],
+      "status": "quoted_source_fact_matches",
+      "limits": "不据字面检索证明整个当时checker没有同义规则或变异一定无判别力"
+    },
+    {
+      "document_line": 45,
+      "statement": "I-1.2/I-5.3/I-8.1/I-8.2/I-8.5 all marked not implemented",
+      "historical_matching_lines": [
+        {
+          "line": 22,
+          "text": "| I-1.2 | 块头写序已发布 | 任一单元，其头记录的写序 (i, n)（D18（块里携带什么信息）已定项 7 / 11 的字段）与诞生代号 b 按 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2 的全局已发布谓词判成已发布：i < 挂载根实例且无该实例的行 ⇒ 已发布，有行 (i, T_pub, W) ⇒ 码 1 要 b ≤ T_pub ∨ n ≤ W、码 2 / 3 要 b ≤ T_pub（所选根那个实例的 T_pub = 重放之后那个根的 txg，严格介于所选根的实例与新实例之间、又不是切换照旧事务写序主人的实例写 (i, 0, 0)，切换的所选根按 D23（journal 的角色与格式） 已定项 14 取被重发的在飞 checkpoint 所基于的根；W = **属于实例 i 的**、被这次重放施加的最大事务号，切换时是被照旧的、写序属于 i 的最大事务号；同一次恢复写出的那批行里只有所选根那个实例的 W 可能非 0，同一次切换写出的那批里只有被照旧事务的写序主人的 W 可能非 0，表上允许有多行非 0，它们来自不同次的恢复或切换；2026-09-14 用户定案，C330（中间实例那一行的 T_pub 取所选根的 txg） 三轮三方）；i == 挂载根实例 ⇒ b ≤ 挂载根的 checkpoint_txg；i > 挂载根实例 ⇒ 判损坏。**例外**：打包记录类型 4 的实例表单元不走这条谓词，它的现行版本由根记录持有的物理指针唯一确定。**判不成已发布者必是未发布的撕裂事务垃圾或被抛弃时间线的残留**——这是扫描方向独立于遍历方向判它的依据（D13（验证路线）双方向要求）；2026-09-05 前它只比诞生代号与当前 txg，崩溃后 txg 重发让那条判据对同 txg 两条时间线失效（E104（扫描重建的现行版本判定）：无实例表时崩溃世界复活 6） | 未实现（池级 checker 还没判；恢复路径把它当前置检查，`crates/singlefs-core/src/recovery.rs` 的 `InvariantViolated` 报的就是这一条） |"
+        },
+        {
+          "line": 73,
+          "text": "| I-8.1 | 环几何够大 | `环大小 ≥ F × 任一事务的最坏 journal 占用`，F ≥ 2。最坏占用与 F 写进系统配置，mkfs 时算、mount 时复算比对 | 未实现 ⚠️ **口径注（2026-09-13，D28（挂载期承诺量） 已定项 4）**：ckpt_cost 按当时各记录树的高现算、挂载期内会长，mkfs 时声明的最坏占用要么取上界、要么挂载期内也复算比对——哪一种没定。 |"
+        },
+        {
+          "line": 74,
+          "text": "| I-8.2 | 记录头不跨原子单元 | 任一 journal 记录的头完整落在一个 `physical_block_size` 单元内。该宽度**运行时探测**，不许硬编码 | 未实现 |"
+        },
+        {
+          "line": 77,
+          "text": "| I-8.5 | tail 槽有效集非空 | 全部 tail 槽位中自证校验和通过的记录集合非空，且其中除代号最大者外至少还有一条更早的 | 未实现 |"
+        },
+        {
+          "line": 168,
+          "text": "| I-5.3 | 报出的空闲都兑现得了 | `df` 报给用户的空闲 ≤ 当下可分配 + 能在有界步数内放回的扣住量（defer 窗口里、回退下界以下的释放）。运行时的等价形态：`df` 报出 s 字节空闲时写 s 字节必须成功；删掉 s 字节之后同样大小的写在有界步数内成功（[decisions.md](decisions.md) D3（空间分配） 已定项 9，用户定案）。界随 D16（发布语义） 已定项 1 的形态定。判别力：把「放回扣住量」那一步摘掉，近满盘上删一个对象再写同样大小必须由绿转红 | 未实现 ⚠️ **口径注（2026-09-13，D28（挂载期承诺量） 已定项 4）**：`df` 要扣的 checkpoint 保留池是每次发布现算的量，发布即重算，近满盘上报出的空闲会随树高变小。 |"
+        }
+      ],
+      "status": "quoted_source_fact_matches",
+      "limits": "只核当时文档状态列；当时实际代码实现状态仍待核"
+    },
+    {
+      "document_line": 64,
+      "statement": "quoted text at original invariants line271",
+      "historical_matching_lines": [
+        {
+          "line": 271,
+          "text": "**不进 I-9（inode 树结构） 的**：分裂 / 合并的身份传递（左半身份不变、右半号 = 触发分裂的新记录号、出生树 = 执行分裂的树）与合并时机是操作断言，对着一个镜像判不了，走单测 / 模型对拍与崩溃点重放（C116（叶容器的分裂 / 合并纪律没有会失败的检查））；"
+        }
+      ],
+      "status": "quoted_source_fact_matches",
+      "limits": "正文其余 I-9 前置条件和记录核对器能力未据此通过"
+    }
+  ],
+  "remaining_quote_contexts": [
+    {
+      "path": ".claude/kb/decisions-history.en.md",
+      "old_line": 12085,
+      "current_line": 12107,
+      "target": "../checks-owed.md",
+      "source_sha256": "7a9002613776bb514b341a577b094d5b5ce96ade414ea146e2c140b5e91dbc8b",
+      "line_length": 625,
+      "link_contexts": [
+        {
+          "start_column": 35,
+          "end_column": 254,
+          "text": "generation row of settled item 7, \"the formula check is not yet implemented, owed in [checks-owed.md](../checks-owed.md) C743 (rebuilt allocator recording new class does not verify root occupies slot)\", is changed to the"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": ".claude/kb/decisions-history.ja.md",
+      "old_line": 12085,
+      "current_line": 12107,
+      "target": "../checks-owed.md",
+      "source_sha256": "6a70206dda72b5c65315c702398dadce72f3cb7247eb4203aaf4b66b2a689505",
+      "line_length": 316,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 176,
+          "text": "- 確定項目 7 のインスタンスコードの行の括弧「公式照合はまだ実装されておらず、[checks-owed.md](../checks-owed.md) C743 (アロケータ再構築が新しい類を記録するとき、ルートがそのスロットに属するかを確かめない) に未済」を現状に改めた：公式照合はルートリングを読む二つの読み手（ルート選択でスロットを読む `r"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": ".claude/kb/decisions-history.md",
+      "old_line": 12088,
+      "current_line": 12110,
+      "target": "../checks-owed.md",
+      "source_sha256": "1cc88698299ea57eb15ac65c51da414f74a23188fb83d3c17bf8a9295734fd90",
+      "line_length": 201,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 166,
+          "text": "- 已定项 7 实例代号那一行的括号：「公式核还没实现，欠在 [checks-owed.md](../checks-owed.md) C743（重建分配器记新类时不核根住不住这一槽）」改成现状，公式核在读根环的两个读者里（择根读槽的 `read_root_ring_slot`、重建分配器读根环的那一遍），不合的当这一槽这一次读坏；"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-changes.md",
+      "old_line": 2819,
+      "current_line": 2819,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "7879541c4e000baa16d972acb54bcfe4a5d8f020ffc70b75cd6c3358c5f70bf4",
+      "line_length": 69,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 69,
+          "text": "  新：时释放代判不出唯一值） 已挪 [09-ninth-txn.md](09-ninth-txn.md) 二·3（用户 2026-10-"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-changes.md",
+      "old_line": 2833,
+      "current_line": 2833,
+      "target": "06-sixth-txn.md",
+      "source_sha256": "7879541c4e000baa16d972acb54bcfe4a5d8f020ffc70b75cd6c3358c5f70bf4",
+      "line_length": 75,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 75,
+          "text": "  新：目标负载优先级） 各档的随机小读份额，落 [06-sixth-txn.md](06-sixth-txn.md) 三·4）、C372（全空聚簇段"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 197,
+      "current_line": 197,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 304,
+      "link_contexts": [
+        {
+          "start_column": 67,
+          "end_column": 284,
+          "text": "項空白：C566 (リング上にホールがある場合の超過控除スロットがホール数に伴い無界に増加)、C380 (リング上にホールがある場合に解放世代が唯一値を判定不能) は [09-ninth-txn.md](09-ninth-txn.md) 二·3 へ移管（ユーザー 2026-10-1… | 不改：不相干，引「リングとルートの条項空白」：已是新说法：现查日文行（03 页第 71 行）已写 2026-10-20 に新たに立てた C866、"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 199,
+      "current_line": 199,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 323,
+      "link_contexts": [
+        {
+          "start_column": 27,
+          "end_column": 244,
+          "text": "third-txn.md:71 | \\| 二·4 \\| 环与根的条款空白：C566（环上有洞时多扣的槽随洞数无界增长）、C380（环上有洞时释放代判不出唯一值） 已挪 [09-ninth-txn.md](09-ninth-txn.md) 二·3（用户 2026-10-19 弹窗定；2026-09-28 的「重排」定案与三方要求留在欠账登记行）；C583（… | 不改：不相干，引「环与根的条款空白」：已是新说法：现查该行（03 页第 "
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 374,
+      "current_line": 374,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 303,
+      "link_contexts": [
+        {
+          "start_column": 67,
+          "end_column": 284,
+          "text": "項空白：C566 (リング上にホールがある場合の超過控除スロットがホール数に伴い無界に増加)、C380 (リング上にホールがある場合に解放世代が唯一値を判定不能) は [09-ninth-txn.md](09-ninth-txn.md) 二·3 へ移管（ユーザー 2026-10-1… | 不改：不相干，「リングとルートの条項空白」：这是二·4 的任务格，列的是里程碑三二·4 还欠哪些条款空白（含 C773 同批做、C863 新开），"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 375,
+      "current_line": 375,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 296,
+      "link_contexts": [
+        {
+          "start_column": 27,
+          "end_column": 244,
+          "text": "third-txn.md:71 | \\| 二·4 \\| 环与根的条款空白：C566（环上有洞时多扣的槽随洞数无界增长）、C380（环上有洞时释放代判不出唯一值） 已挪 [09-ninth-txn.md](09-ninth-txn.md) 二·3（用户 2026-10-19 弹窗定；2026-09-28 的「重排」定案与三方要求留在欠账登记行）；C583（… | 不改：不相干，「环与根的条款空白」：这是二·4 的任务格，列的是里程碑三"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 425,
+      "current_line": 425,
+      "target": "../checks-owed.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 266,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 180,
+          "text": "| .claude/kb/experiments/78-重放的起点.md:42 | 落点 [checks-owed.md](../checks-owed.md) C88（根环的时间线判别未实现）（原 C85（发布计数器的四个等号没写死） 2026-10-11 并入）。 | 不改：不相干，「C88（根环的时间线判别未实现）（原 C85」：说的是 C88（根环的"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 434,
+      "current_line": 434,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 287,
+      "link_contexts": [
+        {
+          "start_column": 67,
+          "end_column": 284,
+          "text": "項空白：C566 (リング上にホールがある場合の超過控除スロットがホール数に伴い無界に増加)、C380 (リング上にホールがある場合に解放世代が唯一値を判定不能) は [09-ninth-txn.md](09-ninth-txn.md) 二·3 へ移管（ユーザー 2026-10-1… | 不改：不相干，「リングとルートの条項空白」：这是里程碑三二·4 的任务格，列的是还欠哪些条款空白（含 C743），与新事实一致，结束那一版仍是真话"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 435,
+      "current_line": 435,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 280,
+      "link_contexts": [
+        {
+          "start_column": 27,
+          "end_column": 244,
+          "text": "third-txn.md:71 | \\| 二·4 \\| 环与根的条款空白：C566（环上有洞时多扣的槽随洞数无界增长）、C380（环上有洞时释放代判不出唯一值） 已挪 [09-ninth-txn.md](09-ninth-txn.md) 二·3（用户 2026-10-19 弹窗定；2026-09-28 的「重排」定案与三方要求留在欠账登记行）；C583（… | 不改：不相干，「环与根的条款空白」：这是里程碑三二·4 的任务格，列的是"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 541,
+      "current_line": 541,
+      "target": "../layout/01-first-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 295,
+      "link_contexts": [
+        {
+          "start_column": 7,
+          "end_column": 234,
+          "text": "ude/kb/decisions/23-journal的角色与格式.md:138 | **射程**：管 tail 住哪、多久写一次、恢复怎么用它。字节表 [layout/01-first-txn.md](../layout/01-first-txn.md) 零与一两节按「每次发布一次」写：两次暖机空发布与新池新建文件各推进一次 tail。⚠️ 取系统配置形态时用过的代价表（E23（journal 几何）… | 不改：不相干，D23 射程讲每次发布轮换系"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 622,
+      "current_line": 622,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 275,
+      "link_contexts": [
+        {
+          "start_column": 67,
+          "end_column": 275,
+          "text": "項空白：C566 (リング上にホールがある場合の超過控除スロットがホール数に伴い無界に増加)、C380 (リング上にホールがある場合に解放世代が唯一値を判定不能) は [09-ninth-txn.md](09-ninth-txn.md) 二·3 へ移管（ユーザー 2026-10-1… | 不改：C656「已做完」的依据只在别的会话没提交的改动里，用户定「这些行剔出去、交那个会话自己同步」，已交 里程碑三收尾会话 |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 623,
+      "current_line": 623,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 272,
+      "link_contexts": [
+        {
+          "start_column": 27,
+          "end_column": 244,
+          "text": "third-txn.md:71 | \\| 二·4 \\| 环与根的条款空白：C566（环上有洞时多扣的槽随洞数无界增长）、C380（环上有洞时释放代判不出唯一值） 已挪 [09-ninth-txn.md](09-ninth-txn.md) 二·3（用户 2026-10-19 弹窗定；2026-09-28 的「重排」定案与三方要求留在欠账登记行）；C583（… | 不改：C656「已做完」的依据只在别的会话没提交的改动里，用户定「这些行"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 728,
+      "current_line": 728,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 283,
+      "link_contexts": [
+        {
+          "start_column": 67,
+          "end_column": 283,
+          "text": "項空白：C566 (リング上にホールがある場合の超過控除スロットがホール数に伴い無界に増加)、C380 (リング上にホールがある場合に解放世代が唯一値を判定不能) は [09-ninth-txn.md](09-ninth-txn.md) 二·3 へ移管（ユーザー 2026-10-1… | 不改：说的是那一次发生的事，同上（日文页）：行内列分诊那天补点名的 15 笔，开没开放交各登记行；「リングとルートの条項空白」一行是事件句。 |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 729,
+      "current_line": 729,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 365,
+      "link_contexts": [
+        {
+          "start_column": 27,
+          "end_column": 244,
+          "text": "third-txn.md:71 | \\| 二·4 \\| 环与根的条款空白：C566（环上有洞时多扣的槽随洞数无界增长）、C380（环上有洞时释放代判不出唯一值） 已挪 [09-ninth-txn.md](09-ninth-txn.md) 二·3（用户 2026-10-19 弹窗定；2026-09-28 的「重排」定案与三方要求留在欠账登记行）；C583（… | 不改：说的是那一次发生的事，这一格列的是「2026-10-19 分诊定留"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 799,
+      "current_line": 799,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 349,
+      "link_contexts": [
+        {
+          "start_column": 67,
+          "end_column": 284,
+          "text": "項空白：C566 (リング上にホールがある場合の超過控除スロットがホール数に伴い無界に増加)、C380 (リング上にホールがある場合に解放世代が唯一値を判定不能) は [09-ninth-txn.md](09-ninth-txn.md) 二·3 へ移管（ユーザー 2026-10-1… | 不改：说的是那一次发生的事，这一格列「2026-10-19 分诊定留里程碑三、补点名的 15 笔」（含 C758），附「（仍欠的见各登记行）」：开"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 801,
+      "current_line": 801,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 342,
+      "link_contexts": [
+        {
+          "start_column": 27,
+          "end_column": 244,
+          "text": "third-txn.md:71 | \\| 二·4 \\| 环与根的条款空白：C566（环上有洞时多扣的槽随洞数无界增长）、C380（环上有洞时释放代判不出唯一值） 已挪 [09-ninth-txn.md](09-ninth-txn.md) 二·3（用户 2026-10-19 弹窗定；2026-09-28 的「重排」定案与三方要求留在欠账登记行）；C583（… | 不改：说的是那一次发生的事，这一格列「2026-10-19 分诊定留里程"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 834,
+      "current_line": 834,
+      "target": "04-fourth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 323,
+      "link_contexts": [
+        {
+          "start_column": 77,
+          "end_column": 295,
+          "text": "：C30 (チェーン状引当プールの定量化未検証)、C70 (メトリクスを跨ぐ合計値の監視者不在)、C122 (割り当てレコードのポイント削除後のエントリ数計測条件)（[04-fourth-txn.md](04-fourth-txn.md) 二·1 へ移管）、C19… | 不改：不相干，这里的「项五」是里程碑三自己的「项五」（五·x 作业点），不是原「里程碑四项五（真盘掉电装置）」：这是里程碑三五·4 的状态行；「単独列挙された六件の移"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 837,
+      "current_line": 837,
+      "target": "04-fourth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 327,
+      "link_contexts": [
+        {
+          "start_column": 38,
+          "end_column": 256,
+          "text": "d:110 | \\| 五·4 \\| 单列的六笔各判去向：C30（链式保留池量化未验）、C70（跨统计量的和没人盯）、C122（分配记录不点删之后的条目数口径）（已挪 [04-fourth-txn.md](04-fourth-txn.md) 二·1）、C191（同源性计数器只盖了一对）、C284（施加一条记录在指针层上做什么没有定义）、… | 不改：不相干，这里的「项五」是里程碑三自己的「项五」（五·x 作业点），不是原「里程碑四项五（"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 843,
+      "current_line": 843,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 359,
+      "link_contexts": [
+        {
+          "start_column": 7,
+          "end_column": 224,
+          "text": "ude/kb/milestone/04-fourth-txn.md:25 | **挪出**：真盘掉电装置原是项五（并行线），用户 2026-10-16 定挪进里程碑九（[09-ninth-txn.md](09-ninth-txn.md)「四　真盘掉电装置」）；这份文件没有项五，项六的编号不改。长期老化（原出口 4、段 4、三·2，QEMU 真设备上开着快照与 GC 跑随机历史）用户 2026-1… | 不改：不相干，这一段就是新说法"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 846,
+      "current_line": 846,
+      "target": "04-fourth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 249,
+      "link_contexts": [
+        {
+          "start_column": 15,
+          "end_column": 233,
+          "text": "ilestone/05-fifth-txn.md:22 | \\| 入·2 \\| 里程碑四出口 1、2、3、5、6、7 达成（出口 4 长期老化已挪进里程碑九） \\| [04-fourth-txn.md](04-fourth-txn.md) 出口表各行 \\| 未满足：代码在工作树 `~/.local/share/singlefs/work/m4-predev`（分支 `m4-pr… | 改了：照第 4 段逐行判定的改后句子写（写回员乙；"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 847,
+      "current_line": 847,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 333,
+      "link_contexts": [
+        {
+          "start_column": 30,
+          "end_column": 247,
+          "text": "th-txn.md:27 | E10（老化：结构抗老化 vs 事后整理） 的长期老化不是入口：用户 2026-10-17 定连同里程碑四的原出口 4 一起挪进里程碑九（[09-ninth-txn.md](09-ninth-txn.md)「五　长期老化」；原话「不算，真设备已经移动到里程碑9 了， 如果里程碑4有残留一起移动」）。四·1 与五·2 不… | 不改：不相干，这一段就是新说法：「E10（老化：结构抗老化 vs 事后整理） "
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 913,
+      "current_line": 913,
+      "target": ".claude/main-agent.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 267,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 171,
+          "text": "| CLAUDE.md:12 | **所有任务从 [.claude/main-agent.md](.claude/main-agent.md) 进**：主 agent 的职责、一轮怎么开怎么收（出口、判阻塞、收拢、再判）、派出去之后怎么盯、交回怎么读、派发提示怎么写、什么时候派哪个 agent 的调度表，都在那一份。`CLAUDE.md` "
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 914,
+      "current_line": 914,
+      "target": ".claude/kb/milestone/04-fourth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 274,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 211,
+          "text": "| README.md:45 | 当前里程碑是「共享与回收」（[`.claude/kb/milestone/04-fourth-txn.md`](.claude/kb/milestone/04-fourth-txn.md)）；上一个「删除与多次 COW」（[`.claude/kb/milestone/03-third-txn.md`](.claude/… | 不改：不相干，README.md:45 已写新说法「当前里程"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 961,
+      "current_line": 961,
+      "target": "02-second-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 268,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 198,
+          "text": "| .claude/kb/milestone/03-third-txn.md:25 | **不在出口**：崩溃放量装置本身（[02-second-txn.md](02-second-txn.md)「增补 4」）、并发（项四，整项转里程碑六 [06-sixth-txn.md](06-sixth-txn.md)，用户 2026-10-11 定）、目录与 POSIX 面、快照与克隆、加密、压缩、第三"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 961,
+      "current_line": 961,
+      "target": "06-sixth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 268,
+      "link_contexts": [
+        {
+          "start_column": 37,
+          "end_column": 254,
+          "text": "md:25 | **不在出口**：崩溃放量装置本身（[02-second-txn.md](02-second-txn.md)「增补 4」）、并发（项四，整项转里程碑六 [06-sixth-txn.md](06-sixth-txn.md)，用户 2026-10-11 定）、目录与 POSIX 面、快照与克隆、加密、压缩、第三方管道、扫描… | 不改：不相干，「真设备崩溃注入已挪里程碑九，用户 2026-10-18 定」已是新说法，与结"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 1225,
+      "current_line": 1225,
+      "target": "../layout/01-first-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 308,
+      "link_contexts": [
+        {
+          "start_column": 31,
+          "end_column": 258,
+          "text": "与放置回收.md:306 | **实现的样子**：系统配置自举头有 incompat / compat_ro / compat 三张位图、各 256 位（[layout/01-first-txn.md](../layout/01-first-txn.md)「一、mkfs 已经种下的」），第一版只有 incompat 位 0 = 1（第一条纯 SSD… | 不改：不相干，这句只说发给盘的指令里至少有 discard 并指向未定项 9 的时机一段，没有说 "
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 1379,
+      "current_line": 1379,
+      "target": "09-ninth-txn.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 350,
+      "link_contexts": [
+        {
+          "start_column": 7,
+          "end_column": 224,
+          "text": "ude/kb/milestone/04-fourth-txn.md:25 | **挪出**：真盘掉电装置原是项五（并行线），用户 2026-10-16 定挪进里程碑九（[09-ninth-txn.md](09-ninth-txn.md)「四　真盘掉电装置」）；这份文件没有项五，项六的编号不改。长期老化（原出口 4、段 4、三·2，QEMU 真设备上开着快照与 GC 跑随机历史）用户 2026-1… | 不改：不相干，「的跑前登记留在"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-sync.md",
+      "old_line": 1782,
+      "current_line": 1782,
+      "target": "translation-glossary.md",
+      "source_sha256": "f54d3414b4a8e9a87a664ffb3b6c6ee3cdf2d1fa003c9b30d22cbfdc04909be8",
+      "line_length": 178,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 178,
+          "text": "| .claude/kb/INDEX.md:28 | \\| [translation-glossary.md](translation-glossary.md) \\| 翻译术语表：中、英、日三语并排，仓根 README 与 `briefs/` 的三语版本照它用词 \\| | 改了：照第 8 段逐行判定的改后句子写（写回员乙；依据以 HEAD 现查为准） |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-writeback-b.md",
+      "old_line": 81,
+      "current_line": 81,
+      "target": "04-fourth-txn.md",
+      "source_sha256": "beeb9c5fdec942bce7afac6bc90678091f12e3d4a50de93f4d65803cf4c73abf",
+      "line_length": 171,
+      "link_contexts": [
+        {
+          "start_column": 42,
+          "end_column": 171,
+          "text": "负载层 在这个里程碑立阶段（C409（常规层、大负载层在门禁里没有阶段）（已挪 [04-fourth-txn.md](… | 常规层、大负载层 的立阶段已挪里程碑四 [04-fourth-txn.md](04-fourth-txn.md) 八·3（用户 … |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-writeback-b.md",
+      "old_line": 82,
+      "current_line": 82,
+      "target": "04-fourth-txn.md",
+      "source_sha256": "beeb9c5fdec942bce7afac6bc90678091f12e3d4a50de93f4d65803cf4c73abf",
+      "line_length": 119,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 119,
+          "text": "| `milestone/03-third-txn.md:152` | 常规层、大负载层 立阶段（ | 常规层、大负载层 的立阶段已挪里程碑四 [04-fourth-txn.md](04-fourth-txn.md) 八·3（C40… |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-writeback-b.md",
+      "old_line": 85,
+      "current_line": 85,
+      "target": "04-fourth-txn.md",
+      "source_sha256": "beeb9c5fdec942bce7afac6bc90678091f12e3d4a50de93f4d65803cf4c73abf",
+      "line_length": 174,
+      "link_contexts": [
+        {
+          "start_column": 49,
+          "end_column": 174,
+          "text": "テージを本マイルストーンで開設（C409 (通常層と大規模負荷層がゲート内にステージを持たない)（[04-fo… | 、大規模負荷層のステージ開設はマイルストーン四 [04-fourth-txn.md](04-fourth-txn.md) 八·3… |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/batch-2026-10-21-writeback-b.md",
+      "old_line": 86,
+      "current_line": 86,
+      "target": "04-fourth-txn.md",
+      "source_sha256": "beeb9c5fdec942bce7afac6bc90678091f12e3d4a50de93f4d65803cf4c73abf",
+      "line_length": 122,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 122,
+          "text": "| `milestone/03-third-txn.ja.md:152` | 規模負荷層のステージ開設（ | 規模負荷層のステージ開設はマイルストーン四 [04-fourth-txn.md](04-fourth-txn.md) 八·3 へ… |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/impl-rbf-4a-tmp-evidence/report.md",
+      "old_line": 101,
+      "current_line": 101,
+      "target": "../layout/01-first-txn.md",
+      "source_sha256": "7029633dbe37bdb900ae90ba77efa755c1e24de5366ad9b7db1c0350effc3e95",
+      "line_length": 165,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 165,
+          "text": "    > **定案**：字段表 = [layout/01-first-txn.md](../layout/01-first-txn.md)「一、mkfs 已经种下的」那一节里的「系统配置字段表」，46 行，合计 **489 字节**，住 4096 字节的系统配置槽（已定项 2），槽内余 3607。字段按**可改性**重新分段："
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-b17-judge-s4.md",
+      "old_line": 116,
+      "current_line": 116,
+      "target": "../checks-owed.md",
+      "source_sha256": "5ff320eac7c05f3ff9d8db225a134e550fc58e44c49730cd73929b1c73166a7b",
+      "line_length": 578,
+      "link_contexts": [
+        {
+          "start_column": 33,
+          "end_column": 252,
+          "text": "单元原子性怎么合成.en.md:140 | 要改 | 改后：括号末句「the formula check is not yet implemented, owed in [checks-owed.md](../checks-owed.md) C743 (...)」改成中文第 140 行的译文「the formula check lives in the two readers of the root ring: read_root_ri"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-b17-judge-s4.md",
+      "old_line": 119,
+      "current_line": 119,
+      "target": "../checks-owed.md",
+      "source_sha256": "5ff320eac7c05f3ff9d8db225a134e550fc58e44c49730cd73929b1c73166a7b",
+      "line_length": 329,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 218,
+          "text": "| F13 | .claude/kb/decisions/22-单元原子性怎么合成.ja.md:140 | 要改 | 改后：括号末句「公式照合はまだ実装されておらず、[checks-owed.md](../checks-owed.md) C743 (...) に未済」改成中文第 140 行的译文（公式照合はルートリングを読む二つの読み手にある：read_root_ring_slot ... とアロケータ再構築 ... がどちらも r"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-b17-sync.md",
+      "old_line": 141,
+      "current_line": 141,
+      "target": "../checks-owed.md",
+      "source_sha256": "30909dabbde5f88757a28bdf6d06dbd304b5862a9fc4d181e4b368b36bde6c8f",
+      "line_length": 227,
+      "link_contexts": [
+        {
+          "start_column": 34,
+          "end_column": 227,
+          "text": "sizing-unit-atomicity.en.md:141` | the formula check is not yet implemented, owed in [checks-owed.md](../checks-owed.md) C743 (...) | 不改：工作区已是新句（s4 记的是改名前的 `22-单元原子性怎么合成.en.md` 第 140 行），随提交一起进 |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-b17-sync.md",
+      "old_line": 143,
+      "current_line": 143,
+      "target": "../checks-owed.md",
+      "source_sha256": "30909dabbde5f88757a28bdf6d06dbd304b5862a9fc4d181e4b368b36bde6c8f",
+      "line_length": 182,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 182,
+          "text": "| `.claude/kb/decisions/22-ユニット原子性の合成手法.ja.md:141` | 公式照合はまだ実装されておらず、[checks-owed.md](../checks-owed.md) C743 (...) に未済 | 不改：工作区已是新句（s4 记的是改名前的 `22-单元原子性怎么合成.ja.md` 第 140 行），随提交一起进 |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-noncode-sync.md",
+      "old_line": 48,
+      "current_line": 48,
+      "target": "../pitfalls.md",
+      "source_sha256": "deaed1a14b4b41d1a31c5c01114a47f2fa55d3fdfb33390018b69583637fcc5c",
+      "line_length": 328,
+      "link_contexts": [
+        {
+          "start_column": 106,
+          "end_column": 322,
+          "text": "路径 + 66 条不变量 + 129 条欠账 / 6 条路径）**零命中**，且已定项 4 自己明令「生死判定不查记账树」——不是漏写，是被堵死；唯一的消费者「快照用量」对应 [pitfalls.md](../pitfalls.md) 里标着**未决**的用户可见特性。由此**第一版不… | 不改：不相干，这是已撤回项 8 的依据：「第一版不提供每快照用量，`df` 只报全池的量」，说的是不提供每快照用量，与 df 可用口径多不多"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-noncode-sync.md",
+      "old_line": 163,
+      "current_line": 163,
+      "target": "02-second-txn.md",
+      "source_sha256": "deaed1a14b4b41d1a31c5c01114a47f2fa55d3fdfb33390018b69583637fcc5c",
+      "line_length": 317,
+      "link_contexts": [
+        {
+          "start_column": 110,
+          "end_column": 317,
+          "text": "来改，改完直接改正文，经过靠 git（`.claude/rules/changelog-format.md`「只有决策与实验有历史，别的文件没有」）。前一个里程碑是 [02-second-txn.md](02-second-txn.md)，2026-09-29 判定结… | 不改：不相干，这一句说「没做完的转进项五（五·7 到五·11）」，讲的是里程碑二没做完的事转进项五的范围，五·11 完成并不改这个归属。 |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-noncode-sync.md",
+      "old_line": 165,
+      "current_line": 165,
+      "target": "02-second-txn.md",
+      "source_sha256": "deaed1a14b4b41d1a31c5c01114a47f2fa55d3fdfb33390018b69583637fcc5c",
+      "line_length": 431,
+      "link_contexts": [
+        {
+          "start_column": 105,
+          "end_column": 323,
+          "text": "二收尾的关系」一节）；里程碑二结束那一版的简报是 `briefs/2026-09-28.md`（2026-09-29、2026-09-30 两次更新），不另写 \\| [02-second-txn.md](02-second-txn.md) 增补 2 收口表、[checks-owed.md… | 不改：载体的改动已随 f111c3f3 进 HEAD、不在这一批范围里；当时改了：验收格末句「C618（删完之后不能再建带数据的文件）、C77"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-noncode-sync.md",
+      "old_line": 207,
+      "current_line": 207,
+      "target": "02-second-txn.md",
+      "source_sha256": "deaed1a14b4b41d1a31c5c01114a47f2fa55d3fdfb33390018b69583637fcc5c",
+      "line_length": 456,
+      "link_contexts": [
+        {
+          "start_column": 105,
+          "end_column": 323,
+          "text": "二收尾的关系」一节）；里程碑二结束那一版的简报是 `briefs/2026-09-28.md`（2026-09-29、2026-09-30 两次更新），不另写 \\| [02-second-txn.md](02-second-txn.md) 增补 2 收口表、[checks-owed.md… | 不改：载体的改动已随 f111c3f3 进 HEAD、不在这一批范围里；当时改了：验收列「C618、C778 两行落点交用户」已过时（用户 2"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-w13-code-r1-main-verification.md",
+      "old_line": 22,
+      "current_line": 22,
+      "target": "../layout/01-first-txn.md",
+      "source_sha256": "28ea1f3aadba501b239ed61bc921ac2931b51f50e294d1d3c149e5bcf6e9a8d4",
+      "line_length": 211,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 209,
+          "text": "   - `.claude/kb/decisions/22-单元原子性怎么合成.md:179` 写「段序列与步数以 [layout/01-first-txn.md](../layout/01-first-txn.md) 八「mkfs 种根」那一行为准」；`.claude/kb/layout/01-first-txn.md:410` 仍是「… = 4 单元写，共 14] 屏障 [m3 根 FUA 区域 0] …」那一"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/m3-close-w13-code-r1-sonnet-output.md",
+      "old_line": 73,
+      "current_line": 73,
+      "target": "../layout/01-first-txn.md",
+      "source_sha256": "0c153d9d2ac2e3326a0cfc7feef64bd63158c6311c9c737484d61d8e28b8e8b9",
+      "line_length": 130,
+      "link_contexts": [
+        {
+          "start_column": 1,
+          "end_column": 130,
+          "text": "- 条文这一侧：「段序列与步数以 [layout/01-first-txn.md](../layout/01-first-txn.md) 八「mkfs 种根」那一行为准」（`.claude/kb/decisions/22-单元原子性怎么合成.md:179`）。"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-judgements.md",
+      "old_line": 37,
+      "current_line": 37,
+      "target": "milestone/01-first-txn.md",
+      "source_sha256": "0585f52b56e7b0bf969276c685869bb49d92c179704438d944c8eb4d70a161e1",
+      "line_length": 1715,
+      "link_contexts": [
+        {
+          "start_column": 16,
+          "end_column": 243,
+          "text": "kb/verification-build.md:238`；带日期的现状句 | 2026-09-14 现状：里程碑「新池新建文件」步 0–7 做完（[milestone/01-first-txn.md](milestone/01-first-txn.md)），覆盖了「推荐的落地顺序」那张表的第 0、2、3 步、第 1 步的大部分（门禁的未实现清单没改成按不变量逐条报）与第 4 步里的第一个真事务，第 5 步的记录核对器已接进崩溃点重放的每个崩溃状态；覆"
+        },
+        {
+          "start_column": 1035,
+          "end_column": 1262,
+          "text": "」（614 行）之前，仍开着。没核：「门禁的未实现清单没改成按不变量逐条报」今天还真不真。改后句子：「现状：里程碑「新池新建文件」步 0–7 做完（[milestone/01-first-txn.md](milestone/01-first-txn.md)），覆盖了「推荐的落地顺序」那张表的第 0、2、3 步、第 1 步的大部分（门禁的未实现清单没改成按不变量逐条报）与第 4 步里的第一个真事务，第 5 步的记录核对器已接进崩溃点重放的每个崩溃状态；覆"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-judgements.md",
+      "old_line": 37,
+      "current_line": 37,
+      "target": "milestone/01-first-txn.md",
+      "source_sha256": "0585f52b56e7b0bf969276c685869bb49d92c179704438d944c8eb4d70a161e1",
+      "line_length": 1715,
+      "link_contexts": [
+        {
+          "start_column": 16,
+          "end_column": 243,
+          "text": "kb/verification-build.md:238`；带日期的现状句 | 2026-09-14 现状：里程碑「新池新建文件」步 0–7 做完（[milestone/01-first-txn.md](milestone/01-first-txn.md)），覆盖了「推荐的落地顺序」那张表的第 0、2、3 步、第 1 步的大部分（门禁的未实现清单没改成按不变量逐条报）与第 4 步里的第一个真事务，第 5 步的记录核对器已接进崩溃点重放的每个崩溃状态；覆"
+        },
+        {
+          "start_column": 1035,
+          "end_column": 1262,
+          "text": "」（614 行）之前，仍开着。没核：「门禁的未实现清单没改成按不变量逐条报」今天还真不真。改后句子：「现状：里程碑「新池新建文件」步 0–7 做完（[milestone/01-first-txn.md](milestone/01-first-txn.md)），覆盖了「推荐的落地顺序」那张表的第 0、2、3 步、第 1 步的大部分（门禁的未实现清单没改成按不变量逐条报）与第 4 步里的第一个真事务，第 5 步的记录核对器已接进崩溃点重放的每个崩溃状态；覆"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-judgements.md",
+      "old_line": 41,
+      "current_line": 41,
+      "target": "02-second-txn.md",
+      "source_sha256": "0585f52b56e7b0bf969276c685869bb49d92c179704438d944c8eb4d70a161e1",
+      "line_length": 1388,
+      "link_contexts": [
+        {
+          "start_column": 1210,
+          "end_column": 1388,
+          "text": "l 点名项凑出来的 12 把 key 罩住映射里的 10 把」；「…新池新建文件里做不到，没做。」改「…新池新建文件里做不到，在里程碑「覆盖写、释放、回退与复用」做（[02-second-txn.md](02-second-txn.md) 增补 2 收口表第 36 行）。」历史：2026-09-14 开工；当时映射 6 条、点名项凑出 8 把 key。 |"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-judgements.md",
+      "old_line": 43,
+      "current_line": 43,
+      "target": "../../../crates/singlefs-checker/invariants/README.md",
+      "source_sha256": "0585f52b56e7b0bf969276c685869bb49d92c179704438d944c8eb4d70a161e1",
+      "line_length": 1794,
+      "link_contexts": [
+        {
+          "start_column": 502,
+          "end_column": 757,
+          "text": "内部条目 → 叶容器 → inode 记录 → extent 树 → 指针（位置提示读不到再查映射）→ 数据单元 → 前 size 字节，沿途判的不变量列在 [invariants/README.md](../../../crates/singlefs-checker/invariants/README.md)「状态」一节；单元解析在 `unit::parse_index_node` / `parse_packed_unit` / `parse_data_unit`，与 checker 那份各写各的（D13"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-judgements.md",
+      "old_line": 45,
+      "current_line": 45,
+      "target": "../layout/01-first-txn.md",
+      "source_sha256": "0585f52b56e7b0bf969276c685869bb49d92c179704438d944c8eb4d70a161e1",
+      "line_length": 2494,
+      "link_contexts": [
+        {
+          "start_column": 1118,
+          "end_column": 1345,
+          "text": "本）、(2, 8) 是第三次的；不看 journal 那一遍恢复也过同一个 oracle（另计 `ignored_violations`）。段序列登记在 [layout/01-first-txn.md](../layout/01-first-txn.md) 八的「覆盖写固定脚本流」那句与两行「装置钉住」的表格行，门禁 doc-registries 的 segment-registry 格拿那句与用例里钉的数组、闭式、写数比。还没做的（2026-09-1"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-judgements.md",
+      "old_line": 51,
+      "current_line": 51,
+      "target": "../layout/02-second-txn.md",
+      "source_sha256": "0585f52b56e7b0bf969276c685869bb49d92c179704438d944c8eb4d70a161e1",
+      "line_length": 1513,
+      "link_contexts": [
+        {
+          "start_column": 625,
+          "end_column": 853,
+          "text": "claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md` 加一节整行抄录。覆盖写、释放、回退与复用的字节登记表是 [layout/02-second-txn.md](../layout/02-second-txn.md)。管理员回退、抬 F、复用没进 E152（按里程碑对比六家文件系统的文件性能）（六家没有对应的负载）。收尾时（`crates/` 又改了四处之后）用户要求再跑一轮：2026-09-17 收尾那次正式跑"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-judgements.md",
+      "old_line": 52,
+      "current_line": 52,
+      "target": "../../../scripts/experiment-apparatus/perf-by-milestone.md",
+      "source_sha256": "0585f52b56e7b0bf969276c685869bb49d92c179704438d944c8eb4d70a161e1",
+      "line_length": 2450,
+      "link_contexts": [
+        {
+          "start_column": 1327,
+          "end_column": 1587,
+          "text": "写 3000 字节 + fsync 文件 + fsync 目录」100 次的平均，singlefs 的 344 576 字节是「覆盖写 4100 字节」一次（[perf-by-milestone.md](../../../scripts/experiment-apparatus/perf-by-milestone.md) 与 E152（按里程碑对比六家文件系统的文件性能） 实验页都写了六家没跑覆盖写），两者不是同一个负载，「1.30 倍」只能当量级参考。E152（按里程碑对比六家文件系统的文件性能） 2026-09-"
+        },
+        {
+          "start_column": 1587,
+          "end_column": 1847,
+          "text": "-17 两次正式跑量出发布 B（覆盖写 4100 字节）两盘合计写 344 576 字节、块层 26 次写请求。按单元种类拆开是字节表上的算术，不是块层分解（[perf-by-milestone.md](../../../scripts/experiment-apparatus/perf-by-milestone.md)「差距从哪来（发布 B 写的字节，算术）」）：数据单元 1 个 65 536 字节（19.0%）；元数据单元 7 个 262 144 字节（76.1%：inode 树叶容器 32 KiB，extent"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-judgements.md",
+      "old_line": 52,
+      "current_line": 52,
+      "target": "../../../scripts/experiment-apparatus/perf-by-milestone.md",
+      "source_sha256": "0585f52b56e7b0bf969276c685869bb49d92c179704438d944c8eb4d70a161e1",
+      "line_length": 2450,
+      "link_contexts": [
+        {
+          "start_column": 1327,
+          "end_column": 1587,
+          "text": "写 3000 字节 + fsync 文件 + fsync 目录」100 次的平均，singlefs 的 344 576 字节是「覆盖写 4100 字节」一次（[perf-by-milestone.md](../../../scripts/experiment-apparatus/perf-by-milestone.md) 与 E152（按里程碑对比六家文件系统的文件性能） 实验页都写了六家没跑覆盖写），两者不是同一个负载，「1.30 倍」只能当量级参考。E152（按里程碑对比六家文件系统的文件性能） 2026-09-"
+        },
+        {
+          "start_column": 1587,
+          "end_column": 1847,
+          "text": "-17 两次正式跑量出发布 B（覆盖写 4100 字节）两盘合计写 344 576 字节、块层 26 次写请求。按单元种类拆开是字节表上的算术，不是块层分解（[perf-by-milestone.md](../../../scripts/experiment-apparatus/perf-by-milestone.md)「差距从哪来（发布 B 写的字节，算术）」）：数据单元 1 个 65 536 字节（19.0%）；元数据单元 7 个 262 144 字节（76.1%：inode 树叶容器 32 KiB，extent"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    },
+    {
+      "path": "research/prompts/rot-2026-10-30-sweep-table.md",
+      "old_line": 8,
+      "current_line": 8,
+      "target": "milestone/01-first-txn.md",
+      "source_sha256": "438aecb5f557fe8a427365f81b08e41383ef7d1a7c6e21b0d7781e84d03c7a4f",
+      "line_length": 359,
+      "link_contexts": [
+        {
+          "start_column": 8,
+          "end_column": 235,
+          "text": ".claude/kb/verification-build.md:238` | 2026-09-14 现状：里程碑「新池新建文件」步 0–7 做完（[milestone/01-first-txn.md](milestone/01-first-txn.md)），覆盖了「推荐的落地顺序」那张表的第 0、2、3 步、第 1 步的大部分（门禁的未实现清单没改成按不变量逐条报）与第 4 步里的第一个真事务，第 5 步的记录核对器已接进崩溃点重放的每个崩溃状态；覆"
+        }
+      ],
+      "status": "quoted_relative_reference_requires_source_version_review",
+      "limits": "仅阅读链接附近上下文；长行和整份文档没有因此签已读/通过；引用原位置与历史源码仍待核。"
+    }
+  ]
+}

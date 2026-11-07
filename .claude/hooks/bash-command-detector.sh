@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法、在同一个 inode 上改已有脚本的写法、`rm -r` 作用在工作根本身、它的上级或工作根下第一层通配上的写法、项目子 agent 在 Bash 里起 claude 会话的写法、暂存区非空时不带具体路径清整个索引的写法（⑮）与带路径撤掉工作区里没暂存改动的写法（⑱）在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
+# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法、在同一个 inode 上改已有脚本的写法、`rm -r` 作用在工作根本身、它的上级或工作根下第一层通配上的写法、项目子 agent 在 Bash 里起 claude 会话的写法、暂存区非空时不带具体路径清整个索引的写法（⑮）与带路径撤掉工作区里没暂存改动的写法（⑱）、手拷仓副本的写法（⑳）在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
 # hook-events: PreToolUse:Bash
 # gate-similar: project-code-guard.sh 同挂 PreToolUse[Bash]、按同一个切词模块认命令位置，但它判的是不是不经 task-server 跑项目代码；这里判等待循环、放出追踪、单独的 &、覆盖产物、终止进程、同 inode 改脚本、就地改仓内文件、rm -r 通删工作根，判据没有一条相同
 # gate-similar: write-guard.sh 管 Write / Edit 的写范围与先编后换；这里 ⑧ 管有 Edit 的子 agent 绕到 Bash 里写仓内文件、⑨ 管执行员在 Bash 里写主工作区 crates/ 下的 .rs，两边判的工具不同
@@ -12,24 +12,21 @@
 #
 # 按模式找进程（`pgrep -f`、`pkill -f`、`killall`）不在这里判：上游 SOP 的 `.claude/singlefs-ai-sop/scripts/claude-hooks/pattern-process-guard.sh`
 # 在执行前拒绝（`.claude/settings.json` 里与本 hook 注册在同一条 Bash matcher 下），判据与 shell-lint 的 S2、S3 同一份、只认命令位置。
-# 这里原先自己判，判据是「这几个词出现在哪都算」，把写在 grep 参数里的词也拦了（用户 2026-09-19 定拦截放上游）。
+# 这里不判：「这几个词出现在哪都算」的判据会把写在 grep 参数里的词也拦了，所以拦截放上游。
 #
-# 为什么：2026-09-17 一个实验执行员用 `pgrep -f` 找复跑进程，接着在一个等不到的 `until` 循环里空转，
-# 主 agent 查进度才发现（records/2026-09-17-已分配口径三方与两个实验.md 第六节）。用户定：hook 不能终止任务和脚本，
-# 只负责检出问题，交给主 agent 去判断；子 agent 与脚本结不结束由主 agent 定。
+# hook 不能终止任务和脚本，只负责检出问题，交给主 agent 去判断；子 agent 与脚本结不结束由主 agent 定。
 #
 # 检出三种，写进检出记录（默认工作根下的 agent-hook-detections.jsonl，同目录 lib_work_root.py 的 default_detections_path；环境变量 AGENT_HOOK_DETECTIONS 可改），每条一行 JSON：
 #   ① 没有 `timeout` 的 `until` / `while` 等待循环（里面有 `sleep`）：等的条件不成立时会一直等（前台的在执行前拒绝，见「拒绝七种」②，拒了不再记）；
 #   ② `run_in_background` 起的命令里又自己放后台：外层 shell 当场退出（下面列的形态里，命令位置上的 disown、coproc、setsid -f、nohup … &、
 #      tmux / screen 的分离模式、systemd-run 在执行前拒绝，见「拒绝七种」③；单独的 `&` 而之后同一层没有 `wait` 的在执行前拒绝，见「拒绝七种」④；
 #      拒了不再记。这里剩下的只记：`start-stop-daemon -b`，与不带 --wait 的 setsid），
-#      harness 的完成通知当场发出，真正在跑的东西跑完不再叫醒谁（2026-09-18 一个门禁分诊员这样起门禁与三个缓存计时器，
-#      records/2026-09-16-subagent拆分提案.md 第三十三节）。认的形态：`disown`、`coproc`、`setsid -f/--fork`、同一行带单独 `&` 的 `nohup`、
+#      harness 的完成通知当场发出，真正在跑的东西跑完不再叫醒谁。认的形态：`disown`、`coproc`、`setsid -f/--fork`、同一行带单独 `&` 的 `nohup`、
 #      `tmux new(-session) … -d`、`screen -dm…`、不带 --wait/--pipe/--pty/--scope 的 `systemd-run`、`start-stop-daemon -b`（这几种按正则 SELF_DETACH 找），
 #      以及没等到的单独 `&`（不是 `&&`、`>&`、`&>`、`|&`、`<&`）：与 ④ 同一套数法（unwaited_background_jobs 按层、按圆括号逐个数 wait_coverage），
 #      不带参数的 `wait`、调用里有它的函数等齐之前的全部，`wait <进程号>…` 写了几个号等几个（每个 `&` 记了 `$!`、之后逐个 `wait "$pN"` 的算等齐），
-#      `wait -n`、`tail --pid`、`while|until … kill -0` 轮询各等一个；④ 拒了的不再记，④ 不拒的这里也不记（一百三十七节件 1b：主 agent 的
-#      `( … ) & p1=$!; ( … ) & p2=$!; wait $p1; wait $p2` 原先被正则误记；弄坏开关 background-ampersand-by-regex 退回改前的正则数法）。
+#      `wait -n`、`tail --pid`、`while|until … kill -0` 轮询各等一个；④ 拒了的不再记，④ 不拒的这里也不记（主 agent 的
+#      `( … ) & p1=$!; ( … ) & p2=$!; wait $p1; wait $p2` 不记；弄坏开关 background-ampersand-by-regex 下按正则数，会误记）。
 #      命令位置上的 setsid 前缀不带 -w / --wait（带 -f / --fork 的归 ③ 拒）：它起的那一刻若是进程组组长（包装 exec 过去、bash -c 只有这一条）就 fork 一份、
 #      自己马上退出，执行前看不出会不会是组长，照记一条（bare_setsid_forms；每一层、前缀与 capped.sh / run-with-memory-cap.sh 这类包装剥开；
 #      弄坏开关 bare-setsid-unrecorded 下不记）。
@@ -41,15 +38,13 @@
 #      （subagent_timeout_findings）。主 agent、run_in_background 的（⑩ 已拒）、没写 timeout 的、写得不是数的不记；这条命令被别的道拒了的不记。
 #      弄坏开关 subagent-timeout-unnoted 下不记。
 # 主 agent 的看门狗（scripts/agents/agent-watch.py watch）每 15 秒读一次检出记录，读到本会话的检出就退出、叫醒主 agent。
-# 两种检出都先剥掉喂给非 shell 命令的 heredoc 正文（往笔记里写一段等待循环不是在跑它；2026-09-18 撞过，
-# `records/2026-09-16-subagent拆分提案.md` 第二十五节）；喂给 bash / sh 的 heredoc 正文照查。其余只看顶层命令文本，
+# 两种检出都先剥掉喂给非 shell 命令的 heredoc 正文（往笔记里写一段等待循环不是在跑它）；喂给 bash / sh 的 heredoc 正文照查。其余只看顶层命令文本，
 # 引号里当数据写的等待循环也会被记一条，主 agent 看了判断即可。
 #
-# 判不了的（用户定「放行但必记检出」）：hook 输入不是 JSON 对象（stderr 打一行带钩子名与开头若干字节的诊断，检出记录的会话号写「读不到」）、
+# 判不了的（放行但必记检出）：hook 输入不是 JSON 对象（stderr 打一行带钩子名与开头若干字节的诊断，检出记录的会话号写「读不到」）、
 #   哪一道判的时候抛了异常、共用模块之外的库（lib_project_code_runs.py、lib_writer_lock.py、lib_write_scope.py）读不到、喂给 shell 的不是字面（见 ① 的「判不到的」）：
 #   照常执行，各记进这一条命令的检出（异常与库读不到另打一行 stderr）；这条命令被别的道拒了的，判不了的几样照记一条，结局写「被拒」。
-# ⑩ 子 agent（输入里有 agent_type）用 run_in_background 起命令：一律拒，task-server/task wait 也拒（用户 2026-11-01 定子 agent 一律不往统一任务服务交任务，
-#   records/2026-10-29-subagent拆分提案.md 第一百七十四节；子 agent 不交任务，也就没有要后台等的）。出路：这一条不起，跑项目代码的命令拼成 submit 的整条、
+# ⑩ 子 agent（输入里有 agent_type）用 run_in_background 起命令：一律拒，task-server/task wait 也拒（子 agent 一律不往统一任务服务交任务，也就没有要后台等的）。出路：这一条不起，跑项目代码的命令拼成 submit 的整条、
 #   写进报告「要主 agent 跑的命令」一节，结束本轮交回主 agent。排在最前面判，主 agent 不判（subagent_background_refusal）。弄坏开关 allow-subagent-background（一概放行）。
 # ⑬ 项目子 agent（输入里有 agent_type）在 Bash 里起 claude 会话：命令位置上的命令词是 `claude`、以 `/claude` 结尾的路径（`~/.local/bin/claude`），
 #   或 `"$CLAUDE_CODE_EXECPATH"` / `"${CLAUDE_CODE_EXECPATH}"`（会话自己那份可执行文件）。共用约束 .claude/agent-common.md「派发」一节写明子 agent 不从 Bash 里起
@@ -57,12 +52,12 @@
 #   nice / env / exec / command 这类前缀、capped.sh N、bash -c、喂给 shell 的 heredoc、命令替换里的都认；`command -v claude`、`which claude`、
 #   grep 参数里的 claude、引号里当数据写的、写进文件的 heredoc 正文不拒。拒绝说明的出路：要另起一个 agent 的活写进报告交回主 agent，由主 agent 派。
 #   另照共用模块切出的每一条命令认（launched_command_words）：here-string 与管道喂给 shell 的字面、env -S 拆出来的、名单外启动器（xargs、ssh、find -exec 这类，
-#   lib_project_code_runs.py 的 command_under_launcher 剥开）里面的 claude（正推腿乙报告第五节 Z6 与第六节；弄坏开关 claude-launch-layers-narrow 下不认）。
+#   lib_project_code_runs.py 的 command_under_launcher 剥开）里面的 claude（弄坏开关 claude-launch-layers-narrow 下不认）。
 #   shell 启动时先读的文件（BASH_ENV / ENV、--rcfile、HOME 下的 .bashrc、zsh 的 .zshenv 与 .zshrc；共用模块 launcher 为 "startup" 的命令，另有直接执行的脚本 #! 行指到的 shell 先读的，
-#   startup_files_of；一百三十七节件 8f、8g）是例外：路径是字面的（前面赋过字面值的变量先展开）、读得到的，读进来按同一套认里面起的 claude
+#   startup_files_of）是例外：路径是字面的（前面赋过字面值的变量先展开）、读得到的，读进来按同一套认里面起的 claude
 #   （startup_file_claude_launches；文件里再有这样的写法接着读，同一份只读一遍，MAXIMUM_NESTING 层为限）；路径解不出的子 agent 由
-#   project-code-guard.sh 照认不出的写法拒；弄坏开关 startup-file-claude-unread 下不读这类文件（改前的判法）。登录 shell 读的 /etc/profile 与 HOME 下的 profile、交互 bash 读的 /etc/bash.bashrc
-#   同样是共用模块交的启动文件，照这样读（三方 d137-gov-r1 判决第三段「已知没认」四类）。
+#   project-code-guard.sh 照认不出的写法拒；弄坏开关 startup-file-claude-unread 下不读这类文件。登录 shell 读的 /etc/profile 与 HOME 下的 profile、交互 bash 读的 /etc/bash.bashrc
+#   同样是共用模块交的启动文件，照这样读。
 #   bash / sh / source 起的脚本与直接执行的 shell 脚本（路径带斜杠，#! 指到 shell 或没有 #! 而扩展名是 .sh）：路径是字面的、读得到的，读正文照同一套认里面起的 claude，
 #   同一条命令里前面 cat / tee 读 heredoc 写出的拿写出的内容（file_claude_launches；与 project-code-guard.sh 读脚本正文同一个口子，cp 拷来的不认；弄坏开关 script-body-claude-unread 下不读）。
 #   别的程序里字面写着起的 claude（python -c、perl -e、awk system()、sed e、tclsh exec、git 别名 这类；共用模块 embedded_launches）照命令认，awk -f、sed -f、Makefile 读正文认
@@ -77,8 +72,8 @@
 #   或 `scripts/agents/agent-watch.py watch`——而 run_in_background 不是 true，或整条命令里有单独的 `&`、`nohup`、`disown`、`setsid`，
 #   或看门狗所在那一段把输出重定向到 /dev/null：这样起的看门狗叫不醒主 agent，等于没盯。
 #   /dev/null 只算看门狗所在那一段的（null_redirects_reaching_watchdog）：挂在别的简单命令上、又不在管道后段改标准输出的（`grep … 2>/dev/null; bash scripts/agents/watch.sh …`）
-#   不算；挂在看门狗自己、包着它的那一层（`bash -c '…' > /dev/null`、花括号与圆括号整组、`exec >/dev/null`）、管道后段改标准输出的照算。2026-09-24 主 agent 同一个会话里第三次这样起，
-#   `main-agent.md`「调用里不再加 `&`、`nohup`、`disown`」靠自觉守不住（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 5 行）。
+#   不算；挂在看门狗自己、包着它的那一层（`bash -c '…' > /dev/null`、花括号与圆括号整组、`exec >/dev/null`）、管道后段改标准输出的照算。
+#   `main-agent.md`「调用里不再加 `&`、`nohup`、`disown`」靠自觉守不住。
 #   只认命令位置：按 shell 的规矩切词（引号与 # 注释去掉；case 的模式词、`[[ … ]]` 里的词不在命令位置，共用模块的 case_patterns_and_conditionals_folded），`grep -n watch.sh`、`cat` / `tail` 读看门狗输出这类把名字当参数的不拦；
 #   `bash -c '…'`、`capped.sh N …`、`source`、`python3 脚本` 与 nice / timeout / env / taskset 这类前缀里面的照判，`bash -n`（只查语法）不算，
 #   喂给非 shell 命令的 heredoc 正文每一层都先剥掉。
@@ -87,9 +82,9 @@
 #   判不到的：变量里拼出来的命令、eval、喂给 shell 的不是字面（here-string 或 printf / echo 的参数里有变量、命令替换，管道前一段是 cat 文件或别的命令，标准输入从文件来：
 #   记一条检出，见下面「判不了的」）；喂给 shell 的 heredoc 正文里引号没配对时，其后的切词会错。
 # ② 前台（run_in_background 不是 true）的命令里有没超时的等待循环：命令位置上的 `until` / `while` 循环，条件或循环体里有一条 `sleep`
-#   （剥掉 nice / timeout 这类前缀之后命令词是 sleep），外面又没有 `timeout`。2026-09-25 代码三方攻方腿在前台跑
-#   `until grep -q '^rc=' <日志>; do sleep 10; done`，主 agent 发去的纠正消息要等它下一次调用工具才送得到，它却卡在这一次调用里，
-#   只好按 pid 从外面停掉那个循环（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 20 行）：只记检出叫得醒主 agent，叫不醒卡住的那一个。
+#   （剥掉 nice / timeout 这类前缀之后命令词是 sleep），外面又没有 `timeout`。前台的
+#   `until grep -q '^rc=' <日志>; do sleep 10; done` 卡在这一次调用里，主 agent 发去的纠正消息要等它下一次调用工具才送得到，
+#   只能按 pid 从外面停掉那个循环：只记检出叫得醒主 agent，叫不醒卡住的那一个。
 #   主 agent 与子 agent 都拒；run_in_background 里的等待循环照旧只记检出（①），只有条件或循环体里点名了本会话后台任务输出文件
 #   （`tasks/<id>.output`）的例外：等自己起的后台任务要结束本轮等完成通知，这种轮询前台、run_in_background 一样拒，外面套了 timeout 也拒。
 # ⑧ 有 Edit 工具的项目子 agent（`.claude/agents/<agent_type>.md` 的 tools 里有 Edit）在 Bash 里就地改仓内文件：命令位置上的 `sed -i`（目标不在 /tmp/ 下、也不在工作根下；相对路径从 cd 之后的目录算，见下），
@@ -99,7 +94,7 @@
 #   草稿目录照写，定义点名的脚本（replace-once.py 这类）不在这一条里。路径放在变量里的认不出。
 #   python 代码只指真要被 python 跑的：`python3 -c` 的那一段，和喂给 python 的 heredoc 正文（bash -c、命令替换、喂给 shell 的 heredoc 里的那几层也找）；
 #   喂给 cat、tee 这类别的命令的 heredoc 正文是数据，引号里当数据写的文字也不判（往草稿目录写一份脚本或笔记，正文里出现 open(…, 'w') 不是在写；
-#   改前这一半的正则在整条命令文本上跑，写草稿脚本时被误拒过；弄坏开关 heredoc-body-judged-as-commands 退回那个样子）。
+#   弄坏开关 heredoc-body-judged-as-commands 下这一半的正则在整条命令文本上跑，写草稿脚本会误拒）。
 #   经管道喂给 python 的 heredoc（`cat <<'EOF' | python3 -`、`| python3`，管道前一段是 cat，或 echo / printf 的文字）也是 python 代码，与 `python3 - <<'EOF'` 同一处判（overwrite_steps 的 PythonCode）；
 #   管道后一段是 bash / sh 的，正文照命令逐行判；管道后一段是 grep、tee 这类别的命令的，正文是数据（弄坏开关 heredoc-pipe-fed-as-data 退回正文算数据）。
 #   sed -i 一半取 overwrite_steps 的结果（与 ⑫ 同一处的 cd 跟踪，不另抄一份）：相对路径从 cd 之后的目录起算（起点是 hook 输入的 cwd，没有就是仓库根），
@@ -131,29 +126,28 @@
 # ③ 命令位置上把活放出追踪的写法：`disown`、`coproc`、`setsid -f` / `--fork`、`nohup` 而同一层有单独的 `&`、`tmux new(-session) … -d`、
 #   `screen -dm…` / `-d -m`、不带 --wait / --pipe / --pty / --scope 的 `systemd-run`——前台、run_in_background 一样拒，主 agent 与子 agent 都拒。
 #   进程移出 shell 的作业表或另起会话之后，随后的 `wait` 立刻返回、harness 的完成通知当场发出，进程成了没人追踪的孤儿接着跑
-#   （2026-09-25 一个核查员写 `… & disown 2>/dev/null || true & wait`）；`.claude/agent-common.md`「长活交回主 agent」那一条明令不用这几种，靠自觉守不住。
+#   （例：`… & disown 2>/dev/null || true & wait`）；`.claude/agent-common.md`「长活交回主 agent」那一条明令不用这几种，靠自觉守不住。
 #   每一层（`bash -c '…'`、喂给 shell 的 heredoc 正文、命令替换）都判，nice / timeout / env 这类前缀、`capped.sh N`、`bash 包装脚本` 剥开往里找；
 #   引号里当数据写的、写进文件的 heredoc 正文、注释里的不拒；`nohup` 不带 `&`、不带 -f 的 `setsid`、`systemd-run --wait` 这类会等到结束的不拒
 #   （不带 --wait 的 setsid 在 run_in_background 里照检出 ② 记一条：它是进程组组长时会 fork）；
 #   单独的 `&` 不在这一条：run_in_background 里之后没有 `wait` 的归 ④，其余照检出 ② 只记。
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、`start-stop-daemon -b`（只在 ② 里记）。
 # ④ run_in_background 为 true 的命令里，有一个作业以单独的 `&` 收尾（不是 `&&`、`>&`、`&>`、`|&`），之后同一层、同一对圆括号里再没有 `wait`
-#   （等齐它的 `wait`，数法见下面一百三十七节那一段）：外层 shell 起完它就退出，完成通知当场发出，
-#   真跑完的那个进程叫不醒任何人。2026-09-25 一天里子 agent 至少三次在 run_in_background 里写 `… > 日志 2>&1 &`
-#   （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 23 行）。主 agent 与子 agent 都拒；前台的 `… &` 不拒。
+#   （等齐它的 `wait`，数法见下面「按次序数等了几个」那一段）：外层 shell 起完它就退出，完成通知当场发出，
+#   真跑完的那个进程叫不醒任何人（例：run_in_background 里写 `… > 日志 2>&1 &`）。主 agent 与子 agent 都拒；前台的 `… &` 不拒。
 #   按共用模块切出的记号逐层判：`bash -c '…'`（capped.sh N、nice 这类包着的剥开）、喂给 shell 的 heredoc 正文、命令替换各是一层，
 #   里面的 `&` 要在同一层里等；圆括号是子 shell，`(… &); wait`、`… & (wait)` 里的 `wait` 等不到那个作业，照拒；
 #   `{ …; }`、循环与 if 的身子与外面同一层。
-#   一百三十七节起按次序数等了几个（wait_coverage；正推腿乙报告第五节 Z11–Z14）：不带参数的 wait、调用里有不带参数 wait 的函数（`w() { wait; }; … & w`）等齐之前的全部；
+#   按次序数等了几个（wait_coverage）：不带参数的 wait、调用里有不带参数 wait 的函数（`w() { wait; }; … & w`）等齐之前的全部；
 #   `wait <进程号>…` 等它写了几个号就几个，两个 `&` 只等一个的，剩下那个照拒；`wait -n`、`tail --pid`、`while|until … kill -0` 轮询各等一个（检出 ② 末那一句）。
-#   弄坏开关 partial-wait-allowed 下带进程号的 wait 照等齐算，wait-forms-unseen 下 wait -n、tail --pid、kill -0 轮询、函数里的 wait 都不算（两样都是改前的判法）。
+#   弄坏开关 partial-wait-allowed 下带进程号的 wait 照等齐算，wait-forms-unseen 下 wait -n、tail --pid、kill -0 轮询、函数里的 wait 都不算。
 #   引号里当数据写的、写进文件的 heredoc 正文、注释里的不拒。
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法。
 # ⑤ 命令位置上会整份覆盖 `research/results/` 下一个已存在、又没进 git（`git ls-files --error-unmatch` 失败）的文件：重定向 `>`、`>|`、`&>`、`>& 文件`
 #   （前面带 fd 号的 `2>` 一样截断，一样算）、不带 `-a` / `--append` 的 `tee` 写的每个文件、`cp` / `mv` / `install` 的目标（`-t 目录`、或目标是已有目录、
-#   以 `/` 结尾的，写的是 目录/源的文件名，源里的通配按这一刻的文件展开）、`dd of=`（带不带 `conv=notrunc` 都算）与 `truncate` 的文件（2026-09-25 并进来：
-#   与 ⑦ 认的是同一段 `overwrite_steps` / `follow_simple_command`，不重复判定）。2026-09-25 E158 第九段执行员用 `cp` 把 s8 同名的三份未跟踪产物整份覆盖，
-#   旧字节找不回（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 24 行）；write-guard.sh 只拦 Write / Edit 工具，拦不到 shell。
+#   以 `/` 结尾的，写的是 目录/源的文件名，源里的通配按这一刻的文件展开）、`dd of=`（带不带 `conv=notrunc` 都算）与 `truncate` 的文件（
+#   与 ⑦ 认的是同一段 `overwrite_steps` / `follow_simple_command`，不重复判定）。整份覆盖未跟踪的产物，旧字节找不回；
+#   write-guard.sh 只拦 Write / Edit 工具，拦不到 shell。
 #   进没进 git 的判法：整条命令里确定的目标路径收齐，一次 `git ls-files` 查完（tracked_verdicts）；算不出的样式（通配、变量）另按对得上的文件一次查。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。
 #   放行：`>>`、`&>>`、`tee -a` 追加；目标不存在（新文件名）；目标已进 git（`git add` 过就算，git 兜得住）；目标不在仓库根的 `research/results/` 下；
@@ -168,10 +162,9 @@
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、xargs 与 `find -exec` 起的 cp、`cp -r` 整目录拷进已有目录时里面逐个文件、
 #   `sed -i`、`sort -o`、`rsync`、`ln -f` 与 python 里 `open(…, 'w')` 这类别的写法；圆括号子 shell 里的 cd 当成对后面的命令也生效；
 #   不看 hook 输入里的 cwd（没有 cd 的相对路径一律按仓库根解析）。
-# ⑥ 终止进程只许点名一个自己起的进程号或任务号，一次一个。用户 2026-09-25 原话：「后面的脚本不能终止前面的脚本 这是核心」
-#   「另外不能动ssh 这是基本的」「终止要按照任务号 终止 禁止终止所有」。起因：2026-09-25 一个子 agent 跑 run-with-memory-cap.sh 的弄坏开关自证，
-#   自测代码读自己 cgroup 的 cgroup.procs、给里面每个进程发 TERM，而不开 scope 的那一支里它就在 SSH 会话的 session-1.scope 里：
-#   VSCode 服务端、扩展宿主、ptyHost 与 Claude 会话一起断掉（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 32 行）。
+# ⑥ 终止进程只许点名一个自己起的进程号或任务号，一次一个：后面的脚本不能终止前面的脚本，不能动 ssh，终止按任务号、禁止终止所有。
+#   为什么：读自己 cgroup 的 cgroup.procs、给里面每个进程发 TERM，而进程就在 SSH 会话的 session-1.scope 里时，
+#   VSCode 服务端、扩展宿主、ptyHost 与 Claude 会话会一起断掉。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。拒的写法：
 #   kill 的目标带负号（进程组；-1 是能发到的全部）、是 0（发命令的整个进程组）或 $PPID（会话本身）；一次给了不止一个目标；目标是命令替换
 #   （`$(pgrep …)`、`$(jobs -p)`）、数组或位置参数的整批展开、通配；在 for / while / until 循环里逐个发（`kill -0` 探活、`kill -l` 不算发）；
@@ -205,11 +198,10 @@
 #   先把 cgroup.procs 读进文件、下一条命令再读文件 kill；循环里 `bash -c "kill $p"`（里面那一层不知道自己在循环里）；python 里经 subprocess 起的 kill、
 #   Popen 的 terminate / kill；进程号写死而那一刻进程表读不到的。
 # ⑦ 在同一个 inode 上改一个已经存在的脚本（`.sh`、`.py`，或带执行位的文件；在仓里、工作根或 Claude Code 的会话临时目录根 /tmp/claude-<uid>（各会话的 scratchpad 在里面）下，两个根只在同目录 lib_work_root.py 里定义）：正在跑它的 bash 按文件偏移往下读，
-#   改完会从新内容的同一偏移接着读，读到的是别的东西。2026-09-25 `replace-once.py` 就地改了一个别的 agent 正经 `run-with-memory-cap.sh` 在跑的脚本
-#   （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 32 行）；两个工具改成改名换上之后，用户 2026-09-25 要给手敲的就地写也加闸。
-#   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。拒的写法（每一种都实测过：改之前打开文件的读者接着读到新内容）：
+#   改完会从新内容的同一偏移接着读，读到的是别的东西；手敲的就地写同样要拦。
+#   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。拒的写法（每一种都实测过：已经打开着文件的读者在改写之后接着读到新内容）：
 #   重定向 `>`、`>|`、`&>`、`>& 文件`（带 fd 号的 `2>` 一样）、`cat > 旧`；不带 `-a` / `--append` 的 `tee`；`cp` 的目标（`-f`、`-u`、`-a` 一样，写进已有目录的按 目录/源的文件名算）；
-#   `dd of=`（带不带 `conv=notrunc` 都算）；`truncate` 的文件（这两种 2026-09-25 起 ⑤ 判整份覆盖 `research/results/` 时也认，同一段 `overwrite_steps` 生成，
+#   `dd of=`（带不带 `conv=notrunc` 都算）；`truncate` 的文件（这两种 ⑤ 判整份覆盖 `research/results/` 时也认，同一段 `overwrite_steps` 生成，
 #   不重复判定）；喂给 python 的代码（`python3 -c` 与喂给它的 heredoc）里 `open(旧, 带 w 或 r+ 的模式)`（io / codecs 的 open 一样）、
 #   `Path(旧).open(同上)`、`Path(旧).write_text` / `write_bytes`、`shutil.copyfile` / `copy` / `copy2` 的目标。
 #   放行：`>>`、`&>>`、`tee -a`、python 的 `'a'` 追加（不动已经读过的偏移之前的字节）；目标不存在（新建）；目标不是脚本；目标在仓外又不在工作根与会话临时目录根下；
@@ -223,7 +215,7 @@
 # ⑪ 命令位置上的 `rm -r`（`-r`、`-R`、`--recursive`，与别的短选项合写的、写在操作数后面的都算）作用在工作根本身、它的上级，或工作根下第一层带通配的路径上
 #   （`rm -rf ~/.local/share/singlefs/work/*`、`…/work/owed-*`、`…/work/*/target`、`rm -rf /tmp/claude-<uid>/*`、`rm -rf /tmp/*`、`cd <工作根> && rm -rf *`）。
 #   工作根是同目录 lib_work_root.py 的配置值（不看它的弄坏开关）与会话临时目录根 /tmp/claude-<uid>（各会话的临时目录在里面），读不到它时按它的两条默认算。
-#   为什么：2026-10-12 主 agent 按目录名通删工作根下 506 项，别的会话在用的冻结副本、交回报告与只存在仓外的跑前登记一起没了（.claude/kb/checks-owed.md C792）。
+#   为什么：按目录名通删工作根下的目录，会把别的会话在用的冻结副本、交回报告与只存在仓外的跑前登记一起删掉（.claude/kb/checks-owed.md C792（清盘按目录名通删没有归属标记））。
 #   出路是 scripts/hosts/work-directory-ownership.sh：claim 写归属文件，sweep 只删归属是本会话、没有进程开着的，删前逐项连大小写日志。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。放行：工作根下一个具体目录（`rm -rf <工作根>/<目录>`）与它里面的通配（`<工作根>/<目录>/copy-*`）、
 #   同名前缀的兄弟目录、别处的 rm -r、不带 -r 的 rm、当数据写的（引号里、写进文件的 heredoc 正文、注释）。
@@ -239,9 +231,9 @@
 #   replace-once.py 的 文件、insert-row.py 的 文件（--line 这类选项的值不算目标）、replace-batch.py 规格 JSON 里每一项的 file（规格读不到或不是数组的，落点算不出，拒）；
 #   ledger-append-section.py 不带目标文件参数，写的是仓根下登记表 .claude/gate.d/split-proposal-ledgers.tsv 里 current 那一份账本（LedgerAppendTarget）：仓根照它自己的认法取
 #   （--root / --root= 给的；没给的是 python3 起的脚本路径解开符号链接之后往上三层；直接执行只剩脚本名，按本仓算），--root 或脚本路径算不出的照落点算不出拒，
-#   登记表读不到、current 不是恰好一行的不判（脚本自己退 2、什么都不写）；写范围里没有 records/ 的子 agent 起它就拒（调度记录批次 #19；弄坏开关 scope-ledger-append-unseen 下不认它）；
+#   登记表读不到、current 不是恰好一行的不判（脚本自己退 2、什么都不写）；写范围里没有 records/ 的子 agent 起它就拒（弄坏开关 scope-ledger-append-unseen 下不认它）；
 #   append-record.py 写的是 <记录>：第一个不是选项的参数（--root 的值不算：RECORD_APPEND_OPTIONS_WITH_VALUE），相对路径从那一刻的当前目录起算（脚本自己也这样认）；
-#   写范围里没有 records/ 的子 agent 起它往记录目录写就拒（调度记录批次 #20；弄坏开关 scope-record-append-unseen 下不认它，scope-record-append-root-as-target 下把 --root 的值当记录）；
+#   写范围里没有 records/ 的子 agent 起它往记录目录写就拒（弄坏开关 scope-record-append-unseen 下不认它，scope-record-append-root-as-target 下把 --root 的值当记录）；
 #   带 --dry-run、--selftest、-h 的不写，不算。脚本词先按同一条命令里前面赋过的值代入再比 KNOWN_WRITE_SCRIPTS（`S=scripts/kb/replace-once.py; python3 $S <文件> …` 照认；
 #   弄坏开关 scope-script-variable-unexpanded 下不代入）；python3 起的脚本词代入之后还有算不出的段（没赋过值或来源不明的变量、命令替换、for 循环变量），
 #   而第一个不是选项的参数算得出、落在本仓里的（`python3 $X .claude/kb/a.md …`），认不出起的是不是定点写脚本，照「落点算不出」拒（UnresolvedScriptTarget）；
@@ -251,9 +243,9 @@
 #   没有写范围的不判：主 agent（输入里没有 agent_type）、表里没有它那几行的定义（表只登记有 Write / Edit 的定义，这样的 agent 在 Bash 里写报告，
 #   范围写在各自定义的「写范围」里，机器没有表可比）。
 #   没有项目定义的 agent（内置类型、插件带来的、定义已删的旧实例；输入里有 agent_type 而 `.claude/agents/<名>.md` 不在）只许写工作根（BUILTIN_AGENT_SCOPE，展开同表里的
-#   $SINGLEFS_WORK_ROOT/** 那一行），与 write-guard.sh 第二道同一口径（用户 2026-10-26 定「只许写草稿目录」；records/2026-10-23-subagent拆分提案.md 第十七节 ①、第十九节 ④）：
+#   $SINGLEFS_WORK_ROOT/** 那一行），与 write-guard.sh 第二道同一口径（只许写草稿目录）：
 #   落在仓里的照上面判，落在仓外而不在工作根下的也拒（会话临时目录根 /tmp/claude-<uid> 下的同样拒；/dev/、/proc/ 下的设备与文件描述符不判：`2>/dev/null`、`> /dev/stderr` 照写）；落点算不出的同样拒。
-#   弄坏开关 builtin-agents-unjudged 退回没有项目定义的一概不判（改前的样子）。
+#   弄坏开关 builtin-agents-unjudged 下没有项目定义的一概不判。
 #   落点这一刻算不出的一律在执行前拒（静态前缀落在仓外、已在写范围里也拒：变量的值可以带 `/..` 爬回仓里，`$S/out-$f` 的 f 可以是 `x/../../<仓>/y`）：
 #   目标里有命令替换（`$(echo $f | tr / _)`）、没赋过值或来源不明的变量、`while read` 读进来的变量、来自变量的 `for` 列表（`for f in $FILES`）、通配、
 #   共用切词展开之后还留着的 `{…,…}` / `{a..b}`（一个词展开超过 BRACE_EXPANSION_LIMIT 份照原样留的、引号里写的、重定向目标上展开成几个词的：
@@ -262,7 +254,7 @@
 #   按文件写多份输出的，循环写成 `for 名字 in 写死的词` 且目标只用这些变量与写死的段，或逐条写字面路径；别的算不出的写法改成字面路径。弄坏开关 scope-undeterminable-only-noted 退回只记检出不拒。
 #   算得出的照算：命令参数上引号外的花括号由共用切词照 bash 展开成几个落点、逐个判（`tee records/{a,b}.md` 判 records/a.md 与 records/b.md 两处，范围外的那一处照拒）；同一条命令里前面赋的写死值；`for 名字 in 写死的词…`（select 同）的循环变量逐个取值，每个取值各算一次落点（bind_loop_variables、loop_value_choices；
 #   取值里的 `..` 与 / 照算，爬回仓里的照判；组合多过 MAXIMUM_LOOP_LANDINGS 种按算不出拒；弄坏开关 scope-loop-values-unknown 把写死的词也当算不出，
-#   scope-loop-landings-trusted 退回改前 plain_loop_variables 的样子、每个取值只当一个普通名字）；read / mapfile 读进来的与 `for f in $列表` 的循环变量作废，前面赋过的同名值不再用；
+#   scope-loop-landings-trusted 下每个取值只当一个普通名字）；read / mapfile 读进来的与 `for f in $列表` 的循环变量作废，前面赋过的同名值不再用；
 #   没在命令里赋过值的 `$HOME`、`${HOME}` 照 hook 自己的环境展开（home_expanded，弄坏开关 scope-home-unexpanded）。
 #   heredoc 正文只在喂给 shell（bash、sh）时照命令逐行判，喂给 python 的照 python 写文件的判法判（那是真代码），喂给 cat、tee 这类别的命令的是数据、不判，
 #   但 `cat > 目标 <<EOF`、`tee 目标 <<EOF` 的目标本身照判（弄坏开关 heredoc-body-judged-as-commands）；经管道喂给 python 的（`cat <<'EOF' | python3 -`，或 echo / printf 的文字）
@@ -284,16 +276,16 @@
 #   命令词是启动器（xargs、find -exec / -execdir / -ok、parallel、flock、/usr/bin/time 这类，名单与 lib_project_code_runs.py 的 launcher_names() 同一份）的，
 #   剥开（command_under_launcher）之后里面那条照判；xargs、find、parallel 读进来接进命令的词（`{}`、xargs 补在后面的参数）落点算不出，改文件的命令
 #   （sed -i、tee、cp、mv、> 这类）目标是它的照算不出拒（认不出的一律拒），拒绝说明写改法：逐个写字面路径（scope_launcher_inner_text；
-#   弄坏开关 scope-launcher-writes-unseen 下不认这几种，改前的样子）。启动器里面写的目标是字面路径的照落点判（`find … -exec cp {} <仓里文件> ';'` 照范围判）。
+#   弄坏开关 scope-launcher-writes-unseen 下不认这几种）。启动器里面写的目标是字面路径的照落点判（`find … -exec cp {} <仓里文件> ';'` 照范围判）。
 #   判不到的：变量里拼出来的命令（`c='sed -i …'; $c`：命令词认不出起什么，子 agent 由 project-code-guard.sh 照认不出的写法拒）、`eval "$c"` 这种代码在变量里的、
 #   `bash x.sh` 起的脚本文件里的写法、patch 与 git apply、经 subprocess 起的写法、规格在同一条命令里才写出来的 replace-batch.py。
 #
-# ⑮ 一百三十七节另认（正推腿乙报告第六节、第五节 Z2）：`git stash` / `git stash push|save`（不带 -k / --keep-index、不带路径或路径是整棵树）、`git rm --cached` 的路径是整棵树、
+# ⑮ 另认：`git stash` / `git stash push|save`（不带 -k / --keep-index、不带路径或路径是整棵树）、`git rm --cached` 的路径是整棵树、
 #   `git checkout [<提交>] -- <整棵树>` 同样清整个索引（git_other_form_clears_index；弄坏开关 whole-index-other-forms-unseen 下不认）；git 的子命令写成变量、命令替换的，
 #   前面赋过字面值的照展开再判，展开不了的认不出是不是清索引，照清索引拒（git-subcommand-unexpanded-allowed 下不认）。
 # ⑮ 暂存区非空（`git diff --cached --quiet` 退 1）时，不带具体路径清整个索引的写法：`git reset`（不带路径，--soft 之外的 --mixed、--hard、--keep、--merge 与 -q 都算，
-#   带不带 HEAD 或别的提交都算）、`git restore --staged`（-S，带不带 --worktree）的路径只有 `.`、`:/`、`:/:`、`:(top)`、`*` 这类整棵树的写法；主 agent 与子 agent 一样拒
-#   （用户 2026-10-26 定「上游补句加钩子」；records/2026-10-23-subagent拆分提案.md 第三十六节 ③ 的钩子那一半）。暂存区里可能有别的会话暂存的改动，整份清掉就是替它们撤了暂存。
+#   带不带 HEAD 或别的提交都算）、`git restore --staged`（-S，带不带 --worktree）的路径只有 `.`、`:/`、`:/:`、`:(top)`、`*` 这类整棵树的写法；主 agent 与子 agent 一样拒。
+#   暂存区里可能有别的会话暂存的改动，整份清掉就是替它们撤了暂存。
 #   带具体路径的（`git reset HEAD -- a.md`、`git restore --staged -- a.md`、`git reset a.md`）、暂存区为空的、`git reset --soft` 放行；`git -C <目录>`、`--git-dir` / `--work-tree`
 #   与 cd 跟着算，暂存区按那个目录现查；目录算不出（cd 到没赋过值的变量）的照拒（判不了空不空）。拒绝说明的出路：只清自己的路径 `git restore --staged -- <路径…>`。
 #   判不到的：git 别名、`git read-tree`、命令词 git 本身写成变量（`g=git; $g reset`；子 agent 由 project-code-guard.sh 照认不出的写法拒，主 agent 放行）、
@@ -301,7 +293,7 @@
 #   whole-index-staged-unchecked（不看暂存区空不空）、whole-index-pathspec-ignored（带路径的也当清整个索引）。
 #
 # ⑰ 往仓里的文件写字面内容，内容里有会话号、钟点或批次代号（主 agent 与子 agent 一样拒）：写闸 write-guard.sh 的第五道、第七道只看 Write / Edit / MultiEdit，
-#   Bash 里 `cat >> records/….md <<'EOF'`、`printf … >> 文件`、`… | tee -a 文件` 这类追加不过它（2026-11-02 几个会话从这条缝往记录里写进几十处会话名）。
+#   Bash 里 `cat >> records/….md <<'EOF'`、`printf … >> 文件`、`… | tee -a 文件` 这类追加不过它。
 #   认的写法（literal_writes）：cat（不带文件操作数）读 heredoc、here-string 或管道前一段的字面、echo 与 printf 的参数，经 >、>>、>|、&>、&>> 写进的；
 #   tee（带不带 -a）把 heredoc、here-string、管道前一段的字面写进的；bash -c 的代码、喂给 shell 的 heredoc、命令替换里的照认，cd 与前面赋过字面值的变量跟着算。
 #   判法（literal_notation_hits）：落点在本仓里的，照同一份判据库 ../gate.d/lib-forbidden-notations.py 的 session-names、clock-times、batch-codes 三种形态判
@@ -332,7 +324,7 @@
 #   放行：点名的路径都没有没暂存的改动（只暂存了、工作区与暂存区相同的也放）、不在仓里的路径、只动暂存区的 `git restore --staged`、git clean -n、
 #   切分支（git checkout <分支>、-b / -B / --orphan / --detach）、没点名路径的（git stash、git clean -fd：不归这一道，暂存区非空时归 ⑮）、
 #   git 报错的（不是 git 仓、路径在仓外：命令自己也跑不成）。
-#   为什么：主工作区几个会话共用，checkout / restore 一份点名的文件会整份冲掉别的会话没暂存的改动；三份已合入的文件被无声改回 HEAD 过，查不到是哪条命令（第一百三十九节）。
+#   为什么：主工作区几个会话共用，checkout / restore 一份点名的文件会整份冲掉别的会话没暂存的改动，无声改回 HEAD 之后查不到是哪条命令。
 #   出路：先 cp 一份留底（scripts/agents/copy-originals.py copy）；只撤自己那几块，把自己的块存成补丁再 `git apply -R`，别人的块照留。
 #   判不到的：git 别名、命令词 git 写成变量、`bash x.sh` 起的脚本文件里的写法、不点名路径的（`git reset --hard`、`git checkout -f`、`git switch --discard-changes`）、
 #   `git checkout <提交> -- <路径>` 与 `git restore --source <提交> --staged --worktree` 连暂存区一起盖掉的已暂存改动（这一道只看没暂存的）。
@@ -354,6 +346,22 @@
 #   Write / Edit 写 records/ 不归这一道：写闸第五道、第七道已判写进去的内容。
 #   弄坏开关：allow-record-append（一概放行）、record-append-python-unseen（不认 python 的 open(…, 'a')）、record-append-tee-unseen（不认 tee -a）、record-howto-unlisted-tool（出路写成不在直接跑名单上的脚本）。
 #   出路本身要过得了别的闸：自证把拒绝说明里的整条写法照抄（文本文件换成自证草稿里的一份）喂给同挂 PreToolUse[Bash] 的 project-code-guard.sh，主 agent 与子 agent 都要放行；
+#   hook 旁边没有 project-code-guard.sh 时这两格不判，成功句报「本次未跑」。
+# ⑳ 手拷仓副本（主 agent 与子 agent 一样拒，前台、run_in_background 一样）：命令位置上的 `rsync`、`cp -r` / `-R` / `-a`（`--recursive`、`--archive`，与别的短选项合写的、
+#   写在操作数后面的都算）的源是本仓的 crates/ 或仓根整个。为什么：手列的拷贝范围跟不上编译与测试要读的仓根条目（path 依赖指到的 prune-server/、测试 include_str! 读的 litmus/ 这类），
+#   拷出来的副本缺东西，到 cargo 编不过、测试读不到才知道（证红任务会退 2「拷贝范围跟不全 path 依赖：…编译期读的 litmus/… 在仓里没有」）。
+#   认的写法（manual_repository_copy_refusal）：源操作数（rsync 是除最后一个目的之外的，cp 是除目标之外的、给了 -t 的是全部）照 ~、前面赋过值的变量与 $HOME 展开，
+#   相对路径从 cd 之后的目录起算（起点是 hook 输入的 cwd，没有就是仓库根），规整 .. 与结尾的 / 并解开符号链接之后等于本仓根或本仓的 crates/；
+#   通配照 bash 的默认展开（不开 dotglob），展开到它们的、通配写在它们下一层整层的（仓根里的 `*`、`crates/*`）同样认；bash -c、喂给 shell 的 heredoc、命令替换、
+#   nice / timeout / env 这类前缀里的照判（共用模块 lib_shell_words.py 的 commands_at_command_position）。
+#   放行：出路本身 `python3 scripts/hosts/minimal-copy.py <仓根> <副本> --with-test-inputs`；拷草稿目录里别的东西（别的副本的 crates/、笔记）；拷 crates/ 下单个包的目录或单个文件；
+#   rsync 带 -n / --dry-run / --list-only 的、只给一个操作数的（只列不拷）；cp 不带递归的（目录拷不过去）；远端写法（主机:路径）；引号里当数据写的、写进文件的 heredoc 正文、grep 的参数。
+#   判不了的（不判，也不记）：源这一刻算不出的（没赋过值的变量、命令替换、cd 到算不出的目录之后的相对路径）、tar / git archive / cpio / install 这类别的拷法、
+#   写法在脚本文件里的（`bash x.sh`、`python3 x.py`）、只拷 crates/ 里几个包或仓根下几样别的条目拼成的副本（每一条都不是 crates/ 或仓根本身）。
+#   出路（拒绝说明里给整条写法，仓根填这一份钩子所在的仓根，副本写 <草稿目录>/copy）：`python3 scripts/hosts/minimal-copy.py <仓根> <草稿目录>/copy --with-test-inputs`，
+#   要门禁表的加 --with-gate-tables，要在副本里起仓里脚本的逐条加 --with scripts=<为什么>；吃副本的脚本（prove-red.sh --copy）开跑前另按同一份闭包核副本缺不缺。
+#   弄坏开关：allow-manual-repository-copy（一概放行）、manual-copy-howto-unlisted-tool（出路写成不在直接跑名单上的脚本）。
+#   出路本身要过得了别的闸：自证把拒绝说明里的整条写法照抄（副本换成自证草稿里的一个路径）喂给同挂 PreToolUse[Bash] 的 project-code-guard.sh，主 agent 与子 agent 都要放行；
 #   hook 旁边没有 project-code-guard.sh 时这两格不判，成功句报「本次未跑」。
 #
 # 切词、切简单命令、认命令位置、剥前缀与包装、跟 cd：同目录的 lib_shell_words.py，与 project-code-guard.sh 共用一份，按文件路径导入，
@@ -445,7 +453,7 @@
 #       「就地改脚本:命令替换里的 >」「就地改脚本:前面赋过值的变量代入」「就地改脚本:nice、timeout 包着的 cp」「就地改脚本:python3 -c 的 open(…, 'w')」「就地改脚本:python3 -c 的 open(…, 'r+')」「就地改脚本:python3 -c 的 open(…, mode='wb')」
 #       「就地改脚本:喂给 python 的 heredoc：只赋过一次的名字」「就地改脚本:喂给 python 的 heredoc：Path(…) / '…' 的 write_text」「就地改脚本:喂给 python 的 heredoc：pathlib.Path(…).write_bytes」
 #       「就地改脚本:喂给 python 的 heredoc：Path(…).open('w')」「就地改脚本:喂给 python 的 heredoc：os.path.join 与 io.open」「就地改脚本:喂给 python 的 heredoc：shutil.copyfile」
-#       「就地改脚本:喂给 python 的 heredoc：shutil.copy 进已有目录」「就地改脚本:cd 之后喂给 python 的相对路径」「就地改脚本:bash -c 里的 python3 -c」「就地改脚本:一百三十七：rsync --inplace 盖已有脚本（正推腿乙 Z8；rsync-inplace-unseen 下红）」
+#       「就地改脚本:喂给 python 的 heredoc：shutil.copy 进已有目录」「就地改脚本:cd 之后喂给 python 的相对路径」「就地改脚本:bash -c 里的 python3 -c」「就地改脚本:一百三十七：rsync --inplace 盖已有脚本（正推腿乙 Z8；rsync-inplace-unseen 下红）」（history-kept: 自证用例标签原文，按原文匹配）
 #       「就地改脚本:拒绝时报出写法与相对仓库根的路径」「就地改脚本:工作根下的脚本」「就地改脚本:会话临时目录根下的脚本」「就地改脚本:会话 scratchpad 里的脚本」「就地改脚本:⑤ 现在认 dd、truncate 覆盖未跟踪产物（与 ⑦ 共用同一段 overwrite_steps，不抄第二份）」「就地改脚本:rm 掉再写未跟踪产物，⑤ 照拒（rm 没留住旧字节）」
 #       「stdin:cp 覆盖未跟踪的产物拒绝（退出码 2）」「stdin:拒绝时 stderr 写了出路（按日期另存、先 git add 或挪到带日期的旧名）」「stdin:run_in_background 里的 > 覆盖同样拒绝（退出码 2）」「stdin:目标算不出、对得上未跟踪产物的放行（退出码 0）并记一条检出」
 #       「stdin:cp 覆盖已有脚本拒绝（退出码 2）」「stdin:拒绝时 stderr 写了出路（临时文件再 mv 换上、replace-once.py / insert-row.py 定点改）」「stdin:run_in_background 里喂给 python 的 open(…, 'w') 同样拒绝（退出码 2）」「通删工作根:工作根下通配（~ 写法）」
@@ -479,16 +487,16 @@
 #       「起 claude:d137 H9：gawk 的 system() 起 claude」「起 claude:d137 H9：sed 的 e 命令起 claude」「起 claude:d137 H9：git -c 别名 ! 起 claude」
 #       「起 claude:d137 H9：tclsh 读 here-string 里 exec 起 claude」「起 claude:d137 H9：make 读 Makefile 配方起 claude」「起 claude:d137 H9：awk -f 程序文件里 system() 起 claude」
 #       「起 claude:d137 已知没认：bash x.sh 起的脚本正文里起 claude」「起 claude:d137 已知没认：source 读进来的脚本正文里起 claude」「起 claude:d137 已知没认：直接执行的 #!/usr/bin/env bash 脚本正文里起 claude」
-#       「起 claude:d137 已知没认：同一条命令里 heredoc 写出再 bash 起，正文里起 claude」（照实测补 31 格，连上面共 517 格）
-#       「stdin:先编后换的出路经 task-server 提交、不写 capped.sh 直接起」（照实测补 1 格，连上面共 518 格；2026-11-01 照文件头逐个数顶层的引号项重数，实测，任务 6177 红 567 格）
+#       「起 claude:d137 已知没认：同一条命令里 heredoc 写出再 bash 起，正文里起 claude」
+#       「stdin:先编后换的出路经 task-server 提交、不写 capped.sh 直接起」
 #       「Bash写范围:写范围里没有 records/ 的 kb-scribe 起 ledger-append-section.py 写现行账本，拒」「Bash写范围:kb-scribe 直接执行 ledger-append-section.py 写现行账本，拒」
-#       「Bash写范围:kb-scribe 的 ledger-append-section.py --root 写成没赋过值的变量，落点算不出，拒」（这 3 格实测，任务 6177，连上面共 521 格）
+#       「Bash写范围:kb-scribe 的 ledger-append-section.py --root 写成没赋过值的变量，落点算不出，拒」
 #       「Bash写范围:写范围里没有 records/ 的 kb-scribe 起 append-record.py 往记录追加，拒」「Bash写范围:kb-scribe 直接执行 append-record.py 往记录追加，拒」
 #       「Bash写范围:kb-scribe cd 进 records 之后按相对路径起 append-record.py，拒」
 #       「Bash写范围:kb-scribe 的 append-record.py 先写 --root 再写记录，落点照第一个位置参数认，拒」
-#       「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」（批次 #20 加的 5 格实测，任务 6177，连上面共 526 格）
+#       「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」
 #       「终止进程:不是 setsid 起的后台任务的进程组 -"$leader"」「终止进程:setsid 起的后台任务的进程号又被改写过 -"$leader"」
-#       「终止进程:python -c 对没开新会话的子进程的进程组 os.killpg」「终止进程:python -c 子进程的名字又被改绑过的 os.killpg」（2026-11-05 认自己起的子进程的进程组时加的 4 格，照判法推的、还没复跑；连上面共 530 格）
+#       「终止进程:python -c 对没开新会话的子进程的进程组 os.killpg」「终止进程:python -c 子进程的名字又被改绑过的 os.killpg」
 #   BASH_COMMAND_DETECTOR_BREAK=disable-self-background  findings_for() 不检出 run_in_background 里又自己放后台的那一种：实测红的格（照失败行原文）
 #       「后台起的 nohup … & 加 disown」「后台起的命令末尾单独一个 &」「后台起的 & 在 wait 之后」「bg-notify-r1 X01」「bg-notify-r1 X02」「bg-notify-r1 X03」「bg-notify-r1 X04」「bg-notify-r1 X05」「bg-notify-r1 X06」
 #       「bg-notify-r1 X07」「bg-notify-r1 X08」「bg-notify-r1 X09」「bg-notify-r1 X10」「bg-notify-r1 X11」「bg-notify-r1 X12」「setsid -f 放后台」（共 16 格）
@@ -503,7 +511,7 @@
 #   BASH_COMMAND_DETECTOR_BREAK=allow-subagent-background  ⑩ 子 agent 的 run_in_background 也放行
 #       「stdin:子 agent 用 run_in_background 起命令拒绝（退出码 2）」「stdin:子 agent 的 run_in_background 拒绝时 stderr 写了不起、写进报告「要主 agent 跑的命令」一节、结束本轮交回的出路，不教后台等」
 #       「stdin:子 agent 后台起 task-server/task wait 7 照拒（退出码 2）」「stdin:子 agent 后台起 cd <仓根> && task-server/task wait 7 照拒（退出码 2）」
-#       「stdin:子 agent 后台起 task-server/task wait 7 && echo x 照拒（退出码 2）」「stdin:子 agent 后台起 sleep 5 照拒（退出码 2）」「stdin:子 agent 后台起 cargo build 照拒（退出码 2）」「stdin:子 agent 后台起 task-server/task wait 后面不是号照拒（退出码 2）」「stdin:子 agent 后台起 task-server/task status 照拒（退出码 2）」（共 9 格；2026-11-01 ⑩ 改成一律拒之后推的，新加的两格没跑）
+#       「stdin:子 agent 后台起 task-server/task wait 7 && echo x 照拒（退出码 2）」「stdin:子 agent 后台起 sleep 5 照拒（退出码 2）」「stdin:子 agent 后台起 cargo build 照拒（退出码 2）」「stdin:子 agent 后台起 task-server/task wait 后面不是号照拒（退出码 2）」「stdin:子 agent 后台起 task-server/task status 照拒（退出码 2）」（共 9 格）
 #   BASH_COMMAND_DETECTOR_BREAK=allow-foreground-wait-loop  ② 等待循环一律放行（前台没超时的、run_in_background 里轮询 tasks/*.output 的都放）：实测红的格（照失败行原文）
 #       「等待循环:前台 until … sleep 没超时」「等待循环:run_in_background 里轮询后台任务的输出文件」「等待循环:run_in_background 里轮询后台任务输出、外面套了 timeout 也拒」「等待循环:前台按 pid 轮询的 while kill -0」「等待循环:前台 timeout 只在循环条件里」
 #       「等待循环:前台多行写的 while true」「等待循环:前台 sleep 在循环条件里」「等待循环:前台喂给 bash 的 heredoc 里的循环」「等待循环:前台 bash -c 里没有 timeout」「等待循环:前台 capped.sh 包着的 bash -c 里没有 timeout」
@@ -537,7 +545,7 @@
 #       「先编后换:执行员 cp 草稿副本盖主工作区的入库装置」「先编后换:执行员 cat > 新建入库装置」「先编后换:执行员 >> 追加」「先编后换:执行员 tee -a」「先编后换:执行员 mv 草稿副本进 bin 目录」「先编后换:执行员 cd 进 bin 目录之后 cp 到 .」「先编后换:执行员 sed -i」「先编后换:执行员 perl -pi -e」
 #       「先编后换:执行员 rsync」「先编后换:执行员 rm 入库装置」「先编后换:执行员 mv 把入库装置挪走」「先编后换:执行员 bash -c 里 cp」「先编后换:执行员变量里的目录」「先编后换:执行员目标算不出、对得上已有的入库装置」「先编后换:执行员 python shutil.copy」「先编后换:执行员 python open(…, 'a')」
 #       「先编后换:执行员 python os.replace」「先编后换:执行员 cwd 在主工作区的 crates/ 里、相对路径写 .rs 拒」「两道包装:包着的 cp 盖主工作区入库装置拒（先编后换）」「stdin:experiment-runner cp 进主工作区的入库装置拒绝（退出码 2）」「stdin:先编后换的拒绝点名那条脚本与出路」（共 21 格）
-#       「stdin:先编后换的出路经 task-server 提交、不写 capped.sh 直接起」（照实测补 1 格，连上面共 22 格）
+#       「stdin:先编后换的出路经 task-server 提交、不写 capped.sh 直接起」
 #   BASH_COMMAND_DETECTOR_BREAK=allow-results-overwrite  ⑤ 整份覆盖 research/results/ 下未跟踪产物也放行、也不记检出：实测红的格（照失败行原文）
 #       「覆盖产物:> 覆盖未跟踪的产物」「覆盖产物:tee 不带 -a」「覆盖产物:cp 的目标（现场原句的形态）」「覆盖产物:bash -c 里的 >」「覆盖产物:>|」「覆盖产物:&>」「覆盖产物:2> 同样截断」「覆盖产物:>& 后面跟文件名」「覆盖产物:tee -i 不是追加」「覆盖产物:tee 写两份、其中一份是未跟踪的」「覆盖产物:mv 的目标」
 #       「覆盖产物:install 的目标」「覆盖产物:cp 进已有目录、源的文件名撞上」「覆盖产物:cp -t 目录」「覆盖产物:cp 源里的通配按这一刻展开」「覆盖产物:cd 进去之后写相对路径」「覆盖产物:cd 进子目录之后写」「覆盖产物:绝对路径」「覆盖产物:喂给 bash 的 heredoc 正文里的 >」「覆盖产物:命令替换里的 >」
@@ -562,7 +570,7 @@
 #       「终止进程:私有配置文件不在:systemctl stop ssh 照拒」「终止进程:私有配置里没有那两个键:systemctl stop ssh 照拒」「stdin:子 agent case 一项的命令里的 reboot 照拒（退出码 2）」「stdin:kill 负进程号拒绝（退出码 2）」「stdin:拒绝时 stderr 写了按 pid 停一个的出路」
 #       「stdin:kill 写死的 1 拒绝（退出码 2，读真的进程表）」「stdin:kill 写死的自检进程号（hook 的祖先）拒绝（退出码 2）」「stdin:run_in_background 里循环 kill 拒绝（退出码 2）」「stdin:一条命令同时踩几类时一次列全（终止进程、放出追踪、前台等待循环）」（共 82 格）
 #       「终止进程:不是 setsid 起的后台任务的进程组 -"$leader"」「终止进程:setsid 起的后台任务的进程号又被改写过 -"$leader"」
-#       「终止进程:python -c 对没开新会话的子进程的进程组 os.killpg」「终止进程:python -c 子进程的名字又被改绑过的 os.killpg」（2026-11-05 认自己起的子进程的进程组时加的 4 格，照判法推的、还没复跑；连上面共 86 格）
+#       「终止进程:python -c 对没开新会话的子进程的进程组 os.killpg」「终止进程:python -c 子进程的名字又被改绑过的 os.killpg」
 #   BASH_COMMAND_DETECTOR_BREAK=ignore-private-config  ⑥ 不读私有配置，本地模型服务的单元与进程也放行
 #       「终止进程:systemctl stop 私有配置登记的本地模型服务（不写后缀）」「终止进程:systemctl restart 私有配置登记的第二个单元」「终止进程:写死的进程号是私有配置登记的本地模型服务」（共 3 格）
 #   BASH_COMMAND_DETECTOR_BREAK=allow-script-in-place-write  ⑦ 在同一个 inode 上改已有脚本也放行：实测红的格（照失败行原文）
@@ -572,7 +580,7 @@
 #       「就地改脚本:python3 -c 的 open(…, 'w')」「就地改脚本:python3 -c 的 open(…, 'r+')」「就地改脚本:python3 -c 的 open(…, mode='wb')」「就地改脚本:喂给 python 的 heredoc：只赋过一次的名字」
 #       「就地改脚本:喂给 python 的 heredoc：Path(…) / '…' 的 write_text」「就地改脚本:喂给 python 的 heredoc：pathlib.Path(…).write_bytes」「就地改脚本:喂给 python 的 heredoc：Path(…).open('w')」
 #       「就地改脚本:喂给 python 的 heredoc：os.path.join 与 io.open」「就地改脚本:喂给 python 的 heredoc：shutil.copyfile」「就地改脚本:喂给 python 的 heredoc：shutil.copy 进已有目录」「就地改脚本:cd 之后喂给 python 的相对路径」
-#       「就地改脚本:bash -c 里的 python3 -c」「就地改脚本:一百三十七：rsync --inplace 盖已有脚本（正推腿乙 Z8；rsync-inplace-unseen 下红）」「就地改脚本:拒绝时报出写法与相对仓库根的路径」「就地改脚本:工作根下的脚本」「就地改脚本:会话临时目录根下的脚本」「就地改脚本:会话 scratchpad 里的脚本」「stdin:cp 覆盖已有脚本拒绝（退出码 2）」
+#       「就地改脚本:bash -c 里的 python3 -c」「就地改脚本:一百三十七：rsync --inplace 盖已有脚本（正推腿乙 Z8；rsync-inplace-unseen 下红）」「就地改脚本:拒绝时报出写法与相对仓库根的路径」「就地改脚本:工作根下的脚本」「就地改脚本:会话临时目录根下的脚本」「就地改脚本:会话 scratchpad 里的脚本」「stdin:cp 覆盖已有脚本拒绝（退出码 2）」（history-kept: 自证用例标签原文，按原文匹配）
 #       「stdin:拒绝时 stderr 写了出路（临时文件再 mv 换上、replace-once.py / insert-row.py 定点改）」「stdin:run_in_background 里喂给 python 的 open(…, 'w') 同样拒绝（退出码 2）」（共 47 格）
 #   BASH_COMMAND_DETECTOR_BREAK=keep-selftest-scratch  自证的临时目录走回 mkdtemp 不删（lib_selftest_scratch.py 的 keep）
 #       「通过那条路上临时目录没删」「red 那条路上临时目录没删」「crash 那条路上临时目录没删」（共 3 格）
@@ -583,16 +591,16 @@
 #       「stdin:一条命令同时踩几类时一次列全（终止进程、放出追踪、前台等待循环）」「stdin:管道喂给 python 的 heredoc 里 open(知识库, 'w') 拒绝（退出码 2，写范围拒）」（共 2 格）
 #   BASH_COMMAND_DETECTOR_BREAK=detection-outcome-dropped  检出记录不写结局（outcome：只记）：实测红的格（照失败行原文）
 #       「stdin:拒了的命令里有判不了的输入（grep 的输出经管道喂给 bash），照记一条、结局被拒」「stdin:只记的检出记录写了结局「只记」」（共 2 格）
-#   BASH_COMMAND_DETECTOR_BREAK=failure-unrecorded  判不了的几样（hook 输入不是 JSON 对象、哪一道抛异常、库读不到、喂给 shell 的不是字面）只打 stderr、不记检出（改前的样子）
+#   BASH_COMMAND_DETECTOR_BREAK=failure-unrecorded  判不了的几样（hook 输入不是 JSON 对象、哪一道抛异常、库读不到、喂给 shell 的不是字面）只打 stderr、不记检出
 #       「stdin:坏 JSON 放行（退出码 0）、stderr 写诊断、记一条检出」「stdin:不是 JSON 对象放行（退出码 0）、stderr 写诊断、记一条检出」
 #       「stdin:判的时候抛异常放行（退出码 0）、stderr 写诊断、记一条检出」「stdin:here-string 喂给 bash 的是变量放行（退出码 0）、记一条检出」
 #       「stdin:拒了的命令里有判不了的输入（grep 的输出经管道喂给 bash），照记一条、结局被拒」（共 5 格）
 #   BASH_COMMAND_DETECTOR_BREAK=allow-work-root-removal  ⑪ rm -r 作用在工作根本身、它的上级或工作根下第一层通配上也放行
 #       「通删工作根:工作根下通配（~ 写法）」「通删工作根:工作根下通配（$HOME 写法、引号里外）」「通删工作根:工作根本身」「通删工作根:工作根本身带结尾的 /」「通删工作根:会话临时目录根下通配」「通删工作根:rm -fr」「通删工作根:rm -r -f 分开写」「通删工作根:rm --recursive --force」「通删工作根:rm -r 不带 -f」「通删工作根:工作根下第一层部分通配」「通删工作根:工作根下第一层通配再往下」「通删工作根:cd 进工作根之后 rm -rf *」「通删工作根:bash -c 里」「通删工作根:nice、sudo 前缀」「通删工作根:工作根的上级」「通删工作根:$SINGLEFS_WORK_ROOT 写法」「通删工作根:/tmp/* 盖住会话临时目录根」「通删工作根:前面 export 过的变量代入」「通删工作根:选项写在操作数后面」「通删工作根:喂给 bash 的 heredoc 里」「通删工作根:D=… 之后 cd $D 进工作根再 rm -rf *」「通删工作根:cd $HOME/… 进工作根再 rm -r 第一层部分通配」「stdin:rm -rf 工作根下通配拒绝（退出码 2）」「stdin:通删工作根的拒绝写了出路（work-directory-ownership.sh 的 sweep 与 claim）」（共 24 格）
 #   （这两格在别的开关下也红：disable-check 下两格都红；allow-detaching、allow-foreground-wait-loop、allow-process-signals 下「一次列全」那一格红）
-#   BASH_COMMAND_DETECTOR_BREAK=always-read-process-table  ⑥ 命令里有数字就先整扫 /proc 读进程表（改前的做法；现在只在判到 kill / proc.py stop 的写死的进程号时才读）
+#   BASH_COMMAND_DETECTOR_BREAK=always-read-process-table  ⑥ 命令里有数字就先整扫 /proc 读进程表（正常只在判到 kill / proc.py stop 的写死的进程号时才读）
 #       「终止进程:没有终止词的带数字命令不读进程表（git log -1、sleep 2、--threads 8）」（共 1 格）
-#   BASH_COMMAND_DETECTOR_BREAK=own-session-group-unrecognized  ⑥ 不认自己用新会话起的子进程的进程组（OwnSessionGroups.is_own_group 一律交假、process_target_findings 不认 `-$名字`；改前的判法）
+#   BASH_COMMAND_DETECTOR_BREAK=own-session-group-unrecognized  ⑥ 不认自己用新会话起的子进程的进程组（OwnSessionGroups.is_own_group 一律交假、process_target_findings 不认 `-$名字`）
 #       「终止进程:setsid 起的后台任务的进程组 -"$leader"」「终止进程:python -c 对 start_new_session=True 起的子进程的进程组 os.killpg 与 os.kill(-组号)」
 #       「扫脚本:进程组:自己用 setsid 或 start_new_session=True 起的子进程的组不报」（共 3 格，照判法推的、还没复跑）
 #   BASH_COMMAND_DETECTOR_BREAK=own-session-group-session-unchecked  ⑥ 认子进程时不看起法：Popen 这一类不看 start_new_session / process_group，shell 里放后台的不看是不是 setsid、带没带 -f
@@ -604,9 +612,9 @@
 #   BASH_COMMAND_DETECTOR_BREAK=own-session-group-first-binding-only  ⑥ 认子进程与 `名字=$!` 时只看第一处绑定，后面的改绑看不见
 #       「终止进程:setsid 起的后台任务的进程号又被改写过 -"$leader"」「终止进程:python -c 子进程的名字又被改绑过的 os.killpg」
 #       「扫脚本:进程组:setsid 起的进程号又被改写过」「扫脚本:进程组:python 子进程的名字又被改绑过」（共 4 格，照判法推的、还没复跑）
-#   BASH_COMMAND_DETECTOR_BREAK=per-path-git-query  ⑤ 确定的目标一份起一次 git ls-files（改前的做法；现在收齐一次查完）
+#   BASH_COMMAND_DETECTOR_BREAK=per-path-git-query  ⑤ 确定的目标一份起一次 git ls-files（正常收齐一次查完）
 #       「覆盖产物:一条命令里两份未跟踪的目标同时判，git ls-files 只起一次」「覆盖产物:已跟踪的、未跟踪的、不存在的目标混在一起，git ls-files 只起一次」（共 2 格）
-#   BASH_COMMAND_DETECTOR_BREAK=opaque-two-logs  wrapped_commands() 不剥 scripts/hosts/two-logs.sh（改前的样子）：它包着的命令照旧看不见
+#   BASH_COMMAND_DETECTOR_BREAK=opaque-two-logs  wrapped_commands() 不剥 scripts/hosts/two-logs.sh：它包着的命令照旧看不见
 #       「两道包装:包着的前台没超时的等待循环拒」「两道包装:--quiet 包着的前台没超时的等待循环拒」「两道包装:包着的 kill 负进程号拒」「两道包装:包着的 setsid -f 拒」「两道包装:包着的 cp 盖主工作区入库装置拒（先编后换）」「Bash写范围:clerk 经 two-logs.sh 包着写知识库」（共 6 格）
 #   （同样的格在 LIB_PROJECT_CODE_RUNS_BREAK=two-logs-opaque 下也红：lib_project_code_runs.py 的 command_under_two_logs 一律交 None，剥法只有那一份）
 #   BASH_COMMAND_DETECTOR_BREAK=allow-bash-scope-write  ⑫ 有写范围的项目子 agent 在 Bash 里写写范围之外的仓内文件也放行：实测红的格（照失败行原文）
@@ -645,8 +653,8 @@
 #       「Bash写范围:写范围里没有 records/ 的 kb-scribe 起 append-record.py 往记录追加，拒」「Bash写范围:kb-scribe 直接执行 append-record.py 往记录追加，拒」
 #       「Bash写范围:kb-scribe cd 进 records 之后按相对路径起 append-record.py，拒」
 #       「Bash写范围:kb-scribe 的 append-record.py 先写 --root 再写记录，落点照第一个位置参数认，拒」
-#       「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」（共 130 格，实测，任务 6173）
-#   BASH_COMMAND_DETECTOR_BREAK=scope-known-scripts-unseen  ⑫ 不认 replace-once.py、insert-row.py、replace-batch.py 的目标文件参数（改前：只认重定向、tee、cp / mv、sed -i、python 的写法）：实测红的格（照失败行原文）
+#       「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」（共 130 格）
+#   BASH_COMMAND_DETECTOR_BREAK=scope-known-scripts-unseen  ⑫ 不认 replace-once.py、insert-row.py、replace-batch.py 的目标文件参数（只认重定向、tee、cp / mv、sed -i、python 的写法）：实测红的格（照失败行原文）
 #       「Bash写范围:clerk 用 replace-once.py 写知识库（现场：越出写范围）」「Bash写范围:clerk 直接执行 replace-once.py 写知识库」「Bash写范围:clerk 先 cd 到 records 再用相对路径写知识库」「Bash写范围:kb-scribe 用 replace-once.py 写 records 拒」
 #       「Bash写范围:clerk 用 insert-row.py 写知识库」「Bash写范围:clerk 用 replace-batch.py，规格点名知识库」「Bash写范围:clerk 脚本路径在变量里，用 replace-once.py 写知识库」「Bash写范围:clerk 脚本路径在变量里，用 insert-row.py 写知识库」
 #       「Bash写范围:clerk 脚本路径在变量里，用 replace-batch.py、规格点名知识库」「Bash写范围:clerk 直接执行变量里的 replace-once.py 写知识库」「Bash写范围:clerk 的目标在没赋过值的变量里：拒」「Bash写范围:没有项目定义的内置 agent 用 replace-once.py 写仓里拒」
@@ -657,21 +665,21 @@
 #       「Bash写范围:写范围里没有 records/ 的 kb-scribe 起 append-record.py 往记录追加，拒」「Bash写范围:kb-scribe 直接执行 append-record.py 往记录追加，拒」
 #       「Bash写范围:kb-scribe cd 进 records 之后按相对路径起 append-record.py，拒」
 #       「Bash写范围:kb-scribe 的 append-record.py 先写 --root 再写记录，落点照第一个位置参数认，拒」
-#       「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」（ledger-append-section.py、append-record.py 一并不认；共 28 格，实测，任务 6174）
-#   BASH_COMMAND_DETECTOR_BREAK=scope-ledger-append-unseen  ⑫ 不认 ledger-append-section.py 要写的现行账本（改前的样子：它不带目标文件参数，⑫ 看不出它写哪一份）
+#       「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」（ledger-append-section.py、append-record.py 一并不认；共 28 格）
+#   BASH_COMMAND_DETECTOR_BREAK=scope-ledger-append-unseen  ⑫ 不认 ledger-append-section.py 要写的现行账本（它不带目标文件参数，⑫ 看不出它写哪一份）
 #       「Bash写范围:写范围里没有 records/ 的 kb-scribe 起 ledger-append-section.py 写现行账本，拒」「Bash写范围:kb-scribe 直接执行 ledger-append-section.py 写现行账本，拒」
 #       「Bash写范围:kb-scribe 的 ledger-append-section.py --root 写成没赋过值的变量，落点算不出，拒」（共 3 格）
-#   BASH_COMMAND_DETECTOR_BREAK=scope-record-append-unseen  ⑫ 不认 append-record.py 要写的记录（改前的样子：它不在 KNOWN_WRITE_SCRIPTS 里，写范围里没有 records/ 的子 agent 起它往 records/ 写看不见）：实测红的格（任务 6171，照失败行原文）
+#   BASH_COMMAND_DETECTOR_BREAK=scope-record-append-unseen  ⑫ 不认 append-record.py 要写的记录（它不在 KNOWN_WRITE_SCRIPTS 里，写范围里没有 records/ 的子 agent 起它往 records/ 写看不见）：实测红的格（照失败行原文）
 #       「Bash写范围:写范围里没有 records/ 的 kb-scribe 起 append-record.py 往记录追加，拒」「Bash写范围:kb-scribe 直接执行 append-record.py 往记录追加，拒」
 #       「Bash写范围:kb-scribe cd 进 records 之后按相对路径起 append-record.py，拒」
 #       「Bash写范围:kb-scribe 的 append-record.py 先写 --root 再写记录，落点照第一个位置参数认，拒」
 #       「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」（共 5 格）
-#   BASH_COMMAND_DETECTOR_BREAK=scope-record-append-root-as-target  ⑫ 认 append-record.py 的记录时不跳过 --root 的值（--root 写在记录前面时把仓根当记录，落在仓外不判）：实测红的格（任务 6172，照失败行原文）
+#   BASH_COMMAND_DETECTOR_BREAK=scope-record-append-root-as-target  ⑫ 认 append-record.py 的记录时不跳过 --root 的值（--root 写在记录前面时把仓根当记录，落在仓外不判）：打开后红的格（照失败行原文）
 #       「Bash写范围:kb-scribe 的 append-record.py 先写 --root 再写记录，落点照第一个位置参数认，拒」（共 1 格）
 #   BASH_COMMAND_DETECTOR_BREAK=scope-main-agent-judged  ⑫ 把主 agent 也当成一条写范围模式都没有的子 agent 判（主 agent 写本仓的任何文件都拒）：实测红的格（照失败行原文）
 #       「Bash写范围:主 agent 写知识库放行」「Bash写范围:主 agent 的目标算不出也不判」「stdin:拒了的不记检出」「stdin:>> 追加放行（退出码 0）、不记检出」「stdin:就地改脚本拒了的不记检出」「stdin:主 agent 同一条写知识库的命令放行（退出码 0）」
 #       「stdin:写到临时文件再 mv 换上放行（退出码 0）、不记检出」「stdin:前台的同一条放行（退出码 0）」「Bash写范围:主 agent 起 ledger-append-section.py 放行」「stdin:Bash heredoc 往仓里追加干净内容放行（退出码 0）」「Bash写范围:主 agent 起 append-record.py 放行」（共 11 格，实测，任务 6176）
-#   BASH_COMMAND_DETECTOR_BREAK=scope-undeterminable-only-noted  ⑫ 落点这一刻算不出的（命令替换、没赋过值或来源不明的变量、while read 与 for $列表 的循环变量、通配、cd 算不出之后的相对路径、读不到规格的 replace-batch.py）只记检出、不拒（改前的样子）：实测红的格（照失败行原
+#   BASH_COMMAND_DETECTOR_BREAK=scope-undeterminable-only-noted  ⑫ 落点这一刻算不出的（命令替换、没赋过值或来源不明的变量、while read 与 for $列表 的循环变量、通配、cd 算不出之后的相对路径、读不到规格的 replace-batch.py）只记检出、不拒：实测红的格（照失败行原
 #       文）
 #       「Bash写范围:clerk 的目标在没赋过值的变量里：拒」「Bash写范围:clerk 重定向目标带通配：拒」「Bash写范围:clerk cd 到没赋过值的变量目录之后写相对路径：拒」「Bash写范围:一百三十七：clerk find -exec sed -i 读进来的路径，落点算不出，拒」
 #       「Bash写范围:一百三十七：clerk echo 喂给 xargs sed -i，落点算不出，拒」「Bash写范围:一百三十七：clerk xargs sed -i 写范围里的 records 也拒（落点算不出）」「Bash写范围:一百三十七：钩子进程在工作根下，clerk sed -i 没赋过值的变量照拒」
@@ -687,16 +695,16 @@
 #       「Bash写范围:模板在别的子 agent 认领的草稿目录里，拒」「Bash写范围:模板目录的归属文件是别的会话，拒」「Bash写范围:模板在 /tmp 下（不是草稿目录），拒」「Bash写范围:hook 输入里没有 agent_id，模板在草稿目录里也拒」「Bash写范围:-p 指到别的子 agent 认领的草稿目录，拒」
 #       「Bash写范围:--tmpdir= 指到别的会话的草稿目录，拒」「Bash写范围:-p 指到 /tmp（不是草稿目录），拒」「Bash写范围:-p 指到仓里的目录，拒」「Bash写范围:hook 输入里没有 agent_id，-p 指到草稿目录也拒」「Bash写范围:套一层、-p 指到别的子 agent 认领的草稿目录，拒」
 #       「Bash写范围:套一层、cd 之后接的不是 pwd，拒」「stdin:目标里有命令替换的拒绝（退出码 2）、不记检出」「stdin:算不出落点的拒绝说明点名算不出、copy-originals.py 与写死的词的 for 循环两条出路」「一百三十七：重定向目标花括号照拒，拒绝说明点名 ambiguous redirect 与改法」
-#       「Bash写范围:kb-scribe 的 ledger-append-section.py --root 写成没赋过值的变量，落点算不出，拒」「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」（共 63 格，实测，任务 6175）
+#       「Bash写范围:kb-scribe 的 ledger-append-section.py --root 写成没赋过值的变量，落点算不出，拒」「Bash写范围:kb-scribe 的 append-record.py 记录写成没赋过值的变量，落点算不出，拒」（共 63 格）
 #   BASH_COMMAND_DETECTOR_BREAK=scope-loop-values-unknown  ⑫ bind_loop_variables() 把 `for 名字 in 写死的词` 的循环变量也当算不出（不逐个取值）
 #       「Bash写范围:for b in 写死的词; do … > <草稿目录>/breaks/$b.out，放行」「Bash写范围:cd 到写死的范围内目录之后 for 循环（列表是写死的名字）里写 $d/…，放行」「Bash写范围:for f in 写死的仓内路径; do cp $f <草稿目录>/; done，放行」「Bash写范围:S=<草稿目录> 之后 for f in 写死的词 写 $S/$f.out，放行」「stdin:算不出落点的拒绝说明点名算不出、copy-originals.py 与写死的词的 for 循环两条出路」「stdin:写死的词的循环变量拼的目标放行（退出码 0）、不记检出」（共 6 格）
-#   BASH_COMMAND_DETECTOR_BREAK=scope-loop-landings-trusted  ⑫ loop_value_choices() 每个循环取值只当一个普通名字（改前 plain_loop_variables 的样子：取值里的 `..` 与 / 看不见，爬回仓里的放过去）
+#   BASH_COMMAND_DETECTOR_BREAK=scope-loop-landings-trusted  ⑫ loop_value_choices() 每个循环取值只当一个普通名字（取值里的 `..` 与 / 看不见，爬回仓里的放过去）
 #       「Bash写范围:for 的列表里有爬回仓里的 ..，落在写范围外，拒」「Bash写范围:for 的列表里有 .. 段、落点回到写范围之外，拒」「stdin:算不出落点的拒绝说明点名算不出、copy-originals.py 与写死的词的 for 循环两条出路」（共 3 格）
 #   BASH_COMMAND_DETECTOR_BREAK=scope-home-unexpanded  ⑫ home_expanded() 不展开没赋过值的 $HOME（当算不出）：实测红的格（照失败行原文）
 #       「Bash写范围:python3 起 $HOME 下的脚本不当算不出，放行」「Bash写范围:$HOME 照 hook 的环境展开，落在仓外放行」（共 2 格）
-#   BASH_COMMAND_DETECTOR_BREAK=scope-landing-lexical-only  ⑫ 落点不解开符号链接，只按字面规整 `..`（经 lib_write_scope.landings_out_of_scope 的 lexical_only 交进去；改前的样子：`<仓外的链接>/../x` 回到仓里看不见，范围内的链接指到仓里范围外、经它写进去也看不见）
+#   BASH_COMMAND_DETECTOR_BREAK=scope-landing-lexical-only  ⑫ 落点不解开符号链接，只按字面规整 `..`（经 lib_write_scope.landings_out_of_scope 的 lexical_only 交进去；`<仓外的链接>/../x` 回到仓里看不见，范围内的链接指到仓里范围外、经它写进去也看不见）
 #       「Bash写范围:仓外的符号链接指到仓内知识库，<链接>/../x 回到仓里，拒」「Bash写范围:范围内的链接指到仓里范围外的目录，经它 > 写，拒」「Bash写范围:范围内的链接指到仓里范围外的目录，经它 cp 写，拒」「Bash写范围:范围内的链接指到仓里范围外的目录，经它 replace-once.py 写，拒」「Bash写范围:范围内的链接指到仓里范围外的目录，cp 进链接（目标是目录），拒」「Bash写范围:范围外的链接指回范围内，经它写，放行」「Bash写范围:范围外的链接指到仓外，经它写的落点在仓外，不判」「stdin:范围内的链接指到仓里范围外，经它写拒绝（退出码 2）、拒绝说明写出解开符号链接之后的落点」（共 8 格）
-#   BASH_COMMAND_DETECTOR_BREAK=heredoc-body-judged-as-commands  heredoc 正文不分喂给谁，一律当命令行与 python 代码判（改前的样子：⑧ 的 python 判法在整条命令文本上跑，写进文件的正文、引号里的文字也算；overwrite_steps 
+#   BASH_COMMAND_DETECTOR_BREAK=heredoc-body-judged-as-commands  heredoc 正文不分喂给谁，一律当命令行与 python 代码判（⑧ 的 python 判法在整条命令文本上跑，写进文件的正文、引号里的文字也算；overwrite_steps 
 #       不剥喂给别的命令的 heredoc 正文，⑤ ⑦ ⑨ ⑫ 一并受影响）：实测红的格（照失败行原文）
 #       「就地改仓内文件:cd 到草稿目录里的仓副本之后 python 相对路径写 crates/ 放行」「就地改仓内文件:cd 到草稿目录里的仓副本之后 python 相对路径挪进 scripts/ 放行」「就地改仓内文件:cd 到草稿目录里的仓副本之后喂给 python 的 heredoc 相对路径写 scripts/ 放行」
 #       「就地改仓内文件:往草稿目录 cat 写脚本，heredoc 正文里的 python open(仓内路径, 'w') 是数据」「就地改仓内文件:往草稿目录 cat 写笔记，heredoc 正文里的 python Path(仓内路径).write_text 是数据」「就地改仓内文件:引号里 echo 的 open(仓内路径, 'w') 文字是数据」
@@ -708,28 +716,28 @@
 #       「就地改脚本:喂给 python 的 heredoc：Path(…).open('w')」「就地改脚本:喂给 python 的 heredoc：os.path.join 与 io.open」「就地改脚本:喂给 python 的 heredoc：shutil.copyfile」
 #       「就地改脚本:喂给 python 的 heredoc：shutil.copy 进已有目录」「就地改脚本:cd 之后喂给 python 的相对路径」「就地改脚本:写进笔记的 heredoc 正文」「stdin:run_in_background 里喂给 python 的 open(…, 'w') 同样拒绝（退出码 2）」
 #       「stdin:cat 写草稿脚本的 heredoc 正文里有 sed -i 知识库放行（退出码 0）」「stdin:管道喂给 python 的 heredoc 里 open(知识库, 'w') 拒绝（退出码 2，写范围拒）」「stdin:管道喂给 grep 的 heredoc 正文放行（退出码 0）」
-#       「往现行账本追加:喂给 python 的 heredoc 里 open(…, 'a') 拒」「往 records 追加:喂给 python 的 heredoc 里 open(…, mode='a') 拒」（共 35 格；后两格是任务 6656 复跑里报的失败行原话，推的，没单独复跑）
-#   BASH_COMMAND_DETECTOR_BREAK=sed-in-place-ignores-cd  ⑧ 的 sed -i 相对路径不跟 cd、也不看 hook 输入的 cwd（改前的样子：cd 到草稿目录之后 sed -i 相对路径照样按仓内文件拒；也不认经管道喂给 bash 的 heredoc 里的 sed -i）
+#       「往现行账本追加:喂给 python 的 heredoc 里 open(…, 'a') 拒」「往 records 追加:喂给 python 的 heredoc 里 open(…, mode='a') 拒」（共 35 格）
+#   BASH_COMMAND_DETECTOR_BREAK=sed-in-place-ignores-cd  ⑧ 的 sed -i 相对路径不跟 cd、也不看 hook 输入的 cwd（cd 到草稿目录之后 sed -i 相对路径照样按仓内文件拒；也不认经管道喂给 bash 的 heredoc 里的 sed -i）
 #       「就地改仓内文件:cd 到工作根下的草稿目录之后 sed -i 相对路径放行」「就地改仓内文件:cd 到 /tmp/ 下的目录之后 sed -i 相对路径放行」「就地改仓内文件:cd 到 // 开头写的 /tmp/ 下的目录之后 sed -i 相对路径放行」「就地改仓内文件:cd 到前面赋过值的草稿目录之后 sed -i 相对路径放行」「就地改仓内文件:管道喂给 bash 的 heredoc 里 sed -i 仓内文件照拒」「就地改仓内文件:命令开头的当前目录在草稿目录里，sed -i 相对路径放行」「stdin:cd 到草稿目录之后 sed -i 相对路径放行（退出码 0）」「stdin:hook 输入的 cwd 在 /tmp 下时 sed -i 相对路径放行（退出码 0）」（共 8 格；「// 开头写的」那一格是推的，没跑）
 #   （其中「就地改仓内文件:管道喂给 bash 的 heredoc 里 sed -i 仓内文件照拒」在 heredoc-pipe-fed-as-data 下也红）
-#   BASH_COMMAND_DETECTOR_BREAK=heredoc-pipe-fed-as-data  经管道喂给 python、bash 的 heredoc 正文与 echo / printf 的文字当数据（改前的样子：`cat <<'EOF' | python3 -` 的正文 ⑧ ⑫ 都不判）
+#   BASH_COMMAND_DETECTOR_BREAK=heredoc-pipe-fed-as-data  经管道喂给 python、bash 的 heredoc 正文与 echo / printf 的文字当数据（`cat <<'EOF' | python3 -` 的正文 ⑧ ⑫ 都不判）
 #       「就地改仓内文件:管道喂给 python3 - 的 heredoc 里 open(仓内路径, 'w') 照拒」「就地改仓内文件:管道喂给 python3（不带 -）的 heredoc 里 open(仓内路径, 'w') 照拒」「就地改仓内文件:管道喂给 python3 - 的 heredoc 里 Path(仓内路径).write_text 照拒」「就地改仓内文件:echo 的文字管道喂给 python3 - 照拒」「就地改仓内文件:管道喂给 bash 的 heredoc 里 sed -i 仓内文件照拒」「Bash写范围:clerk 管道喂给 python3 - 的 heredoc 里 open(知识库, 'w') 照拒」「Bash写范围:clerk 管道喂给 python3（不带 -）的 heredoc 里 open(知识库, 'w') 照拒」「Bash写范围:clerk cd 到 records 之后管道喂给 python3 - 的 heredoc 里相对路径写知识库照拒」「Bash写范围:clerk 管道喂给 bash 的 heredoc 里 sed -i 知识库照拒」「Bash写范围:clerk 管道喂给 bash -s 的 heredoc 里重定向写知识库照拒」「Bash写范围:clerk echo 的文字管道喂给 python3 - 写知识库照拒」「Bash写范围:clerk printf 的文字管道喂给 python3 - 写知识库照拒」「stdin:管道喂给 python 的 heredoc 里 open(知识库, 'w') 拒绝（退出码 2，写范围拒）」「stdin:管道喂给 python 的 heredoc 里 open(知识库, 'w') 同样被 ⑧ 拒（有 Edit 的子 agent 就地改仓内文件）」（共 14 格）
-#   BASH_COMMAND_DETECTOR_BREAK=pwd-variable-unexpanded  ⑫ 里 cd 到写死的目录之后 $PWD 不按那个目录展开（改前的样子：`cd <目录> && … > $PWD/x` 的目标以变量开头，只记检出）
+#   BASH_COMMAND_DETECTOR_BREAK=pwd-variable-unexpanded  ⑫ 里 cd 到写死的目录之后 $PWD 不按那个目录展开（`cd <目录> && … > $PWD/x` 的目标以变量开头，只记检出）
 #       「Bash写范围:clerk cd 到 records 之后写 $PWD/… 放行」「Bash写范围:cd 到写死的草稿目录之后写 $PWD/… 不记」「Bash写范围:cd 到写死的范围内目录之后写 $PWD/… 不记」「Bash写范围:cd 到写死的草稿目录之后 cp 进 $PWD/子目录/ 不记」「Bash写范围:cd 到写死的草稿目录之后 T=$PWD/x 再写 $T/… 不记」「stdin:cd 之后的 $PWD/… 与 mktemp -d 赋的变量放行（退出码 0）、不记检出」（共 6 格）
-#   BASH_COMMAND_DETECTOR_BREAK=mktemp-directory-unknown  ⑫ 里 `d=$(mktemp -d)` 赋的变量算不出（改前的样子：`> $d/x` 的目标以变量开头，只记检出）
+#   BASH_COMMAND_DETECTOR_BREAK=mktemp-directory-unknown  ⑫ 里 `d=$(mktemp -d)` 赋的变量算不出（`> $d/x` 的目标以变量开头，只记检出）
 #       「Bash写范围:clerk mktemp -d 建的变量目录里写放行」「Bash写范围:clerk mktemp -d 之后 cd 进去再写相对路径放行」「Bash写范围:W=$(mktemp -d) 之后 cp 进 $W/ 不记」「Bash写范围:W=`mktemp -d`（反引号）之后写 $W/… 不记」「Bash写范围:export W=$(mktemp -d) 之后写 $W/… 不记」「Bash写范围:mktemp -d 之后 cd 进去写相对路径不记」「Bash写范围:mktemp -d -t 带模板不记」「Bash写范围:mktemp --directory 不记」「stdin:cd 之后的 $PWD/… 与 mktemp -d 赋的变量放行（退出码 0）、不记检出」「Bash写范围:不带值的 --tmpdir：W=$(mktemp -d --tmpdir) 之后写进 $W/ 不记」「Bash写范围:套一层、不带 -p：T=$(cd $(mktemp -d) && pwd -P) 之后写进 $T/ 不记」（共 11 格）
 #   （「stdin:cd 之后的 $PWD/… 与 mktemp -d 赋的变量放行（退出码 0）、不记检出」在 pwd-variable-unexpanded 与 mktemp-directory-unknown 下都红）
-#   BASH_COMMAND_DETECTOR_BREAK=mktemp-scratch-template-unknown  ⑫ 里不带 -t 的 mktemp 模板一律算不出，模板目录落在自己认领的草稿目录里也一样（改前的样子）
+#   BASH_COMMAND_DETECTOR_BREAK=mktemp-scratch-template-unknown  ⑫ 里不带 -t 的 mktemp 模板一律算不出，模板目录落在自己认领的草稿目录里也一样
 #       「Bash写范围:模板在自己认领的草稿目录里：T=$(mktemp -d $W/名.XXXXXX) 之后 cp 进 $T/ 不记」「Bash写范围:模板在自己认领的草稿目录里：直接写进 $(mktemp -d …)/文件 不记」「Bash写范围:cd 进自己认领的草稿目录之后模板写相对路径不记」「Bash写范围:还没有认领文件、派发回执对得上那把锁：模板在它的草稿目录里不记」「stdin:模板在自己认领的草稿目录里的 mktemp -d 放行（退出码 0）、不记检出」（共 5 格）
 #   BASH_COMMAND_DETECTOR_BREAK=mktemp-template-owner-unchecked  own_scratch_directory() 不看归属文件与写者锁，工作根下的目录一律当自己认领的
 #       「Bash写范围:派发回执对不上那把锁（别的子 agent）：拒」「Bash写范围:模板在别的子 agent 认领的草稿目录里，拒」「Bash写范围:模板目录的归属文件是别的会话，拒」「Bash写范围:-p 指到别的子 agent 认领的草稿目录，拒」「Bash写范围:--tmpdir= 指到别的会话的草稿目录，拒」「Bash写范围:套一层、-p 指到别的子 agent 认领的草稿目录，拒」（共 6 格）
-#   BASH_COMMAND_DETECTOR_BREAK=mktemp-option-directory-unknown  ⑫ 里 `mktemp -d -p <目录>`、`--tmpdir=<目录>` 与不带值的 `--tmpdir` 一概算不出（改前的样子）
+#   BASH_COMMAND_DETECTOR_BREAK=mktemp-option-directory-unknown  ⑫ 里 `mktemp -d -p <目录>`、`--tmpdir=<目录>` 与不带值的 `--tmpdir` 一概算不出
 #       「Bash写范围:-p 指到自己认领的草稿目录：T=$(mktemp -d -p "$W") 之后写进 $T/ 不记」「Bash写范围:--tmpdir= 指到自己认领的草稿目录（带模板名）：cp 进 $T/ 不记」「Bash写范围:cd 进自己认领的草稿目录之后 -p . 不记」「Bash写范围:直接写进 $(mktemp -d -p …)/文件 不记」「Bash写范围:不带值的 --tmpdir：W=$(mktemp -d --tmpdir) 之后写进 $W/ 不记」「Bash写范围:套一层 cd 加 pwd -P：T=$(cd $(mktemp -d -p "$W") && pwd -P) 之后写进 $T/ 不记」「Bash写范围:套一层、反引号写法：T=`cd $(mktemp -d -p …) && pwd` 之后写进 $T/ 不记」「Bash写范围:套一层、直接写进 $(cd $(mktemp -d -p …) && pwd -P)/文件 不记」（共 8 格）
-#   BASH_COMMAND_DETECTOR_BREAK=mktemp-nested-substitution-unknown  ⑫ 里 `$(cd $(mktemp …) && pwd -P)` 这种套在别的命令替换里的 mktemp 算不出（改前的样子）
+#   BASH_COMMAND_DETECTOR_BREAK=mktemp-nested-substitution-unknown  ⑫ 里 `$(cd $(mktemp …) && pwd -P)` 这种套在别的命令替换里的 mktemp 算不出
 #       「Bash写范围:套一层 cd 加 pwd -P：T=$(cd $(mktemp -d -p "$W") && pwd -P) 之后写进 $T/ 不记」「Bash写范围:套一层、不带 -p：T=$(cd $(mktemp -d) && pwd -P) 之后写进 $T/ 不记」「Bash写范围:套一层、反引号写法：T=`cd $(mktemp -d -p …) && pwd` 之后写进 $T/ 不记」「Bash写范围:套一层、直接写进 $(cd $(mktemp -d -p …) && pwd -P)/文件 不记」（共 4 格）
-#   BASH_COMMAND_DETECTOR_BREAK=break-honored-outside-selftest  平常跑设了弄坏开关也照认，不拒（改前的样子）；它是关守卫项，只在单独一项时认，与别的项同写照拒
+#   BASH_COMMAND_DETECTOR_BREAK=break-honored-outside-selftest  平常跑设了弄坏开关也照认，不拒；它是关守卫项，只在单独一项时认，与别的项同写照拒
 #       「平常跑设了弄坏开关：退 2 并点名只在自证里认」（共 1 格）
-#   BASH_COMMAND_DETECTOR_BREAK=pending-outside-scanned-as-stale  --scan-scripts 把待改清单里落在这一趟没扫的目录下的行也判成「一处要放行的都没有」（改前的样子）：实测红的格（照失败行原文）
+#   BASH_COMMAND_DETECTOR_BREAK=pending-outside-scanned-as-stale  --scan-scripts 把待改清单里落在这一趟没扫的目录下的行也判成「一处要放行的都没有」：实测红的格（照失败行原文）
 #       「扫脚本:待改清单里的行所在的目录这一趟没扫：退出码 0、报本次未判」「扫脚本:待改清单里的行所在的目录这一趟没扫：往 GATE_NOT_RUN_FILE 报一行」（共 2 格）
 #   BASH_COMMAND_DETECTOR_BREAK=allow-subagent-claude-launch  ⑬ 子 agent 在 Bash 里起 claude 会话也放行：实测红的格（照失败行原文）
 #       「起 claude:子 agent 命令位置上的 claude -p」「起 claude:子 agent 经 "$CLAUDE_CODE_EXECPATH" 起」「起 claude:子 agent 经 ${CLAUDE_CODE_EXECPATH} 起」「起 claude:子 agent 起以 /claude 结尾的可执行文件」
@@ -748,22 +756,22 @@
 #       「起 claude:d137 H9：gawk 的 system() 起 claude」「起 claude:d137 H9：sed 的 e 命令起 claude」「起 claude:d137 H9：git -c 别名 ! 起 claude」
 #       「起 claude:d137 H9：tclsh 读 here-string 里 exec 起 claude」「起 claude:d137 H9：make 读 Makefile 配方起 claude」「起 claude:d137 H9：awk -f 程序文件里 system() 起 claude」
 #       「起 claude:d137 已知没认：bash x.sh 起的脚本正文里起 claude」「起 claude:d137 已知没认：source 读进来的脚本正文里起 claude」「起 claude:d137 已知没认：直接执行的 #!/usr/bin/env bash 脚本正文里起 claude」
-#       「起 claude:d137 已知没认：同一条命令里 heredoc 写出再 bash 起，正文里起 claude」（照实测补 17 格，连上面共 47 格）
+#       「起 claude:d137 已知没认：同一条命令里 heredoc 写出再 bash 起，正文里起 claude」
 #   BASH_COMMAND_DETECTOR_BREAK=subagent-timeout-unnoted  检出 ③ 子 agent 前台 timeout 超过 240000 毫秒不记
 #       「超时检出:子 agent 前台 timeout 600000 毫秒记」「超时检出:子 agent 前台 timeout 写成字符串 300000 也记」
 #       「stdin:子 agent 前台 timeout 600000 毫秒放行（退出码 0）、记一条检出」（共 3 格）
-#   BASH_COMMAND_DETECTOR_BREAK=python-move-into-repository-unseen  ⑧ 的 python 一半退回改前的样子：不认 os.replace / os.rename / shutil.move 的目标，前缀不含 scripts/
+#   BASH_COMMAND_DETECTOR_BREAK=python-move-into-repository-unseen  ⑧ 的 python 一半不认 os.replace / os.rename / shutil.move 的目标，前缀不含 scripts/
 #       「就地改仓内文件:执行员 python os.replace 把草稿挪进 scripts/ 下的入库装置」「就地改仓内文件:执行员 python os.rename 挪进知识库（源是变量）」
 #       「就地改仓内文件:执行员 python shutil.move 挪进仓根起的绝对路径」「就地改仓内文件:执行员 python shutil.move 用 dst= 挪进 scripts/」
 #       「就地改仓内文件:执行员 python open(scripts/ 下的文件, 'w')」（共 5 格）
-#   BASH_COMMAND_DETECTOR_BREAK=python-relative-path-ignores-cd  ⑧ 的 python 一半相对路径不跟 cd、一律按仓内判（改前的样子：cd 进草稿目录里的仓副本再写 crates/…、scripts/… 也拒）：实测红的格（照失败行原文）
+#   BASH_COMMAND_DETECTOR_BREAK=python-relative-path-ignores-cd  ⑧ 的 python 一半相对路径不跟 cd、一律按仓内判（cd 进草稿目录里的仓副本再写 crates/…、scripts/… 也拒）：实测红的格（照失败行原文）
 #       「就地改仓内文件:cd 到草稿目录里的仓副本之后 python 相对路径写 crates/ 放行」「就地改仓内文件:cd 到草稿目录里的仓副本之后 python 相对路径挪进 scripts/ 放行」「就地改仓内文件:cd 到草稿目录里的仓副本之后喂给 python 的 heredoc 相对路径写 scripts/ 放行」（共 3 格）
-#   BASH_COMMAND_DETECTOR_BREAK=scope-script-variable-unexpanded  ⑫ 的脚本词不代入前面赋过的值，代入不出的也不交 UnresolvedScriptTarget（改前的样子）
+#   BASH_COMMAND_DETECTOR_BREAK=scope-script-variable-unexpanded  ⑫ 的脚本词不代入前面赋过的值，代入不出的也不交 UnresolvedScriptTarget
 #       「Bash写范围:clerk 脚本路径在变量里，用 replace-once.py 写知识库」「Bash写范围:clerk 脚本路径在变量里，用 insert-row.py 写知识库」
 #       「Bash写范围:clerk 脚本路径在变量里，用 replace-batch.py、规格点名知识库」「Bash写范围:clerk 直接执行变量里的 replace-once.py 写知识库」
 #       「Bash写范围:python3 起没赋过值的变量里的脚本、第一个参数落在知识库，拒」「Bash写范围:python3 起没赋过值的变量里的脚本、第一个参数落在写范围里的 records 也拒」
 #       「Bash写范围:python3 起命令替换给的脚本、第一个参数是仓根起的绝对路径，拒」（共 7 格）
-#   BASH_COMMAND_DETECTOR_BREAK=builtin-agents-unjudged  ⑫ 没有项目定义的 agent 一概不判（改前的样子：内置类型、定义已删的旧实例写仓里、写仓外别处都放过）：实测红的格（照失败行原文）
+#   BASH_COMMAND_DETECTOR_BREAK=builtin-agents-unjudged  ⑫ 没有项目定义的 agent 一概不判（内置类型、定义已删的旧实例写仓里、写仓外别处都放过）：实测红的格（照失败行原文）
 #       「Bash写范围:没有项目定义的内置 agent 写仓里拒」「Bash写范围:没有项目定义的内置 agent 写仓外别处拒」「Bash写范围:没有项目定义的内置 agent 写会话临时目录根拒（scratchpad 之外）」「Bash写范围:没有项目定义的内置 agent 写会话 scratchpad 拒」「Bash写范围:没有项目定义的内置 agent 用 replace-once.py 写仓里拒」「Bash写范围:定义已删的旧实例写仓里拒」（共 6 格）
 #   BASH_COMMAND_DETECTOR_BREAK=allow-whole-index-reset  ⑮ 暂存区非空时不带具体路径清整个索引的写法也放行：实测红的格（照失败行原文）
 #       「一百三十七：暂存区非空时 git stash 照拒（退出码 2）」「一百三十七：暂存区非空时 git rm -r --cached . 照拒（退出码 2）」「一百三十七：暂存区非空时 git checkout HEAD -- . 照拒（退出码 2）」「一百三十七：暂存区非空时子命令写成没赋过值的变量照拒（退出码 2）」「清整个索引:git reset 拒」
@@ -791,12 +799,12 @@
 #   BASH_COMMAND_DETECTOR_BREAK=path-discard-staged-counted  ⑱ git restore --staged 也当动工作区
 #       「撤工作区改动:git restore --staged 有改动的路径放行（只动暂存区）」「撤工作区改动:git restore -S 有改动的路径放行（只动暂存区）」（共 2 格）
 #   BASH_COMMAND_DETECTOR_BREAK=break-honored-outside-selftest-with-others  带标记的自证子进程里，关守卫项 break-honored-outside-selftest 与别的项同写也照认
-#       （改前的样子：写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒；records/2026-10-23-subagent拆分提案.md 第一百二十二节 ②）
+#       （写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
 #       「关守卫项与别的项同写：带标记的子进程里也退 2 并点名它」（共 1 格）
 #   LIB_SHELL_WORDS_BREAK=shell-standard-input-unread  共用模块 lib_shell_words.py 不把 here-string 与管道喂给 shell 的文本当命令再切、也不交判不了的说明：实测红的格（照失败行原文）
 #       「stdin:here-string 喂给 bash 的是变量放行（退出码 0）、记一条检出」「stdin:拒了的命令里有判不了的输入（grep 的输出经管道喂给 bash），照记一条、结局被拒」「stdin:here-string 里前台起看门狗照拒（退出码 2）」
 #       「一百三十七：子 agent here-string 喂给 bash 的 claude 照拒（退出码 2）」（共 4 格）
-#   LIB_SHELL_WORDS_BREAK=startup-files-unread  共用模块 lib_shell_words.py startup_file_words() 一个文件都不交，shell 启动时先读的文件（BASH_ENV / ENV、--rcfile、.bashrc、zsh 的）都不当被起的脚本（一百三十七节件 8f、8g，改前的判法）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=startup-files-unread  共用模块 lib_shell_words.py startup_file_words() 一个文件都不交，shell 启动时先读的文件（BASH_ENV / ENV、--rcfile、.bashrc、zsh 的）都不当被起的脚本：实测红的格（照失败行原文）
 #       「起 claude:一百三十七：子 agent BASH_ENV 指到的脚本里起 claude」「起 claude:一百三十七：子 agent env BASH_ENV=… 起 bash，脚本里起 claude」「起 claude:一百三十七：子 agent 前面 export BASH_ENV 再起 bash，脚本里起 claude」
 #       「起 claude:一百三十七：子 agent ENV 指到的脚本里起 claude，sh 起的」「起 claude:一百三十七：子 agent BASH_ENV 写相对路径，按命令开头的当前目录解」「起 claude:一百三十七：子 agent 直接执行 #!/bin/bash 的脚本，BASH_ENV 指到的脚本里起 claude」
 #       「起 claude:一百三十七：子 agent 直接执行 #!/bin/sh 的脚本，ENV 指到的脚本里起 claude」「起 claude:一百三十七：子 agent declare -x BASH_ENV 之后起 bash，脚本里起 claude」「起 claude:一百三十七：子 agent typeset -x BASH_ENV 之后起 bash，脚本里起 claude」
@@ -804,18 +812,18 @@
 #       「起 claude:一百三十七：子 agent sh -i 读 ENV 指到的脚本里起 claude」「起 claude:一百三十七：子 agent zsh 读 ZDOTDIR 下的 .zshenv 里起 claude」（共 14 格）
 #       「起 claude:d137 已知没认：登录 bash -l 读 HOME 下的 .bash_profile 里起 claude」「起 claude:d137 已知没认：登录 exec -l bash 照登录 shell 读 .bash_profile 里起 claude」
 #       「起 claude:d137 已知没认：登录 sh -l 读 HOME 下的 .profile 里起 claude」「起 claude:d137 已知没认：系统级 bash -l 读 /etc/profile（样本目录）里起 claude」
-#       「起 claude:d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录）里起 claude」（照实测补 5 格，连上面共 19 格）
-#   LIB_SHELL_WORDS_BREAK=declared-exports-unseen  共用模块 lib_shell_words.py 环境里的变量只认 `export 名字=值`（declare -x、typeset -x、local -x、先赋值后 export、先 export 后赋值、export -n、declare +x、set -a 都不认；一百三十七节件 8g，改前的判法）：实测红的格（照失败行原文）
+#       「起 claude:d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录）里起 claude」
+#   LIB_SHELL_WORDS_BREAK=declared-exports-unseen  共用模块 lib_shell_words.py 环境里的变量只认 `export 名字=值`（declare -x、typeset -x、local -x、先赋值后 export、先 export 后赋值、export -n、declare +x、set -a 都不认）：实测红的格（照失败行原文）
 #       「起 claude:一百三十七：子 agent declare -x BASH_ENV 之后起 bash，脚本里起 claude」「起 claude:一百三十七：子 agent typeset -x BASH_ENV 之后起 bash，脚本里起 claude」「起 claude:一百三十七：子 agent 先赋值后 export BASH_ENV，再起 bash，脚本里起 claude」
 #       「起 claude:一百三十七：子 agent export -n 撤掉 BASH_ENV 之后起 bash」（共 4 格）
-#   LIB_SHELL_WORDS_BREAK=interactive-startup-files-unread  共用模块 lib_shell_words.py 带 -i 不另看（交互的 bash 照旧读 BASH_ENV、不读 .bashrc 与 --rcfile / --init-file；一百三十七节件 8g，改前的判法）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=interactive-startup-files-unread  共用模块 lib_shell_words.py 带 -i 不另看（交互的 bash 照旧读 BASH_ENV、不读 .bashrc 与 --rcfile / --init-file）：实测红的格（照失败行原文）
 #       「起 claude:一百三十七：子 agent bash -i 读 HOME 下的 .bashrc 里起 claude」「起 claude:一百三十七：子 agent bash --rcfile 文件 -i，文件里起 claude」「起 claude:一百三十七：子 agent bash -i 不读 BASH_ENV，.bashrc 里没有 claude」（共 3 格）
-#       「起 claude:d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录）里起 claude」（照实测补 1 格，连上面共 4 格）
-#   LIB_SHELL_WORDS_BREAK=zsh-startup-files-unread  共用模块 lib_shell_words.py zsh 的 .zshenv、.zshrc 不读（一百三十七节件 8g）：实测红的格（照失败行原文）
+#       「起 claude:d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录）里起 claude」
+#   LIB_SHELL_WORDS_BREAK=zsh-startup-files-unread  共用模块 lib_shell_words.py zsh 的 .zshenv、.zshrc 不读：实测红的格（照失败行原文）
 #       「起 claude:一百三十七：子 agent zsh 读 ZDOTDIR 下的 .zshenv 里起 claude」（共 1 格）
-#   LIB_SHELL_WORDS_BREAK=executed-script-startup-unread  共用模块 lib_shell_words.py 直接执行的脚本起来时它的 shell 先读的启动文件不读，#! 指到认不出的解释器的也不判（一百三十七节件 8g）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=executed-script-startup-unread  共用模块 lib_shell_words.py 直接执行的脚本起来时它的 shell 先读的启动文件不读，#! 指到认不出的解释器的也不判：实测红的格（照失败行原文）
 #       「起 claude:一百三十七：子 agent 直接执行 #!/bin/bash 的脚本，BASH_ENV 指到的脚本里起 claude」「起 claude:一百三十七：子 agent 直接执行 #!/bin/sh 的脚本，ENV 指到的脚本里起 claude」（共 2 格）
-#   同一批回归修补里的边角（三方 shell-words-r1 正推腿报告 W3、W4、W5 三节）两个开关：
+#   共用模块的边角开关：
 #   LIB_SHELL_WORDS_BREAK=redirect-fd-dropped  共用模块把 `2> 文件` 也当改标准输出：实测红的格（照失败行原文）
 #       「看门狗:run_in_background 起、管道后段只丢 2 号放行」（共 1 格）
 #   LIB_SHELL_WORDS_BREAK=shell-c-options-unparsed  共用模块取紧跟 -c 的词当代码
@@ -826,10 +834,10 @@
 #       「就地改仓内文件:cd 到 // 开头写的 /tmp/ 下的目录之后 sed -i 相对路径放行」（共 1 格；推的，没跑）
 #   LIB_SHELL_WORDS_BREAK=heredoc-open-substitution-unseen  共用模块对挂在没收尾的 $( / <( 里的 bash 上的 heredoc 照数据剥掉：实测红的格（照失败行原文）
 #       「等待循环:前台 $(bash <<EOF) 里的循环」「等待循环:前台 <(bash <<EOF) 里的循环」「等待循环:前台 $'a\'b' 之后 $(bash <<EOF) 里的循环」（共 3 格）
-#   同一批的回归修补（三方 shell-words-r1 正推腿报告 W1、W2 两节）一个开关：
+#   共用模块的双引号里 `$(` 开关：
 #   LIB_SHELL_WORDS_BREAK=double-quoted-substitution-unclosed  共用模块把双引号里的 `$(` 当没收尾
 #       「等待循环:前台 cd "$(…)" 之后 bash <<EOF 里的循环」「等待循环:前台 echo "$(date)" | bash <<EOF 里的循环」（共 2 格）
-#   三方 shell-words-r2 判决（research/prompts/shell-words-r2-main-verification.md 第二节）第 2–10 条的修补：
+#   共用模块的其余开关：
 #   LIB_SHELL_WORDS_BREAK=shell-syntax-only-code-run  共用模块带 -n 时照判 -c 的代码
 #       「起 claude:一百三十七：子 agent bash -n 只查语法，不读 BASH_ENV」（共 1 格）
 #   LIB_SHELL_WORDS_BREAK=ansi-c-quotes-unseen  共用模块把 `$'…'` 照普通单引号配对
@@ -838,7 +846,7 @@
 #       「stdin:子 agent case 里 ;; 之后的 reboot 模式不当命令放行（退出码 0）」
 #       「stdin:子 agent case 里 ;; 之后的 claude 模式不当命令放行（退出码 0）」（共 2 格）
 #   （conditional-expression-split、brace-sequence-width-padded-ends-only、extended-assignments-as-command、link-source-from-current-directory、env-leading-equals-as-command、uncalled-functions-run、shell-s-positionals-as-script、builtin-as-command、shell-option-values-as-script、function-keyword-as-command、braces-unexpanded、env-loose-assignments-as-command、eval-unread、brace-empties-kept、brace-sequence-unpadded、function-calls-literal-only、redirect-fd-number-literal、redirect-fd-quoted-digits、redirect-fd-duplication-unseen、shell-long-options-after-short、env-options-after-assignment、posix-uncalled-functions-run 下这里不红：这一份自证里没有这几类的格，由项目代码闸的格判红）
-#   BASH_COMMAND_DETECTOR_BREAK=compile-first-capped-hint  ⑨ 的出路退回 capped.sh <线程上限> 直接起 compile-then-swap.py（改前的样子）：
+#   BASH_COMMAND_DETECTOR_BREAK=compile-first-capped-hint  ⑨ 的出路写成 capped.sh <线程上限> 直接起 compile-then-swap.py：
 #       「stdin:先编后换的出路经 task-server 提交、不写 capped.sh 直接起」（共 1 格）
 #   BASH_COMMAND_DETECTOR_BREAK=compile-first-ignores-cwd  ⑨ 的相对路径一律从仓库根起算（compile_first_verdict 不看 hook 输入的 cwd）：
 #       「先编后换:执行员 cwd 在仓副本里、相对路径写 crates/ 下的 .rs 放行」「先编后换:执行员 cwd 在主工作区的 crates/ 里、相对路径写 .rs 拒」（共 2 格）
@@ -850,7 +858,7 @@
 #       「Bash写范围:-p 指到自己认领的草稿目录：T=$(mktemp -d -p "$W") 之后写进 $T/ 不记」「Bash写范围:--tmpdir= 指到自己认领的草稿目录（带模板名）：cp 进 $T/ 不记」「Bash写范围:cd 进自己认领的草稿目录之后 -p . 不记」「Bash写范围:直接写进 $(mktemp -d -p …)/文件 不记」
 #       「Bash写范围:套一层 cd 加 pwd -P：T=$(cd $(mktemp -d -p "$W") && pwd -P) 之后写进 $T/ 不记」「Bash写范围:套一层、反引号写法：T=`cd $(mktemp -d -p …) && pwd` 之后写进 $T/ 不记」
 #       「Bash写范围:套一层、直接写进 $(cd $(mktemp -d -p …) && pwd -P)/文件 不记」「stdin:模板在自己认领的草稿目录里的 mktemp -d 放行（退出码 0）、不记检出」「就地改脚本:工作根下的脚本」「stdin:cd 到草稿目录之后 sed -i 相对路径放行（退出码 0）」「Bash写范围:没有项目定义的内置 agent 写会话临时目录根拒（scratchpad 之外）」「Bash写范围:没有项目定义的内置 agent 写会话 scratchpad 拒」（共 22 格；后两格是工作根退回会话临时目录根之后它成了工作根）
-#   SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  写范围另认会话临时目录根（撤掉之前的放行）：⑫ 放行没有项目定义的 agent 写会话临时目录根
+#   SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  写范围另认会话临时目录根：⑫ 放行没有项目定义的 agent 写会话临时目录根
 #       「Bash写范围:没有项目定义的内置 agent 写会话临时目录根拒（scratchpad 之外）」「Bash写范围:没有项目定义的内置 agent 写会话 scratchpad 拒」（共 2 格）
 #   BASH_COMMAND_DETECTOR_BREAK=in-place-script-session-temporary-root-unseen  ⑦ 不认会话临时目录根下的脚本（各会话的 scratchpad 在里面）
 #       「就地改脚本:会话临时目录根下的脚本」「就地改脚本:会话 scratchpad 里的脚本」（共 2 格）
@@ -858,9 +866,9 @@
 # 这一批的格在已有的 disable-check 等开关下也红，写了「共 N 格」的已有开关在一百三十七节件 1b 照实测重数过、点名改成实测红的格）：
 #   claude-launch-layers-narrow  「一百三十七：子 agent here-string 喂给 bash 的 claude 照拒（退出码 2）」「…env -S 拆串里的 claude…」「…xargs 起的 claude…」「…ssh 起的 claude…」四格
 #   watchdog-tee-null-unseen  「一百三十七：看门狗输出经 tee 丢进 /dev/null 照拒（退出码 2）」
-#   watchdog-null-redirect-whole-command  ① 整条命令里哪一段的 /dev/null 都算（改前的判法）：
+#   watchdog-null-redirect-whole-command  ① 整条命令里哪一段的 /dev/null 都算：
 #       「看门狗:run_in_background 起、前一段 grep 2>/dev/null、后一段 watch.sh 放行」「看门狗:run_in_background 起、管道后段只丢 2 号放行」（共 2 格）
-#   rsync-inplace-unseen  「就地改脚本:一百三十七：rsync --inplace 盖已有脚本（正推腿乙 Z8；rsync-inplace-unseen 下红）」
+#   rsync-inplace-unseen  「就地改脚本:一百三十七：rsync --inplace 盖已有脚本（正推腿乙 Z8；rsync-inplace-unseen 下红）」（history-kept: 自证用例标签原文，按原文匹配）
 #   partial-wait-allowed  「一百三十七：两个 & 只等其中一个照拒（退出码 2）」「单独的 &:几个 & 只 wait 一个 pid：剩下的照拒」
 #   wait-forms-unseen  「一百三十七：一个 & 之后 wait -n 放行（退出码 0）」「…tail --pid 等它放行…」「…kill -0 轮询等它放行…」「一百三十七：wait 写在函数里、函数被调用放行（退出码 0）」
 #       「单独的 &:& 之后按 pid 轮询（tail --pid）算等到了（与检出 ② 同一套数法）」
@@ -869,17 +877,17 @@
 #   brace-target-reason-generic  「一百三十七：重定向目标花括号照拒，拒绝说明点名 ambiguous redirect 与改法」
 #   wait-loop-rewrite-unexplained  「一百三十七：带计数上限的前台等待循环照拒，拒绝说明点名真会结束的几种也要套 timeout」
 #   coproc-prefix-unseen  「一百三十七：coproc 照拒（退出码 2）」、「放出追踪:coproc」（共用模块把 coproc 当关键字跳过之后，只靠前缀名认它）
-#   startup-file-claude-unread  ⑬ 不读 shell 启动时先读的文件（一百三十七节件 8f、8g，改前的判法）：实测红的格（照失败行原文）
+#   startup-file-claude-unread  ⑬ 不读 shell 启动时先读的文件：实测红的格（照失败行原文）
 #       「起 claude:一百三十七：子 agent BASH_ENV 指到的脚本里起 claude」「起 claude:一百三十七：子 agent env BASH_ENV=… 起 bash，脚本里起 claude」「起 claude:一百三十七：子 agent 前面 export BASH_ENV 再起 bash，脚本里起 claude」
 #       「起 claude:一百三十七：子 agent ENV 指到的脚本里起 claude，sh 起的」「起 claude:一百三十七：子 agent BASH_ENV 写相对路径，按命令开头的当前目录解」「起 claude:一百三十七：子 agent 直接执行 #!/bin/bash 的脚本，BASH_ENV 指到的脚本里起 claude」
 #       「起 claude:一百三十七：子 agent 直接执行 #!/bin/sh 的脚本，ENV 指到的脚本里起 claude」「起 claude:一百三十七：子 agent declare -x BASH_ENV 之后起 bash，脚本里起 claude」「起 claude:一百三十七：子 agent typeset -x BASH_ENV 之后起 bash，脚本里起 claude」
 #       「起 claude:一百三十七：子 agent 先赋值后 export BASH_ENV，再起 bash，脚本里起 claude」「起 claude:一百三十七：子 agent bash -i 读 HOME 下的 .bashrc 里起 claude」「起 claude:一百三十七：子 agent bash --rcfile 文件 -i，文件里起 claude」
 #       「起 claude:一百三十七：子 agent sh -i 读 ENV 指到的脚本里起 claude」「起 claude:一百三十七：子 agent zsh 读 ZDOTDIR 下的 .zshenv 里起 claude」（共 14 格）
 #   bash-layer-unrecorded  「一百三十七：钩子 bash 这一层起不来（假 python3 退 127）：放行（退出码 0）、记一条检出」（只在带自证标记的子进程里认）
-#   python-missing-unrecorded  PATH 上没有 python3 时不在 preflight 之前记检出（改前的判法；三方 d137-gov-r1 判决 H13）：「d137 H13：PATH 上没有 python3：放行（退出码 0）、记一条检出」「d137 H13：PATH 上没有 python3、工作根取不到：放行（退出码 0）、不往家目录下写、stderr 说检出没记成」（共 2 格，只在带自证标记的子进程里认）
-#   三方 d137-gov-r1 判决第三段「已知没认」四类在 ⑬ 这一道的开关与各自红的格（「起 claude:d137 …」）：
-#   script-body-claude-unread  ⑬ 不读 bash / sh / source 起的与直接执行的脚本正文（改前的判法）：「起 claude:d137 已知没认：bash x.sh 起的脚本正文里起 claude」「起 claude:d137 已知没认：source 读进来的脚本正文里起 claude」「起 claude:d137 已知没认：直接执行的 #!/usr/bin/env bash 脚本正文里起 claude」「起 claude:d137 已知没认：同一条命令里 heredoc 写出再 bash 起，正文里起 claude」（共 4 格）
-#   embedded-launch-claude-unread  ⑬ 不认别的程序里起的 claude、不读它们读的程序文件（改前的判法）：「起 claude:d137 H9：python -c 里 os.system 起 claude」「起 claude:d137 H9：perl -e 里 system 起 claude」「起 claude:d137 H9：gawk 的 system() 起 claude」「起 claude:d137 H9：sed 的 e 命令起 claude」「起 claude:d137 H9：git -c 别名 ! 起 claude」「起 claude:d137 H9：tclsh 读 here-string 里 exec 起 claude」「起 claude:d137 H9：make 读 Makefile 配方起 claude」「起 claude:d137 H9：awk -f 程序文件里 system() 起 claude」（共 8 格）
+#   python-missing-unrecorded  PATH 上没有 python3 时不在 preflight 之前记检出：「d137 H13：PATH 上没有 python3：放行（退出码 0）、记一条检出」「d137 H13：PATH 上没有 python3、工作根取不到：放行（退出码 0）、不往家目录下写、stderr 说检出没记成」（共 2 格，只在带自证标记的子进程里认）
+#   ⑬ 这一道读脚本正文与别的程序里起的 claude 的开关与各自红的格（「起 claude:d137 …」）：
+#   script-body-claude-unread  ⑬ 不读 bash / sh / source 起的与直接执行的脚本正文：「起 claude:d137 已知没认：bash x.sh 起的脚本正文里起 claude」「起 claude:d137 已知没认：source 读进来的脚本正文里起 claude」「起 claude:d137 已知没认：直接执行的 #!/usr/bin/env bash 脚本正文里起 claude」「起 claude:d137 已知没认：同一条命令里 heredoc 写出再 bash 起，正文里起 claude」（共 4 格）
+#   embedded-launch-claude-unread  ⑬ 不认别的程序里起的 claude、不读它们读的程序文件：「起 claude:d137 H9：python -c 里 os.system 起 claude」「起 claude:d137 H9：perl -e 里 system 起 claude」「起 claude:d137 H9：gawk 的 system() 起 claude」「起 claude:d137 H9：sed 的 e 命令起 claude」「起 claude:d137 H9：git -c 别名 ! 起 claude」「起 claude:d137 H9：tclsh 读 here-string 里 exec 起 claude」「起 claude:d137 H9：make 读 Makefile 配方起 claude」「起 claude:d137 H9：awk -f 程序文件里 system() 起 claude」（共 8 格）
 #   LIB_SHELL_WORDS_BREAK=login-profiles-unread  共用模块不认登录 shell 读的 profile：
 #       「起 claude:d137 已知没认：登录 bash -l 读 HOME 下的 .bash_profile 里起 claude」「起 claude:d137 已知没认：登录 exec -l bash 照登录 shell 读 .bash_profile 里起 claude」「起 claude:d137 已知没认：登录 sh -l 读 HOME 下的 .profile 里起 claude」「起 claude:d137 已知没认：系统级 bash -l 读 /etc/profile（样本目录）里起 claude」（共 4 格）
 #   LIB_SHELL_WORDS_BREAK=system-startup-files-unread  共用模块不交系统级启动文件：
@@ -889,66 +897,75 @@
 #   这一批的格在已有开关下也红：startup-file-claude-unread：「起 claude:d137 已知没认：登录 bash -l 读 HOME 下的 .bash_profile 里起 claude」「起 claude:d137 已知没认：登录 exec -l bash 照登录 shell 读 .bash_profile 里起 claude」「起 claude:d137 已知没认：登录 sh -l 读 HOME 下的 .profile 里起 claude」「起 claude:d137 已知没认：系统级 bash -l 读 /etc/profile（样本目录）里起 claude」「起 claude:d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录）里起 claude」（5 格）；
 #     claude-launch-layers-narrow：「起 claude:d137 H9：python -c 里 os.system 起 claude」「起 claude:d137 H9：perl -e 里 system 起 claude」「起 claude:d137 H9：gawk 的 system() 起 claude」「起 claude:d137 H9：sed 的 e 命令起 claude」「起 claude:d137 H9：git -c 别名 ! 起 claude」「起 claude:d137 H9：tclsh 读 here-string 里 exec 起 claude」（6 格）；
 #     LIB_SHELL_WORDS_BREAK=startup-files-unread：「起 claude:d137 已知没认：登录 bash -l 读 HOME 下的 .bash_profile 里起 claude」「起 claude:d137 已知没认：登录 exec -l bash 照登录 shell 读 .bash_profile 里起 claude」「起 claude:d137 已知没认：登录 sh -l 读 HOME 下的 .profile 里起 claude」「起 claude:d137 已知没认：系统级 bash -l 读 /etc/profile（样本目录）里起 claude」「起 claude:d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录）里起 claude」（5 格）；interactive-startup-files-unread：「起 claude:d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录）里起 claude」（1 格）
-# 一百三十七节第 8 批（复跑分类报告 d137-replay-classify「二、误拒逐条」E1、E6–E9 与 6.5 节两类零星）的开关与各自红的格（自证里「d137 误拒」开头的格）：
-#   BASH_COMMAND_DETECTOR_BREAK=builtin-coproc-detached  ③ 的 coproc 照命令词前面那段的词认、不看共用模块记没记它（改前的判法：`builtin coproc …` 照拒）：
+# 误拒修补的开关与各自红的格（自证里「d137 误拒」开头的格）：
+#   BASH_COMMAND_DETECTOR_BREAK=builtin-coproc-detached  ③ 的 coproc 照命令词前面那段的词认、不看共用模块记没记它（`builtin coproc …` 照拒）：
 #       「stdin:d137 误拒：builtin coproc 里 coproc 不是内建、bash 报错不跑，放行（退出码 0）」「stdin:d137 误拒：builtin -- coproc 里 coproc 不是内建、bash 报错不跑，放行（退出码 0）」（共 2 格）
-#   LIB_SHELL_WORDS_BREAK=heredoc-variables-unexpanded  共用模块不代入 heredoc 正文里前面赋过字面值的变量（E1，改前的判法）：
+#   LIB_SHELL_WORDS_BREAK=heredoc-variables-unexpanded  共用模块不代入 heredoc 正文里前面赋过字面值的变量：
 #       「d137 误拒 E1：python3 读 heredoc，正文变量前面赋过字面值，照代入、不交判不了」（共 1 格）
-#   LIB_SHELL_WORDS_BREAK=python-list-concatenation-unresolved  共用模块不认 python argv 的 `+ 列表` 与 `*列表`（E6，改前的判法）：
+#   LIB_SHELL_WORDS_BREAK=python-list-concatenation-unresolved  共用模块不认 python argv 的 `+ 列表` 与 `*列表`：
 #       「d137 误拒 E6：subprocess.run([du, -sch] + ds)，ds 是赋过的字面列表，照算出的命令交出」「d137 误拒 E6：subprocess.run([du, -sch, *ds])，ds 算不出，照命令词 du 交出」（共 2 格）
-#   LIB_SHELL_WORDS_BREAK=python-compile-as-execution  共用模块把 python 的 compile 当执行（E7，改前的判法）：
+#   LIB_SHELL_WORDS_BREAK=python-compile-as-execution  共用模块把 python 的 compile 当执行：
 #       「d137 误拒 E7：python 只调 compile 不执行，不交判不了」（共 1 格）
-#   LIB_SHELL_WORDS_BREAK=sed-unknown-flags-as-execution  共用模块把 sed 的 s 标志区里的字母 e 一律当 e 标志（E8，改前的判法）：
+#   LIB_SHELL_WORDS_BREAK=sed-unknown-flags-as-execution  共用模块把 sed 的 s 标志区里的字母 e 一律当 e 标志：
 #       「d137 误拒 E8：sed 的 s 命令标志区有 GNU sed 不认的字（分隔符被转义的反斜杠提前收尾），编译就报错、什么都不起」（共 1 格）
-#   LIB_SHELL_WORDS_BREAK=cd-subshell-guards-unseen  共用模块里括号进出一律断开 cd 的 `&&` 守护（E9，改前的判法）：
+#   LIB_SHELL_WORDS_BREAK=cd-subshell-guards-unseen  共用模块里括号进出一律断开 cd 的 `&&` 守护：
 #       「d137 误拒 E9：cd 不在的目录 && ( bash x.sh )，子 shell 照 && 守着」「d137 误拒 E9：cd 不在的目录 && time ( bash x.sh )，照 && 守着」（共 2 格）
 #   这一批的格在已有开关下也红：cd-failure-guards-unseen 下 E9 照 && 守着的两格，python-argument-variables-unresolved 下 E6 命令词是 du 的两格，
 #     builtin-non-builtin-run 下 builtin coproc 两格（这三项的开关这份文件头没列，自证在它们下的别的格不红）
 # 一百三十七节件 1b（d137-hooks-2）的开关与各自红的格：
-#   background-ampersand-by-regex  检出 ② 的单独 & 退回改前的正则数法：「bg-notify-r1 F06：sed 替换串引号里的 & 不记」
+#   background-ampersand-by-regex  检出 ② 的单独 & 按正则数：「bg-notify-r1 F06：sed 替换串引号里的 & 不记」
 #       「一百三十七：两个子 shell 各记 $!、逐个 wait "$pN" 不记」（共 2 格）
 #   bare-setsid-unrecorded  检出 ② 不记不带 --wait 的 setsid：「一百三十七：裸 setsid 不带 --wait，照记一条」「一百三十七：内存包装里的 setsid 不带 --wait，照记一条」（共 2 格）
 #   scope-launcher-writes-unseen  ⑫ 不认 eval 的代码与启动器里面那条：「Bash写范围:一百三十七：clerk eval 字面代码里 sed -i 知识库，拒」
 #       「Bash写范围:一百三十七：clerk find -exec sed -i 读进来的路径，落点算不出，拒」「Bash写范围:一百三十七：clerk echo 喂给 xargs sed -i，落点算不出，拒」
 #       「Bash写范围:一百三十七：clerk xargs sed -i 写范围里的 records 也拒（落点算不出）」「Bash写范围:一百三十七：clerk find -exec cp 到写死的知识库路径，拒」
 #       「Bash写范围:一百三十七：钩子进程在工作根下，clerk xargs sed -i 照拒」（共 6 格）
-#   sed-unknown-target-resolved-from-cwd  sed -i 展开不了的目标照钩子进程的当前目录补成绝对路径（改前的判法）：
+#   sed-unknown-target-resolved-from-cwd  sed -i 展开不了的目标照钩子进程的当前目录补成绝对路径：
 #       「Bash写范围:一百三十七：钩子进程在工作根下，clerk sed -i 没赋过值的变量照拒」「Bash写范围:一百三十七：钩子进程在工作根下，clerk xargs sed -i 照拒」（共 2 格）
-#   BASH_COMMAND_DETECTOR_BREAK=allow-literal-notations  ⑰ 往仓里写的字面内容一律不判（改前的样子）：
+#   BASH_COMMAND_DETECTOR_BREAK=allow-literal-notations  ⑰ 往仓里写的字面内容一律不判：
 #       「字面写入:heredoc 追加会话名拒」「字面写入:heredoc 追加批次代号拒」「字面写入:printf 追加钟点拒」「字面写入:echo 经管道交 tee -a 追加批次代号拒」
 #       「字面写入:cd 进仓里之后按相对路径写照判」「字面写入:bash -c 里的 echo 追加会话名照判」「字面写入:here-string 喂给 cat 写批次代号照判」
 #       「stdin:Bash heredoc 往仓里追加会话名拒绝（退出码 2，点名会话号、出路指到 insert-row.py 与 replace-once.py）」（共 8 格）
 #   BASH_COMMAND_DETECTOR_BREAK=literal-notations-outside-judged  ⑰ 仓外的目标也判（按文件名当相对路径）：
 #       「字面写入:仓外路径不判」（共 1 格）
-#   BASH_COMMAND_DETECTOR_BREAK=allow-record-append  ⑲ 往 records/ 下的 .md 追加一概放行（改前的样子）：实测红的格（照失败行原文；主 agent 经服务复跑任务 5597）
+#   BASH_COMMAND_DETECTOR_BREAK=allow-record-append  ⑲ 往 records/ 下的 .md 追加一概放行：实测红的格（照失败行原文）
 #       「往 records 追加:echo >> 拒」「往 records 追加:cat >> 加 heredoc 拒」「往 records 追加:&>> 拒」「往 records 追加:管道接 tee -a 拒」「往 records 追加:tee --append 拒」
 #       「往 records 追加:cd 进 records 之后 >> 拒」「往 records 追加:绝对路径 >> 拒」「往 records 追加:前面赋过值的变量照代入拒」「往 records 追加:bash -c 里的 >> 拒」
 #       「往 records 追加:python3 -c 里 open(…, 'a') 拒」「往 records 追加:喂给 python 的 heredoc 里 open(…, mode='a') 拒」「往 records 追加:python 的 Path.open('a') 拒」
 #       「往 records 追加:子目录里的 .md 也拒」「往 records 追加:大写后缀 .MD 也拒」「往 records 追加:指进 records 的符号链接照落点拒」
 #       「stdin:主 agent 往 records 追加拒、出路给 append-record.py 的整条写法（退出码 2）」「stdin:子 agent 往 records 追加拒、出路给 append-record.py 的整条写法（退出码 2）」
 #       「出路过别的闸:主 agent 照抄 ⑲ 的出路喂 project-code-guard.sh 放行（退出码 0）」「出路过别的闸:子 agent 照抄 ⑲ 的出路喂 project-code-guard.sh 放行（退出码 0）」（共 19 格）
-#   BASH_COMMAND_DETECTOR_BREAK=record-append-python-unseen  ⑲ 不认 python 的 open(…, 'a')：实测红的格（照失败行原文；任务 5598）
+#   BASH_COMMAND_DETECTOR_BREAK=record-append-python-unseen  ⑲ 不认 python 的 open(…, 'a')：打开后红的格（照失败行原文）
 #       「往 records 追加:python3 -c 里 open(…, 'a') 拒」「往 records 追加:喂给 python 的 heredoc 里 open(…, mode='a') 拒」「往 records 追加:python 的 Path.open('a') 拒」（共 3 格）
-#   BASH_COMMAND_DETECTOR_BREAK=record-append-tee-unseen  ⑲ 不认 tee -a（不看 OverwriteCandidate.appends）：实测红的格（照失败行原文；任务 5599）
+#   BASH_COMMAND_DETECTOR_BREAK=record-append-tee-unseen  ⑲ 不认 tee -a（不看 OverwriteCandidate.appends）：打开后红的格（照失败行原文）
 #       「往 records 追加:管道接 tee -a 拒」「往 records 追加:tee --append 拒」（共 2 格）
 #   BASH_COMMAND_DETECTOR_BREAK=record-howto-unlisted-tool  ⑲ 拒绝说明里的出路写成不在直接跑名单上的 scripts/kb/history-consolidate.py（照抄会被 project-code-guard.sh 拒）：
 #       「stdin:主 agent 往 records 追加拒、出路给 append-record.py 的整条写法（退出码 2）」「stdin:子 agent 往 records 追加拒、出路给 append-record.py 的整条写法（退出码 2）」
 #       「出路过别的闸:主 agent 照抄 ⑲ 的出路喂 project-code-guard.sh 放行（退出码 0）」「出路过别的闸:子 agent 照抄 ⑲ 的出路喂 project-code-guard.sh 放行（退出码 0）」（共 4 格）
-#   BASH_COMMAND_DETECTOR_BREAK=howto-guard-environment-keeps-breaks  ⑲ 出路喂 project-code-guard.sh 时把自证设着的弄坏开关变量（LIB_SHELL_WORDS_BREAK 这类）原样带过去（改前的样子：它见到不是自己自证设的弄坏开关就拒，出路被误判过不了闸）：
+#   BASH_COMMAND_DETECTOR_BREAK=howto-guard-environment-keeps-breaks  ⑲ 出路喂 project-code-guard.sh 时把自证设着的弄坏开关变量（LIB_SHELL_WORDS_BREAK 这类）原样带过去（它见到不是自己自证设的弄坏开关就拒，出路被误判过不了闸）：
 #       「出路过别的闸:喂 project-code-guard.sh 的环境里不带弄坏开关变量，别的变量照带」（共 1 格）
+#   BASH_COMMAND_DETECTOR_BREAK=allow-manual-repository-copy  ⑳ 手拷仓副本（rsync、cp -r / -R / -a 拷本仓的 crates/ 或仓根整个）一概放行：照判法推的格（还没复跑）
+#       「手拷仓副本:rsync 拷 crates 进仓外目录」「手拷仓副本:cp -r 拷 crates」「手拷仓副本:rsync 拷仓根整个（./）」「手拷仓副本:rsync 拷仓根（绝对路径带结尾的 /）」
+#       「手拷仓副本:cp -a 拷仓根 .」「手拷仓副本:cp -R 拷 crates/（带结尾的 /）」「手拷仓副本:cp --archive 拷 crates」「手拷仓副本:cp -t 目录写在前面、-r 写在后面」
+#       「手拷仓副本:rsync 的 --exclude=值 合写」「手拷仓副本:rsync -e 带值的短选项之后的源照认」「手拷仓副本:cd 进仓根之后 rsync crates」
+#       「手拷仓副本:前面赋过值的变量代入」「手拷仓副本:bash -c 里」「手拷仓副本:nice 前缀」「手拷仓副本:仓根里的通配 * 盖住整层」「手拷仓副本:crates/* 盖住 crates 整层」
+#       「手拷仓副本:crates/.. 规整之后是仓根」「手拷仓副本:喂给 bash 的 heredoc 里」「手拷仓副本:rsync 一次给几个源、其中有 crates」
+#       「stdin:主 agent rsync 拷 crates 拒、出路给 minimal-copy.py 的整条写法（退出码 2）」「stdin:子 agent cp -r 拷 crates 拒、出路给 minimal-copy.py 的整条写法（退出码 2）」
+#       「出路过别的闸:主 agent 照抄 ⑳ 的出路喂 project-code-guard.sh 放行（退出码 0）」「出路过别的闸:子 agent 照抄 ⑳ 的出路喂 project-code-guard.sh 放行（退出码 0）」（共 23 格）
+#   BASH_COMMAND_DETECTOR_BREAK=manual-copy-howto-unlisted-tool  ⑳ 拒绝说明里的出路写成不在直接跑名单上的 scripts/hosts/compile-then-swap.py（照抄会被 project-code-guard.sh 拒）：照判法推的格（还没复跑）
+#       「出路过别的闸:主 agent 照抄 ⑳ 的出路喂 project-code-guard.sh 放行（退出码 0）」「出路过别的闸:子 agent 照抄 ⑳ 的出路喂 project-code-guard.sh 放行（退出码 0）」（共 2 格）
 #   LIB_FORBIDDEN_NOTATIONS_BREAK=batch-codes  共用判据库不判批次代号这一形态（写法在 ../gate.d/lib-forbidden-notations.py 文件头）：
 #       「字面写入:heredoc 追加批次代号拒」「字面写入:echo 经管道交 tee -a 追加批次代号拒」「字面写入:cd 进仓里之后按相对路径写照判」
 #       「字面写入:here-string 喂给 cat 写批次代号照判」（共 4 格）
-# ② 末那一句之外：前台等待循环的拒绝说明另写「带计数上限、break、while read、kill -0 探活这类真会结束的循环同样照拒，套 timeout 就放行」（正推腿乙 Z10）；
-# ⑦ 另认 `rsync --inplace 源 已有文件`（就地写、不换 inode，正推腿乙 Z8）；① 另认 `| tee /dev/null`（看门狗的输出照样丢了，Z7）；
-# ⑫ 重定向目标上的花括号（`> o.{a,b}`、`> o{1..2}.txt`，引号里的同样）照落点算不出拒，拒绝说明点名 bash 报 ambiguous redirect、什么都不写，改法是写成一个字面文件名
-#   （修补报告 debt-tw-shell-words-fix2 第 94 行那一类；用户 2026-10-29 定照拒、说明改贴切）；
+# ② 末那一句之外：前台等待循环的拒绝说明另写「带计数上限、break、while read、kill -0 探活这类真会结束的循环同样照拒，套 timeout 就放行」；
+# ⑦ 另认 `rsync --inplace 源 已有文件`（就地写、不换 inode）；① 另认 `| tee /dev/null`（看门狗的输出照样丢了）；
+# ⑫ 重定向目标上的花括号（`> o.{a,b}`、`> o{1..2}.txt`，引号里的同样）照落点算不出拒，拒绝说明点名 bash 报 ambiguous redirect、什么都不写，改法是写成一个字面文件名；
 # 钩子 bash 这一层起不来（python3 起不来、/dev/fd/3 读不到、python 在 main() 之前崩了）时照「放行但必记检出」追加一行、退 0（一百三十七节 ⑤；带参数的起法不读标准输入）。
 #   PATH 上没有 python3 的，preflight 判不了运行条件、会退 78 什么都不记：钩子那种起法在 preflight 之前就照「放行但必记检出」记一条、退 0
-#   （三方 d137-gov-r1 判决 H13；弄坏开关 BASH_COMMAND_DETECTOR_BREAK=python-missing-unrecorded 下照旧交给 preflight 退 78，只在带自证标记的子进程里认）。
+#   （弄坏开关 BASH_COMMAND_DETECTOR_BREAK=python-missing-unrecorded 下照旧交给 preflight 退 78，只在带自证标记的子进程里认）。
 set -uo pipefail
 # 钩子 bash 这一层起不来时也记一条检出（一百三十七节 ⑤）：python3 起不来、/dev/fd/3 读不到、python 在 main() 之前崩了，这条命令照常执行（钩子退出码不是 0、2 时 Claude Code 照常放行），
-# 原先什么都不记。标准输入先在这里读进来、经 here-string 交给 python（python 起不来时 bash 还拿得到会话号）；退出码不是 0、2、又不是 --selftest 的，照「放行但必记检出」
+# 标准输入先在这里读进来、经 here-string 交给 python（python 起不来时 bash 还拿得到会话号）；退出码不是 0、2、又不是 --selftest 的，照「放行但必记检出」
 # 往检出记录追加一行（会话号、agent 从输入里按字面取，取不到写「读不到」）、退 0；带参数的起法（--selftest、--scan-scripts）不读标准输入、照交退出码。弄坏开关 BASH_COMMAND_DETECTOR_BREAK=bash-layer-unrecorded 下不记（照旧把 python 的退出码交出去）。
 hook_record_bash_layer_failure() {   # <钩子名> <python 的退出码> <hook 输入原文>
   local name="$1" status="$2" input="$3" path="${AGENT_HOOK_DETECTIONS:-}" work_root="${SINGLEFS_WORK_ROOT:-}" session="读不到" agent="读不到"
@@ -1023,8 +1040,8 @@ POLL_AFTER = re.compile(r"\btail\b[^\n]*--pid\b|\b(?:until|while)\b[^\n]*\bkill\
 
 def puts_itself_in_background(command):
     """检出 ②：放出追踪的那几种写法（SELF_DETACH，③ 拒了的不再记）与没等到的单独 &。单独的 & 与 ④ 同一套数法（unwaited_background_jobs 按层、按圆括号逐个数
-    wait_coverage）：每个 & 记了 $!、之后逐个 `wait "$pN"` 的算等齐（一百三十七节件 1b：主 agent 的 `( … ) & p1=$!; ( … ) & p2=$!; wait $p1; wait $p2` 原先被这里的正则误记）；
-    引号里当数据写的 & 不算。弄坏开关 background-ampersand-by-regex 退回改前的正则数法（引号里的 & 照记，几个 & 而 `wait "$pid"` 逐个等的照记）。"""
+    wait_coverage）：每个 & 记了 $!、之后逐个 `wait "$pN"` 的算等齐（主 agent 的 `( … ) & p1=$!; ( … ) & p2=$!; wait $p1; wait $p2` 不记）；
+    引号里当数据写的 & 不算。弄坏开关 background-ampersand-by-regex 下按正则数（引号里的 & 照记，几个 & 而 `wait "$pid"` 逐个等的照记）。"""
     stripped = shell_words.strip_data_heredocs(command)
     if SELF_DETACH.search(stripped):
         return True
@@ -1180,7 +1197,7 @@ def watchdog_calls_and_detaching(text):
             detaching.append("命令里有 disown")
         if (name == "tee" and "/dev/null" in [argument for argument in arguments if not argument.startswith("-")]
                 and not detector_break_is_set("watchdog-tee-null-unseen")):
-            detaching.append("输出经 tee 丢进了 /dev/null")   # 正推腿乙报告第五节 Z7：`watch.sh | tee /dev/null`
+            detaching.append("输出经 tee 丢进了 /dev/null")   # `watch.sh | tee /dev/null`
         if is_watchdog_call(command):
             calls.append(" ".join([name, *arguments]))
     return calls, detaching
@@ -1276,7 +1293,8 @@ KNOWN_DETECTOR_BREAK_ITEMS = ("disable-check", "disable-self-background", "keep-
                               "allow-literal-notations", "literal-notations-outside-judged",
                               "allow-record-append", "record-append-python-unseen", "record-append-tee-unseen",
                               "record-howto-unlisted-tool", "howto-guard-environment-keeps-breaks",
-                              "own-session-group-unrecognized", "own-session-group-session-unchecked", "own-session-group-first-binding-only")
+                              "own-session-group-unrecognized", "own-session-group-session-unchecked", "own-session-group-first-binding-only",
+                              "allow-manual-repository-copy", "manual-copy-howto-unlisted-tool")
 
 def detector_break_is_set(item):
     return item in os.environ.get(DETECTOR_BREAK_VARIABLE, "").split(",")
@@ -1286,13 +1304,13 @@ SELFTEST_MARK_VARIABLE = "BASH_COMMAND_DETECTOR_SELFTEST_MARK"
 SELFTEST_MARK_CONTENT = "bash-command-detector-selftest"
 
 # 关守卫项（records/2026-10-23-subagent拆分提案.md 第一百二十二节 ②）：只在它是唯一一项时认；与别的项同写照拒并点名它（带标记的自证子进程里也拒），
-#   免得「关守卫项,别的项」平常跑借道把别的项也认了。GUARD_OFF_WITH_OTHERS_ITEM 是它的弄坏开关：带标记的自证子进程里同写着它时，同写的关守卫项照认（改前的样子）
+#   免得「关守卫项,别的项」平常跑借道把别的项也认了。GUARD_OFF_WITH_OTHERS_ITEM 是它的弄坏开关：带标记的自证子进程里同写着它时，同写的关守卫项照认
 GUARD_OFF_ITEM = "break-honored-outside-selftest"
 GUARD_OFF_WITH_OTHERS_ITEM = "break-honored-outside-selftest-with-others"
 
 def refuse_break_outside_selftest():
     """弄坏开关只在自证里认：平常跑（不是 --selftest，也不是自证起的子进程）设了 BASH_COMMAND_DETECTOR_BREAK 就退 2，stderr 点名变量只在自证里认；没设、--selftest、
-    标记文件在而内容对得上的放行（返回 0）。关守卫项 break-honored-outside-selftest 单独一项时不拒（改前的样子）；与别的项同写一律拒、点名它
+    标记文件在而内容对得上的放行（返回 0）。关守卫项 break-honored-outside-selftest 单独一项时不拒；与别的项同写一律拒、点名它
     （带标记的子进程里同写着 break-honored-outside-selftest-with-others 的除外）。"""
     value = os.environ.get(DETECTOR_BREAK_VARIABLE, "")
     if not value or (len(sys.argv) > 2 and sys.argv[2] == "--selftest"):
@@ -1431,9 +1449,9 @@ def detaching_prefixes(prefix_words, has_lone_ampersand, prefix_names):
     for index, word in enumerate(prefix_words):
         name = os.path.basename(word)
         if name == "coproc" and not detector_break_is_set("coproc-prefix-unseen"):
-            # 共用模块把 coproc 当关键字跳过（三方 shell-words-r3 判决第二节第 3 条）时把它记进路过的前缀名，命令词前面那段里认它；`builtin coproc …`、`builtin -- coproc …`
+            # 共用模块把 coproc 当关键字跳过时把它记进路过的前缀名，命令词前面那段里认它；`builtin coproc …`、`builtin -- coproc …`
             # 里的 coproc 不是内建，bash 报 not a shell builtin、什么都不跑，共用模块不记它，这里也不认（复跑分类报告 d137-replay-classify 6.5 节；
-            # 弄坏开关 builtin-coproc-detached 下照词认，改前的判法）
+            # 弄坏开关 builtin-coproc-detached 下照词认）
             if "coproc" in prefix_names or detector_break_is_set("builtin-coproc-detached"):
                 found.append("coproc")
             continue
@@ -1473,7 +1491,7 @@ def detaching_refusal(command):
 #   Path(<仓内路径字面量>).write_text( / .write_bytes(，os.replace / os.rename / shutil.move 的目标（第二个参数或 dst=）是仓内路径字面量的。
 #   仓内路径字面量：crates/、scripts/、.claude/、research/、records/、litmus/、briefs/ 起头的，或仓根起的绝对路径。
 #   认不出：路径放在变量里的、经脚本文件间接写的（replace-once.py、insert-row.py 这类定义点名的脚本本来就放行）。
-#   弄坏开关 python-move-into-repository-unseen 退回改前的样子：前缀不含 scripts/，三种挪法不认（PYTHON_REPOSITORY_WRITE_BEFORE_MOVES）。
+#   弄坏开关 python-move-into-repository-unseen 下前缀不含 scripts/，三种挪法不认（PYTHON_REPOSITORY_WRITE_BEFORE_MOVES）。
 REPOSITORY_PATH_PREFIX = r"(?:\./)?(?:crates|scripts|\.claude|research|records|litmus|briefs)/"
 REPOSITORY_PATH_PREFIX_BEFORE_MOVES = r"(?:\./)?(?:crates|\.claude|research|records|litmus|briefs)/"
 # 挪法的第一个参数：一个字符串字面量，或不带逗号、括号与引号的一个表达式（名字、属性）
@@ -1511,7 +1529,7 @@ def sed_in_place_targets(arguments):
 
 def written_path_is_absolute(path):
     """sed -i 的目标照文字展开（$SINGLEFS_WORK_ROOT、$HOME、~）之后是绝对路径：展开不了的（`$F`、xargs 的占位词）不拿钩子进程自己的当前目录去补成绝对路径
-    （一百三十七节件 1b：钩子进程的当前目录在工作根下时，`sed -i … $F` 被当成工作根下的草稿、从目标里丢掉）。弄坏开关 sed-unknown-target-resolved-from-cwd 下照改前一律算（改前的判法）。"""
+    （否则钩子进程的当前目录在工作根下时，`sed -i … $F` 被当成工作根下的草稿、从目标里丢掉）。弄坏开关 sed-unknown-target-resolved-from-cwd 下一律补成绝对路径。"""
     if detector_break_is_set("sed-unknown-target-resolved-from-cwd"):
         return True
     return os.path.isabs(work_roots.expand_written_path(path))
@@ -1564,7 +1582,7 @@ def repository_in_place_edit_refusal(command, agent_type, repository_root, start
             or not agent_has_edit_tool(repository_root, agent_type)):
         return []
     found = []
-    if detector_break_is_set("sed-in-place-ignores-cd"):   # 弄坏开关：改前的样子，相对路径不跟 cd
+    if detector_break_is_set("sed-in-place-ignores-cd"):   # 弄坏开关：相对路径不跟 cd
         for layer in shell_layers(command):
             for words in layer.commands:
                 for _, _, name, arguments in wrapped_commands(words):
@@ -1597,7 +1615,7 @@ def is_main_workspace_crate_source(path, repository_root):
 def compile_first_verdict(command, repository_root, start_directory=None):
     """整条命令里写主工作区 crates/ 下 .rs 的每一步，交回 `写法 相对仓库根的路径`。
     相对路径从 cd 之后的目录起算，起点是 start_directory（hook 输入的 cwd，同 ⑧ ⑫；不给是仓库根）；cd 算不出之后的照仓库根解。
-    弄坏开关 BASH_COMMAND_DETECTOR_BREAK=compile-first-ignores-cwd 下起点一律是仓库根（三方 shell-words-r2 判决第二节第 10 条之前的判法）。"""
+    弄坏开关 BASH_COMMAND_DETECTOR_BREAK=compile-first-ignores-cwd 下起点一律是仓库根。"""
     crates_directory = os.path.join(repository_root, "crates")
     refused = []
     if start_directory is None or detector_break_is_set("compile-first-ignores-cwd"):
@@ -1727,7 +1745,7 @@ def known_write_script_steps(name, arguments, directory, variables):
     """命令是 KNOWN_WRITE_SCRIPTS 里的定点写脚本（python3 起它的，或直接执行它的）时，它要写的文件各交一个 OverwriteCandidate；读不出要写哪个文件的交 UnknownScriptTarget。
     name 是命令词的名字（basename；直接执行 `$S …` 时就是 `$S`，代入之后再取名字）。脚本词先按 variables（这条命令里前面赋过的值）代入再取名字比；
     python3 起的脚本词代入之后还有算不出的段、第一个不是选项的参数在、又不带不写的参数的，交 UnresolvedScriptTarget（落点由 bash_scope_verdict 判）。
-    弄坏开关 scope-known-scripts-unseen 下一概交 []；scope-script-variable-unexpanded 下脚本词不代入、也不交 UnresolvedScriptTarget（改前的样子）。"""
+    弄坏开关 scope-known-scripts-unseen 下一概交 []；scope-script-variable-unexpanded 下脚本词不代入、也不交 UnresolvedScriptTarget。"""
     if detector_break_is_set("scope-known-scripts-unseen"):
         return []
     substitute = not detector_break_is_set("scope-script-variable-unexpanded")
@@ -1752,7 +1770,7 @@ def known_write_script_steps(name, arguments, directory, variables):
     if any(argument in NON_WRITING_FLAGS for argument in rest):
         return []
     if script == LEDGER_APPEND_SCRIPT:
-        # 不带目标文件参数：写的是仓根下登记表 current 那一份账本；弄坏开关 scope-ledger-append-unseen 下不认它（改前的样子）
+        # 不带目标文件参数：写的是仓根下登记表 current 那一份账本；弄坏开关 scope-ledger-append-unseen 下不认它
         if detector_break_is_set("scope-ledger-append-unseen"):
             return []
         root = last_option_value(rest, "--root")
@@ -1786,7 +1804,7 @@ def agent_has_definition(repository_root, agent_type):
     return os.path.isfile(os.path.join(repository_root, ".claude", "agents", f"{agent_type}.md"))
 
 def agent_scope_patterns(repository_root, agent_type, table_path):
-    """项目定义的 agent 在写范围表里的模式（表里没有它的行交 []）；没有项目定义的交 BUILTIN_AGENT_SCOPE（弄坏开关 builtin-agents-unjudged 下交 []，改前的样子）。
+    """项目定义的 agent 在写范围表里的模式（表里没有它的行交 []）；没有项目定义的交 BUILTIN_AGENT_SCOPE（弄坏开关 builtin-agents-unjudged 下交 []）。
     读表读不了抛 OSError。"""
     if not agent_has_definition(repository_root, agent_type):
         return [] if detector_break_is_set("builtin-agents-unjudged") else list(BUILTIN_AGENT_SCOPE)
@@ -1829,7 +1847,7 @@ def bind_loop_variables(name, arguments, variables):
 
 def loop_value_choices(texts):
     """目标与源里代入的循环取值逐个组合：交回 [{包着的那一段: 取值}]；没有循环取值交 [{}]，组合多过 MAXIMUM_LOOP_LANDINGS 交 None（照算不出判）。
-    弄坏开关 scope-loop-landings-trusted 下每一段只取一个写死的普通名字（改前 plain_loop_variables 的样子：取值里的 `..` 与 / 看不见）。"""
+    弄坏开关 scope-loop-landings-trusted 下每一段只取一个写死的普通名字（取值里的 `..` 与 / 看不见）。"""
     pieces = list(dict.fromkeys(match.group(0) for text in texts for match in LOOP_VALUE_PIECE.finditer(text)))
     if detector_break_is_set("scope-loop-landings-trusted"):
         return [{piece: "plain-value" for piece in pieces}]
@@ -1863,7 +1881,7 @@ def bash_scope_verdict(command, repository_root, start_directory, patterns, outs
     expanded = write_scope.expanded_scope_patterns(patterns, work_roots)
     refused, undeterminable = [], []
     roots = list(dict.fromkeys((os.path.normpath(repository_root), os.path.realpath(repository_root))))
-    lexical_only = detector_break_is_set("scope-landing-lexical-only")   # 弄坏开关：落点只按字面规整（改前的样子）
+    lexical_only = detector_break_is_set("scope-landing-lexical-only")   # 弄坏开关：落点只按字面规整
     def inside_repository(path):
         return next((os.path.relpath(path, root) for root in roots if path.startswith(root + os.sep)), None)
     def judge(form, raw_path):
@@ -1932,7 +1950,7 @@ def bash_scope_verdict(command, repository_root, start_directory, patterns, outs
                 pattern, has_unknown_piece, has_glob = target_pattern(os.path.expanduser(word))
                 if (has_unknown_piece and step.form in OVERWRITING_REDIRECTS | APPENDING_REDIRECTS and BRACE_PIECE.search(word)
                         and not detector_break_is_set("brace-target-reason-generic")):
-                    # 修补报告 debt-tw-shell-words-fix2 第 94 行那一类（用户 2026-10-29 定照拒、说明改贴切）
+                    # 重定向目标上的花括号照拒，说明点名 bash 报 ambiguous redirect、什么都不写
                     undeterminable.append(f"{step.form} {word}：重定向目标上有花括号。引号外的 bash 展开成几个词、报 ambiguous redirect、一个字节都不写；"
                                           "引号里的（`> 'o.{a,b}'`）bash 当一个字面文件名，这道闸切词已分得出引号里外，对重定向目标上的花括号一律照算不出拒（偏严，用户 2026-10-29 定）。"
                                           "写成一个不带花括号的字面文件名；要写几份就逐份写 `> 文件1`、`> 文件2`，或用 tee 带几个文件参数")
@@ -1954,7 +1972,7 @@ def bash_scope_refusal(command, agent_type, repository_root, start_directory, ta
     """交回 ScopeVerdict；前台、run_in_background 一样判。只判有写范围的项目子 agent（文件头 ⑫ 的「没有写范围的不判」）。
     identity：hook 输入里的 agent_id、session_id、transcript_path，认 mktemp 模板在不在这个子 agent 认领的草稿目录里用（不给就都不在）。
     弄坏开关 allow-bash-scope-write 一概放行；scope-main-agent-judged 把主 agent 也当成一条模式都没有的子 agent 判；
-    scope-undeterminable-only-noted 下落点算不出的只记检出、不拒（改前的样子）。"""
+    scope-undeterminable-only-noted 下落点算不出的只记检出、不拒。"""
     if detector_break_is_set("disable-check") or detector_break_is_set("allow-bash-scope-write"):
         return ScopeVerdict([], [], [], [])
     if agent_type:
@@ -2061,9 +2079,9 @@ def readable_body(word, directory, written, executed):
 
 def file_claude_launches(text, directory=None, environment=None, depth=0, seen=None):
     """text 里读得到正文的文件，读进来认里面起的 claude，文件里再有这样的写法（环境里的变量照样带进去）接着读，同一份只读一遍，MAXIMUM_NESTING 层为限；路径解不出的、读不到的不判
-    （子 agent 由 project-code-guard.sh 照认不出的写法拒）。读哪几种：shell 启动时先读的文件（startup_files_of；弄坏开关 startup-file-claude-unread 下不读，改前的判法）；
-    bash / sh / source 起的脚本与直接执行的 shell 脚本（路径带斜杠的；同一段命令文本里前面 cat / tee 读 heredoc 写出的拿写出的内容；三方 d137-gov-r1 判决第三节「已知没认」四类：
-    `bash x.sh` 起的脚本正文里起 claude，与 project-code-guard.sh 读脚本正文同一个口子；弄坏开关 script-body-claude-unread 下不读，改前的判法）；
+    （子 agent 由 project-code-guard.sh 照认不出的写法拒）。读哪几种：shell 启动时先读的文件（startup_files_of；弄坏开关 startup-file-claude-unread 下不读）；
+    bash / sh / source 起的脚本与直接执行的 shell 脚本（路径带斜杠的；同一段命令文本里前面 cat / tee 读 heredoc 写出的拿写出的内容；
+    `bash x.sh` 起的脚本正文里起 claude，与 project-code-guard.sh 读脚本正文同一个口子；弄坏开关 script-body-claude-unread 下不读）；
     别的程序读进去当代码的文件（共用模块 embedded_launches 交的 awk -f、sed -f、Makefile，正文交 program_text_launches 切出命令；弄坏开关 embedded-launch-claude-unread 下不读）。"""
     seen = set() if seen is None else seen
     found = []
@@ -2098,8 +2116,8 @@ def file_claude_launches(text, directory=None, environment=None, depth=0, seen=N
 def claude_launches_in_text(command):
     """整条命令每一层（顶层、bash -c、喂给 shell 的 heredoc、命令替换）命令位置上起 claude 的简单命令，前缀与包装剥开之后认；交回认出的那几条（截短）。
     另照共用模块切出的每一条命令认（here-string 与管道喂给 shell 的字面、env -S 拆出来的、名单外启动器 xargs / ssh / find -exec 这类剥开之后的，
-    正推腿乙报告第五节 Z6 与第六节：`bash <<< 'claude -p hi'`、`env -S 'claude -p hi'`、`xargs claude`、`ssh host claude` 原先认不出）；
-    弄坏开关 claude-launch-layers-narrow 下只认前一种（改前的判法）。"""
+    例：`bash <<< 'claude -p hi'`、`env -S 'claude -p hi'`、`xargs claude`、`ssh host claude`）；
+    弄坏开关 claude-launch-layers-narrow 下只认前一种。"""
     found = []
     for layer in shell_layers(command):
         for words in layer.commands:
@@ -2228,7 +2246,7 @@ def git_restore_clears_index(arguments):
     return staged and bool(pathspec) and whole_index_pathspec(pathspec)
 
 def git_other_form_clears_index(subcommand, arguments):
-    """git stash / git rm --cached / git checkout 清不清整个索引（正推腿乙报告第六节）：
+    """git stash / git rm --cached / git checkout 清不清整个索引：
     `git stash`、`git stash push|save`（不带 -k / --keep-index、不带路径或路径是整棵树）把暂存的改动收走；`git rm --cached` 的路径是整棵树（`-r --cached .`）把索引里的文件全删；
     `git checkout [<提交>] -- <整棵树>` 拿提交或索引盖掉整棵树的暂存改动。别的子命令与带具体路径的交 False。"""
     if subcommand == "stash":
@@ -2279,7 +2297,7 @@ def whole_index_reset_refusal(command, start_directory):
         global_options, subcommand, arguments = git_global_split(words[1:])
         unresolved = False
         if subcommand and ("$" in subcommand or "`" in subcommand) and not detector_break_is_set("git-subcommand-unexpanded-allowed"):
-            # 子命令写成变量、命令替换（`x=reset; git $x`，正推腿乙 Z2）：前面赋过字面值的照展开再判，展开不了的认不出是不是清索引，照清索引的那一类拒
+            # 子命令写成变量、命令替换（`x=reset; git $x`）：前面赋过字面值的照展开再判，展开不了的认不出是不是清索引，照清索引的那一类拒
             expanded = shell_words.expand_known_variables(subcommand, command_at.variables or {})
             if expanded is None:
                 unresolved = True
@@ -2537,7 +2555,7 @@ def background_job_label(words):
 def wait_coverage(words, wait_functions):
     """一条命令等了几个之前放后台的作业：不带参数的 wait、调用里写着不带参数 wait 的函数（Z14）交 None（全等）；`wait <进程号>…` 交进程号个数；
     `wait -n`（只带选项）、`tail --pid`、`while|until … kill -0` 轮询（文件头 ② 末那一句，Z12、Z13）各交 1；别的交 0。
-    弄坏开关 wait-forms-unseen 下 wait -n、tail --pid、kill -0 轮询、函数里的 wait 都不算（改前的判法）；partial-wait-allowed 下带进程号的 wait 照全等算（改前的判法，Z11）。"""
+    弄坏开关 wait-forms-unseen 下 wait -n、tail --pid、kill -0 轮询、函数里的 wait 都不算；partial-wait-allowed 下带进程号的 wait 照全等算。"""
     skipped = shell_words.skip_prefixes(words)
     keywords = words[:skipped.command_position] if skipped.command_position is not None else words
     if skipped.command_position is None:
@@ -2590,7 +2608,7 @@ def wait_function_names(tokens):
 
 def unwaited_background_jobs(text):
     """整条命令每一层（顶层、bash -c 的代码、喂给 shell 的 heredoc 正文、命令替换）里以单独的 & 收尾、之后同一层同一对圆括号里没等到的作业，交回每个作业的说法。
-    逐层按次序数：不带参数的 wait（或调用里有它的函数）等齐之前的全部；`wait <进程号>` 等它写了几个号就几个（两个 & 只等一个的，剩下那个照没等到拒，正推腿乙 Z11）；
+    逐层按次序数：不带参数的 wait（或调用里有它的函数）等齐之前的全部；`wait <进程号>` 等它写了几个号就几个（两个 & 只等一个的，剩下那个照没等到拒）；
     `wait -n`、`tail --pid`、`kill -0` 轮询各等一个（Z12、Z13），先等先起的那个。"""
     found = []
     for layer in shell_layers(text):
@@ -3049,7 +3067,7 @@ def follow_simple_command(words, directory, variables, steps, depth, heredoc_bod
         steps += [OverwriteCandidate(f"{name} -i", file, directory) for file in in_place_editor_files(name, arguments)]
     elif (name == "rsync" and any(argument == "--inplace" or argument.startswith("--inplace=") for argument in arguments)
           and not detector_break_is_set("rsync-inplace-unseen")):
-        # rsync --inplace 往已有的文件里就地写、不换 inode（正推腿乙报告第五节 Z8），⑤ ⑦ 照整份覆盖认；弄坏开关 rsync-inplace-unseen 下只有 ⑨ ⑫ 认它
+        # rsync --inplace 往已有的文件里就地写、不换 inode，⑤ ⑦ 照整份覆盖认；弄坏开关 rsync-inplace-unseen 下只有 ⑨ ⑫ 认它
         operands = [argument for argument in arguments if not argument.startswith("-")]
         if len(operands) >= 2:
             steps.append(OverwriteCandidate("rsync --inplace", operands[-1], directory, tuple(operands[:-1]), None))
@@ -3097,7 +3115,7 @@ def follow_simple_command(words, directory, variables, steps, depth, heredoc_bod
 def scope_launcher_inner_text(name, arguments, directory):
     """⑫ 用：eval 的代码（参数照 eval 的样子用空格接起来）与启动器（xargs、find -exec、parallel、flock、/usr/bin/time 这类，lib_project_code_runs.py 的 command_under_launcher）
     里面那条命令，交回一段命令文本，照命令接着判写到哪；xargs、find、parallel 读进来接进命令的词是没展开的占位词（LAUNCHER_INPUT_WORDS），落点照算不出拒。
-    不是这几种的交 None。弄坏开关 scope-launcher-writes-unseen 下一律交 None（改前的判法：这几种起的写看不见，一百三十七节件 1b 第 4 条）。"""
+    不是这几种的交 None。弄坏开关 scope-launcher-writes-unseen 下一律交 None（这几种起的写看不见）。"""
     if detector_break_is_set("scope-launcher-writes-unseen"):
         return None
     if name == "eval":
@@ -3288,7 +3306,7 @@ def run_git_ls_files(repository_root, arguments):
 
 def git_tracks(repository_root, path):
     """`git ls-files --error-unmatch`：进过 git 交 True，没进交 False，git 自己出错（不是仓、路径在仓外、超时）交 None。
-    一份一份查，只给弄坏开关 per-path-git-query 退回旧做法用；正常走 tracked_verdicts 一次查完。"""
+    一份一份查，只给弄坏开关 per-path-git-query 用；正常走 tracked_verdicts 一次查完。"""
     try:
         completed = run_git_ls_files(repository_root, ["--error-unmatch", "--", path])
     except (OSError, subprocess.TimeoutExpired):
@@ -3312,7 +3330,7 @@ def tracked_verdicts(repository_root, paths):
     paths = list(dict.fromkeys(paths))
     if not paths:
         return {}
-    if detector_break_is_set("per-path-git-query"):   # 弄坏开关：一份一份查（改前的做法）
+    if detector_break_is_set("per-path-git-query"):   # 弄坏开关：一份一份查
         return {path: git_tracks(repository_root, path) for path in paths}
     tracked = tracked_names(repository_root, paths)
     if tracked is None:
@@ -3426,7 +3444,7 @@ RECORD_APPEND_TOOL = "scripts/kb/append-record.py"
 RECORD_APPEND_UNLISTED_TOOL = "scripts/kb/history-consolidate.py"   # 弄坏开关 record-howto-unlisted-tool 下出路写成它：不在 lib_project_code_runs.py 的直接跑名单上，照抄会被 project-code-guard.sh 拒
 RECORD_HOWTO_TEXT_PLACEHOLDER = "<草稿目录里写好的文本文件>"   # 出路里文本文件那一处的占位，自证照抄出路喂 project-code-guard.sh 时换成真文件
 # ⑲ 出路喂给同一触发点上别的闸（project-code-guard.sh）时用的环境：本钩子这一趟自证设着的弄坏开关（名字以 _BREAK 收尾的变量，含 LIB_SHELL_WORDS_BREAK 这类共用库的）不带过去。
-# 别的钩子见到不是它自己自证设的弄坏开关就拒（退 2），出路过不了闸是被这个开关挡的，不是出路写错。弄坏开关 howto-guard-environment-keeps-breaks 下原样带过去（改前的样子）
+# 别的钩子见到不是它自己自证设的弄坏开关就拒（退 2），出路过不了闸是被这个开关挡的，不是出路写错。弄坏开关 howto-guard-environment-keeps-breaks 下原样带过去
 def howto_guard_environment(base, detections_path):
     environment = dict(base, AGENT_HOOK_DETECTIONS=detections_path)
     if detector_break_is_set("howto-guard-environment-keeps-breaks"):
@@ -3613,7 +3631,7 @@ def literal_notation_remedies(hits, library_path):
 
 # ⑦ 在同一个 inode 上改一个已经存在的脚本：shell 那一半沿用 ⑤ 的 overwrite_steps（同一份写法、cd 与变量），另判喂给 python 的代码
 SCRIPT_SUFFIXES = (".sh", ".py")
-INODE_REPLACING_FORMS = {"mv", "install"}               # 实测换 inode：改之前打开文件的读者接着读到旧内容
+INODE_REPLACING_FORMS = {"mv", "install"}               # 实测换 inode：已经打开着文件的读者接着读到旧内容
 PYTHON_OPTIONS_WITH_VALUE = {"-W", "-X", "--check-hash-based-pycs"}
 PYTHON_STANDARD_INPUT_SCRIPTS = ("/dev/fd/", "/dev/stdin")
 PYTHON_OPEN_MODULES = {"io", "builtins", "codecs"}      # 这几个模块的 open 与内建 open 同一个签名：(文件, 模式)
@@ -3733,7 +3751,7 @@ def python_in_place_writes(code, every_write=False):
 
 def is_existing_script(path, repository_root, scratch_root):
     """path 是仓里或 scratch_root（一个根，或几个根的元组）下一个已经存在的脚本：.sh、.py，或带执行位的普通文件（符号链接按它指向的文件算）。
-    弄坏开关 in-place-script-session-temporary-root-unseen 下会话临时目录根不算（改前没有它的样子）。"""
+    弄坏开关 in-place-script-session-temporary-root-unseen 下会话临时目录根不算。"""
     roots = (scratch_root,) if isinstance(scratch_root, str) else tuple(scratch_root)
     if work_roots and detector_break_is_set("in-place-script-session-temporary-root-unseen"):
         roots = tuple(root for root in roots if root != work_roots.claude_session_temporary_root())
@@ -4193,7 +4211,7 @@ def function_returns(definition):
 
 class OwnSessionGroups:
     """一段 python 代码里认「自己用新会话起的子进程的进程组」（上面 SESSION_CHILD_CALLS 那段注释）。scope_chain 是从模块到当前作用域的节点列表。
-    弄坏开关：own-session-group-unrecognized 一样都不认（改前的判法）；own-session-group-session-unchecked 不看 start_new_session 与 process_group，
+    弄坏开关：own-session-group-unrecognized 一样都不认；own-session-group-session-unchecked 不看 start_new_session 与 process_group，
     凡 Popen 这一类起的都认；own-session-group-first-binding-only 名字只看第一处绑定，后面改绑的看不见。"""
     def __init__(self):
         self.bindings_by_scope = {}
@@ -4420,7 +4438,7 @@ def termination_findings(text, process_table=None, own_ancestors=(), whole_comma
 
 def process_signal_refusal(command, process_table_reader=read_process_table, own_process_id=None):
     """命令里有打得到别人的终止写法就交回每一处的原因；否则交 []。进程表只在判到 kill / proc.py stop 的写死的进程号时才读（ProcessTableOnDemand，读一次）。
-    前台、run_in_background 一样拒。弄坏开关 always-read-process-table：命令里有数字就先整扫 /proc（改前的做法）。"""
+    前台、run_in_background 一样拒。弄坏开关 always-read-process-table：命令里有数字就先整扫 /proc。"""
     if (detector_break_is_set("disable-check")
             or detector_break_is_set("allow-process-signals")):
         return []
@@ -4692,6 +4710,128 @@ def work_root_removal_refusal(command, directory):
                 found.append(f"rm -r {operand}（{hit[1]}：{hit[0]}）")
     return list(dict.fromkeys(found))
 
+# ⑳ 手拷仓副本（文件头 ⑳）：命令位置上的 rsync、cp -r / -R / -a 的源是本仓的 crates/ 或仓根整个。仓副本只经 scripts/hosts/minimal-copy.py 建，
+#   拷哪些由 scripts/hosts/lib_repository_copy.py 的闭包现算；手列的范围跟不上编译与测试要读的仓根条目。
+MINIMAL_COPY_TOOL = "scripts/hosts/minimal-copy.py"
+MANUAL_COPY_UNLISTED_TOOL = "scripts/hosts/compile-then-swap.py"   # 弄坏开关 manual-copy-howto-unlisted-tool 下出路写成它：不在 lib_project_code_runs.py 的直接跑名单上，照抄会被 project-code-guard.sh 拒
+MANUAL_COPY_HOWTO_COPY_PLACEHOLDER = "<草稿目录>/copy"   # 出路里副本那一处的占位，自证照抄出路喂 project-code-guard.sh 时换成自证草稿里的一个路径
+MANUAL_COPY_HOWTO_COMMAND = re.compile(r"→ 怎么办：仓副本只用 `([^`]*)` 建")   # 自证从拒绝说明里取出路的整条写法
+# rsync 带值的选项（值另起一个词时跳过它；写成 --选项=值 的不用跳）：短的是 -e、-f、-T、-B、-M、-@
+RSYNC_SHORT_OPTIONS_WITH_VALUE = "efTBM@"
+RSYNC_LONG_OPTIONS_WITH_VALUE = frozenset({
+    "--exclude", "--include", "--exclude-from", "--include-from", "--filter", "--files-from", "--rsh", "--rsync-path", "--temp-dir",
+    "--compare-dest", "--copy-dest", "--link-dest", "--backup-dir", "--suffix", "--chmod", "--chown", "--usermap", "--groupmap", "--timeout",
+    "--contimeout", "--port", "--sockopts", "--out-format", "--log-file", "--log-file-format", "--password-file", "--bwlimit", "--partial-dir",
+    "--max-size", "--min-size", "--max-delete", "--block-size", "--modify-window", "--checksum-choice", "--compress-choice", "--compress-level",
+    "--skip-compress", "--iconv", "--info", "--debug", "--stop-after", "--stop-at", "--write-batch", "--only-write-batch", "--read-batch",
+    "--protocol", "--outbuf", "--remote-option", "--address", "--copy-as", "--max-alloc"})
+RSYNC_LISTING_OPTIONS = frozenset({"--dry-run", "--list-only"})   # 只演一遍或只列，不拷
+RSYNC_REMOTE_OPERAND = re.compile(r"^[^/]*:")   # 主机:路径、rsync://主机/…（本地路径里带冒号的写成 ./ 起头）
+
+def manual_copy_howto(repository_root):
+    """⑳ 拒绝说明里的出路整条：minimal-copy.py 照这一份钩子所在的仓根建副本、带测试输入；弄坏开关 manual-copy-howto-unlisted-tool 下换成不在直接跑名单上的脚本。"""
+    tool = MANUAL_COPY_UNLISTED_TOOL if detector_break_is_set("manual-copy-howto-unlisted-tool") else MINIMAL_COPY_TOOL
+    return f"python3 {tool} {repository_root} {MANUAL_COPY_HOWTO_COPY_PLACEHOLDER} --with-test-inputs"
+
+def rsync_copied_sources(arguments):
+    """rsync 的参数切开交回源（操作数里除最后一个目的之外的）；带 -n / --dry-run / --list-only 的、只给一个操作数的（只列不拷）交 []。"""
+    operands, position, listing_only = [], 0, False
+    while position < len(arguments):
+        argument = arguments[position]
+        position += 1
+        if argument == "--":
+            operands += arguments[position:]
+            break
+        if argument == "-" or not argument.startswith("-"):
+            operands.append(argument)
+            continue
+        if argument.startswith("--"):
+            option, has_value, _value = argument.partition("=")
+            if option in RSYNC_LISTING_OPTIONS:
+                listing_only = True
+            elif option in RSYNC_LONG_OPTIONS_WITH_VALUE and not has_value:
+                position += 1
+            continue
+        letters = argument[1:]
+        for index, letter in enumerate(letters):
+            if letter in RSYNC_SHORT_OPTIONS_WITH_VALUE:
+                if index + 1 == len(letters):
+                    position += 1
+                break
+            if letter == "n":
+                listing_only = True
+    return [] if listing_only or len(operands) < 2 else operands[:-1]
+
+def copy_arguments_recursive(arguments):
+    """cp 的参数里带 -r / -R / -a（与别的短选项合写的也算，写在操作数后面的也算）、--recursive、--archive；`--` 之后的不算。"""
+    for argument in arguments:
+        if argument == "--":
+            return False
+        if argument in ("--recursive", "--archive"):
+            return True
+        if argument.startswith("-") and not argument.startswith("--") and argument != "-":
+            for letter in argument[1:]:
+                if letter in COPY_SHORT_OPTIONS_WITH_VALUE["cp"]:
+                    break
+                if letter in "rRa":
+                    return True
+    return False
+
+def copied_sources(name, arguments):
+    """rsync 与递归的 cp 的源操作数；别的命令、不拷的写法（rsync -n、只给一个操作数、cp 不带递归）交 []。"""
+    if name == "rsync":
+        return rsync_copied_sources(arguments)
+    if name == "cp" and copy_arguments_recursive(arguments):
+        parsed = parse_copy_arguments("cp", arguments)
+        return list(parsed.operands) if parsed.target_directory else list(parsed.operands[:-1])
+    return []
+
+def copied_source_hits(word, directory, variables, protected):
+    """一个源操作数打到 protected（{真实路径: 说法}）里的哪一处：交说法的列表；远端写法、这一刻算不出的、没打到的交 []。
+    ~、前面赋过值的变量与 $HOME 展开，相对路径按当时的目录，规整 .. 与结尾的 /；带通配的照 bash 的默认展开，通配写在 protected 那一处下一层整层的也算。"""
+    if RSYNC_REMOTE_OPERAND.match(word):
+        return []
+    if word == "~" or word.startswith("~/"):
+        word = os.path.expanduser("~") + word[1:]
+    expanded = shell_words.expand_known_variables(word, variables or {})
+    if expanded is None:
+        return []
+    if not os.path.isabs(expanded):
+        if directory is None:
+            return []
+        expanded = os.path.join(directory, expanded)
+    expanded = os.path.normpath(expanded)
+    if not REMOVAL_GLOB_CHARACTERS & set(expanded):
+        what = protected.get(os.path.realpath(expanded))
+        return [what] if what else []
+    hits = []
+    parent, last = os.path.split(expanded)
+    covered = protected.get(os.path.realpath(parent)) if REMOVAL_GLOB_CHARACTERS & set(last) and not REMOVAL_GLOB_CHARACTERS & set(parent) else None
+    if covered:
+        hits.append(f"通配盖住{covered}的整层")
+    for match in sorted(glob.glob(expanded)):
+        what = protected.get(os.path.realpath(match))
+        if what:
+            hits.append(f"通配展开到{what}")
+    return hits
+
+def manual_repository_copy_refusal(command, repository_root, start_directory):
+    """命令位置上的 rsync、cp -r / -R / -a（每一层：bash -c、喂给 shell 的 heredoc、命令替换；前缀剥开；cd 与前面赋过值的变量跟着算）的源是本仓的 crates/
+    或仓根整个（文件头 ⑳），交回认出的写法；否则交 []。前台、run_in_background、主 agent 与子 agent 一样拒。弄坏开关 allow-manual-repository-copy 下一概放行。"""
+    if detector_break_is_set("allow-manual-repository-copy"):
+        return []
+    root = os.path.realpath(repository_root)
+    protected = {root: "仓根整个", os.path.realpath(os.path.join(root, "crates")): "本仓的 crates/"}
+    found = []
+    for at in shell_words.commands_at_command_position(command, start_directory).commands:
+        if not at.words:
+            continue
+        name = os.path.basename(at.words[0])
+        for word in copied_sources(name, at.words[1:]):
+            for hit in copied_source_hits(word, at.directory, at.variables, protected):
+                found.append(f"{name} {word}（{hit}）")
+    return list(dict.fromkeys(found))
+
 def selftest(hook_dir):
     if shell_words is None:
         print(f"  ✗ 自检：读不到共用切词模块 {shell_words_library_path(hook_dir)}（{shell_words_error!r}）")
@@ -4846,10 +4986,10 @@ def selftest_in(hook_dir, work):
         ("前台 <(bash <<EOF) 里的循环", "diff <(bash <<'EOF'\nuntil grep -q x f; do sleep 10; done\nEOF\n) y", False, 1),
         ("$(timeout 60 bash <<EOF) 里的循环", "x=$(timeout 60 bash <<'EOF'\nuntil grep -q x f; do sleep 10; done\nEOF\n)", False, 0),
         ("$(cat <<EOF) 喂的是数据", "x=$(cat <<'EOF'\nuntil grep -q x f; do sleep 10; done\nEOF\n)", False, 0),
-        # 同一行里先有双引号包着、已收尾的 $(…)，再接顶层的 bash <<EOF（三方 shell-words-r1 正推腿报告 W2 一节；LIB_SHELL_WORDS_BREAK=double-quoted-substitution-unclosed 下这两格红）
+        # 同一行里先有双引号包着、已收尾的 $(…)，再接顶层的 bash <<EOF（LIB_SHELL_WORDS_BREAK=double-quoted-substitution-unclosed 下这两格红）
         ('前台 cd "$(…)" 之后 bash <<EOF 里的循环', "cd \"$(git rev-parse --show-toplevel)\" && bash <<'EOF'\nuntil grep -q x f; do sleep 10; done\nEOF", False, 1),
         ('前台 echo "$(date)" | bash <<EOF 里的循环', "echo \"$(date)\" | bash <<'EOF'\nuntil grep -q x f; do sleep 10; done\nEOF", False, 1),
-        # ANSI-C 引号 $'…' 里的 \' 不收尾，之后没收尾的 $( 里的 bash <<EOF 照认（三方 shell-words-r2 判决第二节第 6 条；LIB_SHELL_WORDS_BREAK=ansi-c-quotes-unseen 下这一格红）
+        # ANSI-C 引号 $'…' 里的 \' 不收尾，之后没收尾的 $( 里的 bash <<EOF 照认（LIB_SHELL_WORDS_BREAK=ansi-c-quotes-unseen 下这一格红）
         ("前台 $'a\\'b' 之后 $(bash <<EOF) 里的循环", "echo $'a\\'b'; x=$(bash <<'EOF'\nuntil grep -q x f; do sleep 10; done\nEOF\n)", False, 1),
     ]
     for label, command, background, want in wait_loop_cases:
@@ -4914,7 +5054,7 @@ def selftest_in(hook_dir, work):
             results.append((f"起 claude:一百三十七：{label}", want, 1 if claude_launch_refusal(command, agent, startup_directory) else 0))
     finally:
         shutil.rmtree(startup_directory, ignore_errors=True)
-    # ⑬ 三方 d137-gov-r1 判决第三段「已知没认」四类：登录 shell 的 profile（LIB_SHELL_WORDS_BREAK=login-profiles-unread）、系统级启动文件（system-startup-files-unread；
+    # ⑬ 登录 shell 的 profile（LIB_SHELL_WORDS_BREAK=login-profiles-unread）、系统级启动文件（system-startup-files-unread；
     # SYSTEM_STARTUP_DIRECTORY 换成样本目录）、别的程序里起的 claude（LIB_SHELL_WORDS_BREAK=embedded-launches-unseen 与 embedded-launch-claude-unread）、
     # bash x.sh 起的脚本正文里起 claude（script-body-claude-unread）；「拒」的格在各自的开关下红（逐格见文件头开关清单）
     d137_directory = tempfile.mkdtemp()
@@ -5108,7 +5248,7 @@ def selftest_in(hook_dir, work):
         ]
         for label, agent, command, want in compile_first_cases:
             results.append((f"先编后换:{label}", want, 1 if compile_first_refusal(command, agent, edit_repository) else 0))
-        # 相对路径从 hook 输入的 cwd 起算，同 ⑧ ⑫（三方 shell-words-r2 判决第二节第 10 条；BASH_COMMAND_DETECTOR_BREAK=compile-first-ignores-cwd 下第一格红）：
+        # 相对路径从 hook 输入的 cwd 起算，同 ⑧ ⑫（BASH_COMMAND_DETECTOR_BREAK=compile-first-ignores-cwd 下第一格红）：
         # cwd 是草稿目录里的仓副本时 crates/… 写的是副本；cwd 在主工作区的子目录里时相对路径从那里算
         copy_root = edit_repository + "-copy"
         results.append(("先编后换:执行员 cwd 在仓副本里、相对路径写 crates/ 下的 .rs 放行", 0,
@@ -5350,7 +5490,7 @@ def selftest_in(hook_dir, work):
         ("replace-batch.py 规格读不到，拒", "clerk", "python3 scripts/kb/replace-batch.py no-such-spec.json", "拒"),
         ("cd 到没赋过值的变量目录之后写相对路径，拒", "clerk", "cd \"$WHERE\" && echo x > a.md", "拒"),
         ("cd 算不出之后 python 写相对路径，拒", "clerk", "cd \"$WHERE\" && python3 -c \"open('a.md', 'w').write('x')\"", "拒"),
-        # 检出原文（2026-10-22 两条，拆分提案新一节）：for 列表写死，但目标里有命令替换 $(echo $f | tr / _)
+        # 例：for 列表写死，但目标里有命令替换 $(echo $f | tr / _)
         ("检出原文：mkdir -p <草稿目录>/originals && for f in …; do cp -p \"$f\" \"<草稿目录>/originals/$(echo $f | tr / _)\"; done，拒", "clerk",
          f"mkdir -p {new_root}/m4-per-run-build-dirs/originals && for f in scripts/gate/merge-and-verify.sh scripts/mutation/crates-mutation-rows.py "
          f"scripts/crash/crash-point-replay.sh; do cp -p \"$f\" \"{new_root}/m4-per-run-build-dirs/originals/$(echo $f | tr / _)\"; done", "拒"),
@@ -5366,7 +5506,7 @@ def selftest_in(hook_dir, work):
         ("for 的列表里有爬回仓里的 ..，落在写范围外，拒", "clerk", f"for f in ok {climb_back}; do echo x > {new_root}/clerk-x/$f; done", "拒"),
         ("for 的列表里有 .. 段、落点回到写范围之外，拒", "clerk", "cd records && for d in a ../b; do echo x > $d/a.md; done", "拒"),
         ("for 的列表里有写范围外的仓内路径，cp 写到它，拒", "clerk", "for f in records/a.md .claude/kb/b.md; do cp /tmp/x \"$f\"; done", "拒"),
-        # 变量来源不明的：静态前缀在哪都拒（改前静态前缀在仓外或范围里就放行，变量的值可以带 /.. 爬回仓里）
+        # 变量来源不明的：静态前缀在哪都拒（静态前缀在仓外或范围里也拒：变量的值可以带 /.. 爬回仓里）
         ("f 来源不明的 > <草稿目录>/out-$f，拒", "clerk", f"echo x > {new_root}/clerk-x/out-$f", "拒"),
         ("变量来源不明、静态前缀在工作根下（仓外），拒", "clerk", f"echo x > {new_root}/clerk-x/breaks/$b.out", "拒"),
         ("变量来源不明、静态前缀在 /tmp 下（仓外），拒", "clerk", "echo x > /tmp/claude-1000/s/scratchpad/$f.out", "拒"),
@@ -5833,7 +5973,7 @@ def selftest_in(hook_dir, work):
                                 input=json.dumps({"tool_name": "Bash", "tool_input": {"command": 'until grep -q "^exit=" log; do sleep 10; done', "run_in_background": False}}),
                                 env=dict(os.environ, **{DETECTOR_BREAK_VARIABLE: "disable-check", "AGENT_HOOK_DETECTIONS": os.path.join(work, "probe-detections.jsonl")}))
     results.append(("自证起的子进程（带标记）照认弄坏开关", 0, marked_run.returncode))
-    # 关守卫项与别的项同写：平常跑与带标记的子进程都退 2、点名它只在单独一项时认；开关 break-honored-outside-selftest-with-others 设着时带标记那一格的开关里也带上它（改前的样子：同写照认），那一格红
+    # 关守卫项与别的项同写：平常跑与带标记的子进程都退 2、点名它只在单独一项时认；开关 break-honored-outside-selftest-with-others 设着时带标记那一格的开关里也带上它（同写照认），那一格红
     combined_items = f"{GUARD_OFF_ITEM},disable-check"
     combined_plain = subprocess.run(["bash", os.path.join(hook_dir, "bash-command-detector.sh"), "--force", "--break-guard-probe-unknown-option"], input="", capture_output=True, text=True,
                                     env=dict(unmarked_environment, **{DETECTOR_BREAK_VARIABLE: combined_items, "AGENT_HOOK_DETECTIONS": os.path.join(work, "probe-detections.jsonl")}))
@@ -6258,12 +6398,12 @@ def selftest_in(hook_dir, work):
     launcher_library = project_code_runs_library()
     launcher_names = sorted(launcher_library.launcher_names()) if launcher_library is not None else None
     results.append(("启动器名单与 lib_project_code_runs 的一致", sorted(LAUNCHER_NAMES), launcher_names))
-    # 照 bash 不跑的放行（判决第二节第 7 条）：case 里 ;; 之后的模式词（case-patterns-as-commands 下这两格红）
+    # 照 bash 不跑的放行：case 里 ;; 之后的模式词（case-patterns-as-commands 下这两格红）
     for label, agent_type, command in (("case 里 ;; 之后的 reboot 模式不当命令", "implementation-writer", 'case "$1" in a) :;; reboot) :;; esac'),
                                        ("case 里 ;; 之后的 claude 模式不当命令", "implementation-writer", 'case "$1" in\n  start) echo s;;\n  claude) echo c;;\nesac')):
         results.append((f"stdin:子 agent {label}放行（退出码 0）", 0, entry_as(agent_type, command).returncode))
     results.append(("stdin:子 agent case 一项的命令里的 reboot 照拒（退出码 2）", 2, entry_as("implementation-writer", 'case "$1" in a) reboot;; esac').returncode))
-    # 一百三十七节第 8 批（复跑分类报告 d137-replay-classify「二、误拒逐条」E1、E6–E9 与 6.5 节两类零星）：钩子认得出、判错了的几处，每处一对放与拒，
+    # 钩子认得出、判错了的几处，每处一对放与拒，
     # 拒的那一侧照报告里的同形写法；放的那一格后面的注释写弄坏它的开关（共用模块 LIB_SHELL_WORDS_BREAK=<项>，检出钩子 BASH_COMMAND_DETECTOR_BREAK=<项>）
     def d137_command(text, name):
         return next(command for command in shell_words.commands_at_command_position(text, work).commands if command.words and os.path.basename(command.words[0]) == name)
@@ -6500,7 +6640,7 @@ def selftest_in(hook_dir, work):
     bash_layer = batch137_entry("ls", "clerk", environment=dict(os.environ, AGENT_HOOK_DETECTIONS=detections, PATH=shim + os.pathsep + os.environ.get("PATH", "")))
     results.append(("一百三十七：钩子 bash 这一层起不来（假 python3 退 127）：放行（退出码 0）、记一条检出", (0, 1, "s-137", "只记"),
                     (bash_layer.returncode, detection_lines() - before, last_detection_entry().get("session_id"), last_detection_entry().get("outcome"))))
-    # PATH 上没有 python3（三方 d137-gov-r1 判决 H13；python-missing-unrecorded 下红）：PATH 只放记检出要用的 cat、date、mkdir、dirname
+    # PATH 上没有 python3（python-missing-unrecorded 下红）：PATH 只放记检出要用的 cat、date、mkdir、dirname
     no_python = os.path.join(work, "no-python-path")
     os.makedirs(no_python, exist_ok=True)
     for tool in ("cat", "date", "mkdir", "dirname"):
@@ -6822,6 +6962,86 @@ def selftest_in(hook_dir, work):
                 howto_exit = subprocess.run(["bash", guard_script], capture_output=True, text=True, input=json.dumps(guard_payload),
                                             env=howto_guard_environment(os.environ, os.path.join(work, "record-howto-detections.jsonl"))).returncode
             results.append((howto_label, 0, howto_exit))
+    # ⑳ 手拷仓副本：(说明, 命令, 该不该拒[, 起点目录])；假仓在草稿里（crates/demo、Cargo.toml），草稿目录另放一份副本的 crates/ 与笔记；起点不写是假仓根
+    copy_repository = os.path.join(work, "manual-copy-repository")
+    copy_scratch = os.path.join(work, "manual-copy-scratch")
+    for base_directory, relative in ((copy_repository, "crates/demo/src/lib.rs"), (copy_repository, "Cargo.toml"),
+                                     (copy_scratch, "notes/a.md"), (copy_scratch, "copy/crates/demo/src/lib.rs")):
+        os.makedirs(os.path.dirname(os.path.join(base_directory, relative)), exist_ok=True)
+        with open(os.path.join(base_directory, relative), "w", encoding="utf-8") as handle:
+            handle.write("\n")
+    manual_copy_cases = [
+        ("rsync 拷 crates 进仓外目录", f"rsync -a --exclude target crates {copy_scratch}/copy/", 1),
+        ("cp -r 拷 crates", f"cp -r crates {copy_scratch}/copy/", 1),
+        ("rsync 拷仓根整个（./）", f"rsync -a --exclude target --exclude .git ./ {copy_scratch}/copy/", 1),
+        ("rsync 拷仓根（绝对路径带结尾的 /）", f"rsync -a --exclude target --exclude .git {copy_repository}/ {copy_scratch}/copy/", 1),
+        ("cp -a 拷仓根 .", f"cp -a . {copy_scratch}/copy", 1),
+        ("cp -R 拷 crates/（带结尾的 /）", f"cp -R crates/ {copy_scratch}/copy/crates", 1),
+        ("cp --archive 拷 crates", f"cp --archive crates {copy_scratch}/copy/", 1),
+        ("cp -t 目录写在前面、-r 写在后面", f"cp -t {copy_scratch}/copy -r crates", 1),
+        ("rsync 的 --exclude=值 合写", f"rsync -av --exclude=target crates {copy_scratch}/copy/", 1),
+        ("rsync -e 带值的短选项之后的源照认", f"rsync -a -e ssh crates {copy_scratch}/copy/", 1),
+        ("cd 进仓根之后 rsync crates", f"cd {copy_repository} && rsync -a crates {copy_scratch}/copy/", 1, copy_scratch),
+        ("前面赋过值的变量代入", f"R={copy_repository}; rsync -a $R/crates {copy_scratch}/copy/", 1, copy_scratch),
+        ("bash -c 里", f"bash -c 'cp -r crates {copy_scratch}/copy/'", 1),
+        ("nice 前缀", f"nice -n 19 rsync -a crates {copy_scratch}/copy/", 1),
+        ("仓根里的通配 * 盖住整层", f"cp -r * {copy_scratch}/copy/", 1),
+        ("crates/* 盖住 crates 整层", f"cp -r crates/* {copy_scratch}/copy/crates/", 1),
+        ("crates/.. 规整之后是仓根", f"rsync -a crates/.. {copy_scratch}/copy/", 1),
+        ("喂给 bash 的 heredoc 里", f"bash <<'EOF'\nrsync -a crates {copy_scratch}/copy/\nEOF", 1),
+        ("rsync 一次给几个源、其中有 crates", f"rsync -a Cargo.toml crates {copy_scratch}/copy/", 1),
+        ("minimal-copy.py 本身放行", f"python3 scripts/hosts/minimal-copy.py {copy_repository} {copy_scratch}/copy --with-test-inputs", 0),
+        ("拷草稿目录里不含本仓 crates 的东西放行", f"rsync -a {copy_scratch}/notes/ {copy_scratch}/notes-backup/", 0),
+        ("拷草稿目录里别的副本的 crates 放行", f"cp -r {copy_scratch}/copy/crates {copy_scratch}/copy-two/", 0),
+        ("cp 不带递归放行（目录拷不过去）", f"cp crates {copy_scratch}/x", 0),
+        ("rsync -n 只演一遍放行", f"rsync -an crates {copy_scratch}/copy/", 0),
+        ("rsync --dry-run 放行", f"rsync --dry-run -a crates {copy_scratch}/copy/", 0),
+        ("rsync 只给一个操作数是只列，放行", "rsync -a crates", 0),
+        ("拷 crates 下单个包的目录放行", f"cp -r crates/demo {copy_scratch}/copy/crates/", 0),
+        ("拷 crates 下单个文件放行", f"cp crates/demo/src/lib.rs {copy_scratch}/lib.rs", 0),
+        ("echo 引号里当数据写的放行", f"echo 'rsync -a crates {copy_scratch}/copy/'", 0),
+        ("grep 参数里的放行", "grep -n 'cp -r crates' notes.md", 0),
+        ("写进文件的 heredoc 正文放行", f"cat > {copy_scratch}/note.md <<'EOF'\nrsync -a crates /x/\nEOF", 0),
+        ("源是没赋过值的变量放行（算不出）", 'rsync -a "$MANUAL_COPY_SOURCE_UNSET" /x/', 0),
+        ("远端源（主机:路径）放行", "rsync -a host:crates /x/", 0),
+        ("同名前缀的兄弟目录放行", f"cp -r crates-old {copy_scratch}/x", 0),
+        ("-- 之后的 -r 是文件名、不算递归，放行", "cp -- -r crates", 0),
+    ]
+    for label, command, want, *start in manual_copy_cases:
+        results.append((f"手拷仓副本:{label}", want, 1 if manual_repository_copy_refusal(command, copy_repository, start[0] if start else copy_repository) else 0))
+    # 走真实入口（这一份钩子、它所在的仓根）：主 agent 与子 agent 手拷本仓的 crates 各拒一格、拒绝说明给 minimal-copy.py 的整条写法；
+    # 出路本身要过得了别的闸：那条整条写法照抄（副本换成草稿里的一个路径）喂给同挂 PreToolUse[Bash] 的 project-code-guard.sh，要放行；起 minimal-copy.py 本身放行
+    manual_copy_root = repository_root_of(hook_dir)
+    for agent_type, command, label in ((None, f"rsync -a --exclude target crates {copy_scratch}/copy/", "主 agent rsync 拷 crates"),
+                                       ("implementation-writer", f"cp -r crates {copy_scratch}/copy/", "子 agent cp -r 拷 crates")):
+        manual_payload = {"tool_name": "Bash", "session_id": "s", "cwd": manual_copy_root, "tool_input": {"command": command, "run_in_background": False}}
+        if agent_type:
+            manual_payload["agent_type"] = agent_type
+        manual_entry = subprocess.run(["bash", os.path.join(hook_dir, "bash-command-detector.sh")], capture_output=True, text=True,
+                                      env=dict(os.environ, AGENT_HOOK_DETECTIONS=os.path.join(work, "manual-copy-detections.jsonl")), input=json.dumps(manual_payload))
+        manual_howto = MANUAL_COPY_HOWTO_COMMAND.search(manual_entry.stderr)
+        results.append((f"stdin:{label} 拒、出路给 minimal-copy.py 的整条写法（退出码 2）", (2, True), (manual_entry.returncode, manual_howto is not None)))
+        manual_howto_label = f"出路过别的闸:{'子 agent' if agent_type else '主 agent'} 照抄 ⑳ 的出路喂 project-code-guard.sh 放行（退出码 0）"
+        manual_guard_script = os.path.join(hook_dir, "project-code-guard.sh")
+        if not os.path.isfile(manual_guard_script):
+            howto_not_run.append(f"{manual_howto_label}（hook 旁边没有 project-code-guard.sh）")
+            continue
+        manual_howto_exit = None   # 拒绝说明里取不出出路也判红
+        if manual_howto:
+            manual_guard_payload = {"tool_name": "Bash", "session_id": "s", "cwd": manual_copy_root,
+                                    "tool_input": {"command": manual_howto.group(1).replace(MANUAL_COPY_HOWTO_COPY_PLACEHOLDER, os.path.join(copy_scratch, "howto-copy")),
+                                                   "run_in_background": False}}
+            if agent_type:
+                manual_guard_payload["agent_type"] = agent_type
+            manual_howto_exit = subprocess.run(["bash", manual_guard_script], capture_output=True, text=True, input=json.dumps(manual_guard_payload),
+                                               env=howto_guard_environment(os.environ, os.path.join(work, "manual-copy-howto-detections.jsonl"))).returncode
+        results.append((manual_howto_label, 0, manual_howto_exit))
+    manual_green = subprocess.run(["bash", os.path.join(hook_dir, "bash-command-detector.sh")], capture_output=True, text=True,
+                                  env=dict(os.environ, AGENT_HOOK_DETECTIONS=os.path.join(work, "manual-copy-detections.jsonl")),
+                                  input=json.dumps({"tool_name": "Bash", "session_id": "s", "cwd": manual_copy_root, "tool_input": {
+                                      "command": f"python3 scripts/hosts/minimal-copy.py {manual_copy_root} {copy_scratch}/copy --with-test-inputs",
+                                      "run_in_background": False}}))
+    results.append(("stdin:主 agent 起 minimal-copy.py 建副本放行（退出码 0）", 0, manual_green.returncode))
     sample_environment = howto_guard_environment({"LIB_SHELL_WORDS_BREAK": "x", "PROJECT_CODE_GUARD_BREAK": "y", "PATH": "/sample"}, "/sample/detections.jsonl")
     results.append(("出路过别的闸:喂 project-code-guard.sh 的环境里不带弄坏开关变量，别的变量照带", (False, False, True, True),
                     ("LIB_SHELL_WORDS_BREAK" in sample_environment, "PROJECT_CODE_GUARD_BREAK" in sample_environment, sample_environment.get("PATH") == "/sample",
@@ -6880,7 +7100,8 @@ def selftest_in(hook_dir, work):
               "「Bash写范围:」里 append-record.py 那几格红的看 known_write_script_steps() 的 RECORD_APPEND_SCRIPT 一支与 first_operand()，"
               "scope-record-append-unseen、scope-record-append-root-as-target 设着的话本来就该红；"
               "「往 records 追加:」与 stdin 里往 records 追加那两格红的看 record_append_refusal() / record_append_landing() / overwrite_steps(every_write=True) 的 tee 一支与 python_in_place_writes()，"
-              "allow-record-append、record-append-python-unseen、record-append-tee-unseen 设着的话本来就该红")
+              "allow-record-append、record-append-python-unseen、record-append-tee-unseen 设着的话本来就该红；"
+              "「手拷仓副本:」与 stdin 里手拷 crates、⑳ 出路过别的闸那几格红的看 manual_repository_copy_refusal() / copied_sources() / rsync_copied_sources() / copy_arguments_recursive() / copied_source_hits() / manual_copy_howto()，allow-manual-repository-copy、manual-copy-howto-unlisted-tool 设着的话本来就该红")
         return 1
     summary = ("没超时的等待循环、run_in_background 里又自己放后台记进检出记录，普通命令、重定向里的 & 、前台的 & 、写进文件的 heredoc 正文与按模式找进程（归上游钩子）不记；"
                "起看门狗不用 run_in_background、或带 &、nohup、setsid、disown、丢进 /dev/null 的拒绝（退出码 2），run_in_background 只写 watch.sh 的、把名字当参数的、"
@@ -6940,7 +7161,8 @@ def selftest_in(hook_dir, work):
                "⑲ 往假仓 records/ 下的 .md 追加（>>、&>>、tee -a、tee --append、cd 之后的相对路径、绝对路径、前面赋过值的变量、bash -c、python 的 open(…, 'a') 与 Path.open('a')、"
                "子目录、大写后缀、指进 records 的符号链接）拒，经 append-record.py、records 下别的后缀、records 外与仓外、同名前缀的兄弟目录、指到仓外的链接、"
                "> 整份写、python 'w'、只读、目标算不出的放行，走入口主 agent 与子 agent 各拒一格并给出整条写法，"
-               "那条写法照抄喂给 project-code-guard.sh 主 agent 与子 agent 都放行（hook 旁边没有它时报本次未跑）")
+               "那条写法照抄喂给 project-code-guard.sh 主 agent 与子 agent 都放行（hook 旁边没有它时报本次未跑）；"
+               "⑳ rsync、cp -r / -R / -a / --archive 拷假仓的 crates/ 或仓根整个（./、.、绝对路径带结尾的 /、crates/、crates/..、仓根里的 *、crates/*、-t 写在前面、--exclude 带值、-e 带值、cd 之后、前面赋过值的变量、bash -c、nice 前缀、喂给 bash 的 heredoc、几个源里有 crates）拒，minimal-copy.py 本身、拷草稿目录里别的东西、cp 不带递归、rsync -n / --dry-run / 只给一个操作数、拷 crates/ 下单个包或单个文件、当数据写的、算不出的变量、远端源、同名前缀的兄弟目录、-- 之后的 -r 放行，走入口主 agent 与子 agent 各拒一格并给出整条写法、那条写法照抄喂给 project-code-guard.sh 两边都放行，起 minimal-copy.py 本身走入口放行")
     not_run_note = f"；本次未跑 {len(howto_not_run)} 格：{'、'.join(howto_not_run)}" if howto_not_run else ""
     print(f"  ✓ 自检通过（查了 {len(results)} 种）：{summary}{not_run_note}")
     return 0
@@ -7228,6 +7450,21 @@ def main():
               "（只删归属是本会话、没有进程开着的，删前逐项连大小写进 <工作根>/sweep-<日期>.log；别的会话的、没有归属文件的列出来交用户定）；"
               f"在工作根下新建目录时 `bash {WORK_ROOT_SWEEP_SCRIPT} claim <目录> --purpose <一句>` 写归属文件。"
               "删一个具体目录直接写它的路径（`rm -rf <工作根>/<目录>`，不带通配）。这一道只拒这种写法，不停你在跑的任何东西")
+    try:
+        copy_directory = hook_input.get("cwd")
+        manual_copies = manual_repository_copy_refusal(tool_input.get("command") or "", repository_root_of(hook_dir),
+                                                       copy_directory if isinstance(copy_directory, str) and os.path.isdir(copy_directory)
+                                                       else repository_root_of(hook_dir))
+    except Exception as error:
+        not_judged(f"bash-command-detector.sh 没判成手拷仓副本的写法（{error!r}），这条命令照常执行")
+        manual_copies = []
+    if manual_copies:
+        refusal_lines.append(f"  ✗ 要手拷仓副本（认出的写法：{'；'.join(manual_copies)}）：手列的拷贝范围跟不上编译与测试要读的仓根条目"
+              "（path 依赖指到的目录、include_str! 与测试读的仓根文件），拷出来的副本缺东西，到 cargo 编不过、测试读不到才知道")
+        refusal_lines.append(f"     → 怎么办：仓副本只用 `{manual_copy_howto(repository_root_of(hook_dir))}` 建（拷哪些由 scripts/hosts/lib_repository_copy.py 的闭包现算："
+              "path 依赖、编译期与运行期读的仓根文件、测试输入；直接跑、不经服务，副本写进自己的草稿目录），要门禁表的加 `--with-gate-tables`，"
+              "要在副本里起仓里脚本的逐条加 `--with scripts=<为什么>`；它拒了照它的出路办。拷草稿目录里自己的东西、拷 crates/ 下单个包或单个文件不拦。"
+              "这一道只拒这种写法，不停你在跑的任何东西")
     if reasons:
         refusal_lines.append(f"  ✗ 看门狗起法不对（{'；'.join(reasons)}；认出的调用：{'、'.join(calls)}）：这样起的看门狗叫不醒主 agent，等于没盯")
         refusal_lines.append("     → 怎么办：看门狗用 Bash 的 run_in_background: true 起，命令只写 `bash scripts/agents/watch.sh [--ack …] <agent 号，逗号分隔>`，"
@@ -7239,7 +7476,7 @@ def main():
     except Exception as error:
         not_judged(f"bash-command-detector.sh 没判成喂给 shell 的标准输入（{error!r}），这条命令照常执行")
         unjudged_inputs = []
-    # 判不了的几样（各道抛异常、库读不到、喂给 shell 的不是字面）都记检出；弄坏开关 failure-unrecorded 下不记（改前的样子：只打 stderr）
+    # 判不了的几样（各道抛异常、库读不到、喂给 shell 的不是字面）都记检出；弄坏开关 failure-unrecorded 下不记（只打 stderr）
     unjudged_notes = [] if detector_break_is_set("failure-unrecorded") else list(JUDGING_NOTICES) + unjudged_inputs
     detections_path = os.environ.get("AGENT_HOOK_DETECTIONS") or DEFAULT_DETECTIONS
     if refusal_lines:

@@ -41,9 +41,9 @@ checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把
 是样本根——根里有 .gate-cells 或空文件 .gate-break-sample、这个根（真实路径）不是生成器所在的仓、也没设 GATE_STAGED_FROM，
 与门禁共用库 .claude/gate.d/lib/stage-cells.sh 的 stage_cells_refuse_unsampled_break_switches 同一条判据。平常跑设了它，读参数之前就拒绝、退 2，
 输出点名这个变量只在样本自证里认。
-  GEN_DECISION_ITEMS_BREAK=read-translations  decision_body_files() 把译文也当正文读（改前的 glob）
+  GEN_DECISION_ITEMS_BREAK=read-translations  decision_body_files() 把译文也当正文读
       decision-items-sync-translation-green（期望退出 0，实测 1：生成器报「首行读不出」）
-  GEN_DECISION_ITEMS_BREAK=cwd-root-unchecked  不认项目根参数、不判用法错，按工作目录读，决策目录不在或没有正文照样退 0、输出空（改前的样子）
+  GEN_DECISION_ITEMS_BREAK=cwd-root-unchecked  不认项目根参数、不判用法错，按工作目录读，决策目录不在或没有正文照样退 0、输出空
       （开关只在样本根上认：下面的空目录里放空文件 .gate-break-sample，第一个参数给的项目根也是放了 .gate-break-sample 的样本根）
       在空目录里起、不带参数（期望退出 1、stderr 有「第一个参数给项目根」，实测 0）；
       在空目录里起、第一个参数给一份带决策正文的样本根（期望退出 0、输出里有「- **D」起头的行，实测 0、输出空）；
@@ -154,7 +154,7 @@ def harvest(sec):
 
     只看该节的**索引表**，即第一个 `####` 子标题之前那一段——
     子标题之下是各分项各自的论证，里面另有编号列表与表格，那些不是分项。
-    整行带回去是为了取进度标记：它写在定案那一格的末尾，不在名字格里。
+    整行带回去是为了取进度标记：它写在最后一格的末尾，不在名字格里。
     """
     cut = re.search(r'^#{4}\s', sec, re.M)
     top = sec[:cut.start()] if cut else sec
@@ -210,7 +210,7 @@ def decision_body_files():
     规矩在 .claude/skills/trilingual/SKILL.md），首行与分项都是译文的写法，当正文读会报首行读不出、或把同一条决策数两遍。
     判法与 .claude/gate.d/lib-trilingual.py 的 LANGUAGE_SUFFIXED 同口径：带两个小写字母语言后缀的 .md 不是中文那一份。"""
     found = sorted(glob.glob('.claude/kb/decisions/*.md'))
-    if 'read-translations' in BROKEN:   # 弄坏开关：译文也当正文读（改前的样子）
+    if 'read-translations' in BROKEN:   # 弄坏开关：译文也当正文读
         return found
     return [f for f in found if not TRANSLATION_SUFFIX.search(os.path.basename(f))]
 
@@ -230,7 +230,7 @@ def parsed_arguments(arguments):
     return root, status_cells
 
 
-if 'cwd-root-unchecked' in BROKEN:   # 弄坏开关：不认项目根、不判用法错，按工作目录读（改前的样子）
+if 'cwd-root-unchecked' in BROKEN:   # 弄坏开关：不认项目根、不判用法错，按工作目录读
     project_root, cells_only = None, '--status-cells' in sys.argv[1:]
 else:
     project_root, cells_only = parsed_arguments(sys.argv[1:])

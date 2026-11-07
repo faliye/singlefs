@@ -7,7 +7,7 @@
 #   compact           上下文压缩之后，接续工作要先对齐的几件：还有没有子 agent 在跑、工作区里哪些没提交、这件活的状态记在哪份记录里。
 #   startup / resume  近 SESSION_START_OOM_HOURS 小时（默认 12）内核因为内存不够杀过的进程：journalctl -k 里的 Killed process 行，
 #                     每条写时间（UTC 与 JST）、进程号、进程名、anon-rss，整机 OOM 与内存上限（cgroup）里的分开列，外加一行「怎么办」；
-#                     同一段时间显卡驱动报的显存不够（同一行既有 NVRM 又有 NV_ERR_NO_MEMORY，用户 2026-10-06 定运行时认显存 OOM，
+#                     同一段时间显卡驱动报的显存不够（同一行既有 NVRM 又有 NV_ERR_NO_MEMORY，运行时认显存 OOM，
 #                     records/2026-09-16-subagent拆分提案.md 第五十五、五十六节）：按卡数次数、写头一次与末一次的时间，外加一行「怎么办」。
 #                     读不到内核日志（没有 journalctl、权限不够看不到内核日志、journalctl 出错或超时）报「没查成」，不当成没有 OOM、也不当成没撞显存。
 #                     近几小时按 journalctl _TRANSPORT=kernel 取（不用 -k：它只看这一次开机，卡死重启之后看不到死机之前那几行）。
@@ -35,9 +35,9 @@
 #   SESSION_START_BREAK=current-boot-only  近几小时只读这一次开机的内核日志（journalctl -k），不读重启之前那一次
 #       「✗ 自检：重启之前那一次开机里的也读到」
 #
-# 为什么：2026-09-25 两次整机 OOM 把 Claude Code 会话拖垮，第一次崩了之后主 agent 没查 `journalctl -k` 就照原样重派同一步，
-# 第二次 OOM 就是这样来的（records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。会话崩了再起，是 startup 或 resume。
-# 压缩那一半：长会话里任务转向时要尽快压缩上下文（用户 2026-09-17），压缩摘要会丢细节，接续最容易错的就是上面那三件。
+# 为什么：整机 OOM 会把 Claude Code 会话拖垮，崩了之后若不查 `journalctl -k` 就照原样重派同一步，
+# 会再 OOM（records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。会话崩了再起，是 startup 或 resume。
+# 压缩那一半：长会话里任务转向时要尽快压缩上下文，压缩摘要会丢细节，接续最容易错的就是上面那三件。
 # SessionStart 的标准输出会进新上下文，所以在这里补。matcher 写 startup|resume|compact，三种注册在同一条上。
 #
 #   session-start.sh             # 从 stdin 读 hook 的 JSON，往标准输出写提示，退出码恒 0
@@ -111,7 +111,7 @@ def read_kernel_journal(hours):
     try:
         probe = subprocess.run(["journalctl", "-k", "-n", "1", "--no-pager", "-q"], capture_output=True, text=True, timeout=JOURNAL_TIMEOUT_SECONDS)
         # 近几小时的内核消息按 _TRANSPORT=kernel 取、不用 -k：-k 隐含 -b（只看这一次开机），机器卡死重启之后会话开头就看不到死机之前那几小时
-        # （2026-10-06 卡死重启，重启前的显存不够与 cgroup OOM 都在上一次开机里，records/2026-09-16-subagent拆分提案.md 第五十六节）
+        # （卡死重启之后，重启前的显存不够与 cgroup OOM 都在上一次开机里，records/2026-09-16-subagent拆分提案.md 第五十六节）
         recent_selector = ["-k"] if BROKEN_JUDGEMENT == "current-boot-only" else ["_TRANSPORT=kernel"]
         recent = subprocess.run(["journalctl", *recent_selector, "--since", f"-{hours:g}h", "--utc", "-o", "short-iso-precise", "--no-pager", "-q"],
                                 capture_output=True, text=True, timeout=JOURNAL_TIMEOUT_SECONDS)
@@ -258,7 +258,7 @@ def reminder(hook_input, project_root):
 
 def record_unjudged(hook_dir, hook_input, problem, switch):
     """判不了、这一次没补提示：stderr 写一行，照「放行但必记检出」往检出记录追加一行（lib_work_root.py 的 record_unjudged_pass，结局只记）。
-    弄坏开关 switch 下只打 stderr、不记（改前连 stderr 也不打）；读不到 lib_work_root.py、写不进去时 stderr 说一句没记成。"""
+    弄坏开关 switch 下只打 stderr、不记；读不到 lib_work_root.py、写不进去时 stderr 说一句没记成。"""
     print(f"! {HOOK_NAME}：{problem}，这一次没补提示", file=sys.stderr)
     if BROKEN_JUDGEMENT == switch:
         return
@@ -288,7 +288,7 @@ def hook_main(raw, hook_dir):
     try:
         text = reminder(hook_input, project_root)
     except Exception as error:
-        if BROKEN_JUDGEMENT == "exception-unrecorded":   # 弄坏开关：不接住，照原样抛出（改前的样子：进程退 1，什么提示都不补、不记检出）
+        if BROKEN_JUDGEMENT == "exception-unrecorded":   # 弄坏开关：不接住，照原样抛出（进程退 1，什么提示都不补、不记检出）
             raise
         record_unjudged(hook_dir, hook_input, f"补提示的时候抛异常（{type(error).__name__}: {error}）", "exception-unrecorded")
         return 0

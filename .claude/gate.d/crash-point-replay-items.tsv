@@ -1,11 +1,14 @@
-# 崩溃点重放的合表（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J2：一张表、一个入口；一项一条流，
+# 崩溃点重放的合表（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J2：一张表、一个入口；
 # .claude/gate.d/stage-inputs.tsv 的全部 crash-case: 与 scripts/crash/crash-amplification.sh 的 ITEMS 全部分项按流去重之后合表）。入口 scripts/crash/crash-point-replay.sh 照这张表跑。
+# 项按功能与模块切（用户 2026-11-06 定「要根据功能和模块来配置item」）：一项是一条流，或一条流里按功能切的一步（一条测试函数，例：删除流按崩溃点录制器的功能步切成的六步与两条 CPU 判器参照）。
+#   按步拆的那条流，流那一项（放量分项与流里别的用例）排在它的几步前面，几步的项名是流那一项的项名接 - 与这一步的名字。
 # 一行一项，制表符分隔三列，再加一列 # 说明：
 #   ① 项名：小写字母、数字、-；不用 layer0、amplification 这两个退役的词（判决第三节 J1）
-#   ② 崩溃点重放那一套的部分：stage-inputs.tsv 里 crash-case: 的键，几条空格隔开（同一条流的几条用例并在一项里）；没有写 -
+#   ② 崩溃点重放那一套的部分：stage-inputs.tsv 里 crash-case: 的键，几条空格隔开（同一条流没按步拆的几条用例并在一项里，按步拆的一步一项）；没有写 -
 #   ③ 放量那一套的部分：crash-amplification.sh 的 ITEMS 里的分项名，几项空格隔开；没有写 -
 # 每一项的测试目标不另登记：就是 ② ③ 点名的部分的测试目标（crates/singlefs-verification/tests/ 下的文件名去掉 .rs），入口为这一项按条复用地跑那几个目标里的全部测试函数
-#   （登记成 crash-case: 的用例与放量分项不在其中，各走各的一套）。
+#   （登记成 crash-case: 的用例与放量分项不在其中，各走各的一套）。几项点名同一个测试目标里的部分时（一条流按步拆成几项，或几条流住一份测试文件），
+#   这个目标归表里第一个点名它的那一项，后面几项只跑自己点名的部分：一个测试函数只归一项，不跟着每一步各跑一遍。
 # 核法在 scripts/crash/lib_crash_point_replay_items.py（入口、crash-case-check.py 的 placement 共用一份）：② 的每个键在 stage-inputs.tsv 里、
 #   ③ 的每一项在 ITEMS 里；stage-inputs.tsv 的每一条 crash-case: 与 ITEMS 的每一项都恰好被一项点名。
 # 次序就是入口的跑序。
@@ -16,7 +19,15 @@ floor-raise-pushed-by-the-session	crash-case:floor-raise-pushed-by-the-session	f
 sigma-of-the-misaligned-reuse	crash-case:c561-sigma-full	sigma-of-the-misaligned-reuse	# UOOUOMSU 历史上 σ 那一段（两边枚举域不同：崩溃点重放一段 2^16 子集、放量判全套）
 multi-record-publish	crash-case:multi-record-publish-stream crash-case:multi-record-publish-every-state-between-the-records crash-case:multi-record-publish-root-slot-persisted-count	multi-record-publish	# 取号 → 暖机两次 → A → B → C
 record-spill-over	crash-case:record-spill-over-whole-or-not-at-all crash-case:record-spill-over-share-with-every-judge-conclusion-reused crash-case:record-spill-over-observer-red-on-the-other-hosts-blocks	-	# 一次发布一个事务跨两条记录（记录跨记录、共享点名跨记录），起点镜像不枚举、只录那一次发布，段序列 130+4+1+2
-unlink-after-the-multi-record-publish	crash-case:unlink-after-the-multi-record-publish-stream crash-case:unlink-after-the-multi-record-publish-rerun-from-the-library	unlink-after-the-multi-record-publish	# 多记录流之后删第一个文件，35 段
+unlink-after-the-multi-record-publish	crash-case:unlink-after-the-multi-record-publish-rerun-from-the-library	unlink-after-the-multi-record-publish	# 多记录流之后删第一个文件，36 段；放量分项与复用机制那一条在这一项，全量按崩溃点录制器的功能步切成下面六项、两批与最后一批另各有一项 CPU 判器参照（测试目标里别的测试函数归这一项）
+unlink-after-the-multi-record-publish-instance-acquisition-and-warm-up	crash-case:unlink-after-the-multi-record-publish-instance-acquisition-and-warm-up	-	# 多记录流之后删第一个文件那条流的一步：取号与暖机（段 0–7）
+unlink-after-the-multi-record-publish-first-file-creation	crash-case:unlink-after-the-multi-record-publish-first-file-creation	-	# 多记录流之后删第一个文件那条流的一步：新建文件（段 8–11）
+unlink-after-the-multi-record-publish-sequential-writes	crash-case:unlink-after-the-multi-record-publish-sequential-writes	-	# 多记录流之后删第一个文件那条流的一步：两次顺序写（段 12–19）
+unlink-after-the-multi-record-publish-unlink-intent	crash-case:unlink-after-the-multi-record-publish-unlink-intent	-	# 多记录流之后删第一个文件那条流的一步：删除意图（段 20–23）
+unlink-after-the-multi-record-publish-unlink-batches	crash-case:unlink-after-the-multi-record-publish-unlink-batches	-	# 多记录流之后删第一个文件那条流的一步：两批（段 24–31）
+unlink-after-the-multi-record-publish-unlink-final-batch	crash-case:unlink-after-the-multi-record-publish-unlink-final-batch	-	# 多记录流之后删第一个文件那条流的一步：最后一批（段 32–35）
+unlink-after-the-multi-record-publish-unlink-batches-on-the-cpu-judge	crash-case:unlink-after-the-multi-record-publish-unlink-batches-on-the-cpu-judge	-	# 多记录流之后删第一个文件那条流的一步：两批的 CPU 判器参照
+unlink-after-the-multi-record-publish-unlink-final-batch-on-the-cpu-judge	crash-case:unlink-after-the-multi-record-publish-unlink-final-batch-on-the-cpu-judge	-	# 多记录流之后删第一个文件那条流的一步：最后一批的 CPU 判器参照
 unlink-merging-inode-leaf-containers	crash-case:unlink-merging-inode-leaf-containers-stream	unlink-merging-inode-leaf-containers	# 合并那几次发布（左从右借、左吸收右），起点镜像不枚举，16 段
 unlink-after-the-fixed-script	crash-case:unlink-after-the-fixed-script-stream crash-case:unlink-after-the-fixed-script-in-place-subsets	unlink-after-the-fixed-script	# 固定脚本到 E 之后经会话 unlink 第一个文件，78 段（前 69 段同固定脚本到 E）
 snapshot-creation	crash-case:snapshot-creation-stream crash-case:snapshot-creation-rerun-from-the-library	snapshot-creation	# 取号 → 暖机两次 → A → 建快照（里程碑四一·4 F1）

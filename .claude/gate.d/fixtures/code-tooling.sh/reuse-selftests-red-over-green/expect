@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：reuse-selftests
+want=· 样本：上一版（.unit-verdict-sample/prior）的 2 条照判绿记进这一版样本的判定库
+want=· 按条复用：2 条要现跑的自证，现判 2、复用 0、拒算 0
+want=输出里没有 REUSE_SELFTEST script=scripts/gate/broken.sh
+want=· 判红记库：1 条记红、撤掉同一把键原有的绿，下一趟这几条现判
+want=· 样本档：判红记库之后再算一次计划：复用 1 条、现判 1 条
+want=现判「scripts/gate/broken.sh」：上次判红
+want=reuse-selftests：红（退出 1）

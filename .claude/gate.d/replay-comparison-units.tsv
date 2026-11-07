@@ -21,12 +21,10 @@
 # 不登记的比对对象：research/prompts/e165-r5-prereg.md #17：r2 模式的变异杀伤界（3-乙），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
 # 不登记的比对对象：research/prompts/e165-r5-prereg.md #18：r3 模式的变异杀伤界（3-乙），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
 # 不登记的比对对象：research/prompts/e165-r5-prereg.md #19：r4 模式的变异杀伤界（3-乙），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e165-r5-prereg.md #2：r1 档的 light 家族产物，对应的复跑驱动随轻型并入重型删掉，单元表里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
 # 不登记的比对对象：research/prompts/e165-r7-prereg.md #1：r3 档择根（KA 换成 KL 的第 7 次重跑），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
 # 不登记的比对对象：research/prompts/e165-r7-prereg.md #2：r4 档带故障的择根（KA 换成 KL 的第 7 次重跑），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
 # 不登记的比对对象：research/prompts/e165-r7-prereg.md #3：r5 修订 1 的 R2 闸那一族带故障的择根（KA 换成 KL 的第 7 次重跑），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
-# 不登记的比对对象：research/prompts/e185-r3-prereg.md #1：r1 的 gpu-submission 产物，今天的写法那几格的挂钟只并列报、不判；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
-# 不登记的比对对象：research/prompts/e185-r3-prereg.md #2：r2 第二段产物，第一段拿它现算候选门槛（P7、停机 J-S3）与 ρ_机器 的分母；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
-# 不登记的比对对象：research/prompts/e185-r3-prereg.md #3：r2 第二段产物，第三段（附带）的 scan_region 重放与它并列只报；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e185-r4-prereg.md #1：r3 第一段带 -2 的产物，控漂移段两条臂的轮次比与 unstable 数与它并列（D1–D5）；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e185-r4-prereg.md #2：r3 第一段带 -2 的产物，重判段 c_rt 来源 r3 那一端逐行重判、写法甲下逐行复现（PR1、K-S3）；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e185-r4-prereg.md #3：r2 第二段产物，写法与拆分段写法甲的阶段 CPU 与它并列（B7，重判段算）；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
@@ -35,12 +33,6 @@
 # 不登记的比对对象：research/prompts/e184-r2-prereg.md #1：第一段整份改前产物 e184-regular-layer-cost-counts-segment-one-2026-10-19.out，E184 装置没有正式跑单元表，判定词逐格比由重跑登记 5.3 的比较脚本做；欠在 C901（E161 与 E184 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e184-r2-prereg.md #2：自检产物 e184-regular-layer-cost-counts-selfcheck-2026-10-23.out，E184 装置没有正式跑单元表，复跑由 replay.sh 的 driver_e184 逐字节比；欠在 C901（E161 与 E184 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e161-r3-prereg.md #1：可行性档改前产物 e161-crash-state-dedup-and-time-split-feasibility-r2-2026-10-05.out，E161 装置没有正式跑单元表，行 3 的比对由登记里的比对脚本做；欠在 C901（E161 与 E184 重跑的比对对象没有单元表）
-# 不登记的比对对象：research/prompts/e172-r3-prereg.md #1：第 2 次产物 e172-r2-deletion-write-dry-run-2026-10-05.out，只当 R-flip 的旧那一边（附带、不逐字节比），E172 装置没有比对单元表；欠在 C930（E172 没有比对单元表）
-# 不登记的比对对象：research/prompts/e172-r3-prereg.md #2：第 2 次 H1、H2 导出 e172-r2-deletion-write-dump-h1h2-2026-10-05.out，只当 R-dump 的旧那一边（附带、不逐字节比），E172 装置没有比对单元表；欠在 C930（E172 没有比对单元表）
-# 不登记的比对对象：research/prompts/e172-r3-prereg.md #3：第 2 次 H3 导出 e172-r2-deletion-write-dump-h3-2026-10-05.out，只当 R-dump 的旧那一边（附带、不逐字节比），E172 装置没有比对单元表；欠在 C930（E172 没有比对单元表）
-# 不登记的比对对象：research/prompts/e16-r7-prereg.md #1：第一段全网格留存产物 e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out，K5 去掉准入头整份逐字节比，重跑产物 e16-fifth-run-peak-under-today-widths-2026-11-02-h496.out，E16 第五次跑的装置没有比对单元表；欠在 C931（E16 第五次跑没有比对单元表）
-# 不登记的比对对象：research/prompts/e16-r7-prereg.md #2：原装置几何 56 格（阳性对照 PC3）留存产物 e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out，K5 去掉准入头整份逐字节比，重跑产物 e16-fifth-run-peak-under-today-widths-pc3-2026-11-02-h496.out，E16 第五次跑的装置没有比对单元表；欠在 C931（E16 第五次跑没有比对单元表）
-# 不登记的比对对象：research/prompts/e16-r7-prereg.md #3：第二段三个旋钮分组留存产物 e16-fifth-run-peak-under-today-widths-second-segment-2026-10-04-h487.out，K5 去掉准入头整份逐字节比，重跑产物 e16-fifth-run-peak-under-today-widths-second-segment-2026-11-02-h496.out，E16 第五次跑的装置没有比对单元表；欠在 C931（E16 第五次跑没有比对单元表）
 # 不登记的比对对象：research/prompts/e171-r2-prereg.md #1：原登记 F4 扩表比对器产物，撤项核算只读它的行、不重出；E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e171-r2-prereg.md #2：原登记加补位比对器产物，撤项核算只读它的行、不重出；E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e171-r2-prereg.md #3：r1 第二段比对器产物，撤项核算只读它的行、不重出；E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）

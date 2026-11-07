@@ -1,0 +1,15 @@
+exit=3
+want=样本档：
+want=· product-gpu-real-card-tests：真显卡对拍那一趟要上卡，显卡是 task-server 交的 192.0.2.1:0:8G（清场归 task-server，这里不另套清场包装）
+want=本次未跑（这不是通过）：产品 GPU 包对拍目标 three_cards_reconcile（crates/singlefs-background-gpu/tests/three_cards_reconcile.rs）声明 3 张、拿到 1 张，提交时单交：
+want=--features tests-on-a-real-gpu --test three_cards_reconcile -- --test-threads 1
+want=· product-gpu-real-card-tests 按条复用：singlefs-background-gpu 的 2 个对拍测试目标里 3 条编得进的测试函数，现判 3、复用 0、拒算 0
+want=── product-gpu-real-card-tests：cargo test --release -p singlefs-background-gpu --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --test-threads 1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-background-gpu --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --test-threads 1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]
+want=· 判绿记库：RECORD recorded=3 changed=0 refused=0
+want=! product-gpu-real-card-tests 不算全绿：2 个对拍测试目标（特性 tests-on-a-real-gpu）跑到 3 条，本次未跑 1 处：编进来 0 条的目标 0 个（无），没卡没跑的对拍 0 条；卡不够没起、提交时单交的目标 1 个（three_cards_reconcile）
+want=→ 卡不够没起的照 .claude/skills/crash-test/commit-stages.md 第 2d 步在提交时逐个单交
+want=逐格：crash-case-replay：绿；feature-gated-tests：无对象可判；product-gpu-real-card-tests：有 1 处本次未跑
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=product-gpu-real-card-tests 样本档用假 cargo 走流程，判绿也退 3（这一趟没跑过真的显卡，不许记成通过）；卡不够的目标本次未跑，不算通过

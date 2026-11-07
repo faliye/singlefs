@@ -11,12 +11,12 @@
    RUN_SCOPE_GUARD_BREAK=segments-unchecked  不核四段齐不齐、值空不空、写没写两次、种类认不认得
        红：「声明缺段：没写为什么拒」「声明值空：范围一段是空的拒」「声明写两次：种类写两次拒」「声明种类认不出拒」
    RUN_SCOPE_GUARD_BREAK=kind-unchecked  不核声明的种类与命令的形状
-       红：「门禁 --item 声明成 whole：种类对不上拒」「merge-and-verify 声明成 items：种类对不上拒」「cargo test 整包声明成 target：种类对不上拒」
+       红：「门禁 --item 声明成 whole：种类对不上拒」「merge-and-verify 声明成 whole：拒」「cargo test 整包声明成 target：种类对不上拒」
    RUN_SCOPE_GUARD_BREAK=count-unchecked  不核范围一段的数（items、target）与整轮整包（whole）
-       红：「门禁 --check 两格写成 1 格：范围数对不上拒」「whole 范围没写整轮或整包拒」「cargo test 两个目标写成 3 个：范围数对不上拒」「cargo test --exact 两个测试写成 1 个：范围数对不上拒」「崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）」「merge-and-verify 点名两项写成 1 项：范围数对不上拒」
+       红：「门禁 --check 两格写成 1 格：范围数对不上拒」「whole 范围没写整轮或整包拒」「cargo test 两个目标写成 3 个：范围数对不上拒」「cargo test --exact 两个测试写成 1 个：范围数对不上拒」「崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）」「merge-and-verify 点名两项写成 1 项：范围数对不上拒」「merge-and-verify 两份补丁写成 1 份：范围数对不上拒」
    RUN_SCOPE_GUARD_BREAK=reason-unchecked  不核为什么一段的字数
        红：「gate.sh 为什么只写验证拒」「为什么太短拒」「为什么只写要跑验证拒」
-   RUN_SCOPE_GUARD_BREAK=subagent-submissions-allowed  子 agent 经 task-server/task submit 交的验证命令不按 lib_project_code_runs.subagent_task_server_refusal 拒（改前许子 agent 自己交的样子）
+   RUN_SCOPE_GUARD_BREAK=subagent-submissions-allowed  子 agent 经 task-server/task submit 交的验证命令不按 lib_project_code_runs.subagent_task_server_refusal 拒（许子 agent 自己交）
        红：「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」
    RUN_SCOPE_GUARD_BREAK=scripts-unread  命令位置上执行的驱动脚本不读进去
        红：「驱动脚本里一行缺声明拒」「外面带声明、驱动脚本里一行缺声明拒」「驱动脚本再起驱动脚本、里面缺声明拒」「直接执行的驱动脚本缺声明拒」「同一条命令里 heredoc 写出的驱动脚本缺声明拒」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
@@ -28,10 +28,10 @@
        红：「入口：拒绝说明附上次红的清单」
    RUN_SCOPE_GUARD_BREAK=query-forms-declared  只查清单、自证、只编不跑、只列用例的写法也要声明
        红：「门禁 --list 不要声明」「门禁 --selftest 不要声明」「崩溃点重放 --list-items 不要声明」「replay.sh --admission-only 不要声明」「replay.sh --list-items 不要声明」「cargo test --no-run 不要声明」「cargo test -- --list 不要声明」「merge-and-verify --list-items 不要声明」
-   RUN_SCOPE_GUARD_BREAK=replay-list-items-declared  replay.sh 的 --list-items 也要声明（改前的写法）
+   RUN_SCOPE_GUARD_BREAK=replay-list-items-declared  replay.sh 的 --list-items 也要声明
        红：「replay.sh --list-items 不要声明」
-   RUN_SCOPE_GUARD_BREAK=merge-items-as-whole  merge-and-verify 带 --item 也当 whole（改前的写法：挑项的写法也按整轮声明）
-       红：「merge-and-verify 点名两项：声明成 items 放」
+   RUN_SCOPE_GUARD_BREAK=merge-as-whole  merge-and-verify 照整轮（whole）判，带不带 --item 都是
+       红：「merge-and-verify 声明成 whole：拒」「merge-and-verify 两份补丁：声明成 items 放」「merge-and-verify 两份补丁另加展开深度：写成 2 份补丁放（深度的值不是补丁）」「merge-and-verify 点名两项：声明成 items 放」
    RUN_SCOPE_GUARD_BREAK=merge-list-items-declared  merge-and-verify 的 --list-items 也要声明
        红：「merge-and-verify --list-items 不要声明」
    RUN_SCOPE_GUARD_BREAK=tooling-scripts-read  仓里的工具脚本（scripts/、.claude/ 下）也读进去
@@ -40,17 +40,17 @@
        红：「cargo test 两个目标、带对的声明：放」「cargo test --lib --exact 两个测试、带对的声明：放」「子 agent cargo test 点名目标、带对的声明：放」「capped.sh 外面带声明放」「驱动脚本里每一行都带声明：放」
    RUN_SCOPE_GUARD_BREAK=template-keeps-declaration  照抄模板时不摘命令开头已有的那份声明（照抄出来两份，bash 取后一份）
        红：「入口：命令开头已有声明时模板只留一份」
-   RUN_SCOPE_GUARD_BREAK=failure-unrecorded  判不了的几样（hook 输入不是 JSON 对象、判的时候出异常、喂给 shell 的不是字面、读不到判法文件）只打 stderr 或什么都不说、不记检出（改前的样子）
+   RUN_SCOPE_GUARD_BREAK=failure-unrecorded  判不了的几样（hook 输入不是 JSON 对象、判的时候出异常、喂给 shell 的不是字面、读不到判法文件）只打 stderr 或什么都不说、不记检出
        红：「入口：hook 输入不是 JSON 对象（坏 JSON、数组）放行、stderr 写诊断、各记一条检出」「入口：判的时候抛异常放行、stderr 报一句、记一条检出」「入口：here-string 喂给 bash 的是变量放行、记一条检出」「入口：判法文件读不到时记一条检出（结局只记、会话号照输入）」「入口：判法文件读不到、没设 AGENT_HOOK_DETECTIONS 时记进 lib_work_root.py 的默认位置」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
-   RUN_SCOPE_GUARD_BREAK=judge-crash-unrecorded  判法文件在而没跑完（导入就出错、被信号停掉，退 0 与 2 以外的码）时只打 stderr、不记检出（改前的样子：exec 判法，退几都照常放行）
+   RUN_SCOPE_GUARD_BREAK=judge-crash-unrecorded  判法文件在而没跑完（导入就出错、被信号停掉，退 0 与 2 以外的码）时只打 stderr、不记检出（exec 判法，退几都照常放行）
        红：「入口：判法文件在而导入就出错时放行、stderr 报一句、记一条检出（结局只记、会话号照输入）」
-   RUN_SCOPE_GUARD_BREAK=driver-unread-unrecorded  读不了、太大的驱动脚本静默不读、不交判不了的说明（改前的样子）
+   RUN_SCOPE_GUARD_BREAK=driver-unread-unrecorded  读不了、太大的驱动脚本静默不读、不交判不了的说明
        红：「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
    切词那一份的开关 LIB_SHELL_WORDS_BREAK=shell-standard-input-unread（lib_shell_words.py：here-string 与管道喂给 shell 的文本不当命令再切、也不交判不了的说明）下也红，不在开关轮里：
        红：「here-string 喂给 bash 的 cargo test 整工作区：没带声明拒」「printf 经管道喂给 bash 的门禁：没带声明拒」「echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒」「入口：here-string 喂给 bash 的是变量放行、记一条检出」
-   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest  平常跑（不是 --selftest、也不是自证起的子进程）设了开关也照认、不拒（改前的样子）；它是关守卫项，只在单独一项时认，与别的项同写照拒
+   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest  平常跑（不是 --selftest、也不是自证起的子进程）设了开关也照认、不拒；它是关守卫项，只在单独一项时认，与别的项同写照拒
        红：「入口：平常跑设了弄坏开关退 2、点名它只在自证里认」「入口：标记文件内容对不上照拒」
-   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest-with-others  带标记的自证子进程里，关守卫项与别的项同写也照认（改前的样子：honor-outside-selftest 写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
+   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest-with-others  带标记的自证子进程里，关守卫项与别的项同写也照认（honor-outside-selftest 写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
        红：「入口：关守卫项与别的项同写：带标记的子进程里也退 2、点名它」
    RUN_SCOPE_GUARD_BREAK=task-server-submissions-unread  task-server/task submit -- 之后那一条不判（当名单上的客户端放过去）
        红：「task-server 提交的门禁整道：没带声明拒」「task-server 提交的 cargo test 整工作区：没带声明拒」「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」
@@ -114,8 +114,9 @@ BREAK_VARIABLE_NAME = "RUN_SCOPE_GUARD_BREAK"
 BREAK_SWITCH_CELLS = {
     "declaration-optional": ["门禁整道：没带声明拒", "崩溃点重放不指定范围跑：没带声明拒", "崩溃放量全部分项：没带声明拒", "崩溃放量双机驱动：没带声明拒", "replay.sh 全部实验：没带声明拒", "gate-staged.sh 没带声明拒", "cargo test 整工作区：没带声明拒", "task-server 提交的门禁整道：没带声明拒", "task-server 提交的 cargo test 整工作区：没带声明拒", "bash -c 里的门禁没带声明拒", "here-string 喂给 bash 的 cargo test 整工作区：没带声明拒", "printf 经管道喂给 bash 的门禁：没带声明拒", "echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒", "capped.sh 包着的 cargo test 没带声明拒", "env 带别的变量、没带声明拒", "nice 与 timeout 包着、没带声明拒", "flock 包着的门禁没带声明拒", "gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", "/usr/bin/time 包着的 cargo test 没带声明拒", "驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒", "入口：没带声明拒（退出码 2）", "入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法", "入口：拒绝说明附上次红的清单", "入口：没有上次红的记录时照写", "入口：被拒的记一行（session_id、范围声明被拒、outcome 被拒）"],
     "segments-unchecked": ["声明缺段：没写为什么拒", "声明值空：范围一段是空的拒", "声明写两次：种类写两次拒", "声明种类认不出拒"],
-    "kind-unchecked": ["门禁 --item 声明成 whole：种类对不上拒", "merge-and-verify 声明成 items：种类对不上拒", "cargo test 整包声明成 target：种类对不上拒"],
-    "count-unchecked": ["门禁 --check 两格写成 1 格：范围数对不上拒", "whole 范围没写整轮或整包拒", "cargo test 两个目标写成 3 个：范围数对不上拒", "cargo test --exact 两个测试写成 1 个：范围数对不上拒", "崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）", "merge-and-verify 点名两项写成 1 项：范围数对不上拒"],
+    "kind-unchecked": ["门禁 --item 声明成 whole：种类对不上拒", "merge-and-verify 声明成 whole：拒", "cargo test 整包声明成 target：种类对不上拒"],
+    "count-unchecked": ["门禁 --check 两格写成 1 格：范围数对不上拒", "whole 范围没写整轮或整包拒", "cargo test 两个目标写成 3 个：范围数对不上拒", "cargo test --exact 两个测试写成 1 个：范围数对不上拒", "崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）", "merge-and-verify 点名两项写成 1 项：范围数对不上拒",
+                        "merge-and-verify 两份补丁写成 1 份：范围数对不上拒"],
     "reason-unchecked": ["gate.sh 为什么只写验证拒", "为什么太短拒", "为什么只写要跑验证拒"],
     "subagent-submissions-allowed": ["子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）", "子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）",
                                      "入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回", "入口：命令开头已有声明时模板只留一份"],
@@ -126,7 +127,8 @@ BREAK_SWITCH_CELLS = {
     "last-runs-unread": ["入口：拒绝说明附上次红的清单"],
     "query-forms-declared": ["门禁 --list 不要声明", "门禁 --selftest 不要声明", "崩溃点重放 --list-items 不要声明", "replay.sh --admission-only 不要声明", "replay.sh --list-items 不要声明", "cargo test --no-run 不要声明", "cargo test -- --list 不要声明", "merge-and-verify --list-items 不要声明"],
     "replay-list-items-declared": ["replay.sh --list-items 不要声明"],
-    "merge-items-as-whole": ["merge-and-verify 点名两项：声明成 items 放"],
+    "merge-as-whole": ["merge-and-verify 声明成 whole：拒", "merge-and-verify 两份补丁：声明成 items 放", "merge-and-verify 两份补丁另加展开深度：写成 2 份补丁放（深度的值不是补丁）",
+                       "merge-and-verify 点名两项：声明成 items 放"],
     "merge-list-items-declared": ["merge-and-verify --list-items 不要声明"],
     "tooling-scripts-read": ["仓里的工具脚本不读：放行"],
     "cargo-targets-as-whole": ["cargo test 两个目标、带对的声明：放", "cargo test --lib --exact 两个测试、带对的声明：放", "子 agent cargo test 点名目标、带对的声明：放", "capped.sh 外面带声明放", "驱动脚本里每一行都带声明：放"],
@@ -286,19 +288,41 @@ def replay_run_shape(arguments):
     return RunShape("whole", "实验复跑的全部实验（不带实验号）", None, "", "整轮", key, "replay")
 
 
+MERGE_OPTIONS_WITH_VALUE = frozenset({"--item", "--crash-expand-up-to"})   # merge-and-verify 带一个值的选项（照它的用法行）：值不是补丁目录
+
+
+def merge_patch_directories(arguments):
+    """merge-and-verify 命令上给的补丁目录：不以 - 起头的词，减掉 --item、--crash-expand-up-to 后面那个值（--item=X 的写法不占下一个词），去重、按出现次序。"""
+    found, position = [], 0
+    while position < len(arguments):
+        argument = arguments[position]
+        if argument in MERGE_OPTIONS_WITH_VALUE:
+            position += 2
+            continue
+        if not argument.startswith("-"):
+            found.append(argument)
+        position += 1
+    return list(dict.fromkeys(found))
+
+
 def merge_run_shape(arguments):
-    """合入后验证：带 --item（给几次取并集，--item=X 也认）是 items，范围数是点名的项数；带 --list-items 只列这一趟可点的项，是问询、不要声明；都不带是 whole。
-    弄坏开关 merge-items-as-whole 下带 --item 也当 whole，merge-list-items-declared 下 --list-items 也要声明。"""
+    """合入后验证只跑补丁改到的测试目标，种类恒是 items（不带 --item 也不是 whole）：带 --item（给几次取并集，--item=X 也认）范围数是点名的项数，
+    不带时是给的补丁目录个数（merge_patch_directories）；带 --list-items 只列这一趟可点的项，是问询、不要声明。
+    弄坏开关 merge-as-whole 下照整轮（whole）判，merge-list-items-declared 下 --list-items 也要声明。"""
     rest = without_force(arguments)
     key = "scripts/gate/merge-and-verify.sh"
     query_arguments = MERGE_QUERY_ARGUMENTS - {"--list-items"} if guard_switch_on("merge-list-items-declared") else MERGE_QUERY_ARGUMENTS
     if query_form(rest, query_arguments):
         return None
-    items = [] if guard_switch_on("merge-items-as-whole") else named_option_values(rest, "--item")
+    if guard_switch_on("merge-as-whole"):
+        return RunShape("whole", "合入后验证（弄坏开关 merge-as-whole：照整轮判）", None, "", "整轮", key, "merge")
+    items = named_option_values(rest, "--item")
     if items:
-        return RunShape("items", f"合入后验证点名的项 {'、'.join(items)}（测试那一步只跑点名的测试目标；打补丁、fmt、clippy、build 与 验证包照旧）",
+        return RunShape("items", f"合入后验证点名的项 {'、'.join(items)}（测试那一步只跑点名的测试目标；打补丁、fmt、clippy、build 照旧，验证包那一步只交点名的验证包目标里的）",
                         len(items), "项", counted_text(len(items), "项"), key, "merge")
-    return RunShape("whole", "合入后验证（打补丁、编、跑补丁改到的包与依赖它们的包的测试与 fmt、clippy、build）", None, "", "整轮", key, "merge")
+    directories = merge_patch_directories(rest)
+    return RunShape("items", f"合入后验证 {len(directories)} 份补丁（{'、'.join(directories) or '没给补丁目录'}；只跑补丁改到的与变异行点名的测试目标，判不出的那几种测试不跑、退 3）",
+                    len(directories), "份补丁", counted_text(len(directories), "份补丁"), key, "merge")
 
 
 def cargo_run_shape(arguments, directory):
@@ -436,9 +460,9 @@ def reason_character_count(reason):
 
 def scope_problems(shape, declaration_text, agent_type, client_refusal=None):
     """这一条要声明的命令哪里不合：交回一串说明，空的是放行。client_refusal 是交它的那一条客户端命令照 lib_project_code_runs.subagent_task_server_refusal 判出的说明
-    （经 task-server/task submit 交的才有）：子 agent 交的照它拒，种类不论（用户 2026-11-01 定子 agent 一律不往统一任务服务交任务，
+    （经 task-server/task submit 交的才有）：子 agent 交的照它拒，种类不论（子 agent 一律不往统一任务服务交任务，
     records/2026-10-29-subagent拆分提案.md 第一百七十四节；判定与 project-code-guard.sh 的 ② 是同一处，这里不另写）。子 agent 直接起的验证命令这里只判声明，
-    直接跑项目代码由 project-code-guard.sh 的 ① 拒。弄坏开关 subagent-submissions-allowed 下子 agent 交的不拒（改前许子 agent 自己交的样子）。"""
+    直接跑项目代码由 project-code-guard.sh 的 ① 拒。弄坏开关 subagent-submissions-allowed 下子 agent 交的不拒（许子 agent 自己交）。"""
     problems = []
     if agent_type and client_refusal and not guard_switch_on("subagent-submissions-allowed"):
         problems.append(f"子 agent 不往统一任务服务交任务：这一条经 {client_refusal} 交的是{shape.what}。{project_code_runs.SUBAGENT_HAND_BACK_WAY_OUT}")
@@ -550,7 +574,7 @@ def driver_script_text(command, state):
         try:
             with open(real, "rb") as handle:
                 data = handle.read(MAXIMUM_SCRIPT_BYTES + 1)
-        except OSError as error:   # 在而读不了：里面要声明的命令判不了，记一处（弄坏开关 driver-unread-unrecorded 下静默跳过，改前的样子）
+        except OSError as error:   # 在而读不了：里面要声明的命令判不了，记一处（弄坏开关 driver-unread-unrecorded 下静默跳过）
             if not guard_switch_on("driver-unread-unrecorded"):
                 state.unjudged.append(f"命令位置上执行的脚本 {real} 读不了（{type(error).__name__}: {error.strerror or error}），里面要声明的命令没判")
             return None
@@ -701,12 +725,12 @@ NARROWING_LINES = (
     "  门禁：bash .claude/gate.d/<阶段>.sh --check <格>[,<格>…]（格名用 --list 列）；有逐项的门禁写 --item <项>（--list-items 列）",
     "  崩溃入口：bash scripts/crash/crash-point-replay.sh --item <项>（--list-items 列）；崩溃放量 scripts/crash/crash-amplification.sh --item <分项>",
     "  cargo test：cargo test -p <包> --test <目标> -- <测试名> --exact；上次红的用 python3 scripts/gate/rerun-failed-tests.py <上次日志> -p <包> 打出只重跑它们的命令",
-    "  merge-and-verify：挑包在脚本里做（只跑补丁改到的包与依赖它们的包，--all-packages 才全跑），不带 --item 种类写 whole，为什么写明这一批补丁碰了哪些包；"
-    "红了只重跑红的写 --skip-apply --item <包>:<目标根文件>（--list-items 列），种类 items，范围写项数",
+    "  merge-and-verify：挑测试目标在脚本里做（只跑补丁改到的与变异行点名的测试目标），种类写 items，不带 --item 范围写补丁目录的份数，为什么写明这一批补丁改到哪些目标；"
+    "红了只重跑红的写 --skip-apply --item <包>:<目标根文件> <同一批补丁目录>（--list-items 列），范围写项数",
 )
 DECLARATION_RULE_LINES = (
     f"→ 声明写在命令开头：{DECLARATION_VARIABLE}='种类=…; 跑什么=…; 范围=…; 为什么=…'，四段用 ; 隔、各段 键=值；"
-    "种类 whole（不带 --item / --check 的整轮、cargo test 整包或整工作区、不带 --item 的 merge-and-verify、整轮门禁）、items（带 --item / --check、merge-and-verify 带 --item、replay.sh 带实验号）、"
+    "种类 whole（不带 --item / --check 的整轮、cargo test 整包或整工作区、整轮门禁）、items（带 --item / --check、merge-and-verify（带 --item 范围写项数，不带写补丁目录的份数）、replay.sh 带实验号）、"
     "target（cargo test 带 --test / --bin / --lib 目标、崩溃放量的分项与双机驱动）；"
     "范围：items 写「N 格 / N 项」、target 写「N 个测试目标」（带 --exact 筛选词的写「N 个测试」），N 是阿拉伯数字、等于点名的个数，whole 写「整轮」或「整包」；"
     f"为什么至少 {REASON_MINIMUM_CHARACTERS} 个字，只写「要跑」「验证」不算；整轮门禁的为什么写「提交前整轮」就放。驱动脚本里每一条验证命令那一行各自带声明。",
@@ -925,10 +949,17 @@ def selftest_cells(work):
         ("replay.sh 全部实验：没带声明拒", None, "bash scripts/experiment-apparatus/replay.sh", 2),
         ("replay.sh --admission-only 不要声明", None, "bash scripts/experiment-apparatus/replay.sh --admission-only E142", 0),
         ("replay.sh --list-items 不要声明", None, "bash scripts/experiment-apparatus/replay.sh --list-items", 0),
-        ("merge-and-verify 声明成 whole：放", None,
-         f"{scope_text('whole', '合入后验证', '整轮', '这一批三份补丁碰了 harness 与 core 两个包，脚本只挑这两个包与依赖它们的包')} bash scripts/gate/merge-and-verify.sh p1 p2", 0),
-        ("merge-and-verify 声明成 items：种类对不上拒", None, f"{scope_text('items', '合入后验证', '2 项')} bash scripts/gate/merge-and-verify.sh p1 p2", 2),
-        # 带 --item（也认 --item=X）是 items，范围数是点名的项数；带 --list-items 是问询，不要声明（弄坏开关 merge-items-as-whole、merge-list-items-declared 下这两格红）
+        # 合入后验证恒是 items：不带 --item 范围数是补丁目录的份数（--crash-expand-up-to 的值不算），声明成 whole 拒（弄坏开关 kind-unchecked、merge-as-whole 下那一格红）
+        ("merge-and-verify 声明成 whole：拒", None,
+         f"{scope_text('whole', '合入后验证', '整轮', '这一批三份补丁碰了 harness 与 core 两个包，照整轮声明')} bash scripts/gate/merge-and-verify.sh p1 p2", 2),
+        ("merge-and-verify 两份补丁：声明成 items 放", None,
+         f"{scope_text('items', '合入后验证两份补丁', '2 份补丁', '这一批两份补丁只改到 core 的库与验证包的一个目标，脚本只挑这几个目标')} bash scripts/gate/merge-and-verify.sh p1 p2", 0),
+        ("merge-and-verify 两份补丁写成 1 份：范围数对不上拒", None,
+         f"{scope_text('items', '合入后验证两份补丁', '1 份补丁', '这一批两份补丁只改到 core 的库与验证包的一个目标，脚本只挑这几个目标')} bash scripts/gate/merge-and-verify.sh p1 p2", 2),
+        ("merge-and-verify 两份补丁另加展开深度：写成 2 份补丁放（深度的值不是补丁）", None,
+         f"{scope_text('items', '合入后验证两份补丁', '2 份补丁', '这一批两份补丁只改到 core 的库与验证包的一个目标，缩崩溃域看一眼')} "
+         "bash scripts/gate/merge-and-verify.sh --skip-apply --crash-expand-up-to 6 p1 p2", 0),
+        # 带 --item（也认 --item=X）是 items，范围数是点名的项数；带 --list-items 是问询，不要声明（弄坏开关 merge-as-whole、merge-list-items-declared 下这两格红）
         ("merge-and-verify 点名两项：声明成 items 放", None,
          f"{scope_text('items', '合入后验证点名两项', '2 项', '上次红了这两个测试目标，只重跑它们看改后是不是转绿')} "
          "bash scripts/gate/merge-and-verify.sh --skip-apply --item alpha:src/lib.rs --item=alpha:tests/beta.rs", 0),
@@ -1061,7 +1092,7 @@ def selftest_entry_cells(work, guard_script):
     template = f"{DECLARATION_VARIABLE}='种类=whole; 跑什么=门禁 doc-text.sh 的全部格（不带 --check / --item）; 范围=整轮; 为什么=<"
     results.append(("入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法", True,
                     all(text in refused.stderr for text in ("跑的是：门禁 doc-text.sh 的全部格", template, "--check <格>", "--exact", "rerun-failed-tests.py",
-                                                             "--all-packages 才全跑"))))
+                                                             "挑测试目标在脚本里做"))))
     results.append(("入口：拒绝说明附上次红的清单", True, "clock-times、prime-marks" in refused.stderr))
     no_record = feed("bash .claude/gate.d/doc-experiments.sh .")
     results.append(("入口：没有上次红的记录时照写", True, "没有上次红的记录" in no_record.stderr))
@@ -1217,7 +1248,7 @@ def selftest_entry_cells(work, guard_script):
                             env=dict(environment, **{BREAK_VARIABLE_NAME: "declaration-optional", DETECTIONS_VARIABLE: unjudged}))
     results.append(("入口：自证起的子进程（带标记）照认弄坏开关", 0, marked.returncode))
     # 关守卫项 honor-outside-selftest 只在单独一项时认（records/2026-10-23-subagent拆分提案.md 第一百二十二节 ②）：与别的项同写，平常跑与带标记的子进程都退 2、点名它；
-    #   honor-outside-selftest-with-others 设着时带标记那一格的开关里也带上它（改前的样子：同写照认），那一格红
+    #   honor-outside-selftest-with-others 设着时带标记那一格的开关里也带上它（同写照认），那一格红
     combined_item = "honor-outside-selftest,declaration-optional"
     combined_plain = subprocess.run(["bash", guard_script, "--force", "--break-guard-probe-unknown-option"], input="", capture_output=True, text=True, timeout=120,
                                     env=dict(unmarked, **{BREAK_VARIABLE_NAME: combined_item, DETECTIONS_VARIABLE: unjudged}))

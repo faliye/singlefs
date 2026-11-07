@@ -16,7 +16,6 @@
 .claude/kb/checks-owed.md:a_raise_whose_second_empty_publish_fails_on_a_write_reports_that_one_publish_of_the_sequence_persisted  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_raise_whose_second_empty_publish_finds_no_slot_is_refused_by_the_rehearsal_before_any_write  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_raise_whose_third_empty_publish_finds_no_slot_is_refused_by_the_rehearsal_before_any_write  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/checks-owed.md:a_row_publish_whose_units_and_instance_table_read_back_zero_falls_back_only_to_the_exactly_witnessed_version  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_system_configuration_write_rereads_an_unreadable_root_ring_slot_once_before_taking_the_effective_floor  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_third_writable_mount_on_a_version_whose_rows_were_written_is_refused_before_touching_the_allocator  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -36,12 +35,12 @@
 .claude/kb/checks-owed.md:a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
 .claude/kb/checks-owed.md:a_use_with_an_alias_brings_only_the_alias_into_the_module_names  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
 .claude/kb/experiments/183-容量斜率读缓存小盘准入与清扫阈值的代价数.md:a_mount_that_stays_short_after_raising_the_floor_is_not_counted_as_admitted  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
-.claude/kb/checks-owed.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
-.claude/kb/checks-owed.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
-.claude/kb/checks-owed.en.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
-.claude/kb/checks-owed.en.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
-.claude/kb/checks-owed.ja.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
-.claude/kb/checks-owed.ja.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.en.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.en.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.ja.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.ja.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
 .claude/kb/checks-owed.md:c_seen_node_insert  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:cfg_attr  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:clone_p  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -477,374 +476,374 @@
 .claude/kb/tooling.md:max_tokens  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/tooling.md:null_blk  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/tooling.md:read_u48  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a10_every_mismatch  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a10_lags  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a10_lags_every  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a10_lags_real  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a10_real_mismatch  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a11_closed_form_mismatches_on_fitting_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a11_h_dong_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a11_h_que_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a11_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a11_red_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a12_every_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a12_k0_max_q1a  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a12_real_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a13_every_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a13_max_q1b  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a13_real_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a14_floor_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a14_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a15_every_below  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a15_every_below_bound  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a15_real_below  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a15_real_below_bound  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:a16_applicable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:anchor_h_dong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:anchor_h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:by_h_dong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:by_h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:by_injected_k  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:f1_front_above_two_groups  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:f22_front_and_back_differ_groups  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:f23_back_at_most_two_groups  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:f24_real_every_differ_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:f2_no_observable_difference  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:f_effective  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:g_adm_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:growth_by_h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:h_dong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:i311  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:i31_judged_hole_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:i31_on_hole  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:i31_red_on_hole_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:k  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:k0_end  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:k10_violation_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:k10_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:k11_holds  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:k8_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:mount_return_h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:new_pool_file_creation_matches_k1_1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:pos  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:registered_released_d0  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:released_d0  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:s  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:s11_a10_real_mismatch_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:s11_a12_real_nonzero_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:s11_a15_real_below_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:s11_k10_violation_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:s12_g_adm_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:s1_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:smallest_h_que_above_one  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:smallest_h_que_above_two  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v16_judge_cases_wrong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v17_a13_every_nonzero_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v1_over_withheld_controls_void  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v2_a10_every_mismatch_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v2_a12_every_nonzero_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v2_a14_mismatch_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v2_a15_every_below_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v2_pc_c2_seen  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v2_pc_pinned_floor_seen  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v6_a11_mismatch_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v6_devices_unequal_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:v6_pc_hole_not_seen_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:w9_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:w9_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:w9_roots_compared  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:a  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:a_arm_extras  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:a_class  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:a_outcome  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:a_read_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:a_reads  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:a_reads_before_first_wait  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:b  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:c  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:cells_differing_outside_o1_and_cell_22  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:cfg  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:device_c_e  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:device_c_witness  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:device_e_content  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:device_n_cfg  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:device_n_slot  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:e_content  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:e_under_faults  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:expected_by_k2_table  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:expected_by_k2_table_fault_count  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:expected_by_k2_table_hit  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:extra_reads_at_least_r_times_faults_and_positive  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f13  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f13_checked  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f13_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f15  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f15_checked  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f15_findings  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f4_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f6  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f6_checked  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f6_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:f6_findings  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:hidden_in_ring_after_a  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:k  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:k_min  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:l0  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:l2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:l3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:l4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:l6  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:lost_write_cells_q1_q2_q3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:lost_write_cells_with_q1_in_ring_only_and_without_q3c  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:m  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:n1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:ok_k0_effective_before_hidden_abandoned_after_rollback_one  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:op1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:op1_kinds_tried  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q0_destination  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q0_destinations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q0_hidden_abandoned_after_a  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q0_hidden_root_abandoned_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_first_change  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_in_ring  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_in_ring_overwrite_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_in_ring_overwritten  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_landing_overwrite_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_landing_overwritten  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_out_of_ring_overwrite_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_out_of_ring_overwritten  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_overwrite_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q1_overwrite_cells_first_changed_while_the_newest  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q2_rollback  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q2_rollback_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q2_rollback_cells_rollback_aware  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q2_rollback_rollback_aware  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q3_last_confirmed  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q3_last_confirmed_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q3_lost  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q3_lost_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q3_lost_cells_rollback_aware  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q3_lost_rollback_aware  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q3_read_back  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q3_read_back_root  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:q6_not_covered  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:r  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:refused_after_r_rounds_k3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:refused_k3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:s4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:s4_findings  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:s4_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:void_cells_v2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:a6_a7_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:anchors_a1_to_a7_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_heads  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_heads_match  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_quick  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_quick_match  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_small  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_small_match  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_stride  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_stride_match  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:g1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:g2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:g3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:g4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:g5  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:k2_consult  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:k2_ignore  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:k2_pair  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:k4_full  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:k4_units  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:k4_walk  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p1_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p1_grew  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p2_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p2_grew  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p3_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p3_grew  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p4_distinct_key_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p4_per_state_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:p4_per_state_grew  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:r1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:r1_at_or_above_half  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:ring_record_r  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:s1_constants_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:s2_shapes_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:state_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:unit_events_replay_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:v6_threads_result_lines_identical  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:w  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:w_formula_holds  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:walk_and_judge_lower_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:walk_and_judge_upper_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:walk_checker_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:wall_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:a0_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:a_limit_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:a_structure_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:above_chosen_root_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:above_newest_root_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:above_water_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:confirmed_publishes_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:d0_checksum_wrong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:d0_unreadable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:d1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:d1_checksum_wrong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:d1_unreadable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:fields_beyond_the_projection_of_the_r2_generator  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:i812_fails  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:i812_holds  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:i812_states_fail  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:i812_states_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j0_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j1_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j2_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j3_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j4_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6_first_call_failed  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6_premise_fails_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6_premise_fails_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6_premise_holds_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6_premise_holds_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6_third_call_differs_or_is_missing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6_third_call_equals_second  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_fails_i812_fails_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_fails_i812_fails_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_fails_i812_holds_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_fails_i812_holds_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_holds_i812_fails_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_holds_i812_fails_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_holds_i812_holds_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_holds_i812_holds_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j7_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j8_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:j8_without_a_source  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:largest_n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:max_n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:max_u  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:smallest_n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:v1822  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:v1823  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:v1824  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:v1825  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:v1826  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:largest_w_per_mille_of_landing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:m1_reserve_covers_apex  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:m3_saturation  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:m5_w_grows_with_file_size  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:m7_within_bound  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:q1_cells_apex_over_reserve_k1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:q1_cells_apex_over_reserve_k144  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:q1_cells_refused  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:q1_groups_unsaturated  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:q2_cells_apex_over_ring_window  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:q2_groups_w_growing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:q2_w_exceeds_landing_publishes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:set_aside_w_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:t  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:u12_refused_with_no_space_after_raising_the_floor  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:w_exceeds_landing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:w_exceeds_landing_publishes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:w_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:w_max_batches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:w_max_groups  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:w_max_intent  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:w_max_of_each_geometry  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:w_max_series  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:bad_s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:p95_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:s4_digest_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:total_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:v2_compared  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:v2_differing_files  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:v2_differing_files_without_timing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:base_o2_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:drive_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:e170_bad_rows_failing_s3_or_s4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:err  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:known_bad_entries_failing_s4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:new_pool_file_creation_o1_every_errored_call_but_the_unmount_is_judged_by_the_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:new_pool_file_creation_o1_model_stops_only_at_the_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:new_pool_file_creation_o1_not_applicable_only_after_the_unmount_or_a_disagreement  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o1_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o1_comparison_red_calls  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_green  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_not_applicable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_off  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o2_direct_differs_from_judge_crash_image  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o2_equals_e170  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o2_matches_judgement_false  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o2_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:o2_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:observe_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:p95_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:s3_o2_judgement_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:s4_digest_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:total_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:write_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:a10_states_equal_the_product  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:drive_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:err  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:new_pool_file_creation_o1_every_errored_call_is_judged_by_the_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:new_pool_file_creation_o1_model_never_stops  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:new_pool_file_creation_o1_not_applicable_only_after_a_disagreement_an_error_or_a_panic  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:not_lost_o1_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_columns_differing_from_the_plain_pairing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_comparison_red_calls  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_green  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_not_applicable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_off  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_abstained  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_green  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_off  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2_direct_differs_from_judge_crash_image  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2_matches_judgement_false  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:observe_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:on_the_d23_list  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:p95_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:q5_not_run  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s13  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s3_o2_judgement_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s4_digest_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s9_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:total_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:write_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs:flush_ios  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs:minimum_io  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs:write_ios  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-checker-tier/src/gpu_unit_checks.rs:cfg  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a10_every_mismatch  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a10_lags  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a10_lags_every  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a10_lags_real  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a10_real_mismatch  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a11_closed_form_mismatches_on_fitting_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a11_h_dong_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a11_h_que_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a11_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a11_red_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a12_every_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a12_k0_max_q1a  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a12_real_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a13_every_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a13_max_q1b  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a13_real_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a14_floor_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a14_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a15_every_below  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a15_every_below_bound  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a15_real_below  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a15_real_below_bound  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:a16_applicable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:anchor_h_dong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:anchor_h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:by_h_dong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:by_h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:by_injected_k  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:f1_front_above_two_groups  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:f22_front_and_back_differ_groups  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:f23_back_at_most_two_groups  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:f24_real_every_differ_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:f2_no_observable_difference  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:f_effective  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:g_adm_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:growth_by_h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:h_dong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:i311  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:i31_judged_hole_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:i31_on_hole  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:i31_red_on_hole_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:k  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:k0_end  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:k10_violation_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:k10_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:k11_holds  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:k8_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:mount_return_h_que  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:new_pool_file_creation_matches_k1_1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:pos  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:registered_released_d0  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:released_d0  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:s  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:s11_a10_real_mismatch_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:s11_a12_real_nonzero_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:s11_a15_real_below_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:s11_k10_violation_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:s12_g_adm_nonzero  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:s1_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:smallest_h_que_above_one  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:smallest_h_que_above_two  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v16_judge_cases_wrong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v17_a13_every_nonzero_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v1_over_withheld_controls_void  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v2_a10_every_mismatch_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v2_a12_every_nonzero_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v2_a14_mismatch_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v2_a15_every_below_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v2_pc_c2_seen  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v2_pc_pinned_floor_seen  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v6_a11_mismatch_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v6_devices_unequal_points  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:v6_pc_hole_not_seen_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:w9_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:w9_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs:w9_roots_compared  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:a  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:a_arm_extras  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:a_class  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:a_outcome  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:a_read_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:a_reads  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:a_reads_before_first_wait  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:b  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:c  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:cells_differing_outside_o1_and_cell_22  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:cfg  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:device_c_e  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:device_c_witness  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:device_e_content  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:device_n_cfg  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:device_n_slot  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:e_content  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:e_under_faults  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:expected_by_k2_table  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:expected_by_k2_table_fault_count  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:expected_by_k2_table_hit  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:extra_reads_at_least_r_times_faults_and_positive  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f13  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f13_checked  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f13_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f15  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f15_checked  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f15_findings  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f4_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f6  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f6_checked  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f6_failures  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:f6_findings  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:hidden_in_ring_after_a  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:k  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:k_min  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:l0  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:l2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:l3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:l4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:l6  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:lost_write_cells_q1_q2_q3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:lost_write_cells_with_q1_in_ring_only_and_without_q3c  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:m  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:n1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:ok_k0_effective_before_hidden_abandoned_after_rollback_one  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:op1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:op1_kinds_tried  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q0_destination  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q0_destinations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q0_hidden_abandoned_after_a  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q0_hidden_root_abandoned_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_first_change  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_in_ring  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_in_ring_overwrite_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_in_ring_overwritten  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_landing_overwrite_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_landing_overwritten  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_out_of_ring_overwrite_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_out_of_ring_overwritten  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_overwrite_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q1_overwrite_cells_first_changed_while_the_newest  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q2_rollback  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q2_rollback_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q2_rollback_cells_rollback_aware  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q2_rollback_rollback_aware  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q3_last_confirmed  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q3_last_confirmed_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q3_lost  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q3_lost_cells  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q3_lost_cells_rollback_aware  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q3_lost_rollback_aware  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q3_read_back  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q3_read_back_root  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:q6_not_covered  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:r  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:refused_after_r_rounds_k3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:refused_k3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:s4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:s4_findings  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:s4_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:void_cells_v2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:a6_a7_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:anchors_a1_to_a7_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_heads  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_heads_match  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_quick  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_quick_match  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_small  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_small_match  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_stride  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:d1_stride_match  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:g1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:g2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:g3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:g4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:g5  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:k2_consult  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:k2_ignore  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:k2_pair  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:k4_full  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:k4_units  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:k4_walk  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p1_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p1_grew  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p2_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p2_grew  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p3_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p3_grew  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p4_distinct_key_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p4_per_state_bytes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:p4_per_state_grew  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:r1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:r1_at_or_above_half  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:ring_record_r  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:s1_constants_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:s2_shapes_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:state_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:unit_events_replay_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:v6_threads_result_lines_identical  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:w  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:w_formula_holds  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:walk_and_judge_lower_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:walk_and_judge_upper_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:walk_checker_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:wall_elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:a0_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:a_limit_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:a_structure_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:above_chosen_root_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:above_newest_root_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:above_water_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:confirmed_publishes_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:d0_checksum_wrong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:d0_unreadable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:d1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:d1_checksum_wrong  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:d1_unreadable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:fields_beyond_the_projection_of_the_r2_generator  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:i812_fails  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:i812_holds  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:i812_states_fail  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:i812_states_hold  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j0_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j1_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j2_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j3_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j4_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6_first_call_failed  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6_premise_fails_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6_premise_fails_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6_premise_holds_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6_premise_holds_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6_third_call_differs_or_is_missing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6_third_call_equals_second  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_fails_i812_fails_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_fails_i812_fails_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_fails_i812_holds_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_fails_i812_holds_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_holds_i812_fails_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_holds_i812_fails_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_holds_i812_holds_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j6qn_premise_holds_i812_holds_violations  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j7_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j8_judged  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:j8_without_a_source  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:largest_n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:max_n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:max_u  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:smallest_n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:v1822  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:v1823  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:v1824  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:v1825  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:v1826  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:largest_w_per_mille_of_landing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:m1_reserve_covers_apex  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:m3_saturation  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:m5_w_grows_with_file_size  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:m7_within_bound  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:q1_cells_apex_over_reserve_k1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:q1_cells_apex_over_reserve_k144  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:q1_cells_refused  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:q1_groups_unsaturated  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:q2_cells_apex_over_ring_window  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:q2_groups_w_growing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:q2_w_exceeds_landing_publishes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:set_aside_w_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:t  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:u12_refused_with_no_space_after_raising_the_floor  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_exceeds_landing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_exceeds_landing_publishes  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_batches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_groups  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_intent  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_of_each_geometry  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_series  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:bad_s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:p95_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:s4_digest_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:total_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:v2_compared  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:v2_differing_files  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:v2_differing_files_without_timing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:base_o2_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:drive_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:e170_bad_rows_failing_s3_or_s4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:err  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:known_bad_entries_failing_s4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:new_pool_file_creation_o1_every_errored_call_but_the_unmount_is_judged_by_the_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:new_pool_file_creation_o1_model_stops_only_at_the_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:new_pool_file_creation_o1_not_applicable_only_after_the_unmount_or_a_disagreement  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o1_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o1_comparison_red_calls  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_green  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_not_applicable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_off  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o1_crash_judge_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o2_direct_differs_from_judge_crash_image  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o2_equals_e170  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o2_matches_judgement_false  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o2_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:o2_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:observe_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:p95_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:s3_o2_judgement_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:s4_digest_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:total_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:write_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:a10_states_equal_the_product  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:drive_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:err  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:new_pool_file_creation_o1_every_errored_call_is_judged_by_the_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:new_pool_file_creation_o1_model_never_stops  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:new_pool_file_creation_o1_not_applicable_only_after_a_disagreement_an_error_or_a_panic  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:not_lost_o1_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_columns_differing_from_the_plain_pairing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_comparison_red_calls  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_green  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_not_applicable  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_off  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_crash_judge_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_abstained  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_green  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_off  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o1_reference_filesystem_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2_direct_differs_from_judge_crash_image  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2_matches_judgement_false  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:o2_red_states  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:observe_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:on_the_d23_list  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:p95_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:q5_not_run  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s13  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s3_o2_judgement_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s4_digest_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:s9_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:total_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:write_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/new_pool_file_creation_on_device.rs:flush_ios  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/new_pool_file_creation_on_device.rs:minimum_io  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/new_pool_file_creation_on_device.rs:write_ios  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/gpu_unit_checks.rs:cfg  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-core/src/transaction.rs:t1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-core/src/transaction.rs:t2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-core/src/transaction.rs:t4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
@@ -852,9 +851,9 @@ crates/singlefs-core/src/transaction.rs:t5  # 2026-10-13 立 C430 之前的名�
 crates/singlefs-core/src/transaction.rs:t6  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-core/src/transaction.rs:t7  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-core/src/transaction.rs:t8  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-harness/src/scenario.rs:h1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-harness/src/scenario.rs:h2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-harness/src/scenario.rs:h3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/scenario.rs:h1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/scenario.rs:h2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/scenario.rs:h3  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e100_system_configuration_slot.rs:alloc_grain  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e100_system_configuration_slot.rs:compact_hi  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e100_system_configuration_slot.rs:compact_lo  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
@@ -937,14 +936,11 @@ scripts/experiment-apparatus/e103_inode_update_cost.rs:saturation_1e6_leaf_k_hug
 scripts/experiment-apparatus/e103_inode_update_cost.rs:w  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:ctr  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:file_ops  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-scripts/experiment-apparatus/e104_current_version.rs:in_alloc  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-scripts/experiment-apparatus/e104_current_version.rs:in_root_alloc  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:loc  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:mixed_gate_v1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:mixed_w2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:recovery_own_txns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:recovery_own_txns_global_w  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-scripts/experiment-apparatus/e104_current_version.rs:recs  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:snap_after_scrub_gate_v1  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:snap_after_scrub_gate_v2  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e104_current_version.rs:txn_fail  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
@@ -2636,3 +2632,120 @@ scripts/experiment-apparatus/lib.rs:elapsed_ns  # 2026-10-13 立 C430 之前的�
 scripts/experiment-apparatus/lib.rs:mib_per_s  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/lib.rs:ops  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 scripts/experiment-apparatus/main.rs:acc  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+.claude/kb/checks-owed.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/checks-owed.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/checks-owed.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions-history.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions-history.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions/15-format-freeze-policy.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions/15-フォーマット凍結ポリシー.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions/16-publish-semantics.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions/16-パブリッシュセマンティクス.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions/16-发布语义.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions/23-journal-role-format.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/decisions/23-ジャーナルの役割と形式.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments-history.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments-history.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/104-current-version-determination-in-scan-rebuild.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/104-スキャン再構築における現行バージョンの判定.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/107-stripe-table-write-amplification-on-primary-workload.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/107-ストライプ表が主負荷に与える書き込み増幅.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/108-cost-crossover-point-of-plaintext-layer.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/108-平文層のコスト交差点.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/109-runtime-costs-of-three-location-authority-arms.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/109-位置権威3アームの実行時コスト.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/111-stripe-table-keys-and-geometry.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/111-ストライプ表のキーとその幾何.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/114-overall-accounting-of-small-data-packing-containers.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/114-小データパッキングコンテナの全体収支.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/115-completeness-and-byte-budget-of-system-configuration-field-table.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/115-システム構成フィールド表の完全性とバイト予算.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/120-choosing-the-common-ratio-of-a-geometric-size-class-table.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/120-等比のサイズクラス表で公比をどう決めるか.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/121-cap基準分割と段階数の最適点.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/121-optimal-points-for-tiering-by-cap-and-tier-count.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/125-what-is-read-above-write-pointer-in-sequential-zone.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/125-シーケンシャルゾーン書き込みポインタ上方で読めるデータ.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/126-costs-of-four-system-config-slot-width-candidates.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/126-システム構成スロット幅4候補のコスト.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/129-how-writes-below-io_min-fail-on-real-devices.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/129-io_min-未満の書き込みの実デバイス上での障害形態.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/130-does-per-head-livelist-pass-bounded-destruction.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/130-ヘッド毎のlivelistは有界破棄を満たすか.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/132-livelist-carrier-recomputed-with-real-tree-count-and-fanout.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/132-livelist媒体-実ツリー数と内部ファンアウトでの再計算.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/133-format-cost-of-mapping-key-candidates.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/133-マッピングキー各候補のフォーマットコスト.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/134-mapping-key-format-cost-slot-baseline-and-two-new-arms.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/134-マッピングキーフォーマットコスト-スロット基準と2新アーム.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/138-per-disk-rollback-floor-and-space-requirements-for-pushing-empty.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/138-ディスク別ロールバック下限と空押しの容量要件.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/139-tightened-form-of-per-disk-rollback-floor.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/139-ディスク別ロールバック下限の厳格形態.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/140-cross-unit-pages-and-read-side-copying-forced-by-unit-header.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/140-ユニットヘッダに起因するユニット境界跨ぎページと読み取り側コピー.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/142-新池新建文件的干跑.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/142-新池新建文件的干跑.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/156-alloc-basis-の四つの分岐に伴うコストの数値-一部実施済み.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/156-alloc-basis四条岔路的代价数.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/156-cost-figures-for-the-four-alloc-basis-forks.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/158-four-forks-in-root-selection-and-repair.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/158-ルート選択と修復の四つの分岐-第4回実行を提出済み-分岐1・2はユーザーが決定、3は未完.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/164-small-scale-functional-test-of-the-new-crash-amplification-design.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/164-クラッシュ増幅の新設計に対する小規模機能テスト.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/167-crash-enumeration-cuts-for-multiple-in-flight-publications.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/167-複数の実行中公開に対するクラッシュ列挙の区切り方.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/170-O3-仕様実行器の初版.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/170-first-o3-specification-executor.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/171-3オラクル共謀テスト.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/171-three-oracle-collusion-test.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/175-inode-number-watermark-regression-and-reissuance-on-the-product-path.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/175-製品経路における-inode-番号-watermark-の後退と再発行.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/178-counts-of-leaf-container-and-record-deaths.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/178-葉コンテナとレコードの死亡数.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/183-cost-numbers-for-capacity-slope-read-cache-small-disk-admission-and-sweep-thresholds.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/183-容量勾配・読み取りキャッシュ・小容量ディスクの受け入れ・掃除しきい値のコスト.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/183-容量斜率读缓存小盘准入与清扫阈值的代价数.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/185-GC-一バッチ分の移動の壁時計分解.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/185-wall-clock-breakdown-of-a-batch-of-gc-migrations.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/186-unknown-trees-accounting-dimension-rederived.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/186-不认识的树-记账维重推.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/186-未知のツリー・記帳次元の再導出.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/71-entry-count-and-width-of-accounting-keys.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/71-記帳キーのエントリ数と幅.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/71-记账key的条目数与宽度.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/76-discriminative-power-of-payload-checksum.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/76-ペイロードチェックサムの判別力.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/96-consistency-of-hybrid-architecture.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/96-ハイブリッドアーキテクチャの一致性.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/97-entry-encoding-of-accounting-and-allocation-records.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/97-記帳および割り当て記録のエントリ符号化.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/97-记账与分配记录的条目编码.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/98-geometry-of-inode-records-and-inode-trees.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/experiments/98-inode-レコードと-inode-ツリーの幾何.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/layout/04-fourth-txn.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/layout/04-fourth-txn.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/layout/04-fourth-txn.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/milestone/17-seventeenth-txn.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/milestone/17-seventeenth-txn.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/prior-art.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/prior-art.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/tooling.en.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/tooling.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+.claude/kb/tooling.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+crates/singlefs-unit-graph/src/shell_sources.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+scripts/experiment-apparatus/e187_quarantine_mark_cost.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+scripts/experiment-apparatus/e71_accounting_keys_single_generation.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+scripts/experiment-apparatus/e97_entry_encoding_single_generation.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑

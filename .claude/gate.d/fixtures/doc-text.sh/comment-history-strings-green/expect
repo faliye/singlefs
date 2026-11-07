@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：comment-history
+want=✓ 注释里没有历史写法：扫了 3 份文件
+want=命中 0 行：按标记放过 0 行、滞后表放过 0 行、红 0 行（滞后表 0 行，没有滞后表）
+want=comment-history：绿

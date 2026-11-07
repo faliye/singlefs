@@ -1,0 +1,3 @@
+# 样本登记表：一份带齐，一份那一句少 red=
+scripts/gate/sample-entry.sh	SAMPLE_ITEM	item=,exit=,judged=	# 样本：带齐
+scripts/gate/short_fields.py	SAMPLE_PY_ITEM	judged=,red=,reused=	# 样本：那一句少红了多少

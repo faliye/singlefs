@@ -1,0 +1,9 @@
+# 代码与脚本注释里历史写法的豁免表：门禁 doc-text 的 comment-history 格读它，登记的文件整份不判（判法与写法在 scripts/gate/comment-history-check.py 文件头）。
+# 写法（制表符分隔，两列）：<路径，相对仓根，要是判法射程里的文件><TAB># <为什么整份不判，至少 8 个字>
+# 只收主题就是历史词表的文件：这一格自己的判法脚本、登记禁用写法的词表文件、处理历史条目的脚本。
+# 注释里写了历史、该改写的存量不往这里放，登记进 .claude/gate.d/comment-history-lag.tsv。
+# 登记的路径不在射程里的文件中、重复、理由不到 8 个字、列数不对，那一格判红。
+scripts/gate/comment-history-check.py	# 判法脚本，文件头与词表写的正是词表里的那些词
+.claude/gate.d/lib-forbidden-notations.py	# 禁用写法的词表本身，注释与正则写的就是日期、轮次与出处这些词
+scripts/kb/history-consolidate.py	# 整理变更史的脚本，注释讲它认的日期块、改前字段与 loss-check 的改前改后参数
+scripts/kb/doc-consolidate.py	# 整理 kb 历史节的脚本，注释讲它认的日期条目形态与改前改后两份输入

@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：comment-history
+want=1 行的 history-kept 标记理由不到 8 个字（去掉空白后算），这几行不放过：
+want=scripts/demo/tool.py:2  理由「太短了」只有 3 个字
+want=→ 怎么办：标记写成 history-kept: <理由>，理由至少 8 个字
+want=doc-text.sh：1 格里 1 格红（comment-history）

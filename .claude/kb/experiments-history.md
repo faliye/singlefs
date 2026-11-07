@@ -586,6 +586,20 @@
 
 ## E16（journal 的角色：WAL vs 意图日志）
 
+### 2026-11-02
+
+- 第 7 次重跑（差分）：三份带准入键的新产物与变异表整表已出，正文与留存产物逐字节相同；K1–K7 判完，问题单第 3 行判甲
+  - **改前**：2026-10-29 那条的「改后」：装置记录头 496、接准入，单测 34 条、变异表 31 条，三份新产物与整表变异待跑；整表第一遍（任务 4702）在 `mutate.sh` 副本里红了一条仓根单测（`repository_root_is_three_levels_above_the_apparatus_source` 后一条断言要求副本里没有的 `.claude/singlefs-ai-sop/scripts/preflight.py`）。
+  - **改后**：那条单测只留路径算术，「往上三层是不是真仓」挪到运行期由 `preflight()` 拒算（退 78），另加单测，单测 35 条全绿（任务 4801）；变异表加 N10「不是仓根的目录也认成仓根」，32 条，整表（任务 4871）抓到 32、没红 0、无效 0，日志 `research/results/e16-mutate-after-2026-11-02-h496.log`；三把准入键在装置 sha256 `222d6a3f…` 上现算（任务 4888），三份产物（任务 4890）`research/results/e16-fifth-run-peak-under-today-widths-2026-11-02-h496.out`、`…-pc3-2026-11-02-h496.out`、`…-second-segment-2026-11-02-h496.out` 头上各一行 `E7INPUT`，与现算的键逐字相同（K1、K2 过）；去掉准入头之后与三份留存产物 `cmp` 三对都相同（K5：正文不变，Q1–Q6、8.1、8.2 判定沿用第 6 次，标「够判后未跑」）；K6 复跑表三行指到新产物、K7 无非数过；`replay.sh` 三行第 4 栏、`.claude/gate.d/replay-comparison-units.tsv` 第 41–43 行、重跑登记比对对象表的重跑产物名由登记起草时的日期段换成 2026-11-02（登记第十二节改名修订）。K3（三把键落盘后退 77）与 K4（`replay-row-keys` 绿）由主 agent 交服务跑（任务 4918，退 0）：三把键 `admission.py experiment` 各退 77（stderr 首句「拒绝开跑 E16R5…自上次产物以来没变，不必重跑」，产物头键前缀 `e08c6fc19d77`、`416a9f4447a6`、`92a539ba8cf5` 与 K1 三份产物第 1 行一致），`replay-row-keys` 退 0、`grep -c '✗'` 为 0、E16R5 三行第 4 栏 `yes`；F9 的五个触发条件一个都没触发，问题单第 3 行判甲（原样输出在 `.claude/kb/experiments/16-journal的角色WALvs意图日志.md` 第 7 次重跑一节 K 判定表下的围栏里）。
+  - **依据**：重跑登记 `research/prompts/e16-r7-prereg.md`；问题单 `research/prompts/m3-close-b19-p5-forks.md` 第 3 行；C777（五个实验键在 stage-inputs.tsv 没有登记行）。
+
+### 2026-10-29
+
+- 第 7 次重跑（差分）：装置记录头 487 → 496、接准入，部分已跑（装置与单测已改，变异表与三份产物待跑）
+  - **改前**：装置 `JOURNAL_HEADER_BYTES` 487，`crates/singlefs-format/src/lib.rs` 已是 496（重跑登记的停机 S1 触发）；装置 `main` 不调准入，三份留存产物头上没有准入键；单测 27 条、变异表 22 条；`scripts/experiment-apparatus/replay.sh` 三行 `E16R5|` 指 `e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out`、`e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out`、`e16-fifth-run-peak-under-today-widths-second-segment-2026-10-04-h487.out`。
+  - **改后**：常量改 496（一条记录仍装 64 项），钉值单测跟着改；`main` 三种跑法各传准入键 `E16R5`、`E16R5/pc3`、`E16R5/second-segment`；补 7 条单测（Q2、Q4、Q6、8.1、8.2 的汇总判法，空的 fsync 代价序列，原装置几何流数 2 批 1 那一格），单测 34 条全绿；变异表 31 条（加 9 条，整表待主 agent 跑）；复跑表三行第 4 栏改指 `…-2026-11-02-h496.out` 三份新名（起草时先按登记那天写日期段，产物 2026-11-02 跑出后换成这一天，产物当时待出）；`admission.py replay-row-keys` 退 0、0 处 ✗。三条比对对象在 `.claude/gate.d/replay-comparison-units.tsv` 写「不登记」，欠在 C931（E16 第五次跑没有比对单元表）。正文判定（Q1–Q6、8.1、8.2）照第 6 次，等去掉准入头之后与留存产物逐字节比再定沿用还是重判。
+  - **依据**：重跑登记 `research/prompts/e16-r7-prereg.md`；问题单 `research/prompts/m3-close-b19-p5-forks.md` 第 3 行；C777（五个实验键在 stage-inputs.tsv 没有登记行）。
+
 ### 2026-10-17
 
 - 把「C6（块层语义假设写错） 还要求一个显式的在飞记录数上限」改指 C42（残留记录冒充合法前缀）：C6（块层语义假设写错） 行没有这一条，C42（残留记录冒充合法前缀） 行把它列为三条闸之一；结论、数与产物不变。
@@ -4513,6 +4527,13 @@
 
 ## E139（按盘回退下界的收严形态）
 
+### 2026-10-29
+
+- 第 3 次重跑（回收门槛照 `crates/` 今天的写法改）已跑：装置加 CG（F_生效 三项取最大、当场取 min(F_生效, m) 其余扣到本实例的根落满每块幸存盘；自证不过的槽钉在可能住过的最旧 txg；管理员回退不重算 F），被测臂 `RGall_core_gate` 对第 2 次的 `RGall_ring_all` 逐行比 611 对，判定位 0 → 1 的 0 对、1 → 0 的 0 对，不翻面；判红 8 行（删了再写失败，`near_full` 与 `cost_growth` 开销升到 c_max 那几格）第 2 次产物里就有，F3、F9 触发，记「不翻面，甲的前提另有缺口」；`activation_faults` 的阳性对照在 S = 16 有 12 行为 0，F4 只管那一类；判别力 220 对，全在轨迹与归因行；CG 走到：d ≠ 0 12628 个采样、dF ≠ 0 14080、钉值起作用 480、扣住在等 0；`G2R_core_gate` 够判后未跑。
+  - **改后**：实验页加「第 3 次重跑」一节（读数表、判决行整行抄、判红 8 行的出处命令、失败条款一览、对 D16（发布语义） 已定项 1 的对照、答不了的），标题、复跑一段与「这是计数模型」一节改数，「影响的决策」三行回看；索引行状态加第 3 次重跑；`scripts/experiment-apparatus/replay.sh` 的 E139（按盘回退下界的收严形态） 装置行指 `e139-tightened-floor-2026-10-29.out`，另加 `driver_e139` 一行比第 2 次产物；`.claude/gate.d/replay-comparison-units.tsv` 登记一行；单测 56 → 70 个 `#[test]`、变异 41 → 53。
+  - **依据**：重跑登记 `research/prompts/e139-r3-prereg.md`；问题单 `research/prompts/m3-close-b19-e139-forks.md`；产物 `e139-tightened-floor-2026-10-29.out`；欠账 C660（按盘回退下界的定案那一句与装置对不上）。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/139-按盘回退下界的收严形态.md` 与 `git show 59ce5a865:.claude/kb/experiments.md` 里 E139（按盘回退下界的收严形态） 那一行（没有第 3 次重跑）。
+
 ### 2026-10-05
 
 - 第 2 次重跑（候选下界补系统配置的 F、回收门槛与另外五处退回整环）已跑：第 1 次那批格 610 行逐行比，228 行计数变了、全是甲（只改数的口径）、乙与丙 0，G2SW 的 `activation` 假候选 46 行降到 6 行，旧下界的候选集严格大于条款形的 53392 次、反方向 0 次（页里「不大于，偏少」那一句方向写反，已改）；RGall、RGall_Q 在第 1 次那 13 类世界与 `disk_stuck` 上假候选、不可恢复、判的格假性 ENOSPC 全 0，`disk_stuck` 上扣住的单元 7 行没有上界、1 行卡死，`broken_slot` 与 H1 的 S = 4 没有上界、S = 16 有上界
@@ -4597,10 +4618,16 @@
 
 ## E142（新池新建文件的干跑）
 
+### 2026-11-01
+
+- 「装置逼出来的 33 处空白」一节 G12 那一行照装置现状改：「位 0 退役」改成「位 0 空出」，装置从 mkfs 起置位 1 与位 2（incompat 位图第一个字节 0x06），解析器拒的不认识位写成产物那一格的 0x0e（位 1、位 2 加没登记的位 3），位 1 或位 2 没置也拒；早先产物里的 `refuses_retired_bit0=true` 写明是位 0 退役那时的记录。装置量的数、结论与产物不变，影响的决策表各行同日回看。
+  - **依据**：`scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs` 现状（位 0 空出的注释、`WRITTEN_FIRST_INCOMPAT_BYTE`、判据 9 那一段的 0x0e）；第 5 批工具员报告 `~/.local/share/singlefs/work/compat-removal-batch5-scripts/result.md`；`records/2026-10-31-删兼容旧版本代码.md`「第 5 批（2026-11-01）」那一节。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/142-新池新建文件的干跑.md`「装置逼出来的 33 处空白」一节 G12 那一行。
+
 ### 2026-10-21
 
 - 两处引 `crates/` 新池新建文件流全量数的说法按取号写两轮改成现值：崩溃点重放主臂一句补「装置按取号写一轮量，取号写两轮之后全量 16777268、61 次操作」，局限第 9 条把装置量到的与今天 `crates/` 里的流分开写；装置量的数、结论与产物不变。
-  - **依据**：`crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES` 为 16_777_268；`.claude/kb/layout/01-first-txn.md` 写同一个数。
+  - **依据**：`crates/singlefs-verification/tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES` 为 16_777_268；`.claude/kb/layout/01-first-txn.md` 写同一个数。
   - **改前**：`git show 841b3beab:.claude/kb/experiments/142-新池新建文件的干跑.md`。
 
 ### 2026-10-17
@@ -4690,7 +4717,7 @@
 
 - E142（新池新建文件的干跑） 第十二次跑——追平 mkfs 加清零写之后 `crates/` 只读快照变了的一个标量，不量新数、不动判据
   - **改前**：留存产物 `e142-new-pool-file-creation-dry-run-2026-09-18-change-count-three.out`（第十一次跑，2026-09-18）里 `crates/` 只读快照那一段的 `name=impl_config` 行写 `mkfs_operations=13`；那份产物是并行线四改 mkfs 写路径之前的字节。
-  - **改后**：并行线四同一天两次改了 `crates/` 的 mkfs 写路径——① mkfs 自己整环清零根环三区域与 journal 环（用户 2026-09-19 定案「块设备抽象加写零」）；② 根环也一起清（C484（mkfs 不清根环，同 fsid 重来旧根还择得中），用户定案）；`crates/singlefs-harness/src/segments.rs` 新增第六种步骤 `StepKind::ZeroFill`，`crates/singlefs-core/src/make_filesystem.rs:260-262` 按几何逐区域清零。重跑 `driver_e142`（`scripts/experiment-apparatus/replay.sh:157`），产物换成 `e142-new-pool-file-creation-dry-run-2026-09-22-mkfs-zero-fill-resync.out`：与第十一次跑的产物逐字节比对，309 行里只有 1 行不同——`mkfs_operations` 13 → 21（新增 8 次 `write_zeroes`：每盘 3 个根环区域 + 1 个 journal 环，2 盘）；`policy_mismatches=0`、`name=impl_bytes_equal_summary regions=21 equal=21 unequal=0` 不变，区域字节没有跟着变（起点设备本来就是全零，清零写的是已经是零的字节）。装置自己的 `name=segments path=mkfs` 仍是 `operations=13 segments=4+1+1+1+4`——`scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs` 这次没有改一个字节，它是独立手写模型、不读 `crates/` 的 mkfs 实现，这次重跑没有让它追平 `crates/` 新加的清零步骤。单测复跑 `cargo test --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e142-new-pool-file-creation-dry-run` 仍 50 passed；变异表源码未改，未重新跑。`replay.sh:157` 改指新产物，复跑判定「字节一致」。「影响的决策」表 31 行按今天的产物逐行重新回看，关系（支撑/备料/不影响）一行未改。
+  - **改后**：并行线四同一天两次改了 `crates/` 的 mkfs 写路径——① mkfs 自己整环清零根环三区域与 journal 环（用户 2026-09-19 定案「块设备抽象加写零」）；② 根环也一起清（C484（mkfs 不清根环，同 fsid 重来旧根还择得中），用户定案）；`crates/singlefs-verification/src/segments.rs` 新增第六种步骤 `StepKind::ZeroFill`，`crates/singlefs-core/src/make_filesystem.rs:260-262` 按几何逐区域清零。重跑 `driver_e142`（`scripts/experiment-apparatus/replay.sh:157`），产物换成 `e142-new-pool-file-creation-dry-run-2026-09-22-mkfs-zero-fill-resync.out`：与第十一次跑的产物逐字节比对，309 行里只有 1 行不同——`mkfs_operations` 13 → 21（新增 8 次 `write_zeroes`：每盘 3 个根环区域 + 1 个 journal 环，2 盘）；`policy_mismatches=0`、`name=impl_bytes_equal_summary regions=21 equal=21 unequal=0` 不变，区域字节没有跟着变（起点设备本来就是全零，清零写的是已经是零的字节）。装置自己的 `name=segments path=mkfs` 仍是 `operations=13 segments=4+1+1+1+4`——`scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs` 这次没有改一个字节，它是独立手写模型、不读 `crates/` 的 mkfs 实现，这次重跑没有让它追平 `crates/` 新加的清零步骤。单测复跑 `cargo test --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e142-new-pool-file-creation-dry-run` 仍 50 passed；变异表源码未改，未重新跑。`replay.sh:157` 改指新产物，复跑判定「字节一致」。「影响的决策」表 31 行按今天的产物逐行重新回看，关系（支撑/备料/不影响）一行未改。
   - **依据**：跑前登记为主 agent 派发提示原文（本轮无独立 `e142-r12-prereg.md`，任务明写「不量任何新数、不动判据、不动臂的定义」）；新产物 `e142-new-pool-file-creation-dry-run-2026-09-22-mkfs-zero-fill-resync.out`；`diff` 它与 `e142-new-pool-file-creation-dry-run-2026-09-18-change-count-three.out`（两份都留存在仓里）只有第 285 行不同；复跑 `bash scripts/experiment-apparatus/replay.sh E142`（新池新建文件的干跑）报字节一致；门禁 52 号（段序列登记）仍绿——它只比对 kb 登记表与 E142（新池新建文件的干跑） 产物，两边都没有反映 `crates/` 新的清零步骤，属于 C485（segment-registry 格不读活代码，段序列变了照样绿） 已记的假绿，这一轮照实抄、不修；门禁 55 号（QEMU）与要不要另立一轮把装置模型也改成六种步骤，本轮未判，交主 agent；正文 [142-新池新建文件的干跑.md](experiments/142-新池新建文件的干跑.md)。
 
 ### 2026-09-19
@@ -4704,7 +4731,7 @@
 - E142（新池新建文件的干跑） 第十一次跑——改动计数字段 1 → 3 逐字节相减，另加装置↔`crates/` 实装比对（首次触发又收口 F1）
   - **改前**：第十次跑（2026-09-17）产物 93 行，改动计数字段（D8（核心索引结构） 已定项 6 偏移 88）装置与跑前登记都按字面 1 写；量 5（装置↔`crates/` 实装逐字节比对）从未跑过，登记里只是占位；27 单测 / 66 条变异。
   - **改后**：用户定案改动计数按定义写成 checkpoint_txg（新池新建文件是 3）；装置 `publish_first_file` 加 `change_count` 形参，`main()` 与新增的 `run_full_pipeline` 传 3。新增 M_A（新口径）/ M_B（真实基线，字面 1）整份镜像逐字节相减：67 段差异全部归因（0 个 gap），登记点名的六处各至少一段，另发现 `journal_record`、`mapping_root` 两处不在点名之内也跟着变；阳性对照精确报出注入点；既有结果行除 `name=done` 计数外一字不变。
-    `crates/` 侧当天补上只读产出 `new_pool_file_creation_region_bytes`（21 行区域清单）之后，量 5 **第一次真跑触发 F1**（10 `equal=true`、11 `equal=false`）；只读诊断报告 `e142-r11-f1-diagnosis.md` 查明 11 处不等全部同一根因——装置与 `crates/singlefs-harness/src/scenario.rs::first_file_content()` 喂给新池新建文件的 3000 字节文件内容公式不一样（装置 `(index*7+3)%251`，`crates/` `index%251`），两边各自的写路径在字节层逐字相同（独立按位 CRC32C 核对器两边各 92 格全过，把任一边内容换成另一边之后 21/21 全等）。主 agent 判定改装置对齐到 `index % 251`（`crates/` 一侧被 QEMU 日志核对器与三份测试用例、崩溃点重放两条流钉着）；改完重跑，量 5 **21/21 全等**。单测 27 → 50、变异 67 → 75，两轮（改文件内容前后）各自 75 条全抓。
+    `crates/` 侧当天补上只读产出 `new_pool_file_creation_region_bytes`（21 行区域清单）之后，量 5 **第一次真跑触发 F1**（10 `equal=true`、11 `equal=false`）；只读诊断报告 `e142-r11-f1-diagnosis.md` 查明 11 处不等全部同一根因——装置与 `crates/singlefs-verification/src/scenario.rs::first_file_content()` 喂给新池新建文件的 3000 字节文件内容公式不一样（装置 `(index*7+3)%251`，`crates/` `index%251`），两边各自的写路径在字节层逐字相同（独立按位 CRC32C 核对器两边各 92 格全过，把任一边内容换成另一边之后 21/21 全等）。主 agent 判定改装置对齐到 `index % 251`（`crates/` 一侧被 QEMU 日志核对器与三份测试用例、崩溃点重放两条流钉着）；改完重跑，量 5 **21/21 全等**。单测 27 → 50、变异 67 → 75，两轮（改文件内容前后）各自 75 条全抓。
   - **依据**：跑前登记 `e142-r11-prereg.md`（含「修订」三条）；产物 `e142-new-pool-file-creation-dry-run-2026-09-18-change-count-three.out`（309 行，触发过 F1 的一版留存为 `...-pre-f1-fix.out`）；诊断报告 `e142-r11-f1-diagnosis.md`；`replay.sh:157` 改用 `@driver_e142` 跨两个 cargo workspace 现跑现比，正文 [142-新池新建文件的干跑.md](experiments/142-新池新建文件的干跑.md)。
 
 ### 2026-09-16
@@ -5071,7 +5098,7 @@
   - **依据**：重跑登记 `research/prompts/e156-r6-prereg.md`；产物 `e156-alloc-basis-counts-2026-10-05-r2.out`、`research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`、`research/results/e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.txt`、`research/results/e156-alloc-basis-counts-2026-10-05-r6-point-sets.txt`；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)「第 6 次重跑（2026-10-05）」一节。
 
 - E156（alloc-basis 四条岔路的代价数） 第 5 次重跑——core 断言之后 W7 那一格的阳性对照换成 PC-钉门槛，第 4 次读数在新 `crates/` 上逐字段重比
-  - **改前**：装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`（5776 行，17 单测）里 W7 的阳性对照是 PC-分配器（`allocator_without_the_root_ring`，S = 4、ρ = 1、k = 0，换回不装根环表的分配器，A10 应判红），产物 `e156-alloc-basis-counts-2026-09-26-r2.out`（4007 行），`replay.sh` 的 E156（alloc-basis 四条岔路的代价数） 那一行指它；用户定「core 在分配器没装根环表而记了一条根时断言」之后，PC-分配器 在第一次记根就 panic。
+  - **改前**：装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（5776 行，17 单测）里 W7 的阳性对照是 PC-分配器（`allocator_without_the_root_ring`，S = 4、ρ = 1、k = 0，换回不装根环表的分配器，A10 应判红），产物 `e156-alloc-basis-counts-2026-09-26-r2.out`（4007 行），`replay.sh` 的 E156（alloc-basis 四条岔路的代价数） 那一行指它；用户定「core 在分配器没装根环表而记了一条根时断言」之后，PC-分配器 在第一次记根就 panic。
   - **改后**：装置 5819 行、18 单测（PC-分配器 撤了，加 PC-钉门槛：格表里 Hh(1, 后, S, ρ) 六格的两份滞后集合交 k = 0 的 A10 判定，打 `name=pc_pinned_floor` 六行与一行汇总；新单测 U19）；产物 `research/results/e156-alloc-basis-counts-2026-10-05.out`（3955 行，同一个二进制再跑逐字节相同）。第 1 行：六格两列的判定都判「不符」、滞后集合都含 6S − 1，`v2_pc_pinned_floor_seen=true`。第 2 行：规范化之后 3948 行里 294 行不同（60 判决行、234 计数行，含 `name=done` 的计数项）：`f24_real_every_differ_points` 0 → 34、`s11_k10_violation_points` 0 → 34、`q1d_growth` 的几何敏感性由「12 个取样点一致」变「不稳定」（「实」列 4 点 `not_monotonic`）、F1 仍触发；归属跑（副本里反打 31-1 的断言）与新产物逐字节相同，不同不是 31-1 带来的。停机 S11、S14 触发，交主 agent；`replay.sh` 的 E156（alloc-basis 四条岔路的代价数） 那一行改指新产物，r2 那一份留着。内联单测与变异整表没跑（重型，归提交时）。
   - **依据**：重跑登记 `research/prompts/e156-r5-prereg.md`；产物 `research/results/e156-alloc-basis-counts-2026-10-05.out`、`research/results/e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out`、`research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`；变异两行 `research/results/e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv`、`research/results/e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
   - **改前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 文档铁律修正之前的原样：这一块里的编号补了简称、撞名的本地臂名改成小写，原句在这一版）
@@ -5079,7 +5106,7 @@
 ### 2026-09-26
 
 - E156（alloc-basis 四条岔路的代价数） 第 4 次重跑——三个前提在装置上复现、岔路单第 3 行按前提 2 失效、第 1 行 38 条历史量完
-  - **改前**：装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`（4335 行，11 单测 / 12 条变异）照挂载时回退、挂载内不回收的旧实现写：H0 / HR / HK / HK-F0 / HF / HX / HY / Hh 八族，岔路 1 只在 S = 8 与 S = 4、ρ = 1、回收时点「实」、洞位置「后」、k ≤ 2 上量过；开工时单测 U11、U13 就红（挂载时回退已删）。索引行状态「部分已跑（2026-09-22 第一、二段 + 2026-09-23 R2 第一段 + 2026-09-24 R2 第二、三段（缩小范围，只在 S=8、ρ=1 一个几何取样点上），入库装置，确定性，5 单测 / 4 条变异全抓；岔路 2、7 已跑；岔路 3 一个几何格已跑（X8（小池耗尽两口径构造）-A 未做）；岔路 1 三个洞数取样点已跑（S×ρ 全扫未做））」；结论列原样：K1 逐字核对相符（盘 0 记账第 1/2/5 项 13/211955/1）；岔路 2：清单 L（4 处）漏了命令抓到的 41 处（`|M∖L|=41`），门禁 51 号本身不用改（数据驱动），但登记给的两步说明本身漏了一处公式副本；岔路 7（R2 第一段改成只读被判镜像之后重跑）：G27 在 H0/HR/HK 共 168 个真实合法状态上零误报（Q7b）；判别力自测①（不减第 5 项）在这一段测过的 7 个可达基底（β0/β1/β2 与 HK 的四个观测点）上都没看到规定的转色，触发登记里的作废条款，Q7a 整张表按登记规则作废——Q7d-2/Q7d-3 排除了「量法本身看不见 0」这条解释（HK-F0、β_syn 上量法测得到 0），根因当时收窄到「可达合法状态第 5 项从来不是 0」；**这句结论已被 2026-09-25 第 3 次重跑续派段推翻**：补一个新的可达基底（`beta_hr_rollback_row`，HR 家族回退写行那一步，`family=HR kind=rollback_row txg=76`，第 5 项恰为 0）之后，判别力自证①第一次在可达基底上转色（`flips_red_to_green=true`），详见实验页「历史版本」2026-09-25 续派段；岔路 3（一个 HF 几何格）：G7（公开入口重组）与 F-扣（真实实现）的 D_rel 完全相同（都是 0，非空发布计），差别不大（`max_diff=0≤3`），K9 未验到预期的 3；岔路 1（三个 Hh(k) 洞数取样点，k=0/1/2）：Q1a−Q1b 之差 Δ 随洞数单调 +50/洞（20→70→120），从 h=0 起就越过 2 槽/1 槽两个门槛，但 h=0 的基线值 20 本身未查透机制。
+  - **改前**：装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（4335 行，11 单测 / 12 条变异）照挂载时回退、挂载内不回收的旧实现写：H0 / HR / HK / HK-F0 / HF / HX / HY / Hh 八族，岔路 1 只在 S = 8 与 S = 4、ρ = 1、回收时点「实」、洞位置「后」、k ≤ 2 上量过；开工时单测 U11、U13 就红（挂载时回退已删）。索引行状态「部分已跑（2026-09-22 第一、二段 + 2026-09-23 R2 第一段 + 2026-09-24 R2 第二、三段（缩小范围，只在 S=8、ρ=1 一个几何取样点上），入库装置，确定性，5 单测 / 4 条变异全抓；岔路 2、7 已跑；岔路 3 一个几何格已跑（X8（小池耗尽两口径构造）-A 未做）；岔路 1 三个洞数取样点已跑（S×ρ 全扫未做））」；结论列原样：K1 逐字核对相符（盘 0 记账第 1/2/5 项 13/211955/1）；岔路 2：清单 L（4 处）漏了命令抓到的 41 处（`|M∖L|=41`），门禁 51 号本身不用改（数据驱动），但登记给的两步说明本身漏了一处公式副本；岔路 7（R2 第一段改成只读被判镜像之后重跑）：G27 在 H0/HR/HK 共 168 个真实合法状态上零误报（Q7b）；判别力自测①（不减第 5 项）在这一段测过的 7 个可达基底（β0/β1/β2 与 HK 的四个观测点）上都没看到规定的转色，触发登记里的作废条款，Q7a 整张表按登记规则作废——Q7d-2/Q7d-3 排除了「量法本身看不见 0」这条解释（HK-F0、β_syn 上量法测得到 0），根因当时收窄到「可达合法状态第 5 项从来不是 0」；**这句结论已被 2026-09-25 第 3 次重跑续派段推翻**：补一个新的可达基底（`beta_hr_rollback_row`，HR 家族回退写行那一步，`family=HR kind=rollback_row txg=76`，第 5 项恰为 0）之后，判别力自证①第一次在可达基底上转色（`flips_red_to_green=true`），详见实验页「历史版本」2026-09-25 续派段；岔路 3（一个 HF 几何格）：G7（公开入口重组）与 F-扣（真实实现）的 D_rel 完全相同（都是 0，非空发布计），差别不大（`max_diff=0≤3`），K9 未验到预期的 3；岔路 1（三个 Hh(k) 洞数取样点，k=0/1/2）：Q1a−Q1b 之差 Δ 随洞数单调 +50/洞（20→70→120），从 h=0 起就越过 2 槽/1 槽两个门槛，但 h=0 的基线值 20 本身未查透机制。
   - **改后**：装置整个改写（5755 行，17 单测；`crates/mutations.tsv` 新加 M35–M43 九行、改锚 M32–M34 三行，点着这个装置的 22 行在草稿目录仓副本里逐条全红）：只跑第一段（前提 1–3 的最小复现、PC-c2、挂着回退那一形的两个单测）与第二段（Hh(k, 位置, S, ρ) 38 条排得下的历史 × 「实」「每」）。前提 1 成立、前提 2 不成立（岔路单第 3 行失效不量）、前提 3 只有岔路 2 那一族按旧式子；第 1 行 12 个取样点上 Q1c-前 都越过 2 槽，F1 触发。第一段撞上停机 S1(i)（装置原有「发完只改回根槽」的对照镜像与录写切段差每块盘一个系统配置扇区，实现在根槽之后还轮换系统配置），按 S1 行「改装置，写进第十二节」把对照镜像改成连系统配置两槽一起改回，交主 agent 认。实验页正文换成第 4 次重跑的现状，第 1–3 次重跑的正文原样挪进页内「历史版本」。
   - **依据**：重跑登记 `e156-r4-prereg.md`（第十二节修订 1、2）；产物 `e156-alloc-basis-counts-2026-09-26.out`；对 E156（alloc-basis 四条岔路的代价数）跑 `bash scripts/experiment-apparatus/replay.sh` 的 E156（alloc-basis 四条岔路的代价数） 那一格报字节一致；单测 `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 17 passed；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
 
@@ -5094,7 +5121,7 @@
 ### 2026-09-23
 
 - E156（alloc-basis 四条岔路的代价数） R2 重跑第一段——R3（G27 改读镜像）、HK/HK-F0 两族新历史、岔路 7 全套 Q7a–Q7f
-  - **改前**：第一、二段的装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`（2 单测 / 1 条变异）里 G27 两侧都不读被判镜像——基底那一侧读内存分配器，坏镜像那一侧读调用方传入的三元组（C471（产物里同一个字段名在两条路径上指着相反的两个量） 记的那处字段语义反了的缺陷改掉之后仍是这个读法）；只有 β0/β1/β2 三个基底；岔路 7 判别力自证①在三个基底上都不转色，Q7a 按 V3 作废；S1(c) 只现跑已有测试文件，没有装置侧重放；岔路 1、3、7 全开着，无 Q7d/Q7e/Q7f/S9 这几类量。
+  - **改前**：第一、二段的装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（2 单测 / 1 条变异）里 G27 两侧都不读被判镜像——基底那一侧读内存分配器，坏镜像那一侧读调用方传入的三元组（C471（产物里同一个字段名在两条路径上指着相反的两个量） 记的那处字段语义反了的缺陷改掉之后仍是这个读法）；只有 β0/β1/β2 三个基底；岔路 7 判别力自证①在三个基底上都不转色，Q7a 按 V3 作废；S1(c) 只现跑已有测试文件，没有装置侧重放；岔路 1、3、7 全开着，无 Q7d/Q7e/Q7f/S9 这几类量。
   - **改后**：跑前登记 `e156-r2-prereg.md`（只覆盖岔路单第 9、11、12 行；这一段只做第 12 行）。R3：新函数 `allocated_minus_deferred_mismatches_referenced(pool, accounting_slot, referenced)` 只解析镜像字节；旧内存读法保留给 U8 的变异反面用。新增 HK / HK-F0 两族真实历史（β0→O→E→无崩溃重开→O×4→抬 F 到上限→O→管理员回退→O→c2 崩溃并恢复→O，覆盖 骨架发布 全部发布种类；HK-F0 同一串操作但 `ReuseWindow::ForcedToZero`，R7 的不可达阳性对照），连同 β0/β1/β2、β_syn（β0 镜像做 (第 1 项 −1、第 5 项 −1、第 2 项 +1)）、β_F0 凑成 9 个基底，逐个跑 Q7a（Bd(+1)/(−1)/(+8)）、Q7c①②、PC-检查-Bk1/Bk2/Bk3；新增 Q7d-1/Q7d-2/Q7d-3、Q7e、Q7f 五类量；S1(c) 改成装置自己重放 `rollback_by_a_forward_publish.rs` 的回退隔离场景并 `assert_eq!` 逐项核对；锚1/锚2/锚3 三个锚点在装置里现算并与实现侧同名常量或几何函数回比。写装置期间发现并修了两处自己的实现缺口（产物之前，见 `e156-r2-prereg.md`「十二」修订 1、2）：① HK 的回退目标选取要按 `effective_rollback_floor` 过滤候选集，不能直接拿 `readable_roots` 里 `checkpoint_txg` 最小的一条（HK 抬过 F 之后 genesis 已经不是候选）；② `mount_writable`/`mount_rollback` 内部重建的分配器会把 `ReuseWindow` 重置回产品默认，每次挂载/回退之后要重新 `set_reuse_window`。命名纪律改了 40 余处单字母/字母加数字标识符（`g8_prime_is_red` 等），`naming-lint.sh` 全绿。单测 4 个（新增 `new_pool_file_creation_self_release_is_one_slot`、`red_check_reads_the_corrupted_mirror_not_the_live_allocator`），变异表这个 bin 累计 3 条，全部手工验证红→绿→复原绿。产物 `e156-alloc-basis-counts-2026-09-23-stage1.out`（324 行，两遍现跑逐字节一致），`replay.sh:175` 改指向它。**结论**：Q7b 在 168 个可达合法状态（H0/HR/HK）上 G27 零误报；Q7d-2 显示这 168 个状态第 5 项从未为 0（最小值 1）；Q7d-3（阳性对照）证明量法看得见 0（HK-F0、β_syn 都测到）；Q7c①在全部 7 个可达基底上仍不转色，只在 2 个不可达基底（β_syn、β_F0）上转色；按登记 V3，**Q7a 整张表仍然作废**——岔路 7（岔路单第 12 行）续跑翻不了面，改判据还是认下交主 agent。HK-F0 的抬 F 探测撞上 S9（候选根树表读不出，`ForcedToZero` 下过早复用了 genesis 的树表单元），停在那一格，不影响已报的判定。
   - **依据**：跑前登记 `e156-r2-prereg.md`；产物 `e156-alloc-basis-counts-2026-09-23-stage1.out`；复跑 `bash scripts/experiment-apparatus/replay.sh E156`（alloc-basis 四条岔路的代价数）报字节一致；单测 `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 4 passed；变异表 `crates/mutations.tsv` 该 bin 3 条逐条手工验证；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
 
@@ -5175,7 +5202,7 @@
     Φ1 故障注入、PC1-a/PC1-b、Q1-1 至 Q1-4 的装置代码一行没写，一个数都没有；岔路单第 2 行（C331（择根倒挂压过已确认的写） ①②）
     同样一个数都没有。
   - **改后**：主 agent 消息「接着做，这一段还没交出岔路单要的数，不停」——在
-    `crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 新增约 500 行：H1 家族枚举（`h1_family`：
+    `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 新增约 500 行：H1 家族枚举（`h1_family`：
     n1∈{1,2,3}、j 取每条可读根、m∈{0,1,2}）、Φ1 故障注入（`attempt_op1`：按 (设备, 偏移) 精确注入，落点由
     `locate_allocation_record_tree` 现查树表 0 条/非 0 条两支）、PC1-a/PC1-b（`run_pc1_a_and_b`）。
     **过程中发现并修了一个 bug（产物之前）**：`root_record_of` 最初拿 `RootView::record_bytes`（截到 457
@@ -5293,7 +5320,7 @@
 
 - E161（崩溃放量的去重与分段耗时） 可行性档
   - **改前**：只有跑前登记 `research/prompts/e161-preregistration.md`，没有装置、产物与实验页。
-  - **改后**：入库装置 `crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs`（13 单测，`crates/mutations.tsv` 追加 12 条变异）；按用户定只跑可行性档（第一条流写数少于 26 的各段全量、两条流的甲二快档全域、两个 26 写段各 4096 个段头），停机条款 S1–S6、登记第七节全部锚点与 crates 逐状态对拍全过，G1–G5 未判。
+  - **改后**：入库装置 `crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs`（13 单测，`crates/mutations.tsv` 追加 12 条变异）；按用户定只跑可行性档（第一条流写数少于 26 的各段全量、两条流的甲二快档全域、两个 26 写段各 4096 个段头），停机条款 S1–S6、登记第七节全部锚点与 crates 逐状态对拍全过，G1–G5 未判。
   - **依据**：登记第十二节 12.2（用户定只验可行性）；产物 `e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out`。
 
 ## E162（崩溃放量判定块存储选型）
@@ -5355,6 +5382,13 @@
   执行员写装置时卡住被停，主 agent 接手写装置 `scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs`、12 条单测、22 条变异（全抓），跑第一、二段，三份产物落 `research/results/e164-crash-amplification-design-function-test-2026-09-28-*.out`；跑前登记第十二节写了修订 R1–R9。第三段没跑。
 
 ## E165（恢复重放有界穷举与变异杀伤界）
+
+### 2026-11-05
+
+- E165（恢复重放有界穷举与变异杀伤界） 第 3 次重跑第三段「它答不了的」第一条改成现值，状态、结论、数与产物不变
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md` 第 608 行。
+  - **改后**：原句说 D22（单元原子性怎么合成） 已定项 7 写「设备失而复得会造出两条同 txg 的合法根」、「同 txg 不同实例」与「实例代号更高而 txg 更低」两种根环正是那几类状态里才会冒出来；改成：读者只收落在公式给的那一槽的根，同一个非 0 txg 至多一条进择根，设备失而复得造不出两条同 txg 的根同进一次择根，那一分项正文没有那句；「实例代号更高而 txg 更低」那种在掉盘、设备失而复得、管理员回退、实例切换几类状态里会不会冒出来没量过（推的）。「影响的决策」十二行逐行回看，都不受影响。
+  - **依据**：判决 `research/prompts/m3-close-b19-e165-r3-main-verification.md` 第二节「腐烂两处」与 v1826 两格；读者落点核 `crates/singlefs-core/src/recovery.rs` 第 1865–1873 行、`crates/singlefs-core/src/root_ring.rs` 第 188–193 行。
 
 ### 2026-10-23
 
@@ -5454,7 +5488,7 @@
 ### 2026-10-01
 
 - E168（删除借保留量的环窗口） 建页，装置写成
-  前两次派发的执行员没交回；第三次接手写入库装置 `crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs`（主工作区那一份删除入口是桩）、删除路径补丁表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`（19 行）、11 条单测、`crates/mutations.tsv` 末尾 15 行装置变异，编过；单测、变异与第一段产物都没跑（checker 档），状态「进行中（装置）」。
+  前两次派发的执行员没交回；第三次接手写入库装置 `crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs`（主工作区那一份删除入口是桩）、删除路径补丁表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`（19 行）、11 条单测、`crates/mutations.tsv` 末尾 15 行装置变异，编过；单测、变异与第一段产物都没跑（checker 档），状态「进行中（装置）」。
 
 ### 2026-10-03
 
@@ -5514,6 +5548,45 @@
   - **改前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 文档铁律修正之前的原样：这一块里的编号补了简称、撞名的本地臂名改成小写，原句在这一版）
 
 ## E171（三oracle合谋测试）
+
+### 2026-11-02
+
+- 第 2 次重跑的 Z12 重跑落页：名单核对重跑 `research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-list-check-2026-11-01.out` 第 40 行 `pinned_values_equal=true`（作废那一份是 `false`），三份撤项核算重跑 `…-removal-effect-on-the-s4-f4-2026-11-01.out`、`…-removal-effect-on-the-s4-f4-substitutes-2026-11-01.out`、`…-removal-effect-on-the-revision-6-segment-two-2026-11-01.out` 判决行与作废那一趟逐字相同、都 `q1_judgement=jia`；页面状态「第 2 次重跑撤项核算段部分已跑：…Z12 触发待重跑…」改成「已跑：Q2 有，Q1 撤项那一格甲（Z12 重跑之后三份判定词仍全同）」，新加第 9 条整行引四份新产物，复跑表四行改指新产物名，第 7 条现状整表段的前置照登记修订 3 第 3.7 条改写，「它答不了的」里「重跑预计判定词不变（推的）」那一条改成量的；「影响的决策」十五行回看改到 2026-11-02（不受影响）。
+  - **依据**：上面四份产物；登记 `research/prompts/e171-r2-prereg.md` 修订 3（第 3.1 条）；`replay.sh` 四条 `driver_e171_second_rerun_*` 登记行改指新名。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/171-三oracle合谋测试.md`。
+- 第 2 次重跑撤项核算段一节加第 10 条（三语）：现状整表段前置的两张研究一侧变异表各跑一趟，前置那一张 `research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-02-current-state-preconditions-research-mutations.out` 第 25 行 11 条全抓，库根那一张 `…-2026-11-02-current-state-library-root-research-mutations.out` 第 6 行基线红、一条没跑（变异驱动的副本往上三层取不到工作根库）；那一张的重跑、宣布行的第三张表与 R8-18 锚点重写后的修订 8 那张表还没跑。
+  - **依据**：上面两份产物；登记 `research/prompts/e171-r2-prereg.md` 修订 5 第 5.2、5.3、5.6 条。
+  - **改前**：`git show HEAD:.claude/kb/experiments/171-三oracle合谋测试.md` 与同目录英、日两份。
+- 第 2 次重跑撤项核算段一节加第 11 条（三语）：前置那几张研究一侧变异表又跑一趟，五份全抓、基线都绿——修订 8 那一张 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-07-s1-revision-8-tools-research-mutations-2026-11-02.out` 第 55 行 26/26、修订 11 那一张 `…-2026-10-08-revision-11-tools-research-mutations-2026-11-02.out` 第 33 行 15/15、前置那一张 `research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-02-current-state-preconditions-research-mutations-2026-11-02.out` 第 25 行 11/11、库根那一张 `…-2026-11-02-current-state-library-root-research-mutations-2026-11-02.out` 第 11 行 4/4、宣布行那一张 `…-2026-11-02-current-state-announcement-research-mutations.out` 第 7 行 2/2；修订 11 与前置那两份与登记的那两份逐字节相同。登记修订 6 之后修订 8 那张表删 R8-25、改 R8-26 锚点，要再跑（`…-2026-11-02-r2.out`），另开第四张表（线程账与对照），两份都还没跑。
+  - **依据**：上面五份产物；登记 `research/prompts/e171-r2-prereg.md` 修订 5 第 5.2、5.3、5.6 条与修订 6。
+  - **改前**：`git show HEAD:.claude/kb/experiments/171-三oracle合谋测试.md` 与同目录英、日两份。
+- 第 2 次重跑撤项核算段一节加第 12 条（三语）：S20 重钉之后那一趟 `research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-stream-constants-r2.out` 第 82 行 `s1_failed_checks=0`；修订 8 那张表 `…-2026-11-02-r2.out`、`…-2026-11-02-r3.out` 两趟都是第 53 行 25/25、逐字节相同；第四张表两版，16 条那一版第 35 行 16/16、23 条那一版 `…-current-state-threads-and-contrast-research-mutations-2026-11-02.out` 第 49 行 23/23；整行引五条判决行，另写复跑另登的四行与改指 `-r3` 的一行；`replay.sh` 的 `driver_e171_r1_revision_12_stream_constants` 一行由修订 12 那一份改指 `-r2` 那一份。第 2、3、10、11 条代码块里的产物名由省去前缀改成全名，第 2 条两行前面加上作废那一份名单核对产物的名字与行号；第 5、7、10、11 条末尾各加一句指向后来的读数；第 1 条「第 70、141 行」那一句不再写崩溃点重放的旧称。数与判定词都没变。
+  - **依据**：上面五份产物；登记 `research/prompts/e171-r2-prereg.md` 修订 2 第 2.4 条、修订 4 第 4.6 条、修订 7 第 7.5 条、修订 8 第 8.5 条；`grep -n '^E171|' scripts/experiment-apparatus/replay.sh`。
+  - **改前**：`git show HEAD:.claude/kb/experiments/171-三oracle合谋测试.md` 与同目录英、日两份（那一版还没有第 10–12 条；第 10、11 条是这一批里加的，没提交过）。
+- 第 2 次重跑收尾（用户定，登记修订 9）：现状整表段不跑，整表在今天的树上另立新实验。标题状态与索引状态列由「最终主线的修订 8 那一趟待拍树」「第 2 次重跑撤项核算段已跑：Q2 有，Q1 撤项那一格甲（Z12 重跑之后三份判定词仍全同），现状整表段前置未齐」改成「最终主线的修订 8 那一趟没拍树，随第 2 次重跑的现状整表段一起不跑」「第 2 次重跑已收尾：…现状整表段不跑（冻结层依赖的 r1 输入造不回来），整表在今天的树上另立新实验」；「第 2 次重跑·撤项核算段」一节标题括注、开头一段的「没起」改成「不跑」；第 7 条由前置清单改成不跑的说明；第 12 条末一句「现状整表段还没起」改成「不起（第 13 条）」；新加第 13 条（六处卡口、Q2 与 Q1 撤项整行引、`replay.sh` 十行核对、收尾时撤回与留下的）；「它答不了的」第一条与第五条改成不跑的说明，加一条整表在今天的树上的逐格对比与归因没做；索引行摘要加第 2 次重跑一句；「影响的决策」十五行回看加一句，关系都不改。装置一侧：`revision_8_placeholders.json` 里先前填的 H17（15 份文件的 sha256）撤回，改回 `null`。
+  - **依据**：用户在弹窗里选「第 2 次重跑收尾，整表另立新实验」；登记 `research/prompts/e171-r2-prereg.md` 修订 9（第 9.1–9.5 条）；整行引的产物行见页上第 13 条（`research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-list-check-2026-11-01.out` 第 20、27、37、40 行与三份撤项核算产物的判决行）；`sed -n '1923,1932p' scripts/experiment-apparatus/replay.sh` 十行的驱动与期望产物核对。
+  - **改前**：标题与索引状态列见上；第 7 条原文是「**现状整表段（没起）**：问题单 Q1 的够判条件字面要「整张名单在主工作区现状上跑完、与 r1 逐格对比」，这一格只有现状整表段给得出。前置没齐（登记修订 3 第 3.7 条）：S20 重钉那一趟没跑（装置换进主工作区那一步红在 `scripts/hosts/compile-then-swap.py` 的仓副本缺 `prune-server/`）；占位 H31 九份要重填，H17 必登的 `s2_compare.py` 不在，H30 跟判定库服务那件走（修订 3 第 3.6 条）；经两份入口起只用一台、跨机对照 `not_run`，照修订 3 第 3.4 条不作数，第一段今天没有经服务分两台的起法（第 3.5 条）。C936 的钉值现量已与被钉文件逐个对上，冻结层里指旧文件名、写死 1–281 的只剩说那一次的几处（修订 3 第 3.3 条）。S20 重钉那一趟后来跑了，见第 12 条。」（原文里「现量」前有一个与所属日期块同日的日期，删了）；`revision_8_placeholders.json` 的 H17 改前是 15 份文件的 sha256（值是那 15 份文件当时的内容的摘要，随任一份文件再改而过期，没有进仓留存），再前（暂存区那一版）是 `null`；其余照 `git show HEAD:.claude/kb/experiments/171-三oracle合谋测试.md`（那一版没有这一节）。
+
+### 2026-11-01
+
+- 第 2 次重跑撤项核算段（登记 `research/prompts/e171-r2-prereg.md`，问题单 `research/prompts/e171-r2-questions.md`）：页面状态在「…流三段长已按修订 12 重钉」之后加「第 2 次重跑撤项核算段部分已跑：Q2 有，Q1 撤项三份判定词全同而 Z12 触发待重跑，现状整表段前置未齐」，新加「第 2 次重跑·撤项核算段」一节。Q2 有：按名字取不到的是第 33、70、107、141、168、236 行，第 236 行甲、第 33、107 行丙（撤、不换）、第 70、141、168 行乙（改引）；两张名单改名 `bad-implementations-step-8.tsv`（115 行）、`bad-implementations-step-4-only.tsv`（163 行），合 278 行。撤项核算在原登记 F4 扩表、补位与 r1 第二段三份旧读数上撤第 236 行，判定词 0 格变、`q1_judgement=jia`；名单核对的钉值一格因 `count_reusable_units.py` 载入报 `AttributeError` 没过，照 Z12 字面三份作废待重跑。`stream-constants` 在今天的树上 `s1_failed_checks=19`，全是乙类，登记修订 2 写了重钉，装置换上与重钉之后那一趟没跑。研究一侧变异 11 条全抓。
+  - **依据**：产物 `research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-list-check.out`、`…-removal-effect-on-the-s4-f4.out`、`…-removal-effect-on-the-s4-f4-substitutes.out`、`…-removal-effect-on-the-revision-6-segment-two.out`、`…-stream-constants.out`、`…-list-removal-research-mutations.out`；执行员报告 `~/.local/share/singlefs/work/compat-removal-e171-r2-run-b/result.md`。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/171-三oracle合谋测试.md`。
+- 同一次的现状句：「装置、研究一侧与变异表」一节研究一侧那一格的名单名改成新名（注原名与撤后行数），复跑那一格「二十行登记」改成「二十五行」（加第 2 次重跑五行）；「它答不了的」第 33 行旧名那一条末尾补「第 2 次重跑把第 33 行撤出两张名单」；「影响的决策」十四行回看改成写明第 2 次重跑撤项核算段不影响，加 D15（格式冻结政策） 已定项 4 一行（不影响，只作起因）。
+  - **依据**：登记第五节 5.4 第 3 条「说现状的，改」；`grep -c '^E171|@driver' scripts/experiment-apparatus/replay.sh` 为 25。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/171-三oracle合谋测试.md`。
+
+### 2026-10-30
+
+- 2026-10-29 冻结层重钉：第一段编排器 rows_orchestrator.py 跑那一趟的 `1dcfb8d0…` 那一版（git `c84047263`）与此刻差的不只是登记过的搬迁（每台线程改取登记值、`--check` 只认同目录 check_product.py、分片配置检查脚本改名），倒换不回去，冻结层（cross_host_o3_check.py、rows_orchestrator_revision_8.py、rows_orchestrator_segment_two.py、rows_orchestrator_segment_two_revision_10.py）与 reuse_library.py、修订 11 三份的钉值一起照此刻内容重钉（第一段编排器 `0ea08d23…`）；冻结层调的行集、比法与合并规则没变，分配随编排器改成登记值，与跑那一趟不同；第二段编排器自证 e2e-regrow 格改用内存卡本机；6 份冻结层同时加上平常跑设弄坏开关先退 2 的守卫（在钉值核对之前）与 mutate.sh 写法的开关表。
+  - **依据**：工具员报告 `~/.local/share/singlefs/work/m3-close-b19-c936/result.md`「实验页要记的一句」一节；主 agent 现量 sha256。实验页「影响的决策」各行回看改到 2026-10-30：重钉装置钉值，结论、数与产物不变。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/171-三oracle合谋测试.md`。
+- 2026-10-29 冻结层两格自证负载高时会抖，改法：`rows_orchestrator_segment_two.py` 的 `e2e-substitution-sequential` 格给编排器的假资源，可用内存 25 GiB 改成 15 GiB（槽数 ⌊15/10⌋ = 1，恒为一槽；编排器不读线程数那一项，保持不动；没有调大任何等待上限），与 `e2e-regrow` 那一格的改法同一路（每台线程改取登记值以后，靠内存卡槽数）；第二段编排器 `rows_orchestrator_segment_two.py` 与 `rows_orchestrator_segment_two_revision_10.py` 两个被钉的文件因此重钉：前者 `96d0a9bd…` 改成 `b9cd11ca…`（钉它的是修订 10 与 reuse_library.py），后者 `ef7ec641…` 改成 `3e38b167…`（钉它的是修订 11）；`rows_orchestrator_segment_two_revision_10.py` 的 `segment-two-orchestrator-selftest` 格只是起整份第二段自证，同源（读代码推的，没有在改前的字节上单独复现）。改前压负载（8 个空转进程加限定第 0 核）连跑那一格 12 次红 1 次，改后同样跑法 12 次红 0 次（量的）。
+  - **依据**：工具员报告 `~/.local/share/singlefs/work/m3-close-b19-c938/result.md`（改前红的原样、改后三组跑法与钉值前后都在里面）。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/171-三oracle合谋测试.md`；装置文件的改前钉值见这一项里的钉值对。
+- 「s3 整表作废」一节「留档不删：…」那一截改成「留档：`research/results/` 下的三份已归档、从 git 历史取（删于提交 31128273）；`scripts/experiment-apparatus/target/e171-dumps/rows-s3*`、`rows-s5-clean-check` 是编译目录下的导出，已不在」：那一截是现状句，已不真——`research/results/` 下那三份 2026-10-03 的 s3 产物在 2026-10-10 归档（提交 31128273），编译目录 `scripts/experiment-apparatus/target/` 下的 `e171-dumps/` 已不在；同一行「s3 那一次整表（输出根 …）」是事件句，没动；结论、数与产物不变。
+  - **依据**：`records/2026-10-30-知识腐烂治理按现状.md`「现状（开工时现查）」表第 4 行；回扫员报告 `~/.local/share/singlefs/work/rot-2026-10-30-sweep/result.md`「行」一列 42 那一行（现查命令与输出在那一行的理由里）。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/171-三oracle合谋测试.md` 第 126 行那一句。
 
 ### 2026-10-17
 
@@ -5588,6 +5661,23 @@
 
 ## E172（删除写出的字节的干跑）
 
+### 2026-11-02
+
+- 第 3 次重跑第三段：产物 `research/results/e172-r3-deletion-write-dry-run-2026-11-02.out`（966 行）跑出，问题单 `research/prompts/m3-close-b19-p5-forks.md` 第 2 行判甲，页头状态、索引行与正文换成第 3 次的现状（钉值层、条款层、判别臂 R-ret、阳性对照 25 对、A-journal 八行不符、单测 52 条与变异表 49 条全抓）；第 2 次的现状、做了什么、复跑、判决、读数、A-journal、单测与变异挪进页面「历史版本」的第 2 次那一条（整行抄的第 2 次产物行改成指针），「它答不了的」加第 10–13 条，「路径与结论登记」的源码行号改成现值，「影响的决策」加 D3（空间分配） 已定项 2、D8（核心索引结构） 已定项 9 两行（备料），其余各行重新回看（不受影响）。
+  - **依据**：产物 sha256 `6a31bf33c014defc56bcdc84e3beffc4d91238b341d4c1cff90479993580a12d`（任务 5086 同一个二进制两遍逐字节相同），判决行第 537、561、657、661、675、687、850、928、961、964、965 行；单测任务 5082（`52 passed; 0 failed`）；变异表任务 5087（抓到 49 条、没红 0 条、无效 0 条）；重跑登记 `research/prompts/e172-r3-prereg.md` 第十二节修订 6、7.1–7.4。
+  - **改前**：暂存区那一版 `git show :.claude/kb/experiments/172-删除写出的字节的干跑.md` 第 1 行（页头状态「……两份导出已入库（2026-11-02），读导出的单测、产物与变异表 44 条待跑」）与 `git show :.claude/kb/experiments.md` 里 E172 那一行；正文是第 2 次的现状与各节，加一节「第 3 次重跑（装置已改，导出已入库，读导出的单测、产物与变异表待跑）」。
+  - **改后**：页头状态「已跑（够判）：第 3 次重跑……问题单第 2 行判甲……变异表 49 条全抓；A-journal 八行不符照报、不进第 2 行」。
+
+- 第 3 次重跑第二段：两份 r3 导出入库（`research/results/e172-r3-deletion-write-dump-h1h2-2026-11-02.out` 474 行、`research/results/e172-r3-deletion-write-dump-h3-2026-11-02.out` 150 行），装置单测常量 `H1H2_EXPORT`、`H3_EXPORT`、复跑表 E172 行与 `driver_e172` 注释里的文件名从 `2026-10-29` 改成 `2026-11-02`；页头状态、第 3 次重跑一节与索引行改成「两份导出已入库，读导出的单测、产物与变异表待跑」。读导出的 30 条单测、产物、变异表 44 条还没跑，第 2 次的读数与结论不变。
+  - **依据**：`wc -l` 得 474、150，`sha256sum` 前 16 位 `229934e319f1f9e6`、`f8a72c560fb7d76f`（量的，2026-11-02）；导出任务 4795、4796 由主 agent 派发提示给出 succeeded。
+  - **改前**：下面 2026-10-29 那一项改出的页头状态与索引行（还没提交，原文是「……单测 52 条过，两份导出、产物与变异表 44 条待跑」）；2026-10-29 那一项里的 `2026-10-29` 导出与产物文件名是当时按日期预填的，实际导出在 2026-11-02 跑。
+
+### 2026-10-29
+
+- 第 3 次重跑第一段：装置 `scripts/experiment-apparatus/e172_deletion_write_dry_run.rs` 照重跑登记 `research/prompts/e172-r3-prereg.md` 第五节 5.8 改16–改30 加退役项（退役份额进标签 6 式子、tr@0 与 tr、树表 12 条、水位 65549、L03-15–L03-17、钉值层、判别臂 R-ret、PC-J/K/L、接准入），单测 52 条过（读 r3 导出的 30 条报本次未跑），变异表 44 条写好未跑；两份导出与产物待主 agent 跑。页头状态与索引行改成「第 3 次重跑装置已加退役项……待跑」，第 2 次的读数与结论不变。
+  - **依据**：重跑登记第五节 5.8、第十二节修订 1–5；`cargo test --release --bin e172-deletion-write-dry-run` 报「52 passed; 0 failed」（量的，2026-10-29）。
+  - **改前**：`git show HEAD:.claude/kb/experiments/172-删除写出的字节的干跑.md` 第 1 行（页头状态）与 `git show HEAD:.claude/kb/experiments.md` 里 E172 那一行。
+
 ### 2026-10-26
 
 - 「它答不了的」第 6 条改指路：td、tt 头的层级与 key 区间原写「对错归 C478（码 2 头的 key 区间是条目键区间还是子树覆盖区间） 与 C713（删除线两个树根的层级没有条款）」，两笔都已还清；改成层级指条款 D8（核心索引结构） 已定项 16 第 3 条与 D18（块里携带什么信息） 已定项 24 第 1 条、key 区间指条款 D18（块里携带什么信息） 已定项 2，tt 的区间归池级 checker 判，池级 checker 核不核 td 的区间见欠账表；「影响的决策」各行重新回看；结论、数与产物不变。
@@ -5623,6 +5713,12 @@
   - **改前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 文档铁律修正之前的原样：这一块里的编号补了简称、撞名的本地臂名改成小写，原句在这一版）
 
 ## E173（上限卡在读坏槽的三种处置）
+
+### 2026-11-02
+
+- E173（上限卡在读坏槽的三种处置） 第 1 次重跑（保留池按 ckpt_cost 现算的一臂，C723（读坏槽上限实验三处条款与代码读法不同））已跑，问题单第 1 行判乙：按 ckpt_cost 现算的代码读法与条款读法不同，只代码读法打中 152 格、只条款读法 0 格（推空取不到落点被拒、全零并多卡），最小那一档池上 κ 只装得下 3、3、4 次实际空发布，差别随池大小与 S 变，新代码读法让旧代码读法 33 个取样格由不中变中；页面新增「第 1 次重跑」一节，状态加「第 1 次重跑已跑」，「它答不了的」与「路径与结论登记」补条，「影响的决策」里 D28（挂载期承诺量） 已定项 4 一行由不影响改成备料、其余四行回看更新
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md`。
+  - **依据**：重跑登记 `research/prompts/e173-r1-prereg.md`；产物 `research/results/e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out`、`research/results/e173-admission-ceiling-bad-ring-slot-dispositions-checkpoint-cost-reserve-2026-11-02.out`、`…-z2-2026-11-02.out`、`…-f7-2026-11-02.out`（都在同一目录）。
 
 ### 2026-10-17
 
@@ -5761,7 +5857,7 @@
 ### 2026-10-21
 
 - 新立，未跑：建页并登记进 experiments.md 索引。第一段读数段装置、45 条单测、22 条变异行与 29 片的分片长跑脚本 `scripts/experiment-apparatus/e180-reading-shards.sh` 写成；读数长跑两趟都没跑完，片在仓外、不入库，没有产物；第二段扣住位段装置没写。跑前登记 `research/prompts/e180-preregistration.md`（第十二节修订 1–4：T 被 journal 记录上限截尾的状态补三栏判定、探测的会话拷贝摘掉大字节、第一段的偏离六条、截尾状态按需收紧与第一段分片跑再合并）。
-  - **依据**：岔路单 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` 的 F2、F5、F6、F8 四行；调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md` 第 230、310 行（两趟长跑没跑完、停了）；装置 `crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs`（`grep -c '#\[test\]'` = 45），`crates/mutations.tsv` 里名字以小写 `e180` 起头的 22 行。
+  - **依据**：岔路单 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` 的 F2、F5、F6、F8 四行；调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md` 第 230、310 行（两趟长跑没跑完、停了）；装置 `crates/singlefs-verification/src/bin/e180_admission_reading_versus_writable_bytes.rs`（`grep -c '#\[test\]'` = 45），`crates/mutations.tsv` 里名字以小写 `e180` 起头的 22 行。
 
 ## E181（落得下那一判与挂载下界）
 
@@ -5774,7 +5870,7 @@
 
 ### 2026-10-18
 
-- 新立，第一段装置写成、产物未跑：建页，跑前登记 `research/prompts/e182-preregistration.md`（第十二节修订 12.1 至 12.10：续跑键换成函数单元闭包指纹、挂钟按实测改写、单盘恢复里掉了的盘身份还在读不到、`Overwrite` 取 `publish_overwrite`、状态只取两态、阳性对照跑法、臂的产物名、变异行、单测没能跑、`walk.rs` 指纹与登记不同），入库装置 `crates/singlefs-checker-tier/src/bin/e182_unreadable_abandoned_root_forks.rs`、长跑脚本 `scripts/experiment-apparatus/e182-single-device-long-run.sh`、变异行 6 条；单测交主 agent 跑，第一段产物（B1、B4）与第二段（B2）未跑。
+- 新立，第一段装置写成、产物未跑：建页，跑前登记 `research/prompts/e182-preregistration.md`（第十二节修订 12.1 至 12.10：续跑键换成函数单元闭包指纹、挂钟按实测改写、单盘恢复里掉了的盘身份还在读不到、`Overwrite` 取 `publish_overwrite`、状态只取两态、阳性对照跑法、臂的产物名、变异行、单测没能跑、`walk.rs` 指纹与登记不同），入库装置 `crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs`、长跑脚本 `scripts/experiment-apparatus/e182-single-device-long-run.sh`、变异行 6 条；单测交主 agent 跑，第一段产物（B1、B4）与第二段（B2）未跑。
   - **依据**：岔路单 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` 的 B1、B2、B4 三行，调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 
 ### 2026-10-19
@@ -5788,6 +5884,21 @@
 
 ## E183（容量斜率读缓存小盘准入与清扫阈值的代价数）
 
+### 2026-11-03
+
+- 第 2 次重跑，第二段 H2 第一次跑（重跑登记 `research/prompts/e183-r2-prereg.md`，sha256 `76257619fe9f7a1da89a433fe794ab345fc7a8ac3230f8e57e57e1fb6af3119a`；问题单 H2 一行，C567（分配与发布的代价随盘容量线性） 的改前基线）：经统一任务服务分 5 片、一片一轮，两台都派到（第 1、2、4 轮第二台，第 3、5 轮本机），产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h2-2026-11-03.out`（949 行，sha256 `c07d13a209d8a4c178d52d16000cba1f63599b06de9d0d0750f17c8460088bd7`）。45 个进程全部在阈值 24 GiB 内跑完；R2a 次线性、R2b 线性、R2d 分配基本无关与发布线性、R2c 线性、R2e 分配次线性，R2e 发布两行不出类（登记的 X5 造不出）；本机能造的最大稀疏盘是阶梯端点 16 TiB − 1 MiB，阈值减半时 4 TiB；G2 触发，G11 记一次输；登记第十一节字面下 H2 不够判（差 R2e 发布两行）。页内加「第 2 次重跑」一节与第二段的读数、条款逐条、岔路表各节，标题与现状、索引行改成第二段已跑，「它答不了的」补 H2 一条，单测与变异行的数改成现数（87 个、64 条），「影响的决策」三行回看到这一天（都不受影响）。
+  - **依据**：产物第 849、853、864、943 至 948 行；任务 5382（子任务 5383、5429 至 5433、5470）的 `task-server/task status 5382 --json` 每次尝试的 `memory_peak` 与各片服务日志里每格的负载行；调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md#19`。
+  - **改前**：暂存区那一版 `git show :.claude/kb/experiments/183-容量斜率读缓存小盘准入与清扫阈值的代价数.md`（基于 `59ce5a865`）。
+
+### 2026-10-30
+
+- 第 1 次重跑（重跑登记 `research/prompts/e183-r1-prereg.md`，sha256 `9417c63368fbe1b6f6d0e04844214d07a98059ca1a2cd6bc409f608b5076fd59`；问题单 `research/prompts/m3-close-b19-e183-threshold-365-questions.md`）：C690（清扫触发阈值的默认值没定） 的默认值定 365 后，装置里清扫阈值的本地常量 `SWEEP_THRESHOLD_PLACEHOLDER_ROWS` 由 369 改 365（常量名与产物里的键名不改），第一段 `all` 重出产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-30.out`（459 行、152434 字节，两遍 `cmp` 相同，sha256 `7c5add8502106e9822bdeea4ec806c5e3079c50aaa916bcd16d5b619227a7870`）与 A31 核对输出 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-30-anchor-check.out`（56 份读数 0 处不符，sha256 `eaecf66cbfa6057b56bdf71e470d55998061388c6f5ad52c7fd307cc7b144c00`）；与 2026-10-23 那份逐行 diff 只变第 6 行（`local=369 implementation=369` → `local=365 implementation=365`），11 条判决行逐字相同，核对输出只变头一行的 `product_sha256=`。复跑登记两行与 `driver_e183_anchor_check` 读的产物改指新文件，比对对象两行进 `.claude/gate.d/replay-comparison-units.tsv`，旧两份产物留着；装置里钉的第一段 SHA-256 在草稿副本里改成 `7c5add85…`，换进主工作区归主 agent；两条快档用例等换上之后由主 agent 跑。页内现状、做了什么（加第 8 条）、复跑三处与影响的决策三行回看随之改，新加「第 1 次重跑」一节。
+  - **依据**：`diff research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23.out research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-30.out` 只列第 6 行；新产物判决行第 23、26、49、120、197、289、369、395、421、447、458 行；新核对输出末行（第 58 行）`readings_checked=56 mismatches=0`；调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md#19`。
+  - **改前**：下面抄的是页内被改动的几处原文。现状第 1 条里的一句：「复跑登记的产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23.out`，核对输出 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23-anchor-check.out`。」现状第 2 条里的一句：「装置单测里钉的第一段 SHA-256 跟着换成新产物的 `b4ff64f11be3b2d07137458ca66ebbeca9607111e1f62b152ecc82b41a7de6fe`。」复跑一节：A31 命令的产物参数是 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23.out`；登记行说明里的两个期望产物是 `e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23.out` 与 `e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23-anchor-check.out`；结果行条数那条命令读的产物是 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23.out`。
+- U3 换上与两条快档用例：装置钉的第一段 SHA-256（`7c5add85…`）由主 agent 经 `scripts/hosts/compile-then-swap.py`（整条经 `run-with-memory-cap.sh 24G`）换进主工作区，退 0；之后两条快档用例（`local_constants_equal_the_implementation_constants`、`segment_one_all_output_equals_the_registered_product_byte_for_byte`）在主工作区跑，「2 passed; 0 failed」。页内「第 1 次重跑」一节两句改成这两件的结果。
+  - **依据**：调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md` 2026-10-30「E183 U3 先编后换」那一条。
+  - **改前**：「第 1 次重跑」一节两句原文是「等主 agent 经 `compile-then-swap.py` 换进主工作区（……这一句是推的，没跑）」与「等钉值换进主工作区之后由主 agent 跑，这一页写这两条结果时再补；」。
+
 ### 2026-10-23
 
 - 上游写序变化，只修钉值，结论不变：取号写两轮与 C755（恢复与两种挂载触发退回的失败不同）那一处每次可写挂载问一次 F2 之后，第一段 `all` 重出产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23.out`（459 行、152434 字节，两遍 `cmp` 相同，sha256 `b4ff64f11be3b2d07137458ca66ebbeca9607111e1f62b152ecc82b41a7de6fe`）与 A31 核对输出 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23-anchor-check.out`（56 份读数 0 处不符）；与 2026-10-18 那份只差 28 行 `name=h4_mount_tally` 的 `system_configuration=` 字段（`r26/106496,w3/12288` → `r30/122880,w4/16384`），判决行与正文引的读数行逐字相同。装置单测钉的 `SEGMENT_ONE_PINNED_SHA256` 从 `7ed2e16c6cc42b914f740f943a05440bef6a43c0917baac0114d5084f558adc8` 换成新产物的 sha256；复跑登记两行与 `driver_e183_anchor_check` 读的产物改指新文件，旧产物与旧核对输出留着；正文现状、做了什么第 7 条、复跑与各处出处改指新文件，影响的决策三行回看「不受影响」。
@@ -5796,7 +5907,7 @@
 
 ### 2026-10-18
 
-- 新立，第一段（H4）已跑：建页，跑前登记 `research/prompts/e183-preregistration.md`（第十二节修订三条：PC-准入 空池一半按 V33 原文记一次输、补阳性对照 PC-准入-文件、K32 空池一半只在 `writable_mount` 入口判而 `before_a_publish` 入口按 G8 记），入库装置 `crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`，产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out` 与 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18-anchor-check.out`；V33 空池一半打中，PC-准入-文件 4 项成立，H4 够判，第二到四段（H2、H5、H3）未跑。
+- 新立，第一段（H4）已跑：建页，跑前登记 `research/prompts/e183-preregistration.md`（第十二节修订三条：PC-准入 空池一半按 V33 原文记一次输、补阳性对照 PC-准入-文件、K32 空池一半只在 `writable_mount` 入口判而 `before_a_publish` 入口按 G8 记），入库装置 `crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`，产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out` 与 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18-anchor-check.out`；V33 空池一半打中，PC-准入-文件 4 项成立，H4 够判，第二到四段（H2、H5、H3）未跑。
   - **依据**：问题单 `research/prompts/m3-close-cost-measurement-questions.md` 的 H4 一行，调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 
 ## E184（常规层与大负载层的代价计数）
@@ -5804,7 +5915,7 @@
 ### 2026-10-26
 
 - 正文改过时的现状句与指路，结论、数与产物不变：「第 2 次重跑」一节候选甲、乙那一条与岔路表第一行「还差什么」那一格写上主 agent 定的候选甲（往原登记第十二节追加）不追、乙已成（原写「追不追由主 agent 定」）；路径与结论登记第 5 行的源码落点行号改成现行的 `:774`（原写 `:762`），第 6 行补上前 12 段得新池新建文件流的两态闭式 16777243；「影响的决策」各行重新回看。
-  - **依据**：主 agent 定候选甲不追，见 `records/2026-10-18-里程碑三收尾与近期欠账.md` 批 17 记 E184（常规层与大负载层的代价计数） 收尾留给主 agent 定的那一条；`crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs` 第 774 行 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`；「做了什么」第 6 条的 `python3 -c` 现算。
+  - **依据**：主 agent 定候选甲不追，见 `records/2026-10-18-里程碑三收尾与近期欠账.md` 批 17 记 E184（常规层与大负载层的代价计数） 收尾留给主 agent 定的那一条；`crates/singlefs-verification/tests/crash_enumeration_new_pool_file_creation_stream.rs` 第 774 行 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`；「做了什么」第 6 条的 `python3 -c` 现算。
   - **改前**：暂存区那一版 `git show :.claude/kb/experiments/184-常规层与大负载层的代价计数.md`（基于 `841b3beab`）。
 
 ### 2026-10-24
@@ -5822,7 +5933,7 @@
 
 ### 2026-10-19
 
-- 新立，第一段（J1，对应岔路 G1）已跑：建页，跑前登记 `research/prompts/e184-preregistration.md`（第十二节修订十条：修订 1 `crash_points_of_the_steps` 改直接调、修订 6 覆盖写链 u = 4、16 改走顺序写、修订 10 块数上界超过 2^26 的展开不排计划），入库装置 `crates/singlefs-checker-tier/src/bin/e184_regular_layer_cost_counts.rs` 与 `crates/singlefs-checker-tier/src/bin/e184_regular_layer_cost_counts_write_dump.rs`，长跑脚本 `scripts/experiment-apparatus/e184-segment-one-long-run.sh`，产物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out`（950 行，18 件现跑 17 件）；J1-乙 随机历史随步数档 overlap、overlap、partial、separate（步数一行记不稳定），覆盖写链三档 separate，J1-丙 全部 independent，9 条流取不出，锚 B1 触发失败条款 F6；G1 够判，第二到四段（J3、J2、J4）未跑。
+- 新立，第一段（J1，对应岔路 G1）已跑：建页，跑前登记 `research/prompts/e184-preregistration.md`（第十二节修订十条：修订 1 `crash_points_of_the_steps` 改直接调、修订 6 覆盖写链 u = 4、16 改走顺序写、修订 10 块数上界超过 2^26 的展开不排计划），入库装置 `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts.rs` 与 `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump.rs`，长跑脚本 `scripts/experiment-apparatus/e184-segment-one-long-run.sh`，产物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out`（950 行，18 件现跑 17 件）；J1-乙 随机历史随步数档 overlap、overlap、partial、separate（步数一行记不稳定），覆盖写链三档 separate，J1-丙 全部 independent，9 条流取不出，锚 B1 触发失败条款 F6；G1 够判，第二到四段（J3、J2、J4）未跑。
   - **依据**：问题单 `research/prompts/m3-close-c409-cost-questions.md` 的 J1 一行，岔路单 `research/prompts/m3-close-c409-r1-forks.md` 的 G1 一行，调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 - 复跑表登记确定性的一片：`E184|@driver_e184||e184-regular-layer-cost-counts-selfcheck-2026-10-19.out|exact`（`selfcheck`，留存产物 `research/results/e184-regular-layer-cost-counts-selfcheck-2026-10-19.out` 是整份产物第 31 至 69 行加驱动补的收尾行），其余各件含挂钟字段，不登记。
   - **依据**：产物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out` 第 30 至 69 行。
@@ -5830,6 +5941,15 @@
   - **依据**：产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h5-2026-10-19.out` 第 7931、7932、19065、19066 行，调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md`「主 agent 判 E183 跑产物前五处」一行。
 
 ## E185（GC一批搬迁的挂钟拆分）
+
+### 2026-11-02
+
+- 复跑一节照第二台在共享的活树里跑的现状改写，结论、数与产物不变：派哪台由服务定（只派一台的名单已删，入口不在任何名单里），产物直接写进共享树的 `research/results/`，不再按 `wait` 末行的 `peer_tree` 取；入口在共享的树里、同一个绝对路径上做四步，编译目录取 `CARGO_TARGET_DIR`（派到第二台时是 `multi-host-run.sh` 在第二台本地盘上这一趟新建、跑完删的那一个），装置路径写成 `${CARGO_TARGET_DIR:-target}/release/…`；交的命令补上入口必写的 `--disk-model <盘的型号>`；镜像目录照入口的取法写（`E185_IMAGE_DIRECTORY`，没设取 `<MULTI_HOST_RUN_PEER_SCRATCH>/e185-images`，再没有取 `${CARGO_TARGET_DIR:-target}/e185-images`），不再写树里的 `target/e185-images`。
+  - **依据**：`scripts/experiment-apparatus/e185-r2-segment-run.sh` 文件头（用法、「点盘」「环境」）；`records/2026-10-31-task-server巡检.md` 第 129 行（问题 74：第二台在共享的活树上跑）、第 149 行（问题 94：只派一台的表全删）。
+  - **改前**：`git show 59ce5a865:.claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md` 里「复跑（第 2 次重跑；…）」一节；那一版之后暂存区里的中间态，第 291 行是「# 三趟（单点核、第一段、第二段）各一条命令，主 agent 在本机仓根经 task-server 交；入口 `e185-r2-segment-run.sh` 在 `PEER_ONLY_ENTRIES` 里，服务只派第二台，写出的产物按 `wait` 末行的 `peer_tree` 取；」，第 293 行是「`SINGLEFS_RUN_SCOPE='…' task-server/task submit -- env E185_RUN_DATE=<日期> bash scripts/experiment-apparatus/e185-r2-segment-run.sh <段>`」。
+- 装置源码在第 2、3、4 次重跑的产物之后又改过两批（删 SINGLEFS_SERIAL_DECLARATIONS 时删串行段声明、enter_the_timing_window 的 emitter 参数与 TimingWindow::ALL；四处 `fn run` 改名），量法与判据没动；页首现状那一行与三份起跑脚本的 `registered_apparatus_sha256` 改成现在的 `a5b48b734f034114a6e2fe3a81f17ecd171dafba5e5b5ec1082e1b150fa5f082`（25496 行、226 条），已有产物与它们引的行不动。
+  - **依据**：用户原话「E185 的装置哈希 改掉 我们不能认为下一次还能遵守规范」；三份跑前登记 `research/prompts/e185-r2-prereg.md`、`e185-r3-prereg.md`、`e185-r4-prereg.md` 第十二节当天补的一行。
+  - **改前**：`git show HEAD:scripts/experiment-apparatus/e185-r2-segment-run.sh` 第 81 行（r3 第 37 行、r4 第 44 行）。
 
 ### 2026-10-23
 
@@ -6016,7 +6136,7 @@
 
 ### 2026-10-19
 
-- 新立，装置已写、未跑：建页，跑前登记 `research/prompts/e185-preregistration.md`（第十二节只记 12.1：变异表落在 `crates/mutations.tsv`，判据没动）；入库装置 `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs` 四个子命令、45 条内联单测写成，22 条变异行追加进 `crates/mutations.tsv`；单测、变异三个数与四段产物都没跑。
+- 新立，装置已写、未跑：建页，跑前登记 `research/prompts/e185-preregistration.md`（第十二节只记 12.1：变异表落在 `crates/mutations.tsv`，判据没动）；入库装置 `crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs` 四个子命令、45 条内联单测写成，22 条变异行追加进 `crates/mutations.tsv`；单测、变异三个数与四段产物都没跑。
   - **依据**：问题单 `research/prompts/m4-gpugc-measure-forks.md` 第 1 行与第 4 行的单跑那一半（派发这一段要答的岔路），调度记录 `records/2026-10-19-里程碑四GPU垃圾回收开工.md`。
 
 ## E186（不认识的树·记账维重推）
@@ -6044,3 +6164,78 @@
 
 - 新立，第一段已跑、第二段与变异表没跑：建页，跑前登记 `research/prompts/e187-preregistration.md`（第十二节修订一到修订五，写在单测之后、产物之前；修订一把模型的两条落点规则按 `crates/` 落细，交主 agent 认），装置 `scripts/experiment-apparatus/e187_quarantine_mark_cost.rs`（30 条单测，另 2 条线程登记位），变异表 `scripts/mutation/tables/e187_quarantine_mark_cost.tsv`（17 条，没跑），第一段产物 `research/results/e187-quarantine-mark-cost-segment-one-2026-10-21.out`（250 行），复跑表登记 `E187|e187-quarantine-mark-cost|segment-one|e187-quarantine-mark-cost-segment-one-2026-10-21.out|exact`。状态「部分已跑（第一段已跑；第二段工作负载与变异表没跑）」。
   - **依据**：岔路单 `research/prompts/m4-i315-quarantine-mark-cost-forks.md` 那一行，批次 `records/2026-10-13-里程碑四预开发.md` 的 m4-i315-quarantine-mark-cost 一节；第二段（320 格 × 三臂）在本机满载时前台 225 秒跑完 42 格，交主 agent 起。
+
+## E198（取号跳过认出生代号的前提）
+
+### 2026-11-05
+
+- 问题单第 1 行的判定补一句判臂结论，状态与第 1 行判乙不变：C699（取号跳过改认出生代号） 的推论轮判决按字面验收，甲分不全（sw-read 一形，今天的臂同样错），判臂只看分辨得出臂的格，判甲；F1 的判定照留。实验页「问题单第 1 行」那一段补了这一句，「影响的决策」两行（D23（journal 的角色与格式）、D22（单元原子性怎么合成））的回看日期更新。
+  - **依据**：判决 `research/prompts/m3-close-b19-c699-r1-main-verification.md` 第二节「问题单第 1 行」一格与第五节写 E198（取号跳过认出生代号的前提） 实验页问题单第 1 行的那一行。决策回看两行按「备料、不受影响」重看，没有决策的依据段引 E198（取号跳过认出生代号的前提）。
+
+### 2026-11-02
+
+- 第一段（nrb、rs1、几何敏感性 G4）产物跑完，状态由「装置已写、产物未跑」改「部分已跑（第一段已跑，问题单第 2 行够判；第二段未跑，第 1 行未判）」：产物 `research/results/e198-instance-table-pointer-birth-skip-premise-segment-one.out`（1445 行，末行 `E7RESULT name=done result_lines=1444`）。问题单第 2 行：I-3.5 一半判甲（Q13 今天的臂在 nrb 6 张、rs1 285 张上张张认错，Q14、Q15 甲认错 0，产物第 1415–1418 行），I-3.9 一半判乙（Q16 rs1 红 150 张、Q17 nrb 红 0 张，A7 与条款 150 / 285 同数，失败条款 F4 触发，第 1419、1420、1439 行）；停机条款 S1–S5、锚点 B3、B4、B6、A3–A7、C1 全过，失败条款只 F4 触发；150 张红的分布是「步号 ≥ 1 且读得出的根之前有非空发布」张张红，原因没查。登记加修订 3（S5 账本一边改字面，补变异 V10，单测 25 条变 26 条，草稿待编、换上）；`scripts/experiment-apparatus/replay.sh` 的两个 E198 驱动去掉写死的线程数 31，装置取每台默认重活线程数。
+  - **依据**：产物第 8–13、1403–1444 行；登记第十二节修订 3（依据 `records/2026-10-18-里程碑三收尾与近期欠账.md` 第 1909 行主 agent 定的 S5 字面）；问题单 `research/prompts/m3-close-b19-c699-forks.md` 第 2 行。决策回看两行（D23、D22）按「备料、不受影响」重看，没有决策的依据段引 E198，「该不该升成支撑」交主 agent。
+- 修订 3 的草稿换进主工作区后单测 26 条里 25 条过、1 条红，状态仍是「部分已跑」：红的是 `records_applied_comparison_takes_in_the_covered_versions_whose_records_are_still_readable`，断言消息「S5：k=9 装置认的与账本推的相同」，`apparatus_missing: [VersionKey { instance: 3, txg: 28 }]`。原因（读码推的）：账本一边的原那一支（被施加过、根槽没落）不判 ① ② ④，k = 9 那一张环里最旧的有效根已盖到 (3, 28) 之后，装置按 ④ 不认、账本仍收；装置没错。登记加修订 4（账本两支都过 ① ② ④，收窄不是放宽，依据是单测读数；单测再加一段断言，仍 26 条；V10 改成覆盖两支）与修订 5（门禁 data-names 点的 22 处键名与动作名改全词，对照表在修订 5；第一段产物用新装置重出到 `research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out`，旧产物不动，两份按对照逐行比）；`replay.sh` 的 `E198|@driver_e198` 登记行改指新文件。
+  - **依据**：派发提示转述的任务 5010 单测输出；登记第十二节修订 4、修订 5；门禁 data-names 的 22 处（任务 4997）。第二段产物仍未跑。
+- 第二段（ss、skr、sw-crash、sw-read 与几何敏感性 G1–G3）产物跑完，第一段用改名后的装置重出并与旧产物逐行比对相同，状态由「部分已跑」改「已跑（够判）」：问题单第 1 行判乙（失败条款 F1 只由 Q10 触发：sw-read 读故障加清扫那一形 315 张，甲与今天的臂各认错 315；Q1–Q5、Q7、Q8、Q11 都是 0，sw-crash 与 G1 一对洞对都没有，Q6、Q9 记没有对象，登记第四节第 4 条跑前推的 27 不成立）；第 2 行 I-3.5 一半判甲、I-3.9 一半判乙不变。产物 `research/results/e198-instance-table-pointer-birth-skip-premise-segment-two.out` 2107 行与 `…-segment-one-2026-11-02.out` 1445 行；停机条款 S1–S5 与锚点全过；登记加修订 6（补记修订 4 的射程，窗口外那一版记一次输）；`replay.sh` 的两个 E198 驱动指新的第一段与第二段产物；第三段 sw-none 够判后未跑。门禁 clippy 点了装置里 `results_of` 的显式生命周期，草稿已改、产物不重跑，待主 agent 编过换上。
+  - **依据**：第二段产物第 8–13、2049–2107 行；第一段新文件第 1415–1444 行；登记第十二节修订 4、5、6；问题单 `research/prompts/m3-close-b19-c699-forks.md` 第 1、2 行。决策回看两行（D23、D22）按「备料、不受影响」重看，没有决策的依据段引 E198，「该不该升成支撑」交主 agent。
+
+### 2026-10-29
+
+- 新立，装置已写、产物未跑：建页，跑前登记 `research/prompts/e198-preregistration.md`（第十二节修订 1 照派发提示里主 agent 对四个待认项的定案写，清扫阈值的产品默认由 369 改成 365、G1 取 365；修订 2 写定 V4、V7 的取样点与单测），入库装置 `crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs`（25 条单测，在执行员草稿目录里写成，编译与单测归主 agent），变异行 9 条备在草稿目录，复跑表登记 `E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one.out|exact` 与 `E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact`。状态「装置已写、产物未跑」。
+  - **依据**：问题单 `research/prompts/m3-close-b19-c699-forks.md` 两行，批次 `records/2026-10-18-里程碑三收尾与近期欠账.md` 的 19-3；停机条款 S5 按读码推会在第二段触发、S5 的字面交主 agent 定，写在实验页「现状」与执行员报告 `~/.local/share/singlefs/work/m3-close-b19-e198-run/result.md`。
+
+## E199（发布照抄上一版的代价）
+
+### 2026-11-05
+
+- 累计里丁那一对改名之后重出产物，页与复跑登记改引新产物：单测 63 条全过；整张变异表 57 条全部被抓，收尾原样「计数：抓到 57 条、没红 0 条、无效 0 条、没跑完 0 条、抓名字有盲区 0 条、锚点失效 0 条、现判 57 条、复用 0 条、拒算 0 条」与「已还原，基线仍全绿」；产物 `research/results/e199-transaction-output-copy-2026-11-05-r2.out` 1050 行（末行 `E7RESULT name=done emitted=1050`），装置 sha256 `5bce2b3193d427d4664149e42ac3bc2c62f9a2704d6a950ae34d5e91ff4585b4`、2619 行。比对：旧产物同名行 2、新产物同名行 0、新名行 2，改名后逐行相同，直接 `diff` 差异 4 行（第 1038、1039 行的旧新各 2 行）。`replay.sh` 的 E199 那一行改指新产物；旧产物留着，被它取代。判决行（第 1049 行）只有 `execution_clock=not_run`（登记预期内，第二段才量挂钟），其余字段都是 `true`。
+  - **依据**：产物 `research/results/e199-transaction-output-copy-2026-11-05-r2.out` 第 1038、1039、1049 行；执行员报告 `~/.local/share/singlefs/work/e199-runner-segment-1-r8/result.md`；变异表 `scripts/mutation/tables/e199_transaction_output_copy.tsv` 第 54–57 行。
+- 丙调用点逐处读码清单：第一份被主 agent 照第四份第五节「谁核」抽查，`admission.rs` 1212、1746 两处的类与主 agent 读到的不同，照「任一处不同，整份退回执行员重读」退回一次；执行员整份重读，交第二份 `research/results/e199-transaction-output-copy-call-sites-read-2026-11-05-r2.out`（645 处，三条 grep 现跑 487 + 153 + 5，要改 123 处、不用改 522 处，与规则归类不同的 128 处）；主 agent 照三条取法核了 169 处（规则 1 128 处、规则 2 19 处、规则 3 22 处），三列全部相同，核对记录 `research/results/e199-transaction-output-copy-call-sites-check-2026-11-05.out`（末行 `verdict=judgeable`）。丙行「全部调用点（文件:行）与改法」那一格记够判，丙行整行仍因第二段挂钟不够判；实验页改引第二份与核对记录。另：装置里累计 `cumulative_ratio` 丁那一对的名字原写 `ding_without_compaction`、数取自每 64 次压实的整份新基那条臂，装置已改叫 `ding_period_64_whole_new_base`（数不变），加一条单测、四条变异，改名后的产物当时待重出（后来重出，见上一条）。
+  - **依据**：第二份清单第 707–715、844、845 行与第 2、3 行；核对记录第 173 行与头第 3 行；第四份第五节「谁核」、第十一节「够判停机」；装置 `scripts/experiment-apparatus/e199_transaction_output_copy.rs` 的 `cumulative_arm_name` 与单测 `cumulative_ratio_pair_names_the_arm_whose_bytes_it_divides_by`。
+- 第一段产物跑完，状态由「未跑（第一段装置已照第四份登记改，产物未跑）」改「部分已跑（第一段已跑，岔路单四行都不够判；第二段未写）」：产物 `research/results/e199-transaction-output-copy-2026-11-05.out` 1050 行（后被 `e199-transaction-output-copy-2026-11-05-r2.out` 取代，见上一条；末行 `E7RESULT name=done emitted=1050`），单测 62 条全过，变异 53 条全部被抓（没红 0、无效 0）。G0 上甲-B2后 ÷ 乙2、÷ 丙、÷ 丁的照抄字节比与现算重建比十二格都判「不倾向留甲」，两格稳定、十格「不稳定」（G-small 翻面，准入后现算重建三格另在 a_T = 815000 翻面）；五条臂退化形态的阳性对照 9.2257–9.7597、现算重建三条 8.3247，全过；丁整份新基准入后照抄比在 p = 1、2 上 < 2、p ≥ 3 上 ≥ 2，最小 p 是 3，丁行「每个 p 都 < 2」那一格不翻面；10⁶ 次 unlink 累计三对两段十二个判都「不倾向留甲」；丙、丁常驻峰值 ÷ 甲都 < 1；判决行没有 false，`execution_clock=not_run` 归第二段。
+  - **依据**：产物第 2、15–27、964–1039、1049 行；登记 `research/prompts/e199-preregistration-r4.md` 第六、十、十一节（连同照留的第三份、第二份、第一份那几节）；岔路单 `research/prompts/m4-transaction-output-copy-forks.md` 四行。决策回看三行（D8（核心索引结构）、D16（发布语义）、D18（块里携带什么信息））按「备料、不受影响」重看，没有决策的依据段引 E199（发布照抄上一版的代价），「该不该升成支撑」交主 agent。
+- 交了丙调用点逐处读码清单第一份 `research/results/e199-transaction-output-copy-call-sites-read-2026-11-05.out`：641 处（三条 grep 现跑 483 + 153 + 5），要改 123 处、不用改 518 处，与规则归类不同的 91 处；当时主 agent 照第四份第五节取法抽查未完成，不作丙行够判的依据（这一份后来被退回，经过见本节首条）。
+  - **依据**：清单第 651–660、752、753 行；第四份第五节「丙调用点清单」、第十一节「够判停机」。
+- 改完装置之后主工作区 7 份 core `.rs` 被换掉，照第三份停机条款第 1 条 ②③ 重跑全扫：六份命中各自新出现 0 条、没了 0 条，202 条里 143 条只挪了行号；不停，新行号写进第四份第十二节「执行员修订」。装置里数据形态的名字改成全词（`jia_after_b2` → `jia_after_patch`、`from_u` / `to_u` → `from_tombstone_records` / `to_tombstone_records` 这类），变异表 53 行原文仍恰好命中一次。
+  - **依据**：第四份第十二节「执行员修订」；执行员报告 `~/.local/share/singlefs/work/e199-runner-segment-1-r5/result.md`「停机条款 ③ 逐条归类」「装置改名」两节。
+- 跑前登记换成第四份；第一段装置照第四份改（乙2、乙1 阳性对照，乙1 照抄字节，丁常驻峰值加残余式），变异表加到 53 条；丙调用点规则归类那一份标「未逐处读码，不作丙行够判的依据」。
+  - **依据**：第四份文件头「改了什么」八条与第五节各小节。
+
+### 2026-11-04
+
+- 开工核对停机条款没打中；第一段装置、单测与变异表写完，产物未跑；丙调用点规则归类出了产物 `research/results/e199-transaction-output-copy-call-sites-2026-11-04.out`（469 + 150 + 5 = 624 处）。
+  - **依据**：第三份第十一节停机条款第 1、2 条与第十节第一行的核对命令与输出（执行员报告 `~/.local/share/singlefs/work/e199-runner-segment-1-r3/result.md`）。
+
+### 2026-11-03
+
+- 新立，未跑：建页，登记 E199（发布照抄上一版的代价）跑前登记第三份 `research/prompts/e199-preregistration-r3.md`，装置未写。
+  - **依据**：岔路单 `research/prompts/m4-transaction-output-copy-forks.md` 四行。
+
+## E200（修订6近似树重跑）
+
+### 2026-11-02
+
+- 用户定案收尾（登记修订 2），状态由「部分已跑（第一段停在停机 S40，交主 agent）」改「已跑（够判，用户定收尾：第一段停在停机 S40，Q1 记候选二，Q2 记近似树造不成，第二、三段不跑）」：问句「E200 接下来怎么走？」，用户选 Q1 记「差别伸进产品代码与池级 checker」（`allocator.rs`、`image.rs`、`walk.rs` 三份甲乙都不等于钉值，缺的那份测试另注，翻不动候选是推的）、Q2 记「近似树造不成，出不来」（树里编两个 bin 没试，「编不过」没测）、不再跑 14–16 小时的第二段。岔路单两行都定了，Q1 判法产物、树里编两个 bin、第二段、第三段四样标「够判后未跑」，各对应哪一行写在实验页「现状」一节；登记修订 2 抄了甲乙两份 `manifest_sha256`。
+  - **依据**：用户 2026-11-02 在弹窗里的回答（原话在实验页「现状」一节「用户定案」一条）；造树甲乙两份产物的 `name=file` 行（`allocator.rs`、`image.rs`、`walk.rs` 各一行）与第 308–310 行；登记第十二节修订 2。
+- 第一段跑过单测、变异与造近似树甲乙，状态改「部分已跑（第一段停在停机 S40，交主 agent）」：单测 38 条全过，变异 8 条全抓（`research/results/e200-revision-6-segment-one-on-an-approximate-tree-s1-mutations.out`）；造树两份（`research/results/e200-revision-6-segment-one-on-an-approximate-tree-s1-tree-a.out`、`research/results/e200-revision-6-segment-one-on-an-approximate-tree-s1-tree-b.out`）都退 1，判决行 `stops=1 built=false`，停在停机 S40：未提交改动 94 行里唯一一行 `??` 的新测试 `model_compares_inode_creations_across_two_inode_leaf_containers.rs` 在后代提交与悬空 blob 里都取不到，记 `missing`。照停机字面两份不当结果，Q1 判法产物与树里编两个 bin 没出；Q1 照字面不够判（够判条件要每份写出取的版本与 sha256），Q2 没判（S41 写了「Q2 记候选三」，S40 没写）。描述读数：装置 T3 没找到、T4 删七行之后正好等于修订 6 树的 `67e7a549…`；十五份钉值甲乙两棵都是 6 份相等、9 份不等，不等的含产品代码与池级 checker 3 份（`allocator.rs`、`image.rs`、`walk.rs`），所以缺的那一份怎么记都翻不动 Q1 候选二（推的）。`replay.sh` 不登记这三份：造树产物的输出目录、悬空 blob 计数与研究一侧取今天文件的几行逐字节复跑不了。
+  - **依据**：两份造树产物第 308–310 行；实验页「现状」一节。S40 之下 Q1 那一判记不记、S40 停下的树算不算 Q2 候选三「近似树造不成」，交主 agent 定。
+- 新立，装置已写、产物未跑：建页，跑前登记 `research/prompts/e200-preregistration.md`（第十二节修订 1：抄第一节读法 1 要的六行，补四类在逐份归类时的落法、研究一侧十一份的找法、T3 与 T5 落到命令上的读法与编法，改写第六节与第十四节写挂钟的那一句，进程挂钟写成量的、折出来的态数写成推的，估值不变），第一段研究一侧装置 `scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/`（造树、Q1 与编译三份，单测 38 条），变异表 `scripts/mutation/tables/e200_revision_6_segment_one_on_an_approximate_tree.tsv` 8 条；单测、变异与产物都没跑。状态「装置已写、产物未跑」。
+  - **依据**：问题单 `research/prompts/e171-revision-6-approximate-tree-questions.md` 两行，批次 `records/2026-10-31-删兼容旧版本代码.md` 第 17 批；用户定「照近似树重跑，另立新实验」（原话在那一批的记录）。
+
+## E201（三oracle合谋今树整表）
+
+### 2026-11-03
+
+- 第二段执行员补完登记落地清单：单测 55 → 94 条、自证三格 → 四格（加存进库的行与完整导出逐字相同，A7）、变异表 14 → 38 条；登记修订 3（Z8 由主 agent 读 `task wait` 末行判，照字面补齐 Z1、Z4、Z6、F3、K3）、修订 4（主 agent 定 Z6 收严成整趟不过、原判据照留）。单测、自证、六条弄坏开关、变异表都跑过，状态仍是「装置已写、产物未跑」。
+  - **依据**：任务 5353 `Ran 94 tests`、`OK`；任务 5354 `FULL_TABLE_SELFTEST cells=4 passed=4 failed=0 failed_cells=-`；任务 5355–5360 各红在点名的那一项；产物 `research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-03-r2-s1-mutations.out` 末行 `E7RESULT name=verdict mutations=38 caught=38 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`；批次 `records/2026-10-31-删兼容旧版本代码.md` 第 19 批。
+- 新立，装置已写、产物未跑：建页，跑前登记 `research/prompts/e201-preregistration.md`（第十二节修订 1：用户 2026-11-02 定的三条——Q2 认 D 这个范围、两段都跑而流三那几格算进够判范围、「今天的树」认交任务那一刻的主工作区——关掉未定项第 1、2 条；修订 2：读法 7 的分类表与读法 8 G5、G7 两张对应表的 sha256 与归因的落法，都写在任何产物之前），研究一侧装置 `scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/`（入口 `full_table_run.py` 经服务分片三步，逐行驱动 `current_tree_row_driver.py` 照抄 E171（三oracle合谋测试） 那一份、不套 nice、带 gpu 特性，逐格比、归因、Q2、整表矩阵各一份，逐行结论进 prune-server 的 apparatus-items 族），单测六份，变异表 `scripts/mutation/tables/e201_three_oracle_collusion_full_table_on_the_current_tree.tsv` 14 条；单测、变异、自证与两段产物都没跑。状态「装置已写、产物未跑」。
+  - **依据**：问题单 `research/prompts/e171-current-tree-full-table-questions.md` 两行，批次 `records/2026-10-31-删兼容旧版本代码.md` 第 18 批；用户定「第 2 次重跑收尾，整表另立新实验」与 2026-11-02 弹窗里的三条（选项记在那一批的记录）。
+
+## E203（准入之前扫类的步代价）
+
+### 2026-11-05
+
+- 新立，第一段装置已写、产物未跑：建页，跑前登记 `research/prompts/e203-preregistration.md`；装置在 `scripts/experiment-apparatus/` 下，量的那一路（`e203_admission_scan_cost_counters.py`、`e203_admission_scan_cost_histories.rs`、`e203-admission-scan-cost-run.sh`）与推的那一路（计数模型 `e203_admission_scan_cost.rs`，bin 名 `e203-admission-scan-cost`）；计数模型单测 12 条、变异表 12 条（`scripts/mutation/tables/e203_admission_scan_cost.tsv`），插计数脚本变异 3 条；登记清单三十六行里计数站点已落 20 行、12 行未落、4 行半落；状态「未跑」。
+  - **依据**：登记 `research/prompts/e203-preregistration.md` 第五、七、九、十四节；岔路单 `research/prompts/m4-admission-delta-forks.md` 三行；落地清单在第一段执行员的报告里。

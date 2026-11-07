@@ -1,0 +1,100 @@
+{
+  "at": "2026-11-04",
+  "document": "crates/singlefs-checker/invariants/05-空间记账.md",
+  "document_sha256": "589b7705d115c0918cb643a82de7894c26fe82df684d3bd62f77df2961615a32",
+  "line": 28,
+  "invariant": "I-3.21",
+  "whole_invariant_complete": false,
+  "clauses": [
+    {
+      "claim": "候选版本中走到的引用起点，与 I-3.1 同源",
+      "status": "partial",
+      "evidence": "walk.rs:1991,21528；WGSL w_note_reference:1513；两处都使用 I-3.1 引用集合",
+      "limits": "候选版本筛选及全部指针写入链未全文审完"
+    },
+    {
+      "claim": "只与最新根记录比较",
+      "status": "matched_static",
+      "evidence": "walk.rs:10748-10810,21639；scan.wgsl:2238-2328,3150",
+      "limits": "完整最新根寻址链待核"
+    },
+    {
+      "claim": "未释放或释放代严格大于 θ_high",
+      "status": "matched_static",
+      "evidence": "walk.rs:10788；scan.wgsl:2886；调用阈值与 I-3.1 共用",
+      "limits": "等号边界未另造图运行"
+    },
+    {
+      "claim": "比较(盘,起点槽)，不接受只被宽记录覆盖",
+      "status": "matched_cpu_runtime",
+      "evidence": "task5276；walk.rs:10791-10803；GPU源码:3102-3125",
+      "limits": "task5295登记的一对GPU/CPU对拍也通过；其他坏图形仍待核"
+    },
+    {
+      "claim": "不依赖有没有记账",
+      "status": "matched_static",
+      "evidence": "walk.rs:21639在if accounting_seen之前；scan.wgsl:3150在!w_accounting_seen返回之前",
+      "limits": "没有单独去记账镜像运行"
+    },
+    {
+      "claim": "树表为空时不适用",
+      "status": "matched_static",
+      "evidence": "allocation_records_of_a_root_record_without_judging零指针/空树；walk.rs:10769；scan.wgsl:3103",
+      "limits": "无对象路径未另跑"
+    },
+    {
+      "claim": "树表读不出或条目过窄则部分没判",
+      "status": "matched_static",
+      "evidence": "walk.rs:10324-10400 GiveUpOnTheRoot；10763；scan.wgsl:2244-2263,3106",
+      "limits": "没有逐种坏格式图运行"
+    },
+    {
+      "claim": "任一分配记录树读不全则部分没判",
+      "status": "matched_static",
+      "evidence": "walk.rs:10367 GiveUpOnTheRoot；scan.wgsl:2283,3106",
+      "limits": "分配记录树内部递归读取算法未全文审完"
+    },
+    {
+      "claim": "树表非空而无种类3条目则部分没判",
+      "status": "matched_static",
+      "evidence": "walk.rs:10778；scan.wgsl:2328,3106",
+      "limits": "未另造缺种类3镜像运行"
+    },
+    {
+      "claim": "逐起点判红并点名盘槽",
+      "status": "matched_cpu_runtime",
+      "evidence": "walk.rs:10795 judge_naming_the_slots；task5276核树表槽号文字",
+      "limits": "GPU输出细节格式非本文逐点名断言"
+    },
+    {
+      "claim": "登记的宽镜像只红I-3.18与I-3.21，其他判定不变",
+      "status": "matched_cpu_runtime",
+      "evidence": "task5276：1通过0失败297过滤；checker_known_bad_images.rs:4051-4106",
+      "limits": "只覆盖这张坏图及配套干净底图"
+    },
+    {
+      "claim": "GPU同判且有对应对拍测试",
+      "status": "matched_gpu_runtime",
+      "evidence": "task5295 attempt3：clean/changed两张JudgedNow；1通过0失败7过滤，违例位和判到位逐位一致",
+      "limits": "只覆盖登记的一对镜像；前两次编译OOM，第三次9GiB额度成功；不是全GPU或崩溃全量"
+    },
+    {
+      "claim": "合法写者没有起点未对齐的这种来源",
+      "status": "pending",
+      "evidence": "研究判决明示两腿逐种推断，尚未量合法盘面",
+      "limits": "需要追覆盖写、换位、记录施加版本、第0版树表全部写路径与历史模型"
+    },
+    {
+      "claim": "崩溃点重放快档上不红",
+      "status": "pending",
+      "evidence": "文档说由合入后验证判",
+      "limits": "本轮没有运行崩溃全量或取得该次合入验证全部证据"
+    },
+    {
+      "claim": "E(θ_high)解释与决议的未释放措辞关系",
+      "status": "partial",
+      "evidence": "第二轮决议Q2写E(θ_high)里的未释放；现行条款明确包括释放代>θ并注明实现员读法待认",
+      "limits": "不能把该解释说成历史用户定案已独立证实"
+    }
+  ]
+}

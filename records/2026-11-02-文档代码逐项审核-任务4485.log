@@ -1,0 +1,19 @@
+== 任务 4485 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-4485.attempt-1.log（共 18 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.3
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-4485-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+{"case": "normal_dry_run", "exit": 0, "content": "original\n", "same_inode": true, "stdout": "✓ 1 处都命中得对（1 个文件），--dry-run 没写\n", "stderr": ""}
+{"case": "legacy_dry_run", "exit": 0, "content": "replacement\n", "same_inode": true, "stdout": "", "stderr": ""}
+{"case": "legacy_dry_run_later_anchor_missing", "exit": 1, "content": "replacement\n", "same_inode": true, "stdout": "✗ 第 2 处 /tmp/singlefs-run-with-memory-cap-3652774-Ndlxde/singlefs-doc-audit-y4kxteoo/legacy_dry_run_later_anchor_missing.txt：期望命中 1 次，实际 0\n→ 对一下原文再跑（这是逐处写盘的旧行为，前面几处已经落盘了）\n", "stderr": ""}
+REPRODUCED: legacy switch bypasses --dry-run and writes before checking all anchors
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=9.3 seconds=7.0 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=9.3
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-4485-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=9.8 seconds=0.5 exit=0

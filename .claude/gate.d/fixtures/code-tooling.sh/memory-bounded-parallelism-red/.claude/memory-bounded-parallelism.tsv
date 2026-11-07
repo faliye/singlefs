@@ -1,0 +1,9 @@
+# 样本的登记表：第 2 行写对了，第 3 行起每一行各错一样
+scripts/experiment-apparatus/registered_run.sh	4294967296	7000 attempt-1 样本：一个走种子的线程峰值	argument:--seeds	0	样本：这一行写对了
+scripts/experiment-apparatus/registered_run.sh	4294967296	7000 attempt-1 样本：少了理由那一列	argument:--seeds	0
+scripts/experiment-apparatus/gone_run.sh	4294967296	7000 attempt-1 样本	fixed:2	0	样本：入口文件不在
+cargo:demo:missing_target	4294967296	7000 attempt-1 样本	fixed:2	0	样本：包里没有这个目标
+scripts/experiment-apparatus/registered_run.sh	6.8G	7000 attempt-1 样本	item-plan	0	样本：峰值带了单位
+scripts/experiment-apparatus/registered_run.sh	4294967296	量的	item-plan	0	样本：出处没有任务号
+scripts/experiment-apparatus/registered_run.sh	4294967296	7000 attempt-1 样本	by-memory	0	样本：件数从哪来写法不认
+scripts/hosts/plain_run.sh	4294967296	7000 attempt-1 样本	fixed:2	0	样本：入口里没有按内存定并发的写法

@@ -1,0 +1,11 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：comment-history
+want=滞后表 .claude/gate.d/comment-history-lag.tsv 有 6 处写得不对：
+want=第 3 行：scripts/demo/stock.sh 与第 2 行重复登记
+want=第 4 行：有 2 列，要三列：<路径><TAB><命中行数><TAB># <理由>
+want=第 5 行：命中行数要是正整数，写的是「二」
+want=第 6 行：第三列要以 # 起头、写为什么还没改（至少 4 个字）
+want=第 7 行：登记的路径不在判法射程里的文件中：scripts/demo/gone.sh
+want=第 8 行：命中行数要是正整数，写的是「0」
+want=2 份文件的注释里写了历史，共 2 行
+want=doc-text.sh：1 格里 1 格红（comment-history）

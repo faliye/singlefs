@@ -1,0 +1,67 @@
+== 任务 7184 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-7184.attempt-1.log（共 66 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.8
+MULTI_HOST_RUN_CLEANUP time_us=1793858724254722 pid=1247123 label=task-b0f6b921-7184-1 status=pending reason=starting
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-7184-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+AUDIT_RUST case=normal exit=0 traceback=False doc=True attribute=True
+AUDIT_RUST case=missing exit=2 traceback=False doc=False attribute=False
+AUDIT_RUST case=invalid_utf8 exit=1 traceback=True doc=False attribute=False
+AUDIT_RUST case=multiline_attribute exit=0 traceback=False doc=False attribute=False
+AUDIT_ATOMIC case=normal exception=None content=NEW temporary_files=0
+AUDIT_ATOMIC case=file_fsync_error exception=ReplaceRefused content=OLD temporary_files=0
+AUDIT_ATOMIC case=directory_interrupt exception=KeyboardInterrupt content=NEW temporary_files=0
+AUDIT_SECTIONS setting=normal exit=0 output_lines=8
+### 小节清单：`/tmp/singlefs-run-with-memory-cap-115275-UY6v5N/audit-text-boundaries-317_8w41/sections.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| # First | | |
+| （First 标题之下、第一个下级标题之前的正文：第 4-10 行） | | |
+| ## Second | | |
+
+AUDIT_SECTIONS setting=KB_SECTIONS_BREAK exit=2 output_lines=0
+  ✗ KB_SECTIONS_BREAK 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做
+     → 怎么办：unset KB_SECTIONS_BREAK 再来；要看开关红在哪一项，跑 KB_SECTIONS_BREAK=<项> python3 scripts/kb/kb-sections.py --selftest
+AUDIT_SECTIONS setting=KB_SECTIONS_NO_H1 exit=0 output_lines=7
+### 小节清单：`/tmp/singlefs-run-with-memory-cap-115275-UY6v5N/audit-text-boundaries-317_8w41/sections.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| ## Second | | |
+| （Second 标题之下、第一个下级标题之前的正文：第 12-13 行） | | |
+
+AUDIT_SECTIONS setting=KB_SECTIONS_NO_PREAMBLE exit=0 output_lines=7
+### 小节清单：`/tmp/singlefs-run-with-memory-cap-115275-UY6v5N/audit-text-boundaries-317_8w41/sections.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| # First | | |
+| ## Second | | |
+
+AUDIT_SECTIONS setting=KB_SECTIONS_NO_FENCE exit=0 output_lines=9
+### 小节清单：`/tmp/singlefs-run-with-memory-cap-115275-UY6v5N/audit-text-boundaries-317_8w41/sections.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| # First | | |
+| （First 标题之下、第一个下级标题之前的正文：第 4-7 行） | | |
+| ## Fake | | |
+| ## Second | | |
+
+AUDIT_TEXT source=scripts/kb/quote-rust-items.py sha256=a48ad8643c7133b980ac3903b26f924bd39551887256e0b4d9f5a057c808c6c0
+AUDIT_TEXT source=scripts/kb/lib_atomic_replace.py sha256=61ab6aa21ca42bc185e2948e6841450dbc9d3e549dea472be996b43cdf8fed6a
+AUDIT_TEXT source=scripts/kb/kb-sections.py sha256=1aa10e1113b08094be615e3ea79917b65dff0eaf6238fd49b1416c3ff9e07104
+AUDIT_TEXT temporary_materials_removed=true
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=32067584
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=10.5 seconds=7.8 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=10.5
+MULTI_HOST_RUN_CLEANUP time_us=1793858732055698 pid=1247123 label=task-b0f6b921-7184-1 status=confirmed reason=processes-gone
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-7184-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=11.1 seconds=0.5 exit=0

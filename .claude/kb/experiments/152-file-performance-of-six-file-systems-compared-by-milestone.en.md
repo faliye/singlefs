@@ -6,7 +6,7 @@ The question is where XFS, ext4, F2FS, Bcachefs, Btrfs, OpenZFS, and singlefs st
 
 **Background material:** Supports no decision directly. It is used on the D23 (Journal Role & Format) side to judge whether and how to reduce cold-recovery reads, and on the D17 (Implementation Layering & Third-Party Pipeline) settled item 5 side to judge when to add FUSE: at the new-pool file creation milestone only three of eight dimensions can be compared.
 
-**Subjects and parameters:** The six systems use their defaults, except ext4's `noinit_itable` mount option, with one 16 GiB virtio disk each; a raw-disk row provides the ceiling. At the “new-pool file creation” milestone singlefs has no file interface (D17 settled item 5: the first version is a pure user-space library, not mounted), so only the checker-tier-qemu-device-streams real-device binary can run, using two disks (D2 RAID striping strategy, settled item 9). Versions, commands, and ordering are registered verbatim before the run in `e152-preregistration.md`.
+**Subjects and parameters:** The six systems use their defaults, except ext4's `noinit_itable` mount option, with one 16 GiB virtio disk each; a raw-disk row provides the ceiling. At the “new-pool file creation” milestone singlefs has no file interface (D17 settled item 5: the first version is a pure user-space library, not mounted), so only the qemu-device-streams real-device binary can run, using two disks (D2 RAID striping strategy, settled item 9). Versions, commands, and ordering are registered verbatim before the run in `e152-preregistration.md`.
 
 **Test bench:** Local QEMU 8.2.2 + KVM, 4 vCPUs and 4 GiB; guest kernel 6.17.0-1028-oem (same as host, without lockdep, obtained with `scripts/devices/vm-kernel.sh --release`). Disks are fallocate-preallocated raw files in TMPDIR, with `cache=none,aio=native`. Measurements show relative positions on this bench; absolute values are not compared with external published numbers.
 
@@ -16,12 +16,12 @@ The question is where XFS, ext4, F2FS, Bcachefs, Btrfs, OpenZFS, and singlefs st
 bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-<date>.out   # Single disk: eight configurations interleaved for five rounds
 E152_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs" \
   bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-mirror-<date>.out   # Two-disk mirrors
-E152_ROUNDS=1 E152_CONFIGURATIONS="ext4" bash scripts/devices/e152-run.sh <artifact>              # Smoke test
+E152_ROUNDS=1 E152_CONFIGURATIONS="ext4" bash scripts/devices/e152-run.sh <artifact>              # Smoke test: a scoped run plus a domain reduction; the artifact header gets reduced=yes … not_e152_product=yes and it is not taken as an artifact of E152 (per-milestone file performance against six file systems)
 E152_CONFIGURATIONS=singlefs bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-file-overwrite-<date>.out   # After milestone, rerun singlefs arm only
 ```
 
 
-A formal run of eight configurations over five rounds takes about 45 minutes. During that time do not compile or run gates on the host: checker-tier-crash-point-replay, checker-tier-qemu-device-streams, and checker-tier-research-build-and-replay consume CPU or start VMs and would contaminate timings.
+`E152_CONFIGURATIONS` makes it a scoped run and `E152_ROUNDS` is a domain reduction; a run whose rounds or configurations differ from the registered ones gets `reduced=yes registered_rounds=… registered_configurations=… not_e152_product=yes` appended to the artifact header `E152RUN_HEADER`. A formal run of eight configurations over five rounds takes about 45 minutes. During that time do not compile or run gates on the host: crash-point-replay, qemu-device-streams, and research-build-and-replay consume CPU or start VMs and would contaminate timings.
 
 Code: `scripts/experiment-apparatus/e152_file_system_benchmark.rs` (26 unit tests; guest single-round workload and host summary modes); mutation table `scripts/mutation/tables/e152_file_system_benchmark.tsv` (all 26 caught); additional root `scripts/devices/e152-stage-root.sh`; driver `scripts/devices/e152-run.sh`; tables `scripts/experiment-apparatus/e152-tables.py` (`--selftest`). Original outputs: `e152-file-system-benchmark-2026-09-15.out` (single disk, 890 lines, final line `emitted=174`) and `e152-file-system-benchmark-mirror-2026-09-15.out` (two-disk mirror, 941 lines, final line `emitted=174`). Preregistration `e152-preregistration.md` has six revisions and four smoke tests before the formal run in section 10.
 
@@ -117,7 +117,7 @@ The six dimension tables and singlefs table below are the first seven tables rep
 | OpenZFS mirror (vdev is a partition) | 544 | 3 574 272 ⚠111% | 26.0 | 46.9 | 46.9 |
 | singlefs (two disks) | — | — | — | — | — |
 
-#### singlefs (two 16 GiB disks, checker-tier-qemu-device-streams real-device binary)
+#### singlefs (two 16 GiB disks, qemu-device-streams real-device binary)
 
 | Configuration | mkfs + number acquisition + warm-up + new-pool file creation ms | Overwrite, release, rollback and reuse (overwrite B) ms | Publication B (binary's own timing) ms | Cold recovery ms | Bytes read across both disks | Read requests across both disks | B write requests across both disks | B bytes written across both disks | B barriers across both disks | B FUA writes across both disks |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -203,7 +203,7 @@ The following six dimension tables and singlefs table are the first seven tables
 | OpenZFS mirror (vdev is a partition) | 543 | 3 586 560 | 26.0 | 46.9 | 46.9 |
 | singlefs (two disks) | — | — | — | — | — |
 
-#### singlefs (two 16 GiB disks, checker-tier-qemu-device-streams real-device binary)
+#### singlefs (two 16 GiB disks, qemu-device-streams real-device binary)
 
 | Configuration | mkfs + number acquisition + warm-up + new-pool file creation ms | Overwrite, release, rollback and reuse (overwrite B) ms | Publication B (binary's own timing) ms | Cold recovery ms | Bytes read across both disks | Read requests across both disks | B write requests across both disks | B bytes written across both disks | B barriers across both disks | B FUA writes across both disks |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -255,7 +255,7 @@ Under preregistration section 11's “stop when sufficient to judge,” Q1, Q3 a
 
 ### 2026-09-17 wrap-up: rerun the singlefs arm at completion of “overwrite, release, rollback and reuse”
 
-Whole artifact lines are copied; lines from artifacts moved out of the workspace are one-line pointers. The user requested another run at milestone wrap-up. Since step 7, `crates/` had four changes, individually listed in preregistration section 13; workload and criteria were unchanged. Five rounds succeeded first try, host one-minute load 2.27–2.45, while the checker-tier-crash-point-replay full crash-point replay was running concurrently at `nice -n 19`. Artifact `e152-file-system-benchmark-second-transaction-final-2026-09-17.out` (91 lines, final `emitted=10`).
+Whole artifact lines are copied; lines from artifacts moved out of the workspace are one-line pointers. The user requested another run at milestone wrap-up. Since step 7, `crates/` had four changes, individually listed in preregistration section 13; workload and criteria were unchanged. Five rounds succeeded first try, host one-minute load 2.27–2.45, while the crash-point-replay full crash-point replay was running concurrently at `nice -n 19`. Artifact `e152-file-system-benchmark-second-transaction-final-2026-09-17.out` (91 lines, final `emitted=10`).
 
 ```text
 Artifact line: git show 0ec0be214cdc:research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out line 82 (name=summary)
@@ -273,7 +273,7 @@ The preregistered section 13 criteria hold individually: in all five rounds B's 
 
 **Step 7: singlefs arm for the “overwrite, release, rollback and reuse” milestone** (whole artifact lines copied; lines from artifacts moved out of the workspace are one-line pointers).
 
-Only singlefs ran: two 16 GiB disks in `file-overwrite` mode, overwriting once in the same process after creating a file in a new pool. All five rounds succeeded first try, host one-minute load 1.28–1.69. Another full gate was concurrently running the checker-tier-research-build-and-replay experiment-replay cell on the same machine; preregistration section 7 specified running and recording it anyway. Configuration and criteria are in preregistration section 12; the six baselines were not rerun. Artifact `e152-file-system-benchmark-second-transaction-2026-09-17.out` (91 lines, final `emitted=10`).
+Only singlefs ran: two 16 GiB disks in `file-overwrite` mode, overwriting once in the same process after creating a file in a new pool. All five rounds succeeded first try, host one-minute load 1.28–1.69. Another full gate was concurrently running the research-build-and-replay experiment-replay cell on the same machine; preregistration section 7 specified running and recording it anyway. Configuration and criteria are in preregistration section 12; the six baselines were not rerun. Artifact `e152-file-system-benchmark-second-transaction-2026-09-17.out` (91 lines, final `emitted=10`).
 
 ```text
 Artifact line: git show 0ec0be214cdc:research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out line 82 (name=summary)
@@ -437,7 +437,7 @@ The six dimension tables and singlefs table below are the first seven reproduced
 | OpenZFS mirror (vdev is a partition) | 546 | 3 586 048 | 26.0 | 46.9 | 46.9 |
 | singlefs (two disks) | — | — | — | — | — |
 
-#### singlefs (two 16 GiB disks, checker-tier-qemu-device-streams real-device binary)
+#### singlefs (two 16 GiB disks, qemu-device-streams real-device binary)
 
 | Configuration | mkfs + number acquisition + warm-up + new-pool file creation ms | Overwrite, release, rollback and reuse (overwrite B) ms | Publication B (binary's own timing) ms | Cold recovery ms | Bytes read across both disks | Read requests across both disks | B write requests across both disks | B bytes written across both disks | B barriers across both disks | B FUA writes across both disks |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -569,7 +569,7 @@ The six dimension tables and singlefs table below are the first seven reproduced
 | OpenZFS (vdev is a partition) | 278 | 1 791 488 | 13.0 | 93.8 | 93.8 |
 | singlefs (two disks) | — | — | — | — | — |
 
-#### singlefs (two 16 GiB disks, checker-tier-qemu-device-streams real-device binary)
+#### singlefs (two 16 GiB disks, qemu-device-streams real-device binary)
 
 | Configuration | mkfs + number acquisition + warm-up + new-pool file creation ms | Overwrite, release, rollback and reuse (overwrite B) ms | Publication B (binary's own timing) ms | Cold recovery ms | Bytes read across both disks | Read requests across both disks | B write requests across both disks | B bytes written across both disks | B barriers across both disks | B FUA writes across both disks |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -644,10 +644,10 @@ Artifact line: git show 0ec0be214cdc:research/results/e142-first-txn-dry-run-202
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D23 (Journal Role & Format) | Background material | 2026-10-15 unaffected: whole copied artifact lines were replaced by artifact pointers; numbers, conclusions and artifacts unchanged. |
-| D17 (Implementation Layering & Third-Party Pipeline), settled item 5 | Background material | 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
-| D2 (RAID Stripe Policy), settled item 9 | No effect | 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
-| D4 (Checksum Location), settled item 5 | No effect | 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
+| D23 (Journal Role & Format) | Background material | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by artifact pointers; numbers, conclusions and artifacts unchanged. |
+| D17 (Implementation Layering & Third-Party Pipeline), settled item 5 | Background material | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
+| D2 (RAID Stripe Policy), settled item 9 | No effect | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
+| D4 (Checksum Location), settled item 5 | No effect | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
 
 ## Historical Versions
 

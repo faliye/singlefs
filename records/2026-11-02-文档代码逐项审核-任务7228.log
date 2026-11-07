@@ -1,0 +1,61 @@
+== 任务 7228 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-7228.attempt-1.log（共 60 行，下面是整份）
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=3.1
+MULTI_HOST_RUN_CLEANUP time_us=1793859133511069 pid=1456765 label=task-b0f6b921-7228-1 status=pending reason=starting
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-7228-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+AUDIT_ORPHAN case=missing exit=1
+── experiment-orphans：目录登记列的各处出现过的实验号在 kb 里有没有正文
+  ✗ 目录登记 .claude/gate.d/experiment-number-directories.tsv 列的各处有这些实验号的东西，kb/experiments/ 里却没有正文：
+      E42   research/e42-output.txt 
+  → 怎么办：给它建正文（测什么 / 判据 / 失败条款 / 口径 / 复跑命令），并登记进 experiments.md 的索引表；
+    若那轮的结论不打算入库，就把 research 下那些文件删掉——留着等于留一份没人能复核的证据。
+── 汇总：doc-experiments.sh 跑了 1 格（--check 点名）
+  experiment-orphans：红（退出 1）
+  ✗ doc-experiments.sh：1 格里 1 格红（experiment-orphans）
+     → experiment-orphans：给这个实验号建正文 .claude/kb/experiments/<号>-*.md（测什么 / 判据 / 失败条款 / 口径 / 复跑命令），并登记进 experiments.md 的索引表；实验号住在哪几处照 .claude/gate.d/experiment-number-directories.tsv，写法在它的文件头
+     → 改完只重跑红的格：bash .claude/gate.d/doc-experiments.sh --check experiment-orphans
+AUDIT_ORPHAN case=actual_page exit=0
+── experiment-orphans：目录登记列的各处出现过的实验号在 kb 里有没有正文
+  ✓ 目录登记 .claude/gate.d/experiment-number-directories.tsv 列的各处出现过的实验号在 kb 里都有正文（1 个）
+    扫了 1 处：research（target/ 不扫）；不在的 0 处：（没有）
+── 汇总：doc-experiments.sh 跑了 1 格（--check 点名）
+  experiment-orphans：绿
+  ✓ doc-experiments.sh：1 格里 1 格绿（experiment-orphans），0 格本次未跑（无）
+AUDIT_ORPHAN case=empty_page exit=0
+── experiment-orphans：目录登记列的各处出现过的实验号在 kb 里有没有正文
+  ✓ 目录登记 .claude/gate.d/experiment-number-directories.tsv 列的各处出现过的实验号在 kb 里都有正文（1 个）
+    扫了 1 处：research（target/ 不扫）；不在的 0 处：（没有）
+── 汇总：doc-experiments.sh 跑了 1 格（--check 点名）
+  experiment-orphans：绿
+  ✓ doc-experiments.sh：1 格里 1 格绿（experiment-orphans），0 格本次未跑（无）
+AUDIT_ORPHAN case=directory_only exit=0
+── experiment-orphans：目录登记列的各处出现过的实验号在 kb 里有没有正文
+  ✓ 目录登记 .claude/gate.d/experiment-number-directories.tsv 列的各处出现过的实验号在 kb 里都有正文（1 个）
+    扫了 1 处：research（target/ 不扫）；不在的 0 处：（没有）
+── 汇总：doc-experiments.sh 跑了 1 格（--check 点名）
+  experiment-orphans：绿
+  ✓ doc-experiments.sh：1 格里 1 格绿（experiment-orphans），0 格本次未跑（无）
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no
+AUDIT_ORPHAN case=wrong_suffix exit=0
+── experiment-orphans：目录登记列的各处出现过的实验号在 kb 里有没有正文
+  ✓ 目录登记 .claude/gate.d/experiment-number-directories.tsv 列的各处出现过的实验号在 kb 里都有正文（1 个）
+    扫了 1 处：research（target/ 不扫）；不在的 0 处：（没有）
+── 汇总：doc-experiments.sh 跑了 1 格（--check 点名）
+  experiment-orphans：绿
+  ✓ doc-experiments.sh：1 格里 1 格绿（experiment-orphans），0 格本次未跑（无）
+AUDIT_ORPHAN source=.claude/gate.d/doc-experiments.sh sha256=e13d509f97c1c8669125cc3531d79925d5a8c10500d2da5b62cf9ad58526ab48
+AUDIT_ORPHAN source=scripts/kb/lib_experiment_number_directories.py sha256=a47fdee398d3d8b9d1e405db9930a3f71679fa50c06a95dadb21d578f40d8cf8
+AUDIT_ORPHAN source=.claude/gate.d/lib/stage-cells.sh sha256=aa4006c46cb46ee869dc13ad6e82557bf55144eb8f64e74ded07bc4ba6bd8f33
+AUDIT_ORPHAN temporary_materials_removed=true
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=0 read=no
+MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=23089152
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0
+  · 第二台那条命令退 0
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=11.2 seconds=8.0 exit=0
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=11.2
+MULTI_HOST_RUN_CLEANUP time_us=1793859141578743 pid=1456765 label=task-b0f6b921-7228-1 status=confirmed reason=processes-gone
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-7228-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=11.7 seconds=0.5 exit=0

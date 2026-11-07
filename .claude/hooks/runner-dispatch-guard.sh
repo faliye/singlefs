@@ -22,16 +22,16 @@
 #      工作根（默认 ~/.local/share/singlefs/work/）认展开的绝对路径与 ~/…、$HOME/…、$SINGLEFS_WORK_ROOT/… 几种写法，会话临时目录根认 /tmp/claude-<uid>/（表里的 $SINGLEFS_WORK_ROOT/ 不展开成它，点名它的照越界拒），
 #      读表、模式转正则与表里 $SINGLEFS_WORK_ROOT/ 起头的模式怎么展开在同目录的 lib_write_scope.py（write-guard.sh、bash-command-detector.sh 调的是同一份，读不到它时 ④ 不判，stderr 写一句），
 #      工作根与会话临时目录根怎么认只在同目录的 lib_work_root.py。
-#   ⑤ 实现员与工具员撞文件（writer_collision_verdict）：实现员要有一行「要动的 crates 文件：…」（份数不设上限，用户 2026-09-27 定；`crates/mutations.tsv` 只追加、不算撞）；
+#   ⑤ 实现员与工具员撞文件（writer_collision_verdict）：实现员要有一行「要动的 crates 文件：…」（份数不设上限；`crates/mutations.tsv` 只追加、不算撞）；
 #      工具员的文件取「要改的文件」（tooling_writer_files：行首「要改的文件：」一行里的路径，值空着的接下面连着的列表项；标题是「要改的文件」那一节到下一个标题；
 #      闭合围栏块里的不算；从仓根起、带 / 的词，以 / 收尾的是目录、罩住底下的文件；认不出路径的不拒、登记一份空的；拆分提案第十九节 ②）。
 #      与本会话还在跑的实现员、工具员登记的文件有交集就拒（实现员对实现员、工具员对工具员、实现员对工具员都算）。登记在 <DISPATCH_GUARD_STATE_ROOT>/<会话 id>/implementation-writers.tsv，一行一次派发
-#      （时刻、提示的 sha256、文件、类型；改前只登记实现员、一行三列，读到三列的当实现员）；每次判之前先删掉已结束的：主会话记录里那次派发（toolUseResult 的 prompt 同 sha256）的 agent
+#      （时刻、提示的 sha256、文件、类型）；每次判之前先删掉已结束的：主会话记录里那次派发（toolUseResult 的 prompt 同 sha256）的 agent
 #      交回了（`<agent-message from="<id>">` 后跟 `[Subagent hand-back]`）、任务通知是 failed / killed / stopped、或被 TaskStop 停了、或 TaskStop 报找不到它
 #      （结果是「No task found with ID: <id>. Running background agents: …」而同一句的在跑名单里没有它：中断之后没起来的那件）；
 #      派发之后 10 分钟主会话记录里还没有它的，按没派出去删；那次派发被拒掉的（登记时刻之前最后一次 Agent / Task 的 tool_use 有 is_error 的 tool_result，
 #      判法同 ⑯ 的 dispatch_refusal_lookup）立刻删，不等 10 分钟：派发闸放行之后才轮到挂在同一事件上的别的钩子，它拒了，这次派发没起来，登记没人用。
-#      主会话记录这一条路要等记录写进去：重派来得比记录落盘快的罩不住（2026-11-05 重派在 22 秒后仍被被拒那一件的登记挡，58 秒后放，推的：记录里当时还读不到那次被拒），
+#      主会话记录这一条路要等记录写进去：重派来得比记录落盘快的罩不住（记录里还读不到那次被拒时，重派会被被拒那一件的登记挡住），
 #      所以本闸放行之前另把同一事件上别的钩子（项目 .claude/settings.json 的 hooks.PreToolUse 里 matcher 认得这个工具名的，本闸自己除外，sibling_refusals）按同一份输入先跑一遍：
 #      有一个会拒（退 2）的这一次不建写者锁（⑯）、不登撞文件（⑤），stderr 写一句点名那个钩子；那个钩子自己跑不起来、超时的当它不拒。只有钩子入口（take_locks）才问，
 #      --check-prompt 与自检里直接调 decide 不问。
@@ -55,10 +55,10 @@
 #      每一行都要出处（不按日期、不按轮名免），门禁那一格用同一份判法。
 #      指到这一轮自己的材料（research/prompts/<轮>*、_<轮>*）、规则与定义文件、仓外路径、别的轮的叫停原话、日期写坏、同一轮两行、
 #      原话找不到（行号提示那一行没有这一轮的名字，或去掉新旧名与日期之后对不上）或命中不止一次（行号提示不在其中）的都不收，那一轮照旧算开着，拒绝说明里写没收的原因。
-#      钩子认不出那句话是不是用户为这一轮说的（〔〕逐字照抄了同一轮另一句带名字与「」原话的话时也照收），那一半靠主 agent 核。
+#      钩子认不出那句话是不是出自用户本人、讲的是不是这一轮（〔〕逐字照抄了同一轮另一句带名字与「」原话的话时也照收），那一半靠主 agent 核。
 #      读不到 lib_abandoned_rounds.py 时 ⑥ 不收任何叫停的轮（登记表当没有），stderr 写一句。
 #   ⑦ 并发与模型：本会话还在跑的子 agent（不分模型；主会话记录里派出去、没结束、会话记录 3 小时内动过或 3 小时内派的）
-#      已有 SUBAGENT_CONCURRENCY_LIMIT 个（5，用户 2026-10-02 定）就拒，没有放行行。同一条消息里并行派的几个，后几个判的时候前几个可能还没写进主会话记录，数不到。
+#      已有 SUBAGENT_CONCURRENCY_LIMIT 个（5）就拒，没有放行行。同一条消息里并行派的几个，后几个判的时候前几个可能还没写进主会话记录，数不到。
 #   ⑧ 书记员：提示里点名的工作根或会话临时目录根下的规格文件逐份交给 scripts/kb/kb-spec-check.py，红了拒；一份认得出的规格都没有也拒
 #      （规格写在提示正文里的，把提示正文当规格判）；放行行「规格检查已判：<理由>」。
 #   ⑨ 设计员写重跑登记（提示里有 research/prompts/e<号>-r<n>-prereg.md）：`scripts/gate/admission.py experiment <根> E<号>` 退 77
@@ -88,7 +88,7 @@
 #      还没落进记录、而那次派发已经被拒掉的，不论提示改没改也直接接手：派发闸放行之后才轮到挂在同一事件上的别的钩子（Agent 事件上除本闸还有
 #      borrowed-convention-guard.sh），它拒了，这次派发没起来，锁是本闸放行时留下的。判法在 dispatch_refusal_lookup：锁登记的派发会话的记录里，
 #      这份提示在锁的派发时刻（含 DISPATCH_TIME_SLACK_SECONDS 的误差）之前最后一次 Agent / Task 的 tool_use，有 is_error 的 tool_result 才算被拒；
-#      回执已落进记录的、还没有结果的（同一条消息里并行派的上一件）、记录里找不到的都不放，仍按 10 分钟算在跑。放过的：被用户拒掉的派发（权限弹窗点了否）
+#      回执已落进记录的、还没有结果的（同一条消息里并行派的上一件）、记录里找不到的都不放，仍按 10 分钟算在跑。放过的：权限弹窗里点了否的派发
 #      同样没起来，一并放；记录写得比重派慢（结果还没落盘）时按没被拒算，等 10 分钟或在提示里写「写者锁已判」行）；
 #      持锁的已交回 / 失效 / 从没起来，或提示里写了「写者锁已判：<理由>」，新锁接手，旧写者之后写这个目录被 write-guard.sh 第九道拒。
 #      锁文件在而判不了（读不了、不是普通文件、不是 JSON 对象、缺 nonce / dispatched_at / prompt_sha256，lib_writer_lock.py 的 lock_state）的，与写闸第九道同一口径
@@ -99,49 +99,49 @@
 #   ⑰ 报告行：④ 与这一条共用一份报告行解析（report_line_mentions）：标签认「报告」「报告路径」「报告写进」「报告写到」四种。
 #      ④ 只在行首或句首认：行首可带 - * > _、粗体与「1.」「2)」这类编号，句首是。！？；之后；句中的（「，报告 <路径>」）不认。
 #      ⑰ 的文件名与三方腿形态两判在哪都认，前面连着字的（「交回报告：」「把报告写进」）不认；两边都不认「」『』“”、反引号里引着的
-#      （攻方 landing-audit-r2 K2-3：正文里引着的「报告：」被当成报告行、误拦两份合法派发）。引号怎么配（quoted_spans）：「」『』“”照整份提示配对，
+#      （正文里引着的「报告：」不当报告行）。引号怎么配（quoted_spans）：「」『』“”照整份提示配对，
 #      一句引文折到下一行、后半截照样算引号里的（拆分提案第九十节 ㉟），可以套，没配上的开头不算；反引号按行配对。
 #      ⑰ 两判只看报告行里落在本提示草稿目录下的路径与不带目录的裸文件名（「<草稿目录>/…」写法也算在草稿目录下），别的目录下的当转述别的子 agent 的报告，不判
-#      （攻方 landing-audit-r3 K2-1、K2-2：行首、句首两种锚法在真提示上各有误拦误放，按位置分不出自己的报告行与转述；用户 2026-10-23 定按草稿目录判）。
+#      （行首、句首两种锚法在真提示上各有误拦误放，按位置分不出自己的报告行与转述，所以按草稿目录判）。
 #      本提示的草稿目录：行首「草稿目录：」一行点名的、工作根底下的目录（report_scratch_directories；认法只在同目录 lib_prompt_scratch_line.py，与 ⑯ 共用，
-#      取骨架 scripts/agents/dispatch-prompt.py 打的那一行：句中「，草稿目录 <别处>」、列表「- 草稿目录 <别处>」这类转述不认，「草稿目录在 <路径>」也不认，判决 landing-audit-r4 K2-4、K3-2）；
+#      取骨架 scripts/agents/dispatch-prompt.py 打的那一行：句中「，草稿目录 <别处>」、列表「- 草稿目录 <别处>」这类转述不认，「草稿目录在 <路径>」也不认）；
 #      提示里没有这一行的（没写，或写了而那一行点名的不在工作根底下）：文件名一判只判不带目录的裸文件名与「<草稿目录>/…」写法，
-#      带目录的路径一律当转述、不判（拆分提案第九十节 ㉗：2026-10-14 以前不照骨架写的提示多半没有这一行，那批只罩裸文件名）；三方腿那一判不看草稿目录，
+#      带目录的路径一律当转述、不判（拆分提案第九十节 ㉗：不照骨架写的提示多半没有这一行，那批只罩裸文件名）；三方腿那一判不看草稿目录，
 #      本腿的报告路径照下面三方腿那几条判（报告行点名的文件不是三方腿形态时，有这一行才分得出落没落在草稿目录下，没有这一行的只有裸文件名算本提示自己的、拒）；
 #      「报告」要接冒号，或接空白再接路径（~、/、$、research/、.claude/、crates/、litmus/、records/ 起头），另三种冒号可有可无；
 #      标签之后到行尾是这一行的正文，正文里第一个像路径的词（带 / 或带扩展名）是这一行点名的路径（交 ④ 判写范围、交三方腿判形态），
-#      正文里的每个词交文件名判，紧跟在否定词（不、别、勿、禁止，中间隔不到五个字、没有标点）后面的不判（「（不要叫 report.md）」，辩方 landing-audit-r2 K2-4）。
+#      正文里的每个词交文件名判，紧跟在否定词（不、别、勿、禁止，中间隔不到五个字、没有标点）后面的不判（「（不要叫 report.md）」）。
 #      闭合了的围栏代码块（照 CommonMark，without_code_blocks）里的行不认。
 #      文件名：报告行正文里的文件，名字（路径最后一段，要带扩展名）里带 report（不分大小写）的拒，以 SUMMARY、FINDINGS、ANALYSIS 开头（不分大小写）的 .md 也拒
 #      （拆分提案第九十节 ㉑，实测 research/prompts/subagent-landing-audit-2026-10-22/b9-prefix-probe.md：这三个词在名字中间或末尾的、不是 .md 的写得进去，不拦；扩展名照工具层也不分大小写，.MD 照拒、.markdown 放，
 #      实测 research/prompts/subagent-landing-audit-2026-10-22/b12-scratch-lib.md「6.1 工具层真调」），出路是改成草稿目录下的 result.md。
 #      Claude Code 自带的拦截不让子 agent 用 Write 建名字为 report.md 的文件（工具结果原文「Subagents should return findings as text, not write report files. Include this content in your final response instead.」，
-#      不在仓里任何钩子里；2026-10-14 起子 agent 写 report.md 209 次全被拒，名字里带 report 的别的文件 16 次里拒 6 次，progress.md、result.md 写得进去），骨架（scripts/agents/dispatch-prompt.py）默认填 <草稿目录>/result.md。
-#      四种标签都判（攻方 landing-audit-r1 K2-4：原来 ④ 只认后三种、⑰ 只认「报告：」，两边各漏一半）；目录名带 report、文件名不带的放行。
+#      不在仓里任何钩子里；子 agent 写 report.md 全被拒，名字里带 report 的别的文件有拒有放，progress.md、result.md 写得进去），骨架（scripts/agents/dispatch-prompt.py）默认填 <草稿目录>/result.md。
+#      四种标签都判；目录名带 report、文件名不带的放行。
 #      没有放行行：这一条拦的是工具层必拒的名字，没有「确要写 report.md」的情形。
 #      三方腿（类型表只登记在定义 frontmatter 的 leg: three-way 一行，派发那一刻按提示的仓根经同目录 lib_three_way_legs.py 读，three_way_report_types；
 #      交回闸、骨架与账表读同一处，拆分提案第九十节 ⑯）另判形态（three_way_report_verdict、leg_report_reading）：要有一处本腿的报告路径 research/prompts/<名>-output.md
 #      （形态只在 lib_three_way_legs.py 认，报告行那一支 leg_report_written_tree、整份提示那一支 leg_report_mentions、交回闸 ② 的 leg_report_mentions_in_trees
 #      都经那份库的 leg_report_mentions_in_trees 一个函数，三处判得一样：没填的 <轮> 占位、子目录下的、仓外副本里同名的都不认，仓根、./、本仓工作树的绝对路径、
-#      ~ 与 $HOME 起头的、../<仓根目录名>/ 这类都认，判决 landing-audit-r4 K2-5、landing-audit-r5「交回闸 ② 仓外报告」，拆分提案第九十节 ㉗；
+#      ~ 与 $HOME 起头的、../<仓根目录名>/ 这类都认，拆分提案第九十节 ㉗；
 #      $SINGLEFS_WORK_ROOT/、${SINGLEFS_WORK_ROOT}/ 起头的先照同目录 lib_work_root.py 展开成工作根再交那份库认，与交回闸 ② 同一种解法，work_root_tokens_expanded）。本腿的报告只认两处：
 #      报告行点名的（带扩展名的那个词整个是这一形态；它不合形态、又不在本提示草稿目录下也不是裸文件名的，这一行正文里后面合形态的那个词也算：
 #      「报告路径（形态 `research/prompts/<轮>-sonnet-output.md`）：research/prompts/x-r1-sonnet-output.md」这种写法），或报告行里一处都没有时，整份提示里不在「」『』“”与反引号里、名字以本腿轮名加「-」起头的
-#      （攻方 landing-audit-r3 K2-3：「交付：报告 …-output.md」写法；拆分提案第九十节 ㉗：只认本腿轮名下的，别的轮的判决、腿报告是背景材料，不当本腿的）。
+#      （「交付：报告 …-output.md」写法；拆分提案第九十节 ㉗：只认本腿轮名下的，别的轮的判决、腿报告是背景材料，不当本腿的）。
 #      本腿轮名（leg_round_names）：行首「背景材料：」一行里的 _<轮>-background.md 或 _<轮>-body.md（三种腿的定义都要这一样输入），与前面不连着字、
 #      不在引号里的「轮名」标签后面那个名字（冒号可有可无，可带粗体与一个反引号）；一个都认不出时整份提示那一支一处都不认，只剩报告行。
 #      禁读清单那几段（forbidden_list_spans：行首「禁读清单」或「禁读」接冒号的一行到行尾，冒号后面是空的再连着往下的列表项；标题里有「禁读」的一节到下一行标题）
 #      里的 -output.md 是别的腿的，不当本腿的报告，报告标签落在里面的也不算报告行；禁读清单里点到本腿自己的报告（与 own 里的 research/prompts/<名>-output.md 一样，
-#      引号、反引号里的也算）拒（拆分提案第九十节 ㉙，landing-audit-r4 攻方提示头一版就是这样写的、当时放行）。
+#      引号、反引号里的也算）拒（拆分提案第九十节 ㉙）。
 #      报告行点名的文件落在本提示草稿目录下或是裸文件名、又不是这一形态的（例如草稿目录下的 result.md）拒，别的目录下的当转述不判；一处本腿的报告都没有也拒，
 #      拒绝说明列出认到的本腿轮名、只在禁读清单里的、不在本腿轮名下的与当成转述的报告行。本腿的报告路径另交文件名那一判：名字里带 report 的、以 SUMMARY、FINDINGS、
-#      ANALYSIS 开头的拒（拆分提案第九十节 ㉗：它不在草稿目录下，原来不判；共用约束「报告」一节：报告文件名里不带 report）。
+#      ANALYSIS 开头的拒（拆分提案第九十节 ㉗：它不在草稿目录下也判；共用约束「报告」一节：报告文件名里不带 report）。
 #      交回闸 .claude/hooks/handback-guard.sh 只认这种形态（三方腿的报告就是它，.claude/rules/three-way-inference.md「云端腿的报告要分段落盘」），
-#      派发时放过草稿目录下的 result.md，腿照做必在交回时被拒（攻方 landing-audit-r1 K3-1）。报告行里还有 <填 …> 占位的交 ⑬，这一判不看那一行。
+#      派发时放过草稿目录下的 result.md，腿照做必在交回时被拒。报告行里还有 <填 …> 占位的交 ⑬，这一判不看那一行。
 #      三方腿另要一行行首「报告：」（leg_report_line_verdict；LINE_START 起头，闭合了的围栏代码块里的不算）：没有就拒，句中写的「报告写进 …」「。报告：…」不顶这一行，
-#      出路是照骨架写「报告：research/prompts/<轮>-<模型>-output.md」（research/prompts/subagent-landing-audit-2026-10-22/b12-dispatch-followup.md 第 6 条：骨架落地之后三份攻方腿只在句中写）。
-#   ⑱ 派发提示常设要求的几行（records/2026-09-16-subagent拆分提案.md 第九十节 ⑤；清单 research/prompts/subagent-landing-audit-2026-10-22/b12-standing-requirements.md，各条判法在真派发提示上量过）：
-#      批次（batch_verdict，常设要求 A2）：行首「批次：」一行（闭合了的围栏代码块里的不算）的值要形如 records/<文件>.md#<批号>：批号不空、不是占位，写法不限数字（「#12」「#批6」「#第 3 批后半」都认），
+#      出路是照骨架写「报告：research/prompts/<轮>-<模型>-output.md」（research/prompts/subagent-landing-audit-2026-10-22/b12-dispatch-followup.md 第 6 条）。
+#   ⑱ 派发提示常设要求的几行（records/2026-09-16-subagent拆分提案.md 第九十节 ⑤；清单 research/prompts/subagent-landing-audit-2026-10-22/b12-standing-requirements.md）：
+#      批次（batch_verdict，常设要求 A2）：行首「批次：」一行（闭合了的围栏代码块里的不算）的值要形如 records/<文件>.md#<批号>：批号不空、不是占位，写法不限数字（「#12」「#批6」「#第 3 批后半」都认）， history-kept: 批号写法的例子，是数据
 #      批号后面接句号、逗号、括注与别的话的照认；文件在本仓仓根或 git worktree 登记的哪一棵工作树里（lib_three_way_legs.py 的 registered_trees），路径里不许有 ..；
 #      写了几行的每一行都判，几行都要对；派 BATCH_LINE_AGENTS（implementation-writer、investigator、tooling-writer、experiment-runner、mutation-triage、three-way-attack、clerk、
 #      three-way-forward、three-way-defense、experiment-designer 十种）没有这一行也拒，别的类型写了才判；值是 <填 …> 占位的交 ⑬。
@@ -170,9 +170,9 @@
 #      前面点名别的会话或别的子 agent 的（别的会话的执行员会跑……）不算；动词与阶段名之间除了内存包装、capped.sh、two-logs.sh、run-build-directory.sh、gpu-quiesce-run.sh
 #      没有别的脚本、没有 --item（stage-selftest.sh 喂样本那一种）。参数（反引号里的到反引号为止，不在的到句末）里的 --check、--list、--write 这几样，
 #      没写 --check 而写了小写连字符格名的当 --check 那几格，参数是什么都拒：命名检查 code-source-discipline.sh 只点名 vague-names、test-file-names、ordinal-names、data-names
-#      那几格、--list、--list-items、--write、带 --item 的、广谱变异只点名 gate-verdict 同样拒（用户 2026-11-01 定子 agent 一律不往统一任务服务交任务，
+#      那几格、--list、--list-items、--write、带 --item 的、广谱变异只点名 gate-verdict 同样拒（子 agent 一律不往统一任务服务交任务，
 #      records/2026-10-29-subagent拆分提案.md 第一百七十四节；这几样写进报告「要主 agent 跑的命令」一节交回）。登记为 light 的自证不在 .claude/gate.d/ 这一层
-#      （.claude/gate.d/lib/ 与 lib- 起头的不算阶段），不判，另由 ㉒ 判。弄坏开关 gate-stage-light-allowed 下退回改前：交 .claude/hooks/lib_project_code_runs.py 的 classify_gate_stage，
+#      （.claude/gate.d/lib/ 与 lib- 起头的不算阶段），不判，另由 ㉒ 判。弄坏开关 gate-stage-light-allowed 下：交 .claude/hooks/lib_project_code_runs.py 的 classify_gate_stage，
 #      交 None 的放行，读不到 lib_project_code_runs.py 时这一条不判，stderr 写一句，照「放行但必记检出」追加一行检出。认不出的：不写跑 / 执行 / 运行 / 起的说法（「核一下 doc-text 那一格」）、
 #      不写阶段文件名的（「门禁 code-tooling 的 xx 格」）。
 #   ㉒ 叫子 agent 自己交任务（task_submission_sentences）：派给子 agent 的提示正文里有一句许可或要求它往统一任务服务交任务——点到 task-server/task 的
@@ -180,7 +180,7 @@
 #      认法：逐行（闭合了的围栏块里的、「」『』“”引着的不判；交回节的名字「要主 agent 跑的命令」先摘掉引号再认），
 #      按 。；;！？ 切句（反引号里的不切）；提到主 agent 的句子、有交回说法（写进报告、写进交回、要主 agent 跑的命令，TASK_SUBMISSION_HAND_BACK）的句子不判
 #      （「写进报告「要主 agent 跑的命令」一节、由主 agent 交」「拼成提交整条、写进报告的交回节」都是交回的写法）；那一处前面同一子句里八个字以内有否定（不、没、别、勿、禁止、严禁、一律不）、
-#      后面同一子句里有不起 / 不交 / 都不这类的不算；只读的 task-server/task status、log 不算。用户 2026-11-01 定子 agent 一律不往统一任务服务交任务
+#      后面同一子句里有不起 / 不交 / 都不这类的不算；只读的 task-server/task status、log 不算。子 agent 一律不往统一任务服务交任务
 #      （records/2026-10-29-subagent拆分提案.md 第一百七十四节）；执行那一刻 project-code-guard.sh 的 ② 与 bash-command-detector.sh 的 ⑩ 照拒。
 #      认不出的：不点这几个词的说法（「自证你自己核一遍」）；同一句里有交回说法、又叫子 agent 自己交的（「自己交、结果写进报告」）当交回放过。
 #      弄坏开关 task-submission-unchecked 下一句都不判，hand-back-sentences-judged 下有交回说法、没写主 agent 的句子照判。
@@ -213,18 +213,18 @@
 #       「快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒 应当返回 2，实际 0」；「快照:出处没带〔〕原话，照拒 应当返回 2，实际 0」；「快照:那一行没有这一轮的名字（引无关的一句），照拒 应当返回 2，实际 0」；「快照:那一行是别的轮的叫停原话，照拒 应当返回 2，实际 0」；「快照:原话不到 6 个字，照拒 应当返回 2，实际 0」；「快照:那一行没有「」括的原话，照拒 应当返回 2，实际 0」
 #       「快照:那一行的名字是更长的另一轮名（前后连着轮名字符），照拒 应当返回 2，实际 0」；「快照:出处点名的文件不在，照拒 应当返回 2，实际 0」；「快照:出处指这一轮自己的正文，照拒 应当返回 2，实际 0」；「快照:出处指这一轮自己的 halted 文件，照拒 应当返回 2，实际 0」；「快照:出处指规则文件，照拒 应当返回 2，实际 0」；「快照:出处路径里有 ..（解到仓内别处），照拒 应当返回 2，实际 0」；「快照:出处用 .. 指到仓外，照拒 应当返回 2，实际 0」
 #       「快照:出处是 records/ 下指到仓外的符号链接，照拒 应当返回 2，实际 0」；「快照:出处从 research/ 起头 .. 到仓外，照拒 应当返回 2，实际 0」；「快照:登记行不是四列（门禁也判红），不收 应当返回 2，实际 0」；「快照:只写 halted 文件、没登记，照拒（这一支已撤） 应当返回 2，实际 0」；「快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒 应当返回 2，实际 0」；「快照:出处那一行同时写着登记表里别的轮名，照拒 应当返回 2，实际 0」
-#       「快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒 应当返回 2，实际 0」；「快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒 应当返回 2，实际 0」；「快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收 应当返回 2，实际 0」；「快照:同一轮登记两行（两行出处都合格，门禁也判红），不收 应当返回 2，实际 0」；「快照:出处没写，2026-10-12 的行照拒（门禁同样判红） 应当返回 2，实际 0」
-#       「快照:出处没写，2026-10-11 的行也照拒（不按日期免；门禁同样判红） 应当返回 2，实际 0」；「快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处） 应当返回 True，实际 False」；「快照:拒绝说明的出路改道登记表、不再写 halted 应当返回 True，实际 False」；「快照:halted 文件还在时拒绝说明提醒这一支已撤、改道登记表 应当返回 True，实际 False」
+#       「快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒 应当返回 2，实际 0」；「快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒 应当返回 2，实际 0」；「快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收 应当返回 2，实际 0」；「快照:同一轮登记两行（两行出处都合格，门禁也判红），不收 应当返回 2，实际 0」；「快照:出处没写，2026-10-12 的行照拒（门禁同样判红） 应当返回 2，实际 0」 history-kept: 引的是自证用例标签原文，按原文匹配
+#       「快照:出处没写，2026-10-11 的行也照拒（不按日期免；门禁同样判红） 应当返回 2，实际 0」；「快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处） 应当返回 True，实际 False」；「快照:拒绝说明的出路改道登记表、不再写 halted 应当返回 True，实际 False」；「快照:halted 文件还在时拒绝说明提醒这一支已撤、改道登记表 应当返回 True，实际 False」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「快照:写坏的登记行在说明里点名第几行 应当返回 True，实际 False」；「快照:原话找不到、命中两次、没带原话的拒绝说明写了原因 应当返回 True，实际 False」；「快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上 应当返回 True，实际 False」；「快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因 应当返回 True，实际 False」
 #       「报告名:报告：一行写 report.md 拒 应当返回 2，实际 0」；「报告名:名字里带 report 的别的文件也拒 应当返回 2，实际 0」；「报告名:大写也拒（不分大小写） 应当返回 2，实际 0」；「报告名:粗体与列表记号也认 应当返回 2，实际 0」；「报告名:反引号包着的路径也认 应当返回 2，实际 0」；「报告名:一行写几个路径，有一个带 report 就拒 应当返回 2，实际 0」；「报告名:代码块之后行首的那一行照判 应当返回 2，实际 0」
 #       「报告名:「报告路径：」一行写 report.md 也拒 应当返回 2，实际 0」；「报告名:「报告写进」后面写 report.md 也拒 应当返回 2，实际 0」；「报告名:「报告写到」后面写 report.md 也拒 应当返回 2，实际 0」；「报告名:句中逗号之后、落在本提示草稿目录下的「报告写到」照认 应当返回 2，实际 0」；「报告名:没写草稿目录一行时，裸文件名照判 应当返回 2，实际 0」；「报告名:草稿目录一行点名的不在工作根下时，裸文件名照判 应当返回 2，实际 0」
 #       「报告名:不带目录的裸文件名照判 应当返回 2，实际 0」；「报告名:「<草稿目录>/report.md」写法照判 应当返回 2，实际 0」；「报告名:三方腿报告行写的本腿报告路径 research/prompts/<名>-output.md 名字里带 report 照判 应当返回 2，实际 0」；「报告名:三方腿整份提示里本腿轮名下的报告路径名字里带 report 照判 应当返回 2，实际 0」；「报告名:三方腿的报告路径以 SUMMARY 开头照判 应当返回 2，实际 0」
 #       「报告名:句号之后的报告标签照认 应当返回 2，实际 0」；「报告名:编号列表记号之后的报告标签照认 应当返回 2，实际 0」；「草稿目录一行:「草稿目录在 <路径>」的提示照判裸文件名 应当返回 2，实际 0」；「报告名:草稿目录下以 SUMMARY 开头的 .md 拒 应当返回 2，实际 0」；「报告名:草稿目录下以 findings 开头的 .md 拒（小写） 应当返回 2，实际 0」；「报告名:草稿目录下以 Analysis 开头的 .md 拒（大小写混写） 应当返回 2，实际 0」
 #       「报告名:不带目录的裸文件名以 summary 开头的 .md 照判 应当返回 2，实际 0」；「报告名:以三个前缀开头的 .md 拒绝说明点名文件名、三个前缀与 result.md 的写法 应当返回 True，实际 False」；「报告名:拒绝说明点名文件名、规矩与 result.md 的写法 应当返回 True，实际 False」；「stdin:报告文件名带 report 拒绝（退出码 2） 应当返回 2，实际 0」
-#       「stdin:报告文件名拒绝的 stderr 写了 result.md 的写法与骨架 应当返回 1，实际 0」；「写范围:报告行里还有占位的交骨架占位那一条、写范围不判 应当返回 True，实际 False」；「三方报告:攻方腿报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方报告:正推腿报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方报告:草稿目录下的 result.md 写在逗号之后照拒 应当返回 2，实际 0」
+#       「stdin:报告文件名拒绝的 stderr 写了 result.md 的写法与骨架 应当返回 1，实际 0」；「写范围:报告行里还有占位的交骨架占位那一条、写范围不判 应当返回 True，实际 False」；「三方报告:攻方腿报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方报告:正推腿报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方报告:草稿目录下的 result.md 写在逗号之后照拒 应当返回 2，实际 0」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「三方报告:只在引号或反引号里出现的 -output.md 不算，拒 应当返回 2，实际 0」；「三方报告:禁读清单里另一条腿的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:禁读清单冒号后空着、往下列表项里另一条腿的 -output.md 也不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:标题「禁读」一节里的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」
 #       「三方报告:整份提示里只有别的轮的 -output.md（背景里的上一轮腿报告），拒 应当返回 2，实际 0」；「三方报告:轮名 x-r1 不认 x-r10 下的 -output.md，拒 应当返回 2，实际 0」；「三方报告:禁读清单里点到本腿自己的报告路径拒（landing-audit-r4 攻方提示头一版的写法） 应当返回 2，实际 0」；「三方报告:禁读清单里点到本腿自己的报告，写在反引号里也拒 应当返回 2，实际 0」
-#       「三方报告:跨行的「」引文里的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:辩方腿没写报告行拒 应当返回 2，实际 0」；「三方报告:报告行写别的仓内文件拒 应当返回 2，实际 0」；「三方报告:禁读清单点到本腿报告的拒绝说明点名那一份与改法 应当返回 True，实际 False」；「三方报告:拒绝说明给出形态与骨架 应当返回 True，实际 False」；「三方报告:报告行写没填的 <轮> 占位、整份提示没有别的 -output.md，拒 应当返回 2，实际 0」
+#       「三方报告:跨行的「」引文里的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:辩方腿没写报告行拒 应当返回 2，实际 0」；「三方报告:报告行写别的仓内文件拒 应当返回 2，实际 0」；「三方报告:禁读清单点到本腿报告的拒绝说明点名那一份与改法 应当返回 True，实际 False」；「三方报告:拒绝说明给出形态与骨架 应当返回 True，实际 False」；「三方报告:报告行写没填的 <轮> 占位、整份提示没有别的 -output.md，拒 应当返回 2，实际 0」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「三方报告:报告行写子目录下的 -output.md，拒 应当返回 2，实际 0」；「三方报告:整份提示里只在子目录下有 -output.md，拒 应当返回 2，实际 0」；「三方报告:整份提示里只有仓外同名的 …/research/prompts/…-output.md，拒 应当返回 2，实际 0」；「三方腿类型表:样本仓登记的 sample-leg 报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」
 #       「写者锁:建出的锁带会话号、提示 sha256 与随机串 应当返回 True，实际 False」；「写者锁:同一目录再派、持锁的还在跑拒 应当返回 2，实际 0」；「写者锁:拒绝说明点名持锁者、目录与已判行的写法 应当返回 True，实际 False」；「写者锁:拒绝之后锁没动 应当返回 True，实际 False」；「写者锁:接手之后锁换成新一次派发的 应当返回 True，实际 False」
 #       「写者锁:已判行接手之后锁换成新一次派发的 应当返回 True，实际 False」；「写者锁:没起来的持锁者 10 分钟内算在跑，再派拒 应当返回 2，实际 0」；「写者锁:--check-prompt 不建锁、写明派的那一刻另判 应当返回 (0, False, True)，实际 (0, False, False)」；「写者锁:锁不是 JSON，派发拒 应当返回 2，实际 0」；「写者锁:判不了的锁的拒绝点名那把锁、判不了与删掉再派的出路 应当返回 True，实际 False」
@@ -264,7 +264,7 @@
 #       「批次:每一行都要对 应当返回 2，实际」
 #       ；「门禁阶段:命名检查只点名那四格也拒（子 agent 不往服务交任务） 应当返回 2，实际 0」
 #       「门禁阶段:--list 只查清单也拒（子 agent 不往服务交任务） 应当返回 2，实际 0」；「交任务:正文叫子 agent 经 task-server/task submit 交自证拒 应当返回 2，实际 0」
-#       「交任务:正文许可子 agent 自己经统一任务服务交 harness 测试拒 应当返回 2，实际 0」；「交任务:骨架改前的「自证在哪跑」那一句拒 应当返回 2，实际 0」
+#       「交任务:正文许可子 agent 自己经统一任务服务交 harness 测试拒 应当返回 2，实际 0」；「交任务:骨架改前的「自证在哪跑」那一句拒 应当返回 2，实际 0」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「写者锁:同一事件上别的钩子拒了这次派发，改过提示的重派照放、锁换成重派的 应当返回 (0, 0, True)，实际」；「写者锁:上一次派发的回执已落进记录、子 agent 在跑，改过提示的派发照拒、锁不动 应当返回 (2, True)，实际」；「写者锁:上一次派发还没出结果（同一条消息里并行派的），改过提示的派发照拒、锁不动 应当返回 (2, True)，实际」；「写者锁:同一份提示先被拒、原样重派后还没出结果，改过提示的派发照拒、锁不动 应当返回 (2, True)，实际」；「工具员:上一次派发还没出结果（同一条消息里并行派的），改过提示、要改的文件一样的派发照拒 应当返回 (0, 2)，实际」
 #   RUNNER_DISPATCH_GUARD_BREAK=disable-snapshot  snapshot_conflict_verdict 一进来就放行，快照那一条不判（⑥）
 #       「快照:书记员撞开着的轮（清单写 ./.claude/） 应当返回 2，实际 0」；「快照:实现员撞开着的轮（清单写 tree/crates/） 应当返回 2，实际 0」；「快照:提示写项目根起的绝对路径、中文文件名 应当返回 2，实际 0」；「快照:清单写 defs/.claude/ 也归一 应当返回 2，实际 0」
@@ -303,8 +303,8 @@
 #       「快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒 应当返回 2，实际」
 #       「快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收 应当返回 2，实际」
 #       「快照:同一轮登记两行（两行出处都合格，门禁也判红），不收 应当返回 2，实际」
-#       「快照:出处没写，2026-10-12 的行照拒（门禁同样判红） 应当返回 2，实际」
-#       「快照:出处没写，2026-10-11 的行也照拒（不按日期免；门禁同样判红） 应当返回 2，实际」
+#       「快照:出处没写，2026-10-12 的行照拒（门禁同样判红） 应当返回 2，实际」 history-kept: 引的是自证用例标签原文，按原文匹配
+#       「快照:出处没写，2026-10-11 的行也照拒（不按日期免；门禁同样判红） 应当返回 2，实际」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处） 应当返回 True，实际」
 #       「快照:拒绝说明的出路改道登记表、不再写 halted 应当返回 True，实际」
 #       「快照:halted 文件还在时拒绝说明提醒这一支已撤、改道登记表 应当返回 True，实际」
@@ -319,23 +319,23 @@
 #       「准入:前提没齐的拒绝说明点名 admission.py 报的前提与放行行 应当返回 True，实际 False」
 #       「准入:判法跑不起来的拒绝说明出路是先让 admission.py 能跑，不是接准入 应当返回 [True, True, True, True]，实际 [False, False, False, False]」；「准入:判法报了没登记的拒绝说明出路是接准入，不写先让判法能跑 应当返回 True，实际 False」
 #       「准入:环境里设着已删的强制重跑变量时设计员派发被拒 应当返回 2，实际 0」；「准入:已删的强制重跑变量那一拒的出路是从环境里去掉它、要重跑先改输入 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=admission-unregistered-allowed  designer_admission_verdict 对 admission.py 退 2 一律照放（改前的样子，两种出路都不拒）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-unregistered-allowed  designer_admission_verdict 对 admission.py 退 2 一律照放（两种出路都不拒）
 #       「准入:准入登记里没有这个实验键不写重跑登记 应当返回 2，实际 0」；「准入:这个实验的准入登记有错不写重跑登记 应当返回 2，实际 0」
 #       「准入:判法跑不起来的拒绝说明出路是先让 admission.py 能跑，不是接准入 应当返回 [True, True, True, True]，实际 [False, False, False, False]」
 #       「准入:判法报了没登记的拒绝说明出路是接准入，不写先让判法能跑 应当返回 True，实际 False」
 #       「准入:环境里设着已删的强制重跑变量时设计员派发被拒 应当返回 2，实际 0」；「准入:已删的强制重跑变量那一拒的出路是从环境里去掉它、要重跑先改输入 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=admission-precondition-allowed  designer_admission_verdict 对 admission.py 退 3（前提没齐）照放（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-precondition-allowed  designer_admission_verdict 对 admission.py 退 3（前提没齐）照放
 #       「准入:前提没齐不写重跑登记 应当返回 2，实际 0」
 #       「准入:前提没齐的拒绝说明点名 admission.py 报的前提与放行行 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=admission-other-exit-silent  designer_admission_verdict 对 admission.py 退 0、2、3、77 之外的码照放、不记检出（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-other-exit-silent  designer_admission_verdict 对 admission.py 退 0、2、3、77 之外的码照放、不记检出
 #       「没判全:admission.py 退 0、2、3、77 之外的码记一处（admission） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=admission-unrunnable-allowed  designer_admission_verdict 对 admission.py 退 2 而输出不是它自己报「没登记」「登记有错」的句子（脚本不在、python 只打用法、什么都没打）放行并记检出（第一轮修补后的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-unrunnable-allowed  designer_admission_verdict 对 admission.py 退 2 而输出不是它自己报「没登记」「登记有错」的句子（脚本不在、python 只打用法、什么都没打）放行并记检出
 #       「准入:判法跑不起来的拒绝说明出路是先让 admission.py 能跑，不是接准入 应当返回 [True, True, True, True]，实际 [False, False, False, False]」
-#   RUNNER_DISPATCH_GUARD_BREAK=admission-unrunnable-one-way-out  designer_admission_verdict 对判法本身没跑起来的退 2 也只写接准入那一条出路（第一轮修补前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-unrunnable-one-way-out  designer_admission_verdict 对判法本身没跑起来的退 2 也只写接准入那一条出路
 #       「准入:判法跑不起来的拒绝说明出路是先让 admission.py 能跑，不是接准入 应当返回 [True, True, True, True]，实际 [False, False, False, False]」
-#   RUNNER_DISPATCH_GUARD_BREAK=admission-key-refused-silent  designer_admission_verdict 对 admission.py 退 0 而产物头写 sha256=refused（实验键拒算）放行、不记检出（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-key-refused-silent  designer_admission_verdict 对 admission.py 退 0 而产物头写 sha256=refused（实验键拒算）放行、不记检出
 #       「没判全:admission.py 退 0 而实验键拒算记一处（admission） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=admission-rerun-reason-cleared  designer_admission_verdict 起 admission.py 前从环境里清掉已删的 SINGLEFS_EXPERIMENT_RERUN_REASON（改前的样子：环境里设着它也不拒）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-rerun-reason-cleared  designer_admission_verdict 起 admission.py 前从环境里清掉已删的 SINGLEFS_EXPERIMENT_RERUN_REASON（环境里设着它也不拒）
 #       「准入:环境里设着已删的强制重跑变量时设计员派发被拒 应当返回 2，实际 0」；「准入:已删的强制重跑变量那一拒的出路是从环境里去掉它、要重跑先改输入 应当返回 True，实际 False」
 #   RUNNER_DISPATCH_GUARD_BREAK=admission-retired-variable-unrecognized  designer_admission_verdict 不认 admission.py 报已删变量的那一句，照「判法本身没跑起来」写出路
 #       「准入:已删的强制重跑变量那一拒的出路是从环境里去掉它、要重跑先改输入 应当返回 True，实际 False」
@@ -367,7 +367,7 @@
 #       「真提示样本:少一份时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['aa9ec3423c1f54bba.txt', 'a4737c6f3660f4f7e.txt', 'a28fe10b58d88beec.txt', 'a86c5c8fb8ec28789.txt', 'a0a2dfee322e26786.txt', 'a789e7091d91430aa.txt', 'a8afb2185cfa840cc.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #       「真提示样本:一份末尾多一个空格时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['aa9ec3423c1f54bba.txt', 'a4737c6f3660f4f7e.txt', 'a28fe10b58d88beec.txt', 'a86c5c8fb8ec28789.txt', 'a0a2dfee322e26786.txt', 'a789e7091d91430aa.txt', 'a8afb2185cfa840cc.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #       「报告名:以 SUMMARY 开头、扩展名写成大写 .MD 的照拒（工具层同样拒） 应当返回 2，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=report-line-labels-split  报告行退回改前各读一半：⑰ 只认行首「报告：」，④ 只认句中「报告路径 / 报告写进 / 报告写到」（改前的 SCOPE_MENTION），三方腿那一判也只读行首「报告：」
+#   RUNNER_DISPATCH_GUARD_BREAK=report-line-labels-split  报告行各读一半：⑰ 只认行首「报告：」，④ 只认句中「报告路径 / 报告写进 / 报告写到」（SCOPE_MENTION），三方腿那一判也只读行首「报告：」
 #       「写范围:「报告：」一行点名写范围外的路径也拒 应当返回 2，实际 0」；「报告名:「报告路径：」一行写 report.md 也拒 应当返回 2，实际 0」；「报告名:「报告写进」后面写 report.md 也拒 应当返回 2，实际 0」；「报告名:「报告写到」后面写 report.md 也拒 应当返回 2，实际 0」；「报告名:句中逗号之后、落在本提示草稿目录下的「报告写到」照认 应当返回 2，实际 0」；「报告名:没写草稿目录一行时，裸文件名照判 应当返回 2，实际 0」
 #       「报告名:草稿目录一行点名的不在工作根下时，裸文件名照判 应当返回 2，实际 0」；「报告名:不带目录的裸文件名照判 应当返回 2，实际 0」；「报告名:句号之后的报告标签照认 应当返回 2，实际 0」；「报告名:编号列表记号之后的报告标签照认 应当返回 2，实际 0」；「报告名:跨行的「」引文里的报告标签不认 应当返回 0，实际 2」；「草稿目录一行:「草稿目录在 <路径>」的提示照判裸文件名 应当返回 2，实际 0」；「报告名:不带目录的裸文件名以 summary 开头的 .md 照判 应当返回 2，实际 0」
 #       「三方报告:报告路径写成仓根下的绝对路径放行 应当返回 0，实际 2」；「三方报告:报告路径一行写在括注里的形态、后面接真路径放行 应当返回 0，实际 2」
@@ -375,8 +375,8 @@
 #       「真提示样本:一份末尾多一个空格时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['a0a2dfee322e26786.txt', 'a789e7091d91430aa.txt', 'a8afb2185cfa840cc.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #   RUNNER_DISPATCH_GUARD_BREAK=report-line-unanchored  ④ ⑰ 的报告行都退回句中也认、引号里的也认（标签前面只要不连着字：「」里引着的、逗号之后的都当报告行）（⑰ ④）
 #       「报告名:正文引号里的报告标签不认 应当返回 0，实际 2」；「报告名:跨行的「」引文里的报告标签不认 应当返回 0，实际 2」；「三方报告:正文引号里的「报告：」不当报告行 应当返回 0，实际 2」
-#       「真提示:a3652270eb80e4fd0-delivery-colon.txt（three-way-attack，「交付：报告 …-output.md」写法（第三轮判决 K2-3）） 应当返回 ('9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87', False, False)，实际 ('9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87', True, True)」
-#       「真提示:a3652270eb80e4fd0-section-colon.txt（three-way-attack，「照正文「交付」：报告写进 …-output.md」写法（第三轮判决 K2-3）） 应当返回 ('4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105', False, False)，实际 ('4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105', True, True)」
+#       「真提示:a3652270eb80e4fd0-delivery-colon.txt（three-way-attack，「交付：报告 …-output.md」写法（第三轮判决 K2-3）） 应当返回 ('9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87', False, False)，实际 ('9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87', True, True)」 history-kept: 引的是自证用例标签原文，按原文匹配
+#       「真提示:a3652270eb80e4fd0-section-colon.txt（three-way-attack，「照正文「交付」：报告写进 …-output.md」写法（第三轮判决 K2-3）） 应当返回 ('4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105', False, False)，实际 ('4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105', True, True)」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「真提示样本:少一份时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['a3652270eb80e4fd0.txt', 'a3652270eb80e4fd0-delivery-colon.txt', 'a3652270eb80e4fd0-section-colon.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #       「真提示样本:一份末尾多一个空格时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['a3652270eb80e4fd0.txt', 'a3652270eb80e4fd0-delivery-colon.txt', 'a3652270eb80e4fd0-section-colon.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #   RUNNER_DISPATCH_GUARD_BREAK=report-name-negation-judged  报告行正文里紧跟否定词的文件名也交文件名判（⑰）
@@ -387,8 +387,8 @@
 #       「三方报告:报告行之外不在引号里、本腿轮名下的 research/prompts/<名>-output.md 也认放行 应当返回 0，实际 2」；「三方报告:轮名取「轮名」标签，整份提示里本腿轮名下的 -output.md 认，放行 应当返回 0，实际 2」；「三方报告:转述别的草稿目录下的报告不当自己的报告行 应当返回 0，实际 2」；「三方报告:整份提示里写仓根起头的绝对路径，放行 应当返回 0，实际 2」
 #       「三方报告:报告行与整份提示两处形态都经 lib_three_way_legs.py 的 leg_report_mentions_in_trees 应当返回 (True, True, False)，实际 (True, False, False)」
 #       「三方报告:报告行、整份提示与交回闸 ② 三处对同一组写法判得一样 应当返回 ([True, True, True, True, False, False, False], [True, True, True, True, False, False, False], [True, True, True, True, False, False, False])，实际 ([True, True, True, True, False, False, False], [False, False, False, False, False, False, False], [True, True, True, True, False, False, False])」
-#       「真提示:a3652270eb80e4fd0-delivery-colon.txt（three-way-attack，「交付：报告 …-output.md」写法（第三轮判决 K2-3）） 应当返回 ('9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87', False, False)，实际 ('9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87', False, True)」
-#       「真提示:a3652270eb80e4fd0-section-colon.txt（three-way-attack，「照正文「交付」：报告写进 …-output.md」写法（第三轮判决 K2-3）） 应当返回 ('4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105', False, False)，实际 ('4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105', False, True)」
+#       「真提示:a3652270eb80e4fd0-delivery-colon.txt（three-way-attack，「交付：报告 …-output.md」写法（第三轮判决 K2-3）） 应当返回 ('9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87', False, False)，实际 ('9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87', False, True)」 history-kept: 引的是自证用例标签原文，按原文匹配
+#       「真提示:a3652270eb80e4fd0-section-colon.txt（three-way-attack，「照正文「交付」：报告写进 …-output.md」写法（第三轮判决 K2-3）） 应当返回 ('4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105', False, False)，实际 ('4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105', False, True)」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「真提示样本:少一份时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['a3652270eb80e4fd0-delivery-colon.txt', 'a3652270eb80e4fd0-section-colon.txt', 'aa9ec3423c1f54bba-own-result.txt', 'a4737c6f3660f4f7e-own-result.txt', 'a0a2dfee322e26786.txt', 'a789e7091d91430aa.txt', 'a8afb2185cfa840cc.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #       「真提示样本:一份末尾多一个空格时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['a3652270eb80e4fd0-delivery-colon.txt', 'a3652270eb80e4fd0-section-colon.txt', 'aa9ec3423c1f54bba-own-result.txt', 'a4737c6f3660f4f7e-own-result.txt', 'a0a2dfee322e26786.txt', 'a789e7091d91430aa.txt', 'a8afb2185cfa840cc.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #       「三方报告:整份提示里写 ${SINGLEFS_WORK_ROOT}/ 起头、展开后解到本仓一棵树的报告路径，放行 应当返回 True，实际」
@@ -402,32 +402,32 @@
 #   RUNNER_DISPATCH_GUARD_BREAK=leg-report-outside-root-kept  ⑰ 整份提示里那几处三方腿报告路径不看解不解到仓根下的 research/prompts/（直接用 lib_three_way_legs.py 的 LEG_REPORT_MENTION，仓外同名的也认）
 #       「三方报告:整份提示里只有仓外同名的 …/research/prompts/…-output.md，拒 应当返回 2，实际 0」；「三方报告:报告行与整份提示两处形态都经 lib_three_way_legs.py 的 leg_report_mentions_in_trees 应当返回 (True, True, False)，实际 (True, False, False)」
 #       「三方报告:报告行、整份提示与交回闸 ② 三处对同一组写法判得一样 应当返回 ([True, True, True, True, False, False, False], [True, True, True, True, False, False, False], [True, True, True, True, False, False, False])，实际 ([True, True, True, True, False, False, False], [True, True, True, True, False, False, True], [True, True, True, True, False, False, False])」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-line-root-only  ⑰ 报告行那一支退回改前：只去仓根前缀与 ./ 再调 lib_three_way_legs.py 的 is_leg_report_path，不经 leg_report_mentions_in_trees（不认工作树、~、$HOME、../ 写法）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-line-root-only  ⑰ 报告行那一支只去仓根前缀与 ./ 再调 lib_three_way_legs.py 的 is_leg_report_path，不经 leg_report_mentions_in_trees（不认工作树、~、$HOME、../ 写法）
 #       「三方报告:报告行与整份提示两处形态都经 lib_three_way_legs.py 的 leg_report_mentions_in_trees 应当返回 (True, True, False)，实际 (False, True, True)」
 #       「三方报告:报告行、整份提示与交回闸 ② 三处对同一组写法判得一样 应当返回 ([True, True, True, True, False, False, False], [True, True, True, True, False, False, False], [True, True, True, True, False, False, False])，实际 ([True, True, True, False, False, False, False], [True, True, True, True, False, False, False], [True, True, True, True, False, False, False])」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-forbidden-counted  ⑰ 禁读清单那几段当普通正文：里面另一条腿的 -output.md 当本腿的报告、里面的报告标签当报告行（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-forbidden-counted  ⑰ 禁读清单那几段当普通正文：里面另一条腿的 -output.md 当本腿的报告、里面的报告标签当报告行
 #       「三方报告:禁读清单里另一条腿的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:禁读清单冒号后空着、往下列表项里另一条腿的 -output.md 也不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:标题「禁读」一节里的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-any-round  ⑰ 整份提示那一支不看本腿轮名，哪一轮的 -output.md 都当本腿的报告（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-any-round  ⑰ 整份提示那一支不看本腿轮名，哪一轮的 -output.md 都当本腿的报告
 #       「三方报告:整份提示里只有别的轮的 -output.md（背景里的上一轮腿报告），拒 应当返回 2，实际 0」；「三方报告:轮名 x-r1 不认 x-r10 下的 -output.md，拒 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-forbidden-own-unchecked  ⑰ 不判禁读清单点到本腿自己的报告路径（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-forbidden-own-unchecked  ⑰ 不判禁读清单点到本腿自己的报告路径
 #       「三方报告:禁读清单里点到本腿自己的报告路径拒（landing-audit-r4 攻方提示头一版的写法） 应当返回 2，实际 0」；「三方报告:禁读清单里点到本腿自己的报告，写在反引号里也拒 应当返回 2，实际 0」；「三方报告:禁读清单点到本腿报告的拒绝说明点名那一份与改法 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-name-unchecked  ⑰ 文件名那一判不看三方腿本腿的报告路径（research/prompts/<名>-output.md 不在草稿目录下，改前不判）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-name-unchecked  ⑰ 文件名那一判不看三方腿本腿的报告路径（research/prompts/<名>-output.md 不在草稿目录下，不判）
 #       「报告名:三方腿报告行写的本腿报告路径 research/prompts/<名>-output.md 名字里带 report 照判 应当返回 2，实际 0」；「报告名:三方腿整份提示里本腿轮名下的报告路径名字里带 report 照判 应当返回 2，实际 0」；「报告名:三方腿的报告路径以 SUMMARY 开头照判 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-work-root-token-kept  ⑰ 三方腿报告路径前面的 $SINGLEFS_WORK_ROOT/ 不展开就交 lib_three_way_legs.py 认（改前的样子：工作根下工作树里的报告认不出）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-report-work-root-token-kept  ⑰ 三方腿报告路径前面的 $SINGLEFS_WORK_ROOT/ 不展开就交 lib_three_way_legs.py 认（工作根下工作树里的报告认不出）
 #       「三方报告:报告行写 $SINGLEFS_WORK_ROOT/ 起头、照 lib_work_root.py 展开后解到本仓一棵树的报告路径，放行 应当返回 True，实际 False」
 #       「三方报告:整份提示里写 ${SINGLEFS_WORK_ROOT}/ 起头、展开后解到本仓一棵树的报告路径，放行 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=quote-pairs-per-line  ⑰ quoted_spans 的「」『』“”退回按行配对（改前的样子：折到下一行的引文后半截不当引号里的）
+#   RUNNER_DISPATCH_GUARD_BREAK=quote-pairs-per-line  ⑰ quoted_spans 的「」『』“”按行配对（折到下一行的引文后半截不当引号里的）
 #       「报告名:跨行的「」引文里的报告标签不认 应当返回 0，实际 2」；「引号:「」照整份配对、可以跨行、配最近的那个开头，反引号按行配对 应当返回 [(5, 8), (10, 13), (14, 22)]，实际 [(5, 8), (10, 13)]」；「三方报告:跨行的「」引文里的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」
 #   LIB_PROMPT_SCRATCH_LINE_BREAK=label-anywhere（同目录 lib_prompt_scratch_line.py：「草稿目录」在一行里哪都认、冒号可有可无，第九批 ⑰ 的认法）  ⑯ ⑰ 把转述里的别处也当本提示的草稿目录
 #       「报告名:草稿目录只写在句中（没有行首「草稿目录：」一行），带目录的报告路径不判 应当返回 0，实际 2」；「草稿目录一行:转述里「，草稿目录 <别处>」下的 report.md 不判 应当返回 0，实际 2」；「草稿目录一行:列表里「- 草稿目录 <别处>」下的 report.md 不判 应当返回 0，实际 2」
-#       「真提示:a9717cf07fb6e7c21.txt（tooling-writer，草稿目录只写在句中、没有行首「草稿目录：」一行，只判裸文件名（第四轮判决 K2-4：认法收成骨架那一行，这一份不照骨架写，不再罩它）） 应当返回 ('a192f6e07576e2ba18bd4bcd70fd6c81c624793bc40524309537f0a0d9d3c466', False, False)，实际 ('a192f6e07576e2ba18bd4bcd70fd6c81c624793bc40524309537f0a0d9d3c466', True, False)」
+#       「真提示:a9717cf07fb6e7c21.txt（tooling-writer，草稿目录只写在句中、没有行首「草稿目录：」一行，只判裸文件名（第四轮判决 K2-4：认法收成骨架那一行，这一份不照骨架写，不再罩它）） 应当返回 ('a192f6e07576e2ba18bd4bcd70fd6c81c624793bc40524309537f0a0d9d3c466', False, False)，实际 ('a192f6e07576e2ba18bd4bcd70fd6c81c624793bc40524309537f0a0d9d3c466', True, False)」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「真提示样本:少一份时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['a9717cf07fb6e7c21.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #       「真提示样本:一份末尾多一个空格时只有那一份判红 应当返回 ['a75e9e30847f57bcd-forbidden-own.txt']，实际 ['a9717cf07fb6e7c21.txt', 'a75e9e30847f57bcd-forbidden-own.txt']」
 #       「草稿目录一行:「草稿目录在 <路径>」不是那一行，带目录的 report.md 不判 应当返回 0，实际」
 #   RUNNER_DISPATCH_GUARD_BREAK=three-way-report-unchecked  three_way_report_verdict 一进来就放行，三方腿的报告形态不判（⑰）
-#       「三方报告:攻方腿报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方报告:正推腿报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方报告:草稿目录下的 result.md 写在逗号之后照拒 应当返回 2，实际 0」；「三方报告:只在引号或反引号里出现的 -output.md 不算，拒 应当返回 2，实际 0」；「三方报告:禁读清单里另一条腿的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」
+#       「三方报告:攻方腿报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方报告:正推腿报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方报告:草稿目录下的 result.md 写在逗号之后照拒 应当返回 2，实际 0」；「三方报告:只在引号或反引号里出现的 -output.md 不算，拒 应当返回 2，实际 0」；「三方报告:禁读清单里另一条腿的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「三方报告:禁读清单冒号后空着、往下列表项里另一条腿的 -output.md 也不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:标题「禁读」一节里的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:整份提示里只有别的轮的 -output.md（背景里的上一轮腿报告），拒 应当返回 2，实际 0」；「三方报告:轮名 x-r1 不认 x-r10 下的 -output.md，拒 应当返回 2，实际 0」
-#       「三方报告:禁读清单里点到本腿自己的报告路径拒（landing-audit-r4 攻方提示头一版的写法） 应当返回 2，实际 0」；「三方报告:禁读清单里点到本腿自己的报告，写在反引号里也拒 应当返回 2，实际 0」；「三方报告:跨行的「」引文里的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:辩方腿没写报告行拒 应当返回 2，实际 0」；「三方报告:报告行写别的仓内文件拒 应当返回 2，实际 0」
+#       「三方报告:禁读清单里点到本腿自己的报告路径拒（landing-audit-r4 攻方提示头一版的写法） 应当返回 2，实际 0」；「三方报告:禁读清单里点到本腿自己的报告，写在反引号里也拒 应当返回 2，实际 0」；「三方报告:跨行的「」引文里的 -output.md 不当本腿的报告，拒 应当返回 2，实际 0」；「三方报告:辩方腿没写报告行拒 应当返回 2，实际 0」；「三方报告:报告行写别的仓内文件拒 应当返回 2，实际 0」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「三方报告:禁读清单点到本腿报告的拒绝说明点名那一份与改法 应当返回 True，实际 False」；「三方报告:拒绝说明给出形态与骨架 应当返回 True，实际 False」；「三方报告:报告行写没填的 <轮> 占位、整份提示没有别的 -output.md，拒 应当返回 2，实际 0」；「三方报告:报告行写子目录下的 -output.md，拒 应当返回 2，实际 0」；「三方报告:整份提示里只在子目录下有 -output.md，拒 应当返回 2，实际 0」
 #       「三方报告:整份提示里只有仓外同名的 …/research/prompts/…-output.md，拒 应当返回 2，实际 0」；「三方报告:报告行与整份提示两处形态都经 lib_three_way_legs.py 的 leg_report_mentions_in_trees 应当返回 (True, True, False)，实际 (True, True, True)」
 #       「三方报告:报告行、整份提示与交回闸 ② 三处对同一组写法判得一样 应当返回 ([True, True, True, True, False, False, False], [True, True, True, True, False, False, False], [True, True, True, True, False, False, False])，实际 ([True, True, True, True, True, True, True], [True, True, True, True, True, True, True], [True, True, True, True, False, False, False])」
@@ -448,9 +448,9 @@
 #       「报告名:三方腿的报告路径以 SUMMARY 开头照判 应当返回 2，实际 0」；「报告名:草稿目录下以 SUMMARY 开头的 .md 拒 应当返回 2，实际 0」；「报告名:草稿目录下以 findings 开头的 .md 拒（小写） 应当返回 2，实际 0」；「报告名:草稿目录下以 Analysis 开头的 .md 拒（大小写混写） 应当返回 2，实际 0」；「报告名:不带目录的裸文件名以 summary 开头的 .md 照判 应当返回 2，实际 0」
 #       「报告名:以三个前缀开头的 .md 拒绝说明点名文件名、三个前缀与 result.md 的写法 应当返回 True，实际 False」
 #       「报告名:以 SUMMARY 开头、扩展名写成大写 .MD 的照拒（工具层同样拒） 应当返回 2，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=report-name-prefix-extension-lowercase  ⑰ 三个前缀那一判的扩展名退回只认小写 .md（改前的样子：SUMMARY.MD 工具层拒而这里放）
+#   RUNNER_DISPATCH_GUARD_BREAK=report-name-prefix-extension-lowercase  ⑰ 三个前缀那一判的扩展名只认小写 .md（SUMMARY.MD 工具层拒而这里放）
 #       「报告名:以 SUMMARY 开头、扩展名写成大写 .MD 的照拒（工具层同样拒） 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-types-hardcoded  ⑰ 三方腿类型表不读定义 frontmatter 的 leg: three-way，退回改前写死的 three-way-forward、three-way-attack、three-way-defense（⑰）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-types-hardcoded  ⑰ 三方腿类型表不读定义 frontmatter 的 leg: three-way，写死 three-way-forward、three-way-attack、three-way-defense（⑰）
 #       「三方腿类型表:样本仓读到的类型与 frontmatter 逐个相同 应当返回 ['sample-leg', 'three-way-defense', 'three-way-forward']，实际 ['three-way-attack', 'three-way-defense', 'three-way-forward']」
 #       「三方腿类型表:样本仓登记的 sample-leg 报告写草稿目录下的 result.md 拒 应当返回 2，实际 0」；「三方腿类型表:样本仓没登记的攻方报告写草稿目录下的 result.md 不按三方腿判 应当返回 0，实际 2」
 #       「没判全:放行时几处没判全落进检出记录（读不到 lib_three_way_legs.py，结局只记） 应当返回 (0, 1, '只记', True)，实际」
@@ -515,7 +515,7 @@
 #   RUNNER_DISPATCH_GUARD_BREAK=snapshot-unreadable-unmarked  读不了的快照清单不分出来（lib_snapshot_conflicts.py 不往 unreadable 里交、照旧只记进 notes），不打放行但必记检出那几行、不记检出（⑥）
 #       「快照:清单是目录或没有读权限，结果里分得出读不了 应当返回 True，实际 False」；「stdin:快照清单读不了时 stderr 点名那一轮与那份清单、写明放行但必记检出 应当返回 1，实际 0」
 #       「stdin:快照清单读不了时检出记录多一行（结局只记） 应当返回 1，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-error-unrecorded  ⑥ 自己出错照常放行时不记检出，只在 stderr 写那一句（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-error-unrecorded  ⑥ 自己出错照常放行时不记检出，只在 stderr 写那一句
 #       「快照:自己出错照常放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 (0, 0, None, False)」
 #   RUNNER_DISPATCH_GUARD_BREAK=snapshot-valve-ignored  ruled_snapshot_conflicts 不认「快照冲突已判」放行行（⑥）
 #       「快照:有放行行，放行 应当返回 0，实际 2」
@@ -539,7 +539,7 @@
 #       「书记员:给判决不给规格放行（写回员自己起草） 应当返回 0，实际 2」
 #   RUNNER_DISPATCH_GUARD_BREAK=stop-at-first  judge_dispatch 只交第一条不成立的（退回逐条试、一次只报一样的旧样子）
 #       ；「输入:缺的输入写明按字面子串认、给照抄的一行 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=inputs-hint-dropped  ③ 的拒绝说明退回旧写法：不说按字面子串认哪几个字，不给照抄的一行
+#   RUNNER_DISPATCH_GUARD_BREAK=inputs-hint-dropped  ③ 的拒绝说明不说按字面子串认哪几个字，不给照抄的一行
 #       「输入:缺的输入写明按字面子串认、给照抄的一行 应当返回 True，实际 False」
 #   RUNNER_DISPATCH_GUARD_BREAK=check-mode-registers  --check-prompt 照派发那一刻判：读主会话记录、读写实现员登记、放行就登记
 #       「检查模式:--check-prompt 放行时不登记实现员、写明派的那一刻另判的两条 应当返回 (0, True, True)，实际 (0, False, False)」
@@ -557,8 +557,8 @@
 #       「快照:出处指这一轮自己的正文，照拒 应当返回 2，实际 0」；「快照:出处指这一轮自己的 halted 文件，照拒 应当返回 2，实际 0」；「快照:出处指规则文件，照拒 应当返回 2，实际 0」；「快照:出处路径里有 ..（解到仓内别处），照拒 应当返回 2，实际 0」；「快照:出处用 .. 指到仓外，照拒 应当返回 2，实际 0」
 #       「快照:出处是 records/ 下指到仓外的符号链接，照拒 应当返回 2，实际 0」；「快照:出处从 research/ 起头 .. 到仓外，照拒 应当返回 2，实际 0」；「快照:登记行不是四列（门禁也判红），不收 应当返回 2，实际 0」
 #       「快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒 应当返回 2，实际 0」；「快照:出处那一行同时写着登记表里别的轮名，照拒 应当返回 2，实际 0」；「快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒 应当返回 2，实际 0」
-#       「快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收 应当返回 2，实际 0」；「快照:同一轮登记两行（两行出处都合格，门禁也判红），不收 应当返回 2，实际 0」；「快照:出处没写，2026-10-12 的行照拒（门禁同样判红） 应当返回 2，实际 0」
-#       「快照:出处没写，2026-10-11 的行也照拒（不按日期免；门禁同样判红） 应当返回 2，实际 0」；「快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处） 应当返回 True，实际 False」
+#       「快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收 应当返回 2，实际 0」；「快照:同一轮登记两行（两行出处都合格，门禁也判红），不收 应当返回 2，实际 0」；「快照:出处没写，2026-10-12 的行照拒（门禁同样判红） 应当返回 2，实际 0」 history-kept: 引的是自证用例标签原文，按原文匹配
+#       「快照:出处没写，2026-10-11 的行也照拒（不按日期免；门禁同样判红） 应当返回 2，实际 0」；「快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处） 应当返回 True，实际 False」 history-kept: 引的是自证用例标签原文，按原文匹配
 #       「快照:原话找不到、命中两次、没带原话的拒绝说明写了原因 应当返回 True，实际 False」；「快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上 应当返回 True，实际 False」
 #       「快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒 应当返回 2，实际」
 #       「快照:写坏的登记行在说明里点名第几行 应当返回 True，实际」
@@ -592,24 +592,24 @@
 #       other-round-name-ok（出处那一行有别的轮名也收）：快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒；快照:出处那一行同时写着登记表里别的轮名，照拒；
 #           快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒、快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒（以上应当返回 2，实际 0）；
 #           快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）
-#       other-form-ignored（别的轮名只认仓里认得的全集，不认 <名>-r<数字> 形；改前的判法）：快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒（应当返回 2，实际 0）；
+#       other-form-ignored（别的轮名只认仓里认得的全集，不认 <名>-r<数字> 形）：快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒（应当返回 2，实际 0）；
 #           快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）；其余格不红（有材料的、登记表里的、不以 -r<数字> 结尾而仓里有材料的名字仍照拒）
 #       other-name-by-form（别的轮名退回只认 <名>-r<数字> 形与登记表里的名字）：快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒（应当返回 2，实际 0）；
 #           快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）；其余格不红（轮名形如 <名>-r<数字> 的那一格仍照拒）
-#       line-number-read（退回按行号读：取出处写的第 N 行判，〔〕原话不要求也不找；改前的判法）：快照:出处的行号对不上而〔〕原话恰好找到一次（行号只当提示），放行（应当返回 0，实际 2）；
+#       line-number-read（按行号读：取出处写的第 N 行判，〔〕原话不要求也不找）：快照:出处的行号对不上而〔〕原话恰好找到一次（行号只当提示），放行（应当返回 0，实际 2）；
 #           快照:〔〕里的原话在出处文件里命中两次，照拒（行号提示的第 26 行是另一句带这一轮名字与原话的补记）、快照:出处没带〔〕原话，照拒、
 #           快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒（以上应当返回 2，实际 0）
 #           快照:原话找不到、命中两次、没带原话的拒绝说明写了原因（应当返回 True，实际 False）；快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）；其余格不红（行号对得上的照旧判那一行）
 #       source-optional（出处一概不要求）：snapshot-abandoned-unchecked 条下点名的出处各格（登记行没有出处……出处从 research/ 起头 .. 到仓外）加快照:出处那一行同时写着别的轮的叫停原话、
-#           快照:出处那一行同时写着登记表里别的轮名、快照:出处没写，2026-10-12 的行照拒、快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒、快照:出处没写，2026-10-11 的行也照拒（以上应当返回 2，实际 0）；
+#           快照:出处那一行同时写着登记表里别的轮名、快照:出处没写，2026-10-12 的行照拒、快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒、快照:出处没写，2026-10-11 的行也照拒（以上应当返回 2，实际 0）； history-kept: 引的是自证用例标签原文，按原文匹配
 #           快照:不合格的拒绝说明写了没收的原因（应当返回 True，实际 False）；快照:原话找不到、命中两次、没带原话的拒绝说明写了原因（应当返回 True，实际 False）；快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）
-#       line-hint-ignored（不看行号提示：原话命中几处、或找不到，一律不收；改前的判法）：快照:〔〕里的原话命中两次而行号提示落在其中一处，取那一行，放行；
+#       line-hint-ignored（不看行号提示：原话命中几处、或找不到，一律不收）：快照:〔〕里的原话命中两次而行号提示落在其中一处，取那一行，放行；
 #           快照:〔〕是改名前的原话、行号提示那一行照改名表换了词，取那一行，放行；快照:〔〕带着记录里后来删掉的日期，取行号提示那一行，放行；
 #           快照:〔〕带着写在全角括号里、记录里后来连括号删掉的日期，取行号提示那一行，放行；快照:〔〕带着写在半角括号里、记录里后来连括号删掉的日期，取行号提示那一行，放行（以上应当返回 0，实际 2）；
 #           快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）；也红在门禁 abandoned-rounds 格的样本；其余格不红
-#       hint-line-unmatched（原话找不到时不比〔〕与提示那一行，提示那一行有这一轮的名字就取它；改前的判法）：快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒（应当返回 2，实际 0）
+#       hint-line-unmatched（原话找不到时不比〔〕与提示那一行，提示那一行有这一轮的名字就取它）：快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒（应当返回 2，实际 0）
 #           快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）；也红在门禁 abandoned-rounds 格的样本；其余格不红
-#       empty-parentheses-kept（比〔〕与提示那一行时，去掉日期、空白与逗号之后剩下的空括号「（）」「()」留着不去；改前的判法）：
+#       empty-parentheses-kept（比〔〕与提示那一行时，去掉日期、空白与逗号之后剩下的空括号「（）」「()」留着不去）：
 #           快照:〔〕带着写在全角括号里、记录里后来连括号删掉的日期，取行号提示那一行，放行、快照:〔〕带着写在半角括号里、记录里后来连括号删掉的日期，取行号提示那一行，放行
 #           （以上应当返回 0，实际 2）；也红在门禁 abandoned-rounds 格的样本（abandoned-rounds-source-date-parentheses-green）；其余格不红
 #   RUNNER_DISPATCH_GUARD_BREAK=code-fence-loose  认代码块退回更早的逐行认法：行首任意缩进（含制表符、4 格以上）的三个反引号就开块、后面接什么都不看（行首写在一行里的 ```…``` 也当开头）、不比两种认法（⑱ 批次一行）
@@ -617,16 +617,16 @@
 #       「批次:列表项里没闭合的围栏在列表项结束处结束，后面写坏的一行照判拒 应当返回 2，实际」；「批次:HTML 注释里的三个反引号不开块，后面写坏的一行照判拒 应当返回 2，实际」；「批次:波浪线代码块里的示例行不判放行 应当返回 0，实际」；「批次:引用块里的围栏里的示例行不判放行 应当返回 0，实际」
 #       「批次:引用块里开的围栏关的那一行漏 >，两种认法不一致拒 应当返回 2，实际」；「批次:开四个反引号关三个，两种认法不一致拒 应当返回 2，实际」；「批次:四个反引号套三个反引号的示例，两种认法不一致拒 应当返回 2，实际」；「批次:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整 应当返回 True，实际」
 #       「批次:载不进 markdown-it-py 时退回逐行认法，波浪线围栏里的示例行不判放行 应当返回 0，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=code-block-line-rule  认代码块退回改前的逐行认法（CODE_FENCE_OPEN）：只认反引号围栏，开头那一行至多缩进 3 个空格、语言名里不许有反引号，不认波浪线、列表项与引用块的边界、HTML 块，不比两种认法（⑱ 批次一行）
+#   RUNNER_DISPATCH_GUARD_BREAK=code-block-line-rule  认代码块用逐行认法（CODE_FENCE_OPEN）：只认反引号围栏，开头那一行至多缩进 3 个空格、语言名里不许有反引号，不认波浪线、列表项与引用块的边界、HTML 块，不比两种认法（⑱ 批次一行）
 #       「批次:波浪线块里露出一行三个反引号，块外写坏的一行照判拒 应当返回 2，实际」；「批次:列表项里没闭合的围栏在列表项结束处结束，后面写坏的一行照判拒 应当返回 2，实际」；「批次:HTML 注释里的三个反引号不开块，后面写坏的一行照判拒 应当返回 2，实际」；「批次:波浪线代码块里的示例行不判放行 应当返回 0，实际」
 #       「批次:嵌套列表里缩进 4 格的围栏里的示例行不判放行 应当返回 0，实际」；「批次:引用块里的围栏里的示例行不判放行 应当返回 0，实际」；「批次:引用块里开的围栏关的那一行漏 >，两种认法不一致拒 应当返回 2，实际」；「批次:关的那一行多缩进 4 格，两种认法不一致拒 应当返回 2，实际」
 #       「批次:开四个反引号关三个，两种认法不一致拒 应当返回 2，实际」；「批次:四个反引号套三个反引号的示例，两种认法不一致拒 应当返回 2，实际」；「批次:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整 应当返回 True，实际」；「批次:载不进 markdown-it-py 时退回逐行认法，波浪线围栏里的示例行不判放行 应当返回 0，实际」
 #   RUNNER_DISPATCH_GUARD_BREAK=code-block-library-missing  当作载不进 markdown-it-py：不比两种认法，退回宽的逐行认法遮（⑱ 批次一行，同一个函数 without_code_blocks）
 #       「批次:缩进 4 格的三反引号不开围栏，后面一行照判拒 应当返回 2，实际」；「批次:列表项里没闭合的围栏在列表项结束处结束，后面写坏的一行照判拒 应当返回 2，实际」；「批次:HTML 注释里的三个反引号不开块，后面写坏的一行照判拒 应当返回 2，实际」；「批次:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整 应当返回 True，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=code-block-ambiguity-unchecked  标签行不比两种认法，只照 CommonMark 认（⑱ 批次一行，code_block_ambiguous_label_lines；改前的判法）
+#   RUNNER_DISPATCH_GUARD_BREAK=code-block-ambiguity-unchecked  标签行不比两种认法，只照 CommonMark 认（⑱ 批次一行，code_block_ambiguous_label_lines）
 #       「批次:列表项里开的围栏关在顶格，两种认法不一致拒 应当返回 2，实际」；「批次:引用块里开的围栏关的那一行漏 >，两种认法不一致拒 应当返回 2，实际」；「批次:<details> 里有空行，两种认法不一致拒 应当返回 2，实际」；「批次:关的那一行多缩进 4 格，两种认法不一致拒 应当返回 2，实际」
 #       「批次:开四个反引号关三个，两种认法不一致拒 应当返回 2，实际」；「批次:四个反引号套三个反引号的示例，两种认法不一致拒 应当返回 2，实际」；「批次:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整 应当返回 True，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=code-block-fallback-unmasked  载不进 markdown-it-py 时一行都不遮，批次一行整份照判（⑱，without_code_blocks；改前的退路）
+#   RUNNER_DISPATCH_GUARD_BREAK=code-block-fallback-unmasked  载不进 markdown-it-py 时一行都不遮，批次一行整份照判（⑱，without_code_blocks）
 #       「批次:载不进 markdown-it-py 时退回逐行认法，闭合了的反引号围栏里的示例行不判放行 应当返回 0，实际」；「批次:载不进 markdown-it-py 时退回逐行认法，波浪线围栏里的示例行不判放行 应当返回 0，实际」
 #   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-unchecked  writer_lock_verdict 一进来就放行，不建锁也不判（⑯）
 #       「写者锁:建出的锁带会话号、提示 sha256 与随机串 应当返回 True，实际 False」；「写者锁:同一目录再派、持锁的还在跑拒 应当返回 2，实际 0」；「写者锁:拒绝说明点名持锁者、目录与已判行的写法 应当返回 True，实际 False」；「写者锁:拒绝之后锁没动 应当返回 True，实际 False」
@@ -656,14 +656,14 @@
 #       「写者锁:写了已判行接手 应当返回 0，实际 2」；「写者锁:已判行接手之后锁换成新一次派发的 应当返回 True，实际 False」
 #   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-root-locked  工作根本身也算草稿目录，在根里建锁（⑯；经钩子入口真派的那一格「草稿目录写成工作根本身」先被 ⑱ 草稿目录落点拒，不建锁，打开开关也不红）
 #       「草稿目录一行:⑰ 与 ⑯ 调的是 lib_prompt_scratch_line.py 的 scratch_directories 应当返回 (['/sentinel-from-library'], ['/sentinel-from-library'])，实际 (['/sentinel-from-library'], ['/sentinel-from-library', '/sentinel-root'])」
-#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-unreadable-absent  ⑯ 读锁退回 read_lock：判不了的锁当没锁（建锁撞上它报「抢先建了」，缺 prompt_sha256 而派发已久的直接接手；改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-unreadable-absent  ⑯ 读锁用 read_lock：判不了的锁当没锁（建锁撞上它报「抢先建了」，缺 prompt_sha256 而派发已久的直接接手）
 #       「写者锁:判不了的锁的拒绝点名那把锁、判不了与删掉再派的出路 应当返回 True，实际 False」；「写者锁:锁缺 prompt_sha256、派发已久，派发拒不接手 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-fence-ambiguity-unchecked  ⑯ 不比「草稿目录：」一行在两种围栏认法下遮不遮（改前的样子：没收尾的围栏遮住那一行时放行、不建锁）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-fence-ambiguity-unchecked  ⑯ 不比「草稿目录：」一行在两种围栏认法下遮不遮（没收尾的围栏遮住那一行时放行、不建锁）
 #       「写者锁:「草稿目录：」一行照 CommonMark 被没收尾的围栏遮住、照逐行配围栏不遮，拒 应当返回 2，实际 0」
 #       「写者锁:两种围栏认法不一致的拒绝说明逐行写两种认法、叫把围栏写规整 应当返回 True，实际 False」
 #       「写者锁:「草稿目录：」一行照逐行配围栏被缩进 4 格的围栏遮住、照 CommonMark 不遮，拒 应当返回 2，实际 0」
 #       「写者锁:--check-prompt 同样拒两种围栏认法不一致的「草稿目录：」一行 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=refused-dispatch-kept  ⑯ ⑤ 不认被同一事件上别的钩子拒掉的派发：那次派发的结果是错误结果也照旧按「没落进记录的 10 分钟内算在跑」留着锁与登记（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=refused-dispatch-kept  ⑯ ⑤ 不认被同一事件上别的钩子拒掉的派发：那次派发的结果是错误结果也照旧按「没落进记录的 10 分钟内算在跑」留着锁与登记
 #       「写者锁:同一事件上别的钩子拒了这次派发，改过提示的重派照放、锁换成重派的 应当返回 (0, 0, True)，实际」；「工具员:同一事件上别的钩子拒了这次派发，改过提示、要改的文件一样的重派照放 应当返回 (0, 0)，实际」
 #   RUNNER_DISPATCH_GUARD_BREAK=unclaimed-lock-always-retry  ⑯ 没认领的锁一律当重试接手，不看派发回执、也不看那次派发被拒没有（只要是同一个草稿目录，改过提示的派发也接手；放得太宽的样子）
 #       「写者锁:上一次派发的回执已落进记录、子 agent 在跑，改过提示的派发照拒、锁不动 应当返回 (2, True)，实际」；「写者锁:上一次派发还没出结果（同一条消息里并行派的），改过提示的派发照拒、锁不动 应当返回 (2, True)，实际」；「写者锁:同一份提示先被拒、原样重派后还没出结果，改过提示的派发照拒、锁不动 应当返回 (2, True)，实际」
@@ -674,10 +674,10 @@
 #       「写者锁:同一份提示先被拒、原样重派后还没出结果，改过提示的派发照拒、锁不动 应当返回 (2, True)，实际」
 #   RUNNER_DISPATCH_GUARD_BREAK=sibling-hooks-unconsulted  ⑯ ⑤ 放行之前不问同一事件上别的钩子（sibling_refusals 一律交空）：别的钩子会拒的派发照样建写者锁、登撞文件
 #       「同一事件上别的钩子:会拒这次派发，本闸放行、不建写者锁 应当返回 (0, False)，实际」；「同一事件上别的钩子:会拒的那一次没登撞文件，要改的文件一样的重派照放 应当返回 0，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=claim-purpose-judged  ① ㉒ ⑲ 认领行 --purpose 后面的用途文字也当句子判（without_claim_purpose 原样交回；改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=claim-purpose-judged  ① ㉒ ⑲ 认领行 --purpose 后面的用途文字也当句子判（without_claim_purpose 原样交回）
 #       「项目代码:认领行 --purpose 引号里写着复跑、自证、弄坏开关，不当叫子 agent 跑 应当返回 0，实际」；「项目代码:认领行 --purpose 没加引号、写到行尾也不判 应当返回 0，实际」
 #       「任务服务:认领行 --purpose 里写经 task-server/task submit 交自证，不当叫子 agent 交任务 应当返回 0，实际」；「门禁阶段:认领行 --purpose 里写跑门禁阶段，不当叫子 agent 起 应当返回 0，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=heavy-entry-start-unjudged  ① 三道重型入口、崩溃放量、广谱变异、形式化证明这些入口的名字，也要整个落进动词后面 RUN_OBJECT_DISTANCE 个字以内才算要跑的对象（改前的样子：
+#   RUNNER_DISPATCH_GUARD_BREAK=heavy-entry-start-unjudged  ① 三道重型入口、崩溃放量、广谱变异、形式化证明这些入口的名字，也要整个落进动词后面 RUN_OBJECT_DISTANCE 个字以内才算要跑的对象（
 #       路径长的写法，入口名的前几个字在距离里、末尾出了距离，认不出）
 #       「项目代码:正文要求跑崩溃点重放入口带 --item 拒 应当返回 2，实际 0」；「项目代码:正文要求跑形式化那一道带 --item 拒 应当返回 2，实际 0」
 #   LIB_WRITER_LOCK_BREAK 的开关在同目录 lib_writer_lock.py：这个钩子的写者锁那几格只走建锁、接手与读锁、用不到认锁，那些开关（claim-not-exclusive、holder-ignored、launch-ignored、
@@ -685,7 +685,7 @@
 #   broken-claim-absent）红在 write-guard.sh 的自检里。
 # 改法加的三格在下面这几个开关下也红：disable-check 下三格都红（一次列全那一格实得 (0, False)，检查模式那一格实得 (0, True, False)）；
 # disable-heavy-test、placeholders-ignored 下「一次列全」那一格红（实得 (2, False)）；inputs-ignored 下「一次列全」与「输入:缺的输入…」两格红。
-# 用户 2026-10-12 那一批加的 ⑥ 拒绝格（快照:… 登记表各「照拒」格）在 disable-check 下同样红（应当返回 2，实际 0）
+# ⑥ 拒绝格（快照:… 登记表各「照拒」格）在 disable-check 下同样红（应当返回 2，实际 0）
 # disable-snapshot 下 ⑥ 登记表各「照拒」格红；disable-heavy-test、placeholders-ignored、inputs-ignored 这三个开关下这一批的格不红（各判各的条）。
 # 认围栏照 CommonMark 加的拒绝格（批次:行首行内三反引号不开围栏…、批次:缩进 4 格的三反引号不开围栏…）在 disable-check 与 batch-unchecked 下同样红（应当返回 2，实际 0）。
 # 工作根的三个弄坏开关在同目录 lib_work_root.py（一次设一个；经 bash 起钩子的 stdin 那几项也带着）：
@@ -745,7 +745,7 @@
 #       「批次:十种类型没写批次一行拒 应当返回 2，实际 0」；「批次:闭合围栏里的批次一行不算 应当返回 2，实际 0」
 #   RUNNER_DISPATCH_GUARD_BREAK=batch-file-unchecked  批次一行点名的调度记录不核在不在（⑱）
 #       「批次:点名的调度记录不在拒 应当返回 2，实际 0」；「批次:别的类型写了批次一行照判点名的调度记录 应当返回 2，实际 0」；「批次:拒绝说明点名不在的调度记录、给照抄的一行 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=batch-label-digits-only  批号退回只认数字（收窄之前的写法，真提示里「#批6」「#第 3 批后半」这类都拒）（⑱）
+#   RUNNER_DISPATCH_GUARD_BREAK=batch-label-digits-only  批号只认数字（真提示里「#批6」「#第 3 批后半」这类都拒）（⑱） history-kept: 批号写法的例子，是数据
 #       「批次:批号写批名放行 应当返回 0，实际 2」；「批次:批号后面接句号与别的话放行 应当返回 0，实际 2」
 #   RUNNER_DISPATCH_GUARD_BREAK=retired-lines-refused  退回撤掉 ⑭ ⑮ 与 ⑱ 写死台数之前的一部分样子：提示里有撤掉的那几种标签行（线程上限、线程上限已判、预计挂钟、分片、续跑、多机、多机已判、分不了、复用；闭合了的围栏代码块里的不算），或正文写死本机与第二台成对的线程数，就拒
 #       「撤掉的行:线程上限一行写括注、公式、不等于登记值不拒 应当返回 0，实际」；「撤掉的行:多机一行写死台数与额度、多机已判没写理由、分不了不到 8 个字不拒 应当返回 0，实际」；「撤掉的行:正文写死本机与第二台各几线程、两台合计内存不拒 应当返回 0，实际」
@@ -756,17 +756,17 @@
 #       「落点说明:工作根不在 ~ 下时草稿目录与报告两处拒绝说明都写工作根的绝对路径 应当返回 True，实际 False」
 #   RUNNER_DISPATCH_GUARD_BREAK=scratch-line-legacy-root-accepted  草稿目录落点另认会话临时目录根（⑱）
 #       「草稿目录落点:落在会话临时目录根拒 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=scratch-line-root-written-under-home  ⑱ 草稿目录落点与报告落点的拒绝说明一律把工作根写成 ~/ 起头的相对写法（written_work_root；改前草稿目录落点那一处的样子：工作根不在 ~ 下时写成 ~/../…）
+#   RUNNER_DISPATCH_GUARD_BREAK=scratch-line-root-written-under-home  ⑱ 草稿目录落点与报告落点的拒绝说明一律把工作根写成 ~/ 起头的相对写法（written_work_root；工作根不在 ~ 下时写成 ~/../…）
 #       「落点说明:工作根不在 ~ 下时草稿目录与报告两处拒绝说明都写工作根的绝对路径 应当返回 True，实际 False」
 #   RUNNER_DISPATCH_GUARD_BREAK=selftest-location-unchecked  selftest_location_verdict 一进来就放行，自证在哪跑不判（⑱）
 #       「自证在哪跑:指到工作根下的仓副本拒 应当返回 2，实际 0」；「自证在哪跑:指到会话临时目录根拒 应当返回 2，实际 0」
 #   RUNNER_DISPATCH_GUARD_BREAK=leg-report-line-optional  三方腿没有行首「报告：」一行也放行（⑰）
 #       「三方报告:没有行首「报告：」一行、句中写报告写进拒 应当返回 2，实际 0」；「三方报告:「报告：」一行只在闭合围栏里拒 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=writer-collision-implementation-only  ⑤ 退回改前：只判实现员、只比实现员，工具员不登记也不比（⑤）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-collision-implementation-only  ⑤ 只判实现员、只比实现员，工具员不登记也不比（⑤）
 #       「工具员:两个工具员撞文件拒 应当返回 2，实际 0」；「工具员:一节「## 要改的文件」下的列表照认，撞了拒 应当返回 2，实际 0」；「工具员:目录罩住在跑工具员的文件也算撞 应当返回 2，实际 0」
 #       「工具员:工具员撞在跑的实现员拒 应当返回 2，实际 0」；「工具员:实现员撞在跑的工具员拒 应当返回 2，实际 0」
 #       「工具员:上一次派发还没出结果（同一条消息里并行派的），改过提示、要改的文件一样的派发照拒 应当返回 (0, 2)，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=runner-fork-page-continuation  ⑪ 续做退回改前的认法：实验页在就算续做，不分是哪一份登记（⑪）
+#   RUNNER_DISPATCH_GUARD_BREAK=runner-fork-page-continuation  ⑪ 续做这样认：实验页在就算续做，不分是哪一份登记（⑪）
 #       「新的重跑登记第一段只要岔路放行 应当返回 0，实际 2」
 #   RUNNER_DISPATCH_GUARD_BREAK=runner-rerun-segments-ignored  ⑪ 重跑的登记一律当第一段，不看实验页里有没有「第 n 次重跑」（⑪）
 #       「重跑登记已有过一段的算续做，没写还差拒 应当返回 2，实际 0」
@@ -782,57 +782,57 @@
 #   RUNNER_DISPATCH_GUARD_BREAK=gate-stage-unchecked  gate_stage_verdict 一进来就放行，门禁阶段不判（⑲）
 #       「门禁阶段:叫子 agent 跑 --check mutation-tables 单格拒（拆分提案第六十四节的原句） 应当返回 2，实际 0」；「门禁阶段:写全路径叫子 agent 跑一道拒 应当返回 2，实际 0」
 #       「门禁阶段:拒绝说明引那一句、点名格与判成哪一类、给否定句与交主 agent 的出路 应当返回 True，实际 False」
-#       「门禁阶段:命名检查只点名那四格也拒（子 agent 不往服务交任务） 应当返回 2，实际 0」；「门禁阶段:--list 只查清单也拒（子 agent 不往服务交任务） 应当返回 2，实际 0」（2026-11-01 改判的两格推的，没跑）
+#       「门禁阶段:命名检查只点名那四格也拒（子 agent 不往服务交任务） 应当返回 2，实际 0」；「门禁阶段:--list 只查清单也拒（子 agent 不往服务交任务） 应当返回 2，实际 0」
 #   RUNNER_DISPATCH_GUARD_BREAK=gate-stage-negation-judged  ⑲ 动词前面紧挨否定的也算叫子 agent 跑（⑲）
 #       「门禁阶段:否定句「不跑门禁阶段」放行 应当返回 0，实际 2」
 #   RUNNER_DISPATCH_GUARD_BREAK=task-submission-unchecked  task_submission_sentences 一句都不交，叫子 agent 交任务的句子不判（㉒）
 #       「交任务:正文叫子 agent 经 task-server/task submit 交自证拒 应当返回 2，实际 0」；「交任务:正文许可子 agent 自己经统一任务服务交 harness 测试拒 应当返回 2，实际 0」
-#       「交任务:骨架改前的「自证在哪跑」那一句拒 应当返回 2，实际 0」
+#       「交任务:骨架改前的「自证在哪跑」那一句拒 应当返回 2，实际 0」 history-kept: 引的是自证用例标签原文，按原文匹配
 #   RUNNER_DISPATCH_GUARD_BREAK=project-code-run-sentences-unjudged  project_code_run_sentences 一句都不交，叫子 agent 跑项目代码（cargo、本仓的脚本、门禁阶段、自证、样本档、弄坏开关）的句子不判（①）：红的格（推的）
 #       「项目代码:正文许可跑 cargo test -p singlefs-verification 拒 应当返回 2，实际 0」；「项目代码:正文要求跑崩溃点重放入口带 --item 拒 应当返回 2，实际 0」；「项目代码:正文叫它自己跑 --selftest 拒 应当返回 2，实际 0」
 #       「项目代码:正文许可编译 cargo build 拒 应当返回 2，实际 0」；「项目代码:正文直接写跑门禁阶段拒 应当返回 2，实际 0」；「项目代码:正文叫它执行样本档拒 应当返回 2，实际 0」
 #       「stdin:正文许可跑项目代码拒绝（退出码 2） 应当返回 2，实际 0」
-#   RUNNER_DISPATCH_GUARD_BREAK=hand-back-sentences-judged  task_submission_sentences 不认交回说法：有「写进报告」、带引号的「要主 agent 跑的命令」而引号外没写主 agent 的句子照判（改前的样子，㉒）
+#   RUNNER_DISPATCH_GUARD_BREAK=hand-back-sentences-judged  task_submission_sentences 不认交回说法：有「写进报告」、带引号的「要主 agent 跑的命令」而引号外没写主 agent 的句子照判（㉒）
 #       「交任务:只说拼成提交整条、写进报告的交回节、没写主 agent 不判 应当返回 0，实际 2」；「交任务:只说列进带引号的「要主 agent 跑的命令」一节、引号外没写主 agent 不判 应当返回 0，实际 2」
-#   RUNNER_DISPATCH_GUARD_BREAK=json-error-unrecorded  hook 的 JSON 解析不了时只打 stderr、不记检出（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=json-error-unrecorded  hook 的 JSON 解析不了时只打 stderr、不记检出
 #       「stdin:JSON 解析不了放行时检出记录多一行（结局只记） 应当返回 (0, 1, '只记', True)，实际 (0, 0, None, False)」
-#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-library-unrecorded  ⑯ 读不到 lib_writer_lock.py 放行时只打 stderr、不记检出（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-library-unrecorded  ⑯ 读不到 lib_writer_lock.py 放行时只打 stderr、不记检出
 #       「写者锁:读不到 lib_writer_lock.py 照常放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 (0, 0, None, False)」
-#   RUNNER_DISPATCH_GUARD_BREAK=scope-library-unrecorded  scope_patterns() 读不到 lib_write_scope.py 时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=scope-library-unrecorded  scope_patterns() 读不到 lib_write_scope.py 时只打 stderr、不记进没判全的几处
 #       「没判全:④ 读不到 lib_write_scope.py记一处（scope-library） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=scope-table-unrecorded  scope_patterns() 读不了写范围表时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=scope-table-unrecorded  scope_patterns() 读不了写范围表时只打 stderr、不记进没判全的几处
 #       「没判全:④ 写范围表读不了记一处（scope-table） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=transcript-unrecorded  session_dispatch_events() 读不了主会话记录时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=transcript-unrecorded  session_dispatch_events() 读不了主会话记录时只打 stderr、不记进没判全的几处
 #       「没判全:主会话记录读不了记一处（transcript） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=spec-check-unrecorded  kb_scribe_spec_verdict() 跑不了 kb-spec-check.py、它退别的码时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=spec-check-unrecorded  kb_scribe_spec_verdict() 跑不了 kb-spec-check.py、它退别的码时只打 stderr、不记进没判全的几处
 #       「没判全:kb-spec-check.py 跑不了记一处（spec-check） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=admission-unrecorded  designer_admission_verdict() 跑不了 admission.py、实验键拒算、退别的码时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-unrecorded  designer_admission_verdict() 跑不了 admission.py、实验键拒算、退别的码时只打 stderr、不记进没判全的几处
 #       「没判全:admission.py 跑不了记一处（admission） 应当返回 True，实际 False」；「没判全:admission.py 退 0 而实验键拒算记一处（admission） 应当返回 True，实际 False」
 #       「没判全:admission.py 退 0、2、3、77 之外的码记一处（admission） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-spec-unrecorded  specification_texts() 提示点名的规格读不了时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-spec-unrecorded  specification_texts() 提示点名的规格读不了时只打 stderr、不记进没判全的几处
 #       「没判全:⑥ 提示点名的规格读不了记一处（snapshot-spec） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=scratch-line-unrecorded  prompt_scratch_directories() 读不到 lib_prompt_scratch_line.py 或它抛异常时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=scratch-line-unrecorded  prompt_scratch_directories() 读不到 lib_prompt_scratch_line.py 或它抛异常时只打 stderr、不记进没判全的几处
 #       「没判全:⑯ ⑰ 读不到 lib_prompt_scratch_line.py记一处（scratch-line） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-types-unrecorded  three_way_report_types() 读不到 lib_three_way_legs.py 时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-types-unrecorded  three_way_report_types() 读不到 lib_three_way_legs.py 时只打 stderr、不记进没判全的几处
 #       「没判全:⑰ 读不到 lib_three_way_legs.py记一处（leg-types） 应当返回 True，实际 False」
 #       「没判全:放行时几处没判全落进检出记录（读不到 lib_three_way_legs.py，结局只记） 应当返回 (0, 1, '只记', True)，实际」
-#   RUNNER_DISPATCH_GUARD_BREAK=leg-definitions-unrecorded  three_way_report_types() 有定义读不了（三方腿类型表读不全）时只打 stderr、不记进没判全的几处（改前的样子：静默跳过那一份）
+#   RUNNER_DISPATCH_GUARD_BREAK=leg-definitions-unrecorded  three_way_report_types() 有定义读不了（三方腿类型表读不全）时只打 stderr、不记进没判全的几处（静默跳过那一份）
 #       「没判全:⑰ 有一份定义读不了记一处（leg-definitions） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=fence-compare-unrecorded  scratch_line_fence_ambiguity() 比两种围栏认法出错时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=fence-compare-unrecorded  scratch_line_fence_ambiguity() 比两种围栏认法出错时只打 stderr、不记进没判全的几处
 #       「没判全:⑯ 两种围栏认法比的时候出错记一处（fence-compare） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=lock-create-unrecorded  acquire_writer_locks() 建不了写者锁时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=lock-create-unrecorded  acquire_writer_locks() 建不了写者锁时只打 stderr、不记进没判全的几处
 #       「没判全:⑯ 建不了写者锁记一处（lock-create） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=scratch-root-unrecorded  scratch_line_root_verdict() 读不到库或认落点出错时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=scratch-root-unrecorded  scratch_line_root_verdict() 读不到库或认落点出错时只打 stderr、不记进没判全的几处
 #       「没判全:⑱ 认不出草稿目录落在哪记一处（scratch-root） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=experiment-page-unrecorded  registration_has_segment() 实验页读不了时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=experiment-page-unrecorded  registration_has_segment() 实验页读不了时只打 stderr、不记进没判全的几处
 #       「没判全:⑪ 实验页读不了记一处（experiment-page） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=registry-read-unrecorded  live_registry_rows() 登记在而读不了时只打 stderr、不记进没判全的几处（改前的样子：静默当没有登记）
+#   RUNNER_DISPATCH_GUARD_BREAK=registry-read-unrecorded  live_registry_rows() 登记在而读不了时只打 stderr、不记进没判全的几处（静默当没有登记）
 #       「没判全:⑤ 实现员与工具员的登记读不了记一处（registry-read） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=registry-write-unrecorded  rewrite_registry() 登记写不了时只打 stderr、不记进没判全的几处（改前的样子）
+#   RUNNER_DISPATCH_GUARD_BREAK=registry-write-unrecorded  rewrite_registry() 登记写不了时只打 stderr、不记进没判全的几处
 #       「没判全:⑤ 实现员与工具员的登记写不了记一处（registry-write） 应当返回 True，实际 False」
-#   RUNNER_DISPATCH_GUARD_BREAK=exception-unrecorded  judge_hook_input() 判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，放行、不记检出）
+#   RUNNER_DISPATCH_GUARD_BREAK=exception-unrecorded  judge_hook_input() 判的时候抛异常不接住、照原样抛出（进程退 1，放行、不记检出）
 #       「入口:判的时候抛异常照常放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 …」
-#   SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  写范围表的 $SINGLEFS_WORK_ROOT/ 另展开成会话临时目录根（撤掉之前的放行；④）
+#   SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  写范围表的 $SINGLEFS_WORK_ROOT/ 另展开成会话临时目录根（④）
 #       「写范围:登记了工作根的类型报告写进会话临时目录根拒 应当返回 2，实际 0」
 #   SINGLEFS_WORK_ROOT_BREAK=session-temporary-mentions-unseen  不挑提示里会话临时目录根下的路径（④⑥⑱）
 #       「写范围:没登记工作根的类型报告写进会话临时目录根拒 应当返回 2，实际 0」；「写范围:登记了工作根的类型报告写进会话临时目录根拒 应当返回 2，实际 0」；「快照:会话临时目录根下的规格文件里点名的照拒 应当返回 2，实际 0」
@@ -904,7 +904,7 @@ LINE_START = r"^[ \t>*_\-]*"
 # 提到主 agent 的子句、同一句里前面提到主 agent 的子句不算（那是主 agent 跑的）。子 agent 一律不跑项目代码，也不往统一任务服务交任务，写成「要主 agent 跑的命令」交回
 SENTENCE_QUOTED = re.compile(r"「[^「」\n]*」|『[^『』\n]*』|“[^“”\n]*”")
 # 认领行（work-directory-ownership.sh claim <目录> --purpose <用途>）里 --purpose 后面的用途是给人看的一句话（记这个目录归谁、做什么用），不是叫子 agent 去做什么：
-# ①、㉒、⑲ 三处逐行判句子之前先把它摘掉（加了引号的摘引号里的，没加引号的摘到行尾）。弄坏开关 claim-purpose-judged 下不摘（改前的样子）
+# ①、㉒、⑲ 三处逐行判句子之前先把它摘掉（加了引号的摘引号里的，没加引号的摘到行尾）。弄坏开关 claim-purpose-judged 下不摘
 CLAIM_PURPOSE = re.compile(r"(work-directory-ownership\.sh\s+claim\b[^\n]*?--purpose(?:\s+|=))(?:'[^'\n]*'|\"[^\"\n]*\"|[^\n]*)")
 
 def without_claim_purpose(line):
@@ -928,7 +928,7 @@ RUN_OBJECT = re.compile(r"cargo\s+(?:\+\S+\s+)?(?:test|t|run|r|bench|build|b|che
 RUN_OBJECT_DISTANCE = 40   # 动词后面这么多字以内找对象
 # 重型入口（agent-common.md「重型测试就是 验证包那一批」点名的入口脚本）的名字：这些入口整条命令比距离长（`bash scripts/crash/crash-point-replay.sh --item x`），
 # 名字起头在距离里就算要跑的对象，不要求整个落进去；别的对象仍要整个落在 RUN_OBJECT_DISTANCE 个字以内（放宽到所有对象，叙述里点名脚本的句子会大面积误拒）。
-# 名字后面接 : 的是文件:行号的引用，不算。弄坏开关 heavy-entry-start-unjudged 下不用这一条（改前的样子）
+# 名字后面接 : 的是文件:行号的引用，不算。弄坏开关 heavy-entry-start-unjudged 下不用这一条
 RUN_OBJECT_HEAVY = re.compile(r"(?<![\w.-])(?:crash-point-replay|crash-amplification(?:-item|-two-hosts)?|build-patched-qemu|qemu-device-streams|lkmm|crates-mutation-replay"
                               r"|formal-verification|broad-mutation|research-build-and-replay|model-differential-and-scenarios)\.sh(?![\w:-])"
                               r"|(?<![\w.-])(?:broad-mutation|verus-proof-check|e165-pin-red-examples)\.py(?![\w:-])")
@@ -943,7 +943,7 @@ TASK_SUBMISSION_NEGATION_AFTER = re.compile(r"^[^，,]*?(?:不起|不交|不跑|
 TASK_SUBMISSION_HAND_BACK = re.compile(r"写进(?:交回)?报告|写进交回|要主 agent 跑的命令")
 TASK_SUBMISSION_HAND_BACK_SECTION_QUOTED = re.compile(r"[「『“]要主 agent 跑的命令[」』”]")
 COMMON_CONSTRAINTS_READ = re.compile(r"开工先读[^\n]*\.claude/agent-common\.md")
-SUBAGENT_CONCURRENCY_LIMIT = 5              # 用户 2026-10-02 定（原话「一个主agent 最多同时开5个subagent」）
+SUBAGENT_CONCURRENCY_LIMIT = 5              # 一个主 agent 最多同时开 5 个 subagent
 RUNNING_RECENT_SECONDS = 3 * 3600
 UNLAUNCHED_GRACE_SECONDS = 600
 DISPATCH_TIME_SLACK_SECONDS = 2   # 主会话记录里派发的 tool_use 与派发闸放行、建锁、登记之间的时钟误差（与 lib_writer_lock.py 的 LAUNCH_SLACK_SECONDS 同值）
@@ -958,7 +958,7 @@ SCOPE_PATH_START = r"(?:" + SCRATCH_MENTION_PREFIX + r"|research/|\.claude/|crat
 SCOPE_PATH_HEAD = re.compile(SCOPE_PATH_START)
 # ④ 自己读的「写进 / 写到 / 更新」；报告行（「报告」「报告路径」「报告写进」「报告写到」）由 report_line_mentions 解析，与 ⑰ 共用一份
 SCOPE_MENTION = re.compile(r"(?:写进|写到|更新)[*\s]*[：:]?[*\s]*`?(?P<path>" + SCOPE_PATH_START + r"[^\s`'\"，。；：、（）()「」,;]*)")
-# 改前 ④ 自己读后三种报告标签的写法：只有弄坏开关 report-line-labels-split 下还在用
+# ④ 自己读后三种报告标签的写法：只有弄坏开关 report-line-labels-split 下才用
 SCOPE_MENTION_BEFORE_MERGE = re.compile(r"(?:报告路径|报告写进|报告写到|写进|写到|更新)[*\s]*[：:]?[*\s]*`?(?P<path>" + SCOPE_PATH_START + r"[^\s`'\"，。；：、（）()「」,;]*)")
 SCOPE_NEGATION = re.compile(r"不|别|禁止|勿")
 MUTATION_TABLE_MENTION = re.compile(r"scripts/mutation/tables/[^\s`'\"]+\.tsv|crates/mutations\.tsv")
@@ -1134,7 +1134,7 @@ def dispatch_refusal_lookup(transcript_path):
     派发闸放行之后才轮到挂在同一事件上的别的钩子（borrowed-convention-guard.sh 这类）：它拒了，这次派发没起来，派发闸留下的写者锁与撞文件登记没人用，
     提示改过的重派不该被它们挡 10 分钟。只放被拒掉的：回执已落进记录的（子 agent 在跑）、还没有结果的（同一条消息里并行派的上一件）、记录里找不到的都不放。
     记录到第一次要用时才读（登记里没有「派出去了没回执」的行、锁已有认领时不读）。
-    弄坏开关：refused-dispatch-kept 一律不放（改前的样子）；refused-dispatch-result-unchecked 记录里找得到这次派发就放，不看结果；
+    弄坏开关：refused-dispatch-kept 一律不放；refused-dispatch-result-unchecked 记录里找得到这次派发就放，不看结果；
     refused-dispatch-any-earlier 这份提示在这一刻之前只要有过一次被拒就放，不只看最后一次。"""
     loaded = []
 
@@ -1161,7 +1161,7 @@ def registry_path(hook_input):
 
 def live_registry_rows(hook_input, launches, ended):
     """登记里还在跑的那几行（顺手把结束了的、派发之后没出现的删掉）。→ [(时刻, 提示 sha256, [文件], 类型)]。
-    一行四列「时刻、提示 sha256、文件（空格分隔）、类型」；改前只登记实现员、一行三列，读到三列的当实现员。"""
+    一行四列「时刻、提示 sha256、文件（空格分隔）、类型」。"""
     path = registry_path(hook_input)
     try:
         rows = [line.rstrip("\n").split("\t") for line in open(path, encoding="utf-8") if line.strip()]
@@ -1234,14 +1234,14 @@ def paths_overlap(one, other):
 def writer_collision_verdict(hook_input, prompt, subagent_type, launches, ended, registry=True):
     """⑤ 实现员与工具员撞文件 → (拒绝说明或 None, 要登记的文件, 还在跑的登记行)。registry 为假（--check-prompt）时只判那一行，不读不写登记。
     实现员要有「要动的 crates 文件：…」一行；工具员的文件从「要改的文件」取（tooling_writer_files，认不出路径的不拒，登记一份空的）。
-    两种类型登记在同一份表里互比：实现员对实现员、工具员对工具员、实现员对工具员都算撞。弄坏开关 writer-collision-implementation-only 下退回改前：
+    两种类型登记在同一份表里互比：实现员对实现员、工具员对工具员、实现员对工具员都算撞。弄坏开关 writer-collision-implementation-only 下：
     只判实现员、只比实现员，工具员不登记也不比。"""
     if subagent_type == "implementation-writer":
         line = CRATES_FILES_LINE.search(prompt)
         if line is None:
             return ("✗ 派 implementation-writer 的提示里没有「要动的 crates 文件：…」一行。\n"
                     "→ 怎么办：把这一件要动的 crates/ 文件逐个写进这一行（路径从仓根起）；说不全要动哪些文件，这件活还没切小，先切。"), [], []
-        # crates/mutations.tsv 只追加、不算撞文件（主 agent 合补丁时按 mutations-append.tsv 并）；份数不设上限（用户 2026-09-27 定）。
+        # crates/mutations.tsv 只追加、不算撞文件（主 agent 合补丁时按 mutations-append.tsv 并）；份数不设上限。
         files = sorted(set(CRATES_PATH.findall(line.group(1))) - {"crates/mutations.tsv"})
     else:
         files = sorted(set(tooling_writer_files(prompt)) - {"crates/mutations.tsv"})
@@ -1412,7 +1412,7 @@ UNJUDGED_SITES = ("scope-library", "scope-table", "transcript", "spec-check", "a
 
 def note_unjudged(site, message, printed=True):
     """判不了而放行的一处：stderr 照原样写 message（printed 为假的那一处另有提醒写出来），记进 UNJUDGED_NOTES。
-    弄坏开关 RUNNER_DISPATCH_GUARD_BREAK=<site>-unrecorded 下只打 stderr、不记（改前的样子）。"""
+    弄坏开关 RUNNER_DISPATCH_GUARD_BREAK=<site>-unrecorded 下只打 stderr、不记。"""
     if printed:
         print(message, file=sys.stderr)
     if not break_switch_is(f"{site}-unrecorded"):
@@ -1505,12 +1505,12 @@ def snapshot_conflict_verdict(subagent_type, prompt, project_root, unreadable=No
         return 0, ("\n".join(notes) or None)
     return 2, snapshot_library.refusal_text(project_root, f"派 {subagent_type} 要改的文件", conflicts, notes, "再派", "在派发提示里单起一行写")
 
-CODE_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,})[^`]*$")   # 只有弄坏开关 code-block-line-rule 下还在用：改前逐行认的开头围栏行（至多缩进 3 个空格，三个及以上反引号，语言名里不许有反引号）
+CODE_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,})[^`]*$")   # 只有弄坏开关 code-block-line-rule 下才用：逐行认的开头围栏行（至多缩进 3 个空格，三个及以上反引号，语言名里不许有反引号）
 CODE_FENCE_OPEN_LOOSE = re.compile(r"^[ \t]*(`{3,})")   # 只有弄坏开关 code-fence-loose 下还在用：更早的行首任意缩进的三个反引号就开块，后面接什么都不看
 CODE_BLOCK_CLOSING_PREFIX = re.compile(r"^(?:[ \t]*>)*[ \t]*")   # 围栏块最后一行前面的引用块 > 与缩进（列表项的缩进也在里面），去掉之后才是关的那一行围栏字符
 
 def without_code_blocks_by_lines(prompt, loose):
-    """只有弄坏开关 code-block-line-rule、code-fence-loose 下还在用：改前逐行认围栏，只认反引号；开头那一行至多缩进 3 个空格、语言名里不许有反引号
+    """只有弄坏开关 code-block-line-rule、code-fence-loose 下才用：逐行认围栏，只认反引号；开头那一行至多缩进 3 个空格、语言名里不许有反引号
     （loose 时任意缩进的三个反引号就开块），往后找第一行同样多个反引号当关块（loose 时不限缩进），没找到的那一行照原样留着。不认波浪线、列表项与引用块的边界、HTML 块。"""
     fence_open = CODE_FENCE_OPEN_LOOSE if loose else CODE_FENCE_OPEN
     lines = prompt.split("\n")
@@ -1620,16 +1620,16 @@ def code_block_ambiguity_refusal(subagent_type, ambiguous, labels, rule=None, ho
 # 「报告路径 / 报告写进 / 报告写到」冒号可有可无；「报告」要接冒号，或接空白再接路径
 REPORT_LABEL = r"(?:报告(?:路径|写进|写到)[* \t]*[：:]?|报告[* \t]*[：:]|报告(?=[ \t]+`?(?:~|/|\$|research/|\.claude/|crates/|litmus/|records/)))"
 REPORT_LINE = re.compile(r"(?P<lead>^[ \t>*_\-]*(?:\d+[.)][ \t]+[ \t*_]*)?|(?<=[。！？；])[ \t*_]*)" + REPORT_LABEL + r"(?P<rest>[^\n]*)", re.M)
-# 前面不连着字的标签在哪都认：⑰ 用它再去掉引号里的；弄坏开关 report-line-unanchored 下 ④⑰ 都用它、引号里的也认（攻方 landing-audit-r2 K2-3：正文「」里引着的「报告：」被当成报告行）
+# 前面不连着字的标签在哪都认：⑰ 用它再去掉引号里的；弄坏开关 report-line-unanchored 下 ④⑰ 都用它、引号里的也认（正文「」里引着的「报告：」被当成报告行）
 REPORT_LINE_UNANCHORED = re.compile(r"(?<![^\W_])" + REPORT_LABEL + r"(?P<rest>[^\n]*)")
 # ⑰ 只判报告行里落在本提示「草稿目录：」一行点名的目录下的路径与不带目录的裸文件名；别的目录下的当转述别的子 agent 的报告，不判
-# （攻方 landing-audit-r3 K2-1、K2-2：按行首句首锚分不出自己的报告行与转述；用户 2026-10-23 定按草稿目录判）。弄坏开关 report-line-position-anchored 下退回改前：④ 的锚法、不看目录。
-# 那一行怎么认只在同目录 lib_prompt_scratch_line.py（与 ⑯、完工清理闸、交回闸 ⑥ 共用；判决 landing-audit-r4 K2-4、K3-2）
+# （按行首句首锚分不出自己的报告行与转述，所以按草稿目录判）。弄坏开关 report-line-position-anchored 下用 ④ 的锚法、不看目录。
+# 那一行怎么认只在同目录 lib_prompt_scratch_line.py（与 ⑯、完工清理闸、交回闸 ⑥ 共用）
 REPORT_SCRATCH_PLACEHOLDER = re.compile(r"<(?:填[ \t]*)?草稿目录[^>\n]*>(?:/|$)")   # 「<草稿目录>/report.md」这类写法：说的就是本提示的草稿目录
 QUOTE_PAIRS = {"「": "」", "『": "』", "“": "”"}
-# 报告行正文里紧跟在否定词后面的文件名（「（不要叫 report.md）」）不交文件名判（辩方 landing-audit-r2 K2-4）；弄坏开关 report-name-negation-judged 下也判
+# 报告行正文里紧跟在否定词后面的文件名（「（不要叫 report.md）」）不交文件名判；弄坏开关 report-name-negation-judged 下也判
 REPORT_NAME_NEGATION_BEFORE = re.compile(r"(?:不|别|勿|禁止)[^，,；;。（）()]{0,4}$")
-# 改前 ⑰ 只认的行首「报告：」：只有弄坏开关 report-line-labels-split 下还在用
+# ⑰ 只认的行首「报告：」：只有弄坏开关 report-line-labels-split 下才用
 REPORT_LINE_BEFORE_MERGE = re.compile(LINE_START + r"报告[* \t]*[：:][* \t]*(?P<rest>.*?)[ \t]*$", re.M)
 REPORT_NAME_TOKEN = re.compile(r"[^\s`'\"，。；：、（）()「」『』“”,;*]+")   # 报告行正文里的一段路径或词（尖括号不切开：「<轮>-sonnet-output.md」这类形态写法整段是一个词）
 REPORT_NAME_EXTENSION = re.compile(r"\.[A-Za-z0-9]+$")   # 带扩展名才算文件名（光一个 report 字不算）
@@ -1638,11 +1638,11 @@ REPORT_WORD_LOWERCASE, REPORT_WORD_ANY_CASE = re.compile("report"), re.compile("
 # 名字中间或末尾带的、不是 .md 的写得进去）。扩展名照工具层也不分大小写：.MD 工具层拒、这里照拒，.markdown 工具层放、这里照放
 # （实测 research/prompts/subagent-landing-audit-2026-10-22/b12-scratch-lib.md「6.1 工具层真调」）。弄坏开关 report-name-prefixes-unchecked 下不判这三个前缀
 REPORT_REFUSED_PREFIX_NAME = re.compile(r"(?i:summary|findings|analysis)[^/]*\.(?i:md)")
-REPORT_REFUSED_PREFIX_NAME_LOWERCASE_EXTENSION = re.compile(r"(?i:summary|findings|analysis)[^/]*\.md")   # 只有弄坏开关 report-name-prefix-extension-lowercase 下还在用：改前扩展名只认小写 .md
+REPORT_REFUSED_PREFIX_NAME_LOWERCASE_EXTENSION = re.compile(r"(?i:summary|findings|analysis)[^/]*\.md")   # 只有弄坏开关 report-name-prefix-extension-lowercase 下才用：扩展名只认小写 .md
 
 def report_name_refused_prefix(name):
     """名字（路径最后一段）以 SUMMARY、FINDINGS、ANALYSIS 开头（不分大小写）、扩展名是 .md（不分大小写）的：工具层的 Write 拒这种名字。
-    弄坏开关 report-name-prefixes-unchecked 下一概不判，report-name-prefix-extension-lowercase 下扩展名退回只认小写（改前的样子）。"""
+    弄坏开关 report-name-prefixes-unchecked 下一概不判，report-name-prefix-extension-lowercase 下扩展名只认小写。"""
     if break_switch_is("report-name-prefixes-unchecked"):
         return False
     pattern = REPORT_REFUSED_PREFIX_NAME_LOWERCASE_EXTENSION if break_switch_is("report-name-prefix-extension-lowercase") else REPORT_REFUSED_PREFIX_NAME
@@ -1654,7 +1654,7 @@ def report_token_is_file(token):
 
 def quoted_spans(text):
     """「」『』“”与反引号引着的区间 → [(起, 止)]。「」『』“”照整份配对、可以跨行（拆分提案第九十节 ㉟：一句引文折到下一行，后半截原来不当引号里的），
-    可以套，没配上的开头不算；反引号按行配对（一行里没配上的反引号不开引文）。弄坏开关 quote-pairs-per-line 下「」这类也按行配对（改前的样子）。"""
+    可以套，没配上的开头不算；反引号按行配对（一行里没配上的反引号不开引文）。弄坏开关 quote-pairs-per-line 下「」这类也按行配对。"""
     spans, offset, stack = [], 0, []
     per_line = break_switch_is("quote-pairs-per-line")
     for line in text.split("\n"):
@@ -1763,7 +1763,7 @@ def report_line_mentions(prompt, anywhere=False):
     "tokens": 正文里的每个词, "judged_tokens": 交文件名判的词（紧跟否定词的不算）, "placeholder": 正文里还有没有 <填 …> 占位,
     "before": 标签前面同一行里的记号（行首的 - * > 与编号；④ 看否定词，锚在行首句首之后这里不会有否定词）}]。
     anywhere 为假（④）标签只在行首句首认；为真（⑰）前面不连着字的在哪都认、引号与反引号里的不认（弄坏开关 report-line-position-anchored 下退回行首句首）。
-    闭合了的围栏代码块里的行不认（弄坏开关 report-name-codeblock-judged 下也认）；弄坏开关 report-line-labels-split 下退回改前 ⑰ 的行首「报告：」一种，
+    闭合了的围栏代码块里的行不认（弄坏开关 report-name-codeblock-judged 下也认）；弄坏开关 report-line-labels-split 下 ⑰ 只认行首「报告：」一种，
     report-line-unanchored 下 ④⑰ 都句中也认、引号里的也认，report-name-negation-judged 下紧跟否定词的文件名也交文件名判。"""
     judged = prompt if break_switch_is("report-name-codeblock-judged") else without_code_blocks(prompt)
     spans = []
@@ -1797,7 +1797,7 @@ def report_file_name_verdict(subagent_type, prompt, project_root=None):
     报告行怎么认在 report_line_mentions（与 ④ 共用，anywhere 为真）；只判 own_report_token 认的词。给了 project_root、类型是三方腿的，本腿的报告路径
     （leg_report_reading 的 own，research/prompts/<名>-output.md，不在草稿目录下）照判名字（拆分提案第九十节 ㉗）。弄坏开关 report-name-unchecked / report-name-case-sensitive / report-name-whole-path /
     report-name-codeblock-judged / report-line-labels-split / report-line-unanchored / report-name-negation-judged / report-line-position-anchored / report-name-prefixes-unchecked / report-name-prefix-extension-lowercase /
-    leg-report-name-unchecked（三方腿的报告路径不判名字，改前的样子）。"""
+    leg-report-name-unchecked（三方腿的报告路径不判名字）。"""
     if break_switch_is("report-name-unchecked"):
         return None
     word = REPORT_WORD_LOWERCASE if break_switch_is("report-name-case-sensitive") else REPORT_WORD_ANY_CASE
@@ -1834,11 +1834,11 @@ def report_file_name_verdict(subagent_type, prompt, project_root=None):
             "→ 怎么办：报告行改成草稿目录下的 result.md，例：「报告：~/.local/share/singlefs/work/<目录>/result.md」（三方腿照 research/prompts/<轮>-<模型>-output.md，<模型> 那一段写模型名、不带 report）；"
             "骨架（python3 scripts/agents/dispatch-prompt.py <类型>）默认就填这个名字；文件名里不带 report，目录名带不带都行。")
 
-THREE_WAY_REPORT_TYPES_BEFORE_REGISTRY = ("three-way-forward", "three-way-attack", "three-way-defense")   # 改前写死的那一份：只有弄坏开关 leg-types-hardcoded 下还在用
+THREE_WAY_REPORT_TYPES_BEFORE_REGISTRY = ("three-way-forward", "three-way-attack", "three-way-defense")   # 写死的那一份：只有弄坏开关 leg-types-hardcoded 下才用
 
 def three_way_report_types(project_root):
     """⑰ 要报告形态的三方腿类型：派发那一刻的仓根下定义 frontmatter 写了 leg: three-way 的（lib_three_way_legs.py 的 three_way_leg_types）。
-    读不到那份库交空集、stderr 写一句；弄坏开关 leg-types-hardcoded 下退回改前写死的三种。"""
+    读不到那份库交空集、stderr 写一句；弄坏开关 leg-types-hardcoded 下用写死的三种。"""
     if break_switch_is("leg-types-hardcoded"):
         return frozenset(THREE_WAY_REPORT_TYPES_BEFORE_REGISTRY)
     if three_way_legs is None:
@@ -1850,13 +1850,13 @@ def three_way_report_types(project_root):
     return three_way_legs.three_way_leg_types(project_root)
 
 # 三方腿报告路径的形态只在同目录 lib_three_way_legs.py 认：报告行那一支（leg_report_written_tree）、整份提示那一支（leg_report_mentions）与交回闸 ②
-# （leg_report_mentions_in_trees）都经那份库的 leg_report_mentions_in_trees 一个函数（判决 landing-audit-r4 K2-5，拆分提案第九十节 ㉗）：没填的占位（<轮>）、
-# 子目录下的、仓外副本里的都不认，仓根、./、工作树的绝对路径、~ 与 $HOME 起头的都认。改前报告行那一支认占位（下面这一份），只有弄坏开关 leg-report-placeholder-kept 下还在用
+# （leg_report_mentions_in_trees）都经那份库的 leg_report_mentions_in_trees 一个函数（拆分提案第九十节 ㉗）：没填的占位（<轮>）、
+# 子目录下的、仓外副本里的都不认，仓根、./、工作树的绝对路径、~ 与 $HOME 起头的都认。报告行那一支认占位（下面这一份），只有弄坏开关 leg-report-placeholder-kept 下才用
 THREE_WAY_REPORT_FORM_BEFORE_LIBRARY = re.compile(r"research/prompts/[^/\s`'\"]+-output\.md")
 
 def leg_report_path_verdict(named, project_root):
     """⑰ 报告行点名的这一个词整个是不是三方腿报告形态（lib_three_way_legs.py 的 leg_report_written_tree）。
-    弄坏开关 leg-report-placeholder-kept 下退回更早这里自己的一份（认 <轮> 占位）；leg-report-line-root-only 下退回改前只去仓根前缀与 ./ 再调 is_leg_report_path（不解工作树、~、$HOME、../）。"""
+    弄坏开关 leg-report-placeholder-kept 下用这里自己的一份（认 <轮> 占位）；leg-report-line-root-only 下只去仓根前缀与 ./ 再调 is_leg_report_path（不解工作树、~、$HOME、../）。"""
     if break_switch_is("leg-report-placeholder-kept") or break_switch_is("leg-report-line-root-only"):
         root_prefix = os.path.normpath(project_root) + "/"
         relative = named[len(root_prefix):] if named.startswith(root_prefix) else named[2:] if named.startswith("./") else named
@@ -1873,7 +1873,7 @@ def leg_report_name(written):
 def work_root_tokens_expanded(text):
     """⑰ 三方腿：文字里的 $SINGLEFS_WORK_ROOT/、${SINGLEFS_WORK_ROOT}/ 先换成展开后的工作根（同目录 lib_work_root.py 的 expand_written_path，与交回闸 ② 同一种解法），
     再交 lib_three_way_legs.py 认报告路径（那份库只展开 ~ 与 $HOME，带别的变量的前缀不认）：工作根下的本仓工作树里的报告这样才认得出。
-    读不到 lib_work_root.py、工作根的弄坏开关写错时原样交回；弄坏开关 leg-report-work-root-token-kept 下不换（改前的样子）。"""
+    读不到 lib_work_root.py、工作根的弄坏开关写错时原样交回；弄坏开关 leg-report-work-root-token-kept 下不换。"""
     if work_roots is None or break_switch_is("leg-report-work-root-token-kept"):
         return text
     variable = re.escape(work_roots.WORK_ROOT_VARIABLE)
@@ -2043,7 +2043,7 @@ def writer_lock_holder_state(scratch, lock, launches, ended, current_transcript,
 
 def writer_lock_verdict(hook_input, prompt, subagent_type, launches, ended, session_judged, unjudged, library_errors=None):
     """⑯ → (拒绝说明或 None, 放行后要办的 [(草稿目录, 旧锁或 None)])。--check-prompt（session_judged 为假）不读锁、不判，记进 unjudged。
-    读不到 lib_writer_lock.py 时不判、照常放行，照「放行但必记检出」往 library_errors 里记一句（弄坏开关 writer-lock-library-unrecorded 下不记，改前的样子）。"""
+    读不到 lib_writer_lock.py 时不判、照常放行，照「放行但必记检出」往 library_errors 里记一句（弄坏开关 writer-lock-library-unrecorded 下不记）。"""
     if break_switch_is("writer-lock-unchecked"):
         return None, []
     ambiguous = scratch_line_fence_ambiguity(prompt)
@@ -2064,7 +2064,7 @@ def writer_lock_verdict(hook_input, prompt, subagent_type, launches, ended, sess
     current_transcript = hook_input.get("transcript_path") or ""
     actions, conflicts, unreadable_locks = [], [], []
     for scratch in directories:
-        if break_switch_is("writer-lock-unreadable-absent"):   # 弄坏开关：改前的样子，判不了的锁当没锁（接着排他建锁撞上它，报「抢先建了」）
+        if break_switch_is("writer-lock-unreadable-absent"):   # 弄坏开关：判不了的锁当没锁（接着排他建锁撞上它，报「抢先建了」）
             lock = writer_lock.read_lock(scratch)
         else:
             state, lock = writer_lock.lock_state(scratch)   # 锁文件在而判不了的与写闸第九道同一口径：「锁在而判不了」
@@ -2355,7 +2355,7 @@ def gate_stage_runs(prompt, project_root, library_errors=None):
     提到主 agent 的句子不判；句子里点名 .claude/gate.d/ 这一层的阶段（写全路径的要指到 .claude/gate.d/，只写文件名的要在本提示仓根的 .claude/gate.d/ 里有这一份），
     它前面同一句里有跑 / 执行 / 运行 / 起（前面紧挨否定的不算），动词与阶段名之间除了内存包装、capped.sh 这几种包装没有别的脚本、没有 --item（stage-selftest.sh 喂样本那一种），
     就算叫子 agent 起它，参数照 gate_stage_arguments 取；参数是什么都算（命名检查那四格、--list、--list-items、--write、带 --item 的也算：
-    子 agent 一律不往统一任务服务交任务，用户 2026-11-01 定，records/2026-10-29-subagent拆分提案.md 第一百七十四节）。
+    子 agent 一律不往统一任务服务交任务，records/2026-10-29-subagent拆分提案.md 第一百七十四节）。
     弄坏开关 gate-stage-negation-judged 下前面紧挨否定的也算。"""
     stages = gate_stage_names(project_root)
     if not stages:
@@ -2459,7 +2459,7 @@ def registration_has_segment(project_root, number, rerun):
     """⑪ 这一份登记有没有过一段：原登记（e<号>-preregistration.md）看实验页在不在；第 n 次重跑的登记（e<号>-r<n>-prereg.md）看实验页（中文那一份）里
     有没有一行标题（两到六个井号）写着「第 n 次重跑」（n 写阿拉伯数字或中文数字都认，「第 n 次重跑未跑 / 没跑」不算；执行员跑完一段写进去：
     「### 第 7 次重跑（…）」「#### 第 3 次重跑第二段」「### 2026-10-20：…（第五次重跑…」、标题行状态里的「第 2 次重跑已跑」）。
-    弄坏开关 runner-fork-page-continuation 下退回改前：实验页在就算续做，不分是哪一份登记；runner-rerun-segments-ignored 下重跑的登记一律当第一段。"""
+    弄坏开关 runner-fork-page-continuation 下：实验页在就算续做，不分是哪一份登记；runner-rerun-segments-ignored 下重跑的登记一律当第一段。"""
     pages = glob.glob(os.path.join(project_root, ".claude", "kb", "experiments", f"{number}-*.md"))
     if not pages:
         return False
@@ -2536,7 +2536,7 @@ def decide(hook_input, project_root, hook_dir=None, take_locks=False, record_det
     """返回 (0, None 或给 stderr 的提醒) 放行；(2, 说明) 拒绝。各条都判完（judge_dispatch），不成立的几条一次列全，每条带自己的出路。
     take_locks：放行时真的在草稿目录里建写者锁（钩子入口传真，自检里直接调 decide 不建）。
     record_detections：放行而 ⑥ 有读不了的快照清单时往检出记录追加一行（lib_snapshot_conflicts.py 的 record_unreadable；钩子入口传真，自检里直接调 decide 不记）；
-    放行而 ⑥ 自己出错（或读不到它的共用模块）时同样追加一行（record_unjudged；弄坏开关 snapshot-error-unrecorded 下不记，改前的样子）；
+    放行而 ⑥ 自己出错（或读不到它的共用模块）时同样追加一行（record_unjudged；弄坏开关 snapshot-error-unrecorded 下不记）；
     放行而 ⑯ 读不到 lib_writer_lock.py 时也追加一行（各条的弄坏开关下那一条不往表里交）。"""
     unreadable, snapshot_errors, library_errors = [], [], []
     del UNJUDGED_NOTES[:]
@@ -2607,7 +2607,7 @@ def task_submission_sentences(prompt):
     统一任务服务或 task-server，run_in_background）而那一处前面同一子句里八个字以内没有否定、后面同一子句里没有不起 / 不交 / 一律不这类的，交那一句；
     提到主 agent 的句子、有交回说法（TASK_SUBMISSION_HAND_BACK：写进报告、写进交回、要主 agent 跑的命令）的句子不判
     （「写进报告「要主 agent 跑的命令」一节、由主 agent 交」「拼成提交整条、写进报告的交回节」都是交回的写法）。只读的 task-server/task status、log 不算。
-    弄坏开关 task-submission-unchecked 下一句都不交；hand-back-sentences-judged 下有交回说法、没写主 agent 的句子照判（改前的样子）。"""
+    弄坏开关 task-submission-unchecked 下一句都不交；hand-back-sentences-judged 下有交回说法、没写主 agent 的句子照判。"""
     if break_switch_is("task-submission-unchecked"):
         return []
     hits = []
@@ -2751,7 +2751,7 @@ def judge_dispatch(hook_input, project_root, hook_dir=None, check_only=False, ta
             refusals.append(("并发", concurrency_message))
     else:
         unjudged.append("⑦ 并发（派的那一刻按主会话记录判）")
-    if break_switch_is("retired-lines-refused"):   # 退回撤掉之前的一部分样子：撤掉的那几种标签行与成对写死的线程数照拒
+    if break_switch_is("retired-lines-refused"):   # 撤掉的那几种标签行与成对写死的线程数照拒
         judged = without_code_blocks(prompt)
         retired = [line.strip() for line in judged.split("\n") if RETIRED_LABEL_LINE.match(line)] + [found.group(0) for found in RETIRED_HOST_PAIR.finditer(judged)]
         if retired:
@@ -2819,8 +2819,8 @@ def write_batch_record(project_root):
         with open(path, "w", encoding="utf-8") as handle:
             handle.write("# 自检样本的调度记录\n")
 
-# ⑳ 自证读真提示（拆分提案第九十节 ⑳、㉘、㉜）：第三轮攻方模型目录里从会话记录取出的派发提示原样（加攻方照做法改出的几份），逐份只看报告类两种拒。
-# 那 14 份逐字节拷进钩子自己的样本目录（相对本钩子所在目录，判决 landing-audit-r5 K2-3a：研究目录下一次归档会删），目录里 sources.tsv 写来历与整份 sha256。
+# ⑳ 自证读真提示（拆分提案第九十节 ⑳、㉘、㉜）：从会话记录取出的派发提示原样（加照做法改出的几份），逐份只看报告类两种拒。
+# 那 14 份逐字节拷进钩子自己的样本目录（相对本钩子所在目录：研究目录下一次归档会删），目录里 sources.tsv 写来历与整份 sha256。
 # 另 7 份（拆分提案第九十节 ㉗、㉙）：landing-audit-r4、r5、r6 六份真腿提示从各自会话记录的首条提示原样取出，加 r4 攻方那一份改一处（禁读清单写成本腿自己的报告）。
 # 每行：文件名、整份的 sha256（与 sources.tsv 逐份相同；前 14 份另与 research/prompts/landing-audit-r3-opus-output.md 列的逐份相同；读到的对不上那一格判红）、类型、报告文件名拒不拒、三方腿报告路径拒不拒、依据。
 REAL_PROMPTS_DIRECTORY = os.path.join("fixtures", "runner-dispatch-guard", "real-prompts")
@@ -3129,7 +3129,7 @@ def selftest(hook_dir):
         cases.append(session_case("实现员:带 mutations.tsv 的一件登记下来", "implementation-writer", "要动的 crates 文件：crates/mutations.tsv crates/a/src/five.rs\n", 0, "registry"))
         cases.append(session_case("实现员:mutations.tsv 与在跑的重叠不算撞", "implementation-writer", "要动的 crates 文件：crates/mutations.tsv crates/a/src/six.rs\n", 0, "registry"))
         # ⑤ 推广到工具员（拆分提案第十九节 ②）：工具员「要改的文件」登记进同一份表，工具员对工具员、工具员对实现员都算撞；
-        # 开关 writer-collision-implementation-only（改前：只判实现员）下「两个工具员撞」「工具员撞在跑的实现员」「实现员撞在跑的工具员」三格红
+        # 开关 writer-collision-implementation-only（只判实现员）下「两个工具员撞」「工具员撞在跑的实现员」「实现员撞在跑的工具员」三格红
         write_session("tooling", [])
         cases.append(session_case("工具员:第一件登记下来", "tooling-writer", "要改的文件：.claude/hooks/sample-guard.sh、scripts/agents/sample.py\n", 0, "tooling"))
         cases.append(session_case("工具员:两个工具员撞文件拒", "tooling-writer", "要改的文件：scripts/agents/sample.py\n", 2, "tooling"))
@@ -3713,9 +3713,9 @@ def selftest(hook_dir):
                      "- 用户 r-ab-reworded 叫停：「原话改了字而行号那一行还有轮名」\n"                                        # 25  登记行〔〕里写「已叫停」，找不到；行号提示的这一行有这一轮的名字
                      "- 补记 r-ab-twice：「另一处提到这一轮的六个字以上」\n"                                                 # 26  r-ab-twice 的行号提示：带名字与原话、不含〔〕那几个字（line-number-read 下收）
                      "- 用户 r-ab-renamed 叫停：「新称样本那一轮先停掉吧」\n"                                                  # 27  登记行〔〕写改名前的「旧称样本」，样本改名表登记了旧称样本 → 新称样本
-                     "- 用户 r-ab-dated 叫停（用户说「删了日期之后的六个字以上」）\n"                                         # 28  登记行〔〕带着后来删掉的日期 2026-10-12
-                     "- 用户 r-ab-fullparen 叫停：「日期写在全角括号里后来连括号删掉」\n"                                      # 29  登记行〔〕写「r-ab-fullparen（2026-10-12）叫停」，记录里那一对括号连日期删了
-                     "- 用户 r-ab-halfparen 叫停：「日期写在半角括号里后来连括号删掉」\n")                                     # 30  同上，半角括号「(2026-10-12)」
+                     "- 用户 r-ab-dated 叫停（用户说「删了日期之后的六个字以上」）\n"                                         # 28  登记行〔〕带着后来删掉的日期 2026-10-12 history-kept: 测试输入里的日期是数据
+                     "- 用户 r-ab-fullparen 叫停：「日期写在全角括号里后来连括号删掉」\n"                                      # 29  登记行〔〕写「r-ab-fullparen（2026-10-12）叫停」，记录里那一对括号连日期删了 history-kept: 测试输入里的日期是数据
+                     "- 用户 r-ab-halfparen 叫停：「日期写在半角括号里后来连括号删掉」\n")                                     # 30  同上，半角括号「(2026-10-12)」 history-kept: 测试输入里的日期是数据
         write_sample(work, ".claude/kb/term-renames.md", "# 术语改名对照表（自检样本）\n\n<!-- term-renames:table -->\n| 旧 | 新 | 匹配 | 是什么 |\n|---|---|---|---|\n"
                      "| 旧称样本 | 新称样本 | 整串 | 自检样本：r-ab-renamed 的出处那一行登记之后照这一行改了名 |\n")
         os.symlink(os.path.join(outside_directory, "link-target.md"), os.path.join(work, "records", "ab-link.md"))
@@ -3819,7 +3819,7 @@ def selftest(hook_dir):
                       and abandoned_message_has("r-ab-baddate", "日期不是 YYYY-MM-DD：10月13日")
                       and abandoned_message_has("r-ab-dup", "登记了不止一行")))
         # ── ⑰ 报告行：四种标签的报告行正文里的文件名带 report（不分大小写）拒，result.md 放行；三方腿另判形态 ──
-        # 报告行点名的路径只在落在本提示草稿目录下时判（攻方 landing-audit-r3 K2-1、K2-2）：样本都带骨架那一行「草稿目录：」（这几格直接调 decide，不建写者锁；
+        # 报告行点名的路径只在落在本提示草稿目录下时判：样本都带骨架那一行「草稿目录：」（这几格直接调 decide，不建写者锁；
         # 走 stdin 的那一格另用不带草稿目录一行的提示，不在真工作根里建锁）
         report_scratch_line = f"草稿目录：{home_new_root}/w/\n"
         report_name_head = report_scratch_line + f"报告：{home_new_root}/w/"
@@ -3835,17 +3835,17 @@ def selftest(hook_dir):
             case("报告名:目录名带 report、文件名不带放行", "clerk", f"草稿目录：{home_new_root}/reports/\n报告：{home_new_root}/reports/result.md\n", 0),
             case("报告名:代码块里的示例行不判放行", "clerk", report_name_head + "result.md\n示例：\n```\n" + report_name_head + "report.md\n```\n", 0),
             case("报告名:只提到 report 这个词、不是文件名的放行", "clerk", report_name_head + "result.md，不要叫 report\n", 0),
-            # 四种标签共用一份报告行解析（攻方 landing-audit-r1 K2-4；开关 report-line-labels-split 下这四格红）
+            # 四种标签共用一份报告行解析（开关 report-line-labels-split 下这四格红）
             case("报告名:「报告路径：」一行写 report.md 也拒", "clerk", report_scratch_line + f"报告路径：{home_new_root}/w/report.md\n", 2),
             case("报告名:「报告写进」后面写 report.md 也拒", "clerk", report_scratch_line + f"报告写进 {home_new_root}/w/report.md\n", 2),
             case("报告名:「报告写到」后面写 report.md 也拒", "clerk", report_scratch_line + f"报告写到：{home_new_root}/w/report.md\n", 2),
             case("报告名:「交回报告：」这类前面连着字的不是报告行", "clerk", report_name_head + "result.md\n交回报告：不要写成 notes/report.md 这种名字\n", 0),
-            # 标签只在行首（列表记号、粗体、编号之后也算）或句首认（攻方 landing-audit-r2 K2-3；开关 report-line-unanchored 下引号与句中两格红）
+            # 标签只在行首（列表记号、粗体、编号之后也算）或句首认（开关 report-line-unanchored 下引号与句中两格红）
             case("报告名:正文引号里的报告标签不认", "clerk", report_name_head + "result.md\n"
                  f"另判一处：骨架「报告：」一行默认填 `<草稿目录>/report.md`。\n转述『报告路径：{home_new_root}/w/report.md』这一句。\n"
                  f"“报告写进 {home_new_root}/w/report.md”是旧写法。\n照 `报告：{home_new_root}/w/report.md` 那样写的会被拒。\n", 0),
-            # 按草稿目录判（攻方 landing-audit-r3 K2-1、K2-2、K2-3，用户 2026-10-23 定；开关 report-line-position-anchored 下逗号之后、转述、没草稿目录一行、交付写法几格红）
-            # 草稿目录写在句中、没有行首「草稿目录：」一行的（第三轮攻方那份不照骨架写的工具员提示）：本提示的草稿目录认不出，只判裸文件名（判决 landing-audit-r4 K2-4）
+            # 按草稿目录判（开关 report-line-position-anchored 下逗号之后、转述、没草稿目录一行、交付写法几格红）
+            # 草稿目录写在句中、没有行首「草稿目录：」一行的（不照骨架写的工具员提示）：本提示的草稿目录认不出，只判裸文件名
             case("报告名:草稿目录只写在句中（没有行首「草稿目录：」一行），带目录的报告路径不判", "clerk",
                  f"批次：x#1。回复用中文。草稿目录 `{home_new_root}/w/`（自己建，排他），报告 `{home_new_root}/w/report.md`，交回只写结论。\n", 0,
                  ignored=("批次",)),
@@ -3870,7 +3870,7 @@ def selftest(hook_dir):
                  "上一轮的报告 research/prompts/x-report-r1-opus-output.md 照读。\n", 0),
             case("报告名:句号之后的报告标签照认", "clerk", report_scratch_line + f"轮名：x-r1。报告：{home_new_root}/w/report.md。\n", 2),
             case("报告名:编号列表记号之后的报告标签照认", "clerk", report_scratch_line + f"1. **报告**：{home_new_root}/w/report.md\n", 2),
-            # 紧跟否定词的文件名不判（辩方 landing-audit-r2 K2-4；开关 report-name-negation-judged 下这一格红）
+            # 紧跟否定词的文件名不判（开关 report-name-negation-judged 下这一格红）
             case("报告名:报告行里否定词后面点名的 report.md 不判", "clerk", report_name_head + "result.md（不要叫 report.md）\n", 0),
             # 「」『』“”照整份配对，折到下一行的引文后半截照样算引号里的（拆分提案第九十节 ㉟；开关 quote-pairs-per-line 下这两格红）
             case("报告名:跨行的「」引文里的报告标签不认", "clerk", report_name_head + "result.md\n转述上一轮的提示「骨架改之前写的是\n"
@@ -3878,7 +3878,7 @@ def selftest(hook_dir):
             ("引号:「」照整份配对、可以跨行、配最近的那个开头，反引号按行配对", [(5, 8), (10, 13), (14, 22)], sorted(quoted_spans("a「b\nc『d』\ne`x`f「g\n`h\ni」"))),
             case("报告名:没写报告行不判", "clerk", "改完交回。\n", 0),
         ]
-        # 「本提示的草稿目录」只认行首「草稿目录：」一行（判决 landing-audit-r4 K2-4、K3-2；攻方探针 scratch_prompts.sh 的三份）：转述里的别处不当本提示的草稿目录，
+        # 「本提示的草稿目录」只认行首「草稿目录：」一行：转述里的别处不当本提示的草稿目录，
         # 「草稿目录在 <路径>」不是那一行、只判裸文件名。开关 LIB_PROMPT_SCRATCH_LINE_BREAK=label-anywhere 下转述那两格红
         relay_head = report_scratch_line + f"报告：{home_new_root}/w/result.md\n"
         cases += [
@@ -3948,7 +3948,7 @@ def selftest(hook_dir):
                                                     "报告：research/prompts/<填 轮>-runner-result.md\n这一段回答的岔路：岔路 1\n"}}, defs_work, hook_dir)
         cases.append(("写范围:报告行里还有占位的交骨架占位那一条、写范围不判", True,
                       placeholder_report[0] == 2 and "占位没填" in (placeholder_report[1] or "") and "写范围之外" not in (placeholder_report[1] or "")))
-        # ⑰ 三方腿的报告形态（攻方 landing-audit-r1 K3-1；开关 three-way-report-unchecked 下拒的几格红，report-line-labels-split 下括注那一格红）
+        # ⑰ 三方腿的报告形态（开关 three-way-report-unchecked 下拒的几格红，report-line-labels-split 下括注那一格红）
         cases += [
             case("三方报告:正推腿报告写 research/prompts/<轮>-<模型>-output.md 放行", "three-way-forward", "报告：research/prompts/x-r1-sonnet-output.md\n", 0),
             case("三方报告:攻方腿报告写 research/prompts/x-r1-opus-output.md 放行", "three-way-attack", "报告：research/prompts/x-r1-opus-output.md\n", 0),
@@ -3983,7 +3983,7 @@ def selftest(hook_dir):
                  "禁读清单：research/prompts/x-r1-sonnet-output.md\n报告：research/prompts/x-r1-opus-output.md\n", 0),
             ("三方报告:本腿轮名取背景材料一行与「轮名」标签，引号里的标签不算", ["x-r2", "y-r1"],
              leg_round_names("背景材料：research/prompts/_x-r2-background.md（正文 research/prompts/_x-r2-body.md）\n轮名：y-r1。\n「轮名：z-r9」是转述。\n")),
-            # 禁读清单里点到本腿自己的报告拒（拆分提案第九十节 ㉙，landing-audit-r4 攻方提示头一版；开关 leg-report-forbidden-own-unchecked 下这两格与说明那一格红）
+            # 禁读清单里点到本腿自己的报告拒（拆分提案第九十节 ㉙；开关 leg-report-forbidden-own-unchecked 下这两格与说明那一格红）
             case("三方报告:禁读清单里点到本腿自己的报告路径拒（landing-audit-r4 攻方提示头一版的写法）", "three-way-attack",
                  "背景材料：research/prompts/_x-r1-background.md\n禁读清单：research/prompts/x-r1-opus-output.md（同一轮的正推腿报告）\n报告：research/prompts/x-r1-opus-output.md\n", 2),
             case("三方报告:禁读清单里点到本腿自己的报告，写在反引号里也拒", "three-way-attack",
@@ -4013,19 +4013,19 @@ def selftest(hook_dir):
                       three_way_code == 2 and "research/prompts/<轮>-<模型>-output.md" in (three_way_message or "")
                       and f"「{home_new_root}/x-r1-opus/result.md」" in (three_way_message or "") and "dispatch-prompt.py three-way-attack" in (three_way_message or "")
                       and "handback-guard.sh" in (three_way_message or "") and "→ 怎么办" in (three_way_message or "")))
-        # 三方腿报告路径一处认（判决 landing-audit-r4 K2-5）：没填的 <轮> 占位、子目录下的都不认；形态调的是 lib_three_way_legs.py 那一份
+        # 三方腿报告路径一处认：没填的 <轮> 占位、子目录下的都不认；形态调的是 lib_three_way_legs.py 那一份
         # （开关 leg-report-placeholder-kept 下占位那一格红）
         cases += [
             case("三方报告:报告行写没填的 <轮> 占位、整份提示没有别的 -output.md，拒", "three-way-attack", "报告：research/prompts/<轮>-opus-output.md\n", 2),
             case("三方报告:报告行写子目录下的 -output.md，拒", "three-way-attack", "报告：research/prompts/x-r1/x-r1-opus-output.md\n", 2),
             case("三方报告:整份提示里只在子目录下有 -output.md，拒", "three-way-defense", "照正文交付，分段落盘到 research/prompts/x-r1/x-r1-sonnet-output.md。\n", 2, report=False, ignored=("三方腿报告行",)),
-            # 只认解到仓根下 research/prompts/ 的（判决 landing-audit-r5「交回闸 ② 仓外报告」，与交回闸 ② 同一处认法）：仓外副本里同名的不认（开关 leg-report-outside-root-kept 下这一格红）
+            # 只认解到仓根下 research/prompts/ 的（与交回闸 ② 同一处认法）：仓外副本里同名的不认（开关 leg-report-outside-root-kept 下这一格红）
             case("三方报告:整份提示里只有仓外同名的 …/research/prompts/…-output.md，拒", "three-way-defense",
                  f"背景材料：research/prompts/_x-r1-background.md\n照正文交付，分段落盘到 {os.path.join(work, 'elsewhere-copy')}/research/prompts/x-r1-sonnet-output.md。\n", 2, report=False, ignored=("三方腿报告行",)),
             case("三方报告:整份提示里写仓根起头的绝对路径，放行", "three-way-defense",
                  f"背景材料：research/prompts/_x-r1-background.md\n照正文交付，分段落盘到 {work}/research/prompts/x-r1-sonnet-output.md。\n", 0, report=False, ignored=("三方腿报告行",)),
         ]
-        # 报告行那一支、整份提示那一支与交回闸 ② 都经 lib_three_way_legs.py 的 leg_report_mentions_in_trees 一个函数（判决 landing-audit-r4 K2-5，拆分提案第九十节 ㉗）：
+        # 报告行那一支、整份提示那一支与交回闸 ② 都经 lib_three_way_legs.py 的 leg_report_mentions_in_trees 一个函数（拆分提案第九十节 ㉗）：
         # 把它换成替身，两支交回的都是替身认的（开关 leg-report-placeholder-kept、leg-report-line-root-only、leg-report-outside-root-kept 下这一格红）
         library_mentions_in_trees = three_way_legs.leg_report_mentions_in_trees
         three_way_legs.leg_report_mentions_in_trees = lambda text, project_root, trees=None: [(match, project_root) for match in re.finditer(r"sentinel/x-r1-from-library\.md", text or "")]
@@ -4067,9 +4067,9 @@ def selftest(hook_dir):
             else:
                 os.environ[work_roots.WORK_ROOT_VARIABLE] = saved_work_root
         cases += work_root_cells
-        # ⑳ 第三轮攻方模型里的真提示（拆分提案第九十节 ⑳）与 landing-audit-r4 到 r6 的六份真腿提示（第九十节 ㉗、㉙）：逐份只看报告类的两种拒（报告文件名、三方腿报告路径），
-        # 期望照九十节 ⑳、第三轮判决、第四轮判决 K2-4 与九十节 ㉗、㉙
-        # 样本在钩子自己的样本目录里（判决 landing-audit-r5 K2-3a），sources.tsv 与期望表逐份同名同 sha256；目录不在、少一份、改了一个字节都判红，不报本次未跑
+        # ⑳ 真提示（拆分提案第九十节 ⑳）与 landing-audit-r4 到 r6 的六份真腿提示（第九十节 ㉗、㉙）：逐份只看报告类的两种拒（报告文件名、三方腿报告路径），
+        # 期望照九十节 ⑳、㉗、㉙
+        # 样本在钩子自己的样本目录里，sources.tsv 与期望表逐份同名同 sha256；目录不在、少一份、改了一个字节都判红，不报本次未跑
         real_directory, repository_root = os.path.join(hook_dir, REAL_PROMPTS_DIRECTORY), os.path.dirname(os.path.dirname(hook_dir))
         real_status, real_cases = real_prompt_cells(real_directory, repository_root)
         cases += real_cases
@@ -4094,7 +4094,7 @@ def selftest(hook_dir):
                 handle.write(b" ")
         cases.append(("真提示样本:少一份时只有那一份判红", [altered_name], failing_names(real_prompt_cells(altered["missing-one"], repository_root)[1])))
         cases.append(("真提示样本:一份末尾多一个空格时只有那一份判红", [altered_name], failing_names(real_prompt_cells(altered["one-byte"], repository_root)[1])))
-        # 三方腿类型表（拆分提案第九十节 ⑯）：⑰ 读到的类型集合与登记处（定义 frontmatter 的 leg: three-way 一行）逐个相同。样本仓里的登记故意与改前写死的三种不同：
+        # 三方腿类型表（拆分提案第九十节 ⑯）：⑰ 读到的类型集合与登记处（定义 frontmatter 的 leg: three-way 一行）逐个相同。样本仓里的登记故意与写死的三种不同：
         # 攻方没登记、辩方的值带行尾注释、另登记一种不以 three-way 起头的 sample-leg、材料员没登记、正文里写的不算；本仓按 frontmatter 现扫，至少要有一种。
         # 再经 decide 判一遍：样本仓里 sample-leg 报告写草稿目录下的 result.md 拒，没登记的攻方不按三方腿判（开关 leg-types-hardcoded 下样本仓那三格红）
         legs_work = tempfile.mkdtemp()
@@ -4197,7 +4197,7 @@ def selftest(hook_dir):
         cases.append(("写者锁:--check-prompt 不建锁、写明派的那一刻另判", (0, False, True),
                       (checked_lock.returncode, os.path.exists(os.path.join(lock_root, "w9", ".writer-lock")), "⑯" in checked_lock.stdout)))
         # ⑯ 锁文件在而判不了（不是 JSON、锁的位置是目录、缺 prompt_sha256）：与写闸第九道同一口径拒，点名那把锁、出路是主 agent 核过之后删掉再派，
-        # 已判行不接手；开关 writer-lock-unreadable-absent（改前：当没锁，建锁撞上它报「抢先建了」，缺字段而派发已久的直接接手）下点名的几格红
+        # 已判行不接手；开关 writer-lock-unreadable-absent（当没锁，建锁撞上它报「抢先建了」，缺字段而派发已久的直接接手）下点名的几格红
         broken_lock_path = os.path.join(lock_root, "w10", ".writer-lock")
         os.makedirs(os.path.join(lock_root, "w10"), exist_ok=True)
         with open(broken_lock_path, "w", encoding="utf-8") as broken_lock_file:
@@ -4469,7 +4469,7 @@ def main():
     return judge_hook_input(hook_input, project_root)
 
 def judge_hook_input(hook_input, project_root):
-    """读得懂的 hook 输入 → 退出码。判的时候抛异常照「放行但必记检出」照常放行、记一条检出（弄坏开关 exception-unrecorded 下照原样抛出，改前的样子：进程退 1、不记）。"""
+    """读得懂的 hook 输入 → 退出码。判的时候抛异常照「放行但必记检出」照常放行、记一条检出（弄坏开关 exception-unrecorded 下照原样抛出：进程退 1、不记）。"""
     try:
         code, message = decide(hook_input, project_root, take_locks=True, record_detections=True)
     except Exception as error:

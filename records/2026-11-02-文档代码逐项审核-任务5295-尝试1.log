@@ -1,0 +1,135 @@
+  · 查卡：多机配置点名的卡都好（scripts/hosts/gpu-card-health.py 退 0）
+  · 回读看的卡：本机一张都不看（环境变量 GPU_CARDS_BY_PRIORITY 只点名了另一台的卡）；另一台卡 1；跳过别的活着的登记下的 37 个进程
+GPU_QUIESCE step=quiesce result=joined-and-read-back holders=3
+  · 已有 3 趟清过场在用卡，回读过了，跟着用
+  · ③ 工作目录 /home/fy5090/code/singlefs、命令里的路径、多机配置、工作根与共享数据根都在共享根下（/home/fy5090/.local/share/singlefs:/home/fy5090/.claude/projects:/home/fy5090/code/singlefs）：第二台在同一个绝对路径里跑，不拷树、不送、不取回
+  · ④ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · 第二台那里 cargo metadata --offline 过了：离线依赖齐
+  · ⑤ 命令里有 cargo：第二台起它之前先判第二台的 RocksDB 预编库取值（scripts/hosts/rocksdb-prebuilt.py entry），判红退 78、命令不跑
+MULTI_HOST_RUN_STEP step=peer-command event=begin elapsed_seconds=2.8
+  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 /home/fy5090/code/singlefs 里，经 run-with-memory-cap.sh 4096M，编译目录在第二台这一趟的本地目录 builds/task-b0f6b921-5295-1 下），每 5 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU
+  … 第二台那一份：running
+  ✓ rocksdb-prebuilt entry：查了 4 项，进程环境的取值是这台的预编库（/home/faliye/.local/share/singlefs/rocksdb-prebuilt/librocksdb-sys-0.19.0+11.8.1/67873f27d6329162/lib）
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling libc v0.2.189
+   Compiling cfg-if v1.0.4
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v2.0.1
+   Compiling equivalent v1.0.2
+   Compiling cfg_aliases v0.2.2
+   Compiling bitflags v2.13.2
+   Compiling pkg-config v0.3.34
+   Compiling foldhash v0.2.0
+   Compiling libm v0.2.16
+   Compiling thiserror v2.0.21
+   Compiling autocfg v1.5.1
+   Compiling glob v0.3.4
+   Compiling zerocopy v0.8.59
+   Compiling log v0.4.34
+   Compiling rustc-hash v1.1.0
+   Compiling minimal-lexical v0.2.1
+   Compiling memchr v2.8.3
+   Compiling regex-syntax v0.8.11
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling ash v0.38.0+1.3.281
+   Compiling either v1.18.0
+   Compiling bindgen v0.72.1
+   Compiling unicode-width v0.2.2
+   Compiling vcpkg v0.2.15
+   Compiling bit-vec v0.9.1
+   Compiling parking_lot_core v0.9.12
+   Compiling hashbrown v0.17.1
+   Compiling libloading v0.8.9
+   Compiling naga v30.0.1
+   Compiling raw-window-handle v0.6.2
+   Compiling smallvec v1.16.2
+   Compiling allocator-api2 v0.2.21
+   Compiling spirv v0.4.0+sdk-1.4.341.0
+   Compiling arrayvec v0.7.8
+   Compiling shlex v1.3.0
+   Compiling rustc-hash v2.1.3
+   Compiling itertools v0.13.0
+   Compiling scopeguard v1.2.0
+   Compiling once_cell v1.21.4
+   Compiling static_assertions v1.1.0
+   Compiling bit-set v0.10.0
+   Compiling codespan-reporting v0.13.1
+   Compiling lock_api v0.4.14
+   Compiling wgpu-hal v30.0.1
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling presser v0.3.1
+   Compiling rustflags v0.1.7
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+   Compiling renderdoc-sys v1.1.0
+   Compiling profiling v1.0.18
+   Compiling clang-sys v1.9.1
+MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=12724679 read=yes
+   Compiling wgpu-core v30.0.1
+   Compiling litrs v1.0.0
+   Compiling num-traits v0.2.19
+   Compiling singlefs-format v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-format)
+   Compiling wgpu v30.0.1
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-reference-filesystem)
+   Compiling pollster v1.0.1
+   Compiling hashbrown v0.16.1
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker)
+   Compiling nom v7.1.3
+   Compiling indexmap v2.14.2
+   Compiling document-features v0.2.12
+   Compiling syn v2.0.119
+   Compiling syn v3.0.6
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling jobserver v0.1.35
+   Compiling regex-automata v0.4.18
+   Compiling parking_lot v0.12.5
+   Compiling cc v1.5.1
+   Compiling ordered-float v5.5.0
+   Compiling cexpr v0.6.0
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling lz4-sys v1.11.1+lz4-1.10.0
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling libz-sys v1.1.29
+   Compiling thiserror-impl v2.0.21
+   Compiling bytemuck_derive v1.12.1
+   Compiling regex v1.13.1
+   Compiling bytemuck v1.25.2
+   Compiling naga-types v30.0.1
+   Compiling wgpu-types v30.0.1
+   Compiling synstructure v0.13.2
+   Compiling singlefs-unit-graph v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-unit-graph)
+   Compiling zerocopy-derive v0.8.59
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling librocksdb-sys v0.19.0+11.8.1
+   Compiling half v2.7.1
+   Compiling gpu-allocator v0.28.0
+   Compiling rocksdb v0.25.0
+   Compiling singlefs-checker-tier v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker-tier)
+MULTI_HOST_RUN_PEER_CPU poll=2 usage_usec=93673058 read=yes
+   Compiling prune-server v0.1.0 (/home/fy5090/code/singlefs/prune-server)
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-replay-prefix)
+   Compiling wgpu-naga-bridge v30.0.1
+   Compiling wgpu-core-deps-windows-linux-android v30.0.1
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+MULTI_HOST_RUN_PEER_CPU poll=3 usage_usec=135851580 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=4 usage_usec=157490157 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=5 usage_usec=166101929 read=yes
+MULTI_HOST_RUN_PEER_CPU poll=6 usage_usec=204917248 read=yes
+run-with-memory-cap: 撞了内存上限 4096M（scope singlefs-memory-cap-2345000-1116620111 的 Result=oom-kill，命令退出码 143）
+MULTI_HOST_RUN_PEER_CPU poll=7 usage_usec=204917248 read=no
+MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=4294971392
+MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=4327873661
+  · 第二台那条命令退 250
+MULTI_HOST_RUN_STEP step=peer-command event=end elapsed_seconds=39.3 seconds=36.4 exit=250
+MULTI_HOST_RUN_STEP step=remove-build event=begin elapsed_seconds=39.3
+  · ⑥ 删了第二台这一趟的本地目录 builds/task-b0f6b921-5295-1（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）
+MULTI_HOST_RUN_STEP step=remove-build event=end elapsed_seconds=39.8 seconds=0.5 exit=0
+  ! 那条命令退 250：内存包装 run-with-memory-cap.sh 自己的结局（文件头「退出码」），那一次的输出不算结果
+GPU_QUIESCE step=command result=exit-250
+GPU_QUIESCE step=restore result=not-restored holders=3
+  · 清了场、没复原：清场停下的服务一直停着；要复原手动跑私有复原脚本（多机配置的 QUIESCE_START_COMMAND），再跑 QUIESCE_STARTED_CHECK_COMMAND 回读到它退 0
+GPU_QUIESCE step=exit code=250

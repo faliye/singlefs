@@ -7,7 +7,8 @@ set -euo pipefail
 chmod +x .crash-point-replay-sample-tools/cargo .crash-point-replay-sample-tools/rustc
 prior=.unit-verdict-sample/prior
 mkdir -p "$prior"
-cp -dR --preserve=timestamps,links Cargo.toml crates "$prior/"
+# 上一版连同登记表（.claude/gate.d 下的 stage-inputs.tsv 与合表）一起拷：阶段给上一版算键时带 --exclude-registered，test-plan 从那一版的树里读登记的崩溃枚举用例，缺了就算不出键
+cp -dR --preserve=timestamps,links Cargo.toml crates .claude "$prior/"
 revert() { # <文件> <这一版的串> <上一版的串>：恰好命中一次才改
   python3 -c '
 import sys

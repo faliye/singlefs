@@ -21,9 +21,9 @@
 #
 # ── checker-implementation-disjoint ──
 # 依据：.claude/kb/decisions/13-验证路线.md 已定项 5（两侧只共享 kb 字段表生成的常量模块）；⑤⑥⑦ 另依已定项 3（RefFS）
-# 与用户 2026-10-02 定 F4「RefFS 单独一个包，按依赖图判」（research/prompts/m3-formal-r4-main-verification.md「用户定案」，
-# 判决 research/prompts/m3-formal-r5-main-verification.md 第二节 U4 一行）；⑧ 另依七·2 第三轮判决 research/prompts/m4-gpugc-design-r3-main-verification.md
-# 第二节 G7 一行与用户 2026-10-26 定「新开产品 GPU 包，门禁补一格」（records/2026-10-19-里程碑四GPU垃圾回收开工.md 那一天弹窗定四问的一行）。①②③⑤⑥⑦⑧ 七条，任一条不成立判红：
+# 与 F4「RefFS 单独一个包，按依赖图判」（research/prompts/m3-formal-r4-main-verification.md，
+# 判决 research/prompts/m3-formal-r5-main-verification.md 第二节 U4 一行）；⑧ 另依七·2 research/prompts/m4-gpugc-design-r3-main-verification.md
+# 第二节 G7 一行与「新开产品 GPU 包，门禁补一格」（records/2026-10-19-里程碑四GPU垃圾回收开工.md 里弹窗定四问的一行）。①②③⑤⑥⑦⑧ 七条，任一条不成立判红：
 #   ① 按 crates/*/Cargo.toml 建内部依赖图，singlefs-checker 与 singlefs-core 各取传递闭包求交，减去 singlefs-format 必须为空。
 #      取闭包：checker 经中间包依赖实现时，直接依赖表上看不出。外部 crate 是叶子、照样参与求交；
 #      罩不到外部 crate 之间的传递依赖（要真跑 cargo tree）。
@@ -68,7 +68,7 @@
 # （C119（冻结组件没有 spec 文件）），有了就把抽取源换过去。
 # 改动范围取 scripts/gate/changed-paths.sh 的 gate_diff_base gate 与 gate_changed_paths（带未跟踪文件）；
 # 基准那一版的格式定义经 lib-lag-baseline.py 的 baseline_text 取：基准里没有这份（这次新加的）常量全算新增；git 取不到（基准名不在、对象库缺了那一份）判红、
-#   点名那一份，那一套布局的第 ④ 条不往下比（改前取不到交空串，与「基准里没有」分不出，撞上另一份没变同值的就按首次登记放过去）。
+#   点名那一份，那一套布局的第 ④ 条不往下比（取不到不交空串：空串与「基准里没有」分不出，撞上另一份没变同值的就按首次登记放过去）。
 # git 调用带 `-c core.quotepath=false`，否则中文路径被打成八进制引号串，与布局清单比不上。
 # 滞后表指的欠账号按 lib-owed.py 读 checks-owed.md：「### 已还清」整行标题之前算开着，认不出那个标题判红。
 #
@@ -81,7 +81,7 @@
 #   layout-checker-sync-first-registration-underscored-literal .rs 字面量带 `_`、标记写不带的同一个数：绿
 #   layout-checker-sync-first-registration-changed-value       源值这次也变了：红
 #   layout-checker-sync-base-unreadable-red                    两份格式定义都没改，基准那一版布局.md 的对象从对象库里删掉（ls-tree 认得出、show 读不出）：
-#                                                              红、点名「读不出基准 HEAD 里的 format/布局.md」（改前当成基准里没有、报首次登记判绿）
+#                                                              红、点名「读不出基准 HEAD 里的 format/布局.md」（不当成基准里没有、不报首次登记判绿）
 #   checker-implementation-disjoint-red 与 -green 都带 RefFS 包与产品 GPU 包；-green 的 RefFS 包（dev-dependencies 里用别名引 singlefs-format，
 #                                          测试引 singlefs_reference_filesystem 自己；验证包依赖它，方向对）：⑤⑥⑦ 绿
 #   checker-implementation-disjoint-reference-closure-red          RefFS 依赖一个外部 crate，dev-dependencies 经中间包够到 singlefs-core：⑤ 红
@@ -161,7 +161,7 @@
 #
 # ── checker-direction-overlap ──
 # 依据：D13（验证路线） 已定项 12「两者对同一条不变量独立判断，共享的只有格式解析」与 checks-owed.md C410（checker 两个方向共享什么没有检查）；
-# 扫描式方向的边界照用户 2026-10-26 定的「连 walk.rs 扫单元头那几个函数一起算，另建调用图」。checker-implementation-disjoint 格是 crate 粒度，罩不到同一个 crate 里的两个方向。
+# 扫描式方向的边界：「连 walk.rs 扫单元头那几个函数一起算，另建调用图」。checker-implementation-disjoint 格是 crate 粒度，罩不到同一个 crate 里的两个方向。
 # 判法只在 scripts/gate/checker-direction-overlap.py check（两个方向的闭包怎么收、切点与比对点、交集里各类单元怎么分、登记表核法与射程都在它文件头）；
 # 闭包由 scripts/gate/lib_function_units.py 收，入口、切点、比对点、局部绑定与允许共享的格式解析单元登记在 .claude/gate.d/checker-direction-entries.tsv。
 # 交集里格式解析之外的函数单元越界判红，取不到调用图（表不在、入口找不到、闭包里有拒算）判红；crates/ 不在退 77。
@@ -180,6 +180,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ checker-independence-and-sync.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 STAGE_NAME="$(basename "$0")"

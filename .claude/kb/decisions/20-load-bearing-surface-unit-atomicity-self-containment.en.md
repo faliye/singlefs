@@ -116,7 +116,7 @@ if ((id->nsfeat & NVME_NS_FEAT_ATOMICS) && id->nawupf) {
 
 #### Settled Item 6: How Violations Are Detected—Crash-Point Replay + Checker
 
-**Settlement**: The landing point for Question 3 is **crash-point replay + checker**. Both are present (gate checker-tier-crash-point-replay, `crates/singlefs-checker`), but crash-point replay currently records only this project's own single pipeline, enumerating whole writes and conflating tearing into "unpersisted" (D13 (Verification Route) settled item 4) => "failure atomicity width / tearing / reordering" as declared per pipeline still has **zero coverage**.
+**Settlement**: The landing point for Question 3 is **crash-point replay + checker**. Both are present (gate crash-point-replay, `crates/singlefs-checker`), but crash-point replay currently records only this project's own single pipeline, enumerating whole writes and conflating tearing into "unpersisted" (D13 (Verification Route) settled item 4) => "failure atomicity width / tearing / reordering" as declared per pipeline still has **zero coverage**.
 
 **Scope**: Torn writes cannot be induced on the local host either (`dm-flakey` has only `drop_writes` / `error_writes` / `corrupt_bio_byte`) => this question must await the second pipeline and torn write injection before it can be verified. "Landing point settled" does not equal "already verified".
 

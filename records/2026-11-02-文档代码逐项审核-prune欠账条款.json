@@ -1,0 +1,742 @@
+{
+  "at": "2026-11-04",
+  "scope": "C955-C960 only, six rows in each of Chinese/English/Japanese; whole documents remain pending",
+  "complete_document_review": false,
+  "rows": [
+    {
+      "language": "zh",
+      "document": ".claude/kb/checks-owed.md",
+      "sha256": "66b4fdceaada5f0700a3140c5926cbbb3f4931ad1640bcf1735279a575caaee6",
+      "line": 599,
+      "id": "C955",
+      "text": "| C955 | 开判定库不设一次性库也不拿守卫 | 验证包测试（`crates/*/tests/` 里的用例、`crates/*/src/bin/` 里的单测）经 `LibraryOpenInThisProcess::open_or_share` 或 `CrashLibrary::open`（`crates/singlefs-checker-tier/src/crash_library.rs`）开判定库，开库之前既没有用 `make_it_the_library_of_this_process` 设一次性库，也没有拿 `TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out`（同文件，「用服务那一份」守卫）：同一个测试二进制里别的用例设着一次性库时，它开到那一份，那条用例收尾停掉临时服务，这一边接着读写就连不上（退 75）；没人设着时开到全仓那一份，测试写了真服务。今天没有会红的检查，库测试红那件与守卫那件是逐处人核的 | 静态一格：`crates/*/tests/*.rs` 与 `crates/*/src/bin/*.rs` 里调用 `open_or_share(` 或 `CrashLibrary::open(` 的函数，在开库之前找不到 `make_it_the_library_of_this_process(` 与 `keep_disposable_libraries_out(` 之一的判红并点名函数；经辅助函数开库的，在辅助函数的调用者里找；判别力两份样本：开库前两样都没有的（转红）、先拿守卫的（不红） | 设库函数与守卫都已有（`crates/singlefs-checker-tier/src/crash_library.rs`）；先定「开库之前找得到」的口径（同一个函数体里，还是沿调用者往上找）再立格；去向：未排进里程碑，等主 agent 排 | `records/2026-11-01-判定库服务化.md` 第 419 行（GPU 配置测试那件交回：「验证包测试开引擎而没设一次性库」没有会红的检查，记欠账）、第 455 行（库测试三处红那件）、第 458 行（守卫那件） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Setting and guard APIs exist and exclude each other",
+          "status": "static_correspondence",
+          "evidence": [
+            "crates/singlefs-checker-tier/src/crash_library.rs:576-590 write guard",
+            "crash_library.rs:615 RwLock",
+            "crash_library.rs:635-640 read guard",
+            "crash_library.rs:652-657 Drop clears selected library"
+          ]
+        },
+        {
+          "claim": "Unguarded open can select another test temporary library",
+          "status": "static_correspondence",
+          "evidence": [
+            "crash_library.rs:691-710 clones current selection without acquiring the setting read guard"
+          ]
+        },
+        {
+          "claim": "Disconnect necessarily exits75",
+          "status": "needs_narrowing",
+          "evidence": [
+            "Temporary selection sets PruneServerFailureHandling::ReturnTheError at crash_library.rs:698; permanent selection sets ExitTheProcess. Caller behavior not fully traced."
+          ]
+        },
+        {
+          "claim": "No static checker and all relevant test callsites audited",
+          "status": "pending",
+          "evidence": [
+            "Registry absence and whole-caller-chain enumeration not proved; proposed gate is future work, not existing behavior."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "zh",
+      "document": ".claude/kb/checks-owed.md",
+      "sha256": "66b4fdceaada5f0700a3140c5926cbbb3f4931ad1640bcf1735279a575caaee6",
+      "line": 600,
+      "id": "C956",
+      "text": "| C956 | 简易客户端读不拆帧 | 读路径用 `SimpleClient::read`（`prune-server/src/client.rs`）读可能大的值：它只发一帧、不拆，回应超过帧长上限时整帧被拒；崩溃库点读与前缀扫已不走它（走 `ReliableClient`，回应会超帧长就对半拆键） | 静态一格：`prune-server/src/` 与 `crates/` 里 `SimpleClient::read(` 的调用点，不在登记表（逐处写读的是什么、为什么不会超帧长上限）里的判红，存量登进只缩不涨的滞后表；判别力两份样本：读整值的调用点没登记（转红）、读几个字节的哨兵并登记了的（不红） | 先现查 `SimpleClient::read` 今天的调用点（`grep -rn 'SimpleClient' prune-server/src crates`）并逐处分出读小值的与读大值的；`SimpleClient::read` 自己改成会拆帧的，这一条就不用立；去向：未排进里程碑，等主 agent 排 | `records/2026-11-01-判定库服务化.md` 第 405 行（成批点读拆帧那件交回：「SimpleClient::read 只发一帧不拆，崩溃库点读不走它，记进 checks-owed」） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "SimpleClient::read submits one frame without recursive halving",
+          "status": "static_correspondence",
+          "evidence": [
+            "prune-server/src/client.rs:879-892"
+          ]
+        },
+        {
+          "claim": "ReliableClient point read halves keys after MalformedPayload when more than one key",
+          "status": "static_correspondence",
+          "evidence": [
+            "prune-server/src/reliable_client.rs:797-829; one-key rejection remains an error, other malformed payload also causes splitting"
+          ]
+        },
+        {
+          "claim": "Prefix scans use the same halving mechanism",
+          "status": "wording_needs_narrowing",
+          "evidence": [
+            "ReliableClient::scan:897-927 sends one frame; storage::scan_prefix:597-637 truncates by count/bytes; verdict_store::visit_stored_rows_with_prefix:2734-2787 splits truncated prefixes into256 subprefixes, not halves of key list."
+          ]
+        },
+        {
+          "claim": "Every remaining SimpleClient read callsite is classified",
+          "status": "pending",
+          "evidence": [
+            "Proposed registry has not been audited/constructed; no whole-callsite signoff."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "zh",
+      "document": ".claude/kb/checks-owed.md",
+      "sha256": "66b4fdceaada5f0700a3140c5926cbbb3f4931ad1640bcf1735279a575caaee6",
+      "line": 601,
+      "id": "C957",
+      "text": "| C957 | prune-server 自己的测试不在门禁里 | prune-server 是工作区外的独立工程（仓根 `Cargo.toml` 的 `exclude`），它自己的 cargo 测试目标（`prune-server/tests/` 下几份，例 `reliable_client_prefix_scan_after_busy.rs`、`offline_drop_of_whole_values_too_long_for_one_frame.rs`）不在任何门禁里，合入后验证与快档都不跑它们：这些测试红了，门禁照绿 | 门禁一格：`prune-server/tests/` 下每个测试目标都被点名，并经服务跑 `cargo test --manifest-path prune-server/Cargo.toml --test <目标>`，有一个红就判红；目录里新增一份没被点名的也判红；判别力：把其中一份测试的断言弄坏，这一格红 | 先现读 `.claude/gate.d/` 里哪一道门禁今天起 prune-server 的编译与自证，再定这一格挂在哪；测试目标只在 prune-server 自己的清单下编，不进工作区的 `cargo test`；去向：未排进里程碑，等主 agent 排 | `records/2026-11-01-判定库服务化.md` 第 396 行（Rust 大值分段那件交回，定 ⑤「prune-server 新 cargo test 目标平时没门禁跑——记欠账」）、第 450 行与第 462 行（两份例子测试的来历） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "prune-server excluded from root Cargo workspace",
+          "status": "static_correspondence",
+          "evidence": [
+            "Cargo.toml:18 exclude"
+          ]
+        },
+        {
+          "claim": "Named tests not in any gate; their failure leaves gates green",
+          "status": "discrepancy",
+          "finding": "A42",
+          "evidence": [
+            "crates/mutations.tsv:6548,6552,6553",
+            "checker-tier-crates-mutation-replay.sh:336",
+            "crates-mutation-rows.py:3705,4905,5116"
+          ]
+        },
+        {
+          "claim": "Whole directory enumerated in routine and quick validation",
+          "status": "pending",
+          "evidence": [
+            "Existing selective mutation path is not whole-package coverage; proposed exhaustive gate remains distinct."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false,
+      "revalidations": [
+        {
+          "at": "2026-11-05",
+          "line": 601,
+          "sha256": "f08b14ffb4a947ef3b2bceacee67980c89db4e2c4bf45e77728d7e98a0674bde",
+          "text": "| C957 | prune-server 自己的测试不在门禁里 | prune-server 是工作区外的独立工程（仓根 `Cargo.toml` 的 `exclude`），它自己的 cargo 测试目标（`prune-server/tests/` 下几份，例 `reliable_client_prefix_scan_after_busy.rs`、`offline_drop_of_whole_values_too_long_for_one_frame.rs`）不在任何门禁里，合入后验证与快档都不跑它们：这些测试红了，门禁照绿 | 门禁一格：`prune-server/tests/` 下每个测试目标都被点名，并经服务跑 `cargo test --manifest-path prune-server/Cargo.toml --test <目标>`，有一个红就判红；目录里新增一份没被点名的也判红；判别力：把其中一份测试的断言弄坏，这一格红 | 先现读 `.claude/gate.d/` 里哪一道门禁今天起 prune-server 的编译与自证，再定这一格挂在哪；测试目标只在 prune-server 自己的清单下编，不进工作区的 `cargo test`；去向：未排进里程碑，等主 agent 排 | `records/2026-11-01-判定库服务化.md` 第 396 行（Rust 大值分段那件交回，定 ⑤「prune-server 新 cargo test 目标平时没门禁跑——记欠账」）、第 450 行与第 462 行（两份例子测试的来历） |",
+          "conclusion": "三语仍称不在任何门禁；保留A42范围结论。原证据行按当次摘要解释，后续源码再变不覆盖旧观察。"
+        }
+      ]
+    },
+    {
+      "language": "zh",
+      "document": ".claude/kb/checks-owed.md",
+      "sha256": "66b4fdceaada5f0700a3140c5926cbbb3f4931ad1640bcf1735279a575caaee6",
+      "line": 602,
+      "id": "C958",
+      "text": "| C958 | sha256 三份手写没有对拍 | 手写的 SHA-256 有三份独立模块：`crates/singlefs-harness/src/sha256.rs`、`crates/singlefs-unit-graph/src/sha256.rs`、`prune-server/src/sha256.rs`（现查 `grep -rln -e \"fn sha256\" -e \"struct Sha256\" crates/ prune-server/src scripts/`，命中的另有实验装置各自内嵌的几份，不在这三份里）；后两份文件头写的是照 harness 那份另写一份，没有一条检查逼三份对同一组输入出同一个摘要，写歪了一份要等仓外 `sha256sum` 或 Python `hashlib` 复算才发现（跨装置口径，`.claude/singlefs-ai-sop/rules/show-me-test.md`「建模口径上」一行「立在装置之间」） | 对拍一格：同一张向量表（标准向量与块边界长度 55、56、63、64、65 字节的输入）三份各自的测试都读它，摘要不等于表里的判红；判别力：弄坏其中一份的一位，这一格红 | 先定是并成一份还是三份对同一张表：prune-server 在工作区外、不依赖仓根的 crate（`prune-server/src/sha256.rs` 文件头），并不成时向量表要放在三个工程都读得到的位置；去向：未排进里程碑，等主 agent 排 | `records/2026-11-01-判定库服务化.md` 第 396 行（Rust 大值分段那件交回，定 ④「sha256 三份手写并不并下一轮再说（记进 checks-owed）」） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Three independent SHA256 module paths and headers",
+          "status": "paths_and_test_bodies_confirmed",
+          "evidence": [
+            "Three paths exist; module implementations not yet fully read in this continuation."
+          ]
+        },
+        {
+          "claim": "No existing shared-input check; external recomputation required to detect mistake",
+          "status": "discrepancy",
+          "finding": "A40",
+          "evidence": [
+            "harness sha256 tests204",
+            "unit-graph sha256 tests265",
+            "prune-server sha256 tests212; same four input/digest pairs"
+          ]
+        },
+        {
+          "claim": "Shared maintained table/unified three-module test and all boundary lengths",
+          "status": "pending",
+          "evidence": [
+            "Distributed existing assertions do not establish shared table or comprehensive gate."
+          ]
+        },
+        {
+          "claim": "Million-byte vector covers bit length above32bits",
+          "status": "discrepancy_in_source_comment",
+          "finding": "A41",
+          "evidence": [
+            "1000000*8=8000000 < 2**32"
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "zh",
+      "document": ".claude/kb/checks-owed.md",
+      "sha256": "66b4fdceaada5f0700a3140c5926cbbb3f4931ad1640bcf1735279a575caaee6",
+      "line": 603,
+      "id": "C959",
+      "text": "| C959 | 要卡才取显卡先后那一处没配变异 | `crates/singlefs-checker-tier/src/crash_amplification.rs` 的 `run_from_environment`（实现在 `run_from_environment_with_observers` 里 `routes.need_a_card()` 那一支）「要卡才取显卡先后」那一处没配变异行：能钉它的现有用例都经测试里替用例设卡的函数（`common_crash_points`），变异门禁整趟清场时那个函数会替它设上卡，把「不要卡的一趟也取显卡先后」弄进去，变异不红 | `crates/mutations.tsv` 加一行，把 `routes.need_a_card()` 那一支改成不论要不要卡都取显卡先后，配一条不经替用例设卡函数的用例：配置只开 GPU 开关、环境不交显卡先后的一趟，取了就红，变异下这条用例红 | 先有一条不经 `common_crash_points` 的用例（它自己清卡变量，不靠替用例设卡的函数）；去向：未排进里程碑，等主 agent 排 | `records/2026-11-01-判定库服务化.md` 第 449 行（卡项那件交回：「run_from_environment 那处不配变异行，记欠账（能钉它的用例都经替用例设卡的函数，要先有一条不经它的用例）」） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "GPU card order fetched only when routes.need_a_card",
+          "status": "static_correspondence",
+          "evidence": [
+            "crash_amplification.rs:17534-17538; wrapper17442 delegates to run_one_slice_round_from_environment_with_observers"
+          ]
+        },
+        {
+          "claim": "Precise function localization in document",
+          "status": "stale_localization",
+          "evidence": [
+            "Current branch moved from wrapper to helper, still called by named wrapper. No claim that behavior removed."
+          ]
+        },
+        {
+          "claim": "No discriminating mutation and all tests use card-setting helper",
+          "status": "pending",
+          "evidence": [
+            "Literal anchor search alone cannot prove all test paths or equivalent mutations absent; no mutation executed."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "zh",
+      "document": ".claude/kb/checks-owed.md",
+      "sha256": "66b4fdceaada5f0700a3140c5926cbbb3f4931ad1640bcf1735279a575caaee6",
+      "line": 604,
+      "id": "C960",
+      "text": "| C960 | 闸类边的边级排除没有自证口径 | `.claude/rules/implementation-workflow.md`「复用重型门禁的判定」一节写边级排除要配三格自证，其中「这条路上的任何异常不改包装退出码」，对「闸」类边（准入：退出码本来就决定跑不跑；例 `scripts/gate/lib_function_units.py` 的 `EXCLUDED_PROGRAM_EDGES` 里 `e183-capacity-cells.sh` 起 `admission.py` 那一条）照字面套不上；该条登记的自证改照「只决定跑不跑、读数出不来」写，规则里没有闸边的口径 | 先定闸边的口径（三格自证对闸边各写什么），再给 `EXCLUDED_PROGRAM_EDGES` 里的闸边立会红的检查：自证缺了闸边口径要的哪一格判红；规则的改动走三方或用户豁免，这里只记欠 | 规则改动走三方或用户豁免（`.claude/rules/implementation-workflow.md`）；去向：未排进里程碑，等主 agent 排 | `records/2026-11-01-判定库服务化.md` 第 475 行（准入闸边那件交回：「规则『这条路上的任何异常不改包装退出码』对闸边套不上字面，要不要补一句闸边口径（规则改动，先记）」） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Policy requires excluded-edge anomaly leave wrapper exit unchanged",
+          "status": "static_correspondence",
+          "evidence": [
+            ".claude/rules/implementation-workflow.md:31"
+          ]
+        },
+        {
+          "claim": "Actual E183 admission edge uses different anomaly criterion",
+          "status": "static_correspondence",
+          "evidence": [
+            "lib_function_units.py:9341-9345,12672-12713; anomaly cells require nonzero exit and no build/product"
+          ]
+        },
+        {
+          "claim": "Output stripping and removed-unit reachability selftest bodies exist",
+          "status": "static_correspondence",
+          "evidence": [
+            "lib_function_units.py:12716-12777"
+          ]
+        },
+        {
+          "claim": "Historical decision authorization and runtime selftest results",
+          "status": "pending",
+          "evidence": [
+            "Current history and rule text are not independent proof of original user quotes; task5288 not fetched in this continuation."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "en",
+      "document": ".claude/kb/checks-owed.en.md",
+      "sha256": "bec397c4fbbaedbca1da905550f114cfb1c2539f52d523a9473fd5e0a4c322f6",
+      "line": 599,
+      "id": "C955",
+      "text": "| C955 | Opening the verdict library neither sets a disposable library nor takes the guard | A checker-tier test (a test case under `crates/*/tests/` or a unit test under `crates/*/src/bin/`) opens the verdict library through `LibraryOpenInThisProcess::open_or_share` or `CrashLibrary::open` (`crates/singlefs-checker-tier/src/crash_library.rs`) without having set a disposable library with `make_it_the_library_of_this_process` or taken `TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out` (same file, the \"use the service library\" guard) beforehand: when another test case in the same test binary has set a disposable library, this test opens that copy, and once the other case finishes and stops the temporary server, subsequent reads and writes on this side fail to connect (exit 75); when no test has set one, it opens the repo-wide library and writes to the real service. Today no red-turning check exists; the library-test red failure and the guard fix were audited by hand site by site | One static cell: a function in `crates/*/tests/*.rs` or `crates/*/src/bin/*.rs` that calls `open_or_share(` or `CrashLibrary::open(` without finding either `make_it_the_library_of_this_process(` or `keep_disposable_libraries_out(` before opening the library is red and names the function; when opened via a helper function, look in the helper's callers; discriminating power, two samples: one with neither before opening the library (turns red), and one that takes the guard first (stays green) | Both the library-setting function and the guard already exist (`crates/singlefs-checker-tier/src/crash_library.rs`); first settle the rule for \"found before opening the library\" (within the same function body, or walking up callers) and then add the cell; destination: not yet scheduled into a milestone, waiting for the main agent | `records/2026-11-01-判定库服务化.md` line 419 (handback of the GPU configuration test item: 「验证包测试开引擎而没设一次性库」 has no red-turning check, recorded as debt), line 455 (the three red failures in library tests), line 458 (the guard item) |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Setting and guard APIs exist and exclude each other",
+          "status": "static_correspondence",
+          "evidence": [
+            "crates/singlefs-checker-tier/src/crash_library.rs:576-590 write guard",
+            "crash_library.rs:615 RwLock",
+            "crash_library.rs:635-640 read guard",
+            "crash_library.rs:652-657 Drop clears selected library"
+          ]
+        },
+        {
+          "claim": "Unguarded open can select another test temporary library",
+          "status": "static_correspondence",
+          "evidence": [
+            "crash_library.rs:691-710 clones current selection without acquiring the setting read guard"
+          ]
+        },
+        {
+          "claim": "Disconnect necessarily exits75",
+          "status": "needs_narrowing",
+          "evidence": [
+            "Temporary selection sets PruneServerFailureHandling::ReturnTheError at crash_library.rs:698; permanent selection sets ExitTheProcess. Caller behavior not fully traced."
+          ]
+        },
+        {
+          "claim": "No static checker and all relevant test callsites audited",
+          "status": "pending",
+          "evidence": [
+            "Registry absence and whole-caller-chain enumeration not proved; proposed gate is future work, not existing behavior."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "en",
+      "document": ".claude/kb/checks-owed.en.md",
+      "sha256": "bec397c4fbbaedbca1da905550f114cfb1c2539f52d523a9473fd5e0a4c322f6",
+      "line": 600,
+      "id": "C956",
+      "text": "| C956 | SimpleClient read does not split frames | A read path uses `SimpleClient::read` (`prune-server/src/client.rs`) to read a value that may be large: it sends a single frame without splitting, so when the response exceeds the frame-length limit the whole frame is rejected; crash-library point reads and prefix scans no longer go through it (they go through `ReliableClient`, halving keys whenever the response would exceed the frame length) | One static cell: a call site of `SimpleClient::read(` under `prune-server/src/` or `crates/` not listed in the registry table (which records site by site what is read and why it cannot exceed the frame-length limit) is red, with the existing stock entered into a shrink-only lag table; discriminating power, two samples: an unregistered call site reading a full value (turns red), and a registered call site reading a few-byte sentinel (stays green) | First inspect today's call sites of `SimpleClient::read` (`grep -rn 'SimpleClient' prune-server/src crates`) and separate site by site those reading small values from those reading large values; if `SimpleClient::read` itself is changed to split frames, this cell is no longer needed; destination: not yet scheduled into a milestone, waiting for the main agent | `records/2026-11-01-判定库服务化.md` line 405 (handback of the batched point-read frame-splitting item: 「SimpleClient::read 只发一帧不拆，崩溃库点读不走它，记进 checks-owed」) |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "SimpleClient::read submits one frame without recursive halving",
+          "status": "static_correspondence",
+          "evidence": [
+            "prune-server/src/client.rs:879-892"
+          ]
+        },
+        {
+          "claim": "ReliableClient point read halves keys after MalformedPayload when more than one key",
+          "status": "static_correspondence",
+          "evidence": [
+            "prune-server/src/reliable_client.rs:797-829; one-key rejection remains an error, other malformed payload also causes splitting"
+          ]
+        },
+        {
+          "claim": "Prefix scans use the same halving mechanism",
+          "status": "wording_needs_narrowing",
+          "evidence": [
+            "ReliableClient::scan:897-927 sends one frame; storage::scan_prefix:597-637 truncates by count/bytes; verdict_store::visit_stored_rows_with_prefix:2734-2787 splits truncated prefixes into256 subprefixes, not halves of key list."
+          ]
+        },
+        {
+          "claim": "Every remaining SimpleClient read callsite is classified",
+          "status": "pending",
+          "evidence": [
+            "Proposed registry has not been audited/constructed; no whole-callsite signoff."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "en",
+      "document": ".claude/kb/checks-owed.en.md",
+      "sha256": "bec397c4fbbaedbca1da905550f114cfb1c2539f52d523a9473fd5e0a4c322f6",
+      "line": 601,
+      "id": "C957",
+      "text": "| C957 | prune-server's own tests are not in any gate | prune-server is an independent project outside the workspace (`exclude` in the repo-root `Cargo.toml`), and its own cargo test targets (several files under `prune-server/tests/`, e.g. `reliable_client_prefix_scan_after_busy.rs` and `offline_drop_of_whole_values_too_long_for_one_frame.rs`) are not in any gate, so neither post-merge verification nor the fast tier runs them: if those tests turn red, the gates stay green | One gate cell: every test target under `prune-server/tests/` is named and run through the task service via `cargo test --manifest-path prune-server/Cargo.toml --test <target>`, turning red if any target fails; a new file under the directory that is not named also turns red; discriminating power: breaking an assertion in one of the tests turns this cell red | First check which gate under `.claude/gate.d/` currently builds and runs self-tests for prune-server, then decide where to attach this cell; the test targets build only under prune-server's own manifest and do not enter the workspace `cargo test`; destination: not yet scheduled into a milestone, waiting for the main agent | `records/2026-11-01-判定库服务化.md` line 396 (handback of the Rust large-value chunking item, ruling ⑤ 「prune-server 新 cargo test 目标平时没门禁跑——记欠账」), lines 450 and 462 (origin of the two example tests) |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "prune-server excluded from root Cargo workspace",
+          "status": "static_correspondence",
+          "evidence": [
+            "Cargo.toml:18 exclude"
+          ]
+        },
+        {
+          "claim": "Named tests not in any gate; their failure leaves gates green",
+          "status": "discrepancy",
+          "finding": "A42",
+          "evidence": [
+            "crates/mutations.tsv:6548,6552,6553",
+            "checker-tier-crates-mutation-replay.sh:336",
+            "crates-mutation-rows.py:3705,4905,5116"
+          ]
+        },
+        {
+          "claim": "Whole directory enumerated in routine and quick validation",
+          "status": "pending",
+          "evidence": [
+            "Existing selective mutation path is not whole-package coverage; proposed exhaustive gate remains distinct."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false,
+      "revalidations": [
+        {
+          "at": "2026-11-05",
+          "line": 601,
+          "sha256": "9db0878b9e8705bd76c3ed01afacbe53e4fd664625c0471af45150a978c1368a",
+          "text": "| C957 | prune-server's own tests are not in any gate | prune-server is an independent project outside the workspace (`exclude` in the repo-root `Cargo.toml`), and its own cargo test targets (several files under `prune-server/tests/`, e.g. `reliable_client_prefix_scan_after_busy.rs` and `offline_drop_of_whole_values_too_long_for_one_frame.rs`) are not in any gate, so neither post-merge verification nor the fast tier runs them: if those tests turn red, the gates stay green | One gate cell: every test target under `prune-server/tests/` is named and run through the task service via `cargo test --manifest-path prune-server/Cargo.toml --test <target>`, turning red if any target fails; a new file under the directory that is not named also turns red; discriminating power: breaking an assertion in one of the tests turns this cell red | First check which gate under `.claude/gate.d/` currently builds and runs self-tests for prune-server, then decide where to attach this cell; the test targets build only under prune-server's own manifest and do not enter the workspace `cargo test`; destination: not yet scheduled into a milestone, waiting for the main agent | `records/2026-11-01-判定库服务化.md` line 396 (handback of the Rust large-value chunking item, ruling ⑤ 「prune-server 新 cargo test 目标平时没门禁跑——记欠账」), lines 450 and 462 (origin of the two example tests) |",
+          "conclusion": "三语仍称不在任何门禁；保留A42范围结论。原证据行按当次摘要解释，后续源码再变不覆盖旧观察。"
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "document": ".claude/kb/checks-owed.en.md",
+      "sha256": "bec397c4fbbaedbca1da905550f114cfb1c2539f52d523a9473fd5e0a4c322f6",
+      "line": 602,
+      "id": "C958",
+      "text": "| C958 | Three hand-written sha256 implementations have no differential test | Hand-written SHA-256 exists in three independent modules: `crates/singlefs-harness/src/sha256.rs`, `crates/singlefs-unit-graph/src/sha256.rs`, and `prune-server/src/sha256.rs` (checked with `grep -rln -e \"fn sha256\" -e \"struct Sha256\" crates/ prune-server/src scripts/`, which also hits copies embedded in experiment apparatuses outside these three); the headers of the latter two state that they are separate copies modeled on the harness one, and no check forces all three to produce the same digest on the same inputs, so a bug in one copy would only be caught when recomputed outside the repo by `sha256sum` or Python `hashlib` (cross-apparatus alignment, `.claude/singlefs-ai-sop/rules/show-me-test.md` row 「建模口径上」 「立在装置之间」) | One differential test cell: the tests of all three modules read the same vector table (standard vectors plus inputs at block-boundary lengths of 55, 56, 63, 64, and 65 bytes) and turn red if any digest differs from the table; discriminating power: corrupting one bit in one of the three copies turns this cell red | First decide whether to merge them into one or keep three copies tested against a shared table: prune-server is outside the workspace and does not depend on repo-root crates (header of `prune-server/src/sha256.rs`), so if kept separate the vector table must sit at a path readable by all three projects; destination: not yet scheduled into a milestone, waiting for the main agent | `records/2026-11-01-判定库服务化.md` line 396 (handback of the Rust large-value chunking item, ruling ④ 「sha256 三份手写并不并下一轮再说（记进 checks-owed）」) |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Three independent SHA256 module paths and headers",
+          "status": "paths_and_test_bodies_confirmed",
+          "evidence": [
+            "Three paths exist; module implementations not yet fully read in this continuation."
+          ]
+        },
+        {
+          "claim": "No existing shared-input check; external recomputation required to detect mistake",
+          "status": "discrepancy",
+          "finding": "A40",
+          "evidence": [
+            "harness sha256 tests204",
+            "unit-graph sha256 tests265",
+            "prune-server sha256 tests212; same four input/digest pairs"
+          ]
+        },
+        {
+          "claim": "Shared maintained table/unified three-module test and all boundary lengths",
+          "status": "pending",
+          "evidence": [
+            "Distributed existing assertions do not establish shared table or comprehensive gate."
+          ]
+        },
+        {
+          "claim": "Million-byte vector covers bit length above32bits",
+          "status": "discrepancy_in_source_comment",
+          "finding": "A41",
+          "evidence": [
+            "1000000*8=8000000 < 2**32"
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "en",
+      "document": ".claude/kb/checks-owed.en.md",
+      "sha256": "bec397c4fbbaedbca1da905550f114cfb1c2539f52d523a9473fd5e0a4c322f6",
+      "line": 603,
+      "id": "C959",
+      "text": "| C959 | Fetching GPU card order only when a card is needed has no mutation row | In `run_from_environment` of `crates/singlefs-checker-tier/src/crash_amplification.rs` (implemented in the `routes.need_a_card()` branch of `run_from_environment_with_observers`), the check that fetches the GPU card order only when a card is needed has no mutation row: every existing test case that could pin it goes through the test helper that sets a card for the test (`common_crash_points`), so when the mutation gate clears the environment for a full run, that helper sets a card anyway and a mutation that fetches the GPU card order even on a cardless run does not turn red | Add a row to `crates/mutations.tsv` changing the `routes.need_a_card()` branch so it fetches the GPU card order regardless of whether a card is needed, paired with a test case that does not go through the card-setting helper: a run configured with only the GPU switch on and no GPU card order in the environment turns red if the card order is fetched, so the test turns red under the mutation | First add a test case that does not go through `common_crash_points` (clearing the card variables itself instead of relying on the helper); destination: not yet scheduled into a milestone, waiting for the main agent | `records/2026-11-01-判定库服务化.md` line 449 (handback of the card item: 「run_from_environment 那处不配变异行，记欠账（能钉它的用例都经替用例设卡的函数，要先有一条不经它的用例）」) |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "GPU card order fetched only when routes.need_a_card",
+          "status": "static_correspondence",
+          "evidence": [
+            "crash_amplification.rs:17534-17538; wrapper17442 delegates to run_one_slice_round_from_environment_with_observers"
+          ]
+        },
+        {
+          "claim": "Precise function localization in document",
+          "status": "stale_localization",
+          "evidence": [
+            "Current branch moved from wrapper to helper, still called by named wrapper. No claim that behavior removed."
+          ]
+        },
+        {
+          "claim": "No discriminating mutation and all tests use card-setting helper",
+          "status": "pending",
+          "evidence": [
+            "Literal anchor search alone cannot prove all test paths or equivalent mutations absent; no mutation executed."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "en",
+      "document": ".claude/kb/checks-owed.en.md",
+      "sha256": "bec397c4fbbaedbca1da905550f114cfb1c2539f52d523a9473fd5e0a4c322f6",
+      "line": 604,
+      "id": "C960",
+      "text": "| C960 | Edge-level exclusion of gate-type edges has no self-test rule | The section 「复用重型门禁的判定」 of `.claude/rules/implementation-workflow.md` states that an edge-level exclusion must carry a three-cell self-test, one cell being 「这条路上的任何异常不改包装退出码」 (any failure along this path does not change the wrapper exit code), which cannot be applied literally to a \"gate\"-type edge (acceptance: the exit code is what decides whether to run in the first place; e.g. the edge where `e183-capacity-cells.sh` invokes `admission.py` in `EXCLUDED_PROGRAM_EDGES` of `scripts/gate/lib_function_units.py`); that entry's self-test was written instead under the rule \"decides only whether to run and produces no reading\", while the rule document itself lacks a clause for gate edges | First settle the rule for gate edges (what each of the three self-test cells must test for a gate edge), then add a red-turning check for gate edges in `EXCLUDED_PROGRAM_EDGES`: missing any cell required by the gate-edge rule turns red; changing the rule file goes through the three-party flow or a user exemption, so only the debt is recorded here | Changing the rule file goes through the three-party flow or a user exemption (`.claude/rules/implementation-workflow.md`); destination: not yet scheduled into a milestone, waiting for the main agent | `records/2026-11-01-判定库服务化.md` line 475 (handback of the acceptance gate-edge item: 「规则『这条路上的任何异常不改包装退出码』对闸边套不上字面，要不要补一句闸边口径（规则改动，先记）」) |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Policy requires excluded-edge anomaly leave wrapper exit unchanged",
+          "status": "static_correspondence",
+          "evidence": [
+            ".claude/rules/implementation-workflow.md:31"
+          ]
+        },
+        {
+          "claim": "Actual E183 admission edge uses different anomaly criterion",
+          "status": "static_correspondence",
+          "evidence": [
+            "lib_function_units.py:9341-9345,12672-12713; anomaly cells require nonzero exit and no build/product"
+          ]
+        },
+        {
+          "claim": "Output stripping and removed-unit reachability selftest bodies exist",
+          "status": "static_correspondence",
+          "evidence": [
+            "lib_function_units.py:12716-12777"
+          ]
+        },
+        {
+          "claim": "Historical decision authorization and runtime selftest results",
+          "status": "pending",
+          "evidence": [
+            "Current history and rule text are not independent proof of original user quotes; task5288 not fetched in this continuation."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "ja",
+      "document": ".claude/kb/checks-owed.ja.md",
+      "sha256": "641cab4f086cd932f2584f504449b1ca533f29d33f1e268dc133a5d5014586b1",
+      "line": 599,
+      "id": "C955",
+      "text": "| C955 | 判定ライブラリを開くときに使い捨てライブラリも設定せずガードも取らない | checker 層のテスト（`crates/*/tests/` 内のテストケース、`crates/*/src/bin/` 内の単体テスト）が `LibraryOpenInThisProcess::open_or_share` または `CrashLibrary::open`（`crates/singlefs-checker-tier/src/crash_library.rs`）経由で判定ライブラリを開く際、事前に `make_it_the_library_of_this_process` で使い捨てライブラリを設定することも、`TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out`（同ファイル、「サービスのその一つを使う」ガード）を取ることもしていない：同じテストバイナリ内の別のテストケースが使い捨てライブラリを設定しているとその一つを開いてしまい、あちらのケースが終了時に一時サービスを止めると、こちら側の続く読み書きが接続できなくなる（終了コード 75）；誰も設定していなければリポジトリ全体のその一つを開き、テストが本物のサービスに書き込んでしまう。現時点では赤になる検査がなく、ライブラリテストが赤になった件とガードの件は箇所ごとに人手で確認した | 静的セル一つ：`crates/*/tests/*.rs` と `crates/*/src/bin/*.rs` の中で `open_or_share(` または `CrashLibrary::open(` を呼ぶ関数について、ライブラリを開く前に `make_it_the_library_of_this_process(` と `keep_disposable_libraries_out(` のどちらも見つからないものは赤とし、関数を名指す；補助関数経由で開くものは補助関数の呼び出し元を探す；判別力のサンプル二つ：開く前にどちらもないもの（赤になる）と、先にガードを取るもの（赤にならない） | ライブラリ設定関数とガードはどちらも既にある（`crates/singlefs-checker-tier/src/crash_library.rs`）；まず「開く前に見つかる」の基準（同じ関数本体内か、呼び出し元を遡って探すか）を決めてからセルを立てる；行き先：マイルストーン未編入、メイン agent の編入待ち | `records/2026-11-01-判定库服务化.md` 第 419 行（GPU 設定テストの件の差し戻し：「验证包测试开引擎而没设一次性库」に赤になる検査がなく、負債として記録）、第 455 行（ライブラリテスト 3 か所が赤になった件）、第 458 行（ガードの件） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Setting and guard APIs exist and exclude each other",
+          "status": "static_correspondence",
+          "evidence": [
+            "crates/singlefs-checker-tier/src/crash_library.rs:576-590 write guard",
+            "crash_library.rs:615 RwLock",
+            "crash_library.rs:635-640 read guard",
+            "crash_library.rs:652-657 Drop clears selected library"
+          ]
+        },
+        {
+          "claim": "Unguarded open can select another test temporary library",
+          "status": "static_correspondence",
+          "evidence": [
+            "crash_library.rs:691-710 clones current selection without acquiring the setting read guard"
+          ]
+        },
+        {
+          "claim": "Disconnect necessarily exits75",
+          "status": "needs_narrowing",
+          "evidence": [
+            "Temporary selection sets PruneServerFailureHandling::ReturnTheError at crash_library.rs:698; permanent selection sets ExitTheProcess. Caller behavior not fully traced."
+          ]
+        },
+        {
+          "claim": "No static checker and all relevant test callsites audited",
+          "status": "pending",
+          "evidence": [
+            "Registry absence and whole-caller-chain enumeration not proved; proposed gate is future work, not existing behavior."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "ja",
+      "document": ".claude/kb/checks-owed.ja.md",
+      "sha256": "641cab4f086cd932f2584f504449b1ca533f29d33f1e268dc133a5d5014586b1",
+      "line": 600,
+      "id": "C956",
+      "text": "| C956 | 簡易クライアントの読み出しがフレームを分割しない | 読み出し経路が `SimpleClient::read`（`prune-server/src/client.rs`）で大きくなり得る値を読む：1 フレームだけ送って分割しないため、応答がフレーム長上限を超えるとフレームごと拒否される；クラッシュライブラリの点読みとプレフィックス走査は既にこれを通らない（`ReliableClient` を通り、応答がフレーム長を超えそうならキーを半分に割る） | 静的セル一つ：`prune-server/src/` と `crates/` 内の `SimpleClient::read(` の呼び出し箇所のうち、登録表（何を読むか、なぜフレーム長上限を超えないかを箇所ごとに書く）にないものは赤とし、既存分は縮むだけの遅延表に登記する；判別力のサンプル二つ：値全体を読む未登録の呼び出し箇所（赤になる）と、数バイトの番兵を読み登録済みの箇所（赤にならない） | まず現時点の `SimpleClient::read` の呼び出し箇所を調べ（`grep -rn 'SimpleClient' prune-server/src crates`）、小さい値を読む箇所と大きい値を読む箇所を箇所ごとに仕分ける；`SimpleClient::read` 自体をフレーム分割するように改めればこの項目は立てなくてよい；行き先：マイルストーン未編入、メイン agent の編入待ち | `records/2026-11-01-判定库服务化.md` 第 405 行（一括点読みフレーム分割の件の差し戻し：「SimpleClient::read 只发一帧不拆，崩溃库点读不走它，记进 checks-owed」） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "SimpleClient::read submits one frame without recursive halving",
+          "status": "static_correspondence",
+          "evidence": [
+            "prune-server/src/client.rs:879-892"
+          ]
+        },
+        {
+          "claim": "ReliableClient point read halves keys after MalformedPayload when more than one key",
+          "status": "static_correspondence",
+          "evidence": [
+            "prune-server/src/reliable_client.rs:797-829; one-key rejection remains an error, other malformed payload also causes splitting"
+          ]
+        },
+        {
+          "claim": "Prefix scans use the same halving mechanism",
+          "status": "wording_needs_narrowing",
+          "evidence": [
+            "ReliableClient::scan:897-927 sends one frame; storage::scan_prefix:597-637 truncates by count/bytes; verdict_store::visit_stored_rows_with_prefix:2734-2787 splits truncated prefixes into256 subprefixes, not halves of key list."
+          ]
+        },
+        {
+          "claim": "Every remaining SimpleClient read callsite is classified",
+          "status": "pending",
+          "evidence": [
+            "Proposed registry has not been audited/constructed; no whole-callsite signoff."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "ja",
+      "document": ".claude/kb/checks-owed.ja.md",
+      "sha256": "641cab4f086cd932f2584f504449b1ca533f29d33f1e268dc133a5d5014586b1",
+      "line": 601,
+      "id": "C957",
+      "text": "| C957 | prune-server 自身のテストがゲートに入っていない | prune-server はワークスペース外の独立プロジェクト（リポジトリルート `Cargo.toml` の `exclude`）であり、自身の cargo テストターゲット（`prune-server/tests/` 下のいくつか、例 `reliable_client_prefix_scan_after_busy.rs`、`offline_drop_of_whole_values_too_long_for_one_frame.rs`）はどのゲートにも入っておらず、マージ後検証でも高速層でも走らない：これらのテストが赤になってもゲートは緑のままになる | ゲートのセル一つ：`prune-server/tests/` 下の各テストターゲットを名指しし、サービス経由で `cargo test --manifest-path prune-server/Cargo.toml --test <ターゲット>` を走らせ、一つでも赤なら赤と判定する；ディレクトリ内に名指しされていないファイルが増えた場合も赤と判定する；判別力：テストの一つのアサーションを壊すとこのセルが赤になる | まず `.claude/gate.d/` のどのゲートが現在 prune-server のビルドと自己検証を起動しているかを確認し、このセルをどこに掛けるか決める；テストターゲットは prune-server 自身のマニフェスト下でのみビルドし、ワークスペースの `cargo test` には入れない；行き先：マイルストーン未編入、メイン agent の編入待ち | `records/2026-11-01-判定库服务化.md` 第 396 行（Rust 大値チャンク分割の件の差し戻し、決定 ⑤「prune-server 新 cargo test 目标平时没门禁跑——记欠账」）、第 450 行および第 462 行（二つの例テストの由来） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "prune-server excluded from root Cargo workspace",
+          "status": "static_correspondence",
+          "evidence": [
+            "Cargo.toml:18 exclude"
+          ]
+        },
+        {
+          "claim": "Named tests not in any gate; their failure leaves gates green",
+          "status": "discrepancy",
+          "finding": "A42",
+          "evidence": [
+            "crates/mutations.tsv:6548,6552,6553",
+            "checker-tier-crates-mutation-replay.sh:336",
+            "crates-mutation-rows.py:3705,4905,5116"
+          ]
+        },
+        {
+          "claim": "Whole directory enumerated in routine and quick validation",
+          "status": "pending",
+          "evidence": [
+            "Existing selective mutation path is not whole-package coverage; proposed exhaustive gate remains distinct."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false,
+      "revalidations": [
+        {
+          "at": "2026-11-05",
+          "line": 601,
+          "sha256": "32866db7f808d53366debed5e3f5cd705787ccdaed05acf0591149aca6f8f1ee",
+          "text": "| C957 | prune-server 自身のテストがゲートに入っていない | prune-server はワークスペース外の独立プロジェクト（リポジトリルート `Cargo.toml` の `exclude`）であり、自身の cargo テストターゲット（`prune-server/tests/` 下のいくつか、例 `reliable_client_prefix_scan_after_busy.rs`、`offline_drop_of_whole_values_too_long_for_one_frame.rs`）はどのゲートにも入っておらず、マージ後検証でも高速層でも走らない：これらのテストが赤になってもゲートは緑のままになる | ゲートのセル一つ：`prune-server/tests/` 下の各テストターゲットを名指しし、サービス経由で `cargo test --manifest-path prune-server/Cargo.toml --test <ターゲット>` を走らせ、一つでも赤なら赤と判定する；ディレクトリ内に名指しされていないファイルが増えた場合も赤と判定する；判別力：テストの一つのアサーションを壊すとこのセルが赤になる | まず `.claude/gate.d/` のどのゲートが現在 prune-server のビルドと自己検証を起動しているかを確認し、このセルをどこに掛けるか決める；テストターゲットは prune-server 自身のマニフェスト下でのみビルドし、ワークスペースの `cargo test` には入れない；行き先：マイルストーン未編入、メイン agent の編入待ち | `records/2026-11-01-判定库服务化.md` 第 396 行（Rust 大値チャンク分割の件の差し戻し、決定 ⑤「prune-server 新 cargo test 目标平时没门禁跑——记欠账」）、第 450 行および第 462 行（二つの例テストの由来） |",
+          "conclusion": "三语仍称不在任何门禁；保留A42范围结论。原证据行按当次摘要解释，后续源码再变不覆盖旧观察。"
+        }
+      ]
+    },
+    {
+      "language": "ja",
+      "document": ".claude/kb/checks-owed.ja.md",
+      "sha256": "641cab4f086cd932f2584f504449b1ca533f29d33f1e268dc133a5d5014586b1",
+      "line": 602,
+      "id": "C958",
+      "text": "| C958 | sha256 の三つの手書き実装に突き合わせテストがない | 手書きの SHA-256 には三つの独立モジュールがある：`crates/singlefs-harness/src/sha256.rs`、`crates/singlefs-unit-graph/src/sha256.rs`、`prune-server/src/sha256.rs`（`grep -rln -e \"fn sha256\" -e \"struct Sha256\" crates/ prune-server/src scripts/` で確認、他に実験装置がそれぞれ埋め込んだものがあるがこの三つには含まれない）；後ろ二つのファイルヘッダには harness のものを手本に別書きしたとあり、三つが同じ入力群に同じダイジェストを出すことを強制する検査が一つもなく、一つを書き損じてもリポジトリ外の `sha256sum` や Python `hashlib` で再計算するまで気づかない（装置間の基準、`.claude/singlefs-ai-sop/rules/show-me-test.md`「建模口径上」の行「立在装置之间」） | 突き合わせテストのセル一つ：同一のベクタ表（標準ベクタおよびブロック境界長 55、56、63、64、65 バイトの入力）を三つそれぞれのテストが読み、ダイジェストが表と一致しなければ赤と判定する；判別力：三つのうち一つの 1 ビットを壊すとこのセルが赤になる | まず一つに統合するか三つで同じ表を照合するか決める：prune-server はワークスペース外にありリポジトリルートの crate に依存しない（`prune-server/src/sha256.rs` のファイルヘッダ）ため、統合しないならベクタ表は三つのプロジェクトすべてから読める位置に置く；行き先：マイルストーン未編入、メイン agent の編入待ち | `records/2026-11-01-判定库服务化.md` 第 396 行（Rust 大値チャンク分割の件の差し戻し、決定 ④「sha256 三份手写并不并下一轮再说（记进 checks-owed）」） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Three independent SHA256 module paths and headers",
+          "status": "paths_and_test_bodies_confirmed",
+          "evidence": [
+            "Three paths exist; module implementations not yet fully read in this continuation."
+          ]
+        },
+        {
+          "claim": "No existing shared-input check; external recomputation required to detect mistake",
+          "status": "discrepancy",
+          "finding": "A40",
+          "evidence": [
+            "harness sha256 tests204",
+            "unit-graph sha256 tests265",
+            "prune-server sha256 tests212; same four input/digest pairs"
+          ]
+        },
+        {
+          "claim": "Shared maintained table/unified three-module test and all boundary lengths",
+          "status": "pending",
+          "evidence": [
+            "Distributed existing assertions do not establish shared table or comprehensive gate."
+          ]
+        },
+        {
+          "claim": "Million-byte vector covers bit length above32bits",
+          "status": "discrepancy_in_source_comment",
+          "finding": "A41",
+          "evidence": [
+            "1000000*8=8000000 < 2**32"
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "ja",
+      "document": ".claude/kb/checks-owed.ja.md",
+      "sha256": "641cab4f086cd932f2584f504449b1ca533f29d33f1e268dc133a5d5014586b1",
+      "line": 603,
+      "id": "C959",
+      "text": "| C959 | カードが必要なときだけ GPU カード順序を取る箇所に変異行がない | `crates/singlefs-checker-tier/src/crash_amplification.rs` の `run_from_environment`（実装は `run_from_environment_with_observers` 内の `routes.need_a_card()` の分岐）で「カードが必要なときだけ GPU カード順序を取る」箇所に変異行が割り当てられていない：そこを固定できる既存のテストケースはすべてテスト内でケースの代わりにカードを設定する関数（`common_crash_points`）を経由するため、変異ゲートが実行全体の環境をクリアしてもその関数がカードを設定してしまい、「カード不要の回でも GPU カード順序を取る」変異を入れても赤にならない | `crates/mutations.tsv` に 1 行足し、`routes.need_a_card()` の分岐をカード要否にかかわらず GPU カード順序を取るように変え、カード設定補助関数を経由しないテストケースを一つ組み合わせる：GPU スイッチだけを入れ環境で GPU カード順序を渡さない回で、順序を取れば赤になり、変異下でそのテストケースが赤になる | まず `common_crash_points` を経由しないテストケースを一つ用意する（カード設定補助関数に頼らず自分でカード変数をクリアする）；行き先：マイルストーン未編入、メイン agent の編入待ち | `records/2026-11-01-判定库服务化.md` 第 449 行（カード項目の件の差し戻し：「run_from_environment 那处不配变异行，记欠账（能钉它的用例都经替用例设卡的函数，要先有一条不经它的用例）」） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "GPU card order fetched only when routes.need_a_card",
+          "status": "static_correspondence",
+          "evidence": [
+            "crash_amplification.rs:17534-17538; wrapper17442 delegates to run_one_slice_round_from_environment_with_observers"
+          ]
+        },
+        {
+          "claim": "Precise function localization in document",
+          "status": "stale_localization",
+          "evidence": [
+            "Current branch moved from wrapper to helper, still called by named wrapper. No claim that behavior removed."
+          ]
+        },
+        {
+          "claim": "No discriminating mutation and all tests use card-setting helper",
+          "status": "pending",
+          "evidence": [
+            "Literal anchor search alone cannot prove all test paths or equivalent mutations absent; no mutation executed."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    },
+    {
+      "language": "ja",
+      "document": ".claude/kb/checks-owed.ja.md",
+      "sha256": "641cab4f086cd932f2584f504449b1ca533f29d33f1e268dc133a5d5014586b1",
+      "line": 604,
+      "id": "C960",
+      "text": "| C960 | ゲート類エッジのエッジ単位除外に自己検証基準がない | `.claude/rules/implementation-workflow.md`「复用重型门禁的判定」節ではエッジ単位除外に 3 セルの自己検証を求めており、そのうち「这条路上的任何异常不改包装退出码」（この経路上のいかなる異常もラッパー終了コードを変えない）は「ゲート」類エッジ（受入：終了コードがそもそも走るかどうかを決める；例 `scripts/gate/lib_function_units.py` の `EXCLUDED_PROGRAM_EDGES` にある `e183-capacity-cells.sh` が `admission.py` を起動するエッジ）には字面どおり当てはまらない；その登録の自己検証は「走るかどうかだけ決め、測定値は出ない」に沿って書かれており、規則にはゲートエッジの基準がない | まずゲートエッジの基準（3 セルの自己検証がゲートエッジに対してそれぞれ何を書くか）を定め、次に `EXCLUDED_PROGRAM_EDGES` 内のゲートエッジに赤になる検査を立てる：自己検証にゲートエッジ基準が求めるセルのどれかが欠けていれば赤と判定する；規則の変更は三者合意またはユーザー免除を通すため、ここでは負債の記録のみとする | 規則変更は三者合意またはユーザー免除を通す（`.claude/rules/implementation-workflow.md`）；行き先：マイルストーン未編入、メイン agent の編入待ち | `records/2026-11-01-判定库服务化.md` 第 475 行（受入ゲートエッジの件の差し戻し：「规则『这条路上的任何异常不改包装退出码』对闸边套不上字面，要不要补一句闸边口径（规则改动，先记）」） |",
+      "translation_comparison": "Read in full; main scope/proposed checks/prerequisites/historical references agree; the same overclaims are inherited. No glossary-wide signoff.",
+      "subclaims": [
+        {
+          "claim": "Policy requires excluded-edge anomaly leave wrapper exit unchanged",
+          "status": "static_correspondence",
+          "evidence": [
+            ".claude/rules/implementation-workflow.md:31"
+          ]
+        },
+        {
+          "claim": "Actual E183 admission edge uses different anomaly criterion",
+          "status": "static_correspondence",
+          "evidence": [
+            "lib_function_units.py:9341-9345,12672-12713; anomaly cells require nonzero exit and no build/product"
+          ]
+        },
+        {
+          "claim": "Output stripping and removed-unit reachability selftest bodies exist",
+          "status": "static_correspondence",
+          "evidence": [
+            "lib_function_units.py:12716-12777"
+          ]
+        },
+        {
+          "claim": "Historical decision authorization and runtime selftest results",
+          "status": "pending",
+          "evidence": [
+            "Current history and rule text are not independent proof of original user quotes; task5288 not fetched in this continuation."
+          ]
+        }
+      ],
+      "whole_paragraph_verified": false
+    }
+  ]
+}

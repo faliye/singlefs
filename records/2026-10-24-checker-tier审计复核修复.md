@@ -1,4 +1,4 @@
-# checker 档审计复核两项的修复与审计目录搬迁：调度记录
+# 验证包审计复核两项的修复与审计目录搬迁：调度记录
 
 ## 课题与出口
 
@@ -18,7 +18,7 @@
 |---|---|---|---|---|
 | 主 agent | 报告本身：checker-tier、checker 两个审计目录搬家与引用、两份记录与初稿的绝对链接 | `records/` 下四份、`research/prompts/recovery-audit-checker-tier-2026-10-24/`、`research/prompts/recovery-audit-checker-2026-10-24/` | 无 | 1（已做） |
 | 主 agent | harness 审计目录搬家与那份记录的 6 处绝对链接 | `crates/singlefs-harness/audits/`、`records/2026-10-24-singlefs-harness-恢复验证审计.md` | 那个目录还在被别的会话写，等它停下 | 2（已做：搬到 `research/prompts/recovery-audit-harness-2026-10-24/`，两份脚本的 `ROOT` 随目录深度改成 `HERE.parents[2]`，日志里抄下的旧路径照留；搬之前那 15 个文件已被别的会话全部暂存，暂存状态原样带过去，已给在跑的会话发消息告知新路径） |
-| 实现员 | T01、T02（可能同改 `crates/singlefs-checker-tier/src/crash_given_states.rs`，聚成一簇） | `crates/singlefs-checker-tier/src/crash_judge_conclusions.rs`、`crash_judge_gpu.rs`、`crash_judge_recovery.wgsl`、`verdict_store.rs`、`crash_given_states.rs` 与引用恢复字的 checker 档测试、`crates/mutations.tsv` | 无 | 1 |
+| 实现员 | T01、T02（可能同改 `crates/singlefs-checker-tier/src/crash_given_states.rs`，聚成一簇） | `crates/singlefs-checker-tier/src/crash_judge_conclusions.rs`、`crash_judge_gpu.rs`、`crash_judge_recovery.wgsl`、`verdict_store.rs`、`crash_given_states.rs` 与引用恢复字的 验证包测试、`crates/mutations.tsv` | 无 | 1 |
 
 | 实现员（第二件） | T01 没改全的两处 4 字摘要：`crates/singlefs-checker-tier/src/crash_amplification.rs` 的 `recovery_words_of` 与 `crates/singlefs-checker-tier/src/crash_judge_gpu.rs` 的 `gpu_recovery_words` 仍截 txg 低 32 位（第一件实现员报告「要你定的」第 2 条） | 那两份源文件、`tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`、`tests/gpu_recovery_root_choice_refuses_root_record_pointer_head_fields_like_the_core.rs`、`tests/record_checker_judges_absence_by_the_persisted_set.rs`、`crates/mutations.tsv` | 第一件的补丁（已打） | 2 |
 
@@ -40,8 +40,8 @@
 ## 什么算写完（逐条）
 
 - 出口表 T01、T02 两行的条款都有实现：T01 对拍字、恢复字、判定库、GPU 结论字、两处 4 字摘要；T02 「判成立过」改读计数向量。没有「下一批再补」的行。
-- 每条新行为都有测试（第 1 批 8 条、第 2 批 3 条，都在 checker 档包，交回前没跑），每处改法都有变异行（第 1 批追加 8 行改写 1 行，第 2 批追加 5 行，全是 checker 档的重型行，证红留给提交时照 `.claude/skills/crash-test/commit-stages.md:1` 跑）。
-- 剩下只有跑出来才知道的：编译、测试、WGSL 内核、mutation-tables 那一格。进验证段。批内冒出的新发现进下一轮的清单。checker 档是测试代码，不开代码轮三方（`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」）。
+- 每条新行为都有测试（第 1 批 8 条、第 2 批 3 条，都在 验证包，交回前没跑），每处改法都有变异行（第 1 批追加 8 行改写 1 行，第 2 批追加 5 行，全是 验证包的重型行，证红留给提交时照 `.claude/skills/crash-test/commit-stages.md:1` 跑）。
+- 剩下只有跑出来才知道的：编译、测试、WGSL 内核、mutation-tables 那一格。进验证段。批内冒出的新发现进下一轮的清单。验证包是测试代码，不开代码轮三方（`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」）。
 
 ## 不碰（别的会话在改）
 
@@ -62,23 +62,23 @@
 ## 验证段
 
 - 合入后验证（两份补丁都已打，一条命令带 `--skip-apply`）第一趟：这一趟 ✓ 4 ✗ 1，✗ 的是：`cargo build --all-targets` 撞了内存上限 8G（`run-with-memory-cap` 报 oom-kill，退出码 143，日志 `~/.local/share/singlefs/work/merge-and-verify/2026-10-24-3760894/build.log` 里被杀前没有 rustc 报错）；fmt、clippy（含编码纪律 7 条）过。是上限给小了，不是代码红，照加大的上限重跑 build。
-- 看门狗报 checker 档快档那一步（进程 205201）在用核数过少：那一步在 `run-with-memory-cap.sh` 排内存（slice 已占 24 到 31 GiB，这一步要 36 GiB），不是装置串行，`--ack` 接着排。
-- 合入后验证第一趟收尾：这一趟 ✓ 4 ✗ 2 本次未跑 1，✗ 的是：`cargo build --all-targets` 撞内存上限 8G；checker 档快档本机内存排不上（包装退 252，一行没编）。本次未跑：测试（补丁只改 checker 档包）。照脚本的出路交第二台重跑，`--memory` 从 8G 提到 24G。
-- 合入后验证第二趟（`--peer --memory 24G`，第二台编）：这一趟 ✓ 3 ✗ 0 本次未跑 2，✓ 的是 fmt、clippy（含编码纪律 7 条）、build；本次未跑：测试（补丁只改 checker 档包）、checker 档快档（`--peer` 不交判定库）。照脚本打出的命令在本机原样起 `checker-tier-crash-point-replay.sh --check crash-case-replay,feature-gated-tests`。
-- 看门狗报本机 checker 档快档（进程 1754561）在用核数过少：同样是在 `run-with-memory-cap.sh` 排内存（slice 已占 29 到 35 GiB、要 36 GiB），`--ack` 接着排。
-- 本机 checker 档快档第二次排内存也满 60 分钟退 252（heavy slice 被别的会话占 34 GiB、总上限 40.1 GiB）。照包装给的出路经 `multi-host-run.sh --peer --memory-cap 36G` 挪第二台跑那两格；第二台没有本机的判定库，两格全部现判、不写回本机库；提交时快档照常在本机按键复用再跑。另一个会话那处 `crash_judge_checker_common.wgsl` 的 `const_assert` 写法（naga 解析不过）已由它改好，不归这一轮。
+- 看门狗报 验证包快档那一步（进程 205201）在用核数过少：那一步在 `run-with-memory-cap.sh` 排内存（slice 已占 24 到 31 GiB，这一步要 36 GiB），不是装置串行，`--ack` 接着排。
+- 合入后验证第一趟收尾：这一趟 ✓ 4 ✗ 2 本次未跑 1，✗ 的是：`cargo build --all-targets` 撞内存上限 8G；验证包快档本机内存排不上（包装退 252，一行没编）。本次未跑：测试（补丁只改 验证包）。照脚本的出路交第二台重跑，`--memory` 从 8G 提到 24G。
+- 合入后验证第二趟（`--peer --memory 24G`，第二台编）：这一趟 ✓ 3 ✗ 0 本次未跑 2，✓ 的是 fmt、clippy（含编码纪律 7 条）、build；本次未跑：测试（补丁只改 验证包）、验证包快档（`--peer` 不交判定库）。照脚本打出的命令在本机原样起 `checker-tier-crash-point-replay.sh --check crash-case-replay,feature-gated-tests`。
+- 看门狗报本机 验证包快档（进程 1754561）在用核数过少：同样是在 `run-with-memory-cap.sh` 排内存（slice 已占 29 到 35 GiB、要 36 GiB），`--ack` 接着排。
+- 本机 验证包快档第二次排内存也满 60 分钟退 252（heavy slice 被别的会话占 34 GiB、总上限 40.1 GiB）。照包装给的出路经 `multi-host-run.sh --peer --memory-cap 36G` 挪第二台跑那两格；第二台没有本机的判定库，两格全部现判、不写回本机库；提交时快档照常在本机按键复用再跑。另一个会话那处 `crash_judge_checker_common.wgsl` 的 `const_assert` 写法（naga 解析不过）已由它改好，不归这一轮。
 - 第二台快档那一趟：这一趟 ✓ 0 ✗ 1，✗ 的是：第二台在用 2.6 核（登记 31，近 606 秒）。现查第二台进程：在跑 `scripts/gate/admission.py test-plan`（逐个测试函数算单元键，单线程 python，已 5 分钟），还没到编译与测试；是装置没声明的串行段，不是卡住，`--ack` 接着跑。
-- 第二台快档那一趟收尾：这一趟 ✓ 1 ✗ 2，✓ 的是不带特性的 checker 档快档（现判 1750、复用 0、拒算 71，没有红）；✗ 的是 crash-case-replay（`make-filesystem-over-a-used-pool-stream`、`random-histories-and-fault-injection-given-states` 两条退 78：第二台上没照配置清场，命令没起）与 feature-gated-tests（带 gpu 特性那一趟同样因没清场没起）。两样都不是代码红，算本次未跑；本机 5090 上有别的会话的计算进程，本机清场回读过不了，GPU 那一侧留给提交时快档带 gpu 特性那一趟（`.claude/skills/crash-test/commit-stages.md:1`）。
+- 第二台快档那一趟收尾：这一趟 ✓ 1 ✗ 2，✓ 的是不带特性的 验证包快档（现判 1750、复用 0、拒算 71，没有红）；✗ 的是 crash-case-replay（`make-filesystem-over-a-used-pool-stream`、`random-histories-and-fault-injection-given-states` 两条退 78：第二台上没照配置清场，命令没起）与 feature-gated-tests（带 gpu 特性那一趟同样因没清场没起）。两样都不是代码红，算本次未跑；本机 5090 上有别的会话的计算进程，本机清场回读过不了，GPU 那一侧留给提交时快档带 gpu 特性那一趟（`.claude/skills/crash-test/commit-stages.md:1`）。
 - 轻型三条：形式化 ✓（3 格绿：Verus 69 项 78 verified 0 errors，钉表 360 行）；崩溃（点名 4 项）第一趟编译撞内存上限 8G 被杀（退 250），加到 24G 重跑；变异（点名 14 行：两批追加的 13 行与改写的 E2 J8 一行）在跑。
-- 命名检查：`naming-lint.sh` 全仓 3489 处是排除表里的旧账，checker 档包 887 处命中逐行对两份补丁新加的行，落在新加行上的 0 处。
+- 命名检查：`naming-lint.sh` 全仓 3489 处是排除表里的旧账，验证包 887 处命中逐行对两份补丁新加的行，落在新加行上的 0 处。
 - 变异轻型（点名 14 行加核心部分）：这一趟 ✓ 275 ✗ 0 本次未跑 5，抓到 275、没红 0、无效 0；这一批的 14 行里 9 行抓到（T01、T02 的 CPU 一侧 8 行与改写的 E2 J8 一行），5 行带 gpu 特性的（`crates/mutations.tsv` 第 5494、5495、5506、5507、5508 行：GPU 结论、GPU 恢复内核、GPU 恢复摘要三行）照多机配置清场回读没过（卡上有别的会话的计算进程），基线没起、变异没跑，算本次未跑，留给提交时 checker-tier-crates-mutation-replay（`.claude/skills/crash-test/commit-stages.md:1`）。
 - 崩溃轻型（24G，点名 4 项加核心部分）：这一趟 ✓ 0 ✗ 0 本次未跑 全部，入口末句报「30 项红」，逐行数：78 行 ✗ 里 36 行是 `cargo test 退 78、红 0 条`、42 行是「照多机配置清场之后回读没过」，另 29 项报本次未跑（放量入口与双机驱动退 78）；没有一行是测试判红（红条数全是 0）。原因是卡上有别的会话的计算进程，清场回读过不了，用 GPU 的项都没起。
 
 ## 验证段小结
 
-- 绿：fmt、clippy（含编码纪律 7 条）、build（第二台 24G）、checker 档快档不带特性那一趟（第二台现判 1750、没有红）、形式化轻型 3 格、变异轻型 275 抓到 0 没红 0 无效（这一批 14 行里 9 行抓到）、命名检查（新加行 0 处命中）。
-- 本次未跑（都因 GPU 清场过不了或第二台没清场，不是代码红）：checker 档快档带 gpu 特性那一趟与两条 `red-blocks=judged-by-test` 崩溃枚举用例、变异轻型里 5 行 GPU 变异、崩溃轻型全部项。等卡空出来在本机重跑崩溃轻型与那 5 行变异；没等到的照提交时六道重阶段跑（`.claude/skills/crash-test/commit-stages.md`）。
-- 没开代码轮三方：两批只改 checker 档包（测试代码，`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」）。
+- 绿：fmt、clippy（含编码纪律 7 条）、build（第二台 24G）、验证包快档不带特性那一趟（第二台现判 1750、没有红）、形式化轻型 3 格、变异轻型 275 抓到 0 没红 0 无效（这一批 14 行里 9 行抓到）、命名检查（新加行 0 处命中）。
+- 本次未跑（都因 GPU 清场过不了或第二台没清场，不是代码红）：验证包快档带 gpu 特性那一趟与两条 `red-blocks=judged-by-test` 崩溃枚举用例、变异轻型里 5 行 GPU 变异、崩溃轻型全部项。等卡空出来在本机重跑崩溃轻型与那 5 行变异；没等到的照提交时六道重阶段跑（`.claude/skills/crash-test/commit-stages.md`）。
+- 没开代码轮三方：两批只改 验证包（测试代码，`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」）。
 - 待查：`apply-writer-patch.py` 打两批时报的 code-source-discipline mutation-tables 格退 1，这一格只在提交流程里跑，提交时整轮门禁判。
 - 崩溃轻型补跑（卡空了）：看门狗报第二台 `read-faulted-states-never-hold-the-witness-criterion`（核心部分老项，不是这一批改的）在用 4.6 核：现查第二台只有那条测试二进制一个进程、单线程约 95% CPU，没声明串行段。停它这一轮验证就跑不完、改装置超出这一轮范围，`--ack` 接着跑；跑完照它的用时判要不要登欠账。
 - 同一趟：第二台「给定状态表」那一项（进程 3453088）0 核，现查是在第二台 `run-with-memory-cap.sh 24G` 排内存（那边 heavy slice 被别的会话的 E185 装置占着），不是装置串行，`--ack` 接着排。
@@ -97,8 +97,8 @@
 ## 验证段收尾
 
 - 轻型三条全绿：形式化 3 格；变异轻型核心部分 266 条加这一批 14 行全部抓到（没红 0、无效 0、基线不绿 0）；崩溃轻型 39 项不红。
-- 合入后验证：fmt、clippy、build 绿；checker 档快档不带特性那一趟绿（第二台现判 1750、没有红）。
-- 还没验到的：checker 档快档带 gpu 特性那一趟与两条 `red-blocks=judged-by-test` 崩溃枚举用例（第二台那一趟没清场退 78，本机内存排不上），交由提交时 `checker-tier-crash-point-replay` 快档；code-source-discipline 的 mutation-tables 格（只在提交流程里跑）。
+- 合入后验证：fmt、clippy、build 绿；验证包快档不带特性那一趟绿（第二台现判 1750、没有红）。
+- 还没验到的：验证包快档带 gpu 特性那一趟与两条 `red-blocks=judged-by-test` 崩溃枚举用例（第二台那一趟没清场退 78，本机内存排不上），交由提交时 `checker-tier-crash-point-replay` 快档；code-source-discipline 的 mutation-tables 格（只在提交流程里跑）。
 - 延后项去向：R01 → C898；协作工具两条 → `records/2026-10-23-subagent拆分提案.md` 一百一十六、一百二十三；单线程用例 → C907。
 
 ## 第 3 批：延后项（用户 2026-10-25 弹窗选四项、允许多开子 agent）
@@ -143,3 +143,14 @@
 - 变异轻型（C907 两行加核心部分）收尾：这一趟 ✓ 266 ✗ 0 本次未跑 2，抓到 266、没红 0、无效 0（共 268 条，现判 261、复用 7；现判的 257 条是点名测试的闭包变了）；C907 两行都抓到。基线不绿 2 行都是环境：第 2944 行（点名 GPU 测试，清场回读没过：卡让给里程碑四预开发会话在用）、第 5070 行（C656，峰值表记撞过顶、每条要 12G，比外层 8G 大，一行没跑）；都是核心部分老行。等里程碑四预开发会话用完卡，外层给够内存单独重跑这两行。
 - 里程碑四预开发会话的崩溃轻型带 `--local-only`、走单机路，照不到双机导入那条路径，它只回报那一项在单机路上的结果。主 agent 派调查员（只读：读代码与 `crash-amplification-…-2531097-two-hosts` 那几份日志）回答双机导入那一趟何时报「录入段那一块不在库里」、为什么上一趟绿这一趟红，并写出只跑这一分项的复现命令交主 agent；双机复现等里程碑四预开发会话用完卡由主 agent 跑。
 - 调查员（several-inodes 那一处红）报告 `~/.local/share/singlefs/work/investigate-import-missing-observer-block/result.md`（sha256 `5a01347d…1f32f01bd2c`）：这一项录入段与本机判段用旧二进制，导入那一趟前主工作区打进了里程碑四的七·3 骨架补丁（`m4-gpugc-skeleton-writer/patch/crates.patch`，sha256 `c3cf9ea5…`）重编，补丁改到观察者 writable_mount_and_continuation 闭包里的单元，观察者版本变了，导入那一趟按新版本找不到录入块。主 agent 现查：import.log 有 3 行 `Compiling singlefs-`、2m 49s，share-0.log 0 行、0.54s；补丁点名的 5 份文件都在 share-0 与 import 之间改过、`git apply --check --reverse` 退 0；同一窗口另有 5 份测试文件（`tests/` 下）也被别的会话改过，调查员写成「正好是补丁那 5 个」不准，测试文件不进观察者闭包，不推翻结论。结论：不是代码缺陷，是跑的中途树被别的会话改了，与这一批无关；冻住的树上重跑这一项预言绿（推的），卡空出来时随下一趟崩溃轻型核。顺带的工具毛病（版本闸在分项驱动交来的判段那条路上跳过、报成通用红）登拆分提案一百二十八。
+- 2026-10-28 GPU 补跑：这一轮的改动已随 2026-10-26 的提交进了 HEAD；两台卡都空着，经 `detached-run.sh` 起崩溃轻型（核心部分加 several-inodes-overwritten-in-turn，24G）。看门狗判定行这一趟 ✓ 4 ✗ 2，✗ 的是：crash-light-several-inodes 在用 7.1 核（声明了串行 243 秒：在卡上算，成立，`--ack`）；debt-gpu-checks-2 在用 0.0 核（别的会话的脱离单元，不碰）。
+- 2026-10-29 GPU 补跑结局（主工作区那一趟）：`CRASH_POINT_REPLAY_TOTAL tier=quick dispatched=52 collected=52 green=36 red=11 not_run=5`。这一趟 ✓ 36 ✗ 11 本次未跑 5，✗ 的是：unlink-after-the-fixed-script、position-addressed-trees、one-file-overwritten-across-two-writable-remounts、several-inodes-overwritten-in-turn、large-file-overwritten-across-lower-leaves、unlink-of-two-files-holding-data、truncate-to-zero-on-a-nearly-full-pool、compaction-deadlist-reclamation、three-generation-mount-fork、tree-split-and-shrink、nearly-full-pool-ro-fallback；11 项都是放量录入段退 101、states=0：录入日志是 `error[E0425]: cannot find function every_byte_is_zero`（别的会话往 `crates/singlefs-core/src/bytes.rs` 加函数、改调用方，HEAD 里没有这几个函数）与 `no test target named crash_enumeration_nearly_full_pool_ro_fallback_stream`（别的会话撤了这一项的测试目标），不是崩溃一致性判红；本次未跑的 5 项：crash-injection-fast-tier、read-faulted-states-never-hold-the-witness-criterion（双机驱动核源码摘要，中途被别的会话改树，退 77）、compaction-relocation、lifecycle-closure（放量退 77）、both-tiers:pinned-red-examples（还没有钉表）。改在 HEAD 59ce5a865 的冻住副本 `~/.local/share/singlefs/work/checker-audit-crash-light-frozen`（git worktree）上整趟重核，脱离单元 crash-light-frozen-head。
+- 2026-10-29 冻住副本那一趟起跑：看门狗判定行这一趟 ✓ 3 ✗ 2，✗ 的是：crash-light-frozen-head 在用 0.0 核（run-with-memory-cap 排队等内存：slice 已占 36.1 GiB、这一条要 24 GiB，成立，`--ack`）；crash-light-speed-merge-verify-clean 在用 0.0 核（别的会话的脱离单元，不碰）。
+- 2026-10-29 冻住副本第一次起跑（crash-light-frozen-head）排了 8234 秒内存后退出、什么都没跑：`.claude/singlefs-ai-sop/` 在 `.gitignore` 里，`git worktree add` 带不过来，`lib_crash_point_replay_items.py` 报 `ModuleNotFoundError: No module named 'preflight'`。从主工作区补拷规范副本（`diff -rq` 一致）后重起，脱离单元 crash-light-frozen-head-2。
+- 2026-10-29 用户：「如果轻型跑10个小时 这就是明确的问题」。主工作区那一趟的时间账（量的，日志 `~/.local/state/singlefs/detached-runs/crash-light-several-inodes/log`）：快档 57 个测试目标逐个串行，`finished in` 合计 14624 秒（最大 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 5302 秒）；singlefs-checker-tier 编了 55 次、合计 3208 秒；等判定库锁约 5824 秒；三个双机快档项 7167 秒。这个课题归另一个会话（`records/2026-10-28-崩溃轻型提速.md`），这一轮不另改，数已发给它（SendMessage）；快档目标之间不并行那一条它的批次 2 里没有，由它判。
+- 2026-10-29 那个会话回：数已记进它的记录（标成转述的线索）；GPU 对拍目标在它批次 2 第 6 条放开单测试线程、按显存排队；快档目标之间并行这次不做，挡着的是判定库整趟独占锁（要改 `crash_amplification.rs` 开库那一段，别的会话在改），等它的对照跑完再定；crash-light-frozen-head-2 不用停，它起对照之前再找这边。
+- 2026-10-29 看门狗判定行这一趟 ✓ 7 ✗ 1，✗ 的是：crash-light-frozen-head-2 在用 2.3 核（声明了串行 551 秒：在卡上算，成立，`--ack`）。
+- 2026-10-29 冻住副本那一趟放量段红 2 项：multi-record-publish、unlink-after-the-multi-record-publish，都是开崩溃判定库时等锁满 1800 秒放弃（`等了 1800 秒别的进程还持着这份库的锁（上限 1800 秒，SINGLEFS_CRASH_LIBRARY_LOCK_WAIT_SECONDS 可改）`），不是崩溃一致性判红。持锁的是别的会话合入后验证树里的测试进程 `crash_enumeration_truncate_an_inode_other_than_the_first_to_zero_stream`（进程 3080028，已跑 1 小时以上，开着库的 `LOCK`）。报错前半句「按结论种类存之前的、判定向量编号还是一个字节的旧布局库拒绝」是 `crates/singlefs-checker-tier/src/crash_library.rs` 第 475 行对任何开库失败都套的话，等锁超时时误导；判定库一个进程整趟独占锁这一条，归在改提速的那个会话（它说要改 `crash_amplification.rs` 开库那一段）。这两项等锁空出来再补跑。
+- 那个会话回：进程 3080028 是它干净树上单跑 验证包快档两格的，判完才放锁；判定库锁的范围升成它下一批的头一件（这一批对照跑完就开），`crash_library.rs` 那句开库失败的话一起改成按原因分开报；那一趟结束它通知这边，再补跑这两项。
+- 2026-10-29 放量段第三项 unlink-merging-inode-leaf-containers 同样等锁满 1801 秒放弃（拿锁的进程号 2496236）。别的会话的测试进程不放锁时，剩下的放量项会逐项等满 1800 秒再红，一项也判不成，而这一趟又是旧配置，于是用 `detached-run.sh stop crash-light-frozen-head-2` 停掉；在新逻辑下的整趟轻型并进那个会话的改后对照一起跑。这一趟放量段判过的块已照块键入库；快档那一段是冻住树里的旧代码，不入库。
+- 清理：冻住副本 `~/.local/share/singlefs/work/checker-audit-crash-light-frozen`（510M，`git worktree remove --force`）与两趟冻住树轻型的运行目录 12 个（最大 82M）已删。

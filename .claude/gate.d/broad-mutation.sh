@@ -8,7 +8,7 @@
 # gate-similar: crates-mutation-replay.sh 它按 crates/mutations.tsv 手写的几十行逐条改坏 crates/、自己起 cargo、要点名的测试红；这里不自己起 cargo，起广谱变异驱动剪枝跑（cargo 归驱动）再读 cargo-mutants 全量清单在广谱变异判定库里的结论，两张表、两个判据、两个判定库都不同
 # gate-similar: code-source-discipline.sh 它的 mutation-tables 格静态判变异表成形、锚点唯一；这里不读变异表，读驱动 --summary 的判定行与判定库
 # gate-similar: formal-verification.sh 它起 Verus 判证明，每条判定按单元键在它自己的库里复用；这里只读广谱变异驱动的判定，并进去会让两件不相干的事共用一份判法
-# gate-similar: crash-point-replay.sh 它逐条核崩溃枚举用例的崩溃状态块、缺块报本次未跑；这里有没结论的判红不报本次未跑（用户定提交前跑完才能提交）
+# gate-similar: crash-point-replay.sh 它逐条核崩溃枚举用例的崩溃状态块、缺块报本次未跑；这里有没结论的判红不报本次未跑（提交前要跑完才能提交）
 #
 # gate-cell: gate-verdict 先起驱动剪枝跑（按单元键沿用、沿用不了的现判，判到此刻清单的全部条；--check gate-verdict 指定范围时不起、只读库），再读驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论（要 GPU 那一趟的条两趟合起来有结论）、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上；驱动没跑成判红；判定库服务不可用退 75
 # 参数解析、每格一个子 shell、汇总与退出码经共用库 lib/stage-cells.sh。
@@ -17,7 +17,7 @@
 #   抓它的测试的单元闭包键（没红的是能碰到它的测试各自的闭包键）、工具链、cargo-mutants / nextest / llvm 版本、构建环境的生效值、解析出的依赖版本、判法单元指纹
 #   （规则在 scripts/mutation/mutation-prune.py 文件头，判定库在 scripts/mutation/broad-mutation.py 文件头「判定库」「键」：prune-server 里那一份，族 broad-mutation）。
 #   判定库里没有「一版」：不比暂存树、不比提交，没有 library-version-is-staged-tree 格，没有 --marker-check；也没有整道标记，不问 stage-must-run.sh，每趟照判。
-#   记红、撤绿、下趟现判（用户 2026-10-29 弹窗定案；驱动文件头「判定行」末段）：这一道判红的是没红（missed > 0）与没结论；没红的条在驱动的剪枝跑里不沿用，每趟现判（同一把键更早的抓到、无效撤掉，
+#   记红、撤绿、下趟现判（驱动文件头「判定行」末段）：这一道判红的是没红（missed > 0）与没结论；没红的条在驱动的剪枝跑里不沿用，每趟现判（同一把键更早的抓到、无效撤掉，
 #   单独一行没红、先抓到后判没红都一样；要 GPU 那一趟的条看合起来的状态）；抓到、无效照键沿用。这一道只读 --summary：状态本来就取最后一个定论，没红照没红数，不另设格，红的这一支照抄 MISSED 明细。
 #   不指定范围（不带 --check）：这一道自己先起驱动 scripts/mutation/broad-mutation.py --source <被判的根>，不带选条参数（剪枝跑：每条按单元键沿用、沿用不了的现判，判到此刻清单的全部条，
 #   末尾补 GPU 那一趟，没卡的机器上那几条是本次未跑），驱动退非 0（跑不成、基线红、锁被占、环境坏了……）这一格判红、不往下读 --summary；退 75（判定库服务不可用）这一格退 75。
@@ -31,12 +31,12 @@
 #   NO_CONCLUSION、MISSED、REFUSED、UNLISTED 明细行数与计数不同、清单 0 条）、汇总行与判定行各数对不上（两行的 total、refused、unlisted_units，
 #   汇总行抓到加没红加无效对判定行的 concluded、汇总行只过了第一段加驱动错加没跑对 without_conclusion、汇总行六栏之和对它的 total），都判红。
 #   拒算的条（refused=：单元键里有认不出的形态、或抓到它的测试认不出）照报条数、逐条 REFUSED，有键相同的现判结论就算有结论（驱动每趟都现判它们）。
-#   GPU 那一趟（C489，用户 2026-10-22 定第二段补一趟带 gpu 特性的 验证包，驱动文件头「GPU 那一趟」）：CPU 那一趟没红、又有带 gpu 特性的测试够得着的条，
+#   GPU 那一趟（C489，驱动文件头「GPU 那一趟」）：CPU 那一趟没红、又有带 gpu 特性的测试够得着的条，
 #   要 GPU 那一趟的结论才算有结论：驱动 --summary 的汇总行与判定行都带 gpu_needed（要这一趟的条数）、gpu_reused（库里键相同的 GPU 结论）、gpu_not_run（还没有 GPU 结论：没卡、
 #   清场没过、没来得及跑，本次未跑不算没红也不算通过）、gpu_without_conclusion（GPU 趟驱动错）；后两种条在 without_conclusion 里、NO_CONCLUSION 明细的理由写 gpu-…。
 #   这一格判：判定行要有这四个数（没有的是旧驱动，判红）；gpu_needed = gpu_reused + gpu_not_run + gpu_without_conclusion；后两个之和不超过 without_conclusion（判绿的驱动
 #   不许把没有 GPU 结论的条当有结论数；GPU 趟没结论判红，红的那一支照抄 NO_CONCLUSION 明细）；汇总行的四个数与判定行的相同。
-#   驱动不设内存上限、不限时（驱动文件头「内存与限时」，用户 2026-10-31 定 SC02）：整条驱动是统一任务服务的一个任务，撞上限、卡住由服务停，在途那一条不落行；
+#   驱动不设内存上限、不限时（驱动文件头「内存与限时」）：整条驱动是统一任务服务的一个任务，撞上限、卡住由服务停，在途那一条不落行；
 #   汇总行六栏：抓到、没红、无效、只过了第一段、驱动错、没跑。判定库里认不出的结局驱动 --summary 报对不上、退 1，这一格照退 1 判红。
 #   判定库服务不可用（驱动 --summary 退 75：连不上、停了、忙到上限，scripts/prune-server/prune_server_client.py 文件头「退出码」）：这一格退 75，
 #   共用库把整道记成「prune-server 不可用」（不是红，也不算通过）；驱动退 3（服务的配置不对、回应解不开）照「退了 0、8 之外的码」判红。
@@ -93,7 +93,7 @@
 #       gate-verdict-gpu-silent-driver-red（判绿）
 #   CHECKER_TIER_BROAD_MUTATION_BREAK=gpu-totals-unchecked  不核汇总行的 GPU 趟计数与判定行的相同
 #       gate-verdict-gpu-summary-mismatch-red（判绿）
-#   CHECKER_TIER_BROAD_MUTATION_BREAK=driver-not-run  不起驱动（改前的样子：只读库，不判到全部条）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=driver-not-run  不起驱动，只读库、不判到全部条
 #       gate-verdict-driver-not-run-red（判绿）
 #   CHECKER_TIER_BROAD_MUTATION_BREAK=summary-unavailable-as-red  驱动 --summary 退 75（判定库服务不可用）也照「退了 0、8 之外的码」判红、退 1
 #       gate-verdict-service-unavailable（判红，退 1 不是期望的 75）
@@ -113,6 +113,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ broad-mutation.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 DRIVER="$STAGE_REPOSITORY/scripts/mutation/broad-mutation.py"
 SAMPLE_BUILDER="$STAGE_REPOSITORY/.claude/gate.d/lib/broad-mutation-samples.py"

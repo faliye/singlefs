@@ -87,7 +87,7 @@ All `q1a`–`q1f` in four S1 verdicts are 0: no lost or silently corrupt blocks,
 
 The registered row compares `research/results/e162-verdict-store-power-cut-2026-09-27-selftest-r2.out` (49 lines, penultimate `E7RESULT name=verdict part=anchors anchor_mismatches=0`).
 
-`replay.sh` registers only deterministic anchors (S1/S2 contain kill timing and measurements, so two runs naturally differ):
+`replay.sh` registers the deterministic anchors (`exact`, byte-for-byte comparison) and also three all-arms rows (`timing`, structural comparison): `driver_e162_s1_all_arms` and `driver_e162_s2_all_arms` start the registered tier once for each of arms R1, R0, K and F in order and concatenate the output into one, and `driver_e162_s4_all_arms` starts `s4-drive`, which runs all four arms when `--arms` is not given (it starts a QEMU VM); there are no artifacts for these three rows under `research/results/` yet. The feasibility tier `feasibility` is a domain reduction, and the replay table does not run it:
 
 ```
 bash scripts/experiment-apparatus/replay.sh E162
@@ -99,15 +99,15 @@ E162  @driver_e162_anchors     字节一致 e162-crash-verdict-block-store-2026-
 
 (2026-09-28 path migration: the registered row for E162 (storage selection for crash verdict blocks) in `replay.sh` was changed to point to this new artifact; it is byte-for-byte identical to `e162-crash-verdict-block-store-2026-09-27-anchors.out` prior to renaming, see “Historical Versions”.)
 
-Direct feasibility reruns of anchors, S1 and S2 (separate commands, `<臂>` is F, R1, R0 or K; S1/S2 spawn and kill subprocesses and write anew, with timing noise, so no byte comparison to checked-in output):
+Direct feasibility reruns of anchors, S1 and S2 (`feasibility` is a domain reduction: the verdict cells of the artifact write `not_judged_feasibility_tier_only` and it is not taken as a formal artifact; without this argument it is the registered tier; separate commands, `<臂>` is F, R1, R0 or K; S1/S2 spawn and kill subprocesses and write anew, with timing noise, so no byte comparison to checked-in output):
 
 ```
-bash scripts/hosts/run-with-memory-cap.sh 8G cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- anchors
-bash scripts/hosts/run-with-memory-cap.sh 8G cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- s1 <臂> feasibility
-bash scripts/hosts/run-with-memory-cap.sh 8G cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- s2 <臂> feasibility
+task-server/task submit -- cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- anchors
+task-server/task submit -- cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- s1 <臂> feasibility
+task-server/task submit -- cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- s2 <臂> feasibility
 ```
 
-Unit tests: `cd scripts/experiment-apparatus && bash ../hosts/run-with-memory-cap.sh 4G cargo test --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store` (earlier that day 23 passed / 0 failed; at the time this page was written, rerun was blocked by the `librocksdb-sys` environment, see limitations).
+Unit tests: `task-server/task submit --cwd scripts/experiment-apparatus -- cargo test --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store` (earlier that day 23 passed / 0 failed; at the time this page was written, rerun was blocked by the `librocksdb-sys` environment, see limitations).
 
 ### S1 decisive tier (2026-09-27, segment two)
 
@@ -162,7 +162,7 @@ Under 6.1 and 11.1 V1–V6, all positive controls pass (V1–V5 do not invalidat
 Unit tests (rerun once in this segment to verify the build with the changed environment still passes):
 
 ```
-cd scripts/experiment-apparatus && BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include bash ../hosts/capped.sh 4 bash ../hosts/run-with-memory-cap.sh 8G cargo test --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store
+task-server/task submit --cwd scripts/experiment-apparatus -- env BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include cargo test --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store
 ```
 
 23 passed / 0 failed; the previously documented `librocksdb-sys` / `bindgen` blocker was worked around by `BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include`.
@@ -170,7 +170,7 @@ cd scripts/experiment-apparatus && BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_6
 These four decisive-tier artifacts do not enter `replay.sh` for byte-by-byte comparison, for the same reason as the feasibility tier: S1 launches a new subprocess every time and kills it according to real wall-clock time, reopening after real persistence latency on disk, so two runs are not the same batch of bytes (witnessed firsthand in this segment: F encountered four interference reruns this time, whereas the feasibility tier did not encounter a single one, with different bytes resulting from the same code and the same batch of seeds). Direct rerun command (`<臂>` takes one of F, R1, R0, K; omitting `feasibility` runs the decisive tier, completing the full 200 kills):
 
 ```
-BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include bash scripts/hosts/capped.sh 4 bash scripts/hosts/run-with-memory-cap.sh 8G cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- s1 <臂>
+task-server/task submit -- env BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- s1 <臂>
 ```
 
 The registry for this segment was unchanged (before 2026-09-28 path migration), only `driver_e162_anchors`; replay output matches the feasibility section's copied output byte for byte:
@@ -198,7 +198,7 @@ E162  @driver_e162_anchors     字节一致 e162-crash-verdict-block-store-2026-
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D13 (Verification Route) settled item 4 | Background | 2026-10-24 unaffected: apparatus verified by replay.sh, output byte-for-byte identical with retained artifact, conclusions and numbers unchanged; prior 2026-10-18 unaffected: rerun section identifies the artifact registered in replay.sh; conclusions and numbers unchanged |
+| D13 (Verification Route) settled item 4 | Background | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-24 unaffected: apparatus verified by replay.sh, output byte-for-byte identical with retained artifact, conclusions and numbers unchanged; prior 2026-10-18 unaffected: rerun section identifies the artifact registered in replay.sh; conclusions and numbers unchanged |
 
 ## Historical Versions
 
@@ -213,3 +213,7 @@ E162  @driver_e162_anchors     字节一致 e162-crash-verdict-block-store-2026-
 ### 2026-09-28: path migration
 
 - Repository-root git-ignored multi-host config renamed `layer0-shard.env` → `multi-host.env` under user settlement. In `scripts/experiment-apparatus/e162_crash_verdict_block_store.rs`, configuration filename read by `peer_logical_processors` and preceding comment changed. That function is called only from S2/geometry sensitivity `throughput_context`, not anchors. Conclusions, numbers and artifacts unchanged: 23 tests passed / 0 failed (same rerun command, `/tmp/claude-1000/e162-config-rename/unit-test.log`); new `research/results/e162-crash-verdict-block-store-2026-09-27-anchors-2026-09-28.out` matched pre-rename `e162-crash-verdict-block-store-2026-09-27-anchors.out` byte-for-byte via `cmp`. E162 anchors registration in `replay.sh` points to new artifact; old artifact not modified or deleted.
+
+### 2026-11-03
+
+- After format bitmap evolution reverted retirement bit compatibility, apparatus source modified, not run formally.

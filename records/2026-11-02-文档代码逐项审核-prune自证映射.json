@@ -1,0 +1,999 @@
+{
+  "at": "2026-11-04",
+  "sources": {
+    "prune-server/src/bin/prune_server.rs": "bef4bbb313bca17f4437a6c40037eba4478faf094ca03be804233a9b9e237254",
+    "prune-server/src/break_switches.rs": "c589c6cc867ce83fbf64e8a9828ed85b11bc259a866ff44d671156a90dd9785e",
+    "prune-server/src/selftest.rs": "6cd506c5982af4f9e518b74e8cccc515517199b5ac54fa295b5be44037958172"
+  },
+  "scope": "Complete name/red_cell table correspondence only. Descriptions, executable effects, cell assertions and mutation runtime remain per-row pending. Not whole-file semantic approval.",
+  "switch_rows": [
+    {
+      "line": 122,
+      "switch": "multi-get-per-key",
+      "description": "成批点读退回逐键 get",
+      "documented_red_cell": "batched-point-read",
+      "actual_red_cell": "batched-point-read",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 123,
+      "switch": "write-sync-per-entry",
+      "description": "成批写每条各自一个同步写批",
+      "documented_red_cell": "group-commit-coalesces-syncs",
+      "actual_red_cell": "group-commit-coalesces-syncs",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 124,
+      "switch": "prefix-scan-overruns",
+      "description": "前缀扫走出前缀不停",
+      "documented_red_cell": "prefix-scan",
+      "actual_red_cell": "prefix-scan",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 125,
+      "switch": "missing-tcp-address-defaults-to-loopback",
+      "description": "多机配置没有 TCP 地址时退回回环、不拒",
+      "documented_red_cell": "missing-tcp-address-refused",
+      "actual_red_cell": "missing-tcp-address-refused",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 126,
+      "switch": "response-sequence-unchecked",
+      "description": "客户端不核回应序号、按到达先后配给最早的请求",
+      "documented_red_cell": "pipelined-out-of-order",
+      "actual_red_cell": "pipelined-out-of-order",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 127,
+      "switch": "frame-length-unchecked",
+      "description": "服务不判帧长度、照声称的长度读下去",
+      "documented_red_cell": "frame-length-rejected",
+      "actual_red_cell": "frame-length-rejected",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 128,
+      "switch": "unknown-operation-accepted",
+      "description": "认不得的操作码回空的成功",
+      "documented_red_cell": "unknown-operation-rejected",
+      "actual_red_cell": "unknown-operation-rejected",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 129,
+      "switch": "trailing-bytes-accepted",
+      "description": "解帧不判帧尾多出来的字节",
+      "documented_red_cell": "malformed-payload-rejected",
+      "actual_red_cell": "malformed-payload-rejected",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 130,
+      "switch": "bench-judgment-lenient",
+      "description": "压测达标线从 95% 放到 50%",
+      "documented_red_cell": "bench-rate-judgment",
+      "actual_red_cell": "bench-rate-judgment",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 131,
+      "switch": "bench-library-kept-on-interrupt",
+      "description": "压测器被打断时不删压测库",
+      "documented_red_cell": "bench-interrupted-removes-library",
+      "actual_red_cell": "bench-interrupted-removes-library",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 132,
+      "switch": "unacknowledged-frames-dropped-on-reconnect",
+      "description": "对端关连接或读写出错后不重放在途的写帧",
+      "documented_red_cell": "replay-after-disconnect-and-server-kill",
+      "actual_red_cell": "replay-after-disconnect-and-server-kill",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 133,
+      "switch": "acknowledge-before-sync",
+      "description": "服务先回写确认、过 2 秒才同步 WAL",
+      "documented_red_cell": "replay-after-disconnect-and-server-kill",
+      "actual_red_cell": "replay-after-disconnect-and-server-kill",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 134,
+      "switch": "duplicate-requests-reapplied",
+      "description": "服务不按（身份，请求号）去重",
+      "documented_red_cell": "delay-jitter-duplicate-tolerated",
+      "actual_red_cell": "delay-jitter-duplicate-tolerated",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 135,
+      "switch": "duplicate-responses-fatal",
+      "description": "客户端把重复到达的回应当成协议错",
+      "documented_red_cell": "delay-jitter-duplicate-tolerated",
+      "actual_red_cell": "delay-jitter-duplicate-tolerated",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 136,
+      "switch": "frame-timeout-ignored",
+      "description": "客户端不给在途帧设超时",
+      "documented_red_cell": "half-open-connection-recovered",
+      "actual_red_cell": "half-open-connection-recovered",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 137,
+      "switch": "keepalive-not-set",
+      "description": "客户端的 TCP 连接不开 keepalive",
+      "documented_red_cell": "half-open-connection-recovered",
+      "actual_red_cell": "half-open-connection-recovered",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 138,
+      "switch": "reconnect-backoff-flat",
+      "description": "重连间隔不翻倍",
+      "documented_red_cell": "reconnect-gives-up-at-limit",
+      "actual_red_cell": "reconnect-gives-up-at-limit",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 139,
+      "switch": "reconnect-without-jitter",
+      "description": "重连间隔不加抖动",
+      "documented_red_cell": "reconnect-gives-up-at-limit",
+      "actual_red_cell": "reconnect-gives-up-at-limit",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 140,
+      "switch": "reconnect-unbounded",
+      "description": "重连没有次数与总时长上限",
+      "documented_red_cell": "reconnect-gives-up-at-limit",
+      "actual_red_cell": "reconnect-gives-up-at-limit",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 141,
+      "switch": "read-failure-reported-as-absent",
+      "description": "读失败时回「键都不在」",
+      "documented_red_cell": "reconnect-gives-up-at-limit",
+      "actual_red_cell": "reconnect-gives-up-at-limit",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 142,
+      "switch": "unacknowledged-frames-not-journaled",
+      "description": "客户端不把写帧记进追加日志",
+      "documented_red_cell": "reconnect-gives-up-at-limit",
+      "actual_red_cell": "reconnect-gives-up-at-limit",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 143,
+      "switch": "busy-replaced-by-unbounded-queue",
+      "description": "服务不设待处理上限、不回忙",
+      "documented_red_cell": "busy-backpressure-bounded",
+      "actual_red_cell": "busy-backpressure-bounded",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 144,
+      "switch": "busy-retry-without-delay",
+      "description": "客户端收到忙立刻重发",
+      "documented_red_cell": "busy-backpressure-bounded",
+      "actual_red_cell": "busy-backpressure-bounded",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 145,
+      "switch": "claim-not-exclusive",
+      "description": "认领不判别人持有",
+      "documented_red_cell": "claim-exclusive-and-lease-expiry",
+      "actual_red_cell": "claim-exclusive-and-lease-expiry",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 146,
+      "switch": "claim-lease-never-expires",
+      "description": "认领的租期到了也不作废",
+      "documented_red_cell": "claim-exclusive-and-lease-expiry",
+      "actual_red_cell": "claim-exclusive-and-lease-expiry",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 147,
+      "switch": "claim-kept-after-conclusion",
+      "description": "写结论不释放认领、认领不看结论",
+      "documented_red_cell": "claim-exclusive-and-lease-expiry",
+      "actual_red_cell": "claim-exclusive-and-lease-expiry",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 148,
+      "switch": "group-commit-disabled",
+      "description": "一帧一次 WAL 同步",
+      "documented_red_cell": "group-commit-coalesces-syncs",
+      "actual_red_cell": "group-commit-coalesces-syncs",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 149,
+      "switch": "bench-load-threshold-ignored",
+      "description": "压测器不看 loadavg",
+      "documented_red_cell": "bench-environment-judgment",
+      "actual_red_cell": "bench-environment-judgment",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 150,
+      "switch": "journal-compacts-on-every-acknowledgement",
+      "description": "追加日志一过门槛就整理、不随整理完的长度翻倍",
+      "documented_red_cell": "fault-injection-bench-finishes",
+      "actual_red_cell": "fault-injection-bench-finishes",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 151,
+      "switch": "fault-proxy-half-closes-on-server-death",
+      "description": "代理在服务那头没了时只半关客户端那头的写",
+      "documented_red_cell": "server-kill-while-client-writes",
+      "actual_red_cell": "server-kill-while-client-writes",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 152,
+      "switch": "control-dry-run-writes",
+      "description": "install --dry-run 照样写文件、起 systemctl",
+      "documented_red_cell": "control-install-start-stop-check",
+      "actual_red_cell": "control-install-start-stop-check",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 153,
+      "switch": "control-install-readback-skipped",
+      "description": "install 不回读服务通不通",
+      "documented_red_cell": "control-install-start-stop-check",
+      "actual_red_cell": "control-install-start-stop-check",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 154,
+      "switch": "control-start-readback-skipped",
+      "description": "start 不回读 is-active 与服务通不通",
+      "documented_red_cell": "control-install-start-stop-check",
+      "actual_red_cell": "control-install-start-stop-check",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 155,
+      "switch": "control-stop-readback-skipped",
+      "description": "stop 只看 systemctl 的退出码",
+      "documented_red_cell": "control-install-start-stop-check",
+      "actual_red_cell": "control-install-start-stop-check",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 156,
+      "switch": "client-announcement-omits-task",
+      "description": "报到时任务号报空",
+      "documented_red_cell": "stop-lists-connected-clients",
+      "actual_red_cell": "stop-lists-connected-clients",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 157,
+      "switch": "announcement-ignored",
+      "description": "服务不把报到记进登记",
+      "documented_red_cell": "stop-lists-connected-clients",
+      "actual_red_cell": "stop-lists-connected-clients",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 158,
+      "switch": "control-stop-record-skipped",
+      "description": "stop 不写停服务记录",
+      "documented_red_cell": "stop-lists-connected-clients",
+      "actual_red_cell": "stop-lists-connected-clients",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 159,
+      "switch": "stop-notice-not-sent",
+      "description": "宣布停服务不给客户端发「服务停了」",
+      "documented_red_cell": "intentional-stop-fails-clients-fast",
+      "actual_red_cell": "intentional-stop-fails-clients-fast",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 160,
+      "switch": "stop-notice-retried",
+      "description": "客户端收到「服务停了」照常重连",
+      "documented_red_cell": "intentional-stop-fails-clients-fast",
+      "actual_red_cell": "intentional-stop-fails-clients-fast",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 161,
+      "switch": "unreachable-exit-code-generic",
+      "description": "「连不上」退 3 而不是 75",
+      "documented_red_cell": "unannounced-server-death-bounded",
+      "actual_red_cell": "unannounced-server-death-bounded",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 162,
+      "switch": "fault-line-not-written",
+      "description": "服务出错不写故障行",
+      "documented_red_cell": "fault-line-on-server-error",
+      "actual_red_cell": "fault-line-on-server-error",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 163,
+      "switch": "watch-ignores-unit-state",
+      "description": "watch 不看单元在不在跑",
+      "documented_red_cell": "watch-reports-unit-not-running",
+      "actual_red_cell": "watch-reports-unit-not-running",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 164,
+      "switch": "watch-ignores-health",
+      "description": "watch 不看服务通不通",
+      "documented_red_cell": "watch-reports-server-unreachable",
+      "actual_red_cell": "watch-reports-server-unreachable",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 165,
+      "switch": "watch-ignores-fault-log",
+      "description": "watch 不看故障日志",
+      "documented_red_cell": "watch-reports-new-fault-line",
+      "actual_red_cell": "watch-reports-new-fault-line",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 166,
+      "switch": "watch-counts-old-fault-lines",
+      "description": "watch 把起之前的故障行也当新的",
+      "documented_red_cell": "watch-reports-new-fault-line",
+      "actual_red_cell": "watch-reports-new-fault-line",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 167,
+      "switch": "client-write-timeout-unset",
+      "description": "容错客户端不设写超时",
+      "documented_red_cell": "client-write-timeout-when-peer-stops-reading",
+      "actual_red_cell": "client-write-timeout-when-peer-stops-reading",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 168,
+      "switch": "fault-proxy-only-stops-reading-on-server-death",
+      "description": "代理在服务没了时只关客户端那头的读、fd 留着",
+      "documented_red_cell": "tcp-proxy-server-kill-client-fails",
+      "actual_red_cell": "tcp-proxy-server-kill-client-fails",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 169,
+      "switch": "bookkeeping-key-tag-dropped",
+      "description": "请求号行不带键前缀 F0、落进客户端的键空间",
+      "documented_red_cell": "single-library-layout",
+      "actual_red_cell": "single-library-layout",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 170,
+      "switch": "service-keys-open-to-clients",
+      "description": "客户端碰 0xF0 起头的键不拒、前缀扫走进记账那一段不停",
+      "documented_red_cell": "single-library-layout",
+      "actual_red_cell": "single-library-layout",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 171,
+      "switch": "library-extra-column-families-accepted",
+      "description": "开库不判另有列族、一起打开",
+      "documented_red_cell": "library-refuses-mismatched",
+      "actual_red_cell": "library-refuses-mismatched",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 172,
+      "switch": "library-open-failure-reported-as-locked",
+      "description": "RocksDB 拒开的每种错都报成库被持有（退 3）",
+      "documented_red_cell": "library-refuses-mismatched",
+      "actual_red_cell": "library-refuses-mismatched",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 173,
+      "switch": "library-without-current-file-opened",
+      "description": "有文件没有 CURRENT 的目录不拒、在里面建库",
+      "documented_red_cell": "library-refuses-mismatched",
+      "actual_red_cell": "library-refuses-mismatched",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 174,
+      "switch": "control-check-omits-library",
+      "description": "check 不打库目录",
+      "documented_red_cell": "control-install-start-stop-check",
+      "actual_red_cell": "control-install-start-stop-check",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 175,
+      "switch": "journal-compaction-drops-high-water",
+      "description": "追加日志整理不写请求号高水位",
+      "documented_red_cell": "journal-high-water-survives-compaction",
+      "actual_red_cell": "journal-high-water-survives-compaction",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 176,
+      "switch": "sync-failure-kept-serving",
+      "description": "同步 WAL 失败之后服务不退出、照常回确认",
+      "documented_red_cell": "write-ahead-log-sync-failure-never-acknowledged",
+      "actual_red_cell": "write-ahead-log-sync-failure-never-acknowledged",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 177,
+      "switch": "response-slot-released-on-enqueue",
+      "description": "回应一进写出队就放名额、不记进额度",
+      "documented_red_cell": "unread-responses-bounded",
+      "actual_red_cell": "unread-responses-bounded",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 178,
+      "switch": "frame-body-read-before-admission",
+      "description": "先照声明的长度分配、读完帧体再过准入",
+      "documented_red_cell": "incomplete-frames-bounded",
+      "actual_red_cell": "incomplete-frames-bounded",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 179,
+      "switch": "journal-locks-renamed-file",
+      "description": "追加日志的锁加在会被整理改名换掉的日志本身上",
+      "documented_red_cell": "journal-lock-survives-compaction",
+      "actual_red_cell": "journal-lock-survives-compaction",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 180,
+      "switch": "oversize-frame-sent-and-retried",
+      "description": "客户端发帧不核帧长、照发，「帧长度不对」当断线重连重发",
+      "documented_red_cell": "oversize-frame-reported-at-once",
+      "actual_red_cell": "oversize-frame-reported-at-once",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 181,
+      "switch": "claim-response-unbudgeted",
+      "description": "认领不核回应字节、照编越过帧长上限的回应",
+      "documented_red_cell": "claim-response-within-frame-limit",
+      "actual_red_cell": "claim-response-within-frame-limit",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 182,
+      "switch": "connect-without-deadline",
+      "description": "阻塞的 connect、报到不设写期限、在途帧不受重连总时长管",
+      "documented_red_cell": "connect-bounded-by-reconnect-total",
+      "actual_red_cell": "connect-bounded-by-reconnect-total",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 183,
+      "switch": "cell-runs-in-runner-process",
+      "description": "自证把判这一条的那一格留在跑格的进程的线程里跑",
+      "documented_red_cell": "cell-runs-alone-in-own-process",
+      "actual_red_cell": "cell-runs-alone-in-own-process",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    },
+    {
+      "line": 184,
+      "switch": "descriptor-soft-limit-not-raised",
+      "description": "开库之前不抬软上限、不核够不够（改前的开法）",
+      "documented_red_cell": "library-opens-under-low-descriptor-soft-limit",
+      "actual_red_cell": "library-opens-under-low-descriptor-soft-limit",
+      "mapping_matches": true,
+      "semantic_effect_review": "pending",
+      "runtime_break_sweep": "not_run"
+    }
+  ],
+  "cell_rows": [
+    {
+      "line": 55,
+      "name": "batched-point-read",
+      "description": "一帧 103 个键（3 个不在）读回逐个对上，RocksDB 数到 multi_get 恰好 1 次、读 103 个键",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 56,
+      "name": "prefix-scan",
+      "description": "前缀扫只回前缀下的键、按升序、到条数上限标截断、用别的表的名义扫回同样的键",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 57,
+      "name": "tcp-route-from-configuration",
+      "description": "TCP 地址取自多机配置的键，经 TCP 三种操作与统计都对",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 58,
+      "name": "missing-tcp-address-refused",
+      "description": "多机配置里没有那个键时服务退 5、点名这个键",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 59,
+      "name": "pipelined-out-of-order",
+      "description": "先发的帧被服务压后，回应乱序到达，客户端按序号认领到各自的值",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 60,
+      "name": "frame-length-rejected",
+      "description": "声称 4 GiB 与短于帧头的帧都回序号 0 的帧长度拒绝、随后关连接",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 61,
+      "name": "unknown-operation-rejected",
+      "description": "认不得的操作码回状态 2，连接接着能用",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 62,
+      "name": "malformed-payload-rejected",
+      "description": "个数对不上、帧尾多字节、认不得的表都回状态 1，一条都不写",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 63,
+      "name": "single-library-holder",
+      "description": "同一个库目录第二个服务打不开、退 3，头一个照常回话（拒的是 RocksDB 自己的 LOCK，没有弄坏开关）",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 64,
+      "name": "bench-rate-judgment",
+      "description": "压测达标判法（95%）与百分位（最近秩法）的已知答案",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 65,
+      "name": "bench-runs-every-mode",
+      "description": "六种负载小速率都跑通（退 0、1 或 4，末行 result 与退出码一致）、末行字段齐、fault-injection 带 faults=3、",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 67,
+      "name": "bench-interrupted-removes-library",
+      "description": "压测器收 SIGTERM 停下、删压测库、停掉它起的服务、退 3",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 68,
+      "name": "fault-injection-bench-finishes",
+      "description": "带故障的压测（每秒 2 万态 6 秒、服务每组提交等满 200 毫秒、追加日志整理门槛 64 KiB，没确认的帧",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 71,
+      "name": "replay-after-disconnect-and-server-kill",
+      "description": "不丢：经代理断在一帧中间、吞掉回应再断各一次，40 帧逐键对上；确认过的 30 帧 kill -9 后一个不少；",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 73,
+      "name": "delay-jitter-duplicate-tolerated",
+      "description": "网络波动：两个方向每帧延迟 0 到 15 毫秒、迟到的帧重复，结果不变（逐帧改写的键是最后一帧）、不卡死",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 74,
+      "name": "half-open-connection-recovered",
+      "description": "网络波动：TCP keepalive 在内核里开着；连接半开（不转也不关）时帧超时、重连、全部落库",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 75,
+      "name": "server-kill-while-client-writes",
+      "description": "经代理连着的服务 kill -9 再重起之后客户端接着写两帧 4 MiB：看到连接断了、重连、两帧逐字节落库，",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 77,
+      "name": "reconnect-gives-up-at-limit",
+      "description": "网络波动：服务停了，写与读各重连到次数上限回退 78 那一类的错（读不当成键不在），间隔翻倍、有抖动；",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 79,
+      "name": "busy-backpressure-bounded",
+      "description": "防雪崩：服务变慢（自证专用的提交延迟）时客户端收到忙、照毫秒数退避、全部完成，待处理帧数峰值不超上限",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 80,
+      "name": "claim-exclusive-and-lease-expiry",
+      "description": "防击穿：两个客户端同时认领同一批键每把恰好一个认领到；写了结论的回已有结论；持有者 kill -9 后租期过了别人认领到",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 81,
+      "name": "group-commit-coalesces-syncs",
+      "description": "一帧 100 条只同步 1 次；8 条连接并发 128 帧，RocksDB 数到同步 WAL 至多 32 次",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 82,
+      "name": "bench-environment-judgment",
+      "description": "压测环境判法（loadavg 超阈值不干净）、loadavg 与 diskstats 解析、忙度换算的已知答案",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 83,
+      "name": "control-install-start-stop-check",
+      "description": "control 在假 systemctl 下：install --dry-run 不写不起；服务不通时 install 退 1、通时退 0、单元 ExecStart 不带 --library；",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 85,
+      "name": "stop-lists-connected-clients",
+      "description": "两个带不同任务号的自证客户端连着时 control stop：清单两行字段对、停服务记录排他写了一份",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 86,
+      "name": "intentional-stop-fails-clients-fast",
+      "description": "宣布停服务再 SIGTERM：客户端 15 秒内退 75、说「服务停了」",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 87,
+      "name": "unannounced-server-death-bounded",
+      "description": "服务 kill -9 不重起：客户端在重连上限（6 秒）里退 75、说「连不上」",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 88,
+      "name": "fault-line-on-server-error",
+      "description": "自证造的存储写失败：故障日志新增一行，种类与报到身份的字段齐",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 89,
+      "name": "watch-reports-unit-not-running",
+      "description": "control watch：什么都没出时不退；单元不在跑时退 1",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 90,
+      "name": "watch-reports-server-unreachable",
+      "description": "control watch：服务不通时退 1、客户端清单写拿不到",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 91,
+      "name": "watch-reports-new-fault-line",
+      "description": "control watch：起之前的故障行不算；新增一行退 1，打故障行原文、客户端、task status 查法",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 92,
+      "name": "client-write-timeout-when-peer-stops-reading",
+      "description": "代理一个字节都不读时，写帧在写超时处出错、重连重放落库",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 93,
+      "name": "tcp-proxy-server-kill-client-fails",
+      "description": "经 TCP 代理 kill -9 服务：客户端的写出错、到重连上限回「连不上」，不堵在写里",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 94,
+      "name": "single-library-layout",
+      "description": "不带 --library 开的是状态目录下的 library；三张表的名义互读同一行、认领不分表、空前缀扫只回客户端写的行、",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 96,
+      "name": "library-refuses-mismatched",
+      "description": "库里另有列族、比较器不同、有文件没有 CURRENT 的目录各退 6 点名原因（列族名、「选项与库对不上」、CURRENT），",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 98,
+      "name": "library-opens-under-low-descriptor-soft-limit",
+      "description": "样本库 300 个 SST（文件数多于 128）：服务子进程软硬上限都压到 128 时退 8、",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 101,
+      "name": "journal-high-water-survives-compaction",
+      "description": "追加日志整理门槛 1 字节：全确认之后整理、重开再写，与「请求号 1 没确认、2 确认了」之后整理、重开再写，",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 103,
+      "name": "write-ahead-log-sync-failure-never-acknowledged",
+      "description": "内建造错点造的同步 WAL 失败：写回存储出错、服务退 7；故障没解除时重起、重发同一请求",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 107,
+      "name": "unread-responses-bounded",
+      "description": "每条连接额度 4 MiB：小请求读 1 MiB 的值、只发不收 64 次，写出队峰值不超额度加一个回应加不带名额的回应上限、",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 109,
+      "name": "incomplete-frames-bounded",
+      "description": "额度 1024 字节、待处理 1 帧：四条连接各声明 16 MiB 只发 2 MiB，给没收完的帧体分配的峰值不超额度加一帧；",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 111,
+      "name": "journal-lock-survives-compaction",
+      "description": "第二个打开者卡在开文件与加锁之间、第一个整理（改名换上新文件）之后放行：被同一把锁挡住，原路径重开读回的没确认写帧不多",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 112,
+      "name": "claim-response-within-frame-limit",
+      "description": "255 字节身份的「别人持有」一帧至多 253240 个（已知答案）；混合认领照常；26 万个短键查别人持有的认领整帧回状态 1、",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 114,
+      "name": "connect-bounded-by-reconnect-total",
+      "description": "重连总时长上限 600 毫秒：unix 连接队列满、TCP 握手不完成、连上之后不读不回各在上限加 2 秒里回「连不上」；",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 116,
+      "name": "oversize-frame-reported-at-once",
+      "description": "键长超过帧长上限的一条：容错客户端在重连总时长 2 秒之内回协议错、说帧长上限、追加日志里没有这一帧；",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    },
+    {
+      "line": 118,
+      "name": "cell-runs-alone-in-own-process",
+      "description": "这一格在跑格的进程为它另起的进程里单独跑：父进程是跑格的进程（别的格起子进程复制不到它的描述符）",
+      "semantic_review": "pending",
+      "runtime": "not_run"
+    }
+  ],
+  "actual_cell_order": [
+    "batched-point-read",
+    "prefix-scan",
+    "tcp-route-from-configuration",
+    "missing-tcp-address-refused",
+    "pipelined-out-of-order",
+    "frame-length-rejected",
+    "unknown-operation-rejected",
+    "malformed-payload-rejected",
+    "single-library-holder",
+    "bench-rate-judgment",
+    "bench-runs-every-mode",
+    "bench-interrupted-removes-library",
+    "fault-injection-bench-finishes",
+    "replay-after-disconnect-and-server-kill",
+    "delay-jitter-duplicate-tolerated",
+    "half-open-connection-recovered",
+    "server-kill-while-client-writes",
+    "reconnect-gives-up-at-limit",
+    "busy-backpressure-bounded",
+    "claim-exclusive-and-lease-expiry",
+    "group-commit-coalesces-syncs",
+    "bench-environment-judgment",
+    "control-install-start-stop-check",
+    "stop-lists-connected-clients",
+    "intentional-stop-fails-clients-fast",
+    "unannounced-server-death-bounded",
+    "fault-line-on-server-error",
+    "watch-reports-unit-not-running",
+    "watch-reports-server-unreachable",
+    "watch-reports-new-fault-line",
+    "client-write-timeout-when-peer-stops-reading",
+    "tcp-proxy-server-kill-client-fails",
+    "single-library-layout",
+    "library-refuses-mismatched",
+    "library-opens-under-low-descriptor-soft-limit",
+    "journal-high-water-survives-compaction",
+    "write-ahead-log-sync-failure-never-acknowledged",
+    "unread-responses-bounded",
+    "incomplete-frames-bounded",
+    "journal-lock-survives-compaction",
+    "claim-response-within-frame-limit",
+    "connect-bounded-by-reconnect-total",
+    "oversize-frame-reported-at-once",
+    "cell-runs-alone-in-own-process"
+  ],
+  "cell_order_matches": true,
+  "extraction_notes": "Exact three-space declaration indent excludes multiline continuation (start); single-space name/description separation included; OWN_PROCESS_CELL_NAME resolved from source literal. Initial regex candidates were not findings."
+}

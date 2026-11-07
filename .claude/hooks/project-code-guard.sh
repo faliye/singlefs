@@ -10,8 +10,8 @@
 # gate-similar: continuation-guard.sh 挂 PreToolUse[SendMessage]，判的是收件的子 agent 在会话记录里交回过没有、被中断过没有；这里挂 PreToolUse[Bash]，判命令本身，两边的对象与输入没有交集
 # gate-overlap:copy-kept bash-command-detector.sh 两边 main() 开头那十行（认 --selftest、从 stdin 读 hook 的 JSON、不是 JSON 对象就打一行诊断、记一条检出、放行）是入口，读不到共用模块时照样要跑：那时还要拿这份 JSON 带着 session_id 记一条检出，看门狗按 session_id 认本会话；抽进 lib_shell_words.py 或另一个同目录模块，模块读不到的那一刻入口跟着一起没了（两个 hook 自检里「hook 旁边没有共用模块」那一例走的就是这条路）
 #
-# 为什么：用户 2026-10-30「无论轻任务重任务 cpu或者gpu任务 一律走启动器。」，2026-11-01「现在需要发给 task-server的任务 都不能自己启动」：一切跑项目代码的命令只认经 task-server/task 起，
-# 子 agent 不交任务（records/2026-10-30-编译绕过内存总上限.md 批 3b；records/2026-10-29-subagent拆分提案.md 第一百七十四节）。定义里写一句「不跑」守不住：
+# 为什么：一切跑项目代码的命令只认经 task-server/task 起，
+# 子 agent 不交任务。定义里写一句「不跑」守不住：
 # 同一天几个实现员在各自的副本里直接跑全量 cargo test，满载下每遍四五个小时（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 4、10、12、14 行）。
 # 同日一个实现员把验证链写成 /tmp 下的脚本再用后台 Bash 起它，链里有一步是直接跑项目代码，这道闸只看到「执行一个脚本」、放行了
 # （同一张表第 15 行）：所以命令位置上执行的脚本文件要读进去判。
@@ -55,29 +55,29 @@
 #   不在的源照空的算（cat_concatenation；弄坏开关 PROJECT_CODE_GUARD_BREAK=cat-concatenation-unseen 退回几个源的不认）），
 #   源在盘上就读源文件，源是同一条命令里更前面写出的就接着用那份内容；
 #   追加（`>>`、`tee -a`）接在这条命令里前面写出的内容、或盘上那份（读得了的文本）后面；盘上那份读不了的（目录、超过读的上限、不是 UTF-8）不认那个目的，照旧读盘上，
-#   这一条命令里后面的词照常判（改前 cat 追加到这样的文件上，判的时候抛 AttributeError、整条命令照常执行；PROJECT_CODE_GUARD_BREAK=cat-append-unreadable-destination-raises 退回改前）。
+#   这一条命令里后面的词照常判（PROJECT_CODE_GUARD_BREAK=cat-append-unreadable-destination-raises 下 cat 追加到这样的文件上，判的时候抛 AttributeError、整条命令照常执行）。
 #   脚本里再写出、再执行的同样认，写出的文件对外层后面的命令也算数。读法与判定同盘上的脚本（开头的 `#!`、大小上限、递归读）。
 #   `cat 源 >> 目的`、`&>`、`>& 目的`、`&>>` 写出的 cat 拷贝与 tee 拷出（`cat 源 | tee [-a] 目的`、`tee 目的 < 源`、管道前一段是 printf / echo / 读 heredoc 的 cat 的）
-#   同样按拷来的内容认（正推腿乙报告 research/prompts/shell-words-r3-sonnet-s2-output.md 第八节 A1；弄坏开关 PROJECT_CODE_GUARD_BREAK=copy-redirections-unseen、tee-copy-unseen）。
+#   同样按拷来的内容认（弄坏开关 PROJECT_CODE_GUARD_BREAK=copy-redirections-unseen、tee-copy-unseen）。
 #   认不出的写法（printf、echo、dd、sed、head、install /dev/stdin、python 写文件、带选项的 cat、变量拼出的目标）写出再执行的，在命令文本这一层照「认不出起什么的写法」拒
 #   （下面「认不出的写法」；脚本正文里的照旧：还不在的按「不存在」记检出，已经在的读盘上那份）。
 #   几个源的 cat（`cat a b > d`）、`cat 源 >> d`、`cat 源 | tee d` 里有盘上不在、又不是同一条命令里前面认出写出的源：读不到它的内容，那个目的照认不出、执行它时照拒
-#   （偏严，用户 2026-10-29 定「cat 不看源在不在那一类照拒」；三方 d137-gov-r1 判决 H7、S3）；拒绝说明点名不在的源与改法
-#   （PROJECT_CODE_GUARD_BREAK=cat-missing-source-unexplained 下不点名；cat-missing-source-allowed 下退回改前：照把在的源接起来当写出的内容判）。
+#   （偏严：cat 不看源在不在那一类照拒）；拒绝说明点名不在的源与改法
+#   （PROJECT_CODE_GUARD_BREAK=cat-missing-source-unexplained 下不点名；cat-missing-source-allowed 下照把在的源接起来当写出的内容判）。
 #   正文不带引号的 heredoc（`<<EOF`）写进文件之前 shell 还要展开 `$` 与命令替换，这里判的是展开之前的原文。
 # 命令位置上的词里带没展开的 `$`、反引号、括号、引号残片、重定向、通配字符、逗号或等号（NOT_A_LITERAL_PATH）的，不当脚本路径去读；
 #   命令替换 `$(…)` 与反引号整段留在所在的词里，里面的命令按一条完整的命令另判（lib_shell_words.py）。
 # 喂给从标准输入读命令的 shell（bash / sh 这类不带 -c、不带脚本，或带 -s）的字面文本当命令判：here-string（`bash <<< '…'`）与管道前一段是 printf、echo、
 #   读 heredoc 的 cat 的（`printf '…' | bash`），同 bash -c 一样挂它的那条命令上的包装（内存包装、目录、变量）算在里面（lib_shell_words.py 的 shell_standard_input）；
-#   标准输入是盘上的文件（`bash -s < 文件`、`bash < 文件`、`sh -s < 文件`、`cat 文件 | bash`）照 `bash 文件` 读那份文件判（lib_shell_words.py 的 shell_standard_input_files；正推腿乙第八节 A2）。
+#   标准输入是盘上的文件（`bash -s < 文件`、`bash < 文件`、`sh -s < 文件`、`cat 文件 | bash`）照 `bash 文件` 读那份文件判（lib_shell_words.py 的 shell_standard_input_files）。
 #   喂进去的不是字面（here-string 或 printf / echo 的参数里有变量、命令替换，管道前一段是 grep 这类别的命令）认不出：命令文本这一层照「认不出起什么的写法」拒、照记一条检出
-#   （PROJECT_CODE_GUARD_BREAK=unjudged-shell-input-allowed 下只记不拒，改前的判法）；读进来的脚本正文里的照常执行、记检出。
+#   （PROJECT_CODE_GUARD_BREAK=unjudged-shell-input-allowed 下只记不拒）；读进来的脚本正文里的照常执行、记检出。
 # 判不了的几样都照常执行，stderr 报一句、记一条检出（结局「只记」）：读不到共用模块、decide() 抛异常、hook 输入不是 JSON 对象（诊断带开头的字节，会话号读不到照实写读不到）、
 #   读不到或看不全的脚本、脚本正文里喂给 shell 的不是字面的。
 #   钩子 bash 这一层起不来（python3 起不来、/dev/fd/3 读不到、python 在 main() 之前崩了，退出码不是 0、2）时，bash 照「放行但必记检出」往检出记录追加一行、退 0
-#   （一百三十七节 ⑤；会话号、agent 从输入里按字面取；弄坏开关 PROJECT_CODE_GUARD_BREAK=bash-layer-unrecorded 下不记，照旧把 python 的退出码交出去）。
+#   （会话号、agent 从输入里按字面取；弄坏开关 PROJECT_CODE_GUARD_BREAK=bash-layer-unrecorded 下不记，照旧把 python 的退出码交出去）。
 #   PATH 上没有 python3 的，preflight 判不了运行条件、会退 78 什么都不记：钩子那种起法（不带参数）在 preflight 之前就照「放行但必记检出」记一条、退 0
-#   （三方 d137-gov-r1 判决 H13；弄坏开关 PROJECT_CODE_GUARD_BREAK=python-missing-unrecorded 下照旧交给 preflight 退 78）。
+#   （弄坏开关 PROJECT_CODE_GUARD_BREAK=python-missing-unrecorded 下照旧交给 preflight 退 78）。
 # 命令词带通配（`*`、`?`、`[`）的，判定照 bash 展开、按展开出来的那几份的名字判（外部程序名单里的程序，写成通配的包装照剥；
 #   lib_project_code_runs.py 文件头「命令词带通配」），展开出来的脚本照样不读正文。
 #   带方括号里的 POSIX 字符类、等价类、整理符号的（`[[:alpha:]]`、`[[=h=]]`、`[[.h.]]`）交给 bash 自己展开（python glob 不认），判不出展开成哪一份的命令词照拒。
@@ -85,43 +85,43 @@
 #   （`{cargo,test}`、门禁 `crash-point-replay.{sh,}`；lib_project_code_runs.py 文件头 classify 一段），花括号展开出来的脚本同样不读正文。
 # 命令词写在变量里、同一段命令文本里前面赋过字面值的（`S=.claude/gate.d/<那一道>; bash "$S"`、`G=…; bash "$G/<那一道>"`、export 的同样认）：先展开再判，
 #   展开出来的脚本照读（lib_project_code_runs.py 的 command_word_expanded）。
-# 认不出的写法（用户 2026-10-29 弹窗定「认不出的一律拒（偏严）」，records/2026-10-29-一百三十七节那一轮调度记录.md「用户在弹窗里定的」；一百三十七节 ②③⑤⑨⑱）：
+# 认不出的写法（认不出的一律拒，偏严）：
 #   命令文本这一层（Bash 调用的命令、它 bash -c / eval / 命令替换 / here-string 与管道喂给 shell 的字面、剥掉启动器之后的那几段；不是读进来的脚本正文）里下面几种，
 #   照「认不出起什么的写法」这一类（kind unrecognized）拒：主 agent 与子 agent 一样拒，拒绝说明写改法：
 #   ① 命令词、bash / sh / source 起的脚本路径、python 起的脚本路径（python 起的脚本正文不读，路径照样要认得出；lib_project_code_runs.py 的 LAUNCHED_FILE_NAMES）
 #      由变量、命令替换、位置参数（`"$@"`、`$1`、`$0`）、进程替换拼出而执行前展开不了的，或展开出来夹着空白的
-#      （`c='cargo test'; $c`、`$(which cargo) test`、`set -- …; "$@"`、`bash <(…)`、`source <(…)`、`bash -c "$(cat 文件)"`、`eval "$c"`、`for f in …; do bash $f; done`；正推腿乙 Z1、Z2、Z16）；
+#      （`c='cargo test'; $c`、`$(which cargo) test`、`set -- …; "$@"`、`bash <(…)`、`source <(…)`、`bash -c "$(cat 文件)"`、`eval "$c"`、`for f in …; do bash $f; done`）；
 #      前面赋过字面值的照展开再判（下面「命令词写在变量里」）；命令词是 `"$CLAUDE_CODE_EXECPATH"`、`"${CLAUDE_CODE_EXECPATH}"` 的（会话自己那份可执行文件）不算认不出：
 #      检出钩子 ⑬ 认它是起 claude 会话，交那一道判（复跑分类报告 d137-replay-classify「四」两道口径；弄坏开关 LIB_PROJECT_CODE_RUNS_BREAK=claude-executable-path-unrecognized）；
 #   ② cargo test / run / bench（连同 nextest、miri、llvm-cov、hack、mutants）的子命令或参数写成展开不了的变量、命令替换、位置参数的（`cargo $(echo test --workspace)`、
-#      `bash -c 'cargo "$@"' _ test --workspace`；`--` 之后给测试二进制的、--target-dir / -j / --color / --message-format 的值除外；正推腿乙 Z15）；前面赋过字面值的先展开
+#      `bash -c 'cargo "$@"' _ test --workspace`；`--` 之后给测试二进制的、--target-dir / -j / --color / --message-format 的值除外）；前面赋过字面值的先展开
 #      （`F=--workspace; cargo test $F` 照全量拒；lib_project_code_runs.py 的 cargo_arguments_expanded、unrecognized_launch）；
-#   ③ 同一条命令里前面一条认不出写法的命令写过（重定向的目标是它，或参数、heredoc 正文里写着它，又不是只读的命令）、后面执行的脚本（正推腿乙 Z4、调度记录
-#      records/2026-10-26-subagent欠账清理.md 第 175 行；unrecognized_write，弄坏开关 PROJECT_CODE_GUARD_BREAK=unrecognized-writes-allowed）；
+#   ③ 同一条命令里前面一条认不出写法的命令写过（重定向的目标是它，或参数、heredoc 正文里写着它，又不是只读的命令）、后面执行的脚本（
+#      unrecognized_write，弄坏开关 PROJECT_CODE_GUARD_BREAK=unrecognized-writes-allowed）；
 #      python3 -c 的代码、喂给 python3 - 的 heredoc 正文里没有任何能写文件的东西的（PYTHON_WRITE_MARKER），代码里的字样不算点到后面执行的脚本：管道里读 JSON 打字的
-#      `python3 -c "…d['task']…"` 不是写了 `task-server/task`（另一个会话 2026-11-05 报；python_filter_code，弄坏开关 PROJECT_CODE_GUARD_BREAK=python-filter-code-judged）；
+#      `python3 -c "…d['task']…"` 不是写了 `task-server/task`（python_filter_code，弄坏开关 PROJECT_CODE_GUARD_BREAK=python-filter-code-judged）；
 #      剥掉之后里面那条接着判的启动器（systemd-run、chrt、ssh、/usr/bin/time、strace、prlimit、numactl、unshare 这一类）只算它自己的词点到的，里面那条起的脚本不算它写过
 #      （d137-replay-classify 误拒 E2；launcher_own_words，弄坏开关 PROJECT_CODE_GUARD_BREAK=launcher-recorded-as-writer）；task-server/task submit 的客户端同样只算
 #      `submit`、`--cwd <目录>`、`--` 这几个词点到的，`--` 之后那条起的脚本不算它写过（收尾批 #3 误拒：子 agent 交 `-- bash <不按名字判的脚本>` 被认成 task 写过那份脚本；同一个开关）；heredoc 写出的目标与记写者时的重定向目标同一套，
 #      前面赋过字面值的变量照代入（误拒 E3；written_target_word，弄坏开关 heredoc-targets-unexpanded）；
-#   ④ 命令词不带斜杠的：这一条设了 PATH（命令前、env、export）的照它找，没设的只找 .sh 结尾的名字（钩子自己的 PATH），找到的不在系统目录下照读正文（正推腿乙 Z3；
+#   ④ 命令词不带斜杠的：这一条设了 PATH（命令前、env、export）的照它找，没设的只找 .sh 结尾的名字（钩子自己的 PATH），找到的不在系统目录下照读正文（
 #      path_lookup_script，PROJECT_CODE_GUARD_BREAK=path-scripts-unread）；PATH 写成展开不了的值照认不出拒；
-#   ⑤ bash / source 起的脚本路径带通配的照当前目录展开、读排在头一个的那一份（正推腿乙 Z9；PROJECT_CODE_GUARD_BREAK=glob-scripts-unread）；
+#   ⑤ bash / source 起的脚本路径带通配的照当前目录展开、读排在头一个的那一份（PROJECT_CODE_GUARD_BREAK=glob-scripts-unread）；
 #   ⑥ 喂给 shell 的标准输入不是字面的（见上）；
 #   ⑦ shell 启动时先读的文件路径由变量、命令替换拼出而解不出的（`BASH_ENV=$(…) bash -c true`、`bash --rcfile $(…) -i`、`ZDOTDIR=$(…) zsh`、`HOME=$(…) bash -i`；写在命令前、env 的参数里、
-#      前面 export / declare -x 的都算；一百三十七节件 8f、8g，字面路径、前面赋过字面值的变量读得到的，照 `bash 脚本` 读正文判，下面「shell 启动时先读的文件」一段）；
-#   ⑧ 直接执行的脚本 #! 行指到认不出的解释器（不是 shell、也不在 lib_shell_words.py 的 NON_SHELL_INTERPRETER 里），而这条命令的环境里设了 BASH_ENV 或 ENV 的（认不出它读不读；一百三十七节件 8g）。
-#   弄坏开关 LIB_PROJECT_CODE_RUNS_BREAK=unrecognized-launches-allowed 下 ①② 不判（改前的判法）。
-#   读进来的脚本正文里 ①② 只判一种（一百三十七节件 1b 第 3 条：件 1 的子 agent 在草稿里写一份脚本，`R=$1; cmds=("bash $R/.claude/hooks/… --selftest" …)`、
-#   `… ${cmds[$i]}` 起改过的钩子自证，这道闸读正文却认不出、放行了三趟）：命令词、bash / sh / source / python 起的脚本路径由变量、命令替换、位置参数拼出、执行前解不出，
+#      前面 export / declare -x 的都算；字面路径、前面赋过字面值的变量读得到的，照 `bash 脚本` 读正文判，下面「shell 启动时先读的文件」一段）；
+#   ⑧ 直接执行的脚本 #! 行指到认不出的解释器（不是 shell、也不在 lib_shell_words.py 的 NON_SHELL_INTERPRETER 里），而这条命令的环境里设了 BASH_ENV 或 ENV 的（认不出它读不读）。
+#   弄坏开关 LIB_PROJECT_CODE_RUNS_BREAK=unrecognized-launches-allowed 下 ①② 不判。
+#   读进来的脚本正文里 ①② 只判一种（例：草稿里一份脚本 `R=$1; cmds=("bash $R/.claude/hooks/… --selftest" …)`、
+#   `… ${cmds[$i]}` 起改过的钩子自证，读正文却认不出就会放行）：命令词、bash / sh / source / python 起的脚本路径由变量、命令替换、位置参数拼出、执行前解不出，
 #   而它连同它点到的变量在这份正文里的定义（`名=值`、`名=(…)`、`for 名 in 词…`，往下点到的接着收）、点到位置参数时连同起这份脚本的那一条的参数，里面写着
 #   自证（`--selftest`）、门禁阶段（`.claude/gate.d/<名>.sh`）、入口脚本（按名字判的那几份、Verus 两份判法、广谱变异驱动、prove-red.sh）或 cargo 的，照「认不出起什么的写法」拒；
 #   字面命令词 cargo 而起编出来代码的子命令或参数解不出的同样（lib_project_code_runs.py 的 script_body_unresolved_launch；弄坏开关 LIB_PROJECT_CODE_RUNS_BREAK=script-body-launches-unjudged）。
 #   边界（普通脚本照常起）：定义里与起它的参数里都点不到这几样的 `"$@"`、`$cmd`（转发参数、拼普通命令）照旧不判；脚本起它自己（`bash "$0" --selftest`）不判；
 #   正文所在的脚本落在本仓里（整条路径逐级不是符号链接），或与本仓同一相对位置那一份逐字节相同的拷贝，这一条不判（仓里 multi-host-run.sh、
-#   merge-and-verify.sh 这类本来就经变量起包装与命令；script_in_own_repository）。直接写 `bash "$R/…/x.sh" --selftest` 的改前就按登记表照拒（解到的不是登记的那一份）。
+#   merge-and-verify.sh 这类本来就经变量起包装与命令；script_in_own_repository）。直接写 `bash "$R/…/x.sh" --selftest` 的按登记表照拒（解到的不是登记的那一份）。
 #   脚本正文按 SCRIPT_POLICY 那一段读，下面「脚本里自己的转发函数」另认。
-# shell 启动时先读的文件（用户 2026-10-29 弹窗定「认不出的一律拒（偏严）」，一百三十七节件 8f、8g）：bash 起非交互 shell 先读 `BASH_ENV` 指的文件并执行，
+# shell 启动时先读的文件（认不出的一律拒，偏严）：bash 起非交互 shell 先读 `BASH_ENV` 指的文件并执行，
 #   所以 `BASH_ENV=<脚本> bash -c true` 等于起了那份脚本；交互的 bash（带 -i）不读 `BASH_ENV`，读 `--rcfile` / `--init-file` 指的文件（没给读 HOME 下的 .bashrc，`--norc` 不读）；
 #   sh / dash / ksh 与 posix 模式的 bash（`--posix`、`-o posix`）读 `ENV`（实测 bash 5.2、dash：非交互的 sh 与 --posix 其实不读 ENV，只有带 -i 才读，这里照偏严算）；
 #   zsh 读 ZDOTDIR（没设取 HOME）下的 .zshenv、.zshrc（`-f`、`--no-rcs` 不读；.zshrc 其实只有交互才读，照偏严都读；本机没有 zsh，这一项没起真 shell 实测，照文档）。
@@ -133,34 +133,34 @@
 #   直接执行的脚本（命令词是脚本路径，`BASH_ENV=<文件> ./other.sh`）：读到它之后看开头的 #! 行（executed_file_head、lib_shell_words.py 的 executed_script_startup），#! 指到 bash（含 env bash）
 #   或没有 #! 的文本文件（从 bash 里起是 bash 另起自己，实测读 BASH_ENV）读 BASH_ENV，指到 sh 读 ENV，指到 zsh 读 zsh 的；指到 python 这类不是 shell 的不读；
 #   指到别的而环境里设了 BASH_ENV 或 ENV 的，认不出它读不读，照认不出拒；启动文件接在这条命令之后当被起的脚本判（pending）。
-#   弄坏开关 LIB_SHELL_WORDS_BREAK=startup-files-unread 下一个启动文件都不认（改前的判法）；declared-exports-unseen 下环境只认 `export 名字=值`；
+#   弄坏开关 LIB_SHELL_WORDS_BREAK=startup-files-unread 下一个启动文件都不认；declared-exports-unseen 下环境只认 `export 名字=值`；
 #   interactive-startup-files-unread 下 -i 不另看；zsh-startup-files-unread 下 zsh 不读；executed-script-startup-unread 下直接执行的脚本不读（逐格见下面开关清单）。
 #   登录 shell（`-l`、`--login`、`exec -l`、`exec -a -名字`）另读 /etc/profile 与 HOME 下的 .bash_profile、.bash_login、.profile（sh 一类与 posix 模式只读 .profile）与 .bash_logout，
-#   交互的 bash 另读 /etc/bash.bashrc（`--norc` 不读，`--rcfile` 只换掉 .bashrc），zsh 另读 /etc/zsh/ 下的（三方 d137-gov-r1 判决第三段「已知没认」四类；lib_shell_words.py 文件头「登录 shell」一段，
+#   交互的 bash 另读 /etc/bash.bashrc（`--norc` 不读，`--rcfile` 只换掉 .bashrc），zsh 另读 /etc/zsh/ 下的（lib_shell_words.py 文件头「登录 shell」一段，
 #   读哪几份照本机 bash 5.2、dash 实测）；/etc/profile 里循环变量起的 source（`. $i`）照脚本正文里解不出的路径办、不读。弄坏开关 LIB_SHELL_WORDS_BREAK=login-profiles-unread、
 #   system-startup-files-unread 下不读这两类（逐格见下面开关清单）。自证里系统级的目录换成样本目录，不读本机的 /etc。
 #   非交互的 shell source 的文件（启动文件、`.` / source 读进来的）读到顶层的 `case $- in *i*) ;; *) return;; esac`、`[[ $- != *i* ]] && return` 这类守卫就 return 了，守卫之后的不读
 #   （lib_shell_words.py 的 non_interactive_return_offset；跑它的 shell 交不交互照切词记的 CommandAtPosition.interactive：带 -i、不带 -c 也不带脚本的照交互算，直接执行的看 #! 行；
-#   三方 d137-gov-r2 判决 R1 过度修补 G：非交互的 `bash -lc` 读登录 shell 启动文件再 source ~/.bashrc，守卫之后的 bash-completion 这类大文件照读全份，每次多两三秒、多记一条检出）。
+#   例：非交互的 `bash -lc` 读登录 shell 启动文件再 source ~/.bashrc，守卫之后的 bash-completion 这类大文件照读全份，每次多两三秒、多记一条检出）。
 #   弄坏开关 LIB_SHELL_WORDS_BREAK=non-interactive-return-unseen 下整份照读。
-# cd 之后的相对路径脚本（三方 d137-gov-r2 判决 H5、R1 过度修补 F）：cd 的目标里 $PWD、$OLDPWD、`cd -`、起头的 `$(git rev-parse --show-toplevel)` 与 `$(pwd)` 照算出的目录
+# cd 之后的相对路径脚本：cd 的目标里 $PWD、$OLDPWD、`cd -`、起头的 `$(git rev-parse --show-toplevel)` 与 `$(pwd)` 照算出的目录
 #   （lib_shell_words.py 的 changed_directory）；cd 到盘上不在的目录，后面跟 `&&` 的那一串与 `cd 目录 || exit` 之后同一层的（cd 失败就不跑；CommandAtPosition.cd_failure_skips）
 #   照 cd 成功了的那个目录判（同一条命令里前面写出的照读，不在的照「脚本不存在」只记），`;`、`||`、换行、括号之后照跑的照「目录不在、cd 会失败」拒；
 #   弄坏开关 LIB_SHELL_WORDS_BREAK=cd-known-targets-unexpanded、cd-failure-guards-unseen（逐格见下面开关清单）。
-# 别的程序里起的命令（三方 d137-gov-r1 判决 H9 与「已知没认」那一类；lib_shell_words.py 的 embedded_launches，认哪几种程序、哪几种写法写在它的文件头）：
+# 别的程序里起的命令（lib_shell_words.py 的 embedded_launches，认哪几种程序、哪几种写法写在它的文件头）：
 #   python / perl / ruby / node / php / lua 的代码串与喂进标准输入的字面代码、awk 的程序、sed 的 e 命令、tclsh / expect、make --eval 与喂进标准输入的 Makefile、git 的别名与带命令的配置、
 #   tar / ssh / less / vim 带命令的选项里，字面写着的命令照一段命令文本接着判（同 bash -c）；awk -f、sed -f、Makefile 读正文交 program_text_launches 切出命令，照脚本正文那样判
 #   （program_file_text；文件都不在的不判，程序自己报错；路径写成前面赋过字面值的变量的照代入，d137-replay-classify 误拒 E5，弄坏开关 PROJECT_CODE_GUARD_BREAK=program-file-variables-unexpanded）；起了命令而写法认不出的（变量、拼接、动态求值），命令文本这一层照「认不出起什么的写法」拒，读进来的正文与程序文件里的照常执行、记检出。
 #   python / perl / ruby / tclsh 起的脚本文件不读（共用约束「写」一节由子 agent 自己守）。
 #   弄坏开关 LIB_SHELL_WORDS_BREAK=embedded-launches-unseen、PROJECT_CODE_GUARD_BREAK=program-files-unread、embedded-unjudged-allowed（逐格见下面开关清单）。
 # 脚本里自己的转发函数（`run() { "$@"; }`、`run_logged() { local log=$1; shift; "$@" > "$log"; }`，函数体里有一条命令的命令词是位置参数；lib_shell_words.py 的 launcher_functions）：
-#   命令文本与读进来的脚本正文里都认，调用的参数从每一处起的一段各当一条命令判（正推腿乙第八节 C、C12c：仓副本里经 crash-point-replay.sh 自己的 run_logged 起 验证包）；
+#   命令文本与读进来的脚本正文里都认，调用的参数从每一处起的一段各当一条命令判（例：仓副本里经 crash-point-replay.sh 自己的 run_logged 起 验证包）；
 #   弄坏开关 PROJECT_CODE_GUARD_BREAK=launcher-functions-unjudged 下不认。
 # 名单外启动器（xargs、find -exec / -execdir / -ok、ssh、doas、script -c、unshare、setpriv、numactl、nsenter、su -c、runuser、sg、watch、parallel、ltrace、valgrind、gdb --args、
 #   faketime、unbuffer、cpulimit、dbus-run-session、firejail、bwrap、proot、scl enable、chroot、cgexec；lib_project_code_runs.py 的 EXTRA_LAUNCHER_NAMES、command_under_extra_launcher）
 #   照 /usr/bin/time 那一类剥掉、里面那条照判；xargs、find、parallel 读进来接进命令里的词换成没展开的占位词，照上面 ①② 认不出拒（`xargs bash`、`find -exec bash {} \;`）。
-# 派发起法 `bash scripts/hosts/multi-host-run.sh --peer [选项…] -- <命令…>`（它只有这一种派发用法，不带 --peer 退 2；lib_project_code_runs.py 的 command_under_dispatch_launcher；
-#   records/2026-10-29-一百三十七节那一轮调度记录.md#8）照 /usr/bin/time 那一类剥掉、`--` 后面那条照判，派发器本身是本仓的脚本，直接起照下面「经 task-server 起」① 拒；
+# 派发起法 `bash scripts/hosts/multi-host-run.sh --peer [选项…] -- <命令…>`（它只有这一种派发用法，不带 --peer 退 2；lib_project_code_runs.py 的 command_under_dispatch_launcher）
+#   照 /usr/bin/time 那一类剥掉、`--` 后面那条照判，派发器本身是本仓的脚本，直接起照下面「经 task-server 起」① 拒；
 #   `… -- <脚本> --selftest` 照里面那条的登记判，不当派发器自己的自证带了别的参数；multi-host-run.sh --selftest 照它自己的登记判。
 #   host-dispatch.py 是 task-server 载入的判法库（命令行只认 --selftest），不在这里剥：带了别的参数照本仓的脚本拒。
 #   编译目录那一道（下面「再一道」）交给 lib_workspace_cargo_lock.py 的判定库同样剥它（DispatchLaunchersSeen）：里面裸起的 cargo 照拒。
@@ -173,8 +173,7 @@
 #   钩子自己的 PATH 上找到的、名字不带 .sh 的脚本（本机用户 bin 目录下的 cargo 包装这类照程序算）；source 进来的文件里 export 的变量对外层后面命令的影响；
 #   .cargo/config.toml 与 `--config <文件>` 里定的别名与 runner；拷走改名、又不点名登记的用例函数的测试二进制（看门狗在进程这一层同样认不出）；
 #   ssh 起的命令在别的机器上跑，这里照本机那一条判（偏严）。
-# 经 task-server 起（records/2026-10-30-编译绕过内存总上限.md 批 3b；用户「无论轻任务重任务 cpu或者gpu任务 一律走启动器。」「子 agent 也过 task-server」
-#   「主agent 增加redis任务和取消redis任务都要走标准接口 不可以绕过」；用户 2026-11-01「现在需要发给 task-server的任务 都不能自己启动」）：
+# 经 task-server 起（加任务、取消任务都走标准接口，不绕过；子 agent 也过 task-server）：
 #   上面那张「谁能跑哪一类」的表之外另判三样，钩子入口照 task_server_decision 判（decide 是那张表，它先判）。
 #   ① 一切跑项目代码的命令只认经 task-server/task 起，主 agent 与子 agent 同判：不经 `task-server/task submit -- …` 起的这几样执行前拒——会编的 cargo（build、check、clippy、test、run、bench、doc，
 #      别名与插件照会编算；fmt、metadata、tree、clean 不编，直接跑：lib_project_code_runs.starts_a_build）、跑编译出来的代码（cargo test / run / bench、直接执行编出来的二进制：
@@ -185,7 +184,7 @@
 #      有 shell 写法的包进 `bash -c`，submit_candidate）；子 agent 那一份的出路是把同一条（照主 agent 交它再判过放行才给）写进报告「要主 agent 跑的命令」一节交回
 #      （subagent_task_server_policy，出路那一句是 lib_project_code_runs.SUBAGENT_HAND_BACK_WAY_OUT）。
 #      直接跑的只剩：不是本仓文件的命令（只读的 git、ls、grep、cat、sed -n、wc、sha256sum、diff、du、ps 这类与草稿里自己写的、里面不跑项目代码的脚本）、语法检查（bash -n、python3 -m py_compile）、
-#      lib_project_code_runs.py 的 TEXT_TOOLS_RUN_DIRECTLY（用户定的「文本工具直接跑」：replace-once.py、replace-batch.py、insert-row.py、work-directory-ownership.sh claim、kb-spec-check.py、
+#      lib_project_code_runs.py 的 TEXT_TOOLS_RUN_DIRECTLY（文本工具直接跑：replace-once.py、replace-batch.py、insert-row.py、work-directory-ownership.sh claim、kb-spec-check.py、
 #      stale-candidates.py、kb-sections.py、checklist-specs.py、cite-check.py、claim-experiment.sh、gate-overlap.py --list，主 agent 定的 relabel-item.py、copy-originals.py，用户授权的 append-record.py，
 #      加 task-server/task 的 submit / wait / status / cancel / log / clean 与 task-server/control check；子 agent 起客户端另照 ② 只许 status、log），与只给主 agent 的 MAIN_AGENT_TOOLS_RUN_DIRECTLY（proc.py、remind.sh、watch.sh、agent-watch.py、dispatch-prompt.py、
 #      task-server/control 的 install / start / stop / watch：起在服务的单元里就丢了会话身份或停不了服务自己）。名单上的脚本整份放行，读进来的正文里那几行不另算（listed_scripts）。
@@ -216,7 +215,7 @@
 #      弄坏开关（只给自检证明会红，红的格写在下面开关表）：PROJECT_CODE_GUARD_BREAK=temporary-service-bare-allowed（④ 不判）、temporary-service-wrapper-not-marked
 #      （剥开包装重判时不补标记）、temporary-service-submit-inner-unread（submit 里那一条不收）、temporary-service-remedy-dropped（说明不贴规矩与怎么办）。
 # 再一道，与谁在跑无关（主 agent 与子 agent 一样判）：主工作区里直接起的、编译目录会落进主仓的 cargo（build、test、check、clippy、run、bench、doc 这类会编的；
-#   fmt、metadata、tree、clean 这类不编的放行）执行前拒绝（用户定案「所有脚本自行编译，完成后自行删除 不再预留生成物」，主工作区的 target/ 删了又长）。
+#   fmt、metadata、tree、clean 这类不编的放行）执行前拒绝（所有脚本自行编译、完成后自行删除、不预留生成物：主工作区的 target/ 删了又长）。
 #   目录取 cd、env -C、-C、--manifest-path 之后的（包装剥掉之后：run-with-memory-cap.sh、capped.sh、nice、timeout、env、bash -c、/usr/bin/time 这一类），
 #   只判落在主仓（project_root）那棵主工作树里的，仓副本、git worktree 加出来的树不判；--target-dir、CARGO_TARGET_DIR、CARGO_BUILD_TARGET_DIR、--config build.target-dir
 #   或配置文件的 build.target-dir 指到仓外的放行，经 scripts/hosts/run-build-directory.sh 包一层起的放行（它给这一次一个自己的编译目录、跑完删）；
@@ -241,9 +240,9 @@
 #       「stdin:被拒的检出记录写了结局「被拒」「stdin:坏 JSON 放行（退出码 0）、stderr 写诊断、记一条检出」「stdin:不是 JSON 对象放行（退出码 0）、stderr 写诊断、记一条检出」「stdin:判的时候抛异常放行（退出码 0）、stderr 写诊断、记一条检出」「stdin:放行时的检出记录写了结局「只记」
 #   PROJECT_CODE_GUARD_BREAK=copy-without-run-scope  被拒时照抄的那条不带四段范围声明（SINGLEFS_RUN_SCOPE，写法在 run-scope-guard.sh 文件头）
 #       「stdin:主 agent 直接跑整道门禁被拒时照抄的那条经 task-server 提交、四段范围声明写在 submit 前面（为什么是占位），照它再判放行」「经 task-server：照抄：实现员直接跑 harness 测试，照抄的那条经 task-server 提交」「经 task-server：照抄：带 && 的整条包进 bash -c」
-#   PROJECT_CODE_GUARD_BREAK=failure-unrecorded  main() 里判不了的两支（hook 输入不是 JSON 对象、decide() 抛异常）只打 stderr、不记检出（改前的样子）
+#   PROJECT_CODE_GUARD_BREAK=failure-unrecorded  main() 里判不了的两支（hook 输入不是 JSON 对象、decide() 抛异常）只打 stderr、不记检出
 #       「stdin:坏 JSON 放行（退出码 0）、stderr 写诊断、记一条检出」「stdin:不是 JSON 对象放行（退出码 0）、stderr 写诊断、记一条检出」「stdin:判的时候抛异常放行（退出码 0）、stderr 写诊断、记一条检出」
-#   PROJECT_CODE_GUARD_BREAK=copy-by-cp-only  copy_pairs() 只认 cp（改前的判法）：同一条命令里 ln / install / mv 拷出、`cat 源 > 目的` 写出的脚本不认，执行时按盘上那份判，还不在的记「不存在」：实测红的格（照失败行原文）
+#   PROJECT_CODE_GUARD_BREAK=copy-by-cp-only  copy_pairs() 只认 cp：同一条命令里 ln / install / mv 拷出、`cat 源 > 目的` 写出的脚本不认，执行时按盘上那份判，还不在的记「不存在」：实测红的格（照失败行原文）
 #       「主 agent cat 01> 拷出再起全量脚本照拒：读进去几份脚本」「主 agent cat 源 "2"> 拷出（引号里的 2 是源）再起全量脚本照拒：读进去几份脚本」「主 agent cat 3> 再 >&3 拷出再起全量脚本照拒：读进去几份脚本」「主 agent 同一条命令里 cp 再 mv 改名再起全量脚本照拒：读进去几份脚本」「主 agent cat > 拷出、另把 stderr 丢进 /dev/null 再起全量脚本照拒：读进去几份脚本」「主 agent ln -s 的相对源从链接所在的目录算、经它起全量脚本照拒：读进去几份脚本」「一百三十七：cat 源 >> 拷出再起，照写出的内容判：读进去几份脚本」「一百三十七：cat 轻脚本 &> 拷出再起，照内容判、放行」「一百三十七：cat 轻脚本 &> 拷出再起，照内容判、放行：读进去几份脚本」「一百三十七：cat 源里有不在的文件、&& 接起，照拒并点名不在的源」「d137 H8：install /bin/bash ./x; ./x 脚本 读正文照拒：读进去几份脚本」「d137 H7：多源 cat 两个源都在、都无害，放行、读写出的内容」「d137 H7：单源 cat 源在、起全量，照拒（控制组）：读进去几份脚本」
 #   WORKSPACE_CARGO_LOCK_BREAK=bare-cargo-allowed  （不判编译目录）：实测红的格（照失败行原文）
 #       「编译目录：主 agent 在主工作区裸起 cargo build：拒（退出码 2）」「编译目录：子 agent 经内存包装在主工作区起 cargo test：拒（退出码 2）」「编译目录：拒绝说明给出经 task-server 提交的出路」「编译目录：function 定义之后拆开拼写调用：拒（退出码 2）」「lib_workspace_cargo_lock.py 的自检」「编译目录：子 agent 经 multi-host-run.sh --peer 在主工作区起 cargo test、没给编译目录：拒（退出码 2）」
@@ -256,8 +255,8 @@
 #   WORKSPACE_CARGO_LOCK_BREAK=non-building-refused  （不编的子命令也判）：实测红的格（照失败行原文）
 #       「编译目录：cargo fmt：放行（退出码 0）」「lib_workspace_cargo_lock.py 的自检」
 #   LIB_SHELL_WORDS_BREAK=arguments-as-executed  `python3 -` 后面的词、`bash -n` 的目标当被执行的脚本：实测红的格（照失败行原文）
-#       「bash -c -n 只查语法：放行」「工具实现员在门禁目录里 python3 - 读几份门禁（2026-09-28 误拦的那一条原样，目录换成自检的临时工作区）」「lib_project_code_runs.py 的自检」「一百三十七：bash -n 只查语法，不读 BASH_ENV：放行」
-#   LIB_SHELL_WORDS_BREAK=shell-standard-input-unread  here-string 与管道喂给 shell 的文本不当命令再切、也不交判不了的说明（改前的判法）：实测红的格（照失败行原文）
+#       「bash -c -n 只查语法：放行」「工具实现员在门禁目录里 python3 - 读几份门禁（2026-09-28 误拦的那一条原样，目录换成自检的临时工作区）」「lib_project_code_runs.py 的自检」「一百三十七：bash -n 只查语法，不读 BASH_ENV：放行」（history-kept: 自证用例标签原文，按原文匹配）
+#   LIB_SHELL_WORDS_BREAK=shell-standard-input-unread  here-string 与管道喂给 shell 的文本不当命令再切、也不交判不了的说明：实测红的格（照失败行原文）
 #       「实现员 here-string 喂给 bash 的是变量：认不出照拒、照记检出」「实现员 here-string 喂给 bash 的是变量：认不出照拒、照记检出：记几条检出」「一百三十七：grep 的输出经管道喂给 bash：认不出照拒」「一百三十七：grep 的输出经管道喂给 bash：认不出照拒：记几条检出」「lib_project_code_runs.py 的自检」「stdin:here-string 喂给 bash 的是变量认不出照拒（退出码 2）、stderr 点名判不了、记一条检出」「d137 H4：echo 代码 | bash /dev/stdin 照拒」「d137 H4：bash /dev/fd/0 <<< 代码 照拒」
 #   LIB_SHELL_WORDS_BREAK=redirect-fd-dropped  `2> 文件` 也当改标准输出（cat 拷出取最后一个输出重定向）：实测红的格（照失败行原文）
 #       「主 agent cat 3> 再 >&3 拷出再起全量脚本照拒：读进去几份脚本」「heredoc 写文件：cat <<EOF 2> 写的那一份拿不到正文：认不出写法写出再起，照拒：读进去几份脚本」「主 agent heredoc 写文件：cat <<EOF 3> 再 >&3 写出再起全量脚本照拒：读进去几份脚本」「主 agent cat > 拷出、另把 stderr 丢进 /dev/null 再起全量脚本照拒：读进去几份脚本」「cat > 拷出、起的是 2> 写的那一份：认不出写法写出再起，照拒：读进去几份脚本」
@@ -309,7 +308,7 @@
 #       「主 agent cat 3> 再 >&3 拷出再起全量脚本照拒：读进去几份脚本」「主 agent heredoc 写文件：cat <<EOF 3> 再 >&3 写出再起全量脚本照拒：读进去几份脚本」
 #   LIB_SHELL_WORDS_BREAK=redirect-target-braces-expanded  重定向目标上的花括号照旧展开：实测红的格（照失败行原文）
 #       「重定向目标花括号展开成几个词：bash 报 ambiguous redirect 不写，放行」「重定向目标花括号展开成几个词：bash 报 ambiguous redirect 不写，放行：记几条检出」
-#   PROJECT_CODE_GUARD_BREAK=heredoc-write-every-redirection  heredoc_write_targets() 的输出重定向不看 fd 号、一律当写了正文（改前的判法）：实测红的格（照失败行原文）
+#   PROJECT_CODE_GUARD_BREAK=heredoc-write-every-redirection  heredoc_write_targets() 的输出重定向不看 fd 号、一律当写了正文：实测红的格（照失败行原文）
 #       「heredoc 写文件：cat <<EOF 2> 写的那一份拿不到正文：认不出写法写出再起，照拒：读进去几份脚本」
 #   LIB_SHELL_WORDS_BREAK=shell-long-options-after-short  ：实测红的格（照失败行原文）
 #       「bash -c 之后的长选项：bash 报错不跑，放行」
@@ -329,7 +328,7 @@
 #       「数组元素赋值与 += 追加是赋值、不是命令词：放行」
 #   PROJECT_CODE_GUARD_BREAK=unrecognized-writes-allowed  ：实测红的格（照失败行原文）
 #       「别的命令带几个文件参数写到 > 文件不当 cat 接起来：认不出写法写出再起，照拒」「别的命令带几个文件参数写到 > 文件不当 cat 接起来：认不出写法写出再起，照拒：记几条检出」「heredoc 写文件：cat <<EOF 2> 写的那一份拿不到正文：认不出写法写出再起，照拒」「heredoc 写文件：cat <<EOF 2> 写的那一份拿不到正文：认不出写法写出再起，照拒：记几条检出」「cat > 拷出、起的是 2> 写的那一份：认不出写法写出再起，照拒」「cat > 拷出、起的是 2> 写的那一份：认不出写法写出再起，照拒：记几条检出」「ln -s 的相对源在链接所在的目录里不在：认不出写法写出再起，照拒」「ln -s 的相对源在链接所在的目录里不在：认不出写法写出再起，照拒：记几条检出」「实现员 cat -n 带选项写出：认不出，照拒」「实现员 cat -n 带选项写出：认不出，照拒：记几条检出」「实现员 cp 的源不在：认不出，照拒」「实现员 cp 的源不在：认不出，照拒：记几条检出」「实现员 printf 写出再起：认不出，照拒」「实现员 printf 写出再起：认不出，照拒：记几条检出」「一百三十七：echo 写出再起照拒」「一百三十七：echo 写出再起照拒：记几条检出」「一百三十七：python 写出再起照拒」「一百三十七：python 写出再起照拒：记几条检出」
-#   PROJECT_CODE_GUARD_BREAK=python-filter-code-judged  ：python3 -c 的代码、喂给 python3 - 的 heredoc 正文里没有任何能写文件的东西，也照旧算点到后面执行的脚本（python_filter_code 交空；改前的判法）：红的格（推的）
+#   PROJECT_CODE_GUARD_BREAK=python-filter-code-judged  ：python3 -c 的代码、喂给 python3 - 的 heredoc 正文里没有任何能写文件的东西，也照旧算点到后面执行的脚本（python_filter_code 交空）：红的格（推的）
 #       「经 task-server：管道读 JSON 的 python3 -c 代码里写着 'task'，不当写了后面执行的 task-server/task：主 agent 放行」「经 task-server：循环里管道读 JSON 的 python3 -c 代码里写着 'task'，不当写了 task-server/task：主 agent 放行」
 #   PROJECT_CODE_GUARD_BREAK=path-scripts-unread  ：实测红的格（照失败行原文）
 #       「一百三十七：PATH 指到放脚本的目录、命令词不带斜杠的 .sh 照读正文」「一百三十七：PATH 指到放脚本的目录、命令词不带斜杠的 .sh 照读正文：读进去几份脚本」
@@ -345,47 +344,47 @@
 #       「一百三十七：别处树里的 run-with-memory-cap.sh 拷贝照读正文：读进去几份脚本」
 #   PROJECT_CODE_GUARD_BREAK=cat-missing-source-unexplained  ：实测红的格（照失败行原文）
 #       「一百三十七：cat 源里有不在的文件、&& 接起，照拒并点名不在的源」
-#   PROJECT_CODE_GUARD_BREAK=cat-append-unreadable-destination-raises  ：cat 追加到盘上读不了的文件时，不认那个目的这一支退回改前（pieces 是 None 还接着 append，判的时候抛 AttributeError）；实测红的格（照失败行原文，实际一栏是抛的错）
+#   PROJECT_CODE_GUARD_BREAK=cat-append-unreadable-destination-raises  ：cat 追加到盘上读不了的文件时，不认那个目的这一支不生效（pieces 是 None 还接着 append，判的时候抛 AttributeError）；实测红的格（照失败行原文，实际一栏是抛的错）
 #       「一百三十七：cat 追加到不是文本的文件之后接 herd7 x.litmus，照拒」「一百三十七：同一条主 agent 起，照拒」
-#   PROJECT_CODE_GUARD_BREAK=relative-script-undeterminable-directory-allowed  script_path_of() 不拒当前目录算不出（cd 失败、cd 到的目录是算不出的变量 / 命令替换、~- 的 OLDPWD）而起的相对路径脚本（改前的判法：算不出就当脚本不在、放行；三方 d137-gov-r1 判决 H5、H6）
+#   PROJECT_CODE_GUARD_BREAK=relative-script-undeterminable-directory-allowed  script_path_of() 不拒当前目录算不出（cd 失败、cd 到的目录是算不出的变量 / 命令替换、~- 的 OLDPWD）而起的相对路径脚本（算不出就当脚本不在、放行）
 #       「d137 H5：cd 到不在的目录、cd 失败，相对脚本认不出在哪，照拒」「记几条检出」「d137 H5：cd 目标写成命令替换、算不出，相对脚本认不出，照拒」「d137 H6：bash ~-/脚本 的 OLDPWD 算不出，认不出起哪一份，照拒」「应当是 2，实际 0」
-#   PROJECT_CODE_GUARD_BREAK=bash-env-forwarding-untracked  scan_uses() 不拿调用处的 environment 重判「体内起 shell 的转发函数」的函数体（改前的判法：函数体就地按词法环境判、看不到调用处前缀设的 BASH_ENV / ENV；三方 d137-gov-r1 攻方腿 A2）
+#   PROJECT_CODE_GUARD_BREAK=bash-env-forwarding-untracked  scan_uses() 不拿调用处的 environment 重判「体内起 shell 的转发函数」的函数体（函数体就地按词法环境判、看不到调用处前缀设的 BASH_ENV / ENV）
 #       「d137 A2：BASH_ENV=脚本 包进起 bash 的转发函数、跟进函数体读正文照拒」「读进去几份脚本」「d137 A2：env BASH_ENV=脚本 起转发函数照拒」「读进去几份脚本」「d137 A2：function 关键字定义的函数同样跟进、照拒」「读进去几份脚本」「d137 A2：BASH_ENV 指到轻脚本，放行：读进去几份脚本」
-#   PROJECT_CODE_GUARD_BREAK=compound-stdin-untracked  scan_uses() 不认 exec < 文件 / { … } < 文件 / ( … ) < 文件 / while … done < 文件 下发给里层 shell 的标准输入文件（改前的判法：里层读标准输入的 shell 看不到复合命令 / exec 上的输入重定向；三方 d137-gov-r1 判决 H4）
+#   PROJECT_CODE_GUARD_BREAK=compound-stdin-untracked  scan_uses() 不认 exec < 文件 / { … } < 文件 / ( … ) < 文件 / while … done < 文件 下发给里层 shell 的标准输入文件（里层读标准输入的 shell 看不到复合命令 / exec 上的输入重定向）
 #       「d137 H4：exec < 文件; bash 读那份文件判、照拒」「d137 H4：exec 0< 文件; bash -s 照拒」「d137 H4：{ bash; } < 文件 照拒」「d137 H4：( bash ) < 文件 照拒」「d137 H4：while … done < 文件 照拒」「读进去几份脚本」「d137 H4：exec < 变量; bash 来源算不出，照拒」「d137 H4：exec < 轻文件; bash 放行：读进去几份脚本」「d137 H4：{ bash; } < 轻脚本 放行：读进去几份脚本」
-#   PROJECT_CODE_GUARD_BREAK=copied-shell-binary-untracked  scan_uses() 不认同一条命令里 cp / ln / install 拷来、链来的 shell 二进制（copied_shell_binary 交 None；改前的判法：./x 命令词不在 SHELL_NAMES、它的参数没当 shell 判；三方 d137-gov-r1 判决 H8）
+#   PROJECT_CODE_GUARD_BREAK=copied-shell-binary-untracked  scan_uses() 不认同一条命令里 cp / ln / install 拷来、链来的 shell 二进制（copied_shell_binary 交 None：./x 命令词不在 SHELL_NAMES、它的参数没当 shell 判）
 #       「d137 H8：cp /bin/bash ./x; ./x -c 代码 照 bash 判、照拒」「d137 H8：ln -sf /bin/bash ./x; ./x -c 代码 照拒」「d137 H8：install /bin/bash ./x; ./x 脚本 读正文照拒」「读进去几份脚本」「d137 H8：cp /bin/bash ./x; ./x 轻脚本 放行：读进去几份脚本」
-#   PROJECT_CODE_GUARD_BREAK=cat-missing-source-allowed  record_files_written() 与 piped_text() 退回改前：多源 cat / >> / tee 的源盘上不在、读不到内容时，照把在的源接起来当写出的内容判，不照认不出拒（三方 d137-gov-r1 判决 H7、S3；用户 2026-10-29 定「cat 不看源在不在那一类照拒」）
+#   PROJECT_CODE_GUARD_BREAK=cat-missing-source-allowed  record_files_written() 与 piped_text() 下多源 cat / >> / tee 的源盘上不在、读不到内容时，照把在的源接起来当写出的内容判，不照认不出拒
 #       「d137 H7：多源 cat 有盘上不在的源（在的源无害），照拒」「d137 H7：源是 echo 写出的（认不出写法、盘上不在），照拒」「d137 H7：cat 源 >> 追加、源盘上不在，照拒」「d137 H7：cat 源 | tee 拷出、源盘上不在，照拒」「读进去几份脚本」「d137 H7：多源 cat 有盘上不在的源（在的源起全量）、写出再起，照拒：读进去几份脚本」
 #   PROJECT_CODE_GUARD_BREAK=unjudged-shell-input-allowed  ：实测红的格（照失败行原文）
 #       「一百三十七：grep 的输出经管道喂给 bash：认不出照拒」
 #   PROJECT_CODE_GUARD_BREAK=bash-layer-unrecorded  ：实测红的格（照失败行原文）
 #       「一百三十七：钩子 bash 这一层起不来（假 python3 退 127）：放行（退出码 0）、记一条检出」
-#   PROJECT_CODE_GUARD_BREAK=python-missing-unrecorded  PATH 上没有 python3 时不在 preflight 之前记检出，照旧由 preflight 退 78、什么都不记（改前的判法；三方 d137-gov-r1 判决 H13）
+#   PROJECT_CODE_GUARD_BREAK=python-missing-unrecorded  PATH 上没有 python3 时不在 preflight 之前记检出，照旧由 preflight 退 78、什么都不记
 #       「d137 H13：PATH 上没有 python3：放行（退出码 0）、记一条检出」「d137 H13：PATH 上没有 python3、工作根取不到：放行（退出码 0）、不往家目录下写、stderr 说检出没记成」
-#   LIB_SHELL_WORDS_BREAK=login-profiles-unread  共用模块 startup_file_words() 不认登录 shell（-l、--login、exec -l、exec -a -名字）：/etc/profile、HOME 下的 profile 一类都不读（改前的判法）
+#   LIB_SHELL_WORDS_BREAK=login-profiles-unread  共用模块 startup_file_words() 不认登录 shell（-l、--login、exec -l、exec -a -名字）：/etc/profile、HOME 下的 profile 一类都不读
 #       「d137 已知没认：登录 bash -l 读 HOME 下的 .bash_profile，里面起全量，照拒」「d137 已知没认：登录 bash -l 读 HOME 下的 .bash_profile，里面起全量，照拒：读进去几份脚本」「d137 已知没认：登录 bash --login 同样读 .bash_profile，照拒」「d137 已知没认：登录 bash --login 同样读 .bash_profile，照拒：读进去几份脚本」「d137 已知没认：登录 sh -l 读 HOME 下的 .profile，照拒」「d137 已知没认：登录 sh -l 读 HOME 下的 .profile，照拒：读进去几份脚本」「d137 已知没认：登录 exec -l bash 照登录 shell 读 .bash_profile，照拒」「d137 已知没认：登录 exec -l bash 照登录 shell 读 .bash_profile，照拒：读进去几份脚本」「d137 已知没认：登录 exec -a -bash bash 照登录 shell 读 .bash_profile，照拒」「d137 已知没认：登录 exec -a -bash bash 照登录 shell 读 .bash_profile，照拒：读进去几份脚本」「d137 已知没认：登录 bash -l 读的 profile 只有轻活，放行：读进去几份脚本」「d137 已知没认：系统级 bash -l 读 /etc/profile（样本目录），里面起全量，照拒」「d137 已知没认：系统级 bash -l 读 /etc/profile（样本目录），里面起全量，照拒：读进去几份脚本」「d137-r2 G：登录 bash -l 读 .profile 再 source 带非交互守卫的 .bashrc，守卫之后不读，放行：读进去几份脚本」「d137-r2 G：守卫不在顶层（套在 if 里）不截，照拒」
-#   LIB_SHELL_WORDS_BREAK=system-startup-files-unread  共用模块不交 SYSTEM_STARTUP_DIRECTORY 下的系统级启动文件（/etc/profile、/etc/bash.bashrc；改前的判法）
+#   LIB_SHELL_WORDS_BREAK=system-startup-files-unread  共用模块不交 SYSTEM_STARTUP_DIRECTORY 下的系统级启动文件（/etc/profile、/etc/bash.bashrc）
 #       「d137 已知没认：系统级 bash -l 读 /etc/profile（样本目录），里面起全量，照拒」「d137 已知没认：系统级 bash -l 读 /etc/profile（样本目录），里面起全量，照拒：读进去几份脚本」「d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录），照拒」「d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录），照拒：读进去几份脚本」「d137 已知没认：系统级 bash --rcfile 轻文件 -i 照读 /etc/bash.bashrc，照拒」「d137 已知没认：系统级 bash --rcfile 轻文件 -i 照读 /etc/bash.bashrc，照拒：读进去几份脚本」
-#   LIB_SHELL_WORDS_BREAK=embedded-launches-unseen  共用模块 embedded_launches() 一条都不认：别的程序里起的命令不判（改前的判法）
+#   LIB_SHELL_WORDS_BREAK=embedded-launches-unseen  共用模块 embedded_launches() 一条都不认：别的程序里起的命令不判
 #       「d137 H9：python -c 里 os.system 起全量，照拒」「d137 H9：python 读 heredoc 里 subprocess.run 起全量，照拒」「d137 H9：python -c 里 os.system 的命令是变量，认不出照拒」「d137 H9：perl -e 里 system 起全量，照拒」「d137 H9：ruby -e 里 system 起全量，照拒」「d137 H9：node -e 里 child_process 起全量，照拒」「d137 H9：tclsh 读 here-string 里 exec 起全量，照拒」「d137 H9：gawk 的 system() 起全量，照拒」「d137 H9：awk 的 print 管道到全量，照拒」「d137 H9：awk -f 程序文件里 system() 起全量，读正文照拒」「d137 H9：awk -f 程序文件里 system() 起全量，读正文照拒：读进去几份脚本」「d137 H9：awk -f 程序文件不起命令，放行：读进去几份脚本」「d137 H9：sed 的 e 命令起全量，照拒」「d137 H9：sed 的 s///e 执行模式空间，认不出照拒」「d137 H9：git -c 别名 ! 起全量，照拒」「d137 H9：git -c core.pager 起全量，照拒」「d137 H9：GIT_EXTERNAL_DIFF 起全量，照拒」「d137 H9：make 读 Makefile 配方起全量，照拒」「d137 H9：make 读 Makefile 配方起全量，照拒：读进去几份脚本」「d137 H9：make 读 Makefile 配方只有轻活，放行：读进去几份脚本」「d137 H9：make -f /dev/stdin 读 here-string 的配方起全量，照拒」「d137 H9：tar --to-command 起全量，照拒」「d137 H9：ssh -o ProxyCommand 起全量，照拒」「d137 H9：脚本正文里 perl -e 起全量，读正文照拒」「d137-r2 A：sed 算术地址后接 e 起全量，照拒」「d137-r2 A：sed 命令替换落在命令位上，照拒」「d137-r2 B：sed 文本之后另起一行 e 起全量，照拒」「d137-r2 C：python argv 起 cargo test 而参数是变量，照拒」「d137-r2 C：python argv 头一项是变量，照拒」「d137-r2 D：python 先赋变量的字面列表起全量，照拒」「d137-r2 D：python 列表赋过之后被改，认不出照拒」「d137-r2 E：awk 里 cmd 赋全量再 | getline，照拒」「d137-r2 E：awk 里 cmd 是拼接的，认不出照拒」「d137 闸误拒 E5：W 赋过字面目录，awk -f $W/程序文件，读正文放行：读进去几份脚本」「d137 闸误拒 E5：W 没赋过，awk -f $W/程序文件认不出，照拒」
-#   PROJECT_CODE_GUARD_BREAK=program-files-unread  scan_uses() 不读别的程序从文件读的代码（awk -f、sed -f、Makefile；改前的判法：只判命令行上字面写着的）
+#   PROJECT_CODE_GUARD_BREAK=program-files-unread  scan_uses() 不读别的程序从文件读的代码（awk -f、sed -f、Makefile：只判命令行上字面写着的）
 #       「d137 H9：awk -f 程序文件里 system() 起全量，读正文照拒」「d137 H9：awk -f 程序文件里 system() 起全量，读正文照拒：读进去几份脚本」「d137 H9：awk -f 程序文件不起命令，放行：读进去几份脚本」「d137 H9：make 读 Makefile 配方起全量，照拒」「d137 H9：make 读 Makefile 配方起全量，照拒：读进去几份脚本」「d137 H9：make 读 Makefile 配方只有轻活，放行：读进去几份脚本」「d137 闸误拒 E5：W 赋过字面目录，awk -f $W/程序文件，读正文放行：读进去几份脚本」「d137 闸误拒 E5：W 没赋过，awk -f $W/程序文件认不出，照拒」
-#   PROJECT_CODE_GUARD_BREAK=embedded-unjudged-allowed  别的程序里起命令而写法认不出的，命令文本这一层只记不拒（改前的判法）
+#   PROJECT_CODE_GUARD_BREAK=embedded-unjudged-allowed  别的程序里起命令而写法认不出的，命令文本这一层只记不拒
 #       「d137 H9：python -c 里 os.system 的命令是变量，认不出照拒」「d137 H9：python -c 里 os.system 的命令是变量，认不出照拒：记几条检出」「d137 H9：sed 的 s///e 执行模式空间，认不出照拒」「d137 H9：sed 的 s///e 执行模式空间，认不出照拒：记几条检出」「d137-r2 A：sed 命令替换落在命令位上，照拒」「d137-r2 D：python 列表赋过之后被改，认不出照拒」「d137-r2 E：awk 里 cmd 是拼接的，认不出照拒」「d137 闸误拒 E5：W 没赋过，awk -f $W/程序文件认不出，照拒」
-#   LIB_SHELL_WORDS_BREAK=sed-expansions-unparsed  sed_script_commands() 不另算 sed 脚本词里没展开的 bash 展开，原样切、切不下去照「解析不下去」拒（改前的判法；过度修补 A）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=sed-expansions-unparsed  sed_script_commands() 不另算 sed 脚本词里没展开的 bash 展开，原样切、切不下去照「解析不下去」拒：实测红的格（照失败行原文）
 #       「d137-r2 A：sed 地址里的算术展开照 sed 判，放行」「d137-r2 A：sed 地址里的 $[ ] 算术照 sed 判，放行」「d137-r2 A：sed 行号地址是命令替换，照 sed 判，放行」
-#   LIB_SHELL_WORDS_BREAK=sed-text-first-line-only  sed_script_parse() 的 a / i / c 文本只读到头一个换行（改前的判法：`a\` 换行之后的文本行被当命令读；过度修补 B）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=sed-text-first-line-only  sed_script_parse() 的 a / i / c 文本只读到头一个换行（`a\` 换行之后的文本行被当命令读）：实测红的格（照失败行原文）
 #       「d137-r2 B：sed 的 c\ 多行文本，放行」「d137-r2 B：sed 的 a\ 续行文本，放行」（推的）
-#   LIB_SHELL_WORDS_BREAK=python-argument-variables-unresolved  scan_python() 起命令的参数只认整个字面的（改前的判法：argv 里有一项是变量、赋过字面值的变量、字面串的 .split() 都整条认不出；过度修补 C、D）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=python-argument-variables-unresolved  scan_python() 起命令的参数只认整个字面的（argv 里有一项是变量、赋过字面值的变量、字面串的 .split() 都整条认不出）：实测红的格（照失败行原文）
 #       「d137-r2 C：python argv 头一项字面、参数是变量，照命令词判，放行」「d137-r2 D：python 字面列表先赋变量再起，放行」「d137-r2 D：python 字面串 .split() 作命令，放行」
-#   LIB_SHELL_WORDS_BREAK=awk-command-variables-unresolved  scan_awk() 不认赋过字面串的变量（改前的判法：`cmd = "date"; cmd | getline`、命令行 cmd=sort 再 print | cmd 照写成变量拒；过度修补 E）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=awk-command-variables-unresolved  scan_awk() 不认赋过字面串的变量（`cmd = "date"; cmd | getline`、命令行 cmd=sort 再 print | cmd 照写成变量拒）：实测红的格（照失败行原文）
 #       「d137-r2 E：awk 里 cmd 赋字面再 | getline，放行」「d137-r2 E：awk 命令行 cmd=sort 再 print |，放行」
-#   LIB_SHELL_WORDS_BREAK=cd-known-targets-unexpanded  changed_directory() 不认 $PWD、$OLDPWD、`cd -`、起头的 `$(git rev-parse --show-toplevel)` 与 `$(pwd)`（改前的判法：cd 之后目录算不出；过度修补 F）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=cd-known-targets-unexpanded  changed_directory() 不认 $PWD、$OLDPWD、`cd -`、起头的 `$(git rev-parse --show-toplevel)` 与 `$(pwd)`（cd 之后目录算不出）：实测红的格（照失败行原文）
 #       「d137-r2 F：cd "$PWD" 之后 bash 轻脚本，放行」「d137-r2 F：cd "$PWD" 之后 bash 轻脚本，放行：读进去几份脚本」「d137-r2 F：cd "$PWD" 之后 bash 重脚本，照拒：读进去几份脚本」「d137-r2 F：cd 到 git 顶层之后 bash 轻脚本，放行」「d137-r2 F：cd 到 git 顶层之后 bash 轻脚本，放行：读进去几份脚本」「d137-r2 F：cd 到 git 顶层之后 bash 重脚本，照拒：读进去几份脚本」「d137-r2 F：cd "$OLDPWD" 回来之后 bash 轻脚本，放行」「d137-r2 F：cd "$OLDPWD" 回来之后 bash 轻脚本，放行：读进去几份脚本」「d137-r2 F：cd "$OLDPWD" 回来之后 bash 重脚本，照拒：读进去几份脚本」
-#   LIB_SHELL_WORDS_BREAK=cd-failure-guards-unseen  CommandAtPosition.cd_failure_skips 一律是假（改前的判法：`cd 不在的目录 && 相对脚本`、`|| exit` 守着的也照「cd 会失败」拒；H5）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=cd-failure-guards-unseen  CommandAtPosition.cd_failure_skips 一律是假（`cd 不在的目录 && 相对脚本`、`|| exit` 守着的也照「cd 会失败」拒）：实测红的格（照失败行原文）
 #       「d137-r2 H5：cd 盘上不在的目录 && 相对脚本，cd 失败就不跑，放行」「d137-r2 H5：cd 盘上不在的目录 && 相对脚本，cd 失败就不跑，放行：记几条检出」「d137-r2 H5：cd 盘上不在的目录 || exit 之后的相对脚本，放行」「d137-r2 H5：cd 盘上不在的目录 || exit 之后的相对脚本，放行：记几条检出」「d137-r2 H5：mkdir 再 cd 进去跑同一条里写出的重脚本，照拒：读进去几份脚本」
-#   LIB_SHELL_WORDS_BREAK=non-interactive-return-unseen  non_interactive_return_offset() 交 None：非交互 shell source 的文件里 `case $- in *i*) ;; *) return;; esac` 这类守卫不截、整份照读（改前的判法；过度修补 G）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=non-interactive-return-unseen  non_interactive_return_offset() 交 None：非交互 shell source 的文件里 `case $- in *i*) ;; *) return;; esac` 这类守卫不截、整份照读：实测红的格（照失败行原文）
 #       「d137-r2 G：登录 bash -l 读 .profile 再 source 带非交互守卫的 .bashrc，守卫之后不读，放行」
 #   LIB_SHELL_WORDS_BREAK=substitution-case-and-comment-unseen  ：实测红的格（照失败行原文）
 #       「一百三十七：命令替换里不加括号的 case 模式不提前收尾，里面的 --all 照拒」「一百三十七：命令替换里注释的 ) 不收尾，后面的 --all 照拒」
@@ -399,15 +398,15 @@
 #       「实现员 cat 文件经管道喂给 bash：放行并记检出」「一百三十七：bash -s < 文件 读那份文件判：记几条检出」「一百三十七：bash -s < 文件 读那份文件判：读进去几份脚本」「一百三十七：cat 文件 | bash 读那份文件判：记几条检出」「一百三十七：cat 文件 | bash 读那份文件判：读进去几份脚本」「一百三十七：sh -s < 轻脚本放行」「一百三十七：sh -s < 轻脚本放行：记几条检出」「一百三十七：sh -s < 轻脚本放行：读进去几份脚本」
 #   LIB_SHELL_WORDS_BREAK=function-launchers-unseen  同 launcher-functions-unjudged 那一格：实测红的格（照失败行原文）
 #       「一百三十七：脚本里经自己的 run_logged 起 --all 照拒」
-#   LIB_SHELL_WORDS_BREAK=startup-files-unread  ：startup_file_words() 一个文件都不交，shell 启动时先读的文件（BASH_ENV / ENV、--rcfile、.bashrc、zsh 的）都不当被起的脚本（一百三十七节件 8f、8g，改前的判法）；实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=startup-files-unread  ：startup_file_words() 一个文件都不交，shell 启动时先读的文件（BASH_ENV / ENV、--rcfile、.bashrc、zsh 的）都不当被起的脚本；实测红的格（照失败行原文）
 #       「一百三十七：BASH_ENV 写在命令前、指到字面路径的脚本，正文起全量，照拒」「一百三十七：BASH_ENV 写在命令前、指到字面路径的脚本，正文起全量，照拒：读进去几份脚本」「一百三十七：BASH_ENV 写相对路径，按这条命令的当前目录解，照拒」「一百三十七：BASH_ENV 写相对路径，按这条命令的当前目录解，照拒：读进去几份脚本」「一百三十七：env BASH_ENV=… 起 bash，照拒」「一百三十七：env BASH_ENV=… 起 bash，照拒：读进去几份脚本」「一百三十七：前面 export BASH_ENV=… 再起 bash，照拒」「一百三十七：前面 export BASH_ENV=… 再起 bash，照拒：读进去几份脚本」「一百三十七：BASH_ENV 指到的脚本正文起全量，bash 起的又是一份轻脚本，两份都读，照拒」「一百三十七：BASH_ENV 指到的脚本正文起全量，bash 起的又是一份轻脚本，两份都读，照拒：读进去几份脚本」「一百三十七：BASH_ENV 指到的脚本 source 自己目录下的库，库也读，照拒」「一百三十七：BASH_ENV 指到的脚本 source 自己目录下的库，库也读，照拒：读进去几份脚本」「一百三十七：BASH_ENV 指到的脚本正文起全量，实现员照拒」「一百三十七：BASH_ENV 指到的脚本正文起全量，实现员照拒：读进去几份脚本」「一百三十七：BASH_ENV 指到的脚本正文只有轻活，放行：读进去几份脚本」「一百三十七：BASH_ENV 写成前面赋过字面值的变量，展开之后读正文，照拒」「一百三十七：BASH_ENV 写成前面赋过字面值的变量，展开之后读正文，照拒：读进去几份脚本」「一百三十七：ENV 指到的脚本正文起全量，sh 起的，照拒」「一百三十七：ENV 指到的脚本正文起全量，sh 起的，照拒：读进去几份脚本」「一百三十七：ENV 指到的脚本正文起全量，bash --posix 起的，照拒」「一百三十七：ENV 指到的脚本正文起全量，bash --posix 起的，照拒：读进去几份脚本」「一百三十七：ENV 指到的脚本正文起全量，bash -o posix 起的，照拒」「一百三十七：ENV 指到的脚本正文起全量，bash -o posix 起的，照拒：读进去几份脚本」「一百三十七：BASH_ENV 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：BASH_ENV 写成命令替换拼出的路径，认不出，主 agent 照拒」「一百三十七：BASH_ENV 写成没赋过值的变量，认不出，实现员照拒」「一百三十七：env 的 BASH_ENV 写成命令替换，认不出，实现员照拒」「一百三十七：ENV 写成命令替换，sh 起的，认不出，实现员照拒」「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 指的文件照读，照拒」「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 指的文件照读，照拒：读进去几份脚本」「一百三十七：直接执行 #!/usr/bin/env bash 的脚本，BASH_ENV 指的文件照读，照拒」「一百三十七：直接执行 #!/usr/bin/env bash 的脚本，BASH_ENV 指的文件照读，照拒：读进去几份脚本」「一百三十七：直接执行没有 #! 的 .sh，从 bash 里起是 bash 另起自己，BASH_ENV 指的文件照读，照拒」「一百三十七：直接执行没有 #! 的 .sh，从 bash 里起是 bash 另起自己，BASH_ENV 指的文件照读，照拒：读进去几份脚本」「一百三十七：env 写的 BASH_ENV，直接执行 #!/bin/bash 的脚本，照拒」「一百三十七：env 写的 BASH_ENV，直接执行 #!/bin/bash 的脚本，照拒：读进去几份脚本」「一百三十七：直接执行 #!/bin/sh 的脚本，ENV 指的文件照读，照拒」「一百三十七：直接执行 #!/bin/sh 的脚本，ENV 指的文件照读，照拒：读进去几份脚本」「一百三十七：直接执行 #!/bin/zsh 的脚本，ZDOTDIR 下的 .zshenv 照读，照拒」「一百三十七：直接执行 #!/bin/zsh 的脚本，ZDOTDIR 下的 .zshenv 照读，照拒：读进去几份脚本」「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 指的文件只有轻活，放行：读进去几份脚本」「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：declare -x BASH_ENV=…，再起 bash，照拒」「一百三十七：declare -x BASH_ENV=…，再起 bash，照拒：读进去几份脚本」「一百三十七：typeset -x BASH_ENV=…，再起 bash，照拒」「一百三十七：typeset -x BASH_ENV=…，再起 bash，照拒：读进去几份脚本」「一百三十七：先 BASH_ENV=… 赋值、后 export BASH_ENV，再起 bash，照拒」「一百三十七：先 BASH_ENV=… 赋值、后 export BASH_ENV，再起 bash，照拒：读进去几份脚本」「一百三十七：先 export BASH_ENV、后赋值，再起 bash，照拒」「一百三十七：先 export BASH_ENV、后赋值，再起 bash，照拒：读进去几份脚本」「一百三十七：export 过之后换成另一份脚本，起 bash 读的是后一份，照拒」「一百三十七：export 过之后换成另一份脚本，起 bash 读的是后一份，照拒：读进去几份脚本」「一百三十七：set -a 之后赋值的 BASH_ENV 进环境，照拒」「一百三十七：set -a 之后赋值的 BASH_ENV 进环境，照拒：读进去几份脚本」「一百三十七：local -x BASH_ENV=… 的函数里起 bash，照拒」「一百三十七：local -x BASH_ENV=… 的函数里起 bash，照拒：读进去几份脚本」「一百三十七：declare -x BASH_ENV 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：先赋值后 export 的 BASH_ENV 是命令替换拼出的路径，认不出，实现员照拒」「一百三十七：bash -i 读 HOME 下的 .bashrc，里面起全量，照拒」「一百三十七：bash -i 读 HOME 下的 .bashrc，里面起全量，照拒：读进去几份脚本」「一百三十七：bash -ic 合写的 -i 同样读 HOME 下的 .bashrc，照拒」「一百三十七：bash -ic 合写的 -i 同样读 HOME 下的 .bashrc，照拒：读进去几份脚本」「一百三十七：bash --rcfile 文件 -i，文件里起全量，照拒」「一百三十七：bash --rcfile 文件 -i，文件里起全量，照拒：读进去几份脚本」「一百三十七：bash --init-file 文件 -i，文件里起全量，照拒」「一百三十七：bash --init-file 文件 -i，文件里起全量，照拒：读进去几份脚本」「一百三十七：bash -i 读 HOME 下只有轻活的 .bashrc：放行：读进去几份脚本」「一百三十七：bash -i 不读 BASH_ENV，.bashrc 只有轻活：放行：读进去几份脚本」「一百三十七：bash -i 不读 ENV：放行：读进去几份脚本」「一百三十七：sh -i 读 ENV 指的文件，照拒」「一百三十七：sh -i 读 ENV 指的文件，照拒：读进去几份脚本」「一百三十七：sh -i 读 ENV 指的文件，只有轻活：放行：读进去几份脚本」「一百三十七：bash --posix -i 读 ENV 指的文件，照拒」「一百三十七：bash --posix -i 读 ENV 指的文件，照拒：读进去几份脚本」「一百三十七：bash --rcfile 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：bash -i 的 HOME 写成命令替换，.bashrc 路径认不出，实现员照拒」「一百三十七：zsh 读 ZDOTDIR 下的 .zshenv，里面起全量，照拒」「一百三十七：zsh 读 ZDOTDIR 下的 .zshenv，里面起全量，照拒：读进去几份脚本」「一百三十七：zsh 读 ZDOTDIR 下的 .zshrc，里面起全量，照拒」「一百三十七：zsh 读 ZDOTDIR 下的 .zshrc，里面起全量，照拒：读进去几份脚本」「一百三十七：zsh 没设 ZDOTDIR 取 HOME 下的 .zshenv，照拒」「一百三十七：zsh 没设 ZDOTDIR 取 HOME 下的 .zshenv，照拒：读进去几份脚本」「一百三十七：前面 export 的 ZDOTDIR，zsh 照读，照拒」「一百三十七：前面 export 的 ZDOTDIR，zsh 照读，照拒：读进去几份脚本」「一百三十七：zsh 的启动文件只有轻活：放行：读进去几份脚本」「一百三十七：zsh 的 ZDOTDIR 写成命令替换，认不出，实现员照拒」
-#   LIB_SHELL_WORDS_BREAK=declared-exports-unseen  ：环境里的变量只认 `export 名字=值`（declare -x、typeset -x、local -x、先赋值后 export、先 export 后赋值、export -n、declare +x、set -a 都不认；一百三十七节件 8g，改前的判法）；实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=declared-exports-unseen  ：环境里的变量只认 `export 名字=值`（declare -x、typeset -x、local -x、先赋值后 export、先 export 后赋值、export -n、declare +x、set -a 都不认）；实测红的格（照失败行原文）
 #       「一百三十七：declare -x BASH_ENV=…，再起 bash，照拒」「一百三十七：declare -x BASH_ENV=…，再起 bash，照拒：读进去几份脚本」「一百三十七：typeset -x BASH_ENV=…，再起 bash，照拒」「一百三十七：typeset -x BASH_ENV=…，再起 bash，照拒：读进去几份脚本」「一百三十七：先 BASH_ENV=… 赋值、后 export BASH_ENV，再起 bash，照拒」「一百三十七：先 BASH_ENV=… 赋值、后 export BASH_ENV，再起 bash，照拒：读进去几份脚本」「一百三十七：先 export BASH_ENV、后赋值，再起 bash，照拒」「一百三十七：先 export BASH_ENV、后赋值，再起 bash，照拒：读进去几份脚本」「一百三十七：export 过之后换成另一份脚本，起 bash 读的是后一份，照拒」「一百三十七：set -a 之后赋值的 BASH_ENV 进环境，照拒」「一百三十七：set -a 之后赋值的 BASH_ENV 进环境，照拒：读进去几份脚本」「一百三十七：local -x BASH_ENV=… 的函数里起 bash，照拒」「一百三十七：local -x BASH_ENV=… 的函数里起 bash，照拒：读进去几份脚本」「一百三十七：export -n 撤掉 export 之后起 bash：放行」「一百三十七：export -n 撤掉 export 之后起 bash：放行：读进去几份脚本」「一百三十七：export -n 带赋值，不进环境：放行」「一百三十七：export -n 带赋值，不进环境：放行：读进去几份脚本」「一百三十七：declare +x 撤掉 export 之后起 bash：放行」「一百三十七：declare +x 撤掉 export 之后起 bash：放行：读进去几份脚本」「一百三十七：declare -x BASH_ENV 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：先赋值后 export 的 BASH_ENV 是命令替换拼出的路径，认不出，实现员照拒」
-#   LIB_SHELL_WORDS_BREAK=interactive-startup-files-unread  ：带 -i 不另看（交互的 bash 照旧读 BASH_ENV、不读 .bashrc 与 --rcfile / --init-file；一百三十七节件 8g，改前的判法）；实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=interactive-startup-files-unread  ：带 -i 不另看（交互的 bash 照旧读 BASH_ENV、不读 .bashrc 与 --rcfile / --init-file）；实测红的格（照失败行原文）
 #       「一百三十七：bash -i 读 HOME 下的 .bashrc，里面起全量，照拒」「一百三十七：bash -i 读 HOME 下的 .bashrc，里面起全量，照拒：读进去几份脚本」「一百三十七：bash -ic 合写的 -i 同样读 HOME 下的 .bashrc，照拒」「一百三十七：bash -ic 合写的 -i 同样读 HOME 下的 .bashrc，照拒：读进去几份脚本」「一百三十七：bash --rcfile 文件 -i，文件里起全量，照拒」「一百三十七：bash --rcfile 文件 -i，文件里起全量，照拒：读进去几份脚本」「一百三十七：bash --init-file 文件 -i，文件里起全量，照拒」「一百三十七：bash --init-file 文件 -i，文件里起全量，照拒：读进去几份脚本」「一百三十七：bash -i 读 HOME 下只有轻活的 .bashrc：放行：读进去几份脚本」「一百三十七：bash -i 不读 BASH_ENV，.bashrc 只有轻活：放行」「一百三十七：bash -i 不读 ENV：放行：读进去几份脚本」「一百三十七：bash --rcfile 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：bash -i 的 HOME 写成命令替换，.bashrc 路径认不出，实现员照拒」
-#   LIB_SHELL_WORDS_BREAK=zsh-startup-files-unread  ：zsh 的 .zshenv、.zshrc 不读（一百三十七节件 8g）；实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=zsh-startup-files-unread  ：zsh 的 .zshenv、.zshrc 不读；实测红的格（照失败行原文）
 #       「一百三十七：直接执行 #!/bin/zsh 的脚本，ZDOTDIR 下的 .zshenv 照读，照拒」「一百三十七：直接执行 #!/bin/zsh 的脚本，ZDOTDIR 下的 .zshenv 照读，照拒：读进去几份脚本」「一百三十七：zsh 读 ZDOTDIR 下的 .zshenv，里面起全量，照拒」「一百三十七：zsh 读 ZDOTDIR 下的 .zshenv，里面起全量，照拒：读进去几份脚本」「一百三十七：zsh 读 ZDOTDIR 下的 .zshrc，里面起全量，照拒」「一百三十七：zsh 读 ZDOTDIR 下的 .zshrc，里面起全量，照拒：读进去几份脚本」「一百三十七：zsh 没设 ZDOTDIR 取 HOME 下的 .zshenv，照拒」「一百三十七：zsh 没设 ZDOTDIR 取 HOME 下的 .zshenv，照拒：读进去几份脚本」「一百三十七：前面 export 的 ZDOTDIR，zsh 照读，照拒」「一百三十七：前面 export 的 ZDOTDIR，zsh 照读，照拒：读进去几份脚本」「一百三十七：zsh 的启动文件只有轻活：放行：读进去几份脚本」「一百三十七：zsh 的 ZDOTDIR 写成命令替换，认不出，实现员照拒」
-#   LIB_SHELL_WORDS_BREAK=executed-script-startup-unread  ：直接执行的脚本起来时它的 shell 先读的启动文件不读，#! 指到认不出的解释器的也不判（一百三十七节件 8g）；实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=executed-script-startup-unread  ：直接执行的脚本起来时它的 shell 先读的启动文件不读，#! 指到认不出的解释器的也不判；实测红的格（照失败行原文）
 #       「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 指的文件照读，照拒」「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 指的文件照读，照拒：读进去几份脚本」「一百三十七：直接执行 #!/usr/bin/env bash 的脚本，BASH_ENV 指的文件照读，照拒」「一百三十七：直接执行 #!/usr/bin/env bash 的脚本，BASH_ENV 指的文件照读，照拒：读进去几份脚本」「一百三十七：直接执行没有 #! 的 .sh，从 bash 里起是 bash 另起自己，BASH_ENV 指的文件照读，照拒」「一百三十七：直接执行没有 #! 的 .sh，从 bash 里起是 bash 另起自己，BASH_ENV 指的文件照读，照拒：读进去几份脚本」「一百三十七：env 写的 BASH_ENV，直接执行 #!/bin/bash 的脚本，照拒」「一百三十七：env 写的 BASH_ENV，直接执行 #!/bin/bash 的脚本，照拒：读进去几份脚本」「一百三十七：直接执行 #!/bin/sh 的脚本，ENV 指的文件照读，照拒」「一百三十七：直接执行 #!/bin/sh 的脚本，ENV 指的文件照读，照拒：读进去几份脚本」「一百三十七：直接执行 #!/bin/zsh 的脚本，ZDOTDIR 下的 .zshenv 照读，照拒」「一百三十七：直接执行 #!/bin/zsh 的脚本，ZDOTDIR 下的 .zshenv 照读，照拒：读进去几份脚本」「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 指的文件只有轻活，放行：读进去几份脚本」「一百三十七：直接执行 #! 指到认不出的解释器、环境里设了 BASH_ENV，实现员照拒」「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 写成命令替换拼出的路径，认不出，实现员照拒」
 #   LIB_PROJECT_CODE_RUNS_BREAK=unrecognized-launches-allowed  ：实测红的格（照失败行原文）
 #       「实现员经内存包装起循环里 ls 出来的 验证包测试二进制：命令词认不出照拒」「一百三十七：bash <(…) 照拒」「一百三十七：eval 变量里拼的命令照拒」「一百三十七：source <(…) 照拒」「一百三十七：命令词是 $(which cargo) 照拒」「一百三十七：for 循环变量当脚本路径照拒」「一百三十七：xargs bash 起读进来的脚本照拒」「一百三十七：BASH_ENV 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：BASH_ENV 写成命令替换拼出的路径，认不出，主 agent 照拒」「一百三十七：BASH_ENV 写成没赋过值的变量，认不出，实现员照拒」「一百三十七：env 的 BASH_ENV 写成命令替换，认不出，实现员照拒」「一百三十七：ENV 写成命令替换，sh 起的，认不出，实现员照拒」「一百三十七：直接执行 #!/bin/bash 的脚本，BASH_ENV 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：declare -x BASH_ENV 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：先赋值后 export 的 BASH_ENV 是命令替换拼出的路径，认不出，实现员照拒」「一百三十七：bash --rcfile 写成命令替换拼出的路径，认不出，实现员照拒」「一百三十七：bash -i 的 HOME 写成命令替换，.bashrc 路径认不出，实现员照拒」「一百三十七：zsh 的 ZDOTDIR 写成命令替换，认不出，实现员照拒」「lib_project_code_runs.py 的自检」「d137 闸误拒 E3：$t 没赋过，cat > $t 写出再 bash $t，照拒」
@@ -417,19 +416,19 @@
 #       「一百三十七：xargs bash 起读进来的脚本照拒」「lib_project_code_runs.py 的自检」「d137 闸误拒 E2：ssh localhost 包着 bash 轻脚本，放行：读进去几份脚本」「d137 闸误拒 E2：numactl -N0 包着 bash 轻脚本，放行：读进去几份脚本」「d137 闸误拒 E2：unshare --user 包着 bash 轻脚本，放行：读进去几份脚本」
 #   LIB_PROJECT_CODE_RUNS_BREAK=sourced-libraries-unread  ：实测红的格（照失败行原文）
 #       「实现员起的脚本里命令替换、反引号、算术后面接路径：片段不当路径：记几条检出」「一百三十七：脚本 source 自己目录下的库，读正文时库也读」「一百三十七：脚本 source 自己目录下的库，读正文时库也读：读进去几份脚本」「lib_project_code_runs.py 的自检」
-#   LIB_PROJECT_CODE_RUNS_BREAK=script-body-launches-unjudged  （一百三十七节件 1b）：实测红的格（照失败行原文）
+#   LIB_PROJECT_CODE_RUNS_BREAK=script-body-launches-unjudged  ：实测红的格（照失败行原文）
 #       「一百三十七：脚本正文里经数组变量起拼出路径的钩子自证（件 1 那三趟的形态），照拒」「一百三十七：同一份脚本主 agent 照拒」「lib_project_code_runs.py 的自检」
-#   LIB_PROJECT_CODE_RUNS_BREAK=dispatch-launchers-unseen  （一百三十七节第 8 批，records/2026-10-29-一百三十七节那一轮调度记录.md#8：multi-host-run.sh --peer … -- 不剥）：红的格（multi-host-run.sh --peer 那几格推的、没复跑：批 17 去掉不带 --peer 的那一格、别的格补上 --peer）
+#   LIB_PROJECT_CODE_RUNS_BREAK=dispatch-launchers-unseen  （multi-host-run.sh --peer … -- 不剥）：红的格（multi-host-run.sh --peer 那几格推的、没复跑）
 #       「一百三十七#8：工具实现员经 multi-host-run.sh --peer 起门禁格，照拒」「lib_project_code_runs.py 的自检」「编译目录：子 agent 经 multi-host-run.sh --peer 在主工作区起 cargo test、没给编译目录：拒（退出码 2）」
-#   PROJECT_CODE_GUARD_BREAK=launcher-recorded-as-writer  （一百三十七节第 8 批，d137-replay-classify 误拒 E2：剥掉之后里面那条接着判的启动器整条记成写者）：实测红的格（照失败行原文）
+#   PROJECT_CODE_GUARD_BREAK=launcher-recorded-as-writer  （剥掉之后里面那条接着判的启动器整条记成写者）：实测红的格（照失败行原文）
 #       「d137 闸误拒 E2：systemd-run --user --wait 包着 bash 轻脚本，放行」「d137 闸误拒 E2：systemd-run --user --wait 包着 bash 轻脚本，放行：读进去几份脚本」「d137 闸误拒 E2：chrt -i 0 包着 bash 轻脚本，放行」「d137 闸误拒 E2：ssh localhost 包着 bash 轻脚本，放行」「d137 闸误拒 E2：/usr/bin/time 包着 bash 轻脚本，放行」「d137 闸误拒 E2：strace -o /dev/null 包着 bash 轻脚本，放行」「d137 闸误拒 E2：prlimit --as 包着 bash 轻脚本，放行」「d137 闸误拒 E2：numactl -N0 包着 bash 轻脚本，放行」「d137 闸误拒 E2：unshare --user 包着 bash 轻脚本，放行」「d137 闸误拒 E2：systemd-run --user --wait 包着 bash 重脚本，读正文照拒：读进去几份脚本」
-#   PROJECT_CODE_GUARD_BREAK=heredoc-targets-unexpanded  （一百三十七节第 8 批，误拒 E3：heredoc 写出的目标不代入前面赋过字面值的变量）：实测红的格（照失败行原文）
+#   PROJECT_CODE_GUARD_BREAK=heredoc-targets-unexpanded  （heredoc 写出的目标不代入前面赋过字面值的变量）：实测红的格（照失败行原文）
 #       「d137 闸误拒 E3：t 赋过字面路径，cat > $t 读 heredoc 写出再 bash $t，放行」
-#   PROJECT_CODE_GUARD_BREAK=program-file-variables-unexpanded  （一百三十七节第 8 批，误拒 E5：awk -f、sed -f、Makefile 的路径不代入前面赋过字面值的变量）：实测红的格（照失败行原文）
+#   PROJECT_CODE_GUARD_BREAK=program-file-variables-unexpanded  （awk -f、sed -f、Makefile 的路径不代入前面赋过字面值的变量）：实测红的格（照失败行原文）
 #       「d137 闸误拒 E5：W 赋过字面目录，awk -f $W/程序文件，读正文放行」「d137 闸误拒 E5：W 赋过字面目录，awk -f $W/程序文件，读正文放行：读进去几份脚本」
-#   LIB_PROJECT_CODE_RUNS_BREAK=claude-executable-path-unrecognized  （一百三十七节第 8 批，d137-replay-classify「四」口径：命令词 "$CLAUDE_CODE_EXECPATH" 照变量拼出的认不出）：实测红的格（照失败行原文）
+#   LIB_PROJECT_CODE_RUNS_BREAK=claude-executable-path-unrecognized  （命令词 "$CLAUDE_CODE_EXECPATH" 照变量拼出的认不出）：实测红的格（照失败行原文）
 #       「lib_project_code_runs.py 的自检」
-#   LIB_SHELL_WORDS_BREAK=aliases-same-line-expanded  （一百三十七节第 8 批，d137-replay-classify 误拒 E4：同一行里先定义再用的别名照展开）：实测红的格（照失败行原文）
+#   LIB_SHELL_WORDS_BREAK=aliases-same-line-expanded  （同一行里先定义再用的别名照展开）：实测红的格（照失败行原文）
 #       「d137 闸误拒 E4：同一行先 alias 再用，这一行不展开别名、放行」
 #   LIB_PROJECT_CODE_RUNS_BREAK=build-subcommands-unjudged  lib_project_code_runs.py 的 starts_a_build 不认会编的 cargo：红的格（推的，没跑）
 #       「lib_project_code_runs.py 的自检」
@@ -438,7 +437,7 @@
 #   PROJECT_CODE_GUARD_BREAK=task-server-direct-allowed  task_server_decision 不判 ① 的直接跑（编译、编出来的二进制、本仓的代码、剥掉的包装、那张表认出的每一样），只照「谁能跑哪一类」判：红的格（推的）
 #       judge_task_cases 那二十一格（实现员在仓根裸跑 cargo test、实现员交回前自查命名那四格、书记员跑 doc-decisions、主 agent 跑 gate-lint.sh 这一批：应当是 2，实际 0）
 #       「经 task-server：照抄：实现员直接跑 harness 测试，照抄的那条经 task-server 提交」「经 task-server：照抄：经内存包装直接起的去掉包装」「经 task-server：照抄：带 && 的整条包进 bash -c」「stdin:实现员直接跑测试目标拒绝（退出码 2）」「stdin:子 agent 不经 task-server 的拒绝 stderr 写了照抄的提交、写进报告「要主 agent 跑的命令」「stdin:主 agent 直接跑被拒时最前面是能照抄的经 task-server 提交的那条（照抄的那条再判放行）」「stdin:主 agent 被拒时不贴「谁能跑哪一类」「stdin:主 agent 直接跑整道门禁被拒时照抄的那条经 task-server 提交、四段范围声明写在 submit 前面（为什么是占位），照它再判放行」
-#   PROJECT_CODE_GUARD_BREAK=subagent-task-client-allowed  ② 不判：子 agent 起 task-server/task 的 submit、wait、cancel、clean 照放（改前许子 agent 自己交的样子；
+#   PROJECT_CODE_GUARD_BREAK=subagent-task-client-allowed  ② 不判：子 agent 起 task-server/task 的 submit、wait、cancel、clean 照放（子 agent 自己交；
 #       「经 task-server：子 agent 交任务的拒绝说明写明写进报告「要主 agent 跑的命令」
 #   PROJECT_CODE_GUARD_BREAK=task-server-bypass-allowed  ③ 不判（scan_uses 不记、命令文本这一层不看）：红的格（推的；直接起服务本体与每次尝试的那一层另由 ① 照拒，不红）
 #       「经 task-server：绕开：读签名密钥照拒，说明点名绕开写法」「lib_project_code_runs.py 的自检」
@@ -464,7 +463,7 @@
 #       「经 task-server：主 agent 提交自己起服务的自证（own-server）裸写：放行」「lib_project_code_runs.py 的自检」
 #   LIB_PROJECT_CODE_RUNS_BREAK=temporary-service-command-bare  说明里给的整条写法是裸写的样子：钩子这一侧红的格（推的）
 #       「经 task-server：要临时服务的自证裸写被拒时，说明点名登记表、给整条包装写法」「经 task-server：子 agent 直接裸写要临时服务的自证被拒时，说明写进报告「要主 agent 跑的命令」「stdin:主 agent 经 task-server 提交要临时服务的自证裸写 --selftest 拒绝（退出码 2），stderr 给包装写法的整条」
-#   LIB_PROJECT_CODE_RUNS_BREAK=temporary-service-command-binary-placeholder  说明里给的整条写法带 --server-binary 与尖括号占位（改前的写法）：钩子这一侧红的格（任务 7401 量的）
+#   LIB_PROJECT_CODE_RUNS_BREAK=temporary-service-command-binary-placeholder  说明里给的整条写法带 --server-binary 与尖括号占位：钩子这一侧红的格
 #       「经 task-server：要临时服务的自证裸写被拒时，说明点名登记表、给整条包装写法」「经 task-server：子 agent 直接裸写要临时服务的自证被拒时，说明写进报告「要主 agent 跑的命令」「stdin:主 agent 经 task-server 提交要临时服务的自证裸写 --selftest 拒绝（退出码 2），stderr 给包装写法的整条」「lib_project_code_runs.py 的自检」
 #   LIB_PROJECT_CODE_RUNS_BREAK=temporary-service-table-lenient  要临时服务的表写坏的行照收、不报：钩子这一侧红的格（推的，只在 lib_project_code_runs.py 的自检里）
 #       「lib_project_code_runs.py 的自检」
@@ -485,8 +484,8 @@
 #   LIB_PROJECT_CODE_RUNS_BREAK=task-server-units-unjudged  不认 systemctl 停禁改它的单元：钩子这一侧红的格（推的）
 #       「lib_project_code_runs.py 的自检」
 set -uo pipefail
-# 钩子 bash 这一层起不来时也记一条检出（一百三十七节 ⑤）：python3 起不来、/dev/fd/3 读不到、python 在 main() 之前崩了，这条命令照常执行（钩子退出码不是 0、2 时 Claude Code 照常放行），
-# 原先什么都不记。标准输入先在这里读进来、经 here-string 交给 python（python 起不来时 bash 还拿得到会话号）；退出码不是 0、2、又不是 --selftest 的，照「放行但必记检出」
+# 钩子 bash 这一层起不来时也记一条检出：python3 起不来、/dev/fd/3 读不到、python 在 main() 之前崩了，这条命令照常执行（钩子退出码不是 0、2 时 Claude Code 照常放行），
+# 标准输入先在这里读进来、经 here-string 交给 python（python 起不来时 bash 还拿得到会话号）；退出码不是 0、2、又不是 --selftest 的，照「放行但必记检出」
 # 往检出记录追加一行（会话号、agent 从输入里按字面取，取不到写「读不到」）、退 0。弄坏开关 PROJECT_CODE_GUARD_BREAK=bash-layer-unrecorded 下不记（照旧把 python 的退出码交出去）。
 hook_record_bash_layer_failure() {   # <钩子名> <python 的退出码> <hook 输入原文>
   local name="$1" status="$2" input="$3" path="${AGENT_HOOK_DETECTIONS:-}" work_root="${SINGLEFS_WORK_ROOT:-}" session="读不到" agent="读不到"
@@ -508,7 +507,7 @@ hook_record_bash_layer_failure() {   # <钩子名> <python 的退出码> <hook �
 }
 hook_input=""
 if [[ $# -eq 0 ]]; then hook_input="$(cat)"; fi   # 只有钩子那种起法（不带参数，从标准输入读 JSON）读；--selftest 不读
-# PATH 上没有 python3：下面的 preflight 判不了运行条件，会退 78、什么都不记；钩子那种起法在它之前照「放行但必记检出」记一条、退 0（三方 d137-gov-r1 判决 H13；
+# PATH 上没有 python3：下面的 preflight 判不了运行条件，会退 78、什么都不记；钩子那种起法在它之前照「放行但必记检出」记一条、退 0（
 # 弄坏开关 PROJECT_CODE_GUARD_BREAK=python-missing-unrecorded 下照旧交给 preflight）
 if [[ $# -eq 0 ]] && ! command -v python3 >/dev/null 2>&1 && [[ ",${PROJECT_CODE_GUARD_BREAK:-}," != *,python-missing-unrecorded,* ]]; then
   hook_record_bash_layer_failure "project-code-guard.sh" "127，PATH 上没有 python3" "$hook_input"
@@ -558,7 +557,7 @@ except Exception as error:   # 文件不在、语法错都算读不到
 MAXIMUM_SCRIPT_DEPTH = 6        # 从命令文本起一层层读进去的脚本最多几层；再往里判「看不全」
 MAXIMUM_SCRIPT_BYTES = 1 << 20  # 脚本超过这么大不读，判「读不到」
 # 直接执行的文件先读开头这么多判是不是 shell 脚本（ELF 魔数、NUL 字节、`#!` 指到别的解释器、没有 `#!` 而扩展名不是 .sh），不是就不读也不记，之后才判大小上限：
-# 编译产物常有几 MB，先判大小会把它记成「超过上限、没判」（2026-09-24 现场：scripts/experiment-apparatus/target/release/e49_chain_width 5124256 字节）
+# 编译产物常有几 MB，先判大小会把它记成「超过上限、没判」（例：scripts/experiment-apparatus/target/release/e49_chain_width 5124256 字节）
 SCRIPT_HEAD_BYTES = 4096
 SHELL_SCRIPT_EXTENSION = ".sh"  # 直接执行、没有 `#!` 的文件，只有这个扩展名的当 shell 脚本读
 
@@ -695,7 +694,7 @@ def heredoc_write_targets(command):
         appends = any(argument in ("-a", "--append") or (argument.startswith("-") and not argument.startswith("--") and "a" in argument[1:])
                       for argument in arguments if argument != "--")
         targets = [(target, appends) for target in targets]
-    if guard_break_is_set("heredoc-write-every-redirection"):   # 弄坏开关：输出重定向的目标不看 fd 号一律当写了正文（改前的判法）
+    if guard_break_is_set("heredoc-write-every-redirection"):   # 弄坏开关：输出重定向的目标不看 fd 号一律当写了正文
         for operator, target in command.output_redirections:
             if operator == ">&" and (target.isdigit() or target == "-"):
                 continue
@@ -708,7 +707,7 @@ def heredoc_write_targets(command):
     return targets
 
 # 同一条命令里先拷出再执行：cp 之外，ln（-s 的符号链接与硬链接，执行时读到的都是源的内容）、install、mv 的目标与 `cat 源 > 目的` 也按源的内容认
-#   （弄坏开关 PROJECT_CODE_GUARD_BREAK=copy-by-cp-only 下只认 cp，改前的判法）；install 另有三个带值的选项，-d / --directory 建目录不拷文件
+#   （弄坏开关 PROJECT_CODE_GUARD_BREAK=copy-by-cp-only 下只认 cp）；install 另有三个带值的选项，-d / --directory 建目录不拷文件
 COPYING_COMMANDS = {"cp", "ln", "install", "mv"}
 INSTALL_OPTIONS_WITH_VALUE = {"-m", "--mode", "-o", "--owner", "-g", "--group"}
 
@@ -717,7 +716,7 @@ def cat_destination(command):
     `3>d.sh >&3` 算；lib_shell_words.py 的 standard_output_destination）；不是这种写法交 None。"""
     destination = shell_words.standard_output_destination(command.output_redirections)
     sources = command.words[1:]
-    # `&>`、`>& 文件` 同时写标准输出与标准错误（源都在时错误输出是空的）、`>>`、`&>>` 追加（正推腿乙报告第八节 A1）；弄坏开关 copy-redirections-unseen 下只认 `>`、`>|`（改前的判法）
+    # `&>`、`>& 文件` 同时写标准输出与标准错误（源都在时错误输出是空的）、`>>`、`&>>` 追加；弄坏开关 copy-redirections-unseen 下只认 `>`、`>|`
     operators = (">", ">|") if guard_break_is_set("copy-redirections-unseen") else (">", ">|", "&>", ">&", ">>", "&>>")
     if (os.path.basename(command.words[0]) != "cat" or destination is None or destination[1] not in operators or not sources
             or any(source.startswith("-") for source in sources) or command.standard_input_heredocs):
@@ -734,7 +733,7 @@ def cat_copy_pairs(command):
 def cat_concatenation(command):
     """`cat 源 源… > 目的`（两个以上的源，`cat s.sh "2"> d.sh` 里引号写的 2 也是一个源）：(源词表, 目的词)；不是这种写法交 None。
     目的里是各个源依次接起来的内容（不在的源 cat 报错、不写东西，照空的算；record_files_written）。
-    弄坏开关 PROJECT_CODE_GUARD_BREAK=cat-concatenation-unseen 下不认（改前的判法：几个源的不当拷贝）。"""
+    弄坏开关 PROJECT_CODE_GUARD_BREAK=cat-concatenation-unseen 下不认（几个源的不当拷贝）。"""
     destination = cat_destination(command)
     if (destination is None or (len(command.words) < 3 and not cat_appends(command)) or guard_break_is_set("cat-concatenation-unseen")
             or guard_break_is_set("copy-by-cp-only")):
@@ -828,8 +827,8 @@ def text_on_disk(path, state):
 
 def written_target_word(command, word):
     """heredoc 写出的目标词：带 `$` 的照这段命令文本里前面赋过的值代入（与 note_writer 记重定向目标同一套，lib_shell_words.py 的 expand_known_variables）；
-    展开不了交原词（literal_path 照认不出交 None）。d137-replay-classify 误拒 E3：`t=<字面路径>; cat > $t <<EOF … EOF; bash $t` 原先这里不代入、记写者那里代入，同一个目标两处不一。
-    弄坏开关 PROJECT_CODE_GUARD_BREAK=heredoc-targets-unexpanded 下原样交回（改前的判法）。"""
+    展开不了交原词（literal_path 照认不出交 None）。例：`t=<字面路径>; cat > $t <<EOF … EOF; bash $t` 这里与记写者那里同样代入，同一个目标两处一致。
+    弄坏开关 PROJECT_CODE_GUARD_BREAK=heredoc-targets-unexpanded 下原样交回。"""
     if "$" not in word or guard_break_is_set("heredoc-targets-unexpanded"):
         return word
     expanded = shell_words.expand_known_variables(word, command.variables or {})
@@ -887,7 +886,7 @@ def record_files_written(command, state):
             missing_source = False
             for source in sources:
                 if pieces is None and not guard_break_is_set("cat-append-unreadable-destination-raises"):
-                    break   # 追加的目的盘上读不了（目录、超过读的上限、不是 UTF-8 文本）：目的不认，不再往 pieces 里接源（改前接了，判的那一刻抛 AttributeError、整条命令照常执行）
+                    break   # 追加的目的盘上读不了（目录、超过读的上限、不是 UTF-8 文本）：目的不认，不再往 pieces 里接源（接了的话，判的那一刻抛 AttributeError、整条命令照常执行）
                 source_path = literal_path(command, source)
                 entry = written.get(source_path) if source_path is not None else None
                 text = None if source_path is None else (
@@ -896,7 +895,7 @@ def record_files_written(command, state):
                     pieces = None   # 有一个源算不出（带变量、读不了、不是文本）：认不出，执行时照旧按盘上有没有判
                     break
                 if entry is None and source_path is not None and not os.path.lexists(source_path):
-                    # 源盘上不在、也不是同一条命令里前面认出写出的：读不到它的内容，照认不出（用户 2026-10-29 定「cat 不看源在不在那一类照拒」，三方 d137-gov-r1 判决 H7、S3）
+                    # 源盘上不在、也不是同一条命令里前面认出写出的：读不到它的内容，照认不出（偏严：cat 不看源在不在那一类照拒）
                     state.missing_cat_sources.append((source, destination))
                     if not guard_break_is_set("cat-missing-source-allowed"):
                         missing_source = True
@@ -936,7 +935,7 @@ def piped_text(command, state):
             return None
         entry = state.written.get(source_path)
         if entry is None and not os.path.lexists(source_path) and not guard_break_is_set("cat-missing-source-allowed"):
-            return None   # tee 的源盘上不在、也不是同一条命令里前面认出写出的：读不到它的内容，照认不出（用户定「cat 不看源在不在那一类照拒」，三方 d137-gov-r1 判决 H7）
+            return None   # tee 的源盘上不在、也不是同一条命令里前面认出写出的：读不到它的内容，照认不出（偏严：cat 不看源在不在那一类照拒）
         text = (entry.text if entry.text is not None else text_on_disk(entry.copied_from, state)) if entry is not None else text_on_disk(source_path, state)
         if text is None:
             return None
@@ -946,7 +945,7 @@ def piped_text(command, state):
 
 def tee_copy(command, state, remember, forget):
     """`… | tee [-a] 目的…`、`tee 目的 < 源`（heredoc 喂给 tee 的由 heredoc_write_targets 认）：目的里是 tee 读到的标准输入（piped_text），-a 接在原来的后面；
-    算不出的照旧不认（执行时按盘上判；前面写过的那份认不出写法，unrecognized_write 照拒）。弄坏开关 tee-copy-unseen 下不认（改前的判法）。"""
+    算不出的照旧不认（执行时按盘上判；前面写过的那份认不出写法，unrecognized_write 照拒）。弄坏开关 tee-copy-unseen 下不认。"""
     if guard_break_is_set("tee-copy-unseen") or os.path.basename(command.words[0]) != "tee" or command.standard_input_heredocs:
         return
     arguments = command.words[1:]
@@ -971,7 +970,7 @@ def tee_copy(command, state, remember, forget):
         else:
             remember(path, WrittenScript(text, None))
 
-# 同一条命令里先写出、再执行的脚本，写法认不出的（正推腿乙报告第五节 Z4、调度记录 records/2026-10-26-subagent欠账清理.md 第 175 行：echo / printf / dd / sed / head /
+# 同一条命令里先写出、再执行的脚本，写法认不出的（echo / printf / dd / sed / head /
 # install /dev/stdin / python 写出再起）：命令文本这一层里前面有一条命令点到了这份脚本（重定向的目标是它，或参数、heredoc 正文里写着它），又不是只读的命令、
 # 也没被认成写出了确定内容（record_files_written 记下的那几种），执行它时照认不出拒（unrecognized_write）。弄坏开关 PROJECT_CODE_GUARD_BREAK=unrecognized-writes-allowed 下不判。
 READ_ONLY_COMMANDS = frozenset({"ls", "stat", "test", "[", "[[", "file", "wc", "grep", "egrep", "fgrep", "rg", "head", "tail", "cat", "less", "more", "sha256sum",
@@ -979,7 +978,7 @@ READ_ONLY_COMMANDS = frozenset({"ls", "stat", "test", "[", "[[", "file", "wc", "
                                 "touch", "shellcheck", "du", "sort", "uniq", "cut", "true", "false", ":", "cd", "pushd", "popd", "export", "unset", "local", "declare", "typeset", "readonly",
                                 "bash", "sh", "source", ".", "command", "type", "which", "hash", "mkdir", "rm", "rmdir", "nl", "od", "xxd", "hexdump", "strings", "sed",
                                 "tr", "column", "jq", "find", "tree"})
-# 经 PATH 找到的命令词（不带斜杠）是 shell 脚本的照读正文（正推腿乙报告第五节 Z3）；这几个前缀下面的是系统包装的程序，不读
+# 经 PATH 找到的命令词（不带斜杠）是 shell 脚本的照读正文；这几个前缀下面的是系统包装的程序，不读
 PATH_UNRESOLVED_SUFFIX = "，而这一条的 PATH 写成展开不了的值"
 DIRECTORY_UNRESOLVED_SUFFIX = "，而这一条的当前目录算不出"
 SYSTEM_PATH_PREFIXES = ("/usr/", "/bin/", "/sbin/", "/lib", "/opt/", "/snap/", "/etc/", "/nix/")
@@ -988,7 +987,7 @@ SYSTEM_PATH_PREFIXES = ("/usr/", "/bin/", "/sbin/", "/lib", "/opt/", "/snap/", "
 # python3 的代码（-c 的那个词、喂给 python3 - 的 heredoc 正文）里没有任何能写文件或起别的程序的东西，就是只读输入、往标准输出打字的过滤器：
 # 代码里提到的字样（`d['task']` 里的 task）不算点到后面执行的脚本（`task-server/task`）。有这些的（open(、.write(、shutil、os.、subprocess、pathlib、exec( / eval( / compile(、
 # dump(、.save( / .copy( / .move( / .link( / .touch( / .extract( 这一类）照旧整段算点到。命令词不是 python、跑的是脚本文件（python3 gen.py x.sh）的，参数照旧算点到。
-# 弄坏开关 PROJECT_CODE_GUARD_BREAK=python-filter-code-judged 下不分，代码里有字样就算点到（改前的判法）
+# 弄坏开关 PROJECT_CODE_GUARD_BREAK=python-filter-code-judged 下不分，代码里有字样就算点到
 PYTHON_COMMAND = re.compile(r"python[0-9.]*")
 PYTHON_CODE_OPTION = re.compile(r"-[A-Za-z]*c")
 PYTHON_WRITE_MARKER = re.compile(r"\bopen\s*\(|(?<!sys\.stdout)(?<!sys\.stderr)\.write\w*\s*\(|\bshutil\b|\bos\s*\.|\bsubprocess\b|\bpathlib\b|\bPath\s*\(|\bexec\s*\(|\beval\s*\("
@@ -1044,7 +1043,7 @@ def note_writer(command, state, recognized, own_words=None):
     # bash / source 起的脚本这一条是在执行它（命令词已换成脚本路径），照只读算；python 起的程序可能写文件，照写的算
     name = os.path.basename(command.words[0]) if command.words and command.launcher is None else {"shell": "bash", "source": "source", "startup": "source", "python": "python3"}.get(command.launcher, "")
     if command.launcher is None and command.words and copied_shell_binary(command, state) is not None:
-        name = "bash"   # 同一条命令里拷来 / 链来的 shell 起脚本是在执行它（同 bash <脚本>）、照只读算，不是写它（三方 d137-gov-r1 判决 H8）
+        name = "bash"   # 同一条命令里拷来 / 链来的 shell 起脚本是在执行它（同 bash <脚本>）、照只读算，不是写它
     blob = command_text_blob(command if own_words is None else command._replace(words=[command.words[0], *own_words]))
     state.writers.append((state.serial, blob, frozenset(recognized), name, tuple(targets)))
 
@@ -1053,12 +1052,12 @@ def launcher_own_words(command, state):
     """这一条是剥掉之后里面那条接着判的启动器（/usr/bin/time、systemd-run、chrt、ssh 这一类，gpu-quiesce-run.sh、两种派发起法；
     scan_uses 里剥它的那几处同一套）时，交启动器自己的词（命令词之后、里面那条之前的选项与位置参数）；里面那条的词要是外层词的尾巴
     （选项带进来的 NAME=VALUE 先去掉），或像 ssh、sg 那样把尾巴几个词用空格连成 `sh -c` 的一段。不是启动器、或对不上尾巴的交 None，照整条记写者。
-    d137-replay-classify 误拒 E2：`systemd-run --user --wait bash <轻脚本>` 原先把 systemd-run 整条记成写过这份脚本的认不出写法，里面那条照拒。
+    例：`systemd-run --user --wait bash <轻脚本>` 不把 systemd-run 整条记成写过这份脚本的认不出写法，里面那条照常判。
     task-server/task submit（lib_project_code_runs.task_server_submission 认的那一种，python3 起的同算）同样交它自己的词（`submit`、`--cwd <目录>`、`--`）：
     客户端只把 `--` 之后那条交给服务、自己不写文件，那条在 scan_uses 里另判、在里层自己记写者。
-    收尾批 #3 误拒：子 agent 交 `task-server/task submit -- bash <不按名字判的脚本>`（草稿里自己的辅助脚本；hook-swap 草稿树里经符号链接的崩溃点重放入口），
-    原先把 task 整条记成写过这份脚本的认不出写法，里面那条照拒。
-    弄坏开关 PROJECT_CODE_GUARD_BREAK=launcher-recorded-as-writer 下一律交 None（改前的判法）。"""
+    例：子 agent 交 `task-server/task submit -- bash <不按名字判的脚本>`（草稿里自己的辅助脚本；hook-swap 草稿树里经符号链接的崩溃点重放入口），
+    不把 task 整条记成写过这份脚本的认不出写法，里面那条照常判。
+    弄坏开关 PROJECT_CODE_GUARD_BREAK=launcher-recorded-as-writer 下一律交 None。"""
     if guard_break_is_set("launcher-recorded-as-writer") or not command.words:
         return None
     submitted = project_code_runs.task_server_submission(command.words, command.directory, command.launcher)
@@ -1110,7 +1109,7 @@ FUNCTION_DEFINITION = re.compile(r"(?:^|[\s;&|(])(?:function\s+([A-Za-z_][\w-]*)
 
 def path_lookup_script(command):
     """命令词不带斜杠、直接执行的：照这一条的 PATH（命令前、env、export 设的，`$PATH` 展开成钩子自己的）在 PATH 上找，找到的不在系统目录（SYSTEM_PATH_PREFIXES）下就交它的路径；
-    PATH 写成展开不了的值交 (None, 说明)；找不到、在系统目录下交 (None, None)。弄坏开关 PROJECT_CODE_GUARD_BREAK=path-scripts-unread 下一律交 (None, None)（改前的判法）。"""
+    PATH 写成展开不了的值交 (None, 说明)；找不到、在系统目录下交 (None, None)。弄坏开关 PROJECT_CODE_GUARD_BREAK=path-scripts-unread 下一律交 (None, None)。"""
     word = command.words[0]
     if guard_break_is_set("path-scripts-unread") or word in shell_words.BASH_BUILTINS or word in shell_words.COMMAND_KEYWORDS:
         return None, None
@@ -1144,7 +1143,7 @@ def script_path_of(command, written, strict=False):
     written 是同一条命令里前面写出的文件（record_files_written），在里面的算找得到；直接执行的还不在，扩展名不是 .sh 的不读也不记。"""
     word = command.words[0]
     if command.launcher in ("shell", "source") and not guard_break_is_set("glob-scripts-unread") and set("*?[") & set(word) and not set("$`()'\"<>|&;{}=,\n") & set(word):
-        # bash / source 起的脚本路径带通配（正推腿乙报告第五节 Z9：`bash 目录/*s.sh`）：照当前目录展开，bash 起的是排在头一个的那一份；对不上文件的 bash 报错不跑。弄坏开关 glob-scripts-unread 下不读（改前的判法）
+        # bash / source 起的脚本路径带通配（`bash 目录/*s.sh`）：照当前目录展开，bash 起的是排在头一个的那一份；对不上文件的 bash 报错不跑。弄坏开关 glob-scripts-unread 下不读
         pattern = shell_words.resolve_path(command.directory, os.path.expanduser(word))
         matches = sorted(glob.glob(pattern)) if pattern is not None else []
         return (matches[0], None) if matches else (None, None)
@@ -1157,16 +1156,16 @@ def script_path_of(command, written, strict=False):
     undeterminable_directory = (strict and not guard_break_is_set("relative-script-undeterminable-directory-allowed")
                                 and command.launcher in ("shell", "source", None))
     if resolved is None:
-        # 当前目录算不出（cd 到的目录是算不出的变量 / 命令替换、~- 的 OLDPWD）而起的是相对路径脚本：认不出起的是哪一份（三方 d137-gov-r1 判决 H5、H6；
+        # 当前目录算不出（cd 到的目录是算不出的变量 / 命令替换、~- 的 OLDPWD）而起的是相对路径脚本：认不出起的是哪一份（
         # 弄坏开关 PROJECT_CODE_GUARD_BREAK=relative-script-undeterminable-directory-allowed 下照旧放行）
         if undeterminable_directory:
             return None, f"{LAUNCHER_WORDS[command.launcher]}脚本 {word} 的当前目录算不出{DIRECTORY_UNRESOLVED_SUFFIX}"
         return None, None
     if (undeterminable_directory and not os.path.isabs(expanded) and command.directory is not None and not os.path.isdir(command.directory)
             and not command.cd_failure_skips):
-        # cd 到的目录是字面路径、盘上不在：cd 会失败、留在原来的目录，相对路径脚本认不出在哪个目录（三方 d137-gov-r1 判决 H5）。
+        # cd 到的目录是字面路径、盘上不在：cd 会失败、留在原来的目录，相对路径脚本认不出在哪个目录。
         # cd 失败了这一条就不跑的（`cd 目录 && 这一条`、`cd 目录 || exit` 之后；lib_shell_words.py 的 cd_failure_skips）不在此列：照 cd 成功了的那个目录往下判
-        # （同一条命令里前面写出的照读，不在的照「脚本不存在」只记；三方 d137-gov-r2 判决 H5，弄坏开关 LIB_SHELL_WORDS_BREAK=cd-failure-guards-unseen 下照旧拒）
+        # （同一条命令里前面写出的照读，不在的照「脚本不存在」只记；弄坏开关 LIB_SHELL_WORDS_BREAK=cd-failure-guards-unseen 下照旧拒）
         return None, (f"{LAUNCHER_WORDS[command.launcher]}脚本 {word} 要先 cd 到 {command.directory}，那个目录此刻盘上不在（同一条命令里前面 mkdir 建的也照不在算），"
                       "cd 会失败而这一条照跑（cd 后面接的是 `;`、换行或括号；写成 `cd 目录 && …` 或 `cd 目录 || exit` 才照 cd 成功了的目录判）"
                       f"{DIRECTORY_UNRESOLVED_SUFFIX}")
@@ -1254,7 +1253,7 @@ def lower_cycle_frame(first, second):
 
 def copied_shell_binary(command, state):
     """同一条命令里前面 cp / ln / install 拷来、链来的可执行文件（state.written 记下 copied_from），源解到已知 shell 二进制名（bash / sh / dash / zsh / ksh / rbash / ash）时交那个名；
-    不是这种的（裸命令词、没拷来、源不是 shell）交 None（三方 d137-gov-r1 判决 H8；源算不出的那几种写法由 unrecognized_write 拦）。"""
+    不是这种的（裸命令词、没拷来、源不是 shell）交 None（源算不出的那几种写法由 unrecognized_write 拦）。"""
     word = command.words[0]
     if word.startswith("-") or NOT_A_LITERAL_PATH & set(word):
         return None
@@ -1273,7 +1272,7 @@ def program_file_text(program_file, state, variables=None):
     候选路径按次序取头一份在的（同一条命令里前面写出的也算）；都不在交 (None, None, None, False)（程序自己报错、什么都不跑）；路径写成变量、命令替换，或当前目录算不出的，
     交认不出的说明（调用方在命令文本这一层照认不出拒）；读不了、太大、不是文本的同脚本，交只记的说明。
     variables 是这段命令文本里前面赋过的 shell 变量（CommandAtPosition.variables）：路径里的 `$名字`、`${名字}` 照它代入再判（d137-replay-classify 误拒 E5：
-    `W=<字面目录>; awk -f $W/p.awk f.rs`）；代入不了的、带命令替换或反引号的照认不出。弄坏开关 PROJECT_CODE_GUARD_BREAK=program-file-variables-unexpanded 下不代入（改前的判法）。"""
+    `W=<字面目录>; awk -f $W/p.awk f.rs`）；代入不了的、带命令替换或反引号的照认不出。弄坏开关 PROJECT_CODE_GUARD_BREAK=program-file-variables-unexpanded 下不代入。"""
     for written in program_file.words:
         word = written
         if "$" in written and "`" not in written and "(" not in written and not guard_break_is_set("program-file-variables-unexpanded"):
@@ -1304,7 +1303,7 @@ def scan_uses(text, directory, environment=None, frames_above=(), script=None, s
     认不出起什么的写法（lib_project_code_runs.unrecognized_launch）与认不出写法写出再执行的脚本（unrecognized_write）只在这一层判；脚本正文里只判命令词或脚本路径解不出、
     而定义或起它时给的参数（positional：起这份脚本的那一条的参数）里写着自证、门禁阶段、入口脚本或 cargo 的（lib_project_code_runs.script_body_unresolved_launch，文件头「认不出的写法」）。
     directory_guarded：起这段文本的那一条的 cd_failure_skips（lib_shell_words.py：前面可能失败的 cd 失败了它就不跑）；interactive：跑这段文本的 shell 可能是交互的。
-    两样都交给切词，读进去的正文照起它的那一条的往下传（三方 d137-gov-r2 判决 H5、R1 过度修补 G）。"""
+    两样都交给切词，读进去的正文照起它的那一条的往下传。"""
     if state is None:
         state = JudgingState()
     if strict is None:
@@ -1335,7 +1334,7 @@ def scan_uses(text, directory, environment=None, frames_above=(), script=None, s
     notices += [Notice(frames_above if script is None else frames_above + ((script, None),), f"{entry}，这一处没判全")
                 for entry in scan.unjudged_shell_inputs]
     # 命令文本这一层里喂给 shell 的不是字面的（管道前一段是 grep 这类别的命令、here-string 里有命令替换……）：认不出喂进去的是什么，照认不出拒（照样记检出）；
-    # 弄坏开关 PROJECT_CODE_GUARD_BREAK=unjudged-shell-input-allowed 下只记不拒（改前的判法）
+    # 弄坏开关 PROJECT_CODE_GUARD_BREAK=unjudged-shell-input-allowed 下只记不拒
     if strict and not guard_break_is_set("unjudged-shell-input-allowed"):
         uses += [UseAt(project_code_runs.program_use(project_code_runs.UNRECOGNIZED_KIND, f"{entry}，认不出喂进 shell 跑的是什么"),
                           frames_above) for entry in scan.unjudged_shell_inputs]
@@ -1349,7 +1348,7 @@ def scan_uses(text, directory, environment=None, frames_above=(), script=None, s
         scripts_read.extend(inner.scripts_read)
         hit_depth_limit = hit_depth_limit or inner.hit_depth_limit
         lowest_cycle_frame = lower_cycle_frame(lowest_cycle_frame, inner.lowest_cycle_frame)
-    # exec < 文件 / { … } < 文件 / ( … ) < 文件 / while … done < 文件：把 < 的文件下发给里层读标准输入的 bash / sh，照 `bash 文件` 读那份文件判（三方 d137-gov-r1 判决 H4）
+    # exec < 文件 / { … } < 文件 / ( … ) < 文件 / while … done < 文件：把 < 的文件下发给里层读标准输入的 bash / sh，照 `bash 文件` 读那份文件判
     # （弄坏开关 PROJECT_CODE_GUARD_BREAK=compound-stdin-untracked 下不认）
     if strict and not guard_break_is_set("compound-stdin-untracked"):
         feeds = shell_words.compound_redirected_stdin_files(text)
@@ -1414,7 +1413,7 @@ def scan_uses(text, directory, environment=None, frames_above=(), script=None, s
             direct_runs.append(DirectRun(f"经 {os.path.basename(wrapper_word)} 直接起（交给服务的命令不带包装）", frames_of(key, occurrence)))
         # 认不出起什么的写法（命令文本这一层；lib_project_code_runs.py 的 unrecognized_launch）：照「认不出起什么的写法」那一类拒
         unrecognized = project_code_runs.unrecognized_launch(command.words, command.launcher) if strict else None
-        # 脚本正文里命令词或脚本路径由变量拼出、解不出，而定义或位置参数里写着自证、门禁阶段、入口脚本或 cargo 的（一百三十七节件 1b 第 3 条：经脚本里的变量起改过的钩子自证绕过了这道闸）
+        # 脚本正文里命令词或脚本路径由变量拼出、解不出，而定义或位置参数里写着自证、门禁阶段、入口脚本或 cargo 的（例：经脚本里的变量起改过的钩子自证）
         if not strict:
             unrecognized = project_code_runs.script_body_unresolved_launch(command.words, command.launcher, own_definitions, positional,
                                                                    script if script is not None else (frames_above[-1][0] if frames_above else None))
@@ -1431,14 +1430,14 @@ def scan_uses(text, directory, environment=None, frames_above=(), script=None, s
             for start in range(1, len(command.words)):
                 merge(scan_uses(shlex.join(command.words[start:]), command.directory, command.environment, frames_of(key, occurrence), None, state,
                                  command.memory_capped, own_definitions, strict=strict, directory_guarded=command.cd_failure_skips))
-        # 命令词是这段文本里定义的、函数体起 shell 的函数，且这一条前缀设了 BASH_ENV / ENV（三方 d137-gov-r1 攻方腿 A2：函数体就地判时看不到调用处的 BASH_ENV）：
+        # 命令词是这段文本里定义的、函数体起 shell 的函数，且这一条前缀设了 BASH_ENV / ENV（函数体就地判时看不到调用处的 BASH_ENV）：
         # 拿调用处的 environment 重判函数体，补上里层 shell 读的启动文件（弄坏开关 PROJECT_CODE_GUARD_BREAK=bash-env-forwarding-untracked 下不认）
         if (command.launcher is None and os.path.basename(command.words[0]) in shell_functions
                 and (shell_words.STARTUP_FILE_BASH_VARIABLE in command.environment or shell_words.STARTUP_FILE_POSIX_VARIABLE in command.environment)):
             merge(scan_uses(shell_functions[os.path.basename(command.words[0])], command.directory, command.environment,
                              frames_of(key, occurrence), None, state, command.memory_capped, own_definitions, strict=strict,
                              directory_guarded=command.cd_failure_skips))
-        # 别的程序里起的命令（python / perl / awk / sed / tclsh / make / git / tar / ssh 这类；三方 d137-gov-r1 判决 H9 与「已知没认」四类，lib_shell_words.py 的 embedded_launches）：
+        # 别的程序里起的命令（python / perl / awk / sed / tclsh / make / git / tar / ssh 这类；lib_shell_words.py 的 embedded_launches）：
         # 字面写着的照一段命令文本接着判（同 bash -c）；程序从文件读的代码（awk -f、sed -f、Makefile）读正文判（program_text_launches，照脚本正文那样只判解得出的）；
         # 写法认不出的，命令文本这一层照认不出拒，读进来的正文里照常执行、记检出（弄坏开关 PROJECT_CODE_GUARD_BREAK=program-files-unread 下不读程序文件，
         # embedded-unjudged-allowed 下认不出的只记不拒）
@@ -1490,7 +1489,7 @@ def scan_uses(text, directory, environment=None, frames_above=(), script=None, s
             merge(inner)
             continue
         # 同一条命令里 cp / ln / install 拷来、链来的、或盘上符号链接指到的可执行文件，解到已知 shell 二进制（bash / sh / dash / zsh / ksh / rbash / ash）：
-        # 按那种 shell 重判它的参数（-c 的代码、起的脚本、启动文件；三方 d137-gov-r1 判决 H8）。弄坏开关 PROJECT_CODE_GUARD_BREAK=copied-shell-binary-untracked 下不认
+        # 按那种 shell 重判它的参数（-c 的代码、起的脚本、启动文件）。弄坏开关 PROJECT_CODE_GUARD_BREAK=copied-shell-binary-untracked 下不认
         if command.launcher is None and not guard_break_is_set("copied-shell-binary-untracked"):
             shell_binary = copied_shell_binary(command, state)
             if shell_binary is not None:
@@ -1545,7 +1544,7 @@ def scan_uses(text, directory, environment=None, frames_above=(), script=None, s
                                         f"超过读的上限 {MAXIMUM_SCRIPT_DEPTH} 层，看不全，里面的命令没判"))
             continue
         if command.launcher is None:
-            # 直接执行的脚本：它的 shell 起来时先读 BASH_ENV / ENV / .bashrc / zsh 的启动文件（一百三十七节件 8g；lib_shell_words.py 的 executed_script_startup），
+            # 直接执行的脚本：它的 shell 起来时先读 BASH_ENV / ENV / .bashrc / zsh 的启动文件（lib_shell_words.py 的 executed_script_startup），
             # 读到的启动文件接在后面当被起的脚本判；#! 指到的解释器认不出、而环境里设了 BASH_ENV 或 ENV 的，照认不出拒
             startups, unknown_interpreter = shell_words.executed_script_startup(command, executed_file_head(path, state))
             pending.extend(startups)
@@ -1563,7 +1562,7 @@ def scan_uses(text, directory, environment=None, frames_above=(), script=None, s
         body = project_code_runs.script_directory_expanded(body, path)
         # 跑这份正文的 shell 交不交互：source 与启动文件是起它的那个 shell，bash / sh 起的是新起的那个 shell（切词记在 command.interactive），直接执行的看 #! 行的选项里有没有 i。
         # 非交互的 shell source 的文件读到 `case $- in *i*) ;; *) return;; esac` 这类守卫就 return 了，后面的不读（lib_shell_words.py 的 non_interactive_return_offset；
-        # 三方 d137-gov-r2 判决 R1 过度修补 G：~/.bashrc 开头的守卫之后才 source bash-completion 这类大文件，非交互的登录 shell 读登录启动文件时照读全份，每次多两三秒、多记一条检出）
+        # ~/.bashrc 开头的守卫之后才 source bash-completion 这类大文件，非交互的登录 shell 读登录启动文件时照读全份，每次多两三秒、多记一条检出）
         if command.launcher in ("source", "startup", "shell"):
             body_interactive = command.interactive
         else:
@@ -1729,7 +1728,7 @@ def scan_decision(hook_input, project_root):
     if target_refusal:
         message = target_refusal + "\n" + message
     if state.missing_cat_sources and not guard_break_is_set("cat-missing-source-unexplained"):
-        # 三方 d137-gov-r1 判决 H7、S3：cat / tee 的源盘上不在、读不到它的内容，那个目的照认不出拒（偏严，用户 2026-10-29 定「cat 不看源在不在那一类照拒」），说明点名这一种写法与改法
+        # cat / tee 的源盘上不在、读不到它的内容，那个目的照认不出拒（偏严：cat 不看源在不在那一类照拒），说明点名这一种写法与改法
         named = "、".join(f"`{source}`（写进 {destination}）" for source, destination in state.missing_cat_sources)
         message += (f"\n→ 这一条里 cat / tee 的源 {named} 盘上不在、也不是同一条命令里前面认出写出的：真跑时 cat 报 No such file、退 1，用 `&&` 接的后一条其实不跑；"
                     "读不到这个源的内容，写出的那份目的照认不出、执行它照拒。要跑的话把不在的源去掉，或把引号写的 `\"2\">` 改成重定向 `2>` 本来想写的样子，再拆成两条命令。")
@@ -1907,7 +1906,7 @@ def build_sample_scripts(work):
     write("big.sh", "# 填充\n" * (MAXIMUM_SCRIPT_BYTES // 8 + 1) + "herd7 x.litmus\n")
     write("tool", "#!/usr/bin/env python3\nimport subprocess\nsubprocess.run(['cargo', 'test', '--all'])\nherd7 x.litmus\n")
     write("prog", b"\x7fELF\x02\x01\x01\x00\x00\nherd7 x.litmus\n", "wb")
-    # 超过读的上限的编译产物与 python 程序：先认出不是 shell 脚本、不读也不记，轮不到大小上限（2026-09-24 现场误记过 e49_chain_width）
+    # 超过读的上限的编译产物与 python 程序：先认出不是 shell 脚本、不读也不记，轮不到大小上限（例：e49_chain_width）
     write("bigprog", b"\x7fELF\x02\x01\x01\x00" + b"\x00" * (MAXIMUM_SCRIPT_BYTES + 64) + b"\nherd7 x.litmus\n", "wb")
     write("bigtool", "#!/usr/bin/env python3\n" + "# 填充\n" * (MAXIMUM_SCRIPT_BYTES // 8 + 1) + "herd7 x.litmus\n")
     write("elsewhere/mutate.sh", "#!/usr/bin/env bash\nherd7 x.litmus\n")
@@ -1921,7 +1920,7 @@ def build_sample_scripts(work):
                os.path.join(work, "link-tree", "scripts", "experiment-apparatus", "replay.sh"))
     write("scripts/gate/gate-staged.sh", "#!/usr/bin/env bash\nbash .claude/scripts/gate.sh --staged\n")
     write(".claude/singlefs-ai-sop/scripts/naming-lint.sh", "#!/usr/bin/env bash\ntrue\n")   # 交回前自查命名的那条命令起的上游 lint：脚本在，读得到
-    # 查名字与数组赋值：照 .claude/scripts/fetch-deps.sh 第 44 行、scripts/gate/change-touches-crates.sh（2026-10-15 删掉）第 61 行原样
+    # 查名字与数组赋值：照 .claude/scripts/fetch-deps.sh 第 44 行、scripts/gate/change-touches-crates.sh 第 61 行原样
     write("command-lookup.sh", "#!/usr/bin/env bash\n  if command -v herd7 >/dev/null 2>&1; then ok \"herd7 已在\"; return 0; fi\n")
     write("array-assignment.sh", "#!/usr/bin/env bash\n  ((${#prefixes[@]})) || prefixes=(\"crates/\")\nchains=(./s.sh ./outer.sh)\n")
     # 命令替换的两种写法，照 .claude/singlefs-ai-sop/scripts/doc-lint.sh 第 43 行、第 70 行原样：切碎之后的片段不许当成脚本路径去读
@@ -1935,7 +1934,7 @@ def build_sample_scripts(work):
     write("unwrapped.sh", "#!/usr/bin/env bash\ncargo test -p singlefs-core --test core_contract\n")
     write("substitution-heavy.sh", "#!/usr/bin/env bash\n  set -- \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)\"\n"
           "summary=\"$(herd7 x.litmus 2>&1 | tail -3)\"\n")
-    # 直接执行时不当脚本读的文本：Rust 源码的文档注释里反引号括着彼此的路径与 `herd7 x.litmus`，当 shell 读就一路互相读下去（2026-09-25 现场一条命令 100 秒没判完）
+    # 直接执行时不当脚本读的文本：Rust 源码的文档注释里反引号括着彼此的路径与 `herd7 x.litmus`，当 shell 读就一路互相读下去（一条命令 100 秒判不完）
     checker_sources = ["walk.rs", "image.rs", "lib.rs"]
     for name in checker_sources:
         others = "` 与 `".join(f"crates/singlefs-checker/src/{other}" for other in checker_sources if other != name)
@@ -1960,10 +1959,10 @@ def build_sample_scripts(work):
     write("sub/inner-rel.sh", "herd7 x.litmus\n")
     write("has-missing.sh", "bash missing.sh\n")
     write("outer-missing.sh", "echo 起里一层\nbash has-missing.sh\n")
-    # BASH_ENV / ENV 指的启动文件（一百三十七节件 8f）：正文只有一行重活的、只有轻活的
+    # BASH_ENV / ENV 指的启动文件：正文只有一行重活的、只有轻活的
     write("startup-heavy.sh", "bash scripts/hosts/run-with-memory-cap.sh 16G herd7 x.litmus\n")
     write("startup-light.sh", "echo hello\n")
-    # 直接执行的脚本先读的启动文件（一百三十七节件 8g）：#! 指到 bash、env bash、sh、python、认不出的解释器、zsh 的，和没有 #! 的
+    # 直接执行的脚本先读的启动文件：#! 指到 bash、env bash、sh、python、认不出的解释器、zsh 的，和没有 #! 的
     for name, text in (("exec-bash.sh", "#!/bin/bash\necho hello\n"), ("exec-env-bash.sh", "#!/usr/bin/env bash\necho hello\n"), ("exec-sh.sh", "#!/bin/sh\necho hello\n"),
                        ("exec-python.py", "#!/usr/bin/env python3\nprint(1)\n"), ("exec-unknown.sh", "#!/opt/odd/interp\nhello\n"),
                        ("exec-zsh.sh", "#!/bin/zsh\necho hello\n"), ("exec-no-shebang.sh", "echo hello\n")):
@@ -1978,7 +1977,7 @@ def build_sample_scripts(work):
     write("zdot-light/.zshenv", "echo hello\n")
     write("zdot-light/.zshrc", "echo hello\n")
 
-# 2026-09-25 现场一条命令 100 秒没判完：双引号里没转义的反引号把 `crates/singlefs-checker/src/walk.rs` 当命令替换执行（原样，cwd 换成自检的临时工作区）
+# 一条命令 100 秒判不完的写法：双引号里没转义的反引号把 `crates/singlefs-checker/src/walk.rs` 当命令替换执行（原样，cwd 换成自检的临时工作区）
 SLOW_REPRODUCTION_COMMAND = 'python3 scripts/kb/replace-once.py .claude/kb/verification-build.md "池级 checker（\\`crates/singlefs-checker\\` 的 \\`walk::check_pool_image\\`，24 条）" "池级 checker（\\`crates/singlefs-checker\\` 的 \\`walk::check_pool_image\\`，26 条：第一版 23 条加 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽））" && python3 scripts/kb/replace-once.py .claude/kb/milestone/02-second-txn.md "checker 新接的只有 I-3.8（实例表行唯一且低于挂载根），I-3.1（已分配统计对得上） 与 I-2.1（校验和与内容匹配） 改按回退候选集判，预想清单里其余各条（I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽） 那一族起）还没有 checker；" "checker 新接了 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）（后两条按候选集里每条根各判一格：走读它引用的单元时校验和对不上或头用不了就红，坏镜像是 mkfs 树表单元——只有第 0 代根还引用——改内容重封 / 抹成零；`crates/singlefs-checker/src/walk.rs`、`image.rs` 清单 26 条），I-3.1（已分配统计对得上） 与 I-2.1（校验和与内容匹配） 改按回退候选集判；预想清单里其余各条（I-3.4（可用空间扣待删占用） 起）还没有 checker；" && bash .claude/singlefs-ai-sop/scripts/doc-lint.sh . 2>&1 | tail -1'
 SLOW_REPRODUCTION_SECONDS = 1.0  # 复现输入那一条要在这么多秒内判完
 
@@ -2012,7 +2011,7 @@ def selftest(hook_dir):
     try:
         project_code_runs.build_sample_workspace(work)
         project_code_runs.FAMILY_OWN_REPOSITORY = work   # 样本工作区里的门禁阶段、同族脚本照「本仓那一份」认（lib_project_code_runs.py 的 family_own_copy）
-        shell_words.SYSTEM_STARTUP_DIRECTORY = os.path.join(work, "system-startup-empty")   # 系统级启动文件不读本机的 /etc（三方 d137-gov-r1 第三段那几组另换样本目录）
+        shell_words.SYSTEM_STARTUP_DIRECTORY = os.path.join(work, "system-startup-empty")   # 系统级启动文件不读本机的 /etc（换成样本目录）
         project_code_runs.SAMPLE_INDEX_REPOSITORY = os.path.join(work, project_code_runs.SAMPLE_INDEX_REFERENCE_NAME)
         build_sample_scripts(work)
         writer, crash, triage, scribe = "implementation-writer", "crash-verifier", "gate-triage", "kb-scribe"
@@ -2084,16 +2083,16 @@ def selftest(hook_dir):
             #   redirect-fd-duplication-unseen 下第二格红，各连着「：记几条检出」「：读进去几份脚本」；放行的那一格起的那一份不在，记一条检出）
             ("heredoc 写文件：cat <<EOF 2> 写的那一份拿不到正文：认不出写法写出再起，照拒", None, "cat <<'EOS' 2>s-hd2.sh\nherd7 x.litmus\nEOS\nbash s-hd2.sh", 2, 0, 0),
             ("主 agent heredoc 写文件：cat <<EOF 3> 再 >&3 写出再起全量脚本照拒", None, "cat <<'EOS' 3>s-hd3.sh >&3\nherd7 x.litmus\nEOS\nbash s-hd3.sh", 2, 0, 1),
-            # bash -c 之后照 bash 只认短选项、-n 只查语法；env 认到赋值之后不再认选项（判决第二节第 4、5 条；shell-long-options-after-short 下第一格红，
+            # bash -c 之后照 bash 只认短选项、-n 只查语法；env 认到赋值之后不再认选项（shell-long-options-after-short 下第一格红，
             #   shell-syntax-only-code-run 下第二格红，env-options-after-assignment 下第四格红；第三、五格钉住长选项写在前面、选项写在赋值前面的照判）
             ("bash -c 之后的长选项：bash 报错不跑，放行", None, "bash -c --posix 'herd7 x.litmus'", 0),
             ("bash -c -n 只查语法：放行", None, "bash -c -n 'herd7 x.litmus'", 0),
             ("主 agent bash 长选项写在 -c 前面照拒", None, "bash --posix -c 'herd7 x.litmus'", 2),
             ("env =1 之后的 -u 是命令词：env 报错不跑，放行", None, "env =1 -u X herd7 x.litmus", 0),
             ("主 agent env -u 写在赋值前面照拒", None, "env -u X =1 herd7 x.litmus", 2),
-            # 带步长、两端宽度不一的补零序列照 bash 补到长的那一边（判决第二节第 6 条；brace-sequence-width-padded-ends-only 下这一格与它的「：读进去几份脚本」红）
+            # 带步长、两端宽度不一的补零序列照 bash 补到长的那一边（brace-sequence-width-padded-ends-only 下这一格与它的「：读进去几份脚本」红）
             ("主 agent cp 带步长、两端宽度不一的补零序列拷出再起全量脚本照拒", None, "cp s.sh s{01..100..100}.sh && bash s001.sh", 2, 0, 1),
-            # ANSI-C 引号 $'…' 里的 \' 不收尾（判决第二节第 6 条；ansi-c-quotes-unseen 下这一格红）
+            # ANSI-C 引号 $'…' 里的 \' 不收尾（ansi-c-quotes-unseen 下这一格红）
             ("主 agent $'…' 里带 \\' 之后 bash <<EOF 里起全量照拒", None, "echo $'a\\'b'; bash <<'EOF'\nherd7 x.litmus\nEOF", 2),
             # ANSI-C 引号解开之后，定义里的 \t 隔开了测试目标名：数组元素赋值与 += 追加照 bash 是赋值、不是命令词（LIB_SHELL_WORDS_BREAK=extended-assignments-as-command 下这一格红）
             ("数组元素赋值与 += 追加是赋值、不是命令词：放行", writer,
@@ -2120,7 +2119,7 @@ def selftest(hook_dir):
             ("主 agent $(bash <<EOF) 里起全量照拒", None, "x=$(bash <<'EOF'\nherd7 x.litmus\nEOF\n)", 2),
             ("主 agent <(bash <<EOF) 里起全量照拒", None, "cat <(bash <<'EOF'\nherd7 x.litmus\nEOF\n)", 2),
             ("$(cat <<EOF) 里的正文是数据：放行", None, "x=$(cat <<'EOF'\nherd7 x.litmus\nEOF\n)", 0),
-            # 花括号展开出来的空串照 bash 去掉、整数序列照 bash 补零（三方 shell-words-r1 正推腿报告 W1 一节；LIB_SHELL_WORDS_BREAK=brace-empties-kept 下前四格红，
+            # 花括号展开出来的空串照 bash 去掉、整数序列照 bash 补零（LIB_SHELL_WORDS_BREAK=brace-empties-kept 下前四格红，
             #   brace-sequence-unpadded 下第五格与它的「：读进去几份脚本」红）
             ("主 agent {,} 写在命令词前面起全量照拒", None, "{,} herd7 x.litmus", 2),
             ("主 agent cp 补零的序列拷出再起全量脚本照拒", None, "cp s.sh s{01..01}.sh && bash s01.sh", 2, 0, 1),
@@ -2131,8 +2130,8 @@ def selftest(hook_dir):
             ('主 agent FOO="$(pwd)" bash <<EOF 里起全量照拒', None, "FOO=\"$(pwd)\" bash <<'EOF'\nherd7 x.litmus\nEOF", 2),
             # 起测试的外部子命令、别名与 runner、只列不跑、没标 #[ignore] 的登记用例
             ("实现员 cargo mutants 整个 验证包（随时跑）", writer, "bash scripts/hosts/run-with-memory-cap.sh 4G cargo mutants -p singlefs-verification", 0),
-            # 喂的样本与暂存区比（攻方 2026-10-01 的造法：样本的 setup.sh 起 验证包；LIB_PROJECT_CODE_RUNS_BREAK=stage-samples-fixtures-unchecked 下这一格红）
-            # 登记表的键按真实路径认（攻方 2026-10-01 的造法；LIB_PROJECT_CODE_RUNS_BREAK=selftest-registry-by-path-tail 下第一格红）
+            # 喂的样本与暂存区比（样本的 setup.sh 起 验证包；LIB_PROJECT_CODE_RUNS_BREAK=stage-samples-fixtures-unchecked 下这一格红）
+            # 登记表的键按真实路径认（LIB_PROJECT_CODE_RUNS_BREAK=selftest-registry-by-path-tail 下第一格红）
             ("工具实现员起带 case 模式行 .claude/gate.d/lib/*.py) 的脚本：放行", "tooling-writer", "bash case-pattern.sh", 0, 0, 1),
             # 只查清单、只生成、只读、只查语法的放行（lib_shell_words.py 的 LIB_SHELL_WORDS_BREAK=arguments-as-executed 下最后两格红；
             ("实现员 gate-overlap.py --list 查清单", writer, "python3 .claude/singlefs-ai-sop/scripts/gate-overlap.py --list", 0),
@@ -2181,7 +2180,7 @@ def selftest(hook_dir):
             ("实现员 ./ 执行超过读的上限的 shell 脚本：放行并记检出", writer, "./big.sh", 0, 1, 0),
             ("实现员起 doc-lint.sh 第 43 行那种命令替换：片段不当路径", writer, "bash doc-lint-line-43.sh", 0, 0, 1),
             ("实现员起 doc-lint.sh 第 70 行那种命令替换：片段不当路径", writer, "bash doc-lint-line-70.sh", 0, 0, 1),
-            ("实现员起的脚本里命令替换、反引号、算术后面接路径：片段不当路径", writer, "bash substitution-fragments.sh", 0, 1, 1),   # `$(dirname "$0")/helper.sh` 换成脚本所在目录之后照路径认，helper.sh 不在记一条（一百三十七节 ⑮）
+            ("实现员起的脚本里命令替换、反引号、算术后面接路径：片段不当路径", writer, "bash substitution-fragments.sh", 0, 1, 1),   # `$(dirname "$0")/helper.sh` 换成脚本所在目录之后照路径认，helper.sh 不在记一条
             ("实现员起的脚本里命令替换里跑 --all", writer, "bash substitution-heavy.sh", 2, 0, 1),
             ("实现员起的脚本里 command -v herd7：查名字不是跑", writer, "bash command-lookup.sh", 0, 0, 1),
             ("实现员起的脚本里数组赋值的元素：不当命令、不当路径", writer, "bash array-assignment.sh", 0, 0, 1),
@@ -2200,7 +2199,7 @@ def selftest(hook_dir):
             # pattern-expansions-bare 下「写成通配的 capped.sh」那一格红）
             ("实现员写成通配的 capped.sh 包全量：照拒", writer, f"cd {repo} && bash scripts/hosts/capped.s? 4 herd7 x.litmus", 2),
             ("实现员合法的通配 ls scripts/*.sh：放行", writer, f"cd {repo} && ls scripts/*.sh", 0, 0, 0),
-            # 方括号里的 POSIX 字符类、等价类、整理符号交给 bash 展开（test-script-align-r3 攻方 A1；LIB_PROJECT_CODE_RUNS_BREAK=posix-brackets-by-python-glob 下前四格红，
+            # 方括号里的 POSIX 字符类、等价类、整理符号交给 bash 展开（LIB_PROJECT_CODE_RUNS_BREAK=posix-brackets-by-python-glob 下前四格红，
             # posix-brackets-unresolved-literal 下第四格红）
             ("实现员合法的 POSIX 字符类 ls scripts/[[:alpha:]]*.sh：放行", writer, f"cd {repo} && ls scripts/[[:alpha:]]*.sh", 0, 0, 0),
             # two-logs.sh 包一层不让里面那条脱离闸（LIB_PROJECT_CODE_RUNS_BREAK=two-logs-opaque 下「实现员经 two-logs.sh 起全量 cargo test：照拒」红）
@@ -2312,7 +2311,7 @@ def selftest(hook_dir):
             ("一百三十七#8：工具实现员经 multi-host-run.sh --peer 起门禁格，照拒", "tooling-writer",
              f"bash {repo}/scripts/hosts/multi-host-run.sh --peer --memory-cap 8G -- bash .claude/gate.d/code-tooling.sh --check agent-write-scope ."),
         ])
-        # 一百三十七节那一批（records/2026-10-29-一百三十七节那一轮调度记录.md 件 1；用户定「认不出的一律拒（偏严）」）。每格后面的注释写弄坏它的开关
+        # 认不出的一律拒（偏严）的各格。每格后面的注释写弄坏它的开关
         for relative, text in (("srclib/entry.sh", '#!/usr/bin/env bash\nsource "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\n'),
                                ("srclib/lib.sh", "herd7 x.litmus\n"),
                                ("launcher-function.sh", '#!/usr/bin/env bash\nrun_logged() { local log=$1; shift; "$@" > "$log" 2>&1; }\nrun_logged out.log herd7 x.litmus\n'),
@@ -2324,7 +2323,7 @@ def selftest(hook_dir):
                 handle.write(text)
             os.chmod(os.path.join(work, relative), 0o755)
         batch137_cases = [
-            # 三种静默漏拒（三方 shell-words-r3 判决第二节第 2、3、7 条）
+            # 三种静默漏拒
             ("一百三十七：命令替换里不加括号的 case 模式不提前收尾，里面的 --all 照拒", None, 'echo "$(case a in a) herd7 x.litmus;; esac)"', 2),   # LIB_SHELL_WORDS_BREAK=substitution-case-and-comment-unseen
             ("一百三十七：命令替换里注释的 ) 不收尾，后面的 --all 照拒", None, 'echo "$(echo hi # )\nherd7 x.litmus)"', 2),                        # 同上
             ("一百三十七：coproc 后面那条照判", None, "coproc herd7 x.litmus", 2),                                                            # LIB_SHELL_WORDS_BREAK=coproc-as-command
@@ -2340,19 +2339,19 @@ def selftest(hook_dir):
             ("一百三十七：bash 起通配写出的脚本路径照 bash 展开读正文", writer, "bash ./s.s?", 2, 0, 1),                                       # PROJECT_CODE_GUARD_BREAK=glob-scripts-unread
             ("一百三十七：echo 写出再起照拒", writer, "echo 'cargo build' > gen-echo.sh; bash gen-echo.sh", 2),                               # PROJECT_CODE_GUARD_BREAK=unrecognized-writes-allowed
             ("一百三十七：python 写出再起照拒", writer, "python3 -c \"open('gen-py.sh','w').write('true')\"; bash gen-py.sh", 2),                # 同上
-            # 拷出写法 >>、&>、tee（正推腿乙第八节 A1）：认成拷贝，照拷来的内容判
+            # 拷出写法 >>、&>、tee：认成拷贝，照拷来的内容判
             ("一百三十七：cat 源 >> 拷出再起，照写出的内容判", writer, "cat s.sh >> gen-append.sh; bash gen-append.sh", 2, 0, 1),               # PROJECT_CODE_GUARD_BREAK=copy-redirections-unseen
             ("一百三十七：cat 轻脚本 &> 拷出再起，照内容判、放行", writer, "cat light.sh &> gen-both.sh; bash gen-both.sh", 0, 0, 1),           # 同上
             ("一百三十七：cat 源 | tee 拷出再起，照写出的内容判", writer, "cat s.sh | tee gen-tee.sh >/dev/null; bash gen-tee.sh", 2, 0, 1),   # PROJECT_CODE_GUARD_BREAK=tee-copy-unseen
             ("一百三十七：tee 目的 < 轻脚本 拷出再起，照内容判、放行", writer, "tee gen-tee2.sh < light.sh >/dev/null; bash gen-tee2.sh", 0, 0, 1),  # 同上
-            # 标准输入从文件来的 shell（正推腿乙第八节 A2）：读那份文件判
+            # 标准输入从文件来的 shell：读那份文件判
             ("一百三十七：bash -s < 文件 读那份文件判", writer, "bash -s < s.sh", 2, 0, 1),                                                      # LIB_SHELL_WORDS_BREAK=shell-standard-input-file-unread
             ("一百三十七：cat 文件 | bash 读那份文件判", writer, "cat s.sh | bash", 2, 0, 1),                                                    # 同上
             ("一百三十七：sh -s < 轻脚本放行", writer, "sh -s < light.sh", 0, 0, 1),                                                             # 同上
-            # 名单外启动器（正推腿乙第八节 A3、A4；第二轮判决第二节第 11 条）
+            # 名单外启动器
             ("一百三十七：xargs bash 起读进来的脚本照拒", writer, "echo s.sh | xargs bash", 2),                                                  # 同上
-            # 派发起法剥开照判（records/2026-10-29-一百三十七节那一轮调度记录.md#8；LIB_PROJECT_CODE_RUNS_BREAK=dispatch-launchers-unseen 下红的格逐格写在文件头）
-            # 函数当启动器（正推腿乙第八节 C、C12c：脚本里经自己的 run_logged 起）
+            # 派发起法剥开照判（LIB_PROJECT_CODE_RUNS_BREAK=dispatch-launchers-unseen 下红的格逐格写在文件头）
+            # 函数当启动器（脚本里经自己的 run_logged 起）
             ("一百三十七：脚本里经自己的 run_logged 起 --all 照拒", writer, "bash launcher-function.sh", 2, 0, 1),                               # PROJECT_CODE_GUARD_BREAK=launcher-functions-unjudged
             # 读正文时展开入口按自己所在目录 source 的库（第一百一十八节跟进）
             ("一百三十七：脚本 source 自己目录下的库，读正文时库也读", writer, "bash srclib/entry.sh", 2, 0, 2),                                # LIB_PROJECT_CODE_RUNS_BREAK=sourced-libraries-unread
@@ -2446,7 +2445,7 @@ def selftest(hook_dir):
             ("一百三十七：zsh 的 ZDOTDIR 写成命令替换，认不出，实现员照拒", writer, "ZDOTDIR=$(echo zdot-env) zsh -c true", 2),
         ]
         judge_cases(batch137_cases)
-        # 三方 d137-gov-r1 判决第一轮修补：H2(trap)、H4(标准输入设备)、H5(cd 失败 / 算不出)、H6(~+ / ~-)、H8(rbash / busybox / dash / ksh)。
+        # trap、标准输入设备、cd 失败 / 算不出、~+ / ~-、rbash / busybox / dash / ksh。
         # 每格后面注释写弄坏它的开关；startup-heavy.sh（herd7 x.litmus）、startup-light.sh（echo hello）在 work 根
         d137_cases = [
             # H2：trap 'action' 的字符串当 shell 代码判（LIB_SHELL_WORDS_BREAK=trap-action-unread）
@@ -2488,7 +2487,7 @@ def selftest(hook_dir):
             ("d137 H3：没 shopt -s expand_aliases（非交互 bash 不展开），别名不展开、放行", writer, "alias t='herd7 x.litmus'; t", 0),
         ]
         judge_cases(d137_cases)
-        # 三方 d137-gov-r1 判决第二段：A2(BASH_ENV 包进起 shell 的转发函数)、H4(exec / 复合命令上的输入重定向)、H8(拷来 / 链来的 shell 二进制)、H7 连 S3(多源 cat / >> / tee 的源盘上不在)。
+        # BASH_ENV 包进起 shell 的转发函数、exec / 复合命令上的输入重定向、拷来 / 链来的 shell 二进制、多源 cat / >> / tee 的源盘上不在。
         # 每格后面注释写弄坏它的开关；startup-heavy.sh / s.sh（herd7 x.litmus）、startup-light.sh（echo hello）在 work 根，/bin/bash 是真的
         d137r3_cases = [
             # A2：BASH_ENV / ENV 包进起 shell 的转发函数（PROJECT_CODE_GUARD_BREAK=bash-env-forwarding-untracked）
@@ -2525,7 +2524,7 @@ def selftest(hook_dir):
             ("d137 H7：单源 cat 源在、起全量，照拒（控制组）", writer, "cat s.sh > dd137g.sh && bash dd137g.sh", 2, 0, 1),
         ]
         judge_cases(d137r3_cases)
-        # 三方 d137-gov-r1 判决第三段：「已知没认」四类里的登录 shell 的 profile、系统级启动文件、别的程序里起的命令（H9）；脚本正文里起 claude 归 bash-command-detector.sh。
+        # 登录 shell 的 profile、系统级启动文件、别的程序里起的命令；脚本正文里起 claude 归 bash-command-detector.sh。
         # 系统级启动文件的目录（lib_shell_words.py 的 SYSTEM_STARTUP_DIRECTORY）平常换成空的 system-startup-empty（不读本机的 /etc），系统级那一组换成 system-startup-heavy
         for relative, text in (
                                ('home-login-heavy/.bash_profile', 'herd7 x.litmus\n'),
@@ -2598,9 +2597,9 @@ def selftest(hook_dir):
             ('d137 H9：ssh -o ProxyCommand 起全量，照拒', writer, "ssh -o ProxyCommand='herd7 x.litmus' host true", 2, 0, 0),
             ('d137 H9：脚本正文里 perl -e 起全量，读正文照拒', writer, f'bash {work}/body-embedded137.sh', 2, 0, 1),
         ])
-        # 三方 d137-gov-r2 判决 R1 过度修补 A–G 与 H5：认得出起的是什么、不起重活与 claude 的照放，同形起重活的照拒。逐格见文件头开关清单：A 格 LIB_SHELL_WORDS_BREAK=sed-expansions-unparsed、
-        # B 格 sed-text-first-line-only、C 与 D 格 python-argument-variables-unresolved、E 格 awk-command-variables-unresolved、F 格 cd-known-targets-unexpanded、
-        # H5 格 cd-failure-guards-unseen、G 格 non-interactive-return-unseen 下「放行」的格（F、H5 另有照拒格的「读进去几份脚本」）红。{work} 换成样本目录
+        # 认得出起的是什么、不起重活与 claude 的照放，同形起重活的照拒。逐格见文件头开关清单：LIB_SHELL_WORDS_BREAK=sed-expansions-unparsed、
+        # sed-text-first-line-only、python-argument-variables-unresolved、awk-command-variables-unresolved、cd-known-targets-unexpanded、
+        # cd-failure-guards-unseen、non-interactive-return-unseen 下「放行」的格（cd-known-targets-unexpanded、cd-failure-guards-unseen 另有照拒格的「读进去几份脚本」）红。{work} 换成样本目录
         for relative, text in (
                                ('r2-light.sh', 'echo hello\n'),
                                ('r2-heavy.sh', 'herd7 x.litmus\n'),
@@ -2655,7 +2654,7 @@ def selftest(hook_dir):
             ('d137-r2 G：交互的 bash -i 读带守卫的 .bashrc 不截，守卫之后的全量照拒', 'HOME={work}/home-guarded137 bash -i -c true', 2, 0, 1),
             ('d137-r2 G：守卫不在顶层（套在 if 里）不截，照拒', 'HOME={work}/home-unguarded137 bash -l -c true', 2, 0, 2),
         ]])
-        # 一百三十七节第 8 批（复跑分类报告 d137-replay-classify「二、误拒逐条」E2–E5 与「四」那两道口径）：认得出起的是什么的照放，同形起重活或认不出的照拒。
+        # 认得出起的是什么的照放，同形起重活或认不出的照拒。
         # E2 格 PROJECT_CODE_GUARD_BREAK=launcher-recorded-as-writer、E3 格 heredoc-targets-unexpanded、E5 格 program-file-variables-unexpanded、
         # E4 格 LIB_SHELL_WORDS_BREAK=aliases-same-line-expanded、口径格 LIB_PROJECT_CODE_RUNS_BREAK=claude-executable-path-unrecognized 下「放行」的格红（逐格见文件头开关清单）
         judge_cases([(label, agent_type, command.replace("{work}", work), want, want_notices, want_read)
@@ -2676,9 +2675,9 @@ def selftest(hook_dir):
             ("d137 闸误拒 E5：W 没赋过，awk -f $W/程序文件认不出，照拒", writer, "awk -f $W/prog-light137.awk f", 2, 0, 0),
             ("d137 闸口径：主 agent 经 \"$CLAUDE_CODE_EXECPATH\" 起 claude，交检出钩子判，放行", None, '"$CLAUDE_CODE_EXECPATH" -p hi', 0, 0, 0),
         ]])
-        # 读进来的脚本正文里命令词或脚本路径由变量拼出、解不出，而定义或起它的参数里写着自证、门禁阶段、入口脚本或 cargo 的，照认不出办（一百三十七节件 1b 第 3 条：
-        # 件 1 那三趟就是草稿里一份脚本 `R=$1; cmds=("bash $R/.claude/hooks/… --selftest" …); … ${cmds[$i]}` 起改过的钩子自证；
-        # LIB_PROJECT_CODE_RUNS_BREAK=script-body-launches-unjudged 下「照拒」的三格红，应当是 2，实际 0；cargo 参数解不出那一种由 lib_project_code_runs.py 的格钉住）。直接写 `bash "$R/…/x.sh" --selftest` 的改前就按登记表照拒，不另立格；
+        # 读进来的脚本正文里命令词或脚本路径由变量拼出、解不出，而定义或起它的参数里写着自证、门禁阶段、入口脚本或 cargo 的，照认不出办（例：
+        # 草稿里一份脚本 `R=$1; cmds=("bash $R/.claude/hooks/… --selftest" …); … ${cmds[$i]}` 起改过的钩子自证；
+        # LIB_PROJECT_CODE_RUNS_BREAK=script-body-launches-unjudged 下「照拒」的三格红，应当是 2，实际 0；cargo 参数解不出那一种由 lib_project_code_runs.py 的格钉住）。直接写 `bash "$R/…/x.sh" --selftest` 按登记表照拒，不另立格；
         # 本仓里的脚本不判这一条（照旧放行那一格）
         for relative, text in (("body-array-selftest.sh", '#!/usr/bin/env bash\nR=$1\ncmds=("bash $R/.claude/hooks/project-code-guard.sh --selftest" "python3 $R/.claude/hooks/lib_project_code_runs.py --selftest")\n'
                                                           'for i in "${!cmds[@]}"; do env "$@" timeout 900 nice -n 19 ${cmds[$i]} > "out-$i" 2>&1; done\n'),
@@ -2705,8 +2704,8 @@ def selftest(hook_dir):
         missing_source = scan_decision({"tool_name": "Bash", "cwd": work, "agent_type": writer, "tool_input": {"command": 'cat s.sh "5"> d2.sh && bash d2.sh'}}, work)
         results.append(("一百三十七：cat 源里有不在的文件、&& 接起，照拒并点名不在的源", (2, True),
                         (missing_source.code, "盘上不在" in (missing_source.message or "") and "`5`" in (missing_source.message or ""))))
-        # cat 追加到盘上读不了的文件（不是 UTF-8 文本的、目录）：那个目的不认，判照常走完；改前 pieces 是 None 还接着 append，判的那一刻抛 AttributeError、整条命令照常执行
-        # （一百三十七节余项：现场是子 agent 的 `grep -c '    "X' 文件 && … cat 源 >> 超过读的上限的 mutations.tsv`；抛错那一遍引号只是同一条命令里的别的词）。
+        # cat 追加到盘上读不了的文件（不是 UTF-8 文本的、目录）：那个目的不认，判照常走完；pieces 是 None 还接着 append 的话，判的那一刻抛 AttributeError、整条命令照常执行
+        # （例：子 agent 的 `grep -c '    "X' 文件 && … cat 源 >> 超过读的上限的 mutations.tsv`；抛错那一遍引号只是同一条命令里的别的词）。
         # PROJECT_CODE_GUARD_BREAK=cat-append-unreadable-destination-raises 下抛错，这几格拿到的不是 want
         with open(os.path.join(work, "unreadable-binary.tsv"), "wb") as handle:
             handle.write(b"\xff\xfe\x00")
@@ -2835,7 +2834,7 @@ def selftest(hook_dir):
         own_server_submit = task_server_decision({"tool_name": "Bash", "cwd": repo, "tool_input": {
             "command": "task-server/task submit -- python3 scripts/prune-server/prune-server-load-simulation.py --selftest"}}, repo)
         results.append(("经 task-server：主 agent 提交自己起服务的自证（own-server）裸写：放行", 0, own_server_submit.code))
-        # python3 -c 在管道里读 JSON、往标准输出打字，代码里的 'task' 字样不是写了后面执行的 task-server/task（另一个会话 2026-11-05 报的两条）；
+        # python3 -c 在管道里读 JSON、往标准输出打字，代码里的 'task' 字样不是写了后面执行的 task-server/task；
         # 真往 task-server/task 写了再执行的照拒（PROJECT_CODE_GUARD_BREAK=python-filter-code-judged 下前两格红）
         for label, command, want in (
                 ("经 task-server：管道读 JSON 的 python3 -c 代码里写着 'task'，不当写了后面执行的 task-server/task：主 agent 放行",
@@ -2946,7 +2945,7 @@ def selftest(hook_dir):
         results.append(("stdin:here-string 喂给 bash 的是变量认不出照拒（退出码 2）、stderr 点名判不了、记一条检出", (2, True, 1, "s-fed"),
                         (fed_variable.returncode, "here-string `$CMD`" in fed_variable.stderr, count_detections() - recorded,
                          last_detection().get("session_id"))))
-        # 钩子 bash 这一层起不来时也记一条检出（一百三十七节 ⑤；PROJECT_CODE_GUARD_BREAK=bash-layer-unrecorded 下红）：PATH 前面放一份只对 /dev/fd/3 退 127 的假 python3
+        # 钩子 bash 这一层起不来时也记一条检出（PROJECT_CODE_GUARD_BREAK=bash-layer-unrecorded 下红）：PATH 前面放一份只对 /dev/fd/3 退 127 的假 python3
         shim = os.path.join(work, "bash-layer-shim")
         os.makedirs(shim, exist_ok=True)
         with open(os.path.join(shim, "python3"), "w", encoding="utf-8") as handle:
@@ -2957,7 +2956,7 @@ def selftest(hook_dir):
                                     input=json.dumps({"tool_name": "Bash", "cwd": work, "session_id": "s-bash-layer", "agent_type": writer, "tool_input": {"command": "ls"}}))
         results.append(("一百三十七：钩子 bash 这一层起不来（假 python3 退 127）：放行（退出码 0）、记一条检出", (0, 1, "s-bash-layer", "只记"),
                         (bash_layer.returncode, count_detections() - recorded, last_detection().get("session_id"), last_detection().get("outcome"))))
-        # PATH 上没有 python3（三方 d137-gov-r1 判决 H13；PROJECT_CODE_GUARD_BREAK=python-missing-unrecorded 下红）：PATH 只放记检出要用的 cat、date、mkdir、dirname
+        # PATH 上没有 python3（PROJECT_CODE_GUARD_BREAK=python-missing-unrecorded 下红）：PATH 只放记检出要用的 cat、date、mkdir、dirname
         no_python = os.path.join(work, "no-python-path")
         os.makedirs(no_python, exist_ok=True)
         for tool in ("cat", "date", "mkdir", "dirname"):
@@ -3089,7 +3088,7 @@ def selftest(hook_dir):
                                 and "task-server/task submit -- " in bare_main.stderr and "task-server/task clean <号>" in bare_main.stderr)))
             results.append(("编译目录：经 run-build-directory.sh 包一层起：放行（退出码 0）", 0,
                             hook_in_target_workspace("bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/run-build-directory.sh cargo build").returncode))
-            # 派发起法里面那条照判（records/2026-10-29-一百三十七节那一轮调度记录.md#8；LIB_PROJECT_CODE_RUNS_BREAK=dispatch-launchers-unseen 下第一格红）
+            # 派发起法里面那条照判（LIB_PROJECT_CODE_RUNS_BREAK=dispatch-launchers-unseen 下第一格红）
             dispatched_bare = hook_in_target_workspace("bash scripts/hosts/multi-host-run.sh --peer --label x -- cargo test -p singlefs-verification --lib", "tooling-writer")
             results.append(("编译目录：子 agent 经 multi-host-run.sh --peer 在主工作区起 cargo test、没给编译目录：拒（退出码 2）", 2,
                             dispatched_bare.returncode if "编进主仓" in dispatched_bare.stderr else 0))
@@ -3099,7 +3098,7 @@ def selftest(hook_dir):
             results.append(("编译目录：带仓外 CARGO_TARGET_DIR：放行（退出码 0）", 0,
                             hook_in_target_workspace(f"CARGO_TARGET_DIR={os.path.join(target_work, 'outside-target')} bash scripts/hosts/run-with-memory-cap.sh 4G cargo build").returncode))
             results.append(("编译目录：cargo fmt：放行（退出码 0）", 0, hook_in_target_workspace("cargo fmt --all").returncode))
-            # 只定义、调不到的 function 与判项目代码那一处同一个口径（三方 shell-words-r2 判决第二节第 2、8 条；WORKSPACE_CARGO_LOCK_BREAK=uncalled-functions-judged 下第一格红，
+            # 只定义、调不到的 function 与判项目代码那一处同一个口径（WORKSPACE_CARGO_LOCK_BREAK=uncalled-functions-judged 下第一格红，
             # LIB_SHELL_WORDS_BREAK=function-calls-literal-only 下第二格红）
             results.append(("编译目录：只定义、调不到的 function 函数体：放行（退出码 0）", 0, hook_in_target_workspace("function noop { cargo build; }").returncode))
             results.append(("编译目录：function 定义之后拆开拼写调用：拒（退出码 2）", 2, hook_in_target_workspace('function noop { bash scripts/hosts/run-with-memory-cap.sh 4G cargo build; }; "no"op').returncode))

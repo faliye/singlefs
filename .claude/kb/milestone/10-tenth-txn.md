@@ -19,7 +19,7 @@
 | 3 | 真盘长跑：会话持有若干小时跑随机历史，与模型对拍逐项相同，内存与每次 fsync 延迟的轨迹落在跑前登记写死的门槛里；卸载后池级 checker 核镜像零违例 | 二 |
 | 4 | 接里程碑九项四的真盘掉电装置：会话跑着时断电，重开会话恢复，池级 checker 核「fsync 返回过的写在、发布没被切开」 | 二 |
 | 5 | 多租户隔离：`O_DIRECT` 会话绕开内核 VFS，内核的文件权限检查不再起作用，由 singlefs 在这条路上照 Linux 的权限模型自己判：身份取调用进程的 uid、gid 与附加组，每个文件带属主 uid、属组 gid 与 mode 位，判法与 Linux 内核对普通文件的判法相同，root 照 Linux 的规矩；用户与组就是 Linux 系统里的用户与组，singlefs 不另立用户表；按 uid 的空间配额；每一种越权都有一个用例被拒，判法与 Linux 内核逐项对拍 | 三 |
-| 6 | 崩溃全量：新增的跑完，另补积压，每个里程碑至少 100 亿态（用户 2026-10-22 定）。照两段跑（录入在 CPU、判在 GPU，观察者挂全），不缩枚举域，全部 0 红。① 这一里程碑新增的崩溃流与单元键变了的块先跑；② 再从积压登记表（里程碑四立的）里补跑，至少 50 亿态，按登记表的次序接着上一次停下的地方。新增与积压合起来多于 100 亿态时，这一里程碑至少跑 100 亿态，新增跑不完的那一截进积压登记表末尾；合起来不足 100 亿时全部跑完。红了照 `.claude/rules/test-script-discipline.md`「全量的红，钉回快档」钉回快档、修好再跑。 | 崩溃全量（跨里程碑） |
+| 6 | 崩溃点重放与崩溃放量不指定范围那一趟：新增的判完，从没判过的接着判，每个里程碑至少 100 亿态（用户 2026-10-22 定）。照两段跑（录入在 CPU、判在 GPU，观察者挂全），不缩枚举域，全部 0 红。门禁照单元键自己选要判的块：① 这一里程碑新增的崩溃流与单元键变了的块；② 当前键下从没判过的块，至少 50 亿态。两样合起来多于 100 亿态时，这一里程碑至少判 100 亿态；合起来不足 100 亿时全部判完。态数按这一里程碑里不指定范围那几趟实际判过的态现数。红了照 `.claude/rules/test-script-discipline.md`「门禁出的红，钉成能单点复判的用例」钉成用例、修好再跑。 | 崩溃点重放与崩溃放量（跨里程碑） |
 
 ## 分组与次序
 
@@ -34,7 +34,7 @@
 
 ## 一　会话与对外接口
 
-- **仓里已有的**：`O_DIRECT` 后端是 `crates/singlefs-core/src/block_device.rs` 的 `DirectInputOutputBlockDevice`（物理块大小经 sysfs 探测或声明），全仓只有 checker 档的两个装置二进制用它（`new_pool_file_creation_on_device`、`new_pool_file_creation_device_log_check`），跑在 QEMU 的 virtio 盘上（`crates/singlefs-checker-tier/src/on_device_modes.rs` 的 `direct` 模式）；挂着之后的发布由 `crates/singlefs-core/src/mounted_session.rs` 那一层接；core 里没有独占打开（`grep -n 'O_EXCL\|flock\|lock_exclusive' crates/singlefs-core/src/*.rs` 零命中），也没有给应用用的二进制或命令行。C618（删完之后不能再建带数据的文件） 的去向原写目录与 POSIX 那个里程碑，这一份要多文件就提前到这里。
+- **仓里已有的**：`O_DIRECT` 后端是 `crates/singlefs-core/src/block_device.rs` 的 `DirectInputOutputBlockDevice`（物理块大小经 sysfs 探测或声明），全仓只有验证包的两个装置二进制用它（`new_pool_file_creation_on_device`、`new_pool_file_creation_device_log_check`），跑在 QEMU 的 virtio 盘上（`crates/singlefs-verification/src/on_device_modes.rs` 的 `direct` 模式）；挂着之后的发布由 `crates/singlefs-core/src/mounted_session.rs` 那一层接；core 里没有独占打开（`grep -n 'O_EXCL\|flock\|lock_exclusive' crates/singlefs-core/src/*.rs` 零命中），也没有给应用用的二进制或命令行。C618（删完之后不能再建带数据的文件） 的去向原写目录与 POSIX 那个里程碑，这一份要多文件就提前到这里。
 - **作业点**：
 
 | # | 做什么 | 压着的条款与欠账 | 验收 | 依赖 |

@@ -1,6 +1,6 @@
 """项目自己的 python 脚本从这一份取 preflight，不直接 import 规范副本里的 preflight.py（理由与同目录的 preflight.sh 相同）。
 
-规范副本 .claude/singlefs-ai-sop/ 被 .gitignore 挡着，git worktree 里没有它：提交时在「HEAD + 暂存区」临时树里跑 checker-tier-crash-point-replay --full，
+规范副本 .claude/singlefs-ai-sop/ 被 .gitignore 挡着，git worktree 里没有它：提交时在「HEAD + 暂存区」临时树里跑 crash-point-replay，
 它调的 scripts/gate/admission.py 就在那种树里跑。直接 import 副本会当场 ImportError。
 这一份随仓走，每棵树里都在：先用这棵树里的副本（相对这一份的字面路径 .claude/scripts/../singlefs-ai-sop/scripts/，
 gate.sh --staged 的临时树与只拷了 .claude/ 的小树里副本跟着拷），没有就用主仓（git 的公共目录所在的那一份仓）里的，
@@ -35,9 +35,8 @@ def shared_preflight_directory():
 def shared_preflight_module(script_file):
     directory = shared_preflight_directory()
     if directory is None:
-        print(f'  ✗ {script_file}：找不到规范副本里的 preflight.py（这棵树与主仓里都没有），准入与运行条件一条都判不了，拒绝往下跑', file=sys.stderr)
-        print('     → 怎么办：规范副本 .claude/singlefs-ai-sop/ 不随 git 走；在主仓里装好它（bash .claude/singlefs-ai-sop/install.sh），'
-              '临时树从主仓的副本里找得到。', file=sys.stderr)
+        print(f'  ✗ {script_file}：找不到规范副本里的 preflight.py（这棵树里没有），准入与运行条件一条都判不了，拒绝往下跑', file=sys.stderr)
+        print('     → 怎么办：这棵树是手工拷的副本，漏了规范副本（它不随 git 走）：拷树时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷。', file=sys.stderr)
         sys.exit(1)
     if directory not in sys.path:
         sys.path.insert(0, directory)

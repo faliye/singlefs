@@ -55,19 +55,19 @@ bash-command-detector.sh 只读用，它的自证在下面十二项里任何一�
       「✗ 自检：写者锁:同一份提示但派发早于这把锁的旧进程不能认领」、「✗ 自检：写者锁:持锁者第一次写放行」、「✗ 自检：写者锁:持锁者续写放行」、「✗ 自检：写者锁:持锁者写子目录放行」、「✗ 自检：写者锁:拒绝说明点名持锁者与出路」、「✗ 自检：写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」、「✗ 自检：stdin:第二个写者的拒绝点名持锁者、锁的目录与出路」、「✗ 自检：stdin:持锁者放行」、「✗ 自检：stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」
   LIB_WRITER_LOCK_BREAK=no-walk-up  只看目标所在的那一层目录有没有锁，不往上走（子目录里的写漏过去）
       「✗ 自检：写者锁:第二个写者写子目录也被拒」
-  LIB_WRITER_LOCK_BREAK=foreign-holder-unnamed  回执对不上的拒绝不去记录里找持锁者的 agent_id（改前的说明：只写「派发提示对得上这把锁的那一个子 agent」）
+  LIB_WRITER_LOCK_BREAK=foreign-holder-unnamed  回执对不上的拒绝不去记录里找持锁者的 agent_id，只写「派发提示对得上这把锁的那一个子 agent」
       「✗ 自检：写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」、「✗ 自检：stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」
   LIB_WRITER_LOCK_BREAK=replace-temp-kept  接手换锁写临时文件之后、换上之前抛异常，不删自己建的临时文件（草稿目录里留下 .tmp）
       「✗ 自检：写者锁:换锁时锁内容写不进 JSON，抛异常且不留临时文件」、「✗ 自检：写者锁:换锁时锁的位置被目录占着，抛异常且不留临时文件」
-  LIB_WRITER_LOCK_BREAK=unreadable-lock-absent  lock_state 把「锁文件在而判不了」（读不了、不是普通文件、不是 JSON 对象、缺 REQUIRED_LOCK_FIELDS 里的字段）当成没有锁（改前 read_lock 的样子）
+  LIB_WRITER_LOCK_BREAK=unreadable-lock-absent  lock_state 把「锁文件在而判不了」（读不了、不是普通文件、不是 JSON 对象、缺 REQUIRED_LOCK_FIELDS 里的字段）当成没有锁
       「✗ 自检：写者锁:锁文件不是 JSON 拒」、「✗ 自检：写者锁:锁缺 nonce 拒」、「✗ 自检：写者锁:锁缺 dispatched_at 拒」、「✗ 自检：写者锁:锁缺 prompt_sha256 拒」、「✗ 自检：写者锁:锁的位置是目录拒」、「✗ 自检：写者锁:判不了的锁的拒绝点名那份锁与出路」、「✗ 自检：stdin:坏锁拒绝（退出码 2）」、「✗ 自检：stdin:坏锁的拒绝点名那份锁与出路」
-  LIB_WRITER_LOCK_BREAK=missing-receipt-claims  派发回执读不到时照旧先到先得认领（改前的样子：先写的非持锁者拿到锁，真持锁者随后被拒）
+  LIB_WRITER_LOCK_BREAK=missing-receipt-claims  派发回执读不到时照旧先到先得认领（先写的非持锁者拿到锁，真持锁者随后被拒）
       「✗ 自检：写者锁:回执还没落盘的乙先写放行、不认领、记一处没判全」、「✗ 自检：写者锁:真持锁者回执还没落盘时第一次写也放行、不认领」、「✗ 自检：写者锁:回执落盘之后持锁者写拿到锁」、「✗ 自检：写者锁:持锁者认领之后，回执一直没落盘的乙写被拒」、「✗ 自检：写者锁:认领之后持锁者续写放行」、「✗ 自检：stdin:回执还没落盘的写放行、不认领，stderr 一行并记一条检出（结局只记）」
-  LIB_WRITER_LOCK_BREAK=exclusive-temp-kept  排他建锁、建认领时 JSON 写到一半抛异常，不删自己建的临时文件（改前 json.dump 在清理范围外的样子）
+  LIB_WRITER_LOCK_BREAK=exclusive-temp-kept  排他建锁、建认领时 JSON 写到一半抛异常，不删自己建的临时文件
       「✗ 自检：写者锁:排他建锁时锁内容写不进 JSON，抛异常、不留临时文件也不留锁」、「✗ 自检：写者锁:认领时认领内容写不进 JSON，抛异常、不留临时文件也不留认领」
-  LIB_WRITER_LOCK_BREAK=takeover-sweeps-new-claims  接手换锁之后删掉目录里所有 nonce 不同的认领文件（含换锁之后别的接手才建的认领与认领的临时文件，改前的样子）
+  LIB_WRITER_LOCK_BREAK=takeover-sweeps-new-claims  接手换锁之后删掉目录里所有 nonce 不同的认领文件（含换锁之后别的接手才建的认领与认领的临时文件）
       「✗ 自检：写者锁:两次接手交错（A 换锁、B 换锁并认领、A 清理）之后 B 的认领还在，第三个认领不成，旧认领删掉」、「✗ 自检：写者锁:接手不删别的进程正在写的认领临时文件」
-  LIB_WRITER_LOCK_BREAK=broken-claim-absent  claim_state 把「认领文件在而判不了」当成没有认领（改前 read_claim 的样子：接着排他建认领撞上它，拒绝说明不点名那份文件）
+  LIB_WRITER_LOCK_BREAK=broken-claim-absent  claim_state 把「认领文件在而判不了」当成没有认领（接着排他建认领撞上它，拒绝说明不点名那份文件）
       「✗ 自检：写者锁:认领文件判不了的拒绝点名那份认领文件与出路」、「✗ 自检：写者锁:认领文件判不了的不另建一份、不改它」、「✗ 自检：stdin:坏认领文件拒绝并点名那份认领文件（退出码 2）」
 
 没有锁与锁判不了分开（lock_state）：write-guard.sh 第九道按 find_lock_directory(…, any_entry=True) 找最近一层有锁文件的目录，lock_state 交
@@ -197,7 +197,7 @@ def read_claim(scratch, lock):
 def write_exclusively(path, value):
     """把 value 写成 path：先写同目录临时文件，再 os.link 到 path（已存在就是 FileExistsError）；别人读到的要么没有这个文件、要么是写完整的。
     写临时文件（json.dump 写到一半抛异常这类）与链接放在同一个清理范围里：失败时删掉自己建的临时文件再把异常抛出去；临时文件建不成（同名已在）就不是自己的，不删。
-    弄坏开关 exclusive-temp-kept 下 JSON 写失败时留下临时文件（改前的样子）。"""
+    弄坏开关 exclusive-temp-kept 下 JSON 写失败时留下临时文件。"""
     temporary = f"{path}.{os.getpid()}.{secrets.token_hex(4)}{TEMPORARY_SUFFIX}"
     handle = open(temporary, "x", encoding="utf-8")
     written = False
@@ -234,7 +234,7 @@ def replace_lock(scratch, lock, after_replace=None):
     """接手：同目录临时文件写完整再 os.replace 换上锁；写或换失败时删掉自己建的临时文件再把异常抛出去。
     旧认领：换锁之前先列出目录里已有的认领文件，换上之后只删列过的那几份（nonce 换了本来也不算数）；换锁之后才建的认领（别的接手换上的锁的认领）不删
     （文件头「派发接手」）。after_replace 只给自检造交错用：换上之后、清理之前调一次。
-    弄坏开关 takeover-sweeps-new-claims 下换上之后删掉此刻目录里所有 nonce 不同的认领文件与认领的临时文件（改前的样子）。"""
+    弄坏开关 takeover-sweeps-new-claims 下换上之后删掉此刻目录里所有 nonce 不同的认领文件与认领的临时文件。"""
     keep = CLAIM_PREFIX + lock["nonce"]
     listed = stale_claim_names(scratch, keep)
     temporary = f"{lock_path(scratch)}.{os.getpid()}.{secrets.token_hex(4)}{TEMPORARY_SUFFIX}"
@@ -325,7 +325,7 @@ def writer_verdict(scratch, lock, agent_id, transcript_path):
     "foreign" 它的派发回执对不上这把锁（别的派发、或早于这把锁的旧进程），没人认领也不认领给它（第二项是 None）；
     "unclaimed" 它的派发回执读不到（还没落盘、记录读不了）：这一次放行、不认领（第二项是 None），调用方照「放行但必记检出」打一行、记一条检出；
     "broken-claim" 这把锁的认领文件在而判不了（第二项是判不了的原因）：调用方拒，点名 claim_path 那份文件。
-    弄坏开关 missing-receipt-claims 下回执读不到的照旧先到先得认领（改前的样子）。"""
+    弄坏开关 missing-receipt-claims 下回执读不到的照旧先到先得认领。"""
     mode = break_mode()
     if mode == "holder-ignored":
         return "holder", agent_id

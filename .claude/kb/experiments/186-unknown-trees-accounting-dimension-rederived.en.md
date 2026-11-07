@@ -24,10 +24,9 @@ Harness `scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs` 
 # 仓根；产物逐字节复跑登记在 scripts/experiment-apparatus/replay.sh：E186|e186-unknown-tree-accounting-rederive||e186-unknown-tree-accounting-rederive.out.gz|exact
 cd scripts/experiment-apparatus
 SINGLEFS_RUN_SCOPE='种类=target; 跑什么=装置 e186-unknown-tree-accounting-rederive 的单测; 范围=1 个测试目标; 为什么=复核单测' \
-  bash ../hosts/capped.sh 31 bash ../hosts/run-with-memory-cap.sh 3G cargo test --release --bin e186-unknown-tree-accounting-rederive
-bash ../hosts/capped.sh 31 cargo build --release --bin e186-unknown-tree-accounting-rederive
-bash ../hosts/run-with-memory-cap.sh 3G target/release/e186-unknown-tree-accounting-rederive > <新文件名>.out
-nice -n 19 bash ../mutation/mutate.sh e186-unknown-tree-accounting-rederive e186_unknown_tree_accounting_rederive.rs ../mutation/tables/e186_unknown_tree_accounting_rederive.tsv
+  ../../task-server/task submit -- cargo test --release --bin e186-unknown-tree-accounting-rederive
+../../task-server/task submit -- bash -c 'cargo run --release -p e7-index-bench --bin e186-unknown-tree-accounting-rederive > <新文件名>.out'
+../../task-server/task submit -- bash ../mutation/mutate.sh e186-unknown-tree-accounting-rederive e186_unknown_tree_accounting_rederive.rs ../mutation/tables/e186_unknown_tree_accounting_rederive.tsv
 ```
 
 ### Readings: Q1 Accounting Winners (judged readings B1 and W2, Q2 read as "counted"; under both Q2 readings Q1 is identical point by point, `research/results/e186-unknown-tree-accounting-rederive.out.gz` line 186048)
@@ -189,9 +188,8 @@ The harness is the same bin with an added argument `--judgement <vacuous-u5|dang
 ```bash
 # 复跑：登记在 scripts/experiment-apparatus/replay.sh（两行 E186，第二行带 --judgement dangling-u5，exact）
 cd scripts/experiment-apparatus
-bash ../hosts/capped.sh 31 cargo build --release --bin e186-unknown-tree-accounting-rederive
-bash ../hosts/run-with-memory-cap.sh 3G target/release/e186-unknown-tree-accounting-rederive --judgement dangling-u5 > <新文件名>.out
-nice -n 19 bash ../mutation/mutate.sh e186-unknown-tree-accounting-rederive e186_unknown_tree_accounting_rederive.rs ../mutation/tables/e186_unknown_tree_accounting_rederive.tsv
+../../task-server/task submit -- bash -c 'cargo run --release -p e7-index-bench --bin e186-unknown-tree-accounting-rederive -- --judgement dangling-u5 > <新文件名>.out'
+../../task-server/task submit -- bash ../mutation/mutate.sh e186-unknown-tree-accounting-rederive e186_unknown_tree_accounting_rederive.rs ../mutation/tables/e186_unknown_tree_accounting_rederive.tsv
 ```
 
 #### Readings: Judgement of the Q1 Reverse Acceptance Clause (judged readings B1 and W2, Q2 read as "counted"; the judged point set is the legal points with `h_new > 0`)
@@ -296,10 +294,12 @@ Cross-path comparison assertions: path 1 against path 2 is pinned in the unit te
 
 | Decision item | Relationship | Retrospective |
 |---|---|---|
-| D8 (Core Index Structure) settled item 8 | Preparation | 2026-10-20 unaffected: the basis paragraph of that item cites E112 (Legacy Writer Encountering Unknown Trees) and E113 (Unknown Trees: Saturated Arm Set), not E186 (Unknown Trees: Accounting Dimension Rederived), and this page only prepares material; the first run, by the letter of the old criteria, has Q1 winners without `Carry` on legal points with `r_tree_dim = 1`, the second run, by the new criteria (`unique_carry` on the judged points), has ㊀ not flipping, the two stand side by side, and the Q2 winner changes tier with the reading; whether this cell should be raised to supporting or overturning needs a three-way argument and is left to the main agent; the decision body was not changed this time |
-| D5 (Snapshot / Space Accounting Mechanism) settled item 2 | Preparation | 2026-10-20 unaffected: the basis paragraph of that item does not cite E186 (Unknown Trees: Accounting Dimension Rederived); keep-with-root needs an exception for it when `lpc = 0` (U1 false); this page only measures clause counts and sample points, the second run only changed U5 and the reverse acceptance clause and did not touch U1, and the decision body was not changed this time |
-| D8 (Core Index Structure) settled item 12 | Preparation | 2026-10-20 unaffected: the basis paragraph of that item does not cite E186 (Unknown Trees: Accounting Dimension Rederived); the U5 of the second run reads the half-sentence of its settlement "including the accounting rows carried by old writers of the ㊀ kind of settled item 8"; under `NoCarry` and keep-with-root those rows do not exist, the clause refers to nothing and counts as "to amend"; this page only prepares material, and the decision body was not changed this time |
+| D8 (Core Index Structure) settled item 8 | Preparation | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-20 unaffected: the basis paragraph of that item cites E112 (Legacy Writer Encountering Unknown Trees) and E113 (Unknown Trees: Saturated Arm Set), not E186 (Unknown Trees: Accounting Dimension Rederived), and this page only prepares material; the first run, by the letter of the old criteria, has Q1 winners without `Carry` on legal points with `r_tree_dim = 1`, the second run, by the new criteria (`unique_carry` on the judged points), has ㊀ not flipping, the two stand side by side, and the Q2 winner changes tier with the reading; whether this cell should be raised to supporting or overturning needs a three-way argument and is left to the main agent; the decision body was not changed this time |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 2 | Preparation | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-20 unaffected: the basis paragraph of that item does not cite E186 (Unknown Trees: Accounting Dimension Rederived); keep-with-root needs an exception for it when `lpc = 0` (U1 false); this page only measures clause counts and sample points, the second run only changed U5 and the reverse acceptance clause and did not touch U1, and the decision body was not changed this time |
+| D8 (Core Index Structure) settled item 12 | Preparation | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-20 unaffected: the basis paragraph of that item does not cite E186 (Unknown Trees: Accounting Dimension Rederived); the U5 of the second run reads the half-sentence of its settlement "including the accounting rows carried by old writers of the ㊀ kind of settled item 8"; under `NoCarry` and keep-with-root those rows do not exist, the clause refers to nothing and counts as "to amend"; this page only prepares material, and the decision body was not changed this time |
 
 ## Historical Versions
+
+- 2026-11-03: After format bitmap evolution reverted retirement bit compatibility, apparatus source modified, not run formally.
 
 The history entries of E186 (Unknown Trees: Accounting Dimension Rederived) are collected in [experiments-history.md](../experiments-history.md).

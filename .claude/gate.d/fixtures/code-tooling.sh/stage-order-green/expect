@@ -1,2 +1,2 @@
 exit=0
-want=harness-test-environment.sh 排在第 3/4 道，门禁目录里 2 道跑测试的阶段都排在它前面（crash-sample.sh、harness-model-scenarios.sh）
+want=test-environment.sh 排在第 3/4 道，门禁目录里 2 道跑测试的阶段都排在它前面（crash-sample.sh、model-scenarios.sh）

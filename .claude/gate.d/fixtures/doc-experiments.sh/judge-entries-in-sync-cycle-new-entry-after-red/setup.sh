@@ -99,7 +99,7 @@ pub fn enumerate_crash_states_selecting_versions() -> bool {
     enumerate_crash_states_with_every_kind_of_observer()
 }
 
-pub fn enumerate_crash_states_quick_tier_versions() -> bool {
+pub fn enumerate_crash_states_with_attached_observers() -> bool {
     enumerate_crash_states_with_every_kind_of_observer()
 }
 

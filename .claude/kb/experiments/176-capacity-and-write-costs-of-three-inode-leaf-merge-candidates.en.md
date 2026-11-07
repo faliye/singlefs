@@ -40,18 +40,16 @@ This is a deterministic model: two byte-identical runs show no hidden state or t
 ```
 # Repository root; model in scripts/experiment-apparatus/ does not depend on crates/. SINGLEFS_THREAD_CAP affects elapsed time, not output
 cd /home/fy5090/code/singlefs/scripts/experiment-apparatus
-bash ../hosts/capped.sh 8 cargo build --release --bin e176-inode-leaf-merge-capacity-and-rewrites
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-one
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-two
+../../task-server/task submit -- cargo run --release -p e7-index-bench --bin e176-inode-leaf-merge-capacity-and-rewrites -- segment-one
+../../task-server/task submit -- cargo run --release -p e7-index-bench --bin e176-inode-leaf-merge-capacity-and-rewrites -- segment-two
 # Registered replay: segment-one and segment-two entries
 cd ../.. && bash scripts/experiment-apparatus/replay.sh E176
 # Comparison (standalone manifest, read-only crates/ path dependencies; replay.sh does not build it)
 cd scripts/experiment-apparatus
-bash ../hosts/capped.sh 8 cargo build --release --manifest-path e176_crates_oracle/Cargo.toml --target-dir target
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-crates-oracle
+../../task-server/task submit -- cargo run --release --manifest-path e176_crates_oracle/Cargo.toml -p e176-crates-oracle --bin e176-inode-leaf-merge-crates-oracle
 # 22 unit tests and 16 mutations
-bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites
-MUTATE_JOBS=4 MUTATE_CARGO_JOBS=2 MUTATE_MEMORY_MAX=4G bash ../mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites e176_inode_leaf_merge_capacity_and_rewrites.rs ../mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv
+../../task-server/task submit -- cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites
+../../task-server/task submit -- bash ../mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites e176_inode_leaf_merge_capacity_and_rewrites.rs ../mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv
 ```
 
 Segment one took about 16 s at eight threads and 23 s at one; segment two about 19 s and 25 s respectively, including memory wrapper; comparison about 23 s at eight threads. Artifacts:
@@ -642,7 +640,7 @@ Path 1 vs 2 is asserted in `scripts/experiment-apparatus/e176_crates_oracle/orac
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D8 (Core Index Structure), settled item 6 | Support | 2026-10-17 unaffected: this round synchronizes wording, artifact references, paths and numbers only, leaving conclusion, values and artifacts unchanged. 2026-10-11 also unaffected: wording only (time, positional references, self-reference), with conclusion, values and artifacts unchanged. |
+| D8 (Core Index Structure), settled item 6 | Support | 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-17 unaffected: this round synchronizes wording, artifact references, paths and numbers only, leaving conclusion, values and artifacts unchanged. 2026-10-11 also unaffected: wording only (time, positional references, self-reference), with conclusion, values and artifacts unchanged. |
 
 ## Historical Versions
 

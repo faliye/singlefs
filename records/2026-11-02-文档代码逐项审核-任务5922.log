@@ -1,0 +1,8 @@
+== 任务 5922 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-5922.attempt-1.log（共 7 行，下面是整份）
+Traceback (most recent call last):
+  File "/home/fy5090/code/singlefs/records/2026-11-02-文档代码逐项审核-prune控制复现.py", line 50, in <module>
+    main()
+  File "/home/fy5090/code/singlefs/records/2026-11-02-文档代码逐项审核-prune控制复现.py", line 27, in main
+    assert "[Install]" not in unit
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

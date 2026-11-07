@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：comment-history
+want=命中 2 行：按标记放过 0 行、滞后表放过 2 行、红 0 行（滞后表 1 行，与 gate 基准 HEAD 那一版比没涨（基准 2 行，此刻 1 行））
+want=comment-history：绿

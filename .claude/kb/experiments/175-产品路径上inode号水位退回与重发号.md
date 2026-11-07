@@ -10,7 +10,7 @@
 
 跑前登记 `e175-preregistration.md`（照它跑两段时 sha256 `d68c9d2229bcf3800c5efd36c9194e6af9684b193a172258b58846474afae805`，问法定成读法 B：「重发号」只算同一条时间线上的；第十二节「修订」有两次：修订 1 是执行员写的 8 条读法钉死与装置写法，修订 2 是设计员写的「两段都在一份冻结副本上跑」与几何四点，判据、门槛、臂、量的去留都没动）。岔路单 `m3-3-5-forks.md` 里岔路 W：C479（inode 号复用已发过的号今天造不出来） 剩下的「活记录被原地换」那一形，翻面观测是「产品路径上（不装只供测试的水位开关），有没有一段历史能让 inode 号水位退回去、造出重发号」，够判条件是在随机历史与带回退的历史上跑够登记的历史数、数到重发号与 I-9.29（同号只许一个出生代） 红的次数，有一次就够判。
 
-**这一页的数全部出自仓副本装置，跑在一份冻结副本上**：装置照登记第五节「装置写在哪」写死，放在冻结副本 `~/.local/share/singlefs/work/e175-frozen-crates-2/repo/` 的 `crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs`，主工作区 `crates/` 不动（形式化线冻结期）；装置源码原样放在 `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs`（不在产物目录里）。冻结副本 `code_baseline=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb`，拷于 2026-10-08，根环线第 10z 批第十、十一块合入、合后验证全绿之后；HEAD `31e47115471ba5502a4531d25dffcc921be36899`（`baseline-frozen-crates.out` 第一行）。kb 别处引这些数要写明「仓副本装置、冻结副本」；装置要不要进 `crates/`、要不要在入库装置上重做一次，由主 agent 定。
+**这一页的数全部出自仓副本装置，跑在一份冻结副本上**：装置照登记第五节「装置写在哪」写死，放在冻结副本 `~/.local/share/singlefs/work/e175-frozen-crates-2/repo/` 的 `crates/singlefs-verification/tests/e175_product_path_inode_watermark_regression.rs`，主工作区 `crates/` 不动（形式化线冻结期）；装置源码原样放在 `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs`（不在产物目录里）。冻结副本 `code_baseline=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb`，拷于 2026-10-08，根环线第 10z 批第十、十一块合入、合后验证全绿之后；HEAD `31e47115471ba5502a4531d25dffcc921be36899`（`baseline-frozen-crates.out` 第一行）。kb 别处引这些数要写明「仓副本装置、冻结副本」；装置要不要进 `crates/`、要不要在入库装置上重做一次，由主 agent 定。
 
 **现状**：两段都在这一份冻结副本上跑完：第一段（D 族钉值、F3a 定向穷举、F2 带回退的随机历史）与第二段（F1 四组现有随机历史、第八节几何四点 G-long、G-small、G-draw、G-long-F1），P、V1、V2 照登记各跑各的规模。第三段（F3b、F4）是附带，W 行够判之后没跑（够判后未跑）。
 
@@ -35,16 +35,17 @@
 # 冻结副本（拷 Cargo.toml、Cargo.lock、.cargo、crates 四样；主工作区 crates/ 不动），核清单再放装置
 F=~/.local/share/singlefs/work/e175-frozen-crates-2/repo; R=$PWD/research/results/e175-product-path-inode-watermark-regression-2026-10-08
 (cd $F && sha256sum -c --quiet $R/baseline-frozen-crates.sha)
-cp $PWD/scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs $F/crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs
+cp $PWD/scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs $F/crates/singlefs-verification/tests/e175_product_path_inode_watermark_regression.rs
 # 每一臂：施加补丁（P 不施加；V1、V2 照 $R/patch-V1.diff、$R/patch-V2.diff）、编、拷出二进制、还原，再核一次清单
-ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> bash $ROOT/scripts/hosts/capped.sh 5 cargo test --release -p singlefs-harness --test e175_product_path_inode_watermark_regression --no-run)
-E175_ARM=P bash scripts/hosts/capped.sh 5 bash scripts/hosts/run-with-memory-cap.sh 8G <测试二进制> --test-threads 5
-E175_ARM=P E175_FAMILY=F2 E175_RESULT_FILE=$R/f2-P.out E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb E175_WORKER_THREADS=5 E175_TIME_BUDGET_SECONDS=170 \
-  bash scripts/hosts/capped.sh 5 bash scripts/hosts/run-with-memory-cap.sh 8G <测试二进制> --ignored --exact run_one_family_on_one_arm_into_the_result_file
+ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> $ROOT/task-server/task submit -- cargo test --release -p singlefs-verification --test e175_product_path_inode_watermark_regression --no-run)
+task-server/task submit -- env E175_ARM=P <测试二进制> --test-threads 5
+task-server/task submit -- env E175_ARM=P E175_FAMILY=F2 E175_RESULT_FILE=$R/f2-P.out E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb E175_WORKER_THREADS=5 \
+  <测试二进制> --exact run_one_family_on_one_arm_into_the_result_file
+# 不设 E175_TIME_BUDGET_SECONDS、E175_INDICES、E175_INDEX_LIMIT 就是登记的全部段；设了任一个是缩域，那一趟不写 family_complete 行、汇总里这一族写 complete=no，不当整族的产物（两段产物那几趟设过 E175_TIME_BUDGET_SECONDS=170）
 # 族名：D、F3a、F2、F1-broad、F1-reuse-after-raising-the-floor、F1-deleting-files-of-several-lower-leaves、
 #       F1-newest-system-configuration-slot-reading-zeros、G-long、G-small、G-draw、G-long-F1
 # 汇总（两段各一份）
-E175_SUMMARY_INPUTS=<逗号分隔的结果文件> E175_SUMMARY_FILE=<新文件> E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb <测试二进制> --ignored --exact summarize_the_result_files
+E175_SUMMARY_INPUTS=<逗号分隔的结果文件> E175_SUMMARY_FILE=<新文件> E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb <测试二进制> --exact summarize_the_result_files
 # 登记的复跑（scripts/experiment-apparatus/replay.sh 一行 E175|@driver_e175：拷今天的 crates/ 进副本、放进 device-source.rs、跑 D 族 P 臂）
 bash scripts/experiment-apparatus/replay.sh E175
 ```
@@ -189,7 +190,7 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 - 崩溃恢复抛弃根（双故障形，F3b）与写 / 刷盘故障注入后建 inode（F4）是登记第三段附带，够判后未跑；历史里抽到的 `CrashRecoveryAbandoningTheNewestRoot` 在 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙之后挂载被拒、不造被抛弃根，Q3b 的 0 不说明跨被抛弃时间线的重发不存在。装置没有数「判成被抛弃的根」的次数，两段里 S3 有没有判出过一条被抛弃根，页上不下结论。
 - Q6 的读法有一处局限：现行那一版取自这一步可读根里最新的那条，回退之前它自己就在环里读得出，Q6 > 0 只可能在现行那一版自己重建不出时出现；无读故障的历史里 Q6 = 0 由这个读法推得出，不是独立的观测。V717 因此在每一族都没跑，「回退取 max」那条护栏在这些历史里有没有被走到，这一页答不了。
 - 「活记录被原地换」那一形 I-9.29（同号只许一个出生代） 看不见：阳性对照 V1 臂 G-long 序号 24 的两次重发（`g-long-V1.out` 里 `index=24 kind=q1_same_timeline` 的 `position=op92`、`position=op95` 两行）那两步 I-9.29（同号只许一个出生代） 判成立。产品臂上没造出这一形，所以这一页答不了「产品路径上出现了 I-9.29（同号只许一个出生代） 能不能抓」，只说 P 臂上它 0 次。
-- 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的第二份冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 又变了 6 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`），其中 `crates/singlefs-core/src/mount.rs` 与 `crates/singlefs-harness/src/gpu_memory_ledger.rs` 编进这个装置；F3a、F2、F1、几何点这些族没在漂移后的代码上重跑，只有 `scripts/experiment-apparatus/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
+- 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的第二份冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 又变了 6 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`），其中 `crates/singlefs-core/src/mount.rs` 与 `crates/singlefs-verification/src/gpu_memory_ledger.rs` 编进这个装置；F3a、F2、F1、几何点这些族没在漂移后的代码上重跑，只有 `scripts/experiment-apparatus/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
 - 什么现象会推翻页上的读数：同一份冻结副本、同一装置重跑出任何一段 P 臂结果行与产物不同（续跑与多线程合并在快档对拍过）；或第三段 F3b / F4、或登记之外的历史里出现同一条时间线上 Q1 ≥ 1、I-9.29（同号只许一个出生代） 红。
 
 ### 路径与结论登记
@@ -197,7 +198,7 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 | # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
 |---|---|---|---|---|
 | 1 | S3 路 1（实例表） | 最新那条可读根的实例表，按 (实例, txg) 判每条根抛不抛弃；对两段每一步的每一条可读根（扫遍） | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:713 abandoned_by_the_table`，判法 `crates/singlefs-core/src/recovery.rs:1553 publish_is_abandoned_by_the_instance_table` | `readable_roots` 列出的根、盘上实例表、`crates/` 的抛弃判法 |
-| 2 | S3 路 2（步账） | 每次挂载做成，模型根环里那一步之前最新的那条根当所选根，同一旧实例里 txg 更大的根判抛弃 | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:723 abandoned_by_the_step_ledger`，所选根取自 `crates/singlefs-harness/src/model.rs:2235 answer_mount_writable` 的择法 | `readable_roots` 列出的根、理想模型的根环、执行器交回的挂载结局 |
+| 2 | S3 路 2（步账） | 每次挂载做成，模型根环里那一步之前最新的那条根当所选根，同一旧实例里 txg 更大的根判抛弃 | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:723 abandoned_by_the_step_ledger`，所选根取自 `crates/singlefs-verification/src/model.rs:2235 answer_mount_writable` 的择法 | `readable_roots` 列出的根、理想模型的根环、执行器交回的挂载结局 |
 | 3 | S1 账的重发号（Q1） | 按号记出生代与持有它的根，一次发号碰上同号另一个出生代就记事件 | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:1028 HistoryAccount::observe`，重建 `crates/singlefs-core/src/recovery.rs:5405 rebuild_version` | `readable_roots`、`rebuild_version`、路 1 的抛弃判法 |
 | 4 | S2 checker 的 I-9.29（同号只许一个出生代） | 池级 checker 对每一步的镜像判 | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:1158 HistoryAccount::judge_with_the_checker`，`crates/singlefs-checker/src/walk.rs:10947 check_pool_image` | 只有镜像本身；与 1–3 不共用解析代码 |
 
@@ -207,8 +208,8 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D8（核心索引结构） 已定项 6 | 备料 | 2026-10-21 不受影响：页首段的装置源码位置改成搬进 scripts/experiment-apparatus/ 之后的现状，结论、数与产物不变；此前 2026-10-18 不受影响：上一轮的产物归档进版本库（git 历史里取得回），正文引用改成只留文件名；装置源码从产物目录搬进 scripts/experiment-apparatus/，内容没变；结论、数不变 |
-| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-21 不受影响：页首段的装置源码位置改成搬进 scripts/experiment-apparatus/ 之后的现状，结论、数与产物不变；此前 2026-10-18 不受影响：上一轮的产物归档进版本库（git 历史里取得回），正文引用改成只留文件名；装置源码从产物目录搬进 scripts/experiment-apparatus/，内容没变；结论、数不变 |
+| D8（核心索引结构） 已定项 6 | 备料 | 2026-11-05 不受影响：只改用法与复跑说明（一个门禁、两种跑法；验证包改名），结论、数与产物不变；此前 2026-11-01 不受影响：只改复跑起法；此前 2026-10-21 不受影响：页首段的装置源码位置改成搬进 scripts/experiment-apparatus/ 之后的现状，结论、数与产物不变；此前 2026-10-18 不受影响：上一轮的产物归档进版本库（git 历史里取得回），正文引用改成只留文件名；装置源码从产物目录搬进 scripts/experiment-apparatus/，内容没变；结论、数不变 |
+| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-11-05 不受影响：只改用法与复跑说明（一个门禁、两种跑法；验证包改名），结论、数与产物不变；此前 2026-11-01 不受影响：只改复跑起法；此前 2026-10-21 不受影响：页首段的装置源码位置改成搬进 scripts/experiment-apparatus/ 之后的现状，结论、数与产物不变；此前 2026-10-18 不受影响：上一轮的产物归档进版本库（git 历史里取得回），正文引用改成只留文件名；装置源码从产物目录搬进 scripts/experiment-apparatus/，内容没变；结论、数不变 |
 
 ## 历史版本
 

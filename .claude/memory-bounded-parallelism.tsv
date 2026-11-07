@@ -1,0 +1,13 @@
+# 准许按内存上限定并发的入口：一行一个入口。用户 2026-11-05 定，除了这几样，别的一律照每台默认重活线程数（.claude/heavy-thread-default）开；表里没登记的照旧 31 线程、按命令的历史峰值给上限。
+# 写法：制表符分隔六列，空行与 # 开头的行不算：
+#   入口          仓根下的相对路径（服务照命令位置上起的脚本认），或 cargo:<包>:<目标名>（装置二进制，服务照 cargo 的 --bin / --test 目标认）
+#   每件峰值      一件（一个工作进程、一份试写的拷贝、一个走种子的线程……）的峰值，字节，量的，写成整数
+#   出处          量到这个数的任务号与日志行：「<任务号> attempt-<第几次> <日志里那一行或量法>」
+#   件数从哪来    三选一：item-plan（估算子任务读 ITEM_PLAN 的 to_judge 加和）、fixed:<n>（固定开 n 份）、argument:<选项名>（从命令里那个选项的值取）
+#   底座          并发之外那一份常驻的字节数（编译、主进程；没有写 0），写成整数；不是量的在出处里写明「底座推的」与怎么推的
+#   理由          一句，写明为什么不能 31 份同时开
+# 服务的起点 = 底座 + min(件数, 31) × 每件峰值，不超过那台总上限；上限装不下一件的照撞上限办（task-server/task_server_lib.py 文件头「错误类型」的 memory-cap-hit）。
+# 这张表写得对不对、代码里按内存定开几个进程或线程的写法所在的入口登没登记、登记的入口代码里还有没有这类写法，由门禁 code-tooling 的 memory-bounded-parallelism 格判（判法在那一格函数上方的注释）。
+.claude/gate.d/crates-mutation-replay.sh	7288188928	6847 attempt-3 共享根 crates-mutation-run-records/worker-peaks/32/ 下最大的一份记录 7288188928（编译并行度 32、一个工作进程整棵进程树 RssAnon+RssShmem+VmPTE 加总，crates-mutation-rows.py 量）；之后各趟头一行读它，例 7618 attempt-1 日志第 127 行「每个工作进程的峰值 6.8 GiB」；底座推的：6847 attempt-3 共享根峰值表回收不掉的用量 7329546240 减去每件峰值，两个口径不同（工作进程读数把共享匿名页重复算，峰值表含内核那几样），「先编一份依赖」那一步没量过	item-plan	41357312	一个工作进程（编译并行度 32）量到 6.8 GiB，31 个同时开约 211 GiB，每台总上限 50G（多机配置 SLICE_MEMORY_CAP_BY_HOST）
+scripts/gate/test-targets-parallel.py	1578140706	8848 attempt-1 服务日志 task-b0f6b921-8848.attempt-1.log 里 MULTI_HOST_RUN_PEER_MEMORY poll=162 current_bytes=48456056832 peak_bytes=48922361856（第二台整个任务的 cgroup 记的，含页缓存；合入后验证的验证包那一步、按条复用那一趟 --jobs 31 同时开着的测试二进制合起来）；每件峰值推的：48922361856 ÷ 31 向上取整，假定峰值那一刻 31 件都在跑、一样大、不扣底座；底座推的：并发之外常驻的是起它的门禁链（合入后验证、门禁阶段的 bash 与 python）与这一份脚本自己，没量过、写 0，脚本每一片派活之前现量（自己 cgroup 里每个进程 RssAnon+RssShmem+VmPTE 加总）；脚本自己不读这一行，照共享根 test-targets-parallel-peaks/ 下实量的每个测试目标的峰值分片	argument:--jobs	0	按条复用那一趟按测试目标同时起 --jobs 31 份测试二进制，8848 在第二台 46656M 的上限上合起来到 48922361856 字节、撞上限收尾（memory-cap-at-maximum）；用户 2026-11-06 定上限不改、超过就分片，脚本按「上限 − 底座」与每个目标量的峰值分片，一条测试函数还装不下才退 250
+cargo:singlefs-verification:e185_gc_batch_wall_clock_split	2371514368	9451 attempt-3 PEAK_SAMPLER_FINAL label=e185-8192x2 vmhwm_bytes=5398515712 减 9450 attempt-3 PEAK_SAMPLER_FINAL label=e185-8192x1 vmhwm_bytes=3027001344（两点减一点；采样器 /home/fy5090/.local/share/singlefs/work/e168-e185-piece-peaks/peak-sampler.sh 读被起进程的 VmHWM，编译不进采样）	fixed:4	655486976	一件是一个取样点的准备（两份池，P=8192 约 2.2 GiB），默认 4 个取样点、装置按 E185_MEMORY_CAP 自排，31 件同时开装不下

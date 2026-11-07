@@ -1,0 +1,2 @@
+# 样本登记表
+tests/live_tree.rs::reads_the_live_tree	断言就是关于真仓里的登记表，要读活树

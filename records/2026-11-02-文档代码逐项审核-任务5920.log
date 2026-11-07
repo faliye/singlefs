@@ -1,0 +1,50 @@
+   Compiling libc v0.2.189
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling pkg-config v0.3.34
+   Compiling glob v0.3.4
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling minimal-lexical v0.2.1
+   Compiling memchr v2.8.3
+   Compiling regex-syntax v0.8.11
+   Compiling cfg-if v1.0.4
+   Compiling either v1.18.0
+   Compiling bindgen v0.72.1
+   Compiling vcpkg v0.2.15
+   Compiling rustc-hash v2.1.3
+   Compiling shlex v1.3.0
+   Compiling bitflags v2.13.2
+   Compiling rustflags v0.1.7
+   Compiling libloading v0.8.9
+   Compiling itertools v0.13.0
+   Compiling clang-sys v1.9.1
+   Compiling nom v7.1.3
+   Compiling syn v2.0.119
+   Compiling jobserver v0.1.35
+   Compiling regex-automata v0.4.18
+   Compiling cc v1.5.1
+   Compiling cexpr v0.6.0
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling libz-sys v1.1.29
+   Compiling lz4-sys v1.11.1+lz4-1.10.0
+   Compiling regex v1.13.1
+   Compiling librocksdb-sys v0.19.0+11.8.1
+   Compiling rocksdb v0.25.0
+   Compiling prune-server v0.1.0 (/home/fy5090/code/singlefs/prune-server)
+   Compiling singlefs-document-audit-prune-dry-run v0.0.0 (/home/fy5090/code/singlefs/records/2026-11-02-文档代码逐项审核-prune预演)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.71s
+     Running `/home/fy5090/.local/share/singlefs/task-server-builds/task-b0f6b921-5920-1/target/debug/singlefs-document-audit-prune-dry-run`
+PRUNE_SERVER_DROP_OVERSIZED_VALUES mode=dry-run library=/tmp/singlefs-run-with-memory-cap-3280900-SePyEO/singlefs-document-audit-prune-3280933-1793747258058853443/library scanned_rows=2 oversized_rows=0 longest_readable_value_bytes=67108845
+AUDIT_DRY_RUN_FILE_CHANGED path=000004.log before_bytes=Some(79) after_bytes=None
+AUDIT_DRY_RUN_FILE_CHANGED path=000008.sst before_bytes=None after_bytes=Some(1355)
+AUDIT_DRY_RUN_FILE_CHANGED path=000009.log before_bytes=None after_bytes=Some(0)
+AUDIT_DRY_RUN_FILE_CHANGED path=CURRENT before_bytes=Some(16) after_bytes=Some(16)
+AUDIT_DRY_RUN_FILE_CHANGED path=LOG before_bytes=Some(55368) after_bytes=Some(34054)
+AUDIT_DRY_RUN_FILE_CHANGED path=LOG.old.1793747258069417 before_bytes=None after_bytes=Some(55368)
+AUDIT_DRY_RUN_FILE_CHANGED path=MANIFEST-000005 before_bytes=Some(127) after_bytes=None
+AUDIT_DRY_RUN_FILE_CHANGED path=MANIFEST-000010 before_bytes=None after_bytes=Some(266)
+AUDIT_DRY_RUN_FILE_CHANGED path=OPTIONS-000012 before_bytes=None after_bytes=Some(8987)
+AUDIT_DRY_RUN_RESULT exit=0 physical_files_changed=9 fixture_value_unchanged=true

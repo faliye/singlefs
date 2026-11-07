@@ -13,11 +13,11 @@
 #   $KTREE_CACHE；失败只删临时目录，已有的 $KTREE_CACHE 不动。
 #
 # 弄坏开关（设进环境，只给证红用；几项用逗号隔开）：
-#   FETCH_DEPS_BREAK=fetch-in-place  fetch_kernel 退回改前：不加锁，先 rm -rf $KTREE_CACHE 再往同一个路径 clone，失败也整个删掉
+#   FETCH_DEPS_BREAK=fetch-in-place  fetch_kernel 退回在原地取：不加锁，先 rm -rf $KTREE_CACHE 再往同一个路径 clone，失败也整个删掉
 #       已有一份不全的 $KTREE_CACHE（里面放一份标记文件）、SINGLEFS_KERNEL_GIT 指到不存在的仓：期望退 1 而标记还在，实测标记被删；
 #       两个进程相隔 1 秒同时取（假 git 在 clone 之前睡 3 秒）：期望两个都退 0、树在，实测后起的那个 clone 失败、删掉先起的那个取好的树；
 #       另一个进程持着锁、SINGLEFS_KERNEL_FETCH_WAIT=1：期望退 1、报「正在取」，实测不等锁照取
-#   FETCH_DEPS_BREAK=extra-arguments-ignored  参数多于一个不判，只读第一个（改前）
+#   FETCH_DEPS_BREAK=extra-arguments-ignored  参数多于一个不判，只读第一个
 #       fetch-deps.sh --check --bogus：期望退 1、报用法，实测照 --check 跑完退 0
 #
 # 边界（rules/command-safety.md）：**本脚本不跑 sudo。**
@@ -93,7 +93,7 @@ fetch_kernel() {
   ((fetch_status == 0))
 }
 
-# 弄坏开关 FETCH_DEPS_BREAK=fetch-in-place 走这一份（改前的取法）：不加锁，先删再往同一个路径 clone
+# 弄坏开关 FETCH_DEPS_BREAK=fetch-in-place 走这一份：不加锁，先删再往同一个路径 clone
 fetch_kernel_in_place() {
   warn "稀疏检出 tools/memory-model 到 $KTREE_CACHE（只取那一个目录，几 MB）"
   rm -rf "$KTREE_CACHE"

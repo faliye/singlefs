@@ -1,0 +1,18 @@
+== 任务 5921 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-5921.attempt-1.log（共 17 行，下面是整份）
+  ✓ local-address-runs-here
+  ✓ remote-address-forwarded-over-ssh
+  ✓ hosts-missing-refused
+  ✓ address-outside-hosts-refused
+  ✓ shared-judge-refusal-stops-here
+  ✓ address-missing-refused
+  ✓ forwarded-loop-refused
+  ✓ install-binary-shared-root
+  ✓ watch-forwarded-streams-lines
+  ✓ ssh-failure-reported
+  ✓ forwarded-watch-exits-on-hangup
+  ✓ install-enables-restarting-unit
+  ✓ stop-stays-stopped
+  ✓ drop-oversized-refused-while-running
+  ✓ drop-oversized-runs-installed-binary
+  ✓ drop-oversized-forwarded-over-ssh
+PRUNE_SERVER_CONTROL_SELFTEST cells=16 failed=0 break=-

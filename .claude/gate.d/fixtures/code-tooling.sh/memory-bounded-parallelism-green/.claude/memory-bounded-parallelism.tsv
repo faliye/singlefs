@@ -1,0 +1,4 @@
+# 样本的登记表：三行都写对了
+.claude/gate.d/sample-stage.sh	7288188928	6847 attempt-3 样本：每个工作进程峰值	item-plan	41357312	样本：一个工作进程一大块内存
+scripts/experiment-apparatus/budget_run.sh	4294967296	7000 attempt-1 样本：一个走种子的线程峰值	argument:--seeds	0	样本：一个走种子的线程约 4 GiB
+cargo:demo:demo_device	2694840320	7001 attempt-2 样本：一份准备单位	fixed:24	1073741824	样本：一份准备单位要建两份池

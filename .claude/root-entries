@@ -1,0 +1,3 @@
+读取claude的配置，按照规范执行任务。
+task-server # 统一任务服务（服务本体、客户端 task、控制命令 control、执行器、单元模板与自证）：一切跑项目代码的命令都写成 task-server/task submit，路径是全仓与各会话共用的入口，搬进别的目录要改全仓与用户级单元
+prune-server # 判定库服务（独立 Cargo 工程、服务本体、控制命令 control、单元模板与测试）：验证包以 path 依赖引它、全仓脚本与门禁按 prune-server/control 起停，用户级单元也指这条路径，搬进别的目录要改全仓与单元

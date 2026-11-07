@@ -1,4 +1,4 @@
-# 样本目录登记：与仓里那份 .claude/gate.d/experiment-number-directories.tsv 同样五处。
+# 样本目录登记：仓里那份 .claude/gate.d/experiment-number-directories.tsv 里样本用得到的五处（产品 GPU 包那一处样本里没有，不列）。
 research	e-number-names	# 跑前登记、重跑登记、三方材料与实验产物
 scripts	e-number-names	# 实验装置、变异表与别处带实验号的脚本
 crates/singlefs-verification/src/bin	e-number-names	# 写死成入库装置的实验

@@ -7,7 +7,7 @@
 - 工程反复要跑的脚本、它们读的输入表、自证与样本，一律放 `scripts/` 下按用途分的子目录，从那里跑；分哪几类、各放什么写在 `scripts/README.md`。
 - 层级：`scripts/` 下最多三层，最深是 `scripts/<子目录>/<装置目录>/<文件>`。再深的拆成平级的装置目录。
 - `scripts/` 顶层只放 `README.md` 与子目录；每个子目录有一份 `README.md`，写它放什么、从哪跑。新加一个脚本，放进用途对得上的子目录，在那份 `README.md` 的表里加一行。
-- 不放结果：产物、日志、实测表不进 `scripts/`。实验产物写进 `research/results/`；只在本机成立的运行状态（内存峰值表这类）放 `~/.local/share/singlefs/`。
+- 不放结果：产物、日志、实测表不进 `scripts/`。实验产物写进 `research/results/`；运行记录（峰值表这类）放多机配置 `NFS_SHARED_ROOTS` 点名的共享根下、两台读同一份，不经 `~` 取（`.claude/rules/verification.md`「判定库只有一份」）。
 - 两台主机跑同一份脚本：资源分发、编译、跑测试都是同一份，差异只走参数与本地配置 `multi-host.env`。不为第二台另写一份脚本。
 
 ## research/：可以整个删掉的研究目录

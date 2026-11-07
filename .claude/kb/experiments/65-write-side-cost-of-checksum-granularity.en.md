@@ -113,10 +113,7 @@ Code `scripts/experiment-apparatus/e65_write_grain.rs` (5 unit tests, 7 mutation
 **Rerun**:
 
 ```bash
-cd scripts/experiment-apparatus && cargo build --release --bin e65-write-grain
-for s in 1 2 3 4 5; do
-  ./target/release/e65-write-grain "${E65_IMG:-${TMPDIR:-/tmp}/e65.img}" $s 2048 8192
-done                        # Artifact e65-write-grain-2026-08-31.out
+task-server/task submit -- bash -c 'for s in 1 2 3 4 5; do cargo run --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e65-write-grain -- "${E65_IMG:-$TMPDIR/e65.img}" $s 2048 8192; done > research/results/e65-write-grain-<YYYY-MM-DD>.out'
 ```
 
 ### A Harness Defect: N=5 Actually Has Only 3 Seeds
@@ -145,8 +142,8 @@ and the explanation that "NVMe absorbs writes into SLC" does not hold (invalidat
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D4 (Checksum Location) settled item 2 | Supports | 2026-09-19 Unaffected: space amplification identity of pad arm (1 KiB file under 32 KiB unit occupies 32×) is precisely the cost of settled item 2 |
-| D4 (Checksum Location) settled item 3 | Supports | 2026-09-19 Unaffected: byte and time costs of three arms rmw / full / rmwsync are precisely what settled item 3 knowingly accepted |
+| D4 (Checksum Location) settled item 2 | Supports | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-09-19 Unaffected: space amplification identity of pad arm (1 KiB file under 32 KiB unit occupies 32×) is precisely the cost of settled item 2 |
+| D4 (Checksum Location) settled item 3 | Supports | 2026-11-03 unaffected: only the wording of the rerun commands was changed; conclusions, numbers and artifacts unchanged; previously, 2026-09-19 Unaffected: byte and time costs of three arms rmw / full / rmwsync are precisely what settled item 3 knowingly accepted |
 
 ## Historical Versions
 

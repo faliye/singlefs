@@ -1,0 +1,9 @@
+exit=1
+want=· 样本档：上一版（.unit-verdict-sample/prior）的
+want=test tests::shared_check ... FAILED
+want=按条复用失灵：判红没记进判定库：crates/singlefs-verification/src/lib.rs::tests::shared_check（键
+want=同一把键原有的绿已撤掉 1 条，下一趟这几条现判
+want=现判 crates/singlefs-verification/src/lib.rs::tests::shared_check（库里没有这一条
+want=逐格：crash-case-replay：红；feature-gated-tests：绿
+want=✗ 有 1 格判红：crash-case-replay
+want=crash-case-replay：红

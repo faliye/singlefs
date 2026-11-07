@@ -31,19 +31,18 @@ doc-decisions（kb-shape 第 7 段）中文索引表的分项计数只对中文�
 
 **决策表只读中文原文**（decision_heads、self_decisions）：决策号、简称与分项表都只从中文原文 `<号>-<名>.md` 读，译文（带 `.<两个小写字母>.md` 后缀）
 不进决策表，首行写成什么（`—` 单破折号、Settled / 確定 这类状态词）这里都不判、不报读不出；译文的分项引用归属落在同号的中文原文那条决策上。
-改前译文与原文一起读：译文首行与中文写法不同就整格报「首行读不出」红，读得出时同号的分项表靠文件名排序让中文那份最后覆盖。
-弄坏开关 KB_DECISION_HEADS_BREAK=read-translations：译文又进决策表（改前的口径；KB_NUMBERED_FILE_BREAK=first-match 下同样连译文一起读）。
+弄坏开关 KB_DECISION_HEADS_BREAK=read-translations：译文又进决策表（译文首行与中文写法不同就整格报「首行读不出」红，读得出时同号的分项表靠文件名排序让中文那份最后覆盖；KB_NUMBERED_FILE_BREAK=first-match 下同样连译文一起读）。
 样本：门禁 doc-decisions 的 item-ref-status-translation-first-line-green。
 
 **孤立译文不顶替原文**（is_orphan_translation、orphan_translations）：decisions/ 下带语言后缀的译文，同目录没有同名的中文原文（`<号>-<名>.md`），
 就是孤立译文。它不进决策表（decision_heads 不收、load_map 不读）、不参与按编号取文件、不当引用方的归属，也不被扫引用；
-main 把它单独报一类红，出路是补中文原文或删掉这份译文。改前它的首行读得出时，同一个决策号的分项表被它整张换掉，
-中文引用方写的「D1（数据可移动性 / 反向索引） 已定项 4」被解成「D1（甲（訳））」而报「没有第 4 条」。
-弄坏开关 KB_ORPHAN_TRANSLATION_BREAK=substitute：孤立译文又进决策表、顶替同号的中文原文，也不单独报（改前的口径）。
+main 把它单独报一类红，出路是补中文原文或删掉这份译文。
+弄坏开关 KB_ORPHAN_TRANSLATION_BREAK=substitute：孤立译文又进决策表、顶替同号的中文原文（同一个决策号的分项表被它整张换掉，
+中文引用方写的「D1（数据可移动性 / 反向索引） 已定项 4」被解成「D1（甲（訳））」而报「没有第 4 条」），也不单独报。
 
 **变更史的节标题**（references）：`decisions-history.md` 一条决策一节，节标题写成 `## D<n>（简称）`，节里 `### <日期>` 的条目带不带决策号的「已定项 k / 未定项 k」都归这一节的决策。
 归属顺序：行内紧挨着的指名、行内最近的 D 记号、文件自身的决策号、日期标题上的 D 号、节标题的 D 号、之前出现过的最近的 D 记号。
-弄坏开关 KB_HISTORY_SECTION_OWNER_BREAK=nearest-d：不认 `## D<n>（` 节标题、每个 `### ` 标题都清掉标题上的归属（改前的口径），
+弄坏开关 KB_HISTORY_SECTION_OWNER_BREAK=nearest-d：不认 `## D<n>（` 节标题、每个 `### ` 标题都清掉标题上的归属，
 节里裸写的分项退回「往前找最近出现过的 D 号」，归错决策或报归属判不出。
 """
 import re, glob, sys, os, json
@@ -78,7 +77,7 @@ def language_of(path):
 def is_orphan_translation(path):
     """带编号的译文（`<号>-<名>.<语言>.md`），同目录没有同名的中文原文 `<号>-<名>.md`。
     若在 .claude/kb/translation-paths.json 登记过映射，以映射的中文原名判断。
-    弄坏开关 KB_ORPHAN_TRANSLATION_BREAK=substitute 与 KB_NUMBERED_FILE_BREAK=first-match（改前的口径，不区分孤立与否）下一份都不算。"""
+    弄坏开关 KB_ORPHAN_TRANSLATION_BREAK=substitute 与 KB_NUMBERED_FILE_BREAK=first-match（不区分孤立与否）下一份都不算。"""
     if ORPHAN_TRANSLATION_BREAK == 'substitute' or NUMBERED_FILE_BREAK == 'first-match':
         return False
     name = os.path.basename(path or '')
@@ -237,7 +236,7 @@ def load_map(heads=None):
             top = seg[:cut.start()] if cut else seg
             # ⚠️ 正则要与 `.claude/scripts/gen-decision-items.py` 逐字同口径：
             # 那边要求表格行有**闭合的第二根竖线**。两边不一致时，一行畸形表格
-            # 会「一边看得见、一边看不见」，而两边都不报错（2026-08-30 对抗验证指出）。
+            # 会「一边看得见、一边看不见」，而两边都不报错。
             for n in re.findall(r'^\|\s*(\d+)\s*\|[^|]*\|', top, re.M) or re.findall(r'^(\d+)\.\s', top, re.M):
                 m[d][int(n)] = st
     return m, name
@@ -254,7 +253,7 @@ def is_excluded_prompt_file(path):
     # research/prompts/ 显式排除，理由是 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」
     # （`.claude/doc-lint-exclude` 排除它也是这一条）：那是原样发给模型的提示与模型的原样输出，
     # 与 research/results/ 里的产物一一对应，事后改它等于让产物对不上输入。
-    # 实测（2026-09-03）：反推腿的输出里有一条复现命令 `grep -n "已定项 8" …`，
+    # 例：反推腿的输出里有一条复现命令 `grep -n "已定项 8" …`，
     # 没有决策号可归属，按正文规则判红，而那一行按证据链不许改。
     return '/prompts/' in path
 
@@ -276,7 +275,7 @@ def self_decisions(heads=None):
 
 
 # 紧挨着分项引用的「D<n>（简称）」：简称里许套一层括号（「D14（双轨（大小文件 / 持久临时））」），
-# 不许的话指名认不出来，引用就落回文件自身的决策上判（门禁审核 2026-09-26 那一格）。
+# 不许的话指名认不出来，引用就落回文件自身的决策上判。
 ADJACENT_NAMED_DECISION = re.compile(r'D(\d+)\s*(?:（(?:[^（）]|（[^（）]*）)*）)?\s*[*`]*\s*$')
 
 
@@ -291,11 +290,11 @@ def references(path, item_map, self_map, skipped_fenced_lines=None):
     # 围栏行是奇数个：最后一个没闭合，不当围栏——按开关切的话，它之后的半份文件整段不判。
     unclosed_fence_line_number = fence_line_numbers[-1] if len(fence_line_numbers) % 2 else None
     for ln, line in enumerate(lines, 1):
-        # 代码围栏里是逐字照抄的东西——变更史的「改前」原行、实验的产物行、源码片段。
+        # 代码围栏里是逐字照抄的东西——变更史里抄录的原行、实验的产物行、源码片段。
         # 按今天的状态判它们，等于要求「原样保存的证据」跟着现状改
         # （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」）。
-        # 实测（2026-09-20）：第三批瘦身把 D17（实现分层与第三方管道） 的旧正文抄进变更史围栏之后，
-        # 围栏里两处「未定项 6」当场判红——那两行说的是抄下来那天的状态，而立项让第 6 条变成了已定。
+        # 例：D17（实现分层与第三方管道） 的旧正文抄进变更史围栏之后，
+        # 围栏里的「未定项 6」按今天的状态判会红——那几行说的是抄下来那天的状态，而第 6 条此刻是已定。
         if line.lstrip().startswith('```') and ln != unclosed_fence_line_number:
             in_fence = not in_fence
             continue
@@ -306,7 +305,7 @@ def references(path, item_map, self_map, skipped_fenced_lines=None):
         if path.endswith('decisions-history.md') or '/decisions-history/' in path:
             # 变更史一条决策一节：`## D<n>（简称）` 是节标题，节里 `### <日期>` 的条目裸写的分项归这一节的决策；
             # 日期标题自己带 D 号的（`### … D14 …`）归那一条，不带的不清掉节标题的归属。
-            # 弄坏开关 nearest-d：不认节标题，每个 `### ` 标题都把归属清成标题上的 D 号或空（改前的口径）。
+            # 弄坏开关 nearest-d：不认节标题，每个 `### ` 标题都把归属清成标题上的 D 号或空。
             if line.startswith('## ') and HISTORY_SECTION_OWNER_BREAK != 'nearest-d':
                 mm = re.match(r'## D(\d+)', line); section = 'D' + mm.group(1) if mm else None; hist = None
             elif line.startswith('### '):
@@ -321,8 +320,8 @@ def references(path, item_map, self_map, skipped_fenced_lines=None):
             named = ('D' + adj.group(1)) if adj else None
             # 指名道姓的那条决策，正文里没有第 k 条 ⇒ 当场判红，不许往下落到别的决策。
             # 少了这一句，一个不存在的分项号会被静默改判到「刚好有第 k 条」的另一条决策
-            # 头上并判绿：2026-09-06 起 decisions-history 里的「D6 已定项 2」就这样绿了四天，
-            # 而 D6 从头到尾只有 1 个分项，同一个号在两份腿输出里还指着两样东西。
+            # 头上并判绿：例如 decisions-history 里的「D6 已定项 2」会判绿，
+            # 而 D6 只有 1 个分项。
             if named in item_map and k not in item_map[named]:
                 yield ln, line, m, want, None, named, named
                 continue

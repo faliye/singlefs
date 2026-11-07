@@ -1,0 +1,5 @@
+# 样本：三份有判定库的假自证，各打三问都过的规范输出
+# scan: scripts/gate/*.sh
+scripts/gate/alpha.sh	bash scripts/gate/alpha.sh --selftest	样本里的假库	reuse-three-questions
+scripts/gate/beta.sh	bash scripts/gate/beta.sh --selftest	样本里的假库	reuse-three-questions
+scripts/gate/gamma.sh	bash scripts/gate/gamma.sh --selftest	样本里的假库	reuse-three-questions

@@ -1,0 +1,3 @@
+# 样本登记表：两份带齐
+scripts/gate/sample-alpha.sh	SAMPLE_ALPHA	item=,exit=,judged=	# 样本：alpha 带齐
+scripts/gate/sample-beta.sh	SAMPLE_BETA	item=,exit=,judged=	# 样本：beta 带齐

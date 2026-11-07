@@ -5,7 +5,7 @@
 # gate-fixture: yes
 # gate-category: 文档类
 # gate-similar: link-targets.py 它只解析 ](相对路径) 链接与「第 N 节」，不看反引号里的路径、「门禁 N 号」与「小节」名；这三类与 experiment-refs、decision-refs 两格同是「引用了不存在的东西」，并在这里
-# gate-similar: doc-decisions.sh 它判决策文档本身（索引结论字数、分项引用状态、未定项写没写改不改新池新建文件的字节、用户定案改动记没记欠账）；这一道判字段表指向的分项存不存在、判「是」的分项在字节表与里程碑里挂没挂钩、认购表求和、欠账表与收口表的形状与去向，decision-refs 只判 D 号有定义
+# gate-similar: doc-decisions.sh 它判决策文档本身（索引结论字数、分项引用状态、未定项写没写改不改新池新建文件的字节、待用户复核的决策记没记欠账）；这一道判字段表指向的分项存不存在、判「是」的分项在字节表与里程碑里挂没挂钩、认购表求和、欠账表与收口表的形状与去向，decision-refs 只判 D 号有定义
 # gate-similar: checker-independence-and-sync.sh 它的 layout-checker-sync 格判 layouts.tsv 登记的布局常量变了 checker 跟没跟，对象是布局清单与 checker 源码；这一道只对 kb 各表之间、kb 与 E142 产物和钉住的用例之间的账
 # gate-similar: code-source-discipline.sh 它的 reading-discipline、mutation-tables、format-constants、clause-enums、feature-bits 几格方向是 kb 到代码，拿登记值核 crates 源码；这一道的 field-table-sums 与它共用 lib-format-const.py 读标记但只判 kb 里的加和与登记，format-const-placeholders 只核代码注释里的编号指得到 kb，closeout-row27-preconditions 只数几段写死的原文命中几次，都不拿 kb 的值比代码
 # gate-similar: doc-experiments.sh 它的 multipath-registry 格判实验页登记表的形状，quoted-result-lines 格判 kb 整行抄的产物行在 research/results/ 里找得到（kb 到产物）；这一道 audit-contradictions 格判总审核处置列引的原文在 kb 今天的正文里找得到（记录到 kb），另判欠账号还开着
@@ -76,7 +76,7 @@
 #   governance-refs-green       只跑 governance-refs：按全名指的门禁与格都在，历史节、变更史与记录文件名里的旧编号不判，报扫了几份、全名与格名几处；
 #                               kb 页反引号里的 .claude/gate.d/doc-text.sh 与 records/ 下那份记录在样本根下各放了一份，kb 路径判了 2 处、带占位的跳过 1 处
 #   governance-refs-old-gate-path-red  只跑 governance-refs：治理文档反引号里写去编号之前的门禁路径 `.claude/gate.d/47-…`，② 交给 ⑤、⑤ 点名 47 号判红（退 1），
-#                               不崩成 traceback（改前 ② 引已删的 KEPT_NUMBER，lib 退 4、这一格报没跑成）
+#                               不崩成 traceback
 #   governance-refs-kb-red      只跑 governance-refs（setup.sh 建 git 仓，样本自己登记 .claude/kb-directories 带一个不变量清单目录）：kb 中文页里改了名的路径红行写出
 #                               「改成 <新路径>（改名：改名链 …」、删了没后继的写出「删于 <提交>（标题）…`<提交>^:<路径>`」、research/ 下从没进过 git 的与不变量清单里从没进过 git 的
 #                               写「从没进过 git」，四处逐条点名
@@ -124,7 +124,7 @@
 #   unreachable-claims-stock-grown-red  只跑 unreachable-claims：基准里存量清单一行，工作区多加一行（kb 那一句本身是基准里就有的），只缩不涨判红
 #   field-refs-blank-red        只跑 field-refs：指向写「无分项」与空着的各一行没登记豁免、根槽那一节一行指未定项、根槽那一节一行「无分项」登了豁免也不认、
 #                               豁免表里一条一行都不命中，五处逐条点名判红（C66 的判别力自证：「无分项」由绿转红）；「## 历史版本」之后那张表里的「无分项」不判
-#   third-txn-hooks-red         只跑 third-txn-hooks：一行写「第 50 批」、一行指里程碑没有的 三·9、一行少一格、引 layout/01 不存在的节、引段序列登记表不存在的行、
+#   third-txn-hooks-red         只跑 third-txn-hooks：一行写「第 50 批」（history-kept: 样本里的批次写法是被判的数据）、一行指里程碑没有的 三·9、一行少一格、引 layout/01 不存在的节、引段序列登记表不存在的行、
 #                               出处的函数改了名、出处的文件不在，七处逐条点名判红
 #   third-txn-hooks-green       只跑 third-txn-hooks：三处互相点名，报「字节那一步 三·6；形态 3 行、行到作业点 6 处、引 layout/01 2 处、段序列出处的文件与函数 4 个」
 #   field-widths-red            只跑 field-widths：「设备 ID」宽 1 指一条只说「带」的已定项、「密文校验和」宽 4 指一条只说「32 位」的已定项，各点名判红（C66 的判别力自证）；
@@ -145,28 +145,24 @@
 #   field-registry-green 另放 .claude/gate.d/field-pointer-blanks.tsv，把「样本字段丁」那一行「无分项」登成豁免，报「指向列 7 行都写了分项（登记豁免的格式级空白 1 行」
 #   按编号取文件的六份（D<n>、E<n> 有中文原文 <号>-<名>.md 与译文 <号>-<名>.en.md / .ja.md，中文这一侧取中文原文，判法 lib-item-ref-status.py 的 numbered_files）：
 #   field-refs-translation-green        只跑 field-refs：D9 的两份译文排在中文原文前面、分项表标题是各自的语言；布局表引已定项 10 与已定项 12 的两行算法类型，
-#                               中文原文都有，判绿，报「查了 3 处引用」「核了 2 行」（改前取到 09-样本加密.en.md，三处都报「那张表里没有这一条」、定案表读不出）
+#                               中文原文都有，判绿，报「查了 3 处引用」「核了 2 行」
 #   field-refs-translation-red          只跑 field-refs：布局表引 D9 已定项 11，中文原文没有、英语译文照中文的写法列着它，判红、点名「指向 D9（09-样本加密.md）的「已定项 11」」
 #   format-const-placeholders-translation-green  只跑 format-const-placeholders：占位指 D23 已定项 19，中文原文有、两份译文的分项表标题是各自的语言，判绿
 #   format-const-placeholders-translation-red    只跑 format-const-placeholders：占位指 D23 已定项 20，中文原文没有、英语译文照中文的写法列着它，判红、点名「D23 里找不到 已定项 20」
 #   audit-contradictions-translation-green       只跑 audit-contradictions：总审核「已改」行点名 D9，引的原句在中文原文里、两份译文里没有，判绿
 #   audit-contradictions-translation-red         只跑 audit-contradictions：引的原句中文原文里没有、只在日语译文里有，判红、点名「只在 decisions/09-样本决策.ja.md 里有」
-#                               （改前把三语三份并起来找，判绿）
 #   数条数只数中文原文的两份（判法 lib-item-ref-status.py 的 same_language_files）：
 #   invariant-counts-translation-green  只跑 declared-counts、invariant-count-elsewhere：不变量表的中文原文 3 行、退役 1 行，实验页的英语、日语译文里各抄着两行 `| I-…`；
 #                               中文侧「现共 2 条在用」、中文普查页「2 条不变量在用」与英语译文里的「2 条在用」都对得上，判绿，两格的成功行报没数的译文 2 份、4 行
-#                               （改前把译文的 4 行也数进去，实际在用算成 6 条，两格都红）
 #   invariant-counts-translation-red    同一套表，中文侧写的是把译文表行数进去的「现共 6 条在用」、日语译文里一句「5 条在用」：两格都红，
 #                               declared-counts 点名「正文声称在用 6 条，实际 2 条」，invariant-count-elsewhere 点名那两句、都与中文原文数出的 2 条比
 #   kb-directories-unreadable-red  只跑 invariant-count-elsewhere、inline-sums：setup.sh 往 .claude/kb-directories 写一个不是 UTF-8 的字节，读登记位的那段 python
-#                               （scripts/kb/quote-kb.py 的 kb_candidate_roots）起不来；两格都判红、说登记位读不出（改前两格都当候选目录是空的、退 77，整道退 77）
+#                               （scripts/kb/quote-kb.py 的 kb_candidate_roots）起不来；两格都判红、说登记位读不出
 #   读登记位的另四格各一份，都只跑点名的那一格，setup.sh 写同一个坏字节（判法 kb_roots_or_red，六格共用）：
 #   audit-contradictions-kb-directories-unreadable-red  只跑 audit-contradictions（records/ 下放一份总审核记录，这一格才有对象）：判红、说登记位读不出
-#                               （改前照空的往下判：一份不变量表都找不到）
 #   declared-counts-kb-directories-unreadable-red  只跑 declared-counts：判红、说登记位读不出，欠账表那一半照数（报「欠检查 1 条、已还清 1 条」）
-#                               （改前红在「候选 kb 目录里一个带不变量表行的文件都没扫到」，与真没有分不开）
-#   invariant-anchors-kb-directories-unreadable-red  只跑 invariant-anchors（setup.sh 另建一个 git 小仓）：判红、说登记位读不出（改前退 77）
-#   invariant-prerequisites-kb-directories-unreadable-red  只跑 invariant-prerequisites：判红、说登记位读不出（改前退 77）
+#   invariant-anchors-kb-directories-unreadable-red  只跑 invariant-anchors（setup.sh 另建一个 git 小仓）：判红、说登记位读不出
+#   invariant-prerequisites-kb-directories-unreadable-red  只跑 invariant-prerequisites：判红、说登记位读不出
 #   能数的数那一格（counted-claims，判据与各份样本放了什么写在这一格函数上方的注释），四份都只跑 counted-claims，都不是 git 仓：
 #   counted-claims-red          登记表九行：数对不上、命中两次、命中 0 次、命令退 3、命令打的不是整数、只有三列、文件不在、正则没有捕获组，八处逐行点名判红；写对的一行不点名
 #   counted-claims-green        README.md、README.en.md、NOTES.md 三份四行（两行共用一条命令），判绿，报「核了 4 行、3 份文件、起了 3 条命令」
@@ -179,7 +175,7 @@
 #       field-refs-red（期望退出 1，实测 0）；field-refs-reservation-owner-red（期望退出 1，实测 0）；field-refs-reservation-owner-green（输出里找不到「新池新建文件的字段表指向都成立…」）；
 #       field-registry-green（输出里找不到「新池新建文件的字段表指向都成立（查了 7 处引用）」）；field-refs-translation-red（期望退出 1，实测 0）；
 #       field-refs-translation-green（输出里找不到「新池新建文件的字段表指向都成立（查了 3 处引用）」）；field-refs-blank-red（期望退出 1，实测 0）
-#   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py（设进环境，被各格起的 python 继承）：按编号取文件不分语言，取排序后的第一个命中（改前的取法，取到 <号>-<名>.en.md），
+#   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py（设进环境，被各格起的 python 继承）：按编号取文件不分语言，取排序后的第一个命中（取到 <号>-<名>.en.md），
 #                               求并集的连译文一起并进来；same_language_files 不筛语言（不变量在用条数把译文里的表行一并数进去）
 #       field-refs-translation-green、format-const-placeholders-translation-green（期望退出 0，实测 1）；field-refs-translation-red、format-const-placeholders-translation-red、
 #       audit-contradictions-translation-red（期望退出 1，实测 0）；audit-contradictions 那一格的译文绿样本照旧绿（中文原文在并集里，开关下也找得到）；
@@ -220,9 +216,9 @@
 #   DOC_REGISTRIES_BREAK=audit-contradictions  audit-contradictions 格不跑、按判过了记
 #       checks-owed-green、audit-contradictions-translation-green（输出里找不到「每一行都有去向」）；checks-owed-red（输出里找不到「有行没有去向」）；
 #       audit-contradictions-translation-red、audit-contradictions-unnamed-translation-red、audit-contradictions-kb-directories-unreadable-red（期望退出 1，实测 0）
-#   DOC_REGISTRIES_BREAK=read-translations  field-table-sums、admission-terms、tree-table-reserve 连译文一起读，audit-contradictions 没点名文件的行连译文一起找（改前）
+#   DOC_REGISTRIES_BREAK=read-translations  field-table-sums、admission-terms、tree-table-reserve 连译文一起读，audit-contradictions 没点名文件的行连译文一起找
 #       field-registry-translation-green（期望退出 0，实测 1）；audit-contradictions-unnamed-translation-red（期望退出 1，实测 0）
-#   DOC_REGISTRIES_BREAK=invariant-single-file  audit-contradictions 格走回改前的读法：不变量类文件与 README.md 不进 kb 正文，I- 号一律指 .claude/kb/invariants.md
+#   DOC_REGISTRIES_BREAK=invariant-single-file  audit-contradictions 格不变量类文件与 README.md 不进 kb 正文，I- 号一律指 .claude/kb/invariants.md
 #       checks-owed-green（期望退出 0，实测 1）；checks-owed-red（输出里找不到「第 9 行处置列写「已改」，引的「只在 journal 类里…」）
 #   DOC_REGISTRIES_BREAK=closeout-row27-preconditions  closeout-row27-preconditions 格不跑、按判过了记
 #       checks-owed-green（输出里找不到「5 条逐字探针、覆盖 4 笔」）；checks-owed-red（输出里找不到「收口表第 27 行那几笔欠账的前置动了」）
@@ -260,7 +256,7 @@
 #   DOC_REGISTRIES_BREAK=inline-sums  inline-sums 格不跑、按判过了记
 #       inline-sums-green（输出里找不到「kb 正文里的内联算式左右相等：扫 2 份 kb 文件…」）；inline-sums-red（期望退出 1，实测 0）；
 #       kb-directories-unreadable-red（输出里找不到「inline-sums 没判：kb 目录登记位读不出」）
-#   DOC_REGISTRIES_BREAK=kb-roots-failure-ignored  读登记位的六格（kb_roots_or_red）都不看读登记位那段 python 的退出码（改前：读不出就当候选目录是空的）
+#   DOC_REGISTRIES_BREAK=kb-roots-failure-ignored  读登记位的六格（kb_roots_or_red）都不看读登记位那段 python 的退出码（读不出就当候选目录是空的）
 #       kb-directories-unreadable-red（期望退出 1，实测 77）；invariant-anchors-kb-directories-unreadable-red、invariant-prerequisites-kb-directories-unreadable-red（期望退出 1，实测 77）；
 #       audit-contradictions-kb-directories-unreadable-red（输出里找不到「audit-contradictions 没判：kb 目录登记位读不出」）；
 #       declared-counts-kb-directories-unreadable-red（输出里找不到「declared-counts 没判：kb 目录登记位读不出」）
@@ -404,6 +400,8 @@
 #       governance-refs-kb-sections-green（期望退出 0，实测 1）
 #   GOVERNANCE_REFS_BREAK=placeholders-literal  lib-governance-refs.py 的 ③ 把脚本输出句里的占位字母照字面比
 #       governance-refs-kb-sections-green（期望退出 0，实测 1）
+#   GOVERNANCE_REFS_BREAK=hyphenless-names-skipped  lib-governance-refs.py 的门禁全名与「X 的 Y 格」只认带连字符的名字（并包之后不带连字符的 lkmm 不数、不判）
+#       governance-refs-green（输出里找不到「扫 5 份现状文字…」）；governance-refs-red（输出里找不到「README.md:4: 「lkmm 的 no-such-cell 格」…」）
 #   GOVERNANCE_REFS_BREAK=section-lag-unread  lib-governance-refs.py 不读小节滞后表 dead-section-lag.tsv（登记了的照判红，表写没写对、该不该删、涨没涨都不判）
 #       governance-refs-kb-sections-green（期望退出 0，实测 1）；governance-refs-kb-sections-lag-red（输出里找不到「.claude/gate.d/dead-section-lag.tsv:3: …」）；
 #       governance-refs-green、governance-refs-kb-sections-red（输出里找不到「…小节滞后表 0 行（没有小节滞后表）」）
@@ -438,7 +436,7 @@
 #       以 governance-refs 起头的八份红样本照判得对（它们的 expect 不写汇总行，照跑全部格时 governance-refs 那几行照样在；
 #       名字不在这一条里逐个写，开关复跑按名字认点名）
 #   LIB_CHANGED_PATHS_BREAK=untracked  scripts/gate/changed-paths.sh 丢掉未跟踪文件：invariant-anchors 看不见未跟踪的清单
-#       （2026-10-22 复跑实测：references 那一份红样本在这个开关下照判得对，这一条在样本上没有判错的，证红欠着；交回报告里写了）
+#       （references 那一份红样本在这个开关下照判得对，这一条在样本上没有判错的，证红欠着）
 #
 #   bash .claude/gate.d/doc-registries.sh [项目根]                                   三十格都跑
 #   bash .claude/gate.d/doc-registries.sh --list                                     逐行打格名与判什么，不跑格
@@ -446,6 +444,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ doc-registries.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 
 # 阶段自己的位置在 cd 之前取：用相对路径调本阶段、又另给项目根时，cd 之后 $(dirname "$0") 就解析不到了
 STAGE_NAME="$(basename "${BASH_SOURCE[0]}")"
@@ -572,17 +575,17 @@ howto() { printf '     → 怎么办： %s\n' "$1"; shift; for l in "$@"; do pri
 # 「无分项」不当引用、这一半不判；指向空着的行归下面「指向列空着」那一半判（C66）。表或 decisions/ 不在、一处引用都没有，退 77。
 # 另判一半（day-1 预留字段的归属）：.claude/kb/layout/*.md 里字段名以「算法类型」起头、指向写「D9（加密） 已定项 12 第 N 项」的行，
 # N 要与这一行所在的表所属的单元类一致。单元类按表的节标题、再加表前那一段（空行隔开的最近一块）判：
-#   · 点名了 D9 已定项 12 定案表里「自证单元（…）」括号列的某一个（根记录、journal 记录头、系统配置槽；名字现从定案表读，门禁里不抄）
-#     ⇒ 自证单元自己身上的算法类型，N 要等于定案表里写着自证单元又写着算法类型的那一行的项号；
-#   · 否则点名了指针、extent、节点 ⇒ 数据 / 元数据写的算法类型，N 要等于定案表里写着算法类型而没提自证单元的那一行的项号；
+#   · 点名了 D9 已定项 12 的表里「自证单元（…）」括号列的某一个（根记录、journal 记录头、系统配置槽；名字现从那张表读，门禁里不抄）
+#     ⇒ 自证单元自己身上的算法类型，N 要等于那张表里写着自证单元又写着算法类型的那一行的项号；
+#   · 否则点名了指针、extent、节点 ⇒ 数据 / 元数据写的算法类型，N 要等于那张表里写着算法类型而没提自证单元的那一行的项号；
 #   · 两样都没点名的行报出来（「!」行）、不判红；同一层里两样都点名，自证单元优先（节标题先判，不够再并上表前那一段）。
-# 成功那句多报「核了 K 行预留字段的指向」（K 不含判不出的行）。定案表读不出、而又有行要判时判红，不悄悄当没有。
+# 成功那句多报「核了 K 行预留字段的指向」（K 不含判不出的行）。那张表读不出、而又有行要判时判红，不悄悄当没有。
 # 样本：field-refs-reservation-owner-red 里 journal 记录头表的算法类型行写第 4 项（该是第 1 项）判红、点名那一行，指针头表与根记录表各指对不判，
 # 第四张表没点名单元类、只报不判；field-refs-reservation-owner-green 三处各指对，报「核了 3 行」。
 # 弄坏开关 DOC_REGISTRIES_BREAK=reservation-owner-unchecked：这一半不判。
 # 样本：field-refs-red 指向索引里没有的 D322 已定项 7、简称套了括号的 D323 已定项 3、只在论证编号列表里出现的 D322 已定项 5；
 # field-registry-green 表格式与列表式两种索引、未定项与「无分项」都放行。
-# 「指向」与预留字段的定案表按编号取哪一份：lib-item-ref-status.py 的 numbered_files（中文的布局表取中文原文，译文的取同一种语言的那一份）。
+# 「指向」与预留字段的已定项表按编号取哪一份：lib-item-ref-status.py 的 numbered_files（中文的布局表取中文原文，译文的取同一种语言的那一份）。
 # 样本：field-refs-translation-green（译文排在前面、中文原文有那几条，判绿）、field-refs-translation-red（只有译文列着那一条，判红）；弄坏开关 KB_NUMBERED_FILE_BREAK=first-match。
 cell_field_refs() {
   local KB=.claude/kb
@@ -593,7 +596,7 @@ cell_field_refs() {
   local bad=0 checked=0 lineno dnum kind item file section
 
   # 编号 → 决策文件只走 lib-item-ref-status.py 的 numbered_files：这张表是中文，取中文原文 <号>-<名>.md。
-  # 改前按 ls 排序取第一个命中，取到的是排在前面的译文 <号>-<名>.en.md（门禁日志里「指向 D9（09-encryption.en.md）」那 382 处）。
+  # 按 ls 排序取第一个命中会取到排在前面的译文 <号>-<名>.en.md，所以不这样取。
   local resolved_files resolved_number resolved_file
   local -A decision_file_by_number=()
   if ! resolved_files="$(python3 - "$ITEM_REF_STATUS_LIBRARY" "$KB/decisions" "$TABLE" 2>&1 <<'PY'
@@ -675,8 +678,8 @@ item_ref_status = importlib.util.module_from_spec(spec); spec.loader.exec_module
 OWNER_DECISION, OWNER_ITEM = 9, 12     # D9（加密） 已定项 12：day-1 预留四样
 POINTER_WORDS = ("指针", "extent", "节点")   # 第 4 项的射程：数据 / 元数据写（指针头表、extent、节点）的表
 
-# ── 先读定案表：谁是自证单元、各归第几项。读哪一份按引用方取（numbered_files：中文的布局表读中文原文，
-#    译文读同一种语言的那一份）；改前取 glob 排序的第一个，读到的是 09-encryption.en.md，定案表一行都读不出
+# ── 先读已定项 12 的表：谁是自证单元、各归第几项。读哪一份按引用方取（numbered_files：中文的布局表读中文原文，
+#    译文读同一种语言的那一份）；取 glob 排序的第一个会读到 09-encryption.en.md，那张表一行都读不出
 owner_tables = {}
 
 
@@ -921,7 +924,7 @@ PY
 #   1. 只认表头恰好是 `| 字段 | 宽 |` 或 `| 字段 | 宽度 |` 的表，散在段落里的字段定义抓不到。
 #   2. 只查 layout/01-first-txn.md 里引过（`D<n>（简称） 已定项 <k>`）的分项：新池新建文件不含快照、加密、目录树，
 #      对没投影的分项要求投影会假红；代价是从没进过投影表的分项，这一格一个字也不说。
-#   3. 字段名按子串比，只判在不在，不判宽度（宽度归 code-source-discipline 与 C94（登记的格式常量与后来的定案对不上））。
+#   3. 字段名按子串比，只判在不在，不判宽度（宽度归 code-source-discipline 与 C94（登记的格式常量与后来的定案对不上））；history-kept: 欠账 C94 的登记名逐字引用。
 #   一张被投影的字段表都没核到，退 77。
 # 样本：field-projection-red 里 D362 已定项 7 的字段表三行，投影表只收了 magic，「块头版本」只在别的节的正文里提了一句；
 # field-registry-green 里被投影的两行都在引了那条分项的那一节的表里。
@@ -995,7 +998,7 @@ PY
 }
 
 # ── 格 field-table-sums：字段表加出来的数（表后合计、表前说明句、format-const 标记）与字节布局表里结构总宽的登记
-# 落的是 C94（登记的格式常量与后来的定案对不上）里能机械判的那几样。射程：
+# 落的是 C94（登记的格式常量与后来的定案对不上）里能机械判的那几样（history-kept: 欠账 C94 的登记名逐字引用）。射程：
 #   1. 只认表头里「字段」列紧跟「宽」或「宽度」列的表（前面可以有「段」这类列）；表后合计在表后 3 行内，写成「合计 N 字节」或「合计 **N** 字节」。
 #   2. 宽度格按整数或只含 ×、+、− 的整数算式读；有一行读不出（「未定」「随实现定」「—」），整张表跳过并计入跳过数：加不出确定的和时判红只会是假红。
 #   3. 只判总宽与各行之和、标记与分项之和、布局里的总宽有没有登记；各行宽度本身对不对不判。
@@ -1028,7 +1031,7 @@ library_spec.loader.exec_module(format_const)
 item_ref_status_spec = importlib.util.spec_from_file_location("item_ref_status", sys.argv[2])
 item_ref_status = importlib.util.module_from_spec(item_ref_status_spec)
 item_ref_status_spec.loader.exec_module(item_ref_status)
-# 译文不读（射程第 5 条）：译文照抄了中文的标记，没跟上的译文留着旧值；表头是各自语言的「Field / Width」。弄坏开关 read-translations 连译文一起读（改前）
+# 译文不读（射程第 5 条）：译文照抄了中文的标记，没跟上的译文留着旧值；表头是各自语言的「Field / Width」。弄坏开关 read-translations 连译文一起读
 read_translations = os.environ.get("BREAK_SWITCH") == "read-translations"
 
 SUM = re.compile(r"合计\s*\**\s*(\d+)\s*\**\s*字节")
@@ -1516,7 +1519,7 @@ import glob, importlib.util, os, re, sys
 item_ref_status_spec = importlib.util.spec_from_file_location('item_ref_status', os.environ['ITEM_REF_STATUS_LIBRARY'])
 item_ref_status = importlib.util.module_from_spec(item_ref_status_spec)
 item_ref_status_spec.loader.exec_module(item_ref_status)
-# 只读中文原文（第 6 条）：译文照抄两个锚与式子，读进来锚就成了三处。弄坏开关 read-translations 连译文一起读（改前）
+# 只读中文原文（第 6 条）：译文照抄两个锚与式子，读进来锚就成了三处。弄坏开关 read-translations 连译文一起读
 files = item_ref_status.originals_only(sorted(glob.glob('.claude/kb/decisions/*.md')),
                                        os.environ.get('BREAK_SWITCH') == 'read-translations')
 texts = {path: open(path, encoding='utf-8').read() for path in files}
@@ -1543,7 +1546,7 @@ if len(formula_hits) != 1 or len(terms_hits) != 1:
 formula_path, formula_line, formula_lines = formula_hits[0]
 formula_text = None
 inside_block = False
-# 弄坏开关 DOC_REGISTRIES_BREAK=formula-fullwidth-d-unmatched：抓式子那一行只认半角 (d)（改前的写法）
+# 弄坏开关 DOC_REGISTRIES_BREAK=formula-fullwidth-d-unmatched：抓式子那一行只认半角 (d)
 formula_line_pattern = r'^可用(\(d\))?\s*=' if os.environ.get('BREAK_SWITCH') == 'formula-fullwidth-d-unmatched' else r'^可用(\(d\)|（d）)?\s*='
 for line in formula_lines[formula_line + 1:]:
     if line.startswith('```'):
@@ -1723,7 +1726,7 @@ for path in sorted(glob.glob('crates/singlefs-format/src/**/*.rs', recursive=Tru
         c = re.match(r'C(\d+)（[^）]+）', text)
         if d:
             n, kind, k = d.group(1), d.group(2), d.group(3)
-            # 代码是中文这一侧，取中文原文（numbered_files）；改前取 glob 不排序的第一个，取到哪份译文看目录项的次序
+            # 代码是中文这一侧，取中文原文（numbered_files）；取 glob 不排序的第一个会取到哪份译文，看目录项的次序
             files = item_ref_status.numbered_files('.claude/kb/decisions', n, path)
             if not files:
                 bad.append((path, number, f'D{n} 没有决策文件')); continue
@@ -1915,7 +1918,7 @@ PY
 #   2. layout/03 里「[…](01-first-txn.md)「X」」引的 X 是 layout/01 的节标题（子串）或某张表一行的首格；「段序列登记表「X」那一行」的 X 是 layout/01「八、」那张表某一行的首格。
 #   3. layout/03「四、」那张表「出处」一列里反引号的 `*.rs` 在仓里（路径相对仓根），紧跟在它后面的反引号函数名在那份文件里有 `fn 名字`。
 # 射程：只认上面几种写法的点名；字节对不对由 E172（删除写出的字节的干跑） 与钉住的用例判，这里不判。「## 历史版本」之后不扫。三份文件缺一份，退 77。
-# 样本：third-txn-hooks-red 里一行写「第 50 批」、一行指里程碑没有的 三·9、一行少一格、引 layout/01 一个不存在的节、引段序列登记表不存在的行、
+# 样本：third-txn-hooks-red 里一行写「第 50 批」（history-kept: 样本里的批次写法是被判的数据）、一行指里程碑没有的 三·9、一行少一格、引 layout/01 一个不存在的节、引段序列登记表不存在的行、
 #   出处的函数改了名、出处的文件不在，七处逐条点名；third-txn-hooks-green 三处互相点名、出处一份在 tests/ 一份在 src/。
 # 弄坏开关 DOC_REGISTRIES_BREAK=third-txn-hooks（整格不跑）、third-txn-bytes-step-unchecked（判据 1 后半不判：行不点名字节那一步也放过）。
 cell_crash_verification_rebuild_hooks() {
@@ -2080,7 +2083,7 @@ item_ref_status_spec = importlib.util.spec_from_file_location("item_ref_status",
 item_ref_status = importlib.util.module_from_spec(item_ref_status_spec)
 item_ref_status_spec.loader.exec_module(item_ref_status)
 marker = re.compile(r"<!--\s*gate:tree-table-reserve\s+total=(\d+)\s*-->")
-# 只读中文原文：译文照抄标记与认购表，读进来带标记的表就成了三张。弄坏开关 read-translations 连译文一起读（改前）
+# 只读中文原文：译文照抄标记与认购表，读进来带标记的表就成了三张。弄坏开关 read-translations 连译文一起读
 files = item_ref_status.originals_only(sorted(glob.glob(".claude/kb/decisions/*.md")),
                                        os.environ.get("BREAK_SWITCH") == "read-translations")
 found = []
@@ -2119,7 +2122,7 @@ for cells in rows:
         print("BAD", f"「{name}」的宽度列不是正整数：{width_text}", sep="\t")
         continue
     subtotal += int(width_text)
-    # 弄坏开关 DOC_REGISTRIES_BREAK=owed-number-width-fixed：编号位数写死（C 三位、D 两位，改前的写法）
+    # 弄坏开关 DOC_REGISTRIES_BREAK=owed-number-width-fixed：编号位数写死（C 三位、D 两位）
     number_pattern = r"(C\d{1,3}|D\d{1,2})（" if os.environ.get("BREAK_SWITCH") == "owed-number-width-fixed" else r"(C\d+|D\d+)（"
     numbers = re.findall(number_pattern, source)
     if not numbers:
@@ -2298,7 +2301,7 @@ PY
 #   要在的两张：数据单元（码 1）与树表单元（码 2），缺一张、码标错都判红；标记下面紧跟的不是表判红。表头要有「字段」与「宽…」两列，有「段」列的只取写「单元头」的行；
 #   宽度格是一个数，或用 +、× 连起来的几个数（全角括号里的注、粗体、反引号与 HTML 注释不算），读不出判红、那张表的偏移不往下比；偏移从 0 起按行累加。
 # 判据（D18 取中文原文，lib-item-ref-status.py 的 numbered_files）：
-#   ① 五元组（只对码 1）：D18 已定项 3 定案里的「`(…)`」与「五个字段的宽度：名 宽 + … =」两处的名字要相同；表里「五元组 · <名>」那几行（名字去掉注与结尾的「副本」）
+#   ① 五元组（只对码 1）：D18 已定项 3 里的「`(…)`」与「五个字段的宽度：名 宽 + … =」两处的名字要相同；表里「五元组 · <名>」那几行（名字去掉注与结尾的「副本」）
 #      与五元组逐项比：少一项、多一项、宽度不同、指向没点名 D18 已定项 3，都判红。
 #   ② 偏移与名字：D18 已定项 7 那一节第一张「| 字段 | 宽 | 出处 |」表（共同明文前缀，偏移按行累加）接 D18 已定项 18「| 码 <n> | … |」那一行（「偏移 名 [宽]」用「 / 」隔开，
 #      「⇒」之后不读，偏移与宽里的 k 取标记的 key-width，没写宽的取到下一段的偏移，最后一段要写宽）；共同前缀的合计要等于类身份段的起点。每个定下的字段：表里要有一行
@@ -2362,7 +2365,7 @@ decision_text = open(found[0], encoding="utf-8").read().split("\n## 历史版本
 if not found:
     bad.append(f"{KB}/decisions 里没有 D{DECISION}，单元头字段表没东西可比")
 
-# ── D18 已定项 3：五元组的名字（定案那一句的「(…)」）与宽度（「五个字段的宽度：名 宽 + …」）
+# ── D18 已定项 3：五元组的名字（那一项里的「(…)」）与宽度（「五个字段的宽度：名 宽 + …」）
 five_tuple, five_widths = [], {}
 section_three = item_section(decision_text, 3) if found else None
 if found:
@@ -3033,7 +3036,7 @@ PY
 # 必须在仓里的 `.rs` / `.py` / `.sh` 的代码里按整词找得到；找不到就红。按整词（加了后缀的不算还在）、只认注释之外
 # （`.rs` 的 `//` 之后、`.py` / `.sh` 的 `#` 之后不算：旧名只剩在一句注释里，那个测试其实已经没了）。
 # 已还清表一行都没有、或行里一个这样的标识符都没有，退 77。
-# 已还清的行里点名的单测常是那条定案唯一的记录位，它被改名或删掉时没有别的东西会说话。
+# 已还清的行里点名的单测常是那条决策唯一的记录位，它被改名或删掉时没有别的东西会说话。
 # 欠着的那张表不查：那里点名一个还不存在的测试名是它应有的样子。
 # 至少三段：放宽到两段会把 `log_append`、`write_cache` 这类词组也扫进来。
 # 注释里不写被拦的那个标识符的整串字面量，搜索也排掉 `.claude/gate.d/`：否则 grep 扫到这个阶段自己，把该红的那一条判成「还在」。
@@ -3157,7 +3160,7 @@ PY
 # D / E 编号点名的是哪一份：lib-item-ref-status.py 的 numbered_files，总审核记录是中文，取中文原文，不把三语三份并起来找。
 # 样本：audit-contradictions-translation-green / -red（原句在中文原文里 / 只在日语译文里）；弄坏开关 KB_NUMBERED_FILE_BREAK=first-match。
 # 一个 kb 文件都没点名的行同样只在中文原文里找（lib-item-ref-status.py 的 originals_only）：样本 audit-contradictions-unnamed-translation-red
-#   （没点名文件的一行引的原句只在英语译文里有，译文首行与中文不同），判红；弄坏开关 DOC_REGISTRIES_BREAK=read-translations 照改前连译文一起找，判绿。
+#   （没点名文件的一行引的原句只在英语译文里有，译文首行与中文不同），判红；弄坏开关 DOC_REGISTRIES_BREAK=read-translations 连译文一起找，判绿。
 cell_audit_contradictions() {
   local PENDING=".claude/audit-rows-pending"
   local latest report invariant_files
@@ -3245,7 +3248,7 @@ for path in sorted(glob.glob(".claude/kb/**/*.md", recursive=True)):
         continue
     kb_body_by_path[path] = normalized(open(path, encoding="utf-8").read().split("\n## 历史版本")[0])
 
-# 弄坏开关 invariant-single-file：走回改前的读法，不变量文件不进 kb 正文、I- 号一律指 .claude/kb/invariants.md
+# 弄坏开关 invariant-single-file：不变量文件不进 kb 正文、I- 号一律指 .claude/kb/invariants.md
 single_file_reading = os.environ.get("BREAK_SWITCH") == "invariant-single-file"
 invariant_files_by_class, invariant_indexes = {}, []
 for path in [] if single_file_reading else [line for line in os.environ.get("INVARIANT_TABLE_FILES", "").split("\n") if line]:
@@ -3264,7 +3267,7 @@ def shown(path):
     return os.path.relpath(path, ".claude/kb") if path.startswith(".claude/kb/") else path
 
 def kb_paths_named_by(text):
-    # 编号指的是总审核记录（中文）那一侧的中文原文（numbered_files）；改前把三语三份并进来，中文正文里没有的原句在日语译文里搜得到也算找到
+    # 编号指的是总审核记录（中文）那一侧的中文原文（numbered_files）；把三语三份并进来的话，中文正文里没有的原句在日语译文里搜得到也算找到
     named = set()
     for number in re.findall(r"(?<![A-Za-z0-9_])D(\d+)(?!\d)", text):
         named |= set(item_ref_status.numbered_files(".claude/kb/decisions", number, latest))
@@ -3303,7 +3306,7 @@ for number, line in rows:
         if not named_paths:
             unnamed_rows += 1
         # 没点名文件的行只在中文原文里找（取法 lib-item-ref-status.py 的 originals_only）：总审核是中文，中文正文里删掉的原句
-        # 在没跟上的译文里还在，算找到就判绿。译文留在 kb_body_by_path 里只给下面「只在 … 里有」那句提示用。弄坏开关 read-translations 照改前连译文一起找
+        # 在没跟上的译文里还在，算找到就判绿。译文留在 kb_body_by_path 里只给下面「只在 … 里有」那句提示用。弄坏开关 read-translations 连译文一起找
         searched_paths = named_paths or set(item_ref_status.originals_only(
             kb_body_by_path, os.environ.get("BREAK_SWITCH") == "read-translations"))
         for quote in affirmed_quotes:
@@ -3392,9 +3395,9 @@ PY
 # 这一格判的是它们各自的前置动没动：每一笔登记一条逐字探针（文件、原文、今天的命中次数）。
 #   全部对上：前置一个都没进来，退 77。任一条对不上：那一笔的前置进来了，或者它压着的那段代码改了形态，红，回去重核那一笔。
 #   重构那几处也会红：要做的同样是重核，不是把探针的期望值改成新数（那等于把这一笔的描述悄悄换掉）。
-# UNPROBED 表是手写的：第 27 行只写「alloc-basis 第三轮转来的四条」、没有逐条列，现算不出来。
+# UNPROBED 表是手写的：第 27 行只写「alloc-basis 第三轮转来的四条」（history-kept: 引的是被判的欠账表里的条目名原文）、没有逐条列，现算不出来。
 # 能现算的那一半每轮现算、只报不判：第 27 行第二格按「、」「；」切成几笔，探针与 UNPROBED 两边都没有的逐个列名；
-#   「alloc-basis 第三轮转来的 N 条」拿 N 与这里名字以「alloc-basis 第三轮」起头的笔数比。对不上是这张表手写得不全，要人回去补。
+#   「alloc-basis 第三轮转来的 N 条」（history-kept: 引的是被判的欠账表里的条目名原文）拿 N 与这里名字以「alloc-basis 第三轮」起头的笔数比。对不上是这张表手写得不全，要人回去补。
 # 样本：checks-owed-red 的 instance_table.rs 里多了一处 `rows.retain(`（C333 那一笔的前置进来了），判红并点名那一笔；
 # checks-owed-green 的探针逐条对上今天的值，这一格退 77，并报第 27 行现算的笔数与 alloc-basis 那一笔的条数对照。
 cell_closeout_row27_preconditions() {
@@ -3761,7 +3764,7 @@ PY
 # 读登记位的六格（audit-contradictions、declared-counts、invariant-count-elsewhere、invariant-anchors、inline-sums、invariant-prerequisites）开头都调这一份：
 # 登记位读不出（kb_candidate_roots 起不来）判红，不当成候选目录是空的——空的会一份文件都扫不到，多半退 77 或报「一个都没有」，与真没有分不开。
 # 用法：kb_roots_or_red <格名> <当成空的会被误认成什么> <候选目录写到哪个文件>；读得出返回 0，读不出打红行与出路、返回 1。
-# 弄坏开关 DOC_REGISTRIES_BREAK=kb-roots-failure-ignored 退回改前：不看 kb_candidate_roots 的退出码，照空的往下判。
+# 弄坏开关 DOC_REGISTRIES_BREAK=kb-roots-failure-ignored：不看 kb_candidate_roots 的退出码，照空的往下判。
 kb_roots_or_red() {
   if ! kb_candidate_roots > "$3" && [[ "$BREAK_SWITCH" != kb-roots-failure-ignored ]]; then
     bad "$1 没判：kb 目录登记位读不出（原因在上面），候选 kb 目录取不到，$2"
@@ -3791,7 +3794,7 @@ invariant_table_files() {  # → 每行一个路径：候选目录下含不变�
 # inv_counted_files（数组：数条数的那几份，只有中文原文）、inv_translation_files / inv_translation_rows（没数的译文份数与表行数，成功行报出来）。
 # 条数只数中文原文：译文（<名>.en.md、<名>.ja.md，常见的是实验页、决策页的译文里抄着几行 `| I-…`）是同一份内容的另一种语言，
 # 数进去就把一条算成两三条。取法走 lib-item-ref-status.py 的 same_language_files（与按编号取文件同一份判法，不在这里另认后缀）；
-# 弄坏开关 KB_NUMBERED_FILE_BREAK=first-match 下不分语言、译文的表行一并数（改前的数法）。inv_files 照旧三语都在：
+# 弄坏开关 KB_NUMBERED_FILE_BREAK=first-match 下不分语言、译文的表行一并数。inv_files 照旧三语都在：
 # invariant-anchors 判这次改动写的每一行（译文里的也判），invariant-count-elsewhere 不扫带表行的文件，都用它。
 # 判法库读不到、python 没跑成：退 1，两格判红，不退回不分语言去数。
 count_invariant_rows() {
@@ -3834,7 +3837,7 @@ report_invariant_count_failure() {
   howto "按上面的 traceback 修（判法库在不在、能不能 import）；没数成就是没判，不许退回不分语言去数（译文的表行会被多数一遍）。"
 }
 
-# 没数的译文：成功行与红行在括号里报出来（一份都没有时不报，消息与改前逐字相同）
+# 没数的译文：成功行与红行在括号里报出来（一份都没有时不报）
 inv_translation_note() {
   ((inv_translation_files)) && printf '；只数中文原文，译文 %s 份里的 %s 行表行不数' "$inv_translation_files" "$inv_translation_rows"
   return 0
@@ -4765,7 +4768,7 @@ PY
   return "$frequency_rc"
 }
 
-# ── 格 unreachable-claims：kb 里写「不可达 / 走不到 / 触发不了」的句子，要么钉一条用例，要么写明是推的（拆分提案第四十节第 26 行；用户 2026-10-26 定「只判新增行」）
+# ── 格 unreachable-claims：kb 里写「不可达 / 走不到 / 触发不了」的句子，要么钉一条用例，要么写明是推的（拆分提案第四十节第 26 行；只判新增行）
 # 为什么：C120 写「掉盘只能只读挂载 ⇒ 不可达」，于是挂载准入与整盘作废一直没实现，实测空盘、旧盘都能挂成可写；「不可达」是一句推论，变成可达时没有东西报警。
 # 判据：
 #   ① 对象：这次改动在 .claude/kb 下中文原文 .md（不含 *.en.md、*.ja.md 与 en/、ja/ 目录下的译文）里新增的行（scripts/gate/changed-paths.sh 的 gate_added_lines，

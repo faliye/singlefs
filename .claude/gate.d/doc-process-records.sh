@@ -50,7 +50,8 @@
 #   ⑤ 登记的路径要从仓库根起写（不以 / ./ ../ 开头、不含 /../）；写歪了 ⇒ 红。
 #   ⑥ 判③红时列的每一行格式是「.claude/batch-scope:行号：路径」，路径只是冒号后面那一段；同一个路径登记了几行就列几行。
 #      出路里打一条能直接粘贴的删行命令：按整行内容匹配（grep -vxF，别的行不动）、写到 .claude/batch-scope.pruned 再换上、删完回读确认那几行已不在。
-#      弄坏开关 BATCH_SCOPE_BREAK=prune-command-misses-last：命令里漏掉最后一行，batch-scope-stale-red 里钉命令全文的那条 want 找不到。
+#      BATCH_SCOPE_BREAK=prune-command-misses-last  命令里漏掉最后一行，照它跑完这一格仍红
+#        batch-scope-stale-red（输出里找不到钉命令全文的那条 want）
 #   改动范围一个文件都没有：退 77。
 # .claude/batch-scope 一行一条 <从仓库根起的路径><制表符或空格>#<为什么这一批要碰它>；空行与整行以 # 开头的行是注释。一批提交完把它清空（只留注释）。
 # 管不到的：理由写得对不对、这一批该不该碰这个文件、登记是不是开工时写的。
@@ -580,6 +581,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ doc-process-records.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 # implementation-premise 格按 glob 取正文：没有匹配时展开成空，不留字面的通配串
 shopt -s nullglob
 

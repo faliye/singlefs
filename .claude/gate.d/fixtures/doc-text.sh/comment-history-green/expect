@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：comment-history
+want=✓ 注释里没有历史写法：扫了
+want=（豁免表整份不判的 1 份不算在内）
+want=命中 3 行：按标记放过 3 行、滞后表放过 0 行、红 0 行（滞后表 0 行，没有滞后表）
+want=comment-history：绿

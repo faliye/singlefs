@@ -26,6 +26,11 @@
 D13 (検証ルート) 確定項目 9 の3層テーブルの3段階：層 0 スモーク → スモーク層、層 1 通常 → 通常層、層 2 フル実行 → 高負荷層；散在する「層 0」は 2026-10-12 の節に従ってクラッシュポイント再生に変更。英語識別子（layer0_enumeration、checker-tier-layer0-replay、record など）はこのラウンドでは変更しない。
 英語識別子改名のバッチ（`records/2026-10-13-复用键与全仓改名.md#3`、依存テーブル第8行）により、前文で変更しなかった英語識別子も変更された。ユーザーの言葉「関数名に layer0 や類似の名前を付けてはならない、機能と役割が識別できなければならない」：crates、スクリプトとゲート、文書の3経路ですべて変更され、旧名は下記の表に1つずつ登録された（単体の単語 `layer0`、`LAYER0`、`Layer0` は登録しない；実験装置、保持成果物、および原文引用内のものはそのまま維持し、`.claude/term-rename-exempt` に登録）。このバッチの行はすべて正規表現で記述：名前はリテラルで開始し、前後に ASCII 文字、数字、アンダースコアが隣接しない（ハイフン付きの名前はハイフンも単語内の文字とみなす）、単語境界と同様に判定し、隣接する漢字や仮名にもマッチする。`\b` で開始しない理由は、`\b` で始まる行がリポジトリ全体の走査を大幅に遅延させるためである：E178 (リーフコンテナとレコード死亡の計数)成果物 `e178-leaf-and-record-death-counts-segment-two.out` の最初の 2,000,000 文字において、従来の56行は0.19秒、この234行のリテラル開始を追加した場合は0.71秒、単語境界で記述した場合は2.96秒を要した。
 
+## 軽重・速遅の層分け → 一つのゲート；二つの検証クレートを一つに統合（2026-11-05 以降）
+
+ユーザー決定（原文は `records/2026-11-05-删轻型并入重型.md` 108 行目）：ゲートは一つだけで、範囲指定なしと範囲指定ありの二つの走らせ方に分け、軽重・速遅にはもう分けない。それに伴って改名したのは判定種別（`<ステージファイル名>:quick-tier-test-functions` → `<ステージファイル名>:test-functions`、`scripts/gate/admission.py` の `quick-tier-request` → `test-functions-request`）、甲二展開の関数名（列挙メンバー `InPlaceSubsetsWithCopyOnWriteNoneOrAll` にちなんで命名）と三つのフック（それぞれの破壊スイッチ変数を含む）であり、旧名は一つずつ下の表に登録した。
+ユーザーはさらに決定（原文は同記録 286、287、307 行目）：二つの検証コードパッケージを一つに統合し、パッケージ名は `singlefs-verification`、ディレクトリは `crates/singlefs-verification`；パッケージを指すときは「検証クレート」、コミット時の六つのゲートを指すときは「コミット時の六つのゲート」と書くかゲートを名指しし、マージ後検証の中のその一段は「検証クレートの段」と書く。旧パッケージの呼び方「harness 档」「checker 档」は下の表に登録した；二つの旧パッケージディレクトリとゲートファイルの改名はパスの移転であり、`.claude/rules/path-moves.md` に従って登録し、この表には入れない。
+
 <!-- term-renames:table -->
 1行に1つのペア、`scripts/kb/sweep-term.py` はこの表に従って置換・検証を行う；**1行追加すると自動的にゲート管理の対象となる**。
 「マッチ」は `完全一致`、`単語境界`、または `正規表現` を記述：`単語境界` は略語に使用し、他の単語内の文字への誤マッチを防止する；同一の文字列が他の場所で別の量を表す場合は `正規表現` を記述し、「旧」列にその概念の表現のみにマッチする Python 正規表現を記述（例：`(?<![每第内外里叶二])(?<![0-9] )层 1(?![0-9])` は「層 1 通常」にマッチし、「各層 134」「第 1 層 2 個」「外層 16.33 ms」にはマッチしない）、パイプは `\|` と記述し、キャプチャグループは使用禁止、「新」列はリテラルで置換する。制限事項の詳細は `scripts/kb/sweep-term.py` のファイル頭部を参照。長いパターンを前に記述し、短いパターンが長いパターンを途中で消費することを防止する。
@@ -89,7 +94,7 @@ D13 (検証ルート) 確定項目 9 の3層テーブルの3段階：層 0 ス�
 | 层 2 全量 | 大负载层 | 完全一致 | 同テーブル第3段階のラベル |
 | `(?<![第每各叶外内深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?1(?![0-9.])(?! ?常规)` | 常规层 | 正規表現 | 中国語用語：3層テーブル第2段階の単独表記時；木の階層にはマッチしない |
 | `(?<![第每各叶外内深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?2(?![0-9.])(?! ?全量)` | 大负载层 | 正規表現 | 中国語用語：3層テーブル第3段階の単独表記時；木の階層にはマッチしない；「全量」（フル実行）付きのものは一つ前の行で置換する |
-| `checker-tier-layer0-replay(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]checker-tier-layer0-replay)` | checker-tier-crash-point-replay | 正規表現 | ゲート名、ステージファイル名、フィクスチャディレクトリ名 |
+| `checker-tier-layer0-replay(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]checker-tier-layer0-replay)` | crash-point-replay | 正規表現 | ゲート名、ステージファイル名、フィクスチャディレクトリ名 |
 | `layer0-shard-configuration-check(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-shard-configuration-check)` | crash-point-replay-shard-configuration-check | 正規表現 | 二台構成のシャーディング構成判定スクリプト名 |
 | `layer0-shard-run(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-shard-run)` | crash-point-replay-shard-run | 正規表現 | クラッシュポイント再生二台構成のシャーディングラッパースクリプト名 |
 | `layer0-sample-tools(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-sample-tools)` | crash-point-replay-sample-tools | 正規表現 | ゲートフィクスチャルート内のダミーツールディレクトリ名 (`.layer0-sample-tools`) |
@@ -98,7 +103,7 @@ D13 (検証ルート) 確定項目 9 の3層テーブルの3段階：層 0 ス�
 | src/layer0_library.rs | src/crash_library.rs | 完全一致 | `Cargo.toml` コメント内で参照される判定ライブラリソースファイル |
 | `layer0_enumeration(?![A-Za-z0-9_])(?<![A-Za-z0-9_]layer0_enumeration)` | crash_state_enumeration | 正規表現 | モジュール名、`.rs` ファイル名、判定ライブラリクラス名、マニフェスト種別 |
 | `layer0_progress(?![A-Za-z0-9_])(?<![A-Za-z0-9_]layer0_progress)` | crash_point_replay_progress | 正規表現 | モジュール名および `.rs` ファイル名 |
-| `layer0-enumeration-library(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-enumeration-library)` | crash-state-verdicts | 正規表現 | 判定ライブラリにあるクラッシュ列挙ケースの種類のサブディレクトリ名。複数のテスト種類を一つのライブラリにまとめた後、そのディレクトリ名は `crash-state-verdicts`（`crates/singlefs-checker-tier/src/crash_library.rs` の `CRASH_LIBRARY_DIRECTORY_NAME`） |
+| `layer0-enumeration-library(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-enumeration-library)` | crash-state-verdicts | 正規表現 | 判定ライブラリにあるクラッシュ列挙ケースの種類の旧サブディレクトリ名。複数のテスト種類を一つのローカルライブラリにまとめた後、そのディレクトリ名は `crash-state-verdicts`。2026-11-02 にクラッシュ判定ライブラリは prune-server だけを通るように改め、コードはもうローカルのライブラリディレクトリを組み立てず、定数 `CRASH_LIBRARY_DIRECTORY_NAME` は削除した（`crates/singlefs-verification/src/crash_library.rs` のファイルヘッダー） |
 | `layer0-replay(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-replay)` | crash-case-replay | 正規表現 | クラッシュポイント再生ゲートのセル名（ゲート名の行が先にあり、長い名前から置き換える） |
 | `LAYER0_CELL_NAME(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LAYER0_CELL_NAME)` | CRASH_CASE_REPLAY_CELL_NAME | 正規表現 | ステージ内のセル名定数 |
 | `LAYER0_CELL_TITLE(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LAYER0_CELL_TITLE)` | CRASH_CASE_REPLAY_CELL_TITLE | 正規表現 | ステージ内のセルタイトル定数 |
@@ -323,6 +328,17 @@ D13 (検証ルート) 確定項目 9 の3層テーブルの3段階：層 0 ス�
 | `layer0-shape(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-shape)` | crash-case-shape | 正規表現 | 2つのクラッシュ増幅スクリプト自己検証内のフィクスチャファイル名 |
 | `layer0_shape(?![A-Za-z0-9_])(?<![A-Za-z0-9_]layer0_shape)` | crash_case_shape | 正規表現 | 2つのクラッシュ増幅スクリプト自己検証内の変数名 |
 | `STUB_CASE_SHAPE=layer0(?![A-Za-z0-9_])(?<![A-Za-z0-9_]STUB_CASE_SHAPE=layer0)` | STUB_CASE_SHAPE=crash-case | 正規表現 | 2つのクラッシュ増幅スクリプト自己検証内のダミーケース形態 |
+| `harness ?档包?` | 验证包 | 正規表現 | 統合前の `crates/singlefs-harness` パッケージ（`crates/singlefs-verification` に統合）の呼び方；「harness 档包」は「包」ごと置き換え、「验证包包」にならないようにする |
+| `(?<!池级 )checker ?档包?` | 验证包 | 正規表現 | 統合前の `crates/singlefs-checker-tier` パッケージ（`crates/singlefs-verification` に統合）の呼び方；「池级 checker」（`crates/singlefs-checker`、別のパッケージ）（プールレベル checker）には当てない；「checker 档包」は「包」ごと置き換える |
+| `quick_tier_expansion(?![A-Za-z0-9_])(?<![A-Za-z0-9_]quick_tier_expansion)` | in_place_subsets_with_copy_on_write_none_or_all_expansion | 正規表現 | 甲二展開の関数名（`crash::quick_tier_expansion`）、列挙メンバー `InPlaceSubsetsWithCopyOnWriteNoneOrAll` にちなんで命名 |
+| `quick-tier-test-functions(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]quick-tier-test-functions)` | test-functions | 正規表現 | 判定種別名の後半（`<ステージファイル名>:quick-tier-test-functions`） |
+| `quick-tier-request(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]quick-tier-request)` | test-functions-request | 正規表現 | `scripts/gate/admission.py` のリクエスト名 |
+| `heavy-test-guard(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]heavy-test-guard)` | project-code-guard | 正規表現 | フック名（`.claude/hooks/heavy-test-guard.sh` を `project-code-guard.sh` に改名） |
+| `lib_heavy_tests(?![A-Za-z0-9_])(?<![A-Za-z0-9_]lib_heavy_tests)` | lib_project_code_runs | 正規表現 | フック共用ライブラリ（`.claude/hooks/lib_heavy_tests.py` を `lib_project_code_runs.py` に改名） |
+| `light-selftest-guard(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]light-selftest-guard)` | selftest-process-guard | 正規表現 | 自己検証プロセスの関門（`scripts/gate/light-selftest-guard.py` を `selftest-process-guard.py` に改名） |
+| `HEAVY_TEST_GUARD_BREAK(?![A-Za-z0-9_])(?<![A-Za-z0-9_]HEAVY_TEST_GUARD_BREAK)` | PROJECT_CODE_GUARD_BREAK | 正規表現 | フック `project-code-guard.sh` の破壊スイッチ変数 |
+| `LIB_HEAVY_TESTS_BREAK(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LIB_HEAVY_TESTS_BREAK)` | LIB_PROJECT_CODE_RUNS_BREAK | 正規表現 | フック共用ライブラリ `lib_project_code_runs.py` の破壊スイッチ変数 |
+| `LIGHT_SELFTEST_GUARD_BREAK(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LIGHT_SELFTEST_GUARD_BREAK)` | SELFTEST_PROCESS_GUARD_BREAK | 正規表現 | 自己検証プロセスの関門 `selftest-process-guard.py` の破壊スイッチ変数 |
 
 **付随して変更されたファイル名**：`crates/singlefs-core/src/superblock.rs` → `system_configuration.rs`；5つの実験装置、5つのミューテーション表、5つの保持成果物（E100 (システム構成の3段幾何)、E115 (システム構成フィールド表の完全性とバイト予算)、E124 (D18 確定項目 14 によるシステム構成フィールド表の再計算)、E126 (システム構成スロット幅4候補のコスト)、E147 (システム構成フィールド表を新規プールでのファイル作成のバイト表から再計算)）。移行手順は [.claude/rules/path-moves.md](../rules/path-moves.md) の「手順」節を参照。
 

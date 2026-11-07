@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：comment-history
+want=滞后表登记的行数比此刻命中多，1 份文件的登记要改小（不留余量给新写的）：
+want=crates/demo/src/slack.rs：登记 3 行，此刻命中 2 行 → 改小到 2
+want=→ 怎么办：改好了几行就把那份文件在
+want=doc-text.sh：1 格里 1 格红（comment-history）

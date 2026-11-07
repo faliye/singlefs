@@ -20,7 +20,7 @@ experiment-runner	research/results/**	这个实验的产物
 experiment-runner	scripts/experiment-apparatus/replay.sh	复跑登记行
 experiment-runner	.claude/gate.d/replay-comparison-units.tsv	experiment-runner.md 第 5 步与「写范围」：重跑登记有比对对象表的，实现单元时往这张表每个比对对象登一行（只写这个实验的行）
 experiment-runner	scripts/experiment-apparatus/Cargo.toml	在末尾追加这个实验的 [[bin]]（agent-defs-r2 写范围探针：138 个实验 bin 有 100 个显式登记，副本里的试跑测不到这一处被拒）
-experiment-runner	research/prompts/e*-preregistration.md	跑前登记的「修订」一段
+experiment-runner	research/prompts/e*-preregistration*.md	跑前登记的「修订」一段：原登记 e<号>-preregistration.md 与带轮号的 e<号>-preregistration-r<N>.md 都算
 experiment-runner	.claude/kb/experiments/**	实验页
 experiment-runner	.claude/kb/experiments.md	实验索引行
 experiment-runner	.claude/kb/experiments-history.md	重跑已有实验时这个实验的历史条目（agent-defs-r1 判决 D2）

@@ -28,7 +28,7 @@
 #     读的环境变量：GATE_VERUS_JOBS（几处同时验，没设照判法文件头 --jobs 的默认）、
 #     SINGLEFS_THREAD_CAP（线程，没设取登记的重活默认并行度 .claude/heavy-thread-default）、SINGLEFS_VERUS_ROOT（Verus 安装目录，盖过登记表）。
 #     判法直接起 Verus，不套内存包装、不设每个进程的内存上限，也不按内存收几处同时验：整条命令的内存额度与线程上限由 task-server 给（task-server/README.md「提交写法」）。
-#     不限时（用户定案「工具里不限时」）：卡住由 task-server 判、停掉记 stalled，Verus 没出结局就没有判定，不当通过。
+#     不限时：卡住由 task-server 判、停掉记 stalled，Verus 没出结局就没有判定，不当通过。
 #   红例两格：scripts/experiment-apparatus/e165-pin-red-examples.py --check-table / --replay，表的格式写在 .claude/gate.d/e165-pinned-red-examples.tsv 表头；
 #     table 格只读钉表与变异表，不读红例账、kill-bounds 产物与 research/ 下任何文件（钉全由 E165 第二段驱动 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh
 #     写完一对账与产物时当场判，写法在它文件头「钉红例」一段）；每行的 ㉒ 是出那份账的那一趟的档，replay 按档分组起装置、每组带 ㉒ 的参数（例 --profile r2）。
@@ -69,7 +69,7 @@
 #   --item <项>（可给多次，取并集）只跑点了项的那几格，证明、空真、必红世界、红例重放四格只判点名的项（proof 一项是整格）；项名写错、缺项名退 2 并列出可点名的项；
 #     与 --check、--list-items 不一起用（退 2）。
 #     证明那一格同时收到 proof 与 proof:<名> 时照整格判（点名的加在整格之上，各项之和、完整 crate 证明与 MIR 比对照跑；verus-proof-check.py 的 check_proof，
-#     弄坏开关 VERUS_PROOF_CHECK_BREAK=proof-item-narrows 下只验点名的那一个，改前的样子）。
+#     弄坏开关 VERUS_PROOF_CHECK_BREAK=proof-item-narrows 下只验点名的那一个）。
 # 样本（fixtures/formal-verification.sh/<格名>-<情形>/，各放 .gate-cells 点名一格；共享门禁的 stage-selftest.sh 跑）。名字读不出判法的几份：
 #   verus-toolchain-pinned-*：假的 Verus 安装与假的 cargo 缓存放在样本的 .formal-sample/ 下
 #   verus-must-red-worlds-list-items：只列项；-list-items-key-counts：列项照临时服务里空的那一份比键（.formal-sample/with-keys），每格「无记录」几条、末了「键对不上共 0 条」
@@ -110,7 +110,7 @@
 #   用样本自己的，不写 .formal-fake-tools。要真 Verus 的判别力（真证明红绿）不在样本档：整道真跑时 verus-proof-check.py 判真 Verus。
 #   假 Verus 认的标记写在 scripts/gate/verus-proof-check.py 的 FAKE_VERUS 文件头（SELFTEST_BROKEN 当一处证明错、SELFTEST_VACUOUS 当空真、SELFTEST_NEEDS_RLIMIT_<n> 当要至少 n 的 rlimit、
 #   SELFTEST_SLEEP_<n> 验到这一行睡 n/10 秒、SELFTEST_KILLED 起来就 kill -9 自己 等）：要验得红的样本核里带这些标记，必红世界表的替换文也带。
-#   被验区域与多 crate 的那几份（出口 5 第三轮判决第三节「门禁」；要拦的写法取自 research/prompts/m4-exit5-relocation-proof-r2-opus-model/verus/ 与
+#   被验区域与多 crate 的那几份（要拦的写法取自 research/prompts/m4-exit5-relocation-proof-r2-opus-model/verus/ 与
 #   research/prompts/m4-exit5-relocation-proof-r3-sonnet-model/verus/ 里的例子，样本核的文件头写着取自哪一份）：
 #     verus-proof-trust-unregistered-red（binary_search 的 assume_specification 没登记）、-trust-registered-green（登记齐了：规格原文 sha256、差分测试名，
 #     不带 --no-cheating 照验、MIR 比对相同）、-trust-digest-red（登记的 sha256 不对）、-trust-test-missing-red（差分测试不在）、-trust-vstd-red（vstd 行版本不对）、
@@ -134,19 +134,27 @@
 # 弄坏开关：格的判法那一份的开关 VERUS_PROOF_CHECK_BREAK=<项> 与 E165_PIN_RED_EXAMPLES_BREAK=<项>（逐项让哪份样本判错写在两份脚本的文件头）；
 #   汇总与 --check 的归共用库（STAGE_CELLS_BREAK=red-swallowed 让每份红样本整道退 0；marker-ignored 让每份样本七格都跑，汇总那条「跑了 1 格」找不到）。
 #   逐项点名与按条复用：判法那一半的开关在两份脚本文件头「逐项点名与按条复用」；这一道自己接的那一半 FORMAL_VERIFICATION_BREAK=<项>[,<项>…]，
-#   每项后面写打开之后判错的样本（这一半没有脚本自证，复跑方只有这一道的样本档）：
-#     items-unchecked       --item 写错的项名悄悄丢掉、不退 2        样本 pinned-red-examples-replay-item-unknown 判错
-#     item-plan-lines-skipped  --list-items --with-keys 不打 ITEM_PLAN 行                         样本 verus-must-red-worlds-list-items-with-keys、-plan-reusable 判错（找不到 ITEM_PLAN 行）
-#     item-plan-unkeyed     --with-keys 不看 ITEM_KEY、每项一律 to_judge=1 reusable=0（不比键的样子）  样本 verus-must-red-worlds-list-items-plan-reusable 判错（键相同的项没报 reusable=1）
-#     item-plan-count-short --with-keys 少打最后一项的 ITEM_PLAN（行数与项数对不上）                  样本 verus-must-red-worlds-list-items-with-keys 判错（整道退 1，找不到「与项数 N 相同」）
-#     item-plan-ignores-item  --list-items --with-keys 带 --item 也比整表、打整表                样本 verus-must-red-worlds-list-items-with-keys-one-item、-two-items 判错（整道退 1：ITEM_PLAN 行数对不上点名项数）
-#     item-done-lines-skipped  真跑收尾不打 ITEM_DONE 行（toolchain、table 两格也不记）            样本 verus-toolchain-pinned-green、pinned-red-examples-table-green、verus-proof-item-done 判错
-#     item-done-whole-run-seconds  ITEM_DONE 的秒数一律写整道从起到收尾的挂钟，不是各项自己的            样本 verus-proof-item-done 判错（快的那一项秒数不再是 0.x）
-#     rocksdb-entry-unchecked  pinned-red-examples-replay 不带 --binary 时起装置的 cargo build 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
-#                              样本 pinned-red-examples-replay-rocksdb-entry-refused 判错（输出里找不到「rocksdb-prebuilt entry：」）
-#     list-items-red-swallowed  列项（--list-items、--item 都先列项）退非 0 时不回显判法打在 stdout 的 ✗ 与 → 行，只剩「列不出 … 退 1」（改前的样子；只在样本根上认，
-#                              echo_listing_red_lines；admission.py 的自证不盯它，靠这两份样本）：样本 verus-proof-list-items-trait-default-collision-red 判错（找不到点名撞的那两项）、
-#                              verus-vacuity-list-items-requires-on-plain-block-red 判错（找不到「第 17 行的 requires 找不到函数体的 {」）
+#   一项一行「FORMAL_VERIFICATION_BREAK=<值>  弄坏哪一处」，下一行起写打开之后判错的样本（这一半没有脚本自证，复跑方只有这一道的样本档）：
+#   FORMAL_VERIFICATION_BREAK=items-unchecked  --item 写错的项名悄悄丢掉、不退 2
+#       pinned-red-examples-replay-item-unknown
+#   FORMAL_VERIFICATION_BREAK=item-plan-lines-skipped  --list-items --with-keys 不打 ITEM_PLAN 行
+#       verus-must-red-worlds-list-items-with-keys、verus-must-red-worlds-list-items-plan-reusable（找不到 ITEM_PLAN 行）
+#   FORMAL_VERIFICATION_BREAK=item-plan-unkeyed  --with-keys 不看 ITEM_KEY、每项一律 to_judge=1 reusable=0（不比键的样子）
+#       verus-must-red-worlds-list-items-plan-reusable（键相同的项没报 reusable=1）
+#   FORMAL_VERIFICATION_BREAK=item-plan-count-short  --with-keys 少打最后一项的 ITEM_PLAN（行数与项数对不上）
+#       verus-must-red-worlds-list-items-with-keys（整道退 1，找不到「与项数 N 相同」）
+#   FORMAL_VERIFICATION_BREAK=item-plan-ignores-item  --list-items --with-keys 带 --item 也比整表、打整表
+#       verus-must-red-worlds-list-items-with-keys-one-item、verus-must-red-worlds-list-items-with-keys-two-items（整道退 1：ITEM_PLAN 行数对不上点名项数）
+#   FORMAL_VERIFICATION_BREAK=item-done-lines-skipped  真跑收尾不打 ITEM_DONE 行（toolchain、table 两格也不记）
+#       verus-toolchain-pinned-green、pinned-red-examples-table-green、verus-proof-item-done
+#   FORMAL_VERIFICATION_BREAK=item-done-whole-run-seconds  ITEM_DONE 的秒数一律写整道从起到收尾的挂钟，不是各项自己的
+#       verus-proof-item-done（快的那一项秒数不再是 0.x）
+#   FORMAL_VERIFICATION_BREAK=rocksdb-entry-unchecked  pinned-red-examples-replay 不带 --binary 时起装置的 cargo build 之前不调 scripts/hosts/rocksdb-prebuilt.py entry
+#       pinned-red-examples-replay-rocksdb-entry-refused（输出里找不到「rocksdb-prebuilt entry：」）
+#   FORMAL_VERIFICATION_BREAK=list-items-red-swallowed  列项（--list-items、--item 都先列项）退非 0 时不回显判法打在 stdout 的 ✗ 与 → 行，只剩「列不出 … 退 1」（只在样本根上认，
+#       echo_listing_red_lines；admission.py 的自证不盯它，靠这两份样本）：
+#       verus-proof-list-items-trait-default-collision-red（找不到点名撞的那两项）、
+#       verus-vacuity-list-items-requires-on-plain-block-red（找不到「第 17 行的 requires 找不到函数体的 {」）
 #   被验区域与多 crate（判法在 scripts/gate/verus-proof-check.py，那份文件头「被验区域与多 crate 的弄坏开关」一段另列打开之后自证哪几格判错）的开关，
 #   开关一行、下一行起写打开之后判错的样本：
 #   FORMAL_VERIFICATION_BREAK=single-crate-registry  登记表只认第一个 crate
@@ -193,7 +201,7 @@
 #   FORMAL_VERIFICATION_BREAK=same-origin-unbuilt-events-accepted  未立的对收了事件也不判红
 #       same-origin-counter-unbuilt-event-red（判绿）
 #   红例两格的开关，开关一行、下一行起写打开之后判错的样本（自证格写在 e165-pin-red-examples.py 文件头）：
-#   E165_PIN_RED_EXAMPLES_BREAK=table-check-globs-research  table 格照改前的判法：取 research/results/e165-*-red-examples.tsv、按文件名配产物判钉全
+#   E165_PIN_RED_EXAMPLES_BREAK=table-check-globs-research  table 格取 research/results/e165-*-red-examples.tsv、按文件名配产物判钉全
 #       pinned-red-examples-table-archived-ledger-green（判红：产物不在）、pinned-red-examples-table-green（退 77：没有账）
 #   E165_PIN_RED_EXAMPLES_BREAK=fingerprint-unchecked  不拿 ②③⑦ 重算 ①
 #       pinned-red-examples-table-red（判绿）
@@ -219,6 +227,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ formal-verification.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 VERUS_CHECK="$STAGE_REPOSITORY/scripts/gate/verus-proof-check.py"
 PIN_CHECK="$STAGE_REPOSITORY/scripts/experiment-apparatus/e165-pin-red-examples.py"
@@ -323,7 +336,7 @@ fi
 formal_items_file=""
 formal_items_report_file=""
 # 列项退非 0 时，判法的红句（以 ✗、→ 起头的行）打在 stdout、进了 formal_items_file：原样回显到 stdout（stderr 那一份另由调用处 cat 回显），
-#   不然红在哪被吞掉、只剩「列不出 … 退 1」。弄坏开关 FORMAL_VERIFICATION_BREAK=list-items-red-swallowed 只在样本根上认：不回显（改前的样子）
+#   不然红在哪被吞掉、只剩「列不出 … 退 1」。弄坏开关 FORMAL_VERIFICATION_BREAK=list-items-red-swallowed 只在样本根上认：不回显
 echo_listing_red_lines() {
   if ((sample_mode)) && [[ ",${FORMAL_VERIFICATION_BREAK:-}," == *,list-items-red-swallowed,* ]]; then return 0; fi
   grep -E '^[[:space:]]*(✗|→)' "$formal_items_file"

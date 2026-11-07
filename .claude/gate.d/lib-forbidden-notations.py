@@ -26,7 +26,7 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
   钟点后面跟时区词、带 x 通配的「时:分x」、不带日期的 Z 钟点，与不挨日期时区的钟点（时:分、时:分:秒、带毫秒、区间、「月-日 时:分」）。
 - ISO 时间戳：日期与钟点之间是 T 的（带不带日期、带不带时区偏移或 Z 都算），date 的原样输出也在内。
 - ISO 基本格式的紧凑时间戳：日期（8 位连写，或带连字符的）、字母 T、钟点（4 到 6 位连写，可带小数秒）、可带 Z 或偏移，中间没有冒号；
-  日期是 8 位连写的，钟点也可以是带冒号的「时:分」。日期与钟点各位都要合法（年 20 开头、月 01 到 12、日 01 到 31、时 00 到 23、分 00 到 59），
+  日期是 8 位连写的，钟点也可以是带冒号的「时:分」。日期与钟点各位都要合法（年 20 开头、月 01 到 12、日 01 到 31、时 00 到 23、分 00 到 59；带连字符的日期也一样核），
   前后不挨 ASCII 字母数字（下划线、连字符、斜杠、点不算，运行目录名与日志文件名里的写法照判）；没有放行写法，字段值、路径名都判。
   日期或钟点越界的、年不是 20 开头的、钟点位数不对的、小写 t 的数字加 T 写法（哈希、编号）不算。不带日期的「T 加钟点」不判（与编号分不开）。
 - 时区词：ZONE_WORDS 里那两个缩写，大写、前后不挨 ASCII 字母数字与下划线（标识符里的不算）。
@@ -50,11 +50,12 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
   不带批次词的「15 乙一」不判：「出口 4 甲一」「已定项 1 甲」「C554 乙」这类候选与臂的名字是同一个写法。地支（「辰」）不在内（「未」「午」与常用字分不开）。
 这四条前后都不挨 ASCII 字母数字、- . / 与省略号，前面另不挨 :（标识符、路径、文件名、带连字符的目录名、哈希的截断「…162d」、「文件:行号」不算），
 后面不接「.字母数字」（扩展名）与「:数字」（行号）。
-一位数字加一个字母（「7a」「3d」）是许可的会话短号，四条都不判（批次词后面的除外）；三位以上数字加字母（「143k」「140n」）不判。
-上下文规则（batch_code_is_not_code）放过：反引号里的（代码）、紧跟在「=」（可隔空白）后面的产物字段值、紧挨在 " ' , ; 后面的代码字面与参数
+一位数字加一个字母（「7a」「3d」）是许可的会话短号，四条都不判（批次词后面的除外）；三位以上数字加字母（「143k」「140n」）不判，挨着批次词的也不判。
+上下文规则（batch_code_is_not_code）放过：反引号代码段里的（一串反引号开头、到后面第一串一样长的反引号为止，长短不限；后面配不上一样长的那一串按字面算，
+不开代码段）、紧跟在「=」（可隔空白）后面的产物字段值、紧挨在 " ' , ; 后面的代码字面与参数
 （sed 的「11,15p」）、算式里的（前面是 + * / × ÷ ( < > ≤ ≥ ~ ≈ ^，或后面是 + * / × ÷ ) < > ≤ ≥ ^ ;，可隔空白：「135 + 140n」「31u) / 32u」）。
 不认放行标记；排除的是上游副本、门禁与钩子的样本目录、变异表 crates/mutations.tsv（源码原文列里有 WGSL 的「31u」这类字面，名字列的批号是变异行的键）。
-管不到的：中文数字或全角数字写的代号；三位以上数字的；不带批次词、字母在 UNIT_LETTERS 里的（「10h」「10k」单写）；不带批次词的天干编号；改了写法的代号（「第二十四批丙一」之外的自造写法）。
+管不到的：中文数字或全角数字写的代号；三位以上数字加字母的（挨不挨批次词都一样）；不带批次词、字母在 UNIT_LETTERS 里的（「10h」「10k」单写）；不带批次词的天干编号；改了写法的代号（「第二十四批丙一」之外的自造写法）。
 
 
 上下文规则放过长得像钟点、其实不是的冒号对（不挨日期时区的钟点那一行）：
@@ -76,9 +77,9 @@ ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（
   同一个变量另认两项会让编号对与紧凑时间戳判法退回旧样子的：numbered-pairs-whole-line（编号对按整行读，不按句读）与 compact-timestamp-loose（紧凑时间戳退回「8 位数字加 T 加 4 到 6 位数字」）；
   前者打开时 doc-text.sh 的 clock-times-red 里 records/bare-clock-sentences.md 那五行必须报不出来（want 找不到、行数对不上），后者打开时 clock-times-green 里 records/近似写法.md 的数字加 T 近似写法必须判红。
   紧凑时间戳那一条判据行的键是 iso-compact-timestamp，写进上面的 <判据行键> 关掉它时 clock-times-red 里 records/iso-compact.md 那六行必须报不出来。
-  同一个变量另认一项 first-hit-only：all_hits 只交最靠前的那一处（退回只报第一处的旧样子）；
+  同一个变量另认一项 first-hit-only：all_hits 只交最靠前的那一处；
   打开时 write-guard.sh --selftest 的「钟点:两处都报（行号与总数）」「会话号:两处都报（行号与总数）」两格必须判红。
-  同一个变量另认一项 mountinfo-device-numbers：mountinfo 一行里的主:次设备号不放过（退回改前，当钟点判）；
+  同一个变量另认一项 mountinfo-device-numbers：mountinfo 一行里的主:次设备号不放过，打开时当钟点判；
   打开时 doc-text.sh 的 clock-times-green 里 records/colon-pairs.md 的 mountinfo 那两行必须判红（clock-times-mountinfo-red 不受影响，它本来就红）。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=<判据行键或形态键>：那几条判据行的上下文规则不生效，命中一律算违例。
   打开时 doc-text.sh 的 clock-times-green 样本里的冒号对、write-guard.sh --selftest 里靠上下文放行的格必须判红，证放行靠的是上下文规则。
@@ -94,6 +95,11 @@ ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（
   同一个变量另认一项 judged-suffixes-ignored：judged_suffixes 不生效，什么后缀都判（退回没有这一键的样子）；打开时 write-guard.sh --selftest 的
   「批次代号:.py 不判」「批次代号:.sh 不判」两格、bash-command-detector.sh --selftest 的「字面写入:写进 .py 的批次代号不判（批次代号只判 .md、.tsv、.txt）」、
   三份定点写入脚本自证里「写会话号：.py 目标的新串带代号」那一行必须判红。
+- 三项放宽判法的开关（同一个变量 LIB_FORBIDDEN_NOTATIONS_BREAK，表在 LOOSENED_PATTERNS 与 batch_code_is_not_code）：
+  compact-hyphenated-date-loose：紧凑时间戳带连字符的那一种写法不核月日；打开时 write-guard.sh --selftest 的「紧凑时间戳:带连字符的日期月份越界放行」
+  「紧凑时间戳:带连字符的日期日越界放行」两格必须判红。
+  batch-code-labeled-three-digits：挨着批次词的三位数字加字母也判；打开时「批次代号:批次词后面的三位数字加字母放行」「批次代号:三位数字加字母挨着批字放行」两格必须判红。
+  code-span-backtick-parity：反引号只数前面的奇偶，不按代码段配对；打开时「批次代号上下文:双反引号代码段里的放行」「批次代号:配不上对的反引号不开代码段」两格必须判红。
 """
 import os
 import re
@@ -122,12 +128,24 @@ ISO_TIMESTAMP = rf'(?:{DATE}|(?<![{ASCII_WORD}\-]))T(?:[01]\d|2[0-3]):{MINUTE_VA
 # 之后可带 Z 或偏移。日期与钟点的各个位都要在合法范围里（年 20 开头、月 01 到 12、日 01 到 31、时 00 到 23、分 00 到 59），前后不挨 ASCII 字母数字
 # （下划线、连字符、斜杠、点不算：运行目录名与日志文件名里的写法照判）；8 位数字后面跟 T 与 4 到 6 位数字、但日期或钟点越界的编号不算。
 # 带连字符的日期加带冒号的钟点不在这一条里（ISO_TIMESTAMP 判，它认「=」后面的字段值放行）。
-DATE_COMPACT = r'20\d\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])'
+MONTH_VALUE = r'(?:0[1-9]|1[0-2])'
+DAY_VALUE = r'(?:0[1-9]|[12]\d|3[01])'
+DATE_COMPACT = rf'20\d\d{MONTH_VALUE}{DAY_VALUE}'
+DATE_HYPHENATED = rf'20\d\d-{MONTH_VALUE}-{DAY_VALUE}'
 TIME_COMPACT = r'(?:[01]\d|2[0-3])[0-5]\d\d{0,2}(?:[.,]\d+)?'
-ISO_COMPACT_TIMESTAMP = (rf'(?<![A-Za-z0-9])(?:{DATE}T{TIME_COMPACT}|{DATE_COMPACT}T(?:{TIME_COMPACT}|(?:[01]\d|2[0-3]):{MINUTE_VALUE}))'
-                         rf'(?:Z|[+\-](?:[01]\d|2[0-3]):?[0-5]\d)?(?![A-Za-z0-9])')
+
+
+def iso_compact_timestamp(hyphenated_date):
+    """紧凑时间戳的判据串；hyphenated_date 是带连字符那一种写法的日期（平常是核月日的 DATE_HYPHENATED）。"""
+    return (rf'(?<![A-Za-z0-9])(?:{hyphenated_date}T{TIME_COMPACT}|{DATE_COMPACT}T(?:{TIME_COMPACT}|(?:[01]\d|2[0-3]):{MINUTE_VALUE}))'
+            rf'(?:Z|[+\-](?:[01]\d|2[0-3]):?[0-5]\d)?(?![A-Za-z0-9])')
+
+
+ISO_COMPACT_TIMESTAMP = iso_compact_timestamp(DATE_HYPHENATED)
 # 弄坏用：不核日期与钟点的范围、前后不管，8 位数字加 T 加 4 到 6 位数字都算（LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose）
 COMPACT_TIMESTAMP_LOOSE_PATTERN = re.compile(r'\d{8}T\d{4,6}')
+# 弄坏用：带连字符的那一种写法不核月日（LIB_FORBIDDEN_NOTATIONS_BREAK=compact-hyphenated-date-loose）
+COMPACT_HYPHENATED_DATE_LOOSE_PATTERN = re.compile(iso_compact_timestamp(DATE))
 ZONE_WORD = rf'(?<![{ASCII_WORD}]){ZONE}(?![{ASCII_WORD}])'
 TWELVE_HOUR = rf'(?<![{ASCII_WORD}:.])\d{{1,2}}(?::{MINUTE_VALUE})? ?[AaPp]\.?[Mm]\.?(?![{ASCII_WORD}])'
 # 会话号：本仓与上游三语仓的目录名，后面跟 - 与 2 到 6 位小写十六进制；后面紧跟 . - } / 的是 mktemp 模板、路径里的临时目录名，不算
@@ -141,8 +159,18 @@ HEAVENLY_STEMS = '甲乙丙丁戊己庚辛壬癸'
 CHINESE_NUMERALS = '一二三四五六七八九十百零两'
 BATCH_CODE_SUFFIXED = rf'{BATCH_CODE_BEFORE}\d{{1,2}}(?!e-)[a-z]-\d{{1,2}}{BATCH_CODE_AFTER}'
 BATCH_CODE_LETTERED = rf'{BATCH_CODE_BEFORE}\d{{2}}[{CODE_LETTERS}]{BATCH_CODE_AFTER}'
-BATCH_CODE_LABELED = (rf'(?:(?<![{ASCII_WORD}])批次?\s*|(?<![{ASCII_WORD}])[Bb]atch(?:es)?\s+){BATCH_CODE_BEFORE}\d{{1,3}}[a-z]{BATCH_CODE_AFTER}'
-                      rf'|{BATCH_CODE_BEFORE}\d{{1,3}}[a-z]\s*批')
+
+
+def batch_code_labeled(most_digits):
+    """挨着批次词的「数字加字母」的判据串；数字至多 most_digits 位（平常是 2：三位以上数字加字母不判，挨着批次词的也一样）。"""
+    digits = rf'\d{{1,{most_digits}}}'
+    return (rf'(?:(?<![{ASCII_WORD}])批次?\s*|(?<![{ASCII_WORD}])[Bb]atch(?:es)?\s+){BATCH_CODE_BEFORE}{digits}[a-z]{BATCH_CODE_AFTER}'
+            rf'|{BATCH_CODE_BEFORE}{digits}[a-z]\s*批')
+
+
+BATCH_CODE_LABELED = batch_code_labeled(2)
+# 弄坏用：挨着批次词的三位数字加字母也判（LIB_FORBIDDEN_NOTATIONS_BREAK=batch-code-labeled-three-digits）
+BATCH_CODE_LABELED_THREE_DIGITS_PATTERN = re.compile(batch_code_labeled(3))
 BATCH_CODE_STEM = (rf'(?:第\s*[\d{CHINESE_NUMERALS}]+\s*批\s*|(?<![{ASCII_WORD}])批次?\s*\d{{1,3}}(?:-\d{{1,2}})?\s*)'
                    rf'[{HEAVENLY_STEMS}][{CHINESE_NUMERALS}\d]?')
 FORMULA_BEFORE = re.compile(r'[+*/×÷(<>≤≥~≈^]\s*$')
@@ -209,11 +237,36 @@ def field_value(line, match):
     return line[:match.start()].endswith('=')
 
 
+def inside_code_span(line, position):
+    """这一行的 position 落在代码段里：一串反引号开头、到后面第一串一样长的反引号为止（长短不限，``a`b`` 这种里面夹短串的照算一段）；
+    后面找不到一样长的那一串的，这一串按字面算，不开代码段（同 CommonMark 的行内代码）。"""
+    index = 0
+    while index < len(line):
+        if line[index] != '`':
+            index += 1
+            continue
+        opening_end = index
+        while opening_end < len(line) and line[opening_end] == '`':
+            opening_end += 1
+        width = opening_end - index
+        closing = re.compile(rf'(?<!`)`{{{width}}}(?!`)').search(line, opening_end)
+        if closing is None:
+            index = opening_end
+            continue
+        if opening_end <= position < closing.start():
+            return True
+        index = closing.end()
+    return False
+
+
 def batch_code_is_not_code(line, match):
-    """批次代号四条判据行的上下文规则：True 是这一处按上下文不是批次代号——反引号里的、「=」（可隔空白）后面的字段值、
-    紧挨在 " ' , ; 后面的代码字面与参数、算式里的。"""
+    """批次代号四条判据行的上下文规则：True 是这一处按上下文不是批次代号——反引号代码段里的（inside_code_span）、「=」（可隔空白）后面的字段值、
+    紧挨在 " ' , ; 后面的代码字面与参数、算式里的。弄坏开关 LIB_FORBIDDEN_NOTATIONS_BREAK=code-span-backtick-parity 时只数前面反引号的奇偶。"""
     before = line[:match.start()]
-    if before.count('`') % 2 == 1:
+    if 'code-span-backtick-parity' in environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK'):
+        if before.count('`') % 2 == 1:
+            return True
+    elif inside_code_span(line, match.start()):
         return True
     if re.search(r'=\s*$', before) or before.endswith(('"', "'", ',', ';')):
         return True
@@ -344,7 +397,6 @@ FORMS = (
             ('research/prompts/d165-valves-r1-sonnet-output.md', '冻结证据：腿的模型报告，时间戳是被测输入'),
             ('research/prompts/m3-close-b19-code-r3-sonnet-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间'),
             ('research/prompts/m3-close-b19-design-r2-sonnet-output.md', '冻结证据：腿的模型报告，时间戳是被测输入'),
-            ('records/2026-11-02-文档代码逐项审核-', '过程记录与审核产物，原始日志与台账里的时间戳是被测输入'),
         ),
         'allow_suffixes': ('.sh', '.py', '.rs'),
         'judged_suffixes': (),
@@ -460,6 +512,13 @@ FORMS = (
 )
 
 FORMS_BY_KEY = {form['key']: form for form in FORMS}
+# 弄坏开关 LIB_FORBIDDEN_NOTATIONS_BREAK 里这几项把一条判据行换成宽松写法：开关项 → (判据行键, 换上的正则)。
+# 同一条判据行点了几项的，取这张表里排在后面的那一项。
+LOOSENED_PATTERNS = {
+    'compact-timestamp-loose': ('iso-compact-timestamp', COMPACT_TIMESTAMP_LOOSE_PATTERN),
+    'compact-hyphenated-date-loose': ('iso-compact-timestamp', COMPACT_HYPHENATED_DATE_LOOSE_PATTERN),
+    'batch-code-labeled-three-digits': ('batch-code-labeled', BATCH_CODE_LABELED_THREE_DIGITS_PATTERN),
+}
 
 
 def environment_keys(variable):
@@ -489,8 +548,8 @@ def judged_patterns(form_key):
     if form_key in skipped:
         return None
     context_off = environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT')
-    loose = 'compact-timestamp-loose' in skipped
-    return [(index, key, name, COMPACT_TIMESTAMP_LOOSE_PATTERN if loose and key == 'iso-compact-timestamp' else pattern,
+    replaced = {pattern_key: pattern for switch, (pattern_key, pattern) in LOOSENED_PATTERNS.items() if switch in skipped}
+    return [(index, key, name, replaced.get(key, pattern),
              None if key in context_off or form_key in context_off else not_violation)
             for index, (key, name, pattern, not_violation) in enumerate(FORMS_BY_KEY[form_key]['patterns']) if key not in skipped]
 

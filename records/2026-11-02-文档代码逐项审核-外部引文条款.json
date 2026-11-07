@@ -1,0 +1,1575 @@
+{
+  "at": "2026-11-05",
+  "sources": [
+    {
+      "path": "scripts/kb/verify-citations.sh",
+      "sha256": "6454e1877b501d67dc0cfdb15d68895175208a0087b9475ae888e33309cc72ee",
+      "read_ranges": [
+        [
+          1,
+          660
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false
+    },
+    {
+      "path": "scripts/kb/pdf-text.py",
+      "sha256": "ee677c5ad2931b908ea791c667b287d875e29686d32da50eac7dcd96db3528b5",
+      "read_ranges": [
+        [
+          1,
+          292
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false
+    },
+    {
+      "path": "scripts/kb/fetch-refs.sh",
+      "sha256": "bffe756cb97c5d7248fb7b0e749e676f914b289c70142999f7b7c26a5be93952",
+      "read_ranges": [
+        [
+          1,
+          116
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false
+    }
+  ],
+  "checker_claims": [
+    {
+      "claim": "正常断言逐条记录pass/fail，未知树与格数错计unmarked",
+      "status": "static_match_bounded",
+      "evidence": "129-231,257-295,621-660"
+    },
+    {
+      "claim": "普通运行不得切换到自证表",
+      "status": "discrepancy_A56_reproduced",
+      "evidence": "7221:89claims4pass85fail->4claims4pass0fail,normalCLIwithoutselftestmarker"
+    },
+    {
+      "claim": "取数用pipefail且grep零命中退0",
+      "status": "static_match_bounded",
+      "evidence": "181-199,217-230,279-294;进程替换明确不保证状态传播"
+    },
+    {
+      "claim": "树根与实际读取树不分叉",
+      "status": "partial",
+      "evidence": "117-127,158-178只判字符串与包含关系；符号链接/路径规范化/任意命令语义未核"
+    },
+    {
+      "claim": "每趟缓存隔离，抽取失败不发布部分结果",
+      "status": "static_match_bounded",
+      "evidence": "242-255,595-608;清理命令失败不影响退出码分支待核"
+    },
+    {
+      "claim": "每个声明完整语义都由模式保证",
+      "status": "pending_per_row",
+      "evidence": "所有内置断言逐行保留；D19仅dev:8也可能命中，7221复现排队"
+    },
+    {
+      "claim": "refs-linux/zfs/docs均由fetch-refs按URL+sha256固定",
+      "status": "discrepancy_A55_static",
+      "evidence": "本脚本14-17,95-103；fetch-refs.sh仅7个PDF表，不能取得linux/zfs/RFC8439；verify不自行校验摘要"
+    },
+    {
+      "claim": "既有自证所有格",
+      "status": "runtime_pass_bounded",
+      "evidence": "7222:26cells;existingcoverageonly"
+    }
+  ],
+  "builtin_assertions": [
+    {
+      "line": 300,
+      "end_line": 300,
+      "kind": "ckn",
+      "decision": "D8",
+      "tree": "refs-linux",
+      "claim": "btree 树数",
+      "arguments": [
+        "21",
+        "grep -oE '^\\\tx\\([a-z_]+,[[:space:]]+[0-9]+' <(awk '/^#define BCH_BTREE_IDS\\(\\)/{f=1} f{print}' '%ROOT%/fs/bcachefs/bcachefs_format.h') | awk -F, '{gsub(/[ \\t]/,\"\",\\$2);print \\$2}' | sort -nu | wc -l"
+      ],
+      "raw": "ckn D8  refs-linux  \"btree 树数\"                 21 \"grep -oE '^\\\tx\\\\([a-z_]+,[[:space:]]+[0-9]+' <(awk '/^#define BCH_BTREE_IDS\\\\(\\\\)/{f=1} f{print}' '%ROOT%/fs/bcachefs/bcachefs_format.h') | awk -F, '{gsub(/[ \\t]/,\\\"\\\",\\$2);print \\$2}' | sort -nu | wc -l\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 301,
+      "end_line": 301,
+      "kind": "ck",
+      "decision": "D19",
+      "tree": "refs-linux",
+      "claim": "bch_extent_ptr 是 offset:44/dev:8/gen:8",
+      "arguments": [
+        "fs/bcachefs/extents_format.h",
+        "offset:44,.*$|dev:8"
+      ],
+      "raw": "ck  D19 refs-linux  \"bch_extent_ptr 是 offset:44/dev:8/gen:8\" fs/bcachefs/extents_format.h 'offset:44,.*$|dev:8'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "discrepancy_A57_reproduced",
+      "evidence": "7221 originalpredicateandassertionacceptsfilewithonlydev:8inunrelatedstruct;actualLinuxsourcefactstillpending"
+    },
+    {
+      "line": 302,
+      "end_line": 302,
+      "kind": "ck",
+      "decision": "D19",
+      "tree": "refs-linux",
+      "claim": "crc128 的 offset 是 13 位",
+      "arguments": [
+        "fs/bcachefs/extents_format.h",
+        "CRC128_SIZE_MAX[[:space:]]+\\(1U << 13\\)"
+      ],
+      "raw": "ck  D19 refs-linux  \"crc128 的 offset 是 13 位\"   fs/bcachefs/extents_format.h 'CRC128_SIZE_MAX[[:space:]]+\\(1U << 13\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 303,
+      "end_line": 303,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "refs-linux",
+      "claim": "crc64 的 80 位由 csum_hi:16 + csum_lo 拼出",
+      "arguments": [
+        "fs/bcachefs/extents_format.h",
+        "csum_hi:16"
+      ],
+      "raw": "ck  D9  refs-linux  \"crc64 的 80 位由 csum_hi:16 + csum_lo 拼出\" fs/bcachefs/extents_format.h 'csum_hi:16'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 304,
+      "end_line": 304,
+      "kind": "ckn",
+      "decision": "D9",
+      "tree": "refs-linux",
+      "claim": "对 crypto_aead/setauthsize 零命中",
+      "arguments": [
+        "0",
+        "grep -rE 'crypto_aead|setauthsize' '%ROOT%/fs/bcachefs' | wc -l"
+      ],
+      "raw": "ckn D9  refs-linux  \"对 crypto_aead/setauthsize 零命中\" 0 \"grep -rE 'crypto_aead|setauthsize' '%ROOT%/fs/bcachefs' | wc -l\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 305,
+      "end_line": 305,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "refs-linux",
+      "claim": "MAC 截断靠 memcpy bch_crc_bytes",
+      "arguments": [
+        "fs/bcachefs/checksum.c",
+        "memcpy\\(&ret, digest, bch_crc_bytes\\[type\\]\\)"
+      ],
+      "raw": "ck  D9  refs-linux  \"MAC 截断靠 memcpy bch_crc_bytes\"  fs/bcachefs/checksum.c 'memcpy\\(&ret, digest, bch_crc_bytes\\[type\\]\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 306,
+      "end_line": 306,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "refs-linux",
+      "claim": "元数据加密时恒用 128 位",
+      "arguments": [
+        "fs/bcachefs/checksum.h",
+        "bch2_meta_checksum_type"
+      ],
+      "raw": "ck  D9  refs-linux  \"元数据加密时恒用 128 位\"      fs/bcachefs/checksum.h 'bch2_meta_checksum_type'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 307,
+      "end_line": 307,
+      "kind": "ck",
+      "decision": "D11",
+      "tree": "refs-linux",
+      "claim": "accounting 树格式级绑 write buffer",
+      "arguments": [
+        "fs/bcachefs/bcachefs_format.h",
+        "x\\(accounting,[[:space:]]+20,"
+      ],
+      "raw": "ck  D11 refs-linux  \"accounting 树格式级绑 write buffer\" fs/bcachefs/bcachefs_format.h 'x\\(accounting,[[:space:]]+20,'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 308,
+      "end_line": 308,
+      "kind": "ck",
+      "decision": "D11",
+      "tree": "refs-linux",
+      "claim": "记账更新是 delta",
+      "arguments": [
+        "fs/bcachefs/disk_accounting_format.h",
+        "updates are _deltas_"
+      ],
+      "raw": "ck  D11 refs-linux  \"记账更新是 delta\"             fs/bcachefs/disk_accounting_format.h 'updates are _deltas_'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 309,
+      "end_line": 309,
+      "kind": "ck",
+      "decision": "D11",
+      "tree": "refs-linux",
+      "claim": "运行时与 GC 重建共用同一行",
+      "arguments": [
+        "fs/bcachefs/disk_accounting.h",
+        "this_cpu_add\\(e->v\\[gc\\]\\[i\\], a\\.v->d\\[i\\]\\)"
+      ],
+      "raw": "ck  D11 refs-linux  \"运行时与 GC 重建共用同一行\"    fs/bcachefs/disk_accounting.h 'this_cpu_add\\(e->v\\[gc\\]\\[i\\], a\\.v->d\\[i\\]\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 310,
+      "end_line": 310,
+      "kind": "ck",
+      "decision": "D11",
+      "tree": "refs-linux",
+      "claim": "btree_gc 自陈重建侧不幂等",
+      "arguments": [
+        "fs/bcachefs/btree_gc.c",
+        "not idempotant"
+      ],
+      "raw": "ck  D11 refs-linux  \"btree_gc 自陈重建侧不幂等\"     fs/bcachefs/btree_gc.c 'not idempotant'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 311,
+      "end_line": 311,
+      "kind": "ck",
+      "decision": "D18",
+      "tree": "refs-linux",
+      "claim": "BTREE_NODE_SEQ 判谁覆盖谁",
+      "arguments": [
+        "fs/bcachefs/btree_gc.c",
+        "BTREE_NODE_SEQ\\(cur->data\\) > BTREE_NODE_SEQ\\(prev->data\\)"
+      ],
+      "raw": "ck  D18 refs-linux  \"BTREE_NODE_SEQ 判谁覆盖谁\"     fs/bcachefs/btree_gc.c 'BTREE_NODE_SEQ\\(cur->data\\) > BTREE_NODE_SEQ\\(prev->data\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 312,
+      "end_line": 312,
+      "kind": "ck",
+      "decision": "D22",
+      "tree": "refs-linux",
+      "claim": "btree 指针不带校验和",
+      "arguments": [
+        "fs/bcachefs/extents_format.h",
+        "Btree pointers don't carry around checksums"
+      ],
+      "raw": "ck  D22 refs-linux  \"btree 指针不带校验和\"          fs/bcachefs/extents_format.h \"Btree pointers don't carry around checksums\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 313,
+      "end_line": 313,
+      "kind": "ck",
+      "decision": "D12",
+      "tree": "refs-linux",
+      "claim": "bucket 寻址显式带设备",
+      "arguments": [
+        "fs/bcachefs/buckets.h",
+        "div_u64\\(s, ca->mi\\.bucket_size\\)"
+      ],
+      "raw": "ck  D12 refs-linux  \"bucket 寻址显式带设备\"         fs/bcachefs/buckets.h 'div_u64\\(s, ca->mi\\.bucket_size\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 314,
+      "end_line": 314,
+      "kind": "ck",
+      "decision": "D1",
+      "tree": "refs-linux",
+      "claim": "BUCKET_GC_GEN_MAX 是 96",
+      "arguments": [
+        "fs/bcachefs/alloc_background.h",
+        "BUCKET_GC_GEN_MAX[[:space:]]+96U"
+      ],
+      "raw": "ck  D1  refs-linux  \"BUCKET_GC_GEN_MAX 是 96\"       fs/bcachefs/alloc_background.h 'BUCKET_GC_GEN_MAX[[:space:]]+96U'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 317,
+      "end_line": 317,
+      "kind": "ck",
+      "decision": "D4",
+      "tree": "refs-zfs",
+      "claim": "blkptr_t 是 128 字节",
+      "arguments": [
+        "include/sys/spa.h",
+        "SPA_BLKPTRSHIFT[[:space:]]+7"
+      ],
+      "raw": "ck  D4  refs-zfs    \"blkptr_t 是 128 字节\"          include/sys/spa.h 'SPA_BLKPTRSHIFT[[:space:]]+7'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 318,
+      "end_line": 318,
+      "kind": "ck",
+      "decision": "D18",
+      "tree": "refs-zfs",
+      "claim": "预留区是 blk_prop2 + blk_pad",
+      "arguments": [
+        "include/sys/spa.h",
+        "uint64_t[[:space:]]+blk_prop2;"
+      ],
+      "raw": "ck  D18 refs-zfs    \"预留区是 blk_prop2 + blk_pad\"  include/sys/spa.h 'uint64_t[[:space:]]+blk_prop2;'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 319,
+      "end_line": 319,
+      "kind": "ck",
+      "decision": "D18",
+      "tree": "refs-zfs",
+      "claim": "BP_GET_REWRITE 用 blk_prop2 最高位",
+      "arguments": [
+        "include/sys/spa.h",
+        "BF64_GET\\(\\(bp\\)->blk_prop2, 63, 1\\)"
+      ],
+      "raw": "ck  D18 refs-zfs    \"BP_GET_REWRITE 用 blk_prop2 最高位\" include/sys/spa.h 'BF64_GET\\(\\(bp\\)->blk_prop2, 63, 1\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 320,
+      "end_line": 320,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "refs-zfs",
+      "claim": "密文校验和不论密钥在不在都能查损坏",
+      "arguments": [
+        "include/sys/spa.h",
+        "whether or not the$"
+      ],
+      "raw": "ck  D9  refs-zfs    \"密文校验和不论密钥在不在都能查损坏\" include/sys/spa.h 'whether or not the$'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 321,
+      "end_line": 321,
+      "kind": "ck",
+      "decision": "D4",
+      "tree": "refs-zfs",
+      "claim": "加密块最多 2 副本",
+      "arguments": [
+        "include/sys/spa.h",
+        "encrypted blocks can only have 2 copies"
+      ],
+      "raw": "ck  D4  refs-zfs    \"加密块最多 2 副本\"             include/sys/spa.h 'encrypted blocks can only have 2 copies'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 322,
+      "end_line": 322,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "refs-zfs",
+      "claim": "ZIO_DATA_MAC_LEN 是 16",
+      "arguments": [
+        "include/sys/zio.h",
+        "ZIO_DATA_MAC_LEN[[:space:]]+16"
+      ],
+      "raw": "ck  D9  refs-zfs    \"ZIO_DATA_MAC_LEN 是 16\"        include/sys/zio.h 'ZIO_DATA_MAC_LEN[[:space:]]+16'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 323,
+      "end_line": 323,
+      "kind": "ck",
+      "decision": "D5",
+      "tree": "refs-zfs",
+      "claim": "deadlist 并到更新的那一侧",
+      "arguments": [
+        "module/zfs/dsl_destroy.c",
+        "Merge our deadlist into next"
+      ],
+      "raw": "ck  D5  refs-zfs    \"deadlist 并到更新的那一侧\"      module/zfs/dsl_destroy.c 'Merge our deadlist into next'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 324,
+      "end_line": 324,
+      "kind": "ck",
+      "decision": "D5",
+      "tree": "refs-zfs",
+      "claim": "分叉点快照不许销毁",
+      "arguments": [
+        "module/zfs/dsl_destroy.c",
+        "Can't delete a branch point"
+      ],
+      "raw": "ck  D5  refs-zfs    \"分叉点快照不许销毁\"            module/zfs/dsl_destroy.c \"Can't delete a branch point\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 325,
+      "end_line": 325,
+      "kind": "ck",
+      "decision": "D16",
+      "tree": "refs-zfs",
+      "claim": "TXG_DEFER_SIZE 是 2",
+      "arguments": [
+        "include/sys/txg.h",
+        "TXG_DEFER_SIZE[[:space:]]+2"
+      ],
+      "raw": "ck  D16 refs-zfs    \"TXG_DEFER_SIZE 是 2\"           include/sys/txg.h 'TXG_DEFER_SIZE[[:space:]]+2'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 326,
+      "end_line": 326,
+      "kind": "ck",
+      "decision": "D17",
+      "tree": "refs-zfs",
+      "claim": "vdev 后端签名里带 txg",
+      "arguments": [
+        "include/sys/vdev_impl.h",
+        "vdev_asize_func_t\\(vdev_t \\*vd, uint64_t psize, uint64_t txg\\)"
+      ],
+      "raw": "ck  D17 refs-zfs    \"vdev 后端签名里带 txg\"          include/sys/vdev_impl.h 'vdev_asize_func_t\\(vdev_t \\*vd, uint64_t psize, uint64_t txg\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 327,
+      "end_line": 327,
+      "kind": "ck",
+      "decision": "D20",
+      "tree": "refs-zfs",
+      "claim": "ZFS 自陈设备不做单扇区原子覆写",
+      "arguments": [
+        "module/zfs/vdev_label.c",
+        "even though it is required to"
+      ],
+      "raw": "ck  D20 refs-zfs    \"ZFS 自陈设备不做单扇区原子覆写\"  module/zfs/vdev_label.c 'even though it is required to'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 328,
+      "end_line": 328,
+      "kind": "ck",
+      "decision": "D20",
+      "tree": "refs-zfs",
+      "claim": "ZFS 的 4 个 label",
+      "arguments": [
+        "include/sys/vdev_impl.h",
+        "#define[[:space:]]+VDEV_LABELS[[:space:]]+4"
+      ],
+      "raw": "ck  D20 refs-zfs    \"ZFS 的 4 个 label\"                include/sys/vdev_impl.h '#define[[:space:]]+VDEV_LABELS[[:space:]]+4'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 329,
+      "end_line": 329,
+      "kind": "ck",
+      "decision": "D20",
+      "tree": "refs-zfs",
+      "claim": "ZFS 的 128 KiB uberblock 环",
+      "arguments": [
+        "include/sys/vdev_impl.h",
+        "#define[[:space:]]+VDEV_UBERBLOCK_RING[[:space:]]+\\(128 << 10\\)"
+      ],
+      "raw": "ck  D20 refs-zfs    \"ZFS 的 128 KiB uberblock 环\"      include/sys/vdev_impl.h '#define[[:space:]]+VDEV_UBERBLOCK_RING[[:space:]]+\\(128 << 10\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 330,
+      "end_line": 330,
+      "kind": "ck",
+      "decision": "D20",
+      "tree": "refs-zfs",
+      "claim": "ZFS 槽号 = txg % 槽数（轮换）",
+      "arguments": [
+        "module/zfs/vdev_label.c",
+        "ub->ub_txg - \\(RRSS_GET_STATE"
+      ],
+      "raw": "ck  D20 refs-zfs    \"ZFS 槽号 = txg % 槽数（轮换）\"     module/zfs/vdev_label.c 'ub->ub_txg - \\(RRSS_GET_STATE'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 331,
+      "end_line": 331,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "refs-zfs",
+      "claim": "ZIL 有 zh_claim_txg",
+      "arguments": [
+        "include/sys/zil.h",
+        "zh_claim_txg"
+      ],
+      "raw": "ck  D23 refs-zfs    \"ZIL 有 zh_claim_txg\"           include/sys/zil.h 'zh_claim_txg'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 334,
+      "end_line": 334,
+      "kind": "ckn",
+      "decision": "D17",
+      "tree": "refs-linux",
+      "claim": "btrfs_is_zoned 的文件数",
+      "arguments": [
+        "22",
+        "grep -rn 'btrfs_is_zoned' '%ROOT%/fs/btrfs' | awk -F: '{print \\$1}' | sort -u | wc -l"
+      ],
+      "raw": "ckn D17 refs-linux  \"btrfs_is_zoned 的文件数\"        22 \"grep -rn 'btrfs_is_zoned' '%ROOT%/fs/btrfs' | awk -F: '{print \\$1}' | sort -u | wc -l\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 335,
+      "end_line": 335,
+      "kind": "ckn",
+      "decision": "D17",
+      "tree": "refs-linux",
+      "claim": "btrfs_is_zoned 的总处数",
+      "arguments": [
+        "93",
+        "grep -rn 'btrfs_is_zoned' '%ROOT%/fs/btrfs' | wc -l"
+      ],
+      "raw": "ckn D17 refs-linux  \"btrfs_is_zoned 的总处数\"        93 \"grep -rn 'btrfs_is_zoned' '%ROOT%/fs/btrfs' | wc -l\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 336,
+      "end_line": 336,
+      "kind": "ckn",
+      "decision": "D17",
+      "tree": "refs-linux",
+      "claim": "其中落在事务日志路径的",
+      "arguments": [
+        "5",
+        "grep -c 'btrfs_is_zoned' '%ROOT%/fs/btrfs/tree-log.c'"
+      ],
+      "raw": "ckn D17 refs-linux  \"其中落在事务日志路径的\"          5 \"grep -c 'btrfs_is_zoned' '%ROOT%/fs/btrfs/tree-log.c'\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 337,
+      "end_line": 337,
+      "kind": "ckn",
+      "decision": "D17",
+      "tree": "refs-linux",
+      "claim": "其中落在 ENOSPC 准入的",
+      "arguments": [
+        "6",
+        "grep -c 'btrfs_is_zoned' '%ROOT%/fs/btrfs/space-info.c'"
+      ],
+      "raw": "ckn D17 refs-linux  \"其中落在 ENOSPC 准入的\"          6 \"grep -c 'btrfs_is_zoned' '%ROOT%/fs/btrfs/space-info.c'\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 340,
+      "end_line": 340,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "refs-docs",
+      "claim": "RFC 8439 的 Tag truncation MUST NOT",
+      "arguments": [
+        "rfc8439.txt",
+        "Tag truncation"
+      ],
+      "raw": "ck  D9  refs-docs   \"RFC 8439 的 Tag truncation MUST NOT\" rfc8439.txt 'Tag truncation'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 341,
+      "end_line": 341,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "refs-docs",
+      "claim": "RFC 8439 的 2\\^128 possible tags",
+      "arguments": [
+        "rfc8439.txt",
+        "2\\^128"
+      ],
+      "raw": "ck  D9  refs-docs   \"RFC 8439 的 2\\^128 possible tags\"    rfc8439.txt '2\\^128'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 344,
+      "end_line": 344,
+      "kind": "ck",
+      "decision": "D2",
+      "tree": "host-kernel",
+      "claim": "io_min 取 phys_bs，与 physical_block_size 不同",
+      "arguments": [
+        "drivers/nvme/host/core.c",
+        "lim->io_min = phys_bs;"
+      ],
+      "raw": "ck  D2  host-kernel \"io_min 取 phys_bs，与 physical_block_size 不同\" drivers/nvme/host/core.c 'lim->io_min = phys_bs;'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 345,
+      "end_line": 345,
+      "kind": "ck",
+      "decision": "D2",
+      "tree": "host-kernel",
+      "claim": "physical_block_size 取 min(phys_bs, atomic_bs)",
+      "arguments": [
+        "drivers/nvme/host/core.c",
+        "lim->physical_block_size = min\\(phys_bs, atomic_bs\\)"
+      ],
+      "raw": "ck  D2  host-kernel \"physical_block_size 取 min(phys_bs, atomic_bs)\" drivers/nvme/host/core.c 'lim->physical_block_size = min\\(phys_bs, atomic_bs\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 346,
+      "end_line": 346,
+      "kind": "ck",
+      "decision": "D20",
+      "tree": "host-kernel",
+      "claim": "原子宽度要 ATOMICS 位且 nawupf 非零",
+      "arguments": [
+        "drivers/nvme/host/core.c",
+        "NVME_NS_FEAT_ATOMICS\\) && id->nawupf"
+      ],
+      "raw": "ck  D20 host-kernel \"原子宽度要 ATOMICS 位且 nawupf 非零\" drivers/nvme/host/core.c 'NVME_NS_FEAT_ATOMICS\\) && id->nawupf'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 347,
+      "end_line": 347,
+      "kind": "ckn",
+      "decision": "D9",
+      "tree": "host-kernel",
+      "claim": "MaxInvalids 全内核零命中",
+      "arguments": [
+        "0",
+        "grep -rl 'MaxInvalids' '%ROOT%' 2>/dev/null | wc -l"
+      ],
+      "raw": "ckn D9  host-kernel \"MaxInvalids 全内核零命中\"        0 \"grep -rl 'MaxInvalids' '%ROOT%' 2>/dev/null | wc -l\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 348,
+      "end_line": 348,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "host-kernel",
+      "claim": "dm-integrity 的 number_of_mismatches 只自增不比阈值",
+      "arguments": [
+        "drivers/md/dm-integrity.c",
+        "atomic64_inc\\(&ic->number_of_mismatches\\)"
+      ],
+      "raw": "ck  D9  host-kernel \"dm-integrity 的 number_of_mismatches 只自增不比阈值\" drivers/md/dm-integrity.c 'atomic64_inc\\(&ic->number_of_mismatches\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 349,
+      "end_line": 349,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "host-kernel",
+      "claim": "dm-integrity 的 recalc_sector 可被清零",
+      "arguments": [
+        "Documentation/admin-guide/device-mapper/dm-integrity.rst",
+        "set recalc_sector to zero"
+      ],
+      "raw": "ck  D9  host-kernel \"dm-integrity 的 recalc_sector 可被清零\" Documentation/admin-guide/device-mapper/dm-integrity.rst 'set recalc_sector to zero'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 350,
+      "end_line": 350,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "host-kernel",
+      "claim": "fscrypt 明写不防离线篡改",
+      "arguments": [
+        "Documentation/filesystems/fscrypt.rst",
+        "manipulate the filesystem offline"
+      ],
+      "raw": "ck  D9  host-kernel \"fscrypt 明写不防离线篡改\"        Documentation/filesystems/fscrypt.rst 'manipulate the filesystem offline'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 351,
+      "end_line": 351,
+      "kind": "ck",
+      "decision": "D17",
+      "tree": "host-kernel",
+      "claim": "dm-verity 的信任锚",
+      "arguments": [
+        "Documentation/admin-guide/device-mapper/verity.rst",
+        "no other authenticity"
+      ],
+      "raw": "ck  D17 host-kernel \"dm-verity 的信任锚\"              Documentation/admin-guide/device-mapper/verity.rst 'no other authenticity'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 352,
+      "end_line": 352,
+      "kind": "ck",
+      "decision": "D22",
+      "tree": "host-kernel",
+      "claim": "dm-flakey 造不出撕裂",
+      "arguments": [
+        "Documentation/admin-guide/device-mapper/dm-flakey.rst",
+        "corrupt_bio_byte"
+      ],
+      "raw": "ck  D22 host-kernel \"dm-flakey 造不出撕裂\"            Documentation/admin-guide/device-mapper/dm-flakey.rst 'corrupt_bio_byte'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 353,
+      "end_line": 353,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS_MIN_LOG_FACTOR 存在",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "XFS_MIN_LOG_FACTOR"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS_MIN_LOG_FACTOR 存在\"         fs/xfs/libxfs/xfs_log_format.h 'XFS_MIN_LOG_FACTOR'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 354,
+      "end_line": 354,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XLOG_MAX_ICLOGS 存在",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "XLOG_MAX_ICLOGS"
+      ],
+      "raw": "ck  D23 host-kernel \"XLOG_MAX_ICLOGS 存在\"            fs/xfs/libxfs/xfs_log_format.h 'XLOG_MAX_ICLOGS'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 355,
+      "end_line": 355,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 的 h_prev_block 是 32 位块号",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "__be32[[:space:]]+h_prev_block"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 的 h_prev_block 是 32 位块号\"  fs/xfs/libxfs/xfs_log_format.h '__be32[[:space:]]+h_prev_block'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 356,
+      "end_line": 356,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 用 h_cycle 分辨圈次",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "__be32[[:space:]]+h_cycle;"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 用 h_cycle 分辨圈次\"          fs/xfs/libxfs/xfs_log_format.h '__be32[[:space:]]+h_cycle;'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 357,
+      "end_line": 357,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 每个基本块带 cycle 戳",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "h_cycle_data\\[XLOG_CYCLE_DATA_SIZE\\]"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 每个基本块带 cycle 戳\"        fs/xfs/libxfs/xfs_log_format.h 'h_cycle_data\\[XLOG_CYCLE_DATA_SIZE\\]'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 358,
+      "end_line": 358,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 恢复靠 cycle 跃变找头",
+      "arguments": [
+        "fs/xfs/xfs_log_recover.c",
+        "first_half_cycle"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 恢复靠 cycle 跃变找头\"        fs/xfs/xfs_log_recover.c 'first_half_cycle'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 359,
+      "end_line": 359,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "jbd2 恢复后号跳过断点",
+      "arguments": [
+        "fs/jbd2/recovery.c",
+        "j_transaction_sequence"
+      ],
+      "raw": "ck  D23 host-kernel \"jbd2 恢复后号跳过断点\"            fs/jbd2/recovery.c 'j_transaction_sequence'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 360,
+      "end_line": 360,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 的事务可跨多条记录",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "XLOG_CONTINUE_TRANS"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 的事务可跨多条记录\"          fs/xfs/libxfs/xfs_log_format.h 'XLOG_CONTINUE_TRANS'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 361,
+      "end_line": 361,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 用 END_TRANS 标事务末条",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "XLOG_END_TRANS"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 用 END_TRANS 标事务末条\"      fs/xfs/libxfs/xfs_log_format.h 'XLOG_END_TRANS'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 362,
+      "end_line": 362,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 自陈单个 region 装不下就拆",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "split up into"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 自陈单个 region 装不下就拆\"   fs/xfs/libxfs/xfs_log_format.h 'split up into'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 363,
+      "end_line": 363,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "jbd2 的事务由多块拼成",
+      "arguments": [
+        "fs/jbd2/commit.c",
+        "jbd2_journal_get_descriptor_buffer"
+      ],
+      "raw": "ck  D23 host-kernel \"jbd2 的事务由多块拼成\"            fs/jbd2/commit.c 'jbd2_journal_get_descriptor_buffer'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 364,
+      "end_line": 364,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 的 CRC 覆盖载荷",
+      "arguments": [
+        "fs/xfs/xfs_log.c",
+        "crc32c\\(crc, dp, size\\)"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 的 CRC 覆盖载荷\"             fs/xfs/xfs_log.c 'crc32c\\(crc, dp, size\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 365,
+      "end_line": 365,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "jbd2 每个数据块自带校验和",
+      "arguments": [
+        "fs/jbd2/commit.c",
+        "jbd2_block_tag_csum_set"
+      ],
+      "raw": "ck  D23 host-kernel \"jbd2 每个数据块自带校验和\"        fs/jbd2/commit.c 'jbd2_block_tag_csum_set'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 366,
+      "end_line": 366,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "XFS 默认 iclog 32 KiB",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_log_format.h",
+        "XLOG_BIG_RECORD_BSIZE\t\\(32\\*1024\\)"
+      ],
+      "raw": "ck  D23 host-kernel \"XFS 默认 iclog 32 KiB\"           fs/xfs/libxfs/xfs_log_format.h 'XLOG_BIG_RECORD_BSIZE\t\\(32\\*1024\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 367,
+      "end_line": 367,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "host-kernel",
+      "claim": "jbd2 描述块塞满 tag 为止",
+      "arguments": [
+        "fs/jbd2/commit.c",
+        "space_left < tag_bytes"
+      ],
+      "raw": "ck  D23 host-kernel \"jbd2 描述块塞满 tag 为止\"         fs/jbd2/commit.c 'space_left < tag_bytes'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 368,
+      "end_line": 368,
+      "kind": "ck",
+      "decision": "D23",
+      "tree": "refs-linux",
+      "claim": "bcachefs 的 csum 是 jset 首字段",
+      "arguments": [
+        "fs/bcachefs/bcachefs_format.h",
+        "struct jset \\{"
+      ],
+      "raw": "ck  D23 refs-linux  \"bcachefs 的 csum 是 jset 首字段\"  fs/bcachefs/bcachefs_format.h 'struct jset \\{'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 369,
+      "end_line": 369,
+      "kind": "ck",
+      "decision": "D22",
+      "tree": "host-kernel",
+      "claim": "XFS 日志下限 10 MiB / 512 块",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_fs.h",
+        "XFS_MIN_LOG_BYTES[[:space:]]+\\(10 \\* 1024 \\* 1024ULL\\)"
+      ],
+      "raw": "ck  D22 host-kernel \"XFS 日志下限 10 MiB / 512 块\"     fs/xfs/libxfs/xfs_fs.h 'XFS_MIN_LOG_BYTES[[:space:]]+\\(10 \\* 1024 \\* 1024ULL\\)'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 370,
+      "end_line": 370,
+      "kind": "ck",
+      "decision": "D22",
+      "tree": "host-kernel",
+      "claim": "XFS 日志上限 2 GiB",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_fs.h",
+        "XFS_MAX_LOG_BYTES"
+      ],
+      "raw": "ck  D22 host-kernel \"XFS 日志上限 2 GiB\"               fs/xfs/libxfs/xfs_fs.h 'XFS_MAX_LOG_BYTES'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 371,
+      "end_line": 371,
+      "kind": "ck",
+      "decision": "D22",
+      "tree": "host-kernel",
+      "claim": "jbd2 日志下限 1024 块",
+      "arguments": [
+        "include/linux/jbd2.h",
+        "JBD2_MIN_JOURNAL_BLOCKS 1024"
+      ],
+      "raw": "ck  D22 host-kernel \"jbd2 日志下限 1024 块\"            include/linux/jbd2.h 'JBD2_MIN_JOURNAL_BLOCKS 1024'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 372,
+      "end_line": 372,
+      "kind": "ck",
+      "decision": "D12",
+      "tree": "host-kernel",
+      "claim": "btrfs 的 zoned incompat 位",
+      "arguments": [
+        "include/uapi/linux/btrfs.h",
+        "BTRFS_FEATURE_INCOMPAT_ZONED"
+      ],
+      "raw": "ck  D12 host-kernel \"btrfs 的 zoned incompat 位\"      include/uapi/linux/btrfs.h 'BTRFS_FEATURE_INCOMPAT_ZONED'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 373,
+      "end_line": 373,
+      "kind": "ck",
+      "decision": "D12",
+      "tree": "host-kernel",
+      "claim": "XFS 的 zoned incompat 位",
+      "arguments": [
+        "fs/xfs/libxfs/xfs_format.h",
+        "XFS_SB_FEAT_INCOMPAT_ZONED"
+      ],
+      "raw": "ck  D12 host-kernel \"XFS 的 zoned incompat 位\"        fs/xfs/libxfs/xfs_format.h 'XFS_SB_FEAT_INCOMPAT_ZONED'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 374,
+      "end_line": 374,
+      "kind": "ck",
+      "decision": "D12",
+      "tree": "host-kernel",
+      "claim": "md/raid0 的布局 feature bit",
+      "arguments": [
+        "include/uapi/linux/raid/md_p.h",
+        "MD_FEATURE_RAID0_LAYOUT"
+      ],
+      "raw": "ck  D12 host-kernel \"md/raid0 的布局 feature bit\"     include/uapi/linux/raid/md_p.h 'MD_FEATURE_RAID0_LAYOUT'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 375,
+      "end_line": 375,
+      "kind": "ck",
+      "decision": "D14",
+      "tree": "host-kernel",
+      "claim": "erofs 无条件只读",
+      "arguments": [
+        "fs/erofs/super.c",
+        "SB_RDONLY"
+      ],
+      "raw": "ck  D14 host-kernel \"erofs 无条件只读\"                fs/erofs/super.c 'SB_RDONLY'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 376,
+      "end_line": 376,
+      "kind": "ck",
+      "decision": "D14",
+      "tree": "host-kernel",
+      "claim": "btrfs 的默认内联上限",
+      "arguments": [
+        "fs/btrfs/fs.h",
+        "BTRFS_DEFAULT_MAX_INLINE"
+      ],
+      "raw": "ck  D14 host-kernel \"btrfs 的默认内联上限\"            fs/btrfs/fs.h 'BTRFS_DEFAULT_MAX_INLINE'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 377,
+      "end_line": 377,
+      "kind": "ck",
+      "decision": "D18",
+      "tree": "host-kernel",
+      "claim": "btrfs 用 transid 抓丢写/错向写",
+      "arguments": [
+        "fs/btrfs/disk-io.c",
+        "wrong place"
+      ],
+      "raw": "ck  D18 host-kernel \"btrfs 用 transid 抓丢写/错向写\"   fs/btrfs/disk-io.c 'wrong place'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 378,
+      "end_line": 378,
+      "kind": "ck",
+      "decision": "D18",
+      "tree": "host-kernel",
+      "claim": "f2fs 把 checkpoint CRC 塞进 cp_ver",
+      "arguments": [
+        "fs/f2fs/node.h",
+        "cur_cp_crc"
+      ],
+      "raw": "ck  D18 host-kernel \"f2fs 把 checkpoint CRC 塞进 cp_ver\" fs/f2fs/node.h 'cur_cp_crc'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 379,
+      "end_line": 379,
+      "kind": "ck",
+      "decision": "D18",
+      "tree": "host-kernel",
+      "claim": "ocfs2 的 metaecc",
+      "arguments": [
+        "fs/ocfs2/ocfs2_fs.h",
+        "ocfs2_block_check"
+      ],
+      "raw": "ck  D18 host-kernel \"ocfs2 的 metaecc\"                fs/ocfs2/ocfs2_fs.h 'ocfs2_block_check'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 380,
+      "end_line": 380,
+      "kind": "ck",
+      "decision": "D19",
+      "tree": "host-kernel",
+      "claim": "btrfs 的 sys_chunk_array 定长",
+      "arguments": [
+        "include/uapi/linux/btrfs_tree.h",
+        "BTRFS_SYSTEM_CHUNK_ARRAY_SIZE"
+      ],
+      "raw": "ck  D19 host-kernel \"btrfs 的 sys_chunk_array 定长\"    include/uapi/linux/btrfs_tree.h 'BTRFS_SYSTEM_CHUNK_ARRAY_SIZE'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 381,
+      "end_line": 381,
+      "kind": "ck",
+      "decision": "D9",
+      "tree": "host-kernel",
+      "claim": "ext4 把 uuid 折进 s_csum_seed",
+      "arguments": [
+        "fs/ext4/super.c",
+        "s_csum_seed"
+      ],
+      "raw": "ck  D9  host-kernel \"ext4 把 uuid 折进 s_csum_seed\"    fs/ext4/super.c 's_csum_seed'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 382,
+      "end_line": 382,
+      "kind": "ck",
+      "decision": "D13",
+      "tree": "host-kernel",
+      "claim": "iomap 契约里没有事务概念",
+      "arguments": [
+        "include/linux/iomap.h",
+        "iomap_begin"
+      ],
+      "raw": "ck  D13 host-kernel \"iomap 契约里没有事务概念\"          include/linux/iomap.h 'iomap_begin'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 385,
+      "end_line": 386,
+      "kind": "ckdoc",
+      "decision": "D18",
+      "tree": "refs-docs",
+      "claim": "OSTEP §45.6：身份校验抓不到丢失写",
+      "arguments": [
+        "ostep-45-file-integrity.pdf",
+        "the old block likely has a matching checksum"
+      ],
+      "raw": "ckdoc D18 refs-docs \"OSTEP §45.6：身份校验抓不到丢失写\"  ostep-45-file-integrity.pdf 'the old block likely has a matching checksum'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 387,
+      "end_line": 388,
+      "kind": "ckdoc",
+      "decision": "D18",
+      "tree": "refs-docs",
+      "claim": "NetApp FAST.20：lost write 占 13.54%",
+      "arguments": [
+        "netapp-fast20-ssd-reliability.pdf",
+        "Lost Writes 13 ?: ?54%"
+      ],
+      "raw": "ckdoc D18 refs-docs \"NetApp FAST.20：lost write 占 13.54%\" netapp-fast20-ssd-reliability.pdf 'Lost Writes 13 ?: ?54%'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 389,
+      "end_line": 390,
+      "kind": "ckdoc",
+      "decision": "D18",
+      "tree": "refs-docs",
+      "claim": "NetApp FAST.20：靠 WAFL 块签名发现",
+      "arguments": [
+        "netapp-fast20-ssd-reliability.pdf",
+        "signature, ?which includes attributes ?and ?version number"
+      ],
+      "raw": "ckdoc D18 refs-docs \"NetApp FAST.20：靠 WAFL 块签名发现\"   netapp-fast20-ssd-reliability.pdf 'signature, ?which includes attributes ?and ?version number'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 391,
+      "end_line": 392,
+      "kind": "ckdoc",
+      "decision": "D9",
+      "tree": "refs-docs",
+      "claim": "NaCl §9：一次伪造即可解出 r",
+      "arguments": [
+        "naclcrypto.pdf",
+        "by polynomial root-finding, easily determine ClampP"
+      ],
+      "raw": "ckdoc D9  refs-docs \"NaCl §9：一次伪造即可解出 r\"          naclcrypto.pdf 'by polynomial root-finding, easily determine ClampP'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 393,
+      "end_line": 394,
+      "kind": "ckdoc",
+      "decision": "D9",
+      "tree": "refs-docs",
+      "claim": "SP 800-38D §5.2.1.2 的五个 t 取值",
+      "arguments": [
+        "nist-sp800-38d.pdf",
+        "128, 120, 112, 104, or 96"
+      ],
+      "raw": "ckdoc D9  refs-docs \"SP 800-38D §5.2.1.2 的五个 t 取值\"     nist-sp800-38d.pdf '128, 120, 112, 104, or 96'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 395,
+      "end_line": 396,
+      "kind": "ckdoc",
+      "decision": "D9",
+      "tree": "refs-docs",
+      "claim": "SP 800-38D 的 shall not（七选一）",
+      "arguments": [
+        "nist-sp800-38d.pdf",
+        "shall not support values for t"
+      ],
+      "raw": "ckdoc D9  refs-docs \"SP 800-38D 的 shall not（七选一）\"     nist-sp800-38d.pdf 'shall not support values for t'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 397,
+      "end_line": 397,
+      "kind": "ckdocn",
+      "decision": "D9",
+      "tree": "refs-docs",
+      "claim": "MaxInvalids 属 38B 不属 38D（38B 侧）",
+      "arguments": [
+        "nist-sp800-38b.pdf",
+        "MaxInvalids",
+        "2"
+      ],
+      "raw": "ckdocn D9 refs-docs \"MaxInvalids 属 38B 不属 38D（38B 侧）\"  nist-sp800-38b.pdf 'MaxInvalids' 2",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 398,
+      "end_line": 398,
+      "kind": "ckdocn",
+      "decision": "D9",
+      "tree": "refs-docs",
+      "claim": "MaxInvalids 属 38B 不属 38D（38D 侧）",
+      "arguments": [
+        "nist-sp800-38d.pdf",
+        "MaxInvalids",
+        "0"
+      ],
+      "raw": "ckdocn D9 refs-docs \"MaxInvalids 属 38B 不属 38D（38D 侧）\"  nist-sp800-38d.pdf 'MaxInvalids' 0",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 399,
+      "end_line": 400,
+      "kind": "ckdoc",
+      "decision": "D8",
+      "tree": "refs-docs",
+      "claim": "FAST18：全路径索引的 Achilles heel",
+      "arguments": [
+        "betrfs-fast18-fullpath.pdf",
+        "Achilles' heel of full-path indexing"
+      ],
+      "raw": "ckdoc D8  refs-docs \"FAST18：全路径索引的 Achilles heel\"   betrfs-fast18-fullpath.pdf \"Achilles' heel of full-path indexing\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 401,
+      "end_line": 402,
+      "kind": "ckdoc",
+      "decision": "D8",
+      "tree": "refs-docs",
+      "claim": "FAST18：改名代价从子树大小降到深度",
+      "arguments": [
+        "betrfs-fast18-fullpath.pdf",
+        "proportional to the size of the subtree to the depth of the subtree"
+      ],
+      "raw": "ckdoc D8  refs-docs \"FAST18：改名代价从子树大小降到深度\"   betrfs-fast18-fullpath.pdf 'proportional to the size of the subtree to the depth of the subtree'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 403,
+      "end_line": 403,
+      "kind": "ckdocn",
+      "decision": "D8",
+      "tree": "refs-docs",
+      "claim": "FAST18 全文无 checksum",
+      "arguments": [
+        "betrfs-fast18-fullpath.pdf",
+        "checksum",
+        "0"
+      ],
+      "raw": "ckdocn D8 refs-docs \"FAST18 全文无 checksum\"               betrfs-fast18-fullpath.pdf 'checksum' 0",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 404,
+      "end_line": 405,
+      "kind": "ckdoc",
+      "decision": "D10",
+      "tree": "refs-docs",
+      "claim": "FAST18：git 负载把 ext4 scan 退化 15 倍",
+      "arguments": [
+        "betrfs-fast18-fullpath.pdf",
+        "degrade ext4 scan performance by up to 15"
+      ],
+      "raw": "ckdoc D10 refs-docs \"FAST18：git 负载把 ext4 scan 退化 15 倍\" betrfs-fast18-fullpath.pdf 'degrade ext4 scan performance by up to 15'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 406,
+      "end_line": 407,
+      "kind": "ckdoc",
+      "decision": "D10",
+      "tree": "refs-docs",
+      "claim": "FAST17：老化用连续 git checkout 内核树",
+      "arguments": [
+        "betrfs-fast17-senescence.pdf",
+        "successive git checkouts of the Linux kernel source"
+      ],
+      "raw": "ckdoc D10 refs-docs \"FAST17：老化用连续 git checkout 内核树\" betrfs-fast17-senescence.pdf 'successive git checkouts of the Linux kernel source'",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    },
+    {
+      "line": 408,
+      "end_line": 409,
+      "kind": "ckdoc",
+      "decision": "D10",
+      "tree": "refs-docs",
+      "claim": "FAST17：老化的 BetrFS 胜过别家未老化",
+      "arguments": [
+        "betrfs-fast17-senescence.pdf",
+        "Other than Btrfs, BetrFS's aged performance is better than the other file systems' unaged performance"
+      ],
+      "raw": "ckdoc D10 refs-docs \"FAST17：老化的 BetrFS 胜过别家未老化\" betrfs-fast17-senescence.pdf \"Other than Btrfs, BetrFS's aged performance is better than the other file systems' unaged performance\"",
+      "text_read": true,
+      "historical_source_verified": false,
+      "status": "pending_source_and_full_claim_semantics"
+    }
+  ],
+  "pdf_claims": [
+    {
+      "claim": "FlateDecode损坏/截断拒绝",
+      "status": "static_match",
+      "evidence": "31-45;test_review_regressions445-457"
+    },
+    {
+      "claim": "嵌套字符串/注释/转义换行/十六进制词法",
+      "status": "static_match_bounded",
+      "evidence": "49-129;459-466,642-649 existingtests notexecutedhere"
+    },
+    {
+      "claim": "仅BT/ET内Tj/TJ/单引双引文本",
+      "status": "static_match_bounded",
+      "evidence": "132-165;未涵盖全部PDF语法"
+    },
+    {
+      "claim": "同页Contents数组共享文本状态",
+      "status": "static_match_bounded",
+      "evidence": "205-227;631-640现有测试"
+    },
+    {
+      "claim": "Differences只补非ASCII码位，合并字体可能冲突",
+      "status": "static_match",
+      "evidence": "176-196;文档明确限制"
+    },
+    {
+      "claim": "CID/ToUnicode不支持，乱码不得证明无引文",
+      "status": "limitation_explicit",
+      "evidence": "11-14;未实现通用乱码检测，不将正文要求当成软件已检测"
+    },
+    {
+      "claim": "三份已知PDF锚点自证逐份计失败",
+      "status": "static_match_execution_pending",
+      "evidence": "240-284;本轮未取得真实文献或运行此自证"
+    },
+    {
+      "claim": "整份PDF字节到对象的通用正确性",
+      "status": "pending",
+      "evidence": "23-29仅字面obj/endobj切分；对象流/页面树顺序/加密/编码过滤组合均未验证"
+    }
+  ],
+  "pending_tests": [],
+  "external_truths_not_established": true,
+  "runtime": [
+    {
+      "task": 7221,
+      "exit_code": 0,
+      "log": "records/2026-11-02-文档代码逐项审核-任务7221.log",
+      "complete_log_read": true,
+      "task_clean": true,
+      "limits": "2真实CLI对照与2原判据对照，A56/A57复现；假树不能证明外部事实"
+    },
+    {
+      "task": 7222,
+      "exit_code": 0,
+      "log": "records/2026-11-02-文档代码逐项审核-任务7222.log",
+      "complete_log_read": true,
+      "task_clean": true,
+      "limits": "26格既有自证通过，含假PDF抽取器；不是89条真实来源复核"
+    }
+  ]
+}

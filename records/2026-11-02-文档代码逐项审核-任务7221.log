@@ -1,0 +1,10 @@
+== 任务 7221 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-7221.attempt-1.log（共 9 行，下面是整份）
+AUDIT_CITATIONS case=normal exit=1 summary=['══ 结果：4 条命中，85 条未命中；分组合计 89 条，与断言总数一致 ══']
+AUDIT_CITATIONS case=selftest_table_outside_selftest exit=0 summary=['══ 结果：4 条命中，0 条未命中；分组合计 4 条，与断言总数一致 ══', '  ✓ 全部命中（4 条，按树分组： refs-linux 2 refs-zfs 1 refs-docs 0 host-kernel 1）']
+AUDIT_CITATION_PREDICATE case=nonmatching_control exit=0
+  ✗ D19    bch_extent_ptr 是 offset:44/dev:8/gen:8   模式没命中：/tmp/singlefs-run-with-memory-cap-1376788-5tM8O8/audit-citation-trees-cfy86wag/refs/linux-6.17/fs/bcachefs/extents_format.h
+AUDIT_SCORE pass=0 fail=1
+AUDIT_CITATION_PREDICATE case=only_dev_no_offset_or_gen exit=0
+  ✓ D19    bch_extent_ptr 是 offset:44/dev:8/gen:8
+AUDIT_SCORE pass=1 fail=0
+AUDIT_CITATIONS sha256=6454e1877b501d67dc0cfdb15d68895175208a0087b9475ae888e33309cc72ee temporary_materials_removed=true

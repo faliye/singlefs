@@ -18,7 +18,7 @@
   .claude/hooks/runner-dispatch-guard.sh   ⑰ 报告行点名的那一个词整个是不是这一形态、解到哪一棵（leg_report_written_tree），整份提示里那几处（leg_report_mentions）
   .claude/hooks/handback-guard.sh          ② 交回里点名的报告（leg_report_mentions_in_trees），逐份交 cite-check.py
   leg_report_written_tree 与 leg_report_mentions 都只是在 leg_report_mentions_in_trees 外面包一层，不另写认法；is_leg_report_path 只认从仓根起的写法、不解树，
-  两份钩子都不再调它，只给派发闸的弄坏开关 leg-report-line-root-only（退回改前报告行那一支）用。
+  两份钩子都不再调它，只给派发闸的弄坏开关 leg-report-line-root-only（报告行只认从仓根起的写法那一支）用。
 形态：research/prompts/<名>-output.md，<名> 里没有空白、/、尖括号、引号与反引号、中文标点与括号（LEG_REPORT_NAME）：
   没填的占位（带 <、>，「<轮>-opus-output.md」）不认，子目录下的（research/prompts/<子目录>/…-output.md）不认；名字里的中文照认（骨架自证把占位填成「已填」）。
 leg_report_mentions(文字, 仓根) 在一段文字里找（LEG_REPORT_MENTION）：前面不连着字母、数字、_ . -，后面不接字母、数字、_ -，也不接「.<字母数字>」；

@@ -15,14 +15,13 @@ The only in-format alternative is padding the payload to 28672 (7 whole pages, h
 sequential read user bandwidth of padded form is 7.6%–9.2% less than with header. The two cells move in opposite directions; per pre-run hardcoded criterion 4 reporting only the crossover point: when random page reads account for 1.05%–1.47% of user bytes, the mixed costs of both forms are equal.
 Round 1 and Round 2 were each invalidated per their own clause b; their progression is documented in section "Progression of Two Invalidation Rounds".
 
-**Re-run command** (`timing` mode: single-round artifact for seed 1, ops 4096 supplied for `replay.sh` byte-for-byte comparison after stripping timing; nanoseconds and ratios pinned by range assertions):
+**Re-run command** (`timing` mode: `replay.sh` runs one round with seed 1 at the apparatus's default registered scale (ops 8192, region 8192 MiB), strips timing and compares byte for byte with the retained artifact; nanoseconds and ratios pinned by range assertions; when the given ops or region is smaller than the registered value, the config row records the reduction and the output is not taken as a formal artifact):
 
 ```bash
 bash scripts/experiment-apparatus/replay.sh E140          # Test partition taken from REPLAY_DEV140, defaulting to temp dir, binary creates and fills 8 GiB itself
 # Run apparatus directly (five seeds of Round 3; test file path forbidden from repository):
-cd scripts/experiment-apparatus && cargo build --release --bin e140-header-alignment
-for s in 1 2 3 4 5; do ./target/release/e140-header-alignment "${E140_IMG:-${TMPDIR:-/tmp}/e140.img}" $s none 16384 8192; done
-./target/release/e140-header-alignment "${E140_IMG:-${TMPDIR:-/tmp}/e140.img}" 1 nodirect 16384 8192   # Negative control, run twice
+task-server/task submit -- bash -c 'for s in 1 2 3 4 5; do cargo run --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e140-header-alignment -- "${E140_IMG:-$TMPDIR/e140.img}" $s none 16384 8192; done'
+task-server/task submit -- bash -c 'cargo run --release --manifest-path scripts/experiment-apparatus/Cargo.toml --bin e140-header-alignment -- "${E140_IMG:-$TMPDIR/e140.img}" 1 nodirect 16384 8192'   # Negative control, run twice
 ```
 
 Code `scripts/experiment-apparatus/e140_header_alignment.rs`, pre-run registration `e140-preregistration.md` (all three rounds of registration contained within, criteria and thresholds unedited by a single word),
@@ -136,10 +135,10 @@ Three tiers of Criterion 4: "both cells lose ≥ 10%" did not occur, "both cells
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D4 (Checksum Location) settled item 5 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D18 (Information Carried in a Block) settled item 14 | Material | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D19 (Block Pointer Structure & Width Budget) settled item 4 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D25 (Target Workload Priority) | Material | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D4 (Checksum Location) settled item 5 | Supports | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the rerun wording was changed; conclusions, numbers, and artifacts all unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D18 (Information Carried in a Block) settled item 14 | Material | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the rerun wording was changed; conclusions, numbers, and artifacts all unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D19 (Block Pointer Structure & Width Budget) settled item 4 | Does not affect | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the rerun wording was changed; conclusions, numbers, and artifacts all unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D25 (Target Workload Priority) | Material | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-03 unaffected: only the rerun wording was changed; conclusions, numbers, and artifacts all unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

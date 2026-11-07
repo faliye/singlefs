@@ -3,7 +3,7 @@
 project-code-guard.sh（PreToolUse[Bash]）在 scan_decision() 里调这一份，按文件路径用 importlib 导入。
 
 编译目录（workspace_cargo_target_refusal）：
-  用户定案「所有脚本自行编译，完成后自行删除 不再预留生成物」：主工作区里直接敲的 cargo 编进 <仓根>/target、删了又长，这一判在执行前拒。
+  所有脚本自行编译，完成后自行删除、不再预留生成物：主工作区里直接敲的 cargo 编进 <仓根>/target、删了又长，这一判在执行前拒。
   ① 命令位置上的每一条 cargo 照 cargo_invocations 取（包装剥掉之后剥出来的那条再切一遍，bash -c、cd 跟着走；run-build-directory.sh 那一层记下来；
      命令文本本身里只定义、调不到的 `function 名字 { …; }` 的函数体不判，与项目代码那一处同一个口径，拆开拼写调到的、认不准的照判：lib_shell_words.py 的 function_never_called）；
      子命令是会编的（BUILDING_SUBCOMMANDS：build、check、test、bench、run、doc、clippy、rustc、rustdoc、fix 与它们的内建别名）才判，fmt、metadata、tree、clean 这类放行。
@@ -26,7 +26,7 @@ project-code-guard.sh（PreToolUse[Bash]）在 scan_decision() 里调这一份�
 （格名是 selftest 里 cell 的说明）：
   WORKSPACE_CARGO_LOCK_BREAK=bare-cargo-allowed  不判编译目录，一律放行
       「编译目录：裸 cargo test：拒」「编译目录：cd 进 crates/ 之后的 cargo build：拒」「编译目录：经内存包装起：拒」「编译目录：capped.sh、nice、timeout、env 包着：拒」
-      「编译目录：bash -c 里起：拒」「编译目录：CARGO_TARGET_DIR 指到仓里：拒」「编译目录：拒绝说明给出经 task-server 提交的出路」等这一判里该拒的 12 格、「cd 进写在变量里的主工作区再起：拒」与三方 shell-words-r2 判决第 8 条加的「编译目录：function 定义之后拆开拼写调用：拒」，
+      「编译目录：bash -c 里起：拒」「编译目录：CARGO_TARGET_DIR 指到仓里：拒」「编译目录：拒绝说明给出经 task-server 提交的出路」等这一判里该拒的 12 格、「cd 进写在变量里的主工作区再起：拒」与「编译目录：function 定义之后拆开拼写调用：拒」，
       与「编译目录：CARGO_TARGET_DIR 写在算不出的变量里：放行并记一条」（不记 notice）；project-code-guard.sh 自检「编译目录：」开头该拒的三格与「编译目录：function 定义之后拆开拼写调用：拒（退出码 2）」
   WORKSPACE_CARGO_LOCK_BREAK=outside-target-not-recognized  不认显式给的编译目录（--target-dir、CARGO_TARGET_DIR、CARGO_BUILD_TARGET_DIR、--config）
       「编译目录：带仓外 CARGO_TARGET_DIR：放行」「编译目录：export 了仓外 CARGO_TARGET_DIR 再起：放行」「编译目录：会话环境里有仓外 CARGO_TARGET_DIR：放行」
@@ -37,7 +37,7 @@ project-code-guard.sh（PreToolUse[Bash]）在 scan_decision() 里调这一份�
       「编译目录：拒绝说明给出经 task-server 提交的出路」；project-code-guard.sh 自检「编译目录：拒绝说明给出经 task-server 提交的出路」「lib_workspace_cargo_lock.py 的自检」
   WORKSPACE_CARGO_LOCK_BREAK=non-building-refused  不编的子命令也判
       「编译目录：cargo fmt：放行」「编译目录：cargo metadata、cargo tree、cargo clean：放行」
-  WORKSPACE_CARGO_LOCK_BREAK=uncalled-functions-judged  命令文本本身里只定义、调不到的 function 的函数体也判（三方 shell-words-r2 判决第二节第 8 条之前的判法）
+  WORKSPACE_CARGO_LOCK_BREAK=uncalled-functions-judged  命令文本本身里只定义、调不到的 function 的函数体也判
       「编译目录：只定义、调不到的 function 函数体：放行」；project-code-guard.sh 自检「编译目录：只定义、调不到的 function 函数体：放行（退出码 0）」与「lib_workspace_cargo_lock.py 的自检」
 另有 lib_shell_words.py 的 LIB_SHELL_WORDS_BREAK=function-calls-literal-only（拆开拼写的调用认不出）与 function-keyword-as-command（function 关键字当命令词）：「编译目录：function 定义之后拆开拼写调用：拒」；
 uncalled-functions-run（只定义的函数体照判）：「编译目录：只定义、调不到的 function 函数体：放行」
@@ -86,7 +86,7 @@ def cargo_invocations(command, directory, shell_words, project_code_runs, enviro
     里面起的每一条记 own_build_directory（弄坏开关 wrapper-not-recognized 下不记）。→ [CargoInvocation]。
     最外一层（depth 0，Bash 调用的命令文本本身）里只定义、调不到的 `function 名字 { …; }` 的函数体不判，与 project-code-guard.sh 判项目代码那一处同一个口径
     （lib_shell_words.py 的 uncalled_functions_skipped / function_never_called：拆开拼写调到的、认不准的照判；剥出来的里一层照判函数体）；
-    弄坏开关 uncalled-functions-judged 下最外一层也照判函数体（改前的判法）。"""
+    弄坏开关 uncalled-functions-judged 下最外一层也照判函数体。"""
     invocations = []
     skip_uncalled = depth == 0 and not switch_is_set("uncalled-functions-judged")
     for found in shell_words.commands_at_command_position(command, directory, environment, uncalled_functions_skipped=skip_uncalled).commands:
@@ -321,7 +321,7 @@ def selftest():
         target_cell("编译目录：git worktree 加出来的树里起：放行", "cargo build", linked, False)
         target_cell("编译目录：CARGO_TARGET_DIR 写在算不出的变量里：放行并记一条", "CARGO_TARGET_DIR=$SOMEWHERE/target cargo build", main, False, want_notice=True)
         target_cell("编译目录：命令里只是提到 cargo 的字：放行", "echo cargo build; grep -n cargo Cargo.toml", main, False)
-        # 只定义、调不到的 function 与判项目代码那一处同一个口径（三方 shell-words-r2 判决第二节第 2、8 条；uncalled-functions-judged 下第一格红，
+        # 只定义、调不到的 function 与判项目代码那一处同一个口径（research/prompts/shell-words-r2-main-verification.md 第二节第 2、8 条；uncalled-functions-judged 下第一格红，
         # lib_shell_words.py 的 function-calls-literal-only 下第二格红）
         target_cell("编译目录：只定义、调不到的 function 函数体：放行", "function noop { cargo build; }", main, False)
         target_cell("编译目录：function 定义之后拆开拼写调用：拒", 'function noop { cargo build; }; "no"op', main, True)

@@ -6,7 +6,8 @@ chmod +x .crash-point-replay-sample-tools/cargo .crash-point-replay-sample-tools
 # 上一版：与这一版逐字相同（先拷一份，替换文与原文相同）
 prior=.unit-verdict-sample/prior
 mkdir -p "$prior"
-cp -dR --preserve=timestamps,links Cargo.toml crates "$prior/"
+# 上一版连同登记表（.claude/gate.d 下的 stage-inputs.tsv 与合表）一起拷：阶段给验证包那几格的上一版算键时带 --exclude-registered，test-plan 从那一版的树里读登记的崩溃枚举用例，缺了就算不出键
+cp -dR --preserve=timestamps,links Cargo.toml crates .claude "$prior/"
 python3 -c '
 import sys
 path, old, new = sys.argv[1:4]

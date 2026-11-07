@@ -8,7 +8,7 @@
 # gate-similar: doc-experiments.sh 同样各写一份汇总外壳，格判的是实验页与产物，不并进来
 # gate-similar: doc-decisions.sh 它是第一道改用这份库的阶段，只留格的判法
 #
-# 门禁阶段共用的格结构：登记格、解析 --list / --check、样本只跑点名的格、每格一个子 shell、逐格汇总。
+# 门禁阶段共用的格结构：登记格、解析 --list / --check、样本只跑点名的格、每格一个子 shell（放进它自己的进程组）、逐格汇总。
 # 规则：.claude/rules/verification.md「门禁的结构」。这份库只管格，不判整道要不要跑。
 #
 # 阶段里的写法（preflight 那一行之后）：
@@ -32,7 +32,7 @@
 #   被判的根（pwd -P）不是这道阶段所在的仓（阶段文件往上两级，pwd -P）、也没设 GATE_STAGED_FROM 时，
 #   只跑文件里点名的格；与 --check 走同一段选格（stage_cells_pick）。文件里点了没登记的格、或一格都没点：退 2。
 #
-# 弄坏开关只在样本根上认（C622（门禁的弄坏开关平常跑也认），用户 2026-10-01 定「样本根里放标记」）：stage_cells_run 开头先调
+# 弄坏开关只在样本根上认（C622（门禁的弄坏开关平常跑也认））：stage_cells_run 开头先调
 #   stage_cells_refuse_unsampled_break_switches：环境里有名字以 _BREAK 结尾、值非空的变量（哪一道、哪一份库的开关都算，连同 STAGE_CELLS_BREAK），
 #   而被判的根（当前目录）不是样本根，就一格都不跑、退 2。样本根：根里有 .gate-cells 或 .gate-break-sample（空文件也行，随样本进库），
 #   而且这个根（pwd -P）不是这道阶段所在的仓、也没设 GATE_STAGED_FROM（与 .gate-cells 同一条判据）。是样本根时打一行「认环境里的弄坏开关」。
@@ -42,6 +42,12 @@
 #   不 source 这份库跑格的阶段（门禁 crash-point-replay）在 cd 到根之后自己调这一个函数。
 #
 # stage_cells_run：每格的退出码写进临时目录，全部跑完按登记次序回读（份数对不上判红）。
+#   每格一个子 shell，放进它自己的进程组（stage_cells_run_cell：只在起它的那一刻开作业控制 set -m，组号就是子 shell 的进程号），
+#   门禁在 wait 里等它；标准输入是终端时格的标准输入换成 /dev/null（后台的组读终端会被 SIGTTIN 停住）。
+#   门禁收到 TERM、INT、HUP（stage_cells_stop_on_signal）：对正在跑的那一格整组先 TERM，过 STAGE_CELLS_TERM_GRACE_SECONDS 秒组里还有没退出的（僵尸不算）再 KILL，
+#   再在 /proc 里核组里没有留下进程（留下的逐个列进那一行 ✗），之后退 128 加信号号（TERM 143、INT 130、HUP 129）；阶段自己的 EXIT trap 照跑。
+#   规则：.claude/singlefs-ai-sop/rules/command-safety.md「装置起的样本进程，放进它自己的进程组」。SIGKILL 收不到，那一种靠起门禁的一方收它的会话
+#   （scripts/gate/lib_process_group.py 的 run_in_own_session）与外层的 scope。格正常退出时不收它丢下的进程，判法与汇总照旧。
 #   汇总逐格一行「<格名>：绿 / 红（退出 N）/ 本次未跑」。
 #   有一格红（退出码不是 0、77、75）⇒ 整道退 1，红格逐格接它登记的出路，末了给只重跑红格的 --check 命令；
 #   没有红、有格退 75（prune-server 不可用：判定库连不上，scripts/prune-server/prune_server_client.py 文件头「退出码」）⇒ 整道退 75，
@@ -69,11 +75,12 @@
 #   not-run-unreported  退 77 的格不往 $GATE_NOT_RUN_FILE 报        all-not-run、mixed 判错
 #   generic-howto       红格不接它自己的出路，只给一句通用的        red 判错
 #   last-run-unwritten  不写上次红的清单                            last-run-whole、last-run-partial 判错
-#   break-honored-everywhere  弄坏开关在哪个根上都认（改前的样子）   break-without-marker、break-with-marker、break-staged、break-own-repository、
+#   break-honored-everywhere  弄坏开关在哪个根上都认               break-without-marker、break-with-marker、break-staged、break-own-repository、
 #                             break-own-repository-marked、break-own-repository-marked-staged、break-own-repository-elsewhere 判错
 #   own-repository-any-marker  阶段所在的仓里有 .gate-break-sample 就认，不看第一行   break-own-repository、break-own-repository-elsewhere 判错
-#   own-repository-refused     阶段所在的仓一律不认（改前的样子：自证搭的小仓也拒）   break-own-repository-marked 判错
-#   unavailable-as-red  格退 75 照红记、整道退 1（改前的样子）                         unavailable 判错
+#   own-repository-refused     阶段所在的仓一律不认（自证搭的小仓也拒）               break-own-repository-marked 判错
+#   unavailable-as-red  格退 75 照红记、整道退 1                                       unavailable 判错
+#   term-leaves-cell    格在前台子 shell 里跑、不装 trap：门禁被 TERM 时自己退出，格里的进程不收   term-collects-cell 判错
 
 declare -ga STAGE_CELLS_NAMES=()
 declare -gA STAGE_CELLS_FUNCTION=() STAGE_CELLS_TITLE=() STAGE_CELLS_HOWTO=()
@@ -86,6 +93,11 @@ STAGE_CELLS_STAGE_REPOSITORY=""
 # 自证搭的小仓在 .gate-break-sample 第一行写这一句、紧接这个根的 pwd -P（文件头「弄坏开关只在样本根上认」）；scripts/mutation/mutation-shard-run.sh 的自证从这一行现读
 STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE="自证在临时目录里搭的小仓，阶段的副本就在这棵树里："
 STAGE_CELLS_REUSE_CHECKS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P)/scripts/gate/lib_reuse_checks.py"
+# 收到信号时收格的宽限：比 scripts/gate/lib_process_group.py 的 TERM_GRACE_SECONDS（8 秒）短，起门禁的一方收会话之前这一层先把格收完
+STAGE_CELLS_TERM_GRACE_SECONDS=5
+STAGE_CELLS_RUNNING_GROUP=""
+STAGE_CELLS_RUNNING_PID=""
+STAGE_CELLS_RUNNING_NAME=""
 if [[ "$STAGE_CELLS_STAGE_FILE" == */* ]]; then
   STAGE_CELLS_STAGE_REPOSITORY="$(cd "${STAGE_CELLS_STAGE_FILE%/*}/../.." 2>/dev/null && pwd -P)"
 else
@@ -277,6 +289,82 @@ stage_cells_write_last_run() {
   return 0
 }
 
+# stage_cells_group_members <进程组号>：/proc 里这个组还没退出的进程号（僵尸不算），一行一个。只读，不发信号。
+stage_cells_group_members() {
+  local stat_file line rest state group
+  for stat_file in /proc/[0-9]*/stat; do
+    { read -r line < "$stat_file"; } 2>/dev/null || continue
+    rest="${line##*) }"            # 进程名里可能带空格与右括号，从最后一个「) 」之后数：状态、父进程号、进程组号……
+    state="${rest%% *}"; rest="${rest#* }"; rest="${rest#* }"; group="${rest%% *}"
+    if [[ "$group" == "$1" && "$state" != Z && "$state" != X ]]; then
+      printf '%s\n' "${stat_file//[!0-9]/}"
+    fi
+  done
+}
+
+# stage_cells_stop_on_signal <信号名> <信号号>：门禁收到 TERM、INT、HUP 时的 trap（文件头「stage_cells_run」）。
+#   正在跑的那一格整组先 TERM、过宽限 KILL，核组里没有留下进程，再退 128 加信号号；没有格在跑就直接退。收尾这一段里再来的信号不打断它。
+stage_cells_stop_on_signal() {
+  local signal_name="$1" signal_number="$2" group="$STAGE_CELLS_RUNNING_GROUP" cell_pid="$STAGE_CELLS_RUNNING_PID" deadline left=""
+  trap '' TERM INT HUP
+  if [[ -n "$group" ]]; then
+    kill -TERM -- -"$group" 2>/dev/null
+    deadline=$((SECONDS + STAGE_CELLS_TERM_GRACE_SECONDS))
+    while ((SECONDS < deadline)) && [[ -n "$(stage_cells_group_members "$group")" ]]; do sleep 0.1; done
+    kill -KILL -- -"$group" 2>/dev/null
+    wait "$cell_pid" 2>/dev/null
+    # KILL 之后再等至多两秒，让孙进程的僵尸被收走，再核组里还有谁
+    deadline=$((SECONDS + 2))
+    left="$(stage_cells_group_members "$group")"
+    while [[ -n "$left" ]] && ((SECONDS < deadline)); do sleep 0.1; left="$(stage_cells_group_members "$group")"; done
+  elif [[ -n "$cell_pid" ]]; then
+    kill -TERM "$cell_pid" 2>/dev/null
+    wait "$cell_pid" 2>/dev/null
+  fi
+  if [[ -n "$left" ]]; then
+    printf '  ✗ %s：收到 SIG%s，正在跑的格 %s 没跑完；对它的进程组 %s 先 TERM、过宽限 KILL 之后组里还留着：%s\n' \
+      "$STAGE_CELLS_STAGE_NAME" "$signal_name" "$STAGE_CELLS_RUNNING_NAME" "$group" "$(tr '\n' ' ' <<<"$left")"
+    printf '     → 怎么办：这一道是被停掉的，不算判过；上面那几个进程停不掉（多半卡在内核里），报给主 agent，别的照常重跑：bash .claude/gate.d/%s --check %s\n' \
+      "$STAGE_CELLS_STAGE_NAME" "$STAGE_CELLS_RUNNING_NAME"
+  elif [[ -n "$STAGE_CELLS_RUNNING_NAME" ]]; then
+    printf '  ✗ %s：收到 SIG%s，正在跑的格 %s 没跑完；已对它的进程组 %s 先 TERM、过宽限 KILL，组里一个不剩，这一道退 %s\n' \
+      "$STAGE_CELLS_STAGE_NAME" "$signal_name" "$STAGE_CELLS_RUNNING_NAME" "${group:-（没放进自己的组，只停了子 shell $cell_pid）}" "$((128 + signal_number))"
+    printf '     → 怎么办：这一道是被停掉的，不算判过；要结果就重跑：bash .claude/gate.d/%s --check %s\n' "$STAGE_CELLS_STAGE_NAME" "$STAGE_CELLS_RUNNING_NAME"
+  else
+    printf '  ✗ %s：收到 SIG%s，此刻没有格在跑，这一道退 %s\n' "$STAGE_CELLS_STAGE_NAME" "$signal_name" "$((128 + signal_number))"
+    printf '     → 怎么办：这一道是被停掉的，不算判过；要结果就整道重跑：bash .claude/gate.d/%s\n' "$STAGE_CELLS_STAGE_NAME"
+  fi
+  exit $((128 + signal_number))
+}
+
+# stage_cells_run_cell <格名> <函数>：格放进它自己的进程组跑（文件头「stage_cells_run」），交回格的退出码。
+#   作业控制只开在起它的那一刻：开着 set -m 起的后台子 shell 由 bash 放进新的进程组（组号是它的进程号），之后照原样关回去。
+#   起完核一遍组号；没进自己的组（作业控制没开起来）就打一行 !，收到信号时只停得到这一格的子 shell。
+stage_cells_run_cell() {
+  local cell_pid cell_group="" stat_line monitor_was_on=0
+  [[ $- == *m* ]] && monitor_was_on=1
+  set -m
+  if [[ -t 0 ]]; then
+    ( "$2" ) < /dev/null &
+  else
+    ( "$2" ) &
+  fi
+  cell_pid=$!
+  ((monitor_was_on)) || set +m
+  if { read -r stat_line < "/proc/$cell_pid/stat"; } 2>/dev/null; then
+    stat_line="${stat_line##*) }"; stat_line="${stat_line#* }"; stat_line="${stat_line#* }"; cell_group="${stat_line%% *}"
+  fi
+  if [[ "$cell_group" != "$cell_pid" ]]; then
+    printf '  ! %s：格 %s 的子 shell %s 没放进自己的进程组（组号读到「%s」），收到信号时只停得到它自己\n' "$STAGE_CELLS_STAGE_NAME" "$1" "$cell_pid" "$cell_group"
+    cell_group=""
+  fi
+  STAGE_CELLS_RUNNING_NAME="$1"; STAGE_CELLS_RUNNING_PID="$cell_pid"; STAGE_CELLS_RUNNING_GROUP="$cell_group"
+  local cell_exit=0
+  wait "$cell_pid" || cell_exit=$?
+  STAGE_CELLS_RUNNING_NAME=""; STAGE_CELLS_RUNNING_PID=""; STAGE_CELLS_RUNNING_GROUP=""
+  return "$cell_exit"
+}
+
 stage_cells_run() {
   local root="${1:-.}" scratch name function_name cell_exit index=0 collected=0
   local green=() red=() not_run=() unavailable=()
@@ -284,6 +372,12 @@ stage_cells_run() {
   stage_cells_refuse_unsampled_break_switches "$root"
   stage_cells_apply_sample_marker "$root"
   scratch="$(mktemp -d)" || { printf '  ✗ %s：建不了放逐格退出码的临时目录\n' "$STAGE_CELLS_STAGE_NAME"; printf '     → 怎么办：看 $TMPDIR 满没满、有没有写权限，修好再跑；这一道一格都没跑。\n'; exit 1; }
+  # 收到 TERM、INT、HUP 时先收正在跑的那一格（文件头「stage_cells_run」）；stage_cells_run 不返回，trap 装上就不再拆
+  if [[ "${STAGE_CELLS_BREAK:-}" != term-leaves-cell ]]; then
+    trap 'stage_cells_stop_on_signal TERM 15' TERM
+    trap 'stage_cells_stop_on_signal INT 2' INT
+    trap 'stage_cells_stop_on_signal HUP 1' HUP
+  fi
   for name in "${STAGE_CELLS_SELECTED[@]}"; do
     function_name="${STAGE_CELLS_FUNCTION[$name]}"
     printf '── %s：%s\n' "$name" "${STAGE_CELLS_TITLE[$name]}"
@@ -293,7 +387,9 @@ stage_cells_run() {
       cell_exit=1
     elif [[ "${STAGE_CELLS_BREAK:-}" == shared-shell ]]; then
       "$function_name"; cell_exit=$?
-    elif ( "$function_name" ); then
+    elif [[ "${STAGE_CELLS_BREAK:-}" == term-leaves-cell ]]; then
+      if ( "$function_name" ); then cell_exit=0; else cell_exit=$?; fi
+    elif stage_cells_run_cell "$name" "$function_name"; then
       cell_exit=0
     else
       cell_exit=$?
@@ -376,6 +472,16 @@ stage_cells_run() {
 }
 
 # ── 自证 ──
+# stage_cells_process_alive <进程号> <命令行开头>：那个进程还在（不是僵尸），命令行以给的那一段开头（进程号被别人复用的不算）。只读。
+stage_cells_process_alive() {
+  local stat_line state command_line
+  { read -r stat_line < "/proc/$1/stat"; } 2>/dev/null || return 1
+  stat_line="${stat_line##*) }"; state="${stat_line%% *}"
+  [[ "$state" != Z && "$state" != X ]] || return 1
+  command_line="$(tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null)"
+  [[ "$command_line" == "$2"* ]]
+}
+
 # stage_cells_selftest <树根> [nested]：造一道三格（alpha、beta、gamma）的合成阶段 source 那棵树里的这一份库
 # （<树根>/.claude/gate.d/lib/stage-cells.sh），逐条判
 stage_cells_selftest() {
@@ -392,7 +498,7 @@ stage_cells_selftest() {
   # 这一趟的 STAGE_CELLS_BREAK 经 SAMPLE_CELLS_BROKEN 交进合成阶段、在里面当不导出的变量用：只证这份库的格结构，不让「弄坏开关只在样本根上认」
   # 那一判把每一条都拦成退 2；那一判自己由 break-* 那几条用环境里的 SAMPLE_SWITCH_BREAK 证。
   printf '%s\n' '#!/usr/bin/env bash' 'set -uo pipefail' 'STAGE_CELLS_BREAK="${SAMPLE_CELLS_BROKEN:-}"; unset SAMPLE_CELLS_BROKEN' "source $(printf '%q' "$library_under_test")" \
-      'cell_alpha() { printf "alpha\n" >> "$SAMPLE_TRACE"; echo "  alpha 格判完"; exit "${OUTCOME_ALPHA:-0}"; }' \
+      'cell_alpha() { printf "alpha\n" >> "$SAMPLE_TRACE"; if [[ -n "${SAMPLE_SLEEPER:-}" ]]; then sleep 293 & printf "%s\n" "$!" > "$SAMPLE_SLEEPER"; wait "$!"; fi; echo "  alpha 格判完"; exit "${OUTCOME_ALPHA:-0}"; }' \
       'cell_beta()  { printf "beta\n"  >> "$SAMPLE_TRACE"; echo "  beta 格判完";  exit "${OUTCOME_BETA:-0}"; }' \
       'cell_gamma() { printf "gamma\n" >> "$SAMPLE_TRACE"; echo "  gamma 格判完"; exit "${OUTCOME_GAMMA:-0}"; }' \
       'stage_cell alpha cell_alpha "判甲" "甲的出路：改甲"' \
@@ -526,11 +632,36 @@ stage_cells_selftest() {
   fi
   rm -f "$own_root/.gate-break-sample"
   sample_case break-empty-value 0 "alpha beta gamma" SAMPLE_SWITCH_BREAK= -- "$bare_root"
+  # 门禁被 TERM（文件头「stage_cells_run」）：alpha 格里放一个睡着的孙进程（SAMPLE_SLEEPER 记下它的进程号），等它起来再只给门禁 bash 发 TERM；
+  # 门禁要退 143、打出「收到 SIGTERM」，孙进程跟着没了。合成阶段用 setsid 起在它自己的会话里，开关 term-leaves-cell 下留下的进程都在那一组里，判完对那一组 KILL 收尾。
+  label=term-collects-cell; cases=$((cases + 1))
+  local term_stage_pid sleeper_pid="" sleeper_waited=0 term_switches=() term_switch_name
+  while IFS= read -r term_switch_name; do
+    [[ "$term_switch_name" == *_BREAK ]] && term_switches+=(-u "$term_switch_name")
+  done < <(compgen -e)
+  : > "$scratch/trace"; rm -f "$scratch/sleeper"
+  env -u GATE_NOT_RUN_FILE -u GATE_STAGED_FROM ${term_switches[@]+"${term_switches[@]}"} SAMPLE_CELLS_BROKEN="${STAGE_CELLS_BREAK:-}" \
+    SAMPLE_TRACE="$scratch/trace" SAMPLE_REST="$scratch/rest" SAMPLE_SLEEPER="$scratch/sleeper" \
+    setsid --wait bash "$stage_file" --check alpha "$sample_root" > "$scratch/out" 2>&1 < /dev/null &
+  term_stage_pid=$!
+  while [[ ! -s "$scratch/sleeper" ]] && ((sleeper_waited < 100)); do sleep 0.1; sleeper_waited=$((sleeper_waited + 1)); done
+  sleeper_pid="$(cat "$scratch/sleeper" 2>/dev/null)"
+  kill -TERM "$term_stage_pid" 2>/dev/null
+  got_exit=0
+  wait "$term_stage_pid" || got_exit=$?
+  if [[ -z "$sleeper_pid" ]]; then
+    case_wrong "alpha 格里的孙进程等了 10 秒没起来（$scratch/sleeper 还是空的）"
+  elif stage_cells_process_alive "$sleeper_pid" sleep; then
+    case_wrong "门禁 bash 被 TERM 之后，alpha 格里睡着的孙进程还在（pid $sleeper_pid）"
+  fi
+  [[ "$got_exit" == 143 ]] || case_wrong "门禁 bash 被 TERM 之后退 $got_exit，该退 143"
+  output_has "收到 SIGTERM，正在跑的格 alpha 没跑完"
+  kill -KILL -- -"$term_stage_pid" 2>/dev/null
 
   local breaks_proven=0 breaks_missed=() break_name
   if ((wrong == 0)) && [[ -z "$nested" && -z "${STAGE_CELLS_BREAK:-}" ]]; then
     for break_name in list-empty check-ignored unknown-accepted marker-everywhere marker-ignored red-swallowed not-run-as-pass shared-shell not-run-unreported generic-howto last-run-unwritten break-honored-everywhere \
-        own-repository-any-marker own-repository-refused unavailable-as-red; do
+        own-repository-any-marker own-repository-refused unavailable-as-red term-leaves-cell; do
       if STAGE_CELLS_BREAK="$break_name" bash "$library_under_test" --selftest-nested >/dev/null 2>&1; then
         breaks_missed+=("$break_name")
       else

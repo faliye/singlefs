@@ -46,6 +46,7 @@ code-source-discipline.sh	crate-sources-reachable	tooling-writer	判法在 scrip
 code-source-discipline.sh	ordinal-names	implementation-writer,tooling-writer	名字带序号或位置词：crates/ 里的名字由改 crates/ 的实现员改，scripts/、.claude/gate.d、.claude/hooks 里的名字与这一格的判法由工具实现员改；词表与排除表在项目根 .claude/ 下，归主 agent。新立（用户 2026-10-13 定），没有合并之前的旧归属
 code-source-discipline.sh	data-names	experiment-runner,implementation-writer,kb-scribe,tooling-writer	字符串字面量与 kb 表格里名字形态的串带没登记的缩写或单字母：scripts/experiment-apparatus/ 里的名字由实验执行员写，crates/ 里的由改 crates/ 的实现员写，kb 表格里的由书记员写；登记表 .claude/abbreviations 与排除表 .claude/data-name-lint-exclude 在项目根 .claude/ 下，判法 scripts/gate/data-name-lint.py 由工具实现员改。新立（欠账 C430），没有合并之前的旧归属
 code-source-discipline.sh	verus-ghost-names	implementation-writer,tooling-writer	被验 crate 里自定义或改名出 Ghost / Tracked：crates/ 里的名字由改 crates/ 的实现员改，登记表 .claude/gate.d/verus-pins.tsv 与这一格的判法归工具实现员。2026-11-02 新立
+code-source-discipline.sh	refused-tests	implementation-writer,tooling-writer	拒算登记表 .claude/gate.d/refused-tests.tsv 在 gate.d 下，每加一行由主 agent 在合入后验证之后二次确认，行由主 agent 或工具实现员写；拒算而没登记多半是新写的测试读了活树或运行时拼出的仓根路径，该改测试的是改 crates/ 的实现员；判法在 scripts/gate/refused-test-registry.py，判法本身错了归工具实现员。新立，没有合并之前的旧归属
 code-tooling.sh	research-script-selftests	three-way-materials	材料员用的抽取脚本的自证
 code-tooling.sh	research-script-selftest-coverage	three-way-materials	研究脚本实现了 --selftest 就要有门禁在跑它，材料员的抽取脚本与本地腿脚本最常新加
 code-tooling.sh	reuse-selftests	tooling-writer	带判定库的脚本的自证与登记表 .claude/gate.d/verdict-library-scripts.tsv 归工具实现员改。2026-10-15 新立
@@ -66,7 +67,9 @@ code-tooling.sh	committed-file-size	tooling-writer	2026-10-21 新立，没有旧
 code-tooling.sh	stage-location-before-cd	tooling-writer	2026-10-13 新立，没有旧归属：阶段 cd 之后不再找自己旁边的文件（欠账 C525），门禁阶段由工具实现员改
 code-tooling.sh	heavy-thread-defaults	tooling-writer	合并之后新加的格，没有旧归属：门禁、钩子与脚本里的默认并行度与排除表由工具实现员改；红在 crates/ 里的交实现员走代码批
 code-tooling.sh	hardcoded-quota	tooling-writer	跑法里写死的内存上限与台数、排除表 .claude/gate.d/hardcoded-quota-exempt.tsv 与判法由工具实现员改；红在别的会话正改着的脚本里的，交那个会话照「改成 auto 或登记理由」改
+code-tooling.sh	memory-bounded-parallelism	tooling-writer	2026-11-06 新立的格，没有旧归属：登记表 .claude/memory-bounded-parallelism.tsv 的写法与判法由工具实现员改；红在 crates/ 里按内存定并发的写法交实现员走代码批，表里登记新入口要量到的峰值，交主 agent 定
 code-tooling.sh	function-units-two-implementations-agree	tooling-writer,implementation-writer	python 那一份（scripts/gate/lib_function_units.py）照 Rust 那一份改由工具实现员改；口径要动 crates/singlefs-unit-graph 时由改 crates/ 的实现员改。2026-10-15 新立
+code-tooling.sh	rust-name-collisions	implementation-writer,tooling-writer	撞名的条目在 crates/ 与 prune-server/ 里，改名归改它们的实现员；判法 scripts/gate/rust-name-collisions.py 与样本归工具实现员（用户 2026-11-06 定不得撞名，不设豁免表）。2026-11-06 新立，没有合并之前的旧归属
 code-tooling.sh	mutation-list-items	tooling-writer,implementation-writer	--list-items 的脚本 scripts/mutation/crates-mutation-rows.py 归工具实现员；红在变异表某一行点名的测试特性不对的，交改 crates/mutations.tsv 的实现员（03 待优化第 57 行）。2026-10-22 新立，没有旧归属
 code-tooling.sh	break-switches-sample-only	tooling-writer	门禁阶段与共用库 lib/stage-cells.sh 由工具实现员改（C622）。2026-10-22 新立，没有旧归属
 code-tooling.sh	entry-scripts	tooling-writer	入口脚本与登记表 .claude/gate.d/entry-scripts.tsv 由工具实现员改（C641）。2026-10-22 新立，没有旧归属
@@ -83,6 +86,7 @@ code-tooling.sh	retired-names	tooling-writer,implementation-writer	退役名单 
 code-tooling.sh	verdict-library-code	tooling-writer	登记表 .claude/gate.d/verdict-library-scripts.tsv、写法表 verdict-library-code-forms.tsv、带判定库的脚本里取不到库照跑与本地库读写的写法由工具实现员改；第三列翻 prune-server 由主 agent 在一族接完之后翻；2026-11-02 新立（records/2026-11-01-判定库服务化.md 批次 22，欠账 C948（判定另存别处的库）），没有旧归属
 code-tooling.sh	temporary-service-runners	tooling-writer	runner 表（code-tooling.sh 的 SELFTEST_RUNNERS）与要临时服务的表 .claude/hooks/selftest-temporary-service.tsv 两边对齐的判法与样本由工具实现员改；新写了调 selftest_service_problem 的自证，先在 selftest-registry.tsv 登记、往要临时服务的表加一行，再把 runner 表里那一条写成包装写法；2026-11-05 新立（账本第一百八十三节仍欠的①），没有旧归属
 code-tooling.sh	temporary-service-wrapper-form	tooling-writer	要临时服务的自证的整条写法在登记表文件头、拒绝说明、骨架、客户端文件头、自证登记表、runner 表、包装前缀常量这七处逐字相同、包装的解析收得下的判法与样本由工具实现员改；包装改了用法（scripts/prune-server/prune_server_client_selftest.py 文件头那一行）就各处一起改；2026-11-05 新立（账本第一百九十七节①），没有旧归属
+code-tooling.sh	repository-copy-closure	tooling-writer	脚本、门禁与钩子里建仓副本的写法（改成经 scripts/hosts/lib_repository_copy.py 的 copy_closure / copy_entries，shell 经 minimal-copy.py）、排除表 .claude/gate.d/repository-copy-closure-exempt.tsv 与判法由工具实现员改；2026-11-06 新立（task-server 巡检批 73），没有旧归属
 doc-decisions.sh	kb-shape	kb-scribe	kb 用词、指代、链接、条数与标题，归写 kb 的书记员
 doc-decisions.sh	item-ref-status	kb-scribe	分项引用写的状态与正文分项表相符，归写 kb 的书记员
 doc-decisions.sh	status-redundancy	kb-scribe	分项状态别重复标注，归写 kb 的书记员
@@ -178,6 +182,7 @@ doc-text.sh	account-quota	kb-scribe,implementation-writer,tooling-writer	这次�
 doc-text.sh	out-of-project-names	kb-scribe,tooling-writer	这次改动新加的行里写了不归本项目的目录名或根下系统目录的占用：记录与 kb 页的句子归写它们的书记员改成不指名的说法；放行表 .claude/out-of-project-paths 与判法归工具实现员。没有合并之前的旧归属，2026-10-21 新立
 doc-text.sh	utf8-valid	kb-scribe,tooling-writer	这次改动里的文本文件不是合法 UTF-8（工作区或暂存区里的版本）：记录与 kb 页里的归写它们的书记员，用 Edit 或 replace-once.py 按字符改回来；脚本、门禁与样本里的归工具实现员；暂存区里坏而工作区已修好的重新暂存。2026-10-22 新立，没有合并之前的旧归属
 doc-text.sh	dated-status	kb-scribe	登记的 kb 目录里的中文页在历史节之前写了带日期的现状句（「现状（日期」「日期 现状」），或滞后表写错、比基准涨了：删日期、现查事实改成现值归写 kb 的书记员，滞后表跟着删行。没有合并之前的旧归属，2026-10-30 新立
+doc-text.sh	comment-history	implementation-writer,tooling-writer	代码与脚本的注释、文件头、文档串或 README 写了历史（日期、谁定的与哪一轮打中的、改动经过、旧值与旧做法），或豁免表、滞后表写错、滞后表比基准涨了：crates/ 下 .rs 与 .wgsl 的注释归改 crates/ 的实现员，scripts/、门禁、钩子、task-server 与各 README 的归工具实现员，照命中逐行改写；新加的这一格没有合并之前的旧归属
 model-differential-and-scenarios.sh	one-scenario	investigator	用例一条一个场景：谁改 crates/ 下测试都可能写成一条多场景，收尾跑整轮门禁时一并判
 model-differential-and-scenarios.sh	model-random-histories	implementation-writer,investigator	模型对拍随机历史：改 crates/ 的实现员修；主 agent跑重门禁时一起看
 model-differential-and-scenarios.sh	model-reuse-sampling	implementation-writer,investigator	模型对拍的复用取样点：改 crates/ 的实现员修；主 agent跑重门禁时一起看
@@ -185,4 +190,4 @@ model-differential-and-scenarios.sh	model-rollback-sampling	implementation-write
 model-differential-and-scenarios.sh	model-allocation-record-wall	implementation-writer,investigator	模型对拍的逼近分配记录墙取样点：改 crates/ 的实现员修；主 agent跑重门禁时一起看
 model-differential-and-scenarios.sh	model-unit-area-wall	implementation-writer,investigator	模型对拍的小盘逼近单元区墙取样点：改 crates/ 的实现员修；主 agent跑重门禁时一起看
 model-differential-and-scenarios.sh	model-unit-area-wall-admission-judged	implementation-writer,investigator	模型对拍的单元区墙准入判定取样点：改 crates/ 的实现员修；主 agent跑重门禁时一起看
-harness-test-environment.sh	machine-clean	investigator	跑完测试之后机器还干不干净：主 agent 跑完重门禁、提交前各看一次
+test-environment.sh	machine-clean	investigator	跑完测试之后机器还干不干净：主 agent 跑完重门禁、提交前各看一次

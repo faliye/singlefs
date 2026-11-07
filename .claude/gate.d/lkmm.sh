@@ -45,14 +45,14 @@
 #       expect 里的 exit=77、「复用（」那几句与「· 按条」那一句找不到（第二趟报「现判 3、复用 0」）；
 #     litmus-key-samples-expectation-changed-red：照旧退 1，「· herd7:publish.litmus：红，现判（期望 变了」与「· herd7:publish-nofence.litmus：绿，复用（」找不到。
 #     litmus-key-samples-full-red-rejudged：照旧退 1，照常读库那一趟「· herd7:publish.litmus：红，现判（上次判红」与「· herd7:publish-nofence.litmus：绿，复用（」找不到。
-#   GATE_LKMM_BREAK=litmus-items-by-file-name  项名只取文件名（改前），两个子目录里的同名 litmus 共用一个项名
+#   GATE_LKMM_BREAK=litmus-items-by-file-name  项名只取文件名，两个子目录里的同名 litmus 共用一个项名
 #     litmus-same-name-subdirectories-red：照旧退 1，两份都报成 binding:publish.litmus、都红，
 #       「· binding:a/publish.litmus：绿」「写出 b/publish.litmus」「代码绑定检查未过：1 项」那几句找不到。
-#   GATE_LKMM_BREAK=binding-mention-substring  写出项名那一查退回按子串找（改前）
+#   GATE_LKMM_BREAK=binding-mention-substring  写出项名那一查按子串找
 #     binding-mention-boundary-red：mp-publish.litmus 也算写出 publish.litmus，判绿退 77，expect 里的 exit=1 与「binding:publish.litmus：红」那几句找不到。
-#   GATE_LKMM_BREAK=litmus-count-top-level-only  成功句里的份数只数 litmus/ 顶层（改前 -maxdepth 1），子目录里的 litmus 不算
+#   GATE_LKMM_BREAK=litmus-count-top-level-only  成功句里的份数只数 litmus/ 顶层（-maxdepth 1），子目录里的 litmus 不算
 #     litmus-count-subdirectories：照旧退 77，成功句报成「2 份 litmus 全过」，expect 里「4 份 litmus 全过」那一句找不到。
-#   GATE_LKMM_BREAK=red-not-recorded  现判判红的那一条不记红、不撤同一把键原有的绿（改前的样子：只记绿）
+#   GATE_LKMM_BREAK=red-not-recorded  现判判红的那一条不记红、不撤同一把键原有的绿，只记绿
 #     litmus-key-samples-full-red-rejudged：照常读库那一趟 herd7:publish.litmus 照头一趟的绿复用、判绿，整格退 77，expect 里的 exit=1 与「现判（上次判红」找不到。
 # 复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：哨兵在 lkmm.sh 里每一趟真跑都抽（绑定、herd7 各一份），被现判、强制现判判定不同这一格红；
 #   复用三问那一格在 scripts/gate/lkmm-selftest.sh（登记表 .claude/gate.d/verdict-library-scripts.tsv 那一行）。上次红的清单由 lib/stage-cells.sh 按格写。
@@ -63,6 +63,11 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+if ! declare -F preflight >/dev/null; then
+  echo "  ✗ lkmm.sh：source .claude/scripts/preflight.sh 没成（上面一行报了找不到），preflight 没有定义、参数已被清空，拒绝往下跑（不拦的话 --check 与 --list 会变成全跑）"
+  echo "     → 怎么办：这棵树缺 .claude/scripts/preflight.sh：建副本时连 .claude/scripts 与 .claude/singlefs-ai-sop 一起拷（scripts/hosts/minimal-copy.py 逐条加 --with .claude/scripts=… 与 --with .claude/singlefs-ai-sop=…），或回主工作区跑"
+  exit 2
+fi
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 ADMISSION_MODULE="$STAGE_REPOSITORY/scripts/gate/admission.py"
 LKMM="$(cd "$(dirname "$0")/../scripts" && pwd)/lkmm.sh"
@@ -147,7 +152,7 @@ if [[ "$rc" -ne 0 ]]; then
   exit 1
 fi
 # 份数与 lkmm.sh 判的那一批同一种找法：litmus/ 下递归找 .litmus（子目录里的也数），按 NUL 数
-# 弄坏开关 GATE_LKMM_BREAK=litmus-count-top-level-only 退回改前：只数 litmus/ 顶层（文件头「弄坏开关」一段）
+# 弄坏开关 GATE_LKMM_BREAK=litmus-count-top-level-only 只数 litmus/ 顶层（文件头「弄坏开关」一段）
 if [[ ",${GATE_LKMM_BREAK:-}," == *,litmus-count-top-level-only,* ]]; then
   litmus_file_count="$(find "$ROOT/litmus" -maxdepth 1 -name '*.litmus' -type f | wc -l)"
 else

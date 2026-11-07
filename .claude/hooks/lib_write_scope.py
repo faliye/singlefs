@@ -70,7 +70,7 @@ def path_in_scope(expanded_patterns, absolute, project_root):
 def landing_forms(raw_absolute, lexical_only=False):
     """一个写的目标（绝对路径，可以没规整过）最终落在哪几种认法下：照 shell 逐段解开符号链接的（`链接/..` 回到链接指向那一层的上级），
     与先规整 `..` 再解开的（工具先规整路径再打开的走法）。目标或它往上几层不存在时，os.path.realpath 解到最深的已存在那一层、再接上剩下的段；
-    悬空的链接照它指向的路径算。lexical_only 时只交字面规整的那一种（弄坏开关用：改前的认法）。解不开（读不了链接）抛 OSError。"""
+    悬空的链接照它指向的路径算。lexical_only 时只交字面规整的那一种（弄坏开关用）。解不开（读不了链接）抛 OSError。"""
     if lexical_only:
         return [os.path.normpath(raw_absolute)]
     return list(dict.fromkeys((os.path.realpath(raw_absolute), os.path.realpath(os.path.normpath(raw_absolute)))))
@@ -88,7 +88,7 @@ def resolved_pattern(pattern):
 
 def landings_out_of_scope(expanded_patterns, raw_absolute, project_root, lexical_only=False):
     """目标的每一种落点（landing_forms）都要命中展开后的某条模式才算在范围里；交回不在范围里的那几种落点（空列表就是都在）。
-    相对模式比相对仓根的写法，仓根照字面与解开符号链接各认一次；绝对模式照字面与字面前缀解开符号链接各认一次。lexical_only 时只认字面（改前的样子）。"""
+    相对模式比相对仓根的写法，仓根照字面与解开符号链接各认一次；绝对模式照字面与字面前缀解开符号链接各认一次。lexical_only 时只认字面。"""
     roots = [os.path.normpath(project_root)] if lexical_only else list(dict.fromkeys((os.path.normpath(project_root), os.path.realpath(project_root))))
     patterns = list(expanded_patterns) if lexical_only else list(dict.fromkeys(
         list(expanded_patterns) + [resolved_pattern(pattern) for pattern in expanded_patterns if pattern.startswith("/")]))

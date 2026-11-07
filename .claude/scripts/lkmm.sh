@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# admission: always 判的是此刻 litmus/ 与代码里的锚点，上一次的结论不替这一次作保（门禁 checker-tier-lkmm 每份 litmus 按单元键复用，写在那一道文件头）
-# run-condition: none herd7 与内核树由它自己找（PATH、opam、fetch-deps.sh），找不到就判红并给出路，checker-tier-lkmm 靠这一条判红，不交给调用方预判
+# admission: always 判的是此刻 litmus/ 与代码里的锚点，上一次的结论不替这一次作保（门禁 lkmm 每份 litmus 按单元键复用，写在那一道文件头）
+# run-condition: none herd7 与内核树由它自己找（PATH、opam、fetch-deps.sh），找不到就判红并给出路，门禁 lkmm 靠这一条判红，不交给调用方预判
 # 用 LKMM 判内存序结论：herd7 给模型判定。
 #
-# 这是本工程自己的一份：上游 singlefs-ai-sop 2026-09-16 起不再管 herd7 / LKMM（移交那次的记录与删前原样在提交 fbae43e 里，`git show fbae43e:.claude/handover/qemu-herd7/README.md`），
+# 这是本工程自己的一份：上游 singlefs-ai-sop 已不再管 herd7 / LKMM（移交那次的记录与删前原样在提交 fbae43e 里，`git show fbae43e:.claude/handover/qemu-herd7/README.md`），
 # 原文取自那里的 `sop-0.0.50-snapshot/scripts/lkmm.sh`，只改了 lib.sh 的路径、`litmus/` 改指本仓 `litmus/`。
-# 门禁阶段 `.claude/gate.d/checker-tier-lkmm.sh` 调它；提交前必跑（`.claude/rules/implementation-workflow.md`）。
+# 门禁阶段 `.claude/gate.d/lkmm.sh` 调它；提交前必跑（`.claude/rules/implementation-workflow.md`）。
 #
-#   lkmm.sh [项目根] [--verdict-library <目录> [--no-reuse]]   跑 <项目根>/litmus/*.litmus；给了判定库就按条复用（下面「判定库」一段）
-#   lkmm.sh [项目根] --static-only    只跑不需要 herd7 的检查；全过也退 3——它不是通过
+#   lkmm.sh [项目根]                  跑 <项目根>/litmus/*.litmus，按条复用（下面「判定库」一段）
 #   lkmm.sh --herd7-version           只找 herd7（与全量判定同一段找法，PATH 里没有就试 opam 的环境），stdout 打它版本输出的第一行、退 0；找不到退 1
 #
 # 每个 .litmus 必须在文件里声明期望判定：
@@ -49,9 +48,9 @@
 #
 # 项名：litmus/ 下递归找 .litmus，每份的项名是它相对 litmus/ 的路径（顶层的就是文件名，子目录里的带目录，例 sub/publish.litmus）；
 #   判定项、按条的临时文件（$WORK/<种类>/<项名>）与写出文件名那一查都用项名，两个子目录里同名的 litmus 不串。
-#   弄坏开关 GATE_LKMM_BREAK=litmus-items-by-file-name（自证 scripts/gate/lkmm-selftest.sh 用）：项名只取文件名（改前），两个子目录里的同名 litmus 共用一个项名与一份临时文件，
+#   弄坏开关 GATE_LKMM_BREAK=litmus-items-by-file-name（自证 scripts/gate/lkmm-selftest.sh 用）：项名只取文件名，两个子目录里的同名 litmus 共用一个项名与一份临时文件，
 #     两份都报成 binding:<文件名>、herd7:<文件名>（自证 litmus-same-name-subdirectories 那一格判错：找不到 binding:a/publish.litmus 那一行）。
-# 判定库（--verdict-library <目录>，判定库 scripts/crash/lib_verdict_library.py；门禁给 git common-dir 下的 singlefs-lkmm-verdicts/）：每份 litmus 两条判定。
+# 判定库（scripts/crash/lib_verdict_library.py；库目录是 <项目根的 git common-dir>/singlefs-lkmm-verdicts，只当名字，键里不带哪棵仓）：每份 litmus 两条判定。
 #   herd7:<项名>      herd7 的判定与声明相符。键是 litmus 去掉行首起的 (* … *) 注释之后的内容、singlefs-expect 声明的那个值（它在注释里却决定判据）、
 #                     herd7（-version 第一行与可执行文件的 sha256）、内核树 tools/memory-model 里 herd7 读的模型文件（顶层的 .cfg、.cat、.bell、.def）
 #                     逐份内容、内核树的版本（git 树的提交号，不是 git 树就读 Makefile 的 VERSION / PATCHLEVEL / SUBLEVEL / EXTRAVERSION），
@@ -60,20 +59,29 @@
 #                     锚点指到的那几个单元的（种类，去注释指纹）、项名（组成表那一行仍叫「litmus 文件名」）、写出文件名的测试（crates/ 下写出项名的 .rs 按路径排序，
 #                     逐份相对路径与内容 sha256；一份都没有写固定的「无」），判法单元指纹是 check_binding_test_mentions 的单元闭包键。
 #                     锚点与写出文件名的那批 .rs 每趟都现找（键要它们）：那批 .rs 删掉、改名或改掉那一处提及都让键变、这一条现判。
-#   键相同、上次判绿就复用（herd7 那一条不起 herd7）；--no-reuse 只写不读。每条一行「· <项>：绿|红，现判（<原因>：<变了的单元>）|复用（…）」，
-#   末了一行「· 按条：现判 N、复用 M」。不给 --verdict-library 不读不写，每条都现判。
-#   弄坏开关 GATE_LKMM_BREAK=litmus-key-drops-every-comment（门禁 checker-tier-lkmm 的样本用）：herd7 那一条的键把注释整个去掉、连 singlefs-expect 的值也不留，
+#   键相同、上次判绿就复用（herd7 那一条不起 herd7）。每条一行「· <项>：绿|红，现判（<原因>：<变了的单元>）|复用（…）」，
+#   末了一行「· 按条：现判 N、复用 M」。
+#   库位置只由被判那棵仓定，命令行不收别的：项目根不是 git 工作树（取不到 git common-dir，判定库没有名字）一条都不判、退 2、点名它；
+#   自证与门禁样本各用各的 git 工作树，临时服务底下各占一个命名空间（客户端文件头「键空间」）。
+#   判定库在 prune-server 里（库目录只当名字，本地不建）：
+#   lookup、record、record-red 与复用哨兵的 verdict-library-candidate 退 75（prune-server 不可用）时整道退 75、打「prune-server 不可用」与出路
+#   （exit_when_library_unavailable），不当现判、不当「没记进」放过。
+#   记红、撤绿、下趟现判：现判判红的那一条（绑定查不过；herd7 执行失败、读不到 Observation、判定与声明不符）照同一把键调 lib_verdict_library.py record-red，
+#     盖掉这把键原有的绿，下一趟这一条现判、原因以「上次判红」起头（record_red_item）；判绿照旧 record，盖回绿。
+#   弄坏开关 GATE_LKMM_BREAK=red-not-recorded（门禁 lkmm 的样本用）：判红的不记（只记绿，同一把键原有的绿留着照复用），
+#     样本 litmus-key-samples-full-red-rejudged 照常读库那一趟 herd7:publish.litmus 照复用判绿、整格退 77（expect 要的是退 1 与「现判（上次判红」）。
+#   弄坏开关 GATE_LKMM_BREAK=litmus-key-drops-every-comment（门禁 lkmm 的样本用）：herd7 那一条的键把注释整个去掉、连 singlefs-expect 的值也不留，
 #     改了期望照样复用（样本 litmus-key-samples-expectation-changed-red 判绿退 77）。
 #   弄坏开关 GATE_LKMM_BREAK=binding-key-drops-test-mentions（自证 scripts/gate/lkmm-selftest.sh 用）：绑定那一条的组成表不放「写出文件名的测试」那一行，
 #     删掉唯一写出文件名的 .rs 照样复用判绿（自证 binding-test-mentions-in-key 那一格判错）。
-#   弄坏开关 GATE_LKMM_BREAK=binding-mention-substring（自证 scripts/gate/lkmm-selftest.sh 用）：写出项名那一查退回按子串找（改前），
+#   弄坏开关 GATE_LKMM_BREAK=binding-mention-substring（自证 scripts/gate/lkmm-selftest.sh 用）：写出项名那一查按子串找，
 #     只写了 mp-publish.litmus 的 .rs 也算写出 publish.litmus（自证 binding-mention-boundary 那一格判错）。
 #   复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「二」）：绑定、herd7 两种判定各一份，组成表都算好之后、判之前抽（候选按键文件查，verdict-library-candidate，
 #     与 lookup 分开）；抽中强制现判的那一条那一行写「强制现判」、不读库；哨兵被现判、强制现判判定与库里不同，算一项红。种子与条数取 SINGLEFS_REUSE_SENTINEL_SEED、
-#     SINGLEFS_REUSE_SENTINEL_COUNT；没给判定库、--no-reuse 不抽。弄坏开关 GATE_LKMM_BREAK=reuse-lookup-skipped：一律不读库，自证（scripts/gate/lkmm-selftest.sh）
+#     SINGLEFS_REUSE_SENTINEL_COUNT。弄坏开关 GATE_LKMM_BREAK=reuse-lookup-skipped：一律不读库，自证（scripts/gate/lkmm-selftest.sh）
 #     reuse-three-questions 那一格判错、reuse-sentinel 那一格要的红照判。
-#   复用三问与哨兵的自证在 scripts/gate/lkmm-selftest.sh（拿门禁 checker-tier-lkmm 的样本 litmus-key-samples-anchor-body-changed 的 setup.sh 造现场、假 herd7 跑这一份）：
-#     这一份的 --selftest 会被重型测试闸按 herd7 拦，自证另放一份可以单独起的。
+#   复用三问与哨兵的自证在 scripts/gate/lkmm-selftest.sh（拿门禁 lkmm 的样本 litmus-key-samples-anchor-body-changed 的 setup.sh 造现场、假 herd7 跑这一份）：
+#     这一份的 --selftest 会被项目代码闸按 herd7 拦，自证另放一份可以单独起的。
 # 准入经 .claude/scripts/preflight.sh 判（规范副本先找这棵树的、再找主仓的，两处都没有就拒绝；坑写在它的文件头），不直接 source 副本里的 lib.sh：
 #   worktree 与 gate.sh --staged 的临时树里没有副本，直接 source 会落空，preflight 成了找不到的命令、参数被清空、不带参数照跑。
 #   lib.sh（ok、bad、howto、warn、say、die、head1、project_root）取 preflight.sh 找到的那一份副本里的：它与 preflight.py 同在副本的 scripts/ 下（PREFLIGHT_PROGRAM）。
@@ -84,18 +92,17 @@ source "${PREFLIGHT_PROGRAM%/*}/lib.sh" || { echo "  ✗ 规范副本里没有 l
 
 LKMM_SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERDICT_LIBRARY_MODULE="$LKMM_SCRIPT_DIRECTORY/../../scripts/crash/lib_verdict_library.py"
-STATIC_ONLY=0; HERD7_VERSION_ONLY=0; ROOT=""; VERDICT_LIBRARY=""; NO_REUSE=0; expect_library_directory=0
+HERD7_VERSION_ONLY=0; ROOT=""; VERDICT_LIBRARY=""
 for argument in "$@"; do
-  if ((expect_library_directory)); then VERDICT_LIBRARY="$argument"; expect_library_directory=0; continue; fi
   case "$argument" in
-    --static-only) STATIC_ONLY=1 ;;
     --herd7-version) HERD7_VERSION_ONLY=1 ;;
-    --verdict-library) expect_library_directory=1 ;;
-    --no-reuse) NO_REUSE=1 ;;
+    -*)
+      echo "  ✗ 认不出的参数 $argument"
+      echo "     → 怎么办：只认 --herd7-version 与一个项目根（lkmm.sh [项目根] [--herd7-version]）。"
+      exit 2 ;;
     *) ROOT="$argument" ;;
   esac
 done
-((expect_library_directory == 0)) || die "--verdict-library 后面缺目录" "写成 --verdict-library <目录>（门禁 checker-tier-lkmm 给 git common-dir 下的 singlefs-lkmm-verdicts/）"
 
 # herd7 不在 PATH 里就试一次 opam 的环境；找得到返回 0。全量判定与 --herd7-version 共用这一段找法。
 find_herd7() {
@@ -128,6 +135,13 @@ command -v python3 >/dev/null 2>&1 || die "缺 python3 —— 对照组「是不
 # 绝对化：失败信息里的 rel 要靠 ${f#$ROOT/} 剥前缀，而 FILES 是 readlink -f 出来的绝对路径。
 # ROOT 是相对路径时剥不掉，报出来的就是一长串绝对路径——看的人得自己找哪一段是项目内路径。
 [[ -d "$ROOT" ]] && ROOT="$(cd "$ROOT" && pwd)"
+# 判定库的库目录只由被判那棵仓定（文件头「判定库」）：项目根的 git common-dir 底下那一份；取不到一条都不判、退 2
+if ! library_common_directory="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$library_common_directory" ]]; then
+  bad "$ROOT 不是 git 工作树（取不到 git common-dir），判定库没有名字：一条都没判"
+  howto "在 git 工作树里跑；rsync 拷的仓副本先在副本根 git init（键里不带哪棵仓，副本与主仓读写同一份库）"
+  exit 2
+fi
+VERDICT_LIBRARY="$library_common_directory/singlefs-lkmm-verdicts"
 LITMUS_DIR="$ROOT/litmus"
 KTREE="${SINGLEFS_KERNEL_TREE:-}"
 
@@ -140,7 +154,7 @@ head1 "LKMM（herd7）"
 # 相对路径 cd 之后就找不着了
 # 每份的项名（LITMUS_KEY）是它相对 litmus/ 的路径：顶层的就是文件名（判定库里已有的判定照旧复用），子目录里的带目录，
 # 两个子目录里同名的 litmus 各是各的项，判定项、临时文件与写出文件名那一查都不串（文件头「判定库」一段）。
-# 弄坏开关 GATE_LKMM_BREAK=litmus-items-by-file-name 退回改前：项名只取文件名。
+# 弄坏开关 GATE_LKMM_BREAK=litmus-items-by-file-name：项名只取文件名。
 declare -A LITMUS_KEY=()
 FILES=()
 while IFS= read -r -d '' litmus_relative; do
@@ -396,24 +410,42 @@ judging_units_file() { # judging_units_file <函数名>
 }
 judged_count=0; reused_count=0
 declare -A JUDGED_REASONS=()
+# exit_when_library_unavailable <退出码> <在做什么>：判定库命令退 75（prune-server 不可用，scripts/prune-server/prune_server_client.py 文件头「退出码」）时整道退 75，
+# 不当「现判」「没记进」放过（判定库没有本地文件那条路，文件头「判定库」）
+exit_when_library_unavailable() {
+  (($1 == 75)) || return 0
+  bad "prune-server 不可用：$2 时判定库命令退 75（上面是客户端的原因）；这一道停在这里，不把读不到的当现判"
+  howto "python3 prune-server/control check 看服务在不在、第二台连的地址通不通；服务回来之后重跑同一条命令"
+  exit 75
+}
 # lookup_item <种类> <项> <组成表>：交 0 复用、1 现判；打那一行的前半，原因留在 $item_reason
 lookup_item() {
-  item_reason="没给判定库"
-  if [[ -z "$VERDICT_LIBRARY" ]]; then return 1; fi
-  local options=() answer=""
-  ((NO_REUSE)) && options=(--no-reuse)
-  if answer="$(python3 "$VERDICT_LIBRARY_MODULE" lookup "$VERDICT_LIBRARY" "$1" "$2" "$3" ${options[@]+"${options[@]}"})"; then
+  item_reason=""
+  local answer="" status=0
+  answer="$(python3 "$VERDICT_LIBRARY_MODULE" lookup "$VERDICT_LIBRARY" "$1" "$2" "$3")" || status=$?
+  if ((status == 0)); then
     item_reason="${answer#*$'\t'}"; return 0
   fi
+  exit_when_library_unavailable "$status" "查 $2"
   item_reason="$(printf '%s' "$answer" | cut -f2)"
   local detail; detail="$(printf '%s' "$answer" | cut -f3)"
   [[ -n "$detail" ]] && item_reason="$item_reason：$detail"
   return 1
 }
 record_item() { # record_item <种类> <项> <组成表> <一句判定> <跑法>
-  [[ -n "$VERDICT_LIBRARY" ]] || return 0
-  python3 "$VERDICT_LIBRARY_MODULE" record "$VERDICT_LIBRARY" "$1" "$2" "$3" --summary "$4" --run "$5" >/dev/null \
-    || warn "$2 判绿了，没记进判定库 $VERDICT_LIBRARY：下一趟这一条照判"
+  local status=0
+  python3 "$VERDICT_LIBRARY_MODULE" record "$VERDICT_LIBRARY" "$1" "$2" "$3" --summary "$4" --run "$5" >/dev/null || status=$?
+  exit_when_library_unavailable "$status" "记 $2 判绿"
+  ((status == 0)) || warn "$2 判绿了，没记进判定库 $VERDICT_LIBRARY：下一趟这一条照判"
+}
+# record_red_item <种类> <项> <组成表> <一句判定> <跑法>：现判判红的那一条照同一把键记红、撤掉这把键原有的绿（文件头「判定库」记红、撤绿、下趟现判）。
+# 弄坏开关 GATE_LKMM_BREAK=red-not-recorded 下不记
+record_red_item() {
+  [[ ",${GATE_LKMM_BREAK:-}," == *,red-not-recorded,* ]] && return 0
+  local status=0
+  python3 "$VERDICT_LIBRARY_MODULE" record-red "$VERDICT_LIBRARY" "$1" "$2" "$3" --summary "$4" --run "$5" >/dev/null || status=$?
+  exit_when_library_unavailable "$status" "记 $2 判红"
+  ((status == 0)) || warn "$2 判红了，没记进判定库 $VERDICT_LIBRARY：同一把键原有的绿还在，下一趟可能照复用"
 }
 count_item() { # count_item <复用 0|1> <原因>
   if [[ "$1" == 1 ]]; then reused_count=$((reused_count + 1)); else judged_count=$((judged_count + 1)); JUDGED_REASONS["${2%%：*}"]=$(( ${JUDGED_REASONS["${2%%：*}"]:-0} + 1 )); fi
@@ -423,21 +455,17 @@ REUSE_CHECKS_MODULE="$LKMM_SCRIPT_DIRECTORY/../../scripts/gate/lib_reuse_checks.
 LKMM_SCRIPT_KEY=".claude/scripts/lkmm.sh"
 # sentinel_plan <种类> <标签> <状态文件> <项数组名> <组成表数组名>：候选是这把键在库里有判绿记录的项（verdict-library-candidate 按键文件查，与 lookup 分开）
 sentinel_plan() {
-  local kind="$1" label="$2" state="$3" index candidates="$3.candidates" off=""
+  local kind="$1" label="$2" state="$3" index candidates="$3.candidates"
   local -n plan_items="$4" plan_tables="$5"
-  if [[ -z "$VERDICT_LIBRARY" ]]; then off="没给判定库"; elif ((NO_REUSE)); then off="关了复用（--no-reuse）"; fi
   : > "$candidates"
+  local candidate_status
   for index in "${!plan_items[@]}"; do
-    [[ -n "$off" ]] && break
-    if python3 "$REUSE_CHECKS_MODULE" verdict-library-candidate "$VERDICT_LIBRARY" "$kind" "${plan_tables[$index]}"; then
-      printf '%s\t绿\n' "${plan_items[$index]}" >> "$candidates"
-    fi
+    candidate_status=0
+    python3 "$REUSE_CHECKS_MODULE" verdict-library-candidate "$VERDICT_LIBRARY" "$kind" "${plan_tables[$index]}" || candidate_status=$?
+    exit_when_library_unavailable "$candidate_status" "查复用哨兵的候选 ${plan_items[$index]}"
+    ((candidate_status == 0)) && printf '%s\t绿\n' "${plan_items[$index]}" >> "$candidates"
   done
-  if [[ -n "$off" ]]; then
-    python3 "$REUSE_CHECKS_MODULE" sentinel-plan "$state" --script "$LKMM_SCRIPT_KEY" --label "$label" --off "$off" || warn "复用哨兵（$label）没抽成"
-  else
-    python3 "$REUSE_CHECKS_MODULE" sentinel-plan "$state" --script "$LKMM_SCRIPT_KEY" --label "$label" --candidates "$candidates" || warn "复用哨兵（$label）没抽成"
-  fi
+  python3 "$REUSE_CHECKS_MODULE" sentinel-plan "$state" --script "$LKMM_SCRIPT_KEY" --label "$label" --candidates "$candidates" || warn "复用哨兵（$label）没抽成"
 }
 # judge_lookup <种类> <项> <组成表> <状态文件>：交 0 复用、1 现判；judged_word 是那一行写「现判」还是「强制现判」（抽中的那一条不读库）。
 # 弄坏开关 GATE_LKMM_BREAK=reuse-lookup-skipped 下一律不读库（复用哨兵该判红「复用失灵」）
@@ -446,7 +474,7 @@ judge_lookup() {
   if python3 "$REUSE_CHECKS_MODULE" sentinel-forced "$4" "$2" 2>/dev/null; then
     judged_word=强制现判; item_reason="复用哨兵抽中：键相同，这一趟不读库"; return 1
   fi
-  if [[ ",${GATE_LKMM_BREAK:-}," == *,reuse-lookup-skipped,* && -n "$VERDICT_LIBRARY" ]]; then
+  if [[ ",${GATE_LKMM_BREAK:-}," == *,reuse-lookup-skipped,* ]]; then
     item_reason="无记录（弄坏开关 reuse-lookup-skipped：没读库）"; return 1
   fi
   lookup_item "$1" "$2" "$3"
@@ -471,7 +499,7 @@ tally_text() {
 #   （litmus 前面同样不接字母、数字、_、-、.，可以接 /，例 ../../litmus/<项名>）；后面不接文件名字符。
 #   所以只写了 mp-bar.litmus 的不算写出 bar.litmus，写了 "litmus/bar.litmus" 的算；别的目录下的同名文件（other/bar.litmus、litmus/sub/bar.litmus）也不算写出顶层的 bar.litmus。
 #   按字节比（LC_ALL=C）：汉字、引号这类非 ASCII 字符都算边界。
-#   弄坏开关 GATE_LKMM_BREAK=binding-mention-substring 退回改前：按子串找（grep -F），不看边界。
+#   弄坏开关 GATE_LKMM_BREAK=binding-mention-substring：按子串找（grep -F），不看边界。
 binding_mention_paths() {
   local status=0 pattern
   : > "$2"
@@ -567,6 +595,7 @@ for index in "${!binding_items[@]}"; do
   if ! check_binding_test_mentions "$litmus_key"; then
     say "  · $item：红，$judged_word（$item_reason）"   # gate-lint:detail
     sentinel_observe "$WORK/sentinel-binding.json" "$item" "$judged_word" 红
+    record_red_item binding-litmus "$item" "$table" "crates/ 下没有一个 .rs 写出 $litmus_key" "lkmm.sh 绑定检查（锚点经 lib_function_units.py 解析）"
     bad "$rel  crates/ 下没有一个 .rs 写出 $litmus_key —— 没有测试把它和代码对上"
     howto "写一个测试读这个 litmus，拿它的写者 / 读者次序跟代码今天实际发出的次序比" \
           "（例：录制写请求流，按步骤分类后逐项比）。测试里要写出 $litmus_key（顶层的写文件名，子目录里的写相对 litmus/ 的路径，前面可以带 litmus/），" \
@@ -581,13 +610,6 @@ for index in "${!binding_items[@]}"; do
 done
 sentinel_finish "$WORK/sentinel-binding.json" || fails=$((fails+1))
 [[ $fails -eq 0 ]] || { bad "代码绑定检查未过：$fails 项"; exit 1; }   # gate-lint:summary
-
-if [[ $STATIC_ONLY -eq 1 ]]; then
-  say ""
-  warn "静态检查全过：$n_never 条 Never 每条都有内容对得上的对照组，$n_bound 条绑到代码、$n_unbound 条声明不对应代码；共 $n_some 条 Sometimes"
-  warn "herd7 判定没跑（--static-only），退出码 3——这不是通过"
-  exit 3
-fi
 
 # ── herd7 ──
 find_herd7 || { report_herd7_missing; exit 1; }
@@ -674,6 +696,7 @@ for index in "${!FILES[@]}"; do
   out="$(timeout 300 herd7 -conf linux-kernel.cfg "$f" 2>&1)" || {
     say "  · $item：红，$judged_word（$item_reason）"   # gate-lint:detail
     sentinel_observe "$WORK/sentinel-herd7.json" "$item" "$judged_word" 红
+    record_red_item herd7-litmus "$item" "$table" "herd7 执行失败" "herd7 -conf linux-kernel.cfg litmus/$litmus_key（$HERD7_VERSION_LINE）"
     bad "$rel  herd7 执行失败"; printf '%s\n' "$out" | tail -5 | sed 's/^/        /'
     howto "看上面的报错。多半是 litmus 语法问题，照 litmus/ 现有文件的格式改；" \
           "超时（300s）则是状态空间太大，把进程数或变量数减下来。"
@@ -683,6 +706,7 @@ for index in "${!FILES[@]}"; do
   if [[ $herd7_verdict == 1 ]]; then
     say "  · $item：红，$judged_word（$item_reason）"   # gate-lint:detail
     sentinel_observe "$WORK/sentinel-herd7.json" "$item" "$judged_word" 红
+    record_red_item herd7-litmus "$item" "$table" "herd7 的输出里读不到 Observation 行" "herd7 -conf linux-kernel.cfg litmus/$litmus_key（$HERD7_VERSION_LINE）"
     bad "$rel  读不到 Observation 行 —— 判定不明，整条作废"
     printf '%s\n' "$out" | tail -5 | sed 's/^/        /'; fails=$((fails+1))
     howto "多半是 litmus 语法错。最常见的一处：进程签名后面不能跟行内注释，" \
@@ -695,6 +719,7 @@ for index in "${!FILES[@]}"; do
   else
     say "  · $item：红，$judged_word（$item_reason）"   # gate-lint:detail
     sentinel_observe "$WORK/sentinel-herd7.json" "$item" "$judged_word" 红
+    record_red_item herd7-litmus "$item" "$table" "herd7 判 $herd7_observation，声明是 $want" "herd7 -conf linux-kernel.cfg litmus/$litmus_key（$HERD7_VERSION_LINE）"
     bad "$rel  期望 $want，实际 $herd7_observation"
     printf '%s\n' "$out" | grep -E '^(States|Condition|Observation)' | sed 's/^/        /' || true
     howto "两种可能，别急着改声明：" \

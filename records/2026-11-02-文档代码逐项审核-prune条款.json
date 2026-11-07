@@ -1,0 +1,526 @@
+{
+  "at": "2026-11-04",
+  "document": "prune-server/README.md",
+  "sha256": "1fb93cd9515434755f93e4f61d4f607e33fcaff25b9dc3fea59a2e438e6bf7fe",
+  "complete_document_review": false,
+  "rows": [
+    {
+      "line": 1,
+      "text": "# prune-server",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 3,
+      "text": "singlefs 的判定库服务：RocksDB 判定库的唯一持有者，两台的任务都经它读写同一份库。用户级 systemd 服务 `singlefs-prune-server.service`，本机走 unix socket（`${XDG_RUNTIME_DIR}/singlefs-prune-server/server.sock`），第二台走 TCP（地址取仓根 `multi-host.env` 的 `PRUNE_SERVER_TCP_ADDRESS`）。协议在 `src/protocol.rs` 文件头，容错客户端在 `src/reliable_client.rs`。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 5,
+      "text": "| 文件 | 做什么 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 6,
+      "text": "|---|---|",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 7,
+      "text": "| `control` | 装、起、停、查、监听：`install [--dry-run] [--binary <编好的 prune-server>]`、`start`、`stop`、`check`、`watch`、`drop-oversized-values [--dry-run]`；派到哪台都只管服务那台的单元（不在服务那台就经 ssh 转去）；用法、退出码与自证在文件头 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 8,
+      "text": "| `singlefs-prune-server.service.in` | 用户级单元模板，`control install` 照它填路径；`Restart=always`、`RestartSec` 在模板文件头 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 9,
+      "text": "| `src/bin/prune_server.rs` | 服务（`serve`）、控制命令调的 `admin`、自证；用法、自证的格、弄坏开关表在文件头 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 10,
+      "text": "| `src/storage.rs` | 库的布局（只有默认列族、键原样、记账行的键前缀）、开库选项、开库之前抬文件数软上限与核够不够、同步 WAL 失败之后退出重开库的规则 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 11,
+      "text": "| `src/server.rs` | 准入：待处理帧数与字节数的额度（收着的帧体、待处理的帧、没写出去的回应都记在里面）、帧读取期限、写回应期限、连接数上限 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 12,
+      "text": "| `src/journal.rs` | 容错客户端的追加日志：格式（含请求号高水位）、整理、旁边的 `<日志>.lock` 排他锁 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 13,
+      "text": "| `src/fault_log.rs` | 故障行的写法 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 14,
+      "text": "| `src/oversized_values.rs` | 离线子命令 `drop-oversized-values`：服务停着时删掉一把键单独一帧也读不回的整值（「库」一节） |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 16,
+      "text": "## 装",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 18,
+      "text": "1. 编（经统一任务服务，不在本机直接起 cargo）。编译目录归服务、派到哪台都可能、跑完就删，所以同一条命令里把二进制拷到多机配置 `NFS_SHARED_ROOTS` 某一段下的目录（两台同一绝对路径读得到）：",
+      "status": "partial",
+      "evidence_and_limits": "Task-server cleanup traced; command preserves artifact inside submitted command; A32 erroneous control fallback is separate",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 19,
+      "text": "   `task-server/task submit --cwd <仓根>/prune-server -- bash -c 'cargo build --release --offline --bin prune-server && cp \"${CARGO_TARGET_DIR:?}/release/prune-server\" <共享根下的目录>/prune-server.new && mv <共享根下的目录>/prune-server.new <共享根下的目录>/prune-server'`，再 `task-server/task wait <号>`；`<共享根下的目录>/prune-server` 是二进制。",
+      "status": "partial",
+      "evidence_and_limits": "Submission example inspected; not run this production binary build",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 20,
+      "text": "2. `python3 prune-server/control install --dry-run --binary <那个二进制>` 看每一步。",
+      "status": "partial",
+      "evidence_and_limits": "control install dry-run writing flag traced; selftest5921 local routing only; exhaustive no-write test not run",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 21,
+      "text": "3. `python3 prune-server/control install --binary <那个二进制>`：拷成 `~/.local/share/singlefs/prune-server/bin/prune-server`（回读 sha256），建状态目录 `~/.local/state/singlefs/prune-server`（700），写单元、`daemon-reload`、`start`、`enable`（两台开了 linger，开机就起），回读服务通了才退 0。单元带 `Restart=always`：进程不是 `systemctl stop` 停掉的（被 earlyoom 杀、崩了、退了），隔 `RestartSec` 秒由 systemd 拉起，落在容错客户端一轮重连（至多 120 秒）里，客户端重连上接着做。服务的库是状态目录下的 `library`，服务头一次起时建。",
+      "status": "discrepancy",
+      "evidence_and_limits": "A31 enable/autostart contradicted by control400 and template; other claims individually pending",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 22,
+      "text": "4. 用完 `task-server/task clean <号>` 删编译目录。",
+      "status": "partial",
+      "evidence_and_limits": "task clean valid but normal successful runs already remove compilation directory; prior tasks confirm",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 23,
+      "text": "5. 换二进制：再跑 3（单元在跑的不重起），然后 `control stop`、`control start`。",
+      "status": "partial",
+      "evidence_and_limits": "install uses start without restart; actual deployment not changed",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 25,
+      "text": "## 库",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 27,
+      "text": "服务不原地打开别的库，只开自己那一份（状态目录下的 `library`）：只有默认列族，三张表都落在它里面、键原样，去重与认领两张记账表也在里面、各一个 0xF0 起的键前缀（`src/storage.rs` 文件头）。",
+      "status": "partial",
+      "evidence_and_limits": "storage default-CF opening traced; three-table identity and bookkeeping key bytes require full caller/protocol check",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 29,
+      "text": "状态目录下已有的库不是这一种（另有列族，例如早先多列族布局建的）时服务拒起退 6：挪开那个目录让服务建一份新的，判定在新库里重判。",
+      "status": "partial",
+      "evidence_and_limits": "open_single_column_family_library refusal branch inspected previously; CLI mapping and no-physical-change promise not fully checked",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 31,
+      "text": "### 一把键单独一帧也读不回的整值",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 33,
+      "text": "大值分段（`scripts/prune-server/prune_server_client.py` 文件头「键空间」）之前写进来的整值，有的单个就长过成批点读一帧回得了的长度：服务整帧拒、客户端拆到一把键还被拒，那把键永远读不出。读路径上不兼容这种行，服务停着时离线删掉，删掉的判定由各入口下次经服务现判、分段写回：",
+      "status": "partial",
+      "evidence_and_limits": "A30 selection and point-read length traced; historic stored-value population not inventoried",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 35,
+      "text": "派到哪台都一样：`control drop-oversized-values` 判服务在哪台，不在这台就经 ssh 转去；单元在跑就退 78；二进制与状态目录取装好的单元文件 ExecStart，起 `<二进制> drop-oversized-values --state-directory <状态目录> [--dry-run]`，输出原样打、退它的退出码（`control` 文件头）。",
+      "status": "verified_scoped",
+      "evidence_and_limits": "control drop wrapper and task5921 three cells match host routing, stopped-state gate, installed paths, flags and child exit forwarding; not actual RocksDB run",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 37,
+      "text": "1. `python3 prune-server/control stop`。",
+      "status": "partial",
+      "evidence_and_limits": "stop call chain inspected; A33 cgroup-query failure discrepancy; actual service not stopped",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 38,
+      "text": "2. `python3 prune-server/control drop-oversized-values --dry-run`，只打清单（每行 `PRUNE_SERVER_OVERSIZED_VALUE table=… value_bytes=… key=…`，末行 `PRUNE_SERVER_DROP_OVERSIZED_VALUES mode=dry-run … oversized_rows=N`），库不动。",
+      "status": "discrepancy",
+      "evidence_and_limits": "A30 task5920 physical files change despite dry-run; logical fixture value unchanged",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 39,
+      "text": "3. 同一条去掉 `--dry-run`：删掉清单里的行、同步 WAL、逐把点读核没了，末行 `mode=dropped`，退 0。",
+      "status": "partial",
+      "evidence_and_limits": "oversized_values deletion/write/WAL/readback statically traced; failure injection and actual oversized deletion target not run",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 40,
+      "text": "4. 再带 `--dry-run` 跑一次，末行 `oversized_rows=0`。",
+      "status": "pending",
+      "evidence_and_limits": "Operational recheck recommendation; no actual deletion done, cannot claim post-delete zero",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 41,
+      "text": "5. `python3 prune-server/control start`、`python3 prune-server/control check`。",
+      "status": "partial",
+      "evidence_and_limits": "start/check branches inspected; fake selftest only",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 43,
+      "text": "认哪几行：键不是段键、计数键的形状，值长让只读这一把键的成批点读回应超过帧长上限（与服务整帧拒同一份判法，`src/oversized_values.rs` 文件头）；判定向量两张表的空值行认不上。服务开着库时退 3（RocksDB 的 LOCK），退出码全表在 `src/bin/prune_server.rs` 文件头。",
+      "status": "partial",
+      "evidence_and_limits": "Selection key shapes and response-length predicate traced; real LOCK/error exit targets not run",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 45,
+      "text": "## 控制命令",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 47,
+      "text": "派到哪台都只管服务那台的单元。每个子命令先判服务在不在这台：多机配置 `PRUNE_SERVER_TCP_ADDRESS` 的 IP 与多机配置的共用取法（`scripts/hosts/multi_host_addresses.py` 的 `resolve`：整份配置判过才给主机数组 `HOSTS` 里这一台与第二台的地址）给的两个地址比，是这一台那一项就在这台做；是第二台那一项，就经 ssh 直连那个 IP（用户名照这台的 `~/.ssh/config`），在那台同一绝对路径的仓里起同一条 `python3 <仓根>/prune-server/control <同样的参数>`，对端的标准输出、标准错误原样打出来、退它的退出码。",
+      "status": "verified_scoped",
+      "evidence_and_limits": "service_host/forward plus task5921 fake-SSH tests; actual network/authentication not validated",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 49,
+      "text": "- 不过就退 78 的三样：多机配置里有 `PRUNE_SERVER_TCP_ADDRESS`（写 `<IP>:<端口>`，不写主机名）；共用取法取得到地址（配置整份判得过：`HOSTS` 写了、那个 IP 在 `HOSTS` 里、别的键齐，原因照抄判法那一句）；经 ssh 之前，这一条不是别的那台转来的（两台都不认那个 IP 是自己的，就是配置错了）。",
+      "status": "verified_scoped",
+      "evidence_and_limits": "Task5921 missing/invalid key, hosts, loop refusal cells; full dependency parser edge cases pending",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 50,
+      "text": "- `install --binary` 转去时，二进制要在多机配置 `NFS_SHARED_ROOTS` 某一段下（两台同一绝对路径读得到），不在退 78。",
+      "status": "verified_scoped",
+      "evidence_and_limits": "shared_binary_refusal and inside/outside roots cell5921; inaccessible remote path not exercised",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 51,
+      "text": "- `watch` 转去时照样前台、按行转打，对端退出就退它的退出码；ssh 断了或连不上按「服务不通」报、退 1。别的子命令 ssh 连不上退 78。",
+      "status": "verified_scoped",
+      "evidence_and_limits": "forward streaming, exit and 255 mapping;5921 tests fake SSH and forwarded stdin hangup",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 52,
+      "text": "- `control --selftest`：这份文件自己的自证（判在哪台、经 ssh 转、共用取法与本份的几种拒绝、watch 转打与断开、单元自己拉起与 enable、stop 之后不被拉起、drop-oversized-values 的拒与转起），用假的 ssh、假的 systemctl 与整份判得过的假配置（这一台写每台 lo 上都有的 127.0.0.1，第二台写文档段地址），共用取法照真的判法判，不起真服务；格与弄坏开关 `PRUNE_SERVER_CONTROL_BREAK` 的表在 `control` 文件头。",
+      "status": "discrepancy",
+      "evidence_and_limits": "A31 description says enable; actual selftest asserts no enable. All16 cells passed5921",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 54,
+      "text": "- `control check`：二进制、多机配置里的 TCP 地址、服务通不通，都过退 0，缺一样退 78；另打库目录（装好的单元 ExecStart 的 `--state-directory` 下的 `library`）。",
+      "status": "partial",
+      "evidence_and_limits": "check binary/config/health and library-print branches read; repeated dependency failures not all run",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 55,
+      "text": "- `control start`：起单元，回读 `is-active` 是 `active` 且服务通才退 0。",
+      "status": "verified_scoped",
+      "evidence_and_limits": "start requires active and health; code traced, no actual service startup",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 56,
+      "text": "- `control stop`：立刻停，不等在跑的读写。先叫服务宣布停服务（服务给每条连着的客户端发一帧「服务停了」，它们退 75 不再重试），打出停之前连着的客户端（主机、任务号、第几次、进程号），排他写进状态目录 `stops/` 下一份带时刻的停服务记录，再 `systemctl --user stop`（这样停的 systemd 不拉起；不 disable，开机照起）；回读 `is-active` 是 `inactive`/`failed`、单元 `cgroup.procs` 为空，隔单元的 `RestartSec` 加一秒再回读 `is-active` 仍是 `inactive`/`failed`（没被拉起）才退 0。最后对每个任务号打一行 `task-server/task status <号>`。",
+      "status": "discrepancy",
+      "evidence_and_limits": "A31 autostart, A33 unreadable cgroup, A34 notification delivery are not guaranteed as written; rest of clause remains separate partial evidence; A33 reproduced by task5924 with fake cgroup pid retained.",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 57,
+      "text": "- `control watch`：前台循环（主 agent 用 run_in_background 起）。单元不在跑、服务不通、故障日志里有这次 watch 起之后新增的故障行，判出一样就打出来退 1：出了什么、故障行原文、此刻连着的客户端（拿不到写拿不到）、每个任务号的 `task-server/task status <号>` 查法。一直好就一直查。",
+      "status": "partial",
+      "evidence_and_limits": "watch branches read; control header active-only discrepancy A35; file replacement races and real service faults not tested",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 58,
+      "text": "- `control drop-oversized-values [--dry-run]`：单元在跑退 78（出路先 `control stop`）；停着时起装好的单元 ExecStart 的二进制跑同名子命令，`--state-directory` 取单元的，退它的退出码（「库」一节）。",
+      "status": "verified_scoped",
+      "evidence_and_limits": "drop wrapper selftests5921 cover running refusal, installed binary/state-directory and dry-run forwarding, peer routing",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 60,
+      "text": "## 退出码",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 62,
+      "text": "| 谁 | 码 | 意思 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 63,
+      "text": "|---|---|---|",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 64,
+      "text": "| 容错客户端（调用方照 `ClientFailure::exit_code` 退） | 75 | prune-server 不可用：服务有意停了（「服务停了」）、重连到上限（缺省 30 次、120 秒，「连不上」）、同一帧忙到上限。没确认的写帧留在追加日志里，重交时重放 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 65,
+      "text": "| | 3 | 别的错（服务拒了帧、协议错、追加日志出错、调用方要停）；一帧大过帧长上限（`src/protocol.rs` 的 `MAXIMUM_FRAME_BODY_BYTES`）的当场报协议错、不记追加日志、不发、不重试，服务回「帧长度不对」的同样报协议错、不重连（`src/reliable_client.rs`、`src/client.rs` 文件头）；Python 客户端的大值分段在 `scripts/prune-server/prune_server_client.py` 文件头「键空间」 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 66,
+      "text": "| `control` | 0 / 1 / 2 / 78 | 成了 / 回读不对或 watch 判出问题（含经 ssh 的 watch 断了）/ 用法错 / 运行条件不满足；经 ssh 转去的退服务那台的退出码；`drop-oversized-values` 起了二进制的退二进制的退出码（下面那一行） |",
+      "status": "partial",
+      "evidence_and_limits": "Control dispatch/forward/child exit statuses traced; exception exit behavior not exhaustively tested",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 67,
+      "text": "| `prune-server admin` | 0 / 1 / 2 / 75 | 成了 / 服务回了错 / 用法错 / 连不上服务 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 68,
+      "text": "| `prune-server drop-oversized-values` | 0 / 1 / 2 / 3 / 6 / 8 / 78 | 成了 / 删完点读还读得到 / 用法错 / 库打不开（服务开着它、目录不在）或读写出错 / 库对不上 / 文件数上限不够 / 准入不满足 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 69,
+      "text": "| `prune-server serve` | 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 78 | 监听停了 / 用法错（含认不得的参数）/ 库打不开（被别的进程持有、目录建不了）/ socket 不能用 / TCP 不能用 / 库对不上（目录里有文件却不是 RocksDB、另有列族、选项对不上）/ 同步 WAL 失败、服务退出（重起时从 WAL 重开库，`src/storage.rs` 文件头）/ 文件数上限不够（下面一段）/ 准入不满足 |",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 71,
+      "text": "退 8（文件数上限不够）：RocksDB 开库时把库里的 SST 全打开，库有几个文件就占几个描述符。服务与自证起的临时服务每次开库之前先把 RLIMIT_NOFILE 的软上限抬到硬上限，再核够不够（库目录的文件数、进程此刻开着的描述符数与写死的余量之和，余量的算法在 `src/storage.rs` 文件头「文件数上限」）；抬完仍不够就不开库，标准错误写「文件数上限不够：要 N、硬上限 M」。出路是请有权限的人把起它的那一层的硬上限抬到至少 N（不超过 `/proc/sys/fs/nr_open`）再重起；单元模板里不另写软上限。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 73,
+      "text": "## 故障行",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 75,
+      "text": "服务每出一个自身的错（读写库出错、分派错、线程 panic）往 `~/.local/state/singlefs/prune-server/faults.log` 追加一行，客户端发错格式被拒的不记：",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 77,
+      "text": "```",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 78,
+      "text": "PRUNE_SERVER_FAULT time=<零时区 ISO 8601，到毫秒> kind=<storage-read-failed|storage-write-failed|dispatch-bug|internal-panic> server_pid=<数> connection=<数> transport=<unix|tcp> peer=<地址> host=<主机名> task=<任务号> attempt=<第几次> pid=<客户端进程号> detail=<说明>",
+      "status": "discrepancy",
+      "evidence_and_limits": "A34 schema omits StopNoticeUndelivered fifth kind; field order matches fault_line",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 79,
+      "text": "```",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 81,
+      "text": "身份那几段来自客户端连上时的报到（`TASK_SERVER_TASK`、`TASK_SERVER_ATTEMPT`、主机名、进程号；不在 task-server 里跑的、不报到的写 `-`）。",
+      "status": "partial",
+      "evidence_and_limits": "connections announcement_from_environment and announcement_fields traced; actual handshake not exercised",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 83,
+      "text": "## 第二台怎么连",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 85,
+      "text": "第二台的客户端连 `multi-host.env` 里的 `PRUNE_SERVER_TCP_ADDRESS`（本机在有线直连段上的地址），与本机的服务读同一份配置。TCP 这一版不认证、帧不带校验列，只开在有线直连段的地址上。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 87,
+      "text": "## 出了问题怎么处置（主 agent）",
+      "status": "structure_read",
+      "evidence_and_limits": "Structural line read; no substantive semantic approval implied",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 89,
+      "text": "1. `control watch` 退出，看它打的那几行：是不是服务自身的缺陷（故障行、服务不通、单元不在跑）。不是的（任务自己的红）交 task-server 照常打回。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 90,
+      "text": "   服务退了、被杀了，systemd 隔 `RestartSec` 秒自己拉起，客户端重连上接着做；watch 判出单元不在跑而拉起之后又反复退出的，才往下走。故障行写着「同步 WAL 失败之后服务退出」的，是服务退了 7：先查库所在的盘与文件系统（`dmesg`、`df`），盘好了往下走第 5 步重起（不用换二进制）。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 91,
+      "text": "2. 是：`python3 prune-server/control stop`，记下它打的客户端清单与停服务记录的路径。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 92,
+      "text": "3. 照清单里每个任务号 `task-server/task status <号>` 查是哪个会话交的，通知它们取消对应任务（客户端已退 75）。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 93,
+      "text": "4. 修。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 94,
+      "text": "5. 换二进制（见「装」第 5 条）、`python3 prune-server/control start`，`control check` 退 0。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 95,
+      "text": "6. 再起 `control watch`。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    },
+    {
+      "line": 96,
+      "text": "7. 通知那几个会话可以重交。",
+      "status": "pending",
+      "evidence_and_limits": "Read text only; all subclaims still require evidence before approval",
+      "whole_paragraph_verified": false
+    }
+  ],
+  "pending_tasks": [],
+  "limits": "Each nonblank README line retained. A verified_scoped row proves only named properties, never whole paragraph/document. Control/fault/admin/code source ranges are in main ledger.",
+  "completed_reproduction_task": 5924,
+  "additional_source_claims": [
+    {
+      "claim": "Serve defaults group2ms/256frames; pending512/8192/1GiB/256MiB; connections1024; read/write60s; busy20ms",
+      "status": "static_matches",
+      "evidence": "command_line.rs49-64,162-189,341-363",
+      "runtime": "not_run"
+    },
+    {
+      "claim": "Configuration override selects file path; TCP address itself read only from file; absent/empty key refusal5",
+      "status": "static_matches",
+      "evidence": "configuration.rs18-60;command_line.rs295-319",
+      "runtime": "not_run"
+    },
+    {
+      "claim": "Bookkeeping F0 plus u8 identity length+identity+u64BE request, valueu32LE; F1 pluskey, valueu64LE expiry+holder",
+      "status": "static_matches",
+      "evidence": "storage.rs278-316,430-455",
+      "limits": "Protocol length/forbidden key validation not fully audited"
+    },
+    {
+      "claim": "Three protocol tables share defaultCF/keyspace, point-read single batched_multi_get, prefix scan stops at private prefix",
+      "status": "static_matches",
+      "evidence": "storage.rs430-454,540-570,594-637",
+      "limits": "Malformed input guard and full protocol caller paths still pending"
+    },
+    {
+      "claim": "Fault log fields fixed order, unknown identities hyphens, detail newline sanitized, append mutex, panic try_lock",
+      "status": "static_matches",
+      "evidence": "fault_log.rs91-187;connections.rs222-284",
+      "limits": "Timestamp formula and actual failure paths not runtime tested; fifth kind missing from README A34"
+    }
+  ]
+}

@@ -1,0 +1,592 @@
+{
+  "at": "2026-11-05",
+  "claims": [
+    {
+      "tool": "kb-sections",
+      "claim": "H1-H6 headings and first heading body get checklist rows",
+      "status": "static_match_bounded",
+      "evidence": "HEAD/is_head/sections:49-92; H1 and initial-body selftest cases",
+      "limits": "无首标题的散文、容器内标题及非常规标题语法不在本轮已核范围；射程按工具认法"
+    },
+    {
+      "tool": "kb-sections",
+      "claim": "Fenced code headings excluded, respecting fence marker and length",
+      "status": "static_match_bounded",
+      "evidence": "fenced_lines:53-69; heading_bounds:95-106",
+      "limits": "只核顶层围栏，未扩张到 Markdown 容器"
+    },
+    {
+      "tool": "kb-sections",
+      "claim": "heading_bounds independent from quote pick and same recognition as checklist",
+      "status": "static_match",
+      "evidence": "heading_bounds uses is_head/fenced_lines; no call into pick",
+      "limits": "静态核对，未据此签整份文档或全部输入通过"
+    },
+    {
+      "tool": "kb-sections",
+      "claim": "No file/unknown option/unreadable file exits2;help exits0",
+      "status": "static_match_bounded",
+      "evidence": "main:182-210; OSError and UnicodeDecodeError caught",
+      "limits": "多参数 help/selftest、非法UTF8报具体文件名及所有异常组合未测"
+    },
+    {
+      "tool": "kb-sections",
+      "claim": "Mutation switches only for selftest",
+      "status": "discrepancy_A52_reproduced",
+      "evidence": "settle_break_switches guards only KB_SECTIONS_BREAK; NO_H1/NO_FENCE/NO_PREAMBLE read unguarded",
+      "limits": "7184 ordinary CLI,registered BREAK refuses2;3NO_*return0withchangedchecklist"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Three extraction modes and earliest separator with existing prefix",
+      "status": "static_match",
+      "evidence": "split_spec:124-139;pick:142-195",
+      "limits": "异常路径、非法正则及并发源变动仍待核"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Fence length longer than any copied backtick run",
+      "status": "static_match",
+      "evidence": "fence_for:103-112;build:198-211",
+      "limits": "静态核对，未据此签整份文档或全部输入通过"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Produced blocks compared to newly picked source lines; mismatch exits3",
+      "status": "static_match_bounded",
+      "evidence": "verify:214-234;main:1030+",
+      "limits": "核的是内存生成产物；磁盘出口写后没有再读取，不能称磁盘落盘后回读校验"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Heading boundary independently checked; failure7 before output write",
+      "status": "static_match",
+      "evidence": "independent_section_range/check_section_bounds:249-270;main checks before open(dest)",
+      "limits": "静态核对，未据此签整份文档或全部输入通过"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Every copied checklist section must be present",
+      "status": "discrepancy_A47_reproduced",
+      "evidence": "check_checklist:283-319 builds global heading set and ignores source for heading rows;main:1047 and final success sentence",
+      "limits": "task6618:real CLI--cited,2controls+3counterexamples confirmed;no evidence of actual historical loss"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Reverse check is restricted to same source file",
+      "status": "static_match_bounded",
+      "evidence": "heading_lines_by_file/check_checklist_reverse:322-378",
+      "limits": "实际仅判标题行出现；内部代码标题、伪出处行、行区间引言豁免已保留待核"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Uncopied reason naming copied section checked; missing8",
+      "status": "static_match_bounded",
+      "evidence": "sections_named_in_reason/check_checklist_reasons:390-418",
+      "limits": "按任一抄录标题的子串命中，不证明理由完整语义"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "not-numbers declarations inside fences do not count",
+      "status": "discrepancy_A53_reproduced",
+      "evidence": "not_numbers_declared:424-433 only toggles triple backticks; tilde fence ignored",
+      "limits": "7187 tilde/longfences hideC1;ordinary/triplefencecontrols refuse5"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Strict D/E matching excludes en/ja;loose includes them",
+      "status": "static_match",
+      "evidence": "cited_kb_sources:566-582;trilingual selftest:896+",
+      "limits": "重复中文编号和不存在编号的处理射程另待核"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "I references select Chinese class table carriers with adjacent README",
+      "status": "static_match_bounded",
+      "evidence": "invariant_class_files:503-535;invariant_files_for:538-547",
+      "limits": "同目录任意 README 的非不变量目录、文件读取失败被跳过的影响未验证"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "KB registry normalized,reject absolute/traversal/root entries",
+      "status": "static_match_bounded",
+      "evidence": "kb_directory_entries:451-479;kb_candidate_roots:486-501",
+      "limits": "符号链接指向仓外的情况未验证；被拒行报告而整体可回退，未当成事务拒绝"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Missing cited file checklist exits5",
+      "status": "static_match_bounded",
+      "evidence": "check_cited:626-629;main:1079+",
+      "limits": "严格编号不唯一或不存在时是否漏列，仍待专项核验"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Failure order3,7,4,6,8,5;do not write destination on those failures",
+      "status": "static_match",
+      "evidence": "main:1030-1097",
+      "limits": "不涵盖最终写入异常、异常参数或特殊环境开关"
+    },
+    {
+      "tool": "quote-kb",
+      "claim": "Selftest scratch removed on green/red/crash",
+      "status": "bounded_runtime_match",
+      "evidence": "selftest delegates lib_selftest_scratch.py",
+      "limits": "dependency134lines fully read;task6619 passed existing3routes;not arbitrary signals or cleanup failures"
+    },
+    {
+      "tool": "quote-rust-items",
+      "claim": "Named fn/struct/enum/trait/mod/const/static/impl items selected,duplicate4",
+      "status": "static_match_bounded",
+      "evidence": "header_pattern/find_item:92-142",
+      "limits": "正常单行项头匹配已读，完整Rust/Verus语法、泛型impl精确性与同一行多项未审完"
+    },
+    {
+      "tool": "quote-rust-items",
+      "claim": "Skip comments,strings,characters for delimiter pairing",
+      "status": "static_match_bounded",
+      "evidence": "strip_code:31-89",
+      "limits": "原始字符串、多行块注释、字节/字符形式分支阅读，未做全语法证明"
+    },
+    {
+      "tool": "quote-rust-items",
+      "claim": "Unrecognized/unbalanced item returns3 rather than partial output",
+      "status": "partial",
+      "evidence": "find_item stack traversal:116-142",
+      "limits": "Verus契约表达式与多行属性的返回边界仍待专项输入，不能签全保证"
+    },
+    {
+      "tool": "quote-rust-items",
+      "claim": "File problems exit2",
+      "status": "discrepancy_A50_reproduced",
+      "evidence": "quote:157-160 and174 read_text calls unguarded",
+      "limits": "7184 invalidUTF8 tracebackexit1;missingfilecontrol2"
+    },
+    {
+      "tool": "quote-rust-items",
+      "claim": "Readback compares to source and mismatches5",
+      "status": "static_match_bounded",
+      "evidence": "quote:174 compares fresh entire source to initial text",
+      "limits": "没有解析输出块回读；保证是源前后未变，非出口磁盘回读"
+    },
+    {
+      "tool": "quote-rust-items",
+      "claim": "Doc comments and attributes retained with item",
+      "status": "discrepancy_A51_reproduced",
+      "evidence": "find_item:108-111 walks preceding single lines beginningdoc/attribute",
+      "limits": "7184 multilinecfgandprecedingdocomitted;singlelinecontrolretained"
+    }
+  ],
+  "sources": [
+    {
+      "path": "scripts/kb/kb-sections.py",
+      "sha256": "1aa10e1113b08094be615e3ea79917b65dff0eaf6238fd49b1416c3ff9e07104",
+      "read_ranges": [
+        [
+          1,
+          248
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "functions": [
+        {
+          "name": "fenced_lines",
+          "line": 54,
+          "end_line": 66,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "is_head",
+          "line": 69,
+          "end_line": 71,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "sections",
+          "line": 74,
+          "end_line": 91,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "heading_bounds",
+          "line": 94,
+          "end_line": 105,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "render",
+          "line": 108,
+          "end_line": 118,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "selftest_red",
+          "line": 121,
+          "end_line": 126,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "selftest",
+          "line": 129,
+          "end_line": 179,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "main",
+          "line": 182,
+          "end_line": 210,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "inside_selftest",
+          "line": 216,
+          "end_line": 228,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "settle_break_switches",
+          "line": 231,
+          "end_line": 240,
+          "text_read": true,
+          "full_semantics_verified": false
+        }
+      ]
+    },
+    {
+      "path": "scripts/kb/quote-kb.py",
+      "sha256": "3a5c44d556ae8c955dd556b8f157eccefd3c4733975628609c0d412a362428cd",
+      "read_ranges": [
+        [
+          1,
+          1131
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "functions": [
+        {
+          "name": "fence_for",
+          "line": 104,
+          "end_line": 113,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "read",
+          "line": 116,
+          "end_line": 118,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "split_spec",
+          "line": 124,
+          "end_line": 137,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "pick",
+          "line": 140,
+          "end_line": 188,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "build",
+          "line": 191,
+          "end_line": 203,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "verify",
+          "line": 206,
+          "end_line": 223,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "kb_sections_module",
+          "line": 229,
+          "end_line": 237,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "independent_section_range",
+          "line": 240,
+          "end_line": 252,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "check_section_bounds",
+          "line": 255,
+          "end_line": 270,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "normalize_heading",
+          "line": 273,
+          "end_line": 280,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "check_checklist",
+          "line": 283,
+          "end_line": 317,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "heading_lines_by_file",
+          "line": 320,
+          "end_line": 335,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "check_checklist_reverse",
+          "line": 338,
+          "end_line": 372,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "sections_named_in_reason",
+          "line": 381,
+          "end_line": 387,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "check_checklist_reasons",
+          "line": 390,
+          "end_line": 414,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "not_numbers_declared",
+          "line": 420,
+          "end_line": 432,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "kb_directory_entries",
+          "line": 453,
+          "end_line": 483,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "kb_candidate_roots",
+          "line": 489,
+          "end_line": 502,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "invariant_class_files",
+          "line": 505,
+          "end_line": 533,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "invariant_files_for",
+          "line": 536,
+          "end_line": 545,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "cited_kb_sources",
+          "line": 548,
+          "end_line": 588,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "cited_kb_files",
+          "line": 591,
+          "end_line": 593,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "lacking_checklist_message",
+          "line": 596,
+          "end_line": 624,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "check_cited",
+          "line": 627,
+          "end_line": 630,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "selftest",
+          "line": 633,
+          "end_line": 646,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "selftest_in",
+          "line": 649,
+          "end_line": 1022,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "main",
+          "line": 1025,
+          "end_line": 1093,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "inside_selftest",
+          "line": 1099,
+          "end_line": 1111,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "settle_break_switches",
+          "line": 1114,
+          "end_line": 1123,
+          "text_read": true,
+          "full_semantics_verified": false
+        }
+      ]
+    },
+    {
+      "path": "scripts/kb/quote-rust-items.py",
+      "sha256": "a48ad8643c7133b980ac3903b26f924bd39551887256e0b4d9f5a057c808c6c0",
+      "read_ranges": [
+        [
+          1,
+          237
+        ]
+      ],
+      "full_text_read": true,
+      "full_semantic_signoff": false,
+      "functions": [
+        {
+          "name": "strip_code",
+          "line": 31,
+          "end_line": 89,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "header_pattern",
+          "line": 92,
+          "end_line": 96,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "find_item",
+          "line": 99,
+          "end_line": 144,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "quote",
+          "line": 147,
+          "end_line": 181,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "selftest",
+          "line": 184,
+          "end_line": 219,
+          "text_read": true,
+          "full_semantics_verified": false
+        },
+        {
+          "name": "main",
+          "line": 222,
+          "end_line": 232,
+          "text_read": true,
+          "full_semantics_verified": false
+        }
+      ]
+    }
+  ],
+  "pending_tests": [],
+  "complete_document_review": false,
+  "runtime_results": [
+    {
+      "task": 6618,
+      "exit_code": 0,
+      "complete_log_read": true,
+      "task_clean": true,
+      "log": "records/2026-11-02-文档代码逐项审核-任务6618.log",
+      "limits": "5 real CLI cases:2controls+3 A47 discrepancies; source hashes unchanged;temporary materials removed"
+    },
+    {
+      "task": 6619,
+      "exit_code": 0,
+      "complete_log_read": true,
+      "task_clean": true,
+      "log": "records/2026-11-02-文档代码逐项审核-任务6619.log",
+      "limits": "Existing quote-kb selftest incl 3 scratch cleanup routes passed; not exhaustive checklist coverage"
+    },
+    {
+      "task": 6620,
+      "exit_code": 0,
+      "complete_log_read": true,
+      "task_clean": true,
+      "log": "records/2026-11-02-文档代码逐项审核-任务6620.log",
+      "limits": "Existing kb-sections selftest passed; unguarded NO_* ordinary CLI behavior pending7184"
+    },
+    {
+      "task": 6621,
+      "exit_code": 0,
+      "complete_log_read": true,
+      "task_clean": true,
+      "log": "records/2026-11-02-文档代码逐项审核-任务6621.log",
+      "limits": "Existing quote-rust-items selftest passed; file error and multiline attribute boundary pending7184"
+    },
+    {
+      "task": 7184,
+      "exit_code": 0,
+      "complete_log_read": true,
+      "task_clean": true,
+      "log": "records/2026-11-02-文档代码逐项审核-任务7184.log",
+      "limits": "4 Rust CLI cases,3 atomic fault/control cases,5 checklist CLI switch cases; A49-A52 confirmed"
+    },
+    {
+      "task": 7187,
+      "exit_code": 0,
+      "complete_log_read": true,
+      "task_clean": true,
+      "log": "records/2026-11-02-文档代码逐项审核-任务7187.log",
+      "limits": "5 real citation CLI cases incl3 controls+2 discrepancies; 8 notation predicate inputs incl5 controls+3 discrepancies;A53-A54"
+    }
+  ],
+  "runtime_updated_at": "2026-11-05"
+}

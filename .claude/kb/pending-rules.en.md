@@ -17,12 +17,12 @@ Each entry records the original text, where it originally came from, why it was 
 ```text
 ## 立验证装置或测试入口之前，同样先找已有的
 
-射程：验证装置（枚举、对拍、跑真设备或外部工具的那一套代码）、测试入口（`test-script-discipline.md` 说的入口脚本），以及跑它们的门禁阶段与快慢两档。
+射程：验证装置（枚举、对拍、跑真设备或外部工具的那一套代码）、测试入口（`test-script-discipline.md` 说的入口脚本），以及跑它们的门禁阶段。
 
 1. 先列已有的装置与入口各判什么：判哪件事、哪一批对象（哪几条流、哪个枚举域）、用哪个判法、在哪个阶段跑。
-2. 有判同一件事、同一批对象的，新的并进已有的那一套：换一种算法、换到加速硬件、加一条流、加一个域，都写成它的加速路径或新项，用它的名字、它的入口、它的阶段与它的快慢两档，不另起名字、不另立阶段、不另分一套快档与全量。加速路径留参照路径、两边对拍，照 `test-script-discipline.md`「用上现有的硬件加速」。
+2. 有判同一件事、同一批对象的，新的并进已有的那一套：换一种算法、换到加速硬件、加一条流、加一个域，都写成它的加速路径或新项，用它的名字、它的入口与它的阶段，不另起名字、不另立阶段。加速路径留参照路径、两边对拍，照 `test-script-discipline.md`「用上现有的硬件加速」。
 3. 只有一部分重叠（几条流、一段域相同）的，重叠的那一部分并进去，其余作为同一套里的新项。
-4. 仓里已经并存两套判同一件事的，先合成一套，再跑它的剪枝跑或全量；合之前不跑两套各自的全量。
+4. 仓里已经并存两套判同一件事的，先合成一套，再跑它；合之前不对两套各自跑不指定范围那一趟。
 5. 非单独立不可，在新入口的文件头写 `# gate-similar: <已有的装置或入口> <为什么不并进它>`；一个像的都没有，写 `# gate-similar: 无 <查过哪些>`。
 
 「立验证装置或测试入口之前，同样先找已有的」门禁还不判：新入口的文件头写没写 `gate-similar`、两套装置判的是不是同一件事，都靠 review。
@@ -31,12 +31,12 @@ English translation:
 
 ## Search for existing before creating verification apparatus or test entry point
 
-Scope: verification apparatuses (the code that enumerates, runs a differential, or drives real devices or external tools), test entry points (the entry scripts that `test-script-discipline.md` refers to), and the gate stages and the quick and slow tiers that run them.
+Scope: verification apparatuses (the code that enumerates, runs a differential, or drives real devices or external tools), test entry points (the entry scripts that `test-script-discipline.md` refers to), and the gate stages that run them.
 
 1. First list what each existing apparatus and entry point judges: which thing, which set of objects (which streams, which enumeration domain), with which judging method, in which stage.
-2. If one already judges the same thing on the same set of objects, merge the new one into it: a different algorithm, a move to acceleration hardware, an added stream or an added domain is written as its acceleration path or a new item, using its name, its entry point, its stage and its quick and slow tiers; do not start another name, another stage, or a separate quick tier and full run. An acceleration path keeps the reference path and runs a differential between the two, per `test-script-discipline.md` "Use the existing hardware acceleration".
+2. If one already judges the same thing on the same set of objects, merge the new one into it: a different algorithm, a move to acceleration hardware, an added stream or an added domain is written as its acceleration path or a new item, using its name, its entry point and its stage; do not start another name or another stage. An acceleration path keeps the reference path and runs a differential between the two, per `test-script-discipline.md` "Use the existing hardware acceleration".
 3. If only part overlaps (some streams or part of the domain are the same), merge the overlapping part and add the rest as new items in the same apparatus.
-4. If the repo already has two apparatuses side by side judging the same thing, merge them into one first, then run its pruning run or full run; before merging, do not run the full run of each one.
+4. If the repo already has two apparatuses side by side judging the same thing, merge them into one first, then run it; before merging, do not give each of the two its own unscoped run.
 5. If it truly has to stand alone, write `# gate-similar: <existing apparatus or entry point> <why it is not merged into it>` in the file header of the new entry point; if nothing is similar, write `# gate-similar: 无 <what was checked>`.
 
 The gate does not judge "Search for existing before creating verification apparatus or test entry point" yet: whether the file header of a new entry point has `gate-similar`, and whether two apparatuses judge the same thing, both rely on review.

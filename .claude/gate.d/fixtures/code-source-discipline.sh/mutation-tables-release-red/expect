@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=crates/mutations.tsv 这 1 行命中重测试目标（gpu 特性、登记的崩溃枚举用例目标）而第五段没写 --release
+want=crates/mutations.tsv:8 M_gpu 特性没写 release：gpu 特性 gpu
+want=→ 怎么办：第五段补上 --release（插在第一个 -- 之前
+want=mutation-tables：红（退出 1）

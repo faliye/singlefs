@@ -10,7 +10,7 @@
 # gate-similar: timer-only-remind-guard.sh 的 matcher 含 Bash、同用 lib_shell_words.py；它拒 remind.sh 之外的定时写法，与起验证脚本无关
 # gate-similar: pattern-process-guard.sh 上游的钩子，同挂 PreToolUse[Bash]；它拒按模式找进程，判据与 shell-lint 同一份，与验证脚本的范围无关，也不许在上游副本里加本工程的判据
 #
-# 为什么：用户 2026-10-15「该做的是红了只跑红的、改了只点名改到的。做成门禁。跑之前提醒，这个东西靠prompt 根本控制不住」，
+# 为什么：该做的是红了只跑红的、改了只点名改到的，这个东西靠 prompt 根本控制不住，要做成门禁、跑之前提醒，
 #   「提醒 agent 是跑单个一条 还是跑整个 让agent解释清楚 选好参数才跑」「agent 启动脚本的时候 必须要解释清楚 跑什么 范围多大 为什么要这么跑。范围是不是合适。」
 #   当天三个验证驱动都整套重跑、合入后验证每次跑全部 212 个测试二进制，而那一轮补丁只碰 unit-graph 与 验证包（records/2026-10-13-复用键与全仓改名.md 第 686、689–691 行）。
 #
@@ -24,7 +24,7 @@
 #   认 submit 用 lib_project_code_runs.py 的 task_server_submission（本仓的客户端或逐字节相同的拷贝）；声明写在 submit 前面：
 #   `SINGLEFS_RUN_SCOPE='…' task-server/task submit -- <命令…>`——客户端把 SINGLEFS_RUN_SCOPE 当白名单变量带进任务，服务起的那一条看得见它；
 #   写在 `--` 之后的要写成 `env SINGLEFS_RUN_SCOPE='…' <命令…>`（服务按词起命令，`名字=值` 打头的词不当赋值），钩子两处都认。
-#   子 agent 经 submit 交的一律拒（用户 2026-11-01 定子 agent 一律不往统一任务服务交任务，records/2026-10-29-subagent拆分提案.md 第一百七十四节）：判定只调
+#   子 agent 经 submit 交的一律拒（子 agent 一律不往统一任务服务交任务，records/2026-10-29-subagent拆分提案.md 第一百七十四节）：判定只调
 #   lib_project_code_runs.py 的 subagent_task_server_refusal（project-code-guard.sh 的 ② 是同一处），出路那一句是它的 SUBAGENT_HAND_BACK_WAY_OUT，这里不另写一份。
 #   task-server/task 的 wait、status、cancel、log、clean 不是验证命令，不要声明。
 # 要声明的命令（只认命令位置）。包在外面的照剥、剥出来的照同一张表判，外面写的声明带进里面那一条：bash -c、run-with-memory-cap.sh、capped.sh、env、nice、timeout、
@@ -36,9 +36,9 @@
 #   崩溃放量    scripts/crash/crash-amplification.sh：带 --item 是 items（N = 分项数）；不带 --item 的是 whole。
 #               scripts/crash/crash-amplification-item.sh、crash-amplification-two-hosts.sh 起一个测试目标：target，N = 1（范围写「1 个测试目标」，带 --test-filter 的写「1 个测试」）。
 #   实验复跑    scripts/experiment-apparatus/replay.sh：不带实验号是 whole，带实验号是 items（N = 实验号个数，范围写「N 个实验」）。
-#   合入后验证  scripts/gate/merge-and-verify.sh：带 --item <包>:<目标根文件>（给几次取并集，--item=X 也认）是 items，N = 项数（范围写「N 项」）；
-#               不带 --item 是 whole（挑包在脚本里做：只跑补丁改到的包与依赖它们的包，--all-packages 与它文件头写的另几种照旧全跑；
-#               声明写 whole，为什么写明这一批补丁碰了哪些包）。
+#   合入后验证  scripts/gate/merge-and-verify.sh：恒是 items（只跑补丁改到的与变异行点名的测试目标，判不出的那几种不跑、退 3；它文件头「挑测试目标」）：
+#               带 --item <包>:<目标根文件>（给几次取并集，--item=X 也认）N = 项数（范围写「N 项」）；不带 --item 的 N = 给的补丁目录份数
+#               （不以 - 起头的词，--item、--crash-expand-up-to 后面那个值不算；范围写「N 份补丁」，为什么写明这一批补丁改到哪些目标）。声明成 whole 拒。
 #   整轮门禁    scripts/gate/gate-staged.sh、.claude/singlefs-ai-sop/scripts/gate.sh 与它的包装 .claude/scripts/gate.sh：whole。
 #   cargo test  cargo test 与 cargo t（cargo 的全局选项与 +工具链照 lib_project_code_runs.py 的 cargo_subcommand 跳过）：带 --test / --bin / --example / --bench <名>、--lib、--doc，
 #               又不带 --workspace / --all / --tests / --bins / --examples / --benches / --all-targets 的是 target，N = 目标数；`--` 之后带 --exact 又给了筛选词的，
@@ -63,7 +63,7 @@
 # 拒绝说明（stderr，写给 agent）：逐条写命令（驱动脚本里的写 脚本:行）、跑的是什么、范围多大、哪里不合、上次这一道红的清单；
 #   再给照抄的声明模板（种类、跑什么、范围按命令现算好，为什么留尖括号让 agent 填；驱动脚本里的写「在 <脚本> 那一行的命令前面加」，命令超过 2000 字的不整条贴），
 #   只跑红的与改到的写法（门禁 --check <格> / --item <项>，崩溃入口 --item <项>，cargo test -p <包> --test <目标> -- <测试名> --exact 或
-#   python3 scripts/gate/rerun-failed-tests.py <上次日志> -p <包>（它打出的每条命令开头已带 target 声明），merge-and-verify 写挑包在脚本里做、不带 --item 种类写 whole，只重跑红的写 --skip-apply --item <包>:<目标根文件>、种类 items），与声明的写法。
+#   python3 scripts/gate/rerun-failed-tests.py <上次日志> -p <包>（它打出的每条命令开头已带 target 声明），merge-and-verify 写挑测试目标在脚本里做、种类 items、不带 --item 范围写补丁目录份数，只重跑红的写 --skip-apply --item <包>:<目标根文件> <同一批补丁目录>），与声明的写法。
 #   上次红的清单：读 <目录>/<脚本相对仓根的路径，/ 换成 __>.tsv（目录是 SINGLEFS_LAST_RUNS_DIRECTORY，没设是数据根下的 last-runs：同目录 lib_work_root.py 的 shared_data_path，数据根 SINGLEFS_DATA_ROOT 没设是 ~/.local/share/singlefs；
 #   一行一个项名，空行与 # 开头的行不算）；没有这份文件或是空的写「没有上次红的记录」。各道跑完写这份文件归下一批。cargo test 没有这份文件，说明里指到 rerun-failed-tests.py。
 # 检出记录（AGENT_HOOK_DETECTIONS，没设是 lib_work_root.py 的 default_detections_path）：
@@ -105,12 +105,12 @@
 #   RUN_SCOPE_GUARD_BREAK=segments-unchecked  不核四段齐不齐、值空不空、写没写两次、种类认不认得
 #       红：「声明缺段：没写为什么拒」「声明值空：范围一段是空的拒」「声明写两次：种类写两次拒」「声明种类认不出拒」
 #   RUN_SCOPE_GUARD_BREAK=kind-unchecked  不核声明的种类与命令的形状
-#       红：「门禁 --item 声明成 whole：种类对不上拒」「merge-and-verify 声明成 items：种类对不上拒」「cargo test 整包声明成 target：种类对不上拒」
+#       红：「门禁 --item 声明成 whole：种类对不上拒」「merge-and-verify 声明成 whole：拒」「cargo test 整包声明成 target：种类对不上拒」
 #   RUN_SCOPE_GUARD_BREAK=count-unchecked  不核范围一段的数（items、target）与整轮整包（whole）
-#       红：「门禁 --check 两格写成 1 格：范围数对不上拒」「whole 范围没写整轮或整包拒」「cargo test 两个目标写成 3 个：范围数对不上拒」「cargo test --exact 两个测试写成 1 个：范围数对不上拒」「崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）」「merge-and-verify 点名两项写成 1 项：范围数对不上拒」
+#       红：「门禁 --check 两格写成 1 格：范围数对不上拒」「whole 范围没写整轮或整包拒」「cargo test 两个目标写成 3 个：范围数对不上拒」「cargo test --exact 两个测试写成 1 个：范围数对不上拒」「崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）」「merge-and-verify 点名两项写成 1 项：范围数对不上拒」「merge-and-verify 两份补丁写成 1 份：范围数对不上拒」
 #   RUN_SCOPE_GUARD_BREAK=reason-unchecked  不核为什么一段的字数
 #       红：「gate.sh 为什么只写验证拒」「为什么太短拒」「为什么只写要跑验证拒」
-#   RUN_SCOPE_GUARD_BREAK=subagent-submissions-allowed  子 agent 经 task-server/task submit 交的验证命令不按 lib_project_code_runs.subagent_task_server_refusal 拒（改前许子 agent 自己交的样子）
+#   RUN_SCOPE_GUARD_BREAK=subagent-submissions-allowed  子 agent 经 task-server/task submit 交的验证命令不按 lib_project_code_runs.subagent_task_server_refusal 拒（许子 agent 自己交）
 #       红：「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」
 #   RUN_SCOPE_GUARD_BREAK=scripts-unread  命令位置上执行的驱动脚本不读进去
 #       红：「驱动脚本里一行缺声明拒」「外面带声明、驱动脚本里一行缺声明拒」「驱动脚本再起驱动脚本、里面缺声明拒」「直接执行的驱动脚本缺声明拒」「同一条命令里 heredoc 写出的驱动脚本缺声明拒」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
@@ -122,10 +122,10 @@
 #       红：「入口：拒绝说明附上次红的清单」
 #   RUN_SCOPE_GUARD_BREAK=query-forms-declared  只查清单、自证、只编不跑、只列用例的写法也要声明
 #       红：「门禁 --list 不要声明」「门禁 --selftest 不要声明」「崩溃点重放 --list-items 不要声明」「replay.sh --admission-only 不要声明」「replay.sh --list-items 不要声明」「cargo test --no-run 不要声明」「cargo test -- --list 不要声明」「merge-and-verify --list-items 不要声明」
-#   RUN_SCOPE_GUARD_BREAK=replay-list-items-declared  replay.sh 的 --list-items 也要声明（改前的写法）
+#   RUN_SCOPE_GUARD_BREAK=replay-list-items-declared  replay.sh 的 --list-items 也要声明
 #       红：「replay.sh --list-items 不要声明」
-#   RUN_SCOPE_GUARD_BREAK=merge-items-as-whole  merge-and-verify 带 --item 也当 whole（改前的写法：挑项的写法也按整轮声明）
-#       红：「merge-and-verify 点名两项：声明成 items 放」
+#   RUN_SCOPE_GUARD_BREAK=merge-as-whole  merge-and-verify 照整轮（whole）判，带不带 --item 都是
+#       红：「merge-and-verify 声明成 whole：拒」「merge-and-verify 两份补丁：声明成 items 放」「merge-and-verify 两份补丁另加展开深度：写成 2 份补丁放（深度的值不是补丁）」「merge-and-verify 点名两项：声明成 items 放」
 #   RUN_SCOPE_GUARD_BREAK=merge-list-items-declared  merge-and-verify 的 --list-items 也要声明
 #       红：「merge-and-verify --list-items 不要声明」
 #   RUN_SCOPE_GUARD_BREAK=tooling-scripts-read  仓里的工具脚本（scripts/、.claude/ 下）也读进去
@@ -134,17 +134,17 @@
 #       红：「cargo test 两个目标、带对的声明：放」「cargo test --lib --exact 两个测试、带对的声明：放」「子 agent cargo test 点名目标、带对的声明：放」「capped.sh 外面带声明放」「驱动脚本里每一行都带声明：放」
 #   RUN_SCOPE_GUARD_BREAK=template-keeps-declaration  照抄模板时不摘命令开头已有的那份声明（照抄出来两份，bash 取后一份）
 #       红：「入口：命令开头已有声明时模板只留一份」
-#   RUN_SCOPE_GUARD_BREAK=failure-unrecorded  判不了的几样（hook 输入不是 JSON 对象、判的时候出异常、喂给 shell 的不是字面、读不到判法文件）只打 stderr 或什么都不说、不记检出（改前的样子）
+#   RUN_SCOPE_GUARD_BREAK=failure-unrecorded  判不了的几样（hook 输入不是 JSON 对象、判的时候出异常、喂给 shell 的不是字面、读不到判法文件）只打 stderr 或什么都不说、不记检出
 #       红：「入口：hook 输入不是 JSON 对象（坏 JSON、数组）放行、stderr 写诊断、各记一条检出」「入口：判的时候抛异常放行、stderr 报一句、记一条检出」「入口：here-string 喂给 bash 的是变量放行、记一条检出」「入口：判法文件读不到时记一条检出（结局只记、会话号照输入）」「入口：判法文件读不到、没设 AGENT_HOOK_DETECTIONS 时记进 lib_work_root.py 的默认位置」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
-#   RUN_SCOPE_GUARD_BREAK=judge-crash-unrecorded  判法文件在而没跑完（导入就出错、被信号停掉，退 0 与 2 以外的码）时只打 stderr、不记检出（改前的样子：exec 判法，退几都照常放行）
+#   RUN_SCOPE_GUARD_BREAK=judge-crash-unrecorded  判法文件在而没跑完（导入就出错、被信号停掉，退 0 与 2 以外的码）时只打 stderr、不记检出（exec 判法，退几都照常放行）
 #       红：「入口：判法文件在而导入就出错时放行、stderr 报一句、记一条检出（结局只记、会话号照输入）」
-#   RUN_SCOPE_GUARD_BREAK=driver-unread-unrecorded  读不了、太大的驱动脚本静默不读、不交判不了的说明（改前的样子）
+#   RUN_SCOPE_GUARD_BREAK=driver-unread-unrecorded  读不了、太大的驱动脚本静默不读、不交判不了的说明
 #       红：「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
 #   切词那一份的开关 LIB_SHELL_WORDS_BREAK=shell-standard-input-unread（lib_shell_words.py：here-string 与管道喂给 shell 的文本不当命令再切、也不交判不了的说明）下也红，不在开关轮里：
 #       红：「here-string 喂给 bash 的 cargo test 整工作区：没带声明拒」「printf 经管道喂给 bash 的门禁：没带声明拒」「echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒」「入口：here-string 喂给 bash 的是变量放行、记一条检出」
-#   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest  平常跑（不是 --selftest、也不是自证起的子进程）设了开关也照认、不拒（改前的样子）；它是关守卫项，只在单独一项时认，与别的项同写照拒
+#   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest  平常跑（不是 --selftest、也不是自证起的子进程）设了开关也照认、不拒；它是关守卫项，只在单独一项时认，与别的项同写照拒
 #       红：「入口：平常跑设了弄坏开关退 2、点名它只在自证里认」「入口：标记文件内容对不上照拒」
-#   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest-with-others  带标记的自证子进程里，关守卫项与别的项同写也照认（改前的样子：honor-outside-selftest 写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
+#   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest-with-others  带标记的自证子进程里，关守卫项与别的项同写也照认（honor-outside-selftest 写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
 #       红：「入口：关守卫项与别的项同写：带标记的子进程里也退 2、点名它」
 #   RUN_SCOPE_GUARD_BREAK=task-server-submissions-unread  task-server/task submit -- 之后那一条不判（当名单上的客户端放过去）
 #       红：「task-server 提交的门禁整道：没带声明拒」「task-server 提交的 cargo test 整工作区：没带声明拒」「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」
@@ -153,7 +153,7 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
-# 弄坏开关只在自证里认（文件头「弄坏开关」一段）：找判法文件、读 hook 的 JSON 之前先判；关守卫项 honor-outside-selftest 单独一项时不拒（改前的样子），
+# 弄坏开关只在自证里认（文件头「弄坏开关」一段）：找判法文件、读 hook 的 JSON 之前先判；关守卫项 honor-outside-selftest 单独一项时不拒，
 #   与别的项同写一律拒、点名它（带标记的子进程里也拒，同写着 honor-outside-selftest-with-others 的除外；records/2026-10-23-subagent拆分提案.md 第一百二十二节 ②）
 if [[ -n "${RUN_SCOPE_GUARD_BREAK:-}" && "${1:-}" != "--selftest" ]]; then
   selftest_mark="${RUN_SCOPE_GUARD_SELFTEST_MARK:-}"
@@ -219,7 +219,7 @@ if [[ ! -f "$JUDGE" ]]; then
     echo "  → 怎么办：把 lib_run_scope.py 放回 .claude/hooks/，再跑 bash .claude/hooks/run-scope-guard.sh --selftest" >&2
     exit 1
   fi
-  # 弄坏开关 failure-unrecorded 下只打 stderr（改前的样子）
+  # 弄坏开关 failure-unrecorded 下只打 stderr
   if [[ ",${RUN_SCOPE_GUARD_BREAK:-}," != *",failure-unrecorded,"* ]]; then
     record_unjudged "读不到判法 $JUDGE，这条命令照常执行（范围声明没判）"
   fi
@@ -229,7 +229,7 @@ if [[ "${1:-}" == "--selftest" ]]; then
   exec python3 "$JUDGE" "$HOOK_DIR" "$@"
 fi
 # 判法文件在而没跑完（导入就出错、被信号停掉：退 0 与 2 以外的码）：照常放行，stderr 报一句、记一条检出。
-#   hook 的 JSON 先读进变量（命令替换只去掉末尾的换行），判法与记检出各读一遍；弄坏开关 judge-crash-unrecorded 下只打 stderr、不记（改前的样子：exec 判法，退几都照常放行）
+#   hook 的 JSON 先读进变量（命令替换只去掉末尾的换行），判法与记检出各读一遍；弄坏开关 judge-crash-unrecorded 下只打 stderr、不记（exec 判法，退几都照常放行）
 hook_input_text="$(cat)"
 printf '%s' "$hook_input_text" | python3 "$JUDGE" "$HOOK_DIR" "$@"
 judge_status=${PIPESTATUS[1]}
