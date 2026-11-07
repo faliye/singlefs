@@ -35,7 +35,7 @@ use crate::background_gpu::{
     open_background_gpu_with_the_memory_leaked_in_this_process, BackgroundGpu,
     BackgroundGpuOpenRefused, BackgroundGpuOverTheCards, BatchNotSplitOverTheGpus,
     CardOfTheBackgroundGpu, ChecksumBatchFailed, GpuFailureCause, LiveSlotBatchFailed,
-    RegionRecordBatchFailed, SmallestPieceNotHeldOnTheGpu,
+    RegionRecordBatchFailed, SmallestPieceNotHeldOnTheGpu, VulkanInstanceOfThisProcess,
 };
 use crate::checksum_kernels::{
     reconciled_unit_checksums, ChecksumKernelOutcome, UnitChecksumToVerify,
@@ -192,17 +192,21 @@ pub struct OpenedBackgroundGpuCompute {
 /// 核心层挂载时照这份实现答的卡清单（此刻本机在的独显，连同没开成的那几张）再校验一次，并把校验过的那一组交过来
 /// （`use_the_settings_from_the_next_batch`），之后每次切换生效时另交，参与的卡、显存上限、等的上限都照核心层交来的那一组。
 /// `memory_leaked_in_this_process` 是调用方在进程里留着的那一份：此前几次挂载泄漏在一张卡上的字节先从它的余量里扣掉，这一次卸载泄漏的记进去。
+/// `vulkan_instance` 同样是调用方在进程里留着的那一份（[`VulkanInstanceOfThisProcess`]）：开卡的枚举与之后现查本机在的独显都用它，不另建。
 ///
 /// # Errors
-/// [`BackgroundGpuOpenRefused`] 的四种：设置被拒（GPU 不在、点名的卡不存在、上限个数不对、上限超过显存总量……）、参与的独显交不成清单、
-/// 枚举适配器超过等 GPU 的上限、一张参与的卡用不上。显存上限装不下最小的一片的卡不拒（见 [`OpenedBackgroundGpuCompute`]）。
+/// [`BackgroundGpuOpenRefused`] 的五种：设置被拒（GPU 不在、上限个数不对、上限超过显存总量……）、点名的卡不在这一次枚举的清单里
+/// （带这一次枚举到的适配器与没收进清单的独显）、参与的独显交不成清单、枚举适配器超过等 GPU 的上限、一张参与的卡用不上。
+/// 显存上限装不下最小的一片的卡不拒（见 [`OpenedBackgroundGpuCompute`]）。
 pub fn open_background_gpu_compute(
     selection: &BackgroundGpuSelection,
     memory_leaked_in_this_process: &GpuMemoryLeakedInThisProcess,
+    vulkan_instance: &VulkanInstanceOfThisProcess,
 ) -> Result<OpenedBackgroundGpuCompute, BackgroundGpuOpenRefused> {
     let background_gpu = open_background_gpu_with_the_memory_leaked_in_this_process(
         selection,
         memory_leaked_in_this_process,
+        vulkan_instance,
     )?;
     let gpus_not_opened_at_the_mount = background_gpu.gpus_not_opened_at_the_mount().to_vec();
     let gpus_left_out_under_their_memory_limit = background_gpu
@@ -606,7 +610,7 @@ mod tests {
     use crate::checksum_kernels::UnrecognizedVerdictWord;
     use crate::region_record_kernels::MappingKeyLongerThanTheKernelsHold;
 
-    fn card() -> GpuDeviceIdentifier {
+    fn card_named_in_the_failures() -> GpuDeviceIdentifier {
         GpuDeviceIdentifier::of_opaque_bytes(b"0000:01:00.0".to_vec())
     }
 
@@ -616,7 +620,7 @@ mod tests {
         let wait_limit = Duration::from_secs(10);
         let failed_on_the_card =
             |cause: GpuFailureOnTheDevice| BackgroundGpuComputeFailed::GpuFailed {
-                device: card(),
+                device: card_named_in_the_failures(),
                 cause,
             };
         vec![
@@ -647,7 +651,7 @@ mod tests {
             (
                 GpuFailureCause::WaitForTheGpuExceededTheLimit { wait_limit },
                 BackgroundGpuComputeFailed::WaitForTheGpuExceededTheLimit {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     wait_limit,
                     submission_waited_for: SubmissionWaitedForPastTheLimit::SubmissionOfThisBatch,
                 },
@@ -657,7 +661,7 @@ mod tests {
                     wait_limit,
                 },
                 BackgroundGpuComputeFailed::WaitForTheGpuExceededTheLimit {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     wait_limit,
                     submission_waited_for:
                         SubmissionWaitedForPastTheLimit::EarlierTimedOutSubmissionStillRunning,
@@ -700,7 +704,7 @@ mod tests {
         for (cause, expected) in every_gpu_failure_cause_and_its_core_failure() {
             assert_eq!(
                 core_failure_of_the_checksum_batch(&ChecksumBatchFailed::GpuFailed {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     cause: cause.clone(),
                 }),
                 expected,
@@ -708,7 +712,7 @@ mod tests {
             );
             assert_eq!(
                 core_failure_of_the_region_record_batch(&RegionRecordBatchFailed::GpuFailed {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     cause: cause.clone(),
                 }),
                 expected,
@@ -716,7 +720,7 @@ mod tests {
             );
             assert_eq!(
                 core_failure_of_the_live_slot_batch(&LiveSlotBatchFailed::GpuFailed {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     cause: cause.clone(),
                 }),
                 expected,
@@ -729,14 +733,14 @@ mod tests {
     #[test]
     fn inputs_the_gpu_cannot_take_are_reported_with_their_card_and_entry() {
         let smallest_piece_not_held = SmallestPieceNotHeldOnTheGpu {
-            device: card(),
+            device: card_named_in_the_failures(),
             entry_position: 3,
             memory_limit: Some(GpuMemoryInBytes(50)),
             smallest_piece_bytes: 104,
         };
         let reported = BackgroundGpuComputeFailed::InputNotSupportedOnTheGpu(
             InputNotSupportedOnTheGpu::EntryLargerThanAChunkOnTheDevice {
-                device: card(),
+                device: card_named_in_the_failures(),
                 entry_position: 3,
                 input_bytes: 104,
             },
@@ -808,14 +812,14 @@ mod tests {
                 last_cause: Box::new(last_cause),
             };
             let expected = BackgroundGpuComputeFailed::GpuUnusableAfterResubmissions {
-                device: card(),
+                device: card_named_in_the_failures(),
                 resubmissions: 3,
                 wait_limit,
                 last_submission_waited_for,
             };
             assert_eq!(
                 core_failure_of_the_checksum_batch(&ChecksumBatchFailed::GpuFailed {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     cause: unusable.clone(),
                 }),
                 expected,
@@ -823,7 +827,7 @@ mod tests {
             );
             assert_eq!(
                 core_failure_of_the_region_record_batch(&RegionRecordBatchFailed::GpuFailed {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     cause: unusable.clone(),
                 }),
                 expected,
@@ -831,7 +835,7 @@ mod tests {
             );
             assert_eq!(
                 core_failure_of_the_live_slot_batch(&LiveSlotBatchFailed::GpuFailed {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     cause: unusable,
                 }),
                 expected,
@@ -848,7 +852,7 @@ mod tests {
     ) {
         let gpus_left_out = vec![
             GpuLeftOutUnderItsMemoryLimit {
-                device: card(),
+                device: card_named_in_the_failures(),
                 memory_limit: GpuMemoryInBytes(50),
                 smallest_piece_bytes: 976,
                 bytes_already_held_on_the_device: 0,
@@ -904,11 +908,11 @@ mod tests {
         assert_eq!(
             core_failure_of_the_batch_not_split_over_the_gpus(
                 &BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch {
-                    device: card(),
+                    device: card_named_in_the_failures(),
                     cause: cause.clone(),
                 }
             ),
-            core_failure_of_the_gpu(&card(), &cause),
+            core_failure_of_the_gpu(&card_named_in_the_failures(), &cause),
             "换设置时量代价出错照那张卡的 GPU 出错报"
         );
     }
@@ -920,7 +924,7 @@ mod tests {
     fn every_participating_gpu_short_of_free_memory_is_reported_with_each_card_short_and_those_left_out_under_their_limit(
     ) {
         let gpus_short_of_free_memory = vec![GpuShortOfFreeMemoryForTheSmallestPiece {
-            device: card(),
+            device: card_named_in_the_failures(),
             bytes_of_the_last_chunk_not_created: 64,
             smallest_piece_bytes: 64,
         }];
@@ -971,7 +975,7 @@ mod tests {
         assert_eq!(
             expected.gpu_devices_named(),
             vec![
-                card(),
+                card_named_in_the_failures(),
                 GpuDeviceIdentifier::of_opaque_bytes(b"0000:02:00.0".to_vec())
             ],
             "因空闲显存不用的在前、因显存上限不用的在后"

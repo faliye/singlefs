@@ -78,7 +78,7 @@ pub struct TargetPlatform {
     pub key_values: &'static [(&'static str, &'static str)],
 }
 
-/// 认得的目标三元组：每一行逐项取自 `rustc --print cfg --target <三元组>`（rustc 1.98.0，2026-10-15 在本机跑的），
+/// 认得的目标三元组：每一行逐项取自 `rustc --print cfg --target <三元组>`（rustc 1.98.0，在本机跑的），
 /// 只留 `RECOGNIZED_KEYS` 里的键与 `unix` / `windows`（十个三元组的 `target_abi` 都是空串、`panic` 都是 `unwind`）；
 /// `target_has_atomic` 的几个值列在 `atomics` 一段。
 macro_rules! target_platform_table {
@@ -360,7 +360,7 @@ fn rendered_list(parts: &[Predicate]) -> String {
         .join(", ")
 }
 
-fn is_identifier_text(text: &str) -> bool {
+fn is_ascii_identifier_text(text: &str) -> bool {
     text.bytes()
         .next()
         .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
@@ -407,8 +407,8 @@ pub fn split_at_top_level_commas<'tokens>(tokens: &[&'tokens str]) -> Vec<Vec<&'
 #[must_use]
 pub fn parse_predicate(tokens: &[&str]) -> Predicate {
     match tokens {
-        [name] if is_identifier_text(name) => Predicate::Name((*name).to_string()),
-        [key, "=", value] if is_identifier_text(key) => match plain_string_content(value) {
+        [name] if is_ascii_identifier_text(name) => Predicate::Name((*name).to_string()),
+        [key, "=", value] if is_ascii_identifier_text(key) => match plain_string_content(value) {
             Some(content) => Predicate::KeyValue {
                 key: (*key).to_string(),
                 value: content.to_string(),
@@ -687,7 +687,7 @@ mod tests {
             Evaluation::Holds
         );
         assert_eq!(
-            set.evaluate(&conditions("cfg ( not ( feature = \"verdict-store\" ) )")[0]),
+            set.evaluate(&conditions("cfg ( not ( feature = \"lookup-work-counters\" ) )")[0]),
             Evaluation::Holds
         );
         assert_eq!(
@@ -732,7 +732,7 @@ mod tests {
             "开着 gpu 时这一条等于 cfg(test)，非测试构建为假"
         );
         assert_eq!(
-            host_with_feature("verdict-store").evaluate(&attribute[0]),
+            host_with_feature("lookup-work-counters").evaluate(&attribute[0]),
             Evaluation::Holds,
             "没开 gpu 时这一条不起作用"
         );

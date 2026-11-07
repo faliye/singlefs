@@ -1,0 +1,3 @@
+SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIRECTORY/lib/dot-only.sh"
+dot_function

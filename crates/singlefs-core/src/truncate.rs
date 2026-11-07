@@ -1,4 +1,4 @@
-//! 截断（truncate）与变长的计划（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2、K3、K5、K11、K12）：
+//! 截断（truncate）与变长的计划：
 //! 意图那次要不要重写尾单元、之后每一批留几个单元、改 size 之后 extent 树哪几个节点重写。
 //!
 //! 和 `crate::unlink` 一样只算、不发一个写、不动分配器、不碰落点：条款的几条纪律（先落目标：意图那次写 size = N 并重写尾单元；
@@ -16,13 +16,10 @@ use crate::records::InodeRecordTruncationField;
 use crate::transaction::{
     role_of_extent_upper_node, ExtentTreeNodeOrigin, ExtentTreePlan, TransactionUnit,
 };
-use crate::unit::data_unit_payload_capacity;
 use crate::unlink::UnlinkBatchSize;
-use crate::write_request_split::data_unit_count_of_a_sequential_write;
-
-fn payload_capacity_in_bytes() -> u64 {
-    u64::try_from(data_unit_payload_capacity()).expect("32634")
-}
+use crate::write_request_split::{
+    data_unit_count_of_a_sequential_write, payload_capacity_in_bytes,
+};
 
 /// size 为 `size_in_bytes` 的文件要几个数据单元：⌈size ÷ 净荷⌉.max(1)（与写侧切分同一条除法，截到 0 留一个声明长度 0 的单元，K3）。
 #[must_use]
@@ -34,19 +31,18 @@ pub fn data_units_a_size_needs(size_in_bytes: u64) -> u64 {
 #[must_use]
 pub fn declared_length_within_a_size(unit: DataUnitIndexInFile, size_in_bytes: u64) -> u64 {
     let payload = payload_capacity_in_bytes();
-    size_in_bytes
-        .saturating_sub(unit.first_file_byte(payload).0)
-        .min(payload)
+    singlefs_replay_prefix::file_range_proofs::payload_length_from_start(
+        unit.first_file_byte(payload).0,
+        size_in_bytes,
+        payload,
+    )
 }
 
 /// 截断目标 size 的上限（K12）：⌈N ÷ 净荷⌉ × 净荷装得进 u64。超了在任何写之前拒。
 #[must_use]
 pub fn target_size_rounded_up_to_a_whole_data_unit_fits(target_size_in_bytes: u64) -> bool {
     let payload = payload_capacity_in_bytes();
-    target_size_in_bytes
-        .div_ceil(payload)
-        .checked_mul(payload)
-        .is_some()
+    singlefs_replay_prefix::file_range_proofs::rounded_size_fits(target_size_in_bytes, payload)
 }
 
 /// 一次改 size 的请求走哪一条（K2、K5、K11、K12）：只看现在的 size 与目标 size，两样在操作期间不变（`.claude/rules/fs-design.md`
@@ -109,8 +105,7 @@ pub fn tail_data_unit_rewrite_of_a_truncation(
         })
 }
 
-/// 截断意图那次 inode 记录的截断字段（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R2 与第六节用户定案「放了单元才写、
-/// 整个替换」）：这次放单元之前存在的单元数多于 ⌈N ÷ 净荷⌉.max(1)（这次截断要放掉单元）时写成（这次 txg, N），否则照抄上一版
+/// 截断意图那次 inode 记录的截断字段（放了单元才写、整个替换）：这次放单元之前存在的单元数多于 ⌈N ÷ 净荷⌉.max(1)（这次截断要放掉单元）时写成（这次 txg, N），否则照抄上一版
 /// （截到洞里、截在最后一个单元之内都不放单元）。各批与最后一批不碰记录，变长与 N = S 照抄，整份写清零，都不经这里。
 #[must_use]
 pub fn truncation_field_after_the_truncation_intent(
@@ -130,8 +125,7 @@ pub fn truncation_field_after_the_truncation_intent(
 }
 
 /// 变长那次要不要重写尾单元（K5）：最后一个存在的单元声明长度小于 min(N − 起点, 净荷) 时补零重写到那个长度；之后到 N 是洞、不写单元。
-/// 一个单元都不存在（上段叶标签 0：整个文件都是洞，K5、S1）时没有单元可补：不重写、不加单元，变长只改记录、标签留 0
-/// （判决 `research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑：写者接得住这一形」）。
+/// 一个单元都不存在（上段叶标签 0：整个文件都是洞，K5、S1）时没有单元可补：不重写、不加单元，变长只改记录、标签留 0。
 #[must_use]
 pub fn tail_data_unit_rewrite_of_an_extension(
     data_units_existing: u64,
@@ -164,18 +158,15 @@ pub fn next_truncation_step(
     target_size_in_bytes: u64,
     batch_size: UnlinkBatchSize,
 ) -> TruncationStep {
-    let data_units_kept_at_the_end =
-        data_units_existing.min(data_units_a_size_needs(target_size_in_bytes));
-    let data_units_beyond_the_size = data_units_existing - data_units_kept_at_the_end;
-    let data_units_per_batch = batch_size.data_units_per_batch();
-    if data_units_beyond_the_size <= data_units_per_batch {
-        return TruncationStep::FinalBatch {
-            data_units_kept: data_units_kept_at_the_end,
-        };
+    let (data_units_kept, final_batch) = singlefs_replay_prefix::file_range_proofs::next_tail_batch(
+        data_units_existing,
+        data_units_a_size_needs(target_size_in_bytes),
+        batch_size.data_units_per_batch(),
+    );
+    if final_batch {
+        return TruncationStep::FinalBatch { data_units_kept };
     }
-    TruncationStep::Batch {
-        data_units_kept: data_units_existing - data_units_per_batch,
-    }
+    TruncationStep::Batch { data_units_kept }
 }
 
 /// 从挂着 `data_units_existing` 个单元起走到底的每一步，按先后：最后一步恒是 [`TruncationStep::FinalBatch`]。
@@ -202,8 +193,8 @@ pub fn every_truncation_step_from(
 }
 
 /// 一次发布重写的那一段数据单元：单元号 `[first, end_exclusive)`，空段是一个都不重写。截断意图与变长重写的尾单元是一个单元的一段
-/// （K3、K5）；按偏移的部分写从偏移 o 所在的单元起到写之后最后一个单元（判决 `research/prompts/m4-partial-write-r1-main-verification.md`
-/// 第二节 R4），段里单元号不小于写之前单元数的那几个是这次新加的。
+/// （K3、K5）；按偏移的部分写从偏移 o 所在的单元起到写之后最后一个单元
+/// 段里单元号不小于写之前单元数的那几个是这次新加的。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DataUnitsRewrittenInOnePublish {
     pub first: u64,
@@ -283,9 +274,9 @@ pub struct LowerSegmentAfterASizeChange {
 }
 
 /// 截断（意图、各批、最后一批）与变长、只改记录那几次发布之后一个文件的下段（K3：截断的 extent 计划自己写，不调
-/// `unlink::plan_the_extent_tree_after_a_deletion_batch`），按偏移的部分写（判决 m4-partial-write-r1 第二节 R4、R5）也走这一份。
+/// `unlink::plan_the_extent_tree_after_a_deletion_batch`），按偏移的部分写也走这一份。
 /// 入参是这个文件自己上一版下段的节点位置（bump 次序）：第一个文件与第一个文件之外的
-/// 文件各交自己那一份（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S3「抽出下段计划」）。
+/// 文件各交自己那一份。
 /// 下段按这次之后的单元数排，一个节点照抄的条件是它罩着的、存在的单元两版一样（罩的单元全在两版都有的那一段里，或这次单元数没变）**而且**不罩着
 /// 这次重写的那一段里的任何一个单元——罩着被重写单元的下段叶到根恒重写，留下的单元数正在叶边界上（144 的倍数）时也一样（K9 叶边界对任意 inode）；
 /// 被截掉那一段里的节点换下、没有同名后继。只剩一个单元时不建下段（内联）。部分写加单元时，新加的单元都在重写的那一段里。
@@ -436,33 +427,13 @@ pub fn plan_the_extent_tree_after_a_size_change(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extent_tree::ExtentUpperNodePosition;
-    use crate::pointer::NodePointer;
+    use crate::extent_tree::extent_node_positions_for_tests::extent_lower_node_position;
     use crate::transaction::FIRST_INODE_NUMBER;
-    use crate::unlink::UnlinkBatchDataUnitsCappedForTests;
+    use crate::unlink::unlink_and_truncate_test_builders::{
+        extent_tree_of_a_file_without_holes, unlink_batch_size_capped_at, PAYLOAD_IN_BYTES,
+    };
 
-    const PAYLOAD_IN_BYTES: u64 = 32634;
-
-    fn capped(data_units: u64) -> UnlinkBatchSize {
-        UnlinkBatchSize::CappedForTests(
-            UnlinkBatchDataUnitsCappedForTests::new(data_units).expect("1..=144"),
-        )
-    }
-
-    fn extent_tree_of_a_file_without_holes(data_units: u64) -> ExtentTreeVersion {
-        ExtentTreeVersion {
-            upper_nodes: vec![(
-                ExtentUpperNodePosition { level: 0, index: 0 },
-                NodePointer::empty_root(),
-            )],
-            lower_nodes: lower_segment_nodes_of_a_file_without_holes(data_units)
-                .into_iter()
-                .map(|position| (position, NodePointer::empty_root()))
-                .collect(),
-        }
-    }
-
-    /// 判决 m4-trunc-r2 R2 与第六节用户定案：截断意图那次存在的单元数多于 ⌈N ÷ 净荷⌉.max(1) 才写（这次 txg, N）、整个替换，否则照抄上一版。
+    /// 截断意图那次存在的单元数多于 ⌈N ÷ 净荷⌉.max(1) 才写（这次 txg, N）、整个替换，否则照抄上一版。
     /// 期望值按条款手算：三个单元截到单元 0 中间（要一个，放两个）写；截到 0（要一个）写成 T ≠ 0、N_w = 0；截在最后一个单元之内（三个要三个）、
     /// 截到洞里（一个单元的文件变长到三个净荷再截到两个净荷：要两个，有一个）照抄；恰好多一个写、恰好相等照抄（`>` 的边界）；
     /// 上一版写过的字段在照抄时原样留着，写的时候整个换掉、不取 min。
@@ -546,10 +517,6 @@ mod tests {
                 "{what}"
             );
         }
-    }
-
-    fn lower(level: u8, index: u64) -> ExtentLowerNodePosition {
-        ExtentLowerNodePosition { level, index }
     }
 
     /// 截断意图那次的计划：单元数不变、只重写尾单元 k（这里 k 由调用方给），尾部没有洞。
@@ -643,7 +610,7 @@ mod tests {
     #[test]
     fn truncation_batches_release_from_the_tail_and_the_final_batch_may_release_nothing() {
         assert_eq!(
-            every_truncation_step_from(5, PAYLOAD_IN_BYTES + 1, capped(1)),
+            every_truncation_step_from(5, PAYLOAD_IN_BYTES + 1, unlink_batch_size_capped_at(1)),
             vec![
                 TruncationStep::Batch { data_units_kept: 4 },
                 TruncationStep::Batch { data_units_kept: 3 },
@@ -651,7 +618,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            every_truncation_step_from(2, 2 * PAYLOAD_IN_BYTES, capped(1)),
+            every_truncation_step_from(2, 2 * PAYLOAD_IN_BYTES, unlink_batch_size_capped_at(1)),
             vec![TruncationStep::FinalBatch { data_units_kept: 2 }],
             "截在最后一个单元末尾之后（落在洞里或边界上）：放 0 个"
         );
@@ -669,23 +636,29 @@ mod tests {
         assert_eq!(
             plan.lower_nodes,
             vec![
-                (lower(0, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
                 (
-                    lower(0, 1),
+                    extent_lower_node_position(0, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
+                (
+                    extent_lower_node_position(0, 1),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 ),
                 (
-                    lower(0, 2),
+                    extent_lower_node_position(0, 2),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 ),
-                (lower(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (
+                    extent_lower_node_position(1, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
             ]
         );
         assert_eq!(
             plan.rewritten_roles(),
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 0)),
-                TransactionUnit::ExtentLowerNode(lower(1, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(1, 0)),
                 TransactionUnit::ExtentRoot,
             ]
         );
@@ -698,14 +671,14 @@ mod tests {
         assert_eq!(
             plan.rewritten_roles(),
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 0)),
                 TransactionUnit::ExtentRoot
             ]
         );
         assert_eq!(
             plan.replaced_previous_roles,
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 0)),
                 TransactionUnit::ExtentRoot
             ]
         );
@@ -720,8 +693,8 @@ mod tests {
         assert_eq!(
             intent.rewritten_roles(),
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 0)),
-                TransactionUnit::ExtentLowerNode(lower(1, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(1, 0)),
                 TransactionUnit::ExtentRoot,
             ],
             "罩着被重写单元 k 的叶到根恒并进重写集"
@@ -740,7 +713,7 @@ mod tests {
         assert_eq!(
             final_batch.lower_nodes,
             vec![(
-                lower(0, 0),
+                extent_lower_node_position(0, 0),
                 ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
             )]
         );
@@ -759,15 +732,21 @@ mod tests {
             plan.lower_nodes,
             vec![
                 (
-                    lower(0, 0),
+                    extent_lower_node_position(0, 0),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 ),
-                (lower(0, 1), ExtentTreeNodeOrigin::RewrittenThisPublish),
                 (
-                    lower(0, 2),
+                    extent_lower_node_position(0, 1),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
+                (
+                    extent_lower_node_position(0, 2),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 ),
-                (lower(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (
+                    extent_lower_node_position(1, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
             ]
         );
     }
@@ -790,13 +769,13 @@ mod tests {
         assert!(plan.replaced_previous_roles.is_empty());
     }
 
-    /// 部分写加单元（判决 m4-partial-write-r1 第二节 R4、R5）：144 个单元正好一片叶，写到第 145 个单元（单元 143 满、不重写）——
+    /// 部分写加单元：144 个单元正好一片叶，写到第 145 个单元（单元 143 满、不重写）——
     /// 第 0 片叶罩的单元两版一样、照抄，第 1 片新叶与新的下段根重写，上一版那片叶（兼下段根）不被换下；从单元 100 起重写到 145 个——
     /// 第 0 片叶罩着重写的单元，叶与根都重写、上一版那一片换下。
     #[test]
     fn a_partial_write_adding_units_carries_only_the_leaves_below_the_first_rewritten_unit() {
         let past_a_full_leaf = plan_the_lower_segment_after_a_size_change(
-            &[lower(0, 0)],
+            &[extent_lower_node_position(0, 0)],
             SizeChangeOfTheFile {
                 data_units_before: 144,
                 data_units_after: 145,
@@ -812,17 +791,23 @@ mod tests {
             past_a_full_leaf.nodes,
             vec![
                 (
-                    lower(0, 0),
+                    extent_lower_node_position(0, 0),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 ),
-                (lower(0, 1), ExtentTreeNodeOrigin::RewrittenThisPublish),
-                (lower(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (
+                    extent_lower_node_position(0, 1),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
+                (
+                    extent_lower_node_position(1, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
             ]
         );
         assert!(past_a_full_leaf.previous_nodes_rewritten.is_empty());
         assert!(past_a_full_leaf.previous_nodes_dropped.is_empty());
         let from_unit_one_hundred = plan_the_lower_segment_after_a_size_change(
-            &[lower(0, 0)],
+            &[extent_lower_node_position(0, 0)],
             SizeChangeOfTheFile {
                 data_units_before: 144,
                 data_units_after: 145,
@@ -837,14 +822,23 @@ mod tests {
         assert_eq!(
             from_unit_one_hundred.nodes,
             vec![
-                (lower(0, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
-                (lower(0, 1), ExtentTreeNodeOrigin::RewrittenThisPublish),
-                (lower(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (
+                    extent_lower_node_position(0, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
+                (
+                    extent_lower_node_position(0, 1),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
+                (
+                    extent_lower_node_position(1, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
             ]
         );
         assert_eq!(
             from_unit_one_hundred.previous_nodes_rewritten,
-            vec![lower(0, 0)]
+            vec![extent_lower_node_position(0, 0)]
         );
     }
 

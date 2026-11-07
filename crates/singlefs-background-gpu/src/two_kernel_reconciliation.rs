@@ -147,7 +147,7 @@ mod tests {
     use super::*;
 
     /// 假的条目：键是一个数，结果是一个数（两份核交回的数相同就算相同）。
-    fn entry(
+    fn two_kernel_outcomes_of_the_entry(
         entry_key: u32,
         outcome_by_one_kernel: u32,
         outcome_by_the_independently_written_kernel: u32,
@@ -160,7 +160,7 @@ mod tests {
     }
 
     /// CPU 参照判出的结果固定是 900 加位置，测试认得出是不是它判的。
-    fn cpu_reference_outcome(entry_position: usize) -> u32 {
+    fn outcome_the_cpu_reference_gives_at_the_position(entry_position: usize) -> u32 {
         900 + u32::try_from(entry_position).expect("测试的批不大")
     }
 
@@ -168,7 +168,10 @@ mod tests {
     fn identical_outcomes_are_confirmed() {
         let mut counts = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
         let batch = counts.reconcile_the_two_kernel_outcomes(
-            vec![entry(1, 7, 7), entry(2, 0, 0)],
+            vec![
+                two_kernel_outcomes_of_the_entry(1, 7, 7),
+                two_kernel_outcomes_of_the_entry(2, 0, 0),
+            ],
             |_entry_position| panic!("两份核相同时不交 CPU 判"),
         );
         assert_eq!(
@@ -189,7 +192,10 @@ mod tests {
     fn different_outcomes_are_uncertain_for_one_round_without_asking_the_cpu() {
         let mut counts = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
         let batch = counts.reconcile_the_two_kernel_outcomes(
-            vec![entry(1, 7, 8), entry(2, 5, 5)],
+            vec![
+                two_kernel_outcomes_of_the_entry(1, 7, 8),
+                two_kernel_outcomes_of_the_entry(2, 5, 5),
+            ],
             |_entry_position| panic!("只不确定一轮时不交 CPU 判"),
         );
         assert_eq!(batch.decisions[0], EntryDecision::UncertainThisRound);
@@ -207,15 +213,19 @@ mod tests {
     #[test]
     fn two_consecutive_uncertain_rounds_hand_the_entry_to_the_cpu_reference() {
         let mut counts = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
-        counts.reconcile_the_two_kernel_outcomes(vec![entry(1, 7, 8)], |_entry_position| {
-            panic!("只不确定一轮时不交 CPU 判")
-        });
+        counts.reconcile_the_two_kernel_outcomes(
+            vec![two_kernel_outcomes_of_the_entry(1, 7, 8)],
+            |_entry_position| panic!("只不确定一轮时不交 CPU 判"),
+        );
         let mut cpu_judged_positions = Vec::new();
         let batch = counts.reconcile_the_two_kernel_outcomes(
-            vec![entry(3, 4, 4), entry(1, 9, 2)],
+            vec![
+                two_kernel_outcomes_of_the_entry(3, 4, 4),
+                two_kernel_outcomes_of_the_entry(1, 9, 2),
+            ],
             |entry_position| {
                 cpu_judged_positions.push(entry_position);
-                cpu_reference_outcome(entry_position)
+                outcome_the_cpu_reference_gives_at_the_position(entry_position)
             },
         );
         assert_eq!(
@@ -227,7 +237,9 @@ mod tests {
             batch.decisions,
             vec![
                 EntryDecision::ConfirmedByBothKernels(4),
-                EntryDecision::JudgedByTheCpuReference(cpu_reference_outcome(1)),
+                EntryDecision::JudgedByTheCpuReference(
+                    outcome_the_cpu_reference_gives_at_the_position(1)
+                ),
             ],
             "按 CPU 的判定处理"
         );
@@ -252,8 +264,14 @@ mod tests {
         let never_cpu = |_entry_position: usize| -> u32 {
             panic!("没有连续两轮不确定，不交 CPU 判")
         };
-        counts.reconcile_the_two_kernel_outcomes(vec![entry(1, 7, 8)], never_cpu);
-        let agreeing = counts.reconcile_the_two_kernel_outcomes(vec![entry(1, 7, 7)], never_cpu);
+        counts.reconcile_the_two_kernel_outcomes(
+            vec![two_kernel_outcomes_of_the_entry(1, 7, 8)],
+            never_cpu,
+        );
+        let agreeing = counts.reconcile_the_two_kernel_outcomes(
+            vec![two_kernel_outcomes_of_the_entry(1, 7, 7)],
+            never_cpu,
+        );
         assert_eq!(
             agreeing.decisions,
             vec![EntryDecision::ConfirmedByBothKernels(7)]
@@ -263,8 +281,10 @@ mod tests {
             0,
             "相同了就清零"
         );
-        let disagreeing_again =
-            counts.reconcile_the_two_kernel_outcomes(vec![entry(1, 7, 8)], never_cpu);
+        let disagreeing_again = counts.reconcile_the_two_kernel_outcomes(
+            vec![two_kernel_outcomes_of_the_entry(1, 7, 8)],
+            never_cpu,
+        );
         assert_eq!(
             disagreeing_again.decisions,
             vec![EntryDecision::UncertainThisRound],
@@ -276,8 +296,14 @@ mod tests {
     fn an_entry_absent_from_a_batch_keeps_its_count() {
         let mut counts = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
         let never_cpu = |_entry_position: usize| -> u32 { panic!("这一轮不交 CPU 判") };
-        counts.reconcile_the_two_kernel_outcomes(vec![entry(1, 7, 8)], never_cpu);
-        counts.reconcile_the_two_kernel_outcomes(vec![entry(2, 3, 3)], never_cpu);
+        counts.reconcile_the_two_kernel_outcomes(
+            vec![two_kernel_outcomes_of_the_entry(1, 7, 8)],
+            never_cpu,
+        );
+        counts.reconcile_the_two_kernel_outcomes(
+            vec![two_kernel_outcomes_of_the_entry(2, 3, 3)],
+            never_cpu,
+        );
         assert_eq!(
             counts.consecutive_uncertain_rounds_of(&1),
             1,
@@ -288,15 +314,16 @@ mod tests {
     #[test]
     fn dropping_the_counts_forgets_every_uncertain_round() {
         let mut counts = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
-        counts.reconcile_the_two_kernel_outcomes(vec![entry(1, 7, 8)], |_entry_position| {
-            panic!("只不确定一轮时不交 CPU 判")
-        });
+        counts.reconcile_the_two_kernel_outcomes(
+            vec![two_kernel_outcomes_of_the_entry(1, 7, 8)],
+            |_entry_position| panic!("只不确定一轮时不交 CPU 判"),
+        );
         drop(counts);
         let mut counts_after_a_remount = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
-        let batch = counts_after_a_remount
-            .reconcile_the_two_kernel_outcomes(vec![entry(1, 7, 8)], |_entry_position| {
-                panic!("重挂之后从零数起")
-            });
+        let batch = counts_after_a_remount.reconcile_the_two_kernel_outcomes(
+            vec![two_kernel_outcomes_of_the_entry(1, 7, 8)],
+            |_entry_position| panic!("重挂之后从零数起"),
+        );
         assert_eq!(batch.decisions, vec![EntryDecision::UncertainThisRound]);
     }
 
@@ -305,7 +332,10 @@ mod tests {
     fn the_same_entry_twice_in_one_batch_panics() {
         let mut counts = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
         counts.reconcile_the_two_kernel_outcomes(
-            vec![entry(1, 7, 7), entry(1, 7, 7)],
+            vec![
+                two_kernel_outcomes_of_the_entry(1, 7, 7),
+                two_kernel_outcomes_of_the_entry(1, 7, 7),
+            ],
             |_entry_position| 0,
         );
     }

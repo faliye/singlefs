@@ -1,7 +1,7 @@
 //! 一次编译里各包实际开了哪些特性（D13（验证路线） 已定项 17：键里闭包真引到的 cfg 原子各带「这一次编译」的真值）。
 //!
-//! cargo 在同一次构建里把各包对同一个依赖要的特性并到唯一那一份上（特性统一）：`cargo test` 一起编 harness 档与 checker 档时，
-//! harness 档的 dev 依赖替 `singlefs-core` 打开的特性，checker 档链进来的那一份 `singlefs-core` 同样开着。只看正在编的包自己的
+//! cargo 在同一次构建里把各包对同一个依赖要的特性并到唯一那一份上（特性统一）：`cargo test` 编验证包的测试时，
+//! 验证包的 dev 依赖替 `singlefs-core` 打开的特性，验证包的库链进来的那一份 `singlefs-core` 同样开着。只看正在编的包自己的
 //! `CARGO_FEATURE_*` 与清单里的依赖边，看不到别的包并上来的那一部分。
 //!
 //! 取法：依赖包带 `links`，它自己的构建脚本把 cargo 这一次给它开的特性（并过之后的）照 [`ENABLED_FEATURES_METADATA_KEY`]
@@ -11,7 +11,7 @@
 //!
 //! 「cargo 这一次开没开」一律从构建脚本自己的 `cfg!(feature = "<名>")` 取（cargo 编构建脚本时带着本包这一次开了的特性的 cfg），
 //! 不读进程环境里的 `CARGO_FEATURE_*`：外面带进来的同名变量（不开特性、环境里设 `CARGO_FEATURE_LOOKUP_WORK_COUNTERS=1`）与 cargo 设的分不出，
-//! 键会说开着而编出来的代码没开（七·6 后续批代码轮第一轮判决第二节 T4）。正在编的包自己的那一份同样照这个取法交进来
+//! 键会说开着而编出来的代码没开。正在编的包自己的那一份同样照这个取法交进来
 //! （[`features_of_the_crate_being_built`]）。
 //!
 //! 取到的特性交给 `closure::compute_closure_of_entries_with_the_features_of_the_build`：解特性时这些包一被链进来，就照这一次编译的
@@ -270,7 +270,7 @@ mod singlefs_core_build_script;
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroUsize;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
@@ -293,13 +293,13 @@ mod tests {
     const JUDGING_MANIFEST: &str =
         "[package]\nname = \"judging\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
         [dependencies]\ncounting-basis = { path = \"../counting-basis\" }\n";
-    /// 判器的包照「一起编」的样子把计数特性写进依赖（攻方量「开」那一把键的做法）。
+    /// 判器的包照「一起编」的样子把计数特性写进依赖（量「开」那一把键的做法）。
     const JUDGING_MANIFEST_ASKING_FOR_COUNTING: &str = "[package]\nname = \"judging\"\nversion = \"0.1.0\"\n\
         edition = \"2021\"\n\n[dependencies]\ncounting-basis = { path = \"../counting-basis\", features = [\"counting\"] }\n";
     const JUDGING_LIBRARY: &str =
         "pub fn judge_one_image() -> u64 {\n    let mut counter = 0;\n    \
         counting_basis::count_one_lookup(&mut counter);\n    counter\n}\n";
-    /// 脚手架的包：dev 依赖替计数的包打开 `counting`（与 harness 档同形）。
+    /// 脚手架的包：dev 依赖替计数的包打开 `counting`（与验证包同形）。
     const SCAFFOLD_MANIFEST: &str = "[package]\nname = \"scaffold\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
         [dependencies]\ncounting-basis = { path = \"../counting-basis\" }\n\n\
         [dev-dependencies]\ncounting-basis = { path = \"../counting-basis\", features = [\"counting\"] }\n";
@@ -700,20 +700,28 @@ mod tests {
         );
     }
 
+    /// `singlefs-core` 的清单与构建脚本按字面路径编进测试二进制：变异判法的单元键要从字面路径认出读的是哪份文件，
+    /// 运行期拼出来的路径它认不出，点名这两条测试的变异行就只能照跑、不复用。
+    /// 路径从清单目录起算（`concat!(env!("CARGO_MANIFEST_DIR"), …)`，编译期折成字面路径，单元键照样认得出）：变异门禁核仓外路径字面量时
+    /// 把 `"../` 起头的字面量按所在 crate 的根解析，按源文件目录写的相对路径在那里会解到仓外。
+    const CORE_MANIFEST_TEXT: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../singlefs-core/Cargo.toml"
+    ));
+    const CORE_BUILD_SCRIPT_TEXT: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../singlefs-core/build.rs"
+    ));
+
     /// `singlefs-core` 那一侧的约定与这里读的对得上：清单写了 links、构建脚本照 [`ENABLED_FEATURES_METADATA_KEY`] 打元数据。
     /// 构建脚本不依赖本 crate，键名在两处各写一次，这一条钉住它们相同。
     #[test]
     fn the_core_build_script_reports_under_the_key_read_here() {
-        let core_directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../singlefs-core");
-        let manifest_text =
-            std::fs::read_to_string(core_directory.join("Cargo.toml")).expect("读得了核心层清单");
         let manifest =
-            crate::manifest::parse_crate_manifest(&manifest_text).expect("核心层清单读得了");
+            crate::manifest::parse_crate_manifest(CORE_MANIFEST_TEXT).expect("核心层清单读得了");
         assert_eq!(manifest.links.as_deref(), Some("singlefs-core"));
-        let build_script_text =
-            std::fs::read_to_string(core_directory.join("build.rs")).expect("读得了核心层构建脚本");
         assert!(
-            build_script_text.contains(&format!(
+            CORE_BUILD_SCRIPT_TEXT.contains(&format!(
                 "\"cargo::metadata={ENABLED_FEATURES_METADATA_KEY}={{}}\""
             )),
             "核心层构建脚本照 {ENABLED_FEATURES_METADATA_KEY} 交出特性"
@@ -722,15 +730,12 @@ mod tests {
 
     /// `singlefs-core` 清单 `[features]` 里的每个特性在它构建脚本的特性表（`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG`）里恰好一行、
     /// 表里没有清单之外的名字（`crates/singlefs-core/build.rs` 文件头点名的这一条）。构建脚本只读 cfg、构建时自己不比：清单加了特性而表没加，
-    /// 那个特性开着时交出去的元数据里没有它，依赖方的判法单元键按没开算，`cargo build` 与 checker 档的构建都不报。
+    /// 那个特性开着时交出去的元数据里没有它，依赖方的判法单元键按没开算，`cargo build` 与验证包的构建都不报。
     /// 表编进来读（同一份源码），清单照原文解（`manifest::parse_crate_manifest`）。
     #[test]
     fn the_core_build_script_lists_every_feature_of_its_manifest() {
-        let core_directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../singlefs-core");
-        let manifest_text =
-            std::fs::read_to_string(core_directory.join("Cargo.toml")).expect("读得了核心层清单");
         let manifest =
-            crate::manifest::parse_crate_manifest(&manifest_text).expect("核心层清单读得了");
+            crate::manifest::parse_crate_manifest(CORE_MANIFEST_TEXT).expect("核心层清单读得了");
         let names_in_the_manifest: Vec<&str> =
             manifest.features.keys().map(String::as_str).collect();
         let mut names_in_the_table: Vec<&str> =

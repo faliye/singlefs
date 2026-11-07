@@ -21,19 +21,16 @@ use crate::root_ring::{RootRingSlotsPerRegion, RootRingSlotsPerRegionOutOfRange}
 
 pub const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
 pub const FORMAT_VERSION: u16 = 1;
-/// incompat 位 1 = 第一条纯 SSD 布局线，系统配置带回退下界 F、根记录带卸载记号的那一版（D15（格式冻结政策） 已定项 4，
-/// 用户 2026-09-26 定「换 incompat 位，挂不上」）；mkfs 起就置上。位 n 住第 n div 8 个字节的第 n mod 8 低位
+/// incompat 位 1 = 第一条纯 SSD 布局线，系统配置带回退下界 F、根记录带卸载记号的那一版（D15（格式冻结政策） 已定项 4）；
+/// mkfs 起就置上。位 n 住第 n div 8 个字节的第 n mod 8 低位
 /// （D22（单元原子性怎么合成） 已定项 13），位 1 是第一个字节从最低位数起的第 2 位。
 pub const INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT: u8 = 0x02;
-/// incompat 位 0 退役：带回退见证、系统配置不带 F 的那一版（D15（格式冻结政策） 已定项 4，用户 2026-09-26）。
-/// 位一旦用过不许回收（`.claude/kb/feature-bits.md`）；它不在 [`SUPPORTED_INCOMPAT_BITS`] 里，读者见到它按不认识的位拒。
-pub const INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT: u8 = 0x01;
-/// incompat 位 2 = inode 记录带截断字段（偏移 120 起 T 与 N_w，用户 2026-10-17 定新开一位，判决
-/// `research/prompts/m4-trunc-r2-main-verification.md` 第六节；位号的登记归阶段同步）：mkfs 起就置上，写者每次写系统配置都写它。
-/// 读者收只带位 1 的（0x02）与位 1、位 2 都带的（0x06）两种；不带位 2 的池里截断字段必须全零
-/// （[`InodeRecordTruncationFieldsOfThePool::AllZero`]）。
+/// incompat 位 2 = inode 记录带截断字段（偏移 120 起 T 与 N_w）：是布局身份的一部分，
+/// 写者每次写系统配置都写它。
 pub const INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT: u8 = 0x04;
-pub const SUPPORTED_INCOMPAT_BITS: u8 =
+/// 这一版布局的 incompat 位图第一个字节：位 1 与位 2 都带。写者写的就是它；读者只收它，第一个字节是别的值、或其余 31 字节
+/// 有一个不为 0，一律是 incompat 位图不认识（[`SystemConfigurationSlotRefusal::IncompatBitsNotRecognized`]）。
+pub const INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT: u8 =
     INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT
         | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT;
 const FEATURE_BITS_OFFSET: usize = 4 + 2;
@@ -97,8 +94,8 @@ pub const ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION: SlotNumber = SlotNumber(ROOT
 /// D2（RAID 条带策略） 已定项 18：第一版 w_max 与 g 都写 4。
 const MAXIMUM_STRIPE_WIDTH: u8 = 4;
 const GROUP_SIZE: u8 = 4;
-/// D16（发布语义） 已定项 5 的两个可调值。T_time 盘上那 4 字节的单位是毫秒（用户 2026-10-05 定：已定项 5 的可设区间
-/// [200 ms, 5 s] 下端在「秒」里写不出；判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2），默认 5 s 写 5000。
+/// D16（发布语义） 已定项 5 的两个可调值。T_time 盘上那 4 字节的单位是毫秒（已定项 5 的可设区间
+/// [200 ms, 5 s] 下端在「秒」里写不出），默认 5 s 写 5000。
 const TIME_THRESHOLD_MILLISECONDS: u32 = 5000;
 const DIRTY_THRESHOLD_BYTES: u64 = 2 << 30;
 /// 整理低水位 / 高水位 / 停止线三条（D26（后台整理与放置回收） 已定项 1）。
@@ -106,13 +103,13 @@ const COMPACTION_WATERMARK_COUNT: usize = 3;
 /// 三条水位第一版恒 0，0 的含义是「用内置默认」（D22（单元原子性怎么合成） 已定项 15 ④）。
 const COMPACTION_WATERMARK_BUILT_IN_DEFAULT: u64 = 0;
 
-/// 在飞记录数上限 = 环槽数 ÷ F，语义是一次恢复重放的前缀最多这么多条（D23（journal 的角色与格式） 已定项 18，
-/// 2026-09-14 用户定案）。环槽数 = 环长 ÷ [`JOURNAL_RECORD_BYTES`]，F = [`JOURNAL_SAFETY_FACTOR`]（I-8.1（环几何够大）），两次都取整数部分。
+/// 在飞记录数上限 = 环槽数 ÷ F，语义是一次恢复重放的前缀最多这么多条（D23（journal 的角色与格式） 已定项 18）。
+/// 环槽数 = 环长 ÷ [`JOURNAL_RECORD_BYTES`]，F = [`JOURNAL_SAFETY_FACTOR`]（I-8.1（环几何够大）），两次都取整数部分。
 /// core 里写系统配置那一格、mkfs 判环够不够、恢复取前缀、一次发布最多切几条记录，都调这一份。
 ///
-/// 式子住 core 自己这里：`singlefs-format` 只放标量（D13（验证路线） 已定项 5；2026-09-27 用户定案「三方各算一份 + 交叉断言」）。
+/// 式子住 core 自己这里：`singlefs-format` 只放标量（D13（验证路线） 已定项 5）。
 /// 实验装置 E158（择根与修复四岔路） 自写一份、不调它；checker 不算在飞上限，不另造。两份在环长上的交叉断言在
-/// `crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 的 `journal_in_flight_record_limit_cross_check_tests` 模块。
+/// `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 的 `journal_in_flight_record_limit_cross_check_tests` 模块。
 #[must_use]
 pub fn journal_in_flight_record_limit(journal_ring_bytes: u64) -> u64 {
     journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR
@@ -130,7 +127,7 @@ pub fn journal_in_flight_record_limit_fits_its_four_byte_field(journal_ring_byte
 
 /// 一槽系统配置里记着的根环区域数 R（偏移 361 那 1 字节）。只切字节、不判值：[`SystemConfiguration::parse_slot`] 不读它（内存里不另存一份），
 /// 读者择系统配置时拿它与第一版常量 `ROOT_RING_REGIONS` 比，不等整池拒（`recovery` 的 `system_configuration_values_this_reader_accepts`；
-/// C663（系统配置槽越界与不收之值两读者分类不同），用户 2026-10-20 定「R 读并整池拒」）。
+/// C663（系统配置槽越界与不收之值两读者分类不同））。
 ///
 /// # Panics
 /// 槽短于 4096 字节：调用方先过了 [`SystemConfiguration::parse_slot`]（它判过槽宽）才调这里。
@@ -251,7 +248,7 @@ pub enum SlotFieldMutability {
 /// 五个都在字段表「几何」段里，都属于系统不可变配置——改它们要重建文件系统。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemImmutableSizes {
-    /// mkfs 时探测到的 physical_block_size（2026-09-14 用户定案的字段，给挂载与 checker 比对用）。
+    /// mkfs 时探测到的 physical_block_size（给挂载与 checker 比对用）。
     pub physical_block_size: u32,
     /// mkfs 时探测的 io_min。
     pub minimum_input_output_bytes: u32,
@@ -279,7 +276,6 @@ impl SystemImmutableSizes {
 
     /// 根槽与系统配置槽的起始偏移要按的判定宽度：声明的 max(physical_block_size, io_min)（I-7.5（根槽按判定宽度对齐）
     /// 的射程注：io_min 大于 physical_block_size 时按 io_min 判；io_min 写 0 是没声明，取 physical_block_size）。
-    /// 用户 2026-10-01 定「非常规几何由 mkfs 拒，I-7.5 按 max(pbs, io_min) 判」（`research/prompts/m3-inv-a-r1-main-verification.md` 第四节）。
     #[must_use]
     pub fn declared_alignment_decision_width_in_bytes(&self) -> u64 {
         u64::from(
@@ -296,9 +292,8 @@ impl SystemImmutableSizes {
 /// 校验和算法标识 1 + 本盘设备号 4 + 设备数 devs 4）+ 加密预留 6 行 114（系统配置自身 MAC 16 +
 /// nonce 水位 12 + KDF 标识 4 + 加密类型 1 + MAC 长度声明 1 + 主密钥槽 80）+ 几何段除节点大小之外的
 /// 23 行 128。这 37 行里只有下面 7 个字段（`sizes` 里 5 个值，合起来 11 个值）在内存里存着，
-/// 其余由 [`SystemConfiguration::to_slot`] 照格式常量写死。journal 环起点与根环起点两个字段读进来（代码三方 m2-closeout-code-r2
-/// 「core 与 checker 对系统配置几何字段的读法」：此前解槽跳过这两个字段、按编译期常量走，checker 按字段读，两边判不一致；
-/// 用户 2026-09-27 定「读字段，不等于常量就整池拒」）。
+/// 其余由 [`SystemConfiguration::to_slot`] 照格式常量写死。journal 环起点与根环起点两个字段读进来：
+/// 解槽不跳过这两个字段、不按编译期常量走：checker 按字段读，core 与它的读法一致。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemImmutableConfiguration {
     pub filesystem_identifier: [u8; 16],
@@ -312,48 +307,6 @@ pub struct SystemImmutableConfiguration {
     /// 根环起点（偏移 371，16 KiB 槽号；基址 = 该字段 × 16384，D22（单元原子性怎么合成） 已定项 16 第 1 句）。
     /// 写者写 [`ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION`]；读者收的只有它，判固定结构槽距的上界用它（同一槽自述的根环起点）。
     pub root_ring_base_slot: SlotNumber,
-    /// incompat 位 2（偏移 6 那一字节）：写者写 [`InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER`]；读者两种都收，
-    /// 走读 inode 记录时按它判截断字段收不收（`records::InodeRecord::truncation_field_fits_the_pool`）。
-    pub inode_record_truncation_fields: InodeRecordTruncationFieldsOfThePool,
-}
-
-/// 一个池的 inode 记录带不带截断字段：系统配置 incompat 位 2 带不带（[`INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT`]）。
-/// 封闭集合，`match` 不写通配臂。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum InodeRecordTruncationFieldsOfThePool {
-    /// 不带位 2：inode 记录偏移 120–135 必须全零，读到非零的记录判不可用。
-    AllZero,
-    /// 带位 2（mkfs 起就置上）：偏移 120–135 是截断字段 T 与 N_w。
-    Carried,
-}
-
-impl InodeRecordTruncationFieldsOfThePool {
-    /// 写者写进系统配置的那一种：mkfs 与之后每一次写系统配置都带位 2（用户 2026-10-17 定、主 agent 定 mkfs 写这一位）。
-    pub const WRITTEN_BY_THIS_WRITER: Self = InodeRecordTruncationFieldsOfThePool::Carried;
-
-    /// incompat 位图第一个字节里位 2 带不带。
-    #[must_use]
-    pub const fn of_the_first_incompat_byte(first_incompat_byte: u8) -> Self {
-        if first_incompat_byte & INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT == 0 {
-            InodeRecordTruncationFieldsOfThePool::AllZero
-        } else {
-            InodeRecordTruncationFieldsOfThePool::Carried
-        }
-    }
-
-    /// 写进 incompat 位图第一个字节的那几位：位 1（布局身份）恒带，位 2 照这一种。
-    #[must_use]
-    pub const fn first_incompat_byte(self) -> u8 {
-        match self {
-            InodeRecordTruncationFieldsOfThePool::AllZero => {
-                INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT
-            }
-            InodeRecordTruncationFieldsOfThePool::Carried => {
-                INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT
-                    | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT
-            }
-        }
-    }
 }
 
 impl SystemImmutableConfiguration {
@@ -387,9 +340,10 @@ impl SystemMutableConfiguration {
 /// 系统运行配置：36 字节，改它无代价、每次挂载可重设并回写（D22（单元原子性怎么合成） 已定项 26 第三档）。
 ///
 /// 字段表里归这一档的 3 行：可调值段的「T_time 4」「T_dirty 8」「整理低 / 高 / 停三水位 8 × 3」。
-/// **没有字段**：挂载选项通道不存在（C422（挂载选项通道不存在）），这三行今天既没有可设的入口、
-/// 也没有触发路径——T_time 与 T_dirty 的发布触发没实现，整理三水位恒 0 = 内置默认
-/// （D22（单元原子性怎么合成） 已定项 15 ④）。所以这一档拿内置默认值写盘，不带状态。
+/// **没有字段**：挂载选项通道不存在（C422（挂载选项通道不存在）），这三行今天没有可设的入口，只有内置默认值。
+/// T_time 与 T_dirty 的发布触发已经接上：挂载时 [`PublishTriggerThresholds::of_the_mount`] 从这里取两个内置默认值求值一次
+/// （脏量那一支按环长夹），会话里 `mounted_session::publish_trigger_cause` 拿它们比时间与待发的 journal 字节；
+/// 整理三水位恒 0 = 内置默认（D22（单元原子性怎么合成） 已定项 15 ④）。所以这一档拿内置默认值写盘，不带状态。
 /// 真有了挂载选项通道，值落在这里，下面三个方法退回去当默认值。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemRuntimeConfiguration;
@@ -421,10 +375,10 @@ impl SystemRuntimeConfiguration {
 /// （`.claude/rules/fs-design.md` 五条硬要求第 5 条：分支变量是这两个阈值，`now` 与待发的 journal 字节是被比较的量）。
 ///
 /// 时间那一支取系统运行配置里的 `T_time`（毫秒）；脏量那一支照已定项 5 夹一次：有效 `T_dirty` = min(系统运行配置里的 `T_dirty`, 环长 ÷ F)，
-/// 两边都是 journal 字节（脏量按待发改动要写的 journal 字节算，用户 2026-10-26 定）。挂载选项通道还没有（C422），产品路径只有
+/// 两边都是 journal 字节（脏量按待发改动要写的 journal 字节算）。挂载选项通道还没有（C422），产品路径只有
 /// [`PublishTriggerThresholds::of_the_mount`] 这一个来源；只供测试的那个来源（`.claude/rules/fs-design.md` 五条硬要求第 2 条：每条分支能被测试强制进入）
-/// 在默认关的 cargo 特性 `test-only-publish-thresholds` 后面，发布构建里调不到（判决 `research/prompts/m4-publish-trigger-r1-main-verification.md`
-/// 第二节「只供测试的开关」那一格）。只供测试的那个来源给的是夹之前的那个值，夹照常做（攻方 P6-乙：给有效值就跳过夹的那条分支）。
+/// 在默认关的 cargo 特性 `test-only-publish-thresholds` 后面，发布构建里调不到。
+/// 只供测试的那个来源给的是夹之前的那个值，夹照常做（给有效值就跳过夹的那条分支）。
 ///
 /// 发布构建里够不着那个来源，按编译期判：不开特性编本包时下面这一段必须编不过；开着特性编时它照常编得过、跑得对（两种编法各判一半，
 /// `cargo test -p singlefs-core --doc` 单编本包时特性关着，跑的是前一半）。
@@ -460,7 +414,7 @@ impl PublishTriggerThresholds {
 
     /// 只供测试的来源：把两个阈值压到测试的尺度（几毫秒、几条记录），无视 5 s 与 256 MiB 的判据强制进入时间那一支或脏量那一支。
     /// `dirty_threshold_before_the_clamp` 是夹之前的值（与系统运行配置里那个字段同一个位置），有效值照样 min(它, 环长 ÷ F)。
-    /// 只在默认关的 cargo 特性 `test-only-publish-thresholds` 打开时编进来（harness 档的 dev 依赖打开它）：不开特性编的库里没有这个名字
+    /// 只在默认关的 cargo 特性 `test-only-publish-thresholds` 打开时编进来（验证包的 dev 依赖打开它）：不开特性编的库里没有这个名字
     /// （[`PublishTriggerThresholds`] 文档里那一段在那时编不过）。
     #[cfg(feature = "test-only-publish-thresholds")]
     #[must_use]
@@ -639,11 +593,7 @@ impl SystemConfiguration {
         slot.write(SlotFieldMutability::ImmutableConfiguration, |writer| {
             writer.put(&SYSTEM_CONFIGURATION_MAGIC);
             writer.put_u16(FORMAT_VERSION);
-            writer.put_u8(
-                self.immutable
-                    .inode_record_truncation_fields
-                    .first_incompat_byte(),
-            );
+            writer.put_u8(INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT);
             writer.skip(95);
             writer.assert_position(
                 u64::try_from(FSID_OFFSET).expect("fsid 偏移"),
@@ -830,13 +780,8 @@ impl SystemConfiguration {
             usize::try_from(ROLLBACK_FLOOR_OFFSET).expect("字段表里的偏移装得进 usize"),
         );
         let rollback_floor = CheckpointTxg(rollback_floor_reader.get_u64());
-        let inode_record_truncation_fields =
-            InodeRecordTruncationFieldsOfThePool::of_the_first_incompat_byte(
-                bytes[FEATURE_BITS_OFFSET],
-            );
         Ok(Self {
             immutable: SystemImmutableConfiguration {
-                inode_record_truncation_fields,
                 filesystem_identifier,
                 this_device,
                 device_count,
@@ -852,7 +797,7 @@ impl SystemConfiguration {
                 root_ring_base_slot,
             },
             // 节点大小那 4 字节上面判过等于格式常量 `NODE_BYTES`，内存里不另存一份；有了 mkfs 参数那天值落进这一档、
-            // 判定连着换成判它在 mkfs 收的范围里（C840，用户 2026-10-15 定「当自证不过」）。
+            // 判定连着换成判它在 mkfs 收的范围里（C840）。
             mutable: SystemMutableConfiguration,
             // 可调值那 36 字节不读回来：挂载选项通道不存在（C422（挂载选项通道不存在）），
             // 读回来的值没有任何使用者。
@@ -874,14 +819,14 @@ pub enum SystemConfigurationSlotRefusal {
     /// magic、整槽校验和两关里有一关不过 ⇒ **这一槽不可择**：换一槽、换一盘还可以试，
     /// 系统配置每盘两槽、池里每盘一份买的就是这份冗余（D22（单元原子性怎么合成） 已定项 8 第 1 条）。
     NotSelfDescribing,
-    /// magic 与整槽校验和两关都过、incompat 位图里有这个读者不认识的位或缺布局身份位（`incompat_bits_are_mountable` 不过）
+    /// magic 与整槽校验和两关都过、incompat 位图不是这一版布局的那一个（`incompat_bits_are_mountable` 不过）
     /// ⇒ **这一槽同样不可择**（incompat 档「不认识不许挂」，`.claude/rules/fs-design.md`），但它不是坏槽：是一份完整的系统配置，
-    /// 布局不是这个读者认得的那一版（退役的位 0 那一版旧镜像，或更新的实现写的，D15（格式冻结政策） 已定项 4）。
+    /// 布局不是这个读者认得的这一版（D15（格式冻结政策） 已定项 4）。
     /// 与 [`Self::NotSelfDescribing`] 分开报，调用方据此把「布局不认识」与「数据坏了」分开。带着那一槽的 incompat 位图原样。
     IncompatBitsNotRecognized { incompat_bitmap: IncompatBitmap },
     /// magic、整槽校验和、incompat 位三关都过，而节点大小那 4 字节（偏移 301）不等于格式常量 `NODE_BYTES`
     /// ⇒ **当这一槽自证不过**：这一槽不可择，换一槽、换一盘还可以试，与 [`Self::NotSelfDescribing`] 同一个处置
-    /// （C840，用户 2026-10-15 弹窗定「当自证不过」）。单列成员是为了报得出拒在节点大小这一格、带着盘上读到的值；
+    /// （C840（系统配置节点大小字段没人判）：节点大小不符当这一槽自证不过）。单列成员是为了报得出拒在节点大小这一格、带着盘上读到的值；
     /// 节点照格式常量读，不收别的节点大小（D22（单元原子性怎么合成） 已定项 26 第二档：改节点大小的路第一版没有）。
     NodeBytesNotTheFormatConstant { recorded_node_bytes: u32 },
     /// 自述的每区槽数 S 落在格式承诺的区间之外 ⇒ **整池拒绝挂载**，不换一槽再试：S 是池级字段，
@@ -904,17 +849,14 @@ fn incompat_bitmap_of(slot: &[u8]) -> IncompatBitmap {
     )
 }
 
-/// incompat 位图里不认识的位 ⇒ 挂不上（`.claude/rules/fs-design.md`）；且必须带布局身份位。
-/// 退役的位 0（系统配置不带 F 的旧镜像）不在 [`SUPPORTED_INCOMPAT_BITS`] 里，按不认识的位拒，
-/// 与新的布局身份位同时置上也拒（D15（格式冻结政策） 已定项 4）。位 2（inode 记录带截断字段）带不带都收：第一个字节收 0x02 与 0x06 两种。
+/// incompat 位图不是这一版布局的那一个 ⇒ 挂不上（`.claude/rules/fs-design.md`）：第一个字节恰好是
+/// [`INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT`]、其余 31 字节全零才收（D15（格式冻结政策） 已定项 4）。
 #[must_use]
 pub fn incompat_bits_are_mountable(slot: &[u8]) -> bool {
     let incompat = &slot[FEATURE_BITS_OFFSET..FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES];
-    let unknown_in_first_byte = incompat[0] & !SUPPORTED_INCOMPAT_BITS;
-    let unknown_in_rest = incompat[1..].iter().any(|byte| *byte != 0);
-    let has_layout_identity =
-        incompat[0] & INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT != 0;
-    unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity
+    let first_byte_is_this_layout = incompat[0] == INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT;
+    let rest_is_zero = incompat[1..].iter().all(|byte| *byte == 0);
+    first_byte_is_this_layout && rest_is_zero
 }
 
 #[cfg(test)]
@@ -922,7 +864,7 @@ mod tests {
     use super::*;
     use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
 
-    fn sample() -> SystemConfiguration {
+    fn sample_system_configuration() -> SystemConfiguration {
         SystemConfiguration {
             immutable: SystemImmutableConfiguration {
                 filesystem_identifier: [3u8; 16],
@@ -938,7 +880,6 @@ mod tests {
                 },
                 journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
                 root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
-                inode_record_truncation_fields: InodeRecordTruncationFieldsOfThePool::Carried,
             },
             mutable: SystemMutableConfiguration,
             runtime: SystemRuntimeConfiguration,
@@ -951,17 +892,9 @@ mod tests {
         }
     }
 
-    /// 同 [`sample`]，系统配置不带 incompat 位 2（第一条布局线、截断字段之前的旧镜像）。
-    fn sample_without_the_truncation_fields_bit() -> SystemConfiguration {
-        let mut without = sample();
-        without.immutable.inode_record_truncation_fields =
-            InodeRecordTruncationFieldsOfThePool::AllZero;
-        without
-    }
-
     /// 把槽里 incompat 位图第一个字节改成 `first_incompat_byte`，整槽校验和重封：magic 与校验和两关照样过，拒它的只能是 incompat 判。
     fn slot_with_first_incompat_byte(first_incompat_byte: u8) -> Vec<u8> {
-        let mut slot = sample().to_slot();
+        let mut slot = sample_system_configuration().to_slot();
         slot[FEATURE_BITS_OFFSET] = first_incompat_byte;
         let digest = wide_checksum_with_field_zeroed(
             &slot,
@@ -975,7 +908,7 @@ mod tests {
 
     #[test]
     fn system_configuration_is_489_bytes_in_a_4096_slot_and_round_trips() {
-        let slot = sample().to_slot();
+        let slot = sample_system_configuration().to_slot();
         assert_eq!(slot.len(), 4096);
         assert!(
             slot[489..].iter().all(|byte| *byte == 0),
@@ -983,13 +916,16 @@ mod tests {
         );
         assert_eq!(
             slot[6], 0x06,
-            "incompat 带位 1（新的布局身份）与位 2（inode 记录带截断字段），退役的位 0 不置"
+            "incompat 第一个字节是这一版布局的那一个：位 1 与位 2 都带，别的位不置"
         );
         assert_eq!(
             &slot[FSID_OFFSET + 16..FSID_OFFSET + 16 + 11],
             b"singlefs-rs"
         );
-        assert_eq!(SystemConfiguration::parse_slot(&slot), Ok(sample()));
+        assert_eq!(
+            SystemConfiguration::parse_slot(&slot),
+            Ok(sample_system_configuration())
+        );
         assert_eq!(
             slot[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")],
             8,
@@ -1005,121 +941,71 @@ mod tests {
     /// 坏槽与不认识的 incompat 位都挂不上，但报的成员不同：前者是这一槽自证不过（数据坏了），后者自证得过、只是布局不认识。
     #[test]
     fn corrupted_slot_and_unknown_incompat_bit_are_both_unmountable() {
-        let mut slot = sample().to_slot();
+        let mut slot = sample_system_configuration().to_slot();
         slot[4000] ^= 1;
         assert_eq!(
             SystemConfiguration::parse_slot(&slot),
             Err(SystemConfigurationSlotRefusal::NotSelfDescribing),
             "补齐区改一字节也失配：整槽校验和罩 4096"
         );
-        let mut unknown = sample().to_slot();
+        let mut unknown = sample_system_configuration().to_slot();
         unknown[6] |= 0x08;
         assert!(!incompat_bits_are_mountable(&unknown));
-        let resealed_unknown = slot_with_first_incompat_byte(
-            INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | 0x08,
-        );
-        let mut expected_bitmap = [0u8; FEATURE_BITMAP_BYTES];
-        expected_bitmap[0] =
-            INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | 0x08;
-        assert_eq!(
-            SystemConfiguration::parse_slot(&resealed_unknown),
-            Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized {
-                incompat_bitmap: IncompatBitmap(expected_bitmap),
-            }),
-            "位 3 没分出去、整槽重封过：报布局不认识、带着位图，不报自证不过"
+        assert_the_slot_is_refused_as_an_unrecognized_layout(
+            INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT | 0x08,
+            "位 3 没分出去",
         );
     }
 
-    /// 位 0 退役（D15（格式冻结政策） 已定项 4，用户 2026-09-26）：只带位 0 的旧镜像、位 0 与位 1 都带的、一个布局身份位都不带的，
-    /// 三样都按 incompat 判拒成「这一槽不可择」、报的是布局不认识（带着那一槽的位图），不是自证不过；只带位 1 的收。
-    /// 四份槽都重封过整槽校验和，拒它们的只能是 incompat 判。
+    /// 第一个字节改成 `first_incompat_byte`、整槽校验和重封的一槽：自证得过，读者拒成这一槽不可择、报布局不认识（带着那一槽的位图），
+    /// 不报自证不过。
+    fn assert_the_slot_is_refused_as_an_unrecognized_layout(first_incompat_byte: u8, what: &str) {
+        let slot = slot_with_first_incompat_byte(first_incompat_byte);
+        assert!(
+            wide_checksum_field_holds(&slot, 4096, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET),
+            "{what}：这一槽自证得过"
+        );
+        assert!(!incompat_bits_are_mountable(&slot), "{what}：挂不上");
+        let mut expected_bitmap = [0u8; FEATURE_BITMAP_BYTES];
+        expected_bitmap[0] = first_incompat_byte;
+        assert_eq!(
+            SystemConfiguration::parse_slot(&slot),
+            Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized {
+                incompat_bitmap: IncompatBitmap(expected_bitmap),
+            }),
+            "{what}：读者拒成这一槽不可择，报布局不认识"
+        );
+    }
+
+    /// 只带布局身份位 1、不带位 2（0x02）：位 2 是这一版布局身份的一部分，读者不收。
     #[test]
-    fn slot_carrying_the_retired_layout_bit_zero_is_refused_like_an_unknown_incompat_bit() {
-        for (first_incompat_byte, what) in [
-            (
-                INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT,
-                "只带退役的位 0：带回退见证、系统配置不带 F 的旧镜像",
-            ),
-            (
-                INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT
-                    | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
-                "位 0 与位 1 都带",
-            ),
-            (0, "一个布局身份位都不带"),
-        ] {
-            let slot = slot_with_first_incompat_byte(first_incompat_byte);
-            assert!(
-                wide_checksum_field_holds(&slot, 4096, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET),
-                "{what}：这一槽自证得过"
-            );
-            assert!(!incompat_bits_are_mountable(&slot), "{what}：挂不上");
-            let mut expected_bitmap = [0u8; FEATURE_BITMAP_BYTES];
-            expected_bitmap[0] = first_incompat_byte;
-            assert_eq!(
-                SystemConfiguration::parse_slot(&slot),
-                Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized {
-                    incompat_bitmap: IncompatBitmap(expected_bitmap),
-                }),
-                "{what}：读者拒成这一槽不可择，报布局不认识"
-            );
-        }
-        let new_layout_only = slot_with_first_incompat_byte(
+    fn slot_whose_first_incompat_byte_lacks_bit_two_is_refused_as_an_unrecognized_layout() {
+        assert_the_slot_is_refused_as_an_unrecognized_layout(
             INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
-        );
-        assert_eq!(
-            SystemConfiguration::parse_slot(&new_layout_only),
-            Ok(sample_without_the_truncation_fields_bit()),
-            "只带位 1 的收"
+            "只带位 1",
         );
     }
 
-    /// incompat 位 2（用户 2026-10-17 定，判决 m4-trunc-r2 第六节）：读者收第一个字节 0x02 与 0x06 两种，读成池的截断字段那一档
-    /// （0x02 ⇒ 截断字段必须全零、0x06 ⇒ 带截断字段），写者照那一档写回同一个字节；只带位 2、不带布局身份位 1 的拒。三份槽都重封过整槽校验和。
+    /// 只带位 2、不带布局身份位 1（0x04）：读者不收。
     #[test]
-    fn incompat_bit_two_is_read_into_the_truncation_fields_of_the_pool_and_written_back() {
-        assert_eq!(
-            SystemConfiguration::parse_slot(&slot_with_first_incompat_byte(0x02)),
-            Ok(sample_without_the_truncation_fields_bit()),
-            "0x02：不带位 2 的池，截断字段必须全零"
+    fn slot_whose_first_incompat_byte_lacks_bit_one_is_refused_as_an_unrecognized_layout() {
+        assert_the_slot_is_refused_as_an_unrecognized_layout(
+            INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT,
+            "只带位 2",
         );
-        assert_eq!(
-            SystemConfiguration::parse_slot(&slot_with_first_incompat_byte(0x06)),
-            Ok(sample()),
-            "0x06：带位 2 的池"
-        );
-        assert_eq!(
-            sample_without_the_truncation_fields_bit().to_slot()[FEATURE_BITS_OFFSET],
-            0x02,
-            "不带位 2 那一档写回 0x02"
-        );
-        assert_eq!(
-            sample().to_slot()[FEATURE_BITS_OFFSET],
-            0x06,
-            "带位 2 那一档写回 0x06"
-        );
-        let mut expected_bitmap = [0u8; FEATURE_BITMAP_BYTES];
-        expected_bitmap[0] = INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT;
-        assert_eq!(
-            SystemConfiguration::parse_slot(&slot_with_first_incompat_byte(
-                INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT
-            )),
-            Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized {
-                incompat_bitmap: IncompatBitmap(expected_bitmap),
-            }),
-            "只带位 2、不带布局身份位 1：拒"
-        );
-        assert_eq!(
-            InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER,
-            InodeRecordTruncationFieldsOfThePool::Carried,
-            "写者写位 2"
-        );
+    }
+
+    /// 一个 incompat 位都不带（第一个字节为 0）：读者不收。
+    #[test]
+    fn slot_carrying_no_incompat_bit_is_refused_as_an_unrecognized_layout() {
+        assert_the_slot_is_refused_as_an_unrecognized_layout(0, "一个 incompat 位都不带");
     }
 
     /// 系统配置里的回退下界 F（D22（单元原子性怎么合成） 已定项 9）：写在 [481, 489)、小端，读者从同一处读回来；
     /// 取一个每个字节都不同的值，写错位置、读错位置、读成 0 都对不上。
     #[test]
     fn the_rollback_floor_is_written_little_endian_at_481_and_read_back_from_the_slot() {
-        let mut with_floor = sample();
+        let mut with_floor = sample_system_configuration();
         with_floor.quantities.rollback_floor = CheckpointTxg(0x0807_0605_0403_0201);
         let slot = with_floor.to_slot();
         assert_eq!(
@@ -1146,7 +1032,7 @@ mod tests {
     #[test]
     fn self_describing_slot_declaring_an_out_of_range_slots_per_region_is_refused_by_name() {
         for (declared, expected) in [(3u64, 3u64), (17, 17), (0, 0), (255, 255)] {
-            let mut slot = sample().to_slot();
+            let mut slot = sample_system_configuration().to_slot();
             slot[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")] =
                 u8::try_from(declared).expect("采样点都装得进一字节");
             let digest = wide_checksum_with_field_zeroed(
@@ -1175,7 +1061,7 @@ mod tests {
             );
         }
         for declared in [4u8, 8, 16] {
-            let mut slot = sample().to_slot();
+            let mut slot = sample_system_configuration().to_slot();
             slot[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")] = declared;
             let digest = wide_checksum_with_field_zeroed(
                 &slot,
@@ -1199,7 +1085,7 @@ mod tests {
     fn self_describing_slot_declaring_a_node_size_other_than_the_format_constant_is_refused_by_name(
     ) {
         let node_bytes_field = usize::try_from(NODE_BYTES_OFFSET).expect("301");
-        let mut slot = sample().to_slot();
+        let mut slot = sample_system_configuration().to_slot();
         assert_eq!(
             u32::from_le_bytes(
                 slot[node_bytes_field..node_bytes_field + 4]
@@ -1283,7 +1169,8 @@ mod tests {
     /// 落在哪一档——上一条只核四个常量之间的算术，分错档它一个字也不说。
     #[test]
     fn to_slot_writes_exactly_the_budgeted_bytes_into_each_mutability_class() {
-        let (bytes, accounting) = sample().to_slot_with_mutability_accounting();
+        let (bytes, accounting) =
+            sample_system_configuration().to_slot_with_mutability_accounting();
         assert_eq!(bytes.len(), 4096);
         assert_eq!(
             accounting,

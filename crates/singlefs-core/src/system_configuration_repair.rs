@@ -1,7 +1,4 @@
-//! 系统配置见证判不出（R2：有槽设备报读错，且没有一块盘两槽都自证过）之后的离线出路（α'，C596（见证判不出的系统配置盘面只剩只读挂载）；
-//! 三方判决 `research/prompts/m3-close-sysconf-r1-main-verification.md` 第三节形态甲、`research/prompts/m3-close-sysconf-r2-main-verification.md` 第四节 α'、
-//! `research/prompts/m3-close-sysconf-r3-main-verification.md` 第二节 U2 与第三节；岔路单 `research/prompts/m3-close-sysconf-r2-forks.md` S1 一行，
-//! 用户 2026-10-19 定「许，另加扫单元写序」，2026-10-20 再采「离线出路加 birth_txg 闸」）。
+//! 系统配置见证判不出（R2：有槽设备报读错，且没有一块盘两槽都自证过）之后的离线出路（α'，C596（见证判不出的系统配置盘面只剩只读挂载））。
 //!
 //! 调用方（管理员工具）断言一个版本；这里查过才写，只重写不自证的系统配置槽，不发布、不取号。只在取号写两轮（甲'）之上用：
 //! 取号写两轮之下每块盘两槽都带着取号时的新号，这里写的实例代号取盘上读得到的最大值、不加一，下一次可写挂载取号照常加一。
@@ -142,15 +139,15 @@ pub enum SystemConfigurationRepairRefused {
     /// 这里拿不到几何，不写。
     SystemConfigurationNotChosen(RecoveryFailure),
     /// 断言那一版的根在根环里读不出、它那次发布带末条标志的记录在 journal 环里也读不出（或读出的不是它）：查不到就一个字节不写
-    /// （第二轮判决 α' 的「查断言那一版的根或记录读得出、且是它」）。
+    /// （「查断言那一版的根或记录读得出、且是它」）。
     AssertedVersionReadableNeitherInTheRootRingNorInTheJournalRing { asserted: AssertedVersion },
-    /// 断言那一版的根读得出、带末条标志的记录读不出：写进系统配置的 tail 该取什么，条款没写（第三轮攻方的 α' 取那一版末条记录的计数器，
+    /// 断言那一版的根读得出、带末条标志的记录读不出：写进系统配置的 tail 该取什么，条款没写（α' 取那一版末条记录的计数器，
     /// 末条读不出时没有这个数），第一版不支持，一个字节不写。
     TailOfTheAssertedVersionUndecidedWithoutItsLastRecordUnsupportedInTheFirstVersion {
         asserted: AssertedVersion,
     },
-    /// 单元区里有单元的 `birth_txg` 比断言那一版大（birth_txg 闸，用户 2026-10-20 采「离线出路加 birth_txg 闸」）：比它新的版本写过单元，
-    /// 照写会把可恢复的盘面写成丢了已确认的那一版（第三轮攻方 U2「断言 T−1」那一格），一个字节不写。代价：发布途中崩、只落了单元的孤单元
+    /// 单元区里有单元的 `birth_txg` 比断言那一版大（birth_txg 闸）：比它新的版本写过单元，
+    /// 照写会把可恢复的盘面写成丢了已确认的那一版（「断言 T−1」那一格），一个字节不写。代价：发布途中崩、只落了单元的孤单元
     /// 也会让真实的断言被拒，池留在只读。`device` 是按盘表次序第一块扫到它的盘。
     UnitBornAfterTheAssertedVersion {
         asserted: AssertedVersion,

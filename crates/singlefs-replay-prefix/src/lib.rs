@@ -1,6 +1,6 @@
 //! 取 journal 前缀并施加的纯函数核：`singlefs-core` 的 `recovery::replay_journal` 取前缀那一截全部判定都在这里，
-//! Verus 验的就是编进产品、被恢复路径调用的这一份（用户 2026-10-01 定「Verus 跑真实代码」；里程碑三七·3）。
-//! 单独成一个 crate、只依赖 `vstd`：Verus 验证这个 crate 及其模块，不编整个 `singlefs-core`（用户 2026-10-01 定拆）。
+//! Verus 验的就是编进产品、被恢复路径调用的这一份。
+//! 单独成一个 crate、只依赖 `vstd`：Verus 验证这个 crate 及其模块，不编整个 `singlefs-core`。
 //!
 //! 判定与判的次序照提交 fcc4d340 的 `crates/singlefs-core/src/recovery.rs` 里 `replay_journal` 搬过来：每一判断在哪、
 //! 两个读盘回调在哪一判之前调，都与原文相同。
@@ -12,7 +12,7 @@
 //! 读盘才判得出的两件（反向链、点名单元）由调用方给两个回调，核走到那一步才调。
 //! spec 只说「核据以接受或断链的那一次回调交回了什么」，不管回调调了几次、按什么次序调；回调自己判得对不对也不在 Verus 里。
 //! 块层读几次盘、按什么次序读，只在只读挂载（`mount_read_only`）的这几种形状上由 harness 用例
-//! `crates/singlefs-harness/tests/mounted_recovery_reads_each_candidate_once_in_order.rs` 钉住：锚点读得出、两次单条发布都施加；
+//! `crates/singlefs-verification/tests/mounted_recovery_reads_each_candidate_once_in_order.rs` 钉住：锚点读得出、两次单条发布都施加；
 //! 锚点那条记录撕了；锚点读不出、链首序号不是 1；一次发布两条记录；候选在末条的提交标记上被断。
 //! 别的形状（反向链断了、到了在飞上限、可写挂载走读阶段缓存、`recover` 不验点名单元那一臂）读几次盘没有用例钉。
 //! 平时的 stable 编译用 crates.io 的 `vstd` 与 `verus_builtin_macros` 把 `verus!` 擦成普通 Rust；
@@ -30,8 +30,11 @@ use std::collections::BTreeMap;
 use vstd::prelude::*;
 
 pub mod compaction_plan_proofs;
+pub mod file_range_proofs;
 pub mod gc_crash_proofs;
 pub mod gc_ring_interval_proofs;
+pub mod partial_write_proofs;
+pub mod unlink_proofs;
 
 verus! {
 
@@ -40,7 +43,7 @@ verus! {
 // （address.rs 的 InstanceGeneration、CheckpointTxg，journal.rs 的 JournalRecordOrdinalWithinPublish、JournalRecordPlaceInPublish）
 // 是同一个概念的两个类型，不是一处定义：胶水（recovery.rs 的 replay_journal）逐个手抄映射过来，两边加字段、加成员没有东西逼着同步。
 // 没合成一处，是因为 core 在 journal.rs 里给后两个类型写了固有方法，外 crate 的类型上写不了；把那几个方法挪进本 crate 的 verus! 之外、
-// core 改用这里的类型，是代码轮第三轮判决 U3 里用户没选的那一条（选的是维持改名、这里写实话）。
+// core 改用这里的类型，这条路不取：维持改名、这里写实话。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PrefixKernelInstanceGeneration(pub u32);
 
@@ -142,7 +145,7 @@ pub open spec fn every_counter_has_a_successor<RootSource>(
             < u64::MAX
 }
 
-// 已定项 14 定案句：只施加 (实例代号, checkpoint_txg) 严格大于所选根的记录；注 1：实例代号与所选根不同即停。
+// 已定项 14 的原句：只施加 (实例代号, checkpoint_txg) 严格大于所选根的记录；注 1：实例代号与所选根不同即停。
 pub open spec fn above_the_chosen_root<RootSource>(
     record: CoreRecord<RootSource>,
     root_instance: PrefixKernelInstanceGeneration,
@@ -269,7 +272,6 @@ pub open spec fn is_a_later_record_of_the_same_instance<RootSource>(
 
 // 已定项 4 读者规则第四格（C540）：同一 (实例代号, checkpoint_txg) 里这一条之后还有读得出的记录。
 // 「之后」按计数器、不要求紧接着；往后看到 txg 越过这一条的就不再看——同实例 txg 随计数器不降（K10）时与「之后任一条同 txg」逐态相同
-// （判决 research/prompts/m3-formal-r2-main-verification.md 第二节第 8 条）。
 pub open spec fn a_later_record_of_the_same_publish_is_readable<RootSource>(
     records: Seq<CoreRecord<RootSource>>,
     position: int,
@@ -680,13 +682,12 @@ pub open spec fn replay_follows_the_prefix_rules<
     }
 }
 
-// ===== M3 幂等与单调（spec，可信：照判决文字写）=====
-// D13（验证路线）已定项 1 的 M3 一行；题面照第二轮判决 research/prompts/m3-formal-r2-main-verification.md 第二节第 5、6、7 行
-// 与第三轮判决 research/prompts/m3-formal-r3-main-verification.md 第三节（用户 2026-10-01 定 S5 版本序、S6 txg 顶格）。
-// 主语是 replay_core：singlefs-core 里以 `NamedUnitVerification::Verify` 调 replay_journal 的三处走到的就是它（第二轮判决第 7 行）。
+// ===== M3 幂等与单调（spec，可信：照条款文字写）=====
+// D13（验证路线）已定项 1 的 M3 一行。
+// 主语是 replay_core：singlefs-core 里以 `NamedUnitVerification::Verify` 调 replay_journal 的三处走到的就是它。
 // 下面四条都写成 replay_core 的 ensures（证在 M3 的引理那一节），说的是编进产品的这一份交回的结果；单调本身是推论 corollary_the_landed_version_does_not_go_back。
 
-// I-8.12（K10，判决 research/prompts/m3-inv-b-r1-main-verification.md 第二节第 9 行）：同一实例里 journal 记录的 txg 随计数器不减。
+// I-8.12（同实例记录的 txg 不减），K10：同一实例里 journal 记录的 txg 随计数器不减。
 // 核不判它：记录级的第二半与不动点把它写成前提（核拿到的记录表满足它）。
 pub open spec fn journal_txg_does_not_decrease_with_the_counter_within_an_instance<RootSource>(
     records: Seq<CoreRecord<RootSource>>,
@@ -697,7 +698,7 @@ pub open spec fn journal_txg_does_not_decrease_with_the_counter_within_an_instan
             ==> records[earlier].checkpoint_txg.0 <= records[later].checkpoint_txg.0
 }
 
-// 「同一个读者」（第二轮判决第 6 行不动点那一读的前提）：读盘回调在同一个下标上只交回一种答案。
+// 「同一个读者」（不动点那一读的前提）：读盘回调在同一个下标上只交回一种答案。
 pub open spec fn the_reader_answers_each_position_one_way<Reader: Fn(usize) -> bool>(
     reader: Reader,
 ) -> bool {
@@ -782,7 +783,7 @@ pub open spec fn root_source_after_applying_in_order<RootSource>(
     }
 }
 
-// M3 幂等·记录级（第二轮判决第二节第 6 行「记录级」，I-8.4（重放幂等）的字面「任一 journal 记录被重放两次与重放一次，产生的盘上状态相同」）：
+// M3 幂等·记录级（「记录级」，I-8.4（重放幂等）的字面「任一 journal 记录被重放两次与重放一次，产生的盘上状态相同」）：
 // ① 交回的根就是按次序施加那几条的结果，其中任一条紧接着再施加一次，根与施加一次相同；
 // ② 在 I-8.12 之下，施加过的每一条都不在落到的那一版之上：再取一次前缀时它不是候选，不会被第二次施加。
 #[verifier::opaque]
@@ -842,9 +843,9 @@ pub open spec fn replaying_again_from_the_landed_root_stays_put<RootSource>(
     }
 }
 
-// M3 幂等·不动点（第二轮判决第二节第 6 行「不动点」，第三轮 S6）：把落到的那一版当所选根，同一张记录表、同一个读者、同一个开关、
+// M3 幂等·不动点（「不动点」）：把落到的那一版当所选根，同一张记录表、同一个读者、同一个开关、
 // 同一个在飞上限再取一次前缀（第二次取前缀的结果是规则容得下的任一个），根不动。
-// 前提照第二轮判决第 6 行辩方那一句：I-8.12；同一个读者；所选根之上的记录条数不超在飞上限。
+// 前提：I-8.12；同一个读者；所选根之上的记录条数不超在飞上限。
 // 「同一 (实例代号, 计数器) 只对应一份内容」由 replay_core 的入参严格升序担保；txg 不顶格那一条照 S6 不当前提，写进结局。
 #[verifier::opaque]
 pub open spec fn replaying_from_the_landed_root_is_a_fixed_point<
@@ -889,8 +890,8 @@ pub open spec fn replaying_from_the_landed_root_is_a_fixed_point<
         ))
 }
 
-// M3 单调（推论，第二轮判决第二节第 5 行、第三轮 S5）里核自己的两半，推论本身是下面的 corollary_the_landed_version_does_not_go_back。
-// 一半（攻方 3.2 用的 J1）：落到的那一版不早于所选根，按 S5 的 (txg, 实例代号) 序。
+// M3 单调（推论）里核自己的两半，推论本身是下面的 corollary_the_landed_version_does_not_go_back。
+// 一半（J1）：落到的那一版不早于所选根，按 S5 的 (txg, 实例代号) 序。
 pub open spec fn replay_lands_no_earlier_than_the_chosen_root<
     RootSource,
     BackChain: Fn(usize) -> bool,
@@ -914,7 +915,7 @@ pub open spec fn replay_lands_no_earlier_than_the_chosen_root<
     )
 }
 
-// 另一半（攻方 3.2 第 4 步「恢复是确定的函数」）：同样的入参、同一个读者，规则只容得下这一个结果。
+// 另一半（「恢复是确定的函数」）：同样的入参、同一个读者，规则只容得下这一个结果。
 #[verifier::opaque]
 pub open spec fn replay_outcome_is_the_only_one_the_rules_allow<
     RootSource,
@@ -954,7 +955,7 @@ pub open spec fn replay_outcome_is_the_only_one_the_rules_allow<
 // D22（单元原子性怎么合成）已定项 7：择新按 (checkpoint_txg, 实例代号)，txg 为主、平局时实例代号高者赢；
 // 已定项 24：先逐个验证全部候选、再在有效者中择新。核的入参是根环三个区域全部槽按读根环的次序读出来的样子：
 // 自证过的槽给它的择新键，读不出、自证不过的槽给 None；读盘、自证校验和、fsid 由胶水（recovery.rs 的 choose_root）做，不在 Verus 里。
-// 择新序就是上面 M3 单调用的 version_is_not_later_than（第三轮 S5 定它与择根同序），这里不另写一个序。
+// 择新序就是上面 M3 单调用的 version_is_not_later_than（它与择根同序），这里不另写一个序。
 pub open spec fn root_choice_key_of(slot: Option<RootChoiceKey>) -> RootChoiceKey {
     match slot {
         Some(choice_key) => choice_key,
@@ -1015,7 +1016,7 @@ pub open spec fn root_choice_follows_the_newest_rule(
 
 // ===== 扫环建表（spec，可信）=====
 // recovery.rs 的 scan_journal 按读者的盘次序、每块盘环内偏移次序读到的记录，同一 (实例代号, 计数器) 先到先得：第一份读到的留下
-// （第三轮判决 research/prompts/m3-formal-r3-main-verification.md 第二节 S3、第四节第 10 条；replay_core 入参「严格升序」与 M2 语义层
+// （replay_core 入参「严格升序」与 M2 语义层
 // 「同一 (实例代号, 计数器) 只对应一份内容」用的就是这张表）。核只管「每个键留第几份」：入参是读到的记录按读到的次序摊成的键，
 // 交回每个键第一次读到的位置；读盘、解记录由胶水做。
 // 键摊成 (u32, u64) 两个无符号整数，不用 PrefixKernelInstanceGeneration 与 JournalCounter：vstd 给 BTreeMap 的规格只在键的比较守
@@ -1050,7 +1051,7 @@ pub open spec fn each_kept_copy_stands_for_one_record_key(
         ) && one_key != other_key ==> first_copies[one_key] != first_copies[other_key]
 }
 
-// ===== 择根与取前缀合判（C650 的 Verus 一半；用户 2026-10-02 定 Y6 两边都做）=====
+// ===== 择根与取前缀合判（C650 的 Verus 一半）=====
 // 落到的那一版不早于根环里任一自证过的根：择根取的是择新序最大的有效根，取前缀落点又不早于所选根（M3 的 J1）。
 // 改坏择根序（平局取低、实例代号为主、不看实例、取第一个有效者）时，所选根之外会有一条自证过的根比落点新，这一条就不成立。
 pub open spec fn replay_lands_no_earlier_than_any_self_verified_root<RootSource>(
@@ -2271,7 +2272,7 @@ proof fn lemma_the_landed_record_closes_its_txg<
     );
 }
 
-// 不动点那一读（第二轮判决第二节第 6 行；第三轮 S6 取 Qn）：落到的那一版当所选根再取一次前缀，结局是 replaying_again_from_the_landed_root_stays_put。
+// 不动点那一读：落到的那一版当所选根再取一次前缀，结局是 replaying_again_from_the_landed_root_stays_put。
 // 前提：I-8.12、同一个读者、所选根之上的记录条数不超在飞上限（入参严格升序担保「同一 (实例代号, 计数器) 只对应一份内容」）。
 #[allow(clippy::too_many_arguments, reason = "入参照 replay_follows_the_prefix_rules 原样摊开")]
 proof fn lemma_replaying_from_the_landed_root_stays_put<
@@ -2836,10 +2837,10 @@ broadcast proof fn lemma_replay_core_result_is_the_only_one_the_rules_allow<
     }
 }
 
-// M3 单调（推论；第二轮判决第二节第 5 行，第三轮 S5 版本序取 (txg, 实例代号)）：同一次运行里两个崩溃状态 s ⊆ u，
+// M3 单调（推论；版本序取 (txg, 实例代号)）：同一次运行里两个崩溃状态 s ⊆ u，
 // u 上恢复落到的那一版不早于 s 上的。核里证的只有两步：落点不早于所选根、恢复是确定的函数（上面两条 ensures 的引理）；
-// 两条前提是择根、写侧的条款，核判不了，照攻方 research/prompts/m3-formal-r2-opus-output.md 3.2 推的写成 requires：
-// 所选根取根环里最新的有效根 ⇒ u 的所选根不早于 s 的（3.2 第 1 步）；s 施加了一次发布时，串行提交与 D16（发布语义）已定项 7 的持久顺序
+// 两条前提是择根、写侧的条款，核判不了，推出来的写成 requires：
+// 所选根取根环里最新的有效根 ⇒ u 的所选根不早于 s 的；s 施加了一次发布时，串行提交与 D16（发布语义）已定项 7 的持久顺序
 // ⇒ u 含那一版的根槽（u 的所选根不早于它），否则 u 与 s 的所选根、记录表、读者都相同（3.2 第 2、4 步）。开并行提交或把域放宽到带故障的状态时重开。
 #[allow(clippy::too_many_arguments, reason = "两次恢复各一套入参，照 replay_follows_the_prefix_rules 原样摊开")]
 pub proof fn corollary_the_landed_version_does_not_go_back<
@@ -3077,8 +3078,7 @@ pub proof fn corollary_recovery_replays_from_the_newest_self_verified_root<
         Ok(outcome) => {
             // 每一条自证过的根 ≤ 所选根（择根核）≤ 落点：择新序可传递。后一个 ≤ 由 requires 里 replay_core 的 M2
             // （replay_follows_the_prefix_rules）推得出（lemma_replay_core_result_lands_no_earlier_than_the_chosen_root 只凭 M2 证它），
-            // requires 里另列的 J1（replay_lands_no_earlier_than_the_chosen_root）是多余前提，不是这一步非用不可的
-            // （代码轮第一轮判决「改法落地」一节，research/prompts/m3-formal-code-r1-main-verification.md）。
+            // requires 里另列的 J1（replay_lands_no_earlier_than_the_chosen_root）是多余前提，不是这一步非用不可的。
             assert forall|slot_index: int|
                 0 <= slot_index < root_slots.len() && (#[trigger] root_slots[slot_index]) is Some
                     implies version_is_not_later_than(
@@ -3468,10 +3468,10 @@ fn judge_the_candidate<RootSource, BackChain: Fn(usize) -> bool, NamedUnits: Fn(
                 return CandidateVerdict::FailsACheckBeforeTheNamedUnits;
             }
         },
-        // 锚点读不出：链首只能是 txg = 根的 txg + 1、本次发布内序号为 1 的那条（三方第一轮 K4-b）。
+        // 锚点读不出：链首只能是 txg = 根的 txg + 1、本次发布内序号为 1 的那条。
         // 序号与 txg 一起在反向链回调之前判，次序同原文：链首序号不是 1 的不调反向链回调。下面「攒着的为空且序号不是 1」那一判
         // 管锚点读得出时接上的那一次与之后新开的每一次发布；它对这一支的链首也成立（走到这一支时攒着的一定是空的，下面这句由 Verus 证），
-        // 这里先判掉，读盘次序才与原文相同（代码轮第三轮判决 J1、用户定案 U1）。
+        // 这里先判掉，读盘次序才与原文相同。
         None => {
             proof {
                 assert(records_of_the_open_publish@.len() == 0);
@@ -3581,7 +3581,7 @@ pub fn replay_core<
             named_units_verified,
             replayed,
         ),
-        // M3 幂等·记录级（第二轮判决第二节第 6 行「记录级」，I-8.4 的字面）
+        // M3 幂等·记录级（「记录级」，I-8.4 的字面）
         replaying_an_applied_record_twice_leaves_the_root_as_once(
             root_instance,
             root_checkpoint_txg,
@@ -3593,7 +3593,7 @@ pub fn replay_core<
             named_units_verified,
             replayed,
         ),
-        // M3 幂等·不动点（第二轮判决第二节第 6 行「不动点」；第三轮 S6 取 Qn）
+        // M3 幂等·不动点（「不动点」）
         replaying_from_the_landed_root_is_a_fixed_point(
             root_instance,
             root_checkpoint_txg,
@@ -3605,7 +3605,7 @@ pub fn replay_core<
             named_units_verified,
             replayed,
         ),
-        // M3 单调推论的 J1 那一步（第二轮判决第二节第 5 行；第三轮 S5 版本序 (txg, 实例代号)）
+        // M3 单调推论的 J1 那一步（版本序 (txg, 实例代号)）
         replay_lands_no_earlier_than_the_chosen_root(
             root_instance,
             root_checkpoint_txg,
@@ -3617,7 +3617,7 @@ pub fn replay_core<
             named_units_verified,
             replayed,
         ),
-        // M3 单调推论第 4 步「恢复是确定的函数」（第二轮判决第二节第 5 行）
+        // M3 单调推论第 4 步「恢复是确定的函数」
         replay_outcome_is_the_only_one_the_rules_allow(
             root_instance,
             root_checkpoint_txg,

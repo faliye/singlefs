@@ -1,0 +1,3 @@
+pub fn stop_count() -> u32 {
+    fservice::stopped_connections()
+}

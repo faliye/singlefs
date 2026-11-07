@@ -8,13 +8,13 @@
 //!
 //! 给几个入口时一起收一个闭包（`compute_closure_of_entries`：几个入口都在 `--target` 点名的那个目标里、同一个 crate）。
 //! `--toolchain-of-the-build <profile>` 照这台机器现拼一次构建的工具链行（`build_toolchain::toolchain_lines_of_the_build`，与
-//! `singlefs-checker-tier` 的构建脚本同一份拼法）：跑 `$RUSTC -vV`（没设跑 `rustc`）与 `$CARGO -V`（没设跑 `cargo`），目标取
+//! `singlefs-verification` 的构建脚本同一份拼法）：跑 `$RUSTC -vV`（没设跑 `rustc`）与 `$CARGO -V`（没设跑 `cargo`），目标取
 //! `CARGO_BUILD_TARGET`、没设取 `rustc -vV` 的 `host:`，RUSTFLAGS 取 `CARGO_ENCODED_RUSTFLAGS`、没设按空白切 `RUSTFLAGS`，
 //! profile 的生效值从 `<根>` 那棵树的根 `Cargo.toml` 算（`CARGO_PROFILE_<名>_<键>` 照盖）；拼出的行接在 `--toolchain-line` 给的后面。
 //! 要与构建脚本写进 `OUT_DIR` 的键逐字相同，另给 `--no-default-features` 与构建时开的每个特性（`--cfg 'feature="default"'` 这样逐个写）、
 //! `--lock-file <根>/Cargo.lock` 和 `--judgment-kind product-behavior`（判器组是产品行为判定）。
 //! `--judgment-kind` 定这一趟在哪个视图上切、收、算（`singlefs_unit_graph::verus_ghost_code`）：`product-behavior` 剥掉 `verus!` 里的规格与证明块，
-//! `formal-verification` 照源码原样；不给是 `formal-verification`——规格与证明都进键，多判不假绿，原先不带它的调用照旧得同一把键。
+//! `formal-verification` 照源码原样；不给是 `formal-verification`——规格与证明都进键，多判不假绿。
 //!
 //! `<根>` 是仓根或 `crates/` 目录。目标写 `lib`（不给时）、`bin:<名>`、`test:<名>`、`example:<名>`、`bench:<名>`、`build`、`doctest`；
 //! 库里的单测要另给 `--cfg test`。`--cfg` 写 `名字` 或 `键="值"`（`feature="gpu"` 当本 crate 的特性）。
@@ -28,7 +28,8 @@
 //!
 //! 退出码：0 交了全部行（`dump` 照列拒算行，也是 0）；2 用法错（缺目标三元组、两种依赖行都给了）、根目录或清单读不了、
 //! `--lock-file` 读不了、`--toolchain-of-the-build` 拼不出（`rustc`、`cargo` 跑不了，profile 算不出）、入口找不到或不唯一、
-//! 几个入口不在同一个 crate、入口在这组 cfg 下不编进来、写标准输出失败；
+//! 几个入口不在同一个 crate、入口在这组 cfg 下不编进来、闭包读到的 shell 脚本交 bash 规范化跑不下去（bash 不在、退非 0、超时）、
+//! 写标准输出失败；
 //! 3 闭包里有拒算（`closure` 列组成清单与拒算行、不打键行，`key` 只打拒算行）。
 //! 弄坏开关的环境变量这里不认（只给测试用），规则一律全开。
 

@@ -1,16 +1,16 @@
 //! 把这一次编译里 cargo 给本包打开的特性交给直接依赖本包的构建脚本：`links` 的元数据，依赖方读 `DEP_SINGLEFS_CORE_ENABLED_FEATURES`
 //! （`singlefs_unit_graph::build_features::features_enabled_on_the_dependencies`，键名是那里的 `ENABLED_FEATURES_METADATA_KEY`）。
-//! cargo 解出来的特性是并过之后的：别的包在同一次构建里替本包打开的特性（harness 档的 dev 依赖打开的 `lookup-work-counters`）
-//! 也在里面，依赖方自己的特性看不到它们。checker 档的构建脚本拿这一份算判法单元键。同一个值另经 `cargo::rustc-env` 编进本包
+//! cargo 解出来的特性是并过之后的：别的包在同一次构建里替本包打开的特性（验证包的 dev 依赖打开的 `lookup-work-counters`）
+//! 也在里面，依赖方自己的特性看不到它们。验证包的构建脚本拿这一份算判法单元键。同一个值另经 `cargo::rustc-env` 编进本包
 //! （`transaction::lookup_work::ENABLED_FEATURES_REPORTED_BY_THE_BUILD_SCRIPT`），测试拿它判「cargo 真开着时报开着」。
 //!
 //! 取法：cargo 编本包的构建脚本时带着本包这一次开了的特性（每个开着的特性一个 `--cfg feature="<名>"`，与编本包的库同一份），
 //! 所以 `cfg!(feature = "<名>")` 就是 cargo 这一次真开没开；特性一变，构建脚本按另一份 cfg 重编、重跑。不读进程环境里的
 //! `CARGO_FEATURE_*`：那是 cargo 设的，外面带进来的同名变量（`CARGO_FEATURE_LOOKUP_WORK_COUNTERS=1` 而不开特性）它也照收，
-//! 分不出来（七·6 后续批代码轮第一轮判决第二节 T4）。同仓 `Cargo.lock` 里的 `librocksdb-sys` 构建脚本按同一个取法读它的特性
+//! 分不出来。同仓 `Cargo.lock` 里的 `librocksdb-sys` 构建脚本按同一个取法读它的特性
 //! （`if cfg!(feature = "snappy")`）。
 //!
-//! 这个取法差一种编法（七·6 后续批代码轮第二轮判决第二节 T4 ①，用户 2026-10-23 定并进）：带 `--target` 时 `RUSTFLAGS` 里的
+//! 这个取法差一种编法：带 `--target` 时 `RUSTFLAGS` 里的
 //! `--cfg feature="<名>"` 只给编库的那一次、不给编构建脚本的那一次，库按开着编、这里的 cfg 却说没开。cargo 交给构建脚本的
 //! `CARGO_ENCODED_RUSTFLAGS` 是编库那一份参数（本机 cargo 1.98.0 带 `--target` 量过：构建脚本读到 `--cfg` 与 `feature="…"` 两项，
 //! 自己的 cfg 是假），所以那里点名打开、这里的 cfg 却说没开的特性，构建当场停下、说出是哪一个，不交一份与编出来的库不符的元数据。
@@ -20,7 +20,7 @@
 //! `build_features` 单测把两边逐个比（`the_core_build_script_lists_every_feature_of_its_manifest`）。
 
 /// 本包清单 `[features]` 里的每个特性（清单里的写法，按名字排好）与 cargo 这一次开没开它。
-/// `pub(crate)`：harness 档的 `publish_lookup_by_identity` 与 `singlefs-unit-graph` 的单测经 `#[path]` 把这份构建脚本编成一个模块，
+/// `pub(crate)`：验证包的 `publish_lookup_by_identity` 与 `singlefs-unit-graph` 的单测经 `#[path]` 把这份构建脚本编成一个模块，
 /// 要读它与下面两个函数。
 pub(crate) const FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG: [(&str, bool); 2] = [
     (

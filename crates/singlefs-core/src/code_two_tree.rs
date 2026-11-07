@@ -38,8 +38,8 @@ impl CodeTwoKeyFieldWidths {
     /// 中央映射 key 27：类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 尾段 6（D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10：
     /// 码 1 的尾段是事务号低 48 位；码 2 / 码 3 是出生序号 4 + 补零 2，按 6 字节整数比与按出生序号比同序）。
     pub const CENTRAL_MAPPING: Self = Self(&[1, 8, 8, 4, 6]);
-    /// deadlist 条目的 key 43：头的树 ID 8 + 纪元 8 + 中央映射 key 的五段（D5（快照 / 空间记账机制） 已定项 12；
-    /// 判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3）。按头、纪元、映射 key 逐字段比，
+    /// deadlist 条目的 key 43：头的树 ID 8 + 纪元 8 + 中央映射 key 的五段（D5（快照 / 空间记账机制） 已定项 12）：
+    /// 按头、纪元、映射 key 逐字段比，
     /// 同一个头同一段纪元的条目挨着（「按头 / 按快照删一段」那一读法要的次序）。
     pub const DEADLIST: Self = Self(&[8, 8, 1, 8, 8, 4, 6]);
 
@@ -136,7 +136,7 @@ pub fn build_internal_entry(separator_key: &[u8], child: NodePointer) -> Vec<u8>
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InternalEntryRefusal {
     /// 条目宽（节点头里的盘上字段）不等于 key 宽 + 86（窄的切不出子指针，宽的同样不收：I-1.10（码 2 条目宽等于字段表宽） 写「等于」，
-    /// 用户 2026-10-18 定「宽于字段表也拒」，欠账 C780）：调用方报条目宽与字段表不符。
+    /// 欠账 C780）：调用方报条目宽与字段表不符。
     WidthOtherThanTheKeyAndTheChildPointer,
     /// 子指针头部里加密、压缩与 extent 偏移那几段不是第一版的取值（代码审阅第 29 条；extent 偏移是 C581）。
     ChildPointerHeadOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
@@ -696,7 +696,7 @@ pub fn plan_the_tree_after_this_publish(
 }
 
 /// 同 [`plan_the_tree_after_this_publish`]，另收这一版一把 key 都不剩的那一格：这次之后零根（形状一个节点都没有），
-/// 上一版的每个节点都换下（deadlist 树：删快照放掉最后几条之后零根，判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3、S4；
+/// 上一版的每个节点都换下（deadlist 树：删快照放掉最后几条之后零根、S4；
 /// 树表条目的根指针置零，同 day-1 注册的那一形）。上一版也是零根、这一版也一把 key 都没有时一个节点都不写。
 ///
 /// # Errors
@@ -796,7 +796,10 @@ pub enum CodeTwoTreeHeaderJudgement {
     OnlyWhatTheShapeNeeds,
 }
 
-fn violated(detail: &'static str) -> RecoveryFailure {
+/// I-1.1（块头自述逻辑地址） 不成立：码 2 树、分配记录树与 extent 树的读者报同一条不变量。
+pub(crate) fn header_self_described_logical_address_violated(
+    detail: &'static str,
+) -> RecoveryFailure {
     RecoveryFailure::InvariantViolated {
         invariant: "I-1.1",
         detail,
@@ -871,7 +874,7 @@ fn judge_the_header_against_its_reference(
             (None, _) | (_, None) => true,
         };
         if !first_and_last_hold {
-            return Err(violated(detail(
+            return Err(header_self_described_logical_address_violated(detail(
                 "根 key 区间与条目不符",
                 "叶的 key 区间不是首末两条条目的 key",
             )));
@@ -975,7 +978,9 @@ impl TreeReading<'_> {
         units_seen: &mut BTreeSet<SlotNumber>,
     ) -> Result<NodeReadFromDisk, RecoveryFailure> {
         if !units_seen.insert(pointer.locations[0].slot) {
-            return Err(violated("同一个码 2 节点被两条父条目引用"));
+            return Err(header_self_described_logical_address_violated(
+                "同一个码 2 节点被两条父条目引用",
+            ));
         }
         let bytes = read_node(pointer)?;
         let header = parse_index_node(&bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
@@ -1004,17 +1009,21 @@ impl TreeReading<'_> {
         }
         if let Some(expected) = expected_level {
             if header.level != expected {
-                return Err(violated("孩子的层级不是父层级减一"));
+                return Err(header_self_described_logical_address_violated(
+                    "孩子的层级不是父层级减一",
+                ));
             }
         }
         if header.entries.is_empty() {
-            return Err(violated("多层码 2 树的节点一条条目都没有"));
+            return Err(header_self_described_logical_address_violated(
+                "多层码 2 树的节点一条条目都没有",
+            ));
         }
         if header.level == 0 {
             return self.leaf_read_from_disk(pointer, bytes, header);
         }
         let internal_width = internal_entry_width_in_bytes(key_width);
-        // 宽于 key 宽 + 86 的同样拒（C780，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
+        // 宽于 key 宽 + 86 的同样拒（C780）。报的成员沿用
         // `EntryWidthDiffersFromItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
         if header.entry_width != internal_width {
             return Err(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
@@ -1042,10 +1051,14 @@ impl TreeReading<'_> {
             if self.judges_every_header() {
                 if let Some((previous_separator, previous_child)) = children.last() {
                     if separator_key <= *previous_separator {
-                        return Err(violated("内部节点的分隔 key 不严格递增"));
+                        return Err(header_self_described_logical_address_violated(
+                            "内部节点的分隔 key 不严格递增",
+                        ));
                     }
                     if separator_key <= self.key(&previous_child.header.largest_key) {
-                        return Err(violated("分隔 key 不大于左邻孩子头里的最大 key"));
+                        return Err(header_self_described_logical_address_violated(
+                            "分隔 key 不大于左邻孩子头里的最大 key",
+                        ));
                     }
                 }
             }
@@ -1056,7 +1069,9 @@ impl TreeReading<'_> {
                 units_seen,
             )?;
             if self.judges_every_header() && separator_key > self.key(&child.header.smallest_key) {
-                return Err(violated("分隔 key 大于孩子头里的最小 key"));
+                return Err(header_self_described_logical_address_violated(
+                    "分隔 key 大于孩子头里的最小 key",
+                ));
             }
             children.push((separator_key, child));
         }
@@ -1066,7 +1081,7 @@ impl TreeReading<'_> {
             if first_child.header.smallest_key != header.smallest_key
                 || last_child.header.largest_key != header.largest_key
             {
-                return Err(violated(
+                return Err(header_self_described_logical_address_violated(
                     "内部节点的 key 区间不是子树覆盖区间（第一个孩子的最小 key 到最后一个孩子的最大 key）",
                 ));
             }
@@ -1096,7 +1111,9 @@ impl TreeReading<'_> {
                 .windows(2)
                 .all(|pair| self.key(&pair[0][..key_width]) < self.key(&pair[1][..key_width]));
             if !keys_ascend {
-                return Err(violated("叶里的条目不按 key 严格递增"));
+                return Err(header_self_described_logical_address_violated(
+                    "叶里的条目不按 key 严格递增",
+                ));
             }
         }
         Ok(NodeReadFromDisk {
@@ -1232,7 +1249,7 @@ mod tests {
             .collect()
     }
 
-    /// deadlist 树按节点格式算的容量：叶 376、内部 125（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：
+    /// deadlist 树按节点格式算的容量：叶 376、内部 125（
     /// key 43、value 空，叶条目宽 = key 宽；内部条目 = key 43 + 子指针 86）。
     #[test]
     fn a_deadlist_node_holds_three_hundred_seventy_six_leaf_entries_or_one_hundred_twenty_five_children(

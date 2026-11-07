@@ -1,0 +1,7 @@
+fn reported_features() -> String {
+    String::from("plain")
+}
+
+fn main() {
+    println!("cargo::rustc-env=FBUILD_REPORTED_FEATURES={}", reported_features());
+}

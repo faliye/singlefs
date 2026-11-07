@@ -1,0 +1,5 @@
+[package]
+name = "fuser"
+
+[dependencies]
+fservice = { path = "../../fservice" }

@@ -17,7 +17,7 @@ pub struct UnitIndex(pub usize);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WgslUnitIndex(pub usize);
 
-/// Rust 单元的种类（设计 3.2 那张清单，外加 Verus 的 `broadcast group` 与模块头）。
+/// Rust 单元的种类（设计 3.2 那张清单，外加 Verus 的 `broadcast group`、`assume_specification` 与模块头）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UnitKind {
     Function,
@@ -38,6 +38,10 @@ pub enum UnitKind {
     ExternBlock,
     ExternCrate,
     VerusBroadcastGroup,
+    /// `verus!` 里的 `assume_specification[ 路径 ] …;`（整条到 `;`，连属性）：给方括号里点名的那一项（常是别的 crate 里的常量或函数）
+    /// 交一份 Verus 信的规格。按那条路径末段的名字找得到它：闭包点到那个名字时连它一起收，改它交回的值、改它的 ensures，
+    /// 点到那个名字的形式化判定的键跟着变。产品行为视图里它整条剥掉（`verus_ghost_code`），不成单元。
+    VerusAssumeSpecification,
     DocumentationTest,
 }
 
@@ -63,6 +67,7 @@ impl UnitKind {
             UnitKind::ExternBlock => "extern_block",
             UnitKind::ExternCrate => "extern_crate",
             UnitKind::VerusBroadcastGroup => "broadcast_group",
+            UnitKind::VerusAssumeSpecification => "assume_specification",
             UnitKind::DocumentationTest => "doctest",
         }
     }
@@ -87,11 +92,13 @@ impl UnitKind {
             | UnitKind::ExternBlock
             | UnitKind::ExternCrate
             | UnitKind::VerusBroadcastGroup
+            | UnitKind::VerusAssumeSpecification
             | UnitKind::DocumentationTest => false,
         }
     }
 
     /// 按裸名能不能找到它（R-裸名）：use、模块头、模块声明、外部 crate 声明与文档测试不按名字找。
+    /// `assume_specification` 按它点名的那一项的名字找（`declared_names`），不按它自己的名字。
     #[must_use]
     pub fn is_found_by_bare_name(self) -> bool {
         match self {
@@ -106,7 +113,8 @@ impl UnitKind {
             | UnitKind::MacroRulesDefinition
             | UnitKind::ItemMacroInvocation
             | UnitKind::ExternBlock
-            | UnitKind::VerusBroadcastGroup => true,
+            | UnitKind::VerusBroadcastGroup
+            | UnitKind::VerusAssumeSpecification => true,
             UnitKind::ImplementationHead
             | UnitKind::Use
             | UnitKind::ModuleDeclaration
@@ -137,6 +145,7 @@ impl UnitKind {
             | UnitKind::ItemMacroInvocation
             | UnitKind::ExternBlock
             | UnitKind::VerusBroadcastGroup
+            | UnitKind::VerusAssumeSpecification
             | UnitKind::DocumentationTest => true,
         }
     }
@@ -170,6 +179,14 @@ pub enum RefusalForm {
     /// 产品行为判定的视图里，这份文件有一块 `verus!` 交给 `verus_syn` 解不开：规格与证明块剥不了，那份文件原样留着、链接到它的闭包拒算
     /// （`verus_ghost_code`）。形式化判定的视图不剥，不记这一条。
     VerusGhostCodeUnparsed,
+    /// Rust 闭包读到的 shell 脚本里 `source` / `.` 的路径折不出（`shell_sources`）。
+    ShellPathUnfolded,
+    /// `source` / `.` 的路径折出来落在仓根外面。
+    ShellPathOutsideRoot,
+    /// `source` / `.` 的路径折出来指到仓里不在的文件。
+    ShellPathMissing,
+    /// 读到的 shell 脚本或它 source 进来的文件 `bash -n` 过不了（有告警也算）、或包不进函数，按 bash 规范化不出来。
+    ShellBashSyntax,
 }
 
 impl RefusalForm {
@@ -198,14 +215,27 @@ impl RefusalForm {
             RefusalForm::TargetTripleUnrecognized => "target-triple-unrecognized",
             RefusalForm::LockDependencyUnresolved => "lock-dependency-unresolved",
             RefusalForm::VerusGhostCodeUnparsed => "verus-ghost-code-unparsed",
+            RefusalForm::ShellPathUnfolded => "shell-path-unfolded",
+            RefusalForm::ShellPathOutsideRoot => "shell-path-outside-root",
+            RefusalForm::ShellPathMissing => "shell-path-missing",
+            RefusalForm::ShellBashSyntax => "bash-syntax",
         }
     }
+}
+
+/// 拒算落在哪份文件。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RefusalFile {
+    /// 工作区里的一份源码文件（`.rs` 或 `.wgsl`）。
+    WorkspaceSourceFile(FileIndex),
+    /// Rust 闭包读到的 shell 脚本，或它（传递地）source 进来的一份文件：从仓根起的路径（`shell_sources`）。
+    ShellScriptFromTheRepositoryRoot(String),
 }
 
 /// 一条拒算：形态、落在哪份文件哪一行、原样片段。
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Refusal {
-    pub file: FileIndex,
+    pub file: RefusalFile,
     pub line: u32,
     pub form: RefusalForm,
     pub fragment: String,
@@ -232,8 +262,86 @@ pub enum SourceRead {
     },
     /// `include_*!(concat!(env!("OUT_DIR"), …))`：连到本 crate 构建脚本的 `main` 闭包。
     BuildScriptOutput { line: u32 },
+    /// `env!("X")` / `option_env!("X")` 读的变量不是 cargo 给的（不以 `CARGO` 起头、也不是 `OUT_DIR`）：值只能由本 crate 构建脚本经
+    /// `cargo::rustc-env` 交进来，连到构建脚本的 `main` 闭包；没有构建脚本的不连、不拒算（值来自编译时的进程环境，不在仓里的代码里）。
+    /// 与 `scripts/gate/lib_function_units.py` 的 `build-environment` 那一支同一条规则。
+    BuildScriptEnvironmentValue { variable: String, line: u32 },
     /// `env!("CARGO_BIN_EXE_<名>")`：连到那个 bin 的 `main` 闭包。
     BinaryExecutable { binary_name: String, line: u32 },
+    /// 运行期按清单目录拼出 `crates/` 之下（不是 `crates/` 本身）的一个目录：整个目录（递归）当一个数据单元（`data-directory`），
+    /// 摘要是 [`directory_digest`]。
+    Directory {
+        absolute_path: PathBuf,
+        line: u32,
+        digest: Sha256Digest,
+    },
+    /// `Command::new(current_exe())` 起本测试二进制的一个子进程，参数里 `--exact` 后面跟着的测试名：闭包里解到入口目标里那个
+    /// `#[test] fn`，连一条边（`current-exe-child`）。解不出来时照旧拒算 `current-exe`，`fragment` 就是那一条的原样片段。
+    ChildTestProcess {
+        line: u32,
+        test_name: ChildTestName,
+        fragment: String,
+    },
+}
+
+/// 子进程测试名的一段：字面串，或同一 crate 里 `const 名: &str = "…";` 的名字（闭包里再解成它的值）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TestNamePiece {
+    Literal(String),
+    Constant(String),
+}
+
+/// `--exact` 后面那个测试名是怎么写的。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ChildTestName {
+    /// 由字面串与常量拼成（字面串、常量名、`format!`、`concat!`）：几段依次连起来就是测试名。
+    Pieces(Vec<TestNamePiece>),
+    /// 起子进程的函数自己的一个参数（`parameter_position` 从 0 起，不带 `self` 的函数）：测试名取闭包里每一处
+    /// `function_name(…)` 调用在这个位置上交的实参。
+    ParameterOfTheSpawningFunction {
+        function_name: String,
+        parameter_position: usize,
+    },
+}
+
+/// 目录数据单元的摘要：目录下（递归）每份文件按相对路径（以 `/` 分段）排好，逐份写一行「相对路径 \t 内容的 SHA-256」、
+/// 每行以 `\n` 收尾，整段的 SHA-256。指到目录的符号链接不进（与 python `os.walk` 不跟链接同一种走法），指到文件的照读它指到的内容。
+///
+/// # Errors
+/// 目录或其中一份文件读不了，交读不了的那条路径。
+pub fn directory_digest(directory: &std::path::Path) -> Result<Sha256Digest, PathBuf> {
+    let mut files: Vec<(String, PathBuf)> = Vec::new();
+    let mut directories_to_visit: Vec<(PathBuf, String)> =
+        vec![(directory.to_path_buf(), String::new())];
+    while let Some((visiting, relative_prefix)) = directories_to_visit.pop() {
+        let entries = std::fs::read_dir(&visiting).map_err(|_| visiting.clone())?;
+        for entry in entries {
+            let entry = entry.map_err(|_| visiting.clone())?;
+            let entry_path = entry.path();
+            let entry_name = entry.file_name().to_string_lossy().into_owned();
+            let relative = format!("{relative_prefix}{entry_name}");
+            let file_type = entry.file_type().map_err(|_| entry_path.clone())?;
+            if file_type.is_dir() {
+                directories_to_visit.push((entry_path, format!("{relative}/")));
+            } else if file_type.is_symlink() {
+                if entry_path.is_file() {
+                    files.push((relative, entry_path));
+                }
+            } else {
+                files.push((relative, entry_path));
+            }
+        }
+    }
+    files.sort();
+    let mut listing = String::new();
+    for (relative, path) in &files {
+        let bytes = std::fs::read(path).map_err(|_| path.clone())?;
+        listing.push_str(relative);
+        listing.push('\t');
+        listing.push_str(&crate::sha256::sha256_of(&bytes).hexadecimal());
+        listing.push('\n');
+    }
+    Ok(crate::sha256::sha256_of(listing.as_bytes()))
 }
 
 /// 一个单元里出现的名字，按 3.3 的规则分好类。
@@ -263,13 +371,17 @@ pub struct UseImports {
 
 /// impl 头的形状：自身类型里的名字、trait 自己的名字（`for` 之前那一截里尖括号外的最后一个名字，`dyn` 不算；
 /// `impl Wrap<dyn Sink> for Holder` 的 trait 是 `Wrap`，不是 `Sink`）、是不是 blanket impl（自身类型里任何深度出现这个 impl 自己的一个泛型参数：
-/// `impl<T: Copy> Shout for T`、`for &T`、`for Box<T>`、`for (u32, T)`、`for [T; N]` 都算；全具体的 `for Foo` 不算）。R-开放（只在入口签名上收）与 R-路径按 trait 自己的名字找 impl，R-方法与 R-路径放行 blanket impl（定案 3）。
+/// `impl<T: Copy> Shout for T`、`for &T`、`for Box<T>`、`for (u32, T)`、`for [T; N]` 都算；全具体的 `for Foo` 不算）。R-开放（只在入口签名上收）与 R-路径按 trait 自己的名字找 impl，R-方法与 R-路径放行 blanket impl。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ImplementationShape {
     pub self_type_names: Vec<String>,
     pub trait_name: Option<String>,
     pub is_trait_implementation: bool,
     pub is_blanket_implementation: bool,
+    /// 自身类型写成路径 `a::B` 时的头一段（`impl Tr for std::time::Duration` 的 `std`）；自身类型头一个名字后面不接 `::` 的是 `None`。
+    /// 认外部类型上的本仓 trait impl 用（`workspace` 的 `foreign_type_trait_implementations`），与 `scripts/gate/lib_function_units.py`
+    /// 的 `self_path_root` 同一个认法：跳过 `dyn`、`mut`、`const`、`impl`、`for`、`where`、`as`、`unsafe` 之后的头一个名字。
+    pub self_type_path_root: Option<String>,
 }
 
 /// `mod 名;` 的形状。
@@ -307,7 +419,7 @@ pub struct Unit {
     /// 文件里从外到内的条件编译谓词（外层行内模块、impl / trait 头与它自己的属性），与起来。文档测试单元取它所挂条目的那一串。
     pub conditions: Vec<Predicate>,
     /// 单元自己的词法单元里写出来的条件编译谓词：`#[cfg(谓词)]`、`#![cfg(谓词)]`、`#[cfg_attr(条件, 属性…)]` 的条件与属性里套的
-    /// `cfg(…)`、`cfg_attr(…)`，以及 `cfg!(谓词)`（函数体里的也算）。复用键的条件成分只取闭包里各单元的这一份与 `conditions` 真引到的原子（定案 2）。
+    /// `cfg(…)`、`cfg_attr(…)`，以及 `cfg!(谓词)`（函数体里的也算）。复用键的条件成分只取闭包里各单元的这一份与 `conditions` 真引到的原子。
     pub condition_predicates_in_the_tokens: Vec<Predicate>,
     pub is_public: bool,
     pub fingerprint: Sha256Digest,
@@ -321,4 +433,9 @@ pub struct Unit {
     /// 这个单元一进闭包就要报的拒算。
     pub refusals: Vec<Refusal>,
     pub documentation_test_of: Option<DocumentationTestAttachment>,
+    /// 函数单元带 `#[test]` 属性（子进程测试名只解到这种函数；WGSL 名字供给不收它，入口本身除外）。
+    pub has_test_attribute: bool,
+    /// 外层的行内模块、文件开头的内属性或 impl / trait 头的条件链里有 `test` 这一项（与起来的一项，`all(…)` 里的也算）：
+    /// 只在测试里编进来的代码，WGSL 名字供给不收它。
+    pub is_inside_test_only_code: bool,
 }

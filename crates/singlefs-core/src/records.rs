@@ -1,22 +1,49 @@
 //! 树里的记录与条目：inode 记录 140、inode 内部条目 120、extent 叶记录 112、记账条目 34、映射条目 55、树表条目 200。
 //! key 的全序按逐字段无符号整数、字段自左向右比较（D8（核心索引结构） 已定项 11）——小端存储不构成 memcmp 序，所以各给 sort key。
+//!
+//! 整份在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇）：每一种记录有一份写法的规格
+//! （`spec_bytes`）、一份读法的规格（`spec_parse`）与一条往返引理（`lemma_parse_round_trip`：写出来的字节读回同一条记录）；
+//! 写的函数交出的就是写法的规格，读的函数交出的就是读法的规格。
 
 use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, EXTENT_LEAF_RECORD_BYTES, INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES,
     LINEAGE_RECORD_BYTES, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_POINTER_BYTES,
     RETIREMENT_RECORD_BYTES, TOMBSTONE_RECORD_BYTES, TREE_TABLE_ENTRY_BYTES,
 };
+use vstd::prelude::*;
 
 use crate::address::{
     CheckpointTxg, DeviceIdentity, InodeNumber, InstanceGeneration, TreeIdentifier,
 };
-use crate::bytes::{ByteReader, ByteWriter};
-use crate::pointer::{
-    BirthSequence, DataPointer, LocationEntry, NodePointer, PointerHead,
-    PointerHeadFieldOutsideTheFirstVersion,
-};
-use crate::system_configuration::InodeRecordTruncationFieldsOfThePool;
+// 规格与引理只在 Verus 编的时候有（平时的构建把它们擦掉），按名字引会编不过，所以整个模块引进来。
+use crate::bytes::*;
+// 规格与引理只在 Verus 编的时候有（平时的构建把它们擦掉），按名字引会编不过，所以整个模块引进来。
+use crate::pointer::*;
 use crate::unit::{PackedIdentity, WriteOrder, UNIT_CLASS_DATA};
+
+verus! {
+
+broadcast use group_little_endian_round_trips;
+
+// ===== 这一份文件用到的 singlefs-format 常量的规格（写法同 unit.rs 头上那一段；MAPPING_KEY_BYTES 在 verified_model.rs 里）=====
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::ACCOUNTING_ENTRY_BYTES ] -> (entry_bytes: u64) returns 34u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::EXTENT_LEAF_RECORD_BYTES ] -> (record_bytes: u64) returns 112u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::INODE_INTERNAL_ENTRY ] -> (entry_bytes: u64) returns 120u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::INODE_RECORD_BYTES ] -> (record_bytes: u64) returns 140u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::LINEAGE_RECORD_BYTES ] -> (record_bytes: u64) returns 24u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::MAPPING_ENTRY_BYTES ] -> (entry_bytes: u64) returns 55u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::RETIREMENT_RECORD_BYTES ] -> (record_bytes: u64) returns 34u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::TOMBSTONE_RECORD_BYTES ] -> (record_bytes: u64) returns 40u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::TREE_TABLE_ENTRY_BYTES ] -> (entry_bytes: u64) returns 200u64;
 
 /// 统计量标签 = D5（快照 / 空间记账机制） 已定项 4 的行号（已定项 10 的登记表）。
 pub const STATISTIC_ALLOCATED_BYTES: u16 = 1;
@@ -33,7 +60,7 @@ pub const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
 /// 第一版直落叶，seq 一律 1（D8（核心索引结构） 已定项 10）。
 pub const ACCOUNTING_SEQUENCE_DIRECT_TO_LEAF: u32 = 1;
 
-/// inode 记录里截断字段（T 8 字节、N_w 8 字节）的起点（判决 m4-trunc-r2 R1）：之前 108–119、之后 136–139 两段仍恒 0。
+/// inode 记录里截断字段（T 8 字节、N_w 8 字节）的起点：之前 108–119、之后 136–139 两段仍恒 0。
 pub const INODE_RECORD_TRUNCATION_FIELD_OFFSET: u64 = 120;
 
 /// inode 记录偏移 48 那个 `blocks` 字段的计量单位：512 字节一块（D8（核心索引结构） 已定项 6）。
@@ -45,11 +72,12 @@ pub const NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES: u32 = 1;
 /// unlink 的意图那次发布把记录写成 nlink = 0、size 不变（D8（核心索引结构） 已定项 16 第 1 条）：从那一版起读者答「没有文件」、写入口拒它。
 pub const NLINK_OF_AN_INODE_BEING_DELETED: u32 = 0;
 
-/// inode 记录偏移 120 起的截断字段（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1）：T（截断字段的 txg，偏移 120 起
+/// inode 记录偏移 120 起的截断字段：T（截断字段的 txg，偏移 120 起
 /// 8 字节小端，0 是没写过）与 N_w（截断字段的 size，偏移 128 起 8 字节小端）。存 size 不存单元数：单元数由 ⌈N_w ÷ 净荷⌉.max(1) 现算。
 /// 合法性只判「T = 0 ⇒ N_w = 0」（截到 0 时 T ≠ 0、N_w = 0）：两段私有，只能经 [`Self::NOT_WRITTEN`]、
-/// [`Self::written_by_the_truncation_intent_of`] 与 [`Self::from_the_two_fields_on_disk`] 进来，T = 0 而 N_w ≠ 0 的值造不出来。
-/// 什么时候写由 `truncate::truncation_field_after_the_truncation_intent` 判（R2 与第六节用户定案）。
+/// [`Self::written_by_the_truncation_intent_of`] 与 [`Self::from_the_two_fields_on_disk`] 进来，T = 0 而 N_w ≠ 0 的值造不出来
+/// （这一条是类型不变量 [`Self::is_consistent`]）。
+/// 什么时候写由 `truncate::truncation_field_after_the_truncation_intent` 判（R2 与第六节）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InodeRecordTruncationField {
     truncation_txg: CheckpointTxg,
@@ -57,23 +85,68 @@ pub struct InodeRecordTruncationField {
 }
 
 impl InodeRecordTruncationField {
-    /// T = 0、N_w = 0：建出来之后没被截断意图写过，或整份写（顺序写、覆盖写）清零之后。
-    pub const NOT_WRITTEN: Self = Self {
-        truncation_txg: CheckpointTxg(0),
-        truncated_size_in_bytes: 0,
-    };
+    /// 类型不变量：T = 0 ⇒ N_w = 0。
+    #[verifier::type_invariant]
+    spec fn is_consistent(self) -> bool {
+        self.truncation_txg.0 == 0 ==> self.truncated_size_in_bytes == 0
+    }
+
+    /// T。
+    pub closed spec fn spec_truncation_txg(self) -> CheckpointTxg {
+        self.truncation_txg
+    }
+
+    /// N_w。
+    pub closed spec fn spec_truncated_size_in_bytes(self) -> u64 {
+        self.truncated_size_in_bytes
+    }
+
+    /// 类型不变量的公开说法：每一个造得出来的值都满足它，两个读字段的方法在 `ensures` 里交出来。
+    pub open spec fn spec_is_consistent(self) -> bool {
+        self.spec_truncation_txg().0 == 0 ==> self.spec_truncated_size_in_bytes() == 0
+    }
+
+    /// 盘上读来的两段 8 字节解成的字段（[`Self::from_the_two_fields_on_disk`] 的判法）。
+    pub closed spec fn spec_from_the_two_fields_on_disk(truncation_txg: u64, truncated_size_in_bytes: u64) -> Option<Self> {
+        if truncation_txg == 0 && truncated_size_in_bytes != 0 {
+            None
+        } else {
+            Some(InodeRecordTruncationField { truncation_txg: CheckpointTxg(truncation_txg), truncated_size_in_bytes })
+        }
+    }
+
+    /// 往返：合法的字段把它的两段再解一次就是它自己；解出来的两段就是给的那两段。
+    pub proof fn lemma_from_the_two_fields_on_disk(self, truncation_txg: u64, truncated_size_in_bytes: u64)
+        ensures
+            self.spec_is_consistent() ==> Self::spec_from_the_two_fields_on_disk(
+                self.spec_truncation_txg().0,
+                self.spec_truncated_size_in_bytes(),
+            ) == Some(self),
+            Self::spec_from_the_two_fields_on_disk(truncation_txg, truncated_size_in_bytes) matches Some(field)
+                ==> field.spec_truncation_txg().0 == truncation_txg && field.spec_truncated_size_in_bytes()
+                == truncated_size_in_bytes && field.spec_is_consistent(),
+    {
+    }
 
     /// 截断意图那次写下的（这次 txg, N）。
     ///
     /// # Panics
-    /// `truncation_txg` 是 0：T = 0 是「没写过」，截断意图那次发布的 checkpoint_txg 恒大于 0（mkfs 那一版是第 0 代，之后每次发布加一）。
+    /// `truncation_txg` 是 0（`requires` 排除的那一种）：T = 0 是「没写过」，截断意图那次发布的 checkpoint_txg 恒大于 0
+    /// （mkfs 那一版是第 0 代，之后每次发布加一）。
     #[must_use]
     pub fn written_by_the_truncation_intent_of(
         truncation_txg: CheckpointTxg,
         truncated_size_in_bytes: u64,
-    ) -> Self {
-        assert_ne!(
-            truncation_txg.0, 0,
+    ) -> (field: Self)
+        requires
+            truncation_txg.0 != 0,
+        ensures
+            field.spec_truncation_txg() == truncation_txg,
+            field.spec_truncated_size_in_bytes() == truncated_size_in_bytes,
+    {
+        // assert_ne! 展开成的 core::panicking::assert_failed 没有 Verus 规格，写成 assert! 加同一句话。
+        assert!(
+            truncation_txg.0 != 0,
             "截断意图那次发布的 checkpoint_txg 不是 0（第 0 代是 mkfs 那一版，不发截断）"
         );
         Self {
@@ -87,7 +160,10 @@ impl InodeRecordTruncationField {
     pub const fn from_the_two_fields_on_disk(
         truncation_txg: u64,
         truncated_size_in_bytes: u64,
-    ) -> Option<Self> {
+    ) -> (field: Option<Self>)
+        ensures
+            field == Self::spec_from_the_two_fields_on_disk(truncation_txg, truncated_size_in_bytes),
+    {
         if truncation_txg == 0 && truncated_size_in_bytes != 0 {
             return None;
         }
@@ -99,19 +175,36 @@ impl InodeRecordTruncationField {
 
     /// T：写下字段的那次截断意图的 checkpoint_txg；没写过是 0。
     #[must_use]
-    pub const fn truncation_txg(self) -> CheckpointTxg {
+    pub const fn truncation_txg(self) -> (truncation_txg: CheckpointTxg)
+        ensures
+            truncation_txg == self.spec_truncation_txg(),
+            self.spec_is_consistent(),
+    {
+        proof {
+            use_type_invariant(self);
+        }
         self.truncation_txg
     }
 
     /// N_w：写下字段的那次截断意图的目标 size；没写过是 0。
     #[must_use]
-    pub const fn truncated_size_in_bytes(self) -> u64 {
+    pub const fn truncated_size_in_bytes(self) -> (truncated_size_in_bytes: u64)
+        ensures
+            truncated_size_in_bytes == self.spec_truncated_size_in_bytes(),
+            self.spec_is_consistent(),
+    {
+        proof {
+            use_type_invariant(self);
+        }
         self.truncated_size_in_bytes
     }
 
     /// T ≠ 0：被一次截断意图写过。
     #[must_use]
-    pub const fn is_written(self) -> bool {
+    pub const fn is_written(self) -> (is_written: bool)
+        ensures
+            is_written == (self.spec_truncation_txg().0 != 0),
+    {
         self.truncation_txg.0 != 0
     }
 }
@@ -131,13 +224,141 @@ pub struct InodeRecord {
     pub size: u64,
     pub change_count: u64,
     pub write_time_seconds: u64,
-    /// 偏移 120 起两段 8 字节（判决 m4-trunc-r2 R1）。
+    /// 偏移 120 起两段 8 字节。
     pub truncation_field: InodeRecordTruncationField,
 }
 
+} // verus!
+
+// 这一个关联常量在 verus! 外面：字段私有的类型在 verus! 里不许用结构体字面量写公开常量（Verus 报「constructor for an opaque datatype」）；
+// T = 0、N_w = 0 满足类型不变量。
+impl InodeRecordTruncationField {
+    /// T = 0、N_w = 0：建出来之后没被截断意图写过，或整份写（顺序写、覆盖写）清零之后。
+    pub const NOT_WRITTEN: Self = Self {
+        truncation_txg: CheckpointTxg(0),
+        truncated_size_in_bytes: 0,
+    };
+}
+
+verus! {
+
+/// `blocks` = ⌈`size` ÷ 512⌉（[`InodeRecord::to_bytes`] 写的那 8 字节）。
+pub open spec fn spec_blocks_of_the_size(size: u64) -> u64 {
+    if size % 512 == 0 {
+        (size / 512) as u64
+    } else {
+        (size / 512 + 1) as u64
+    }
+}
+
 impl InodeRecord {
+    /// 截断字段满足类型不变量（每一个造得出来的字段都满足）：[`Self::lemma_parse_round_trip`] 的前提。
+    pub open spec fn is_well_formed(self) -> bool {
+        self.truncation_field.spec_is_consistent()
+    }
+
+    /// 盘上 140 字节（[`Self::to_bytes`] 交出的）。
+    pub open spec fn spec_bytes(self) -> Seq<u8> {
+        little_endian_bytes(self.inode as nat, 8) + little_endian_bytes(self.object_birth.0 as nat, 8)
+            + little_endian_bytes(0, 8) + little_endian_bytes(0o100_644, 4) + little_endian_bytes(0, 4)
+            + little_endian_bytes(0, 4) + little_endian_bytes(self.nlink as nat, 4) + little_endian_bytes(
+            self.size as nat,
+            8,
+        ) + little_endian_bytes(spec_blocks_of_the_size(self.size) as nat, 8) + little_endian_bytes(0, 8)
+            + little_endian_bytes(self.write_time_seconds as nat, 8) + little_endian_bytes(
+            self.write_time_seconds as nat,
+            8,
+        ) + little_endian_bytes(self.write_time_seconds as nat, 8) + little_endian_bytes(
+            self.change_count as nat,
+            8,
+        ) + zero_bytes(12) + zero_bytes(12) + little_endian_bytes(
+            self.truncation_field.spec_truncation_txg().0 as nat,
+            8,
+        ) + little_endian_bytes(self.truncation_field.spec_truncated_size_in_bytes() as nat, 8) + zero_bytes(4)
+    }
+
+    /// [`Self::parse`] 的判法。
+    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+        if bytes.len() != INODE_RECORD_BYTES || bytes.subrange(108, 120) != zero_bytes(12) || bytes.subrange(136, 140)
+            != zero_bytes(4) {
+            None
+        } else {
+            match InodeRecordTruncationField::spec_from_the_two_fields_on_disk(
+                little_endian_value(bytes.subrange(120, 128)) as u64,
+                little_endian_value(bytes.subrange(128, 136)) as u64,
+            ) {
+                None => None,
+                Some(truncation_field) => Some(InodeRecord {
+                    inode: little_endian_value(bytes.subrange(0, 8)) as u64,
+                    object_birth: CheckpointTxg(little_endian_value(bytes.subrange(8, 16)) as u64),
+                    nlink: little_endian_value(bytes.subrange(36, 40)) as u32,
+                    size: little_endian_value(bytes.subrange(40, 48)) as u64,
+                    change_count: little_endian_value(bytes.subrange(88, 96)) as u64,
+                    write_time_seconds: little_endian_value(bytes.subrange(64, 72)) as u64,
+                    truncation_field,
+                }),
+            }
+        }
+    }
+
+    /// 往返：写出的 140 字节读回同一条记录。
+    pub proof fn lemma_parse_round_trip(self)
+        requires
+            self.is_well_formed(),
+        ensures
+            Self::spec_parse(self.spec_bytes()) == Some(self),
+    {
+        lemma_little_endian_capacities();
+        let bytes = self.spec_bytes();
+        assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+        let inode = little_endian_bytes(self.inode as nat, 8);
+        let birth = little_endian_bytes(self.object_birth.0 as nat, 8);
+        let locality = little_endian_bytes(0, 8);
+        let mode = little_endian_bytes(0o100_644, 4);
+        let uid = little_endian_bytes(0, 4);
+        let gid = little_endian_bytes(0, 4);
+        let nlink = little_endian_bytes(self.nlink as nat, 4);
+        let size = little_endian_bytes(self.size as nat, 8);
+        let blocks = little_endian_bytes(spec_blocks_of_the_size(self.size) as nat, 8);
+        let rdev = little_endian_bytes(0, 8);
+        let access_time = little_endian_bytes(self.write_time_seconds as nat, 8);
+        let modify_time = little_endian_bytes(self.write_time_seconds as nat, 8);
+        let change_time = little_endian_bytes(self.write_time_seconds as nat, 8);
+        let change_count = little_endian_bytes(self.change_count as nat, 8);
+        let nanoseconds = zero_bytes(12);
+        let reserved = zero_bytes(12);
+        let truncation_txg = little_endian_bytes(self.truncation_field.spec_truncation_txg().0 as nat, 8);
+        let truncated_size = little_endian_bytes(self.truncation_field.spec_truncated_size_in_bytes() as nat, 8);
+        let tail_reserved = zero_bytes(4);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time + change_time + change_count + nanoseconds + reserved + truncation_txg + truncated_size, tail_reserved);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time + change_time + change_count + nanoseconds + reserved + truncation_txg, truncated_size);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time + change_time + change_count + nanoseconds + reserved, truncation_txg);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time + change_time + change_count + nanoseconds, reserved);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time + change_time + change_count, nanoseconds);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time + change_time, change_count);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time, change_time);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time, modify_time);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev, access_time);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks, rdev);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size, blocks);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink, size);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid, nlink);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid, gid);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode, uid);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality, mode);
+        lemma_split_a_concatenated_range(bytes, 0, inode + birth, locality);
+        lemma_split_a_concatenated_range(bytes, 0, inode, birth);
+        self.truncation_field.lemma_from_the_two_fields_on_disk(0, 0);
+    }
+
+    /// # Panics
+    /// 截断字段不满足类型不变量造不出来，这里不 panic；字段表偏移的断言由 Verus 证过对得上。
     #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> (bytes: Vec<u8>)
+        ensures
+            bytes@ == self.spec_bytes(),
+            self.is_well_formed(),
+    {
         let mut writer = ByteWriter::new(usize::try_from(INODE_RECORD_BYTES).expect("140"));
         writer.put_u64(self.inode);
         writer.put_u64(self.object_birth.0);
@@ -148,12 +369,19 @@ impl InodeRecord {
         writer.put_u32(self.nlink);
         writer.assert_position(40, "size");
         writer.put_u64(self.size);
-        writer.put_u64(self.size.div_ceil(INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES)); // blocks = ⌈size ÷ 512⌉
+        // blocks = ⌈size ÷ 512⌉：u64::div_ceil 没有 Verus 规格，写成取商、有余数再加一，同一个数。
+        let blocks = if self.size.is_multiple_of(INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES) {
+            self.size / INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES
+        } else {
+            self.size / INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES + 1
+        };
+        writer.put_u64(blocks);
         writer.put_u64(0); // rdev
         writer.assert_position(64, "时间秒");
-        for _clock in 0..3 {
-            writer.put_u64(self.write_time_seconds);
-        }
+        // 三个时间秒（atime、mtime、ctime）写同一个值。
+        writer.put_u64(self.write_time_seconds);
+        writer.put_u64(self.write_time_seconds);
+        writer.put_u64(self.write_time_seconds);
         writer.assert_position(88, "改动计数");
         writer.put_u64(self.change_count);
         writer.assert_position(96, "时间纳秒");
@@ -166,19 +394,23 @@ impl InodeRecord {
         writer.assert_position(136, "预留");
         writer.skip(4);
         writer.assert_position(INODE_RECORD_BYTES, "inode 记录");
-        writer.into_bytes()
+        let bytes = writer.into_bytes();
+        assert(bytes@ =~= self.spec_bytes());
+        bytes
     }
-    /// 读者：偏移 108–119 与 136–139 两段恒零区非零、截断字段「T = 0 而 N_w ≠ 0」都判不可用（I-9.7，判决 m4-trunc-r2 R1）。
-    /// 池里认不认截断字段（incompat 位 2）不归这里判：[`Self::truncation_field_fits_the_pool`]。
+
+    /// 读者：偏移 108–119 与 136–139 两段恒零区非零、截断字段「T = 0 而 N_w ≠ 0」都判不可用（I-9.7）。
     #[must_use]
-    pub fn parse(bytes: &[u8]) -> Option<Self> {
+    pub fn parse(bytes: &[u8]) -> (record: Option<Self>)
+        ensures
+            record == Self::spec_parse(bytes@),
+    {
         let truncation_field_offset =
             usize::try_from(INODE_RECORD_TRUNCATION_FIELD_OFFSET).expect("120");
+        // 两段恒零区分开判（迭代器的 chain 与 any 没有 Verus 规格），两段都全零才收，与连起来判同一个结论。
         if bytes.len() != usize::try_from(INODE_RECORD_BYTES).expect("140")
-            || bytes[108..truncation_field_offset]
-                .iter()
-                .chain(&bytes[truncation_field_offset + 16..])
-                .any(|byte| *byte != 0)
+            || !every_byte_is_zero(&bytes[108..truncation_field_offset])
+            || !every_byte_is_zero(&bytes[truncation_field_offset + 16..])
         {
             return None;
         }
@@ -212,21 +444,6 @@ impl InodeRecord {
             truncation_field,
         })
     }
-
-    /// 这条记录的截断字段在这个池里收不收（incompat 位 2，用户 2026-10-17 定，判决 m4-trunc-r2 第六节）：池的系统配置带位 2 时
-    /// 什么合法的字段都收；不带位 2 时截断字段必须全零（T 与 N_w 都是 0），否则这条记录判不可用。
-    #[must_use]
-    pub fn truncation_field_fits_the_pool(
-        &self,
-        truncation_fields_of_the_pool: InodeRecordTruncationFieldsOfThePool,
-    ) -> bool {
-        match truncation_fields_of_the_pool {
-            InodeRecordTruncationFieldsOfThePool::Carried => true,
-            InodeRecordTruncationFieldsOfThePool::AllZero => {
-                self.truncation_field == InodeRecordTruncationField::NOT_WRITTEN
-            }
-        }
-    }
 }
 
 /// 墓碑记录 40（D18（块里携带什么信息） 已定项 24 第 2 条；字段表在 `.claude/kb/layout/03-third-txn.md`「二、墓碑记录」）：
@@ -252,7 +469,16 @@ impl TombstoneRecord {
         object: InodeNumber,
         object_birth: CheckpointTxg,
         death_txg: CheckpointTxg,
-    ) -> Self {
+    ) -> (record: Self)
+        ensures
+            record == (TombstoneRecord {
+                object,
+                object_birth,
+                range_start_in_bytes: 0,
+                range_end_in_bytes: u64::MAX,
+                death_txg,
+            }),
+    {
         Self {
             object,
             object_birth,
@@ -262,8 +488,54 @@ impl TombstoneRecord {
         }
     }
 
+    /// 盘上 40 字节：对象 ID 8 + 对象出生代 8 + 区间起 8 + 区间止 8 + 死亡 txg 8。
+    pub open spec fn spec_bytes(self) -> Seq<u8> {
+        little_endian_bytes(self.object.0 as nat, 8) + little_endian_bytes(self.object_birth.0 as nat, 8)
+            + little_endian_bytes(self.range_start_in_bytes as nat, 8) + little_endian_bytes(
+            self.range_end_in_bytes as nat,
+            8,
+        ) + little_endian_bytes(self.death_txg.0 as nat, 8)
+    }
+
+    /// [`Self::parse`] 的判法：长度不是 40 交回 `None`。
+    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+        if bytes.len() != TOMBSTONE_RECORD_BYTES {
+            None
+        } else {
+            Some(TombstoneRecord {
+                object: InodeNumber(little_endian_value(bytes.subrange(0, 8)) as u64),
+                object_birth: CheckpointTxg(little_endian_value(bytes.subrange(8, 16)) as u64),
+                range_start_in_bytes: little_endian_value(bytes.subrange(16, 24)) as u64,
+                range_end_in_bytes: little_endian_value(bytes.subrange(24, 32)) as u64,
+                death_txg: CheckpointTxg(little_endian_value(bytes.subrange(32, 40)) as u64),
+            })
+        }
+    }
+
+    /// 往返：写出的 40 字节读回同一条墓碑。
+    pub proof fn lemma_parse_round_trip(self)
+        ensures
+            Self::spec_parse(self.spec_bytes()) == Some(self),
+    {
+        lemma_little_endian_capacities();
+        let bytes = self.spec_bytes();
+        assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+        let object = little_endian_bytes(self.object.0 as nat, 8);
+        let birth = little_endian_bytes(self.object_birth.0 as nat, 8);
+        let start = little_endian_bytes(self.range_start_in_bytes as nat, 8);
+        let end = little_endian_bytes(self.range_end_in_bytes as nat, 8);
+        let death = little_endian_bytes(self.death_txg.0 as nat, 8);
+        lemma_split_a_concatenated_range(bytes, 0, object + birth + start + end, death);
+        lemma_split_a_concatenated_range(bytes, 0, object + birth + start, end);
+        lemma_split_a_concatenated_range(bytes, 0, object + birth, start);
+        lemma_split_a_concatenated_range(bytes, 0, object, birth);
+    }
+
     #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> (bytes: Vec<u8>)
+        ensures
+            bytes@ == self.spec_bytes(),
+    {
         let mut writer = ByteWriter::new(usize::try_from(TOMBSTONE_RECORD_BYTES).expect("40"));
         writer.put_u64(self.object.0);
         writer.put_u64(self.object_birth.0);
@@ -271,12 +543,17 @@ impl TombstoneRecord {
         writer.put_u64(self.range_end_in_bytes);
         writer.put_u64(self.death_txg.0);
         writer.assert_position(TOMBSTONE_RECORD_BYTES, "墓碑记录");
-        writer.into_bytes()
+        let bytes = writer.into_bytes();
+        assert(bytes@ =~= self.spec_bytes());
+        bytes
     }
 
     /// 墓碑记录的读者：长度不是 40 交回 `None`（记录宽是容器头里的盘上字段，读者先核它等于 40 再切）。
     #[must_use]
-    pub fn parse(bytes: &[u8]) -> Option<Self> {
+    pub fn parse(bytes: &[u8]) -> (record: Option<Self>)
+        ensures
+            record == Self::spec_parse(bytes@),
+    {
         if bytes.len() != usize::try_from(TOMBSTONE_RECORD_BYTES).expect("40") {
             return None;
         }
@@ -303,19 +580,61 @@ pub struct LineageRecord {
 }
 
 impl LineageRecord {
+    /// 盘上 24 字节：T_rb 8 + T_old 8 + H_cur 8。
+    pub open spec fn spec_bytes(self) -> Seq<u8> {
+        little_endian_bytes(self.rollback_txg.0 as nat, 8) + little_endian_bytes(self.rollback_target_txg.0 as nat, 8)
+            + little_endian_bytes(self.inode_number_watermark_of_the_version_rolled_back_from as nat, 8)
+    }
+
+    /// [`Self::parse`] 的判法：长度不是 24 交回 `None`。
+    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+        if bytes.len() != LINEAGE_RECORD_BYTES {
+            None
+        } else {
+            Some(LineageRecord {
+                rollback_txg: CheckpointTxg(little_endian_value(bytes.subrange(0, 8)) as u64),
+                rollback_target_txg: CheckpointTxg(little_endian_value(bytes.subrange(8, 16)) as u64),
+                inode_number_watermark_of_the_version_rolled_back_from: little_endian_value(bytes.subrange(16, 24)) as u64,
+            })
+        }
+    }
+
+    /// 往返：写出的 24 字节读回同一条谱系记录。
+    pub proof fn lemma_parse_round_trip(self)
+        ensures
+            Self::spec_parse(self.spec_bytes()) == Some(self),
+    {
+        lemma_little_endian_capacities();
+        let bytes = self.spec_bytes();
+        assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+        let rollback = little_endian_bytes(self.rollback_txg.0 as nat, 8);
+        let target = little_endian_bytes(self.rollback_target_txg.0 as nat, 8);
+        let watermark = little_endian_bytes(self.inode_number_watermark_of_the_version_rolled_back_from as nat, 8);
+        lemma_split_a_concatenated_range(bytes, 0, rollback + target, watermark);
+        lemma_split_a_concatenated_range(bytes, 0, rollback, target);
+    }
+
     #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> (bytes: Vec<u8>)
+        ensures
+            bytes@ == self.spec_bytes(),
+    {
         let mut writer = ByteWriter::new(usize::try_from(LINEAGE_RECORD_BYTES).expect("24"));
         writer.put_u64(self.rollback_txg.0);
         writer.put_u64(self.rollback_target_txg.0);
         writer.put_u64(self.inode_number_watermark_of_the_version_rolled_back_from);
         writer.assert_position(LINEAGE_RECORD_BYTES, "谱系记录");
-        writer.into_bytes()
+        let bytes = writer.into_bytes();
+        assert(bytes@ =~= self.spec_bytes());
+        bytes
     }
 
     /// 谱系记录的读者：长度不是 24 交回 `None`（记录宽是容器头里的盘上字段，读者先核它等于 24 再切）。
     #[must_use]
-    pub fn parse(bytes: &[u8]) -> Option<Self> {
+    pub fn parse(bytes: &[u8]) -> (record: Option<Self>)
+        ensures
+            record == Self::spec_parse(bytes@),
+    {
         if bytes.len() != usize::try_from(LINEAGE_RECORD_BYTES).expect("24") {
             return None;
         }
@@ -328,7 +647,7 @@ impl LineageRecord {
     }
 }
 
-/// 退役记录 34（D18（块里携带什么信息） 已定项 11 打包记录类型 3；判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 2、3 条）：
+/// 退役记录 34（D18（块里携带什么信息） 已定项 11 打包记录类型 3；第 2、3 条）：
 /// 被退役身份的出生树 8 | 打包记录类型 2 | 容器号 8 | 容器出生代 8 | 死亡 txg 8，小端，无填充无预留。身份四段与 inode 内部条目里的
 /// 身份引用（[`build_inode_internal_entry`]）同序同宽。死亡 txg = 身份消失那次发布的 checkpoint_txg（删空摘掉、被左邻吸收那次）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -338,8 +657,45 @@ pub struct RetirementRecord {
 }
 
 impl RetirementRecord {
+    /// 盘上 34 字节：被退役的身份 26 + 死亡 txg 8。
+    pub open spec fn spec_bytes(self) -> Seq<u8> {
+        self.retired.spec_bytes() + little_endian_bytes(self.death_txg.0 as nat, 8)
+    }
+
+    /// [`Self::parse`] 的判法：长度不是 34 交回 `None`。
+    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+        if bytes.len() != RETIREMENT_RECORD_BYTES {
+            None
+        } else {
+            Some(RetirementRecord {
+                retired: PackedIdentity::spec_decode_at(bytes, 0),
+                death_txg: CheckpointTxg(little_endian_value(bytes.subrange(26, 34)) as u64),
+            })
+        }
+    }
+
+    /// 往返：写出的 34 字节读回同一条退役记录。
+    pub proof fn lemma_parse_round_trip(self)
+        ensures
+            Self::spec_parse(self.spec_bytes()) == Some(self),
+    {
+        lemma_little_endian_capacities();
+        let bytes = self.spec_bytes();
+        assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+        lemma_split_a_concatenated_range(
+            bytes,
+            0,
+            self.retired.spec_bytes(),
+            little_endian_bytes(self.death_txg.0 as nat, 8),
+        );
+        self.retired.lemma_decode_at_round_trip(bytes, 0);
+    }
+
     #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> (bytes: Vec<u8>)
+        ensures
+            bytes@ == self.spec_bytes(),
+    {
         let mut writer = ByteWriter::new(usize::try_from(RETIREMENT_RECORD_BYTES).expect("34"));
         writer.put_u64(self.retired.birth_tree.0);
         writer.put_u16(self.retired.record_type);
@@ -347,12 +703,17 @@ impl RetirementRecord {
         writer.put_u64(self.retired.container_birth.0);
         writer.put_u64(self.death_txg.0);
         writer.assert_position(RETIREMENT_RECORD_BYTES, "退役记录");
-        writer.into_bytes()
+        let bytes = writer.into_bytes();
+        assert(bytes@ =~= self.spec_bytes());
+        bytes
     }
 
     /// 退役记录的读者：长度不是 34 交回 `None`（记录宽是容器头里的盘上字段，读者先核它等于 34 再切）。
     #[must_use]
-    pub fn parse(bytes: &[u8]) -> Option<Self> {
+    pub fn parse(bytes: &[u8]) -> (record: Option<Self>)
+        ensures
+            record == Self::spec_parse(bytes@),
+    {
         if bytes.len() != usize::try_from(RETIREMENT_RECORD_BYTES).expect("34") {
             return None;
         }
@@ -369,13 +730,31 @@ impl RetirementRecord {
     }
 }
 
+/// inode 内部条目 120 的写法：分隔 key 8 + 身份引用 26 + 子指针 86。
+pub open spec fn spec_inode_internal_entry_bytes(
+    separator_key: u64,
+    child_identity: PackedIdentity,
+    child: NodePointer,
+) -> Seq<u8> {
+    little_endian_bytes(separator_key as nat, 8) + child_identity.spec_bytes() + child.spec_bytes()
+}
+
 /// inode 树内部节点条目 120：分隔 key 8 + 身份引用 26（出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8）+ 子指针 86。
+///
+/// # Panics
+/// 子指针的槽号装不进 6 字节或位置条目次序写者不肯写（`requires` 排除的那一种）。
 #[must_use]
 pub fn build_inode_internal_entry(
     separator_key: u64,
     child_identity: PackedIdentity,
     child: NodePointer,
-) -> Vec<u8> {
+) -> (entry: Vec<u8>)
+    requires
+        child.is_encodable(),
+        child.has_location_entries_the_writer_accepts(),
+    ensures
+        entry@ == spec_inode_internal_entry_bytes(separator_key, child_identity, child),
+{
     let mut writer = ByteWriter::new(usize::try_from(INODE_INTERNAL_ENTRY).expect("120"));
     writer.put_u64(separator_key);
     writer.put_u64(child_identity.birth_tree.0);
@@ -384,19 +763,38 @@ pub fn build_inode_internal_entry(
     writer.put_u64(child_identity.container_birth.0);
     child.write_to(&mut writer);
     writer.assert_position(INODE_INTERNAL_ENTRY, "inode 内部条目");
-    writer.into_bytes()
+    let entry = writer.into_bytes();
+    assert(entry@ =~= spec_inode_internal_entry_bytes(separator_key, child_identity, child));
+    entry
+}
+
+/// extent 叶记录 112 的写法：key (locality_id 0, inode 8, offset 8) + 数据指针 88。
+pub open spec fn spec_extent_record_bytes(inode: u64, offset: u64, pointer: DataPointer) -> Seq<u8> {
+    little_endian_bytes(0, 8) + little_endian_bytes(inode as nat, 8) + little_endian_bytes(offset as nat, 8)
+        + pointer.spec_bytes()
 }
 
 /// extent 叶记录 112：key (locality_id 8, inode 8, offset 8) + 数据指针 88。
+///
+/// # Panics
+/// 数据指针装不进或位置条目不按设备身份严格升序（`requires` 排除的那一种）。
 #[must_use]
-pub fn build_extent_record(inode: u64, offset: u64, pointer: DataPointer) -> Vec<u8> {
+pub fn build_extent_record(inode: u64, offset: u64, pointer: DataPointer) -> (record: Vec<u8>)
+    requires
+        pointer.is_encodable(),
+        spec_location_entries_ascend_by_device(pointer.locations),
+    ensures
+        record@ == spec_extent_record_bytes(inode, offset, pointer),
+{
     let mut writer = ByteWriter::new(usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112"));
     writer.put_u64(0);
     writer.put_u64(inode);
     writer.put_u64(offset);
     pointer.write_to(&mut writer);
     writer.assert_position(EXTENT_LEAF_RECORD_BYTES, "extent 叶记录");
-    writer.into_bytes()
+    let record = writer.into_bytes();
+    assert(record@ =~= spec_extent_record_bytes(inode, offset, pointer));
+    record
 }
 
 /// 记账条目 34：key (标签 2, 树 ID 8, 设备 4, 代 8) + value 8 + seq 4。
@@ -411,8 +809,55 @@ pub struct AccountingEntry {
 }
 
 impl AccountingEntry {
+    /// 盘上 34 字节。
+    pub open spec fn spec_bytes(self) -> Seq<u8> {
+        little_endian_bytes(self.statistic as nat, 2) + little_endian_bytes(self.tree.0 as nat, 8)
+            + little_endian_bytes(self.device.0 as nat, 4) + little_endian_bytes(self.generation.0 as nat, 8)
+            + little_endian_bytes(self.value as nat, 8) + little_endian_bytes(self.sequence as nat, 4)
+    }
+
+    /// [`Self::parse`] 的判法：宽不等于 34 交回 `None`。
+    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+        if bytes.len() != ACCOUNTING_ENTRY_BYTES {
+            None
+        } else {
+            Some(AccountingEntry {
+                statistic: little_endian_value(bytes.subrange(0, 2)) as u16,
+                tree: TreeIdentifier(little_endian_value(bytes.subrange(2, 10)) as u64),
+                device: DeviceIdentity(little_endian_value(bytes.subrange(10, 14)) as u32),
+                generation: CheckpointTxg(little_endian_value(bytes.subrange(14, 22)) as u64),
+                value: little_endian_value(bytes.subrange(22, 30)) as u64,
+                sequence: little_endian_value(bytes.subrange(30, 34)) as u32,
+            })
+        }
+    }
+
+    /// 往返：写出的 34 字节读回同一条记账条目。
+    pub proof fn lemma_parse_round_trip(self)
+        ensures
+            Self::spec_parse(self.spec_bytes()) == Some(self),
+    {
+        lemma_little_endian_capacities();
+        let bytes = self.spec_bytes();
+        assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+        let statistic = little_endian_bytes(self.statistic as nat, 2);
+        let tree = little_endian_bytes(self.tree.0 as nat, 8);
+        let device = little_endian_bytes(self.device.0 as nat, 4);
+        let generation = little_endian_bytes(self.generation.0 as nat, 8);
+        let value = little_endian_bytes(self.value as nat, 8);
+        let sequence = little_endian_bytes(self.sequence as nat, 4);
+        lemma_split_a_concatenated_range(bytes, 0, statistic + tree + device + generation + value, sequence);
+        lemma_split_a_concatenated_range(bytes, 0, statistic + tree + device + generation, value);
+        lemma_split_a_concatenated_range(bytes, 0, statistic + tree + device, generation);
+        lemma_split_a_concatenated_range(bytes, 0, statistic + tree, device);
+        lemma_split_a_concatenated_range(bytes, 0, statistic, tree);
+    }
+
     #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> (bytes: Vec<u8>)
+        ensures
+            bytes@ == self.spec_bytes(),
+    {
         let mut writer = ByteWriter::new(usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34"));
         writer.put_u16(self.statistic);
         writer.put_u64(self.tree.0);
@@ -421,14 +866,26 @@ impl AccountingEntry {
         writer.put_u64(self.value);
         writer.put_u32(self.sequence);
         writer.assert_position(ACCOUNTING_ENTRY_BYTES, "记账条目");
-        writer.into_bytes()
+        let bytes = writer.into_bytes();
+        assert(bytes@ =~= self.spec_bytes());
+        bytes
     }
+
+    /// key 那 22 字节（标签、树 ID、设备、代）：整条的前 22 字节。
     #[must_use]
-    pub fn key_bytes(&self) -> Vec<u8> {
-        self.to_bytes()[..22].to_vec()
+    pub fn key_bytes(&self) -> (key: Vec<u8>)
+        ensures
+            key@ == self.spec_bytes().subrange(0, 22),
+    {
+        // `to_vec` 没有 Verus 规格，经 copied_into_a_vector 拷，同一个结果。
+        copied_into_a_vector(&self.to_bytes()[..22])
     }
+
     #[must_use]
-    pub fn sort_key(&self) -> (u16, u64, u32, u64) {
+    pub fn sort_key(&self) -> (sort_key: (u16, u64, u32, u64))
+        ensures
+            sort_key == (self.statistic, self.tree.0, self.device.0, self.generation.0),
+    {
         (
             self.statistic,
             self.tree.0,
@@ -436,11 +893,15 @@ impl AccountingEntry {
             self.generation.0,
         )
     }
+
     /// 记账条目 34 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 22），
     /// 不等于 34 时返回 `None`：这里是盘上字节进字段表的边界，往里就按 34 信它。窄于 34 的切不出整条记录；
-    /// 宽于 34 的同样不收（I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，用户 2026-10-18 定「宽于字段表也拒」，欠账 C780）。
+    /// 宽于 34 的同样不收（I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，欠账 C780）。
     #[must_use]
-    pub fn parse(bytes: &[u8]) -> Option<Self> {
+    pub fn parse(bytes: &[u8]) -> (entry: Option<Self>)
+        ensures
+            entry == Self::spec_parse(bytes@),
+    {
         if bytes.len() != usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34") {
             return None;
         }
@@ -456,10 +917,24 @@ impl AccountingEntry {
     }
 }
 
+/// 码 1 映射 key 的写法：类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10。
+pub open spec fn spec_mapping_key_for_data_bytes(head: PointerHead, write_order: WriteOrder) -> Seq<u8> {
+    little_endian_bytes(UNIT_CLASS_DATA as nat, 1) + little_endian_bytes(head.birth_tree.0 as nat, 8)
+        + little_endian_bytes(head.birth_txg.0 as nat, 8) + write_order.spec_bytes()
+}
+
 /// 中央映射 key 一律 27（D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10）：码 1 = 类标签 + 出生树 + 出生 txg + 写序 10；
 /// 码 2 / 码 3 = 类标签 + 出生树 + 出生 txg + 实例代号 4 + 出生序号 4，末尾补零 2。
+///
+/// # Panics
+/// 写序的事务号装不进 6 字节（`requires` 排除的那一种）。
 #[must_use]
-pub fn mapping_key_for_data(head: PointerHead, write_order: WriteOrder) -> Vec<u8> {
+pub fn mapping_key_for_data(head: PointerHead, write_order: WriteOrder) -> (key: Vec<u8>)
+    requires
+        write_order.is_encodable(),
+    ensures
+        key@ == spec_mapping_key_for_data_bytes(head, write_order),
+{
     let mut writer = ByteWriter::new(usize::try_from(MAPPING_KEY_BYTES).expect("27"));
     writer.put_u8(UNIT_CLASS_DATA);
     writer.put_u64(head.birth_tree.0);
@@ -467,11 +942,23 @@ pub fn mapping_key_for_data(head: PointerHead, write_order: WriteOrder) -> Vec<u
     writer.put_u32(write_order.instance.0);
     writer.put_six_byte_unsigned(write_order.transaction);
     writer.assert_position(MAPPING_KEY_BYTES, "码 1 映射 key");
-    writer.into_bytes()
+    let key = writer.into_bytes();
+    assert(key@ =~= spec_mapping_key_for_data_bytes(head, write_order));
+    key
+}
+
+/// 码 2 / 码 3 映射 key 的写法：类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 出生序号 4 + 补零 2。
+pub open spec fn spec_mapping_key_for_node_bytes(unit_class: u8, pointer: NodePointer) -> Seq<u8> {
+    little_endian_bytes(unit_class as nat, 1) + little_endian_bytes(pointer.head.birth_tree.0 as nat, 8)
+        + little_endian_bytes(pointer.head.birth_txg.0 as nat, 8) + little_endian_bytes(pointer.instance.0 as nat, 4)
+        + little_endian_bytes(pointer.birth_sequence.0 as nat, 4) + zero_bytes(2)
 }
 
 #[must_use]
-pub fn mapping_key_for_node(unit_class: u8, pointer: NodePointer) -> Vec<u8> {
+pub fn mapping_key_for_node(unit_class: u8, pointer: NodePointer) -> (key: Vec<u8>)
+    ensures
+        key@ == spec_mapping_key_for_node_bytes(unit_class, pointer),
+{
     let mut writer = ByteWriter::new(usize::try_from(MAPPING_KEY_BYTES).expect("27"));
     writer.put_u8(unit_class);
     writer.put_u64(pointer.head.birth_tree.0);
@@ -480,12 +967,30 @@ pub fn mapping_key_for_node(unit_class: u8, pointer: NodePointer) -> Vec<u8> {
     writer.put_u32(pointer.birth_sequence.0);
     writer.assert_position(25, "码 2 / 码 3 映射 key 里有含义的那一段");
     writer.skip(2);
-    writer.into_bytes()
+    let key = writer.into_bytes();
+    assert(key@ =~= spec_mapping_key_for_node_bytes(unit_class, pointer));
+    key
 }
 
 /// 类标签 → 出生树 → 出生 txg → 尾段（码 1 的写序、码 2 / 码 3 的实例代号与出生序号）。
+///
+/// # Panics
+/// key 短于 27 字节（`requires` 排除的那一种：映射 key 一律 27）。
 #[must_use]
-pub fn mapping_key_sort_key(key: &[u8]) -> (u8, u64, u64, u32, u64) {
+pub fn mapping_key_sort_key(key: &[u8]) -> (sort_key: (u8, u64, u64, u32, u64))
+    requires
+        key@.len() >= MAPPING_KEY_BYTES,
+    ensures
+        sort_key.0 == little_endian_value(key@.subrange(0, 1)),
+        sort_key.1 == little_endian_value(key@.subrange(1, 9)),
+        sort_key.2 == little_endian_value(key@.subrange(9, 17)),
+        sort_key.3 == little_endian_value(key@.subrange(17, 21)),
+        sort_key.4 == if sort_key.0 == UNIT_CLASS_DATA {
+            little_endian_value(key@.subrange(21, 27))
+        } else {
+            little_endian_value(key@.subrange(21, 25))
+        },
+{
     let mut reader = ByteReader::at(key, 0);
     let unit_class = reader.get_u8();
     let birth_tree = reader.get_u64();
@@ -499,34 +1004,76 @@ pub fn mapping_key_sort_key(key: &[u8]) -> (u8, u64, u64, u32, u64) {
     (unit_class, birth_tree, birth_txg, instance, tail)
 }
 
+/// 映射条目 55 的写法：key 27 + 两条位置条目 28。
+pub open spec fn spec_mapping_entry_bytes(key: Seq<u8>, locations: [LocationEntry; 2]) -> Seq<u8> {
+    key + spec_location_entries_bytes(locations)
+}
+
 /// 映射条目 55：key 27 + 位置条目 14 × 2。
+///
+/// # Panics
+/// key 不是 27 字节、或位置条目的槽号装不进 6 字节（`requires` 排除的两种）。
 #[must_use]
-pub fn build_mapping_entry(key: &[u8], locations: [LocationEntry; 2]) -> Vec<u8> {
-    assert_eq!(key.len(), usize::try_from(MAPPING_KEY_BYTES).expect("27"));
+pub fn build_mapping_entry(key: &[u8], locations: [LocationEntry; 2]) -> (entry: Vec<u8>)
+    requires
+        key@.len() == MAPPING_KEY_BYTES,
+        locations[0].is_encodable(),
+        locations[1].is_encodable(),
+    ensures
+        entry@ == spec_mapping_entry_bytes(key@, locations),
+{
+    // assert_eq! 展开成的 core::panicking::assert_failed 没有 Verus 规格，写成 assert!。
+    assert!(
+        key.len() == usize::try_from(MAPPING_KEY_BYTES).expect("27"),
+        "映射 key 一律 27 字节"
+    );
     let mut writer = ByteWriter::new(usize::try_from(MAPPING_ENTRY_BYTES).expect("55"));
     writer.put(key);
-    for location in &locations {
-        location.write_to(&mut writer);
-    }
+    // 两条位置条目照数组次序写（对数组的 for 循环没有 Verus 规格，逐条写，同一个次序）。
+    locations[0].write_to(&mut writer);
+    locations[1].write_to(&mut writer);
     writer.assert_position(MAPPING_ENTRY_BYTES, "映射条目");
-    writer.into_bytes()
+    let entry = writer.into_bytes();
+    assert(entry@ =~= spec_mapping_entry_bytes(key@, locations));
+    entry
 }
 
-/// journal 点名项与映射 key 共用的 10 字节尾段。
+/// journal 点名项与映射 key 共用的 10 字节尾段。事务号只取低 6 字节（与 `to_le_bytes()[..6]` 同一个截法）。
 #[must_use]
-pub fn data_key_tail(write_order: WriteOrder) -> [u8; 10] {
-    let mut tail = [0u8; 10];
-    tail[..4].copy_from_slice(&write_order.instance.0.to_le_bytes());
-    tail[4..].copy_from_slice(&write_order.transaction.to_le_bytes()[..6]);
-    tail
+pub fn data_key_tail(write_order: WriteOrder) -> (tail: [u8; 10])
+    ensures
+        tail@ == little_endian_bytes(write_order.instance.0 as nat, 4) + little_endian_bytes(
+            (write_order.transaction % 0x1_0000_0000_0000) as nat,
+            6,
+        ),
+{
+    // copy_from_slice 与 to_le_bytes 没有 Verus 规格：经 ByteWriter 写成 10 字节再拷成数组，同一组字节。
+    let mut writer = ByteWriter::new(10);
+    writer.put_u32(write_order.instance.0);
+    writer.put_six_byte_unsigned(write_order.transaction % 0x1_0000_0000_0000);
+    let tail = writer.into_bytes();
+    assert(tail@ =~= little_endian_bytes(write_order.instance.0 as nat, 4) + little_endian_bytes(
+        (write_order.transaction % 0x1_0000_0000_0000) as nat,
+        6,
+    ));
+    copied_into_an_array(&tail)
 }
 
 #[must_use]
-pub fn node_key_tail(instance: InstanceGeneration, birth_sequence: BirthSequence) -> [u8; 10] {
-    let mut tail = [0u8; 10];
-    tail[..4].copy_from_slice(&instance.0.to_le_bytes());
-    tail[4..8].copy_from_slice(&birth_sequence.0.to_le_bytes());
-    tail
+pub fn node_key_tail(instance: InstanceGeneration, birth_sequence: BirthSequence) -> (tail: [u8; 10])
+    ensures
+        tail@ == little_endian_bytes(instance.0 as nat, 4) + little_endian_bytes(birth_sequence.0 as nat, 4)
+            + zero_bytes(2),
+{
+    // 同 data_key_tail：经 ByteWriter 写成 10 字节再拷成数组，末尾两字节保持 0。
+    let mut writer = ByteWriter::new(10);
+    writer.put_u32(instance.0);
+    writer.put_u32(birth_sequence.0);
+    writer.skip(2);
+    let tail = writer.into_bytes();
+    assert(tail@ =~= little_endian_bytes(instance.0 as nat, 4) + little_endian_bytes(birth_sequence.0 as nat, 4)
+        + zero_bytes(2));
+    copied_into_an_array(&tail)
 }
 
 /// 树的种类码（D8（核心索引结构） 已定项 9 的登记表）。
@@ -537,28 +1084,28 @@ pub const TREE_KIND_ACCOUNTING: u16 = 4;
 pub const TREE_KIND_LIVELIST: u16 = 6;
 pub const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
 pub const TREE_KIND_DEADLIST: u16 = 8;
-/// 第一个文件版本那次零根注册的四棵树的种类码：D8（核心索引结构） 已定项 9 登记表的码 9..12（只追加不重用码，接在 8 之后，
-/// 次序照 D18（块里携带什么信息） 已定项 24 第 6 条列的）。
+/// 第一个文件版本那次零根注册的四棵树的种类码：D8（核心索引结构） 已定项 9 登记表的码 9..12
+/// （次序照 D18（块里携带什么信息） 已定项 24 第 6 条列的）。
 pub const TREE_KIND_DELETED_INODES: u16 = 9;
 pub const TREE_KIND_TOMBSTONE: u16 = 10;
 pub const TREE_KIND_LINEAGE: u16 = 11;
 pub const TREE_KIND_LOGGED_OPERATIONS: u16 = 12;
-/// 退役树：码 13，接在 logged_ops 之后追加（D8（核心索引结构） 已定项 9；判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条）。
+/// 退役树：码 13（D8（核心索引结构） 已定项 9 登记表；第 1 条）。
 pub const TREE_KIND_RETIREMENT: u16 = 13;
-/// 只读快照的 inode 根：码 14，接在退役树之后追加（D8（核心索引结构） 已定项 9 只追加不重用；判决
+/// 只读快照的 inode 根：码 14（D8（核心索引结构） 已定项 9 登记表；判决
 /// `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S1）。一个快照一条，字段取值：根指针 = 建快照那一版活头 inode 树的根；
 /// 诞生 txg = S.txg（建快照那次独立发布的 `checkpoint_txg`，同一判决 S2）；`previous_snapshot_txg` = 捕获那一刻活头 inode 树条目里的值；
 /// 头 ID = 活头 inode 树的树 ID；flags 位 0 是「销毁中」（同一判决 S4：删快照的意图写在这里，[`SnapshotDestructionMark`]）。
 /// 一张树表里可以有多条（每个快照一条），与 [`TREE_KIND_SNAPSHOT_EXTENT_ROOT`] 一一配对。
 pub const TREE_KIND_SNAPSHOT_INODE_ROOT: u16 = 14;
-/// 只读快照的 extent 根：码 15，接在码 14 之后追加（同上 S1）。根指针 = 建快照那一版活头 extent 树的根；头 ID = 与它配对的那条
+/// 只读快照的 extent 根：码 15（D8（核心索引结构） 已定项 9 登记表；同上 S1）。根指针 = 建快照那一版活头 extent 树的根；头 ID = 与它配对的那条
 /// [`TREE_KIND_SNAPSHOT_INODE_ROOT`] 条目的树 ID；`previous_snapshot_txg` 写 0（0 = 不适用，D5（快照 / 空间记账机制） 已定项 9）。
 pub const TREE_KIND_SNAPSHOT_EXTENT_ROOT: u16 = 15;
-/// 第一版同时活着的只读快照至多几个（一张树表里码 14 的条数上界）：用户 2026-10-13 定「10」（判决
+/// 第一版同时活着的只读快照至多几个（一张树表里码 14 的条数上界）：（判决
 /// `research/prompts/m4-snapshot-r1-main-verification.md` 第七节岔路 1；单节点树表能装 34 个，取 10 是用户给的上界）。
 pub const SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION: usize = 10;
 
-/// 树表条目 flags 的位 0「销毁中」：只在码 14 条目上有含义（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S4 与第七节岔路 2：
+/// 树表条目 flags 的位 0「销毁中」：只在码 14 条目上有含义（ 与第七节岔路 2：
 /// 删快照的意图写在被删那个快照自己的码 14 条目上，只占这一位，预留字节不写）。别的位、别的种类上的这一位仍按 D8（核心索引结构） 已定项 8 ㊁拒收。
 pub const TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED: u16 = 1;
 
@@ -570,9 +1117,20 @@ pub enum SnapshotDestructionMark {
 }
 
 impl SnapshotDestructionMark {
+    /// 这个记号在 flags 那 2 字节里的值（[`Self::flags`] 的规格）。
+    pub open spec fn spec_flags(self) -> u16 {
+        match self {
+            SnapshotDestructionMark::NotBeingDestroyed => 0,
+            SnapshotDestructionMark::BeingDestroyed => TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED,
+        }
+    }
+
     /// 这个记号在 flags 那 2 字节里的值。
     #[must_use]
-    pub const fn flags(self) -> u16 {
+    pub const fn flags(self) -> (flags: u16)
+        ensures
+            flags == self.spec_flags(),
+    {
         match self {
             SnapshotDestructionMark::NotBeingDestroyed => 0,
             SnapshotDestructionMark::BeingDestroyed => {
@@ -583,7 +1141,7 @@ impl SnapshotDestructionMark {
 }
 
 /// deadlist 条目的 key 宽：头的树 ID 8 + 纪元 8 + 中央映射 key 27 = 43，value 空（D5（快照 / 空间记账机制） 已定项 12；
-/// 判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：deadlist 是第三棵多层码 2 树，种类 8）。
+/// deadlist 是第三棵多层码 2 树，种类 8）。
 pub const DEADLIST_ENTRY_KEY_BYTES: usize = 8 + 8 + 27;
 
 /// 中央映射 key 里出生 txg 那 8 字节的起点：类标签 1 + 出生树 8（[`mapping_key_for_data`]、[`mapping_key_for_node`]）。
@@ -592,7 +1150,14 @@ const MAPPING_KEY_BIRTH_TXG_OFFSET_IN_BYTES: usize = 1 + 8;
 /// 一把中央映射 key 里的出生 txg（D5（快照 / 空间记账机制） 已定项 19 的 `birth`：判决 S3「birth 从映射 key 的出生 txg 段取」）。
 /// key 不是 27 字节时交回 `None`（盘上读来的 key 由调用方当取不到处置：D5 已定项 14「判据的输入取不到时默认进 deadlist」）。
 #[must_use]
-pub fn birth_txg_of_a_mapping_key(mapping_key: &[u8]) -> Option<CheckpointTxg> {
+pub fn birth_txg_of_a_mapping_key(mapping_key: &[u8]) -> (birth_txg: Option<CheckpointTxg>)
+    ensures
+        birth_txg == if mapping_key@.len() == MAPPING_KEY_BYTES {
+            Some(CheckpointTxg(little_endian_value(mapping_key@.subrange(9, 17)) as u64))
+        } else {
+            None
+        },
+{
     if mapping_key.len() != usize::try_from(MAPPING_KEY_BYTES).expect("27") {
         return None;
     }
@@ -611,18 +1176,60 @@ pub struct DeadlistEntry {
 }
 
 impl DeadlistEntry {
+    /// 盘上 43 字节：头的树 ID 8 + 纪元 8 + 映射 key 27。
+    pub open spec fn spec_bytes(self) -> Seq<u8> {
+        little_endian_bytes(self.head.0 as nat, 8) + little_endian_bytes(self.epoch.0 as nat, 8) + self.mapping_key@
+    }
+
+    /// [`Self::parse`] 的判法：宽不等于 43 交回 `None`。
+    pub open spec fn spec_parse_fields(bytes: Seq<u8>) -> Option<(TreeIdentifier, CheckpointTxg, Seq<u8>)> {
+        if bytes.len() != DEADLIST_ENTRY_KEY_BYTES {
+            None
+        } else {
+            Some(
+                (
+                    TreeIdentifier(little_endian_value(bytes.subrange(0, 8)) as u64),
+                    CheckpointTxg(little_endian_value(bytes.subrange(8, 16)) as u64),
+                    bytes.subrange(16, 43),
+                ),
+            )
+        }
+    }
+
+    /// 往返：映射 key 是 27 字节的条目写出的 43 字节读回同样的三段。
+    pub proof fn lemma_parse_round_trip(self)
+        requires
+            self.mapping_key@.len() == MAPPING_KEY_BYTES,
+        ensures
+            Self::spec_parse_fields(self.spec_bytes()) == Some((self.head, self.epoch, self.mapping_key@)),
+    {
+        lemma_little_endian_capacities();
+        let bytes = self.spec_bytes();
+        assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+        let head = little_endian_bytes(self.head.0 as nat, 8);
+        let epoch = little_endian_bytes(self.epoch.0 as nat, 8);
+        let mapping_key = self.mapping_key@;
+        lemma_split_a_concatenated_range(bytes, 0, head + epoch, mapping_key);
+        lemma_split_a_concatenated_range(bytes, 0, head, epoch);
+    }
+
     /// 盘上 43 字节（叶条目就是 key）。
     ///
     /// # Panics
-    /// `mapping_key` 不是 27 字节：条目的映射 key 取自一版的 `mapped_units`（写者现算的）或 [`Self::parse`] 判过宽度的盘上字节。
+    /// `mapping_key` 不是 27 字节（`requires` 排除的那一种）：条目的映射 key 取自一版的 `mapped_units`（写者现算的）或 [`Self::parse`] 判过宽度的盘上字节。
     #[must_use]
-    pub fn key_bytes(&self) -> Vec<u8> {
+    pub fn key_bytes(&self) -> (key: Vec<u8>)
+        requires
+            self.mapping_key@.len() == MAPPING_KEY_BYTES,
+        ensures
+            key@ == self.spec_bytes(),
+    {
         let mut writer = ByteWriter::new(DEADLIST_ENTRY_KEY_BYTES);
         writer.put_u64(self.head.0);
         writer.put_u64(self.epoch.0);
-        assert_eq!(
-            self.mapping_key.len(),
-            usize::try_from(MAPPING_KEY_BYTES).expect("27"),
+        // assert_eq! 展开成的 core::panicking::assert_failed 没有 Verus 规格，写成 assert! 加同一句话。
+        assert!(
+            self.mapping_key.len() == usize::try_from(MAPPING_KEY_BYTES).expect("27"),
             "deadlist 条目里的映射 key 是 27 字节：取自写者现算的 key 或读者判过宽度的字节"
         );
         writer.put(&self.mapping_key);
@@ -630,13 +1237,23 @@ impl DeadlistEntry {
             u64::try_from(DEADLIST_ENTRY_KEY_BYTES).expect("43"),
             "deadlist 条目",
         );
-        writer.into_bytes()
+        let key = writer.into_bytes();
+        assert(key@ =~= self.spec_bytes());
+        key
     }
 
     /// 读者：条目宽不等于 43 交回 `None`（`parse_index_node` 只判了条目宽 ≥ key 宽）。宽于 43 的同样不收
-    /// （I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，用户 2026-10-18 定「宽于字段表也拒」，欠账 C780、C867）。
+    /// （I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，欠账 C780、C867）。
     #[must_use]
-    pub fn parse(bytes: &[u8]) -> Option<Self> {
+    pub fn parse(bytes: &[u8]) -> (entry: Option<Self>)
+        ensures
+            match entry {
+                Some(parsed) => Self::spec_parse_fields(bytes@) == Some(
+                    (parsed.head, parsed.epoch, parsed.mapping_key@),
+                ),
+                None => Self::spec_parse_fields(bytes@) is None,
+            },
+    {
         if bytes.len() != DEADLIST_ENTRY_KEY_BYTES {
             return None;
         }
@@ -646,16 +1263,25 @@ impl DeadlistEntry {
         Some(Self {
             head,
             epoch,
-            mapping_key: bytes[16..DEADLIST_ENTRY_KEY_BYTES].to_vec(),
+            mapping_key: copied_into_a_vector(&bytes[16..DEADLIST_ENTRY_KEY_BYTES]),
         })
     }
 
     /// 这条条目指的那个单元的出生 txg（映射 key 的出生 txg 段）。
     ///
     /// # Panics
-    /// 映射 key 不是 27 字节：同 [`Self::key_bytes`]。
+    /// 映射 key 不是 27 字节（`requires` 排除的那一种）：同 [`Self::key_bytes`]。
     #[must_use]
-    pub fn birth_txg(&self) -> CheckpointTxg {
+    pub fn birth_txg(&self) -> (birth_txg: CheckpointTxg)
+        requires
+            self.mapping_key@.len() == MAPPING_KEY_BYTES,
+        ensures
+            birth_txg.0 == little_endian_value(self.mapping_key@.subrange(9, 17)),
+    {
+        proof {
+            lemma_little_endian_value_fits(self.mapping_key@.subrange(9, 17));
+            lemma_little_endian_capacities();
+        }
         birth_txg_of_a_mapping_key(&self.mapping_key)
             .expect("deadlist 条目里的映射 key 是 27 字节：取自写者现算的 key 或读者判过宽度的字节")
     }
@@ -679,20 +1305,114 @@ pub struct TreeTableEntry {
 }
 
 impl TreeTableEntry {
+    /// 写得出的一条：根指针装得进、位置条目次序写者肯写，「销毁中」只写在码 14 上。
+    pub open spec fn is_writable_with(self, mark: SnapshotDestructionMark) -> bool {
+        &&& self.root.is_encodable()
+        &&& self.root.has_location_entries_the_writer_accepts()
+        &&& (mark == SnapshotDestructionMark::NotBeingDestroyed || self.kind == TREE_KIND_SNAPSHOT_INODE_ROOT)
+    }
+
+    /// 盘上 200 字节，flags 写 `mark` 的值。
+    pub open spec fn spec_bytes_with_destruction_mark(self, mark: SnapshotDestructionMark) -> Seq<u8> {
+        little_endian_bytes(self.tree.0 as nat, 8) + little_endian_bytes(200, 2) + little_endian_bytes(self.kind as nat, 2)
+            + little_endian_bytes(mark.spec_flags() as nat, 2) + self.root.spec_bytes() + little_endian_bytes(
+            self.previous_snapshot_txg.0 as nat,
+            8,
+        ) + little_endian_bytes(self.birth_txg.0 as nat, 8) + little_endian_bytes(self.head_identifier as nat, 8)
+            + zero_bytes(76)
+    }
+
+    /// [`Self::parse_with_destruction_mark`] 的判法。
+    pub open spec fn spec_parse_with_destruction_mark(bytes: Seq<u8>) -> Option<(Self, SnapshotDestructionMark)> {
+        let kind = little_endian_value(bytes.subrange(10, 12)) as u16;
+        let flags = little_endian_value(bytes.subrange(12, 14)) as u16;
+        if bytes.len() != TREE_TABLE_ENTRY_BYTES || bytes.subrange(124, 200) != zero_bytes(76) {
+            None
+        } else if little_endian_value(bytes.subrange(8, 10)) != TREE_TABLE_ENTRY_BYTES {
+            None
+        } else if !(flags == 0 || (flags == TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED && kind
+            == TREE_KIND_SNAPSHOT_INODE_ROOT)) {
+            None
+        } else {
+            match NodePointer::spec_read_judging_at(bytes, 14) {
+                Err(_refusal) => None,
+                Ok(root) => Some(
+                    (
+                        TreeTableEntry {
+                            kind,
+                            tree: TreeIdentifier(little_endian_value(bytes.subrange(0, 8)) as u64),
+                            root,
+                            previous_snapshot_txg: CheckpointTxg(little_endian_value(bytes.subrange(100, 108)) as u64),
+                            birth_txg: CheckpointTxg(little_endian_value(bytes.subrange(108, 116)) as u64),
+                            head_identifier: little_endian_value(bytes.subrange(116, 124)) as u64,
+                        },
+                        if flags == 0 {
+                            SnapshotDestructionMark::NotBeingDestroyed
+                        } else {
+                            SnapshotDestructionMark::BeingDestroyed
+                        },
+                    ),
+                ),
+            }
+        }
+    }
+
+    /// 往返：带记号写出的 200 字节读回同一条条目与同一个记号。
+    pub proof fn lemma_parse_round_trip(self, mark: SnapshotDestructionMark)
+        requires
+            self.is_writable_with(mark),
+        ensures
+            Self::spec_parse_with_destruction_mark(self.spec_bytes_with_destruction_mark(mark)) == Some((self, mark)),
+    {
+        lemma_little_endian_capacities();
+        let bytes = self.spec_bytes_with_destruction_mark(mark);
+        assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+        let tree = little_endian_bytes(self.tree.0 as nat, 8);
+        let length = little_endian_bytes(200, 2);
+        let kind = little_endian_bytes(self.kind as nat, 2);
+        let flags = little_endian_bytes(mark.spec_flags() as nat, 2);
+        let root = self.root.spec_bytes();
+        let previous = little_endian_bytes(self.previous_snapshot_txg.0 as nat, 8);
+        let birth = little_endian_bytes(self.birth_txg.0 as nat, 8);
+        let head = little_endian_bytes(self.head_identifier as nat, 8);
+        let reserved = zero_bytes(76);
+        lemma_split_a_concatenated_range(bytes, 0, tree + length + kind + flags + root + previous + birth + head, reserved);
+        lemma_split_a_concatenated_range(bytes, 0, tree + length + kind + flags + root + previous + birth, head);
+        lemma_split_a_concatenated_range(bytes, 0, tree + length + kind + flags + root + previous, birth);
+        lemma_split_a_concatenated_range(bytes, 0, tree + length + kind + flags + root, previous);
+        lemma_split_a_concatenated_range(bytes, 0, tree + length + kind + flags, root);
+        lemma_split_a_concatenated_range(bytes, 0, tree + length + kind, flags);
+        lemma_split_a_concatenated_range(bytes, 0, tree + length, kind);
+        lemma_split_a_concatenated_range(bytes, 0, tree, length);
+        self.root.lemma_decode_at_round_trip(bytes, 14);
+    }
+
     /// flags 写 0（不带「销毁中」的记号）。
     #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> (bytes: Vec<u8>)
+        requires
+            self.is_writable_with(SnapshotDestructionMark::NotBeingDestroyed),
+        ensures
+            bytes@ == self.spec_bytes_with_destruction_mark(SnapshotDestructionMark::NotBeingDestroyed),
+    {
         self.to_bytes_with_destruction_mark(SnapshotDestructionMark::NotBeingDestroyed)
     }
 
-    /// flags 写 `mark` 的值（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S4：删快照的意图只占码 14 条目 flags 位 0）。
+    /// flags 写 `mark` 的值。
     ///
     /// # Panics
-    /// 给不是码 14 的条目写「销毁中」：读者对别的种类上的这一位拒收（[`Self::parse_with_destruction_mark`]），写者只给被删的那条码 14 写。
+    /// 给不是码 14 的条目写「销毁中」（`requires` 排除的那一种）：读者对别的种类上的这一位拒收（[`Self::parse_with_destruction_mark`]），
+    /// 写者只给被删的那条码 14 写。
     #[must_use]
-    pub fn to_bytes_with_destruction_mark(&self, mark: SnapshotDestructionMark) -> Vec<u8> {
+    pub fn to_bytes_with_destruction_mark(&self, mark: SnapshotDestructionMark) -> (bytes: Vec<u8>)
+        requires
+            self.is_writable_with(mark),
+        ensures
+            bytes@ == self.spec_bytes_with_destruction_mark(mark),
+    {
+        // 记号的 == 没有 Verus 规格，比 flags 的值：两种记号的值不同，同一个判法。
         assert!(
-            mark == SnapshotDestructionMark::NotBeingDestroyed
+            mark.flags() == SnapshotDestructionMark::NotBeingDestroyed.flags()
                 || self.kind == TREE_KIND_SNAPSHOT_INODE_ROOT,
             "「销毁中」只写在码 14 条目上（判决 S4）"
         );
@@ -711,31 +1431,60 @@ impl TreeTableEntry {
         writer.put_u64(self.head_identifier);
         writer.skip(76);
         writer.assert_position(TREE_TABLE_ENTRY_BYTES, "树表条目");
-        writer.into_bytes()
+        let bytes = writer.into_bytes();
+        assert(bytes@ =~= self.spec_bytes_with_destruction_mark(mark));
+        bytes
     }
+
     /// 一条条目盘上字节里根指针那 86 字节的原样（逐字节比两条根指针用；解析成 `NodePointer` 会丢掉第一版恒 0 的 MAC / nonce 那几段）。
     /// 调用方要先用 `parse` 核过这是一条合法的 200 字节条目。
+    ///
+    /// # Panics
+    /// 短于 100 字节（`requires` 排除的那一种）。
     #[must_use]
-    pub fn root_pointer_bytes(entry_bytes: &[u8]) -> &[u8] {
+    pub fn root_pointer_bytes(entry_bytes: &[u8]) -> (root_pointer: &[u8])
+        requires
+            entry_bytes@.len() >= 100,
+        ensures
+            root_pointer@ == entry_bytes@.subrange(14, 100),
+    {
         &entry_bytes[TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES
             ..TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES
                 + usize::try_from(NODE_POINTER_BYTES).expect("86")]
     }
+
     /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 76 非零、根指针头部有一段不是第一版的取值
     /// （MAC / nonce 非 0、算法类型不是未加密、压缩算法码不认识、码 0 而压后长度非 0、extent 偏移非 0：D19（块指针的结构与宽度预算） 已定项 3、
     /// D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据），判该指针所在的结构——这条条目——损坏）都判不可用。
     /// 码 14 条目 flags 位 0（销毁中）收下、丢掉记号；要记号的读者用 [`Self::parse_with_destruction_mark`]。
     #[must_use]
-    pub fn parse(bytes: &[u8]) -> Option<Self> {
-        Self::parse_with_destruction_mark(bytes).map(|(entry, _mark)| entry)
+    #[allow(
+        clippy::manual_map,
+        reason = "Option::map 带闭包时 Verus 交不出结果的规格（vstd 的规格只说调了闭包），写成 match 才证得出交回的就是那条条目"
+    )]
+    pub fn parse(bytes: &[u8]) -> (entry: Option<Self>)
+        ensures
+            entry == match Self::spec_parse_with_destruction_mark(bytes@) {
+                Some((parsed, _mark)) => Some(parsed),
+                None => None,
+            },
+    {
+        // Option::map 带闭包时 Verus 交不出结果的规格，写成 match：丢掉记号、照旧交回条目。
+        match Self::parse_with_destruction_mark(bytes) {
+            Some((entry, _mark)) => Some(entry),
+            None => None,
+        }
     }
 
     /// 同 [`Self::parse`]，连同 flags 读出来的「销毁中」记号：flags 是 0 ⇒ `NotBeingDestroyed`；码 14 条目上 flags 恰是位 0 ⇒ `BeingDestroyed`；
     /// 别的取值（别的位、别的种类上的位 0）照 D8（核心索引结构） 已定项 8 ㊁拒收。
     #[must_use]
-    pub fn parse_with_destruction_mark(bytes: &[u8]) -> Option<(Self, SnapshotDestructionMark)> {
+    pub fn parse_with_destruction_mark(bytes: &[u8]) -> (entry: Option<(Self, SnapshotDestructionMark)>)
+        ensures
+            entry == Self::spec_parse_with_destruction_mark(bytes@),
+    {
         if bytes.len() != usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("200")
-            || bytes[bytes.len() - 76..].iter().any(|byte| *byte != 0)
+            || !every_byte_is_zero(&bytes[bytes.len() - 76..])
         {
             return None;
         }
@@ -745,20 +1494,25 @@ impl TreeTableEntry {
             return None;
         }
         let kind = reader.get_u16();
-        let mark = match reader.get_u16() {
-            0 => SnapshotDestructionMark::NotBeingDestroyed,
-            TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED
-                if kind == TREE_KIND_SNAPSHOT_INODE_ROOT =>
-            {
-                SnapshotDestructionMark::BeingDestroyed
-            }
-            _flags_this_reader_refuses => return None,
+        // 按 flags 的值分的 match（常量模式加守卫、余下的拒收）写成 if：Verus 不认按常量匹配，三种结论不变。
+        let flags = reader.get_u16();
+        let mark = if flags == 0 {
+            SnapshotDestructionMark::NotBeingDestroyed
+        } else if flags == TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED
+            && kind == TREE_KIND_SNAPSHOT_INODE_ROOT
+        {
+            SnapshotDestructionMark::BeingDestroyed
+        } else {
+            return None;
         };
+        // Result::ok 接 ? 写成 match：头部判不过的根指针与别的拒收同一个处置。
         let root =
-            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+            match NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
                 &mut reader,
-            )
-            .ok()?;
+            ) {
+                Ok(root) => root,
+                Err(_refusal) => return None,
+            };
         let previous_snapshot_txg = CheckpointTxg(reader.get_u64());
         let birth_txg = CheckpointTxg(reader.get_u64());
         let head_identifier = reader.get_u64();
@@ -775,24 +1529,69 @@ impl TreeTableEntry {
         ))
     }
 }
-
 /// 一条带指针的条目（inode 内部条目 120、extent 叶记录 112）解不开是哪一种。封闭集合，`match` 不写通配臂。
 /// 两种都是盘上读来的字节、不是我们的不变量：调用方把这条条目当损坏处置，不拿里面的指针去解引用。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PointerCarryingEntryRefusal {
     /// 条目宽（索引节点头里的盘上字段）不等于字段表（窄于、宽于都算：I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，
-    /// 用户 2026-10-18 定「宽于字段表也拒」，欠账 C867）：调用方报「条目宽与字段表不符」。
+    /// 欠账 C867）：调用方报「条目宽与字段表不符」。
     WidthOtherThanItsFieldTable,
     /// 条目里那条指针的头部有一段不是第一版的取值（MAC / nonce、算法类型、压缩算法码与压后长度、extent 偏移）：判该指针所在的结构
     /// （这条条目）损坏（D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据））。
     PointerHeadFieldOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
 }
 
+/// [`parse_inode_internal_entry_or_refusal`] 的判法。
+pub open spec fn spec_parse_inode_internal_entry(
+    bytes: Seq<u8>,
+) -> Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal> {
+    if bytes.len() != INODE_INTERNAL_ENTRY {
+        Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable)
+    } else {
+        match NodePointer::spec_read_judging_at(bytes, 34) {
+            Err(refusal) => Err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(refusal)),
+            Ok(child) => Ok(
+                (
+                    little_endian_value(bytes.subrange(0, 8)) as u64,
+                    PackedIdentity::spec_decode_at(bytes, 8),
+                    child,
+                ),
+            ),
+        }
+    }
+}
+
+/// 往返：写出的 inode 内部条目读回同样的三样。
+pub proof fn lemma_inode_internal_entry_round_trip(separator_key: u64, child_identity: PackedIdentity, child: NodePointer)
+    requires
+        child.is_encodable(),
+    ensures
+        spec_parse_inode_internal_entry(spec_inode_internal_entry_bytes(separator_key, child_identity, child)) == Ok::<
+            (u64, PackedIdentity, NodePointer),
+            PointerCarryingEntryRefusal,
+        >((separator_key, child_identity, child)),
+{
+    lemma_little_endian_capacities();
+    let bytes = spec_inode_internal_entry_bytes(separator_key, child_identity, child);
+    assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+    let separator = little_endian_bytes(separator_key as nat, 8);
+    lemma_split_a_concatenated_range(bytes, 0, separator + child_identity.spec_bytes(), child.spec_bytes());
+    lemma_split_a_concatenated_range(bytes, 0, separator, child_identity.spec_bytes());
+    child_identity.lemma_decode_at_round_trip(bytes, 8);
+    child.lemma_decode_at_round_trip(bytes, 34);
+}
+
 /// inode 内部条目 120 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 8），
 /// 不等于字段表宽（窄于、宽于都算）、或子指针头部有一段不是第一版的取值时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
 /// 要分清是哪一种的调用方（冷启动走读、只读挂载打开池）用 [`parse_inode_internal_entry_or_refusal`]；只要知道解不解得开的（用例）用这一个。
 #[must_use]
-pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, NodePointer)> {
+pub fn parse_inode_internal_entry(bytes: &[u8]) -> (entry: Option<(u64, PackedIdentity, NodePointer)>)
+    ensures
+        entry == match spec_parse_inode_internal_entry(bytes@) {
+            Ok(parsed) => Some(parsed),
+            Err(_refusal) => None,
+        },
+{
     parse_inode_internal_entry_or_refusal(bytes).ok()
 }
 
@@ -802,7 +1601,10 @@ pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, 
 /// 不等于 120（窄于、宽于都算，欠账 C867）⇒ `WidthOtherThanItsFieldTable`；子指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
 pub fn parse_inode_internal_entry_or_refusal(
     bytes: &[u8],
-) -> Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal> {
+) -> (entry: Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal>)
+    ensures
+        entry == spec_parse_inode_internal_entry(bytes@),
+{
     if bytes.len() != usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
         return Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable);
     }
@@ -814,11 +1616,35 @@ pub fn parse_inode_internal_entry_or_refusal(
         container: reader.get_u64(),
         container_birth: CheckpointTxg(reader.get_u64()),
     };
-    let child = NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+    // Result::map_err 接 ? 写成 match：头部判不过的照旧包成 PointerHeadFieldOutsideTheFirstVersion。
+    let child = match NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
         &mut reader,
-    )
-    .map_err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion)?;
+    ) {
+        Ok(child) => child,
+        Err(refusal) => {
+            return Err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(refusal))
+        }
+    };
     Ok((separator_key, child_identity, child))
+}
+
+/// 往返：写出的 extent 叶记录里，key 那 24 字节是三段 key 的小端、指针读回同一条数据指针。
+pub proof fn lemma_extent_record_round_trip(inode: u64, offset: u64, pointer: DataPointer)
+    requires
+        pointer.is_encodable(),
+    ensures
+        spec_extent_record_bytes(inode, offset, pointer).subrange(0, 24) == little_endian_bytes(0, 8)
+            + little_endian_bytes(inode as nat, 8) + little_endian_bytes(offset as nat, 8),
+        DataPointer::spec_read_judging_at(spec_extent_record_bytes(inode, offset, pointer), 24) == Ok::<
+            DataPointer,
+            PointerHeadFieldOutsideTheFirstVersion,
+        >(pointer),
+{
+    let bytes = spec_extent_record_bytes(inode, offset, pointer);
+    assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+    let key = little_endian_bytes(0, 8) + little_endian_bytes(inode as nat, 8) + little_endian_bytes(offset as nat, 8);
+    lemma_split_a_concatenated_range(bytes, 0, key, pointer.spec_bytes());
+    pointer.lemma_decode_at_round_trip(bytes, 24);
 }
 
 /// extent 叶记录 112 的读者：key 24 + 指针 88（同 [`parse_inode_internal_entry_or_refusal`]：`parse_index_node` 只判了条目宽 ≥ key 宽 24，
@@ -828,17 +1654,56 @@ pub fn parse_inode_internal_entry_or_refusal(
 /// 不等于 112（窄于、宽于都算，欠账 C867）⇒ `WidthOtherThanItsFieldTable`；数据指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
 pub fn parse_extent_record(
     bytes: &[u8],
-) -> Result<([u8; 24], DataPointer), PointerCarryingEntryRefusal> {
+) -> (record: Result<([u8; 24], DataPointer), PointerCarryingEntryRefusal>)
+    ensures
+        match record {
+            Ok((key, pointer)) => {
+                &&& bytes@.len() == EXTENT_LEAF_RECORD_BYTES
+                &&& key@ == bytes@.subrange(0, 24)
+                &&& DataPointer::spec_read_judging_at(bytes@, 24) == Ok::<DataPointer, PointerHeadFieldOutsideTheFirstVersion>(pointer)
+            },
+            Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable) => bytes@.len() != EXTENT_LEAF_RECORD_BYTES,
+            Err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(refusal)) => {
+                &&& bytes@.len() == EXTENT_LEAF_RECORD_BYTES
+                &&& DataPointer::spec_read_judging_at(bytes@, 24) == Err::<DataPointer, PointerHeadFieldOutsideTheFirstVersion>(refusal)
+            },
+        },
+{
     if bytes.len() != usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112") {
         return Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable);
     }
-    let key: [u8; 24] = bytes[..24].try_into().expect("24");
+    // 切片转定长数组的 try_into 没有 Verus 规格，经 copied_into_an_array 拷，同一个结果。
+    let key: [u8; 24] = copied_into_an_array(&bytes[..24]);
+    // Result::map_err 接 ? 写成 match：头部判不过的照旧包成 PointerHeadFieldOutsideTheFirstVersion。
     let pointer =
-        DataPointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+        match DataPointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
             &mut ByteReader::at(bytes, 24),
-        )
-        .map_err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion)?;
+        ) {
+            Ok(pointer) => pointer,
+            Err(refusal) => {
+                return Err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(refusal))
+            }
+        };
     Ok((key, pointer))
+}
+
+/// 往返：写出的映射条目读回同一把 key 与同两条位置条目。
+pub proof fn lemma_mapping_entry_round_trip(key: Seq<u8>, locations: [LocationEntry; 2])
+    requires
+        key.len() == MAPPING_KEY_BYTES,
+        locations[0].is_encodable(),
+        locations[1].is_encodable(),
+    ensures
+        spec_mapping_entry_bytes(key, locations).subrange(0, 27) == key,
+        LocationEntry::spec_decode_at(spec_mapping_entry_bytes(key, locations), 27) == locations[0],
+        LocationEntry::spec_decode_at(spec_mapping_entry_bytes(key, locations), 41) == locations[1],
+{
+    let bytes = spec_mapping_entry_bytes(key, locations);
+    assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
+    lemma_split_a_concatenated_range(bytes, 0, key, spec_location_entries_bytes(locations));
+    lemma_split_a_concatenated_range(bytes, 27, locations[0].spec_bytes(), locations[1].spec_bytes());
+    locations[0].lemma_decode_at_round_trip(bytes, 27);
+    locations[1].lemma_decode_at_round_trip(bytes, 41);
 }
 
 /// 映射条目 55 的读者：key 27 + 位置条目 14 × 2。条目宽窄于 55 时返回 `None`
@@ -849,11 +1714,23 @@ pub fn parse_extent_record(
 /// 条目一律 55 已由 D19（块指针的结构与宽度预算） 已定项 10 定，落在 [`MAPPING_KEY_BYTES`] 与 [`MAPPING_ENTRY_BYTES`] 上，
 /// 这一判跟着那两个常量走，不自己写死一个宽度。宽于 55 的条目这里不拒，拒它欠在 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树）。
 #[must_use]
-pub fn parse_mapping_entry(bytes: &[u8]) -> Option<(Vec<u8>, [LocationEntry; 2])> {
+pub fn parse_mapping_entry(bytes: &[u8]) -> (entry: Option<(Vec<u8>, [LocationEntry; 2])>)
+    ensures
+        match entry {
+            Some((key, locations)) => {
+                &&& bytes@.len() >= MAPPING_ENTRY_BYTES
+                &&& key@ == bytes@.subrange(0, 27)
+                &&& locations[0] == LocationEntry::spec_decode_at(bytes@, 27)
+                &&& locations[1] == LocationEntry::spec_decode_at(bytes@, 41)
+            },
+            None => bytes@.len() < MAPPING_ENTRY_BYTES,
+        },
+{
     if bytes.len() < usize::try_from(MAPPING_ENTRY_BYTES).expect("55") {
         return None;
     }
-    let key = bytes[..usize::try_from(MAPPING_KEY_BYTES).expect("27")].to_vec();
+    // `to_vec` 没有 Verus 规格，经 copied_into_a_vector 拷，同一个结果。
+    let key = copied_into_a_vector(&bytes[..usize::try_from(MAPPING_KEY_BYTES).expect("27")]);
     let mut reader = ByteReader::at(bytes, key.len());
     Some((
         key,
@@ -863,6 +1740,8 @@ pub fn parse_mapping_entry(bytes: &[u8]) -> Option<(Vec<u8>, [LocationEntry; 2])
         ],
     ))
 }
+
+} // verus!
 
 #[cfg(test)]
 mod tests {
@@ -877,7 +1756,7 @@ mod tests {
         TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH, TREE_IDENTIFIER_WATERMARK_AT_MKFS,
     };
 
-    /// 树的种类码与树 ID 的值域不相交（D8（核心索引结构） 已定项 9 射程、已定项 11，用户 2026-10-01 定案「树 ID 整体挪开」）：
+    /// 树的种类码与树 ID 的值域不相交（D8（核心索引结构） 已定项 9 射程、已定项 11）：
     /// 核心层的每个种类码都小于 65536（树的种类那 2 字节取不到的最小值），每个树 ID 与两个水位都不小于它。
     #[test]
     fn every_tree_kind_code_is_below_every_tree_identifier() {
@@ -1069,7 +1948,7 @@ mod tests {
         assert_eq!(TreeTableEntry::parse(&bytes), Some(entry), "逐字段读回相等");
     }
 
-    /// 删快照的意图只占码 14 条目 flags 位 0（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S4）：写进偏移 12 那 2 字节、
+    /// 删快照的意图只占码 14 条目 flags 位 0：写进偏移 12 那 2 字节、
     /// 读回来记号相同、别的字段不动；码 14 上别的位、别的种类上的位 0 读者拒收。
     #[test]
     fn the_destruction_mark_sits_in_flags_bit_zero_of_a_snapshot_inode_root_entry_only() {
@@ -1126,7 +2005,7 @@ mod tests {
     }
 
     /// deadlist 条目 43 字节：头的树 ID 8 + 纪元 8 + 中央映射 key 27（D5（快照 / 空间记账机制） 已定项 12），读回来逐字段相等；
-    /// 出生 txg 取映射 key 偏移 9 那 8 字节（判决 S3），不取纪元。
+    /// 出生 txg 取映射 key 偏移 9 那 8 字节，不取纪元。
     #[test]
     fn a_deadlist_entry_is_the_head_the_epoch_and_the_mapping_key_and_reads_back() {
         let mapping_key = mapping_key_for_node(
@@ -1256,7 +2135,7 @@ mod tests {
         }
     }
 
-    /// 判决 m4-trunc-r2 R1：T 写在偏移 120 起 8 字节、N_w 写在 128 起 8 字节，都是小端，读者从同一处读回来；两段各取一个每个字节都不同的值，
+    /// T 写在偏移 120 起 8 字节、N_w 写在 128 起 8 字节，都是小端，读者从同一处读回来；两段各取一个每个字节都不同的值，
     /// 写错位置、读错位置、读成 0、两段对调都对不上。之前 108–119、之后 136–139 两段仍是 0。
     #[test]
     fn truncation_field_is_written_little_endian_at_offsets_120_and_128_and_read_back() {
@@ -1293,7 +2172,7 @@ mod tests {
         );
     }
 
-    /// 判决 m4-trunc-r2 R1：合法性只判「T = 0 ⇒ N_w = 0」。T = 0 而 N_w ≠ 0 拒；截到 0 是 T ≠ 0、N_w = 0，收。
+    /// 合法性只判「T = 0 ⇒ N_w = 0」。T = 0 而 N_w ≠ 0 拒；截到 0 是 T ≠ 0、N_w = 0，收。
     #[test]
     fn parse_refuses_a_truncation_field_whose_txg_is_zero_while_its_size_is_not() {
         let mut size_without_txg =
@@ -1323,7 +2202,7 @@ mod tests {
         );
     }
 
-    /// 判决 m4-trunc-r2 R1：截断字段两边那两段恒零区（108–119、136–139）任一字节非零都拒，截断字段那 16 字节里的非零（T 非零）收。
+    /// 截断字段两边那两段恒零区（108–119、136–139）任一字节非零都拒，截断字段那 16 字节里的非零（T 非零）收。
     #[test]
     fn parse_refuses_a_nonzero_byte_in_either_always_zero_area_around_the_truncation_field() {
         let bytes =
@@ -1345,26 +2224,6 @@ mod tests {
                 "偏移 {offset} 是 T 的一个字节：T 非零、N_w = 0 合法"
             );
         }
-    }
-
-    /// 用户 2026-10-17 定（判决 m4-trunc-r2 第六节）：不带 incompat 位 2 的池里截断字段必须全零；带位 2 的池什么合法的字段都收。
-    #[test]
-    fn a_written_truncation_field_fits_only_a_pool_whose_system_configuration_carries_bit_two() {
-        let not_written = record_with_the_truncation_field(InodeRecordTruncationField::NOT_WRITTEN);
-        let written = record_with_the_truncation_field(
-            InodeRecordTruncationField::written_by_the_truncation_intent_of(CheckpointTxg(7), 0),
-        );
-        assert!(not_written
-            .truncation_field_fits_the_pool(InodeRecordTruncationFieldsOfThePool::AllZero));
-        assert!(not_written
-            .truncation_field_fits_the_pool(InodeRecordTruncationFieldsOfThePool::Carried));
-        assert!(
-            !written.truncation_field_fits_the_pool(InodeRecordTruncationFieldsOfThePool::AllZero),
-            "不带位 2 的池里 T ≠ 0 的记录判不可用"
-        );
-        assert!(
-            written.truncation_field_fits_the_pool(InodeRecordTruncationFieldsOfThePool::Carried)
-        );
     }
 
     /// D8（核心索引结构） 已定项 16 第 4 条：nlink 由 `to_bytes` 照结构里的值写进偏移 36、由 `parse` 读回来——
@@ -1403,7 +2262,7 @@ mod tests {
         }
     }
 
-    /// C480（inode 记录的 blocks 怎么算全仓没有条款） 定案（D8（核心索引结构） 已定项 6）：`blocks` = ⌈size ÷ 512⌉，
+    /// C480（inode 记录的 blocks 怎么算全仓没有条款）（D8（核心索引结构） 已定项 6）：`blocks` = ⌈size ÷ 512⌉，
     /// 逻辑长度的块数，不表示分到的空间。期望值按条款手算，不从被测代码反推。
     /// 每个取样点旁边写着另外两种读法会给的数：「按分到几个 32 KiB 数据单元 × 64 填」（净荷 32634 一个单元）
     /// 与「向下取整」——除了 0 之外，每个点至少把其中一种分开。

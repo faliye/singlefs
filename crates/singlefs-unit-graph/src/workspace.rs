@@ -13,12 +13,12 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::conditional_compilation::Predicate;
-use crate::lexer::Token;
+use crate::lexer::{identifier_name, token_text, Token, TokenKind};
 use crate::manifest::{
     parse_crate_manifest, BuildScriptDeclaration, CrateManifest, DeclaredTarget, ManifestError,
 };
-use crate::rule_switches::RuleSwitches;
-use crate::rust_items::{normalized_path, parse_rust_file, RustFileInput};
+use crate::rule_switches::{BrokenRule, RuleSwitches};
+use crate::rust_items::{is_keyword, normalized_path, parse_rust_file, RustFileInput};
 use crate::units::{
     DocumentationTestAttachment, FileIndex, Refusal, RefusalForm, Unit, UnitIndex, UnitKind,
 };
@@ -153,6 +153,26 @@ pub struct WorkspaceCrate {
     pub crate_identifier: String,
     pub directory: PathBuf,
     pub manifest: CrateManifest,
+    pub origin: CrateOrigin,
+}
+
+/// 一个 crate 是怎么收进来的：工作区成员（`crates/` 下的），还是顺 path 依赖收进来的工作区外 crate（`prune-server/` 这一类）。
+/// 工作区外的按调用关系连，不按同名连（`closure` 的 `follow_bare_names`；与 `scripts/gate/lib_function_units.py` 的
+/// `RustCrate.outside_workspace` 同一个分法）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CrateOrigin {
+    UnderTheCratesDirectory,
+    PathDependencyOutsideTheWorkspace,
+}
+
+/// 别的包按裸名连得到一个工作区外 crate 的哪些名字（与 `scripts/gate/lib_function_units.py` 的
+/// `RustWorkspace.names_reaching_outside_crate` 同一个算法，`names_reaching_an_outside_crate`）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NamesReachingAnOutsideCrate {
+    /// 别的包的 use 语句里，这个 crate 的库名（或从它引进的名字）后面有 `*`：哪个名字都可能引进来了。
+    EveryName,
+    /// 经 use、`extern crate` 或路径从这个 crate 引进来的名字。
+    Named(BTreeSet<String>),
 }
 
 /// 源码是哪种语言。
@@ -207,6 +227,356 @@ pub struct WorkspaceIndexes {
     pub documentation_tests_of_module: HashMap<(FileIndex, Vec<String>), Vec<UnitIndex>>,
     /// 绝对路径 → 文件。
     pub files_by_path: HashMap<PathBuf, FileIndex>,
+    /// 条目级宏调用 → 调用体里跟在 `enum` / `struct` / `union` / `type` 后面的名字（宏生成的类型）：调用进闭包时这些名字算被点名。
+    pub types_declared_by_item_macro: HashMap<UnitIndex, Vec<String>>,
+    /// 带 `#[global_allocator]` 的 static：链接集里有它所在的目标，它就进闭包。
+    pub global_allocators: Vec<UnitIndex>,
+    /// 外部类型上的本仓 trait impl 头：R-方法、R-路径不等自身类型被点名就放行它的成员（自身类型永远点不到）。
+    pub foreign_type_trait_implementations: BTreeSet<UnitIndex>,
+    /// 工作区外的 crate → 别的包按裸名连得到它的哪些名字（只给 [`CrateOrigin::PathDependencyOutsideTheWorkspace`] 的 crate 算）。
+    pub names_reaching_crates_outside_the_workspace:
+        HashMap<CrateIndex, NamesReachingAnOutsideCrate>,
+}
+
+/// 闭包外的四类边里在装工作区时建的索引（`scripts/gate/lib_function_units.py` 的 `RustWorkspace.index_macro_and_foreign_edges`
+/// 同一趟扫法，只扫至少属于一个编译目标的文件里的单元，文档测试不扫）。
+struct EdgesOutsideTheEightRules {
+    types_declared_by_item_macro: HashMap<UnitIndex, Vec<String>>,
+    /// 宏名 → 同名 `macro_rules!` 展开式顶层按字面写出的名字（几份同名定义合起来算）。
+    literal_names_of_macro_rules: HashMap<String, BTreeSet<String>>,
+    global_allocators: Vec<UnitIndex>,
+    foreign_type_trait_implementations: BTreeSet<UnitIndex>,
+}
+
+/// 宏体里跟在这几个关键字后面、按字面写出的名字，是展开结果顶层的条目名。
+const ITEM_KEYWORDS_IN_A_MACRO_EXPANSION: [&str; 7] =
+    ["const", "static", "fn", "struct", "enum", "union", "type"];
+/// 条目级宏调用体里跟在这几个关键字后面的名字是宏生成的类型。
+const TYPE_KEYWORDS_IN_AN_ITEM_MACRO: [&str; 4] = ["enum", "struct", "union", "type"];
+/// `macro_rules!` 里展开结果顶层所在的括号深度：宏体的括号一层、展开式的括号一层（`impl $name { fn new … }` 里的关联项更深，不算：
+/// 它们按类型连，按名字登会让每一处 `X::new()` 都拉进这个宏的全部调用）。
+const MACRO_EXPANSION_TOP_LEVEL_BRACKET_DEPTH: isize = 2;
+/// impl 自身类型路径的头一段是这几个时指的是本 crate 里的东西，不算外部类型。
+const LOCAL_PATH_ROOTS: [&str; 4] = ["crate", "self", "super", "Self"];
+
+fn edges_outside_the_eight_rules(
+    units: &[Unit],
+    files: &[SourceFile],
+    memberships: &[Vec<FileMembership>],
+    crates: &[WorkspaceCrate],
+) -> EdgesOutsideTheEightRules {
+    let mut edges = EdgesOutsideTheEightRules {
+        types_declared_by_item_macro: HashMap::new(),
+        literal_names_of_macro_rules: HashMap::new(),
+        global_allocators: Vec::new(),
+        foreign_type_trait_implementations: BTreeSet::new(),
+    };
+    let mut type_names: BTreeSet<String> = BTreeSet::new();
+    let mut trait_names: BTreeSet<String> = BTreeSet::new();
+    let mut trait_implementations: Vec<UnitIndex> = Vec::new();
+    for (unit_position, unit) in units.iter().enumerate() {
+        let unit_index = UnitIndex(unit_position);
+        let Some((first_token, end_token)) = unit.token_range else {
+            continue;
+        };
+        if unit.kind == UnitKind::DocumentationTest || memberships[unit.file.0].is_empty() {
+            continue;
+        }
+        let file = &files[unit.file.0];
+        let text_at = move |position: usize| {
+            file.tokens
+                .get(position)
+                .map_or("", |token| token_text(&file.source, token))
+        };
+        let is_identifier_at = move |position: usize| {
+            file.tokens
+                .get(position)
+                .is_some_and(|token| token.kind == TokenKind::Identifier)
+        };
+        match unit.kind {
+            UnitKind::ItemMacroInvocation => {
+                let declared: BTreeSet<String> = (first_token..end_token)
+                    .filter(|position| {
+                        TYPE_KEYWORDS_IN_AN_ITEM_MACRO.contains(&text_at(*position))
+                            && is_identifier_at(position + 1)
+                            && !is_keyword(identifier_name(text_at(position + 1)))
+                    })
+                    .map(|position| identifier_name(text_at(position + 1)).to_string())
+                    .collect();
+                type_names.extend(declared.iter().cloned());
+                edges
+                    .types_declared_by_item_macro
+                    .insert(unit_index, declared.into_iter().collect());
+            }
+            UnitKind::MacroRulesDefinition => {
+                let mut bracket_depth: isize = 0;
+                for position in first_token..end_token {
+                    let word = text_at(position);
+                    match word {
+                        "{" | "(" | "[" => bracket_depth += 1,
+                        "}" | ")" | "]" => bracket_depth -= 1,
+                        _ => {}
+                    }
+                    if bracket_depth != MACRO_EXPANSION_TOP_LEVEL_BRACKET_DEPTH
+                        || !ITEM_KEYWORDS_IN_A_MACRO_EXPANSION.contains(&word)
+                    {
+                        continue;
+                    }
+                    let name_position = if word == "static" && text_at(position + 1) == "mut" {
+                        position + 2
+                    } else {
+                        position + 1
+                    };
+                    let name = identifier_name(text_at(name_position));
+                    if is_identifier_at(name_position)
+                        && !name.starts_with('$')
+                        && !is_keyword(name)
+                        && name != UNNAMED_ITEM_NAME
+                    {
+                        edges
+                            .literal_names_of_macro_rules
+                            .entry(unit.name.clone())
+                            .or_default()
+                            .insert(name.to_string());
+                    }
+                }
+            }
+            UnitKind::Static => {
+                let is_global_allocator = (first_token..end_token).any(|position| {
+                    text_at(position) == "global_allocator"
+                        && position >= first_token + 2
+                        && text_at(position - 1) == "["
+                        && text_at(position - 2) == "#"
+                });
+                if is_global_allocator {
+                    edges.global_allocators.push(unit_index);
+                }
+            }
+            UnitKind::Struct | UnitKind::Enumeration | UnitKind::Union | UnitKind::TypeAlias => {
+                type_names.insert(unit.name.clone());
+            }
+            UnitKind::TraitHead => {
+                trait_names.insert(unit.name.clone());
+            }
+            UnitKind::ImplementationHead => {
+                if unit.implementation.as_ref().is_some_and(|shape| {
+                    shape.is_trait_implementation && !shape.is_blanket_implementation
+                }) {
+                    trait_implementations.push(unit_index);
+                }
+            }
+            UnitKind::Function
+            | UnitKind::Constant
+            | UnitKind::Use
+            | UnitKind::ModuleDeclaration
+            | UnitKind::ModuleHead
+            | UnitKind::ExternBlock
+            | UnitKind::ExternCrate
+            | UnitKind::VerusBroadcastGroup
+            | UnitKind::VerusAssumeSpecification
+            | UnitKind::DocumentationTest => {}
+        }
+    }
+    let local_path_roots: BTreeSet<&str> = LOCAL_PATH_ROOTS
+        .iter()
+        .copied()
+        .chain(
+            crates
+                .iter()
+                .map(|workspace_crate| workspace_crate.crate_identifier.as_str()),
+        )
+        .collect();
+    for implementation_head in trait_implementations {
+        let shape = units[implementation_head.0]
+            .implementation
+            .as_ref()
+            .expect("只收了带 ImplementationShape 的 trait impl 头");
+        let is_written_as_an_outside_path = shape
+            .self_type_path_root
+            .as_deref()
+            .is_some_and(|root| !local_path_roots.contains(root));
+        let names_no_local_type = !shape
+            .self_type_names
+            .iter()
+            .any(|name| type_names.contains(name));
+        let implements_a_local_trait = shape
+            .trait_name
+            .as_ref()
+            .is_some_and(|trait_name| trait_names.contains(trait_name));
+        if implements_a_local_trait && (is_written_as_an_outside_path || names_no_local_type) {
+            edges
+                .foreign_type_trait_implementations
+                .insert(implementation_head);
+        }
+    }
+    edges
+}
+
+/// use 语句里根名后面不当引进名字的几个词。
+const PATH_WORDS_THAT_IMPORT_NOTHING: [&str; 4] = ["self", "super", "crate", "as"];
+/// 宏调用名后面接的开括号。
+const MACRO_INVOCATION_OPENING_BRACKETS: [&str; 3] = ["(", "[", "{"];
+
+/// 每个工作区外 crate 的 [`NamesReachingAnOutsideCrate`]。
+fn names_reaching_crates_outside_the_workspace(
+    units: &[Unit],
+    files: &[SourceFile],
+    memberships: &[Vec<FileMembership>],
+    targets: &[Target],
+    crates: &[WorkspaceCrate],
+) -> HashMap<CrateIndex, NamesReachingAnOutsideCrate> {
+    let mut reaching = HashMap::new();
+    for (crate_position, workspace_crate) in crates.iter().enumerate() {
+        match workspace_crate.origin {
+            CrateOrigin::UnderTheCratesDirectory => {}
+            CrateOrigin::PathDependencyOutsideTheWorkspace => {
+                let outside_crate = CrateIndex(crate_position);
+                reaching.insert(
+                    outside_crate,
+                    names_reaching_an_outside_crate(
+                        outside_crate,
+                        workspace_crate,
+                        units,
+                        files,
+                        memberships,
+                        targets,
+                    ),
+                );
+            }
+        }
+    }
+    reaching
+}
+
+/// 别的包按裸名连得到工作区外这个 crate 的哪些名字。扫的是这个 crate 以外每个编译目标的文件：根名起先是这个 crate 的库名；
+/// use / `extern crate` 语句里出现根名的，它后面的名字都算引进来、也都当根名（引进来的可能是模块或别名），收到不再变；语句里根名后面有 `*` 的全收。
+/// 路径 `根名::a::b` 里根名后面的段都算；名字后面接 `!` 与开括号、又是这个 crate 里 `macro_rules!` 的名字的也算。引进来的名字按整个工作区收、
+/// 不分模块：经别处 `pub use` 转出去再 glob 引进来的照样认得。
+fn names_reaching_an_outside_crate(
+    outside_crate: CrateIndex,
+    workspace_crate: &WorkspaceCrate,
+    units: &[Unit],
+    files: &[SourceFile],
+    memberships: &[Vec<FileMembership>],
+    targets: &[Target],
+) -> NamesReachingAnOutsideCrate {
+    let is_in_a_target_of_the_outside_crate = |file_position: usize| {
+        memberships[file_position]
+            .iter()
+            .any(|membership| targets[membership.target.0].crate_index == outside_crate)
+    };
+    let scanned_files: Vec<&SourceFile> = files
+        .iter()
+        .enumerate()
+        .filter(|(file_position, _)| {
+            !is_in_a_target_of_the_outside_crate(*file_position)
+                && memberships[*file_position]
+                    .iter()
+                    .any(|membership| targets[membership.target.0].crate_index != outside_crate)
+        })
+        .map(|(_, file)| file)
+        .collect();
+    let macro_names: BTreeSet<&str> = units
+        .iter()
+        .filter(|unit| {
+            unit.kind == UnitKind::MacroRulesDefinition
+                && is_in_a_target_of_the_outside_crate(unit.file.0)
+        })
+        .map(|unit| unit.name.as_str())
+        .collect();
+    // （文件，语句里 use / crate 之后的头一个词法单元，语句收尾的 `;`）
+    let mut statements: Vec<(&SourceFile, usize, usize)> = Vec::new();
+    for file in scanned_files.iter().copied() {
+        for position in 0..file.tokens.len() {
+            let word = file_token_text(file, position);
+            if !is_file_token_identifier(file, position) || !matches!(word, "use" | "crate") {
+                continue;
+            }
+            if word == "crate"
+                && position
+                    .checked_sub(1)
+                    .is_none_or(|previous| file_token_text(file, previous) != "extern")
+            {
+                continue;
+            }
+            let mut end = position + 1;
+            while end < file.tokens.len() && file_token_text(file, end) != ";" {
+                end += 1;
+            }
+            statements.push((file, position + 1, end));
+        }
+    }
+    let mut roots: BTreeSet<String> = BTreeSet::from([workspace_crate.crate_identifier.clone()]);
+    let mut is_every_name_imported = false;
+    let mut has_grown = true;
+    // 根名只增不减、上界是语句里标识符的个数：收到一趟不再长就停
+    while has_grown {
+        has_grown = false;
+        for (file, low, high) in &statements {
+            let Some(start) = (*low..*high).find(|position| {
+                is_file_token_identifier(file, *position)
+                    && roots.contains(file_token_text(file, *position))
+            }) else {
+                continue;
+            };
+            for position in start + 1..*high {
+                let word = file_token_text(file, position);
+                if word == "*" {
+                    is_every_name_imported = true;
+                } else if is_file_token_identifier(file, position)
+                    && !PATH_WORDS_THAT_IMPORT_NOTHING.contains(&word)
+                    && !roots.contains(word)
+                {
+                    roots.insert(word.to_string());
+                    has_grown = true;
+                }
+            }
+        }
+    }
+    if is_every_name_imported {
+        return NamesReachingAnOutsideCrate::EveryName;
+    }
+    let mut names = roots.clone();
+    for file in scanned_files.iter().copied() {
+        for position in 0..file.tokens.len() {
+            if !is_file_token_identifier(file, position) {
+                continue;
+            }
+            let word = file_token_text(file, position);
+            if macro_names.contains(word)
+                && file_token_text(file, position + 1) == "!"
+                && MACRO_INVOCATION_OPENING_BRACKETS.contains(&file_token_text(file, position + 2))
+            {
+                names.insert(word.to_string());
+            }
+            if !roots.contains(word) {
+                continue;
+            }
+            let mut following = position + 1;
+            while file_token_text(file, following) == ":"
+                && file_token_text(file, following + 1) == ":"
+                && is_file_token_identifier(file, following + 2)
+            {
+                names.insert(file_token_text(file, following + 2).to_string());
+                following += 3;
+            }
+        }
+    }
+    NamesReachingAnOutsideCrate::Named(names)
+}
+
+/// 文件里第 `position` 个词法单元的原文；越界交空串。
+fn file_token_text(file: &SourceFile, position: usize) -> &str {
+    file.tokens
+        .get(position)
+        .map_or("", |token| token_text(&file.source, token))
+}
+
+/// 文件里第 `position` 个词法单元是标识符（关键字也算）；越界交假。
+fn is_file_token_identifier(file: &SourceFile, position: usize) -> bool {
+    file.tokens
+        .get(position)
+        .is_some_and(|token| token.kind == TokenKind::Identifier)
 }
 
 /// 装好的工作区。
@@ -229,6 +599,8 @@ pub struct Workspace {
     loading_switches: RuleSwitches,
     /// 产品行为视图（只在原样的那一份上有），第一次要时才切。
     product_behavior_view: OnceLock<Box<Workspace>>,
+    /// 闭包读到的 shell 脚本各自（传递地）source 进来的文件：一份脚本在这个工作区里只折一趟（`shell_sources`）。
+    pub shell_sourced_files: crate::shell_sources::ShellSourcedFilesCache,
 }
 
 /// 工作区装不起来。
@@ -342,7 +714,7 @@ fn source_to_split(
                     Err(unparsed) => (
                         original.clone(),
                         Some(Refusal {
-                            file,
+                            file: crate::units::RefusalFile::WorkspaceSourceFile(file),
                             line: unparsed.line,
                             form: RefusalForm::VerusGhostCodeUnparsed,
                             fragment: unparsed.reason,
@@ -857,9 +1229,14 @@ pub const UNNAMED_ITEM_NAME: &str = "_";
 
 fn build_indexes(
     units: &[Unit],
+    files: &[SourceFile],
     memberships: &[Vec<FileMembership>],
+    targets: &[Target],
+    crates: &[WorkspaceCrate],
     files_by_path: HashMap<PathBuf, FileIndex>,
+    switches: &RuleSwitches,
 ) -> WorkspaceIndexes {
+    let edges = edges_outside_the_eight_rules(units, files, memberships, crates);
     let mut indexes = WorkspaceIndexes {
         units_by_target_and_name: HashMap::new(),
         members_by_name: HashMap::new(),
@@ -871,7 +1248,18 @@ fn build_indexes(
         documentation_tests_of_item: HashMap::new(),
         documentation_tests_of_module: HashMap::new(),
         files_by_path,
+        types_declared_by_item_macro: edges.types_declared_by_item_macro,
+        global_allocators: edges.global_allocators,
+        foreign_type_trait_implementations: edges.foreign_type_trait_implementations,
+        names_reaching_crates_outside_the_workspace: names_reaching_crates_outside_the_workspace(
+            units,
+            files,
+            memberships,
+            targets,
+            crates,
+        ),
     };
+    let links_macro_rules_literal_names = switches.is_intact(BrokenRule::MacroRulesLiteralNames);
     for (unit_position, unit) in units.iter().enumerate() {
         let unit_index = UnitIndex(unit_position);
         if let Some(container) = unit.container {
@@ -893,6 +1281,29 @@ fn build_indexes(
                     .or_default();
                 for name in &unit.declared_names {
                     by_name.entry(name.clone()).or_default().push(unit_index);
+                }
+            }
+        }
+        if unit.kind == UnitKind::ItemMacroInvocation && links_macro_rules_literal_names {
+            // 同名 `macro_rules!` 展开式顶层按字面写出的名字登到这次调用名下（调用体里已有的不重登）：点名这个名字的单元连到调用。
+            // 只进按名字的索引，不改 `declared_names`（WGSL 外名的着落不变）；与 python 那一份一样不看调用在不在 impl / trait 里。
+            let macro_name = unit
+                .name
+                .split_once("!@")
+                .map_or(unit.name.as_str(), |(name_before_the_line, _line)| {
+                    name_before_the_line
+                });
+            if let Some(literal_names) = edges.literal_names_of_macro_rules.get(macro_name) {
+                for membership in &memberships[unit.file.0] {
+                    let by_name = indexes
+                        .units_by_target_and_name
+                        .entry(membership.target)
+                        .or_default();
+                    for name in literal_names {
+                        if !unit.declared_names.contains(name) {
+                            by_name.entry(name.clone()).or_default().push(unit_index);
+                        }
+                    }
                 }
             }
         }
@@ -987,7 +1398,19 @@ pub fn load_workspace(
         });
     }
     let mut crates = Vec::new();
-    for directory in crate_directories {
+    // 收完 `crates/` 下的以后，顺各 crate 清单的 path 依赖（普通、开发、构建三种）广度优先收落在仓根底下、有 `Cargo.toml` 的目录
+    // （根清单 exclude 里的 `prune-server/` 这一类自己是工作区根的独立工程）；`.`、`..` 起头的、落在仓根外的、清单里写成绝对路径的不收。
+    // 与 `scripts/gate/lib_function_units.py` 的 `discover_rust_crates` 同一条规则。弄坏开关 path-dependencies-outside-the-workspace：不收
+    let follows_path_dependencies =
+        switches.is_intact(BrokenRule::PathDependenciesOutsideTheWorkspace);
+    let mut known_directories: BTreeSet<PathBuf> = crate_directories
+        .iter()
+        .map(|directory| normalized_path(directory.as_path()))
+        .collect();
+    // `crates/` 下的是工作区成员；之后顺 path 依赖收进来的是工作区外的（`CrateOrigin`）
+    let workspace_member_directories = known_directories.clone();
+    let mut pending_directories: VecDeque<PathBuf> = crate_directories.into_iter().collect();
+    while let Some(directory) = pending_directories.pop_front() {
         let manifest_path = directory.join("Cargo.toml");
         let text = std::fs::read_to_string(&manifest_path).map_err(|error| {
             WorkspaceError::RootUnreadable {
@@ -1005,11 +1428,40 @@ pub fn load_workspace(
             .as_ref()
             .and_then(|library| library.name.clone())
             .unwrap_or_else(|| manifest.package_name.replace('-', "_"));
+        if follows_path_dependencies {
+            for dependency_path in manifest
+                .dependencies
+                .iter()
+                .filter_map(|dependency| dependency.path.as_deref())
+            {
+                if Path::new(dependency_path).is_absolute() {
+                    continue;
+                }
+                let place = normalized_path(&directory.join(dependency_path));
+                let is_under_the_repository_root = place
+                    .strip_prefix(&repository_root)
+                    .is_ok_and(|relative| !relative.as_os_str().is_empty());
+                if !is_under_the_repository_root
+                    || known_directories.contains(&place)
+                    || !place.join("Cargo.toml").is_file()
+                {
+                    continue;
+                }
+                known_directories.insert(place.clone());
+                pending_directories.push_back(place);
+            }
+        }
+        let origin = if workspace_member_directories.contains(&normalized_path(&directory)) {
+            CrateOrigin::UnderTheCratesDirectory
+        } else {
+            CrateOrigin::PathDependencyOutsideTheWorkspace
+        };
         crates.push(WorkspaceCrate {
             package_name: manifest.package_name.clone(),
             crate_identifier,
             directory,
             manifest,
+            origin,
         });
     }
     let mut entries = Vec::new();
@@ -1123,7 +1575,7 @@ fn assemble_workspace(
         if reported_missing.insert(unit_index) {
             let unit = &units[unit_index.0];
             files[unit.file.0].file_level_refusals.push(Refusal {
-                file: unit.file,
+                file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                 line: unit.start_line,
                 form: RefusalForm::ModuleFileMissing,
                 fragment: candidates,
@@ -1138,7 +1590,15 @@ fn assemble_workspace(
         }
     }
     assign_qualified_names(&mut units, &files, &memberships, &targets, &crates);
-    let indexes = build_indexes(&units, &memberships, files_by_path);
+    let indexes = build_indexes(
+        &units,
+        &files,
+        &memberships,
+        &targets,
+        &crates,
+        files_by_path,
+        loading.switches,
+    );
     Workspace {
         repository_root,
         crates,
@@ -1153,6 +1613,7 @@ fn assemble_workspace(
         loading_threads: loading.threads,
         loading_switches: loading.switches.clone(),
         product_behavior_view: OnceLock::new(),
+        shell_sourced_files: crate::shell_sources::ShellSourcedFilesCache::default(),
     }
 }
 

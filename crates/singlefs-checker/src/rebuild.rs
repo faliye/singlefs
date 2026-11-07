@@ -13,18 +13,18 @@
 //! 并核非测试代码里每一处指名 crate 内一项的路径都落在白名单里（C410（checker 两个方向共享什么没有检查） 的会红形态）。
 //!
 //! 条款没逐字写、按条款推出来的四处读法（重建这一侧与 `walk` 里比对那一侧各两处）：
-//! - 读法：没有 inode 记录也没有墓碑压着的码 1 单元照认领，进数据单元集合与中央映射（主 agent 2026-10-13 认，条款没写）。
-//! - 读法：中央映射同一 key 两边的落点集合不同时，两边各只留读得出的副本再比，掉一份副本的降级镜像不判红（主 agent 2026-10-13 认，条款没写）。
-//! - 读法：三张表在两边都是空表（mkfs、暖机之后）判成立，不判不适用：比对真跑了（主 agent 2026-10-13 认，条款没写）。
-//! - 读法：每个 inode 的数据单元集合那张表的值比映射 key，不比落点，落点归中央映射那张表（主 agent 2026-10-13 认，条款没写）。
+//! - 读法：没有 inode 记录也没有墓碑压着的码 1 单元照认领，进数据单元集合与中央映射。
+//! - 读法：中央映射同一 key 两边的落点集合不同时，两边各只留读得出的副本再比，掉一份副本的降级镜像不判红。
+//! - 读法：三张表在两边都是空表（mkfs、暖机之后）判成立，不判不适用：比对真跑了。
+//! - 读法：每个 inode 的数据单元集合那张表的值比映射 key，不比落点，落点归中央映射那张表。
 //!
-//! 谱系记录与退役记录的两条读法（用户 2026-10-14 定，`research/prompts/m4-batch2-code-r1-forks.md` 第 1 行「甲」）：
+//! 谱系记录与退役记录的两条读法：
 //! - 谱系记录（C615（扫盘重建对挂着时的回退没有输入））按「不是任何现行版本的成员」认领：随回退走的那几类（码 1 数据单元、
 //!   inode 叶容器）只在诞生代号落在最新那一版谱系上的版本里择当前版本，回退抛弃的那一段里诞生的版本不进任何一张表；
-//!   随现行那一版走的树（墓碑树、退役树、谱系树）的容器不按谱系滤、只按已发布谓词择（用户 2026-10-08 定的 X1「退役记录·甲」）。
+//!   随现行那一版走的树（墓碑树、退役树、谱系树）的容器不按谱系滤、只按已发布谓词择。
 //! - 退役记录（C768（退役记录的扫描重建读侧没有消费者））按退役树认领：死亡 txg 在谱系上的退役记录点名的 inode 叶容器整个身份不认领。
 //!
-//! 两条读法落到代码时按条款推出来、条款没逐字写的三处（实现员 2026-10-15 推的，交主 agent 认）：
+//! 两条读法落到代码时按条款推出来、条款没逐字写的三处：
 //! - 读法：「在谱系上」照 I-9.18（删除队列里的号有谱系上的墓碑） 的定义，父链的起点取 2⁶⁴ − 1 而不取最新根的 txg（重建不读根）：
 //!   已发布的单元诞生代号都不过最新根的 txg（I-1.2（块头写序已发布）），已发布的谱系容器里的 T_rb 也都不过它，两个起点认出的是同一批版本。
 //! - 读法：墓碑只认死亡 txg 在谱系上的（I-9.19（谱系上的墓碑不指活对象） 同一定义），回退抛弃的那一段里写的墓碑不压回退目标那一版里活着的对象。
@@ -116,7 +116,7 @@ pub(crate) struct RebuiltIndexTables {
     pub(crate) inode_records: BTreeMap<u64, Vec<u8>>,
     /// 墓碑压着、记录还在的对象：inode 号 → 当前版本 inode 叶容器里它那条记录 140 字节原样（谱系上有它那一对 (号, 对象出生代) 的墓碑）。
     /// 这条记录不进上面的 inode 记录集合，它的数据单元按墓碑不认领。算不算删除中，这一侧认不了，由比对那一侧（`walk` 模块）两侧一起认
-    /// （判决 `research/prompts/m4-c860-r1-main-verification.md` 第三节 C2，用户 2026-10-20 选丙）：遍历方向也有同号、同对象出生代的记录，
+    /// 遍历方向也有同号、同对象出生代的记录，
     /// 且两侧那条记录 nlink 都是 0（D8（核心索引结构） 已定项 16 第 1、3 条）才算，两侧都去掉它的记录、数据单元与映射（判决
     /// `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M5）；不算的，这条记录放回 inode 记录集合，两侧照比。
     pub(crate) records_of_the_tombstoned_objects: BTreeMap<u64, Vec<u8>>,
@@ -127,7 +127,7 @@ pub(crate) struct RebuiltIndexTables {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ScanRebuildNotDecided {
     /// 码 1 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同：I-1.8（归并后版本全序） ② 不成立，择新键择不出
-    /// （码 1 的全序键与码 3 同形，C464（I-1.8 对码 1 的全序键写窄了） 用户 2026-10-26 定「① 加诞生代号打头」）。
+    /// （码 1 的全序键与码 3 同形，C464（I-1.8 对码 1 的全序键写窄了））。
     /// 扫描方向交来的副本 fsid 都等于本池的，那样两组的归并键相同、合成一版，这一支只在交进来的副本 fsid 不同时走到。
     DataUnitVersionsTiedOnTheTotalOrderKeyOfI18,
     /// 码 3 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同：I-1.8（归并后版本全序） ② 不成立，择新键择不出。
@@ -185,9 +185,9 @@ impl ScanRebuildNotDecided {
     }
 }
 
-/// C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3 的择新键：取 (诞生代号, 实例代号, 事务号) 最大者，诞生代号打头、
+/// C113（扫描重建时多版单元的现行版本判定无输入） P3 的择新键：取 (诞生代号, 实例代号, 事务号) 最大者，诞生代号打头、
 /// 同一 checkpoint 里写过几次的由事务号定——这就是 I-1.8（归并后版本全序） 的全序键三元，码 1 与码 3 同形（码 1 那一半是
-/// C464（I-1.8 对码 1 的全序键写窄了） 用户 2026-10-26 定的「① 加诞生代号打头」：一个事务跨两个 checkpoint 时两版写序逐字节相同，
+/// C464（I-1.8 对码 1 的全序键写窄了）的「① 加诞生代号打头」：一个事务跨两个 checkpoint 时两版写序逐字节相同，
 /// 只有诞生代号分得开）。字段次序就是比较次序。只在同一个对象身份的各版之间比：对象身份首字节是类标签，一个身份上的各版必然同类。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct CurrentVersionOrderKey {
@@ -228,7 +228,7 @@ type OrderedVersion = (CurrentVersionOrderKey, VersionOfAnObject);
 enum VersionsOfAnObject {
     /// 墓碑、退役、谱系三棵随现行那一版走的树的容器，连同实例表的片与未登记的类型：管理员回退不取回退目标那一版的
     /// （`crates/singlefs-core/src/transaction.rs` 的 `TransactionOutput` 那三棵树的字段文档），只按已发布谓词择
-    /// （C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2 / P3；用户 2026-10-08 定的 X1「退役记录·甲」）。
+    /// （C113（扫描重建时多版单元的现行版本判定无输入） P2 / P3）。
     ChosenAmongEveryPublishedVersion(VersionOfAnObject),
     /// 码 1 数据单元与 inode 叶容器：管理员回退取回退目标那一版的 extent 树与 inode 树，回退抛弃的那一段里诞生的版本不是任何现行版本的成员。
     /// 各版按择新键升序，第二步只在诞生代号落在谱系上的版本里取最大的。
@@ -288,17 +288,17 @@ fn birth_txg_of(version: &VersionOfAnObject) -> u64 {
 
 /// 谱系记录 24 字节里 T_rb 与 T_old 两段的偏移（`.claude/kb/layout/03-third-txn.md`「三、谱系记录」），按字段表另写一份，不用实现的解析，
 /// 也不用 `walk` 里那一份。
-const LINEAGE_RECORD_ROLLBACK_TXG_OFFSET: usize = 0;
+const LINEAGE_RECORD_ROLLBACK_TXG_OFFSET_FOR_THE_SCAN_REBUILD: usize = 0;
 const LINEAGE_RECORD_ROLLBACK_TARGET_TXG_OFFSET: usize = 8;
 
 /// 退役记录 34 字节（同一份字段表「五、退役记录」）：被退役身份 26 字节（出生树 8、打包记录类型 2、容器号 8、容器出生代 8），与码 3
 /// 类身份段里类标签之后那 26 字节同序同宽；死亡 txg 在 26。
 const RETIREMENT_RECORD_RETIRED_IDENTITY_BYTES: usize = 26;
-const RETIREMENT_RECORD_RECORD_TYPE_OFFSET: usize = 8;
-const RETIREMENT_RECORD_DEATH_TXG_OFFSET: usize = 26;
+const RETIREMENT_RECORD_RECORD_TYPE_OFFSET_FOR_THE_SCAN_REBUILD: usize = 8;
+const RETIREMENT_RECORD_DEATH_TXG_OFFSET_FOR_THE_SCAN_REBUILD: usize = 26;
 
 /// 墓碑记录 40 字节里死亡 txg 的偏移（同一份字段表「二、墓碑记录」）。
-const TOMBSTONE_RECORD_DEATH_TXG_OFFSET: usize = 32;
+const TOMBSTONE_RECORD_DEATH_TXG_OFFSET_FOR_THE_SCAN_REBUILD: usize = 32;
 
 /// 码 3 对象身份（类身份段 42..69）里类标签之后那一段的起点：退役记录点名的身份从这里起逐字节相等。
 const PACKED_OBJECT_IDENTITY_AFTER_THE_CLASS_TAG: usize = 1;
@@ -330,7 +330,10 @@ fn txgs_on_the_lineage_of_the_newest_version(
         .iter()
         .map(|record| {
             (
-                read_u64(record, LINEAGE_RECORD_ROLLBACK_TXG_OFFSET),
+                read_u64(
+                    record,
+                    LINEAGE_RECORD_ROLLBACK_TXG_OFFSET_FOR_THE_SCAN_REBUILD,
+                ),
                 read_u64(record, LINEAGE_RECORD_ROLLBACK_TARGET_TXG_OFFSET),
             )
         })
@@ -561,7 +564,7 @@ fn records_of_a_current_container(
         .ok_or(ScanRebuildNotDecided::CurrentPackedContainerDecodesFromNoCopy)
 }
 
-/// 读法 Z 加写序的第三条（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K6，用户 2026-10-16 定）要的那张表：
+/// 读法 Z 加写序的第三条要的那张表：
 /// 每个 (inode, 对象出生代) 的当前版本数据单元里，每个偏移之下（偏移严格更小）那些单元的最大出生 txg。按偏移升序扫一遍，
 /// 同一个偏移上有几版（树 ID 不同）的先都记下、再并进「之下」那一份。
 fn newest_birth_txg_below_each_data_unit(
@@ -595,15 +598,15 @@ fn newest_birth_txg_below_each_data_unit(
 
 /// 第二步：从第一步归并出的各版与那几片容器的整单元字节现算三张表。
 ///
-/// 认领的规矩，逐条有出处：数据单元按对象身份择当前版本（C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3）；
-/// 有同一对象出生代的 inode 记录时按读法 Z 加写序（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K6，用户 2026-10-16 定，
+/// 认领的规矩，逐条有出处：数据单元按对象身份择当前版本（C113（扫描重建时多版单元的现行版本判定无输入） P3）；
+/// 有同一对象出生代的 inode 记录时按读法 Z 加写序（
 /// D18（块里携带什么信息） 已定项 10）判死活，三条都满足才认领：对象出生代与记录相同；偏移在 ⌈size ÷ 净荷⌉.max(1) 个单元之内
 /// （size 之外的不认领：截断中间态里还挂着的、覆盖写变短与截断放掉而还在盘上的）；同一 (inode, 对象出生代) 的当前版本里没有偏移更小、
 /// 出生 txg 更大的单元（变长留洞之后、洞里放掉而还在盘上的旧单元由它判死）。前提是活单元的出生 txg 随偏移不降：今天的写入口
 /// 都从偏移 0 整份写、截断只重写最后留下的单元、变长只重写最后一个存在的单元；出现「写到偏移 o 而不重写 o 之后的单元」的入口
-/// （pwrite、punch）时这一条要重开。三条之外再合取第四条（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R3、R4）：
+/// （pwrite、punch）时这一条要重开。三条之外再合取第四条：
 /// 记录偏移 120 的截断字段 T ≠ 0 时，单元号不小于 ⌈N_w ÷ 净荷⌉.max(1)（N_w 在偏移 128）且单元头出生 txg 早于 T 的不认领。
-/// 没有同一对象出生代的记录的单元照旧认领（见文件头「没有 inode 记录也没有墓碑压着的码 1 单元照认领」；判决 m4-trunc-r1 第六节 S3）；
+/// 没有同一对象出生代的记录的单元照旧认领（见文件头「没有 inode 记录也没有墓碑压着的码 1 单元照认领」）；
 /// 码 1 与 inode 叶容器只在诞生代号落在谱系上的版本里择（谱系记录按「不是任何现行版本的成员」认领，见文件头）；
 /// 墓碑判 key 死亡（D11（索引节点要不要留消息缓冲区） 已定项 4）——第一版墓碑只写整对象，压住 (对象, 对象出生代) 的全部单元，
 /// 只认死亡 txg 在谱系上的；死亡 txg 在谱系上的退役记录点名的 inode 叶容器不认领（退役记录按退役树认领，见文件头）；
@@ -663,8 +666,14 @@ pub(crate) fn rebuild_index_tables(
     // 被退役身份（类标签之后那 26 字节）→ 谱系上最早的那个死亡 txg。
     let mut retired_leaf_containers: BTreeMap<Vec<u8>, u64> = BTreeMap::new();
     for record in &retirement_records {
-        let death_txg = read_u64(record, RETIREMENT_RECORD_DEATH_TXG_OFFSET);
-        if read_u16(record, RETIREMENT_RECORD_RECORD_TYPE_OFFSET) != PACKED_TYPE_INODE
+        let death_txg = read_u64(
+            record,
+            RETIREMENT_RECORD_DEATH_TXG_OFFSET_FOR_THE_SCAN_REBUILD,
+        );
+        if read_u16(
+            record,
+            RETIREMENT_RECORD_RECORD_TYPE_OFFSET_FOR_THE_SCAN_REBUILD,
+        ) != PACKED_TYPE_INODE
             || !txgs_on_the_lineage.holds(death_txg)
         {
             continue;
@@ -687,7 +696,10 @@ pub(crate) fn rebuild_index_tables(
                 ScanRebuildNotDecided::TombstoneRangeOtherThanTheWholeObjectOfTheFirstVersion,
             );
         }
-        if txgs_on_the_lineage.holds(read_u64(record, TOMBSTONE_RECORD_DEATH_TXG_OFFSET)) {
+        if txgs_on_the_lineage.holds(read_u64(
+            record,
+            TOMBSTONE_RECORD_DEATH_TXG_OFFSET_FOR_THE_SCAN_REBUILD,
+        )) {
             tombstoned_objects.insert((
                 read_u64(record, TOMBSTONE_RECORD_OBJECT_IDENTIFIER_OFFSET),
                 read_u64(record, TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET),
@@ -742,7 +754,7 @@ pub(crate) fn rebuild_index_tables(
         }
     }
     // 墓碑压着、记录还在的对象（谱系上有墓碑）：记录先放一边、不进这一侧的 inode 记录集合，算不算删除中由比对那一侧两侧一起认
-    // （判决 m4-c860-r1 第三节 C2，见 `RebuiltIndexTables::records_of_the_tombstoned_objects`）；它的数据单元下面按墓碑不认领。
+    // 它的数据单元下面按墓碑不认领。
     let tombstoned_inodes_that_still_have_a_record: Vec<u64> = inode_records
         .iter()
         .filter(|(inode, record)| {
@@ -788,7 +800,7 @@ pub(crate) fn rebuild_index_tables(
             {
                 continue;
             }
-            // 读法 Z 第四条（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R3、R4，与写序那一条是合取）：记录的截断字段
+            // 读法 Z 第四条：记录的截断字段
             // T ≠ 0 时，单元号不小于 ⌈N_w ÷ 净荷容量⌉.max(1)、单元头出生 txg 早于 T 的是那次截断放掉而还在盘上的旧单元，不认领。
             // 截在单元边界上再变长时这几个旧单元与留下的单元同一个出生 txg，写序那一条判不死它们。
             let truncation_field_txg = read_u64(record, INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET);
@@ -1112,7 +1124,7 @@ mod tests {
         named_outside_the_whitelist
     }
 
-    /// 攻方 W1 的绕过（m4-batch2-code-r1 判决 S8）：`use` 清单之后一行注释里带测试模块那一行属性的字样，下一行再引走树的函数。
+    /// 绕过：`use` 清单之后一行注释里带测试模块那一行属性的字样，下一行再引走树的函数。
     /// 拼成一行字符串（`\n` 换行），本文件里没有一行恰是那一行属性。
     const SOURCE_WITH_A_WALK_IMPORT_BEHIND_A_COMMENT_NAMING_THE_TEST_ATTRIBUTE: &str = "use std::collections::BTreeMap;\n// 测试模块从 #[cfg(test)] 那一行起\nuse crate::walk::check_pool_image;\n\nfn rebuild() {}\n\n#[cfg(test)]\nmod tests {}\n";
 
@@ -1576,7 +1588,7 @@ mod tests {
     }
 
     /// 墓碑压着、记录还在的对象：它的记录与数据单元都不进重建出的表，记录原样放进 `records_of_the_tombstoned_objects`，扫描重建照常交回
-    /// （此前整张交回「条款没写」）。算不算删除中这一侧不认，由比对那一侧两侧一起认（判决 m4-c860-r1 第三节 C2）。
+    /// 算不算删除中这一侧不认，由比对那一侧两侧一起认。
     #[test]
     fn a_tombstoned_object_that_still_has_its_record_is_set_aside_for_the_comparison_to_judge_with_both_sides(
     ) {
@@ -1627,7 +1639,7 @@ mod tests {
         );
     }
 
-    /// 读法 Z 加写序（判决 m4-trunc-r1 K6）的那几条单测共用的镜像：第一个 inode 的记录（size `size_in_bytes`），与它在偏移 0、一个净荷处
+    /// 读法 Z 加写序的那几条单测共用的镜像：第一个 inode 的记录（size `size_in_bytes`），与它在偏移 0、一个净荷处
     /// 各一个数据单元，出生 txg 分别是 `birth_txgs`（写序跟着出生 txg 走：实例 1、事务号 = 2 × 出生 txg 加单元号，同一个出生 txg 的两个单元是同一次发布里
     /// 先后两个事务，映射 key 不同）。交回重建出的数据单元集合里有哪几个偏移。
     fn offsets_claimed_with_two_data_units(size_in_bytes: u64, birth_txgs: [u64; 2]) -> Vec<u64> {
@@ -1641,13 +1653,13 @@ mod tests {
         )
     }
 
-    /// inode 记录偏移 120 起的截断字段（判决 m4-trunc-r2 第三节 R1）：T 与 N_w。
+    /// inode 记录偏移 120 起的截断字段：T 与 N_w。
     struct TruncationFieldOfTheRecord {
         txg: u64,
         size_in_bytes: u64,
     }
 
-    /// 同 [`offsets_claimed_with_two_data_units`]，第一个 inode 的记录另带截断字段 `truncation_field`（读法 Z 第四条，判决 m4-trunc-r2 R3）。
+    /// 同 [`offsets_claimed_with_two_data_units`]，第一个 inode 的记录另带截断字段 `truncation_field`（读法 Z 第四条）。
     fn offsets_claimed_with_two_data_units_under_a_truncation_field(
         size_in_bytes: u64,
         truncation_field: TruncationFieldOfTheRecord,
@@ -1721,7 +1733,7 @@ mod tests {
         );
     }
 
-    /// 题面那一形（判决 m4-trunc-r2 第三节 R3）：两个单元同在 txg 3 写下，txg 4 截在单元边界上（N_w = 一个净荷，不重写单元 0）、
+    /// 题面那一形：两个单元同在 txg 3 写下，txg 4 截在单元边界上（N_w = 一个净荷，不重写单元 0）、
     /// 放掉单元 1，再变长到两个净荷（洞）。单元 1 还在盘上、出生 txg 与单元 0 相同，写序那一条判不死它；第四条判死它，只认领单元 0。
     #[test]
     fn a_data_unit_born_before_the_truncation_field_beyond_its_size_is_not_claimed() {

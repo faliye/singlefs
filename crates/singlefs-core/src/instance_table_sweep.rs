@@ -21,10 +21,11 @@
 //! 第一版不做的：现行那一版树表 0 条时不清扫（[`NoRowDeletedThisRound::SweepOnAVersionWithoutFileNotSupportedInTheFirstVersion`]：
 //! 那一版的账住根记录那一项、不在树表里，「跳过根环里可读根的账」那一半读不全；清扫发布在那一版上的形状条款也没写）。
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use singlefs_format::{
     DATA_UNIT_HEADER_BYTES, INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE,
-    INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT, INSTANCE_TABLE_PAGE_RECORDS, PACKED_UNIT_HEADER_BYTES,
+    INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT, PACKED_UNIT_HEADER_BYTES,
 };
 
 use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
@@ -33,7 +34,7 @@ use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
 use crate::checksum::wide_checksum_field_holds;
 use crate::instance_table::InstanceRow;
 use crate::journal::back_chain_of;
-use crate::make_filesystem::MakeFilesystemParameters;
+use crate::make_filesystem::{MakeFilesystemParameters, GENESIS_CHECKPOINT_TXG};
 use crate::mount::RollbackTarget;
 use crate::recovery::{
     allocation_records_under_root_in_the_unit_area_starting_at, choose_system_configuration,
@@ -41,7 +42,10 @@ use crate::recovery::{
     unit_area_start_of_the_chosen_system_configuration, PoolReader, RecoveryFailure,
 };
 use crate::root_record::{RootRecord, UnmountMarker};
-use crate::root_ring::{slot_offset, RootRingSlot};
+use crate::root_ring::{
+    root_sits_in_the_ring_slot_the_formula_gives, slot_offset, target_for_publish, RootRingSlot,
+    RootRingSlotsPerRegion,
+};
 use crate::transaction::{
     prepare_the_version_publish, publish_version, DeletionAndLineageOfThePublish,
     InstanceTablePlan, InstanceTableRewrite, PoolVersion, PoolWriter, PublishError, PublishPlan,
@@ -66,9 +70,12 @@ pub enum InstanceTableSweepSwitch {
 pub struct InstanceTableRowCountThreshold(pub u64);
 
 impl InstanceTableRowCountThreshold {
-    /// 默认值没定（C690（清扫触发阈值的默认值没定））：这里的占位取一片实例表装得下的数据行数 369（370 条记录减去链指针那一条），
-    /// 行数越过它链就长出第二片。不是定案，定了照定案换。
-    pub const PLACEHOLDER_UNTIL_C690: Self = Self(INSTANCE_TABLE_PAGE_RECORDS - 1);
+    /// 产品路径的默认阈值 365 行：用户 2026-10-29 弹窗定（C690（清扫触发阈值的默认值没定））。它是清扫的触发阈值：挂载末尾现行那一版的
+    /// 实例表行数越过它（366 行起）的那一次挂载末尾就扫。它不改每片装几行：每片仍装 369 行（370 条记录减去链指针那一条）。
+    /// 每次挂载写一行、末尾清扫做成时链留在一片之内；清扫这一轮一行不删、一次挂载写几行、或开关交给挂着时的后台清扫时，链照样长出第二片，
+    /// 切换预留照准入式子按片数留（`admission` 里按每片行数取上整的那一项）。
+    // 出处：E183 第三段（H5）的读数，θ = 365 不越过一片的上界、θ = 369 越过（`.claude/kb/experiments/183-容量斜率读缓存小盘准入与清扫阈值的代价数.md`「H5 的读数」那一条）。
+    pub const DEFAULT_KEEPING_THE_ROWS_WITHIN_ONE_PAGE: Self = Self(365);
     /// 有一行就清扫（用例要在少量行上强制进入清扫那一支，`.claude/rules/fs-design.md` 五条硬要求第 2 条）。
     pub const ANY_ROW: Self = Self(0);
 }
@@ -92,10 +99,11 @@ pub struct InstanceTableSweepConfiguration {
 }
 
 impl InstanceTableSweepConfiguration {
-    /// 产品路径（`mount::mount_writable`）：开关关着、阈值取占位（[`InstanceTableRowCountThreshold::PLACEHOLDER_UNTIL_C690`]）。
+    /// 产品路径（`mount::mount_writable`）：开关关着、阈值取默认的 365 行（[`InstanceTableRowCountThreshold::DEFAULT_KEEPING_THE_ROWS_WITHIN_ONE_PAGE`]）。
     pub const PRODUCT: Self = Self {
         switch: InstanceTableSweepSwitch::SweptAtTheEndOfTheMountAboveTheThreshold,
-        row_count_threshold: InstanceTableRowCountThreshold::PLACEHOLDER_UNTIL_C690,
+        row_count_threshold:
+            InstanceTableRowCountThreshold::DEFAULT_KEEPING_THE_ROWS_WITHIN_ONE_PAGE,
         sweep_publish_placements: SweepPublishPlacements::TakenFromTheAllocatorOfTheMount,
     };
 }
@@ -273,7 +281,9 @@ pub enum NoRowDeletedThisRound {
     },
     /// 根环一个槽读不出、或读成功而全零：按「可能有该实例的根」算，这一次不删。
     ARootRingSlotIsUnreadableOrAllZero { ring_slot: RootRingSlot },
-    /// 根环一个槽读得出而自证不过，重读一次仍不过。
+    /// 根环一个槽读得出而自证不过，重读一次仍不过（自证得过、却不住在它的 txg 按落点公式该住的那一槽的错位读也算自证不过，
+    /// 与 `recovery::read_root_ring_slot` 同一个核 `root_ring::root_sits_in_the_ring_slot_the_formula_gives`；
+    /// 一个槽 0 读出第 0 代根、而同一遍读出的环里最大的 txg 已到发布路径写进这一槽的 txg，也算这一槽自证不过）。
     ARootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot: RootRingSlot },
     /// 择不到系统配置：判不了池有几块盘、根环在哪。
     SystemConfigurationNotChosen { failure: RecoveryFailure },
@@ -453,32 +463,32 @@ pub fn judge_the_instance_table_sweep(
     })
 }
 
-/// 读根环每个槽：读不出、读成功而全零 ⇒ 这一次不删；读得出而自证不过 ⇒ 重读一次，仍不过 ⇒ 这一次不删；都自证过就交回每一条根。
+/// 读根环每个槽：读不出、读成功而全零 ⇒ 这一次不删；读得出而自证不过（含自证得过、落点公式不合的错位读）⇒ 重读一次，仍不过 ⇒ 这一次不删；
+/// 都自证过之后，再按这一遍读出的环看住着第 0 代根的槽（[`genesis_root_in_a_ring_slot_the_publishes_of_the_pass_have_reached`]）：
+/// 这一遍读出的最大 txg 已到发布路径写进这一槽的 txg，这一槽的第 0 代根算自证不过，这一槽只读过一次的重读一次、仍不过（或已重读过）⇒ 这一次不删；
+/// 都过了就交回每一条根。
 fn every_root_of_the_ring_self_verified(
     reader: &dyn PoolReader,
     region_devices: &[DeviceIdentity; 3],
     immutable_sizes: &crate::system_configuration::SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
 ) -> Result<Vec<RootRecord>, NoRowDeletedThisRound> {
-    let root_slot_bytes = usize::try_from(immutable_sizes.physical_block_size).expect("根槽宽");
-    let mut roots = Vec::new();
+    let ring_slots = every_root_ring_slot(immutable_sizes);
+    let ring_length_in_slots = ring_slots.len();
+    let mut roots_read: Vec<RootOfARingSlotReadBySweep> = Vec::with_capacity(ring_length_in_slots);
     // 迭代上界是根环的槽数（3 × S），每槽至多读两次；提前出口是这一次不删的那几种。
-    for ring_slot in every_root_ring_slot(immutable_sizes) {
-        let device = region_devices[usize::try_from(ring_slot.region).expect("区域号")];
-        let offset = slot_offset(ring_slot, immutable_sizes.fixed_structure_slot_spacing);
+    for ring_slot in ring_slots {
         let mut root_read = None;
+        let mut readings_of_the_slot = 0u32;
         for _reading in 0..2 {
-            let Some(bytes) = reader.read(device, offset, root_slot_bytes) else {
-                return Err(NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero {
-                    ring_slot,
-                });
-            };
-            if bytes.iter().all(|byte| *byte == 0) {
-                return Err(NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero {
-                    ring_slot,
-                });
-            }
-            root_read = RootRecord::parse_slot(&bytes, filesystem_identifier);
+            readings_of_the_slot += 1;
+            root_read = root_read_once_from_the_ring_slot(
+                reader,
+                region_devices,
+                immutable_sizes,
+                filesystem_identifier,
+                ring_slot,
+            )?;
             if root_read.is_some() {
                 break;
             }
@@ -488,9 +498,119 @@ fn every_root_of_the_ring_self_verified(
                 NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot },
             );
         };
-        roots.push(root);
+        roots_read.push(RootOfARingSlotReadBySweep {
+            ring_slot,
+            root,
+            self_verified_on_the_first_read: readings_of_the_slot == 1,
+        });
     }
-    Ok(roots)
+    let highest_txg_of_the_pass = roots_read
+        .iter()
+        .map(|read| read.root.checkpoint_txg)
+        .max()
+        .expect("根环至少三个区域各一槽，每槽都交回了一条根");
+    let slots_per_region = immutable_sizes.root_ring_slots_per_region;
+    let genesis_root_reached_by_the_publishes_of_the_pass = |root: &RootRecord, ring_slot| {
+        genesis_root_in_a_ring_slot_the_publishes_of_the_pass_have_reached(
+            root.checkpoint_txg,
+            ring_slot,
+            highest_txg_of_the_pass,
+            slots_per_region,
+            ring_length_in_slots,
+        )
+    };
+    // 迭代上界是根环的槽数；每槽至多再读一次（判据只用上面那一遍读出的最大 txg，重读读出的不改它）；提前出口是这一次不删的那几种。
+    for read in &mut roots_read {
+        if !genesis_root_reached_by_the_publishes_of_the_pass(&read.root, read.ring_slot) {
+            continue;
+        }
+        if !read.self_verified_on_the_first_read {
+            return Err(
+                NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread {
+                    ring_slot: read.ring_slot,
+                },
+            );
+        }
+        let reread = root_read_once_from_the_ring_slot(
+            reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+            read.ring_slot,
+        )?
+        .filter(|root| !genesis_root_reached_by_the_publishes_of_the_pass(root, read.ring_slot));
+        let Some(root) = reread else {
+            return Err(
+                NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread {
+                    ring_slot: read.ring_slot,
+                },
+            );
+        };
+        read.root = root;
+    }
+    Ok(roots_read.into_iter().map(|read| read.root).collect())
+}
+
+/// 清扫读根环一槽读出的根：住在哪一槽、读出的根、是不是第一次读就自证过（不是的已重读过一次，不再读）。
+struct RootOfARingSlotReadBySweep {
+    ring_slot: RootRingSlot,
+    root: RootRecord,
+    self_verified_on_the_first_read: bool,
+}
+
+/// 读根环一槽一次：读不出、读成功而全零 ⇒ 这一次不删（`Err`）；读得出而自证不过、或自证得过而落点公式不合（错位读）⇒ `Ok(None)`；
+/// 自证过、落点对 ⇒ 那条根。
+fn root_read_once_from_the_ring_slot(
+    reader: &dyn PoolReader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &crate::system_configuration::SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+    ring_slot: RootRingSlot,
+) -> Result<Option<RootRecord>, NoRowDeletedThisRound> {
+    let root_slot_bytes = usize::try_from(immutable_sizes.physical_block_size).expect("根槽宽");
+    let device = region_devices[usize::try_from(ring_slot.region).expect("区域号")];
+    let offset = slot_offset(ring_slot, immutable_sizes.fixed_structure_slot_spacing);
+    let Some(bytes) = reader.read(device, offset, root_slot_bytes) else {
+        return Err(NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero { ring_slot });
+    };
+    if bytes.iter().all(|byte| *byte == 0) {
+        return Err(NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero { ring_slot });
+    }
+    // 核落点公式（D16（发布语义） 已定项 6 骑手条款 1「恢复与挂载读根环时都调」，C973（实例表清扫读根环不核落点））：自证得过、却不住在它的 txg 该住的那一槽的根
+    // 是错位读（第 0 代根照 mkfs 种根的槽另认），照这一槽这一次自证不过记——不核的话，错位读把一个实例在环里唯一的根换成别槽的根，
+    // 那个实例就成了「环里没有根」的候选行被删掉。
+    Ok(
+        RootRecord::parse_slot(&bytes, filesystem_identifier).filter(|root| {
+            root_sits_in_the_ring_slot_the_formula_gives(
+                root.checkpoint_txg,
+                ring_slot,
+                immutable_sizes.root_ring_slots_per_region,
+            )
+        }),
+    )
+}
+
+/// 住在 `ring_slot` 的是第 0 代根，而这一遍读出的环里最大的 txg 已到发布路径按 [`target_for_publish`] 写进这一槽的某个 txg
+/// （C973（实例表清扫读根环不核落点）；D18（块里携带什么信息） 已定项 11「其余的槽须自证过」）。落点核按 mkfs 种根的槽认第 0 代根
+/// （[`root_sits_in_the_ring_slot_the_formula_gives`]），三个区域的槽 0 里同字节的三份，错位读从别的槽 0 读回第 0 代根它核不出来；
+/// 发布路径已写到这一槽之后，这一槽的合法内容不再是 mkfs 种的那一份，读出第 0 代根就当这一槽这一次自证不过。
+/// 只读调用方给的这一遍读数（最大 txg），不读别的状态。
+///
+/// 循环：txg 从第 0 代根之后一个起往上至多走环长 3S 个（连续 3S 个 txg 每槽恰好落一个，再往上只重复）、不超过这一遍的最大 txg；
+/// 不跨轮携带状态；提前出口是碰到落进这一槽的那一个。
+fn genesis_root_in_a_ring_slot_the_publishes_of_the_pass_have_reached(
+    checkpoint_txg: CheckpointTxg,
+    ring_slot: RootRingSlot,
+    highest_txg_of_the_pass: CheckpointTxg,
+    slots_per_region: RootRingSlotsPerRegion,
+    ring_length_in_slots: usize,
+) -> bool {
+    if checkpoint_txg != GENESIS_CHECKPOINT_TXG {
+        return false;
+    }
+    (GENESIS_CHECKPOINT_TXG.0 + 1..=highest_txg_of_the_pass.0)
+        .take(ring_length_in_slots)
+        .any(|txg| target_for_publish(CheckpointTxg(txg), slots_per_region) == ring_slot)
 }
 
 /// 抹头那一步与清扫发布走到哪儿。
@@ -648,7 +768,7 @@ pub fn erase_the_heads_and_publish_the_sweep<Device: BlockDevice>(
             &mut pool,
             allocator,
             plan.as_publish_plan(),
-            Some(&current_file_version),
+            Some(Arc::as_ref(&current_file_version)),
         ),
         SweepPublishPlacements::EveryFreeSlotTakenAwayByTheTestOnlySwitch => {
             let mut allocator_without_a_free_slot = allocator.clone();
@@ -657,7 +777,7 @@ pub fn erase_the_heads_and_publish_the_sweep<Device: BlockDevice>(
                 &pool,
                 &mut allocator_without_a_free_slot,
                 &plan.as_publish_plan(),
-                Some(&current_file_version),
+                Some(Arc::as_ref(&current_file_version)),
                 current_file_version.tree_identifiers,
                 ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt,
                 UnmountMarker::NotWrittenByTheUnmountSequence,
@@ -931,5 +1051,911 @@ mod tests {
         without_magic[..4].copy_from_slice(b"SFSX");
         without_magic[6] = UNIT_CLASS_DATA;
         assert_eq!(unit_head_read_by_sweep(&without_magic), None);
+    }
+}
+
+/// C973（实例表清扫读根环不核落点）的盘面：实例 1 在根环里只剩一条根，读它那一槽的读错位读回别槽里一条自证得过的实例 2 的根。
+#[cfg(test)]
+mod misplaced_ring_reads_tests {
+    use super::*;
+    use crate::address::DeviceOffsetInBytes;
+    use crate::block_device::PhysicalBlockSizeInBytes;
+    use crate::make_filesystem::make_filesystem;
+    use crate::mount::mount_writable;
+    use crate::recovery::{read_root_ring_slot, RootRingSlotReading};
+    use crate::root_ring::{target_for_publish, RootRingSlotsPerRegion};
+    use crate::system_configuration::SystemImmutableSizes;
+    use crate::transaction::{publish_first_file, publish_overwrite, FirstFile};
+    use std::cell::Cell;
+
+    /// 每块盘的字节数：128 MiB（同验证包根环空洞那几组池），清扫扫池那一遍只走八千来个槽。
+    const DEVICE_BYTES: u64 = 128 << 20;
+    /// 稀疏盘一页的字节数。
+    const PAGE_BYTES: u64 = 4096;
+    /// 每区槽数 S = 4：环长 12，十来次发布就把实例 1 的根轮得只剩一条。
+    const SLOTS_PER_REGION: u64 = 4;
+    /// 第一个文件的写入时刻；之后每一版晚一秒。
+    const WRITE_TIME_SECONDS_OF_THE_EARLIEST_VERSION: u64 = 1_788_000_000;
+    /// 每一版文件内容的字节数（一个数据单元装得下）。
+    const CONTENT_BYTES: usize = 3000;
+    /// 实例 2 至多覆盖写几次去把实例 1 的根轮到只剩一条。
+    const OVERWRITES_ROTATING_THE_RING_AT_MOST: u64 = 64;
+
+    /// 只在内存里的盘：写过的页才存，没写过的读回全零；越过末尾报越界。
+    struct DeviceOfPagesInMemory {
+        pages: BTreeMap<u64, Vec<u8>>,
+    }
+
+    impl DeviceOfPagesInMemory {
+        fn refuse_past_the_end(
+            offset: DeviceOffsetInBytes,
+            length: u64,
+        ) -> Result<(), BlockDeviceError> {
+            if offset.0 + length > DEVICE_BYTES {
+                return Err(BlockDeviceError::OutOfRange {
+                    offset,
+                    length,
+                    device_size: DEVICE_BYTES,
+                });
+            }
+            Ok(())
+        }
+
+        fn page_index_and_offset_in_page(address: u64) -> (u64, usize) {
+            (
+                address / PAGE_BYTES,
+                usize::try_from(address % PAGE_BYTES).expect("页内偏移装得进 usize"),
+            )
+        }
+    }
+
+    impl BlockDevice for DeviceOfPagesInMemory {
+        fn read_at(
+            &self,
+            offset: DeviceOffsetInBytes,
+            buffer: &mut [u8],
+        ) -> Result<(), BlockDeviceError> {
+            let length = u64::try_from(buffer.len()).expect("长度装得进 u64");
+            Self::refuse_past_the_end(offset, length)?;
+            for (index_in_buffer, byte) in buffer.iter_mut().enumerate() {
+                let (page_index, index_in_page) = Self::page_index_and_offset_in_page(
+                    offset.0 + u64::try_from(index_in_buffer).expect("下标装得进 u64"),
+                );
+                *byte = self
+                    .pages
+                    .get(&page_index)
+                    .map_or(0, |page| page[index_in_page]);
+            }
+            Ok(())
+        }
+        fn write_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            bytes: &[u8],
+            _durability: WriteDurability,
+        ) -> Result<(), BlockDeviceError> {
+            let length = u64::try_from(bytes.len()).expect("长度装得进 u64");
+            Self::refuse_past_the_end(offset, length)?;
+            for (index_in_bytes, byte) in bytes.iter().enumerate() {
+                let (page_index, index_in_page) = Self::page_index_and_offset_in_page(
+                    offset.0 + u64::try_from(index_in_bytes).expect("下标装得进 u64"),
+                );
+                self.pages
+                    .entry(page_index)
+                    .or_insert_with(|| vec![0; usize::try_from(PAGE_BYTES).expect("4096")])
+                    [index_in_page] = *byte;
+            }
+            Ok(())
+        }
+        fn write_zeroes_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            length: u64,
+        ) -> Result<(), BlockDeviceError> {
+            Self::refuse_past_the_end(offset, length)?;
+            let end = offset.0 + length;
+            let pages_touched: Vec<u64> = self
+                .pages
+                .range(offset.0 / PAGE_BYTES..end.div_ceil(PAGE_BYTES))
+                .map(|(page_index, _)| *page_index)
+                .collect();
+            for page_index in pages_touched {
+                let page_start = page_index * PAGE_BYTES;
+                let zeroed_from = offset.0.max(page_start) - page_start;
+                let zeroed_to = end.min(page_start + PAGE_BYTES) - page_start;
+                let page = self.pages.get_mut(&page_index).expect("刚从表里列出的页");
+                page[usize::try_from(zeroed_from).expect("页内偏移")
+                    ..usize::try_from(zeroed_to).expect("页内偏移")]
+                    .fill(0);
+            }
+            Ok(())
+        }
+        fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+            Ok(())
+        }
+        fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+            PhysicalBlockSizeInBytes(512)
+        }
+        fn size_in_bytes(&self) -> u64 {
+            DEVICE_BYTES
+        }
+    }
+
+    type DevicesInMemory = Vec<(DeviceIdentity, DeviceOfPagesInMemory)>;
+
+    fn parameters() -> MakeFilesystemParameters {
+        MakeFilesystemParameters {
+            filesystem_identifier: [7; 16],
+            region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
+            geometry: SystemImmutableSizes {
+                physical_block_size: 512,
+                minimum_input_output_bytes: 512,
+                fixed_structure_slot_spacing: 4096,
+                journal_ring_bytes: 1 << 20,
+                root_ring_slots_per_region:
+                    RootRingSlotsPerRegion::from_system_configuration_field(SLOTS_PER_REGION)
+                        .expect("S = 4 在区间里"),
+            },
+        }
+    }
+
+    /// 第 `txg` 版的文件内容（各版不同）。
+    fn content_of_the_version(txg: u64) -> Vec<u8> {
+        (0..CONTENT_BYTES)
+            .map(|index| {
+                let index = u64::try_from(index).expect("长度装得进 u64");
+                u8::try_from((index * 131 + txg * 7 + 1) % 251).expect("小于 256")
+            })
+            .collect()
+    }
+
+    /// 根环每一槽照恢复的读法（核自证与落点公式）读一遍：自证过、落点对的根连同它住的槽。
+    fn roots_of_the_ring_by_slot(
+        devices: &DevicesInMemory,
+    ) -> Vec<(RootRingSlot, Option<RootRecord>)> {
+        let parameters = parameters();
+        every_root_ring_slot(&parameters.geometry)
+            .into_iter()
+            .map(|ring_slot| {
+                let reading = read_root_ring_slot(
+                    devices,
+                    &parameters.region_devices,
+                    &parameters.geometry,
+                    &parameters.filesystem_identifier,
+                    ring_slot,
+                );
+                let root = match reading {
+                    RootRingSlotReading::SelfVerified(root) => Some(root),
+                    RootRingSlotReading::Bad(_) => None,
+                };
+                (ring_slot, root)
+            })
+            .collect()
+    }
+
+    /// 清扫判之前的盘面：两块盘、现行那一版的根、实例 1 在环里唯一那条根住的槽、一个住着实例 2 自证过的根的别的槽。
+    struct PoolWithAnInstanceDownToOneRingRoot {
+        devices: DevicesInMemory,
+        current_root: RootRecord,
+        instance_rotated_out: InstanceGeneration,
+        ring_slot_of_the_only_root_of_the_instance: RootRingSlot,
+        ring_slot_of_a_root_of_the_rotating_instance: RootRingSlot,
+    }
+
+    /// mkfs → 实例 1 可写挂载、第一个文件、两次覆盖写（不卸载）→ 实例 2 可写挂载、覆盖写到根环每一槽都住着自证过的根、
+    /// 实例 1 的根只剩一条为止。实例表里实例 1 那一行还在（两次挂载末尾都没清扫：行数没越过默认阈值）。
+    fn pool_with_an_instance_down_to_one_ring_root() -> PoolWithAnInstanceDownToOneRingRoot {
+        let parameters = parameters();
+        let mut devices: DevicesInMemory = [DeviceIdentity(0), DeviceIdentity(1)]
+            .into_iter()
+            .map(|identity| {
+                (
+                    identity,
+                    DeviceOfPagesInMemory {
+                        pages: BTreeMap::new(),
+                    },
+                )
+            })
+            .collect();
+        make_filesystem(&parameters, &mut devices).expect("128 MiB 两盘、S = 4 建得成");
+        let instance_rotated_out = {
+            let mounted = mount_writable(&parameters, &mut devices).expect("实例 1 的可写挂载");
+            let instance_rotated_out = mounted.output.instance;
+            let mut allocator = mounted.allocator;
+            let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
+            let mut current = publish_first_file(
+                &mut writer,
+                &mut allocator,
+                mounted.current.root(),
+                FirstFile {
+                    content: &content_of_the_version(0),
+                    write_time_seconds: WRITE_TIME_SECONDS_OF_THE_EARLIEST_VERSION,
+                },
+                instance_rotated_out,
+                mounted.current.record_bytes(),
+            )
+            .expect("实例 1 的第一个文件");
+            // 迭代上界：两次覆盖写。
+            for _ in 0..2 {
+                let txg = current.root.checkpoint_txg.0 + 1;
+                current = publish_overwrite(
+                    &mut writer,
+                    &mut allocator,
+                    &current,
+                    FirstFile {
+                        content: &content_of_the_version(txg),
+                        write_time_seconds: WRITE_TIME_SECONDS_OF_THE_EARLIEST_VERSION + txg,
+                    },
+                    instance_rotated_out,
+                )
+                .expect("实例 1 的覆盖写");
+            }
+            instance_rotated_out
+        };
+        let mounted = mount_writable(&parameters, &mut devices).expect("实例 2 的可写挂载");
+        let instance_rotating_the_ring = mounted.output.instance;
+        assert!(
+            instance_rotating_the_ring > instance_rotated_out,
+            "前提：实例 2 取的号比实例 1 大"
+        );
+        let mut allocator = mounted.allocator;
+        let mut current = mounted
+            .current
+            .into_file_version()
+            .expect("前提：实例 2 挂上的那一版带文件");
+        let ring_slots_of_the_rotated_out_instance =
+            |devices_read_now: &DevicesInMemory| -> Option<Vec<RootRingSlot>> {
+                let roots_by_slot = roots_of_the_ring_by_slot(devices_read_now);
+                if roots_by_slot.iter().any(|(_, root)| root.is_none()) {
+                    return None;
+                }
+                Some(
+                    roots_by_slot
+                        .iter()
+                        .filter(|(_, root)| {
+                            root.is_some_and(|resident| resident.instance == instance_rotated_out)
+                        })
+                        .map(|(ring_slot, _)| *ring_slot)
+                        .collect(),
+                )
+            };
+        // 迭代上界：实例 2 至多覆盖写 OVERWRITES_ROTATING_THE_RING_AT_MOST 次；跨轮携带的只有现行那一版；
+        // 提前出口是根环每一槽都住着自证过的根、实例 1 的根只剩一条。
+        for _ in 0..OVERWRITES_ROTATING_THE_RING_AT_MOST {
+            if ring_slots_of_the_rotated_out_instance(&devices)
+                .is_some_and(|ring_slots| ring_slots.len() == 1)
+            {
+                break;
+            }
+            let txg = current.root.checkpoint_txg.0 + 1;
+            let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
+            current = publish_overwrite(
+                &mut writer,
+                &mut allocator,
+                &current,
+                FirstFile {
+                    content: &content_of_the_version(txg),
+                    write_time_seconds: WRITE_TIME_SECONDS_OF_THE_EARLIEST_VERSION + txg,
+                },
+                instance_rotating_the_ring,
+            )
+            .expect("实例 2 的覆盖写");
+        }
+        let ring_slots = ring_slots_of_the_rotated_out_instance(&devices)
+            .expect("前提：根环每一槽都住着自证过、落点对的根");
+        assert_eq!(
+            ring_slots.len(),
+            1,
+            "前提：实例 1 在根环里只剩一条根（住在 {ring_slots:?}）"
+        );
+        let rows = instance_table_chain_of_root(&devices, &current.root)
+            .expect("前提：现行那一版的实例表读得出")
+            .records
+            .rows;
+        assert!(
+            rows.iter().any(|row| row.instance == instance_rotated_out),
+            "前提：现行那一版的实例表里实例 1 那一行还在"
+        );
+        let ring_slot_of_a_root_of_the_rotating_instance = target_for_publish(
+            current.root.checkpoint_txg,
+            parameters.geometry.root_ring_slots_per_region,
+        );
+        assert_ne!(
+            ring_slot_of_a_root_of_the_rotating_instance, ring_slots[0],
+            "前提：现行那一版的根与实例 1 那条根不住同一槽"
+        );
+        PoolWithAnInstanceDownToOneRingRoot {
+            devices,
+            current_root: current.root,
+            instance_rotated_out,
+            ring_slot_of_the_only_root_of_the_instance: ring_slots[0],
+            ring_slot_of_a_root_of_the_rotating_instance,
+        }
+    }
+
+    /// 读者：读 `misplaced` 那一槽的前 `misplaced_reads_left` 次读回 `read_back_instead` 那一槽的字节（错位读），别的读原样交给盘。
+    struct PoolReadingOneRingSlotMisplaced<'pool> {
+        devices: &'pool DevicesInMemory,
+        misplaced: (DeviceIdentity, DeviceOffsetInBytes),
+        read_back_instead: (DeviceIdentity, DeviceOffsetInBytes),
+        misplaced_reads_left: Cell<u32>,
+    }
+
+    impl<'pool> PoolReadingOneRingSlotMisplaced<'pool> {
+        fn over(pool: &'pool PoolWithAnInstanceDownToOneRingRoot, misplaced_reads: u32) -> Self {
+            let parameters = parameters();
+            let device_and_offset_of = |ring_slot: RootRingSlot| {
+                (
+                    parameters.region_devices[usize::try_from(ring_slot.region).expect("区域号")],
+                    slot_offset(ring_slot, parameters.geometry.fixed_structure_slot_spacing),
+                )
+            };
+            Self {
+                devices: &pool.devices,
+                misplaced: device_and_offset_of(pool.ring_slot_of_the_only_root_of_the_instance),
+                read_back_instead: device_and_offset_of(
+                    pool.ring_slot_of_a_root_of_the_rotating_instance,
+                ),
+                misplaced_reads_left: Cell::new(misplaced_reads),
+            }
+        }
+    }
+
+    impl PoolReader for PoolReadingOneRingSlotMisplaced<'_> {
+        fn device_identities(&self) -> Vec<DeviceIdentity> {
+            PoolReader::device_identities(self.devices)
+        }
+        fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
+            PoolReader::device_size_in_bytes(self.devices, device)
+        }
+        fn read(
+            &self,
+            device: DeviceIdentity,
+            offset: DeviceOffsetInBytes,
+            length: usize,
+        ) -> Option<Vec<u8>> {
+            if (device, offset) == self.misplaced && self.misplaced_reads_left.get() > 0 {
+                self.misplaced_reads_left
+                    .set(self.misplaced_reads_left.get() - 1);
+                let (device_read_instead, offset_read_instead) = self.read_back_instead;
+                return PoolReader::read(
+                    self.devices,
+                    device_read_instead,
+                    offset_read_instead,
+                    length,
+                );
+            }
+            PoolReader::read(self.devices, device, offset, length)
+        }
+        fn journal_record_offsets_hint(
+            &self,
+            device: DeviceIdentity,
+            ring_start: DeviceOffsetInBytes,
+            ring_bytes: u64,
+        ) -> Option<Vec<DeviceOffsetInBytes>> {
+            PoolReader::journal_record_offsets_hint(self.devices, device, ring_start, ring_bytes)
+        }
+    }
+
+    /// 场景（C973 验收）：实例 1 在根环里只剩一条根，读它那一槽的两次读（第一次与重读）都错位读回实例 2 住在别槽的一条自证得过的根。
+    /// 预期：清扫那一遍不删实例 1 那一行——错位读照落点公式核出来当这一槽自证不过，重读一次仍不过，这一轮一行都不删
+    /// （D16（发布语义） 已定项 6 骑手条款 1「恢复与挂载读根环时都调」）。
+    /// 判别力：`crates/mutations.tsv`「C973 清扫读根环不核落点公式」那一行，这一条红在 `Ok` 那一支（实例 1 那一行判成要删）。
+    #[test]
+    fn a_misplaced_read_replacing_the_only_ring_root_of_an_instance_on_both_reads_deletes_no_row() {
+        let pool = pool_with_an_instance_down_to_one_ring_root();
+        let reader = PoolReadingOneRingSlotMisplaced::over(&pool, 2);
+        match judge_the_instance_table_sweep(&reader, &pool.current_root) {
+            Err(NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread {
+                ring_slot,
+            }) => {
+                assert_eq!(
+                    ring_slot, pool.ring_slot_of_the_only_root_of_the_instance,
+                    "停在错位读的那一槽"
+                );
+            }
+            Ok(judgement) => panic!(
+                "错位读把实例 1 唯一的根换成了别槽的根，清扫判出要删的行 {:?}",
+                judgement.rows_to_delete
+            ),
+            Err(other) => panic!("这一轮该停在错位读的那一槽，停在了 {other:?}"),
+        }
+        assert_eq!(
+            reader.misplaced_reads_left.get(),
+            0,
+            "那一槽读了两次（第一次与重读），两次都错位"
+        );
+    }
+
+    /// 场景：同一张盘面，只有第一次读错位，重读读回那一槽真住着的实例 1 的根。
+    /// 预期：实例 1 在环里有根，那一行不是候选行（阳性对照：落点核只让错位那一读作废，重读读对了照认那条根）。
+    /// 判别力：`crates/mutations.tsv`「C973 清扫读根环自证不过不重读」那一行，这一条红（第一次错位就停，不重读）；
+    /// 「C973 清扫读根环不核落点公式」那一行同样红（错位那一读当自证过，实例 1 那一行判成要删）。
+    #[test]
+    fn a_misplaced_read_of_the_only_ring_root_of_an_instance_reread_right_keeps_its_row() {
+        let pool = pool_with_an_instance_down_to_one_ring_root();
+        let reader = PoolReadingOneRingSlotMisplaced::over(&pool, 1);
+        let instance_rotated_out = pool.instance_rotated_out;
+        match judge_the_instance_table_sweep(&reader, &pool.current_root) {
+            Err(NoRowDeletedThisRound::NoCandidateRow) => {}
+            Ok(judgement) => assert!(
+                judgement
+                    .rows_to_delete
+                    .iter()
+                    .all(|row| row.instance != instance_rotated_out),
+                "重读读回了实例 1 的根，那一行不该判成要删：{:?}",
+                judgement.rows_to_delete
+            ),
+            Err(other) => panic!("重读读对了，这一轮不该停在 {other:?}"),
+        }
+        assert_eq!(reader.misplaced_reads_left.get(), 0, "第一次读错位过了");
+    }
+
+    /// 点名的那一次写落盘之后就断电：它与之前的写都已落盘，之后两块盘都不再落任何写（同一个「断电了没有」两块盘共用）。
+    struct DeviceLosingEveryWriteAfterAPowerCut {
+        memory: DeviceOfPagesInMemory,
+        identity: DeviceIdentity,
+        power_cut_after_the_write_to: (DeviceIdentity, DeviceOffsetInBytes),
+        power_cut: std::rc::Rc<Cell<bool>>,
+    }
+
+    impl BlockDevice for DeviceLosingEveryWriteAfterAPowerCut {
+        fn read_at(
+            &self,
+            offset: DeviceOffsetInBytes,
+            buffer: &mut [u8],
+        ) -> Result<(), BlockDeviceError> {
+            self.memory.read_at(offset, buffer)
+        }
+        fn write_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            bytes: &[u8],
+            durability: WriteDurability,
+        ) -> Result<(), BlockDeviceError> {
+            if self.power_cut.get() {
+                return Ok(());
+            }
+            self.memory.write_at(offset, bytes, durability)?;
+            if (self.identity, offset) == self.power_cut_after_the_write_to {
+                self.power_cut.set(true);
+            }
+            Ok(())
+        }
+        fn write_zeroes_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            length: u64,
+        ) -> Result<(), BlockDeviceError> {
+            if self.power_cut.get() {
+                return Ok(());
+            }
+            self.memory.write_zeroes_at(offset, length)
+        }
+        fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+            Ok(())
+        }
+        fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+            self.memory.probe_physical_block_size()
+        }
+        fn size_in_bytes(&self) -> u64 {
+            self.memory.size_in_bytes()
+        }
+    }
+
+    /// mkfs → 实例 1 可写挂载，写行 txg 1 那次发布写区域 1 槽 0 的根槽落盘之后就断电（系统配置轮换与暖机 txg 2 都丢；同
+    /// E205（多处读坏倒挂三条改法的代价） 起点镜像「根槽 FUA 持久、系统配置轮换没持久」那一形）→ 实例 2 可写挂载、新池新建文件、覆盖写到根环每一槽都住着自证过的根为止
+    /// （S = 4：区域 0 槽 0 要到 txg 12 才轮到）。
+    /// 盘面：区域 0 槽 0 仍是 mkfs 种的第 0 代根；实例 1 在环里只剩写行那条根（txg 1，区域 1 槽 0，也是 mkfs 种过第 0 代根的槽）；
+    /// 实例表里实例 1 那一行还在。`ring_slot_of_a_root_of_the_rotating_instance` 这里放区域 0 槽 0（错位读回第 0 代根）。
+    fn pool_with_the_only_root_of_an_instance_in_a_ring_slot_seeded_by_make_filesystem(
+    ) -> PoolWithAnInstanceDownToOneRingRoot {
+        let parameters = parameters();
+        let mut devices_made_by_make_filesystem: DevicesInMemory =
+            [DeviceIdentity(0), DeviceIdentity(1)]
+                .into_iter()
+                .map(|identity| {
+                    (
+                        identity,
+                        DeviceOfPagesInMemory {
+                            pages: BTreeMap::new(),
+                        },
+                    )
+                })
+                .collect();
+        make_filesystem(&parameters, &mut devices_made_by_make_filesystem)
+            .expect("128 MiB 两盘、S = 4 建得成");
+        let region_one_slot_zero_written_last = RootRingSlot { region: 1, slot: 0 };
+        let power_cut = std::rc::Rc::new(Cell::new(false));
+        let power_cut_after_the_write_to = (
+            parameters.region_devices[1],
+            slot_offset(
+                region_one_slot_zero_written_last,
+                parameters.geometry.fixed_structure_slot_spacing,
+            ),
+        );
+        let mut devices_losing_writes: Vec<(DeviceIdentity, DeviceLosingEveryWriteAfterAPowerCut)> =
+            devices_made_by_make_filesystem
+                .into_iter()
+                .map(|(identity, memory)| {
+                    (
+                        identity,
+                        DeviceLosingEveryWriteAfterAPowerCut {
+                            memory,
+                            identity,
+                            power_cut_after_the_write_to,
+                            power_cut: power_cut.clone(),
+                        },
+                    )
+                })
+                .collect();
+        drop(mount_writable(&parameters, &mut devices_losing_writes));
+        assert!(
+            power_cut.get(),
+            "前提：实例 1 的挂载写到了区域 1 槽 0 那一次根槽写（写行 txg 1）"
+        );
+        let mut devices: DevicesInMemory = devices_losing_writes
+            .into_iter()
+            .map(|(identity, device)| (identity, device.memory))
+            .collect();
+        let mounted = mount_writable(&parameters, &mut devices).expect("实例 2 的可写挂载");
+        let instance_of_the_mount = mounted.output.instance;
+        let mut allocator = mounted.allocator;
+        let mut current = {
+            let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
+            publish_first_file(
+                &mut writer,
+                &mut allocator,
+                mounted.current.root(),
+                FirstFile {
+                    content: &content_of_the_version(0),
+                    write_time_seconds: WRITE_TIME_SECONDS_OF_THE_EARLIEST_VERSION,
+                },
+                instance_of_the_mount,
+                mounted.current.record_bytes(),
+            )
+            .expect("实例 2 的新池新建文件")
+        };
+        // 迭代上界：至多 OVERWRITES_ROTATING_THE_RING_AT_MOST 次；跨轮携带的只有现行那一版；提前出口是根环每一槽都住着自证过的根。
+        for _ in 0..OVERWRITES_ROTATING_THE_RING_AT_MOST {
+            if roots_of_the_ring_by_slot(&devices)
+                .iter()
+                .all(|(_, root)| root.is_some())
+            {
+                break;
+            }
+            let txg = current.root.checkpoint_txg.0 + 1;
+            let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
+            current = publish_overwrite(
+                &mut writer,
+                &mut allocator,
+                &current,
+                FirstFile {
+                    content: &content_of_the_version(txg),
+                    write_time_seconds: WRITE_TIME_SECONDS_OF_THE_EARLIEST_VERSION + txg,
+                },
+                instance_of_the_mount,
+            )
+            .expect("实例 2 的覆盖写");
+        }
+        let roots_by_slot = roots_of_the_ring_by_slot(&devices);
+        assert!(
+            roots_by_slot.iter().all(|(_, root)| root.is_some()),
+            "前提：根环每一槽都住着自证过、落点对的根：{roots_by_slot:?}"
+        );
+        let region_zero_slot_zero = RootRingSlot { region: 0, slot: 0 };
+        let region_one_slot_zero = RootRingSlot { region: 1, slot: 0 };
+        let root_at = |ring_slot: RootRingSlot| {
+            roots_by_slot
+                .iter()
+                .find(|(resident_slot, _)| *resident_slot == ring_slot)
+                .and_then(|(_, root)| *root)
+                .expect("每一槽都住着根")
+        };
+        assert_eq!(
+            root_at(region_zero_slot_zero).checkpoint_txg,
+            crate::make_filesystem::GENESIS_CHECKPOINT_TXG,
+            "前提：区域 0 槽 0 仍是 mkfs 种的第 0 代根"
+        );
+        let instance_cut_by_the_power = root_at(region_one_slot_zero).instance;
+        assert!(
+            instance_cut_by_the_power < instance_of_the_mount
+                && instance_cut_by_the_power > InstanceGeneration(0),
+            "前提：区域 1 槽 0 住着实例 1 写行那条根（{:?}）",
+            root_at(region_one_slot_zero)
+        );
+        let ring_slots_of_the_instance: Vec<RootRingSlot> = roots_by_slot
+            .iter()
+            .filter(|(_, root)| {
+                root.is_some_and(|resident| resident.instance == instance_cut_by_the_power)
+            })
+            .map(|(ring_slot, _)| *ring_slot)
+            .collect();
+        assert_eq!(
+            ring_slots_of_the_instance,
+            vec![region_one_slot_zero],
+            "前提：实例 1 在根环里只剩区域 1 槽 0 那一条根"
+        );
+        let rows = instance_table_chain_of_root(&devices, &current.root)
+            .expect("前提：现行那一版的实例表读得出")
+            .records
+            .rows;
+        assert!(
+            rows.iter()
+                .any(|row| row.instance == instance_cut_by_the_power),
+            "前提：现行那一版的实例表里实例 1 那一行还在：{rows:?}"
+        );
+        PoolWithAnInstanceDownToOneRingRoot {
+            devices,
+            current_root: current.root,
+            instance_rotated_out: instance_cut_by_the_power,
+            ring_slot_of_the_only_root_of_the_instance: region_one_slot_zero,
+            ring_slot_of_a_root_of_the_rotating_instance: region_zero_slot_zero,
+        }
+    }
+
+    /// 场景（C973 验收）：上面那张盘面；读实例 1 唯一那条根所在的区域 1 槽 0 时，两次读（第一次与重读）都错位读回区域 0 槽 0 那份第 0 代根。
+    /// 落点核认第 0 代根住三个区域的槽 0 任一槽，核不出这一错位；这一遍读出的环里最大的 txg 已越过发布路径写进区域 1 槽 0 的 txg 1。
+    /// 预期：区域 1 槽 0 读出的第 0 代根算自证不过，重读仍是第 0 代根，这一轮不删，停在区域 1 槽 0（实例 1 那一行不删）。
+    /// 判别力：`crates/mutations.tsv`「C973 清扫槽 0 读到第 0 代根不看环里更大的 txg」「C973 清扫重读第 0 代根那一槽不再核第 0 代根判据」两行，
+    /// 这一条红在 `Ok` 那一支（实例 1 那一行判成要删）。
+    #[test]
+    fn misplaced_read_returning_the_genesis_root_over_the_only_ring_root_of_an_instance_on_both_reads_deletes_no_row(
+    ) {
+        let pool =
+            pool_with_the_only_root_of_an_instance_in_a_ring_slot_seeded_by_make_filesystem();
+        let reader = PoolReadingOneRingSlotMisplaced::over(&pool, 2);
+        match judge_the_instance_table_sweep(&reader, &pool.current_root) {
+            Err(NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread {
+                ring_slot,
+            }) => {
+                assert_eq!(
+                    ring_slot, pool.ring_slot_of_the_only_root_of_the_instance,
+                    "停在错位读回第 0 代根的区域 1 槽 0"
+                );
+            }
+            Ok(judgement) => panic!(
+                "错位读回第 0 代根把实例 1 唯一的根换掉，清扫判出要删的行 {:?}",
+                judgement.rows_to_delete
+            ),
+            Err(other) => panic!("这一轮该停在区域 1 槽 0，停在了 {other:?}"),
+        }
+    }
+
+    /// 场景：同一张盘面，只有第一次读区域 1 槽 0 错位读回第 0 代根，重读读回那一槽真住着的实例 1 的根。
+    /// 预期：实例 1 在环里有根，没有候选行（阳性对照：第 0 代根那一条判据只让那一读作废，重读读对了照认那条根）。
+    /// 判别力：`crates/mutations.tsv`「C973 清扫第 0 代根那一槽不重读、直接拒」那一行，这一条红（停在区域 1 槽 0）；
+    /// 「C973 清扫槽 0 读到第 0 代根不看环里更大的 txg」那一行下这一条也红（第一次那一读当自证过，实例 1 那一行判成要删）。
+    #[test]
+    fn misplaced_read_returning_the_genesis_root_over_the_only_ring_root_of_an_instance_reread_right_keeps_its_row(
+    ) {
+        let pool =
+            pool_with_the_only_root_of_an_instance_in_a_ring_slot_seeded_by_make_filesystem();
+        let reader = PoolReadingOneRingSlotMisplaced::over(&pool, 1);
+        let judged = judge_the_instance_table_sweep(&reader, &pool.current_root);
+        assert!(
+            matches!(judged, Err(NoRowDeletedThisRound::NoCandidateRow)),
+            "重读读回了实例 1 的根，没有候选行：{judged:?}"
+        );
+        assert_eq!(reader.misplaced_reads_left.get(), 0, "第一次读错位过了");
+    }
+
+    /// 场景：同一张盘面，不错位；区域 0 槽 0 仍住着 mkfs 种的第 0 代根，环里最大的 txg 是 11，发布路径还没写到这一槽（S = 4 时要到 txg 12）。
+    /// 预期：区域 0 槽 0 的第 0 代根照自证过算，清扫不因第 0 代根那一条判据拒；每个实例在环里都有根，没有候选行。
+    /// 判别力：`crates/mutations.tsv`「C973 清扫槽 0 读到的第 0 代根一律算自证不过」「C973 清扫判第 0 代根时把第 0 代根自己的 txg 也算成发布路径写进这一槽」
+    /// 两行，这一条红在停在区域 0 槽 0 那一支。
+    #[test]
+    fn the_genesis_root_left_in_a_ring_slot_no_publish_has_reached_yet_is_self_verified_and_no_row_is_a_candidate(
+    ) {
+        let pool =
+            pool_with_the_only_root_of_an_instance_in_a_ring_slot_seeded_by_make_filesystem();
+        let judged = judge_the_instance_table_sweep(&pool.devices, &pool.current_root);
+        assert!(
+            matches!(judged, Err(NoRowDeletedThisRound::NoCandidateRow)),
+            "不错位时实例 1 有根、区域 0 槽 0 的第 0 代根照认：{judged:?}"
+        );
+    }
+
+    /// 场景：同一张盘面，错位读回的换成区域 0 槽 1 那条实例 2 的根（不是第 0 代根）。
+    /// 预期：落点核照拦——这一槽两读都自证不过，这一轮不删，停在区域 1 槽 0（阳性对照：第 0 代根那一条判据之外，落点核照旧起作用）。
+    /// 判别力：`crates/mutations.tsv`「C973 清扫读根环落点核判反」那一行，这一条红（停在区域 0 槽 0）。
+    #[test]
+    fn misplaced_read_returning_another_root_than_the_genesis_root_on_the_same_pool_deletes_no_row()
+    {
+        let mut pool =
+            pool_with_the_only_root_of_an_instance_in_a_ring_slot_seeded_by_make_filesystem();
+        pool.ring_slot_of_a_root_of_the_rotating_instance = RootRingSlot { region: 0, slot: 1 };
+        let reader = PoolReadingOneRingSlotMisplaced::over(&pool, 2);
+        let judged = judge_the_instance_table_sweep(&reader, &pool.current_root);
+        assert!(
+            matches!(
+                judged,
+                Err(NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot })
+                    if ring_slot == RootRingSlot { region: 1, slot: 0 }
+            ),
+            "错位读回非第 0 代根：这一轮不删、停在区域 1 槽 0：{judged:?}"
+        );
+    }
+
+    /// 场景：刚 mkfs 的池（S = 4），环里只有三个区域槽 0 各一份第 0 代根，别的槽读回全零；拿读得出的那三槽与这一遍的最大 txg（0）判。
+    /// 预期：三槽都不算发布路径已写到（第 0 代根住在 mkfs 种根的槽，这一遍没有比第 0 代根大的 txg），第 0 代根那一条判据一槽都不拒。
+    /// 判别力：「C973 清扫槽 0 读到的第 0 代根一律算自证不过」「C973 清扫判第 0 代根时把第 0 代根自己的 txg 也算成发布路径写进这一槽」两行，这一条红。
+    #[test]
+    fn right_after_make_filesystem_no_ring_slot_holding_the_genesis_root_counts_as_reached_by_the_publishes(
+    ) {
+        let parameters = parameters();
+        let mut devices: DevicesInMemory = [DeviceIdentity(0), DeviceIdentity(1)]
+            .into_iter()
+            .map(|identity| {
+                (
+                    identity,
+                    DeviceOfPagesInMemory {
+                        pages: BTreeMap::new(),
+                    },
+                )
+            })
+            .collect();
+        make_filesystem(&parameters, &mut devices).expect("128 MiB 两盘、S = 4 建得成");
+        let roots_read: Vec<(RootRingSlot, RootRecord)> = roots_of_the_ring_by_slot(&devices)
+            .into_iter()
+            .filter_map(|(ring_slot, root)| root.map(|resident| (ring_slot, resident)))
+            .collect();
+        assert_eq!(
+            roots_read
+                .iter()
+                .map(|(ring_slot, root)| (*ring_slot, root.checkpoint_txg))
+                .collect::<Vec<_>>(),
+            crate::make_filesystem::genesis_root_ring_slots()
+                .map(|ring_slot| (ring_slot, GENESIS_CHECKPOINT_TXG))
+                .collect::<Vec<_>>(),
+            "前提：刚 mkfs 的环里读得出的只有三个区域槽 0 的第 0 代根"
+        );
+        let ring_length_in_slots = every_root_ring_slot(&parameters.geometry).len();
+        let ring_slots_reached: Vec<RootRingSlot> = roots_read
+            .iter()
+            .filter(|(ring_slot, root)| {
+                genesis_root_in_a_ring_slot_the_publishes_of_the_pass_have_reached(
+                    root.checkpoint_txg,
+                    *ring_slot,
+                    GENESIS_CHECKPOINT_TXG,
+                    parameters.geometry.root_ring_slots_per_region,
+                    ring_length_in_slots,
+                )
+            })
+            .map(|(ring_slot, _)| *ring_slot)
+            .collect();
+        assert_eq!(
+            ring_slots_reached,
+            Vec::new(),
+            "刚 mkfs：一槽都不算发布路径已写到"
+        );
+    }
+
+    /// 场景：S = 4（环长 12），住着第 0 代根的三个区域槽 0，这一遍的最大 txg 取发布路径第一次写进那一槽的 txg 与它前一个
+    /// （区域 1 槽 0 是 txg 1、区域 2 槽 0 是 txg 2、区域 0 槽 0 是 txg 12）；同一槽住的不是第 0 代根时取最大 txg 12。
+    /// 预期：最大 txg 到了那一个 txg 才算发布路径已写到，前一个不算；不是第 0 代根的一律不算。
+    /// 判别力：`crates/mutations.tsv`「C973 清扫判第 0 代根时往上只走环长少一个 txg」那一行，这一条红在区域 0 槽 0、最大 txg 12 那一格。
+    #[test]
+    fn genesis_root_counts_as_reached_from_the_first_txg_the_publish_path_writes_into_its_ring_slot(
+    ) {
+        let parameters = parameters();
+        let slots_per_region = parameters.geometry.root_ring_slots_per_region;
+        let ring_length_in_slots = every_root_ring_slot(&parameters.geometry).len();
+        let reached =
+            |checkpoint_txg: u64, ring_slot: RootRingSlot, highest_txg_of_the_pass: u64| {
+                genesis_root_in_a_ring_slot_the_publishes_of_the_pass_have_reached(
+                    CheckpointTxg(checkpoint_txg),
+                    ring_slot,
+                    CheckpointTxg(highest_txg_of_the_pass),
+                    slots_per_region,
+                    ring_length_in_slots,
+                )
+            };
+        let region_zero_slot_zero = RootRingSlot { region: 0, slot: 0 };
+        let region_one_slot_zero = RootRingSlot { region: 1, slot: 0 };
+        let region_two_slot_zero = RootRingSlot { region: 2, slot: 0 };
+        assert_eq!(
+            [
+                reached(0, region_one_slot_zero, 0),
+                reached(0, region_one_slot_zero, 1),
+                reached(0, region_two_slot_zero, 1),
+                reached(0, region_two_slot_zero, 2),
+                reached(0, region_zero_slot_zero, 11),
+                reached(0, region_zero_slot_zero, 12),
+                reached(12, region_zero_slot_zero, 12),
+            ],
+            [false, true, false, true, false, true, false],
+            "区域 1 槽 0 从 txg 1 起、区域 2 槽 0 从 txg 2 起、区域 0 槽 0 从 txg 12 起算发布路径已写到；txg 12 的根不是第 0 代根"
+        );
+    }
+
+    /// 读者：读 `misplaced` 那一槽的前几次依次读回 `read_back_instead_in_order` 里那几槽的字节（每次错位读回的不同），之后读原样交给盘；
+    /// 别的读原样交给盘。
+    struct PoolReadingOneRingSlotMisplacedInOrder<'pool> {
+        devices: &'pool DevicesInMemory,
+        misplaced: (DeviceIdentity, DeviceOffsetInBytes),
+        read_back_instead_in_order:
+            std::cell::RefCell<std::collections::VecDeque<(DeviceIdentity, DeviceOffsetInBytes)>>,
+    }
+
+    impl PoolReader for PoolReadingOneRingSlotMisplacedInOrder<'_> {
+        fn device_identities(&self) -> Vec<DeviceIdentity> {
+            PoolReader::device_identities(self.devices)
+        }
+        fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
+            PoolReader::device_size_in_bytes(self.devices, device)
+        }
+        fn read(
+            &self,
+            device: DeviceIdentity,
+            offset: DeviceOffsetInBytes,
+            length: usize,
+        ) -> Option<Vec<u8>> {
+            let read_back_instead = if (device, offset) == self.misplaced {
+                self.read_back_instead_in_order.borrow_mut().pop_front()
+            } else {
+                None
+            };
+            match read_back_instead {
+                Some((device_read_instead, offset_read_instead)) => PoolReader::read(
+                    self.devices,
+                    device_read_instead,
+                    offset_read_instead,
+                    length,
+                ),
+                None => PoolReader::read(self.devices, device, offset, length),
+            }
+        }
+        fn journal_record_offsets_hint(
+            &self,
+            device: DeviceIdentity,
+            ring_start: DeviceOffsetInBytes,
+            ring_bytes: u64,
+        ) -> Option<Vec<DeviceOffsetInBytes>> {
+            PoolReader::journal_record_offsets_hint(self.devices, device, ring_start, ring_bytes)
+        }
+    }
+
+    /// 场景：第 0 代根那张盘面；读区域 1 槽 0 第一次错位读回区域 0 槽 1 那条实例 2 的根（落点核拦下），重读错位读回区域 0 槽 0 的第 0 代根
+    /// （落点核照收），再往后的读读回那一槽真住着的实例 1 的根。
+    /// 预期：这一槽已重读过一次，第 0 代根那一条判据判它自证不过时不再读第三次，这一轮不删，停在区域 1 槽 0。
+    /// 判别力：`crates/mutations.tsv`「C973 清扫第 0 代根那一槽已重读过还再读一次」那一行，这一条红（第三次读回实例 1 的根，没有候选行）。
+    #[test]
+    fn ring_slot_reread_after_one_misplaced_read_and_read_back_as_the_genesis_root_is_not_read_third_time_and_deletes_no_row(
+    ) {
+        let pool =
+            pool_with_the_only_root_of_an_instance_in_a_ring_slot_seeded_by_make_filesystem();
+        let parameters = parameters();
+        let device_and_offset_of = |ring_slot: RootRingSlot| {
+            (
+                parameters.region_devices[usize::try_from(ring_slot.region).expect("区域号")],
+                slot_offset(ring_slot, parameters.geometry.fixed_structure_slot_spacing),
+            )
+        };
+        let reader = PoolReadingOneRingSlotMisplacedInOrder {
+            devices: &pool.devices,
+            misplaced: device_and_offset_of(pool.ring_slot_of_the_only_root_of_the_instance),
+            read_back_instead_in_order: std::cell::RefCell::new(
+                [
+                    device_and_offset_of(RootRingSlot { region: 0, slot: 1 }),
+                    device_and_offset_of(RootRingSlot { region: 0, slot: 0 }),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        };
+        let judged = judge_the_instance_table_sweep(&reader, &pool.current_root);
+        assert!(
+            matches!(
+                judged,
+                Err(NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot })
+                    if ring_slot == pool.ring_slot_of_the_only_root_of_the_instance
+            ),
+            "已重读过的那一槽读出第 0 代根：这一轮不删、停在区域 1 槽 0：{judged:?}"
+        );
+        assert!(
+            reader.read_back_instead_in_order.borrow().is_empty(),
+            "前提：两次错位读都用掉了"
+        );
     }
 }

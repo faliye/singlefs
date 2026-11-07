@@ -1,7 +1,7 @@
-//! WGSL 跨文件着落边（`records/2026-10-13-复用键与全仓改名.md`「crates 第三轮 A 交回」之后主 agent 定的第 2 条，定案 3「多连不少连」）：
+//! WGSL 跨文件着落边（「多连不少连」）：
 //! 闭包读到的 `.wgsl` 里用到、却没定义的名字，链接集里别的单元 `include_str!` 读进来的 `.wgsl` 定义了它的，把那个单元连同那份 `.wgsl`
 //! 并进闭包，名字在合起来的名字空间里解；哪份都没定义的才拒算（`wgsl-undefined-name`）。真仓的形状：`crash_judge_checker_common.wgsl`
-//! 的常量引 `crash_judge_common.wgsl` 里定义的 `MAX_ROWS` 这类常量，两份由 `crates/singlefs-checker-tier/src/crash_judge_gpu.rs` 的
+//! 的常量引 `crash_judge_common.wgsl` 里定义的 `MAX_ROWS` 这类常量，两份由 `crates/singlefs-verification/src/crash_judge_gpu.rs` 的
 //! `checker_walk_kernel_source` 拼成一份着色器，只把前一份当文本读的测试闭包里没有后一份。
 //! 夹具：`fsplitkernel` 用两个 `include_str!` 读两份 `.wgsl`，`checker.wgsl` 的 `const_assert` 引 `common.wgsl` 的 `SCRATCH_BASE`；
 //! 谁都不依赖的 `funlinkedcommon` 里另有一份定义同名常量的 `.wgsl`。

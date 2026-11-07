@@ -2,7 +2,7 @@
 //!
 //! 每条规则落在哪个函数：
 //!   R-目标  `build_link`（入口目标的链接集、每个目标看得见哪几个目标、每个目标的生效 cfg 集）、`follow_bare_names` 里跨目标只认 `pub`
-//!   R-裸名  `follow_bare_names`
+//!   R-裸名  `follow_bare_names`（同一个目标里按模块筛，见下面「R-裸名同一个目标里按模块筛」）
 //!   R-路径  `follow_qualified_paths`
 //!   R-方法  `follow_methods`（RTA）与 `name_type` 里后点名的类型补上之前见过的方法
 //!   R-隐式  `name_type` 里的 trait impl 那一支，与 `visit_unit_for_target` 里 trait 头那一支
@@ -10,6 +10,19 @@
 //!           值只能由某个具体类型经 unsized 转换而来，那个类型在闭包里被点名（R-隐式 带进它的 trait impl）或从入口签名传进来
 //!   R-结构  `follow_structure`（成员连头、单元连模块头与声明它所在文件的 `mod`、连引进它用到的名字的 use、glob 一律连、别名按原名解）
 //!   R-宏    宏名按裸名解到 `macro_rules!`（`follow_bare_names`），宏体与条目级宏调用里的标识符都在单元的名字里（`rust_items`）
+//! 闭包外的四类边（与 `scripts/gate/lib_function_units.py` 文件头 Rust 闭包「闭包外的四类边」同一套规则；索引在 `workspace` 的
+//! `edges_outside_the_eight_rules`，每类一个弄坏开关）：
+//!   条目级宏调用生成的条目  调用体里跟在 enum / struct / union / type 后面的名字在调用进闭包时算被点名（`visit_unit_for_target`）；
+//!           同名 `macro_rules!` 展开式顶层按字面写出的名字登到这个宏的每次调用名下（`workspace` 的 `build_indexes`，R-裸名照它解）
+//!   `#[global_allocator]`  链接集里有它所在目标的分配器 static 进闭包（`push_global_allocators_of_the_linked_targets`）
+//!   外部类型上的本仓 trait impl  R-方法、R-路径不等自身类型被点名就放行它的成员（`foreign_type_trait_implementations`）
+//!   构建脚本交的值  `env!` / `option_env!` 读的非 cargo 变量连到本 crate 构建脚本的 `main`，没有构建脚本的不连（`follow_reads`）
+//!   工作区外的 path 依赖  `load_workspace` 顺 path 依赖收仓根底下、`crates/` 之外的 crate，调到它们的函数照 R-目标连；这样收进来的 crate
+//!           按调用关系连、不按同名连（工作区成员之间跨目标照旧按同名连）：别的包里的裸名要这个名字在工作区里经 use 或路径从它引进来过
+//!           （`workspace` 的 `names_reaching_an_outside_crate`）才连，只是同名的字段、局部变量不连；同一个目标里按模块筛照 R-裸名。各一个弄坏开关
+//! R-裸名同一个目标里按模块筛（`crates/` 下的包与工作区外的 crate 一样，各一个弄坏开关）：只连单元所在模块看得见的那几份
+//! （`candidates_seen_from_the_module_of_the_unit`：本模块定义的、经 use 引进的、glob use 的模块里的、写成 `模块::名` 的），点不准的退回全连；
+//! 名字是 use 改名的原名、单元是 `macro_rules!`（体里的名字在调用处解）的不筛。跨目标的只认 `pub`、不按模块筛。
 //! 拒算：单元自己带的（`rust_items` 切分时记下）、链接到的文件切不全的、数据文件读不了的、构建脚本或 bin 找不到的、
 //! proc-macro crate、cfg 谓词判不了的、工具链的目标三元组查不出的、WGSL 外名没有着落的，全部收进 `ClosureOutcome::refusals`；有一条拒算就不交键。
 //! WGSL 外名（`.wgsl` 里用到、模块里没定义的名字）的着落（`WgslExternalNameSources::supply`）：整名是闭包里某个 Rust 串字面量的一个词；
@@ -21,29 +34,36 @@
 //! 就把那个单元连同那份 `.wgsl` 并进闭包，名字在合起来的名字空间里解；哪份 `.wgsl` 都没定义的、闭包里又还没有着落的，再在链接集里找供它的
 //! 单元（按名字定义了它或以 `_` 加它收尾的常量、静态量、条目级宏调用，串字面量里有它这个词的单元），连同它们的闭包并进入口闭包，再收、
 //! 再核，直到不再有新单元；最后还没有着落的拒算（`wgsl-undefined-name`）。
-//! 这是超集：供名字的单元一律连上，不核它读的 `.wgsl`、它的串真被交给了拼内核的函数。
+//! 这是超集：供名字的单元一律连上，不核它读的 `.wgsl`、它的串真被交给了拼内核的函数；只是带 `#[test]` 的函数与只在测试里编进来的代码
+//! （`#[cfg(test)]` 模块里的单元）不当供名字的单元收（测试函数没人调，它的串到不了拼内核的函数；入口本身在闭包里，照旧算着落）。
+//! 子进程测试边（`current-exe-child`，`pull_in_child_process_tests`）：单元把 `current_exe()` 交给 `Command::new` 起本测试二进制、
+//! `--exact` 后面跟着折得出的测试名（字面串、同一 crate 的 `const …: &str`、全由它们组成的 `format!` / `concat!`；或起子进程的函数的
+//! 一个参数，取闭包里每一处调用在那个位置上交的实参），就连到入口目标里那个 `#[test] fn`；折不出、解不到恰好一个的拒算 `current-exe`。
+//! 单元里不起子进程（没有 `Command`、`spawn` 这类词）、只问 `current_exe()` 路径的不拒算、不连边（`rust_items` 的 `SPAWNING_WORDS`）。
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
 
 use crate::build_features::FeaturesEnabledByTheBuild;
 use crate::conditional_compilation::{
-    atom_of_the_leaf, leaves_of_the_predicate, parse_predicate, rendered_predicate,
-    target_platform_of_triple, CompilationConditions, ConditionalCompilationSet, Evaluation,
-    Predicate, TargetPlatform,
+    atom_of_the_leaf, leaves_of_the_predicate, parse_predicate, plain_string_content,
+    rendered_predicate, split_at_top_level_commas, target_platform_of_triple,
+    CompilationConditions, ConditionalCompilationSet, Evaluation, Predicate, TargetPlatform,
 };
 use crate::lexer::{lex_source, token_text, DocumentationCommentTreatment, TokenKind};
 use crate::manifest::DependencySection;
 use crate::rule_switches::{BrokenRule, RuleSwitches};
-use crate::rust_items::normalized_path;
+use crate::rust_items::{normalized_path, test_name_pieces_of_texts};
 use crate::sha256::{sha256_of, Sha256Digest};
+use crate::shell_sources::ShellNormalizationFailure;
 use crate::units::{
-    DocumentationTestAttachment, FileIndex, ReadOrigin, Refusal, RefusalForm, SourceRead,
-    UnitIndex, UnitKind, WgslUnitIndex,
+    ChildTestName, DocumentationTestAttachment, FileIndex, ReadOrigin, Refusal, RefusalForm,
+    SourceRead, TestNamePiece, UnitIndex, UnitKind, WgslUnitIndex,
 };
 use crate::wgsl::wgsl_module_closure;
 use crate::workspace::{
-    CrateIndex, SourceLanguage, TargetIndex, TargetKind, TargetSelector, Workspace,
+    CrateIndex, CrateOrigin, NamesReachingAnOutsideCrate, SourceLanguage, TargetIndex, TargetKind,
+    TargetSelector, Workspace,
 };
 
 /// 命令行 `--cfg` 给的一项：无值名字、特性，或别的键值。
@@ -92,7 +112,7 @@ pub struct ClosureRequest {
     pub target_triple: String,
 }
 
-/// 入口找不到或不唯一：用法错，不是拒算。
+/// 收不了闭包：入口找不到或不唯一（用法错），或闭包读到的 shell 脚本交 bash 规范化跑不下去（运行条件不满足）；都不是拒算，整趟报错。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EntryError {
     MalformedEntryPath(String),
@@ -113,6 +133,9 @@ pub enum EntryError {
     },
     EntryInactive(String),
     NoDocumentationTests(String),
+    /// 闭包读到的 shell 脚本交 bash 规范化跑不下去（bash 不在、退非 0、超时）：与 `scripts/gate/lib_function_units.py` 抛
+    /// `FunctionUnitsError` 同，整趟报错，不记成拒算。
+    ShellNormalizationFailed(ShellNormalizationFailure),
 }
 
 impl fmt::Display for EntryError {
@@ -147,24 +170,48 @@ impl fmt::Display for EntryError {
             EntryError::NoDocumentationTests(path) => {
                 write!(formatter, "「{path}」的文档注释里没有 Rust 代码块")
             }
+            EntryError::ShellNormalizationFailed(failure) => write!(formatter, "{failure}"),
         }
     }
 }
 
-/// 闭包里的一个数据单元：读它的单元、数据文件（从仓根起的路径，只当索引）、读的那一行、内容摘要。
+/// 数据单元读的是一份文件还是一整个目录。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DataUnitKind {
+    File,
+    /// `crates/` 之下的一个目录（递归），摘要是 `units::directory_digest`。
+    Directory,
+}
+
+impl DataUnitKind {
+    /// 输出行的种类名。与 `scripts/gate/lib_function_units.py` 同一套写法。
+    #[must_use]
+    pub fn output_name(self) -> &'static str {
+        match self {
+            DataUnitKind::File => "data",
+            DataUnitKind::Directory => "data-directory",
+        }
+    }
+}
+
+/// 闭包里的一个数据单元：读它的单元、数据文件或目录（从仓根起的路径，只当索引）、读的那一行、内容摘要、读的是文件还是目录。
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DataUnit {
     pub site: UnitIndex,
     pub path_display: String,
     pub site_line: u32,
     pub digest: Sha256Digest,
+    pub kind: DataUnitKind,
 }
 
 /// 一次收闭包的结果。
 #[derive(Clone, Debug)]
 pub struct ClosureOutcome {
     pub entry_target_kind: TargetKind,
-    /// 闭包里各单元真引到的条件原子，各带收它进来那个目标下的真值（`<原子>\t<true|false>`，排好序、去重）：键的条件成分只取它们（定案 2）。
+    /// 从哪几个入口单元收的：请求点名的入口与另给的入口各自解到的单元（文档测试目标是所挂条目或模块的全部文档测试），
+    /// 链进来的别的目标的 `main` 不算。复用键的 entry 行取它们（[`reuse_key`]）。
+    pub entry_units: Vec<UnitIndex>,
+    /// 闭包里各单元真引到的条件原子，各带收它进来那个目标下的真值（`<原子>\t<true|false>`，排好序、去重）：键的条件成分只取它们。
     pub condition_atoms_with_their_values: Vec<String>,
     pub units: Vec<UnitIndex>,
     pub wgsl_units: Vec<WgslUnitIndex>,
@@ -752,6 +799,7 @@ fn defines_names_a_kernel_can_use(kind: UnitKind) -> bool {
         | UnitKind::ExternBlock
         | UnitKind::ExternCrate
         | UnitKind::VerusBroadcastGroup
+        | UnitKind::VerusAssumeSpecification
         | UnitKind::DocumentationTest => false,
     }
 }
@@ -796,6 +844,8 @@ impl WgslExternalNameSources {
 struct ClosureRun<'workspace> {
     workspace: &'workspace Workspace,
     link: Link,
+    /// 入口目标：`current_exe()` 起的就是它编出来的那个测试二进制，子进程测试名在它的文件里解。
+    entry_target: TargetIndex,
     switches: RuleSwitches,
     pending: Vec<(UnitIndex, TargetIndex)>,
     seen_pairs: HashSet<(UnitIndex, TargetIndex)>,
@@ -811,6 +861,8 @@ struct ClosureRun<'workspace> {
     wgsl_name_suppliers_tried: HashSet<UnitIndex>,
     /// 闭包里各单元真引到的条件原子与真值（`record_condition_atoms`）。
     condition_atoms: BTreeSet<String>,
+    /// 头一份 bash 规范化跑不下去的 shell 脚本（`follow_shell_sources`）：有了它这一趟交 `EntryError::ShellNormalizationFailed`，不交闭包。
+    shell_normalization_failure: Option<ShellNormalizationFailure>,
 }
 
 /// R-方法：基本类型与 `Self`、`Vec`、`Option`、`Result`、`Box`、`String` 恒被点名。
@@ -819,11 +871,20 @@ const ALWAYS_NAMED_TYPES: [&str; 23] = [
     "f64", "bool", "char", "str", "String", "Vec", "Option", "Result", "Box", "Self",
 ];
 
+/// R-裸名按模块筛候选时，路径根名是这几个的指标准库，不点本目标里的哪一份（另几个是看得见的别的 crate 的库名）。
+const PATH_ROOTS_OF_THE_STANDARD_CRATES: [&str; 3] = ["std", "core", "alloc"];
+
 impl<'workspace> ClosureRun<'workspace> {
-    fn new(workspace: &'workspace Workspace, link: Link, switches: &RuleSwitches) -> Self {
+    fn new(
+        workspace: &'workspace Workspace,
+        link: Link,
+        switches: &RuleSwitches,
+        entry_target: TargetIndex,
+    ) -> Self {
         Self {
             workspace,
             link,
+            entry_target,
             switches: switches.clone(),
             pending: Vec::new(),
             seen_pairs: HashSet::new(),
@@ -840,6 +901,7 @@ impl<'workspace> ClosureRun<'workspace> {
             requested_roots: BTreeSet::new(),
             wgsl_name_suppliers_tried: HashSet::new(),
             condition_atoms: BTreeSet::new(),
+            shell_normalization_failure: None,
         }
     }
 
@@ -886,7 +948,8 @@ impl<'workspace> ClosureRun<'workspace> {
             | UnitKind::ModuleHead
             | UnitKind::ExternBlock
             | UnitKind::ExternCrate
-            | UnitKind::VerusBroadcastGroup => true,
+            | UnitKind::VerusBroadcastGroup
+            | UnitKind::VerusAssumeSpecification => true,
         }
     }
 
@@ -919,7 +982,7 @@ impl<'workspace> ClosureRun<'workspace> {
             Activity::Active => {}
             Activity::ActiveWithUnknownCondition(fragment) => {
                 self.refusals.insert(Refusal {
-                    file: unit.file,
+                    file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                     line: unit.start_line,
                     form: RefusalForm::UnrecognizedConditionalCompilationPredicate,
                     fragment,
@@ -948,8 +1011,22 @@ impl<'workspace> ClosureRun<'workspace> {
         if unit.kind.is_type() {
             self.name_type(&unit.name);
         }
+        if unit.kind == UnitKind::ItemMacroInvocation
+            && self.switches.is_intact(BrokenRule::MacroGeneratedTypes)
+        {
+            // 条目级宏调用生成的类型算被点名：R-方法、R-隐式照连到写给它的 impl。弄坏开关 macro-generated-types：不算
+            if let Some(type_names) = workspace
+                .indexes
+                .types_declared_by_item_macro
+                .get(&unit_index)
+            {
+                for type_name in type_names {
+                    self.name_type(type_name);
+                }
+            }
+        }
         if unit.kind == UnitKind::TraitHead {
-            // trait 头进闭包时它的 blanket impl 连同成员一起进（定案 3）
+            // trait 头进闭包时它的 blanket impl 连同成员一起进
             if let Some(implementations) = workspace
                 .indexes
                 .blanket_implementations_by_trait_name
@@ -987,7 +1064,7 @@ impl<'workspace> ClosureRun<'workspace> {
         }
     }
 
-    /// 键的条件成分（定案 2）：这个单元在收它进来的这个目标下真引到的条件原子，各带这个目标的生效集合下的真值（`<原子>\t<true|false>`）。
+    /// 键的条件成分：这个单元在收它进来的这个目标下真引到的条件原子，各带这个目标的生效集合下的真值（`<原子>\t<true|false>`）。
     /// 原子取它自己连外层的条件链与它词法单元里写出来的谓词的每一片叶子；叶子写不成谓词、判不了真假的拒算。闭包没引到的原子不进键：
     /// 闭包不提 `gpu` 的入口，带不带 `gpu` 特性两种目标下键相同。
     fn record_condition_atoms(&mut self, unit_index: UnitIndex, target: TargetIndex) {
@@ -1005,7 +1082,7 @@ impl<'workspace> ClosureRun<'workspace> {
                     (Some(atom), Evaluation::DoesNotHold) => format!("{atom}\tfalse"),
                     (Some(_), Evaluation::Unknown) | (None, _) => {
                         self.refusals.insert(Refusal {
-                            file: unit.file,
+                            file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                             line: unit.start_line,
                             form: RefusalForm::UnrecognizedConditionalCompilationPredicate,
                             fragment: rendered_predicate(predicate),
@@ -1082,6 +1159,31 @@ impl<'workspace> ClosureRun<'workspace> {
         let unit = &workspace.units[unit_index.0];
         let visible = self.link.visible_targets(target);
         let ignores_visibility = !self.switches.is_intact(BrokenRule::TargetScope);
+        let links_outside_crate_names_only_when_imported = self
+            .switches
+            .is_intact(BrokenRule::OutsideCrateNamesImportedOnly);
+        let links_outside_crate_names_by_module = self
+            .switches
+            .is_intact(BrokenRule::OutsideCrateNamesByModule);
+        let links_crates_directory_names_by_module = self
+            .switches
+            .is_intact(BrokenRule::CratesDirectoryNamesByModule);
+        // macro_rules! 体里的裸名在调用处解，定义所在模块看不出它落在哪一份：一律全连
+        let is_resolved_at_the_call_site = unit.kind == UnitKind::MacroRulesDefinition;
+        let unit_crate = workspace.targets[target.0].crate_index;
+        let roots_naming_another_crate: BTreeSet<&str> = PATH_ROOTS_OF_THE_STANDARD_CRATES
+            .iter()
+            .copied()
+            .chain(
+                visible
+                    .iter()
+                    .map(|visible_target| workspace.targets[visible_target.0].crate_index)
+                    .filter(|visible_crate| *visible_crate != unit_crate)
+                    .map(|visible_crate| {
+                        workspace.crates[visible_crate.0].crate_identifier.as_str()
+                    }),
+            )
+            .collect();
         for name in unit.references.plain_names.iter().chain(alias_originals) {
             for visible_target in &visible {
                 let Some(found) = workspace
@@ -1092,7 +1194,40 @@ impl<'workspace> ClosureRun<'workspace> {
                 else {
                     continue;
                 };
-                for found_unit in found {
+                let visible_crate = workspace.targets[visible_target.0].crate_index;
+                let seen_from_the_module: Vec<UnitIndex>;
+                let mut candidates: &[UnitIndex] = found;
+                // 同一个目标里只连这个单元所在模块看得见的那几份（文件头「R-裸名」）：crates/ 下的包与工作区外的 crate 一样
+                // （验证包里 CPU 判器的单元经 use 从格式库引进 SLOT_BYTES，不连到 gpu_unit_checks 里私有的同名常量）
+                let links_by_module = match workspace.crates[visible_crate.0].origin {
+                    CrateOrigin::UnderTheCratesDirectory => links_crates_directory_names_by_module,
+                    CrateOrigin::PathDependencyOutsideTheWorkspace => {
+                        // 工作区外的 crate 按调用关系连（文件头「工作区外的 path 依赖」）：从别的包连进来，这个名字要在工作区里经 use 或路径
+                        // 从它引进来过（验证包的 run 字段不连到 prune-server 的 command_line::run）
+                        if links_outside_crate_names_only_when_imported
+                            && visible_crate != unit_crate
+                            && !self.is_name_imported_from_the_outside_crate(visible_crate, name)
+                        {
+                            continue;
+                        }
+                        links_outside_crate_names_by_module
+                    }
+                };
+                if links_by_module
+                    && *visible_target == target
+                    && !alias_originals.contains(name)
+                    && !is_resolved_at_the_call_site
+                {
+                    seen_from_the_module = self.candidates_seen_from_the_module_of_the_unit(
+                        unit_index,
+                        target,
+                        name,
+                        candidates,
+                        &roots_naming_another_crate,
+                    );
+                    candidates = &seen_from_the_module;
+                }
+                for found_unit in candidates {
                     if *visible_target == target
                         || workspace.units[found_unit.0].is_public
                         || ignores_visibility
@@ -1104,12 +1239,239 @@ impl<'workspace> ClosureRun<'workspace> {
         }
     }
 
+    /// 别的包里的裸名 `name` 在工作区里经 use 或路径从工作区外的 `outside_crate` 引进来过（`workspace` 的
+    /// `names_reaching_an_outside_crate`）。
+    fn is_name_imported_from_the_outside_crate(
+        &self,
+        outside_crate: CrateIndex,
+        name: &str,
+    ) -> bool {
+        match self
+            .workspace
+            .indexes
+            .names_reaching_crates_outside_the_workspace
+            .get(&outside_crate)
+            .expect("每个工作区外的 crate 装工作区时都算了引进名字；这里没有说明 CrateOrigin 与索引对不上")
+        {
+            NamesReachingAnOutsideCrate::EveryName => true,
+            NamesReachingAnOutsideCrate::Named(names) => names.contains(name),
+        }
+    }
+
+    /// 单元在目标里所在的模块路径：文件在目标模块树里的路径接文件里的行内模块路径。
+    fn module_path_in_the_target(&self, unit_index: UnitIndex, target: TargetIndex) -> Vec<String> {
+        let unit = &self.workspace.units[unit_index.0];
+        let mut module_path = self
+            .workspace
+            .membership(unit.file, target)
+            .expect("候选与单元都是按这个目标的模块树找到的，文件在这个目标里")
+            .module_path
+            .clone();
+        module_path.extend(unit.local_module_path.iter().cloned());
+        module_path
+    }
+
+    /// 同一个目标里，单元按裸名 `name` 连得到 `candidates` 里的哪几份（与 `scripts/gate/lib_function_units.py` 的
+    /// `RustWorkspace.candidates_seen_from_module` 同一个判法）：与单元同一模块的；所在模块的 use 引进了 `name`（或是 glob）、use 路径里有
+    /// 候选所在模块末段的（`crate` 对根模块、`super` 对上一层、`super::super` 对上两层，`self` 起头对本模块）；单元里写成 `前缀::name`、
+    /// 前缀是候选所在模块末段的（前缀是 `super` 时按整条路径里 `super` 的个数往上数层）。
+    /// use 路径或 `…::name` 整条路径的根名在 `roots_naming_another_crate` 里的（别的 crate 的库名、`std`、`core`、`alloc`）指的是别的 crate，
+    /// 不点这个目标里的哪一份，跳过这一处。
+    /// 认不出落在哪一份的退回全连：use 或前缀一份都没点到（经 `pub use` 转出来的）、单元里另有 `use`（函数体里的）、`name` 后面接 `!` 与开括号。
+    /// 前缀是本目标的类型或 trait、或 `Self` 的是关联项（R-路径另管），跳过这一处。哪一样都不沾的（字段名、局部变量、impl 成员自己的名字）一份都不连。
+    fn candidates_seen_from_the_module_of_the_unit(
+        &self,
+        unit_index: UnitIndex,
+        target: TargetIndex,
+        name: &str,
+        candidates: &[UnitIndex],
+        roots_naming_another_crate: &BTreeSet<&str>,
+    ) -> Vec<UnitIndex> {
+        let workspace = self.workspace;
+        let unit = &workspace.units[unit_index.0];
+        let file = &workspace.files[unit.file.0];
+        let text_at = |position: usize| {
+            file.tokens
+                .get(position)
+                .map_or("", |token| token_text(&file.source, token))
+        };
+        let is_identifier_at = |position: usize| {
+            file.tokens
+                .get(position)
+                .is_some_and(|token| token.kind == TokenKind::Identifier)
+        };
+        let own_module = self.module_path_in_the_target(unit_index, target);
+        let candidate_modules: Vec<Vec<String>> = candidates
+            .iter()
+            .map(|candidate| self.module_path_in_the_target(*candidate, target))
+            .collect();
+        let mut seen: BTreeSet<usize> = candidate_modules
+            .iter()
+            .enumerate()
+            .filter(|(_, module)| **module == own_module)
+            .map(|(candidate_position, _)| candidate_position)
+            .collect();
+        // 路径（不含 name 本身）点到的候选（下标）；一份都没点到交 None
+        let placed = |segments: &[&str]| -> Option<BTreeSet<usize>> {
+            // 路径里写了几个 `super` 就往上几层；超出根模块的写法编不过，按根模块算
+            let levels_up = segments
+                .iter()
+                .filter(|segment| **segment == "super")
+                .count();
+            let found: BTreeSet<usize> = candidate_modules
+                .iter()
+                .enumerate()
+                .filter(|(_, module)| {
+                    module
+                        .last()
+                        .is_some_and(|last_segment| segments.contains(&last_segment.as_str()))
+                        || (module.is_empty() && segments.first() == Some(&"crate"))
+                        || (levels_up > 0
+                            && module[..]
+                                == own_module[..own_module.len().saturating_sub(levels_up)])
+                        || (segments.first() == Some(&"self") && **module == own_module)
+                })
+                .map(|(candidate_position, _)| candidate_position)
+                .collect();
+            (!found.is_empty()).then_some(found)
+        };
+        let mut is_placement_unknown = false;
+        if let Some(uses) = workspace
+            .indexes
+            .uses_by_scope
+            .get(&(unit.file, unit.local_module_path.clone()))
+        {
+            for use_index in uses {
+                let use_unit = &workspace.units[use_index.0];
+                let (Some((first_token, end_token)), Some(imports)) =
+                    (use_unit.token_range, use_unit.imports.as_ref())
+                else {
+                    continue;
+                };
+                if !imports.is_glob
+                    && !imports
+                        .names
+                        .iter()
+                        .any(|imported| imported.as_str() == name)
+                {
+                    continue;
+                }
+                // use 之后头一个标识符（跳过开头的 `::`）是路径的根名；`use {…}` 没有根名
+                let path_root = (first_token..end_token)
+                    .skip_while(|position| {
+                        !(is_identifier_at(*position) && text_at(*position) == "use")
+                    })
+                    .skip(1)
+                    .find(|position| text_at(*position) != ":")
+                    .filter(|position| is_identifier_at(*position))
+                    .map(text_at);
+                if path_root.is_some_and(|root| roots_naming_another_crate.contains(root)) {
+                    continue;
+                }
+                let segments: Vec<&str> = (first_token..end_token)
+                    .filter(|position| is_identifier_at(*position))
+                    .map(text_at)
+                    .filter(|word| !matches!(*word, "use" | "pub" | "as") && *word != name)
+                    .collect();
+                match placed(&segments) {
+                    Some(hit) => seen.extend(hit),
+                    None => is_placement_unknown = true,
+                }
+            }
+        }
+        if let (Some((first_token, end_token)), false) = (unit.token_range, is_placement_unknown) {
+            let names_in_the_target = workspace.indexes.units_by_target_and_name.get(&target);
+            let is_type_or_trait_of_the_target = |prefix: &str| {
+                names_in_the_target
+                    .and_then(|by_name| by_name.get(prefix))
+                    .is_some_and(|units| {
+                        units.iter().any(|found_unit| {
+                            let kind = workspace.units[found_unit.0].kind;
+                            kind.is_type() || kind == UnitKind::TraitHead
+                        })
+                    })
+            };
+            for position in first_token..end_token {
+                let word = text_at(position);
+                if word == "use" && is_identifier_at(position) && position != first_token {
+                    is_placement_unknown = true;
+                    break;
+                }
+                if word != name || !is_identifier_at(position) {
+                    continue;
+                }
+                if text_at(position + 1) == "!" && matches!(text_at(position + 2), "(" | "[" | "{")
+                {
+                    is_placement_unknown = true;
+                    break;
+                }
+                let Some(prefix_position) = position.checked_sub(3) else {
+                    continue;
+                };
+                if text_at(position - 1) != ":"
+                    || text_at(position - 2) != ":"
+                    || !is_identifier_at(prefix_position)
+                {
+                    continue;
+                }
+                let prefix = text_at(prefix_position);
+                // 整条路径 `根::…::前缀::name`，从前缀往前顺着 `标识符 ::` 收到根
+                let mut path_before_the_name = vec![prefix];
+                let mut segment_position = prefix_position;
+                while segment_position >= 3
+                    && text_at(segment_position - 1) == ":"
+                    && text_at(segment_position - 2) == ":"
+                    && is_identifier_at(segment_position - 3)
+                {
+                    segment_position -= 3;
+                    path_before_the_name.push(text_at(segment_position));
+                }
+                path_before_the_name.reverse();
+                if path_before_the_name
+                    .first()
+                    .is_some_and(|root| roots_naming_another_crate.contains(root))
+                {
+                    continue;
+                }
+                if prefix == "Self"
+                    || (is_type_or_trait_of_the_target(prefix)
+                        && !matches!(prefix, "crate" | "self" | "super"))
+                {
+                    continue;
+                }
+                let only_the_prefix = [prefix];
+                let placement_segments: &[&str] = if prefix == "super" {
+                    &path_before_the_name
+                } else {
+                    &only_the_prefix
+                };
+                match placed(placement_segments) {
+                    Some(hit) => seen.extend(hit),
+                    None => {
+                        is_placement_unknown = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if is_placement_unknown {
+            return candidates.to_vec();
+        }
+        candidates
+            .iter()
+            .enumerate()
+            .filter(|(candidate_position, _)| seen.contains(candidate_position))
+            .map(|(_, candidate)| *candidate)
+            .collect()
+    }
+
     fn follow_methods(&mut self, unit_index: UnitIndex) {
         if !self.switches.is_intact(BrokenRule::MethodCalls) {
             return;
         }
         let workspace = self.workspace;
         let unit = &workspace.units[unit_index.0];
+        let foreign_type_implementations = self.foreign_type_trait_implementations();
         for method_name in &unit.references.method_names {
             if !self.methods_seen.insert(method_name.clone()) {
                 continue;
@@ -1125,14 +1487,14 @@ impl<'workspace> ClosureRun<'workspace> {
                 let is_eligible = if container_unit.kind == UnitKind::TraitHead {
                     true
                 } else if container_unit.kind == UnitKind::ImplementationHead {
-                    // blanket impl 够得到的方法算边（定案 3）：自身类型里带它的泛型参数，能被点名的具体名字可能一个都没有，不等自身类型被点名
+                    // blanket impl 够得到的方法算边：自身类型里带它的泛型参数，能被点名的具体名字可能一个都没有，不等自身类型被点名
                     container_unit.implementation.as_ref().is_some_and(|shape| {
                         shape.is_blanket_implementation
                             || shape
                                 .self_type_names
                                 .iter()
                                 .any(|type_name| self.named_types.contains(type_name))
-                    })
+                    }) || foreign_type_implementations.contains(&container)
                 } else {
                     false
                 };
@@ -1152,6 +1514,7 @@ impl<'workspace> ClosureRun<'workspace> {
         let own_container = unit
             .container
             .map(|container| &workspace.units[container.0]);
+        let foreign_type_implementations = self.foreign_type_trait_implementations();
         for (qualifier, member_name) in &unit.references.qualified_paths {
             let Some(members) = workspace.indexes.members_by_name.get(member_name) else {
                 continue;
@@ -1195,13 +1558,44 @@ impl<'workspace> ClosureRun<'workspace> {
                                     || implementation_shape
                                         .self_type_names
                                         .iter()
-                                        .any(|type_name| self.named_types.contains(type_name)))
+                                        .any(|type_name| self.named_types.contains(type_name))
+                                    || foreign_type_implementations.contains(&container))
                         })
                 } else {
                     false
                 };
                 if is_match {
                     self.push_with_a_linked_target(*member);
+                }
+            }
+        }
+    }
+
+    /// 外部类型上的本仓 trait impl 头（`workspace` 的 `foreign_type_trait_implementations`）：经泛型约束分派、自身类型永远不会被点名，
+    /// R-方法落到 `.x(` 时它的成员 `x` 照连，R-路径 `Tr::x` 同样。弄坏开关 foreign-type-trait-implementations：一个都不放行。
+    fn foreign_type_trait_implementations(&self) -> &'workspace BTreeSet<UnitIndex> {
+        static NO_IMPLEMENTATIONS: BTreeSet<UnitIndex> = BTreeSet::new();
+        if self
+            .switches
+            .is_intact(BrokenRule::ForeignTypeTraitImplementations)
+        {
+            &self.workspace.indexes.foreign_type_trait_implementations
+        } else {
+            &NO_IMPLEMENTATIONS
+        }
+    }
+
+    /// `#[global_allocator]` 的 static 管整个链接出来的程序：链接集里有它所在的目标，它就进闭包（连同它的类型、R-隐式带上 GlobalAlloc 的 impl）。
+    /// 弄坏开关 global-allocator-edges：不进。
+    fn push_global_allocators_of_the_linked_targets(&mut self) {
+        if !self.switches.is_intact(BrokenRule::GlobalAllocatorEdges) {
+            return;
+        }
+        let workspace = self.workspace;
+        for allocator in &workspace.indexes.global_allocators {
+            for membership in &workspace.memberships[workspace.units[allocator.0].file.0] {
+                if self.link.targets.contains(&membership.target) {
+                    self.push(*allocator, membership.target);
                 }
             }
         }
@@ -1274,6 +1668,75 @@ impl<'workspace> ClosureRun<'workspace> {
         }
     }
 
+    /// 读到的数据文件是 shell 脚本（`shell_sources::is_shell_script`）：它（传递地）`source` / `.` 进来的仓内文件各记一个数据单元，
+    /// 落在读这份脚本的那一处（同一个单元、同一行），字节进键；折不出、落在根外、指到不在的文件、bash 规范化不出来的，照 shell 那一份的位置记拒算；bash 规范化跑不下去（bash 不在、退非 0、超时）
+    /// 不是拒算，记下头一份、这一趟交 `EntryError::ShellNormalizationFailed`
+    /// （`shell_sources::shell_sourced_files`，与 `scripts/gate/lib_function_units.py` 的 `shell_sourced_files` 同一份规则）。
+    /// 仓根外面的数据文件不看（显示路径不是从仓根起的）。
+    fn follow_shell_sources(
+        &mut self,
+        site: UnitIndex,
+        script_absolute_path: &std::path::Path,
+        site_line: u32,
+    ) {
+        let workspace = self.workspace;
+        if self.shell_normalization_failure.is_some() {
+            return;
+        }
+        let script_path_from_the_repository_root = workspace.display_path(script_absolute_path);
+        if script_path_from_the_repository_root.starts_with('/')
+            || !crate::shell_sources::is_shell_script(
+                &workspace.repository_root,
+                &script_path_from_the_repository_root,
+            )
+        {
+            return;
+        }
+        let sourced = match workspace.shell_sourced_files.sourced_files_of(
+            &workspace.repository_root,
+            &script_path_from_the_repository_root,
+        ) {
+            Ok(sourced) => sourced,
+            Err(failure) => {
+                self.shell_normalization_failure = Some(failure);
+                return;
+            }
+        };
+        for sourced_file in &sourced.sourced_files {
+            match std::fs::read(workspace.repository_root.join(sourced_file)) {
+                Ok(bytes) => {
+                    self.data_units.insert(DataUnit {
+                        site,
+                        path_display: sourced_file.clone(),
+                        site_line,
+                        digest: sha256_of(&bytes),
+                        kind: DataUnitKind::File,
+                    });
+                }
+                Err(_) => {
+                    self.refusals.insert(Refusal {
+                        file: crate::units::RefusalFile::WorkspaceSourceFile(
+                            workspace.units[site.0].file,
+                        ),
+                        line: site_line,
+                        form: RefusalForm::DataFileUnreadable,
+                        fragment: sourced_file.clone(),
+                    });
+                }
+            }
+        }
+        for shell_refusal in &sourced.refusals {
+            self.refusals.insert(Refusal {
+                file: crate::units::RefusalFile::ShellScriptFromTheRepositoryRoot(
+                    shell_refusal.file.clone(),
+                ),
+                line: shell_refusal.line,
+                form: shell_refusal.form,
+                fragment: shell_refusal.snippet.clone(),
+            });
+        }
+    }
+
     fn follow_reads(&mut self, unit_index: UnitIndex, target: TargetIndex) {
         let workspace = self.workspace;
         let unit = &workspace.units[unit_index.0];
@@ -1302,11 +1765,13 @@ impl<'workspace> ClosureRun<'workspace> {
                                 path_display: workspace.display_path(absolute_path),
                                 site_line: *line,
                                 digest: *digest,
+                                kind: DataUnitKind::File,
                             });
+                            self.follow_shell_sources(unit_index, absolute_path, *line);
                         }
                         (ReadOrigin::Included | ReadOrigin::Runtime, _, None) => {
                             self.refusals.insert(Refusal {
-                                file: unit.file,
+                                file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                                 line: *line,
                                 form: RefusalForm::DataFileUnreadable,
                                 fragment: workspace.display_path(absolute_path),
@@ -1321,7 +1786,7 @@ impl<'workspace> ClosureRun<'workspace> {
                         }
                         None => {
                             self.refusals.insert(Refusal {
-                                file: unit.file,
+                                file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                                 line: *line,
                                 form: RefusalForm::BuildScriptMissing,
                                 fragment: "env!(\"OUT_DIR\")".to_string(),
@@ -1329,6 +1794,35 @@ impl<'workspace> ClosureRun<'workspace> {
                         }
                     }
                 }
+                SourceRead::BuildScriptEnvironmentValue { .. } => {
+                    // 构建脚本经 `cargo::rustc-env` 交的值：连到本 crate 构建脚本的 `main`；没有构建脚本的不连、不拒算
+                    // （值来自编译时的进程环境，不在仓里的代码里）。弄坏开关 build-script-environment-edges：不连
+                    if self
+                        .switches
+                        .is_intact(BrokenRule::BuildScriptEnvironmentEdges)
+                    {
+                        if let Some(build_script) =
+                            workspace.target_of_crate(crate_index, TargetKind::BuildScript, None)
+                        {
+                            self.requested_roots.insert(build_script);
+                        }
+                    }
+                }
+                SourceRead::Directory {
+                    absolute_path,
+                    line,
+                    digest,
+                } => {
+                    self.data_units.insert(DataUnit {
+                        site: unit_index,
+                        path_display: workspace.display_path(absolute_path),
+                        site_line: *line,
+                        digest: *digest,
+                        kind: DataUnitKind::Directory,
+                    });
+                }
+                // 子进程测试边在闭包收完一趟之后连（`pull_in_child_process_tests`）：参数写法要看闭包里的调用处
+                SourceRead::ChildTestProcess { .. } => {}
                 SourceRead::BinaryExecutable { binary_name, line } => {
                     match workspace.target_of_crate(
                         crate_index,
@@ -1340,7 +1834,7 @@ impl<'workspace> ClosureRun<'workspace> {
                         }
                         None => {
                             self.refusals.insert(Refusal {
-                                file: unit.file,
+                                file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                                 line: *line,
                                 form: RefusalForm::BinaryTargetMissing,
                                 fragment: format!("CARGO_BIN_EXE_{binary_name}"),
@@ -1429,6 +1923,7 @@ impl<'workspace> ClosureRun<'workspace> {
             if self.in_closure.contains(&unit_index)
                 || self.wgsl_name_suppliers_tried.contains(&unit_index)
                 || self.linked_target_of(unit_index).is_none()
+                || self.is_test_only_code(unit_index)
             {
                 continue;
             }
@@ -1506,7 +2001,10 @@ impl<'workspace> ClosureRun<'workspace> {
                     ..
                 }
                 | SourceRead::BuildScriptOutput { .. }
-                | SourceRead::BinaryExecutable { .. } => false,
+                | SourceRead::BuildScriptEnvironmentValue { .. }
+                | SourceRead::BinaryExecutable { .. }
+                | SourceRead::Directory { .. }
+                | SourceRead::ChildTestProcess { .. } => false,
             });
             if includes_a_defining_file {
                 includers.push((unit_index, linked_target));
@@ -1560,8 +2058,217 @@ impl<'workspace> ClosureRun<'workspace> {
         !suppliers.is_empty()
     }
 
-    fn finish(mut self, entry_target: TargetIndex) -> ClosureOutcome {
+    /// 只在测试里编进来的代码：带 `#[test]` 的函数，外层条件链里有 `test` 的单元（`#[cfg(test)]` 模块里的），
+    /// 或它所在的文件在链接集里的那个目标下每一种挂法都带 `test`（`#[cfg(test)] mod 名字;` 引进来的文件）。
+    fn is_test_only_code(&self, unit_index: UnitIndex) -> bool {
+        let unit = &self.workspace.units[unit_index.0];
+        if unit.has_test_attribute || unit.is_inside_test_only_code {
+            return true;
+        }
+        self.linked_target_of(unit_index)
+            .and_then(|linked_target| self.workspace.membership(unit.file, linked_target))
+            .is_some_and(|membership| {
+                !membership.condition_alternatives.is_empty()
+                    && membership.condition_alternatives.iter().all(|alternative| {
+                        alternative
+                            .iter()
+                            .any(crate::rust_items::predicate_requires_the_test_configuration)
+                    })
+            })
+    }
+
+    /// 单元自己的词法单元原文。
+    fn token_texts_of(&self, unit_index: UnitIndex) -> Vec<&'workspace str> {
         let workspace = self.workspace;
+        let unit = &workspace.units[unit_index.0];
+        let Some((first, end)) = unit.token_range else {
+            return Vec::new();
+        };
+        let file = &workspace.files[unit.file.0];
+        file.tokens[first..end]
+            .iter()
+            .map(|token| token_text(&file.source, token))
+            .collect()
+    }
+
+    /// 常量 `name` 的串值：先找写在 `context` 这个单元里的 `const name: … = "…";`，再找同一个包、在这一次链接集里（同一包的别的 bin 不算）
+    /// 叫这个名字的常量单元（几个都得写成 `= "…";`、值相同）。找不到、写法不是串字面量或几个值不同交 `None`。
+    fn constant_string_value(&self, context: UnitIndex, name: &str) -> Option<String> {
+        let definition_value = |texts: &[&str]| -> Option<String> {
+            let const_index = (0..texts.len()).find(|index| {
+                texts[*index] == "const"
+                    && texts.get(index + 1).copied() == Some(name)
+                    && texts.get(index + 2).copied() == Some(":")
+            })?;
+            let equals = (const_index + 3..texts.len()).find(|index| texts[*index] == "=")?;
+            match texts.get(equals + 1..equals + 3)? {
+                [literal, ";"] => plain_string_content(literal).map(str::to_string),
+                _ => None,
+            }
+        };
+        if let Some(value) = definition_value(&self.token_texts_of(context)) {
+            return Some(value);
+        }
+        let workspace = self.workspace;
+        let crate_index = workspace.files[workspace.units[context.0].file.0].crate_index;
+        let mut values = BTreeSet::new();
+        for (position, unit) in workspace.units.iter().enumerate() {
+            if unit.kind == UnitKind::Constant
+                && unit.name == name
+                && workspace.files[unit.file.0].crate_index == crate_index
+                && self.linked_target_of(UnitIndex(position)).is_some()
+            {
+                values.insert(definition_value(&self.token_texts_of(UnitIndex(position)))?);
+            }
+        }
+        match values.len() {
+            1 => values.into_iter().next(),
+            _ => None,
+        }
+    }
+
+    /// 几段连成测试名：常量在 `context` 这个单元（与它的 crate）里解。
+    fn folded_test_name(&self, context: UnitIndex, pieces: &[TestNamePiece]) -> Option<String> {
+        let mut name = String::new();
+        for piece in pieces {
+            match piece {
+                TestNamePiece::Literal(text) => name.push_str(text),
+                TestNamePiece::Constant(constant) => {
+                    name.push_str(&self.constant_string_value(context, constant)?);
+                }
+            }
+        }
+        Some(name)
+    }
+
+    /// 入口目标里 libtest 名字（模块路径 `::` 函数名，不带 crate 名）恰好是 `test_name` 的那一个 `#[test] fn`。
+    fn test_function_named(&self, test_name: &str) -> Option<UnitIndex> {
+        let workspace = self.workspace;
+        let segments: Vec<&str> = test_name.split("::").collect();
+        let (function_name, module_path) = segments.split_last()?;
+        let mut found = Vec::new();
+        for file in &workspace.files_of_target[self.entry_target.0] {
+            for unit_index in units_of_file(workspace, *file) {
+                let unit = &workspace.units[unit_index.0];
+                if unit.kind != UnitKind::Function
+                    || !unit.has_test_attribute
+                    || unit.container.is_some()
+                    || unit.name != *function_name
+                {
+                    continue;
+                }
+                let matches_the_module = unit_module_path(workspace, unit_index, self.entry_target)
+                    .is_some_and(|path| {
+                        path.iter()
+                            .map(String::as_str)
+                            .eq(module_path.iter().copied())
+                    });
+                if matches_the_module {
+                    found.push(unit_index);
+                }
+            }
+        }
+        match found.as_slice() {
+            [only] => Some(*only),
+            _ => None,
+        }
+    }
+
+    /// 起子进程的单元 `spawning` 里那条 `--exact` 点名的测试：解出来的每一个 `#[test] fn`（参数写法时闭包里每一处调用各解一个）。
+    /// 有一处折不出、解不到恰好一个，或参数写法在闭包里一处调用都没有，交 `None`（拒算 `current-exe`）。
+    fn child_tests_of(
+        &self,
+        spawning: UnitIndex,
+        test_name: &ChildTestName,
+    ) -> Option<Vec<UnitIndex>> {
+        match test_name {
+            ChildTestName::Pieces(pieces) => {
+                let name = self.folded_test_name(spawning, pieces)?;
+                Some(vec![self.test_function_named(&name)?])
+            }
+            ChildTestName::ParameterOfTheSpawningFunction {
+                function_name,
+                parameter_position,
+            } => {
+                let mut tests = Vec::new();
+                for caller in &self.in_closure {
+                    let texts = self.token_texts_of(*caller);
+                    for (index, text) in texts.iter().enumerate() {
+                        let is_call = *text == function_name
+                            && texts.get(index + 1).copied() == Some("(")
+                            && !matches!(
+                                index.checked_sub(1).map(|previous| texts[previous]),
+                                Some("fn" | ".")
+                            );
+                        if !is_call {
+                            continue;
+                        }
+                        let mut depth = 0usize;
+                        let close = (index + 1..texts.len()).find(|position| {
+                            match texts[*position] {
+                                "(" | "[" | "{" => depth += 1,
+                                ")" | "]" | "}" => depth = depth.saturating_sub(1),
+                                _ => {}
+                            }
+                            depth == 0
+                        })?;
+                        let arguments = split_at_top_level_commas(&texts[index + 2..close]);
+                        let pieces =
+                            test_name_pieces_of_texts(arguments.get(*parameter_position)?)?;
+                        let name = self.folded_test_name(*caller, &pieces)?;
+                        tests.push(self.test_function_named(&name)?);
+                    }
+                }
+                (!tests.is_empty()).then_some(tests)
+            }
+        }
+    }
+
+    /// 子进程测试边（`current-exe-child`）：闭包里起子进程的单元点名的测试并进闭包（在入口目标里收）。交回这一趟有没有新推进去的单元。
+    fn pull_in_child_process_tests(&mut self) -> bool {
+        let workspace = self.workspace;
+        let mut children = Vec::new();
+        for unit_index in &self.in_closure {
+            for read in &workspace.units[unit_index.0].reads {
+                if let SourceRead::ChildTestProcess { test_name, .. } = read {
+                    if let Some(tests) = self.child_tests_of(*unit_index, test_name) {
+                        children.extend(tests);
+                    }
+                }
+            }
+        }
+        let mut pushed = false;
+        for child in children {
+            if !self.seen_pairs.contains(&(child, self.entry_target)) {
+                self.push(child, self.entry_target);
+                pushed = true;
+            }
+        }
+        pushed
+    }
+
+    fn finish(mut self, entry_target: TargetIndex, entry_units: Vec<UnitIndex>) -> ClosureOutcome {
+        let workspace = self.workspace;
+        for unit_index in &self.in_closure {
+            let unit = &workspace.units[unit_index.0];
+            for read in &unit.reads {
+                if let SourceRead::ChildTestProcess {
+                    line,
+                    test_name,
+                    fragment,
+                } = read
+                {
+                    if self.child_tests_of(*unit_index, test_name).is_none() {
+                        self.refusals.insert(Refusal {
+                            file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
+                            line: *line,
+                            form: RefusalForm::CurrentExecutablePath,
+                            fragment: fragment.clone(),
+                        });
+                    }
+                }
+            }
+        }
         for target in &self.link.targets {
             for file in &workspace.files_of_target[target.0] {
                 for refusal in &workspace.files[file.0].file_level_refusals {
@@ -1576,7 +2283,7 @@ impl<'workspace> ClosureRun<'workspace> {
                     .and_then(|library| workspace.targets[library.0].root_file)
                 {
                     self.refusals.insert(Refusal {
-                        file: root,
+                        file: crate::units::RefusalFile::WorkspaceSourceFile(root),
                         line: 1,
                         form: RefusalForm::ProcedureMacroCrate,
                         fragment: format!(
@@ -1605,7 +2312,7 @@ impl<'workspace> ClosureRun<'workspace> {
                     if !sources.supply(&name, accepts_prefixes) {
                         let wgsl_unit = &workspace.wgsl_units[wgsl_unit_index.0];
                         self.refusals.insert(Refusal {
-                            file: wgsl_unit.file,
+                            file: crate::units::RefusalFile::WorkspaceSourceFile(wgsl_unit.file),
                             line: wgsl_unit.start_line,
                             form: RefusalForm::WgslUndefinedName,
                             fragment: name,
@@ -1617,6 +2324,7 @@ impl<'workspace> ClosureRun<'workspace> {
         }
         ClosureOutcome {
             entry_target_kind: workspace.targets[entry_target.0].kind,
+            entry_units,
             condition_atoms_with_their_values: self.condition_atoms.into_iter().collect(),
             units: self.in_closure.into_iter().collect(),
             wgsl_units,
@@ -1831,7 +2539,8 @@ fn resolve_entry_units(
 /// 从入口收闭包。
 ///
 /// # Errors
-/// 入口找不到、不唯一或在这组 cfg 下不编进来（用法错，不是拒算；拒算在 `ClosureOutcome::refusals` 里）。
+/// 入口找不到、不唯一或在这组 cfg 下不编进来（用法错，不是拒算；拒算在 `ClosureOutcome::refusals` 里）；闭包读到的 shell 脚本交 bash
+/// 规范化跑不下去（[`EntryError::ShellNormalizationFailed`]，运行条件不满足，整趟报错）。
 pub fn compute_closure(
     workspace: &Workspace,
     request: &ClosureRequest,
@@ -1924,7 +2633,7 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
                 &link,
             )?);
         }
-        let mut run = ClosureRun::new(workspace, link, switches);
+        let mut run = ClosureRun::new(workspace, link, switches, entry_target);
         for entry in &entries {
             run.push(*entry, entry_target);
             let signature_traits = workspace.units[entry.0]
@@ -1940,19 +2649,24 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
                 run.push(main, *root);
             }
         }
+        run.push_global_allocators_of_the_linked_targets();
         run.drain();
-        while run.pull_in_wgsl_name_suppliers() {
+        while run.pull_in_child_process_tests() || run.pull_in_wgsl_name_suppliers() {
             run.drain();
         }
+        if let Some(failure) = run.shell_normalization_failure.take() {
+            return Err(EntryError::ShellNormalizationFailed(failure));
+        }
         if run.requested_roots.is_subset(&extra_roots) {
-            let mut outcome = run.finish(entry_target);
+            let mut outcome = run.finish(entry_target, entries);
             if platform.is_none() {
-                let entry_unit = &workspace.units[entries
+                let entry_unit = &workspace.units[outcome
+                    .entry_units
                     .first()
                     .expect("resolve_entry_units 只在找到至少一个入口单元时交 Ok")
                     .0];
                 outcome.refusals.push(Refusal {
-                    file: entry_unit.file,
+                    file: crate::units::RefusalFile::WorkspaceSourceFile(entry_unit.file),
                     line: entry_unit.start_line,
                     form: RefusalForm::TargetTripleUnrecognized,
                     fragment: request.target_triple.clone(),
@@ -1966,7 +2680,8 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
     }
 }
 
-/// 复用键（设计 3.1）：入口目标的种类与闭包里各单元真引到的条件原子各带真值（定案 2：闭包没引到的原子不进键）+ 闭包里每个单元（种类，指纹）的多重集 + 数据单元摘要的多重集 + 调用方给的工具链与依赖解析行。
+/// 复用键（设计 3.1）：入口目标的种类与闭包里各单元真引到的条件原子各带真值（闭包没引到的原子不进键）+ 闭包里每个单元（种类，指纹）的多重集 + 数据单元摘要的多重集
+/// 加上入口单元自己（`entry_key_lines`）与调用方给的工具链、依赖解析行。
 /// 不带路径、名字、行号、手写版本号。
 ///
 /// # Errors
@@ -2018,6 +2733,7 @@ pub fn reuse_key(
         .collect();
     data_lines.sort();
     lines.extend(data_lines);
+    lines.extend(entry_key_lines(workspace, outcome));
     lines.extend(
         external
             .toolchain_lines
@@ -2031,6 +2747,42 @@ pub fn reuse_key(
             .map(|line| format!("lock\t{line}")),
     );
     Ok(sha256_of(lines.join("\n").as_bytes()))
+}
+
+/// 键里的 entry 行：每个入口单元连同包它的 impl / trait 头（`Unit::container`）一层层往外，各取（种类，指纹），一个入口一行
+/// （`entry\t<种类>\t<指纹>[\t<种类>\t<指纹>…]`），排序去重；不带名字、路径与行号。与 `scripts/gate/lib_function_units.py` 的
+/// `entry_key_lines` 同一个口径。闭包是单元的多重集，几个入口互相收进对方的闭包（同一个 impl 里的几个方法、互相调用的两个函数）时
+/// 闭包一模一样，没有这几行就共用一把键、一份判定。文档测试取到它自己就停：它挂的条目记在 `documentation_test_of`，
+/// `container` 是空的，R-结构也不连它（文档测试另编一个 crate）。
+fn entry_key_lines(workspace: &Workspace, outcome: &ClosureOutcome) -> Vec<String> {
+    let mut entry_lines: BTreeSet<String> = BTreeSet::new();
+    for entry in &outcome.entry_units {
+        let mut chain_of_kinds_and_fingerprints: Vec<String> = Vec::new();
+        let mut units_on_the_chain: BTreeSet<UnitIndex> = BTreeSet::new();
+        let mut owner = Some(*entry);
+        while let Some(owner_index) = owner {
+            assert!(
+                units_on_the_chain.insert(owner_index),
+                "container 链不成环：成员指向 impl / trait 头，头自己没有 container（rust_items 切分时只这样填）"
+            );
+            let owner_unit = &workspace.units[owner_index.0];
+            assert!(
+                owner_unit.kind != UnitKind::DocumentationTest || owner_unit.container.is_none(),
+                "文档测试单元的 container 是空的（所挂条目记在 documentation_test_of）：entry 行取到文档测试自己就停"
+            );
+            chain_of_kinds_and_fingerprints.push(format!(
+                "{}\t{}",
+                owner_unit.kind.output_name(),
+                owner_unit.fingerprint.hexadecimal()
+            ));
+            owner = owner_unit.container;
+        }
+        entry_lines.insert(format!(
+            "entry\t{}",
+            chain_of_kinds_and_fingerprints.join("\t")
+        ));
+    }
+    entry_lines.into_iter().collect()
 }
 
 /// 文档测试单元挂在哪个条目下（输出用）。

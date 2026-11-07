@@ -1,0 +1,2 @@
+source "$(dirname "${BASH_SOURCE[0]}")/lib/defines-a-path.sh"
+source "$DEFINED_LIBRARY"

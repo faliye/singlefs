@@ -1,11 +1,10 @@
 //! 起 GPU 的外壳（D26（后台整理与放置回收） 已定项 13 第 1–4、8 条）：挂载那一刻枚举 wgpu 适配器、判过校验、在本机每一张独立显卡上起设备与各段两份核的管线、
 //! 量一次提交的主机 CPU 时间；一张卡没开成时，它是参与的卡就拒绝挂载，给了 `background_gpu_devices` 而没点它就跳过、报出来
-//! （[`BackgroundGpuOverTheCards::gpus_not_opened_at_the_mount`]；判法在 `crate::gpus_of_this_host::gpus_opened_at_the_mount`，`records/2026-10-19-里程碑四GPU垃圾回收开工.md`
-//! 第 45 批交回那一行的定法）。给了 `background_gpu_devices` 时只判点名的卡：没点名的独显缺总线地址、缺设备本地堆、与别的独显报了同一个地址都不拒，
+//! （[`BackgroundGpuOverTheCards::gpus_not_opened_at_the_mount`]；判法在 `crate::gpus_of_this_host::gpus_opened_at_the_mount`）。给了 `background_gpu_devices` 时只判点名的卡：没点名的独显缺总线地址、缺设备本地堆、与别的独显报了同一个地址都不拒，
 //! 不收进卡清单、报出来（[`BackgroundGpuOverTheCards::unnamed_discrete_gpus_left_off_the_list`]，判法 `crate::adapter_inventory::discrete_gpus_of_the_enumeration_under_the_named`）。
 //! 参与的卡由设置定（[`BackgroundGpuOverTheCards::participating_gpus`] 报出来），挂着切换时核心层交来新的一组
 //! （[`BackgroundGpuOverTheCards::use_the_settings_from_the_next_batch`]，两批之间），从下一批起只在它点的卡上、照它给的显存上限与等的上限跑，不重开设备
-//! （`records/2026-10-19-里程碑四GPU垃圾回收开工.md` 第 43 批交回那一行的定法；分活、切段、等的纯逻辑在 `crate::gpus_of_this_host`）。
+//! （分活、切段、等的纯逻辑在 `crate::gpus_of_this_host`）。
 //! 挂着的时候每一批按卡的顺序填满参与的卡（前面的卡填到它照显存上限一次放得下的量，装不下的才给后面的卡；挂载时量的代价不用来分活）、按显存上限切段、两份核各算一次、逐条比对。三段都接上了：扫描里的校验和核对（[`BackgroundGpuOverTheCards::verify_unit_checksums`]）、
 //! 区域扫描里的单元头解析与映射反查（[`BackgroundGpuOverTheCards::classify_region_records`]）与选段打分的每段活槽数（[`BackgroundGpuOverTheCards::count_live_slots_per_cluster_segment`]）。
 //! 本机的卡清单（核心层 `GpuInventory`）答的是此刻本机在的独显与各自的显存总量（按总线地址排，挂载那一刻没开成的照列；每次答之前现枚举一次，
@@ -19,7 +18,7 @@
 //!
 //! GPU 出错（设备丢了、wgpu 报了没接住的错、等不成、回读映射不成、核没写到某一条）时这一批交回出错、不换 CPU（第 4 条）；一次提交等超过上限的，
 //! 在同一张卡上重交，这一批在这张卡上（一批切成几片、几段时合起来算，交活之前等前一次超时的那次提交那一等也算）第 4 次等超过上限才交回「这张卡用不了」
-//! （`crate::waiting_for_the_gpu::TimeoutsOfTheBatchOnOneGpu`，用户 2026-10-28 定；重交的单位照旧只是超时的那一片，用户 2026-10-30 定）。
+//! （`crate::waiting_for_the_gpu::TimeoutsOfTheBatchOnOneGpu`；重交的单位照旧只是超时的那一片）。
 //! 出错时不动连续不确定的计数（这一批放弃了，不算一轮）。只有一张卡时两份核都在这张卡上跑；几张卡时每张卡在自己分到的那几条上跑两份核。
 //! 每一处阻塞等 GPU 都在此刻设置给的上限之内等（开包时是 `BackgroundGpuSelection::background_gpu_wait_limit`，等法在 `crate::waiting_for_the_gpu`）：
 //! 等 wgpu 的 future 用 std 写的最小等法（[`wait_for_the_wgpu_future`]），等提交用 wgpu 自己带限时的 `poll`，不依赖 `pollster`
@@ -29,7 +28,7 @@
 //! 等它做完（`crate::memory_limit_and_chunks` 文件头）。
 //! 装不下就切小：单元切成几片（校验和那一段）、映射按落点切成几片（区域扫描那一段）、记录表按记录切成几片（选段打分那一段），逐片交；
 //! 一张卡这一批连最小的一片都切不出（显存上限扣掉已占的）就这一批不分给它、活分给别的卡，参与的卡全都切不出才报
-//! （`crate::gpus_of_this_host::plans_of_a_batch_filling_the_gpus_in_order`；用户 2026-10-28 定）。
+//! （`crate::gpus_of_this_host::plans_of_a_batch_filling_the_gpus_in_order`）。
 //! 卡上建缓冲时显存不足（空闲的比上限少，第 3 条「卡上此刻空闲的不到这个数也照常跑，只用空闲的那些」）：这张卡这一批的地方压到建不成的那一段的一半、
 //! 重切、从头再交它分到的那几条，不报出错；一路压到连最小的一片都建不成才报（条款没写，第一版不支持）。
 //! 挂载那一刻量代价那一段也按开卡时的上限切片，代价取各片之和。
@@ -59,8 +58,8 @@ use crate::adapter_inventory::{
     discrete_gpus_of_the_enumeration_under_the_named,
     identifiers_of_the_discrete_gpus_in_the_enumeration,
     participating_gpus_admitted_by_the_mount_checks, AdapterDeviceKind, BackgroundGpuSelection,
-    DiscreteGpuListRefused, DiscreteGpuOnThisHost, DiscreteGpusPresentNow,
-    EnumeratedAdapterDescription,
+    DiscreteGpuListRefused, DiscreteGpuOnThisHost, DiscreteGpusOfTheEnumeration,
+    DiscreteGpusPresentNow, EnumeratedAdapterDescription, ParticipatingGpu,
 };
 use crate::checksum_kernels::{
     checksum_outcomes_of_the_units_cut_into_pieces, decoded_kernel_outcomes,
@@ -141,7 +140,7 @@ pub enum GpuFailureCause {
     UncapturedErrorOrDeviceLost { reason: String },
     /// 等这一次提交没等成（不是超时）。
     WaitForTheSubmissionFailed { reason: String },
-    /// 等 GPU（等 wgpu 的 future、等一次提交做完、等回读映射好）超过了开包时给的上限（用户 2026-10-26 定「设超时，超时算出错」）。
+    /// 等 GPU（等 wgpu 的 future、等一次提交做完、等回读映射好）超过了开包时给的上限。
     WaitForTheGpuExceededTheLimit { wait_limit: Duration },
     /// 这张卡上前一次等超过上限的那次提交，下一批在这张卡上交活之前又等满了上限还没在 GPU 上做完：它的缓冲还占着卡上的显存，
     /// 不越过上限去交（第 3、4 条）。
@@ -159,7 +158,7 @@ pub enum GpuFailureCause {
     /// 一批在一张卡上第 4 次等超过上限（`waiting_for_the_gpu::RESUBMISSIONS_AFTER_A_TIMEOUT` 加 1；一批切成几片时各片的超时合起来算，
     /// 交活之前、重交之前等前一次那一次没等到也算一次），`resubmissions` 是这期间真交到卡上的重交次数（重交之前那一等没等到、
     /// 重交那一次建缓冲显存不足没交出去的不算，所以可以比 3 少）：这张卡用不了，
-    /// 交核心层当报警（用户 2026-10-28 定「都超时才报警」）。`last_cause` 是最后那一次的原因（等超过上限的那两种之一）。
+    /// 交核心层当报警。`last_cause` 是最后那一次的原因（等超过上限的那两种之一）。
     UnusableAfterResubmissions {
         resubmissions: u32,
         last_cause: Box<GpuFailureCause>,
@@ -169,8 +168,12 @@ pub enum GpuFailureCause {
 /// 挂载那一刻开不了后台 GPU（第 4 条：拒绝挂载并报错，不降级、不退回 CPU）。成员按调用方要改哪一样分。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BackgroundGpuOpenRefused {
-    /// 挂载参数配错或 GPU 不在：核心层那一套校验拒的（改参数，或装上卡）。
+    /// 挂载参数配错或 GPU 不在：核心层那一套校验拒的（改参数，或装上卡）。核心层拒成「点名的卡不在卡清单里」的不在这里，在
+    /// [`Self::NamedGpuDeviceNotOnTheListOfThisEnumeration`]。
     SettingsRefused(BackgroundComputeSettingsRefused),
+    /// 点名的卡不在这一次枚举交成的卡清单里（核心层拒成 `NamedGpuDeviceNotInTheInventory`）：连同这一次枚举到的每个适配器与没收进清单的那几张，
+    /// 分得清是这一次枚举里没有这张卡、还是有独显而它交不成一张卡（例：没报总线地址）。
+    NamedGpuDeviceNotOnTheListOfThisEnumeration(NamedGpuDeviceNotOnTheListOfThisEnumeration),
     /// 枚举到的独立显卡交不成一份卡清单（条款没写的形态，第一版不支持）。
     DiscreteGpuListNotSupported(DiscreteGpuListRefused),
     /// 枚举适配器这一步就没成（等 wgpu 交回适配器列表超过了上限）：还没有哪一张卡可点名。
@@ -184,7 +187,34 @@ pub enum BackgroundGpuOpenRefused {
     },
 }
 
-/// 一张参与的卡连这一批最小的一片都装不下（用户 2026-10-28 定「连一片都装不下就不用这张卡」）：哪张卡、
+/// 点名的卡不在这一次枚举交成的卡清单里：点的是哪张卡、这一次枚举到的每个适配器（按枚举的次序，不论算不算显卡）、
+/// 给了 `background_gpu_devices` 而没点名、交不成一张卡而没收进清单的那几张独显（各带原因，按枚举的次序；同
+/// [`BackgroundGpuOverTheCards::unnamed_discrete_gpus_left_off_the_list`]）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NamedGpuDeviceNotOnTheListOfThisEnumeration {
+    pub device: GpuDeviceIdentifier,
+    pub adapters_in_the_enumeration: Vec<AdapterSeenInTheEnumeration>,
+    pub unnamed_left_off_the_list: Vec<DiscreteGpuListRefused>,
+}
+
+/// 枚举到的一个适配器在拒绝里报的两样：哪一类设备与 PCI 总线地址（驱动不报时是空串）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AdapterSeenInTheEnumeration {
+    pub device_kind: AdapterDeviceKind,
+    pub pci_bus_address: String,
+}
+
+impl AdapterSeenInTheEnumeration {
+    #[must_use]
+    pub fn of_the_description(description: &EnumeratedAdapterDescription) -> Self {
+        Self {
+            device_kind: description.device_kind,
+            pci_bus_address: description.pci_bus_address.clone(),
+        }
+    }
+}
+
+/// 一张参与的卡连这一批最小的一片都装不下：哪张卡、
 /// 那一片要切的条目在这一批里的位置、给它的显存上限（不给是 `None`：最小的一片装不进绑定上限）、
 /// 最小的一片合占的字节数（这张卡至少要剩这么多）。这一批一张卡都还没交活。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -208,7 +238,7 @@ pub enum ChecksumBatchFailed {
     GpuCannotHoldTheSmallestPiece(SmallestPieceNotHeldOnTheGpu),
     /// 这组设置点的卡的显存上限连最小的一片都装不下，参与的卡一张都不剩：按参与的次序列出每张卡、上限与至少要多少。一张卡都没交活。
     EveryParticipatingGpuLeftOutUnderItsMemoryLimit(Vec<GpuLeftOutUnderItsMemoryLimit>),
-    /// 这一批参与的卡一张都不剩，其中至少一张是卡上空闲的显存连最小的一片都建不成（用户 2026-10-28 定「连一片都装不下就不用这张卡」：
+    /// 这一批参与的卡一张都不剩，其中至少一张是卡上空闲的显存连最小的一片都建不成（
     /// 这一批不用它，它还没交成的活转给这一批别的参与的卡重交，全都不剩才是这一种）：因空闲显存不用的按先后列出，连同这一段因显存上限不用的。
     EveryParticipatingGpuShortOfFreeMemoryForTheSmallestPiece {
         gpus_short_of_free_memory: Vec<GpuShortOfFreeMemoryForTheSmallestPiece>,
@@ -363,7 +393,8 @@ pub struct BackgroundGpuOverTheCards<Card: CardOfTheBackgroundGpu> {
     submissions_since_the_last_take: GpuSubmissionsOfTheBatch,
     gpus_leaked_when_dropped: GpusLeakedWhenTheBackgroundGpuIsDropped,
     memory_leaked_in_this_process: GpuMemoryLeakedInThisProcess,
-    /// 此刻本机在的独显（卡清单每次答之前现查）。产品里它带着枚举出卡的那个 wgpu 实例：排在卡后面，卡都丢了才丢它。
+    /// 此刻本机在的独显（卡清单每次答之前现查）。产品里它带着这个进程的 Vulkan 实例（[`VulkanInstanceOfThisProcess`] 的一份克隆）现枚举：
+    /// 排在卡后面，卡都丢了才丢它（实例本身由调用方留着，活过这一次挂载）。
     discrete_gpus_present_now: Box<dyn DiscreteGpusPresentNow + Send>,
 }
 
@@ -544,8 +575,8 @@ struct BuffersOfAChunk<Buffers, Buffer> {
 
 /// 建一段缓冲那一刻要设备做的几样：开一个只接显存不足的错误范围、建一份回读暂存、报一份缓冲建的时候要了多少字节、关上那个范围并在等的上限之内
 /// 取它接住的显存不足。产品是 `wgpu::Device`；单测换上在内存里记账的替身（`tests::DeviceOfAChunkInMemoryForTests`）：它照 wgpu 错误范围的规矩
-/// （范围开着时建不成的错归最里层那个范围，没有范围开着时报成没接住的错）判得出回读暂存是不是建在范围里（判决 m4-gpugc-code-r2 第三节第 5 条、
-/// 四之一「造不出就换方法继续造」：真卡上造不出只让回读暂存建不成的条件），也数得出这一段真建了几份、各多少字节（判决 m4-gpugc-code-r3 第三节第 4 条）。
+/// （范围开着时建不成的错归最里层那个范围，没有范围开着时报成没接住的错）判得出回读暂存是不是建在范围里（
+/// 真卡上造不出只让回读暂存建不成的条件），也数得出这一段真建了几份、各多少字节。
 trait DeviceCreatingTheBuffersOfAChunk {
     type Buffer;
     type OutOfMemoryScope;
@@ -605,8 +636,8 @@ impl DeviceCreatingTheBuffersOfAChunk for wgpu::Device {
 }
 
 /// 在同一个只接显存不足的错误范围里建这一段的缓冲（`create_the_buffers`）与两份核各自的回读暂存（`outcome_bytes` 字节）：回读暂存算在这一段的占用里
-/// （`bytes_held_by_this_chunk`），建在范围之外时它显存不足报成没接住的错、这一批出错停下，不走「这一批转给别的卡」（判决 m4-gpugc-code-r2 第三节第 5 条）。
-/// 账核真建的缓冲（判决 m4-gpugc-code-r3 第三节第 4 条）：关上范围之后把这一段真建的每一份缓冲要的字节加起来，与记在这张卡账上的 `bytes_held_by_this_chunk`
+/// （`bytes_held_by_this_chunk`），建在范围之外时它显存不足报成没接住的错、这一批出错停下，不走「这一批转给别的卡」。
+/// 账核真建的缓冲：关上范围之后把这一段真建的每一份缓冲要的字节加起来，与记在这张卡账上的 `bytes_held_by_this_chunk`
 /// 比（账在建之前按切批的占用记下、记的时候断言过不超上限）；多建一块、少记一块都在这里断言，不带着比账多的显存往下交。
 /// 建得成交回缓冲与回读暂存；范围接住了显存不足就丢掉建出来的、交回 [`GpuFailureCause::OutOfMemoryCreatingTheBuffers`]；
 /// 等设备交回那个范围超过 `wait_limit` 照它的错交回。不动这一段的账（调用方放）。
@@ -653,7 +684,7 @@ where
 }
 
 /// 在卡上建一份 `bytes` 字节的缓冲（`usage`），建的时候映射着：映射得上才交给 `write_the_contents` 写、再解开映射。
-/// 不用 wgpu 的 `create_buffer_init`：它建完就对映射区 `expect`，缓冲因显存不足建不成时那一句 panic（判决 m4-gpugc-code-r3 第三节第 2 条，wgpu 30.0.1
+/// 不用 wgpu 的 `create_buffer_init`：它建完就对映射区 `expect`，缓冲因显存不足建不成时那一句 panic（wgpu 30.0.1
 /// `src/util/device.rs`），调用方开着的显存不足的错误范围没机会关、走不到「切小重切、这一批转给别的卡」。映射不上只有一种：缓冲没建成（显存不足），
 /// 那一条错已归调用方开着的那个范围，这里不写、不解开映射（对建不成的缓冲解开映射会另报一条没接住的错）。
 fn buffer_mapped_at_creation_within_the_scope_of_the_caller(
@@ -708,58 +739,117 @@ fn submissions_of_a_live_slot_plan(plan: &[RecordSliceWithItsChunks]) -> usize {
         .sum()
 }
 
+/// 这个进程的那一个 wgpu 实例（只开 Vulkan 后端、不带显示句柄）：调用方在进程里建一份、跨多次挂载留着，每次开卡都交同一份
+/// （传法同 [`GpuMemoryLeakedInThisProcess`]）。开卡时的枚举、挂着切换时现查本机在的独显（[`AdaptersEnumeratedByTheInstance`] 拿它的一份克隆，
+/// 克隆指的是同一个实例）、本包测试与实验装置枚举本机适配器都用它，不另建。
+/// 与泄漏的那一份并列、不合进去：泄漏的那一份不要卡也建（不要卡的测试与 CPU 臂随处新建），实例只在要开卡、要枚举本机适配器时才建，
+/// 不开 `tests-on-a-real-gpu` 的测试不建（`Cargo.toml` 的特性说明「不碰 GPU」）。
+///
+/// 为什么一个进程只建一个：同一个进程里新建的实例多了，Vulkan 驱动不一定还认得出独显——第二台上同一个进程里新建到第 12 个实例起，
+/// 枚举只剩软件 Vulkan、三张独显一张都不报（前面的实例都已丢掉），开卡就拒点名的卡不在清单里；只建一个实例、反复枚举，每一次三张都在。
+#[derive(Clone, Debug)]
+pub struct VulkanInstanceOfThisProcess {
+    instance: wgpu::Instance,
+}
+
+impl VulkanInstanceOfThisProcess {
+    /// 建这个进程的那一个实例：调用方一个进程只建这一次、留着它，之后每次开卡都交它。
+    #[must_use]
+    pub fn created_for_this_process() -> Self {
+        Self::with_the_backends(wgpu::Backends::VULKAN)
+    }
+
+    /// 一个后端都不开的实例：不装 Vulkan 加载器、不碰 GPU，枚举交回空列表。只给不要卡的单测走开卡那一条路。
+    #[cfg(test)]
+    fn without_any_backend() -> Self {
+        Self::with_the_backends(wgpu::Backends::empty())
+    }
+
+    fn with_the_backends(backends: wgpu::Backends) -> Self {
+        Self {
+            instance: wgpu::Instance::new(wgpu::InstanceDescriptor {
+                backends,
+                ..wgpu::InstanceDescriptor::new_without_display_handle()
+            }),
+        }
+    }
+
+    /// 这个实例此刻看得到的 Vulkan 适配器，按枚举的次序，在 `wait_limit` 之内等。
+    ///
+    /// # Errors
+    /// 等 wgpu 交回适配器列表超过 `wait_limit`。
+    pub fn vulkan_adapters_enumerated_within(
+        &self,
+        wait_limit: Duration,
+    ) -> Result<Vec<wgpu::Adapter>, GpuFailureCause> {
+        wait_for_the_wgpu_future(
+            self.instance.enumerate_adapters(wgpu::Backends::VULKAN),
+            wait_limit,
+            &SteadyClockOfThisProcess::starting_now(),
+        )
+    }
+}
+
+/// 开卡从哪里取这个进程的 Vulkan 实例：产品交 [`VulkanInstanceOfThisProcess`] 本身；不要卡的单测换上记下取了几次的替身，
+/// 钉住每次开卡都取交进来的那一份、不另建。
+pub trait VulkanInstanceHandedToTheOpening {
+    /// 这一次开卡用的实例（交回的克隆指的是同一个实例）。
+    fn vulkan_instance_for_this_opening(&self) -> VulkanInstanceOfThisProcess;
+}
+
+impl VulkanInstanceHandedToTheOpening for VulkanInstanceOfThisProcess {
+    fn vulkan_instance_for_this_opening(&self) -> VulkanInstanceOfThisProcess {
+        self.clone()
+    }
+}
+
 /// 挂载那一刻：枚举适配器、判卡清单与校验、在本机每一张独立显卡上起设备与各段两份核、量一次提交的主机 CPU 时间（同
-/// [`open_background_gpu_with_the_memory_leaked_in_this_process`]，进程里还一张卡都没泄漏过）。
+/// [`open_background_gpu_with_the_memory_leaked_in_this_process`]，进程里还一张卡都没泄漏过；实例是调用方留着的 `vulkan_instance`）。
 ///
 /// # Errors
-/// [`BackgroundGpuOpenRefused`] 的四种。
+/// [`BackgroundGpuOpenRefused`] 的五种。
 pub fn open_background_gpu(
     selection: &BackgroundGpuSelection,
+    vulkan_instance: &VulkanInstanceOfThisProcess,
 ) -> Result<BackgroundGpu, BackgroundGpuOpenRefused> {
     open_background_gpu_with_the_memory_leaked_in_this_process(
         selection,
         &GpuMemoryLeakedInThisProcess::with_nothing_leaked(),
+        vulkan_instance,
     )
 }
 
 /// 挂载那一刻：枚举适配器、判卡清单与校验、在本机每一张独立显卡上起设备与各段两份核、量一次提交的主机 CPU 时间；参与的卡照 `selection`
 /// （之后切换时核心层另交，[`BackgroundGpuOverTheCards::use_the_settings_from_the_next_batch`]）。每一处等 wgpu 都在 `selection.background_gpu_wait_limit` 之内。
 /// 给了 `background_gpu_devices` 时只判点名的卡（没点名的独显交不成一张卡就不收、报出来）。
-/// 每张卡开卡（起设备、编各段两份核的管线、量代价）至多等 [`WAIT_LIMIT_OF_OPENING_A_GPU_AT_THE_MOUNT`]（用户 2026-11-02 定五分钟），到点当那张卡没开成
+/// 每张卡开卡（起设备、编各段两份核的管线、量代价）至多等 [`WAIT_LIMIT_OF_OPENING_A_GPU_AT_THE_MOUNT`]（五分钟），到点当那张卡没开成
 /// （`waiting_for_the_gpu::outcome_of_opening_a_gpu_within_the_limit`，报等超过上限、带这个上限），挂载等开卡成功或到点才往下走。
 /// 没参与的卡也开（之后的切换可能点它，切换不重开设备）；一张卡没开成，参与的就拒，给了列表而没点名的跳过、报出来
 /// （[`gpus_opened_at_the_mount`]、[`BackgroundGpuOverTheCards::gpus_not_opened_at_the_mount`]）。参与的卡照开卡那一组给它的显存上限
-/// （先扣掉这个进程里此前几次挂载泄漏在它上面的字节，`memory_leaked_in_this_process`）把量代价那一段（[`COST_PROBE_CHUNK`]）切成几片逐片量、代价取各片之和；
+/// （先扣掉这个进程里之前几次挂载泄漏在它上面的字节，`memory_leaked_in_this_process`）把量代价那一段（[`COST_PROBE_CHUNK`]）切成几片逐片量、代价取各片之和；
 /// 显存上限连最小的一片都装不下的卡照开、不量代价、不参与、报出来（[`BackgroundGpuOverTheCards::gpus_left_out_under_their_memory_limit`]），挂载不因此拒绝；
 /// 参与的卡因此一张都不剩时照样交回，三段每一批都报「参与的卡一张都不剩」（[`BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut`]），
 /// 核心层挂载那一刻就读到、当场报警停着。丢掉它时泄漏的卡记进 `memory_leaked_in_this_process`。
+/// 枚举与之后现查本机在的独显都用 `vulkan_instance_handed_over` 交来的那一个实例（调用方在进程里留着的那一份，[`VulkanInstanceOfThisProcess`]），不另建。
 ///
 /// # Errors
-/// [`BackgroundGpuOpenRefused`] 的四种。
+/// [`BackgroundGpuOpenRefused`] 的五种。
 pub fn open_background_gpu_with_the_memory_leaked_in_this_process(
     selection: &BackgroundGpuSelection,
     memory_leaked_in_this_process: &GpuMemoryLeakedInThisProcess,
+    vulkan_instance_handed_over: &impl VulkanInstanceHandedToTheOpening,
 ) -> Result<BackgroundGpu, BackgroundGpuOpenRefused> {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::VULKAN,
-        ..wgpu::InstanceDescriptor::new_without_display_handle()
-    });
-    let adapters = wait_for_the_wgpu_future(
-        instance.enumerate_adapters(wgpu::Backends::VULKAN),
-        selection.background_gpu_wait_limit,
-        &SteadyClockOfThisProcess::starting_now(),
-    )
-    .map_err(|cause| BackgroundGpuOpenRefused::AdapterEnumerationFailed { cause })?;
+    let vulkan_instance = vulkan_instance_handed_over.vulkan_instance_for_this_opening();
+    let adapters = vulkan_instance
+        .vulkan_adapters_enumerated_within(selection.background_gpu_wait_limit)
+        .map_err(|cause| BackgroundGpuOpenRefused::AdapterEnumerationFailed { cause })?;
     let descriptions: Vec<EnumeratedAdapterDescription> =
         adapters.iter().map(description_of_the_adapter).collect();
-    let discrete_gpus = discrete_gpus_of_the_enumeration_under_the_named(
-        &descriptions,
-        selection.background_gpu_devices.as_deref(),
-    )
-    .map_err(BackgroundGpuOpenRefused::DiscreteGpuListNotSupported)?;
-    let participating =
-        participating_gpus_admitted_by_the_mount_checks(selection, &discrete_gpus.listed)
-            .map_err(BackgroundGpuOpenRefused::SettingsRefused)?;
+    let (discrete_gpus, participating) =
+        discrete_gpus_and_participating_gpus_admitted_from_the_enumeration(
+            selection,
+            &descriptions,
+        )?;
     let gpus_opened = gpus_opened_at_the_mount(
         discrete_gpus.listed,
         &participating,
@@ -794,26 +884,72 @@ pub fn open_background_gpu_with_the_memory_leaked_in_this_process(
         gpus_opened.left_out_under_their_memory_limit,
         memory_leaked_in_this_process.clone(),
         Box::new(AdaptersEnumeratedByTheInstance {
-            instance,
+            vulkan_instance,
             wait_limit: selection.background_gpu_wait_limit,
         }),
     ))
 }
 
-/// 挂着切换那一刻现查本机在的独显（[`DiscreteGpusPresentNow`]）：拿开卡的那个 wgpu 实例再枚举一次，在开卡时那个等的上限之内等；
-/// 它也是卡的设备都丢了之后才丢的那个实例。
+/// 同一次枚举（`descriptions`）交成卡清单（给了 `background_gpu_devices` 时只判点名的卡）、照它判挂载那一刻的校验、取参与的卡：判与取读同一份清单。
+/// 核心层拒成「点名的卡不在卡清单里」时，拒绝带上这一次枚举到的每个适配器（类型与总线地址）与没点名、没收进清单的那几张
+/// （[`BackgroundGpuOpenRefused::NamedGpuDeviceNotOnTheListOfThisEnumeration`]）；核心层别的拒照原样交回。
+///
+/// # Errors
+/// [`BackgroundGpuOpenRefused`] 的 `DiscreteGpuListNotSupported`、`NamedGpuDeviceNotOnTheListOfThisEnumeration` 与 `SettingsRefused`。
+fn discrete_gpus_and_participating_gpus_admitted_from_the_enumeration(
+    selection: &BackgroundGpuSelection,
+    descriptions: &[EnumeratedAdapterDescription],
+) -> Result<(DiscreteGpusOfTheEnumeration, Vec<ParticipatingGpu>), BackgroundGpuOpenRefused> {
+    let discrete_gpus = discrete_gpus_of_the_enumeration_under_the_named(
+        descriptions,
+        selection.background_gpu_devices.as_deref(),
+    )
+    .map_err(BackgroundGpuOpenRefused::DiscreteGpuListNotSupported)?;
+    match participating_gpus_admitted_by_the_mount_checks(selection, &discrete_gpus.listed) {
+        Ok(participating) => Ok((discrete_gpus, participating)),
+        Err(BackgroundComputeSettingsRefused::NamedGpuDeviceNotInTheInventory { device }) => {
+            Err(BackgroundGpuOpenRefused::NamedGpuDeviceNotOnTheListOfThisEnumeration(
+                NamedGpuDeviceNotOnTheListOfThisEnumeration {
+                    device,
+                    adapters_in_the_enumeration: descriptions
+                        .iter()
+                        .map(AdapterSeenInTheEnumeration::of_the_description)
+                        .collect(),
+                    unnamed_left_off_the_list: discrete_gpus.unnamed_left_off_the_list,
+                },
+            ))
+        }
+        Err(
+            refused @ (BackgroundComputeSettingsRefused::GpuNotPresent
+            | BackgroundComputeSettingsRefused::MemoryLimitCountDifferentFromTheParticipatingDevices {
+                ..
+            }
+            | BackgroundComputeSettingsRefused::MemoryLimitAboveTheTotalMemoryOfTheDevice { .. }
+            | BackgroundComputeSettingsRefused::EmptyGpuDeviceListWhoseMeaningIsUndecided
+            | BackgroundComputeSettingsRefused::GpuDeviceNamedMoreThanOnceWhoseMeaningIsUndecided {
+                ..
+            }
+            | BackgroundComputeSettingsRefused::GpuWaitLimitOfZero
+            | BackgroundComputeSettingsRefused::ParticipatingGpuDeviceNotOpenedAtTheMount(_)
+            | BackgroundComputeSettingsRefused::GcCpuCompensationThresholdAboveTheWholeCapacity {
+                ..
+            }),
+        ) => Err(BackgroundGpuOpenRefused::SettingsRefused(refused)),
+    }
+}
+
+/// 挂着切换那一刻现查本机在的独显（[`DiscreteGpusPresentNow`]）：拿开卡用的那一份进程级 Vulkan 实例再枚举一次，在开卡时那个等的上限之内等。
 struct AdaptersEnumeratedByTheInstance {
-    instance: wgpu::Instance,
+    vulkan_instance: VulkanInstanceOfThisProcess,
     wait_limit: Duration,
 }
 
 impl DiscreteGpusPresentNow for AdaptersEnumeratedByTheInstance {
     fn identifiers_of_the_discrete_gpus_present_now(&self) -> Vec<GpuDeviceIdentifier> {
-        let Ok(adapters) = wait_for_the_wgpu_future(
-            self.instance.enumerate_adapters(wgpu::Backends::VULKAN),
-            self.wait_limit,
-            &SteadyClockOfThisProcess::starting_now(),
-        ) else {
+        let Ok(adapters) = self
+            .vulkan_instance
+            .vulkan_adapters_enumerated_within(self.wait_limit)
+        else {
             // 枚举不成（等 wgpu 超过上限）：一张都不算在，切换照「GPU 不在」拒（DiscreteGpusPresentNow 的约定）。
             return Vec::new();
         };
@@ -1061,7 +1197,7 @@ fn completion_check_of_the_submission(
 
 impl GpuInUse {
     /// 量一次提交的主机 CPU 时间（第 2 条；挂载那一刻，或换设置让开卡时没量的卡参与时）：这条线程的 CPU 钟（不是挂钟）。
-    /// 交的那一段是 [`COST_PROBE_CHUNK`]，照这张卡此刻剩下的界（上限扣掉已占的，含这个进程里此前泄漏在它上面的）切成几片、几段
+    /// 交的那一段是 [`COST_PROBE_CHUNK`]，照这张卡此刻剩下的界（上限扣掉已占的，含这个进程里之前泄漏在它上面的）切成几片、几段
     /// （装得下就一段一片），每一次是各段各交一遍：建缓冲、编码两份核、交、等、回读、解码，与挂着时交一段走同一条路
     /// （[`CardOfTheBackgroundGpu::both_kernel_outcomes_of_a_checksum_chunk`]）；先空跑一遍，再量 [`COST_MEASUREMENT_SUBMISSIONS`] 遍，
     /// 每遍取各段之和，取中位数（[`measured_cost_summed_over_the_pieces`]）。
@@ -1659,7 +1795,7 @@ impl CardOfTheBackgroundGpu for GpuInUse {
 impl<Card: CardOfTheBackgroundGpu> BackgroundGpuOverTheCards<Card> {
     /// 挂载那一刻开卡之后：开成的卡（与 `discrete_gpus_after_the_opening.opened` 一一对应、同序）、开卡之后的本机独显、没点名而没收进清单的那几张、
     /// 开卡那一组参与的卡与因显存上限不用的卡（`gpus_of_this_host::gpus_opened_at_the_mount` 交回的），进程里泄漏的那一份（丢它时记进去），
-    /// 与卡清单每次答之前现查本机在的独显的那一样（产品带着开卡的 wgpu 实例）。测试拿它把替身卡装进来。
+    /// 与卡清单每次答之前现查本机在的独显的那一样（产品带着开卡用的那一份进程级 Vulkan 实例）。测试拿它把替身卡装进来。
     ///
     /// # Panics
     /// 开成的卡与 `discrete_gpus_after_the_opening.opened` 张数不等。
@@ -1791,7 +1927,7 @@ impl<Card: CardOfTheBackgroundGpu> BackgroundGpuOverTheCards<Card> {
                 continue;
             }
             // 第 3 条「挂着切换给了它装得下的上限，从下一批起照新上限重新量代价」：上一组设置因显存上限晾下的卡请回来时照新上限再量一次
-            // （判决 m4-gpugc-code-r3 第三节第 5 条）；量出的代价不用来分活（用户 2026-11-02 定「按卡的顺序填满」），量不成照旧不参与。
+            // 量出的代价不用来分活，量不成照旧不参与。
             let is_brought_back_after_being_left_out = devices_left_out_under_the_settings_before
                 .contains(&card.discrete_gpu().identifier);
             if card.measured_cost().is_none() || is_brought_back_after_being_left_out {
@@ -1966,8 +2102,8 @@ impl<Card: CardOfTheBackgroundGpu> BackgroundGpuOverTheCards<Card> {
     /// （`run_the_plan_on_a_card`：这一段自己的交法，交它这张卡、分到的那几条、切法与这一批这张卡的那一份，每一段套重交）。
     /// 建缓冲显存不足（[`GpuFailureCause::OutOfMemoryCreatingTheBuffers`]）就把这张卡这一次的地方压到建不成的那一段的一半、照新切法从头整段重交它分到的那几条
     /// （已交成的片的结果不用，第 4 条「这一段在这张卡上已做完的片不留」）
-    /// （第 3 条「卡上此刻空闲的不到这个数也照常跑，只用空闲的那些」）；压到连最小的一片都切不出，这一批就不用这张卡（用户 2026-10-28 定
-    /// 「连一片都装不下就不用这张卡」；下一批照设置重新起），它分到的那几条（一条都没交回）重新分给这一批还用的参与的卡、照它们的地方切、交；
+    /// （第 3 条「卡上此刻空闲的不到这个数也照常跑，只用空闲的那些」）；压到连最小的一片都切不出，这一批就不用这张卡
+    /// （下一批照设置重新起），它分到的那几条（一条都没交回）重新分给这一批还用的参与的卡、照它们的地方切、交；
     /// 都不用了交回 [`OutcomesOfTheBatchNotComputed::EveryParticipatingGpuShortOfFreeMemory`]。各卡交回的按条目的次序接起来。
     /// 交成了几次、几片、重交了几次、重切了几次、哪几张卡分到了活，记进这一段的那一份（出错也记，[`Self::take_the_submissions_of_the_batch`]）。
     ///
@@ -2036,7 +2172,7 @@ impl<Card: CardOfTheBackgroundGpu> BackgroundGpuOverTheCards<Card> {
                         }) => {
                             recuts_after_running_out_of_memory += 1;
                             room = room.with_the_memory_limit_at_most(bytes_held_by_the_chunk / 2);
-                            // 重切不留已做完的片：这张卡分到的那几条照新切法从头整段重交（判决 m4-gpugc-code-r3 第三节第 3 条）。
+                            // 重切不留已做完的片：这张卡分到的那几条照新切法从头整段重交。
                             match cut(planned.entries.clone(), room) {
                                 Ok(recut) => plan = recut,
                                 Err(smallest_piece) => {
@@ -2188,8 +2324,8 @@ impl<Card: CardOfTheBackgroundGpu> BackgroundGpuOverTheCards<Card> {
     /// [`Self::classify_region_records`] 都用它。`records` 都是区域扫描会去读的那一种（`region_record_kernels` 文件头），
     /// `mapping_entries` 是这一版的中央映射条目（与核心层区域扫描建按身份索引的是同一份）。
     /// 按卡的顺序填满各卡，每张卡上再按此刻剩下的显存切段（整份映射每段都占一份；连同一条记录装不下时映射按落点切成几片逐片交，
-    /// 最大那条记录连同一个落点上的条目还装不下时单元切成头一片与之后的几片，`region_record_kernels::region_record_plan_on_a_gpu`；
-    /// 用户 2026-10-28 定「装不下应该自适应的分片，缩小逐次进行」）；分活、切段、超时、重切照 [`Self::outcomes_of_a_batch_over_the_cards`]。
+    /// 最大那条记录连同一个落点上的条目还装不下时单元切成头一片与之后的几片，`region_record_kernels::region_record_plan_on_a_gpu`）；
+    /// 分活、切段、超时、重切照 [`Self::outcomes_of_a_batch_over_the_cards`]。
     ///
     /// # Errors
     /// [`RegionRecordBatchFailed`] 的四种。
@@ -2356,7 +2492,7 @@ impl<Card: CardOfTheBackgroundGpu> BackgroundGpuOverTheCards<Card> {
     }
 }
 
-/// 丢后台 GPU（卸载、丢掉核心层收的把手、测试里展开）：不等还在 GPU 上跑的提交（用户 2026-10-28 定「卸载时同样不等、泄漏设备」）——
+/// 丢后台 GPU（卸载、丢掉核心层收的把手、测试里展开）：不等还在 GPU 上跑的提交——
 /// 还记着一次等超过上限、没做完的提交的卡整张泄漏（设备、队列、管线都不析构：wgpu-core 30.0.1 的 `Queue` 析构调 `wait_for_idle`，
 /// 即 Vulkan 的 `vkQueueWaitIdle`，不带上限），别的卡照常丢（`gpus_of_this_host::gpus_dropped_leaking_those_still_running`）。
 /// 泄漏了哪几张、各占着多少字节报给调用方（[`BackgroundGpuOverTheCards::gpus_leaked_when_dropped`]），并记进进程里的那一份，新一次挂载先扣掉。
@@ -2385,7 +2521,7 @@ impl<Card: CardOfTheBackgroundGpu> Drop for BackgroundGpuOverTheCards<Card> {
 /// 卡清单（核心层挂载与切换照它校验设置，D26（后台整理与放置回收） 已定项 13 第 2、4 条）：此刻本机在的独显与各自的显存总量，按总线地址排
 /// （挂载那一刻没开成的照列；没给 `background_gpu_devices` 时上限按这个次序一张卡一个），连同没开成的那几张与原因（[`DiscreteGpusAfterTheOpening`]）。
 /// 答卡清单之前现查本机在的独显（[`DiscreteGpusPresentNow`]）：挂载之后掉了的卡不列，切换点它照「点名的卡不存在」拒、不点名时它不参与、一张都不剩照「GPU 不在」拒。
-/// 没开成的那几张是挂载那一刻定下的，答它不现查（判决 m4-gpugc-code-r2 第三节第 1 条：一次切换只现枚举一次，判与取参与的卡读同一份；
+/// 没开成的那几张是挂载那一刻定下的，答它不现查（一次切换只现枚举一次，判与取参与的卡读同一份；
 /// 两样各现查一次时，第二次枚举答空就把点名一张没开成的卡的切换收下了），掉了的没开成的卡照列，它不在卡清单里、不参与。
 /// 切换可以点开包时没参与而开成了的卡；参与的卡里有没开成的照第 4 条拒。
 impl<Card: CardOfTheBackgroundGpu> GpuInventory for BackgroundGpuOverTheCards<Card> {
@@ -2429,7 +2565,7 @@ pub fn host_cpu_time_of_this_thread() -> std::time::Duration {
     )
 }
 
-/// 本机开机以来的 `CLOCK_MONOTONIC_RAW`：单调不减，不受 NTP 调频（用户 2026-11-05 定）。
+/// 本机开机以来的 `CLOCK_MONOTONIC_RAW`：单调不减，不受 NTP 调频。
 /// `std::time::Instant` 读的 `CLOCK_MONOTONIC` 跟着 NTP 调频走，线程 CPU 钟（[`host_cpu_time_of_this_thread`]）不跟，
 /// 两样成对相减时差出几十 ppm；要拿挂钟与线程 CPU 钟比大小的读这一个。
 ///
@@ -2704,7 +2840,7 @@ mod tests {
     }
 
     impl CardComputedOnTheCpuForTests {
-        /// 总线地址 `pci_bus_address` 的一张 8 GiB 替身卡，量过代价，给它的显存上限 `memory_limit_in_bytes`，这个进程里此前泄漏在它上面 `bytes_leaked` 字节。
+        /// 总线地址 `pci_bus_address` 的一张 8 GiB 替身卡，量过代价，给它的显存上限 `memory_limit_in_bytes`，这个进程里之前泄漏在它上面 `bytes_leaked` 字节。
         fn of_the_address(
             pci_bus_address: &str,
             memory_limit_in_bytes: Option<u64>,
@@ -2943,7 +3079,7 @@ mod tests {
         }
     }
 
-    /// 外壳装上这几张替身卡（按交进来的次序就是本机的次序，全都参与），进程里泄漏的那一份是 `memory_leaked`；交回外壳与「此刻本机在的独显」那一份（起初全在）。
+    /// 外壳装上这几张替身卡（按交进来的次序就是本机的次序，全都参与），进程里泄漏的那一份是 `memory_leaked`；交回外壳与「此刻本机在的独显」那一份（一开始全在）。
     fn background_gpu_over_cards_on_the_cpu(
         cards: Vec<CardComputedOnTheCpuForTests>,
         memory_leaked: &GpuMemoryLeakedInThisProcess,
@@ -3009,7 +3145,7 @@ mod tests {
             .collect()
     }
 
-    /// 判决 m4-gpugc-code-r1 第三节第 1 条：校验和那一段一批切成 4 段（上限 1100 字节只装得下一个 1000 字节的单元），每段头一次交都等超过上限、
+    /// 校验和那一段一批切成 4 段（上限 1100 字节只装得下一个 1000 字节的单元），每段头一次交都等超过上限、
     /// 重交一次就做完——这一批在这张卡上第 4 次超时报这张卡用不了。这一段记下交成 3 次、3 片、重交 3 次、分到活的是这张卡。
     #[test]
     fn the_checksum_batch_cut_into_four_chunks_each_timing_out_once_reports_the_card_unusable() {
@@ -3183,7 +3319,7 @@ mod tests {
         );
     }
 
-    /// 判决第三节第 4 条在外壳上：两张卡，「0000:01:00.0」上限 1000 字节而这个进程里此前泄漏了 950 字节，余量 50 字节装不下校验和那一段最小的一片（64 字节）——
+    /// 外壳上：两张卡，「0000:01:00.0」上限 1000 字节而这个进程里之前泄漏了 950 字节，余量 50 字节装不下校验和那一段最小的一片（64 字节）——
     /// 这一批不分给它，两条全交另一张卡，结果与 CPU 参照逐条相同；这一段记下分到活的只有「0000:41:00.0」。
     #[test]
     fn the_checksum_batch_goes_wholly_to_the_other_card_when_one_card_is_short_of_the_smallest_piece(
@@ -3216,7 +3352,7 @@ mod tests {
         );
     }
 
-    /// 判决第三节第 5 条（第 3 条「卡上此刻空闲的不到这个数也照常跑，只用空闲的那些」）：上限 1 MiB、卡上实际只空闲 256 KiB，八个 64 KiB 的单元
+    /// 第 3 条「卡上此刻空闲的不到这个数也照常跑，只用空闲的那些」：上限 1 MiB、卡上实际只空闲 256 KiB，八个 64 KiB 的单元
     /// 照上限一段装得下（512 KiB 多）而建缓冲显存不足——压到那一段的一半重切成三、三、二个一段，照常交回，判定与 CPU 参照逐条相同、全都确认；
     /// 这一段记下重切 1 次、交成 3 次、8 片。
     #[test]
@@ -3271,7 +3407,7 @@ mod tests {
         }
     }
 
-    /// 判决第三节第 5 条连同用户 2026-10-28「连一片都装不下就不用这张卡」：唯一一张卡上只空闲 10 字节，一路压小到连最小的一片（64 字节）都建不成——这一批不用这张卡，参与的卡一张都不剩，
+    /// 「连一片都装不下就不用这张卡」：唯一一张卡上只空闲 10 字节，一路压小到连最小的一片（64 字节）都建不成——这一批不用这张卡，参与的卡一张都不剩，
     /// 报空闲显存那一种（它是因空闲显存不用的那一张，没有因显存上限不用的），重切了 5 次。
     #[test]
     fn the_single_card_short_of_free_memory_for_the_smallest_piece_leaves_every_participating_gpu_short(
@@ -3309,7 +3445,7 @@ mod tests {
     /// 一张卡的上限一次只交得下一个 1000 字节的单元（1060 字节）：按卡的顺序它填一个，剩下的才给后面的卡。
     const MEMORY_LIMIT_HOLDING_ONE_UNIT_OF_ONE_THOUSAND_BYTES: u64 = 1060;
 
-    /// 用户 2026-10-28「连一片都装不下就不用这张卡」用于空闲显存：两张卡、两个 1000 字节的单元，排在前面的「0000:01:00.0」的上限一次只交得下一个，
+    /// 「连一片都装不下就不用这张卡」用于空闲显存：两张卡、两个 1000 字节的单元，排在前面的「0000:01:00.0」的上限一次只交得下一个，
     /// 按卡的顺序它填一个、另一个给「0000:41:00.0」；「0000:01:00.0」只空闲 10 字节、压到最小的一片都建不成——这一批不用它，它分到的那一条转给
     /// 「0000:41:00.0」重交（接在后面交、按条目的次序接回），照常交回、与 CPU 参照逐条相同；这一段记下交成 2 次、2 片、重切 5 次、分到活的是两张卡（先「0000:01:00.0」）。
     #[test]
@@ -3440,7 +3576,7 @@ mod tests {
         );
     }
 
-    /// 判决第三节第 8 条：丢外壳时，记着一次还在跑的提交（占 600 字节）的那张卡泄漏、另一张照常丢；泄漏了哪一张、占着多少交到调用方拿着的那一份，
+    /// 丢外壳时，记着一次还在跑的提交（占 600 字节）的那张卡泄漏、另一张照常丢；泄漏了哪一张、占着多少交到调用方拿着的那一份，
     /// 并记进进程里的那一份（新一次挂载这张卡先扣掉）。
     #[test]
     fn dropping_the_background_gpu_reports_the_card_leaked_and_notes_it_in_the_process() {
@@ -3474,7 +3610,7 @@ mod tests {
         );
     }
 
-    /// 判决第三节第 2 条：卡清单每次答之前现查本机在的独显——挂载之后那张卡掉了，不点名的切换照「GPU 不在」拒、点名它照「点名的卡不存在」拒。
+    /// 卡清单每次答之前现查本机在的独显——挂载之后那张卡掉了，不点名的切换照「GPU 不在」拒、点名它照「点名的卡不存在」拒。
     #[test]
     fn the_switch_after_the_card_dropped_off_the_host_is_refused_as_gpu_not_present() {
         let (background_gpu, present) = background_gpu_over_cards_on_the_cpu(
@@ -3537,7 +3673,7 @@ mod tests {
         }
     }
 
-    /// 判决 m4-gpugc-code-r2 第三节第 1 条：本机两张独显，0000:41:00.0 挂载那一刻没开成；切换点名它，现查本机在的独显头一次答两张都在、之后答一张都没有——
+    /// 本机两张独显，0000:41:00.0 挂载那一刻没开成；切换点名它，现查本机在的独显头一次答两张都在、之后答一张都没有——
     /// 一次切换只现枚举一次（判与取参与的卡读同一份），照第 4 条拒成「参与的卡里有挂载那一刻没开成的」，不收下、不交给实现（交了就在外壳里 panic）。
     #[test]
     fn the_switch_naming_a_card_not_opened_at_the_mount_is_refused_on_a_single_enumeration_though_a_repeated_one_would_come_back_empty(
@@ -3600,7 +3736,7 @@ mod tests {
         );
     }
 
-    /// 判决第三节第 2 条在外壳上：校验和那一段一条 1000 字节的单元，头一次交等超过上限，重交之前等前一次那一等又超时 2 回、第 3 回等到再交、做完——
+    /// 外壳上：校验和那一段一条 1000 字节的单元，头一次交等超过上限，重交之前等前一次那一等又超时 2 回、第 3 回等到再交、做完——
     /// 这一段照常交回、与 CPU 参照相同，这张卡上交了 2 次，这一段记下重交 1 次（只数真交出去的）。
     #[test]
     fn the_checksum_batch_whose_wait_before_the_resubmission_times_out_twice_reports_one_resubmission(
@@ -3632,7 +3768,7 @@ mod tests {
         );
     }
 
-    /// 判决第三节第 4 条在外壳上：同一进程里两次挂载同时开着、都在同一张卡上各有一次等超过上限还在跑的提交（先开的 600 字节、后开的 300 字节，
+    /// 外壳上：同一进程里两次挂载同时开着、都在同一张卡上各有一次等超过上限还在跑的提交（先开的 600 字节、后开的 300 字节，
     /// 开卡那一刻都没算上对方的），两次都丢掉——进程里这张卡记 900（按次累加），新一次挂载这张卡的账从 900 起。
     #[test]
     fn two_mounts_alive_at_once_leaking_on_one_gpu_add_up_through_the_drops_of_the_background_gpu()
@@ -3776,7 +3912,7 @@ mod tests {
         (submissions, submissions_made_by_each_card)
     }
 
-    /// 用户 2026-11-02 定「按卡的顺序填满」（判决 m4-gpugc-code-r3 五之一）：三张卡各 1 GiB、一批 12 个单元一次交得下——只有排在前面的
+    /// 按卡的顺序填满：三张卡各 1 GiB、一批 12 个单元一次交得下——只有排在前面的
     /// 「0000:01:00.0」分到活、交一次，后两张一次都不交（不要求每张卡都分到活）。
     #[test]
     fn the_batch_the_first_card_in_the_order_holds_goes_only_to_that_card() {
@@ -3819,7 +3955,7 @@ mod tests {
         assert_eq!(submissions_made_by_each_card, vec![1, 1, 0]);
     }
 
-    /// 同一条的饱和（用户 2026-11-02「你要测任务饱和的情况」）：三张卡的上限各一次只交得下 8 个单元，一批 30 个——前两张各填满 8 个、交一次，
+    /// 同一条的饱和：三张卡的上限各一次只交得下 8 个单元，一批 30 个——前两张各填满 8 个、交一次，
     /// 排在最后的那张拿剩下的 14 个、交两次（8 个与 6 个）；每张都分到活、各自都交过，结果与 CPU 参照逐条相同。
     #[test]
     fn the_batch_saturating_every_card_fills_each_card_and_each_card_submits() {
@@ -3906,7 +4042,7 @@ mod tests {
         );
     }
 
-    /// 判决 m4-gpugc-code-r3 第三节第 5 条（照「按卡的顺序填满」改写的验收）：一组设置给「0000:01:00.0」的上限连最小的一片都装不下，它被晾下、
+    /// 一组设置给「0000:01:00.0」的上限连最小的一片都装不下，它被晾下、
     /// 活全给「0000:41:00.0」；下一组给它装得下的上限，它请回来——照新上限再量一次代价（另一张不重量），从下一批起照参与的次序排在前面、重新分到活。
     #[test]
     fn the_card_left_out_under_its_memory_limit_is_measured_again_and_takes_part_in_order_once_brought_back(
@@ -3949,7 +4085,7 @@ mod tests {
         );
     }
 
-    /// 判决 m4-gpugc-code-r3 第三节第 3 条（第 4 条「建缓冲显存不足、切小重切时，这一段在这张卡上已做完的片不留，照新的切法整段从头重交」）：
+    /// 第 4 条「建缓冲显存不足、切小重切时，这一段在这张卡上已做完的片不留，照新的切法整段从头重交」：
     /// 一张卡上限 1500 字节、卡上只空闲 500 字节，三个单元 100、600、600 字节一次交得下（1448 字节）而建不成——压到 724 字节重切成三段（160、660、660），
     /// 头一段交成（这一次的结果是坏的：替身把它的判定翻了），第二段又建不成——压到 330 字节，照新切法整段从头重交七段（600 字节的单元切成 268、268、64），
     /// 头一段交成的那一次的结果不用：判定与 CPU 参照逐条相同；这张卡上交成 8 次（1 + 7），这一段记下交成 8 次、8 片、重切 2 次。
@@ -3988,7 +4124,7 @@ mod tests {
         );
     }
 
-    /// 判决 m4-gpugc-code-r3 第三节第 6 条在外壳上：一个单元头一次交等超过上限，之后重交之前那一等连着 3 回等不到、一次都没重交——
+    /// 外壳上：一个单元头一次交等超过上限，之后重交之前那一等连着 3 回等不到、一次都没重交——
     /// 第 4 次超时报这张卡用不了，报警带的重交次数是真交出去的 0 次（不是常数 3），原因是最后那一等没等到。
     #[test]
     fn the_card_unusable_without_any_resubmission_reaching_it_reports_no_resubmission() {
@@ -4122,7 +4258,7 @@ mod tests {
     const BYTES_OF_THE_OTHER_BUFFERS_OF_THE_CHUNK: u64 = 1000;
     const OUTCOME_BYTES_OF_THE_CHUNK: u64 = 64;
 
-    /// 判决 m4-gpugc-code-r2 第三节第 5 条、四之一（用户 2026-11-01 定「造不出就换方法继续造」）：卡上空闲的装得下这一段自己那几样缓冲，
+    /// 卡上空闲的装得下这一段自己那几样缓冲，
     /// 装不下两份回读暂存——回读暂存建在同一个只接显存不足的范围里，那一条显存不足被范围接住：交回 `OutOfMemoryCreatingTheBuffers`
     /// （外壳照它放掉这一段的账、走「这一批转给别的卡」），一条没接住的错都没有。回读暂存建在范围之外时，那一条显存不足没被接住、这一段照「建成了」交回。
     #[test]
@@ -4201,7 +4337,7 @@ mod tests {
         );
     }
 
-    /// 判决 m4-gpugc-code-r3 第三节第 4 条（七·3 验收「塞一个多分配一块缓冲的故障要红」）：这张卡的上限与卡上空闲的都是 1500 字节，这一段记在账上
+    /// 这张卡的上限与卡上空闲的都是 1500 字节，这一段记在账上
     /// 1128 字节（这一段自己那几样 1000、两份回读暂存各 64），建的时候多建了一块 300 字节的缓冲——卡上真占的到了 1428 字节，比账多：
     /// 账核真建的缓冲字节，当场断言，不带着比账多的显存往下交。
     #[test]
@@ -4238,11 +4374,11 @@ mod tests {
         );
     }
 
-    /// 地址空间压住之后这一段自己的那份缓冲要的字节（攻方探针 `noop_chunk_buffer_with_contents_short` 取的 128 MiB）：比压住之后留的那一截
+    /// 地址空间压住之后这一段自己的那份缓冲要的字节（`noop_chunk_buffer_with_contents_short` 取 128 MiB）：比压住之后留的那一截
     /// [`ROOM_LEFT_IN_THE_CAPPED_ADDRESS_SPACE`] 大，noop 后端在主机内存里 `try_reserve_exact` 这么多就失败、wgpu 报显存不足；
     /// 又在 `wgpu::Limits::default()` 的单个缓冲上限（256 MiB）之内，wgpu 不先报校验错。
     const BYTES_OF_THE_BUFFER_BEYOND_THE_CAPPED_ADDRESS_SPACE: u64 = 128 << 20;
-    /// 压地址空间上限时比此刻的 VmSize 多留的那一截（攻方探针取的 32 MiB）：两份 64 字节的回读暂存、等错误范围、打印与 libtest 收尾用得下。
+    /// 压地址空间上限时比此刻的 VmSize 多留的那一截（取 32 MiB）：两份 64 字节的回读暂存、等错误范围、打印与 libtest 收尾用得下。
     const ROOM_LEFT_IN_THE_CAPPED_ADDRESS_SPACE: u64 = 32 << 20;
     /// 标记「这一次是地址空间压住的那个子进程」的环境变量：外面那一次起子进程时设上。
     const VARIABLE_MARKING_THE_RUN_WITH_THE_ADDRESS_SPACE_CAPPED: &str =
@@ -4396,7 +4532,7 @@ mod tests {
         );
     }
 
-    /// 判决 m4-gpugc-code-r3 第三节第 2 条（攻方探针 `noop_chunk_buffer_with_contents_short` 的造法）：noop 后端在主机内存里建缓冲，要真建不成就得压
+    /// 用 `noop_chunk_buffer_with_contents_short` 的造法：noop 后端在主机内存里建缓冲，要真建不成就得压
     /// 进程的地址空间上限；压的是整个进程，所以本进程照原样再起一次自己、只跑这一条，那一次里压上限再建
     /// （[`the_buffer_of_the_chunk_beyond_the_capped_address_space_is_reported_as_out_of_memory`]），跑别的用例的这个进程不压。
     /// 外面那一次认那一次退 0、打了判过的那一行。起的那一次放进它自己的进程组，它跑完才交回。
@@ -4459,6 +4595,166 @@ mod tests {
             created.buffers[0].size(),
             8,
             "5 个字节的内容按整字补成 8 字节，与切批记账同一种算法"
+        );
+    }
+
+    /// 开卡取实例的替身：交回一个不开任何后端的实例（枚举交回空列表，不碰 GPU），记下开卡取了它几次。
+    struct VulkanInstanceCountingTheOpenings {
+        instance_without_any_backend: VulkanInstanceOfThisProcess,
+        openings_that_took_it: Cell<usize>,
+    }
+
+    impl VulkanInstanceHandedToTheOpening for VulkanInstanceCountingTheOpenings {
+        fn vulkan_instance_for_this_opening(&self) -> VulkanInstanceOfThisProcess {
+            self.openings_that_took_it
+                .set(self.openings_that_took_it.get() + 1);
+            self.instance_without_any_backend.clone()
+        }
+    }
+
+    /// 同一个进程里开卡几次的轮数：开卡每次另建实例时取交来的那一份的次数是 0，与它不等。
+    const OPENINGS_ON_THE_HANDED_OVER_INSTANCE: usize = 3;
+
+    fn selection_naming_the_card_at(pci_bus_address: &str) -> BackgroundGpuSelection {
+        BackgroundGpuSelection {
+            background_gpu_devices: Some(vec![card_identifier(pci_bus_address)]),
+            background_gpu_memory_limit: None,
+            background_gpu_wait_limit: BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
+        }
+    }
+
+    /// 同一个进程里反复开卡，每一次都从调用方交来的那一份取实例、不另建：替身记下的次数等于开卡的次数。替身的实例不开后端、枚举是空的，
+    /// 点名的卡每一次都拒成「不在这一次枚举的清单里」、枚举到的适配器一个都没有（不要卡，也不建 Vulkan 实例）。
+    #[test]
+    fn every_opening_in_one_process_takes_the_vulkan_instance_handed_over_instead_of_creating_one()
+    {
+        let vulkan_instance = VulkanInstanceCountingTheOpenings {
+            instance_without_any_backend: VulkanInstanceOfThisProcess::without_any_backend(),
+            openings_that_took_it: Cell::new(0),
+        };
+        let memory_leaked = GpuMemoryLeakedInThisProcess::with_nothing_leaked();
+        let selection = selection_naming_the_card_at("0000:ff:1f.7");
+        for opening_round in 0..OPENINGS_ON_THE_HANDED_OVER_INSTANCE {
+            let refused = open_background_gpu_with_the_memory_leaked_in_this_process(
+                &selection,
+                &memory_leaked,
+                &vulkan_instance,
+            )
+            .err();
+            assert_eq!(
+                refused,
+                Some(
+                    BackgroundGpuOpenRefused::NamedGpuDeviceNotOnTheListOfThisEnumeration(
+                        NamedGpuDeviceNotOnTheListOfThisEnumeration {
+                            device: card_identifier("0000:ff:1f.7"),
+                            adapters_in_the_enumeration: Vec::new(),
+                            unnamed_left_off_the_list: Vec::new(),
+                        }
+                    )
+                ),
+                "第 {opening_round} 轮（从 0 数）开卡在交来的不开后端的实例上枚举，一个适配器都没有，点名的卡不在清单里"
+            );
+        }
+        assert_eq!(
+            vulkan_instance.openings_that_took_it.get(),
+            OPENINGS_ON_THE_HANDED_OVER_INSTANCE,
+            "开了 {OPENINGS_ON_THE_HANDED_OVER_INSTANCE} 次卡，每一次都取交来的那一份实例（不另建）"
+        );
+    }
+
+    /// 点名一张卡开包时的那一次枚举里一张独显都没有（只有软件 Vulkan）。
+    fn enumeration_with_only_the_software_vulkan() -> Vec<EnumeratedAdapterDescription> {
+        vec![EnumeratedAdapterDescription {
+            name: "llvmpipe software rasterizer".to_string(),
+            device_kind: AdapterDeviceKind::SoftwareRenderingOnTheCpu,
+            pci_bus_address: String::new(),
+            device_local_memory: None,
+        }]
+    }
+
+    /// 点名的卡这一次枚举里根本没有：拒绝里列出枚举到的那一个软件 Vulkan，没有一张独显被留在清单外。
+    #[test]
+    fn naming_a_card_absent_from_the_enumeration_is_refused_listing_the_adapters_seen_and_none_left_off(
+    ) {
+        assert_eq!(
+            discrete_gpus_and_participating_gpus_admitted_from_the_enumeration(
+                &selection_naming_the_card_at("0000:01:00.0"),
+                &enumeration_with_only_the_software_vulkan(),
+            ),
+            Err(
+                BackgroundGpuOpenRefused::NamedGpuDeviceNotOnTheListOfThisEnumeration(
+                    NamedGpuDeviceNotOnTheListOfThisEnumeration {
+                        device: card_identifier("0000:01:00.0"),
+                        adapters_in_the_enumeration: vec![AdapterSeenInTheEnumeration {
+                            device_kind: AdapterDeviceKind::SoftwareRenderingOnTheCpu,
+                            pci_bus_address: String::new(),
+                        }],
+                        unnamed_left_off_the_list: Vec::new(),
+                    }
+                )
+            ),
+            "枚举里没有这张卡：只列出枚举到的软件 Vulkan，清单外一张都没有"
+        );
+    }
+
+    /// 枚举里有一张独显而它没报总线地址：拒绝里列出这张独显（地址是空串）与它被留在清单外的原因，与「枚举里没有」分得开。
+    #[test]
+    fn naming_a_card_while_the_discrete_gpu_reports_no_bus_address_is_refused_listing_that_gpu_left_off(
+    ) {
+        let mut adapters = vec![EnumeratedAdapterDescription {
+            name: "discrete graphics without an address".to_string(),
+            device_kind: AdapterDeviceKind::DiscreteGpu,
+            pci_bus_address: String::new(),
+            device_local_memory: Some(GpuMemoryInBytes(EIGHT_GIBIBYTES)),
+        }];
+        adapters.extend(enumeration_with_only_the_software_vulkan());
+        assert_eq!(
+            discrete_gpus_and_participating_gpus_admitted_from_the_enumeration(
+                &selection_naming_the_card_at("0000:01:00.0"),
+                &adapters,
+            ),
+            Err(
+                BackgroundGpuOpenRefused::NamedGpuDeviceNotOnTheListOfThisEnumeration(
+                    NamedGpuDeviceNotOnTheListOfThisEnumeration {
+                        device: card_identifier("0000:01:00.0"),
+                        adapters_in_the_enumeration: vec![
+                            AdapterSeenInTheEnumeration {
+                                device_kind: AdapterDeviceKind::DiscreteGpu,
+                                pci_bus_address: String::new(),
+                            },
+                            AdapterSeenInTheEnumeration {
+                                device_kind: AdapterDeviceKind::SoftwareRenderingOnTheCpu,
+                                pci_bus_address: String::new(),
+                            },
+                        ],
+                        unnamed_left_off_the_list: vec![
+                            DiscreteGpuListRefused::DiscreteGpuWithoutAPciBusAddressIsNotSupported {
+                                name: "discrete graphics without an address".to_string(),
+                            }
+                        ],
+                    }
+                )
+            ),
+            "有独显而它没报总线地址：列出这张独显（地址空串）与它没收进清单的原因"
+        );
+    }
+
+    /// 核心层别的拒照原样交回：一张独显都没有、也没点名时是「GPU 不在」。
+    #[test]
+    fn no_discrete_gpu_without_named_cards_is_refused_as_gpu_not_present_through_the_settings() {
+        assert_eq!(
+            discrete_gpus_and_participating_gpus_admitted_from_the_enumeration(
+                &BackgroundGpuSelection {
+                    background_gpu_devices: None,
+                    background_gpu_memory_limit: None,
+                    background_gpu_wait_limit: BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
+                },
+                &enumeration_with_only_the_software_vulkan(),
+            ),
+            Err(BackgroundGpuOpenRefused::SettingsRefused(
+                BackgroundComputeSettingsRefused::GpuNotPresent
+            )),
+            "没点名、一张独显都没有：照核心层的「GPU 不在」交回"
         );
     }
 }

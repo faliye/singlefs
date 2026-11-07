@@ -1,0 +1,4 @@
+[package]
+name = "fservice"
+
+[workspace]

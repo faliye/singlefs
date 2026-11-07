@@ -1,4 +1,4 @@
-//! 按 key 空间定形状的两棵派生树（分配记录树、extent 树，D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1 / K2）在 checker 这边的几何：
+//! 按 key 空间定形状的两棵派生树（分配记录树、extent 树，D8（核心索引结构） 已定项 14）在 checker 这边的几何：
 //! 只与实现共享格式常量模块（D13（验证路线） 已定项 5），几何、key 的字节、位置怎么算按条款另写一份，不用实现的解析。
 //!
 //! - 分配记录树：叶 k 罩一块盘上的槽 `[k × W, (k + 1) × W)`，层级 L 的节点罩 `W × F^L` 个槽（W = 812、F = 169）；根罩整个 key 空间，
@@ -6,7 +6,7 @@
 //!   （D18（块里携带什么信息） 已定项 2 对按位置寻址的树那一句）；父条目的 key 是孩子那一段的起点。
 //! - extent 树：上段按 inode 号的位置（叶罩 143 个 inode 号、内部扇出 147），下段一个文件一棵按数据单元号的位置（叶罩 144 个单元、扇出 147），
 //!   上段叶条目 113 带标签 0 到 4（没有单元 / 下段根指针 / 内联数据指针 / 下段根指针、之后到 size 是洞 / 内联单元 0、之后到 size 是洞；
-//!   标签 3、4 是判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5，用户 2026-10-16 定「加标签声明洞」）。
+//!   标签 3、4 用来声明洞：单元之后到 size 是洞）。
 
 use singlefs_format::{
     ALLOCATION_RECORD_TREE_INTERNAL_FANOUT, ALLOCATION_RECORD_TREE_LEAF_SLOTS, DATA_POINTER_BYTES,
@@ -268,7 +268,7 @@ pub fn extent_lower_child_of_entry_key(
         .then_some((child_level, child_index))
 }
 
-/// 上段叶条目声明的、最后一个存在的数据单元之后到 size 那一段（判决 m4-trunc-r1 K5 与第六节 S1）：标签 1、2 不许有洞，
+/// 上段叶条目声明的、最后一个存在的数据单元之后到 size 那一段：标签 1、2 不许有洞，
 /// 标签 3、4 之后到 size 是洞（存在的单元少于 ⌈size ÷ 净荷⌉.max(1)、至少一个洞单元）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TailAfterTheLastDataUnit {
@@ -298,7 +298,7 @@ pub enum ExtentUpperLeafEntryView {
     Malformed,
 }
 
-/// 上段叶条目标签的五个值（D8（核心索引结构） 已定项 14 与判决 m4-trunc-r1 K5），按字段表另写一份。
+/// 上段叶条目标签的五个值（D8（核心索引结构） 已定项 14），按字段表另写一份。
 const EXTENT_UPPER_LEAF_ENTRY_TAG_NO_DATA_UNIT: u8 = 0;
 const EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT: u8 = 1;
 const EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT: u8 = 2;
@@ -356,7 +356,7 @@ pub fn extent_upper_leaf_entry_view(entry: &[u8]) -> ExtentUpperLeafEntryView {
 mod tests {
     use super::*;
 
-    /// 4 GiB 两盘 3 层、1 TiB 两盘 4 层（判决 S1 的本地腿算术），与实现各算各的。
+    /// 4 GiB 两盘 3 层、1 TiB 两盘 4 层，与实现各算各的。
     #[test]
     fn the_root_level_follows_the_device_sizes() {
         let four_gibibytes = (4u64 << 30) / 16384;

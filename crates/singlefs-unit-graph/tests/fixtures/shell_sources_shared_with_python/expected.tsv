@@ -1,0 +1,24 @@
+# 两份实现在同一组样本脚本上收出的文件与拒算：crates/singlefs-unit-graph 的 shell_sources::shell_sourced_files 与 scripts/gate/lib_function_units.py 的 shell_sourced_files。
+# 样本是这个目录下以 .fixture 收尾的文件，去掉 .fixture 写进一棵临时树的同一相对路径；每个样本脚本从那棵树的根起算。
+# 每行制表符分隔：<样本脚本> sourced <收进来的文件>｜<样本脚本> refused <形态> <文件>:<行> <片段>｜<样本脚本> nothing（一份也没收、也没拒算）。
+# Rust 一侧由 tests/unit_graph_shell_scripts_read_as_data_bring_in_the_files_they_source.rs 核，python 一侧的核法写在那份测试的文件头。
+scripts/cd-then-relative.sh	sourced	scripts/lib/cd-target.sh
+scripts/directory-of-the-script.sh	sourced	scripts/lib/first.sh
+scripts/directory-of-the-script.sh	sourced	scripts/lib/second.sh
+scripts/dotted.sh	sourced	scripts/lib/dot-only.sh
+scripts/function-and-default.sh	sourced	scripts/lib/in-function.sh
+scripts/generated.sh	sourced	scripts/lib/plain-library.sh
+scripts/literal.sh	sourced	scripts/lib/plain-library.sh
+scripts/missing-and-outside.sh	refused	shell-path-missing	scripts/missing-and-outside.sh:1	source "$(dirname "${BASH_SOURCE[0]}")/lib/not-there.sh"
+scripts/missing-and-outside.sh	refused	shell-path-outside-root	scripts/missing-and-outside.sh:2	source /etc/profile
+scripts/not-followed.sh	nothing
+scripts/plain.sh	nothing
+scripts/project-directory.sh	sourced	scripts/lib/plain-library.sh
+scripts/sources-a-broken-library.sh	sourced	scripts/lib/broken.sh
+scripts/sources-a-broken-library.sh	refused	bash-syntax	scripts/lib/broken.sh:1	broken_function() {
+scripts/subscript.sh	sourced	scripts/lib/plain-library.sh
+scripts/tree-copy.sh	sourced	scripts/lib/plain-library.sh
+scripts/two-assignments.sh	sourced	lib/shim-target.sh
+scripts/unfolded.sh	refused	shell-path-unfolded	scripts/unfolded.sh:2	source "$library"
+scripts/variable-from-sourced-library.sh	sourced	scripts/lib/defined-target.sh
+scripts/variable-from-sourced-library.sh	sourced	scripts/lib/defines-a-path.sh

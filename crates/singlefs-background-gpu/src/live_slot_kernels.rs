@@ -69,7 +69,8 @@ const RELEASED_WORD_OF_A_LIVE_RECORD: u32 = 0;
 /// 两份核各一个结果缓冲与一个回读暂存缓冲。
 const LIVE_SLOT_OUTCOME_AND_READBACK_BUFFERS: u64 = 4;
 
-fn low_and_high_words_of_the_slot(slot: SlotNumber) -> [u32; 2] {
+/// 区域扫描那一段（[`crate::region_record_kernels`]）打包槽号也用这一份：两段交给核的槽号字是同一种拆法。
+pub(crate) fn low_and_high_words_of_the_slot(slot: SlotNumber) -> [u32; 2] {
     [
         u32::try_from(slot.0 & u64::from(u32::MAX)).expect("取了低 32 位"),
         u32::try_from(slot.0 >> 32).expect("盘上槽号是 6 字节，高 32 位装得进 u32"),
@@ -603,7 +604,9 @@ mod tests {
         );
     }
 
-    fn outcome_bytes(outcome_words: [u32; LIVE_SLOT_OUTCOME_WORDS]) -> Vec<u8> {
+    fn live_slot_outcome_bytes_of_the_words(
+        outcome_words: [u32; LIVE_SLOT_OUTCOME_WORDS],
+    ) -> Vec<u8> {
         outcome_words
             .iter()
             .flat_map(|word| word.to_le_bytes())
@@ -612,8 +615,12 @@ mod tests {
 
     #[test]
     fn readback_records_decode_into_sixty_four_bit_live_slot_counts() {
-        let mut readback = outcome_bytes([64, 0, VERDICT_WORD_COUNTED]);
-        readback.extend(outcome_bytes([5, 2, VERDICT_WORD_COUNTED]));
+        let mut readback = live_slot_outcome_bytes_of_the_words([64, 0, VERDICT_WORD_COUNTED]);
+        readback.extend(live_slot_outcome_bytes_of_the_words([
+            5,
+            2,
+            VERDICT_WORD_COUNTED,
+        ]));
         assert_eq!(
             decoded_live_slot_outcomes(&readback),
             Ok(vec![64, (2_u64 << 32) | 5]),
@@ -622,8 +629,8 @@ mod tests {
     }
 
     #[test]
-    fn an_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word() {
-        let mut readback = outcome_bytes([1, 0, VERDICT_WORD_COUNTED]);
+    fn live_slot_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word() {
+        let mut readback = live_slot_outcome_bytes_of_the_words([1, 0, VERDICT_WORD_COUNTED]);
         readback.extend(live_slot_outcome_buffer_before_the_kernel_writes(1));
         assert_eq!(
             decoded_live_slot_outcomes(&readback),
@@ -739,7 +746,8 @@ mod tests {
     }
 
     #[test]
-    fn the_two_kernels_are_separate_sources_with_their_own_entry_points() {
+    fn the_walking_and_searching_live_slot_kernels_are_separate_sources_with_their_own_entry_points(
+    ) {
         assert!(WALKING_EVERY_RECORD_KERNEL_SOURCE
             .contains(&format!("fn {WALKING_EVERY_RECORD_KERNEL_ENTRY_POINT}(")));
         assert!(SEARCHING_SORTED_RECORDS_KERNEL_SOURCE.contains(&format!(

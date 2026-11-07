@@ -1,15 +1,19 @@
 //! CRC-32C（Castagnoli）与 32 字节校验和字段（D18（块里携带什么信息） 已定项 17：
 //! 多项式 0x1EDC6F41、反射实现、初值 0xFFFFFFFF、输出取反；结果小端写进字段前 4 字节，其余 28 字节恒 0）。
 //! 实现走两条路之一：x86_64 上运行时查到 SSE4.2 就用 `crc32` 指令三路交错（[`CastagnoliRoute::HardwareCrcInstructionThreeWay`]），
-//! 查不到或不是 x86_64 就用 slicing-by-8（[`CastagnoliRoute::SoftwareSlicingByEight`]）；两条路对同一段字节逐字节同值
-//! （用户 2026-10-26 定「两处都换，并进七·3」）。checker 另写一份按位的，两份对同一段字节必须给同一个数（D13（验证路线） 已定项 5），
+//! 查不到或不是 x86_64 就用 slicing-by-8（[`CastagnoliRoute::SoftwareSlicingByEight`]）；两条路对同一段字节逐字节同值。
+//! checker 另写一份按位的，两份对同一段字节必须给同一个数（D13（验证路线） 已定项 5），
 //! checker 那一份不跟着换。
 //!
 //! 选路照 `.claude/rules/fs-design.md`「五条硬要求」：判据只有「这台处理器有没有 SSE4.2」一条（[`castagnoli_route_of_this_processor`]，
 //! 进程活着时不变）；运行时看得出走了哪条（同一个函数交回的就是这一次走的路）；[`crc32_castagnoli_on_route`] 是只供测试的开关，
 //! 无视判据走点名的那条。
 
-use singlefs_format::{CHECKSUM_CRC32_CASTAGNOLI_BYTES, WIDE_CHECKSUM_BYTES};
+use singlefs_format::WIDE_CHECKSUM_BYTES;
+use vstd::prelude::*;
+
+// 规格与引理只在 Verus 编的时候有（平时的构建把它们擦掉），按名字引会编不过，所以整个模块引进来。
+use crate::bytes::*;
 
 /// 反射后的 Castagnoli 多项式。
 const CASTAGNOLI_POLYNOMIAL_REFLECTED: u32 = 0x82F6_3B78;
@@ -95,11 +99,26 @@ pub fn castagnoli_route_of_this_processor() -> CastagnoliRoute {
     CastagnoliRoute::SoftwareSlicingByEight
 }
 
+verus! {
+
+/// CRC-32C 在 Verus 里是未解释函数（D13（验证路线） 已定项 14「哈希是 uninterpreted function」）：证明只用到「同一段字节同一个数」，
+/// 不展开多项式。它与真实现对不对得上不归 Verus 判，归差分测试 [`tests::crc32c_matches_the_published_check_value`]（公开校验值）
+/// 与 checker 那一份按位实现的交叉比（D13（验证路线） 已定项 5）；这一条与 [`crc32_castagnoli`] 的 `external_body` 各登记一行信任清单。
+pub uninterp spec fn spec_crc32_castagnoli(bytes: Seq<u8>) -> u32;
+
 /// 完整 32 位 CRC-32C，走 [`castagnoli_route_of_this_processor`] 选的那条路。
+///
+/// 函数体不经 Verus 验（`external_body`）：查表、硬件指令与选路都在 `verus!` 外面，被验区域只信「交回的就是那段字节的 CRC-32C」。
+#[verifier::external_body]
 #[must_use]
-pub fn crc32_castagnoli(bytes: &[u8]) -> u32 {
+pub fn crc32_castagnoli(bytes: &[u8]) -> (crc: u32)
+    ensures
+        crc == spec_crc32_castagnoli(bytes@),
+{
     crc32_castagnoli_on_route(castagnoli_route_of_this_processor(), bytes)
 }
+
+} // verus!
 
 /// 完整 32 位 CRC-32C，走点名的那条路：只供测试的开关（`.claude/rules/fs-design.md`「五条硬要求」第 2 条），
 /// 用例拿它在有 SSE4.2 的机器上强制走 slicing-by-8；产品代码只调 [`crc32_castagnoli`]。两条路对同一段字节交回同一个数。
@@ -273,30 +292,112 @@ mod hardware_crc_instruction {
     }
 }
 
+verus! {
+
+// ===== 这一份文件用到的 singlefs-format 常量的规格（写法同 unit.rs 头上那一段）=====
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::WIDE_CHECKSUM_BYTES ] -> (wide_checksum_bytes: u64) returns 32u64;
+#[allow(unsafe_code, reason = "Verus 把 assume_specification 展开成 unsafe fn 声明；只在 Verus 编的时候有，产品构建里擦掉")]
+pub assume_specification[ singlefs_format::CHECKSUM_CRC32_CASTAGNOLI_BYTES ] -> (crc_bytes: u64) returns 4u64;
+
+/// 求校验和时罩住的那一截：`[0, cover_end)`，其中校验和字段自己那 32 字节按 0 参与（I-2.4）。
+pub open spec fn spec_covered_with_the_field_zeroed(bytes: Seq<u8>, cover_end: int, field_offset: int) -> Seq<u8> {
+    bytes.subrange(0, field_offset) + zero_bytes(WIDE_CHECKSUM_BYTES as nat) + bytes.subrange(
+        field_offset + WIDE_CHECKSUM_BYTES,
+        cover_end,
+    )
+}
+
+/// 32 字节校验和字段该写的样子：罩住那一截的 CRC-32C 小端 4 字节，其余 28 字节 0（D18（块里携带什么信息） 已定项 17）。
+pub open spec fn spec_wide_checksum_field(bytes: Seq<u8>, cover_end: int, field_offset: int) -> Seq<u8> {
+    little_endian_bytes(
+        spec_crc32_castagnoli(spec_covered_with_the_field_zeroed(bytes, cover_end, field_offset)) as nat,
+        singlefs_format::CHECKSUM_CRC32_CASTAGNOLI_BYTES as nat,
+    ) + zero_bytes((WIDE_CHECKSUM_BYTES - singlefs_format::CHECKSUM_CRC32_CASTAGNOLI_BYTES) as nat)
+}
+
+/// 校验和字段的前提：字段整个落在罩住的那一截里，罩住的那一截不过 `bytes` 末尾。
+pub open spec fn spec_wide_checksum_field_fits(bytes: Seq<u8>, cover_end: int, field_offset: int) -> bool {
+    &&& 0 <= field_offset
+    &&& field_offset + WIDE_CHECKSUM_BYTES <= cover_end
+    &&& cover_end <= bytes.len()
+}
+
+/// 32 字节校验和字段的值：CRC-32C 小端 4 字节，其余 28 字节 0。
+fn wide_checksum_field_of_the_crc(crc: u32) -> (field: [u8; 32])
+    ensures
+        field@ == little_endian_bytes(crc as nat, singlefs_format::CHECKSUM_CRC32_CASTAGNOLI_BYTES as nat) + zero_bytes(
+            (WIDE_CHECKSUM_BYTES - singlefs_format::CHECKSUM_CRC32_CASTAGNOLI_BYTES) as nat,
+        ),
+{
+    let mut field = [0u8; 32];
+    field[0] = u8::try_from(crc % 256).expect("对 256 取余装得进一个字节");
+    field[1] = u8::try_from(crc / 0x100 % 256).expect("对 256 取余装得进一个字节");
+    field[2] = u8::try_from(crc / 0x1_0000 % 256).expect("对 256 取余装得进一个字节");
+    field[3] = u8::try_from(crc / 0x100_0000 % 256).expect("对 256 取余装得进一个字节");
+    proof {
+        reveal_with_fuel(little_endian_bytes, 5);
+        assert(field@ =~= little_endian_bytes(crc as nat, 4) + zero_bytes(28));
+    }
+    field
+}
+
 /// 32 字节校验和字段的值：把 `[field_offset, field_offset + 32)` 按 0 参与，对 `[0, cover_end)` 求 CRC-32C，
 /// 小端写进前 4 字节、其余 28 字节 0（I-2.4：字段自身按 0 参与）。
+///
+/// # Panics
+/// 字段不整个落在罩住的那一截里，或罩住的那一截过了 `bytes` 末尾（`requires` 排除的那一种）。
 #[must_use]
 pub fn wide_checksum_with_field_zeroed(
     bytes: &[u8],
     cover_end: usize,
     field_offset: usize,
-) -> [u8; 32] {
-    let mut covered = bytes[..cover_end].to_vec();
+) -> (field: [u8; 32])
+    requires
+        spec_wide_checksum_field_fits(bytes@, cover_end as int, field_offset as int),
+    ensures
+        field@ == spec_wide_checksum_field(bytes@, cover_end as int, field_offset as int),
+{
     let field_width = usize::try_from(WIDE_CHECKSUM_BYTES).expect("32");
-    covered[field_offset..field_offset + field_width].fill(0);
-    let mut field = [0u8; 32];
-    let crc_width = usize::try_from(CHECKSUM_CRC32_CASTAGNOLI_BYTES).expect("4");
-    field[..crc_width].copy_from_slice(&crc32_castagnoli(&covered).to_le_bytes());
-    field
+    // 罩住的那一截：字段之前照抄、字段 32 字节按 0、字段之后照抄到 cover_end（写者 new 出来就是 0，跳过的那一段保持 0）。
+    let mut covered_writer = ByteWriter::new(cover_end);
+    covered_writer.put(&bytes[..field_offset]);
+    covered_writer.skip(field_width);
+    covered_writer.put(&bytes[field_offset + field_width..cover_end]);
+    let covered = covered_writer.into_bytes();
+    proof {
+        assert(covered@ =~= spec_covered_with_the_field_zeroed(bytes@, cover_end as int, field_offset as int));
+    }
+    wide_checksum_field_of_the_crc(crc32_castagnoli(&covered))
 }
 
 /// 读者那一侧：字段里那 28 字节非 0 一律判损坏（D18（块里携带什么信息） 已定项 17）。
+///
+/// # Panics
+/// 同 [`wide_checksum_with_field_zeroed`]。
 #[must_use]
-pub fn wide_checksum_field_holds(bytes: &[u8], cover_end: usize, field_offset: usize) -> bool {
+pub fn wide_checksum_field_holds(bytes: &[u8], cover_end: usize, field_offset: usize) -> (holds: bool)
+    requires
+        spec_wide_checksum_field_fits(bytes@, cover_end as int, field_offset as int),
+    ensures
+        holds == (bytes@.subrange(field_offset as int, field_offset + WIDE_CHECKSUM_BYTES)
+            == spec_wide_checksum_field(bytes@, cover_end as int, field_offset as int)),
+{
     let field_width = usize::try_from(WIDE_CHECKSUM_BYTES).expect("32");
     let stored = &bytes[field_offset..field_offset + field_width];
-    wide_checksum_with_field_zeroed(bytes, cover_end, field_offset) == stored
+    let expected = wide_checksum_with_field_zeroed(bytes, cover_end, field_offset);
+    let holds = expected == stored;
+    proof {
+        if holds {
+            assert(stored@ =~= expected@);
+        } else {
+            assert(stored@ != expected@);
+        }
+    }
+    holds
 }
+
+} // verus!
 
 #[cfg(test)]
 mod tests {

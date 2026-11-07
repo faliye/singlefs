@@ -1,4 +1,4 @@
-//! 分配记录树按 key 空间定形状（D8（核心索引结构） 已定项 14「分配记录树」，用户 2026-09-24 定 K1）：不分裂，按绝对槽号按位置寻址。
+//! 分配记录树按 key 空间定形状（D8（核心索引结构） 已定项 14「分配记录树」）：不分裂，按绝对槽号按位置寻址。
 //!
 //! - **叶**：盘 d 上第 k 片叶罩槽 `[k × W, (k + 1) × W)`，W = [`ALLOCATION_RECORD_TREE_LEAF_SLOTS`]（偶数、≤ 叶条目容量 812）；
 //!   记录按起点槽落叶，记录的末槽不越过它所在叶的末槽（两槽单元起在偶数槽、W 取偶数 ⇒ 永远不跨叶）。
@@ -29,6 +29,7 @@ use crate::allocator::{
     absolute_slot_count_of_device, AllocationRecord, AllocationRecordEntryRefusal, PoolAllocator,
 };
 use crate::bytes::{ByteReader, ByteWriter};
+use crate::code_two_tree::header_self_described_logical_address_violated;
 use crate::pointer::{
     BirthSequence, NodePointer, PointerHeadFieldGroup, PointerHeadFieldsJudgement,
 };
@@ -606,13 +607,6 @@ impl AllocationRecordTreeReadFromDisk {
     }
 }
 
-fn violated(detail: &'static str) -> RecoveryFailure {
-    RecoveryFailure::InvariantViolated {
-        invariant: "I-1.1",
-        detail,
-    }
-}
-
 /// 读一棵分配记录树时一路不变的那几样。
 struct AllocationRecordTreeReading<'reading> {
     geometry: &'reading AllocationRecordTreeGeometry,
@@ -692,7 +686,9 @@ impl AllocationRecordTreeReading<'_> {
         records: &mut Vec<AllocationRecord>,
     ) -> Result<(), RecoveryFailure> {
         if !units_seen.insert(pointer.locations[0].slot) {
-            return Err(violated("同一个分配记录树节点被两条父条目引用"));
+            return Err(header_self_described_logical_address_violated(
+                "同一个分配记录树节点被两条父条目引用",
+            ));
         }
         let bytes = read_node(pointer)?;
         let is_root = node == AllocationRecordTreeNode::Root;
@@ -711,16 +707,18 @@ impl AllocationRecordTreeReading<'_> {
             });
         }
         if header.level != self.geometry.level_of(node) {
-            return Err(violated("分配记录树节点的层级不是它的位置规定的那一层"));
+            return Err(header_self_described_logical_address_violated(
+                "分配记录树节点的层级不是它的位置规定的那一层",
+            ));
         }
         let (smallest_key, largest_key) = self.geometry.key_range_of(node);
         if header.smallest_key != smallest_key || header.largest_key != largest_key {
-            return Err(violated(
+            return Err(header_self_described_logical_address_violated(
                 "分配记录树节点头里的 key 区间不是它的位置规定罩的那一段",
             ));
         }
         if header.entries.is_empty() {
-            return Err(violated(
+            return Err(header_self_described_logical_address_violated(
                 "分配记录树节点一条条目都没有（缺席的一段不写节点）",
             ));
         }
@@ -755,14 +753,16 @@ impl AllocationRecordTreeReading<'_> {
                 .windows(2)
                 .all(|pair| pair[0].sort_key() < pair[1].sort_key());
             if !keys_ascend {
-                return Err(violated("分配记录树叶里的记录不按 key 严格递增"));
+                return Err(header_self_described_logical_address_violated(
+                    "分配记录树叶里的记录不按 key 严格递增",
+                ));
             }
             nodes.push((node, *pointer, bytes));
             return Ok(());
         }
         let internal_width =
             usize::try_from(ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES).expect("96");
-        // 宽于 key 宽 + 86 的同样拒（C867，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
+        // 宽于 key 宽 + 86 的同样拒（C867）。报的成员沿用
         // `EntryWidthDiffersFromItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
         if header.entry_width != internal_width {
             return Err(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
@@ -777,11 +777,13 @@ impl AllocationRecordTreeReading<'_> {
             let child = self
                 .geometry
                 .child_named_by_entry_key(node, &entry[..key_bytes_width()])
-                .ok_or(violated(
+                .ok_or(header_self_described_logical_address_violated(
                     "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点",
                 ))?;
             if previous_child.is_some_and(|previous| previous >= child) {
-                return Err(violated("分配记录树内部节点的孩子不按位置严格递增"));
+                return Err(header_self_described_logical_address_violated(
+                    "分配记录树内部节点的孩子不按位置严格递增",
+                ));
             }
             previous_child = Some(child);
             let mut reader = ByteReader::at(entry, key_bytes_width());
@@ -924,7 +926,11 @@ mod tests {
     use super::*;
     use singlefs_format::SLOT_BYTES;
 
-    fn record(device: u32, slot: u64, span_slots: u16) -> AllocationRecord {
+    fn allocation_record_held_since_generation_one(
+        device: u32,
+        slot: u64,
+        span_slots: u16,
+    ) -> AllocationRecord {
         AllocationRecord {
             device: DeviceIdentity(device),
             slot: SlotNumber(slot),
@@ -943,7 +949,7 @@ mod tests {
         ])
     }
 
-    /// 本地腿两次抽样一致的层数（判决 S1）：4 GiB 两盘 3 层——叶罩 812 槽、层级 1 罩 137228 槽，每盘 262144 槽要两格，两盘四格装进根。
+    /// 本地腿两次抽样一致的层数：4 GiB 两盘 3 层——叶罩 812 槽、层级 1 罩 137228 槽，每盘 262144 槽要两格，两盘四格装进根。
     #[test]
     fn two_four_gibibyte_devices_give_a_tree_of_height_three() {
         let geometry = geometry_of_two_four_gibibyte_devices();
@@ -952,7 +958,7 @@ mod tests {
         assert_eq!(span_in_slots_at_level(1), 812 * 169);
     }
 
-    /// 1 TiB 两盘 4 层（判决 S1 的 1 TiB 那一格）。
+    /// 1 TiB 两盘 4 层。
     #[test]
     fn two_one_tebibyte_devices_give_a_tree_of_height_four() {
         let slots = (1u64 << 40) / SLOT_BYTES;
@@ -1014,7 +1020,8 @@ mod tests {
     fn records_with_the_quarantine_mark_fit_in_their_leaf_by_the_span_in_the_low_bits() {
         let geometry = geometry_of_two_four_gibibyte_devices();
         for (slot, span_field, span_slots) in [(50342u64, 0x4002u16, 2u16), (50343, 0x4001, 1)] {
-            let mut bytes = record(0, slot, span_slots).to_bytes();
+            let mut bytes =
+                allocation_record_held_since_generation_one(0, slot, span_slots).to_bytes();
             bytes[10..12].copy_from_slice(&span_field.to_le_bytes());
             let parsed = AllocationRecord::parse(&bytes).expect("带隔离记号、未释放的记录解得开");
             assert_eq!(parsed.span_slots, span_slots, "跨度取低位");
@@ -1035,10 +1042,10 @@ mod tests {
     fn changed_record_changes_its_leaf_and_every_ancestor_only() {
         let geometry = geometry_of_two_four_gibibyte_devices();
         let before = vec![
-            record(0, 50176, 2),
-            record(0, 51000, 1),
-            record(1, 50176, 2),
-            record(1, 51000, 1),
+            allocation_record_held_since_generation_one(0, 50176, 2),
+            allocation_record_held_since_generation_one(0, 51000, 1),
+            allocation_record_held_since_generation_one(1, 50176, 2),
+            allocation_record_held_since_generation_one(1, 51000, 1),
         ];
         let mut after = before.clone();
         after[1].is_released = true;

@@ -2,7 +2,7 @@
 //!
 //! 每个常量的值来自 `.claude/kb/layout/01-first-txn.md` 与各决策分项；带 `format-const:` 注的常量
 //! 与 kb 里同名的 `<!-- format-const: NAME = N -->` 标记由门禁 code-source-discipline 的 format-constants 格绑住，改值要三处一起动。
-//! 值还是预想（等一次实测或一次定案）的常量，前一行写 `// placeholder: <分项或欠账编号（简称）> —— 为什么还是预想`，
+//! 值还是预想（等一次实测或一次决策）的常量，前一行写 `// placeholder: <分项或欠账编号（简称）> —— 为什么还是预想`，
 //! 门禁「格式常量文件里的占位」数它们、并核每个占位都指到一条真实存在的分项或欠账。
 //!
 //! checker 与实现只共享这一个模块（D13（验证路线） 已定项 5），别的都各写一份。
@@ -28,7 +28,7 @@ pub const WIDE_CHECKSUM_BYTES: u64 = 32;
 /// 校验和字段里真正承载 CRC-32C 的那 4 字节。
 pub const CHECKSUM_CRC32_CASTAGNOLI_BYTES: u64 = 4;
 
-/// 单元明文头末尾之后的预留位：nonce 12 + MAC 16 + 算法类型 1（D18（块里携带什么信息） 已定项 14 / 已定项 16；算法类型 2026-09-14 用户定案）。format-const: NONCE_MAC_ALGORITHM_RESERVED_BYTES
+/// 单元明文头末尾之后的预留位：nonce 12 + MAC 16 + 算法类型 1（D18（块里携带什么信息） 已定项 14 / 已定项 16；算法类型）。format-const: NONCE_MAC_ALGORITHM_RESERVED_BYTES
 pub const NONCE_MAC_ALGORITHM_RESERVED_BYTES: u64 = 29;
 
 /// 码 1 数据单元的类身份段末尾，也是头校验和的端点（D18（块里携带什么信息） 已定项 7 / 已定项 18）。format-const: DATA_UNIT_HEADER_BYTES
@@ -43,16 +43,16 @@ pub const PACKED_UNIT_HEADER_BYTES: u64 = 107;
 /// 码 3 含预留位的头：类身份段 107 + 预留位 29，记录区从这里起（D18（块里携带什么信息） 已定项 16）。format-const: PACKED_UNIT_RECORDS_OFFSET
 pub const PACKED_UNIT_RECORDS_OFFSET: u64 = 136;
 
-/// 码 2 索引节点头里不含 key 区间的部分：共同前缀 42 + 树 ID 8 + 层级 1 + key 宽 1 + 诞生代号 8 + fsid 8 + 写序 4 + 出生序号 4 + 载荷 CRC 4 + 预留 2 + 条目数 2 + 条目宽 2（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 18；key 宽的位置 2026-09-14 用户定案）。format-const: INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE
+/// 码 2 索引节点头里不含 key 区间的部分：共同前缀 42 + 树 ID 8 + 层级 1 + key 宽 1 + 诞生代号 8 + fsid 8 + 写序 4 + 出生序号 4 + 载荷 CRC 4 + 预留 2 + 条目数 2 + 条目宽 2（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 18；key 宽的位置）。format-const: INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE
 pub const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;
 
 /// 码 2 索引节点头里的 key 区间装几个 key：最小 key 与最大 key 各一个，所以 key 区间占 `2 × key 宽` 字节
 /// （D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 18 的偏移表「52 key 区间 2k」）。format-const: INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT
 ///
 /// 含 key 区间与预留位的头宽 `86 + 2 × key 宽 + 29` 这条式子**不在这里**：这里只放标量，core（`singlefs_core::unit::index_node_header_bytes`）、
-/// checker（`singlefs_checker::index_node_header_bytes`）、理想模型（`singlefs_harness::model::index_node_header_bytes`）各写一份、互不调用
-/// （D13（验证路线） 已定项 5：发射物里不许有算术；2026-09-27 用户定案「三方各算一份 + 交叉断言」），
-/// 三份在 key 宽的全部取值上连起来比的是 `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`。
+/// checker（`singlefs_checker::index_node_header_bytes`）、理想模型（`singlefs_verification::model::index_node_header_bytes`）各写一份、互不调用
+/// （D13（验证路线） 已定项 5：发射物里不许有算术），
+/// 三份在 key 宽的全部取值上连起来比的是 `crates/singlefs-verification/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`。
 pub const INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT: u64 = 2;
 
 /// inode 树根（码 2）的节点头：`86 + 2 × 8 + 29`，key 宽 8，条目区从这里起（D8（核心索引结构） 已定项 6 / 已定项 11；D18（块里携带什么信息） 已定项 16 / 已定项 18）。format-const: INODE_TREE_ROOT_INDEX_NODE_HEADER_BYTES
@@ -79,7 +79,7 @@ pub const LOC_ENTRY: u64 = 14; // naming-lint:external 名字由 kb 的 format-c
 /// 每条指针带几份位置条目（D2（RAID 条带策略） 已定项 6：每次写至少 w = 2 列）。
 pub const LOCATION_ENTRIES_PER_POINTER: u64 = 2;
 
-/// 指针头部：MAC 16 + nonce 12 + 算法类型 1 + 压缩算法码 1 + 压后长度 2 + extent 偏移 2 + 出生树 8 + 出生 txg 8（D19（块指针的结构与宽度预算） 已定项 11；压缩两段 2026-09-14 用户定案）。
+/// 指针头部：MAC 16 + nonce 12 + 算法类型 1 + 压缩算法码 1 + 压后长度 2 + extent 偏移 2 + 出生树 8 + 出生 txg 8（D19（块指针的结构与宽度预算） 已定项 11；压缩两段）。
 pub const POINTER_HEAD_BYTES: u64 = 50;
 
 /// 指向码 1 的指针：头部 50 + 位置条目 14 × 2 + 写序 10（D19（块指针的结构与宽度预算） 已定项 7 / 已定项 8）。format-const: DATA_POINTER_BYTES
@@ -88,7 +88,7 @@ pub const DATA_POINTER_BYTES: u64 = 88;
 /// 指向码 2 / 码 3 的指针：头部 50 + 位置条目 14 × 2 + 实例代号 4 + 出生序号 4（D19（块指针的结构与宽度预算） 已定项 7 / 已定项 8）。format-const: NODE_POINTER_BYTES
 pub const NODE_POINTER_BYTES: u64 = 86;
 
-/// 中央映射 key：类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10，码 2 / 码 3 的 8 字节尾段补零到同宽（D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10，2026-09-14 用户定案一宽）。
+/// 中央映射 key：类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10，码 2 / 码 3 的 8 字节尾段补零到同宽（D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10一宽）。
 pub const MAPPING_KEY_BYTES: u64 = 27;
 
 /// 中央映射条目：key 27 + 位置条目 14 × 2（D19（块指针的结构与宽度预算） 已定项 6）。format-const: MAPPING_ENTRY_BYTES
@@ -122,11 +122,11 @@ pub const LINEAGE_RECORD_BYTES: u64 = 24;
 pub const LINEAGE_CONTAINER_RECORDS: u64 = 1359;
 
 /// 退役记录定长 34：被退役身份的出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8 + 死亡 txg 8，小端，身份四段与 inode 内部条目里的
-/// 身份引用同序同宽、无填充无预留（D18（块里携带什么信息） 已定项 11 打包记录类型 3；判决 `research/prompts/m3-retire-r1-main-verification.md`
+/// 身份引用同序同宽、无填充无预留（D18（块里携带什么信息） 已定项 11 打包记录类型 3；
 /// 第三节第 2 条）。format-const: RETIREMENT_RECORD_BYTES
 pub const RETIREMENT_RECORD_BYTES: u64 = 34;
 
-/// 一个 32 KiB 码 3 退役容器装几条：(32768 − 136) ÷ 34（同一判决第三节第 2 条）。format-const: RETIREMENT_CONTAINER_RECORDS
+/// 一个 32 KiB 码 3 退役容器装几条：(32768 − 136) ÷ 34。format-const: RETIREMENT_CONTAINER_RECORDS
 pub const RETIREMENT_CONTAINER_RECORDS: u64 = 959;
 
 /// `deleted_inodes` 树节点的条目：key = inode 号 8 字节、无 value、不带对象出生代（D8（核心索引结构） 已定项 16 第 1 条）。
@@ -169,7 +169,7 @@ pub const ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES: u64 = 96;
 pub const ALLOCATION_RECORD_TREE_INTERNAL_FANOUT: u64 = 169;
 
 /// extent 树内部节点条目（上段与下段同一种）：孩子罩的那一段的起点 key 24 + 子指针 86（D8（核心索引结构） 已定项 11 那一行，
-/// extent 110 是用户 2026-09-24 定的）。
+/// extent 110 是的）。
 pub const EXTENT_TREE_INTERNAL_ENTRY_BYTES: u64 = 110;
 
 /// extent 树内部节点的扇出（上段与下段同一种）：(16384 − 163) ÷ 110 的整数部分（D8（核心索引结构） 已定项 14「内部扇出 147」）。
@@ -186,29 +186,29 @@ pub const EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES: u64 = 113;
 pub const EXTENT_TREE_UPPER_LEAF_INODES: u64 = 143;
 
 /// logged_ops 树条目的 key：种类 2 + 签发 txg 8，按逐字段无符号整数、字段自左向右比较（D8（核心索引结构） 已定项 11；
-/// 判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1「单树、定宽联合条目」）。format-const: LOGGED_OPERATIONS_KEY_BYTES
+/// 「单树、定宽联合条目」）。format-const: LOGGED_OPERATIONS_KEY_BYTES
 pub const LOGGED_OPERATIONS_KEY_BYTES: u64 = 10;
 
 /// logged_ops 树条目的 value，按种类解、定宽：种类 1（整理）= R 的设备 4 + 起始槽 6 + 槽数 2、`c0` 8、`segs0` 8、补零 6；
-/// 别的种类码保留（同一判决 G1）。format-const: LOGGED_OPERATIONS_VALUE_BYTES
+/// 别的种类码保留。format-const: LOGGED_OPERATIONS_VALUE_BYTES
 pub const LOGGED_OPERATIONS_VALUE_BYTES: u64 = 34;
 
-/// logged_ops 树条目：key 10 + value 34（同一判决 G1）。format-const: LOGGED_OPERATIONS_ENTRY_BYTES
+/// logged_ops 树条目：key 10 + value 34。format-const: LOGGED_OPERATIONS_ENTRY_BYTES
 pub const LOGGED_OPERATIONS_ENTRY_BYTES: u64 = 44;
 
 /// 一个 logged_ops 码 2 节点装几条：(16384 − 头 `86 + 2 × 10 + 29`) ÷ 44 的整数部分（同一判决 G1「一节点 369 条」）。
 /// format-const: LOGGED_OPERATIONS_ENTRIES_PER_NODE
 pub const LOGGED_OPERATIONS_ENTRIES_PER_NODE: u64 = 369;
 
-/// 树表条目：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8；重排与头 ID 2026-09-14 用户定案，加宽到 200 是 2026-09-16 用户定案）。format-const: TREE_TABLE_ENTRY_BYTES
+/// 树表条目：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8；重排与头 ID，加宽到 200 是）。format-const: TREE_TABLE_ENTRY_BYTES
 pub const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 
 /// 新池新建文件写出的树表条目数（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist，
 /// 加 `deleted_inodes`、墓碑树、谱系树、logged_ops、退役树五棵零根注册的树：D8（核心索引结构） 已定项 9 / 已定项 16 第 3 条、
-/// D18（块里携带什么信息） 已定项 24 第 6 条；退役树见判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条）。
+/// D18（块里携带什么信息） 已定项 24 第 6 条；退役树见第 1 条）。
 pub const NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES: u64 = 12;
 
-/// 树 ID 从 65536 起（树的种类那 2 字节取不到的最小值），与树的种类码值域不相交（D8（核心索引结构） 已定项 11，用户 2026-10-01 定案整体挪开）。
+/// 树 ID 从 65536 起（树的种类那 2 字节取不到的最小值），与树的种类码值域不相交（D8（核心索引结构） 已定项 11）。
 pub const TREE_IDENTIFIER_EXTENT: u64 = 65536;
 pub const TREE_IDENTIFIER_INODE: u64 = 65537;
 pub const TREE_IDENTIFIER_ALLOCATION_RECORDS: u64 = 65538;
@@ -230,11 +230,11 @@ pub const TREE_IDENTIFIER_RETIREMENT: u64 = 65548;
 pub const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u64 = 65536;
 pub const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: u64 = 65549;
 
-/// 根记录：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树表指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表指针 86 + 中央映射树根指针 86 + 分配记录树根指针 86 + 回收门槛 t 8 + 钉槽 p 1 + 算法类型 1 + nonce 12 + MAC 16（D22（单元原子性怎么合成） 已定项 7；加密预留 2026-09-14 用户定案；分配记录树根指针 2026-09-23 用户定案随 C512（树表 0 条的一版上被换下的单元记在哪） 加；回收门槛 t 与钉槽 p 随 C773（读坏与全零根槽的回收门槛钉只在内存里） 加，D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」，用户 2026-10-20 定）。format-const: ROOT_RECORD_BYTES
+/// 根记录：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树表指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表指针 86 + 中央映射树根指针 86 + 分配记录树根指针 86 + 回收门槛 t 8 + 钉槽 p 1 + 算法类型 1 + nonce 12 + MAC 16（D22（单元原子性怎么合成） 已定项 7；加密预留；分配记录树根指针随 C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 加；回收门槛 t 与钉槽 p 随 C773（读坏与全零根槽的回收门槛钉只在内存里） 加，D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」）。format-const: ROOT_RECORD_BYTES
 pub const ROOT_RECORD_BYTES: u64 = 466;
 
 /// 根记录与 journal 新根段里钉槽 p 那 1 字节的「没有钉着的槽」（D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」，
-/// C773（读坏与全零根槽的回收门槛钉只在内存里）；用户 2026-10-20 定）：钉着的槽的钉值是 `3·槽 + 区域`，S ≤ 16 时小于 48，取不到这个值。
+/// C773（读坏与全零根槽的回收门槛钉只在内存里））：钉着的槽的钉值是 `3·槽 + 区域`，S ≤ 16 时小于 48，取不到这个值。
 pub const ROOT_RECORD_NO_RING_SLOT_PINNED: u8 = 255;
 
 /// journal 记录定长 4 KiB（D23（journal 的角色与格式） 已定项 12）。
@@ -244,11 +244,11 @@ pub const JOURNAL_RECORD_BYTES: u64 = 4096;
 pub const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
 
 /// journal 记录头的新根段：树表指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4 +
-/// 回收门槛 t 8 + 钉槽 p 1（D23（journal 的角色与格式） 已定项 15；实例表指针、分配记录树根指针与卸载记号随用户 2026-10-02「回到甲」加，卸载记号 4 字节是判决没单独定宽、照第一轮正推腿的算法取的；
+/// 回收门槛 t 8 + 钉槽 p 1（D23（journal 的角色与格式） 已定项 15；卸载记号 4 字节，条款没单独定宽；
 /// t 与 p 随 C773（读坏与全零根槽的回收门槛钉只在内存里） 加在末尾，与根记录同一对字段）。format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES
 pub const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 373;
 
-/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 373 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案；本次发布内序号 2026-09-23 用户定案，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES
+/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 373 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC；本次发布内序号，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES
 pub const JOURNAL_HEADER_BYTES: u64 = 496;
 
 /// journal 点名项：位置条目 14 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1（D23（journal 的角色与格式） 已定项 17）。format-const: JOURNAL_NAMED_ENTRY_BYTES
@@ -268,12 +268,11 @@ pub const JOURNAL_RING_DEFAULT_BYTES: u64 = 805_306_368;
 ///
 /// 在飞记录数上限 `环槽数 ÷ F`（D23（journal 的角色与格式） 已定项 18）这条式子**不在这里**：这里只放标量。
 /// core 的 `singlefs_core::system_configuration::journal_in_flight_record_limit` 与实验装置 E158（择根与修复四岔路）
-/// （`crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs`）各写一份、互不调用；checker 不算在飞上限（它不判重放前缀取几条），
+/// （`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs`）各写一份、互不调用；checker 不算在飞上限（它不判重放前缀取几条），
 /// 不另造一份。两份在环长上的交叉断言在那个装置的 `journal_in_flight_record_limit_cross_check_tests` 模块里。
 pub const JOURNAL_SAFETY_FACTOR: u64 = 3;
 
-/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 / 已定项 15；2026-09-14 用户定案加四个字段；
-/// 2026-09-26 用户定案在系统运行量末尾加回退下界 F 8 字节，偏移 481 起，481 → 489）。format-const: SYSTEM_CONFIGURATION_BYTES
+/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 / 已定项 15；系统运行量末尾是回退下界 F 8 字节，偏移 481 起，481 → 489）。format-const: SYSTEM_CONFIGURATION_BYTES
 pub const SYSTEM_CONFIGURATION_BYTES: u64 = 489;
 
 /// 系统配置每盘恒 2 个槽、槽 = 世代号 mod 2（D22（单元原子性怎么合成） 已定项 16）。
@@ -283,7 +282,7 @@ pub const SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: u64 = 2;
 /// 就是 max(4096, io_min)，io_min = 3072 时是 6144；实现的算式在 `SystemImmutableSizes::slot_spacing_for`）。
 pub const FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES: u64 = 4096;
 
-/// 系统配置槽宽是格式常量 4096（D22（单元原子性怎么合成） 已定项 2，2026-09-14 三方第一轮 + 用户定案；此前是探测到的 physical_block_size）。format-const: SYSTEM_CONFIGURATION_SLOT_BYTES
+/// 系统配置槽宽是格式常量 4096（D22（单元原子性怎么合成） 已定项 2；不取探测到的 physical_block_size）。format-const: SYSTEM_CONFIGURATION_SLOT_BYTES
 pub const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 
 /// 根环参数：R 个区域、素数步长 P、chunk、基址（D22（单元原子性怎么合成） 已定项 2 / 已定项 16）。
@@ -299,12 +298,12 @@ pub const ROOT_RING_REGIONS: u64 = 3;
 /// format-const: ROOT_RING_SLOTS_PER_REGION_MINIMUM
 pub const ROOT_RING_SLOTS_PER_REGION_MINIMUM: u64 = 4;
 
-/// 每区槽数 S 的上界 16（D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格，用户 2026-10-22 定「上界 16 是格式常量」）。
+/// 每区槽数 S 的上界 16（D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格）。
 /// format-const: ROOT_RING_SLOTS_PER_REGION_MAXIMUM
 pub const ROOT_RING_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
 
 /// 第一版 mkfs 默认 S 的上限：默认 S = min(8, ⌊P × chunk ÷ 固定结构槽距⌋)，小于 5 拒绝 mkfs（D22（单元原子性怎么合成） 已定项 16
-/// 第 3 句，用户 2026-10-22 定）；式子住 `singlefs_core::root_ring::RootRingSlotsPerRegion::first_version_make_filesystem_default_for_the_slot_spacing`。
+/// 第 3 句）；式子住 `singlefs_core::root_ring::RootRingSlotsPerRegion::first_version_make_filesystem_default_for_the_slot_spacing`。
 /// 显式给 S 的建池入口（测试与装置）取它当 S 时也是这个值，与 `.claude/kb/layout/01-first-txn.md` 一字段表「每区槽数 S」那一行的值相同。
 pub const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
 
@@ -315,7 +314,7 @@ pub const ROOT_RING_CHUNK_BYTES: u64 = 1_048_576;
 
 /// 根环起点是 16 KiB 槽号（1 MiB）。
 pub const ROOT_RING_BASE_SLOT: u64 = 64;
-/// 根环区域归属第一版写死 0 / 1 / 0（D2（RAID 条带策略） 已定项 7，2026-09-14 用户定案）。
+/// 根环区域归属第一版写死 0 / 1 / 0（D2（RAID 条带策略） 已定项 7）。
 pub const ROOT_RING_REGION_DEVICES: [u32; 3] = [0, 1, 0];
 
 /// 单元区从槽 50176（784 MiB）起（D3（空间分配） 已定项 10）。
@@ -327,7 +326,7 @@ pub const CLUSTER_SEGMENT_SLOTS: u64 = 64;
 /// 新池新建文件的 checkpoint_txg 是 3：两次暖机空发布之后（D16（发布语义） 已定项 6 / 已定项 8）。format-const: NEW_POOL_FILE_CREATION_TXG
 ///
 /// ⚠️ **射程只有 mkfs 同一个进程里那条流**（mkfs → 取号 → 暖机两次 → 新池新建文件），**不管任何池的第一个文件版本**
-/// （2026-09-23 用户定案）：池重开过一次可写挂载之后再写第一个文件时，那一版已经推到别的 txg，
+/// 池重开过一次可写挂载之后再写第一个文件时，那一版已经推到别的 txg，
 /// `transaction::publish_first_file` 从它接着算，不取这个常量。
 pub const NEW_POOL_FILE_CREATION_TXG: u64 = 3;
 
@@ -335,7 +334,7 @@ pub const NEW_POOL_FILE_CREATION_TXG: u64 = 3;
 pub const WARM_UP_EMPTY_PUBLISHES: u64 = 2;
 
 /// 测试镜像默认 4 GiB = 4294967296 字节（`.claude/kb/layout/01-first-txn.md` 的预想镜像；没有条款，欠账在 C323（镜像大小全仓没有条款））。format-const: TEST_IMAGE_DEFAULT_BYTES
-// placeholder: C323（镜像大小全仓没有条款） —— 测试镜像 4 GiB 是里程碑步 0 的预想（由 环 ≤ 容量 / 4 逼出），用户说虚拟盘可扩到 200–500 GB
+// placeholder: C323（镜像大小全仓没有条款） —— 测试镜像 4 GiB 是里程碑步 0 的预想（由 环 ≤ 容量 / 4 逼出），虚拟盘可扩到 200–500 GB
 pub const TEST_IMAGE_DEFAULT_BYTES: u64 = 4_294_967_296;
 
 #[cfg(test)]
@@ -524,7 +523,7 @@ mod tests {
         );
     }
 
-    /// 这六个宽写成整数字面量，门禁 code-source-discipline 的 format-constants 格才核得了它们与 kb 的登记值（C94（登记的格式常量与后来的定案对不上））；
+    /// 这六个宽写成整数字面量，门禁 code-source-discipline 的 format-constants 格才核得了它们与 kb 的登记值（C94）；
     /// 原来定义它们的算式留在这里，要一个数不差。写成加法、不写减法（减法在变异下会编译期溢出）。
     #[test]
     fn pointer_record_and_entry_width_literals_equal_the_field_sums_they_stand_for() {
@@ -613,7 +612,7 @@ mod tests {
     }
 
     /// 码 2 头宽按字段表的三段加起来：只在这份单测里用，核下面那几个字面量；core、checker、模型各自的那一份不调它
-    /// （三份的交叉断言在 `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`）。
+    /// （三份的交叉断言在 `crates/singlefs-verification/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`）。
     fn index_node_header_bytes(key_width_in_bytes: u64) -> u64 {
         INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE
             + INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT * key_width_in_bytes
@@ -656,7 +655,7 @@ mod tests {
         );
     }
 
-    /// logged_ops 树条目的四个宽写成整数字面量，原来的算式留在这里，一个数不差（判决 `m4-gc-r1` 第三节 G1）：
+    /// logged_ops 树条目的四个宽写成整数字面量，原来的算式留在这里，一个数不差：
     /// key = 种类 2 + 签发 txg 8；整理那一种的 value = R 的设备 4 + 起始槽 6 + 槽数 2 + `c0` 8 + `segs0` 8 + 补零 6；
     /// 一节点条数 = 节点里 key 宽 10 的码 2 头之后装得下几条 44。
     #[test]
@@ -686,7 +685,7 @@ mod tests {
     }
 
     /// 系统配置的 489 与它所在的槽：槽宽 4096 时余 3607（D22 已定项 9「槽内余 3607」），装得下下一条 86 字节指针；
-    /// 按此前的 512 槽算只余 23、塞不进（D22 已定项 2 重开的理由之一）。
+    /// 按 512 槽算只余 23、塞不进（D22 已定项 2 的理由之一）。
     #[test]
     fn system_configuration_fits_in_the_slot_with_room_for_one_more_pointer() {
         let slot_bytes = std::hint::black_box(SYSTEM_CONFIGURATION_SLOT_BYTES);
@@ -707,7 +706,7 @@ mod tests {
     }
 
     /// 十三棵树（八棵加第一个文件版本那次零根注册的五棵）的树 ID 与两个水位逐个等于 D8（核心索引结构） 已定项 11 登记的值
-    /// （用户 2026-10-01 定案「树 ID 整体挪开」）：从 65536 起连号，起点是树的种类那 2 字节取不到的最小值，水位在最后一个之后。
+    /// 从 65536 起连号，起点是树的种类那 2 字节取不到的最小值，水位在最后一个之后。
     #[test]
     fn tree_identifiers_are_the_registered_values_in_a_row_from_the_first_value_the_kind_field_cannot_hold(
     ) {

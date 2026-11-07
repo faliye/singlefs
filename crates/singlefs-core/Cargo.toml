@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 description = "核心层：地址 newtype 与块设备抽象（步 0），事务层与写路径随后各步接上"
 # 构建脚本（build.rs）把这一次编译里开了哪些特性交给直接依赖本包的构建脚本（DEP_SINGLEFS_CORE_ENABLED_FEATURES）：
-# checker 档的构建脚本拿它算判法单元键，认得出别的包在同一次构建里并上来的特性（harness 档的 dev 依赖打开的 lookup-work-counters）。
+# 验证包的构建脚本拿它算判法单元键，认得出别的包在同一次构建里并上来的特性（验证包的 dev 依赖打开的 lookup-work-counters）。
 # 不链接任何本地库，links 只用来交这一份元数据。
 links = "singlefs-core"
 
@@ -15,11 +15,23 @@ libc = "0.2"
 singlefs-format = { path = "../singlefs-format" }
 # 取 journal 前缀的纯函数核（Verus 验的那一份），recovery::replay_journal 调它；compaction_plan 直接调用整理选段核、计划核，allocator 调用释放代比较核。
 singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
+# core 的被验区域（address、system_configuration 里那一个枚举、verified_model 等文件里的 verus!，登记在 .claude/gate.d/verus-pins.tsv）经 cargo verus focus 直接验
+# （用户 2026-10-26 定「core 直验，连胶水一起证」）。版本与 singlefs-replay-prefix 那一份钉同一个发布、写精确版本，理由写在那份 Cargo.toml 里；
+# 平时的 cargo build 用这份 vstd 的 verus! 把 spec 与 proof 擦掉，编出的产品代码与没有 verus! 时相同。
+vstd = "=0.0.0-2026-09-20-0158"
+
+# `cargo verus` 编的时候带 verus_keep_ghost / verus_keep_ghost_body 两个 cfg，平时的 rustc 不认得它们会报 unexpected_cfgs。
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
+
+# `cargo verus focus` / `verify` 只验带这一项的包；不带时它只验依赖里的 vstd、跳过这个包。
+[package.metadata.verus]
+verify = true
 
 [features]
 # 七·6 各处按身份查的计数（`transaction::lookup_work`：查了几次、每次看过索引几项、建了几次索引、解了几次中央映射叶）：只给测试读，默认关；
-# harness 档的 dev 依赖打开它。不开时计数的几处什么都不做，发布构建不多出开销。
+# 验证包的 dev 依赖打开它。不开时计数的几处什么都不做，发布构建不多出开销。
 lookup-work-counters = []
 # 发布触发两个阈值的只供测试来源（`system_configuration::PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring`，判决
-# `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节「只供测试的开关」那一格）：默认关，发布构建里调不到；harness 档的 dev 依赖打开它。
+# `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节「只供测试的开关」那一格）：默认关，发布构建里调不到；验证包的 dev 依赖打开它。
 test-only-publish-thresholds = []

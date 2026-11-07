@@ -5,14 +5,12 @@
 //! 根环三个区域与 journal 环整环清零（每块盘 4 次写零调用）→ 实例表单元第 0 片与树表单元第 0 版（两盘各一份）→ 屏障 →
 //! 第 0 代根记录种进三个区域各自槽 0（各一道 FUA 写）→ 每盘两个系统配置槽都写世代号 1 → 屏障。
 //!
-//! 两个入口（用户 2026-10-20 定「对外生成，留内层入口」）：对外入口 [`make_filesystem_drawing_the_filesystem_identifier`]
+//! 两个入口：对外入口 [`make_filesystem_drawing_the_filesystem_identifier`]
 //! 从随机源取 fsid（前 8 字节就是随机源给的，单元头只带这 8 字节）；内层入口 [`make_filesystem`] 的 fsid 由调用方给，
 //! 给测试、装置、崩溃点重放与 C484、C651 的回归用例用：同参数同 fsid 两次逐字节相同。
 //!
-//! 清零 2026-09-22 起由 mkfs 自己做（用户 2026-09-19 定案「块设备抽象加写零」，
-//! `records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行；里程碑「覆盖写、释放、回退与复用」并行线四）：
-//! 此前它是「镜像准备」、不进录制流，等于要求设备是新建的全零镜像——真设备上没有这个前提。
-//! 根环连着一起清是同一天的续作（C484（mkfs 不清根环，同 fsid 重来旧根还择得中），用户 2026-09-22 定案）。
+//! 清零由 mkfs 自己做、进录制流：不要求设备是新建的全零镜像（真设备上没有这个前提）。
+//! 根环连着一起清（C484（mkfs 不清根环，同 fsid 重来旧根还择得中））。
 
 use singlefs_format::{
     INSTANCE_ROW_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR,
@@ -40,10 +38,9 @@ use crate::root_ring::{
 };
 use crate::system_configuration::{
     journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
-    InodeRecordTruncationFieldsOfThePool, SystemConfiguration, SystemImmutableConfiguration,
-    SystemImmutableSizes, SystemMutableConfiguration, SystemRuntimeConfiguration,
-    SystemRuntimeQuantities, JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
-    ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+    SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
+    SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
+    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
 };
 use crate::unit::{
     build_index_node, build_packed_unit, PackedIdentity, WriteOrder, PACKED_TYPE_INSTANCE_TABLE,
@@ -74,8 +71,8 @@ pub const TREE_TABLE_KEY_WIDTH: usize = 8;
 pub const FIRST_VERSION_REGION_DEVICES: [DeviceIdentity; 3] =
     [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)];
 
-/// mkfs 的参数。内层入口 [`make_filesystem`] 照 `filesystem_identifier` 写，同参数（连同同一个 fsid）两次逐字节相同
-/// （里程碑步 1 验收，用户 2026-10-20 改成「同参数同 fsid」）；对外入口 [`make_filesystem_drawing_the_filesystem_identifier`]
+/// mkfs 的参数。内层入口 [`make_filesystem`] 照 `filesystem_identifier` 写，同参数（连同同一个 fsid）两次逐字节相同；
+/// 对外入口 [`make_filesystem_drawing_the_filesystem_identifier`]
 /// 不收 fsid，从随机源取、填进交回的这一份参数里。
 ///
 /// 三样都进系统不可变配置那一档（D22（单元原子性怎么合成） 已定项 26 第一档：改了要重建文件系统）；
@@ -181,8 +178,7 @@ pub enum MakeFilesystemError {
     /// 在飞记录数上限（环槽数 ÷ F，D23（journal 的角色与格式） 已定项 18）装不进系统配置里它那 4 字节
     /// （`layout/01-first-txn.md` 一「journal 在飞记录数上限 | 4」）：环长 ≥ 2³² × 12288 字节（约 48 TiB）才走得到，
     /// 要一块 ≥ 192 TiB 的盘才过得了环长上界那一关。该拒还是该改字段宽，条款没写；
-    /// 第一版在任何写之前拒，改之前 mkfs 写系统配置那一步 panic（`SystemConfiguration::to_slot` 的 expect），那时根环、journal 环
-    /// 已清、两个单元与三条第 0 代根已写。`in_flight_record_limit` 是这个环长算出来的上限。
+    /// 第一版在任何写之前拒，不让 mkfs 写系统配置那一步（`SystemConfiguration::to_slot` 的 expect）panic。`in_flight_record_limit` 是这个环长算出来的上限。
     JournalInFlightRecordLimitWiderThanItsFourByteField {
         ring_bytes: u64,
         in_flight_record_limit: u64,
@@ -195,8 +191,7 @@ pub enum MakeFilesystemError {
     ),
     /// 一个系统配置槽或根槽的起始偏移不是声明的判定宽度（[`SystemImmutableSizes::declared_alignment_decision_width_in_bytes`]，
     /// max(physical_block_size, io_min)）的整数倍：一次槽写会跨两个原子单元，撕裂会连带打掉相邻的那一个（C47（根槽没按判定宽度对齐））。
-    /// 用户 2026-10-01 定「非常规几何由 mkfs 拒」（`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 5 行、第四节）：
-    /// 改之前 pbs 4096 + io_min 3072（槽距 6144）在 4096 宽的盘上清完环、写完单元与根，写到系统配置槽 1 才被块设备拒；
+    /// 不对齐时 pbs 4096 + io_min 3072（槽距 6144）在 4096 宽的盘上清完环、写完单元与根，写到系统配置槽 1 才被块设备拒；
     /// pbs 512 + io_min 3072 整个收下。逐槽判（两个系统配置槽、R × S 个根槽），报的是按排布次序第一个不对齐的那一槽。
     FixedStructureSlotNotAlignedToTheDecisionWidth {
         slot: SlotJudgedForAlignment,
@@ -208,8 +203,8 @@ pub enum MakeFilesystemError {
         region: u64,
         device: DeviceIdentity,
     },
-    /// 第一版两块盘时根环三个区域的归属写死盘 0 / 盘 1 / 盘 0（D2（RAID 条带策略） 已定项 7，2026-09-14 用户定案：不是 mkfs 参数），
-    /// 参数给的不是它：暖机次数与新池新建文件的 txg 3 都压在这个归属上（m2-emptypool-nonempty-r1 云端攻方腿 Z3-B：[0, 1, 1] 下暖机要推两次、
+    /// 第一版两块盘时根环三个区域的归属写死盘 0 / 盘 1 / 盘 0（D2（RAID 条带策略） 已定项 7：不是 mkfs 参数），
+    /// 参数给的不是它：暖机次数与新池新建文件的 txg 3 都压在这个归属上（[0, 1, 1] 下暖机要推两次、
     /// 第一个文件版本与暖机撞在同一个 (实例, txg) 上）。
     RegionDevicesNotTheFirstVersionLayout {
         region_devices: [DeviceIdentity; 3],
@@ -244,8 +239,7 @@ pub fn filesystem_identifier_from_the_random_source() -> Result<[u8; 16], MakeFi
     filesystem_identifier_from_the_random_source_at(std::path::Path::new(RANDOM_SOURCE_PATH))
 }
 
-/// 从 `random_source_path` 那个随机源读一个 16 字节的 fsid。打不开、读不满都只交回错，不退回别的来源
-/// （m3-close-w13-code-r1 判决第二节 K2「随机源打不开、读不满都在任何写之前拒，不退回别的来源」）。
+/// 从 `random_source_path` 那个随机源读一个 16 字节的 fsid。打不开、读不满都只交回错，不退回别的来源。
 ///
 /// # Errors
 /// 随机源打不开或读不满 16 字节：[`MakeFilesystemError::RandomSourceUnreadable`]。
@@ -287,7 +281,7 @@ pub fn make_filesystem_drawing_the_filesystem_identifier<Device: BlockDevice>(
 }
 
 /// 同 [`make_filesystem_drawing_the_filesystem_identifier`]，随机源换成 `random_source_path` 那个文件（对外入口能换随机源：
-/// 打不开、读不满两支要在测试里造得出来，m3-close-w13-code-r1 判决第三节改法表「K2 失败分支没有用例」那一行）。
+/// 打不开、读不满两支要在测试里造得出来，m3-close-w13-code-r1 改法表「K2 失败分支没有用例」那一行）。
 /// 取 fsid 在任何写之前：随机源读不出就一个字节都不写，也不退回 [`RANDOM_SOURCE_PATH`] 或别的来源。
 ///
 /// # Errors
@@ -673,8 +667,8 @@ pub fn make_filesystem<Device: BlockDevice>(
     // 它今天读不到全靠择根与 checker 两处各自按归属读（`recovery::visit_valid_roots`、
     // `singlefs-checker` 的 `image.rs`），任一处以后改成扫全部盘，漏就回来了。
     // 按几何清之后 mkfs 的后置条件只有一句：根环三段在每块盘上只剩这次写下的三条第 0 代根，别处全 0。
-    // 次序与屏障（D22（单元原子性怎么合成） 已定项 8 第 3 条的两趟写序，三方判决 `research/prompts/m3-close-c656-r3-main-verification.md`
-    // 第二节 S3，用户 2026-10-20 定）：每块盘先清 [0, 根环基址)，两块盘各过一道屏障（作废），之后才写别的。
+    // 次序与屏障（D22（单元原子性怎么合成） 已定项 8 第 3 条的两趟写序）：
+    // 每块盘先清 [0, 根环基址)，两块盘各过一道屏障（作废），之后才写别的。
     // 作废那道屏障把 mkfs 中途崩溃的结局分成两截：作废持久之前，两块盘是同一个池时旧池读回最后确认的一版；作废持久之后，
     // 下一次挂载只有整池拒（`NoValidSystemConfiguration`）或恢复读回第 0 代空池两种结局，不读回旧池的任何一版，也不让新系统配置与旧池的根并存
     // （少了它，清根环、清 journal 环与清 [0, 根环基址) 同在一段，旧池的系统配置还在而它的根已被清掉的状态摆得出来）。
@@ -691,8 +685,8 @@ pub fn make_filesystem<Device: BlockDevice>(
     // 根环基址之前那一段 [0, 根环基址) 也整段清零，每块盘一次调用、发在最前、自成一段：系统配置两槽住在这一段里，
     // 槽 1 的偏移随槽距走。在用过的盘上换一个 io_min 重做 mkfs，旧池写在别的槽距上的槽 1 自证得过、记的槽距也等于它所在的偏移，
     // 全池没有可用的槽 0 时逐档读槽 1 的读者（恢复与池级 checker）分不出它与本池的槽 1、按世代号会择中它
-    // （C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同） 第一轮判决岔路 W，用户 2026-10-02 定 W1 mkfs 清零，
-    // `research/prompts/m3-c651-r1-main-verification.md`「用户定案」）。与根环、journal 环的清零同一种动作。
+    // （C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同））。
+    // 与根环、journal 环的清零同一种动作。
     let root_ring_base = region_start(0);
     for (_, device) in devices.iter_mut() {
         device.write_zeroes_at(DeviceOffsetInBytes(0), root_ring_base.0)?;
@@ -760,7 +754,7 @@ pub fn make_filesystem<Device: BlockDevice>(
         // mkfs 的第 0 代不写分配记录树：这一版的账由实例表与树表两条指针直接算得出
         // （`mount::format_time_allocator`，字节表五里 m1 / m2 两条分配代 0 的记录）。
         allocation_record_tree_root: NodePointer::empty_root(),
-        // mkfs 第 0 代：回收门槛 t = 0、钉槽 p = 255（没有钉着的槽；C773（读坏与全零根槽的回收门槛钉只在内存里），用户 2026-10-20 定）。
+        // mkfs 第 0 代：回收门槛 t = 0、钉槽 p = 255（没有钉着的槽；C773（读坏与全零根槽的回收门槛钉只在内存里））。
         reclaim_threshold: CheckpointTxg(0),
         pinned_ring_slot: PinnedRingSlot::NO_SLOT_PINNED,
     };
@@ -787,9 +781,6 @@ pub fn make_filesystem<Device: BlockDevice>(
                 sizes: parameters.geometry,
                 journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
                 root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
-                // mkfs 起就置上 incompat 位 2（用户 2026-10-17 定，判决 m4-trunc-r2 第六节）。
-                inode_record_truncation_fields:
-                    InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER,
             },
             mutable: SystemMutableConfiguration,
             runtime: SystemRuntimeConfiguration,

@@ -1,13 +1,15 @@
-//! 产品行为判定与形式化判定分开取键（m4-exit5-relocation-proof-r3 判决第二节 Z4 与第三节「判器键」）：产品行为视图剥掉 `verus!` 里的
+//! 产品行为判定与形式化判定分开取键（m4-exit5-relocation-proof-r3 与第三节「判器键」）：产品行为视图剥掉 `verus!` 里的
 //! 规格与证明块，形式化判定照源码原样。
 //!
-//! 夹具上照辩方腿原型（`research/prompts/m4-exit5-relocation-proof-r3-sonnet-model/tools/key_variants_stripped.sh`）的八种改法，
+//! 夹具上照`research/prompts/m4-exit5-relocation-proof-r3-sonnet-model/tools/key_variants_stripped.sh` 的八种改法，
 //! 改的都是同一个 `key_bytes_width`：只加注释、只用 `verus!` 包一下、加 ensures、加 ensures 与 proof 块、加 spec 函数与 proof 函数与
 //! `let ghost` 与 `assert` 五种只改证明的，产品行为的键不变；改执行代码里的串、表达式、加一个属性三种，产品行为的键变——
 //! 后三种比的是同样包在 `verus!` 里、只差那一处执行代码的两份，剥到执行代码（两份一起剥没）时它们红。
-//! `Ghost<…>` / `Tracked<…>` 参数与 ghost 字段（主 agent 2026-10-26 定也剥）：夹具上两个函数一起换成都包在 `verus!` 里的两种写法比，
+//! `Ghost<…>` / `Tracked<…>` 参数与 ghost 字段：夹具上两个函数一起换成都包在 `verus!` 里的两种写法比，
 //! 只加一个 ghost 参数（连调用处的 `Ghost(…)` 实参）、ghost 字段（连初值与模式），产品行为的键不变；同一处换成普通参数、改执行代码的实参、
 //! 改执行字段的类型，键变——剥过头（普通的也剥）时它们红。
+//! `#[verifier::…]` / `#[verifier(…)]` 外属性（`verus!` 里外都剥）：只多一行这类属性，产品行为的键不变、
+//! 形式化的键变；带这类属性的函数体里的串改了、属性下面多一行 `#[inline(never)]`，产品行为的键变——剥过头（剥过配对的 `]`）时它们红。
 //! 判器组（`entry_groups`）与命令行各一格：判器组在产品行为视图上取键；命令行不给 `--judgment-kind` 时照源码原样取键。
 //! 真仓上（测试自己拷一份）`crates/singlefs-replay-prefix/src/lib.rs` 一条引理多一句 `assert(true);`：CPU 判器的产品行为键不变，
 //! CPU 判器与那条引理的形式化键都变。
@@ -26,7 +28,7 @@ use singlefs_unit_graph::entry_groups::{entry_group_key, EntryGroupRequest, Entr
 use singlefs_unit_graph::rule_switches::RuleSwitches;
 use singlefs_unit_graph::{ExternalKeyInputs, JudgmentKind, TargetSelector, Workspace};
 
-/// 夹具：一个 crate，判法入口经一个 exec 函数用到一个常量（辩方原型改的是核心层 `allocation_record_tree` 里同名的那一个）。
+/// 夹具：一个 crate，判法入口经一个 exec 函数用到一个常量（取自核心层 `allocation_record_tree` 里同名的那一个）。
 const STRIPPING_FIXTURE: [(&str, &str); 3] = [
     (
         "crates/fstripped/Cargo.toml",
@@ -97,7 +99,7 @@ fn formal_verification_key_changes_under(replacement: &str) -> bool {
         != fixture_judge_key(Some(replacement), JudgmentKind::FormalVerification)
 }
 
-/// 辩方原型把注释加在函数前面；这里加在函数体里：切词规则被弄坏、注释成了词法单元时，函数前面那一行先让切分拒算，
+/// 原型把注释加在函数前面；这里加在函数体里：切词规则被弄坏、注释成了词法单元时，函数前面那一行先让切分拒算，
 /// 断言碰不到键，写在函数体里才由「键不变」这一条断言红。
 const COMMENT_ONLY: &str = "fn key_bytes_width() -> usize {\n    // 只加一行注释。\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}";
 
@@ -186,6 +188,87 @@ fn adding_an_attribute_to_the_executable_function_changes_the_product_behavior_k
     assert!(
         product_behavior_key_changes_between(WRAPPED_WITH_AN_ENSURES, EXECUTABLE_ATTRIBUTE_ADDED),
         "exec 函数上加 #[inline(never)]：属性照进指纹，键要变"
+    );
+}
+
+/// 两种改法之间，判法入口的形式化键变没变（变为 true）。
+fn formal_verification_key_changes_between(reference: &str, replacement: &str) -> bool {
+    fixture_judge_key(Some(reference), JudgmentKind::FormalVerification)
+        != fixture_judge_key(Some(replacement), JudgmentKind::FormalVerification)
+}
+
+const WRAPPED_WITH_AN_ENSURES_AND_A_VERIFIER_EXTERNAL_BODY_ATTRIBUTE: &str = "verus! {\n#[verifier::external_body]\nfn key_bytes_width() -> (width: usize)\n    ensures width == 10,\n{\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}\n}";
+
+const WRAPPED_WITH_AN_ENSURES_AND_A_VERIFIER_ATTRIBUTE_IN_THE_PARENTHESIZED_FORM: &str = "verus! {\n#[verifier(external_body)]\nfn key_bytes_width() -> (width: usize)\n    ensures width == 10,\n{\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}\n}";
+
+const VERIFIER_EXTERNAL_BODY_ATTRIBUTE_OUTSIDE_VERUS: &str = "#[verifier::external_body]\nfn key_bytes_width() -> usize {\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}";
+
+const VERIFIER_EXTERNAL_BODY_ATTRIBUTE_WITH_THE_EXECUTABLE_STRING_CHANGED: &str = "verus! {\n#[verifier::external_body]\nfn key_bytes_width() -> (width: usize)\n    ensures width == 10,\n{\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"11\")\n}\n}";
+
+const VERIFIER_EXTERNAL_BODY_ATTRIBUTE_FOLLOWED_BY_AN_INLINE_ATTRIBUTE: &str = "verus! {\n#[verifier::external_body]\n#[inline(never)]\nfn key_bytes_width() -> (width: usize)\n    ensures width == 10,\n{\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}\n}";
+
+#[test]
+fn an_added_verifier_attribute_inside_verus_keeps_the_product_behavior_key_and_changes_the_formal_verification_key(
+) {
+    assert!(
+        !product_behavior_key_changes_between(
+            WRAPPED_WITH_AN_ENSURES,
+            WRAPPED_WITH_AN_ENSURES_AND_A_VERIFIER_EXTERNAL_BODY_ATTRIBUTE
+        ),
+        "verus! 里的 exec 函数只多一行 #[verifier::external_body]：只给 Verus 看，产品行为视图剥掉，键不变"
+    );
+    assert!(
+        formal_verification_key_changes_between(
+            WRAPPED_WITH_AN_ENSURES,
+            WRAPPED_WITH_AN_ENSURES_AND_A_VERIFIER_EXTERNAL_BODY_ATTRIBUTE
+        ),
+        "形式化判定照源码原样：external_body 改了 Verus 验不验函数体，键要变"
+    );
+}
+
+#[test]
+fn an_added_verifier_attribute_in_the_parenthesized_form_keeps_the_product_behavior_key() {
+    assert!(
+        !product_behavior_key_changes_between(
+            WRAPPED_WITH_AN_ENSURES,
+            WRAPPED_WITH_AN_ENSURES_AND_A_VERIFIER_ATTRIBUTE_IN_THE_PARENTHESIZED_FORM
+        ),
+        "旧写法 #[verifier(external_body)]：同样剥掉，键不变"
+    );
+}
+
+#[test]
+fn an_added_verifier_attribute_outside_verus_keeps_the_product_behavior_key_and_changes_the_formal_verification_key(
+) {
+    assert!(
+        !product_behavior_key_changes_under(VERIFIER_EXTERNAL_BODY_ATTRIBUTE_OUTSIDE_VERUS),
+        "verus! 外面的函数只多一行 #[verifier::external_body]：产品行为视图同样剥掉，键不变"
+    );
+    assert!(
+        formal_verification_key_changes_under(VERIFIER_EXTERNAL_BODY_ATTRIBUTE_OUTSIDE_VERUS),
+        "形式化判定照源码原样：属性进指纹，键要变"
+    );
+}
+
+#[test]
+fn changing_the_executable_code_next_to_a_verifier_attribute_changes_the_product_behavior_key() {
+    assert!(
+        product_behavior_key_changes_between(
+            WRAPPED_WITH_AN_ENSURES_AND_A_VERIFIER_EXTERNAL_BODY_ATTRIBUTE,
+            VERIFIER_EXTERNAL_BODY_ATTRIBUTE_WITH_THE_EXECUTABLE_STRING_CHANGED
+        ),
+        "带 #[verifier::external_body] 的函数体里的串改了：只剥属性、不剥它后面的执行代码，键要变"
+    );
+}
+
+#[test]
+fn an_ordinary_attribute_next_to_a_verifier_attribute_still_changes_the_product_behavior_key() {
+    assert!(
+        product_behavior_key_changes_between(
+            WRAPPED_WITH_AN_ENSURES_AND_A_VERIFIER_EXTERNAL_BODY_ATTRIBUTE,
+            VERIFIER_EXTERNAL_BODY_ATTRIBUTE_FOLLOWED_BY_AN_INLINE_ATTRIBUTE
+        ),
+        "#[verifier::external_body] 下面多一行 #[inline(never)]：剥到配对的 ] 为止，挨着的普通属性照进指纹，键要变"
     );
 }
 
@@ -505,7 +588,7 @@ fn repository_copy() -> FixtureTree {
 
 /// CPU 判器入口（崩溃判定库判器组的定义那一组）。
 const CENTRAL_PROCESSOR_JUDGE: EntrySpecification = EntrySpecification {
-    entry_path: "singlefs_checker_tier::crash::judge_crash_image",
+    entry_path: "singlefs_verification::crash::judge_crash_image",
     target: "lib",
     conditions: &[],
 };

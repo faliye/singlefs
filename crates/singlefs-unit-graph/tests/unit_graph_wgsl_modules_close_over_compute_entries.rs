@@ -313,8 +313,9 @@ fn an_external_name_whose_prefix_lands_only_in_an_unrelated_string_is_refused() 
     );
 }
 
-/// 供外名的条目级宏调用不经任何名字点到（拼内核的函数只用宏体里定义的 `GPU_FAILURE_POINTS`，宏体里的名字按 R-宏 解不到调用，
-/// 与真仓 `crash_judge_conclusions.rs` 的 `gpu_failure_points!` 同一条路）：靠外名 `FAILURE_POINT_*` 的着落做成边，调用才进闭包。
+/// 供外名的条目级宏调用不经调用体里的名字点到（拼内核的函数只用宏体里定义的 `GPU_FAILURE_POINTS`，与真仓 `crash_judge_conclusions.rs` 的
+/// `gpu_failure_points!` 同一条路）：靠外名 `FAILURE_POINT_*` 的着落做成边，调用进闭包。`GPU_FAILURE_POINTS` 是宏体展开式顶层按字面写出的名字，
+/// 它登到调用名下（闭包外的四类边「条目级宏调用生成的条目」）也让调用进闭包：只看着落那条边的两条用例都弄坏 macro-rules-literal-names。
 const SUPPLIER_EDGE_FIXTURE: [(&str, &str); 3] = [
     (
         "crates/fsupplied/Cargo.toml",
@@ -376,9 +377,11 @@ fn supplied_kernel_key_changes_with_the_code(switches: &RuleSwitches) -> Result<
 fn the_item_macro_supplying_an_external_name_is_pulled_into_the_closure_and_its_codes_change_the_key(
 ) {
     assert_eq!(
-        supplied_kernel_key_changes_with_the_code(&RuleSwitches::every_rule_intact()),
+        supplied_kernel_key_changes_with_the_code(&RuleSwitches::with_broken(&[
+            BrokenRule::MacroRulesLiteralNames,
+        ])),
         Ok(true),
-        "宏调用定义的 GPU_FAILURE_POINT_UNREADABLE 以 _ 加外名收尾：着落做成边，调用进闭包，改码键变"
+        "宏调用定义的 GPU_FAILURE_POINT_UNREADABLE 以 _ 加外名收尾：着落做成边，调用进闭包，改码键变（宏体字面名字那条边关着，只靠着落）"
     );
 }
 
@@ -386,6 +389,7 @@ fn the_item_macro_supplying_an_external_name_is_pulled_into_the_closure_and_its_
 fn breaking_the_supplier_edges_misses_the_code_change() {
     let verdict = supplied_kernel_key_changes_with_the_code(&RuleSwitches::with_broken(&[
         BrokenRule::WgslSupplierEdges,
+        BrokenRule::MacroRulesLiteralNames,
     ]));
     assert!(
         verdict != Ok(true),

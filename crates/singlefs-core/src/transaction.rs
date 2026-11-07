@@ -9,8 +9,9 @@
 //! 被换下的十二个单元在同一次发布里释放（分配记录改写成已释放 + 释放代，条目不删，D3（空间分配） 已定项 7）。
 //! 每一步都经过块设备接口，录制器挂在那层（D17（实现分层与第三方管道） 已定项 5）。
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, DELETED_INODES_ENTRY_BYTES, EXTENT_KEY_BYTES, INODE_INTERNAL_ENTRY,
@@ -35,11 +36,11 @@ use crate::admission::{
     admit_the_units_landing_on_every_device,
     checkpoint_cost_of_the_version_to_build_on_with_node_capacities,
     committed_reservation_for_tombstones_and_retirement_records,
-    demand_of_the_roles_on_each_device, inode_records_of_the_inode_tree,
-    live_objects_of_the_inode_tree, publish_has_an_ordinary_allocation, units_of_a_publish_to_land,
-    worst_case_occupancy_of_a_compaction_batch, AdmissionRefusedOnSomeDevices,
-    BytesSummedOverAllReplicas, EmptyClusterSegmentsBelowTheFloorOnSomeDevices,
-    EmptyClusterSegmentsConjunctReach, PlacementRoomOnOneDevice, ReplicaCount, SpaceAdmission,
+    demand_of_the_roles_on_each_device, publish_has_an_ordinary_allocation,
+    units_of_a_publish_to_land, worst_case_occupancy_of_a_compaction_batch,
+    AdmissionRefusedOnSomeDevices, BytesSummedOverAllReplicas,
+    EmptyClusterSegmentsBelowTheFloorOnSomeDevices, EmptyClusterSegmentsConjunctReach,
+    InodeRecordCounts, PlacementRoomOnOneDevice, ReplicaCount, SpaceAdmission,
     TombstoneAndRetirementPrepayBasis,
 };
 use crate::allocation_record_tree::{
@@ -144,10 +145,9 @@ use crate::retirement_tree::{
 use crate::root_record::{RootRecord, UnmountMarker};
 use crate::root_ring::{slot_offset, target_for_publish};
 use crate::system_configuration::{
-    journal_in_flight_record_limit, InodeRecordTruncationFieldsOfThePool, SystemConfiguration,
-    SystemImmutableConfiguration, SystemMutableConfiguration, SystemRuntimeConfiguration,
-    SystemRuntimeQuantities, JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
-    ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+    journal_in_flight_record_limit, SystemConfiguration, SystemImmutableConfiguration,
+    SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
+    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
 };
 use crate::tombstone_tree::{
     append_tombstone_to_the_open_container, TombstoneContainer, TombstoneContainerIndexInTree,
@@ -184,7 +184,7 @@ pub const NEW_POOL_FILE_CREATION_NUMBER: u64 = 1;
 pub const TREE_IDENTIFIER_NONE: u64 = 0;
 
 /// 提交步骤的封闭枚举，五个成员，`match` 不写通配臂——少一个臂编译不过。
-/// D17（实现分层与第三方管道） 已定项 2 说的六种步骤种类是录制流一侧的 `StepKind`（`crates/singlefs-harness/src/segments.rs`），
+/// D17（实现分层与第三方管道） 已定项 2 说的六种步骤种类是录制流一侧的 `StepKind`（`crates/singlefs-verification/src/segments.rs`），
 /// 不是这五个成员：多出的整段清零（`StepKind::ZeroFill`）在这里没有对应成员，它是 mkfs 清零根环基址之前那一段、根环与 journal 环时直接发的 `write_zeroes_at`，不经提交步骤。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CommitStep<'publish> {
@@ -367,6 +367,13 @@ pub struct PoolWriter<'pool, Device: BlockDevice> {
     /// 这个写入口上读新槽残留的账（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R2：残留那一读出错记数、
     /// 不拒写，读到的字节不进新单元）。只记，发布照成；新开的写入口从 0 起。
     residue_reads: Cell<ResidueReadsOfTheWriter>,
+    /// 这个写入口上读—改—写读回旧数据单元时只坏一份的次数（D4（校验和位置） 已定项 4「读到只坏一份时计数」，
+    /// [`PoolWriter::old_data_unit_reads_back_with_one_copy_failing`]）。只在内存里、不落盘；新开的写入口从 0 起。
+    old_data_unit_reads_back_with_one_copy_failing: Cell<u64>,
+    /// 同一个计数里每一次读回的那个旧单元在上一版里的映射 key，按读的先后（一次一把；同一个单元读两次记两把）。会话拿它另发一批搬迁，
+    /// 把这次发布之后仍被活快照钉着（换下来进 deadlist、映射条目留存）的那几个搬到新槽（用户 2026-11-04 定「另发一批搬迁修好」，
+    /// [`relocations_of_old_data_units_kept_for_the_snapshots`]）。只在内存里；新开的写入口从空起。
+    mapping_keys_of_old_data_units_read_back_with_one_copy_failing: RefCell<Vec<Vec<u8>>>,
 }
 
 /// 一个写入口上读新槽残留的账（[`PoolWriter::residue_reads`]）：发了几次、读不出几次。
@@ -404,6 +411,8 @@ impl<'pool, Device: BlockDevice> PoolWriter<'pool, Device> {
                 InodeNumberWatermarkSource::FromThePreviousVersionsAccounting,
             snapshot_lifetime_judgement: SnapshotLifetimeJudgement::FollowTheJudgement,
             residue_reads: Cell::new(ResidueReadsOfTheWriter::NONE),
+            old_data_unit_reads_back_with_one_copy_failing: Cell::new(0),
+            mapping_keys_of_old_data_units_read_back_with_one_copy_failing: RefCell::new(Vec::new()),
         }
     }
 }
@@ -422,6 +431,23 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
             issued: before.issued + 1,
             failed: before.failed + u64::from(!read_back),
         });
+    }
+
+    /// 这个写入口上读—改—写读回旧数据单元时只坏一份的次数（部分写、截断与变长的尾单元；D4（校验和位置） 已定项 4「读到只坏一份时计数」）。
+    /// 读回的那个单元在同一次发布里整个重写到新槽、两份新写，旧落点照释放之前读盘核隔离（[`copies_failing_the_release_checksum_check`]）。
+    #[must_use]
+    pub fn old_data_unit_reads_back_with_one_copy_failing(&self) -> u64 {
+        self.old_data_unit_reads_back_with_one_copy_failing.get()
+    }
+
+    /// 同 [`Self::old_data_unit_reads_back_with_one_copy_failing`] 那几次读回的旧单元在上一版里的映射 key，按读的先后，一次一把。
+    /// 有活快照时读回的旧单元换下来进 deadlist、不释放（判决 m4-partial-write-r1 R7），坏的那一份留在旧落点上；会话按这几把 key
+    /// 另发一批搬迁（[`relocations_of_old_data_units_kept_for_the_snapshots`]）。
+    #[must_use]
+    pub fn mapping_keys_of_old_data_units_read_back_with_one_copy_failing(&self) -> Vec<Vec<u8>> {
+        self.mapping_keys_of_old_data_units_read_back_with_one_copy_failing
+            .borrow()
+            .clone()
     }
 
     /// 装上节点容量这个只供测试的开关（`CodeTwoTreeNodeCapacities`）。产品路径一处都不调它。
@@ -660,9 +686,6 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
                 sizes: self.parameters.geometry,
                 journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
                 root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
-                // 写者每次写系统配置都带 incompat 位 2（mkfs 起就置上）：不带位 2 的旧池可写挂载取号那一写起就带上它，之后才发得出截断意图。
-                inode_record_truncation_fields:
-                    InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER,
             },
             mutable: SystemMutableConfiguration,
             runtime: SystemRuntimeConfiguration,
@@ -2328,7 +2351,7 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
             PublishedUnit {
                 slot: slots[identity],
                 identity: *identity,
-                bytes: page.bytes.clone(),
+                bytes: Arc::from(page.bytes.as_slice()),
             }
         })
         .chain(allocation_built.rewritten_units.iter().cloned())
@@ -2399,17 +2422,21 @@ fn allocate_placement_for_role(
 /// 池里现行的那一版：还没发布过文件版本（树表 0 条，零单元发布或写行那次发布写出的根）、带文件的一版，
 /// 或有树而文件集合为空的一版（D8（核心索引结构） 已定项 16 第 5 条，判定见 [`TransactionOutput::is_a_version_with_trees_and_no_file`]）。
 /// 有树的两种由 [`PoolVersion::of_a_version_of_trees`] 按同一个判定分，不由调用方挑。
+/// 有树的一版按引用计数共享（判决 `research/prompts/m4-gpugc-publish-growth-r1-main-verification.md` 第二节 Q2.2「版本列表与挂载交回值共享同一份」）：
+/// 会话与挂载的现行那一版、交回给调用方的版本列表（[`DeletionQueueWalk::steps_published`]、`mounted_session::VersionsPublishedInThisChange`、
+/// `mount::MountOutput` 里的那几版）指着同一份 [`TransactionOutput`]，不再各拷一整版。一版发出来之后不再改：要改的地方经 [`Arc::make_mut`]
+/// 改一份自己的（还有别人指着时先拷一份，没有时就地改），别人指着的那一份不动。相等照内容比，与共不共享无关。
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(
     clippy::large_enum_variant,
-    reason = "一次挂载只有几个这样的值、不进集合，两个成员差几百字节按值搬无所谓；装箱只多一层解引用"
+    reason = "一次挂载只有几个这样的值、不进集合，树表 0 条那一版按值搬无所谓；装箱只多一层解引用"
 )]
 pub enum PoolVersion {
     WithoutFile(VersionWithoutFilePublishOutput),
-    WithFile(TransactionOutput),
+    WithFile(Arc<TransactionOutput>),
     /// 有树、文件集合为空（D8（核心索引结构） 已定项 16 第 5 条，不借 `WithoutFile`）：接在它后面的只有 `publish_new_inodes`（size 0）、
     /// 写行与空发布（K-U5 X1），会话、挂载按这个成员分流。
-    WithTreesAndNoFile(TransactionOutput),
+    WithTreesAndNoFile(Arc<TransactionOutput>),
 }
 
 impl PoolVersion {
@@ -2417,6 +2444,11 @@ impl PoolVersion {
     /// `WithTreesAndNoFile`，否则 `WithFile`。
     #[must_use]
     pub fn of_a_version_of_trees(version: TransactionOutput) -> PoolVersion {
+        PoolVersion::of_a_shared_version_of_trees(Arc::new(version))
+    }
+    /// 同 [`Self::of_a_version_of_trees`]，收的是已经共享着的一版（版本列表里那一份）：成员里指着同一份，不拷。
+    #[must_use]
+    pub fn of_a_shared_version_of_trees(version: Arc<TransactionOutput>) -> PoolVersion {
         if version.is_a_version_with_trees_and_no_file() {
             PoolVersion::WithTreesAndNoFile(version)
         } else {
@@ -2455,14 +2487,15 @@ impl PoolVersion {
     pub fn file_version(&self) -> Option<&TransactionOutput> {
         match self {
             PoolVersion::WithoutFile(_) | PoolVersion::WithTreesAndNoFile(_) => None,
-            PoolVersion::WithFile(version) => Some(version),
+            PoolVersion::WithFile(version) => Some(Arc::as_ref(version)),
         }
     }
+    /// 同 [`Self::file_version`]，交回自己的一份：没有别人指着就原样交出，还有别人指着（版本列表里那一份）就拷一份。
     #[must_use]
     pub fn into_file_version(self) -> Option<TransactionOutput> {
         match self {
             PoolVersion::WithoutFile(_) | PoolVersion::WithTreesAndNoFile(_) => None,
-            PoolVersion::WithFile(version) => Some(version),
+            PoolVersion::WithFile(version) => Some(Arc::unwrap_or_clone(version)),
         }
     }
     /// 有树的那一版（带文件的、有树而文件集合为空的）；树表 0 条时 `None`。
@@ -2471,12 +2504,29 @@ impl PoolVersion {
         match self {
             PoolVersion::WithoutFile(_) => None,
             PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
+                Some(Arc::as_ref(version))
+            }
+        }
+    }
+    /// 同 [`Self::version_of_trees`]，交回共享着的那一份本身（不拷）：放进版本列表、与现行那一版指着同一份时用。
+    #[must_use]
+    pub fn shared_version_of_trees(&self) -> Option<&Arc<TransactionOutput>> {
+        match self {
+            PoolVersion::WithoutFile(_) => None,
+            PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
                 Some(version)
             }
         }
     }
+    /// 同 [`Self::into_file_version`] 的有树那两种。
     #[must_use]
     pub fn into_version_of_trees(self) -> Option<TransactionOutput> {
+        self.into_shared_version_of_trees()
+            .map(Arc::unwrap_or_clone)
+    }
+    /// 同 [`Self::shared_version_of_trees`]，交出共享着的那一份本身（不拷）。
+    #[must_use]
+    pub fn into_shared_version_of_trees(self) -> Option<Arc<TransactionOutput>> {
         match self {
             PoolVersion::WithoutFile(_) => None,
             PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
@@ -2508,7 +2558,7 @@ impl PoolVersion {
         match &mut self {
             PoolVersion::WithoutFile(version) => version.writes = writes,
             PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
-                version.writes = writes;
+                Arc::make_mut(version).writes = writes;
             }
         }
         self
@@ -3184,7 +3234,9 @@ impl FileVersionTreeIdentifiers {
 pub struct PublishedUnit {
     pub slot: SlotNumber,
     pub identity: TransactionUnit,
-    pub bytes: Vec<u8>,
+    /// 字节不可变、按引用计数共享：没重写的角色从上一版照抄（`carried_unit`）、版本整份拷贝时只多一个引用，不再复制这份字节
+    /// （判决 `research/prompts/m4-gpugc-publish-growth-r1-main-verification.md` 第二节 Q2.1 甲档）。相等照字节比，与共不共享无关。
+    pub bytes: Arc<[u8]>,
 }
 
 /// 一次发布写出的一条 journal 记录与它的 4096 字节。
@@ -3299,6 +3351,33 @@ pub struct TransactionOutput {
     /// 这个实例到这次发布为止用过的最大事务号（空发布写 0、不推进它）。下一次发布取它加一，
     /// 而不是取上一条记录上的事务号加一（D23（journal 的角色与格式） 已定项 7：事务号按实例计数、从 1 起）。
     pub highest_transaction_number_in_this_instance: u64,
+    /// 墓碑树、退役树根单元在 `units` 里的下标（[`ContainerTreeRootUnitPositions`]）：准入读两个 H 时按它直接取根单元，不在 `units` 上逐项找。
+    pub container_tree_root_unit_positions: ContainerTreeRootUnitPositions,
+    /// 这一版 inode 树里的 n_live 与 n_记录（[`InodeRecordCounts`]）：每次发布在提交时增量维护，准入读它，不遍历 inode 树。
+    pub inode_record_counts: InodeRecordCounts,
+}
+
+/// 一版里墓碑树、退役树根单元在 `units` 里的下标；那棵树零根（没有根单元）时 `None`。准入读两个 H（D3（空间分配） 已定项 2「各从自己的
+/// 树根节点码 2 头现读」）按它直接取根单元的字节：它在运行时决策路径上（ENOSPC 准入，`.claude/rules/fs-design.md`「记账是事务的副产品，
+/// 不是事后的遍历」），在 `units` 上逐项找是这一版的单元数（每片容器、每个码 2 节点各一项），随容器总数涨。装好一版的 `units` 时找一次记下
+/// （发布、从盘上重建、管理员回退各一处），之后 `units` 不再挪动。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ContainerTreeRootUnitPositions {
+    pub tombstone_root: Option<usize>,
+    pub retirement_root: Option<usize>,
+}
+
+impl ContainerTreeRootUnitPositions {
+    /// 在装好的 `units` 里各找一次两个根单元（取最先那一项，与 [`TransactionOutput::unit`] 同一项）。
+    #[must_use]
+    pub fn of_the_units(units: &[PublishedUnit]) -> Self {
+        let first_position_of =
+            |identity: TransactionUnit| units.iter().position(|unit| unit.identity == identity);
+        Self {
+            tombstone_root: first_position_of(TransactionUnit::TombstoneRoot),
+            retirement_root: first_position_of(TransactionUnit::RetirementRoot),
+        }
+    }
 }
 
 /// [`TransactionOutput::unit`] 与 [`FirstEntryOfEachIdentity::unit`] 查不到时的 panic 消息：两条查法查的是同一张 `units`。
@@ -3309,7 +3388,7 @@ const EVERY_ROLE_LOOKED_UP_HAS_A_UNIT_IN_THE_VERSION: &str =
 /// 在索引上查了几次、每次看过索引里几项、建了几次索引、解了几次中央映射叶，按点名的几处（[`lookup_work::LookupSite`]）分开记。
 /// 数的是产品调用点上的次数，不是测试自己另建的索引；测试读它判增长与「每片叶至多解一次」，不读挂钟与 CPU 时间。
 ///
-/// 只在特性 `lookup-work-counters` 下记（harness 档的 dev 依赖打开它）：不开时 [`lookup_work::entering`] 与 [`lookup_work::count`]
+/// 只在特性 `lookup-work-counters` 下记（验证包的 dev 依赖打开它）：不开时 [`lookup_work::entering`] 与 [`lookup_work::count`]
 /// 什么都不做，发布构建不多出开销。计数记在本线程上：核心层不起线程，一次发布或一趟整理的查找都在调它的那个线程里做；
 /// 测试的各条用例各在自己的线程里跑，互不串数。
 pub mod lookup_work {
@@ -3547,7 +3626,7 @@ pub mod lookup_work {
 }
 
 /// 按身份排好序、每个身份只留一项的索引存放：查与走都经这里，各自记看过几项（[`lookup_work`]）。
-/// 放在自己的模块里，外面拿不到那张排好序的表，只能经 `get` 与 `iter`：按身份查与逐项走都逃不过计数。
+/// 放在自己的模块里，外面拿不到那张排好序的表，只能经 `value_stored_for_identity` 与 `iter`：按身份查与逐项走都逃不过计数。
 mod sorted_identity_index {
     use super::lookup_work::count;
 
@@ -3569,7 +3648,7 @@ mod sorted_identity_index {
         }
 
         /// 身份是 `identity` 的那一项。折半查：一次至多看 `sorted` 项数的二进制位数那么多项。
-        pub(super) fn get(&self, identity: &Identity) -> Option<&Value> {
+        pub(super) fn value_stored_for_identity(&self, identity: &Identity) -> Option<&Value> {
             let mut entries_examined: u64 = 0;
             let mut low = 0;
             let mut high = self.sorted.len();
@@ -3665,7 +3744,9 @@ impl<'table, Identity: Ord, Entry> FirstEntryOfEachIdentity<'table, Identity, En
     /// 表里身份是 `identity` 的最先那一项；没有就是 `None`（同 `iter().find`）。
     #[must_use]
     pub fn first_entry_of(&self, identity: &Identity) -> Option<&'table Entry> {
-        self.first_entry_of_each_identity.get(identity).copied()
+        self.first_entry_of_each_identity
+            .value_stored_for_identity(identity)
+            .copied()
     }
 
     /// 索引里的每个身份与它在表里的最先那一项，按身份升序：表里每个不同的身份恰好一项。走一项记看过一项。
@@ -3894,7 +3975,9 @@ pub fn take_the_mapping_positions_over_the_location_hints<PositionOfKey>(
         );
     // 迭代上界是有位置的进映射角色数。
     for (identity, slot) in new_slot_of_each_mapped_role {
-        if let Some(position) = position_in_the_units_of_each_role.get(&identity) {
+        if let Some(position) =
+            position_in_the_units_of_each_role.value_stored_for_identity(&identity)
+        {
             version.units[*position].slot = slot;
         }
     }
@@ -3981,15 +4064,36 @@ impl ContainerTreeIndexNodesVersion {
     }
 
     /// 根之下 `position` 上那个节点这一版的指针；那个位置上没有根之下的节点交回 `None`。
+    /// `pointers_below_the_root` 按 bump 次序列根之下的每个节点各一项（根最末、不在其中），所以这个位置那一项就在「这一层之前各层的节点数之和
+    /// + 同层序号」那一格，按下标直接取：装一版的单元时每个照抄的节点都问一次（`build_deletion_tree_units`），在整张上逐项找合起来是节点数的平方。
+    ///
+    /// # Panics
+    /// 那一格上记的位置不是问的这一个：这张与形状出自同一次发布（`publish_admitted` 按 `node_origins` 的 bump 次序装）或同一次从盘上重建
+    /// （`recovery` 按 bump 次序读），都按 bump 次序列根之下的全部节点。
     #[must_use]
     pub fn pointer_below_the_root(
         &self,
         position: ContainerTreeNodePosition,
     ) -> Option<NodePointer> {
-        self.pointers_below_the_root
-            .iter()
-            .find(|(node_position, _)| *node_position == position)
-            .map(|(_, pointer)| *pointer)
+        if !self.shape.has_a_node_at(position) || self.shape.is_the_root(position) {
+            return None;
+        }
+        let nodes_on_the_levels_below: usize = (1..position.level)
+            .map(|level| self.shape.nodes_at_level(level))
+            .sum();
+        let index_in_bump_order = nodes_on_the_levels_below
+            + usize::try_from(position.index_in_level).expect("同层序号装得进 usize");
+        let (listed_position, pointer) = *self
+            .pointers_below_the_root
+            .get(index_in_bump_order)
+            .expect(
+                "根之下的每个节点在指针表里各一项、按 bump 次序：形状里有、又不是根的位置都在表里",
+            );
+        assert_eq!(
+            listed_position, position,
+            "根之下节点的指针表按 bump 次序排：第 {index_in_bump_order} 项就是这个位置"
+        );
+        Some(pointer)
     }
 }
 
@@ -4133,6 +4237,25 @@ impl TransactionOutput {
             .copied()
     }
 
+    /// 这一版 inode 树里号是 `inode` 的那条记录（删除中的也在），按叶序折半找：叶容器左起按 key 序、各片的记录按号升序、两片之间不交叠，
+    /// 先找最后一条号不小于它的那一片，再在那一片里折半找。与 [`TransactionOutput::inode_record_of`] 交回同一条；发布路径改 n_live 与 n_记录时
+    /// 每写一条找一次（运行时决策路径，不遍历 inode 树）。叶容器都非空（记录数为 0 的容器不落盘，删空的那次摘掉），按最后一条找不会落空。
+    #[must_use]
+    pub fn inode_record_found_by_its_leaf(&self, inode: InodeNumber) -> Option<InodeRecord> {
+        let holding = self.inode_leaf_containers.partition_point(|container| {
+            container
+                .contents
+                .records
+                .last()
+                .is_some_and(|last| last.inode < inode.0)
+        });
+        let records = &self.inode_leaf_containers.get(holding)?.contents.records;
+        records
+            .binary_search_by_key(&inode.0, |record| record.inode)
+            .ok()
+            .map(|position| records[position])
+    }
+
     /// 这一版 inode 树里的叶容器内容，交给 `crate::inode_tree` 算下一次发布的落法。
     #[must_use]
     pub fn inode_leaf_container_contents(&self) -> Vec<InodeLeafContainer> {
@@ -4196,6 +4319,83 @@ impl TransactionOutput {
             }
         }
         steps
+    }
+
+    /// 这一版墓碑树根单元：按装这一版时记下的下标取（[`ContainerTreeRootUnitPositions`]），不在 `units` 上找；墓碑树零根时 `None`。
+    ///
+    /// # Panics
+    /// 记下的下标上不是墓碑树根单元：`units` 装好之后才记下标，之后不再挪动（三处装 `units` 的地方都是装好再找）。
+    #[must_use]
+    pub fn tombstone_root_unit(&self) -> Option<&PublishedUnit> {
+        self.unit_at_the_recorded_position(
+            self.container_tree_root_unit_positions.tombstone_root,
+            TransactionUnit::TombstoneRoot,
+        )
+    }
+
+    /// 这一版退役树根单元，同 [`TransactionOutput::tombstone_root_unit`]；退役树零根时 `None`。
+    ///
+    /// # Panics
+    /// 同 [`TransactionOutput::tombstone_root_unit`]。
+    #[must_use]
+    pub fn retirement_root_unit(&self) -> Option<&PublishedUnit> {
+        self.unit_at_the_recorded_position(
+            self.container_tree_root_unit_positions.retirement_root,
+            TransactionUnit::RetirementRoot,
+        )
+    }
+
+    /// 这一版墓碑树的内部层数 H：从它的根节点码 2 头现读，层级减一（D3（空间分配） 已定项 2「各从自己的树根节点码 2 头现读」）；零根 0。
+    /// 根单元按装这一版时记下的下标取（[`TransactionOutput::tombstone_root_unit`]），不在 `units` 上找：准入读它（运行时决策路径）。
+    ///
+    /// # Panics
+    /// 这一版有墓碑容器而没有记下墓碑树根单元，或那份字节解不开：单元是这个进程装出来的，或从盘上重建时读出、核过的
+    /// （`recovery::rebuild_version` 把删除那两棵树的每个节点都放进 `units`）。
+    #[must_use]
+    pub fn tombstone_tree_internal_levels_read_from_its_root_node_header(&self) -> u64 {
+        if self.tombstone_containers.is_empty() {
+            return 0;
+        }
+        let root_unit = self
+            .tombstone_root_unit()
+            .expect("有墓碑容器就有墓碑树根单元：装 units 时记下了它的下标");
+        let root_header = parse_index_node(&root_unit.bytes)
+            .expect("墓碑树根单元是这个进程装的，或重建时读出、核过的");
+        u64::from(root_header.level).saturating_sub(1)
+    }
+
+    /// 这一版退役树的内部层数 H，读法同 [`TransactionOutput::tombstone_tree_internal_levels_read_from_its_root_node_header`]；零根 0。
+    ///
+    /// # Panics
+    /// 这一版有退役容器而没有记下退役树根单元，或那份字节解不开（同墓碑树那一份）。
+    #[must_use]
+    pub fn retirement_tree_internal_levels_read_from_its_root_node_header(&self) -> u64 {
+        if self.retirement_containers.is_empty() {
+            return 0;
+        }
+        let root_unit = self
+            .retirement_root_unit()
+            .expect("有退役容器就有退役树根单元：装 units 时记下了它的下标");
+        let root_header = parse_index_node(&root_unit.bytes)
+            .expect("退役树根单元是这个进程装的，或重建时读出、核过的");
+        u64::from(root_header.level).saturating_sub(1)
+    }
+
+    fn unit_at_the_recorded_position(
+        &self,
+        recorded_position: Option<usize>,
+        identity: TransactionUnit,
+    ) -> Option<&PublishedUnit> {
+        let position = recorded_position?;
+        let unit = self
+            .units
+            .get(position)
+            .expect("记下的根单元下标在 units 里：装好 units 之后才记，之后不再挪动");
+        assert_eq!(
+            unit.identity, identity,
+            "units 第 {position} 项是装这一版时记下的那个根单元：装好之后才记，之后不再挪动"
+        );
+        Some(unit)
     }
 
     /// 这一版里角色是 `identity` 的那个单元（`units` 里最先那一项）。在 `units` 上线性找：一次调用里只查几次的用它；
@@ -5476,7 +5676,7 @@ pub enum PublishError {
     /// 这条路径按「树还没建起来」写——`previous` 传 `None`、十二棵树从水位重新发号、inode 树与 extent 树从头建、
     /// 树表条目的诞生 txg 与 inode 1 的对象出生代都取这次发布的 txg。接在已经有文件的一版后面写出来的那条根，
     /// 会与同一条时间线上的旧根在 I-9.14（树表条目的诞生 txg 跨根不变） 与 I-9.10（对象出生代与 inode 记录相符） 上对不上
-    /// （2026-09-23 崩溃注入快档打中）。判的是树表条数，不是水位（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步：
+    /// （2026-09-23 崩溃注入默认批打中）。判的是树表条数，不是水位（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步：
     /// 回退到树表 0 条的一版时水位带着根环里的 max，已经不是 mkfs 的 65536）。
     /// 同一个文件再写一版走 `publish_overwrite`。一个字节都不写。
     FirstFileVersionOnAVersionThatAlreadyHasAFile { tree_table_entries: usize },
@@ -5837,7 +6037,7 @@ pub struct PublishPlan<'content> {
 
 /// 一次发布在 unlink 里是哪一步（D8（核心索引结构） 已定项 16 第 1、2 条）；不是删除的发布给 [`DeletionStepOfThePublish::NotADeletion`]。
 ///
-/// 不并进 [`PublishPlan`]：checker 档几份装置按字段逐个构造 `PublishPlan`，加字段就要动它们；删除这一步由删除的入口
+/// 不并进 [`PublishPlan`]：验证包几份装置按字段逐个构造 `PublishPlan`，加字段就要动它们；删除这一步由删除的入口
 /// （`publish_unlink_intent`、`publish_unlink_step`）单独交给发布路径，别的入口一律给 `NotADeletion`。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeletionStepOfThePublish {
@@ -6540,7 +6740,7 @@ fn deadlist_changes_of_this_publish(
         ));
         // C145 第三条（用户 2026-10-26 定「加断言并留档」）：放块时要删的那条 deadlist 条目必须还在。放掉的条目是
         // `deadlist_entries_the_destruction_of_a_snapshot_releases` 从上一版的 deadlist 里挑的、`entries_after` 也从同一份建，构造上恒成立；
-        // 删掉这条断言的变异是等价变异，等价性由 harness 档用例
+        // 删掉这条断言的变异是等价变异，等价性由 harness 用例
         // `every_deadlist_entry_a_snapshot_destruction_releases_is_in_the_deadlist_the_release_starts_from` 钉住。
         assert!(
             released_entry.is_some(),
@@ -6729,13 +6929,15 @@ impl ContainerTreeRoles {
         node_below_the_root: TransactionUnit::RetirementNodeBelowTheRoot,
     };
 
-    /// 形状为 `shape` 的那一版里，`position` 上那个码 2 节点的角色：是那一版的根就是根，别的按位置。
+    /// 根在 `root_of_that_version`（零根 `None`）的那一版里，`position` 上那个码 2 节点的角色：是那一版的根就是根，别的按位置。
+    /// 根的位置由调用方从那一版的形状（[`ContainerTreeShape::root_position`]）或上一版记着的每层节点数
+    /// （[`crate::container_tree::ContainerTreeNodeCounts::root_position`]）取一次。
     fn of_node(
         self,
         position: ContainerTreeNodePosition,
-        shape: &ContainerTreeShape,
+        root_of_that_version: Option<ContainerTreeNodePosition>,
     ) -> TransactionUnit {
-        if shape.is_the_root(position) {
+        if root_of_that_version == Some(position) {
             self.root
         } else {
             (self.node_below_the_root)(position)
@@ -6748,13 +6950,14 @@ fn container_tree_roles_rewritten<Record>(
     tree: &ContainerTreeAfterThisPublish<Record>,
     roles: ContainerTreeRoles,
 ) -> Vec<TransactionUnit> {
+    let root = tree.shape.root_position();
     tree.rewritten_containers
         .iter()
         .map(|position| (roles.container)(*position))
         .chain(
             tree.rewritten_nodes()
                 .into_iter()
-                .map(|position| roles.of_node(position, &tree.shape)),
+                .map(|position| roles.of_node(position, root)),
         )
         .collect()
 }
@@ -6770,9 +6973,12 @@ fn mapped_units_of_a_container_tree<Record>(
 ) -> Vec<(TransactionUnit, Vec<u8>)> {
     let mut mapped_units = Vec::new();
     let mut birth_sequence = 0;
+    // 重写的是最右端连着的那几片：序号不小于头一片就重写了，不在重写清单上逐个找（运行时决策路径，`.claude/rules/fs-design.md`
+    // 「记账是事务的副产品，不是事后的遍历」：映射 key 集决定中央映射树重写哪几个节点，进分配）。
+    let first_rewritten_container = tree.first_rewritten_container();
     for position in 0..tree.containers.len() {
         let identity = (roles.container)(position);
-        if tree.rewritten_containers.contains(&position) {
+        if first_rewritten_container.is_some_and(|first| position >= first) {
             mapped_units.push((
                 identity,
                 key_of_a_unit_born_in_this_publish(UNIT_CLASS_PACKED, birth_sequence),
@@ -6782,8 +6988,10 @@ fn mapped_units_of_a_container_tree<Record>(
             mapped_units.push((identity, key_carried_from_the_previous_version(identity)));
         }
     }
+    let root = tree.shape.root_position();
+    let root_before_this_publish = tree.node_counts_before_this_publish.root_position();
     for (position, origin) in tree.node_origins() {
-        let identity = roles.of_node(position, &tree.shape);
+        let identity = roles.of_node(position, root);
         match origin {
             ContainerTreeNodeOrigin::RewrittenThisPublish => {
                 mapped_units.push((
@@ -6796,7 +7004,7 @@ fn mapped_units_of_a_container_tree<Record>(
                 mapped_units.push((
                     identity,
                     key_carried_from_the_previous_version(
-                        roles.of_node(position, &tree.shape_before_this_publish),
+                        roles.of_node(position, root_before_this_publish),
                     ),
                 ));
             }
@@ -6807,8 +7015,9 @@ fn mapped_units_of_a_container_tree<Record>(
 
 /// 记账标签 6（已承诺预留里墓碑与退役记录那两份，D3（空间分配） 已定项 2）在这次发布之后那一版的值：
 /// 副本数 × ((2 + H_墓碑 + 1 + 2 + H_退役 + 1) × 16384 + 41 × n_live + 35 × n_记录)：H_墓碑、H_退役是这次之后墓碑树、退役树的内部层数，
-/// n_live 是这次之后 inode 树里 nlink ≥ 1 的记录数（[`crate::admission::live_objects_of_the_inode_tree`]），n_记录 是这次之后 inode 树里全部记录数
-/// （含 nlink = 0 的，[`crate::admission::inode_records_of_the_inode_tree`]；判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）。
+/// n_live 是这次之后 inode 树里 nlink ≥ 1 的记录数，n_记录 是这次之后 inode 树里全部记录数（含 nlink = 0 的；判决
+/// `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）：两个数读 [`ResolvedPublish::inode_record_counts`]（随一版带着、
+/// 提交时增量维护，[`InodeRecordCounts`]），不遍历 inode 树；两个 H 按装 `units` 时记下的下标取根单元（[`ContainerTreeRootUnitPositions`]）。
 /// `TransactionOutput` 恒有树表条目（`deleted_inodes` 那一条在内），所以走不到「没有 `deleted_inodes` 条目取 0」那一支——那一支是树表 0 条的一版，
 /// 它不走这条发布路径、没有记账树。记账行写它，发布路径判式子读它（「写入类发布按发布之后的标签判」）：一个函数算，两处读同一个数。
 /// 两个 H 照条款字面从各自根节点的码 2 头现读（[`tombstone_tree_internal_levels_read_from_the_root_node_header`]、
@@ -6823,17 +7032,18 @@ pub fn committed_reservation_for_tombstones_and_retirement_records_after_this_pu
         TombstoneAndRetirementPrepayBasis::VersionWithADeletedInodesTreeTableEntry {
             tombstone_tree_internal_levels:
                 tombstone_tree_internal_levels_read_from_the_root_node_header(resolved, previous),
-            live_objects: live_objects_of_the_inode_tree(&resolved.inode_tree.containers),
+            live_objects: resolved.inode_record_counts.live_objects,
             retirement_tree_internal_levels:
                 retirement_tree_internal_levels_read_from_the_root_node_header(resolved, previous),
-            inode_records: inode_records_of_the_inode_tree(&resolved.inode_tree.containers),
+            inode_records: resolved.inode_record_counts.records,
         },
         replicas,
     )
 }
 
 /// 这次发布之后退役树的内部层数（同 [`tombstone_tree_internal_levels_read_from_the_root_node_header`] 的读法）：这次重写根（有身份消失）时
-/// 新根的头由同一份形状编出，按构造就是 `resolved.retirement_tree.internal_levels()`；这次照抄退役树时读上一版那份 `RetirementRoot` 单元字节的码 2 头。
+/// 新根的头由同一份形状编出，按构造就是 `resolved.retirement_tree.internal_levels()`；这次照抄退役树时读上一版那份 `RetirementRoot` 单元字节的码 2 头
+/// （[`TransactionOutput::retirement_tree_internal_levels_read_from_its_root_node_header`]：根单元按装 `units` 时记下的下标取，不在 `units` 上找）。
 ///
 /// # Panics
 /// 上一版有退役容器而它的单元里没有 `RetirementRoot`，或那份字节解不开：单元是这个进程装出来的，或从盘上重建时读出、核过的。
@@ -6845,22 +7055,18 @@ pub fn retirement_tree_internal_levels_read_from_the_root_node_header(
     if resolved.retirement_tree.is_the_root_rewritten() {
         return resolved.retirement_tree.internal_levels();
     }
-    match previous {
-        Some(previous_version) if !previous_version.retirement_containers.is_empty() => {
-            let root_header =
-                parse_index_node(&previous_version.unit(TransactionUnit::RetirementRoot).bytes)
-                    .expect("退役树根单元是这个进程装的，或重建时读出、核过的");
-            u64::from(root_header.level).saturating_sub(1)
-        }
-        // 上一版退役树零根，这次又没重写它：这次之后仍是零根。
-        Some(_) | None => 0,
-    }
+    // 上一版退役树零根（或没有上一版），这次又没重写它：这次之后仍是零根，读出来是 0。
+    previous.map_or(
+        0,
+        TransactionOutput::retirement_tree_internal_levels_read_from_its_root_node_header,
+    )
 }
 
 /// 这次发布之后墓碑树的内部层数 H（D3（空间分配） 已定项 2「H 从墓碑树根节点码 2 头现读」，代码轮 U8，
 /// `research/prompts/m3-unlink-code-r1-main-verification.md` 第三节）：根节点头的层级减一（零根时 0）。
 /// 这次重写根（意图那次往开放容器追加墓碑）：新根的头由同一份形状编出（`build_index_node` 的层级取根在形状里的层级），按构造就是
-/// `resolved.tombstone_tree.internal_levels()`，不另读；这次照抄墓碑树（写入类发布、各批）：读上一版那份 `TombstoneRoot` 单元字节的码 2 头，
+/// `resolved.tombstone_tree.internal_levels()`，不另读；这次照抄墓碑树（写入类发布、各批）：读上一版那份 `TombstoneRoot` 单元字节的码 2 头
+/// （[`TransactionOutput::tombstone_tree_internal_levels_read_from_its_root_node_header`]：根单元按装 `units` 时记下的下标取，不在 `units` 上找），
 /// 照 [`TransactionOutput::height_read_from_the_root_node_header`] 的先例，不读内存里那份形状。
 ///
 /// # Panics
@@ -6874,16 +7080,11 @@ pub fn tombstone_tree_internal_levels_read_from_the_root_node_header(
     if resolved.tombstone_tree.is_the_root_rewritten() {
         return resolved.tombstone_tree.internal_levels();
     }
-    match previous {
-        Some(previous_version) if !previous_version.tombstone_containers.is_empty() => {
-            let root_header =
-                parse_index_node(&previous_version.unit(TransactionUnit::TombstoneRoot).bytes)
-                    .expect("墓碑树根单元是这个进程装的，或重建时读出、核过的");
-            u64::from(root_header.level).saturating_sub(1)
-        }
-        // 上一版墓碑树零根（没有容器就没有根），这次又没重写它：这次之后仍是零根。
-        Some(_) | None => 0,
-    }
+    // 上一版墓碑树零根（没有容器就没有根，或没有上一版），这次又没重写它：这次之后仍是零根，读出来是 0。
+    previous.map_or(
+        0,
+        TransactionOutput::tombstone_tree_internal_levels_read_from_its_root_node_header,
+    )
 }
 
 /// 一次发布在动分配器、动盘之前先算完的东西：这次之后 inode 树是哪几片叶容器、这次重写哪些角色（按 bump 次序）。
@@ -6891,6 +7092,9 @@ pub fn tombstone_tree_internal_levels_read_from_the_root_node_header(
 #[derive(Clone, Debug)]
 pub struct ResolvedPublish {
     pub inode_tree: InodeLeafContainersAfterThisPublish,
+    /// 这次之后 inode 树里的 n_live 与 n_记录：上一版的按这次写进、删掉的那几条改出来（[`InodeRecordCounts::after_writing`]、
+    /// [`InodeRecordCounts::after_removing`]），准入读它，不遍历这次之后的叶容器。
+    pub inode_record_counts: InodeRecordCounts,
     /// 这次之后 extent 树长什么样（D8（核心索引结构） 已定项 14 的两段）。
     pub extent_tree: ExtentTreePlan,
     /// 这次之后第一个文件之外有数据单元的文件长什么样（数据单元与下段；它们在上段里的条目归 `extent_tree` 的上段）。
@@ -7927,6 +8131,8 @@ struct MultiLevelTreesOfThisPublish {
 /// 与写的文件内容切成的一单元事务（没有文件版本的发布为空）。
 struct OrdinaryAllocationPartOfThePublish {
     inode_tree: InodeLeafContainersAfterThisPublish,
+    /// 这次之后 inode 树里的 n_live 与 n_记录（[`ResolvedPublish::inode_record_counts`]）。
+    inode_record_counts: InodeRecordCounts,
     extent_tree: ExtentTreePlan,
     /// 第一个文件之外有数据单元的文件这次之后的样子（这次写的那一个整份重写，别的照抄）。
     files_other_than_the_first: FilesOtherThanTheFirstPlan,
@@ -8230,6 +8436,31 @@ impl PublishPlan<'_> {
                 trees.inode,
             )?,
         };
+        // n_live 与 n_记录随一版带着、按这次写进与删掉的那几条改（准入读它，`.claude/rules/fs-design.md`「空间统计与配额落在第一格」）：
+        // 上一版里那个号的记录按叶序折半找，不遍历 inode 树。
+        let inode_record_counts_before = previous
+            .map_or(InodeRecordCounts::OF_AN_EMPTY_INODE_TREE, |version| {
+                version.inode_record_counts
+            });
+        let record_before_this_publish = |inode: InodeNumber| {
+            previous.and_then(|version| version.inode_record_found_by_its_leaf(inode))
+        };
+        let inode_record_counts = match deletion_and_lineage.step {
+            DeletionStepOfThePublish::FinalBatch { inode } => inode_record_counts_before.after_removing(
+                &record_before_this_publish(inode)
+                    .expect("最后一批删的那条记录在上一版的 inode 树里：不在的那一种 remove_record_from_leaf_containers 已经拒了"),
+            ),
+            DeletionStepOfThePublish::Intent { .. }
+            | DeletionStepOfThePublish::Batch { .. }
+            | DeletionStepOfThePublish::TruncationIntent { .. }
+            | DeletionStepOfThePublish::TruncationBatch { .. }
+            | DeletionStepOfThePublish::TruncationFinalBatch { .. }
+            | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+            | DeletionStepOfThePublish::PartialWrite { .. }
+            | DeletionStepOfThePublish::NotADeletion => {
+                inode_record_counts_before.after_writing(&record_writes, record_before_this_publish)
+            }
+        };
         let file_content_transactions = self
             .file_content_transactions_and_the_rewritten_data_units(
                 deletion_and_lineage
@@ -8432,15 +8663,17 @@ impl PublishPlan<'_> {
                     .collect()
             })
             .unwrap_or_default();
-        let tombstone_shape_before = previous
-            .map_or_else(ContainerTreeShape::zero_root, |version| {
-                version.tombstone_tree_index_nodes.shape.clone()
+        // 上一版的形状借过来用，不先照抄一份：追加那一支只拿它的引用（新一版的形状在追加里从它造），照抄那一支才要一份自己的。
+        let zero_root_shape = ContainerTreeShape::zero_root();
+        let tombstone_shape_before: &ContainerTreeShape = previous
+            .map_or(&zero_root_shape, |version| {
+                &version.tombstone_tree_index_nodes.shape
             });
         let tombstone_tree = match deletion_and_lineage.step {
             DeletionStepOfThePublish::Intent { tombstone, .. } => {
                 append_tombstone_to_the_open_container(
                     &tombstone_containers_before,
-                    &tombstone_shape_before,
+                    tombstone_shape_before,
                     tombstone,
                     self.txg,
                     trees.tombstone,
@@ -8460,7 +8693,7 @@ impl PublishPlan<'_> {
             | DeletionStepOfThePublish::PartialWrite { .. }
             | DeletionStepOfThePublish::NotADeletion => TombstoneTreeAfterThisPublish::carried(
                 tombstone_containers_before,
-                tombstone_shape_before,
+                tombstone_shape_before.clone(),
             ),
         };
         // 退役树（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 3–5 条）：这次身份消失的每一片 inode 叶容器
@@ -8475,13 +8708,13 @@ impl PublishPlan<'_> {
                     .collect()
             })
             .unwrap_or_default();
-        let retirement_shape_before = previous
-            .map_or_else(ContainerTreeShape::zero_root, |version| {
-                version.retirement_tree_index_nodes.shape.clone()
+        let retirement_shape_before: &ContainerTreeShape = previous
+            .map_or(&zero_root_shape, |version| {
+                &version.retirement_tree_index_nodes.shape
             });
         let retirement_tree = append_retirement_records_to_the_open_container(
             &retirement_containers_before,
-            &retirement_shape_before,
+            retirement_shape_before,
             &retirement_records_of_this_publish(&inode_tree.retired_identities(), self.txg),
             self.txg,
             trees.retirement,
@@ -8508,6 +8741,7 @@ impl PublishPlan<'_> {
         };
         Ok(OrdinaryAllocationPartOfThePublish {
             inode_tree,
+            inode_record_counts,
             extent_tree,
             files_other_than_the_first,
             data_roles_rewritten,
@@ -8573,6 +8807,7 @@ impl PublishPlan<'_> {
         );
         let OrdinaryAllocationPartOfThePublish {
             inode_tree,
+            inode_record_counts,
             extent_tree,
             files_other_than_the_first,
             data_roles_rewritten,
@@ -8717,6 +8952,7 @@ impl PublishPlan<'_> {
         rewritten_roles.push(TransactionUnit::TreeTable);
         Ok(ResolvedPublish {
             inode_tree,
+            inode_record_counts,
             extent_tree,
             files_other_than_the_first,
             allocation_record_tree,
@@ -8760,14 +8996,16 @@ impl PublishPlan<'_> {
                     .collect()
             })
             .unwrap_or_default();
-        let shape_before = previous.map_or_else(ContainerTreeShape::zero_root, |version| {
-            version.lineage_tree_index_nodes.shape.clone()
+        // 上一版的形状借过来用（同墓碑树那一处）：追加那一支只拿引用，照抄那一支才要一份自己的。
+        let zero_root_shape = ContainerTreeShape::zero_root();
+        let shape_before: &ContainerTreeShape = previous.map_or(&zero_root_shape, |version| {
+            &version.lineage_tree_index_nodes.shape
         });
         match deletion_and_lineage.lineage {
             LineageStepOfThePublish::AdministratorRollback { record, .. } => {
                 append_lineage_record_to_the_open_container(
                     &containers_before,
-                    &shape_before,
+                    shape_before,
                     record,
                     self.txg,
                     trees.lineage,
@@ -8780,7 +9018,7 @@ impl PublishPlan<'_> {
             }
             LineageStepOfThePublish::NoLineageRecord => Ok(LineageTreeAfterThisPublish::carried(
                 containers_before,
-                shape_before,
+                shape_before.clone(),
             )),
         }
     }
@@ -9629,7 +9867,7 @@ pub fn publish_sequential_write<Device: BlockDevice>(
     let txg = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
     // 改动计数与新池新建文件号先取成局部量、字段也换了次序：`crates/mutations.tsv` 有几条变异按 `publish_overwrite` 里
     // `change_count: txg.0,`、`transaction: previous.highest_transaction_number_in_this_instance + 1,` 与那几行字段的原样
-    // 锚着，同一份文件里再出现一次它们就腐化（门禁 checker-tier-crates-mutation-replay 判锚点恰好命中一次；`publish_new_inodes` 里那句注释是同一件事）。
+    // 锚着，同一份文件里再出现一次它们就腐化（门禁 crates-mutation-replay 判锚点恰好命中一次；`publish_new_inodes` 里那句注释是同一件事）。
     let change_count = txg.0;
     let new_pool_file_creation_of_this_request =
         previous.highest_transaction_number_in_this_instance + 1;
@@ -9694,7 +9932,7 @@ pub fn publish_new_inodes<Device: BlockDevice>(
         .watermark_this_publish_starts_from(first_new_inode_number);
     // 改动计数与事务号都先取成局部量：`crates/mutations.tsv` 有几条变异按 `change_count: txg.0,` 与
     // `transaction: previous.highest_transaction_number_in_this_instance + 1,` 这两串字面锚在 `publish_overwrite` 上，
-    // 同一份文件里再出现一次它们就腐化（门禁 checker-tier-crates-mutation-replay 判锚点恰好命中一次；`publish_sequential_write` 里那句注释是同一件事）。
+    // 同一份文件里再出现一次它们就腐化（门禁 crates-mutation-replay 判锚点恰好命中一次；`publish_sequential_write` 里那句注释是同一件事）。
     // 改动计数 = 最后一次改动所在发布的 checkpoint_txg（D8（核心索引结构） 已定项 6 偏移 88）；建出来那次就是这次发布。
     let change_count = txg.0;
     let transaction_number = previous.highest_transaction_number_in_this_instance + 1;
@@ -10935,7 +11173,7 @@ fn relocation_checked_against_the_version<Reader: PoolReader + ?Sized>(
             .central_mapping
             .unit_of_role(role)
             .bytes
-            .clone(),
+            .to_vec(),
         RelocatedUnitHolder::KeptForTheSnapshots => {
             let unit_bytes = usize::try_from(planned.source.span * SLOT_BYTES)
                 .expect("一个单元两槽以内，字节数装得进 usize");
@@ -11261,13 +11499,16 @@ pub fn publish_size_change<Device: BlockDevice>(
     let payloads_of_the_rewritten_data_units: Vec<RewrittenDataUnitPayload> =
         match step.tail_data_unit_rewrite() {
             Some(rewrite) => {
-                let mut payload = read_back_the_old_payload_of_a_data_unit(
+                // 只坏一份时计数（D4（校验和位置） 已定项 4）；这个尾单元这一次就整个重写到新槽，旧落点照释放之前读盘核隔离。
+                let mut payload = read_back_the_old_payload_counting_a_failing_copy(
                     &*pool.devices,
                     previous,
                     inode,
                     record,
                     rewrite.unit,
                     &pool.parameters.filesystem_identifier,
+                    &pool.old_data_unit_reads_back_with_one_copy_failing,
+                    &pool.mapping_keys_of_old_data_units_read_back_with_one_copy_failing,
                 )
                 .map_err(|read_back| {
                     PublishError::TruncationRefused(
@@ -11386,6 +11627,234 @@ pub fn read_back_the_old_payload_of_a_data_unit<Reader: PoolReader + ?Sized>(
     unit: DataUnitIndexInFile,
     filesystem_identifier: &[u8; 16],
 ) -> Result<Vec<u8>, OldDataUnitReadBackFailure> {
+    read_back_the_old_data_unit_telling_whether_a_copy_failed(
+        reader,
+        previous,
+        inode,
+        record_before,
+        unit,
+        filesystem_identifier,
+    )
+    .map(|read_back| read_back.payload)
+}
+
+/// 同 [`read_back_the_old_payload_of_a_data_unit`]，读到的是只坏一份时把 `reads_with_one_copy_failing` 加一、把这个单元在上一版里的映射 key
+/// 追加进 `mapping_keys_read_with_one_copy_failing`：部分写与截断、变长读回旧单元走它，计数与 key 交写入口那两份
+/// （[`PoolWriter::old_data_unit_reads_back_with_one_copy_failing`]、[`PoolWriter::mapping_keys_of_old_data_units_read_back_with_one_copy_failing`]）。
+///
+/// # Errors
+/// 见 [`OldDataUnitReadBackFailure`]。
+///
+/// # Panics
+/// 同 [`read_back_the_old_payload_of_a_data_unit`]。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "参数各是一样东西：读者、上一版、哪个 inode、写之前的记录、哪个单元、本池 fsid、计数、映射 key 的账"
+)]
+fn read_back_the_old_payload_counting_a_failing_copy<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    previous: &TransactionOutput,
+    inode: InodeNumber,
+    record_before: InodeRecord,
+    unit: DataUnitIndexInFile,
+    filesystem_identifier: &[u8; 16],
+    reads_with_one_copy_failing: &Cell<u64>,
+    mapping_keys_read_with_one_copy_failing: &RefCell<Vec<Vec<u8>>>,
+) -> Result<Vec<u8>, OldDataUnitReadBackFailure> {
+    let read_back = read_back_the_old_data_unit_telling_whether_a_copy_failed(
+        reader,
+        previous,
+        inode,
+        record_before,
+        unit,
+        filesystem_identifier,
+    )?;
+    match read_back.copies {
+        CopiesOfAUnitRead::WithoutAFailingCopy => {}
+        CopiesOfAUnitRead::FromTheOtherCopyAfterOneFailed => {
+            reads_with_one_copy_failing.set(reads_with_one_copy_failing.get() + 1);
+            mapping_keys_read_with_one_copy_failing
+                .borrow_mut()
+                .push(mapping_key_for_data(
+                    read_back.pointer.head,
+                    read_back.pointer.write_order,
+                ));
+        }
+    }
+    Ok(read_back.payload)
+}
+
+/// 读—改—写读回时只坏一份的旧数据单元（`mapping_keys`，[`PoolWriter::mapping_keys_of_old_data_units_read_back_with_one_copy_failing`]）里，
+/// 到 `version` 这一版仍被活快照钉着的那几个，照已有的搬迁路径另发一批时的计划（D4（校验和位置） 已定项 4「经已有的搬迁路径把这个单元整个搬到新槽、
+/// 两份新写，旧落点照释放前核隔离」；用户 2026-11-04 定有活快照时「另发一批搬迁修好」）：被钉着的单元换下来进 deadlist、不释放（判决 m4-partial-write-r1
+/// R7），映射条目留存（`version.mapping_entries_kept_for_the_snapshots`），坏的那一份留在旧落点上，读回它的那次发布不搬它；交回的每一项就是
+/// [`publish_relocation_batch`] 收的那一种（源落点取留存条目的位置项，两盘同槽；跨度按单元类）。不在留存条目里的 key（那次发布里已经释放、
+/// 照释放之前读盘核隔离了）不进计划。按 `mapping_keys` 的次序，同一把 key 只进一次（被拒重判的那次发布读回同一个单元，记两把）。只读内存。
+///
+/// # Panics
+/// 留存条目里找得到的一把 key 是空的、或类标签不是三类用户可见单元之一：写入口记的 key 都由 [`mapping_key_for_data`] 算出，走不到。
+#[must_use]
+pub fn relocations_of_old_data_units_kept_for_the_snapshots(
+    version: &TransactionOutput,
+    mapping_keys: &[Vec<u8>],
+) -> Vec<PlannedRelocation> {
+    let mut planned: Vec<PlannedRelocation> = Vec::new();
+    // 迭代上界是 `mapping_keys` 的个数（一次改动里只坏一份的读回次数）；跨轮携带的只有已进计划的那几项。
+    for mapping_key in mapping_keys {
+        if planned
+            .iter()
+            .any(|relocation| relocation.mapping_key == *mapping_key)
+        {
+            continue;
+        }
+        let Some((_, locations)) = version
+            .mapping_entries_kept_for_the_snapshots
+            .iter()
+            .find(|(kept_key, _)| kept_key == mapping_key)
+        else {
+            continue;
+        };
+        let role = user_visible_role_standing_for_a_unit_class(
+            *mapping_key
+                .first()
+                .expect("映射 key 27 字节，首字节是类标签"),
+        )
+        .expect("这几把 key 由 mapping_key_for_data 算出、类标签是数据单元，归得到用户可见角色");
+        planned.push(PlannedRelocation {
+            mapping_key: mapping_key.clone(),
+            source: Placement {
+                slot: locations[0].slot,
+                span: role.span_slots(),
+            },
+        });
+    }
+    planned
+}
+
+/// 一版里此刻住在 `locations` 这几组位置条目上的那几个单元的映射 key：进中央映射的单元按映射里那两条位置条目认，留存的映射条目
+/// （`version.mapping_entries_kept_for_the_snapshots`）按它记的那两条认；一把 key 只出一次，按 `mapped_units` 的次序、留存的排在后面。
+/// 可写挂载读盘建上一版时读到只坏一份的那几个单元（`recovery::PoolReaderCountingUnitReadsWithOneCopyFailing::locations_of_the_units_read_with_one_copy_failing`）
+/// 在挂载交回之前经它认成 key，交给会话下一次用户改动之后另发的那一批（用户 2026-11-05 定「可写挂载时搬」）。
+/// 豁免映射的三类（映射树自己的节点、树表、实例表）不在映射里、认不出；挂载这一串的发布里已经换了落点的单元（树表、记账树这类每次发布都换下的）
+/// 也认不出——它们的旧落点照释放之前读盘核那一路走。
+#[must_use]
+pub fn mapping_keys_of_the_units_at_these_locations(
+    version: &TransactionOutput,
+    locations: &[[LocationEntry; 2]],
+) -> Vec<Vec<u8>> {
+    let mut mapping_keys: Vec<Vec<u8>> = Vec::new();
+    if locations.is_empty() {
+        return mapping_keys;
+    }
+    let mut central_mapping = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
+    // 迭代上界是这一版进映射的单元数加留存条目数；跨轮携带的只有已认出的那几把 key。
+    for (_, mapping_key) in &version.mapped_units {
+        if mapping_keys.contains(mapping_key) {
+            continue;
+        }
+        match central_mapping.locations_of_key(mapping_key) {
+            MappingLookup::Found(mapped_locations) if locations.contains(&mapped_locations) => {
+                mapping_keys.push(mapping_key.clone());
+            }
+            MappingLookup::Found(_)
+            | MappingLookup::NodeMalformedOrNoEntryWithThisKey
+            | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => {}
+        }
+    }
+    for (kept_key, kept_locations) in &version.mapping_entries_kept_for_the_snapshots {
+        if !mapping_keys.contains(kept_key) && locations.contains(kept_locations) {
+            mapping_keys.push(kept_key.clone());
+        }
+    }
+    mapping_keys
+}
+
+/// 可写挂载读盘建上一版时读到只坏一份的那几个单元（`mapping_keys`，[`mapping_keys_of_the_units_at_these_locations`] 认出来的）里，到 `version`
+/// 这一版仍在中央映射里或留存条目里的那几个，照已有的搬迁路径另发一批时的计划（用户 2026-11-05 定「可写挂载时搬」；与
+/// [`relocations_of_old_data_units_kept_for_the_snapshots`] 同一批发，`planned_before` 是那一份、已在里面的 key 不重复）：源落点取映射里那两条
+/// 位置条目（或留存条目记的那两条）的槽，跨度按 key 的类标签归到的用户可见角色取（[`user_visible_role_standing_for_a_unit_class`]）。
+/// 到 `version` 这一版已经不在的（这次改动或挂载之后的发布把它整个重写了、旧落点照释放之前读盘核那一路走）不进计划。
+#[must_use]
+pub fn relocations_of_the_units_read_with_one_copy_failing_while_mounting(
+    version: &TransactionOutput,
+    mapping_keys: &[Vec<u8>],
+    planned_before: &[PlannedRelocation],
+) -> Vec<PlannedRelocation> {
+    let mut planned: Vec<PlannedRelocation> = Vec::new();
+    let mut central_mapping = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
+    // 迭代上界是 `mapping_keys` 的个数；跨轮携带的只有已进计划的那几项。
+    for mapping_key in mapping_keys {
+        if planned_before
+            .iter()
+            .chain(&planned)
+            .any(|relocation| relocation.mapping_key == *mapping_key)
+        {
+            continue;
+        }
+        let Some(role) = mapping_key
+            .first()
+            .and_then(|unit_class| user_visible_role_standing_for_a_unit_class(*unit_class))
+        else {
+            continue;
+        };
+        let source_locations = match central_mapping.locations_of_key(mapping_key) {
+            MappingLookup::Found(mapped_locations) => Some(mapped_locations),
+            MappingLookup::NodeMalformedOrNoEntryWithThisKey
+            | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => version
+                .mapping_entries_kept_for_the_snapshots
+                .iter()
+                .find(|(kept_key, _)| kept_key == mapping_key)
+                .map(|(_, kept_locations)| *kept_locations),
+        };
+        let Some(source_locations) = source_locations else {
+            continue;
+        };
+        planned.push(PlannedRelocation {
+            mapping_key: mapping_key.clone(),
+            source: Placement {
+                slot: source_locations[0].slot,
+                span: role.span_slots(),
+            },
+        });
+    }
+    planned
+}
+
+/// 按一组两条位置条目读一个单元时读到的是哪一份（D4（校验和位置） 已定项 4「读到只坏一份时计数」）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CopiesOfAUnitRead {
+    /// 头一条就对上，或两条位置提示都没对上、映射那一组头一条对上（提示过期与两份都坏分不开，不算只坏一份），
+    /// 或按提示读到只坏一份而提示不是这个单元此刻在映射里的落点（提示过期：旧槽上坏的那一份不归这个单元计）。
+    WithoutAFailingCopy,
+    /// 同一组里前一条读不回字节或整单元 CRC-32C 对不上，后一条对上：只坏一份。
+    FromTheOtherCopyAfterOneFailed,
+}
+
+/// 读回的旧单元：净荷与读到的是哪一份（[`read_back_the_old_data_unit_telling_whether_a_copy_failed`]）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OldDataUnitReadBack {
+    pub payload: Vec<u8>,
+    pub copies: CopiesOfAUnitRead,
+    /// 上一版里走到这个单元的那条数据指针（只坏一份时按它的头与写序算映射 key，[`mapping_key_for_data`]）。
+    pub pointer: DataPointer,
+}
+
+/// 同 [`read_back_the_old_payload_of_a_data_unit`]，另交回读到的是哪一份（[`CopiesOfAUnitRead`]）：部分写与截断、变长经
+/// [`PoolWriter`] 读回时按它给写入口记账（[`PoolWriter::old_data_unit_reads_back_with_one_copy_failing`]）。
+///
+/// # Errors
+/// 见 [`OldDataUnitReadBackFailure`]。
+///
+/// # Panics
+/// 同 [`read_back_the_old_payload_of_a_data_unit`]。
+pub fn read_back_the_old_data_unit_telling_whether_a_copy_failed<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    previous: &TransactionOutput,
+    inode: InodeNumber,
+    record_before: InodeRecord,
+    unit: DataUnitIndexInFile,
+    filesystem_identifier: &[u8; 16],
+) -> Result<OldDataUnitReadBack, OldDataUnitReadBackFailure> {
     let position = usize::try_from(unit.0).expect("单元序号");
     let pointer = if inode.0 == FIRST_INODE_NUMBER {
         previous.data_pointers.get(position)
@@ -11399,19 +11868,50 @@ pub fn read_back_the_old_payload_of_a_data_unit<Reader: PoolReader + ?Sized>(
     let role = role_of_a_data_unit_of_the_inode(inode, unit);
     let unit_bytes = usize::try_from(role.span_slots() * SLOT_BYTES)
         .expect("一个单元两槽以内，字节数装得进 usize");
+    // 读到的是哪一份：同一组里前一条没读成、后一条对上时改记只坏一份（D4（校验和位置） 已定项 4 的计数）。
+    let copies_read = Cell::new(CopiesOfAUnitRead::WithoutAFailingCopy);
     let read_by_the_locations = |locations: &[LocationEntry; 2]| {
+        let mut an_earlier_copy_failed = false;
         locations.iter().find_map(|location| {
-            reader
+            let read = reader
                 .read(
                     location.device,
                     location.slot.to_device_offset(),
                     unit_bytes,
                 )
-                .filter(|bytes| crc32_castagnoli(bytes) == location.unit_checksum)
+                .filter(|bytes| crc32_castagnoli(bytes) == location.unit_checksum);
+            match (&read, an_earlier_copy_failed) {
+                (Some(_), true) => {
+                    copies_read.set(CopiesOfAUnitRead::FromTheOtherCopyAfterOneFailed);
+                }
+                (Some(_), false) => {}
+                (None, _) => an_earlier_copy_failed = true,
+            }
+            read
         })
     };
     let bytes = match read_by_the_locations(&pointer.locations) {
-        Some(bytes) => bytes,
+        Some(bytes) => {
+            // 按提示读到只坏一份：这个单元此刻的权威落点是上一版中央映射里那两条位置条目（D19（块指针的结构与宽度预算） 已定项 8），
+            // 提示就是它们才算只坏一份；单元被整理搬走之后提示还指旧槽，旧槽上坏的那一份不归这个单元计
+            // （判决 `research/prompts/m4-close-code-r3-main-verification.md` 第三节第 4 条，与冷走读、可写挂载建上一版、挂载态读同一判）。
+            if copies_read.get() == CopiesOfAUnitRead::FromTheOtherCopyAfterOneFailed {
+                let hints_are_the_mapping_position =
+                    match MappedUnitsOfAVersionReadByRole::of_the_version(previous)
+                        .locations_of_role(role)
+                    {
+                        MappingLookup::Found(mapped_locations) => {
+                            mapped_locations == pointer.locations
+                        }
+                        MappingLookup::NodeMalformedOrNoEntryWithThisKey
+                        | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => false,
+                    };
+                if !hints_are_the_mapping_position {
+                    copies_read.set(CopiesOfAUnitRead::WithoutAFailingCopy);
+                }
+            }
+            bytes
+        }
         None => {
             let mapped_locations =
                 match MappedUnitsOfAVersionReadByRole::of_the_version(previous)
@@ -11455,7 +11955,11 @@ pub fn read_back_the_old_payload_of_a_data_unit<Reader: PoolReader + ?Sized>(
     }
     let payload = data_unit_payload(&bytes, header.declared_length)
         .map_err(|_unit_error| disagrees("声明长度之后的补齐字节非零"))?;
-    Ok(payload.to_vec())
+    Ok(OldDataUnitReadBack {
+        payload: payload.to_vec(),
+        copies: copies_read.get(),
+        pointer,
+    })
 }
 
 /// 按偏移写一个活 inode（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节；任意活 inode，R6）：把 `bytes` 写到文件偏移
@@ -11551,13 +12055,16 @@ pub fn publish_partial_write<Device: BlockDevice>(
         let unit = DataUnitIndexInFile(unit_number);
         let data_unit = write.data_unit(unit);
         let mut payload = if data_unit.reads_the_old_unit_back() {
-            read_back_the_old_payload_of_a_data_unit(
+            // 只坏一份时计数（D4（校验和位置） 已定项 4）；读回的单元这一次就整个重写到新槽，旧落点照释放之前读盘核隔离。
+            read_back_the_old_payload_counting_a_failing_copy(
                 &*pool.devices,
                 previous,
                 inode,
                 record,
                 unit,
                 &pool.parameters.filesystem_identifier,
+                &pool.old_data_unit_reads_back_with_one_copy_failing,
+                &pool.mapping_keys_of_old_data_units_read_back_with_one_copy_failing,
             )
             .map_err(|read_back| {
                 PublishError::TruncationRefused(
@@ -11755,7 +12262,7 @@ pub(crate) fn rehearse_every_step_of_the_deletion_queue_walk<Device: BlockDevice
 pub fn publish_unlink_steps_until_the_queue_is_empty<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     allocator: &mut PoolAllocator,
-    current: &mut TransactionOutput,
+    current: &mut Arc<TransactionOutput>,
     batch_size: UnlinkBatchSize,
     instance: InstanceGeneration,
 ) -> Result<usize, PublishError> {
@@ -11764,20 +12271,20 @@ pub fn publish_unlink_steps_until_the_queue_is_empty<Device: BlockDevice>(
     walk.stopped_by.map(|()| walk.steps_published.len())
 }
 
-/// 走空一趟的结局（[`walk_the_deletion_queue_until_it_is_empty`]）：发成的每一步（按先后，最后一个就是 `current`），
+/// 走空一趟的结局（[`walk_the_deletion_queue_until_it_is_empty`]）：发成的每一步（按先后，最后一个就是 `current`，两处指着同一份），
 /// 与这一趟停在哪：走空了是 `Ok`，一步没发成是那一步的错（已经发成的那几步留在盘上）。
 #[derive(Debug)]
 pub struct DeletionQueueWalk {
-    pub steps_published: Vec<TransactionOutput>,
+    pub steps_published: Vec<Arc<TransactionOutput>>,
     pub stopped_by: Result<(), PublishError>,
 }
 
 /// 同 [`publish_unlink_steps_until_the_queue_is_empty`]，连同发成的每一步交回（会话与挂载续做要把它们交给调用方，
-/// 模型对拍逐次比它们）。
+/// 模型对拍逐次比它们）。每发成一步，`current` 与交回的那一步指着同一份（不拷一整版）。
 pub fn walk_the_deletion_queue_until_it_is_empty<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     allocator: &mut PoolAllocator,
-    current: &mut TransactionOutput,
+    current: &mut Arc<TransactionOutput>,
     batch_size: UnlinkBatchSize,
     instance: InstanceGeneration,
 ) -> DeletionQueueWalk {
@@ -11809,8 +12316,8 @@ pub fn walk_the_deletion_queue_until_it_is_empty<Device: BlockDevice>(
         };
         match next_step {
             Ok(next) => {
-                *current = next;
-                steps_published.push(current.clone());
+                *current = Arc::new(next);
+                steps_published.push(Arc::clone(current));
             }
             Err(refusal) => {
                 return DeletionQueueWalk {
@@ -13098,8 +13605,8 @@ fn carried_unit(
 /// （`carried_file_version_units`）。extent 树的节点不在这里——它们按这些指针由 `build_extent_tree` 装；
 /// 这个对象的 inode 记录也不在这里——它进 inode 树，由 `build_inode_tree_units` 按叶容器装。
 struct FileVersionUnits {
-    /// 文件的数据单元，第 i 项是文件第 i 个单元（与 `data_pointers` 同序）。
-    data_units: Vec<Vec<u8>>,
+    /// 文件的数据单元，第 i 项是文件第 i 个单元（与 `data_pointers` 同序）。照抄的那几个与上一版共用同一份字节（`carried_file_version_units`）。
+    data_units: Vec<Arc<[u8]>>,
     /// 指向每个数据单元的指针，第 i 项是文件第 i 个单元；extent 树下段的叶记录（或内联的那一条）按同一个次序装（key 升序）。
     data_pointers: Vec<DataPointer>,
     /// C319（请求内单元按 key 升序发出没有条款也没有检查）的运行时计数；照抄的一版恒 0。
@@ -13183,7 +13690,7 @@ fn build_file_version_units(
                 .try_into()
                 .expect("24"),
         );
-        data_units.push(data_unit);
+        data_units.push(Arc::from(data_unit));
         data_pointers.push(data_pointer);
     }
     let key_order_mismatches = count_key_order_mismatches(&extent_keys);
@@ -13277,7 +13784,7 @@ fn build_extent_tree(
         units_so_far.push(PublishedUnit {
             slot,
             identity: role,
-            bytes,
+            bytes: Arc::from(bytes),
         });
         pointer
     };
@@ -13650,7 +14157,7 @@ fn build_allocation_record_tree(
                 rewritten_units.push(PublishedUnit {
                     slot,
                     identity: role,
-                    bytes,
+                    bytes: Arc::from(bytes),
                 });
                 pointer
             }
@@ -13924,10 +14431,12 @@ where
         birth_sequence,
     };
     let mut containers = Vec::with_capacity(after.containers.len());
+    // 重写的是最右端连着的那几片：序号不小于头一片就重写了，不在重写清单上逐个找。
+    let first_rewritten_container = after.first_rewritten_container();
     for (position, contents) in after.containers.iter().enumerate() {
         let index = (to_build.index_of_position)(position);
         let role = (to_build.roles.container)(position);
-        let node = if after.rewritten_containers.contains(&position) {
+        let node = if first_rewritten_container.is_some_and(|first| position >= first) {
             let birth_sequence = sequences.next(to_build.tree, txg, instance);
             let bytes = build_packed_unit(
                 contents.identity,
@@ -13966,9 +14475,15 @@ where
         BTreeMap::new();
     let mut nodes_below_the_root = Vec::new();
     let mut root = None;
+    let root_position = after.shape.root_position();
+    let root_before_this_publish = after.node_counts_before_this_publish.root_position();
+    // 每个节点的孩子区间每层顺着累加一遍（一个一个问、每个都从这一层最左加起是这一层节点数的平方）。
+    let children_of_every_node = after.shape.children_of_every_node();
     for (position, origin) in after.node_origins() {
-        let identity = to_build.roles.of_node(position, &after.shape);
-        let children = after.shape.children_of(position);
+        let identity = to_build.roles.of_node(position, root_position);
+        let children = children_of_every_node[usize::from(position.level) - 1]
+            [usize::try_from(position.index_in_level).expect("同层序号装得进 usize")]
+        .clone();
         // 这个节点的条目：(分隔 key, 身份引用, 子指针)，按孩子的次序；连同每个孩子那一枝最右那片容器的号。
         let entries_and_largest_container_numbers: Vec<((u64, PackedIdentity, NodePointer), u64)> =
             children
@@ -14051,7 +14566,7 @@ where
                 }
             }
             ContainerTreeNodeOrigin::CarriedFromThePreviousVersion => DeletionTreeNodeUnit {
-                pointer: if after.shape_before_this_publish.is_the_root(position) {
+                pointer: if root_before_this_publish == Some(position) {
                     (to_build.carried_root_pointer)()
                 } else {
                     (to_build.carried_node_below_the_root_pointer)(position)
@@ -14067,7 +14582,7 @@ where
                 largest_container_number,
             ),
         );
-        if after.shape.is_the_root(position) {
+        if root_position == Some(position) {
             root = Some(node);
         } else {
             nodes_below_the_root.push(ContainerTreeNodeBelowTheRootUnit {
@@ -14075,7 +14590,7 @@ where
                 identity,
                 identity_in_the_previous_version: to_build
                     .roles
-                    .of_node(position, &after.shape_before_this_publish),
+                    .of_node(position, root_before_this_publish),
                 node,
             });
         }
@@ -14557,7 +15072,7 @@ fn publish_admitted<Device: BlockDevice>(
             PublishedUnit {
                 slot: destination.slot,
                 identity: relocation.role_for_the_checks,
-                bytes: relocation.bytes.clone(),
+                bytes: Arc::from(relocation.bytes.as_slice()),
             },
             NamedUnit {
                 locations: destination_locations,
@@ -14750,7 +15265,7 @@ fn publish_admitted<Device: BlockDevice>(
             let position = usize::try_from(transaction.unit_index_in_file.0).expect("单元序号");
             if position < data_pointers.len() {
                 data_pointers[position] = pointer;
-                data_units[position] = data_unit;
+                data_units[position] = Arc::from(data_unit);
             } else {
                 assert_eq!(
                     position,
@@ -14758,7 +15273,7 @@ fn publish_admitted<Device: BlockDevice>(
                     "部分写新加的单元从上一版的单元数起连号接在后面"
                 );
                 data_pointers.push(pointer);
-                data_units.push(data_unit);
+                data_units.push(Arc::from(data_unit));
             }
         }
     }
@@ -15780,7 +16295,7 @@ fn publish_admitted<Device: BlockDevice>(
 
     // 这一版全部角色的单元：重写的是这次装的，照抄的从上一版拷（按 bump 次序：每个数据单元、extent 根、每片 inode 叶容器、
     // inode 根、分配记录树、记账树与中央映射树的每个节点（树内先叶后根）、树表，实例表链的各片在末尾）。
-    let rewritten_unit = |identity: TransactionUnit, bytes: Vec<u8>| PublishedUnit {
+    let rewritten_unit = |identity: TransactionUnit, bytes: Arc<[u8]>| PublishedUnit {
         slot: slot_of(identity),
         identity,
         bytes,
@@ -15823,7 +16338,7 @@ fn publish_admitted<Device: BlockDevice>(
                     identity,
                 )
             }
-            None | Some(_) => rewritten_unit(identity, data_unit.clone()),
+            None | Some(_) => rewritten_unit(identity, Arc::clone(data_unit)),
         });
     }
     // 第一个文件之外各文件的数据单元（按 inode 号、单元序号）：这次写的那一个是这次装的，别的从上一版照抄。
@@ -15837,11 +16352,12 @@ fn publish_admitted<Device: BlockDevice>(
                         .expect("计划里整份重写的那个文件就是这次写的那一个");
                     rewritten_unit(
                         identity,
-                        written_units
-                            .data_units
-                            .get(usize::try_from(position).expect("单元序号"))
-                            .expect("这次写的那个文件的单元数就是计划里的单元数")
-                            .clone(),
+                        Arc::clone(
+                            written_units
+                                .data_units
+                                .get(usize::try_from(position).expect("单元序号"))
+                                .expect("这次写的那个文件的单元数就是计划里的单元数"),
+                        ),
                     )
                 }
                 FileOtherThanTheFirstOrigin::SizeChangedThisPublish { .. }
@@ -15851,14 +16367,16 @@ fn publish_admitted<Device: BlockDevice>(
                 {
                     rewritten_unit(
                         identity,
-                        rewritten_data_unit_of_a_file_other_than_the_first(
-                            &data_units_of_a_file_other_than_the_first_rewritten,
-                            file_plan.inode,
-                            DataUnitIndexInFile(position),
-                        )
-                        .expect("计划里重写的单元就是这次装的那一段里的（同一份计划拼的）")
-                        .bytes
-                        .clone(),
+                        Arc::from(
+                            rewritten_data_unit_of_a_file_other_than_the_first(
+                                &data_units_of_a_file_other_than_the_first_rewritten,
+                                file_plan.inode,
+                                DataUnitIndexInFile(position),
+                            )
+                            .expect("计划里重写的单元就是这次装的那一段里的（同一份计划拼的）")
+                            .bytes
+                            .as_slice(),
+                        ),
                     )
                 }
                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
@@ -15877,7 +16395,7 @@ fn publish_admitted<Device: BlockDevice>(
         let identity = TransactionUnit::InodeLeafContainer(container.index);
         units.push(match container.origin {
             InodeLeafContainerOrigin::RewrittenThisPublish => {
-                rewritten_unit(identity, container.bytes.clone())
+                rewritten_unit(identity, Arc::from(container.bytes.as_slice()))
             }
             // 照抄上一版那个叶序上的那一份（字节、落点不动），装进这一版时换成这一版的角色。
             InodeLeafContainerOrigin::CarriedFrom(previous_index) => {
@@ -15896,7 +16414,7 @@ fn publish_admitted<Device: BlockDevice>(
         });
     }
     units.push(match &inode_tree_units.rewritten_root {
-        Some(root) => rewritten_unit(TransactionUnit::InodeRoot, root.bytes.clone()),
+        Some(root) => rewritten_unit(TransactionUnit::InodeRoot, Arc::from(root.bytes.as_slice())),
         None => carried_unit(
             units_of_the_previous_version
                 .as_ref()
@@ -15927,7 +16445,9 @@ fn publish_admitted<Device: BlockDevice>(
     units.extend(deadlist_built.units.iter().cloned());
     let deletion_tree_unit =
         |identity: TransactionUnit, node: &DeletionTreeNodeUnit| match &node.rewritten {
-            Some(rewritten_node) => rewritten_unit(identity, rewritten_node.bytes.clone()),
+            Some(rewritten_node) => {
+                rewritten_unit(identity, Arc::from(rewritten_node.bytes.as_slice()))
+            }
             None => carried_unit(
                 units_of_the_previous_version
                     .as_ref()
@@ -15941,7 +16461,9 @@ fn publish_admitted<Device: BlockDevice>(
     // 容器树根之下的节点照抄时按它在上一版里的角色拷（长高那次的旧根上一版是根），装进这一版时换成这一版的角色。
     let container_tree_node_below_the_root_unit =
         |node: &ContainerTreeNodeBelowTheRootUnit| match &node.node.rewritten {
-            Some(rewritten_node) => rewritten_unit(node.identity, rewritten_node.bytes.clone()),
+            Some(rewritten_node) => {
+                rewritten_unit(node.identity, Arc::from(rewritten_node.bytes.as_slice()))
+            }
             None => {
                 let carried = carried_unit(
                     units_of_the_previous_version
@@ -16001,13 +16523,13 @@ fn publish_admitted<Device: BlockDevice>(
     units.extend(mapping_built.units.iter().cloned());
     units.push(rewritten_unit(
         TransactionUnit::TreeTable,
-        tree_table_unit.clone(),
+        Arc::from(tree_table_unit.as_slice()),
     ));
     // 实例表链上的各片按链上的次序（第 0 片在前）：重写的是这次装的，照抄的是上一版带着的那几片。
     match (&plan.instance_table, previous) {
         (InstanceTablePlan::Rewrite(_), _) => {
             for page in &instance_table_rewrite {
-                units.push(rewritten_unit(page.role, page.bytes.clone()));
+                units.push(rewritten_unit(page.role, Arc::from(page.bytes.as_slice())));
             }
         }
         (InstanceTablePlan::Carry(_), Some(previous_version)) => {
@@ -16390,6 +16912,8 @@ fn publish_admitted<Device: BlockDevice>(
     } = written_records
         .pop()
         .expect("一次发布至少一条记录（`roles_named_by_each_record_of_the_publish` 至少给一项）");
+    // 装好这一版的 units 之后记下两棵容器树根单元的下标：下一次准入读 H 按它直接取（运行时决策路径，不在 units 上找）。
+    let container_tree_root_unit_positions = ContainerTreeRootUnitPositions::of_the_units(&units);
     let output = TransactionOutput {
         root,
         record,
@@ -16505,6 +17029,8 @@ fn publish_admitted<Device: BlockDevice>(
             .max(last_transaction_of_this_publish),
         // 落盘之后由 `persist_the_publish_or_freeze_it` 换成这次真写出去的账。
         writes: WritesByStructureKind::NOTHING_WRITTEN,
+        container_tree_root_unit_positions,
+        inode_record_counts: resolved.inode_record_counts,
     };
     Ok((writes, output))
 }
@@ -16672,7 +17198,7 @@ fn build_multi_level_tree(
                     PublishedUnit {
                         slot,
                         identity,
-                        bytes,
+                        bytes: Arc::from(bytes),
                     },
                 )
             }
@@ -16694,6 +17220,66 @@ fn build_multi_level_tree(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 根之下节点的指针按位置直接取，不在指针表上逐项找（运行时决策路径之外装单元时每个照抄的节点都问一次，逐项找合起来是节点数的平方）：
+    /// 层级 1 有 20000 个节点的三层形状（根之下 20200 个节点），指针表按 bump 次序、每项的出生序号就是它的下标；表头那一项故意记成要问的
+    /// 那个位置、带另一个指针——逐项找的写法先碰到它、交回那个错的，按下标取的写法只看「这一层之前各层的节点数之和 + 同层序号」那一格。
+    #[test]
+    fn a_node_pointer_below_the_root_is_taken_at_its_position_in_bump_order() {
+        const LEVEL_ONE_NODES: usize = 20_000;
+        const LEVEL_TWO_NODES: usize = 200;
+        let shape = ContainerTreeShape::from_children_of_each_node_at_each_level(vec![
+            vec![3; LEVEL_ONE_NODES],
+            vec![100; LEVEL_TWO_NODES],
+            vec![LEVEL_TWO_NODES],
+        ])
+        .expect("每层孩子数之和等于下一层的节点数、根一个节点");
+        let pointer_numbered = |number: u32| NodePointer {
+            head: NodePointer::empty_root().head,
+            locations: NodePointer::empty_root().locations,
+            instance: NodePointer::empty_root().instance,
+            birth_sequence: BirthSequence(number),
+        };
+        let asked = ContainerTreeNodePosition {
+            level: 2,
+            index_in_level: 7,
+        };
+        let mut pointers_below_the_root: Vec<(ContainerTreeNodePosition, NodePointer)> = shape
+            .positions_in_bump_order()
+            .into_iter()
+            .filter(|position| !shape.is_the_root(*position))
+            .zip(0..)
+            .map(|(position, number)| (position, pointer_numbered(number)))
+            .collect();
+        pointers_below_the_root[0] = (asked, pointer_numbered(u32::MAX));
+        let version = ContainerTreeIndexNodesVersion {
+            shape,
+            pointers_below_the_root,
+        };
+        assert_eq!(
+            version.pointer_below_the_root(asked),
+            Some(pointer_numbered(
+                u32::try_from(LEVEL_ONE_NODES + 7).expect("两万多装得进 u32")
+            )),
+            "层级 2 第 7 个在 bump 次序里是层级 1 的 20000 个之后的第 7 项"
+        );
+        assert_eq!(
+            version.pointer_below_the_root(ContainerTreeNodePosition {
+                level: 3,
+                index_in_level: 0
+            }),
+            None,
+            "根不在根之下的指针表里"
+        );
+        assert_eq!(
+            version.pointer_below_the_root(ContainerTreeNodePosition {
+                level: 2,
+                index_in_level: u32::try_from(LEVEL_TWO_NODES).expect("两百装得进 u32")
+            }),
+            None,
+            "形状里没有的位置"
+        );
+    }
 
     /// D5（快照 / 空间记账机制） 已定项 14 的左边界：birth == S.txg 时快照引用它（进 deadlist），birth == S.txg + 1 时不引用（释放）；
     /// 映射 key 不是 27 字节（birth 取不到）默认进 deadlist（「判据的输入取不到时默认进 deadlist」）。没打过快照（p = 0）时一律释放。
@@ -16932,7 +17518,7 @@ mod tests {
         // （inode 树那个计数器上面一个都没用过，所以从 0 起）。
         let mut records = Vec::new();
         // 这里不写 `change_count: txg.0,`：`crates/mutations.tsv` 按那串字面锚在 `publish_overwrite` 上，
-        // 同一份文件里出现两次它就腐化（门禁 checker-tier-crates-mutation-replay 判锚点恰好命中一次）。
+        // 同一份文件里出现两次它就腐化（门禁 crates-mutation-replay 判锚点恰好命中一次）。
         let change_count = txg.0;
         for inode in 1..=(INODE_LEAF_RECORDS + 1) {
             records.push(InodeRecord {

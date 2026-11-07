@@ -4,7 +4,9 @@
 //! trait 头与它的每个成员；const；static；struct / enum / union；type 别名；`macro_rules!` 整个定义；每条 use；
 //! 条目级宏调用（带路径的 `a::b::m! { … }` 与 `m! { … }` 同一种）；`mod x;`（连 `#[path]`）；行内模块头与文件开头的内属性；
 //! extern 块；extern crate。`thread_local!` 展开成里面的 static 再切；`verus!` 里的条目按「从这个条目起头到下一个同层条目起头之前」
-//! 整段一个单元（Verus 的 `requires` / `ensures` 可以带花括号，「签名之后第一个 `{` 是函数体」不成立）。
+//! 整段一个单元（Verus 的 `requires` / `ensures` 可以带花括号，「签名之后第一个 `{` 是函数体」不成立）；其中
+//! `assume_specification[ 路径 ] …;`（带不带可见性、属性、泛型参数表、参数表、`returns` 都算）是一个 `assume_specification` 单元，
+//! 名字写 `assume_specification@<关键字那一行>`，按方括号里路径末段的名字找得到它。
 //! 文档注释不进条目指纹；文档注释里的 ```` ``` ```` Rust 代码块另成文档测试单元，挂在所属条目（或模块）下。
 
 use std::collections::{BTreeSet, HashSet};
@@ -22,9 +24,9 @@ use crate::lexer::{
 use crate::rule_switches::{BrokenRule, RuleSwitches};
 use crate::sha256::{sha256_of, Sha256Digest, Sha256Hasher};
 use crate::units::{
-    DocumentationTestAttachment, FileIndex, ImplementationShape, ModuleDeclarationShape,
-    ReadOrigin, Refusal, RefusalForm, SourceRead, Unit, UnitIndex, UnitKind, UnitReferences,
-    UseImports,
+    directory_digest, ChildTestName, DocumentationTestAttachment, FileIndex, ImplementationShape,
+    ModuleDeclarationShape, ReadOrigin, Refusal, RefusalForm, SourceRead, TestNamePiece, Unit,
+    UnitIndex, UnitKind, UnitReferences, UseImports,
 };
 
 /// 词法单元之间的分隔字节：单元串按它连起来取 SHA-256。
@@ -34,6 +36,31 @@ pub const UNIT_SEPARATOR: u8 = 0x1f;
 const FRAGMENT_TOKEN_LIMIT: usize = 12;
 /// 拒算行的原样片段最多几个字符。
 const FRAGMENT_CHARACTER_LIMIT: usize = 160;
+
+/// 找 impl 自身类型路径的头一段时跳过的词（与 `scripts/gate/lib_function_units.py` 的 `SELF_TYPE_SKIPPED` 同一份）。
+const WORDS_BEFORE_THE_SELF_TYPE_PATH_ROOT: [&str; 8] = [
+    "dyn", "mut", "const", "impl", "for", "where", "as", "unsafe",
+];
+
+/// `env!` / `option_env!` 读的变量里 cargo 自己给的那一类的前缀（`CARGO_MANIFEST_DIR`、`CARGO_BIN_EXE_<名>`、`CARGO_PKG_*` 这类）。
+const CARGO_SUPPLIED_ENVIRONMENT_VARIABLE_PREFIX: &str = "CARGO";
+/// cargo 给构建脚本输出目录的变量。
+const BUILD_SCRIPT_OUTPUT_DIRECTORY_VARIABLE: &str = "OUT_DIR";
+
+/// 清单目录拼出的目录绑到名字、名字的用法再绑到名字，最多跟这么多层（再深的拒算）。
+const DEEPEST_DIRECTORY_BINDING_CHAIN: usize = 4;
+
+/// 单元里出现这几个词算起了子进程：此时 `current_exe()` 折不出要点名的那一条测试就拒算 `current-exe`；一个都没有的只是在问路径，
+/// 不拒算（与 `scripts/gate/lib_function_units.py` 的 `SPAWNING_WORDS` 同一份）。
+const SPAWNING_WORDS: [&str; 7] = [
+    "Command",
+    "spawn",
+    "posix_spawn",
+    "fork",
+    "execv",
+    "execve",
+    "execvp",
+];
 
 const RUST_KEYWORDS: [&str; 39] = [
     "as",
@@ -477,11 +504,183 @@ enum IncludeArgument {
     NotAllowed,
 }
 
-/// 运行期按清单目录拼路径读文件，折得出折不出。
+/// 运行期按清单目录拼路径读，折出来的一样（拼出的目录绑到一个名字上时，那个名字的每一处用法各折一样）。
 enum RuntimeFold {
     File(PathBuf),
+    /// `crates/` 之下（不是 `crates/` 本身）的一个目录：整个目录当一个数据单元。
+    Directory(PathBuf),
     Missing(PathBuf),
     NotFoldable,
+}
+
+/// `env!` / `option_env!` 读的这个变量的值只能由本 crate 构建脚本经 `cargo::rustc-env` 交进来：不空、不以 `CARGO` 起头、也不是 `OUT_DIR`
+/// （`SourceRead::BuildScriptEnvironmentValue`；与 `scripts/gate/lib_function_units.py` 的 `build-environment` 那一支同一个判法）。
+fn is_handed_over_by_a_build_script(variable: &str) -> bool {
+    !variable.is_empty()
+        && !variable.starts_with(CARGO_SUPPLIED_ENVIRONMENT_VARIABLE_PREFIX)
+        && variable != BUILD_SCRIPT_OUTPUT_DIRECTORY_VARIABLE
+}
+
+/// 名字的写法是不是一个标识符（`r#` 起头的也算）。
+fn is_identifier_text(text: &str) -> bool {
+    let name = identifier_name(text);
+    let mut characters = name.chars();
+    characters
+        .next()
+        .is_some_and(|first| first.is_alphabetic() || first == '_')
+        && characters.all(|character| character.is_alphanumeric() || character == '_')
+}
+
+/// `format!` 的格式串与实参折成测试名的几段：`{}` 依次取实参、`{数字}` 按位置取、`{名字}` 是常量；带格式说明（`{:?}`）、
+/// 具名实参或实参不是字面串与常量名的，交 `None`。
+fn format_pieces(inside: &[&str]) -> Option<Vec<TestNamePiece>> {
+    let parts = split_at_top_level_commas(inside);
+    let (format_part, argument_parts) = parts.split_first()?;
+    let [format_literal] = format_part.as_slice() else {
+        return None;
+    };
+    let template = plain_string_content(format_literal)?;
+    let mut arguments = Vec::new();
+    for argument in argument_parts {
+        match argument.as_slice() {
+            [literal] if plain_string_content(literal).is_some() => arguments.push(
+                TestNamePiece::Literal(plain_string_content(literal)?.to_string()),
+            ),
+            [identifier] | ["&", identifier] if is_identifier_text(identifier) => arguments.push(
+                TestNamePiece::Constant(identifier_name(identifier).to_string()),
+            ),
+            _ => return None,
+        }
+    }
+    let characters: Vec<char> = template.chars().collect();
+    let mut pieces = Vec::new();
+    let mut literal_run = String::new();
+    let mut next_positional = 0usize;
+    let mut position = 0usize;
+    while position < characters.len() {
+        let current = characters[position];
+        let next = characters.get(position + 1).copied();
+        match (current, next) {
+            ('{', Some('{')) | ('}', Some('}')) => {
+                literal_run.push(current);
+                position += 2;
+            }
+            ('{', _) => {
+                let close =
+                    (position + 1..characters.len()).find(|index| characters[*index] == '}')?;
+                let placeholder: String = characters[position + 1..close].iter().collect();
+                if !literal_run.is_empty() {
+                    pieces.push(TestNamePiece::Literal(std::mem::take(&mut literal_run)));
+                }
+                if placeholder.is_empty() {
+                    pieces.push(arguments.get(next_positional)?.clone());
+                    next_positional += 1;
+                } else if placeholder
+                    .chars()
+                    .all(|character| character.is_ascii_digit())
+                {
+                    let argument_position: usize = placeholder.parse().ok()?;
+                    pieces.push(arguments.get(argument_position)?.clone());
+                } else if is_identifier_text(&placeholder) {
+                    pieces.push(TestNamePiece::Constant(placeholder));
+                } else {
+                    return None;
+                }
+                position = close + 1;
+            }
+            ('}', _) => return None,
+            _ => {
+                literal_run.push(current);
+                position += 1;
+            }
+        }
+    }
+    if !literal_run.is_empty() {
+        pieces.push(TestNamePiece::Literal(literal_run));
+    }
+    Some(pieces)
+}
+
+/// 一个表达式（词法单元原文）折成子进程测试名的几段：字面串、常量名（`&常量名` 同）、全由字面串与常量组成的 `format!`、
+/// 全是字面串的 `concat!`。别的写法交 `None`。闭包里折调用处实参时同用这一份（`closure`）。
+#[must_use]
+pub fn test_name_pieces_of_texts(texts: &[&str]) -> Option<Vec<TestNamePiece>> {
+    match texts {
+        [literal] if plain_string_content(literal).is_some() => Some(vec![TestNamePiece::Literal(
+            plain_string_content(literal)?.to_string(),
+        )]),
+        [identifier] | ["&", identifier] if is_identifier_text(identifier) => {
+            Some(vec![TestNamePiece::Constant(
+                identifier_name(identifier).to_string(),
+            )])
+        }
+        ["format", "!", "(", inside @ .., ")"] => format_pieces(inside),
+        ["concat", "!", "(", inside @ .., ")"] => split_at_top_level_commas(inside)
+            .iter()
+            .map(|part| match part.as_slice() {
+                [literal] => plain_string_content(literal)
+                    .map(|content| TestNamePiece::Literal(content.to_string())),
+                _ => None,
+            })
+            .collect(),
+        _ => None,
+    }
+}
+
+/// 一段条件链里有没有 `test` 这一项（与起来的：`test` 本身，或 `all(…)` 里的一项）：有它，这段代码只在测试里编进来。
+#[must_use]
+pub fn predicate_requires_the_test_configuration(predicate: &Predicate) -> bool {
+    match predicate {
+        Predicate::Name(name) => name == "test",
+        Predicate::All(conjuncts) => conjuncts
+            .iter()
+            .any(predicate_requires_the_test_configuration),
+        Predicate::KeyValue { .. }
+        | Predicate::Any(_)
+        | Predicate::Not(_)
+        | Predicate::Unrecognized(_) => false,
+    }
+}
+
+/// 一份文件里 `const 名字: &str = env!("CARGO_MANIFEST_DIR");` 这一形的私有常量（`pub` 的不收：别的文件里的用法这里看不见）。
+/// 文件里哪个串字面量带 `{名字` 的格式捕获也不收：捕获里的用法不是词法单元，跟不到。
+fn private_manifest_directory_constants(source: &str, tokens: &[Token]) -> BTreeSet<String> {
+    let text_at = |index: usize| {
+        tokens
+            .get(index)
+            .map_or("", |token| token_text(source, token))
+    };
+    let mut constants = BTreeSet::new();
+    for index in 0..tokens.len() {
+        if text_at(index) != "const"
+            || tokens[index + 1..].first().map(|token| token.kind) != Some(TokenKind::Identifier)
+        {
+            continue;
+        }
+        let is_public = index > 0 && matches!(text_at(index - 1), "pub" | ")");
+        let Some(equals) = (index + 2..tokens.len().min(index + 12))
+            .find(|position| matches!(text_at(*position), "=" | ";"))
+        else {
+            continue;
+        };
+        let is_manifest_directory = text_at(equals) == "="
+            && text_at(equals + 1) == "env"
+            && text_at(equals + 2) == "!"
+            && text_at(equals + 3) == "("
+            && plain_string_content(text_at(equals + 4)) == Some("CARGO_MANIFEST_DIR")
+            && text_at(equals + 5) == ")"
+            && text_at(equals + 6) == ";";
+        if is_manifest_directory && !is_public {
+            constants.insert(identifier_name(text_at(index + 1)).to_string());
+        }
+    }
+    constants.retain(|name| {
+        let capture = format!("{{{name}");
+        !tokens.iter().any(|token| {
+            token.kind == TokenKind::Literal && token_text(source, token).contains(&capture)
+        })
+    });
+    constants
 }
 
 struct RustScanner<'scan> {
@@ -493,6 +692,8 @@ struct RustScanner<'scan> {
     tokens: &'scan [Token],
     closes: &'scan [Option<usize>],
     documentation_comments: &'scan [DocumentationComment],
+    /// 这份文件里的私有清单目录常量（[`private_manifest_directory_constants`]）：它们的用法按 `env!("CARGO_MANIFEST_DIR")` 折。
+    manifest_directory_constants: BTreeSet<String>,
     units: Vec<Unit>,
     file_level_refusals: Vec<Refusal>,
 }
@@ -548,7 +749,7 @@ impl<'scan> RustScanner<'scan> {
 
     fn refusal(&self, form: RefusalForm, at_token: usize, fragment: String) -> Refusal {
         Refusal {
-            file: self.file,
+            file: crate::units::RefusalFile::WorkspaceSourceFile(self.file),
             line: self.line_of(at_token),
             form,
             fragment,
@@ -803,7 +1004,7 @@ impl<'scan> RustScanner<'scan> {
                 let self_type_names = names_in(for_position + 1, where_index);
                 // 自身类型里任何深度出现这个 impl 自己的一个泛型参数（`for T`、`&T`、`Box<T>`、`(u32, T)`、`[T; N]`、
                 // `Option<Box<T>>`）就算 blanket：这类 impl 的自身类型里可能一个能被点名的具体名字都没有（`[T]`），
-                // 不放行它的成员就进不了任何闭包、键过窄（定案 3「多连不少连」）。全具体的自身类型照旧等被点名。
+                // 不放行它的成员就进不了任何闭包、键过窄（「多连不少连」）。全具体的自身类型照旧等被点名。
                 let is_blanket_implementation = self_type_names
                     .iter()
                     .any(|name| generic_parameters.contains(name));
@@ -812,6 +1013,7 @@ impl<'scan> RustScanner<'scan> {
                     trait_name,
                     is_trait_implementation: true,
                     is_blanket_implementation,
+                    self_type_path_root: self.self_type_path_root(for_position + 1, where_index),
                 }
             }
             None => ImplementationShape {
@@ -819,14 +1021,26 @@ impl<'scan> RustScanner<'scan> {
                 trait_name: None,
                 is_trait_implementation: false,
                 is_blanket_implementation: false,
+                self_type_path_root: self.self_type_path_root(index, where_index),
             },
         }
+    }
+
+    /// impl 自身类型（`range_start..range_end`）写成路径 `a::B` 时的头一段：跳过 [`WORDS_BEFORE_THE_SELF_TYPE_PATH_ROOT`] 之后的头一个名字，
+    /// 后面紧接 `::` 才算；不是路径的交 `None`（`ImplementationShape::self_type_path_root`）。
+    fn self_type_path_root(&self, range_start: usize, range_end: usize) -> Option<String> {
+        let first_name = (range_start..range_end).find(|position| {
+            self.is_identifier(*position)
+                && !WORDS_BEFORE_THE_SELF_TYPE_PATH_ROOT.contains(&self.text_of(*position))
+        })?;
+        (self.text_of(first_name + 1) == ":" && self.text_of(first_name + 2) == ":")
+            .then(|| self.name_at(first_name))
     }
 
     fn use_imports(&self, low: usize, high: usize) -> UseImports {
         let mut imports = UseImports::default();
         let mut names = BTreeSet::new();
-        // 套着的每一层 `{` 前面那一段（`a::{` 的 `a`；不是名字、或是 self / super / crate 的记 None）：花括号里的 `self` 引进的就是它（定案 3）
+        // 套着的每一层 `{` 前面那一段（`a::{` 的 `a`；不是名字、或是 self / super / crate 的记 None）：花括号里的 `self` 引进的就是它
         let mut segments_before_the_braces: Vec<Option<String>> = Vec::new();
         let original_name_at = |index: usize, segments: &[Option<String>]| -> Option<String> {
             let name = self.name_at(index);
@@ -981,22 +1195,212 @@ impl<'scan> RustScanner<'scan> {
         Some(normalized_path(Path::new(&joined)))
     }
 
+    fn text_before(&self, index: usize) -> &'scan str {
+        index
+            .checked_sub(1)
+            .map_or("", |previous| self.text_of(previous))
+    }
+
+    /// 折出的目录落在清单目录的上一级（`crates/`）之下、又不是它本身：目录数据单元；仓根、`crates/` 之外与 `crates/` 整个照旧拒算。
+    fn directory_fold(&self, folded: PathBuf) -> RuntimeFold {
+        match self.manifest_directory.and_then(Path::parent) {
+            Some(crates_directory)
+                if folded.starts_with(crates_directory) && folded != crates_directory =>
+            {
+                RuntimeFold::Directory(folded)
+            }
+            Some(_) | None => RuntimeFold::NotFoldable,
+        }
+    }
+
+    /// `std::path::Path::new` 这类写法起头的那个词法单元：从 `new` / `from` 往回跨过 `名字 ::`。
+    fn path_expression_start(&self, constructor_index: usize) -> usize {
+        let mut start = constructor_index;
+        while start >= 3
+            && self.text_of(start - 1) == ":"
+            && self.text_of(start - 2) == ":"
+            && self.is_identifier(start - 3)
+        {
+            start -= 3;
+        }
+        start
+    }
+
+    /// 从 `expression_start` 起、到 `after_expression` 之前的表达式整个是 `let [mut] 名字 [: 类型] = …;` 的右边时，交那个名字。
+    fn let_binding_name(&self, expression_start: usize, after_expression: usize) -> Option<String> {
+        if self.text_of(after_expression) != ";" || self.text_before(expression_start) != "=" {
+            return None;
+        }
+        let equals = expression_start - 1;
+        let let_index = (0..equals)
+            .rev()
+            .find(|position| matches!(self.text_of(*position), "let" | ";" | "{" | "}" | "="))?;
+        if self.text_of(let_index) != "let" {
+            return None;
+        }
+        let mut name_index = let_index + 1;
+        if self.text_of(name_index) == "mut" {
+            name_index += 1;
+        }
+        if !self.is_identifier(name_index) {
+            return None;
+        }
+        let is_plain = name_index + 1 == equals;
+        let is_typed = self.text_of(name_index + 1) == ":" && self.text_of(name_index + 2) != ":";
+        (is_plain || is_typed).then(|| self.name_at(name_index))
+    }
+
+    /// 名字在 `from..end` 里的每一处用法（`.名字` 的字段或方法、`名字::` 的路径段不算）；碰到再 `let` 这个名字就停（之后是另一个值）。
+    fn uses_of_the_binding(&self, name: &str, from: usize, end: usize) -> Vec<usize> {
+        let mut uses = Vec::new();
+        for index in from..end {
+            if !self.is_identifier(index) || self.name_at(index) != name {
+                continue;
+            }
+            let previous = self.text_before(index);
+            if previous == "let" || (previous == "mut" && self.text_before(index - 1) == "let") {
+                break;
+            }
+            if previous == "." || (self.text_of(index + 1) == ":" && self.text_of(index + 2) == ":")
+            {
+                continue;
+            }
+            uses.push(index);
+        }
+        uses
+    }
+
+    /// 从 `chain_start` 起接字面 `.join("…")` 链，拼在 `base` 后面。折出的是目录、表达式又整个是一条 `let 名字 = …;` 的右边时，
+    /// 交那个名字每一处用法折出的（[`Self::fold_use_of_a_path`]；名字后面再没用到的交目录本身）：名字之后接了 `.parent()`、
+    /// `.join(变量)` 这类的，那一处拒算，读整棵仓的写法照旧拒。
+    fn fold_path_chain(
+        &self,
+        base: &Path,
+        chain_start: usize,
+        expression_start: usize,
+        unit_end: usize,
+        binding_depth: usize,
+    ) -> Vec<RuntimeFold> {
+        let mut path = base.to_path_buf();
+        let mut position = chain_start;
+        while self.text_of(position) == "."
+            && self.text_of(position + 1) == "join"
+            && self.text_of(position + 2) == "("
+            && self.text_of(position + 4) == ")"
+        {
+            let Some(content) = plain_string_content(self.text_of(position + 3)) else {
+                break;
+            };
+            path.push(content);
+            position += 5;
+        }
+        // 字面 `.join(…)` 链之后还接任何方法（`.canonicalize()`、`.parent()`、`.join(变量)`、`.read_dir()` 这类）：
+        // 拼出的不再是交给读文件的那条字面路径，拒算（与 `scripts/gate/lib_function_units.py` 的 `runtime_manifest_path` 同一条）
+        if self.text_of(position) == "." {
+            return vec![RuntimeFold::NotFoldable];
+        }
+        let folded = normalized_path(&path);
+        if folded.is_file() {
+            return vec![RuntimeFold::File(folded)];
+        }
+        if !folded.is_dir() {
+            return vec![RuntimeFold::Missing(folded)];
+        }
+        let Some(binding) = self.let_binding_name(expression_start, position) else {
+            return vec![self.directory_fold(folded)];
+        };
+        if binding_depth >= DEEPEST_DIRECTORY_BINDING_CHAIN {
+            return vec![RuntimeFold::NotFoldable];
+        }
+        let uses = self.uses_of_the_binding(&binding, position + 1, unit_end);
+        if uses.is_empty() {
+            return vec![self.directory_fold(folded)];
+        }
+        uses.into_iter()
+            .flat_map(|use_index| {
+                self.fold_use_of_a_path(&folded, use_index, unit_end, binding_depth + 1)
+            })
+            .collect()
+    }
+
+    fn is_wrapped_in_a_path_constructor(&self, use_index: usize) -> bool {
+        use_index >= 2
+            && self.text_of(use_index - 1) == "("
+            && matches!(self.text_of(use_index - 2), "new" | "from")
+            && self.text_of(use_index + 1) == ")"
+    }
+
+    /// 绑着一个路径的名字的一处用法：`Path::new(名字)` / `PathBuf::from(名字)` 之后、或名字本身之后接的字面 `.join` 链；
+    /// 名字单独交给别的函数（`strip_prefix(名字)`、`扫目录(名字)`）的，折出的就是它绑着的目录。
+    fn fold_use_of_a_path(
+        &self,
+        value: &Path,
+        use_index: usize,
+        unit_end: usize,
+        binding_depth: usize,
+    ) -> Vec<RuntimeFold> {
+        if self.is_wrapped_in_a_path_constructor(use_index) {
+            return self.fold_path_chain(
+                value,
+                use_index + 2,
+                self.path_expression_start(use_index - 2),
+                unit_end,
+                binding_depth,
+            );
+        }
+        self.fold_path_chain(value, use_index + 1, use_index, unit_end, binding_depth)
+    }
+
+    /// 私有清单目录常量的一处用法：只认 `Path::new(常量)` / `PathBuf::from(常量)`（串拼进 `format!` 这类的拒算）。
+    fn fold_manifest_directory_constant_use(
+        &self,
+        use_index: usize,
+        unit_end: usize,
+    ) -> Vec<RuntimeFold> {
+        match self.manifest_directory {
+            Some(manifest) if self.is_wrapped_in_a_path_constructor(use_index) => {
+                self.fold_use_of_a_path(manifest, use_index, unit_end, 0)
+            }
+            Some(_) | None => vec![RuntimeFold::NotFoldable],
+        }
+    }
+
+    /// `const 名字: &str = env!("CARGO_MANIFEST_DIR");` 里的那个 `env!`，而且名字是这份文件收下的私有清单目录常量。
+    fn is_manifest_directory_constant_definition(
+        &self,
+        environment_index: usize,
+        environment_close: usize,
+    ) -> bool {
+        if self.text_of(environment_close + 1) != ";" || self.text_before(environment_index) != "="
+        {
+            return false;
+        }
+        (environment_index.saturating_sub(12)..environment_index)
+            .rev()
+            .find(|position| self.text_of(*position) == "const")
+            .is_some_and(|const_index| {
+                self.manifest_directory_constants
+                    .contains(&self.name_at(const_index + 1))
+            })
+    }
+
     fn fold_manifest_directory_read(
         &self,
         environment_index: usize,
         environment_close: usize,
-    ) -> RuntimeFold {
+        unit_end: usize,
+    ) -> Vec<RuntimeFold> {
         let Some(manifest) = self.manifest_directory else {
-            return RuntimeFold::NotFoldable;
+            return vec![RuntimeFold::NotFoldable];
         };
-        let folded = if environment_index >= 3
+        if environment_index >= 3
             && self.text_of(environment_index - 1) == "("
             && self.text_of(environment_index - 2) == "!"
             && self.text_of(environment_index - 3) == "concat"
         {
             let concat_close = self.close_of(environment_index - 1);
             if self.text_of(environment_close + 1) != "," && environment_close + 1 != concat_close {
-                return RuntimeFold::NotFoldable;
+                return vec![RuntimeFold::NotFoldable];
             }
             let texts: Vec<&str> = (environment_close + 2..concat_close)
                 .map(|index| self.text_of(index))
@@ -1006,49 +1410,238 @@ impl<'scan> RustScanner<'scan> {
                 match part.as_slice() {
                     [literal] => match plain_string_content(literal) {
                         Some(content) => suffix.push_str(content),
-                        None => return RuntimeFold::NotFoldable,
+                        None => return vec![RuntimeFold::NotFoldable],
                     },
-                    _ => return RuntimeFold::NotFoldable,
+                    _ => return vec![RuntimeFold::NotFoldable],
                 }
             }
-            match self.manifest_relative_path(&suffix) {
-                Some(path) => path,
-                None => return RuntimeFold::NotFoldable,
-            }
-        } else if environment_index >= 2
+            let Some(folded) = self.manifest_relative_path(&suffix) else {
+                return vec![RuntimeFold::NotFoldable];
+            };
+            // `concat!` 拼出的是串：绑到名字上的不跟（用法里的 `Path::new(名字).parent()` 看不见），只认就地交出去的那一处
+            return if folded.is_file() {
+                vec![RuntimeFold::File(folded)]
+            } else if !folded.is_dir() {
+                vec![RuntimeFold::Missing(folded)]
+            } else if self
+                .let_binding_name(environment_index - 3, concat_close + 1)
+                .is_some()
+            {
+                vec![RuntimeFold::NotFoldable]
+            } else {
+                vec![self.directory_fold(folded)]
+            };
+        }
+        if environment_index >= 2
             && self.text_of(environment_index - 1) == "("
             && matches!(self.text_of(environment_index - 2), "new" | "from")
             && self.close_of(environment_index - 1) == environment_close + 1
         {
-            let mut path = manifest.to_path_buf();
-            let mut position = environment_close + 2;
-            while self.text_of(position) == "."
-                && self.text_of(position + 1) == "join"
-                && self.text_of(position + 2) == "("
-                && self.text_of(position + 4) == ")"
-            {
-                let Some(content) = plain_string_content(self.text_of(position + 3)) else {
-                    break;
-                };
-                path.push(content);
-                position += 5;
-            }
-            // 字面 `.join(…)` 链之后还接任何方法（`.canonicalize()`、`.parent()`、`.join(变量)`、`.read_dir()` 这类）：
-            // 拼出的不再是交给读文件的那条字面路径，拒算（与 `scripts/gate/lib_function_units.py` 的 `runtime_manifest_path` 同一条）
-            if self.text_of(position) == "." {
-                return RuntimeFold::NotFoldable;
-            }
-            normalized_path(&path)
-        } else {
-            return RuntimeFold::NotFoldable;
-        };
-        if folded.is_file() {
-            RuntimeFold::File(folded)
-        } else if folded.is_dir() {
-            RuntimeFold::NotFoldable
-        } else {
-            RuntimeFold::Missing(folded)
+            return self.fold_path_chain(
+                manifest,
+                environment_close + 2,
+                self.path_expression_start(environment_index - 2),
+                unit_end,
+                0,
+            );
         }
+        if self.is_manifest_directory_constant_definition(environment_index, environment_close) {
+            // 读在常量的用法那几处折（`fold_manifest_directory_constant_use`）
+            return Vec::new();
+        }
+        vec![RuntimeFold::NotFoldable]
+    }
+
+    /// 一样折出的东西记成读或拒算；拒算落在起折的那个词法单元（`env!` 或常量名）上。
+    fn record_runtime_fold(
+        &self,
+        fold: RuntimeFold,
+        origin_index: usize,
+        reads: &mut Vec<SourceRead>,
+        refusals: &mut Vec<Refusal>,
+    ) {
+        let line = self.line_of(origin_index);
+        let read = match fold {
+            RuntimeFold::File(path) => self.file_read(path, line, ReadOrigin::Runtime),
+            RuntimeFold::Directory(path) => match directory_digest(&path) {
+                Ok(digest) => SourceRead::Directory {
+                    absolute_path: path,
+                    line,
+                    digest,
+                },
+                Err(unreadable) => {
+                    refusals.push(self.refusal(
+                        RefusalForm::DataFileUnreadable,
+                        origin_index,
+                        cleaned_fragment(&unreadable.display().to_string()),
+                    ));
+                    return;
+                }
+            },
+            RuntimeFold::Missing(path) => {
+                refusals.push(self.refusal(
+                    RefusalForm::DataFileUnreadable,
+                    origin_index,
+                    cleaned_fragment(&path.display().to_string()),
+                ));
+                return;
+            }
+            RuntimeFold::NotFoldable => {
+                refusals.push(self.refusal(
+                    RefusalForm::RuntimeReadWithoutLiteralPath,
+                    origin_index,
+                    self.fragment(origin_index.saturating_sub(4), origin_index + 9),
+                ));
+                return;
+            }
+        };
+        if !reads.contains(&read) {
+            reads.push(read);
+        }
+    }
+
+    /// 这个单元是函数时，`name` 是它第几个参数（从 0 起）；带 `self` 的方法、不是参数的交 `None`。同时交函数名。
+    fn parameter_position(
+        &self,
+        unit_first: usize,
+        unit_end: usize,
+        name: &str,
+    ) -> Option<(String, usize)> {
+        let fn_index = (unit_first..unit_end)
+            .find(|index| self.text_of(*index) == "fn" && self.is_identifier(index + 1))?;
+        let open = (fn_index + 2..unit_end).find(|index| self.text_of(*index) == "(")?;
+        let close = self.close_of(open);
+        let mut parameters: Vec<Vec<&str>> = Vec::new();
+        let mut current: Vec<&str> = Vec::new();
+        let mut bracket_depth = 0usize;
+        let mut angle_depth = 0usize;
+        for index in open + 1..close {
+            let text = self.text_of(index);
+            match text {
+                "(" | "[" | "{" => bracket_depth += 1,
+                ")" | "]" | "}" => bracket_depth = bracket_depth.saturating_sub(1),
+                "<" => angle_depth += 1,
+                ">" if self.text_before(index) != "-" => {
+                    angle_depth = angle_depth.saturating_sub(1);
+                }
+                "," if bracket_depth == 0 && angle_depth == 0 => {
+                    parameters.push(std::mem::take(&mut current));
+                    continue;
+                }
+                _ => {}
+            }
+            current.push(text);
+        }
+        if !current.is_empty() {
+            parameters.push(current);
+        }
+        let has_receiver = parameters.first().is_some_and(|first| {
+            first
+                .iter()
+                .take_while(|text| **text != ":")
+                .any(|text| *text == "self")
+        });
+        if has_receiver {
+            return None;
+        }
+        parameters
+            .iter()
+            .position(|parameter| {
+                let pattern = match parameter.as_slice() {
+                    ["mut", rest @ ..] => rest,
+                    whole => whole,
+                };
+                matches!(pattern, [identifier, ":", ..] if identifier_name(identifier) == name)
+            })
+            .map(|position| (self.name_at(fn_index + 1), position))
+    }
+
+    /// `current_exe` 那个词交给 `Command::new(…)` 起子进程、方法链里 `.arg(…)` / `.args([…])` 的参数有 `"--exact"`、它后面那个参数
+    /// 折得出测试名的写法（[`test_name_pieces_of_texts`]，或起子进程的函数自己的一个参数）时交那个写法；不是这一形交 `None`
+    /// （单元里有 [`SPAWNING_WORDS`] 的词才拒算，没有的只是在问路径）。
+    /// 名字在单元里另有 `let` 绑定的不认（认成常量或参数会认错）。
+    fn child_test_name_at(
+        &self,
+        current_exe_index: usize,
+        unit_first: usize,
+        unit_end: usize,
+    ) -> Option<ChildTestName> {
+        let enclosing_open = (unit_first..current_exe_index).rev().find(|position| {
+            self.text_of(*position) == "("
+                && self.closes[*position].is_some_and(|close| close > current_exe_index)
+        })?;
+        let is_command_new = enclosing_open >= 4
+            && self.text_of(enclosing_open - 1) == "new"
+            && self.text_of(enclosing_open - 2) == ":"
+            && self.text_of(enclosing_open - 3) == ":"
+            && self.text_of(enclosing_open - 4) == "Command";
+        if !is_command_new {
+            return None;
+        }
+        let mut arguments: Vec<Vec<&str>> = Vec::new();
+        let mut position = self.close_of(enclosing_open) + 1;
+        while position + 2 < unit_end
+            && self.text_of(position) == "."
+            && self.is_identifier(position + 1)
+            && self.text_of(position + 2) == "("
+        {
+            let call_open = position + 2;
+            let call_close = self.close_of(call_open);
+            let inside: Vec<&str> = (call_open + 1..call_close)
+                .map(|index| self.text_of(index))
+                .collect();
+            match self.text_of(position + 1) {
+                "arg" => arguments.push(inside),
+                "args" => {
+                    let listed = match inside.as_slice() {
+                        ["[", listed @ .., "]"]
+                        | ["&", "[", listed @ .., "]"]
+                        | ["vec", "!", "[", listed @ .., "]"] => listed,
+                        _ => return None,
+                    };
+                    arguments.extend(split_at_top_level_commas(listed));
+                }
+                _ => {}
+            }
+            position = call_close + 1;
+        }
+        let exact_position = arguments
+            .iter()
+            .position(|argument| argument.as_slice() == ["\"--exact\""])?;
+        let name_texts = arguments.get(exact_position + 1)?;
+        let bound_by_let = |name: &str| {
+            (unit_first..unit_end).any(|index| {
+                self.text_of(index) == "let"
+                    && (self.name_at(index + 1) == name
+                        || (self.text_of(index + 1) == "mut" && self.name_at(index + 2) == name))
+            })
+        };
+        match name_texts.as_slice() {
+            [identifier] | ["&", identifier] if is_identifier_text(identifier) => {
+                let name = identifier_name(identifier);
+                if bound_by_let(name) {
+                    return None;
+                }
+                if let Some((function_name, parameter_position)) =
+                    self.parameter_position(unit_first, unit_end, name)
+                {
+                    return Some(ChildTestName::ParameterOfTheSpawningFunction {
+                        function_name,
+                        parameter_position,
+                    });
+                }
+                Some(ChildTestName::Pieces(vec![TestNamePiece::Constant(
+                    name.to_string(),
+                )]))
+            }
+            _ => test_name_pieces_of_texts(name_texts).map(ChildTestName::Pieces),
+        }
+    }
+
+    /// 单元的词法单元 `[first, end)` 里有没有起子进程的词（[`SPAWNING_WORDS`]，标识符逐字比）。
+    fn starts_a_process(&self, first: usize, end: usize) -> bool {
+        (first..end)
+            .any(|index| self.is_identifier(index) && SPAWNING_WORDS.contains(&self.text_of(index)))
     }
 
     fn reads_and_refusals_of(&self, first: usize, end: usize) -> (Vec<SourceRead>, Vec<Refusal>) {
@@ -1058,6 +1651,8 @@ impl<'scan> RustScanner<'scan> {
             return (reads, refusals);
         }
         let mut consumed_until = first;
+        // 最近一处 `concat!(…)` 的闭括号：在它之前的 `env!` 不当构建脚本交的值（与 python 那一份的跳法相同）
+        let mut concatenation_close: Option<usize> = None;
         for index in first..end {
             if index < consumed_until || !self.is_identifier(index) {
                 continue;
@@ -1097,33 +1692,35 @@ impl<'scan> RustScanner<'scan> {
                         )),
                     }
                 }
-                "env" if self.text_of(index + 1) == "!" && self.text_of(index + 2) == "(" => {
+                "concat" if self.text_of(index + 1) == "!" && self.is_open_bracket(index + 2) => {
+                    concatenation_close = Some(self.close_of(index + 2));
+                }
+                "env" | "option_env"
+                    if self.text_of(index + 1) == "!" && self.is_open_bracket(index + 2) =>
+                {
                     let close = self.close_of(index + 2);
-                    if close != index + 4 {
-                        continue;
-                    }
                     let Some(variable) = plain_string_content(self.text_of(index + 3)) else {
                         continue;
                     };
+                    // python 那一份读到 `concat!(…)` 整段跳过（runtime_concat），里面的 `env!` 不当构建脚本交的值
+                    let is_inside_a_concatenation = concatenation_close
+                        .is_some_and(|concatenation_end| index < concatenation_end);
+                    if !is_inside_a_concatenation && is_handed_over_by_a_build_script(variable) {
+                        reads.push(SourceRead::BuildScriptEnvironmentValue {
+                            variable: variable.to_string(),
+                            line: self.line_of(index),
+                        });
+                        continue;
+                    }
+                    if self.text_of(index) != "env"
+                        || self.text_of(index + 2) != "("
+                        || close != index + 4
+                    {
+                        continue;
+                    }
                     if variable == "CARGO_MANIFEST_DIR" {
-                        match self.fold_manifest_directory_read(index, close) {
-                            RuntimeFold::File(path) => {
-                                reads.push(self.file_read(
-                                    path,
-                                    self.line_of(index),
-                                    ReadOrigin::Runtime,
-                                ));
-                            }
-                            RuntimeFold::Missing(path) => refusals.push(self.refusal(
-                                RefusalForm::DataFileUnreadable,
-                                index,
-                                cleaned_fragment(&path.display().to_string()),
-                            )),
-                            RuntimeFold::NotFoldable => refusals.push(self.refusal(
-                                RefusalForm::RuntimeReadWithoutLiteralPath,
-                                index,
-                                self.fragment(index.saturating_sub(4), index + 9),
-                            )),
+                        for fold in self.fold_manifest_directory_read(index, close, end) {
+                            self.record_runtime_fold(fold, index, &mut reads, &mut refusals);
                         }
                     } else if let Some(binary_name) = variable.strip_prefix("CARGO_BIN_EXE_") {
                         reads.push(SourceRead::BinaryExecutable {
@@ -1143,11 +1740,35 @@ impl<'scan> RustScanner<'scan> {
                         self.fragment(index.saturating_sub(4), index + 8),
                     ));
                 }
-                "current_exe" => refusals.push(self.refusal(
-                    RefusalForm::CurrentExecutablePath,
-                    index,
-                    self.fragment(index.saturating_sub(4), index + 4),
-                )),
+                "current_exe" if self.text_of(index + 1) == "(" => {
+                    let fragment = self.fragment(index.saturating_sub(4), index + 4);
+                    match self.child_test_name_at(index, first, end) {
+                        Some(test_name) => reads.push(SourceRead::ChildTestProcess {
+                            line: self.line_of(index),
+                            test_name,
+                            fragment,
+                        }),
+                        // 同一个单元里起了子进程、又折不出点名的那一条测试：子进程跑什么说不清，拒算
+                        None if self.starts_a_process(first, end) => refusals.push(self.refusal(
+                            RefusalForm::CurrentExecutablePath,
+                            index,
+                            fragment,
+                        )),
+                        // 不起子进程、只问路径（读程序文件的大小、`current_exe().is_ok()`）：路径拿去做什么与要点名的测试无关，
+                        // 不拒算、不连边（与 `scripts/gate/lib_function_units.py` 文件头「测试二进制起自己」同一判法）
+                        None => {}
+                    }
+                }
+                constant
+                    if self
+                        .manifest_directory_constants
+                        .contains(identifier_name(constant))
+                        && self.text_before(index) != "const" =>
+                {
+                    for fold in self.fold_manifest_directory_constant_use(index, end) {
+                        self.record_runtime_fold(fold, index, &mut reads, &mut refusals);
+                    }
+                }
                 "concat_idents" | "paste" if self.text_of(index + 1) == "!" => {
                     refusals.push(self.refusal(
                         RefusalForm::IdentifierPastingMacro,
@@ -1226,6 +1847,8 @@ impl<'scan> RustScanner<'scan> {
                 reads: Vec::new(),
                 refusals: Vec::new(),
                 documentation_test_of: Some(attachment.clone()),
+                has_test_attribute: false,
+                is_inside_test_only_code: false,
             });
         }
     }
@@ -1255,6 +1878,7 @@ impl<'scan> RustScanner<'scan> {
             | UnitKind::ExternBlock
             | UnitKind::ExternCrate
             | UnitKind::VerusBroadcastGroup
+            | UnitKind::VerusAssumeSpecification
             | UnitKind::DocumentationTest => None,
         };
         let references = references_of_tokens(self.source, unit_tokens, signature_end);
@@ -1267,6 +1891,17 @@ impl<'scan> RustScanner<'scan> {
         let declared_names = new_unit
             .declared_names
             .unwrap_or_else(|| vec![new_unit.name.clone()]);
+        let has_test_attribute = new_unit.kind == UnitKind::Function
+            && (first..new_unit.header_token.min(end)).any(|index| {
+                self.text_of(index) == "#"
+                    && self.text_of(index + 1) == "["
+                    && self.text_of(index + 2) == "test"
+                    && self.text_of(index + 3) == "]"
+            });
+        let is_inside_test_only_code = scan_context
+            .conditions
+            .iter()
+            .any(predicate_requires_the_test_configuration);
         let unit_index = UnitIndex(self.units.len());
         self.units.push(Unit {
             kind: new_unit.kind,
@@ -1292,6 +1927,8 @@ impl<'scan> RustScanner<'scan> {
             reads,
             refusals,
             documentation_test_of: None,
+            has_test_attribute,
+            is_inside_test_only_code,
         });
         if new_unit.kind != UnitKind::ModuleHead {
             let comments = self.documentation_comments_between(
@@ -1713,8 +2350,71 @@ impl<'scan> RustScanner<'scan> {
             | "struct" | "enum" | "union" | "impl" | "trait" | "const" | "static" | "type"
             | "use" | "mod" | "unsafe" | "extern" | "macro_rules" | "global" | "tracked"
             | "ghost" | "uninterp" | "axiom" | "async" | "default" => true,
+            "assume_specification" => self.is_assume_specification_keyword(index),
             _ => self.text_of(index + 1) == "!" && self.is_open_bracket(index + 2),
         }
+    }
+
+    /// `assume_specification` 这个词后面接 `[`（点名的路径）或 `<`（泛型参数表）：Verus 的 `assume_specification` 条目的关键字。
+    fn is_assume_specification_keyword(&self, index: usize) -> bool {
+        self.text_of(index) == "assume_specification"
+            && self.kind_of(index + 1) == Some(TokenKind::Punctuation)
+            && matches!(self.text_of(index + 1), "[" | "<")
+    }
+
+    /// 从 `open_angle` 那个 `<` 起配到它的 `>`，交 `>` 后面那个词法单元的位置；`->` 的 `>` 不算。配不上（`end` 之前没回到零层）交 `None`。
+    fn after_the_angle_brackets(&self, open_angle: usize, end: usize) -> Option<usize> {
+        let mut depth = 0usize;
+        // 每一步往后走一个词法单元：至多走到条目末尾
+        for position in open_angle..end {
+            match self.text_of(position) {
+                "<" => depth += 1,
+                ">" if position == 0 || self.text_of(position - 1) != "-" => {
+                    depth = depth.checked_sub(1)?;
+                    if depth == 0 {
+                        return Some(position + 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// `assume_specification` 之后（可带一段 `<…>` 泛型参数表）那对方括号里点名的路径，末段的名字：
+    /// `[ singlefs_format::WIDE_CHECKSUM_BYTES ]` 是 `WIDE_CHECKSUM_BYTES`，`[ Vec::<Element>::len ]` 是 `len`（尖括号里的名字不算）。
+    /// 认不出那对方括号、方括号里尖括号外一个名字都没有的，交 `None`。
+    fn assume_specification_target_name(
+        &self,
+        after_the_keyword: usize,
+        end: usize,
+    ) -> Option<String> {
+        let open_bracket = if self.text_of(after_the_keyword) == "<" {
+            self.after_the_angle_brackets(after_the_keyword, end)?
+        } else {
+            after_the_keyword
+        };
+        if self.text_of(open_bracket) != "[" || !self.is_open_bracket(open_bracket) {
+            return None;
+        }
+        let close_bracket = self.close_of(open_bracket);
+        let mut angle_depth = 0usize;
+        let mut last_name_outside_the_angle_brackets = None;
+        // 每一步往后走一个词法单元：至多走到配对的 `]`
+        for position in open_bracket + 1..close_bracket {
+            match self.text_of(position) {
+                "<" => angle_depth += 1,
+                ">" if self.text_of(position - 1) != "-" => {
+                    angle_depth = angle_depth.saturating_sub(1);
+                }
+                _ => {
+                    if angle_depth == 0 && self.is_identifier(position) {
+                        last_name_outside_the_angle_brackets = Some(self.name_at(position));
+                    }
+                }
+            }
+        }
+        last_name_outside_the_angle_brackets
     }
 
     /// `verus!` 块里同层条目的起头：块首，或顶层的 `;` / `}` 之后紧接一个条目关键字（或属性）的位置。
@@ -1921,6 +2621,29 @@ impl<'scan> RustScanner<'scan> {
                 };
                 self.scan_verus_items(open + 1, close, &body_context);
             }
+            "assume_specification" if self.is_assume_specification_keyword(keyword_index) => {
+                // 按点名的那一项的名字找得到它；名字认不出时这份文件里谁连得到它说不全，照认不出的条目起头记文件级拒算
+                let Some(target_name) =
+                    self.assume_specification_target_name(keyword_index + 1, end)
+                else {
+                    self.file_level_refusals.push(self.refusal(
+                        RefusalForm::UnrecognizedItemStart,
+                        header,
+                        self.fragment(header, end),
+                    ));
+                    return;
+                };
+                let mut new_unit = NewUnit::plain(
+                    UnitKind::VerusAssumeSpecification,
+                    format!("assume_specification@{}", self.line_of(keyword_index)),
+                    whole,
+                    header,
+                    conditions,
+                    is_public,
+                );
+                new_unit.declared_names = Some(vec![target_name]);
+                self.push_unit(new_unit, scan_context);
+            }
             "macro_rules" => {
                 self.push_unit(
                     NewUnit::plain(
@@ -2045,7 +2768,7 @@ pub fn parse_rust_file(input: &RustFileInput) -> ParsedRustFile {
                 tokens: lexed.tokens,
                 units: Vec::new(),
                 file_level_refusals: vec![Refusal {
-                    file: input.file,
+                    file: crate::units::RefusalFile::WorkspaceSourceFile(input.file),
                     line,
                     form: RefusalForm::UnbalancedBrackets,
                     fragment,
@@ -2062,6 +2785,10 @@ pub fn parse_rust_file(input: &RustFileInput) -> ParsedRustFile {
         tokens: &lexed.tokens,
         closes: &closes,
         documentation_comments: &lexed.documentation_comments,
+        manifest_directory_constants: private_manifest_directory_constants(
+            input.source,
+            &lexed.tokens,
+        ),
         units: Vec::new(),
         file_level_refusals: Vec::new(),
     };
@@ -2185,7 +2912,7 @@ mod tests {
 
     #[test]
     fn a_path_qualified_item_macro_invocation_is_one_unit_that_declares_its_names() {
-        let parsed = parse("singlefs_harness::enum_listing_every_member! {\n    #[derive(Debug)]\n    pub enum Color { Red, Green }\n}\n");
+        let parsed = parse("singlefs_verification::enum_listing_every_member! {\n    #[derive(Debug)]\n    pub enum Color { Red, Green }\n}\n");
         assert!(
             parsed.file_level_refusals.is_empty(),
             "带路径的条目级宏调用认得：{:?}",

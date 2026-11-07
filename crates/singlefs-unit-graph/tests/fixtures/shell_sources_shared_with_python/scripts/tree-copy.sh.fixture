@@ -1,0 +1,2 @@
+copied_tree="$1"
+source "$copied_tree/scripts/lib/plain-library.sh"

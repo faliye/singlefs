@@ -1,0 +1,5 @@
+load_library() {
+  local library_directory="${LIBRARY_DIRECTORY:-$(dirname "${BASH_SOURCE[0]}")/lib}"
+  source "$library_directory/in-function.sh"
+}
+load_library

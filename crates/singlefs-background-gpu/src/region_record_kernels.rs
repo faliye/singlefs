@@ -63,6 +63,7 @@ use singlefs_core::unit::{
 };
 
 use crate::checksum_kernels::UnrecognizedVerdictWord;
+use crate::live_slot_kernels::low_and_high_words_of_the_slot;
 use crate::memory_limit_and_chunks::{
     chunks_that_fit_on_the_gpu, input_buffer_bytes, pieces_cut_to_fit_on_the_gpu,
     ChunkBoundsOfAGpu, ChunkFootprint, PieceOfAnEntry, SmallestPieceLargerThanTheRoom,
@@ -229,13 +230,6 @@ impl PackedRegionRecordChunk {
     pub fn record_count(&self) -> usize {
         self.descriptor_words.len() / RECORD_DESCRIPTOR_WORDS
     }
-}
-
-fn low_and_high_words_of_the_slot(slot: SlotNumber) -> [u32; 2] {
-    [
-        u32::try_from(slot.0 & u64::from(u32::MAX)).expect("取了低 32 位"),
-        u32::try_from(slot.0 >> 32).expect("盘上槽号是 6 字节，高 32 位装得进 u32"),
-    ]
 }
 
 /// 把一段的几片按次序打包：每一片的字节首尾相接（起点是前面那些字节数之和，不按字对齐），读不到的占 0 字节；描述带上这一片是哪一种、
@@ -1414,7 +1408,7 @@ mod tests {
         })
     }
 
-    fn entry(key: Vec<u8>, locations: [LocationEntry; 2]) -> CentralMappingEntry {
+    fn central_mapping_entry(key: Vec<u8>, locations: [LocationEntry; 2]) -> CentralMappingEntry {
         CentralMappingEntry { key, locations }
     }
 
@@ -1637,7 +1631,7 @@ mod tests {
 
     #[test]
     fn mapping_tables_list_each_entry_with_its_key_length_and_both_locations() {
-        let tables = MappingTablesForTheKernels::of_the_mapping_entries(&[entry(
+        let tables = MappingTablesForTheKernels::of_the_mapping_entries(&[central_mapping_entry(
             vec![1, 2, 3, 4, 5],
             [
                 LocationEntry {
@@ -1670,9 +1664,9 @@ mod tests {
             unit_checksum: 0,
         }; 2];
         let tables = MappingTablesForTheKernels::of_the_mapping_entries(&[
-            entry(vec![1], locations_at(SlotNumber(90))),
-            entry(vec![2], same_location_twice),
-            entry(vec![3], locations_at(SlotNumber(70))),
+            central_mapping_entry(vec![1], locations_at(SlotNumber(90))),
+            central_mapping_entry(vec![2], same_location_twice),
+            central_mapping_entry(vec![3], locations_at(SlotNumber(70))),
         ])
         .expect("短 key 装得下");
         assert_eq!(
@@ -1692,10 +1686,10 @@ mod tests {
     #[test]
     fn the_key_index_is_sorted_by_key_length_and_words_with_ties_in_table_order() {
         let tables = MappingTablesForTheKernels::of_the_mapping_entries(&[
-            entry(vec![9, 9], locations_at(SlotNumber(1))),
-            entry(vec![1, 2, 3], locations_at(SlotNumber(2))),
-            entry(vec![5], locations_at(SlotNumber(3))),
-            entry(vec![9, 9], locations_at(SlotNumber(4))),
+            central_mapping_entry(vec![9, 9], locations_at(SlotNumber(1))),
+            central_mapping_entry(vec![1, 2, 3], locations_at(SlotNumber(2))),
+            central_mapping_entry(vec![5], locations_at(SlotNumber(3))),
+            central_mapping_entry(vec![9, 9], locations_at(SlotNumber(4))),
         ])
         .expect("短 key 装得下");
         assert_eq!(
@@ -1709,8 +1703,8 @@ mod tests {
     fn one_mapping_key_longer_than_the_kernels_hold_refuses_the_tables() {
         assert_eq!(
             MappingTablesForTheKernels::of_the_mapping_entries(&[
-                entry(vec![1; 28], locations_at(SlotNumber(1))),
-                entry(vec![1; 29], locations_at(SlotNumber(2))),
+                central_mapping_entry(vec![1; 28], locations_at(SlotNumber(1))),
+                central_mapping_entry(vec![1; 29], locations_at(SlotNumber(2))),
             ]),
             Err(MappingKeyLongerThanTheKernelsHold {
                 entry_position: 1,
@@ -1733,7 +1727,9 @@ mod tests {
         );
     }
 
-    fn outcome_bytes(outcome_words: [u32; REGION_RECORD_OUTCOME_WORDS]) -> Vec<u8> {
+    fn region_record_outcome_bytes_of_the_words(
+        outcome_words: [u32; REGION_RECORD_OUTCOME_WORDS],
+    ) -> Vec<u8> {
         little_endian_bytes_of_the_words(&outcome_words)
     }
 
@@ -1753,7 +1749,7 @@ mod tests {
         let mut readback = Vec::new();
         let [key_word_0, key_word_1, key_word_2, key_word_3, key_word_4, key_word_5, key_word_6] =
             movable_key_words;
-        readback.extend(outcome_bytes([
+        readback.extend(region_record_outcome_bytes_of_the_words([
             OUTCOME_KIND_MOVABLE,
             u32::from(UNIT_CLASS_DATA),
             0,
@@ -1768,7 +1764,7 @@ mod tests {
             key_word_5,
             key_word_6,
         ]));
-        readback.extend(outcome_bytes([
+        readback.extend(region_record_outcome_bytes_of_the_words([
             OUTCOME_KIND_DEAD,
             0,
             0,
@@ -1783,7 +1779,7 @@ mod tests {
             0,
             0,
         ]));
-        readback.extend(outcome_bytes([
+        readback.extend(region_record_outcome_bytes_of_the_words([
             OUTCOME_KIND_UNIT_CLASS_DISAGREES_WITH_THE_MAPPING_KEY,
             u32::from(UNIT_CLASS_PACKED),
             u32::from(UNIT_CLASS_INDEX_NODE),
@@ -1798,7 +1794,7 @@ mod tests {
             0,
             0,
         ]));
-        readback.extend(outcome_bytes([
+        readback.extend(region_record_outcome_bytes_of_the_words([
             OUTCOME_KIND_HEADER_KEY_DISAGREES_WITH_THE_MAPPING_LOCATION,
             0,
             0,
@@ -1813,7 +1809,7 @@ mod tests {
             0,
             0,
         ]));
-        readback.extend(outcome_bytes([
+        readback.extend(region_record_outcome_bytes_of_the_words([
             OUTCOME_KIND_DEVICE_READ_FAILED,
             0,
             0,
@@ -1828,7 +1824,7 @@ mod tests {
             0,
             0,
         ]));
-        readback.extend(outcome_bytes([
+        readback.extend(region_record_outcome_bytes_of_the_words([
             OUTCOME_KIND_SPAN_IS_NOT_A_UNIT_FOOTPRINT,
             3,
             0,
@@ -1843,7 +1839,7 @@ mod tests {
             0,
             0,
         ]));
-        readback.extend(outcome_bytes([
+        readback.extend(region_record_outcome_bytes_of_the_words([
             OUTCOME_KIND_REFUSED_BY_THE_PARSER,
             UNIT_ERROR_WRONG_UNIT_CLASS,
             u32::from(UNIT_CLASS_DATA) | (2 << 8),
@@ -1858,7 +1854,7 @@ mod tests {
             0,
             0,
         ]));
-        readback.extend(outcome_bytes([
+        readback.extend(region_record_outcome_bytes_of_the_words([
             OUTCOME_KIND_REFUSED_BY_THE_PARSER,
             UNIT_ERROR_STRUCTURE,
             7,
@@ -1910,8 +1906,22 @@ mod tests {
     }
 
     #[test]
-    fn an_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word() {
-        let mut readback = outcome_bytes([OUTCOME_KIND_DEAD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    fn region_record_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word() {
+        let mut readback = region_record_outcome_bytes_of_the_words([
+            OUTCOME_KIND_DEAD,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]);
         readback.extend(region_record_outcome_buffer_before_the_kernel_writes(1));
         assert_eq!(
             decoded_region_record_outcomes(&readback),
@@ -1955,13 +1965,13 @@ mod tests {
             ),
         ];
         let mapping_entries = vec![
-            entry(data_key, locations_at(slot_in_region(0))),
-            entry(node_key.clone(), locations_at(slot_in_region(2))),
-            entry(packed_key, locations_at(slot_in_region(4))),
+            central_mapping_entry(data_key, locations_at(slot_in_region(0))),
+            central_mapping_entry(node_key.clone(), locations_at(slot_in_region(2))),
+            central_mapping_entry(packed_key, locations_at(slot_in_region(4))),
             // 槽 8 上那个节点的 key 不在映射里，指着槽 8 的是槽 2 那个节点的 key
-            entry(node_key, locations_at(slot_in_region(8))),
+            central_mapping_entry(node_key, locations_at(slot_in_region(8))),
             // 槽 10 上是数据单元，指着它的条目 key 打头是节点的类标签
-            entry(index_node_and_key(61).1, locations_at(slot_in_region(10))),
+            central_mapping_entry(index_node_and_key(61).1, locations_at(slot_in_region(10))),
         ];
         let records: Vec<AllocationRecord> = records_and_bytes
             .iter()
@@ -2056,7 +2066,8 @@ mod tests {
     }
 
     #[test]
-    fn the_two_kernels_are_separate_sources_with_their_own_entry_points() {
+    fn the_walking_and_searching_region_record_kernels_are_separate_sources_with_their_own_entry_points(
+    ) {
         assert!(WALKING_KERNEL_SOURCE.contains(&format!("fn {WALKING_KERNEL_ENTRY_POINT}(")));
         assert!(SEARCHING_KERNEL_SOURCE.contains(&format!("fn {SEARCHING_KERNEL_ENTRY_POINT}(")));
         assert!(
@@ -2101,12 +2112,12 @@ mod tests {
             ),
         ];
         let mapping_entries = vec![
-            entry(data_key, locations_at(slot_in_region(0))),
-            entry(node_key.clone(), locations_at(slot_in_region(2))),
-            entry(packed_key, locations_at(slot_in_region(4))),
-            entry(node_key, locations_at(slot_in_region(8))),
-            entry(index_node_and_key(61).1, locations_at(slot_in_region(10))),
-            entry(key_mapped_elsewhere, locations_at(slot_in_region(40))),
+            central_mapping_entry(data_key, locations_at(slot_in_region(0))),
+            central_mapping_entry(node_key.clone(), locations_at(slot_in_region(2))),
+            central_mapping_entry(packed_key, locations_at(slot_in_region(4))),
+            central_mapping_entry(node_key, locations_at(slot_in_region(8))),
+            central_mapping_entry(index_node_and_key(61).1, locations_at(slot_in_region(10))),
+            central_mapping_entry(key_mapped_elsewhere, locations_at(slot_in_region(40))),
         ];
         let records: Vec<RegionRecordToClassify<'_, usize>> = records_and_bytes
             .iter()
@@ -2329,10 +2340,10 @@ mod tests {
             ),
         ];
         let mapping_entries = vec![
-            entry(data_key, locations_at(slot_in_region(0))),
-            entry(node_key, locations_at(slot_in_region(2))),
-            entry(packed_key, locations_at(slot_in_region(4))),
-            entry(key_mapped_elsewhere, locations_at(slot_in_region(40))),
+            central_mapping_entry(data_key, locations_at(slot_in_region(0))),
+            central_mapping_entry(node_key, locations_at(slot_in_region(2))),
+            central_mapping_entry(packed_key, locations_at(slot_in_region(4))),
+            central_mapping_entry(key_mapped_elsewhere, locations_at(slot_in_region(40))),
         ];
         let records: Vec<RegionRecordToClassify<'_, usize>> = records_and_bytes
             .iter()
@@ -2426,7 +2437,7 @@ mod tests {
         let mut outcome_words = [0_u32; REGION_RECORD_OUTCOME_WORDS];
         outcome_words[0] = OUTCOME_KIND_REGISTER_AFTER_THE_PIECE;
         outcome_words[1] = 0xDEAD_BEEF;
-        let mut readback = outcome_bytes(outcome_words);
+        let mut readback = region_record_outcome_bytes_of_the_words(outcome_words);
         readback.extend(region_record_outcome_buffer_before_the_kernel_writes(1));
         assert_eq!(
             decoded_registers_after_the_pieces(&readback),
@@ -2451,13 +2462,16 @@ mod tests {
         for (entries, expected_location_items) in [
             (Vec::new(), 0_u64),
             (
-                vec![entry(data_key.clone(), locations_at(slot_in_region(0)))],
+                vec![central_mapping_entry(
+                    data_key.clone(),
+                    locations_at(slot_in_region(0)),
+                )],
                 2,
             ),
             (
                 vec![
-                    entry(data_key.clone(), locations_at(slot_in_region(0))),
-                    entry(
+                    central_mapping_entry(data_key.clone(), locations_at(slot_in_region(0))),
+                    central_mapping_entry(
                         data_key,
                         [
                             locations_at(slot_in_region(3))[0],

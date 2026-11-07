@@ -4,8 +4,8 @@
 //! `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」、返回成功；交了卡却对不上本机的独显、或开不了判红。
 //! 源头没声明张数，服务分一张；整包一起跑时服务照别的目标的声明多分，这里照样全用交来的（点名一张的那几条取头一张）。
 //! 只在开了特性 `tests-on-a-real-gpu` 时编；用 GPU，经 `task-server/task submit` 交（卡与清场由服务定），带 `--test-threads 1`。
-//! 开卡时每张参与的卡的显存上限给 1 GiB（七·3 验收，用户 2026-11-01 定；`common_discrete_gpus_of_this_host`），专门测小上限切片的几条照用更小的。
-//! 一张卡按卡的顺序填满那一条在这里（`common_checksum_batches_over_the_handed_over_gpus`，用户 2026-11-02 定「按卡的顺序填满」，测饱和）；
+//! 开卡时每张参与的卡的显存上限给 1 GiB（`common_discrete_gpus_of_this_host`），专门测小上限切片的几条照用更小的。
+//! 一张卡按卡的顺序填满那一条在这里（`common_checksum_batches_over_the_handed_over_gpus`，测饱和）；
 //! 两张、三张的各在自己的测试目标里（`checksum_batches_over_two_real_gpus_give_each_gpu_work_and_agree_with_the_cpu_reference`、
 //! `checksum_batches_over_three_real_gpus_give_each_gpu_work_and_agree_with_the_cpu_reference`，源头声明张数）。
 //!
@@ -23,8 +23,10 @@ use common_discrete_gpus_of_this_host::{
     background_gpu_on_the_handed_over_gpus_under_one_gibibyte_each_or_report_not_run,
     handed_over_gpus_of_the_declared_count_or_report_not_run, handed_over_gpus_or_report_not_run,
     opened_background_gpu, selection_over_the_handed_over_gpus,
+    HandedOverGpusSeenThroughTheInstance, MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU,
 };
 use singlefs_background_gpu::adapter_inventory::gpu_device_identifier_of_the_pci_bus_address;
+use singlefs_background_gpu::background_gpu::{open_background_gpu, VulkanInstanceOfThisProcess};
 use singlefs_background_gpu::checksum_kernels::{ChecksumKernelOutcome, CHECKSUM_CHUNK_FOOTPRINT};
 use singlefs_background_gpu::two_kernel_reconciliation::{
     ConsecutiveUncertaintyCounts, EntryDecision,
@@ -35,6 +37,8 @@ const UNIT_LENGTHS_UNDER_TEST: [usize; 7] = [0, 1, 7, 8, 9, 4095, 4096];
 const STARTING_OFFSET_RESIDUES: usize = 4;
 /// 等 GPU 的上限：这几批在健康的卡上远用不了这么久。
 const WAIT_LIMIT_OF_THE_GPU_TESTS: std::time::Duration = std::time::Duration::from_secs(60);
+/// 同一个进程里在一个实例上反复开卡的轮数：第二台上每开一次新建一个实例时从 0 数第 11 轮起就开不成，30 轮罩得住这个转折、在一条用例里跑得完。
+const OPENINGS_OF_THE_HANDED_OVER_GPUS_IN_ONE_PROCESS: usize = 30;
 
 /// 这批要核的单元字节与期望值：每种起点余数先垫一个那么长的单元，再放每种长度；期望值逢单数位置故意给错。
 fn unit_bytes_and_expected_checksums() -> Vec<(Vec<u8>, u32)> {
@@ -146,18 +150,23 @@ fn the_two_kernels_confirm_every_entry_on_a_healthy_gpu() {
 fn the_memory_limit_smaller_than_the_batch_cuts_it_into_chunks_with_the_same_outcomes() {
     let test_name =
         "the_memory_limit_smaller_than_the_batch_cuts_it_into_chunks_with_the_same_outcomes";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
     // 8 KiB：一块 4096 字节的单元连同描述与结果装得下，整批（约 33 KiB 的输入）装不下，要切成好几段
     let small_memory_limit = GpuMemoryInBytes(8 * 1024);
-    let mut limited = opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        small_memory_limit,
-        WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ));
+    let mut limited = opened_background_gpu(
+        &vulkan_instance,
+        &selection_over_the_handed_over_gpus(
+            &handed_over_gpus,
+            small_memory_limit,
+            WAIT_LIMIT_OF_THE_GPU_TESTS,
+        ),
+    );
     let unit_bytes_and_expected = unit_bytes_and_expected_checksums();
     let outcomes = limited
         .both_kernel_outcomes_of_the_batch(&units_to_verify(&unit_bytes_and_expected))
@@ -173,24 +182,29 @@ fn the_memory_limit_smaller_than_the_batch_cuts_it_into_chunks_with_the_same_out
     );
 }
 
-/// 用户 2026-10-28 定「装不下应该自适应的分片」：上限 1 KiB 时 4095、4096 字节的单元单独成一段都装不下，切成几片逐片交、两份核各片的值
+/// 装不下自适应分片：上限 1 KiB 时 4095、4096 字节的单元单独成一段都装不下，切成几片逐片交、两份核各片的值
 /// 各按自己的合法合成整单元的值，照样逐条与 CPU 参照（对整单元一次算）相同；开卡时量代价那一段同样切成几片量。
 #[test]
 fn the_memory_limit_smaller_than_a_unit_cuts_it_into_pieces_with_the_same_outcomes() {
     let test_name =
         "the_memory_limit_smaller_than_a_unit_cuts_it_into_pieces_with_the_same_outcomes";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
     let smaller_than_a_unit = GpuMemoryInBytes(1024);
     // 上限比量代价那一段小：切开量，不拒挂载
-    let mut limited = opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        smaller_than_a_unit,
-        WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ));
+    let mut limited = opened_background_gpu(
+        &vulkan_instance,
+        &selection_over_the_handed_over_gpus(
+            &handed_over_gpus,
+            smaller_than_a_unit,
+            WAIT_LIMIT_OF_THE_GPU_TESTS,
+        ),
+    );
     assert_eq!(
         limited.participating_gpus().len(),
         handed_over_gpus.len(),
@@ -277,22 +291,16 @@ fn free_device_local_bytes_of_the_card(adapter: &wgpu::Adapter) -> Option<u64> {
     )
 }
 
-/// 本机总线地址 `pci_bus_address` 那张卡的 Vulkan 适配器（另开一个 wgpu 实例枚举）；找不到交回 `None`。
-fn vulkan_adapter_of_the_card(pci_bus_address: &str) -> Option<wgpu::Adapter> {
-    use singlefs_background_gpu::background_gpu::wait_for_the_wgpu_future;
-    use singlefs_background_gpu::waiting_for_the_gpu::SteadyClockOfThisProcess;
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::VULKAN,
-        ..wgpu::InstanceDescriptor::new_without_display_handle()
-    });
-    wait_for_the_wgpu_future(
-        instance.enumerate_adapters(wgpu::Backends::VULKAN),
-        WAIT_LIMIT_OF_THE_GPU_TESTS,
-        &SteadyClockOfThisProcess::starting_now(),
-    )
-    .expect("枚举适配器在等的上限之内")
-    .into_iter()
-    .find(|adapter| adapter.get_info().device_pci_bus_id == pci_bus_address)
+/// 本机总线地址 `pci_bus_address` 那张卡的 Vulkan 适配器（在这条用例开卡用的那一个实例 `vulkan_instance` 上枚举，不另建）；找不到交回 `None`。
+fn vulkan_adapter_of_the_card(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+    pci_bus_address: &str,
+) -> Option<wgpu::Adapter> {
+    vulkan_instance
+        .vulkan_adapters_enumerated_within(WAIT_LIMIT_OF_THE_GPU_TESTS)
+        .expect("枚举适配器在等的上限之内")
+        .into_iter()
+        .find(|adapter| adapter.get_info().device_pci_bus_id == pci_bus_address)
 }
 
 /// 另一个设备把一张卡的空闲显存占进一截里之后交回的：占着的设备与缓冲（随它们活着）、占了多少字节、占完回读的空闲量。
@@ -413,7 +421,7 @@ fn units_of_the_batch_short_of_free_memory() -> Vec<(Vec<u8>, u32)> {
         .collect()
 }
 
-/// 判决 m4-gpugc-code-r1 第三节第 5 条（D26（后台整理与放置回收） 已定项 13 第 3 条「卡上此刻空闲的不到这个数也照常跑，只用空闲的那些」）在真卡上：
+/// D26（后台整理与放置回收） 已定项 13 第 3 条「卡上此刻空闲的不到这个数也照常跑，只用空闲的那些」在真卡上：
 /// 点名服务交来的头一张卡、上限照一段装下整批（[`units_of_the_batch_short_of_free_memory`]，512 MiB 多）给，开卡之后另一个设备逐块占显存、每块后回读这张卡
 /// 此刻的空闲量，占到空闲的落进 [`FREE_BYTES_LEFT_ON_THE_CARD`]（比这一段的输入缓冲小）才往下走，再交这一批——照上限一段装得下而建缓冲显存不足，
 /// 按更小的片重切重交，照常交回、两份核逐条与 CPU 参照相同，重切了至少一次。
@@ -425,11 +433,15 @@ fn units_of_the_batch_short_of_free_memory() -> Vec<(Vec<u8>, u32)> {
 fn the_batch_on_a_card_with_less_free_memory_than_its_limit_is_recut_and_agrees_with_the_cpu() {
     let test_name =
         "the_batch_on_a_card_with_less_free_memory_than_its_limit_is_recut_and_agrees_with_the_cpu";
-    let Some(handed_over_gpus) = handed_over_gpus_of_the_declared_count_or_report_not_run(
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_of_the_declared_count_or_report_not_run(
         test_name,
         1,
         WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ) else {
+    )
+    else {
         return;
     };
     let pci_bus_address = handed_over_gpus[0].pci_bus_address.clone();
@@ -444,8 +456,8 @@ fn the_batch_on_a_card_with_less_free_memory_than_its_limit_is_recut_and_agrees_
             input_bytes_of_the_batch,
             u64::try_from(UNIT_COUNT_OF_THE_BATCH_SHORT_OF_FREE_MEMORY).expect("单元数装得进 u64"),
         ));
-    let adapter =
-        vulkan_adapter_of_the_card(&pci_bus_address).expect("刚枚举到的那张卡再枚举一次照样在");
+    let adapter = vulkan_adapter_of_the_card(&vulkan_instance, &pci_bus_address)
+        .expect("刚枚举到的那张卡再枚举一次照样在");
     let largest_binding_of_the_card = adapter
         .limits()
         .max_storage_buffer_binding_size
@@ -456,11 +468,14 @@ fn the_batch_on_a_card_with_less_free_memory_than_its_limit_is_recut_and_agrees_
         );
         return;
     }
-    let mut background_gpu = opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        memory_limit_holding_the_batch_in_one_chunk,
-        WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ));
+    let mut background_gpu = opened_background_gpu(
+        &vulkan_instance,
+        &selection_over_the_handed_over_gpus(
+            &handed_over_gpus,
+            memory_limit_holding_the_batch_in_one_chunk,
+            WAIT_LIMIT_OF_THE_GPU_TESTS,
+        ),
+    );
     let (_card, total_memory) = GpuInventory::devices_with_total_memory(&background_gpu)
         .into_iter()
         .find(|(identifier, _total_memory)| *identifier == card)
@@ -523,4 +538,49 @@ fn the_batch_over_one_named_real_gpu_gives_it_work_and_it_submits() {
         1,
         WAIT_LIMIT_OF_THE_GPU_TESTS,
     );
+}
+
+/// 同一个进程里在交进来的那一个 Vulkan 实例上反复开卡（D26（后台整理与放置回收） 已定项 13 第 1 条「挂载那一刻开卡」，七·3 真卡测法）：
+/// 照服务交来的卡开包、交一批校验和核对、丢掉，连做 [`OPENINGS_OF_THE_HANDED_OVER_GPUS_IN_ONE_PROCESS`] 轮，每一轮都开成、两份核逐条与 CPU 参照相同。
+/// 开卡每次另建实例时，第二台的驱动上从 0 数第 11 轮起开卡拒「点名的卡不在这一次枚举的清单里」。
+#[test]
+fn opening_the_handed_over_gpus_again_and_again_in_one_process_succeeds_every_round_on_one_vulkan_instance(
+) {
+    let test_name = "opening_the_handed_over_gpus_again_and_again_in_one_process_succeeds_every_round_on_one_vulkan_instance";
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    else {
+        return;
+    };
+    let selection = selection_over_the_handed_over_gpus(
+        &handed_over_gpus,
+        MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU,
+        WAIT_LIMIT_OF_THE_GPU_TESTS,
+    );
+    let unit_bytes_and_expected = unit_bytes_and_expected_checksums();
+    let reference = cpu_reference_outcomes(&unit_bytes_and_expected);
+    for opening_round in 0..OPENINGS_OF_THE_HANDED_OVER_GPUS_IN_ONE_PROCESS {
+        let mut background_gpu = open_background_gpu(&selection, &vulkan_instance)
+            .unwrap_or_else(|refused| {
+                panic!(
+                    "同一个进程里第 {opening_round} 轮（从 0 数）开服务交来的卡开不成：{refused:?}（点名的 {selection:?}）"
+                )
+            });
+        let outcomes = background_gpu
+            .both_kernel_outcomes_of_the_batch(&units_to_verify(&unit_bytes_and_expected))
+            .unwrap_or_else(|failed| {
+                panic!("第 {opening_round} 轮开成的卡上一批交不成：{failed:?}")
+            });
+        assert_eq!(
+            outcomes,
+            reference
+                .iter()
+                .map(|outcome| (*outcome, *outcome))
+                .collect::<Vec<_>>(),
+            "第 {opening_round} 轮开成的卡上两份核逐条与 CPU 参照相同"
+        );
+        drop(background_gpu);
+    }
 }

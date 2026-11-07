@@ -1,6 +1,6 @@
 //! 没给 `--threads` 时用几个线程：取法与 `scripts/experiment-apparatus/heavy_threads_default/threads.rs` 相同——
 //! `SINGLEFS_THREAD_CAP` 是正整数照它（`scripts/hosts/capped.sh` 设），否则取登记文件 `.claude/heavy-thread-default`
-//! 第一条非注释行的头一个词。登记文件在构建时编进来，运行时不找仓根；本 crate 不依赖 `singlefs-harness`，所以不用它那一份。
+//! 第一条非注释行的头一个词。登记文件在构建时编进来，运行时不找仓根；本 crate 不依赖 `singlefs-verification`，所以不用它那一份。
 
 use std::num::NonZeroUsize;
 
@@ -8,7 +8,7 @@ use std::num::NonZeroUsize;
 pub const THREAD_CAP_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_THREAD_CAP";
 
 /// 构建时编进来的登记文件原文：路径从这个包的清单目录往上两级到仓根。相对的那一段单写成以 `../` 起头的字面量，
-/// 拷贝范围漏了这份登记时门禁 code-source-discipline 的 mutation-tables 格点名（同 `singlefs-harness` 的 `heavy_threads`）。
+/// 拷贝范围漏了这份登记时门禁 code-source-discipline 的 mutation-tables 格点名（同 `singlefs-verification` 的 `heavy_threads`）。
 pub const REGISTRATION_FILE_TEXT: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/",

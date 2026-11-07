@@ -40,7 +40,7 @@ pub struct RootRingSlotsPerRegionOutOfRange {
     pub maximum: u64,
 }
 
-/// 第一版 mkfs 默认 S 的下限 5：小于它拒绝 mkfs（D22（单元原子性怎么合成） 已定项 16 第 3 句，用户 2026-10-22 定）。
+/// 第一版 mkfs 默认 S 的下限 5：小于它拒绝 mkfs（D22（单元原子性怎么合成） 已定项 16 第 3 句）。
 /// 取区间下界加一：mkfs 的默认值不取两条边，下界那一条边是 [`ROOT_RING_SLOTS_PER_REGION_MINIMUM`]。
 pub const FIRST_VERSION_MAKE_FILESYSTEM_SMALLEST_DEFAULT_SLOTS_PER_REGION: u64 =
     ROOT_RING_SLOTS_PER_REGION_MINIMUM + 1;
@@ -79,7 +79,7 @@ impl RootRingSlotsPerRegion {
         Self { slots_per_region }
     }
 
-    /// 第一版 mkfs 的默认 S：min(8, ⌊P × chunk ÷ 固定结构槽距⌋)，小于 5 拒（D22（单元原子性怎么合成） 已定项 16 第 3 句，用户 2026-10-22 定）。
+    /// 第一版 mkfs 的默认 S：min(8, ⌊P × chunk ÷ 固定结构槽距⌋)，小于 5 拒（D22（单元原子性怎么合成） 已定项 16 第 3 句）。
     /// 算出来的值落在 [5, 8] 里，不碰区间的两条边；这一条在运行时经 [`Self::strictly_between_the_edges_of_the_format_interval`] 判。
     /// 只管 mkfs 的默认取值：显式给 S 的建池入口（`MakeFilesystemParameters` 的 `geometry` 里直接放一个 S）不经这里，
     /// 只受读者的区间判与 S × 槽距判。

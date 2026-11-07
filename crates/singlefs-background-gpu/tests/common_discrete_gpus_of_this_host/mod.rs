@@ -4,12 +4,14 @@
 //! 每项 `<HOSTS 里的地址>:<nvidia-smi 序号>:<额度>`，空白隔开）：真卡用例只点名交来的这几张（挂载参数 `background_gpu_devices`），不再点本机全部独显——
 //! 同一台上别的卡可能分给了别的任务。这一台是 `HOSTS` 里哪一项只由多机配置判法认（`scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-addresses`
 //! 打的 `THIS_HOST_ADDRESS`，全仓只那一份判法）；`nvidia-smi` 序号对到 wgpu 的适配器按 PCI 总线地址对（去掉域、小写，
-//! 同 checker 档 `gpu_unit_checks` 文件头「按 PCI 总线号对上 wgpu 的适配器」的对法；harness 一侧不依赖 checker 档，这里自己写一份）。
+//! 同 验证包 `gpu_unit_checks` 文件头「按 PCI 总线号对上 wgpu 的适配器」的对法；harness 一侧不依赖 验证包，这里自己写一份）。
 //! 变量没设、或这一台一张都没交：打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」；交了卡却对不上本机任何适配器、或交来的比这一份要的少：判红。
-//! 七·3 验收「真卡用例每张参与的卡显存上限给 1 GiB（测小上限切片的几条照用更小的）」（用户 2026-11-01 定）：每张参与的卡各给
+//! 七·3 验收「真卡用例每张参与的卡显存上限给 1 GiB（测小上限切片的几条照用更小的）」：每张参与的卡各给
 //! [`MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU`]；专门测小上限切片的那几条照用各自更小的值。
 //! 解析与对卡是纯函数（单测在 `tests/real_gpu_tests_open_only_the_gpus_the_task_server_handed_over.rs`，不挂特性、不要卡），读环境、起判法、起 `nvidia-smi`、
 //! 枚举适配器的那一层薄壳在 [`handed_over_gpus_or_report_not_run`]。
+//! 一条用例只建一个 Vulkan 实例：服务交了这一台的卡时 [`handed_over_gpus_or_report_not_run`] 建一份 [`VulkanInstanceOfThisProcess`]，连同交来的卡交回，
+//! 这条用例里对卡、开卡、再枚举都用它；服务没交卡时不建（不碰 GPU）。
 #![allow(dead_code, reason = "几份测试文件各自 mod 进来，只用到其中一部分")]
 
 use std::collections::BTreeMap;
@@ -22,9 +24,8 @@ use singlefs_background_gpu::adapter_inventory::{
     EnumeratedAdapterDescription,
 };
 use singlefs_background_gpu::background_gpu::{
-    open_background_gpu, wait_for_the_wgpu_future, BackgroundGpu,
+    open_background_gpu, BackgroundGpu, VulkanInstanceOfThisProcess,
 };
-use singlefs_background_gpu::waiting_for_the_gpu::SteadyClockOfThisProcess;
 use singlefs_core::background_compute::{GpuDeviceIdentifier, GpuMemoryInBytes};
 
 /// 真卡用例给每张参与的卡的显存上限：1 GiB。
@@ -148,7 +149,7 @@ pub fn gpus_handed_to_this_host(
 }
 
 /// bash `printf %q` 打出来的一个地址还原成原样：判法只打地址（十六进制数字、点、冒号）与隔开它们的空格，`%q` 只给空格前面加反斜杠，空串打成 `''`；
-/// 别的引号写法判法不会打给这几行，认不出就报错，不猜（同 checker 档 `gpu_card_configuration` 的同名读法）。
+/// 别的引号写法判法不会打给这几行，认不出就报错，不猜（同 验证包 `gpu_card_configuration` 的同名读法）。
 fn value_printed_by_printf_quoted(quoted: &str) -> Result<String, String> {
     if quoted == "''" {
         return Ok(String::new());
@@ -193,7 +194,7 @@ pub fn this_host_address_emitted_by_the_configuration_check(
 }
 
 /// PCI 总线地址只留 `总线:设备.功能` 那一段、小写：`nvidia-smi` 报的 `00000000:01:00.0` 与 wgpu 报的 `0000:01:00.0` 认成同一张卡
-/// （同 harness 档 `gpu_memory_ledger` 的同名函数；本包测试不依赖 harness 档，自己留一份）。
+/// （同 验证包 `gpu_memory_ledger` 的同名函数；本包测试不依赖 验证包，自己留一份）。
 #[must_use]
 pub fn pci_bus_identifier_without_the_domain(pci_bus_address: &str) -> String {
     let lowered = pci_bus_address.trim().to_ascii_lowercase();
@@ -363,62 +364,74 @@ pub fn identifiers_of_the_handed_over_gpus(
         .collect()
 }
 
-/// 照 `selection` 开卡。卡是服务交来、对上了本机适配器的，开不了判红。
+/// 服务交来、对上了本机 Vulkan 独显的卡（照交来的次序），连同对卡时枚举用的那一份 Vulkan 实例：这条用例里开卡、再枚举都用它，不另建。
+pub struct HandedOverGpusSeenThroughTheInstance {
+    pub vulkan_instance: VulkanInstanceOfThisProcess,
+    pub gpus: Vec<HandedOverGpu>,
+}
+
+/// 照 `selection` 在 `vulkan_instance` 上开卡。卡是服务交来、对上了本机适配器的，开不了判红。
 ///
 /// # Panics
 /// 开卡拒了。
 #[must_use]
-pub fn opened_background_gpu(selection: &BackgroundGpuSelection) -> BackgroundGpu {
-    open_background_gpu(selection).unwrap_or_else(|refused| {
+pub fn opened_background_gpu(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+    selection: &BackgroundGpuSelection,
+) -> BackgroundGpu {
+    open_background_gpu(selection, vulkan_instance).unwrap_or_else(|refused| {
         panic!("服务交来、对上了本机适配器的卡开不了后台 GPU：{refused:?}（点名的 {selection:?}）")
     })
 }
 
-/// 本机这一次枚举到的适配器（另起一个只开 Vulkan 的 wgpu 实例，与产品开卡同一种实例），在 `wait_limit` 之内等。
+/// 本机这一次在 `vulkan_instance` 上枚举到的适配器（与产品开卡用同一个实例），在 `wait_limit` 之内等。
 ///
 /// # Panics
 /// 等枚举超过 `wait_limit`。
-fn adapter_descriptions_on_this_host(wait_limit: Duration) -> Vec<EnumeratedAdapterDescription> {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::VULKAN,
-        ..wgpu::InstanceDescriptor::new_without_display_handle()
-    });
-    wait_for_the_wgpu_future(
-        instance.enumerate_adapters(wgpu::Backends::VULKAN),
-        wait_limit,
-        &SteadyClockOfThisProcess::starting_now(),
-    )
-    .expect("枚举适配器在等的上限之内")
-    .iter()
-    .map(|adapter| {
-        let adapter_information = adapter.get_info();
-        EnumeratedAdapterDescription {
-            name: adapter_information.name,
-            device_kind: AdapterDeviceKind::of_the_wgpu_device_type(
-                adapter_information.device_type,
-            ),
-            pci_bus_address: adapter_information.device_pci_bus_id,
-            device_local_memory: None,
-        }
-    })
-    .collect()
+fn adapter_descriptions_on_this_host(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+    wait_limit: Duration,
+) -> Vec<EnumeratedAdapterDescription> {
+    vulkan_instance
+        .vulkan_adapters_enumerated_within(wait_limit)
+        .expect("枚举适配器在等的上限之内")
+        .iter()
+        .map(|adapter| {
+            let adapter_information = adapter.get_info();
+            EnumeratedAdapterDescription {
+                name: adapter_information.name,
+                device_kind: AdapterDeviceKind::of_the_wgpu_device_type(
+                    adapter_information.device_type,
+                ),
+                pci_bus_address: adapter_information.device_pci_bus_id,
+                device_local_memory: None,
+            }
+        })
+        .collect()
 }
 
-/// 此刻本机在的独立显卡，按 wgpu 枚举的次序（照产品那一份判法数：集显、虚拟显卡、软件 Vulkan、认不出类型的与没有总线地址的不算，
+/// 此刻 `vulkan_instance` 上看得到的本机独立显卡，按 wgpu 枚举的次序（照产品那一份判法数：集显、虚拟显卡、软件 Vulkan、认不出类型的与没有总线地址的不算，
 /// `adapter_inventory::identifiers_of_the_discrete_gpus_in_the_enumeration`）。只给「Vulkan 驱动全藏起来时一张都看不到」那一条数卡用，开卡点名交来的卡。
 ///
 /// # Panics
 /// 等枚举超过 `wait_limit`。
 #[must_use]
-pub fn discrete_gpus_on_this_host(wait_limit: Duration) -> Vec<GpuDeviceIdentifier> {
+pub fn discrete_gpus_on_this_host(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+    wait_limit: Duration,
+) -> Vec<GpuDeviceIdentifier> {
     identifiers_of_the_discrete_gpus_in_the_enumeration(&adapter_descriptions_on_this_host(
+        vulkan_instance,
         wait_limit,
     ))
 }
 
 /// 此刻本机 Vulkan 独显各自的总线地址（wgpu 报的原样），哪些算独显照产品那一份判法（[`discrete_gpus_on_this_host`]）。
-fn pci_bus_addresses_of_the_discrete_gpus_on_this_host(wait_limit: Duration) -> Vec<String> {
-    let descriptions = adapter_descriptions_on_this_host(wait_limit);
+fn pci_bus_addresses_of_the_discrete_gpus_on_this_host(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+    wait_limit: Duration,
+) -> Vec<String> {
+    let descriptions = adapter_descriptions_on_this_host(vulkan_instance, wait_limit);
     let discrete_gpus = identifiers_of_the_discrete_gpus_in_the_enumeration(&descriptions);
     descriptions
         .into_iter()
@@ -477,8 +490,8 @@ fn pci_buses_reported_by_nvidia_smi() -> Result<BTreeMap<NvidiaSmiIndex, String>
     pci_buses_by_nvidia_smi_index(&String::from_utf8_lossy(&output.stdout))
 }
 
-/// 服务交给这个进程、属于这一台的卡，逐张对上本机的 Vulkan 独显，照交来的次序。服务没交卡、或交的卡里没有这一台的：打
-/// `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」、交回 `None`。
+/// 服务交给这个进程、属于这一台的卡，逐张对上本机的 Vulkan 独显，照交来的次序；连同对卡时建的那一份 Vulkan 实例交回（这条用例里开卡、再枚举都用它）。
+/// 服务没交卡、或交的卡里没有这一台的：不建实例，打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」、交回 `None`。
 ///
 /// # Panics
 /// 变量读不成、多机配置判法认不出这一台、`nvidia-smi` 起不来或读不成、交来的卡有一张对不上本机的独显：判红。
@@ -486,7 +499,7 @@ fn pci_buses_reported_by_nvidia_smi() -> Result<BTreeMap<NvidiaSmiIndex, String>
 pub fn handed_over_gpus_or_report_not_run(
     test_name: &str,
     wait_limit: Duration,
-) -> Option<Vec<HandedOverGpu>> {
+) -> Option<HandedOverGpusSeenThroughTheInstance> {
     let handover_variable_value =
         std::env::var(VARIABLE_OF_THE_GPUS_HANDED_OVER_BY_THE_TASK_SERVER).ok();
     let handed_to_this_host = gpus_handed_to_this_host(
@@ -504,8 +517,9 @@ pub fn handed_over_gpus_or_report_not_run(
     let pci_buses_by_index = pci_buses_reported_by_nvidia_smi().unwrap_or_else(|reason| {
         panic!("服务交了卡（序号 {handed_over_indices:?}），读不成本机的卡：{reason}")
     });
+    let vulkan_instance = VulkanInstanceOfThisProcess::created_for_this_process();
     let pci_bus_addresses_of_the_discrete_adapters =
-        pci_bus_addresses_of_the_discrete_gpus_on_this_host(wait_limit);
+        pci_bus_addresses_of_the_discrete_gpus_on_this_host(&vulkan_instance, wait_limit);
     let handed_over_gpus = handed_over_gpus_matched_to_the_adapters(
         &handed_over_indices,
         &pci_buses_by_index,
@@ -524,7 +538,10 @@ pub fn handed_over_gpus_or_report_not_run(
             .collect::<Vec<_>>()
             .join(",")
     );
-    Some(handed_over_gpus)
+    Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    })
 }
 
 /// 同 [`handed_over_gpus_or_report_not_run`]，再照交来的次序取头 `declared_gpu_count` 张（这一份源头声明的张数，[`handed_over_gpus_of_the_declared_count`]）。
@@ -536,12 +553,13 @@ pub fn handed_over_gpus_of_the_declared_count_or_report_not_run(
     test_name: &str,
     declared_gpu_count: usize,
     wait_limit: Duration,
-) -> Option<Vec<HandedOverGpu>> {
-    let handed_over_gpus = handed_over_gpus_or_report_not_run(test_name, wait_limit)?;
-    Some(
-        handed_over_gpus_of_the_declared_count(handed_over_gpus, declared_gpu_count)
+) -> Option<HandedOverGpusSeenThroughTheInstance> {
+    let handed_over = handed_over_gpus_or_report_not_run(test_name, wait_limit)?;
+    Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance: handed_over.vulkan_instance,
+        gpus: handed_over_gpus_of_the_declared_count(handed_over.gpus, declared_gpu_count)
             .unwrap_or_else(|reason| panic!("{reason}")),
-    )
+    })
 }
 
 /// 开交来的卡、每张卡的显存上限 [`MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU`]、等 GPU 的上限 `wait_limit`；服务没交这一台的卡时打
@@ -554,12 +572,15 @@ pub fn background_gpu_on_the_handed_over_gpus_under_one_gibibyte_each_or_report_
     test_name: &str,
     wait_limit: Duration,
 ) -> Option<BackgroundGpu> {
-    let handed_over_gpus = handed_over_gpus_or_report_not_run(test_name, wait_limit)?;
-    Some(opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU,
-        wait_limit,
-    )))
+    let handed_over = handed_over_gpus_or_report_not_run(test_name, wait_limit)?;
+    Some(opened_background_gpu(
+        &handed_over.vulkan_instance,
+        &selection_over_the_handed_over_gpus(
+            &handed_over.gpus,
+            MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU,
+            wait_limit,
+        ),
+    ))
 }
 
 /// `card_count` 张参与的卡各一个 [`MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU`]（挂载参数 `background_gpu_memory_limit` 按次序一张卡一个、不补齐）。

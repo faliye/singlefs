@@ -193,7 +193,7 @@ fn handed_over_gpus_are_matched_to_the_adapters_on_the_same_bus_in_the_handed_or
 }
 
 #[test]
-fn a_handed_over_gpu_on_a_bus_without_a_discrete_adapter_is_red_and_not_skipped() {
+fn handed_over_gpu_on_a_bus_without_a_discrete_adapter_is_red_and_not_skipped() {
     assert_eq!(
         handed_over_gpus_matched_to_the_adapters(
             &[NvidiaSmiIndex(0), NvidiaSmiIndex(1)],
@@ -209,7 +209,7 @@ fn a_handed_over_gpu_on_a_bus_without_a_discrete_adapter_is_red_and_not_skipped(
 }
 
 #[test]
-fn a_handed_over_index_nvidia_smi_does_not_report_is_red() {
+fn handed_over_index_nvidia_smi_does_not_report_is_red() {
     assert_eq!(
         handed_over_gpus_matched_to_the_adapters(
             &[NvidiaSmiIndex(5)],

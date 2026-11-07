@@ -1,14 +1,17 @@
 //! 输出行：一行一项、次序确定，行格式与 `scripts/gate/lib_function_units.py` 同一份——
-//!   单元行 `<种类>\t<限定名>\t<文件>:<起>-<止>\t<指纹>`（数据单元的种类是 `data`，限定名是数据文件从仓根起的路径，文件:行是读它的那一处）；
+//!   单元行 `<种类>\t<限定名>\t<文件>:<起>-<止>\t<指纹>`（数据单元的种类是 `data`，限定名是数据文件从仓根起的路径，文件:行是读它的那一处；
+//!   目录数据单元的种类是 `data-directory`，限定名是目录从仓根起的路径，指纹是 `units::directory_digest`）；
 //!   键行 `key\t<sha256>`；拒算行 `refused\t<形态>\t<文件>:<行>\t<原样片段>`。
 
 use std::collections::BTreeSet;
 
-use crate::closure::{ClosureOutcome, DataUnit};
+use crate::closure::{ClosureOutcome, DataUnit, DataUnitKind};
 use crate::conditional_compilation::{ConditionalCompilationSet, Evaluation};
 use crate::rust_items::cleaned_fragment;
 use crate::sha256::Sha256Digest;
-use crate::units::{ReadOrigin, Refusal, RefusalForm, SourceRead, UnitIndex, WgslUnitIndex};
+use crate::units::{
+    ReadOrigin, Refusal, RefusalFile, RefusalForm, SourceRead, UnitIndex, WgslUnitIndex,
+};
 use crate::workspace::{SourceLanguage, Workspace};
 
 /// 一行加上排序用的位置（文件、起止行），排好之后丢掉位置。
@@ -86,7 +89,8 @@ fn data_placed_line(workspace: &Workspace, data_unit: &DataUnit) -> PlacedLine {
     let file = workspace.files[site.file.0].relative_path.clone();
     PlacedLine {
         text: format!(
-            "data\t{}\t{file}:{}-{}\t{}",
+            "{}\t{}\t{file}:{}-{}\t{}",
+            data_unit.kind.output_name(),
             data_unit.path_display,
             data_unit.site_line,
             data_unit.site_line,
@@ -98,13 +102,26 @@ fn data_placed_line(workspace: &Workspace, data_unit: &DataUnit) -> PlacedLine {
     }
 }
 
+/// 拒算落在的那份文件从仓根起的路径。
+fn refusal_file_path<'workspace>(
+    workspace: &'workspace Workspace,
+    refusal: &'workspace Refusal,
+) -> &'workspace str {
+    match &refusal.file {
+        RefusalFile::WorkspaceSourceFile(file) => &workspace.files[file.0].relative_path,
+        RefusalFile::ShellScriptFromTheRepositoryRoot(path_from_the_repository_root) => {
+            path_from_the_repository_root
+        }
+    }
+}
+
 /// 拒算行。
 #[must_use]
 pub fn refusal_line(workspace: &Workspace, refusal: &Refusal) -> String {
     format!(
         "refused\t{}\t{}:{}\t{}",
         refusal.form.output_name(),
-        workspace.files[refusal.file.0].relative_path,
+        refusal_file_path(workspace, refusal),
         refusal.line,
         cleaned_fragment(&refusal.fragment)
     )
@@ -120,7 +137,7 @@ fn sorted_refusal_lines(workspace: &Workspace, refusals: &BTreeSet<Refusal>) -> 
     let placed = refusals
         .iter()
         .map(|refusal| PlacedLine {
-            file: workspace.files[refusal.file.0].relative_path.clone(),
+            file: refusal_file_path(workspace, refusal).to_string(),
             start_line: refusal.line,
             end_line: refusal.line,
             text: refusal_line(workspace, refusal),
@@ -143,7 +160,7 @@ pub fn parse_time_refusals(workspace: &Workspace) -> BTreeSet<Refusal> {
         for predicate in &unit.conditions {
             if recognition.evaluate(predicate) == Evaluation::Unknown {
                 refusals.insert(Refusal {
-                    file: unit.file,
+                    file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                     line: unit.start_line,
                     form: RefusalForm::UnrecognizedConditionalCompilationPredicate,
                     fragment: crate::conditional_compilation::rendered_predicate(predicate),
@@ -159,7 +176,7 @@ pub fn parse_time_refusals(workspace: &Workspace) -> BTreeSet<Refusal> {
             } = read
             {
                 refusals.insert(Refusal {
-                    file: unit.file,
+                    file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                     line: *line,
                     form: RefusalForm::DataFileUnreadable,
                     fragment: workspace.display_path(absolute_path),
@@ -182,6 +199,24 @@ pub fn dump_lines(workspace: &Workspace) -> Vec<String> {
     );
     for (position, unit) in workspace.units.iter().enumerate() {
         for read in &unit.reads {
+            if let SourceRead::Directory {
+                absolute_path,
+                line,
+                digest,
+            } = read
+            {
+                placed.push(data_placed_line(
+                    workspace,
+                    &DataUnit {
+                        site: UnitIndex(position),
+                        path_display: workspace.display_path(absolute_path),
+                        site_line: *line,
+                        digest: *digest,
+                        kind: DataUnitKind::Directory,
+                    },
+                ));
+                continue;
+            }
             let SourceRead::File {
                 absolute_path,
                 line,
@@ -206,6 +241,7 @@ pub fn dump_lines(workspace: &Workspace) -> Vec<String> {
                     path_display: workspace.display_path(absolute_path),
                     site_line: *line,
                     digest: *digest,
+                    kind: DataUnitKind::File,
                 },
             ));
         }

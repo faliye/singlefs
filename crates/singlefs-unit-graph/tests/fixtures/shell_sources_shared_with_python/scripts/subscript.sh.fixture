@@ -1,0 +1,6 @@
+declare -A item
+key="$1" address="$2" value="$3"
+item[$key $address]="$value" library=scripts/lib/plain-library.sh
+item[$key]+=" more"
+echo "${item[$key $address]}"
+source "$library"

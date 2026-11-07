@@ -1,0 +1,9 @@
+[package]
+name = "singlefs-device-library"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "实验装置读写判定库的口子：经起装置的 scripts/experiment-apparatus/device-code-key.py run 开的两根管道一问一答，转给 prune-server 的那一份判定库；只用 std，不依赖工作区任何 crate。用到它的装置按 path 依赖引"
+
+# 不设 [features]：验证包的构建脚本取直接依赖的特性要依赖带 links 与构建脚本（singlefs_unit_graph::build_features::features_enabled_on_the_dependencies），
+# 带特性而不带 links 的依赖让它当场停下；单测用的内存那一种（DeviceLibrary::in_memory）因此不挂特性、一律编。

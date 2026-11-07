@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use common_background_gpu_compute::CpuBackedBackgroundGpuComputeForTests;
+use common_background_gpu_compute::{CpuBackedBackgroundGpuComputeForTests, EIGHT_GIBIBYTES};
 use common_pool_on_memory_devices::pool_after_a_sequential_write_in_an_earlier_mount;
 use singlefs_background_gpu::adapter_inventory::DiscreteGpuOnThisHost;
 use singlefs_background_gpu::background_gpu::{
@@ -76,7 +76,6 @@ const TREE_OF_THE_TEST_DATA: u64 = 11;
 const CARD_OF_THE_TEST_DOUBLE: &str = "card-of-the-cpu-test-double";
 /// 切换用例里挂载那一刻没开成而跳过的那一张卡。
 const CARD_NOT_OPENED_AT_THE_MOUNT: &str = "card-not-opened-at-the-mount";
-const EIGHT_GIBIBYTES: u64 = 8 << 30;
 
 fn card_of_the_test_double() -> GpuDeviceIdentifier {
     GpuDeviceIdentifier::of_opaque_bytes(CARD_OF_THE_TEST_DOUBLE.as_bytes().to_vec())
@@ -572,8 +571,8 @@ fn inject_disagreements(
     fake.cluster_segments_uncertain = cluster_segments;
 }
 
-/// 第 8 条：三段各点名一条，头两轮两份核判得不一样、第三轮一样。产品那一份（背后 CPU 替身）与核心层测试用的假实现逐轮逐条交回相同的判定：
-/// 头一轮那几条不确定、第二轮按 CPU 判、第三轮确认，别的条目每轮确认。
+/// 第 8 条：三段各点名一条，前两轮两份核判得不一样、最后一轮一样。产品那一份（背后 CPU 替身）与核心层测试用的假实现逐轮逐条交回相同的判定：
+/// 头一轮那几条不确定、接着一轮按 CPU 判、最后一轮确认，别的条目每轮确认。
 #[test]
 fn decisions_over_three_rounds_agree_with_the_fake_of_the_core_on_every_segment() {
     let inputs = small_inputs_of_the_three_segments();
@@ -778,7 +777,7 @@ fn the_core_admits_gpu_settings_against_the_inventory_the_implementation_answers
     );
 }
 
-/// 第 4 条「挂载或切换那一刻……点名的卡不存在，就拒绝挂载（或拒绝切换）」与 `records/2026-10-19-里程碑四GPU垃圾回收开工.md` 第 45 批交回那一行的定法：
+/// 第 4 条「挂载或切换那一刻……点名的卡不存在，就拒绝挂载（或拒绝切换）」：
 /// 挂载时给了卡列表、没点名的那张卡没开成而被跳过；挂着切换点到它（点名它，或不给卡列表、本机全部独显都参与）照拒，校验同挂载那一刻，
 /// 生效的与待生效的都不动，实现只收到挂载那一组。经核心层的切换入口与产品那一份实现（两份核那一层是 CPU 替身）走。
 #[test]
@@ -1144,7 +1143,7 @@ fn the_switch_requested_in_the_middle_of_a_batch_reaches_the_kernels_only_at_the
     );
 }
 
-/// 用户 2026-10-28 定「在间隔内重试三次，如果gpu无法用就报警」：丙段交回「这张卡重交 3 次都等超过上限」（两份核那一层是 CPU 替身），
+/// 在间隔内重试三次，gpu 仍无法用就报警：丙段交回「这张卡重交 3 次都等超过上限」（两份核那一层是 CPU 替身），
 /// 经产品那一份实现报给核心层是「这张卡用不了」那一个成员，带卡、重交了几次、等的上限与最后那一次是这一批的那一次提交；整理这一批放弃、
 /// 一个写都没发、停着，`stopped_after_a_compute_error` 读得出它。
 #[test]
@@ -1203,8 +1202,8 @@ fn the_gpu_unusable_after_its_resubmissions_stops_the_compaction_reporting_the_c
     );
 }
 
-/// 用户 2026-10-28 定「不能因为装不下就拒绝」「连一片都装不下就不用这张卡」：挂载选 `gpu`，两份核那一层答「参与的卡一张都不剩」（显存上限装不下最小的一片）：
-/// 挂载照常做成，挂载那一刻整理就记成出错停着、读得出原因（「参与的卡一张都不剩」，带那张卡、上限与至少要多少），不等头一批；之后一趟整理停在此前出错停着上、
+/// 装不下不拒绝、连一片都装不下就不用这张卡：挂载选 `gpu`，两份核那一层答「参与的卡一张都不剩」（显存上限装不下最小的一片）：
+/// 挂载照常做成，挂载那一刻整理就记成出错停着、读得出原因（「参与的卡一张都不剩」，带那张卡、上限与至少要多少），不等头一批；之后一趟整理停在先前出错停着上、
 /// 一个写都不发，两份核那一层一段都没算。
 #[test]
 fn the_mount_whose_participating_gpus_are_all_left_out_under_their_memory_limit_starts_with_the_compaction_stopped(
@@ -1266,10 +1265,10 @@ fn the_mount_whose_participating_gpus_are_all_left_out_under_their_memory_limit_
     );
 }
 
-/// 用户 2026-10-28 定「不能因为装不下就拒绝」：挂着切到一组一张卡都用不上的设置（显存上限 64 字节，两份核那一层收到这一组之后答「参与的卡一张都不剩」），
+/// 装不下不拒绝：挂着切到一组一张卡都用不上的设置（显存上限 64 字节，两份核那一层收到这一组之后答「参与的卡一张都不剩」），
 /// 切换照收；切换生效的那一批开头整理当场停着，报的成员与挂载那一刻一张都用不上时相同
 /// （`the_mount_whose_participating_gpus_are_all_left_out_under_their_memory_limit_starts_with_the_compaction_stopped`）。那一批不开、
-/// 一趟停在此前出错停着上，切换之前那一批照常走 GPU；两份核那一层收到切换那一组之后一段都没算。
+/// 一趟停在先前出错停着上，切换之前那一批照常走 GPU；两份核那一层收到切换那一组之后一段都没算。
 #[test]
 fn the_switch_to_settings_whose_participating_gpus_are_all_left_out_stops_the_compaction_at_the_next_batch_as_at_the_mount(
 ) {
@@ -1369,7 +1368,7 @@ fn the_switch_to_settings_whose_participating_gpus_are_all_left_out_stops_the_co
     );
 }
 
-/// 判决 m4-gpugc-code-r1 第三节第 8 条：一批三段在卡上是怎么交的（交了几片、重交了几次、显存不足重切了几次、用了哪几张卡）随那一批的记账报出来——
+/// 一批三段在卡上是怎么交的（交了几片、重交了几次、显存不足重切了几次、用了哪几张卡）随那一批的记账报出来——
 /// 核心层每一批算完之后经实现取一次（`BackgroundGpuCompute::take_the_submissions_of_the_batch`，产品那一份转给两份核那一层），记进
 /// `GpuWorkOfTheBatch::submissions_on_the_gpus`。替身每次都交回同一份，选 `gpu` 推一趟整理：每一批的记账里都是它，逐项相同。
 #[test]

@@ -2,7 +2,7 @@
 //! 恢复、可写挂载与实例切换（写行）都从这里解；checker 是独立解析器，不共用这份。
 //!
 //! 一张实例表是一条链：根记录指着第 0 片，第 k 片的链指针记录指着第 k + 1 片，最后一片写「无下一片」
-//! （沿链读盘在 `recovery::instance_table_chain_of_root`）。写者按用户 2026-09-24 的两条定案写多片：行一片写满 369 行再开下一片、
+//! （沿链读盘在 `recovery::instance_table_chain_of_root`）。写者写多片：行一片写满 369 行再开下一片、
 //! 最后一片装剩下的（D18（块里携带什么信息） 已定项 11，[`instance_table_rows_of_each_page`]）；在提交内生块的 bump 次序里尾片先
 //! （D3（空间分配） 已定项 10 ⑤，装链在 `transaction::build_instance_table_chain`）。
 
@@ -16,7 +16,7 @@ use singlefs_format::{INSTANCE_ROW_BYTES, INSTANCE_TABLE_PAGE_RECORDS, NODE_POIN
 
 /// 实例表 `kind` 0 行记录（D18（块里携带什么信息） 已定项 11）：
 /// `kind 1 | 实例代号 4 | 所选根的 checkpoint_txg 8 | 属于该实例的最大已施加事务号 W 8 | flags 1 | 预留 66`。
-/// flags 第一版恒 0、非 0 拒收；bit0 退役、不回收（曾标回退行，以后不给它另赋含义）。
+/// flags 第一版恒 0、非 0 拒收。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InstanceRow {
     pub instance: InstanceGeneration,
@@ -26,7 +26,7 @@ pub struct InstanceRow {
 
 const INSTANCE_ROW_KIND_ROW: u8 = 0;
 const INSTANCE_ROW_KIND_CHAIN: u8 = 1;
-/// 行记录 flags 字节第一版的唯一合法值（D18（块里携带什么信息） 已定项 11：恒 0、非 0 拒收；bit0 退役、不回收）。
+/// 行记录 flags 字节第一版的唯一合法值（D18（块里携带什么信息） 已定项 11：恒 0、非 0 拒收）。
 const INSTANCE_ROW_FLAGS_OF_THE_FIRST_VERSION: u8 = 0;
 
 impl InstanceRow {
@@ -43,7 +43,7 @@ impl InstanceRow {
         writer.into_bytes()
     }
 
-    /// `kind` 0 才是行；链指针记录（`kind` 1）与别的 `kind` 返回 `None`。flags 非 0 拒收，退役的 bit0 也在内。
+    /// `kind` 0 才是行；链指针记录（`kind` 1）与别的 `kind` 返回 `None`。flags 非 0 拒收。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
         if bytes.len() != usize::try_from(INSTANCE_ROW_BYTES).expect("88")
@@ -71,7 +71,7 @@ impl InstanceRow {
 /// （字节表七 m1「无下一片」的链指针记录）。
 const CHAIN_RECORD_NO_NEXT_PAGE: u8 = 0;
 /// 「有无下一片」的「有」。⚠️ 条款只写了字段名与宽度（`有无下一片 1`），「有」取 1、0 与 1 之外的值拒收是按字段名、
-/// 按同一张表里 kind 0 那个 flags 字节「其余位恒 0、非 0 拒收」同一个口径读出来的，没有逐字条款（交主 agent）。
+/// 按同一张表里 kind 0 那个 flags 字节「恒 0、非 0 拒收」同一个口径读出来的，没有逐字条款（交主 agent）。
 const CHAIN_RECORD_HAS_NEXT_PAGE: u8 = 1;
 /// 链指针记录里位置指针的偏移：`kind` 1 字节 + 有无下一片 1 字节。
 const CHAIN_RECORD_POINTER_OFFSET: usize = 2;
@@ -130,7 +130,7 @@ fn instance_rows_per_page() -> usize {
 }
 
 /// 一张表的行分到链上各片，按链上的次序（第 0 片在前）：一片写满 369 行再开下一片，最后一片装剩下的
-/// （D18（块里携带什么信息） 已定项 11，用户 2026-09-24 定案）；0 行也是一片（空的那一片）。片数恒等于
+/// （D18（块里携带什么信息） 已定项 11）；0 行也是一片（空的那一片）。片数恒等于
 /// [`instance_table_pages_for_rows`]。
 #[must_use]
 pub fn instance_table_rows_of_each_page(rows: &[InstanceRow]) -> Vec<&[InstanceRow]> {
@@ -315,10 +315,10 @@ mod chain_record_tests {
     use crate::unit::{build_packed_unit, WriteOrder};
     use singlefs_format::INSTANCE_ROW_BYTES;
 
-    /// 行记录的 flags 字节（D18（块里携带什么信息） 已定项 11）：写者恒写 0；读者见到非 0 一律拒收，退役的 bit0（曾标回退行）也在内——
-    /// 它不许被读成「一行普通的行」，也不许被读成别的含义。偏移 21 = kind 1 + 实例代号 4 + 所选根 txg 8 + W 8。
+    /// 行记录的 flags 字节（D18（块里携带什么信息） 已定项 11）：写者恒写 0；读者见到非 0 一律拒收——
+    /// 不许被读成「一行普通的行」，也不许被读成别的含义。偏移 21 = kind 1 + 实例代号 4 + 所选根 txg 8 + W 8。
     #[test]
-    fn the_row_writer_writes_zero_flags_and_the_reader_refuses_the_retired_bit_zero() {
+    fn the_row_writer_writes_zero_flags_and_the_reader_refuses_every_nonzero_flags_value() {
         let row = InstanceRow {
             instance: InstanceGeneration(3),
             selected_root_txg: CheckpointTxg(7),
@@ -328,16 +328,15 @@ mod chain_record_tests {
         let flags_offset = 1 + 4 + 8 + 8;
         assert_eq!(bytes[flags_offset], 0, "写者写的 flags 是 0");
         assert_eq!(InstanceRow::parse(&bytes), Some(row));
-        let mut carrying_the_retired_bit = bytes.clone();
-        carrying_the_retired_bit[flags_offset] = 0b0000_0001;
-        assert_eq!(
-            InstanceRow::parse(&carrying_the_retired_bit),
-            None,
-            "bit0 退役、不回收：带它的行拒收"
-        );
-        let mut carrying_another_bit = bytes;
-        carrying_another_bit[flags_offset] = 0b1000_0000;
-        assert_eq!(InstanceRow::parse(&carrying_another_bit), None);
+        for nonzero_flags in 1..=u8::MAX {
+            let mut carrying_nonzero_flags = bytes.clone();
+            carrying_nonzero_flags[flags_offset] = nonzero_flags;
+            assert_eq!(
+                InstanceRow::parse(&carrying_nonzero_flags),
+                None,
+                "flags 非 0 一律拒收：flags = {nonzero_flags:#010b} 的行"
+            );
+        }
     }
 
     fn next_page_pointer() -> NodePointer {
@@ -459,7 +458,7 @@ mod chain_record_tests {
         assert_eq!(instance_table_pages_for_rows(739), 3);
     }
 
-    /// 行分到各片（用户 2026-09-24 定：一片写满 369 行再开下一片，最后一片装剩下的）：各片的行数，片数与
+    /// 行分到各片：各片的行数，片数与
     /// `instance_table_pages_for_rows` 同一个数（写者按后者取落点、按前者装片，两者不等就有一片没有落点）；
     /// 一片的记录 = 这一片的行 + 末尾一条链指针记录，「有下一片」那一条解回来就是写进去的那个指针。
     #[test]

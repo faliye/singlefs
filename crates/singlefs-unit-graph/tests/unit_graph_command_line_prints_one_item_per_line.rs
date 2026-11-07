@@ -130,7 +130,7 @@ fn a_refused_closure_exits_three_and_prints_no_key_line() {
             ),
             (
                 "crates/refusing/src/lib.rs",
-                "pub fn entry_point() -> bool {\n    std::env::current_exe().is_ok()\n}\n",
+                "pub fn entry_point() -> bool {\n    std::process::Command::new(std::env::current_exe().expect(\"路径\")).status().is_ok()\n}\n",
             ),
         ],
     );

@@ -1,0 +1,1 @@
+source "$CLAUDE_PROJECT_DIR/scripts/lib/plain-library.sh"

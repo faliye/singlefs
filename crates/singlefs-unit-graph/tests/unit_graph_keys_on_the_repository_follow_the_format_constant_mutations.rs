@@ -34,14 +34,14 @@ const FORMAT_LIBRARY_WIDTH_TEST: EntrySpecification = EntrySpecification {
 
 /// 新池发布那条集成测试（V5 点名的测试）。
 const NEW_POOL_PUBLISH_TEST: EntrySpecification = EntrySpecification {
-    entry_path: "singlefs_harness::root_slots_system_configurations_and_journal_ring_hold_the_published_state",
+    entry_path: "singlefs_verification::root_slots_system_configurations_and_journal_ring_hold_the_published_state",
     target: "test:new_pool_file_creation_publish",
     conditions: &[],
 };
 
 /// CPU 判器入口。
 const CENTRAL_PROCESSOR_JUDGE: EntrySpecification = EntrySpecification {
-    entry_path: "singlefs_checker_tier::crash::judge_crash_image",
+    entry_path: "singlefs_verification::crash::judge_crash_image",
     target: "lib",
     conditions: &[],
 };
@@ -234,9 +234,9 @@ fn dumping_the_repository_with_one_thread_and_with_several_threads_gives_the_sam
 /// GPU 判器拼内核源码的三个函数（`crash_judge_gpu.rs` 整份在 `feature = "gpu"` 下）：内核里 Rust 现拼的外名
 /// （`format!` 拼的 `T_*`、宏 `gpu_failure_points!` 的名字去掉 `GPU_` 拼的 `FAILURE_POINT_*`）都有着落、`_ = …` 不当外名，三把键都交得出。
 const GPU_KERNEL_SOURCE_ENTRIES: [&str; 3] = [
-    "singlefs_checker_tier::crash_judge_gpu::recovery_kernel_source",
-    "singlefs_checker_tier::crash_judge_gpu::checker_walk_kernel_source",
-    "singlefs_checker_tier::crash_judge_gpu::checker_scan_kernel_source",
+    "singlefs_verification::crash_judge_gpu::recovery_kernel_source",
+    "singlefs_verification::crash_judge_gpu::checker_walk_kernel_source",
+    "singlefs_verification::crash_judge_gpu::checker_scan_kernel_source",
 ];
 
 #[test]
@@ -257,7 +257,7 @@ fn the_three_gpu_kernel_source_functions_close_with_no_refusal() {
     }
 }
 
-/// 失败点码表（`crates/singlefs-checker-tier/src/crash_judge_conclusions.rs` 的条目级宏调用 `gpu_failure_points! { … }`）里改一个码
+/// 失败点码表（`crates/singlefs-verification/src/crash_judge_conclusions.rs` 的条目级宏调用 `gpu_failure_points! { … }`）里改一个码
 /// 前后，拼恢复内核的函数的键：都交得出时交两把是否不同，有一把拒算交拒算说明。
 fn failure_point_code_change_changes_the_recovery_kernel_key(
     switches: &RuleSwitches,
@@ -274,7 +274,7 @@ fn failure_point_code_change_changes_the_recovery_kernel_key(
         switches,
     )?;
     tree.replace_exactly_once(
-        "crates/singlefs-checker-tier/src/crash_judge_conclusions.rs",
+        "crates/singlefs-verification/src/crash_judge_conclusions.rs",
         "    GPU_FAILURE_POINT_UNIT_UNREADABLE = 9,\n",
         "    GPU_FAILURE_POINT_UNIT_UNREADABLE = 99,\n",
     );
@@ -297,14 +297,18 @@ fn changing_a_failure_point_code_in_the_item_macro_changes_the_recovery_kernel_k
     );
 }
 
+/// 宏调用进恢复内核的闭包有两条互不依赖的边：WGSL 外名的着落（`FAILURE_POINT_*` 由调用里的 `GPU_FAILURE_POINT_*` 供），与
+/// `macro_rules! gpu_failure_points` 展开式顶层按字面写出的 `GPU_FAILURE_POINTS` 登到调用名下（`failure_point_wgsl_constants` 点名它）。
+/// 两条都弄坏，改码才漏掉；只弄坏一条照样换键。
 #[test]
-fn without_supplier_edges_the_failure_point_code_change_is_missed() {
+fn without_supplier_edges_and_macro_rules_literal_names_the_failure_point_code_change_is_missed() {
     let verdict =
         failure_point_code_change_changes_the_recovery_kernel_key(&RuleSwitches::with_broken(&[
             BrokenRule::WgslSupplierEdges,
+            BrokenRule::MacroRulesLiteralNames,
         ]));
     assert!(
         verdict != Ok(true),
-        "着落不做成边：宏调用不进恢复内核的闭包，改码不该照常换键：{verdict:?}"
+        "着落不做成边、宏体里的字面名字也不登：宏调用不进恢复内核的闭包，改码不该照常换键：{verdict:?}"
     );
 }

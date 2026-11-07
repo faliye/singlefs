@@ -18,17 +18,17 @@ pub enum WrittenStructureKind {
     InodeTreeRoot,
     AllocationRecordTreeNode,
     AccountingTreeNode,
-    /// deadlist 树的节点（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：第三棵多层码 2 树）：按树数，不按层数。
+    /// deadlist 树的节点：按树数，不按层数。
     DeadlistTreeNode,
     /// `deleted_inodes` 树的根（D8（核心索引结构） 已定项 16）。
     DeletedInodesTreeNode,
     /// 墓碑树的容器与根（D18（块里携带什么信息） 已定项 24）：按树数，不按容器与根分。
     TombstoneTreeNode,
-    /// 谱系树的容器与根（D18（块里携带什么信息） 已定项 24 第 5 条）：另立一种、不并进墓碑树那一种（用户 2026-10-02 定「另立一种」），按树数。
+    /// 谱系树的容器与根（D18（块里携带什么信息） 已定项 24 第 5 条）：另立一种、不并进墓碑树那一种，按树数。
     LineageTreeNode,
-    /// logged_ops 树的根（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1：单树、只有一个码 2 根）：另立一种，按树数。
+    /// logged_ops 树的根：另立一种，按树数。
     LoggedOperationsTreeNode,
-    /// 退役树的容器与根（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 5 条）：照谱系树另立一种，按树数。
+    /// 退役树的容器与根：照谱系树另立一种，按树数。
     RetirementTreeNode,
     CentralMappingTreeNode,
     TreeTableUnit,

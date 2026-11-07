@@ -1,5 +1,5 @@
 //! SHA-256（FIPS 180-4）流式实现：单元指纹与复用键要能在仓外用 `sha256sum` 独立复算，所以必须是标准 SHA-256。
-//! 本 crate 不依赖工作区任何 crate（外部包只有剥 Verus 规格与证明块用的 `verus_syn` 那一套），算法照 `crates/singlefs-harness/src/sha256.rs` 另写一份流式的：
+//! 本 crate 不依赖工作区任何 crate（外部包只有剥 Verus 规格与证明块用的 `verus_syn` 那一套），算法照 `crates/singlefs-verification/src/sha256.rs` 另写一份流式的：
 //! 指纹按词法单元一段一段喂进来，不先拼出整串。
 //!
 //! 名字里的 `sha256` 是 FIPS 180-4 给这个算法起的名字，不是我们的缩写。
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(
             sha256_of(&vec![b'a'; 1_000_000]).hexadecimal(),
             "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
-            "一百万个 a：长消息那条向量，位数字段超过 32 位"
+            "一百万个 a：长消息那条向量，覆盖多块处理；位数 8,000,000，没越过 32 位，长度字段高 32 位那一半这条不覆盖"
         );
     }
 

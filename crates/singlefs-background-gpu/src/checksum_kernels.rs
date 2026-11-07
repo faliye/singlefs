@@ -575,7 +575,8 @@ mod tests {
     }
 
     #[test]
-    fn the_two_kernels_are_separate_sources_with_their_own_entry_points() {
+    fn the_table_driven_and_bitwise_checksum_kernels_are_separate_sources_with_their_own_entry_points(
+    ) {
         assert!(
             TABLE_DRIVEN_KERNEL_SOURCE.contains(&format!("fn {TABLE_DRIVEN_KERNEL_ENTRY_POINT}("))
         );

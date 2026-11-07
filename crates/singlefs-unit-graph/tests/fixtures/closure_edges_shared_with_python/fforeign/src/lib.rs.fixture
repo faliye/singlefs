@@ -1,0 +1,20 @@
+pub trait Measured {
+    fn measure(&self) -> u64;
+}
+
+impl Measured for std::time::Duration {
+    fn measure(&self) -> u64 {
+        self.as_secs() + 1
+    }
+}
+
+pub fn measure_of<Value>(value: &Value) -> u64
+where
+    Value: Measured,
+{
+    value.measure()
+}
+
+pub fn measured_second() -> u64 {
+    measure_of(&std::time::Duration::from_secs(1))
+}

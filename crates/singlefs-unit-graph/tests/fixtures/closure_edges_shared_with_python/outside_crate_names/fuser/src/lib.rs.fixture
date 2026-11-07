@@ -1,0 +1,11 @@
+use fservice::control;
+use fservice::restarts;
+
+pub struct Counters {
+    pub halted: u32,
+}
+
+pub fn served() -> u32 {
+    let counters = Counters { halted: 1 };
+    fservice::stopped_connections() + restarts() + control::paused() + counters.halted
+}

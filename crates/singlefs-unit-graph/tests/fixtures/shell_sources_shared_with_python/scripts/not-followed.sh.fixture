@@ -1,0 +1,6 @@
+# source scripts/lib/never.sh
+bash -c 'source scripts/lib/never.sh'
+cat <<'EOF'
+source scripts/lib/never.sh
+EOF
+echo "source scripts/lib/never.sh"

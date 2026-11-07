@@ -3,7 +3,7 @@
 //! 只开服务经 `GPU_CARDS_BY_PRIORITY` 交给这个进程、属于这一台的那几张卡（`common_discrete_gpus_of_this_host`）：服务没交这一台的卡时每条打一行
 //! `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」、返回成功；交了卡却对不上本机的独显、或开不了判红。源头没声明张数，服务分一张。
 //! 只在开了特性 `tests-on-a-real-gpu` 时编；用 GPU，经 `task-server/task submit` 交（卡与清场由服务定），带 `--test-threads 1`。
-//! 开卡时每张参与的卡的显存上限给 1 GiB（七·3 验收，用户 2026-11-01 定；`common_discrete_gpus_of_this_host`），专门测小上限切片的几条照用更小的。
+//! 开卡时每张参与的卡的显存上限给 1 GiB（`common_discrete_gpus_of_this_host`），专门测小上限切片的几条照用更小的。
 //!
 //! 两块单元区：默认环长下的那一块（6 个整段加末尾 10 个槽），与起点在槽 2^32 − 128 的那一块（第 3 个整段从槽 2^32 起，槽号的高 32 位在段中间进位）。
 //! 每块上的记录：起点在单元区之前、罩进头一个段的；段里的普通记录；释放了的；别的盘上的；跨两段的；同一个落点两条（各算一次）；
@@ -17,6 +17,7 @@ mod common_discrete_gpus_of_this_host;
 use common_discrete_gpus_of_this_host::{
     background_gpu_on_the_handed_over_gpus_under_one_gibibyte_each_or_report_not_run,
     handed_over_gpus_or_report_not_run, opened_background_gpu, selection_over_the_handed_over_gpus,
+    HandedOverGpusSeenThroughTheInstance,
 };
 use singlefs_background_gpu::background_gpu::{BackgroundGpu, LiveSlotBatchFailed};
 use singlefs_background_gpu::gpus_of_this_host::bytes_of_the_smallest_piece_every_participating_gpu_holds;
@@ -248,14 +249,16 @@ fn the_two_live_slot_kernels_confirm_every_segment_on_a_healthy_gpu() {
 
 /// 第 3 条「一批放不下就切成几次交」：开卡就给每张卡「装得下两个段、装不下这块单元区的全部段」的显存上限（由这一批的记录表现算：
 /// 整份记录表与参数每段各占一份，每个段另占上下界与两份核的结果、回读暂存），两份核的数照样逐段与 CPU 参照相同。这个上限比量代价那一段小，
-/// 开卡时量代价那一段照它切成几片量（用户 2026-10-28 定「装不下应该自适应的分片」），不拒挂载。
+/// 开卡时量代价那一段照它切成几片量，不拒挂载。
 #[test]
 fn the_memory_limit_smaller_than_the_batch_cuts_the_segments_into_chunks_with_the_same_live_slots()
 {
     let test_name =
         "the_memory_limit_smaller_than_the_batch_cuts_the_segments_into_chunks_with_the_same_live_slots";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
@@ -276,11 +279,14 @@ fn the_memory_limit_smaller_than_the_batch_cuts_the_segments_into_chunks_with_th
             "上限 {two_segments} 字节装得下两个段、装不下全部 {segment_count} 个段（{every_segment} 字节）"
         );
         // 上限比量代价那一段小：切开量，不拒挂载
-        let mut background_gpu = opened_background_gpu(&selection_over_the_handed_over_gpus(
-            &handed_over_gpus,
-            GpuMemoryInBytes(two_segments),
-            WAIT_LIMIT_OF_THE_GPU_TESTS,
-        ));
+        let mut background_gpu = opened_background_gpu(
+            &vulkan_instance,
+            &selection_over_the_handed_over_gpus(
+                &handed_over_gpus,
+                GpuMemoryInBytes(two_segments),
+                WAIT_LIMIT_OF_THE_GPU_TESTS,
+            ),
+        );
         let (both, reference) =
             both_kernels_and_the_cpu_reference_on(&mut background_gpu, unit_area);
         assert_eq!(
@@ -295,14 +301,16 @@ fn the_memory_limit_smaller_than_the_batch_cuts_the_segments_into_chunks_with_th
     }
 }
 
-/// 用户 2026-10-28 定「装不下应该自适应的分片」：上限取参与的卡至少要装得下的那一片（卡照样参与），连整份记录表加一个段都装不下，记录表按记录切成几片、
+/// 装不下自适应分片：上限取参与的卡至少要装得下的那一片（卡照样参与），连整份记录表加一个段都装不下，记录表按记录切成几片、
 /// 各片数出的逐段相加，两份核的数照样逐段与 CPU 参照相同。
 #[test]
 fn the_memory_limit_smaller_than_the_record_table_cuts_it_into_slices_with_the_same_live_slots() {
     let test_name =
         "the_memory_limit_smaller_than_the_record_table_cuts_it_into_slices_with_the_same_live_slots";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
@@ -318,11 +326,14 @@ fn the_memory_limit_smaller_than_the_record_table_cuts_it_into_slices_with_the_s
             "整份记录表加一个段（{whole_table_and_one_segment} 字节）装不下：要切"
         );
         // 上限装得下最小的一片：不拒挂载
-        let mut background_gpu = opened_background_gpu(&selection_over_the_handed_over_gpus(
-            &handed_over_gpus,
-            GpuMemoryInBytes(memory_limit_holding_the_smallest_piece),
-            WAIT_LIMIT_OF_THE_GPU_TESTS,
-        ));
+        let mut background_gpu = opened_background_gpu(
+            &vulkan_instance,
+            &selection_over_the_handed_over_gpus(
+                &handed_over_gpus,
+                GpuMemoryInBytes(memory_limit_holding_the_smallest_piece),
+                WAIT_LIMIT_OF_THE_GPU_TESTS,
+            ),
+        );
         let (both, reference) =
             both_kernels_and_the_cpu_reference_on(&mut background_gpu, unit_area);
         assert_eq!(
@@ -337,24 +348,29 @@ fn the_memory_limit_smaller_than_the_record_table_cuts_it_into_slices_with_the_s
     }
 }
 
-/// 用户 2026-10-28 定「连一片都装不下就不用这张卡」：每张卡的显存上限都比最小的一片少一个字节——开卡不拒挂载、不 panic，
+/// 连一片都装不下就不用这张卡：每张卡的显存上限都比最小的一片少一个字节——开卡不拒挂载、不 panic，
 /// 参与的卡一张都不剩、每张都报出来（卡、上限、至少要多少），交一批报「连最小的一片都装不下」（核心层当 GPU 用不上那一态）。
 #[test]
 fn the_memory_limit_below_the_smallest_piece_leaves_every_gpu_out_without_refusing_the_opening() {
     let test_name =
         "the_memory_limit_below_the_smallest_piece_leaves_every_gpu_out_without_refusing_the_opening";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
     let smallest_piece_bytes = bytes_of_the_smallest_piece_every_participating_gpu_holds();
     // 上限装不下最小的一片：不用这些卡，不拒挂载
-    let mut background_gpu = opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        GpuMemoryInBytes(smallest_piece_bytes - 1),
-        WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ));
+    let mut background_gpu = opened_background_gpu(
+        &vulkan_instance,
+        &selection_over_the_handed_over_gpus(
+            &handed_over_gpus,
+            GpuMemoryInBytes(smallest_piece_bytes - 1),
+            WAIT_LIMIT_OF_THE_GPU_TESTS,
+        ),
+    );
     assert!(
         background_gpu.participating_gpus().is_empty(),
         "参与的卡一张都不剩"

@@ -409,7 +409,7 @@ pub fn parse_wgsl_file(source: &str, file: FileIndex) -> ParsedWgslFile {
             return ParsedWgslFile {
                 units: Vec::new(),
                 refusals: vec![Refusal {
-                    file,
+                    file: crate::units::RefusalFile::WorkspaceSourceFile(file),
                     line: lexed
                         .tokens
                         .get(offending_index)
@@ -529,7 +529,7 @@ pub fn parse_wgsl_file(source: &str, file: FileIndex) -> ParsedWgslFile {
                     .collect::<Vec<&str>>()
                     .join(" ");
                 refusals.push(Refusal {
-                    file,
+                    file: crate::units::RefusalFile::WorkspaceSourceFile(file),
                     line: scanner.line_of(index),
                     form: RefusalForm::WgslUnrecognizedItemStart,
                     fragment: cleaned_fragment(&fragment),

@@ -121,7 +121,7 @@ pub enum Verdict {
     /// 系统配置自述的区域数 R 大于字段表给逐区域设备身份留的字段数
     /// （[`crate::image::REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION`]）：
     /// 第 3 个及以后的区域没有设备身份可读，这份系统配置这个格式版本读不了。R 不等于第一版常量 3 是这一版读者不收的值
-    /// （用户 2026-10-20 定 C663「R 读并整池拒」）：[`crate::image::value_refused_by_this_reader`] 认它，整池不作保。
+    /// （C663（系统配置槽越界与不收之值两读者分类不同）：R 读并整池拒）：[`crate::image::value_refused_by_this_reader`] 认它，整池不作保。
     RegionCountPastTheRegionDeviceFields,
     /// 系统配置自述的每区槽数 S（偏移 362 那一字节）落在格式承诺的区间之外
     /// （`singlefs_format::ROOT_RING_SLOTS_PER_REGION_MINIMUM`..`_MAXIMUM`，D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格）：
@@ -130,19 +130,19 @@ pub enum Verdict {
     /// 不夹到区间里往下走（那是按一个池里根本不存在的几何走读，少读或多读几个槽而没人说），
     /// 也不 panic：S = 0 会让环长变 0、实现侧取模除零。挂载侧同一条判定是
     /// `singlefs_core::recovery::RecoveryFailure::RootRingSlotsPerRegionOutOfRange`，整池拒绝挂载；checker 同一个处置
-    /// （D22（单元原子性怎么合成） 已定项 2「越界整池拒绝挂载，与每区槽数 S 越界同一个处置」，用户 2026-10-20 定 C663「S 照条款整池拒」）：
+    /// （D22（单元原子性怎么合成） 已定项 2「越界整池拒绝挂载，与每区槽数 S 越界同一个处置」，C663（系统配置槽越界与不收之值两读者分类不同）：S 照条款整池拒）：
     /// [`crate::image::value_refused_by_this_reader`] 认它，整池不作保。
     RootRingSlotsPerRegionOutsideTheFormatInterval,
     /// 系统配置自述的区域数 R（偏移 361 那一字节）是 0：根环一个槽都没有，择根与 `image::root_slot_positions` 按 R 取模、除，R = 0 除零。
     /// 与 [`Self::RegionCountPastTheRegionDeviceFields`] 同一条理由、同一个处置：R 是盘上读来的一字节，不夹、不 panic，整池不作保。
     RegionCountZero,
     /// 系统配置自述的区域数 R（偏移 361 那一字节）是 1 或 2：小于第一版的格式常量 `ROOT_RING_REGIONS`（3，D22（单元原子性怎么合成）
-    /// 已定项 2 参数表「区域数 R = 3」）。实现按常量写根，checker 若按字段读就少读几个区域。用户 2026-10-20 定 C663「R 读并整池拒」：
+    /// 已定项 2 参数表「区域数 R = 3」）。实现按常量写根，checker 若按字段读就少读几个区域。C663（系统配置槽越界与不收之值两读者分类不同）：R 读并整池拒：
     /// R 与 3 不等归这一版读者不收的值；0 与大于 3 的两头各报自己的成员（[`Self::RegionCountZero`]、
     /// [`Self::RegionCountPastTheRegionDeviceFields`]），同一个处置。
     RegionCountBelowTheFirstVersionConstant,
     /// 系统配置偏移 363 自述的根环区域步长 P 不是第一版的格式常量 `ROOT_RING_PRIME_STEP`（3，D22（单元原子性怎么合成） 已定项 16
-    /// 第 1 句、I-7.13，用户 2026-10-22 定）：实现按常量放区域，checker 也按常量放（`image::root_slot_positions`），字段与常量不等时
+    /// 第 1 句、I-7.13）：实现按常量放区域，checker 也按常量放（`image::root_slot_positions`），字段与常量不等时
     /// 写这一槽的写者放的是另一个环。这一版读者不收的值：[`crate::image::value_refused_by_this_reader`] 认它，整池不作保。
     RootRingPrimeStepNotTheFirstVersionConstant,
     /// 系统配置偏移 367 自述的根环 chunk 不是第一版的格式常量 `ROOT_RING_CHUNK_BYTES`（1 MiB），同一句条款、同一个处置。
@@ -175,11 +175,11 @@ pub enum Verdict {
     /// 或环的末端越过同一槽自述的单元区起点（已定项 19 ③：单元区起始槽号随环长走）。
     JournalRingBytesOutsideTheSupportedRange,
     /// 系统配置偏移 325 自述的 journal 环起点不是第一版的格式常量 `JOURNAL_RING_START_SLOT`（D23（journal 的角色与格式） 已定项 2：
-    /// 环从槽 1024 起）。实现按这个常量写记录、扫环（实审 Y4，用户 2026-09-27 定「读字段，不等于常量就整池拒」）：
+    /// 环从槽 1024 起）。实现按这个常量写记录、扫环（实审 Y4），读到的字段不等于常量就整池拒（[`crate::image::value_refused_by_this_reader`]）：
     /// checker 若按字段扫一个错位的环，判的是另一个环。
     JournalRingStartSlotNotTheFirstVersionConstant,
     /// 系统配置偏移 371 自述的根环起点不是第一版的格式常量 `ROOT_RING_BASE_SLOT`（D22（单元原子性怎么合成） 已定项 16 第 1 句：
-    /// 基址 = 该字段 × 16384，第一版取 64）。同一条用户定案：实现按常量写根，checker 若按字段读就读另一个根环。
+    /// 基址 = 该字段 × 16384，第一版取 64）。同一条：实现按常量写根，checker 若按字段读就读另一个根环。
     RootRingBaseSlotNotTheFirstVersionConstant,
     /// 系统配置偏移 417 自述的单元区起始槽号不是 journal 环末尾的下一个槽（同一槽的环起点 + 环长向上取整到槽，
     /// D3（空间分配） 已定项 10 ④、D23（journal 的角色与格式） 已定项 19 ③「单元区起始槽号随环长走」）。
@@ -189,10 +189,10 @@ pub enum Verdict {
     UnitAreaStartOffTheClusterSegmentBoundary,
     /// journal 记录新根段末尾卸载记号那 4 字节（记录偏移 459，D23（journal 的角色与格式） 已定项 15）位 0 之外有位为 1：
     /// 与根记录 flags 同一个编码，读者与恢复把这条记录当损坏（`crates/singlefs-core/src/root_record.rs` 的
-    /// `of_unmount_marker_field_of_a_new_root_segment` 交 `None`），checker 照同一口径不收它（m3-root-ring-code-r1 判决 RR1）。
+    /// `of_unmount_marker_field_of_a_new_root_segment` 交 `None`），checker 照同一口径不收它。
     UnmountMarkerBitsOtherThanBitZero,
     /// 系统配置偏移 301 自述的节点大小（几何段开头那 4 字节，D8（核心索引结构） 已定项 2）不是格式常量 `NODE_BYTES`：
-    /// 这一版只按 16384 读节点。用户 2026-10-15 定（C840）：当这一槽自证不过、不可择，别的槽照旧可择——
+    /// 这一版只按 16384 读节点。（C840）：当这一槽自证不过、不可择，别的槽照旧可择——
     /// 与整槽校验和不对同一个处置（[`crate::image::verdict_says_the_slot_does_not_verify_itself`] 把它归进去）。
     /// 实现那一侧同一条判定是 `singlefs_core::system_configuration::SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant`。
     NodeBytesNotTheFormatConstant,
@@ -211,10 +211,8 @@ pub struct SystemConfigurationView {
     /// 系统配置里另记的那一份回退下界 F（D22（单元原子性怎么合成） 已定项 9 字段表最后一行；D16（发布语义） 已定项 1「生效」取
     /// max(根上带的, 系统配置里读得出的)）。C556（checker 与崩溃点重放不读系统配置里的 F） 那一半读它。
     pub rollback_floor: u64,
-    /// incompat 位 2 带没带（inode 记录偏移 120 起的截断字段，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第六节用户定案）。
-    pub inode_record_truncation_field: InodeRecordTruncationField,
     /// 字段表之后到槽末那一段（[`SYSTEM_CONFIGURATION_BYTES`]（489）起到 4096）里第一个非 0 的字节；整段全 0 时是 None。
-    /// 第一版写 0（用户 2026-10-20 定 C728「恒 0，由 checker 判」），池级 checker 按 I-2.4 判
+    /// 第一版写 0（C728（根槽与系统配置槽尾部字节没有条款）：恒 0，由 checker 判），池级 checker 按 I-2.4 判
     /// （[`image::judge_system_configuration_slot_bytes_past_the_field_table_are_zero`]）。
     pub first_non_zero_byte_past_the_field_table:
         Option<FirstNonZeroByteInTheSystemConfigurationSlot>,
@@ -264,14 +262,6 @@ fn first_non_zero_byte_from(slot: &[u8], start: usize) -> Option<(usize, u8)> {
         .map(|(offset_in_the_slot, byte)| (offset_in_the_slot, *byte))
 }
 
-/// 一槽系统配置的 incompat 位 2（inode 记录带截断字段，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1、第六节用户定案）：
-/// 带这一位的池，inode 记录偏移 120 起两段 8 字节是截断字段的 txg T 与 size N_w；不带的池里这 16 字节必须全零（I-9.7）。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum InodeRecordTruncationField {
-    CarriedUnderIncompatBitTwo,
-    AbsentWithoutIncompatBitTwo,
-}
-
 /// 根记录 flags 位 0 的卸载记号（D22（单元原子性怎么合成） 已定项 7）照实读出来：池级 checker 按它给
 /// I-7.9（回退下界 F 不高于抬 F 的上限） 分两支。checker 自己写一份，不从 `singlefs-core` 引。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -297,24 +287,28 @@ const SYSTEM_CONFIGURATION_TAIL_OFFSET: usize = 469;
 /// 系统配置里回退下界 F 那 8 字节：字段表里 journal tail 8、journal 实例代号 4 之后的那一行（D22（单元原子性怎么合成） 已定项 9）。
 /// 按 checker 自己走字段表的读法从 tail 那一行推出来，不借实现那边的偏移。
 const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = SYSTEM_CONFIGURATION_TAIL_OFFSET + 8 + 4;
-/// incompat 位 1 = 第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号的那一版）；位 0 退役，见到按不认识的位判
-/// （D15（格式冻结政策） 已定项 4，用户 2026-09-26）。位 n 住第 n div 8 个字节的第 n mod 8 低位（D22（单元原子性怎么合成） 已定项 13）。
-/// checker 自己写一份，不从 `singlefs-core` 引。
+/// incompat 位 1 = 第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号的那一版，D15（格式冻结政策） 已定项 4）。
+/// 位 n 住第 n div 8 个字节的第 n mod 8 低位（D22（单元原子性怎么合成） 已定项 13）。checker 自己写一份，不从 `singlefs-core` 引。
 const INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT: u8 = 0x02;
-/// incompat 位 2 = inode 记录带截断字段（D15（格式冻结政策） 已定项 4 登记，用户 2026-10-17 定新开这一位，
-/// 判决 `research/prompts/m4-trunc-r2-main-verification.md` 第六节）。只与位 1 同时出现才认（第一字节 0x06）；
-/// checker 自己写一份，不从 `singlefs-core` 引。
+/// incompat 位 2 = inode 记录带截断字段：
+/// 是布局身份的一部分。checker 自己写一份，不从 `singlefs-core` 引。
 const INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT: u8 = 0x04;
+/// 这一版布局的 incompat 位图第一个字节：位 1 与位 2 都带。第一个字节是别的值、或其余 31 字节有一个不为 0，一律是不认识的 incompat 位
+/// （[`Verdict::UnknownIncompatBit`]）。
+const INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT: u8 =
+    INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT
+        | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT;
 const ROOT_CHECKSUM_OFFSET: usize = 138;
 /// 根记录 flags 那 4 字节的偏移：magic 4 + fsid 16。
 const ROOT_FLAGS_OFFSET: usize = 20;
 /// 根记录 flags 位 0 = 卸载记号（D22（单元原子性怎么合成） 已定项 7）；其余位第一版恒 0、非 0 拒收（已定项 17）。
 const ROOT_FLAG_UNMOUNT_MARKER: u32 = 1 << 0;
-/// 根记录里回收门槛 t 8 字节与钉槽 p 1 字节的偏移（C773（读坏与全零根槽的回收门槛钉只在内存里），根环三方第二轮正推 Y4.2 的摆法）：
+/// 根记录里回收门槛 t 8 字节与钉槽 p 1 字节的偏移（C773（读坏与全零根槽的回收门槛钉只在内存里））：
 /// 自证校验和 32 在 138 之后是实例表指针、中央映射树根指针、分配记录树根指针三条 86，到 428 为止，t 接在那里、p 接在 t 后面。
 /// checker 自己走字段表推，不借实现那边的写者。
 const ROOT_RECLAIM_THRESHOLD_OFFSET: usize = ROOT_CHECKSUM_OFFSET + 32 + 3 * 86;
 const ROOT_PINNED_RING_SLOT_OFFSET: usize = ROOT_RECLAIM_THRESHOLD_OFFSET + 8;
+/// 单元头校验和字段的偏移（共同前缀，三类同一处）。
 const UNIT_HEADER_CHECKSUM_OFFSET: usize = 10;
 /// 格式版本那 2 字节的偏移：单元头共同前缀与系统配置自举头都是紧跟 magic 4（D18（块里携带什么信息） 已定项 7 的共同前缀表；
 /// D22（单元原子性怎么合成） 已定项 9 的字段表）。
@@ -345,7 +339,7 @@ pub(crate) fn read_u64(bytes: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
 }
 /// 码 1 数据单元的整单元宽（格式常量 `DATA_UNIT_BYTES` 换成切片下标用的 usize）。住在 crate 根、不住在 `walk`：遍历式与扫描式两个方向
-/// 都读整单元，共享的只许是格式解析与常量（D13（验证路线） 已定项 12；C410（checker 两个方向共享什么没有检查） 用户 2026-10-26 定的「搬进 lib.rs」）。
+/// 都读整单元，共享的只许是格式解析与常量（D13（验证路线） 已定项 12；C410（checker 两个方向共享什么没有检查）的「搬进 lib.rs」）。
 pub(crate) fn data_unit_bytes() -> usize {
     usize::try_from(DATA_UNIT_BYTES).expect("格式常量 DATA_UNIT_BYTES 是 32768，装得进 usize")
 }
@@ -374,21 +368,11 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
     }
     let incompat = &slot
         [SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 32];
-    if incompat[0]
-        & !(INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT
-            | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT)
-        != 0
+    if incompat[0] != INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT
         || incompat[1..].iter().any(|byte| *byte != 0)
-        || incompat[0] & INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT == 0
     {
         return Err(Verdict::UnknownIncompatBit);
     }
-    let inode_record_truncation_field =
-        if incompat[0] & INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT == 0 {
-            InodeRecordTruncationField::AbsentWithoutIncompatBitTwo
-        } else {
-            InodeRecordTruncationField::CarriedUnderIncompatBitTwo
-        };
     if u64::from(read_u32(slot, SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET)) != NODE_BYTES {
         return Err(Verdict::NodeBytesNotTheFormatConstant);
     }
@@ -411,7 +395,6 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
         journal_tail: read_u64(slot, SYSTEM_CONFIGURATION_TAIL_OFFSET),
         journal_instance: read_u32(slot, SYSTEM_CONFIGURATION_TAIL_OFFSET + 8),
         rollback_floor: read_u64(slot, SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET),
-        inode_record_truncation_field,
         first_non_zero_byte_past_the_field_table: first_non_zero_byte_from(
             &slot[..slot_bytes],
             usize::try_from(SYSTEM_CONFIGURATION_BYTES).expect("489"),
@@ -459,14 +442,14 @@ pub struct RootView {
     pub tree_identifier_watermark: u64,
     pub rollback_floor: u64,
     pub unmount_marker: UnmountMarkerView,
-    /// 回收门槛 t（C773（读坏与全零根槽的回收门槛钉只在内存里），用户 2026-10-20 定）：写者写的那一份，I-7.18（根记录的回收门槛等于现算的门槛） 拿它求等。
+    /// 回收门槛 t（C773（读坏与全零根槽的回收门槛钉只在内存里））：写者写的那一份，I-7.18（根记录的回收门槛等于现算的门槛） 拿它求等。
     pub reclaim_threshold: u64,
     /// 钉槽 p 那 1 字节原样（255 = 没有钉着的槽，别的值是钉值 `3·槽 + 区域`）：I-7.18 并进现算、I-7.19（钉着的槽不住本实例写的根） 还原成槽。
     pub pinned_ring_slot: u8,
     /// 466 字节记录本身（含校验和字段），三个区域比对用。
     pub record_bytes: Vec<u8>,
     /// 根记录之后到槽宽那一段（[`ROOT_RECORD_BYTES`]（466）起到读进来的槽宽）里第一个非 0 的字节；整段全 0 时是 None。
-    /// 第一版写 0（用户 2026-10-20 定 C728「恒 0，由 checker 判」），池级 checker 按 I-2.4 判
+    /// 第一版写 0（C728（根槽与系统配置槽尾部字节没有条款）：恒 0，由 checker 判），池级 checker 按 I-2.4 判
     /// （[`image::judge_root_slot_bytes_past_the_record_are_zero`]）。
     pub first_non_zero_byte_past_the_record: Option<FirstNonZeroByteInTheRootSlot>,
 }
@@ -521,9 +504,9 @@ pub fn check_root_slot(
 /// 码 2 索引节点含 key 区间与预留位的头宽，也是条目区的起点：`86 + 2 × key 宽 + 29`，key 宽取盘上偏移 51 那 1 字节原样
 /// （D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 16 / 已定项 18）。
 ///
-/// checker 自己的一份式子，不调实现、也不调理想模型的那一份（D13（验证路线） 已定项 5：`singlefs-format` 只放标量；
-/// 2026-09-27 用户定案「三方各算一份 + 交叉断言」）；三份在 key 宽字段全部 256 个取值上连起来比的是
-/// `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`。
+/// checker 自己的一份式子，不调实现、也不调理想模型的那一份（D13（验证路线） 已定项 5：`singlefs-format` 只放标量）；
+/// 三份在 key 宽字段全部 256 个取值上连起来比的是
+/// `crates/singlefs-verification/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`。
 #[must_use]
 pub fn index_node_header_bytes(key_width_byte_at_offset_51: u8) -> usize {
     let key_range_bytes =
@@ -538,7 +521,7 @@ pub fn index_node_header_bytes(key_width_byte_at_offset_51: u8) -> usize {
 
 /// 一个单元两道校验和各罩哪段字节：头校验和罩 `[0, header_end)`（字段在 [`UNIT_HEADER_CHECKSUM_BYTE_OFFSET`]，算时那 32 字节当 0），
 /// 载荷 CRC 罩 `[header_end, 单元末尾)`、存在 `payload_crc_offset`。类标签（第 6 字节）不认得、或单元短到读不出类与 key 宽时交回 None。
-/// [`check_unit`] 与崩溃放量的 GPU 核对（`singlefs_checker_tier::gpu_unit_checks`）都按这一份取字节。
+/// [`check_unit`] 与崩溃放量的 GPU 核对（`singlefs_verification::gpu_unit_checks`）都按这一份取字节。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UnitChecksumLayout {
     pub header_end: usize,
@@ -725,13 +708,12 @@ pub const KEY_SCHEMA_TREE_TABLE: KeySchema = KeySchema { field_widths: &[8] };
 /// 墓碑树与谱系树的 key：容器号 8 字节（D18（块里携带什么信息） 已定项 24 第 1、5 条，根条目照 inode 树内部节点的 120 字节形态）。
 pub const KEY_SCHEMA_CONTAINER_NUMBER: KeySchema = KeySchema { field_widths: &[8] };
 /// deadlist 树（种类 8）的 key 43：头的树 ID 8 + 纪元 8 + 中央映射 key 27（类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 尾段 6），
-/// value 空（D5（快照 / 空间记账机制） 已定项 12；判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：
-/// 第三棵多层码 2 树，叶条目就是 key、内部条目 = key + 子指针 86）。
+/// value 空（D5（快照 / 空间记账机制） 已定项 12）；
+/// 第三棵多层码 2 树，叶条目就是 key、内部条目 = key + 子指针 86。
 pub const KEY_SCHEMA_DEADLIST: KeySchema = KeySchema {
     field_widths: &[8, 8, 1, 8, 8, 4, 6],
 };
-/// logged_ops 树（种类 12）的 key 10：种类 2 + 签发 txg 8，先按种类、再按签发先后（判决 `research/prompts/m4-gc-r1-main-verification.md`
-/// 第三节 G1「单树、定宽联合条目」；`singlefs_format::LOGGED_OPERATIONS_KEY_BYTES`）。
+/// logged_ops 树（种类 12）的 key 10：种类 2 + 签发 txg 8，先按种类、再按签发先后；单棵树、定宽联合条目（整理与截断两种条目住同一棵树、条目宽固定，`singlefs_format::LOGGED_OPERATIONS_KEY_BYTES`）。
 pub const KEY_SCHEMA_LOGGED_OPERATIONS: KeySchema = KeySchema {
     field_widths: &[2, 8],
 };
@@ -763,9 +745,8 @@ impl KeySchema {
 }
 
 /// 树的种类码 → key 形态（D8（核心索引结构） 已定项 9 / 已定项 11）；livelist 6、稀疏旁表 7 两棵 day-1 只注册、没有节点要解，
-/// logged_ops 12 的 key 是 [`KEY_SCHEMA_LOGGED_OPERATIONS`]（字段表判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1）。`deleted_inodes` 9 的 key 是 inode 号 8 字节（D8（核心索引结构） 已定项 16），
+/// logged_ops 12 的 key 是 [`KEY_SCHEMA_LOGGED_OPERATIONS`]（字段表）。`deleted_inodes` 9 的 key 是 inode 号 8 字节（D8（核心索引结构） 已定项 16），
 /// 墓碑树 10、谱系树 11 的 key 是容器号 8 字节（D18（块里携带什么信息） 已定项 24）。deadlist 8 的 key 是 [`KEY_SCHEMA_DEADLIST`]
-/// （判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：只读快照落地之后它有节点）。
 /// 快照的两种条目（码 14、码 15）不在这里：它们的根指着的是活头那两种树（inode 树、extent 树）的节点，没有自己的 key 形态。
 #[must_use]
 pub fn key_schema_for_tree_kind(kind: u16) -> Option<KeySchema> {
@@ -955,7 +936,7 @@ pub(crate) const DATA_UNIT_OBJECT_OFFSET: usize = 51;
 pub(crate) const DATA_UNIT_OBJECT_BIRTH_OFFSET: usize = 59;
 pub(crate) const DATA_UNIT_ANCHOR_OFFSET_IN_BYTES_OFFSET: usize = 67;
 
-/// 码 3 的打包记录类型（D18（块里携带什么信息） 已定项 11 的登记表）：墓碑 1、inode 2、退役 3（记录宽 34，判决 m3-retire-r1 第三节第 2 条）、
+/// 码 3 的打包记录类型（D18（块里携带什么信息） 已定项 11 的登记表）：墓碑 1、inode 2、退役 3（记录宽 34）、
 /// 实例表 4、谱系 5（D18（块里携带什么信息） 已定项 24 第 5 条，不复用登记过的 3）。
 pub(crate) const PACKED_TYPE_TOMBSTONE: u16 = 1;
 pub(crate) const PACKED_TYPE_INODE: u16 = 2;
@@ -967,7 +948,7 @@ pub(crate) const PACKED_TYPE_LINEAGE: u16 = 5;
 pub(crate) const INODE_RECORD_OBJECT_BIRTH_OFFSET: usize = 8;
 pub(crate) const INODE_RECORD_SIZE_OFFSET: usize = 40;
 /// inode 记录偏移 120 起两段 8 字节（小端）的截断字段：T（截断字段的 txg，0 是没写过）与 N_w（截断字段的 size），
-/// 判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1；带 incompat 位 2 的池才有（第六节用户定案）。
+/// 带 incompat 位 2 的池才有。
 pub(crate) const INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET: usize = 120;
 pub(crate) const INODE_RECORD_TRUNCATION_FIELD_SIZE_OFFSET: usize = 128;
 
@@ -1257,8 +1238,7 @@ mod tests {
             slot[FORMAT_VERSION_OFFSET..FORMAT_VERSION_OFFSET + 2].copy_from_slice(
                 &SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS.to_le_bytes(),
             );
-            slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] =
-                INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT;
+            slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] = INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT;
             slot[SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET
                 ..SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET + 4]
                 .copy_from_slice(&node_bytes.to_le_bytes());
@@ -1309,36 +1289,60 @@ mod tests {
         slot
     }
 
-    /// incompat 第一个字节收 0x02（只带位 1）与 0x06（位 1 加位 2，inode 记录带截断字段；判决 m4-trunc-r2 第六节用户定案），
-    /// 交回的视图照实说带没带截断字段；位 2 不配位 1（0x04）、再带位 3（0x0E）、带退役的位 0（0x07）都拒成不认识的位。
+    /// incompat 第一个字节是这一版布局的那一个（0x06：位 1 与位 2 都带）：照收。
     #[test]
-    fn incompat_bit_two_is_accepted_only_alongside_bit_one_and_reports_the_truncation_field() {
-        assert_eq!(
+    fn the_first_incompat_byte_of_this_layout_is_accepted() {
+        assert!(
             check_system_configuration_slot(
-                &system_configuration_slot_with_the_first_incompat_byte(0x02)
-            )
-            .map(|view| view.inode_record_truncation_field),
-            Ok(InodeRecordTruncationField::AbsentWithoutIncompatBitTwo),
-            "只带位 1：照收，inode 记录不带截断字段"
-        );
-        assert_eq!(
-            check_system_configuration_slot(
-                &system_configuration_slot_with_the_first_incompat_byte(0x06)
-            )
-            .map(|view| view.inode_record_truncation_field),
-            Ok(InodeRecordTruncationField::CarriedUnderIncompatBitTwo),
-            "位 1 加位 2：照收，inode 记录带截断字段"
-        );
-        for first_incompat_byte in [0x04u8, 0x0E, 0x07] {
-            assert_eq!(
-                check_system_configuration_slot(
-                    &system_configuration_slot_with_the_first_incompat_byte(first_incompat_byte)
+                &system_configuration_slot_with_the_first_incompat_byte(
+                    INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT
                 )
-                .err(),
-                Some(Verdict::UnknownIncompatBit),
-                "incompat 第一个字节 {first_incompat_byte:#04x}：不认识的位组合要拒"
-            );
-        }
+            )
+            .is_ok(),
+            "位 1 与位 2 都带：照收"
+        );
+    }
+
+    /// incompat 第一个字节改成 `first_incompat_byte`、整槽校验和封上的一槽：拒成不认识的 incompat 位。
+    fn assert_the_first_incompat_byte_is_an_unknown_incompat_bit(
+        first_incompat_byte: u8,
+        what: &str,
+    ) {
+        assert_eq!(
+            check_system_configuration_slot(
+                &system_configuration_slot_with_the_first_incompat_byte(first_incompat_byte)
+            )
+            .err(),
+            Some(Verdict::UnknownIncompatBit),
+            "{what}（incompat 第一个字节 {first_incompat_byte:#04x}）：不是这一版布局，拒"
+        );
+    }
+
+    /// 只带位 1、不带位 2（0x02）：位 2 是这一版布局身份的一部分，拒。
+    #[test]
+    fn a_first_incompat_byte_without_bit_two_is_an_unknown_incompat_bit() {
+        assert_the_first_incompat_byte_is_an_unknown_incompat_bit(
+            INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
+            "只带位 1",
+        );
+    }
+
+    /// 只带位 2、不带布局身份位 1（0x04）：拒。
+    #[test]
+    fn a_first_incompat_byte_without_bit_one_is_an_unknown_incompat_bit() {
+        assert_the_first_incompat_byte_is_an_unknown_incompat_bit(
+            INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT,
+            "只带位 2",
+        );
+    }
+
+    /// 这一版布局之外再带没分出去的位 3（0x0E）：拒。
+    #[test]
+    fn a_first_incompat_byte_carrying_an_unassigned_bit_is_an_unknown_incompat_bit() {
+        assert_the_first_incompat_byte_is_an_unknown_incompat_bit(
+            INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT | 0x08,
+            "再带位 3",
+        );
     }
 
     #[test]

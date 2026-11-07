@@ -3,7 +3,7 @@
 //! 只开服务经 `GPU_CARDS_BY_PRIORITY` 交给这个进程、属于这一台的那几张卡（`common_discrete_gpus_of_this_host`）：服务没交这一台的卡时每条打一行
 //! `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」、返回成功；交了卡却对不上本机的独显、或开不了判红。源头没声明张数，服务分一张。
 //! 只在开了特性 `tests-on-a-real-gpu` 时编；用 GPU，经 `task-server/task submit` 交（卡与清场由服务定），带 `--test-threads 1`。
-//! 开卡时每张参与的卡的显存上限给 1 GiB（七·3 验收，用户 2026-11-01 定；`common_discrete_gpus_of_this_host`），专门测小上限切片的几条照用更小的。
+//! 开卡时每张参与的卡的显存上限给 1 GiB（`common_discrete_gpus_of_this_host`），专门测小上限切片的几条照用更小的。
 //!
 //! 一个 R 里放齐各类：三类可搬（码 1、码 2、码 3）、已死、类标签不符（含指着它的条目 key 为空）、key 与位置不符（两种）、读不到、跨度不对、
 //! 字节数不对（排在前面，让后面的单元起点不在字边界上），以及核心层三个 parse 的每一种拒法里造得出的：magic、版本、flags、类标签、
@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 use common_discrete_gpus_of_this_host::{
     background_gpu_on_the_handed_over_gpus_under_one_gibibyte_each_or_report_not_run,
     handed_over_gpus_or_report_not_run, opened_background_gpu, selection_over_the_handed_over_gpus,
+    HandedOverGpusSeenThroughTheInstance,
 };
 
 use singlefs_background_gpu::gpus_of_this_host::bytes_of_the_smallest_piece_every_participating_gpu_holds;
@@ -589,18 +590,23 @@ fn the_memory_limit_smaller_than_the_region_batch_cuts_it_into_chunks_with_the_s
 ) {
     let test_name =
         "the_memory_limit_smaller_than_the_region_batch_cuts_it_into_chunks_with_the_same_classifications";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
     // 48 KiB：一条 32 KiB 的单元连同整份映射、描述与结果装得下，两条装不下，整批要切成一条一段
     let small_memory_limit = GpuMemoryInBytes(48 * 1024);
-    let mut limited = opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        small_memory_limit,
-        WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ));
+    let mut limited = opened_background_gpu(
+        &vulkan_instance,
+        &selection_over_the_handed_over_gpus(
+            &handed_over_gpus,
+            small_memory_limit,
+            WAIT_LIMIT_OF_THE_GPU_TESTS,
+        ),
+    );
     let region =
         region_with_every_class_and_every_parser_refusal(PayloadOfTheDataUnits::WithinTheHeadPiece);
     let classifications = limited
@@ -621,14 +627,16 @@ fn the_memory_limit_smaller_than_the_region_batch_cuts_it_into_chunks_with_the_s
     );
 }
 
-/// 用户 2026-10-28 定「装不下应该自适应的分片」：上限装得下最大那条 32 KiB 的记录连同两条条目的映射、装不下整份映射，映射按落点切成几片逐片交、
+/// 装不下自适应分片：上限装得下最大那条 32 KiB 的记录连同两条条目的映射、装不下整份映射，映射按落点切成几片逐片交、
 /// 每条记录的分类两份各按自己的合法合成，照样逐条与 CPU 参照（整份映射）相同。
 #[test]
 fn the_memory_limit_smaller_than_the_mapping_cuts_it_into_slices_with_the_same_classifications() {
     let test_name =
         "the_memory_limit_smaller_than_the_mapping_cuts_it_into_slices_with_the_same_classifications";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
@@ -653,11 +661,14 @@ fn the_memory_limit_smaller_than_the_mapping_cuts_it_into_slices_with_the_same_c
         whole_mapping_bytes > two_entries_of_the_mapping_bytes,
         "整份映射（{whole_mapping_bytes} 字节）比两条条目的大：要切"
     );
-    let mut limited = opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        GpuMemoryInBytes(memory_limit),
-        WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ));
+    let mut limited = opened_background_gpu(
+        &vulkan_instance,
+        &selection_over_the_handed_over_gpus(
+            &handed_over_gpus,
+            GpuMemoryInBytes(memory_limit),
+            WAIT_LIMIT_OF_THE_GPU_TESTS,
+        ),
+    );
     let classifications = limited
         .both_kernel_classifications_of_the_region_records(
             region_under_test(),
@@ -676,7 +687,7 @@ fn the_memory_limit_smaller_than_the_mapping_cuts_it_into_slices_with_the_same_c
     );
 }
 
-/// 用户 2026-10-28 定「这部分不能因为装不下就拒绝，装不下应该自适应的分片，缩小逐次进行」：上限 4 KiB，比一个单元（16 KiB 的索引节点、
+/// 装不下不拒绝、自适应分片，缩小逐次进行：上限 4 KiB，比一个单元（16 KiB 的索引节点、
 /// 32 KiB 的两槽单元）小、装得下参与的卡至少要装得下的那一片：比头一片长的单元都切成头一片与之后的几片，两份核先各自逐片接着算载荷 CRC 的寄存器、
 /// 再照头一片解头、查映射、合出整个载荷的 CRC，每条记录两份的分类各自逐条与 CPU 参照（整个单元、整份映射）相同——各类、各种拒法都在里面。
 /// 码 1 单元的载荷两万字节、字节各不相同（[`PayloadOfTheDataUnits::RunningPastTheHeadPiece`]）：头一片之后的寄存器不是 0，
@@ -685,8 +696,10 @@ fn the_memory_limit_smaller_than_the_mapping_cuts_it_into_slices_with_the_same_c
 fn the_memory_limit_smaller_than_a_unit_cuts_each_unit_into_pieces_with_the_same_classifications() {
     let test_name =
         "the_memory_limit_smaller_than_a_unit_cuts_each_unit_into_pieces_with_the_same_classifications";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
@@ -697,11 +710,14 @@ fn the_memory_limit_smaller_than_a_unit_cuts_each_unit_into_pieces_with_the_same
         "上限装得下参与的卡至少要装得下的那一片、装不下一个单元"
     );
     // 4 KiB 装得下最小的一片：不拒挂载
-    let mut limited = opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        smaller_than_a_unit,
-        WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ));
+    let mut limited = opened_background_gpu(
+        &vulkan_instance,
+        &selection_over_the_handed_over_gpus(
+            &handed_over_gpus,
+            smaller_than_a_unit,
+            WAIT_LIMIT_OF_THE_GPU_TESTS,
+        ),
+    );
     assert_eq!(
         limited.participating_gpus().len(),
         handed_over_gpus.len(),

@@ -95,7 +95,7 @@ pub const WGSL_KERNEL_FIXTURE: [(&str, &str); 3] = [
     ),
 ];
 
-/// 与 `scripts/gate/lib_function_units.py` 同形的四份夹具（定案 2、3 的 Rust 侧，4-3d 报告第三节 R1–R4 的验收）：键的条件成分只取闭包真引到的原子
+/// 与 `scripts/gate/lib_function_units.py` 同形的四份夹具（Rust 侧）：键的条件成分只取闭包真引到的原子
 /// （`fcfg`）、`use a::{self}` 引进 `a`（`fuse`）、R-开放只按 trait 自己的名字找 impl（`fopen`）、blanket impl 够得到的方法算边（`fblanket`）；
 /// 再加 `const _` 不是 R-裸名的着落（`funderscore`，与那边的 `UNDERSCORE_FIXTURE` 同形）。
 pub const CLOSURE_RULES_SHARED_WITH_PYTHON_FIXTURE: [(&str, &str); 11] = [

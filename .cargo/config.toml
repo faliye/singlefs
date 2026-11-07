@@ -1,6 +1,6 @@
 # 仓里每一处 cargo（门禁、gate.sh --staged 的临时 worktree、各子 agent 自己的编译目录）都读这一份：
-# singlefs-checker-tier 开 verdict-store 特性时要现编 librocksdb-sys，它的 bindgen 在本机只有 libclang、没有 clang 的头文件，
-# 找不到 stdbool.h；给它指到 gcc 自带的那一份头文件目录（13 与 14 都列上：两台机器各装的版本不同，不在的目录 -I 无害）。不开特性的编法不读这个变量。
+# singlefs-verification 经它常在的依赖 prune-server（仓根 prune-server/）现编 librocksdb-sys，它的 bindgen 在本机只有 libclang、没有 clang 的头文件，
+# 找不到 stdbool.h；给它指到 gcc 自带的那一份头文件目录（13 与 14 都列上：两台机器各装的版本不同，不在的目录 -I 无害）。
 # 值要与 scripts/crash/crash-amplification-two-hosts.sh 的 BINDGEN_INCLUDE_ARGUMENTS 逐字相同：这个变量进 librocksdb-sys 构建脚本的指纹，
 # 两处不一样，同一个 target 目录里 RocksDB 的 C++ 就会被反复重编。
 # RocksDB 与 snappy 的 C++ 不在编译目录里编：每台主机编一次（scripts/hosts/rocksdb-prebuilt.py build），四个变量 ROCKSDB_LIB_DIR、ROCKSDB_STATIC、

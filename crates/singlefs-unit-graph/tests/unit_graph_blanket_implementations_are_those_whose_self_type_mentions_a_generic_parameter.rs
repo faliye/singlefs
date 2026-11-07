@@ -1,9 +1,9 @@
-//! blanket impl 怎么认（`records/2026-10-13-复用键与全仓改名.md`「crates 第三轮 A 交回」之后主 agent 定的第 1 条，定案 3「多连不少连」）：
+//! blanket impl 怎么认（「多连不少连」）：
 //! trait impl 的自身类型里任何深度出现这个 impl 自己的一个泛型参数，就按 blanket 放行——trait 头一进闭包，它连同成员一起进；
 //! 自身类型全具体的照旧等自身类型被点名。`impl<Element> InASlice for [Element]` 这类自身类型里一个能被点名的具体名字都没有，
-//! 不放行就进不了任何闭包、键过窄（第三轮 A 报告「一、」的 `probe-slice` 实测）。
+//! 不放行就进不了任何闭包、键过窄（`probe-slice` 实测）。
 //! 夹具 `fselftypes`：每种自身类型一个 trait、一个 impl、一个只在泛型约束里写 trait 名的辅助函数和调它的入口（入口不点名自身类型，
-//! 也不调 trait 的方法，闭包里有没有那个 impl 的方法体只看它算不算 blanket）；`fslice` 是第三轮 A 的 `probe-slice`。
+//! 也不调 trait 的方法，闭包里有没有那个 impl 的方法体只看它算不算 blanket）；`fslice` 是 `probe-slice`。
 
 mod common_fixture_workspace;
 

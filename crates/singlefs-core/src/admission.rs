@@ -1,13 +1,13 @@
 //! 分配准入的读数与逐设备合取（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 5 行）：D28（挂载期承诺量） 已定项 1 的式子逐设备算可用，
 //! D3（空间分配） 已定项 7 合取表第 1 条「可用 ≥ 需求」按逐设备合取判——每一块盘都够才放行，一块盘不够就拒，
-//! 不拿别的盘的富余补（2026-09-23 用户定 C355（checkpoint 保留池池级扣而固定点每块要落两列） 取丁）。
+//! 不拿别的盘的富余补（ C355（checkpoint 保留池池级扣而固定点每块要落两列） 取丁）。
 //! 容量之外的前四项取这块盘自己的值；待删占用、已承诺预留、checkpoint 保留池三项是全池的承诺量，按全部副本之和记物理字节，
-//! 每块盘各扣「副本之和 ÷ 副本数」（C375（待删占用与已承诺预留按份还是按和记没有条款） 第三轮写回）。
-//! 式子不扣「defer 待释放」：「已分配」按读法甲已经含着 defer 里的槽，另扣一次是重复扣（用户 2026-09-25 定，D28（挂载期承诺量） 已定项 1）。
+//! 每块盘各扣「副本之和 ÷ 副本数」（C375（待删占用与已承诺预留按份还是按和记没有条款））。
+//! 式子不扣「defer 待释放」：「已分配」按读法甲已经含着 defer 里的槽，另扣一次是重复扣（D28（挂载期承诺量） 已定项 1）。
 //!
 //! 全是只读的纯函数：不动分配器、不发一个写。
 //!
-//! 接在两处（C363 (b) 判决 `research/prompts/c363b-r1-main-verification.md` 第四节第 2 条，里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 5 行）：
+//! 接在两处（C363 (b) 第 2 条，里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 5 行）：
 //! - 发布路径：`transaction::prepare_the_version_publish` 在算定这次发布的样子之后、读盘核与动分配器之前，按
 //!   [`admission_reading_before_a_publish`] 取读数（实例切换的预留按下一次可写挂载的 rows0，D28（挂载期承诺量） 已定项 3
 //!   「发布路径用 rows0 + 1」）、按 [`demand_of_the_roles_on_each_device`] 取这次的需求，逐设备合取；判不判按
@@ -16,25 +16,25 @@
 //! - 可写挂载：`mount::establish_instance` 在取号之前按 [`admission_reading_of_a_writable_mount`]（这次挂载的 rows0）判
 //!   「实例切换的预留拿得到」（D2（RAID 条带策略） 已定项 13），需求逐盘 0。
 //!
-//! 条款给的量：checkpoint 保留池的 ckpt_cost 按一次空发布至多写出的固定点计，一律按最坏情况（D28（挂载期承诺量） 已定项 4，用户 2026-09-27 定：
-//! 分配记录树取几何上整棵树（每块盘单元区在根之下每一层罩到的位置数之和加根，用户同日再定取 K1），中央映射树逐层按可能改的路径数与可能切出来的节点数，
+//! 条款给的量：checkpoint 保留池的 ckpt_cost 按一次空发布至多写出的固定点计，一律按最坏情况（D28（挂载期承诺量） 已定项 4：
+//! 分配记录树取几何上整棵树（每块盘单元区在根之下每一层罩到的位置数之和加根），中央映射树逐层按可能改的路径数与可能切出来的节点数，
 //! 记账树按每发布的节点数（这次发布写完之后那棵树的，inode 号水位台阶行跨过一片叶那次多出的节点算上），树表一项，实例表链不进；
 //! [`checkpoint_cost_of_the_version_to_build_on`]）；挂载期承诺量暖机那一半的 c_max
 //! 与保留池「按同一个现算的 c_max 取」（D28（挂载期承诺量） 已定项 4 末条）；需求 = 这次发布新写的全部槽（普通分配加这次写出的固定点，
-//! 不加这次换下的槽），没有普通分配的发布（空发布、写行、暖机、抬 F）不判（D28（挂载期承诺量） 已定项 1 接线，用户 2026-09-25 定）。
+//! 不加这次换下的槽），没有普通分配的发布（空发布、写行、暖机、抬 F）不判（D28（挂载期承诺量） 已定项 1 接线）。
 //!
-//! 实现员取的读法（条款没写，交主 agent）：需求按盘字节记（C370（需求、可用与 df 没有共同单位） 2026-09-17 收窄：与「已分配」同口径只能读成盘字节），
+//! 实现员取的读法（条款没写，交主 agent）：需求按盘字节记（C370（需求、可用与 df 没有共同单位）：与「已分配」同口径只能读成盘字节），
 //! 第一版每个单元落每块盘，每块盘的需求相同；读数取分配器此刻的计数（挂载时是回收与影子账隔离之后、写行之前那一刻；admission 读哪一个
 //! 在那两段里条款没写，见 [`AdmissionReading::of_allocator`]）。
 //!
 //! 发布路径另有一判排在式子之前、走固定点之前：这次的单元按分配器今天的落点规则落不落得下（[`admit_the_units_landing_on_every_device`]，
-//! C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）——数据单元要段外成对的空槽、提交内生块要没挡的槽，
+//! C545（空间准入罩不住分裂与聚簇段层））——数据单元要段外成对的空槽、提交内生块要没挡的槽，
 //! 读的是分配器增量维护的两个数（[`PlacementRoomOnOneDevice`]），不扫单元区。落不下同样交回空间准入不够。
 //!
 //! 准入不够、或准入放行而落点取不到时先推空发布抬 F 再判（D16（发布语义） 已定项 1「准入」那一行，C283（准入失败时不先推发布就报 ENOSPC））
 //! 不在这里做：发布那一处归挂着的会话（`mounted_session`），可写挂载那一处归 `mount::establish_instance`（写行之后推）。
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU64;
 
 use singlefs_format::{
@@ -42,7 +42,7 @@ use singlefs_format::{
     SLOT_BYTES, TOMBSTONE_CONTAINER_RECORDS,
 };
 
-use crate::address::{CheckpointTxg, DataUnitIndexInFile, DeviceIdentity};
+use crate::address::{CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InodeNumber};
 use crate::allocation_record_tree::{span_in_slots_at_level, AllocationRecordTreeGeometry};
 use crate::allocator::PoolAllocator;
 use crate::code_two_tree::{
@@ -51,7 +51,8 @@ use crate::code_two_tree::{
 };
 use crate::inode_tree::InodeLeafContainer;
 use crate::records::{
-    AccountingEntry, NLINK_OF_AN_INODE_BEING_DELETED, STATISTIC_COMMITTED_RESERVATION_BYTES,
+    AccountingEntry, InodeRecord, NLINK_OF_AN_INODE_BEING_DELETED,
+    STATISTIC_COMMITTED_RESERVATION_BYTES,
 };
 use crate::root_ring::RootRingSlotsPerRegion;
 use crate::transaction::{
@@ -80,7 +81,7 @@ impl BytesOnOneDevice {
     }
 }
 
-/// 全池的承诺量：按全部副本之和记的物理字节（C375（待删占用与已承诺预留按份还是按和记没有条款） 第三轮写回：
+/// 全池的承诺量：按全部副本之和记的物理字节（C375（待删占用与已承诺预留按份还是按和记没有条款）：
 /// 与「已分配」同一口径；按一份副本记会让 D28（挂载期承诺量） 已定项 1 的式子与 I-3.4（可用空间扣待删占用） 当场为假）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BytesSummedOverAllReplicas(pub u64);
@@ -168,8 +169,8 @@ impl MetadataBlocks {
     }
 }
 
-/// ckpt_cost 里谱系容器那一项的固定部分（D28（挂载期承诺量） 已定项 4「谱系容器单列一项，按一次谱系容器 COW 算」，
-/// 用户 2026-10-02 定「乙 连祖先算」）：一个谱系容器（32 KiB 码 3，2 块）加谱系树根（1 块）；谱系树的内部层数另加
+/// ckpt_cost 里谱系容器那一项的固定部分（D28（挂载期承诺量） 已定项 4「谱系容器单列一项，按一次谱系容器 COW 算」）：
+/// 一个谱系容器（32 KiB 码 3，2 块）加谱系树根（1 块）；谱系树的内部层数另加
 /// （[`checkpoint_cost_of_one_lineage_container_cow`]）。
 pub const LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
 pub const LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COW: u64 = 1;
@@ -192,7 +193,7 @@ pub fn checkpoint_cost_of_one_lineage_container_cow(
 
 /// 一次谱系容器 COW 连祖先在中央映射树里改的条目数（每把至多删一次旧的、插一次新的）：谱系容器、谱系树根与每层内部节点各是一个进映射的单元、
 /// 各一把 key（容器是一个 32 KiB 码 3 单元，一把 key，不按块数），所以 = 1 + 1 + 内部层数。ckpt_cost 中央映射树那一项的删插数把它们
-/// 一并算上（用户 2026-10-02 定「乙 一并算上」；D28（挂载期承诺量） 已定项 4 的删插数原文只写了「分配记录树这一项 + 记账树节点数」）。
+/// 一并算上（D28（挂载期承诺量） 已定项 4 的删插数原文只写了「分配记录树这一项 + 记账树节点数」）。
 ///
 /// # Panics
 /// 加出来装不进 u64：内部层数至多十来层。
@@ -207,7 +208,7 @@ pub fn central_mapping_entries_of_one_lineage_container_cow(
         .expect("谱系那几把装得进 u64")
 }
 
-/// ckpt_cost 里退役容器那一项的固定部分（判决 `research/prompts/m3-retire-r1-main-verification.md` 第六节 R2「两样都做」：
+/// ckpt_cost 里退役容器那一项的固定部分（「两样都做」：
 /// 照谱系在 ckpt_cost 里单列一项）：一个退役容器（32 KiB 码 3，2 块）加退役树根（1 块）；退役树的内部层数另加
 /// （[`checkpoint_cost_of_one_retirement_container_cow`]）。
 pub const RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COW: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
@@ -230,7 +231,6 @@ pub fn checkpoint_cost_of_one_retirement_container_cow(
 }
 
 /// 一次退役容器 COW 连祖先在中央映射树里改的条目数：退役容器、退役树根与每层内部节点各一把 key，= 1 + 1 + 内部层数
-/// （判决第六节 R2「中央映射树删插数加退役容器、退役树根各一把和内部层每层一把」，同谱系那几把）。
 ///
 /// # Panics
 /// 加出来装不进 u64：内部层数至多十来层。
@@ -275,29 +275,95 @@ pub fn committed_reservation_recorded_in(
     })
 }
 
-/// n_live（D3（空间分配） 已定项 2）：一版 inode 树里 nlink ≥ 1 的记录数。
-/// 管理员回退那一版按 D23（journal 的角色与格式） 已定项 14 写的是「R_old 那一版 inode 树各叶容器的记录数之和减 `deleted_inodes` 的 key 数」：
-/// 回退那一版的 inode 树与 `deleted_inodes` 都取 R_old 的，队列 = inode 树里 nlink = 0 的号集合（D8（核心索引结构） 已定项 16 第 3 条）⇒
-/// 两种写法是同一个数；这里按 nlink 数，盘上读来的队列与记录对不上时也不会减成负数。
-#[must_use]
-pub fn live_objects_of_the_inode_tree(inode_leaf_containers: &[InodeLeafContainer]) -> u64 {
-    let live_records = inode_leaf_containers
-        .iter()
-        .flat_map(|container| container.records.iter())
-        .filter(|record| record.nlink != NLINK_OF_AN_INODE_BEING_DELETED)
-        .count();
-    u64::try_from(live_records).expect("一棵 inode 树的记录数装得进 u64")
+/// 一版 inode 树里的 n_live 与 n_记录：记账标签 6 的两项（D3（空间分配） 已定项 2）。n_live 是 nlink ≥ 1 的记录数；n_记录 是全部记录数，
+/// 含 nlink = 0 的（第 6 条：退役记录写在最后一批，意图到最后一批之间那个对象
+/// n_live 已不含它，退役那一份预付挂 n_live 就在用到之前释放了）。管理员回退那一版按 D23（journal 的角色与格式） 已定项 14 写的是
+/// 「R_old 那一版 inode 树各叶容器的记录数之和减 `deleted_inodes` 的 key 数」：回退那一版的 inode 树与 `deleted_inodes` 都取 R_old 的，
+/// 队列 = inode 树里 nlink = 0 的号集合（D8（核心索引结构） 已定项 16 第 3 条）⇒ 两种写法是同一个数；这里按 nlink 数。
+/// 准入（运行时决策路径）读它，所以随一版带着、在提交时增量维护（`.claude/rules/fs-design.md`「空间统计与配额落在第一格：必须在事务提交时
+/// 增量维护出来」）：发布按这次写进与删掉的那几条记录改上一版的（[`Self::after_writing`]、[`Self::after_removing`]），只有冷恢复读出一版时
+/// 逐片逐条数一遍当起始值（[`Self::counted_over_the_inode_tree`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InodeRecordCounts {
+    pub live_objects: u64,
+    pub records: u64,
 }
 
-/// n_记录（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）：一版 inode 树里全部记录数，含 nlink = 0 的
-/// （退役记录写在最后一批，意图到最后一批之间那个对象 n_live 已不含它，退役那一份预付挂 n_live 就在用到之前释放了）。
-#[must_use]
-pub fn inode_records_of_the_inode_tree(inode_leaf_containers: &[InodeLeafContainer]) -> u64 {
-    let records: usize = inode_leaf_containers
-        .iter()
-        .map(|container| container.records.len())
-        .sum();
-    u64::try_from(records).expect("一棵 inode 树的记录数装得进 u64")
+impl InodeRecordCounts {
+    /// 一条记录都没有的 inode 树（mkfs 之后、头一个文件版本之前）。
+    pub const OF_AN_EMPTY_INODE_TREE: InodeRecordCounts = InodeRecordCounts {
+        live_objects: 0,
+        records: 0,
+    };
+
+    /// 逐片逐条数一遍：冷恢复从盘上读出一版时算起始值（挂载一次）。测试对照维护出来的值用它自己另写的数法，不用这一个。
+    #[must_use]
+    pub fn counted_over_the_inode_tree<'containers>(
+        inode_leaf_containers: impl IntoIterator<Item = &'containers InodeLeafContainer>,
+    ) -> Self {
+        let mut counts = Self::OF_AN_EMPTY_INODE_TREE;
+        // 迭代上界是叶容器片数乘一片的记录数；跨轮携带的是到这一片为止的两个数。
+        for container in inode_leaf_containers {
+            counts.records +=
+                u64::try_from(container.records.len()).expect("一片叶容器的记录数装得进 u64");
+            counts.live_objects += u64::try_from(
+                container
+                    .records
+                    .iter()
+                    .filter(|record| record.nlink != NLINK_OF_AN_INODE_BEING_DELETED)
+                    .count(),
+            )
+            .expect("一片叶容器的记录数装得进 u64");
+        }
+        counts
+    }
+
+    /// 这次发布逐条写进 `written`（号已在树里的原地换掉、不在的接在末尾，同 `crate::inode_tree::write_records_into_leaf_containers`）之后的两个数：
+    /// 换掉的那一条按它换掉之前是不是活的改 n_live，接在末尾的 n_记录加一。`record_before_this_publish` 交回上一版里那个号的记录（没有就 `None`），
+    /// 调用方按叶序折半找，不遍历；同一次里写了两次的号，后一次按前一次写的算。代价是这次写的条数（乘一次折半找）。
+    #[must_use]
+    pub fn after_writing(
+        self,
+        written: &[InodeRecord],
+        record_before_this_publish: impl Fn(InodeNumber) -> Option<InodeRecord>,
+    ) -> Self {
+        let mut counts = self;
+        let mut written_so_far: BTreeMap<u64, InodeRecord> = BTreeMap::new();
+        // 迭代上界是这次写的条数；跨轮携带的是到这一条为止的两个数与这次已写的那几条。
+        for record in written {
+            let replaced = written_so_far
+                .get(&record.inode)
+                .copied()
+                .or_else(|| record_before_this_publish(InodeNumber(record.inode)));
+            match replaced {
+                Some(replaced_record) => {
+                    counts.live_objects = counts.live_objects
+                        - u64::from(is_live(&replaced_record))
+                        + u64::from(is_live(record));
+                }
+                None => {
+                    counts.records += 1;
+                    counts.live_objects += u64::from(is_live(record));
+                }
+            }
+            written_so_far.insert(record.inode, *record);
+        }
+        counts
+    }
+
+    /// 这次发布删掉 `removed` 那一条（unlink 最后一批，`crate::inode_tree::remove_record_from_leaf_containers`）之后的两个数。
+    #[must_use]
+    pub fn after_removing(self, removed: &InodeRecord) -> Self {
+        Self {
+            live_objects: self.live_objects - u64::from(is_live(removed)),
+            records: self.records - 1,
+        }
+    }
+}
+
+/// 这条记录算不算 n_live 里的一个：nlink ≥ 1（nlink = 0 是删除中，D8（核心索引结构） 已定项 16）。
+fn is_live(record: &InodeRecord) -> bool {
+    record.nlink != NLINK_OF_AN_INODE_BEING_DELETED
 }
 
 /// 墓碑预付里每个活对象、每份副本摊的字节：⌈一个 32 KiB 墓碑容器 ÷ 一容器装的墓碑条数 815⌉ = ⌈32768 ÷ 815⌉ = 41
@@ -311,7 +377,6 @@ pub const TOMBSTONE_PREPAY_OPEN_CONTAINER_SLOTS_ON_ONE_REPLICA: u64 = DATA_UNIT_
 pub const TOMBSTONE_PREPAY_ROOT_SLOTS_ON_ONE_REPLICA: u64 = 1;
 
 /// 退役记录预付里每条 inode 记录、每份副本摊的字节：⌈一个 32 KiB 退役容器 ÷ 一容器装的退役记录条数 959⌉ = ⌈32768 ÷ 959⌉ = 35
-/// （判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）。
 pub const RETIREMENT_PREPAY_BYTES_PER_INODE_RECORD_ON_ONE_REPLICA: u64 =
     DATA_UNIT_BYTES.div_ceil(RETIREMENT_CONTAINER_RECORDS);
 
@@ -335,8 +400,8 @@ pub enum TombstoneAndRetirementPrepayBasis {
     },
 }
 
-/// 记账标签 6「已承诺预留」（D3（空间分配） 已定项 2，用户定案 F2；退役那一项是判决 `research/prompts/m3-retire-r1-main-verification.md`
-/// 第六节 R2「两样都做」的墓碑式预付）：
+/// 记账标签 6「已承诺预留」（D3（空间分配） 已定项 2；退役那一项是
+/// 「两样都做」的墓碑式预付）：
 /// 副本数 × ((2 + H_墓碑 + 1 + 2 + H_退役 + 1) × 16384 + 41 × n_live + 35 × n_记录) 字节，按全部副本之和记（C375），
 /// 41、35 每对象先取整再乘（[`TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA`]、
 /// [`RETIREMENT_PREPAY_BYTES_PER_INODE_RECORD_ON_ONE_REPLICA`]）；树表里没有 `deleted_inodes` 条目的版本取 0。
@@ -394,12 +459,11 @@ pub fn committed_reservation_for_tombstones_and_retirement_records(
 }
 
 /// W 式子（D28（挂载期承诺量） 已定项 1「环窗口」那一条）里分配记录树之外那一项：一次删除类发布每盘新占的槽里，
-/// 普通分配 16 + 固定点根 4 + 映射树根以下 4 = 24（辩方 `research/prompts/m3-delete-r3-sonnet-output.md` 3.1 节式子那一行的拆法）。
+/// 普通分配 16 + 固定点根 4 + 映射树根以下 4 = 24。
 pub const DELETION_PUBLISH_SLOTS_OUTSIDE_THE_ALLOCATION_RECORD_TREE_AT_MOST: u64 = 24;
 
 /// W 式子里退役树那一项除内部层数之外的部分：一次删除类发布至多跨两片退役容器（一次发布的退役记录 ≤ 134 条 < 959）⇒
-/// 新写的退役单元 ≤ 2 × 2 + 1 + H_退役 + 1 = 6 + H_退役 槽（判决 `research/prompts/m3-retire-r1-main-verification.md` 第二节 K4
-/// 「一次发布至多几条退役记录」那一行与第三节第 6 条，不论 M3 连不连锁；主 agent 由两次抽样的数推的，没量）。
+/// 新写的退役单元 ≤ 2 × 2 + 1 + H_退役 + 1 = 6 + H_退役 槽
 pub const DELETION_PUBLISH_RETIREMENT_TREE_SLOTS_BEYOND_ITS_INTERNAL_LEVELS_AT_MOST: u64 = 6;
 
 /// W 式子里分配记录树每一层的上界 2·(K + 26)：K 是删除批大小（数据单元个数），这两个常量是式子里的 2 与 26。
@@ -409,8 +473,7 @@ pub const DELETION_PUBLISH_ALLOCATION_RECORD_TREE_LEVEL_BOUND_UNITS_BEYOND_THE_B
 /// W：一次删除类发布每盘新占槽数的上界（D28（挂载期承诺量） 已定项 1），W = 24 + (6 + H_退役) + Σ_ℓ min(N_ℓ, 2·(K + 26))。
 /// `positions_at_each_level` 是分配记录树根之下每一层全部盘合计罩到的位置数 N_ℓ（层级 0 到根层级 − 1），
 /// `batch_data_units` 是删除批大小 K（产品取 `EXTENT_TREE_LOWER_LEAF_DATA_UNITS`，D8（核心索引结构） 已定项 16 第 2 条），
-/// `retirement_tree_internal_levels` 是要接着发布的那一版退役树的内部层数 H_退役（判决 `research/prompts/m3-retire-r1-main-verification.md`
-/// 第三节第 6 条「W 加 6 + H_退役」）。
+/// `retirement_tree_internal_levels` 是要接着发布的那一版退役树的内部层数 H_退役
 ///
 /// # Panics
 /// 加出来装不进 u64：N_ℓ 由槽号（至多 2^48）算出、K 至多 144，远装得下。
@@ -452,7 +515,7 @@ pub enum RingWindowOfTheReading {
 
 impl RingWindowOfTheReading {
     /// 可写挂载那一判的读法：要接的那一版没有树 ⇒ 还没起计；它的承诺类队列不空（`deleted_inodes`、销毁中的快照、截断条目，
-    /// `transaction::TransactionOutput::queue_of_committed_intents_is_empty`，判决 m4-trunc-r1 K1）⇒ 算作可动用；否则扣。
+    /// `transaction::TransactionOutput::queue_of_committed_intents_is_empty`）⇒ 算作可动用；否则扣。
     #[must_use]
     pub fn of_a_writable_mount(
         version_to_build_on: Option<&TransactionOutput>,
@@ -592,8 +655,7 @@ pub struct DeviceAdmissionTerms {
     /// 式子里的「容量」：这块盘单元区的大小（D28（挂载期承诺量） 已定项 4「『容量』是单元区大小」）。
     pub capacity: BytesOnOneDevice,
     /// 式子里的「已分配」（记账第 1 项「已分配字节」）：分配器的占着槽数——仍分配的加上已释放、还在 defer 窗口里的
-    /// （I-3.1（已分配统计对得上） 读法甲，2026-09-14 用户定）。defer 里的槽只在这一项里扣一次：式子不再另扣「defer 待释放」
-    /// （用户 2026-09-25 定，安全设计轮第二轮判决 `research/prompts/m2-safety-r2-main-verification.md`：那一项与「已分配」重复扣）。
+    /// （I-3.1（已分配统计对得上） 读法甲）。defer 里的槽只在这一项里扣一次：式子不再另扣「defer 待释放」
     pub allocated: BytesOnOneDevice,
     /// 式子里的「不可回收」（记账第 3 项）。
     pub unreclaimable: BytesOnOneDevice,
@@ -602,7 +664,7 @@ pub struct DeviceAdmissionTerms {
     pub mount_time_commitment: BytesOnOneDevice,
     /// 式子第九项（D28（挂载期承诺量） 已定项 1，C318（影子账隔离的单元没进准入不等式））：分配器实际隔离的槽，是同一个集合——
     /// 只被被抛弃根引用的槽，加可写挂载那一刻水位之上没施加的 journal 记录点名、不被回退候选集里的根（与现行账）引用、还没解开的槽
-    /// （C694 的 C，判决 `research/prompts/m3-c694-r2-main-verification.md` 第三节第 3 条：第九项的定义随 C 扩成分配器实际隔离的集合）。
+    /// （C694 的 C第 3 条：第九项的定义随 C 扩成分配器实际隔离的集合）。
     /// 读法不变：取 `DeviceFreeMap::isolated_slots`。
     pub isolated_for_abandoned_roots_and_unapplied_journal_records: BytesOnOneDevice,
     /// 式子里的「环窗口」（D28（挂载期承诺量） 已定项 1 末项）：删除各批新写的兜底，常驻扣项、只住内存、每块盘各扣这一份
@@ -850,7 +912,7 @@ pub fn admit_on_every_device(
 }
 
 /// 合取 7（D3（空间分配） 已定项 7 登记表第 7 行）管不管这一次发布：只拦前台写入类发布，删除类、整理批、挂载与回退的发布免
-/// （用户 2026-10-13 定「只拦前台写入类发布」）。封闭集合。
+/// 封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EmptyClusterSegmentsConjunctReach {
     /// 前台写入类：写文件内容（第一个文件、覆盖写、顺序写）、建 inode、建快照——条款列出的四类免除之外、带普通分配的发布。
@@ -905,7 +967,7 @@ pub fn admit_the_empty_cluster_segments_floor_on_every_device(
     }
 }
 
-/// 「这次的单元落得下」那一判的读数，一块盘一条（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）：
+/// 「这次的单元落得下」那一判的读数，一块盘一条（C545（空间准入罩不住分裂与聚簇段层））：
 /// 这块盘此刻按分配器今天的落点规则（D3（空间分配） 已定项 8、已定项 10）还落得下多少。两个数都是分配器随三种挡位增量维护的
 /// （`DeviceFreeMap::set_blocking_bit`），读它们 O(这次挂载开过的聚簇段数)，不扫单元区（`.claude/rules/fs-design.md`「记账是事务的副产品」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -950,7 +1012,7 @@ pub struct UnitsOfAPublishToLand {
 /// 一次发布要落的单元：`ordinary_allocation_roles` 是这次普通分配那一半的角色（数据单元、extent 树与 inode 树的节点，
 /// 在走分配记录树的固定点之前就定了，`transaction::prepare_the_version_publish`），按角色数槽；固定点按 `checkpoint_cost` 计，
 /// 每个一槽（码 2 节点与树表单元都是一槽）——这次重写分配记录树哪几个节点要在分配器上走到固定点才知道，拿 ckpt_cost 的最坏数
-/// （分配记录树那一项是 K1 整棵树）顶它（C545 的准入先拒，用户 2026-09-27 定）。
+/// （分配记录树那一项是 K1 整棵树）顶它（C545 的准入先拒）。
 ///
 /// # Panics
 /// `ordinary_allocation_roles` 里有一个不是普通分配的角色（[`space_budget_of_role`]）：调用方只交普通分配那一半。
@@ -983,7 +1045,7 @@ pub fn units_of_a_publish_to_land(
 }
 
 /// 「这次的单元落得下」逐设备合取（C545（空间准入罩不住分裂与聚簇段层）：D3（空间分配） 已定项 5「字节总量够」与「聚簇段里有合法空槽」
-/// 之间没有条款连起来，用户 2026-09-27 定准入先拒）：每块盘都要两样都够才放行——
+/// 之间没有条款连起来）：每块盘都要两样都够才放行——
 /// ① 数据单元：段外成对的空槽 ≥ 这次的数据单元个数（数据单元在这次的角色里排最前、先取落点，`transaction::PublishPlan::resolve` 排角色那一段：`rewritten_roles` 从写的文件内容的数据单元起）；
 /// ② 提交内生块：没挡的槽减去数据单元取走的那几对 ≥ 这次提交内生块至多要的槽。
 ///
@@ -1048,10 +1110,10 @@ pub fn admit_the_units_landing_on_every_device(
 }
 
 /// 声明一个封闭集合的枚举，连同它的 `ALL`（每一个成员，按声明的次序）：成员表只写一遍，`ALL` 由同一张表生成，加一个成员不会漏进
-/// 复现入口认的取值全集（`code-discipline.md`「重复要生成，不许手抄」；代码三方 test-script-align-code-r1 判决 K4）。
+/// 复现入口认的取值全集（`code-discipline.md`「重复要生成，不许手抄」）。
 /// 只生成枚举与 `ALL`，不藏逻辑：按成员挑东西的地方照旧写穷举 `match`。住在核心层，是因为核心层的 [`SpaceAdmission`] 要用它、
-/// 而核心层不依赖 harness；harness 与 checker 档经 `singlefs_harness::enum_listing_every_member!` 转到这里，定义只有这一份。
-/// 生成的 `ALL` 由 `singlefs_harness` 的 `history::tests` 里的
+/// 而核心层不依赖验证包；验证包经 `singlefs_verification::enum_listing_every_member!` 转到这里，定义只有这一份。
+/// 生成的 `ALL` 由 `singlefs_verification` 的 `history::tests` 里的
 /// `the_generated_member_table_lists_every_member_once_in_declaration_order` 盯着。
 #[macro_export]
 macro_rules! enum_listing_every_member {
@@ -1099,8 +1161,8 @@ impl SpaceAdmission {
 }
 
 /// checkpoint 保留池的 ckpt_cost（D28（挂载期承诺量） 已定项 4）：一次空发布至多写出的固定点单元数，按这次发布要接在后面的那一版的结构现算，
-/// 一律按最坏情况计（用户 2026-09-27 定：游标跨叶、中央映射树多层都不许少扣；此前按盘分路的那一版只罩「每块盘一片叶、中央映射树 1 层」）：
-/// - 分配记录树：几何上整棵树（用户同日再定取 K1），1 + Σ_盘 Σ_{层级 L = 0 … 根层级 − 1} 这块盘单元区在层级 L 上罩到的位置数
+/// 一律按最坏情况计：
+/// - 分配记录树：几何上整棵树，1 + Σ_盘 Σ_{层级 L = 0 … 根层级 − 1} 这块盘单元区在层级 L 上罩到的位置数
 ///   （[`allocation_record_tree_positions_over_the_unit_areas`]）；
 /// - 中央映射树：逐层按这次可能改的路径数与可能切出来的节点数计（[`central_mapping_tree_nodes_an_empty_publish_rewrites_at_most`]）；
 /// - 记账树：这次发布写完之后那棵记账树的节点数（[`accounting_tree_nodes_after_the_publish_built_on`]：行数至多是这一版的行数加
@@ -1108,7 +1170,7 @@ impl SpaceAdmission {
 /// - 树表 1（每次发布重写一个单元，D16（发布语义） 已定项 9）；实例表链不进（它的开销归已定项 3 的切换预留）；
 /// - 谱系容器单列一项，按一次谱系容器 COW 连路径算（[`checkpoint_cost_of_one_lineage_container_cow`]，只算带文件的一版：
 ///   树表 0 条的一版没有谱系树，也走不到管理员回退）；
-/// - 退役容器照谱系单列一项（[`checkpoint_cost_of_one_retirement_container_cow`]，判决 `research/prompts/m3-retire-r1-main-verification.md`
+/// - 退役容器照谱系单列一项（[`checkpoint_cost_of_one_retirement_container_cow`]
 ///   第六节 R2「两样都做」，只算带文件的一版），它在中央映射树里的删插同样算上。
 ///
 /// 「当前」= 这次发布要接在后面的那一版：
@@ -1121,8 +1183,8 @@ impl SpaceAdmission {
 /// 中央映射树的节点容量按节点格式算（产品路径）；只供测试的压小容量下量同一个数用
 /// [`checkpoint_cost_of_the_version_to_build_on_with_node_capacities`]。
 ///
-/// 分配记录树那一项不读这一版有哪些节点：此前「每块盘两条叶路径」（K0）在开放段装不下开新段、没有全空段回落到最低空槽、
-/// 换下很久以前落在别处的节点这三种情形下少扣（量到一块盘改 3–4 片叶，报告 `research/prompts/m2-rev-a4c-implementer-report.md` 第二节），
+/// 分配记录树那一项不读这一版有哪些节点：按「每块盘两条叶路径」算，在开放段装不下开新段、没有全空段回落到最低空槽、
+/// 换下很久之前落在别处的节点这三种情形下少扣（量到一块盘改 3–4 片叶），
 /// 一次发布改几片叶的不动点收不了口，拿得准的上界只有几何上整棵树。代价随单元区线性涨（两块 4 GiB 盘 529 个节点）。
 ///
 /// 同一个数也是挂载期承诺量里暖机那一半的 c_max（已定项 4 末条「按同一个现算的 c_max 取」）。
@@ -1172,7 +1234,7 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
             let retirement_tree_internal_levels = file_version.retirement_tree_internal_levels();
             // 一次空发布在中央映射树里改的条目是这两棵树的节点（别的进映射的单元照抄上一版、key 不变）：重写的每个节点删一把旧 key
             // （上一版有它时）、插一把这次的 key。再加回退那次谱系容器 COW 连祖先改的那几把：谱系那一项按一次 COW 连祖先算
-            // （D28（挂载期承诺量） 已定项 4），它在中央映射树里的删插一并算上（用户 2026-10-02 定「乙 一并算上」）。
+            // （D28（挂载期承诺量） 已定项 4），它在中央映射树里的删插一并算上。
             // 记账树的删至多是这一版的节点数、插至多是这次之后的节点数：两者在台阶行跨过一片叶的那次不同。
             let mapped_changes_with_accounting_nodes = |accounting_nodes: u64| {
                 allocation_record_tree_nodes
@@ -1197,7 +1259,7 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
                             MultiLevelCodeTwoTree::CentralMapping,
                         ),
                     ),
-                    // 映射条目数 = 进映射的单元 + 被活快照钉住、留存的映射条目（判决 S3 的 α）：空发布两样都照抄。
+                    // 映射条目数 = 进映射的单元 + 被活快照钉住、留存的映射条目：空发布两样都照抄。
                     u64::try_from(
                         file_version.mapped_units.len()
                             + file_version.mapping_entries_kept_for_the_snapshots.len(),
@@ -1299,7 +1361,7 @@ pub fn accounting_tree_nodes_after_the_publish_built_on(
     u64::try_from(nodes).expect("记账树的节点数装得进 u64")
 }
 
-/// 分配记录树一次空发布至多重写的节点数，取几何上整棵树（K1，用户 2026-09-27 定；D8（核心索引结构） 已定项 14：按位置寻址、根里按盘分路、
+/// 分配记录树一次空发布至多重写的节点数，取几何上整棵树（K1；D8（核心索引结构） 已定项 14：按位置寻址、根里按盘分路、
 /// 根之下每个节点只属于一块盘）：
 /// 1（根，罩整个 key 空间）+ Σ_盘 Σ_{层级 L = 0 … 根层级 − 1}（这块盘单元区 [s, e) 在层级 L 上罩到的位置数 = ⌊(e − 1) ÷ S_L⌋ − ⌊s ÷ S_L⌋ + 1），
 /// S_L = 812 × 169^L（[`span_in_slots_at_level`]，两个数是 `singlefs_format` 的 `ALLOCATION_RECORD_TREE_LEAF_SLOTS` 与
@@ -1405,7 +1467,7 @@ fn splits_at_one_level_at_most(
         + (additions - first_splits_of_pre_existing_nodes) / additions_per_split_of_a_fresh_node
 }
 
-/// 中央映射树一次空发布至多重写的节点数（用户 2026-09-27 定按最坏情况计，逐层按可能改的路径数计）：
+/// 中央映射树一次空发布至多重写的节点数：
 /// - 每一层原有的节点里，这次重写的都在某一把删掉或插进的 key 的路径上（叶到根整条 COW，D8（核心索引结构） 已定项 11 ①），
 ///   一把 key 一层一个 ⇒ 至多 min(这一层的节点数, 删的 + 插的)；
 /// - 切出来的节点都是新写的：叶层至多 [`splits_at_one_level_at_most`]（加的是插的 key），内部层同一条（加的是下一层切出来的孩子）；
@@ -1528,7 +1590,7 @@ pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
         | TransactionUnit::TombstoneLeafContainer(_)
         | TransactionUnit::TombstoneRoot
         | TransactionUnit::TombstoneNodeBelowTheRoot(_) => SpaceBudgetOfARole::OrdinaryAllocation,
-        // 退役树三个角色同墓碑（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）：只在最后一批（身份消失那次）重写，
+        // 退役树三个角色同墓碑：只在最后一批（身份消失那次）重写，
         // 落点那一判照判，式子那一判删除类发布整次不判；它们的空间罩在标签 6 的退役那一份与环窗口 W 的 6 + H_退役 里。
         TransactionUnit::RetirementLeafContainer(_)
         | TransactionUnit::RetirementRoot
@@ -1558,7 +1620,7 @@ pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
 }
 
 /// 整理一批的最坏占用（D26（后台整理与放置回收） 已定项 3 第 2 句「整理不是释放路径，它走常规准入，批次最坏占用计入『已承诺预留』」；
-/// 用户 2026-10-26 定 C906「照条款：整理批走常规准入」）：这一批计划搬的单元在目的地各新占它的跨度，每个单元落每一份副本
+/// C906（整理批不过常规准入与条款对不上）：照条款，整理批走常规准入）：这一批计划搬的单元在目的地各新占它的跨度，每个单元落每一份副本
 /// （第一版每块盘一份，[`ReplicaCount::of_every_device_in_the_pool`]），按全部副本之和记——与「已承诺预留」同一口径，发布路径把它加进
 /// 这一次准入读数的已承诺预留（只进这一次的读数，不写进记账行：一批在同一个调用里准入、分配、落盘，落盘之后它就在「已分配」里）。
 /// 「最坏」是计划里每一项都真搬：其中这次发布本来就重写、不另搬的那几个也照搬算。`slots_of_the_planned_units` 是计划里每一项源落点的跨度之和。
@@ -1586,9 +1648,9 @@ pub fn publish_has_an_ordinary_allocation(rewritten_roles: &[TransactionUnit]) -
 }
 
 /// 一次发布的需求：这次新写的全部角色（普通分配加这次写出的固定点，不加这次换下的槽，D28（挂载期承诺量） 已定项 1 接线，
-/// 用户 2026-09-25 定 ND+A1n）要在每块盘上新占的物理字节：
+/// ND+A1n）要在每块盘上新占的物理字节：
 /// 第一版每个单元落池里每一块盘（`ReplicaCount::of_every_device_in_the_pool` 同一条理由），每块盘的需求相同；
-/// 按盘字节记（C370（需求、可用与 df 没有共同单位） 2026-09-17 收窄：需求要与逐盘物理字节的「已分配」同口径）。
+/// 按盘字节记（C370（需求、可用与 df 没有共同单位）：需求要与逐盘物理字节的「已分配」同口径）。
 /// 按 `devices` 的次序每块盘一条，需求为零也写 0（`admit_on_every_device` 要逐盘写全）。
 ///
 /// # Panics
@@ -1609,7 +1671,7 @@ pub fn demand_of_the_roles_on_each_device(
         .collect()
 }
 
-/// 读数里的实例切换预留按哪一次可写挂载的行数算（D28（挂载期承诺量） 已定项 3「发布路径用 rows0 + 1」，用户 2026-09-26 定）。
+/// 读数里的实例切换预留按哪一次可写挂载的行数算（D28（挂载期承诺量） 已定项 3「发布路径用 rows0 + 1」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InstanceRowsOfTheSwitchReserve {
     /// 可写挂载自己判：这次挂载的 rows0（挂载时读到的行数加写行那次要写的行数）。
@@ -1800,7 +1862,7 @@ mod tests {
     }
 
     /// 式子的九项各取一个互不相同的数：每一项都在、各扣一次、逐盘各取各的，少扣或多扣任何一项结果都对不上。
-    /// 「已分配」里含着 defer 里的槽（读法甲），式子不另扣「defer 待释放」（D28（挂载期承诺量） 已定项 1，用户 2026-09-25 定）；
+    /// 「已分配」里含着 defer 里的槽（读法甲），式子不另扣「defer 待释放」（D28（挂载期承诺量） 已定项 1）；
     /// 环窗口是逐盘的常驻扣项（同一条，末项）。
     #[test]
     fn each_of_the_nine_terms_is_subtracted_once_on_every_device() {
@@ -1860,7 +1922,7 @@ mod tests {
     /// 请求 1 个单元。按副本之和记：每块盘扣墓碑 2 + 保留池 4，剩 1 槽 < 数据单元 2 槽 ⇒ 拒。
     /// 判别力：换成按一份副本记（记下 2 槽、摊到每块盘只扣 1），那一格翻成放行——而每块盘真要落 2 + 4 + 2 = 8 > 7。
     #[test]
-    fn c375_two_devices_of_seven_slots_with_checkpoint_cost_four_and_one_tombstone_container_refuse_one_data_unit(
+    fn two_devices_of_seven_slots_with_checkpoint_cost_four_and_one_tombstone_container_counted_over_every_replica_refuse_one_data_unit(
     ) {
         let replicas = replicas_of_two_devices();
         let tombstone_container_of_one_copy = slots(2);
@@ -1905,7 +1967,8 @@ mod tests {
     /// 判别力两条：把保留池改回池级标量扣一份（每块盘只扣一半），或让盘 1 的富余补盘 0，那一格都翻成放行——
     /// 而固定点每一块要在盘 0 上落一份，盘 0 真装不下。
     #[test]
-    fn c355_a_device_one_slot_short_is_refused_even_when_the_other_device_has_plenty() {
+    fn device_one_slot_short_of_its_own_checkpoint_reserve_share_is_refused_even_when_the_other_device_has_plenty(
+    ) {
         let replicas = replicas_of_two_devices();
         let reading = AdmissionReading::new(
             vec![empty_device(0, 5), empty_device(1, 100)],
@@ -1959,7 +2022,7 @@ mod tests {
         );
     }
 
-    /// ckpt_cost 里分配记录树那一项取几何上整棵树（K1，D28（挂载期承诺量） 已定项 4，用户 2026-09-27 定）：
+    /// ckpt_cost 里分配记录树那一项取几何上整棵树（K1，D28（挂载期承诺量） 已定项 4）：
     /// 1 + Σ_盘 Σ_{L < 根层级}（⌊(e − 1) ÷ S_L⌋ − ⌊s ÷ S_L⌋ + 1），单元区 [s, e) 从槽 50176 起（叶 61 罩 [49532, 50344)）。
     /// - 两块单元区 16 槽的盘：只罩叶 61，根层级 1 ⇒ 1 + 2 × 1 = 3；
     /// - 两块 384 槽：叶 61、62 ⇒ 1 + 2 × 2 = 5；
@@ -2008,8 +2071,7 @@ mod tests {
 
     /// 两块 4 GiB 盘（单元区 [50176, 262144)、根层级 2）：N_0 = 2 × (322 − 61 + 1) = 524、N_1 = 2 × 2 = 4，
     /// 产品批大小 K = 144、退役树只有根（H_退役 = 0）⇒ W = 24 + (6 + 0) + min(524, 340) + min(4, 340) = 374；
-    /// S = 8 ⇒ 环窗口 = (3 × 8 + 1) × 374 = 9350 槽 / 盘（辩方 `research/prompts/m3-delete-r3-sonnet-output.md` 第三节表里 4 GiB 那一行的 368，
-    /// 加判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条的 6 + H_退役）。
+    /// S = 8 ⇒ 环窗口 = (3 × 8 + 1) × 374 = 9350 槽 / 盘（W 的 374 = 368 加第 6 条的 6 + H_退役）。
     #[test]
     fn ring_window_on_two_four_gibibyte_devices_is_twenty_five_times_three_hundred_seventy_four_slots(
     ) {
@@ -2058,7 +2120,7 @@ mod tests {
     }
 
     /// 两块 16 GiB 盘（根层级 2）：N_1 = 2 × 8 = 16，崩溃点重放远超 340 ⇒ W = 24 + 6 + 340 + 16 = 386；环窗口 = 25 × 386 = 9650 槽 / 盘
-    /// （辩方第三节表里 16 GiB 那一行的 380 加退役树那 6 + 0）。
+    /// （W 的 386 = 380 加退役树那 6 + 0）。
     #[test]
     fn ring_window_on_two_sixteen_gibibyte_devices_is_twenty_five_times_three_hundred_eighty_six_slots(
     ) {
@@ -2134,7 +2196,7 @@ mod tests {
         );
     }
 
-    /// ckpt_cost 谱系那一项（用户 2026-10-02 定「乙 连祖先算」）：零根与只有根（内部 0 层）都是容器 2 + 根 1 = 3 块；
+    /// ckpt_cost 谱系那一项：零根与只有根（内部 0 层）都是容器 2 + 根 1 = 3 块；
     /// 长高一层之后 4 块、两层 5 块。
     #[test]
     fn the_lineage_term_of_the_checkpoint_cost_is_a_container_a_root_and_every_internal_level() {
@@ -2144,7 +2206,7 @@ mod tests {
         );
     }
 
-    /// ckpt_cost 退役那一项（判决 m3-retire-r1 第六节 R2「两样都做」，照谱系）：容器 2 + 根 1 + 内部层数块，零根与只有根 3 块、
+    /// ckpt_cost 退役那一项：容器 2 + 根 1 + 内部层数块，零根与只有根 3 块、
     /// 长高一层 4 块、两层 5 块；它在中央映射树里改的条目 = 容器 1 + 根 1 + 内部层数把。
     #[test]
     fn the_retirement_term_of_the_checkpoint_cost_is_a_container_a_root_and_every_internal_level() {
@@ -2182,7 +2244,7 @@ mod tests {
             inserted_at_most: 10,
         };
 
-    /// 中央映射树逐层按可能改的路径数与可能切出来的节点数计（D28（挂载期承诺量） 已定项 4，用户 2026-09-27 定按最坏情况）：
+    /// 中央映射树逐层按可能改的路径数与可能切出来的节点数计（D28（挂载期承诺量） 已定项 4）：
     /// - 一层、条目加插的装得进一片叶：一次都切不了，重写根一个；
     /// - 一层、装不下：根（叶）切一次（10 条插不满第二次，⌊9 ÷ 147⌋ = 0），长出新根：1 + 1 + 1 = 3；
     /// - 两层（叶 2、根 1）：叶层 min(2, 20) + 切 min(2, 10) = 4，根层装得下 4 个孩子不切、1 个 ⇒ 5；
@@ -2430,7 +2492,7 @@ mod tests {
         }
     }
 
-    /// 「这次的单元落得下」逐盘两样都判（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）：
+    /// 「这次的单元落得下」逐盘两样都判（C545（空间准入罩不住分裂与聚簇段层））：
     /// - 两块盘段外各 3 对、没挡的槽各 20，要 3 个数据单元与 14 槽提交内生块：20 − 6 = 14 ≥ 14，放行；
     /// - 盘 1 段外只有 2 对：只拒盘 1，报段外 4 槽 < 数据单元 6 槽；
     /// - 两块盘没挡的槽各 19、要 15 槽提交内生块：数据单元取走 6 槽之后剩 13 < 15，两块盘都拒。

@@ -46,7 +46,7 @@ use singlefs_background_gpu::adapter_inventory::{
 };
 use singlefs_background_gpu::background_gpu::{
     host_cpu_time_of_this_thread, monotonic_raw_time_now,
-    open_background_gpu_with_the_memory_leaked_in_this_process, wait_for_the_wgpu_future,
+    open_background_gpu_with_the_memory_leaked_in_this_process, VulkanInstanceOfThisProcess,
 };
 use singlefs_background_gpu::background_gpu_compute::{
     open_background_gpu_compute, BackgroundGpuComputeOnTheParticipatingGpus,
@@ -55,7 +55,6 @@ use singlefs_background_gpu::gpus_of_this_host::{
     GpuMemoryLeakedInThisProcess, GpusLeakedWhenTheBackgroundGpuIsDropped,
 };
 use singlefs_background_gpu::region_record_kernels::cpu_reference_classification;
-use singlefs_background_gpu::waiting_for_the_gpu::SteadyClockOfThisProcess;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, FileOffsetInBytes, InodeNumber, SlotNumber,
     TreeIdentifier,
@@ -2747,19 +2746,14 @@ struct DiscreteGpuSeenByThisProcess {
     model: String,
 }
 
-/// 本进程看得到的独立显卡，按 PCI 地址次序（产品没点名时填满的次序）：另起一个只开 Vulkan 的 wgpu 实例枚举一次，
+/// 本进程看得到的独立显卡，按 PCI 地址次序（产品没点名时填满的次序）：在这个进程的那一份 Vulkan 实例（开卡也用它）上枚举一次，
 /// 判法同产品（集显、虚拟显卡、软件 Vulkan、认不出类型的与没有总线地址的不算）。
-fn discrete_gpus_seen_by_this_process() -> Result<Vec<DiscreteGpuSeenByThisProcess>, String> {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::VULKAN,
-        ..wgpu::InstanceDescriptor::new_without_display_handle()
-    });
-    let adapters = wait_for_the_wgpu_future(
-        instance.enumerate_adapters(wgpu::Backends::VULKAN),
-        LOCAL_GPU_WAIT_LIMIT_BY_DEFAULT,
-        &SteadyClockOfThisProcess::starting_now(),
-    )
-    .map_err(|cause| format!("枚举适配器没在等的上限之内交回：{cause:?}"))?;
+fn discrete_gpus_seen_by_this_process(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+) -> Result<Vec<DiscreteGpuSeenByThisProcess>, String> {
+    let adapters = vulkan_instance
+        .vulkan_adapters_enumerated_within(LOCAL_GPU_WAIT_LIMIT_BY_DEFAULT)
+        .map_err(|cause| format!("枚举适配器没在等的上限之内交回：{cause:?}"))?;
     let mut discrete_gpus: Vec<DiscreteGpuSeenByThisProcess> = adapters
         .iter()
         .map(wgpu::Adapter::get_info)
@@ -4232,11 +4226,20 @@ struct GpuOfTheRun {
     gpus_leaked_when_dropped: Option<GpusLeakedWhenTheBackgroundGpuIsDropped>,
 }
 
-/// 照这条臂开卡（挂载与开卡都在第一次 GC 调用之前做完、在窗口外：登记第一节「不含挂载那一刻量代价」）。
+/// GPU 臂开卡用的那一份进程级 Vulkan 实例（这条命令枚举独显时建的）；这条命令没建（不枚举独显）交回 `Err`。
+fn vulkan_instance_for_the_gpu_arm(
+    vulkan_instance: Option<&VulkanInstanceOfThisProcess>,
+) -> Result<&VulkanInstanceOfThisProcess, String> {
+    vulkan_instance
+        .ok_or_else(|| "GPU 臂要开卡，这条命令却没建进程级 Vulkan 实例（没枚举独显）".to_string())
+}
+
+/// 照这条臂开卡（挂载与开卡都在第一次 GC 调用之前做完、在窗口外：登记第一节「不含挂载那一刻量代价」），在 `vulkan_instance` 上开。
 fn open_the_gpu_of_the_arm(
     arm: LockstepArm,
     settings: &BackgroundComputeSettings,
     memory_leaked: &GpuMemoryLeakedInThisProcess,
+    vulkan_instance: Option<&VulkanInstanceOfThisProcess>,
 ) -> Result<GpuOfTheRun, String> {
     if !arm.compute.uses_the_gpu() {
         return Ok(GpuOfTheRun {
@@ -4245,10 +4248,11 @@ fn open_the_gpu_of_the_arm(
             gpus_leaked_when_dropped: None,
         });
     }
+    let vulkan_instance = vulkan_instance_for_the_gpu_arm(vulkan_instance)?;
     let selection = BackgroundGpuSelection::of_the_settings(settings);
     match arm.rejudging {
         RejudgingOfTheArm::NotRejudged => {
-            let opened = open_background_gpu_compute(&selection, memory_leaked)
+            let opened = open_background_gpu_compute(&selection, memory_leaked, vulkan_instance)
                 .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
             Ok(GpuOfTheRun {
                 gpu_compute: Some(opened.gpu_compute),
@@ -4260,6 +4264,7 @@ fn open_the_gpu_of_the_arm(
             let background_gpu = open_background_gpu_with_the_memory_leaked_in_this_process(
                 &selection,
                 memory_leaked,
+                vulkan_instance,
             )
             .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
             let gpus_leaked_when_dropped = background_gpu.gpus_leaked_when_dropped();
@@ -4944,6 +4949,8 @@ struct LockstepRunSetting<'run> {
     image: &'run StartingImage,
     discrete_gpus: &'run [DiscreteGpuSeenByThisProcess],
     memory_leaked: &'run GpuMemoryLeakedInThisProcess,
+    /// 开卡用的那一份进程级 Vulkan 实例；只跑 CPU 臂的没有。
+    vulkan_instance: Option<&'run VulkanInstanceOfThisProcess>,
     user_changes: u64,
     batch_units: usize,
 }
@@ -4956,7 +4963,12 @@ fn run_lockstep_once(
 ) -> Result<LockstepRunSummary, String> {
     let host_at_the_start = host_load_reading()?;
     let settings = background_compute_settings_of_the_arm(arm.compute, setting.discrete_gpus);
-    let gpu = open_the_gpu_of_the_arm(arm, &settings, setting.memory_leaked)?;
+    let gpu = open_the_gpu_of_the_arm(
+        arm,
+        &settings,
+        setting.memory_leaked,
+        setting.vulkan_instance,
+    )?;
     let (session, devices, recording) = measuring_mount(
         setting.image,
         settings,
@@ -5554,18 +5566,21 @@ fn run_one_lockstep_repeat(
 
 // ---- 子命令共用的开头：产物、开跑检查、crates 版本（停机条款第 2 条：与产物里已有的比）、卡 ----
 
-/// 子命令开头读到的：产物里已有的结果行、这是第几次起这条命令、合起来的 crates 摘要、本进程看得到的独显。
+/// 子命令开头读到的：产物里已有的结果行、这是第几次起这条命令、合起来的 crates 摘要、本进程看得到的独显，
+/// 与枚举它们的那一份进程级 Vulkan 实例（这条命令里开卡都用它，不另建；不枚举独显的命令不建，是 `None`）。
 struct OpeningOfTheCommand {
     lines_already_in_the_product: Vec<KindAndFieldsOfAResultLine>,
     session_number: u64,
     registered_heavy_threads: usize,
     discrete_gpus: Vec<DiscreteGpuSeenByThisProcess>,
+    vulkan_instance: Option<VulkanInstanceOfThisProcess>,
 }
 
-/// 这条命令要不要枚举本进程看得到的独显（几何核不要卡）。封闭集合。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum GpusOfTheCommand {
-    Enumerated,
+/// 这条命令要不要枚举本进程看得到的独显（几何核不要卡）：要的带着这个进程的那一份 Vulkan 实例（`main` 照要卡的子命令建，一个进程一份，
+/// 枚举与这条命令里开卡都用它）。封闭集合。
+#[derive(Clone, Copy, Debug)]
+enum GpusOfTheCommand<'process> {
+    EnumeratedOn(&'process VulkanInstanceOfThisProcess),
     NotNeeded,
 }
 
@@ -5573,7 +5588,7 @@ fn opening_of_the_command(
     product: &mut ProductWriter,
     product_path: &Path,
     command_fields: &str,
-    gpus: GpusOfTheCommand,
+    gpus: GpusOfTheCommand<'_>,
 ) -> Result<OpeningOfTheCommand, i32> {
     let lines_already_in_the_product =
         result_lines_already_in_the_product(product_path).map_err(|reason| {
@@ -5606,22 +5621,25 @@ fn opening_of_the_command(
         );
         return Err(EXIT_STOPPED);
     }
-    let discrete_gpus = if gpus == GpusOfTheCommand::Enumerated {
-        discrete_gpus_seen_by_this_process().map_err(|reason| {
-            product.emit(
-                "gpus",
-                &format!("enumerated=false reason={}", field_value(&reason)),
-            );
-            EXIT_RUN_CONDITION_NOT_MET
-        })?
-    } else {
-        Vec::new()
+    let (vulkan_instance, discrete_gpus) = match gpus {
+        GpusOfTheCommand::EnumeratedOn(vulkan_instance) => {
+            let discrete_gpus =
+                discrete_gpus_seen_by_this_process(vulkan_instance).map_err(|reason| {
+                    product.emit(
+                        "gpus",
+                        &format!("enumerated=false reason={}", field_value(&reason)),
+                    );
+                    EXIT_RUN_CONDITION_NOT_MET
+                })?;
+            (Some(vulkan_instance.clone()), discrete_gpus)
+        }
+        GpusOfTheCommand::NotNeeded => (None, Vec::new()),
     };
     product.emit(
         "gpus",
         &format!(
             "enumerated={} count={} pci_bus_addresses={} models={}",
-            gpus == GpusOfTheCommand::Enumerated,
+            vulkan_instance.is_some(),
             discrete_gpus.len(),
             field_value(
                 &discrete_gpus
@@ -5644,6 +5662,7 @@ fn opening_of_the_command(
         session_number,
         registered_heavy_threads,
         discrete_gpus,
+        vulkan_instance,
     })
 }
 
@@ -5793,7 +5812,10 @@ fn repeats_already_done(
     (done, numbers, next_repeat)
 }
 
-fn lockstep_command(command: &LockstepCommand) -> i32 {
+fn lockstep_command(
+    command: &LockstepCommand,
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+) -> i32 {
     let mut product = match ProductWriter::appending_to(&command.product) {
         Ok(product) => product,
         Err(reason) => {
@@ -5813,7 +5835,7 @@ fn lockstep_command(command: &LockstepCommand) -> i32 {
         &mut product,
         &command.product,
         &command_fields,
-        GpusOfTheCommand::Enumerated,
+        GpusOfTheCommand::EnumeratedOn(vulkan_instance),
     ) {
         Ok(opening) => opening,
         Err(exit_code) => {
@@ -5867,6 +5889,7 @@ fn lockstep_command(command: &LockstepCommand) -> i32 {
         image: &image,
         discrete_gpus: &opening.discrete_gpus,
         memory_leaked: &memory_leaked,
+        vulkan_instance: opening.vulkan_instance.as_ref(),
         user_changes: command.user_changes,
         batch_units: command.batch_units,
     };
@@ -6561,6 +6584,8 @@ struct ConcurrentRunSetting<'run> {
     image: &'run StartingImage,
     discrete_gpus: &'run [DiscreteGpuSeenByThisProcess],
     memory_leaked: &'run GpuMemoryLeakedInThisProcess,
+    /// 开卡用的那一份进程级 Vulkan 实例；只跑 CPU 臂的没有。
+    vulkan_instance: Option<&'run VulkanInstanceOfThisProcess>,
     user_changes: u64,
     foreground_interval: Duration,
 }
@@ -6574,7 +6599,12 @@ fn run_concurrent_once(
     let host_at_the_start = host_load_reading()?;
     let settings =
         background_compute_settings_of_the_arm(arm.compute_of_the_arm(), setting.discrete_gpus);
-    let gpu = open_the_gpu_of_the_arm(arm.as_a_lockstep_arm(), &settings, setting.memory_leaked)?;
+    let gpu = open_the_gpu_of_the_arm(
+        arm.as_a_lockstep_arm(),
+        &settings,
+        setting.memory_leaked,
+        setting.vulkan_instance,
+    )?;
     let (session, devices, _recording) = measuring_mount(
         setting.image,
         settings,
@@ -7037,7 +7067,10 @@ fn command_fields_of_a_concurrent_command(command: &ConcurrentCommand) -> String
     )
 }
 
-fn concurrent_command(command: &ConcurrentCommand) -> i32 {
+fn concurrent_command(
+    command: &ConcurrentCommand,
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+) -> i32 {
     let mut product = match ProductWriter::appending_to(&command.product) {
         Ok(product) => product,
         Err(reason) => {
@@ -7050,7 +7083,7 @@ fn concurrent_command(command: &ConcurrentCommand) -> i32 {
         &mut product,
         &command.product,
         &command_fields,
-        GpusOfTheCommand::Enumerated,
+        GpusOfTheCommand::EnumeratedOn(vulkan_instance),
     ) {
         Ok(opening) => opening,
         Err(exit_code) => {
@@ -7104,6 +7137,7 @@ fn concurrent_command(command: &ConcurrentCommand) -> i32 {
         image: &image,
         discrete_gpus: &opening.discrete_gpus,
         memory_leaked: &memory_leaked,
+        vulkan_instance: opening.vulkan_instance.as_ref(),
         user_changes: CONCURRENT_USER_CHANGES,
         foreground_interval: command.foreground_interval,
     };
@@ -7224,12 +7258,19 @@ fn sensitivity_concurrent_command(product: &Path) -> ConcurrentCommand {
 }
 
 /// 两点串着跑、写进同一份产物：交替跑那一点不是 0 就不跑并发那一点、交回它的退出码。
-fn sensitivity_command(product: &Path, user_changes: u64) -> i32 {
-    let lockstep_exit = lockstep_command(&sensitivity_lockstep_command(product, user_changes));
+fn sensitivity_command(
+    product: &Path,
+    user_changes: u64,
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+) -> i32 {
+    let lockstep_exit = lockstep_command(
+        &sensitivity_lockstep_command(product, user_changes),
+        vulkan_instance,
+    );
     if lockstep_exit != EXIT_SUCCESS {
         return lockstep_exit;
     }
-    concurrent_command(&sensitivity_concurrent_command(product))
+    concurrent_command(&sensitivity_concurrent_command(product), vulkan_instance)
 }
 
 // ---- 子命令 geometry-check（登记第五节「分段」第一段：只造池、不计时、不要卡；第一节未定第 6 项：量每档造池耗时与每次跑的批数）----
@@ -7250,6 +7291,7 @@ fn geometry_check_of_a_tier(tier: UnitAreaTier) -> GeometryCheckOfATier {
                 image: &image,
                 discrete_gpus: &[],
                 memory_leaked: &memory_leaked,
+                vulkan_instance: None,
                 user_changes,
                 batch_units: BATCH_UNITS_AT_THE_MAIN_SAMPLING_POINT,
             };
@@ -7796,12 +7838,14 @@ fn stage_three_share_of_one_greedy_call(
     arm: ComputeOfTheArm,
     discrete_gpus: &[DiscreteGpuSeenByThisProcess],
     memory_leaked: &GpuMemoryLeakedInThisProcess,
+    vulkan_instance: Option<&VulkanInstanceOfThisProcess>,
 ) -> Result<StageThreeShareOfOneGreedyCall, String> {
     let settings = background_compute_settings_of_the_arm(arm, discrete_gpus);
     let (gpu_compute, timing, gpus_leaked_when_dropped) = if arm.uses_the_gpu() {
         let background_gpu = open_background_gpu_with_the_memory_leaked_in_this_process(
             &BackgroundGpuSelection::of_the_settings(&settings),
             memory_leaked,
+            vulkan_instance_for_the_gpu_arm(vulkan_instance)?,
         )
         .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
         let gpus_leaked_when_the_gpu_is_dropped = background_gpu.gpus_leaked_when_dropped();
@@ -7888,6 +7932,7 @@ fn stage_three_counts_on_the_arm(
     unit_area: UnitAreaOfOneDevice,
     discrete_gpus: &[DiscreteGpuSeenByThisProcess],
     memory_leaked: &GpuMemoryLeakedInThisProcess,
+    vulkan_instance: Option<&VulkanInstanceOfThisProcess>,
 ) -> Result<StageThreeCountsOfTheArm, String> {
     match arm {
         ComputeOfTheArm::Cpu => stage_three_counts_of_the_counter(
@@ -7900,6 +7945,7 @@ fn stage_three_counts_on_the_arm(
             let background_gpu = open_background_gpu_with_the_memory_leaked_in_this_process(
                 &BackgroundGpuSelection::of_the_settings(&settings),
                 memory_leaked,
+                vulkan_instance_for_the_gpu_arm(vulkan_instance)?,
             )
             .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
             let gpus_leaked_when_the_gpu_is_dropped = background_gpu.gpus_leaked_when_dropped();
@@ -7939,7 +7985,11 @@ fn allocation_records_and_unit_area_of_the_image(
     ))
 }
 
-fn stage_three_cost_command(tier: UnitAreaTier, product_path: &Path) -> i32 {
+fn stage_three_cost_command(
+    tier: UnitAreaTier,
+    product_path: &Path,
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+) -> i32 {
     let mut product = match ProductWriter::appending_to(product_path) {
         Ok(product) => product,
         Err(reason) => {
@@ -7954,7 +8004,7 @@ fn stage_three_cost_command(tier: UnitAreaTier, product_path: &Path) -> i32 {
             "command=stage-three-cost tier={} repeats={STAGE_THREE_COST_REPEATS}",
             tier.name()
         ),
-        GpusOfTheCommand::Enumerated,
+        GpusOfTheCommand::EnumeratedOn(vulkan_instance),
     ) {
         Ok(opening) => opening,
         Err(exit_code) => {
@@ -8004,6 +8054,7 @@ fn stage_three_cost_command(tier: UnitAreaTier, product_path: &Path) -> i32 {
             unit_area,
             &opening.discrete_gpus,
             &memory_leaked,
+            opening.vulkan_instance.as_ref(),
         )
         .and_then(|counts| {
             stage_three_share_of_one_greedy_call(
@@ -8011,6 +8062,7 @@ fn stage_three_cost_command(tier: UnitAreaTier, product_path: &Path) -> i32 {
                 arm,
                 &opening.discrete_gpus,
                 &memory_leaked,
+                opening.vulkan_instance.as_ref(),
             )
             .map(|share| (counts, share))
         });
@@ -8394,23 +8446,36 @@ fn command_of_the_arguments(arguments: &[String]) -> Result<CommandOfTheApparatu
     Ok(command)
 }
 
+/// 一个进程只起一条子命令；要卡的子命令在这里建这个进程的那一份 Vulkan 实例交下去（敏感度那一条的交替跑与并发跑共用它），不要卡的不建。
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let exit_code = match command_of_the_arguments(&arguments) {
         Ok(CommandOfTheApparatus::GeometryCheck { product }) => geometry_check_command(&product),
-        Ok(CommandOfTheApparatus::Lockstep(command)) => lockstep_command(&command),
-        Ok(CommandOfTheApparatus::Concurrent(command)) => concurrent_command(&command),
+        Ok(CommandOfTheApparatus::Lockstep(command)) => lockstep_command(
+            &command,
+            &VulkanInstanceOfThisProcess::created_for_this_process(),
+        ),
+        Ok(CommandOfTheApparatus::Concurrent(command)) => concurrent_command(
+            &command,
+            &VulkanInstanceOfThisProcess::created_for_this_process(),
+        ),
         Ok(CommandOfTheApparatus::Sensitivity {
             product,
             user_changes,
-        }) => sensitivity_command(&product, user_changes),
+        }) => sensitivity_command(
+            &product,
+            user_changes,
+            &VulkanInstanceOfThisProcess::created_for_this_process(),
+        ),
         Ok(CommandOfTheApparatus::JudgeTrend {
             product,
             lockstep_products,
         }) => judge_trend_command(&product, &lockstep_products),
-        Ok(CommandOfTheApparatus::StageThreeCost { tier, product }) => {
-            stage_three_cost_command(tier, &product)
-        }
+        Ok(CommandOfTheApparatus::StageThreeCost { tier, product }) => stage_three_cost_command(
+            tier,
+            &product,
+            &VulkanInstanceOfThisProcess::created_for_this_process(),
+        ),
         Ok(CommandOfTheApparatus::ConstructionTiming(command)) => {
             construction_timing_command(&command)
         }
@@ -8627,7 +8692,7 @@ mod tests {
 
     /// 共用的存法：写成全是零的块不存，读回照旧是零；各存各的存法照存。
     #[test]
-    fn a_chunk_written_back_to_zeroes_is_not_stored_and_reads_back_zero() {
+    fn chunk_written_back_to_zeroes_is_not_stored_and_reads_back_zero() {
         let recording: SharedRecordingDigest = Arc::new(Mutex::new(RecordingDigest::empty()));
         let mut shared = empty_pool_devices(4 * MEMORY_DEVICE_CHUNK_BYTES, &recording);
         let mut copied = empty_pool_devices_storing_the_chunks(
@@ -8657,7 +8722,7 @@ mod tests {
 
     /// 共用的存法：拷一个池只拷块的引用（拷出来的与原来的指同一份），拷出来的那个池写到一块才复制那一块，原来的读回照旧。
     #[test]
-    fn a_copied_pool_shares_the_chunks_until_one_of_its_devices_writes_a_chunk() {
+    fn copied_pool_shares_the_chunks_until_one_of_its_devices_writes_a_chunk() {
         let recording: SharedRecordingDigest = Arc::new(Mutex::new(RecordingDigest::empty()));
         let mut devices = empty_pool_devices(4 * MEMORY_DEVICE_CHUNK_BYTES, &recording);
         let written = chunk_content(0);
@@ -9864,6 +9929,7 @@ mod tests {
             image: &image,
             discrete_gpus: &[],
             memory_leaked: &memory_leaked,
+            vulkan_instance: None,
             user_changes: LOCKSTEP_USER_CHANGES_LADDER[0],
             batch_units: BATCH_UNITS_AT_THE_MAIN_SAMPLING_POINT,
         };
@@ -10964,6 +11030,7 @@ mod tests {
             image: &image,
             discrete_gpus: &[],
             memory_leaked: &memory_leaked,
+            vulkan_instance: None,
             user_changes: 8,
             foreground_interval: Duration::from_millis(5),
         };
@@ -11219,9 +11286,14 @@ mod tests {
             ));
         }
         let memory_leaked = GpuMemoryLeakedInThisProcess::with_nothing_leaked();
-        let share =
-            stage_three_share_of_one_greedy_call(&image, ComputeOfTheArm::Cpu, &[], &memory_leaked)
-                .expect("CPU 臂挂载得成");
+        let share = stage_three_share_of_one_greedy_call(
+            &image,
+            ComputeOfTheArm::Cpu,
+            &[],
+            &memory_leaked,
+            None,
+        )
+        .expect("CPU 臂挂载得成");
         assert!(share.gc_call_wall > Duration::ZERO, "{share:?}");
         assert_eq!(share.stage_three, None);
     }
@@ -11232,7 +11304,9 @@ mod tests {
     #[test]
     fn the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool(
     ) {
-        let discrete_gpus = discrete_gpus_seen_by_this_process().expect("枚举得到适配器");
+        let vulkan_instance = VulkanInstanceOfThisProcess::created_for_this_process();
+        let discrete_gpus =
+            discrete_gpus_seen_by_this_process(&vulkan_instance).expect("枚举得到适配器");
         assert!(
             !discrete_gpus.is_empty(),
             "带 tests-on-a-real-gpu 跑，本进程要看得到至少一张独显"
@@ -11249,6 +11323,7 @@ mod tests {
             unit_area,
             &discrete_gpus,
             &memory_leaked,
+            Some(&vulkan_instance),
         )
         .expect("GPU 点名一张卡臂数得成");
         assert_eq!(on_the_card.walls.len(), 5);
@@ -11261,6 +11336,7 @@ mod tests {
             ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress,
             &discrete_gpus,
             &memory_leaked,
+            Some(&vulkan_instance),
         )
         .expect("GPU 点名一张卡臂挂载得成");
         let stage_three = share.stage_three.expect("GPU 臂外面套了丙段计时");

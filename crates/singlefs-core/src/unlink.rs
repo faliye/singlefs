@@ -133,19 +133,30 @@ pub enum UnlinkStep {
 
 /// 现行那一版这个文件还剩 `data_units_remaining` 个数据单元时，下一步是哪一批：剩下的多于一批 ⇒ 释放尾部一批；
 /// 剩下的不多于一批 ⇒ 最后一批把它们全部释放（「只有这一条路，不设一次做完的快路」：剩下的再少也走最后一批这一个形状）。
+/// 判哪一步与 size 的乘法都由 Verus 验过的核算（`singlefs_replay_prefix::unlink_proofs`：整串计划的形状、步数、每个单元恰好释放一次、
+/// 续做的计划与一路做下来的后半截逐步相同）。
+///
+/// # Panics
+/// 留下的单元数 × 净荷容量装不进 u64（池里的单元数到不了这个量级）。
 #[must_use]
 pub fn next_unlink_step(data_units_remaining: u64, batch_size: UnlinkBatchSize) -> UnlinkStep {
-    let data_units_per_batch = batch_size.data_units_per_batch();
-    if data_units_remaining <= data_units_per_batch {
+    let (data_units_kept, final_batch) = singlefs_replay_prefix::unlink_proofs::next_unlink_batch(
+        data_units_remaining,
+        batch_size.data_units_per_batch(),
+    );
+    if final_batch {
         return UnlinkStep::FinalBatch {
             data_units_released: data_units_remaining,
         };
     }
-    let data_units_kept = data_units_remaining - data_units_per_batch;
     UnlinkStep::Batch {
         data_units_kept,
-        size_after_the_batch_in_bytes: data_units_kept
-            * u64::try_from(data_unit_payload_capacity()).expect("32634"),
+        size_after_the_batch_in_bytes:
+            singlefs_replay_prefix::unlink_proofs::size_after_an_unlink_batch(
+                data_units_kept,
+                u64::try_from(data_unit_payload_capacity()).expect("32634"),
+            )
+            .expect("留下的单元数 × 净荷容量装得进 u64"),
     }
 }
 
@@ -330,13 +341,47 @@ fn lower_nodes_carried_whole(
         .collect()
 }
 
+/// 删除与截断两处单测共用的造法：数据单元的净荷宽、封顶的批大小、没有洞的文件那棵 extent 树。
 #[cfg(test)]
-mod tests {
+pub(crate) mod unlink_and_truncate_test_builders {
     use super::*;
     use crate::extent_tree::ExtentUpperNodePosition;
-    use crate::transaction::TransactionUnit;
 
-    const PAYLOAD_IN_BYTES: u64 = 32634;
+    /// 一个数据单元装的用户数据字节数（字段表的数，单测照它手算期望值）。
+    pub(crate) const PAYLOAD_IN_BYTES: u64 = 32634;
+
+    pub(crate) fn unlink_batch_size_capped_at(data_units: u64) -> UnlinkBatchSize {
+        UnlinkBatchSize::CappedForTests(
+            UnlinkBatchDataUnitsCappedForTests::new(data_units).expect("1..=144"),
+        )
+    }
+
+    /// 一个 `data_units` 个单元、没有洞的文件那棵 extent 树（上段只有根兼叶：第一个文件在上段第 0 片叶里），指针不进计划、取全 0。
+    pub(crate) fn extent_tree_of_a_file_without_holes(data_units: u64) -> ExtentTreeVersion {
+        ExtentTreeVersion {
+            upper_nodes: vec![(
+                ExtentUpperNodePosition { level: 0, index: 0 },
+                NodePointer::empty_root(),
+            )],
+            lower_nodes: lower_segment_nodes_of_a_file_without_holes(data_units)
+                .into_iter()
+                .map(|position| (position, NodePointer::empty_root()))
+                .collect(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unlink_and_truncate_test_builders::{
+        extent_tree_of_a_file_without_holes, unlink_batch_size_capped_at, PAYLOAD_IN_BYTES,
+    };
+    use super::*;
+    use crate::extent_tree::extent_node_positions_for_tests::{
+        extent_lower_node_position, extent_upper_node_position,
+    };
+    use crate::extent_tree::ExtentUpperNodePosition;
+    use crate::transaction::TransactionUnit;
 
     /// 从还剩 `data_units_remaining` 个数据单元起走到底的每一步，按先后：最后一步恒是 [`UnlinkStep::FinalBatch`]。
     fn every_unlink_step_from(
@@ -359,34 +404,6 @@ mod tests {
                 UnlinkStep::FinalBatch { .. } => return steps,
             }
         }
-    }
-
-    fn capped(data_units: u64) -> UnlinkBatchSize {
-        UnlinkBatchSize::CappedForTests(
-            UnlinkBatchDataUnitsCappedForTests::new(data_units).expect("1..=144"),
-        )
-    }
-
-    /// 一个 `data_units` 个单元、没有洞的文件那棵 extent 树（上段只有根兼叶：第一个文件在上段第 0 片叶里），指针不进计划、取全 0。
-    fn extent_tree_of_a_file_without_holes(data_units: u64) -> ExtentTreeVersion {
-        ExtentTreeVersion {
-            upper_nodes: vec![(
-                ExtentUpperNodePosition { level: 0, index: 0 },
-                NodePointer::empty_root(),
-            )],
-            lower_nodes: lower_segment_nodes_of_a_file_without_holes(data_units)
-                .into_iter()
-                .map(|position| (position, NodePointer::empty_root()))
-                .collect(),
-        }
-    }
-
-    fn lower(level: u8, index: u64) -> ExtentLowerNodePosition {
-        ExtentLowerNodePosition { level, index }
-    }
-
-    fn upper(level: u8, index: u64) -> ExtentUpperNodePosition {
-        ExtentUpperNodePosition { level, index }
     }
 
     /// 只有第一个文件在 extent 树里有条目时有条目的 inode 号集合。
@@ -420,10 +437,10 @@ mod tests {
         );
         assert_eq!(UnlinkBatchDataUnitsCappedForTests::new(0), None);
         assert_eq!(UnlinkBatchDataUnitsCappedForTests::new(145), None);
-        assert_eq!(capped(144).data_units_per_batch(), 144);
+        assert_eq!(unlink_batch_size_capped_at(144).data_units_per_batch(), 144);
         assert_ne!(
             UnlinkBatchSize::OneExtentLowerLeaf.name(),
-            capped(1).name(),
+            unlink_batch_size_capped_at(1).name(),
             "两条分支运行时分得开"
         );
     }
@@ -432,7 +449,7 @@ mod tests {
     #[test]
     fn three_data_units_in_batches_of_one_take_two_batches_and_a_final_batch_of_one() {
         assert_eq!(
-            every_unlink_step_from(3, capped(1)),
+            every_unlink_step_from(3, unlink_batch_size_capped_at(1)),
             vec![
                 UnlinkStep::Batch {
                     data_units_kept: 2,
@@ -479,7 +496,7 @@ mod tests {
     #[test]
     fn the_plan_continued_from_any_intermediate_version_equals_the_rest_of_the_uninterrupted_plan()
     {
-        let batch_size = capped(2);
+        let batch_size = unlink_batch_size_capped_at(2);
         let uninterrupted = every_unlink_step_from(7, batch_size);
         assert_eq!(uninterrupted.len(), 4, "7 → 5 → 3 → 1 → 最后一批");
         for (steps_done, step) in uninterrupted.iter().enumerate() {
@@ -514,18 +531,24 @@ mod tests {
             plan.lower_nodes,
             vec![
                 (
-                    lower(0, 0),
+                    extent_lower_node_position(0, 0),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 ),
-                (lower(0, 1), ExtentTreeNodeOrigin::RewrittenThisPublish),
-                (lower(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (
+                    extent_lower_node_position(0, 1),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
+                (
+                    extent_lower_node_position(1, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
             ]
         );
         assert_eq!(
             plan.rewritten_roles(),
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 1)),
-                TransactionUnit::ExtentLowerNode(lower(1, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 1)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(1, 0)),
                 TransactionUnit::ExtentRoot,
             ],
             "重写角色集合钉绝对值：被截掉那片叶、下段根、上段根"
@@ -533,9 +556,9 @@ mod tests {
         assert_eq!(
             plan.replaced_previous_roles,
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 1)),
-                TransactionUnit::ExtentLowerNode(lower(0, 2)),
-                TransactionUnit::ExtentLowerNode(lower(1, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 1)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 2)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(1, 0)),
                 TransactionUnit::ExtentRoot,
             ]
         );
@@ -556,7 +579,7 @@ mod tests {
         assert_eq!(
             plan.lower_nodes,
             vec![(
-                lower(0, 0),
+                extent_lower_node_position(0, 0),
                 ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
             )]
         );
@@ -564,9 +587,9 @@ mod tests {
         assert_eq!(
             plan.replaced_previous_roles,
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 1)),
-                TransactionUnit::ExtentLowerNode(lower(0, 2)),
-                TransactionUnit::ExtentLowerNode(lower(1, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 1)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 2)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(1, 0)),
                 TransactionUnit::ExtentRoot,
             ]
         );
@@ -588,7 +611,7 @@ mod tests {
         assert_eq!(
             plan.replaced_previous_roles,
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 0)),
                 TransactionUnit::ExtentRoot,
             ]
         );
@@ -599,8 +622,14 @@ mod tests {
     #[test]
     fn a_deletion_batch_of_another_inode_carries_the_first_file_and_rewrites_only_the_upper_path_of_that_inode(
     ) {
-        let previous =
-            extent_tree_with_the_upper_nodes(&[upper(0, 0), upper(0, 3), upper(1, 0)], 3);
+        let previous = extent_tree_with_the_upper_nodes(
+            &[
+                extent_upper_node_position(0, 0),
+                extent_upper_node_position(0, 3),
+                extent_upper_node_position(1, 0),
+            ],
+            3,
+        );
         let plan = plan_the_extent_tree_after_a_deletion_batch(
             &previous,
             &BTreeSet::from([FIRST_INODE_NUMBER, 500]),
@@ -618,17 +647,23 @@ mod tests {
             plan.upper_nodes,
             vec![
                 (
-                    upper(0, 0),
+                    extent_upper_node_position(0, 0),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 ),
-                (upper(0, 3), ExtentTreeNodeOrigin::RewrittenThisPublish),
-                (upper(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (
+                    extent_upper_node_position(0, 3),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
+                (
+                    extent_upper_node_position(1, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
             ]
         );
         assert_eq!(
             plan.replaced_previous_roles,
             vec![
-                TransactionUnit::ExtentUpperNodeBelowTheRoot(upper(0, 3)),
+                TransactionUnit::ExtentUpperNodeBelowTheRoot(extent_upper_node_position(0, 3)),
                 TransactionUnit::ExtentRoot,
             ],
             "只换下 500 那一串：第一个文件的下段与它那片叶都不换下"
@@ -640,8 +675,14 @@ mod tests {
     #[test]
     fn the_final_batch_of_the_first_file_beside_another_file_drops_the_leaf_of_inode_one_and_rewrites_the_root(
     ) {
-        let previous =
-            extent_tree_with_the_upper_nodes(&[upper(0, 0), upper(0, 3), upper(1, 0)], 3);
+        let previous = extent_tree_with_the_upper_nodes(
+            &[
+                extent_upper_node_position(0, 0),
+                extent_upper_node_position(0, 3),
+                extent_upper_node_position(1, 0),
+            ],
+            3,
+        );
         let plan = plan_the_extent_tree_after_the_final_batch(
             &previous,
             &BTreeSet::from([FIRST_INODE_NUMBER, 500]),
@@ -652,17 +693,20 @@ mod tests {
             plan.upper_nodes,
             vec![
                 (
-                    upper(0, 3),
+                    extent_upper_node_position(0, 3),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 ),
-                (upper(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (
+                    extent_upper_node_position(1, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                ),
             ]
         );
         assert_eq!(
             plan.replaced_previous_roles,
             vec![
-                TransactionUnit::ExtentLowerNode(lower(0, 0)),
-                TransactionUnit::ExtentUpperNodeBelowTheRoot(upper(0, 0)),
+                TransactionUnit::ExtentLowerNode(extent_lower_node_position(0, 0)),
+                TransactionUnit::ExtentUpperNodeBelowTheRoot(extent_upper_node_position(0, 0)),
                 TransactionUnit::ExtentRoot,
             ]
         );
@@ -673,8 +717,14 @@ mod tests {
     #[test]
     fn the_final_batch_of_another_file_lowers_the_upper_segment_and_carries_the_first_leaf_as_the_root(
     ) {
-        let previous =
-            extent_tree_with_the_upper_nodes(&[upper(0, 0), upper(0, 3), upper(1, 0)], 3);
+        let previous = extent_tree_with_the_upper_nodes(
+            &[
+                extent_upper_node_position(0, 0),
+                extent_upper_node_position(0, 3),
+                extent_upper_node_position(1, 0),
+            ],
+            3,
+        );
         let plan = plan_the_extent_tree_after_the_final_batch(
             &previous,
             &BTreeSet::from([FIRST_INODE_NUMBER, 500]),
@@ -683,7 +733,7 @@ mod tests {
         assert_eq!(
             plan.upper_nodes,
             vec![(
-                upper(0, 0),
+                extent_upper_node_position(0, 0),
                 ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
             )]
         );
@@ -695,7 +745,7 @@ mod tests {
         assert_eq!(
             plan.replaced_previous_roles,
             vec![
-                TransactionUnit::ExtentUpperNodeBelowTheRoot(upper(0, 3)),
+                TransactionUnit::ExtentUpperNodeBelowTheRoot(extent_upper_node_position(0, 3)),
                 TransactionUnit::ExtentRoot,
             ]
         );
@@ -723,8 +773,14 @@ mod tests {
             plan_the_lower_segment_after_a_deletion_batch(&previous.lower_nodes, 300, 200);
         assert_eq!(
             lower_segment.previous_nodes_rewritten,
-            vec![lower(0, 1), lower(1, 0)]
+            vec![
+                extent_lower_node_position(0, 1),
+                extent_lower_node_position(1, 0)
+            ]
         );
-        assert_eq!(lower_segment.previous_nodes_dropped, vec![lower(0, 2)]);
+        assert_eq!(
+            lower_segment.previous_nodes_dropped,
+            vec![extent_lower_node_position(0, 2)]
+        );
     }
 }

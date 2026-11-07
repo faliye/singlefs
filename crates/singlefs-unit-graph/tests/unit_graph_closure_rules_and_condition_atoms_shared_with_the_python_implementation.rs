@@ -1,7 +1,6 @@
-//! 两份实现归并的 Rust 侧（`records/2026-10-13-复用键与全仓改名.md`「2026-10-15 验证段第一步判红、两条定案、4-3 四批派出」定案 2、3；
-//! 4-3d 报告第三节 R1–R4）：夹具与 `scripts/gate/lib_function_units.py` 的 `CFG_ATOMS_FIXTURE`、`USE_SELF_FIXTURE`、`OPEN_TRAIT_ARGUMENT_FIXTURE`、
+//! 两份实现归并的 Rust 侧：夹具与 `scripts/gate/lib_function_units.py` 的 `CFG_ATOMS_FIXTURE`、`USE_SELF_FIXTURE`、`OPEN_TRAIT_ARGUMENT_FIXTURE`、
 //! `BLANKET_FIXTURE` 同形，每条断言与那边同名的格同一个结论；`const _` 那一条与那边的 `UNDERSCORE_FIXTURE`、`underscore_const_cell` 同形
-//! （crates 红批报告「OUT_DIR 里 judging_units_keys.tsv 默认构建对 gpu 构建」：gpu 构建下 `const _` 被 R-裸名拉进 CPU 组闭包）。
+//! （gpu 构建下 `const _` 被 R-裸名拉进 CPU 组闭包）。
 
 mod common_fixture_workspace;
 

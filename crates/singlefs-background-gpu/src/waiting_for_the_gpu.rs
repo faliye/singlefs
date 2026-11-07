@@ -1,11 +1,8 @@
-//! 阻塞等 GPU 时的上限（用户 2026-10-26 定等 GPU 结果「设超时，超时算出错」，记在 `records/2026-10-19-里程碑四GPU垃圾回收开工.md`
-//! 第 40 批交回那一行；D26（后台整理与放置回收） 已定项 13 第 4 条）：每一处阻塞等 GPU 的地方（挂载那一刻等 wgpu 的 future、
+//! 阻塞等 GPU 时的上限（等 GPU 结果设超时，超时算出错；D26（后台整理与放置回收） 已定项 13 第 4 条）：每一处阻塞等 GPU 的地方（挂载那一刻等 wgpu 的 future、
 //! 等一次提交做完、等回读缓冲映射好）都在同一个上限之内等，上限由调用方开包时给（`BackgroundGpuSelection::background_gpu_wait_limit`）。
 //! 超过上限就交回 [`GpuFailureCause::WaitForTheGpuExceededTheLimit`]。
 //!
-//! 等超过上限的那一次提交在同一张卡上重交（[`outcome_resubmitted_after_timeouts`]；用户 2026-10-28 定
-//! 「重试是把那一批重新交一次」：放弃的那一批在同一张卡上重交，最多 3 次，都超时才报警，原话在 `records/2026-10-19-里程碑四GPU垃圾回收开工.md`
-//! 末尾「用户定案（弹窗两次）」那一行；用户 2026-10-30 定重交的单位照旧只是超时的那一片）。超时按批、按卡数（[`TimeoutsOfTheBatchOnOneGpu`]）：
+//! 等超过上限的那一次提交在同一张卡上重交（[`outcome_resubmitted_after_timeouts`]）：放弃的那一批在同一张卡上重交，最多 3 次，都超时才报警；重交的单位只是超时的那一片。超时按批、按卡数（[`TimeoutsOfTheBatchOnOneGpu`]）：
 //! 一批切成几片时各片的超时合起来算，交活之前等前一次超时的那次提交那一等（[`outcome_waited_for_again_after_timeouts`]）也算；
 //! 重交之前先等前一次没做完的那次（照显存的账，等不到算又超时了一次）；任何一次做完了照常交回；
 //! 这一批在这张卡上第 1 + [`RESUBMISSIONS_AFTER_A_TIMEOUT`] 次超时就交回 [`GpuFailureCause::UnusableAfterResubmissions`]（这张卡用不了，带最后一次的原因），这一批放弃、不换 CPU，
@@ -115,7 +112,7 @@ pub fn wait_for_completion_before_the_deadline<Output>(
     }
 }
 
-/// 一批里一张卡等超过上限之后在同一张卡上至多重交几次（用户 2026-10-28 定「最多 3 次，都超时才报警」）：这一批在这张卡上第
+/// 一批里一张卡等超过上限之后在同一张卡上至多重交几次：这一批在这张卡上第
 /// 1 + [`RESUBMISSIONS_AFTER_A_TIMEOUT`] 次等超过上限就报这张卡用不了。
 pub const RESUBMISSIONS_AFTER_A_TIMEOUT: u32 = 3;
 
@@ -174,7 +171,7 @@ impl TimeoutsOfTheBatchOnOneGpu {
     ) -> Result<(), GpuFailureCause> {
         self.timeouts += 1;
         if self.timeouts > RESUBMISSIONS_AFTER_A_TIMEOUT {
-            // 报这一批这张卡真交出去的重交次数（判决 m4-gpugc-code-r3 第三节第 6 条）：重交之前那一等等满了上限、
+            // 报这一批这张卡真交出去的重交次数：重交之前那一等等满了上限、
             // 重交那一次建缓冲显存不足没交出去的那几回不算，所以它可以比 RESUBMISSIONS_AFTER_A_TIMEOUT 少。
             return Err(GpuFailureCause::UnusableAfterResubmissions {
                 resubmissions: self.resubmissions,
@@ -229,8 +226,8 @@ pub fn outcome_resubmitted_after_timeouts<Gpu, Outcome>(
             }
             Err(cause) => return Err(cause),
         }
-        // 「重交了几次」只数真交出去的：重交之前那一等又等满了上限的那一回没交（判决 m4-gpugc-code-r2 第三节第 2 条），
-        // 重交那一次建缓冲显存不足的那一回也没交（判决 m4-gpugc-code-r3 第三节第 1 条），所以交完再看它交没交到卡上才数。
+        // 「重交了几次」只数真交出去的：重交之前那一等又等满了上限的那一回没交，
+        // 重交那一次建缓冲显存不足的那一回也没交，所以交完再看它交没交到卡上才数。
         attempt = match wait_for_the_timed_out_submission(gpu) {
             Ok(()) => {
                 let resubmitted = submit_once(gpu);
@@ -267,8 +264,8 @@ pub fn outcome_waited_for_again_after_timeouts<Gpu, Outcome>(
     }
 }
 
-/// 挂载那一刻开一张卡（起设备、编各段两份核的管线、量一次提交的代价）最多等这么久（用户 2026-11-02 定「gpu 挂载要什么时间上限？ 五分钟？」，
-/// 判决 m4-gpugc-code-r3 五之一）：到点就当那张卡没开成（[`outcome_of_opening_a_gpu_within_the_limit`]）。与挂着时的等的上限
+/// 挂载那一刻开一张卡（起设备、编各段两份核的管线、量一次提交的代价）最多等这么久：
+/// 到点就当那张卡没开成（[`outcome_of_opening_a_gpu_within_the_limit`]）。与挂着时的等的上限
 /// （`background_gpu_wait_limit`，管每一次等 wgpu 的 future 与提交）分开：编管线（`create_shader_module`、`create_compute_pipeline`）是同步调用，
 /// 那个上限管不到它。
 pub const WAIT_LIMIT_OF_OPENING_A_GPU_AT_THE_MOUNT: Duration = Duration::from_secs(5 * 60);
@@ -598,7 +595,7 @@ mod tests {
     }
 
     /// 第 4 条「放弃的那一批在同一张卡上重交，至多 3 次，都超时才报警」按批数：一批切成 4 片、每片头一次交都等超过上限、重交一次就做完——
-    /// 这一批在这张卡上第 4 次超时就报这张卡用不了，第 4 片不再重交（攻方探针 T1-1 那一种，改前按片各重交 3 次、照常交回）。
+    /// 这一批在这张卡上第 4 次超时就报这张卡用不了，第 4 片不再重交。
     #[test]
     fn the_batch_of_four_pieces_each_timing_out_once_reports_the_gpu_unusable_at_the_fourth_timeout(
     ) {
@@ -635,7 +632,7 @@ mod tests {
         );
     }
 
-    /// 同一定案：一批 1 片，超时 3 次、第 4 次交做完——这一批照常交回，不报警。
+    /// 一批 1 片，超时 3 次、第 4 次交做完——这一批照常交回，不报警。
     #[test]
     fn the_batch_of_one_piece_timing_out_three_times_then_completing_is_not_reported() {
         let mut gpu = GpuWithScriptedSubmissions::scripted(
@@ -719,7 +716,7 @@ mod tests {
         }
     }
 
-    /// 用户 2026-10-28 定「放弃的那一批在同一张卡上重交，最多 3 次」：头两次等超过上限、第三次做完——照常交回第三次的结果，
+    /// 放弃的那一批在同一张卡上重交，最多 3 次：头两次等超过上限、第三次做完——照常交回第三次的结果，
     /// 交了 3 次、每次重交之前各等了前一次一回。
     #[test]
     fn two_timeouts_then_a_completion_return_the_outcome_of_the_third_submission() {
@@ -743,7 +740,7 @@ mod tests {
         );
     }
 
-    /// 同一定案「都超时才报警」：四次都等超过上限，恰好重交 3 次，报这张卡用不了、带最后一次的原因。
+    /// 「都超时才报警」：四次都等超过上限，恰好重交 3 次，报这张卡用不了、带最后一次的原因。
     #[test]
     fn four_timeouts_report_the_gpu_unusable_after_exactly_three_resubmissions() {
         let mut gpu = GpuWithScriptedSubmissions::scripted(
@@ -804,7 +801,7 @@ mod tests {
         (outcome, timeouts_of_the_batch)
     }
 
-    /// 判决 m4-gpugc-code-r2 第三节第 2 条：头一次交超时，重交之前等前一次那一等又超时 2 回、第 3 回等到再交、做完——
+    /// 头一次交超时，重交之前等前一次那一等又超时 2 回、第 3 回等到再交、做完——
     /// 超时 3 次，真交出去的重交 1 次，「重交了几次」记 1。
     #[test]
     fn two_waits_timing_out_before_the_resubmission_count_one_resubmission_actually_made() {
@@ -830,7 +827,7 @@ mod tests {
     }
 
     /// 同一条：头一次交超时，之后那一等连着超时 3 回、一次都没重交——第 4 次超时照旧报这张卡用不了，「重交了几次」记 0，
-    /// 报警里带的重交次数也是 0（判决 m4-gpugc-code-r3 第三节第 6 条：报真交出去的次数，不报常数 3）。
+    /// 报警里带的重交次数也是 0（报真交出去的次数，不报常数 3）。
     #[test]
     fn three_waits_timing_out_before_any_resubmission_count_no_resubmission_and_report_the_gpu_unusable(
     ) {
@@ -862,7 +859,7 @@ mod tests {
         );
     }
 
-    /// 判决 m4-gpugc-code-r3 第三节第 1 条：头一次交等超过上限，重交之前那一等等到了，重交那一次在建缓冲时显存不足、一次都没交出去——
+    /// 头一次交等超过上限，重交之前那一等等到了，重交那一次在建缓冲时显存不足、一次都没交出去——
     /// 「重交了几次」记 0（只数真交到卡上的），超时 1 次，建缓冲显存不足照原样交回（外壳照它重切）。
     #[test]
     fn the_resubmission_short_of_memory_for_its_buffers_is_not_counted_as_a_resubmission() {
@@ -894,7 +891,7 @@ mod tests {
     /// 编管线那一步卡住的替身：卡 `stuck_for` 那么久之后才交回开成了（`OPENED_AFTER_BEING_STUCK`）。
     const OPENED_AFTER_BEING_STUCK: u32 = 7;
 
-    /// 用户 2026-11-02 定挂载时开卡加上限、到点就当那张卡没开成（判决 m4-gpugc-code-r3 五之一）：编管线那一步卡住 20 秒，
+    /// 挂载时开卡加上限、到点就当那张卡没开成：编管线那一步卡住 20 秒，
     /// 开卡的上限 200 毫秒——到点交回等超过上限（带开卡的上限），挂载那一头不跟着卡住（10 秒之内就交回）。
     #[test]
     fn opening_a_gpu_stuck_past_the_opening_limit_is_reported_as_not_opened_without_waiting_for_it()
@@ -941,7 +938,7 @@ mod tests {
         );
     }
 
-    /// 开卡的上限是 5 分钟（用户 2026-11-02 定）。
+    /// 开卡的上限是 5 分钟。
     #[test]
     fn the_wait_limit_of_opening_a_gpu_at_the_mount_is_five_minutes() {
         assert_eq!(

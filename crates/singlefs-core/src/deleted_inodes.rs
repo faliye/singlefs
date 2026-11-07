@@ -5,18 +5,29 @@
 //! 任何一版里至多一条 key（第 6 条：会话里每一次用户改动先把队列走空、unlink 一次调用走完全部批）——发布路径按这一条断言。
 //! 队列多于一个根装得下的号（2031）要在根之下长层，条款没写怎么长：那一支在构造根的条目时拒成类型化错误
 //! （[`DeletedInodesQueueRefusal::MoreKeysThanOneRootNodeHolds`]，不是空间不够），只在构造函数这一层测——发布路径上至多一条，走不到它。
+//!
+//! 这份文件的代码都在 `verus!` 里，由 Verus 直接验（里程碑四出口 5 容器小树那一簇）：根条目逐条是号的 8 字节小端，读回来逐条就是原来的号
+//! （「key 到条目」：[`lemma_deleted_inodes_root_entries_read_back_as_the_keys`]）。字节换算用 vstd 的 `u64_to_le_bytes` / `u64_from_le_bytes`
+//! （与 `u64::to_le_bytes` / `u64::from_le_bytes` 同一份实现，vstd 按版本整体登记在信任清单里）。
 
 use singlefs_format::DELETED_INODES_ENTRY_BYTES;
+use vstd::bytes::{u64_from_le_bytes, u64_to_le_bytes};
+use vstd::prelude::*;
 
 use crate::address::InodeNumber;
 use crate::unit::index_node_entry_capacity;
+
+verus! {
 
 /// `deleted_inodes` 树的 key 宽：inode 号 8 字节（与 inode 树的 key 同一个量）。
 pub const DELETED_INODES_KEY_WIDTH_IN_BYTES: usize = 8;
 
 /// 一个码 2 根装得下几个号：(16384 − 含预留位的头 131) ÷ 8 的整数部分 = 2031。
 #[must_use]
-pub fn deleted_inodes_one_root_node_holds() -> usize {
+pub fn deleted_inodes_one_root_node_holds() -> (capacity: usize)
+    ensures
+        capacity == 2031,
+{
     index_node_entry_capacity(
         DELETED_INODES_KEY_WIDTH_IN_BYTES,
         usize::try_from(DELETED_INODES_ENTRY_BYTES).expect("8"),
@@ -31,48 +42,125 @@ pub enum DeletedInodesQueueRefusal {
     MoreKeysThanOneRootNodeHolds { keys: usize, capacity: usize },
 }
 
+/// 号按升序、不重复。
+pub open spec fn inode_numbers_strictly_ascend(keys: Seq<InodeNumber>) -> bool {
+    forall|earlier: int, later: int| 0 <= earlier < later < keys.len() ==> (#[trigger] keys[earlier]).0 < (#[trigger] keys[later]).0
+}
+
 /// `deleted_inodes` 根要装的条目：每个号一条 8 字节 key（小端），按号升序。`keys` 由调用方按升序给、不重复。
 ///
 /// # Errors
 /// 号多于一个根装得下的 ⇒ [`DeletedInodesQueueRefusal::MoreKeysThanOneRootNodeHolds`]。
 ///
 /// # Panics
-/// `keys` 不是严格升序：队列是发布路径自己按号维护的集合（加一个号、删一个号），乱序说明调用方拼错了。
-pub fn deleted_inodes_root_entries(
-    keys: &[InodeNumber],
-) -> Result<Vec<Vec<u8>>, DeletedInodesQueueRefusal> {
-    assert!(
-        keys.windows(2).all(|pair| pair[0] < pair[1]),
-        "deleted_inodes 的号按升序、不重复：发布路径按集合维护它"
-    );
+/// `keys` 不是严格升序（`requires` 排除的那一种）：队列是发布路径自己按号维护的集合（加一个号、删一个号），乱序说明调用方拼错了。
+pub fn deleted_inodes_root_entries(keys: &[InodeNumber]) -> (entries: Result<Vec<Vec<u8>>, DeletedInodesQueueRefusal>)
+    requires
+        inode_numbers_strictly_ascend(keys@),
+    ensures
+        match entries {
+            Ok(entries) => {
+                &&& keys.len() <= 2031
+                &&& entries.len() == keys.len()
+                &&& forall|position: int|
+                    0 <= position < entries.len() ==> (#[trigger] entries@[position])@ == vstd::bytes::spec_u64_to_le_bytes(keys[position].0)
+            },
+            Err(refusal) => keys.len() > 2031 && refusal == (DeletedInodesQueueRefusal::MoreKeysThanOneRootNodeHolds {
+                keys: keys.len(),
+                capacity: 2031,
+            }),
+        },
+{
+    let mut later: usize = 1;
+    while later < keys.len()
+        invariant
+            1 <= later,
+            inode_numbers_strictly_ascend(keys@),
+        decreases keys.len() - later,
+    {
+        assert!(
+            keys[later - 1].0 < keys[later].0,
+            "deleted_inodes 的号按升序、不重复：发布路径按集合维护它"
+        );
+        later += 1;
+    }
     let capacity = deleted_inodes_one_root_node_holds();
     if keys.len() > capacity {
-        return Err(DeletedInodesQueueRefusal::MoreKeysThanOneRootNodeHolds {
-            keys: keys.len(),
-            capacity,
-        });
+        return Err(DeletedInodesQueueRefusal::MoreKeysThanOneRootNodeHolds { keys: keys.len(), capacity });
     }
-    Ok(keys
-        .iter()
-        .map(|key| key.0.to_le_bytes().to_vec())
-        .collect())
+    let mut entries: Vec<Vec<u8>> = Vec::new();
+    let mut position: usize = 0;
+    while position < keys.len()
+        invariant
+            position <= keys.len(),
+            entries.len() == position,
+            forall|done: int|
+                0 <= done < position ==> (#[trigger] entries@[done])@ == vstd::bytes::spec_u64_to_le_bytes(keys[done].0),
+        decreases keys.len() - position,
+    {
+        entries.push(u64_to_le_bytes(keys[position].0));
+        position += 1;
+    }
+    Ok(entries)
 }
 
 /// 从一个 `deleted_inodes` 根的条目读回号。每条条目宽恰好 8（无 value）：重建上一版读这个根的那一判
 /// （`recovery::rebuild_version_in_the_unit_area_starting_at`）宽不等于 8 就报 `UnitMalformed`、不走到这里；宽于 8 的不截前 8 字节收下。
+///
+/// # Panics
+/// 有一条条目短于 8 字节（`requires` 排除的那一种）：读者核过等于 8。
 #[must_use]
-pub fn inode_numbers_of_the_deleted_inodes_root_entries(entries: &[Vec<u8>]) -> Vec<InodeNumber> {
-    entries
-        .iter()
-        .map(|entry| {
-            InodeNumber(u64::from_le_bytes(
-                entry[..DELETED_INODES_KEY_WIDTH_IN_BYTES]
-                    .try_into()
-                    .expect("条目宽在读者那里核过等于 8"),
-            ))
-        })
-        .collect()
+pub fn inode_numbers_of_the_deleted_inodes_root_entries(entries: &[Vec<u8>]) -> (keys: Vec<InodeNumber>)
+    requires
+        forall|position: int| 0 <= position < entries.len() ==> (#[trigger] entries[position])@.len() >= 8,
+    ensures
+        keys.len() == entries.len(),
+        forall|position: int|
+            0 <= position < keys.len() ==> (#[trigger] keys@[position]).0 == vstd::bytes::spec_u64_from_le_bytes(
+                entries[position]@.subrange(0, 8),
+            ),
+{
+    let mut keys: Vec<InodeNumber> = Vec::new();
+    let mut position: usize = 0;
+    while position < entries.len()
+        invariant
+            position <= entries.len(),
+            forall|any_position: int| 0 <= any_position < entries.len() ==> (#[trigger] entries[any_position])@.len() >= 8,
+            keys.len() == position,
+            forall|done: int|
+                0 <= done < position ==> (#[trigger] keys@[done]).0 == vstd::bytes::spec_u64_from_le_bytes(entries[done]@.subrange(0, 8)),
+        decreases entries.len() - position,
+    {
+        let entry = &entries[position];
+        let key_bytes = &entry.as_slice()[..DELETED_INODES_KEY_WIDTH_IN_BYTES];
+        proof {
+            assert(key_bytes@ =~= entries[position as int]@.subrange(0, 8));
+        }
+        keys.push(InodeNumber(u64_from_le_bytes(key_bytes)));
+        position += 1;
+    }
+    keys
 }
+
+/// 「key 到条目」：根条目读回来逐条就是原来的号。
+pub proof fn lemma_deleted_inodes_root_entries_read_back_as_the_keys(keys: Seq<InodeNumber>, entries: Seq<Seq<u8>>)
+    requires
+        entries.len() == keys.len(),
+        forall|position: int| 0 <= position < entries.len() ==> #[trigger] entries[position] == vstd::bytes::spec_u64_to_le_bytes(keys[position].0),
+    ensures
+        forall|position: int|
+            0 <= position < entries.len() ==> (#[trigger] entries[position]).len() == 8 && vstd::bytes::spec_u64_from_le_bytes(
+                entries[position].subrange(0, 8),
+            ) == keys[position].0,
+{
+    vstd::bytes::lemma_auto_spec_u64_to_from_le_bytes();
+    assert forall|position: int| 0 <= position < entries.len() implies (#[trigger] entries[position]).len() == 8
+        && vstd::bytes::spec_u64_from_le_bytes(entries[position].subrange(0, 8)) == keys[position].0 by {
+        assert(entries[position].subrange(0, 8) =~= entries[position]);
+    }
+}
+
+} // verus!
 
 #[cfg(test)]
 mod tests {

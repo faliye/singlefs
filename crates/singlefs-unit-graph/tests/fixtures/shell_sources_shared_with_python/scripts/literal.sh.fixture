@@ -1,0 +1,3 @@
+set -uo pipefail
+source scripts/lib/plain-library.sh
+plain_library_function

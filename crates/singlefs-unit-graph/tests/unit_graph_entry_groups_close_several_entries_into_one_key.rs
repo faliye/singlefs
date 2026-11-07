@@ -1,4 +1,4 @@
-//! 一组入口（`singlefs-checker-tier` 的构建脚本按判器入口逐组算键用的那一层）：几个入口一起收一个闭包，组里任一入口够得着的单元改了键就变；
+//! 一组入口（`singlefs-verification` 的构建脚本按判器入口逐组算键用的那一层）：几个入口一起收一个闭包，组里任一入口够得着的单元改了键就变；
 //! 只在关着的特性下编进来的入口交「不编进来」，不是拒算；闭包里有拒算的交拒算行；写成表再读回逐项相同。
 
 mod common_fixture_workspace;
@@ -11,7 +11,7 @@ use singlefs_unit_graph::{
     ReadBackEntryGroupVerdict, TargetSelector,
 };
 
-/// 一个 crate：`alpha` 调 `shared`，`beta` 调 `other`；`gpu_only` 只在特性 `gpu` 下编进来；`starts_itself` 读自己的可执行文件路径（拒算）。
+/// 一个 crate：`alpha` 调 `shared`，`beta` 调 `other`；`gpu_only` 只在特性 `gpu` 下编进来；`starts_itself` 拿自己的可执行文件路径起一个子进程、不点名测试（拒算；只问路径不起子进程的不拒算）。
 /// 另一个 crate `fneighbour` 给「不在同一个 crate」那一格用。
 const GROUP_FIXTURE: [(&str, &str); 5] = [
     (
@@ -37,7 +37,7 @@ const GROUP_FIXTURE: [(&str, &str); 5] = [
          \x20   3\n\
          }\n\
          pub fn starts_itself() -> bool {\n\
-         \x20   std::env::current_exe().is_ok()\n\
+         \x20   std::process::Command::new(std::env::current_exe().expect(\"路径\")).status().is_ok()\n\
          }\n",
     ),
     (

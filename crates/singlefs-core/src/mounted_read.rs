@@ -5,13 +5,13 @@
 //! - D21（权威态与派生态的分界） 已定项 9 / 已定项 10：索引是派生态，挂载态里的这一份全是从盘上读回来的，
 //!   丢了就从盘上重走 ⇒ 这里一个字节都不回写、不缓存数据单元的载荷，判定要的每个值都能再走一遍权威态得出。
 //! - D19（块指针的结构与宽度预算） 已定项 5：位置条目**是提示**，解引用先按提示读，读不到或校验和不对再查中央映射；
-//!   随定案生效的硬规则 3「提示过期的多跳率要有运行时观测点」⇒ [`ReadPathObservation`]。
+//!   硬规则 3「提示过期的多跳率要有运行时观测点」⇒ [`ReadPathObservation`]。
 //! - D4（校验和位置） 已定项 5：单元恒 32768 含头 ⇒ 净荷 32634 不是 4096 的整数倍，文件偏移到单元做除法而不是移位，
 //!   一成多的 4 KiB 页跨在两个单元上、那一次读要读两个单元（[`DataUnitSpanOfARead`]）。
 //! - D17（实现分层与第三方管道） 已定项 5：第一版是纯用户态库、只对块设备抽象编程；那条射程 ① 要实现给出
 //!   「一次 API 调用发了几个设备级操作」的读数交装置比对 ⇒ [`ReadPathObservation::device_reads_issued`]。
 //!
-//! - D8（核心索引结构） 已定项 3（C490（extent 叶 key 的 offset 段没定单位） 2026-09-23 定）：extent 叶记录 key 的 offset 段
+//! - D8（核心索引结构） 已定项 3（C490（extent 叶 key 的 offset 段没定单位））：extent 叶记录 key 的 offset 段
 //!   是**文件字节偏移**，第 n 个数据单元是 n × 净荷容量；数据单元头里的锚点偏移是同一个数（D9（加密） 已定项 6）。
 //!   [`MountedPoolForRead::open_file`] 当场核：这个 inode 的第 i 条记录的 offset 段要等于 i × 净荷容量（没有洞、没有错位），
 //!   记录条数要等于文件大小按 D4（校验和位置） 已定项 5 的除法算出来的单元数；对不上就拒绝打开这个文件，不猜。
@@ -45,21 +45,26 @@ use crate::records::{
 };
 use crate::recovery::{
     choose_root, choose_system_configuration_naming_devices_without_a_mountable_slot,
-    fall_back_judged_on_the_three_readers, inode_tree_root_key_range_is_the_subtree_coverage,
+    fall_back_judged_on_the_three_readers,
+    inode_record_is_not_below_the_separator_key_and_the_container,
+    inode_records_of_the_leaf_ascend_after_the_leaves_before,
+    inode_tree_root_key_range_is_the_subtree_coverage,
     read_mapped_tree_node_via_hint_then_central_mapping, read_mapped_tree_root,
     read_unit_via_locations, replay_journal, scan_journal,
     tree_table_entries_each_kind_at_most_once, FailureKindForTheFallBack, JournalScanReport,
-    MappedTreeNodeClass, NamedUnitVerification, PoolReader, RecoveryFailure,
+    MappedTreeNodeClass, NamedUnitVerification, PoolReader,
+    PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition, RecoveryFailure,
     TreeTableEntriesRefusal,
 };
 use crate::root_record::RootRecord;
-use crate::system_configuration::InodeRecordTruncationFieldsOfThePool;
 use crate::transaction::MultiLevelCodeTwoTree;
 use crate::unit::{
-    data_unit_payload, data_unit_payload_capacity, parse_data_unit, parse_index_node,
-    parse_packed_unit, unit_filesystem_identifier, DataUnitHeader, UnitError, PACKED_TYPE_INODE,
+    data_unit_payload, parse_data_unit, parse_index_node, parse_packed_unit,
+    unit_filesystem_identifier, DataUnitHeader, UnitError, PACKED_TYPE_INODE,
 };
-use crate::write_request_split::{data_units_read_within_the_file_size, DataUnitsOfTheInode};
+use crate::write_request_split::{
+    data_units_read_within_the_file_size, payload_capacity_in_bytes, DataUnitsOfTheInode,
+};
 
 /// extent 叶记录 key 第三段（offset 段，文件字节偏移，D8（核心索引结构） 已定项 3）的起点。
 const EXTENT_KEY_THIRD_SEGMENT_OFFSET_IN_BYTES: usize = 16;
@@ -79,6 +84,11 @@ pub struct ReadPathObservation {
     pub stale_location_hint_hops: u64,
     /// 向块层发了几次读（每条位置条目试一次就算一次，读不回字节也算——请求已经发出去了）。
     pub device_reads_issued: u64,
+    /// 读数据单元时只坏一份的次数：同一组位置条目里前一条读不回字节或整单元校验和对不上、后一条对上（D4（校验和位置） 已定项 4
+    /// 「读到只坏一份时计数」；两条位置提示都没对上、转去查映射的那一回不算，映射那一组里只坏一份的照算；按提示读到只坏一份而提示不是这个单元
+    /// 此刻在映射里的落点（提示过期）不算）。一次读中途报错时，报错之前读到的照样进打开之后的累计（[`OpenFileForRead::read_at`]）。
+    /// 只读挂载只计数、不搬：它没有写者，搬迁要走事务层的发布（C946（只坏一份的读没有计数也没有搬迁修复））。
+    pub data_unit_reads_with_one_copy_failing: u64,
 }
 
 impl ReadPathObservation {
@@ -91,6 +101,8 @@ impl ReadPathObservation {
             stale_location_hint_hops: self.stale_location_hint_hops
                 + later.stale_location_hint_hops,
             device_reads_issued: self.device_reads_issued + later.device_reads_issued,
+            data_unit_reads_with_one_copy_failing: self.data_unit_reads_with_one_copy_failing
+                + later.data_unit_reads_with_one_copy_failing,
         }
     }
 
@@ -135,11 +147,6 @@ pub fn data_unit_span_covering(
         first: DataUnitIndexInFile(first_byte.0 / payload_capacity),
         last_inclusive: DataUnitIndexInFile(last_byte_inclusive.0 / payload_capacity),
     }
-}
-
-/// 一个数据单元装得下多少字节用户数据，换成 `u64`：唯一的来源是 [`crate::unit::data_unit_payload_capacity`]。
-fn payload_capacity_in_bytes() -> u64 {
-    u64::try_from(data_unit_payload_capacity()).expect("32634")
 }
 
 /// 挂载态里留着的一条 extent 叶记录：盘上那 24 字节 key 与 88 字节数据指针。
@@ -196,15 +203,12 @@ pub enum OpenPoolForReadFailure {
     InodeLeafContainerDisagreesWithTheInternalEntry { detail: &'static str },
     /// inode 记录解不开（108–119 或 136–139 恒零区非零、截断字段 T = 0 而 N_w ≠ 0，I-9.7）。
     InodeRecordMalformed,
-    /// 系统配置不带 incompat 位 2 的池里读到截断字段不是全零的 inode 记录（用户 2026-10-17 定，判决
-    /// `research/prompts/m4-trunc-r2-main-verification.md` 第六节）：这条记录判不可用。`inode` 是那条记录的号。
-    InodeRecordCarriesATruncationFieldInAPoolWithoutIncompatBitTwo { inode: u64 },
     /// 节点里的一条记录 / 条目解不开：盘上自述的条目宽窄于字段表（这一版的读者不认这一版写的条目布局）。
     RecordMalformed { what: &'static str },
     /// 节点里的一条条目按字段表解得开，而它带的那条指针头部有一段不是第一版的取值（MAC / nonce 非 0、算法类型不是未加密、
     /// 压缩算法码不认识、码 0 而压后长度非 0、extent 偏移非 0）：这条指针不能解引用，判该指针所在的结构损坏
     /// （D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据））。与 `RecordMalformed` 分开报：
-    /// 那一种是条目布局不认，这一种是条目布局认得、指针指不过去（`records/2026-09-30-里程碑三开工第一轮.md` 第 8 批 core 簇第 8 条）。
+    /// 那一种是条目布局不认，这一种是条目布局认得、指针指不过去。
     PointerInTheRecordCannotBeDereferenced {
         what: &'static str,
         field: PointerHeadFieldOutsideTheFirstVersion,
@@ -234,9 +238,6 @@ impl OpenPoolForReadFailure {
             | OpenPoolForReadFailure::UnitMalformed { .. }
             | OpenPoolForReadFailure::InodeLeafContainerDisagreesWithTheInternalEntry { .. }
             | OpenPoolForReadFailure::InodeRecordMalformed
-            | OpenPoolForReadFailure::InodeRecordCarriesATruncationFieldInAPoolWithoutIncompatBitTwo {
-                ..
-            }
             | OpenPoolForReadFailure::RecordMalformed { .. }
             | OpenPoolForReadFailure::PointerInTheRecordCannotBeDereferenced { .. } => {
                 Some(FailureKindForTheFallBack::ContentRefused)
@@ -377,11 +378,8 @@ pub struct MountedPoolForRead {
 ///
 /// 打开这一段发了几次块层读**不由核心层自己数**：这几步走的是恢复路径那几个读者（`code_two_tree::read_code_two_tree`、
 /// `read_unit_via_locations`），它们不带计数。要这个数就在块层数（D17（实现分层与第三方管道） 已定项 5 射程 ①：
-/// 录制钩子挂在块设备接口上），装置侧的计数器在 `singlefs_harness::read_tally`。
+/// 录制钩子挂在块设备接口上），装置侧的计数器在 `singlefs_verification::read_tally`。
 /// 核心层自己报的那几个数只罩打开之后的每一次读（[`ReadPathObservation`]）。
-///
-/// inode 记录的截断字段照这个写者写的那一种池（带 incompat 位 2）收：调用方手里没有择好的系统配置时用它；只读挂载按择到的那一份判，走
-/// [`open_pool_for_read_judging_the_truncation_fields_as`]。
 ///
 /// # Errors
 /// 见 [`OpenPoolForReadFailure`]：读不到 / 解不开 / 树表 0 条 / 树表里缺树 / 层级不对 / 叶容器身份不符。
@@ -389,29 +387,12 @@ pub fn open_pool_for_read(
     reader: &dyn PoolReader,
     root: &RootRecord,
 ) -> Result<MountedPoolForRead, OpenPoolForReadFailure> {
-    open_pool_for_read_judging_the_truncation_fields_as(
-        reader,
-        root,
-        InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER,
-    )
-}
-
-/// 同 [`open_pool_for_read`]，inode 记录的截断字段按择到的系统配置那一档判：不带 incompat 位 2 的池里截断字段不是全零的记录判不可用
-/// （[`OpenPoolForReadFailure::InodeRecordCarriesATruncationFieldInAPoolWithoutIncompatBitTwo`]）。
-///
-/// # Errors
-/// 同 [`open_pool_for_read`]，另加上面那一种。
-pub fn open_pool_for_read_judging_the_truncation_fields_as(
-    reader: &dyn PoolReader,
-    root: &RootRecord,
-    truncation_fields_of_the_pool: InodeRecordTruncationFieldsOfThePool,
-) -> Result<MountedPoolForRead, OpenPoolForReadFailure> {
     let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
     let filesystem_identifier_in_unit_headers =
         unit_filesystem_identifier(&root.filesystem_identifier);
 
-    // 映射根是空指针（mkfs 的第 0 代、暖机根与写行根这几条树表 0 条的根）时先判树表 0 条（C695 甲，用户 2026-10-07 定「先修次序」，
-    // 判决 `research/prompts/m3-c694-r1-main-verification.md` 第二节 K3 那一行）：先读空映射根会把一个两盘都在、树表 0 条的版本报成
+    // 映射根是空指针（mkfs 的第 0 代、暖机根与写行根这几条树表 0 条的根）时先判树表 0 条（C695 甲，
+    //  那一行）：先读空映射根会把一个两盘都在、树表 0 条的版本报成
     // 槽 0 读不出。树表有条目而映射根是空指针的，照下面的次序往下走（读映射那一步判红）。
     if root.mapping_root == NodePointer::empty_root() {
         let tree_table_bytes =
@@ -458,7 +439,7 @@ pub fn open_pool_for_read_judging_the_truncation_fields_as(
         central_mapping_entries.push(CentralMappingEntryInMountState { key, locations });
     }
 
-    // 树表单元：一次读就拿到每棵树的根指针连校验和（2026-09-17 用户指示：树表条目 200 字节带着根指针，
+    // 树表单元：一次读就拿到每棵树的根指针连校验和（树表条目 200 字节带着根指针，
     // 不用再翻别的结构找根、也不用另读一次才能验）。
     let tree_table_bytes = read_unit_via_locations(reader, &root.tree_table.locations, node_bytes)?;
     let tree_table = parse_index_node(&tree_table_bytes).map_err(|error| {
@@ -523,8 +504,9 @@ pub fn open_pool_for_read_judging_the_truncation_fields_as(
         });
     }
     let mut inode_records: Vec<InodeRecord> = Vec::new();
+    let mut largest_inode_number_of_the_leaves_read = None;
     for entry_bytes in &inode_root.entries {
-        let (_separator_key, identity_in_the_entry, child) = parse_inode_internal_entry_or_refusal(
+        let (separator_key, identity_in_the_entry, child) = parse_inode_internal_entry_or_refusal(
             entry_bytes,
         )
         .map_err(|refusal| match refusal {
@@ -581,18 +563,28 @@ pub fn open_pool_for_read_judging_the_truncation_fields_as(
                 },
             );
         }
+        let mut records_of_the_container = Vec::with_capacity(container.records.len());
         for record_bytes in &container.records {
             let record = InodeRecord::parse(record_bytes)
                 .ok_or(OpenPoolForReadFailure::InodeRecordMalformed)?;
-            if !record.truncation_field_fits_the_pool(truncation_fields_of_the_pool) {
-                return Err(
-                    OpenPoolForReadFailure::InodeRecordCarriesATruncationFieldInAPoolWithoutIncompatBitTwo {
-                        inode: record.inode,
-                    },
-                );
-            }
-            inode_records.push(record);
+            // 记录号不小于分隔 key 与容器号（I-9.4 第一句，分隔 key 那一半是 I-9.12 第二句）：与冷走读、可写挂载重建、快照冷读同一个判法，
+            // 少了这一判，只读挂载会收下另三个读者都拒的一版。
+            inode_record_is_not_below_the_separator_key_and_the_container(
+                record.inode,
+                separator_key,
+                identity_in_the_entry.container,
+            )?;
+            records_of_the_container.push(record);
         }
+        // 只读挂载与冷走读、可写挂载重建同一判：全部叶的记录按叶序严格升序（写者的前提，I-9.12 与 I-9.4 第四句），分隔 key 大于前面那几片的
+        // 最大记录号（I-9.12 第三句），同一张坏镜像读 inode 树的各个读者一个结局，不在这里收下
+        largest_inode_number_of_the_leaves_read =
+            inode_records_of_the_leaf_ascend_after_the_leaves_before(
+                separator_key,
+                largest_inode_number_of_the_leaves_read,
+                &records_of_the_container,
+            )?;
+        inode_records.extend(records_of_the_container);
     }
     // inode 树根头里的 key 区间是子树覆盖区间（D18（块里携带什么信息） 已定项 2）：`read_mapped_tree_root` 对层级 ≥ 1 的根不判区间，
     // 读完叶容器在这里判，与冷走读同一个函数。
@@ -649,7 +641,7 @@ pub struct MountedReadOnly {
 ///
 /// **扫环只在这一步发生一次**：之后每一次 [`OpenFileForRead::read_at`] 都不碰 journal 环。
 /// 崩溃点重放的每个恢复结果上也能跑这一条——`reader` 换成那个崩溃镜像即可（并行线二验收第 3 条；
-/// 枚举那一半归 checker 档，由主 agent 经门禁 checker-tier-crash-point-replay 跑）。
+/// 枚举那一半归验证包，由主 agent 经门禁 crash-point-replay 跑）。
 ///
 /// # Errors
 /// 见 [`MountReadOnlyFailure`]。
@@ -669,10 +661,7 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
         NamedUnitVerification::Verify,
     )
     .map_err(MountReadOnlyFailure::Recovery)?;
-    let truncation_fields_of_the_pool = system_configuration
-        .immutable
-        .inode_record_truncation_fields;
-    // 判退不看打开通没通，看三样读者的并集（C755，用户 2026-10-20 定「三句都补」；C866 改法甲：并集里有内容拒收不退），与恢复、可写挂载同一份
+    // 判退不看打开通没通，看三样读者的并集（C755；C866 改法甲：并集里有内容拒收不退），与恢复、可写挂载同一份
     // （`recovery::fall_back_judged_on_the_three_readers`）：退到的那一版打得开就打开它（不重放）；打不开、或不退，留在所选那一版，
     // 成不成照打开它（树表 0 条照报 `TreeTableHasNoEntries`）。
     let version_fallen_back_to_opened = fall_back_judged_on_the_three_readers(
@@ -683,25 +672,17 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
         &records,
     )
     .and_then(|fall_back| {
-        open_pool_for_read_judging_the_truncation_fields_as(
-            reader,
-            &fall_back.version_fallen_back_to,
-            truncation_fields_of_the_pool,
-        )
-        .ok()
-        .map(|mounted| (mounted, fall_back.version_fallen_back_to))
+        open_pool_for_read(reader, &fall_back.version_fallen_back_to)
+            .ok()
+            .map(|mounted| (mounted, fall_back.version_fallen_back_to))
     });
     let (mounted, chosen_root, effective_root) = match version_fallen_back_to_opened {
         Some((mounted, version_fallen_back_to)) => {
             (mounted, version_fallen_back_to, version_fallen_back_to)
         }
         None => {
-            let mounted = open_pool_for_read_judging_the_truncation_fields_as(
-                reader,
-                &effective_root,
-                truncation_fields_of_the_pool,
-            )
-            .map_err(MountReadOnlyFailure::Open)?;
+            let mounted =
+                open_pool_for_read(reader, &effective_root).map_err(MountReadOnlyFailure::Open)?;
             (mounted, chosen_root, effective_root)
         }
     };
@@ -804,7 +785,7 @@ impl MountedPoolForRead {
         // 上段这一趟读到叶没有：停下时最后读的那个节点是层级 0 才算读到一片（上段停在内部节点时不算）。
         let upper_leaves = upper_leaves_read_at_open(level_of_the_node_read_last.get());
         let target: Option<ExtentUpperLeafTarget> = entry.map(|found| found.target);
-        // 标签 3、4 与「标签 0 配 size > 0」最后一个存在的单元之后到 size 是洞（判决 m4-trunc-r1 K5）。
+        // 标签 3、4 与「标签 0 配 size > 0」最后一个存在的单元之后到 size 是洞。
         let data_units_of_the_inode = match target {
             None => DataUnitsOfTheInode::NoneWritten,
             Some(
@@ -885,7 +866,7 @@ impl MountedPoolForRead {
             }
         }
         // 单元数按标签对 size（`write_request_split::data_units_read_within_the_file_size`，不在这里另写一个）：标签 1、2 不少于
-        // size 除出来的数，多出来的是截断中间态里 size 之外还挂着的单元——不读、不判声明长度，从记录里去掉（判决 m4-trunc-r1 K2）；
+        // size 除出来的数，多出来的是截断中间态里 size 之外还挂着的单元——不读、不判声明长度，从记录里去掉；
         // 标签 3、4、0 少于它，之后到 size 是洞，读出 0（K5）。
         let extent_records = u64::try_from(data_unit_records.len()).expect("记录条数");
         let data_units_within_the_size = data_units_read_within_the_file_size(
@@ -1004,9 +985,42 @@ impl OpenFileForRead<'_> {
                 observation: ReadPathObservation::default(),
             });
         }
+        let mut observation = ReadPathObservation::default();
+        let read = self.read_the_data_units_of_the_range(
+            reader,
+            offset,
+            length_in_bytes,
+            end_exclusive,
+            &mut observation,
+        );
+        // 读到一半报错（后面一个单元两份都坏、映射里没有、自描述对不上……）的那一次，报错之前已经发出的读、已经读到的只坏一份照样并进打开之后的累计：
+        // 与写入口「改动被拒时那几次读也算」同一种口径——读是真发到盘上的、坏的那一份是真读到的，计不计不看这一次调用成没成
+        // 这一次读自己的观测随报错丢掉，只留在累计里。
+        self.mount.add_to_observation_since_open(observation);
+        Ok(FileReadOutput {
+            bytes: read?,
+            observation,
+        })
+    }
+
+    /// [`Self::read_at`] 已核过范围、长度不为 0 之后的那一段：逐个单元读、核、拷出 `[offset, end_exclusive)`，这一次读的观测记进 `observation`
+    /// （报错时记到报错之前那一步为止）。
+    ///
+    /// # Errors
+    /// 同 [`Self::read_at`]，范围那一种除外。
+    ///
+    /// # Panics
+    /// 同 [`Self::read_at`]。
+    fn read_the_data_units_of_the_range(
+        &self,
+        reader: &dyn PoolReader,
+        offset: FileOffsetInBytes,
+        length_in_bytes: u64,
+        end_exclusive: u64,
+        observation: &mut ReadPathObservation,
+    ) -> Result<Vec<u8>, FileReadFailure> {
         let payload_capacity = payload_capacity_in_bytes();
         let span = data_unit_span_covering(offset, FileOffsetInBytes(end_exclusive - 1));
-        let mut observation = ReadPathObservation::default();
         let mut bytes =
             Vec::with_capacity(usize::try_from(length_in_bytes).expect("一次读的长度装得进 usize"));
         let mut anchor_offset_of_the_previous_unit: Option<u64> = None;
@@ -1019,7 +1033,7 @@ impl OpenFileForRead<'_> {
                 .get(usize::try_from(unit_number).expect("单元序号装得进 usize"))
                 .copied()
             else {
-                // 尾部的洞（标签 3、4、0，判决 m4-trunc-r1 K5）：这一段答 0、不读盘。单元序号由 (文件大小 − 1) ÷ 净荷容量界住，
+                // 尾部的洞（标签 3、4、0）：这一段答 0、不读盘。单元序号由 (文件大小 − 1) ÷ 净荷容量界住，
                 // 记录条数在 open_file 里按标签核过，记录之后到 size 只能是洞。
                 let hole_from = offset.0.max(unit_starts_at_file_byte);
                 let hole_until = end_exclusive.min(unit_starts_at_file_byte + payload_capacity);
@@ -1030,7 +1044,7 @@ impl OpenFileForRead<'_> {
                 continue;
             };
             let unit_bytes =
-                self.dereference_data_unit(reader, record, unit_index_in_file, &mut observation)?;
+                self.dereference_data_unit(reader, record, unit_index_in_file, observation)?;
             let header = parse_data_unit(&unit_bytes).map_err(|error| {
                 FileReadFailure::DataUnitMalformed {
                     unit_index_in_file,
@@ -1067,8 +1081,7 @@ impl OpenFileForRead<'_> {
             length_in_bytes,
             "拷出来的字节数要等于请求的长度：各单元的声明长度在上面逐个核过"
         );
-        self.mount.add_to_observation_since_open(observation);
-        Ok(FileReadOutput { bytes, observation })
+        Ok(bytes)
     }
 
     /// 解引用一个数据单元：先按父指针里的位置提示逐条试（整单元 CRC-32C 等于条目里的校验和才算读到），
@@ -1084,8 +1097,32 @@ impl OpenFileForRead<'_> {
         let pointer = record.data_unit_pointer;
         let hinted_slot = pointer.locations[0].slot;
         observation.data_unit_dereferences += 1;
-        let by_hint =
-            read_unit_by_location_entries(reader, &pointer.locations, data_unit_bytes, observation);
+        // 按提示读的那一次另记一份观测：只坏一份按这个单元此刻的权威落点判（中央映射里那两条位置条目，D19（块指针的结构与宽度预算） 已定项 8），
+        // 单元被整理搬走之后提示还指旧槽，旧槽上坏的那一份不归这个单元计、不报（
+        // 报给读者那一半由 `recovery::PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition` 判，同冷走读）。映射那一组读到的只坏一份照计。
+        let mapping_key = mapping_key_for_data(pointer.head, pointer.write_order);
+        let central_mapping_locations_of_key = |mapping_key_looked_up: &[u8]| {
+            Ok(self.mount.central_mapping_lookup(mapping_key_looked_up))
+        };
+        let reader_noting_one_copy_failing_only_at_the_mapping_position =
+            PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition::over(
+                reader,
+                &mapping_key,
+                &central_mapping_locations_of_key,
+            );
+        let mut observation_of_the_read_by_the_hints = ReadPathObservation::default();
+        let by_hint = read_unit_by_location_entries(
+            &reader_noting_one_copy_failing_only_at_the_mapping_position,
+            &pointer.locations,
+            data_unit_bytes,
+            &mut observation_of_the_read_by_the_hints,
+        );
+        if reader_noting_one_copy_failing_only_at_the_mapping_position
+            .dropped_a_one_copy_failing_note_off_the_mapping_position()
+        {
+            observation_of_the_read_by_the_hints.data_unit_reads_with_one_copy_failing = 0;
+        }
+        *observation = observation.plus(observation_of_the_read_by_the_hints);
         let hint_outcome = match by_hint {
             UnitReadOutcome::Read(unit_bytes) => return Ok(unit_bytes),
             UnitReadOutcome::EveryLocationReadButTheChecksumMismatched => {
@@ -1095,7 +1132,6 @@ impl OpenFileForRead<'_> {
         };
         // 提示不算数 ⇒ 走中央映射那条路，多跳一次。
         observation.stale_location_hint_hops += 1;
-        let mapping_key = mapping_key_for_data(pointer.head, pointer.write_order);
         let mapped_locations = self.mount.central_mapping_lookup(&mapping_key).ok_or(
             FileReadFailure::CentralMappingMiss {
                 unit_index_in_file,
@@ -1212,7 +1248,8 @@ enum UnitReadFailedBecause {
 
 /// 按两条位置条目逐条试着读一个单元：整单元 CRC-32C 等于条目里那 4 字节校验和才算读到
 /// （D19（块指针的结构与宽度预算） 已定项 4 的密文校验和段，加密关时是整单元 CRC-32C）。
-/// 每试一条就记一次块层读——请求已经发出去了，读不回字节也算。
+/// 每试一条就记一次块层读——请求已经发出去了，读不回字节也算。前一条没读成、后一条对上（只坏一份）记进
+/// [`ReadPathObservation::data_unit_reads_with_one_copy_failing`]，也报给读者（[`PoolReader::note_that_a_unit_was_read_with_one_copy_failing`]）。
 fn read_unit_by_location_entries(
     reader: &dyn PoolReader,
     locations: &[LocationEntry; 2],
@@ -1220,6 +1257,7 @@ fn read_unit_by_location_entries(
     observation: &mut ReadPathObservation,
 ) -> UnitReadOutcome {
     let mut some_location_returned_bytes = false;
+    let mut an_earlier_copy_failed = false;
     for location in locations {
         observation.device_reads_issued += 1;
         let Some(unit_bytes_read) = reader.read(
@@ -1227,12 +1265,18 @@ fn read_unit_by_location_entries(
             location.slot.to_device_offset(),
             unit_bytes,
         ) else {
+            an_earlier_copy_failed = true;
             continue;
         };
         some_location_returned_bytes = true;
         if crc32_castagnoli(&unit_bytes_read) == location.unit_checksum {
+            if an_earlier_copy_failed {
+                observation.data_unit_reads_with_one_copy_failing += 1;
+                reader.note_that_a_unit_was_read_with_one_copy_failing(locations);
+            }
             return UnitReadOutcome::Read(unit_bytes_read);
         }
+        an_earlier_copy_failed = true;
     }
     if some_location_returned_bytes {
         UnitReadOutcome::EveryLocationReadButTheChecksumMismatched
@@ -1317,6 +1361,7 @@ mod tests {
             data_unit_dereferences: 8,
             stale_location_hint_hops: 1,
             device_reads_issued: 9,
+            data_unit_reads_with_one_copy_failing: 0,
         };
         assert_eq!(
             observation.stale_location_hint_hops_per_million_dereferences(),
@@ -1365,7 +1410,7 @@ mod tests {
 
     /// `ExtentTreeReadsAtOpen::leaves` 只数真读到的叶：extent 上段的根是层级 1 的内部节点，只有罩着
     /// inode 0–142 的那一片叶一个孩子；打开 inode 200（活着、size 0、没写过内容）时上段在根那一层就找不到罩着它的孩子、停在根，
-    /// 一片叶都没读——`leaves` 是 0，读了 1 个节点、这一路的高 1。改之前上段那一份恒记 1。
+    /// 一片叶都没读——`leaves` 是 0，读了 1 个节点、这一路的高 1。
     #[test]
     fn opening_a_file_whose_upper_segment_stops_at_an_internal_node_counts_no_leaf() {
         use crate::address::{CheckpointTxg, InstanceGeneration};

@@ -953,12 +953,10 @@ mod tests {
 
     use crate::adapter_inventory::{
         discrete_gpus_of_the_enumeration, participating_gpus_admitted_by_the_mount_checks,
-        AdapterDeviceKind, BackgroundGpuSelection, EnumeratedAdapterDescription,
+        AdapterDeviceKind, BackgroundGpuSelection, EnumeratedAdapterDescription, GIBIBYTE,
     };
     use crate::background_gpu::COST_PROBE_CHUNK;
     use crate::memory_limit_and_chunks::SubmissionOfTheChunk;
-
-    const GIBIBYTE: u64 = 1 << 30;
 
     /// 本机三张独显，按总线地址排：代价各不相同。
     struct ThreeCardsOnThisHost;

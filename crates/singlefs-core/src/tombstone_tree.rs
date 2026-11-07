@@ -9,10 +9,14 @@
 //! 和 `crate::inode_tree` 一样，这里只算「这次发布之后树里是哪几片容器、各装哪些记录、哪几片要重写」，
 //! 不发一个写、不动分配器、不碰落点，几条纪律是纯函数的后置条件，单测判得了。
 //!
-//! **根满长高**：根装满之后长一层（D8（核心索引结构） 已定项 6、用户定案 K-R3-3），共用的那一半在 `crate::container_tree`；
+//! **根满长高**：根装满之后长一层（D8（核心索引结构） 已定项 6），共用的那一半在 `crate::container_tree`；
 //! 只供测试的扇出旋钮（`crate::container_tree::ContainerTreeNodeEntries`）与这里的容器容量旋钮一样不落盘。
+//!
+//! 这份文件的代码都在 `verus!` 里，由 Verus 直接验（里程碑四出口 5 容器小树那一簇）：追加照 `crate::container_tree` 的
+//! [`append_record_to_the_open_container`] 保持「key 到条目」，`ensures` 原样转述它的那一条。
 
 use singlefs_format::TOMBSTONE_CONTAINER_RECORDS;
+use vstd::prelude::*;
 
 use crate::address::{CheckpointTxg, TreeIdentifier};
 use crate::container_tree::{
@@ -24,6 +28,8 @@ use crate::unit::PACKED_TYPE_TOMBSTONE;
 
 pub use crate::container_tree::CONTAINER_NUMBER_KEY_WIDTH_IN_BYTES;
 
+verus! {
+
 /// 墓碑树里第几片叶容器，按叶序（= 容器号升序）从 0 数。它是树里的位置，不是容器号：容器号从 1 起、叶序从 0 起。
 /// 第一版不回收墓碑 ⇒ 容器只在最右端出现、一片都不删，位置一旦定下就不再挪，可以当发布路径里的角色序号用。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -32,16 +38,24 @@ pub struct TombstoneContainerIndexInTree(pub u32);
 impl TombstoneContainerIndexInTree {
     /// 当下标用。
     #[must_use]
-    pub fn position(self) -> usize {
+    pub fn position(self) -> (position: usize)
+        ensures
+            position == self.0,
+    {
         usize::try_from(self.0).expect("u32 的墓碑容器序号装得进 usize")
     }
 
     /// 第几片，从 0 数。
     ///
     /// # Panics
-    /// 序号装不进 u32：要 2^32 片墓碑容器（约 3.5 × 10^12 次 unlink），走不到。
+    /// 序号装不进 u32（`requires` 排除的那一种）：要 2^32 片墓碑容器（约 3.5 × 10^12 次 unlink），走不到。
     #[must_use]
-    pub fn of_position(position: usize) -> Self {
+    pub fn of_position(position: usize) -> (index: Self)
+        requires
+            position <= u32::MAX,
+        ensures
+            index.0 == position,
+    {
         Self(u32::try_from(position).expect("墓碑容器片数装得进 u32：要 2^32 片才装不下"))
     }
 }
@@ -55,16 +69,41 @@ pub type TombstoneContainer = RecordContainer<TombstoneRecord>;
 pub struct TombstoneRecordsPerContainerCappedForTests(u64);
 
 impl TombstoneRecordsPerContainerCappedForTests {
+    /// 类型不变量：至少 1、至多产品容量 815（只经 [`Self::new`] 进来）。
+    #[verifier::type_invariant]
+    spec fn records_lie_between_one_and_the_product_capacity(self) -> bool {
+        1 <= self.0 <= 815
+    }
+
+    /// 压小之后一片装满几条（规格里用）。
+    pub closed spec fn records_in_the_specification(self) -> int {
+        self.0 as int
+    }
+
     /// 0 条（容器永远装不下一条）或多于产品容量 815（一片 32 KiB 装不下）交回 `None`。
+    #[allow(clippy::manual_range_contains, reason = "Verus 推不出 RangeInclusive::contains 的结果，写成两个比较")]
     #[must_use]
-    pub fn new(records: u64) -> Option<Self> {
-        (1..=TOMBSTONE_CONTAINER_RECORDS)
-            .contains(&records)
-            .then_some(Self(records))
+    pub fn new(records: u64) -> (capped: Option<Self>)
+        ensures
+            capped is Some <==> 1 <= records <= 815,
+            capped matches Some(capped_records) ==> capped_records.records_in_the_specification() == records,
+    {
+        if 1 <= records && records <= TOMBSTONE_CONTAINER_RECORDS {
+            Some(Self(records))
+        } else {
+            None
+        }
     }
 
     #[must_use]
-    pub const fn records(self) -> u64 {
+    pub const fn records(self) -> (records: u64)
+        ensures
+            1 <= records <= 815,
+            records == self.records_in_the_specification(),
+    {
+        proof {
+            use_type_invariant(&self);
+        }
         self.0
     }
 }
@@ -90,9 +129,21 @@ impl TombstoneContainerCapacity {
         }
     }
 
+    /// 一片装满几条（规格里用）。
+    pub open spec fn records_per_container_in_the_specification(self) -> int {
+        match self {
+            TombstoneContainerCapacity::FromTheContainerFormat => 815,
+            TombstoneContainerCapacity::CappedForTests(capped) => capped.records_in_the_specification(),
+        }
+    }
+
     /// 一片装满几条。
     #[must_use]
-    pub const fn records_per_container(self) -> u64 {
+    pub const fn records_per_container(self) -> (records: u64)
+        ensures
+            1 <= records <= 815,
+            records == self.records_per_container_in_the_specification(),
+    {
         match self {
             TombstoneContainerCapacity::FromTheContainerFormat => TOMBSTONE_CONTAINER_RECORDS,
             TombstoneContainerCapacity::CappedForTests(capped) => capped.records(),
@@ -118,7 +169,24 @@ pub fn append_tombstone_to_the_open_container(
     tombstone_tree: TreeIdentifier,
     capacity: TombstoneContainerCapacity,
     node_entries: ContainerTreeNodeEntries,
-) -> Result<TombstoneTreeAfterThisPublish, NextContainerNumberPastTheTopOfItsRange> {
+) -> (after: Result<TombstoneTreeAfterThisPublish, NextContainerNumberPastTheTopOfItsRange>)
+    requires
+        crate::container_tree::container_count(shape_before_this_publish.levels()) == containers_before_this_publish.len(),
+    ensures
+        match after {
+            Ok(after) => crate::container_tree::appending_keeps_the_key_to_entry_mapping(
+                containers_before_this_publish@,
+                shape_before_this_publish.levels(),
+                seq![record],
+                checkpoint_txg,
+                tombstone_tree,
+                PACKED_TYPE_TOMBSTONE,
+                capacity.records_per_container_in_the_specification(),
+                after,
+            ),
+            Err(error) => error.tree == tombstone_tree && error.rightmost_container == u64::MAX,
+        },
+{
     append_record_to_the_open_container(
         containers_before_this_publish,
         shape_before_this_publish,
@@ -130,6 +198,8 @@ pub fn append_tombstone_to_the_open_container(
         node_entries,
     )
 }
+
+} // verus!
 
 #[cfg(test)]
 mod tests {
@@ -152,7 +222,7 @@ mod tests {
         )
     }
 
-    fn capped(records: u64) -> TombstoneContainerCapacity {
+    fn tombstone_container_capacity_capped_at(records: u64) -> TombstoneContainerCapacity {
         TombstoneContainerCapacity::CappedForTests(
             TombstoneRecordsPerContainerCappedForTests::new(records).expect("1..=815"),
         )
@@ -214,14 +284,18 @@ mod tests {
     /// 开放容器还装得下：追加进最右那一片、身份不变、只重写它。
     #[test]
     fn a_tombstone_is_appended_to_the_open_container_while_it_has_room() {
-        let first = after_appending(1, capped(2), ContainerTreeNodeEntries::FromTheNodeFormat);
+        let first = after_appending(
+            1,
+            tombstone_container_capacity_capped_at(2),
+            ContainerTreeNodeEntries::FromTheNodeFormat,
+        );
         let after = append_tombstone_to_the_open_container(
             &first.containers,
             &first.shape,
             tombstone(3, 9),
             CheckpointTxg(9),
             TOMBSTONE_TREE,
-            capped(2),
+            tombstone_container_capacity_capped_at(2),
             ContainerTreeNodeEntries::FromTheNodeFormat,
         )
         .expect("容器号从 1 起逐片加一，远在顶之下");
@@ -241,14 +315,18 @@ mod tests {
     /// 开放容器满了就关、开下一片：容器号 = 最大号 + 1、出生代 = 这次的 txg；满了的那片一个字节都不动、不进重写清单。
     #[test]
     fn a_full_open_container_is_closed_and_the_next_one_takes_the_largest_number_plus_one() {
-        let two = after_appending(2, capped(2), ContainerTreeNodeEntries::FromTheNodeFormat);
+        let two = after_appending(
+            2,
+            tombstone_container_capacity_capped_at(2),
+            ContainerTreeNodeEntries::FromTheNodeFormat,
+        );
         let after = append_tombstone_to_the_open_container(
             &two.containers,
             &two.shape,
             tombstone(4, 11),
             CheckpointTxg(11),
             TOMBSTONE_TREE,
-            capped(2),
+            tombstone_container_capacity_capped_at(2),
             ContainerTreeNodeEntries::FromTheNodeFormat,
         )
         .expect("容器号从 1 起逐片加一，远在顶之下");
@@ -263,14 +341,17 @@ mod tests {
         assert_eq!(after.rewritten_containers, vec![1], "只重写新开的那一片");
     }
 
-    /// 根装满之后再开一片：长一层（D8 已定项 6、用户定案 K-R3-3）——产品扇出 135 片之后的第 136 片；扇出压到 2 时第 3 片。
+    /// 根装满之后再开一片：长一层（D8 已定项 6）——产品扇出 135 片之后的第 136 片；扇出压到 2 时第 3 片。
     /// 长高那次旧根留在 (层级 1, 第 0 个) 照抄，新开的容器、右半 (1, 1) 与新根 (2, 0) 重写。
     #[test]
     fn opening_a_container_past_what_one_root_holds_grows_the_tree_one_level() {
         let capacity_of_the_root = containers_one_container_tree_root_holds();
         assert_eq!(capacity_of_the_root, 135, "与 inode 树根同一形态：扇出 135");
-        let full_root =
-            after_appending(135, capped(1), ContainerTreeNodeEntries::FromTheNodeFormat);
+        let full_root = after_appending(
+            135,
+            tombstone_container_capacity_capped_at(1),
+            ContainerTreeNodeEntries::FromTheNodeFormat,
+        );
         assert_eq!(full_root.shape.root_level(), 1);
         let grown = append_tombstone_to_the_open_container(
             &full_root.containers,
@@ -278,7 +359,7 @@ mod tests {
             tombstone(1000, 136),
             CheckpointTxg(136),
             TOMBSTONE_TREE,
-            capped(1),
+            tombstone_container_capacity_capped_at(1),
             ContainerTreeNodeEntries::FromTheNodeFormat,
         )
         .expect("容器号从 1 起逐片加一，远在顶之下");
@@ -287,7 +368,11 @@ mod tests {
         let node_entries_of_two = ContainerTreeNodeEntries::CappedForTests(
             ContainerTreeNodeEntriesCappedForTests::new(2).expect("2..=135"),
         );
-        let three = after_appending(3, capped(1), node_entries_of_two);
+        let three = after_appending(
+            3,
+            tombstone_container_capacity_capped_at(1),
+            node_entries_of_two,
+        );
         assert_eq!(
             three.rewritten_nodes(),
             vec![
@@ -307,7 +392,8 @@ mod tests {
 
     /// 只供测试的容量至少 1、至多产品容量 815。
     #[test]
-    fn the_capacity_capped_for_tests_lies_between_one_and_the_product_capacity() {
+    fn the_tombstone_container_capacity_capped_for_tests_lies_between_one_and_the_product_capacity()
+    {
         assert_eq!(TombstoneRecordsPerContainerCappedForTests::new(0), None);
         assert_eq!(TombstoneRecordsPerContainerCappedForTests::new(816), None);
         assert_eq!(

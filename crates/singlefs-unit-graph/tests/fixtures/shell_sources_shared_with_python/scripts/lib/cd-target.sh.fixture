@@ -1,0 +1,3 @@
+cd_target_function() {
+  echo cd target
+}

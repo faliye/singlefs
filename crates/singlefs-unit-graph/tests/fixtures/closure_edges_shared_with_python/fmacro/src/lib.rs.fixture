@@ -1,0 +1,36 @@
+macro_rules! listed_enumeration {
+    ($(#[$attribute:meta])* $visibility:vis enum $name:ident { $($variant:ident,)+ }) => {
+        $(#[$attribute])*
+        $visibility enum $name { $($variant,)+ }
+    };
+}
+listed_enumeration! {
+    pub enum Weight {
+        Light,
+        Heavy,
+    }
+}
+impl Weight {
+    pub fn amount(self) -> u32 {
+        match self {
+            Weight::Light => 1,
+            Weight::Heavy => 9,
+        }
+    }
+}
+pub fn heavy_amount() -> u32 {
+    Weight::Heavy.amount()
+}
+macro_rules! code_table {
+    ($($constant:ident = $code:literal,)*) => {
+        $(pub const $constant: u32 = $code;)*
+        pub const EVERY_CODE: &[u32] = &[$($constant,)*];
+    };
+}
+code_table! {
+    CODE_NONE = 0,
+    CODE_FULL = 7,
+}
+pub fn code_count() -> usize {
+    EVERY_CODE.len()
+}

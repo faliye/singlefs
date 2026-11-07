@@ -1,7 +1,6 @@
-//! 整理的选段与计划（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G2）：三层里的后两层，都是纯函数——
+//! 整理的选段与计划：三层里的后两层，都是纯函数——
 //! 不读设备、不发写、不动分配器。`choose_region` 按记录给候选段排序、按扫描分类定资格（没扫过的先让调用方经
 //! `crate::region_scan::scan_region` 扫），`plan_batch` 从扫描结果里取下一批要搬的（映射 key, 源落点）。**目的落点不在计划里**：由那一批发布时的分配器按 D3（空间分配） 已定项 8 现取
-//! （判决 G2，攻方 H-G2-1：缓存目的落点的臂撞上映射重复）。
 //!
 //! 判据显式（`.claude/rules/fs-design.md` 五条硬要求第 1 条）：第一版只有 greedy 一种（[`RegionChoiceCriterion::Greedy`]），
 //! 打分是 [`greedy_score`]；cost-benefit 与轮转留给 E10（老化：结构抗老化 vs 事后整理） 的臂。
@@ -23,10 +22,10 @@ use crate::background_compute::{BackgroundTaskAfterTheComputeError, ClusterSegme
 use crate::logged_operations::{CompactionIntent, CompactionRegion};
 use crate::region_scan::{AllocationInRegion, RegionScan, RegionScanRefusal, ScannedAllocation};
 
-/// 选段判据。封闭集合：加一种判据就加一个成员（判决 G2 的 S-b、S-c 由 E10 定要不要加）。
+/// 选段判据。封闭集合：加一种判据就加一个成员。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RegionChoiceCriterion {
-    /// 活槽最少的段先（判决 G2 第一版）。
+    /// 活槽最少的段先。
     Greedy,
 }
 
@@ -46,8 +45,8 @@ pub const fn greedy_score(live_slots_in_segment: u64) -> u64 {
 
 /// 这一次挂载里区域扫描整次拒过的聚簇段（段起点 → 拒的理由）：[`choose_region`] 不再选它们。只增不减，随挂载会话一起丢。
 /// 拒整次扫描的是盘上的坏记录（跨段的记录只有盘上读来的才有，归 C411（分配记录的跨度段与单元类别不符没检查） 的域），
-/// 整理不替它修（主 agent 2026-10-13 定，判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S4）。
-/// 第一版两盘同槽：按段起点的槽号记（判决 G1 攻方 K-n）。
+/// 整理不替它修。
+/// 第一版两盘同槽：按段起点的槽号记。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SegmentsRefusedByTheRegionScan {
     refused: BTreeMap<SlotNumber, RegionScanRefusal>,
@@ -79,14 +78,13 @@ pub enum RegionChoice {
     NoEligibleSegment,
 }
 
-/// 挑一个整理区域 R（判决 G2 `choose_region`）。资格五条全成立的段才算：不在这次挂载开过的聚簇段里（`cluster_segments`，段起点）、
+/// 挑一个整理区域 R。资格五条全成立的段才算：不在这次挂载开过的聚簇段里（`cluster_segments`，段起点）、
 /// 不是活意图的 R、罩住的槽一个都不在 `pinned_slots` 里、这次挂载里没被区域扫描整次拒过（`segments_refused_by_the_region_scan`）、
-/// R 里至少一个能搬的单元（按 `region_scans` 里这一段的扫描分类取，判决 G2「R 里至少一个能搬的单元」，攻方 K-b；
-/// 判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S4）。
+/// R 里至少一个能搬的单元（按 `region_scans` 里这一段的扫描分类取）；
 /// 按判据打分（活槽数：R 那块盘上未释放记录罩住的槽）排候选，同分取起点槽号最小的；排在最前的那一段扫过就交回
 /// [`RegionChoice::Chosen`]，没扫过就交回 [`RegionChoice::ScanBeforeChoosing`]；扫过而一个能搬的都没有的段不是候选。
 /// `region_scans` 要是对这一份 `allocation_records` 扫出来的（记录变了就重扫），不是 `unit_area.device` 那块盘上的不算。
-/// 第一版两盘同槽：活槽数按 `unit_area.device` 那块盘的记录数，`cluster_segments`、活 R、`pinned_slots` 与被拒的段都只比槽号（判决 G1 攻方 K-n）。
+/// 第一版两盘同槽：活槽数按 `unit_area.device` 那块盘的记录数，`cluster_segments`、活 R、`pinned_slots` 与被拒的段都只比槽号。
 #[must_use]
 #[allow(
     clippy::too_many_arguments,
@@ -268,7 +266,7 @@ pub fn choose_region_over_the_live_slots(
     }
 }
 
-/// 一批至多搬几个单元（判决 G2 的 K）。至少 1；取值归 E10（老化：结构抗老化 vs 事后整理），这里只是参数。
+/// 一批至多搬几个单元。至少 1；取值归 E10（老化：结构抗老化 vs 事后整理），这里只是参数。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CompactionBatchUnits(NonZeroUsize);
 
@@ -292,25 +290,24 @@ pub struct PlannedRelocation {
     pub source: Placement,
 }
 
-/// [`plan_batch`] 的答案：有要搬的，或者一个能搬的都没有时分「搬空」与「搬不动」（判决 m4-batch2-code-r1 S4）。封闭集合。
+/// [`plan_batch`] 的答案：有要搬的，或者一个能搬的都没有时分「搬空」与「搬不动」。封闭集合。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PlannedBatch {
     /// 这一批要搬的，按槽升序，至少一项、至多 K 项。
     Relocate(Vec<PlannedRelocation>),
-    /// R 里一条未释放的记录都没有了：R 按记录全空（判决 G4 的停机谓词「删意图那一刻 R 按记录全空」看的就是这个）。
+    /// R 里一条未释放的记录都没有了：R 按记录全空。
     RegionEmptied,
     /// R 里一个能搬的都没有，却还有未释放的记录（钉住、隔离、已死、不一致的）：再推下去也空不了。
     NothingMovableButTheRegionIsNotEmpty,
 }
 
-/// 下一批要搬的：扫描结果里可搬的单元按槽升序取前 `batch` 个（判决 G2 `plan_batch`）。钉住、隔离、已死、不一致的一个都不进。
+/// 下一批要搬的：扫描结果里可搬的单元按槽升序取前 `batch` 个。钉住、隔离、已死、不一致的一个都不进。
 /// 这一批发布之后它们离开 R，下一次扫描就不再有它们：各批互不相交，全部批的并集是 R 里可搬的 key 集合。
 /// 一个能搬的都没有时不交空表：R 里没有未释放的记录交 [`PlannedBatch::RegionEmptied`]，还有交 [`PlannedBatch::NothingMovableButTheRegionIsNotEmpty`]。
 ///
 /// # Panics
 /// 扫描结果里能搬的映射 key 有相同的：计划的输入只来自 [`crate::region_scan::scan_region`] 交回的 `Ok`，它见到同一把 key 判成可搬两次
 /// 就拒这个 R（`RegionScanRefusal::TwoRecordsMovableUnderOneMappingKey`），所以这里收到的 key 两两不同，一批里的 key 也就互异
-/// （判决 G7 的 P2；Verus 证的核把它写成蕴含的前提 `movable_mapping_keys_are_distinct`）。
 #[must_use]
 pub fn plan_batch(region_scan: &RegionScan, batch: CompactionBatchUnits) -> PlannedBatch {
     assert!(
@@ -375,8 +372,8 @@ fn compaction_kernel_allocations(
         .collect()
 }
 
-/// 下一批要搬的，跳过这次发布本来就重写的节点（判决 `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H4，用户 2026-10-16
-/// 定「规划时补足」）：`rewritten_anyway` 是会话在这一次发布上试算出的、计划过而发布路径不另搬的映射 key（它们照样离开 R，只是不算搬）。
+/// 下一批要搬的，跳过这次发布本来就重写的节点（
+/// 规划时补足）：`rewritten_anyway` 是会话在这一次发布上试算出的、计划过而发布路径不另搬的映射 key（它们照样离开 R，只是不算搬）。
 /// 扫描结果里去掉这几把 key 的可搬项，剩下的照 [`plan_batch`] 取（按槽升序取前 `batch` 个，补上 R 里真要搬的单元）；剩下的一项都没有时
 /// 分两种：R 里本来就没有未释放的记录交 [`PlannedBatch::RegionEmptied`]；R 里只剩这次发布本来就重写的节点（每条未释放记录都是可搬单元、
 /// 它们的 key 都在 `rewritten_anyway` 里）交 [`PlannedBatch::Relocate`] 带上它们全部——计划罩住 R 里每一条记录，调用方照 F2 同一次发布
@@ -434,18 +431,18 @@ pub fn plan_batch_skipping_the_units_this_publish_rewrites_anyway(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompactionBatchSize {
     NotDecidedByTheClauses,
-    /// 只供测试（判决 G6 `CompactionSwitches` 的「批大小」）。
+    /// 只供测试。
     ForcedForTests(CompactionBatchUnits),
 }
 
-/// 整理什么时候起跑。封闭集合。产品路径照水位（[`CompactionRunForcing::FollowTheWatermarks`]）；另两种只供测试（判决 G6「强制起跑 / 停」）。
+/// 整理什么时候起跑。封闭集合。产品路径照水位（[`CompactionRunForcing::FollowTheWatermarks`]）；另两种只供测试。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompactionRunForcing {
-    /// 用户改动发成之后与定时兜底那一次按水位判起不起跑（判决 G8 丁；D26（后台整理与放置回收） 已定项 13 第 5 条）。第一版三条水位恒 0、
-    /// 0 = 关（判决 G4 V-a；内置默认改非零不在这一批），所以这一支在产品路径上不起跑；显式入口（`mounted_session::MountedSession::run_compaction`）
+    /// 定时兜底那一次与用户改动发成之后那一次按水位判起不起跑（D26（后台整理与放置回收） 已定项 13 第 5 条）。第一版三条水位恒 0、
+    /// 0 = 关，所以这一支在产品路径上不起跑；显式入口（`mounted_session::MountedSession::run_compaction`）
     /// 不看水位、照常跑。
     FollowTheWatermarks,
-    /// 只供测试：起跑判据不看水位、恒为真——用户改动发成之后记下「该跑了」，定时兜底查到的也是「该跑」，由后台入口
+    /// 只供测试：起跑判据不看水位、恒为真——定时兜底查到的是「该跑」，用户改动发成之后记下的也是「该跑了」，由后台入口
     /// （`mounted_session::MountedSession::run_compaction_in_the_background`）去跑。
     ForcedToStartForTests,
     /// 只供测试：两个入口都不起跑，停机原因 [`CompactionRunStop::ForcedToStopForTests`]。
@@ -456,7 +453,7 @@ pub enum CompactionRunForcing {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompactionRegionExclusion {
     ExcludedWhileTheIntentIsLive,
-    /// 只供测试（判决 G6「关 R 排他」）：活意图的 R 照样当分配目的地。
+    /// 只供测试：活意图的 R 照样当分配目的地。
     SwitchedOffForTests,
 }
 
@@ -465,11 +462,11 @@ pub enum CompactionRegionExclusion {
 pub enum RelocationDestinationPolicy {
     /// 判决 G2 的 D-a：码 1 走用户数据落点函数（D3（空间分配） 已定项 8 第 1 条），节点与打包容器走开放段 bump（已定项 10 ⑤），都不落在活 R 里。
     UserDataPlacementForDataAndOpenSegmentForTheRest,
-    /// 只供测试（判决 G6「强制目的地政策」）：每个单元都取单元区里起点最小、整跨度没挡的落点（提交内生块回落那一个函数），仍不落在活 R 里。
+    /// 只供测试：每个单元都取单元区里起点最小、整跨度没挡的落点（提交内生块回落那一个函数），仍不落在活 R 里。
     LowestUnblockedSlotForEveryUnitForTests,
 }
 
-/// 签发之后强制一次「释放前核出对不上」（判决 G6）。封闭集合。
+/// 签发之后强制一次「释放前核出对不上」。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ForcedReleaseChecksumMismatchAfterIssue {
     NotForced,
@@ -483,7 +480,7 @@ pub enum ForcedReleaseChecksumMismatchAfterIssue {
 pub enum EmptyClusterSegmentsFloor {
     /// 第一版的值 [`EMPTY_CLUSTER_SEGMENTS_FLOOR_OF_THE_FIRST_VERSION`]（算式等计数模型验过再定，E10（老化：结构抗老化 vs 事后整理））。
     OfTheFirstVersion,
-    /// 只供测试（判决 G6「强制合取 7 的 `N₀`」）。
+    /// 只供测试。
     ForcedForTests(u64),
 }
 
@@ -513,14 +510,52 @@ pub enum RelocationPublishOrder {
     SourceReleasedWhileTheMappingStillNamesItForTests,
 }
 
-/// 整理只供测试的开关（判决 G6 `CompactionSwitches`；`.claude/rules/fs-design.md` 五条硬要求第 2 条：每条分支能被测试强制进入）。
+/// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条：每条分支能被测试强制进入）：会话为读回时只坏一份、又被活快照钉着的旧单元另发的那一批搬迁
+/// （`mounted_session::RelocationOfTheOldDataUnitsKeptForTheSnapshots`），在发之前当作被空间准入拒。产品路径恒 [`Self::NotForced`]。
+/// 被拒推抬 F 再试那一支在小盘之外的池上造不出「改动放得下、紧接着那一批放不下」，靠它进；
+/// 开关造的拒绝在这一批的写入口建起之前交回，一个写都没发。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RelocationKeptForTheSnapshotsRefusedForSpace {
+    NotForced,
+    /// 接下来这几次发这一批都当作被拒，用完之后照常发。
+    ForcedForTheNextAttemptsForTests {
+        attempts: NonZeroU64,
+    },
+    /// 每一次发这一批都当作被拒。
+    ForcedOnEveryAttemptForTests,
+}
+
+/// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：会话另发的那一批搬迁（同 [`RelocationKeptForTheSnapshotsRefusedForSpace`]）在发之前
+/// 当作被拒、而不是空间不够（计划对不上那一版那一种：`transaction::RelocationBatchRefused::PlannedUnitNotInTheVersion`，点名计划里头一把 key）。
+/// 产品路径恒 [`Self::NotForced`]。被拒不是空间不够那一支（不推抬 F、不再试，`mounted_session::RelocationOfTheOldDataUnitsKeptForTheSnapshots::RefusedNotForSpace`）
+/// 在产品路径上要计划在算出来与发之间失效、或发布路径报空间之外的错才进得去，靠它进；开关造的拒绝在这一批的写入口建起之前交回，一个写都没发。
+/// 被空间拒的那个开关同时开着时先照那一个拒（它在前面判）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RelocationKeptForTheSnapshotsRefusedNotForSpace {
+    NotForced,
+    /// 每一次发这一批都当作被拒（不是空间不够：不再试，一批只发这一次）。
+    ForcedOnEveryAttemptForTests,
+}
+
+/// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：会话为另发的那一批搬迁被空间拒而推抬 F 时，那一串抬 F 当作自己报了错
+/// （`mount::MountError::InstanceTableUnreadable`：`mount::push_one_floor_raise_within_the_admission_budget` 在任何写之前交得出的那一种），一个写都不发。
+/// 产品路径恒 [`Self::NotForced`]。抬 F 自己报错那一支（`mounted_session::RelocationOfTheOldDataUnitsKeptForTheSnapshots::FloorRaiseFailedWhilePushingForSpace`）
+/// 在产品路径上要推抬 F 时读盘或落盘出错才进得去，靠它进；要先被空间拒才推抬 F，与 [`RelocationKeptForTheSnapshotsRefusedForSpace`] 合着开。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FloorRaiseForTheRelocationKeptForTheSnapshotsFails {
+    NotForced,
+    /// 每一次为这一批推抬 F 都当作抬 F 自己报了错。
+    ForcedOnEveryRaiseForTests,
+}
+
+/// 整理只供测试的开关。
 /// 产品路径是 [`CompactionSwitches::PRODUCT`]；只住内存，装在分配器上（`allocator::PoolAllocator::set_compaction_switches`），
 /// 平常构造（`PoolAllocator::new`、挂载重建的分配器）一律是产品值；可写挂载续做意图要开关时由调用方交给挂载
 /// （`mount::mount_writable_with_compaction_switches`）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CompactionSwitches {
     pub batch_size: CompactionBatchSize,
-    /// 只供测试（判决 G6「强制选段」）：签发时不按判据选、取这一段（资格那五条照判，不合格就停）。`None` 是产品路径。
+    /// 只供测试：签发时不按判据选、取这一段（资格那五条照判，不合格就停）。`None` 是产品路径。
     pub forced_region: Option<CompactionRegion>,
     pub run_forcing: CompactionRunForcing,
     pub region_exclusion: CompactionRegionExclusion,
@@ -545,7 +580,7 @@ impl CompactionSwitches {
     };
 }
 
-/// 一次整理运行停在哪（判决 G8 观测「停机原因」）。封闭集合。
+/// 一次整理运行停在哪。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompactionRunStop {
     /// 产品路径的批大小条款没写（[`CompactionBatchSize::NotDecidedByTheClauses`]）：一个意图都没签、一个写都没发。
@@ -554,25 +589,25 @@ pub enum CompactionRunStop {
     ForcedToStopForTests,
     /// 一段都没资格（[`RegionChoice::NoEligibleSegment`]），或强制选的那一段不合格。
     NoEligibleSegment,
-    /// 签发前判不过（D26（后台整理与放置回收） 已定项 1 第 2 条，攻方 K-g）：R 外非全空段的空洞少于 R 里要搬的单元数，不签。
+    /// 签发前判不过（D26（后台整理与放置回收） 已定项 1 第 2 条）：R 外非全空段的空洞少于 R 里要搬的单元数，不签。
     HolesOutsideTheRegionFewerThanItsUnitsToMove { holes: u64, units_to_move: u64 },
-    /// 上一条意图完成了，全局差值 `全空聚簇段数(现在) − segs0 ≥ 1` 为假（攻方 K-h）：不签下一条。
+    /// 上一条意图完成了，全局差值 `全空聚簇段数(现在) − segs0 ≥ 1` 为假：不签下一条。
     NoYieldFromTheLastIntent {
         empty_cluster_segments_now: u64,
         empty_cluster_segments_at_issue: u64,
     },
-    /// 这次运行的发布预算用完了（判决 G8 `B_gc`）。
+    /// 这次运行的发布预算用完了。
     PublishBudgetSpent { budget: u64 },
-    /// 一批被空间拒（准入或落点）：暂停——撤掉 R 排他、意图留着（攻方 K-k），不推抬 F（判决 G8 g1）。
+    /// 一批被空间拒（准入或落点）：暂停——撤掉 R 排他、意图留着，不推抬 F。
     PausedShortOfSpace,
-    /// 签发那次发布被空间拒（准入或落点）：意图没签成、盘上没有它，R 排他跟着撤；不推抬 F（判决 G8 g1）。
+    /// 签发那次发布被空间拒（准入或落点）：意图没签成、盘上没有它，R 排他跟着撤；不推抬 F。
     IssueRefusedShortOfSpace,
     /// 可写挂载续做（只续做盘上那一条未完成的意图、不签新的，D8（核心索引结构） 已定项 5 第 2 条「续做是每次恢复都跑的常规动作」）：
     /// 那一条删了（达成或丢掉），或本来就没有活意图。
     NoLiveIntentLeftToContinue,
     /// R 里一个能搬的都没有、却还有未释放的记录（[`PlannedBatch::NothingMovableButTheRegionIsNotEmpty`]）：意图连同 R 排他丢掉。
     NothingMovableButTheRegionIsNotEmpty,
-    /// 用户改动之后起跑的那一趟只跑至多一批（判决 G8 丁），跑完了。
+    /// 用户改动之后起跑的那一趟只跑至多一批，跑完了。
     OneBatchAfterTheUserChangeDone,
     /// 后台入口：前台有 fsync 在等，不发下一批（D26（后台整理与放置回收） 已定项 13 第 6 条）。
     YieldedToAForegroundFsync,
@@ -586,8 +621,10 @@ pub enum CompactionRunStop {
     BatchAbandonedAfterABackgroundComputeError {
         task_after_the_error: BackgroundTaskAfterTheComputeError,
     },
-    /// 整理这个后台任务此前因一批出错停着（D26 已定项 13 第 4 条）：这一趟一个写都不发，等一次通过校验的切换请求解除停下
-    /// （用户 2026-10-26 定「停着时收到切换请求就当场解除停下」）。
+    /// 整理这个后台任务先前因一批出错停着（D26 已定项 13 第 4 条；挂载那一刻或切换生效的那一批开头，实现照交给它的那一组一张卡都用不上而当场停着的同算），
+    /// 而这一刻池子每块盘的已分配占它的容量都不超过补跑阈值：
+    /// 停在这一刻，从这一刻起一个写都不发、撤掉活意图的 R 排他。一趟开头就判出的，这一趟一个写都没发；一趟之中在 CPU 上补跑过几批之后、
+    /// 或一趟之中切换生效的那一批开头才判出的，前面那几批照常发过。等占用超过阈值（下一趟照常补跑），或一次通过校验的切换请求解除停下。
     BackgroundTaskStoppedAfterAnEarlierComputeError,
     /// GPU 路径上 R 里除了这一轮两份核判得不一样的记录，再没有判定了可搬的（D26 已定项 13 第 8 条「这一批不回收、不搬，留到下一轮重算」）：
     /// 这一批不发，意图照留（不删也不丢），下一批重扫照判。
@@ -651,7 +688,7 @@ impl CompactionRunStop {
     }
 }
 
-/// 一条活意图在这次挂载里的样子：意图本身与它的 R 排没排他（暂停 = 撤掉 R 排他、意图留着，攻方 K-k）。
+/// 一条活意图在这次挂载里的样子：意图本身与它的 R 排没排他（暂停 = 撤掉 R 排他、意图留着）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LiveCompactionIntent {
     pub intent: CompactionIntent,
@@ -707,7 +744,7 @@ impl CompactionSwitchesAndTheExcludedRegion {
     }
 
     /// 分配器这一侧的签发：记下活意图，R 从此排他（开关关掉 R 排他时不排）。盘上那一条由签发那次发布写进 logged_ops
-    /// （`transaction::publish_compaction_step`）；挂载按 logged_ops 里那一条装上。全池活意图至多一条（判决 G1 e1）。
+    /// （`transaction::publish_compaction_step`）；挂载按 logged_ops 里那一条装上。全池活意图至多一条。
     ///
     /// # Panics
     /// 已经有一条活意图：调用方先判过（会话按现行那一版的 logged_ops 判，挂载在新建的分配器上装）。
@@ -730,7 +767,7 @@ impl CompactionSwitchesAndTheExcludedRegion {
         self.live_intent.take().map(|live| live.intent)
     }
 
-    /// 暂停：撤掉 R 排他、意图留着（攻方 K-k）。下一次运行接着推它时重新排他。
+    /// 暂停：撤掉 R 排他、意图留着。下一次运行接着推它时重新排他。
     pub fn pause_the_live_intent(&mut self) {
         if let Some(live) = self.live_intent.as_mut() {
             live.is_the_region_excluded_from_placement = false;
@@ -785,27 +822,49 @@ impl CompactionSwitchesAndTheExcludedRegion {
 }
 
 /// 会话这一侧的整理状态（丁 1 交判第 2 点：不合格段表挂会话；生命周期一次挂载）：这次挂载里被区域扫描拒过的段、这次挂载里释放前核出对不上
-/// 而隔离的槽（常驻隔离集，攻方 K-c 读它）、上一次用户改动之后整理发了几次布（`B_gc`）、观测。住在挂着的会话上
+/// 而隔离的槽（常驻隔离集）、上一次用户改动之后整理发了几次布（`B_gc`）、观测。住在挂着的会话上
 /// （`mounted_session::MountedSession::compaction`），可写挂载续做意图时先建一份、交给会话接着用（`mount::MountOutput::compaction_continuation`）。
-/// 整理挪出用户改动的调用线程之后（用户 2026-10-26 定「挪出调用线程，补齐三样保证」）另住四样：起跑判据记下的「该跑了」、上一条完成的意图
-/// （签下一条之前那一判跨趟读它）、定时兜底上一次查的钟读数、写带宽这一个窗口里整理写了多少。
+/// 整理挪出用户改动的调用线程之后另住四样：起跑判据记下的「该跑了」、上一条完成的意图
+/// （签下一条之前那一判跨趟读它）、定时兜底上一次查的钟读数、写带宽这一个窗口里整理写了多少。另记这次挂载里读—改—写读回旧数据单元时只坏一份的次数
+/// （会话按挂载累计，`mounted_session::MountedSession::old_data_unit_reads_back_with_one_copy_failing_in_this_mount`）、可写挂载读盘建上一版时只坏一份的次数
+/// （`mounted_session::MountedSession::unit_reads_with_one_copy_failing_while_mounting`），与会话另发那一批搬迁的三个只供测试的开关（被空间拒、
+/// 被拒不是空间不够、为它推的抬 F 自己报错）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CompactionOfThisMount {
     pub segments_refused_by_the_region_scan: SegmentsRefusedByTheRegionScan,
     quarantined_slots: BTreeSet<SlotNumber>,
-    /// 上一次用户改动之后整理发了几次布（判决 G8 `B_gc` 式子里「已经过去的发布数」）：会话发成一次用户改动就归零。
+    /// 上一次用户改动之后整理发了几次布：会话发成一次用户改动就归零。
     pub publishes_since_the_last_user_change: u64,
     pub observations: CompactionObservations,
     /// 用户改动发成之后起跑判据查出来的结果，后台入口取走（[`CompactionStartJudgement`]）。
     pub start_judgement: CompactionStartJudgement,
-    /// 这次挂载里上一条完成的意图（攻方 K-h「上一条无产出就不签」读它的 `segs0`）：跨趟留着，不随一趟结束丢掉
-    /// （第三轮判决 `research/prompts/m4-gpugc-design-r3-main-verification.md` 第二节 G8、岔路单第 11 行乙的第二样保证），
+    /// 这次挂载里上一条完成的意图（「上一条无产出就不签」读它的 `segs0`）：跨趟留着，不随一趟结束丢掉，
     /// 可写挂载续做做完的那一条也记在这里、交给会话。
     pub last_completed_intent: Option<CompactionIntent>,
     /// 定时兜底上一次查起跑判据时调用方的钟读数；还没查过是 `None`。
     timer_fallback_last_check: Option<CallerMonotonicClockReading>,
     /// 写带宽上限的这一个窗口（[`COMPACTION_WRITE_BANDWIDTH_WINDOW`]）：开了上限的后台入口推第一批时开、过了一个窗口长就换新的。
     write_bandwidth_window: Option<CompactionWriteBandwidthWindow>,
+    /// 这次挂载里读—改—写读回旧数据单元时只坏一份的次数（D4（校验和位置） 已定项 4「读到只坏一份时计数」）：会话把每次用户改动里各次发布的写入口
+    /// 上的数加进来（`transaction::PoolWriter::old_data_unit_reads_back_with_one_copy_failing`）。与常驻隔离集同是这次挂载里见到的坏副本那一类观测，
+    /// 同住这一份挂载期状态；只在内存里，新挂载从 0 起（[`Self::of_a_new_mount`]）。
+    old_data_unit_reads_back_with_one_copy_failing: u64,
+    /// 可写挂载读盘建上一版时按位置条目读一个单元只坏一份的次数（D4（校验和位置） 已定项 4「读到只坏一份时计数」）：挂载交回之前记一次
+    /// （`mount::mount_writable` 那一串）。与上一样分开记：上一样是读—改—写读回旧数据单元，这一样是挂载读的各类单元。只在内存里，新挂载从 0 起。
+    unit_reads_with_one_copy_failing_while_mounting: u64,
+    /// 可写挂载读盘建上一版时读到只坏一份、到挂载交回那一版仍在中央映射里（或留存条目里）的那几个单元的映射 key（一个单元一把，按读到的先后）：
+    /// 会话下一次用户改动发成之后照快照下另发那批同一条路径把它们搬到新槽、两份新写（
+    /// `mounted_session::MountedSession::publish_user_change`），交给那一批就清空。只在内存里，新挂载是空的。
+    mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting: Vec<Vec<u8>>,
+    /// 只供测试的开关：会话另发的那一批搬迁发之前当作被空间准入拒（[`RelocationKeptForTheSnapshotsRefusedForSpace`]）。新挂载是产品值。
+    relocation_kept_for_the_snapshots_refused_for_space:
+        RelocationKeptForTheSnapshotsRefusedForSpace,
+    /// 只供测试的开关：会话另发的那一批搬迁发之前当作被拒、不是空间不够（[`RelocationKeptForTheSnapshotsRefusedNotForSpace`]）。新挂载是产品值。
+    relocation_kept_for_the_snapshots_refused_not_for_space:
+        RelocationKeptForTheSnapshotsRefusedNotForSpace,
+    /// 只供测试的开关：为另发的那一批推的抬 F 当作自己报错（[`FloorRaiseForTheRelocationKeptForTheSnapshotsFails`]）。新挂载是产品值。
+    floor_raise_for_the_relocation_kept_for_the_snapshots_fails:
+        FloorRaiseForTheRelocationKeptForTheSnapshotsFails,
 }
 
 impl CompactionOfThisMount {
@@ -821,7 +880,161 @@ impl CompactionOfThisMount {
             last_completed_intent: None,
             timer_fallback_last_check: None,
             write_bandwidth_window: None,
+            old_data_unit_reads_back_with_one_copy_failing: 0,
+            unit_reads_with_one_copy_failing_while_mounting: 0,
+            mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting: Vec::new(),
+            relocation_kept_for_the_snapshots_refused_for_space:
+                RelocationKeptForTheSnapshotsRefusedForSpace::NotForced,
+            relocation_kept_for_the_snapshots_refused_not_for_space:
+                RelocationKeptForTheSnapshotsRefusedNotForSpace::NotForced,
+            floor_raise_for_the_relocation_kept_for_the_snapshots_fails:
+                FloorRaiseForTheRelocationKeptForTheSnapshotsFails::NotForced,
         }
+    }
+
+    /// 可写挂载读盘建上一版时只坏一份的次数（[`Self::count_unit_reads_with_one_copy_failing_while_mounting`] 记的）。
+    #[must_use]
+    pub fn unit_reads_with_one_copy_failing_while_mounting(&self) -> u64 {
+        self.unit_reads_with_one_copy_failing_while_mounting
+    }
+
+    /// 把可写挂载读盘建上一版时只坏一份的次数加进这一份挂载期状态（挂载交回之前调一次）。
+    ///
+    /// # Panics
+    /// 加起来越过 u64：每一次都是一次真读盘，一次挂载里读不到 2⁶⁴ 次。
+    pub(crate) fn count_unit_reads_with_one_copy_failing_while_mounting(
+        &mut self,
+        reads_while_mounting: u64,
+    ) {
+        self.unit_reads_with_one_copy_failing_while_mounting = self
+            .unit_reads_with_one_copy_failing_while_mounting
+            .checked_add(reads_while_mounting)
+            .expect("一次挂载里只坏一份的读次数装得进 u64");
+    }
+
+    /// 可写挂载读盘建上一版时读到只坏一份、还没交给另发那一批的那几个单元的映射 key（[`Self::keep_the_mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting`]
+    /// 记的，会话下一次用户改动发成之后取走）。
+    #[must_use]
+    pub fn mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting(
+        &self,
+    ) -> &[Vec<u8>] {
+        &self.mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting
+    }
+
+    /// 记下可写挂载读盘建上一版时读到只坏一份的那几个单元的映射 key（挂载交回之前调一次，接在已记的后面、同一把只记一次）。
+    pub(crate) fn keep_the_mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting(
+        &mut self,
+        mapping_keys: Vec<Vec<u8>>,
+    ) {
+        for mapping_key in mapping_keys {
+            if !self
+                .mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting
+                .contains(&mapping_key)
+            {
+                self.mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting
+                    .push(mapping_key);
+            }
+        }
+    }
+
+    /// 取走记着的那几把 key（交给另发那一批），这一份挂载期状态里清空：另发那一批不管搬没搬成都只试这一次，被拒的结局随那次改动报出。
+    pub(crate) fn take_the_mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting(
+        &mut self,
+    ) -> Vec<Vec<u8>> {
+        std::mem::take(
+            &mut self.mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting,
+        )
+    }
+
+    /// 装上只供测试的开关：会话另发的那一批搬迁发之前当作被空间准入拒（[`RelocationKeptForTheSnapshotsRefusedForSpace`]）。产品路径一处都不调它。
+    pub fn force_the_relocation_kept_for_the_snapshots_refused_for_space_for_tests(
+        &mut self,
+        forcing: RelocationKeptForTheSnapshotsRefusedForSpace,
+    ) {
+        self.relocation_kept_for_the_snapshots_refused_for_space = forcing;
+    }
+
+    /// 会话另发那一批的这一次该不该当作被空间准入拒（开关用掉一次就记下：「接下来这几次」少一次，用完回到产品值）。
+    pub(crate) fn take_a_forced_space_refusal_of_the_relocation_kept_for_the_snapshots(
+        &mut self,
+    ) -> bool {
+        match self.relocation_kept_for_the_snapshots_refused_for_space {
+            RelocationKeptForTheSnapshotsRefusedForSpace::NotForced => false,
+            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedOnEveryAttemptForTests => true,
+            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedForTheNextAttemptsForTests {
+                attempts,
+            } => {
+                self.relocation_kept_for_the_snapshots_refused_for_space =
+                    match NonZeroU64::new(attempts.get() - 1) {
+                        Some(attempts_left) => {
+                            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedForTheNextAttemptsForTests {
+                                attempts: attempts_left,
+                            }
+                        }
+                        None => RelocationKeptForTheSnapshotsRefusedForSpace::NotForced,
+                    };
+                true
+            }
+        }
+    }
+
+    /// 装上只供测试的开关：会话另发的那一批搬迁发之前当作被拒、不是空间不够（[`RelocationKeptForTheSnapshotsRefusedNotForSpace`]）。
+    /// 产品路径一处都不调它。
+    pub fn force_the_relocation_kept_for_the_snapshots_refused_not_for_space_for_tests(
+        &mut self,
+        forcing: RelocationKeptForTheSnapshotsRefusedNotForSpace,
+    ) {
+        self.relocation_kept_for_the_snapshots_refused_not_for_space = forcing;
+    }
+
+    /// 会话另发那一批的这一次该不该当作被拒、不是空间不够。
+    #[must_use]
+    pub(crate) fn is_the_relocation_kept_for_the_snapshots_forced_refused_not_for_space(
+        &self,
+    ) -> bool {
+        match self.relocation_kept_for_the_snapshots_refused_not_for_space {
+            RelocationKeptForTheSnapshotsRefusedNotForSpace::NotForced => false,
+            RelocationKeptForTheSnapshotsRefusedNotForSpace::ForcedOnEveryAttemptForTests => true,
+        }
+    }
+
+    /// 装上只供测试的开关：为另发的那一批推的抬 F 当作自己报错（[`FloorRaiseForTheRelocationKeptForTheSnapshotsFails`]）。产品路径一处都不调它。
+    pub fn force_the_floor_raise_for_the_relocation_kept_for_the_snapshots_to_fail_for_tests(
+        &mut self,
+        forcing: FloorRaiseForTheRelocationKeptForTheSnapshotsFails,
+    ) {
+        self.floor_raise_for_the_relocation_kept_for_the_snapshots_fails = forcing;
+    }
+
+    /// 为另发那一批推的这一串抬 F 该不该当作自己报了错。
+    #[must_use]
+    pub(crate) fn is_the_floor_raise_for_the_relocation_kept_for_the_snapshots_forced_to_fail(
+        &self,
+    ) -> bool {
+        match self.floor_raise_for_the_relocation_kept_for_the_snapshots_fails {
+            FloorRaiseForTheRelocationKeptForTheSnapshotsFails::NotForced => false,
+            FloorRaiseForTheRelocationKeptForTheSnapshotsFails::ForcedOnEveryRaiseForTests => true,
+        }
+    }
+
+    /// 这次挂载里读—改—写读回旧数据单元时只坏一份的次数（各次发布之和）。
+    #[must_use]
+    pub fn old_data_unit_reads_back_with_one_copy_failing(&self) -> u64 {
+        self.old_data_unit_reads_back_with_one_copy_failing
+    }
+
+    /// 把一次用户改动里各次发布读回时只坏一份的次数加进这次挂载的累计。
+    ///
+    /// # Panics
+    /// 加起来越过 u64：每一次都是一次真读盘，一次挂载里读不到 2⁶⁴ 次。
+    pub(crate) fn count_old_data_unit_reads_back_with_one_copy_failing(
+        &mut self,
+        reads_of_the_change: u64,
+    ) {
+        self.old_data_unit_reads_back_with_one_copy_failing = self
+            .old_data_unit_reads_back_with_one_copy_failing
+            .checked_add(reads_of_the_change)
+            .expect("一次挂载里只坏一份的读回次数装得进 u64");
     }
 
     /// 定时兜底这一次该不该再查一次起跑判据（D26（后台整理与放置回收） 已定项 13 第 5 条「另有定时兜底，每隔一段时间再查一次」）：
@@ -951,7 +1164,7 @@ pub fn empty_cluster_segments_by_the_records(
     full_segments - u64::try_from(segments_with_an_unreleased_record.len()).expect("段数")
 }
 
-/// 签发前判（D26（后台整理与放置回收） 已定项 1 第 2 条，攻方 K-g）的左边：R 那块盘上、R 之外、「非全空」的段里没挡的槽数。
+/// 签发前判（D26（后台整理与放置回收） 已定项 1 第 2 条）的左边：R 那块盘上、R 之外、「非全空」的段里没挡的槽数。
 /// 「非全空」按记录口径；只装提交内生块的段不算非全空——段里至少一个槽罩在 `slots_holding_user_data`（码 1 数据单元的落点，
 /// 两盘同槽只比槽号）里才算。`is_unblocked(槽)` 说那一槽此刻能不能当目的地（已分配、隔离、抬 F 扣住三种位一个都没置）。
 #[must_use]
@@ -1051,7 +1264,7 @@ pub fn region_is_empty_by_the_records(
     })
 }
 
-/// 一条意图完成之后签不签下一条（攻方 K-h）：全局差值 `全空聚簇段数(现在) − segs0 ≥ 1` 为真才签。
+/// 一条意图完成之后签不签下一条：全局差值 `全空聚簇段数(现在) − segs0 ≥ 1` 为真才签。
 #[must_use]
 pub const fn the_completed_intent_yielded(
     empty_cluster_segments_now: u64,
@@ -1060,7 +1273,7 @@ pub const fn the_completed_intent_yielded(
     empty_cluster_segments_now > empty_cluster_segments_at_issue
 }
 
-/// 签发之后 R 里出现了隔离槽没有（攻方 K-c；丁 1 交判第 4 点：一个槽既钉住又在隔离集里，区域扫描判「钉住」照旧，这一判另外直接查隔离集，
+/// 签发之后 R 里出现了隔离槽没有（一个槽既钉住又在隔离集里，区域扫描判「钉住」照旧，这一判另外直接查隔离集，
 /// 两者同时成立也算有）。
 #[must_use]
 pub fn region_holds_a_quarantined_slot(
@@ -1073,7 +1286,7 @@ pub fn region_holds_a_quarantined_slot(
         .is_some()
 }
 
-/// 用户改动发成之后起跑判据查出的结果（判决 G8 丁）。整理挪出了用户改动的调用线程（用户 2026-10-26 定「挪出调用线程」；
+/// 用户改动发成之后起跑判据查出的结果。整理挪出了用户改动的调用线程（
 /// D24（后台重活能不能卸给 GPU） 已定项 2 第 2 条「不许进前台路径」）：发布路径只查、一批都不发，查出「该跑了」记在会话上，
 /// 由后台入口（`mounted_session::MountedSession::run_compaction_in_the_background`）取走去跑。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1095,8 +1308,8 @@ pub enum CompactionTimerFallback {
     EveryMilliseconds(NonZeroU64),
 }
 
-/// 定时兜底间隔的默认：关（第一轮正推 `research/prompts/m4-gpugc-design-r1-sonnet-output.md`「G6.5」推荐（2）「兜底间隔默认 0（关），
-/// 与水位恒 0 同一个读法」）。默认值待 C412（整理的挂钟代价没量过） 与 E10（老化：结构抗老化 vs 事后整理）。
+/// 定时兜底间隔的默认：关（兜底间隔默认 0（关），
+/// 与水位恒 0 同一个读法）。默认值待 C412（整理的挂钟代价没量过） 与 E10（老化：结构抗老化 vs 事后整理）。
 pub const COMPACTION_TIMER_FALLBACK_BY_DEFAULT: CompactionTimerFallback =
     CompactionTimerFallback::Off;
 
@@ -1115,7 +1328,7 @@ pub enum CompactionWriteBandwidthLimit {
     BytesPerSecond(NonZeroU64),
 }
 
-/// 写带宽上限的默认：不限（第一轮正推「G6.5」推荐（1）「写带宽上限默认不限」）。默认值待 C412（整理的挂钟代价没量过） 与
+/// 写带宽上限的默认：不限。默认值待 C412（整理的挂钟代价没量过） 与
 /// E10（老化：结构抗老化 vs 事后整理）。
 pub const COMPACTION_WRITE_BANDWIDTH_LIMIT_BY_DEFAULT: CompactionWriteBandwidthLimit =
     CompactionWriteBandwidthLimit::Unlimited;
@@ -1160,7 +1373,7 @@ pub trait CallerOfTheBackgroundCompaction {
     fn foreground_fsync(&self) -> ForegroundFsync;
 }
 
-/// 一次整理运行的发布预算（判决 G8 `B_gc`，正推 O11：整理的发布不改用户可见状态，连发会把回退候选集挤成 1 个状态）：
+/// 一次整理运行的发布预算：
 /// `3S − 4 − 已经过去的发布数`，至少 1。`S` 是每区根槽数。
 #[must_use]
 pub fn publish_budget_of_a_compaction_run(
@@ -1173,10 +1386,10 @@ pub fn publish_budget_of_a_compaction_run(
         .max(1)
 }
 
-/// 后台入口的一趟还能发几次整理发布（岔路单 `research/prompts/m4-gpugc-design-r1-forks.md` 第 18 行甲，用户 2026-10-26 定「与用户改动共用
-/// `B_gc`」）：一次用户改动给出一份 `B_gc`（[`publish_budget_of_a_compaction_run`] 在已经过去的发布数为 0 时的值，至少 1），之后用户改动那一趟
+/// 后台入口的一趟还能发几次整理发布（与用户改动共用
+/// `B_gc`）：一次用户改动给出一份 `B_gc`（[`publish_budget_of_a_compaction_run`] 在已经过去的发布数为 0 时的值，至少 1），之后用户改动那一趟
 /// 与定时兜底那几趟都从这同一份里扣；扣完是 0，等下一次用户改动（会话发成一次用户改动就把已经过去的发布数归零）才再有。
-/// 不像显式入口那样每一趟至少 1：那一条加上定时兜底，闲置时整理发布就没有上限（第二轮攻方模型 200 拍连着 213 次，线是 `3S − 4`）。
+/// 不像显式入口那样每一趟至少 1：那一条加上定时兜底，闲置时整理发布就没有上限（200 拍连着 213 次，线是 `3S − 4`）。
 #[must_use]
 pub fn publishes_left_of_the_budget_given_by_the_last_user_change(
     root_ring_slots_per_region: u64,
@@ -1186,7 +1399,7 @@ pub fn publishes_left_of_the_budget_given_by_the_last_user_change(
         .saturating_sub(publishes_since_the_last_user_change)
 }
 
-/// 起跑判据（判决 G8 丁：水位越线再跑；D26（后台整理与放置回收） 已定项 13 第 5 条：每次用户改动发成之后查一次，定时兜底每隔一段时间再查一次，
+/// 起跑判据（水位越线再跑；D26（后台整理与放置回收） 已定项 13 第 5 条：定时兜底每隔一段时间查一次，每次用户改动发成之后也查一次，
 /// 两处查的都是它）。第一版三条水位恒 0（关），产品路径恒不起跑；只供测试的开关强制。
 #[must_use]
 pub const fn compaction_starts_by_the_watermarks(forcing: CompactionRunForcing) -> bool {
@@ -1198,7 +1411,7 @@ pub const fn compaction_starts_by_the_watermarks(forcing: CompactionRunForcing) 
     }
 }
 
-/// 与 Verus 证过的选段核、计划核逐项对拍（`.claude/kb/milestone/04-fourth-txn.md` 二·4；判决 `research/prompts/m4-gc-r1-main-verification.md`
+/// 与 Verus 证过的选段核、计划核逐项对拍（`.claude/kb/milestone/04-fourth-txn.md` 二·4；
 /// 第三节 G7 的 P1、P2、P3 证在 `singlefs_replay_prefix::compaction_plan_proofs` 的两个核上）：小输入上每一种形状都喂给这里的
 /// [`choose_region`]、[`plan_batch`] 与核，答案逐项相同。核那一侧的入参由用例按形状直接写出，不经这里的代码算，
 /// 所以两边对上就是这里的实现在这些输入上合核证过的性质。产品直接调用核；测试保留独立的原算法，核的证明不覆盖输入转换。
@@ -1326,7 +1539,7 @@ mod tests {
     /// 另一块盘上的记录：选段只数单元区那块盘上的活槽，核的入参里没有它们。
     const ANOTHER_DEVICE: DeviceIdentity = DeviceIdentity(1);
     const MOST_SEGMENTS_IN_THE_UNIT_AREA: usize = 3;
-    /// 一段里各条活记录的跨度（槽数），一条一项（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F8：输入域加跨度 2 的记录、
+    /// 一段里各条活记录的跨度（槽数），一条一项（输入域加跨度 2 的记录、
     /// 段内多于 2 条活记录）。选段数的是活槽、不是条数：跨度 2 的一条与跨度 1 的两条活槽相同、条数不同，跨度 2 的一条与跨度 1 的一条条数相同、
     /// 活槽不同，打分改成数条数时这两种并排的段排序就变了（`crates/mutations.tsv` 一行）。
     const LIVE_RECORD_SPANS_OF_A_SEGMENT: [&[u16]; 5] = [&[], &[1], &[2], &[1, 1], &[1, 1, 1]];
@@ -1430,7 +1643,7 @@ mod tests {
         .expect("默认单元区起点在聚簇段边界上，整段起点都是 64 的倍数")
     }
 
-    fn record(
+    fn allocation_record_of_generation_one(
         device: DeviceIdentity,
         slot: u64,
         span_slots: u16,
@@ -1468,20 +1681,20 @@ mod tests {
             let start_slot = segment_start_slot(segment_index);
             // 第 i 条活记录起在段起点之后 2i：跨度至多 2，各条互不重叠。
             for (live_record, span_slots) in (0_u64..).zip(shape.live_record_spans) {
-                allocation_records.push(record(
+                allocation_records.push(allocation_record_of_generation_one(
                     DEVICE_OF_THE_UNIT_AREA,
                     start_slot + 2 * live_record,
                     *span_slots,
                     false,
                 ));
-                allocation_records.push(record(
+                allocation_records.push(allocation_record_of_generation_one(
                     ANOTHER_DEVICE,
                     start_slot + 2 * live_record + 1,
                     1,
                     false,
                 ));
             }
-            allocation_records.push(record(
+            allocation_records.push(allocation_record_of_generation_one(
                 DEVICE_OF_THE_UNIT_AREA,
                 start_slot + RELEASED_RECORD_OFFSET_IN_THE_SEGMENT,
                 1,
@@ -1749,7 +1962,7 @@ mod tests {
     }
 
     /// 两项能搬、映射 key 相同的扫描结果（`scan_region` 交回 `Ok` 时走不到：它见到这样两项就拒这个 R）进计划就断言，
-    /// 不让同一把 key 进同一批两次（判决 G7 的 P2）。
+    /// 不让同一把 key 进同一批两次。
     #[test]
     #[should_panic(expected = "扫描结果里能搬的映射 key 两两不同")]
     fn plan_batch_refuses_a_region_scan_holding_two_movable_units_under_one_mapping_key() {
@@ -1777,7 +1990,7 @@ mod tests {
         }
     }
 
-    /// 跳过的集合是空的时，跳过本来就重写的节点那一份计划与 `plan_batch` 逐项相同（判决 m4-segment-code-r2 第三节 H4：没有试算出本来就重写的
+    /// 跳过的集合是空的时，跳过本来就重写的节点那一份计划与 `plan_batch` 逐项相同（没有试算出本来就重写的
     /// 单元时，计划照证过的核取）。
     #[test]
     fn plan_batch_skipping_no_unit_agrees_with_plan_batch_on_every_small_region_scan() {
@@ -1807,7 +2020,7 @@ mod tests {
         assert!(region_scans_compared > 0, "比过的形状不为 0");
     }
 
-    /// 打头那一个可搬单元是这次发布本来就重写的节点：计划跳过它，补上后面真要搬的单元，补满批大小（判决 m4-segment-code-r2 第三节 H4「补上 R 里
+    /// 打头那一个可搬单元是这次发布本来就重写的节点：计划跳过它，补上后面真要搬的单元，补满批大小（「补上 R 里
     /// 真要搬的单元」）。
     #[test]
     fn plan_batch_skipping_a_unit_rewritten_anyway_fills_the_batch_with_the_next_movable_units() {
@@ -1886,12 +2099,27 @@ mod tests {
             slots: 2 * CLUSTER_SEGMENT_SLOTS + CLUSTER_SEGMENT_SLOTS - 1,
         };
         let records = vec![
-            record(DEVICE_OF_THE_UNIT_AREA, start, 2, false),
-            record(DEVICE_OF_THE_UNIT_AREA, segment_start_slot(1), 1, false),
-            record(ANOTHER_DEVICE, segment_start_slot(1), 20, false),
-            record(DEVICE_OF_THE_UNIT_AREA, segment_start_slot(1) + 2, 20, true),
-            record(DEVICE_OF_THE_UNIT_AREA, start - 2, 1, false),
-            record(DEVICE_OF_THE_UNIT_AREA, segment_start_slot(2), 1, false),
+            allocation_record_of_generation_one(DEVICE_OF_THE_UNIT_AREA, start, 2, false),
+            allocation_record_of_generation_one(
+                DEVICE_OF_THE_UNIT_AREA,
+                segment_start_slot(1),
+                1,
+                false,
+            ),
+            allocation_record_of_generation_one(ANOTHER_DEVICE, segment_start_slot(1), 20, false),
+            allocation_record_of_generation_one(
+                DEVICE_OF_THE_UNIT_AREA,
+                segment_start_slot(1) + 2,
+                20,
+                true,
+            ),
+            allocation_record_of_generation_one(DEVICE_OF_THE_UNIT_AREA, start - 2, 1, false),
+            allocation_record_of_generation_one(
+                DEVICE_OF_THE_UNIT_AREA,
+                segment_start_slot(2),
+                1,
+                false,
+            ),
         ];
         let scan = |region: CompactionRegion, class| RegionScan {
             region,
@@ -1921,14 +2149,14 @@ mod tests {
         ];
         let opened = BTreeSet::new();
         let refused = SegmentsRefusedByTheRegionScan::default();
-        let check = |scans: &[RegionScan], pins: &BTreeSet<SlotNumber>, expected| {
+        let check = |scans_in_this_order: &[RegionScan], pins: &BTreeSet<SlotNumber>, expected| {
             let actual = choose_region(
                 &records,
                 area,
                 &opened,
                 None,
                 pins,
-                scans,
+                scans_in_this_order,
                 &refused,
                 RegionChoiceCriterion::Greedy,
             );
@@ -1941,7 +2169,7 @@ mod tests {
                     &opened,
                     None,
                     pins,
-                    scans,
+                    scans_in_this_order,
                     &refused,
                     RegionChoiceCriterion::Greedy
                 )
@@ -2245,7 +2473,7 @@ mod tests {
                         (FULL_SEGMENTS_OF_THE_RANDOM_UNIT_AREA + 1) * CLUSTER_SEGMENT_SLOTS + 16,
                     );
                 let span_slots = u16::try_from(1 + random.below(3)).expect("1 到 3");
-                record(device, slot, span_slots, random.one_in(4))
+                allocation_record_of_generation_one(device, slot, span_slots, random.one_in(4))
             })
             .collect();
         let segments_of_the_area = FULL_SEGMENTS_OF_THE_RANDOM_UNIT_AREA + 1;

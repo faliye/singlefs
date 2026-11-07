@@ -4,14 +4,14 @@
 //! - D16（发布语义） 已定项 5 末段逐字「事务切分纪律是一事务一单元」「事务切分纪律把一次写请求按单元切成若干事务各自取号，
 //!   一个事务最多写一个单元的用户数据，**同一次请求切出的若干事务按其单元的 key 升序取号**」；
 //! - D23（journal 的角色与格式） 已定项 7：事务号按实例计数、从 1 起，一条记录一个事务号；
-//! - C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案「一条记录装一个事务连同它的元数据」
+//! - C310（事务切分纪律与记录数口径打架）
 //!   ⇒ N 个数据单元 = N 个事务 = N 条记录；
 //! - D4（校验和位置） 已定项 5：单元恒 32768 含头，净荷不是 2 的幂，文件偏移到单元做除法（净荷容量取
 //!   [`crate::unit::data_unit_payload_capacity`]，不在这里另写一个数）。
 //!
 //! 这个模块只算切分：每个事务写哪一段文件字节、取几号事务号，在这里定死。它不发一个写、不动分配器。
 //! 每个事务的 `payload_start` 就是 extent 叶记录 key 的 offset 段与数据单元头的锚点偏移（文件字节偏移，
-//! D8（核心索引结构） 已定项 3，C490（extent 叶 key 的 offset 段没定单位） 2026-09-23 定），发布路径直接拿它编 key。
+//! D8（核心索引结构） 已定项 3，C490（extent 叶 key 的 offset 段没定单位）），发布路径直接拿它编 key。
 
 use crate::address::{DataUnitIndexInFile, FileOffsetInBytes};
 use crate::unit::data_unit_payload_capacity;
@@ -58,7 +58,10 @@ impl OneUnitTransaction {
 #[must_use]
 pub fn data_unit_count_of_a_sequential_write(content_length_in_bytes: u64) -> u64 {
     let payload_capacity = payload_capacity_in_bytes();
-    content_length_in_bytes.div_ceil(payload_capacity).max(1)
+    singlefs_replay_prefix::file_range_proofs::units_for_sequential_write(
+        content_length_in_bytes,
+        payload_capacity,
+    )
 }
 
 /// 读侧看一个 inode 在 extent 树上段叶里的那一条（D8（核心索引结构） 已定项 14；标签 3、4 与「标签 0 配 size > 0」是判决
@@ -124,7 +127,7 @@ pub fn data_units_read_within_the_file_size(
 ///
 /// **为什么这个次序就是 D16（发布语义） 已定项 5 要的「按 key 升序取号」**：extent key 三段是
 /// `(locality_id, inode, offset)`（D8（核心索引结构） 已定项 3），一次写请求内前两段不变，第三段就是文件字节偏移
-/// （2026-09-23 定）⇒ 文件偏移升序即 key 升序。
+/// ⇒ 文件偏移升序即 key 升序。
 ///
 /// # Panics
 /// 事务号加到绕回 u64，或算出的区间起点乘溢出：两样都要求内容长度接近 u64 上界，而内容是一段内存里的切片。
@@ -165,7 +168,7 @@ pub fn split_sequential_write_into_one_unit_transactions(
     transactions
 }
 
-/// 一次按偏移的写（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节）里一个要装的数据单元从哪来、读不读盘。
+/// 一次按偏移的写里一个要装的数据单元从哪来、读不读盘。
 /// 封闭集合，`match` 不写通配臂。「有没有旧单元」只看写之前的单元数，不看任何一次读的结果；「盖满」是这次的字节罩住这个单元整个净荷容量
 /// （`[单元号 × 净荷, (单元号 + 1) × 净荷)`），不是只罩住它的声明长度（R2「盖满不读」那一格）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,7 +178,7 @@ pub enum DataUnitOfAPartialWrite {
     OldUnitReadBack,
     /// 有旧单元、净荷被这次的字节整单元盖满：不读，内容全取这次的字节。
     OldUnitCoveredWhole,
-    /// 没有旧单元、这次写到它而没盖满：读这次发布分到的新槽的残留一次，字节丢掉、旧内容按零（用户 2026-10-26 定「首次写也读回」，
+    /// 没有旧单元、这次写到它而没盖满：读这次发布分到的新槽的残留一次，字节丢掉、旧内容按零（
     /// 残留读出错记数、不拒写）。
     NewUnitReadingTheResidueOfItsSlot,
     /// 没有旧单元、净荷被这次的字节整单元盖满：不读。
@@ -225,7 +228,7 @@ impl DataUnitOfAPartialWrite {
 }
 
 /// 一次按偏移的写在一个文件上要做的事（只算，不读不写、不动分配器）：写之前这个文件挂着几个单元、size 多少，这次写 `[offset, offset + 长度)`。
-/// 写之后的 size 取写之前的与写的终点里大的（跨末尾的写同时是一次变长，判决第二节 R5 那一格）；写之后的单元数取写之前的与这次写到的最后一个
+/// 写之后的 size 取写之前的与写的终点里大的（跨末尾的写同时是一次变长， 那一格）；写之后的单元数取写之前的与这次写到的最后一个
 /// 单元号加一里大的（单元从 0 起连号，洞只在尾部）。重写的是从 [`Self::first_rewritten_unit`] 起到写之后最后一个单元的那一段（R4：写到偏移 o
 /// 时把 o 之后的单元一起重写，「出生 txg 随偏移不降」照旧成立，读法 Z 加写序不改）：
 /// - 写落在已有的单元上（o 小于写之前的单元数）：从 o 起；
@@ -250,7 +253,10 @@ impl PartialWriteOfAFile {
         offset: FileOffsetInBytes,
         length_in_bytes: std::num::NonZeroU64,
     ) -> Option<Self> {
-        let end_exclusive = offset.0.checked_add(length_in_bytes.get())?;
+        let end_exclusive = singlefs_replay_prefix::file_range_proofs::checked_write_end(
+            offset.0,
+            length_in_bytes.get(),
+        )?;
         Some(PartialWriteOfAFile {
             data_units_before,
             size_before_in_bytes,
@@ -275,37 +281,51 @@ impl PartialWriteOfAFile {
     /// 这次的字节落到的第一个单元（o）。
     #[must_use]
     pub fn first_written_unit(self) -> DataUnitIndexInFile {
-        DataUnitIndexInFile(self.offset.0 / payload_capacity_in_bytes())
+        DataUnitIndexInFile(
+            singlefs_replay_prefix::partial_write_proofs::unit_containing_byte(
+                self.offset.0,
+                payload_capacity_in_bytes(),
+            ),
+        )
     }
 
     /// 这次的字节落到的最后一个单元。
     #[must_use]
     pub fn last_written_unit(self) -> DataUnitIndexInFile {
-        DataUnitIndexInFile((self.end_exclusive - 1) / payload_capacity_in_bytes())
+        DataUnitIndexInFile(
+            singlefs_replay_prefix::partial_write_proofs::unit_containing_byte(
+                self.end_exclusive - 1,
+                payload_capacity_in_bytes(),
+            ),
+        )
     }
 
     /// 写之后这个文件挂着几个单元（从 0 起连号）。
     #[must_use]
     pub fn data_units_after(self) -> u64 {
-        self.data_units_before.max(self.last_written_unit().0 + 1)
+        singlefs_replay_prefix::partial_write_proofs::units_after_partial_write(
+            self.data_units_before,
+            self.end_exclusive,
+            payload_capacity_in_bytes(),
+        )
     }
 
     /// 这次从第几个单元起一起重写（到 [`Self::data_units_after`] 为止，见类型的文档）。
     #[must_use]
     pub fn first_rewritten_unit(self) -> DataUnitIndexInFile {
         let first_written = self.first_written_unit().0;
-        if first_written < self.data_units_before {
-            return DataUnitIndexInFile(first_written);
-        }
-        match self.data_units_before.checked_sub(1) {
-            Some(last_existing)
-                if payload_length_within_a_size(last_existing, self.size_before_in_bytes)
-                    < payload_capacity_in_bytes() =>
-            {
-                DataUnitIndexInFile(last_existing)
-            }
-            Some(_) | None => DataUnitIndexInFile(self.data_units_before),
-        }
+        let tail_is_partial = first_written >= self.data_units_before
+            && self.data_units_before.checked_sub(1).is_some_and(|last| {
+                payload_length_within_a_size(last, self.size_before_in_bytes)
+                    < payload_capacity_in_bytes()
+            });
+        DataUnitIndexInFile(
+            singlefs_replay_prefix::partial_write_proofs::first_unit_to_rewrite(
+                first_written,
+                self.data_units_before,
+                tail_is_partial,
+            ),
+        )
     }
 
     /// 这次重写的每个单元号，升序。
@@ -323,7 +343,7 @@ impl PartialWriteOfAFile {
     /// 第 `unit` 个单元（在 [`Self::rewritten_units`] 里）这次怎么装。
     ///
     /// # Panics
-    /// `unit` 不在这次重写的那一段里：调用方只问那一段。
+    /// `unit` 不在这次重写的那一段里，或完整单元地址超出 u64。
     #[must_use]
     pub fn data_unit(self, unit: DataUnitIndexInFile) -> DataUnitOfAPartialWrite {
         assert!(
@@ -331,34 +351,53 @@ impl PartialWriteOfAFile {
             "只问这次重写的那一段里的单元"
         );
         let payload_capacity = payload_capacity_in_bytes();
-        let unit_start = unit.0 * payload_capacity;
-        let unit_end_exclusive = unit_start + payload_capacity;
-        let is_written = self.offset.0 < unit_end_exclusive && unit_start < self.end_exclusive;
-        let is_covered_whole =
-            self.offset.0 <= unit_start && unit_end_exclusive <= self.end_exclusive;
-        let has_an_old_unit = unit.0 < self.data_units_before;
-        match (has_an_old_unit, is_written, is_covered_whole) {
-            (true, _, true) => DataUnitOfAPartialWrite::OldUnitCoveredWhole,
-            (true, _, false) => DataUnitOfAPartialWrite::OldUnitReadBack,
-            (false, false, _) => DataUnitOfAPartialWrite::GapFilledWithZeros,
-            (false, true, true) => DataUnitOfAPartialWrite::NewUnitCoveredWhole,
-            (false, true, false) => DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot,
+        let (unit_start, unit_end_exclusive) =
+            singlefs_replay_prefix::file_range_proofs::checked_unit_byte_range(
+                unit.0,
+                payload_capacity,
+            )
+            .expect("部分写只处理完整地址可表示的单元");
+        use singlefs_replay_prefix::partial_write_proofs::PartialWriteUnitSource;
+        match singlefs_replay_prefix::partial_write_proofs::classify_partial_write_unit(
+            unit.0 < self.data_units_before,
+            self.offset.0,
+            self.end_exclusive,
+            unit_start,
+            unit_end_exclusive,
+        ) {
+            PartialWriteUnitSource::OldCoveredWhole => DataUnitOfAPartialWrite::OldUnitCoveredWhole,
+            PartialWriteUnitSource::OldReadBack => DataUnitOfAPartialWrite::OldUnitReadBack,
+            PartialWriteUnitSource::ZeroGap => DataUnitOfAPartialWrite::GapFilledWithZeros,
+            PartialWriteUnitSource::NewCoveredWhole => DataUnitOfAPartialWrite::NewUnitCoveredWhole,
+            PartialWriteUnitSource::NewReadResidue => {
+                DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot
+            }
         }
     }
 
     /// 这次的字节落在第 `unit` 个单元净荷里的那一段（[`BytesOfTheWriteInOneUnit`]）；这次没写到它交回 `None`。
+    ///
+    /// # Panics
+    /// 完整单元地址超出 u64；调用方须先检查整单元取整后的目标大小与已有单元界限。
     #[must_use]
     pub fn bytes_written_into(self, unit: DataUnitIndexInFile) -> Option<BytesOfTheWriteInOneUnit> {
         let payload_capacity = payload_capacity_in_bytes();
-        let unit_start = unit.0 * payload_capacity;
-        let unit_end_exclusive = unit_start + payload_capacity;
-        let from = self.offset.0.max(unit_start);
-        let until = self.end_exclusive.min(unit_end_exclusive);
-        (from < until).then(|| BytesOfTheWriteInOneUnit {
-            offset_in_the_payload: from - unit_start,
-            offset_in_the_bytes_written: from - self.offset.0,
-            length_in_bytes: until - from,
-        })
+        singlefs_replay_prefix::file_range_proofs::checked_bytes_in_indexed_unit(
+            self.offset.0,
+            self.end_exclusive,
+            unit.0,
+            payload_capacity,
+        )
+        .expect("部分写只处理完整地址可表示的单元")
+        .map(
+            |(offset_in_the_payload, offset_in_the_bytes_written, length_in_bytes)| {
+                BytesOfTheWriteInOneUnit {
+                    offset_in_the_payload,
+                    offset_in_the_bytes_written,
+                    length_in_bytes,
+                }
+            },
+        )
     }
 }
 
@@ -374,20 +413,122 @@ pub struct BytesOfTheWriteInOneUnit {
 /// （与 `truncate::declared_length_within_a_size` 同一条式子；`truncate` 依赖这个模块，这里不反过来引它）。
 fn payload_length_within_a_size(unit: u64, size_in_bytes: u64) -> u64 {
     let payload_capacity = payload_capacity_in_bytes();
-    size_in_bytes
-        .saturating_sub(unit.saturating_mul(payload_capacity))
-        .min(payload_capacity)
+    singlefs_replay_prefix::file_range_proofs::payload_length_from_start(
+        unit.saturating_mul(payload_capacity),
+        size_in_bytes,
+        payload_capacity,
+    )
 }
 
 /// 一个数据单元装得下多少字节用户数据，换成 `u64`：唯一的来源是
 /// [`crate::unit::data_unit_payload_capacity`]，这里不另写一个数。
-fn payload_capacity_in_bytes() -> u64 {
+pub(crate) fn payload_capacity_in_bytes() -> u64 {
     u64::try_from(data_unit_payload_capacity()).expect("32634")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn partial_write_unit_addresses_reject_overflow_in_all_build_profiles() {
+        let capacity = payload_capacity_in_bytes();
+        let last_complete_end = u64::MAX / capacity * capacity;
+        let valid = PartialWriteOfAFile::new(
+            0,
+            0,
+            FileOffsetInBytes(last_complete_end - 1),
+            std::num::NonZeroU64::MIN,
+        )
+        .expect("写的终点可表示");
+        assert_eq!(
+            valid.bytes_written_into(valid.last_written_unit()),
+            Some(BytesOfTheWriteInOneUnit {
+                offset_in_the_payload: capacity - 1,
+                offset_in_the_bytes_written: 0,
+                length_in_bytes: 1,
+            })
+        );
+        let invalid = PartialWriteOfAFile::new(
+            0,
+            0,
+            FileOffsetInBytes(u64::MAX - 1),
+            std::num::NonZeroU64::MIN,
+        )
+        .expect("字节终点可表示不等于完整单元终点可表示");
+        assert!(std::panic::catch_unwind(
+            || invalid.bytes_written_into(invalid.last_written_unit())
+        )
+        .is_err());
+        assert!(
+            std::panic::catch_unwind(|| invalid.data_unit(invalid.last_written_unit())).is_err()
+        );
+        assert!(std::panic::catch_unwind(
+            || valid.bytes_written_into(DataUnitIndexInFile(u64::MAX))
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn partial_write_read_decisions_match_overwritten_bytes_at_unit_boundaries() {
+        let capacity = 32_634u64;
+        for existing in [0u64, 1, 2] {
+            for offset in [0, capacity - 1, capacity, capacity + 1, 3 * capacity] {
+                for length in [1, capacity, capacity + 1] {
+                    let plan = PartialWriteOfAFile::new(
+                        existing,
+                        (existing * capacity).saturating_sub(1),
+                        FileOffsetInBytes(offset),
+                        std::num::NonZeroU64::new(length).unwrap(),
+                    )
+                    .unwrap();
+                    let touched = (offset..offset + length)
+                        .map(|byte| byte / capacity)
+                        .collect::<std::collections::BTreeSet<_>>();
+                    assert_eq!(plan.first_written_unit().0, *touched.first().unwrap());
+                    assert_eq!(plan.last_written_unit().0, *touched.last().unwrap());
+                    for unit in plan.rewritten_units() {
+                        let overwritten = (unit * capacity..(unit + 1) * capacity)
+                            .filter(|byte| (offset..offset + length).contains(byte))
+                            .count() as u64;
+                        let source = plan.data_unit(DataUnitIndexInFile(unit));
+                        assert_eq!(
+                            source.reads_the_old_unit_back(),
+                            unit < existing && overwritten < capacity
+                        );
+                        assert_eq!(
+                            source.reads_the_residue_of_its_slot(),
+                            unit >= existing && overwritten > 0 && overwritten < capacity
+                        );
+                        assert_eq!(
+                            source == DataUnitOfAPartialWrite::GapFilledWithZeros,
+                            unit >= existing && overwritten == 0
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn unit_count_and_truncation_admission_agree_at_the_last_representable_whole_unit() {
+        let capacity = 32_634u64;
+        let last_multiple = u64::MAX / capacity * capacity;
+        assert_eq!(data_unit_count_of_a_sequential_write(0), 1);
+        assert_eq!(
+            data_unit_count_of_a_sequential_write(last_multiple),
+            u64::MAX / capacity
+        );
+        assert_eq!(
+            data_unit_count_of_a_sequential_write(last_multiple + 1),
+            u64::MAX / capacity + 1
+        );
+        assert!(crate::truncate::target_size_rounded_up_to_a_whole_data_unit_fits(last_multiple));
+        assert!(
+            !crate::truncate::target_size_rounded_up_to_a_whole_data_unit_fits(last_multiple + 1)
+        );
+        assert!(!crate::truncate::target_size_rounded_up_to_a_whole_data_unit_fits(u64::MAX));
+    }
 
     /// 净荷容量是 32634（32768 − 头 105 − 预留 29，字节表二）：切分的每个数都压在它上面，先把它钉住。
     #[test]
@@ -607,7 +748,7 @@ mod tests {
             .collect()
     }
 
-    /// 判决 m4-partial-write-r1 第二节 R2 逐格表与 R4：三个单元的文件改单元 1 中间 4 KiB，单元 1、2 一起重写、都读回旧单元；
+    /// 三个单元的文件改单元 1 中间 4 KiB，单元 1、2 一起重写、都读回旧单元；
     /// 整单元盖满单元 1 时单元 1 不读、单元 2 照读；单元数与 size 不变。
     #[test]
     fn a_write_inside_existing_units_rewrites_every_unit_from_the_offset_and_reads_back_what_it_does_not_cover(

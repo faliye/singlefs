@@ -1,0 +1,3 @@
+pub fn reported() -> &'static str {
+    env!("FBUILD_REPORTED_FEATURES")
+}

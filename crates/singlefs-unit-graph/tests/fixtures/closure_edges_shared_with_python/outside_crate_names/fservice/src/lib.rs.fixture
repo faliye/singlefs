@@ -1,0 +1,43 @@
+pub mod control {
+    pub fn paused() -> u32 {
+        5
+    }
+}
+
+pub mod bench {
+    pub struct Log {
+        pub entries: u64,
+    }
+
+    pub fn launch() -> u32 {
+        7
+    }
+}
+
+pub mod log {
+    pub struct Log {
+        pub entries: u32,
+    }
+}
+
+use log::Log;
+
+pub struct Worker;
+
+impl Worker {
+    fn launch(&self) -> u32 {
+        2
+    }
+}
+
+pub fn stopped_connections() -> u32 {
+    Worker.launch() + Log { entries: 1 }.entries
+}
+
+pub fn restarts() -> u32 {
+    4
+}
+
+pub fn halted() -> u32 {
+    6
+}

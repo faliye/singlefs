@@ -1,11 +1,10 @@
-//! extent 树按 key 空间定形状（D8（核心索引结构） 已定项 14「extent 树」，用户 2026-09-24 定 K2）：两段，都按位置寻址，不分裂。
+//! extent 树按 key 空间定形状（D8（核心索引结构） 已定项 14「extent 树」）：两段，都按位置寻址，不分裂。
 //!
 //! - **上段**按 inode 号的位置寻址：叶 j 罩 inode 号 `[j × U, (j + 1) × U)`，U = [`EXTENT_TREE_UPPER_LEAF_INODES`]；层级 L 上第 j 个节点罩
 //!   `[j × U × F^L, (j + 1) × U × F^L)`，F = [`EXTENT_TREE_INTERNAL_FANOUT`]。上段的根是它最高那一层的第 0 个节点（罩从 inode 0 起的一段），
 //!   层级是罩得住有条目的最大 inode 号的最低一层。上段叶条目（[`ExtentUpperLeafEntry`]，113 字节）带一个标签字节区分
 //!   「没有单元（0）/ 下段根指针（1）/ 内联数据指针（2）/ 下段根指针、下段最后一个单元之后到 size 是洞（3）/
-//!   内联数据指针、单元 0 之后到 size 是洞（4）」（3、4 两个值：判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5，
-//!   用户 2026-10-16 定「加标签声明洞」）。
+//!   内联数据指针、单元 0 之后到 size 是洞（4）」。
 //! - **下段**一个文件一棵，按数据单元号的位置寻址：叶罩 [`EXTENT_TREE_LOWER_LEAF_DATA_UNITS`] 个单元，层级 L 上一个节点罩 144 × F^L 个单元，
 //!   根是罩得住这个文件全部单元的最低一层的第 0 个节点。叶的条目是 extent 叶记录 112（key (0, inode, 文件字节偏移) + 数据指针 88），
 //!   内部条目是「孩子那一段的起点 key + 子指针」110。洞就是缺席：没有单元的一段不写节点，父节点那一格留空。
@@ -31,6 +30,7 @@ use singlefs_format::{
 
 use crate::address::{CheckpointTxg, InstanceGeneration, SlotNumber, TreeIdentifier};
 use crate::bytes::{ByteReader, ByteWriter};
+use crate::code_two_tree::header_self_described_logical_address_violated;
 use crate::pointer::{
     BirthSequence, DataPointer, NodePointer, PointerHeadFieldGroup,
     PointerHeadFieldOutsideTheFirstVersion,
@@ -39,9 +39,8 @@ use crate::records::{build_extent_record, parse_extent_record, PointerCarryingEn
 use crate::recovery::RecoveryFailure;
 use crate::root_record::RootRecord;
 use crate::transaction::ExtentTreeNodeOrigin;
-use crate::unit::{
-    build_index_node, data_unit_payload_capacity, parse_index_node, IndexNodeHeader,
-};
+use crate::unit::{build_index_node, parse_index_node, IndexNodeHeader};
+use crate::write_request_split::payload_capacity_in_bytes;
 
 /// 上段叶条目的标签：这个 inode 没有数据单元（D8（核心索引结构） 已定项 14 的「没有单元」）。
 pub const EXTENT_UPPER_LEAF_ENTRY_TAG_NO_DATA_UNIT: u8 = 0;
@@ -49,9 +48,9 @@ pub const EXTENT_UPPER_LEAF_ENTRY_TAG_NO_DATA_UNIT: u8 = 0;
 pub const EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT: u8 = 1;
 /// 上段叶条目的标签：载荷是这个文件唯一那个数据单元的数据指针（内联）。
 pub const EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT: u8 = 2;
-/// 上段叶条目的标签：载荷是这个文件下段根的节点指针，下段最后一个单元之后到 size 是洞（判决 m4-trunc-r1 K5）。
+/// 上段叶条目的标签：载荷是这个文件下段根的节点指针，下段最后一个单元之后到 size 是洞。
 pub const EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT_FOLLOWED_BY_A_HOLE: u8 = 3;
-/// 上段叶条目的标签：载荷是单元 0 的数据指针（内联），单元 0 之后到 size 是洞（判决 m4-trunc-r1 K5）。
+/// 上段叶条目的标签：载荷是单元 0 的数据指针（内联），单元 0 之后到 size 是洞。
 pub const EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT_FOLLOWED_BY_A_HOLE: u8 = 4;
 
 fn key_width() -> usize {
@@ -73,10 +72,6 @@ pub fn extent_key_bytes(inode: u64, offset_in_bytes: u64) -> Vec<u8> {
 pub fn extent_key_fields(key: &[u8]) -> (u64, u64, u64) {
     let mut reader = ByteReader::at(key, 0);
     (reader.get_u64(), reader.get_u64(), reader.get_u64())
-}
-
-fn payload_capacity_in_bytes() -> u64 {
-    u64::try_from(data_unit_payload_capacity()).expect("32634")
 }
 
 /// 上段层级 L 上一个节点罩几个 inode 号：U × F^L，乘到装不进 u64 就停在 u64 的最大值。
@@ -173,7 +168,7 @@ pub fn upper_path_of_inode(inode: u64, root_level: u8) -> Vec<ExtentUpperNodePos
     path
 }
 
-/// 上段的规范形（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2，D8（核心索引结构） 已定项 14 extent 那一条与
+/// 上段的规范形（D8（核心索引结构） 已定项 14 extent 那一条与
 /// 已定项 16 第 8 条）：形状只由有条目的 inode 号集合 `inodes_with_an_entry` 定——根层级是罩得住其中最大号的最低一层，节点是每个号从它那片叶
 /// 到根那一串的并；集合空时是层级 0 第 0 格一个零条目的根兼叶。交回根层级与节点（bump 次序：层级升序、同层按序号升序，根在最末）。
 #[must_use]
@@ -202,7 +197,7 @@ pub struct ExtentUpperSegmentPlan {
     pub replaced_previous_positions: Vec<ExtentUpperNodePosition>,
 }
 
-/// 上段的统一计划（判决 m3-multi-file-unlink-r1 第三节 M2：写第一个文件、写别的文件、删除批、最后一批都调它）：这一版的形状是
+/// 上段的统一计划：这一版的形状是
 /// [`canonical_upper_segment_of_the_inodes_with_an_entry`] 按 `inodes_with_an_entry_after_this_publish` 定的那一个；一个节点重写，当且仅当
 /// 上一版没有它，或它罩着 `inodes_whose_entry_changed` 里的一个号（那个号进了集合、出了集合或条目内容变了：它那一串上留在新形状里的节点
 /// 条目或孩子变了）；别的照抄。上一版有而新形状没有的、与上一版有而这次重写的，换下。长高那次旧根照抄成根之下的节点（它不罩变了的号时），
@@ -319,7 +314,7 @@ pub fn lower_children_of_a_file_without_holes(
         .collect()
 }
 
-/// 一个文件最后一个存在的数据单元之后、到 size 之前是不是洞（判决 m4-trunc-r1 K5：洞只在尾部，标签声明它）。
+/// 一个文件最后一个存在的数据单元之后、到 size 之前是不是洞。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TailOfAFile {
     /// 标签 1、2：单元数不少于 ⌈size ÷ 净荷⌉.max(1)（截断中间态里可以多：size 之外还挂着的单元）。
@@ -404,14 +399,14 @@ impl ExtentUpperLeafTarget {
         }
     }
 
-    /// 第一个文件一个数据单元都没有时它在上段叶里那一条（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5 与第六节 S1：
-    /// 标签 0 是这个文件一个单元都没有，size > 0 时整个文件都是洞；`research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑：写者接得住这一形」；
-    /// `research/prompts/m4-validate-code-r2-main-verification.md` 第二节 T1，用户 2026-10-24 定「甲」）：`size_of_its_inode_record_in_bytes` 是这一版
+    /// 第一个文件一个数据单元都没有时它在上段叶里那一条（
+    /// 标签 0 是这个文件一个单元都没有，size > 0 时整个文件都是洞；`research/prompts/m4-validate-code-r1-main-verification.md`；
+    /// `research/prompts/m4-validate-code-r2-main-verification.md` 第二节 T1）：`size_of_its_inode_record_in_bytes` 是这一版
     /// 第一个文件那条 inode 记录的 size，记录在就写标签 0、不看 size（size 0 与 size > 0 同一形），记录没了（unlink 最后一批之后）不写这一条。
     /// size 0 也写：冷读那一路（`recovery` 读上段里第一个文件那一条）只给「第一个文件删完」留了没有条目的口子，有记录而没有条目的第一个文件
     /// 冷走读、可写重挂、冷恢复都按标签 1、2 要至少一个单元、拒收。号 ≥ 2 的空 inode（`transaction::publish_new_inodes` 建出来、没改过 size 的）
     /// 不经这里，照旧没有条目、读者按「没有条目」收（`write_request_split::DataUnitsOfTheInode::NoneWritten`，size 0 才收）；它改 size 到 size > 0
-    /// 而一个单元都没有时写者照写标签 0、之后一直留着（粘住的标签 0，判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S2，
+    /// 而一个单元都没有时写者照写标签 0、之后一直留着（粘住的标签 0，
     /// `transaction::FileOfAnInodeOtherThanTheFirst`），不经这里。
     /// 写者装上段叶、算上段形状（有条目的号集合）都经这里。
     #[must_use]
@@ -481,7 +476,7 @@ pub const EXTENT_LEAF_RECORD_DATA_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSID
     &str = "extent 叶记录里数据指针头部的加密、压缩那几段不是第一版的取值";
 
 /// 一条指针头部第一版之外的取值报哪一句：按落在哪一组字段上，在读者给的两句里挑（三类 extent 树读者共用）。
-fn what_of_a_pointer_head_field_outside_the_first_version(
+fn what_of_a_pointer_head_field_outside_the_first_version_for_the_extent_tree_readers(
     field: PointerHeadFieldOutsideTheFirstVersion,
     what_of_the_encryption_or_compression_fields: &'static str,
     what_of_the_extent_offset: &'static str,
@@ -572,7 +567,7 @@ impl ExtentUpperLeafEntry {
                 )
                 .map_err(ExtentUpperLeafEntryMalformed::PointerHeadFieldOutsideTheFirstVersion)?,
             ),
-            // 标签 3、4 的载荷与标签 1、2 同一个字段表（判决 m4-trunc-r1 K5 只加「之后到 size 是洞」这一句）：换成对应的没有洞的标签照同一段解
+            // 标签 3、4 的载荷与标签 1、2 同一个字段表：换成对应的没有洞的标签照同一段解
             // （补齐与指针头部的判只有一份），再换回带洞的那一种。
             EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT_FOLLOWED_BY_A_HOLE
             | EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT_FOLLOWED_BY_A_HOLE => {
@@ -813,13 +808,6 @@ pub struct ExtentTreeReading<'reading> {
     pub expected_filesystem_identifier: u64,
 }
 
-fn violated(detail: &'static str) -> RecoveryFailure {
-    RecoveryFailure::InvariantViolated {
-        invariant: "I-1.1",
-        detail,
-    }
-}
-
 impl ExtentTreeReading<'_> {
     /// 读一个节点、核头与位置：交回解开的头。`level_and_key_range` 是这个位置的层级与它按位置规定罩的那一段；
     /// `already_read` 是调用方为了先认出根的层级已经读过一遍的字节（根那一个），不再读第二次；
@@ -835,7 +823,9 @@ impl ExtentTreeReading<'_> {
     ) -> Result<(Vec<u8>, IndexNodeHeader), RecoveryFailure> {
         let (expected_level, key_range) = level_and_key_range;
         if !units_seen.insert(pointer.locations[0].slot) {
-            return Err(violated("同一个 extent 树节点被两条父条目引用"));
+            return Err(header_self_described_logical_address_violated(
+                "同一个 extent 树节点被两条父条目引用",
+            ));
         }
         let bytes = match already_read {
             Some(bytes) => bytes,
@@ -903,16 +893,18 @@ impl ExtentTreeReading<'_> {
             });
         }
         if header.level != expected_level {
-            return Err(violated("extent 树节点的层级不是它的位置规定的那一层"));
+            return Err(header_self_described_logical_address_violated(
+                "extent 树节点的层级不是它的位置规定的那一层",
+            ));
         }
         if header.smallest_key != key_range.0 || header.largest_key != key_range.1 {
-            return Err(violated(
+            return Err(header_self_described_logical_address_violated(
                 "extent 树节点头里的 key 区间不是它的位置规定罩的那一段",
             ));
         }
         // 零条目只许上段的根兼叶（第一个文件删完之后的零条目根，D8（核心索引结构） 已定项 16 第 5 条）。
         if header.entries.is_empty() && !(is_the_root_of_the_tree && expected_level == 0) {
-            return Err(violated(
+            return Err(header_self_described_logical_address_violated(
                 "extent 树节点一条条目都没有（缺席的一段不写节点）",
             ));
         }
@@ -924,7 +916,7 @@ impl ExtentTreeReading<'_> {
         header: &IndexNodeHeader,
     ) -> Result<Vec<(Vec<u8>, NodePointer)>, RecoveryFailure> {
         let internal_width = usize::try_from(EXTENT_TREE_INTERNAL_ENTRY_BYTES).expect("110");
-        // 宽于 key 宽 + 86 的同样拒（C867，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
+        // 宽于 key 宽 + 86 的同样拒（C867）。报的成员沿用
         // `EntryWidthDiffersFromItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
         if header.entry_width != internal_width {
             return Err(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
@@ -942,7 +934,7 @@ impl ExtentTreeReading<'_> {
                 )
                 .map(|child| (entry[..key_width()].to_vec(), child))
                 .map_err(|field| RecoveryFailure::UnitMalformed {
-                    what: what_of_a_pointer_head_field_outside_the_first_version(
+                    what: what_of_a_pointer_head_field_outside_the_first_version_for_the_extent_tree_readers(
                         field,
                         EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION,
                         EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
@@ -1042,7 +1034,7 @@ fn read_lower_node_and_its_subtree(
                     }
                     PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(field) => {
                         RecoveryFailure::UnitMalformed {
-                            what: what_of_a_pointer_head_field_outside_the_first_version(
+                            what: what_of_a_pointer_head_field_outside_the_first_version_for_the_extent_tree_readers(
                                 field,
                                 EXTENT_LEAF_RECORD_DATA_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION,
                                 EXTENT_LEAF_RECORD_DATA_POINTER_EXTENT_OFFSET_NOT_ZERO,
@@ -1052,7 +1044,7 @@ fn read_lower_node_and_its_subtree(
                 })?;
             let (locality, record_inode, offset) = extent_key_fields(&key);
             if locality != 0 || record_inode != inode || !offset.is_multiple_of(payload) {
-                return Err(violated(
+                return Err(header_self_described_logical_address_violated(
                     "extent 叶记录的 key 不是 (0, 这个文件, 单元号 × 净荷容量)",
                 ));
             }
@@ -1060,7 +1052,7 @@ fn read_lower_node_and_its_subtree(
             if !(first_unit..=last_unit).contains(&unit)
                 || previous_unit.is_some_and(|previous| previous >= unit)
             {
-                return Err(violated(
+                return Err(header_self_described_logical_address_violated(
                     "extent 叶记录不在叶罩的那一段里，或不按 key 严格递增",
                 ));
             }
@@ -1078,7 +1070,7 @@ fn read_lower_node_and_its_subtree(
         let child_span = lower_span_in_data_units(position.level - 1);
         let child_offset_span = child_span.saturating_mul(payload);
         if locality != 0 || child_inode != inode || !offset.is_multiple_of(child_offset_span) {
-            return Err(violated(
+            return Err(header_self_described_logical_address_violated(
                 "extent 下段内部条目的 key 不是这个文件里一个孩子那一段的起点",
             ));
         }
@@ -1089,7 +1081,7 @@ fn read_lower_node_and_its_subtree(
         if child.data_unit_range().0 / lower_span_in_data_units(position.level) != position.index
             || previous_child.is_some_and(|previous| previous >= child)
         {
-            return Err(violated(
+            return Err(header_self_described_logical_address_violated(
                 "extent 下段内部条目的孩子不在父节点那一段里，或不按位置严格递增",
             ));
         }
@@ -1159,7 +1151,7 @@ fn upper_leaf_entries(
                 }
                 ExtentUpperLeafEntryMalformed::PointerHeadFieldOutsideTheFirstVersion(field) => {
                     RecoveryFailure::UnitMalformed {
-                        what: what_of_a_pointer_head_field_outside_the_first_version(
+                        what: what_of_a_pointer_head_field_outside_the_first_version_for_the_extent_tree_readers(
                             field,
                             EXTENT_UPPER_LEAF_ENTRY_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION,
                             EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO,
@@ -1172,7 +1164,7 @@ fn upper_leaf_entries(
                 .last()
                 .is_some_and(|previous| previous.inode >= entry.inode)
         {
-            return Err(violated(
+            return Err(header_self_described_logical_address_violated(
                 "extent 上段叶条目不在叶罩的那一段 inode 号里，或不按 inode 号严格递增",
             ));
         }
@@ -1258,7 +1250,7 @@ fn read_upper_node_and_its_subtree(
     for (child_start_key, child_pointer) in ExtentTreeReading::internal_entries(&header)? {
         let child = upper_child_named_by_entry_key(position, &child_start_key)
             .filter(|child| previous_child.is_none_or(|previous| previous < *child))
-            .ok_or(violated(
+            .ok_or(header_self_described_logical_address_violated(
                 "extent 上段内部条目的 key 不是这个节点里一个孩子那一段的起点，或孩子不按位置严格递增",
             ))?;
         previous_child = Some(child);
@@ -1329,7 +1321,7 @@ pub fn find_upper_leaf_entry(
         for (child_start_key, child_pointer) in ExtentTreeReading::internal_entries(&header)? {
             let child = upper_child_named_by_entry_key(position, &child_start_key)
                 .filter(|child| previous_child.is_none_or(|previous| previous < *child))
-                .ok_or(violated(
+                .ok_or(header_self_described_logical_address_violated(
                     "extent 上段内部条目的 key 不是这个节点里一个孩子那一段的起点，或孩子不按位置严格递增",
                 ))?;
             previous_child = Some(child);
@@ -1420,10 +1412,25 @@ pub fn read_extent_tree(
     Ok(ExtentTreeReadFromDisk { upper, files })
 }
 
+/// 单测按层级与序号写 extent 树两段节点位置的造法（extent 树、删除与截断三处单测共用）。
+#[cfg(test)]
+pub(crate) mod extent_node_positions_for_tests {
+    use super::{ExtentLowerNodePosition, ExtentUpperNodePosition};
+
+    pub(crate) fn extent_upper_node_position(level: u8, index: u64) -> ExtentUpperNodePosition {
+        ExtentUpperNodePosition { level, index }
+    }
+
+    pub(crate) fn extent_lower_node_position(level: u8, index: u64) -> ExtentLowerNodePosition {
+        ExtentLowerNodePosition { level, index }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use singlefs_format::TREE_IDENTIFIER_EXTENT;
 
+    use super::extent_node_positions_for_tests::extent_upper_node_position;
     use super::*;
     use crate::address::DeviceIdentity;
     use crate::pointer::{LocationEntry, PointerHead};
@@ -1566,10 +1573,6 @@ mod tests {
         );
     }
 
-    fn upper(level: u8, index: u64) -> ExtentUpperNodePosition {
-        ExtentUpperNodePosition { level, index }
-    }
-
     /// 一串「这一步之后有条目的号集合、条目变了的号」从空的上段起一步步走统一计划，交回最后那一版上段的节点位置（bump 次序）。
     fn upper_positions_after_the_steps(steps: &[(&[u64], &[u64])]) -> Vec<ExtentUpperNodePosition> {
         let mut positions: Vec<ExtentUpperNodePosition> = Vec::new();
@@ -1584,12 +1587,16 @@ mod tests {
         positions
     }
 
-    /// 正推模型规则 A 的三种终态（`research/prompts/m3-multi-file-unlink-r1-sonnet-model/out/run.out` 第 11–16 行，S = {1, 500}）：
+    /// 模型规则 A 的三种终态（`research/prompts/m3-multi-file-unlink-r1-sonnet-model/out/run.out` 第 11–16 行，S = {1, 500}）：
     /// 只剩 500 是它那片叶 (0, 3) 加根 (1, 0)、根重写；只剩 1 是第 0 片叶照抄成根（降层、一个都不重写），旧根与 500 那片叶换下；
     /// 删空是层级 0 的零条目根兼叶，重写。
     #[test]
     fn the_unified_upper_plan_reaches_the_three_terminal_shapes_of_the_forward_model() {
-        let both = [upper(0, 0), upper(0, 3), upper(1, 0)];
+        let both = [
+            extent_upper_node_position(0, 0),
+            extent_upper_node_position(0, 3),
+            extent_upper_node_position(1, 0),
+        ];
         assert_eq!(
             canonical_upper_segment_of_the_inodes_with_an_entry(&BTreeSet::from([1, 500])),
             (1, both.iter().copied().collect()),
@@ -1602,12 +1609,18 @@ mod tests {
             ExtentUpperSegmentPlan {
                 nodes: vec![
                     (
-                        upper(0, 3),
+                        extent_upper_node_position(0, 3),
                         ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                     ),
-                    (upper(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                    (
+                        extent_upper_node_position(1, 0),
+                        ExtentTreeNodeOrigin::RewrittenThisPublish
+                    ),
                 ],
-                replaced_previous_positions: vec![upper(0, 0), upper(1, 0)],
+                replaced_previous_positions: vec![
+                    extent_upper_node_position(0, 0),
+                    extent_upper_node_position(1, 0)
+                ],
             },
             "删 1：S = {{500}}"
         );
@@ -1617,33 +1630,51 @@ mod tests {
             only_1,
             ExtentUpperSegmentPlan {
                 nodes: vec![(
-                    upper(0, 0),
+                    extent_upper_node_position(0, 0),
                     ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                 )],
-                replaced_previous_positions: vec![upper(0, 3), upper(1, 0)],
+                replaced_previous_positions: vec![
+                    extent_upper_node_position(0, 3),
+                    extent_upper_node_position(1, 0)
+                ],
             },
             "删 500：S = {{1}}，降层"
         );
         let emptied_after_500 = plan_the_extent_upper_segment(
-            &[upper(0, 3), upper(1, 0)],
+            &[
+                extent_upper_node_position(0, 3),
+                extent_upper_node_position(1, 0),
+            ],
             &BTreeSet::new(),
             &BTreeSet::from([500]),
         );
         assert_eq!(
             emptied_after_500,
             ExtentUpperSegmentPlan {
-                nodes: vec![(upper(0, 0), ExtentTreeNodeOrigin::RewrittenThisPublish)],
-                replaced_previous_positions: vec![upper(0, 3), upper(1, 0)],
+                nodes: vec![(
+                    extent_upper_node_position(0, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                )],
+                replaced_previous_positions: vec![
+                    extent_upper_node_position(0, 3),
+                    extent_upper_node_position(1, 0)
+                ],
             },
             "先删 1 再删 500：零条目根"
         );
-        let emptied_after_1 =
-            plan_the_extent_upper_segment(&[upper(0, 0)], &BTreeSet::new(), &BTreeSet::from([1]));
+        let emptied_after_1 = plan_the_extent_upper_segment(
+            &[extent_upper_node_position(0, 0)],
+            &BTreeSet::new(),
+            &BTreeSet::from([1]),
+        );
         assert_eq!(
             emptied_after_1,
             ExtentUpperSegmentPlan {
-                nodes: vec![(upper(0, 0), ExtentTreeNodeOrigin::RewrittenThisPublish)],
-                replaced_previous_positions: vec![upper(0, 0)],
+                nodes: vec![(
+                    extent_upper_node_position(0, 0),
+                    ExtentTreeNodeOrigin::RewrittenThisPublish
+                )],
+                replaced_previous_positions: vec![extent_upper_node_position(0, 0)],
             },
             "先删 500 再删 1：零条目根"
         );
@@ -1662,7 +1693,7 @@ mod tests {
             (&[1, 2, 150], &[30000]),
             (&[1, 2], &[150]),
         ]);
-        assert_eq!(direct, vec![upper(0, 0)]);
+        assert_eq!(direct, vec![extent_upper_node_position(0, 0)]);
         assert_eq!(through_higher_levels, direct);
     }
 
@@ -1670,7 +1701,7 @@ mod tests {
     #[test]
     fn growing_the_upper_segment_carries_the_old_root_below_the_new_one() {
         let plan = plan_the_extent_upper_segment(
-            &[upper(0, 0)],
+            &[extent_upper_node_position(0, 0)],
             &BTreeSet::from([1, 150]),
             &BTreeSet::from([150]),
         );
@@ -1679,11 +1710,17 @@ mod tests {
             ExtentUpperSegmentPlan {
                 nodes: vec![
                     (
-                        upper(0, 0),
+                        extent_upper_node_position(0, 0),
                         ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
                     ),
-                    (upper(0, 1), ExtentTreeNodeOrigin::RewrittenThisPublish),
-                    (upper(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                    (
+                        extent_upper_node_position(0, 1),
+                        ExtentTreeNodeOrigin::RewrittenThisPublish
+                    ),
+                    (
+                        extent_upper_node_position(1, 0),
+                        ExtentTreeNodeOrigin::RewrittenThisPublish
+                    ),
                 ],
                 replaced_previous_positions: Vec::new(),
             }

@@ -5,8 +5,12 @@
 //! **根满长高**：根装满之后同样长一层（第 5 条「谱系树根满同样长高」），共用的那一半在 `crate::container_tree`。
 //! 只供测试的两个旋钮（一片装几条 [`LineageContainerCapacity`]、一个码 2 节点装几条 `ContainerTreeNodeEntries`）只住内存、不落盘，
 //! 「开下一片」与「长高」这两支按产品容量要 1359 次与 1359 × 135 次回退才走得到（`.claude/rules/fs-design.md` 五条硬要求第 2 条）。
+//!
+//! 这份文件的代码都在 `verus!` 里，由 Verus 直接验（里程碑四出口 5 容器小树那一簇）：追加照 `crate::container_tree` 的
+//! [`append_record_to_the_open_container`] 保持「key 到条目」，`ensures` 原样转述它的那一条。
 
 use singlefs_format::LINEAGE_CONTAINER_RECORDS;
+use vstd::prelude::*;
 
 use crate::address::{CheckpointTxg, TreeIdentifier};
 use crate::container_tree::{
@@ -16,6 +20,8 @@ use crate::container_tree::{
 use crate::records::LineageRecord;
 use crate::unit::PACKED_TYPE_LINEAGE;
 
+verus! {
+
 /// 谱系树里第几片叶容器，按叶序（= 容器号升序）从 0 数。它是树里的位置，不是容器号（容器号从 1 起）。
 /// 只增不删 ⇒ 容器只在最右端出现，位置一旦定下就不再挪，可以当发布路径里的角色序号用。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,16 +30,24 @@ pub struct LineageContainerIndexInTree(pub u32);
 impl LineageContainerIndexInTree {
     /// 当下标用。
     #[must_use]
-    pub fn position(self) -> usize {
+    pub fn position(self) -> (position: usize)
+        ensures
+            position == self.0,
+    {
         usize::try_from(self.0).expect("u32 的谱系容器序号装得进 usize")
     }
 
     /// 第几片，从 0 数。
     ///
     /// # Panics
-    /// 序号装不进 u32：要 2^32 片谱系容器（约 8.8 × 10^12 次回退），走不到。
+    /// 序号装不进 u32（`requires` 排除的那一种）：要 2^32 片谱系容器（约 8.8 × 10^12 次回退），走不到。
     #[must_use]
-    pub fn of_position(position: usize) -> Self {
+    pub fn of_position(position: usize) -> (index: Self)
+        requires
+            position <= u32::MAX,
+        ensures
+            index.0 == position,
+    {
         Self(u32::try_from(position).expect("谱系容器片数装得进 u32：要 2^32 片才装不下"))
     }
 }
@@ -46,16 +60,41 @@ pub type LineageContainer = RecordContainer<LineageRecord>;
 pub struct LineageRecordsPerContainerCappedForTests(u64);
 
 impl LineageRecordsPerContainerCappedForTests {
+    /// 类型不变量：至少 1、至多产品容量 1359（只经 [`Self::new`] 进来）。
+    #[verifier::type_invariant]
+    spec fn records_lie_between_one_and_the_product_capacity(self) -> bool {
+        1 <= self.0 <= 1359
+    }
+
+    /// 压小之后一片装满几条（规格里用）。
+    pub closed spec fn records_in_the_specification(self) -> int {
+        self.0 as int
+    }
+
     /// 0 条或多于产品容量 1359 交回 `None`。
+    #[allow(clippy::manual_range_contains, reason = "Verus 推不出 RangeInclusive::contains 的结果，写成两个比较")]
     #[must_use]
-    pub fn new(records: u64) -> Option<Self> {
-        (1..=LINEAGE_CONTAINER_RECORDS)
-            .contains(&records)
-            .then_some(Self(records))
+    pub fn new(records: u64) -> (capped: Option<Self>)
+        ensures
+            capped is Some <==> 1 <= records <= 1359,
+            capped matches Some(capped_records) ==> capped_records.records_in_the_specification() == records,
+    {
+        if 1 <= records && records <= LINEAGE_CONTAINER_RECORDS {
+            Some(Self(records))
+        } else {
+            None
+        }
     }
 
     #[must_use]
-    pub const fn records(self) -> u64 {
+    pub const fn records(self) -> (records: u64)
+        ensures
+            1 <= records <= 1359,
+            records == self.records_in_the_specification(),
+    {
+        proof {
+            use_type_invariant(&self);
+        }
         self.0
     }
 }
@@ -81,9 +120,21 @@ impl LineageContainerCapacity {
         }
     }
 
+    /// 一片装满几条（规格里用）。
+    pub open spec fn records_per_container_in_the_specification(self) -> int {
+        match self {
+            LineageContainerCapacity::FromTheContainerFormat => 1359,
+            LineageContainerCapacity::CappedForTests(capped) => capped.records_in_the_specification(),
+        }
+    }
+
     /// 一片装满几条。
     #[must_use]
-    pub const fn records_per_container(self) -> u64 {
+    pub const fn records_per_container(self) -> (records: u64)
+        ensures
+            1 <= records <= 1359,
+            records == self.records_per_container_in_the_specification(),
+    {
         match self {
             LineageContainerCapacity::FromTheContainerFormat => LINEAGE_CONTAINER_RECORDS,
             LineageContainerCapacity::CappedForTests(capped) => capped.records(),
@@ -107,7 +158,24 @@ pub fn append_lineage_record_to_the_open_container(
     lineage_tree: TreeIdentifier,
     capacity: LineageContainerCapacity,
     node_entries: ContainerTreeNodeEntries,
-) -> Result<LineageTreeAfterThisPublish, NextContainerNumberPastTheTopOfItsRange> {
+) -> (after: Result<LineageTreeAfterThisPublish, NextContainerNumberPastTheTopOfItsRange>)
+    requires
+        crate::container_tree::container_count(shape_before_this_publish.levels()) == containers_before_this_publish.len(),
+    ensures
+        match after {
+            Ok(after) => crate::container_tree::appending_keeps_the_key_to_entry_mapping(
+                containers_before_this_publish@,
+                shape_before_this_publish.levels(),
+                seq![record],
+                checkpoint_txg,
+                lineage_tree,
+                PACKED_TYPE_LINEAGE,
+                capacity.records_per_container_in_the_specification(),
+                after,
+            ),
+            Err(error) => error.tree == lineage_tree && error.rightmost_container == u64::MAX,
+        },
+{
     append_record_to_the_open_container(
         containers_before_this_publish,
         shape_before_this_publish,
@@ -119,6 +187,8 @@ pub fn append_lineage_record_to_the_open_container(
         node_entries,
     )
 }
+
+} // verus!
 
 #[cfg(test)]
 mod tests {

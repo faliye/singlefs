@@ -6,7 +6,7 @@
 //! `inherits` 往上找；工作区根 `Cargo.toml` 的 `[profile.<名>]` 逐层盖上去，最后盖 `CARGO_PROFILE_<名>_<键>` 环境变量。
 //! 不认的：`.cargo/config.toml` 与 `--config` 里写的 profile、`[profile.<名>.package.<包>]` 与 `build-override`（今天工作区里一处都没有）。
 //!
-//! `singlefs-checker-tier` 的构建脚本与命令行 `unit-graph --toolchain-of-the-build <profile>` 都经 [`toolchain_lines_of_the_build`] 拼，
+//! `singlefs-verification` 的构建脚本与命令行 `unit-graph --toolchain-of-the-build <profile>` 都经 [`toolchain_lines_of_the_build`] 拼，
 //! 两边逐字相同（同一份输入算出同一把键）。
 
 use std::collections::BTreeMap;

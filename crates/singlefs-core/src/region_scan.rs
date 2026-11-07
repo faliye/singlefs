@@ -1,4 +1,4 @@
-//! 区域扫描（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G9）：对一个整理区域 R 按槽升序看每条未释放的分配记录，
+//! 区域扫描：对一个整理区域 R 按槽升序看每条未释放的分配记录，
 //! 读单元头反查映射 key、查中央映射核位置，把它分成可搬、钉住、隔离、已死、不一致五类；已释放或没有记录的槽跳过。
 //! 「已死」第一版只报告不动（里程碑五的打包容器那一支不写，只保证这一类在）。
 //!
@@ -7,7 +7,7 @@
 //!
 //! 第一版两盘同槽（D2（RAID 条带策略） 已定项 10），每个落点逐盘一条记录、两盘对称（D3（空间分配） 已定项 7；释放前核出对不上时
 //! 两盘一起留在已分配，D19（块指针的结构与宽度预算） 已定项 5）：分类按 R 那块盘上的记录做，钉住与隔离按槽号登记
-//! （R 罩住每块盘上的同号槽，判决 G1 攻方 K-n）。
+//! （R 罩住每块盘上的同号槽）。
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -35,7 +35,7 @@ pub struct CentralMappingEntry {
     pub locations: [LocationEntry; 2],
 }
 
-/// 一版中央映射条目的两张按身份索引（用户 2026-10-26 定「两处都换，并进七·3」，岔路单
+/// 一版中央映射条目的两张按身份索引（岔路单
 /// `research/prompts/m4-gpugc-design-r1-forks.md` 区域扫描按身份查那一行）：按落点（盘、槽）查哪几条条目的位置项指着它，
 /// 按映射 key 查映射里有没有这把 key。建一次走一遍条目，之后每查一次不再走整张映射：区域扫描对 R 里每条记录各查一次，
 /// 在条目上线性找是「记录数 × 条目数」。
@@ -44,9 +44,9 @@ pub struct CentralMappingEntry {
 /// （产品不读，测试读它判「条目数翻倍时看过的条目数不涨」）。
 pub use mapping_identity_index::{CentralMappingIdentityIndex, MappingIdentityLookupWork};
 
-/// 本线程上建了几份映射条目的按身份索引、扫了几个 R：整理每读一版只建一份、这一版里扫几个 R 都共用它（用户 2026-10-26 定
+/// 本线程上建了几份映射条目的按身份索引、扫了几个 R：整理每读一版只建一份、这一版里扫几个 R 都共用它（
 /// 「每读一版建一次」，`mounted_session` 推整理的那一步），测试读它判「一版扫几个 R 只建 1 份」。
-/// 只在特性 `lookup-work-counters` 下记（harness 档的 dev 依赖打开它），产品不读；不开时计数那一处什么都不做。
+/// 只在特性 `lookup-work-counters` 下记（验证包的 dev 依赖打开它），产品不读；不开时计数那一处什么都不做。
 /// 记在本线程上：核心层不起线程，一趟整理的扫描都在调它的那个线程里做，测试的各条用例各在自己的线程里跑，互不串数。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct IdentityIndexBuildsAndRegionScans {
@@ -281,7 +281,7 @@ pub enum AllocationInRegion {
     /// 罩住的槽里有钉住的（豁免三类或被根直接指着）：不搬。
     Pinned,
     /// 罩住的槽里有在隔离集里的（释放前核出对不上，D19 已定项 5 硬规则 1），不论映射里有没有条目指着它：搬不动，
-    /// 单列给丢意图那一步（G2 攻方 K-c）。
+    /// 单列给丢意图那一步。
     Quarantined,
     /// 映射里没有条目指着它、头里的 key 映射里也没有、不在隔离集里：第一版只报告。
     Dead,
@@ -331,7 +331,7 @@ impl RegionScan {
         None
     }
 
-    /// 能搬的那几项映射 key 两两不同（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7 的 P2「key 互异」的前提，
+    /// 能搬的那几项映射 key 两两不同（ 的 P2「key 互异」的前提，
     /// `singlefs_replay_prefix::compaction_plan_proofs::movable_mapping_keys_are_distinct`）。[`scan_region`] 交回 `Ok` 的扫描结果上恒真。
     #[must_use]
     pub fn movable_mapping_keys_are_pairwise_distinct(&self) -> bool {
@@ -353,7 +353,7 @@ pub enum RegionScanRefusal {
     },
     /// R 里两条起点不同的记录都判成可搬、单元头反查出的映射 key 相同（`slots` 是头一对的起点，按槽升序）。判「可搬」要指着这一槽的映射条目
     /// 都带头里那把 key，而一把 key 在映射里只有一条条目：走到这里，那条条目在 R 那块盘上指着两个槽——两条位置项落在同一块盘上，
-    /// D19（块指针的结构与宽度预算） 已定项 5（用户 2026-09-25 定）把它当映射条目损坏、在任何写之前拒绝（发布路径的同一判是
+    /// D19（块指针的结构与宽度预算） 已定项 5把它当映射条目损坏、在任何写之前拒绝（发布路径的同一判是
     /// `transaction::refuse_mapping_entries_that_do_not_name_two_pool_devices`）。读盘重建时只有一部分映射条目经它覆盖的指针按 I-2.5 核过
     /// 位置项设备升序（`recovery::pointers_of_the_rebuilt_version_ascend_by_device` 列的那几类），留存给快照的那几条
     /// （`mapping_entries_kept_for_the_snapshots`）不经任何指针、没有经它核，盘上这样一条条目走得到这里（推的，没造过这样的盘）。
@@ -697,7 +697,7 @@ where
     })
 }
 
-/// 一条未释放记录的分类，次序：钉住 → 隔离 → 读头 → 类标签 → key 与位置（判决 m4-batch2-code-r1 S3）。
+/// 一条未释放记录的分类，次序：钉住 → 隔离 → 读头 → 类标签 → key 与位置。
 /// 钉住与隔离都看记录罩住的每一个槽，不只看起点槽；隔离不看映射有没有条目指着它。
 fn classify_allocation<ReadUnitBytes>(
     record: &AllocationRecord,
@@ -713,7 +713,7 @@ where
     if pinned_slots.range(covered_slots.clone()).next().is_some() {
         return AllocationInRegion::Pinned;
     }
-    // 隔离不看映射：隔离 = 释放前核出校验和对不上，映射照旧指着它时搬它就是把坏副本搬走（主 agent 2026-10-13 定，判决 m4-batch2-code-r1 S3）。
+    // 隔离不看映射：隔离 = 释放前核出校验和对不上，映射照旧指着它时搬它就是把坏副本搬走。
     if quarantined_slots.range(covered_slots).next().is_some() {
         return AllocationInRegion::Quarantined;
     }
@@ -859,7 +859,7 @@ mod tests {
         WriteOrder, PACKED_TYPE_INODE,
     };
 
-    const FILESYSTEM_IDENTIFIER: [u8; 16] = [7u8; 16];
+    const FILESYSTEM_IDENTIFIER_OF_THE_SCANNED_POOL: [u8; 16] = [7u8; 16];
     const BIRTH_TXG: CheckpointTxg = CheckpointTxg(7);
     const WRITING_INSTANCE: InstanceGeneration = InstanceGeneration(2);
     const DEVICE_ZERO: DeviceIdentity = DeviceIdentity(0);
@@ -958,7 +958,7 @@ mod tests {
                 anchor_offset: 0,
             },
             BIRTH_TXG,
-            &FILESYSTEM_IDENTIFIER,
+            &FILESYSTEM_IDENTIFIER_OF_THE_SCANNED_POOL,
             write_order,
             &[0x5A; 100],
         );
@@ -993,7 +993,7 @@ mod tests {
             &[0u8; 24],
             &[0u8; 24],
             BIRTH_TXG,
-            &FILESYSTEM_IDENTIFIER,
+            &FILESYSTEM_IDENTIFIER_OF_THE_SCANNED_POOL,
             WRITING_INSTANCE,
             BirthSequence(birth_sequence),
             112,
@@ -1018,7 +1018,7 @@ mod tests {
             140,
             &[vec![1u8; 140]],
             BIRTH_TXG,
-            &FILESYSTEM_IDENTIFIER,
+            &FILESYSTEM_IDENTIFIER_OF_THE_SCANNED_POOL,
             WriteOrder {
                 instance: WRITING_INSTANCE,
                 transaction: 9,
@@ -1222,7 +1222,7 @@ mod tests {
         );
     }
 
-    /// 隔离槽上的单元头完好、映射条目照旧指着它、key 也对得上：照样判「隔离」，不判可搬（判决 m4-batch2-code-r1 S3：
+    /// 隔离槽上的单元头完好、映射条目照旧指着它、key 也对得上：照样判「隔离」，不判可搬（
     /// 隔离 = 释放前核出校验和对不上，搬它就是把坏副本搬走；隔离排在读头与核映射之前）。
     #[test]
     fn a_quarantined_slot_the_mapping_still_points_at_is_quarantined_not_movable() {
@@ -1244,7 +1244,7 @@ mod tests {
     }
 
     /// 两条映射条目指着同一个槽：一条是单元头里反查出的 key，另一条是别的 key（类标签相同）。要每一条都是头里那把 key 才可搬，
-    /// 这里判「不一致」（判决 m4-batch2-code-r1 S3，攻方翻过的 `all` → `any`）。
+    /// 这里判「不一致」。
     #[test]
     fn a_slot_two_mapping_entries_point_at_with_only_one_carrying_the_header_key_is_inconsistent() {
         let mut pool = PoolUnderTest::default();
@@ -1266,7 +1266,7 @@ mod tests {
     }
 
     /// 单元头里的 key 在映射里，映射的两条位置条目槽号与这个槽相同、却在另两块盘上（不是 R 那块盘）：没有条目指着 R 那块盘上的这个槽，
-    /// 判「不一致」，不判可搬（判决 m4-batch2-code-r1 S3，攻方翻过的「位置条目不比盘」）。
+    /// 判「不一致」，不判可搬。
     #[test]
     fn a_mapping_entry_at_the_same_slot_number_on_other_devices_does_not_point_at_the_region_device(
     ) {
@@ -1293,7 +1293,7 @@ mod tests {
         );
     }
 
-    /// 两槽单元的第二个槽钉住（起点槽没钉住）：整条记录判「钉住」，不判可搬（判决 m4-batch2-code-r1 S3，攻方翻过的「钉住只看起点槽」）。
+    /// 两槽单元的第二个槽钉住（起点槽没钉住）：整条记录判「钉住」，不判可搬。
     #[test]
     fn a_two_slot_unit_whose_second_slot_is_pinned_is_pinned() {
         let mut pool = PoolUnderTest::default();
@@ -1353,7 +1353,7 @@ mod tests {
 
     /// 同一个单元的两份副本（搬迁原样拷，头里反查出的 key 相同）落在 R 的两个槽上。映射条目健康（两条位置项分在两块盘、指同一个槽）时
     /// 只有它指着的那一份可搬，另一份不一致；映射条目两条位置项都落在 R 那块盘上、各指一份（D19（块指针的结构与宽度预算） 已定项 5 当它损坏）时
-    /// 两份都会判成可搬、key 相同：整次拒、一条都不交（判决 G7 的 P2「一批里的 key 互异」靠它）。
+    /// 两份都会判成可搬、key 相同：整次拒、一条都不交。
     #[test]
     fn two_records_movable_under_one_mapping_key_refuse_the_region() {
         let (copy_of_the_unit, key) = data_unit(1);

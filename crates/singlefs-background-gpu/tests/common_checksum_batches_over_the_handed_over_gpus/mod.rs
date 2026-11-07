@@ -1,7 +1,6 @@
-//! 校验和核对那两份核的真卡测试目标共用：造单元与期望值、CPU 参照、按卡的顺序填满服务交来的几张卡的那一批（用户 2026-11-02 定「按卡的顺序填满」，测饱和）。
+//! 校验和核对那两份核的真卡测试目标共用：造单元与期望值、CPU 参照、按卡的顺序填满服务交来的几张卡的那一批（测饱和）。
 //! 一张卡的在 `checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference`，两张、三张的各是一个测试目标（源头声明 `// task-server-gpu-cards: <张数>`，
-//! 服务照它分同一台的几张）：七·3 验收「一张卡1gb 2张卡 三张卡 每张卡都能用来分片gc」（用户 2026-11-01 定，原话在
-//! `records/2026-10-19-里程碑四GPU垃圾回收开工.md`）。要先 `mod common_discrete_gpus_of_this_host;` 再 mod 进这一份。
+//! 服务照它分同一台的几张）：验收「一张卡 1 GiB、两张卡、三张卡，每张卡都能用来分片 gc」。要先 `mod common_discrete_gpus_of_this_host;` 再 mod 进这一份。
 #![allow(dead_code, reason = "几份测试文件各自 mod 进来，只用到其中一部分")]
 
 use std::time::Duration;
@@ -94,16 +93,16 @@ pub fn background_gpu_on_the_declared_count_of_handed_over_gpus_or_report_not_ru
     memory_limit: GpuMemoryInBytes,
     wait_limit: Duration,
 ) -> Option<(BackgroundGpu, Vec<GpuDeviceIdentifier>)> {
-    let handed_over_gpus = handed_over_gpus_of_the_declared_count_or_report_not_run(
+    let handed_over = handed_over_gpus_of_the_declared_count_or_report_not_run(
         test_name,
         declared_gpu_count,
         wait_limit,
     )?;
-    let background_gpu = opened_background_gpu(&selection_over_the_handed_over_gpus(
-        &handed_over_gpus,
-        memory_limit,
-        wait_limit,
-    ));
+    let handed_over_gpus = handed_over.gpus;
+    let background_gpu = opened_background_gpu(
+        &handed_over.vulkan_instance,
+        &selection_over_the_handed_over_gpus(&handed_over_gpus, memory_limit, wait_limit),
+    );
     assert_eq!(
         background_gpu.participating_gpus().len(),
         declared_gpu_count,
@@ -115,7 +114,7 @@ pub fn background_gpu_on_the_declared_count_of_handed_over_gpus_or_report_not_ru
     ))
 }
 
-/// 七·3 验收「真卡用例……一张、两张、三张卡各跑一遍」（用户 2026-11-01 定），按用户 2026-11-02 定「按卡的顺序填满」「你要测任务饱和的情况」：
+/// 真卡用例一张、两张、三张卡各跑一遍，按卡的顺序填满、测任务饱和：
 /// 点名服务交来的头 `declared_gpu_count` 张卡、每张的上限一次只交得下 [`UNITS_PER_SUBMISSION_OF_THE_FILL_OVER_THE_GPUS`] 个 4096 字节的单元，交一批
 /// 比每张都填满还多一次的单元（`declared_gpu_count` + 1 次的量）：前面的卡各填满一次、排在最后的那张多交一次。两份核逐条与 CPU 参照相同，
 /// 这一段记下分到活的正好是点名的这几张、按点名的次序，交成 `declared_gpu_count` + 1 次、全部单元都交了。

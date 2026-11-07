@@ -4,8 +4,7 @@
 //! 切法是纯函数（[`chunks_that_fit_on_the_gpu`]）；外壳每建一个缓冲先在这张卡的账上记下（[`GpuMemoryAccount::hold`]），
 //! 记下之后超过上限就断言：切批算对了就走不到那一步，走到了是切批的 bug，不带着超限往下跑。
 //!
-//! 一条自己就装不进一段时把它切成几片逐片交（用户 2026-10-28 定「装不下应该自适应的分片，缩小逐次进行」，原话在
-//! `records/2026-10-19-里程碑四GPU垃圾回收开工.md` 末尾「用户定案（弹窗两次）」那一行）：[`pieces_cut_to_fit_on_the_gpu`] 按输入字节切，
+//! 一条自己就装不进一段时把它切成几片逐片交（装不下自适应分片，缩小逐次进行）：[`pieces_cut_to_fit_on_the_gpu`] 按输入字节切，
 //! 每片单独成一段装得下；连最小的一片（一个字节的输入加这一段的固定占用）都装不下才交回 [`SmallestPieceLargerThanTheRoom`]，
 //! 调用方照「连一片都装不下就不用这张卡」办。各段每段都交一份的表（区域扫描的映射、选段打分的记录表）大到装不下时的切法在各段自己的模块里。
 //!
@@ -303,7 +302,7 @@ impl<Submission> GpuMemoryAccount<Submission> {
         Self::with_the_bytes_leaked_by_earlier_mounts(memory_limit, 0)
     }
 
-    /// 这个进程里此前几次挂载在这张卡上泄漏了 `bytes_leaked_by_earlier_mounts` 字节（丢后台 GPU 时还在跑的提交，设备不析构，显存不还）：
+    /// 这个进程里之前几次挂载在这张卡上泄漏了 `bytes_leaked_by_earlier_mounts` 字节（丢后台 GPU 时还在跑的提交，设备不析构，显存不还）：
     /// 这一次的账从它起，这一次挂载里一直记着、不放（第 3 条「任何时刻都不许比它多」：泄漏的那一片仍占着这张卡）。
     #[must_use]
     pub fn with_the_bytes_leaked_by_earlier_mounts(
@@ -971,7 +970,7 @@ mod tests {
         );
     }
 
-    /// 用户 2026-10-28 定「装不下应该自适应的分片」：一条 4096 字节的单独成一段都装不下 1024 字节的上限，切成每片 968 字节
+    /// 装不下自适应分片：一条 4096 字节的单独成一段都装不下 1024 字节的上限，切成每片 968 字节
     /// （1024 扣掉一段 16、一条 40）的几片，最后一片是余下的；前后装得下的整条照常，片按批里的次序、一条之内按字节的次序排，每段都不超上限。
     #[test]
     fn an_entry_larger_than_the_memory_limit_is_cut_into_pieces_that_each_fit() {

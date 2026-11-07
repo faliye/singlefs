@@ -1,0 +1,9 @@
+shim_directory="${BASH_SOURCE[0]%/*}"
+if [[ "$shim_directory" == "${BASH_SOURCE[0]}" ]]; then shim_directory=.; fi
+library="$shim_directory/../lib/shim-target.sh"
+if [[ ! -f "$library" ]]; then
+  if common_directory="$(git -C "$shim_directory" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+    library="${common_directory%/*}/lib/shim-target.sh"
+  fi
+fi
+source "$library"

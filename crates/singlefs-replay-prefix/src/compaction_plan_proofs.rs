@@ -1,4 +1,4 @@
-//! 整理的选段与计划的 Verus 核与证明（里程碑四二·4；判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7 的 V-1：
+//! 整理的选段与计划的 Verus 核与证明（里程碑四二·4； 的 V-1：
 //! 放进这个 crate 的一个模块）。`singlefs-core` 的 `compaction_plan::choose_region` 与 `compaction_plan::plan_batch` 去掉读记录、
 //! 读扫描结果之后剩下的判定写成两个可执行的核（[`choose_compaction_segment`]、[`plan_compaction_batch`]），证判决 G7 点名的四条：
 //! - P1 选段健全与贪心选择（活槽数最少、平局取最前）：选出的段合 G2 的资格——不是这次挂载开过的段、不是活意图的 R、没装钉住的槽、没被区域扫描拒过、
@@ -9,7 +9,7 @@
 //! - P4 抽象恒等引理：映射（key → 落点的槽区间，起点加跨度）加每个槽上的字节是具体状态，每个 key 经映射读到的单元是抽象状态。
 //!   目的区间两两不重叠、不与现行映射的区间重叠、不压住回退候选与读者的区间、跨度等于源区间时，按计划搬一批（源区间的字节原样写到
 //!   目的区间、映射条目换到目的区间）不改现行映射与回退候选、读者任何一个 key 读到的单元；在前提「R 内每条未释放记录都有映射 key 且
-//!   不在隔离集里」（攻方 H-G7-1）下，一批批搬到 R 空也不改（判决 m4-exit5-relocation-proof-r1 第二节按区间、r3 第二节 Z1 回退候选进前提）。
+//!   不在隔离集里」下，一批批搬到 R 空也不改。
 //!
 //! 核心层 `compaction_plan::choose_region` 与 `plan_batch` 直接调用这两个核；输入转换仍是普通 Rust，
 //! 单测保留独立参考算法并对拍适配层。协议层的根环、回退候选、两层 F、读者与崩溃历史模型见 `gc_ring_interval_proofs`；
@@ -493,8 +493,8 @@ pub fn plan_compaction_batch(
 
 // ===== P4：抽象恒等引理（执行层的模型，不是执行层）=====
 // 具体状态：映射（key 的身份 → 落点的槽区间，起点加跨度），加上每个槽号上的字节；抽象状态：每个 key 经映射读到的单元
-// （区间里每个槽上的字节，按槽序）。目的地的前提按区间不重叠说，不只比起点（判决 m4-exit5-relocation-proof-r1 第二节）；
-// 回退候选与读者还在读的区间也进前提（判决 m4-exit5-relocation-proof-r3 第二节 Z1：只看现行映射的区间版前提放得过
+// （区间里每个槽上的字节，按槽序）。目的地的前提按区间不重叠说，不只比起点；
+// 回退候选与读者还在读的区间也进前提（只看现行映射的区间版前提放得过
 // 「目的地压住回退目标两槽单元的第二槽」）。槽号与跨度用 int，接 core 的 u64 时要另证起点加跨度不溢出。
 pub open spec fn unit_read_through_the_storage(storage: spec_fn(int) -> Seq<u8>, run: SlotRun) -> Seq<Seq<u8>> {
     Seq::new(run.span as nat, |offset: int| storage(run.start + offset))
@@ -508,7 +508,7 @@ pub open spec fn bytes_read_through_the_mapping(
     unit_read_through_the_storage(storage, mapping[mapping_key_identity])
 }
 
-// 搬一个单元的写：源区间每个槽上的字节原样写到目的区间对应的槽（判决 G3：头不盖戳、birth 不变），别的槽不动。
+// 搬一个单元的写：源区间每个槽上的字节原样写到目的区间对应的槽，别的槽不动。
 pub open spec fn storage_after_copying(
     storage: spec_fn(int) -> Seq<u8>,
     source: SlotRun,
@@ -566,7 +566,7 @@ pub open spec fn every_run_of_the_mapping_has_a_slot(mapping: Map<u64, SlotRun>)
     forall|mapping_key_identity: u64| #[trigger] mapping.contains_key(mapping_key_identity) ==> mapping[mapping_key_identity].span >= 1
 }
 
-// 目的地是分配器的性质（判决 G2）：分配器交的落点区间此刻不与映射里任何一个 key 的区间重叠（「目的地不在 R 内」是它的一个特例：
+// 目的地是分配器的性质：分配器交的落点区间此刻不与映射里任何一个 key 的区间重叠（「目的地不在 R 内」是它的一个特例：
 // R 里能搬的单元都在映射里）。
 pub open spec fn destination_is_free_in_the_mapping(mapping: Map<u64, SlotRun>, destination: SlotRun) -> bool {
     forall|mapping_key_identity: u64|
@@ -977,7 +977,7 @@ pub proof fn lemma_a_planned_batch_keeps_every_read(
 }
 
 // ===== P4，搬到 R 空 =====
-// 前提「R 内每条未释放记录都有映射 key 且不在隔离集里」（攻方 H-G7-1）在扫描结果上就是每一项都能搬：钉住的豁免三类没有映射 key，
+// 前提「R 内每条未释放记录都有映射 key 且不在隔离集里」在扫描结果上就是每一项都能搬：钉住的豁免三类没有映射 key，
 // 已死的映射不指它，隔离的在隔离集里，不一致的是映射与单元头对不上。
 pub open spec fn every_allocation_in_the_region_is_movable(
     allocations: Seq<CompactionKernelScannedAllocation>,
@@ -1307,7 +1307,7 @@ pub proof fn corollary_compacting_the_region_until_it_is_empty_keeps_every_read(
     }
 }
 
-// 第三轮攻方 A2（Z1 变体一）：现行映射只有 key 7 在 [10, 11)，回退目标里 key 4 是 [20, 22) 两槽单元，把 key 7 搬到 [21, 22)。
+// 变体一：现行映射只有 key 7 在 [10, 11)，回退目标里 key 4 是 [20, 22) 两槽单元，把 key 7 搬到 [21, 22)。
 // 只看现行映射的区间前提放得过；回退候选进了前提，这一批的目的地就不合格。
 pub proof fn lemma_a_destination_on_the_second_slot_of_a_rollback_target_unit_breaks_the_premise()
     ensures
@@ -1337,7 +1337,7 @@ pub proof fn lemma_a_destination_on_the_second_slot_of_a_rollback_target_unit_br
     assert(!destination_spares_the_protected_mappings(protected_mappings, destinations[0]));
 }
 
-// 第一轮攻方的两槽目的地（只比起点那一版放得过）：映射 key 5 在 [3, 4)，key 9 在 [6, 8)，目的区间 [2, 4) 压住了槽 3。
+// 两槽目的地（只比起点的前提放得过）：映射 key 5 在 [3, 4)，key 9 在 [6, 8)，目的区间 [2, 4) 压住了槽 3。
 pub proof fn lemma_a_two_slot_destination_over_a_one_slot_unit_breaks_the_premise()
     ensures
         ({

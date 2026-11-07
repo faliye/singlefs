@@ -1,0 +1,3 @@
+pub fn stopped_connections() -> u32 {
+    3
+}

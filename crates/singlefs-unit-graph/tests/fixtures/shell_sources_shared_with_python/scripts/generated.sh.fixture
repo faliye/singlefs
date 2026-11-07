@@ -1,0 +1,5 @@
+work_directory="$(mktemp -d)"
+cat > "$work_directory/generated-library.sh" <<'EOF'
+source scripts/lib/plain-library.sh
+EOF
+source "$work_directory/generated-library.sh"

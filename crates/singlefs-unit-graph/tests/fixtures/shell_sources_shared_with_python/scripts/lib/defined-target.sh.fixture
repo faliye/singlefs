@@ -1,0 +1,3 @@
+defined_target_function() {
+  echo defined target
+}

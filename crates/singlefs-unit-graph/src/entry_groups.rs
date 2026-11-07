@@ -1,4 +1,4 @@
-//! 一组入口的复用键与组成清单，连同写进构建输出目录的那份表（`singlefs-checker-tier` 的构建脚本按登记的判器入口逐组算、写进
+//! 一组入口的复用键与组成清单，连同写进构建输出目录的那份表（`singlefs-verification` 的构建脚本按登记的判器入口逐组算、写进
 //! `OUT_DIR`，库经 `include_str!` 读回，跑时只用编进去的这一份、不读盘上的树；设计 3.8「build.rs 做什么」）。
 //!
 //! 一组 = 同一个目标里的几个入口 fn（[`crate::closure::compute_closure_of_entries`] 一次收），开哪几个特性、工具链行
@@ -8,7 +8,7 @@
 //! （[`crate::build_features`]，[`entry_group_key_with_the_features_of_the_build`]）时，等于把那些特性写进入口包对那个依赖的 `features` 之后
 //! 命令行算的那一把。
 //! 判器组都是产品行为判定（崩溃判定库的判器组与观察者）：键与组成清单都在 [`Workspace::view_for_judgment`] 交的产品行为视图上算，
-//! `verus!` 里的规格与证明块不进指纹、不当边（m4-exit5-relocation-proof-r3 判决第二节 Z4）；与命令行对得上要另给 `--judgment-kind product-behavior`。
+//! `verus!` 里的规格与证明块不进指纹、不当边；与命令行对得上要另给 `--judgment-kind product-behavior`。
 //!
 //! 表的写法（一行一项、制表符隔开；组名与限定名、文件:行只当索引，不进键）：
 //!   `# singlefs entry group keys`                                   头一行

@@ -264,7 +264,7 @@ pub fn narrowed_lock_lines(
                 Some(package) => pending.push((package, unit.file, line)),
                 None => {
                     refusals.insert(Refusal {
-                        file: unit.file,
+                        file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
                         line,
                         form: RefusalForm::LockDependencyUnresolved,
                         fragment: format!("{own_package_name} → {dependency_package_name}"),
@@ -283,7 +283,7 @@ pub fn narrowed_lock_lines(
                 Some(dependency) => pending.push((dependency, file, line)),
                 None => {
                     refusals.insert(Refusal {
-                        file,
+                        file: crate::units::RefusalFile::WorkspaceSourceFile(file),
                         line,
                         form: RefusalForm::LockDependencyUnresolved,
                         fragment: format!("{} → {item}", package.name),

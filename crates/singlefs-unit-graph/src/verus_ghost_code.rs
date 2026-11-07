@@ -1,6 +1,6 @@
-//! 产品行为判定与形式化判定分开取键（m4-exit5-relocation-proof-r3 判决第二节 Z4 与第三节「判器键」，D13（验证路线）已定项 17）：
-//! 产品行为那几类判定（崩溃判定库的判器组、checker 档快档按条复用、crates 变异判法单元）的单元指纹，去注释之后再剥掉 `verus!` 里
-//! 只在 Verus 下有意义的部分——它们不进产品编译出来的代码，只改它们的改动不改产品行为；形式化判定（门禁 checker-tier-formal-verification
+//! 产品行为判定与形式化判定分开取键（D13（验证路线）已定项 17）：
+//! 产品行为那几类判定（崩溃判定库的判器组、验证包按条复用、crates 变异判法单元）的单元指纹，去注释之后再剥掉 `verus!` 里
+//! 只在 Verus 下有意义的部分——它们不进产品编译出来的代码，只改它们的改动不改产品行为；形式化判定（门禁 formal-verification
 //! 的每条）判的正是规格与证明，键保留它们，剥了会拿旧判定顶新规格（假绿）。
 //!
 //! 剥法用 Verus 自己的语法树，不用词法：每一块 `verus! { … }` 的内文照 `verus_builtin_macros` 的做法（`verus_syn::rejoin_tokens` 之后
@@ -12,14 +12,20 @@
 //! `with` 一截，具名返回值 `-> (名: 类型)` 的 `(名:` 与 `)`；函数体（与常量、静态量的初值）里的 `proof { … }`、`assert(…)`（连 `by …`）、
 //! `assert forall`、`assume(…)`、`reveal(…)` 一族、`let ghost` 与 `let tracked`，循环头的 invariant 一族、ensures、decreases 与 for 循环给迭代器起的名，
 //! 闭包的 requires 与 ensures，exec 常量与静态量的 ensures。
-//! 再剥（主 agent 2026-10-26 定：产品编译里它们只剩不带数据的壳，值在擦 ghost 代码时擦掉）：函数签名里类型是 `Ghost<…>` / `Tracked<…>`
+//! 再剥：函数签名里类型是 `Ghost<…>` / `Tracked<…>`
 //! 的参数（连它的模式，例 `Ghost(名): Ghost<类型>`）；结构体与元组结构体里 ghost / tracked 模式的字段与类型是 `Ghost<…>` / `Tracked<…>`
 //! 的字段；调用与方法调用里整个实参是 `Ghost(…)` / `Tracked(…)` 的那几个、结构体字面量里初值是 `Ghost(…)` / `Tracked(…)` 的字段、
 //! 结构体模式里子模式是 `Ghost(名)` / `Tracked(名)` 的字段。剥一列里的几样时连它们的逗号一起剥，剩下的与压根没写那几样时逐个词法单元相同。
 //! `Ghost(…)` / `Tracked(…)` 与解包模式照 `verus_builtin_macros` 认（`handle_mode_blocks`、`ExecGhostPatVisitor`：不带限定、只有一段路径、
 //! 恰好一个实参或元素）。
 //! 不剥（偏保守，改了照样换键）：别处的 `Ghost(…)` / `Tracked(…)`（例 exec 的 `let` 初值）、闭包的参数、结构体字面量里简写的字段（`S { 名 }`，
-//! 看不出是不是 ghost 字段）、`tracked` 记号的参数与返回值、`exec` 记号、`#[verifier::…]` 这类属性。执行代码一个字节不剥。
+//! 看不出是不是 ghost 字段）、`tracked` 记号的参数与返回值、`exec` 记号。执行代码一个字节不剥。
+//!
+//! 外属性 `#[verifier::…]` 与另一种写法 `#[verifier(…)]` 也剥（产品行为视图里单元只多一行这类属性指纹就变）：
+//! 它们只给 Verus 看，产品编译里不剩东西。这一样按词法认、不走语法树：
+//! `verus!` 外面也有（不进 `verus_syn`），`verus!` 里外同一套认法。从 `#` 剥到配对的 `]`，挨着的别的属性与条目一个词法单元不动。
+//! 不剥的（偏保守）：内属性 `#![verifier::…]`、`#[cfg_attr(…, verifier::…)]`，以及落在 `verus!` 以外的宏调用与 `macro_rules!` 的
+//! 词法单元组里的（那里的 `#[…]` 可能是匹配模式或交给别的宏的词法单元，不是属性）。
 //!
 //! 一份文件里有一块 `verus!` 解不开，整份文件原样留着，交 [`UnparsedVerusBlock`]：工作区装产品行为视图时记一条
 //! `verus-ghost-code-unparsed` 拒算，链接到它的产品行为判定照跑、不复用（不静默少剥，也不静默当成剥过）。
@@ -38,7 +44,7 @@ use verus_syn::{
     PatStruct, PathArguments, ReturnType, Signature, Stmt, TraitItemConst, TraitItemFn, Type, UnOp,
 };
 
-use crate::lexer::{lex_source, token_text, DocumentationCommentTreatment, TokenKind};
+use crate::lexer::{lex_source, token_text, DocumentationCommentTreatment, Token, TokenKind};
 
 /// 换行符：剥的时候留着它，行号不变。
 const LINE_FEED: u8 = 0x0a;
@@ -46,9 +52,9 @@ const LINE_FEED: u8 = 0x0a;
 /// 一份判定判的是什么，决定它的键取哪一个视图（`Workspace::view_for_judgment`）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JudgmentKind {
-    /// 判产品行为：崩溃判定库的判器组、checker 档快档按条复用、crates 变异判法单元。键在剥掉 Verus 规格与证明块的视图上算。
+    /// 判产品行为：崩溃判定库的判器组、验证包按条复用、crates 变异判法单元。键在剥掉 Verus 规格与证明块的视图上算。
     ProductBehavior,
-    /// 判 Verus 的证明：门禁 checker-tier-formal-verification 的每条。键在原样的源码上算，规格与证明都进指纹。
+    /// 判 Verus 的证明：门禁 formal-verification 的每条。键在原样的源码上算，规格与证明都进指纹。
     FormalVerification,
 }
 
@@ -117,6 +123,30 @@ fn byte_index(byte_offset: u32) -> usize {
     usize::try_from(byte_offset).expect("字节偏移放得进 usize")
 }
 
+const OPENING_BRACKETS: [&str; 3] = ["{", "(", "["];
+const CLOSING_BRACKETS: [&str; 3] = ["}", ")", "]"];
+
+fn is_bracket_token(source: &str, token: &Token, brackets: &[&str]) -> bool {
+    token.kind == TokenKind::Punctuation && brackets.contains(&token_text(source, token))
+}
+
+/// 从下标 `open` 那个左括号起，配到与它同层的右括号（三种括号一起数层）；配不上（文件先完）交 `None`。
+fn matching_closing_bracket(source: &str, tokens: &[Token], open: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    // 每一步往后走一个词法单元：至多走到文件末尾
+    for (position, token) in tokens.iter().enumerate().skip(open) {
+        if is_bracket_token(source, token, &OPENING_BRACKETS) {
+            depth += 1;
+        } else if is_bracket_token(source, token, &CLOSING_BRACKETS) {
+            depth -= 1;
+            if depth == 0 {
+                return Some(position);
+            }
+        }
+    }
+    None
+}
+
 /// 源码里每一块最外层的 `verus! { … }`（`vstd::prelude::verus! { … }` 也算）：词法单元 `verus`、`!`、`{` 挨着，配到它的 `}`。
 /// 配不上的不算（括号配不上的文件由切分记拒算）。
 fn verus_blocks_of(source: &str) -> Vec<VerusBlock> {
@@ -139,21 +169,7 @@ fn verus_blocks_of(source: &str) -> Vec<VerusBlock> {
             continue;
         }
         let open = index + 2;
-        let mut depth = 0usize;
-        let mut close = None;
-        // 每一步往后走一个词法单元：至多走到文件末尾
-        for position in open..tokens.len() {
-            if is_bracket_punctuation(position, &["{", "(", "["]) {
-                depth += 1;
-            } else if is_bracket_punctuation(position, &["}", ")", "]"]) {
-                depth -= 1;
-                if depth == 0 {
-                    close = Some(position);
-                    break;
-                }
-            }
-        }
-        let Some(close) = close else {
+        let Some(close) = matching_closing_bracket(source, tokens, open) else {
             break;
         };
         blocks.push(VerusBlock {
@@ -164,6 +180,108 @@ fn verus_blocks_of(source: &str) -> Vec<VerusBlock> {
         index = close + 1;
     }
     blocks
+}
+
+/// Verus 的属性路径头：`#[verifier::…]` 与另一种写法 `#[verifier(…)]` 都以它起头。
+const VERIFIER_ATTRIBUTE_PATH_HEAD: &str = "verifier";
+
+/// 宏名：`verus` 开的 `{ … }` 是 Verus 的块，别的宏开的词法单元组里不认属性。
+const VERUS_MACRO_NAME: &str = "verus";
+
+/// 下标 `open` 那个左括号是不是开了一组交给宏的词法单元：前面紧挨 `名 !`（宏调用，`#![…]` 的 `#` 不是名字，不算）或
+/// `macro_rules ! 名`（宏定义）。交宏名，宏定义交 `macro_rules`。把 `if !(…)` 这类当成宏调用的只会少剥（偏保守）。
+fn macro_name_opening_the_group<'source>(
+    source: &'source str,
+    tokens: &[Token],
+    open: usize,
+) -> Option<&'source str> {
+    let is_exclamation_mark = |index: usize| {
+        tokens[index].kind == TokenKind::Punctuation && token_text(source, &tokens[index]) == "!"
+    };
+    let is_identifier = |index: usize| tokens[index].kind == TokenKind::Identifier;
+    if open >= 2 && is_exclamation_mark(open - 1) && is_identifier(open - 2) {
+        return Some(token_text(source, &tokens[open - 2]));
+    }
+    let opens_a_macro_rules_body = open >= 3
+        && is_identifier(open - 1)
+        && is_exclamation_mark(open - 2)
+        && is_identifier(open - 3)
+        && token_text(source, &tokens[open - 3]) == "macro_rules";
+    opens_a_macro_rules_body.then_some("macro_rules")
+}
+
+/// 从下标 `hash` 起是不是一条 `#[verifier::…]` / `#[verifier(…)]` 外属性：是就交配对的 `]` 的下标。
+fn verifier_attribute_closing_bracket(
+    source: &str,
+    tokens: &[Token],
+    hash: usize,
+) -> Option<usize> {
+    let text = |index: usize| token_text(source, &tokens[index]);
+    let is_punctuation = |index: usize, punctuation: &str| {
+        index < tokens.len()
+            && tokens[index].kind == TokenKind::Punctuation
+            && text(index) == punctuation
+    };
+    let opens_a_verifier_attribute = is_punctuation(hash, "#")
+        && is_punctuation(hash + 1, "[")
+        && hash + 2 < tokens.len()
+        && tokens[hash + 2].kind == TokenKind::Identifier
+        && text(hash + 2) == VERIFIER_ATTRIBUTE_PATH_HEAD
+        && ((is_punctuation(hash + 3, ":") && is_punctuation(hash + 4, ":"))
+            || is_punctuation(hash + 3, "("));
+    if !opens_a_verifier_attribute {
+        return None;
+    }
+    matching_closing_bracket(source, tokens, hash + 1)
+}
+
+/// 源码里每一条 `#[verifier::…]` / `#[verifier(…)]` 外属性从 `#` 到配对的 `]` 的字节区间：`verus!` 里外都认，
+/// 落在别的宏调用或 `macro_rules!` 的词法单元组里的不认。配不上 `]` 的不认（括号配不上的文件由切分记拒算）。
+fn verifier_attribute_ranges_of(source: &str) -> Vec<Range<usize>> {
+    let lexed = lex_source(source, DocumentationCommentTreatment::KeptOutOfTheTokens);
+    let tokens = &lexed.tokens;
+    // 每一层还开着的括号：这一层（连外层）落没落在别的宏的词法单元组里
+    let mut is_inside_another_macro_by_open_bracket: Vec<bool> = Vec::new();
+    let mut ranges = Vec::new();
+    let mut index = 0usize;
+    // 每一步至少往后走一个词法单元：至多走到文件末尾
+    while index < tokens.len() {
+        let is_inside_another_macro = is_inside_another_macro_by_open_bracket
+            .last()
+            .copied()
+            .unwrap_or(false);
+        if !is_inside_another_macro {
+            if let Some(close) = verifier_attribute_closing_bracket(source, tokens, index) {
+                let from_the_hash_to_the_closing_bracket =
+                    byte_index(tokens[index].start_byte)..byte_index(tokens[close].end_byte);
+                ranges.push(from_the_hash_to_the_closing_bracket);
+                index = close + 1;
+                continue;
+            }
+        }
+        let token = &tokens[index];
+        if is_bracket_token(source, token, &OPENING_BRACKETS) {
+            let opens_another_macro = macro_name_opening_the_group(source, tokens, index)
+                .is_some_and(|macro_name| {
+                    macro_name != VERUS_MACRO_NAME || token_text(source, token) != "{"
+                });
+            is_inside_another_macro_by_open_bracket
+                .push(is_inside_another_macro || opens_another_macro);
+        } else if is_bracket_token(source, token, &CLOSING_BRACKETS) {
+            is_inside_another_macro_by_open_bracket.pop();
+        }
+        index += 1;
+    }
+    ranges
+}
+
+/// 区间里除换行以外的字节换成空格（换行留着，行号不变）。
+fn blank_the_bytes(bytes: &mut [u8], range: Range<usize>) {
+    for byte in &mut bytes[range] {
+        if *byte != LINE_FEED {
+            *byte = b' ';
+        }
+    }
 }
 
 /// 一个节点交回词法单元串之后各词法单元（括号组取整组）的字节区间的并：从最早的起点到最晚的终点。
@@ -626,7 +744,8 @@ fn unparsed_block(
     }
 }
 
-/// 源码里每一块 `verus!` 的规格与证明块换成空格（换行留着，字节数与行号都不变）；没有 `verus!` 的原样交回。
+/// 源码里每一块 `verus!` 的规格与证明块、`verus!` 里外的 `#[verifier::…]` / `#[verifier(…)]` 外属性换成空格（换行留着，字节数与行号都不变）；
+/// 两样都没有的原样交回。
 ///
 /// # Errors
 /// 有一块交给 `verus_syn` 解不开：交头一块解不开的那一块（行号是源码里的行号）。
@@ -641,13 +760,14 @@ pub fn source_with_verus_ghost_code_blanked(source: &str) -> Result<String, Unpa
             }
         };
         for range in ranges {
-            let absolute = block.interior.start + range.start..block.interior.start + range.end;
-            for byte in &mut bytes[absolute] {
-                if *byte != LINE_FEED {
-                    *byte = b' ';
-                }
-            }
+            blank_the_bytes(
+                &mut bytes,
+                block.interior.start + range.start..block.interior.start + range.end,
+            );
         }
+    }
+    for range in verifier_attribute_ranges_of(source) {
+        blank_the_bytes(&mut bytes, range);
     }
     Ok(String::from_utf8(bytes).expect(
         "换成空格的区间是语法树节点的字节区间，起止都落在字符边界上，整段多字节字符一起换掉，交回的仍是 UTF-8",
@@ -683,6 +803,51 @@ mod tests {
             words,
             ["verus!", "{", "fn", "width()", "->", "usize", "{", "10", "}", "}"],
             "剥掉 spec 函数、具名返回值的名字、ensures 与 proof 块，剩下 exec 代码：{blanked}"
+        );
+    }
+
+    #[test]
+    fn verifier_attributes_inside_and_outside_verus_blocks_are_blanked_and_the_attributes_next_to_them_kept(
+    ) {
+        let source = "#[verifier::external_body]\n#[inline(never)]\nfn outside() -> u64 {\n    1\n}\nverus! {\n#[verifier(opaque)]\n#[verifier::allow(autoderive_clone_without_spec)]\n#[derive(Clone)]\npub struct Inside(u64);\n}\n";
+        let blanked = source_with_verus_ghost_code_blanked(source).expect("这块解得开");
+        assert_eq!(blanked.len(), source.len(), "字节数不变");
+        assert_eq!(
+            blanked.matches('\n').count(),
+            source.matches('\n').count(),
+            "换行都留着"
+        );
+        let words: Vec<&str> = blanked.split_whitespace().collect();
+        assert_eq!(
+            words,
+            [
+                "#[inline(never)]",
+                "fn",
+                "outside()",
+                "->",
+                "u64",
+                "{",
+                "1",
+                "}",
+                "verus!",
+                "{",
+                "#[derive(Clone)]",
+                "pub",
+                "struct",
+                "Inside(u64);",
+                "}"
+            ],
+            "verus! 外的 #[verifier::…]、verus! 里的 #[verifier(…)] 与 #[verifier::…(…)] 都剥，挨着的 #[inline]、#[derive] 留着：{blanked}"
+        );
+    }
+
+    #[test]
+    fn verifier_attributes_inside_other_macros_come_back_byte_for_byte() {
+        let source = "macro_rules! keep_the_item {\n    (#[verifier::external_body] $item:item) => { $item };\n}\nlookalike! {\n    #[verifier::external_body]\n    fn inside() {}\n}\n";
+        assert_eq!(
+            source_with_verus_ghost_code_blanked(source).as_deref(),
+            Ok(source),
+            "macro_rules! 的匹配模式与别的宏调用里写的 #[verifier::…] 不当属性剥"
         );
     }
 

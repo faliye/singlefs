@@ -2,12 +2,12 @@
 //! 选 `gpu`，推一趟整理到停；同一历史的另一个池选 `cpu` 推一趟。两趟发的每一版、录制流、盘上字节、停在哪、搬了几批、整理观测与 discard 逐项相同
 //! （D26（后台整理与放置回收） 已定项 13「GPU 路径与 CPU 路径是两份实现……两份实现在测试里对拍」）。另钉住这份实现答的卡清单：开包时开着的本机全部独显，
 //! 点名交来的卡时参与的就是交来的那几张、次序照点名的次序；交来一组只点其中一张的设置之后参与的卡只剩它、卡清单不变（不重开），一批照常只在它上面算。
-//! 池的搭建在 `common_pool_on_memory_devices`（同 harness 档 `build_pool` 那一串，盘在内存里）。
+//! 池的搭建在 `common_pool_on_memory_devices`（同 验证包 `build_pool` 那一串，盘在内存里）。
 //! 开卡与挂载只点名服务经 `GPU_CARDS_BY_PRIORITY` 交给这个进程、属于这一台的那几张卡（`common_discrete_gpus_of_this_host`）：服务没交这一台的卡时每条打一行
 //! `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」、返回成功；交了卡却对不上本机的独显、或开不了判红。源头没声明张数，服务分一张。
 //! 只在开了特性 `tests-on-a-real-gpu` 时编；用 GPU，经 `task-server/task submit` 交（卡与清场由服务定），带 `--test-threads 1`。
-//! 开卡与挂载给每张参与的卡的显存上限 1 GiB（七·3 验收，用户 2026-11-01 定；`common_discrete_gpus_of_this_host`）。
-//! 七·3 验收（用户 2026-11-01 定）的另几格也在这里：没有卡时拒绝挂载（本进程照原样再起一次自己、把 Vulkan 驱动全藏起来，那一次里一张独显都看不到）；
+//! 开卡与挂载给每张参与的卡的显存上限 1 GiB（`common_discrete_gpus_of_this_host`）。
+//! 七·3 验收的另几格也在这里：没有卡时拒绝挂载（本进程照原样再起一次自己、把 Vulkan 驱动全藏起来，那一次里一张独显都看不到）；
 //! 挂着时卡出错就报警、GC 停下（挂着切到等 GPU 的上限 1 纳秒：一批交出去就等超过上限、重交 3 次都超时，第 4 条「含重交 3 次都超时」那一种 GPU 出错）；
 //! 停下之后占用超过阈值在 CPU 上补跑、结果与 CPU 模式相同，不超过时照旧停着。
 mod common_discrete_gpus_of_this_host;
@@ -19,13 +19,14 @@ use std::time::Duration;
 use common_discrete_gpus_of_this_host::{
     discrete_gpus_on_this_host, handed_over_gpus_or_report_not_run,
     identifiers_of_the_handed_over_gpus, memory_limits_of_one_gibibyte_each, HandedOverGpu,
+    HandedOverGpusSeenThroughTheInstance,
 };
 use common_pool_on_memory_devices::{
     parameters, pool_after_a_sequential_write_in_an_earlier_mount, PoolOnMemoryDevices,
 };
 use singlefs_background_gpu::adapter_inventory::BackgroundGpuSelection;
 use singlefs_background_gpu::background_gpu::{
-    open_background_gpu, BackgroundGpu, BackgroundGpuOpenRefused,
+    open_background_gpu, BackgroundGpu, BackgroundGpuOpenRefused, VulkanInstanceOfThisProcess,
 };
 use singlefs_background_gpu::background_gpu_compute::open_background_gpu_compute;
 use singlefs_background_gpu::checksum_kernels::{cpu_reference_outcome, UnitChecksumToVerify};
@@ -62,23 +63,30 @@ fn gpu_settings_on_the_handed_over_gpus(
     }
 }
 
-/// 选 `gpu`、不点名（本机全部独显）、每张卡的显存上限 1 GiB：只给 Vulkan 驱动全藏起来的那一次用（一张独显都看不到，上限列表是空的，开卡照「GPU 不在」拒）。
-fn gpu_settings_on_every_discrete_gpu() -> BackgroundComputeSettings {
+/// 选 `gpu`、不点名（`vulkan_instance` 上看得到的本机全部独显）、每张卡的显存上限 1 GiB：只给 Vulkan 驱动全藏起来的那一次用
+/// （一张独显都看不到，上限列表是空的，开卡照「GPU 不在」拒）。
+fn gpu_settings_on_every_discrete_gpu(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+) -> BackgroundComputeSettings {
     BackgroundComputeSettings {
         background_compute: BackgroundComputeBackend::Gpu,
         background_gpu_devices: None,
         background_gpu_memory_limit: Some(memory_limits_of_one_gibibyte_each(
-            discrete_gpus_on_this_host(WAIT_LIMIT_OF_THE_GPU_TESTS).len(),
+            discrete_gpus_on_this_host(vulkan_instance, WAIT_LIMIT_OF_THE_GPU_TESTS).len(),
         )),
         background_gpu_wait_limit: WAIT_LIMIT_OF_THE_GPU_TESTS,
     }
 }
 
-/// 照挂载那一组设置（点名交来的卡）开卡、交回把手。卡是服务交来、对上了本机适配器的，开不了判红。
-fn opened_gpu_compute(settings: &BackgroundComputeSettings) -> BackgroundGpuComputeHandle {
+/// 照挂载那一组设置（点名交来的卡）在 `vulkan_instance` 上开卡、交回把手。卡是服务交来、对上了本机适配器的，开不了判红。
+fn opened_gpu_compute(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+    settings: &BackgroundComputeSettings,
+) -> BackgroundGpuComputeHandle {
     match open_background_gpu_compute(
         &BackgroundGpuSelection::of_the_settings(settings),
         &GpuMemoryLeakedInThisProcess::with_nothing_leaked(),
+        vulkan_instance,
     ) {
         Ok(opened) => opened.gpu_compute,
         Err(refused) => {
@@ -87,23 +95,32 @@ fn opened_gpu_compute(settings: &BackgroundComputeSettings) -> BackgroundGpuComp
     }
 }
 
-/// 照挂载那一组设置（点名交来的卡）开产品 GPU 包的后台 GPU。卡是服务交来、对上了本机适配器的，开不了判红。
-fn opened_background_gpu_of_the_settings(settings: &BackgroundComputeSettings) -> BackgroundGpu {
-    open_background_gpu(&BackgroundGpuSelection::of_the_settings(settings)).unwrap_or_else(
-        |refused| panic!("服务交来、对上了本机适配器的卡开不了后台 GPU：{refused:?}"),
+/// 照挂载那一组设置（点名交来的卡）在 `vulkan_instance` 上开产品 GPU 包的后台 GPU。卡是服务交来、对上了本机适配器的，开不了判红。
+fn opened_background_gpu_of_the_settings(
+    vulkan_instance: &VulkanInstanceOfThisProcess,
+    settings: &BackgroundComputeSettings,
+) -> BackgroundGpu {
+    open_background_gpu(
+        &BackgroundGpuSelection::of_the_settings(settings),
+        vulkan_instance,
     )
+    .unwrap_or_else(|refused| panic!("服务交来、对上了本机适配器的卡开不了后台 GPU：{refused:?}"))
 }
 
 #[test]
 fn the_compaction_run_on_the_real_gpus_ends_exactly_as_the_cpu_path() {
-    let Some(handed_over_gpus) = handed_over_gpus_or_report_not_run(
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(
         "the_compaction_run_on_the_real_gpus_ends_exactly_as_the_cpu_path",
         WAIT_LIMIT_OF_THE_GPU_TESTS,
-    ) else {
+    )
+    else {
         return;
     };
     let settings = gpu_settings_on_the_handed_over_gpus(&handed_over_gpus);
-    let gpu_compute = opened_gpu_compute(&settings);
+    let gpu_compute = opened_gpu_compute(&vulkan_instance, &settings);
     let history = pool_after_a_sequential_write_in_an_earlier_mount();
     let mut cpu_pool = history.copied_with_an_empty_stream();
     let mut gpu_pool = history.copied_with_an_empty_stream();
@@ -181,13 +198,15 @@ fn the_compaction_run_on_the_real_gpus_ends_exactly_as_the_cpu_path() {
 fn the_implementation_answers_the_participating_gpus_as_the_inventory_the_core_admits_against() {
     let test_name =
         "the_implementation_answers_the_participating_gpus_as_the_inventory_the_core_admits_against";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
     let settings = gpu_settings_on_the_handed_over_gpus(&handed_over_gpus);
-    let background_gpu = opened_background_gpu_of_the_settings(&settings);
+    let background_gpu = opened_background_gpu_of_the_settings(&vulkan_instance, &settings);
     let participating: Vec<GpuDeviceIdentifier> = background_gpu
         .participating_gpus()
         .into_iter()
@@ -208,7 +227,7 @@ fn the_implementation_answers_the_participating_gpus_as_the_inventory_the_core_a
         "参与的卡都在卡清单里（卡清单是本机全部独显）：参与的 {participating:?}，卡清单 {inventory:?}"
     );
     drop(background_gpu);
-    let gpu_compute = opened_gpu_compute(&settings);
+    let gpu_compute = opened_gpu_compute(&vulkan_instance, &settings);
     let naming = |device: GpuDeviceIdentifier| BackgroundComputeSettings {
         background_compute: BackgroundComputeBackend::Gpu,
         background_gpu_devices: Some(vec![device]),
@@ -245,13 +264,15 @@ fn the_implementation_answers_the_participating_gpus_as_the_inventory_the_core_a
 fn settings_naming_one_card_narrow_the_participating_gpus_without_reopening_the_cards() {
     let test_name =
         "settings_naming_one_card_narrow_the_participating_gpus_without_reopening_the_cards";
-    let Some(handed_over_gpus) =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+    let Some(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
     else {
         return;
     };
     let settings = gpu_settings_on_the_handed_over_gpus(&handed_over_gpus);
-    let mut background_gpu = opened_background_gpu_of_the_settings(&settings);
+    let mut background_gpu = opened_background_gpu_of_the_settings(&vulkan_instance, &settings);
     let inventory_at_the_opening = background_gpu.devices_with_total_memory();
     let named_card = handed_over_gpus[0].identifier();
     let memory_limit_of_the_named_card: Vec<GpuMemoryInBytes> =
@@ -325,17 +346,19 @@ const THRESHOLD_EXCEEDED_BY_ANY_ALLOCATED_BYTE: BackgroundGcCpuCompensationThres
 /// 驱动全藏起来的那一次里判的：照产品那一份判法数出 0 张独显；产品 GPU 包照挂载那一组设置开卡报「GPU 不在」；同一历史拷的池选 `gpu`、
 /// 不递实现（开不出把手）的可写挂载拒（`GpuNotPresent`），盘上逐字节不变、一个改盘的动作都没录到。
 fn the_mount_choosing_gpu_is_refused_with_no_discrete_gpu_visible() {
-    let discrete_gpus = discrete_gpus_on_this_host(WAIT_LIMIT_OF_THE_GPU_TESTS);
+    let vulkan_instance = VulkanInstanceOfThisProcess::created_for_this_process();
+    let discrete_gpus = discrete_gpus_on_this_host(&vulkan_instance, WAIT_LIMIT_OF_THE_GPU_TESTS);
     assert!(
         discrete_gpus.is_empty(),
         "Vulkan 驱动全藏起来之后一张独显都看不到：{discrete_gpus:?}"
     );
-    let settings = gpu_settings_on_every_discrete_gpu();
+    let settings = gpu_settings_on_every_discrete_gpu(&vulkan_instance);
     assert!(
         matches!(
             open_background_gpu_compute(
                 &BackgroundGpuSelection::of_the_settings(&settings),
                 &GpuMemoryLeakedInThisProcess::with_nothing_leaked(),
+                &vulkan_instance,
             ),
             Err(BackgroundGpuOpenRefused::SettingsRefused(
                 BackgroundComputeSettingsRefused::GpuNotPresent
@@ -374,7 +397,7 @@ fn the_mount_choosing_gpu_is_refused_with_no_discrete_gpu_visible() {
     );
 }
 
-/// 七·3 验收「没有卡时拒绝挂载」（用户 2026-11-01 定）：本进程照原样再起一次自己、只跑这一条，那一次里把 Vulkan 驱动全藏起来
+/// 七·3 验收「没有卡时拒绝挂载」：本进程照原样再起一次自己、只跑这一条，那一次里把 Vulkan 驱动全藏起来
 /// （`VK_DRIVER_FILES` 与 `VK_ICD_FILENAMES` 指到一份不存在的驱动清单、不设 `VK_ADD_DRIVER_FILES`：Vulkan 加载器一个驱动都找不到，
 /// wgpu 一个适配器都枚举不到，与本机没有独显时产品看到的一样；推的，读 Vulkan 加载器的环境变量约定），在那一次里判
 /// [`the_mount_choosing_gpu_is_refused_with_no_discrete_gpu_visible`]。外面那一次认那一次退 0、打了判过的那一行。
@@ -449,10 +472,12 @@ fn gpu_session_after_a_run_whose_every_wait_exceeds_the_limit(
     test_name: &str,
     threshold: BackgroundGcCpuCompensationThreshold,
 ) -> Option<GpuSessionAfterARunWhoseEveryWaitExceedsTheLimit> {
-    let handed_over_gpus =
-        handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)?;
+    let HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    } = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)?;
     let settings = gpu_settings_on_the_handed_over_gpus(&handed_over_gpus);
-    let gpu_compute = opened_gpu_compute(&settings);
+    let gpu_compute = opened_gpu_compute(&vulkan_instance, &settings);
     let participating_gpus = identifiers_of_the_handed_over_gpus(&handed_over_gpus);
     let history = pool_after_a_sequential_write_in_an_earlier_mount();
     let mut gpu_pool = history.copied_with_an_empty_stream();
@@ -496,7 +521,7 @@ fn is_stopped_after_a_compute_error_in_the_run(run: &CompactionRun) -> bool {
     ) && run.versions_published.is_empty()
 }
 
-/// 七·3 验收「挂着时卡出错就报警、GC 停下」（用户 2026-11-01 定）在真卡上：挂着切到等的上限 1 纳秒之后推一趟——一批在卡上等超过上限、
+/// 七·3 验收「挂着时卡出错就报警、GC 停下」在真卡上：挂着切到等的上限 1 纳秒之后推一趟——一批在卡上等超过上限、
 /// 重交 3 次都超时，这一批放弃、整理停下，一个改盘的动作都没发；这一趟就交回报警：整理、叫起 0 次（出错停下的那一趟不数）、补跑 0 批，
 /// 错点名的卡至少一张、都是参与的卡；会话里整理停着。
 #[test]
@@ -550,7 +575,7 @@ fn the_run_whose_every_wait_on_the_real_gpus_exceeds_the_limit_returns_an_alarm_
     );
 }
 
-/// 七·3 验收「占用超过阈值时在 CPU 上补跑、结果与 CPU 模式相同」（用户 2026-11-01 定）在真卡上：切换时连同补跑阈值 0%，那一趟在 GPU 上出错停下之后
+/// 七·3 验收「占用超过阈值时在 CPU 上补跑、结果与 CPU 模式相同」在真卡上：切换时连同补跑阈值 0%，那一趟在 GPU 上出错停下之后
 /// 再推一趟——每一批记成停着时在 CPU 上补跑，这一趟交回报警（叫起 1 次、补跑的批数就是这一趟的批数）；同一历史拷的另一个池选 `cpu` 推一趟：
 /// 两趟停在同一条上、发的每一版逐项相同、搬了一样多批，录制流逐步相同、盘上逐字节相同（出错停下那一趟一个改盘的动作都没发）。
 #[test]
@@ -630,7 +655,7 @@ fn the_compaction_stopped_on_the_real_gpus_compensates_on_the_cpu_above_the_thre
     );
 }
 
-/// 七·3 验收「不超过时照旧停着」（用户 2026-11-01 定）在真卡上：补跑阈值取默认 85%（这个池每块盘的占用远低于 1%），那一趟在 GPU 上出错停下之后
+/// 七·3 验收「不超过时照旧停着」在真卡上：补跑阈值取默认 85%（这个池每块盘的占用远低于 1%），那一趟在 GPU 上出错停下之后
 /// 再推一趟——照旧停着、一批都没开、一个改盘的动作都没发，这一趟交回报警（叫起 1 次、补跑 0 批）。
 #[test]
 fn the_compaction_stopped_on_the_real_gpus_stays_stopped_while_not_above_the_threshold() {

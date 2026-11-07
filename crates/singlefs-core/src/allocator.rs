@@ -12,7 +12,8 @@
 //! `DeviceFreeMap::empty_segments` 每次被读都把内存里逐段的已用槽数数一遍（不读盘，代价随段数长）。
 
 use singlefs_format::{
-    ALLOCATION_RECORD_BYTES, CLUSTER_SEGMENT_SLOTS, JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES,
+    ALLOCATION_RECORD_BYTES, CLUSTER_SEGMENT_SLOTS, JOURNAL_RING_DEFAULT_BYTES, ROOT_RING_REGIONS,
+    SLOT_BYTES,
 };
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -117,7 +118,7 @@ impl AllocationRecord {
     }
     /// 分配记录 20 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 10），
     /// 不等于 20 时拒：这里是盘上字节进字段表的边界，往里就按 20 信它。窄于 20 的切不出整条记录；
-    /// 宽于 20 的同样不收（I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，用户 2026-10-18 定「宽于字段表也拒」，欠账 C867）。
+    /// 宽于 20 的同样不收（I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，欠账 C867）。
     /// 跨度段次高位 0x4000 读成隔离记号、跨度取去掉两个标志位之后的值（D19（块指针的结构与宽度预算） 已定项 5）。
     ///
     /// # Errors
@@ -322,10 +323,10 @@ pub struct DeviceFreeMap {
     /// 空闲槽的连续段数（增量维护）。
     free_runs: u64,
     /// 占着的槽数：仍分配的加上已释放、还在 defer 窗口里的——它们仍被根环里的有效根引用、仍占着空间
-    /// （I-3.1（已分配统计对得上） 的读法 2026-09-14 用户定甲：按根环里全部有效根的引用取并集）。
+    /// （I-3.1（已分配统计对得上） 的读法：按根环里全部有效根的引用取并集）。
     allocated_slots: u64,
     /// 空闲槽数，独立维护：分配时减、回收放回时加，不由「容量 − 已分配」现算（D5（快照 / 空间记账机制） 已定项 4 的 ⚠️：
-    /// 那样 I-5.2（空闲统计对得上） 是恒真式；三方代码第一轮攻方腿打中）。已释放而还在 defer 窗口里的不算空闲。
+    /// 那样 I-5.2（空闲统计对得上） 是恒真式）。已释放而还在 defer 窗口里的不算空闲。
     free_slots: u64,
     /// 影子账（D23（journal 的角色与格式） 已定项 14 回退段与「可写挂载时的预隔离」；D28（挂载期承诺量） 已定项 1 第九项）隔离的槽，两部分置同一位：
     /// 只被被抛弃根引用的槽，隔离到那条被抛弃的根离开根环；可写挂载那一刻水位之上没施加的 journal 记录点名的落点与那几次发布的账里的落点
@@ -338,13 +339,13 @@ pub struct DeviceFreeMap {
     /// 其中已释放、还在 defer 窗口里的槽数（D5（快照 / 空间记账机制） 已定项 4 第 5 项）。
     deferred_slots: u64,
     /// 抬 F 回收、但 F 还没在每块盘上生效的槽：记账已经算它空闲，分配器却不许发出去，直到带新 F 的根落满每块盘
-    /// （D16（发布语义） 已定项 1「每块幸存盘上都有带新 F 的持久根才生效」；alloc-basis 第二轮云端攻方腿打中：抬 F 自己的空发布开新段时
+    /// （D16（发布语义） 已定项 1「每块幸存盘上都有带新 F 的持久根才生效」；抬 F 自己的空发布开新段时
     /// 正好开到刚回收空的那一段，崩在两条带新 F 的根之间时 F 之下的根仍是候选、它们的单元已被盖）。只住内存。
     held_until_floor_takes_effect: Vec<bool>,
     held_per_segment: Vec<u64>,
     /// 已分配、影子账隔离、抬 F 扣住三种位一个都没置的槽数：提交内生块落得下的槽（开放段 bump、开全空段、回落挡的都是这三种位，
     /// [`Self::is_blocked_for_commit_generated`]），三种位每变一次跟着增量维护（[`Self::set_blocking_bit`]）。
-    /// 发布路径在走固定点之前判「这次的单元落得下」读它（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）。
+    /// 发布路径在走固定点之前判「这次的单元落得下」读它（C545（空间准入罩不住分裂与聚簇段层））。
     unblocked_slots: u64,
     /// 每个 64 槽聚簇段里两槽都没挡（三种位都没置）的偶数起点槽对数：用户数据落得下的槽对（[`Self::lowest_user_data_slot`] 认的那一种，
     /// 段内外之分由读的一方减），同上增量维护。单元区起点在段边界上（[`UnitAreaStart`] 的不变量）、段长是偶数 ⇒ 一对不跨段；
@@ -353,7 +354,7 @@ pub struct DeviceFreeMap {
     /// 上一项全部段之和。
     unblocked_slot_pairs: u64,
     /// 回收过槽、还没发过 discard 的段（段号）：回收那一刻记（[`Self::mark_reclaimed`]），发布返回之后整段可再分配时发 discard 并摘掉
-    /// （判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G5；[`Self::take_the_segments_to_discard`]）。只住内存。
+    /// 只住内存。
     segments_reclaimed_not_yet_discarded: BTreeSet<usize>,
 }
 
@@ -377,8 +378,8 @@ enum SlotBlockingBit {
 /// 一块盘上有几个完整的 16 KiB 槽（盘上绝对槽数，槽号从 0 起数到它为止）：字节数 ÷ 16384，盘尾不足一槽的零头不算。
 /// **这是这个量唯一的一处定义**：单元区槽数（[`unit_area_slots_of_device`]）与分配记录树的根层级
 /// （`crate::allocation_record_tree::AllocationRecordTreeGeometry`：写侧 `of_allocator`、读侧 `of_reader` 同走
-/// `of_device_sizes_in_bytes`）都从它算。此前写侧按「单元区起点 + 单元区槽数」、读侧按「盘字节数 ÷ 16384」各算一份，
-/// 算的是同一个量、没有东西把两份连起来（代码三方 `research/prompts/m2-final-code-r3-main-verification.md` 第三节「算术」那一格）。
+/// `of_device_sizes_in_bytes`）都从它算，不各算一份：
+/// 各算一份时，算的是同一个量、却没有东西把两份连起来。
 #[must_use]
 pub fn absolute_slot_count_of_device(device_bytes: u64) -> u64 {
     device_bytes / SLOT_BYTES
@@ -397,7 +398,7 @@ pub struct DeviceEndsBeforeTheUnitAreaStart {
 /// 那一道判（`recovery::allocation_records_fit_the_pool_geometry`）都读它，两处手抄会分叉。
 ///
 /// # Errors
-/// 设备末尾在单元区起点之前 ⇒ [`DeviceEndsBeforeTheUnitAreaStart`]（改之前是一句直接的减法，`overflow-checks = true` 下下溢 panic）。
+/// 设备末尾在单元区起点之前 ⇒ [`DeviceEndsBeforeTheUnitAreaStart`]。
 pub fn unit_area_slots_of_device_starting_at(
     device_bytes: u64,
     unit_area_start: UnitAreaStart,
@@ -700,7 +701,7 @@ impl DeviceFreeMap {
 
     /// 隔离一个只被被抛弃根引用的落点：不进已分配、不进 defer、不动空闲计数，只让分配器绕开它（用户数据落点与开放段都不落在它上面）。
     /// 隔离位独立于分配位：一个槽在当前账里已分配、后来被释放、再被回收，隔离位照样让它发不出去——抬 F 之后候选集缩小，
-    /// 一个此前靠候选根豁免的槽会在回收之前被补隔离（`mount::raise_rollback_floor`）。同一个槽隔离两次不重复计数。
+    /// 一个先前靠候选根豁免的槽会在回收之前被补隔离（`mount::raise_rollback_floor`）。同一个槽隔离两次不重复计数。
     pub fn isolate(&mut self, slot: SlotNumber, span: u64) {
         let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
@@ -798,9 +799,9 @@ impl DeviceFreeMap {
     }
 
     /// 提交内生块的 bump 游标要绕开的槽：已分配、影子账隔离、抬 F 扣住三种位任一为真
-    /// （代码三方第三轮云端攻方腿打中：开段那一刻的条件担保不了开段之后才置的隔离位与扣住位）。
-    /// 释放之前核出校验和对不上的那一份不另占一种位：它那块盘上的分配记录留在已分配（D19（块指针的结构与宽度预算） 已定项 5，
-    /// 用户 2026-09-24 定案），落在「已分配」那一位上。
+    /// （开段那一刻的条件担保不了开段之后才置的隔离位与扣住位）。
+    /// 释放之前核出校验和对不上的那一份不另占一种位：它那块盘上的分配记录留在已分配（D19（块指针的结构与宽度预算） 已定项 5），
+    /// 落在「已分配」那一位上。
     #[must_use]
     pub fn is_blocked_for_commit_generated(&self, slot: SlotNumber) -> bool {
         let index = self.index(slot);
@@ -859,7 +860,7 @@ impl DeviceFreeMap {
         )
     }
 
-    /// 这一段是不是整段都可再分配（判决 G5「可再分配」谓词逐槽为真）：没有已分配（仍分配与 defer 窗口里的都算占着）、没有影子账隔离、
+    /// 这一段是不是整段都可再分配：没有已分配（仍分配与 defer 窗口里的都算占着）、没有影子账隔离、
     /// 没有抬 F 扣住（扣住 = F 还没在每块盘上生效）。单元区末尾凑不满 64 槽的那一截不是整段。
     #[must_use]
     pub fn segment_is_reusable_as_a_whole(&self, segment_index: usize) -> bool {
@@ -871,7 +872,7 @@ impl DeviceFreeMap {
             && self.held_per_segment[segment_index] == 0
     }
 
-    /// 发布返回之后要发 discard 的段起点（判决 G5：可再分配谓词为真的槽按 64 槽对齐的整段发）：回收过槽、还没发过的段里，
+    /// 发布返回之后要发 discard 的段起点：回收过槽、还没发过的段里，
     /// 整段可再分配的交出去并摘掉；段里又有槽被分配了的也摘掉（之后再回收会重新记上）；只差扣住或隔离的留着，等它们放开。
     /// 只看回收时记下的段，不扫单元区（`.claude/rules/fs-design.md`「记账是事务的副产品」：discard 不在决策路径上，也不为它遍历）。
     pub fn take_the_segments_to_discard(&mut self) -> Vec<SlotNumber> {
@@ -913,7 +914,7 @@ impl DeviceFreeMap {
         self.used_per_segment[segment_index] == 0
     }
 
-    /// 把 `[slot, slot + span)` 标成已分配，并增量更新 runs 与段计数。要求整个跨度此前都空闲。
+    /// 把 `[slot, slot + span)` 标成已分配，并增量更新 runs 与段计数。要求整个跨度事先都空闲。
     ///
     /// 两条断言都是**前置条件，不是这里判盘上内容的地方**：从盘上读来的分配记录在进分配器之前由
     /// `recovery::allocation_records_fit_the_pool_geometry` 判过跨度在单元区内、同一块盘上两条记录不罩同一个槽
@@ -1133,7 +1134,7 @@ enum RecordAtThePlacementSlot {
 /// 一块盘上，与新落点 [槽, 槽 + 跨度) 相交的已有记录给这次分配让位（I-5.4（分配记录罩住的槽互不相交））：
 /// 起点就是这个槽的已回收记录改写成这次的分配（字节表五「已释放记录被重用之后再改写一次」），起点不是这个槽的已回收记录
 /// 随这次分配一起删掉——留着它，下一次可写挂载重建分配器时两条记录罩住同一个槽，重建在 `mark_allocated` 的断言上 panic、
-/// 池从此挂不上可写（代码三方第二轮 Z1-d：两槽的数据单元复用一条跨 1 的已回收记录，下一槽另一条跨 1 的已回收记录留着）。
+/// 池从此挂不上可写（两槽的数据单元复用一条跨 1 的已回收记录，下一槽另一条跨 1 的已回收记录留着）。
 /// 删掉的记录罩住的槽已经回到空闲（`mark_reclaimed` 清了位图、减了计数），删它不动位图与计数；起点不在这次落点里的那一截槽
 /// 删完之后就没有记录，与从没分配过的槽同样（D3（空间分配） 已定项 7：条目留到该落点被重新分配时覆盖，而它罩住的槽正被这次分配重新占用）。
 ///
@@ -1211,10 +1212,11 @@ impl PlacementOnDevice {
     }
 }
 
-/// 挂载那一刻读坏（设备报读错，或读得出、不是全零而自证不过）的一个根环槽能住的 txg（D16（发布语义） 已定项 1 的「挂载时读不出的槽」，
-/// 用户 2026-10-04 定：读不出、自证不过的根槽在回收门槛里钉在它可能住过的最旧 txg，重读读出有效根或确认为空之前门槛不越过它；
-/// 准入抬 F 的上限照 Q3 按它在 (N − 3S, 新实例第一次发布的 txg − 1] 里能住的最大 txg 并）。读回全零的槽不在这里：它不并进上限
-/// （用户 2026-10-04 定），回收门槛里照「自证不过」那一类钉住（用户 2026-10-05 定乙），记成 [`RootRingOccupant::AllZeroAtMount`]。
+/// 挂载那一刻读坏（设备报读错，或读得出、不是全零而自证不过）或读回全零的一个根环槽能住的 txg（D16（发布语义） 已定项 1 的「挂载时读不出的槽」，
+/// 读不出、自证不过的根槽在回收门槛里钉在它可能住过的最旧 txg，重读读出有效根或确认为空之前门槛不越过它；
+/// 准入抬 F 的上限照 Q3 按它在 (N − 3S, 新实例第一次发布的 txg − 1] 里能住的最大 txg 并）。读回全零的槽同一个算法、同样带这两个数
+/// （[`RootRingOccupant::AllZeroAtMount`]）：回收门槛里照「自证不过」那一类钉住，准入抬 F 的上限同读坏的槽一样按
+/// 能住的最大 txg 并（D16（发布语义） 已定项 1「抬 F 的上限」那一行）。
 /// 不变量：最旧的不高于最大的（构造时断言）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TxgsARingSlotBadAtMountCanHold {
@@ -1254,36 +1256,37 @@ impl TxgsARingSlotBadAtMountCanHold {
 }
 
 /// 根环一个槽上这会儿住着哪条根。一个 txg 都住不了的槽（年轻的环里还没轮到的）不在 `RootRingOccupancy` 里：
-/// 回收门槛取「环里最旧有效根」（D16（发布语义） 已定项 1，用户 2026-10-04 定 RGall，`research/prompts/m3-reclaim-window-r1-main-verification.md`
+/// 回收门槛取「环里最旧有效根」（D16（发布语义） 已定项 1，`research/prompts/m3-reclaim-window-r1-main-verification.md`
 /// 第六节 Q1），看自证合法的根与挂载时读坏、读回全零的槽；读不出的被抛弃根影子账本来就罩不到（`mount::isolate_slots_referenced_only_by_abandoned_roots`）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RootRingOccupant {
     /// 挂载那一刻读回全零的槽：回收门槛照「自证不过」那一类钉在它可能住过的最旧 txg（盘上那一槽可能住着一条有效根、只是这一次读回了全零），
-    /// 准入抬 F 的上限不并它（用户 2026-10-04 定全零不并进上限，2026-10-05 定乙：回收门槛里照旧钉住；条文还没写回，定案在
-    /// `records/2026-09-30-里程碑三开工第一轮.md`）。直到这个进程把那个槽写掉，或进程内记根时重读读出有效根、读出被抛弃的根才解开；
-    /// 重读读回全零不算确认为空，照旧钉着。它不算「这个进程知道住着根的槽」。
+    /// 准入抬 F 的上限同读坏的槽一样按它能住的最大 txg 并（D16（发布语义） 已定项 1「抬 F 的上限」那一行）。
+    /// 两个数与读坏的槽同一个算法（[`TxgsARingSlotBadAtMountCanHold`]）。
+    /// 直到这个进程把那个槽写掉，或进程内记根时重读读出有效根、读出被抛弃的根才解开；重读读回全零不算确认为空，照旧钉着、照旧并进上限。
+    /// 它不算「这个进程知道住着根的槽」。
     AllZeroAtMount {
-        oldest_txg_it_can_have_held: CheckpointTxg,
+        txgs_it_can_hold: TxgsARingSlotBadAtMountCanHold,
     },
     /// 挂载那一刻读坏的槽（设备报读错，或读得出、不是全零而自证不过）：回收门槛钉在它可能住过的最旧 txg、准入抬 F 的上限按它能住的最大 txg
     /// 并（[`TxgsARingSlotBadAtMountCanHold`]），直到这个进程把那个槽写掉，或进程内记根时重读读出有效根、读出被抛弃的根
-    /// （用户 2026-10-04 定；重读读回全零照旧钉着，2026-10-05 定乙）。它不算「这个进程知道住着根的槽」（[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]）：
+    /// 它不算「这个进程知道住着根的槽」（[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]）：
     /// D16 已定项 1「根槽这一次读坏」那一行，挂载那一刻就读坏、之后没写过的槽算上限时并进来、判回退候选时当没有根，不因为这里记了它就改成「读坏就拒」。
     BadAtMount(TxgsARingSlotBadAtMountCanHold),
     /// 挂载那一刻读坏的槽，这个进程在它成了环里最小的那个时重读、读出了一条自证过而按实例表仍然有效的根
-    /// （D16（发布语义） 已定项 1 的 E2，用户 2026-10-03 定，`research/prompts/m3-root-ring-code-r1-main-verification.md` 第三节表二之后那一段）：
+    /// （D16（发布语义） 已定项 1 的 E2，`research/prompts/m3-root-ring-code-r1-main-verification.md` 第三节表二之后那一段）：
     /// 照读出来的 txg 进环里最旧有效根。它算「这个进程知道住着根的槽」（[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]；D16 已定项 1
-    /// 「根槽这一次读坏」那一行，用户 2026-10-04 定，`research/prompts/m3-root-ring-code-r2-main-verification.md` 第六节 RS1）：
+    /// 「根槽这一次读坏」那一行，`research/prompts/m3-root-ring-code-r2-main-verification.md` 第六节 RS1）：
     /// 之后那一槽再读坏，算上限、判回退候选时重读一次、仍坏就拒，不按没有根往下走。
     ValidRootReadWhenTheSlotBadAtMountWasReread { checkpoint_txg: CheckpointTxg },
     /// 重建分配器读根环有一块盘没读出有效根、整环重读了一遍，两遍按槽并起来是一条自证过的根，而另一遍那一槽没自证过（读不出、读得出而
     /// 自证不过或读回全零）：并出来的照读出来的那条根算（有效的进环里最旧有效根，被抛弃的带着它引用的落点，离开根环时按它清），
     /// 另记读出来的那整条根记录 `root_record_self_verified_on_one_rebuild_pass`。抬 F 那一串（准入与卸载）读它读坏、重读一次仍坏时拿这条记录顶上，
-    /// 照它本身算、不拒这一次抬（用户 2026-10-06 定 T1 甲，判决 `research/prompts/m3-batch10i-code-r1-main-verification.md` 第六节）：
+    /// 照它本身算、不拒这一次抬：
     /// 有效的照它本身进准入上限与候选集，被抛弃的照它记着的落点进影子账、不进上限；有效还是被抛弃照那一遍判抛弃的实例表判。
-    /// 之前（S1，`research/prompts/m3-batch10-code-r3-main-verification.md` 第六节）照挂载那一刻读坏钉在能住的 txg：被抛弃的那一半掉出影子账（I-7.4 红），
-    /// 准入上限卡在它能住的最大 txg（同一份第 10i 批判决第二节 K1）。管理员回退判候选与算 F_生效 那一遍照旧把它算进
-    /// 「这个进程知道住着根的槽」（[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]），读坏重读仍坏就拒（同一份判决第六节 T2：照今天拒）。
+    /// 不按挂载那一刻读坏钉在能住的 txg：那样被抛弃的那一半会掉出影子账（I-7.4 红），
+    /// 准入上限也不卡在它能住的最大 txg。管理员回退判候选与算 F_生效 那一遍把它算进
+    /// 「这个进程知道住着根的槽」（[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]），读坏重读仍坏就拒。
     RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
         root: RootReadOnOneRebuildPass,
         root_record_self_verified_on_one_rebuild_pass: Box<RootRecord>,
@@ -1294,7 +1297,7 @@ pub enum RootRingOccupant {
     /// 因而没隔离的也在内：它们之后在这次挂载里被回收时要补隔离，这条根离开根环时按它清。
     /// 账读不出（凭据放行）的、影子账关着（只供测试）的，这一串是空的：它什么都没隔离，离开根环时也什么都不清。
     /// 抬 F 那一串（准入与卸载）重算影子账时，这一槽这一遍读出的被抛弃根与这里记着的是同一条（实例代号与 txg 都对上）就照这一串算、
-    /// 不再从盘上读它的账（[`RootRingOccupancy::placements_recorded_for_the_abandoned_root`]，D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句，用户 2026-10-07 定）。
+    /// 不再从盘上读它的账（[`RootRingOccupancy::placements_recorded_for_the_abandoned_root`]，D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句）。
     AbandonedRoot {
         instance: InstanceGeneration,
         checkpoint_txg: CheckpointTxg,
@@ -1329,11 +1332,11 @@ pub struct RootRingOccupancy {
     latest_recorded_txg: CheckpointTxg,
     /// 见 [`RootRingOccupancy::instance_table_judging_the_rereads`]。
     instance_table_judging_the_rereads: InstanceTableRecords,
-    /// 可写挂载那一刻水位之上、没被施加的 journal 记录点名的落点（C694 的 C，判决 `research/prompts/m3-c694-r2-main-verification.md`
+    /// 可写挂载那一刻水位之上、没被施加的 journal 记录点名的落点（C694 的 C
     /// 第三节第 1 条：选法取水位之上全部记录），按那条记录的 txg 在根环里对应的槽归组：那条记录所属的发布若落过根，根就住在那一槽，
     /// 这个进程写掉那一槽之前那条根还可能被下一次恢复择到。挂载那一刻仍被候选根或现行账引用、因而没隔离的落点也在内：
     /// 它们之后在这次挂载里被回收时要补隔离。只在 [`PoolAllocator::record_root_written_by_this_process`] 写掉那一槽、那次发布取完落点之后
-    /// 解开（判决同一条的 `ring`）；进程内重读那一槽（D16（发布语义） 已定项 1 读回全零的槽）读出什么都不解开它。
+    /// 解开；进程内重读那一槽（D16（发布语义） 已定项 1 读回全零的槽）读出什么都不解开它。
     placements_named_by_unapplied_journal_records: BTreeMap<RootRingSlot, Vec<PlacementOnDevice>>,
 }
 
@@ -1369,8 +1372,8 @@ impl RootRingOccupancy {
             .collect()
     }
 
-    /// 抬 F 那一串（准入与卸载）重算影子账时一条被抛弃根的落点（D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句「抬 F 那一串（准入与卸载）里的被抛弃根」，
-    /// 用户 2026-10-07 定）：这条根（`instance`、`checkpoint_txg`）的 txg 在根环里对应的那一槽上，表里记着的是挂载那一刻读出的被抛弃根
+    /// 抬 F 那一串（准入与卸载）重算影子账时一条被抛弃根的落点（D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句「抬 F 那一串（准入与卸载）里的被抛弃根」）：
+    /// 这条根（`instance`、`checkpoint_txg`）的 txg 在根环里对应的那一槽上，表里记着的是挂载那一刻读出的被抛弃根
     /// （[`RootRingOccupant::AbandonedRoot`]，或两遍里只有一遍自证过的槽里被抛弃的那一半，按那一遍读出的整条根记录认），而且就是这一条——
     /// 实例代号与 txg 都对上，不只按槽号对——就交回挂载时算出、记着的那一串落点；记着的是别的根、有效根、挂载时读坏或读回全零的槽，
     /// 或这个进程已写掉那一槽（换成有效根），交 `None`。只读内存里的表，不读盘。
@@ -1411,7 +1414,7 @@ impl RootRingOccupancy {
     }
 
     /// 抬 F 那一串（准入与卸载）重算影子账时，一条根环表里没记着落点的被抛弃根借 C 那一圈记着的落点（D16（发布语义） 已定项 1「根槽这一次读坏」
-    /// 那一行，用户 2026-10-08 定 H2「用 C 那一圈记着的落点」，判决 `research/prompts/m3-batch10z-b-code-r1-main-verification.md` 第三节）：
+    /// 那一行）：
     /// 可写挂载自己写行之后才按现行那一版的实例表判成被抛弃的根，挂载那一刻按最新那条根的表判有效、记成有效根，不带落点。
     /// 这条根（`instance`、`checkpoint_txg`）的 txg 在根环里对应的那一槽上，表里记着的是一条有效根、txg 与它相同（实例代号记着的就也比：
     /// 两遍里只有一遍自证过的有效那一半带整条根记录），而 C 那一圈（水位之上没施加的记录点名的落点、那几次发布的账、比所选那一版新的可读根的账，
@@ -1459,8 +1462,8 @@ impl RootRingOccupancy {
     }
 
     /// 根环表里记成被抛弃根的槽（[`RootRingOccupant::AbandonedRoot`]）与那条根挂载时记着的落点，按槽的次序：抬 F 那一串读根环时这几槽读坏、
-    /// 重读仍坏不拒，照这里记着的落点进影子账、不进上限（D16（发布语义） 已定项 1「根槽这一次读坏」那一行，用户 2026-10-08 定 H1
-    /// 「被抛弃根的槽不拒」）。两遍里只有一遍自证过的槽不在其内：抬 F 那一遍拿它记着的整条根记录顶上（用户 2026-10-06 定 T1 甲）。
+    /// 重读仍坏不拒，照这里记着的落点进影子账、不进上限（D16（发布语义） 已定项 1「根槽这一次读坏」那一行 H1
+    /// 「被抛弃根的槽不拒」）。两遍里只有一遍自证过的槽不在其内：抬 F 那一遍拿它记着的整条根记录顶上。
     /// 这个进程写掉那一槽之后就不在其内。
     #[must_use]
     pub fn ring_slots_recorded_as_holding_an_abandoned_root(
@@ -1484,7 +1487,7 @@ impl RootRingOccupancy {
 
     /// C 那一圈（水位之上没施加的记录点名的落点、那几次发布的账、比所选那一版新的可读根的账，认不出回退时的宽护在其中，[`RootRingOccupancy`]
     /// 那一项的注释）还没解开、记着落点的槽，各带记着的落点，按槽的次序：这个进程写掉那一槽之前它们一直罩着（回收出来的照补隔离）。
-    /// 会话推环推到哪一槽、推满仍不够时报不报「被宽护卡住」读它（`mounted_session`，用户 2026-10-08 弹窗定「显式推环命令加带出路的错」）。
+    /// 会话推环推到哪一槽、推满仍不够时报不报「被宽护卡住」读它（`mounted_session`）。
     /// 记着空串的槽（凭据放行那一形）不在其内：它什么都不罩。只读内存里的表。
     #[must_use]
     pub fn ring_slots_holding_placements_named_by_unapplied_journal_records(
@@ -1538,7 +1541,7 @@ impl RootRingOccupancy {
     /// 这个进程知道住着一条根的根环槽（D16（发布语义） 已定项 1「根槽这一次读坏」那一行）：挂载那一刻读得出、自证过的槽
     /// （有效的与被抛弃的都算），这个进程之后写过、FUA 返回过的槽——发布在落盘之前或落盘途中失败时分配器整个换回发布之前那一份，
     /// 这张表随之退回，记着的只剩根落盘做成的那几次——，与进程内记根时重读读出了有效根的槽
-    /// （[`RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread`]，用户 2026-10-04 定）。挂载那一刻读坏、
+    /// （[`RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread`]）。挂载那一刻读坏、
     /// 之后又没写过也没重读出有效根的槽不在其内（[`RootRingOccupant::BadAtMount`] 与 [`RootRingOccupant::AllZeroAtMount`] 记着的槽也不在）。
     /// 重建分配器两遍里只有一遍自证过的槽（[`RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses`]）在其内：管理员回退判候选、
     /// 算 F_生效 读到它仍坏照旧拒；抬 F 那一遍另按 [`Self::ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes`] 处置
@@ -1559,7 +1562,7 @@ impl RootRingOccupancy {
     }
 
     /// 重建分配器两遍里只有一遍自证过、还记在表里的槽（[`RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses`]），
-    /// 各带重建那一遍自证过的那整条根记录，按槽的次序：抬 F 那一串读它读坏、重读一次仍坏时拿这条记录顶上（用户 2026-10-06 定 T1 甲）。
+    /// 各带重建那一遍自证过的那整条根记录，按槽的次序：抬 F 那一串读它读坏、重读一次仍坏时拿这条记录顶上。
     /// 这个进程写掉那一槽之后就不在其内。
     #[must_use]
     pub fn ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes(
@@ -1581,8 +1584,8 @@ impl RootRingOccupancy {
             .collect()
     }
 
-    /// 环里最旧有效根的 txg（D16（发布语义） 已定项 1「环里最旧有效根」，用户 2026-10-04 定 RGall：回收门槛从一圈窗口退回整个环）：
-    /// 这张表里全部有效根与挂载时读坏、读回全零的槽（钉在它可能住过的最旧 txg，用户 2026-10-04 定；读回全零的 2026-10-05 定乙）取最小，
+    /// 环里最旧有效根的 txg（D16（发布语义） 已定项 1「环里最旧有效根」：回收门槛从一圈窗口退回整个环）：
+    /// 这张表里全部有效根与挂载时读坏、读回全零的槽（钉在它可能住过的最旧 txg）取最小，
     /// 不按 txg 离这个进程记到的最新根多远滤。
     /// 一条都没有时 `None`。
     fn oldest_valid_root_in_the_ring(&self) -> Option<CheckpointTxg> {
@@ -1600,9 +1603,9 @@ impl RootRingOccupancy {
                 RootRingOccupant::BadAtMount(txgs_it_can_hold) => {
                     Some(txgs_it_can_hold.oldest_txg_it_can_have_held())
                 }
-                RootRingOccupant::AllZeroAtMount {
-                    oldest_txg_it_can_have_held,
-                } => Some(*oldest_txg_it_can_have_held),
+                RootRingOccupant::AllZeroAtMount { txgs_it_can_hold } => {
+                    Some(txgs_it_can_hold.oldest_txg_it_can_have_held())
+                }
                 RootRingOccupant::AbandonedRoot { .. }
                 | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
                     root: RootReadOnOneRebuildPass::AbandonedRoot { .. },
@@ -1642,7 +1645,8 @@ impl RootRingOccupancy {
     }
 
     /// 挂载那一刻读坏、还记在表里的槽（[`RootRingOccupant::BadAtMount`]），各带它能住的 txg，按槽的次序。回收门槛与 E2 重读按其中
-    /// 可能住过的最旧 txg 取，准入抬 F 的上限按其中能住的最大 txg 并（`mount::ring_slots_bad_at_mount_by`）。
+    /// 可能住过的最旧 txg 取；准入抬 F 的上限按其中能住的最大 txg 并，连同读回全零的槽一起
+    /// （[`Self::ring_slots_bad_or_reading_back_all_zero_at_mount`]）。读回全零的槽不在这一份里。
     #[must_use]
     pub fn ring_slots_bad_at_mount(
         &self,
@@ -1675,8 +1679,31 @@ impl RootRingOccupancy {
             .collect()
     }
 
+    /// 挂载那一刻读坏或读回全零、还记在表里的槽（[`RootRingOccupant::BadAtMount`] 与 [`RootRingOccupant::AllZeroAtMount`]），
+    /// 各带它能住的 txg，按槽的次序：准入抬 F 的上限按其中能住的最大 txg 并（`mount::ring_slots_bad_or_reading_back_all_zero_at_mount_by`；
+    /// D16（发布语义） 已定项 1「抬 F 的上限」那一行：读坏槽与读回全零的槽都并进上限，读回全零那一半）。
+    /// 一个槽在表里只有一项，两类不会同时有它。
+    #[must_use]
+    pub fn ring_slots_bad_or_reading_back_all_zero_at_mount(
+        &self,
+    ) -> BTreeMap<RootRingSlot, TxgsARingSlotBadAtMountCanHold> {
+        self.occupants
+            .iter()
+            .filter_map(|(ring_slot, occupant)| match occupant {
+                RootRingOccupant::BadAtMount(txgs_it_can_hold)
+                | RootRingOccupant::AllZeroAtMount { txgs_it_can_hold } => {
+                    Some((*ring_slot, *txgs_it_can_hold))
+                }
+                RootRingOccupant::ValidRoot { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+                | RootRingOccupant::AbandonedRoot { .. }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses { .. } => None,
+            })
+            .collect()
+    }
+
     /// 挂载那一刻读回全零、还记在表里的槽（[`RootRingOccupant::AllZeroAtMount`]），各钉在它可能住过的最旧 txg，按槽的次序。
-    /// 准入抬 F 的上限不并它们（[`Self::ring_slots_bad_at_mount`] 里没有它们，用户 2026-10-04 定）。
+    /// 准入抬 F 的上限按它们能住的最大 txg 并，经 [`Self::ring_slots_bad_or_reading_back_all_zero_at_mount`] 取，不经这一份。
     #[must_use]
     pub fn ring_slots_reading_back_all_zero_at_mount_pinned_at_the_oldest_txg_they_can_have_held(
         &self,
@@ -1684,9 +1711,9 @@ impl RootRingOccupancy {
         self.occupants
             .iter()
             .filter_map(|(ring_slot, occupant)| match occupant {
-                RootRingOccupant::AllZeroAtMount {
-                    oldest_txg_it_can_have_held,
-                } => Some((*ring_slot, *oldest_txg_it_can_have_held)),
+                RootRingOccupant::AllZeroAtMount { txgs_it_can_hold } => {
+                    Some((*ring_slot, txgs_it_can_hold.oldest_txg_it_can_have_held()))
+                }
                 RootRingOccupant::ValidRoot { .. }
                 | RootRingOccupant::BadAtMount(_)
                 | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
@@ -1696,8 +1723,8 @@ impl RootRingOccupancy {
             .collect()
     }
 
-    /// 回收门槛与 E2 重读看的那几个槽：挂载那一刻读坏的与读回全零的，各钉在它可能住过的最旧 txg（读回全零的照「自证不过」那一类钉住，
-    /// 用户 2026-10-05 定乙）。一个槽在表里只有一项，两类不会同时有它。
+    /// 回收门槛与 E2 重读看的那几个槽：挂载那一刻读坏的与读回全零的，各钉在它可能住过的最旧 txg（读回全零的照「自证不过」那一类钉住）。
+    /// 一个槽在表里只有一项，两类不会同时有它。
     #[must_use]
     pub fn ring_slots_pinned_since_the_mount_at_the_oldest_txg_they_can_have_held(
         &self,
@@ -1719,22 +1746,22 @@ impl RootRingOccupancy {
     }
 }
 
-/// 进程内重读一个挂载那一刻读坏或读回全零的根环槽读到了什么（D16（发布语义） 已定项 1 的 E2，用户 2026-10-03 定；用户 2026-10-04 定：
-/// 重读读出有效根之前回收门槛不越过它；2026-10-05 定乙：读回全零不算确认为空，照「自证不过」那一类钉着）。封闭集合，`match` 不写通配臂。
+/// 进程内重读一个挂载那一刻读坏或读回全零的根环槽读到了什么（D16（发布语义） 已定项 1 的 E2：
+/// 重读读出有效根之前回收门槛不越过它；读回全零不算确认为空，照「自证不过」那一类钉着）。封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RereadOfARootRingSlotBadAtMount {
     /// 读得出、自证过，按实例表仍然有效：照读出来的 txg 算（回收门槛取整个环，RGall，读出来多旧都算）；那一槽从此算「这个进程知道住着根的槽」。
     ValidRoot { checkpoint_txg: CheckpointTxg },
     /// 读得出、自证过，读出来的根按实例表被抛弃：当没有根。
     AbandonedByTheInstanceTable,
-    /// 读回全零：不算确认为空（盘上那一槽可能住着一条有效根、这一次又读回了全零），照旧钉在它可能住过的最旧 txg（用户 2026-10-05 定乙）。
+    /// 读回全零：不算确认为空（盘上那一槽可能住着一条有效根、这一次又读回了全零），照旧钉在它可能住过的最旧 txg。
     AllZero,
     /// 仍读不出，或读得出、不是全零而自证不过：照旧钉在它可能住过的最旧 txg。
     StillUnreadableOrNotSelfVerified,
 }
 
-/// 环里最旧有效根，挂载那一刻读坏的槽按 E2 并进来（D16（发布语义） 已定项 1，用户 2026-10-03 定；回收门槛取整个环，用户 2026-10-04 定
-/// RGall；读坏的槽钉在它可能住过的最旧 txg，用户 2026-10-04 定；读回全零的槽同样钉着，用户 2026-10-05 定乙）：`valid_root_txgs` 是已知
+/// 环里最旧有效根，挂载那一刻读坏的槽按 E2 并进来（D16（发布语义） 已定项 1；回收门槛取整个环
+/// RGall；读坏的槽钉在它可能住过的最旧 txg；读回全零的槽同样钉着）：`valid_root_txgs` 是已知
 /// 住着有效根的 txg，`bad_at_mount` 是挂载那一刻读坏或读回全零、各按它可能住过的最旧 txg 钉着的槽；两者里最小的那个若是一个钉着的槽，
 /// 先重读那一槽（`reread`）：读出有效根就照它的 txg 换进去、读出被抛弃的根就拿掉，再取最小；仍读不出、读得出而自证不过或读回全零
 /// 才按钉着的 txg 算。
@@ -1783,21 +1810,40 @@ pub fn oldest_txg_in_the_ring_rereading_slots_bad_at_mount(
 }
 
 /// 分配器记一条根那一刻的回收门槛与还钉着的槽里最小的钉值（D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」，
-/// C773（读坏与全零根槽的回收门槛钉只在内存里），用户 2026-10-20 定）：[`PoolAllocator::record_root_written_by_this_process`] 记完这条根、
+/// C773（读坏与全零根槽的回收门槛钉只在内存里））：[`PoolAllocator::record_root_written_by_this_process`] 记完这条根、
 /// 按谓词回收之后记下（[`PoolAllocator::reclaim_floor_when_the_latest_root_was_recorded`]），带单元的发布在记根之后、装根之前读它，
 /// 写根记录里的回收门槛 t 与钉槽 p（采样点在回收之后、装根之前）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReclaimFloorWhenTheRootWasRecorded {
     /// 这一次回收用的门槛：max(挂载时生效的 F, 环里最旧有效根并上钉值)（`mount::reclaim_floor`）。
     pub reclaim_floor: CheckpointTxg,
-    /// 记了这条根之后还钉着的槽（挂载那一刻读坏或读回全零、这个进程还没写掉、重读也没解开的）里钉值最小的那个；一个都没钉着是 `None`。
-    pub lowest_pinned_txg: Option<CheckpointTxg>,
+    /// 记了这条根之后还钉着的槽（挂载那一刻读坏或读回全零、这个进程还没写掉、重读也没解开的）里按（钉值, 槽）最小的那一个；
+    /// 一个都没钉着是 `None`。
+    pub lowest_pin: Option<LowestPinnedRingSlot>,
+}
+
+/// 记一条根之后还钉着的槽里按（钉值, 槽）最小的那一个：钉值与槽一起往下带到写根那一刻（C773（读坏与全零根槽的回收门槛钉只在内存里），
+///  采乙）。三个区域的槽 0 钉值都是第 0 代根的 txg 0
+/// （`mount::oldest_txg_a_ring_slot_bad_at_mount_can_have_held`），钉值不再唯一定槽：只带钉值就还原不出钉的是哪一槽，钉槽 p 存的是槽。
+/// 平局按槽（区域在前、槽号在后）破，同一份根环表每次记根取到的是同一槽。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LowestPinnedRingSlot {
+    pub pinned_txg: CheckpointTxg,
+    pub ring_slot: RootRingSlot,
+}
+
+impl LowestPinnedRingSlot {
+    /// 钉着的槽在根环里的编码 `3·槽 + 区域`：钉槽 p 存它（0 到 3S 之内与落点公式 `root_ring::target_for_publish` 落到这一槽的最小 txg 相同）。
+    #[must_use]
+    pub fn ring_slot_encoding(self) -> u64 {
+        ROOT_RING_REGIONS * self.ring_slot.slot + self.ring_slot.region
+    }
 }
 
 impl ReclaimFloorWhenTheRootWasRecorded {
-    /// 根记录里的回收门槛 t：max(这条根自己带的 F, 分配器记这条根时的回收门槛)（用户 2026-10-20 认的取法）。
+    /// 根记录里的回收门槛 t：max(这条根自己带的 F, 分配器记这条根时的回收门槛)。
     /// 分配器那一半用的是挂载时生效的 F、抬 F 生效之后不跟着抬（[`RootRingOccupancy`] 的 `effective_floor`），所以要再与这条根自己的 F 取大：
-    /// 抬 F 那一串自己已经回收到新 F（根环三方第三轮攻方 Z4.2）。
+    /// 抬 F 那一串自己已经回收到新 F。
     #[must_use]
     pub fn reclaim_threshold_of_a_root_carrying(
         self,
@@ -1806,10 +1852,13 @@ impl ReclaimFloorWhenTheRootWasRecorded {
         self.reclaim_floor.max(rollback_floor_of_the_root)
     }
 
-    /// 根记录里的钉槽 p。
+    /// 根记录里的钉槽 p：按（钉值, 槽）最小的那一槽的编码 `3·槽 + 区域`，不是它的钉值（槽号为 0 的槽钉值是 0、编码是区域号）。
     #[must_use]
     pub fn pinned_ring_slot(self) -> crate::root_record::PinnedRingSlot {
-        crate::root_record::PinnedRingSlot::of_the_lowest_pin(self.lowest_pinned_txg)
+        crate::root_record::PinnedRingSlot::of_the_lowest_pin(
+            self.lowest_pin
+                .map(LowestPinnedRingSlot::ring_slot_encoding),
+        )
     }
 }
 
@@ -1821,9 +1870,9 @@ pub struct PoolAllocator {
     open_segment: Option<SlotNumber>,
     bump_cursor: u64,
     /// 这次挂载开过的聚簇段的起点，开过就一直算数（只在内存，重开后按 D3（空间分配） 已定项 10 ①「挂载后新开一段」重来）。
-    /// 用户数据的候选集排除它们全部（已定项 10 ②「不在任何开放的聚簇段里」），不只排除当前那一个——回落把 `open_segment` 置空之后
-    /// 那一段仍装着这次提交的内生块，D3（空间分配） 已定项 8 第 2 条「聚簇段只给提交内生块」照样压着它（增补 2 第 20c 行，
-    /// 代码三方第一轮打中）。段里的块被回收空了也仍算聚簇段：它还能被 `lowest_empty_segment` 重新开来装提交内生块。
+    /// 按已定项 10 ②「不在任何开放的聚簇段里」，用户数据的候选集排除它们全部、不只排除当前那一个——回落把 `open_segment` 置空之后
+    /// 那一段仍装着这次提交的内生块，D3（空间分配） 已定项 8 第 2 条「聚簇段只给提交内生块」照样压着它。
+    /// 段里的块被回收空了也仍算聚簇段：它还能被 `lowest_empty_segment` 重新开来装提交内生块。
     cluster_segments: BTreeSet<SlotNumber>,
     records: Vec<AllocationRecord>,
     /// 已回收、还没被复用的落点（盘上那条记录仍写着已释放；复用时那条记录被改写）。只住内存。
@@ -1831,7 +1880,7 @@ pub struct PoolAllocator {
     /// mkfs 写出的第 0 版树表单元的落点：第一个文件版本重写树表时把它释放（COW 换下的单元进 defer 队列，D3（空间分配） 已定项 7）；
     /// 重开之后上一版从盘上重建、释放经映射与根记录走，这里留空。
     format_time_tree_table: Option<Placement>,
-    /// 树表 0 条的那一版写行时写下的那棵分配记录树（根记录那一项指着它的根，C512（树表 0 条的一版上被换下的单元记在哪））：
+    /// 树表 0 条的那一版写行时写下的那棵分配记录树（根记录那一项指着它的根，C512（树表 0 条的一版上被换下的实例表记在哪没有条款））：
     /// 每个节点与它的指针，连同那一版的全部记录。这一版上再发一次时（再写一次行，或发第一个文件版本）要照抄或换下它的节点、
     /// 按它的记录判哪几片叶变了，而那一版没有上一版的内存态可查——与 `format_time_tree_table` 同一个用处。
     /// mkfs 的第 0 代与带文件的一版都留空。
@@ -1846,11 +1895,11 @@ pub struct PoolAllocator {
     /// 只增、只住内存、`new` 与 `rebuild_from_records` 起步是 0。只读，产品路径不按它分支：它是回落那一支的观测
     /// （`.claude/rules/fs-design.md` 五条硬要求第 4 条「分支必须可观测」）。harness 的看门用例在「mkfs 之后连续可写挂载、再写第一个文件」
     /// 那一族上断言它是 0：I-5.5 的开放段认法（池级 checker 拿树表单元所在的段当开放段）假定这一族不走回落，哪天走进回落，用例红、
-    /// 回来重看那一格（判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y3「开放段回落误排」那一行）。
+    /// 回来重看那一格。
     commit_generated_placements_that_fell_back_to_the_lowest_free_slot: u64,
     /// 分配器眼里的根环（`RootRingOccupancy`）：挂载时装（`mount::rebuilt_allocator`），mkfs 同一个进程里由建分配器的一方装
     /// （`make_filesystem::root_ring_occupancy_after_make_filesystem`）。`None`：建分配器的一方没装（`new` 与 `rebuild_from_records`
-    /// 都不装）。没装的分配器不许记根：`record_root_written_by_this_process` 断言（C551，用户 2026-10-05 定），只做不发布的事：分配，
+    /// 都不装）。没装的分配器不许记根：`record_root_written_by_this_process` 断言（C551），只做不发布的事：分配，
     /// 以及调用方自己给根环每区槽数的准入读数 `admission::admission_reading_before_a_publish_on_a_ring_of`——
     /// `admission::admission_reading_before_a_publish` 从这张表取每区槽数，没装就断言。
     root_ring: Option<RootRingOccupancy>,
@@ -1873,7 +1922,7 @@ pub struct PoolAllocator {
     /// 发布路径隔离过还没交给会话的槽）。R 排他就是分配器的一条合取（D26（后台整理与放置回收） 已定项 1 第 3 条）；不合格段表、常驻隔离集与观测
     /// 住会话（`compaction_plan::CompactionOfThisMount`）。`new` 与 `rebuild_from_records` 起步是产品值、没有活意图。
     compaction: CompactionSwitchesAndTheExcludedRegion,
-    /// 上一次记根时回收用的门槛与还钉着的槽里最小的钉值（[`ReclaimFloorWhenTheRootWasRecorded`]，C773）。只住内存，`new` 与
+    /// 上一次记根时回收用的门槛与还钉着的槽里按（钉值, 槽）最小的那一槽（[`ReclaimFloorWhenTheRootWasRecorded`]，C773）。只住内存，`new` 与
     /// `rebuild_from_records` 起步是 `None`；随分配器整个换回发布之前（失败的发布）一起退回。
     reclaim_floor_when_the_latest_root_was_recorded: Option<ReclaimFloorWhenTheRootWasRecorded>,
 }
@@ -2092,7 +2141,7 @@ impl PoolAllocator {
         }
         allocator.records = records;
         // mkfs 那片第 0 版树表单元还没被换下（分配代 0、跨度 1、未释放；m1 实例表跨度 2，字节表一）时，重开之后第一个文件版本
-        // 照样要把它释放——不然 mkfs 与第一个文件版本不在同一个进程里那一格永远漏一槽（步 4 / 步 5 代码三方第一轮本地辩方腿两份样本都指出）。
+        // 照样要把它释放——不然 mkfs 与第一个文件版本不在同一个进程里那一格永远漏一槽。
         allocator.format_time_tree_table = allocator
             .records
             .iter()
@@ -2199,7 +2248,7 @@ impl PoolAllocator {
 
     /// 同 [`Self::release`]，只是 `devices_whose_record_stays_allocated` 那几块盘上的那条分配记录留在「已分配」、分配代不变，
     /// 跨度段置上隔离记号：释放之前按位置项读盘核校验和、核出对不上（读不出也算）的那个单元（D19（块指针的结构与宽度预算） 已定项 5，
-    /// 用户 2026-09-24 定案；记号是同一项「隔离的盘上记号」，用户 2026-10-22 定落点甲）——那一份的槽不还回空闲池；记录与这次发布的别的改动
+    /// 记号是同一项「隔离的盘上记号」）——那一份的槽不还回空闲池；记录与这次发布的别的改动
     /// 一起落盘，重挂之后从分配记录树重建的分配器照样认它已分配、带着记号，准入里照已分配算、不另进式子。
     /// 逐盘各算：不在 `devices_whose_record_stays_allocated` 里的盘上那一份照常释放；释放的记录带着隔离记号时记号随之清掉
     /// （「释放隔离记录时改写成已释放，0x4000 随之清掉」）。
@@ -2625,7 +2674,7 @@ impl PoolAllocator {
 
     /// 同 [`Self::isolate_abandoned`]，只隔离落点里分配位没置着的槽（[`DeviceFreeMap::isolate_the_slots_not_allocated`]）：被抛弃根引用、
     /// 现行账里已释放而还在 defer 窗口里的槽分配位置着，算在「已分配」里，D28（挂载期承诺量） 已定项 1 第九项不在这里再算一次
-    /// （第 10z 批第十四块实现员报告第七节第 2 条，与 C 那一圈同一个做法）。它们回收的那一刻由根环表照这条根记着的落点补隔离
+    /// （与 C 那一圈同一个做法）。它们回收的那一刻由根环表照这条根记着的落点补隔离
     /// （[`RootRingOccupancy::placements_the_isolation_still_protects`] 里被抛弃根那一份，挂载内记根与抬 F 那一串回收两条路都走它）。
     /// 只给落点记在根环表里的被抛弃根用：可写挂载那一遍读出的（落点随后记进表里）、抬 F 那一串取表里记着的或借 C 那一圈的；
     /// 抬 F 那一串读盘得来、表里没记着的那几条照旧 [`Self::isolate_abandoned`]（回收时没有一份补得上它们，`mount::isolate_slots_referenced_only_by_abandoned_roots`）。
@@ -2708,7 +2757,7 @@ impl PoolAllocator {
     /// 这个进程写了一条根（txg `checkpoint_txg`，落在根环公式给的那个槽上；这个进程写的根按实例表恒有效）：它盖掉那个槽上原来的根。
     ///
     /// - 盖掉的是一条被抛弃的根：它引用的槽里，环里别的被抛弃根都不引用的那些清掉隔离位（D28（挂载期承诺量） 已定项 1 第九项
-    ///   「被抛弃的根被轮转覆写时清零」，C503（隔离位清零的时机条文与实现说反话） 2026-09-23 用户定改代码）。
+    ///   「被抛弃的根被轮转覆写时清零」，C503（隔离位清零的时机条文与实现说反话）改代码）。
     /// - 盖掉之后环里最旧有效根往前挪了：按可再分配谓词回收（D16（发布语义） 已定项 1：已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)，
     ///   C518（一次挂载之内环转过一圈之后不回收））。回收出来的槽里仍被环里某条被抛弃根引用着的，当场补隔离——候选根离开根环之后
     ///   它们就只被被抛弃根引用了，D23（journal 的角色与格式） 已定项 14 的主句不许它们在那条被抛弃根离开根环之前重新分配；
@@ -2721,12 +2770,12 @@ impl PoolAllocator {
     ///
     /// # Panics
     /// - 分配器没装根环表（`install_root_ring_occupancy`）：不装就一次不回收，转过根环之后已分配统计越积越多、I-3.1（已分配统计对得上）红
-    ///   （C551（`build_pool` 的分配器没有根环表），用户 2026-10-05 定：core 在这里断言，漏装的装置当场 panic，不再静默不回收）。
+    ///   （C551（`build_pool` 的分配器没有根环表）：core 在这里断言，漏装的装置当场 panic，不再静默不回收）。
     ///   出路是建分配器的一方装上根环表：mkfs 同一个进程里用 `make_filesystem::allocator_after_make_filesystem`，或
     ///   `install_root_ring_occupancy(make_filesystem::root_ring_occupancy_after_make_filesystem(..))`；挂载建的分配器（`mount::rebuilt_allocator`）装着。
     /// - 这条根的 txg 不是上一条记到的加一：有一条根没经分配器写出去，这张表说的环已经不是盘上的环，再按它回收会把还被环里的根引用的槽发出去。
     ///
-    /// 记完、回收完之后把这一次回收用的门槛与还钉着的槽里最小的钉值记下（[`Self::reclaim_floor_when_the_latest_root_was_recorded`]，C773）：
+    /// 记完、回收完之后把这一次回收用的门槛与还钉着的槽里按（钉值, 槽）最小的那一槽记下（[`Self::reclaim_floor_when_the_latest_root_was_recorded`]，C773）：
     /// 带单元的发布拿它写根记录的 t 与 p；零单元发布在根落盘之后才调，它的 t、p 照抄上一版，用不到这一对。
     pub fn record_root_written_by_this_process(&mut self, checkpoint_txg: CheckpointTxg) {
         let occupancy = self.root_ring.as_mut().expect(
@@ -2759,10 +2808,15 @@ impl PoolAllocator {
             .unwrap_or_default();
         let still_protected_by_the_isolation = occupancy.placements_the_isolation_still_protects();
         // 钉槽 p 的采样与回收门槛同一刻：这条根已经盖掉它那一槽（盖掉的若是钉着的槽，钉随之解开），之后到装根之前不再记根。
-        let lowest_pinned_txg = occupancy
+        // 钉值与槽一起取，按（钉值, 槽）取最小：三个区域的槽 0 钉值都是 0，只比钉值就分不出取哪一槽（C773 判决 R1 乙）。
+        let lowest_pin = occupancy
             .ring_slots_pinned_since_the_mount_at_the_oldest_txg_they_can_have_held()
-            .into_values()
-            .min();
+            .into_iter()
+            .map(|(pinned_ring_slot, pinned_txg)| LowestPinnedRingSlot {
+                pinned_txg,
+                ring_slot: pinned_ring_slot,
+            })
+            .min_by_key(|pin| (pin.pinned_txg, pin.ring_slot));
         match displaced {
             Some(
                 RootRingOccupant::AbandonedRoot {
@@ -2805,11 +2859,11 @@ impl PoolAllocator {
         self.reclaim_floor_when_the_latest_root_was_recorded =
             Some(ReclaimFloorWhenTheRootWasRecorded {
                 reclaim_floor,
-                lowest_pinned_txg,
+                lowest_pin,
             });
     }
 
-    /// 这个分配器上一次记根（[`Self::record_root_written_by_this_process`]）回收用的门槛与记完之后还钉着的槽里最小的钉值；
+    /// 这个分配器上一次记根（[`Self::record_root_written_by_this_process`]）回收用的门槛与记完之后还钉着的槽里按（钉值, 槽）最小的那一槽；
     /// 这个分配器还没记过根时 `None`。带单元的发布在记这次的根之后、装根之前读它（C773 的采样点）。
     #[must_use]
     pub fn reclaim_floor_when_the_latest_root_was_recorded(
@@ -2819,9 +2873,9 @@ impl PoolAllocator {
     }
 
     /// 同 [`Self::record_root_written_by_this_process`]，记之前先照 E2 重读挂载那一刻读坏或读回全零、记了这条根之后会是环里最小的那个槽
-    /// （D16（发布语义） 已定项 1，用户 2026-10-03 定；用户 2026-10-04 定：读坏的槽钉在它可能住过的最旧 txg，重读读出有效根之前
+    /// （D16（发布语义） 已定项 1：读坏的槽钉在它可能住过的最旧 txg，重读读出有效根之前
     /// 回收门槛不越过它——读得出且自证过就照读出来的根算，按实例表有效的照它的 txg（回收门槛取整个环，RGall，多旧都算），被抛弃的当没有；
-    /// 仍读不出、读得出而自证不过或读回全零照旧钉着：读回全零不算确认为空，用户 2026-10-05 定乙）。
+    /// 仍读不出、读得出而自证不过或读回全零照旧钉着：读回全零不算确认为空）。
     /// `reread` 读盘、判全零、自证与实例表（`mount::reread_of_a_root_ring_slot_bad_at_mount`）；
     /// 这里只定重读哪一槽、按读到的改表。钉着的槽一个都不在最小的位置上时一个都不读。
     ///
@@ -3037,8 +3091,8 @@ mod tests {
         assert_eq!(map.free_runs(), 1);
     }
 
-    /// [`DeviceFreeMap::slots_counted_both_as_allocated_and_as_isolated`] 的阳性对照（判决 `research/prompts/m3-batch10z-no-code-r1-main-verification.md`
-    /// 第二节 K2 ②：harness 档用例里它全是比 0，它恒交 0 时那些用例照绿）。一块盘上分配三段（起点槽起两槽、第 4 槽起一槽、第 8 槽起两槽），
+    /// [`DeviceFreeMap::slots_counted_both_as_allocated_and_as_isolated`] 的阳性对照
+    /// 一块盘上分配三段（起点槽起两槽、第 4 槽起一槽、第 8 槽起两槽），
     /// 再用不看分配位的整段 [`DeviceFreeMap::isolate`] 罩住第 0 到第 5 槽：第 0、1、4 槽同时置着分配位与隔离位，第 2、3、5 槽只置隔离位，
     /// 第 8、9 槽只置分配位。访问器交 3，隔离数 6、已分配数 5 各自对得上。
     #[test]
@@ -3161,11 +3215,11 @@ mod tests {
         (unblocked_slots, pairs_outside)
     }
 
-    /// 发布路径准入先判「这次的单元落得下」读的两个数（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）——
+    /// 发布路径准入先判「这次的单元落得下」读的两个数（C545（空间准入罩不住分裂与聚簇段层））——
     /// 提交内生块落得下的槽数、用户数据落得下的段外槽对数——是增量维护的，这里每一步之后拿逐槽扫出来的同一个量对，两块盘都要对得上。
     /// 三种挡位的置与清各走一遍：分配（开段、bump、用户数据）、回收、抬 F 扣住与放开、影子账隔离（只在盘 0）与清隔离；
     /// 单元区 385 槽（末尾一槽不成对、末尾一段不满 64 槽）。
-    /// 判别力：放开扣住时只清位图、不跟着维护（改之前的 `fill(false)`），放开之后两个数都少算放开的那几槽。
+    /// 判别力：放开扣住时只清位图、不跟着维护（如 `fill(false)`），放开之后两个数都少算放开的那几槽。
     #[test]
     fn unblocked_slot_and_slot_pair_counts_are_maintained_incrementally_and_match_a_scan() {
         let device_bytes = (UNIT_AREA_START_SLOT + 385) * SLOT_BYTES;
@@ -3683,7 +3737,7 @@ mod tests {
         on_device
     }
 
-    /// 代码三方第二轮 Z1-d 的形状：用户数据（两槽）落在一对都已回收的单槽记录上——50178 那条改写成这次的分配、跨度 2，
+    /// 两槽数据单元复用已回收记录的形状：用户数据（两槽）落在一对都已回收的单槽记录上——50178 那条改写成这次的分配、跨度 2，
     /// 50179 那条罩住的槽被新记录罩住，随这次分配删掉；之后按这份记录重建分配器（下一次可写挂载做的事）不 panic、占着的槽数对得上。
     #[test]
     fn reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_rewrites_the_first_and_deletes_the_second(
@@ -3819,7 +3873,7 @@ mod tests {
         }
     }
 
-    /// 增补 2 第 20c 行（代码三方第一轮打中）：回落把开放段置空之后，那一段仍是聚簇段、仍不给用户数据
+    /// 回落把开放段置空之后，那一段仍是聚簇段、仍不给用户数据
     /// （D3（空间分配） 已定项 8 第 2 条「聚簇段只给提交内生块」；已定项 10 ② 的量词是「任何开放的聚簇段」）。
     /// 形态：开段 [50240, 50304) 发七个提交内生块（新池新建文件的前七个，字节表零 t2..t8）⇒ 游标停在 50249；段里游标前方的槽占满、单元区里一个全空段都不剩
     /// ⇒ 下一个提交内生块回落、`open_segment` 置空；再把段里那个两槽容器释放、回收（游标不回头，bump 够不着它）——
@@ -3947,7 +4001,7 @@ mod tests {
         }
     }
 
-    /// 抬 F 那一串取的被抛弃根落点按根认、不只按槽认（D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句，用户 2026-10-07 定）：
+    /// 抬 F 那一串取的被抛弃根落点按根认、不只按槽认（D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句）：
     /// 24 槽的环里 txg 8 那一槽记着实例 2 的被抛弃根（读出那一遍记成 `AbandonedRoot`），txg 9 那一槽是两遍里只有一遍自证过、被抛弃的
     /// 实例 2 的根。同一条根交回记着的落点；同一槽上 txg 差一整圈的根、或实例代号不同的根交 `None`；有效根那一槽交 `None`。
     #[test]
@@ -4077,7 +4131,10 @@ mod tests {
                 (
                     ring_slot_of(12),
                     RootRingOccupant::AllZeroAtMount {
-                        oldest_txg_it_can_have_held: CheckpointTxg(12),
+                        txgs_it_can_hold: TxgsARingSlotBadAtMountCanHold::new(
+                            CheckpointTxg(12),
+                            CheckpointTxg(12),
+                        ),
                     },
                 ),
                 (
@@ -4132,7 +4189,7 @@ mod tests {
 
     /// 抬 F 那一串取被抛弃根记着的落点（[`RootRingOccupancy::placements_recorded_for_the_abandoned_root`]）只认记成被抛弃根的槽：
     /// 挂载时读坏、读回全零、读坏后进程内重读读出有效根、两遍里只有一遍自证过而那一遍是有效根这四类槽，这一遍读出一条被抛弃根时交 `None`
-    /// （照今天读盘），不交一串空落点——交空落点就是「这条根什么都不引用」，不隔离也不读盘，它的单元掉出影子账（正推 m5、m6、m8、m20）。
+    /// （照今天读盘），不交一串空落点——交空落点就是「这条根什么都不引用」，不隔离也不读盘，它的单元掉出影子账。
     #[test]
     fn placements_recorded_for_an_abandoned_root_answer_none_on_slots_recorded_bad_all_zero_or_valid_at_mount(
     ) {
@@ -4157,7 +4214,43 @@ mod tests {
         }
     }
 
-    /// 根环表里没记着落点的被抛弃根借 C 那一圈记着的落点（用户 2026-10-08 定 H2）：认同条件不只按槽号——那一槽记的是有效根且 txg 相同
+    /// 准入抬 F 的上限要并的槽（[`RootRingOccupancy::ring_slots_bad_or_reading_back_all_zero_at_mount`]）是挂载时读坏的与读回全零的两类
+    /// （D16（发布语义） 已定项 1「抬 F 的上限」那一行，读回全零那一半），各带它能住的 txg；进程内重读读出有效根的、
+    /// 两遍里只有一遍自证过的、有效根、被抛弃根都不在其内。只取读坏那一类的 [`RootRingOccupancy::ring_slots_bad_at_mount`] 照旧没有读回全零的那一槽。
+    #[test]
+    fn the_ring_slots_merged_into_the_admission_ceiling_are_the_slots_bad_at_mount_and_the_slots_reading_back_all_zero_at_mount(
+    ) {
+        let slots_per_region = RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM;
+        let ring_slot_of = |txg: u64| target_for_publish(CheckpointTxg(txg), slots_per_region);
+        let occupancy =
+            occupancy_with_every_kind_of_slot_from_txg_11_through_16_and_unapplied_records_on_each(
+            );
+        assert_eq!(
+            occupancy.ring_slots_bad_or_reading_back_all_zero_at_mount(),
+            BTreeMap::from([
+                (
+                    ring_slot_of(11),
+                    TxgsARingSlotBadAtMountCanHold::new(CheckpointTxg(11), CheckpointTxg(11))
+                ),
+                (
+                    ring_slot_of(12),
+                    TxgsARingSlotBadAtMountCanHold::new(CheckpointTxg(12), CheckpointTxg(12))
+                ),
+            ]),
+            "并进上限的是挂载时读坏的 txg 11 那一槽与读回全零的 txg 12 那一槽，各带能住的 txg"
+        );
+        assert_eq!(
+            occupancy
+                .ring_slots_bad_at_mount()
+                .keys()
+                .copied()
+                .collect::<Vec<RootRingSlot>>(),
+            vec![ring_slot_of(11)],
+            "只取读坏那一类的那一份没有读回全零的槽"
+        );
+    }
+
+    /// 根环表里没记着落点的被抛弃根借 C 那一圈记着的落点：认同条件不只按槽号——那一槽记的是有效根且 txg 相同
     /// （两遍里只有一遍自证过的那一类还比实例代号）。同一条根交回 C 在那一槽记着的落点；同一槽上 txg 差一整圈的另一次发布、实例代号不同、
     /// 那一槽记的是被抛弃根或挂载时读坏、读回全零的槽，交 `None`；C 在那一槽解开之后（这个进程写掉了那一槽）也交 `None`。
     #[test]
@@ -4242,7 +4335,7 @@ mod tests {
         );
     }
 
-    /// C 那一圈在那一槽有条目、落点是空的（正推 `research/prompts/m3-batch10z-d-code-r1-sonnet-output.md` K1-2：较新可读根或没施加的发布的账
+    /// C 那一圈在那一槽有条目、落点是空的（较新可读根或没施加的发布的账
     /// 读不出、记录不齐、映射也现算不成，而现行账里有 C694 的 B 那道凭据时，`mount::placements_of_an_unapplied_publish_whose_account_is_unreadable`
     /// 交空串、照样记进 C 那一槽）：借到的是 `Some(空)`，不是 `None`。D16（发布语义） 已定项 1「根槽这一次读坏」那一行：C 那一圈在那一槽记着
     /// 同一条根时「照 C 那一圈记着的落点算、不读账、读不出不拒」，「C 也没记着的照今天读盘」——条目在就是记着了，空串照空串算，
@@ -4270,7 +4363,7 @@ mod tests {
         );
     }
 
-    /// 环上有洞留下的旧根压住进程内的回收门槛（D16（发布语义） 已定项 1「环里最旧有效根」，用户 2026-10-04 定 RGall）：24 槽的环里
+    /// 环上有洞留下的旧根压住进程内的回收门槛（D16（发布语义） 已定项 1「环里最旧有效根」）：24 槽的环里
     /// txg 1 那一槽留着 txg 1 的根（txg 25、49 那两次的根槽都没落），其余 23 槽住着 txg 26–48；这个进程记到 txg 49（没有根的那一个）
     /// 之后再记 txg 50，盖掉的是 txg 26。txg 1 离最新根已过两圈，仍是环里最旧的有效根：释放代 2 的落点不回收、仍在 defer 里。
     /// 照一圈窗口取（锚 50，窗口 txg > 26）时 txg 1 被滤掉、门槛跳到 27，那两槽当场回收。
@@ -4318,7 +4411,7 @@ mod tests {
         }
     }
 
-    /// E2 那一判的取法（D16（发布语义） 已定项 1，用户 2026-10-03 定；读坏的槽钉在它可能住过的最旧 txg，用户 2026-10-04 定）：
+    /// E2 那一判的取法（D16（发布语义） 已定项 1；读坏的槽钉在它可能住过的最旧 txg）：
     /// 12 槽的环（S = 4）；txg 13–23 住着有效根，区域 0 槽 0 挂载那一刻读坏、钉在它可能住过的最旧 txg 0（它能住的最大 txg 是 12），
     /// 是环里最小的那个 ⇒ 重读那一槽一次。
     fn oldest_in_the_ring_when_the_slot_bad_at_mount_rereads_as(
@@ -4388,7 +4481,7 @@ mod tests {
         );
     }
 
-    /// 重读读回全零：不算确认为空，照旧钉在它可能住过的最旧 txg 0（用户 2026-10-05 定乙；照「从没写过」拿掉时最旧有效根是 13）。
+    /// 重读读回全零：不算确认为空，照旧钉在它可能住过的最旧 txg 0。
     #[test]
     fn the_slot_bad_at_mount_reading_back_all_zero_on_the_reread_stays_pinned_at_the_oldest_txg_it_can_have_held(
     ) {
@@ -4433,7 +4526,6 @@ mod tests {
     }
 
     /// 分配器没装根环表（只 `new` 加 mkfs 那两个单元，C551 那一形）而记了一条根：断言失败，不静默跳过回收
-    /// （用户 2026-10-05 定）。
     #[test]
     #[should_panic(expected = "分配器没装根环表却记了一条根")]
     fn recording_a_root_on_an_allocator_without_a_root_ring_occupancy_panics_instead_of_never_reclaiming(

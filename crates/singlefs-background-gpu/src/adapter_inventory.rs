@@ -332,12 +332,16 @@ pub fn participating_gpus_admitted_by_the_mount_checks(
     Ok(participating)
 }
 
+/// 只在测试里用：本模块与 [`crate::gpus_of_this_host`] 的测试写卡的显存都按这一份。
+#[cfg(test)]
+pub(crate) const GIBIBYTE: u64 = 1 << 30;
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const GIBIBYTE: u64 = 1 << 30;
-    const WAIT_LIMIT_UNDER_TEST: std::time::Duration = std::time::Duration::from_secs(5);
+    const WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST: std::time::Duration =
+        std::time::Duration::from_secs(5);
 
     fn adapter(
         name: &str,
@@ -545,7 +549,7 @@ mod tests {
         assert_eq!(
             participating_gpus_admitted_by_the_mount_checks(
                 &BackgroundGpuSelection {
-                    background_gpu_wait_limit: WAIT_LIMIT_UNDER_TEST,
+                    background_gpu_wait_limit: WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST,
                     background_gpu_devices: None,
                     background_gpu_memory_limit: None,
                 },
@@ -562,7 +566,7 @@ mod tests {
         assert_eq!(
             participating_gpus_admitted_by_the_mount_checks(
                 &BackgroundGpuSelection {
-                    background_gpu_wait_limit: WAIT_LIMIT_UNDER_TEST,
+                    background_gpu_wait_limit: WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST,
                     background_gpu_devices: Some(vec![integrated_address.clone()]),
                     background_gpu_memory_limit: None,
                 },
@@ -582,7 +586,7 @@ mod tests {
         assert_eq!(
             participating_gpus_admitted_by_the_mount_checks(
                 &BackgroundGpuSelection {
-                    background_gpu_wait_limit: WAIT_LIMIT_UNDER_TEST,
+                    background_gpu_wait_limit: WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST,
                     background_gpu_devices: None,
                     background_gpu_memory_limit: Some(vec![GpuMemoryInBytes(GIBIBYTE)]),
                 },
@@ -603,7 +607,7 @@ mod tests {
         assert_eq!(
             participating_gpus_admitted_by_the_mount_checks(
                 &BackgroundGpuSelection {
-                    background_gpu_wait_limit: WAIT_LIMIT_UNDER_TEST,
+                    background_gpu_wait_limit: WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST,
                     background_gpu_devices: None,
                     background_gpu_memory_limit: Some(vec![
                         GpuMemoryInBytes(GIBIBYTE),
@@ -627,7 +631,7 @@ mod tests {
     fn named_gpus_participate_in_the_named_order_with_their_memory_limits() {
         let participating = participating_gpus_admitted_by_the_mount_checks(
             &BackgroundGpuSelection {
-                background_gpu_wait_limit: WAIT_LIMIT_UNDER_TEST,
+                background_gpu_wait_limit: WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST,
                 background_gpu_devices: Some(vec![
                     gpu_device_identifier_of_the_pci_bus_address("0000:41:00.0"),
                     gpu_device_identifier_of_the_pci_bus_address("0000:01:00.0"),
@@ -662,7 +666,7 @@ mod tests {
                 "0000:41:00.0",
             )]),
             background_gpu_memory_limit: Some(vec![GpuMemoryInBytes(2 * GIBIBYTE)]),
-            background_gpu_wait_limit: WAIT_LIMIT_UNDER_TEST,
+            background_gpu_wait_limit: WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST,
         };
         assert_eq!(
             BackgroundGpuSelection::of_the_settings(&settings),
@@ -671,7 +675,7 @@ mod tests {
                     "0000:41:00.0"
                 )]),
                 background_gpu_memory_limit: Some(vec![GpuMemoryInBytes(2 * GIBIBYTE)]),
-                background_gpu_wait_limit: WAIT_LIMIT_UNDER_TEST,
+                background_gpu_wait_limit: WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST,
             },
             "开卡照挂载那一组的卡、上限与等 GPU 的上限"
         );
@@ -681,7 +685,7 @@ mod tests {
     fn without_named_gpus_every_discrete_gpu_participates_without_a_memory_limit() {
         let participating = participating_gpus_admitted_by_the_mount_checks(
             &BackgroundGpuSelection {
-                background_gpu_wait_limit: WAIT_LIMIT_UNDER_TEST,
+                background_gpu_wait_limit: WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST,
                 background_gpu_devices: None,
                 background_gpu_memory_limit: None,
             },
