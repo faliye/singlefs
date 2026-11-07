@@ -36,13 +36,13 @@ qemu 进程不自动杀，列出 pid 交人判。白名单与在用的一律不�
 最近一次修改落在 [上一趟开跑, --produced-after) 之内、没有进程开着的，哪怕不到那么久也当上一趟留下的删掉，汇总行单列「上一趟留下的 N 项」；
 --produced-after（本趟开跑时刻）及之后才出现的是这一趟自己产生的，不碰也不算「太新、这一趟清不掉」。没给上一趟时刻时一切照旧。
 --refuse-too-recent（只配不带 --yes 的 clean）：剩下还有「太新、这一趟清不掉」的项就退 4，逐项报还要等多少秒；
-门禁 harness-test-environment 的 machine-clean 格开跑前用它预演。
+门禁 test-environment 的 machine-clean 格开跑前用它预演。
 record-run-start：把一趟门禁的开跑时刻写进 --run-times-file（本趟 current、上一趟 previous 两行，同一个开跑时刻重复记不转动），
-写法是同目录临时文件改名换上，原子；门禁 harness-test-environment 的 machine-clean 格每趟调一次。
+写法是同目录临时文件改名换上，原子；门禁 test-environment 的 machine-clean 格每趟调一次。
 
-为什么要它：用户 2026-09-19 定「每一轮的里程碑都应该要有一个干净的环境……每次里程碑完结后要检查挂载的盘有没有异常」。
-那天现查 /tmp 下 82 个 singlefs-*：37 个 replay 复跑目录共 41G（replay.sh 只在全绿时删），
-40 个 4 GiB 稀疏测试盘镜像（crates 测试靠 Drop 删，进程被杀就漏下）。
+为什么要它：每一轮里程碑都要有一个干净的环境，里程碑完结后要检查挂载的盘有没有异常。
+/tmp 下会漏下 singlefs-*：replay 复跑目录（replay.sh 只在全绿时删）、
+4 GiB 稀疏测试盘镜像（crates 测试靠 Drop 删，进程被杀就漏下）。
 
 退出码：0 干净；1 有残留或异常（clean --yes 时：有一步没做成）；2 用法错；3 有一类没查成（与 1 同时成立时取 1）；
 4 只给 clean --refuse-too-recent：还有太新、这一趟清不掉的项。
@@ -75,7 +75,7 @@ record-run-start：把一趟门禁的开跑时刻写进 --run-times-file（本�
       「✗ --selftest 没通过（破坏开关 previousrunignored）」
   TEST_ENVIRONMENT_CHECK_BREAK=runtimesnotrotated  record-run-start 不把本趟转成上一趟（自检「记两个时刻」那几条不中）
       「✗ --selftest 没通过（破坏开关 runtimesnotrotated）」
-  TEST_ENVIRONMENT_CHECK_BREAK=smartskipped  宿主盘·SMART 不查（judge_smart 一律交 skipped，改前默认不查 SMART 的样子）
+  TEST_ENVIRONMENT_CHECK_BREAK=smartskipped  宿主盘·SMART 不查（judge_smart 一律交 skipped）
       「✗ --selftest 没通过（破坏开关 smartskipped）」
   TEST_ENVIRONMENT_CHECK_BREAK=unknownoptionaccepted  main() 对认不出的选项不拒（用 parse_known_args 收下、丢掉）
       「✗ --selftest 没通过（破坏开关 unknownoptionaccepted）」
@@ -117,8 +117,8 @@ LOOP_BLOCK_MAJOR = 7
 # 进程起始时间晚于条目树里最新的修改时间这么多秒以上，就判那个 pid 已经被别的进程复用
 PROCESS_IDENTIFIER_REUSE_SLACK_SECONDS = 2.0
 
-# 有意跨轮留着的东西：不判残留、clean 不碰。每条写明谁在用它。编译生成物不在这里（用户 2026-10-23 定案「自己用完自己删」：
-# 每一趟自己的编译目录跑完删）。
+# 有意跨轮留着的东西：不判残留、clean 不碰。每条写明谁在用它。编译生成物不在这里：
+# 每一趟自己的编译目录跑完就删。
 ALLOWLIST = (
     (re.compile(r'^singlefs-e152-packages$'),
      'E152 六家文件系统的下载包缓存（scripts/devices/e152-stage-root.sh 的 PACKAGES）'),
@@ -1167,7 +1167,7 @@ def run_check(environment, report_path=''):
 
 
 # ── 门禁开跑时刻的跨趟文件（C474）──────────────────────────────────────
-# 两行：current=<本趟开跑 epoch 秒>、previous=<上一趟的>。上游 gate.sh 不能改，开跑时刻由门禁 harness-test-environment 的 machine-clean 格
+# 两行：current=<本趟开跑 epoch 秒>、previous=<上一趟的>。上游 gate.sh 不能改，开跑时刻由门禁 test-environment 的 machine-clean 格
 # 往上找祖先里的 gate.sh 读出来、调 record-run-start 记下；clean 读它判「上一趟留下的」。
 
 def read_run_times(path):
@@ -1356,7 +1356,7 @@ def run_clean(environment, confirmed, refuse_too_recent=False):
         print(f'    · 没扫到：{directory_text}')
     # 不碰的那几项要在最后一行也报出来。逐条列在上面了，而读的人常常只看末尾那一行——
     # 「太新」这一档尤其要点名：它不是白名单，是这一次清不掉、下一次门禁开跑前又已经存在，
-    # 于是 harness-test-environment 必然判它红（清完紧接着跑门禁时撞过一次，白跑一轮全量）。
+    # 于是 test-environment 必然判它红（清完紧接着跑门禁时撞过一次，白跑一轮全量）。
     # 本趟开跑之后才出现的太新项是这一趟自己的，不算「清不掉」
     too_recent = [entry for entry in kept if '可能正在跑' in entry.reason
                   and not (environment.produced_after and entry.latest_modification_epoch >= environment.produced_after)]
@@ -1624,7 +1624,7 @@ def check_devices_and_clean(recorder, environment, holders, fake_temporary, outs
     recorder.expect(dry_run_exit == 0 and not recorded_commands and all_present,
                     f'不带 --yes 的 clean 不许动任何东西：退出码 {dry_run_exit}，命令 {recorded_commands}')
     # 汇总那一行自己要报出「不碰几项、其中几项只是太新」：读的人常常只看末尾一行，而「太新」这一档
-    # 这一次清不掉、下一次门禁开跑前又已经存在，harness-test-environment 必然判它红（实测因此白跑一轮全量门禁）。
+    # 这一次清不掉、下一次门禁开跑前又已经存在，test-environment 必然判它红。
     dry_run_summary = next((line for line in dry_run_output.getvalue().split('\n') if '没动任何东西' in line), '')
     kept_count = sum(1 for verdict in expectations.values() if verdict != 'residual')
     recorder.expect(f'不碰 {kept_count} 项' in dry_run_summary,
@@ -1990,18 +1990,18 @@ def build_argument_parser():
     parser.add_argument('--minimum-free-percent', type=float, default=10.0, help='剩余空间下限（百分比），默认 10')
     parser.add_argument('--produced-after', type=float, default=0.0,
                         help='这个时刻（epoch 秒）之后才出现的临时条目，单列成「这一次跑自己产生的」、不判红；'
-                             '门禁 harness-test-environment 把本次门禁的开跑时刻传进来（C448）')
+                             '门禁 test-environment 把本次门禁的开跑时刻传进来（C448）')
     parser.add_argument('--gate-run-temporary-directory', action='append', default=[],
                         help='gate.sh 发给这一轮各阶段的 TMPDIR，可给多次；只给 check：临时目录残留这一类不扫它'
-                             '（上游「跑完没留下临时文件」判它），设备与宿主盘照旧算它；门禁 harness-test-environment 在 gate.sh 里时传进来')
+                             '（上游「跑完没留下临时文件」判它），设备与宿主盘照旧算它；门禁 test-environment 在 gate.sh 里时传进来')
     parser.add_argument('--cross-run-temporary-directory', action='append', default=[],
                         help='gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR），可给多次；只给 check：临时目录残留这一类另扫它，'
-                             '设备与宿主盘不算它；门禁 harness-test-environment 在 gate.sh 里时传进来')
+                             '设备与宿主盘不算它；门禁 test-environment 在 gate.sh 里时传进来')
     parser.add_argument('--previous-run-started', type=float, default=0.0,
                         help='只给 clean：上一趟门禁的开跑时刻（epoch 秒）；最近修改落在 [它, --produced-after) 之内、没有进程开着的条目'
                              '当上一趟留下的删，不受 --recent-minutes 限制（C474）；不给就照旧')
     parser.add_argument('--run-times-file', default='',
-                        help='门禁开跑时刻的跨趟文件（门禁 harness-test-environment 的 machine-clean 格写在 '
+                        help='门禁开跑时刻的跨趟文件（门禁 test-environment 的 machine-clean 格写在 '
                              '${GATE_CROSS_RUN_TMPDIR:-<数据根>/cross-run-cache}/gate-run-times，数据根取 .claude/hooks/lib_work_root.py）；'
                              'clean 从它读上一趟的时刻（与 --previous-run-started 二选一），record-run-start 写它')
     parser.add_argument('--run-started', type=float, default=0.0, help='只给 record-run-start：本趟门禁的开跑时刻（epoch 秒）')

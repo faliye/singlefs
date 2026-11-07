@@ -52,7 +52,7 @@ use crate::command_line::DEFAULT_MAXIMUM_CONNECTIONS;
 use crate::protocol::{is_service_key, EntryInTable, KeyInTable};
 
 /// 已生效的请求号那张记账表的键前缀（文件头）。
-const APPLIED_REQUEST_KEY_TAG: u8 = 0xF0;
+pub const APPLIED_REQUEST_KEY_TAG: u8 = 0xF0;
 /// 认领记录那张记账表的键前缀（文件头）。
 pub const CLAIM_KEY_TAG: u8 = 0xF1;
 
@@ -297,7 +297,8 @@ fn applied_request_key(
     key
 }
 
-fn encode_claim_record(record: &ClaimRecord) -> Vec<u8> {
+/// 认领记录的值（文件头「认领记录」）；自证造带认领行的样本库也用它。
+pub(crate) fn encode_claim_record(record: &ClaimRecord) -> Vec<u8> {
     let mut value = Vec::with_capacity(8 + record.holder_identity.len());
     value.extend_from_slice(&record.lease_expiry_milliseconds.to_le_bytes());
     value.extend_from_slice(&record.holder_identity);
@@ -366,20 +367,25 @@ pub struct VerdictLibrary {
     selftest_sync_failure_file: Option<PathBuf>,
 }
 
-/// 扫到的一条：键、值。
-pub type ScannedEntry = (Box<[u8]>, Box<[u8]>);
-
-/// 按前缀扫的结果：键值按升序，`is_truncated` 表示到了条数上限或字节上限还没扫完这个前缀。
-pub struct PrefixScanResult {
-    pub entries: Vec<ScannedEntry>,
+/// 按前缀扫一帧的结局（`VerdictLibrary::scan_prefix_into`）：交给调用方的条数、到了条数上限或字节上限还没扫完这个前缀（`is_truncated`）、
+/// 调用方拒收了一条（`is_refused_by_caller`，服务的工作线程记不进额度，这一帧回忙）。键值原样逐条交给调用方，分段存的值在这一层不拼
+/// （拼回在客户端一侧的 `segmented_values`），这一层不攒整帧的条目。
+pub struct PrefixScanOutcome {
+    pub entries_accepted: usize,
     pub is_truncated: bool,
+    pub is_refused_by_caller: bool,
 }
 
-/// 删前缀一帧碰到的键（`VerdictLibrary::delete_prefix_into_group`）：碰到几把、前缀下是不是已经没有更多的键、最后一把键。
+/// 删前缀一帧碰到的键（`VerdictLibrary::scan_prefix_for_deletion`）：碰到几把、前缀下是不是已经没有更多的键、最后一把键，
+/// 要不要删、碰到的那几把。删除由提交线程在回应记进额度之后才逐把记进写批、同时释放这些键上的认领（`committer.rs` 文件头「删前缀」）。
 pub struct PrefixDeletion {
     pub keys_in_frame: u32,
     pub is_exhausted: bool,
     pub last_key: Vec<u8>,
+    /// 这一帧要删碰到的键（不是只数不删；弄坏开关 delete-prefix-dry-run-deletes 下只数不删也删）。
+    pub deletes_touched_keys: bool,
+    /// 碰到的每一把键：要删时、或弄坏开关 delete-prefix-count-releases-claims 打开时才收，别的时候空（只数不删不为它占内存）。
+    pub touched_keys: Vec<Vec<u8>>,
 }
 
 impl VerdictLibrary {
@@ -464,6 +470,11 @@ impl VerdictLibrary {
 
     pub fn add_claim_release(&self, group: &mut GroupBatch, claim: &[u8]) {
         group.batch.delete(claim);
+    }
+
+    /// 删前缀删的一把数据键记进这一组（`scan_prefix_for_deletion` 交回的 `touched_keys` 里的）。
+    pub fn add_key_deletion(&self, group: &mut GroupBatch, key: &[u8]) {
+        group.batch.delete(key);
     }
 
     /// 库里有没有这个键（认领判「已有结论」用）。
@@ -600,24 +611,42 @@ impl VerdictLibrary {
             .map_err(|failure| failure.message().to_string())
     }
 
-    /// 按前缀扫：从前缀起往后读，走出前缀、走进记账那一段键（文件头）、到条数上限或累计字节到 `maximum_bytes` 就停。
-    pub fn scan_prefix(
+    /// 按前缀扫：从前缀起（`after_key` 不空时从排在它之后的第一把键起，`protocol.rs` 文件头「按前缀扫」）往后读，走出前缀、走进记账那一段键（文件头）、
+    /// 到条数上限或累计字节到 `maximum_bytes` 就停；每一条读出来就交给 `accept_entry`（键、值），不攒整帧。`accept_entry` 回假（服务记不进额度）就停，
+    /// 结局里 `is_refused_by_caller` 为真。弄坏开关 scan-resume-key-ignored 下不看 `after_key`、每帧都从前缀起。
+    pub fn scan_prefix_into(
         &self,
         prefix: &[u8],
+        after_key: &[u8],
         maximum_entries: u32,
         maximum_bytes: usize,
-    ) -> Result<PrefixScanResult, String> {
+        accept_entry: &mut dyn FnMut(&[u8], &[u8]) -> bool,
+    ) -> Result<PrefixScanOutcome, String> {
         let maximum_entry_count =
             usize::try_from(maximum_entries).expect("这个工程只编 64 位目标，u32 放得进 usize");
         let service_keys_open = self
             .break_switches
             .is_enabled(BreakSwitch::ServiceKeysOpenToClients);
-        let mut entries = Vec::new();
+        // 排在 after_key 之后的第一把键是 after_key 后面接一个 0 字节（与 scan_prefix_for_deletion 的续扫起点同一个写法）
+        let mut seek_from = after_key.to_vec();
+        if seek_from.is_empty()
+            || self
+                .break_switches
+                .is_enabled(BreakSwitch::ScanResumeKeyIgnored)
+        {
+            seek_from = prefix.to_vec();
+        } else {
+            seek_from.push(0);
+        }
+        let mut outcome = PrefixScanOutcome {
+            entries_accepted: 0,
+            is_truncated: false,
+            is_refused_by_caller: false,
+        };
         let mut accumulated_bytes = 0_usize;
-        let mut is_truncated = false;
         for item in self
             .database
-            .iterator(IteratorMode::From(prefix, Direction::Forward))
+            .iterator(IteratorMode::From(&seek_from, Direction::Forward))
         {
             let (key, value) = item.map_err(|error| format!("前缀扫失败：{error}"))?;
             if is_service_key(&key) && !service_keys_open {
@@ -630,27 +659,27 @@ impl VerdictLibrary {
             {
                 break;
             }
-            if entries.len() == maximum_entry_count
+            if outcome.entries_accepted == maximum_entry_count
                 || accumulated_bytes + key.len() + value.len() + 8 > maximum_bytes
             {
-                is_truncated = true;
+                outcome.is_truncated = true;
+                break;
+            }
+            if !accept_entry(&key[..], &value[..]) {
+                outcome.is_refused_by_caller = true;
                 break;
             }
             accumulated_bytes += key.len() + value.len() + 8;
-            entries.push((key, value));
+            outcome.entries_accepted += 1;
         }
-        Ok(PrefixScanResult {
-            entries,
-            is_truncated,
-        })
+        Ok(outcome)
     }
 
-    /// 删前缀一帧（`protocol.rs` 文件头「删前缀」）：从前缀起（`after_key` 不空时从排在它之后的第一把键起）按键升序走，
-    /// 至多碰 `maximum_keys` 把以前缀起头的键；走出前缀、走进记账那一段、前缀下没有更多的键就停。
-    /// 不是只数不删时，碰到的每一把键的删除记进 `group`，由调用方的 `commit_group` 落盘；只数不删时 `group` 不动。
-    pub fn delete_prefix_into_group(
+    /// 删前缀一帧要碰的键（`protocol.rs` 文件头「删前缀」）：从前缀起（`after_key` 不空时从排在它之后的第一把键起）按键升序走，
+    /// 至多碰 `maximum_keys` 把以前缀起头的键；走出前缀、走进记账那一段、前缀下没有更多的键就停。只扫、不动库：
+    /// 不是只数不删时，碰到的每一把键交回在 `touched_keys` 里，调用方先把回应记进额度，记得进才逐把 `add_key_deletion`；只数不删时交回空。
+    pub fn scan_prefix_for_deletion(
         &self,
-        group: &mut GroupBatch,
         prefix: &[u8],
         after_key: &[u8],
         maximum_keys: u32,
@@ -660,6 +689,10 @@ impl VerdictLibrary {
             || self
                 .break_switches
                 .is_enabled(BreakSwitch::DeletePrefixDryRunDeletes);
+        let collects_keys = deletes
+            || self
+                .break_switches
+                .is_enabled(BreakSwitch::DeletePrefixCountReleasesClaims);
         let overruns = self
             .break_switches
             .is_enabled(BreakSwitch::DeletePrefixOverruns);
@@ -672,6 +705,7 @@ impl VerdictLibrary {
         }
         let mut keys_in_frame = 0_u32;
         let mut last_key = Vec::new();
+        let mut touched_keys = Vec::new();
         let mut is_exhausted = true;
         for item in self
             .database
@@ -688,16 +722,18 @@ impl VerdictLibrary {
                 is_exhausted = false;
                 break;
             }
-            if deletes {
-                group.batch.delete(&key);
-            }
             keys_in_frame += 1;
             last_key = key.into_vec();
+            if collects_keys {
+                touched_keys.push(last_key.clone());
+            }
         }
         Ok(PrefixDeletion {
             keys_in_frame,
             is_exhausted,
             last_key,
+            deletes_touched_keys: deletes,
+            touched_keys,
         })
     }
 

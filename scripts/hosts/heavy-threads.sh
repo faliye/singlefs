@@ -21,7 +21,7 @@
 # 打开后自证哪几格红（失败行「✗ heavy-threads.sh 自证：<格名>：…」）：
 #   HEAVY_THREADS_BREAK=cap-unchecked  SINGLEFS_THREAD_CAP 原样打出、不判正整数
 #       「✗ heavy-threads.sh 自证：SINGLEFS_THREAD_CAP=0 拒」、「✗ heavy-threads.sh 自证：SINGLEFS_THREAD_CAP=abc 拒」
-#   HEAVY_THREADS_BREAK=missing-registration-uses-core-count  登记文件不在时照改前取本机核数
+#   HEAVY_THREADS_BREAK=missing-registration-uses-core-count  登记文件不在时取本机核数
 #       「✗ heavy-threads.sh 自证：登记文件不在拒」
 
 # 弄坏开关只在自证里认（自证设 HEAVY_COUNT_SELFTEST_MARK 才认）：这份库被很多脚本 source，外面漏进来的开关不许改它们取到的线程数。

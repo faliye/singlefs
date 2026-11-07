@@ -34,24 +34,35 @@
   大值分段（Client.write_many / read_many / scan 一处做，调用方看到的照旧是一把键一个整值）：
     这一段是大值分段格式唯一的说明：Python 这一份与 prune-server 里的 Rust 客户端（崩溃判定库经它写读）照它逐字节相同地写、读、扫，Rust 源码指到这里。
     值长过 SEGMENT_BYTES（一帧装的上限 FRAME_BATCH_BYTES），或值本身以 SEGMENT_MANIFEST_MAGIC 起头的，切成每段至多 SEGMENT_BYTES 字节分段存：
-      原键 <键>                      分段清单：SEGMENT_MANIFEST_MAGIC 后接 JSON {"length": 整值字节数, "sha256": 整值的 sha256, "segments": [各段字节数…]}
-      段键 <键> NUL <段号>            段号是 SEGMENT_INDEX_DIGITS 位十进制、补零（段键按段号升序，排在原键之后）
-      计数键 <键> NUL count           这把键分段存过的段数高水位（十进制），只增不减
-    认段键只认形状：键尾是「NUL 加 SEGMENT_INDEX_DIGITS 位十进制」的是段键的形状（尾巴前面那一截是它的原键），键尾是「NUL 加 SEGMENT_COUNT_SUFFIX」的
-      是计数键的形状（segment_key_parts、has_count_key_shape）；别的键都是原键，带不带 NUL 都一样（崩溃判定库的键以表标签开头、常带 NUL）。
+      原键 <键>                        分段清单：SEGMENT_MANIFEST_MAGIC 后接 JSON {"length": 整值字节数, "sha256": 整值的 sha256, "segments": [各段字节数…]}
+      段键 <键> NUL <版本> NUL <段号>   版本是这个整值的 sha256（64 位小写十六进制，与清单里的 sha256 是同一个）；段号是 SEGMENT_INDEX_DIGITS 位十进制、补零
+                                       （同一版本的段键按段号升序，排在原键之后）。同一把键换了值就换了版本，新值的段写在新的段键上，不就地覆写旧段
+      版本登记键 <键> NUL versions      这把键在服务里可能还留着段的版本：64 位十六进制逗号隔开、升序、不重；空值是一个都没有（SEGMENT_VERSIONS_SUFFIX）
+    认段键只认形状：键尾是「NUL 加 SEGMENT_INDEX_DIGITS 位十进制」的是段键的形状（尾巴前面那一截是「<原键> NUL <版本>」），键尾是「NUL 加 SEGMENT_VERSIONS_SUFFIX」的
+      是版本登记键的形状（segment_key_parts、has_version_registry_key_shape）；别的键都是原键，带不带 NUL 都一样（崩溃判定库的键以表标签开头、常带 NUL）。
       write_many 只拒这两种形状的原键（reserved-key，退 3，这一批一条都不写），扫时只跳过这两种形状的键。不带 NUL 的键（Python 五族的键）
       怎么认都一样。原键带 NUL 时，NUL 后面接一个小于「0」的字节的别的原键会排在原键与它的段键之间：扫时照下面「扫」那一条办。
-    写：先点读这几把键的计数键；先写各段与计数键（一段一帧），最后一帧写清单与别的条目。段数取「这一个值要几段」与计数键里的高水位两者大的那一个，
-      多出来的段写成空段、照进清单：重写同一把键时以前写过的段号全被新清单点名，旧段不留孤儿（协议没有删键，只能覆盖）。
-      分段存过的键之后写小值也照分段存（高水位不为 0）。写到一半断了：清单还是旧的、段已换了一部分，读时核不过、报读错，重写这把键就好。
+    写（同一把键写到一半死掉，清单与它点名的段都不动；write_many 与 Rust 的 write_segments_of_large_values 同一套）：
+      1. 点读这几把键的版本登记键；登记了版本的再点读原键，取它此刻的清单的版本（原键不在、不是清单的没有）。
+      2. 登记了而不是此刻清单那一版的（写到一半死掉留下的、上一次写完还没回收的），按前缀「<键> NUL <版本> NUL」删掉。
+      3. 登记键写成「此刻那一版」并上「这一次要写的那一版」（这一次不分段的不并），等确认；再写这一版的各段（一段一帧）。
+      4. 最后一帧写清单与别的条目（不分段的照原样写进原键）。
+      5. 清单写进服务之后回收：此刻那一版不是这一次写的那一版的，按前缀删掉；登记键写成只剩这一次写的那一版（这一次不分段的写空值）。
+         Rust 那一侧的清单由调用方照它自己的切法写（崩溃判定库把清单与别的行放进同一帧），这一步留给这把键下一次写时的第 2 步做。
+      写方死在哪一步，此刻的清单与它点名的那一版段都没动过，读回的照旧是写之前的值；多写下的那一版段已经登记，下一次写这把键时第 2 步删掉。
+      读的一方手里的清单是旧的、它点名的段被第 2、5 步删了：照下面「读」那一条重读原键、照新清单拼。
+      同一把键两个写方同时写不同的值不在这一条里（第 2 步可能删掉另一个写方正写着的那一版），照旧由调用方的认领挡。
       段数到 10 的 SEGMENT_INDEX_DIGITS 次方（段号装不下）的值写之前拒（too-many-segments，退 3），这一批一条都不写；Rust 那一侧同一条（SEGMENT_INDEX_LIMIT）。
     读：原键读回的是清单就按清单逐段点读（每帧至多 FRAME_BATCH_BYTES）、拼回，核每段长度、整值长度与 sha256；段缺了、长度或 sha256 对不上，
-      照 SEGMENTED_REREAD_DELAYS_SECONDS 逐次等、重读原键：清单换过（同一把键正被重写，读到的是旧清单配新段）就丢掉已经收下的段、照新清单重拼，
+      照 SEGMENTED_REREAD_DELAYS_SECONDS 逐次等、重读原键：清单换过（同一把键正被重写，手里那份旧清单点名的段已被回收）就丢掉已经收下的段、照新清单重拼，
       原键不再是清单就交它；等完清单还是原来那一份、或清单解不开，当读错（退 3），不当「库里没有」。
-    扫：段键与计数键的形状不当条目交出去，清单那一条交拼回的整值（scan_stream 逐条交，同一时刻只攒一把键的段：紧跟着正在拼的那把原键扫到的段先收下，
-      中间隔了别的原键的，那把原键当场交、缺的段逐帧点读，之后再扫到它的段照形状跳过）；清单点名之外的段不交。
-    raw_scan_stream 与 read_many_raw 交服务里的原样（段键、清单都照交）：前者只给自证看存法用，后者是点读、写与扫拼回整值时底下那一层。
-      一帧被截断而一行都没回（头一行的值就装不下一帧）当场退 3（scan-row-over-frame），不往下拆前缀；Rust 那一侧
+    扫：段键与版本登记键的形状不当条目交出去，清单那一条交拼回的整值（scan_stream 逐条交，同一时刻只攒一把键的段：紧跟着正在拼的那把原键扫到的、
+      形状前一截正是「<原键> NUL <清单的版本>」的段先收下，别的版本的段照形状跳过；中间隔了别的原键的，那把原键当场交、缺的段逐帧点读，
+      之后再扫到它的段照形状跳过）；清单点名之外的段不交。
+    raw_scan_stream 与 read_many_raw 交服务里的原样（段键、清单都照交）：前者是扫拼回整值时底下那一层，后者是点读、写与扫拼回整值时底下那一层。
+      raw_scan_stream 一帧一帧接着扫：一帧被截断（到了条数上限或帧长上限）就交这一帧的全部条目，下一帧带「续扫起点」= 这一帧最后一把键，
+      服务从排在它之后的第一把键接着扫（prune-server/src/protocol.rs 文件头「按前缀扫」），到不截断为止；发的帧数是条目数除以一帧装下的条数，
+      不往下拆前缀。一帧被截断而一行都没回（头一行的值就装不下一帧）当场退 3（scan-row-over-frame）；Rust 那一侧
       （crates/singlefs-verification/src/verdict_store.rs 的 visit_stored_rows_with_prefix）同一条。
 
 连哪一处（library_store 第一次读写时才连，一个进程一条连接，fork 出来的子进程自己另连）：
@@ -74,7 +85,7 @@
     是「帧长度不对」就照这一条退 3。
   - 回应超过帧长上限就拆键：成批点读的请求帧小、读回的值合计可以超过帧长上限，服务这时整帧拒成「内容解不开」（状态 1，说明里写读回会有多少字节，协议不变）。
     read_many_raw 收到这一种拒而这一帧不止一把键，就把键对半拆开各自再问、递归到单键，按原次序接起来（单键回应至多一段长加帧头，不会超过：长过一段的值分段存）；
-    单键还被拒照「服务拒了帧」退 3。点读原键与拼大值时读段的那一帧都走这一层。别的拒（认不得的操作码、存储层出错）与别的操作码的帧照旧当场退 3，不拆。
+    单键还被拒照「服务拒了帧」退 3。点读原键与拼大值时读段的那一帧都走这一层。别的拒（认不得的操作码，读、扫、删前缀回的存储层出错）与别的操作码的帧照旧当场退 3，不拆。
     回应多大事先不知道（不分段的值至多一段长，按这个上界切一帧只装得下三四把键），所以先整帧问、被拒再拆；与 prune-server/src/reliable_client.rs 的 read 同一条规则。
   - 连不上、断了、等回应超时（RESPONSE_TIMEOUT_SECONDS；临时服务底下 SINGLEFS_PRUNE_SERVER_RESPONSE_SECONDS 可改）、回应帧长度不对：关连接，指数退避加抖动（起始 RECONNECT_INITIAL_SECONDS、每次翻倍、封顶 RECONNECT_CEILING_SECONDS，再乘 0.5 到 1 的随机数）
     之后重连重发同一帧（序号换新的，写帧的身份与请求号不变，服务按它们去重，重发是幂等的）；从头一次出事算起总时长到
@@ -82,13 +93,19 @@
     建连（连接与报到）只用这一轮总时长上限剩下的时间，不给满一份等回应的超时：服务那头握手迟迟不完成、连接队列满了时
     也在总时长上限里收场（照 prune-server/src/client.rs 文件头「建连有期限」；建连那一步出的事从开始连的那一刻算进总时长）。
   - 服务回忙：照它给的毫秒数再加 0 到一半的随机抖动之后重发同一帧；同一帧忙 BUSY_RETRIES_LIMIT 次退 75（忙到上限）。
+  - 写帧回存储出错（状态 4）：不是「重发也不会好」的拒绝（服务写批写失败时照常服务；同步 WAL 失败时随即退 7、由 systemd 拉起，
+    prune-server/src/storage.rs 文件头「同步 WAL 失败之后」）。照重连那一条的退避（起始 RECONNECT_INITIAL_SECONDS、翻倍、封顶、抖动）等一会，
+    用同一个请求号重发同一帧（服务按身份与请求号去重，重放是幂等的）；服务退了、连接断了照重连那一条办。同一帧连着回存储出错，
+    从头一次算起到 RECONNECT_LIMIT_SECONDS（临时服务底下 SINGLEFS_PRUNE_SERVER_RECONNECT_SECONDS 可改）或次数到 RECONNECT_ATTEMPTS_LIMIT 还没成，退 75
+    （存储一直出错，storage-failing）。与 prune-server/src/reliable_client.rs 文件头「存储出错」同一条（那一侧只按次数）。
+    弄坏开关 write-storage-failure-abandoned 退回改前：写帧回状态 4 当「服务拒了」退 3、不重放。
   - 服务说它停了（状态 6）：不再重试，退 75（服务停了）。
   - 读失败一律退出，不当成「键不在」交回去：调用方拿到的「不在」只来自服务回的「在不在 = 0」。
   - 写在服务回确认（WAL 同步之后）才算数；没确认就退出的写这一趟丢了，下一趟那一条照现判（判定库的写都是判完才写，丢了只是少复用）。
 退出码（失败时抛 PruneServerFailure，它是 SystemExit：调用方的 except Exception 拦不住，进程照它的码退；抛之前在标准错误打 ✗ 与出路）：
-  75  prune-server 不可用：服务有意停了、重连到上限、同一帧忙到上限。修好、重起服务之后由提交它的会话重交。
-  3   别的错：socket 与 TCP 地址都没有（配置）、服务拒了帧（内容解不开、认不得的操作码、存储层出错）、回应解不开（协议对不上）、
-      帧长超限（frame-too-large）、分段存的值拼不回（segmented-read）、原键是段键或计数键的形状（reserved-key）、
+  75  prune-server 不可用：服务有意停了、重连到上限、同一帧忙到上限、同一写帧连着回存储出错到上限（storage-failing）。修好、重起服务之后由提交它的会话重交。
+  3   别的错：socket 与 TCP 地址都没有（配置）、服务拒了帧（内容解不开、认不得的操作码，读、扫、删前缀回的存储层出错）、回应解不开（协议对不上）、
+      帧长超限（frame-too-large）、分段存的值拼不回（segmented-read）、原键是段键或版本登记键的形状（reserved-key）、
       值要的段数段号装不下（too-many-segments）、按前缀扫一行就装不下一帧（scan-row-over-frame）、
       不在临时服务底下设了改连接地址或时限的变量（connection-override，「连哪一处」）。
   不用 78（task-server 已占：连不上 task-server 本身）。
@@ -108,7 +125,7 @@
       （0xF0 起头）的前缀服务拒（退 3）。删本来就幂等，不按请求号去重：断线重发只会让某一帧报的数少一批；要精确的数就先 --dry-run、再删、再 --dry-run 数到 0。
   python3 scripts/prune-server/prune_server_client.py delete-by-item-name [--dry-run] <族> <库目录> <名单文件>
       按值挑键删：判定记录的项名不在键里（键是单元键的哈希），按键前缀删不到，只能读值挑。名单文件每行「种类<TAB>项名」（# 起头与空行跳过）；
-      每个种类整个扫一遍，读每条值，值是 JSON 对象且 item 字段是这个种类名单里的项名的，按完整键逐条删（连段键与计数键）；别的种类里同名的项不动。
+      每个种类整个扫一遍，读每条值，值是 JSON 对象且 item 字段是这个种类名单里的项名的，按完整键逐条删（连段键与版本登记键）；别的种类里同名的项不动。
       每条打 PRUNE_SERVER_DELETE_BY_ITEM_NAME_ROW mode=dry-run|deleted kind=<种类> keys=<条数> key=<完整键> item=<项名>，名单里没找到任何记录的（种类、项名）
       逐条打 PRUNE_SERVER_DELETE_BY_ITEM_NAME_NOT_FOUND kind=… item=…，末行 PRUNE_SERVER_DELETE_BY_ITEM_NAME mode=… kinds=… matched=<条> keys=<总键数> names=… names_not_found=…
       non_records=<值不是带 item 的 JSON 对象的条数> refused=<没删的条数>。--dry-run 只数不删、口径和删一样。退 0；参数不对、名单读不了或格式不对退 2；
@@ -151,15 +168,21 @@
                                       两种现场，子进程读一次都在总时长加 3 秒里退 75、说连不上，不堵到等回应的超时。unix 连接队列满时带超时的
                                       socket 连接当场回 EAGAIN（CPython 只在 EINPROGRESS 时等），这一种现场不分建连给不给满时长；分得出的是 TCP 那一种
   large-value-round-trip              写一个大过帧长上限的值与一条小值：逐字节读回、按前缀扫只交两条原键（大值拼回）、服务里原样有段键；
-                                      同一把键重写成两段长的值：读回新值，服务里这把键的段号与新清单点名的一一对上、计数键等于清单段数（旧段不留孤儿）
+                                      同一把键重写成两段长的值：读回新值，服务里这把键的段键只剩新清单那一版、段号与新清单点名的一一对上，
+                                      版本登记键只登记新的那一版（旧的那一版回收了）
   segmented-read-incomplete-refused   一把分段键清单点名的段缺一段、一把一段短了、一把一段同长换了字节：点读三把都退 3（分段拼不回），按前缀扫那把换了字节的同样退 3，
                                       没有一把读成「不在」或交回值
-  segmented-read-sees-a-rewrite       一把分段键的段已换成新值、清单还是旧的，另一条线程过一会儿写新清单：点读与按前缀扫都交回新值（重读清单之后照新清单拼），不退 3
-  segment-count-over-index-digits-refused  段长与段号位数调小（1 字节、1 位）之后写一个要 11 段的值：退 3（too-many-segments），原键、段键、计数键一条都没写；要 10 段的照写照读回
+  segmented-read-sees-a-rewrite       一把分段键的新一版段已写下、旧一版的段已被回收、清单还是旧的，另一条线程过一会儿写新清单：
+                                      点读与按前缀扫都交回新值（重读清单之后照新清单拼），不退 3
+  segmented-rewrite-survives-writer-death  一把分段键存着旧值，子进程写新值、写完段与版本登记键之后、写清单之前被 SIGKILL：点读与按前缀扫都交回旧值、不退 3，
+                                      服务里登记着旧新两版；再写第三个值之后读回第三个值，段键与版本登记键都只剩第三个值那一版
+  segment-count-over-index-digits-refused  段长与段号位数调小（1 字节、1 位）之后写一个要 11 段的值：退 3（too-many-segments），原键、段键、版本登记键一条都没写；要 10 段的照写照读回
   scan-row-over-frame-refused         按前缀扫的一帧截断而一行都没回（假的服务）：问了一帧就退 3（scan-row-over-frame），不往下拆前缀
-  segment-key-shapes-only-reserved    带 NUL 而键尾不是段键或计数键形状的几把原键（都以表标签那样的字节起头；NUL 接 NUL 的、NUL 后接五位与七位十进制的、
-                                      NUL 后接「count」再接别的字节的、一把分段存的大值，与一把排在这把大值的原键和它的段键之间的原键）：写了逐字节读回，按前缀扫交的键正好是这几把原键、
-                                      大值拼回相同，服务里原样有这把大值的段键与计数键；键尾是段键形状、计数键形状的原键各一把（与一条合法条目同批）：
+  prefix-scan-continues-after-the-last-key  前缀下六把各 15 MiB（不分段存）的值加两条小值、前缀前后各一条别的：raw_scan_stream 与 scan 交的条目逐把与写进去的相同、
+                                      按键升序、不重不漏；一帧装不下全部，发的扫帧数不多于条目数加一（不往下拆前缀），第二帧起带续扫起点
+  segment-key-shapes-only-reserved    带 NUL 而键尾不是段键或版本登记键形状的几把原键（都以表标签那样的字节起头；NUL 接 NUL 的、NUL 后接五位与七位十进制的、
+                                      NUL 后接「versions」再接别的字节的、一把分段存的大值，与一把排在这把大值的原键和它的段键之间的原键）：写了逐字节读回，按前缀扫交的键正好是这几把原键、
+                                      大值拼回相同，服务里原样有这把大值的段键与版本登记键；键尾是段键形状、版本登记键形状的原键各一把（与一条合法条目同批）：
                                       写时都退 3（reserved-key），同批那条合法条目也没写进服务
   oversize-frame-reported-at-once     子进程写一条键长超过帧长上限的条目（重连总时长 3 秒）：当场退 3、说帧长超限与上限多少，不说连不上；
                                       进程内把本地上限放宽到两倍再写同一条（照发给服务）：服务回「帧长度不对」，当场退 3（帧长超限），不重连
@@ -179,7 +202,10 @@
                                       命令行 --dry-run 数到的条数对、逐条打键与项名、库不动；不带 --dry-run 删掉后只少点名种类里项名命中的那几条（含分段的段键），
                                       另一个种类里同名的项与没点名的项一条不少；再 --dry-run 数到 matched=0；名单里没找到记录的项名逐条点名
   batched-read-answer-over-frame-limit-split  五把各正好一段长（不分段存）、合计超过帧长上限的值，中间夹一条小值与一把不在的键，一次 read_many 读全：
-                                      逐字节对、次序与问的相同；那五把都没有计数键（真没分段）
+                                      逐字节对、次序与问的相同；那五把都没有版本登记键（真没分段）
+  write-storage-failure-replayed      服务带 --selftest-write-failure-file 起、造错文件在：写一条收到存储出错、照同一请求号退避重发，等故障日志出现
+                                      storage-write-failed 之后删掉造错文件，这一次写做完（不抛错）、重发过至少一次、读回值；造错文件一直在、重连总时长 2 秒：
+                                      写在限时里退 75（storage-failing），不退 3
 弄坏开关 PRUNE_SERVER_CLIENT_BREAK=<项>（只在自证里认：自证给自己和它起的子进程设 PRUNE_SERVER_CLIENT_SELFTEST=1；直接执行别的用法时设了就退 2）。
 一条一行「PRUNE_SERVER_CLIENT_BREAK=<项>  弄坏哪一处」，下一行起写打开后红的格（失败行「✗ 自证 <格名>：」的句首；自证末尾的开关轮按 BREAK_RED_CELLS 逐条核同一格）：
   PRUNE_SERVER_CLIENT_BREAK=read-failure-reported-as-absent  读失败时交回「键都不在」
@@ -198,21 +224,25 @@
       connect-bounded-by-reconnect-total（「✗ 自证 connect-bounded-by-reconnect-total：」）
   PRUNE_SERVER_CLIENT_BREAK=large-value-sent-unsegmented  大值不分段、整条照一帧发（改前的样子）
       large-value-round-trip（「✗ 自证 large-value-round-trip：」）
-  PRUNE_SERVER_CLIENT_BREAK=segment-count-shrinks-on-rewrite  写时不看计数键的高水位，段数只取这一个值要几段
+  PRUNE_SERVER_CLIENT_BREAK=superseded-versions-kept  写时不回收旧的那一版段（写大值第 2、5 步不删前缀）
       large-value-round-trip（「✗ 自证 large-value-round-trip：」）
   PRUNE_SERVER_CLIENT_BREAK=segments-assembled-without-sha256  拼回之后不核整值的 sha256
       segmented-read-incomplete-refused（「✗ 自证 segmented-read-incomplete-refused：」）
   PRUNE_SERVER_CLIENT_BREAK=segmented-read-not-reread  拼不回当场退 3，不重读原键（改前的样子）
       segmented-read-sees-a-rewrite（「✗ 自证 segmented-read-sees-a-rewrite：」）
+  PRUNE_SERVER_CLIENT_BREAK=segments-overwritten-in-place  段键不带版本、就地覆写同一把键的旧段，不登记版本（改前的样子）
+      segmented-rewrite-survives-writer-death（「✗ 自证 segmented-rewrite-survives-writer-death：」）
   PRUNE_SERVER_CLIENT_BREAK=segment-count-unbounded  写时不核段数装不装得下段号（改前的样子）
       segment-count-over-index-digits-refused（「✗ 自证 segment-count-over-index-digits-refused：」）
   PRUNE_SERVER_CLIENT_BREAK=scan-row-over-frame-split  截断而一行都没回照样往下拆前缀（改前的样子）
       scan-row-over-frame-refused（「✗ 自证 scan-row-over-frame-refused：」）
+  PRUNE_SERVER_CLIENT_BREAK=scan-split-into-next-byte-prefixes  一帧被截断就丢掉这一帧、按下一个字节拆成 256 个前缀递归扫（改前的样子）
+      prefix-scan-continues-after-the-last-key（「✗ 自证 prefix-scan-continues-after-the-last-key：」）
   PRUNE_SERVER_CLIENT_BREAK=nul-keys-reserved-whole  写时拒一切带 NUL 的原键、扫时凡带 NUL 的键都不当条目（改前的样子）
       segment-key-shapes-only-reserved（「✗ 自证 segment-key-shapes-only-reserved：」）
-  PRUNE_SERVER_CLIENT_BREAK=segment-key-shapes-accepted  写时不核原键的形状，段键、计数键形状的原键照写
+  PRUNE_SERVER_CLIENT_BREAK=segment-key-shapes-accepted  写时不核原键的形状，段键、版本登记键形状的原键照写
       segment-key-shapes-only-reserved（「✗ 自证 segment-key-shapes-only-reserved：」）
-  PRUNE_SERVER_CLIENT_BREAK=other-segment-keys-scanned-as-entries  扫时只收下紧跟着正在拼的那把原键的段，别的段键与计数键当条目交
+  PRUNE_SERVER_CLIENT_BREAK=other-segment-keys-scanned-as-entries  扫时只收下紧跟着正在拼的那把原键的段，别的段键与版本登记键当条目交
       segment-key-shapes-only-reserved（「✗ 自证 segment-key-shapes-only-reserved：」）
   PRUNE_SERVER_CLIENT_BREAK=oversize-frame-sent-and-retried  发帧之前不核帧长，服务回「帧长度不对」当连接断了重连重发（改前的样子）
       oversize-frame-reported-at-once（「✗ 自证 oversize-frame-reported-at-once：」）
@@ -236,6 +266,8 @@
       delete-by-item-name-picks-by-value（「✗ 自证 delete-by-item-name-picks-by-value：」）
   PRUNE_SERVER_CLIENT_BREAK=delete-prefix-without-namespace  LibraryStore.delete_prefix 拼的前缀不带命名空间（改前的键空间样子）
       delete-prefix-by-namespace（「✗ 自证 delete-prefix-by-namespace：」）
+  PRUNE_SERVER_CLIENT_BREAK=write-storage-failure-abandoned  写帧回存储出错当「服务拒了」退 3、不重放（改前的样子）
+      write-storage-failure-replayed（「✗ 自证 write-storage-failure-replayed：」）
 没有弄坏开关的格：round-trip-unix、prefix-scan、tcp-round-trip（帧格式由服务那一侧的自证与弄坏开关管，这里错了每一格都红）。
 """
 import contextlib
@@ -324,7 +356,11 @@ SEGMENT_KEY_SEPARATOR = b"\x00"
 SEGMENT_INDEX_DIGITS = 6
 # 分段存的值拼不回时重读原键之前依次等这么久（文件头「键空间」大值分段「读」；Rust SEGMENTED_REREAD_DELAYS_MILLISECONDS 同一张表）
 SEGMENTED_REREAD_DELAYS_SECONDS = (0.05, 0.1, 0.2, 0.4, 0.8, 1.6)
-SEGMENT_COUNT_SUFFIX = b"count"
+SEGMENT_VERSIONS_SUFFIX = b"versions"
+SEGMENT_VERSION_CHARACTERS = 64
+SEGMENT_VERSION_LIST_SEPARATOR = b","
+# 段键在原键之后多出的字节：NUL、版本、NUL、段号（版本登记键多出的 NUL 加 SEGMENT_VERSIONS_SUFFIX 比它短）
+SEGMENT_KEY_TAIL_BYTES = 1 + SEGMENT_VERSION_CHARACTERS + 1 + SEGMENT_INDEX_DIGITS
 SEGMENT_MANIFEST_MAGIC = b"\x00singlefs-prune-server-segments\n"
 SHOWN_KEY_CHARACTERS = 200
 # 发帧出错之后，读还躺在接收缓冲里的「帧长度不对」至多等这么久（文件头「容错」单条超限）
@@ -341,11 +377,11 @@ def break_is(name):
 
 
 class PruneServerFailure(SystemExit):
-    """读写没成（文件头「退出码」）：kind 是 stopped、unreachable、busy-limit（75），configuration、rejected、protocol、
+    """读写没成（文件头「退出码」）：kind 是 stopped、unreachable、busy-limit、storage-failing（75），configuration、rejected、protocol、
     frame-too-large、segmented-read、reserved-key、too-many-segments、scan-row-over-frame（3）。
     是 SystemExit：调用方不接就照 code 退出；抛之前已在标准错误打过 ✗ 与出路。"""
 
-    EXIT_CODES = {"stopped": EXIT_UNAVAILABLE, "unreachable": EXIT_UNAVAILABLE, "busy-limit": EXIT_UNAVAILABLE,
+    EXIT_CODES = {"stopped": EXIT_UNAVAILABLE, "unreachable": EXIT_UNAVAILABLE, "busy-limit": EXIT_UNAVAILABLE, "storage-failing": EXIT_UNAVAILABLE,
                   "configuration": EXIT_OTHER, "rejected": EXIT_OTHER, "protocol": EXIT_OTHER,
                   "frame-too-large": EXIT_OTHER, "segmented-read": EXIT_OTHER, "reserved-key": EXIT_OTHER, "connection-override": EXIT_OTHER,
                   "too-many-segments": EXIT_OTHER, "scan-row-over-frame": EXIT_OTHER}
@@ -367,13 +403,14 @@ REMEDIES = {
     "stopped": "prune-server 有意停了（修缺陷）：等主 agent 修好、重起服务之后重交这个任务；不要改成走本地库",
     "unreachable": "看服务在不在跑（prune-server/control check）、第二台连的地址与端口通不通；服务回来之后重交这个任务；不要改成走本地库",
     "busy-limit": "服务一直回忙：看 prune-server/control watch 与服务的待处理上限；过一会儿重交",
+    "storage-failing": "服务的存储一直出错（写批写失败、同步 WAL 失败）：看 prune-server/control watch 与故障日志、盘还写不写得进；修好之后重交",
     "configuration": f"本机要有服务的 socket，第二台要有多机配置里的 {MULTI_HOST_ADDRESS_KEY}；判定库没有不走服务的那条路",
     "rejected": "服务拒了这一帧：这是客户端或服务的缺陷，把这一行交主 agent（prune-server 那一侧当场修）",
     "protocol": "回应解不开：客户端与服务的帧格式对不上，把这一行交主 agent（prune-server 那一侧当场修）",
     "frame-too-large": "一条请求大过帧长上限、又分不了段（键或前缀太长）：这是调用方的缺陷，把这一行交主 agent；重交照样拒，不要重交、不要改成走本地库",
     "segmented-read": "分段存的值拼不回（段缺了、长度或 sha256 对不上：写到一半断了或被改过）：重写这把键（让写它的那一道重判）；不要当成库里没有",
-    "reserved-key": (f"原键的键尾是「NUL 加 {SEGMENT_INDEX_DIGITS} 位十进制」或「NUL 加 {SEGMENT_COUNT_SUFFIX.decode()}」："
-                     "这两种形状留给大值分段的段键与计数键（客户端文件头「键空间」大值分段）；"
+    "reserved-key": (f"原键的键尾是「NUL 加 {SEGMENT_INDEX_DIGITS} 位十进制」或「NUL 加 {SEGMENT_VERSIONS_SUFFIX.decode()}」："
+                     "这两种形状留给大值分段的段键与版本登记键（客户端文件头「键空间」大值分段）；"
                      "换一把键尾不是这两种形状的键（别处带 NUL 照收）"),
     "too-many-segments": (f"值要的段数超过 {SEGMENT_INDEX_DIGITS} 位十进制段号装得下的：这是调用方的缺陷（一个值大到这一步不该进判定库），"
                           "把这一行交主 agent；重交照样拒"),
@@ -591,6 +628,7 @@ class Client:
         self.next_request_number = 1
         self.busy_responses = 0
         self.busy_waits = []   # (服务给的毫秒数, 真等了的秒数)，自证核「等够了再重发」
+        self.storage_failures = 0   # 写帧回存储出错、照同一请求号重发的次数，自证核「重放过」
         self.frame_limit = MAXIMUM_FRAME_BODY_BYTES   # 发帧之前核的帧体上限；只有自证把它放宽，照发给服务看服务那一侧的拒绝
 
     def close(self):
@@ -639,6 +677,7 @@ class Client:
         unbounded = break_is("reconnect-unbounded")
         trouble_started, trouble_count, delay = None, 0, RECONNECT_INITIAL_SECONDS
         busy_count = 0
+        storage_failures, storage_started, storage_delay = 0, None, RECONNECT_INITIAL_SECONDS
         body_bytes = REQUEST_HEADER_BYTES + len(payload)
         oversize_unchecked = break_is("oversize-frame-sent-and-retried")
         if body_bytes > self.frame_limit and not oversize_unchecked:
@@ -693,6 +732,19 @@ class Client:
                                             f"上限 {MAXIMUM_FRAME_BODY_BYTES} 字节）：{message}")
                 if status == STATUS_MALFORMED_PAYLOAD and oversized_answer_splittable:
                     raise AnswerOverFrameLimit(message)
+                if status == STATUS_STORAGE_FAILED and operation == OPERATION_WRITE and not break_is("write-storage-failure-abandoned"):
+                    # 写帧回存储出错：退避之后同一个请求号重发（文件头「容错」写帧回存储出错）
+                    now = time.monotonic()
+                    storage_started = now if storage_started is None else storage_started
+                    storage_failures += 1
+                    self.storage_failures += 1
+                    elapsed = now - storage_started
+                    if not unbounded and (storage_failures >= RECONNECT_ATTEMPTS_LIMIT or elapsed >= reconnect_limit):
+                        fail("storage-failing", f"{what}：服务连着回存储出错 {storage_failures} 次、{elapsed:.1f} 秒（上限 {RECONNECT_ATTEMPTS_LIMIT} 次、"
+                                                f"{reconnect_limit:g} 秒；{self.route}）；最后一次：{message}")
+                    time.sleep(max(0.0, min(storage_delay, reconnect_limit - elapsed)) * (0.5 + random.random() * 0.5))
+                    storage_delay = min(storage_delay * 2, RECONNECT_CEILING_SECONDS)
+                    continue
                 if status in (STATUS_MALFORMED_PAYLOAD, STATUS_UNKNOWN_OPERATION, STATUS_STORAGE_FAILED):
                     fail("rejected", f"服务拒了操作码 {operation} 的帧（状态 {status}）：{message}")
                 fail("protocol", f"认不得的回应：序号 {answered} 状态 {status} 操作码 {answered_operation}")
@@ -803,47 +855,88 @@ class Client:
 
     def write_many(self, entries):
         """[(键, 值)] 按帧上限切成几帧写；同一帧里的原子（文件头「键空间」：一份判定与它的 items 放同一帧）。
-        大值分段存（文件头「键空间」大值分段）：各段与计数键先写，清单与别的条目最后照原来的切法写。"""
+        大值分段存（文件头「键空间」大值分段「写」的五步）：段写在这一版自己的段键上，不就地覆写；清单最后照原来的切法写，写进之后回收旧的那一版。"""
         entries = list(entries)
         for key, _value in entries:
             if is_reserved_original_key(key):
-                fail("reserved-key", f"键 {shown_key(key)!r} 的键尾是段键或计数键的形状，这两种形状留给大值分段；这一批 {len(entries)} 条一条都没写")
+                fail("reserved-key", f"键 {shown_key(key)!r} 的键尾是段键或版本登记键的形状，这两种形状留给大值分段；这一批 {len(entries)} 条一条都没写")
         longest = max((len(key) for key, _value in entries), default=0)
-        smallest_frame = REQUEST_HEADER_BYTES + 4 + 5 + longest + len(SEGMENT_KEY_SEPARATOR + SEGMENT_COUNT_SUFFIX)
+        smallest_frame = REQUEST_HEADER_BYTES + 4 + 5 + longest + SEGMENT_KEY_TAIL_BYTES
         if smallest_frame > self.frame_limit and not break_is("oversize-frame-sent-and-retried"):
-            fail("frame-too-large", f"成批写 {len(entries)} 条：最长的键 {longest} 字节，连点读它的计数键的一帧都要 {smallest_frame} 字节，"
+            fail("frame-too-large", f"成批写 {len(entries)} 条：最长的键 {longest} 字节，连写它的一个段键的一帧都要 {smallest_frame} 字节，"
                                     f"超过帧长上限 {self.frame_limit} 字节；没发（键分不了段，重发照样拒）")
         unsegmented = break_is("large-value-sent-unsegmented")
-        high_water = {} if unsegmented or break_is("segment-count-shrinks-on-rewrite") else self.segment_high_water([key for key, _value in entries])
-        segment_entries, final_entries = [], []
+        in_place = break_is("segments-overwritten-in-place")
+        versioned = not (unsegmented or in_place)
+        keys = list(dict.fromkeys(key for key, _value in entries))
+        registered = self.registered_versions(keys) if versioned else {}
+        current = self.current_versions([key for key in keys if registered.get(key)])
+        reclaims = not break_is("superseded-versions-kept")
+        segment_entries, final_entries, written_versions = [], [], {}
         for key, value in entries:
-            previous_count = high_water.get(key, 0)
-            if unsegmented or not (previous_count or needs_segments(value)):
+            if unsegmented or not needs_segments(value):
                 final_entries.append((key, value))
+                written_versions.setdefault(key, []).append(None)
                 continue
-            count = max(segments_needed(value), previous_count)
+            count = segments_needed(value)
             if count > 10 ** SEGMENT_INDEX_DIGITS and not break_is("segment-count-unbounded"):
                 fail("too-many-segments", f"{shown_key(key)} 的值 {len(value)} 字节要分 {count} 段，段号只有 {SEGMENT_INDEX_DIGITS} 位十进制"
                                           f"（至多 {10 ** SEGMENT_INDEX_DIGITS} 段）；这一批 {len(entries)} 条一条都没写")
+            version = None if in_place else hashlib.sha256(value).hexdigest().encode("ascii")
             lengths = []
             for index in range(count):
                 piece = value[index * SEGMENT_BYTES:(index + 1) * SEGMENT_BYTES]
-                segment_entries.append((segment_key(key, index), piece))
+                segment_entries.append((segment_key(key, version, index), piece))
                 lengths.append(len(piece))
-            segment_entries.append((segment_count_key(key), b"%d" % count))
             final_entries.append((key, encode_manifest(value, lengths)))
+            written_versions.setdefault(key, []).append(version)
+        # 第 2 步（段数核过、一条都还没写之后）：登记了而不是此刻清单那一版的先删掉
+        for key in keys:
+            for version in registered.get(key, ()):
+                if version != current.get(key) and reclaims:
+                    self.delete_prefix(segment_version_prefix(key, version))
+        # 第 3 步：登记键先写（此刻那一版并上这一次写的各版），再写段
+        registry_entries, reclaim_after = [], []
+        if versioned:
+            for key in keys:
+                now = current.get(key)
+                written = [version for version in written_versions.get(key, ()) if version is not None]
+                pending = sorted({version for version in [now, *written] if version is not None})
+                if pending != registered.get(key, []):
+                    registry_entries.append((version_registry_key(key), encode_version_registry(pending)))
+                last = written_versions[key][-1]
+                kept = [last] if last is not None else []
+                superseded = [version for version in pending if version != last]
+                if superseded or pending != kept:
+                    reclaim_after.append((key, superseded, kept))
+        self.write_batches(registry_entries)
         self.write_batches(segment_entries)
+        # 第 4 步：清单与别的条目
         self.write_batches(final_entries)
+        # 第 5 步：清单写进之后回收此刻那一版（与同一批里先写、又被后写盖掉的那几版），登记键只剩这一次写的那一版
+        if reclaim_after:
+            for key, superseded, _kept in reclaim_after:
+                for version in superseded:
+                    if reclaims:
+                        self.delete_prefix(segment_version_prefix(key, version))
+            self.write_batches([(version_registry_key(key), encode_version_registry(kept)) for key, _superseded, kept in reclaim_after])
 
-    def segment_high_water(self, keys):
-        """{键: 计数键里记的段数}，只交分段存过的键；计数键不是十进制当读错（文件头「键空间」大值分段）。"""
+    def registered_versions(self, keys):
+        """{键: 版本登记键里登记的版本（升序）}，只交登记了版本的键（文件头「键空间」大值分段「写」第 1 步）；登记键解不开当读错。"""
         found = {}
-        for key, value in zip(keys, self.read_many_raw([segment_count_key(key) for key in keys])):
-            if value is None:
-                continue
-            if not value.isdigit():
-                fail("segmented-read", f"{shown_key(key)} 的计数键不是十进制段数：{value[:80]!r}")
-            found[key] = int(value)
+        for key, value in zip(keys, self.read_many_raw([version_registry_key(key) for key in keys])):
+            versions = parse_version_registry(key, value)
+            if versions:
+                found[key] = versions
+        return found
+
+    def current_versions(self, keys):
+        """{键: 此刻原键里那份清单的版本}，原键不在、不是清单、清单解不开的不交（第 1 步；写方要能盖掉一份坏了的清单，这里不退 3）。"""
+        found = {}
+        for key, value in zip(keys, self.read_many_raw(keys)):
+            version = manifest_version_or_none(value)
+            if version is not None:
+                found[key] = version
         return found
 
     def assembled(self, key, value, segments):
@@ -874,12 +967,13 @@ class Client:
             manifest, segments = replacement, {}
 
     def assembled_by_manifest(self, key, manifest, segments):
-        """照一份清单拼回整值：交 (整值, None)，拼不回交 (None, 为什么)。"""
+        """照一份清单拼回整值：交 (整值, None)，拼不回交 (None, 为什么)。段键取这份清单的版本（文件头「键空间」大值分段）。"""
         lengths = manifest["segments"]
+        version = manifest_version(manifest)
         fetched = {index: segments[index] for index in range(len(lengths)) if index in segments}
         missing = [index for index in range(len(lengths)) if index not in fetched]
-        for group in batches_of(missing, lambda index: lengths[index] + len(key) + 16):
-            for index, piece in zip(group, self.read_many_raw([segment_key(key, index) for index in group])):
+        for group in batches_of(missing, lambda index: lengths[index] + len(key) + SEGMENT_KEY_TAIL_BYTES + 16):
+            for index, piece in zip(group, self.read_many_raw([segment_key(key, version, index) for index in group])):
                 if piece is not None:
                     fetched[index] = piece
         pieces = []
@@ -895,9 +989,10 @@ class Client:
             return None, f"{shown_key(key)} 拼回的 {len(whole)} 字节 sha256 是 {hashlib.sha256(whole).hexdigest()}，清单写的是 {manifest['sha256']}"
         return whole, None
 
-    def raw_scan(self, prefix):
-        payload = struct.pack("<BI", TABLE_CONCLUSIONS, len(prefix)) + prefix + struct.pack("<I", SCAN_ENTRIES_LIMIT)
-        cursor = Cursor(self.exchange(OPERATION_PREFIX_SCAN, payload, f"按前缀扫（前缀 {len(prefix)} 字节）"))
+    def raw_scan(self, prefix, after_key=b""):
+        """按前缀扫一帧（prune-server/src/protocol.rs 文件头「按前缀扫」）：after_key 空是从前缀起，不空是从排在它之后的第一把键起；交 ([(键, 值)], 截断了没有)。"""
+        payload = (struct.pack("<BI", TABLE_CONCLUSIONS, len(prefix)) + prefix + struct.pack("<I", SCAN_ENTRIES_LIMIT) + length_prefixed(after_key))
+        cursor = Cursor(self.exchange(OPERATION_PREFIX_SCAN, payload, f"按前缀扫（前缀 {len(prefix)} 字节、续扫起点 {len(after_key)} 字节）"))
         truncated = cursor.unpack("<B", "截断标记")
         count = cursor.unpack("<I", "条数")
         entries = [(bytes(cursor.length_prefixed("键")), bytes(cursor.length_prefixed("值"))) for _ in range(count)]
@@ -905,8 +1000,28 @@ class Client:
         return entries, truncated == 1
 
     def raw_scan_stream(self, prefix):
-        """按前缀逐帧扫服务里的原样（段键、清单都照交），逐条交 (键, 值)、按键升序：一帧被帧长上限截断时按下一个字节拆成更窄的前缀接着扫
-        （前缀本身那个键另点读）；任何时刻手里只有一帧。"""
+        """按前缀逐帧扫服务里的原样（段键、清单都照交），逐条交 (键, 值)、按键升序：一帧被截断就交完这一帧，下一帧从这一帧最后一把键之后续扫
+        （文件头「键空间」raw_scan_stream）；任何时刻手里只有一帧。截断而一行都没回当场退 3（scan-row-over-frame）。
+        弄坏开关 scan-split-into-next-byte-prefixes 下照改前按下一个字节拆前缀（raw_scan_stream_by_next_byte）。"""
+        if break_is("scan-split-into-next-byte-prefixes"):
+            yield from self.raw_scan_stream_by_next_byte(prefix)
+            return
+        after_key = b""
+        while True:
+            entries, truncated = self.raw_scan(prefix, after_key)
+            if truncated and not entries:
+                if break_is("scan-row-over-frame-split") and not after_key:
+                    yield from self.raw_scan_stream_by_next_byte(prefix)
+                    return
+                fail("scan-row-over-frame", f"前缀 {shown_key(prefix)} 下扫回来一行都没有却说被截断：头一行的值就装不下一帧")
+            yield from entries
+            if not truncated:
+                return
+            after_key = entries[-1][0]
+
+    def raw_scan_stream_by_next_byte(self, prefix):
+        """改前的扫法，只给弄坏开关 scan-split-into-next-byte-prefixes、scan-row-over-frame-split 用：一帧被截断就丢掉这一帧，点读前缀本身那把键，
+        再按下一个字节拆成 SCAN_SPLIT_BYTE_VALUES 个更窄的前缀递归扫。"""
         entries, truncated = self.raw_scan(prefix)
         if not truncated:
             yield from entries
@@ -918,12 +1033,13 @@ class Client:
         if exact is not None:
             yield prefix, exact
         for byte_value in range(SCAN_SPLIT_BYTE_VALUES):
-            yield from self.raw_scan_stream(prefix + bytes([byte_value]))
+            yield from self.raw_scan_stream_by_next_byte(prefix + bytes([byte_value]))
 
     def scan_stream(self, prefix):
-        """按前缀扫全部，逐条交 (键, 值)、按键升序：段键与计数键的形状不交，清单那一条交拼回的整值（文件头「键空间」大值分段）。
-        同一时刻只攒一把键的段：紧跟着它扫到的段收下，中间隔了别的原键就当场交（缺的段由 assembled 点读），之后扫到它的段照形状跳过。"""
-        owner, manifest_value, segments = None, None, {}
+        """按前缀扫全部，逐条交 (键, 值)、按键升序：段键与版本登记键的形状不交，清单那一条交拼回的整值（文件头「键空间」大值分段）。
+        同一时刻只攒一把键的段：紧跟着它扫到的、形状前一截是「<原键> NUL <清单的版本>」的段收下，中间隔了别的原键就当场交（缺的段由 assembled 点读），
+        别的版本的段与之后扫到它的段照形状跳过。"""
+        owner, owner_part, manifest_value, segments = None, None, None, {}
         for key, value in self.raw_scan_stream(prefix):
             if break_is("nul-keys-reserved-whole") and SEGMENT_KEY_SEPARATOR in key:
                 parent, _separator, suffix = key.partition(SEGMENT_KEY_SEPARATOR)
@@ -931,16 +1047,17 @@ class Client:
                     segments[int(suffix)] = value
                 continue
             parts = segment_key_parts(key)
-            if parts is not None and owner is not None and parts[0] == owner:
+            if parts is not None and owner is not None and parts[0] == owner_part:
                 segments[parts[1]] = value
                 continue
-            if (parts is not None or has_count_key_shape(key)) and not break_is("other-segment-keys-scanned-as-entries"):
+            if (parts is not None or has_version_registry_key_shape(key)) and not break_is("other-segment-keys-scanned-as-entries"):
                 continue
             if owner is not None:
                 yield owner, self.assembled(owner, manifest_value, segments)
-                owner, manifest_value, segments = None, None, {}
+                owner, owner_part, manifest_value, segments = None, None, None, {}
             if value.startswith(SEGMENT_MANIFEST_MAGIC):
                 owner, manifest_value = key, value
+                owner_part = segment_owner(key, manifest_version(manifest_of(key, value)))
             else:
                 yield key, value
         if owner is not None:
@@ -1013,16 +1130,63 @@ def segments_needed(value):
     return max(1, -(-len(value) // SEGMENT_BYTES))
 
 
-def segment_key(key, index):
-    return key + SEGMENT_KEY_SEPARATOR + b"%0*d" % (SEGMENT_INDEX_DIGITS, index)
+def manifest_version(manifest):
+    """清单的版本（文件头「键空间」大值分段：整值 sha256 的十六进制，bytes）；弄坏开关 segments-overwritten-in-place 下交 None（段键不带版本，改前的样子）。"""
+    return None if break_is("segments-overwritten-in-place") else manifest["sha256"].encode("ascii")
 
 
-def segment_count_key(key):
-    return key + SEGMENT_KEY_SEPARATOR + SEGMENT_COUNT_SUFFIX
+def manifest_version_or_none(value):
+    """value 是一份解得开的清单就交它的版本，别的（None、不是清单、清单解不开）交 None，不退 3：写之前取此刻那一版只为回收，坏了的清单照样要能盖掉。"""
+    if value is None or not value.startswith(SEGMENT_MANIFEST_MAGIC):
+        return None
+    try:
+        digest = json.loads(value[len(SEGMENT_MANIFEST_MAGIC):].decode("utf-8"))["sha256"]
+    except (UnicodeDecodeError, ValueError, KeyError, TypeError):
+        return None
+    if not is_segment_version(digest.encode("ascii", "replace") if isinstance(digest, str) else b""):
+        return None
+    return digest.encode("ascii")
+
+
+def is_segment_version(text):
+    """text（bytes）是一个版本：SEGMENT_VERSION_CHARACTERS 个小写十六进制数字。"""
+    return len(text) == SEGMENT_VERSION_CHARACTERS and all(character in b"0123456789abcdef" for character in text)
+
+
+def segment_owner(key, version):
+    """段键的形状前一截：<原键> NUL <版本>；version 是 None（弄坏开关 segments-overwritten-in-place）时是原键本身。"""
+    return key if version is None else key + SEGMENT_KEY_SEPARATOR + version
+
+
+def segment_key(key, version, index):
+    return segment_owner(key, version) + SEGMENT_KEY_SEPARATOR + b"%0*d" % (SEGMENT_INDEX_DIGITS, index)
+
+
+def segment_version_prefix(key, version):
+    """这把键这一版全部段键共有的前缀：回收时按它删前缀。"""
+    return segment_owner(key, version) + SEGMENT_KEY_SEPARATOR
+
+
+def version_registry_key(key):
+    return key + SEGMENT_KEY_SEPARATOR + SEGMENT_VERSIONS_SUFFIX
+
+
+def encode_version_registry(versions):
+    return SEGMENT_VERSION_LIST_SEPARATOR.join(sorted(set(versions)))
+
+
+def parse_version_registry(key, value):
+    """版本登记键的值 → 升序的版本 [bytes]；不在、空值交 []；不是逗号隔开的版本当读错（退 3）。"""
+    if not value:
+        return []
+    versions = value.split(SEGMENT_VERSION_LIST_SEPARATOR)
+    if not all(is_segment_version(version) for version in versions) or versions != sorted(set(versions)):
+        fail("segmented-read", f"{shown_key(key)} 的版本登记键不是升序、不重的逗号隔开的 {SEGMENT_VERSION_CHARACTERS} 位小写十六进制：{value[:160]!r}")
+    return versions
 
 
 def segment_key_parts(key):
-    """键是段键的形状（键尾 NUL 加 SEGMENT_INDEX_DIGITS 位十进制）交 (原键, 段号)，不是交 None（文件头「键空间」认段键只认形状）。"""
+    """键是段键的形状（键尾 NUL 加 SEGMENT_INDEX_DIGITS 位十进制）交 (形状前一截, 段号)，不是交 None（文件头「键空间」认段键只认形状）。"""
     tail_start = len(key) - len(SEGMENT_KEY_SEPARATOR) - SEGMENT_INDEX_DIGITS
     if tail_start < 0:
         return None
@@ -1032,18 +1196,18 @@ def segment_key_parts(key):
     return key[:tail_start], int(digits)
 
 
-def has_count_key_shape(key):
-    """键是计数键的形状（键尾 NUL 加 SEGMENT_COUNT_SUFFIX）。"""
-    return key.endswith(SEGMENT_KEY_SEPARATOR + SEGMENT_COUNT_SUFFIX)
+def has_version_registry_key_shape(key):
+    """键是版本登记键的形状（键尾 NUL 加 SEGMENT_VERSIONS_SUFFIX）。"""
+    return key.endswith(SEGMENT_KEY_SEPARATOR + SEGMENT_VERSIONS_SUFFIX)
 
 
 def is_reserved_original_key(key):
-    """write_many 不收的原键：段键或计数键的形状；弄坏开关 segment-key-shapes-accepted 下一把都不拒，nul-keys-reserved-whole 下拒一切带 NUL 的（改前的样子）。"""
+    """write_many 不收的原键：段键或版本登记键的形状；弄坏开关 segment-key-shapes-accepted 下一把都不拒，nul-keys-reserved-whole 下拒一切带 NUL 的（改前的样子）。"""
     if break_is("segment-key-shapes-accepted"):
         return False
     if break_is("nul-keys-reserved-whole"):
         return SEGMENT_KEY_SEPARATOR in key
-    return segment_key_parts(key) is not None or has_count_key_shape(key)
+    return segment_key_parts(key) is not None or has_version_registry_key_shape(key)
 
 
 def encode_manifest(value, lengths):
@@ -1136,7 +1300,7 @@ class LibraryStore:
                                      for relative, data in pairs])
 
     def delete_prefix(self, relative_prefix, count_only=False):
-        """删这一家这个种类底下相对路径以 relative_prefix 起头的全部键（连它们的段键与计数键），交条数；count_only 为真只数不删。
+        """删这一家这个种类底下相对路径以 relative_prefix 起头的全部键（连它们的段键与版本登记键），交条数；count_only 为真只数不删。
         键照 key() 拼，临时服务底下带命名空间，只动这一份库目录自己的键。弄坏开关 delete-prefix-without-namespace 下前缀不带命名空间（改前的样子）。"""
         if break_is("delete-prefix-without-namespace"):
             prefix = f"{family_name(self.family)}/{self.kind}/".encode("utf-8", "surrogateescape") + relative_prefix.encode("utf-8", "surrogateescape")
@@ -1266,7 +1430,7 @@ def item_name_of(value):
 
 def command_delete_by_item_name(arguments):
     """delete-by-item-name [--dry-run] <族> <库目录> <名单文件>（文件头「命令行」）：名单文件每行「种类<TAB>项名」；每个种类整个扫一遍（LibraryStore.scan("")）、
-    读值、值是 JSON 对象且 item 字段是这个种类名单里的项名的，按完整键逐条删（delete_prefix 到这把键本身，连段键与计数键），
+    读值、值是 JSON 对象且 item 字段是这个种类名单里的项名的，按完整键逐条删（delete_prefix 到这把键本身，连段键与版本登记键），
     每条打 PRUNE_SERVER_DELETE_BY_ITEM_NAME_ROW mode=… kind=… keys=<条数> key=<完整键> item=<项名>，末行 PRUNE_SERVER_DELETE_BY_ITEM_NAME 汇总，退 0。
     --dry-run 只数不删。同一个项名在别的种类里的记录不动。这把键的文本是同一种类里另一把原键的前缀时（删前缀会连带删掉那一把）这一条不删、点名、整次退 1。
     用法错退 2。弄坏开关 item-name-ignores-kind 下每个种类用名单里全部种类的项名；item-name-dry-run-deletes 下 --dry-run 也删。"""
@@ -1307,6 +1471,9 @@ def command_delete_by_item_name(arguments):
             matched += 1
             keys_total += keys
             found.add((kind, item))
+    if refused:
+        print("     → 怎么办：没删的键是同一种类里别的原键的前缀，删它会连带删掉那些键；先把那些键（✗ 行里例出的）删掉——项名在名单里的这一趟已经删了，不在的补进名单，"
+              "或用 delete-prefix 单独删——再重跑这条命令，直到末行 refused=0", file=sys.stderr)
     missing = sorted((kind, name) for kind, names in names_by_kind.items() for name in names if (kind, name) not in found)
     for kind, name in missing:
         print(f"PRUNE_SERVER_DELETE_BY_ITEM_NAME_NOT_FOUND kind={kind} item={name}")

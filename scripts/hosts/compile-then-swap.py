@@ -115,21 +115,21 @@ PATH 上解到的 cargo 不是那一项自己的假 cargo，那一项不跑、�
   COMPILE_THEN_SWAP_BREAK=fixed-copy-list  按写死的清单拷：只拷 lib_repository_copy.py 的共用清单 COMMON_ENTRIES，不调 copy_closure
       path-dependency-outside-crates（「退出码 1（应当 0）」：假 cargo 沿 path 依赖找不到 crates/ 以外的目录、退 101）、
       thread-registry-copied（「退出码 1（应当 0）」）、tree-kept-until-clean（「仓副本里缺 .claude/singlefs-ai-sop/scripts/preflight.py」）
-  COMPILE_THEN_SWAP_BREAK=features-dropped  build() 拿到了特性也不交给 cargo，照改前不带特性编（走判段的装置编出来只打 NOT_RUN）
+  COMPILE_THEN_SWAP_BREAK=features-dropped  build() 拿到了特性也不交给 cargo，不带特性编（走判段的装置编出来只打 NOT_RUN）
       gpu-feature-passed-through、features-twice-gpu-first、features-equals-spelling、features-short-flag、features-short-flag-attached、
       features-quoted-list、release-features-passed-through（「假 cargo 的调用里没带 --features」）；all-features-passed-through（「假 cargo 的调用里没带 --all-features」）
-  COMPILE_THEN_SWAP_BREAK=command-line-features-dropped  命令行上的特性解析完就丢，不交给 swap()（攻方 d137-ledger-defs-r2 B6 的变异体）
+  COMPILE_THEN_SWAP_BREAK=command-line-features-dropped  命令行上的特性解析完就丢，不交给 swap()
       gpu-feature-passed-through、features-twice-gpu-first、features-equals-spelling、features-short-flag、features-short-flag-attached、
       features-quoted-list、release-features-passed-through（「假 cargo 的调用里没带 --features」）；all-features-passed-through（「假 cargo 的调用里没带 --all-features」）
-  COMPILE_THEN_SWAP_BREAK=features-last-only  --features 写几次只留后一个（改前 options 字典后写的盖前写的）
+  COMPILE_THEN_SWAP_BREAK=features-last-only  --features 写几次只留后一个（options 字典里后写的盖前写的）
       features-twice-gpu-first（「假 cargo 的调用里没带 --features gpu」）
-  COMPILE_THEN_SWAP_BREAK=features-long-form-only  只认分开写的 --features <值>（改前）：--features=、-F、-F<值>、--all-features 落进位置参数
+  COMPILE_THEN_SWAP_BREAK=features-long-form-only  只认分开写的 --features <值>：--features=、-F、-F<值>、--all-features 落进位置参数
       features-equals-spelling、features-short-flag、features-short-flag-attached、all-features-passed-through（「退出码 2（应当 0）」）
   COMPILE_THEN_SWAP_BREAK=features-missing-value-ignored  --features 或 -F 后面缺值时当没给特性，照编照换
       features-missing-value（「退出码 0（应当 2）」）
-  COMPILE_THEN_SWAP_BREAK=release-drops-features  build() 带 --release 时不把特性交给 cargo（攻方 d137-ledger-defs-r3 C4 的变异体 release-drops-features）
+  COMPILE_THEN_SWAP_BREAK=release-drops-features  build() 带 --release 时不把特性交给 cargo
       release-features-passed-through（「假 cargo 的调用里没带 --features gpu」）
-  COMPILE_THEN_SWAP_BREAK=release-ignored  build() 不把 --release 交给 cargo、只编 debug（攻方 d137-ledger-defs-r3 C4 的变异体 release-ignored）
+  COMPILE_THEN_SWAP_BREAK=release-ignored  build() 不把 --release 交给 cargo、只编 debug
       release-features-passed-through（「假 cargo 的调用里没带 --release」）
 """
 import hashlib
@@ -326,7 +326,7 @@ def describe_features(features, all_features):
 
 def swap(draft, target, scratch, root, release=False, after_build=None, after_swap=None, features=(), all_features=False):
     """交回 (退出码, 提示行)。features 是这个装置登记的特性（已合成一份、去重），all_features 是给没给 --all-features（文件头「特性」）。
-    after_build、after_swap 只给自证用：编完、核改没改之前调一次；换上之后、回读之前调一次。"""
+    after_build、after_swap 只给自证用：编完、核有没有改动之前调一次；换上之后、回读之前调一次。"""
     mode = break_mode()
     root = os.path.realpath(root)
     draft = os.path.abspath(draft)

@@ -28,7 +28,7 @@
 # （实验装置自己的线程变量没登记在这里的，加进本文件的 variable_names，或让装置读 SINGLEFS_THREAD_CAP；门禁 code-tooling 的 heavy-thread-defaults 格判：
 # 装置读自己的线程变量，这里不设、文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值的，红）。
 # 弄坏开关（只给 --selftest 证红用；平常跑设了就在一切之前退 2、点名变量只在自证里认，自证起的子进程由 CAPPED_SELFTEST_MARK 认）：
-#   CAPPED_BREAK=default-from-nproc  default 照改前的写法取本机核数、不读登记、不认 SINGLEFS_THREAD_CAP（本机核数不是 5、7、登记值时才红）
+#   CAPPED_BREAK=default-from-nproc  default 取本机核数、不读登记、不认 SINGLEFS_THREAD_CAP（本机核数不是 5、7、登记值时才红）
 #       「✗ 自检：登记 7 ⇒ default 把」、「✗ 自检：登记 7 ⇒ --print default」、「✗ 自检：SINGLEFS_THREAD_CAP=5、登记 7 ⇒ default 设成 5」、
 #       「✗ 自检：SINGLEFS_THREAD_CAP=0 ⇒ default 拒」、「✗ 自检：登记文件不在 ⇒ default 拒」、「✗ 自检：登记写坏 ⇒ default 拒」、
 #       「✗ 自检：本仓的 default 与 heavy_thread_default 同值」
@@ -36,9 +36,9 @@
 #       「✗ 自检：装置只读的 E161_THREADS 要在变量清单里」
 #   CAPPED_BREAK=crash-judge-cpu-threads-unset  变量清单里去掉 SINGLEFS_CRASH_JUDGE_CPU_THREADS（与 e161-threads-unset 同一格）
 #       「✗ 自检：装置只读的 SINGLEFS_CRASH_JUDGE_CPU_THREADS 要在变量清单里」
-#   CAPPED_BREAK=reject-says-default-for-all  上限写错的拒绝说明照改前写「没给线程上限写 default」
+#   CAPPED_BREAK=reject-says-default-for-all  上限写错的拒绝说明一律写「没给线程上限写 default」
 #       「✗ 自检：上限写错的拒绝说明应当写」
-#   CAPPED_BREAK=admission-mark-kept  exec 命令之前不 unset CAPPED_ADMITTED_BY_TASK_SERVER（改前的样子：标记随环境传给命令，任务里面再套一层照跑）
+#   CAPPED_BREAK=admission-mark-kept  exec 命令之前不 unset CAPPED_ADMITTED_BY_TASK_SERVER：标记随环境传给命令，任务里面再套一层照跑
 #       「✗ 自检：被服务起的命令里面再调 capped.sh 应当拒」
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -90,7 +90,7 @@ fi
 
 reject_cap() {
     local howto="线程上限不由调用方写：整条命令经 task-server/task submit 交，服务套 capped.sh <每台默认重活线程数>；default 取 .claude/heavy-thread-default 的登记值"
-    # 弄坏开关 reject-says-default-for-all：改前的句子，没给线程上限的一律写 default（子 agent 也被指到 default 上）
+    # 弄坏开关 reject-says-default-for-all：没给线程上限的一律写 default（子 agent 也被指到 default 上）
     [[ "${CAPPED_BREAK:-}" == reject-says-default-for-all ]] && howto="派发提示给了「线程上限：N」照 N，没给写 default（取 .claude/heavy-thread-default 的登记值）"
     echo "  ✗ 线程上限要是正整数或 default，收到的是「$1」" >&2
     echo "  → 怎么办：写成 capped.sh <正整数|default> <命令>；$howto" >&2

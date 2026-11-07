@@ -27,14 +27,16 @@ ssh 断了或连不上（ssh 退 255）按「服务不通」报、退 1，别的
                                                 由 systemd 隔 RestartSec 秒拉起，模板文件头）；回读服务通不通（admin health）到通了才退 0，
                                                 限时里不通退 1。单元已经在跑的不重起：换了二进制或单元之后 control stop、control start 才换上
   python3 prune-server/control start            systemctl --user start 之后回读 is-active 的输出与服务通不通，都对退 0，不对退 1
-  python3 prune-server/control stop             不等在跑的读写：先叫服务宣布停服务（服务给连着的客户端各发一帧「服务停了」，客户端退 75 不再重试），
+  python3 prune-server/control stop             不等在跑的读写：先叫服务宣布停服务（服务尽力给连着的客户端各发一帧「服务停了」，收到的退 75 不再重试；限时没写进套接字的连接，
+                                                服务往故障日志记 stop-notice-undelivered 一行，那几条客户端收不到、只能靠重连上限退出，stop 照停、可以退 0），
                                                 打出发通知之前连着的客户端（主机、任务号、第几次、进程号）并排他写进状态目录 stops/ 下的停服务记录，
-                                                再 systemctl --user stop（SIGTERM 立刻结束进程；systemctl stop 停的 systemd 不拉起，不 disable，开机照起）；
-                                                回读 is-active 的输出（inactive、failed 才算停了）与单元 cgroup.procs 的内容（空才算），隔单元的 RestartSec
+                                                再 systemctl --user stop（SIGTERM 立刻结束进程；systemctl stop 停的 systemd 不拉起，不 disable，本来也没 enable：开机不自起）；
+                                                回读 is-active 的输出（inactive、failed 才算停了）与单元 cgroup.procs 的内容（空才算；systemctl show 问不到 cgroup、
+                                                cgroup.procs 读不了都不算空，退 1），隔单元的 RestartSec
                                                 加一秒再回读一次 is-active（仍要是 inactive、failed：没被拉起），都对退 0，不对退 1；服务本来就不通的，清单写「拿不到」照停
   python3 prune-server/control check            二进制在不在、多机配置里有没有 PRUNE_SERVER_TCP_ADDRESS、服务通不通，逐样判：
                                                 都过退 0；缺一样退 78、出路写全；另打库目录（单元 ExecStart 的 --state-directory 下的 library）
-  python3 prune-server/control watch            每 WATCH_SECONDS 秒查一次：单元不在跑（is-active 的输出不是 active）、服务不通、故障日志里有这次 watch
+  python3 prune-server/control watch            每 WATCH_SECONDS 秒查一次：单元不在跑（is-active 的输出不是 active、activating、reloading、deactivating 之一）、服务不通、故障日志里有这次 watch
                                                 起之后新增的故障行，判出一样就打出来退 1（出了什么、故障行原文、此刻连着的客户端、每个任务号的
                                                 task-server/task status 查法）；一直好就一直查（主 agent 用 run_in_background 起它，退出即处置）
   python3 prune-server/control --selftest       这份文件自己的自证（下面「自己的自证」），不起真 ssh、真 systemctl、真服务；全过退 0，有格红退 1
@@ -85,7 +87,13 @@ fake-ssh 把收到的参数逐次记进 fake/ssh-calls.log、打一行标准输�
       install-enables-restarting-unit（✗ install-enables-restarting-unit：单元里没有 Restart=always）
   PRUNE_SERVER_CONTROL_BREAK=drop-oversized-unit-state-unchecked  drop-oversized-values 不判单元在不在跑
       drop-oversized-refused-while-running（✗ drop-oversized-refused-while-running：单元在跑时退 4）
-这两条之外，stop-stays-stopped（stop 之后隔一阵再回读仍 inactive；假 systemctl 在 stop 之后又把单元拉起时 stop 退 1）、
+  PRUNE_SERVER_CONTROL_BREAK=cgroup-show-failure-ignored  stop 回读 cgroup 时丢掉 systemctl show 的退出码，show 失败照当 cgroup 里没有进程
+      stop-refuses-unreadable-cgroup（✗ stop-refuses-unreadable-cgroup：show 失败时 stop 退 0）
+  PRUNE_SERVER_CONTROL_BREAK=build-hint-leaves-build-directory  缺二进制时的编法提示只让到编译目录里取二进制（编译目录任务一结束就被服务删）
+      install-build-hint-saves-binary（✗ install-build-hint-saves-binary：提示里没有把二进制拷到共享根的 && cp）
+  PRUNE_SERVER_CONTROL_BREAK=watch-running-states-narrowed  watch 只认 active 算在跑，activating、reloading、deactivating 当单元不在跑
+      watch-accepts-transitional-states（✗ watch-accepts-transitional-states：is-active 打 activating 时 watch 退了）
+这几条之外，stop-stays-stopped（stop 之后隔一阵再回读仍 inactive；假 systemctl 在 stop 之后又把单元拉起时 stop 退 1）、
 drop-oversized-runs-installed-binary（单元停着时起单元 ExecStart 的二进制、--state-directory 取单元的、--dry-run 照传、退它的退出码）、
 drop-oversized-forwarded-over-ssh（服务在第二台时经 ssh 转去同一条）三格没有专门的开关。
 """
@@ -132,9 +140,17 @@ RESTART_SETTLE_MARGIN_SECONDS = 1.0
 FAST_RESTART_SETTLE_SECONDS = 0.3
 ADMIN_TIMEOUT_SECONDS = 10.0
 STOPPED_STATES = ("inactive", "failed")
-RUNNING_STATES = ("active", "reloading")
-BUILD_COMMAND = ("task-server/task submit --cwd <仓根>/prune-server -- cargo build --release --offline --bin prune-server；"
-                 "task-server/task wait <号> 的末行 build=<目录>，二进制是 <目录>/release/prune-server（README.md「装」）")
+# 单元算在的状态：active、activating、reloading、deactivating 都算在（.claude/rules/service-stop-readback.md），watch 只在状态落在这四个之外时报单元不在跑
+RUNNING_STATES = ("active", "activating", "reloading", "deactivating")
+# 编法的提示：编译目录归服务、任务一结束就被服务删，所以编和拷到共享根在同一条提交命令里做完（README.md「装」第 1 条）
+BUILD_COMMAND = ("task-server/task submit --cwd <仓根>/prune-server -- bash -c 'cargo build --release --offline --bin prune-server"
+                 " && cp \"${CARGO_TARGET_DIR:?}/release/prune-server\" <共享根下的目录>/prune-server.new"
+                 " && mv <共享根下的目录>/prune-server.new <共享根下的目录>/prune-server'；"
+                 "task-server/task wait <号>；<共享根下的目录>/prune-server 是二进制（<共享根下的目录> 取多机配置 NFS_SHARED_ROOTS 某一段下的目录；"
+                 "task wait 打的 build=<目录> 跑完就被服务删了，别到那里取）")
+# 弄坏开关 build-hint-leaves-build-directory 下的提示：只让取编译目录里的二进制（编译目录已被服务删）
+BUILD_COMMAND_LEAVING_THE_BUILD_DIRECTORY = ("task-server/task submit --cwd <仓根>/prune-server -- cargo build --release --offline --bin prune-server；"
+                                             "task-server/task wait <号> 的末行 build=<目录>，二进制是 <目录>/release/prune-server（README.md「装」）")
 # 多机配置的主机数组（各台有线直连段的 IP，一行空格分隔）；哪一项是这一台、哪一项是第二台只经共用取法取（文件头），这里只在拒绝的出路与自证的配置里点名
 HOSTS_KEY = "HOSTS"
 MULTI_HOST_ADDRESSES = os.path.join(REPOSITORY, "scripts", "hosts", "multi_host_addresses.py")
@@ -195,6 +211,13 @@ def control_broken(name):
     return name in [item.strip() for item in os.environ.get(CONTROL_BREAK_VARIABLE, "").split(",")]
 
 
+def build_command():
+    """缺二进制时的编法提示（自证里弄坏开关 build-hint-leaves-build-directory 换成取编译目录里二进制的旧写法）。"""
+    if control_broken("build-hint-leaves-build-directory"):
+        return BUILD_COMMAND_LEAVING_THE_BUILD_DIRECTORY
+    return BUILD_COMMAND
+
+
 def say(line):
     print(line, flush=True)
 
@@ -221,17 +244,21 @@ def unit_active_state(paths):
 
 
 def unit_processes(paths):
-    """单元 cgroup.procs 里的进程号；单元没有 cgroup 是空表，读不了回 None（照内容判空不空）。"""
-    _, group, _ = run_systemctl(paths, "show", "-p", "ControlGroup", "--value", UNIT_NAME, timeout=30)
+    """单元 cgroup.procs 里的进程号，回 (进程号表, 读不到的原因)：单元没有 cgroup 是空表；systemctl show 失败（退非 0、起不来、超时）与
+    cgroup.procs 读不了，都回 (None, 原因)——读不到不能证明为空，照内容判空不空（.claude/rules/service-stop-readback.md）。"""
+    code, group, error = run_systemctl(paths, "show", "-p", "ControlGroup", "--value", UNIT_NAME, timeout=30)
+    if code != 0 and not control_broken("cgroup-show-failure-ignored"):
+        return None, f"systemctl show -p ControlGroup 退 {code}：{error or '（没有标准错误）'}"
     if not group:
-        return []
+        return [], ""
+    procs_path = os.path.join(paths.cgroup_root + group, "cgroup.procs")
     try:
-        with open(os.path.join(paths.cgroup_root + group, "cgroup.procs"), encoding="utf-8") as handle:
-            return handle.read().split()
+        with open(procs_path, encoding="utf-8") as handle:
+            return handle.read().split(), ""
     except FileNotFoundError:
-        return []
-    except OSError:
-        return None
+        return [], ""
+    except OSError as error:
+        return None, f"{procs_path} 读不了（{type(error).__name__}: {error}）"
 
 
 def configuration_value(path, key):
@@ -365,7 +392,7 @@ def install(dry_run, binary_source):
             return fail(f"服务这台读不到 --binary 给的 {binary_source}（发起那台在共享根下读得到）",
                         f"在这台核多机配置 {SHARED_ROOTS_KEY} 的各段挂没挂上（stat -f -c %T -- <那一段>/. 读到 nfs），挂好再从发起那台跑同一条命令", RUN_CONDITION_EXIT)
         if not os.path.isfile(binary_source):
-            return fail(f"--binary 给的 {binary_source} 不在", f"先编：{BUILD_COMMAND}", RUN_CONDITION_EXIT)
+            return fail(f"--binary 给的 {binary_source} 不在", f"先编：{build_command()}", RUN_CONDITION_EXIT)
         say(f"  · 二进制：{'拷' if writing else '会拷'} {binary_source} → {paths.binary}（755，回读 sha256）")
         if writing:
             copied, detail = install_binary(binary_source, paths.binary)
@@ -377,7 +404,7 @@ def install(dry_run, binary_source):
     else:
         say(f"  · 二进制 {paths.binary}：不在，也没给 --binary")
         if not dry_run:
-            return fail(f"二进制 {paths.binary} 不在，也没给 --binary", f"先编：{BUILD_COMMAND}；再 python3 prune-server/control install --binary <那个二进制>", RUN_CONDITION_EXIT)
+            return fail(f"二进制 {paths.binary} 不在，也没给 --binary", f"先编：{build_command()}；再 python3 prune-server/control install --binary <那个二进制>", RUN_CONDITION_EXIT)
     say(f"  · 库：{os.path.join(paths.state_directory, LIBRARY_DIRECTORY_NAME)}（服务自己那一份，不在就由服务头一次起时建）")
     for directory in (paths.state_directory, paths.stop_records):
         say(f"  · 目录 {directory}（700）：{'已在' if os.path.isdir(directory) else ('建' if writing else '会建')}")
@@ -388,7 +415,7 @@ def install(dry_run, binary_source):
     for line in unit_text.splitlines():
         say(f"      {line}")
     say(f"  · {'跑' if writing else '会跑'}：systemctl --user daemon-reload；systemctl --user start {UNIT_NAME}"
-        f"（随开机自起；不是 systemctl stop 停掉的由 systemd 照单元的 Restart= 拉起）；回读服务通不通（admin health）")
+        f"（不 enable、开机不自起；不是 systemctl stop 停掉的由 systemd 照单元的 Restart= 拉起）；回读服务通不通（admin health）")
     if not writing:
         say("  ✓ --dry-run：只打了要做的事，一个文件没写、systemctl 一条没起")
         return 0
@@ -466,7 +493,7 @@ def stop():
     paths = Paths()
     clients_known, lines, problem = client_lines(paths, "announce-stop")
     if clients_known:
-        say(f"  · 宣布了停服务（服务给连着的客户端各发了一帧「服务停了」，它们退 75 不再重试）；停之前连着的客户端 {len(lines)} 个：")
+        say(f"  · 宣布了停服务（服务尽力给连着的客户端各发一帧「服务停了」，收到的退 75 不再重试；限时没写进套接字的连接记在故障日志 stop-notice-undelivered 一行，那几条客户端收不到、只能靠重连上限退出）；停之前连着的客户端 {len(lines)} 个：")
         for line in lines:
             say(f"      {line}")
     else:
@@ -477,10 +504,10 @@ def stop():
     if broken("control-stop-readback-skipped"):
         return 0 if code == 0 else 1
     state = unit_active_state(paths)
-    processes = unit_processes(paths)
+    processes, unreadable = unit_processes(paths)
     if code != 0 or state not in STOPPED_STATES or processes is None or processes:
         return fail(f"停了但回读不对：systemctl stop 退 {code}{('（' + error + '）') if error else ''}、is-active 打的是「{state}」、"
-                    f"cgroup 里进程 {'读不到' if processes is None else len(processes)} 个",
+                    f"cgroup 里进程 {f'读不到（{unreadable}）' if processes is None else f'{len(processes)} 个'}",
                     f"看 systemctl --user status {UNIT_NAME}；再停一次，还停不下就把这一行交主 agent", 1)
     settle = FAST_RESTART_SETTLE_SECONDS if paths.is_selftest else unit_restart_seconds(paths) + RESTART_SETTLE_MARGIN_SECONDS
     time.sleep(settle)
@@ -545,7 +572,7 @@ def drop_oversized_values(dry_run):
     binary = words[0]
     if not (os.path.isfile(binary) and os.access(binary, os.X_OK)):
         return fail(f"单元文件 {paths.unit_file} ExecStart 的二进制 {binary} 不在或不能执行",
-                    f"先 python3 prune-server/control install --binary <编好的 prune-server>（编法：{BUILD_COMMAND}），装好再跑同一条", RUN_CONDITION_EXIT)
+                    f"先 python3 prune-server/control install --binary <编好的 prune-server>（编法：{build_command()}），装好再跑同一条", RUN_CONDITION_EXIT)
     library, origin = unit_library(paths)
     arguments = [binary, "drop-oversized-values", "--state-directory", os.path.dirname(library)] + (["--dry-run"] if dry_run else [])
     say(f"  · 单元 is-active 打「{state}」；二进制取单元 ExecStart，状态目录取{origin}：起 {' '.join(shlex.quote(word) for word in arguments)}")
@@ -563,7 +590,7 @@ def check():
         library, origin = unit_library(paths)
         say(f"  · 库目录 {library}；{origin}" if library is not None else f"  · 库目录：读不到，{origin}")
     if not (os.path.isfile(paths.binary) and os.access(paths.binary, os.X_OK)):
-        problems.append((f"二进制 {paths.binary} 不在或不能执行", f"先编：{BUILD_COMMAND}；再 python3 prune-server/control install --binary <那个二进制>"))
+        problems.append((f"二进制 {paths.binary} 不在或不能执行", f"先编：{build_command()}；再 python3 prune-server/control install --binary <那个二进制>"))
     address = configuration_value(paths.configuration, NETWORK_ADDRESS_KEY)
     if not address:
         problems.append((f"多机配置 {paths.configuration} {'不在' if address is None else '里没有 ' + NETWORK_ADDRESS_KEY}",
@@ -613,7 +640,7 @@ def watch():
         problems, fault_lines = [], []
         if not broken("watch-ignores-unit-state"):
             state = unit_active_state(paths)
-            if state not in RUNNING_STATES:
+            if state not in (("active",) if control_broken("watch-running-states-narrowed") else RUNNING_STATES):
                 problems.append(f"单元 {UNIT_NAME} 不在跑（is-active 打的是「{state}」）")
         if not broken("watch-ignores-health"):
             reachable, detail = health(paths)
@@ -727,7 +754,7 @@ def shared_binary_refusal(paths, host, binary):
         return fail(f"--binary {binary} 不在共享根（{SHARED_ROOTS_KEY}={roots}）下，服务那台 {host} 同一路径上读不到",
                     f"把编好的 prune-server 拷到共享根某一段下，再 python3 prune-server/control install --binary <那个路径>", RUN_CONDITION_EXIT)
     if not (os.path.isfile(binary) and os.access(binary, os.R_OK)):
-        return fail(f"--binary {binary} 在这台就读不到", f"先编：{BUILD_COMMAND}；拷到共享根下再给它的路径", RUN_CONDITION_EXIT)
+        return fail(f"--binary {binary} 在这台就读不到", f"先编：{build_command()}；再给它的路径", RUN_CONDITION_EXIT)
     return 0
 
 
@@ -845,7 +872,8 @@ FAKE_BINARY = """#!/bin/sh
 exit 1
 """
 # 记状态的假 systemctl（单元自己拉起、stop、drop-oversized-values 那几格）：调用逐行记进 fake/systemctl-calls.log，单元状态在 fake/unit-state；
-# 有 fake/restarted-after-stop 时 stop 之后头一次 is-active 打 inactive、之后打 active（当单元停了又被拉起）
+# 有 fake/restarted-after-stop 时 stop 之后头一次 is-active 打 inactive、之后打 active（当单元停了又被拉起）；
+# 有 fake/stop-leaves-process 时 stop 之后 cgroup.procs 里还留着进程号；有 fake/show-exit 时 show 不打输出、退那个码（当问不到 cgroup）
 FAKE_SYSTEMCTL_STATEFUL = """#!/bin/sh
 root="$(cd "$(dirname "$0")" && pwd)"
 printf '%s\\n' "$*" >> "$root/fake/systemctl-calls.log"
@@ -855,7 +883,8 @@ case "$1" in
   daemon-reload|enable) exit 0 ;;
   start) echo active > "$root/fake/unit-state"; echo 4242 > "$processes"; exit 0 ;;
   stop)
-    echo inactive > "$root/fake/unit-state"; : > "$processes"
+    echo inactive > "$root/fake/unit-state"
+    if [ -f "$root/fake/stop-leaves-process" ]; then echo 4242 > "$processes"; else : > "$processes"; fi
     [ -f "$root/fake/restarted-after-stop" ] && echo 1 > "$root/fake/restart-pending"
     exit 0 ;;
   is-active)
@@ -863,7 +892,9 @@ case "$1" in
     if [ -f "$root/fake/restart-pending" ]; then rm -f "$root/fake/restart-pending"; echo active > "$root/fake/unit-state"; fi
     echo "$state"
     [ "$state" = active ] ;;
-  show) echo /fake.slice; exit 0 ;;
+  show)
+    if [ -f "$root/fake/show-exit" ]; then echo "假 systemctl show 失败" >&2; exit "$(cat "$root/fake/show-exit")"; fi
+    echo /fake.slice; exit 0 ;;
   *) echo "假 systemctl 认不得：$*" >&2; exit 1 ;;
 esac
 """
@@ -897,6 +928,9 @@ SELFTEST_SWITCH_CELLS = {
     "forwarded-watch-ignores-hangup": ("forwarded-watch-exits-on-hangup",),
     "unit-restart-omitted": ("install-enables-restarting-unit",),
     "drop-oversized-unit-state-unchecked": ("drop-oversized-refused-while-running",),
+    "cgroup-show-failure-ignored": ("stop-refuses-unreadable-cgroup",),
+    "build-hint-leaves-build-directory": ("install-build-hint-saves-binary",),
+    "watch-running-states-narrowed": ("watch-accepts-transitional-states",),
 }
 
 
@@ -1189,6 +1223,70 @@ def cell_stop_stays_stopped(base, switches):
     return problems
 
 
+def cell_stop_refuses_unreadable_cgroup(base, switches):
+    """systemctl show 问不到 cgroup 时 stop 退 1、点名读不到（读不到不能证明为空，不管 cgroup.procs 里还有没有进程）；
+    show 好时 cgroup.procs 里还有进程退 1、没有退 0。"""
+    problems = []
+    for show_fails, leftover in ((True, True), (True, False), (False, True), (False, False)):
+        label = f"show {'失败' if show_fails else '好'}、cgroup.procs {'还有进程' if leftover else '为空'}"
+        world = SelftestWorld(base, "stop-cgroup", host_configuration(LOCAL_ADDRESS), switches, recording=True)
+        world.write("fake/unit-state", "active\n")
+        if show_fails:
+            world.write("fake/show-exit", "1\n")
+        if leftover:
+            world.write("fake/stop-leaves-process", "")
+        code, output, error = world.run(["stop"])
+        if show_fails or leftover:
+            expect(problems, code == 1, f"{label}：stop 该退 1，退了 {code}；标准输出末尾：{output.strip()[-200:]}")
+            expect(problems, "cgroup 里没有进程" not in output, f"{label}：不该打「cgroup 里没有进程」：{output.strip()[-200:]}")
+        else:
+            expect(problems, code == 0 and "cgroup 里没有进程" in output, f"{label}：stop 该退 0、说「cgroup 里没有进程」，退了 {code}：{output.strip()[-200:]} {error.strip()}")
+        if show_fails:
+            expect(problems, "读不到" in error and "systemctl show" in error, f"{label}：该说 cgroup 读不到、点名 systemctl show，标准错误：{error.strip()}")
+        elif leftover:
+            expect(problems, "1 个" in error, f"{label}：该说 cgroup 里进程 1 个，标准错误：{error.strip()}")
+    return problems
+
+
+def cell_install_build_hint_saves_binary(base, switches):
+    """缺二进制时 install 退 78，编法提示是同一条提交命令里编完就把二进制拷到共享根（编译目录任务一结束就被服务删，提示不叫人到编译目录取）。"""
+    world = SelftestWorld(base, "build-hint", host_configuration(LOCAL_ADDRESS), switches)
+    code, _, error = world.run(["install"])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT, f"二进制没装、没给 --binary 时 install 该退 {RUN_CONDITION_EXIT}，退了 {code}：{error.strip()}")
+    expect(problems, "cargo build --release --offline --bin prune-server && cp " in error and "&& mv " in error,
+           f"编法提示该是 cargo build 之后同一条命令里 && cp 到共享根再 && mv，标准错误：{error.strip()}")
+    expect(problems, SHARED_ROOTS_KEY in error, f"编法提示该点名共享根 {SHARED_ROOTS_KEY}，标准错误：{error.strip()}")
+    expect(problems, "<目录>/release/prune-server" not in error, f"编法提示不该叫人到编译目录取二进制，标准错误：{error.strip()}")
+    return problems
+
+
+def cell_watch_accepts_transitional_states(base, switches):
+    """is-active 打 activating、reloading、deactivating 时 watch 不报单元不在跑（一直查、不退）；打 inactive 时报并退 1。"""
+    problems = []
+    running = []
+    try:
+        for state in ("activating", "reloading", "deactivating"):
+            world = SelftestWorld(base, f"watch-{state}", host_configuration(LOCAL_ADDRESS), switches, recording=True)
+            world.write("fake/unit-state", f"{state}\n")
+            running.append((state, subprocess.Popen(world.command(["watch"]), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                                    stderr=subprocess.PIPE, env=world.environment())))
+        stopped_world = SelftestWorld(base, "watch-inactive", host_configuration(LOCAL_ADDRESS), switches, recording=True)
+        stopped_world.write("fake/unit-state", "inactive\n")
+        code, output, error = stopped_world.run(["watch"])
+        expect(problems, code == 1 and "不在跑" in output, f"is-active 打 inactive 时 watch 该报单元不在跑、退 1，退了 {code}：{output.strip()[-200:]} {error.strip()}")
+        time.sleep(SELFTEST_STREAM_GAP_SECONDS)
+        for state, process in running:
+            if process.poll() is not None:
+                expect(problems, False, f"is-active 打 {state} 时 watch 不该退，退了 {process.returncode}：{process.stdout.read().decode('utf-8', 'replace').strip()[-200:]}")
+    finally:
+        for _, process in running:
+            if process.poll() is None:
+                process.kill()
+            process.communicate()
+    return problems
+
+
 def drop_world(base, cell, switches, unit_state):
     """drop-oversized-values 那几格的自证根：单元状态是 unit_state，单元文件的 ExecStart 指 <根>/installed/prune-server、--state-directory 指 <根>/unit-state
     （都不是 Paths 的缺省位置，证明是从单元文件取的）。"""
@@ -1256,6 +1354,9 @@ SELFTEST_CELLS = {
     "drop-oversized-refused-while-running": cell_drop_oversized_refused_while_running,
     "drop-oversized-runs-installed-binary": cell_drop_oversized_runs_installed_binary,
     "drop-oversized-forwarded-over-ssh": cell_drop_oversized_forwarded_over_ssh,
+    "stop-refuses-unreadable-cgroup": cell_stop_refuses_unreadable_cgroup,
+    "install-build-hint-saves-binary": cell_install_build_hint_saves_binary,
+    "watch-accepts-transitional-states": cell_watch_accepts_transitional_states,
 }
 
 

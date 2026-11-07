@@ -15,22 +15,35 @@
 //!   回 `ClientFailure::ServerStopped`。服务没打招呼就断了（崩溃、网络断）照上一条重连，到上限回「连不上」。
 //! - 防雪崩：服务回「忙、多少毫秒后再来」时，这一帧照那个毫秒数再加 0 到一半的随机抖动之后重发；同一帧忙到上限回
 //!   `ClientFailure::BusyLimit`。读失败（连不上、忙到上限、被拒、服务停了）回错误给调用方，不当成「键不在」。
-//! - 按前缀扫（`scan`）与点读走同一套：忙照上一条退避重发、忙到上限回 `BusyLimit`，连接断了照重连那一条重发、到上限回「连不上」，
-//!   被拒照原样回；扫回来的行原样交（截没截断由调用方接着拆前缀），不当成「前缀下没有行」。
+//! - 按前缀扫（`scan`、`scan_after`）与点读走同一套：忙照上一条退避重发、忙到上限回 `BusyLimit`，连接断了照重连那一条重发、到上限回「连不上」，
+//!   被拒照原样回；扫回来的行原样交，不当成「前缀下没有行」。截断了的由调用方拿这一帧的最后一把键作续扫起点调 `scan_after` 接着扫
+//!   （`protocol` 文件头「按前缀扫」），不往下拆前缀。
 //! - 删前缀（`delete_prefix_frame`、`delete_prefix`）与按前缀扫同一套退避与重连；不进追加日志、不带请求号：删本来就幂等，重发只会让某一帧报的数少一批，
 //!   库里的结果不变（`protocol` 文件头「删前缀」）。`delete_prefix` 一帧一帧接着来，直到服务说前缀下没有更多的键。
+//! - 认领（`claim`、`submit_claim`）：每次发出去（头一次、断线重连之后、回了忙之后）帧里都是调用方给的整段租期，不换成剩下的；
+//!   服务对同一身份、租期没到的认领到期只往后挪（`committer.rs` 文件头「认领」）。所以忙了大半租期才落下的、丢了回应之后重发才落下的认领，
+//!   回到调用方手里时到期离服务落下它的那一刻还有整段租期，调用方从回来那一刻起按整段租期写，盖得住（只差同步与回程）。
+//!   弄坏开关 claim-lease-shrunk-on-resend 退回改前：每次发出去换成「原租期减去从交给客户端起过了的毫秒数，至少 1 毫秒」。
+//! - 存储出错（写帧回状态 4）：不是「重发也不会好」的拒绝。帧留在操作表与追加日志里，照重连策略的退避（起始间隔翻倍、封顶、抖动）
+//!   隔一会用同一个请求号再交：写失败时服务还在，再交就写；同步失败时服务随即退 7、连接断了，照重连那一条等服务被拉起来再重放，
+//!   到重连上限回「连不上」（`committer.rs` 文件头、`storage.rs` 文件头「同步 WAL 失败之后」）。同一帧连着回存储出错到重连次数上限
+//!   （`ReconnectPolicy::maximum_attempts`）回 `ClientFailure::StorageFailing`（退 75），帧留在日志里。同一次调用里排着的别的帧照常发、照常收。
+//!   读、扫、认领、删前缀回状态 4 照旧是这一帧失败、连接继续。弄坏开关 write-storage-failure-abandoned 退回改前：写帧回状态 4 就从操作表拿掉、
+//!   回「服务拒了」退 3、不再重放。
 //! - 重复的回应（序号已经回过，例如网络把一帧送了两遍）不算错，记一笔、丢掉。
 //! - 单条超限当场报：写、读、扫、认领的帧拼好之后先核帧体长度，超过 `MAXIMUM_FRAME_BODY_BYTES` 的当场回 `ClientFailure::Protocol`
 //!   （说是哪一种帧、几条、帧体多大、上限多少），不记追加日志、不发、不重试（服务会拒整条连接，重发照样拒）。
 //!   服务回「帧长度不对」（序号 0 的状态 3）同样回协议错、不重连；发帧出错时先读出还躺在接收缓冲里的回应，是「帧长度不对」就照这一条回。
 //! - 回应越过帧长上限就拆键：成批点读的请求帧小、读回的值合计可以越过帧长上限，服务这时整帧拒（`MalformedPayload`，说明里写读回会有多少字节，
 //!   协议不变）；`read` 把这一帧的键对半拆开各自再问、递归到单键，按原次序接起来（单键回应至多一段长加帧头，不会越过：长过一段的值分段存）。
-//! - 大值分段：一行的值长过一段（一帧装不下）照 Python 客户端的分段格式存成清单加段（`segmented_values` 文件头；格式说明只在
-//!   `scripts/prune-server/prune_server_client.py` 文件头「键空间」大值分段那一段）：写前调 `write_segments_of_large_values` 先写段、
-//!   再写它交回的清单，读用 `read_assembling_segmented_values` 拼回整值、核 sha256，拼不回回 `ClientFailure::SegmentedValue`（退 3），不当成键不在。
+//! - 大值分段：一行的值长过一段（一帧装不下）照 Python 客户端的分段格式存成清单加这一版的段（`segmented_values` 文件头；格式说明只在
+//!   `scripts/prune-server/prune_server_client.py` 文件头「键空间」大值分段那一段）：写前调 `write_segments_of_large_values`
+//!   （读版本登记键、删过期的版本、写登记键与这一版的段，段键带整值的 sha256、不就地覆写），再写它交回的清单；写方死在写清单之前，
+//!   原键里的清单与它点名的段都没动，读回的照旧是写之前的值。读用 `read_assembling_segmented_values` 拼回整值、核 sha256，
+//!   拼不回回 `ClientFailure::SegmentedValue`（退 3），不当成键不在。弄坏开关 segments-overwritten-in-place 退回改前：段键不带版本、就地覆写。
 //!
 //! 调用方照 `ClientFailure::exit_code` 退出。退出码表（不与 task-server 已用的 77、78、231、233 这几个撞）：
-//!   75  prune-server 不可用：服务有意停了（「服务停了」）、重连到上限（「连不上」）、同一帧忙到上限。
+//!   75  prune-server 不可用：服务有意停了（「服务停了」）、重连到上限（「连不上」）、同一帧忙到上限、同一写帧连着回存储出错到重连次数上限。
 //!       任务很快结束；修好、重起服务之后由提交它的会话重交，没确认的写帧在追加日志里，重开时重放。
 //!   3   别的错（服务拒了帧、协议错、追加日志读写出错、调用方要停）。
 //!
@@ -53,17 +66,19 @@ use crate::journal::{Journal, JournalOptions, JournalStatistics};
 use crate::keepalive::{enable_keepalive, read_keepalive, KeepaliveSettings};
 use crate::protocol::{
     begin_point_read_frame, begin_write_frame, decode_response_body, encode_claim_frame,
-    encode_delete_prefix_frame, encode_prefix_scan_frame, encode_statistics_frame,
+    encode_delete_prefix_frame, encode_prefix_scan_frame_after, encode_statistics_frame,
     is_frame_length_acceptable, replace_claim_lease, replace_request_sequence, ClaimOutcome,
     ClientAnnouncement, PointReadFrameBuilder, RejectionStatus, Response, ResponseOutcome,
     ScanEntry, StatisticsCounter, Table, WriteFrameBuilder, CONNECTION_LEVEL_SEQUENCE,
-    FRAME_LENGTH_FIELD_BYTES, MAXIMUM_FRAME_BODY_BYTES, RESPONSE_HEADER_BYTES,
+    FRAME_LENGTH_FIELD_BYTES, MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME, MAXIMUM_FRAME_BODY_BYTES,
+    RESPONSE_HEADER_BYTES,
 };
 use crate::segmented_values::{
-    assemble_rereading_the_original_key, frame_ranges, plan_segmented_write,
-    segment_count_high_water, segment_count_keys_to_read_before_writing, segment_key,
-    SegmentManifest, SegmentedValueBeingAssembled, SegmentedValueFailure, SegmentsReadByPoint,
-    StoredSegmentsReader, SEGMENTED_FRAME_ENTRY_LIMIT, SEGMENT_READ_FRAME_BYTES,
+    assemble_rereading_the_original_key, current_version_of_stored, frame_ranges,
+    parse_version_registry, plan_segmented_write, segment_key, segment_version_prefix,
+    version_registry_keys_to_read_before_writing, SegmentManifest, SegmentPlacement,
+    SegmentedValueBeingAssembled, SegmentedValueFailure, SegmentsReadByPoint, StoredSegmentsReader,
+    StoredVersions, SEGMENTED_FRAME_ENTRY_LIMIT, SEGMENT_KEY_TAIL_BYTES, SEGMENT_READ_FRAME_BYTES,
     SEGMENT_READ_OVERHEAD_BYTES_PER_KEY,
 };
 
@@ -279,6 +294,12 @@ pub enum ClientFailure {
     },
     /// 同一帧被回忙到了上限。
     BusyLimit { retries: u32 },
+    /// 同一写帧连着回存储出错到了重连次数上限（文件头「存储出错」）；那一帧留在追加日志里。
+    StorageFailing {
+        request_number: u64,
+        attempts: u32,
+        last_error: String,
+    },
     /// 调用方要停。
     Stopped,
     /// 服务有意停了（收到「服务停了」）；没确认的写帧留在追加日志里。
@@ -292,7 +313,7 @@ pub enum ClientFailure {
     Protocol(String),
     /// 追加日志读写出错。
     Journal(String),
-    /// 大值分段写不成、读不回（`segmented_values`）：原键是段键或计数键的形状、段数超了段号，计数键或清单解不开，段缺了、长度或 sha256 对不上。
+    /// 大值分段写不成、读不回（`segmented_values`）：原键是段键或版本登记键的形状、段数超了段号，版本登记键或清单解不开，段缺了、长度或 sha256 对不上。
     SegmentedValue(SegmentedValueFailure),
 }
 
@@ -312,6 +333,7 @@ impl ClientFailure {
             }
             ClientFailure::ServerUnreachable { .. }
             | ClientFailure::BusyLimit { .. }
+            | ClientFailure::StorageFailing { .. }
             | ClientFailure::ServerStopped { .. } => PRUNE_SERVER_UNAVAILABLE_EXIT_CODE,
             ClientFailure::Stopped
             | ClientFailure::Rejected { .. }
@@ -337,6 +359,15 @@ impl std::fmt::Display for ClientFailure {
             ClientFailure::BusyLimit { retries } => {
                 write!(formatter, "服务一直忙：同一帧被回忙 {retries} 次，到了上限")
             }
+            ClientFailure::StorageFailing {
+                request_number,
+                attempts,
+                last_error,
+            } => write!(
+                formatter,
+                "服务的存储一直出错：写帧（请求号 {request_number}）连着 {attempts} 次回存储出错，到了重连次数上限，最后一次：{last_error}；\
+                 那一帧留在追加日志里，服务修好之后重交任务时重放"
+            ),
             ClientFailure::Stopped => write!(formatter, "调用方要停"),
             ClientFailure::ServerStopped { message } => write!(
                 formatter,
@@ -415,7 +446,7 @@ enum OperationKind {
     },
     Read,
     Scan,
-    /// 认领：交给客户端那一刻与租约毫秒数，重发时只给剩下的（[`claim_lease_left`]）。
+    /// 认领：交给客户端那一刻与租约毫秒数；每次发出去都给整段租约（文件头「认领」），弄坏开关 claim-lease-shrunk-on-resend 下只给剩下的（[`claim_lease_left`]）。
     Claim {
         lease_milliseconds: u32,
         submitted_at: Instant,
@@ -425,8 +456,8 @@ enum OperationKind {
     DeletePrefix,
 }
 
-/// 认领每次发出去（头一次、重连之后、回了忙之后）给的租约：原租约减去从交给客户端起过了的毫秒数，至少 1 毫秒。
-/// 服务按收到的那一刻起算到期，重发照原租约给会把到期往后推；照剩下的给，到期不晚于头一次交出去时算的那一刻（客户端的钟）。
+/// 弄坏开关 claim-lease-shrunk-on-resend 下认领每次发出去给的租约（改前的写法，文件头「认领」）：原租约减去从交给客户端起过了的毫秒数，至少 1 毫秒。
+/// 忙了大半租期才落下、重发才落下的认领拿到的到期就只剩这一点，调用方却从回来那一刻起按整段租约写。
 fn claim_lease_left(lease_milliseconds: u32, elapsed: Duration) -> u32 {
     let elapsed_milliseconds = u32::try_from(elapsed.as_millis()).unwrap_or(u32::MAX);
     lease_milliseconds
@@ -445,12 +476,18 @@ enum OperationState {
         busy_received_at: Instant,
         retry_after: Duration,
     },
+    /// 写帧回了存储出错，到 `due` 用同一个请求号再交（文件头「存储出错」）。
+    AwaitingStorageRetry {
+        due: Instant,
+    },
 }
 
 struct Operation {
     kind: OperationKind,
     frame: Vec<u8>,
     busy_retries: u32,
+    /// 这一帧连着回存储出错的次数（只有写帧会有）。
+    storage_failures: u32,
     state: OperationState,
 }
 
@@ -505,6 +542,8 @@ pub struct ClientDiagnostics {
     pub journal_recovered_writes: u64,
     /// 最近一次连接坏掉的原因。
     pub last_break_reason: Option<String>,
+    /// 写帧回存储出错、照同一请求号再交的次数（文件头「存储出错」）。
+    pub write_storage_failures: u64,
 }
 
 struct Connection {
@@ -699,6 +738,7 @@ impl ReliableClient {
                 kind,
                 frame,
                 busy_retries: 0,
+                storage_failures: 0,
                 state: OperationState::Unsent,
             },
         );
@@ -969,11 +1009,32 @@ impl ReliableClient {
         prefix: &[u8],
         maximum_entries: u32,
     ) -> Result<(bool, Vec<ScanEntry>), ClientFailure> {
+        self.scan_after(table, prefix, &[], maximum_entries)
+    }
+
+    /// 按前缀扫一帧、从续扫起点之后起（`protocol.rs` 文件头「按前缀扫」）：`after_key` 空是从前缀起，不空（上一帧回的最后一把键，要以前缀起头）是从排在它之后的
+    /// 第一把键起；别的照 [`Self::scan`]。一帧被截断时调用方接着用这一帧的最后一把键续扫，不往下拆前缀（Python 客户端 `raw_scan_stream` 同一条）。
+    ///
+    /// # Errors
+    /// 同 [`Self::scan`]；续扫起点不以前缀起头的服务回状态 1（[`ClientFailure::Rejected`]）。
+    pub fn scan_after(
+        &mut self,
+        table: Table,
+        prefix: &[u8],
+        after_key: &[u8],
+        maximum_entries: u32,
+    ) -> Result<(bool, Vec<ScanEntry>), ClientFailure> {
         self.wait_for_window()?;
-        let frame = encode_prefix_scan_frame(0, table, prefix, maximum_entries);
-        if let Some(failure) =
-            oversize_frame_failure(&frame, &format!("按前缀扫（前缀 {} 字节）", prefix.len()))
-                .filter(|_| !self.is_enabled(BreakSwitch::OversizeFrameSentAndRetried))
+        let frame = encode_prefix_scan_frame_after(0, table, prefix, maximum_entries, after_key);
+        if let Some(failure) = oversize_frame_failure(
+            &frame,
+            &format!(
+                "按前缀扫（前缀 {} 字节、续扫起点 {} 字节）",
+                prefix.len(),
+                after_key.len()
+            ),
+        )
+        .filter(|_| !self.is_enabled(BreakSwitch::OversizeFrameSentAndRetried))
         {
             return Err(failure);
         }
@@ -1085,14 +1146,16 @@ impl ReliableClient {
         Ok(values)
     }
 
-    /// 成批写之前把大值分段（文件头「大值分段」；Python 客户端 `write_many` 的头两步）：先点读这批键的计数键，照高水位把要分段的
-    /// 拆成各段与计数键，按 `frame_byte_budget` 切帧写下、等全部确认，再把清单连同不分段的条目交回，由调用方照它自己的切法最后写
-    /// （一块一批落在一帧里的原子由调用方的切法保住）。没有要分段的就一条不写、原样交回（计数键照读：分段存过的键之后写短值也照分段存）。
+    /// 成批写之前把大值分段（文件头「大值分段」；Python 客户端 `write_many` 的第 1 到第 3 步）：先点读这批键的版本登记键，登记了版本的再点读原键取此刻那一版；
+    /// 登记了而不是此刻那一版的按前缀删掉（第 2 步）；要分段的拆成这一版的段（段键带整值的 sha256，不就地覆写旧段），版本登记键写成此刻那一版并上这一批写的各版，
+    /// 按 `frame_byte_budget` 切帧先写登记键、等确认，再写各段、等确认；把清单连同不分段的条目交回，由调用方照它自己的切法最后写
+    /// （一块一批落在一帧里的原子由调用方的切法保住）。清单写进之后的回收（Python 的第 5 步）留给这把键下一次写时的第 2 步。
+    /// 弄坏开关 segments-overwritten-in-place 下段键不带版本、就地覆写，不读也不写登记键、不删（改前的样子）。
     ///
     /// # Errors
-    /// 有一把原键的形状是段键或计数键、有一个值要的段数超过段号装得下的（[`ClientFailure::SegmentedValue`]，一条都没写）；计数键读不成
-    /// （照 [`Self::read`]）或不是十进制（[`ClientFailure::SegmentedValue`]）；写不成（照 [`Self::submit_write_entries`] 与
-    /// [`Self::wait_all_acknowledged`]：段写了一部分时清单还是旧的，读时核不过、报读错，重写这把键就好）。
+    /// 有一把原键的形状是段键或版本登记键、有一个值要的段数超过段号装得下的（[`ClientFailure::SegmentedValue`]，一条都没写）；登记键或原键读不成
+    /// （照 [`Self::read`]）、登记键解不开（[`ClientFailure::SegmentedValue`]）；删前缀不成（照 [`Self::delete_prefix`]）；写不成（照 [`Self::submit_write_entries`] 与
+    /// [`Self::wait_all_acknowledged`]：清单还没写，此刻那一版照旧读得回，下一次写这把键时第 2 步删掉这一次写下的段）。
     pub fn write_segments_of_large_values(
         &mut self,
         entries: Vec<TableEntry>,
@@ -1101,35 +1164,103 @@ impl ReliableClient {
         if entries.is_empty() {
             return Ok(entries);
         }
-        let count_keys = segment_count_keys_to_read_before_writing(&entries)
+        let registry_keys = version_registry_keys_to_read_before_writing(&entries)
             .map_err(ClientFailure::SegmentedValue)?;
-        let mut segment_count_high_water_of_each_entry = Vec::with_capacity(entries.len());
+        let placement = if self.is_enabled(BreakSwitch::SegmentsOverwrittenInPlace) {
+            SegmentPlacement::OverwrittenInPlace
+        } else {
+            SegmentPlacement::Versioned
+        };
+        let mut stored_versions_of_each_entry = vec![StoredVersions::default(); entries.len()];
+        if placement == SegmentPlacement::Versioned {
+            self.read_stored_versions(
+                &entries,
+                &registry_keys,
+                frame_byte_budget,
+                &mut stored_versions_of_each_entry,
+            )?;
+        }
+        let plan = plan_segmented_write(entries, &stored_versions_of_each_entry, placement)
+            .map_err(ClientFailure::SegmentedValue)?;
+        let mut deleted_prefixes: Vec<Vec<u8>> = Vec::new();
+        for ((_table, key, _value), stored_versions) in plan
+            .entries_to_write_last
+            .iter()
+            .zip(&stored_versions_of_each_entry)
+        {
+            for version in stored_versions.stale_versions() {
+                let prefix = segment_version_prefix(key, &version);
+                if !deleted_prefixes.contains(&prefix) {
+                    self.delete_prefix(&prefix, MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME, false)?;
+                    deleted_prefixes.push(prefix);
+                }
+            }
+        }
+        for step in [&plan.version_registry_entries, &plan.segment_entries] {
+            for frame in frame_ranges(
+                step,
+                |(_table, key, value)| WRITE_BYTES_PER_ENTRY + key.len() + value.len(),
+                frame_byte_budget,
+                SEGMENTED_FRAME_ENTRY_LIMIT,
+            ) {
+                self.submit_write_entries(&step[frame])?;
+            }
+            self.wait_all_acknowledged()?;
+        }
+        Ok(plan.entries_to_write_last)
+    }
+
+    /// 写之前读各键的版本（Python 客户端 `write_many` 第 1 步）：版本登记键逐帧点读，登记了版本的再点读原键取此刻那份清单的版本，填进与 `entries` 同序的
+    /// `stored_versions_of_each_entry`。
+    fn read_stored_versions(
+        &mut self,
+        entries: &[TableEntry],
+        registry_keys: &[(Table, Vec<u8>)],
+        frame_byte_budget: usize,
+        stored_versions_of_each_entry: &mut [StoredVersions],
+    ) -> Result<(), ClientFailure> {
         for frame in frame_ranges(
-            &count_keys,
-            |(_table, count_key)| POINT_READ_BYTES_PER_KEY + count_key.len(),
+            registry_keys,
+            |(_table, registry_key)| POINT_READ_BYTES_PER_KEY + registry_key.len(),
             frame_byte_budget,
             SEGMENTED_FRAME_ENTRY_LIMIT,
         ) {
-            let stored_counts = self.read_as_many_values_as_keys(&count_keys[frame.clone()])?;
-            for ((_table, key, _value), stored_count) in entries[frame].iter().zip(stored_counts) {
-                segment_count_high_water_of_each_entry.push(
-                    segment_count_high_water(key, stored_count.as_deref())
-                        .map_err(ClientFailure::SegmentedValue)?,
+            let stored_registries =
+                self.read_as_many_values_as_keys(&registry_keys[frame.clone()])?;
+            for (position, stored_registry) in frame.zip(stored_registries) {
+                stored_versions_of_each_entry[position].registered =
+                    parse_version_registry(&entries[position].1, stored_registry.as_deref())
+                        .map_err(ClientFailure::SegmentedValue)?;
+            }
+        }
+        let registered_positions: Vec<usize> = (0..entries.len())
+            .filter(|position| {
+                !stored_versions_of_each_entry[*position]
+                    .registered
+                    .is_empty()
+            })
+            .collect();
+        let original_keys: Vec<(Table, Vec<u8>)> = registered_positions
+            .iter()
+            .map(|position| (entries[*position].0, entries[*position].1.clone()))
+            .collect();
+        for frame in frame_ranges(
+            &original_keys,
+            |(_table, key)| POINT_READ_BYTES_PER_KEY + key.len(),
+            frame_byte_budget,
+            SEGMENTED_FRAME_ENTRY_LIMIT,
+        ) {
+            let stored_originals =
+                self.read_as_many_values_as_keys(&original_keys[frame.clone()])?;
+            for (position, stored_original) in frame.zip(stored_originals) {
+                let entry_position = registered_positions[position];
+                stored_versions_of_each_entry[entry_position].current = current_version_of_stored(
+                    &entries[entry_position].1,
+                    stored_original.as_deref(),
                 );
             }
         }
-        let plan = plan_segmented_write(entries, &segment_count_high_water_of_each_entry)
-            .map_err(ClientFailure::SegmentedValue)?;
-        for frame in frame_ranges(
-            &plan.segment_and_count_entries,
-            |(_table, key, value)| WRITE_BYTES_PER_ENTRY + key.len() + value.len(),
-            frame_byte_budget,
-            SEGMENTED_FRAME_ENTRY_LIMIT,
-        ) {
-            self.submit_write_entries(&plan.segment_and_count_entries[frame])?;
-        }
-        self.wait_all_acknowledged()?;
-        Ok(plan.entries_to_write_last)
+        Ok(())
     }
 
     /// 成批点读，分段存的键拼回整值（文件头「大值分段」；Python 客户端 `read_many`）：原键照 [`Self::read`] 点读（回应越过帧长上限就拆键），
@@ -1187,7 +1318,7 @@ impl ReliableClient {
             .map_err(ClientFailure::SegmentedValue)
     }
 
-    /// 点读一把分段存的键清单点名、还缺的段（每帧至多 [`SEGMENT_READ_FRAME_BYTES`]）。
+    /// 点读一把分段存的键清单点名、还缺的段（每帧至多 [`SEGMENT_READ_FRAME_BYTES`]），段键取清单的版本。
     fn read_missing_segments(
         &mut self,
         table: Table,
@@ -1196,11 +1327,15 @@ impl ReliableClient {
     ) -> Result<SegmentsReadByPoint, ClientFailure> {
         let missing_segment_indexes = being_assembled.missing_segment_indexes();
         let mut segments_read_by_point = Vec::with_capacity(missing_segment_indexes.len());
+        // 段键带清单的版本；弄坏开关 segments-overwritten-in-place 下不带（与写的一侧同一个开关）
+        let version = (!self.is_enabled(BreakSwitch::SegmentsOverwrittenInPlace))
+            .then(|| being_assembled.version());
         for frame in frame_ranges(
             &missing_segment_indexes,
             |segment_index| {
                 being_assembled.segment_length_in_bytes(*segment_index)
                     + key_in_the_service.len()
+                    + SEGMENT_KEY_TAIL_BYTES
                     + SEGMENT_READ_OVERHEAD_BYTES_PER_KEY
             },
             SEGMENT_READ_FRAME_BYTES,
@@ -1209,7 +1344,12 @@ impl ReliableClient {
             let segment_indexes = &missing_segment_indexes[frame];
             let segment_keys: Vec<(Table, Vec<u8>)> = segment_indexes
                 .iter()
-                .map(|segment_index| (table, segment_key(key_in_the_service, *segment_index)))
+                .map(|segment_index| {
+                    (
+                        table,
+                        segment_key(key_in_the_service, version, *segment_index),
+                    )
+                })
                 .collect();
             let pieces = self.read_as_many_values_as_keys(&segment_keys)?;
             segments_read_by_point.extend(segment_indexes.iter().copied().zip(pieces));
@@ -1466,6 +1606,7 @@ impl ReliableClient {
     fn write_unsent_frames(&mut self) -> Result<(), (String, BreakCause)> {
         let frame_timeout = self.settings.frame_timeout;
         let cycle_deadline = self.reconnect_cycle_deadline();
+        let shrinks_claim_lease = self.is_enabled(BreakSwitch::ClaimLeaseShrunkOnResend);
         let Some(connection) = self.connection.as_mut() else {
             return Err(("没连着".to_string(), BreakCause::PeerClosedOrFailed));
         };
@@ -1481,10 +1622,12 @@ impl ReliableClient {
                 submitted_at,
             } = operation.kind
             {
-                replace_claim_lease(
-                    &mut operation.frame,
-                    claim_lease_left(lease_milliseconds, submitted_at.elapsed()),
-                );
+                if shrinks_claim_lease {
+                    replace_claim_lease(
+                        &mut operation.frame,
+                        claim_lease_left(lease_milliseconds, submitted_at.elapsed()),
+                    );
+                }
             }
             self.activity.enter(ClientActivity::WritingFrame);
             let written = connection.writer.write_all(&operation.frame);
@@ -1530,8 +1673,14 @@ impl ReliableClient {
                     operation.state = OperationState::Unsent;
                     has_unsent = true;
                 }
+                OperationState::AwaitingStorageRetry { due } if due <= now => {
+                    operation.state = OperationState::Unsent;
+                    has_unsent = true;
+                }
                 OperationState::Unsent => has_unsent = true,
-                OperationState::Deferred { .. } | OperationState::OnWire { .. } => {}
+                OperationState::Deferred { .. }
+                | OperationState::AwaitingStorageRetry { .. }
+                | OperationState::OnWire { .. } => {}
             }
         }
         if has_unsent || self.connection.is_none() {
@@ -1542,7 +1691,8 @@ impl ReliableClient {
         for operation in self.operations.values() {
             let wake_at = match operation.state {
                 OperationState::OnWire { deadline } if !ignores_timeout => Some(deadline),
-                OperationState::Deferred { due, .. } => Some(due),
+                OperationState::Deferred { due, .. }
+                | OperationState::AwaitingStorageRetry { due } => Some(due),
                 OperationState::OnWire { .. } | OperationState::Unsent => None,
             };
             if let Some(wake_at) = wake_at {
@@ -1837,11 +1987,21 @@ impl ReliableClient {
                 });
                 Ok(())
             }
+            (
+                OperationKind::Write { request_number },
+                ResponseOutcome::Rejected {
+                    status: RejectionStatus::StorageFailed,
+                    message,
+                },
+            ) if !self.is_enabled(BreakSwitch::WriteStorageFailureAbandoned) => {
+                self.retry_after_storage_failure(identifier, request_number, message)
+            }
             (_, ResponseOutcome::Rejected { status, message }) => {
                 self.operations.remove(&identifier);
                 let failure = ClientFailure::Rejected { status, message };
                 if matches!(kind, OperationKind::Write { .. }) {
-                    // 写被拒是协议或存储的错，重发也不会好；那一帧留在追加日志里，交调用方定。
+                    // 写被拒是协议的错（内容解不开、认不得的操作码），重发也不会好；那一帧留在追加日志里，交调用方定。
+                    // 存储出错不走这一支（上一支，文件头「存储出错」）。
                     return Err(failure);
                 }
                 self.completions.push_back(Completion::Failed {
@@ -1854,6 +2014,45 @@ impl ReliableClient {
                 "{kind:?} 帧收到的回应对不上：{outcome:?}"
             ))),
         }
+    }
+
+    /// 写帧回了存储出错（文件头「存储出错」）：帧留在操作表与追加日志里，照重连策略退避一段之后用同一个请求号再交；
+    /// 同一帧连着回到重连次数上限回 `StorageFailing`（帧照旧留在操作表与日志里）。
+    fn retry_after_storage_failure(
+        &mut self,
+        identifier: OperationIdentifier,
+        request_number: u64,
+        message: String,
+    ) -> Result<(), ClientFailure> {
+        self.diagnostics.write_storage_failures += 1;
+        let failures = {
+            let operation = self
+                .operations
+                .get_mut(&identifier)
+                .expect("调用方刚从操作表里取到");
+            operation.storage_failures += 1;
+            operation.storage_failures
+        };
+        let is_unbounded = self.is_enabled(BreakSwitch::ReconnectUnbounded);
+        if failures >= self.settings.reconnect.maximum_attempts && !is_unbounded {
+            self.operations
+                .get_mut(&identifier)
+                .expect("调用方刚从操作表里取到")
+                .state = OperationState::Unsent;
+            return Err(ClientFailure::StorageFailing {
+                request_number,
+                attempts: failures,
+                last_error: message,
+            });
+        }
+        let delay = self.backoff_delay(failures);
+        self.operations
+            .get_mut(&identifier)
+            .expect("调用方刚从操作表里取到")
+            .state = OperationState::AwaitingStorageRetry {
+            due: Instant::now() + delay,
+        };
+        Ok(())
     }
 
     fn defer_after_busy(
@@ -1902,8 +2101,9 @@ impl ReliableClient {
 mod tests {
     use super::*;
 
-    /// 重发认领时给剩下的租约：过了 3 秒的 10 秒租约只给 7 秒，过完了的给 1 毫秒，刚交的照原租约。
-    /// 判别力（`crates/mutations.tsv`）：重发照原租约给（到期往后推），这条红。
+    /// 弄坏开关 claim-lease-shrunk-on-resend 退回的改前写法给剩下的租约：过了 3 秒的 10 秒租约只给 7 秒，过完了的给 1 毫秒，刚交的照原租约。
+    /// 平常每次发出去都给整段租约（文件头「认领」），这一份只在那个开关下用；开关证红在自证 claim-lease-covers-the-holder-after-the-answer。
+    /// 判别力（`crates/mutations.tsv`）：不减去过了的毫秒数，这条红。
     #[test]
     fn a_resent_claim_gets_only_the_lease_left_since_it_was_submitted() {
         assert_eq!(claim_lease_left(10_000, Duration::from_secs(3)), 7_000);

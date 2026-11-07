@@ -8,14 +8,19 @@
 //! TCP 连接两头都开 keepalive，半开的连接由内核认出来关掉，读线程随即收尾。
 //!
 //! 额度（`Admission`）：待处理字节数一份额度管三样——收着的帧体（读完长度字段、分配帧体之前先记）、进了准入还没回的帧、
-//! 编好了还没写出去的回应（工作线程编完先记，记不进就把回应换成忙；提交线程的写确认几十字节照记，认领回应先算字节再记，
-//! 记不进回忙、一条都不认领）。整个服务（`--maximum-pending-bytes`）与每条连接（`--maximum-pending-bytes-per-connection`）各一份上限；
-//! 记之前额度里只有这一帧自己（没有别的在用）时照记不误，不然比上限大的一帧永远进不来，所以任何时刻记着的字节至多是上限加一帧。
+//! 正在编与编好了还没写出去的回应（工作线程边编边记：成批点读先数出回应多大、记进再分配，按前缀扫每读出一条先记它的字节再往回应里放，
+//! 记不进就整帧回忙、已经记下的放回，不先分配整份回应；统计这类短回应编完再记；提交线程的认领回应与删前缀回应先算字节再记，
+//! 记不进回忙、一条都不认领、一把键都不删）。弄坏开关 response-built-before-budget 退回改前：工作线程先编好整份回应、编完才记。不看上限强行记下的只剩写确认（几十字节，已经做了、撤不回）与当场回的拒绝和忙
+//! （说明是服务自己写的短句）；删前缀回应带一把可以长到接近一帧的键，不强行记（弄坏开关 delete-prefix-response-unbudgeted 退回强行记下）。
+//! 整个服务（`--maximum-pending-bytes`）与每条连接（`--maximum-pending-bytes-per-connection`）各一份上限；
+//! 记之前额度里只有这一帧自己（没有别的在用）时照记不误，不然比上限大的一帧永远进不来，所以任何时刻记着的字节至多是上限加一帧
+//! （再加强行记下的那几十字节一份的写确认、拒绝与忙）。
 //! 收帧时额度不够：帧体照声明的长度读完、丢进一块 `DISCARD_CHUNK_BYTES` 的缓冲（帧边界保住），回忙；不先分配声明那么大的帧体。
 //! 弄坏开关 frame-body-read-before-admission 退回先分配、读完帧体再过准入的写法（没收完的帧占的内存不进额度）。
-//! 服务占的内存因此有上界：额度上限加一帧（`MAXIMUM_FRAME_BODY_BYTES`），加每条连接固定的读写缓冲（各 `STREAM_BUFFER_BYTES`）与
+//! 服务占的内存因此有上界：额度上限加一帧（`MAXIMUM_FRAME_BODY_BYTES`；工作线程正在编的回应已在额度里），加每条连接固定的读写缓冲（各 `STREAM_BUFFER_BYTES`）与
 //! 不带名额的回应（`connections::UNBUDGETED_OUTBOUND_BYTES_PER_CONNECTION`），乘连接数上限（`--maximum-connections`），
-//! 加工作线程正在编的回应（每个至多一帧）。
+//! 加每个工作线程手里正从库里读出、还没放进回应的那一行（成批点读的值钉在 RocksDB 的块缓存里，按前缀扫一次只读一行）。
+//! 统计里 `WORKER_RESPONSE_BYTES_PEAK_COUNTER` 报工作线程手里编着的回应字节合计的峰值，自证 worker-responses-within-pending-budget 拿它核这个上界。
 //! 期限：一帧从长度字段的头一个字节起，`--frame-read-timeout-milliseconds` 里没收齐就关这条连接（帧开头之前的空闲不限）；
 //! 写回应一次堵住 `--write-timeout-milliseconds`（对端不收）就关这条连接，排着的回应丢掉、名额放手。
 //! 连接数：同时连着的到了 `--maximum-connections`，新接进来的当场关掉（统计里数一次 `prune-server.connections.refused`）。
@@ -55,10 +60,10 @@ use crate::keepalive::{enable_keepalive, KeepaliveSettings};
 use crate::protocol::{
     begin_response, decode_request_body, encode_busy, encode_connected_clients_response,
     encode_rejection, encode_server_stopping, is_frame_length_acceptable, peek_request_header,
-    point_read_response_exceeds_frame_limit, point_read_response_payload_bytes, DecodedRequest,
-    OperationCode, RequestRejection, RequestView, ResponseStatus, ServiceKeys, TrailingBytes,
-    Transport, CONNECTION_LEVEL_SEQUENCE, FRAME_LENGTH_FIELD_BYTES, MAXIMUM_FRAME_BODY_BYTES,
-    REQUEST_HEADER_BYTES, RESPONSE_HEADER_BYTES,
+    point_read_response_exceeds_frame_limit, point_read_response_payload_bytes, usize_from_u32,
+    DecodedRequest, OperationCode, RequestRejection, RequestView, ResponseStatus, ServiceKeys,
+    TrailingBytes, Transport, CONNECTION_LEVEL_SEQUENCE, FRAME_LENGTH_FIELD_BYTES,
+    MAXIMUM_FRAME_BODY_BYTES, REQUEST_HEADER_BYTES, RESPONSE_HEADER_BYTES,
 };
 use crate::storage::{LibraryOpenFailure, VerdictLibrary, DESCRIPTOR_LIMIT_NEXT_STEP};
 
@@ -88,6 +93,8 @@ pub const PENDING_BYTES_COUNTER: &str = "prune-server.pending.bytes";
 pub const PENDING_BYTES_PEAK_COUNTER: &str = "prune-server.pending.bytes.peak";
 /// 给还没收完的帧体分配着的字节的峰值。
 pub const RECEIVING_BODY_BYTES_PEAK_COUNTER: &str = "prune-server.receive.allocated.bytes.peak";
+/// 工作线程手里正在编、还没交给写线程的回应字节合计的峰值（文件头「额度」）。
+pub const WORKER_RESPONSE_BYTES_PEAK_COUNTER: &str = "prune-server.worker.response.bytes.peak";
 /// 各连接写出队里排着、还没写出去的字节合计的峰值（`connections` 文件头「写出队的账」）。
 pub const OUTBOUND_QUEUED_BYTES_PEAK_COUNTER: &str = "prune-server.outbound.queued.bytes.peak";
 pub const CONNECTIONS_OPEN_COUNTER: &str = "prune-server.connections.open";
@@ -213,6 +220,9 @@ pub struct ServerCounters {
     pub connections_refused: AtomicU64,
     pub frame_read_timeouts: AtomicU64,
     pub write_timeouts: AtomicU64,
+    /// 工作线程手里正在编的回应字节合计与它的峰值（`ResponseBudget`）。
+    pub worker_response_bytes: AtomicUsize,
+    pub worker_response_bytes_peak: AtomicUsize,
 }
 
 /// WAL 同步用时：最近 `WRITE_AHEAD_LOG_SYNC_SAMPLES_KEPT` 次的样本（微秒）、总次数与最大值。
@@ -359,6 +369,16 @@ impl ByteReservation {
         admission.note_pending_bytes_peak();
         true
     }
+
+    /// 这一笔放回 `released` 字节（工作线程边编边记、编到一半记不进时把已经记下的放回）。
+    fn shrink(&mut self, released: usize) {
+        let released = released.min(self.bytes);
+        self.budget.held_bytes.fetch_sub(released, Ordering::SeqCst);
+        self.admission
+            .pending_bytes
+            .fetch_sub(released, Ordering::SeqCst);
+        self.bytes -= released;
+    }
 }
 
 /// 一帧占着的待处理名额：帧数一个，字节记在 `reservation` 里（请求，回应编好之后再加上回应）。
@@ -377,6 +397,100 @@ impl PendingSlot {
     /// 已经做了、撤不回的回应（写确认）照记，不看上限。
     pub fn force_response(&mut self, response_bytes: usize) {
         self.reservation.grow(response_bytes, true);
+    }
+
+    /// 放回先前 `reserve_response` 记下的 `response_bytes`（回应编到一半记不进、换成忙时）。
+    pub fn release_response(&mut self, response_bytes: usize) {
+        self.reservation.shrink(response_bytes);
+    }
+}
+
+/// 工作线程编一帧回应时的账（文件头「额度」）：边编边记进这一帧的名额（`take`），记不进就由调用方整帧回忙、已经记下的放回（`release`），
+/// 不先分配整份回应；手里编着的字节另记进 `ServerCounters::worker_response_bytes`（统计报峰值），放手时减回去。
+/// 弄坏开关 response-built-before-budget 下 `take` 不记额度、只记手里的字节，编完整份由工作线程再记（改前的写法）。
+struct ResponseBudget<'work> {
+    slot: &'work mut PendingSlot,
+    counters: &'work ServerCounters,
+    reserves_while_building: bool,
+    reserved_bytes: usize,
+    held_bytes: usize,
+}
+
+impl<'work> ResponseBudget<'work> {
+    fn new(
+        slot: &'work mut PendingSlot,
+        counters: &'work ServerCounters,
+        reserves_while_building: bool,
+    ) -> ResponseBudget<'work> {
+        ResponseBudget {
+            slot,
+            counters,
+            reserves_while_building,
+            reserved_bytes: 0,
+            held_bytes: 0,
+        }
+    }
+
+    /// 回应的缓冲要再分配 `bytes` 字节：先记进额度（记不进回假，调用方回忙），再算进手里编着的字节；0 字节不用记。
+    fn take(&mut self, bytes: usize) -> bool {
+        if bytes == 0 {
+            return true;
+        }
+        if self.reserves_while_building {
+            if !self.slot.reserve_response(bytes) {
+                return false;
+            }
+            self.reserved_bytes += bytes;
+        }
+        self.held_bytes += bytes;
+        let now_held = self
+            .counters
+            .worker_response_bytes
+            .fetch_add(bytes, Ordering::SeqCst)
+            + bytes;
+        self.counters
+            .worker_response_bytes_peak
+            .fetch_max(now_held, Ordering::SeqCst);
+        true
+    }
+
+    /// 编到一半记不进：已经记下的放回。
+    fn release(&mut self) {
+        self.slot.release_response(self.reserved_bytes);
+        self.reserved_bytes = 0;
+    }
+
+    /// 编到一半记不进时回的忙（这一帧做过、回应没留，读与扫不改库，重发即可）。
+    fn busy_response(
+        &mut self,
+        shared: &SharedState,
+        sequence: u64,
+        operation_code: u8,
+        wanted_bytes: usize,
+    ) -> Vec<u8> {
+        self.release();
+        let reason = shared
+            .admission
+            .describe_bytes_refusal(&self.slot.budget, wanted_bytes);
+        shared
+            .counters
+            .busy_rejections
+            .fetch_add(1, Ordering::Relaxed);
+        let retry_after = shared.retry_after_milliseconds();
+        encode_busy(
+            sequence,
+            operation_code,
+            retry_after,
+            &format!("忙：回应编到一半{reason}；这一帧做过、回应没留，{retry_after} 毫秒后再来"),
+        )
+    }
+}
+
+impl Drop for ResponseBudget<'_> {
+    fn drop(&mut self) {
+        self.counters
+            .worker_response_bytes
+            .fetch_sub(self.held_bytes, Ordering::SeqCst);
     }
 }
 
@@ -1002,6 +1116,7 @@ pub fn start_in_this_process(
             group_maximum_frames: DEFAULT_GROUP_COMMIT_FRAMES,
             selftest_commit_delay: None,
             selftest_storage_failure_key: None,
+            selftest_write_failure_file: None,
         },
     };
     let (release_sender, released) = mpsc::channel();
@@ -1147,9 +1262,18 @@ fn start_worker_pool(shared: &Arc<SharedState>, worker_threads: usize) -> Sender
                 mut slot,
                 connection,
             } = job;
-            let mut response = process_frame(&shared, &body, &connection);
-            // 回应记进额度才交出去（文件头「额度」）；记不进就换成忙，这一帧做过、回应没留，重发即可（读、扫、统计都不改库）。
-            if !slot.reserve_response(response.len()) {
+            let reserves_while_building =
+                !shared.is_enabled(BreakSwitch::ResponseBuiltBeforeBudget);
+            let (mut response, reserved_while_building) = {
+                let mut budget =
+                    ResponseBudget::new(&mut slot, &shared.counters, reserves_while_building);
+                let response = process_frame(&shared, &body, &connection, &mut budget);
+                (response, budget.reserved_bytes)
+            };
+            // 回应记进额度才交出去（文件头「额度」）：边编边记过的只再记余下的帧头那几个字节；记不进就换成忙、已经记下的放回，
+            // 这一帧做过、回应没留，重发即可（读、扫、统计都不改库）。
+            if !slot.reserve_response(response.len().saturating_sub(reserved_while_building)) {
+                slot.release_response(reserved_while_building);
                 let (sequence, operation_code) = peek_request_header(&body).unwrap_or_default();
                 let reason = shared
                     .admission
@@ -1766,7 +1890,12 @@ fn write_until_senders_gone<Stream: Write>(
     Ok(())
 }
 
-fn process_frame(shared: &SharedState, body: &[u8], connection: &ConnectionRecord) -> Vec<u8> {
+fn process_frame(
+    shared: &SharedState,
+    body: &[u8],
+    connection: &ConnectionRecord,
+    budget: &mut ResponseBudget<'_>,
+) -> Vec<u8> {
     let trailing_bytes = if shared
         .break_switches
         .is_enabled(BreakSwitch::TrailingBytesAccepted)
@@ -1822,17 +1951,13 @@ fn process_frame(shared: &SharedState, body: &[u8], connection: &ConnectionRecor
                 .counters
                 .frames_handled
                 .fetch_add(1, Ordering::Relaxed);
-            execute_request(shared, decoded, connection)
+            execute_request(shared, decoded, connection, budget)
         }
     }
 }
 
 fn u32_count(count: usize) -> u32 {
     u32::try_from(count).expect("个数来自请求里的 u32 字段，或受帧长上限所限，放得进 u32")
-}
-
-fn usize_from_u32(value: u32) -> usize {
-    usize::try_from(value).expect("这个工程只编 64 位目标，u32 放得进 usize")
 }
 
 fn decoded_operation_code(view: &RequestView<'_>) -> u8 {
@@ -1872,6 +1997,7 @@ fn execute_request(
     shared: &SharedState,
     decoded: DecodedRequest<'_>,
     connection: &ConnectionRecord,
+    budget: &mut ResponseBudget<'_>,
 ) -> Vec<u8> {
     let sequence = decoded.sequence;
     match decoded.view {
@@ -1902,6 +2028,10 @@ fn execute_request(
                     operation_code,
                     &message,
                 );
+            }
+            // 回应多大先数出来、记进额度再分配（文件头「额度」）：读回的值钉在块缓存里，记不进就回忙、不分配
+            if !budget.take(payload_bytes) {
+                return budget.busy_response(shared, sequence, operation_code, payload_bytes);
             }
             let mut encoder = begin_response(
                 sequence,
@@ -1943,43 +2073,52 @@ fn execute_request(
             table: _,
             prefix,
             maximum_entries,
+            after_key,
         } => {
             let operation_code = OperationCode::PrefixScan.code();
             let maximum_bytes =
                 usize_from_u32(MAXIMUM_FRAME_BODY_BYTES - RESPONSE_HEADER_BYTES) - 5;
-            let scan = match shared
-                .library
-                .scan_prefix(prefix, maximum_entries, maximum_bytes)
-            {
-                Ok(scan) => scan,
-                Err(message) => {
-                    return storage_read_failed(
-                        shared,
-                        connection,
-                        sequence,
-                        operation_code,
-                        &message,
-                    )
-                }
-            };
-            let payload_bytes = 5 + scan
-                .entries
-                .iter()
-                .map(|(key, value)| 8 + key.len() + value.len())
-                .sum::<usize>();
-            let mut encoder = begin_response(
-                sequence,
-                ResponseStatus::Completed,
-                operation_code,
-                payload_bytes,
+            // 回应边扫边编：每读出一条，回应的缓冲要多分配的那一截先记进额度（文件头「额度」），记得进才分配、放进回应；
+            // 截断标记与条数占位，扫完再填
+            let mut encoder =
+                begin_response(sequence, ResponseStatus::Completed, operation_code, 5);
+            encoder.put_u8(0);
+            encoder.put_u32(0);
+            let mut refused_growth_bytes = 0_usize;
+            let scanned = shared.library.scan_prefix_into(
+                prefix,
+                after_key,
+                maximum_entries,
+                maximum_bytes,
+                &mut |key, value| {
+                    let growth = encoder.capacity_growth_for(8 + key.len() + value.len());
+                    if !budget.take(growth) {
+                        refused_growth_bytes = growth;
+                        return false;
+                    }
+                    encoder.grow_capacity(growth);
+                    encoder.put_length_prefixed(key);
+                    encoder.put_length_prefixed(value);
+                    true
+                },
             );
-            encoder.put_u8(u8::from(scan.is_truncated));
-            encoder.put_u32(u32_count(scan.entries.len()));
-            for (key, value) in &scan.entries {
-                encoder.put_length_prefixed(key);
-                encoder.put_length_prefixed(value);
+            match scanned {
+                Err(message) => {
+                    budget.release();
+                    storage_read_failed(shared, connection, sequence, operation_code, &message)
+                }
+                Ok(outcome) if outcome.is_refused_by_caller => {
+                    drop(encoder);
+                    budget.busy_response(shared, sequence, operation_code, refused_growth_bytes)
+                }
+                Ok(outcome) => {
+                    encoder.set_prefix_scan_header(
+                        outcome.is_truncated,
+                        u32_count(outcome.entries_accepted),
+                    );
+                    encoder.finish()
+                }
             }
-            encoder.finish()
         }
         RequestView::Statistics => {
             let operation_code = OperationCode::Statistics.code();
@@ -2036,6 +2175,10 @@ fn execute_request(
                             .receiving_body_bytes_peak
                             .load(Ordering::SeqCst),
                     ),
+                ),
+                (
+                    WORKER_RESPONSE_BYTES_PEAK_COUNTER,
+                    as_u64(own.worker_response_bytes_peak.load(Ordering::SeqCst)),
                 ),
                 (
                     OUTBOUND_QUEUED_BYTES_PEAK_COUNTER,

@@ -17,13 +17,24 @@
   · 被起、被 source 的传递依赖：上面两条指到的 .sh、.py 与带 #! 的文件逐个读，shell 认「<目录表达式>/<相对路径>.sh|.py」的写法
     （"${BASH_SOURCE[0]%/*}/…"、"$(dirname "${BASH_SOURCE[0]}")/…"、"$某某_directory/…" 这类），python 认同目录与 sys.path 加进来的目录里的 import、
     os.path.join(…, "<段>", …, "<名>.py") 与引号里的 "<名>.py"，都按那份脚本所在目录解，传递地收；注释行不算，指到不在的不收。
+    python 里赋给一个名字的目录也认：<名> = os.path.dirname(os.path.realpath(__file__))（或 abspath）记成脚本所在目录，<名> = os.path.join(<已记的名>, "<段>", …)
+    记成拼出来的目录；之后 os.path.join(<名>, "<段>", …) 按那个目录解，sys.path.insert(0, <名>) / sys.path.append(<名>) 把它加进 import 的搜索目录。
+    同一个名字赋几次的，几个目录都记（不分作用域，指到不在的不收）。.claude/scripts/project_preflight.py 经这一条接上规范副本里的 preflight.py。
+    起点是单独成条的脚本，加上面两条指到的每一份脚本（罩在别的目录条目里、不单独成条的照算）：收不收得进与 Rust 里引用的先后无关。
   · 测试代码：默认不扫（只给副本里编、起非测试代码的调用方）：各包 tests/、benches/、examples/ 下的文件，带 #[cfg(test)]（cfg 里只有 test、不带 not 与 any）
     或 #[test] 的项，文件头 #![cfg(test)] 的整份。test_inputs=True 时一起扫（副本里要跑测试的调用方：crates 变异、证红）。
   · 决不拷的 NEVER_COPIED：仓根的多机配置 multi-host.env（本机私有、被 git 忽略）。指到它的引用记进 left_out，不进副本；
     副本里起命令的一方用 environment_for_commands_in_the_copy 把主工作区那一份的绝对路径显式交给 SINGLEFS_MULTI_HOST_CONFIG。
 调用方要多拷的，经 declared 参数逐条声明 (条目, 为什么)，为什么至少 4 个字；声明的目录同样跟 path 依赖、同样扫。
+  · 声明的条目里的脚本也当追 source 链的起点（副本带 --with-gate-tables 而缺 .claude/scripts/preflight.sh（records/2026-10-31-task-server巡检.md），
+    门禁 source 失败、参数被清空成全跑）：声明的单个脚本，与声明的目录里的每一份脚本（往下逐层，不进 SKIPPED_DIRECTORY_NAMES、target、target-* 与 DECLARED_SKIPPED_DIRECTORY_NAMES
+    那几种目录：fixtures 下是门禁样本，副本里不起），连同它们 source、起、import 的仓内文件传递地收，为什么写 DECLARED_SCRIPTS_REASON 起头的那一句。
+    这一支算不全的拒：从声明的条目里的脚本起，shell 里行首（可带 exec）是 source、.、bash、sh、python3、紧接着照脚本自己所在目录写的路径
+    （"$(dirname "${BASH_SOURCE[0]}")/…"、"${BASH_SOURCE[0]%/*}/…"；ANCHORED_SHELL_REFERENCE，printf 与引号里的样本行不算）的文件在源树里不在的，抛 ClosureRefused、逐处写 <文件>:<行> 与缺的那一份（不拷半份）；python 的 import 与 $名/… 这类照目录变量拼的照旧指到不在的不收、不判。
+    弄坏开关 declared-directories-not-followed 下声明的目录里的脚本不起头，declared-closure-gaps-accepted 下缺的照旧不收、不拒。
 管不到的（靠写代码的人与真编核对）：路径拼在变量里、从环境变量取、format! 中间夹变量的；build.rs 经 .parent() 取仓根再读的（读的是
-Cargo.toml、Cargo.lock 这类，已在清单里）；python 经变量拼出的路径、importlib 按变量路径载入的模块。
+Cargo.toml、Cargo.lock 这类，已在清单里）；python 里不是上面那两种赋法记下的名字拼出的路径（函数返回值、参数、git 取的目录）、importlib 按变量路径载入的模块。
+写法认不出的，改调用方的写法让它认得出（先把目录赋给一个名字，再 os.path.join(<名>, …)），不另加手抄清单；副本里要起、要读的脚本与数据经 declared 声明。
 
 拷法 copy_entries：rsync -a --no-times --checksum --relative（单个文件的上级目录照建；拷过去的修改时刻是此刻），
 不进名叫 .git、target、target-*、__pycache__ 的目录。被 .gitignore 挡着的规范副本 .claude/singlefs-ai-sop 下的条目照文件系统拷。
@@ -38,6 +49,11 @@ Cargo.toml、Cargo.lock 这类，已在清单里）；python 经变量拼出的�
   lib_repository_copy.py link-into <副本根> --root <仓根> --workspace <工作区目录> [--present <条目>]… [--test-inputs]
       只拷了一个工作区（scripts/experiment-apparatus 这类）的副本：闭包里副本根下还没有的仓根条目逐个符号链接回仓里那一份（只读）；
       --present 点名副本里已经放好的（链过去的 research/results 这类）。闭包算不成退 2；末行一句「副本根下链了 N 份 <工作区>/ 之外的仓内文件」
+  lib_repository_copy.py missing-in-copy <副本根> [--root <仓根>] [--test-inputs] [--with <条目>=<为什么>]…
+      核一份仓副本缺不缺（entries_missing_in_copy）：闭包照 <仓根>（不给是这份脚本所在的仓）与同一组参数算，逐条看副本根下在不在；只看条目本身在不在，
+      目录条目在就算在，不比里面的文件与内容（副本里的改动是调用方自己的）。缺的每条打 REPOSITORY_COPY missing_in_copy <条目>\t<为什么>，
+      再打 ✗ 与出路（照 minimal-copy.py 另建副本，copy_rebuild_howto）、退 1；不缺的末行 REPOSITORY_COPY copy-complete entries=<闭包条数>、退 0；闭包算不成退 1。
+      吃副本的脚本（scripts/mutation/prove-red.sh --copy）开跑前调同一个函数，不另抄
   lib_repository_copy.py configuration-path <源树>
       打副本里起命令要用的多机配置的绝对路径（bash 调用方 export 给 SINGLEFS_MULTI_HOST_CONFIG 用；环境里已设的照打它）
   lib_repository_copy.py verify-copy [--root <仓根>] [--work <目录>] [--test-inputs] [--with <条目>=<为什么>]… -- <cargo build 的参数…>
@@ -62,6 +78,7 @@ Cargo.toml、Cargo.lock 这类，已在清单里）；python 经变量拼出的�
   REPOSITORY_COPY_BREAK=runtime-literals-ignored  不认 ../ 起头的串字面量
       「✗ 自证 runtime-literals-resolved-by-crate：」「✗ 自证 test-code-left-out：」「✗ 自证 shell-sources-followed：」「✗ 自证 python-references-followed：」
       「✗ 自证 configuration-never-copied：」「✗ 自证 repository-root-references-in-the-closure：」「✗ 自证 verify-copy-builds-and-starts-the-probes-in-the-copy：」
+      「✗ 自证 covered-scripts-followed：」
   REPOSITORY_COPY_BREAK=join-chains-ignored  不认 .join("..") 起头的一串
       「✗ 自证 join-chains-resolved：」
   REPOSITORY_COPY_BREAK=test-code-scanned  不带 test_inputs 也扫测试代码
@@ -69,9 +86,11 @@ Cargo.toml、Cargo.lock 这类，已在清单里）；python 经变量拼出的�
   REPOSITORY_COPY_BREAK=test-inputs-ignored  带了 test_inputs 也不扫测试代码
       「✗ 自证 test-code-left-out：」
   REPOSITORY_COPY_BREAK=shell-sources-not-followed  不跟 shell 脚本 source、起的文件
-      「✗ 自证 shell-sources-followed：」「✗ 自证 repository-root-references-in-the-closure：」
+      「✗ 自证 shell-sources-followed：」「✗ 自证 repository-root-references-in-the-closure：」「✗ 自证 covered-scripts-followed：」
   REPOSITORY_COPY_BREAK=python-references-not-followed  不跟 python 脚本 import、点名的文件
-      「✗ 自证 python-references-followed：」
+      「✗ 自证 python-references-followed：」「✗ 自证 python-directory-variables-followed：」
+  REPOSITORY_COPY_BREAK=python-directory-variables-ignored  python 里赋给名字的目录不记，os.path.join(<名>, …) 按脚本所在目录解
+      「✗ 自证 python-directory-variables-followed：」
   REPOSITORY_COPY_BREAK=never-copied-copied  多机配置也拷进副本
       「✗ 自证 configuration-never-copied：」
   REPOSITORY_COPY_BREAK=declared-reason-unchecked  声明的条目不写为什么也收
@@ -86,6 +105,14 @@ Cargo.toml、Cargo.lock 这类，已在清单里）；python 经变量拼出的�
       「✗ 自证 runtime-probes-cover-every-started-script：」
   REPOSITORY_COPY_BREAK=verify-probes-skipped  真编核对编完不起运行期脚本
       「✗ 自证 verify-copy-builds-and-starts-the-probes-in-the-copy：」
+  REPOSITORY_COPY_BREAK=copy-completeness-unchecked  entries_missing_in_copy 一条都不报（副本缺闭包里的条目也当拷全了）
+      「✗ 自证 copy-completeness-names-missing-entries：」
+  REPOSITORY_COPY_BREAK=covered-scripts-not-followed  罩在目录条目里、不单独成条的脚本不追 source 链（只拿单独成条的脚本起头）
+      「✗ 自证 covered-scripts-followed：」「✗ 自证 closure-independent-of-reference-order：」
+  REPOSITORY_COPY_BREAK=declared-directories-not-followed  声明的目录里的脚本不当追 source 链的起点（副本缺 .claude/scripts/preflight.sh）
+      「✗ 自证 declared-directory-scripts-followed：」「✗ 自证 declared-closure-gap-refused：」
+  REPOSITORY_COPY_BREAK=declared-closure-gaps-accepted  声明的条目里的脚本照脚本所在目录 source、起的文件在源树里不在时照旧不收、不拒
+      「✗ 自证 declared-closure-gap-refused：」
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -94,6 +121,7 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 import concurrent.futures  # noqa: E402
+import contextlib  # noqa: E402
 import glob  # noqa: E402
 import importlib.util  # noqa: E402
 import io  # noqa: E402
@@ -126,6 +154,11 @@ INCLUDE_MACROS = ("include_str", "include_bytes", "include")
 CLOSING_OF = {"(": ")", "[": "]", "{": "}"}
 MINIMUM_REASON_CHARACTERS = 4
 SCRIPT_SUFFIXES = (".sh", ".py")
+DECLARED_SKIPPED_DIRECTORY_NAMES = ("fixtures",)   # 声明的目录里不当起点的子目录（文件头「闭包」声明的条目那一条）：门禁样本档，副本里不起
+DECLARED_SCRIPTS_REASON = "调用方声明的条目里的脚本 source、起"   # 那一支收进来的条目的为什么起头（minimal-copy.py 的弄坏开关照它认出这一支）
+# 声明的条目那一支判「算不全」只认这一种行：行首（空白之后，可带 exec）是 source、.、bash、sh、python3，紧接着照脚本自己所在目录写的路径；
+# 写在 printf、引号与 heredoc 里的样本行（行首是别的词）不认
+ANCHORED_SHELL_REFERENCE = re.compile(r'^\s*(?:exec\s+)?(?:source|\.|bash|sh|python3)\s+"?(?:\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)|\$\{BASH_SOURCE\[0\]%/\*\})/((?:\.\./)*[\w.\-]+(?:/[\w.\-]+)*\.(?:sh|py))\b')
 # 源码里粗筛：带这几种记号的 .rs 才切词（切词只为认出注释、串字面量与测试代码的边界）
 CANDIDATE_SOURCE = re.compile(r'include(?:_str|_bytes)?!|#\[path|"(?:/|\{[^}"\n]*\}/)?\.\.(?:/|")')
 FORMAT_DIRECTORY_PREFIX = re.compile(r'^\{[A-Za-z_][A-Za-z0-9_]*\}/')
@@ -134,6 +167,11 @@ PYTHON_IMPORT = re.compile(r'^\s*(?:from\s+([A-Za-z_][\w.]*)\s+import\b|import\s
 PYTHON_QUOTED_SCRIPT = re.compile(r'''['"]((?:\.\./)*[\w.\-]+(?:/[\w.\-]+)*\.(?:py|sh))['"]''')
 PYTHON_JOIN_CALL = re.compile(r'path\.join\(([^()]*(?:\([^()]*(?:\([^()]*\))?[^()]*\)[^()]*)*)\)')
 PYTHON_QUOTED_SEGMENT = re.compile(r'''['"]([\w.\-/]+)['"]''')
+# python 里赋给一个名字的目录（文件头「闭包」被起、被 source 的那一条）：<名> = <右边>，右边是脚本所在目录的写法或一个 os.path.join(…)
+PYTHON_ASSIGNMENT = re.compile(r'^\s*([A-Za-z_]\w*)\s*=(?!=)\s*(\S.*?)\s*$')
+PYTHON_SCRIPT_DIRECTORY = re.compile(r'^(?:\w+\.)*path\.dirname\(\s*(?:\w+\.)*path\.(?:realpath|abspath)\(\s*__file__\s*\)\s*\)$')
+PYTHON_SYS_PATH_NAME = re.compile(r'sys\.path\.(?:insert\(\s*\d+\s*,|append\()\s*([A-Za-z_]\w*)\s*\)')
+PYTHON_NAME = re.compile(r'[A-Za-z_]\w*')
 # 真编核对在副本里起的运行期脚本（Rust 非测试代码直接起的每一份都要在这里有一条，格 runtime-probes-cover-every-started-script 判）：
 # {tree} 换成副本根。多机配置判法只打键名（值是私有的，核对只看它在副本里判不判得过）
 RUNTIME_PROBES = {
@@ -518,22 +556,56 @@ def shell_references(text, directory):
     return found
 
 
+def join_base_argument(text):
+    """os.path.join 括号里的参数正文 → 拼的起点那个参数（逗号前头那一段：到不在括号、引号里的逗号为止，去掉两头空白）。"""
+    depth, quote = 0, None
+    for index, character in enumerate(text):
+        if quote:
+            if character == quote:
+                quote = None
+        elif character in "'\"":
+            quote = character
+        elif character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth -= 1
+        elif character == "," and depth == 0:
+            return text[:index].strip()
+    return text.strip()
+
+
 def python_references(text, directory):
+    """一份 python 脚本点到的仓内文件：[(行号, 绝对路径)]（不查在不在）。文件头「闭包」被起、被 source 的那一条：import、os.path.join、引号里的脚本名，
+    与赋给名字的目录。弄坏开关 python-directory-variables-ignored：名字不记，os.path.join(<名>, …) 按脚本所在目录解。"""
     lines = text.splitlines()
     search_directories = [directory]
+    named = {}   # 赋给名字的目录 {名: [绝对路径, …]}：同一个名字赋几次的都记
+    tracked = not broken("python-directory-variables-ignored")
     found = []
     for number, line in enumerate(lines, 1):
         if line.lstrip().startswith("#"):
             continue
+        assignment = PYTHON_ASSIGNMENT.match(line) if tracked else None
+        if assignment and PYTHON_SCRIPT_DIRECTORY.match(re.sub(r"\s+#.*$", "", assignment.group(2))):
+            named.setdefault(assignment.group(1), []).append(directory)
         for call in PYTHON_JOIN_CALL.finditer(line):
             segments = PYTHON_QUOTED_SEGMENT.findall(call.group(1))
             if not segments:
                 continue
-            joined = os.path.normpath(os.path.join(directory, *segments))
+            base_argument = join_base_argument(call.group(1))
+            bases = named.get(base_argument, [directory]) if tracked and PYTHON_NAME.fullmatch(base_argument) else [directory]
+            joined = [os.path.normpath(os.path.join(base, *segments)) for base in bases]
             if segments[-1].endswith(SCRIPT_SUFFIXES):
-                found.append((number, joined))
+                found += [(number, path) for path in joined]
             elif "sys.path" in line:
-                search_directories.append(joined)
+                search_directories += joined
+            whole_right_side = (assignment and re.fullmatch(r"\s*(?:#.*)?", line[call.end():]) is not None
+                                and re.fullmatch(r"(?:\w+\.)*", line[assignment.start(2):call.start()]) is not None)
+            if whole_right_side:
+                named.setdefault(assignment.group(1), []).extend(joined)
+        if tracked:
+            for added in PYTHON_SYS_PATH_NAME.finditer(line):
+                search_directories += named.get(added.group(1), [])
         found += [(number, os.path.normpath(os.path.join(directory, match.group(1)))) for match in PYTHON_QUOTED_SCRIPT.finditer(line)]
     for number, line in enumerate(lines, 1):
         match = PYTHON_IMPORT.match(line)
@@ -548,8 +620,19 @@ def python_references(text, directory):
     return found
 
 
-def script_closure(root, scripts):
-    """scripts（相对仓根）连同它们 source、起、import 的仓内文件，传递地收：{相对仓根的路径: 出处}（起点的出处是空串）。"""
+def anchored_shell_references(text, directory):
+    """shell 脚本里行首 source、起、照脚本自己所在目录写路径的文件（ANCHORED_SHELL_REFERENCE）：[(行号, 绝对路径)]，不查在不在；注释行不算。"""
+    found = []
+    for number, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("#"):
+            continue
+        found += [(number, os.path.normpath(os.path.join(directory, match.group(1)))) for match in ANCHORED_SHELL_REFERENCE.finditer(line)]
+    return found
+
+
+def script_closure(root, scripts, gaps=None):
+    """scripts（相对仓根）连同它们 source、起、import 的仓内文件，传递地收：{相对仓根的路径: 出处}（起点的出处是空串）。
+    gaps 给了一张表的：shell 脚本照自己所在目录 source、起的文件在源树里不在的，往里记一句「<脚本>:<行> 引到的 <路径>」（文件头「闭包」声明的条目那一条）。"""
     found = {script: "" for script in scripts}
     pending = list(scripts)
     while pending:
@@ -564,6 +647,10 @@ def script_closure(root, scripts):
             named = [] if broken("python-references-not-followed") else python_references(text, os.path.dirname(path))
         else:
             named = [] if broken("shell-sources-not-followed") else shell_references(text, os.path.dirname(path))
+            if gaps is not None:
+                for number, target in anchored_shell_references(text, os.path.dirname(path)):
+                    if not os.path.isfile(target):
+                        gaps.append(f"{current}:{number} 引到的 {relative_inside(root, target) or target}")
         for number, target in named:
             relative = relative_inside(root, target)
             if relative is None or relative == "." or relative in found or not os.path.isfile(target):
@@ -586,6 +673,21 @@ def checked_declarations(declared):
             raise ValueError(f"声明的条目「{entry}」没写为什么（至少 {MINIMUM_REASON_CHARACTERS} 个字）")
         checked.append((normalized, reason.strip() if reason else ""))
     return checked
+
+
+def declared_scripts(root, entries):
+    """声明的条目里的脚本（文件头「闭包」声明的条目那一条）：entries（相对仓根）里是脚本的那一条本身，与是目录的那一条底下逐层的每一份脚本
+    （不进 skipped_directory 那几种与 DECLARED_SKIPPED_DIRECTORY_NAMES）；交排好的相对仓根的路径表。弄坏开关 declared-directories-not-followed 下目录不往下找。"""
+    found = set()
+    for entry in entries:
+        path = os.path.join(root, entry)
+        if os.path.isfile(path) and is_script(path):
+            found.add(entry)
+        elif os.path.isdir(path) and not os.path.islink(path) and not broken("declared-directories-not-followed"):
+            for directory, subdirectories, names in os.walk(path):
+                subdirectories[:] = sorted(name for name in subdirectories if not skipped_directory(name) and name not in DECLARED_SKIPPED_DIRECTORY_NAMES)
+                found.update(os.path.relpath(os.path.join(directory, name), root) for name in names if is_script(os.path.join(directory, name)))
+    return sorted(found)
 
 
 def copy_closure(root, declared=(), *, test_inputs=False, workspace=None):
@@ -613,7 +715,7 @@ def copy_closure(root, declared=(), *, test_inputs=False, workspace=None):
         add(entry, f"path 依赖（{where}）")
     packages = package_directories(root, sorted(reasons))
     references, problems = rust_references(root, packages, scan_test_code)
-    left_out, missing, started = {}, {}, []
+    left_out, missing, started, reached_scripts = {}, {}, [], []
     for reference in references:
         relative = relative_inside(root, reference.path)
         if relative is None:
@@ -629,6 +731,8 @@ def copy_closure(root, declared=(), *, test_inputs=False, workspace=None):
         exists = os.path.lexists(os.path.join(root, relative))
         if exists and not reference.compile_time and is_script(os.path.join(root, relative)) and relative not in started:
             started.append(relative)
+        if exists and os.path.isfile(os.path.join(root, relative)) and is_script(os.path.join(root, relative)) and relative not in reached_scripts:
+            reached_scripts.append(relative)   # 罩在目录条目里的也记：下面追 source 链从它起
         if is_covered(relative, list(reasons)):
             continue
         if not exists:
@@ -640,10 +744,24 @@ def copy_closure(root, declared=(), *, test_inputs=False, workspace=None):
         add(relative, ("编译期读" if reference.compile_time else "运行期读") + f"（{reference.where}）")
     if problems:
         raise ClosureRefused("；".join(problems))
-    scripts = sorted(entry for entry in reasons if os.path.isfile(os.path.join(root, entry)) and is_script(os.path.join(root, entry)))
-    for path, where in sorted(script_closure(root, scripts).items()):
+    # 追 source 链的起点（文件头「闭包」被起、被 source 的那一条）：单独成条的脚本加 Rust 代码指到的每一份脚本。
+    # 弄坏开关 covered-scripts-not-followed：只拿单独成条的，罩在目录条目里的不起头
+    scripts = [entry for entry in reasons if os.path.isfile(os.path.join(root, entry)) and is_script(os.path.join(root, entry))]
+    if not broken("covered-scripts-not-followed"):
+        scripts += reached_scripts
+    for path, where in sorted(script_closure(root, sorted(set(scripts))).items()):
         if where and not is_covered(path, list(reasons)):
             add(path, f"被 source、被起（{where}）")
+    # 声明的条目里的脚本也当起点（文件头「闭包」声明的条目那一条）：单个脚本，与声明的目录里的每一份脚本；这一支算不全（照脚本所在目录引到的文件不在）的拒
+    declared_starts = declared_scripts(root, [entry for entry, _ in declarations])
+    gaps = []
+    declared_found = script_closure(root, declared_starts, gaps)
+    if gaps and not broken("declared-closure-gaps-accepted"):
+        raise ClosureRefused("声明的条目里的脚本照自己所在目录 source、起的文件在源树里不在，闭包算不全、不拷半份："
+                             + "；".join(sorted(set(gaps))) + "；补上那几份，或改掉引到它们的那一行")
+    for path, where in sorted(declared_found.items()):
+        if where and not is_covered(path, list(reasons)):
+            add(path, f"{DECLARED_SCRIPTS_REASON}（{where}）")
     for entry in list(reasons):
         if entry == IGNORED_BY_GIT_PREFIX or entry.startswith(IGNORED_BY_GIT_PREFIX + "/"):
             add(entry, "被 .gitignore 挡着的规范副本，按 git 列文件的拷法带不上，照文件系统拷")
@@ -651,6 +769,23 @@ def copy_closure(root, declared=(), *, test_inputs=False, workspace=None):
         del reasons[entry]   # 落在另一条目录条目里面的（先认了文件、后认了它所在的目录）并进那一条
     return CopyClosure(tuple(sorted(reasons)), {entry: tuple(why) for entry, why in reasons.items()}, tuple(sorted(started)),
                        {name: tuple(places) for name, places in left_out.items()}, {name: tuple(places) for name, places in missing.items()})
+
+
+def entries_missing_in_copy(root, copy_root, declared=(), *, test_inputs=False):
+    """copy_root 这份副本缺的仓根条目：root 那棵树的闭包（copy_closure，同一组 declared 与 test_inputs）里副本根下不在的那几条。
+    交 ([(条目, (为什么, …)), …]（照闭包的次序）, 闭包的条数)。只看条目本身在不在：目录条目在就算在，不比里面的文件与内容（副本里的改动是调用方自己的）。
+    闭包算不成抛 ClosureRefused；声明写坏了抛 ValueError。missing-in-copy 子命令与吃副本的脚本（scripts/mutation/prove-red.sh --copy）都调这一份。
+    弄坏开关 copy-completeness-unchecked：一条都不报。"""
+    closure = copy_closure(root, declared, test_inputs=test_inputs)
+    copy_root = os.path.realpath(copy_root)
+    missing = [(entry, closure.reasons[entry]) for entry in closure.entries if not os.path.lexists(os.path.join(copy_root, entry))]
+    return ([] if broken("copy-completeness-unchecked") else missing), len(closure.entries)
+
+
+def copy_rebuild_howto(root):
+    """副本缺闭包里的条目时的出路（missing-in-copy 与吃副本的脚本照这一句写）：照 minimal-copy.py 另建一份，不手补。"""
+    return (f"仓副本只用 python3 scripts/hosts/minimal-copy.py {root} <新副本目录> --with-test-inputs 建（拷哪些由 scripts/hosts/lib_repository_copy.py 的闭包现算；"
+            "建时给过的 --with 照给），副本里自己的改动搬进新副本再用；不手拷、不手补缺的条目")
 
 
 # ── 拷与副本里的环境 ──
@@ -870,6 +1005,41 @@ def command_link_into(arguments):
     return 0
 
 
+def command_missing_in_copy(arguments):
+    copy_root, root, declared_words, test_inputs = None, REPOSITORY_ROOT, [], False
+    index = 0
+    while index < len(arguments):
+        word = arguments[index]
+        if word in ("--root", "--with") and index + 1 < len(arguments):
+            if word == "--root":
+                root = arguments[index + 1]
+            else:
+                declared_words.append(arguments[index + 1])
+            index += 1
+        elif word == "--test-inputs":
+            test_inputs = True
+        elif not word.startswith("-") and copy_root is None:
+            copy_root = word
+        else:
+            raise ValueError(f"认不出的参数「{word}」")
+        index += 1
+    if copy_root is None:
+        raise ValueError("要给 <副本根>")
+    if not os.path.isdir(copy_root):
+        raise ValueError(f"副本根 {copy_root} 不是目录")
+    root = os.path.realpath(root)
+    missing, checked = entries_missing_in_copy(root, copy_root, parse_declarations(declared_words), test_inputs=test_inputs)
+    for entry, reasons in missing:
+        print(f"REPOSITORY_COPY missing_in_copy {entry}\t{'；'.join(reasons)}")
+    if missing:
+        print(f"  ✗ 副本 {copy_root} 缺 {len(missing)} 条闭包里的仓根条目（闭包共 {checked} 条，照 {root} 算）：{'、'.join(entry for entry, _ in missing)}，"
+              "在副本里编、跑会读不到", file=sys.stderr)
+        print(f"  → 怎么办：{copy_rebuild_howto(root)}", file=sys.stderr)
+        return EXIT_REFUSED
+    print(f"REPOSITORY_COPY copy-complete entries={checked}")
+    return 0
+
+
 def command_verify_copy(arguments):
     root, work, declared_words, test_inputs = REPOSITORY_ROOT, None, [], False
     if "--" not in arguments:
@@ -916,7 +1086,7 @@ def command_verify_copy(arguments):
 
 
 # ── 自证 ──
-OLD_MTIME_SECONDS = 1577836800     # 2020-01-01：假树里的文件带着这个旧修改时刻
+OLD_MTIME_SECONDS = 1577836800     # 假树里的文件带着这个旧修改时刻（2020 年 1 月 1 日）
 RECENT_SECONDS = 3600              # 「此刻」：拷过去的文件的修改时刻离现在不超过这么多秒
 DEMO_MANIFEST = '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n'
 ROOT_MANIFEST = '[workspace]\nresolver = "2"\nmembers = ["crates/demo"]\nexclude = ["served"]\n'
@@ -1160,6 +1330,32 @@ def selftest_cells(base):
           and "lib/commented.sh" not in closure.entries,
           f"source 链上的 lib/common.sh、lib/deeper.sh 应当进闭包、注释掉的不进，实际 {closure.entries if closure else error}")
 
+    # covered-scripts-followed：Rust 先指到 tools/ 整个目录、后指到它里面的 tools/run/launcher.sh（罩在目录条目里、不单独成条，Rust 直接起它）；
+    # launcher.sh 起同目录的 inner.sh，inner.sh 起另一个顶层目录下的 hooks/lib_root.py ⇒ hooks/lib_root.py 进闭包、为什么写 inner.sh 那一行，同目录的 unused.py 不进
+    # closure-independent-of-reference-order：同一棵仓把两处引用的先后倒过来（先指到脚本、后指到目录）再算 ⇒ 闭包逐条相同
+    tools_line = 'pub const TOOLS: &str = "../../tools";\n'
+    launcher_line = 'pub const LAUNCHER: &str = "../../tools/run/launcher.sh";\n'
+    order_closures = {}
+    for order, source in (("directory-first", tools_line + launcher_line), ("script-first", launcher_line + tools_line)):
+        root = make_root(base, f"covered-scripts-{order}")
+        write(root, "crates/demo/src/run.rs", source)
+        write(root, "tools/run/launcher.sh", '#!/usr/bin/env bash\nbash "$(dirname "${BASH_SOURCE[0]}")/inner.sh"\n')
+        write(root, "tools/run/inner.sh", 'python3 "$(dirname "${BASH_SOURCE[0]}")/../../hooks/lib_root.py"\n')
+        write(root, "hooks/lib_root.py", "print('root')\n")
+        write(root, "hooks/unused.py", "print('unused')\n")
+        order_closures[order] = closure_or_error(root)
+    closure, error = order_closures["directory-first"]
+    check("covered-scripts-followed", closure is not None and "hooks/lib_root.py" in closure.entries and "hooks/unused.py" not in closure.entries
+          and closure.reasons.get("hooks/lib_root.py", ("",))[0].startswith("被 source、被起（tools/run/inner.sh:1）")
+          and "tools" in closure.entries and "tools/run/launcher.sh" in closure.started,
+          f"罩在 tools/ 里的 launcher.sh 起 inner.sh、inner.sh 起 hooks/lib_root.py，hooks/lib_root.py 应当进闭包、为什么写 inner.sh 那一行，"
+          f"实际 {(closure.reasons, closure.started) if closure else error}")
+    reversed_closure, reversed_error = order_closures["script-first"]
+    check("closure-independent-of-reference-order", closure is not None and reversed_closure is not None and closure.entries == reversed_closure.entries
+          and closure.reasons.get("hooks/lib_root.py") == reversed_closure.reasons.get("hooks/lib_root.py"),
+          f"两处引用的先后倒过来闭包应当逐条相同，实际先指到目录得 {closure.entries if closure else error}、"
+          f"先指到脚本得 {reversed_closure.entries if reversed_closure else reversed_error}")
+
     # python-references-followed：Rust 起的 tools/run.py 同目录 import helper、sys.path 加 ../shared 再 import、引号里的 'proc.py'、os.path.join(…, "side.sh")
     # ⇒ 四份进闭包，同目录没被点名的 unused.py 不进
     root = make_root(base, "python-references-followed")
@@ -1172,6 +1368,21 @@ def selftest_cells(base):
     wanted = ("scripts/side.sh", "shared/shared_module.py", "tools/helper.py", "tools/proc.py")
     check("python-references-followed", closure is not None and all(entry in closure.entries for entry in wanted) and "tools/unused.py" not in closure.entries,
           f"闭包里应当有 {wanted}、没有 tools/unused.py，实际 {closure.entries if closure else error}")
+
+    # python-directory-variables-followed：声明要起的 loader/finder.py 把脚本所在目录赋给 HERE、再拼出 SHARED = os.path.join(HERE, '..', 'canonical', 'scripts')，
+    # 之后 os.path.join(SHARED, 'checker.py')、sys.path.insert(0, SHARED) 再 import helper_module（project_preflight.py 找规范副本 preflight.py 的写法）
+    # ⇒ canonical/scripts/ 下这两份进闭包；同目录没被点名的 unused.py 不进
+    root = make_root(base, "python-directory-variables-followed")
+    write(root, "loader/finder.py", "import os\nimport sys\nHERE = os.path.dirname(os.path.realpath(__file__))\n\n\ndef locate():\n"
+          "    shared = os.path.join(HERE, '..', 'canonical', 'scripts')\n    if os.path.isfile(os.path.join(shared, 'checker.py')):\n"
+          "        sys.path.insert(0, shared)\n        import helper_module\n        return helper_module\n    return None\n")
+    for relative in ("canonical/scripts/checker.py", "canonical/scripts/helper_module.py", "canonical/scripts/unused.py"):
+        write(root, relative, "value = 1\n")
+    closure, error = closure_or_error(root, [("loader/finder.py", "副本里要起这份脚本")])
+    wanted = ("canonical/scripts/checker.py", "canonical/scripts/helper_module.py")
+    check("python-directory-variables-followed", closure is not None and all(entry in closure.entries for entry in wanted)
+          and "canonical/scripts/unused.py" not in closure.entries,
+          f"闭包里应当有 {wanted}、没有 canonical/scripts/unused.py，实际 {closure.entries if closure else error}")
 
     # configuration-never-copied：代码里指到仓根的 multi-host.env ⇒ 不进闭包、记进 left_out
     root = make_root(base, "configuration-never-copied")
@@ -1292,6 +1503,70 @@ def selftest_cells(base):
           and any("scripts/probe.sh" in problem for problem in red) and not os.path.lexists(tree) and "keys=PROBED" in output.getvalue(),
           f"假 cargo 应当在副本 {tree} 里起、探针在副本里起并拿到主工作区的配置路径、探针退 1 判不过、副本收尾删掉，实际问题 {green}、判了 {green_checked} 格、"
           f"cargo 在 {built_in or '没起'}、探针记 {probed or '没起'}、探针退 1 时问题 {red}、副本{'还在' if os.path.lexists(tree) else '删了'}")
+    # copy-completeness-names-missing-entries：闭包里有声明的 litmus/（副本里要读的数据），一份副本拷全、一份缺 litmus/ ⇒
+    # entries_missing_in_copy 对拷全的交空、查 5 条，对缺的只点名 litmus；missing-in-copy 子命令对缺的退 1、打 missing_in_copy litmus 那一行、出路指到 minimal-copy.py，
+    # 对拷全的退 0、报闭包条数。两份副本照条目自己拷（不经 copy_entries：这一格只判核对，不受拷法那几条开关牵连）
+    root = make_root(base, "copy-completeness")
+    write(root, "litmus/never.litmus", "C never\n")
+    completeness_reason = "自证：副本里要读的 litmus 样本"
+    complete_copy = os.path.join(base, "copy-completeness", "complete")
+    short_copy = os.path.join(base, "copy-completeness", "short")
+    for copy_root, copied in ((complete_copy, (".cargo", "Cargo.lock", "Cargo.toml", "crates", "litmus")),
+                              (short_copy, (".cargo", "Cargo.lock", "Cargo.toml", "crates"))):
+        os.makedirs(copy_root)
+        for entry in copied:
+            source = os.path.join(root, entry)
+            if os.path.isdir(source):
+                shutil.copytree(source, os.path.join(copy_root, entry))
+            else:
+                shutil.copyfile(source, os.path.join(copy_root, entry))
+    complete_missing, short_missing, complete_checked, completeness_error = None, None, 0, ""
+    try:
+        complete_missing, complete_checked = entries_missing_in_copy(root, complete_copy, [("litmus", completeness_reason)])
+        short_missing, _ = entries_missing_in_copy(root, short_copy, [("litmus", completeness_reason)])
+    except (ClosureRefused, ValueError) as error:
+        completeness_error = f"抛了 {type(error).__name__}：{error}"
+    completeness_runs = {}
+    for name, copy_root in (("complete", complete_copy), ("short", short_copy)):
+        standard_output, standard_error = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(standard_output), contextlib.redirect_stderr(standard_error):
+                exit_code = command_missing_in_copy([copy_root, "--root", root, "--with", f"litmus={completeness_reason}"])
+        except (ClosureRefused, ValueError) as error:
+            exit_code = f"抛了 {type(error).__name__}：{error}"
+        completeness_runs[name] = (exit_code, standard_output.getvalue(), standard_error.getvalue())
+    short_code, short_output, short_error = completeness_runs["short"]
+    complete_code, complete_output, _ = completeness_runs["complete"]
+    check("copy-completeness-names-missing-entries",
+          not completeness_error and complete_missing == [] and complete_checked == 5 and [entry for entry, _ in short_missing or []] == ["litmus"]
+          and short_code == EXIT_REFUSED and "REPOSITORY_COPY missing_in_copy litmus\t" in short_output and "minimal-copy.py" in short_error
+          and complete_code == 0 and "REPOSITORY_COPY copy-complete entries=5" in complete_output,
+          f"拷全的应当一条都不缺、闭包 5 条，缺 litmus/ 的应当只点名 litmus、子命令退 1 并给 minimal-copy.py 的出路；实际函数对拷全的交 {complete_missing}（闭包 {complete_checked} 条）、"
+          f"对缺的交 {short_missing}{completeness_error}，子命令对缺的退 {short_code}、输出 {short_output.strip()!r} {short_error.strip()!r}，"
+          f"对拷全的退 {complete_code}、输出 {complete_output.strip()!r}")
+
+    # declared-directory-scripts-followed：声明了 tools/ 整个目录（副本带 --with-gate-tables 而缺 .claude/scripts/preflight.sh）：
+    # tools/gate/stage.sh 照自己所在目录 source ../../lib/pre.sh，pre.sh 再起 ../vendor/inner.sh ⇒ 两份进闭包、为什么以 DECLARED_SCRIPTS_REASON 起头；
+    # tools/fixtures/ 下的样本引到不在的文件、printf 里的样本行引到不在的文件，都不算缺；没被引到的 lib/unused.sh 不进
+    root = make_root(base, "declared-directory-scripts-followed")
+    write(root, "tools/gate/stage.sh", '#!/usr/bin/env bash\nsource "$(dirname "${BASH_SOURCE[0]}")/../../lib/pre.sh"\n'
+          "printf '%s\\n' 'source \"$(dirname \"${BASH_SOURCE[0]}\")/sample-absent.sh\"' > /dev/null\n")
+    write(root, "tools/fixtures/sample/run.sh", '#!/usr/bin/env bash\nsource "$(dirname "${BASH_SOURCE[0]}")/absent-in-fixture.sh"\n')
+    write(root, "lib/pre.sh", 'bash "${BASH_SOURCE[0]%/*}/../vendor/inner.sh"\n')
+    write(root, "vendor/inner.sh", "echo inner\n")
+    write(root, "lib/unused.sh", "echo unused\n")
+    closure, error = closure_or_error(root, [("tools", "副本里起它下面的门禁")])
+    check("declared-directory-scripts-followed", closure is not None and "lib/pre.sh" in closure.entries and "vendor/inner.sh" in closure.entries
+          and "lib/unused.sh" not in closure.entries and closure.reasons.get("lib/pre.sh", ("",))[0].startswith(DECLARED_SCRIPTS_REASON),
+          f"声明的 tools/ 里的 stage.sh source 的 lib/pre.sh 与它起的 vendor/inner.sh 应当进闭包、为什么以「{DECLARED_SCRIPTS_REASON}」起头，lib/unused.sh 不进，"
+          f"实际 {(closure.entries, closure.reasons.get('lib/pre.sh')) if closure else error}")
+
+    # declared-closure-gap-refused：声明的 tools/ 里的 stage.sh 照自己所在目录 source 的 ../lib/absent.sh 在源树里不在 ⇒ 抛 ClosureRefused、点名那一行与缺的那一份
+    root = make_root(base, "declared-closure-gap-refused")
+    write(root, "tools/stage.sh", '#!/usr/bin/env bash\nsource "$(dirname "${BASH_SOURCE[0]}")/../lib/absent.sh"\n')
+    closure, error = closure_or_error(root, [("tools", "副本里起它下面的门禁")])
+    check("declared-closure-gap-refused", isinstance(error, ClosureRefused) and "tools/stage.sh:2" in str(error) and "lib/absent.sh" in str(error),
+          f"声明的条目里的脚本 source 的文件在源树里不在应当拒、点名 tools/stage.sh:2 与 lib/absent.sh，实际 {closure.entries if closure else error}")
     return failures, checked
 
 
@@ -1302,12 +1577,14 @@ SWITCH_EXPECTED_CELLS = {   # 文件头「弄坏开关」那一段，两处要�
     "includes-ignored": ["include-literals-resolved-by-file", "unrecognized-include-refused", "copies-the-closure-with-parent-directories",
                          "cross-check-sees-file-relative-includes"],
     "runtime-literals-ignored": ["runtime-literals-resolved-by-crate", "test-code-left-out", "shell-sources-followed", "python-references-followed",
-                                 "configuration-never-copied", "repository-root-references-in-the-closure", "verify-copy-builds-and-starts-the-probes-in-the-copy"],
+                                 "configuration-never-copied", "repository-root-references-in-the-closure", "verify-copy-builds-and-starts-the-probes-in-the-copy",
+                                 "covered-scripts-followed"],
     "join-chains-ignored": ["join-chains-resolved"],
     "test-code-scanned": ["test-code-left-out", "runtime-probes-cover-every-started-script"],
     "test-inputs-ignored": ["test-code-left-out"],
-    "shell-sources-not-followed": ["shell-sources-followed", "repository-root-references-in-the-closure"],
-    "python-references-not-followed": ["python-references-followed"],
+    "shell-sources-not-followed": ["shell-sources-followed", "repository-root-references-in-the-closure", "covered-scripts-followed"],
+    "python-references-not-followed": ["python-references-followed", "python-directory-variables-followed"],
+    "python-directory-variables-ignored": ["python-directory-variables-followed"],
     "never-copied-copied": ["configuration-never-copied"],
     "declared-reason-unchecked": ["declared-entries-need-a-reason"],
     "environment-configuration-unset": ["copy-environment-names-the-main-configuration", "verify-copy-builds-and-starts-the-probes-in-the-copy"],
@@ -1315,6 +1592,10 @@ SWITCH_EXPECTED_CELLS = {   # 文件头「弄坏开关」那一段，两处要�
     "copy-without-parent-directories": ["copies-the-closure-with-parent-directories", "verify-copy-builds-and-starts-the-probes-in-the-copy"],
     "probe-dropped": ["runtime-probes-cover-every-started-script"],
     "verify-probes-skipped": ["verify-copy-builds-and-starts-the-probes-in-the-copy"],
+    "copy-completeness-unchecked": ["copy-completeness-names-missing-entries"],
+    "covered-scripts-not-followed": ["covered-scripts-followed", "closure-independent-of-reference-order"],
+    "declared-directories-not-followed": ["declared-directory-scripts-followed", "declared-closure-gap-refused"],
+    "declared-closure-gaps-accepted": ["declared-closure-gap-refused"],
 }
 
 
@@ -1331,10 +1612,21 @@ def run_cells_in_scratch():
 def selftest():
     failures, checked = run_cells_in_scratch()
     if failures:
-        print(f"  ✗ lib_repository_copy.py 自证 {len(failures)} 格不对（查了 {checked} 格）：{'、'.join(failures)}")
+        # 汇总行不带格名：格名已在上面逐格的「✗ 自证 <格名>：」里，汇总行各开关趟下才是同一句，弄坏开关复跑才认它是汇总
+        print(f"  ✗ lib_repository_copy.py 自证 {len(failures)} 格不对（查了 {checked} 格）")
+        print(f"  → 不对的格：{'、'.join(failures)}")
         print(f"  → 怎么办：照上面逐格改 copy_closure / copy_entries / environment_for_commands_in_the_copy / verify_copy；{BREAK_VARIABLE} 设着的话本来就该红")
         return 1
-    jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), int(os.environ.get("SINGLEFS_THREAD_CAP") or 0) or os.cpu_count() or 1))
+    # 开关轮的并发：每台默认重活线程数（scripts/hosts/heavy_threads.py，登记位 .claude/heavy-thread-default），再按开关条数夹；取不了就拒，不退回按核数算
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import heavy_threads
+    try:
+        switch_round_threads = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        print(f"  ✗ 弄坏开关轮取不了每台默认重活线程数：{error}")
+        print(f"  → 怎么办：{error.howto}；不退回按核数算")
+        return 2
+    jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), switch_round_threads))
 
     def one(switch):
         completed = subprocess.run([sys.executable, "-B", os.path.realpath(__file__), "--selftest-cells"], capture_output=True, text=True,
@@ -1356,8 +1648,11 @@ def selftest():
         return 1
     print(f"  ✓ lib_repository_copy.py 自证通过（查了 {checked} 格：path 依赖逐层跟进而指到仓根之外的拒、编译期 include 按源文件或包目录解而认不出的拒、"
           "运行期 ../ 字面量与 .join(\"..\") 串按包目录解、测试代码默认不扫而带 test_inputs 扫、shell 的 source 链与 python 的 import 传递地跟、"
+          "罩在目录条目里的脚本照追 source 链而与引用的先后无关、声明的目录里的脚本照追 source 链而照脚本所在目录引到的文件不在就拒、"
+          "python 里赋给名字的目录拼出的脚本与搜索目录照认、"
           "多机配置不进副本、声明要写为什么、副本环境取主工作区那一份配置、单个文件连上级目录拷、粗扫认得按源文件目录解的 include、本仓粗扫指到的都在闭包里、直接起的脚本都有起法、"
-          f"真编核对在副本里编与起探针；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
+          "真编核对在副本里编与起探针、副本缺闭包里的条目逐条点名而拷全的不报；"
+          f"弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 
 
@@ -1366,12 +1661,12 @@ def main(arguments):
         print(f"  ✗ 弄坏开关 {BREAK_VARIABLE} 设在 --selftest 之外，什么都没做", file=sys.stderr)
         print(f"  → 怎么办：去掉 {BREAK_VARIABLE} 再跑；它只给 lib_repository_copy.py --selftest 证红用", file=sys.stderr)
         return EXIT_USAGE
-    commands = {"entries": command_entries, "link-into": command_link_into, "verify-copy": command_verify_copy}
+    commands = {"entries": command_entries, "link-into": command_link_into, "missing-in-copy": command_missing_in_copy, "verify-copy": command_verify_copy}
     if arguments[:1] == ["configuration-path"] and len(arguments) == 2:
         print(configuration_path(arguments[1]))
         return 0
     if not arguments or arguments[0] not in commands:
-        print("  ✗ lib_repository_copy.py 用法错：子命令只认 entries、link-into、configuration-path、verify-copy、--selftest", file=sys.stderr)
+        print("  ✗ lib_repository_copy.py 用法错：子命令只认 entries、link-into、missing-in-copy、configuration-path、verify-copy、--selftest", file=sys.stderr)
         print("  → 怎么办：照文件头「用法」写", file=sys.stderr)
         return EXIT_USAGE
     try:

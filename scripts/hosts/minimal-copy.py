@@ -3,17 +3,23 @@
 # run-condition: command python3 rsync
 """建最小仓副本：只拷编译要用的那几处，拷前报大小、超阈值拒绝，拷过去的文件修改时刻是此刻。
 
-为什么：手敲 cp -a 建 GPU 证红的小副本时把 research/ 一起拷了，一下 31G（.claude/kb/milestone/03-third-txn.md「待优化」第 17 行，第 60 批卡上证红）。
+为什么：手敲 cp -a 建 GPU 证红的小副本时把 research/ 一起拷了，一下 31G（.claude/kb/milestone/03-third-txn.md「待优化」第 17 行）。
 修改时刻：rsync -a 把源树里的旧修改时刻原样带过去，cargo 判副本里内容已换的文件「已编过」、静默跑旧二进制（同一张表第 1 行，
-.claude/rules/test-script-discipline.md「编译与算法都要快」）；这里 rsync -a --no-times --checksum：按内容比，
+.claude/rules/test-script-discipline.md「编译与算法都要快」）；这里照 lib_repository_copy.py 的 copy_entries 拷（rsync -a --no-times --checksum）：按内容比，
 内容变了的才拷、拷过去的修改时刻是此刻，没变的不动。
 
 用法：
-  minimal-copy.py <源树> <副本> [--with-gate-tables] [--with-test-inputs] [--target-dir <编译目录>]
+  minimal-copy.py <源树> <副本> [--with-gate-tables] [--with-test-inputs] [--with <条目>=<为什么>]… [--target-dir <编译目录>]
       名单不在这里写：取 scripts/hosts/lib_repository_copy.py 的 copy_closure（共用清单 crates/、Cargo.toml、Cargo.lock、.cargo/ 加它的闭包：
       path 依赖指到的目录（例：验证包依赖的仓根 prune-server/）、编译期 include_str! 读的仓根文件（例：.claude/heavy-thread-default）、
       副本里起的二进制与脚本运行期读的仓根文件连同它们 source、起的；那份文件头「闭包」）。--with-gate-tables 再声明 .claude/gate.d/（要门禁表的副本）；
-      --with-test-inputs 连测试代码一起扫（副本里要跑测试的：scripts/mutation/prove-red.sh --copy 这类）。
+      --with-test-inputs 连测试代码一起扫（副本里要跑测试的：scripts/mutation/prove-red.sh --copy 这类）；
+      --with <条目>=<为什么> 逐条声明要多拷的仓根条目（副本里要起的脚本、要读的数据；为什么至少 4 个字，交 copy_closure 的 declared）：
+      声明的脚本连同它 source、起、import 的仓内文件一起拷（例：--with scripts/prune-server/prune_server_client_selftest.py=副本里起它的自证，
+      连 .claude/scripts/project_preflight.py 与规范副本里的 preflight.py 一起带上）。不写为什么、条目跳出仓根的退 2。
+      --with-gate-tables 的 .claude/gate.d/ 与 --with 声明的目录同样：里面每一份脚本（fixtures/ 下的样本不算）连同它 source、起、import 的一起拷
+      （例：门禁 source 的 .claude/scripts/preflight.sh；副本缺它，门禁 source 失败、参数被清空成全跑）；照脚本所在目录引到的文件源树里不在的拒、退 1、
+      一个文件都不写，拒绝说明逐个点名缺哪几份（lib_repository_copy.py 文件头「闭包」声明的条目那一条）。
       闭包算不成（path 依赖指到仓根之外、编译期读的文件认不出或不在）拒绝、退 1、副本里一个文件都不写。
       拷之前先报每一处的大小与合计，合计超过阈值就拒绝、退 1，副本里一个文件都不写；名单里的每一处不进名叫 .git、target、target-*、__pycache__ 的目录。
       副本里起命令的，多机配置照 lib_repository_copy.py configuration-path <源树> 打的那一份显式交给 SINGLEFS_MULTI_HOST_CONFIG（副本不是 git 工作树，
@@ -21,7 +27,7 @@
       不带 --delete：副本里已有的别的东西不动，顶层有名单之外的项（上一次手拷留下的 research/ 这类）报一行警告。
       给了 --target-dir：拷完对副本做一次 scripts/hosts/source-stamp.py 的 refresh（复用这个编译目录之前要做的那一步）；不给不动编译目录。
   minimal-copy.py --selftest
-阈值 MAXIMUM_COPY_BYTES = 200 MiB，推的：2026-10-12 量的名单（含 .claude/gate.d）合计约 27 MiB，取约 7 倍，容得下 crates/ 长大、挡得住整个 research/ 或 target。
+阈值 MAXIMUM_COPY_BYTES = 200 MiB，推的：量的名单（含 .claude/gate.d）合计约 27 MiB，取约 7 倍，容得下 crates/ 长大、挡得住整个 research/ 或 target。
   真长到超了阈值：先看拒绝信息列的最大几个文件是不是该进副本，确该进再抬 MAXIMUM_COPY_BYTES 并改上面这句的依据。
 输出：一行 MINIMAL_COPY plan ...（大小）、一行 MINIMAL_COPY copied ...；退出码：0 拷好；1 超阈值或拷不成；2 用法错（源树不是仓根、副本在源树里面、参数错）。
 
@@ -31,7 +37,7 @@
       「✗ 自证 whitelist-only：」
   MINIMAL_COPY_BREAK=no-size-limit  超阈值不拒绝，照拷
       「✗ 自证 over-threshold-refused：」
-  MINIMAL_COPY_BREAK=keep-times  rsync -a 带源树的修改时刻
+  MINIMAL_COPY_BREAK=keep-times  拷完把副本里的修改时刻改回源树那一份的
       「✗ 自证 mtime-now：」
   MINIMAL_COPY_BREAK=gate-tables-always  不带 --with-gate-tables 也拷 .claude/gate.d/
       「✗ 自证 gate-tables-opt-in：」
@@ -45,9 +51,13 @@
       「✗ 自证 warns-about-extra-top-level：」
   MINIMAL_COPY_BREAK=closure-ignored  不调 copy_closure，只拷共用清单里在的那几样
       「✗ 自证 thread-registry-copied：」、「✗ 自证 whitelist-only：」、「✗ 自证 path-dependencies-copied：」、「✗ 自证 path-dependency-outside-root-refused：」、
-      「✗ 自证 test-inputs-opt-in：」
+      「✗ 自证 test-inputs-opt-in：」、「✗ 自证 declared-entries-copied：」
   MINIMAL_COPY_BREAK=test-inputs-always  不带 --with-test-inputs 也扫测试代码
       「✗ 自证 test-inputs-opt-in：」
+  MINIMAL_COPY_BREAK=declared-ignored  --with 声明的条目不交给 copy_closure，照没给
+      「✗ 自证 declared-entries-copied：」
+  MINIMAL_COPY_BREAK=gate-tables-closure-skipped  --with-gate-tables 与 --with 声明的条目里的脚本 source、起的不拷（副本缺 .claude/scripts/preflight.sh）
+      「✗ 自证 gate-tables-closure-copied：」
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -99,15 +109,21 @@ def human(byte_count):
     return f"{byte_count / 1024:.1f} KiB"
 
 
-def items_to_copy(source, with_gate_tables, with_test_inputs):
-    """要拷的仓根条目：lib_repository_copy.py 的 copy_closure（文件头「用法」）；闭包算不成抛 repository_copy.ClosureRefused。
-    弄坏开关 closure-ignored：只交共用清单里在的那几样；test-inputs-always：不带 --with-test-inputs 也扫测试代码。"""
+def items_to_copy(source, with_gate_tables, with_test_inputs, declarations=()):
+    """要拷的仓根条目：lib_repository_copy.py 的 copy_closure（文件头「用法」）；declarations 是 --with 声明的 [(条目, 为什么)]（已过 checked_declarations）。
+    闭包算不成抛 repository_copy.ClosureRefused。弄坏开关 closure-ignored：只交共用清单里在的那几样与声明的条目；test-inputs-always：不带 --with-test-inputs 也扫测试代码；
+    declared-ignored：--with 声明的条目照没给。"""
     declared = [(GATE_TABLES_ITEM, GATE_TABLES_REASON)] if with_gate_tables or broken("gate-tables-always") else []
+    if not broken("declared-ignored"):
+        declared += list(declarations)
     if broken("closure-ignored"):
         items = [item for item in repository_copy.COMMON_ENTRIES if os.path.lexists(os.path.join(source, item))]
         items += [item for item, _ in declared if os.path.lexists(os.path.join(source, item))]
     else:
-        items = list(repository_copy.copy_closure(source, declared, test_inputs=with_test_inputs or broken("test-inputs-always")).entries)
+        closure = repository_copy.copy_closure(source, declared, test_inputs=with_test_inputs or broken("test-inputs-always"))
+        items = list(closure.entries)
+        if broken("gate-tables-closure-skipped"):   # 弄坏开关：不收声明的条目里的脚本 source、起的（只有那一支收进来的条目去掉）
+            items = [item for item in items if not all(why.startswith(repository_copy.DECLARED_SCRIPTS_REASON) for why in closure.reasons.get(item, ("",)))]
     if broken("copy-research"):
         items.append("research")
     return items
@@ -157,18 +173,28 @@ def load_stamp_module():
 
 
 def copy_tree(source, copy, items):
-    times = ["-a"] if broken("keep-times") else ["-a", "--no-times", "--checksum"]
-    command = ["rsync", *times, "--sparse", "--relative", "--exclude", ".git", "--exclude", "target/", "--exclude", "target-*/", "--exclude", "__pycache__",
-               *["./" + item for item in items if os.path.lexists(os.path.join(source, item))], copy.rstrip("/") + "/"]
-    completed = subprocess.run(command, cwd=source, capture_output=True, text=True, stdin=subprocess.DEVNULL)
-    if completed.returncode != 0:
-        raise OSError(f"rsync 退 {completed.returncode}：{completed.stderr.strip()[-300:]}")
-    return " ".join(times)
+    """照 lib_repository_copy.py 的 copy_entries 拷（那份文件头「拷法」）；rsync 退非 0 抛 OSError。交拷法的说明（进 copied 那一行）。
+    弄坏开关 keep-times：拷完把副本里每份文件的修改时刻改回源树那一份的。"""
+    repository_copy.copy_entries(source, copy, items)
+    if not broken("keep-times"):
+        return "-a --no-times --checksum"
+    for item in items:
+        for directory, subdirectories, names in os.walk(os.path.join(copy, item)):
+            subdirectories[:] = [name for name in subdirectories if not skipped_directory(name)]
+            for name in names:
+                copied = os.path.join(directory, name)
+                original = os.path.join(source, os.path.relpath(copied, copy))
+                if os.path.isfile(original):
+                    os.utime(copied, (os.stat(original).st_mtime, os.stat(original).st_mtime))
+        single = os.path.join(copy, item)
+        if os.path.isfile(single) and os.path.isfile(os.path.join(source, item)):
+            os.utime(single, (os.stat(os.path.join(source, item)).st_mtime, os.stat(os.path.join(source, item)).st_mtime))
+    return "-a"
 
 
 def execute(arguments):
     """整个流程：交退出码。--selftest 的各格直接调它（不经 main 的弄坏开关拒绝）。"""
-    positional, with_gate_tables, with_test_inputs, target = [], False, False, None
+    positional, with_gate_tables, with_test_inputs, target, declared = [], False, False, None, []
     index = 0
     try:
         while index < len(arguments):
@@ -177,6 +203,14 @@ def execute(arguments):
                 with_gate_tables = True
             elif word == "--with-test-inputs":
                 with_test_inputs = True
+            elif word == "--with":
+                if index + 1 >= len(arguments):
+                    raise ValueError("--with 后面没给 <条目>=<为什么>")
+                entry, separator, reason = arguments[index + 1].partition("=")
+                if not separator:
+                    raise ValueError(f"--with 要写成 <条目>=<为什么>，读到「{arguments[index + 1]}」")
+                declared.append((entry, reason))
+                index += 1
             elif word == "--target-dir":
                 if index + 1 >= len(arguments):
                     raise ValueError("--target-dir 后面没给值")
@@ -197,17 +231,19 @@ def execute(arguments):
             raise ValueError(f"源树 {source} 不是仓根：缺 {'、'.join(missing)}")
         if os.path.commonpath((source, copy)) in (source, copy):
             raise ValueError(f"副本 {copy} 与源树 {source} 相同或互相包含")
+        declarations = repository_copy.checked_declarations(declared)
     except ValueError as error:
         print(f"  ✗ minimal-copy.py 用法错：{error}", file=sys.stderr)
-        print("  → 怎么办：minimal-copy.py <仓根> <副本目录> [--with-gate-tables] [--with-test-inputs] [--target-dir <编译目录>]；副本放在仓外（草稿目录）",
-              file=sys.stderr)
+        print("  → 怎么办：minimal-copy.py <仓根> <副本目录> [--with-gate-tables] [--with-test-inputs] [--with <条目>=<为什么>]… [--target-dir <编译目录>]；"
+              "副本放在仓外（草稿目录），--with 的条目写仓根下的相对路径、为什么至少 4 个字", file=sys.stderr)
         return EXIT_USAGE
     try:
-        items = items_to_copy(source, with_gate_tables, with_test_inputs)
+        items = items_to_copy(source, with_gate_tables, with_test_inputs, declarations)
     except (repository_copy.ClosureRefused, OSError) as error:
         print(f"  ✗ 最小副本拒绝建：拷贝范围的闭包算不成：{error}；副本里一个文件都没写", file=sys.stderr)
         print("  → 怎么办：path 依赖要指到仓根之下（包挪进仓里，或改它的 Cargo.toml）；Cargo.toml 写坏了的先修好它；编译期读的文件写成"
-              " scripts/hosts/lib_repository_copy.py 文件头「闭包」认得的写法并让它进仓", file=sys.stderr)
+              " scripts/hosts/lib_repository_copy.py 文件头「闭包」认得的写法并让它进仓；声明的条目里的脚本引到的文件不在的，补上上面点名的那几份、"
+              "或改掉引到它们的那一行", file=sys.stderr)
         return EXIT_REFUSED
     per_item, every_file = measure(source, items)
     total = sum(item_bytes for _, _, item_bytes in per_item)
@@ -240,7 +276,7 @@ def execute(arguments):
 
 
 # ── 自证 ──
-OLD_MTIME_SECONDS = 1577836800     # 2020-01-01：源树里的文件带着这个旧修改时刻
+OLD_MTIME_SECONDS = 1577836800     # 2020 年 1 月 1 日：源树里的文件带着这个旧修改时刻
 RECENT_SECONDS = 3600              # 「此刻」：自证里文件的修改时刻离现在不超过这么多秒
 REGISTRY_SAMPLE_TEXT = "7  # 自证样本的登记\n"
 LIBRARY_SAMPLE_TEXT = 'pub const THREADS: &str = include_str!("../../../' + THREAD_REGISTRY_ITEM + '");\npub fn f() -> u32 { 1 }\n'
@@ -418,6 +454,40 @@ def selftest_cells(root):
           and os.path.isfile(os.path.join(with_tests, "litmus/a.litmus")),
           f"不带参数副本里不该有 litmus/、带 --with-test-inputs 该有 litmus/a.litmus，实际退 {code_plain} 与 {code_with}、"
           f"不带的有 {tree_files(plain)}、带的有 {tree_files(with_tests)}：{error.strip()[-200:]}")
+
+    # declared-entries-copied：--with 声明副本里要起的 tools/run.py ⇒ 它与它 import 的同目录 helper.py 一起拷进副本，同目录没被点名的 unused.py 不拷；
+    # 不写为什么（--with tools/run.py=）⇒ 退 2、报「为什么」、副本里一个文件都不写
+    source = make_source(root, "declared-entries-copied")
+    write(source, "tools/run.py", "import helper\nprint(helper.value)\n")
+    write(source, "tools/helper.py", "value = 1\n")
+    write(source, "tools/unused.py", "value = 2\n")
+    copy = os.path.join(root, "declared-entries-copied", "copy")
+    unreasoned = os.path.join(root, "declared-entries-copied", "unreasoned")
+    code, _, error = run_captured([source, copy, "--with", "tools/run.py=副本里要起这份脚本"])
+    code_unreasoned, _, error_unreasoned = run_captured([source, unreasoned, "--with", "tools/run.py="])
+    copied_tools = [path for path in tree_files(copy) if path.startswith("tools/")]
+    check("declared-entries-copied", code == 0 and copied_tools == ["tools/helper.py", "tools/run.py"] and code_unreasoned == EXIT_USAGE
+          and not tree_files(unreasoned) and "为什么" in error_unreasoned,
+          f"--with 声明的 tools/run.py 应当连它 import 的 tools/helper.py 一起拷、不拷 tools/unused.py，不写为什么应当退 {EXIT_USAGE}、副本里没有文件，"
+          f"实际退 {code}、拷了 {copied_tools}，不写为什么退 {code_unreasoned}、副本有 {tree_files(unreasoned)}：{error.strip()[-200:]} {error_unreasoned.strip()[-200:]}")
+
+    # gate-tables-closure-copied（副本缺 .claude/scripts/preflight.sh，门禁 source 失败、参数被清空成全跑）：
+    # 带 --with-gate-tables，门禁表里的 stage.sh 照自己所在目录 source ../scripts/preflight.sh ⇒ 副本里有 .claude/scripts/preflight.sh；
+    # 源树里没有那一份（闭包算不全）⇒ 退 1、副本里一个文件都不写、拒绝说明点名缺的那一份
+    source = make_source(root, "gate-tables-closure-copied")
+    write(source, ".claude/gate.d/stage.sh", '#!/usr/bin/env bash\nsource "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"\necho gate\n')
+    write(source, ".claude/scripts/preflight.sh", "preflight() { :; }\n")
+    copy = os.path.join(root, "gate-tables-closure-copied", "copy")
+    code, _, error = run_captured([source, copy, "--with-gate-tables"])
+    gap_source = make_source(root, "gate-tables-closure-gap")
+    write(gap_source, ".claude/gate.d/stage.sh", '#!/usr/bin/env bash\nsource "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"\necho gate\n')
+    gap_copy = os.path.join(root, "gate-tables-closure-gap", "copy")
+    gap_code, _, gap_error = run_captured([gap_source, gap_copy, "--with-gate-tables"])
+    check("gate-tables-closure-copied", code == 0 and os.path.isfile(os.path.join(copy, ".claude/scripts/preflight.sh"))
+          and gap_code == EXIT_REFUSED and not tree_files(gap_copy) and ".claude/scripts/preflight.sh" in gap_error,
+          f"带 --with-gate-tables 时门禁表 source 的 .claude/scripts/preflight.sh 应当一起拷，源树里没有它时应当退 {EXIT_REFUSED}、副本里没有文件、点名它，"
+          f"实际退 {code}、副本里 .claude/ 下有 {[path for path in tree_files(copy) if path.startswith('.claude/')]}，缺的那一棵退 {gap_code}、副本有 {tree_files(gap_copy)}："
+          f"{error.strip()[-200:]} {gap_error.strip()[-300:]}")
     return failures, checked
 
 
@@ -430,8 +500,11 @@ SWITCH_EXPECTED_CELLS = {   # 文件头「弄坏开关」那一段，两处要�
     "no-refresh": ["refresh-with-target-dir"],
     "no-root-check": ["refuses-non-root"],
     "no-extra-warning": ["warns-about-extra-top-level"],
-    "closure-ignored": ["thread-registry-copied", "whitelist-only", "path-dependencies-copied", "path-dependency-outside-root-refused", "test-inputs-opt-in"],
+    "closure-ignored": ["thread-registry-copied", "whitelist-only", "path-dependencies-copied", "path-dependency-outside-root-refused", "test-inputs-opt-in",
+                        "declared-entries-copied"],
     "test-inputs-always": ["test-inputs-opt-in"],
+    "declared-ignored": ["declared-entries-copied"],
+    "gate-tables-closure-skipped": ["gate-tables-closure-copied"],
 }
 
 
@@ -449,7 +522,16 @@ def selftest():
         print(f"  ✗ minimal-copy.py 自证 {len(failures)} 格不对（查了 {checked} 格）：{'、'.join(failures)}")
         print(f"  → 怎么办：照上面逐格改 measure / copy_tree / execute；{BREAK_VARIABLE} 设着的话本来就该红")
         return 1
-    jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), int(os.environ.get("SINGLEFS_THREAD_CAP") or 0) or os.cpu_count() or 1))
+    # 开关轮的并发：每台默认重活线程数（scripts/hosts/heavy_threads.py，登记位 .claude/heavy-thread-default），再按开关条数夹；取不了就拒，不退回按核数算
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import heavy_threads
+    try:
+        switch_round_threads = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        print(f"  ✗ 弄坏开关轮取不了每台默认重活线程数：{error}")
+        print(f"  → 怎么办：{error.howto}；不退回按核数算")
+        return 2
+    jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), switch_round_threads))
 
     def one(switch):
         completed = subprocess.run([sys.executable, "-B", os.path.realpath(__file__), "--selftest-cells"], capture_output=True, text=True,
@@ -472,7 +554,8 @@ def selftest():
     print(f"  ✓ minimal-copy.py 自证通过（查了 {checked} 格：只拷名单里的东西不拷 research/ 与各层编译目录、每台默认重活线程数的登记文件拷进副本、"
           "合计超阈值拒绝且副本里一个文件都不写并点名最大的文件、"
           "拷前先报大小、拷过去的与内容变了的是此刻的修改时刻而没变的不动、门禁表要 --with-gate-tables 才拷、给了 --target-dir 就刷源码戳、"
-          f"源树不是仓根退 {EXIT_USAGE}、副本顶层有名单之外的项报警告、path 依赖逐层拷进副本而指到仓根之外的拒绝、测试读的仓根文件要 --with-test-inputs 才拷；"
+          f"源树不是仓根退 {EXIT_USAGE}、副本顶层有名单之外的项报警告、path 依赖逐层拷进副本而指到仓根之外的拒绝、测试读的仓根文件要 --with-test-inputs 才拷、"
+          f"--with 声明的脚本连它 import 的一起拷而不写为什么退 {EXIT_USAGE}、门禁表里的脚本 source 的一起拷而缺的那一份点名拒绝；"
           f"弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 

@@ -18,7 +18,7 @@ singlefs 的判定库服务：RocksDB 判定库的唯一持有者，两台的任
 1. 编（经统一任务服务，不在本机直接起 cargo）。编译目录归服务、派到哪台都可能、跑完就删，所以同一条命令里把二进制拷到多机配置 `NFS_SHARED_ROOTS` 某一段下的目录（两台同一绝对路径读得到）：
    `task-server/task submit --cwd <仓根>/prune-server -- bash -c 'cargo build --release --offline --bin prune-server && cp "${CARGO_TARGET_DIR:?}/release/prune-server" <共享根下的目录>/prune-server.new && mv <共享根下的目录>/prune-server.new <共享根下的目录>/prune-server'`，再 `task-server/task wait <号>`；`<共享根下的目录>/prune-server` 是二进制。
 2. `python3 prune-server/control install --dry-run --binary <那个二进制>` 看每一步。
-3. `python3 prune-server/control install --binary <那个二进制>`：拷成 `~/.local/share/singlefs/prune-server/bin/prune-server`（回读 sha256），建状态目录 `~/.local/state/singlefs/prune-server`（700），写单元、`daemon-reload`、`start`、`enable`（两台开了 linger，开机就起），回读服务通了才退 0。单元带 `Restart=always`：进程不是 `systemctl stop` 停掉的（被 earlyoom 杀、崩了、退了），隔 `RestartSec` 秒由 systemd 拉起，落在容错客户端一轮重连（至多 120 秒）里，客户端重连上接着做。服务的库是状态目录下的 `library`，服务头一次起时建。
+3. `python3 prune-server/control install --binary <那个二进制>`：拷成 `~/.local/share/singlefs/prune-server/bin/prune-server`（回读 sha256），建状态目录 `~/.local/state/singlefs/prune-server`（700），写单元、`daemon-reload`、`start`，回读服务通了才退 0。不 `enable`，单元也没有 `[Install]` 段：开机不自起（用户定：「开机不自启动。 但是启动后要有恢复能力。」），起来之后才靠 `Restart=always` 恢复。单元带 `Restart=always`：进程不是 `systemctl stop` 停掉的（被 earlyoom 杀、崩了、退了），隔 `RestartSec` 秒由 systemd 拉起，落在容错客户端一轮重连（至多 120 秒）里，客户端重连上接着做。服务的库是状态目录下的 `library`，服务头一次起时建。
 4. 用完 `task-server/task clean <号>` 删编译目录。
 5. 换二进制：再跑 3（单元在跑的不重起），然后 `control stop`、`control start`。
 
@@ -40,7 +40,7 @@ singlefs 的判定库服务：RocksDB 判定库的唯一持有者，两台的任
 4. 再带 `--dry-run` 跑一次，末行 `oversized_rows=0`。
 5. `python3 prune-server/control start`、`python3 prune-server/control check`。
 
-认哪几行：键不是段键、计数键的形状，值长让只读这一把键的成批点读回应超过帧长上限（与服务整帧拒同一份判法，`src/oversized_values.rs` 文件头）；判定向量两张表的空值行认不上。服务开着库时退 3（RocksDB 的 LOCK），退出码全表在 `src/bin/prune_server.rs` 文件头。
+认哪几行：键不是段键、版本登记键的形状，值长让只读这一把键的成批点读回应超过帧长上限（与服务整帧拒同一份判法，`src/oversized_values.rs` 文件头）；判定向量两张表的空值行认不上。服务开着库时退 3（RocksDB 的 LOCK），退出码全表在 `src/bin/prune_server.rs` 文件头。
 
 ## 控制命令
 
@@ -49,12 +49,12 @@ singlefs 的判定库服务：RocksDB 判定库的唯一持有者，两台的任
 - 不过就退 78 的三样：多机配置里有 `PRUNE_SERVER_TCP_ADDRESS`（写 `<IP>:<端口>`，不写主机名）；共用取法取得到地址（配置整份判得过：`HOSTS` 写了、那个 IP 在 `HOSTS` 里、别的键齐，原因照抄判法那一句）；经 ssh 之前，这一条不是别的那台转来的（两台都不认那个 IP 是自己的，就是配置错了）。
 - `install --binary` 转去时，二进制要在多机配置 `NFS_SHARED_ROOTS` 某一段下（两台同一绝对路径读得到），不在退 78。
 - `watch` 转去时照样前台、按行转打，对端退出就退它的退出码；ssh 断了或连不上按「服务不通」报、退 1。别的子命令 ssh 连不上退 78。
-- `control --selftest`：这份文件自己的自证（判在哪台、经 ssh 转、共用取法与本份的几种拒绝、watch 转打与断开、单元自己拉起与 enable、stop 之后不被拉起、drop-oversized-values 的拒与转起），用假的 ssh、假的 systemctl 与整份判得过的假配置（这一台写每台 lo 上都有的 127.0.0.1，第二台写文档段地址），共用取法照真的判法判，不起真服务；格与弄坏开关 `PRUNE_SERVER_CONTROL_BREAK` 的表在 `control` 文件头。
+- `control --selftest`：这份文件自己的自证（判在哪台、经 ssh 转、共用取法与本份的几种拒绝、watch 转打与断开、单元自己拉起与不 enable、stop 之后不被拉起、stop 读不到 cgroup 不当空、缺二进制时的编法提示、watch 认 activating 等过渡状态、drop-oversized-values 的拒与转起），用假的 ssh、假的 systemctl 与整份判得过的假配置（这一台写每台 lo 上都有的 127.0.0.1，第二台写文档段地址），共用取法照真的判法判，不起真服务；格与弄坏开关 `PRUNE_SERVER_CONTROL_BREAK` 的表在 `control` 文件头。
 
 - `control check`：二进制、多机配置里的 TCP 地址、服务通不通，都过退 0，缺一样退 78；另打库目录（装好的单元 ExecStart 的 `--state-directory` 下的 `library`）。
 - `control start`：起单元，回读 `is-active` 是 `active` 且服务通才退 0。
-- `control stop`：立刻停，不等在跑的读写。先叫服务宣布停服务（服务给每条连着的客户端发一帧「服务停了」，它们退 75 不再重试），打出停之前连着的客户端（主机、任务号、第几次、进程号），排他写进状态目录 `stops/` 下一份带时刻的停服务记录，再 `systemctl --user stop`（这样停的 systemd 不拉起；不 disable，开机照起）；回读 `is-active` 是 `inactive`/`failed`、单元 `cgroup.procs` 为空，隔单元的 `RestartSec` 加一秒再回读 `is-active` 仍是 `inactive`/`failed`（没被拉起）才退 0。最后对每个任务号打一行 `task-server/task status <号>`。
-- `control watch`：前台循环（主 agent 用 run_in_background 起）。单元不在跑、服务不通、故障日志里有这次 watch 起之后新增的故障行，判出一样就打出来退 1：出了什么、故障行原文、此刻连着的客户端（拿不到写拿不到）、每个任务号的 `task-server/task status <号>` 查法。一直好就一直查。
+- `control stop`：立刻停，不等在跑的读写。先叫服务宣布停服务（服务尽力给连着的客户端各发一帧「服务停了」，收到的退 75 不再重试；限时 5 秒内没写进套接字的连接，服务往故障日志记一行 `stop-notice-undelivered`，那几条客户端收不到通知，只能靠重连上限退出，`control stop` 照样往下停、可以退 0），打出停之前连着的客户端（主机、任务号、第几次、进程号），排他写进状态目录 `stops/` 下一份带时刻的停服务记录，再 `systemctl --user stop`（这样停的 systemd 不拉起；不 disable，本来也没 enable：开机不自起）；回读 `is-active` 是 `inactive`/`failed`、单元 `cgroup.procs` 为空（`systemctl show` 问 cgroup 失败、`cgroup.procs` 读不了都不算空，退 1），隔单元的 `RestartSec` 加一秒再回读 `is-active` 仍是 `inactive`/`failed`（没被拉起）才退 0。最后对每个任务号打一行 `task-server/task status <号>`。
+- `control watch`：前台循环（主 agent 用 run_in_background 起）。单元不在跑（`is-active` 打的不是 `active`、`activating`、`reloading`、`deactivating` 之一）、服务不通、故障日志里有这次 watch 起之后新增的故障行，判出一样就打出来退 1：出了什么、故障行原文、此刻连着的客户端（拿不到写拿不到）、每个任务号的 `task-server/task status <号>` 查法。一直好就一直查。
 - `control drop-oversized-values [--dry-run]`：单元在跑退 78（出路先 `control stop`）；停着时起装好的单元 ExecStart 的二进制跑同名子命令，`--state-directory` 取单元的，退它的退出码（「库」一节）。
 
 ## 退出码
@@ -72,10 +72,10 @@ singlefs 的判定库服务：RocksDB 判定库的唯一持有者，两台的任
 
 ## 故障行
 
-服务每出一个自身的错（读写库出错、分派错、线程 panic）往 `~/.local/state/singlefs/prune-server/faults.log` 追加一行，客户端发错格式被拒的不记：
+服务每出一个自身的错（读写库出错、分派错、线程 panic、宣布停服务时通知没送达）往 `~/.local/state/singlefs/prune-server/faults.log` 追加一行，客户端发错格式被拒的不记：
 
 ```
-PRUNE_SERVER_FAULT time=<零时区 ISO 8601，到毫秒> kind=<storage-read-failed|storage-write-failed|dispatch-bug|internal-panic> server_pid=<数> connection=<数> transport=<unix|tcp> peer=<地址> host=<主机名> task=<任务号> attempt=<第几次> pid=<客户端进程号> detail=<说明>
+PRUNE_SERVER_FAULT time=<零时区 ISO 8601，到毫秒> kind=<storage-read-failed|storage-write-failed|dispatch-bug|internal-panic|stop-notice-undelivered> server_pid=<数> connection=<数> transport=<unix|tcp> peer=<地址> host=<主机名> task=<任务号> attempt=<第几次> pid=<客户端进程号> detail=<说明>
 ```
 
 身份那几段来自客户端连上时的报到（`TASK_SERVER_TASK`、`TASK_SERVER_ATTEMPT`、主机名、进程号；不在 task-server 里跑的、不报到的写 `-`）。

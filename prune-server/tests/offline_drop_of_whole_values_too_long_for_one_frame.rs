@@ -1,6 +1,6 @@
 //! 离线子命令 `drop-oversized-values` 的认法与删法（`prune_server::oversized_values` 文件头）：每条用例在自己独占的临时目录里用服务写库的那一条路
 //! （`VerdictLibrary` 的组提交）造一份库，写一行比「一把键单独一帧读得回」长一个字节的整值、一行恰好最长读得回的整值、一份真分段存的值
-//! （清单、段键、计数键，照 `plan_segmented_write` 拆）、一行形状是段键而值同样超界的行、判定向量两张表的空值行与一行小值；
+//! （清单、段键、版本登记键，照 `plan_segmented_write` 拆）、一行形状是段键而值同样超界的行、判定向量两张表的空值行与一行小值；
 //! 再照只列与删两种跑，核认出的只有超界的那一行整值、库里别的行逐把不变。不起服务、不连真服务。
 //! 界不从被测模块取：照 `protocol` 文件头的回应帧格式（帧长上限减回应帧头、个数、在不在、值长）在这里另算一遍。
 
@@ -16,7 +16,8 @@ use prune_server::protocol::{
     EntryInTable, Table, MAXIMUM_FRAME_BODY_BYTES, RESPONSE_HEADER_BYTES,
 };
 use prune_server::segmented_values::{
-    plan_segmented_write, segment_count_key, segment_key, SEGMENT_MANIFEST_MAGIC,
+    plan_segmented_write, segment_key, version_registry_key, SegmentPlacement, StoredVersions,
+    SEGMENT_MANIFEST_MAGIC,
 };
 use prune_server::storage::VerdictLibrary;
 
@@ -95,15 +96,17 @@ fn write_fixture_library(library_directory: &Path) -> usize {
             SEGMENTED_OWNER_KEY.to_vec(),
             segmented_value,
         )],
-        &[0],
+        &[StoredVersions::default()],
+        SegmentPlacement::Versioned,
     )
     .expect("一段就装得下的值，段数在段号装得下的范围里");
     assert!(
-        plan.segment_and_count_entries.len() >= 2,
-        "以清单开头的值要存成段与计数键，计划里却只有 {} 条",
-        plan.segment_and_count_entries.len()
+        plan.segment_entries.len() == 1 && plan.version_registry_entries.len() == 1,
+        "以清单开头的值要存成一段与版本登记键，计划里却是段 {} 条、登记键 {} 条",
+        plan.segment_entries.len(),
+        plan.version_registry_entries.len()
     );
-    let segment_shaped_key = segment_key(SEGMENT_SHAPED_OWNER_KEY, 0);
+    let segment_shaped_key = segment_key(SEGMENT_SHAPED_OWNER_KEY, None, 0);
     let mut entries: Vec<(Table, &[u8], &[u8])> = vec![
         (
             Table::Conclusions,
@@ -137,8 +140,9 @@ fn write_fixture_library(library_directory: &Path) -> usize {
         ),
     ];
     for (table, key, value) in plan
-        .segment_and_count_entries
+        .version_registry_entries
         .iter()
+        .chain(&plan.segment_entries)
         .chain(&plan.entries_to_write_last)
     {
         entries.push((*table, key.as_slice(), value.as_slice()));
@@ -218,10 +222,19 @@ fn dropping_removes_just_that_row_and_keeps_segments_and_empty_verdict_vector_ro
     let library_directory = directory.path.join("library");
     let oversized_length = write_fixture_library(&library_directory);
     let rows_before = rows_of_the_library(&library_directory);
+    let segment_keys: Vec<&Vec<u8>> = rows_before
+        .keys()
+        .filter(|key| {
+            key.starts_with(SEGMENTED_OWNER_KEY)
+                && key.len() > SEGMENTED_OWNER_KEY.len() + 1
+                && key[SEGMENTED_OWNER_KEY.len()] == 0x00
+                && **key != version_registry_key(SEGMENTED_OWNER_KEY)
+        })
+        .collect();
     assert!(
-        rows_before.contains_key(&segment_count_key(SEGMENTED_OWNER_KEY))
-            && rows_before.contains_key(&segment_key(SEGMENTED_OWNER_KEY, 0)),
-        "造库之后分段存的值该有计数键与段键"
+        rows_before.contains_key(&version_registry_key(SEGMENTED_OWNER_KEY))
+            && segment_keys.len() == 1,
+        "造库之后分段存的值该有版本登记键与一把段键，段键 {segment_keys:02x?}"
     );
     let report = find_oversized_values_then_drop_unless_listing_only(
         &library_directory,
@@ -245,6 +258,6 @@ fn dropping_removes_just_that_row_and_keeps_segments_and_empty_verdict_vector_ro
     assert_eq!(
         rows_of_the_library(&library_directory),
         rows_expected_after,
-        "删完库里该只少超界的那一行整值：段键形状的、分段存的清单与段与计数键、判定向量空值的、记账行都该原样在"
+        "删完库里该只少超界的那一行整值：段键形状的、分段存的清单与段与版本登记键、判定向量空值的、记账行都该原样在"
     );
 }

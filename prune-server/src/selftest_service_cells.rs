@@ -10,11 +10,11 @@ use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
-use std::thread;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::administration::{CLIENT_LINE_PREFIX, SELFTEST_CLIENT_LINE_PREFIX};
+use crate::bench::SERVER_READY_TIMEOUT;
 use crate::break_switches::{BreakSwitch, BreakSwitches, BREAK_VARIABLE};
 use crate::client::{RouteAddress, SimpleClient};
 use crate::connections::{TASK_ATTEMPT_VARIABLE, TASK_NUMBER_VARIABLE};
@@ -25,7 +25,8 @@ use crate::reliable_client::{
     ClientFailure, ReconnectPolicy, ReliableClient, ReliableClientSettings,
     PRUNE_SERVER_UNAVAILABLE_EXIT_CODE,
 };
-use crate::selftest::{line_field, CellContext, CellDirectory, SERVER_READY_TIMEOUT};
+use crate::selftest::{line_field, CellContext, CellDirectory};
+use crate::selftest_fault_cells::within_deadline;
 use crate::server::LISTENING_LINE_PREFIX;
 use crate::spawned::{SpawnedProcess, StandardError};
 
@@ -892,33 +893,6 @@ pub(crate) fn cell_watch_reports_new_fault_line(context: &CellContext) -> Result
 /// 写超时那一格的写超时（缺省 30 秒，这里缩短好判）与等它的上限。
 const SHORT_WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 const WRITE_TIMEOUT_CELL_DEADLINE: Duration = Duration::from_secs(60);
-
-/// 在一个线程里做 `work`，至多等 `deadline`；到点调 `on_timeout` 让它收手（停标记、关代理的连接），再等它退出、判卡住。
-fn within_deadline<Output: Send>(
-    deadline: Duration,
-    on_timeout: impl FnOnce(),
-    work: impl FnOnce() -> Output + Send,
-) -> Result<Output, String> {
-    thread::scope(|scope| {
-        let (done_sender, done_receiver) = mpsc::channel();
-        let handle = scope.spawn(move || {
-            let output = work();
-            let _ = done_sender.send(());
-            output
-        });
-        match done_receiver.recv_timeout(deadline) {
-            Ok(()) => handle.join().map_err(|_| "做事的线程 panic 了".to_string()),
-            Err(mpsc::RecvTimeoutError::Timeout | mpsc::RecvTimeoutError::Disconnected) => {
-                on_timeout();
-                let _ = handle.join();
-                Err(format!(
-                    "{} 秒没做完，卡住了（到点关了代理的连接）",
-                    deadline.as_secs()
-                ))
-            }
-        }
-    })
-}
 
 fn big_entry(key: &str, bytes: usize) -> (Table, Vec<u8>, Vec<u8>) {
     (

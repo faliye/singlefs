@@ -206,7 +206,7 @@ mod tests {
     use super::*;
 
     /// 公开的测试向量（FIPS 180-2 附录 B 的三条加长消息那条），值与 `sha256sum` 打出来的逐字相同：摘要算错时这里先红，
-    /// 清单里记的就不会是一个自洽却与 Python 客户端对不上的哈希。56 字节那条补白之后跨两块，一百万个 a 那条走整块直接压的那一支。
+    /// 清单里记的就不会是一个自洽却与 Python 客户端对不上的哈希。56 字节那条补白之后跨两块，一百万个 a 那条走整块直接压的那一支（它是 8,000,000 位，不到 2^32，位数字段的高 32 位仍是 0；位数超过 32 位的长度字段另有一条用例）。
     /// 判别力（`crates/mutations.tsv`）：轮常量错一位，这条红。
     #[test]
     fn sha256_matches_the_published_test_vectors() {
@@ -226,7 +226,28 @@ mod tests {
         assert_eq!(
             sha256_hexadecimal(&vec![b'a'; 1_000_000]),
             "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
-            "一百万个 a：长消息那条向量，整块从消息里直接压、位数字段超过 32 位"
+            "一百万个 a：长消息那条向量，整块从消息里直接压；8,000,000 位，位数字段的高 32 位是 0"
+        );
+    }
+
+    /// 位数超过 32 位的长度字段：消息 2^30 字节是 2^33 位，位数字段的高 32 位不为 0。不真分配那么大的消息，直接核补白函数（只吃尾巴与总长）末尾写的 8 个字节。
+    /// 判别力：位数字段只写低 32 位（高 32 位丢成 0）时这条红。
+    #[test]
+    fn the_length_field_carries_message_bit_counts_beyond_32_bits() {
+        let message_length_in_bytes: usize = 1 << 30;
+        let padded = padded_tail_of_the_message(&[], message_length_in_bytes);
+        assert_eq!(padded.len(), BLOCK_BYTES, "空尾巴补白之后正好一块");
+        assert_eq!(padded[0], 0x80, "补白头一个字节是 0x80");
+        let (_, length_field) = padded.split_at(BLOCK_BYTES - MESSAGE_LENGTH_FIELD_BYTES);
+        assert_eq!(
+            length_field,
+            (1_u64 << 33).to_be_bytes(),
+            "2^30 字节 = 2^33 位，大端写满 64 位"
+        );
+        assert_eq!(
+            length_field[..4],
+            [0, 0, 0, 2],
+            "高 32 位是 2：这条要真测到超过 32 位的那一半"
         );
     }
 

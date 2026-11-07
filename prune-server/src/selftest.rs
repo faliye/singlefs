@@ -15,10 +15,9 @@
 //! 红的格要恰好是那一项点名的那一格（`BreakSwitch::red_cell`）；末行 `PRUNE_SERVER_BREAK_SWEEP switches=… matched=… baseline=green|red`，全对退 0。
 
 use std::collections::HashMap;
-use std::os::unix::fs::DirBuilderExt;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -26,12 +25,12 @@ use rocksdb::statistics::Ticker;
 
 use crate::bench::{
     judge_achieved_rate, percentile_microseconds, BenchMode, RateJudgment, BENCH_LINE_PREFIX,
-    ENVIRONMENT_DIRTY_EXIT_CODE, LIBRARY_LINE_PREFIX, STARTED_LINE_PREFIX,
+    ENVIRONMENT_DIRTY_EXIT_CODE, LIBRARY_LINE_PREFIX, SERVER_READY_TIMEOUT, STARTED_LINE_PREFIX,
 };
 use crate::bench_progress::{PROGRESS_LINE_PREFIX, STALLED_LINE_PREFIX, THREAD_LINE_PREFIX};
 use crate::break_switches::{BreakSwitch, BreakSwitches, BREAK_VARIABLE};
 use crate::client::{connect, ReceiveFailure, RouteAddress, SimpleClient};
-use crate::configuration::NETWORK_ADDRESS_KEY;
+use crate::configuration::{create_directory_holding_a_socket, NETWORK_ADDRESS_KEY};
 use crate::protocol::{
     begin_point_read_frame, encode_raw_request_frame, statistics_value, OperationCode,
     RejectionStatus, ResponseOutcome, StatisticsCounter, Table,
@@ -44,14 +43,18 @@ use crate::selftest_fault_cells::{
     cell_server_kill_while_client_writes,
 };
 use crate::selftest_hardening_cells::{
-    cell_claim_response_within_frame_limit, cell_connect_bounded_by_reconnect_total,
+    cell_claim_lease_covers_the_holder_after_the_answer, cell_claim_response_within_frame_limit,
+    cell_connect_bounded_by_reconnect_total, cell_delete_prefix_response_within_pending_budget,
     cell_incomplete_frames_bounded, cell_journal_high_water_survives_compaction,
     cell_journal_lock_survives_compaction, cell_oversize_frame_reported_at_once,
-    cell_unread_responses_bounded, cell_write_ahead_log_sync_failure_never_acknowledged,
+    cell_unread_responses_bounded, cell_worker_responses_within_pending_budget,
+    cell_write_ahead_log_sync_failure_never_acknowledged, cell_write_storage_failure_replayed,
 };
 use crate::selftest_library_layout_cells::{
     cell_delete_prefix_counts_before_deleting, cell_delete_prefix_only_under_prefix,
-    cell_library_opens_under_low_descriptor_soft_limit, cell_library_refuses_mismatched,
+    cell_delete_prefix_releases_claims, cell_library_opens_under_low_descriptor_soft_limit,
+    cell_library_refuses_mismatched, cell_multi_host_configuration_from_the_main_worktree,
+    cell_prefix_scan_resumes_after_the_last_key, cell_segmented_rewrite_survives_writer_death,
     cell_single_library_layout,
 };
 use crate::selftest_service_cells::{
@@ -69,8 +72,6 @@ pub const SWEEP_LINE_PREFIX: &str = "PRUNE_SERVER_BREAK_SWEEP";
 pub const CELL_SELECTION_VARIABLE: &str = "PRUNE_SERVER_SELFTEST_CELLS";
 /// 自证起的服务的工作线程数：至少 2 个才乱序得起来。
 pub(crate) const SELFTEST_WORKER_THREADS: &str = "4";
-/// 等服务打出就绪行的上限：同机重活压着时开库也慢，给足（只是上限，起得快就不等）。
-pub(crate) const SERVER_READY_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// 每格进程的末行开头（文件头「每格各在自己的进程里」）。
 pub const CELL_RESULT_LINE_PREFIX: &str = "PRUNE_SERVER_CELL_RESULT";
@@ -102,13 +103,13 @@ struct Cell {
     function: CellFunction,
 }
 
-const CELLS: [Cell; 46] = [
+const CELLS: [Cell; 54] = [
     Cell {
         name: "batched-point-read",
         remedy: "看 storage.rs 的 read_points：同一张表的键要一次 batched_multi_get_cf 查完，次序与请求相同",
         function: cell_batched_point_read,
     },
-    Cell { name: "prefix-scan", remedy: "看 storage.rs 的 scan_prefix：走出前缀就停、到条数上限标截断", function: cell_prefix_scan },
+    Cell { name: "prefix-scan", remedy: "看 storage.rs 的 scan_prefix_into：走出前缀就停、到条数上限标截断", function: cell_prefix_scan },
     Cell {
         name: "tcp-route-from-configuration",
         remedy: "看 command_line.rs 的 run_server 读多机配置那一段与 server.rs 的 TCP 监听",
@@ -261,7 +262,7 @@ const CELLS: [Cell; 46] = [
     },
     Cell {
         name: "single-library-layout",
-        remedy: "看 storage.rs 文件头与 applied_request_key、claim_key（记账行在默认列族、0xF0 与 0xF1 起头）、scan_prefix（走到 0xF0 那一段就停），\
+        remedy: "看 storage.rs 文件头与 applied_request_key、claim_key（记账行在默认列族、0xF0 与 0xF1 起头）、scan_prefix_into（走到 0xF0 那一段就停），\
                  protocol.rs 的 service_key_refusal（客户端碰 0xF0–0xFF 起头的键回状态 1），command_line.rs 不带 --library 取状态目录下的 library",
         function: cell_single_library_layout,
     },
@@ -278,13 +279,13 @@ const CELLS: [Cell; 46] = [
     },
     Cell {
         name: "delete-prefix-only-under-prefix",
-        remedy: "看 storage.rs 的 delete_prefix_into_group（走出前缀、走到记账那一段就停，一帧至多碰 maximum_keys 把，前缀下还有键时说没有更多=假）与 protocol.rs 的 \
+        remedy: "看 storage.rs 的 scan_prefix_for_deletion（走出前缀、走到记账那一段就停，一帧至多碰 maximum_keys 把，前缀下还有键时说没有更多=假）与 protocol.rs 的 \
                  DeletePrefix 解帧（空前缀、记账那一段的前缀、不以前缀起头的续扫起点、本帧上限越界都回状态 1）",
         function: cell_delete_prefix_only_under_prefix,
     },
     Cell {
         name: "delete-prefix-counts-before-deleting",
-        remedy: "看 storage.rs 的 delete_prefix_into_group 的 count_only：只数不删时不往写批里记删除，数的口径和删一样；客户端 delete_prefix 的续扫起点取上一帧回的最后一把键",
+        remedy: "看 storage.rs 的 scan_prefix_for_deletion 的 count_only（只数不删时不交回要删的键）与 committer.rs 的 add_delete_prefix（只在要删时往写批里记删除），数的口径和删一样；客户端 delete_prefix 的续扫起点取上一帧回的最后一把键",
         function: cell_delete_prefix_counts_before_deleting,
     },
     Cell {
@@ -328,33 +329,77 @@ const CELLS: [Cell; 46] = [
         function: cell_oversize_frame_reported_at_once,
     },
     Cell {
+        name: "claim-lease-covers-the-holder-after-the-answer",
+        remedy: "看 reliable_client.rs 的 write_unsent_frames（认领每次发出去都给整段租期，不换成剩下的）与 committer.rs 的 add_claim\
+                 （同一身份、租期没到的认领到期取已记下的与现在加帧里租期里晚的那一个，不往前挪）",
+        function: cell_claim_lease_covers_the_holder_after_the_answer,
+    },
+    Cell {
+        name: "write-storage-failure-replayed",
+        remedy: "看 reliable_client.rs 的 handle_response 与 retry_after_storage_failure（写帧回存储出错不从操作表拿掉，退避之后照同一请求号再交，\
+                 连着出错到重连次数上限回 StorageFailing 退 75），committer.rs 的 commit（写失败照常服务、同步失败退 7）",
+        function: cell_write_storage_failure_replayed,
+    },
+    Cell {
+        name: "delete-prefix-response-within-pending-budget",
+        remedy: "看 committer.rs 的 add_delete_prefix（回应先 reserve_response 记进额度，记不进回忙、一把都不删，记得进才把删除记进写批）与 server.rs 文件头「额度」",
+        function: cell_delete_prefix_response_within_pending_budget,
+    },
+    Cell {
+        name: "delete-prefix-releases-claims",
+        remedy: "看 committer.rs 的 add_delete_prefix 与 release_claim_on（删掉的每一把键同时从内存认领表与写批里去掉认领；只数不删不动认领）",
+        function: cell_delete_prefix_releases_claims,
+    },
+    Cell {
+        name: "worker-responses-within-pending-budget",
+        remedy: "看 server.rs 的 ResponseBudget 与 execute_request（成批点读先数回应多大、记进额度再分配，按前缀扫每读出一条先记再放进回应，记不进整帧回忙、放回已记的）与 storage.rs 的 scan_prefix_into",
+        function: cell_worker_responses_within_pending_budget,
+    },
+    Cell {
+        name: "multi-host-configuration-from-the-main-worktree",
+        remedy: "看 configuration.rs 的 multi_host_configuration_path_from 与 main_worktree_root_of（没设 SINGLEFS_MULTI_HOST_CONFIG 时照 git rev-parse --git-common-dir 的上一层取主工作树根下那一份）",
+        function: cell_multi_host_configuration_from_the_main_worktree,
+    },
+    Cell {
+        name: "segmented-rewrite-survives-writer-death",
+        remedy: "看 segmented_values.rs 的 plan_segmented_write（段键带整值的 sha256、版本登记键并上此刻那一版）与 reliable_client.rs 的 write_segments_of_large_values、read_missing_segments（段键取清单的版本，写前删过期的版本）",
+        function: cell_segmented_rewrite_survives_writer_death,
+    },
+    Cell {
+        name: "prefix-scan-resumes-after-the-last-key",
+        remedy: "看 protocol.rs 的按前缀扫帧（续扫起点）与 storage.rs 的 scan_prefix_into（续扫起点不空时从它后面接一个 0 字节起扫）",
+        function: cell_prefix_scan_resumes_after_the_last_key,
+    },
+    Cell {
         name: OWN_PROCESS_CELL_NAME,
         remedy: "看 selftest.rs 的 run_cell_isolated 与 run_cell_in_own_process（每格另起一个 selftest-cell 进程只跑它，父进程是跑格的进程）",
         function: cell_runs_alone_in_own_process,
     },
 ];
 
-static DIRECTORY_COUNTER: AtomicU64 = AtomicU64::new(0);
+/// 一格里放 socket 的最长相对路径（控制命令那一格的 `run/server.sock`；别的格是目录下的 `server.sock`、`proxy.sock`）。
+const LONGEST_SOCKET_RELATIVE_PATH_IN_A_CELL: &str = "run/server.sock";
+const CELL_DIRECTORY_NAME_PREFIX: &str = "prune-selftest";
 
-/// 一格自己的临时目录：放手时删。名字短，socket 全路径不超 107 字节。
+/// 一格自己的临时目录：放手时删。建法见 [`create_directory_holding_a_socket`]，里面的 socket 全路径不超 107 字节。
 pub(crate) struct CellDirectory {
     pub(crate) path: PathBuf,
 }
 
 impl CellDirectory {
     pub(crate) fn create() -> Result<CellDirectory, String> {
-        let base = std::env::var_os("TMPDIR")
-            .filter(|value| !value.is_empty())
-            .map_or_else(|| PathBuf::from("/tmp"), PathBuf::from);
-        let path = base.join(format!(
-            "prune-selftest-{}-{}",
-            std::process::id(),
-            DIRECTORY_COUNTER.fetch_add(1, Ordering::SeqCst)
-        ));
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&path)
-            .map_err(|error| format!("建不了临时目录 {}：{error}", path.display()))?;
+        CellDirectory::create_under(std::env::var_os("TMPDIR"))
+    }
+
+    /// `temporary_directory_variable` 是 `TMPDIR` 的值。
+    fn create_under(
+        temporary_directory_variable: Option<OsString>,
+    ) -> Result<CellDirectory, String> {
+        let path = create_directory_holding_a_socket(
+            temporary_directory_variable,
+            CELL_DIRECTORY_NAME_PREFIX,
+            LONGEST_SOCKET_RELATIVE_PATH_IN_A_CELL,
+        )?;
         Ok(CellDirectory { path })
     }
 }
@@ -1807,4 +1852,34 @@ pub fn run_break_sweep() -> i32 {
         if baseline_green { "green" } else { "red" }
     );
     i32::from(!all_matched)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::configuration::{MAXIMUM_SOCKET_PATH_BYTES, SHORT_TEMPORARY_ROOT};
+
+    /// `TMPDIR` 设得比 socket 路径上限还长时，一格的目录退到短根底下，最长的那条 socket 路径仍不超上限。
+    #[test]
+    fn cell_directory_falls_back_to_the_short_root_when_the_temporary_root_is_longer_than_a_socket_path_may_be(
+    ) {
+        let long_root =
+            Path::new(SHORT_TEMPORARY_ROOT).join("r".repeat(MAXIMUM_SOCKET_PATH_BYTES + 20));
+
+        let directory = CellDirectory::create_under(Some(long_root.clone().into_os_string()))
+            .unwrap_or_else(|message| panic!("临时根放不下，短根放得下，却建不成：{message}"));
+
+        assert!(
+            !directory.path.starts_with(&long_root),
+            "临时根 {} 放不下 socket 全路径，目录该改建在 {SHORT_TEMPORARY_ROOT} 底下，实际是 {}",
+            long_root.display(),
+            directory.path.display()
+        );
+        let socket_path = directory.path.join(LONGEST_SOCKET_RELATIVE_PATH_IN_A_CELL);
+        assert!(
+            socket_path.as_os_str().len() <= MAXIMUM_SOCKET_PATH_BYTES,
+            "socket 全路径 {} 超过 {MAXIMUM_SOCKET_PATH_BYTES} 字节",
+            socket_path.display()
+        );
+    }
 }

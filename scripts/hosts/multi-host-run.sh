@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 把一件确定性的活挪到第二台跑（用户 2026-09-28 定）：只在第二台跑，--peer 必写。仓、工作根与会话记录目录经 NFS 两台挂在同一绝对路径
-#   （多机配置 NFS_SHARED_ROOTS；用户 2026-11-01「要是你倾向于把仓本身也做成 NFS 共享、第二台直接在活树上跑。 我认为这么做比较好。」）：
+# 把一件确定性的活挪到第二台跑：只在第二台跑，--peer 必写。仓、工作根与会话记录目录经 NFS 两台挂在同一绝对路径
+#   （多机配置 NFS_SHARED_ROOTS）：
 #   第二台在这一刻的工作目录、同一个绝对路径里直接起，不拷树、不送、不取回、不改写路径，写出的文件两台都读得到。
 #
 #   multi-host-run.sh --peer [--memory-cap <上限>] [--label <标签>] [--keep-build-directory] [--reuse-build-directory <上一次的标签>] -- <命令与参数…>
@@ -29,7 +29,7 @@
 #   ① 配置经 scripts/hosts/peer-host-lib.sh 的 peer_host_load_configuration 读（判法是 scripts/crash/crash-point-replay-shard-configuration-check.sh，
 #      配置 ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，模板是仓根 multi-host.env.example）；判不过退 255。
 #      读之前先单跑一次判法看双机开关（ENABLE_ACROSS_MACHINES，定义在那份判法里；判法退 3 是「双机：关」）：没开就拒、退 255，
-#      出路是在配置里写一行 ENABLE_ACROSS_MACHINES=1，不偷偷退回本机跑（用户 2026-09-28 定：双机要参数开启）。
+#      出路是在配置里写一行 ENABLE_ACROSS_MACHINES=1，不偷偷退回本机跑（双机要参数开启）。
 #      只收服务直接起的那一次（两台对称，不靠认台的角色变量）：task-server 起派第二台的尝试时只给最外层这一层设
 #      MULTI_HOST_RUN_ADMITTED_BY_TASK_SERVER=<任务号>.<第几次尝试>（task-server/task_server.py 文件头 ③「环境」）；这里开头读一次就 unset，
 #      本机这一侧往下起的子进程看不到它，第二台那条命令只拿 ⑤「带到第二台的环境」点名的几样，也看不到。没有它（任务里面的命令再带 --peer，在哪台都一样）
@@ -41,9 +41,11 @@
 #      经服务派来的到不了这里）：
 #      ① 读到的 NFS_SHARED_ROOTS（冒号分隔）列的根；下面几样都要落在某一个根下面（等于根或以「根/」起头；本机这一侧取真路径）：
 #        这一刻的工作目录；
-#        -- 之后命令的每个词里的绝对路径（multi_host_outside_shared_path）：整个词是绝对路径的、「名字=绝对路径」的值、词里有空白的（bash -c 那一段）里每一段绝对路径
-#          （与 task-server/task_server.py 的 QUOTED_WORD_PATH 同一个写法：前面紧挨着 \w、/、}（${…} 收尾）、)（$(…) 收尾）、.（./x、../x 这类相对路径）的 /… 是展开之后的尾巴
-#          或相对路径，不当绝对路径，前面是空白、引号、=、: 一类的照取；整个词就是一个此刻在的、带空白的绝对路径的照整个词）；两台相同的系统路径不判（MULTI_HOST_HOST_INDEPENDENT_PATHS：/dev/null、/dev/stdin、
+#        -- 之后命令的每个词里的绝对路径（multi_host_outside_shared_path；与 task-server/task_server.py 的 find_outside_shared_path 同一个读法，只认整个 shell 词是绝对路径的）：
+#          以 / 起头的整个词（此刻在的、带空白的绝对路径照整个词）、「名字=绝对路径」「--选项=绝对路径」的值；bash、sh 这类后面带 -c（-ec、-lc 同）的脚本那一个词
+#          照 shell 词切开，每个以 / 起头的 shell 词、「名字=」的值与挨着 ;|&<>( 写的下一个词；别的词中间夹着的 /（--item 的值「…（接的是 /）」这类）、
+#          脚本里引号中空白后面的 /、跟在 }、) 后面的 /…（${…}、$(…) 展开之后的尾巴）、./x、../x 与 a:/x 里夹着的都不算；脚本引号不配对、切不开的照子串取（多拒不漏）；
+#          两台相同的系统路径不判（MULTI_HOST_HOST_INDEPENDENT_PATHS：/dev/null、/dev/stdin、
 #          /dev/stdout、/dev/stderr、/dev/fd/ 下、/usr/ 下、/bin/ 下）；相对路径照工作目录解，工作目录在共享根下它们也在；
 #        本机这一份多机配置（第二台那条命令照同一个绝对路径读它，⑤「带到第二台的环境」）；
 #        工作根与共享数据根（都经 .claude/hooks/lib_work_root.py 取：SINGLEFS_DATA_ROOT，没设取多机配置的 SHARED_DATA_ROOT，都没有那份库报错、这里退 255）：两个都照本机的真路径交给第二台那条命令
@@ -64,7 +66,7 @@
 #      （同一个绝对路径；那一层只有这一条的上限与 slice 的总上限，不排队、不记账：排队与记账只在本机的 task-server；那一层只认服务起的那一层，
 #      这里照 ① 读到的服务给这一次的标记给它设 RUN_WITH_MEMORY_CAP_ADMITTED_BY_TASK_SERVER，它照旧从命令的环境里摘掉）。弄坏开关 peer-build-in-shared-tree 下不设
 #      CARGO_TARGET_DIR（cargo 照默认在共享的树里编）；peer-runs-in-scratch 下不在这一刻的工作目录里起，在这一趟的本地目录里起。
-#      编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：--peer 时命令的词里（连同 bash -c 的脚本）写了 CARGO_TARGET_DIR= 是用法错（退 2，命令没跑；
+#      编译目录（自己用完自己删，不跨趟复用）：--peer 时命令的词里（连同 bash -c 的脚本）写了 CARGO_TARGET_DIR= 是用法错（退 2，命令没跑；
 #      multi_host_command_target_in）：编译目录由这里在第二台本地盘上建、⑥ 删。弄坏开关 command-target-accepted 下照跑。
 #      脱离 ssh 会话起（peer_host_start_detached），每 MULTI_HOST_RUN_POLL_SECONDS（默认 5）秒经 ssh 看一次（peer_host_wait_detached，每一轮之后调 multi_host_follow_peer）。
 #      跑着时接回（task-server 看本机这一次尝试的日志涨不涨、CPU 涨不涨判卡住，第二台的任务也要看得见）：每一轮多一次 ssh，读第二台输出文件此刻的字节数与
@@ -76,20 +78,51 @@
 #      singlefs-memory-cap-*.scope，命令里再套一层包装的另算一个）见过的最大 usage_usec 之和：scope 收尾、读不到的照它最后一次读到的数算，所以一轮比一轮不减；
 #      read=yes 是这一轮读到了至少一个那样的 cgroup，no 是这一轮一个都没读到（还没起、已经收尾、ssh 不通、不经内存包装跑）。读这一行的一方（task-server）
 #      峰值：每一轮另读那条命令进程树里头一个不在起它的 bash 那个 cgroup 里的 cgroup（父在子前数，就是第二台那一层内存包装 run-with-memory-cap.sh 的
-#      singlefs-memory-cap-*.scope）的 memory.peak，留见过的最大；等到退出码之后再经 ssh 读一次第二台那一层内存包装在命令退出之后读的那一个
-#      （这里给那一层设 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT=<这一趟的本地目录>/exit-memory-peak，run-with-memory-cap.sh 文件头「task-server 给这一层的两样」：scope 收尾之前一定读到一次），
-#      两样取大的，在「第二台那条命令退 N」那一句之前往本机标准错误打一行，格式固定：
+#      singlefs-memory-cap-*.scope）进程用的内存：memory.stat 的 anon 加 shmem（同 scripts/hosts/memory_peaks_lib.py 的 process_memory_bytes、本机 task-server/attempt_runner.py
+#      文件头 ③，两台同一种量；页缓存与内核挂在 scope 上的不算：编验证包时 anon 921M、file 22163M，memory.peak 顶到上限 50176M，页缓存撑满上限时内核回收它、
+#      不因此杀进程），留见过的最大。等到退出码之后再经 ssh 读一次第二台那一层内存包装在命令退出之后读的那一个
+#      （这里给那一层设 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT=<这一趟的本地目录>/exit-memory-peak，run-with-memory-cap.sh 文件头「task-server 给这一层的两样」：scope 收尾之前一定读到一次
+#      scope 的 memory.peak），按轮一次都没读到（命令比一轮短）才照它；在「第二台那条命令退 N」那一句之前往本机标准错误打一行，格式固定：
 #        MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<十进制字节数>
-#      两样都没读到（不经内存包装跑、读不了）才不打这一行；命令比一轮短的照退出时读的那一个打。没等到退出码的（第二台连不上、进程没了）不打。
+#      两样都没有（不经内存包装跑、读不了）才不打这一行。没等到退出码的（第二台连不上、进程没了）不打。
 #      读这一行的是 task-server（按它记第二台那一次的内存峰值）。弄坏开关 peer-memory-peak-unreported 下不打；peer-memory-peak-unread-printed 下没读到也打 bytes=0；
-#      peak-read-only-by-sampling 下照改前只靠按轮采（不给那一层设这个变量、不读退出时那一个）。
-#      只供自证：MULTI_HOST_RUN_SELFTEST_PEAK_FILE=<文件名> 把每一轮读的文件名换成它，MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE=<文件名> 把退出时读的那一份的文件名换成它
-#      （造「读不到」那几格），只在 --selftest 起的驱动里认，别处设了不认、读完就 unset。
+#      peak-read-only-by-sampling 下只靠按轮采（不给那一层设这个变量、不读退出时那一个）；peer-memory-with-page-cache 下每一轮读 memory.peak 与 memory.current
+#      （含页缓存）、与退出时那一个取大的。
+#      只供自证：MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE=<文件名> 把退出时读的那一份的文件名换成它（造「读不到」那几格），
+#      MULTI_HOST_RUN_SELFTEST_MEMORY_DIRECTORY=<绝对路径> 把每一轮读 memory.stat（弄坏开关下 memory.peak、memory.current）的目录换成它（假 cgroup：造「页缓存撑满上限」那一格，
+#      只收 /、字母、数字与 ._- 组成的绝对路径），只在 --selftest 起的驱动里认，别处设了不认、读完就 unset。
 #      编译目录占盘：峰值那一行之后、⑥ 删之前，在第二台上量这一趟给命令的 CARGO_TARGET_DIR（builds/<标签>/target）的占盘（du -s -b，字节），往本机标准错误打一行，格式固定：
 #        MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=<十进制字节数>
 #      量不到（目录不在了、du 没跑成、ssh 不通）就不打；读这一行的是 task-server。弄坏开关 peer-build-peak-unreported 下不打；peer-build-peak-unread-printed 下量不到也打 bytes=0。
-#      按 usage_usec 涨不涨判「在算」；这一行与 MULTI_HOST_RUN_STEP 行每一轮都打，判日志涨不涨时不算它们。
-#      弄坏开关 peer-output-at-end-only 下跑着时不接回、等到结局才整份打（改前的样子）；peer-output-resent 下结局时从头再打一遍；
+#      编译段峰值：每一轮接回的那一截整行里找 cargo 编完打的那一行（MULTI_HOST_CARGO_FINISHED_PATTERN，与 task-server/task_server_lib.py 的 CARGO_FINISHED_PATTERN 同一个式子），
+#      还没见到的这一轮读到的进程内存（上面「峰值」每一轮读的那一个）收进编译那一段的最大，见到那一行的那一轮与之后的不收（同本机 task-server/attempt_runner.py 文件头 ③）；
+#      结局之后补接回的那一截里才有那一行的照样算见到。见到了那一行、那一行之前至少一轮读到了的，在 MULTI_HOST_RUN_PEER_MEMORY_PEAK 那一行之后打一行，格式固定：
+#        MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK bytes=<十进制字节数>
+#      没见到那一行（编不过、不是 cargo）或之前一轮都没读到的不打；读这一行的是 task-server（编译族只借它，task_server_lib.py 文件头「资源记录」的编译族）。
+#      弄坏开关 peer-build-phase-peak-unreported 下不打。
+#      此刻内存：就是上面「峰值」每一轮读的那一个（那一层内存包装的 scope 这一轮的 anon 加 shmem），每一轮紧跟在 MULTI_HOST_RUN_PEER_CPU 那一行之后往本机标准错误打一行，格式固定：
+#        MULTI_HOST_RUN_PEER_MEMORY poll=<与紧挨着的 CPU 那一行同一个轮数> current_bytes=<这一轮读到的 anon 加 shmem，没读到写 0> peak_bytes=<见过的最大，没读到写 0> read=<yes|no>
+#      read=yes 是这一轮读到了 memory.stat 的 anon 或 shmem，no 是没读到（还没起、已经收尾、ssh 不通、不经内存包装跑）：没读到也照打、两项写 0（peak_bytes 在前面几轮读到过的照写读到过的最大），不漏行。
+#      只在跑着的每一轮打，等到结局之后的那一段不打。读这一行的是 task-server（第二台顶在内存上限上、日志不涨而 CPU 在涨的，按它判撞上限；read=no 时 current_bytes 不算数）。
+#      两边的格式一起改：task-server/task_server.py 的 PEER_MEMORY_LINE 认 ^MULTI_HOST_RUN_PEER_MEMORY poll=([0-9]+) current_bytes=([0-9]+) peak_bytes=([0-9]+) read=(yes|no)$。
+#      弄坏开关 peer-memory-unreported 下不打；peer-memory-unread-skipped 下没读到 current 的这一轮不打这一行（漏行）。
+#      只供自证：MULTI_HOST_RUN_SELFTEST_CURRENT_FILE=<文件名> 把每一轮读 memory.stat 的文件名换成它（造「读不到」那一格），认的地方与读完 unset 同 MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE。
+#      等 IO（task-server 判卡住之前看这一次的进程是不是卡在不可中断的 IO 等待上：本机根盘被写满时本机导出的 NFS 跟着慢，第二台上读写共享根的进程停在 D 状态，
+#      日志不涨、CPU 也不涨，是在等 IO 不是死了）：同一次 ssh 里另数那条命令进程树里（连同进程号文件里那个 bash 自己）/proc/<进程号>/stat 状态字段是 D 的进程，
+#      每一轮紧跟在 MULTI_HOST_RUN_PEER_MEMORY 那一行之后往本机标准错误打一行，格式固定：
+#        MULTI_HOST_RUN_PEER_IO_WAIT poll=<与这一轮 CPU 那一行同一个轮数> blocked=<这一轮 D 状态的进程数，没读到写 0> read=<yes|no>
+#      read=yes 是这一轮读到了进程树（进程号那个 bash 还在），no 是没读到（还没起、已经收尾、ssh 不通）：没读到也照打、blocked 写 0，不漏行；只在跑着的每一轮打。
+#      读这一行的是 task-server（日志与 CPU 都满窗口不涨、这一个窗口里每一轮 blocked 都大于 0 且 read=yes 的不判卡住；read=no 时 blocked 不算数）。
+#      两边的格式一起改：task-server/task_server.py 的 PEER_IO_WAIT_LINE 认 ^MULTI_HOST_RUN_PEER_IO_WAIT poll=([0-9]+) blocked=([0-9]+) read=(yes|no)$。
+#      弄坏开关 peer-io-wait-unreported 下不打；peer-io-wait-uncounted 下读到了也写 blocked=0。
+#      只供自证：MULTI_HOST_RUN_SELFTEST_BLOCKED_STATES=<大写字母…> 把数的状态从 D 换成它们（造「有进程在等」那一格：S 是在睡，空转的命令底下总有在睡的父进程），
+#      只收大写字母，认的地方与读完 unset 同 MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE。
+#      按 usage_usec 涨不涨判「在算」；这一行、MULTI_HOST_RUN_PEER_MEMORY 行、MULTI_HOST_RUN_PEER_IO_WAIT 行与 MULTI_HOST_RUN_STEP 行每一轮都打，判日志涨不涨时不算它们。
+#      换字（peer_host_redact）读到不是合法 UTF-8 的字节（命令按字节截断了汉字、打了二进制）时原样放过那几个字节，其余照换，前后的行照打。
+#      换字那一步自己退非 0（python3 起不来、被杀）时，那一块（第二台输出文件的第 N 到 M 字节）一个字也不往本机打（没换字的私有字不许漏出去），
+#      本机标准错误打一行「! 第二台那条命令的输出第 N 到 M 字节换字时退了 <码>，这一块没打到这里、也不再重打…原样的输出在第二台 runs/ 下的 <标签>.log」，已接回的字节数照旧往前推（不重打）。
+#      只报一行、不整条判错：这一步只管日志上显示什么，第二台那条命令的退出码、输出文件与峰值都没受影响，整条判错会让一趟编了几小时的活白跑、被服务重排。弄坏开关 peer-redact-failure-unreported 下不报这一行。
+#      弄坏开关 peer-output-at-end-only 下跑着时不接回、等到结局才整份打；peer-output-resent 下结局时从头再打一遍；
 #      peer-output-partial-lines 下不留半行、读到多少打多少；peer-cpu-unreported 下不打 CPU 那一行；peer-cpu-not-kept 下 usage_usec 只算这一轮读到的。
 #      带到第二台的环境：本机的环境变量不带（真的第二台经 ssh 也拿不到），要设写成 -- env 变量=值 <命令>；只带 peer_host_carried_environment 打的几样：
 #      SINGLEFS_MULTI_HOST_CONFIG=<本机这一份多机配置的绝对路径>（在共享根下，第二台读同一份，③；不带认台的角色变量，两台对称）；
@@ -102,11 +135,24 @@
 #      RocksDB 预编库的取值：命令里有 cargo（有一个词是 cargo、以 /cargo 结尾，或 bash -c 的脚本里有单独的 cargo 这个词；multi_host_command_starts_cargo）时，
 #      第二台起它之前先跑 python3 <仓根>/scripts/hosts/rocksdb-prebuilt.py entry --root <④ 那棵树的根>（判第二台装了、ssh 起的这条命令拿到的取值与第二台的预编库一致），
 #      判红退 78、命令不跑，红句随输出接回本机；命令整条包在 bash -c '<判> && exec "$@"' 里交给上面几样。不含 cargo 的命令不判。
-#   ⑥ 命令结束之后（连同 ③ 以后在哪一步失败退出、被信号停）删第二台这一趟的本地目录（连同编译目录）与 runs/ 下那三个文件，回读不在了才算删了：
-#      删之前在第二台核没有进程开着里面的文件（仓里 scripts/hosts/run_build_directory.py holders）：有就是那条命令的子进程没收干净，不删、逐个报进程（换掉私有的字）、
+#   ⑥ 命令结束之后（连同 ③ 以后在哪一步失败退出、被信号停，与 --recover-cleanup）删第二台这一趟的本地目录（连同编译目录）与 runs/ 下那三个文件，回读不在了才算删了：
+#      删之前先在第二台停这一趟内存包装的 scope（「status=confirmed reason=processes-gone」之后那一层 scope 里仍可能挂着进程，它们清了环境、换了会话号，
+#      照会话号与标签找不到）：⑤ 起第二台那条命令时给那一层内存包装设 RUN_WITH_MEMORY_CAP_UNIT_OUTPUT=runs/<标签>.scope（进程号文件旁边；run-with-memory-cap.sh 文件头
+#      「multi-host-run.sh 给这一层的一样」），⑥ 照它 systemctl --user stop 那一个 scope、回读 is-active 的输出是 inactive 或 failed、cgroup.procs 是空的（peer-host-lib.sh 的
+#      peer_host_stop_attempt_scope），⑥ 那一行另写停 scope 时里面还有几个；停了还有进程的不删、不打 ⑥、逐个报出留下的进程（换掉私有的字），清理回执记 pending、
+#      原因 scope-processes-remain、scope_leftovers 记那几个进程（task-server 照它把 cleanup-pending 那一条提醒推给交任务的会话，修改意见是核实脚本有没有不等子进程就退），
+#      驱动退 255（命令退的不是 0 时照命令的）；单元名认不出、ssh 没跑成的同样不删、记 pending。弄坏开关 peer-scope-unchecked 下不停 scope。
+#      再停这一趟留下的进程（multi_host_stop_peer_leftovers：会话号是进程号文件里那个号的、环境里带 TASK_SERVER_ATTEMPT_LABEL=<这一趟的标签> 的，
+#      后代自己 setsid 出去的照标签找得到；peer-host-lib.sh 文件头「这一趟留下的进程」；停了 scope 之后这一步只当补充），⑥ 那一行写停了几个；还有停不掉的、读不了 /proc 的不删、不打 ⑥、报出来、
+#      清理回执记 pending（占用照留），驱动退 255（命令退的不是 0 时照命令的）。弄坏开关 leftovers-left-at-cleanup 下不停。
+#      再在第二台核没有进程开着里面的文件（仓里 scripts/hosts/run_build_directory.py holders）：有就是那条命令的子进程没收干净，不删、逐个报进程（换掉私有的字）、
 #      驱动退 255（命令退的不是 0 时照命令的）。删不成同样退 255。弄坏开关 no-peer-cleanup 下不删。
 # 收到 TERM / INT / HUP（退 143 / 130 / 129）：先停那条命令——从它在第二台上记下的进程号起（peer_host_stop_detached），
-#   连同全部后代冻住、从最底层起 TERM、放开，至多等 30 秒，还在的 KILL——再删第二台这一趟的本地目录（⑥），做完才退。
+#   连同全部后代冻住、从最底层起 TERM、放开，至多等 30 秒，还在的 KILL，再停这一趟留下的进程；停干净了而起的那个 bash 来不及写退出码的，由停的这一方补写退出回执
+#   （peer-host-lib.sh 文件头「停下的退出回执」）——再删第二台这一趟的本地目录（⑥），做完才退。
+# --recover-cleanup <清理回执>（只由 task-server 在本机这一层包装结束之后调，task_server.py 的 confirm_peer_cleanup）：回执还是 pending 的，照回执里记的标签与三个文件
+#   在第二台再停一次、再删（⑥），停干净、删成、回执写成 confirmed 才退 0。起的那个 bash 不在、又没有退出回执的，照同一判法核这一趟留下的进程：一个不剩的当场判已停、
+#   补写退出回执；还有的先停、停完再核（peer_host_stop_detached）。弄坏开关 orphan-session-unverified 下：起的那个 bash 不在而没有回执就不核、退 1、回执留在 pending。
 # 退出码：那条命令的退出码（245 与 250–254 是内存包装自己的结局，含义见 run-with-memory-cap.sh 文件头「退出码」，那一次的输出不算结果）；
 #   78 带 --peer、命令里有 cargo 而第二台的 RocksDB 预编库取值判红（⑤，命令没跑）；
 #   2 用法错（含不带 --peer、命令里写了 CARGO_TARGET_DIR=、标签撞了），
@@ -132,7 +178,7 @@
 #       Ⓑ --peer 经仓里的 run-with-memory-cap.sh 跑（cgroup 在 singlefs-memory-cap- 的 scope 里）（「命令记下的 cgroup：0::/user.slice/…」）
 #       连带红的格：「✗ 接回 每一轮一行 MULTI_HOST_RUN_PEER_CPU …」（没有 scope：末行 usage_usec=0、一轮都没读到）、
 #         「✗ Ⓚ --peer：第二台的内存包装认出显存不够 ⇒ 原样退 245、报「显存不够」、说那一次的输出不算结果」（不经包装：命令自己的退 3 原样带回）、
-#         「✗ 峰值 第二台那条命令跑 0.1 秒就退、每一轮都读不到 memory.peak ⇒ …」（不经包装：退出时没人写峰值）、
+#         「✗ 峰值 第二台那条命令跑 0.1 秒就退、每一轮都读不到 memory.stat ⇒ …」（不经包装：退出时没人写峰值）、
 #         「✗ 现场目录 驱动环境里给了 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY、… ⇒ 退 7、那一份由第二台那一层内存包装搬成这个目录」（不经包装：没人搬）
 #   MULTI_HOST_RUN_BREAK=no-peer-cap-limit  --memory-cap 比多机配置 SLICE_MEMORY_CAP_BY_HOST 里第二台那一项大也照跑
 #       Ⓑ --memory-cap 2G 比多机配置 SLICE_MEMORY_CAP_BY_HOST 里第二台那一项 1G 大 ⇒ 拒（退 2），命令没跑（「退 0，命令跑了」）
@@ -148,15 +194,16 @@
 #   MULTI_HOST_RUN_BREAK=no-peer-stop-on-signal  收到 TERM 不停第二台那条命令
 #       Ⓕ 第二台那条命令在跑时收到 TERM ⇒ 退 143，第二台那条命令不在了，runs/ 与 builds/ 下什么都不剩（「退 143，第二台那条命令的进程号「…」还活着」）
 #   MULTI_HOST_RUN_BREAK=no-redact  第二台的输出不经 peer_host_redact 就打
-#       Ⓖ 输出里没有配置里的主机名与第二台的目录，命令打的那两样换成了「第二台」「第二台的目录」（「有的：peer/run.err」）
-#   MULTI_HOST_RUN_BREAK=switch-off-falls-back-to-local  配置里双机没开时退回本机直接跑那条命令（改前的样子）
+#       Ⓖ 输出里没有配置里的主机名与第二台的目录，命令打的那两样换成了「第二台」「第二台的目录」（「有的：peer/run.err」）  history-kept: 自证格名原文引用，按原文匹配
+#       连带红的两格：「✗ 换字 第二台那条命令的输出里夹一行不是合法 UTF-8 的字节…」（地址没换）、「✗ 换字 换字那一步自己退非 0…」（没报，地址漏出来）
+#   MULTI_HOST_RUN_BREAK=switch-off-falls-back-to-local  配置里双机没开时退回本机直接跑那条命令
 #       Ⓗ 配置里 ENABLE_ACROSS_MACHINES=0 ⇒ --peer 拒（退 255，出路写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑、第二台没建目录（「退 0，命令跑了」）
 #   MULTI_HOST_RUN_BREAK=break-honored-anywhere  弄坏开关在 --selftest 之外也认
 #       Ⓘ MULTI_HOST_RUN_BREAK 设在 --selftest 之外（不带自证的标记）⇒ 拒（退 2，说 MULTI_HOST_RUN_BREAK 设在 --selftest 之外），命令没跑
 #         （「退 2，命令没跑；stderr 尾部：…SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 设在 --selftest 之外…」：开关放过去之后被只供测试那一道拒，拒的不是这一道）
 #   MULTI_HOST_RUN_BREAK=gpu-memory-unexplained  那条命令退 245（内存包装认出的显存不够）时不报「显存不够」
 #       Ⓚ --peer：第二台的内存包装认出显存不够 ⇒ 原样退 245、报「显存不够」、说那一次的输出不算结果（「退 245，stderr 尾部：…」）
-#   MULTI_HOST_RUN_BREAK=peer-rocksdb-unchecked  第二台起含 cargo 的命令之前不判第二台的 RocksDB 预编库取值（改前的样子）
+#   MULTI_HOST_RUN_BREAK=peer-rocksdb-unchecked  第二台起含 cargo 的命令之前不判第二台的 RocksDB 预编库取值
 #       Ⓞ 第二台起含 cargo 的命令之前判第二台的取值：取值缺了 ⇒ 退 78、假 cargo 没起；不含 cargo 的命令不判、照跑退 0（「含 cargo 的退 0、假 cargo 起了…」）
 #   MULTI_HOST_RUN_BREAK=command-target-accepted  不拒 --peer 命令里写的 CARGO_TARGET_DIR=（编译目录跟着命令走，可能落在共享根下、⑥ 删不到）
 #       Ⓜ --peer 命令里写了 CARGO_TARGET_DIR=（env 的赋值、bash -c 的脚本两种写法）⇒ 用法错（退 2），命令没跑（「env 那一趟退 0，bash -c 那一趟退 …」）
@@ -164,46 +211,72 @@
 #       Ⓘ 只供测试的 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 设在 --selftest 之外（不带自证的标记）⇒ 拒（退 2，说只在 --selftest 里认），命令没跑（「退 0，命令跑了」）
 #   MULTI_HOST_RUN_BREAK=open-files-unchecked  删第二台这一趟的本地目录之前不核有没有进程开着里面的文件
 #       Ⓡ --peer：第二台那条命令退了、还有进程开着这一趟本地目录里的文件 ⇒ ⑥ 不删、报出那个进程、退 255（「退 0，这一趟的本地目录删了」）
-#   MULTI_HOST_RUN_BREAK=detail-cut-by-bytes  自证的细节行照改前按字节截（cut -c），汉字截成半个
+#   MULTI_HOST_RUN_BREAK=detail-cut-by-bytes  自证的细节行按字节截（cut -c），汉字截成半个
 #       Ⓣ 自证的细节行按字截：比上限长的一行截到上限那么多个字，截出来是合法的 UTF-8（「161 字节，第 159 字节起解不成 UTF-8」）
 #   MULTI_HOST_RUN_BREAK=step-lines-unmarked  ⑤ 第二台那条命令那一步不打 MULTI_HOST_RUN_STEP 的开始与结束两行（文件头「分段计时」）
 #       Ⓦ --peer 跑成：第二台那条命令、删这一趟的本地目录每一步都打了开始与结束两行，结束行的秒数是非负数（「退 0；缺的：peer-command」）
-#   MULTI_HOST_RUN_BREAK=label-unreachable-as-usage-error  ⑤ 查标签那一步 ssh 自己退 255 也当标签已有、用法错退 2（改前的样子）
+#   MULTI_HOST_RUN_BREAK=label-unreachable-as-usage-error  ⑤ 查标签那一步 ssh 自己退 255 也当标签已有、用法错退 2
 #       标签 --peer 查标签时第二台连不上（ssh 自己退 255）⇒ 退 255、说连不上，不当用法错，命令没跑、builds/ 下没建这一趟的目录（「退 2，命令没跑，builds/ 下没建这一趟的目录」）
 #   MULTI_HOST_RUN_BREAK=label-taken-as-unreachable  ⑤ 标签已有也当第二台连不上、退 255
 #       标签 --peer 的 --label 在第二台 builds/ 下已经有同名目录 ⇒ 用法错（退 2），命令没跑、那个目录还在（「退 255，命令没跑，那个目录还在」）
 #   MULTI_HOST_RUN_BREAK=scene-slice-cap-unwritten  自证的场景配置不写 SLICE_MEMORY_CAP_BY_HOST（判法判不过）；自证停在这一格，后面的格不跑
 #       场景配置 场景的多机配置过得了判法（--emit-assignments 退 0），SLICE_MEMORY_CAP_BY_HOST 里这一台那一项照 slice 此刻的总上限写
 #         （「判法退 1；场景配置里没写 SLICE_MEMORY_CAP_BY_HOST…」）
-#   MULTI_HOST_RUN_BREAK=peer-output-at-end-only  ⑤ 跑着时不接回第二台的输出，等到结局才整份打（改前的样子）
+#   MULTI_HOST_RUN_BREAK=peer-output-at-end-only  ⑤ 跑着时不接回第二台的输出，等到结局才整份打
 #       接回 第二台那条命令打的每一行在它还跑着的时候就出现在本机标准错误里（「missed-1 missed-2 missed-3」）
 #   MULTI_HOST_RUN_BREAK=peer-output-resent  ⑤ 等到结局时从头再打一遍第二台的输出（跑着时接回过的又打一次）
 #       接回 本机标准错误里第二台那条命令打的行逐行同序、不重不漏，半行与不以换行收尾的末行都接成整行（「读到的：follow-line-1|…|follow-line-1|…」）
 #   MULTI_HOST_RUN_BREAK=peer-output-partial-lines  ⑤ 跑着时读到多少打多少，不留到最后一个换行（半行被别的行插断）
 #       接回 本机标准错误里第二台那条命令打的行逐行同序、不重不漏…（「读到的：…|follow-part-MULTI_HOST_RUN_PEER_CPU poll=…」）
 #       连带红的格：「✗ 接回 每一轮一行 MULTI_HOST_RUN_PEER_CPU …」（被插断的那一轮的 CPU 行不在行首：「格式不对：follow-part-MULTI_HOST_RUN_PEER_CPU …」）
+#   MULTI_HOST_RUN_BREAK=peer-redact-failure-unreported  ⑤ 换字那一步退非 0 时不报这一块没打出来：悄悄丢掉，字节数照样往前推
+#       换字 换字那一步自己退非 0 ⇒ 驱动照旧退 0、本机标准错误里报这一块没打出来、没有没换字的私有字（「报的行 0 行（要至少 1 行）」）
 #   MULTI_HOST_RUN_BREAK=peer-cpu-unreported  ⑤ 每一轮不打 MULTI_HOST_RUN_PEER_CPU 那一行
 #       接回 每一轮一行 MULTI_HOST_RUN_PEER_CPU poll=<从 1 起连着的号> usage_usec=<数> read=<yes|no>，usage_usec 一轮比一轮不减、末行至少 1000000、有一轮读到了（「只有 0 行 …」）
+#       连带红的格：「✗ 接回 每一轮一行 MULTI_HOST_RUN_PEER_MEMORY …」「✗ 接回 读不到 memory.stat 的每一轮照打 …」（MEMORY 行没有 CPU 行在前：「第 … 行的 MEMORY 前一行不是 CPU」）
+#         「✗ 峰值 每一轮读不到 memory.stat、退出时读不到 memory.peak …」（那一趟数 read=yes 的 CPU 行：「read=yes 的轮 0 轮」）
+#         「✗ 等 IO 每一轮一行 MULTI_HOST_RUN_PEER_IO_WAIT poll=<与这一轮 CPU 那一行同一个轮数>」（IO_WAIT 行前面没有这一轮的 CPU 行：「第 … 行的 IO_WAIT 前面没有这一轮的 CPU」；推的，没复跑）
 #   MULTI_HOST_RUN_BREAK=peer-cpu-not-kept  ⑤ usage_usec 只算这一轮读到的 cgroup，不留见过的最大（scope 收尾之后那一轮掉回 0）
 #       接回 每一轮一行 MULTI_HOST_RUN_PEER_CPU …（「usage_usec 减了：… → 0 …」）
+#   MULTI_HOST_RUN_BREAK=peer-memory-unreported  ⑤ 每一轮不打 MULTI_HOST_RUN_PEER_MEMORY 那一行
+#       接回 每一轮一行 MULTI_HOST_RUN_PEER_MEMORY poll=… current_bytes=… peak_bytes=… read=…：紧跟每行 CPU 之后、轮数与那一行 CPU 相同、至少一轮 read=yes 且 current_bytes 大于 0（「只有 0 行 MEMORY …」）
+#       连带红的格：「✗ 接回 读不到 memory.stat 的每一轮照打 …」（「MEMORY 行 0 行 …」）、「✗ 峰值 页缓存撑满上限 …」（「read=yes 的 MEMORY 行 0 行」；推的，没复跑）
+#   MULTI_HOST_RUN_BREAK=peer-memory-unread-skipped  ⑤ 没读到 memory.stat 的那一轮不打 MULTI_HOST_RUN_PEER_MEMORY 那一行（漏行）
+#       接回 读不到 memory.stat 的每一轮照打 MULTI_HOST_RUN_PEER_MEMORY …current_bytes=0 peak_bytes=0 read=no：每一轮 CPU 之后都有，不漏行（「MEMORY 行 0 行 …」）
+#       连带红的格：「✗ 接回 每一轮一行 MULTI_HOST_RUN_PEER_MEMORY …」（经真的内存包装跑的那一趟，scope 还没起的头一轮与收尾之后的几轮也读不到 current，同样漏行：「第 … 行的 CPU 后面没跟 MEMORY」）
+#   MULTI_HOST_RUN_BREAK=peer-io-wait-unreported  ⑤ 每一轮不打 MULTI_HOST_RUN_PEER_IO_WAIT 那一行（文件头 ⑤「等 IO」）
+#       「✗ 等 IO 每一轮一行 MULTI_HOST_RUN_PEER_IO_WAIT poll=<与这一轮 CPU 那一行同一个轮数>」（「只有 0 行 IO_WAIT」）
+#       「✗ 等 IO 数的状态换成 S（在睡）⇒ 至少一轮 read=yes 且 blocked 大于 0」（「blocked 大于 0 且 read=yes 的轮 0 轮」）
+#   MULTI_HOST_RUN_BREAK=peer-io-wait-uncounted  ⑤ 读到了进程树也写 blocked=0（不数进程的状态；文件头 ⑤「等 IO」）
+#       「✗ 等 IO 数的状态换成 S（在睡）⇒ 至少一轮 read=yes 且 blocked 大于 0」（「blocked 大于 0 且 read=yes 的轮 0 轮」）
 #   MULTI_HOST_RUN_BREAK=peer-memory-peak-unreported  ⑤ 第二台那条命令结束时不打 MULTI_HOST_RUN_PEER_MEMORY_PEAK 那一行
-#       峰值 第二台那条命令结束时打恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>（那一层内存包装 cgroup 的 memory.peak），在最后一行 MULTI_HOST_RUN_PEER_CPU 之后（「峰值行 0 行」）
-#       连带红的格：「✗ 峰值 第二台那条命令跑 0.1 秒就退、每一轮都读不到 memory.peak ⇒ …」（「峰值行「」」）
+#       峰值 第二台那条命令结束时打恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>（那一层内存包装 cgroup 进程内存见过的最大），在最后一行 MULTI_HOST_RUN_PEER_CPU 之后（「峰值行 0 行」）
+#       连带红的格：「✗ 峰值 第二台那条命令跑 0.1 秒就退、每一轮都读不到 memory.stat ⇒ …」（「峰值行「」」）、「✗ 峰值 页缓存撑满上限 …」（「峰值行 0 行：」；推的，没复跑）
 #   MULTI_HOST_RUN_BREAK=peer-build-peak-unreported  ⑤ 第二台那条命令结束时不打 MULTI_HOST_RUN_PEER_BUILD_PEAK 那一行
 #       编译目录占盘 --peer：第二台那条命令结束时打恰好一行 MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=<正整数>（这一趟本地编译目录删之前 du -s -b 量的）（「占盘行 0 行」）
 #   MULTI_HOST_RUN_BREAK=peer-build-peak-unread-printed  ⑤ 量不到编译目录的占盘也打一行 bytes=0
 #       编译目录占盘 --peer：命令自己删了编译目录（量不到）⇒ 退 0、不打 MULTI_HOST_RUN_PEER_BUILD_PEAK 那一行（「占盘行 1 行：MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=0」）
-#   MULTI_HOST_RUN_BREAK=peer-memory-peak-unread-printed  ⑤ 每一轮与退出时都没读到 memory.peak 也打一行 bytes=0
-#       峰值 每一轮与退出时都读不到 memory.peak（两处读的文件名都换成不在的）⇒ 退 0、有一轮 read=yes、不打 MULTI_HOST_RUN_PEER_MEMORY_PEAK 那一行（「峰值行 1 行：MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=0」）
-#   MULTI_HOST_RUN_BREAK=peak-read-only-by-sampling  ⑤ 照改前只靠按轮采：不给第二台那一层内存包装设 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT、等到退出码之后不读退出时那一个
-#       峰值 第二台那条命令跑 0.1 秒就退、每一轮都读不到 memory.peak ⇒ 退 0、照那一层内存包装退出时读的打恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>（「峰值行「」」）
+#   MULTI_HOST_RUN_BREAK=peer-build-phase-peak-unreported  ⑤ 第二台那条命令结束时不打 MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK 那一行（文件头 ⑤「编译段峰值」）
+#       编译段峰值 接回那一趟第二台那条命令打了 cargo 编完那一行 ⇒ 恰好一行 MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK bytes=<正整数>、不大于峰值行的数（「编译段峰值行 0 行」）
+#   MULTI_HOST_RUN_BREAK=peer-memory-peak-unread-printed  ⑤ 每一轮没读到 memory.stat、退出时没读到 memory.peak 也打一行 bytes=0
+#       峰值 每一轮读不到 memory.stat、退出时读不到 memory.peak（两处读的文件名都换成不在的）⇒ 退 0、有一轮 read=yes、不打 MULTI_HOST_RUN_PEER_MEMORY_PEAK 那一行（「峰值行 1 行：MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=0」）
+#   MULTI_HOST_RUN_BREAK=peak-read-only-by-sampling  ⑤ 只靠按轮采：不给第二台那一层内存包装设 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT、等到退出码之后不读退出时那一个
+#       峰值 第二台那条命令跑 0.1 秒就退、每一轮都读不到 memory.stat ⇒ 退 0、照那一层内存包装退出时读的打恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>（「峰值行「」」）
+#   MULTI_HOST_RUN_BREAK=peer-memory-with-page-cache  ⑤ 每一轮读那一层内存包装 cgroup 的 memory.current 与 memory.peak（含页缓存），峰值与退出时读的取大的
+#       峰值 页缓存撑满上限（假 cgroup：anon 1G、file 40G、memory.peak 顶到三项之和）⇒ 每一轮 current_bytes 与 peak_bytes 都是 anon 的 1G、峰值行 bytes=1G
+#         （「不是 current_bytes=1073741824 peak_bytes=1073741824：…」）
+#       连带红的格（推的，没复跑：这种读法不看 MULTI_HOST_RUN_SELFTEST_CURRENT_FILE）：「✗ 峰值 每一轮读不到 memory.stat、退出时读不到 memory.peak …」（「峰值行 1 行 …」）、
+#         「✗ 接回 读不到 memory.stat 的每一轮照打 …」（「不是 current_bytes=0 peak_bytes=0 read=no：…」）
 #   MULTI_HOST_RUN_BREAK=peer-scene-not-passed  ⑤ 不把服务给的 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY 设给第二台那一层内存包装（现场留在第二台的 /tmp 下）
 #       现场目录 驱动环境里给了 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY、第二台那条命令往 TMPDIR 写了文件又退 7 ⇒ 退 7、那一份由第二台那一层内存包装搬成这个目录（「退 7，… 里「」」）
 #   MULTI_HOST_RUN_BREAK=outside-shared-paths-accepted  ③ 不判工作目录与命令里的路径在不在共享根下（在第二台上照同一路径读写，读到的是它自己的那一份或什么都没有）
 #       Ⓩ --peer 命令里有共享根外的绝对路径（整个词、bash -c 词里各一趟）⇒ 退 255、点名那个路径，命令没跑、第二台没建这一趟的目录（「整个词那一趟退 0…」）
 #       Ⓩ --peer 在共享根外的工作目录里起 ⇒ 退 255、说工作目录不在共享根下，命令没跑（「退 0，命令跑了」）
-#   MULTI_HOST_RUN_BREAK=expansion-tail-as-path  ③ 词里的绝对路径照改前只排前面紧挨着 \w 与 / 的（${…}、$(…) 之后的尾巴与 ./x、../x 的后半也当绝对路径）
-#       Ⓩ bash -c 词里紧跟在 }、)、. 后面的 /…（${…}、$(…) 的尾巴，./x、../x）不当绝对路径，前面是空白、=、: 的照取（「「cp "${X:?}/release/a" /w/x」取到「/release/a」…」）
+#   MULTI_HOST_RUN_BREAK=expansion-tail-as-path  ③ bash -c 脚本词切出的 shell 词里跟在 )、} 后面的 /…（${…}、$(…) 展开之后的尾巴）也当绝对路径
+#       Ⓩ bash -c 脚本词照 shell 词切：跟在 }、) 后面的 /…（${…}、$(…) 的尾巴）、./x、../x 与 a:/x 里夹着的 / 不当绝对路径…（「「cp "${X:?}/release/a" /w/x」取到「/release/a」…」）
+#   MULTI_HOST_RUN_BREAK=peer-path-check-substring  ③ 每个带空白的词都按子串取绝对路径（参数值中间夹着的 /、a:/x 里的 / 也当路径）
+#       Ⓩ 参数值中间夹着的 /（--item 的值、bash -c 引号里的「（接的是 /）」）不当绝对路径…（「--item 的值「crash-case-replay（接的是 /）」取到「/）」…」）
+#       连带红的格：「✗ Ⓩ bash -c 脚本词照 shell 词切：…」（「「echo a:/opt/z」取到「/opt/z」…」）
 #   MULTI_HOST_RUN_BREAK=shared-roots-not-passed  ⑤ 不给第二台那条命令设 SINGLEFS_WORK_ROOT、SINGLEFS_DATA_ROOT（第二台照它自己的家目录取，落在它本地盘上）
 #       Ⓢ --peer：第二台那条命令拿到本机的工作根与共享数据根（SINGLEFS_WORK_ROOT、SINGLEFS_DATA_ROOT 照本机的真路径）（「第二台那条命令看到的：work=没设 data=没设」）
 #   MULTI_HOST_RUN_BREAK=peer-directory-unchecked  ⑤ 不判第二台的编译根（BUILD_ROOT_BY_HOST 里它那一项）落不落在共享根下（编译目录落在 NFS 上）
@@ -215,7 +288,7 @@
 #       连带红的格：「✗ Ⓦ 第二台那条命令里判同一份场景配置，结局（退出码与 --emit-assignments 打的赋值）与这一侧判的相同，再起 multi-host-run.sh --peer 照拒（退 255），一次都没往别的台 ssh」
 #         （相对路径的判法在本地目录里不在，退 127）、
 #         「✗ 双机驱动那种起法经 --peer 真跑一趟（在共享的树里、照同一个绝对路径起）⇒ 退 0、第二台的假 cargo 先编后跑起了两次、都在本机那棵树里起」
-#   MULTI_HOST_RUN_BREAK=selftest-caller-toolchain  自证照改前不放假 rustc、cargo，场景里用 PATH 上调用方的那一份（场景的 HOME 是自证自己的 home/、不带 CARGO_HOME 与 RUSTUP_HOME，rustup 的代理找不到工具链）
+#   MULTI_HOST_RUN_BREAK=selftest-caller-toolchain  自证不放假 rustc、cargo，场景里用 PATH 上调用方的那一份（场景的 HOME 是自证自己的 home/、不带 CARGO_HOME 与 RUSTUP_HOME，rustup 的代理找不到工具链）
 #       经 --peer 走到 ④ 的 31 格都红，细节里 stderr 尾部是「本机 rustc / cargo 报不出版本」，例：
 #       Ⓑ --peer 跑成：退 0，在第二台同一个绝对路径（这一刻的工作目录，共享的那棵树）里跑，HEAD 与本机相同（「退 255，在「」跑…」）
 #       Ⓒ 第二台的 rustc -Vv 不同 ⇒ 拒（退 255，说两台的工具链不同），命令没跑、第二台没建这一趟的目录（「退 255，命令没跑；stderr 尾部：…」）
@@ -227,13 +300,20 @@
 #         （「…里层 --peer 退 255…ssh 记了 2 次」：里层照收，判法与读配置各往配置里的另一台 ssh 一次）
 #   MULTI_HOST_RUN_BREAK=admission-mark-forwarded  ⑤ 把最外层那一次的 MULTI_HOST_RUN_ADMITTED_BY_TASK_SERVER 原样带进第二台那条命令（里层再带 --peer 也认成服务起的）
 #       Ⓦ 第二台那条命令里判同一份场景配置…再起 multi-host-run.sh --peer 照拒（退 255），一次都没往别的台 ssh（「…里层 --peer 退 255…ssh 记了 2 次」）
-#   MULTI_HOST_RUN_BREAK=peer-build-not-kept  ⑥ 带 --keep-build-directory 也照删这一趟的本地目录（改前的样子：第二台每一趟新建、跑完删）
+#   MULTI_HOST_RUN_BREAK=peer-build-not-kept  ⑥ 带 --keep-build-directory 也照删这一趟的本地目录（第二台每一趟新建、跑完删）
 #       留着 --keep-build-directory 跑完留着这一趟的编译目录、打 MULTI_HOST_RUN_PEER_BUILD_KEPT；下一趟 --reuse-build-directory 接着用的就是它（「…留着那一份 不在…」）
+#   MULTI_HOST_RUN_BREAK=orphan-session-unverified  起的那个 bash 不在、又没有退出回执时不照会话号与尝试标签核，一律不按已停处理（peer_host_stop_detached 的 keep）
+#       收拾 --recover-cleanup：起的那个 bash 被杀、没写退出回执、后代都已不在 ⇒ 一次就确认（退 0）、补写退出回执、清理回执记 confirmed、第二台 runs/ 与 builds/ 下什么都不剩（「退 1，…」）
+#       收拾 --recover-cleanup：起的那个 bash 被杀、没写退出回执、后代还活着 ⇒ 停掉它们之后确认（退 0）、补写退出回执、后代不在了、第二台 runs/ 与 builds/ 下什么都不剩（「退 1，…」）
+#   MULTI_HOST_RUN_BREAK=leftovers-left-at-cleanup  ⑥ 删之前不停这一趟留下的进程（后代自己 setsid 出去的那一棵没人收）
+#       收拾 --peer：命令退了、后代自己 setsid 出去还在跑（环境里带这一趟的标签）⇒ ⑥ 删之前停掉它、⑥ 那一行写停了 1 个、退 0（「退 0，…还活着…」）
+#   MULTI_HOST_RUN_BREAK=peer-scope-unchecked  ⑥ 不先停这一趟内存包装的 scope，只照会话号与标签找留下的进程
+#       收拾 --peer：那一层内存包装被 KILL、scope 里留着清了环境又换了会话号的进程 ⇒ ⑥ 先停那个 scope、那个进程不在了、⑥ 那一行写停 scope 时里面还有 1 个（「退 137，…还活着…」）
 # 判法的开关 MULTI_HOST_CONFIGURATION_BREAK 也带进这份自证，打开后红哪几格写在 scripts/crash/crash-point-replay-shard-configuration-check.sh 文件头；
 # 共用库的开关 PEER_HOST_LIB_BREAK 同样带进来，打开后红哪几格写在 scripts/hosts/peer-host-lib.sh 文件头。
 # 只供测试的开关：SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）：「第二台」是本机上的另一个目录，命令在本机跑、环境照 ssh 那样只给最少几样。
 #   只在 --selftest 起的驱动里认（MULTI_HOST_RUN_SELFTEST_MARK 对得上；自证另 export peer-host-lib.sh 认的 PEER_HOST_SELFTEST_MARK）：别处设了就拒、退 2，命令一行都没跑。
-#   弄坏开关 this-machine-peer-honored-anywhere 下别处设了也照认（改前的样子）。
+#   弄坏开关 this-machine-peer-honored-anywhere 下别处设了也照认。
 #
 # admission: always 每次调都在这一刻这棵树上跑一条调用方给的命令；要不要重跑由调用方判，不在这里
 # run-condition: command bash git rsync python3
@@ -250,9 +330,15 @@ MULTI_HOST_HOST_INDEPENDENT_PATHS='/dev/null /dev/stdin /dev/stdout /dev/stderr 
 multi_host_peer_forwarded_bytes=0
 multi_host_peer_polls=0
 declare -A multi_host_peer_cgroup_usage=()
-# 峰值（文件头 ⑤「峰值」）：第二台那一层内存包装 cgroup 见过的最大 memory.peak（空串是一轮都没读到）；读哪个文件名（只供自证换，文件头同一段）
+# 峰值（文件头 ⑤「峰值」）：第二台那一层内存包装 cgroup 进程用的内存（anon 加 shmem）见过的最大（空串是一轮都没读到）
 multi_host_peer_memory_peak=""
-multi_host_peer_peak_file=memory.peak
+# 编译段峰值（文件头 ⑤「编译段峰值」）：见到 cargo 编完那一行之前每一轮读到的进程内存见过的最大（空串是一轮都没读到），见没见到那一行
+multi_host_peer_build_phase_peak=""
+multi_host_peer_build_finished=0
+MULTI_HOST_CARGO_FINISHED_PATTERN='^[[:space:]]*Finished[[:space:]].*target\(s\) in '   # task-server/task_server_lib.py 的 CARGO_FINISHED_PATTERN 的 ERE 写法，两边一起改
+multi_host_peer_current_file=memory.stat   # 每一轮读进程内存的文件名（文件头 ⑤「此刻内存」；只供自证换，文件头同一段）
+multi_host_peer_memory_directory=""        # 每一轮读进程内存的目录，空是那一层内存包装的 cgroup（只供自证换成假 cgroup，文件头 ⑤「峰值」）
+multi_host_peer_blocked_states=D   # 每一轮数进程树里哪几种状态的进程（文件头 ⑤「等 IO」；D 是不可中断的 IO 等待，只供自证换）
 MULTI_HOST_PEER_EXIT_PEAK_NAME=exit-memory-peak   # 第二台那一层内存包装退出时写峰值的那一份，在这一趟的本地目录下（文件头 ⑤「峰值」）
 multi_host_keep_build=0       # --keep-build-directory（文件头「留着的编译目录」）；--recover-cleanup、--remove-build-directory 不留
 peer_command_exited=0         # 第二台那条命令等到了退出码：只有这样才照 --keep-build-directory 留着
@@ -283,13 +369,51 @@ multi_host_step() { # <步> <begin|end|skip> [<end 的退出码，或 skip 的�
   echo "MULTI_HOST_RUN_STEP step=$step $fields" >&2
 }
 
-# 共享根外的路径（文件头 ③「共享根」）：第一个参数是 NFS_SHARED_ROOTS，第二个是两台相同的系统路径，往后是要判的词；
-#   打第一个落在共享根外的绝对路径（本机这一侧取真路径），都在打空串。词的读法与 task-server/task_server.py 的 outside_shared_path 相同
-MULTI_HOST_OUTSIDE_PATH_PROGRAM='import os, re, sys
+# 共享根外的路径（文件头 ③「共享根」）：第一个参数是 NFS_SHARED_ROOTS，第二个是两台相同的系统路径，第三个是逗号连的弄坏开关（只认 expansion-tail-as-path、
+#   peer-path-check-substring，别的当没设），往后是要判的命令的词；打第一个落在共享根外的绝对路径（本机这一侧取真路径），都在打空串。
+#   词的读法与 task-server/task_server.py 的 find_outside_shared_path 相同（shell_script_word_indexes、shell_word_paths 两段照抄在这里：这一层在本机起、不经服务，
+#   不载服务的库）：只认整个 shell 词是绝对路径的。整个词以 / 起头的、「名字=绝对路径」「--选项=绝对路径」的值；bash / sh 这类的 -c 脚本那一个词照 shell 词切开，
+#   每个以 / 起头的 shell 词、「名字=」的值与挨着 ;|&<>( 写的下一个词；别的词中间夹着的 /（--item 的值「…（接的是 /）」这类）不算，-c 脚本里引号中的整段是一个词，
+#   空白后面的 / 同样不算；${…}、$(…) 展开之后的尾巴不算；-c 脚本引号不配对、切不开的照子串取（多拒不漏）。
+MULTI_HOST_OUTSIDE_PATH_PROGRAM='import os, re, shlex, sys
 roots = [os.path.realpath(root) for root in sys.argv[1].split(":") if root]
 independent = sys.argv[2].split()
-# 弄坏开关 expansion-tail-as-path 下照改前只排前面紧挨着 \w 与 / 的（第三个参数是 expansion-tail-as-path）
-pattern = re.compile(r"(?<![\w/])/[^\s\x27\x22`;|&()<>]+" if sys.argv[3] == "expansion-tail-as-path" else r"(?<![\w/}).])/[^\s\x27\x22`;|&()<>]+")
+variants = sys.argv[3].split(",")
+words = sys.argv[4:]
+shells = ("bash", "sh", "dash", "zsh", "ksh")
+options_with_value = ("-o", "+o", "-O", "+O", "--rcfile", "--init-file")
+substring = re.compile(r"(?<![\w/}).])/[^\s\x27\x22`;|&()<>]+")
+# 弄坏开关 expansion-tail-as-path 下跟在 )、} 后面的（展开之后的尾巴）也取
+word_path = re.compile(r"(?:^|(?<=[=;|&<>()}]))/[^;|&()<>`]+" if "expansion-tail-as-path" in variants else r"(?:^|(?<=[=;|&<>(]))/[^;|&()<>`]+")
+
+def script_indexes(command):
+    indexes = set()
+    for index, word in enumerate(command):
+        if os.path.basename(word) not in shells:
+            continue
+        cursor, script = index + 1, False
+        while cursor < len(command) and command[cursor][:1] in ("-", "+") and command[cursor] != "--":
+            option = command[cursor]
+            if option in options_with_value:
+                cursor += 1
+            elif not option.startswith("--") and "c" in option[1:]:
+                script = True
+            cursor += 1
+        if cursor < len(command) and command[cursor] == "--":
+            cursor += 1
+        if script and cursor < len(command):
+            indexes.add(cursor)
+    return indexes
+
+def script_paths(script):
+    try:
+        lexer = shlex.shlex(script, posix=True)
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        pieces = list(lexer)
+    except ValueError:
+        return substring.findall(script)
+    return [path for piece in pieces for path in word_path.findall(piece)]
 
 def shared(path):
     real = os.path.realpath(path)
@@ -298,9 +422,14 @@ def shared(path):
 def host_independent(path):
     return any(path == entry or (entry.endswith("/") and path.startswith(entry)) for entry in independent)
 
-for word in sys.argv[4:]:
-    if any(character.isspace() for character in word) and not (word.startswith("/") and os.path.lexists(word)):
-        candidates = pattern.findall(word)
+scripts = script_indexes(words)
+for index, word in enumerate(words):
+    if word.startswith("/") and os.path.lexists(word):
+        candidates = [word]
+    elif "peer-path-check-substring" in variants and any(character.isspace() for character in word):
+        candidates = substring.findall(word)
+    elif index in scripts:
+        candidates = script_paths(word)
     else:
         value = word if word.startswith("/") else word.partition("=")[2]
         candidates = [value] if value.startswith("/") else []
@@ -309,9 +438,11 @@ for word in sys.argv[4:]:
             print(path)
             sys.exit(0)'
 multi_host_outside_shared_path() { # <词…>：打第一个落在共享根外的绝对路径（文件头 ③）；都在共享根下打空串；python3 没跑成交回非 0
-  local variant=current
-  if multi_host_break_is expansion-tail-as-path; then variant=expansion-tail-as-path; fi
-  python3 -c "$MULTI_HOST_OUTSIDE_PATH_PROGRAM" "${NFS_SHARED_ROOTS:-}" "$MULTI_HOST_HOST_INDEPENDENT_PATHS" "$variant" "$@"
+  local variants="" variant
+  for variant in expansion-tail-as-path peer-path-check-substring; do
+    if multi_host_break_is "$variant"; then variants+="${variants:+,}$variant"; fi
+  done
+  python3 -c "$MULTI_HOST_OUTSIDE_PATH_PROGRAM" "${NFS_SHARED_ROOTS:-}" "$MULTI_HOST_HOST_INDEPENDENT_PATHS" "$variants" "$@"
 }
 multi_host_require_shared() { # <是什么> <路径>：路径落在共享根外就退 255（文件头 ③「共享根」：判不了 --peer，第二台上什么都没起）
   local outside
@@ -360,7 +491,7 @@ multi_host_fail() { # <原因> <出路>：这个脚本自己没跑成，退 255�
 }
 
 multi_host_judge_label_free() { # <查标签那条命令的退出码> <标签已有时的用法错原因>：0 往下走；255 是 ssh 自己连不上（被重置、超时），第二台没跑成、退 255；别的非 0 是标签已有，用法错退 2
-  # 弄坏开关 label-unreachable-as-usage-error 下 255 也当用法错（改前的样子），label-taken-as-unreachable 下标签已有也当连不上
+  # 弄坏开关 label-unreachable-as-usage-error 下 255 也当用法错，label-taken-as-unreachable 下标签已有也当连不上
   local status="$1"
   if multi_host_break_is label-taken-as-unreachable && (( status != 0 )); then status=255; fi
   if multi_host_break_is label-unreachable-as-usage-error && (( status == 255 )); then status=1; fi
@@ -378,17 +509,20 @@ multi_host_redact() { # 第二台的输出：经 peer_host_redact 换掉私有�
   if multi_host_break_is no-redact; then cat; else peer_host_redact; fi
 }
 
-multi_host_record_cleanup() { # <pending|confirmed> <原因>：先落本机尝试目录，再发日志；未知结局跨服务重启仍占卡。
-  local status="$1" reason="$2"
+multi_host_record_cleanup() { # <pending|confirmed> <原因> [<停了 scope 还留着的进程，一行一个、换过私有的字>]：先落本机尝试目录，再发日志；未知结局跨服务重启仍占卡。
+  # 第三样给了的记进清理回执的 scope_leftovers（文件头 ⑥：task-server 照它推 cleanup-pending 给交任务的会话）
+  local status="$1" reason="$2" leftovers="${3:-}"
   echo "MULTI_HOST_RUN_CLEANUP time_us=$(multi_host_now_microseconds) pid=$$ label=$run_label status=$status reason=$reason" >&2
   [[ -n "${TASK_SERVER_PEER_CLEANUP_FILE:-}" ]] || return 0
   python3 - "$TASK_SERVER_PEER_CLEANUP_FILE" "$status" "$reason" "$run_label" \
-    "$peer_start_directory" "$peer_scratch" "$peer_pid_file" "$peer_exit_file" "$peer_output_file" "${peer_boot_id:-}" "${peer_processes_stopped:-0}" <<'PY'
+    "$peer_start_directory" "$peer_scratch" "$peer_pid_file" "$peer_exit_file" "$peer_output_file" "${peer_boot_id:-}" "${peer_processes_stopped:-0}" "$leftovers" <<'PY'
 import json, os, sys, time
-path, status, reason, label, directory, scratch, pid, exited, output, boot_id, stopped = sys.argv[1:]
+path, status, reason, label, directory, scratch, pid, exited, output, boot_id, stopped, leftovers = sys.argv[1:]
 record = dict(status=status, reason=reason, label=label, directory=directory, scratch=scratch,
               pid_file=pid, exit_file=exited, output_file=output, boot_id=boot_id,
               processes_stopped=stopped == "1", updated_at=time.time())
+if leftovers.strip():
+    record["scope_leftovers"] = [line for line in leftovers.splitlines() if line.strip()]
 temporary = path + ".partial"
 with open(temporary, "w", encoding="utf-8") as handle:
     json.dump(record, handle)
@@ -416,7 +550,10 @@ multi_host_stop_pending_peer() {
       return $?  # 旧开机的全部进程已不在，仍须检查目录持有者。
     fi
   fi
-  if stop_output="$(peer_host_stop_detached "$peer_start_directory" "$peer_pid_file" "$peer_exit_file")"; then
+  # 起的那个 bash 不在、又没有退出回执的照会话号与尝试标签核（peer-host-lib.sh 文件头「停下的退出回执」）；弄坏开关 orphan-session-unverified 下不核
+  local unverified=""
+  multi_host_break_is orphan-session-unverified && unverified=keep
+  if stop_output="$(peer_host_stop_detached "$peer_start_directory" "$peer_pid_file" "$peer_exit_file" "$run_label" "$unverified")"; then
     echo "  · 第二台那条命令：$stop_output" >&2
     peer_command_started=0
     peer_processes_stopped=1
@@ -429,7 +566,7 @@ multi_host_stop_pending_peer() {
   return 1
 }
 
-multi_host_recover_cleanup() { # task-server 只在本机包装结束后调用；成功回执以前不释放资源。
+multi_host_recover_cleanup() { # task-server 只在本机包装结束后调用；成功回执之前不释放资源。
   TASK_SERVER_PEER_CLEANUP_FILE="$1"
   tree_root="$(cd "$multi_host_script_directory/../.." && pwd)"
   local fields=()
@@ -450,6 +587,7 @@ PY
   [[ "${fields[0]}" == pending ]] || return 1
   run_label="${fields[1]}"; peer_start_directory="${fields[2]}"; peer_scratch="${fields[3]}"
   peer_pid_file="${fields[4]}"; peer_exit_file="${fields[5]}"; peer_output_file="${fields[6]}"; peer_boot_id="${fields[7]}"
+  peer_scope_file="${peer_pid_file%.pid}.scope"   # 文件头 ⑥：进程号文件旁边那一份 scope 单元名
   peer_host_load_configuration "$multi_host_script_directory/../crash/crash-point-replay-shard-configuration-check.sh" "$tree_root" >&2 || return 1
   [[ "$run_label" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && "$peer_start_directory" == /* \
      && "$peer_scratch" =~ ^"${PEER_HOST_BUILD_ROOT%/}/builds/"[A-Za-z0-9][A-Za-z0-9._-]*$ \
@@ -495,7 +633,78 @@ multi_host_remove_kept_build() { # <标签>：删第二台 builds/<标签>/（�
   return 1
 }
 
-multi_host_remove_peer_run() { # ⑥ 删第二台这一趟的本地目录（连同编译目录）与 runs/ 下三个文件，回读不在了才算删了；删之前核没有进程开着里面的文件。没删成置 multi_host_cleanup_failed=1
+multi_host_stop_peer_scope() { # ⑥ 删之前先在第二台停这一趟内存包装的 scope（文件头 ⑥；peer-host-lib.sh 的 peer_host_stop_attempt_scope，照 runs/<标签>.scope 里的单元名）。
+  # 停 scope 时里面还有几个记进 multi_host_scope_stopped；回读 inactive 或 failed 而一个不剩（单元名文件不在也算：这一趟没起 scope）退 0；
+  # 停了还有进程的逐个报（换掉私有的字）、清理回执记 pending scope-processes-remain 并带上那几个进程、退 1；单元名认不出、ssh 没跑成的记 pending scope-unchecked、退 1（占用照留）。
+  # 弄坏开关 peer-scope-unchecked 下不停（只照会话号与标签找）
+  local scope_text scope_status scope_summary remaining_lines
+  multi_host_scope_stopped=0
+  if multi_host_break_is peer-scope-unchecked; then
+    echo "  ! 弄坏开关 MULTI_HOST_RUN_BREAK=peer-scope-unchecked：⑥ 不先停这一趟内存包装的 scope，只照会话号与标签找留下的进程" >&2
+    return 0
+  fi
+  scope_text="$(peer_host_run / "$(declare -f peer_host_stop_attempt_scope)
+peer_host_stop_attempt_scope $(printf '%q' "$peer_scope_file")" 2>/dev/null)"
+  scope_status=$?
+  scope_summary="$(grep -m 1 '^PEER_HOST_SCOPE ' <<<"$scope_text")"
+  if (( scope_status == 0 )); then
+    [[ "$scope_summary" =~ before=([0-9]+) ]] && multi_host_scope_stopped="${BASH_REMATCH[1]}"
+    return 0
+  fi
+  if (( scope_status == 1 )); then
+    remaining_lines="$(grep '^PEER_HOST_SCOPE_REMAINING ' <<<"$scope_text" | sed 's/^PEER_HOST_SCOPE_REMAINING //' | multi_host_redact)"
+    multi_host_record_cleanup pending scope-processes-remain "$remaining_lines"
+    echo "  ✗ 第二台这一趟内存包装的 scope 停了之后还留着进程（${scope_summary#PEER_HOST_SCOPE }），builds/$run_label 与 runs/ 下的文件没删、占用照留：" >&2
+    printf '%s\n' "$remaining_lines" | sed 's/^/      /' >&2   # gate-lint:detail
+    echo "     → 怎么办：这条命令退出后还留着子进程，核实脚本有没有不等子进程就退；到第二台照上面的进程号看它们为什么停不掉，停掉之后服务对账时的 --recover-cleanup 再核、再删" >&2
+  else
+    multi_host_record_cleanup pending scope-unchecked
+    echo "  ✗ 在第二台停这一趟内存包装的 scope 那一步退 $scope_status（${scope_summary:-ssh 连不上，或那一步自己没跑成}）：builds/$run_label 与 runs/ 下的文件没删、占用照留" >&2
+    echo "     → 怎么办：等第二台连得上、看 runs/$run_label.scope 里的单元名，服务对账时的 --recover-cleanup 再核、再删" >&2
+  fi
+  return 1
+}
+
+multi_host_stop_peer_leftovers() { # ⑥ 删之前在第二台停这一趟留下的进程（文件头 ⑥；peer-host-lib.sh 的 peer_host_stop_attempt_leftovers：会话号是进程号文件里那个号的、
+  # 环境里带 TASK_SERVER_ATTEMPT_LABEL=<这一趟的标签> 的，后代自己 setsid 出去的照标签找得到）。停下了几个记进 multi_host_leftovers_stopped；
+  # 一个不剩退 0；还有停不掉的、读不了 /proc、核的那一步跑不成的打原因与出路、记清理回执 pending、退 1（占用照留）。弄坏开关 leftovers-left-at-cleanup 下不停
+  local leftover_text leftover_status summary
+  multi_host_leftovers_stopped=0
+  multi_host_stop_peer_scope || return 1   # 先停这一趟内存包装的 scope（文件头 ⑥）；会话号与标签那一步只当补充
+  if multi_host_break_is leftovers-left-at-cleanup; then
+    echo "  ! 弄坏开关 MULTI_HOST_RUN_BREAK=leftovers-left-at-cleanup：⑥ 删之前不停这一趟留下的进程" >&2
+    return 0
+  fi
+  leftover_text="$(peer_host_run / "$(declare -f peer_host_signal_one peer_host_process_is_alive peer_host_attempt_leftovers peer_host_stop_attempt_leftovers)
+peer_host_stop_signal=none
+session=\"\$(cat $(printf '%q' "$peer_pid_file") 2>/dev/null)\"
+[[ \"\$session\" =~ ^[1-9][0-9]*\$ && \"\$session\" != 1 ]] || session=''
+peer_host_stop_attempt_leftovers \"\$session\" \"\$(cat $(printf '%q' "$peer_pid_file.start") 2>/dev/null)\" $(printf '%q' "$run_label")" 2>/dev/null)"
+  leftover_status=$?
+  summary="$(grep -m 1 '^PEER_HOST_LEFTOVERS stopped=' <<<"$leftover_text")"
+  if (( leftover_status == 0 )) && [[ "$summary" =~ stopped=([0-9]+) ]]; then
+    multi_host_leftovers_stopped="${BASH_REMATCH[1]}"
+    return 0
+  fi
+  if (( leftover_status == 1 )); then
+    multi_host_record_cleanup pending leftovers-remain
+    echo "  ✗ 第二台这一趟留下的进程还有停不掉的（发了 TERM、KILL 还在），builds/$run_label 与 runs/ 下三个文件没删、占用照留：" >&2
+    printf '%s\n' "$leftover_text" | sed 's/^/      /' | multi_host_redact >&2   # gate-lint:detail
+    echo "     → 怎么办：到第二台照上面的进程号看它们为什么停不掉（D 状态等 IO 的等 IO 缓过来），停掉之后服务对账时的 --recover-cleanup 再核、再删" >&2
+  elif (( leftover_status == 2 )); then
+    multi_host_record_cleanup pending leftovers-unreadable
+    echo "  ✗ 第二台读不了 /proc，核不了这一趟留下的进程：builds/$run_label 与 runs/ 下三个文件没删、占用照留" >&2
+    echo "     → 怎么办：看第二台 /proc 的挂载选项（hidepid 这类）；修好之后服务对账时的 --recover-cleanup 再核、再删" >&2
+  else
+    multi_host_record_cleanup pending leftovers-unchecked
+    echo "  ✗ 在第二台核这一趟留下的进程那一步退 $leftover_status（ssh 连不上，或那一步自己没跑成）：builds/$run_label 与 runs/ 下三个文件没删、占用照留" >&2
+    echo "     → 怎么办：等第二台连得上，服务对账时的 --recover-cleanup 再核、再删" >&2
+  fi
+  return 1
+}
+
+multi_host_remove_peer_run() { # ⑥ 删第二台这一趟的本地目录（连同编译目录）与 runs/ 下三个文件，回读不在了才算删了；删之前先停这一趟留下的进程（multi_host_stop_peer_leftovers），
+  # 再核没有进程开着里面的文件。没删成置 multi_host_cleanup_failed=1
   local holder_text holder_status removal_status=1 checker="$tree_root/scripts/hosts/run_build_directory.py"
   peer_run_pending=0
   if multi_host_break_is no-peer-cleanup; then
@@ -503,6 +712,11 @@ multi_host_remove_peer_run() { # ⑥ 删第二台这一趟的本地目录（连�
     return 0
   fi
   multi_host_step remove-build begin
+  if ! multi_host_stop_peer_leftovers; then
+    multi_host_cleanup_failed=1
+    multi_host_step remove-build end 1
+    return 0
+  fi
   # 开着里面文件的进程（文件头 ⑥）：仓里的 run_build_directory.py holders（同一个绝对路径），退 3 是有。弄坏开关 open-files-unchecked 不核
   if multi_host_break_is open-files-unchecked; then
     echo "  ! 弄坏开关 MULTI_HOST_RUN_BREAK=open-files-unchecked：删第二台这一趟的本地目录之前不核开着的文件" >&2
@@ -529,9 +743,9 @@ multi_host_remove_peer_run() { # ⑥ 删第二台这一趟的本地目录（连�
   # 这一趟的本地目录（连同编译目录）留给下一次 --reuse-build-directory；回读它还在、三个文件不在了才算留下，打一行 MULTI_HOST_RUN_PEER_BUILD_KEPT。
   # 没等到退出码的（中途失败、被信号停）照删。弄坏开关 peer-build-not-kept 下一律照删
   if (( multi_host_keep_build && peer_command_exited )) && ! multi_host_break_is peer-build-not-kept; then
-    if peer_host_run / "rm -f -- $(printf '%q' "$peer_scratch/$MULTI_HOST_PEER_EXIT_PEAK_NAME") $(printf '%q' "${peer_pid_file:?}") $(printf '%q' "$peer_pid_file.start") $(printf '%q' "${peer_exit_file:?}") $(printf '%q' "${peer_output_file:?}") && test -d $(printf '%q' "$peer_scratch/target") && test ! -e $(printf '%q' "$peer_pid_file")" >/dev/null; then
+    if peer_host_run / "rm -f -- $(printf '%q' "$peer_scratch/$MULTI_HOST_PEER_EXIT_PEAK_NAME") $(printf '%q' "${peer_pid_file:?}") $(printf '%q' "$peer_pid_file.start") $(printf '%q' "${peer_exit_file:?}") $(printf '%q' "${peer_output_file:?}") $(printf '%q' "${peer_scope_file:?}") && test -d $(printf '%q' "$peer_scratch/target") && test ! -e $(printf '%q' "$peer_pid_file")" >/dev/null; then
       removal_status=0
-      echo "  · ⑥ 留着第二台这一趟的本地目录 builds/${peer_scratch##*/}（连同编译目录，--keep-build-directory），删了 runs/ 下进程号、退出码、输出三个文件（回读过）" >&2
+      echo "  · ⑥ 留着第二台这一趟的本地目录 builds/${peer_scratch##*/}（连同编译目录，--keep-build-directory），删了 runs/ 下进程号、退出码、输出三个文件（回读过），删之前停了这一趟留下的 ${multi_host_leftovers_stopped:-0} 个进程，停这一趟内存包装的 scope 时里面还有 ${multi_host_scope_stopped:-0} 个" >&2
       echo "MULTI_HOST_RUN_PEER_BUILD_KEPT label=${peer_scratch##*/}" >&2
     else
       multi_host_cleanup_failed=1
@@ -541,9 +755,10 @@ multi_host_remove_peer_run() { # ⑥ 删第二台这一趟的本地目录（连�
     multi_host_step remove-build end "$removal_status"
     return 0
   fi
-  if peer_host_run / "rm -rf -- $(printf '%q' "${peer_scratch:?}") $(printf '%q' "${peer_pid_file:?}") $(printf '%q' "$peer_pid_file.start") $(printf '%q' "${peer_exit_file:?}") $(printf '%q' "${peer_output_file:?}") && test ! -e $(printf '%q' "$peer_scratch")" >/dev/null; then
+  if peer_host_run / "rm -rf -- $(printf '%q' "${peer_scratch:?}") $(printf '%q' "${peer_pid_file:?}") $(printf '%q' "$peer_pid_file.start") $(printf '%q' "${peer_exit_file:?}") $(printf '%q' "${peer_output_file:?}") $(printf '%q' "${peer_scope_file:?}") && test ! -e $(printf '%q' "$peer_scratch")" >/dev/null; then
     removal_status=0
-    echo "  · ⑥ 删了第二台这一趟的本地目录 builds/$run_label（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了）" >&2
+    # 这一行的头一段与「回读不在了」是 task-server 认第二台那一份删了的原文（task_server.py 的 PEER_TRIP_REMOVED_MARK、PEER_TRIP_READ_BACK_MARK），停了几个接在后面
+    echo "  · ⑥ 删了第二台这一趟的本地目录 builds/$run_label（连同编译目录）与 runs/ 下进程号、退出码、输出三个文件（回读不在了），删之前停了这一趟留下的 ${multi_host_leftovers_stopped:-0} 个进程，停这一趟内存包装的 scope 时里面还有 ${multi_host_scope_stopped:-0} 个" >&2
   else
     multi_host_cleanup_failed=1
     echo "  ✗ 第二台这一趟的本地目录 builds/$run_label 没删掉" >&2
@@ -610,35 +825,59 @@ multi_host_command_starts_cargo() { # <命令与参数…>：有一个词是 car
 
 # 跑着时接回（文件头 ⑤「跑着时接回」）：在第二台上跑的那一段。参数（前面 set -- 交进来）是进程号文件、输出文件；peer_host_process_tree 随 declare -f 带过去。
 #   打一行「size <输出文件此刻的字节数>」，再给进程号那个 bash 的进程树里、它自己所在的 cgroup 之外的每个 cgroup 打一行「cgroup <usage_usec> <cgroup 路径>」；
-#   其中头一个（父在子前数，就是那一层内存包装的 scope）另打一行「peak <第三个参数那个文件里的数> <cgroup 路径>」（文件头 ⑤「峰值」），读不到不打
-MULTI_HOST_PEER_FOLLOW_SCRIPT='pid_file="$1" output_file="$2" peak_file="$3" peak_reported=0
+#   其中头一个（父在子前数，就是那一层内存包装的 scope）另打一行「current <进程内存> <cgroup 路径>」（文件头 ⑤「峰值」「此刻内存」）：进程内存是那个 cgroup 目录
+#   （第五个参数非空时换成它，只供自证的假 cgroup）下第三个参数那个文件（memory.stat）里 anon 与 shmem 两行之和，两行都没有不打；
+#   第六个参数是 1（弄坏开关 peer-memory-with-page-cache）时另打「peak <memory.peak 的数> <cgroup 路径>」、current 打 memory.current 的数，各自读不到不打；
+#   进程树（连同进程号那个 bash 自己）读完之后打一行「blocked <状态是第四个参数里某个字母的进程数>」（文件头 ⑤「等 IO」；进程号那个 bash 不在了不打）
+MULTI_HOST_PEER_FOLLOW_SCRIPT='pid_file="$1" output_file="$2" current_file="$3" blocked_states="${4:-D}" memory_directory="${5:-}" with_page_cache="${6:-0}" memory_reported=0 blocked=0
 printf "size %s\n" "$(stat -c %s -- "$output_file" 2>/dev/null || echo 0)"
 follow_pid="$(cat -- "$pid_file" 2>/dev/null)"
 [[ "$follow_pid" =~ ^[0-9]+$ && -d "/proc/$follow_pid" ]] || exit 0
 base_cgroup="$(sed -n "s/^0:://p" "/proc/$follow_pid/cgroup" 2>/dev/null)"
 declare -A seen_cgroups=()
 for tree_pid in $(peer_host_process_tree "$follow_pid"); do
+  tree_state="$(sed -n "s/^.*) \([A-Z]\) .*$/\1/p" "/proc/$tree_pid/stat" 2>/dev/null)"
+  if [[ -n "$tree_state" && "$blocked_states" == *"$tree_state"* ]]; then blocked=$(( blocked + 1 )); fi
   tree_cgroup="$(sed -n "s/^0:://p" "/proc/$tree_pid/cgroup" 2>/dev/null)"
   [[ -n "$tree_cgroup" && "$tree_cgroup" != "$base_cgroup" ]] || continue
   [[ -z "${seen_cgroups[$tree_cgroup]:-}" ]] || continue
   seen_cgroups[$tree_cgroup]=1
   usage="$(sed -n "s/^usage_usec //p" "/sys/fs/cgroup$tree_cgroup/cpu.stat" 2>/dev/null)"
   if [[ "$usage" =~ ^[0-9]+$ ]]; then printf "cgroup %s %s\n" "$usage" "$tree_cgroup"; fi
-  (( peak_reported )) && continue
-  peak_reported=1
-  peak="$(cat -- "/sys/fs/cgroup$tree_cgroup/$peak_file" 2>/dev/null)"
-  if [[ "$peak" =~ ^[0-9]+$ ]]; then printf "peak %s %s\n" "$peak" "$tree_cgroup"; fi
+  (( memory_reported )) && continue
+  memory_reported=1
+  memory_root="${memory_directory:-/sys/fs/cgroup$tree_cgroup}"
+  current=""
+  if [[ "$with_page_cache" == 1 ]]; then
+    peak="$(cat -- "$memory_root/memory.peak" 2>/dev/null)"
+    if [[ "$peak" =~ ^[0-9]+$ ]]; then printf "peak %s %s\n" "$peak" "$tree_cgroup"; fi
+    current="$(cat -- "$memory_root/memory.current" 2>/dev/null)"
+  elif [[ -r "$memory_root/$current_file" ]]; then
+    process_total=0 process_seen=0
+    while read -r stat_name stat_value _; do
+      case "$stat_name" in
+        anon|shmem) [[ "$stat_value" =~ ^[0-9]+$ ]] && process_total=$(( process_total + stat_value )) && process_seen=1 ;;
+      esac
+    done 2>/dev/null < "$memory_root/$current_file"
+    (( process_seen )) && current="$process_total"
+  fi
+  if [[ "$current" =~ ^[0-9]+$ ]]; then printf "current %s %s\n" "$current" "$tree_cgroup"; fi
 done
+printf "blocked %s\n" "$blocked"
 exit 0'
 
 multi_host_follow_peer() { # <round|final>：peer_host_wait_detached 每一轮之后（round）与等到结局之后（final）调（文件头 ⑤「跑着时接回」）。
-  # round：一次 ssh 读输出文件的字节数与各 cgroup 的 usage_usec，多出来的那一截取回、到最后一个换行为止经 multi_host_redact 打到标准错误，再打一行 MULTI_HOST_RUN_PEER_CPU；
-  # final：已接回之后的全部取回打出（不以换行收尾的补一个换行），不打 CPU 那一行
-  local phase="$1" state kind first rest size="" read_now=no total=0 cgroup usage_value fetch_now=0 start_byte range_text chunk_size complete partial_size
+  # round：一次 ssh 读输出文件的字节数、各 cgroup 的 usage_usec 与那一层内存包装 cgroup 进程用的内存（anon 加 shmem），多出来的那一截取回、到最后一个换行为止经 multi_host_redact 打到标准错误，
+  #   再打一行 MULTI_HOST_RUN_PEER_CPU、紧跟一行 MULTI_HOST_RUN_PEER_MEMORY，再一行 MULTI_HOST_RUN_PEER_IO_WAIT；
+  # final：已接回之后的全部取回打出（不以换行收尾的补一个换行），不打 CPU、内存与等 IO 那三行
+  local phase="$1" state kind first rest size="" read_now=no total=0 cgroup usage_value fetch_now=0 start_byte range_text chunk_size complete partial_size redact_exit
+  local current_now=0 current_read=no blocked_now=0 blocked_read=no with_page_cache=0 finished_now=0
   local chunk="$multi_host_scratch/peer-output.chunk"
   local -A this_round_usage=()
+  # 弄坏开关 peer-memory-with-page-cache：每一轮读 memory.peak 与 memory.current（含页缓存；文件头 ⑤「峰值」）
+  if multi_host_break_is peer-memory-with-page-cache; then with_page_cache=1; fi
   state="$(peer_host_run / "$(declare -f peer_host_process_tree)
-set -- $(printf '%q' "$peer_pid_file") $(printf '%q' "$peer_output_file") $(printf '%q' "$multi_host_peer_peak_file")
+set -- $(printf '%q' "$peer_pid_file") $(printf '%q' "$peer_output_file") $(printf '%q' "$multi_host_peer_current_file") $(printf '%q' "$multi_host_peer_blocked_states") $(printf '%q' "$multi_host_peer_memory_directory") $with_page_cache
 $MULTI_HOST_PEER_FOLLOW_SCRIPT" 2>/dev/null)" || state=""
   while read -r kind first rest; do
     case "$kind" in
@@ -649,9 +888,22 @@ $MULTI_HOST_PEER_FOLLOW_SCRIPT" 2>/dev/null)" || state=""
         this_round_usage[$rest]="$first"
         if (( first > ${multi_host_peer_cgroup_usage[$rest]:-0} )); then multi_host_peer_cgroup_usage[$rest]="$first"; fi
         ;;
-      peak)
+      peak)   # 只在弄坏开关 peer-memory-with-page-cache 下有（memory.peak）
         [[ "$first" =~ ^[0-9]+$ ]] || continue
         if [[ -z "$multi_host_peer_memory_peak" ]] || (( first > multi_host_peer_memory_peak )); then multi_host_peer_memory_peak="$first"; fi
+        ;;
+      current)   # 这一轮的进程内存；峰值是见过的最大（文件头 ⑤「峰值」），0 不算读到过峰值
+        [[ "$first" =~ ^[0-9]+$ ]] || continue
+        current_now="$first"
+        current_read=yes
+        if (( first > 0 && with_page_cache == 0 )) && { [[ -z "$multi_host_peer_memory_peak" ]] || (( first > multi_host_peer_memory_peak )); }; then
+          multi_host_peer_memory_peak="$first"
+        fi
+        ;;
+      blocked)
+        [[ "$first" =~ ^[0-9]+$ ]] || continue
+        blocked_now="$first"
+        blocked_read=yes
         ;;
     esac
   done <<<"$state"
@@ -677,14 +929,31 @@ $MULTI_HOST_PEER_FOLLOW_SCRIPT" 2>/dev/null)" || state=""
         partial_size="$(tail -n 1 -- "$chunk" | wc -c)"
         complete=$(( chunk_size - partial_size ))
       fi
+      # 编译段峰值（文件头 ⑤「编译段峰值」）：这一截整行里有 cargo 编完那一行的，这一轮读到的不收（grep 单独判退出码，不接在管道后面）
+      if (( complete > 0 && ! multi_host_peer_build_finished )) && grep -Eq -- "$MULTI_HOST_CARGO_FINISHED_PATTERN" < <(head -c "$complete" -- "$chunk"); then
+        finished_now=1
+      fi
       if (( complete > 0 )); then
         head -c "$complete" -- "$chunk" | multi_host_redact >&2
-        if [[ "$phase" == final && -n "$(tail -c 1 -- "$chunk")" ]]; then echo >&2; fi
+        redact_exit="${PIPESTATUS[1]}"   # 换字那一步自己的退出码（管道的退出码是最后一个非 0 的，head 被 SIGPIPE 也会带上）
+        if (( redact_exit != 0 )); then
+          # 换字失败的这一块不重打（重打还是失败，打了一半的会重复），字节数照下面往前推；退非 0 就报，不悄悄丢（文件头 ⑤「跑着时接回」）
+          multi_host_break_is peer-redact-failure-unreported \
+            || echo "  ! 第二台那条命令的输出第 $(( start_byte + 1 )) 到 $(( start_byte + complete )) 字节换字时退了 $redact_exit，这一块没打到这里、也不再重打（命令的退出码不受影响）：原样的输出在第二台 runs/ 下的 $run_label.log，ssh 上去看" >&2
+        elif [[ "$phase" == final && -n "$(tail -c 1 -- "$chunk")" ]]; then
+          echo >&2
+        fi
       fi
       multi_host_peer_forwarded_bytes=$(( start_byte + complete ))
     elif [[ "$phase" == final ]]; then
       echo "  ! 第二台那条命令的输出接回了 $start_byte 字节，之后的没接回来：ssh 到第二台 runs/ 下看 $run_label.log" >&2
     fi
+  fi
+  if (( finished_now )); then
+    multi_host_peer_build_finished=1
+  elif [[ "$phase" == round ]] && (( ! multi_host_peer_build_finished && with_page_cache == 0 )) && [[ "$current_read" == yes ]] && (( current_now > 0 )) \
+      && { [[ -z "$multi_host_peer_build_phase_peak" ]] || (( current_now > multi_host_peer_build_phase_peak )); }; then
+    multi_host_peer_build_phase_peak="$current_now"
   fi
   [[ "$phase" == round ]] || return 0
   # 每一轮一行 CPU（文件头 ⑤ 的固定格式）：各 cgroup 见过的最大之和，一轮比一轮不减；弄坏开关 peer-cpu-not-kept 下只算这一轮读到的、peer-cpu-unreported 下不打
@@ -697,13 +966,25 @@ $MULTI_HOST_PEER_FOLLOW_SCRIPT" 2>/dev/null)" || state=""
   if ! multi_host_break_is peer-cpu-unreported; then
     echo "MULTI_HOST_RUN_PEER_CPU poll=$multi_host_peer_polls usage_usec=$total read=$read_now" >&2
   fi
+  # 紧跟一行此刻内存（文件头 ⑤「此刻内存」）：同一轮、同一个轮数；没读到 current 写 0 与 read=no，峰值没读到写 0，不漏行；
+  # 弄坏开关 peer-memory-unreported 下不打，peer-memory-unread-skipped 下没读到 current 的这一轮不打
+  if ! multi_host_break_is peer-memory-unreported && ! { [[ "$current_read" == no ]] && multi_host_break_is peer-memory-unread-skipped; }; then
+    echo "MULTI_HOST_RUN_PEER_MEMORY poll=$multi_host_peer_polls current_bytes=$current_now peak_bytes=${multi_host_peer_memory_peak:-0} read=$current_read" >&2
+  fi
+  # 再一行等 IO（文件头 ⑤「等 IO」）：同一轮、同一个轮数；进程树没读到写 blocked=0 read=no，不漏行；
+  # 弄坏开关 peer-io-wait-unreported 下不打，peer-io-wait-uncounted 下读到了也写 blocked=0
+  if multi_host_break_is peer-io-wait-unreported; then return 0; fi
+  if multi_host_break_is peer-io-wait-uncounted; then blocked_now=0; fi
+  echo "MULTI_HOST_RUN_PEER_IO_WAIT poll=$multi_host_peer_polls blocked=$blocked_now read=$blocked_read" >&2
 }
 
-multi_host_report_peer_memory_peak() { # 第二台那条命令等到退出码之后打一行那一层内存包装 cgroup 的峰值（文件头 ⑤「峰值」）：按轮采到的与那一层退出时读的取大的，都没读到就不打；
-  # 弄坏开关 peer-memory-peak-unreported 下不打，peer-memory-peak-unread-printed 下没读到也打 bytes=0，peak-read-only-by-sampling 下不读退出时那一个
+multi_host_report_peer_memory_peak() { # 第二台那条命令等到退出码之后打一行那一层内存包装 cgroup 的峰值（文件头 ⑤「峰值」）：按轮采到的进程内存的最大，
+  # 按轮一次都没采到才照那一层退出时读的 memory.peak，都没有就不打；
+  # 弄坏开关 peer-memory-peak-unreported 下不打，peer-memory-peak-unread-printed 下没读到也打 bytes=0，peak-read-only-by-sampling 下不读退出时那一个，
+  # peer-memory-with-page-cache 下按轮采到的（memory.peak）与退出时读的取大的
   local exit_peak=""
   if multi_host_break_is peer-memory-peak-unreported; then return 0; fi
-  if ! multi_host_break_is peak-read-only-by-sampling; then
+  if ! multi_host_break_is peak-read-only-by-sampling && { [[ -z "$multi_host_peer_memory_peak" ]] || multi_host_break_is peer-memory-with-page-cache; }; then
     exit_peak="$(peer_host_run / "cat -- $(printf '%q' "$peer_scratch/$multi_host_peer_exit_peak_file") 2>/dev/null" 2>/dev/null)" || exit_peak=""
     if [[ "$exit_peak" =~ ^[1-9][0-9]*$ ]] && { [[ -z "$multi_host_peer_memory_peak" ]] || (( exit_peak > multi_host_peer_memory_peak )); }; then
       multi_host_peer_memory_peak="$exit_peak"
@@ -714,6 +995,13 @@ multi_host_report_peer_memory_peak() { # 第二台那条命令等到退出码之
     multi_host_peer_memory_peak=0
   fi
   echo "MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=$multi_host_peer_memory_peak" >&2
+}
+
+multi_host_report_peer_build_phase_peak() { # 第二台那条命令等到退出码之后打一行编译段峰值（文件头 ⑤「编译段峰值」）：见到了 cargo 编完那一行、
+  # 那一行之前至少一轮读到了进程内存的才打；弄坏开关 peer-build-phase-peak-unreported 下不打
+  if multi_host_break_is peer-build-phase-peak-unreported; then return 0; fi
+  (( multi_host_peer_build_finished )) && [[ -n "$multi_host_peer_build_phase_peak" ]] || return 0
+  echo "MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK bytes=$multi_host_peer_build_phase_peak" >&2
 }
 
 multi_host_report_peer_build_peak() { # 第二台那条命令等到退出码之后、⑥ 删之前量这一趟本地编译目录的占盘，打一行（文件头 ⑤「编译目录占盘」）：量不到就不打；
@@ -810,6 +1098,7 @@ multi_host_peer_main() { # 带 --peer：步骤 ①–⑥ 见文件头
   peer_pid_file="$peer_runs/$run_label.pid"
   peer_exit_file="$peer_runs/$run_label.exit"
   peer_output_file="$peer_runs/$run_label.log"
+  peer_scope_file="$peer_runs/$run_label.scope"   # 文件头 ⑥：那一层内存包装把 scope 单元名写进它，⑥ 先停这一个 scope
   local scratch_free_test="test ! -e $(printf '%q' "$peer_scratch") && "
   if [[ -n "$multi_host_reuse_label" ]]; then
     # 要接着用的那一份要在（它是上一次带 --keep-build-directory 留下的）；查的那一步 ssh 自己退 255 是连不上，别的非 0 是不在：退 255，服务记 peer-run-failed、下一次照新建的起
@@ -820,7 +1109,7 @@ multi_host_peer_main() { # 带 --peer：步骤 ①–⑥ 见文件头
       "服务把这一次记 peer-run-failed、重排时照新建的起；手跑的去掉 --reuse-build-directory 再跑"
     scratch_free_test=""
   fi
-  peer_host_run / "${scratch_free_test}test ! -e $(printf '%q' "$peer_pid_file") && test ! -e $(printf '%q' "$peer_pid_file.start") && test ! -e $(printf '%q' "$peer_exit_file") && test ! -e $(printf '%q' "$peer_output_file")" >/dev/null \
+  peer_host_run / "${scratch_free_test}test ! -e $(printf '%q' "$peer_pid_file") && test ! -e $(printf '%q' "$peer_pid_file.start") && test ! -e $(printf '%q' "$peer_exit_file") && test ! -e $(printf '%q' "$peer_output_file") && test ! -e $(printf '%q' "$peer_scope_file")" >/dev/null \
     || label_free_status=$?
   multi_host_judge_label_free "$label_free_status" "第二台 builds/ 下已经有 $run_label（或 runs/ 下它的 .pid / .exit / .log）"
   # 接着用的那一份里上一次那一层内存包装退出时写的峰值删掉（这一次读的要是这一次写的；文件头 ⑤「峰值」）
@@ -858,6 +1147,7 @@ multi_host_peer_main() { # 带 --peer：步骤 ①–⑥ 见文件头
   if [[ -n "$multi_host_scene_directory" ]] && ! multi_host_break_is peer-scene-not-passed; then
     wrapper_extras+="RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY=$(printf '%q' "$multi_host_scene_directory") "
   fi
+  wrapper_extras+="RUN_WITH_MEMORY_CAP_UNIT_OUTPUT=$(printf '%q' "$peer_scope_file") "   # 文件头 ⑥：那一层把 scope 单元名写进进程号文件旁边，⑥ 先停它
   wrapper_text="RUN_WITH_MEMORY_CAP_ADMITTED_BY_TASK_SERVER=$(printf '%q' "$multi_host_admitted_by_task_server") ${wrapper_extras}bash $(printf '%q' "$tree_root/scripts/hosts/run-with-memory-cap.sh") $(printf '%q' "$memory_cap") "
   if multi_host_break_is peer-without-memory-cap; then
     echo "  ! 弄坏开关 MULTI_HOST_RUN_BREAK=peer-without-memory-cap：第二台那条命令不经 run-with-memory-cap.sh 跑" >&2
@@ -877,18 +1167,21 @@ multi_host_peer_main() { # 带 --peer：步骤 ①–⑥ 见文件头
   peer_command_started=1   # 先置上：起的那一刻收到信号，也按第二台上记下的进程号去停
   peer_host_start_detached "$peer_start_directory" "$peer_pid_file" "$peer_exit_file" "$peer_output_file" "$command_text" >/dev/null \
     || multi_host_fail "第二台那条命令起不来" "看 ssh 连不连得上、第二台上 $PWD 所在的那一个共享根挂着没有（在第二台 stat -f -c %T -- <根>/. 读到 nfs 才算挂着，task-server/README.md「## NFS 共享」；python3 task-server/control check 判同一项）"
-  echo "  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 $peer_start_directory 里，经 run-with-memory-cap.sh $memory_cap，编译目录在第二台这一趟的本地目录 builds/$run_label 下），每 $poll_seconds 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU" >&2
+  echo "  · ⑤ 第二台开跑（脱离 ssh 会话起，在同一个绝对路径 $peer_start_directory 里，经 run-with-memory-cap.sh $memory_cap，编译目录在第二台这一趟的本地目录 builds/$run_label 下），每 $poll_seconds 秒看一次：跑着时把它的新输出接回本机标准错误、每一轮报一行 MULTI_HOST_RUN_PEER_CPU、一行 MULTI_HOST_RUN_PEER_MEMORY 与一行 MULTI_HOST_RUN_PEER_IO_WAIT" >&2
   # 跑着时接回（文件头 ⑤「跑着时接回」）：每一轮之后与等到结局之后调 multi_host_follow_peer
   multi_host_peer_forwarded_bytes=0
   multi_host_peer_polls=0
   multi_host_peer_cgroup_usage=()
   multi_host_peer_memory_peak=""
+  multi_host_peer_build_phase_peak=""
+  multi_host_peer_build_finished=0
   peer_host_wait_detached "$peer_pid_file" "$peer_exit_file" "$poll_seconds" multi_host_follow_peer >&2
   case "$peer_host_detached_outcome" in
     "exit "*) command_exit="${peer_host_detached_outcome#exit }"; peer_command_started=0; peer_command_exited=1 ;;
     *) multi_host_fail "第二台那条命令没等到退出码：$peer_host_detached_outcome（vanished 进程没了又没留退出码；unreachable 连续 60 次 ssh 不通；never-started 60 次都没起来）" "看上面接回的输出；ssh 到第二台 runs/ 下看 $run_label.log" ;;
   esac
   multi_host_report_peer_memory_peak
+  multi_host_report_peer_build_phase_peak
   multi_host_report_peer_build_peak
   echo "  · 第二台那条命令退 $command_exit" >&2
   multi_host_step peer-command end "$command_exit"
@@ -950,6 +1243,7 @@ multi_host_main() {
   peer_run_pending=0
   peer_scratch=""
   peer_start_directory=""
+  peer_scope_file=""   # 第二台 runs/<标签>.scope：那一层内存包装写的 scope 单元名（文件头 ⑥）
   multi_host_cleanup_failed=0
   multi_host_scratch="$(mktemp -d)"
   trap multi_host_on_exit EXIT
@@ -993,7 +1287,7 @@ multi_host_main() {
 #   「第二台」那一趟的环境只给最少几样，包装用默认的 slice：读不到、不是 MiB 的整数倍的，自证在建场景之前就停（改不改 slice 判不了）
 #   场景配置 场景的多机配置过得了判法（--emit-assignments 退 0），SLICE_MEMORY_CAP_BY_HOST 里这一台那一项照 slice 此刻的总上限写：这一格红了就停，后面经 --peer 的格同因全红
 #     （「双机分片的本地配置判不过」）
-#   Ⓖ 输出（驱动的标准输出与标准错误）里没有配置里的主机名与第二台的目录，而命令打的那两样换成了「第二台」「第二台的目录」
+#   Ⓖ 输出（驱动的标准输出与标准错误）里没有配置里的主机名与第二台的目录，而命令打的那两样被换成「第二台」「第二台的目录」
 #   Ⓗ 配置里 ENABLE_ACROSS_MACHINES=0 ⇒ --peer 拒（退 255，说在配置里写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑
 #   Ⓘ 弄坏开关设在自证之外（起驱动时去掉自证的标记，带 --peer）⇒ 拒（退 2），命令没跑；只供测试的 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 设在自证之外同样拒（退 2）
 #   Ⓚ --peer 跑 bash -c 'exit 3'，第二台的 PATH 最前面（场景的 peer-bin）放假 journalctl（打一行 NVRM … NV_ERR_NO_MEMORY），第二台那一层内存包装照 PATH 取到它 ⇒ 包装退 245，
@@ -1015,8 +1309,9 @@ multi_host_main() {
 #   Ⓧ 驱动正经 gpu-quiesce-run.sh 起（GPU_QUIESCE_HOLDER 指的登记文件名字以驱动的父进程号起头）⇒ 第二台拿到 GPU_QUIESCE_ORIGIN_READ_BACK=1；进程号对不上的登记文件 ⇒ 没设
 #   Ⓩ 共享根（文件头 ③）：--peer 命令里有共享根外的绝对路径（<自证目录>/outside-shared 下，整个词、bash -c 词里各一趟）⇒ 退 255、点名那个路径，命令没跑、没建这一趟的目录；
 #      在 outside-shared 里起 ⇒ 退 255、说工作目录；命令里只有共享根下的路径与 /dev/null ⇒ 照跑、退 0；
-#      直接问 multi_host_outside_shared_path（共享根是一个空目录）：cp "${X:?}/release/a" /w/x 只取 /w/x，cd ./scripts && ls ../a/b 与 ls $(pwd)/target 一个都不取，
-#      cp /opt/x y、OUT=/opt/y true、echo a:/opt/z 照取
+#      直接问 multi_host_outside_shared_path（共享根是一个空目录，每一例放在 bash -c 后面）：cp "${X:?}/release/a" /w/x 只取 /w/x，cd ./scripts && ls ../a/b、
+#      ls $(pwd)/target 与 echo a:/opt/z 一个都不取，cp /opt/x y、OUT=/opt/y true、tool --out=/opt/v、cat </opt/u 照取；
+#      --item 'crash-case-replay（接的是 /）' 与 bash -c 'echo "（接的是 /）" > /dev/null' 一个都不取，--item 'x（接的是 /）' /opt/outside-word 只取 /opt/outside-word
 #   Ⓢ 共享根交给第二台：第二台那条命令看到的 SINGLEFS_WORK_ROOT、SINGLEFS_DATA_ROOT 是场景那两个的真路径；工作根、多机配置放到 outside-shared 下 ⇒ 各退 255、点名是哪一样；
 #      配置 BUILD_ROOT_BY_HOST 里第二台那一项改到场景目录（共享根）下 ⇒ 退 255、说这一趟的本地目录不许落在 NFS 上，命令都没跑
 #   Ⓦ 分段计时：--peer 跑成的那一趟里 peer-command、remove-build 两步都有开始与结束两行
@@ -1025,10 +1320,29 @@ multi_host_main() {
 #   接回（文件头 ⑤「跑着时接回」）：第二台那条命令打三行，每打一行空转一阵 CPU、再等那一行出现在驱动的标准错误文件里（至多 8 秒），记下等到了没有；
 #      再打半行、空转、过 3 秒补完，最后一截不以换行收尾 ⇒ 三行都在跑着时等到了；驱动标准错误里 follow- 起头的行正好是那五行、同序不重；
 #      MULTI_HOST_RUN_PEER_CPU 每一轮一行、poll= 从 1 起连号、usage_usec 不减、末行至少 1000000（空转了四阵、每阵至少 1 秒）、至少一轮 read=yes
-#   峰值（文件头 ⑤「峰值」）：接回那一趟结束时恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>、在最后一行 CPU 之后；再跑一趟空转 3 秒、
-#      读的文件名换成不在的（MULTI_HOST_RUN_SELFTEST_PEAK_FILE）⇒ 退 0、至少一轮 read=yes、不打那一行
+#   此刻内存（文件头 ⑤「此刻内存」）：MULTI_HOST_RUN_PEER_MEMORY 每一轮一行、紧跟在那一轮的 CPU 行之后、poll= 与 CPU 那一行相同、整行对上固定格式、至少一轮 read=yes 且 current_bytes 大于 0；
+#      再跑一趟空转 3 秒、每一轮读 memory.stat 的文件名换成不在的（MULTI_HOST_RUN_SELFTEST_CURRENT_FILE）、退出时读的也换成不在的 ⇒ 退 0、
+#      MEMORY 行与 CPU 行一样多（至少一行）、每一行都是 current_bytes=0 peak_bytes=0 read=no
+#   等 IO（文件头 ⑤「等 IO」）：接回那一趟每一轮一行 MULTI_HOST_RUN_PEER_IO_WAIT、在那一轮的 CPU 行之后、下一轮 CPU 行之前，poll= 与 CPU 那一行相同、整行对上固定格式、
+#      至少一轮 read=yes；上面读不到 memory.stat 那一趟另把数的状态换成 S（MULTI_HOST_RUN_SELFTEST_BLOCKED_STATES=S：空转的命令底下总有在睡的父进程）⇒ 至少一轮 read=yes 且 blocked 大于 0
+#   峰值（文件头 ⑤「峰值」）：接回那一趟结束时恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>、在最后一行 CPU 之后；上面读不到 memory.stat 那一趟
+#      （每一轮与退出时读的都换成不在的）⇒ 退 0、至少一轮 read=yes、不打那一行；再跑一趟 0.1 秒就退的、只把每一轮读的换成不在的 ⇒ 照那一层退出时读的打恰好一行
+#      页缓存撑满上限（文件头 ⑤「峰值」）：每一轮读的目录换成假 cgroup（MULTI_HOST_RUN_SELFTEST_MEMORY_DIRECTORY：memory.stat 里 anon 1G、file 40G、kernel 650M、shmem 0，
+#      memory.current 与 memory.peak 是三项之和），空转 3 秒 ⇒ 退 0、read=yes 的每一行 MEMORY 都是 current_bytes 与 peak_bytes 等于 1G、至少一行，峰值行是 bytes=1G
+#   编译段峰值（文件头 ⑤「编译段峰值」）：接回那一趟三行之后打一行 cargo 编完那一行 ⇒ 恰好一行 MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK bytes=<正整数>、不大于峰值行的数
 #   编译目录占盘（文件头 ⑤「编译目录占盘」）：Ⓠ --peer 那一趟往编译目录里写了产物 ⇒ 恰好一行 MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=<正整数>；
 #      命令自己删了编译目录 ⇒ 退 0、不打那一行
+#   收拾（文件头 ⑥ 与 --recover-cleanup 那一段）：标签都带这一份自证自己的进程号（并行跑的几份自证各用各的标签）。
+#      先按 scope 收：--peer 命令 setsid 出去一个清了环境的 sleep、记下它的进程号，再只给那一层内存包装（RUN_WITH_MEMORY_CAP_OUTER_UNIT 的单元名里带它的进程号）发 KILL
+#        ⇒ 驱动退 137、sleep 不在了、⑥ 那一行写停 scope 时里面还有至少 1 个、第二台 runs/ 与 builds/ 下什么都不剩
+#      setsid 出去的后代：--peer 命令带着这一趟的标签（env TASK_SERVER_ATTEMPT_LABEL=<标签>）经 systemd-run --user --scope 起一个跑出那一层 scope、setsid 出去的 bash（记下自己的进程号、exec sleep 300），
+#        等它记下就退 0 ⇒ 驱动退 0、那一个不在了、⑥ 那一行写「删之前停了这一趟留下的 1 个进程」、第二台 runs/ 与 builds/ 下什么都不剩
+#      --recover-cleanup 两格：驱动环境里给清理回执的路径（TASK_SERVER_PEER_CLEANUP_FILE），命令记下自己的进程号、等放行文件；自证只给自己起的驱动发 KILL
+#        （它不收尾、清理回执留在 pending），再放行：命令 KILL 起它的那个 bash（进程号文件里那个号，它没写退出回执）。
+#        后代都已不在：命令接着退 0；等这一趟的会话里一个进程都不剩，起一次 --recover-cleanup ⇒ 退 0、stderr 里「补写了退出回执「143 stopped already-gone」」、
+#          清理回执是 confirmed、第二台 runs/ 与 builds/ 下什么都不剩
+#        后代还活着：命令接着 exec sleep 300；等起的那个 bash 不在了，起一次 --recover-cleanup ⇒ 退 0、停了至少 1 个（PEER_HOST_LEFTOVERS stopped=）、
+#          补写的退出回执是 143 stopped TERM 或 137 stopped KILL、命令不在了、清理回执是 confirmed、什么都不剩
 # 自证在临时目录里放标记文件、export MULTI_HOST_RUN_SELFTEST_MARK 指向它：场景里起的驱动认得出是自证起的，调用方设的弄坏开关才生效
 
 multi_host_selftest() {
@@ -1098,7 +1412,7 @@ exit 1
 FAKE_RUSTUP
   chmod +x "$fake_rustup_directory/rustup"
   # 假 rustc、cargo（自证段说明里「假 rustup、rustc、cargo」那一句）：toolchain_rustc、toolchain_cargo 是场景里各份假 cargo 的 -V 与自证自己问 host 那一步用的那一份；
-  #   弄坏开关 selftest-caller-toolchain 下照改前不放，两个都取 PATH 上调用方的那一份
+  #   弄坏开关 selftest-caller-toolchain 下不放，两个都取 PATH 上调用方的那一份
   local toolchain_rustc="$fake_rustup_directory/rustc" toolchain_cargo="$fake_rustup_directory/cargo"
   if multi_host_break_is selftest-caller-toolchain; then
     toolchain_rustc="$(command -v rustc)"
@@ -1186,7 +1500,7 @@ FAKE_CARGO
   tail_of() { tail -n 3 "$work/$1/$2.err" 2>/dev/null | tr '\n' '|'; }
   repository_of() { (cd "$work/$1/repo" && pwd -P); }   # <场景名>：小仓的真路径（第二台那条命令在它里面起）
   cut_characters() { # <字数>：每行只留前这么多个字（按 UTF-8 的字截：GNU cut -c 按字节截，会把汉字截成半个，细节行里留下解不成 UTF-8 的字节）；
-    # 弄坏开关 detail-cut-by-bytes 下照改前按字节截（Ⓣ 那一格红）
+    # 弄坏开关 detail-cut-by-bytes 下按字节截（Ⓣ 那一格红）
     if multi_host_break_is detail-cut-by-bytes; then cut -c "1-$1"; return; fi
     python3 -c 'import sys; limit = int(sys.argv[1]); sys.stdout.buffer.write(b"".join((line.decode("utf-8", "replace").rstrip("\n")[:limit] + "\n").encode("utf-8") for line in sys.stdin.buffer))' "$1"
   }
@@ -1755,18 +2069,31 @@ cat $(printf '%q' "$scene/ssh.log") 2>/dev/null | wc -l > \"\$0.ssh-count\"" "$s
   expect "Ⓩ --peer 命令里的路径都在共享根下或是两台相同的系统路径（/dev/null）⇒ 照跑、退 0" \
     "$([[ "$(exit_of outside-paths inside)" == 0 && -e "$scene/inside-ran" ]]; echo $?)" \
     "退 $(exit_of outside-paths inside)，命令$([[ -e "$scene/inside-ran" ]] && echo 跑了 || echo 没跑)；stderr 尾部：$(tail_of outside-paths inside | cut_characters 300)"
-  # Ⓩ 词里的绝对路径怎么取（文件头 ③，与 task-server/task_server.py 的 QUOTED_WORD_PATH 同一个写法）：直接问 multi_host_outside_shared_path，共享根是一个空目录；
-  #   每一例「<bash -c 那一个词>|<要打的那个路径，空是一个都不取>」
+  # Ⓩ 词里的绝对路径怎么取（文件头 ③，与 task-server/task_server.py 的 find_outside_shared_path 同一个读法）：直接问 multi_host_outside_shared_path，共享根是一个空目录；
+  #   每一例「<bash -c 后面那一个脚本词>|<要打的那个路径，空是一个都不取>」
   local expansion_shared="$work/expansion-shared" expansion_case expansion_word expansion_wanted expansion_got expansion_wrong=""
   mkdir -p "$expansion_shared"
-  for expansion_case in 'cp "${X:?}/release/a" /w/x|/w/x' 'cd ./scripts && ls ../a/b|' 'ls $(pwd)/target|' 'cp /opt/x y|/opt/x' 'OUT=/opt/y true|/opt/y' 'echo a:/opt/z|/opt/z'; do
+  for expansion_case in 'cp "${X:?}/release/a" /w/x|/w/x' 'cd ./scripts && ls ../a/b|' 'ls $(pwd)/target|' 'cp /opt/x y|/opt/x' 'OUT=/opt/y true|/opt/y' \
+      'echo a:/opt/z|' 'tool --out=/opt/v|/opt/v' 'cat </opt/u|/opt/u'; do
     expansion_word="${expansion_case%|*}"
     expansion_wanted="${expansion_case##*|}"
-    expansion_got="$(NFS_SHARED_ROOTS="$expansion_shared" multi_host_outside_shared_path "$expansion_word")" || expansion_got="（python3 没跑成）"
+    expansion_got="$(NFS_SHARED_ROOTS="$expansion_shared" multi_host_outside_shared_path bash -c "$expansion_word")" || expansion_got="（python3 没跑成）"
     [[ "$expansion_got" == "$expansion_wanted" ]] || expansion_wrong+="「$expansion_word」取到「$expansion_got」（要「$expansion_wanted」）；"
   done
-  expect "Ⓩ bash -c 词里紧跟在 }、)、. 后面的 /…（\${…}、\$(…) 的尾巴，./x、../x）不当绝对路径，前面是空白、=、: 的照取" \
+  expect "Ⓩ bash -c 脚本词照 shell 词切：跟在 }、) 后面的 /…（\${…}、\$(…) 的尾巴）、./x、../x 与 a:/x 里夹着的 / 不当绝对路径，词头的、= 后面的与挨着 < 的照取" \
     "$([[ -z "$expansion_wrong" ]]; echo $?)" "$expansion_wrong"
+  # Ⓩ 参数值中间夹着的 /（文件头 ③）：--item 的值「…（接的是 /）」、bash -c 脚本里引号中的「（接的是 /）」不当绝对路径；同一条里共享根外的整个词照取。
+  #   每一例「<要打的那个路径，空是一个都不取>」对一组写死的词
+  local substring_got substring_wrong=""
+  substring_got="$(NFS_SHARED_ROOTS="$expansion_shared" multi_host_outside_shared_path bash .claude/gate.d/crash-point-replay.sh --item 'crash-case-replay（接的是 /）' "$expansion_shared")" \
+    || substring_got="（python3 没跑成）"
+  [[ -z "$substring_got" ]] || substring_wrong+="--item 的值「crash-case-replay（接的是 /）」取到「$substring_got」（要一个都不取）；"
+  substring_got="$(NFS_SHARED_ROOTS="$expansion_shared" multi_host_outside_shared_path bash -c 'echo "（接的是 /）" > /dev/null')" || substring_got="（python3 没跑成）"
+  [[ -z "$substring_got" ]] || substring_wrong+="bash -c 引号里的「（接的是 /）」取到「$substring_got」（要一个都不取）；"
+  substring_got="$(NFS_SHARED_ROOTS="$expansion_shared" multi_host_outside_shared_path --item 'x（接的是 /）' /opt/outside-word)" || substring_got="（python3 没跑成）"
+  [[ "$substring_got" == /opt/outside-word ]] || substring_wrong+="--item 'x（接的是 /）' /opt/outside-word 取到「$substring_got」（要「/opt/outside-word」）；"
+  expect "Ⓩ 参数值中间夹着的 /（--item 的值、bash -c 引号里的「（接的是 /）」）不当绝对路径，同一条里共享根外的整个词照取" \
+    "$([[ -z "$substring_wrong" ]]; echo $?)" "$substring_wrong"
 
   # Ⓢ 共享根交给第二台：第二台那条命令记下它看到的两个共享根；工作根、多机配置放到共享根外各一趟；配置 BUILD_ROOT_BY_HOST 里第二台那一项落在共享根下一趟
   prepare_scene shared-roots
@@ -1825,6 +2152,7 @@ for line_number in 1 2 3; do
   for (( wait_round = 0; wait_round < 80; wait_round++ )); do grep -qx "follow-line-$line_number" "$0" && break; sleep 0.1; done
   if grep -qx "follow-line-$line_number" "$0"; then echo "seen-$line_number" >> "$1"; else echo "missed-$line_number" >> "$1"; fi
 done
+echo "    Finished \`release\` profile [optimized] target(s) in 6.00s"
 printf "follow-part-"
 spin
 sleep 3
@@ -1856,9 +2184,60 @@ printf "follow-tail"'
   expect "接回 每一轮一行 MULTI_HOST_RUN_PEER_CPU poll=<从 1 起连着的号> usage_usec=<数> read=<yes|no>，usage_usec 一轮比一轮不减、末行至少 1000000、有一轮读到了" \
     "$([[ "$(exit_of follow run)" == 0 && -z "$cpu_problems" ]]; echo $?)" \
     "${cpu_problems:-无}；stderr 尾部：$(tail_of follow run)"
+  # 此刻内存（文件头 ⑤「此刻内存」）：同一趟里每一轮 CPU 行的下一行就是 MULTI_HOST_RUN_PEER_MEMORY，整行对上固定格式、轮数与那一行 CPU 相同，至少一轮 read=yes 且 current_bytes 大于 0
+  local memory_problems
+  memory_problems="$(awk '
+    /MULTI_HOST_RUN_PEER_CPU poll=/ {
+      if (waiting) print "第 " cpu_line " 行的 CPU 后面没跟 MEMORY"
+      waiting = 1; cpu_line = NR
+      split($0, poll_parts, "poll="); split(poll_parts[2], poll_number, " "); cpu_poll = poll_number[1]
+    }
+    /MULTI_HOST_RUN_PEER_MEMORY poll=/ {
+      if ($0 !~ /^MULTI_HOST_RUN_PEER_MEMORY poll=[0-9]+ current_bytes=[0-9]+ peak_bytes=[0-9]+ read=(yes|no)$/) { print "格式不对：" $0; waiting = 0; next }
+      lines++
+      split($2, poll_field, "="); split($3, current_field, "="); split($5, read_field, "=")
+      if (!waiting || NR != cpu_line + 1) print "第 " NR " 行的 MEMORY 前一行不是 CPU"
+      else if (poll_field[2] != cpu_poll) print "轮数对不上：CPU 是 poll=" cpu_poll "，MEMORY 是 poll=" poll_field[2]
+      waiting = 0
+      if (read_field[2] == "yes" && current_field[2] + 0 > 0) good_rounds++
+    }
+    END {
+      if (waiting) print "第 " cpu_line " 行的 CPU 后面没跟 MEMORY"
+      if (lines == 0) print "只有 0 行 MEMORY"
+      else if (good_rounds == 0) print "一轮都没有 read=yes 且 current_bytes 大于 0"
+    }' "$scene/run.err" 2>/dev/null | tr '\n' ' ')"
+  expect "接回 每一轮一行 MULTI_HOST_RUN_PEER_MEMORY poll=<与 CPU 那一行同一个轮数> current_bytes=<数> peak_bytes=<数> read=<yes|no>，紧跟每行 CPU 之后、至少一轮 read=yes 且 current_bytes 大于 0" \
+    "$([[ "$(exit_of follow run)" == 0 && -z "$memory_problems" ]]; echo $?)" \
+    "${memory_problems:-无}：$(grep -m 3 'MULTI_HOST_RUN_PEER_MEMORY poll=' "$scene/run.err" 2>/dev/null | tr '\n' '|')；stderr 尾部：$(tail_of follow run)"
+  # 等 IO（文件头 ⑤「等 IO」）：同一趟里每一轮 CPU 行之后、下一轮 CPU 行之前恰好一行 MULTI_HOST_RUN_PEER_IO_WAIT，整行对上固定格式、轮数与那一行 CPU 相同，至少一轮 read=yes
+  #   （弄坏开关 peer-io-wait-unreported 下一行都没有）
+  local io_wait_problems
+  io_wait_problems="$(awk '
+    /MULTI_HOST_RUN_PEER_CPU poll=/ {
+      if (waiting) print "第 " cpu_line " 行的 CPU 那一轮没有 IO_WAIT"
+      waiting = 1; cpu_line = NR
+      split($0, poll_parts, "poll="); split(poll_parts[2], poll_number, " "); cpu_poll = poll_number[1]
+    }
+    /MULTI_HOST_RUN_PEER_IO_WAIT poll=/ {
+      if ($0 !~ /^MULTI_HOST_RUN_PEER_IO_WAIT poll=[0-9]+ blocked=[0-9]+ read=(yes|no)$/) { print "格式不对：" $0; waiting = 0; next }
+      lines++
+      split($2, poll_field, "="); split($4, read_field, "=")
+      if (!waiting) print "第 " NR " 行的 IO_WAIT 前面没有这一轮的 CPU"
+      else if (poll_field[2] != cpu_poll) print "轮数对不上：CPU 是 poll=" cpu_poll "，IO_WAIT 是 poll=" poll_field[2]
+      waiting = 0
+      if (read_field[2] == "yes") read_rounds++
+    }
+    END {
+      if (waiting) print "第 " cpu_line " 行的 CPU 那一轮没有 IO_WAIT"
+      if (lines == 0) print "只有 0 行 IO_WAIT"
+      else if (read_rounds == 0) print "一轮都没有 read=yes"
+    }' "$scene/run.err" 2>/dev/null | tr '\n' ' ')"
+  expect "等 IO 每一轮一行 MULTI_HOST_RUN_PEER_IO_WAIT poll=<与这一轮 CPU 那一行同一个轮数> blocked=<数> read=<yes|no>，在这一轮 CPU 之后、下一轮 CPU 之前，至少一轮 read=yes" \
+    "$([[ "$(exit_of follow run)" == 0 && -z "$io_wait_problems" ]]; echo $?)" \
+    "${io_wait_problems:-无}：$(grep -m 3 'MULTI_HOST_RUN_PEER_IO_WAIT poll=' "$scene/run.err" 2>/dev/null | tr '\n' '|')；stderr 尾部：$(tail_of follow run)"
   # 峰值（文件头 ⑤「峰值」）：上面那一趟经真的内存包装跑了十来秒，结束时恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>、在最后一行 CPU 之后；
-  #   再跑一趟、每一轮与退出时读的文件名都换成不在的（MULTI_HOST_RUN_SELFTEST_PEAK_FILE、MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE，只在自证里认）、空转 3 秒（有一轮 read=yes）⇒ 不打那一行；
-  #   再跑一趟 0.1 秒就退的、只把每一轮读的换成不在的 ⇒ 照那一层退出时读的打恰好一行
+  #   再跑一趟、每一轮读的 memory.stat 与退出时读的文件名都换成不在的（MULTI_HOST_RUN_SELFTEST_CURRENT_FILE、MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE，只在自证里认）、
+  #   空转 3 秒（有一轮 read=yes）⇒ 不打那一行；再跑一趟 0.1 秒就退的、只把每一轮读的换成不在的 ⇒ 照那一层退出时读的打恰好一行
   local peak_lines peak_problems unread_peak_lines unread_read_rounds
   peak_lines="$(grep '^MULTI_HOST_RUN_PEER_MEMORY_PEAK' "$scene/run.err" 2>/dev/null)"
   peak_problems="$(awk '/^MULTI_HOST_RUN_PEER_CPU poll=/ { last_cpu = NR } /^MULTI_HOST_RUN_PEER_MEMORY_PEAK/ { peaks++; peak_line = NR; peak_text = $0 }
@@ -1867,29 +2246,88 @@ printf "follow-tail"'
       else if (peak_text !~ /^MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=[1-9][0-9]*$/) print "格式不对：" peak_text
       else if (peak_line < last_cpu) print "峰值行在第 " peak_line " 行，最后一行 CPU 在第 " last_cpu " 行"
     }' "$scene/run.err" 2>/dev/null)"
-  expect "峰值 第二台那条命令结束时打恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>（那一层内存包装 cgroup 的 memory.peak），在最后一行 MULTI_HOST_RUN_PEER_CPU 之后" \
+  expect "峰值 第二台那条命令结束时打恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>（那一层内存包装 cgroup 进程内存见过的最大），在最后一行 MULTI_HOST_RUN_PEER_CPU 之后" \
     "$([[ "$(exit_of follow run)" == 0 && -z "$peak_problems" ]]; echo $?)" \
     "${peak_problems:-无}：$(tr '\n' '|' <<<"$peak_lines")；stderr 尾部：$(tail_of follow run)"
+  # 编译段峰值（文件头 ⑤「编译段峰值」）：那一趟三行之后打了 cargo 编完那一行 ⇒ 恰好一行 MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK bytes=<正整数>、不大于峰值行的数
+  local phase_problems
+  phase_problems="$(awk '/^MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=/ { split($2, field, "="); peak = field[2] + 0 }
+    /^MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK/ { phases++; phase_text = $0; split($2, field, "="); phase = field[2] + 0 }
+    END {
+      if (phases != 1) print "编译段峰值行 " (phases + 0) " 行"
+      else if (phase_text !~ /^MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK bytes=[1-9][0-9]*$/) print "格式不对：" phase_text
+      else if (phase > peak) print "编译段峰值 " phase " 比峰值 " peak " 大"
+    }' "$scene/run.err" 2>/dev/null)"
+  expect "编译段峰值 接回那一趟第二台那条命令打了 cargo 编完那一行 ⇒ 恰好一行 MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK bytes=<正整数>、不大于峰值行的数" \
+    "$([[ "$(exit_of follow run)" == 0 && -z "$phase_problems" ]]; echo $?)" \
+    "${phase_problems:-无}：$(grep '^MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK' "$scene/run.err" 2>/dev/null | tr '\n' '|')；stderr 尾部：$(tail_of follow run)"
   scene_command_for follow
-  ( cd "$scene/repo" && exec "${scene_command[@]:0:${#scene_command[@]}-2}" MULTI_HOST_RUN_SELFTEST_PEAK_FILE=memory.peak-selftest-unreadable \
+  ( cd "$scene/repo" && exec "${scene_command[@]:0:${#scene_command[@]}-2}" \
+      MULTI_HOST_RUN_SELFTEST_CURRENT_FILE=memory.stat-selftest-unreadable MULTI_HOST_RUN_SELFTEST_BLOCKED_STATES=S \
       MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE=exit-memory-peak-selftest-unreadable "${scene_command[@]: -2}" \
       --peer --memory-cap 256M --label follow-peak-unread -- bash -c 'spin_until=$((SECONDS + 3)); while (( SECONDS < spin_until )); do :; done' ) \
     > "$scene/peak-unread.out" 2> "$scene/peak-unread.err" < /dev/null
   echo "$?" > "$scene/peak-unread.exit"
   unread_peak_lines="$(grep -c '^MULTI_HOST_RUN_PEER_MEMORY_PEAK' "$scene/peak-unread.err" 2>/dev/null)" || true
   unread_read_rounds="$(grep -c '^MULTI_HOST_RUN_PEER_CPU poll=[0-9]* usage_usec=[0-9]* read=yes$' "$scene/peak-unread.err" 2>/dev/null)" || true
-  expect "峰值 每一轮与退出时都读不到 memory.peak（两处读的文件名都换成不在的）⇒ 退 0、有一轮 read=yes、不打 MULTI_HOST_RUN_PEER_MEMORY_PEAK 那一行" \
+  expect "峰值 每一轮读不到 memory.stat、退出时读不到 memory.peak（两处读的文件名都换成不在的）⇒ 退 0、有一轮 read=yes、不打 MULTI_HOST_RUN_PEER_MEMORY_PEAK 那一行" \
     "$([[ "$(exit_of follow peak-unread)" == 0 && "${unread_read_rounds:-0}" -ge 1 && "${unread_peak_lines:-0}" == 0 ]]; echo $?)" \
     "退 $(exit_of follow peak-unread)，read=yes 的轮 ${unread_read_rounds:-0} 轮，峰值行 ${unread_peak_lines:-0} 行：$(grep '^MULTI_HOST_RUN_PEER_MEMORY_PEAK' "$scene/peak-unread.err" 2>/dev/null | tr '\n' '|')；stderr 尾部：$(tail_of follow peak-unread)"
+  # 此刻内存读不到（文件头 ⑤「此刻内存」）：同一趟里每一轮读 memory.stat 的文件名换成不在的 ⇒ 每一轮 CPU 之后照样有一行 MEMORY，
+  #   两项写 0、read=no，行数与 CPU 行一样多（弄坏开关 peer-memory-unread-skipped 下漏行）
+  local unread_memory_problems
+  unread_memory_problems="$(awk '
+    /MULTI_HOST_RUN_PEER_CPU poll=/ { cpu_lines++ }
+    /MULTI_HOST_RUN_PEER_MEMORY poll=/ {
+      memory_lines++
+      if ($0 !~ /^MULTI_HOST_RUN_PEER_MEMORY poll=[0-9]+ current_bytes=0 peak_bytes=0 read=no$/) print "不是 current_bytes=0 peak_bytes=0 read=no：" $0
+    }
+    END { if (memory_lines + 0 < 1 || memory_lines != cpu_lines) print "MEMORY 行 " (memory_lines + 0) " 行，CPU 行 " (cpu_lines + 0) " 行" }' "$scene/peak-unread.err" 2>/dev/null | tr '\n' ' ')"
+  expect "接回 读不到 memory.stat 的每一轮照打 MULTI_HOST_RUN_PEER_MEMORY …current_bytes=0 peak_bytes=0 read=no，每一轮 CPU 之后都有、不漏行" \
+    "$([[ "$(exit_of follow peak-unread)" == 0 && -z "$unread_memory_problems" ]]; echo $?)" \
+    "${unread_memory_problems:-无}：$(grep -m 3 'MULTI_HOST_RUN_PEER_MEMORY poll=' "$scene/peak-unread.err" 2>/dev/null | tr '\n' '|')；stderr 尾部：$(tail_of follow peak-unread)"
+  # 等 IO 数得到（文件头 ⑤「等 IO」）：同一趟数的状态取 S（MULTI_HOST_RUN_SELFTEST_BLOCKED_STATES=S）：空转的命令底下进程号那个 bash 在睡 ⇒ 至少一轮 read=yes 且 blocked 大于 0
+  #   （弄坏开关 peer-io-wait-uncounted 下每一轮都写 blocked=0，peer-io-wait-unreported 下一行都没有）
+  local counted_rounds
+  counted_rounds="$(grep -c '^MULTI_HOST_RUN_PEER_IO_WAIT poll=[0-9]* blocked=[1-9][0-9]* read=yes$' "$scene/peak-unread.err" 2>/dev/null)" || true
+  expect "等 IO 数的状态换成 S（在睡）⇒ 至少一轮 read=yes 且 blocked 大于 0" \
+    "$([[ "$(exit_of follow peak-unread)" == 0 && "${counted_rounds:-0}" -ge 1 ]]; echo $?)" \
+    "退 $(exit_of follow peak-unread)，blocked 大于 0 且 read=yes 的轮 ${counted_rounds:-0} 轮：$(grep -m 3 'MULTI_HOST_RUN_PEER_IO_WAIT poll=' "$scene/peak-unread.err" 2>/dev/null | tr '\n' '|')；stderr 尾部：$(tail_of follow peak-unread)"
   # 命令跑 0.1 秒就退（比一轮短），每一轮读的换成不在的：峰值照第二台那一层内存包装退出时读的那一个打（弄坏开关 peak-read-only-by-sampling 下一行都不打）
   local short_peak_lines
-  ( cd "$scene/repo" && exec "${scene_command[@]:0:${#scene_command[@]}-2}" MULTI_HOST_RUN_SELFTEST_PEAK_FILE=memory.peak-selftest-unreadable "${scene_command[@]: -2}" \
+  ( cd "$scene/repo" && exec "${scene_command[@]:0:${#scene_command[@]}-2}" MULTI_HOST_RUN_SELFTEST_CURRENT_FILE=memory.stat-selftest-unreadable "${scene_command[@]: -2}" \
       --peer --memory-cap 256M --label follow-peak-short -- sleep 0.1 ) > "$scene/peak-short.out" 2> "$scene/peak-short.err" < /dev/null
   echo "$?" > "$scene/peak-short.exit"
   short_peak_lines="$(grep '^MULTI_HOST_RUN_PEER_MEMORY_PEAK' "$scene/peak-short.err" 2>/dev/null)"
-  expect "峰值 第二台那条命令跑 0.1 秒就退、每一轮都读不到 memory.peak ⇒ 退 0、照那一层内存包装退出时读的打恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>" \
+  expect "峰值 第二台那条命令跑 0.1 秒就退、每一轮都读不到 memory.stat ⇒ 退 0、照那一层内存包装退出时读的打恰好一行 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<正整数>" \
     "$([[ "$(exit_of follow peak-short)" == 0 && "$short_peak_lines" =~ ^MULTI_HOST_RUN_PEER_MEMORY_PEAK\ bytes=[1-9][0-9]*$ ]]; echo $?)" \
     "退 $(exit_of follow peak-short)，峰值行「$(tr '\n' '|' <<<"$short_peak_lines")」；stderr 尾部：$(tail_of follow peak-short)"
+  # 页缓存撑满上限（文件头 ⑤「峰值」）：每一轮读进程内存的目录换成假 cgroup（MULTI_HOST_RUN_SELFTEST_MEMORY_DIRECTORY，只在自证里认）：
+  #   memory.stat 里 anon 1G、file 40G、kernel 650M、shmem 0，memory.current 与 memory.peak 是三项之和（顶到上限的样子），空转 3 秒
+  #   ⇒ 退 0、read=yes 的 MEMORY 行至少一行且每一行 current_bytes 与 peak_bytes 都是 anon 的 1G、峰值行恰好一行 bytes=1G（弄坏开关 peer-memory-with-page-cache 下照 memory.current、memory.peak 打）
+  local page_cache_directory="$scene/page-cache-memory" page_cache_anon=1073741824 page_cache_file=42949672960 page_cache_kernel=681574400 page_cache_problems
+  mkdir -p "$page_cache_directory"
+  printf 'anon %s\nfile %s\nkernel %s\nshmem 0\n' "$page_cache_anon" "$page_cache_file" "$page_cache_kernel" > "$page_cache_directory/memory.stat"
+  echo "$(( page_cache_anon + page_cache_file + page_cache_kernel ))" > "$page_cache_directory/memory.current"
+  echo "$(( page_cache_anon + page_cache_file + page_cache_kernel ))" > "$page_cache_directory/memory.peak"
+  ( cd "$scene/repo" && exec "${scene_command[@]:0:${#scene_command[@]}-2}" MULTI_HOST_RUN_SELFTEST_MEMORY_DIRECTORY="$page_cache_directory" "${scene_command[@]: -2}" \
+      --peer --memory-cap 256M --label follow-page-cache -- bash -c 'spin_until=$((SECONDS + 3)); while (( SECONDS < spin_until )); do :; done' ) \
+    > "$scene/page-cache.out" 2> "$scene/page-cache.err" < /dev/null
+  echo "$?" > "$scene/page-cache.exit"
+  page_cache_problems="$(awk -v wanted="$page_cache_anon" '
+    /^MULTI_HOST_RUN_PEER_MEMORY poll=.* read=yes$/ {
+      read_lines++
+      split($3, current_field, "="); split($4, peak_field, "=")
+      if (current_field[2] != wanted || peak_field[2] != wanted) print "不是 current_bytes=" wanted " peak_bytes=" wanted "：" $0
+    }
+    /^MULTI_HOST_RUN_PEER_MEMORY_PEAK/ { peaks++; peak_text = $0 }
+    END {
+      if (read_lines + 0 < 1) print "read=yes 的 MEMORY 行 0 行"
+      if (peaks != 1 || peak_text != "MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=" wanted) print "峰值行 " (peaks + 0) " 行：" peak_text
+    }' "$scene/page-cache.err" 2>/dev/null | tr '\n' ' ')"
+  expect "峰值 页缓存撑满上限（假 cgroup：anon 1G、file 40G、memory.peak 顶到三项之和）⇒ 每一轮 current_bytes 与 peak_bytes 都是 anon 的 1G、峰值行 bytes=1G" \
+    "$([[ "$(exit_of follow page-cache)" == 0 && -z "$page_cache_problems" ]]; echo $?)" \
+    "退 $(exit_of follow page-cache)；${page_cache_problems:-无}：$(grep -m 3 '^MULTI_HOST_RUN_PEER_MEMORY' "$scene/page-cache.err" 2>/dev/null | tr '\n' '|')；stderr 尾部：$(tail_of follow page-cache)"
   # 现场目录（文件头 ⑤「现场目录」）：驱动环境里给了 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY（场景的共享根下），第二台那条命令往它的 TMPDIR 写一份文件、退 7
   #   ⇒ 驱动退 7，那一份由第二台那一层内存包装整个搬成这个目录（弄坏开关 peer-scene-not-passed 下留在第二台的临时根下：照它打的路径删掉，不留给别的趟）
   local scene_target="$scene/scene-of-peer-attempt" left_kept
@@ -1903,6 +2341,118 @@ printf "follow-tail"'
     [[ "$left_kept" == /tmp/singlefs-run-with-memory-cap-* && -d "$left_kept" ]] && rm -rf -- "${left_kept:?}"
   done < <(grep -o '留着看现场：/tmp/singlefs-run-with-memory-cap-[^ ]*' "$scene/scene.err" 2>/dev/null | sed 's/^留着看现场：//')
 
+  # 换字（文件头 ⑤「跑着时接回」）两格。
+  #   坏字节：第二台那条命令的输出里夹一行不是合法 UTF-8 的字节（汉字被按字节截断，只剩两个字节），前后各一行带第二台地址的行 ⇒ 驱动退 0；本机标准错误里这三行同序都在，
+  #   坏行的原字节一个不差，前后两行里的地址被换成「第二台」（私有的字照样被换掉）。弄坏开关 PEER_HOST_LIB_BREAK=redact-strict-utf8（换字照严格 UTF-8 读）下坏行起整块都不打。
+  #   换字失败：自证的假 python3 放在 PATH 最前面，换字那一段（-c 的代码里有 PEER_HOST_REDACT_HOST）退 9，别的原样交给真的 python3 ⇒ 驱动照旧退 0、
+  #   本机标准错误里至少一行「! 第二台那条命令的输出第 N 到 M 字节换字时退了 9，…」（输出可能分几轮接回，每一块各报一行）、没有没换字的地址与目录漏出来。
+  #   弄坏开关 peer-redact-failure-unreported（悄悄丢掉）下一行都不报。
+  local redact_bytes_lines redact_failure_lines redact_failure_leaks fake_python_directory="$work/fake-python"
+  prepare_scene redact-bytes
+  scene="$work/redact-bytes"
+  run_in redact-bytes run --peer --memory-cap 256M --label redact-bytes -- bash -c 'printf "redact-before 192.0.2.61\n"; printf "redact-bad-\xe5\xbd\n"; printf "redact-after 192.0.2.61\n"'
+  grep -a '^redact-' "$scene/run.err" > "$scene/redact-bytes.lines" 2>/dev/null
+  printf 'redact-before 第二台\nredact-bad-\xe5\xbd\nredact-after 第二台\n' > "$scene/redact-bytes.expected"
+  redact_bytes_lines="$(LC_ALL=C sed -n 'l' "$scene/redact-bytes.lines" 2>/dev/null | tr '\n' ' ')"
+  expect "换字 第二台那条命令的输出里夹一行不是合法 UTF-8 的字节（按字节截断的汉字）⇒ 坏行前后的行都接回、坏行的原字节照样在、私有的地址照样被换掉" \
+    "$([[ "$(exit_of redact-bytes run)" == 0 ]] && cmp -s "$scene/redact-bytes.lines" "$scene/redact-bytes.expected"; echo $?)" \
+    "退 $(exit_of redact-bytes run)；读到的（sed l 的写法）：${redact_bytes_lines:-（一行都没有）}；stderr 尾部：$(tail_of redact-bytes run)"
+  mkdir -p "$fake_python_directory"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    '# multi-host-run.sh 自证的假 python3：换字那一段（-c 的代码里有 PEER_HOST_REDACT_HOST）退 9，别的原样交给真的 python3' \
+    'if [[ "${1:-}" == -c && "${2:-}" == *PEER_HOST_REDACT_HOST* ]]; then exit 9; fi' \
+    "exec $(printf '%q' "$(command -v python3)") \"\$@\"" > "$fake_python_directory/python3"
+  chmod +x "$fake_python_directory/python3"
+  prepare_scene redact-fails
+  scene="$work/redact-fails"
+  scene_command_for redact-fails
+  ( cd "$scene/repo" && exec "${scene_command[@]:0:${#scene_command[@]}-2}" PATH="$fake_python_directory:$fake_rustup_directory:$PATH" "${scene_command[@]: -2}" \
+      --peer --memory-cap 256M --label redact-fails -- bash -c 'printf "redact-lost 192.0.2.61\n"' ) > "$scene/redact-fails.out" 2> "$scene/redact-fails.err" < /dev/null
+  echo "$?" > "$scene/redact-fails.exit"
+  redact_failure_lines="$(grep -a -c '^  ! 第二台那条命令的输出第 [0-9]* 到 [0-9]* 字节换字时退了 9，' "$scene/redact-fails.err" 2>/dev/null)" || true
+  redact_failure_leaks="$(grep -a -lE '192[.]0[.]2[.]61|peer-homes|peer-bin|redact-lost' "$scene/redact-fails.out" "$scene/redact-fails.err" 2>/dev/null | sed "s|^$work/||" | tr '\n' ' ')"
+  expect "换字 换字那一步自己退非 0 ⇒ 驱动照旧退 0、本机标准错误里报这一块没打出来（退了几、第几到第几字节）、没有没换字的地址与目录漏出来" \
+    "$([[ "$(exit_of redact-fails redact-fails)" == 0 && "${redact_failure_lines:-0}" -ge 1 && -z "$redact_failure_leaks" ]]; echo $?)" \
+    "退 $(exit_of redact-fails redact-fails)；报的行 ${redact_failure_lines:-0} 行（要至少 1 行）；漏出私有字的文件：${redact_failure_leaks:-（没有）}；stderr 尾部：$(tail_of redact-fails redact-fails)"
+
+  # 收拾（文件头 ⑥、--recover-cleanup 那一段；peer-host-lib.sh 文件头「这一趟留下的进程」「停下的退出回执」）三格，逐格写在上面自证段说明的「收拾」。
+  #   标签带这一份自证自己的进程号：并行跑的几份自证各用各的标签，按标签停的那一步不碰别的自证留下的进程
+  local leftover_label="leftover-$$" escaped_pid="" escaped_alive=0
+  prepare_scene leftovers
+  scene="$work/leftovers"
+  # 后代经 systemd-run --user --scope 跑出那一层内存包装的 scope（包装命令退出之后停自己的 scope、⑥ 先停 scope，都停不到它），只剩标签找得到：照会话号与标签那一步收它
+  run_in leftovers escaped --peer --memory-cap 256M --label "$leftover_label" -- env "TASK_SERVER_ATTEMPT_LABEL=$leftover_label" \
+    bash -c 'systemd-run --user --scope --quiet --collect setsid bash -c '\''echo "$$" > "$0"; exec sleep 300'\'' "$0.pid" < /dev/null > /dev/null 2>&1 & for (( rounds = 0; rounds < 100; rounds++ )); do [[ -s "$0.pid" ]] && break; sleep 0.1; done; exit 0' "$scene/escaped"
+  escaped_pid="$(cat "$scene/escaped.pid" 2>/dev/null)"
+  if [[ "$escaped_pid" =~ ^[1-9][0-9]*$ ]] && peer_host_process_is_alive "$escaped_pid"; then
+    escaped_alive=1
+    kill "$escaped_pid"   # 弄坏开关下没停掉的那一个：只停这一格的命令记下的那个进程号
+  fi
+  expect "收拾 --peer：命令退了、后代自己 setsid 出去还在跑（环境里带这一趟的标签）⇒ ⑥ 删之前停掉它、⑥ 那一行写停了 1 个、退 0" \
+    "$([[ "$(exit_of leftovers escaped)" == 0 && -n "$escaped_pid" && "$escaped_alive" == 0 && "$(peer_runs_left leftovers)" == 0 ]] \
+       && grep -q '⑥ 删了第二台这一趟的本地目录.*删之前停了这一趟留下的 1 个进程' "$scene/escaped.err"; echo $?)" \
+    "退 $(exit_of leftovers escaped)，setsid 出去的那一个（进程号「$escaped_pid」）$([[ "$escaped_alive" == 1 ]] && echo 还活着 || echo 不在了)；留着 $(peer_runs_left leftovers) 条；⑥ 那一行：$(grep '⑥' "$scene/escaped.err" 2>/dev/null | tr '\n' '|' | cut_characters 300)"
+  # 先按 scope 收（文件头 ⑥）：命令 setsid 出去一个清了环境的 sleep（会话号、标签都对不上）、记下它的进程号，再只给那一层内存包装（单元名里带它的进程号）发 KILL：
+  # 包装停不了自己的 scope，sleep 留在里面 ⇒ 驱动退 137（那一层被 KILL）、sleep 不在了、⑥ 那一行写停 scope 时里面还有至少 1 个、第二台 runs/ 与 builds/ 下什么都不剩。
+  # 那一层被 KILL 不走它的 EXIT：它在 /tmp 下的空临时目录与状态目录里的峰值文件这一格留下（推的，没量过）
+  local scope_label="scope-leftover-$$" scope_leftover_pid="" scope_leftover_alive=0
+  prepare_scene scope-leftover
+  scene="$work/scope-leftover"
+  run_in scope-leftover wrapper-killed --peer --memory-cap 256M --label "$scope_label" -- \
+    bash -c 'setsid env -i sleep 300 < /dev/null > /dev/null 2>&1 & echo "$!" > "$0.pid"; wrapper="${RUN_WITH_MEMORY_CAP_OUTER_UNIT#singlefs-memory-cap-}"; kill -KILL "${wrapper%%-*}"; exit 0' "$scene/scope-leftover"
+  scope_leftover_pid="$(cat "$scene/scope-leftover.pid" 2>/dev/null)"
+  if [[ "$scope_leftover_pid" =~ ^[1-9][0-9]*$ ]] && peer_host_process_is_alive "$scope_leftover_pid"; then
+    scope_leftover_alive=1
+    kill "$scope_leftover_pid"   # 弄坏开关下没停掉的那一个：只停这一格的命令记下的那个进程号
+  fi
+  expect "收拾 --peer：那一层内存包装被 KILL、scope 里留着清了环境又换了会话号的进程 ⇒ ⑥ 先停那个 scope、那个进程不在了、⑥ 那一行写停 scope 时里面还有 1 个" \
+    "$([[ "$(exit_of scope-leftover wrapper-killed)" == 137 && -n "$scope_leftover_pid" && "$scope_leftover_alive" == 0 && "$(peer_runs_left scope-leftover)" == 0 ]] \
+       && grep -q '⑥ 删了第二台这一趟的本地目录.*scope 时里面还有 [1-9][0-9]* 个' "$scene/wrapper-killed.err"; echo $?)" \
+    "退 $(exit_of scope-leftover wrapper-killed)，留在 scope 里的那一个（进程号「$scope_leftover_pid」）$([[ "$scope_leftover_alive" == 1 ]] && echo 还活着 || echo 不在了)；留着 $(peer_runs_left scope-leftover) 条；⑥ 那一行：$(grep '⑥' "$scene/wrapper-killed.err" 2>/dev/null | tr '\n' '|' | cut_characters 300)"
+  selftest_recover_case() { # <场景名> <gone|alive>：起驱动（环境里给清理回执的路径）、只 KILL 这一格自己起的驱动、放行命令、等到位、起一次 --recover-cleanup；
+    # 结局写场景目录里的 recover.exit、recover.out、recover.err，起之前退出回执在不在写 receipt-before，命令的进程号在 case.command
+    local recover_scene="$work/$1" recover_label="$1-$$" recover_driver recover_rounds recover_session after_release='exit 0'
+    [[ "$2" == alive ]] && after_release='exec sleep 300'
+    prepare_scene "$1"
+    scene_command_for "$1"
+    ( cd "$recover_scene/repo" && exec "${scene_command[@]:0:${#scene_command[@]}-2}" TASK_SERVER_PEER_CLEANUP_FILE="$recover_scene/cleanup.json" "${scene_command[@]: -2}" \
+        --peer --memory-cap 256M --label "$recover_label" -- bash -c 'echo "$$" > "$0.command"; home="$(dirname "$(dirname "$MULTI_HOST_RUN_PEER_SCRATCH")")"; until test -e "$0.go"; do sleep 0.1; done; wrapper_pid=$(cat "$home/runs/$(basename "$MULTI_HOST_RUN_PEER_SCRATCH").pid"); [[ "$wrapper_pid" =~ ^[0-9]+$ ]] && kill -KILL "$wrapper_pid"; '"$after_release" \
+        "$recover_scene/case" ) > "$recover_scene/driver.out" 2> "$recover_scene/driver.err" < /dev/null &
+    recover_driver=$!
+    wait_for_file "$recover_scene/case.command" 180 "$recover_driver"
+    kill -KILL "$recover_driver"   # 只停这一格自己起的驱动：它不收尾、不写退出回执、清理回执留在 pending
+    wait "$recover_driver" 2>/dev/null
+    recover_session="$(cat "$work/peer-homes/$1/runs/$recover_label.pid" 2>/dev/null)"
+    : > "$recover_scene/case.go"
+    # 等起的那个 bash 被命令 KILL 掉；后代都已不在那一格另等这一趟的会话里一个进程都不剩（至多 30 秒）
+    for (( recover_rounds = 0; recover_rounds < 300; recover_rounds++ )); do
+      if [[ "$recover_session" =~ ^[1-9][0-9]*$ ]] && ! peer_host_process_is_alive "$recover_session" \
+         && { [[ "$2" == alive ]] || [[ -z "$(ps -o pid= -s "$recover_session" 2>/dev/null)" ]]; }; then break; fi
+      sleep 0.1
+    done
+    [[ -e "$work/peer-homes/$1/runs/$recover_label.exit" ]] && echo present > "$recover_scene/receipt-before" || echo absent > "$recover_scene/receipt-before"
+    ( cd "$recover_scene/repo" && exec "${scene_command[@]}" --recover-cleanup "$recover_scene/cleanup.json" ) > "$recover_scene/recover.out" 2> "$recover_scene/recover.err" < /dev/null
+    echo "$?" > "$recover_scene/recover.exit"
+  }
+  recover_status_of() { python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("status", ""))' "$work/$1/cleanup.json" 2>/dev/null; }
+  selftest_recover_case recover-gone gone
+  expect "收拾 --recover-cleanup：起的那个 bash 被杀、没写退出回执、后代都已不在 ⇒ 一次就确认（退 0）、补写退出回执、清理回执记 confirmed、第二台 runs/ 与 builds/ 下什么都不剩" \
+    "$([[ "$(exit_of recover-gone recover)" == 0 && "$(cat "$work/recover-gone/receipt-before" 2>/dev/null)" == absent && "$(recover_status_of recover-gone)" == confirmed \
+       && "$(peer_runs_left recover-gone)" == 0 ]] && grep -q '补写了退出回执「143 stopped already-gone」' "$work/recover-gone/recover.err"; echo $?)" \
+    "退 $(exit_of recover-gone recover)，起之前退出回执 $(cat "$work/recover-gone/receipt-before" 2>/dev/null)、清理回执「$(recover_status_of recover-gone)」、留着 $(peer_runs_left recover-gone) 条；stderr 尾部：$(tail_of recover-gone recover | cut_characters 300)"
+  local recover_command_pid recover_command_alive=0
+  selftest_recover_case recover-alive alive
+  recover_command_pid="$(cat "$work/recover-alive/case.command" 2>/dev/null)"
+  if [[ "$recover_command_pid" =~ ^[1-9][0-9]*$ ]] && peer_host_process_is_alive "$recover_command_pid"; then
+    recover_command_alive=1
+    kill "$recover_command_pid"   # 弄坏开关下没停掉的那一条：只停这一格的命令记下的那个进程号（它 exec 成了 sleep）
+  fi
+  expect "收拾 --recover-cleanup：起的那个 bash 被杀、没写退出回执、后代还活着 ⇒ 停掉它们之后确认（退 0）、补写退出回执、后代不在了、第二台 runs/ 与 builds/ 下什么都不剩" \
+    "$([[ "$(exit_of recover-alive recover)" == 0 && "$(cat "$work/recover-alive/receipt-before" 2>/dev/null)" == absent && "$(recover_status_of recover-alive)" == confirmed \
+       && -n "$recover_command_pid" && "$recover_command_alive" == 0 && "$(peer_runs_left recover-alive)" == 0 ]] \
+       && grep -q '补写了退出回执「1[34][37] stopped \(TERM\|KILL\)」' "$work/recover-alive/recover.err" && grep -q 'PEER_HOST_LEFTOVERS stopped=[1-9]' "$work/recover-alive/recover.err"; echo $?)" \
+    "退 $(exit_of recover-alive recover)，起之前退出回执 $(cat "$work/recover-alive/receipt-before" 2>/dev/null)、清理回执「$(recover_status_of recover-alive)」、命令（进程号「$recover_command_pid」）$([[ "$recover_command_alive" == 1 ]] && echo 还活着 || echo 不在了)、留着 $(peer_runs_left recover-alive) 条；stderr 尾部：$(tail_of recover-alive recover | cut_characters 300)"
+
   peer_driver_cells
 
   if (( failures > 0 )); then
@@ -1910,7 +2460,7 @@ printf "follow-tail"'
     echo "     → 怎么办：设了 MULTI_HOST_RUN_BREAK、MULTI_HOST_CONFIGURATION_BREAK 或 PEER_HOST_LIB_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看 scripts/hosts/multi-host-run.sh 与 peer-host-lib.sh"
     return 1
   fi
-  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（不带 --peer 就拒、只供测试的「第二台是本机」设在自证之外就拒、--peer 在第二台同一个绝对路径里跑且退出码带回、上限不超过 SLICE_MEMORY_CAP_BY_HOST 里第二台那一项、按台的三个键各台取各台那一项、标签撞了是用法错而查标签连不上退 255、工具链不同与缺离线依赖就拒（缺的是树里的 path 依赖报树里缺、不报第二台缺缓存）、跑完删第二台这一趟的本地目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒、包装认出显存不够时原样退 245 并报显存不够、--peer 命令里写 CARGO_TARGET_DIR 就拒、--peer 的编译目录在第二台本地这一趟的目录下且跑完删、删之前有进程开着里面的文件就不删并报出进程、第二台起 cargo 之前判 RocksDB 预编库取值、自证的细节行按字截、第二台读本机这一份多机配置、同一份配置在第二台判的结局与这一侧相同、任务里面再带 --peer 两台都拒、起活这一侧清过场才告诉第二台、共享根外的路径与工作目录就拒、工作根与共享数据根照本机的真路径交给第二台而不在共享根下就拒、第二台的编译根在共享根下就拒、--peer 每一步打开始与结束两行秒数、跑着时把第二台的新输出逐行接回且不重不漏、每一轮报一行不减的 CPU、结束时报一行那一层内存包装的峰值（命令比一轮短照那一层退出时读的报）而读不到就不报、退非 0 的现场由第二台那一层搬进服务给的现场目录、删之前报一行编译目录的占盘而量不到就不报、双机驱动先编后跑的起法经 --peer 两步都在本机那棵树里起）"
+  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（不带 --peer 就拒、只供测试的「第二台是本机」设在自证之外就拒、--peer 在第二台同一个绝对路径里跑且退出码带回、上限不超过 SLICE_MEMORY_CAP_BY_HOST 里第二台那一项、按台的三个键各台取各台那一项、标签撞了是用法错而查标签连不上退 255、工具链不同与缺离线依赖就拒（缺的是树里的 path 依赖报树里缺、不报第二台缺缓存）、跑完删第二台这一趟的本地目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒、包装认出显存不够时原样退 245 并报显存不够、--peer 命令里写 CARGO_TARGET_DIR 就拒、--peer 的编译目录在第二台本地这一趟的目录下且跑完删、删之前有进程开着里面的文件就不删并报出进程、第二台起 cargo 之前判 RocksDB 预编库取值、自证的细节行按字截、第二台读本机这一份多机配置、同一份配置在第二台判的结局与这一侧相同、任务里面再带 --peer 两台都拒、起活这一侧清过场才告诉第二台、共享根外的路径与工作目录就拒、工作根与共享数据根照本机的真路径交给第二台而不在共享根下就拒、第二台的编译根在共享根下就拒、--peer 每一步打开始与结束两行秒数、跑着时把第二台的新输出逐行接回且不重不漏、输出里夹不是合法 UTF-8 的字节照接回而私有的字照换、换字那一步退非 0 就报这一块没打出来、每一轮报一行不减的 CPU、结束时报一行那一层内存包装的进程内存峰值（只算 anon 加 shmem，页缓存撑满上限也不算；命令比一轮短照那一层退出时读的报）而读不到就不报、退非 0 的现场由第二台那一层搬进服务给的现场目录、删之前报一行编译目录的占盘而量不到就不报、⑥ 删之前先停那一层内存包装的 scope（包装被 KILL 时 scope 里留着的清了环境、换了会话号的进程也停掉）、再停后代自己 setsid 出去的进程并写停了几个、--recover-cleanup 在起的那个 bash 被杀又没留退出回执时照会话与标签核过就确认并补写回执（后代还活着的先停）、双机驱动先编后跑的起法经 --peer 两步都在本机那棵树里起）"
 }
 
 if [[ "${1:-}" == --selftest ]]; then
@@ -1927,10 +2477,13 @@ if [[ -n "${MULTI_HOST_CONFIGURATION_BREAK:-}" ]] && ! multi_host_inside_selftes
   echo "     → 怎么办：从环境里去掉 MULTI_HOST_CONFIGURATION_BREAK 再起同一条命令；要证红就带着它起 --selftest" >&2
   exit 2
 fi
-# 只供自证（文件头 ⑤「峰值」）：读峰值的文件名换成 MULTI_HOST_RUN_SELFTEST_PEAK_FILE，只在 --selftest 起的驱动里认、只收文件名的字符，读完就 unset、不带给命令
-if [[ "${MULTI_HOST_RUN_SELFTEST_PEAK_FILE:-}" =~ ^[A-Za-z0-9._-]+$ ]] && multi_host_inside_selftest; then multi_host_peer_peak_file="$MULTI_HOST_RUN_SELFTEST_PEAK_FILE"; fi
+# 只供自证（文件头 ⑤「峰值」「此刻内存」「等 IO」）：退出时读的那一份与每一轮读进程内存的文件名、读进程内存的目录（假 cgroup）、数的状态，
+# 只在 --selftest 起的驱动里认、只收文件名（目录只收绝对路径）的字符，读完就 unset、不带给命令
 if [[ "${MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE:-}" =~ ^[A-Za-z0-9._-]+$ ]] && multi_host_inside_selftest; then multi_host_peer_exit_peak_file="$MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE"; fi
-unset MULTI_HOST_RUN_SELFTEST_PEAK_FILE MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE
+if [[ "${MULTI_HOST_RUN_SELFTEST_CURRENT_FILE:-}" =~ ^[A-Za-z0-9._-]+$ ]] && multi_host_inside_selftest; then multi_host_peer_current_file="$MULTI_HOST_RUN_SELFTEST_CURRENT_FILE"; fi
+if [[ "${MULTI_HOST_RUN_SELFTEST_MEMORY_DIRECTORY:-}" =~ ^/[A-Za-z0-9._/-]+$ ]] && multi_host_inside_selftest; then multi_host_peer_memory_directory="$MULTI_HOST_RUN_SELFTEST_MEMORY_DIRECTORY"; fi
+if [[ "${MULTI_HOST_RUN_SELFTEST_BLOCKED_STATES:-}" =~ ^[A-Z]+$ ]] && multi_host_inside_selftest; then multi_host_peer_blocked_states="$MULTI_HOST_RUN_SELFTEST_BLOCKED_STATES"; fi
+unset MULTI_HOST_RUN_SELFTEST_EXIT_PEAK_FILE MULTI_HOST_RUN_SELFTEST_CURRENT_FILE MULTI_HOST_RUN_SELFTEST_MEMORY_DIRECTORY MULTI_HOST_RUN_SELFTEST_BLOCKED_STATES
 # 只供测试的 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE（文件头「只供测试的开关」）：只在 --selftest 起的驱动里认，别处设了就拒；弄坏开关 this-machine-peer-honored-anywhere 下照认
 if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE:-}" ]] && ! multi_host_inside_selftest && ! multi_host_break_is this-machine-peer-honored-anywhere; then
   echo "  ✗ SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=$SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE 设在 --selftest 之外：这个开关只供测试（「第二台」换成本机上的目录），只在 --selftest 里认；这一次什么都没做（退 2，命令一行都没跑）" >&2

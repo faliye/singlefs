@@ -1,6 +1,13 @@
-"""收尾协议的离线回归：模拟 SSH/systemd/cgroup，不连接主机、不启动服务、不使用 GPU。"""
+"""收尾协议的离线回归：模拟 SSH/systemd/cgroup，不连接主机、不启动服务、不使用 GPU。
+由 task-server/task_server_lib.py --selftest 的 cleanup-protocol-unit-tests 格起（在那一格自己的进程里跑，不起服务）。
+假调度器的那几张表照 server.Scheduler.__init__ 里赋成空表、空集合、锁的那几个名字现建（scheduler_tables），不手抄名单：服务再加表这里不用改。
+弄坏开关 TASK_SERVER_BREAK=cleanup-tests-tables-hand-listed 下照手抄的旧名单建（漏 card_loads），收尾那几条红。"""
+import ast
 import copy
+import inspect
 import json
+import textwrap
+import threading
 from pathlib import Path
 import re
 import subprocess
@@ -16,6 +23,29 @@ sys.path.insert(0, str(PROJECT))
 
 import attempt_runner  # noqa: E402
 import task_server as server  # noqa: E402
+
+HAND_LISTED_TABLES = ("log_growth", "log_offsets", "cpu_windows", "unit_checked_at", "unit_gone_since", "peer_memory", "peer_io_wait", "io_waits")   # 只给弄坏开关
+
+
+def scheduler_tables():
+    """server.Scheduler.__init__ 里赋成空表（{}）、空集合（set()）或锁（threading.Lock() / RLock()）的那几个属性 → {名字: 建一份新的那个函数}。
+    照源码的语法树读（inspect.getsource + ast），不跑 __init__（它要配置、库与服务）。"""
+    tree = ast.parse(textwrap.dedent(inspect.getsource(server.Scheduler.__init__)))
+    factories = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target, value = node.targets[0], node.value
+        if not (isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self"):
+            continue
+        if isinstance(value, ast.Dict) and not value.keys:
+            factories[target.attr] = dict
+        elif isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id == "set" and not value.args:
+            factories[target.attr] = set
+        elif (isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute) and isinstance(value.func.value, ast.Name)
+              and value.func.value.id == "threading" and value.func.attr in ("Lock", "RLock")):
+            factories[target.attr] = getattr(threading, value.func.attr)
+    return factories
 
 
 def shell_functions(path, names):
@@ -39,8 +69,12 @@ class CleanupProtocolTests(unittest.TestCase):
         scheduler.store = Mock()
         scheduler.alert = Mock()
         scheduler.settle_attempt = Mock()
-        for name in ("log_growth", "log_offsets", "cpu_windows", "unit_checked_at", "unit_gone_since"):
-            setattr(scheduler, name, {})
+        if server.lib.broken("cleanup-tests-tables-hand-listed"):   # 弄坏开关：照手抄的旧名单建表
+            factories = {name: dict for name in HAND_LISTED_TABLES}
+        else:
+            factories = scheduler_tables()
+        for name, factory in factories.items():
+            setattr(scheduler, name, factory())
         machine = Mock()
         machine.command_exit.return_value = (0, "local", None)
         machine.ended_peaks.return_value = {}
@@ -163,6 +197,7 @@ multi_host_now_microseconds() { echo 123456; }
 multi_host_break_is() { return 1; }
 multi_host_step() { :; }
 multi_host_redact() { cat; }
+multi_host_stop_peer_leftovers() { multi_host_leftovers_stopped=0; }
 peer_host_stop_detached() { echo stop >> "$trace"; return "$stop_status"; }
 peer_host_run() {
   if [[ "$2" == python3* ]]; then echo holders >> "$trace"; return "$test_holder_status"; fi
@@ -204,21 +239,33 @@ exit 255
                 self.assertEqual(marker["status"], "pending")
                 self.assertTrue(marker["processes_stopped"])
 
-    def test_missing_parent_without_exit_receipt_is_not_confirmation(self):
+    def test_missing_parent_without_exit_receipt_is_checked_by_session(self):
+        """起的那个 bash 不在、没有退出回执：照会话号核过一个不剩就判已停、补写退出回执（peer-host-lib.sh 文件头「停下的退出回执」）；
+        进程号文件读不出启动时刻的核不了、带 keep（改前的样子）的不核，都不按已停处理；有回执的照收、回执不改。"""
         definitions = shell_functions("scripts/hosts/peer-host-lib.sh", [
             "peer_host_signal_one", "peer_host_process_is_alive", "peer_host_process_tree",
-            "peer_host_stop_process_tree", "peer_host_stop_detached"])
+            "peer_host_stop_process_tree", "peer_host_attempt_leftovers", "peer_host_stop_attempt_leftovers",
+            "peer_host_stop_detached"])
         (self.root / "pid").write_text("999999999\n")
         program = definitions + r'''
 peer_host_run() { ( cd "$1" && bash -c "$2" ); }
-peer_host_stop_detached "$1" "$1/pid" "$1/exited"
+peer_host_stop_detached "$1" "$1/pid" "$1/exited" "" "$2"
 '''
-        for receipt, expected in ((False, 1), (True, 0)):
-            if receipt:
-                (self.root / "exited").write_text("0\n")
-            completed = subprocess.run(["bash", "-c", program, "stop-test", str(self.root)],
-                                       capture_output=True, text=True)
-            self.assertEqual(completed.returncode, expected, completed.stderr)
+        exited = self.root / "exited"
+        cases = (("没有启动时刻", None, "", 1, None), ("改前的样子", "1", "keep", 1, None),
+                 ("会话里一个不剩", "1", "", 0, "143 stopped already-gone"), ("已有回执", "1", "", 0, "0"))
+        for name, start, mode, expected, receipt in cases:
+            with self.subTest(case=name):
+                if start is None:
+                    (self.root / "pid.start").unlink(missing_ok=True)
+                else:
+                    (self.root / "pid.start").write_text(start + "\n")
+                if name == "已有回执":
+                    exited.write_text("0\n")
+                completed = subprocess.run(["bash", "-c", program, "stop-test", str(self.root), mode],
+                                           capture_output=True, text=True, timeout=60)
+                self.assertEqual(completed.returncode, expected, completed.stdout + completed.stderr)
+                self.assertEqual(exited.read_text().strip() if exited.exists() else None, receipt)
 
     def test_recovery_after_wrapper_exit_uses_saved_stop_receipt(self):
         self.run_shell_cleanup(0, 1)  # 已停树，但第一次回读不可用；模拟包装已退出。
@@ -232,6 +279,7 @@ multi_host_break_is() { return 1; }
 multi_host_step() { :; }
 multi_host_redact() { cat; }
 peer_host_load_configuration() { PEER_HOST_BUILD_ROOT=/; }
+multi_host_stop_peer_leftovers() { multi_host_leftovers_stopped=0; }
 peer_host_stop_detached() { echo unexpected-stop >> "$trace"; return 1; }
 peer_host_run() {
   if [[ "$2" == python3* ]]; then echo holders >> "$trace"; else echo remove >> "$trace"; fi

@@ -903,7 +903,16 @@ def selftest(breaks):
             return name, run_filter_cells(opened)[0]
         return name, run_relay_cells(opened)[0]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    # 开关轮的并发：每台默认重活线程数（scripts/hosts/heavy_threads.py，登记位 .claude/heavy-thread-default），再按开关条数夹；取不了就拒，不退回别的数
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import heavy_threads
+    try:
+        switch_round_threads = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        sys.stdout.write(f"  ✗ 弄坏开关轮取不了每台默认重活线程数：{error}\n")
+        sys.stdout.write(f"  → 怎么办：{error.howto}；不退回别的数\n")
+        return 2
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(len(ALL_BREAKS), switch_round_threads))) as executor:
         for name, red in executor.map(run_one, ALL_BREAKS):
             round_checked += 1
             if sorted(set(red)) != expected_red_cells(name):

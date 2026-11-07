@@ -12,8 +12,8 @@
 //!       [--write-timeout-milliseconds <数，缺省 60000>] [--busy-retry-milliseconds <数，缺省 20>]
 //!       socket 缺省 `${XDG_RUNTIME_DIR}/singlefs-prune-server/server.sock`（目录 700、socket 600、全路径至多 107 字节）；
 //!       库是服务自己那一份，缺省 `~/.local/state/singlefs/prune-server/library`，不在就建；布局只有一种，与崩溃判定库相同：只有默认列族，
-//!       三张表都落在它里面、键原样，两张记账表也在里面、各一个 0xF0 起的键前缀（`src/storage.rs` 文件头）；TCP 地址缺省取仓根 `multi-host.env` 的 `PRUNE_SERVER_TCP_ADDRESS`
-//!       （`SINGLEFS_MULTI_HOST_CONFIG` 设了读它指的那一份）；工作线程缺省本机核数。
+//!       三张表都落在它里面、键原样，两张记账表也在里面、各一个 0xF0 起的键前缀（`src/storage.rs` 文件头）；TCP 地址缺省取主工作树根下 `multi-host.env` 的
+//!       `PRUNE_SERVER_TCP_ADDRESS`（`SINGLEFS_MULTI_HOST_CONFIG` 设了读它指的那一份；没设从当前目录起照 git 找主工作树，`src/configuration.rs` 文件头）；工作线程缺省本机核数。
 //!       组提交：写与认领在 `--group-commit-milliseconds` 的窗口里至多收 `--group-commit-frames` 帧，合成一个 WriteBatch、同步一次 WAL，
 //!       同步之后才回各自的确认；同步 WAL 失败时回存储出错、服务退 7，重起时重开库（`src/storage.rs` 文件头）。
 //!       准入：每条连接与整个服务的待处理帧数、待处理字节数到了上限，当场回「忙、`--busy-retry-milliseconds` 毫秒后再来」；
@@ -23,7 +23,7 @@
 //!   prune-server admin health|connected-clients|announce-stop [--socket <路径>]   控制命令用（`src/administration.rs` 文件头）
 //!   prune-server drop-oversized-values [--state-directory <目录>] [--dry-run]
 //!       离线维护，服务停着时在服务那台跑（`control stop` 之后、`control start` 之前）：直接开状态目录下的 library（只开已有的、不建），
-//!       扫默认列族，认出键不是段键、计数键形状而值一把键单独一帧点读也回不了的整值行（界与服务整帧拒同一份判法，`src/oversized_values.rs` 文件头）；
+//!       扫默认列族，认出键不是段键、版本登记键形状而值一把键单独一帧点读也回不了的整值行（界与服务整帧拒同一份判法，`src/oversized_values.rs` 文件头）；
 //!       每行打 `PRUNE_SERVER_OVERSIZED_VALUE table=<0x表标签或族名> value_bytes=<数> key=<键，非 ASCII 转义>`，
 //!       末行 `PRUNE_SERVER_DROP_OVERSIZED_VALUES mode=dry-run|dropped library=… scanned_rows=… oversized_rows=… longest_readable_value_bytes=…`。
 //!       `--dry-run` 只打清单、库不动；不带它把清单里的行在一个写批里删掉、同步 WAL、逐把点读核没了。删掉的判定由各入口下次经服务现判、分段写回。
@@ -53,7 +53,7 @@
 //!
 //! 自证的格（`src/selftest.rs` 的 `CELLS`，次序相同）：
 //!   batched-point-read                 一帧 103 个键（3 个不在）读回逐个对上，RocksDB 数到 multi_get 恰好 1 次、读 103 个键
-//!   prefix-scan                        前缀扫只回前缀下的键、按升序、到条数上限标截断、用别的表的名义扫回同样的键
+//!   prefix-scan                        前缀扫只回前缀下的键、按升序、到条数上限标截断、用别的表的名义扫回同样的键（续扫起点空，从前缀起）
 //!   tcp-route-from-configuration       TCP 地址取自多机配置的键，经 TCP 三种操作与统计都对
 //!   missing-tcp-address-refused        多机配置里没有那个键时服务退 5、点名这个键
 //!   pipelined-out-of-order             先发的帧被服务压后，回应乱序到达，客户端按序号认领到各自的值
@@ -118,6 +118,22 @@
 //!                                      连接队列满时调用方要停，2 秒里回「调用方要停」
 //!   oversize-frame-reported-at-once    键长超过帧长上限的一条：容错客户端在重连总时长 2 秒之内回协议错、说帧长上限、追加日志里没有这一帧；
 //!                                      一问一答的客户端当场回错、说没发，同一条连接随后照常读写
+//!   claim-lease-covers-the-holder-after-the-answer  租期 4 秒：丢了回应、重发先撞不读的连接等满 2.5 秒帧超时才回来的认领，与服务只许 1 帧待处理、
+//!                                      一帧点读压着 2.8 秒、回忙到过了半个租期才落下的认领，回来时与回来之后 2.4 秒别的身份都回「别人持有」；
+//!                                      同一身份 600 秒认领之后再用 1 毫秒认领，别的身份过 100 毫秒回「别人持有」、剩余超过 300 秒
+//!   write-storage-failure-replayed     内建造错点造的同步 WAL 失败：服务退 7、删掉造错文件再起，同一个容错客户端照同一请求号重放、做完、键在库里；
+//!                                      造错文件造的写批写失败：服务不退，客户端收到存储出错、照同一请求号再交，删掉造错文件之后写进库
+//!   delete-prefix-response-within-pending-budget  每条连接额度 64 KiB、前缀下一把 1 MiB 的长键：一条连接同时排 8 帧只数不删，至少一帧回忙；
+//!                                      排在头一个的删前缀回忙、长键还在，别的连接照常读写；额度峰值不超额度加一个长键回应加每帧余量
+//!   delete-prefix-releases-claims      样本库两把键各带一行别的身份持有、租期没到的认领：删前缀删掉一把之后另一个身份立刻认领到；
+//!                                      只数不删另一把之后它的认领行原样还在
+//!   worker-responses-within-pending-budget  额度 1 MiB、四条连接同时按前缀扫各约 40 MiB（头一帧都压 600 毫秒、四个工作线程同时编）：工作线程手里编着的回应合计
+//!                                      峰值不超额度加一帧、至少回忙一次、四份都扫回且逐字节对；扫完别的连接照常写读、额度放回
+//!   multi-host-configuration-from-the-main-worktree  临时目录里的主仓（git init、提交一次）与它的 worktree：从主仓子目录与 worktree 起找多机配置都落在主仓根下的
+//!                                      multi-host.env，从不在 git 里的目录起找落在它自己下面，SINGLEFS_MULTI_HOST_CONFIG 给了照它
+//!   segmented-rewrite-survives-writer-death  存着两段长旧值的键改写新值，容错客户端写完段与版本登记键、不写清单就丢掉：另一个客户端读回旧值、登记旧新两版；
+//!                                      写第三个值之后读回它、写到一半那一版的段删了；同一个值再写一遍之后登记只剩第三个值那一版
+//!   prefix-scan-resumes-after-the-last-key  前缀下七把键每帧至多三条：从上一帧最后一把键之后续扫，三帧（3、3、1）扫完、逐把相同不重不漏；续扫起点不以前缀起头回状态 1
 //!   cell-runs-alone-in-own-process     这一格在跑格的进程为它另起的进程里单独跑：父进程是跑格的进程（别的格起子进程复制不到它的描述符）
 //!
 //! 弄坏开关 PRUNE_SERVER_BREAK=<项>（逗号分隔；只在自证起的服务与压测器带 --selftest-instance 时认，自证进程自己读它弄坏客户端与判法）。
@@ -187,6 +203,16 @@
 //!   PRUNE_SERVER_BREAK=descriptor-soft-limit-not-raised           开库之前不抬软上限、不核够不够（改前的开法）      library-opens-under-low-descriptor-soft-limit
 //!   PRUNE_SERVER_BREAK=delete-prefix-overruns                     删前缀走出前缀不停、越界删到下一个前缀           delete-prefix-only-under-prefix
 //!   PRUNE_SERVER_BREAK=delete-prefix-dry-run-deletes              只数不删的删前缀请求照样把数到的键删掉           delete-prefix-counts-before-deleting
+//!   PRUNE_SERVER_BREAK=claim-lease-shrunk-on-resend               认领每次发出去换成剩下的租期（改前）             claim-lease-covers-the-holder-after-the-answer
+//!   PRUNE_SERVER_BREAK=claim-expiry-moved-earlier                 同一身份再认领照帧里的租期覆盖到期（改前）       claim-lease-covers-the-holder-after-the-answer
+//!   PRUNE_SERVER_BREAK=write-storage-failure-abandoned            写帧回存储出错就拿掉、退 3（改前）               write-storage-failure-replayed
+//!   PRUNE_SERVER_BREAK=delete-prefix-response-unbudgeted          删前缀回应不核额度、强行记下（改前）             delete-prefix-response-within-pending-budget
+//!   PRUNE_SERVER_BREAK=delete-prefix-claims-kept                  删前缀删掉的键上认领不释放（改前）               delete-prefix-releases-claims
+//!   PRUNE_SERVER_BREAK=delete-prefix-count-releases-claims        只数不删也释放数到的键上的认领                   delete-prefix-releases-claims
+//!   PRUNE_SERVER_BREAK=multi-host-configuration-from-working-directory-only 多机配置缺省位置不顺 git、只取起点目录  multi-host-configuration-from-the-main-worktree
+//!   PRUNE_SERVER_BREAK=segments-overwritten-in-place              写大值段键不带版本、就地覆写旧段（改前）         segmented-rewrite-survives-writer-death
+//!   PRUNE_SERVER_BREAK=response-built-before-budget               工作线程先编好整份回应再记额度（改前）           worker-responses-within-pending-budget
+//!   PRUNE_SERVER_BREAK=scan-resume-key-ignored                    按前缀扫不看续扫起点、每帧从前缀起               prefix-scan-resumes-after-the-last-key
 //!
 //! 没有弄坏开关的格：single-library-holder（拒的是 RocksDB 自己的 LOCK）、tcp-route-from-configuration（读配置那一处由
 //! missing-tcp-address-refused 的开关管）、bench-runs-every-mode（跑通性的冒烟格；fault-injection 的逐键核对与它的去重、重放

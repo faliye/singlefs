@@ -15,19 +15,23 @@
 //! - 成批写（操作码 2）：`u8 客户端身份长`、身份（1 到 255 字节）、`u64 请求号`（同一个身份从 1 起往上数）、`u32 条数`，
 //!   每条 `u8 表`、`u32 键长`、键、`u32 值长`、值。服务端按（身份，请求号）去重：早已生效的请求号不再写，照回写确认；
 //!   没生效的合进组提交的 WriteBatch，同一批里记下「这个请求号已生效」、释放这些键上的认领，WAL 同步之后才回确认。
-//! - 按前缀扫（操作码 3）：`u8 表`、`u32 前缀长`、前缀、`u32 条数上限`。
+//! - 按前缀扫（操作码 3）：`u8 表`、`u32 前缀长`、前缀、`u32 条数上限`、`u32 续扫起点长`、续扫起点。续扫起点空是从前缀起；不空时必须以前缀起头
+//!   （不然回状态 1），从排在它之后的第一把键起扫（上一帧回的最后一把键）。一帧被条数上限或帧长上限截断时，客户端拿这一帧的最后一把键接着扫，
+//!   不往下拆前缀；发的帧数是条目数除以一帧装下的条数。
 //! - 统计（操作码 4）：没有内容；回 RocksDB 自己的计数（同步了几次 WAL、调了几次 multi_get 这类）与服务自己数的
 //!   （待处理帧数峰值、回了几次忙、重复的请求号、WAL 同步用时的分布），自证拿它核「一帧只同步一次」「待处理帧数不超上限」。
 //! - 认领（操作码 5）：`u8 客户端身份长`、身份、`u32 租期毫秒`、`u32 键数`，每键 `u8 表`、`u32 键长`、键。
 //!   逐键判：库里已有这个键（结论已写）回「已有结论」；别的身份持有、租期没到回「别人持有」；否则这个身份认领到
-//!   （自己已持有的照样续上租期）。认领记录与写入走同一个组提交，WAL 同步之后才回。
+//!   （自己已持有、租期没到的照样续上：到期取已记下的与「现在加这一帧的租期」里晚的那一个，只往后不往前，`committer.rs` 文件头「认领」）。
+//!   认领记录与写入走同一个组提交，WAL 同步之后才回。
 //!   「别人持有」带持有者身份（至多 255 字节），一帧短键可以换回比帧长上限还长的回应：服务先逐键判、数回应的字节，
 //!   超过帧长上限就整帧回状态 1、说明里写回应会有多少字节，一个键都不认领、不续租（不留部分结果）；调用方把键拆成几帧再认领。
 //! - 删前缀（操作码 9）：`u32 前缀长`、前缀、`u32 续扫起点长`、续扫起点、`u32 本帧至多几把`、`u8 只数不删`（0 删、1 只数）。
 //!   不认表码、不认键的种类：键以前缀起头的行都是目标，三张表同一个键空间。前缀不许空（空前缀等于清空整个库）、不许落在服务记账那一段；
 //!   续扫起点空是从前缀起，不空时必须以前缀起头、从排在它之后的第一把键起数（上一帧回的最后一把键，已删的墓碑不用再跳过）；
 //!   本帧至多几把在 1 到 `MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME` 之间。提交线程里成批做：同一组里排在前面的写先提交，
-//!   删的是已落盘的库；删的键与回应同一组提交、WAL 同步之后才回。只数不删时不改库，数的口径与删一样。
+//!   删的是已落盘的库；删的键与回应同一组提交、WAL 同步之后才回，删掉的键上的认领同一组释放。回应（带最后一把键）记不进服务的待处理额度时
+//!   整帧回忙（状态 5）、一把都不删（`committer.rs` 文件头「删前缀」）。只数不删时不改库、不动认领，数的口径与删一样。
 //!   删本来就幂等，所以不按（身份，请求号）去重，也不进客户端的追加日志：重发只会让某一帧报的数少一批，库里的结果不变。
 //!
 //! 回应帧：`[u32 帧体长度][u64 请求序号][u8 状态][u8 操作码][内容]`。状态 0 是做完，内容按操作码：
@@ -257,7 +261,7 @@ pub fn point_read_response_exceeds_frame_limit(payload_bytes: usize) -> bool {
     payload_bytes + usize_from_u32(RESPONSE_HEADER_BYTES) > usize_from_u32(MAXIMUM_FRAME_BODY_BYTES)
 }
 
-fn usize_from_u32(value: u32) -> usize {
+pub(crate) fn usize_from_u32(value: u32) -> usize {
     usize::try_from(value).expect("这个工程只编 64 位目标，u32 放得进 usize")
 }
 
@@ -308,6 +312,37 @@ impl FrameEncoder {
         });
         self.bytes.push(length);
         self.bytes.extend_from_slice(text.as_bytes());
+    }
+
+    /// 按前缀扫的回应：帧头之后先占位的截断标记与条数，扫完再填（`server.rs` 边扫边编，文件头「额度」）。
+    ///
+    /// # Panics
+    /// 帧头之后还没放进截断标记与条数那 5 字节（调用方先 `put_u8`、`put_u32` 占位）。
+    pub fn set_prefix_scan_header(&mut self, is_truncated: bool, entry_count: u32) {
+        let start = FRAME_LENGTH_FIELD_BYTES + usize_from_u32(RESPONSE_HEADER_BYTES);
+        self.bytes[start] = u8::from(is_truncated);
+        self.bytes[start + 1..start + 5].copy_from_slice(&entry_count.to_le_bytes());
+    }
+
+    /// 再放 `additional` 字节要多分配的容量（`server.rs` 边编边记额度：先按它记，再 `grow_capacity`）：装得下回 0，装不下回把容量翻倍
+    /// （至少到装得下）多出的字节。
+    #[must_use]
+    pub fn capacity_growth_for(&self, additional: usize) -> usize {
+        let needed = self.bytes.len() + additional;
+        let capacity = self.bytes.capacity();
+        if needed <= capacity {
+            0
+        } else {
+            needed.max(capacity.saturating_mul(2)) - capacity
+        }
+    }
+
+    /// 容量加 `growth` 字节（`capacity_growth_for` 算的、已经记进额度的那么多）；0 不动。
+    pub fn grow_capacity(&mut self, growth: usize) {
+        if growth > 0 {
+            let additional = self.bytes.capacity() + growth - self.bytes.len();
+            self.bytes.reserve_exact(additional);
+        }
     }
 
     /// 帧体此刻的字节数（不含长度字段）。
@@ -428,16 +463,33 @@ impl WriteFrameBuilder {
     }
 }
 
+/// 按前缀扫帧、从前缀起（续扫起点空）。
 pub fn encode_prefix_scan_frame(
     sequence: u64,
     table: Table,
     prefix: &[u8],
     maximum_entries: u32,
 ) -> Vec<u8> {
-    let mut encoder = begin_request(sequence, OperationCode::PrefixScan.code(), prefix.len() + 9);
+    encode_prefix_scan_frame_after(sequence, table, prefix, maximum_entries, &[])
+}
+
+/// 按前缀扫帧（文件头「按前缀扫」）：`after_key` 空是从前缀起，不空是从排在它之后的第一把键起。
+pub fn encode_prefix_scan_frame_after(
+    sequence: u64,
+    table: Table,
+    prefix: &[u8],
+    maximum_entries: u32,
+    after_key: &[u8],
+) -> Vec<u8> {
+    let mut encoder = begin_request(
+        sequence,
+        OperationCode::PrefixScan.code(),
+        prefix.len() + after_key.len() + 13,
+    );
     encoder.put_u8(table.code());
     encoder.put_length_prefixed(prefix);
     encoder.put_u32(maximum_entries);
+    encoder.put_length_prefixed(after_key);
     encoder.finish()
 }
 
@@ -486,7 +538,7 @@ pub fn encode_claim_frame(
 }
 
 /// 换掉一帧编好的认领请求（[`encode_claim_frame`]，带长度字段）里的租约毫秒数：帧头之后是客户端身份（长度 1 字节加身份），再后面 4 字节是租约。
-/// 客户端重发认领时照剩下的租约换（`reliable_client` 的 `claim_lease_left`），帧的其余字节不动。
+/// 弄坏开关 claim-lease-shrunk-on-resend 下客户端每次发认领时照剩下的租约换（`reliable_client` 的 `claim_lease_left`，改前的写法），帧的其余字节不动。
 pub fn replace_claim_lease(frame: &mut [u8], lease_milliseconds: u32) {
     let identity_length_offset = FRAME_LENGTH_FIELD_BYTES + usize_from_u32(REQUEST_HEADER_BYTES);
     let lease_offset = identity_length_offset + 1 + usize::from(frame[identity_length_offset]);
@@ -780,6 +832,7 @@ pub enum RequestView<'frame> {
         table: Table,
         prefix: &'frame [u8],
         maximum_entries: u32,
+        after_key: &'frame [u8],
     },
     Statistics,
     Claim {
@@ -955,10 +1008,15 @@ fn decode_request_payload<'frame>(
             let table = cursor.table()?;
             let prefix = cursor.length_prefixed("前缀")?;
             let maximum_entries = cursor.u32("条数上限")?;
+            let after_key = cursor.length_prefixed("续扫起点")?;
+            if !after_key.is_empty() && !after_key.starts_with(prefix) {
+                return Err("续扫起点不以前缀起头：续扫起点是上一帧回的最后一把键".to_string());
+            }
             Ok(RequestView::PrefixScan {
                 table,
                 prefix,
                 maximum_entries,
+                after_key,
             })
         }
         OperationCode::DeletePrefix => {

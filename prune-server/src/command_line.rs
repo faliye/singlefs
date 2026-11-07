@@ -128,6 +128,7 @@ struct ServeArguments {
     write_timeout_milliseconds: u64,
     busy_retry_milliseconds: u64,
     selftest_sync_failure_file: Option<PathBuf>,
+    selftest_write_failure_file: Option<PathBuf>,
 }
 
 pub(crate) fn parse_positive_number<Number: std::str::FromStr + PartialOrd + Default>(
@@ -180,6 +181,7 @@ fn parse_serve_arguments(arguments: &[String]) -> Result<ServeArguments, String>
         write_timeout_milliseconds: DEFAULT_WRITE_TIMEOUT_MILLISECONDS,
         busy_retry_milliseconds: DEFAULT_BUSY_RETRY_MILLISECONDS,
         selftest_sync_failure_file: None,
+        selftest_write_failure_file: None,
     };
     let mut position = 0;
     while position < arguments.len() {
@@ -242,6 +244,9 @@ fn parse_serve_arguments(arguments: &[String]) -> Result<ServeArguments, String>
             "--selftest-sync-failure-file" => {
                 parsed.selftest_sync_failure_file = Some(PathBuf::from(value));
             }
+            "--selftest-write-failure-file" => {
+                parsed.selftest_write_failure_file = Some(PathBuf::from(value));
+            }
             "--selftest-delay" => parsed.selftest_delay = Some(parse_selftest_delay(value)?),
             "--selftest-commit-delay-milliseconds" => {
                 parsed.selftest_commit_delay =
@@ -254,11 +259,12 @@ fn parse_serve_arguments(arguments: &[String]) -> Result<ServeArguments, String>
     if (parsed.selftest_delay.is_some()
         || parsed.selftest_commit_delay.is_some()
         || parsed.selftest_storage_failure_key.is_some()
-        || parsed.selftest_sync_failure_file.is_some())
+        || parsed.selftest_sync_failure_file.is_some()
+        || parsed.selftest_write_failure_file.is_some())
         && !parsed.is_selftest_instance
     {
         return Err(
-            "--selftest-delay、--selftest-commit-delay-milliseconds、--selftest-storage-failure-key、--selftest-sync-failure-file 只给自证起的服务用，要与 --selftest-instance 一起给"
+            "--selftest-delay、--selftest-commit-delay-milliseconds、--selftest-storage-failure-key、--selftest-sync-failure-file、--selftest-write-failure-file 只给自证起的服务用，要与 --selftest-instance 一起给"
                 .to_string(),
         );
     }
@@ -361,6 +367,7 @@ fn run_server(arguments: &[String]) -> i32 {
             group_maximum_frames: parsed.group_commit_frames,
             selftest_commit_delay: parsed.selftest_commit_delay,
             selftest_storage_failure_key: parsed.selftest_storage_failure_key,
+            selftest_write_failure_file: parsed.selftest_write_failure_file,
         },
     };
     match serve(settings) {

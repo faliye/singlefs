@@ -214,13 +214,13 @@ def selftest(arguments):
         if not passed:
             failed.append("every-family-runs")
         # 服务进程组整组停住：socket 在、连得上，回应不来，客户端照回应限时与重连上限退 75
-        os.killpg(stopped.process.pid, signal.SIGSTOP)
+        stopped.signal_group(signal.SIGSTOP)
         try:
             dead = subprocess.run(command, capture_output=True, text=True,
                                   env=dict(under(stopped), **{client.RESPONSE_TIMEOUT_VARIABLE: "1",
                                                               client.RECONNECT_LIMIT_VARIABLE: str(SELFTEST_RECONNECT_SECONDS)}))
         finally:
-            os.killpg(stopped.process.pid, signal.SIGCONT)
+            stopped.signal_group(signal.SIGCONT)
         lines = [line for line in dead.stdout.splitlines() if line.startswith("PRUNE_SERVER_SIMULATION family=")]
         passed = dead.returncode == 1 and len(lines) == len(FAMILIES) and all(" failures=0 " not in line for line in lines)
         print(f"  {'✓' if passed else '✗'} 自证 failures-counted：退 {dead.returncode}，{lines} {dead.stderr.strip()[-300:]}")  # gate-lint:detail

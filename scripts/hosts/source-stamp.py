@@ -4,8 +4,7 @@
 """换了源码却没重编的拦法：复用编译目录之前，把内容或 mtime 与上一次留下的样子不一样的源文件 touch 到此刻，cargo 下一次就重编它们。
 
 为什么：cargo 按 mtime 判本地包新不新鲜（源文件比上一次编的 dep-info 新才重编）。往一份已经编过的副本树里 rsync -a 铺新源码，
-新内容带着源树里的旧 mtime，比编译目录里的 dep-info 还旧，cargo 认它已编：2026-10-06 GPU 与 CPU 不一致那一次，
-CPU 一侧用的是旧 walk.rs 编出来的库（records/2026-09-30-里程碑三开工第一轮.md「GPU 与 CPU 不一致调查员交回」那一行）。
+新内容带着源树里的旧 mtime，比编译目录里的 dep-info 还旧，cargo 认它已编，链进去的还是旧源码编出来的库。
 
 用法：
   source-stamp.py refresh <树> [--target-dir <编译目录>] [--include <相对树根的路径>]…
@@ -42,9 +41,9 @@ CPU 一侧用的是旧 walk.rs 编出来的库（records/2026-09-30-里程碑三
       「✗ 自证 sync-rebuilds：」
   SOURCE_STAMP_BREAK=touch-everything  每次都把源文件全部 touch
       「✗ 自证 unchanged-not-touched：」、「✗ 自证 fresh-target：」、「✗ 自证 sync-rebuilds：」
-  SOURCE_STAMP_BREAK=sync-copies-build-directories  sync 照改前只排除树根那一层的 target、target-*，下面几层的编译目录照拷
+  SOURCE_STAMP_BREAK=sync-copies-build-directories  sync 只排除树根那一层的 target、target-*，下面几层的编译目录照拷
       「✗ 自证 sync-skips-build-directories：」
-  SOURCE_STAMP_BREAK=sync-dirty-worktree-unchecked  sync 照改前不核副本是不是有未提交改动的 git 工作树，照拷
+  SOURCE_STAMP_BREAK=sync-dirty-worktree-unchecked  sync 不核副本是不是有未提交改动的 git 工作树，照拷
       「✗ 自证 sync-refuses-dirty-worktree：」
   SOURCE_STAMP_BREAK=sync-worktree-refused-even-clean  副本在 git 工作树里就拒，干净的也拒
       「✗ 自证 sync-clean-worktree-allowed：」
@@ -233,7 +232,7 @@ def sync(source, copy, target, includes, say):
     os.makedirs(copy, exist_ok=True)
     # --no-times --checksum：按内容比，只拷内容变了的，拷过去的 mtime 是此刻（不带源树的旧 mtime）；没变的不动、mtime 照旧，cargo 不白重编
     times = ["-a"] if broken("sync-plain-rsync") else ["-a", "--no-times", "--checksum"]
-    # 任意一层名叫 target、target-* 的目录都不拷（文件头 sync）；弄坏开关 sync-copies-build-directories 下照改前只排除树根那一层
+    # 任意一层名叫 target、target-* 的目录都不拷（文件头 sync）；弄坏开关 sync-copies-build-directories 下只排除树根那一层
     build_directories = [] if broken("sync-copies-build-directories") else ["--exclude", "target/", "--exclude", "target-*/"]
     command = ["rsync", *times, "--exclude", ".git", "--exclude", "/target", "--exclude", "/target-*", *build_directories, "--exclude", "__pycache__",
                source.rstrip("/") + "/", copy.rstrip("/") + "/"]
@@ -286,7 +285,7 @@ if subcommand == "test":
     print(f"test result: {'FAILED' if stale else 'ok'}. {len(sources) - len(stale)} passed; {len(stale)} failed")
     sys.exit(101 if stale else 0)
 '''
-OLD_MTIME_SECONDS = 1577836800     # 2020-01-01：源树里的文件都比编译目录里的 dep-info 旧（rsync -a 原样带过去的那种旧 mtime）
+OLD_MTIME_SECONDS = 1577836800     # 2020 年 1 月 1 日：源树里的文件都比编译目录里的 dep-info 旧（rsync -a 原样带过去的那种旧 mtime）
 
 
 def write_fake_cargo(path):
@@ -500,7 +499,16 @@ def selftest():
         print(f"  ✗ source-stamp.py 自证 {len(failures)} 格不对（查了 {checked} 格）：{'、'.join(failures)}")
         print("  → 怎么办：照上面逐格改 refresh / sync；stale-reproduced 红是假 cargo 没被旧 mtime 骗到，先修 FAKE_CARGO；SOURCE_STAMP_BREAK 设着的话本来就该红")
         return 1
-    jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), int(os.environ.get("SINGLEFS_THREAD_CAP") or 0) or os.cpu_count() or 1))
+    # 开关轮的并发：每台默认重活线程数（scripts/hosts/heavy_threads.py，登记位 .claude/heavy-thread-default），再按开关条数夹；取不了就拒，不退回按核数算
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import heavy_threads
+    try:
+        switch_round_threads = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        print(f"  ✗ 弄坏开关轮取不了每台默认重活线程数：{error}")
+        print(f"  → 怎么办：{error.howto}；不退回按核数算")
+        return 2
+    jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), switch_round_threads))
 
     def one(switch):
         completed = subprocess.run([sys.executable, "-B", os.path.realpath(__file__), "--selftest-cells"], capture_output=True, text=True,

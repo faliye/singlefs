@@ -15,8 +15,11 @@ import 本身不起子进程、不开文件。用法（脚本按路径跑时 sys
     经 capped.sh 起与不经起的同一条命令落一个键：task-server 给每一次尝试套 capped.sh <N>，内存包装记的键与服务按提交的那条命令取的键对得上。
   ② 本机路径换成固定记号：工作根（取法同 .claude/hooks/lib_work_root.py 的 scratch_roots：SINGLEFS_WORK_ROOT，没设是数据根下的 work，数据根是 SINGLEFS_DATA_ROOT，
     没设照那份库读多机配置的 SHARED_DATA_ROOT（configured_data_root：按本库所在的仓根载入那份库调 shared_data_root，不另写一份读法；不经 ~ 取，第二台的家目录是另一个）；
-    三样都没有、或经 python3 -c 整份送去跑而载不到那份库时不换工作根（没有就是没有，不补家目录下的缺省），自证里核两边取到的一样）下面那一段——路径里有 /target/ 的，
-    根到 target 之前那一截（副本与草稿目录，多深都算）；没有的，根下第一层目录——换成 SCRATCH_TOKEN；仓根（本库在 <仓根>/scripts/hosts/ 下）换成 REPOSITORY_TOKEN；
+    三样都没有、或经 python3 -c 整份送去跑而载不到那份库时不换工作根（没有就是没有，不补家目录下的缺省），自证里核两边取到的一样）下面那一段——从工作根往下，离工作根最近的那个副本顶层目录名
+    之前那一截（副本与草稿目录，嵌套多深都算：<工作根>/某会话/trees/某变体/scripts/x.sh 折成 SCRATCH_TOKEN/scripts/x.sh）；副本顶层目录名取本库所在仓根下的目录名
+    （repository_top_level_names：现读目录，不手抄）加 target（仓根里没有 target 目录时也认）；路径里一个顶层目录名都没有的，紧挨着工作根的那一层目录——换成 SCRATCH_TOKEN；
+    同一条命令里某个词认出了副本根（顶层目录名之前那一截，比工作根深），别的词里以这一截起头的路径也折成 SCRATCH_TOKEN（--work=<副本根>/work 这类连写的工作目录跟着副本走），
+    不同的脚本、不同的参数照旧分开；仓根（本库在 <仓根>/scripts/hosts/ 下）换成 REPOSITORY_TOKEN；
     家目录换成 HOME_TOKEN。先换工作根、再换仓根、最后换家目录（前两样都在家目录底下）。路径要从词首、空白、= : 引号逗号左括号之后起才认。
     两份副本、两个草稿目录里的同一条命令落一个键；从工作根下的副本里 import 这份库时，它认的仓根是那份副本（已被工作根那一条换掉），主仓的路径只换得到家目录那一截。
   ③ 点名的条目、文件参数与弄坏开关的值换成固定记号（只差这几样的同一条命令落一个键，不各记一条、各从缺省额度试起）：
@@ -79,6 +82,7 @@ KEY_LENGTH_LIMIT = 300
 TEST_BINARY_HASH = re.compile(r"-[0-9a-f]{16}\b")
 # 键里本机路径换成的固定记号（文件头「键」②）
 SCRATCH_TOKEN = "〈工作根下的目录〉"
+TARGET_DIRECTORY = "target"                              # 文件头「键」②：仓根里没有 target 目录（这台没编过）时也当副本顶层目录名认
 REPOSITORY_TOKEN = "〈仓根〉"
 HOME_TOKEN = "〈家目录〉"
 THREAD_WRAPPER_NAME = "capped.sh"                       # 文件头「键」①：剥掉的线程包装
@@ -117,10 +121,10 @@ BREAK_VARIABLE = "MEMORY_PEAKS_LIB_BREAK"
 KNOWN_BREAK_MODES = ("scratch-paths-kept", "capped-kept", "outside-selftest-unnamed", "record-memory-peak", "hit-by-peak", "kernel-counted",
                      "item-and-file-arguments-kept", "row-shape-unchecked", "data-root-home-fallback", "other-hosts-read", "peak-table-per-host",
                      "margin-floored", "margin-whole-carried", "margin-children-counted", "margin-unreadable-as-zero", "scope-label-unread",
-                     "item-words-split", "check-names-folded")
+                     "item-words-split", "check-names-folded", "scratch-nearest-directory-only")
 PEAK_TABLE_COLUMNS = 7       # 峰值表一行：峰值字节、量的时刻、那一次的上限、键、线程数、近几次、哪一台（文件头「哪一台」）
 _break_modes = frozenset()
-_path_replacements_cache = {}   # path_replacements 建好的那一份（键是此刻的 SINGLEFS_WORK_ROOT、HOME 与弄坏开关）
+_path_replacements_cache = {}   # path_replacements 建好的那一份（键是此刻的 SINGLEFS_WORK_ROOT、HOME 与两个弄坏开关）
 SIZE_UNITS = {"K": 1024, "M": MEBIBYTE, "G": 1024 * MEBIBYTE, "T": MEBIBYTE * MEBIBYTE}
 # 峰值表第六列「近几次」记最近这么多次实测（run-with-memory-cap.sh 文件头「峰值表」一段）：撞顶之后要连着这么多次干净跑完才回到按峰值记账
 RECENT_MEASUREMENTS = 5
@@ -152,7 +156,7 @@ DEFAULT_RESERVE_TEXT = "20G"          # 只给 headroom：slice 还没起（这�
 
 def command_key(words, explicit_key=None):
     """峰值表的键（文件头「键」）。words 是命令的各个词（一个词里带空格的仍是一个词）；explicit_key 是 RUN_WITH_MEMORY_CAP_KEY（空串当没给，是一段文本，按空格切词）。
-    弄坏开关 item-words-split 下把词表用空格接起来再切开（改前的样子：条目名、路径里带空格的，后半截漏进键里）。"""
+    弄坏开关 item-words-split 下把词表用空格接起来再切开：条目名、路径里带空格的，后半截漏进键里。"""
     if explicit_key:
         parts = explicit_key.replace("\t", " ").replace("\n", " ").split(" ")
     else:
@@ -236,33 +240,69 @@ def without_thread_wrapper(words):
     return words
 
 
+def repository_top_level_names():
+    """副本顶层目录名（文件头「键」②）：本库所在仓根下的目录名，现读目录、不手抄，加 TARGET_DIRECTORY；仓根取不到（经 python3 -c 送去跑）或目录读不了时只有 TARGET_DIRECTORY。"""
+    names = {TARGET_DIRECTORY}
+    root = repository_root()
+    if root:
+        try:
+            with os.scandir(root) as entries:
+                names.update(entry.name for entry in entries if entry.is_dir())
+        except OSError:
+            pass
+    return sorted(names)
+
+
 def path_replacements():
-    """[(根的字面, 编译好的正则, 记号)]，按换的次序（工作根、仓根、家目录）：按此刻的 SINGLEFS_WORK_ROOT、HOME 建一次，取值不变就复用
-    （读一张几万行的表时每一行都要换，每行现算正则与 realpath 要多花十几倍的时间）。"""
-    cache_key = (os.environ.get(WORK_ROOT_VARIABLE), os.environ.get("HOME"), "scratch-paths-kept" in _break_modes)
+    """[(根的字面, 编译好的正则, 记号, 认副本根的正则或 None)]，按换的次序（工作根、仓根、家目录）：按此刻的 SINGLEFS_WORK_ROOT、HOME 建一次，取值不变就复用
+    （读一张几万行的表时每一行都要换，每行现算正则、realpath 与目录要多花十几倍的时间）。工作根那一项的正则三选一：根到离工作根最近的副本顶层目录名之前那一截、没有顶层目录名的紧挨着工作根的那一层、工作根本身；
+    认副本根的正则抓「比工作根深的、顶层目录名之前那一截」（with_local_paths_replaced 用它让同一条命令里别的词跟着折）。
+    弄坏开关 scratch-nearest-directory-only 下顶层目录名只有 target、不认副本根：嵌套多层的副本只换掉紧挨着工作根的那一层。"""
+    cache_key = (os.environ.get(WORK_ROOT_VARIABLE), os.environ.get("HOME"), "scratch-paths-kept" in _break_modes, "scratch-nearest-directory-only" in _break_modes)
     cached = _path_replacements_cache.get(cache_key)
     if cached is not None:
         return cached
     replacements = []
     if "scratch-paths-kept" not in _break_modes:
+        nearest_directory_only = "scratch-nearest-directory-only" in _break_modes
+        names = [TARGET_DIRECTORY] if nearest_directory_only else repository_top_level_names()
+        before_name = "(?=/(?:" + "|".join(re.escape(name) for name in names) + r")(?:/|\s|$))"
         for root in scratch_roots():
             escaped = re.escape(root)
-            replacements.append((root, re.compile(PATH_START + rf"{escaped}(?:/[^\s/]+)+?(?=/target(?:/|\s|$))|" + PATH_START + rf"{escaped}/[^\s/]+|"
-                                                  + PATH_START + rf"{escaped}(?=\s|$)"), SCRATCH_TOKEN))
+            copy_root = None if nearest_directory_only else re.compile(PATH_START + rf"({escaped}(?:/[^\s/]+)+?){before_name}")
+            replacements.append((root, re.compile(PATH_START + rf"{escaped}(?:/[^\s/]+)*?{before_name}|" + PATH_START + rf"{escaped}/[^\s/]+|"
+                                                  + PATH_START + rf"{escaped}(?=\s|$)"), SCRATCH_TOKEN, copy_root))
     for root, token in ((repository_root(), REPOSITORY_TOKEN), (os.path.normpath(os.path.expanduser("~")), HOME_TOKEN)):
         if root and root != "/":
-            replacements.append((root, re.compile(PATH_START + re.escape(root) + r"(?=/|\s|$)"), token))
+            replacements.append((root, re.compile(PATH_START + re.escape(root) + r"(?=/|\s|$)"), token, None))
     _path_replacements_cache.clear()
     _path_replacements_cache[cache_key] = replacements
     return replacements
 
 
+def copy_roots_in(words, replacements):
+    """文件头「键」②：这条命令的词里认出的副本根（工作根下、比工作根深、顶层目录名之前那一截）→ [(字面, 编译好的正则)]，长的在前。"""
+    found = set()
+    for literal, _, _, copy_root_pattern in replacements:
+        if copy_root_pattern is None:
+            continue
+        for word in words:
+            if literal in word:
+                found.update(match.group(1) for match in copy_root_pattern.finditer(word))
+    return [(prefix, re.compile(PATH_START + re.escape(prefix) + r"(?=/|\s|$)")) for prefix in sorted(found, key=len, reverse=True)]
+
+
 def with_local_paths_replaced(words, replacements=None):
-    """文件头「键」②：工作根下那一段、仓根、家目录换成固定记号，逐词换。收词表、交词表。replacements 是 path_replacements() 交的（读整张表时建一次传进来）。"""
+    """文件头「键」②：工作根下那一段、仓根、家目录换成固定记号，逐词换；同一条命令里认出的副本根先换，别的词里以副本根起头的路径（--work=<副本根>/work 这类）跟着折。
+    收词表、交词表。replacements 是 path_replacements() 交的（读整张表时建一次传进来）。"""
     replacements = path_replacements() if replacements is None else replacements
+    copy_roots = copy_roots_in(words, replacements)
     replaced = []
     for word in words:
-        for literal, pattern, token in replacements:
+        for prefix, pattern in copy_roots:
+            if prefix in word:
+                word = pattern.sub(SCRATCH_TOKEN, word)
+        for literal, pattern, token, _ in replacements:
             if literal in word:
                 word = pattern.sub(token, word)
         replaced.append(word)
@@ -353,7 +393,7 @@ def folded_command_words(words):
     subcommand = cargo_test_subcommand(words, kept)
     positionals_kept = (2 if subcommand == "nextest" else 1) if subcommand else 0   # cargo test 的 test；nextest 连同 run
     after_double_dash = False
-    # 弄坏开关 check-names-folded 下 --check 后面的格名也折成 ITEM_TOKEN（改前的样子）
+    # 弄坏开关 check-names-folded 下 --check 后面的格名也折成 ITEM_TOKEN
     item_options = ITEM_OPTIONS + CELL_OPTIONS if "check-names-folded" in _break_modes else ITEM_OPTIONS
     index = kept + 1
     while index < len(words):
@@ -444,7 +484,7 @@ class PeakTableUnavailable(ValueError):
 
 def default_peak_table():
     """共享数据根下的 memory-peaks.tsv（文件头「峰值表在哪」）：两台读写同一份。取不到抛 PeakTableUnavailable，不退回家目录。
-    弄坏开关 peak-table-per-host 下照改前取本机的 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv（两台各一份）。"""
+    弄坏开关 peak-table-per-host 下取本机的 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv（两台各一份）。"""
     if "peak-table-per-host" in _break_modes:
         return os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "singlefs", PEAK_TABLE_NAME)
     library = work_root_library()
@@ -550,7 +590,7 @@ def read_all_peak_rows(path):
 def recorded_peak(path, key, latest_only=False, host=None):
     """本台的 (预测的峰值字节, 撞过顶没有)；表里没有本台这一条交 (None, False)，调用方照「表里没有」办。host 同 read_peak_rows。
     预测取近几次里最大的，其中有一次撞顶就算撞过顶（滞回：撞顶之后要连着 RECENT_MEASUREMENTS 次干净跑完才回到按峰值记账；
-    峰值一路变小时记账不跟着变小）。latest_only 只看最近一次（只给派发器的弄坏开关用：改前的判法）。"""
+    峰值一路变小时记账不跟着变小）。latest_only 只看最近一次（只给派发器的弄坏开关用）。"""
     row = read_peak_rows(path, host).get(key)
     if row is None:
         return None, False
@@ -574,7 +614,7 @@ def judged_measurement(outcome, cap_bytes, recorded_bytes, unreclaimable_peak, o
         return (recorded_bytes, True, MEASURED_UNRECLAIMABLE)
     if outcome != "clean":
         return None
-    if hit_by_peak:   # 弄坏开关：照改前按 memory.peak 到没到上限判撞顶，不看 oom_kill
+    if hit_by_peak:   # 弄坏开关：按 memory.peak 到没到上限判撞顶，不看 oom_kill
         hit = cap_bytes is not None and recorded_bytes is not None and recorded_bytes >= cap_bytes
     else:
         hit = bool(oom_kill_count) and cap_bytes is not None
@@ -638,7 +678,7 @@ def unreclaimable_bytes(cgroup_directory):
 def process_memory_bytes(cgroup_directory):
     """cgroup 里进程用的内存：memory.stat 的 anon 加 shmem（用户：「内核的资源是内核的资源 和 我们分配的资源无关」）。
     页缓存回收得掉、内核挂在 slice 上的（任务退出之后留下的 slab 这类）不是分出去的，都不算。目录不在交 0；目录在而文件读不了交 None。
-    弄坏开关 kernel-counted：照改前算回收不掉的用量（连内核的一起）。"""
+    弄坏开关 kernel-counted：算回收不掉的用量（连内核的一起）。"""
     if "kernel-counted" in _break_modes:
         return unreclaimable_bytes(cgroup_directory)
     try:
@@ -827,29 +867,33 @@ def cpu_report(proc_root):
 # ── 自证（python3 scripts/hosts/memory_peaks_lib.py --selftest）：只调本库的函数、在临时目录里写假峰值表，不起子进程 ──
 # 弄坏开关（逗号连几个；只在自证里读进来，import 这份库的包装、派发器、看门狗一律不认；平常跑设了它退 2 并点名它只在自证里认，见 refuse_break_outside_selftest；
 # 认不出的值退 2）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（「」里是失败行原文；末尾一句「✗ memory_peaks_lib.py 自证 N 格里 M 格不对」是汇总）：
-#   MEMORY_PEAKS_LIB_BREAK=scratch-paths-kept  取键不换工作根下那一段（改前的样子）
+#   MEMORY_PEAKS_LIB_BREAK=scratch-paths-kept  取键不换工作根下那一段
 #       「✗ 自证格不对：两份副本路径下同一条命令落一个键」
 #       「✗ 自证格不对：经 capped.sh 与不经落一个键」（那一格里连副本路径的那一例要落到〈工作根下的目录〉，开关下没换）
-#   MEMORY_PEAKS_LIB_BREAK=capped-kept  取键不剥 capped.sh N（改前的样子）
+#       「✗ 自证格不对：嵌套多层的仓副本里同一份脚本落一个键，同一份副本里的工作目录参数跟着折」
+#   MEMORY_PEAKS_LIB_BREAK=scratch-nearest-directory-only  取键只换 target 之前那一截、没有 target 的只换紧挨着工作根的那一层，不认别的副本顶层目录名、不让同一条命令里别的词跟着副本根折
+#       「✗ 自证格不对：嵌套多层的仓副本里同一份脚本落一个键，同一份副本里的工作目录参数跟着折」（七个变体副本与一份更深的，脚本词里 trees/<变体> 留在键里）
+#       （对照格“同一份副本里两份不同的脚本、同一份脚本的不同参数落不同的键”在这个开关与 scratch-paths-kept 下照旧绿，不点名）
+#   MEMORY_PEAKS_LIB_BREAK=capped-kept  取键不剥 capped.sh N
 #       「✗ 自证格不对：经 capped.sh 与不经落一个键」
-#   MEMORY_PEAKS_LIB_BREAK=item-and-file-arguments-kept  取键不换条目、文件参数与弄坏开关的值（文件头「键」③；改前的样子）
+#   MEMORY_PEAKS_LIB_BREAK=item-and-file-arguments-kept  取键不换条目、文件参数与弄坏开关的值（文件头「键」③）
 #       「✗ 自证格不对：两份副本路径下同一条命令落一个键」（要的键里 --exact 后面是〈条目〉）
 #       「✗ 自证格不对：只差条目、文件、开关值的命令落一个键」
 #       「✗ 自证格不对：条目名里带空格的同一条命令落一个键，带空格的一个词仍是一个词」
 #       「✗ 自证格不对：--check 后面的格名进键、不同格落不同键，--item 后面的照旧折」
-#   MEMORY_PEAKS_LIB_BREAK=item-words-split  command_key 把词表用空格接起来再切开折叠（改前的样子：条目名、路径里带空格的，后半截漏进键里）
+#   MEMORY_PEAKS_LIB_BREAK=item-words-split  command_key 把词表用空格接起来再切开折叠：条目名、路径里带空格的，后半截漏进键里
 #       「✗ 自证格不对：条目名里带空格的同一条命令落一个键，带空格的一个词仍是一个词」
-#   MEMORY_PEAKS_LIB_BREAK=check-names-folded  --check 后面的格名也折成〈条目〉（改前的样子：轻的几格与重的一格落一个键）
+#   MEMORY_PEAKS_LIB_BREAK=check-names-folded  --check 后面的格名也折成〈条目〉：轻的几格与重的一格落一个键
 #       「✗ 自证格不对：--check 后面的格名进键、不同格落不同键，--item 后面的照旧折」
 #   MEMORY_PEAKS_LIB_BREAK=row-shape-unchecked  读峰值表不核行的形态：不对的行跳过，不抛 TableRowRefused
 #       「✗ 自证格不对：表里只认这一版的行，不对的行整张表读不了并点名行号、要几列与出路」
 #   MEMORY_PEAKS_LIB_BREAK=data-root-home-fallback  没设 SINGLEFS_DATA_ROOT 时不读多机配置、退回一个写死的目录（FIXED_DATA_ROOT）
 #       「✗ 自证格不对：工作根的取法与 lib_work_root.py 的 scratch_roots 一样（连同换了数据根、两个变量都不设而家目录不在）」
-#   MEMORY_PEAKS_LIB_BREAK=other-hosts-read  read_peak_rows 不看第七列（哪一台），两台的行都交（改前一台一份表的读法）
+#   MEMORY_PEAKS_LIB_BREAK=other-hosts-read  read_peak_rows 不看第七列（哪一台），两台的行都交
 #       「✗ 自证格不对：同一个键两台各一行：读的时候只认本台的那一行，另一台的照留」
-#   MEMORY_PEAKS_LIB_BREAK=peak-table-per-host  default_peak_table 照改前取本机家目录下的 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv（两台各一份）
+#   MEMORY_PEAKS_LIB_BREAK=peak-table-per-host  default_peak_table 取本机家目录下的 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv（两台各一份）
 #       「✗ 自证格不对：默认的峰值表在共享数据根下（lib_work_root.py 的 shared_data_path），不在家目录下」
-#   MEMORY_PEAKS_LIB_BREAK=outside-selftest-unnamed  refuse_break_outside_selftest 什么都不交（改前的样子：平常跑设了开关只打「单独跑只认 --selftest」，不点名变量）
+#   MEMORY_PEAKS_LIB_BREAK=outside-selftest-unnamed  refuse_break_outside_selftest 什么都不交：平常跑设了开关只打「单独跑只认 --selftest」，不点名变量
 #       「✗ 自证格不对：平常跑设了弄坏开关退 2 并点名 MEMORY_PEAKS_LIB_BREAK 只在自证里认」
 
 #   口径那几格（measurement_cells，文件头「口径」）的三个开关；格名与红法是推的、照代码读出来的，交主 agent 打开开关跑一遍核：
@@ -861,7 +905,7 @@ def cpu_report(proc_root):
 #       「✗ 自证格不对：页缓存占了大半时记回收不掉的那一截，不是上限」（记成撞顶、记上限）
 #       「✗ 自证格不对：oom_kill 大于 0 记撞顶、峰值记上限（Result 没报 oom-kill 也算），采不到的不记」（oom_kill 1 而 memory.peak 没到上限的记成 clean）
 #       「✗ 自证格不对：峰值到了上限而 oom_kill 是 0 记 clean、不把上限往上推」（记成撞顶）
-#   MEMORY_PEAKS_LIB_BREAK=kernel-counted  process_memory_bytes 照改前算回收不掉的用量（内核挂在 slice 上的也算进 slice 的用量）
+#   MEMORY_PEAKS_LIB_BREAK=kernel-counted  process_memory_bytes 算回收不掉的用量（内核挂在 slice 上的也算进 slice 的用量）
 #       「✗ 自证格不对：slice 的用量只算进程的内存（anon + shmem），内核与页缓存不算」
 #   余量那几格（margin_cells，文件头「余量」）的四个开关：
 #   MEMORY_PEAKS_LIB_BREAK=margin-floored  rounded_up_to_gibibyte 向下取整
@@ -899,6 +943,8 @@ def self_test_cells(work):
                   len(set(copy_keys)) == 1 and copy_keys[0] == wanted and len(set(no_target)) == 1 and other != copy_keys[0]
                   and work_root not in copy_keys[0] + no_target[0] and local_paths == wanted_local,
                   f"三份副本的键 {copy_keys}；没有 target 的两条 {no_target}；换了测试名的 {other}；要的 {wanted}；家目录与仓根 {local_paths}（要的 {wanted_local}）"))
+
+    cells.extend(nested_copy_cells())
 
     plain = ["cargo", "test", "-p", "singlefs-core"]
     wrapped = [["bash", "scripts/hosts/capped.sh", "31"] + plain, ["bash", f"{repository}/scripts/hosts/capped.sh", "default"] + plain,
@@ -1060,6 +1106,40 @@ def scope_cells(work):
     return [(f"在跑的 scope 逐个报回收不掉的用量与标签（标签取进程环境里 {RUN_LABEL_VARIABLE} 的值，没有的是空串）",
              scopes == wanted and not_started == ({}, {}, {}),
              f"三个 scope 交 {scopes}（要的 {wanted}）；slice 还没起、查不了 systemd、目录不在交 {not_started}（都要空表）")]
+
+
+def nested_copy_cells():
+    """文件头「键」②嵌套多层的仓副本那两格：同一份脚本在工作根下嵌套多层的副本里（七个变体副本，加一份更深的）落一个键，工作目录参数（分开写、--work=<副本根>/work 连写）跟着折；
+    同一份副本里不同的脚本、不同的参数落不同的键。样本脚本放在 scripts/ 下（本库自己就在 scripts/hosts/ 下，任何一份副本里 scripts 都是顶层目录名）。
+    交 [(格名, 对不对, 说明)]；弄坏开关 scratch-nearest-directory-only 与 scratch-paths-kept 下嵌套副本那一格红、对照格照旧绿（对照格不看记号，只看四个键互不相同）。"""
+    work_root = scratch_roots()[0]
+    repository = repository_root()
+    variants = ("baseline", "rounds_cut_to_four", "overwrite_never_run", "done_marker_dropped", "unlink_not_done", "overwrite_state_line_dropped", "final_state_mislabeled")
+    script, other_script, other_directory = ("scripts/experiment-apparatus/sample-scan-run.sh", "scripts/experiment-apparatus/other-scan-run.sh",
+                                             "scripts/gate/sample-scan-run.sh")
+
+    def scan(copy, script_path=script, build="counts", joined=False):
+        work = f"{copy}/work"
+        return (["bash", f"{copy}/{script_path}", "--build", build] + ([f"--work={work}"] if joined else ["--work", work])
+                + ["--item", "unlinks_1", "--source", f"{repository}/crates/sample/src/lib.rs"])
+
+    copies = [f"{work_root}/sample-runner-segment/trees/{variant}" for variant in variants] + [f"{work_root}/outer/inner/deeper/trees/other"]
+    separate_keys = [command_key(scan(copy)) for copy in copies]
+    joined_keys = [command_key(scan(copy, joined=True)) for copy in copies]
+    leaked = [key for key in separate_keys + joined_keys if work_root in key or "/trees/" in key]
+    cells = [("嵌套多层的仓副本里同一份脚本落一个键，同一份副本里的工作目录参数跟着折",
+              len(set(separate_keys)) == 1 and len(set(joined_keys)) == 1 and not leaked
+              and f"bash {SCRATCH_TOKEN}/{script} " in separate_keys[0] and f"--work={SCRATCH_TOKEN}/work " in joined_keys[0]
+              and normalized_key(separate_keys[0]) == separate_keys[0] and normalized_key(joined_keys[0]) == joined_keys[0],
+              f"{len(copies)} 份副本分开写工作目录的键 {sorted(set(separate_keys))}；连写 --work= 的键 {sorted(set(joined_keys))}；键里漏了工作根或 /trees/ 的 {leaked}（空表是都对）；"
+              f"要的脚本词 bash {SCRATCH_TOKEN}/{script}，连写的工作目录 --work={SCRATCH_TOKEN}/work")]
+    same_copy = [scan(copies[0]), scan(copies[0], script_path=other_script), scan(copies[0], script_path=other_directory), scan(copies[0], build="sizes")]
+    same_copy_keys = [command_key(words) for words in same_copy]
+    cells.append(("同一份副本里两份不同的脚本、同一份脚本的不同参数落不同的键",
+                  len(set(same_copy_keys)) == len(same_copy) and f"{other_script} " in same_copy_keys[1]
+                  and f"{other_directory} " in same_copy_keys[2] and " --build sizes " in same_copy_keys[3],
+                  f"同一份副本里主脚本、另一份脚本、另一个目录里同名的脚本、另一个 --build 的键 {same_copy_keys}（要四个互不相同）"))
+    return cells
 
 
 def key_fold_cells(work):
@@ -1353,7 +1433,7 @@ def run_self_test():
               "measured_margin / slice_margin_bytes / rounded_up_to_gibibyte / slice_scopes / scope_run_label；"
               "MEMORY_PEAKS_LIB_BREAK 设着的话本来就该红")
         return 1
-    print(f"  ✓ memory_peaks_lib.py 自证 {len(cells)} 格都对（副本与草稿目录路径换成记号、剥 capped.sh N、只差条目文件开关值的落一个键而包与目标与档位分开、带空格的条目名一个词落一个键、--check 后面的格名进键、表里只认这一版的行而不对的行整张表读不了、"
+    print(f"  ✓ memory_peaks_lib.py 自证 {len(cells)} 格都对（副本与草稿目录路径换成记号、嵌套多层的副本里同一份脚本落一个键而同一份副本里不同的脚本与参数分开、剥 capped.sh N、只差条目文件开关值的落一个键而包与目标与档位分开、带空格的条目名一个词落一个键、--check 后面的格名进键、表里只认这一版的行而不对的行整张表读不了、"
           "同一个键两台各一行而只认本台的那一行、默认的峰值表在共享数据根下、页缓存占了大半时记回收不掉的那一截、oom_kill 大于 0 记撞顶而采不到的不记、峰值到了上限而没 OOM 的不把上限往上推、新口径读回近几次里最大的、"
           "工作根取法与 lib_work_root.py 一样、平常跑设了弄坏开关退 2 并点名变量、"
           f"余量按 1 GiB 向上取整（{len(MARGIN_ROUNDING_SAMPLES)} 个读数各一格）、余量只算子 cgroup 里没有的那一截、读不了时量不到余量、在跑的 scope 逐个报用量与标签）")

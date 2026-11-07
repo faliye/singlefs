@@ -4,19 +4,20 @@
 //! read 读回 Rust 客户端写下的大值（两边互读：存下的字节两边一样，Python 才拼得回）。另有一条一段长的值攒成一批、读回合计越过帧长上限的成批点读
 //! （容错客户端拆键再问，`prune_server::reliable_client` 文件头「回应越过帧长上限就拆键」）。
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use prune_server::break_switches::{BreakSwitches, BREAK_VARIABLE};
 use prune_server::client::{RouteAddress, SimpleClient};
+use prune_server::configuration::{create_directory_holding_a_socket, MAXIMUM_SOCKET_PATH_BYTES};
 use prune_server::protocol::{Table, MAXIMUM_FRAME_BODY_BYTES};
 use prune_server::reliable_client::{
     ClientFailure, ReliableClient, ReliableClientSettings, OTHER_CLIENT_FAILURE_EXIT_CODE,
 };
 use prune_server::segmented_values::{
-    frame_ranges, segment_count_key, segment_key, ScannedEntry, SegmentedScanAssembler,
+    frame_ranges, segment_key, version_registry_key, ScannedEntry, SegmentedScanAssembler,
     SegmentedValueFailure, SEGMENTED_FRAME_ENTRY_LIMIT, SEGMENT_BYTES, SEGMENT_MANIFEST_MAGIC,
 };
 use prune_server::server::LISTENING_LINE_PREFIX;
@@ -42,23 +43,28 @@ const PYTHON_RELATIVE_PATH: &str = "large-value";
 /// Python 客户端在临时服务底下给键加的命名空间取库目录 sha256 的前几个字符（`prune_server_client.py` 的 `NAMESPACE_DIGEST_CHARACTERS`）。
 const PYTHON_NAMESPACE_DIGEST_CHARACTERS: usize = 16;
 
-static TEMPORARY_DIRECTORY_COUNTER: AtomicU64 = AtomicU64::new(0);
+/// 临时目录名的前缀与里面 socket 的文件名。
+const TEMPORARY_DIRECTORY_NAME_PREFIX: &str = "prune-segmented";
+const SOCKET_FILE_NAME: &str = "server.sock";
 
-/// 一条用例独占的临时目录：放手时删。名字短，socket 全路径不超 107 字节。
+/// 一条用例独占的临时目录：放手时删。建法见 `create_directory_holding_a_socket`，里面的 socket 全路径不超 107 字节。
 struct TemporaryDirectory {
     path: PathBuf,
 }
 
 impl TemporaryDirectory {
     fn create() -> TemporaryDirectory {
-        let base = std::env::temp_dir();
-        let path = base.join(format!(
-            "prune-segmented-{}-{}",
-            std::process::id(),
-            TEMPORARY_DIRECTORY_COUNTER.fetch_add(1, Ordering::SeqCst)
-        ));
-        std::fs::create_dir(&path)
-            .unwrap_or_else(|error| panic!("建不了临时目录 {}：{error}", path.display()));
+        TemporaryDirectory::create_under(std::env::var_os("TMPDIR"))
+    }
+
+    /// `temporary_directory_variable` 是 `TMPDIR` 的值。
+    fn create_under(temporary_directory_variable: Option<OsString>) -> TemporaryDirectory {
+        let path = create_directory_holding_a_socket(
+            temporary_directory_variable,
+            TEMPORARY_DIRECTORY_NAME_PREFIX,
+            SOCKET_FILE_NAME,
+        )
+        .unwrap_or_else(|message| panic!("{message}"));
         TemporaryDirectory { path }
     }
 }
@@ -83,13 +89,16 @@ impl TemporaryServer {
     /// 起服务：这个工程的服务二进制带 `--selftest-instance`（自证起服务的同一种起法，不过平常跑的准入），socket、状态目录、库都在这条用例的临时目录里，
     /// TCP 走回环、端口由内核给；弄坏开关的变量不传给它。
     fn start() -> TemporaryServer {
-        let directory = TemporaryDirectory::create();
+        TemporaryServer::start_in(TemporaryDirectory::create())
+    }
+
+    fn start_in(directory: TemporaryDirectory) -> TemporaryServer {
         let mut command = Command::new(env!("CARGO_BIN_EXE_prune-server"));
         command
             .arg("serve")
             .arg("--selftest-instance")
             .arg("--socket")
-            .arg(directory.path.join("server.sock"))
+            .arg(directory.path.join(SOCKET_FILE_NAME))
             .arg("--state-directory")
             .arg(&directory.path)
             .arg("--library")
@@ -186,7 +195,7 @@ fn write_stored_entries(client: &mut ReliableClient, entries: &[(Table, Vec<u8>,
         .unwrap_or_else(|failure| panic!("等不到写确认：{failure}"));
 }
 
-/// 原样点读一把键（清单、段、计数键照存着的交）。
+/// 原样点读一把键（清单、段、版本登记键照存着的交）。
 fn stored_value(client: &mut ReliableClient, key: &[u8]) -> Option<Vec<u8>> {
     client
         .read(&[(TABLE, key.to_vec())])
@@ -212,7 +221,7 @@ fn manifest_written_by_the_python_client(value: &[u8], segment_lengths: &[usize]
 }
 
 /// large-value-round-trip：一个长过帧长上限的值（崩溃点重放三项退 3 的那种单独一行）与一条小值写得进；逐字节读回，不在的读成不在；
-/// 服务里原样是 Python 那种存法：原键是清单、五段依次是四整段与余下的一个字节、计数键是 5。
+/// 服务里原样是 Python 那种存法：原键是清单、这一版（整值 sha256）的五段依次是四整段与余下的一个字节、版本登记键是这一版。
 /// 判别力（`crates/mutations.tsv`）：点读读回清单就照原样交、不拼（读回的是清单本身），这条红。
 #[test]
 fn large_value_round_trip_reads_back_every_byte_and_stores_the_segments_like_the_python_client() {
@@ -262,35 +271,35 @@ fn large_value_round_trip_reads_back_every_byte_and_stores_the_segments_like_the
         )),
         "原键里存的是 Python 那种清单"
     );
+    let large_version = sha256_hexadecimal(&large_value);
     for (segment_index, segment_length) in segment_lengths.iter().enumerate() {
         assert_eq!(
-            stored_value(&mut client, &segment_key(&large_key, segment_index))
-                .map(|piece| piece.len()),
+            stored_value(
+                &mut client,
+                &segment_key(&large_key, Some(&large_version), segment_index)
+            )
+            .map(|piece| piece.len()),
             Some(*segment_length),
             "段号 {segment_index} 在服务里、长度照清单"
         );
     }
     assert_eq!(
-        stored_value(&mut client, &segment_count_key(&large_key)),
-        Some(b"5".to_vec())
+        stored_value(&mut client, &version_registry_key(&large_key)),
+        Some(large_version.into_bytes())
     );
 }
 
-/// large-value-round-trip 里改写那一段：分段存过三段的键改写成一个短值：读回短值；照高水位仍写三段，后两段改写成空段，新清单点名全部三段、计数键仍是 3（旧段不留孤儿）。
-/// 判别力（`crates/mutations.tsv`）：写之前读回的计数键不用、高水位一律当 0（短值照原样写，旧的三段与计数键原样留着），这条红。
+/// large-value-round-trip 里改写那一段：分段存过三段的键改写成一个短值：读回短值；短值照原样写进原键，旧的那一版三段这一次不动
+/// （写方死在写原键之前读的照旧是旧值），版本登记键照旧登记着它；再写一次短值时写前第 2 步删掉旧的那一版三段，登记键写成空值（一版都不剩）。
+/// 判别力（`crates/mutations.tsv`）：写之前读回的版本登记键不用、当没登记（旧的那一版三段永远留着），这条红。
 #[test]
-fn large_value_rewritten_shorter_rewrites_every_earlier_segment_and_keeps_the_count() {
+fn large_value_rewritten_shorter_keeps_the_old_version_until_the_next_write_reclaims_it() {
     let server = TemporaryServer::start();
     let mut client = server.reliable_client();
     let key = b"family/kind/rewritten".to_vec();
-    write_with_large_values_segmented(
-        &mut client,
-        vec![(
-            TABLE,
-            key.clone(),
-            patterned_value(2 * SEGMENT_BYTES + 3, 5),
-        )],
-    );
+    let large_value = patterned_value(2 * SEGMENT_BYTES + 3, 5);
+    let large_version = sha256_hexadecimal(&large_value);
+    write_with_large_values_segmented(&mut client, vec![(TABLE, key.clone(), large_value)]);
     write_with_large_values_segmented(&mut client, vec![(TABLE, key.clone(), b"short".to_vec())]);
     assert_eq!(
         client
@@ -300,27 +309,39 @@ fn large_value_rewritten_shorter_rewrites_every_earlier_segment_and_keeps_the_co
     );
     assert_eq!(
         stored_value(&mut client, &key),
-        Some(manifest_written_by_the_python_client(b"short", &[5, 0, 0])),
-        "新清单点名以前写过的全部三段"
+        Some(b"short".to_vec()),
+        "短值照原样写进原键"
     );
+    for segment_index in 0..3 {
+        assert!(
+            stored_value(
+                &mut client,
+                &segment_key(&key, Some(&large_version), segment_index)
+            )
+            .is_some(),
+            "旧的那一版段号 {segment_index} 这一次不动，留给下一次写时回收"
+        );
+    }
     assert_eq!(
-        stored_value(&mut client, &segment_key(&key, 0)),
-        Some(b"short".to_vec())
+        stored_value(&mut client, &version_registry_key(&key)),
+        Some(large_version.clone().into_bytes()),
+        "版本登记键照旧登记着旧的那一版"
     );
+    write_with_large_values_segmented(&mut client, vec![(TABLE, key.clone(), b"shorter".to_vec())]);
+    for segment_index in 0..3 {
+        assert!(
+            stored_value(
+                &mut client,
+                &segment_key(&key, Some(&large_version), segment_index)
+            )
+            .is_none(),
+            "再写一次时旧的那一版段号 {segment_index} 删掉"
+        );
+    }
     assert_eq!(
-        stored_value(&mut client, &segment_key(&key, 1)),
+        stored_value(&mut client, &version_registry_key(&key)),
         Some(Vec::new()),
-        "旧段改写成空段"
-    );
-    assert_eq!(
-        stored_value(&mut client, &segment_key(&key, 2)),
-        Some(Vec::new()),
-        "旧段改写成空段"
-    );
-    assert_eq!(
-        stored_value(&mut client, &segment_count_key(&key)),
-        Some(b"3".to_vec()),
-        "高水位只增不减"
+        "一版都不剩的版本登记键是空值"
     );
 }
 
@@ -330,17 +351,30 @@ fn write_a_hello_world_key_with_its_world_segment_stored_as(
     key: &[u8],
     world_segment: Option<&[u8]>,
 ) {
+    let version = sha256_hexadecimal(b"helloworld");
     let mut entries = vec![
         (
             TABLE,
             key.to_vec(),
             manifest_written_by_the_python_client(b"helloworld", &[5, 5]),
         ),
-        (TABLE, segment_key(key, 0), b"hello".to_vec()),
-        (TABLE, segment_count_key(key), b"2".to_vec()),
+        (
+            TABLE,
+            segment_key(key, Some(&version), 0),
+            b"hello".to_vec(),
+        ),
+        (
+            TABLE,
+            version_registry_key(key),
+            version.clone().into_bytes(),
+        ),
     ];
     if let Some(world_segment) = world_segment {
-        entries.push((TABLE, segment_key(key, 1), world_segment.to_vec()));
+        entries.push((
+            TABLE,
+            segment_key(key, Some(&version), 1),
+            world_segment.to_vec(),
+        ));
     }
     write_stored_entries(client, &entries);
 }
@@ -401,7 +435,7 @@ fn segmented_read_with_swapped_bytes_of_the_same_length_is_refused_by_the_digest
     }
 }
 
-/// large-value-round-trip 的前缀扫：前缀下两条小值与排在最后的一把分段键（两段），另有一条前缀之外的；服务里原样扫回来带着段键与计数键，
+/// large-value-round-trip 的前缀扫：前缀下两条小值与排在最后的一把分段键（两段），另有一条前缀之外的；服务里原样扫回来带着段键与版本登记键，
 /// 喂给拼接器之后交出去的只有三把原键，分段那一把交拼回的整值。
 /// 判别力（`crates/mutations.tsv`）：扫完时把还攒着的那把分段键丢掉（排在最后的分段键交不出去），这条红。
 #[test]
@@ -428,7 +462,7 @@ fn large_value_prefix_scan_hands_out_owner_keys_with_the_segmented_value_assembl
     assert_eq!(
         stored_entries.len(),
         6,
-        "服务里原样有两条小值、清单、两段与计数键"
+        "服务里原样有两条小值、清单、两段与版本登记键"
     );
     let mut assembler = SegmentedScanAssembler::new();
     let mut scanned_entries = Vec::new();
@@ -494,8 +528,8 @@ fn batched_point_read_whose_answer_exceeds_the_frame_limit_reads_back_every_valu
     write_with_large_values_segmented(&mut client, entries);
     for key in &segment_long_keys {
         assert!(
-            stored_value(&mut client, &segment_count_key(key)).is_none(),
-            "正好一段长的值不分段（没有计数键）：单键回应装得下一帧"
+            stored_value(&mut client, &version_registry_key(key)).is_none(),
+            "正好一段长的值不分段（没有版本登记键）：单键回应装得下一帧"
         );
     }
     let keys_to_read: Vec<(Table, Vec<u8>)> = vec![
@@ -596,5 +630,37 @@ fn python_client_reads_back_a_large_value_the_rust_client_wrote() {
         "Python 读回的 {} 字节要与 Rust 写的 {} 字节逐字节相同",
         output.stdout.len(),
         large_value.len()
+    );
+}
+
+/// `TMPDIR` 比 socket 路径上限还长时，临时服务照样起得来、读写得通：目录退到短根底下，socket 全路径不超上限。
+/// 判别力：用例的临时目录不经 `create_directory_holding_a_socket`、一律建在 `TMPDIR` 底下时，这条红（服务报 socket 路径超上限、不打就绪行）。
+#[test]
+fn server_starts_and_serves_when_the_temporary_root_is_longer_than_a_socket_path_may_be() {
+    let long_root_parent = TemporaryDirectory::create();
+    let long_root = long_root_parent
+        .path
+        .join("r".repeat(MAXIMUM_SOCKET_PATH_BYTES + 20));
+    std::fs::create_dir_all(&long_root)
+        .unwrap_or_else(|error| panic!("建不了长临时根 {}：{error}", long_root.display()));
+
+    let server = TemporaryServer::start_in(TemporaryDirectory::create_under(Some(
+        long_root.clone().into_os_string(),
+    )));
+
+    assert!(
+        !server.directory.path.starts_with(&long_root),
+        "临时根 {} 放不下 socket 全路径，目录该改建在短根底下，实际是 {}",
+        long_root.display(),
+        server.directory.path.display()
+    );
+    let mut client = server.reliable_client();
+    let key = b"family/kind/long-temporary-root".to_vec();
+    write_with_large_values_segmented(&mut client, vec![(TABLE, key.clone(), b"short".to_vec())]);
+    assert_eq!(
+        client
+            .read_assembling_segmented_values(&[(TABLE, key)])
+            .unwrap_or_else(|failure| panic!("读不回：{failure}")),
+        vec![Some(b"short".to_vec())]
     );
 }

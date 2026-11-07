@@ -6,7 +6,7 @@
 
 这一个目录里的文件：
   task-server/task                   客户端（submit、wait、status、cancel、log、clean；用法与退出码写在它的文件头）
-  task-server/control                装与查：install [--dry-run]、check、start、stop、watch、clear-queue、pin-cap、unpin-cap、pause、resume（同上）
+  task-server/control                装与查：install [--dry-run]、check、start、stop、clear-queue、pin-cap、unpin-cap、pause、resume（同上）
   task-server/task_server.py         服务：FastAPI 跑在 uvicorn 上，只开 unix socket；队列、起任务、重试、分片、通知、资源记录都在这一个进程里（判法写在它的文件头）
   task-server/attempt_runner.py      每一次尝试的单元里起命令、记退出码与资源（编译目录不在这里删，下面「编译目录」；服务起它，人不起）
   task-server/singlefs-task-server.service.in   用户级 systemd 单元的模板（control install 照它填）
@@ -62,12 +62,16 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
     挂载      经多机配置 HOSTS 里第二台那一项起 ssh（peer_ssh_address、NFS_SSH_OPTIONS）：第二台上 stat -f -c %T -- <根>/. 读到 nfs（nfs_mount_verdict）——走进目录会触发
               x-systemd.automount 挂上它；自动挂载闲着时那里只是一层 autofs 占位，mountpoint -q 照样退 0，不说明 NFS 挂上了，所以不看它。
               不过时出路写在第二台上 systemctl reset-failed 那个挂载单元、ls <根> 触发再挂（问题 84；弄坏开关 nfs-mount-placeholder-accepted 下照改前只看 mountpoint -q）；
+              这一次 ssh 超时（NFS_SSH_SECONDS）先当「慢」：隔 NFS_RECHECK_PAUSE_SECONDS 秒复查一次（总共两次，peer_shell_rechecked），复查通了照通算，慢的那一句交给
+              nfs_share_report 的 slow（服务只记进服务日志：不推提醒、不当第二台用不了）；复查还超时或连不上才算不过，那一句写「连不上第二台（ssh 超时 N 秒，隔 M 秒复查仍不通…）」；
+              头一次就是连不上（ssh 退 255 而不是超时）的不复查，照写「连不上第二台（ssh 退 255：…）」（第二台 load average 约 60 时一次 30 秒超时、同一刻手跑 stat -f 秒回 nfs；
+              弄坏开关 peer-health-single-timeout-reported 下头一次超时就算连不上）；
     两向探针  本机往 <探针目录>/.task-server-nfs-probe 写一个随机记号、第二台 cat 回来逐字相同；第二台往 <探针目录>/.task-server-nfs-probe-peer 写一个随机记号、本机读回逐字相同；
               读完两个文件都删。探针目录：根下的 .git 是目录（根是 git 工作树）时是 <根>/.git，不在项目根下留条目（仓根新条目钩子会报）；别的根是根本身（nfs_probe_directory）。
   没写这一键、写法不对、哪个根哪一项不过：服务不起（Scheduler 建起之前判，退 78），一句话写明哪个根、哪一项、为什么，出路指 task-server/README.md「## NFS 共享」。
   control check 判四项；control install 起之前判前三项、回读到 /health 回 ok 之后判四项；control start 起之前判前三项、回读之后判四项；不过都退 78。
   服务起来之后每 NFS_RECHECK_SECONDS（task_server.py）复核前三项（两向探针只在起来时做）：第二台没挂上的根，当第二台此刻用不了（task_server.py 文件头 ②「机器」）、写告警；
-  /health 的 nfs 一栏是每个根的四项结论（两向探针取起来时那一次）；control watch 每轮判前三项。
+  /health 的 nfs 一栏是每个根的四项结论（两向探针取起来时那一次）；服务自己盯健康那一路（task_server.py 文件头 ⑥）每一轮读这一份，前三项不过就发消息给有任务在排、在跑的会话。
   第二台照同一绝对路径读写共享根（仓也在共享根下）：第二台在同一棵树、同一个绝对路径上跑，工作目录与命令里的路径有不在共享根下的提交时就拒（下面「挑机器」）。
 
 库（${状态目录}/task-server.sqlite3，标准库 sqlite3、WAL，文件 600）：只有服务读写它。表 meta、tasks、attempts、history、item_rates、operations、alerts，
@@ -87,7 +91,8 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
   succeeded               0      命令退 0
   command-failed          照命令  命令自己退非 0：表里没有的退出码一律落在这里，不吞掉（本机的 255 也在这里）
   memory-cap-hit          250    撞了这一条自己的上限（内存包装的 250）；放大额度重试，见「重试」
-  memory-cap-at-maximum   236    撞上限、已到两台最大：再乘 1.5 就到能派的每台 slice 总上限，不再加；wait 的末行写撞了哪台、到了多少、改什么再重投（下面「撞顶到两台最大」）
+  memory-cap-at-maximum   236    撞上限、已到两台最大：再乘 1.5 就到能派的每台 slice 总上限，不再加；wait 的末行写撞了哪台、到了多少、改什么再重投（下面「撞顶到两台最大」）；
+                                 或排队那一刻这一条在每一台上的记账都超过那台的可用上限（task_server.py 文件头 ②「预算」）：一次都不起，说明写记账、两台可用上限与记账从哪来
   squeezed-out            254    被总上限挤掉（内存包装的 254）；同一上限重排
   gpu-memory-short        245    显存不够（内存包装的 245）；等显存再试一次
   timed-out               253    超时（内存包装的 253）
@@ -114,33 +119,116 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
   resubmit-required       232    服务规则改了，还在排的这一条照现行提交规则不再收（服务起来时再核：环境变量、包装与资源参数、编译目录）；
                                  一次都没起，wait 末行写不合哪一条，提交方改了重交
   stalled                 233    卡住：起来后先宽限 STALL_GRACE_SECONDS（10 分钟）不判，之后日志距上一次增长满 STALL_SECONDS（10 分钟）、这段时间 CPU 也几乎没涨，或已跑超过记录用时的 5 倍而日志满 10 分钟没涨（不看 CPU），服务停了它（两台都判）；不重试，看 task log 改了重投。
+                                 日志与 CPU 都满窗口不涨、而这个窗口里每一轮都有进程在 D 状态（不可中断的 IO 等待）的不记这一种、不停：卡在 IO 上，在等盘或 NFS
+                                 （task_server.py 文件头 ①「卡在 IO 上」；本机读进程状态，第二台读 multi-host-run.sh 每轮打的 MULTI_HOST_RUN_PEER_IO_WAIT），连着满 30 分钟报要处置的提醒 io-wait；读不到 D 状态的照上面判
+                                 要卡的、这一次尝试分到了卡，日志与 CPU 都满窗口不涨、而这个窗口里每一轮卡上都有它的计算负载、卡的利用率有一轮不为 0 的同样不记这一种、不停：GPU 在算
+                                 （task_server.py 文件头 ①「卡上有它的计算进程」；本机读 nvidia-smi 的计算进程与 utilization.gpu，第二台与量不到的当有负载；利用率读不到的照有负载免停、
+                                 依据写「利用率读不到」），连着满 30 分钟报要处置的提醒 gpu-busy-quiet；卡上有它的进程而利用率一个窗口里每一轮都是 0 的（占着卡不干活）门槛另提到
+                                 CARD_IDLE_STALL_CPU_CORES（1 个核，task_server.py）：命令自己的 CPU 这一窗口平均不到 1 个核的（CPU 上轮询死等）停、记这一种，说明写日志多久没涨、
+                                 卡的利用率与命令自己的 CPU 三样读数；不少于 1 个核的是在 CPU 上算，照跑；读不到利用率的照上面判；
+                                 有一轮卡上没有它的负载、没分到卡的照上面判；远超记录用时的那一条照停，不看 D 状态也不看卡
                                  判卡住那一刻这一次 scope 的内存峰值已到上限的 STALL_AT_CAP_FRACTION（98%，task_server.py）的不记这一种：顶在上限上卡在回收里，
                                  停了之后记 memory-cap-hit、照「重试」乘 1.5 重排（钉值的照钉值规矩打回 memory-cap-at-maximum），说明写「顶在上限上卡住」；第二台的峰值读不到，照记 stalled
+  over-two-hours          242    跑满两小时打回：各次尝试在跑的时长累加（排队等的不算；撞了内存上限重来的计时归零，只从最后一次撞上限之后那一次起算）满 RUN_LIMIT_SECONDS（7200 秒，
+                                 task_server.py），服务停了它（两台都判）；分片的各片按自己的尝试各自累计。豁免只有提交时的门禁（commit_gate_exempt）：起的是 COMMIT_GATE_ENTRIES
+                                 （提交时的六道门禁与 scripts/gate/gate-staged.sh）之一、不带 --check 与 --item、范围声明 SINGLEFS_RUN_SCOPE 的「为什么」里写了「提交前」；
+                                 带「长跑已确认」标识的（task requeue 重进的，task_server.py 文件头 ⑦）不判这一条；带「整包已确认」标识的照判。不重试，原号不自动重排：提交它的会话核过范围、确是要跑这么久的，
+                                 照 wait 打的那一行 task-server/task requeue <号> --long-run-confirmed --items <N> --tasks <M> --why '<…>' 重进队尾；不对的改了范围照常重交
   shard-plan-refused      234    分片的计划那一步退 0 而它写的计划读不通（下面「分片」：plan.json 不在、不是 JSON、片数超过 MAXIMUM_SHARDS、键写错）
   退出码对类型：0 succeeded；75 prune-server-unavailable；77 not-run；78 run-condition-unmet 或 card-fault（看日志）；245、250、251、253、254 照上表（内存包装的退出码表在
-  scripts/hosts/run-with-memory-cap.sh 文件头「退出码」）；255 在第二台是 peer-run-failed、在本机是 command-failed；别的非 0 都是 command-failed（252 也在这里）。
+  scripts/hosts/run-with-memory-cap.sh 文件头「退出码」）；255 在第二台是 peer-run-failed、在本机是 command-failed；别的非 0 都是 command-failed（252 也在这里：内存包装判出命令退出之后停了自己的 scope、
+  回读还有进程，run-with-memory-cap.sh 文件头「退出码」，stderr 列着留下的进程）。
   第二台的退出码（records/2026-10-31-task-server巡检.md 问题 79）：multi-host-run.sh 在第二台那条命令等到结局时往日志打
   「MULTI_HOST_RUN_STEP step=peer-command event=end … exit=<码>」（PEER_COMMAND_END_LINE，取最后一行）：有这一行照这个码（第二台那条命令自己的、经那边内存包装的）
   按上面对类型，255 记 command-failed、不重排，multi-host-run.sh 之后收尾退的码不盖掉它（尝试另记 peer_runner_exit_code）；没有这一行而退 255 才是 peer-run-failed。
-  命令自己也退得出 232–241 这几个码，wait 的末行写着类型，分得开。
+  命令自己也退得出 232–242 这几个码，wait 的末行写着类型，分得开。
   疑似卡住（不是结局，不进上表）：
   （疑似卡住）            231    任务照跑：wait 打一行「TASK_SERVER_SUSPECT task=<号> attempt=<第几次> host=<本机|第二台> …」与依据、退 231，不打 TASK_SERVER_RESULT；
                                  再起 wait 接着等（同一段只报一次）；判法在 task_server.py 文件头 ①「疑似卡住」（SUSPECT_MARK、SUSPECT_EXIT）
   （需要处置 needs-attention） 230    任务照旧在排或在跑（换卡重排已经跑成的，任务已有结局）：wait 打一行
                                  「TASK_SERVER_ATTENTION task=<号> type=needs-attention kind=<种类> basis=<依据的数> why=<原因> next=<出路>」（值照 shlex 引；ATTENTION_MARK、ATTENTION_TYPE），
                                  任务还没结局的退 230（ATTENTION_EXIT），不打 TASK_SERVER_RESULT，再起 wait 接着等；任务已有结局的这一行打在 TASK_SERVER_REASON 之前，退码仍是任务的。
-                                 六种 kind（ATTENTION_KINDS）：queued-too-long 排队过久，overrun 跑到记录用时的很多倍（日志在涨服务不停它），card-replaced 清场判出卡坏、
+                                 十二种 kind（ATTENTION_KINDS）：queued-too-long 排队过久，overrun 跑到记录用时的很多倍（日志在涨服务不停它），
+                                 oversized-budget 记账不小于某一台的整片界（预算贴着整台，照排），long-run-idle-cores 跑满一小时而平均在用核数不到给的线程数四分之一（照跑），
+                                 fills-any-cap 同一命令键最近三次峰值都贴着各自上限（按给的上限开并行），
+                                 quiet-log-busy 日志长期不涨而服务没停它（CPU 在涨或读不到；没有记录用时的也报），io-wait 卡在 IO 上而服务没停它
+                                 （日志没涨的每一轮都有进程在 D 状态，连着满 30 分钟），gpu-busy-quiet 卡上有这一次尝试的计算进程、日志与 CPU 都不涨而服务没停它
+                                 （分到了卡、每一轮卡上都有它的计算负载、卡的利用率有一轮不为 0 或读不到，连着满 30 分钟），card-replaced 清场判出卡坏、
                                  换别的卡重排（结局可能是 succeeded），cleanup-pending 清场没收尾（资源占用保留），shard-advance-failed 分片父任务推不动，
                                  workspace-write-interrupted 改主工作区的命令没正常结束、可能写了一半（只报有结局的任务，退码仍是任务的；点名要核的文件或补丁目录）；
-                                 每种的判法、档与阈值（QUEUE_ATTENTION_MINUTES、OVERRUN_ATTENTION_FACTOR）在 task_server.py 文件头 ①「要处置的提醒」。
-                                 同一条任务同一种提醒只叫醒一次，档跨过下一档（阈值的两倍、四倍…）才再叫；服务健康不归 wait，由 task-server/control watch 盯
+                                 每种的判法、档与阈值（QUEUE_ATTENTION_MINUTES、OVERRUN_ATTENTION_FACTOR、QUIET_ATTENTION_MINUTES、IO_WAIT_ATTENTION_MINUTES、
+                                 GPU_BUSY_QUIET_ATTENTION_MINUTES）在 task_server.py 文件头 ①「要处置的提醒」；next= 的头一段照下面「异常表」那一行的修改意见。
+                                 同一条任务同一种提醒只叫醒一次，档跨过下一档（阈值的两倍、四倍…）才再叫；服务另直接发消息给提交它的会话（task_server.py 文件头 ⑥，同一份记账）；服务健康不归 wait，服务自己盯、发消息
   打回的理由（用户：「任务出问题  返回给对应的对话时候 要写按照分类明白理由」）：wait 在末行 TASK_SERVER_RESULT 之前打一行
     「TASK_SERVER_REASON type=<错误类型> <要素>… why=<一句人读得懂的原因> next=<出路>」（值照 shlex 引；reason_line），task status 给了号且有结局的同样打。
     每种类型要带的要素在 REASON_ELEMENTS：memory-cap-hit 带 cap=（上限）peak=（峰值）；memory-cap-at-maximum 带 host= reached= peak=；squeezed-out 带 host= cap= by=（同台在跑、
     把它挤掉的那几条，task_server.py 的 finish_attempt 记的 squeezed_by）；resubmit-required 带 rule=（不合的那一条）；never-fits 带 judged=（哪台为什么放不下）；
     要卡而卡用不上的（gpu-memory-short、run-condition-unmet、card-fault）带 card= quiesce=（日志里清场那一行）；命令自己退的那几种带 last_line=（日志最后一行）。
-  每次尝试记：机器（local / peer）、上限、卡、线程数、编译目录、退出码、错误类型、起止时刻、用时、内存峰值（scope 的 memory.peak；量不到记 null，不记 0）、
-  平均在用核数（scope 的 cpu.stat 的 usage_usec 除以用时）、显存峰值（本机 GPU 任务：nvidia-smi 读到的这一条子孙进程用量之和的最大值）、日志路径、单元名。
+    next= 照下面「异常表」里这一种结局那一行的修改意见（anomaly_advice）；memory-cap-at-maximum 前面另接撞了哪台、到了多少、峰值多少（maximum_next_step）。
+  每次尝试记：机器（local / peer）、上限、卡、线程数、编译目录、退出码、错误类型、起止时刻、用时、内存峰值（scope 进程用的内存 anon 加 shmem 见过的最大，下面「退出时的内存峰值」之后「峰值的口径」；量不到记 null，不记 0）、
+  平均在用核数（scope 的 cpu.stat 的 usage_usec 除以用时）、显存峰值（本机 GPU 任务：nvidia-smi 读到的这一条子孙进程用量之和的最大值）、日志路径、单元名，
+  另记编译段峰值 build_phase_peak（下面「资源记录」的编译族）。
+
+异常表（封闭的表；一行一种，栏用「｜」隔开：种类｜动作｜判据｜修改意见｜没处置时）：服务判出的每一种异常——提交时拒与提交时警告、交了待确认、
+  错误类型表里除 succeeded 之外的每一种结局、要处置的提醒（ATTENTION_KINDS）、疑似卡住、结局没人取——都在这里有一行，怎么判、怎么办、没人管时怎么办只照这一行。
+  动作是 ANOMALY_ACTIONS 四样之一：提交时拒（不进库、不跑）、打回（记结局、交给提交它的会话改了重交）、提醒照跑（服务不停、不改任务，只把这一行的修改意见交给会话）、
+  服务自己修（重排、换卡、取消这类，修不成的照打回办）。要处置的提醒、结局（打回与服务自己修）、疑似卡住、结局没人取、没确认被取消、确认的数对不上与客户端读不到收件地址，
+  修改意见就是 wait 打的 next= 那一句与发给会话的正文「出路：」那一行的头一段（{task} 换成任务号，后面另接这一回的具体数）：服务照 anomaly_advice 从这张表取，代码里不另写一份。
+  提交时拒的其余八种与两种提交时警告，拒绝说明在判它的那一处写（要点名这一回的变量、路径、包或那几条结局），表里那一行写的是同一条出路，给人查；
+  每一句点名这一种要核的东西，不写「看 status、等不起就取消改小重交」这种通用句。
+  没处置时：时长判的提醒照档每翻一倍升一档再推；不随时长涨的（oversized-budget、fills-any-cap、long-run-idle-cores、cleanup-pending、card-replaced、shard-advance-failed，
+  ANOMALY_REPUSHED_KINDS）同一档推过之后满 ANOMALY_REPUSH_SECONDS（30 分钟）还在的再推一回、之后每翻一倍再推，正文写前几次推了什么、此刻还差什么；
+  结局满 30 分钟没交给会话的照 unclaimed-outcome 那一行再推。自证 anomaly-table-matches-kinds 读这一段与 ATTENTION_KINDS、OUTCOME_TYPES、SUBMIT_REFUSAL_KINDS 比，对不上判红。
+  environment-refused｜提交时拒｜调用方环境里有白名单外的变量，或环境里、命令里设了退役的变量（RETIRED_VARIABLES）｜去掉拒绝说明点名的那个变量再交；命令真要它的写成 task-server/task submit -- env <名>=<值> <命令…>，退役的照说明里的新写法改｜不进库，没有下一档
+  nested-wrapper｜提交时拒｜命令外层或 bash -c 里套了内存包装、派发器、清场或线程包装，或写了 --memory、--memory-cap、--threads、--peer、--local-only、SINGLEFS_THREAD_CAP｜删掉拒绝说明点名的那一层或那个参数再交：内存、线程、机器与卡都由服务定｜不进库，没有下一档
+  target-directory-in-repository｜提交时拒｜调用方给的 CARGO_TARGET_DIR（环境里或命令里）指到仓里｜去掉它再交，编译目录由服务给；真要自己的给仓外、共享根下的路径｜不进库，没有下一档
+  outside-shared-path｜提交时拒｜工作目录或命令里的绝对路径有不在多机配置 NFS_SHARED_ROOTS 任何一段下的（/tmp 下的同样算）｜把拒绝说明点名的那个路径改放共享根下（草稿放工作根 ~/.local/share/singlefs/work/ 下），再交｜不进库，没有下一档
+  shared-roots-outside｜提交时拒｜交给命令的 SINGLEFS_DATA_ROOT、SINGLEFS_WORK_ROOT 有不在共享根下的｜照点名的那个变量改多机配置的 SHARED_DATA_ROOT，或去掉任务里带的那个变量，再交｜不进库，没有下一档
+  verdict-library-unserved｜提交时拒｜命令点到 .claude/gate.d/verdict-library-scripts.tsv 里带判定库而第三列还没写 prune-server 的一行，或那张表读不了、写坏了｜把点名的那一族接进 prune-server、第三列翻成 prune-server（表写坏的先改对那一行），再交｜不进库，没有下一档
+  temporary-service-heavy｜提交时拒｜临时 prune-server 包装里剥出的原命令会编 cargo 或要卡｜去掉包装重交：验证包的 cargo test 对真服务判｜不进库，没有下一档
+  whole-workspace-cargo｜提交时拒｜命令位置上会编的 cargo 带 --workspace / --all，或不带 -p 而照清单的走法落到虚拟清单｜点名要编的包 -p <包>（验证包写 -p singlefs-verification）；整仓要跑的走 scripts/gate/merge-and-verify.sh 或提交时的门禁｜不进库，没有下一档
+  inbox-missing｜提交时拒｜客户端读不到会话的收件地址（环境里没有 CLAUDE_CODE_MESSAGING_SOCKET 与 CLAUDE_CODE_MESSAGING_TOKEN）｜从 Claude Code 会话的 Bash 里交（那里的环境带收件地址）；子 agent 不交任务，写进报告交回主 agent｜不进库，没有下一档
+  whole-package-unconfirmed｜提交时拒｜命令是整包测试（cargo test 不点名 --test、--bin、带测试名的 --lib，或带 --lib --tests、--workspace；crash-point-replay.sh --check 三格全点；不给补丁目录的 merge-and-verify.sh）而没带 --whole-package-confirmed，或带了而确认文件的形式不合（不是共享根下读得到的绝对路径、缺 ①②③ 哪一段、哪一段不到 12 个字）；提交时的门禁豁免｜改成只点名改到的测试目标与测试函数；确实要整包的照 .claude/agent-common.md「日常开发的测试不跑整个包」确认三遍（①改到的文件与函数、②引到它们的测试目标与函数及 grep 命中、③为什么只点名②不够）写进共享根下的一份文件，带 --whole-package-confirmed <确认文件> 重交；带了照样受两小时限｜不进库，没有下一档
+  requeue-counts-mismatch｜提交时拒｜task requeue 给的项数或在排在跑的条数与服务此刻算的不同（与 task confirm 同一个核法，task_server.py 的 counts_mismatch）｜照拒绝说明打的确认单核这条命令的范围（点的项、测试目标）与这个会话在排在跑的那几条：范围对了照服务算的两个数再 task-server/task requeue {task} --long-run-confirmed --items <N> --tasks <M> --why '<为什么要跑这么久、范围为什么是这些>'，不对的改了范围照常 task-server/task submit 重交｜不进队，没有下一档
+  confirm-counts-mismatch｜提交时拒｜task confirm 给的项数或在排在跑的条数与服务此刻算的不同｜照拒绝说明打的确认单核这条命令的范围（点的项、测试目标）与这个会话在排在跑的那几条：范围对了照服务算的两个数再 task-server/task confirm {task}，不对的 task-server/task cancel {task}、改了重交｜照 unconfirmed 那一行
+  repository-target-bypass｜提醒照跑｜命令里的词、或命令位置上起的本仓脚本正文指向仓根 target/ 下的二进制，绕过服务给的编译目录｜编译交给服务给的编译目录，二进制取这一趟编出来的位置（CARGO_TARGET_DIR 下）；入口脚本里删掉仓根 target/ 的路径，改完 task-server/task cancel {task}、重交｜提交回复、日志头与 status 三处照打，不另推
+  unclaimed-results｜提醒照跑｜交任务时会话名下有父任务的结局满 UNCLAIMED_WARNING_MINUTES（30 分钟）没交给它｜task-server/task wait <号> 把点名的几条结局取走、照结局那一行的出路办完，再 task-server/task clean <号>｜每交一条照打；那几条结局照 unclaimed-outcome 那一行再推
+  unconfirmed｜服务自己修｜交了而满 CONFIRM_TIMEOUT_SECONDS（30 分钟）没 task-server/task confirm（状态 awaiting-confirmation）｜核确认单（task-server/task status {task}）里的范围与项数：对的重交、照确认单 task-server/task confirm；不要了不用管｜服务取消（结局 cancelled）、推一条「没确认，已取消」；那一条结局没人取照 unclaimed-outcome 再推
+  queued-too-long｜提醒照跑｜在排、从提交（重排的从上一次尝试结束）起排满 QUEUE_ATTENTION_MINUTES（30 分钟），排队原因已判出来｜task-server/task status {task} 核「在等：…」点名的是哪一台、哪一样（余量、整片封组、卡、编译目录占盘、第二台用不了）：等余量的核这一条的上限是不是比它该要的大，第二台用不了的看 python3 task-server/control check｜每翻一倍（60、120 分钟…）升一档再推
+  overrun｜提醒照跑｜在跑、有记录用时，这一次已跑到 max(OVERRUN_ATTENTION_FACTOR × 记录用时, 宽限 10 分钟)｜task-server/task log {task} 核最后几行还在不在推进（项数、轮数在涨），对照这一趟的范围是不是比记录用时那一次大；不推进的 task-server/task cancel {task}、修了重交｜每翻一倍升一档再推
+  quiet-log-busy｜提醒照跑｜在跑、日志满 QUIET_ATTENTION_MINUTES（30 分钟）没涨，服务因 CPU 在涨或读不到 CPU 没停它｜task-server/task log {task} 核最后一行停在哪一步，task-server/task status {task} 核在用核数：一直满核而日志不动的多半在回收里打转或死循环，核那一步是不是把输出攒着不打｜每翻一倍升一档再推
+  io-wait｜提醒照跑｜在跑、日志没涨的每一轮都有进程在 D 状态，连着满 IO_WAIT_ATTENTION_MINUTES（30 分钟）｜核这一次尝试所在那台的盘与 NFS：/proc/pressure/io 的 some avg60、谁在大量写盘（同台在跑的全目标编译这类）、第二台上共享根的 NFS 挂载在不在、rpc 等不等得回；IO 缓过来它自己接着跑｜每翻一倍升一档再推
+  gpu-busy-quiet｜提醒照跑｜在跑、分到了卡，日志与 CPU 都不涨而每一轮卡上都有它的计算进程、卡的利用率有一轮不为 0 或读不到，连着满 GPU_BUSY_QUIET_ATTENTION_MINUTES（30 分钟）；利用率一个窗口里都是 0 的照卡住停，不报这一条｜核那张卡的利用率与显存在不在动（nvidia-smi），task-server/task log {task} 核停在哪一步；还在算就等，卡死了 task-server/task cancel {task}｜每翻一倍升一档再推
+  card-replaced｜提醒照跑｜尝试结局 card-fault 而清场点名了坏卡，服务已停用它、换别的卡重排（结局可能是 succeeded）｜主 agent 弹窗请用户重置日志里 GPU_QUIESCE 那一行点名的那张卡；任务不用重交｜又判出一张坏卡升一档；同一档推过满 30 分钟再推，之后每翻一倍再推
+  cleanup-pending｜提醒照跑｜命令已退出而清场回读还有进程或读不了，服务保留这一次的资源与显卡占用｜task-server/task log {task} 看留下的是哪几条命令行，核实脚本有没有不等子进程就退（后台 &、setsid 出去的没等齐）；改好之后重交，那几个进程停掉之后服务自己重查收尾，不要删进程号、退出码或清理状态文件来放行｜每次尝试一档；同一档推过满 30 分钟再推，之后每翻一倍再推
+  shard-advance-failed｜提醒照跑｜分片或估算的父任务推下一步连着出错｜看 journalctl --user -u singlefs-task-server.service 里「推下一步时出错」那一句前后的栈，核计划 plan.json 与各片的产物目录读不读得通；修好之前任务 {task} 不往下走，等不起 task-server/task cancel {task}｜推不动的每一回一档；同一档推过满 30 分钟再推，之后每翻一倍再推
+  workspace-write-interrupted｜提醒照跑｜改主工作区的命令以撞上限、被挤掉、取消、卡住被停、对不回来这类结局收尾或被信号杀，可能写了一半｜核这条命令改的文件或补丁目录（依据里点名）与 git status --short、git diff --stat：没写全的照原样补齐或退回，核过再重交｜随结局推一回；结局没人取照 unclaimed-outcome 再推
+  oversized-budget｜提醒照跑｜排队那一刻在某一台上的记账不小于那台的整片界（可用上限的 WHOLE_FRACTION，85%）而不超过可用上限｜核实这一趟的范围（点的项、测试目标）、分片与同时起的个数；确要这么多就照跑，不要的 task-server/task cancel {task}、收小或分片再交｜同一档推过满 30 分钟还在排、在跑的再推，之后每翻一倍再推
+  long-run-idle-cores｜提醒照跑｜在跑满 LONG_RUN_ATTENTION_SECONDS（一小时），到此刻平均在用核数不到给的线程数的 LONG_RUN_IDLE_CORE_FRACTION（四分之一）｜核实脚本是否串行（该切片并行的照 .claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」）、范围是否点多（点的项、测试目标）；要改就 task-server/task cancel {task}、改了重交｜每次尝试一档；同一档推过满 30 分钟还在跑的再推，之后每翻一倍再推
+  fills-any-cap｜提醒照跑｜同一命令键最近 FILLS_CAP_RUNS（3）次跑成的峰值都不低于各自上限的 FILLS_CAP_FRACTION（90%）；撞了上限的那几次不算（撞的那一次峰值本来就贴着上限）｜这条命令按给的上限开并行，核实：同时起的个数要以这一趟的范围为界（不超过要判的单位数），不照服务交的上限（TASK_SERVER_MEMORY_CAP_BYTES）定｜同一档推过满 30 分钟还在排、在跑的再推，之后每翻一倍再推
+  suspected-stall｜提醒照跑｜宽限过后整个单元的 CPU 满 STALL_SECONDS（10 分钟）平均不到一个核的 1%，要卡的这段时间卡上也没有它的计算负载｜task-server/task log {task} 核停在哪一步、在等什么（锁、子进程、网络）；还在算就不用管，真卡住了 task-server/task cancel {task}｜一段只推一回；CPU 又涨了算这一段结束，再静下来是下一段
+  unclaimed-outcome｜服务自己修｜父任务的结局满 UNCLAIMED_WARNING_MINUTES（30 分钟）没交给提交它的会话（消息没送到，也没起 wait）｜task-server/task wait {task} 取走结局、照结局那一行的出路办完，再 task-server/task clean {task}｜每翻一倍（60、120 分钟…）再推一回，推到取走为止
+  command-failed｜打回｜命令自己退非 0（表外的退出码都在这里）｜task-server/task log {task} 核最后一屏是哪一条断言、哪一步报错，改了命令或代码再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  memory-cap-hit｜服务自己修｜撞了这一条自己的上限（内存包装退 250），或判卡住那一刻顶在上限上｜服务乘 1.5 重排、至多 MEMORY_CAP_RETRIES 次；次数用完打回的，task-server/task status {task} 核各次的峰值是不是一次比一次大（规模变大、内存泄漏），把要的内存降下来再重交｜重排的不推；打回的随结局推一回，没人取照 unclaimed-outcome 再推
+  memory-cap-at-maximum｜打回｜撞上限而再乘 1.5 就到能派的每台的可用上限，或排队那一刻记账超过每一台的可用上限｜核实这一趟的范围（点的项、测试目标）、分片与同时起的个数，收小或分片再交（task-server/task submit）｜随结局推一回；没人取照 unclaimed-outcome 再推
+  squeezed-out｜服务自己修｜被 slice 的总上限挤掉（内存包装退 254）｜服务同一上限重排、至多 SQUEEZE_RETRIES 次；用完打回的，核 by= 点名的同台那几条是不是记账偏小，等它们跑完再重交｜重排的不推；打回的随结局推一回，没人取照 unclaimed-outcome 再推
+  gpu-memory-short｜服务自己修｜显存不够（内存包装退 245）｜服务同一上限重排一次；还不够的核 card= 那张卡上谁占着显存（nvidia-smi），等它空出来再重交｜重排的不推；打回的随结局推一回，没人取照 unclaimed-outcome 再推
+  timed-out｜打回｜内存包装的限时到了（253）｜task-server/task log {task} 核卡在哪一步，把这一趟的范围拆小再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  wrapper-refused｜打回｜内存包装用法错或 scope 起不来（251）｜task-server/task log {task} 看内存包装打的最后那一句，照它修好（systemd --user 在不在、slice 配了没有）再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  run-condition-unmet｜打回｜运行条件不满足：命令或清场包装退 78、要卡而没点名能用的卡、钉了上限而配置读不到、能派的每一台都量不到余量｜照 why= 那一句点名的设备或配置（多机配置那一项、卡、清场回读）修好再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  not-run｜打回｜命令报本次未跑（77）｜task-server/task log {task} 核它报缺的是哪一项前提（设备、工具、输入），补齐再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  peer-run-failed｜服务自己修｜第二台那一趟没跑成（连不上、ssh 被重置、那边的准备没过）｜服务同一上限重排、至多 PEER_RUN_RETRIES 次；用完打回的看 python3 task-server/control check 与 /health 的 peer 一栏，修好第二台再重交｜重排的不推；打回的随结局推一回，没人取照 unclaimed-outcome 再推
+  prune-server-unavailable｜打回｜命令自己退 75：prune-server 不可用｜看 python3 prune-server/control check 那一句修好 prune-server 再重交；不要改成走本地库｜随结局推一回；没人取照 unclaimed-outcome 再推
+  card-fault｜服务自己修｜清场判出卡坏（尝试日志里有 GPU_QUIESCE step=quiesce result=card-fault）｜主 agent 弹窗请用户重置 quiesce= 那一行点名的卡；服务已停用它、换卡重排，坏卡清单取不到的核还有没有好卡（多机配置 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED）｜换卡重排的照 card-replaced 推；打回的随结局推一回，没人取照 unclaimed-outcome 再推
+  launcher-lost｜打回｜尝试的单元不在了、又没留结果｜看 journalctl --user -u <unit= 点名的单元> 核单元是谁停的、有没有被 OOM 杀，照原样重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  cancelled｜打回｜提交它的会话取消了，或交了满 30 分钟没确认被服务取消｜要跑就重交；没确认被取消的照确认单核过范围再 task-server/task confirm｜随结局推一回；没人取照 unclaimed-outcome 再推
+  record-tampered｜打回｜库里这条记录校验不过｜查是谁绕过服务直接写了库（告警记录点名哪一行），照 task-server/task submit 重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  never-fits｜打回｜哪台都等多久也放不下，或点名第二台而它用不了｜核 judged= 那一句点名的那一台为什么放不下（峰值比 slice 总上限大、卡凑不够张数），把命令要的内存或卡收小再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  unit-start-failed｜打回｜尝试的单元起不来（systemd-run 退非 0）｜看 systemctl --user status 与 journalctl --user，核用户级 systemd 在不在、单元名有没有撞上，修好再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  shard-plan-refused｜打回｜分片的计划那一步退 0 而它写的计划读不通｜核 plan.json 在不在、是不是 JSON、片数超没超 MAXIMUM_SHARDS、键写没写错（文件头「分片」），改了计划那一步再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  stalled｜打回｜宽限过后日志与 CPU 都满 STALL_SECONDS（10 分钟）不涨（分到了卡、卡上有它的进程而利用率每一轮都是 0 的，命令自己的 CPU 这一窗口平均不到 CARD_IDLE_STALL_CPU_CORES（1 个核）就算不涨），或跑过记录用时 5 倍而日志满 10 分钟没涨，服务停了它｜task-server/task log {task} 核最后一行停在哪一步、那一步在等什么（锁、子进程、网络）、是不是把输出攒着不打；改了再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
+  over-two-hours｜打回｜不是提交时的门禁，从第一次尝试起跑各次尝试在跑的时长累计满 RUN_LIMIT_SECONDS（两小时），服务停了它；带「长跑已确认」标识的不判｜核两件事：范围对不对（点名范围：--item、--check 少几格、点名测试目标；给补丁目录；或照服务分片；整轮的留到提交时），这条是不是确实要跑这么久；不对的改了范围照常 task-server/task submit 重交；对的照 wait 那一行抄 task-server/task requeue {task} --long-run-confirmed --items <N> --tasks <M> --why '<为什么要跑这么久、范围为什么是这些>'（以原命令、原范围声明重进队尾，记长跑已确认，不再按两小时打回）｜随结局推一回；会话不确认就停在这一种，没人取照 unclaimed-outcome 再推
+  resubmit-required｜打回｜服务规则改了，还在排的这一条照现行提交规则不再收｜照 rule= 那一条（环境变量、包装、编译目录）改了再重交｜随结局推一回；没人取照 unclaimed-outcome 再推
 
 重试（内存不够就放大额度；每一次尝试都留记录，追加不覆盖）：
   memory-cap-hit：上限 × CAP_GROWTH_FACTOR（1.5，按 MiB 向上取整）重排、不钉台（哪台装得下去哪台，照「挑机器」），不超过那台的总上限（那一台 slice 的总上限：那一台的内存包装照多机配置 SLICE_MEMORY_CAP_BY_HOST 里它那一项设成 singlefs-heavy.slice 的 MemoryMax，服务读两台的余量报告；第二台另取 SLICE_MEMORY_CAP_BY_HOST 里第二台那一项的小者）；
@@ -153,6 +241,8 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
   重排的任务照任务号回到队里原来的位置（比它后到的排在它后面）。
 撞顶到两台最大（用户：「如果超过上限那么直接报错，返回给agent错误信息。要求修改重新投。」）：结局 memory-cap-at-maximum，wait 退 236，
   末行在 TASK_SERVER_RESULT 那几栏后面接 host=<本机|第二台> reached=<到顶那一次的上限> next=<改什么再重投>（maximum_next_step；分片里那一片撞的另带 shard=<片号>/<片数>）。
+  next= 与发给会话的正文同一句（用户：「8848 撞了就打回 问到底任务范围和分片是不是核实的」）：撞了哪台、到了多少、峰值多少，修改意见是核实这一趟的范围（点的项、测试目标）、
+  分片与同时起的个数，收小或分片再交；记账超过每一台可用上限、一次都没起的（task_server.py 文件头 ②「预算」）reached= 写那份记账、峰值写预测的峰值。
 
 资源记录（用户：「长任务的用时 资源用量 需要存储下来  每次启动器启动的时候需要参照这个来配置资源」）：
   只认服务自己库里的尝试记录（用户：「可以去掉」）：定额度与预计用时不读内存包装的峰值表，也不读 history 表里导进来的峰值与用时那几行
@@ -195,25 +285,36 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
     SINGLEFS_WORK_ROOT（WORK_ROOT_VARIABLE）是 .claude/hooks/lib_work_root.py 的 work_root() 在服务这一侧现算的真路径；任务自己带了这两个（白名单里的）照任务带的。
     提交时核两个值都落在多机配置 NFS_SHARED_ROOTS 的某一段下（task_server.py 的 shared_roots_problem）：有一个不在就当场拒，点名是哪个变量、值是什么，出路是配多机配置
     （task_server.py 文件头 ②「提交时拒」②）。
-  每条任务的上限不低于 MEMORY_FLOOR_BYTES（4G；问题 92，用户：「按照我们的计划 默认是要给4gb的 这里还是没有改吗？ 如果接下来在计划中 就按照计划走。没有的话 需要加入」）：
-    照上面定的上限低于 4G 的（判红峰值定的、重排的），上限与记账都取 4G，预测照记录；钉值除外（task_server.py 的 memory_floor_applied）。
-    任务 2419：命令键合并后一条编译取到 247M 的峰值、371M 当场撞顶；任务 3013：照记录取到 955M、第二台撞顶。
-    服务自己有真实峰值记录的（定额度那一段算出来的，prediction 记 RECORD_HISTORY）不兜：上限照峰值 × 1.5（按 MiB 向上取整），记账照上限
+  有记录的照记录、不设 4G 底（用户：「有记录的照记录、去掉 4G 底」；records/2026-10-31-task-server巡检.md 批 91）：没有记录的照上面先记 4G；
+    服务自己有真实峰值记录的（定额度那一段算出来的，prediction 记 RECORD_HISTORY）上限照记录 × 1.5（按 MiB 向上取整），记账照上限，不往 4G 抬
     （用户：「这个交给 task-server callback记账，如果有真实的使用数据 按照真实的使用数据来」；任务 5953、5995–5999 预测 17 MiB、照记 4G 排了 1.5–2 小时）；
-    撞了上限照「重试」乘 1.5 重排，重排那一次照上面兜到 4G。弄坏开关 recorded-cap-floored 下照改前记录定的也兜到 4G。
-    同一命令键最近一次结束的尝试撞了上限（RECORD_CAP_HIT_OUTCOMES）的，新提交的那一条第一次尝试也照「重排那一次」办：上限与记账兜到 4G，比 4G 大的照撞过那次的上限 × 1.5
-    （prediction 记 CAP_HIT_RERUN_HISTORY；task_server.py 的 latest_attempt_hit_cap）。理由（用户：「这个问题很严重 交给 task-server去处理」）：改主工作区的命令撞了上限服务不自动重排，
-    调用方自己再交一遍，在服务看来是新任务，只照「峰值 × 1.5」定、不像服务自己重排的那一次兜到 4G；同一条 hook-swap 命令撞了五次（任务 7189 撞 168M、7190 撞 159M、7192 撞 252M，7194 到 378M 才过）。
-    没记录的从 4G 起、有真实峰值记录而最近一次没撞上限的不兜，这两条照旧。弄坏开关 cap-hit-rerun-unfloored 下新提交的不兜到 4G。
+    撞了上限照「重试」乘 1.5 重排，重排那一次照乘出来的上限，不兜到 4G；撞过上限的命令再交一遍，撞过的那一次的上限进记录窗口，头一次照它 × 1.5 起（下面「按近几次最高起跑」）。
+    钉值照旧。弄坏开关 recorded-cap-floored 下照改前把钉值之外低于 MEMORY_FLOOR_BYTES（4G）的上限与记账抬到 4G（有记录的头一次、重排、撞过上限再交、改工作区的首趟都兜；
+    task_server.py 的 memory_floor_applied、workspace_writer_headroom）。
+  改主工作区的命令首趟给足（records/2026-10-31-task-server巡检.md 批 77；任务 8367：hook-swap.py 带 --verify 照同键窗口 × 1.5 只给 857M，撞了、打回、不重排，换上做了一半）：
+    task_server.py 的 modifies_workspace 认的命令不是重排的那一次，上限与记账不低于 (这把键近 RECORD_WINDOW 次最高 + 它换上之后要起的验证命令
+    那把键近 RECORD_WINDOW 次最高) × 1.5（不设 4G 底），比上面几段定出的大才换（prediction 记 WORKSPACE_WRITER_HISTORY；task_server.py 的 workspace_writer_headroom、verify_command_keys）。
+    撞了上限照旧不重排（重排会把写了一半的再写一遍）。弄坏开关 workspace-writer-headroom-skipped 下照改前只看同键窗口。
   编译族（records/2026-10-31-task-server巡检.md 批 60：会编的 cargo 同键没记录只从 4G 起、一撞再撞）：提交时给每条记一段编译族 build_family（task_server.py 的 build_family_of）：
     会编的 cargo（compiles）取它起的每一条会编的 cargo 的包（-p / --package，去重排序）、档（--release 与 --profile release 同一档，没写是 dev）、特性
     （--features / -F 去重排序，--all-features、--no-default-features）与 --target（cargo_build_family；子命令、测试目标名、测试名筛选、`--` 之后的 libtest 参数不进，
     一个包都没点名的记 cargo 起的那个目录相对它所在工作树的根）；命令位置上起的入口脚本文件头前 DECLARED_HEADER_LINES 行里写了
     「# task-server-cargo-family: <cargo 参数>…」（DECLARED_BUILD_FAMILY_MARK）的照写的参数算（declared_build_family；单独 --selftest、带 --list-items / --help / -h 的不算），
     例：入口文件头写「# task-server-cargo-family: -p singlefs-verification --release --features gpu」，与直接起的 cargo test --release -p singlefs-verification --features gpu 同一族。
-    声明由管那份入口的会话加，服务只读。每次尝试记下任务的 build_family；同键一次跑完的都没有的，照同族最近 RECORD_WINDOW 次跑成而量到峰值的尝试取最大 × 1.5 起步
-    （比照原来定的上限大才换；prediction 记 BUILD_FAMILY_HISTORY），有自己记录的照自己的（task_server.py 的 build_family_peak）。分片的计划那一步与各片继承父任务的族；合并与估算那一步不继承（推的：它们读计划与各片的产物、列项，多半不编，继承了会照编译族的大峰值多记账）。
-    弄坏开关 build-family-ignored 下不记、不看族。
+    编哪个包由命令参数定的入口，声明里写取自参数的词（filled_family_words）：「$<n>」是脚本后面的第 n 个词（从 1 数，照原样数，选项与它的值各占一个），
+    「$<选项名>」（$ 后面接以 - 起头的名字）是那个选项的值（认「选项 值」「选项=值」，`--` 之后的不认），提交时照这一条命令填上再算族；
+    有一个填不上（没有那个词、值是空的或以 - 起头）的这条命令不归族，照没记录的 4G 起。例：scripts/mutation/prove-red.sh --copy <副本> <crate> <变异名…> 写「-p $3」，
+    变异名每条都不同（同键从来没有记录，任务 7896 第 1、2 次 4096M、6144M 都撞了上限），按 <crate> 归进同一族、从同族近几次的编译段峰值起步。弄坏开关 family-arguments-unfilled 下不填、照字面算。
+    声明由管那份入口的会话加，服务只读。每次尝试记下任务的 build_family；同键一次跑完的都没有的，与撞上限之后的每次重排，都照同族（别的命令键的也算）已结束的尝试里，
+    跑成的与撞了上限的那几次的编译段峰值（尝试的 build_phase_peak），按结束时刻从新到旧取最近 RECORD_WINDOW 个、取最大 × 1.5 起步（与「按近几次最高起跑」、兄弟片同一个窗口，
+    同一个取窗口的函数 window_maximum；比照原来定的上限大才换；prediction 记 BUILD_FAMILY_HISTORY），有自己记录的照自己的（task_server.py 的 build_family_peak）。
+    编译段峰值：日志里 cargo 打出「Finished … target(s) in …」那一行（CARGO_FINISHED_PATTERN，取头一行）之前按轮采到的进程内存（anon 加 shmem，下面「峰值的口径」）的最大；
+    本机由 attempt_runner.py 采（它文件头 ③，写进 result.json 的 build_phase_peak），第二台由 multi-host-run.sh 照它每一轮的读数采（它文件头 ⑤「编译段峰值」，
+    打一行 PEER_BUILD_PHASE_PEAK_MARK），两台同一种量；见到那一行的那一轮不算。日志里没有那一行（编不过、不是 cargo）或那一行之前一轮都没采到的这一栏记 null、不借。
+    整趟的峰值（memory_peak）与撞了上限那一次的上限只给同一命令键自己（定额度、按近几次最高、兄弟片）：族里各条命令编的是同一份，跑测试那一段要的内存各不相同，
+    借整趟的会把一条单测目标按族里跑得最大的那一条记账。弄坏开关 family-lends-run-peak 下族里照借整趟的峰值与撞了上限那一次的上限。
+    能升能降：之后几次都编得小，大的那一次出了窗口就回落。分片的计划那一步与各片继承父任务的族；合并与估算那一步不继承（推的：它们读计划与各片的产物、列项，多半不编，
+    继承了会照编译族的大峰值多记账）。弄坏开关 build-family-ignored 下不记、不看族，family-cap-hit-not-counted 下族里只收跑成的那几次的编译段峰值。
   同一计划共用峰值（同一批：同一计划的各片各一个键、各自从 4G 爬）：分片的一片不是重排的那一次时，同一父任务名下计划那一步与别的片已结束的尝试里，跑成的峰值、
     撞了上限的那一次的上限，按结束时刻取最近 RECORD_WINDOW（5）个、取最大 × 1.5（能升能降：之后五片都小，早先撞过的那一档出了窗口就回落），比这一片照上面定的上限大才换（只往上抬，不压到没记录的 4G 以下；prediction 记 SHARD_FAMILY_HISTORY；task_server.py 的 shard_family_peak）。
     弄坏开关 shard-siblings-unshared 下各片照自己的键。
@@ -221,7 +322,7 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
     同一条 mutation-tables 命令任务 7349 从 4096M 爬到 20736M、7416 与它同时在跑又从 4096M 爬一遍，各撞四五次）：上面几段定出上限、兜过下限之后，
     新提交的头一次与撞上限之后的每次重排都再看这把键服务自己记着的近 RECORD_WINDOW 次里最高的一次（撞过的上限、跑成的峰值，按结束时刻从新到旧取，
     与定额度同一个窗口），× 1.5 比定出的上限大就换上（prediction 记 KEY_HISTORY_PEAK_HISTORY；task_server.py 的 key_recent_peak、history_raised_prediction）；
-    重排的那一次另照编译族与同一计划的兄弟片往上抬（撞了上限说明自己的记录不够用；兄弟片同样只取近 RECORD_WINDOW 个）。起之前复核现算一次（同键别的任务这期间撞到的更高一档也看得到）。
+    重排的那一次另照编译族与同一计划的兄弟片往上抬（撞了上限说明自己的记录不够用；编译族与兄弟片同样只取近 RECORD_WINDOW 个，兄弟片也收撞过的上限，编译族只收编译段峰值）。起之前复核现算一次（同键别的任务这期间撞到的更高一档也看得到）。
     能升能降（用户：「资源的使用记录 服务要有升降的能力 不能只升不降」）：窗口里刚撞上去的那一档新提交与重排都看得到；更早的出了窗口就不再算，后面几次都跑得小，起点跟着降。
     没任何记录的照旧 4G，有真实峰值记录的不兜那一条照旧。弄坏开关 history-peak-ignored 下不看（头一次只照定额度那一段、重排只照自己那一次 × 1.5 一级级乘），
     history-peak-unwindowed 下照改前不截近几次、全部记录里取最大（一次大峰值永远压着后面，只升不降）。
@@ -247,7 +348,9 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
       （item_rates 里没有这一项、要现判而没有现判速率、要复用而没有复用速率、item_plan 是 null 或里面没有这一项）整条交 None、不插空
       （弄坏开关 item-rate-missing-skipped 下缺速率的那一项当 0 秒照加、item_plan 是 null 的照旧 None，item-estimate-by-command 下照改前按命令那一种算）。
     别的（没点 --item 的、不是那五条入口的、估算子任务自己、分片的计划与合并两步和各片）：服务自己库里同一命令键（与内存记录同一把键：路径、条目照词折过，
-      --check 的格名照留进键）、最近一次跑成（RECORD_COMPLETED_OUTCOMES）的尝试的用时（取结束时刻最晚的一次）；没有交 None。任务 7585 与 7447 只差补丁目录：
+      --check 的格名照留进键）、最近一次命令自己跑到退出的尝试的用时（取结束时刻最晚的一次）；没有交 None。命令自己跑到退出：结局是 ESTIMATE_COMPLETED_OUTCOMES
+      （succeeded、command-failed）之一，被信号杀的 command-failed（退 128 + 信号号，task_server.py 的 SIGNAL_EXIT_CODES）不算；撞上限、超时、卡住被停、被挤掉、取消、
+      跑满两小时这些服务判出或打断的结局不在里面（任务 9730 跑约 1807 秒退 1，同一条再交只照退 0 的那一次报 80 秒）。弄坏开关 estimate-only-succeeded 下只认 succeeded。任务 7585 与 7447 只差补丁目录：
       内存照同键记录预测了 30.9 GiB，预计用时照逐词相同取不到，没有预计用时就不插空、封组挡住后面（弄坏开关 estimate-by-exact-command 下照改前只认命令逐词相同的）。
       分片的计划、各片与合并（SHARD_ROLES）也走这一种：每一步是一个子任务，命令就是父任务的命令，命令键各是这件的键接那一步一段（shard_child_key），
       所以取的是这一步自己最近一次跑成的用时：计划一份、合并一份、各片按片号和片数各一份（片号不同的不混）。各片本来可以照片里的项按上面那一种相加，
@@ -255,9 +358,18 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
       弄坏开关 shard-plan-merge-unestimated 下计划与合并没有预计用时，shard-pieces-unestimated 下各片没有（改前分片那三步一律没有）。
   退出时的内存峰值（任务 5012：跑 1 秒左右的片本机记 null，第二台的计划、合并与一片也是 null；按轮采在 scope 收尾之前一次都没采到）：每一次尝试另经环境给内存包装
     RUN_WITH_MEMORY_CAP_PEAK_OUTPUT（PEAK_OUTPUT_VARIABLE）= <尝试目录>/EXIT_PEAK_FILE_NAME，包装在命令退出之后、scope 收尾之前读一次 scope 的 memory.peak 写进去；
-    本机 attempt_runner.py 照说明里的 exit_peak_file 读，与按轮采到的取大的记进 memory_peak；两样都读不到仍是 null。弄坏开关 peak-read-only-by-sampling 下不给、不读（改前只靠按轮采）。
+    本机 attempt_runner.py 照说明里的 exit_peak_file 读，按轮一次都没采到才记进 memory_peak；两样都没有仍是 null。弄坏开关 peak-read-only-by-sampling 下不给、不读（改前只靠按轮采）。
+  峰值的口径（两台同一种量）：按轮采的是进程用的内存——内存包装那一层 scope 的 memory.stat 的 anon 加 shmem（scripts/hosts/memory_peaks_lib.py 的 process_memory_bytes），
+    留见过的最大；页缓存与内核挂在 scope 上的不算（任务 8853 编验证包：anon 921M、file 22163M，memory.peak 顶到上限 50176M，照 memory.peak 记，编译族照它 × 1.5 起步就记满一台）。
+    本机在 attempt_runner.py 的采样里读（它文件头 ③），第二台在 multi-host-run.sh 每轮那一次 ssh 里读（它文件头 ⑤「峰值」）。退出时那一份是 scope 的 memory.peak（进程退了之后
+    读不到进程内存），只给比一轮还短、按轮一次都没采到的命令兜底。弄坏开关 memory-peak-with-page-cache 下本机照改前按轮读 memory.peak、与退出时那一份取大的。
+  峰值口径一栏（records/2026-10-31-task-server巡检.md 批 93：批 92 之前记的 memory_peak 含页缓存，编译族起步被抬到 45–50G）：服务记下结局的每一次尝试另写一栏
+    peak_metric = PROCESS_MEMORY_PEAK_METRIC（「进程内存」，上面那一种口径；编译段峰值 build_phase_peak 同一种口径）。定额度（recorded_measurements、key_recent_peak）、编译族与兄弟片（attempt_measurement）、
+    判红那一次峰值的下界（failed_peak_floor）与 fills-any-cap（task_server.py 文件头 ①「要处置的提醒」）只读这一栏是它的行（task_server.py 的 current_metric）；
+    没有这一栏的旧行不读、不改、不补（不迁移）。弄坏开关 old-metric-peaks-read 下照改前连旧行一起读。
   第二台的内存峰值（问题 86）：第二台那一层的 cgroup 本机量不到，multi-host-run.sh 在第二台那条命令结束时打一行「MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<十进制字节数>」
-  （按轮采到的与第二台那一层包装退出时读的取大的，都读不到不打；那份文件头 ⑤「峰值」），服务把它记进那一次尝试的 memory_peak，同本机一样进定额度；不打的照旧记「没量到」（null）。
+  （按轮采到的进程内存的最大，按轮一次都没采到才照第二台那一层包装退出时读的，都没有不打；那份文件头 ⑤「峰值」），服务把它记进那一次尝试的 memory_peak，同本机一样进定额度；
+  不打的照旧记「没量到」（null）。
   编译目录占盘（问题 76）：本机 attempt_runner.py 量服务给的编译目录（CARGO_TARGET_DIR 所在）的占盘峰值，第二台照 multi-host-run.sh 打的
   「MULTI_HOST_RUN_PEER_BUILD_PEAK bytes=<十进制字节数>」，记进尝试的 build_peak；预测同内存的键与取法（最近 RECORD_WINDOW 次跑成的最大值），派活时那一台盘余量
   要放得下预测加 task_server.py 的 BUILD_DISK_FLOOR_BYTES（task_server.py 文件头 ②「编译目录占盘」）。
@@ -290,9 +402,10 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
   派不过去的三种提交时就拒（task_server.py 文件头 ②「提交时拒」）：工作目录与命令里有不在 NFS_SHARED_ROOTS 某一段下的绝对路径（/tmp 下的同样算）、
     交给命令的两个共享根不在共享根下、带判定库而登记表 .claude/gate.d/verdict-library-scripts.tsv 第三列还没写 prune-server（或判不了带不带）。
     第二台在同一棵共享的树里、同一个绝对路径上跑（用户 2026-11-01「要是你倾向于把仓本身也做成 NFS 共享、第二台直接在活树上跑。 我认为这么做比较好。」）：
-    路径的读法（task_server.py 的 find_outside_shared_path）与 scripts/hosts/multi-host-run.sh ③ 相同，那边同样拒（退 255）——整个词是绝对路径的、「名字=绝对路径」的值、
-    bash -c 这类整条写在一个词里的（词里有空白）里每一段绝对路径（QUOTED_WORD_PATH）；两台相同的系统路径（HOST_INDEPENDENT_PATHS：/dev/null、/dev/std*、/dev/fd/、/usr/、/bin/）
-    不判；命令里的相对路径照工作目录解。不拷树、不送、不取回、不改写路径；写出的文件就在共享的树与共享根下，两台都读得到。
+    路径的读法（task_server.py 的 find_outside_shared_path）只认整个 shell 词：以 / 起头的整个词、「名字=绝对路径」「--选项=绝对路径」的值、shell -c 脚本词照 shell 词切开之后
+    以 / 起头的每一个（shell_word_paths）；别的词中间夹着的 /（参数值里的「（接的是 /）」）不算。scripts/hosts/multi-host-run.sh ③ 照它自己的读法同样拒（退 255）。
+    两台相同的系统路径（HOST_INDEPENDENT_PATHS：/dev/null、/dev/std*、/dev/fd/、/usr/、/bin/）不判；命令里的相对路径照工作目录解。
+    不拷树、不送、不取回、不改写路径；写出的文件就在共享的树与共享根下，两台都读得到。
     编译目录在第二台本地盘上：multi-host-run.sh 在多机配置 BUILD_ROOT_BY_HOST 里第二台那一项下的 builds/<标签>/ 这一趟新建、跑完删（服务不设，task clean 不管它）。
   没有只派一台的名单（用户：「我再重申一次 【只能在本机跑】 是不能接受的。必须尽快解决 让错误暴露错来」）：点到哪个目录、哪个入口的命令都派得到两台，哪台由余量定；
     派到第二台跑红的照红，由脚本那一侧修，服务不替它挡（弄坏开关 host-lists-restored 下照改前放回 task_server.py 的 RESTORED_HOST_LISTS）。派哪台只看第二台此刻用不用得了（连得上、挂着共享根、
@@ -300,7 +413,7 @@ NFS 共享（用户：「所有的脚本必须多机跑。抛出的结果需要�
     不带 --skip-apply 的 merge-and-verify）与带 --write 的派得到第二台（改的就是同一棵树）；它们撞上限这类本会重排的结局照旧不重排（task_server.py 的 modifies_workspace）。
     不认合入锁（task_server.py 文件头 ②）：主工作树正在合入时照常派。
   第二台用不了要告警（task_server.py 的 note_peer）：连不上、余量查不成、多机配置判不过、挂载复核没过、盘余量不到下限（下一段）、那一趟没跑成（peer-run-failed），
-  写告警 peer-unavailable，/health 的 peer 一栏写明原因，control watch 报出来；哪一台此刻用不了，排队原因带上那一句。
+  写告警 peer-unavailable，/health 的 peer 一栏写明原因，用不了满一段时间服务发「服务健康」给会话（task_server.py 文件头 ⑥）；哪一台此刻用不了，排队原因带上那一句。
   盘余量（records/2026-10-31-task-server巡检.md 问题 72：第二台根分区剩 353M 时任务 peer-run-failed；两台同一个下限）：服务读每台余量的那一次
     （task_server.py 的 Resources.snapshot，同一个缓存周期）另判那台编译目录所在盘（本机是 TASK_SERVER_BUILD_DIRECTORY 所在盘，第二台是 BUILD_ROOT_BY_HOST 里它那一项）的余量：
     报告里有 disk_available（字节，task_server.py 的 DISK_REPORT_KEY）照它，没有就照那一台的接口现量（本机读盘，第二台经同一条连法起 df -B1 --output=avail -- <编译根>）；
@@ -339,6 +452,11 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   （用户：「服务build之后必须删除历史」；task_server.py 的 remove_finished_build_directories，服务起来时 sweep_finished_build_directories 把已有结局还留着的再扫一遍），
   wait 末行不带 build=。提交时设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 的留着现场：wait 末行带 build=<编译目录>，由提交它的会话用 task-server/task clean <号> 删。
   弄坏开关 finished-build-kept 下照改前一律留着等 task clean（起来时也不扫）。
+  取消的不留产物（用户：「取消的任务要自己删掉产物 不要残留」「这个加入流程中 让task server去做」）：task cancel 回读到单元停了，服务在同一次取消里删这条任务
+  （分片与估算的连同子任务）每一次尝试的编译目录与现场目录（下面「现场」），提交时设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 的也删，不再等 task clean；派到第二台的，这一趟第二台本地的 builds/<标签>/ 与 runs/ 下进程号、退出码、输出三个文件由 multi-host-run.sh 的 ⑥ 删，
+  服务照那一次尝试日志里它打的「⑥ 删了第二台这一趟的本地目录 …（回读不在了）」认（task_server.py 的 PEER_TRIP_REMOVED_MARK），上一次带 --keep-build-directory 留着的经 --remove-build-directory 删。
+  删前删后的大小（第二台本地盘上的那一份服务这一侧量不到，照写量不到）写进每条任务最后一次尝试的日志与取消的回复；回读不在了才算删了，没删成的逐份点名、task cancel 退 5
+  （task_server.py 的 remove_cancelled_artifacts）。弄坏开关 cancelled-artifacts-kept 下取消之后不删、不报。
   重试复用（records/2026-10-31-task-server巡检.md 批 60：撞了上限重排时从零重编）：重排时服务在本机建的那一份不删，下一次尝试起在同一台就接着用那一份
   （CARGO_TARGET_DIR 指同一个目录；推的：cargo 照指纹复用已编完的 crate，省多少没量过；尝试记 build_directory_reused），换到第二台的在那一次起的时候删
   （删法 scripts/hosts/run_build_directory.py 的 remove_run_build_directory：删之前核没有进程开着里面的文件，有就不删、写告警 build-directory-left；task_server.py 的 kept_build_directory）。
@@ -359,6 +477,7 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   派第二台的由 multi-host-run.sh 原样设给第二台那一层包装（那份文件头 ⑤「现场目录」）。尝试记录的 scene_directory 记这个路径（status 的 JSON 看得见）。
   什么时候删：提交它的会话 task wait 取走结局（collected_at）之后过 SCENE_KEEP_AFTER_COLLECT_SECONDS（task_server.py，1 小时）由排队线程每一轮扫一遍删
   （sweep_scenes；分片的子任务照父任务取走的时刻）；task clean <号> 当场删。设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 的只由 task clean 删。
+  取消的不等：task cancel 回读到单元停了就在同一次取消里删（上面「编译目录」的取消的不留产物）。
   这一个库的标签之外的目录不动；任务已不在库里的（clear-queue 清过）当场删。
   取走之后再留一段、不在「有结局」那一刻删的理由：结局一出来提交方还没读日志，现场就没了等于白留；wait 取走之后提交方才读日志、照日志里那一句去读现场，
   留一小时够读完。没人 wait 的任务（列在 GET /sessions/self 的「完成了没人取」里）一直留到 task clean。
@@ -433,7 +552,7 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   （弄坏开关 no-detach）、自证本身套在真内存包装的 scope 里跑时（经 task-server 提交），尝试读到的都不是自证自己那一层的 scope，判定不随起法变。
   尝试单元照旧经真的 systemd-run --user 起（单元名带这一份库的随机标签），跑的只有 bash 与 python 小脚本；等放行文件的那几条至多等 60 秒自己退出。
   不起编译、不起重活、不连第二台、不上卡。收尾停掉这一格的服务（自己起的进程号）与它起过、还在跑的单元（按库里记的单元名逐个停），删临时目录。
-  各格并行，并行度取每台默认重活线程数（scripts/hosts/heavy_threads.py），每格的输出与退出码各写自己的文件，按格名次序回读、数份数。
+  各格并行，并行度取每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads 现读），取不出登记值（登记文件不在、写坏，SINGLEFS_THREAD_CAP 不是正整数）整份判红、不退回按核数，每格的输出与退出码各写自己的文件，按格名次序回读、数份数。
   只跑几格：TASK_SERVER_SELFTEST_CELLS=<格名,…>（单跑一格与它在全部格里跑判定相同；门禁与提交前跑的都不设）。
 
 只在自证里认的变量（TASK_SERVER_SELFTEST_MARK 指到自证建的标记文件、内容是 task-server-selftest 才认；别处设了，服务、客户端与 control 一律拒、退 2、什么都不做）：
@@ -453,10 +572,21 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   指到格里的假共享根）；TASK_SERVER_SELFTEST_PAUSE_POINT=<start-checked|claimed|cancel-unlocked>:<目录> 目录里 arm-<点> 在时服务在那一点建 reached-<点>、等 release-<点>
   （start-checked 是判过 queued、记尝试之前，claimed 是记了尝试、起单元之前，cancel-unlocked 是取消记了 cancel_requested、放了锁、停单元之前；task_server.py 的 selftest_pause）；TASK_SERVER_SELFTEST_STOP_FAILS=<文件> 那份文件在时
   下一次停单元不发 systemctl stop、删掉它（演停失败一次）；TASK_SERVER_SELFTEST_START_TIMEOUT_SECONDS 起单元的时限；TASK_SERVER_PRUNE_SERVER_CHECK 命令退 75 时
-  当 prune-server/control check 起的那一份可执行文件。TASK_SERVER_SELFTEST_MEMORY_FLOOR_BYTES 每条任务上限的下限（字节；各格的小世界写 0，重排的小上限照原样看得见，
-  memory-floor-applied 与 recorded-cap-not-floored 两格写空串、照真的 MEMORY_FLOOR_BYTES）。TASK_SERVER_SELFTEST_LONG_RUN_SECONDS「跑得久」的界（秒，换掉 LONG_RUN_SECONDS；上面「续跑」）。
+  当 prune-server/control check 起的那一份可执行文件。TASK_SERVER_SELFTEST_MEMORY_FLOOR_BYTES 弄坏开关 recorded-cap-floored 下兜到的那个下限（字节；各格的小世界写 0，
+  开关只红点名的几格；retry-cap-not-floored、recorded-cap-not-floored、cap-hit-rerun-from-record 三格写空串、照真的 MEMORY_FLOOR_BYTES）。TASK_SERVER_SELFTEST_LONG_RUN_SECONDS「跑得久」的界（秒，换掉 LONG_RUN_SECONDS；上面「续跑」）。
+  TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS 跑满两小时打回的界（秒，换掉 task_server.py 的 RUN_LIMIT_SECONDS；上面「错误类型」over-two-hours：自证不真等两小时）；
+  TASK_SERVER_SELFTEST_NFS_SSH_SECONDS 连第二台那一次 ssh 的时限（秒，换掉 NFS_SSH_SECONDS）、TASK_SERVER_SELFTEST_NFS_RECHECK_PAUSE_SECONDS 超时之后隔多久复查（秒，换掉 NFS_RECHECK_PAUSE_SECONDS；上面「NFS 共享」）。
   TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS 排队过久的头一档（秒，换掉 QUEUE_ATTENTION_MINUTES × 60）；TASK_SERVER_SELFTEST_OVERRUN_ATTENTION_FACTOR 超过记录用时的头一档（倍，
-  换掉 OVERRUN_ATTENTION_FACTOR）；TASK_SERVER_SELFTEST_ADVANCE_FAILS=<文件> 那份文件在时每一轮推分片父任务都抛一个错（演分片父任务推不动；task_server.py 的 selftest_advance_fault）。
+  换掉 OVERRUN_ATTENTION_FACTOR）；TASK_SERVER_SELFTEST_QUIET_ATTENTION_SECONDS 日志长期不涨的头一档（秒，换掉 QUIET_ATTENTION_MINUTES × 60）；
+  TASK_SERVER_SELFTEST_IO_WAIT_ATTENTION_SECONDS 卡在 IO 上的头一档（秒，换掉 IO_WAIT_ATTENTION_MINUTES × 60）；
+  TASK_SERVER_SELFTEST_GPU_BUSY_QUIET_ATTENTION_SECONDS 卡上有它的计算进程而日志与 CPU 都不涨的头一档（秒，换掉 GPU_BUSY_QUIET_ATTENTION_MINUTES × 60）；TASK_SERVER_SELFTEST_PROC_ROOT 本机读进程状态与父进程号的目录
+  换成它（当 /proc 读；task_server.py 的 scope_blocked_processes：假 scope 的 cgroup.procs 里点名的进程号在它下面有一份假的 stat，演 D 状态）；TASK_SERVER_SELFTEST_ADVANCE_FAILS=<文件> 那份文件在时每一轮推分片父任务都抛一个错（演分片父任务推不动；task_server.py 的 selftest_advance_fault）。
+  TASK_SERVER_SELFTEST_UNCLAIMED_WARNING_SECONDS 交任务时会话名下结局满这么多秒没人取就打严厉警告、结局没人取再推的头一档（换掉 UNCLAIMED_WARNING_MINUTES × 60）；
+  TASK_SERVER_CONTROL_SYSTEMCTL 另换服务盯自己的单元在不在时起的 systemctl（task_server.py 的 own_unit_state）。
+  TASK_SERVER_SELFTEST_LONG_RUN_ATTENTION_SECONDS 跑得久而核没用起来的界（秒，换掉 task_server.py 的 LONG_RUN_ATTENTION_SECONDS）。
+  TASK_SERVER_SELFTEST_SESSIONS_DIRECTORY 服务按会话号找收件 socket 时读的会话登记目录（换掉 ~/.claude/sessions；task_server.py 文件头 ⑥「收件地址」）；
+  TASK_SERVER_SELFTEST_CONFIRM_TIMEOUT_SECONDS 交了没确认满这么多秒服务取消（换掉 task_server.py 的 CONFIRM_TIMEOUT_SECONDS）；
+  TASK_SERVER_SELFTEST_ANOMALY_REPUSH_SECONDS 不随时长涨的提醒同一档推过之后再推的头一档（秒，换掉 task_server.py 的 ANOMALY_REPUSH_SECONDS）。
   TASK_SERVER_SELFTEST_CRASH_POINT 的点另有 attempt-claimed（起尝试的事务里、插了尝试、改任务之前）与分片推进的
   parent-inserted、child-finished-<plan|shard|merge>、shard-inserted、merge-outputs-written、merge-inserted。
 
@@ -489,6 +619,11 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：cancel-own-session-only：」、「✗ task_server_lib.py 自证：stalled-attempt-stopped：」、「✗ task_server_lib.py 自证：overrun-quiet-log-stopped：」、「✗ task_server_lib.py 自证：peer-stall-judged-by-peer-cpu：」、
       「✗ task_server_lib.py 自证：stalled-at-cap-retried：」、「✗ task_server_lib.py 自证：cancel-sharded-running：」、「✗ task_server_lib.py 自证：item-estimate-cancelled：」、「✗ task_server_lib.py 自证：cancel-start-race：」、
       「✗ task_server_lib.py 自证：sharded-cancel-retried：」、「✗ task_server_lib.py 自证：start-timeout-read-back：」、「✗ task_server_lib.py 自证：parent-cancel-stops-every-shard：」、「✗ task_server_lib.py 自证：cancel-after-natural-end：」
+      「✗ task_server_lib.py 自证：busy-cpu-pinned-at-cap-retried：」、「✗ task_server_lib.py 自证：peer-pinned-at-cap-busy-cpu-retried：」（这两格推的，没复跑：同 stalled-at-cap-retried，停卡住那一条走同一段停法）
+      「✗ task_server_lib.py 自证：io-wait-peer-not-stalled：」（推的，没复跑：同 peer-stall-judged-by-peer-cpu，没有 D 状态与读不到的那两条照停，走同一段停法）
+      「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」（推的，没复跑：同 stalled-attempt-stopped，卡上有几轮没负载的与没分到卡的那两条照停，走同一段停法）
+      「✗ task_server_lib.py 自证：card-zero-utilization-stalled：」（推的，没复跑：利用率是 0 的那一条走同一段停法）
+      「✗ task_server_lib.py 自证：cancelled-before-peer-trip-built：」（单跑这一格复跑过：任务 8993 红在这一格；取消不停单元，回执停在 not-started 的那一条照样没停下来）
   TASK_SERVER_BREAK=queued-cancel-left-queued  取消排着的任务只记要取消、不当场收尾，任务留在队里（task_server.py 的 cancel）
       「✗ task_server_lib.py 自证：cancel-queued：」
       「✗ task_server_lib.py 自证：cancel-start-race：」、「✗ task_server_lib.py 自证：shard-cancel-alone-merges：」
@@ -506,7 +641,7 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：operation-log：」、「✗ task_server_lib.py 自证：pause-reported：」、「✗ task_server_lib.py 自证：pause-allow-switches-session：」
       「✗ task_server_lib.py 自证：clean-failure-explained：」
   TASK_SERVER_BREAK=unlisted-exit-swallowed  classify_attempt 把表外的退出码记成 succeeded
-      「✗ task_server_lib.py 自证：exit-code-passthrough：」、「✗ task_server_lib.py 自证：error-types：」、「✗ task_server_lib.py 自证：three-duties-two-sessions：」、「✗ task_server_lib.py 自证：failed-run-not-estimated：」、
+      「✗ task_server_lib.py 自证：exit-code-passthrough：」、「✗ task_server_lib.py 自证：error-types：」、「✗ task_server_lib.py 自证：three-duties-two-sessions：」、「✗ task_server_lib.py 自证：failed-run-estimated：」、
       「✗ task_server_lib.py 自证：unfinished-peak-ignored：」、「✗ task_server_lib.py 自证：shard-retry-isolated：」、「✗ task_server_lib.py 自证：shard-plan-failed：」、「✗ task_server_lib.py 自证：shard-merge-failed：」、
       「✗ task_server_lib.py 自证：long-run-failure-noted：」、「✗ task_server_lib.py 自证：failed-peak-floor：」、「✗ task_server_lib.py 自证：item-estimate-failure-queues-parent：」、「✗ task_server_lib.py 自证：reason-line-per-type：」、
       「✗ task_server_lib.py 自证：peer-command-exit-split：」、「✗ task_server_lib.py 自证：failure-scene-kept-until-collected：」、「✗ task_server_lib.py 自证：shard-failure-waits-for-running：」、「✗ task_server_lib.py 自证：workspace-write-interrupted-reported：」
@@ -524,6 +659,8 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：memory-cap-growth：」、「✗ task_server_lib.py 自证：memory-cap-at-maximum：」、「✗ task_server_lib.py 自证：unrecorded-cap-growth：」、
       「✗ task_server_lib.py 自证：completed-after-cap-hit：」
       「✗ task_server_lib.py 自证：stalled-at-cap-retried：」、「✗ task_server_lib.py 自证：ended-attempt-settled-after-restart：」、「✗ task_server_lib.py 自证：explicit-wait-not-starved：」
+      （busy-cpu-pinned-at-cap-retried、peer-pinned-at-cap-busy-cpu-retried 这两格不红，量的：重排那一次的上限由 history_raised_prediction 照同一把键近几次最高乘 1.5 抬到同一档，
+      撞上限那一次记的就是 1536M，不靠 retry_decision 乘；别把这两格点进来）
   TASK_SERVER_BREAK=cap-unclamped  retry_decision 乘了 1.5 到或超过那台的总上限也照重排、不打回
       「✗ task_server_lib.py 自证：memory-cap-at-maximum：」
       「✗ task_server_lib.py 自证：squeezed-at-total-is-cap-hit：」、「✗ task_server_lib.py 自证：cap-hit-starts-above：」、「✗ task_server_lib.py 自证：pinned-peer-unavailable：」
@@ -531,12 +668,13 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：memory-cap-at-maximum：」
       「✗ task_server_lib.py 自证：pinned-peer-unavailable：」
   TASK_SERVER_BREAK=retry-overwrites-attempts  重试那一次起的时候把这个任务前面几次尝试的记录删掉，只留这一次（覆盖前一次；重试次数另记在 outcome_counts，不受它影响）
-      「✗ task_server_lib.py 自证：attention-card-replaced：」、「✗ task_server_lib.py 自证：attention-card-replaced-after-finish：」、「✗ task_server_lib.py 自证：error-types：」、「✗ task_server_lib.py 自证：memory-cap-growth：」、
+      「✗ task_server_lib.py 自证：build-family-cap-hit-raises：」、「✗ task_server_lib.py 自证：attention-card-replaced：」、「✗ task_server_lib.py 自证：attention-card-replaced-after-finish：」、「✗ task_server_lib.py 自证：error-types：」、「✗ task_server_lib.py 自证：memory-cap-growth：」、
       「✗ task_server_lib.py 自证：memory-cap-at-maximum：」、「✗ task_server_lib.py 自证：unrecorded-cap-growth：」、「✗ task_server_lib.py 自证：retry-kinds：」、「✗ task_server_lib.py 自证：retry-keeps-earlier-attempts：」、
       「✗ task_server_lib.py 自证：retry-build-directory-reused：」、「✗ task_server_lib.py 自证：retry-goes-where-it-fits：」、「✗ task_server_lib.py 自证：stalled-at-cap-retried：」、「✗ task_server_lib.py 自证：peer-run-failed-retried：」、
       「✗ task_server_lib.py 自证：completed-after-cap-hit：」、「✗ task_server_lib.py 自证：task-log：」、「✗ task_server_lib.py 自证：ended-attempt-settled-after-restart：」、「✗ task_server_lib.py 自证：card-fault-replaced-on-another-card：」、
-      「✗ task_server_lib.py 自证：card-fault-quarantines-named-card：」、「✗ task_server_lib.py 自证：workspace-writer-not-retried：」、「✗ task_server_lib.py 自证：memory-floor-applied：」、「✗ task_server_lib.py 自证：peer-command-exit-split：」、
+      「✗ task_server_lib.py 自证：card-fault-quarantines-named-card：」、「✗ task_server_lib.py 自证：workspace-writer-not-retried：」、「✗ task_server_lib.py 自证：retry-cap-not-floored：」、「✗ task_server_lib.py 自证：peer-command-exit-split：」、
       「✗ task_server_lib.py 自证：shard-siblings-share-peaks：」
+      「✗ task_server_lib.py 自证：busy-cpu-pinned-at-cap-retried：」、「✗ task_server_lib.py 自证：peer-pinned-at-cap-busy-cpu-retried：」（这两格推的，没复跑：前一次尝试的记录被删）
   TASK_SERVER_BREAK=squeeze-retry-skipped  retry_decision 被总上限挤掉（254）不重排
       「✗ task_server_lib.py 自证：retry-kinds：」、「✗ task_server_lib.py 自证：retry-keeps-earlier-attempts：」、「✗ task_server_lib.py 自证：task-log：」、「✗ task_server_lib.py 自证：pause-lets-running-finish：」、「✗ task_server_lib.py 自证：pause-allows-one-session：」
   TASK_SERVER_BREAK=gpu-short-retry-skipped  retry_decision 显存不够（245）不再试
@@ -563,9 +701,10 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、
       「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、「✗ task_server_lib.py 自证：explicit-wait-not-starved：」、「✗ task_server_lib.py 自证：failed-start-not-counted：」
   TASK_SERVER_BREAK=backfill-disabled  排头放不下时后面放得下的也不起（退回严格排队；task_server.py 的 place_queued）
-      「✗ task_server_lib.py 自证：backfill-when-head-blocked：」、「✗ task_server_lib.py 自证：simulated-two-host-workload：」、「✗ task_server_lib.py 自证：three-duties-two-sessions：」、「✗ task_server_lib.py 自证：whole-and-fragment-alternate：」、
+      「✗ task_server_lib.py 自证：card-whole-seals-while-card-busy：」、「✗ task_server_lib.py 自证：backfill-when-head-blocked：」、「✗ task_server_lib.py 自证：simulated-two-host-workload：」、「✗ task_server_lib.py 自证：three-duties-two-sessions：」、「✗ task_server_lib.py 自证：whole-and-fragment-alternate：」、
       「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：aged-tasks-do-not-hold-fitting-tasks：」、「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、
       「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」
+      「✗ task_server_lib.py 自证：aged-whole-keeps-group-sealed：」（红是量的；原因读代码推的：整片放不下时 behind 把其后碎片的排队原因改写成「排在任务 N 后面」，不写封组）
   TASK_SERVER_BREAK=inner-commands-unchecked  bash / sh -c 引号里的命令不照提交规则判（task_server.py 的 nested_problem）
       「✗ task_server_lib.py 自证：nested-dispatch-refused：」
       「✗ task_server_lib.py 自证：retired-variables-refused：」
@@ -580,6 +719,8 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=cpu-ignored-for-stall  日志满 STALL_SECONDS 没涨就停，不看 CPU 在不在涨（task_server.py 的 check_stall）
       「✗ task_server_lib.py 自证：computing-quietly-not-stalled：」
       「✗ task_server_lib.py 自证：peer-stall-judged-by-peer-cpu：」
+      「✗ task_server_lib.py 自证：busy-cpu-below-cap-keeps-running：」、「✗ task_server_lib.py 自证：attention-quiet-busy-log：」（这两格推的，没复跑：CPU 在涨也照停，wait 等到的是结局不是提醒）
+      「✗ task_server_lib.py 自证：card-idle-cpu-computing-not-stalled：」（新格，推的，没复跑）
   TASK_SERVER_BREAK=prove-red-gpu-unread  prove-red.sh 不读它点名的变异行，带 gpu 特性的也认成不要卡（task_server.py 的 prove_red_uses_gpu）
       「✗ task_server_lib.py 自证：gpu-entry-scripts-recognized：」
   TASK_SERVER_BREAK=queued-not-revalidated  服务起来时不再核还在排的任务（task_server.py 的 revalidate_queued）
@@ -602,6 +743,13 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=stall-ignored  日志满 STALL_SECONDS 没涨也不停（task_server.py 的 check_stall）
       「✗ task_server_lib.py 自证：stalled-attempt-stopped：」、「✗ task_server_lib.py 自证：overrun-quiet-log-stopped：」、「✗ task_server_lib.py 自证：peer-stall-judged-by-peer-cpu：」、「✗ task_server_lib.py 自证：stalled-at-cap-retried：」、
       「✗ task_server_lib.py 自证：stall-clock-from-log-mtime：」
+      「✗ task_server_lib.py 自证：busy-cpu-pinned-at-cap-retried：」、「✗ task_server_lib.py 自证：peer-pinned-at-cap-busy-cpu-retried：」、「✗ task_server_lib.py 自证：attention-quiet-busy-log：」（这三格推的，没复跑：不停就一直跑到命令自己退；
+      日志多久没涨照判卡住记的那一份，开关下不记，提醒也报不出）
+      「✗ task_server_lib.py 自证：io-wait-local-not-stalled：」、「✗ task_server_lib.py 自证：io-wait-peer-not-stalled：」（这两格推的，没复跑：D 状态只在判卡住那一段里读，
+      开关下不读、io-wait 提醒报不出；没有 D 状态与读不到的那两条不停）
+      「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」（推的，没复跑：卡上的负载只在判卡住那一段里记，开关下不记、gpu-busy-quiet 报不出；卡上有几轮没负载的与没分到卡的那两条不停）
+      「✗ task_server_lib.py 自证：card-zero-utilization-stalled：」（推的，没复跑：利用率是 0 的那一条不停、等满安静时限）
+      「✗ task_server_lib.py 自证：card-idle-polling-stalled：」（新格，推的，没复跑）
   TASK_SERVER_BREAK=running-progress-unreported  在跑的那一次不报已跑多久、日志多久没涨、在用核数（task_server.py 的 summary）
       「✗ task_server_lib.py 自证：running-status-shows-progress：」、「✗ task_server_lib.py 自证：stall-clock-from-log-mtime：」、「✗ task_server_lib.py 自证：suspected-stall-notified：」
   TASK_SERVER_BREAK=wrapper-prefixes-allowed  命令里套 nice、timeout、capped.sh、two-logs.sh、gpu-quiesce-run.sh 照收（task_server_lib.py 的 nested_dispatch）
@@ -609,8 +757,8 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=resource-arguments-allowed  命令里写 --memory、--threads、--peer 这类参数照收（task_server_lib.py 的 nested_dispatch）
       「✗ task_server_lib.py 自证：queued-revalidated-on-restart：」、「✗ task_server_lib.py 自证：nested-dispatch-refused：」
 
-  TASK_SERVER_BREAK=failed-runs-estimated  命令自己退非 0 的那几次也算进预计用时（task_server.py 的 command_estimate）
-      「✗ task_server_lib.py 自证：failed-run-not-estimated：」
+  TASK_SERVER_BREAK=estimate-only-succeeded  预计用时只认退 0 的那几次，命令自己退非 0 跑到退出的不算（task_server.py 的 command_estimate）
+      「✗ task_server_lib.py 自证：failed-run-estimated：」
   TASK_SERVER_BREAK=waiting-reason-unreported  排着的任务不报在等什么（task_server.py 的 summary 与 session_tasks）
       「✗ task_server_lib.py 自证：pause-allow-waiting-text：」、「✗ task_server_lib.py 自证：pause-reported：」、「✗ task_server_lib.py 自证：launch-rechecked：」、「✗ task_server_lib.py 自证：starved-head-judged-by-the-formula：」、
       「✗ task_server_lib.py 自证：queued-shows-waiting-reason：」、「✗ task_server_lib.py 自证：peer-disk-floor：」、「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：cpu-gate-holds-busy-host：」、
@@ -626,6 +774,8 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：suspected-stall-card-busy-not-reported：」、「✗ task_server_lib.py 自证：python-entry-gpu-recognized：」、「✗ task_server_lib.py 自证：gpu-argument-declaration-recognized：」、「✗ task_server_lib.py 自证：card-fault-replaced-on-another-card：」、
       「✗ task_server_lib.py 自证：card-fault-quarantines-named-card：」、「✗ task_server_lib.py 自证：card-fault-unlisted-quarantines-none：」、「✗ task_server_lib.py 自证：temporary-service-heavy-refused：」、「✗ task_server_lib.py 自证：gpu-binary-declaration-recognized：」、
       「✗ task_server_lib.py 自证：gpu-two-cards-same-host：」、「✗ task_server_lib.py 自证：gpu-three-cards-only-where-enough：」、「✗ task_server_lib.py 自证：gpu-cards-short-never-fits：」
+      「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」（推的，没复跑：不认要卡就不读卡，卡上一直有负载的那一条也照停）
+      「✗ task_server_lib.py 自证：card-zero-utilization-stalled：」（推的，没复跑：不认要卡就不读卡，利用率 37% 的那一条也照停）
   TASK_SERVER_BREAK=cardless-gpu-launched  GPU 任务而多机配置没点名能用的卡时不判 run-condition-unmet，照不要卡的任务起（task_server.py 的 place）
       「✗ task_server_lib.py 自证：gpu-without-cards-unmet：」
       「✗ task_server_lib.py 自证：card-labels-by-address：」
@@ -651,21 +801,27 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=resources-unrecorded  尝试结束时不把用时之外的资源（内存峰值、核数、显存峰值）写进库（task_server.py 的 finish_attempt）
       「✗ task_server_lib.py 自证：resource-record：」、「✗ task_server_lib.py 自证：unmeasured-not-zero：」、「✗ task_server_lib.py 自证：unfinished-peak-ignored：」、「✗ task_server_lib.py 自证：completed-after-cap-hit：」、
       「✗ task_server_lib.py 自证：failed-peak-floor：」、「✗ task_server_lib.py 自证：build-disk-predicted：」、「✗ task_server_lib.py 自证：peer-memory-peak-recorded：」、「✗ task_server_lib.py 自证：temporary-service-wrapper-unwrapped：」、
-      「✗ task_server_lib.py 自证：short-command-peak-recorded：」、「✗ task_server_lib.py 自证：build-family-peak-shared：」、「✗ task_server_lib.py 自证：build-family-declared：」
+      「✗ task_server_lib.py 自证：short-command-peak-recorded：」、「✗ task_server_lib.py 自证：build-family-peak-shared：」、「✗ task_server_lib.py 自证：build-family-declared：」、
+      「✗ task_server_lib.py 自证：build-family-from-arguments：」（后一格推的，没复跑：同族那一条的峰值记不下）
   TASK_SERVER_BREAK=record-ignored-for-cap  定上限不看服务自己的资源记录，只照没记录的打底（task_server.py 的 prediction_of）
-      「✗ task_server_lib.py 自证：attention-queued-too-long：」、「✗ task_server_lib.py 自证：attention-reported-once：」、「✗ task_server_lib.py 自证：cap-hit-rerun-floored：」、「✗ task_server_lib.py 自证：backfill-when-head-blocked：」、
+      「✗ task_server_lib.py 自证：attention-queued-too-long：」、「✗ task_server_lib.py 自证：attention-reported-once：」、「✗ task_server_lib.py 自证：cap-hit-rerun-from-record：」、「✗ task_server_lib.py 自证：backfill-when-head-blocked：」、
       「✗ task_server_lib.py 自证：error-types：」、「✗ task_server_lib.py 自证：memory-cap-growth：」、「✗ task_server_lib.py 自证：memory-cap-at-maximum：」、「✗ task_server_lib.py 自证：resource-record：」、
       「✗ task_server_lib.py 自证：starved-head-judged-by-the-formula：」、「✗ task_server_lib.py 自证：aged-task-judged-first：」、「✗ task_server_lib.py 自证：unmeasured-not-zero：」、「✗ task_server_lib.py 自证：simulated-two-host-workload：」、
       「✗ task_server_lib.py 自证：three-duties-two-sessions：」、「✗ task_server_lib.py 自证：stalled-at-cap-retried：」、「✗ task_server_lib.py 自证：aged-head-at-slice-total-starts：」、「✗ task_server_lib.py 自证：squeezed-at-total-is-cap-hit：」、
       「✗ task_server_lib.py 自证：completed-after-cap-hit：」、「✗ task_server_lib.py 自证：cap-hit-starts-above：」、「✗ task_server_lib.py 自证：shard-cap-fitted-to-room：」、「✗ task_server_lib.py 自证：pinned-peer-unavailable：」、
       「✗ task_server_lib.py 自证：pinned-cap-from-configuration：」、「✗ task_server_lib.py 自证：admission-booked-at-cap：」、「✗ task_server_lib.py 自证：whole-and-fragment-alternate：」、「✗ task_server_lib.py 自证：whole-starts-beside-running-fragment：」、
       「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：aged-tasks-do-not-hold-fitting-tasks：」、「✗ task_server_lib.py 自证：down-host-waits-not-never：」、「✗ task_server_lib.py 自证：failed-peak-floor：」、
-      「✗ task_server_lib.py 自证：memory-floor-applied：」、「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、
+      「✗ task_server_lib.py 自证：retry-cap-not-floored：」、「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、
       「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、「✗ task_server_lib.py 自证：margin-measured-per-host：」、「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、
       「✗ task_server_lib.py 自证：item-estimate-summed-from-rates：」、「✗ task_server_lib.py 自证：item-estimate-failure-queues-parent：」、「✗ task_server_lib.py 自证：estimate-basis-items-sentence：」、「✗ task_server_lib.py 自证：shard-plan-and-merge-estimated-by-command：」、
       「✗ task_server_lib.py 自证：peer-booked-like-local：」、「✗ task_server_lib.py 自证：peer-scope-missing-booked-at-cap：」、「✗ task_server_lib.py 自证：judge-error-skips-only-that-task：」、「✗ task_server_lib.py 自证：explicit-wait-not-starved：」、
       「✗ task_server_lib.py 自证：reason-line-per-type：」、「✗ task_server_lib.py 自证：build-disk-predicted：」、「✗ task_server_lib.py 自证：peer-memory-peak-recorded：」、「✗ task_server_lib.py 自证：temporary-service-wrapper-unwrapped：」、
       「✗ task_server_lib.py 自证：shard-failure-waits-for-running：」、「✗ task_server_lib.py 自证：shard-cancel-alone-merges：」、「✗ task_server_lib.py 自证：parent-cancel-stops-every-shard：」
+      「✗ task_server_lib.py 自证：busy-cpu-pinned-at-cap-retried：」、「✗ task_server_lib.py 自证：busy-cpu-below-cap-keeps-running：」、「✗ task_server_lib.py 自证：aged-whole-keeps-group-sealed：」（这三格量的）、
+      「✗ task_server_lib.py 自证：card-whole-seals-while-card-busy：」（推的，没复跑：同样没看记录，整片只记 4G、不算整片、不封组，六条碎片都起）
+      「✗ task_server_lib.py 自证：workspace-writer-initial-cap-headroom：」、「✗ task_server_lib.py 自证：both-hosts-sealed-small-unestimated-starts：」、
+      「✗ task_server_lib.py 自证：fragment-group-drops-finished：」（推的，没复跑：记下的峰值都不看，上限都是 4G、整片不算整片）
+      （peer-pinned-at-cap-busy-cpu-retried 这一格不红，量的：没看记录头一次的上限 4096M，第二台报的此刻内存 15G 照样不低于它的 98%，停掉重排跑完）
   TASK_SERVER_BREAK=unclaimed-not-listed  status 不列完成了没人取的任务（task_server.py 的 session_tasks）
       「✗ task_server_lib.py 自证：unclaimed-finished：」
       「✗ task_server_lib.py 自证：three-duties-two-sessions：」
@@ -675,9 +831,6 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：check-missing：」、「✗ task_server_lib.py 自证：install：」
   TASK_SERVER_BREAK=state-placement-unchecked  状态目录落在仓里、运行时目录下或 tmpfs 上也不拒（read_configuration）
       「✗ task_server_lib.py 自证：state-placement：」
-  TASK_SERVER_BREAK=watch-blind  watch 判出服务不通、库写不进、单元不在都不退（control 的 watch）
-      「✗ task_server_lib.py 自证：watch-detects：」、「✗ task_server_lib.py 自证：pause-watch-still-watches：」
-      「✗ task_server_lib.py 自证：nfs-share-verified：」、「✗ task_server_lib.py 自证：peer-unavailable-alerted：」
   TASK_SERVER_BREAK=dry-run-writes  install --dry-run 照真装那样写文件（control 的 install）
       「✗ task_server_lib.py 自证：install：」
   TASK_SERVER_BREAK=secrets-overwritten  install 时签名密钥已在也重写（create_signing_key）
@@ -751,7 +904,8 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：unrecorded-default-small：」、「✗ task_server_lib.py 自证：unrecorded-cap-growth：」、「✗ task_server_lib.py 自证：unfinished-peak-ignored：」、「✗ task_server_lib.py 自证：failed-peak-floor：」、
       「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、「✗ task_server_lib.py 自证：temporary-service-wrapper-unwrapped：」、
       「✗ task_server_lib.py 自证：shard-siblings-share-peaks：」、「✗ task_server_lib.py 自证：build-family-peak-shared：」、「✗ task_server_lib.py 自证：build-family-declared：」
-      「✗ task_server_lib.py 自证：history-peak-unrecorded-default：」、「✗ task_server_lib.py 自证：history-peak-retry-jumps：」（后两格推的，没复跑）
+      「✗ task_server_lib.py 自证：history-peak-unrecorded-default：」、「✗ task_server_lib.py 自证：history-peak-retry-jumps：」（后两格推的，没复跑）、
+      「✗ task_server_lib.py 自证：build-family-from-arguments：」（推的，没复跑：参数缺了的那一条照 6144M 起）、「✗ task_server_lib.py 自证：build-family-cap-hit-raises：」（推的，没复跑：另一族的一条第 1 次照 6144M 起、不是 4096M）
   TASK_SERVER_BREAK=unrecorded-booked-above-cap  没有记录的命令上限取小缺省、记账取小缺省乘 CAP_GROWTH_FACTOR（6144M；task_server.py 的 unrecorded_prediction）
       「✗ task_server_lib.py 自证：unrecorded-default-small：」
       「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」
@@ -759,22 +913,27 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：unfinished-peak-ignored：」
       「✗ task_server_lib.py 自证：failed-peak-floor：」
   TASK_SERVER_BREAK=cap-hit-not-counted  撞了这一条上限的尝试不算跑完、它的上限不进定额度（task_server.py 的 recorded_prediction）
-      「✗ task_server_lib.py 自证：cap-hit-rerun-floored：」、「✗ task_server_lib.py 自证：completed-after-cap-hit：」、「✗ task_server_lib.py 自证：cap-hit-starts-above：」、「✗ task_server_lib.py 自证：judge-error-skips-only-that-task：」
+      「✗ task_server_lib.py 自证：cap-hit-rerun-from-record：」、「✗ task_server_lib.py 自证：completed-after-cap-hit：」、「✗ task_server_lib.py 自证：cap-hit-starts-above：」、「✗ task_server_lib.py 自证：judge-error-skips-only-that-task：」
       「✗ task_server_lib.py 自证：history-peak-window-raises：」、「✗ task_server_lib.py 自证：history-peak-retry-jumps：」（后两格推的，没复跑）
   TASK_SERVER_BREAK=completed-peak-ignored  退 0 的尝试量到的峰值不进定额度（task_server.py 的 recorded_prediction）
-      「✗ task_server_lib.py 自证：attention-queued-too-long：」、「✗ task_server_lib.py 自证：attention-reported-once：」、「✗ task_server_lib.py 自证：cap-hit-rerun-floored：」、「✗ task_server_lib.py 自证：backfill-when-head-blocked：」、
+      「✗ task_server_lib.py 自证：attention-queued-too-long：」、「✗ task_server_lib.py 自证：attention-reported-once：」、「✗ task_server_lib.py 自证：cap-hit-rerun-from-record：」、「✗ task_server_lib.py 自证：backfill-when-head-blocked：」、
       「✗ task_server_lib.py 自证：error-types：」、「✗ task_server_lib.py 自证：memory-cap-growth：」、「✗ task_server_lib.py 自证：memory-cap-at-maximum：」、「✗ task_server_lib.py 自证：resource-record：」、
       「✗ task_server_lib.py 自证：starved-head-judged-by-the-formula：」、「✗ task_server_lib.py 自证：aged-task-judged-first：」、「✗ task_server_lib.py 自证：unmeasured-not-zero：」、「✗ task_server_lib.py 自证：simulated-two-host-workload：」、
       「✗ task_server_lib.py 自证：three-duties-two-sessions：」、「✗ task_server_lib.py 自证：stalled-at-cap-retried：」、「✗ task_server_lib.py 自证：aged-head-at-slice-total-starts：」、「✗ task_server_lib.py 自证：squeezed-at-total-is-cap-hit：」、
       「✗ task_server_lib.py 自证：completed-after-cap-hit：」、「✗ task_server_lib.py 自证：cap-hit-starts-above：」、「✗ task_server_lib.py 自证：shard-cap-fitted-to-room：」、「✗ task_server_lib.py 自证：pinned-peer-unavailable：」、
       「✗ task_server_lib.py 自证：pinned-cap-from-configuration：」、「✗ task_server_lib.py 自证：admission-booked-at-cap：」、「✗ task_server_lib.py 自证：whole-and-fragment-alternate：」、「✗ task_server_lib.py 自证：whole-starts-beside-running-fragment：」、
-      「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：aged-tasks-do-not-hold-fitting-tasks：」、「✗ task_server_lib.py 自证：down-host-waits-not-never：」、「✗ task_server_lib.py 自证：memory-floor-applied：」、
+      「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：aged-tasks-do-not-hold-fitting-tasks：」、「✗ task_server_lib.py 自证：down-host-waits-not-never：」、「✗ task_server_lib.py 自证：retry-cap-not-floored：」、
       「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、
       「✗ task_server_lib.py 自证：margin-measured-per-host：」、「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、「✗ task_server_lib.py 自证：item-estimate-summed-from-rates：」、
       「✗ task_server_lib.py 自证：item-estimate-failure-queues-parent：」、「✗ task_server_lib.py 自证：estimate-basis-items-sentence：」、「✗ task_server_lib.py 自证：shard-plan-and-merge-estimated-by-command：」、「✗ task_server_lib.py 自证：peer-booked-like-local：」、
       「✗ task_server_lib.py 自证：peer-scope-missing-booked-at-cap：」、「✗ task_server_lib.py 自证：explicit-wait-not-starved：」、「✗ task_server_lib.py 自证：reason-line-per-type：」、「✗ task_server_lib.py 自证：build-disk-predicted：」、
       「✗ task_server_lib.py 自证：peer-memory-peak-recorded：」、「✗ task_server_lib.py 自证：temporary-service-wrapper-unwrapped：」、「✗ task_server_lib.py 自证：shard-failure-waits-for-running：」、「✗ task_server_lib.py 自证：shard-cancel-alone-merges：」、
       「✗ task_server_lib.py 自证：parent-cancel-stops-every-shard：」
+      「✗ task_server_lib.py 自证：busy-cpu-pinned-at-cap-retried：」、「✗ task_server_lib.py 自证：busy-cpu-below-cap-keeps-running：」、「✗ task_server_lib.py 自证：aged-whole-keeps-group-sealed：」（这三格量的）、
+      「✗ task_server_lib.py 自证：card-whole-seals-while-card-busy：」（推的，没复跑：跑成的峰值记不下，整片只记 4G、不算整片、不封组，六条碎片都起）
+      「✗ task_server_lib.py 自证：workspace-writer-initial-cap-headroom：」、「✗ task_server_lib.py 自证：both-hosts-sealed-small-unestimated-starts：」、
+      「✗ task_server_lib.py 自证：fragment-group-drops-finished：」（推的，没复跑：记下的峰值都不进，上限都是 4G、整片不算整片）
+      （peer-pinned-at-cap-busy-cpu-retried 这一格不红，量的：记不下峰值时头一次的上限 4096M，第二台报的此刻内存 15G 照样不低于它的 98%，停掉重排跑完）
   TASK_SERVER_BREAK=peer-overflow-blocked  本机在前的任务本机此刻放不下（还不到永远放不下）时不派第二台，留在队里等本机（task_server.py 的 place）
       「✗ task_server_lib.py 自证：attention-cleanup-pending：」、「✗ task_server_lib.py 自证：temporary-service-wrapper-compiles：」、「✗ task_server_lib.py 自证：temporary-service-own-server-compiles：」、「✗ task_server_lib.py 自证：every-command-reaches-peer：」、
       「✗ task_server_lib.py 自证：peer-runs-in-shared-tree：」、「✗ task_server_lib.py 自证：peer-stall-judged-by-peer-cpu：」、「✗ task_server_lib.py 自证：simulated-two-host-workload：」、「✗ task_server_lib.py 自证：peer-when-local-full：」、
@@ -825,8 +984,8 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：pass-booking-carried：」
   TASK_SERVER_BREAK=launch-recheck-skipped  起之前不现读复核，照判的时候那一份起（task_server.py 的 launch_recheck）
       「✗ task_server_lib.py 自证：launch-rechecked：」、「✗ task_server_lib.py 自证：shard-siblings-share-peaks：」（后一格推的，没复跑：排着的片照排队那一轮存的 4096M 起）
-  TASK_SERVER_BREAK=stalled-at-cap-not-retried  判卡住那一刻峰值已到上限的也照记 stalled、不重排（task_server.py 的 judge_stall_stop）
-      「✗ task_server_lib.py 自证：stalled-at-cap-retried：」
+  TASK_SERVER_BREAK=stalled-at-cap-not-retried  判卡住那一刻峰值或此刻内存已到上限的也照记 stalled、不重排（task_server.py 的 judge_stall_stop）
+      「✗ task_server_lib.py 自证：stalled-at-cap-retried：」、「✗ task_server_lib.py 自证：busy-cpu-pinned-at-cap-retried：」、「✗ task_server_lib.py 自证：peer-pinned-at-cap-busy-cpu-retried：」（后两格推的，没复跑）
   TASK_SERVER_BREAK=booked-up-to-slice-total  上限与记账照改前收到那台的总上限、不减余量（task_server.py 的 host_capacity）：slice 里有一点回收不掉的用量时，记满一整台的永远起不来
       squeezed-at-total-is-cap-hit 那一格里“上限已到那台总上限”照 host_capacity 比：开关下比的是总上限本身，48G 的上限比不到、照挤掉原样重排
       「✗ task_server_lib.py 自证：backfill-when-head-blocked：」、「✗ task_server_lib.py 自证：aged-task-judged-first：」、「✗ task_server_lib.py 自证：three-duties-two-sessions：」、「✗ task_server_lib.py 自证：aged-head-at-slice-total-starts：」、
@@ -846,11 +1005,12 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：suspected-stall-notified：」、「✗ task_server_lib.py 自证：suspected-stall-card-busy-not-reported：」
   TASK_SERVER_BREAK=suspect-card-load-ignored  要卡的判疑似卡住不看它那张卡上有没有它的计算负载（task_server.py 的 check_suspect）
       「✗ task_server_lib.py 自证：suspected-stall-card-busy-not-reported：」
+      「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」（推的，没复跑：卡上一直有负载的那一条 CPU 不涨先报疑似卡住，wait 退 231 不是 230）
   TASK_SERVER_BREAK=suspect-reported-every-wait  同一段疑似卡住每起一次 wait 都报（task_server.py 的 unreported_suspect）
       「✗ task_server_lib.py 自证：suspected-stall-notified：」
   TASK_SERVER_BREAK=pinned-cap-ignored  定额度不认钉值，照学到的记录定（task_server.py 的 pinned_prediction）
       「✗ task_server_lib.py 自证：pinned-cap-from-configuration：」、「✗ task_server_lib.py 自证：pinned-cap-unreadable-refused：」、「✗ task_server_lib.py 自证：pinned-cap-by-host：」、「✗ task_server_lib.py 自证：by-host-missing-host-refused：」、
-      「✗ task_server_lib.py 自证：by-host-outside-address-refused：」、「✗ task_server_lib.py 自证：environment-prefix-stripped-from-key：」、「✗ task_server_lib.py 自证：memory-floor-applied：」、「✗ task_server_lib.py 自证：pin-cap-refused-within-margin：」
+      「✗ task_server_lib.py 自证：by-host-outside-address-refused：」、「✗ task_server_lib.py 自证：environment-prefix-stripped-from-key：」、「✗ task_server_lib.py 自证：retry-cap-not-floored：」、「✗ task_server_lib.py 自证：pin-cap-refused-within-margin：」
   TASK_SERVER_BREAK=pinned-cap-grown  钉值撞了上限照撞上限乘 1.5 重排，不照 memory-cap-at-maximum 打回（task_server.py 的 finish_attempt 与 pinned_prediction）
       「✗ task_server_lib.py 自证：pinned-cap-from-configuration：」
   TASK_SERVER_BREAK=pinned-cap-literal  钉值记成钉的那一刻配置里的字面数，改了配置不跟着变（task_server.py 的 pin_cap 与 pin_value）
@@ -875,9 +1035,9 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：shard-failure-waits-for-running：」、「✗ task_server_lib.py 自证：shard-cancel-alone-merges：」、
       「✗ task_server_lib.py 自证：parent-cancel-stops-every-shard：」、「✗ task_server_lib.py 自证：shard-pieces-estimated-by-own-history：」
   TASK_SERVER_BREAK=booked-at-peak  准入照改前按峰值记账、在跑的待涨量按记的峰值算（task_server.py 的 booked_at_cap 与 server_pending）
-      「✗ task_server_lib.py 自证：cap-hit-rerun-floored：」、「✗ task_server_lib.py 自证：starved-head-judged-by-the-formula：」、「✗ task_server_lib.py 自证：shard-cap-fitted-to-room：」、「✗ task_server_lib.py 自证：pinned-cap-from-configuration：」、
+      「✗ task_server_lib.py 自证：cap-hit-rerun-from-record：」、「✗ task_server_lib.py 自证：starved-head-judged-by-the-formula：」、「✗ task_server_lib.py 自证：shard-cap-fitted-to-room：」、「✗ task_server_lib.py 自证：pinned-cap-from-configuration：」、
       「✗ task_server_lib.py 自证：pinned-cap-by-host：」、「✗ task_server_lib.py 自证：admission-booked-at-cap：」、「✗ task_server_lib.py 自证：whole-and-fragment-alternate：」、「✗ task_server_lib.py 自证：whole-starts-beside-running-fragment：」、
-      「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：aged-tasks-do-not-hold-fitting-tasks：」、「✗ task_server_lib.py 自证：environment-prefix-stripped-from-key：」、「✗ task_server_lib.py 自证：memory-floor-applied：」、
+      「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：aged-tasks-do-not-hold-fitting-tasks：」、「✗ task_server_lib.py 自证：environment-prefix-stripped-from-key：」、「✗ task_server_lib.py 自证：retry-cap-not-floored：」、
       「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、
       「✗ task_server_lib.py 自证：margin-measured-per-host：」、「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、「✗ task_server_lib.py 自证：peer-scope-missing-booked-at-cap：」、
       「✗ task_server_lib.py 自证：two-hosts-booked-within-capacity：」、「✗ task_server_lib.py 自证：explicit-wait-not-starved：」
@@ -891,6 +1051,8 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=alternation-disabled  整片与碎片不按台交替，照队列与回填排（task_server.py 的 Alternation）
       「✗ task_server_lib.py 自证：whole-and-fragment-alternate：」、「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、
       「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、「✗ task_server_lib.py 自证：explicit-wait-not-starved：」
+      「✗ task_server_lib.py 自证：aged-whole-keeps-group-sealed：」（量的：不封组，碎片照内存起）、「✗ task_server_lib.py 自证：card-whole-seals-while-card-busy：」（推的，没复跑：同样不封组）
+      「✗ task_server_lib.py 自证：both-hosts-sealed-small-unestimated-starts：」、「✗ task_server_lib.py 自证：fragment-group-drops-finished：」（推的，没复跑：不封组，排队原因里没有封组那一句）
   TASK_SERVER_BREAK=whole-waits-for-empty-host  整片任务等那台服务起的尝试一条都没有才起（改前的样子；task_server.py 的 Alternation.blocked）
       「✗ task_server_lib.py 自证：whole-starts-beside-running-fragment：」
   TASK_SERVER_BREAK=sealed-group-held-when-drained  封了组的那台腾空了、整片仍放不下时照改前一直封着（碎片永远等那条整片；task_server.py 的 Alternation.blocked）
@@ -932,22 +1094,26 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：environment-prefix-stripped-from-key：」
   TASK_SERVER_BREAK=workspace-writers-retried  改主工作区的命令撞了上限、被挤掉这类本会重排的结局照原样重排（task_server.py 的 finish_attempt）
       「✗ task_server_lib.py 自证：workspace-writer-not-retried：」
-  TASK_SERVER_BREAK=memory-floor-ignored  重排定到低于 4G 的上限也照用（task_server.py 的 memory_floor_applied）
-      「✗ task_server_lib.py 自证：memory-floor-applied：」
-  TASK_SERVER_BREAK=recorded-cap-floored  服务自己有真实峰值记录的上限照改前也兜到 4G（task_server.py 的 memory_floor_applied）
-      「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、「✗ task_server_lib.py 自证：memory-floor-applied：」（那一格头一次照记录取 371M，开关下是 4096M）
+  TASK_SERVER_BREAK=recorded-cap-floored  有记录的也抬到 4G（改前的样子）：钉值之外低于 4G 的上限与记账都兜到 4G，有记录的头一次、重排、撞过上限再交、改工作区的首趟都算
+      （task_server.py 的 memory_floor_applied、workspace_writer_headroom）
+      「✗ task_server_lib.py 自证：recorded-cap-not-floored：」（有记录的 200M 那一条开关下是 4096M）、
+      「✗ task_server_lib.py 自证：retry-cap-not-floored：」（那一格头一次照记录取 371M、重排 557M，开关下都是 4096M）、
+      「✗ task_server_lib.py 自证：cap-hit-rerun-from-record：」（推的，没复跑：小的一条头一遍 371M、再交 557M，开关下兜到 4096M、6144M；记录里只撞过一次的那条 371M 兜到 4096M）
   TASK_SERVER_BREAK=sealed-gap-not-backfilled  封组的那台照改前一条碎片都不放，预计用时不超过挡路时长的短任务也封着（task_server.py 的 Alternation.gap_fill）
       「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、
       「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、「✗ task_server_lib.py 自证：sealed-gap-room-takes-unestimated：」（后一格推的，没复跑）
+      「✗ task_server_lib.py 自证：card-whole-seals-while-card-busy：」（推的，没复跑：封着组时有预计用时的短碎片也不插空）
       「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」
+      「✗ task_server_lib.py 自证：both-hosts-sealed-small-unestimated-starts：」、「✗ task_server_lib.py 自证：fragment-group-drops-finished：」（推的，没复跑：小任务插不了空）
   TASK_SERVER_BREAK=sealed-gap-length-ignored  封组的那台有预计用时的就放，不比挡路时长（task_server.py 的 Alternation.gap_fill）
       「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、
-      「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」
-      （这两格里来插空的在装组的还在跑时就照时长放进去了，尝试记的不是“不看预计用时”；后一格第三条起也照放）
+      「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」（整片之外照样空着的那一份放不下的那几条，照时长也放进去了）
+      （gap-fill-by-room-skips-length 推的不再红：整片之外照样空着的那一份不减封组之前起的碎片，五条在装组的还在跑时就照内存那一支起、记「不看预计用时」，轮不到时长那一支）
   TASK_SERVER_BREAK=blocker-remaining-unbounded  挡路的尝试没有预计用时或已跑过预计用时的，还要跑多久当成没有尽头，不按已跑算（task_server.py 的 Alternation.blocking_seconds）
       「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」
   TASK_SERVER_BREAK=gap-fill-room-ignored  封组的那台照改前一律比预计用时与挡路时长，排头整片起来之后照公式还放得下的碎片也看时长（task_server.py 的 Alternation.gap_fill）
       「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、「✗ task_server_lib.py 自证：sealed-gap-room-takes-unestimated：」
+      「✗ task_server_lib.py 自证：both-hosts-sealed-small-unestimated-starts：」、「✗ task_server_lib.py 自证：fragment-group-drops-finished：」（推的，没复跑：没有预计用时的小任务封着）
   TASK_SERVER_BREAK=item-estimate-skipped  三条按项入口点了 --item 的照改前不起估算子任务，提交了就进队（task_server.py 的 submit）
       「✗ task_server_lib.py 自证：item-estimate-before-queue：」、「✗ task_server_lib.py 自证：item-estimate-summed-from-rates：」、
       「✗ task_server_lib.py 自证：item-estimate-failure-queues-parent：」、「✗ task_server_lib.py 自证：estimate-basis-items-sentence：」
@@ -988,12 +1154,12 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=judge-error-blocks-queue  一条这一轮判不了放不放得下时照改前挡住它后面的整队（task_server.py 的 place_queued_into）
       「✗ task_server_lib.py 自证：judge-error-skips-only-that-task：」
   TASK_SERVER_BREAK=nfs-unchecked  不判 NFS 共享，没写 NFS_SHARED_ROOTS、导出或挂载不过也照起（nfs_share_report）
-      「✗ task_server_lib.py 自证：pause-allows-one-session：」、「✗ task_server_lib.py 自证：pause-allow-waiting-text：」、「✗ task_server_lib.py 自证：pause-allow-switches-session：」、「✗ task_server_lib.py 自证：resume-clears-allowed-session：」、
+      「✗ task_server_lib.py 自证：build-family-cap-hit-raises：」、「✗ task_server_lib.py 自证：build-family-peak-windowed：」、「✗ task_server_lib.py 自证：pause-allows-one-session：」、「✗ task_server_lib.py 自证：pause-allow-waiting-text：」、「✗ task_server_lib.py 自证：pause-allow-switches-session：」、「✗ task_server_lib.py 自证：resume-clears-allowed-session：」、
       「✗ task_server_lib.py 自证：pause-allow-survives-restart：」、「✗ task_server_lib.py 自证：pause-allow-reported：」、「✗ task_server_lib.py 自证：pause-holds-new-attempts：」、「✗ task_server_lib.py 自证：pause-lets-running-finish：」、
       「✗ task_server_lib.py 自证：resume-releases-queue：」、「✗ task_server_lib.py 自证：pause-reported：」、「✗ task_server_lib.py 自证：pause-not-starved：」、「✗ task_server_lib.py 自证：pause-waits-for-starting-attempt：」、
-      「✗ task_server_lib.py 自证：pause-watch-still-watches：」、「✗ task_server_lib.py 自证：attention-queued-too-long：」、「✗ task_server_lib.py 自证：attention-overrun：」、「✗ task_server_lib.py 自证：attention-card-replaced：」、
+      「✗ task_server_lib.py 自证：attention-queued-too-long：」、「✗ task_server_lib.py 自证：attention-overrun：」、「✗ task_server_lib.py 自证：attention-card-replaced：」、
       「✗ task_server_lib.py 自证：attention-card-replaced-after-finish：」、「✗ task_server_lib.py 自证：attention-cleanup-pending：」、「✗ task_server_lib.py 自证：attention-shard-advance-failed：」、「✗ task_server_lib.py 自证：attention-reported-once：」、
-      「✗ task_server_lib.py 自证：temporary-service-wrapper-compiles：」、「✗ task_server_lib.py 自证：temporary-service-own-server-compiles：」、「✗ task_server_lib.py 自证：cap-hit-rerun-floored：」、「✗ task_server_lib.py 自证：exit-code-passthrough：」、
+      「✗ task_server_lib.py 自证：temporary-service-wrapper-compiles：」、「✗ task_server_lib.py 自证：temporary-service-own-server-compiles：」、「✗ task_server_lib.py 自证：cap-hit-rerun-from-record：」、「✗ task_server_lib.py 自证：exit-code-passthrough：」、
       「✗ task_server_lib.py 自证：restart-keeps-running：」、「✗ task_server_lib.py 自证：start-once：」、「✗ task_server_lib.py 自证：queue-holds-unplaceable：」、「✗ task_server_lib.py 自证：arrival-order：」、
       「✗ task_server_lib.py 自证：prediction-computed-once：」、「✗ task_server_lib.py 自证：pass-reads-resources-once：」、「✗ task_server_lib.py 自证：pass-booking-carried：」、「✗ task_server_lib.py 自证：launch-rechecked：」、
       「✗ task_server_lib.py 自证：every-command-reaches-peer：」、「✗ task_server_lib.py 自证：backfill-when-head-blocked：」、「✗ task_server_lib.py 自证：error-types：」、「✗ task_server_lib.py 自证：unit-start-failed：」、
@@ -1008,7 +1174,7 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：stall-waits-for-grace：」、「✗ task_server_lib.py 自证：computing-quietly-not-stalled：」、「✗ task_server_lib.py 自证：overrun-quiet-log-stopped：」、「✗ task_server_lib.py 自证：peer-stall-judged-by-peer-cpu：」、
       「✗ task_server_lib.py 自证：simulated-two-host-workload：」、「✗ task_server_lib.py 自证：three-duties-two-sessions：」、「✗ task_server_lib.py 自证：hundred-five-minute-tasks-balanced：」、「✗ task_server_lib.py 自证：stalled-at-cap-retried：」、
       「✗ task_server_lib.py 自证：aged-head-at-slice-total-starts：」、「✗ task_server_lib.py 自证：peer-run-failed-retried：」、「✗ task_server_lib.py 自证：squeezed-at-total-is-cap-hit：」、「✗ task_server_lib.py 自证：peer-starts-throttled：」、
-      「✗ task_server_lib.py 自证：attempt-unit-nofile-raised：」、「✗ task_server_lib.py 自证：queued-shows-waiting-reason：」、「✗ task_server_lib.py 自证：failed-run-not-estimated：」、「✗ task_server_lib.py 自证：unfinished-peak-ignored：」、
+      「✗ task_server_lib.py 自证：attempt-unit-nofile-raised：」、「✗ task_server_lib.py 自证：queued-shows-waiting-reason：」、「✗ task_server_lib.py 自证：failed-run-estimated：」、「✗ task_server_lib.py 自证：unfinished-peak-ignored：」、
       「✗ task_server_lib.py 自证：completed-after-cap-hit：」、「✗ task_server_lib.py 自证：cap-hit-starts-above：」、「✗ task_server_lib.py 自证：balanced-when-both-fit：」、「✗ task_server_lib.py 自证：peer-when-local-full：」、
       「✗ task_server_lib.py 自证：shard-to-peer-by-plan：」、「✗ task_server_lib.py 自证：shard-siblings-share-a-host：」、「✗ task_server_lib.py 自证：shard-cap-fitted-to-room：」、「✗ task_server_lib.py 自证：threads-fixed：」、
       「✗ task_server_lib.py 自证：shard-retry-isolated：」、「✗ task_server_lib.py 自证：task-log：」、「✗ task_server_lib.py 自证：cancel-queued：」、「✗ task_server_lib.py 自证：cancel-finished：」、
@@ -1023,7 +1189,7 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：whole-starts-beside-running-fragment：」、「✗ task_server_lib.py 自证：drained-sealed-group-reopens：」、「✗ task_server_lib.py 自证：ended-attempt-settled-after-restart：」、「✗ task_server_lib.py 自证：aged-tasks-do-not-hold-fitting-tasks：」、
       「✗ task_server_lib.py 自证：cpu-gate-holds-busy-host：」、「✗ task_server_lib.py 自证：unstarted-slice-uses-configured-total：」、「✗ task_server_lib.py 自证：down-host-waits-not-never：」、「✗ task_server_lib.py 自证：card-fault-replaced-on-another-card：」、
       「✗ task_server_lib.py 自证：card-fault-quarantines-named-card：」、「✗ task_server_lib.py 自证：card-fault-unlisted-quarantines-none：」、「✗ task_server_lib.py 自证：failed-peak-floor：」、「✗ task_server_lib.py 自证：environment-prefix-stripped-from-key：」、
-      「✗ task_server_lib.py 自证：verdict-library-family-refused：」、「✗ task_server_lib.py 自证：workspace-writer-not-retried：」、「✗ task_server_lib.py 自证：memory-floor-applied：」、「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、
+      「✗ task_server_lib.py 自证：verdict-library-family-refused：」、「✗ task_server_lib.py 自证：workspace-writer-not-retried：」、「✗ task_server_lib.py 自证：retry-cap-not-floored：」、「✗ task_server_lib.py 自证：recorded-cap-not-floored：」、
       「✗ task_server_lib.py 自证：sealed-gap-takes-short-task：」、「✗ task_server_lib.py 自证：sealed-gap-holds-longer-task：」、「✗ task_server_lib.py 自证：unestimated-blocker-counted-by-elapsed：」、「✗ task_server_lib.py 自证：margin-measured-per-host：」、
       「✗ task_server_lib.py 自证：gap-fill-by-room-skips-length：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、「✗ task_server_lib.py 自证：item-estimate-before-queue：」、「✗ task_server_lib.py 自证：item-done-rates-recorded：」、
       「✗ task_server_lib.py 自证：item-estimate-summed-from-rates：」、「✗ task_server_lib.py 自证：item-estimate-failure-queues-parent：」、「✗ task_server_lib.py 自证：item-estimate-cancelled：」、「✗ task_server_lib.py 自证：estimate-by-folded-command-key：」、
@@ -1038,8 +1204,19 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：gpu-binary-declaration-recognized：」、「✗ task_server_lib.py 自证：short-command-peak-recorded：」、「✗ task_server_lib.py 自证：merge-on-peer-reads-shard-outputs：」、「✗ task_server_lib.py 自证：stop-ends-probe-children：」、
       「✗ task_server_lib.py 自证：failure-scene-kept-until-collected：」、「✗ task_server_lib.py 自证：shard-failure-waits-for-running：」、「✗ task_server_lib.py 自证：shard-cancel-alone-merges：」、「✗ task_server_lib.py 自证：parent-cancel-stops-every-shard：」、
       「✗ task_server_lib.py 自证：cancel-after-natural-end：」、「✗ task_server_lib.py 自证：failed-start-not-counted：」、「✗ task_server_lib.py 自证：child-rows-verified：」、「✗ task_server_lib.py 自证：shard-siblings-share-peaks：」、
-      「✗ task_server_lib.py 自证：build-family-peak-shared：」、「✗ task_server_lib.py 自证：build-family-declared：」、「✗ task_server_lib.py 自证：shard-child-key-folded-by-words：」、「✗ task_server_lib.py 自证：workspace-write-interrupted-reported：」、
+      「✗ task_server_lib.py 自证：build-family-peak-shared：」、「✗ task_server_lib.py 自证：build-family-declared：」、「✗ task_server_lib.py 自证：build-family-from-arguments：」、「✗ task_server_lib.py 自证：shard-child-key-folded-by-words：」、「✗ task_server_lib.py 自证：workspace-write-interrupted-reported：」、
       「✗ task_server_lib.py 自证：workspace-write-complete-not-reported：」、「✗ task_server_lib.py 自证：gpu-two-cards-same-host：」、「✗ task_server_lib.py 自证：gpu-three-cards-only-where-enough：」、「✗ task_server_lib.py 自证：gpu-cards-short-never-fits：」
+      「✗ task_server_lib.py 自证：busy-cpu-pinned-at-cap-retried：」、「✗ task_server_lib.py 自证：busy-cpu-below-cap-keeps-running：」、「✗ task_server_lib.py 自证：peer-pinned-at-cap-busy-cpu-retried：」、
+      「✗ task_server_lib.py 自证：aged-whole-keeps-group-sealed：」、「✗ task_server_lib.py 自证：attention-quiet-busy-log：」、「✗ task_server_lib.py 自证：card-whole-seals-while-card-busy：」（最后一格推的，没复跑：
+      量的那一趟它因别的原因红着，看不出这条开关红不红它；起服务提交任务的格在这条开关下都红）
+      「✗ task_server_lib.py 自证：whole-workspace-cargo-refused：」、「✗ task_server_lib.py 自证：workspace-writer-initial-cap-headroom：」、
+      「✗ task_server_lib.py 自证：both-hosts-sealed-small-unestimated-starts：」、「✗ task_server_lib.py 自证：fragment-group-drops-finished：」（这四格推的，没复跑：同上，起服务提交任务）、
+      「✗ task_server_lib.py 自证：inbox-outcome-succeeded：」、「✗ task_server_lib.py 自证：inbox-outcome-failed：」、「✗ task_server_lib.py 自证：inbox-queued-too-long-once：」、「✗ task_server_lib.py 自证：inbox-unreachable-task-runs：」、「✗ task_server_lib.py 自证：unclaimed-results-warned：」、
+      「✗ task_server_lib.py 自证：health-database-unwritable-notified：」、「✗ task_server_lib.py 自证：health-unit-missing-notified：」、「✗ task_server_lib.py 自证：health-nfs-notified：」、「✗ task_server_lib.py 自证：health-peer-unavailable-notified：」
+      「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」（推的，没复跑：同上，起服务提交任务）
+      「✗ task_server_lib.py 自证：card-zero-utilization-stalled：」（推的，没复跑：同上，起服务提交任务）
+      「✗ task_server_lib.py 自证：cancelled-before-peer-trip-built：」（推的，没复跑：同上，起服务提交任务）
+      「✗ task_server_lib.py 自证：peer-health-slow-rechecked：」（新格，推的，没复跑）
   TASK_SERVER_BREAK=nfs-probe-one-way  两向探针只做本机→第二台那一向，第二台写的本机读不回也照过（nfs_share_report）
       「✗ task_server_lib.py 自证：nfs-share-verified：」
   TASK_SERVER_BREAK=nfs-probe-at-root  根是 git 工作树也把探针写在根下（nfs_probe_directory），红在 nfs-share-verified 一格
@@ -1050,7 +1227,7 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：nfs-probe-concurrent-runs：」
   TASK_SERVER_BREAK=quoted-word-paths-ignored  bash -c 这类整条写在一个词里的不认词里的绝对路径，词里点到共享根外的也照收（任务 2420 在第二台退 127 的那一种；task_server.py 的 find_outside_shared_path）
       「✗ task_server_lib.py 自证：outside-shared-path-refused：」
-  TASK_SERVER_BREAK=expansion-tail-as-path  bash -c 词里紧跟在 ${…}、$(…) 后面的 /… 也当写死的绝对路径（改前的样子，别的会话报的误拒；task_server.py 的 QUOTED_WORD_PATH）
+  TASK_SERVER_BREAK=expansion-tail-as-path  bash -c 词里紧跟在 ${…}、$(…) 后面的 /… 也当写死的绝对路径（改前的样子，别的会话报的误拒；task_server.py 的 shell_word_paths）
       「✗ task_server_lib.py 自证：outside-shared-path-refused：」
   TASK_SERVER_BREAK=peer-unavailable-silent  第二台用不了不记、不写告警，/health 的 peer 一栏照报用得了（task_server.py 的 note_peer）
       「✗ task_server_lib.py 自证：peer-unavailable-alerted：」
@@ -1148,7 +1325,7 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=peak-read-only-by-sampling  不给内存包装 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT、说明里不写 exit_peak_file，attempt_runner.py 照改前只靠按轮采（文件头「资源记录」的退出时峰值）
       「✗ task_server_lib.py 自证：short-command-peak-recorded：」
       「✗ task_server_lib.py 自证：build-family-peak-shared：」、「✗ task_server_lib.py 自证：build-family-declared：」（推的，没复跑：同族那一条的峰值记不下）、
-      「✗ task_server_lib.py 自证：shard-siblings-peak-windowed：」（推的：各片跑成的峰值记不下）
+      「✗ task_server_lib.py 自证：shard-siblings-peak-windowed：」（推的：各片跑成的峰值记不下）、「✗ task_server_lib.py 自证：build-family-from-arguments：」（推的，没复跑：同族那一条的峰值记不下）
   TASK_SERVER_BREAK=shard-outputs-not-carried  派第二台的合并那一次不带 TASK_SERVER_SHARD_OUTPUTS（改前的样子；task_server.py 的 PeerMachine.command 的 carried_names）
       「✗ task_server_lib.py 自证：merge-on-peer-reads-shard-outputs：」
   TASK_SERVER_BREAK=probe-children-left  停服务时不等、不停自己起的子进程（去第二台探测余量与复核挂载的 ssh 这类），留在服务单元的 cgroup 里（改前的样子；task_server.py 的 Scheduler.stop）
@@ -1194,9 +1371,7 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=pause-waiting-unreported  排着的任务 status 不写「服务暂停中（原因：…）」（task_server.py 的 waiting_text）
       「✗ task_server_lib.py 自证：pause-reported：」、「✗ task_server_lib.py 自证：pause-allow-waiting-text：」
   TASK_SERVER_BREAK=pause-judges-starved  暂停中仍照改前另判排头放不放得下（暂停时排队线程不判），/health 回不健康、control check 退 78（task_server.py 的 starved_problem）
-      「✗ task_server_lib.py 自证：pause-not-starved：」、「✗ task_server_lib.py 自证：pause-watch-still-watches：」
-  TASK_SERVER_BREAK=watch-skips-while-paused  上一次读到的 /health 是暂停着，watch 这一轮判出的问题一律不打、不退（control 的 watch）
-      「✗ task_server_lib.py 自证：pause-watch-still-watches：」
+      「✗ task_server_lib.py 自证：pause-not-starved：」
   TASK_SERVER_BREAK=pause-allow-ignored  暂停着连放行的会话交的任务也不排不起，放行形同虚设（task_server.py 的 allowed_during_pause）
       「✗ task_server_lib.py 自证：pause-allows-one-session：」、「✗ task_server_lib.py 自证：pause-allow-waiting-text：」、「✗ task_server_lib.py 自证：pause-allow-switches-session：」、
       「✗ task_server_lib.py 自证：pause-allow-survives-restart：」
@@ -1221,12 +1396,14 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
       「✗ task_server_lib.py 自证：slow-world-patient-wait：」
   TASK_SERVER_BREAK=temporary-service-own-server-unrecognized  prune_server_client_selftest.py、prune-server-load-simulation.py 不带二进制的 --selftest 不当会编的算（改前的样子；own_server_selftest_split）
       「✗ task_server_lib.py 自证：temporary-service-own-server-compiles：」
-  TASK_SERVER_BREAK=cap-hit-rerun-unfloored  同一命令键最近一次结束的尝试撞了上限，再交一遍的第一次尝试不兜到 4G，照记录 × 1.5（task_server.py 的 latest_attempt_hit_cap）
-      「✗ task_server_lib.py 自证：cap-hit-rerun-floored：」
   TASK_SERVER_BREAK=shard-siblings-unshared  分片的一片不看同一计划里计划那一步与兄弟片的峰值，各片照自己的键从 4G 爬（改前的样子；task_server.py 的 shard_family_peak）
       「✗ task_server_lib.py 自证：shard-siblings-share-peaks：」、「✗ task_server_lib.py 自证：shard-siblings-peak-windowed：」
   TASK_SERVER_BREAK=build-family-ignored  提交时不记编译族、定额度不看族，会编的 cargo 与声明了族的入口同键没记录只从 4G 起（改前的样子；task_server.py 的 build_family_of、build_family_peak）
-      「✗ task_server_lib.py 自证：build-family-peak-shared：」、「✗ task_server_lib.py 自证：build-family-declared：」
+      「✗ task_server_lib.py 自证：build-family-peak-shared：」、「✗ task_server_lib.py 自证：build-family-declared：」、「✗ task_server_lib.py 自证：build-family-from-arguments：」、「✗ task_server_lib.py 自证：build-family-cap-hit-raises：」、「✗ task_server_lib.py 自证：build-family-peak-windowed：」
+  TASK_SERVER_BREAK=family-arguments-unfilled  编译族声明里的 $<n>、$<选项名> 不照命令参数填，照字面算族（改前的样子；filled_family_words）：证红按 <crate> 归不进同族、照 4G 起
+      「✗ task_server_lib.py 自证：build-family-from-arguments：」
+  TASK_SERVER_BREAK=family-cap-hit-not-counted  编译族的窗口只收跑成的那几次的编译段峰值，撞了上限的那几次（编完了才撞的）的编译段峰值不收（task_server.py 的 build_family_peak、attempt_measurement）
+      「✗ task_server_lib.py 自证：build-family-cap-hit-raises：」
   TASK_SERVER_BREAK=retry-build-directory-fresh  撞上限重排时当场删这一次的编译目录，下一次新建、从零编（改前的样子；task_server.py 的 settle_attempt、start_attempt）
       「✗ task_server_lib.py 自证：retry-build-directory-reused：」、「✗ task_server_lib.py 自证：peer-retry-build-directory-reused：」（后一格推的，没复跑）
   TASK_SERVER_BREAK=shard-key-from-joined-command  分片子任务的键照改前用空格接父命令的词再按空格切，条目名里带空格的后半截漏进键里（task_server.py 的 create_child）
@@ -1238,20 +1415,177 @@ GPU（要不要卡由服务认，认出的一律套清场、分卡；cargo 特�
   TASK_SERVER_BREAK=gpu-card-count-ignored  不读源文件头的张数声明，要卡的一律一张（改前的样子；task_server.py 的 gpu_cards_wanted）
       「✗ task_server_lib.py 自证：gpu-two-cards-same-host：」、「✗ task_server_lib.py 自证：gpu-three-cards-only-where-enough：」、「✗ task_server_lib.py 自证：gpu-cards-short-never-fits：」
   TASK_SERVER_BREAK=history-peak-ignored  头一次与重排都不看这把键近几次里最高的一次（头一次只照定额度那一段、重排只照自己那一次 × 1.5 一级级乘；task_server.py 的 history_raised_prediction）
-      「✗ task_server_lib.py 自证：history-peak-retry-jumps：」
-  TASK_SERVER_BREAK=history-peak-unwindowed  起点照改前不截近 RECORD_WINDOW 次、照这把键全部记录里最高的一次（只升不降；兄弟片那一段同样不截；task_server.py 的 key_recent_peak、shard_family_peak）
-      「✗ task_server_lib.py 自证：history-peak-first-attempt：」、「✗ task_server_lib.py 自证：shard-siblings-peak-windowed：」
+      「✗ task_server_lib.py 自证：history-peak-retry-jumps：」、「✗ task_server_lib.py 自证：build-family-cap-hit-raises：」（后一格推的，没复跑：重排那一次另看编译族的那一段在 history_raised_prediction 里）
+  TASK_SERVER_BREAK=history-peak-unwindowed  起点照改前不截近 RECORD_WINDOW 次、照这把键全部记录里最高的一次（只升不降；兄弟片与编译族那两段同样不截；task_server.py 的 window_maximum，key_recent_peak、shard_family_peak、build_family_peak 都经它）
+      「✗ task_server_lib.py 自证：history-peak-first-attempt：」、「✗ task_server_lib.py 自证：shard-siblings-peak-windowed：」、「✗ task_server_lib.py 自证：build-family-peak-windowed：」
   TASK_SERVER_BREAK=whole-seals-every-host  一条整片照改前在它算整片的每一台上都封组等腾空，只起在一台上却封住两台（任务 7585；task_server.py 的 Alternation.waiting_hosts）
       「✗ task_server_lib.py 自证：whole-seals-one-host：」
-  TASK_SERVER_BREAK=card-waiting-whole-seals  要卡的整片在卡被占着、凑不够张数的台上照改前也封组等腾空（task_server.py 的 Alternation.waiting_hosts）
-      「✗ task_server_lib.py 自证：card-waiting-whole-not-sealing：」
+  TASK_SERVER_BREAK=card-whole-counts-free-cards-only  要卡的整片照改前只在空卡凑得够它张数的台上算整片：卡一直有人占的台从不为它封组，碎片一直占着内存（任务 7934；task_server.py 的 Alternation.waiting_hosts）
+      「✗ task_server_lib.py 自证：card-whole-seals-while-card-busy：」
+  TASK_SERVER_BREAK=at-cap-busy-cpu-kept-running  日志满窗口不涨、此刻内存贴着上限而 CPU 在涨的照改前当在算、照跑（任务 7723；task_server.py 的 judge_stall_stop）
+      「✗ task_server_lib.py 自证：busy-cpu-pinned-at-cap-retried：」、「✗ task_server_lib.py 自证：peer-pinned-at-cap-busy-cpu-retried：」
+  TASK_SERVER_BREAK=at-cap-fraction-ignored  判贴着上限不比上限：读得到此刻内存就当贴着上限（task_server.py 的 judge_stall_stop）
+      「✗ task_server_lib.py 自证：busy-cpu-below-cap-keeps-running：」
+  TASK_SERVER_BREAK=peer-memory-line-unread  第二台不读日志里的 MULTI_HOST_RUN_PEER_MEMORY 那一行，此刻内存与峰值都交 None（那一行照旧不算日志在涨；task_server.py 的 PeerMachine.memory_now）
+      「✗ task_server_lib.py 自证：peer-pinned-at-cap-busy-cpu-retried：」
+  TASK_SERVER_BREAK=aged-whole-not-counted  满时限的整片照改前不算整片、不为它封组，封着的组一满时限就撤掉（任务 7934；task_server.py 的 Alternation）
+      「✗ task_server_lib.py 自证：aged-whole-keeps-group-sealed：」
+  TASK_SERVER_BREAK=aged-fragment-bypasses-seal  满时限的碎片照改前不过交替，封了的组不挡它（task_server.py 的 place_queued_into）
+      「✗ task_server_lib.py 自证：aged-whole-keeps-group-sealed：」
+  TASK_SERVER_BREAK=attention-quiet-busy-unreported  日志长期不涨而服务没停它不记成要处置的提醒（task_server.py 的 quiet_log_items）
+      「✗ task_server_lib.py 自证：attention-quiet-busy-log：」
+  TASK_SERVER_BREAK=io-wait-ignored  判卡住不看 D 状态：日志与 CPU 都满窗口不涨、每一轮都有进程在等 IO 的也停掉、记 stalled（改前的样子；任务 8608、8609、8611、8619；
+      task_server.py 的 judge_stall_stop）
+      「✗ task_server_lib.py 自证：io-wait-local-not-stalled：」、「✗ task_server_lib.py 自证：io-wait-peer-not-stalled：」
+  TASK_SERVER_BREAK=attention-io-wait-unreported  卡在 IO 上而服务没停它不记成要处置的提醒（task_server.py 的 io_wait_items）
+      「✗ task_server_lib.py 自证：io-wait-local-not-stalled：」
+  TASK_SERVER_BREAK=stall-card-load-ignored  判卡住不看卡：分到了卡、日志与 CPU 都满窗口不涨而每一轮卡上都有它的计算负载的也停掉、记 stalled（改前的样子；任务 8519、8520；
+      task_server.py 的 judge_stall_stop）
+      「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」、「✗ task_server_lib.py 自证：card-zero-utilization-stalled：」
+  TASK_SERVER_BREAK=card-presence-counts-as-busy  判卡住不看卡的利用率：分到了卡、日志与 CPU 都满窗口不涨、每一轮卡上都有它的计算进程而利用率每一轮都读到 0 的也免停
+      （task_server.py 的 judge_stall_stop）
+      「✗ task_server_lib.py 自证：card-zero-utilization-stalled：」
+      「✗ task_server_lib.py 自证：card-idle-polling-stalled：」（新格，推的，没复跑）
+  TASK_SERVER_BREAK=attention-gpu-busy-quiet-unreported  卡上有它的计算进程、日志与 CPU 都不涨而服务没停它不记成要处置的提醒（task_server.py 的 gpu_busy_quiet_items）
+      「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」
+  TASK_SERVER_BREAK=quiet-log-busy-any-exemption  日志长期不涨的提醒不看服务为什么没停它：按 D 状态、卡上负载免停的也报 quiet-log-busy（改前的样子；task_server.py 的 quiet_log_items）
+      「✗ task_server_lib.py 自证：io-wait-local-not-stalled：」、「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」
   TASK_SERVER_BREAK=read-only-arguments-counted-as-writer  改工作区的工具带了只读的参数（apply-writer-patch.py --dry-run、--selftest 这类，task_server.py 的 WORKSPACE_READ_ONLY_ARGUMENTS）
       也当成改主工作区、撞上限不重排（改前的样子；task_server.py 的 modifies_workspace）
       「✗ task_server_lib.py 自证：writer-dry-run-retried：」
   TASK_SERVER_BREAK=peer-retry-build-directory-fresh  派到第二台的尝试不叫 multi-host-run.sh 留着编译目录、重排到第二台的那一次也不接着用（改前的样子：第二台每一趟新建、跑完删；
       task_server.py 的 start_attempt、PeerMachine.command）
       「✗ task_server_lib.py 自证：peer-retry-build-directory-reused：」
-自证另有几格不配开关：selftest-variables-refused（判的守卫在读开关之前，开关在别处设了本身就被它拒）；type-table-covered（静态核错误类型表里每一种都有格喂到）。
+  TASK_SERVER_BREAK=parallelism-falls-back-to-cores  各格并行的路数取不出登记的每台默认重活线程数就按本机核数（改前的样子；task_server_selftest.py 的 parallelism）：
+      登记文件不在、写坏、SINGLEFS_THREAD_CAP 不是正整数时本该判红
+      「✗ task_server_lib.py 自证：parallelism-registration-refused：」
+  TASK_SERVER_BREAK=whole-workspace-cargo-accepted  提交时不判不点名包的全仓编译，不带 -p 的 cargo build、带 --workspace 的 cargo clippy 照收（改前的样子；任务 8105；
+      task_server.py 的 placement_refusal 与 whole_workspace_cargo_refusal）
+      「✗ task_server_lib.py 自证：whole-workspace-cargo-refused：」
+  TASK_SERVER_BREAK=workspace-writer-headroom-skipped  改主工作区的命令首趟照改前只看同键窗口 × 1.5，不加它要起的验证命令那把键、不兜到 4G（任务 8367；
+      task_server.py 的 workspace_writer_headroom）
+      「✗ task_server_lib.py 自证：workspace-writer-initial-cap-headroom：」、「✗ task_server_lib.py 自证：cap-hit-rerun-from-record：」
+  TASK_SERVER_BREAK=gap-fill-room-counts-all-running  插空的内存那一支照改前连封组之前起的碎片一起减（room_by_the_formula 减排头的记账），碎片跑完之前没有预计用时的一条都放不进
+      （任务 8370；task_server.py 的 Alternation.gap_fill）
+      「✗ task_server_lib.py 自证：both-hosts-sealed-small-unestimated-starts：」、「✗ task_server_lib.py 自证：gap-fill-room-exhausted-checks-length：」、
+      「✗ task_server_lib.py 自证：fragment-group-drops-finished：」（gap-fill-room-exhausted-checks-length 照改前只放得下一条、fragment-group-drops-finished 的小任务插不了空，
+      这两格推的，没复跑）
+  TASK_SERVER_BREAK=fragment-group-never-drops  组的账照改前只加不减：封着组时插空起的也记进账、这一组还在跑的那几条跑完也不剪（任务 8370 那一回「已装到 95.1 GiB（界 41.6 GiB）」；
+      task_server.py 的 Alternation.__init__、started）
+      「✗ task_server_lib.py 自证：fragment-group-drops-finished：」
+  TASK_SERVER_BREAK=repository-target-bypass-unwarned  提交时不判命令与入口脚本取仓根 target/ 下的二进制，提交回复、日志头与 status 都不打严厉警告
+      （改前的样子：任务 7937–7944 取了仓根 target/ 下合并前的旧二进制；task_server.py 的 repository_target_bypass）
+      「✗ task_server_lib.py 自证：repository-target-bypass-warned：」
+  TASK_SERVER_BREAK=cancelled-artifacts-kept  取消之后不删各次尝试的编译目录与现场目录、不核第二台那一趟的本地目录，取消的回复与日志里不报删前删后（改前的样子：
+      取消之后编译目录与现场等提交它的会话另下删除指令；task_server.py 的 remove_cancelled_artifacts）
+      「✗ task_server_lib.py 自证：cancelled-artifacts-removed：」
+  TASK_SERVER_BREAK=cancel-not-started-receipt-unread  取消之后核第二台那一趟的本地目录不读清理回执：回执还是 not-started、目录还没建的，日志里没有 ⑥ 那一行也算没删成、
+      cancel 退 5（改前的样子；task_server.py 的 cancelled_attempt_artifacts）
+      「✗ task_server_lib.py 自证：cancelled-before-peer-trip-built：」
+  TASK_SERVER_BREAK=inbox-not-sent  服务一条消息都不往会话的收件 socket 发（task_server.py 的 send_to_session），发不出去的告警也不写
+      「✗ task_server_lib.py 自证：inbox-outcome-succeeded：」、「✗ task_server_lib.py 自证：inbox-outcome-failed：」、「✗ task_server_lib.py 自证：inbox-queued-too-long-once：」、「✗ task_server_lib.py 自证：inbox-unreachable-task-runs：」、
+      「✗ task_server_lib.py 自证：health-database-unwritable-notified：」、「✗ task_server_lib.py 自证：health-unit-missing-notified：」、「✗ task_server_lib.py 自证：health-nfs-notified：」、「✗ task_server_lib.py 自证：health-peer-unavailable-notified：」
+      「✗ task_server_lib.py 自证：peer-health-slow-rechecked：」、「✗ task_server_lib.py 自证：over-two-hours-bounced：」、「✗ task_server_lib.py 自证：long-run-confirmed-not-bounced：」（新格，推的，没复跑）
+  TASK_SERVER_BREAK=inbox-auth-omitted  发消息不发认证行、只发 user 那一行（task_server.py 的 post_to_inbox）
+      「✗ task_server_lib.py 自证：inbox-outcome-succeeded：」、「✗ task_server_lib.py 自证：inbox-outcome-failed：」、「✗ task_server_lib.py 自证：inbox-queued-too-long-once：」、
+      「✗ task_server_lib.py 自证：health-database-unwritable-notified：」、「✗ task_server_lib.py 自证：health-unit-missing-notified：」、「✗ task_server_lib.py 自证：health-nfs-notified：」、「✗ task_server_lib.py 自证：health-peer-unavailable-notified：」
+      「✗ task_server_lib.py 自证：peer-health-slow-rechecked：」、「✗ task_server_lib.py 自证：over-two-hours-bounced：」、「✗ task_server_lib.py 自证：long-run-confirmed-not-bounced：」（新格，推的，没复跑）
+  TASK_SERVER_BREAK=inbox-reported-every-round  发消息那一路不看报过的档与段，每一轮照发（task_server.py 的 push_attention、push_suspects）
+      「✗ task_server_lib.py 自证：inbox-queued-too-long-once：」
+  TASK_SERVER_BREAK=pushed-outcome-not-collected  结局发出去了也不记已取（task_server.py 的 push_outcomes）
+      「✗ task_server_lib.py 自证：inbox-outcome-succeeded：」、「✗ task_server_lib.py 自证：inbox-outcomes-resent-after-error：」
+  TASK_SERVER_BREAK=inbox-pending-dropped-on-error  发结局那一轮处理到某一条抛错时不把它与后面还没处理的号放回待发，下一轮不补发（改前的样子；task_server.py 的 push_outcomes）
+      「✗ task_server_lib.py 自证：inbox-outcomes-resent-after-error：」
+  TASK_SERVER_BREAK=health-unwatched  服务不盯自己的健康、不发「服务健康」（task_server.py 的 watch_health）
+      「✗ task_server_lib.py 自证：health-database-unwritable-notified：」、「✗ task_server_lib.py 自证：health-unit-missing-notified：」、「✗ task_server_lib.py 自证：health-nfs-notified：」、「✗ task_server_lib.py 自证：health-peer-unavailable-notified：」
+      「✗ task_server_lib.py 自证：peer-health-slow-rechecked：」（新格，推的，没复跑）
+  TASK_SERVER_BREAK=health-alerted-every-round  同一样服务健康对同一个会话每一轮照发，不记发过的（task_server.py 的 watch_health）
+      「✗ task_server_lib.py 自证：health-database-unwritable-notified：」、「✗ task_server_lib.py 自证：health-unit-missing-notified：」、「✗ task_server_lib.py 自证：health-nfs-notified：」、「✗ task_server_lib.py 自证：health-peer-unavailable-notified：」
+      「✗ task_server_lib.py 自证：peer-health-slow-rechecked：」（新格，推的，没复跑）
+  TASK_SERVER_BREAK=unclaimed-unwarned  交任务时不判会话名下有没有结局满时限没人取的，不打严厉警告（task_server.py 的 unclaimed_before）
+      「✗ task_server_lib.py 自证：unclaimed-results-warned：」
+  TASK_SERVER_BREAK=leftovers-error-uncaught  attempt_runner 停单元里留下的进程时抛的异常照改前不隔离，result.json 写不出、成功的任务被判 launcher-lost
+      （records/2026-11-03-task-server与prune-server深入对攻审核.md「TS-02」；说明里的 leftovers_error_uncaught，attempt_runner.py 的 main）
+      「✗ task_server_lib.py 自证：leftovers-error-isolated：」
+  TASK_SERVER_BREAK=inbox-attention-per-shard  发给会话的要处置的提醒照改前逐片各发一条、不合、不压一轮（task_server.py 的 attention_groups、push_attention）
+      「✗ task_server_lib.py 自证：inbox-shard-attention-merged：」
+  TASK_SERVER_BREAK=memory-peak-with-page-cache  本机记的峰值与判贴着上限照改前读 scope 的 memory.peak、memory.current（含页缓存；任务 8853；
+      attempt_runner.py 的 Sampler 照说明里的 memory_peak_with_page_cache，task_server.py 的 scope_memory_peak、scope_memory_current）
+      「✗ task_server_lib.py 自证：page-cache-not-counted-as-process-memory：」、「✗ task_server_lib.py 自证：short-command-peak-recorded：」
+  TASK_SERVER_BREAK=attention-reported-memory-only  报过的提醒档照改前只记在服务内存里，服务重启后同一档再报一次（会话 46 的任务 8819；task_server.py 的 note_attention_reported、
+      stored_attention_tiers）
+      「✗ task_server_lib.py 自证：attention-reported-survives-restart：」
+  TASK_SERVER_BREAK=attention-queue-reasonless-sent  排队原因还没判出来的那一轮照改前照报排队过久、原因写读不到（task_server.py 的 attention_of_record）
+      「✗ task_server_lib.py 自证：attention-queue-waits-for-reason：」
+  TASK_SERVER_BREAK=aged-seal-gap-filled  为满时限的整片封了组的那台照改前照样插空（task_server.py 的 Alternation.blocked）
+      「✗ task_server_lib.py 自证：aged-seal-no-gap-fill：」
+  TASK_SERVER_BREAK=budget-over-maxima-waits  记账超过每一台可用上限的照改前留在队里排着、不打回（task_server.py 的 budget_check、place_queued_into）
+      「✗ task_server_lib.py 自证：budget-over-maxima-refused：」
+  TASK_SERVER_BREAK=oversized-budget-silent  记账不小于整片界的不记成要处置的提醒 oversized-budget（task_server.py 的 budget_check、attention_of_record）
+      「✗ task_server_lib.py 自证：oversized-budget-reported：」
+  TASK_SERVER_BREAK=long-run-idle-silent  跑满 LONG_RUN_ATTENTION_SECONDS 而平均在用核数不到给的线程数四分之一的不记成要处置的提醒 long-run-idle-cores（task_server.py 的 long_run_idle_items）
+      「✗ task_server_lib.py 自证：long-run-idle-cores-reported：」
+  TASK_SERVER_BREAK=fills-any-cap-silent  同一命令键最近三次峰值都贴着各自上限的不记成要处置的提醒 fills-any-cap（task_server.py 的 fills_any_cap_items）
+      「✗ task_server_lib.py 自证：fills-any-cap-reported：」
+  TASK_SERVER_BREAK=fills-any-cap-counts-cap-hits  fills-any-cap 的那三次连撞了上限的尝试也算（照上限一档档撞上去的也报成按上限开并行；task_server.py 的 fills_any_cap_items）
+      「✗ task_server_lib.py 自证：fills-any-cap-cap-hits-not-reported：」
+  TASK_SERVER_BREAK=old-metric-peaks-read  定额度、编译族、兄弟片与判红峰值的下界照改前连没写峰值口径的旧尝试行一起读（task_server.py 的 current_metric）
+      「✗ task_server_lib.py 自证：old-metric-peaks-not-counted：」
+  TASK_SERVER_BREAK=attention-next-generic  anomaly_advice 不照异常表取，每一种都交一句通用的「看 status、等不起就取消改小重交」（提醒、打回的 next= 与发给会话的正文都退回它）
+      「✗ task_server_lib.py 自证：anomaly-advice-in-texts：」、「✗ task_server_lib.py 自证：attention-queued-too-long：」、「✗ task_server_lib.py 自证：attention-overrun：」、「✗ task_server_lib.py 自证：attention-quiet-busy-log：」、「✗ task_server_lib.py 自证：io-wait-local-not-stalled：」、「✗ task_server_lib.py 自证：gpu-busy-quiet-not-stalled：」、「✗ task_server_lib.py 自证：attention-card-replaced：」、「✗ task_server_lib.py 自证：attention-card-replaced-after-finish：」、「✗ task_server_lib.py 自证：attention-cleanup-pending：」、「✗ task_server_lib.py 自证：attention-shard-advance-failed：」、「✗ task_server_lib.py 自证：attention-reported-once：」、「✗ task_server_lib.py 自证：attention-reported-survives-restart：」、「✗ task_server_lib.py 自证：attention-queue-waits-for-reason：」、「✗ task_server_lib.py 自证：oversized-budget-reported：」、「✗ task_server_lib.py 自证：long-run-idle-cores-reported：」、「✗ task_server_lib.py 自证：fills-any-cap-reported：」、「✗ task_server_lib.py 自证：memory-cap-at-maximum：」、「✗ task_server_lib.py 自证：budget-over-maxima-refused：」、「✗ task_server_lib.py 自证：anomaly-repushed-with-history：」、「✗ task_server_lib.py 自证：unclaimed-outcome-repushed：」（头两格之后推的，没复跑：各格核 next= 以异常表那一行起头、或核那一句修改意见在不在）
+  TASK_SERVER_BREAK=unclaimed-outcome-not-repushed  结局满 30 分钟没交给会话的不再推（task_server.py 的 repush_unclaimed_outcomes）
+      「✗ task_server_lib.py 自证：unclaimed-outcome-repushed：」
+  TASK_SERVER_BREAK=anomaly-not-repushed  不随时长涨的提醒同一档推过之后一直还在的不再推（task_server.py 的 attention_repush）
+      「✗ task_server_lib.py 自证：anomaly-repushed-with-history：」
+  TASK_SERVER_BREAK=inbox-socket-from-submit-only  发消息照交任务时记的收件 socket，不按会话号读会话登记（task_server.py 的 inbox_socket_of）
+      「✗ task_server_lib.py 自证：inbox-socket-follows-session：」
+  TASK_SERVER_BREAK=inbox-missing-accepted  客户端读不到会话的收件地址也照交（task 的 submit）
+      「✗ task_server_lib.py 自证：inbox-unreachable-task-runs：」
+  TASK_SERVER_BREAK=confirm-skipped  交任务不等确认就进队（task_server.py 的 submit）
+      「✗ task_server_lib.py 自证：submit-awaits-confirmation：」、「✗ task_server_lib.py 自证：unconfirmed-cancelled：」、「✗ task_server_lib.py 自证：operation-log：」（后两格推的，没复跑：不等确认就跑完、操作日志里没有 confirm 那一条）
+  TASK_SERVER_BREAK=confirm-counts-unchecked  task confirm 不核项数与在排在跑的条数（task_server.py 的 confirm）
+      「✗ task_server_lib.py 自证：submit-awaits-confirmation：」
+      「✗ task_server_lib.py 自证：requeue-refusals：」（新格，推的，没复跑）
+  TASK_SERVER_BREAK=unconfirmed-kept  交了没确认的满时限也不取消（task_server.py 的 expire_unconfirmed）
+      「✗ task_server_lib.py 自证：unconfirmed-cancelled：」
+  TASK_SERVER_BREAK=family-lends-run-peak  编译族借同族尝试的整趟峰值 memory_peak 与撞了上限那一次的上限，不只借编译段峰值（task_server.py 的 attempt_measurement）
+      「✗ task_server_lib.py 自证：family-lends-build-phase-only：」
+  TASK_SERVER_BREAK=seal-host-that-cannot-fit  整片挑等腾空的台时峰值本身就装不下它的台（记账超过那台此刻能给的最大上限 host_limit）也挑、为它封组，那台的碎片一直挡着（task_server.py 的 Alternation.__init__）
+      「✗ task_server_lib.py 自证：whole-not-sealed-where-it-cannot-fit：」
+  TASK_SERVER_BREAK=path-check-substring  提交时判共享根外的路径，每个带空白的词都按子串认，参数值中间夹着的 /（「（接的是 /）」）也当绝对路径、整条拒（task_server.py 的 find_outside_shared_path）
+      「✗ task_server_lib.py 自证：path-check-whole-words：」
+  TASK_SERVER_BREAK=build-phase-past-finished  本机采编译段峰值时见到 cargo 编完那一行之后照收，跑测试那一段的用量进编译段峰值（attempt_runner.py 文件头 ③）
+      「✗ task_server_lib.py 自证：family-lends-build-phase-only：」
+  TASK_SERVER_BREAK=cleanup-tests-tables-hand-listed  清场协议单测的假调度器照手抄的名单建表、漏 card_loads（tests/test_cleanup_protocol.py 的 scheduler）
+      「✗ task_server_lib.py 自证：cleanup-protocol-unit-tests：」
+  TASK_SERVER_BREAK=card-idle-stall-threshold-ignored  占着卡不干活（卡上有它的进程而利用率每一轮都是 0）的判卡住照不分卡的门槛 STALL_CPU_CORES，CPU 上轮询死等的照跑（task_server.py 的 judge_stall_stop）
+      「✗ task_server_lib.py 自证：card-idle-polling-stalled：」
+  TASK_SERVER_BREAK=peer-health-single-timeout-reported  连第二台的 ssh 头一次超时就算连不上、不复查（peer_shell_rechecked）
+      「✗ task_server_lib.py 自证：peer-health-slow-rechecked：」
+  TASK_SERVER_BREAK=cap-hit-stat-unreported  内存包装打的撞上限那一刻的内存明细不抄进结局说明与推给会话的正文（task_server.py 的 finish_attempt）
+      「✗ task_server_lib.py 自证：cap-hit-stat-in-note：」
+  TASK_SERVER_BREAK=over-two-hours-not-bounced  累计跑满两小时的不停（task_server.py 的 judge_run_limit）
+      「✗ task_server_lib.py 自证：over-two-hours-bounced：」、「✗ task_server_lib.py 自证：over-two-hours-across-cap-hits：」、「✗ task_server_lib.py 自证：over-two-hours-check-not-exempt：」、
+      「✗ task_server_lib.py 自证：over-two-hours-merge-and-verify-not-exempt：」、「✗ task_server_lib.py 自证：requeue-goes-to-tail：」、「✗ task_server_lib.py 自证：requeue-refusals：」、
+      「✗ task_server_lib.py 自证：long-run-confirmed-not-bounced：」、「✗ task_server_lib.py 自证：whole-package-confirmed-still-bounced：」（后七格推的，没复跑：要一条 over-two-hours 的任务才往下判）
+  TASK_SERVER_BREAK=over-two-hours-cap-hits-counted  撞了内存上限的那几次尝试的用时也累加，重来的那一次不归零（task_server.py 的 judge_run_limit）
+      「✗ task_server_lib.py 自证：over-two-hours-across-cap-hits：」
+  TASK_SERVER_BREAK=over-two-hours-commit-exempt-by-command-only  豁免只看起的是不是提交时的门禁，带 --check、「为什么」没写提交前的也豁免（commit_gate_exempt）
+      「✗ task_server_lib.py 自证：over-two-hours-check-not-exempt：」
+  TASK_SERVER_BREAK=requeue-keeps-original-position  task requeue 不新进队尾，把原号那一条照原任务号放回队里原来的位置（task_server.py 的 requeue）
+      「✗ task_server_lib.py 自证：requeue-goes-to-tail：」
+  TASK_SERVER_BREAK=long-run-confirmed-still-bounced  带「长跑已确认」标识的照样按两小时停（task_server.py 的 judge_run_limit）
+      「✗ task_server_lib.py 自证：long-run-confirmed-not-bounced：」
+  TASK_SERVER_BREAK=long-run-confirmed-flag-hidden  「长跑已确认」那一行不进 task status、列表、推给会话的正文与日志头（task_server.py 的 long_run_lines）
+      「✗ task_server_lib.py 自证：long-run-confirmed-not-bounced：」
+  TASK_SERVER_BREAK=whole-package-unconfirmed-accepted  整包测试没带确认标识也照收（task_server.py 的 whole_package_refusal）
+      「✗ task_server_lib.py 自证：whole-package-unconfirmed-refused：」
+  TASK_SERVER_BREAK=whole-package-confirmed-exempts-two-hours  带「整包已确认」标识的不按两小时打回（task_server.py 的 judge_run_limit）
+      「✗ task_server_lib.py 自证：whole-package-confirmed-still-bounced：」
+  TASK_SERVER_BREAK=whole-package-flag-dropped-on-requeue  task requeue 新交的那一条不带原号的「整包已确认」标识（task_server.py 的 requeue）
+      「✗ task_server_lib.py 自证：whole-package-confirmed-still-bounced：」
+自证另有几格不配开关：selftest-variables-refused（判的守卫在读开关之前，开关在别处设了本身就被它拒）；type-table-covered（静态核错误类型表里每一种都有格喂到）；control-watch-removed（control watch 只剩退 2 打出路句这一支，没有能弄坏的判法）；
+anomaly-table-matches-kinds（静态核文件头异常表的种类与 ATTENTION_KINDS、OUTCOME_TYPES、SUBMIT_REFUSAL_KINDS 逐行对得上）。
 """
 import os
 import sys
@@ -1272,6 +1606,7 @@ import shlex  # noqa: E402
 import socket  # noqa: E402
 import subprocess  # noqa: E402
 import time  # noqa: E402
+import tomllib  # noqa: E402
 from dataclasses import dataclass  # noqa: E402
 
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
@@ -1308,6 +1643,10 @@ RUN_CONDITION_EXIT = 78
 USAGE_EXIT = 2
 VOLATILE_FILESYSTEMS = ("tmpfs", "ramfs")
 SESSION_VARIABLE = "CLAUDE_CODE_SESSION_ID"
+# 会话的收件 socket 与会话令牌（Claude Code 导出给 hook 与 Bash 命令；文件头「发消息给会话」）：task submit 读这两个交给服务，服务记在任务上，出事往那个 socket 发消息
+INBOX_SOCKET_VARIABLE = "CLAUDE_CODE_MESSAGING_SOCKET"
+INBOX_TOKEN_VARIABLE = "CLAUDE_CODE_MESSAGING_TOKEN"
+INBOX_LOG_MARK = "TASK_SERVER_INBOX"   # 发消息没发出去时往那条任务最后一次尝试的日志里接的一行的开头（不算日志在涨：REASON_LOG_NOISE 与 task_server.py 的 log_content）
 ADMITTED_VARIABLE = "RUN_WITH_MEMORY_CAP_ADMITTED_BY_TASK_SERVER"   # 内存包装只认服务起的那一层的准入标记（run-with-memory-cap.sh 文件头「只认服务直接起的那一层」）
 THREAD_ADMITTED_VARIABLE = "CAPPED_ADMITTED_BY_TASK_SERVER"   # capped.sh 只认服务套的那一层（capped.sh 文件头；task_server.py 文件头 ③「起」）：两台都设
 QUIESCE_ADMITTED_VARIABLE = "GPU_QUIESCE_RUN_ADMITTED_BY_TASK_SERVER"   # 清场包装只认服务套的那一层（gpu-quiesce-run.sh 文件头）：套了清场时设
@@ -1321,8 +1660,33 @@ SUSPECT_EXIT = 231                      # wait 报疑似卡住退这个码：错
 ATTENTION_MARK = "TASK_SERVER_ATTENTION"   # wait 报要处置的提醒的那一行（文件头「错误类型」表后的「需要处置」）
 ATTENTION_TYPE = "needs-attention"         # 那一行的 type=；不是结局，不进 OUTCOME_TYPES
 ATTENTION_EXIT = 230                       # 任务还没结局时 wait 报提醒退这个码：错误类型表与 SUSPECT_EXIT 里没用过；任务照旧在排或在跑，再起 wait 接着等
-# 六种提醒（task_server.py 的 attention_items 判，文件头「需要处置」）：排队过久、跑到记录用时的很多倍、换卡重排、清场没收尾、分片父任务推不动、改主工作区的命令没正常结束
-ATTENTION_KINDS = ("queued-too-long", "overrun", "card-replaced", "cleanup-pending", "shard-advance-failed", "workspace-write-interrupted")
+# 十二种提醒（task_server.py 的 attention_items 判，文件头「需要处置」）：排队过久、跑到记录用时的很多倍、日志长期不涨而服务没停它、卡在 IO 上而服务没停它、
+# 卡上有它的计算进程而服务没停它、换卡重排、清场没收尾、分片父任务推不动、改主工作区的命令没正常结束、预算贴着整台、跑得久而核没用起来、按给的上限开并行
+ATTENTION_KINDS = ("queued-too-long", "overrun", "quiet-log-busy", "io-wait", "gpu-busy-quiet", "card-replaced", "cleanup-pending", "shard-advance-failed",
+                   "workspace-write-interrupted", "oversized-budget", "long-run-idle-cores", "fills-any-cap")
+# 异常表（文件头「异常表」）：那几栏只写在文件头那一段，anomaly_table 照 __doc__ 现读，代码里不另抄一份；下面几组是代码里分别处置的种类，自证 anomaly-table-matches-kinds 拿它们与表比
+ANOMALY_ACTIONS = ("提交时拒", "打回", "提醒照跑", "服务自己修")
+ANOMALY_TABLE_HEAD = "异常表（"
+ANOMALY_ROW = re.compile(r"^  ([a-z][a-z-]*)｜([^｜]+)｜([^｜]+)｜([^｜]+)｜([^｜]+)$")
+SUBMIT_REFUSAL_KINDS = ("environment-refused", "nested-wrapper", "target-directory-in-repository", "outside-shared-path", "shared-roots-outside",
+                        "verdict-library-unserved", "temporary-service-heavy", "whole-workspace-cargo", "inbox-missing", "confirm-counts-mismatch",
+                        "requeue-counts-mismatch", "whole-package-unconfirmed")
+SUBMIT_WARNING_KINDS = ("repository-target-bypass", "unclaimed-results")
+SERVICE_ANOMALY_KINDS = ("unconfirmed", "suspected-stall", "unclaimed-outcome")
+# 只给弄坏开关 attention-next-generic：每一种都退回这一句通用的出路
+ANOMALY_GENERIC_ADVICE = "task-server/task status {task} 看在等什么，等不起 task-server/task cancel {task}、改小命令重交"
+ANOMALY_TASK_PLACEHOLDER = "{task}"
+ANOMALY_TABLE_LOADED = []   # 读过的那一份（anomaly_table）
+# 交任务的二次确认（task_server.py 文件头 ⑦）：交了的任务先在这个状态、不进队，task confirm 两个数对得上才进队
+AWAITING_CONFIRMATION_STATE = "awaiting-confirmation"
+CONFIRM_NEEDED_MARK = "TASK_SERVER confirm-needed"   # 客户端打确认单之后那一行（机器读的：自证的帮手照它确认）
+CONFIRM_NEEDED_LINE = re.compile(r"^TASK_SERVER confirm-needed task=([0-9]+) items=([0-9]+) tasks=([0-9]+)(?: |$)", re.MULTILINE)
+NAMED_SCOPE_OPTIONS = ("--item", "--check", "--test", "--bin")   # 后面跟一个值的点名选项（--check 的值照逗号拆）；--lib 不带值，--exact 数 `--` 之后的测试名
+LIBTEST_VALUE_OPTIONS = ("--skip", "--test-threads", "--format", "--color", "--logfile", "-Z")   # `--` 之后带值的 libtest 选项：值不算点名的测试
+# 按会话号找收件 socket（task_server.py 文件头 ⑥「收件地址」）：会话登记的唯一取法是 scripts/agents/lib_session_registry.py，这里只载它
+SESSION_REGISTRY_SCRIPT = os.path.join(REPOSITORY_ROOT, "scripts", "agents", "lib_session_registry.py")
+SESSIONS_DIRECTORY_OVERRIDE = "TASK_SERVER_SELFTEST_SESSIONS_DIRECTORY"
+SESSION_REGISTRY_LOADED = []   # 载过的那一份（session_registry_library）
 MEMORY_CAP_VARIABLE = "TASK_SERVER_MEMORY_CAP_BYTES"   # 每次尝试交给命令的这一次内存上限（字节，十进制；名字已告诉别的会话，不改）
 SOURCE_REPOSITORY_VARIABLE = "TASK_SERVER_SOURCE_REPOSITORY"   # 每次尝试交给命令的提交方那一份仓的根（本机绝对路径；第二台照它拼两台一致的路径，例会话记录目录）
 # 每次尝试交给命令的两个共享根（文件头「资源记录」后的「共享根」）：第二台的 ~ 是另一个目录，经 ~ 取的工作根与共享数据落在第二台本地盘、两台读不到同一份
@@ -1335,6 +1699,7 @@ PIN_SOURCE = "SLICE_MEMORY_CAP_BY_HOST"   # 钉值取多机配置里这个按台
 PINNED_HISTORY = "pinned"               # 尝试记录 prediction 一栏：这一次的上限是钉值
 PIN_UNREADABLE_HISTORY = "pin-unreadable"   # 钉了而配置读不到的那一份预测（不起，只在排队里认；文件头「资源记录」的钉值）
 SUBMIT_MARK = "TASK_SERVER submit"
+REQUEUE_MARK = "TASK_SERVER requeue"   # task requeue 收下时 stdout 那一行的开头（task 文件头 requeue）：后面接 task=<新号> from=<原号>
 CARD_FAULT_MARK = "GPU_QUIESCE step=quiesce result=card-fault"
 CARD_FAULT_LIST_FIELD = "faulty-cards="   # 清场 card-fault 那一行里的坏卡清单（文件头「错误类型」card-fault 那一行）
 RUNNING_UNIT_STATES = ("active", "activating", "deactivating", "reloading", "refreshing")
@@ -1352,6 +1717,7 @@ NFS_PROBE_NAME = ".task-server-nfs-probe"
 NFS_PEER_PROBE_NAME = ".task-server-nfs-probe-peer"
 NFS_SSH_OPTIONS = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")   # 与 scripts/crash/crash-point-replay-shard-configuration-check.sh 连第二台的同一组
 NFS_SSH_SECONDS = 30
+NFS_RECHECK_PAUSE_SECONDS = 5.0   # 连第二台的 ssh 一次超时之后隔这么久复查（文件头「NFS 共享」的挂载）：第二台负载高时一次慢不当连不上，只复查一次
 NFS_PROBE_READ_TRIES = 3   # 第二台 cat 本机刚写的探针：那边 NFS 客户端的目录缓存可能还没看见它，隔一秒再读，至多这么多次
 NFS_README = "task-server/README.md「## NFS 共享」"
 NFS_ITEMS = (("directory", "目录"), ("export", "导出"), ("mount", "挂载"), ("probe", "两向探针"))
@@ -1370,14 +1736,41 @@ REASON_ELEMENTS = {
     "peer-run-failed": ("host", "last_line"), "prune-server-unavailable": ("host", "last_line"), "card-fault": ("card", "quiesce"), "launcher-lost": ("unit",),
     "cancelled": ("by",), "record-tampered": ("what",),
     "never-fits": ("judged",), "unit-start-failed": ("unit", "judged"), "resubmit-required": ("rule",), "stalled": ("judged",), "shard-plan-refused": ("judged",),
+    "over-two-hours": ("host", "last_line"),
 }
+# 内存包装判出撞上限（退 250）那一刻打的一行（scripts/hosts/run-with-memory-cap.sh 文件头「撞上限那一刻的内存明细」；两台同一行，第二台的经 multi-host-run.sh 接回）：
+# 服务把它换成一句抄进那一次尝试的结局说明（oom_stat_note）。两边的格式一起改
+OOM_STAT_LINE = re.compile(r"^RUN_WITH_MEMORY_CAP_OOM_STAT anon=(\d+|unread) file=(\d+|unread) file_dirty=(\d+|unread) file_writeback=(\d+|unread) shmem=(\d+|unread) oom_kill=(\d+|unread)$")
+# 跑满两小时打回的豁免（文件头「错误类型」over-two-hours）：提交时的六道门禁与提交前整轮（仓根下的相对路径），范围声明的「为什么」里要有 COMMIT_SCOPE_WORD
+COMMIT_GATE_ENTRIES = (".claude/gate.d/crash-point-replay.sh", ".claude/gate.d/qemu-device-streams.sh", ".claude/gate.d/lkmm.sh",
+                       ".claude/gate.d/crates-mutation-replay.sh", ".claude/gate.d/formal-verification.sh", ".claude/gate.d/broad-mutation.sh",
+                       "scripts/gate/gate-staged.sh")
+COMMIT_SCOPE_WORD = "提交前"
+SCOPE_RANGE_ARGUMENTS = ("--check", "--item")   # 带了就是指定范围，不是提交时那一趟
+# 整包测试（task_server.py 文件头 ②「提交时拒」⑥；.claude/agent-common.md「日常开发的测试不跑整个包」）：crash-point-replay.sh --check 把这三格全点了算整包
+WHOLE_PACKAGE_CHECK_CELLS = ("crash-case-replay", "feature-gated-tests", "product-gpu-real-card-tests")
+WHOLE_PACKAGE_CRASH_GATE = ".claude/gate.d/crash-point-replay.sh"
+WHOLE_PACKAGE_MERGE_ENTRY = "scripts/gate/merge-and-verify.sh"
+MERGE_VALUE_OPTIONS = ("--crash-expand-up-to", "--item")   # merge-and-verify.sh 带值的选项（它文件头的用法行）：值不当补丁目录
+# cargo 子命令后面带值的选项：值不当测试名（whole_package_cargo_test 认测试名用）
+CARGO_VALUE_OPTIONS = ("-p", "--package", "-F", "--features", "--profile", "--target", "--test", "--bin", "--example", "--bench", "-j", "--jobs",
+                       "--manifest-path", "--target-dir", "--color", "--message-format", "-Z", "--config")
+WHOLE_PACKAGE_MARKS = ("①", "②", "③")   # 整包确认文件的三段（.claude/agent-common.md「日常开发的测试不跑整个包」的三遍确认）各以它起头
+WHOLE_PACKAGE_SECTION_MINIMUM_CHARACTERS = 12   # 每段去掉空白（与段首的记号）至少这么多个字
+WHOLE_PACKAGE_NEXT_STEP = ("改成只点名改到的测试目标与测试函数；确实要整包的照 .claude/agent-common.md「日常开发的测试不跑整个包」确认三遍，"
+                           "带 --whole-package-confirmed <确认文件> 重交（task-server/task submit --whole-package-confirmed <确认文件> -- <命令…>）")
 # multi-host-run.sh 打进日志的几行（文件头「错误类型」与「资源记录」）：第二台那条命令自己的退出码、第二台那一层的内存峰值与编译目录占盘峰值
 PEER_COMMAND_END_LINE = re.compile(r"^MULTI_HOST_RUN_STEP step=peer-command event=end(?: \S+)* exit=([0-9]+)(?: |$)")
 PEER_COMMAND_HOST = "peer-command"   # classify_attempt 的 host：第二台那条命令自己的退出码（255 也是 command-failed）
 PEER_MEMORY_PEAK_MARK = "MULTI_HOST_RUN_PEER_MEMORY_PEAK"
 PEER_BUILD_PEAK_MARK = "MULTI_HOST_RUN_PEER_BUILD_PEAK"
+PEER_BUILD_PHASE_PEAK_MARK = "MULTI_HOST_RUN_PEER_BUILD_PHASE_PEAK"   # multi-host-run.sh 打的第二台那条命令的编译段峰值（文件头「资源记录」的编译族；它文件头 ⑤「编译段峰值」）
+# cargo 编完打的那一行（「    Finished `release` profile [optimized] target(s) in 1m 02s」）：它之前按轮采到的是编译段（文件头「资源记录」的编译族）；
+# 交给 attempt_runner.py 的说明 build_finished_pattern（字节串照 utf-8 编），multi-host-run.sh 的 MULTI_HOST_CARGO_FINISHED_PATTERN 是同一个式子的 ERE 写法，两边一起改
+CARGO_FINISHED_PATTERN = r"^\s*Finished\b.*\btarget\(s\) in "
 PEER_BUILD_KEPT_MARK = "MULTI_HOST_RUN_PEER_BUILD_KEPT"   # multi-host-run.sh 带 --keep-build-directory 跑完留下这一趟的编译目录时打「<它> label=<标签>」（它文件头「留着的编译目录」）
-REASON_LOG_NOISE = ("MULTI_HOST_RUN_STEP ", "MULTI_HOST_RUN_PEER_CPU ", PEER_MEMORY_PEAK_MARK + " ", PEER_BUILD_PEAK_MARK + " ", PEER_BUILD_KEPT_MARK + " ")   # 取日志最后一行时跳过的进度行（task_server.py 判日志涨不涨同样不算它们）
+REASON_LOG_NOISE = ("MULTI_HOST_RUN_STEP ", "MULTI_HOST_RUN_PEER_CPU ", "MULTI_HOST_RUN_PEER_IO_WAIT ", PEER_MEMORY_PEAK_MARK + " ", PEER_BUILD_PEAK_MARK + " ", PEER_BUILD_PHASE_PEAK_MARK + " ", PEER_BUILD_KEPT_MARK + " ",
+                    INBOX_LOG_MARK + " ")   # 取日志最后一行时跳过的进度行（task_server.py 判日志涨不涨同样不算它们）
 # 临时 prune-server 的包装（scripts/prune-server/prune_server_client_selftest.py --with-temporary-service [--server-binary <路径>] -- <原命令>）：
 # 算命令键、认登记表行时剥开、照 -- 后面那条原命令认（unwrapped_temporary_service）；包装本身照旧整条执行
 TEMPORARY_SERVICE_SCRIPT = "prune_server_client_selftest.py"
@@ -1407,6 +1800,7 @@ DECLARED_GPU_CARDS_MARK = "# task-server-gpu-cards:"
 DECLARED_SOURCE_GPU_CARDS_MARK = "// task-server-gpu-cards:"
 # 编译族（文件头「资源记录」的编译族）：入口脚本文件头写「# task-server-cargo-family: <cargo 参数>…」，说它里面起的 cargo 编哪个包、哪一档、哪几个特性
 DECLARED_BUILD_FAMILY_MARK = "# task-server-cargo-family:"
+FAMILY_ARGUMENT_MARK = "$"   # 编译族声明里取自命令参数的词以它起头：$<n> 取第 n 个参数，$<选项名> 取那个选项的值（filled_family_words）
 BUILD_FAMILY_MARK = "〈编译族〉"   # 编译族那一段文本的头（cargo_build_family 交的）
 PACKAGE_SKIPPED_DIRECTORIES = ("target", ".git", "node_modules", "src", "tests", "benches", "examples")   # 找包目录（package_directories）时不往下走的目录
 # 续跑（文件头「续跑」）：命令位置上起的脚本文件头写「# task-server-resumable: <词> [<词>…]」，第一个非选项参数是其中一个，就算这条命令登记了续跑（* 是任何参数）
@@ -1425,6 +1819,8 @@ SCENES_ROOT_NAME = "task-server-scenes"   # 工作根下放判红那一趟现场
 SCENE_VARIABLE = "RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY"   # 交给内存包装的这一次尝试的现场目录（文件头「现场」）
 PEAK_OUTPUT_VARIABLE = "RUN_WITH_MEMORY_CAP_PEAK_OUTPUT"   # 交给内存包装的退出时峰值那一份（文件头「资源记录」的退出时峰值）
 EXIT_PEAK_FILE_NAME = "exit_memory_peak"   # 尝试目录里内存包装写退出时峰值的那一份
+BUILD_PHASE_FILE_NAME = "build_phase"   # 尝试目录里 attempt_runner 写编译段峰值与见没见到 cargo 编完那一行的那一份（文件头「资源记录」的编译族；自证读它）
+MEMORY_PEAK_FILE_NAME = "memory_peak"   # 尝试目录里 attempt_runner 每轮写进程内存见过的最大的那一份（文件头「资源记录」的峰值的口径；task_server.py 的 scope_memory_peak 读它）
 PLAN_FILE = "plan.json"
 SHARD_PLAN_KEYS = ("label",)
 SHARD_ROLES = ("plan", "shard", "merge")   # 分片那三步的子任务（文件头「分片」）；估算那一步（ESTIMATE_ROLE）不算
@@ -1509,6 +1905,7 @@ OUTCOME_TYPES = {
     "never-fits": (241, "哪台都等多久也放不下"),
     "unit-start-failed": (235, "尝试的单元起不来"),
     "shard-plan-refused": (234, "分片的计划读不通"),
+    "over-two-hours": (242, "不是提交时的门禁，累计跑满两小时，服务停了它"),
     "stalled": (233, "日志满 10 分钟没涨，服务停了它"),
     "resubmit-required": (232, "服务规则改了，照现行规则不再收"),
 }
@@ -1529,20 +1926,23 @@ GIBIBYTE = 1024 * MEBIBYTE
 # 没有记录的命令的预测、上限与记账（文件头「资源记录」）：用户选「没记录的先记小，撞了再放大」，主 agent 定 4G
 # （records/2026-10-30-编译绕过内存总上限.md「问题清单的去向」#6）：任务 1–8 实测峰值 10 MiB 到 1.71 GiB；常见命令已从峰值表导入 3321 条记录
 UNRECORDED_MEMORY_DEFAULT_BYTES = 4 * GIBIBYTE
-MEMORY_FLOOR_BYTES = UNRECORDED_MEMORY_DEFAULT_BYTES   # 每条任务上限的下限（文件头「资源记录」；问题 92）：钉值与服务自己的记录定的之外，上限低于它的上限与记账都取它
+MEMORY_FLOOR_BYTES = UNRECORDED_MEMORY_DEFAULT_BYTES   # 改前的 4G 底（文件头「资源记录」的有记录的照记录）：只在弄坏开关 recorded-cap-floored 下兜
 MEMORY_FLOOR_VARIABLE = "TASK_SERVER_SELFTEST_MEMORY_FLOOR_BYTES"   # 只在自证里认：各格的小世界换这个下限（文件头「只在自证里认的变量」）
 UNRECORDED_HISTORY = "unrecorded-default"   # 尝试记录 prediction 一栏：这一次是按没记录的小缺省定的
 RECORD_HISTORY = "record"                   # 尝试记录 prediction 一栏：这一次的上限照服务自己记下的峰值 × 1.5 定（文件头「资源记录」的定额度）
 FAILED_PEAK_HISTORY = "failed-peak"         # 尝试记录 prediction 一栏：这一次的上限照判红那一次量到的峰值 × 1.5 定（文件头「资源记录」）
-CAP_HIT_RERUN_HISTORY = "cap-hit-rerun"     # 尝试记录 prediction 一栏：同一命令键最近一次结束的尝试撞了上限，这一次是再交一遍的第一次尝试，照「重排那一次」兜到 4G（文件头「资源记录」）
-BUILD_FAMILY_HISTORY = "build-family"       # 尝试记录 prediction 一栏：同键没有记录，照同一编译族别的命令跑成的峰值 × 1.5 起步（文件头「资源记录」的编译族）
+BUILD_FAMILY_HISTORY = "build-family"       # 尝试记录 prediction 一栏：照同一编译族别的命令近 RECORD_WINDOW 次的编译段峰值的最大 × 1.5 起步（文件头「资源记录」的编译族）
 SHARD_FAMILY_HISTORY = "shard-family"       # 尝试记录 prediction 一栏：分片的一片照同一计划里计划那一步与兄弟片的峰值往上抬过（文件头「资源记录」的同一计划共用峰值）
 KEY_HISTORY_PEAK_HISTORY = "key-history"    # 尝试记录 prediction 一栏：照这把键历史上最高的一次（撞过的上限、跑成的峰值）× 1.5 往上抬过（文件头「资源记录」的按历史最高起跑）
+WORKSPACE_WRITER_HISTORY = "workspace-writer"   # 尝试记录 prediction 一栏：改主工作区的命令首趟照这把键与它的验证命令近几次最高之和 × 1.5 往上抬过（文件头「资源记录」）
+PROCESS_MEMORY_PEAK_METRIC = "进程内存"   # 尝试记录 peak_metric 一栏：memory_peak 是进程用的内存（anon 加 shmem；文件头「资源记录」的峰值口径一栏）；没有这一栏的旧行不读
 # 命令键换算之前剥掉的环境变量前缀（文件头「资源记录」的命令键）：这几个只改配置路径、范围声明、语言这类，不改命令要多少内存
 KEY_NEUTRAL_VARIABLES = ("SINGLEFS_MULTI_HOST_CONFIG", "SINGLEFS_RUN_SCOPE", "BINDGEN_EXTRA_CLANG_ARGS", "LANG")
 ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=", re.DOTALL)
 # 定额度只用跑完的尝试（文件头「资源记录」）：退 0 的记量到的峰值，撞了这一条自己上限的记「至少要到这个上限」；别的结局的峰值偏小或不作数，不进
 RECORD_COMPLETED_OUTCOMES = ("succeeded",)
+# 预计用时取的尝试（文件头「资源记录」的预计用时）：命令自己跑到退出的两种结局；被信号杀的 command-failed 由 task_server.py 的 command_estimate 另排掉
+ESTIMATE_COMPLETED_OUTCOMES = ("succeeded", "command-failed")
 RECORD_CAP_HIT_OUTCOMES = ("memory-cap-hit", "memory-cap-at-maximum")
 # Linux 的 sockaddr_un.sun_path 是 108 字节；留一个结尾的零，路径本身至多 107 字节（文件头「路径」）
 SOCKET_PATH_MAXIMUM_BYTES = 107
@@ -1559,16 +1959,20 @@ SELFTEST_ONLY_VARIABLES = (
     "TASK_SERVER_SELFTEST_SLOW_RESOURCES_SECONDS", "TASK_SERVER_NFS_EXPORTS", "TASK_SERVER_PEER_SSH", "TASK_SERVER_SELFTEST_PAUSE_POINT",
     "TASK_SERVER_SELFTEST_STOP_FAILS", "TASK_SERVER_SELFTEST_START_TIMEOUT_SECONDS", "TASK_SERVER_PRUNE_SERVER_CHECK", MEMORY_FLOOR_VARIABLE,
     "TASK_SERVER_SELFTEST_LONG_RUN_SECONDS", "TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS", "TASK_SERVER_SELFTEST_OVERRUN_ATTENTION_FACTOR",
-    "TASK_SERVER_SELFTEST_ADVANCE_FAILS")
+    "TASK_SERVER_SELFTEST_QUIET_ATTENTION_SECONDS", "TASK_SERVER_SELFTEST_ADVANCE_FAILS", "TASK_SERVER_SELFTEST_IO_WAIT_ATTENTION_SECONDS",
+    "TASK_SERVER_SELFTEST_PROC_ROOT", "TASK_SERVER_SELFTEST_UNCLAIMED_WARNING_SECONDS", "TASK_SERVER_SELFTEST_GPU_BUSY_QUIET_ATTENTION_SECONDS",
+    "TASK_SERVER_SELFTEST_LONG_RUN_ATTENTION_SECONDS", "TASK_SERVER_SELFTEST_SESSIONS_DIRECTORY", "TASK_SERVER_SELFTEST_CONFIRM_TIMEOUT_SECONDS",
+    "TASK_SERVER_SELFTEST_ANOMALY_REPUSH_SECONDS", "TASK_SERVER_SELFTEST_NFS_SSH_SECONDS", "TASK_SERVER_SELFTEST_NFS_RECHECK_PAUSE_SECONDS",
+    "TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS")
 KNOWN_BREAK_ITEMS = (
     "fallback-run-when-unreachable", "exit-code-dropped", "wait-gives-up-on-disconnect", "environment-unfiltered", "queue-variables-carried",
     "retired-variables-carried", "retired-variable-assignments-accepted", "nested-dispatch-allowed", "session-from-client", "cancel-session-unchecked", "cancel-no-readback", "signature-unchecked", "tamper-unalerted",
     "operations-unlogged", "unlisted-exit-swallowed", "card-fault-unread", "card-fault-unalerted", "peer-exit-unsplit", "lost-not-recorded",
     "cap-growth-skipped", "cap-unclamped", "host-switch-skipped", "retry-overwrites-attempts", "squeeze-retry-skipped", "gpu-short-retry-skipped",
-    "server-pending-ignored", "launch-when-unplaceable", "queue-reversed", "nofile-limit-dropped", "waiting-reason-unreported", "failed-runs-estimated", "backfill-disabled", "gpu-unrecognized", "gpu-entry-scripts-unrecognized",
+    "server-pending-ignored", "launch-when-unplaceable", "queue-reversed", "nofile-limit-dropped", "waiting-reason-unreported", "estimate-only-succeeded", "backfill-disabled", "gpu-unrecognized", "gpu-entry-scripts-unrecognized",
     "card-priority-ignored", "card-labels-all-local", "card-busy-ignored", "card-wait-blocks-all", "no-detach", "start-failure-ignored", "start-twice-after-restart",
     "resources-unrecorded", "record-ignored-for-cap", "unclaimed-not-listed", "check-deps-skipped", "config-missing-ignored",
-    "state-placement-unchecked", "watch-blind", "dry-run-writes", "secrets-overwritten", "install-readback-skipped", "stop-exit-status-only",
+    "state-placement-unchecked", "dry-run-writes", "secrets-overwritten", "install-readback-skipped", "stop-exit-status-only",
     "target-directory-unset", "retry-build-directory-kept", "clean-removes-nothing", "clean-session-unchecked", "runner-wake-skipped", "wait-notify-skipped", "aged-task-not-prioritized", "starved-head-unreported", "blocked-head-counted-as-starved", "in-repository-target-accepted",
     "unmeasured-recorded-as-zero", "estimate-unreported", "threads-unset", "maximum-line-vague", "sharding-unrecognized",
     "shard-retry-restarts-all", "merge-before-all-green", "shard-failure-unnamed", "balance-ignored", "retry-pinned-to-host", "stall-ignored", "stall-grace-skipped", "cpu-unread-counted-as-idle", "outer-scope-cpu-only", "inner-commands-unchecked", "queued-not-revalidated", "cpu-ignored-for-stall", "overrun-not-stopped", "peer-run-retry-skipped", "peer-starts-unthrottled", "squeeze-at-total-not-cap-hit", "prove-red-gpu-unread", "entry-quiesce-skipped", "host-specific-variables-sent-to-peer", "running-progress-unreported", "wrapper-prefixes-allowed", "resource-arguments-allowed", "peer-overflow-blocked",
@@ -1579,7 +1983,7 @@ KNOWN_BREAK_ITEMS = (
     "start-readback-skipped", "start-exit-status-ignored", "cardless-gpu-launched", "pinned-peer-unavailable-waits",
     "prediction-recomputed-every-pass", "pending-read-per-task", "pass-booking-not-carried", "launch-recheck-skipped",
     "gpu-feature-any-subcommand", "no-run-needs-card", "mutation-gate-gpu-unread",
-    "stall-clock-reset-on-restart", "workspace-writers-retried", "memory-floor-ignored", "judge-error-blocks-queue", "stalled-at-cap-not-retried", "booked-up-to-slice-total",
+    "stall-clock-reset-on-restart", "workspace-writers-retried", "judge-error-blocks-queue", "stalled-at-cap-not-retried", "booked-up-to-slice-total",
     "memory-cap-not-passed", "source-repository-not-passed", "suspect-unreported", "suspect-card-load-ignored", "suspect-reported-every-wait", "pinned-cap-ignored", "pinned-cap-grown",
     "pinned-cap-literal", "pin-unreadable-predicted", "booked-at-peak", "health-judges-head", "python-entry-gpu-unrecognized",
     "alternation-disabled", "whole-waits-for-empty-host", "sealed-group-held-when-drained", "pinned-cap-at-slice-total", "margin-fallback-fixed", "margin-unmeasured-waits",
@@ -1604,15 +2008,34 @@ KNOWN_BREAK_ITEMS = (
     "attention-queue-unreported", "attention-overrun-unreported", "attention-card-replaced-unreported", "attention-finished-unreported", "attention-cleanup-unreported",
     "attention-shard-advance-unreported", "attention-reported-every-wait", "temporary-service-build-unrecognized",
     "pause-queue-ignored", "pause-start-ungated", "pause-halts-reconcile", "pause-state-memory-only", "resume-leaves-cache-paused", "pause-health-unreported",
-    "pause-waiting-unreported", "pause-judges-starved", "watch-skips-while-paused",
+    "pause-waiting-unreported", "pause-judges-starved",
     "pause-allow-ignored", "pause-allow-matches-any-session", "pause-allow-waiting-paused", "pause-allow-change-ignored", "resume-keeps-allowed-session",
     "pause-allow-memory-only", "pause-allow-unsigned", "pause-allow-unreported", "pause-other-running-miscounted",
-    "wait-limit-fixed", "temporary-service-own-server-unrecognized", "cap-hit-rerun-unfloored",
-    "shard-siblings-unshared", "build-family-ignored", "retry-build-directory-fresh", "shard-key-from-joined-command",
+    "wait-limit-fixed", "temporary-service-own-server-unrecognized",
+    "shard-siblings-unshared", "build-family-ignored", "family-arguments-unfilled", "retry-build-directory-fresh", "shard-key-from-joined-command",
     "workspace-write-interrupted-unreported", "apply-outcome-ignored", "gpu-card-count-ignored",
     "history-peak-ignored", "read-only-arguments-counted-as-writer", "peer-retry-build-directory-fresh",
-    "history-peak-unwindowed", "whole-seals-every-host", "card-waiting-whole-seals",
-    "health-head-judged-apart", "progress-unwatched", "progress-gates-ignored", "card-wait-blocks-later-cards")
+    "history-peak-unwindowed", "whole-seals-every-host", "card-whole-counts-free-cards-only", "family-cap-hit-not-counted", "parallelism-falls-back-to-cores",
+    "at-cap-busy-cpu-kept-running", "at-cap-fraction-ignored", "peer-memory-line-unread", "aged-whole-not-counted", "aged-fragment-bypasses-seal",
+    "attention-quiet-busy-unreported", "io-wait-ignored", "attention-io-wait-unreported", "stall-card-load-ignored", "card-presence-counts-as-busy",
+    "attention-gpu-busy-quiet-unreported",
+    "health-head-judged-apart", "progress-unwatched", "progress-gates-ignored", "card-wait-blocks-later-cards",
+    "whole-workspace-cargo-accepted", "workspace-writer-headroom-skipped", "gap-fill-room-counts-all-running", "fragment-group-never-drops",
+    "repository-target-bypass-unwarned", "cancelled-artifacts-kept",
+    "inbox-not-sent", "inbox-auth-omitted", "inbox-reported-every-round", "pushed-outcome-not-collected",
+    "health-unwatched", "health-alerted-every-round", "unclaimed-unwarned",
+    "cancel-not-started-receipt-unread", "quiet-log-busy-any-exemption", "inbox-pending-dropped-on-error",
+    "leftovers-error-uncaught", "inbox-attention-per-shard",
+    "memory-peak-with-page-cache", "attention-reported-memory-only", "attention-queue-reasonless-sent",
+    "aged-seal-gap-filled", "budget-over-maxima-waits", "oversized-budget-silent", "long-run-idle-silent",
+    "fills-any-cap-silent", "old-metric-peaks-read",
+    "attention-next-generic", "unclaimed-outcome-not-repushed", "anomaly-not-repushed", "inbox-socket-from-submit-only", "inbox-missing-accepted",
+    "confirm-skipped", "confirm-counts-unchecked", "unconfirmed-kept", "family-lends-run-peak", "cleanup-tests-tables-hand-listed",
+    "seal-host-that-cannot-fit", "build-phase-past-finished", "fills-any-cap-counts-cap-hits", "path-check-substring",
+    "card-idle-stall-threshold-ignored", "peer-health-single-timeout-reported", "cap-hit-stat-unreported",
+    "over-two-hours-not-bounced", "over-two-hours-cap-hits-counted", "over-two-hours-commit-exempt-by-command-only",
+    "requeue-keeps-original-position", "long-run-confirmed-still-bounced", "long-run-confirmed-flag-hidden",
+    "whole-package-unconfirmed-accepted", "whole-package-confirmed-exempts-two-hours", "whole-package-flag-dropped-on-requeue")
 
 
 # ── 只在自证里认的变量 ──
@@ -2118,14 +2541,41 @@ def configured_by_host(configuration_path, key, environment=None):
         return None, f"多机配置 {configuration_path} 写坏了：{error}"
 
 
-def peer_shell(host, script, environment=None):
-    """经 ssh 在第二台上跑一段 shell（NFS_SSH_OPTIONS）：→ (退出码, 标准输出, 标准错误)；ssh 起不来或超时退 255。自证里 ssh 换成 TASK_SERVER_PEER_SSH 那一份。"""
+def peer_shell_timed(host, script, environment=None):
+    """经 ssh 在第二台上跑一段 shell（NFS_SSH_OPTIONS）：→ (退出码, 标准输出, 标准错误, 是不是超时)；ssh 起不来或超时退 255。自证里 ssh 换成 TASK_SERVER_PEER_SSH 那一份、
+    时限换成 TASK_SERVER_SELFTEST_NFS_SSH_SECONDS。"""
     ssh = selftest_override("TASK_SERVER_PEER_SSH", environment) or "ssh"
+    seconds = float(selftest_override("TASK_SERVER_SELFTEST_NFS_SSH_SECONDS", environment) or NFS_SSH_SECONDS)
     try:
-        completed = subprocess.run([ssh, *NFS_SSH_OPTIONS, host, script], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=NFS_SSH_SECONDS)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        return 255, "", f"{type(error).__name__}: {error}"
-    return completed.returncode, completed.stdout, completed.stderr
+        completed = subprocess.run([ssh, *NFS_SSH_OPTIONS, host, script], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=seconds)
+    except subprocess.TimeoutExpired as error:
+        return 255, "", f"{type(error).__name__}: {error}", True
+    except OSError as error:
+        return 255, "", f"{type(error).__name__}: {error}", False
+    return completed.returncode, completed.stdout, completed.stderr, False
+
+
+def peer_shell(host, script, environment=None):
+    """peer_shell_timed 去掉是不是超时那一样：→ (退出码, 标准输出, 标准错误)。"""
+    code, output, error, _ = peer_shell_timed(host, script, environment)
+    return code, output, error
+
+
+def peer_shell_rechecked(host, script, environment=None):
+    """连第二台一次超时先当慢（文件头「NFS 共享」的挂载）：→ (退出码, 标准输出, 标准错误, 慢的那一句)。头一次超时的隔 NFS_RECHECK_PAUSE_SECONDS 复查一次，
+    复查回了照复查的交、慢的那一句写「慢：头一次 ssh 超时 …，隔 … 秒复查回了」；复查还超时或连不上的交 255、标准错误写两次的原因。头一次没超时的照它交、不复查。
+    弄坏开关 peer-health-single-timeout-reported 下不复查（头一次超时就照连不上交）。"""
+    code, output, error, timed_out = peer_shell_timed(host, script, environment)
+    if not timed_out or broken("peer-health-single-timeout-reported", environment):
+        return code, output, error, ""
+    seconds = float(selftest_override("TASK_SERVER_SELFTEST_NFS_SSH_SECONDS", environment) or NFS_SSH_SECONDS)
+    pause = float(selftest_override("TASK_SERVER_SELFTEST_NFS_RECHECK_PAUSE_SECONDS", environment) or NFS_RECHECK_PAUSE_SECONDS)
+    time.sleep(pause)
+    again, output, second_error, second_timed_out = peer_shell_timed(host, script, environment)
+    if again == 255:
+        why = "复查又超时" if second_timed_out else f"复查连不上（{last_line(second_error, '没有输出')}）"
+        return 255, output, f"ssh 超时 {seconds:g} 秒，隔 {pause:g} 秒{why}", ""
+    return again, output, second_error, f"慢：头一次 ssh 超时 {seconds:g} 秒（{last_line(error, '没有输出')}），隔 {pause:g} 秒复查回了"
 
 
 def last_line(text, fallback):
@@ -2187,17 +2637,22 @@ def nfs_probe(root, host, environment=None):
                 os.remove(path)
 
 
-def nfs_mount_verdict(root, host, environment=None):
+def nfs_mount_verdict(root, host, environment=None, slow=None):
     """「挂载」那一项（文件头「NFS 共享」）：经 ssh 在第二台上 stat -f 这个根下面的「.」——走进目录会触发 x-systemd.automount 挂上它（自动挂载点闲着时
     只是一层 autofs 的占位，mountpoint -q 照样退 0，不说明 NFS 挂上了），读到的文件系统类型是 nfs 才过。→「过」或一句为什么不过、怎么在第二台恢复。
+    ssh 一次超时照 peer_shell_rechecked 复查一次：复查回了照回的判，慢的那一句（带上根）追加进 slow（给了的话）；复查仍不通的写连不上。
     弄坏开关 nfs-mount-placeholder-accepted 下照改前只看 mountpoint -q（占位也算挂上）。"""
     if broken("nfs-mount-placeholder-accepted", environment):
-        code, _, error = peer_shell(host, f"mountpoint -q -- {shlex.quote(root)}", environment)
+        code, _, error, slowly = peer_shell_rechecked(host, f"mountpoint -q -- {shlex.quote(root)}", environment)
+        if slowly and slow is not None:
+            slow.append(f"共享根 {root} 的「挂载」{slowly}")
         return NFS_PASSED if code == 0 else (f"第二台 mountpoint -q 退 {code}：没把它挂在同一路径" if code != 255
-                                             else f"连不上第二台（ssh 退 255：{last_line(error, '没有输出')}）")
-    code, output, error = peer_shell(host, f"{NFS_MOUNT_PROBE_TEXT} {shlex.quote(root + '/.')}", environment)
+                                             else f"连不上第二台（{last_line(error, '没有输出')}）")
+    code, output, error, slowly = peer_shell_rechecked(host, f"{NFS_MOUNT_PROBE_TEXT} {shlex.quote(root + '/.')}", environment)
+    if slowly and slow is not None:
+        slow.append(f"共享根 {root} 的「挂载」{slowly}")
     if code == 255:
-        return f"连不上第二台（ssh 退 255：{last_line(error, '没有输出')}）"
+        return f"连不上第二台（{last_line(error, 'ssh 退 255，没有输出')}）"
     kind = output.strip()
     if code == 0 and kind in NFS_FILESYSTEM_TYPES:
         return NFS_PASSED
@@ -2206,11 +2661,13 @@ def nfs_mount_verdict(root, host, environment=None):
 
 
 def nfs_share_report(configuration_path, environment=None, probe=True):
-    """NFS 共享判得过没有（文件头「NFS 共享」）：→ {ok, problem, next_step, roots: [{root, directory, export, mount, probe}…], checked_at}。
+    """NFS 共享判得过没有（文件头「NFS 共享」）：→ {ok, problem, next_step, roots: [{root, directory, export, mount, probe}…], checked_at, slow}。
+    slow 是「挂载」那一项 ssh 头一次超时、复查回了的那几句（nfs_mount_verdict；服务只记进服务日志）。
     每一项是「过」或一句为什么不过（没判的写「没判：…」）；problem 是第一处不过的那一句（哪个根、哪一项、为什么）。probe=False 不做两向探针。
     弄坏开关 nfs-unchecked 下一项都不判、照过。"""
     environment = os.environ if environment is None else environment
-    report = {"ok": False, "problem": "", "next_step": f"照 {NFS_README} 在本机导出、第二台挂在同一绝对路径，修好再起", "roots": [], "checked_at": round(time.time(), 3)}
+    report = {"ok": False, "problem": "", "next_step": f"照 {NFS_README} 在本机导出、第二台挂在同一绝对路径，修好再起", "roots": [], "checked_at": round(time.time(), 3),
+              "slow": []}
     if broken("nfs-unchecked", environment):
         return dict(report, ok=True)
     text, why = configured_value(configuration_path, NFS_ROOTS_KEY)
@@ -2232,7 +2689,7 @@ def nfs_share_report(configuration_path, environment=None, probe=True):
         if not host:
             entry["mount"] = f"{host_why}：连不了第二台"
         else:
-            entry["mount"] = nfs_mount_verdict(root, host, environment)
+            entry["mount"] = nfs_mount_verdict(root, host, environment, report["slow"])
         if not probe:
             entry["probe"] = "没判：只在起来时与 control check、install、start 做"
         elif entry["directory"] != NFS_PASSED or entry["mount"] != NFS_PASSED:
@@ -2455,6 +2912,89 @@ def target_directory_refusal(environment, argv, cwd, broken_environment=None):
     return ""
 
 
+# ── 取仓根 target/ 下的二进制（task_server.py 文件头 ②「提交时警告」）──
+REPOSITORY_TARGET_NAME = "target"
+BYPASS_SCRIPT_MAXIMUM_BYTES = 4 * 1024 * 1024   # 读入口脚本正文只读这么大的（推的：本仓的脚本都远小于它，读不全的不判）
+BYPASS_HITS_SHOWN = 3   # 警告那一句至多点名几处
+# 词里的路径段：引号、命令分隔、重定向与「名=」的等号都切开
+BYPASS_WORD_PATH = re.compile(r"[^\s'\"`;|&()<>=]+")
+# 入口脚本正文里指向仓根 target/ 的路径字面：前面接仓根变量（shell 的 $<名>、${<名>}、${<名>:-…}，python f 串的 {<名>}；名里带 repo、root 或 toplevel）、
+# $(dirname …) 之后往上跳的 /..、$(git rev-parse --show-toplevel)，接 /target/release/ 或 /target/debug/（${CARGO_TARGET_DIR:-$<仓根>/target}/release/ 这种退回仓根的同样算）
+ROOTED_TARGET_LITERAL = re.compile(
+    r"(?:\$\{?\w*(?:repo|root|toplevel)\w*\}?|\{\w*(?:repo|root|toplevel)\w*\}|dirname[^\n]*?\)\"?(?:/\.\.)+|\$\(git rev-parse --show-toplevel\))"
+    r"/target\}?/(?:release|debug)/", re.IGNORECASE)
+# 在仓根起的命令，正文里裸写的 target/release/、target/debug/：赋值的值（NAME=、python 的 name = ）、缺省值（${…:-target/…}）与命令位置（行首不带引号）
+BARE_TARGET_LITERAL = re.compile(r"(?:^\s*|\w\s*=\s*[\"']?|:-[\"']?)(?:\./)?target/(?:release|debug)/")
+# 正文里不读的行：注释、只在弄坏开关下走的那一支（break_is、*_BREAK、broken(）
+BYPASS_SKIPPED_LINE = re.compile(r"^\s*(?:#|//)|\bbreak_is\b|_BREAK\b|\bbroken\(")
+# 自证那一支：python 名字里带 selftest 或以 cells 收尾的函数体、shell 名字里带 selftest 的函数体（样本里造的假路径，如 memory_peaks_lib.py 的 key_fold_cells）
+PYTHON_SELFTEST_DEFINITION = re.compile(r"^(\s*)def\s+(\w*selftest\w*|\w*cells)\s*\(")
+SHELL_SELFTEST_DEFINITION = re.compile(r"^\s*(?:function\s+)?[\w-]*selftest[\w-]*\s*\(\)")
+
+
+def script_target_literals(script_path, bare_counts):
+    """入口脚本正文里指向仓根 target/ 的路径字面（ROOTED_TARGET_LITERAL；bare_counts 为真时另认 BARE_TARGET_LITERAL）：→ [(行号, 那一段字面)]。
+    注释、弄坏开关那一支（BYPASS_SKIPPED_LINE）与自证那一支的函数体不读；读不了、不是普通文件、超过 BYPASS_SCRIPT_MAXIMUM_BYTES 的交 []。"""
+    try:
+        if not os.path.isfile(script_path) or os.path.getsize(script_path) > BYPASS_SCRIPT_MAXIMUM_BYTES:
+            return []
+        with open(script_path, encoding="utf-8", errors="replace") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return []
+    found, python_indent, in_shell_selftest = [], None, False
+    for number, line in enumerate(lines, 1):
+        if in_shell_selftest:
+            in_shell_selftest = not line.startswith("}")
+            continue
+        if python_indent is not None:
+            if not line.strip() or len(line) - len(line.lstrip()) > python_indent:
+                continue
+            python_indent = None
+        definition = PYTHON_SELFTEST_DEFINITION.match(line)
+        if definition:
+            python_indent = len(definition.group(1))
+            continue
+        if SHELL_SELFTEST_DEFINITION.match(line):
+            in_shell_selftest = not line.rstrip().endswith("}")
+            continue
+        if BYPASS_SKIPPED_LINE.search(line):
+            continue
+        match = ROOTED_TARGET_LITERAL.search(line) or (BARE_TARGET_LITERAL.search(line) if bare_counts else None)
+        if match:
+            found.append((number, match.group(0).strip()))
+    return found
+
+
+def repository_target_references(argv, cwd, roots, environment):
+    """这一条命令取仓根 target/ 下的东西（task_server.py 文件头 ②「提交时警告」）：→ [那一处的说明…]，没有交 []。
+    roots 是「仓根」那几棵树（服务的仓根与主工作树；草稿与临时目录下的仓副本不在里面）。认两样：
+    ① 命令里的词（整个词、「名=值」的值、bash -c 词里的每一段；相对路径照工作目录解）落在某个仓根的 target/ 下；调用方给的编译目录（given_target_directories）下的不算；
+    ② 命令位置上起的本仓脚本（command_word_index 剥过之后那一个词；不是 -c）正文里有指向仓根 target/ 的路径字面（script_target_literals；工作目录就是仓根时另认裸写的）。
+    带 --selftest 起的脚本走自证那一支（样本里的假路径），不读正文。"""
+    targets = [os.path.join(os.path.realpath(root), REPOSITORY_TARGET_NAME) for root in roots]
+    given = [path for _, path in given_target_directories(environment, argv, cwd)]
+    found = []
+    for word in argv:
+        for piece in BYPASS_WORD_PATH.findall(word):
+            if REPOSITORY_TARGET_NAME not in piece or "$" in piece:
+                continue
+            path = os.path.normpath(os.path.join(cwd, piece))
+            if (any(inside(path, target) and os.path.realpath(path) != target for target in targets)
+                    and not any(inside(path, directory) for directory in given)):
+                found.append(f"命令里的 {piece}（{path}）")
+                break
+    index = command_word_index(argv)
+    if index < len(argv) and argv[index] != "-c" and "--selftest" not in argv[index + 1:]:
+        script = os.path.realpath(os.path.join(cwd, argv[index]))
+        root = next((os.path.realpath(root) for root in roots if inside(script, root)), "")
+        if root and not inside(script, os.path.join(root, REPOSITORY_TARGET_NAME)):
+            bare = os.path.realpath(cwd) in (os.path.realpath(each) for each in roots)
+            for number, literal in script_target_literals(script, bare):
+                found.append(f"入口脚本 {os.path.relpath(script, root)}:{number} 的 {literal}")
+    return found
+
+
 # ── 分片（文件头「分片」）──
 def declared_header_words(script_path, mark):
     """脚本文件头前 DECLARED_HEADER_LINES 行里以 mark 起头的那一行写的词（分片、要卡的参数、续跑三种声明共用）；文件读不了、不是普通文件或没写交 None。"""
@@ -2577,6 +3117,31 @@ def cargo_option_values(arguments):
     return found
 
 
+MANIFEST_VIRTUAL = "virtual"          # cargo_manifest_scope：只有 [workspace]、没有 [package] 的清单，不点名包就编每一个成员
+MANIFEST_PACKAGE = "package"          # 包自己的清单：不点名包只编这一个包
+MANIFEST_NONE = "none"                # 往上一份 Cargo.toml 都没有：cargo 自己就报错
+MANIFEST_UNREADABLE = "unreadable"    # 有清单而读不了、不是合法的 TOML
+
+
+def cargo_manifest_scope(directory):
+    """cargo 在 directory 起、不点名包时编的范围（task_server.py 文件头 ②「提交时拒」⑤）：照 cargo 找清单的走法，directory 起往上第一份 Cargo.toml。
+    → (那份清单的路径或 None, MANIFEST_VIRTUAL / MANIFEST_PACKAGE / MANIFEST_NONE / MANIFEST_UNREADABLE 之一, 读不了的原因或空串)。"""
+    current = os.path.abspath(directory)
+    while True:
+        manifest = os.path.join(current, "Cargo.toml")
+        if os.path.isfile(manifest):
+            try:
+                with open(manifest, "rb") as handle:
+                    parsed = tomllib.load(handle)
+            except (OSError, tomllib.TOMLDecodeError) as error:
+                return manifest, MANIFEST_UNREADABLE, f"{type(error).__name__}: {error}"
+            return manifest, MANIFEST_VIRTUAL if "workspace" in parsed and "package" not in parsed else MANIFEST_PACKAGE, ""
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None, MANIFEST_NONE, ""
+        current = parent
+
+
 def cargo_build_family(arguments, workspace=""):
     """cargo 这一层的编译族（文件头「资源记录」的编译族）：包（去重排序）、档（--release 与 --profile release 同一档，没写是 dev）、特性（去重排序）、
     --all-features、--no-default-features、--target；子命令、测试目标名、测试名筛选、`--` 之后的 libtest 参数不进。一个包都没点名的记 cargo 起的那个目录
@@ -2592,8 +3157,45 @@ def cargo_build_family(arguments, workspace=""):
     return f"{BUILD_FAMILY_MARK} " + " ".join(parts)
 
 
+def option_value_in_arguments(arguments, option):
+    """参数里 option 的值：认「option 值」与「option=值」，`--` 之后的不认，取第一处；没有交 None。"""
+    for index, word in enumerate(arguments):
+        if word == "--":
+            return None
+        if word == option:
+            return arguments[index + 1] if index + 1 < len(arguments) else None
+        if word.startswith(option + "="):
+            return word[len(option) + 1:]
+    return None
+
+
+def filled_family_words(declared, arguments, environment=None):
+    """编译族声明里取自命令参数的词照这一条命令填上（文件头「资源记录」的编译族）：「$<n>」换成 arguments 里第 n 个词（从 1 数），「$<以 - 起头的选项名>」换成
+    那个选项的值（option_value_in_arguments），别的词照原样。→ 填好的词表；有一个填不上（没有那个词、值是空的或以 - 起头、$ 后面既不是正整数也不是选项名）交 None。
+    弄坏开关 family-arguments-unfilled 下照原样交回、一个都不填（改前的样子：「-p $3」照字面算，每个包都归进同一个字面的族）。"""
+    if broken("family-arguments-unfilled", environment):
+        return list(declared)
+    filled = []
+    for word in declared:
+        if not word.startswith(FAMILY_ARGUMENT_MARK) or word == FAMILY_ARGUMENT_MARK:
+            filled.append(word)
+            continue
+        reference = word[len(FAMILY_ARGUMENT_MARK):]
+        if reference.isdigit() and int(reference) >= 1:
+            value = arguments[int(reference) - 1] if int(reference) <= len(arguments) else None
+        elif reference.startswith("-"):
+            value = option_value_in_arguments(arguments, reference)
+        else:
+            return None
+        if not value or value.startswith("-"):
+            return None
+        filled.append(value)
+    return filled
+
+
 def declared_build_family(argv, cwd, environment=None):
     """命令位置上起的入口脚本文件头写了「# task-server-cargo-family: <cargo 参数>…」的，照声明的参数算编译族（cargo_build_family）；
+    声明里取自命令参数的词（$<n>、$<选项名>）先照这一条命令填上（filled_family_words），填不上的交空串（不归族）。
     单独 --selftest、带 --list-items / --help / -h 的、没写那一行的交空串。"""
     index = command_word_index(argv)
     if index >= len(argv):
@@ -2602,7 +3204,10 @@ def declared_build_family(argv, cwd, environment=None):
     if (arguments[:1] and arguments[0] in NOT_SHARDED_ARGUMENTS) or "--selftest" in arguments:
         return ""
     declared = declared_header_words(os.path.realpath(os.path.join(cwd or REPOSITORY_ROOT, argv[index])), DECLARED_BUILD_FAMILY_MARK)
-    return cargo_build_family(list(declared)) if declared else ""
+    if not declared:
+        return ""
+    filled = filled_family_words(declared, arguments, environment)
+    return cargo_build_family(filled) if filled else ""
 
 
 def package_directories(names, environment=None):
@@ -2965,13 +3570,12 @@ def mebibytes_text(byte_count):
     return f"{math.ceil(byte_count / MEBIBYTE)}M"
 
 
-def maximum_next_step(host, cap_text):
-    """memory-cap-at-maximum 的出路（文件头「撞顶到两台最大」）：撞了哪台、到了多少、改什么再重投。"""
+def maximum_next_step(host, cap_text, peak_text, environment=None):
+    """memory-cap-at-maximum 的出路（文件头「撞顶到两台最大」）：撞了哪台、到了多少、峰值多少，后面接异常表里这一种的修改意见（核实范围、分片与同时起的个数）。
+    wait 的末行、打回的理由与发给会话的正文都用这一句。"""
     where = HOST_NAMES.get(host, host or "本机")
-    raise_cap = (f"多机配置 {PIN_SOURCE} 里第二台那一项" if host == "peer"
-                 else f"本机 slice 的总上限（多机配置 {PIN_SOURCE} 里本机那一项，singlefs-heavy.slice 的 MemoryMax）")
-    return (f"改了再重投：{where}已给到 {cap_text} 还撞、再乘 1.5 就到这台的总上限；把命令要的内存降到 {cap_text} 以内（拆小、少开并行、换小一点的输入），"
-            f"或请用户调大{raise_cap}，改完再 task-server/task submit 重投")
+    return (f"撞到动态上限、打回：{where}已给到 {cap_text}（峰值 {peak_text}），再乘 1.5 就到能派的每一台的可用上限；"
+            + anomaly_advice("memory-cap-at-maximum", "", environment))
 
 
 def pinned_caps_text(reply):
@@ -3014,7 +3618,7 @@ def reason_fields(task, attempts, log_text):
         "host": HOST_NAMES.get(last.get("host") or task.get("maximum_host") or "", last.get("host") or "本机"),
         "last_line": log_last_line(log_text),
         "cap": last.get("memory_cap_text") or "没起",
-        "peak": size_text(last.get("memory_peak")),
+        "peak": size_text(last.get("memory_peak")) if attempts else (task.get("maximum_peak_text") or "没量到"),   # 一次都没起的照打回时记的预测峰值
         "reached": task.get("maximum_cap_text") or last.get("memory_cap_text") or "?",
         "by": last.get("squeezed_by") or "同台没有别的任务在跑（slice 里回收不掉的用量把它挤掉）",
         "card": last.get("card") or "没分到卡",
@@ -3027,44 +3631,422 @@ def reason_fields(task, attempts, log_text):
     if outcome == "cancelled":
         facts["by"] = "提交它的会话（task-server/task cancel）"
     counts = task.get("outcome_counts") or {}
-    log_next = f"看 task-server/task log {task_id}"
-    sentences = {
-        "succeeded": ("命令退 0", "无"),
-        "command-failed": (f"命令自己退 {facts['exit']}（不是服务判的；日志最后一行见 last_line）", f"{log_next}，改了命令或代码再重交"),
-        "memory-cap-hit": (f"撞了这一次的内存上限 {facts['cap']}（量到的峰值 {facts['peak']}），撞了 {counts.get('memory-cap-hit', 1)} 次" + (f"：{note}" if note else ""),
-                           "看这一趟是不是规模变大或内存泄漏；把要的内存降下来再重交"),
-        "memory-cap-at-maximum": (f"{facts['host']}给到 {facts['reached']} 还撞（峰值 {facts['peak']}），再乘 1.5 就到能派的每台的总上限" + (f"：{note}" if note else ""),
-                                  maximum_next_step(task.get("maximum_host") or last.get("host") or "", facts["reached"])),
-        "squeezed-out": (f"{facts['host']}的 slice 总上限满了，这一条（上限 {facts['cap']}）被内核挤掉 {counts.get('squeezed-out', 1)} 次；同台在跑的：{facts['by']}",
-                         "等同台那几条跑完再重交，或请用户调大那台 slice 的总上限"),
-        "gpu-memory-short": (f"卡 {facts['card']} 显存不够（内存包装退 245），重排过也没够", "等那张卡的显存空出来再重交；看是不是别的任务占着它"),
-        "timed-out": (f"内存包装的限时到了（253，上限 {facts['cap']}）", f"{log_next}，看命令卡在哪；拆小再重交"),
-        "wrapper-refused": ("内存包装用法错或 scope 起不来（251）", f"{log_next}，照最后那一句修好再重交"),
-        "run-condition-unmet": (note or f"命令或清场包装退 78（运行条件不满足）：{facts['last_line']}", "照那一句的出路修好设备或配置再重交"),
-        "not-run": ("命令报本次未跑（77）", f"{log_next}，补齐它要的前提再重交"),
-        "peer-run-failed": ("第二台那一趟没跑成（multi-host-run.sh 退 255、日志里没有第二台那条命令的结束行：连不上、ssh 被重置或那边的准备没过），重排过也没成",
-                            "看 python3 task-server/control check 与 /health 的 peer 一栏；修好第二台再重交"),
-        "prune-server-unavailable": ("命令自己退 75：prune-server（判定库服务）不可用；服务另起了一次 python3 prune-server/control check，不通的写了告警",
-                                     "看 python3 prune-server/control check 那一句修好 prune-server，再重交；不要改成走本地库"),
+    whys = {
+        "succeeded": "命令退 0",
+        "command-failed": f"命令自己退 {facts['exit']}（不是服务判的；日志最后一行见 last_line）",
+        "memory-cap-hit": f"撞了这一次的内存上限 {facts['cap']}（量到的峰值 {facts['peak']}），撞了 {counts.get('memory-cap-hit', 1)} 次" + (f"：{note}" if note else ""),
+        # 一次都没起的（记账超过每一台可用上限，task_server.py 文件头 ②「预算」）：说明就是 note，峰值写 note 里预测的那一个
+        "memory-cap-at-maximum": ((f"{facts['host']}给到 {facts['reached']} 还撞（峰值 {facts['peak']}），再乘 1.5 就到能派的每台的总上限" + (f"：{note}" if note else ""))
+                                  if attempts else (note or "记账超过能派的每一台的可用上限，一次都没起")),
+        "squeezed-out": f"{facts['host']}的 slice 总上限满了，这一条（上限 {facts['cap']}）被内核挤掉 {counts.get('squeezed-out', 1)} 次；同台在跑的：{facts['by']}",
+        "gpu-memory-short": f"卡 {facts['card']} 显存不够（内存包装退 245），重排过也没够",
+        "timed-out": f"内存包装的限时到了（253，上限 {facts['cap']}）",
+        "wrapper-refused": "内存包装用法错或 scope 起不来（251）",
+        "run-condition-unmet": note or f"命令或清场包装退 78（运行条件不满足）：{facts['last_line']}",
+        "not-run": "命令报本次未跑（77）",
+        "peer-run-failed": "第二台那一趟没跑成（multi-host-run.sh 退 255、日志里没有第二台那条命令的结束行：连不上、ssh 被重置或那边的准备没过），重排过也没成",
+        "prune-server-unavailable": "命令自己退 75：prune-server（判定库服务）不可用；服务另起了一次 python3 prune-server/control check，不通的写了告警",
         "card-fault": ((f"清场判出卡 {faulty} 坏了（这一次分到的是 {facts['card']}）" if faulty else
-                        f"清场判出有卡坏，清场那一行里取不到坏卡清单（faulty-cards=），一张卡都没停用（这一次分到的是 {facts['card']}）") + (f"：{note}" if note else ""),
-                       "主 agent 弹窗请用户重置清场点名的那张卡（台、序号与依据在 quiesce= 那一行）；看还有没有好卡（多机配置 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED）"),
-        "launcher-lost": (f"尝试的单元 {facts['unit']} 不在了、又没留结果，服务对不回来", f"看 journalctl --user -u {facts['unit']}；照原样重交"),
-        "cancelled": (note or "提交它的会话取消、单元已停", "要跑就重交"),
-        "record-tampered": (f"库里这条记录校验不过（{facts['what']}），一次都不起", "查是谁直接写了库；照 task-server/task submit 重交"),
-        "never-fits": (f"哪台都等多久也放不下，或点名第二台而它用不了：{facts['judged']}", "把命令要的内存降下来，或修好第二台再重交"),
-        "unit-start-failed": (f"尝试的单元起不来：{facts['judged']}", "看 systemctl --user status 与 journalctl --user；修好再重交"),
-        "resubmit-required": (f"服务规则改了，还在排的这一条照现行提交规则不再收：{facts['rule']}", "照 rule 那一条改了再重交"),
-        "stalled": (f"卡住，服务停了它：{facts['judged']}", f"{log_next}，看最后停在哪；改了再重交"),
-        "shard-plan-refused": (f"分片的计划那一步退 0 而它写的计划读不通：{facts['judged']}", "照 task_server_lib.py 文件头「分片」改计划的写法再重交"),
+                        f"清场判出有卡坏，清场那一行里取不到坏卡清单（faulty-cards=），一张卡都没停用（这一次分到的是 {facts['card']}）") + (f"：{note}" if note else "")),
+        "launcher-lost": f"尝试的单元 {facts['unit']} 不在了、又没留结果，服务对不回来",
+        "cancelled": note or "提交它的会话取消、单元已停",
+        "record-tampered": f"库里这条记录校验不过（{facts['what']}），一次都不起",
+        "never-fits": f"哪台都等多久也放不下，或点名第二台而它用不了：{facts['judged']}",
+        "unit-start-failed": f"尝试的单元起不来：{facts['judged']}",
+        "resubmit-required": f"服务规则改了，还在排的这一条照现行提交规则不再收：{facts['rule']}",
+        "stalled": f"卡住，服务停了它：{facts['judged']}",
+        "shard-plan-refused": f"分片的计划那一步退 0 而它写的计划读不通：{facts['judged']}",
+        "over-two-hours": f"不是提交时的门禁，累计跑满两小时，服务停了它：{facts['judged']}",
     }
-    why, next_step = sentences.get(outcome, (note or f"结局 {outcome}", log_next))
+    why = whys.get(outcome, note or f"结局 {outcome}")
+    # 出路照异常表这一种那一行的修改意见（文件头「异常表」）；memory-cap-at-maximum 前面另接撞了哪台、到了多少（maximum_next_step）
+    if outcome == "succeeded":
+        next_step = "无"
+    elif outcome == "memory-cap-at-maximum":
+        next_step = maximum_next_step(task.get("maximum_host") or last.get("host") or "", facts["reached"], facts["peak"])
+    elif outcome == "launcher-lost":
+        next_step = anomaly_advice(outcome, task_id).replace("<unit= 点名的单元>", facts["unit"])
+    elif outcome == "over-two-hours" and task.get("requeue_command"):   # 对的那一条出路照这一回服务算的两个数写成整行（task_server.py 的 requeue_command_text）
+        next_step = f"{anomaly_advice(outcome, task_id)}；对的照这一行：{task['requeue_command']}"
+    else:
+        next_step = anomaly_advice(outcome, task_id)
     return [("type", outcome)] + [(name, facts[name]) for name in REASON_ELEMENTS.get(outcome, ())] + [("why", why), ("next", next_step)]
 
 
 def reason_line(task, attempts, log_text):
     """REASON_MARK 那一行（值照 shlex 引，shlex.split 拆得回）。"""
     return " ".join([REASON_MARK, f"task={task.get('id')}"] + [f"{name}={shlex.quote(str(value))}" for name, value in reason_fields(task, attempts, log_text)])
+
+
+# ── 一条任务的回话（GET /tasks/<号> 与 wait 的 summary）照 wait 的写法拼成几行：客户端打它，服务发消息给会话（task_server.py 文件头 ⑥）照同一份拼 ──
+LOG_REASON_BYTES = 65536   # 打回的理由取日志最后这么多字节（与 task_server.py 的 LOG_TAIL_BYTES 同一个数）
+ROLE_NAMES = {"plan": "计划", "merge": "合并"}
+
+
+def child_prefix(child_task):
+    role = child_task.get("role")
+    if role == "shard":
+        return f"第 {child_task.get('shard_index')}/{child_task.get('shard_count')} 片（子任务 {child_task.get('id')}）"
+    return f"{ROLE_NAMES.get(role, role)}（子任务 {child_task.get('id')}）"
+
+
+def reply_attempts(reply):
+    """[(前缀, 尝试)]：普通任务是它自己的；分片的父任务是各子任务的，按子任务号。"""
+    if reply.get("children"):
+        return [(child_prefix(child["task"]), attempt) for child in reply["children"] for attempt in child.get("attempts", [])]
+    return [("", attempt) for attempt in reply.get("attempts", [])]
+
+
+def outcome_attempts(reply):
+    """结局所在的那几次尝试：分片的有一步没成的是那一步的子任务的，别的是全部（末行的 log= 与打回的理由取同一份）。"""
+    failed = reply["task"].get("failed_step") or {}
+    attempts = [attempt for _, attempt in reply_attempts(reply)]
+    if failed and reply.get("children"):
+        attempts = next((child.get("attempts", []) for child in reply["children"] if child["task"].get("id") == failed.get("task")), attempts)
+    return attempts
+
+
+def log_tail_text(path):
+    """日志最后 LOG_REASON_BYTES 字节（读不了交空串）。"""
+    if not path:
+        return ""
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - LOG_REASON_BYTES))
+            return handle.read().decode("utf-8", "replace")
+    except OSError:
+        return ""
+
+
+def reply_reason_fields(reply):
+    """打回的理由那几栏（reason_fields）：日志取结局那一次的最后 LOG_REASON_BYTES 字节。"""
+    attempts = outcome_attempts(reply)
+    return reason_fields(reply["task"], attempts, log_tail_text(attempts[-1].get("log")) if attempts else "")
+
+
+def reply_reason_line(reply):
+    """末行之前那一行 REASON_MARK（task 文件头 wait 那一段）。"""
+    return " ".join([REASON_MARK, f"task={reply['task'].get('id')}"] + [f"{name}={shlex.quote(str(value))}" for name, value in reply_reason_fields(reply)])
+
+
+def reply_result_line(reply, environment=None):
+    """末行 RESULT_MARK（task 文件头 wait 那一段）。弄坏开关 maximum-line-vague 下撞顶的不写撞了哪台、到了多少、改什么。"""
+    task = reply["task"]
+    pairs = reply_attempts(reply)
+    failed = task.get("failed_step") or {}
+    log_attempts = outcome_attempts(reply)
+    log = log_attempts[-1].get("log", "") if log_attempts else ""
+    line = (f"{RESULT_MARK} task={task.get('id')} type={task.get('outcome')} exit={task.get('exit_code')} attempts={len(pairs)} "
+            f"log={log or '无（一次都没起）'}")
+    if task.get("sharded_entry"):
+        line += f" shards={task.get('shard_count', 0)}"
+    if failed.get("role") == "shard":
+        line += f" shard={failed.get('index')}/{failed.get('count')}"
+    elif failed.get("role") in ("plan", "merge"):
+        line += f" step={failed['role']}"
+    build = next((attempt.get("build_directory") for _, attempt in reversed(pairs) if attempt.get("build_directory") and not attempt.get("build_directory_removed")), "")
+    if build:   # 编译目录留给提交它的 agent：用完 task-server/task clean <号> 删（文件头「编译目录」）
+        line += f" build={build}"
+    if task.get("outcome") == "memory-cap-at-maximum" and not broken("maximum-line-vague", environment):
+        host = failed.get("maximum_host") or task.get("maximum_host", "")
+        cap_text = failed.get("maximum_cap_text") or task.get("maximum_cap_text", "")
+        peak_text = (size_text(log_attempts[-1].get("memory_peak")) if log_attempts
+                     else failed.get("maximum_peak_text") or task.get("maximum_peak_text") or "没量到")
+        line += f" host={HOST_NAMES.get(host, host or '本机')} reached={cap_text or '?'} next={maximum_next_step(host, cap_text or '?', peak_text)}"
+    return line
+
+
+def suspect_line(task_id, suspect):
+    """报疑似卡住的那一行 SUSPECT_MARK（task 文件头 wait 那一段）。"""
+    return (f"{SUSPECT_MARK} task={task_id} attempt={suspect.get('attempt')} host={HOST_NAMES.get(suspect.get('host'), suspect.get('host') or '本机')} "
+            f"window={suspect.get('window_seconds')} cores={suspect.get('cores')} log={suspect.get('log') or '无'} why={suspect.get('why')}")
+
+
+def attention_line(task_id, item):
+    """报要处置的提醒的那一行 ATTENTION_MARK（task 文件头 wait 那一段）：值照 shlex 引（同 REASON_MARK，shlex.split 拆得回）；part= 只在提醒说的是分片的子任务时写它的任务号。"""
+    part = f" part={item.get('task')}" if item.get("task") not in (None, task_id) else ""
+    values = [(name, item.get(name)) for name in ("basis", "why", "next")]
+    return (f"{ATTENTION_MARK} task={task_id}{part} type={ATTENTION_TYPE} kind={item.get('kind')} tier={item.get('tier')} "
+            + " ".join(f"{name}={shlex.quote(str(value))}" for name, value in values))
+
+
+@dataclass(frozen=True)
+class AnomalyRow:
+    kind: str
+    action: str
+    criterion: str
+    advice: str
+    unhandled: str
+
+
+def anomaly_rows(text):
+    """文件头「异常表」那一段（text 里从 ANOMALY_TABLE_HEAD 起头的那一行起、到下一个空行为止）逐行读成 [AnomalyRow]，次序照文件头；
+    行首两个空格、照「｜」切出五栏的才算一行，栏的前后不留空白。没有这一段交 []。"""
+    rows, inside = [], False
+    for line in (text or "").splitlines():
+        if not inside:
+            inside = line.startswith(ANOMALY_TABLE_HEAD)
+            continue
+        if not line.strip():
+            break
+        found = ANOMALY_ROW.match(line)
+        if found:
+            rows.append(AnomalyRow(*(part.strip() for part in found.groups())))
+    return rows
+
+
+def anomaly_table():
+    """{种类: AnomalyRow}：这一份文件头的异常表（anomaly_rows 照 __doc__ 读，读过一次就留着）。"""
+    if not ANOMALY_TABLE_LOADED:
+        ANOMALY_TABLE_LOADED.append({row.kind: row for row in anomaly_rows(__doc__)})
+    return ANOMALY_TABLE_LOADED[0]
+
+
+def anomaly_advice(kind, task, environment=None):
+    """异常表里这一种的修改意见（next= 那一句的头一段），{task} 换成任务号；表里没有这一种抛 KeyError（种类与表对不上是代码错，不悄悄退回一句通用的）。
+    弄坏开关 attention-next-generic 下每一种都交 ANOMALY_GENERIC_ADVICE。"""
+    template = ANOMALY_GENERIC_ADVICE if broken("attention-next-generic", environment) else anomaly_table()[kind].advice
+    return template.replace(ANOMALY_TASK_PLACEHOLDER, str(task))
+
+
+def session_registry_library():
+    """载 scripts/agents/lib_session_registry.py（会话登记的唯一取法）：交模块；载不进抛它的错（服务把这一回当找不到收件 socket）。"""
+    if not SESSION_REGISTRY_LOADED:
+        SESSION_REGISTRY_LOADED.append(load_module("lib_session_registry_for_task_server", SESSION_REGISTRY_SCRIPT))
+    return SESSION_REGISTRY_LOADED[0]
+
+
+def session_inbox_socket(session, environment=None):
+    """按会话号找这个会话此刻的收件 socket（task_server.py 文件头 ⑥「收件地址」）→ (路径, 找不到时的那一句)：读会话登记目录
+    （~/.claude/sessions，自证换成 SESSIONS_DIRECTORY_OVERRIDE 点名的）里会话号相同、进程还活着、带 messagingSocketPath 的那几份，取启动最晚的一份；
+    读法与判活照 lib_session_registry.py（不另读 .key 文件，不另判别的字段）。没有会话（人手）、目录读不了、没有这样的一份，交 ("", 那一句)。"""
+    if not session:
+        return "", "这条任务没有会话（人手交的）"
+    try:
+        registry = session_registry_library()
+        directory = selftest_override(SESSIONS_DIRECTORY_OVERRIDE, environment) or registry.registry_directory({})
+        entries = registry.session_registry_entries(directory)
+    except Exception as error:   # 载不进、读的时候抛错：这一回找不到
+        return "", f"读会话登记出了错（{type(error).__name__}: {error}）"
+    if entries is None:
+        return "", f"会话登记目录 {directory} 读不了，或里面一份能解的登记都没有"
+    alive = [entry for entry in entries if entry.session_id == session and entry.is_alive and entry.messaging_socket_path]
+    if not alive:
+        return "", f"会话登记目录 {directory} 里没有会话 {session} 进程还活着、带收件 socket 的那一份（会话已关）"
+    return max(alive, key=registry.started_or_earliest).messaging_socket_path, ""
+
+
+def confirm_command(task_id, items, tasks):
+    """确认单打的确认命令（task_server.py 文件头 ⑦）：客户端照它打，钩子自证照它喂（.claude/hooks/lib_project_code_runs.py）。"""
+    return f"task-server/task confirm {task_id} --items {items} --tasks {tasks}"
+
+
+def confirm_needed_line(task_id, items, tasks, timeout_seconds):
+    """确认单末尾那一行 CONFIRM_NEEDED_MARK（机器读的；数是服务此刻算的）。"""
+    return f"{CONFIRM_NEEDED_MARK} task={task_id} items={items} tasks={tasks} timeout={float(timeout_seconds):.0f}"
+
+
+def confirm_needed_fields(text):
+    """text 里最后一行 CONFIRM_NEEDED_MARK 的 (任务号, 项数, 条数)；没有交 None。"""
+    found = list(CONFIRM_NEEDED_LINE.finditer(text or ""))
+    return tuple(int(value) for value in found[-1].groups()) if found else None
+
+
+def named_scope(command, environment=None):
+    """确认单的项数（task_server.py 文件头 ⑦）：命令（key_words 剥过不改跑法的前缀与临时 prune-server 包装）里点名的 --item、--check（值照逗号拆）、
+    --test、--bin、--lib 与 `--` 之后带了 --exact 时的测试名（LIBTEST_VALUE_OPTIONS 的值不算）各几个 → [(选项, 值)…]，次序照命令；一个都没点的交 []（整包、不指定范围）。"""
+    words = key_words(command, environment)
+    before, after = (words[:words.index("--")], words[words.index("--") + 1:]) if "--" in words else (words, [])
+    named, position = [], 0
+    while position < len(before):
+        name, joined, value = before[position].partition("=")
+        if name in NAMED_SCOPE_OPTIONS:
+            if not joined:
+                value = before[position + 1] if position + 1 < len(before) else ""
+                position += 1
+            named += [(name, piece) for piece in (value.split(",") if name == "--check" else [value]) if piece]
+        elif before[position] == "--lib":
+            named.append(("--lib", ""))
+        position += 1
+    if "--exact" in after:
+        skip = False
+        for word in after:
+            if skip or word in LIBTEST_VALUE_OPTIONS:
+                skip = not skip
+                continue
+            if not word.startswith("-"):
+                named.append(("--exact", word))
+    return named
+
+
+def named_scope_text(named):
+    """named_scope 交的那几项写成「--item 3、--test 1」（各选项照头一次出现的次序）；一个都没有写「整包、不指定范围」。"""
+    counts = {}
+    for name, _ in named:
+        counts[name] = counts.get(name, 0) + 1
+    return "、".join(f"{name} {count}" for name, count in counts.items()) or "整包、不指定范围"
+
+
+def named_scope_entry(command, environment=None):
+    """点的项属于哪一条入口（比两条命令点的项交不交叠只在同一条入口里比）：剥过前缀之后命令位置上那个词，cargo 另接 -p / --package 点的包（排过序）。"""
+    words = key_words(command, environment)
+    index = command_word_index(words)
+    if index >= len(words):
+        return ""
+    if os.path.basename(words[index]) != "cargo":
+        return words[index]
+    packages = sorted(words[position + 1] for position in range(index, len(words) - 1) if words[position] in ("-p", "--package"))
+    return " ".join(["cargo", *packages])
+
+
+def oom_stat_note(log_text):
+    """日志里最后一行 OOM_STAT_LINE 换成给人看的一句（撞上限那一刻 scope 的内存明细；读不到的那一项写读不到）；没有交空串。
+    大头在 file（页缓存，含没写回的脏页）的另写一句「大头是页缓存」，在 anon 的写「大头是进程自己的内存（堆）」：只记、不改判法。"""
+    found = None
+    for line in log_lines(log_text):
+        matched = OOM_STAT_LINE.match(line)
+        if matched:
+            found = matched
+    if found is None:
+        return ""
+    anon, file_pages, dirty, writeback, shared, killed = found.groups()
+
+    def shown(value):
+        return "读不到" if value == "unread" else mebibytes_text(int(value))
+    text = (f"撞上限那一刻 scope 的内存明细：anon {shown(anon)}、file {shown(file_pages)}（其中没写回的脏页 file_dirty {shown(dirty)}、"
+            f"正在写回 file_writeback {shown(writeback)}）、shmem {shown(shared)}，memory.events 的 oom_kill {killed}")
+    if anon.isdigit() and file_pages.isdigit():
+        text += "：大头是页缓存（file）" if int(file_pages) > int(anon) else "：大头是进程自己的内存（anon，堆）"
+    return text
+
+
+def whole_package_cargo_test(rest):
+    """一条 cargo test 后面的参数（rest）是不是整包测试（task_server.py 文件头 ②「提交时拒」⑥）：→ 一句是哪一种，或空串（点名了测试目标）。
+    带 --workspace / --all 的是整包；点名了 --test、--bin、或带测试名（`--` 前后不以 - 起头的词、选项的值不算）的不是；--lib 与 --tests 都带、没带测试名的是整包；别的都是。"""
+    before, after = (rest[:rest.index("--")], rest[rest.index("--") + 1:]) if "--" in rest else (list(rest), [])
+    options, names, index = set(), [], 0
+    while index < len(before):
+        word = before[index]
+        name = word.split("=", 1)[0] if word.startswith("--") else word
+        if word.startswith("-"):
+            options.add(name)
+            if name in CARGO_VALUE_OPTIONS and "=" not in word and not (name in ("-p", "-F", "-j", "-Z") and len(word) > 2):
+                index += 1
+        else:
+            names.append(word)
+        index += 1
+    skip = False
+    for word in after:
+        if skip:
+            skip = False
+            continue
+        if word in LIBTEST_VALUE_OPTIONS:
+            skip = True
+        elif not word.startswith("-"):
+            names.append(word)
+    if options & {"--workspace", "--all"}:
+        return "cargo test 带 --workspace（整个工作区的每一个包）"
+    if names:
+        return ""
+    if {"--lib", "--tests"} <= options:
+        return "cargo test 带 --lib --tests、没带测试名（包里全部测试目标）"
+    if options & {"--test", "--bin"}:
+        return ""
+    return "cargo test 没点名 --test、--bin，也没带测试名（整个包的测试）"
+
+
+def whole_package_script(argv, cwd):
+    """命令位置上起的入口是不是整包测试（task_server.py 文件头 ②「提交时拒」⑥）：→ 一句或空串。
+    crash-point-replay.sh 门禁的 --check 把 WHOLE_PACKAGE_CHECK_CELLS 三格全点了的、不给补丁目录的 merge-and-verify.sh 是；带 --selftest、--list-items 这类的不是。"""
+    index = command_word_index(argv)
+    if index >= len(argv):
+        return ""
+    word, arguments = argv[index], argv[index + 1:]
+    script = os.path.realpath(os.path.join(cwd or REPOSITORY_ROOT, word))
+    if any(argument in NOT_SHARDED_ARGUMENTS for argument in arguments):
+        return ""
+    if script.endswith("/" + WHOLE_PACKAGE_CRASH_GATE) or word == WHOLE_PACKAGE_CRASH_GATE:
+        cells = set()
+        for position, argument in enumerate(arguments):
+            if argument == "--check" and position + 1 < len(arguments):
+                cells.update(arguments[position + 1].split(","))
+            elif argument.startswith("--check="):
+                cells.update(argument[len("--check="):].split(","))
+        if set(WHOLE_PACKAGE_CHECK_CELLS) <= cells:
+            return f"{WHOLE_PACKAGE_CRASH_GATE} --check 把 {'、'.join(WHOLE_PACKAGE_CHECK_CELLS)} 三格全点了（验证包整包的测试）"
+        return ""
+    if script.endswith("/" + WHOLE_PACKAGE_MERGE_ENTRY) or word == WHOLE_PACKAGE_MERGE_ENTRY:
+        position, given = 0, []
+        while position < len(arguments):
+            argument = arguments[position]
+            if argument in MERGE_VALUE_OPTIONS:
+                position += 2
+                continue
+            if not argument.startswith("-"):
+                given.append(argument)
+            position += 1
+        return "" if given else f"{WHOLE_PACKAGE_MERGE_ENTRY} 没给补丁目录（合入验证整包跑一遍）"
+    return ""
+
+
+def whole_package_confirmation_problem(path, shared_root_of):
+    """整包确认文件（task submit --whole-package-confirmed <文件>；task_server.py 文件头 ②「提交时拒」⑥）的形式：绝对路径、真路径落在某一段共享根下（shared_root_of 交那一段，
+    不在交空串）、读得到、有以 WHOLE_PACKAGE_MARKS 三个记号起头的三段，每段去掉空白与记号至少 WHOLE_PACKAGE_SECTION_MINIMUM_CHARACTERS 个字。
+    → 不合的那一句（点名缺哪一段、哪一段太短），合的交空串。只判形式，不判写得对不对。"""
+    if not path or not os.path.isabs(path):
+        return f"--whole-package-confirmed 给的「{path}」不是绝对路径"
+    real = os.path.realpath(path)
+    if not shared_root_of(real):
+        return f"整包确认文件 {path} 不在多机配置 NFS_SHARED_ROOTS 的共享根下（两台都要读得到）"
+    try:
+        with open(real, encoding="utf-8", errors="replace") as handle:
+            text = handle.read()
+    except OSError as error:
+        return f"整包确认文件 {path} 读不了（{error}）"
+    sections, current = {}, None
+    for line in text.splitlines():
+        stripped = line.strip().lstrip("-*#> ").strip()
+        mark = next((mark for mark in WHOLE_PACKAGE_MARKS if stripped.startswith(mark)), None)
+        if mark is not None:
+            current = mark
+            sections[mark] = sections.get(mark, "") + stripped[len(mark):]
+        elif current is not None:
+            sections[current] += line
+    missing = [mark for mark in WHOLE_PACKAGE_MARKS if mark not in sections]
+    if missing:
+        return f"整包确认文件 {path} 缺以 {'、'.join(missing)} 起头的那一段（三段：①改到的文件与函数、②引到它们的测试目标与函数及 grep 命中、③为什么只点名②不够）"
+    short = [mark for mark in WHOLE_PACKAGE_MARKS if len("".join(sections[mark].split())) < WHOLE_PACKAGE_SECTION_MINIMUM_CHARACTERS]
+    if short:
+        return f"整包确认文件 {path} 的 {'、'.join(short)} 那一段去掉空白不到 {WHOLE_PACKAGE_SECTION_MINIMUM_CHARACTERS} 个字"
+    return ""
+
+
+def commit_gate_exempt(argv, cwd, task_environment, environment=None):
+    """跑满两小时打回的豁免（文件头「错误类型」over-two-hours）：起的是 COMMIT_GATE_ENTRIES 之一（剥法同 sharded_entry）、参数里没有 --check 与 --item
+    （「--check=…」这种写法同样算）、范围声明的「为什么」那一段写了 COMMIT_SCOPE_WORD。三样都要。
+    弄坏开关 over-two-hours-commit-exempt-by-command-only 下只看起的是不是那几道（带 --check、「为什么」没写提交前的也豁免）。"""
+    index = command_word_index(argv)
+    if index >= len(argv):
+        return False
+    word, arguments = argv[index], argv[index + 1:]
+    script = os.path.realpath(os.path.join(cwd or REPOSITORY_ROOT, word))
+    if not any(script.endswith("/" + relative) or word == relative for relative in COMMIT_GATE_ENTRIES):
+        return False
+    if broken("over-two-hours-commit-exempt-by-command-only", environment):
+        return True
+    if any(argument in SCOPE_RANGE_ARGUMENTS or argument.startswith(tuple(name + "=" for name in SCOPE_RANGE_ARGUMENTS)) for argument in arguments):
+        return False
+    why = next((segment.split("=", 1)[1] for segment in scope_declaration_segments(task_environment, argv) if segment.startswith("为什么=")), "")
+    return COMMIT_SCOPE_WORD in why
+
+
+def scope_declaration_segments(environment, command):
+    """范围声明 SINGLEFS_RUN_SCOPE 的原文照「;」切成的几段（确认单逐段打）：任务带的环境里的，或命令里起头的 env 后面写的；都没有交 []。"""
+    text = (environment or {}).get("SINGLEFS_RUN_SCOPE", "")
+    if not text and command and os.path.basename(command[0]) == "env":
+        text = next((word.split("=", 1)[1] for word in command[1:] if word.startswith("SINGLEFS_RUN_SCOPE=")), "")
+    return [segment.strip() for segment in text.split(";") if segment.strip()]
 
 
 def iso_epoch(text):

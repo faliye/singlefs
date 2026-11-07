@@ -1,6 +1,8 @@
-//! 自证里加固的八格（格表在 `selftest.rs` 的 `CELLS`）：追加日志的请求号高水位与排他锁、同步 WAL 失败之后不回确认、
+//! 自证里加固的十一格（格表在 `selftest.rs` 的 `CELLS`）：追加日志的请求号高水位与排他锁、同步 WAL 失败之后不回确认、
 //! 对端不读时回应受额度管、没收完的帧受额度与期限管、认领回应不越过帧长上限、建连受重连总时长上限管、
-//! 一帧大过帧长上限的当场报协议错。
+//! 一帧大过帧长上限的当场报协议错；认领回到调用方手里之后到期盖住整段租期、写帧回存储出错照同一请求号重放、
+//! 删前缀的回应先记进额度（records/2026-11-06-prune-server全量代码审核.md 的四项里前三项）；工作线程边编回应边记额度
+//! （records/2026-11-03-task-server与prune-server深入对攻审核.md 的 PS-04）。
 //! 每格起的服务与客户端只带这一格要证红的那一项弄坏开关（`BreakSwitches::only`），别的格的开关不碰这一格。
 //! 会卡住的格（弄坏开关打开时客户端堵在建连或等回应里）都有限时：到点置停标记、放掉堵着的连接，这一格判红。
 
@@ -15,14 +17,18 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::bench::SERVER_READY_TIMEOUT;
 use crate::break_switches::{BreakSwitch, BreakSwitches, BREAK_VARIABLE};
 use crate::client::{random_client_identity, RouteAddress, SimpleClient};
 use crate::connections::UNBUDGETED_OUTBOUND_BYTES_PER_CONNECTION;
+use crate::fault_log::FAULT_LOG_FILE_NAME;
+use crate::fault_proxy::{FaultProxy, ProxyListen};
 use crate::journal::{Journal, JournalOptions};
 use crate::protocol::{
-    begin_point_read_frame, begin_write_frame, encode_claim_frame, held_by_other_outcome_bytes,
-    maximum_response_payload_bytes, replace_request_sequence, ClaimOutcome, RejectionStatus,
-    ResponseOutcome, Table, CLAIM_OUTCOME_COUNT_BYTES, MAXIMUM_CLIENT_IDENTITY_BYTES,
+    begin_point_read_frame, begin_write_frame, decode_response_body, encode_claim_frame,
+    encode_delete_prefix_frame, held_by_other_outcome_bytes, maximum_response_payload_bytes,
+    replace_request_sequence, ClaimOutcome, RejectionStatus, ResponseOutcome, Table,
+    CLAIM_OUTCOME_COUNT_BYTES, FRAME_LENGTH_FIELD_BYTES, MAXIMUM_CLIENT_IDENTITY_BYTES,
     MAXIMUM_FRAME_BODY_BYTES,
 };
 use crate::reliable_client::{
@@ -31,13 +37,13 @@ use crate::reliable_client::{
 };
 use crate::selftest::{
     bytes, counter, loopback_arguments, server_command, CellContext, CellDirectory,
-    SERVER_READY_TIMEOUT,
 };
 use crate::selftest_fault_cells::within_deadline;
 use crate::server::{
-    CONNECTIONS_REFUSED_COUNTER, FRAME_READ_TIMEOUTS_COUNTER, LISTENING_LINE_PREFIX,
-    OUTBOUND_QUEUED_BYTES_PEAK_COUNTER, PENDING_BYTES_COUNTER, RECEIVING_BODY_BYTES_PEAK_COUNTER,
-    STORAGE_SYNC_FAILED_EXIT_CODE, WRITE_TIMEOUTS_COUNTER,
+    BUSY_REJECTIONS_COUNTER, CONNECTIONS_REFUSED_COUNTER, FRAME_READ_TIMEOUTS_COUNTER,
+    LISTENING_LINE_PREFIX, OUTBOUND_QUEUED_BYTES_PEAK_COUNTER, PENDING_BYTES_COUNTER,
+    PENDING_BYTES_PEAK_COUNTER, RECEIVING_BODY_BYTES_PEAK_COUNTER, STORAGE_SYNC_FAILED_EXIT_CODE,
+    WORKER_RESPONSE_BYTES_PEAK_COUNTER, WRITE_TIMEOUTS_COUNTER,
 };
 use crate::spawned::{SpawnedProcess, StandardError};
 
@@ -997,7 +1003,8 @@ pub(crate) fn cell_journal_lock_survives_compaction(
 
 /// 认领那一格：持有者身份 255 字节、大批里重复查同一把短键的次数。
 const OVERSIZE_CLAIM_REPEATS: usize = 260_000;
-const CLAIM_LEASE_MILLISECONDS: u32 = 60_000;
+/// 认领回应不越过帧长上限那一格，每一帧认领的租期。
+const OVERSIZE_CLAIM_LEASE_MILLISECONDS: u32 = 60_000;
 
 fn claim_with_identity(
     client: &mut SimpleClient,
@@ -1006,7 +1013,12 @@ fn claim_with_identity(
 ) -> Result<ResponseOutcome, String> {
     let borrowed: Vec<(Table, &[u8])> = keys.iter().map(|key| (Table::Conclusions, *key)).collect();
     client.call(|sequence| {
-        encode_claim_frame(sequence, identity, CLAIM_LEASE_MILLISECONDS, &borrowed)
+        encode_claim_frame(
+            sequence,
+            identity,
+            OVERSIZE_CLAIM_LEASE_MILLISECONDS,
+            &borrowed,
+        )
     })
 }
 
@@ -1421,5 +1433,759 @@ pub(crate) fn cell_oversize_frame_reported_at_once(
     Ok(format!(
         "键长 {oversize_bytes} 字节的一条：容错客户端 {} 毫秒回协议错、追加日志里没有这一帧；一问一答的客户端当场回错，同一条连接随后照常读写",
         reliable_elapsed.as_millis()
+    ))
+}
+
+/// 认领租期那一格的数：租期 4 秒（缺省 30 秒按比例缩短）。丢了回应那一半让重发先撞一条不读的连接、等满帧超时 2.5 秒，
+/// 认领落下之后至少过 2.5 秒才回到调用方手里；忙那一半让一帧点读在工作线程里压 2.8 秒、服务只许 1 帧待处理，认领一直回忙到压着的那一帧做完。
+/// 回来之后过租期的 0.6（2.4 秒）别的身份再认领：持有者从回来那一刻起按整段租期写，这时它的写还没到服务。
+const LEASE_COVER_LEASE_MILLISECONDS: u32 = 4_000;
+const LEASE_COVER_RESEND_FRAME_TIMEOUT: Duration = Duration::from_millis(2_500);
+const LEASE_COVER_HOLDING_READ_MILLISECONDS: u64 = 2_800;
+/// 压着的那一帧点读的序号：别的帧（容错客户端与一问一答客户端的序号都从 1 起）撞不上。
+const LEASE_COVER_HOLDING_READ_SEQUENCE: u64 = 777_777;
+const LEASE_COVER_PROBE_AFTER_ANSWER: Duration = Duration::from_millis(2_400);
+/// 同一身份再认领时给的长短两种租期（到期只许往后挪那一问）。
+const LEASE_COVER_LONG_LEASE_MILLISECONDS: u32 = 600_000;
+const LEASE_COVER_SHORT_LEASE_MILLISECONDS: u32 = 1;
+/// 每一半做完的限时。
+const LEASE_COVER_DEADLINE: Duration = Duration::from_secs(60);
+
+/// 别的身份（新连的一问一答客户端）认领 `key`，回那一把键的结局。
+fn claim_as_another_identity(route: &RouteAddress, key: &[u8]) -> Result<ClaimOutcome, String> {
+    let mut other = SimpleClient::connect(route, BreakSwitches::none())?;
+    let outcomes = other.claim(
+        &[(Table::Conclusions, key.to_vec())],
+        LEASE_COVER_LEASE_MILLISECONDS,
+    )?;
+    match outcomes.as_slice() {
+        [outcome] => Ok(outcome.clone()),
+        _ => Err(format!(
+            "认领一把键回了 {} 个结局：{outcomes:?}",
+            outcomes.len()
+        )),
+    }
+}
+
+/// 认领回到持有者手里之后：立刻（还没到头一次落下时算的到期）与过 `LEASE_COVER_PROBE_AFTER_ANSWER`（持有者按整段租期还在写）
+/// 各让别的身份认领一次，两次都该是「别人持有」。
+fn expect_held_after_the_answer(
+    route: &RouteAddress,
+    key: &[u8],
+    answered: Instant,
+    what: &str,
+) -> Result<(), String> {
+    let right_after = claim_as_another_identity(route, key)?;
+    if !matches!(right_after, ClaimOutcome::HeldByOther { .. }) {
+        return Err(format!(
+            "{what}：认领回来之后立刻（头一次落下时算的到期之前）别的身份认领回 {right_after:?}，该是别人持有"
+        ));
+    }
+    thread::sleep(
+        (answered + LEASE_COVER_PROBE_AFTER_ANSWER).saturating_duration_since(Instant::now()),
+    );
+    let while_writing = claim_as_another_identity(route, key)?;
+    if !matches!(while_writing, ClaimOutcome::HeldByOther { .. }) {
+        return Err(format!(
+            "{what}：认领回来之后 {} 毫秒（持有者从回来那一刻起按整段 {LEASE_COVER_LEASE_MILLISECONDS} 毫秒租期写，这时还没写到服务）\
+             别的身份认领回 {while_writing:?}，该是别人持有：服务给的到期没盖住回来之后的整段租期",
+            LEASE_COVER_PROBE_AFTER_ANSWER.as_millis()
+        ));
+    }
+    Ok(())
+}
+
+/// 头一次认领落下、回应被代理吞掉再断；重发先撞一条不读的连接、等满帧超时，再重连重发才回来。
+fn lease_after_a_lost_answer(
+    context: &CellContext,
+    switches: &BreakSwitches,
+) -> Result<String, String> {
+    let server = HardeningServer::start(context, switches.clone(), &[])?;
+    let directory = CellDirectory::create()?;
+    let mut proxy = FaultProxy::start(
+        ProxyListen::UnixSocket(directory.path.join("proxy.sock")),
+        server.route(),
+        &BreakSwitches::none(),
+    )?;
+    let control = proxy.shared_control();
+    let stop = Arc::new(AtomicBool::new(false));
+    let mut settings = plain_client_settings(
+        proxy.route(),
+        directory.path.join("lost-answer.journal"),
+        switches,
+    );
+    settings.frame_timeout = LEASE_COVER_RESEND_FRAME_TIMEOUT;
+    settings.reconnect = ReconnectPolicy {
+        initial_delay: Duration::from_millis(20),
+        maximum_delay: Duration::from_millis(200),
+        maximum_attempts: 100,
+        maximum_total: Duration::from_secs(30),
+    };
+    let stop_for_client = Arc::clone(&stop);
+    settings.stop_check = Arc::new(move || stop_for_client.load(Ordering::SeqCst));
+    let key = bytes("lease-cover/lost-answer");
+    let control_for_client = Arc::clone(&control);
+    let claimed = within_deadline(
+        LEASE_COVER_DEADLINE,
+        || stop.store(true, Ordering::SeqCst),
+        || -> Result<(Vec<ClaimOutcome>, Instant, Instant), ClientFailure> {
+            let mut client = ReliableClient::open(settings)?;
+            control_for_client
+                .swallow_responses_then_cut_requests
+                .store(1, Ordering::SeqCst);
+            control_for_client
+                .stall_reading_connections_remaining
+                .store(1, Ordering::SeqCst);
+            let submitted = Instant::now();
+            let outcomes = client.claim(
+                &[(Table::Conclusions, key.clone())],
+                LEASE_COVER_LEASE_MILLISECONDS,
+            )?;
+            Ok((outcomes, submitted, Instant::now()))
+        },
+    )?;
+    let cuts = control.cuts_done.load(Ordering::SeqCst);
+    let stalls = control.stalls_done.load(Ordering::SeqCst);
+    proxy.stop();
+    let (outcomes, submitted, answered) =
+        claimed.map_err(|failure| format!("丢了回应的认领：客户端出错：{failure}"))?;
+    if outcomes != [ClaimOutcome::Claimed] {
+        return Err(format!("丢了回应、重发之后认领回 {outcomes:?}，该是认领到"));
+    }
+    let answer_delay = answered.duration_since(submitted);
+    if cuts != 1 || stalls != 1 || answer_delay < LEASE_COVER_RESEND_FRAME_TIMEOUT {
+        return Err(format!(
+            "代理吞回应再断 {cuts} 次、停读 {stalls} 条连接（都该是 1）、认领 {} 毫秒回来（该至少等满帧超时 {} 毫秒）：故障没注入上，这一格没测到重发",
+            answer_delay.as_millis(),
+            LEASE_COVER_RESEND_FRAME_TIMEOUT.as_millis()
+        ));
+    }
+    expect_held_after_the_answer(
+        &server.route(),
+        &key,
+        answered,
+        "丢了回应、重发才回来的认领",
+    )?;
+    Ok(format!(
+        "丢了回应的认领 {} 毫秒后重发才回来：回来时与回来之后 {} 毫秒别的身份都回别人持有",
+        answer_delay.as_millis(),
+        LEASE_COVER_PROBE_AFTER_ANSWER.as_millis()
+    ))
+}
+
+/// 服务只许 1 帧待处理、一帧点读在工作线程里压着：认领一直回忙，压着的那一帧做完才落下。
+fn lease_after_a_long_busy(
+    context: &CellContext,
+    switches: &BreakSwitches,
+) -> Result<String, String> {
+    let holding_delay =
+        format!("{LEASE_COVER_HOLDING_READ_SEQUENCE}:{LEASE_COVER_HOLDING_READ_MILLISECONDS}");
+    let server = HardeningServer::start(
+        context,
+        switches.clone(),
+        &[
+            "--maximum-pending-total",
+            "1",
+            "--busy-retry-milliseconds",
+            "100",
+            "--selftest-delay",
+            &holding_delay,
+        ],
+    )?;
+    let directory = CellDirectory::create()?;
+    let stop = Arc::new(AtomicBool::new(false));
+    let mut settings = plain_client_settings(
+        server.route(),
+        directory.path.join("long-busy.journal"),
+        switches,
+    );
+    let stop_for_client = Arc::clone(&stop);
+    settings.stop_check = Arc::new(move || stop_for_client.load(Ordering::SeqCst));
+    let mut holding = connect_raw(&server.socket_path())?;
+    let key = bytes("lease-cover/long-busy");
+    let claimed = within_deadline(
+        LEASE_COVER_DEADLINE,
+        || stop.store(true, Ordering::SeqCst),
+        || -> Result<(Vec<ClaimOutcome>, u64, Instant, Instant), String> {
+            let mut client =
+                ReliableClient::open(settings).map_err(|failure| failure.to_string())?;
+            let mut builder = begin_point_read_frame(LEASE_COVER_HOLDING_READ_SEQUENCE, 1, 32);
+            builder.key(Table::Conclusions, b"lease-cover/holding");
+            holding
+                .write_all(&builder.finish())
+                .map_err(|error| format!("压着的那一帧点读发不出去：{error}"))?;
+            thread::sleep(Duration::from_millis(100));
+            let submitted = Instant::now();
+            let outcomes = client
+                .claim(
+                    &[(Table::Conclusions, key.clone())],
+                    LEASE_COVER_LEASE_MILLISECONDS,
+                )
+                .map_err(|failure| failure.to_string())?;
+            Ok((
+                outcomes,
+                client.diagnostics().busy_responses,
+                submitted,
+                Instant::now(),
+            ))
+        },
+    )?;
+    let (outcomes, busy_responses, submitted, answered) =
+        claimed.map_err(|message| format!("忙了很久的认领：{message}"))?;
+    drop(holding);
+    if outcomes != [ClaimOutcome::Claimed] {
+        return Err(format!("忙了很久之后认领回 {outcomes:?}，该是认领到"));
+    }
+    let answer_delay = answered.duration_since(submitted);
+    let half_lease = Duration::from_millis(u64::from(LEASE_COVER_LEASE_MILLISECONDS / 2));
+    if busy_responses == 0 || answer_delay < half_lease {
+        return Err(format!(
+            "认领回了 {busy_responses} 次忙（该至少 1 次）、{} 毫秒回来（该过了租期的一半 {} 毫秒）：忙没造出来，这一格没测到",
+            answer_delay.as_millis(),
+            half_lease.as_millis()
+        ));
+    }
+    expect_held_after_the_answer(&server.route(), &key, answered, "忙了大半租期才落下的认领")?;
+    Ok(format!(
+        "认领回忙 {busy_responses} 次、{} 毫秒才落下：回来时与回来之后 {} 毫秒别的身份都回别人持有",
+        answer_delay.as_millis(),
+        LEASE_COVER_PROBE_AFTER_ANSWER.as_millis()
+    ))
+}
+
+/// 同一身份先用长租期认领，再用 1 毫秒的租期认领同一把键：到期不往前挪，别的身份过一会照样回别人持有、剩余租期还是长的。
+fn renewal_never_moves_the_expiry_earlier(
+    context: &CellContext,
+    switches: &BreakSwitches,
+) -> Result<String, String> {
+    let server = HardeningServer::start(context, switches.clone(), &[])?;
+    let key = bytes("lease-cover/renewed-shorter");
+    let mut holder = SimpleClient::connect(&server.route(), BreakSwitches::none())?;
+    for lease in [
+        LEASE_COVER_LONG_LEASE_MILLISECONDS,
+        LEASE_COVER_SHORT_LEASE_MILLISECONDS,
+    ] {
+        let outcomes = holder.claim(&[(Table::Conclusions, key.clone())], lease)?;
+        if outcomes != [ClaimOutcome::Claimed] {
+            return Err(format!(
+                "同一身份用 {lease} 毫秒的租期认领自己的键回 {outcomes:?}，该是认领到"
+            ));
+        }
+    }
+    thread::sleep(Duration::from_millis(100));
+    let probe = claim_as_another_identity(&server.route(), &key)?;
+    let half_long_lease = u64::from(LEASE_COVER_LONG_LEASE_MILLISECONDS / 2);
+    match probe {
+        ClaimOutcome::HeldByOther {
+            remaining_lease_milliseconds,
+            ..
+        } if remaining_lease_milliseconds > half_long_lease => Ok(format!(
+            "同一身份 {LEASE_COVER_LONG_LEASE_MILLISECONDS} 毫秒认领之后再用 {LEASE_COVER_SHORT_LEASE_MILLISECONDS} 毫秒认领：\
+             别的身份回别人持有、剩余 {remaining_lease_milliseconds} 毫秒"
+        )),
+        other @ (ClaimOutcome::Claimed
+        | ClaimOutcome::HeldByOther { .. }
+        | ClaimOutcome::AlreadyConcluded) => Err(format!(
+            "同一身份 {LEASE_COVER_LONG_LEASE_MILLISECONDS} 毫秒认领之后再用 {LEASE_COVER_SHORT_LEASE_MILLISECONDS} 毫秒认领，\
+             过 100 毫秒别的身份认领回 {other:?}，该是别人持有、剩余超过 {half_long_lease} 毫秒：到期被帧里更短的租期往前挪了"
+        )),
+    }
+}
+
+/// 认领回到调用方手里之后，服务给的到期盖住调用方从回来那一刻起按整段租期写的那一段（`committer.rs` 文件头「认领」、
+/// `reliable_client.rs` 文件头「认领」）。三条输入：丢了回应重发才回来、忙了大半租期才落下、同一身份用更短的租期再认领。
+pub(crate) fn cell_claim_lease_covers_the_holder_after_the_answer(
+    context: &CellContext,
+) -> Result<String, String> {
+    let switches = context.break_switches.only_these(&[
+        BreakSwitch::ClaimLeaseShrunkOnResend,
+        BreakSwitch::ClaimExpiryMovedEarlier,
+    ]);
+    let lost_answer = lease_after_a_lost_answer(context, &switches)?;
+    let long_busy = lease_after_a_long_busy(context, &switches)?;
+    let renewal = renewal_never_moves_the_expiry_earlier(context, &switches)?;
+    Ok(format!(
+        "租期 {LEASE_COVER_LEASE_MILLISECONDS} 毫秒：{lost_answer}；{long_busy}；{renewal}"
+    ))
+}
+
+/// 存储出错重放那一格：客户端的重连策略（服务退 7 到被拉起来之间连不上，次数给足、间隔封顶 500 毫秒，一轮至多 60 秒）。
+const STORAGE_RETRY_RECONNECT: ReconnectPolicy = ReconnectPolicy {
+    initial_delay: Duration::from_millis(50),
+    maximum_delay: Duration::from_millis(500),
+    maximum_attempts: 1000,
+    maximum_total: Duration::from_secs(60),
+};
+/// 等故障日志里出现写失败那一行的上限。
+const STORAGE_FAILURE_LINE_TIMEOUT: Duration = Duration::from_secs(20);
+
+fn storage_retry_settings(
+    route: RouteAddress,
+    journal_path: PathBuf,
+    switches: &BreakSwitches,
+    stop: &Arc<AtomicBool>,
+) -> ReliableClientSettings {
+    let mut settings = plain_client_settings(route, journal_path, switches);
+    settings.reconnect = STORAGE_RETRY_RECONNECT;
+    let stop = Arc::clone(stop);
+    settings.stop_check = Arc::new(move || stop.load(Ordering::SeqCst));
+    settings
+}
+
+/// 开容错客户端、写一帧 `key` = value、等全部确认；回写帧回存储出错、照同一请求号再交的次数。
+fn write_one_frame_until_acknowledged(
+    settings: ReliableClientSettings,
+    key: &str,
+) -> Result<u64, ClientFailure> {
+    let mut client = ReliableClient::open(settings)?;
+    client.submit_write_entries(&[entry(key, "value")])?;
+    client.wait_all_acknowledged()?;
+    Ok(client.diagnostics().write_storage_failures)
+}
+
+/// 客户端的结局该是做完（退出码 0）；回错的把退出码写进说明。
+fn expect_client_finished(outcome: Result<u64, ClientFailure>, what: &str) -> Result<u64, String> {
+    outcome.map_err(|failure| {
+        format!(
+            "{what}：容错客户端回错、退出码 {}（该照同一请求号重放、做完退 0；连不上到上限才退 75，不许退 3）：{failure}",
+            failure.exit_code()
+        )
+    })
+}
+
+/// 同步 WAL 失败、服务退 7，删掉造错文件再起服务：同一个客户端照同一请求号重放，键在库里。
+fn storage_failure_replayed_after_sync_failure(
+    context: &CellContext,
+    switches: &BreakSwitches,
+) -> Result<String, String> {
+    let arm_directory = CellDirectory::create()?;
+    let arm = arm_directory.path.join("sync-failure-armed");
+    let arm_argument = arm.display().to_string();
+    let mut server = HardeningServer::start(
+        context,
+        BreakSwitches::none(),
+        &["--selftest-sync-failure-file", &arm_argument],
+    )?;
+    std::fs::write(&arm, b"").map_err(|error| format!("建不了 {arm_argument}：{error}"))?;
+    let stop = Arc::new(AtomicBool::new(false));
+    let settings = storage_retry_settings(
+        server.route(),
+        server.path().join("sync-failure.journal"),
+        switches,
+        &stop,
+    );
+    let outcome = thread::scope(|scope| -> Result<Result<u64, ClientFailure>, String> {
+        let writer =
+            scope.spawn(|| write_one_frame_until_acknowledged(settings, "storage-retry/sync"));
+        let restarted = match server.wait_for_exit(SYNC_FAILURE_EXIT_TIMEOUT) {
+            Some(status) if status.code() == Some(STORAGE_SYNC_FAILED_EXIT_CODE) => {
+                std::fs::remove_file(&arm)
+                    .map_err(|error| format!("删不了 {arm_argument}：{error}"))
+                    .and_then(|()| server.spawn(context))
+            }
+            Some(status) => Err(format!(
+                "同步 WAL 失败之后服务该退 {STORAGE_SYNC_FAILED_EXIT_CODE}，退了 {status}；标准错误：{}",
+                server.standard_error_text()
+            )),
+            None => Err(format!(
+                "同步 WAL 失败之后服务 {} 秒没退出",
+                SYNC_FAILURE_EXIT_TIMEOUT.as_secs()
+            )),
+        };
+        if let Err(message) = restarted {
+            stop.store(true, Ordering::SeqCst);
+            let _ = writer.join();
+            return Err(message);
+        }
+        writer.join().map_err(|_| "写的线程 panic 了".to_string())
+    })?;
+    let storage_failures = expect_client_finished(outcome, "同步 WAL 失败、服务退 7 又起来之后")?;
+    let stored = read_value(&server.route(), "storage-retry/sync")?;
+    if stored.as_deref() != Some(b"value".as_slice()) {
+        return Err(format!(
+            "同步 WAL 失败、服务重起之后客户端说做完了，库里读回 {}（该是 value）",
+            shown_value(stored.as_deref())
+        ));
+    }
+    Ok(format!(
+        "同步 WAL 失败、服务退 {STORAGE_SYNC_FAILED_EXIT_CODE} 再起：客户端（收到存储出错 {storage_failures} 次）重连后照同一请求号重放、做完，键在库里"
+    ))
+}
+
+/// 写批写失败、服务不退：造错文件在时每组都写失败，故障日志出现写失败那一行之后删掉造错文件，同一个客户端照同一请求号再交，键写进库。
+fn storage_failure_replayed_after_write_failure(
+    context: &CellContext,
+    switches: &BreakSwitches,
+) -> Result<String, String> {
+    let arm_directory = CellDirectory::create()?;
+    let arm = arm_directory.path.join("write-failure-armed");
+    let arm_argument = arm.display().to_string();
+    let mut server = HardeningServer::start(
+        context,
+        BreakSwitches::none(),
+        &["--selftest-write-failure-file", &arm_argument],
+    )?;
+    std::fs::write(&arm, b"").map_err(|error| format!("建不了 {arm_argument}：{error}"))?;
+    let fault_log = server.path().join(FAULT_LOG_FILE_NAME);
+    let stop = Arc::new(AtomicBool::new(false));
+    let settings = storage_retry_settings(
+        server.route(),
+        server.path().join("write-failure.journal"),
+        switches,
+        &stop,
+    );
+    let outcome = thread::scope(|scope| -> Result<Result<u64, ClientFailure>, String> {
+        let writer =
+            scope.spawn(|| write_one_frame_until_acknowledged(settings, "storage-retry/write"));
+        let deadline = Instant::now() + STORAGE_FAILURE_LINE_TIMEOUT;
+        loop {
+            let logged = std::fs::read_to_string(&fault_log)
+                .is_ok_and(|text| text.contains("kind=storage-write-failed"));
+            if logged || writer.is_finished() {
+                break;
+            }
+            if Instant::now() >= deadline {
+                stop.store(true, Ordering::SeqCst);
+                let _ = writer.join();
+                return Err(format!(
+                    "{} 秒里故障日志 {} 没出现写失败那一行：造错文件没起作用，这一格没测到",
+                    STORAGE_FAILURE_LINE_TIMEOUT.as_secs(),
+                    fault_log.display()
+                ));
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+        if let Err(error) = std::fs::remove_file(&arm) {
+            stop.store(true, Ordering::SeqCst);
+            let _ = writer.join();
+            return Err(format!("删不了 {arm_argument}：{error}"));
+        }
+        writer.join().map_err(|_| "写的线程 panic 了".to_string())
+    })?;
+    let storage_failures = expect_client_finished(outcome, "写批写失败、服务不退")?;
+    if let Some(status) = server.wait_for_exit(Duration::ZERO) {
+        return Err(format!(
+            "写批写失败之后服务退了（{status}），该照常服务；标准错误：{}",
+            server.standard_error_text()
+        ));
+    }
+    if storage_failures == 0 {
+        return Err(
+            "造错文件在时写帧一次存储出错都没收到：这一格没测到写失败之后的重交".to_string(),
+        );
+    }
+    let stored = read_value(&server.route(), "storage-retry/write")?;
+    if stored.as_deref() != Some(b"value".as_slice()) {
+        return Err(format!(
+            "写批写失败、照同一请求号再交之后客户端说做完了，库里读回 {}（该是 value）",
+            shown_value(stored.as_deref())
+        ));
+    }
+    Ok(format!(
+        "写批写失败、服务不退：客户端收到存储出错 {storage_failures} 次、照同一请求号再交，造错文件删掉之后写进库"
+    ))
+}
+
+/// 写帧回存储出错不是「重发也不会好」（`reliable_client.rs` 文件头「存储出错」）：同步失败、服务退出重起之后重放，
+/// 写失败、服务还在时再交，两种都做完、键在库里，不退 3。
+pub(crate) fn cell_write_storage_failure_replayed(context: &CellContext) -> Result<String, String> {
+    let switches = context
+        .break_switches
+        .only(BreakSwitch::WriteStorageFailureAbandoned);
+    let sync_failure = storage_failure_replayed_after_sync_failure(context, &switches)?;
+    let write_failure = storage_failure_replayed_after_write_failure(context, &switches)?;
+    Ok(format!("{sync_failure}；{write_failure}"))
+}
+
+/// 删前缀回应那一格的数：每条连接额度 64 KiB、前缀下一把 1 MiB 的长键、一条连接上一次排 8 帧删前缀；
+/// 组提交等满 8 帧（至多 2 秒）再做，8 帧都进了准入才轮到头一帧，头一帧做的时候额度里还记着别的 7 帧。
+const BUDGETED_DELETE_PER_CONNECTION_BYTES: usize = 64 * 1024;
+const BUDGETED_DELETE_LONG_KEY_BYTES: usize = 1024 * 1024;
+const BUDGETED_DELETE_PIPELINED_FRAMES: u64 = 8;
+const BUDGETED_DELETE_GROUP_WINDOW_MILLISECONDS: u64 = 2_000;
+/// 每帧删前缀的请求与忙的回应（服务自己写的短句）在额度里留的余量。
+const BUDGETED_DELETE_SLACK_BYTES_PER_FRAME: usize = 1024;
+/// 删前缀那一格的前缀。
+const BUDGETED_DELETE_PREFIX: &[u8] = b"budgeted-delete/";
+
+/// 从一条裸连接上读一帧回应、解开。
+fn read_raw_response(stream: &mut UnixStream) -> Result<crate::protocol::Response, String> {
+    let mut length_field = [0_u8; FRAME_LENGTH_FIELD_BYTES];
+    stream
+        .read_exact(&mut length_field)
+        .map_err(|error| format!("读不到回应的长度字段：{error}"))?;
+    let body_bytes = usize::try_from(u32::from_le_bytes(length_field))
+        .map_err(|_| "回应帧体长度放不进 usize".to_string())?;
+    let mut body = vec![0_u8; body_bytes];
+    stream
+        .read_exact(&mut body)
+        .map_err(|error| format!("读不全 {body_bytes} 字节的回应帧体：{error}"))?;
+    decode_response_body(&body)
+}
+
+/// 一次写出一串删前缀帧（`count_only` 逐帧给，序号从 `first_sequence` 起），再按序号读回全部回应；回（序号，结局）按序号排好。
+fn delete_prefix_frames(
+    stream: &mut UnixStream,
+    first_sequence: u64,
+    count_only: &[bool],
+) -> Result<Vec<(u64, ResponseOutcome)>, String> {
+    let mut frames = Vec::new();
+    for (sequence, &is_count_only) in (first_sequence..).zip(count_only) {
+        frames.extend(encode_delete_prefix_frame(
+            sequence,
+            BUDGETED_DELETE_PREFIX,
+            b"",
+            1,
+            is_count_only,
+        ));
+    }
+    stream
+        .write_all(&frames)
+        .map_err(|error| format!("一次写不出 {} 帧删前缀：{error}", count_only.len()))?;
+    let mut answers = Vec::with_capacity(count_only.len());
+    for _ in count_only {
+        let response = read_raw_response(stream)?;
+        answers.push((response.sequence, response.outcome));
+    }
+    answers.sort_by_key(|(sequence, _)| *sequence);
+    Ok(answers)
+}
+
+/// 删前缀的回应先记进额度、记不进整帧回忙一把都不删（`committer.rs` 文件头「删前缀」、`server.rs` 文件头「额度」）。
+pub(crate) fn cell_delete_prefix_response_within_pending_budget(
+    context: &CellContext,
+) -> Result<String, String> {
+    let per_connection = BUDGETED_DELETE_PER_CONNECTION_BYTES.to_string();
+    let group_frames = BUDGETED_DELETE_PIPELINED_FRAMES.to_string();
+    let group_window = BUDGETED_DELETE_GROUP_WINDOW_MILLISECONDS.to_string();
+    let server = HardeningServer::start(
+        context,
+        context
+            .break_switches
+            .only(BreakSwitch::DeletePrefixResponseUnbudgeted),
+        &[
+            "--maximum-pending-bytes-per-connection",
+            &per_connection,
+            "--group-commit-frames",
+            &group_frames,
+            "--group-commit-milliseconds",
+            &group_window,
+        ],
+    )?;
+    let mut long_key = BUDGETED_DELETE_PREFIX.to_vec();
+    long_key.resize(BUDGETED_DELETE_LONG_KEY_BYTES, b'k');
+    let mut other = SimpleClient::connect(&server.route(), BreakSwitches::none())?;
+    other.write(&[(Table::Conclusions, long_key.clone(), bytes("kept"))])?;
+    let mut pipelining = connect_raw(&server.socket_path())?;
+    pipelining
+        .set_read_timeout(Some(Duration::from_secs(60)))
+        .map_err(|error| format!("设不上读超时：{error}"))?;
+    let frame_count = usize::try_from(BUDGETED_DELETE_PIPELINED_FRAMES).expect("8 帧");
+    // 只数不删 8 帧：至多一帧的回应记得进，别的回忙
+    let counting = delete_prefix_frames(&mut pipelining, 1, &vec![true; frame_count])?;
+    let mut counted_frames = 0_usize;
+    let mut busy_frames = 0_usize;
+    for (sequence, outcome) in &counting {
+        match outcome {
+            ResponseOutcome::Busy { .. } => busy_frames += 1,
+            ResponseOutcome::PrefixDeleted {
+                keys_in_frame: 1,
+                last_key,
+                ..
+            } if *last_key == long_key => counted_frames += 1,
+            other_outcome @ (ResponseOutcome::PointValues(_)
+            | ResponseOutcome::WriteAcknowledged { .. }
+            | ResponseOutcome::ScanEntries { .. }
+            | ResponseOutcome::Statistics(_)
+            | ResponseOutcome::Claims(_)
+            | ResponseOutcome::PrefixDeleted { .. }
+            | ResponseOutcome::ConnectedClients(_)
+            | ResponseOutcome::ServerStopping { .. }
+            | ResponseOutcome::Rejected { .. }) => {
+                return Err(format!(
+                    "只数不删的序号 {sequence} 回 {other_outcome:?}，该是忙或数到 1 把、最后一把是那把长键"
+                ))
+            }
+        }
+    }
+    if busy_frames == 0 {
+        return Err(format!(
+            "一条连接上同时排 {frame_count} 帧只数不删、每帧回应带一把 {BUDGETED_DELETE_LONG_KEY_BYTES} 字节的长键、每条连接额度 \
+             {BUDGETED_DELETE_PER_CONNECTION_BYTES} 字节：{counted_frames} 帧都回了长键、一帧忙都没有：回应不看额度、强行记下了"
+        ));
+    }
+    // 删的那一帧排在头一个：做它的时候额度里还记着别的 7 帧，记不进、回忙、一把都不删
+    let mut deleting_pattern = vec![true; frame_count];
+    deleting_pattern[0] = false;
+    let deleting = delete_prefix_frames(
+        &mut pipelining,
+        BUDGETED_DELETE_PIPELINED_FRAMES + 1,
+        &deleting_pattern,
+    )?;
+    let first_answer = deleting.first().map(|(_, outcome)| outcome);
+    if !matches!(first_answer, Some(ResponseOutcome::Busy { .. })) {
+        return Err(format!(
+            "排在头一个的删前缀（额度里还记着别的 7 帧）回 {first_answer:?}，该是忙：回应记不进额度时不许删"
+        ));
+    }
+    let still_there = other.read(&[(Table::Conclusions, long_key.clone())])?;
+    if still_there.first().cloned().flatten().as_deref() != Some(b"kept".as_slice()) {
+        return Err("删前缀回了忙，那把长键却从库里没了：记不进额度的那一帧照样删了".to_string());
+    }
+    other
+        .write(&[entry("budgeted-delete-other/after", "served")])
+        .map_err(|message| format!("删前缀回忙之后别的连接写不进：{message}"))?;
+    let served = read_value(&server.route(), "budgeted-delete-other/after")?;
+    if served.as_deref() != Some(b"served".as_slice()) {
+        return Err(format!(
+            "删前缀回忙之后别的连接读回 {}（该是 served）",
+            shown_value(served.as_deref())
+        ));
+    }
+    let pending_peak = counter(&other.statistics()?, PENDING_BYTES_PEAK_COUNTER)?;
+    let long_response_bytes = BUDGETED_DELETE_LONG_KEY_BYTES + 64;
+    let pending_bound = u64::try_from(
+        BUDGETED_DELETE_PER_CONNECTION_BYTES
+            + long_response_bytes
+            + frame_count * 2 * BUDGETED_DELETE_SLACK_BYTES_PER_FRAME,
+    )
+    .expect("一两 MiB");
+    if pending_peak > pending_bound {
+        return Err(format!(
+            "额度里记着的字节峰值 {pending_peak}，超过每条连接额度加一个长键回应加每帧余量（{pending_bound}）：删前缀回应在额度之外叠了一层"
+        ));
+    }
+    drop(pipelining);
+    Ok(format!(
+        "每条连接额度 {BUDGETED_DELETE_PER_CONNECTION_BYTES} 字节、前缀下一把 {BUDGETED_DELETE_LONG_KEY_BYTES} 字节的长键：同时排 {frame_count} 帧只数不删，\
+         {busy_frames} 帧回忙、{counted_frames} 帧回了长键；排在头一个的删前缀回忙、长键还在，别的连接照常读写；额度峰值 {pending_peak} 字节（上界 {pending_bound}）"
+    ))
+}
+
+/// 工作线程额度那一格：服务整份额度（每条连接的额度照缺省，比它大）。
+const WORKER_BUDGET_PENDING_BYTES: usize = 1024 * 1024;
+/// 同一格：每把值的字节数（不分段的整值，一帧装得下两把）。
+const WORKER_BUDGET_VALUE_BYTES: usize = 20 * 1024 * 1024;
+/// 同一格：每个前缀下几把值（一帧扫回它们全部，回应约 40 MiB）。
+const WORKER_BUDGET_VALUES_PER_PREFIX: usize = 2;
+/// 同一格：同时扫的连接数，与自证服务的工作线程数相同（`selftest::SELFTEST_WORKER_THREADS`）。
+const WORKER_BUDGET_SCANNERS: usize = 4;
+/// 同一格：每条连接头一帧（序号 1）在工作线程里压这么久再做，几个工作线程同时开始编回应。
+const WORKER_BUDGET_HOLD_MILLISECONDS: u64 = 600;
+/// 同一格：扫完之后额度里还许记着的字节（统计那一帧自己的请求与回应）。
+const WORKER_BUDGET_SETTLED_SLACK_BYTES: u64 = 64 * 1024;
+
+/// 一个前缀下的值：`prefix` 的序号与值的序号定每个字节。
+fn worker_budget_value(prefix_index: usize, value_index: usize) -> Vec<u8> {
+    let filler = u8::try_from((prefix_index * WORKER_BUDGET_VALUES_PER_PREFIX + value_index) % 251)
+        .expect("取模 251 放得进 u8");
+    vec![filler; WORKER_BUDGET_VALUE_BYTES]
+}
+
+fn worker_budget_prefix(prefix_index: usize) -> Vec<u8> {
+    bytes(&format!("worker-budget/{prefix_index}/"))
+}
+
+/// 工作线程边编边记额度（`server.rs` 文件头「额度」）：整份额度 1 MiB，四条连接同时按前缀扫各约 40 MiB 的回应（工作线程四个，头一帧都压 600 毫秒再做，
+/// 四个工作线程同时开始编）：工作线程手里编着的回应合计的峰值不超额度加一帧（`WORKER_RESPONSE_BYTES_PEAK_COUNTER`），记不进的帧回忙、
+/// 容错客户端退避重发，四条连接扫回的值逐字节对；扫完之后别的连接照常写读、额度放回。
+pub(crate) fn cell_worker_responses_within_pending_budget(
+    context: &CellContext,
+) -> Result<String, String> {
+    let switches = context
+        .break_switches
+        .only(BreakSwitch::ResponseBuiltBeforeBudget);
+    let pending_bytes = WORKER_BUDGET_PENDING_BYTES.to_string();
+    let hold = format!("1:{WORKER_BUDGET_HOLD_MILLISECONDS}");
+    let server = HardeningServer::start(
+        context,
+        switches,
+        &[
+            "--maximum-pending-bytes",
+            &pending_bytes,
+            "--selftest-delay",
+            &hold,
+        ],
+    )?;
+    let route = server.route();
+    let mut writer = SimpleClient::connect(&route, BreakSwitches::none())?;
+    for prefix_index in 0..WORKER_BUDGET_SCANNERS {
+        let entries: Vec<(Table, Vec<u8>, Vec<u8>)> = (0..WORKER_BUDGET_VALUES_PER_PREFIX)
+            .map(|value_index| {
+                let mut key = worker_budget_prefix(prefix_index);
+                key.extend_from_slice(format!("value-{value_index}").as_bytes());
+                (
+                    Table::Conclusions,
+                    key,
+                    worker_budget_value(prefix_index, value_index),
+                )
+            })
+            .collect();
+        writer.write(&entries)?;
+    }
+    let scanners: Vec<thread::JoinHandle<Result<(), String>>> = (0..WORKER_BUDGET_SCANNERS)
+        .map(|prefix_index| {
+            let route = route.clone();
+            let journal = server.path().join(format!("scanner-{prefix_index}.journal"));
+            thread::spawn(move || {
+                let mut client = ReliableClient::open(plain_client_settings(
+                    route,
+                    journal,
+                    &BreakSwitches::none(),
+                ))
+                .map_err(|failure| format!("扫的客户端开不了：{failure}"))?;
+                let prefix = worker_budget_prefix(prefix_index);
+                let (is_truncated, entries) = client
+                    .scan(Table::Conclusions, &prefix, 100)
+                    .map_err(|failure| format!("扫前缀 {} 不成：{failure}", String::from_utf8_lossy(&prefix)))?;
+                let matched = !is_truncated
+                    && entries.len() == WORKER_BUDGET_VALUES_PER_PREFIX
+                    && entries
+                        .iter()
+                        .enumerate()
+                        .all(|(value_index, entry)| entry.value == worker_budget_value(prefix_index, value_index));
+                if !matched {
+                    return Err(format!(
+                        "扫前缀 {} 回 {} 条（截断 {is_truncated}），该是 {WORKER_BUDGET_VALUES_PER_PREFIX} 条、逐字节与写进去的相同",
+                        String::from_utf8_lossy(&prefix),
+                        entries.len()
+                    ));
+                }
+                Ok(())
+            })
+        })
+        .collect();
+    for scanner in scanners {
+        scanner
+            .join()
+            .map_err(|_| "扫的线程 panic 了".to_string())??;
+    }
+    writer.write(&[entry("worker-budget/after", "still-serving")])?;
+    let after = writer.read(&[(Table::Conclusions, bytes("worker-budget/after"))])?;
+    if after != [Some(bytes("still-serving"))] {
+        return Err(format!(
+            "扫完之后别的连接写了又读回 {after:?}，该读回 still-serving"
+        ));
+    }
+    let statistics = writer.statistics()?;
+    let peak = counter(&statistics, WORKER_RESPONSE_BYTES_PEAK_COUNTER)?;
+    let busy = counter(&statistics, BUSY_REJECTIONS_COUNTER)?;
+    let settled = counter(&statistics, PENDING_BYTES_COUNTER)?;
+    let bound = u64::try_from(WORKER_BUDGET_PENDING_BYTES).unwrap_or(u64::MAX)
+        + u64::from(MAXIMUM_FRAME_BODY_BYTES);
+    if peak > bound {
+        return Err(format!(
+            "工作线程手里编着的回应合计峰值 {peak} 字节，超过额度 {WORKER_BUDGET_PENDING_BYTES} 加一帧 {MAXIMUM_FRAME_BODY_BYTES} = {bound}：\
+             回应先编好整份才记额度，几个工作线程同时编的那几份都在额度之外"
+        ));
+    }
+    if busy == 0 || settled > WORKER_BUDGET_SETTLED_SLACK_BYTES {
+        return Err(format!(
+            "四条连接同时扫各约 40 MiB：回忙 {busy} 次（该至少 1 次，额度 1 MiB 装不下两份回应）、扫完之后额度里还记着 {settled} 字节（该至多 {WORKER_BUDGET_SETTLED_SLACK_BYTES}）"
+        ));
+    }
+    Ok(format!(
+        "额度 {WORKER_BUDGET_PENDING_BYTES} 字节、四条连接同时扫各 {} 字节：工作线程手里编着的回应合计峰值 {peak} 字节（上界 {bound}）、回忙 {busy} 次、四份都扫回且逐字节对、扫完别的连接照常写读、额度放回到 {settled} 字节",
+        WORKER_BUDGET_VALUE_BYTES * WORKER_BUDGET_VALUES_PER_PREFIX
     ))
 }

@@ -6,18 +6,60 @@
 同一个缘故，三家与旁路的原有自证不 import 这一份、不起它：它们只调客户端的 selftest_service_problem() 核环境，临时服务由这一份的
 --with-temporary-service 在外面起好。
 
-  python3 scripts/prune-server/prune_server_client_selftest.py --selftest
+  python3 scripts/prune-server/prune_server_client_selftest.py --selftest [--cells <格名>[,<格名>…]]
   python3 scripts/prune-server/prune_server_client_selftest.py --selftest-families
   python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <命令> [<参数>…]
 三条整条都不带二进制，没给 --server-binary 就现编；自己编了、两台都读得到的二进制才在子命令后另加 --server-binary <路径>。
-格的清单、弄坏开关、末行的写法都在 scripts/prune-server/prune_server_client.py 文件头「命令行」「自证的格」两段。
+格的清单、弄坏开关、末行的写法都在 scripts/prune-server/prune_server_client.py 文件头「命令行」「自证的格」两段；
+弄坏开关轮怎么跑与这一份自己加的两格、九条开关写在下面。
+
+--cells 只走点名的格（次序照 CELLS，重复的走一次）；格名认不出、缺格名、有空项退 2，并列出可用的格名。点名了格就不跑末尾的弄坏开关轮，打一行说明本次未跑。
+不给 --cells 走全部格，成功句的格数是 CELLS 的条数。
+
+弄坏开关轮（全绿之后）：每个开关起一个 --selftest 子进程，只交它在 BREAK_RED_CELLS 里点名的红格（同一个开关点名几格交几格），判红的依据是
+「退出码不是 0，且标准输出里有每一格的『✗ 自证 <格名>：』」。各开关的子进程互相独立，并行跑，并行度取每台默认重活线程数
+（scripts/hosts/heavy_threads.py，再按开关条数夹）；每个子进程自己一个进程组、自己一个 TMPDIR，环境里带 SWEEP_TOKEN_VARIABLE 标记（后代继承）。
+超过 SWEEP_CHILD_SECONDS 秒没退出：对整组发 TERM，过 SWEEP_STOP_GRACE_SECONDS 秒组里还有活的发 KILL；那个开关记没对上，写明「超时」。
+超时与正常退出一样，之后核带标记的后代（换了进程组、换了会话、被收养的都还带着标记）：宽限之内没自己退掉的，逐个点名（进程号与命令行）记进那个开关的没对上，
+不由这一份去停（起的后代都要在父进程没了之后自己退；临时服务同理，见格 temporary-service-exits-with-parent；
+自证里的假进程另盯着开关子进程的临时目录，目录一删就退）。临时目录无论如何删掉。
+逐个收回每个开关的结果，收回的条数不等于派出的条数整轮报错。末行 PRUNE_SERVER_CLIENT_BREAK_SWEEP switches=… matched=… unmatched=… 的写法不变。
+
+这一份自己加的格（run_break_sweep 与 --cells 的解析是它们的被测物，假子进程不起服务、不编译）：
+  sweep-child-runs-only-named-cells  sweep_child_command 拼出的命令交给 parse_selftest_options，走的恰是点名的格；--cells 缺格名、认不出的格名拒并列出可用格名；不给 --cells 走全部
+  sweep-stops-hung-child             三个假子进程并行：卡死的（忽略 TERM，另起两个忽略 TERM 的孙进程，一个同组、一个换了会话并盯着父进程、父进程没了就自己退）要在时限加两倍宽限之内被停、
+                                     记「超时」、组里停 2 个、到点时组外带标记的 1 个、停完组之后宽限之内这个组外的自己退掉（没有点名留下的进程）、临时目录删了、
+                                     整轮回来时没有带标记的进程留下；红在点名格的记对上；退 0 没红的记没对上；收回 3 条
+弄坏开关 PRUNE_SERVER_CLIENT_BREAK=<项>（写法同 scripts/prune-server/prune_server_client.py 文件头「弄坏开关」，一条一行，下一行写打开后红的格）：
+  PRUNE_SERVER_CLIENT_BREAK=sweep-child-runs-all-cells  sweep_child_command 不带 --cells，子进程走全部格
+      sweep-child-runs-only-named-cells（「✗ 自证 sweep-child-runs-only-named-cells：」）
+  PRUNE_SERVER_CLIENT_BREAK=cells-option-ignored  parse_selftest_options 收下 --cells 却照走全部格
+      sweep-child-runs-only-named-cells（「✗ 自证 sweep-child-runs-only-named-cells：」）
+  PRUNE_SERVER_CLIENT_BREAK=unknown-cell-name-accepted  --cells 里认不出的格名悄悄丢掉、不退 2
+      sweep-child-runs-only-named-cells（「✗ 自证 sweep-child-runs-only-named-cells：」）
+  PRUNE_SERVER_CLIENT_BREAK=sweep-child-without-time-limit  开关子进程不设时限，等到它自己退出
+      sweep-stops-hung-child（「✗ 自证 sweep-stops-hung-child：」）
+  PRUNE_SERVER_CLIENT_BREAK=sweep-child-term-only  到点只发 TERM、宽限过了不发 KILL
+      sweep-stops-hung-child（「✗ 自证 sweep-stops-hung-child：」）
+  PRUNE_SERVER_CLIENT_BREAK=sweep-group-not-signalled  到点只给子进程自己发信号，不给整组发
+      sweep-stops-hung-child（「✗ 自证 sweep-stops-hung-child：」）
+  PRUNE_SERVER_CLIENT_BREAK=sweep-job-directory-kept  开关子进程的临时目录不删
+      sweep-stops-hung-child（「✗ 自证 sweep-stops-hung-child：」）
+  PRUNE_SERVER_CLIENT_BREAK=sweep-outcome-dropped  收回的结果丢掉最后一条再核条数
+      sweep-stops-hung-child（「✗ 自证 sweep-stops-hung-child：」）
+  PRUNE_SERVER_CLIENT_BREAK=sweep-descendants-left  卡死的假子进程里换了会话的孙进程不盯父进程，只带临时目录没了就退与 SWEEP_FAKE_BACKSTOP_SECONDS 秒的自退时限：
+                                                   停完整组之后它还留着，被点名列出、判红，开关子进程的临时目录一删它自己退掉
+      sweep-stops-hung-child（「✗ 自证 sweep-stops-hung-child：」）
 """
+import concurrent.futures
 import contextlib
+import dataclasses
 import hashlib
 import importlib.util
 import json
 import os
 import random
+import secrets
 import select
 import shutil
 import signal
@@ -34,31 +76,35 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from prune_server_client import (  # noqa: E402  客户端的常量、类与函数：自证照原来写在同一份文件里时的名字用
     BINARY_VARIABLE, BREAK_VARIABLE, EXIT_OTHER, EXIT_UNAVAILABLE, EXIT_USAGE, FAMILIES, FAMILY_APPARATUS_ITEMS, FAMILY_UNIT_VERDICTS, MAXIMUM_FRAME_BODY_BYTES,
     MULTI_HOST_CONFIGURATION_VARIABLE, OPERATION_ANNOUNCE_STOP, PROCESS_CLIENT, RECONNECT_LIMIT_VARIABLE, REPOSITORY_ROOT, RESPONSE_TIMEOUT_VARIABLE,
-    SEGMENT_BYTES, SELFTEST_VARIABLE, SOCKET_VARIABLE, STATUS_COMPLETED, TCP_ADDRESS_VARIABLE, TEMPORARY_SERVICE_VARIABLE,
-    Client, LibraryStore, PruneServerFailure, break_is, encode_frame, encode_manifest, manifest_of, process_client, read_response, request_body,
-    namespace_of, reset_process_client, segment_count_key, segment_key, segment_key_parts, segments_needed, selftest_service_problem,
+    SEGMENT_BYTES, SEGMENT_KEY_SEPARATOR, SEGMENT_MANIFEST_MAGIC, SELFTEST_VARIABLE, SOCKET_VARIABLE, STATUS_COMPLETED, TCP_ADDRESS_VARIABLE, TEMPORARY_SERVICE_VARIABLE,
+    Client, LibraryStore, PruneServerFailure, break_is, encode_frame, encode_manifest, manifest_of, manifest_version, process_client, read_response, request_body,
+    namespace_of, parse_version_registry, reset_process_client, segment_key, segment_key_parts, segment_version_prefix, segments_needed, selftest_service_problem,
+    version_registry_key,
 )
 
 
 CELLS = ("round-trip-unix", "prefix-scan", "tcp-round-trip", "busy-retried-after-delay",
          "stopped-exits-75", "unreachable-exits-75", "families-over-service", "unreachable-family-exits-75",
          "connect-bounded-by-reconnect-total", "large-value-round-trip", "segmented-read-incomplete-refused",
-         "segmented-read-sees-a-rewrite", "segment-count-over-index-digits-refused", "scan-row-over-frame-refused",
-         "segment-key-shapes-only-reserved", "oversize-frame-reported-at-once", "temporary-service-exits-with-parent", "service-problem-judges-given-environment",
+         "segmented-read-sees-a-rewrite", "segmented-rewrite-survives-writer-death", "segment-count-over-index-digits-refused",
+         "scan-row-over-frame-refused", "prefix-scan-continues-after-the-last-key", "segment-key-shapes-only-reserved", "oversize-frame-reported-at-once", "temporary-service-exits-with-parent", "service-problem-judges-given-environment",
          "connection-variables-refused-outside-temporary-service", "command-line-read", "namespace-only-under-temporary-service",
          "batched-read-answer-over-frame-limit-split", "binary-not-built-without-target-directory", "delete-prefix-by-namespace",
-         "delete-by-item-name-picks-by-value")
+         "delete-by-item-name-picks-by-value", "write-storage-failure-replayed",
+         "sweep-child-runs-only-named-cells", "sweep-stops-hung-child")
 BREAK_RED_CELLS = (("read-failure-reported-as-absent", "unreachable-exits-75"), ("reconnect-unbounded", "unreachable-exits-75"),
                    ("stop-notice-retried", "stopped-exits-75"), ("busy-retry-without-delay", "busy-retried-after-delay"),
                    ("family-prefixes-shared", "families-over-service"),
                    ("unreachable-treated-as-no-library", "unreachable-family-exits-75"),
                    ("connect-given-full-response-timeout", "connect-bounded-by-reconnect-total"),
                    ("large-value-sent-unsegmented", "large-value-round-trip"),
-                   ("segment-count-shrinks-on-rewrite", "large-value-round-trip"),
+                   ("superseded-versions-kept", "large-value-round-trip"),
                    ("segments-assembled-without-sha256", "segmented-read-incomplete-refused"),
                    ("segmented-read-not-reread", "segmented-read-sees-a-rewrite"),
+                   ("segments-overwritten-in-place", "segmented-rewrite-survives-writer-death"),
                    ("segment-count-unbounded", "segment-count-over-index-digits-refused"),
                    ("scan-row-over-frame-split", "scan-row-over-frame-refused"),
+                   ("scan-split-into-next-byte-prefixes", "prefix-scan-continues-after-the-last-key"),
                    ("nul-keys-reserved-whole", "segment-key-shapes-only-reserved"),
                    ("segment-key-shapes-accepted", "segment-key-shapes-only-reserved"),
                    ("other-segment-keys-scanned-as-entries", "segment-key-shapes-only-reserved"),
@@ -72,7 +118,17 @@ BREAK_RED_CELLS = (("read-failure-reported-as-absent", "unreachable-exits-75"), 
                    ("build-without-target-directory", "binary-not-built-without-target-directory"),
                    ("delete-prefix-without-namespace", "delete-prefix-by-namespace"),
                    ("item-name-ignores-kind", "delete-by-item-name-picks-by-value"),
-                   ("item-name-dry-run-deletes", "delete-by-item-name-picks-by-value"))
+                   ("item-name-dry-run-deletes", "delete-by-item-name-picks-by-value"),
+                   ("write-storage-failure-abandoned", "write-storage-failure-replayed"),
+                   ("sweep-child-runs-all-cells", "sweep-child-runs-only-named-cells"),
+                   ("cells-option-ignored", "sweep-child-runs-only-named-cells"),
+                   ("unknown-cell-name-accepted", "sweep-child-runs-only-named-cells"),
+                   ("sweep-child-without-time-limit", "sweep-stops-hung-child"),
+                   ("sweep-child-term-only", "sweep-stops-hung-child"),
+                   ("sweep-group-not-signalled", "sweep-stops-hung-child"),
+                   ("sweep-job-directory-kept", "sweep-stops-hung-child"),
+                   ("sweep-outcome-dropped", "sweep-stops-hung-child"),
+                   ("sweep-descendants-left", "sweep-stops-hung-child"))
 CARGO_TARGET_DIRECTORY_VARIABLE = "CARGO_TARGET_DIR"   # 任务服务给的编译目录；没有它就不现编服务二进制（resolve_binary）
 SERVER_READY_SECONDS = 120
 CHILD_TIMEOUT_SECONDS = 60
@@ -163,7 +219,8 @@ def build_server_binary():
 class TestServer:
     """一格一份真 prune-server：socket、状态目录、库、密钥都在这一格的临时目录里；它自己一个进程组，收尾对整组发信号。
     经 PARENT_DEATH_LAUNCHER 起：起它的进程被硬杀、收尾不跑时内核停服务（客户端文件头「命令行」临时服务跟着起它的进程走）；
-    父进程死亡信号认的是建它的那一条线程，只在活到收尾的线程里建。弄坏开关 temporary-service-outlives-parent 下直接起二进制（改前的样子）。"""
+    父进程死亡信号认的是建它的那一条线程，只在活到收尾的线程里建。弄坏开关 temporary-service-outlives-parent 下直接起二进制（改前的样子）。
+    对它那一组发信号只经 signal_group（在 __init__ 里闭包着刚起的这个子进程，进程组号就是它的进程号）：发信号的地方不去碰别处来的进程号。"""
 
     def __init__(self, binary, directory, extra=()):
         os.makedirs(directory)
@@ -175,9 +232,16 @@ class TestServer:
                    "--library", self.library, "--tcp", "127.0.0.1:0", "--worker-threads", "2", *extra]
         if not break_is("temporary-service-outlives-parent"):
             command = [sys.executable, "-I", "-c", PARENT_DEATH_LAUNCHER, str(os.getpid()), *command]
-        self.process = subprocess.Popen(command,
-                                        stdout=subprocess.PIPE, stderr=self.standard_error, text=True, start_new_session=True,
-                                        env={name: value for name, value in os.environ.items() if not name.startswith("PRUNE_SERVER_BREAK")})
+        process = subprocess.Popen(command,
+                                   stdout=subprocess.PIPE, stderr=self.standard_error, text=True, start_new_session=True,
+                                   env={name: value for name, value in os.environ.items() if not name.startswith("PRUNE_SERVER_BREAK")})
+        self.process = process
+
+        def signal_group(signal_number):
+            """给这一份服务自己的进程组发信号（signal_number 为 0 只探活）。"""
+            os.killpg(process.pid, signal_number)
+
+        self.signal_group = signal_group
         self.tcp_address = ""
         line = self.wait_for_listening_line()
         for field in line.split():
@@ -221,20 +285,20 @@ class TestServer:
         """kill -9 整个进程组（它是这一格自己起的进程，进程组号就是它的进程号），不重起。"""
         if self.process.poll() is None:
             with contextlib.suppress(ProcessLookupError):
-                os.killpg(self.process.pid, signal.SIGKILL)
+                self.signal_group(signal.SIGKILL)
             self.process.wait(timeout=30)
 
     def stop(self):
         if self.process.poll() is None:
             with contextlib.suppress(ProcessLookupError):
-                os.killpg(self.process.pid, signal.SIGTERM)
+                self.signal_group(signal.SIGTERM)
             try:
                 self.process.wait(timeout=30)
             except subprocess.TimeoutExpired:
                 self.kill()
         with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(self.process.pid, 0)
-            os.killpg(self.process.pid, signal.SIGKILL)
+            self.signal_group(0)
+            self.signal_group(signal.SIGKILL)
         # 标准输出不在这里关：读它的线程读到流尾自己退出（进程组已经停了）
         self.standard_error.close()
 
@@ -306,13 +370,14 @@ def run_child(arguments, changes, timeout=CHILD_TIMEOUT_SECONDS, program=None):
     except subprocess.TimeoutExpired:
         with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        output, error = process.communicate()
+        output, error = process.communicate(timeout=STOP_EXIT_WITHIN_SECONDS)
         return None, time.monotonic() - started, output, error
 
 
 def selftest_child(arguments):
     """自证起的子进程：read <键> 读一个键打「absent」或「present」；verdict-lookup <目录> 跑 lib_verdict_library 的 lookup、打它交的那一对；
-    write-long-key <字节数> 写一条键长这么多字节的条目，写成了打「written」；hold-server <二进制> <目录> 起一份 TestServer、打「server_pid=<进程号>」，
+    write-long-key <字节数> 写一条键长这么多字节的条目，写成了打「written」；write-dies-before-manifest <键> <种子> <字节数> 照 write_many 写这个种子生成的值，
+    写到清单那一帧之前 SIGKILL 自己（走完了才打「written」）；hold-server <二进制> <目录> 起一份 TestServer、打「server_pid=<进程号>」，
     再睡 HOLD_SERVER_SECONDS 秒（temporary-service-exits-with-parent 在那之前 SIGKILL 它）。"""
     if arguments[:1] == ["hold-server"] and len(arguments) == 3:
         server = TestServer(arguments[1], arguments[2])
@@ -326,6 +391,20 @@ def selftest_child(arguments):
         return 0
     if arguments[:1] == ["write-long-key"] and len(arguments) == 2 and arguments[1].isdigit():
         process_client().write_many([(b"k" * int(arguments[1]), b"v")])
+        print("written")
+        return 0
+    if arguments[:1] == ["write-dies-before-manifest"] and len(arguments) == 4 and arguments[2].isdigit() and arguments[3].isdigit():
+        value = random.Random(int(arguments[2])).randbytes(int(arguments[3]))
+
+        class DiesBeforeManifest(Client):
+            """写到清单那一帧之前 SIGKILL 自己（segmented-rewrite-survives-writer-death 演写方死在写完段、写清单之前）。"""
+
+            def write_batches(self, entries):
+                if any(stored.startswith(SEGMENT_MANIFEST_MAGIC) for _key, stored in entries):
+                    os.kill(os.getpid(), signal.SIGKILL)
+                super().write_batches(entries)
+
+        DiesBeforeManifest().write_many([(arguments[1].encode(), value)])
         print("written")
         return 0
     if arguments[:1] == ["verdict-lookup"] and len(arguments) == 2:
@@ -465,7 +544,7 @@ def cell_families_over_service(binary, work):
         broad_directory = os.path.join(work, "broad-root", "broad-mutation-units")
         admission_tree = os.path.join(work, "admission-tree")
         os.makedirs(admission_tree)
-        initialized = subprocess.run(["git", "init", "-q", admission_tree], capture_output=True, text=True)
+        initialized = subprocess.run(["git", "init", "-q", admission_tree], capture_output=True, text=True, timeout=CHILD_TIMEOUT_SECONDS)
         admission_common = os.path.join(admission_tree, ".git")
         before_admission = files_under(admission_common)
         with environment_for(unix_environment(server)):
@@ -611,13 +690,24 @@ def cell_connect_bounded_by_reconnect_total(binary, work):
                 opened_socket.close()
 
 
-def segment_indices(raw_entries):
-    """服务里原样扫回的 [(键, 值)] 里段键形状的段号，升序。"""
-    return sorted(parts[1] for parts in (segment_key_parts(key) for key, _value in raw_entries) if parts is not None)
+def stored_segments(raw_entries, key):
+    """服务里原样扫回的 [(键, 值)] 里这把键带版本的段：{版本: [段号…升序]}（客户端文件头「键空间」段键 <键> NUL <版本> NUL <段号>）。"""
+    owner = key + SEGMENT_KEY_SEPARATOR
+    found = {}
+    for raw_key, _value in raw_entries:
+        parts = segment_key_parts(raw_key)
+        if parts is not None and parts[0].startswith(owner):
+            found.setdefault(parts[0][len(owner):], []).append(parts[1])
+    return {version: sorted(indices) for version, indices in found.items()}
+
+
+def version_of(value):
+    """这个整值存成分段时的版本（弄坏开关 segments-overwritten-in-place 下是 None，段键不带版本）。"""
+    return manifest_version({"sha256": hashlib.sha256(value).hexdigest()})
 
 
 def cell_large_value_round_trip(binary, work):
-    """大于帧长上限的值经分段写读往返、扫描只交原键；重写成两段长的值之后旧段号全被新清单点名（客户端文件头「键空间」大值分段）。"""
+    """大于帧长上限的值经分段写读往返、扫描只交原键；重写成两段长的值之后服务里只剩新的那一版段、版本登记键只登记它（客户端文件头「键空间」大值分段）。"""
     server = TestServer(binary, os.path.join(work, "server"))
     try:
         large = random.Random(LARGE_VALUE_SEED).randbytes(LARGE_VALUE_BYTES)
@@ -631,20 +721,25 @@ def cell_large_value_round_trip(binary, work):
             scanned_keys = [key for key, _value in scanned]
             scan_ok = scanned_keys == [b"large/one", b"large/small"] and scanned[0][1] == large
             del values, scanned
-            before = segment_indices(client.raw_scan_stream(b"large/one"))
+            before = stored_segments(client.raw_scan_stream(b"large/one"), b"large/one")
             client.write_many([(b"large/one", rewritten)])
             after = client.read_many([b"large/one"])[0]
             raw_after = dict(client.raw_scan_stream(b"large/one"))
         manifest = manifest_of(b"large/one", raw_after.get(b"large/one"))
         listed = len(manifest["segments"]) if manifest else 0
-        after_indices = segment_indices(raw_after.items())
-        count_value = raw_after.get(segment_count_key(b"large/one"))
-        before_ok = before == list(range(segments_needed(large)))
-        rewrite_ok = after == rewritten and manifest is not None and after_indices == list(range(listed)) and count_value == b"%d" % listed
+        after_segments = stored_segments(raw_after.items(), b"large/one")
+        registered = parse_version_registry(b"large/one", raw_after.get(version_registry_key(b"large/one")))
+        large_version, rewritten_version = version_of(large), version_of(rewritten)
+        before_ok = before == {large_version: list(range(segments_needed(large)))}
+        rewrite_ok = (after == rewritten and manifest is not None and after_segments == {rewritten_version: list(range(listed))}
+                      and registered == [rewritten_version])
         passed = round_trip_ok and scan_ok and before_ok and rewrite_ok
+        shown = {version.decode()[:12]: indices for version, indices in after_segments.items()}
         return passed, (f"写读 {len(large)} 字节的值逐字节相同 {round_trip_ok}（小值与不在的键一并对 {round_trip_ok}）；按前缀扫交 {scanned_keys}、大值拼回相同 {scan_ok}；"
-                        f"服务里的段号 {before}（要 0 到 {segments_needed(large) - 1}）；重写成 {len(rewritten)} 字节之后读回相同 {after == rewritten}、"
-                        f"新清单点名 {listed} 段、服务里的段号 {after_indices}、计数键 {count_value!r}（段号要与清单一一对上、计数键等于清单段数）")
+                        f"服务里的段 {[(version.decode()[:12], indices) for version, indices in before.items()]}（要只有这个值那一版、段号 0 到 {segments_needed(large) - 1}）；"
+                        f"重写成 {len(rewritten)} 字节之后读回相同 {after == rewritten}、新清单点名 {listed} 段、服务里的段 {shown}、"
+                        f"版本登记 {[version.decode()[:12] for version in registered]}（要只剩新值那一版 {rewritten_version.decode()[:12] if rewritten_version else None}、"
+                        "段号与清单一一对上、旧的那一版回收了）")
     finally:
         server.stop()
 
@@ -662,19 +757,20 @@ def segmented_read_outcome(action):
 
 def cell_segmented_read_incomplete_refused(binary, work):
     """分段存的值拼不全（缺段）、一段短了、一段同长换了字节：点读都退 3（分段拼不回），按前缀扫换了字节的那一把同样退 3。
-    协议没有删键，缺段那一把是另起一把键、只写清单与段号 0、2。"""
+    缺段那一把是另起一把键、只写清单与这一版的段号 0、2。"""
     server = TestServer(binary, os.path.join(work, "server"))
     try:
         value = random.Random(LARGE_VALUE_SEED + 1).randbytes(SEGMENT_BYTES * 2 + INCOMPLETE_TAIL_BYTES)
+        version = version_of(value)
         pieces = [value[:SEGMENT_BYTES], value[SEGMENT_BYTES:SEGMENT_BYTES * 2], value[SEGMENT_BYTES * 2:]]
         altered = bytes([pieces[1][0] ^ 0xFF]) + pieces[1][1:]
         with environment_for(unix_environment(server)):
             client = process_client()
             client.write_many([(b"broken/short", value), (b"broken/altered", value)])
             client.write_frame([(b"broken/gap", encode_manifest(value, [len(piece) for piece in pieces])),
-                                (segment_key(b"broken/gap", 0), pieces[0]), (segment_key(b"broken/gap", 2), pieces[2])])
-            client.write_frame([(segment_key(b"broken/short", 2), pieces[2][:-1])])
-            client.write_frame([(segment_key(b"broken/altered", 1), altered)])
+                                (segment_key(b"broken/gap", version, 0), pieces[0]), (segment_key(b"broken/gap", version, 2), pieces[2])])
+            client.write_frame([(segment_key(b"broken/short", version, 2), pieces[2][:-1])])
+            client.write_frame([(segment_key(b"broken/altered", version, 1), altered)])
             outcomes = {name: segmented_read_outcome(lambda key=key: client.read_many([key]))
                         for name, key in (("缺段", b"broken/gap"), ("短段", b"broken/short"), ("换了字节", b"broken/altered"))}
             outcomes["按前缀扫换了字节的"] = segmented_read_outcome(lambda: [value for _key, value in client.scan(b"broken/altered")])
@@ -688,12 +784,13 @@ REWRITE_MANIFEST_AFTER_SECONDS = 0.3
 
 
 def cell_segmented_read_sees_a_rewrite(binary, work):
-    """同一把键正被重写（客户端文件头「键空间」大值分段「读」）：段已换成新值、清单还是旧的，另一条线程 REWRITE_MANIFEST_AFTER_SECONDS 秒后写新清单；
-    点读与按前缀扫都交回新值，不退 3。"""
+    """同一把键正被重写（客户端文件头「键空间」大值分段「读」）：新一版的段已写下、读的一方要读的旧一版段已被回收、清单还是旧的，
+    另一条线程 REWRITE_MANIFEST_AFTER_SECONDS 秒后写新清单；点读与按前缀扫都交回新值，不退 3。"""
     server = TestServer(binary, os.path.join(work, "server"))
     old = random.Random(LARGE_VALUE_SEED + 3).randbytes(SEGMENT_BYTES + INCOMPLETE_TAIL_BYTES)
     new = random.Random(LARGE_VALUE_SEED + 4).randbytes(SEGMENT_BYTES + INCOMPLETE_TAIL_BYTES)
     lengths = [SEGMENT_BYTES, INCOMPLETE_TAIL_BYTES]
+    old_version, new_version = version_of(old), version_of(new)
     try:
         with environment_for(unix_environment(server)):
             client = process_client()
@@ -701,7 +798,9 @@ def cell_segmented_read_sees_a_rewrite(binary, work):
             for name, key, action in (("点读", b"rewritten/read", lambda key: client.read_many([key])[0]),
                                       ("按前缀扫", b"rewritten/scan", lambda key: dict(client.scan(key)).get(key))):
                 client.write_many([(key, old)])
-                client.write_frame([(segment_key(key, 0), new[:SEGMENT_BYTES]), (segment_key(key, 1), new[SEGMENT_BYTES:])])
+                client.write_frame([(segment_key(key, new_version, 0), new[:SEGMENT_BYTES]), (segment_key(key, new_version, 1), new[SEGMENT_BYTES:])])
+                if old_version is not None:
+                    client.delete_prefix(segment_version_prefix(key, old_version))
                 writer = threading.Timer(REWRITE_MANIFEST_AFTER_SECONDS, lambda key=key: client.write_frame([(key, encode_manifest(new, lengths))]))
                 writer.start()
                 try:
@@ -718,22 +817,74 @@ def cell_segmented_read_sees_a_rewrite(binary, work):
         server.stop()
 
 
+DEATH_KEY = b"death/one"
+DEATH_NEW_SEED = LARGE_VALUE_SEED + 6
+
+
+def cell_segmented_rewrite_survives_writer_death(binary, work):
+    """写方死在「写完新一版的段、还没写清单」之间（客户端文件头「键空间」大值分段「写」）：子进程照 write_many 写新值，写到清单那一帧之前 SIGKILL 自己；
+    点读与按前缀扫都交回旧值、不退 3，服务里登记着旧新两版；再写第三个值之后读回它，段与版本登记键都只剩第三个值那一版。"""
+    server = TestServer(binary, os.path.join(work, "server"))
+    old = random.Random(LARGE_VALUE_SEED + 5).randbytes(SEGMENT_BYTES + INCOMPLETE_TAIL_BYTES)
+    new = random.Random(DEATH_NEW_SEED).randbytes(SEGMENT_BYTES + INCOMPLETE_TAIL_BYTES)
+    third = random.Random(LARGE_VALUE_SEED + 7).randbytes(SEGMENT_BYTES + REWRITTEN_TAIL_BYTES)
+    try:
+        with environment_for(unix_environment(server)):
+            process_client().write_many([(DEATH_KEY, old)])
+        code, _seconds, output, error = run_child(["write-dies-before-manifest", DEATH_KEY.decode(), str(DEATH_NEW_SEED), str(len(new))],
+                                                  unix_environment(server))
+        killed = code == -signal.SIGKILL and "written" not in output
+        outcomes = {}
+        with environment_for(unix_environment(server)):
+            client = process_client()
+            for name, action in (("点读", lambda: client.read_many([DEATH_KEY])[0]), ("按前缀扫", lambda: dict(client.scan(b"death/")).get(DEATH_KEY))):
+                try:
+                    result = action()
+                    outcomes[name] = ("交回旧值" if result == old else "交回新值" if result == new else
+                                      "交回「不在」" if result is None else f"交回 {len(result)} 字节的别的值")
+                except PruneServerFailure as failure:
+                    outcomes[name] = f"退 {failure.code}（{failure.kind}）"
+            raw_after_death = dict(client.raw_scan_stream(DEATH_KEY))
+            registered_after_death = parse_version_registry(DEATH_KEY, raw_after_death.get(version_registry_key(DEATH_KEY)))
+            del raw_after_death
+            client.write_many([(DEATH_KEY, third)])
+            third_read = client.read_many([DEATH_KEY])[0]
+            raw_third = dict(client.raw_scan_stream(DEATH_KEY))
+        segments_third = stored_segments(raw_third.items(), DEATH_KEY)
+        registered_third = parse_version_registry(DEATH_KEY, raw_third.get(version_registry_key(DEATH_KEY)))
+        both = sorted(version for version in (version_of(old), version_of(new)) if version is not None)
+        third_version = version_of(third)
+        reads_ok = all(shown == "交回旧值" for shown in outcomes.values())
+        death_registry_ok = registered_after_death == both
+        third_ok = (third_read == third and segments_third == {third_version: list(range(segments_needed(third)))}
+                    and registered_third == [third_version])
+        passed = killed and reads_ok and death_registry_ok and third_ok
+        return passed, (f"子进程写新值：退 {code}（要被 SIGKILL：{-signal.SIGKILL}）、标准输出「{output.strip()}」、标准错误「{error.strip()[-200:]}」；"
+                        + "；".join(f"{name}：{shown}" for name, shown in outcomes.items()) + "（都要交回旧值、不退 3）；"
+                        f"死后版本登记 {[version.decode()[:12] for version in registered_after_death]}（要旧新两版 {[version.decode()[:12] for version in both]}）；"
+                        f"再写第三个值读回相同 {third_read == third}、服务里的段 {[(version.decode()[:12], indices) for version, indices in segments_third.items()]}、"
+                        f"版本登记 {[version.decode()[:12] for version in registered_third]}（要只剩第三个值那一版）")
+    finally:
+        server.stop()
+
+
 def cell_segment_count_over_index_digits_refused(binary, work):
     """段数段号装不下的值写之前拒（客户端文件头「键空间」大值分段「写」）：段长与段号位数调成 1 字节、1 位（至多 10 段），
-    要 11 段的值退 3（too-many-segments）、原键、段键、计数键一条都没写；要 10 段的照写、读回相同。"""
+    要 11 段的值退 3（too-many-segments）、原键、段键、版本登记键一条都没写；要 10 段的照写、读回相同。"""
     server = TestServer(binary, os.path.join(work, "server"))
     client_module = sys.modules[Client.__module__]
     saved = (client_module.SEGMENT_BYTES, client_module.SEGMENT_INDEX_DIGITS)
+    eleven = b"0123456789A"
     try:
         with environment_for(unix_environment(server)):
             client = process_client()
             client_module.SEGMENT_BYTES, client_module.SEGMENT_INDEX_DIGITS = 1, 1
             try:
-                refused = write_outcome(client, [(b"digits/eleven", b"0123456789A")])
+                refused = write_outcome(client, [(b"digits/eleven", eleven)])
                 written = write_outcome(client, [(b"digits/ten", b"0123456789")])
                 ten = client.read_many([b"digits/ten"])[0]
-                left = client.read_many_raw([b"digits/eleven", client_module.segment_count_key(b"digits/eleven"),
-                                             *[client_module.segment_key(b"digits/eleven", index) for index in range(11)]])
+                left = client.read_many_raw([b"digits/eleven", client_module.version_registry_key(b"digits/eleven"),
+                                             *[client_module.segment_key(b"digits/eleven", version_of(eleven), index) for index in range(11)]])
             finally:
                 client_module.SEGMENT_BYTES, client_module.SEGMENT_INDEX_DIGITS = saved
         stored = [value for value in left if value is not None]
@@ -754,7 +905,7 @@ def cell_scan_row_over_frame_refused(_binary, _work):
     calls = []
 
     class TruncatingEveryFrame(Client):
-        def raw_scan(self, prefix):
+        def raw_scan(self, prefix, after_key=b""):
             calls.append(prefix)
             if len(calls) > SCAN_ROW_OVER_FRAME_CALL_LIMIT:
                 raise RuntimeError(f"问了 {len(calls)} 帧还在往下拆前缀")
@@ -785,17 +936,17 @@ def write_outcome(client, entries):
 
 
 def cell_segment_key_shapes_only_reserved(binary, work):
-    """认段键只认形状（客户端文件头「键空间」认段键只认形状）：带 NUL 而不是段键、计数键形状的原键照写照读照扫，
-    一把排在大值原键与它的段键之间的原键不打乱拼回；段键、计数键形状的原键写时整批拒。"""
+    """认段键只认形状（客户端文件头「键空间」认段键只认形状）：带 NUL 而不是段键、版本登记键形状的原键照写照读照扫，
+    一把排在大值原键与它的段键之间的原键不打乱拼回；段键、版本登记键形状的原键写时整批拒。"""
     server = TestServer(binary, os.path.join(work, "server"))
     big_key = SHAPE_CELL_PREFIX + b"big\x00\x07"
     between_key = big_key + b"\x00\x01"
     big = random.Random(LARGE_VALUE_SEED + 2).randbytes(SEGMENT_BYTES + SHAPE_CELL_TAIL_BYTES)
     stored = {SHAPE_CELL_PREFIX + b"\x00\x00digest\x00": b"label-and-nul", SHAPE_CELL_PREFIX + b"five\x0012345": b"five-digits",
-              SHAPE_CELL_PREFIX + b"seven\x001234567": b"seven-digits", SHAPE_CELL_PREFIX + b"counted\x00countdown": b"count-then-more",
+              SHAPE_CELL_PREFIX + b"seven\x001234567": b"seven-digits", SHAPE_CELL_PREFIX + b"listed\x00versionsmore": b"versions-then-more",
               big_key: big, between_key: b"between-owner-and-segments"}
     refused = {"段键形状": (SHAPE_CELL_PREFIX + b"refused\x00000003", SHAPE_CELL_PREFIX + b"alongside-segment-shape"),
-               "计数键形状": (SHAPE_CELL_PREFIX + b"refused\x00count", SHAPE_CELL_PREFIX + b"alongside-count-shape")}
+               "版本登记键形状": (SHAPE_CELL_PREFIX + b"refused\x00versions", SHAPE_CELL_PREFIX + b"alongside-registry-shape")}
     try:
         with environment_for(unix_environment(server)):
             client = process_client()
@@ -810,14 +961,14 @@ def cell_segment_key_shapes_only_reserved(binary, work):
             for name, (reserved_key, alongside_key) in refused.items():
                 kind = write_outcome(client, [(alongside_key, b"legal"), (reserved_key, b"shaped")])
                 refusals[name] = (kind, client.read_many_raw([reserved_key, alongside_key]))
-        big_segment_keys = [segment_key(big_key, index) for index in range(segments_needed(big))]
-        stored_raw_ok = all(key in raw_keys for key in [*big_segment_keys, segment_count_key(big_key)])
+        big_segment_keys = [segment_key(big_key, version_of(big), index) for index in range(segments_needed(big))]
+        stored_raw_ok = all(key in raw_keys for key in [*big_segment_keys, version_registry_key(big_key)])
         interleaved = (all(key in raw_keys for key in (big_key, between_key, big_segment_keys[0]))
                        and raw_keys.index(big_key) < raw_keys.index(between_key) < raw_keys.index(big_segment_keys[0]))
         refused_ok = all(kind == "reserved-key" and values == [None, None] for kind, values in refusals.values())
         passed = stored_outcome == "written" and read_ok and scan_ok and stored_raw_ok and interleaved and refused_ok
         return passed, (f"带 NUL 而不是那两种形状的 {len(stored)} 把原键：写 {stored_outcome}（要 written）、逐字节读回相同 {read_ok}、"
-                        f"按前缀扫交 {scanned_keys}、与写进去的逐条相同 {scan_ok}；服务里原样有大值的段键与计数键 {stored_raw_ok}、"
+                        f"按前缀扫交 {scanned_keys}、与写进去的逐条相同 {scan_ok}；服务里原样有大值的段键与版本登记键 {stored_raw_ok}、"
                         f"排在原键与段键之间的那把确实夹在中间 {interleaved}；"
                         + "；".join(f"{name}：写 {kind}、服务里这把与同批合法那条 {['不在' if value is None else '在' for value in values]}"
                                    for name, (kind, values) in refusals.items())
@@ -908,7 +1059,7 @@ def cell_temporary_service_exits_with_parent(binary, work):
             holder.wait(timeout=30)
         if server_process is not None and start_ticks is not None and still_running(server_process, start_ticks):
             with contextlib.suppress(ProcessLookupError):
-                os.killpg(server_process, signal.SIGKILL)
+                os.kill(server_process, signal.SIGKILL)   # 点名这一个进程号（刚核过起始时刻还是那一个）：服务是一个进程，不起子进程，不用整组
         holder.stdout.close()
         holder.stderr.close()
 
@@ -1000,7 +1151,7 @@ def cell_command_line_read(binary, work):
 
 def cell_batched_read_answer_over_frame_limit_split(binary, work):
     """回应超过帧长上限就拆键（客户端文件头「容错」）：OVER_LIMIT_VALUE_COUNT 把各正好一段长（SEGMENT_BYTES，不分段存）的值合计超过帧长上限，
-    中间夹一条小值与一把不在的键，一次 read_many 读全：逐字节对、次序与问的相同；那几把都没有计数键（真没分段，单键回应装得下一帧）。"""
+    中间夹一条小值与一把不在的键，一次 read_many 读全：逐字节对、次序与问的相同；那几把都没有版本登记键（真没分段，单键回应装得下一帧）。"""
     server = TestServer(binary, os.path.join(work, "server"))
     try:
         generator = random.Random(LARGE_VALUE_SEED + 2)
@@ -1015,17 +1166,17 @@ def cell_batched_read_answer_over_frame_limit_split(binary, work):
         with environment_for(unix_environment(server)):
             client = process_client()
             client.write_many(sized + [(b"split/small", b"small")])
-            count_values = client.read_many_raw([segment_count_key(key) for key, _value in sized])
+            registry_values = client.read_many_raw([version_registry_key(key) for key, _value in sized])
             try:
                 values = client.read_many(asked)
                 outcome = "读完"
             except PruneServerFailure as failure:
                 values, outcome = None, f"退 {failure.code}（{failure.kind}）"
-        unsegmented = count_values == [None] * len(sized)
+        unsegmented = registry_values == [None] * len(sized)
         matched = values == expected
         shown = "-" if values is None else [len(value) if value is not None else None for value in values]
         passed = total > MAXIMUM_FRAME_BODY_BYTES and unsegmented and matched
-        return passed, (f"{len(sized)} 把各 {SEGMENT_BYTES} 字节的值合计 {total} 字节（帧长上限 {MAXIMUM_FRAME_BODY_BYTES}，要超过）、计数键都不在 {unsegmented}；"
+        return passed, (f"{len(sized)} 把各 {SEGMENT_BYTES} 字节的值合计 {total} 字节（帧长上限 {MAXIMUM_FRAME_BODY_BYTES}，要超过）、版本登记键都不在 {unsegmented}；"
                         f"一次读 {len(asked)} 把键：{outcome}，各值长 {shown}，逐字节、次序与问的相同 {matched}（要读完且相同）")
     finally:
         server.stop()
@@ -1158,6 +1309,403 @@ def cell_delete_by_item_name_picks_by_value(binary, work):
         server.stop()
 
 
+CONTINUED_PREFIX = b"continued/"
+CONTINUED_VALUE_BYTES = 12 * 1024 * 1024   # prefix-scan-continues-after-the-last-key：一把的字节数，不到一段长（不分段存）
+CONTINUED_VALUE_COUNT = 6                  # 同一格：几把，合计超过帧长上限（一帧装不下全部）
+
+
+def cell_prefix_scan_continues_after_the_last_key(binary, work):
+    """按前缀扫一帧装不下全部（客户端文件头「键空间」raw_scan_stream）：前缀下 CONTINUED_VALUE_COUNT 把各 CONTINUED_VALUE_BYTES 字节的值加两条小值、
+    前缀前后各一条别的；raw_scan_stream 与 scan 交的条目逐把相同（比 sha256）、按键升序、不重不漏，发的扫帧数不多于条目数加一，第二帧起带续扫起点。"""
+    server = TestServer(binary, os.path.join(work, "server"))
+    try:
+        generator = random.Random(LARGE_VALUE_SEED + 8)
+        stored = [(CONTINUED_PREFIX + b"big-%d" % index, generator.randbytes(CONTINUED_VALUE_BYTES)) for index in range(CONTINUED_VALUE_COUNT)]
+        stored += [(CONTINUED_PREFIX + b"small-a", b"a"), (CONTINUED_PREFIX + b"small-b", b"b")]
+        outside = [(b"continue", b"before-the-prefix"), (b"continued0", b"after-the-prefix")]
+        expected = sorted((key, hashlib.sha256(value).hexdigest()) for key, value in stored)
+        total = sum(len(value) for _key, value in stored)
+        with environment_for(unix_environment(server)):
+            client = process_client()
+            client.write_many(stored + outside)
+            del stored
+            asked = []
+            unwrapped = client.raw_scan
+
+            def counted_raw_scan(prefix, after_key=b""):
+                asked.append(after_key)
+                return unwrapped(prefix, after_key)
+
+            client.raw_scan = counted_raw_scan
+            raw = [(key, hashlib.sha256(value).hexdigest()) for key, value in client.raw_scan_stream(CONTINUED_PREFIX)]
+            raw_frames, resumed = len(asked), sum(1 for after_key in asked if after_key)
+            asked.clear()
+            scanned = [(key, hashlib.sha256(value).hexdigest()) for key, value in client.scan_stream(CONTINUED_PREFIX)]
+            scan_frames = len(asked)
+        raw_ok, scan_ok = raw == expected, scanned == expected
+        bounded = 2 <= raw_frames <= len(expected) + 1 and scan_frames <= len(expected) + 1 and resumed == raw_frames - 1
+        passed = total > MAXIMUM_FRAME_BODY_BYTES and raw_ok and scan_ok and bounded
+        return passed, (f"前缀下 {len(expected)} 条、合计 {total} 字节（帧长上限 {MAXIMUM_FRAME_BODY_BYTES}，要超过）；raw_scan_stream 交 {len(raw)} 条、"
+                        f"逐把相同且按键升序不重不漏 {raw_ok}，发了 {raw_frames} 帧扫（其中带续扫起点的 {resumed} 帧）；scan 交 {len(scanned)} 条、相同 {scan_ok}、"
+                        f"发了 {scan_frames} 帧（帧数要在 2 到条数加一 {len(expected) + 1} 之间，除头一帧都带续扫起点）")
+    finally:
+        server.stop()
+
+
+STORAGE_FAILURE_LINE_SECONDS = 20     # write-storage-failure-replayed：等服务的故障日志出现写失败那一行的上限
+STORAGE_REPLAY_RECONNECT_SECONDS = 60  # 同一格：删掉造错文件之前写一直在重发，总时长上限给宽
+STORAGE_FAILING_RECONNECT_SECONDS = 2  # 同一格：造错文件一直在时的重连总时长上限
+STORAGE_FAILING_GRACE_SECONDS = 8      # 同一格：退 75 要在总时长上限加这么多秒里
+
+
+def cell_write_storage_failure_replayed(binary, work):
+    """写帧回存储出错照同一请求号重放（客户端文件头「容错」写帧回存储出错）：服务带 --selftest-write-failure-file 起（造错文件在时每组写批都当写失败、服务不退）。
+    造错文件在时写一条，等故障日志出现 storage-write-failed 之后删掉造错文件：这一次写做完、重发过、读回值；
+    造错文件一直在、重连总时长 STORAGE_FAILING_RECONNECT_SECONDS 秒：写在限时里退 75（storage-failing），不退 3。"""
+    failure_file = os.path.join(work, "write-failure")
+    server = TestServer(binary, os.path.join(work, "server"), extra=["--selftest-write-failure-file", failure_file])
+    faults = os.path.join(server.directory, "faults.log")
+    try:
+        with open(failure_file, "w", encoding="utf-8"):
+            pass
+        outcome = {}
+        with environment_for(dict(unix_environment(server), **{RECONNECT_LIMIT_VARIABLE: str(STORAGE_REPLAY_RECONNECT_SECONDS)})):
+            client = process_client()
+
+            def write():
+                try:
+                    client.write_many([(b"storage/replayed", b"value")])
+                    outcome["write"] = "做完"
+                except PruneServerFailure as failure:
+                    outcome["write"] = f"退 {failure.code}（{failure.kind}）：{failure.message[-200:]}"
+
+            writer = threading.Thread(target=write)
+            writer.start()
+            deadline, seen = time.monotonic() + STORAGE_FAILURE_LINE_SECONDS, False
+            while not seen and writer.is_alive() and time.monotonic() < deadline:
+                with contextlib.suppress(OSError):
+                    with open(faults, encoding="utf-8", errors="replace") as handle:
+                        seen = "kind=storage-write-failed" in handle.read()
+                time.sleep(0.05)
+            os.remove(failure_file)
+            writer.join(timeout=CHILD_TIMEOUT_SECONDS)
+            finished = not writer.is_alive()
+            replays = client.storage_failures
+            value = client.read_many([b"storage/replayed"])[0] if finished else None
+        with open(failure_file, "w", encoding="utf-8"):
+            pass
+        with environment_for(dict(unix_environment(server), **{RECONNECT_LIMIT_VARIABLE: str(STORAGE_FAILING_RECONNECT_SECONDS)})):
+            started = time.monotonic()
+            try:
+                process_client().write_many([(b"storage/failing", b"value")])
+                failing, failing_kind = "做完", None
+            except PruneServerFailure as failure:
+                failing, failing_kind = f"退 {failure.code}（{failure.kind}）", (failure.code, failure.kind)
+            failing_seconds = time.monotonic() - started
+        os.remove(failure_file)
+        replay_ok = seen and finished and outcome.get("write") == "做完" and replays >= 1 and value == b"value"
+        failing_ok = failing_kind == (EXIT_UNAVAILABLE, "storage-failing") and failing_seconds < STORAGE_FAILING_RECONNECT_SECONDS + STORAGE_FAILING_GRACE_SECONDS
+        passed = replay_ok and failing_ok
+        return passed, (f"造错文件在时写：故障日志见到写失败 {seen}、写 {outcome.get('write', '没回来')}、照同一请求号重发 {replays} 次、读回 {value!r}"
+                        f"（要做完、重发至少 1 次、读回 b'value'）；造错文件一直在：{failing}（{failing_seconds:.1f} 秒，要 {STORAGE_FAILING_RECONNECT_SECONDS + STORAGE_FAILING_GRACE_SECONDS} 秒内退 75（storage-failing））")
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(failure_file)
+        server.stop()
+
+
+SWEEP_CHILD_SECONDS = 2 * (SERVER_READY_SECONDS + STORAGE_FAILURE_LINE_SECONDS + CHILD_TIMEOUT_SECONDS)   # 弄坏开关轮里一个开关的子进程时限：点名格里内部时限合计最长的一格（write-storage-failure-replayed：起服务、等故障日志、收写线程）的两倍
+SWEEP_STOP_GRACE_SECONDS = 5           # 同一处：对整组发 TERM 之后等多久再发 KILL，也是发 KILL 之后核进程都没了、收尾输出各等多久
+SWEEP_TOKEN_VARIABLE = "PRUNE_CLIENT_SELFTEST_SWEEP_JOB"   # 开关子进程环境里的标记表（逗号隔开，后代继承）：收尾按它找出换了进程组、换了会话、被收养的后代
+SWEEP_CELL_LIMIT_SECONDS = 3           # sweep-stops-hung-child：假卡死的子进程的时限
+SWEEP_CELL_GRACE_SECONDS = 2           # 同一格：宽限
+SWEEP_CELL_EXIT_SLACK_SECONDS = 5      # 同一格：卡死的那一个从起到记完要在时限加两倍宽限再加这么多秒里（起 python 子进程、核 /proc）
+SWEEP_CELL_RETURN_SLACK_SECONDS = 15   # 同一格：整轮要在时限加两倍宽限再加这么多秒里回来，没回来就判红，留下的假子进程点名列出、等它们自己退
+SWEEP_FAKE_BACKSTOP_SECONDS = 15       # 同一格：假进程的自退时限（比正常的一轮长、比整轮回来的时限短）
+# sweep-stops-hung-child 的假进程，命令行参数交代模式与自退时限：忽略 TERM；开关子进程的临时目录（TMPDIR）没了、或到自退时限就退；
+# 模式 parent 另外盯着起它的进程，那个进程没了就退。
+SWEEP_HOLDER = """import os, signal, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+mode, backstop, parent, directory = sys.argv[1], float(sys.argv[2]), os.getppid(), os.environ["TMPDIR"]
+deadline = time.monotonic() + backstop
+while time.monotonic() < deadline and os.path.isdir(directory) and (mode != "parent" or os.getppid() == parent):
+    time.sleep(0.05)
+"""
+# 假卡死子进程：先起两个孙进程（一个同组、模式 directory；一个自己一个会话、模式照命令行），再打出临时目录，自己也按 SWEEP_HOLDER 的退法等着（到点没被停才会等满）
+SWEEP_HUNG_CHILD = """import os, subprocess, sys
+backstop, mode, holder = sys.argv[1:4]
+subprocess.Popen([sys.executable, "-c", holder, "directory", backstop])
+subprocess.Popen([sys.executable, "-c", holder, mode, backstop], start_new_session=True)
+print("tmpdir=" + os.environ["TMPDIR"], flush=True)
+sys.argv = ["-c", "directory", backstop]
+exec(holder)
+"""
+
+
+def sweep_hung_child_command():
+    """假卡死子进程的命令行。换了会话的孙进程盯着起它的子进程（模式 parent），子进程没了它就退；
+    弄坏开关 sweep-descendants-left 下它不盯（模式 directory），子进程没了它还留着，直到临时目录没了。"""
+    mode = "directory" if break_is("sweep-descendants-left") else "parent"
+    return [sys.executable, "-c", SWEEP_HUNG_CHILD, str(SWEEP_FAKE_BACKSTOP_SECONDS), mode, SWEEP_HOLDER]
+
+
+@dataclasses.dataclass(frozen=True)
+class SweepJob:
+    """弄坏开关轮里的一个开关：name 是开关名，red_cells 是打开后要红的格，command 与 environment 是它的子进程。"""
+    name: str
+    red_cells: tuple
+    command: list
+    environment: dict
+
+
+@dataclasses.dataclass(frozen=True)
+class SweepOutcome:
+    """一个开关的结果：matched 是红在点名的格且没有留下进程，detail 是没对上的原因（对上的写空串），output 是子进程的标准输出，
+    stopped_in_group 是到点按进程组停掉的进程数，outside_seen 是到点时进程组外带标记的进程数，left 是宽限之后还留着的带标记的进程数（点名写在 detail 里，不停），
+    seconds 是从起到记完的用时。"""
+    name: str
+    matched: bool
+    detail: str
+    output: str
+    stopped_in_group: int
+    outside_seen: int
+    left: int
+    seconds: float
+
+
+def wait_until(condition, seconds):
+    """每 0.05 秒问一次 condition：成立交 True，过了 seconds 秒还不成立交 False。"""
+    deadline = time.monotonic() + seconds
+    while True:
+        if condition():
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.05)
+
+
+def live_group_members(group):
+    """/proc 里进程组号是 group、又不是僵尸的进程号。"""
+    members = []
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        try:
+            with open(f"/proc/{name}/stat", encoding="utf-8", errors="replace") as handle:
+                text = handle.read()
+        except OSError:
+            continue
+        if ")" not in text:
+            continue   # 读的当口进程退出了，stat 是空的
+        fields = text[text.rindex(")") + 2:].split()
+        if fields[2] == str(group) and fields[0] not in ("Z", "X"):
+            members.append(int(name))
+    return members
+
+
+def job_token(root, index):
+    return f"{root}:{index}"
+
+
+def marked_processes(token):
+    """环境里 SWEEP_TOKEN_VARIABLE 的标记表含 token、又不是僵尸的进程：[(进程号, 起始时刻)…]（后代换了进程组、换了会话、被收养都还带着标记）。"""
+    prefix = (SWEEP_TOKEN_VARIABLE + "=").encode()
+    found = []
+    for name in os.listdir("/proc"):
+        if not name.isdigit() or int(name) == os.getpid():
+            continue
+        try:
+            with open(f"/proc/{name}/environ", "rb") as handle:
+                environment = handle.read()
+        except OSError:
+            continue
+        for entry in environment.split(b"\0"):
+            if entry.startswith(prefix) and token in entry[len(prefix):].decode(errors="replace").split(","):
+                state = process_state_and_start(int(name))
+                if state is not None and state[0] not in ("Z", "X"):
+                    found.append((int(name), state[1]))
+                break
+    return found
+
+
+def process_description(process_id):
+    """进程号加命令行开头，点名留下的进程用；命令行读不到（进程已退）写明。"""
+    try:
+        with open(f"/proc/{process_id}/cmdline", "rb") as handle:
+            words = handle.read().split(b"\0")
+    except OSError:
+        return f"{process_id}（读不到命令行）"
+    text = " ".join(word.decode(errors="replace") for word in words).replace("\n", " ")
+    return f"{process_id}（{text[:80]}）"
+
+
+def text_of(value):
+    return value.decode(errors="replace") if isinstance(value, bytes) else (value or "")
+
+
+def run_sweep_job(job, token, time_limit, grace):
+    """起一个开关的子进程（自己一个进程组、一个临时目录，环境里带 token 标记）并等它：time_limit 秒没退出就按进程组停（先 TERM，过 grace 秒组里还有活的再 KILL，
+    再核；进程组号就是子进程的进程号）。超时与正常退出一样，之后等带标记的后代 grace 秒，还留着的逐个点名记进没对上，不停它们。
+    临时目录无论如何删掉（弄坏开关 sweep-job-directory-kept 下不删）。弄坏开关 sweep-child-without-time-limit 下不设时限，
+    sweep-group-not-signalled 下到点只给子进程自己发信号，sweep-child-term-only 下不发 KILL。"""
+    directory = selftest_root()
+    environment = dict(job.environment, TMPDIR=directory)
+    environment[SWEEP_TOKEN_VARIABLE] = ",".join(filter(None, [job.environment.get(SWEEP_TOKEN_VARIABLE), token]))
+    started = time.monotonic()
+    try:
+        try:
+            process = subprocess.Popen(job.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment, start_new_session=True)
+        except OSError as error:
+            return SweepOutcome(job.name, False, f"子进程起不来：{type(error).__name__}：{error}", "", 0, 0, 0, time.monotonic() - started)
+
+        def signal_job_group(signal_number):
+            with contextlib.suppress(ProcessLookupError):
+                if break_is("sweep-group-not-signalled"):
+                    os.kill(process.pid, signal_number)
+                else:
+                    os.killpg(process.pid, signal_number)
+
+        def stop_group():
+            before = len(live_group_members(process.pid))
+            signal_job_group(signal.SIGTERM)
+            if not wait_until(lambda: not live_group_members(process.pid), grace) and not break_is("sweep-child-term-only"):
+                signal_job_group(signal.SIGKILL)
+                wait_until(lambda: not live_group_members(process.pid), grace)
+            return before - len(live_group_members(process.pid))
+
+        timed_out, in_group, outside_seen = False, 0, 0
+        try:
+            output, _error = process.communicate(timeout=None if break_is("sweep-child-without-time-limit") else time_limit)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            members = set(live_group_members(process.pid))
+            outside_seen = len([process_id for process_id, _start in marked_processes(token) if process_id not in members])
+            in_group = stop_group()
+        wait_until(lambda: not marked_processes(token), grace)
+        left = [process_description(process_id) for process_id, _start in marked_processes(token)]
+        if timed_out:
+            try:
+                output, _error = process.communicate(timeout=grace)
+            except subprocess.TimeoutExpired as error:
+                output = text_of(error.stdout)
+                process.stdout.close()
+                process.stderr.close()
+        problems = []
+        if timed_out:
+            problems.append(f"超时：{time_limit} 秒没退出，按进程组停了 {in_group} 个进程，到点时进程组外带标记的有 {outside_seen} 个")
+        if left:
+            problems.append(f"{'停完进程组' if timed_out else '子进程退出'}之后 {grace} 秒还留着 {len(left)} 个带标记的进程：{'、'.join(left)}（不由自证去停，要它们在父进程没了之后自己退）")
+        if not timed_out and not (process.returncode != 0 and all(f"✗ 自证 {cell}：" in output for cell in job.red_cells)):
+            problems.append(f"要红在 {'、'.join(job.red_cells)}，退 {process.returncode}")
+        return SweepOutcome(job.name, not problems, "；".join(problems), output, in_group, outside_seen, len(left), time.monotonic() - started)
+    finally:
+        if not break_is("sweep-job-directory-kept"):
+            shutil.rmtree(directory, ignore_errors=True)
+
+
+def run_break_sweep(jobs, threads, time_limit, grace, token_root):
+    """各开关的子进程并行跑（至多 threads 路），逐个收回结果、按派出的次序交；收回的条数不等于派出的条数报错。
+    弄坏开关 sweep-outcome-dropped 下收回之后丢掉最后一条再核条数。"""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(len(jobs), threads))) as executor:
+        futures = [executor.submit(run_sweep_job, job, job_token(token_root, index), time_limit, grace) for index, job in enumerate(jobs)]
+        outcomes = [future.result() for future in futures]
+    if break_is("sweep-outcome-dropped"):
+        outcomes = outcomes[:-1]
+    if len(outcomes) != len(jobs):
+        raise RuntimeError(f"弄坏开关轮派出 {len(jobs)} 条，只收回 {len(outcomes)} 条")
+    return outcomes
+
+
+def sweep_child_command(binary, cells):
+    """一个开关的子进程：本文件的 --selftest，只走 cells 里的格。弄坏开关 sweep-child-runs-all-cells 下不带 --cells。"""
+    command = [sys.executable, os.path.realpath(__file__), "--selftest", "--server-binary", binary]
+    if not break_is("sweep-child-runs-all-cells"):
+        command += ["--cells", ",".join(cells)]
+    return command
+
+
+def parse_selftest_options(arguments):
+    """--selftest 后面的 --cells <格名>[,<格名>…]：交 (要走的格, 拒绝的原因)。没给 --cells 走全部 CELLS；给了只走点名的，次序照 CELLS、重复的走一次；
+    缺格名、有空项、认不出的格名交 (None, 原因)，原因里列出可用的格名。
+    弄坏开关 cells-option-ignored 下给了也走全部，unknown-cell-name-accepted 下认不出的格名悄悄丢掉。"""
+    if "--cells" not in arguments:
+        return CELLS, ""
+    index = arguments.index("--cells")
+    value = arguments[index + 1] if index + 1 < len(arguments) else ""
+    names = value.split(",")
+    available = f"可用的格名：{'、'.join(CELLS)}"
+    if not value or "" in names:
+        return None, f"--cells 后面要写 <格名>[,<格名>…]（给的是「{value}」）；{available}"
+    unknown = [name for name in names if name not in CELL_FUNCTIONS]
+    if unknown and not break_is("unknown-cell-name-accepted"):
+        return None, f"--cells 认不出 {'、'.join(unknown)}；{available}"
+    if break_is("cells-option-ignored"):
+        return CELLS, ""
+    return tuple(name for name in CELLS if name in names), ""
+
+
+def cell_sweep_child_runs_only_named_cells(_binary, _work):
+    """开关子进程只走点名的格：sweep_child_command 拼出的命令里 --selftest 后面的部分交给 parse_selftest_options，走的恰是点名的格；
+    --cells 缺格名、认不出的格名拒（并列出可用的格名）；不给 --cells 走全部格。"""
+    named = ("round-trip-unix", "prefix-scan")
+    command = sweep_child_command("/no/such/prune-server", named)
+    options = command[command.index("--selftest") + 1:]
+    selected, problem = parse_selftest_options(options)
+    unknown_selected, unknown_problem = parse_selftest_options(["--cells", "round-trip-unix,no-such-cell"])
+    missing_selected, missing_problem = parse_selftest_options(["--cells"])
+    empty_selected, empty_problem = parse_selftest_options(["--cells", "round-trip-unix,"])
+    whole_selected, whole_problem = parse_selftest_options(["--server-binary", "/no/such/prune-server"])
+    named_only = selected == named and not problem
+    unknown_refused = unknown_selected is None and "no-such-cell" in unknown_problem and all(name in unknown_problem for name in CELLS)
+    missing_refused = missing_selected is None and bool(missing_problem) and empty_selected is None and bool(empty_problem)
+    whole_run = whole_selected == CELLS and not whole_problem
+    passed = named_only and unknown_refused and missing_refused and whole_run
+    return passed, (f"命令 {options} 走的格 {selected}（要 {named}）；认不出的格名拒 {unknown_refused}、缺格名与空项拒 {missing_refused}；不给 --cells 走全部 {len(CELLS)} 格 {whole_run}")
+
+
+def cell_sweep_stops_hung_child(_binary, _work):
+    """弄坏开关轮对卡死的子进程到点就停（run_break_sweep）：三个假子进程并行，卡死的（sweep_hung_child_command）要在时限加两倍宽限再加余量之内被停、记「超时」、
+    进程组里停 2 个、到点时组外带标记的 1 个、停完组之后宽限之内这个组外的自己退掉（盯着父进程），没有点名留下的进程、临时目录删了；
+    红在点名格的记对上；退 0 没红的记没对上；收回 3 条。整轮没在时限里回来就判红，留下的进程点名列出，不由这一格去停（假子进程与孙进程有自退时限）。
+    弄坏开关 sweep-descendants-left 下组外的孙进程不盯父进程，停完整组之后它还留着，被点名列出、这一格判红，临时目录一删它自己退掉。"""
+    root = secrets.token_hex(8)
+    jobs = [SweepJob("fake-hang", ("fake-cell",), sweep_hung_child_command(), dict(os.environ)),
+            SweepJob("fake-red", ("fake-cell",), [sys.executable, "-c", "print('✗ 自证 fake-cell：红了'); print('     → 怎么办：假子进程，红是故意的'); raise SystemExit(1)"], dict(os.environ)),
+            SweepJob("fake-not-red", ("fake-cell",), [sys.executable, "-c", "print('✓ 自证 fake-cell：绿了')"], dict(os.environ))]
+    result = {}
+
+    def sweep():
+        try:
+            result["outcomes"] = run_break_sweep(jobs, len(jobs), SWEEP_CELL_LIMIT_SECONDS, SWEEP_CELL_GRACE_SECONDS, root)
+        except RuntimeError as error:
+            result["error"] = str(error)
+
+    runner = threading.Thread(target=sweep, daemon=True)
+    started = time.monotonic()
+    runner.start()
+    return_within = SWEEP_CELL_LIMIT_SECONDS + 2 * SWEEP_CELL_GRACE_SECONDS + SWEEP_CELL_RETURN_SLACK_SECONDS
+    runner.join(timeout=return_within)
+    returned = not runner.is_alive()
+    elapsed = time.monotonic() - started
+    left = [process_description(process_id) for index in range(len(jobs)) for process_id, _start in marked_processes(job_token(root, index))]
+    outcomes = result.get("outcomes") or []
+    by_name = {outcome.name: outcome for outcome in outcomes}
+    hang, red, not_red = by_name.get("fake-hang"), by_name.get("fake-red"), by_name.get("fake-not-red")
+    directory = next((line[len("tmpdir="):] for line in (hang.output.splitlines() if hang else []) if line.startswith("tmpdir=")), "")
+    directory_left = bool(directory) and os.path.exists(directory)
+    if directory_left:
+        shutil.rmtree(directory, ignore_errors=True)
+    stopped = (hang is not None and not hang.matched and "超时" in hang.detail and hang.stopped_in_group == 2 and hang.outside_seen == 1 and hang.left == 0
+               and hang.seconds < SWEEP_CELL_LIMIT_SECONDS + 2 * SWEEP_CELL_GRACE_SECONDS + SWEEP_CELL_EXIT_SLACK_SECONDS)
+    judged = red is not None and red.matched and not_red is not None and not not_red.matched and "退 0" in not_red.detail
+    passed = returned and "error" not in result and len(outcomes) == len(jobs) and stopped and judged and not left and bool(directory) and not directory_left
+    hang_text = (f"{hang.seconds:.1f} 秒记「{hang.detail}」" if hang is not None else "没有结果")
+    return passed, (f"整轮{'回来了' if returned else '没回来'}（{elapsed:.1f} 秒，要 {return_within} 秒内）{result.get('error', '')}；收回 {len(outcomes)} 条（要 {len(jobs)} 条）；"
+                    f"卡死的：{hang_text}（要超时、组里停 2 个、到点时组外带标记的 1 个、停完组之后一个不留、{SWEEP_CELL_LIMIT_SECONDS + 2 * SWEEP_CELL_GRACE_SECONDS + SWEEP_CELL_EXIT_SLACK_SECONDS} 秒内）；"
+                    f"红在点名格的记对上并且退 0 没红的记没对上 {judged}；整轮回来时留下带标记的进程 {len(left)} 个（要 0）{'：' + '、'.join(left) if left else ''}；"
+                    f"卡死的子进程的临时目录 {directory or '（没读到）'} {'还在' if directory_left else '删了'}")
+
+
 CELL_FUNCTIONS = {"round-trip-unix": cell_round_trip_unix, "prefix-scan": cell_prefix_scan,
                   "tcp-round-trip": cell_tcp_round_trip,
                   "busy-retried-after-delay": cell_busy_retried_after_delay, "stopped-exits-75": cell_stopped_exits_75,
@@ -1167,8 +1715,10 @@ CELL_FUNCTIONS = {"round-trip-unix": cell_round_trip_unix, "prefix-scan": cell_p
                   "large-value-round-trip": cell_large_value_round_trip,
                   "segmented-read-incomplete-refused": cell_segmented_read_incomplete_refused,
                   "segmented-read-sees-a-rewrite": cell_segmented_read_sees_a_rewrite,
+                  "segmented-rewrite-survives-writer-death": cell_segmented_rewrite_survives_writer_death,
                   "segment-count-over-index-digits-refused": cell_segment_count_over_index_digits_refused,
                   "scan-row-over-frame-refused": cell_scan_row_over_frame_refused,
+                  "prefix-scan-continues-after-the-last-key": cell_prefix_scan_continues_after_the_last_key,
                   "segment-key-shapes-only-reserved": cell_segment_key_shapes_only_reserved,
                   "oversize-frame-reported-at-once": cell_oversize_frame_reported_at_once,
                   "temporary-service-exits-with-parent": cell_temporary_service_exits_with_parent,
@@ -1178,7 +1728,10 @@ CELL_FUNCTIONS = {"round-trip-unix": cell_round_trip_unix, "prefix-scan": cell_p
                   "batched-read-answer-over-frame-limit-split": cell_batched_read_answer_over_frame_limit_split,
                   "binary-not-built-without-target-directory": cell_binary_not_built_without_target_directory,
                   "delete-prefix-by-namespace": cell_delete_prefix_by_namespace,
-                  "delete-by-item-name-picks-by-value": cell_delete_by_item_name_picks_by_value}
+                  "delete-by-item-name-picks-by-value": cell_delete_by_item_name_picks_by_value,
+                  "write-storage-failure-replayed": cell_write_storage_failure_replayed,
+                  "sweep-child-runs-only-named-cells": cell_sweep_child_runs_only_named_cells,
+                  "sweep-stops-hung-child": cell_sweep_stops_hung_child}
 
 
 def resolve_binary(arguments):
@@ -1199,13 +1752,18 @@ def selftest(arguments):
     os.environ[SELFTEST_VARIABLE] = "1"
     # 三家照这个名字载入客户端：让它们用的就是这一进程里已经 import 的那一份客户端模块（同一个进程级连接，environment_for 换服务时一起丢掉）
     sys.modules.setdefault("singlefs_prune_server_client", sys.modules["prune_server_client"])
+    selected, refusal = parse_selftest_options(arguments)
+    if selected is None:
+        print(f"  ✗ 自证的 --cells 用法不对：{refusal}")
+        print("     → 怎么办：--cells 后面写 <格名>[,<格名>…]，格名取 ✗ 行里列出的可用格名；要走全部格就不给 --cells")
+        return EXIT_USAGE
     binary, problem = resolve_binary(arguments)
     if binary is None or not os.access(binary, os.X_OK):
         print(f"  ✗ 自证起不了服务：{problem or binary + ' 不可执行'}")
         print(f"     → 怎么办：--server-binary <编好的 prune-server 二进制> 或 {BINARY_VARIABLE}=<路径>；只有任务服务给了 {CARGO_TARGET_DIRECTORY_VARIABLE} 才在这里现编")
         return EXIT_USAGE
     failed = []
-    for name in CELLS:
+    for name in selected:
         work = selftest_root()
         try:
             passed, detail = CELL_FUNCTIONS[name](binary, work)
@@ -1218,23 +1776,43 @@ def selftest(arguments):
         else:
             failed.append(name)
             print(f"  ✗ 自证 {name}：{detail}")  # gate-lint:detail
-    print(f"PRUNE_SERVER_CLIENT_SELFTEST cells={len(CELLS)} passed={len(CELLS) - len(failed)} failed={len(failed)} failed_cells={','.join(failed) or '-'}")
+    print(f"PRUNE_SERVER_CLIENT_SELFTEST cells={len(selected)} passed={len(selected) - len(failed)} failed={len(failed)} failed_cells={','.join(failed) or '-'}")
     if failed:
         return 1
     if os.environ.get(BREAK_VARIABLE):
         return 0
-    matched, unmatched = 0, []
+    if "--cells" in arguments:
+        print("  · 只走了点名的格：弄坏开关轮本次未跑")
+        return 0
+    return break_sweep(binary)
+
+
+def break_sweep(binary):
+    """弄坏开关轮：每个开关一个子进程，只走它在 BREAK_RED_CELLS 里点名的红格，并行、各带时限（文件头「弄坏开关轮」），打末行 PRUNE_SERVER_CLIENT_BREAK_SWEEP；
+    全部对上退 0，有没对上的退 1，取不了并行度退 2。"""
+    cells_by_switch = {}
     for switch, red_cell in BREAK_RED_CELLS:
-        completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest", "--server-binary", binary], capture_output=True, text=True,
-                                   env=dict(os.environ, **{BREAK_VARIABLE: switch}))
-        if completed.returncode != 0 and f"✗ 自证 {red_cell}：" in completed.stdout:
-            matched += 1
-        else:
-            unmatched.append(f"{switch}（要红在 {red_cell}，退 {completed.returncode}）")
-    print(f"PRUNE_SERVER_CLIENT_BREAK_SWEEP switches={len(BREAK_RED_CELLS)} matched={matched} unmatched={'；'.join(unmatched) or '-'}")
+        cells_by_switch.setdefault(switch, []).append(red_cell)
+    jobs = [SweepJob(switch, tuple(cells), sweep_child_command(binary, cells), dict(os.environ, **{BREAK_VARIABLE: switch}))
+            for switch, cells in cells_by_switch.items()]
+    # 并行度：每台默认重活线程数（登记位 .claude/heavy-thread-default），再按开关条数夹；取不了就拒，不退回别的数
+    hosts_directory = os.path.join(REPOSITORY_ROOT, "scripts", "hosts")
+    if hosts_directory not in sys.path:
+        sys.path.append(hosts_directory)
+    import heavy_threads
+    try:
+        threads = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        print(f"  ✗ 弄坏开关轮取不了每台默认重活线程数：{error}")
+        print(f"     → 怎么办：{error.howto}；不退回别的数")
+        return EXIT_USAGE
+    print(f"  · 弄坏开关轮：{len(jobs)} 个开关并行 {max(1, min(len(jobs), threads))} 路，每个开关限时 {SWEEP_CHILD_SECONDS} 秒")
+    outcomes = run_break_sweep(jobs, threads, SWEEP_CHILD_SECONDS, SWEEP_STOP_GRACE_SECONDS, secrets.token_hex(8))
+    unmatched = [f"{outcome.name}（{outcome.detail}）" for outcome in outcomes if not outcome.matched]
+    print(f"PRUNE_SERVER_CLIENT_BREAK_SWEEP switches={len(outcomes)} matched={len(outcomes) - len(unmatched)} unmatched={'；'.join(unmatched) or '-'}")
     if unmatched:
         print("  ✗ 弄坏开关打开之后没红在点名那一格")
-        print("     → 怎么办：那几个开关管的那一段没有自证盯着：补一格会被它弄错的自证，或修开关")
+        print("     → 怎么办：那几个开关管的那一段没有自证盯着：补一格会被它弄错的自证，或修开关；写「超时」的是子进程卡住了，看那个开关点名的格为什么不退出")
         return 1
     return 0
 
@@ -1333,7 +1911,7 @@ def main(arguments):
     if arguments[:1] == ["--selftest-child"]:
         return selftest_child(arguments[1:])
     print(f"  ✗ 认不出的用法：{' '.join(arguments) or '（没给参数）'}", file=sys.stderr)
-    print("     → 怎么办：--selftest [--server-binary <…>]、--selftest-families [--server-binary <…>] 或 "
+    print("     → 怎么办：--selftest [--server-binary <…>] [--cells <格名>[,<格名>…]]、--selftest-families [--server-binary <…>] 或 "
           "--with-temporary-service [--server-binary <…>] -- <命令…>", file=sys.stderr)
     return EXIT_USAGE
 

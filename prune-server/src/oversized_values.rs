@@ -6,8 +6,8 @@
 //! 判定库不认旧写法（`.claude/rules/verification.md`「判定库只有一份」）：读路径上不加兼容，服务停着时由这里直接开库把这种行删掉，
 //! 删掉的判定由各入口下次经服务现判、照键分段写回。
 //!
-//! 认哪几行：默认列族（库只有这一个列族，`storage.rs` 文件头）里键不是段键、计数键的形状
-//! （[`has_the_shape_of_a_segment_or_count_key`]），值长让「只读这一把键」的成批点读回应超过帧长上限的行。
+//! 认哪几行：默认列族（库只有这一个列族，`storage.rs` 文件头）里键不是段键、版本登记键的形状
+//! （[`has_the_shape_of_a_segment_or_version_registry_key`]），值长让「只读这一把键」的成批点读回应超过帧长上限的行。
 //! 界与服务整帧拒的判法是同一份（[`point_read_response_payload_bytes`]、[`point_read_response_exceeds_frame_limit`]），这里不另写一个数。
 //! 判定向量两张表的空值行（`crates/singlefs-verification/src/verdict_store.rs` 文件头）值长 0，认不上。
 //!
@@ -26,7 +26,7 @@ use crate::protocol::{
     point_read_response_exceeds_frame_limit, point_read_response_payload_bytes,
     MAXIMUM_FRAME_BODY_BYTES, RESPONSE_HEADER_BYTES,
 };
-use crate::segmented_values::has_the_shape_of_a_segment_or_count_key;
+use crate::segmented_values::has_the_shape_of_a_segment_or_version_registry_key;
 use crate::server::{DESCRIPTOR_LIMIT_TOO_LOW_EXIT_CODE, LIBRARY_MISMATCHED_EXIT_CODE};
 use crate::storage::{
     library_options, open_single_column_family_library, LibraryOpenFailure,
@@ -101,9 +101,9 @@ fn longest_value_readable_by_a_point_read_of_one_key() -> usize {
     longest
 }
 
-/// 这一行要删：不是段键、计数键的形状，值一把键单独一帧也读不回（文件头「认哪几行」）。
+/// 这一行要删：不是段键、版本登记键的形状，值一把键单独一帧也读不回（文件头「认哪几行」）。
 fn is_an_oversized_whole_value(key: &[u8], value_length_in_bytes: usize) -> bool {
-    !has_the_shape_of_a_segment_or_count_key(key)
+    !has_the_shape_of_a_segment_or_version_registry_key(key)
         && is_too_long_for_a_point_read_of_one_key(value_length_in_bytes)
 }
 

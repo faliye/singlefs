@@ -2,14 +2,17 @@
 //! （这条用例独占的临时目录里的 unix socket），头一帧扫回忙、重发的那一帧扫回行；客户端照忙给的毫秒数等过再重发，扫照样拿到行，不把忙当错误交回。
 //! 不起真服务、不连真服务。
 
+use std::ffi::OsString;
 use std::io::{Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
 use prune_server::client::RouteAddress;
+use prune_server::configuration::{
+    create_directory_holding_a_socket, MAXIMUM_SOCKET_PATH_BYTES, SHORT_TEMPORARY_ROOT,
+};
 use prune_server::protocol::{
     begin_response, encode_busy, peek_request_header, OperationCode, ResponseStatus, ScanEntry,
     Table, FRAME_LENGTH_FIELD_BYTES,
@@ -24,23 +27,34 @@ const TEST_DOUBLE_READ_TIMEOUT: Duration = Duration::from_secs(30);
 const TABLE: Table = Table::Conclusions;
 const PREFIX: &[u8] = b"scan-after-busy/";
 
-static TEMPORARY_DIRECTORY_COUNTER: AtomicU64 = AtomicU64::new(0);
+/// 假服务的 socket 文件名，放在用例的临时目录里。
+const SOCKET_FILE_NAME: &str = "test-double.sock";
+/// 临时目录名的前缀。
+const TEMPORARY_DIRECTORY_NAME_PREFIX: &str = "prune-scan-busy";
 
-/// 这条用例独占的临时目录：放手时删。名字短，socket 全路径不超 107 字节。
+/// 这条用例独占的临时目录：放手时删。建法见 `create_directory_holding_a_socket`，里面的 socket 全路径不超 107 字节。
 struct TemporaryDirectory {
     path: PathBuf,
 }
 
 impl TemporaryDirectory {
     fn create() -> TemporaryDirectory {
-        let path = std::env::temp_dir().join(format!(
-            "prune-scan-busy-{}-{}",
-            std::process::id(),
-            TEMPORARY_DIRECTORY_COUNTER.fetch_add(1, Ordering::SeqCst)
-        ));
-        std::fs::create_dir(&path)
-            .unwrap_or_else(|error| panic!("建不了临时目录 {}：{error}", path.display()));
+        TemporaryDirectory::create_under(std::env::var_os("TMPDIR"))
+    }
+
+    /// `temporary_directory_variable` 是 `TMPDIR` 的值。
+    fn create_under(temporary_directory_variable: Option<OsString>) -> TemporaryDirectory {
+        let path = create_directory_holding_a_socket(
+            temporary_directory_variable,
+            TEMPORARY_DIRECTORY_NAME_PREFIX,
+            SOCKET_FILE_NAME,
+        )
+        .unwrap_or_else(|message| panic!("{message}"));
         TemporaryDirectory { path }
+    }
+
+    fn socket_path(&self) -> PathBuf {
+        self.path.join(SOCKET_FILE_NAME)
     }
 }
 
@@ -122,8 +136,40 @@ fn answer_busy_then_the_scanned_rows(
 #[test]
 fn prefix_scan_answered_busy_once_waits_the_retry_after_and_hands_back_the_rows_of_the_resent_frame(
 ) {
-    let directory = TemporaryDirectory::create();
-    let socket_path = directory.path.join("test-double.sock");
+    scan_answered_busy_once_hands_back_the_rows_of_the_resent_frame(TemporaryDirectory::create());
+}
+
+/// 临时根比 socket 路径上限还长（`TMPDIR` 设得很长）时，用例照样通过：目录改建在短根底下，socket 全路径不超上限，扫照样拿到行。
+/// 判别力：目录不经 `create_directory_holding_a_socket`、一律建在给定的临时根底下时，这条红（`UnixListener::bind` 报 `path must be shorter than SUN_LEN`）。
+#[test]
+fn prefix_scan_answered_busy_once_passes_when_the_temporary_root_is_longer_than_a_socket_path_may_be(
+) {
+    let long_root_parent =
+        std::env::temp_dir().join(format!("prune-scan-busy-long-root-{}", std::process::id()));
+    let long_root = long_root_parent.join("r".repeat(MAXIMUM_SOCKET_PATH_BYTES + 20));
+    std::fs::create_dir_all(&long_root)
+        .unwrap_or_else(|error| panic!("建不了长临时根 {}：{error}", long_root.display()));
+    let long_root_guard = TemporaryDirectory {
+        path: long_root_parent,
+    };
+    let directory = TemporaryDirectory::create_under(Some(long_root.clone().into_os_string()));
+    assert!(
+        !directory.path.starts_with(&long_root),
+        "临时根 {} 放不下 socket 全路径，目录该改建在 {SHORT_TEMPORARY_ROOT} 底下，实际是 {}",
+        long_root.display(),
+        directory.path.display()
+    );
+    assert!(
+        directory.socket_path().as_os_str().len() <= MAXIMUM_SOCKET_PATH_BYTES,
+        "socket 全路径 {} 超过 {MAXIMUM_SOCKET_PATH_BYTES} 字节",
+        directory.socket_path().display()
+    );
+    scan_answered_busy_once_hands_back_the_rows_of_the_resent_frame(directory);
+    drop(long_root_guard);
+}
+
+fn scan_answered_busy_once_hands_back_the_rows_of_the_resent_frame(directory: TemporaryDirectory) {
+    let socket_path = directory.socket_path();
     let listener = UnixListener::bind(&socket_path)
         .unwrap_or_else(|error| panic!("绑不上 {}：{error}", socket_path.display()));
     let stored_rows = vec![

@@ -141,10 +141,31 @@ pub enum BreakSwitch {
     DeletePrefixOverruns,
     /// 只数不删的删前缀请求照样把数到的键删掉（干跑不干）。
     DeletePrefixDryRunDeletes,
+    /// 容错客户端认领每次发出去都把帧里的租期换成「原租期减去从交给客户端起过了的毫秒数，至少 1 毫秒」（改前的写法）：
+    /// 忙了大半租期才落下的认领、丢了回应之后重发落下的认领，回来时到期只剩一点，调用方却按整段租期往下写。
+    ClaimLeaseShrunkOnResend,
+    /// 服务给同一身份、租期没到的认领照帧里的租期重算到期时刻（「现在加租期」覆盖已记下的，改前的写法）：帧里的租期短时到期往前挪。
+    ClaimExpiryMovedEarlier,
+    /// 容错客户端的写帧收到存储出错就从操作表拿掉、回「服务拒了」退 3（改前的写法）：同步失败后服务重起、写失败后服务还在，都不再重放。
+    WriteStorageFailureAbandoned,
+    /// 删前缀的回应不核额度、照强行记下（改前的写法）：一条连接上排着的多帧删前缀各带一把长键，额度之外再叠一层。
+    DeletePrefixResponseUnbudgeted,
+    /// 删前缀把数据键删掉、不释放这些键上的认领（改前的写法）：删掉的键上别人照样得到「别人持有」。
+    DeletePrefixClaimsKept,
+    /// 只数不删的删前缀也把数到的键上的认领释放掉（数的那一帧动了认领）。
+    DeletePrefixCountReleasesClaims,
+    /// 多机配置的缺省位置不顺 git 找主工作树，只取起点目录下的 `multi-host.env`（`configuration.rs` 的 `multi_host_configuration_path_from`）。
+    MultiHostConfigurationFromWorkingDirectoryOnly,
+    /// 容错客户端写大值时段键不带版本、就地覆写同一把键的旧段，不读也不写版本登记键（改前的写法）：写方死在写完段、写清单之前，旧清单配新段拼不回。
+    SegmentsOverwrittenInPlace,
+    /// 工作线程先编好整份回应、编完才记额度（改前的写法）：几个工作线程同时编大回应时，额度之外各多一帧。
+    ResponseBuiltBeforeBudget,
+    /// 按前缀扫不看续扫起点，每帧都从前缀起（续扫的客户端拿不到前缀下后面的条目）。
+    ScanResumeKeyIgnored,
 }
 
 impl BreakSwitch {
-    pub const ALL: [BreakSwitch; 65] = [
+    pub const ALL: [BreakSwitch; 75] = [
         BreakSwitch::MultiGetPerKey,
         BreakSwitch::WriteSyncPerEntry,
         BreakSwitch::PrefixScanOverruns,
@@ -210,6 +231,16 @@ impl BreakSwitch {
         BreakSwitch::DescriptorSoftLimitNotRaised,
         BreakSwitch::DeletePrefixOverruns,
         BreakSwitch::DeletePrefixDryRunDeletes,
+        BreakSwitch::ClaimLeaseShrunkOnResend,
+        BreakSwitch::ClaimExpiryMovedEarlier,
+        BreakSwitch::WriteStorageFailureAbandoned,
+        BreakSwitch::DeletePrefixResponseUnbudgeted,
+        BreakSwitch::DeletePrefixClaimsKept,
+        BreakSwitch::DeletePrefixCountReleasesClaims,
+        BreakSwitch::MultiHostConfigurationFromWorkingDirectoryOnly,
+        BreakSwitch::SegmentsOverwrittenInPlace,
+        BreakSwitch::ResponseBuiltBeforeBudget,
+        BreakSwitch::ScanResumeKeyIgnored,
     ];
 
     pub fn name(self) -> &'static str {
@@ -293,6 +324,18 @@ impl BreakSwitch {
             BreakSwitch::DescriptorSoftLimitNotRaised => "descriptor-soft-limit-not-raised",
             BreakSwitch::DeletePrefixOverruns => "delete-prefix-overruns",
             BreakSwitch::DeletePrefixDryRunDeletes => "delete-prefix-dry-run-deletes",
+            BreakSwitch::ClaimLeaseShrunkOnResend => "claim-lease-shrunk-on-resend",
+            BreakSwitch::ClaimExpiryMovedEarlier => "claim-expiry-moved-earlier",
+            BreakSwitch::WriteStorageFailureAbandoned => "write-storage-failure-abandoned",
+            BreakSwitch::DeletePrefixResponseUnbudgeted => "delete-prefix-response-unbudgeted",
+            BreakSwitch::DeletePrefixClaimsKept => "delete-prefix-claims-kept",
+            BreakSwitch::DeletePrefixCountReleasesClaims => "delete-prefix-count-releases-claims",
+            BreakSwitch::MultiHostConfigurationFromWorkingDirectoryOnly => {
+                "multi-host-configuration-from-working-directory-only"
+            }
+            BreakSwitch::SegmentsOverwrittenInPlace => "segments-overwritten-in-place",
+            BreakSwitch::ResponseBuiltBeforeBudget => "response-built-before-budget",
+            BreakSwitch::ScanResumeKeyIgnored => "scan-resume-key-ignored",
         }
     }
 
@@ -378,6 +421,22 @@ impl BreakSwitch {
             }
             BreakSwitch::DeletePrefixOverruns => "delete-prefix-only-under-prefix",
             BreakSwitch::DeletePrefixDryRunDeletes => "delete-prefix-counts-before-deleting",
+            BreakSwitch::ClaimLeaseShrunkOnResend | BreakSwitch::ClaimExpiryMovedEarlier => {
+                "claim-lease-covers-the-holder-after-the-answer"
+            }
+            BreakSwitch::WriteStorageFailureAbandoned => "write-storage-failure-replayed",
+            BreakSwitch::DeletePrefixResponseUnbudgeted => {
+                "delete-prefix-response-within-pending-budget"
+            }
+            BreakSwitch::DeletePrefixClaimsKept | BreakSwitch::DeletePrefixCountReleasesClaims => {
+                "delete-prefix-releases-claims"
+            }
+            BreakSwitch::MultiHostConfigurationFromWorkingDirectoryOnly => {
+                "multi-host-configuration-from-the-main-worktree"
+            }
+            BreakSwitch::SegmentsOverwrittenInPlace => "segmented-rewrite-survives-writer-death",
+            BreakSwitch::ResponseBuiltBeforeBudget => "worker-responses-within-pending-budget",
+            BreakSwitch::ScanResumeKeyIgnored => "prefix-scan-resumes-after-the-last-key",
         }
     }
 

@@ -29,10 +29,12 @@
 #   253    超过限时（RUN_WITH_MEMORY_CAP_TIME_LIMIT）：scope 的 Result 是 timeout，systemd 停掉了 scope 里的进程；
 #   254    被总上限挤掉：scope 的 Result 是 oom-kill，而 scope 自己的 oom 计数是 0、oom_kill 不为 0——slice 撞了顶，内核在 slice 里挑了这一条杀；
 #          它的结果不算数，重跑它（task-server 照同一上限重排）。
+#   252    命令退出之后停了自己的 scope、回读没过（文件头「命令退出之后停自己的 scope」）：is-active 读到的不是 inactive 或 failed，或 cgroup.procs 里还有进程；
+#          stderr 逐个列留下的进程（进程号与命令行前 120 字）。只换掉命令自己的退出码（0–244、246–249）；245、250、253、254 照原样退，留下的进程照列。
 #   包装退非 0（命令自己的非 0、被信号杀的 128 + 信号号、245、250、253、254，包装被 TERM / INT 停）时，包装给命令建的临时目录里有东西就留着、stderr 打出路径；
 #   退 0 照删（文件头「这一条命令自己的临时目录」一段）。退出码本身不因此变。
 #
-# 总上限（用户 2026-10-31 定「两台都提到50G 不设置余量 不得超过这里设置的50g」，records/2026-10-30-编译绕过内存总上限.md）：照下面头一样有的定，不按整机内存减余量算：
+# 总上限（两台都是 50G，不设余量，不得超过这里设置的 50G；records/2026-10-30-编译绕过内存总上限.md）：照下面头一样有的定，不按整机内存减余量算：
 #   ① 环境里给了 RUN_WITH_MEMORY_CAP_SLICE_TOTAL（systemd 写法）：照它。只给自证与别的脚本的假世界压到几百 M 用；task-server 不设它。
 #   ② 多机配置 SLICE_MEMORY_CAP_BY_HOST 里这一台那一项：配置找法同多机配置，SINGLEFS_MULTI_HOST_CONFIG，没设取这份脚本所在那棵树的根上的 multi-host.env
 #      （第二台在同一个绝对路径的共享树里读本机这一份：multi-host-run.sh 把 SINGLEFS_MULTI_HOST_CONFIG 设成它，那份文件头 ⑤「带到第二台的环境」）。
@@ -56,7 +58,21 @@
 #   先 systemctl --user stop 自己开的那个 scope 单元（$unit.scope），scope 里的命令随之收到 TERM、停下；再删标记与峰值文件，退 143 / 130（stop_own_scope_then_exit）。
 #   起 scope 的 systemd-run 放后台、用 wait 等，所以 trap 当场就跑，不等命令退出；命令读的标准输入照旧是调用方的（<&0），INT 照旧不被忽略（env --default-signal=INT；调用方进来时就忽略 INT 的照旧忽略）。
 #   scope 还没建出来（systemd-run 还在起，stop 找不到单元）：改给 systemd-run 那一个进程发 TERM。这一次的峰值不记（量到的是半截）。
+# 命令退出之后停自己的 scope（命令退出之后 scope 里留着进程就一直活着；records/2026-10-31-task-server巡检.md）：外壳退出之后（不论命令退几、
+#   --check 那一次也算），读一次 scope 的 cgroup.procs（目录是外壳写进起跑标记的那一条），还有进程的往 stderr 打一行「还留着 N 个进程」并逐个列；再一律
+#   systemctl --user stop 自己的 $unit.scope，照 .claude/rules/service-stop-readback.md 回读：is-active 的输出是 inactive 或 failed、cgroup.procs 的内容是空的（目录已不在算空）才算停了；
+#   回读没过退 252（文件头「退出码」），stderr 列留下的进程（stop_scope_after_command）。查结局（Result、读早了的 oom-kill）在停之前做完，停不改结局。
+#   弄坏开关 scope-left-after-exit 下不停（scope 里还有进程就一直活着）。
+# multi-host-run.sh 给这一层的一样（它文件头 ⑥）：RUN_WITH_MEMORY_CAP_UNIT_OUTPUT=<文件>，起 scope 之前把这一条的 scope 单元名（不带 .scope）写进去（先写 <文件>.partial 再改名），
+#   第二台清理时照它先停这一个 scope；读了就 unset，不传进命令；写不进说一句、照跑。
 #
+# 撞上限那一刻的内存明细（只记、不改判法；任务 9776 第 2 次在第二台撞 13824M，内核只杀了一个 anon-rss 0.9 GiB 的 python3，撞之前 current_bytes 从 843083776 跳到 10649669632，
+#   同一趟编译目录 203 GiB，推的是页缓存或没写回的脏页撑满了 scope）：在 scope 里跑的外壳在命令退出之后、scope 收尾之前读一次 scope 的 memory.stat（与峰值同一处），
+#   判出撞了这一条自己的上限（退 250）那一刻往 stderr 打一行，格式固定（两台同一行：第二台这一层的 stderr 经 multi-host-run.sh 接回本机日志）：
+#     RUN_WITH_MEMORY_CAP_OOM_STAT anon=<字节> file=<字节> file_dirty=<字节> file_writeback=<字节> shmem=<字节> oom_kill=<次数>
+#   前五样是 memory.stat 那几行，oom_kill 是 scope 自己 memory.events 的那一行；哪一样读不到写 unread。读这一行的是 task-server（task_server_lib.py 的 OOM_STAT_LINE：
+#   抄进那一次尝试的结局说明与推给会话的正文，分得清是堆还是页缓存）；两边的格式一起改。自证的假 cgroup（RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLED_CGROUP）在时前五样改读它的 memory.stat。
+#   弄坏开关 cap-hit-stat-unprinted 下不打。
 # 撞顶的 scope 结局读早了（records/2026-10-23-subagent拆分提案.md 第一百三十七节）：命令退非 0、scope 自己的 memory.events 里 oom_kill 不为 0，而头一次查到的 Result 不是 oom-kill，
 #   再查至多 SCOPE_RESULT_LATE_ATTEMPTS 次（每次隔 0.1 秒）；查到 oom-kill 照撞顶办，另报一行「Result 读早了读到 …」；一直不是就按内核的计数判成 oom-kill，另报一行「Result 一直是 …」。
 #   两种都不报成「被外面停了」。
@@ -73,7 +89,7 @@
 #   （只用 bash 的内建命令），两者取大的记进表。一次都没采到的不记。
 #   采样子进程不拖延收尾：命令结束、超时、撞顶、被停（包装收到 TERM / INT）四种收尾，包装都在退出之前只给它的进程号发 TERM、等它退（stop_peak_sampler）；
 #   包装被 KILL 时它看父进程换了自己退、删掉 <峰值文件>.unreclaimable。
-#   外壳不 exec 命令、留下来读，是因为 scope 一收尾它的 cgroup 就删了、systemd 也不留（2026-09-25 实测命令退出之后 MemoryPeak=[not set]）。
+#   外壳不 exec 命令、留下来读，是因为 scope 一收尾它的 cgroup 就删了、systemd 也不留（命令退出之后 MemoryPeak=[not set]）。
 #   撞顶只认真的 OOM：scope 的 Result=oom-kill 而不是被挤掉（撞了自己的上限，记成上限），或 scope 的 memory.events 里 oom_kill 大于 0（Result 没报 oom-kill、命令照常退出的，
 #   也记成撞了顶、记上限）；峰值到了上限而 oom_kill 是 0 的（页缓存涨满上限）记 clean、记回收不掉的那一截。记什么只在 memory_peaks_lib.py 的 judged_measurement 一处判。
 #   超时、被总上限挤掉、命令被外面的信号停（退 128 加 HUP、INT、KILL、TERM 的信号号 1、2、9、15）而 scope 没撞自己的上限的不记（量到的是半截）；
@@ -87,7 +103,7 @@
 #   写的时候只换本台这个键那一行，另一台的行原样写回。表里的行只认这一版的七列：不是的（列数不对、第六列写不对、第七列空），读表抛 memory_peaks_lib.py 的 TableRowRefused、点名行号与要几列，记峰值的这一趟说一句、命令的退出码照旧；
 #   出路是删掉那一行或把整张表删了，下次跑会重新记。
 #
-# 显存不够（用户 2026-10-06 定：运行时认显存 OOM，records/2026-09-16-subagent拆分提案.md 第五十五、五十六节）：命令退了非 0、或撞了上限、或被总上限挤掉时，
+# 显存不够（运行时认显存 OOM，records/2026-09-16-subagent拆分提案.md 第五十五、五十六节）：命令退了非 0、或撞了上限、或被总上限挤掉时，
 #   包装读 journalctl -k 里它起止之间（起跑前 1 秒到退出后 GPU_JOURNAL_SLACK_SECONDS 秒，--since / --until 按 epoch 秒给）的行，
 #   同一行既有 NVRM 又有 NV_ERR_NO_MEMORY（显卡驱动报的显存不够）就报「显存不够」：退非 0 的那种退 245；撞了上限、被挤掉的照旧退 250 / 254，另报一行。
 #   驱动的这一行不带进程号，同一段时间里别的进程撞了显存也算进来：宁可把这一条的结果当不算数、重跑，不把显存不够当成测试红。
@@ -96,7 +112,7 @@
 #
 # 限时（RUN_WITH_MEMORY_CAP_TIME_LIMIT，秒；不设不限）：给 scope 设 RuntimeMaxSec，从起跑算；到点 systemd 给 scope 里每个进程发 TERM，
 #   RUN_WITH_MEMORY_CAP_KILL_GRACE（默认 30）秒还不退再发 KILL，退 253。RUN_WITH_MEMORY_CAP_KEY、_TIME_LIMIT、_JOURNALCTL 只管这一条，传进命令之前清掉。
-# 这一条命令自己的临时目录（用户 2026-10-23 定案「自己用完自己删」；records/2026-09-16-subagent拆分提案.md 第九十二节末尾）：
+# 这一条命令自己的临时目录（自己用完自己删；records/2026-09-16-subagent拆分提案.md 第九十二节末尾）：
 #   调用方没设 TMPDIR（或设成空串）时，起命令之前在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT（默认 /tmp）下 mktemp -d 一个 singlefs-run-with-memory-cap-<包装进程号>-XXXXXX，
 #   export 成 TMPDIR 交给命令；包装退出时都走 EXIT trap，照包装的退出码分两样（.claude/singlefs-ai-sop/rules/command-safety.md「测试镜像一律放临时目录」）：
 #     退 0：整个删掉，删完回读还在就往 stderr 报一行、退出码照旧。测试进程被 SIGKILL 时 Drop 守卫不走，留在它 TMPDIR 里的东西由这一步删。
@@ -123,7 +139,7 @@
 #   RUN_WITH_MEMORY_CAP_SLICE_TOTAL    直接给总上限（systemd 写法，文件头「总上限」①）
 #   RUN_WITH_MEMORY_CAP_STATE_DIR      峰值文件与锁的目录，默认 ${XDG_RUNTIME_DIR:-/run/user/<uid>}/singlefs-heavy-admission（tmpfs，重启清空）
 #   RUN_WITH_MEMORY_CAP_CGROUP_ROOT    cgroup v2 挂在哪，默认 /sys/fs/cgroup
-#   RUN_WITH_MEMORY_CAP_SELFTEST_TARGET       --selftest 测哪一份包装，默认自己：拿改前那一份跑新的自证，看它判错
+#   RUN_WITH_MEMORY_CAP_SELFTEST_TARGET       --selftest 测哪一份包装，默认自己：指到另一份包装就拿它跑这份自证，看它判错
 #   RUN_WITH_MEMORY_CAP_SELFTEST_OOM_SCORE_ADJUST  scope 里的命令抬到的 oom_score_adj（默认 TASK_OOM_SCORE_ADJUST，500）：只给自证取一个比自己此刻大的数（oom_score_adj 只抬得上去、降不回来，自证经服务起时已继承了 500）
 #   RUN_WITH_MEMORY_CAP_SELFTEST_LATE_ATTEMPTS  scope 结局读早了时再查 Result 的次数（默认 SCOPE_RESULT_LATE_ATTEMPTS，100）：只给自证把「一直读不到 oom-kill」那一例缩短；
 #                                             带着自证的标记才认，传进命令之前清掉
@@ -166,7 +182,7 @@
 #       「命令被外面的 TERM 停」「命令被外面的 KILL 停」红
 #   RUN_WITH_MEMORY_CAP_BREAK=term-leaves-scope  起了 scope 之后包装被 TERM / INT 停时不 systemctl --user stop 自己的 scope
 #       「起了 scope 之后给包装发 TERM」「… INT」红
-#   RUN_WITH_MEMORY_CAP_BREAK=taskserverleaks  起 scope 时不从命令的环境里摘掉 RUN_WITH_MEMORY_CAP_ADMITTED_BY_TASK_SERVER（改前的样子：任务里面再套一层照跑）
+#   RUN_WITH_MEMORY_CAP_BREAK=taskserverleaks  起 scope 时不从命令的环境里摘掉 RUN_WITH_MEMORY_CAP_ADMITTED_BY_TASK_SERVER：任务里面再套一层照跑
 #       「已由 task-server 准入的一条」「被服务起的命令里面再调这一份」红
 #   RUN_WITH_MEMORY_CAP_BREAK=threadsdefaultunset  command_threads 不认 capped.sh default
 #       「峰值表里 selftest-threads-default 那一行」「… selftest-threads-default-cap 那一行」红
@@ -180,7 +196,7 @@
 #       「多机配置里没有 SLICE_MEMORY_CAP_BY_HOST、slice 已有总上限时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=unboundedwithoutcap  三样都定不出总上限时不挂 slice 照跑
 #       「三样都定不出总上限时」红
-#   RUN_WITH_MEMORY_CAP_BREAK=hostcolumnignored  记峰值时不留另一台的行（改前一台一份表的写法：整张表只写本台的行）
+#   RUN_WITH_MEMORY_CAP_BREAK=hostcolumnignored  记峰值时不留另一台的行：整张表只写本台的行
 #       「峰值表两台共用一份：另一台同一个键的行原样留着」红
 #   RUN_WITH_MEMORY_CAP_BREAK=refusalunhandled  峰值表里有不是这一版的行时不接 TableRowRefused、回溯栈打出来
 #       「峰值表里有不是这一版的行」红
@@ -224,24 +240,28 @@
 #       「调用方设了 TMPDIR 时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=oom-score-not-raised  scope 里的命令不抬 oom_score_adj（照内核缺省 0；TASK_OOM_SCORE_ADJUST）
 #       「scope 里的命令 oom_score_adj 应当是 500」红
-#   RUN_WITH_MEMORY_CAP_BREAK=peak-output-unwritten  命令退出之后不往 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 写外壳读到的峰值（改前只靠调用方按轮采）
+#   RUN_WITH_MEMORY_CAP_BREAK=peak-output-unwritten  命令退出之后不往 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 写外壳读到的峰值（只靠调用方按轮采）
 #       「命令跑 0.1 秒就退时，RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份应当是外壳退出时读到的 scope 峰值」红
-#   RUN_WITH_MEMORY_CAP_BREAK=scene-kept-in-temporary-root  设了 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY 也照改前留在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 下、进轮换
+#   RUN_WITH_MEMORY_CAP_BREAK=scene-kept-in-temporary-root  设了 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY 也留在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 下、进轮换
 #       「设了现场目录、命令退 7 而临时目录里有东西时」「设了现场目录与 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时」红
-#   RUN_WITH_MEMORY_CAP_BREAK=memoryhighleft  不清 slice 上别的版本留下的 memory.high：「slice 上留着软上限 47.5G 时」「slice 原先不在、起来之后带着软上限 47.5G 时」
+#   RUN_WITH_MEMORY_CAP_BREAK=memoryhighleft  不清 slice 上别的版本留下的 memory.high：「slice 上留着软上限 47.5G 时」「slice 原先不在、起来之后带着软上限 47.5G 时」  history-kept: 自证失败行原文，按原文匹配
 #       「清软上限之后读回不是 max 时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=memoryhighunverified  清软上限之后不读回、当清掉了
 #       「清软上限之后读回不是 max 时」红
+#   RUN_WITH_MEMORY_CAP_BREAK=scope-left-after-exit  命令退出之后不停自己的 scope：scope 里留着进程就一直活着
+#       「命令退出之后 scope 里留着一个 setsid 出去、清了环境的进程时」「跑完」两格红（后一格是收尾那一格：留着的那个 scope 收尾之后还在，任务 9486 量的）
 #   RUN_WITH_MEMORY_CAP_BREAK=guard-off  平常跑设了弄坏开关也不拒（探针往下走到「没给要在上限里跑的命令」退 251、不点名）：
 #       「平常跑（没有自证的标记）设了 RUN_WITH_MEMORY_CAP_BREAK」标记「空」与标记指到头一行不对的文件两格红
-#   RUN_WITH_MEMORY_CAP_BREAK=selftest-cleanup-unhooked  自证不挂收尾（EXIT、TERM、INT 都不挂），只在走到末尾时停自证开的 slice、删临时目录（改前的样子）
+#   RUN_WITH_MEMORY_CAP_BREAK=selftest-cleanup-unhooked  自证不挂收尾（EXIT、TERM、INT 都不挂），只在走到末尾时停自证开的 slice、删临时目录
 #       「自证开出 slice 之后被 TERM 停时」「自证开出 slice 之后被 INT 停时」两格红
+#   RUN_WITH_MEMORY_CAP_BREAK=cap-hit-stat-unprinted  撞了这一条自己的上限时不打 RUN_WITH_MEMORY_CAP_OOM_STAT 那一行（文件头「撞上限那一刻的内存明细」）
+#       「上限 64M 里分配 512 MiB 的探针撞了上限，stderr 应当恰好有一行 RUN_WITH_MEMORY_CAP_OOM_STAT」红
 # 弄坏开关只在自证里认：RUN_WITH_MEMORY_CAP_BREAK 非空（guard-off 除外）、头一个参数不是 --selftest、又没有自证的标记的，在 preflight 之后、读参数之前退 2，
 #   stderr 点名这个变量只在自证（--selftest）里认，命令一行都没跑。自证的标记：RUN_WITH_MEMORY_CAP_SELFTEST_MARK=<文件>，那份文件在、头一行是 SELFTEST_MARK_CONTENT 那一行。
 #   --selftest 把它建在自己的临时目录里、export 给起的每一份包装；把这个开关原样传给包装的调用方自证（scripts/hosts/multi-host-run.sh）
 #   同样建一份写这一行的标记文件、export 这个变量。标记随环境传给命令；自证收尾删掉标记文件，漏出去的变量指不到文件，不再认。
 #
-# 发信号的地方，每一处只打得到这一条自己起的进程（用户 2026-09-25 定「后面的脚本不能终止前面的脚本」「不能动 ssh」；
+# 发信号的地方，每一处只打得到这一条自己起的进程（后面的脚本不能终止前面的脚本，不能动 ssh；
 # records/2026-09-16-subagent拆分提案.md 第四十节第 32 行）：
 #   撞顶（OOMPolicy=stop）与超时（RuntimeMaxSec）由 systemd 停这一条自己开的 scope，scope 里只有这一条的外壳与它的命令；
 #   查完结局 reset-failed 的是这一条自己的 unit；外壳里的 trap 只收信号、不发；起了 scope 之后被停时的 trap（stop_own_scope_then_exit）先 systemctl --user stop 点名自己开的那个 $unit.scope，
@@ -264,6 +284,8 @@ MEMORY_CAP_HIT_EXIT=250
 MEMORY_CAP_UNAVAILABLE_EXIT=251
 TIME_LIMIT_HIT_EXIT=253
 SLICE_TOTAL_HIT_EXIT=254
+SCOPE_LEFT_EXIT=252                   # 命令退出之后停了自己的 scope、回读没过（文件头「命令退出之后停自己的 scope」）
+SCOPE_LEFTOVER_COMMAND_CHARACTERS=120 # 列留下的进程时每个命令行取前这么多个字
 GPU_MEMORY_HIT_EXIT=245               # 显存不够（文件头「显存不够」一段）
 STOPPED_FROM_OUTSIDE_SIGNALS=" 1 2 9 15 "   # 命令退 128 加这几个信号号：外面发的 HUP、INT、KILL、TERM（文件头「峰值表」一段）；SEGV、ABRT 这类是命令自己崩的，不在内
 GPU_JOURNAL_SLACK_SECONDS=2           # 读内核日志的窗口在命令退出之后再放宽这么多秒：驱动的那一行与命令退出前后脚
@@ -285,7 +307,7 @@ SELFTEST_INTERRUPT_PROBE_SECONDS=60   # 设了 RUN_WITH_MEMORY_CAP_SELFTEST_INTE
 CAP_MODE=run                          # run_capped 的 mode（run：真要跑命令；check：--check 只试上限）
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
-# 弄坏开关只在自证里认（文件头「弄坏开关只在自证里认」一段）：平常跑设了就在读参数之前退 2；弄坏开关 guard-off 下不拒（改前的样子）
+# 弄坏开关只在自证里认（文件头「弄坏开关只在自证里认」一段）：平常跑设了就在读参数之前退 2；弄坏开关 guard-off 下不拒
 SELFTEST_MARK_CONTENT="run-with-memory-cap.sh --selftest 起的包装"
 if [[ -n "$BROKEN_JUDGEMENT" && "$BROKEN_JUDGEMENT" != guard-off && "${1:-}" != --selftest ]] \
     && [[ -z "${RUN_WITH_MEMORY_CAP_SELFTEST_MARK:-}" || "$(head -n 1 -- "$RUN_WITH_MEMORY_CAP_SELFTEST_MARK" 2>/dev/null)" != "$SELFTEST_MARK_CONTENT" ]]; then
@@ -320,7 +342,8 @@ TEMPORARY_ROOT="${RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT:-/tmp}"   # 这一条命令
 # task-server 给这一层的两样（文件头「task-server 给这一层的两样」）：读了就 unset，不传进命令
 PEAK_OUTPUT="${RUN_WITH_MEMORY_CAP_PEAK_OUTPUT:-}"
 SCENE_DIRECTORY="${RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY:-}"
-unset RUN_WITH_MEMORY_CAP_PEAK_OUTPUT RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY
+UNIT_OUTPUT="${RUN_WITH_MEMORY_CAP_UNIT_OUTPUT:-}"   # multi-host-run.sh 给的（文件头「multi-host-run.sh 给这一层的一样」）：scope 单元名写进它
+unset RUN_WITH_MEMORY_CAP_PEAK_OUTPUT RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY RUN_WITH_MEMORY_CAP_UNIT_OUTPUT
 # 只认服务直接起的那一层（文件头「只认服务直接起的那一层」）：起 scope 时从命令的环境里摘掉；taskserverleaks 下不摘
 ADMITTED_BY_TASK_SERVER_UNSET=(-u RUN_WITH_MEMORY_CAP_ADMITTED_BY_TASK_SERVER)
 if [[ "$BROKEN_JUDGEMENT" == taskserverleaks ]]; then ADMITTED_BY_TASK_SERVER_UNSET=(); fi
@@ -332,7 +355,7 @@ PRIVATE_CONFIG="${RUN_WITH_MEMORY_CAP_PRIVATE_CONFIG:-${XDG_CONFIG_HOME:-${HOME:
 # 撞顶之后 systemd 停 scope 发的 TERM 于是只打断命令，外壳读完、写完再退，退出码照传命令的。
 # 命令退出之后改成忽略 TERM / INT（后面不再起子进程，没有谁会继承它），只用 bash 的内建命令读、写（read、printf），不起 cut / cat / grep / mv：
 # systemd 停 scope 时给 scope 里每个进程都发 TERM，那一刻正在跑的外部命令会被它杀掉、内建的 read 会被打断，峰值文件就写不全，
-# 被总上限挤掉的那一条会被报成撞了自己的上限（2026-09-25 门禁 code-tooling 里撞上过一次）。
+# 被总上限挤掉的那一条会被报成撞了自己的上限。
 # 外壳自己的 stderr 指到 /dev/null、命令的 stderr 经 fd 4 接回原处：命令被信号杀掉时 bash 会补一行「line 10: … Killed "$@"」，那一行不是命令的输出。
 # 命令进 scope 之后 oom_score_adj 抬到这个数（scope 里的命令与它起的子进程都继承）：整机内存吃紧时 earlyoom 与内核先挑任务进程，不挑常驻服务（prune-server、task-server、会话）
 TASK_OOM_SCORE_ADJUST=500
@@ -358,15 +381,23 @@ while read -r event_name event_count; do
     oom_kill) oom_kill="$event_count" ;;
   esac
 done < "$own_group/memory.events"
-current="" file_pages=0 unreclaimable=""
+current="" file_pages=0 unreclaimable="" stat_anon="" stat_file="" stat_file_dirty="" stat_file_writeback="" stat_shmem=""
 IFS= read -r current < "$own_group/memory.current"
 while read -r stat_name stat_value; do
   case "$stat_name" in
     active_file|inactive_file) [[ "$stat_value" =~ ^[0-9]+$ ]] && file_pages=$((file_pages + stat_value)) ;;
   esac
+  case "$stat_name" in
+    anon) stat_anon="$stat_value" ;;
+    file) stat_file="$stat_value" ;;
+    file_dirty) stat_file_dirty="$stat_value" ;;
+    file_writeback) stat_file_writeback="$stat_value" ;;
+    shmem) stat_shmem="$stat_value" ;;
+  esac
 done < "$own_group/memory.stat"
 [[ "$current" =~ ^[0-9]+$ ]] && unreclaimable=$((current > file_pages ? current - file_pages : 0))
-printf "peak %s\noom %s\noom_kill %s\nunreclaimable %s\n" "$peak" "$own_oom" "$oom_kill" "$unreclaimable" > "$peak_file"
+printf "peak %s\noom %s\noom_kill %s\nunreclaimable %s\nstat_anon %s\nstat_file %s\nstat_file_dirty %s\nstat_file_writeback %s\nstat_shmem %s\n" \
+  "$peak" "$own_oom" "$oom_kill" "$unreclaimable" "$stat_anon" "$stat_file" "$stat_file_dirty" "$stat_file_writeback" "$stat_shmem" > "$peak_file"
 exit "$command_exit"'
 
 # 用法错退 251（「命令一行都没跑」那一类）：退 2 就落进 0–249，与那条命令自己的退出码分不开（文件头「退出码」一段）
@@ -438,7 +469,7 @@ end_own_temporary_directory() {
     echo "run-with-memory-cap: SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1：这一条命令的临时目录留着看现场：$directory" >&2
     return 0
   fi
-  # 弄坏开关 temporarydeletedonfailure：不论结局都删（改前的跑法）；temporarykeptempty：空的也留
+  # 弄坏开关 temporarydeletedonfailure：不论结局都删；temporarykeptempty：空的也留
   if [[ "$wrapper_exit" != 0 && "$BROKEN_JUDGEMENT" != "temporarydeletedonfailure" ]] \
       && { [[ -n "$(ls -A -- "$directory" 2>/dev/null)" ]] || [[ "$BROKEN_JUDGEMENT" == "temporarykeptempty" ]]; }; then
     move_into_scene "$directory" "包装退 ${wrapper_exit}（命令判红、被信号杀、撞了上限或超时，不是 0）" "提交方 task wait 取走结局之后一段时间由 task-server 删" && return 0
@@ -607,7 +638,7 @@ command_key() {
 }
 
 # 峰值表的「线程数」一列（文件头「峰值表」一段）：命令里经 capped.sh <N> 跑的取 N，经 capped.sh default 跑的取 heavy_thread_default 的值（登记值或 SINGLEFS_THREAD_CAP）；
-# 否则看包装自己环境里 capped.sh 设的那几个线程变量。弄坏开关 threadsdefaultunset 下不认 default（改前的跑法）
+# 否则看包装自己环境里 capped.sh 设的那几个线程变量。弄坏开关 threadsdefaultunset 下不认 default
 command_threads() {
   local previous_word="" word names name value first_value="" differing=0 listing="" registered
   for word in "$@"; do
@@ -665,6 +696,38 @@ stop_own_scope_then_exit() { # stop_own_scope_then_exit <退出码>
   fi
   rm -f -- "$started_marker" "$peak_file" "$peak_file.partial"
   exit "$1"
+}
+
+# 列 scope 里的进程（文件头「命令退出之后停自己的 scope」）：<进程号，一行一个> → 每个一行「<进程号> <命令行前 SCOPE_LEFTOVER_COMMAND_CHARACTERS 字>」；读不到命令行的写「（命令行读不到）」
+scope_process_lines() { # scope_process_lines <cgroup.procs 的内容>
+  local pid command_line
+  while IFS= read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    command_line="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | head_characters "$SCOPE_LEFTOVER_COMMAND_CHARACTERS")"
+    printf '%s %s\n' "$pid" "${command_line:-（命令行读不到）}"
+  done <<<"$1"
+}
+
+# 命令退出之后停自己的 scope（文件头「命令退出之后停自己的 scope」）：先读一次 cgroup.procs，还有进程的说一句、逐个列；一律 systemctl --user stop 这一条自己的 $unit.scope，
+# 回读 is-active 的输出是 inactive 或 failed、cgroup.procs 的内容是空的（目录已不在算空）才退 0；没过打原因、逐个列留下的进程与出路，退 1。
+# 只停这一条自己开的单元（单元名是 run_capped 现起的、带包装的进程号）。弄坏开关 scope-left-after-exit 下不停、退 0
+stop_scope_after_command() { # stop_scope_after_command <单元名> <scope 的 cgroup 目录，读不到给空>
+  local unit="$1" group="$2" before="" after="" state
+  [[ "$BROKEN_JUDGEMENT" != "scope-left-after-exit" ]] || return 0
+  [[ -n "$group" && -d "$group" ]] && before="$(cat -- "$group/cgroup.procs" 2>/dev/null)"
+  if [[ -n "$before" ]]; then
+    echo "run-with-memory-cap: 命令退出之后 scope $unit 里还留着 $(grep -c . <<<"$before") 个进程，停掉自己的 scope：$(scope_process_lines "$before" | tr '\n' '；')" >&2
+  fi
+  systemctl --user stop "$unit.scope" >/dev/null 2>&1   # 判的是下面回读的输出，不看 stop 的退出码（单元已收尾时它报找不到单元）
+  state="$(systemctl --user is-active "$unit.scope" 2>/dev/null)"
+  [[ -n "$group" && -d "$group" ]] && after="$(cat -- "$group/cgroup.procs" 2>/dev/null)"
+  if [[ ( "$state" == inactive || "$state" == failed ) && -z "$after" ]]; then
+    return 0
+  fi
+  echo "  ✗ run-with-memory-cap: 命令退出之后停了自己的 scope $unit，回读 is-active 是「${state:-空}」、cgroup.procs 里还有 $(grep -c . <<<"$after") 个进程（退 $SCOPE_LEFT_EXIT）：" >&2
+  scope_process_lines "$after" | sed 's/^/      /' >&2   # gate-lint:detail
+  echo "  → 怎么办：这条命令退出后还留着子进程，核实脚本有没有不等子进程就退；照上面的进程号逐个看它们为什么停不掉（D 状态等 IO 的等 IO 缓过来），停掉之后 systemctl --user is-active $unit.scope 回读不在了再重跑" >&2
+  return 1
 }
 
 scope_result() {
@@ -950,7 +1013,7 @@ def record_peak(outcome, key, cap_text, peak_text, unreclaimable_text, oom_kill_
     host = selftest_host or peaks.this_host()                  # 第七列；取不到同样抛 PeakTableUnavailable
     with table_lock(path):
         rows = peaks.read_all_peak_rows(path)
-        if broken == "hostcolumnignored":   # 弄坏开关：照改前一台一份表，只留本台的行
+        if broken == "hostcolumnignored":   # 弄坏开关：一台一份表，只留本台的行
             rows = {row_key: row for row_key, row in rows.items() if row_key[0] == host}
         old = rows.get((host, key))
         recent = ([(peak, hit, peaks.MEASURED_UNRECLAIMABLE)] + (old[4] if old is not None else []))[:peaks.RECENT_MEASUREMENTS]
@@ -991,7 +1054,8 @@ write_peak_output() {
 run_capped() {
   local cap="$1" mode="$2" unit started_marker peak_file key command_threads_text exit_code result use_slice=1 slice_status
   local peak_bytes own_oom_count oom_kill_count scope_properties command_started command_ended gpu_verdict stopped_signal
-  local late_oom_note="" late_result_was late_oom_outcome
+  local late_oom_note="" late_result_was late_oom_outcome stat_name stat_text=""
+  local -A memory_stat=()
   shift 2
   if [[ "$BROKEN_JUDGEMENT" == "nocap" ]]; then
     "$@"
@@ -1021,6 +1085,10 @@ run_capped() {
     fi
   fi
   unit="singlefs-memory-cap-$$-$RANDOM$RANDOM"
+  if [[ "$mode" == run && -n "$UNIT_OUTPUT" ]]; then   # multi-host-run.sh 要的 scope 单元名（文件头「multi-host-run.sh 给这一层的一样」）
+    { printf '%s\n' "$unit" > "$UNIT_OUTPUT.partial" && mv -f -- "$UNIT_OUTPUT.partial" "$UNIT_OUTPUT"; } 2>/dev/null \
+      || echo "run-with-memory-cap: scope 单元名写不进 $UNIT_OUTPUT（照跑；第二台清理时只能照会话号与标签找留下的进程）" >&2
+  fi
   key="$(command_key "$@")"
   command_threads_text="$(command_threads "$@")"
   started_marker="${TMPDIR:-/tmp}/run-with-memory-cap-$$-$RANDOM$RANDOM.started"
@@ -1079,6 +1147,9 @@ run_capped() {
     report_unavailable "systemd-run --user --scope 退出码 $exit_code，命令一行都没跑（上面是 systemd-run 自己的报错）" \
       "查用户级 systemd 与 D-Bus（systemctl --user status、echo \$DBUS_SESSION_BUS_ADDRESS \$XDG_RUNTIME_DIR）；起不来就别跑这一步，不许退回无上限去跑"
   fi
+  local scope_cgroup_line="" scope_cgroup_directory="" scope_left=0
+  IFS= read -r scope_cgroup_line 2>/dev/null < "$started_marker"   # 外壳起命令之前写的自己的 cgroup（停 scope 之后照它回读 cgroup.procs）
+  [[ "$scope_cgroup_line" == /* ]] && scope_cgroup_directory="$CGROUP_ROOT$scope_cgroup_line"
   rm -f -- "$started_marker"
   trap - TERM INT
   result="$(scope_result "$unit")"
@@ -1093,15 +1164,26 @@ run_capped() {
   if [[ -n "$sampled_peak" ]] && { [[ -z "$unreclaimable_peak" ]] || ((sampled_peak > unreclaimable_peak)); }; then
     unreclaimable_peak="$sampled_peak"
   fi
+  for stat_name in anon file file_dirty file_writeback shmem; do   # 撞上限那一刻的内存明细（文件头「撞上限那一刻的内存明细」）：外壳读的那几样
+    memory_stat[$stat_name]="$(peak_file_value "$peak_file" "stat_$stat_name")"
+  done
   if [[ -n "$SELFTEST_SAMPLED_CGROUP" ]]; then
-    # 自证的假 cgroup 目录（文件头「其余环境变量」）：memory.peak 与 oom_kill 改读它的；回收不掉的峰值只认采样子进程从它那里采到的
+    # 自证的假 cgroup 目录（文件头「其余环境变量」）：memory.peak、oom_kill 与内存明细改读它的；回收不掉的峰值只认采样子进程从它那里采到的
     IFS= read -r peak_bytes < "$SELFTEST_SAMPLED_CGROUP/memory.peak"
     oom_kill_count="$(awk '$1 == "oom_kill" {print $2}' "$SELFTEST_SAMPLED_CGROUP/memory.events" 2>/dev/null)"
     unreclaimable_peak="$sampled_peak"
+    for stat_name in anon file file_dirty file_writeback shmem; do
+      memory_stat[$stat_name]="$(awk -v wanted="$stat_name" '$1 == wanted {print $2}' "$SELFTEST_SAMPLED_CGROUP/memory.stat" 2>/dev/null)"
+    done
   fi
+  for stat_name in anon file file_dirty file_writeback shmem; do
+    [[ "${memory_stat[$stat_name]}" =~ ^[0-9]+$ ]] || memory_stat[$stat_name]=unread
+    stat_text+="$stat_name=${memory_stat[$stat_name]} "
+  done
   rm -f -- "$peak_file" "$peak_file.partial"
   if [[ "$mode" != "run" ]]; then
     [[ "$result" != "unreadable" ]] || report_unavailable "--check 起的 scope $unit 查不到结局（systemctl --user show 出错）" "查用户级 systemd 还在不在（systemctl --user status）"
+    stop_scope_after_command "$unit" "$scope_cgroup_directory" || return "$SCOPE_LEFT_EXIT"
     return "$exit_code"
   fi
   # 撞顶的 scope 结局读早了（文件头「撞顶的 scope 结局读早了」）：内核在这条 scope 里杀过进程、命令退非 0，而 Result 读到的不是 oom-kill：再查几次；一直不是就按内核的计数办
@@ -1116,6 +1198,8 @@ run_capped() {
     fi
     result="oom-kill"
   fi
+  # 结局查完了：一律停自己的 scope、回读（文件头「命令退出之后停自己的 scope」）；回读没过的，命令自己的退出码换成 SCOPE_LEFT_EXIT（下面最后那一处 return）
+  stop_scope_after_command "$unit" "$scope_cgroup_directory" || scope_left=1
   if [[ "$BROKEN_JUDGEMENT" == "exitcode" ]]; then
     record_run clean "$key" "$cap" "$peak_bytes" "$unreclaimable_peak" "$oom_kill_count" "$command_threads_text"
     if [[ $exit_code -eq 137 || $exit_code -eq 143 ]]; then
@@ -1141,6 +1225,10 @@ run_capped() {
     fi
     record_run own-cap "$key" "$cap" "$(size_in_bytes "$cap")" "$unreclaimable_peak" "$oom_kill_count" "$command_threads_text"
     echo "run-with-memory-cap: 撞了内存上限 $cap（scope $unit 的 Result=oom-kill，命令退出码 $exit_code）" >&2
+    if [[ "$BROKEN_JUDGEMENT" != "cap-hit-stat-unprinted" ]]; then   # 撞上限那一刻的内存明细（文件头那一段）：只记、不改判法
+      [[ "${oom_kill_count:-}" =~ ^[0-9]+$ ]] || oom_kill_count=unread
+      echo "RUN_WITH_MEMORY_CAP_OOM_STAT ${stat_text}oom_kill=$oom_kill_count" >&2
+    fi
     gpu_memory_note "$command_started" "$command_ended"
     return "$MEMORY_CAP_HIT_EXIT"
   fi
@@ -1171,6 +1259,9 @@ run_capped() {
       unreadable\ *)
         echo "run-with-memory-cap: 显存 OOM 没查成（${gpu_verdict#unreadable }）：命令退 $exit_code，判不了是不是显存不够，不当成没撞；手动 journalctl -k | grep NV_ERR_NO_MEMORY 看一眼" >&2 ;;
     esac
+  fi
+  if ((scope_left)); then
+    return "$SCOPE_LEFT_EXIT"   # 停了自己的 scope 回读还有进程（stop_scope_after_command 已列）：命令自己的退出码换成它
   fi
   return "$exit_code"
 }
@@ -1288,7 +1379,7 @@ run_selftest() {
   local failures=0 checked=0 output status marker hog_code job_code target slice_counter=0 slice context_directory
   local first_pid second_pid first_status second_status started_seconds elapsed_seconds cgroup_path refused_before
   local -a context=()
-  # 头一件事挂收尾（文件头「自证的收尾」）：TERM / INT 停与中途 exit 都经 EXIT 走到 selftest_cleanup；弄坏开关 selftest-cleanup-unhooked 下不挂（改前只在末尾停）
+  # 头一件事挂收尾（文件头「自证的收尾」）：TERM / INT 停与中途 exit 都经 EXIT 走到 selftest_cleanup；弄坏开关 selftest-cleanup-unhooked 下不挂（只在末尾停）
   if [[ "$BROKEN_JUDGEMENT" != selftest-cleanup-unhooked ]]; then
     trap selftest_cleanup EXIT
     trap 'exit 143' TERM
@@ -1370,6 +1461,12 @@ run_selftest() {
   if [[ $status -ne $MEMORY_CAP_HIT_EXIT ]] || ! grep -q '撞了内存上限 64M' "$scratch/hog.err"; then
     fail "上限 64M 里分配 512 MiB 的探针应当退 $MEMORY_CAP_HIT_EXIT 并报「撞了内存上限 64M」，实际退 $status：$(cat "$scratch/hog.out" "$scratch/hog.err")"
   fi
+  # 撞上限那一刻的内存明细（文件头那一段）：恰好一行、整行对上固定格式、oom_kill 不为 0
+  checked=$((checked + 1))
+  oom_stat_lines="$(grep -c '^RUN_WITH_MEMORY_CAP_OOM_STAT ' "$scratch/hog.err")"
+  if [[ "$oom_stat_lines" != 1 ]] || ! grep -Eq '^RUN_WITH_MEMORY_CAP_OOM_STAT anon=[0-9]+ file=[0-9]+ file_dirty=[0-9]+ file_writeback=[0-9]+ shmem=[0-9]+ oom_kill=[1-9][0-9]*$' "$scratch/hog.err"; then
+    fail "上限 64M 里分配 512 MiB 的探针撞了上限，stderr 应当恰好有一行 RUN_WITH_MEMORY_CAP_OOM_STAT anon=… file=… file_dirty=… file_writeback=… shmem=… oom_kill=<不为 0>，实际 $oom_stat_lines 行：$(grep '^RUN_WITH_MEMORY_CAP_OOM_STAT' "$scratch/hog.err")"
+  fi
   # 撞了自己的上限的那一次记成撞顶（峰值记上限）（文件头「峰值表」一段）
   checked=$((checked + 1))
   output="$(peak_row selftest-hog)"
@@ -1418,6 +1515,21 @@ run_selftest() {
     if in_context bash "$target" 64M bash -c "exit $wanted"; then status=0; else status=$?; fi
     [[ $status -eq $wanted ]] || fail "命令退 $wanted 时应当原样传回 $wanted，实际 $status"
   done
+
+  # 命令退出之后停自己的 scope（文件头「命令退出之后停自己的 scope」）：命令记下自己的 scope 单元名，setsid 出去一个清了环境的 sleep、记下它的进程号就退 0 ⇒
+  # 包装退 0、那个 sleep 不在了、scope 不再 active、stderr 说还留着 1 个进程；弄坏开关 scope-left-after-exit 下 scope 照活着（收尾停这一例自己的 slice 时一起停）
+  fresh_context 256M
+  checked=$((checked + 1))
+  local leftover_pid="" leftover_unit="" leftover_state=""
+  if in_context bash "$target" 64M bash -c 'printf "%s\n" "$RUN_WITH_MEMORY_CAP_OUTER_UNIT" > "$1"; setsid env -i sleep 300 < /dev/null > /dev/null 2>&1 & echo "$!" > "$2"; exit 0' \
+      scope-leftover "$scratch/leftover.unit" "$scratch/leftover.pid" 2>"$scratch/leftover.err"; then status=0; else status=$?; fi
+  leftover_pid="$(cat "$scratch/leftover.pid" 2>/dev/null)"
+  leftover_unit="$(cat "$scratch/leftover.unit" 2>/dev/null)"
+  [[ -n "$leftover_unit" ]] && leftover_state="$(systemctl --user is-active "$leftover_unit.scope" 2>/dev/null)"
+  if [[ $status -ne 0 || ! "$leftover_pid" =~ ^[1-9][0-9]*$ || -d "/proc/${leftover_pid:-0}" || "$leftover_state" == active ]] \
+      || ! grep -qF '还留着 1 个进程' "$scratch/leftover.err"; then
+    fail "命令退出之后 scope 里留着一个 setsid 出去、清了环境的进程时应当停掉自己的 scope：包装退 0、那个进程不在了、scope 不再 active、stderr 说还留着 1 个进程，实际退 $status、进程「$leftover_pid」$([[ -d "/proc/${leftover_pid:-0}" ]] && echo 还在 || echo 不在)、scope「${leftover_state:-空}」：$(head_characters 400 "$scratch/leftover.err")"
+  fi
 
   # 显存不够（文件头「显存不够」一段）：假 journalctl 按 journal-mode 文件演：oom 打一行 NVRM … NV_ERR_NO_MEMORY，xid 打一行别的 NVRM，
   # failing 退 1（读不到内核日志）；-n 1（看不看得到内核日志）一律打一行。每次调用的参数记进 journal-args
@@ -1681,8 +1793,8 @@ $(head_characters 600 "$scratch/memory-high-$fake_high_case.err")"
   # 外壳写峰值那一步挨得住 systemd 停 scope 时发给 scope 里每个进程的 TERM：命令在 scope 里留一个进程，等命令退出之后 1 到 2 秒里
   # 不停地（不 sleep）给 scope 里除它以外的每个进程发 TERM——外壳那时起的任何外部命令活不过一轮；峰值照样要记进表。
   # 只在这一例自己开的 scope 里发：cgroup 路径要是 …/<这一例的 slice>/singlefs-memory-cap-*.scope（slice 名经 $1 传进去），不对就不发信号、退 0。
-  # 不开 scope 的路径（弄坏开关 nocap）下命令就在调用方的 cgroup 里：2026-09-25 在 SSH 会话的 session-1.scope 里发过一轮 TERM，
-  # 打掉了 VSCode 扩展宿主与 Claude 会话；只核最后一段名字时，外面包着一层别的 singlefs-memory-cap scope（整条门禁经包装跑）会打到外层那一整条
+  # 不开 scope 的路径（弄坏开关 nocap）下命令就在调用方的 cgroup 里：在 SSH 会话的 session-1.scope 里发 TERM，
+  # 会打掉 VSCode 扩展宿主与 Claude 会话；只核最后一段名字时，外面包着一层别的 singlefs-memory-cap scope（整条门禁经包装跑）会打到外层那一整条
   fresh_context 256M
   checked=$((checked + 1))
   if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-term-storm bash "$target" 64M bash -c '
@@ -1881,6 +1993,10 @@ $(head_characters 600 "$scratch/memory-high-$fake_high_case.err")"
   # 被停那一例：命令在 scope 里起来（写下 ran 文件）、记录里有 sampler 那一行之后，只给 & 起、$! 记下的包装（env 直接 exec 成包装）发 TERM
   local sampler_case sampler_label sampler_trace sampler_expected sampler_status sampler_pid sampler_start sampler_now sampler_stat sampler_problem sampler_wrapper_pid sampler_poll
   local -a sampler_line=() sampler_fields=()
+  stop_sampler_wrapper() { # <包装的进程号>：只给这一个包装（下面循环里「被停」那一例 & 起、$! 记下的）发 TERM，等它退出；退出码是包装的
+    kill -TERM "$1"
+    wait "$1"
+  }
   for sampler_case in command-ended time-limit cap-hit stopped; do
     fresh_context 256M
     sampler_trace="$scratch/sampler-$sampler_case.trace"
@@ -1907,8 +2023,7 @@ $(head_characters 600 "$scratch/memory-high-$fake_high_case.err")"
           [[ -e "$scratch/sampler-stopped.ran" ]] && grep -q '^sampler ' "$sampler_trace" 2>/dev/null && break
           sleep 0.1
         done
-        kill -TERM "$sampler_wrapper_pid"
-        wait "$sampler_wrapper_pid"; sampler_status=$? ;;
+        stop_sampler_wrapper "$sampler_wrapper_pid"; sampler_status=$? ;;
     esac
     sampler_problem="" sampler_line=() sampler_now=""
     read -r -a sampler_line 2>/dev/null < <(grep -m 1 '^sampler ' "$sampler_trace" 2>/dev/null)
@@ -2054,7 +2169,7 @@ FAKE_SYSTEMCTL
     fail "命令退非 0 而临时目录里什么都没写时，包装给它的临时目录应当照删（退 7、命令拿到的 TMPDIR 在 $root 底下、跑完那一份不在了、stderr 里没有「留着看现场」），实际退 $status、\
 命令拿到的 TMPDIR 是「$output」、那一份$([[ -n "$output" && -e "$output" ]] && echo '还在' || echo '不在')、$root 底下剩「$leftover」：$(head_characters 600 "$scratch/temporary-empty.err")"
   fi
-  # 判红留着的只留最近 KEPT_TEMPORARY_DIRECTORIES_LIMIT（3）个：root 下先放三份带标记的旧现场（标记的修改时刻依次是 300、200、100 秒以前）与一份没标记的（别的包装正在用的那种），
+  # 判红留着的只留最近 KEPT_TEMPORARY_DIRECTORIES_LIMIT（3）个：root 下先放三份带标记的旧现场（标记的修改时刻距此刻依次是 300、200、100 秒）与一份没标记的（别的包装正在用的那种），
   # 一条退 7 的命令跑完：它那一份留着，旧的里最早的那一份删掉，另两份与没标记的那一份都在
   fresh_context 256M
   root="$scratch/temporary-root-limit"
@@ -2257,7 +2372,7 @@ $root 底下剩「$leftover」：$(head_characters 600 "$scratch/temporary-calle
   [[ -z "$output" ]] || fail "跑完应当不留 scope，实际：$output"
 
   # --status 的本地模型服务那一项：私有配置里配了 OUTSIDE_SERVICE_CGROUP 就读那里的 memory.stat；文件不在、没有这个键都报「没配」、不读、退出码照旧。
-  # cgroup 根指到这一例自己造的假目录，私有配置写在 scratch 里；失败信息不贴 --status 的整段输出（改前那一份会在里面打出单元名）
+  # cgroup 根指到这一例自己造的假目录，私有配置写在 scratch 里；失败信息不贴 --status 的整段输出（整段输出里会打出单元名）
   fresh_context 256M
   local fake_cgroup_root="$scratch/fake-cgroup" private_case private_config expected_text
   mkdir -p "$fake_cgroup_root/system.slice/selftest-outside.service" "$fake_cgroup_root/user.slice"
@@ -2294,7 +2409,7 @@ $root 底下剩「$leftover」：$(head_characters 600 "$scratch/temporary-calle
   if [[ $status -ne $MEMORY_CAP_UNAVAILABLE_EXIT || -e "$marker" ]] || ! grep -q '单位必写' "$scratch/unitless.err"; then
     fail "上限写成不带单位的 16 时应当按用法错退 $MEMORY_CAP_UNAVAILABLE_EXIT、报「单位必写」、命令不跑，实际退 $status、命令$([[ -e "$marker" ]] && echo '跑了' || echo '没跑')：$(cat "$scratch/unitless.err")"
   fi
-  # slice 名不是 singlefs 开头（别人的 slice）：退 $MEMORY_CAP_UNAVAILABLE_EXIT，不设上限、不起 scope。改前那一份会真去设，名字取一个不碍事的，收尾照样停掉、还原
+  # slice 名不是 singlefs 开头（别人的 slice）：退 $MEMORY_CAP_UNAVAILABLE_EXIT，不设上限、不起 scope。要是真去设，名字取一个不碍事的，收尾照样停掉、还原
   local foreign_slice
   checked=$((checked + 1))
   foreign_slice="notsinglefs_selftest_$$.slice"
@@ -2313,6 +2428,7 @@ $root 底下剩「$leftover」：$(head_characters 600 "$scratch/temporary-calle
   fi
   echo "  ✓ run-with-memory-cap.sh 自检通过（查了 $checked 项：平常跑设了弄坏开关退 2 并点名只在自证里认而带着自证的标记照常判、--check 起得来、64M 上限里分配 512 MiB 的探针与它当孙进程时都判撞顶退 $MEMORY_CAP_HIT_EXIT \
 且峰值记成撞顶、上限之内 kill -9 原样退 137 且 stderr 不多一行、被外面的 TERM 与 KILL 停原样退且峰值不记、退出码 0 / 7 / 101 原样传回、\
+命令退出之后停掉自己的 scope 连同 setsid 出去、清了环境的进程且回读 scope 不再 active、\
 命令退非 0 而起止之间内核报了显存不够退 $GPU_MEMORY_HIT_EXIT 且按起止给日志窗口、读不到内核日志报没查成、别的 NVRM 行不算、命令退 0 不读日志、撞了上限又报了显存不够照旧退 $MEMORY_CAP_HIT_EXIT 且另报一行、\
 scope 里 memory.max 与 memory.swap.max 设上了、scope 挂在 slice 底下且 slice 的总上限设上了、slice 设不上时退 $MEMORY_CAP_UNAVAILABLE_EXIT 且命令没跑、\
 总上限照多机配置 SLICE_MEMORY_CAP_BY_HOST 里这一台那一项（头一项是另一台也照这一台取）且 --status 报它从哪来、配置里没有这个键时照 slice 已有的走、\

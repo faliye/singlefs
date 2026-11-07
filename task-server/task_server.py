@@ -20,14 +20,22 @@
                                   两样都由排队线程每一轮排完算好、存下（starved_text、progress_text），/health 只读存的那一句，不现读余量、不起子进程；queued、running 只数行
                                   （弄坏开关 health-judges-head 下照改前现判排头，health-head-judged-apart 下照改前另判一套，progress-unwatched 下不看进展）；
                                   另带 nfs（每个共享根的四项结论：起来时判的，前三项每 NFS_RECHECK_SECONDS 由复核线程更新）与 peer（第二台用不用得了、原因、从哪一刻起、
-                                  最近一次那一趟没跑成；note_peer 记的）：两栏都只读存的，不让 ok 变 false（第二台用不了由 control watch 报）；
+                                  最近一次那一趟没跑成；note_peer 记的）：两栏都只读存的，不让 ok 变 false（第二台用不了满一段时间由服务自己发消息给会话，下面 ⑥「服务健康」）；
                                   再带 paused（暂停着没有）与 pause（{reason, since, allow_session, other_running, text}，text 是「暂停中（原因：…，起于…）、在跑 N 个」，放行了一个会话的接
                                   「、放行会话 <号>」与「、别的会话在跑 M 个」，没暂停是 null）：暂停不让 ok 变 false，暂停中不判「判能起却没起成」，也不看进展（下面 ⑤「暂停」）
-  POST /tasks                     {command: [词…], cwd: 绝对路径, environment: {名: 值}} → {id, session, gpu, sharded}；环境变量照名单再核、命令里套了包装或派发器的拒、
+  POST /tasks                     {command: [词…], cwd: 绝对路径, environment: {名: 值}, inbox: {socket, token}, whole_package_confirmed: 确认文件} → {id, session, gpu, state, sharded, inbox, warnings,
+                                  confirmation, confirm_timeout_seconds}；收下的任务记待确认（state=awaiting-confirmation）、不进队，confirmation 是确认单（下面 ⑦）；
+                                  inbox 是会话的收件地址（task submit 读会话环境里的 CLAUDE_CODE_MESSAGING_SOCKET、CLAUDE_CODE_MESSAGING_TOKEN，读不到的客户端当场拒；下面 ⑥），
+                                  两样都在才记在任务上，回话的 inbox 只说记没记；令牌不进日志、status、/tasks/<号> 的回话（summary 只留 socket）；环境变量照名单再核、命令里套了包装或派发器的拒、
                                   命令外层与 bash / sh -c 里写了退役变量「名=值」的拒（task_server_lib.py 文件头「环境变量」）、
-                                  调用方给的编译目录指到仓里的拒、派不到第二台的三种与临时 prune-server 包装里会编或要卡的拒（400；这四种的 detail 是
-                                  {placement: {problem, next_step}}，下面 ②「提交时拒」）
-  GET  /tasks/{号}                任务与它每一次尝试的记录；排着的带 estimated_seconds（预计用时）、estimate_basis（这个数照哪种算法得的：command 按命令、items 按项、none 没有）
+                                  调用方给的编译目录指到仓里的拒、派不到第二台的三种、临时 prune-server 包装里会编或要卡的与不点名包的全仓编译拒（400；这五种的 detail 是
+                                  {placement: {problem, next_step}}，下面 ②「提交时拒」；整包测试没带确认标识的同样 400 {placement}，②「提交时拒」⑥）
+  POST /tasks/{号}/requeue        {items, tasks, why} → {requeued, id（新号）, from, state, warnings, detail}：跑满两小时被打回的那一条经提交它的会话确认，以原命令新进队尾、
+                                  记「长跑已确认」（下面 ⑦「跑满两小时」）；两个数对不上回 409（detail 同 confirm）；不是提交它的会话 403；结局不是 over-two-hours、requeue 过、
+                                  带标识、子任务回 409；--why 太短回 400
+  POST /tasks/{号}/confirm        {items: 项数, tasks: 这个会话在排在跑的条数} → {confirmed, state, detail}：只许提交它的会话；任务要在待确认；两个数都与服务此刻算的相同才进队，
+                                  对不上回 409、detail 是 {mismatch, items, tasks, lines, problem, next_step}（服务算的两个数与确认单）；不在待确认的回 409（下面 ⑦）
+  GET  /tasks/{号}                任务与它每一次尝试的记录；待确认的带 confirmation（此刻现算的确认单）；排着的带 estimated_seconds（预计用时）、estimate_basis（这个数照哪种算法得的：command 按命令、items 按项、none 没有）
                                   与 waiting_for（上一轮判的在等什么）；分片的父任务带 children（各子任务与它们的尝试）；
                                   按项估预计用时的带 item_estimate（估算子任务与它的尝试，不进 children），还在估算的 waiting_for 写在等哪一条估算子任务
   GET  /tasks/{号}/wait?timeout=秒  至多等这么久（不超过 60）：结局有了回 {finished: true, …}，没有回 {finished: false}；结局交给提交它的会话时记成已取；
@@ -42,7 +50,16 @@
                                   名下有校验不过的尝试或子任务记录（关联列改过，TS-05）、或任务已因校验不过记了 record-tampered 的，一个单元都不停、回 409，不报停了。
                                   分片的父任务连同它在排、在跑的子任务一起取消：父任务先记 cancel_requested、阶段改 cancelling（不先记结局），在排的子任务当场收尾、在跑的逐个停、
                                   回读，都停了才给整件记 cancelled、回 stopped；有没停的回 500（取消已记下，accepted），再取消照样重查、重停活动的子任务；父任务已有结局而子任务
-                                  还在跑的同样停它们（TS-04）
+                                  还在跑的同样停它们（TS-04）。
+                                  取消的不留产物（用户：「取消的任务要自己删掉产物 不要残留」；remove_cancelled_artifacts）：回读到单元停了、回 stopped 之前，在同一次取消里删这条任务
+                                  （分片与估算的连同子任务）每一次尝试的编译目录与现场目录（「这个加入流程中 让task server去做」；设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 的也删）；
+                                  派到第二台的，照那一次尝试日志里 multi-host-run.sh
+                                  的 ⑥ 打的「⑥ 删了第二台这一趟的本地目录 …（回读不在了）」认第二台本地那一份与 runs/ 下三个文件删了（取消时在跑的那一次没有这一行算没删成；
+                                  清理回执 peer-cleanup.json 还是 not-started、日志里也没有建了这一趟的本地目录之后才打的两行的，是还没建，不算没删成、不列，
+                                  同 confirm_peer_cleanup 认 not-started；弄坏开关 cancel-not-started-receipt-unread 下照算没删成），
+                                  上一次带 --keep-build-directory 留着的经 --remove-build-directory 删。删前的大小在取消一开始量（第二台本地盘上的量不到，照写），删后回读不在了才算删了；
+                                  逐份写进每条任务最后一次尝试的日志，回话带 artifacts {removed, left, lines}，没删成的进 left、写告警 build-directory-left，task cancel 照它退 5。
+                                  它与记下结局时删（remove_finished_build_directories）共一把锁（build_removal_lock），先到的删、后到的回读。弄坏开关 cancelled-artifacts-kept 下不删、不报
   GET  /sessions/self             这个会话在排、在跑与完成了没人取的任务（子任务不单列，列在父任务名下）
   POST /history/import            照服务自己的环境找峰值表与用时表、导进 history 表（task_server_lib.py 文件头「资源记录」）→ {peaks: {read, added, skipped}, durations: {read, added}, paths}
   POST /pins                      {command: [词…], pinned: true|false} → {command_key, pinned, changed, source, bytes_by_host, problem}：给这条命令（键照 task_server_lib.py 文件头「资源记录」的命令键换算）
@@ -84,37 +101,116 @@
      STALL_GRACE_SECONDS（600）秒不判；宽限过了，日志距上一次增长满 STALL_SECONDS（600）秒、
      这一个窗口里 scope 的 CPU 平均不到 STALL_CPU_CORES 个核，服务停掉它、记 stalled（CPU 在涨的是在算，照跑，再看下一个窗口）、
      照常经 wait 叫醒提交它的会话；CPU 本机读 attempt_runner 写的 cpu_usec（各 scope 合计），第二台读日志里 multi-host-run.sh 每轮打的 MULTI_HOST_RUN_PEER_CPU 一行，
-     这一行与 MULTI_HOST_RUN_STEP 行不算日志在涨。已跑多久、记录用时、日志多久没涨、到此刻平均在用核数
+     这一行、MULTI_HOST_RUN_PEER_MEMORY 行（下面「顶在上限上卡住」）、MULTI_HOST_RUN_PEER_IO_WAIT 行（下面「卡在 IO 上」）与 MULTI_HOST_RUN_STEP 行不算日志在涨。已跑多久、记录用时、日志多久没涨、到此刻平均在用核数
      只写进 task status（running_progress），核数过少不停；头一回量一次尝试（服务刚起来对账在跑的、或宽限刚过）时「日志上一次涨」取日志文件的修改时刻
      （读不到取此刻；服务重启不把日志多久没涨清零），CPU 的窗口照旧从此刻起量；远超记录用时只照下一句停：
      已跑超过记录用时的 OVERRUN_STOP_FACTOR（5）倍、日志又满 STALL_SECONDS 秒没涨的，不看 CPU 也停掉、记 stalled（用户：「工具里不限时」，占着 CPU 的死循环靠这一条停，整条重来）；没有记录用时的不判这一条。服务重启不杀在跑的任务（它们在各自的单元里），重启之后照这一步对回来。
-     顶在上限上卡住（judge_stall_stop；任务 1866 第 4 次：上限 13824M、峰值 13.50 GiB、日志 1288 秒没涨）：照上面两条判卡住的那一刻，外层 scope（尝试目录的 scope 文件记着）
-     的 memory.peak 已到这一次上限的 STALL_AT_CAP_FRACTION（98%）的，照样停掉，但不记 stalled：记 memory-cap-hit、照重试规矩乘 1.5 重排（钉值的打回 memory-cap-at-maximum），
-     结局与重排的说明前面写「顶在上限上卡住：…」；峰值读不到（第二台、还没采到 scope）的照记 stalled。
+     顶在上限上卡住（judge_stall_stop；任务 1866 第 4 次：上限 13824M、峰值 13.50 GiB、日志 1288 秒没涨）：照上面两条判卡住的那一刻，这一次尝试的内存
+     此刻或峰值已到这一次上限的 STALL_AT_CAP_FRACTION（98%）的，照样停掉，但不记 stalled：记 memory-cap-hit、照重试规矩乘 1.5 重排（钉值的打回 memory-cap-at-maximum），
+     结局与重排的说明前面写「顶在上限上卡住：…」；两样都读不到（还没采到 scope、第二台那一层这一轮没打那一行）的照记 stalled。
+     内存只算进程用的（memory.stat 的 anon 加 shmem，memory_peaks_lib.py 的 process_memory_bytes；同 task-server/README.md「算这台还放得下多少」）：页缓存撑满 scope 上限时
+     内核回收它、不因此杀进程（任务 8853：anon 921M、file 22163M、memory.peak 顶到上限 50176M），只有进程内存会撞 OOM，撞上限照旧看 memory.events 的 oom_kill 与包装的退出码。
+     内存两台同一段判，按台不同的只在读法（Machine.memory_now：本机此刻读外层 scope（尝试目录的 scope 文件记着）的 anon 加 shmem，峰值读 attempt_runner 每轮写进尝试目录的
+     memory_peak（它见过的最大）；第二台读日志里 multi-host-run.sh 每轮打的最近一行
+     「MULTI_HOST_RUN_PEER_MEMORY poll=<轮数> current_bytes=<字节> peak_bytes=<字节> read=<yes|no>」（PEER_MEMORY_LINE；那一层内存包装 scope 这一轮的 anon 加 shmem 与
+     见过的最大，read=no 是这一轮没读到：此刻交 None、峰值照留上一次读到的））。弄坏开关 memory-peak-with-page-cache 下本机照改前读 memory.current 与 memory.peak
+     （attempt_runner 记的峰值同样照 memory.peak，attempt_runner.py 文件头 ⑥）。
+     贴着上限而 CPU 在涨的同样算卡住（任务 7723 第 2 次：上限 6144M，scope 的 memory.current 6442393600、memory.max 6442450944，memory.pressure full avg300=2.62，
+     日志 37702 秒没涨，CPU 平均 2.526 核在回收里打转，跑了 37775 秒没人停）：日志满 STALL_SECONDS 没涨、此刻内存不低于上限的 STALL_AT_CAP_FRACTION 的，
+     CPU 在涨、读不到都不算在算，照这一条停掉、记 memory-cap-hit、乘 1.5 重排；此刻内存离上限远的、读不到此刻内存的照上面看 CPU（在涨的照跑）。
+     弄坏开关 at-cap-busy-cpu-kept-running 下贴着上限而 CPU 在涨的照跑（改前的样子），at-cap-fraction-ignored 下读得到此刻内存就当贴着上限、不比上限，
+     peer-memory-line-unread 下第二台不读 MULTI_HOST_RUN_PEER_MEMORY 那一行（此刻与峰值都交 None；那一行照旧不算日志在涨）。
+     卡在 IO 上（任务 8608、8609、8611、8619：本机根盘被一条全目标编译写到盘忙 84%、/proc/pressure/io some avg10=82.44，本机导出的 NFS 跟着慢，第二台上 find、git diff、
+     往工作根 mv 的进程都在 D 状态、wchan 是 rpc_wait_bit_killable / nfs_wait_bit_killable，卡了十几分钟，日志不涨、CPU 20 分钟只涨 1.9 秒，被当成卡住停掉；它们是在等 IO）：
+     日志没涨的每一轮另读一次这一次尝试此刻在 D 状态（不可中断的 IO 等待）的进程数（note_io_wait；两台同一段，按台不同的只在读法 Machine.io_blocked：本机数尝试目录 started
+     记的 runner 进程号连同它的子孙与外层 scope 的 cgroup.procs 里各进程 /proc/<号>/stat 的状态字段；第二台读日志里 multi-host-run.sh 每轮打的
+     「MULTI_HOST_RUN_PEER_IO_WAIT poll=<轮数> blocked=<D 状态的进程数> read=<yes|no>」（PEER_IO_WAIT_LINE，这一行不算日志在涨；上一回之后读到几行取最少的，有一行 read=no 算这一回读不到））。
+     日志与 CPU 都满窗口不涨、而这一个窗口里每一轮都读到了、都有进程在 D 状态的，不判 stalled、不停，从此刻再看一个窗口；有一轮没有 D 状态的进程或读不到的照原判法判。
+     远超记录用时那一条与贴着上限那一条照停（贴着上限时回收本身也让进程进 D 状态，不当在等 IO）。每一轮都有 D 状态的进程满 IO_WAIT_ATTENTION_MINUTES 分钟的另报要处置的提醒 io-wait（下面）。
+     弄坏开关 io-wait-ignored 下不看 D 状态（改前的样子）。
+     卡上有它的计算进程（任务 8519、8520：两条单条 GPU 对拍在本机分到卡，日志从「has been running for over 60 seconds」之后一行都没再打，前段 CPU 满、后段 CPU 闲
+     （推的：GPU 在算），跑了 1233、1253 秒被当成卡住停掉；用户定 GPU 任务「不自己终止，告诉负责的对话 自己检查」）：要卡的任务、这一次尝试分到了卡的，
+     日志没涨的每一轮另记一次它那张卡上有没有它的计算负载（note_card_load；照 card_load 的口径：本机读 nvidia-smi -i <序号> 的计算进程里有没有这一次尝试的子孙进程，
+     第二台与量不到的当有负载；这一轮读的那一次判疑似卡住也用，不另读），卡上有它的负载的那一轮另读一次那几张卡的利用率（Machine.card_utilization：本机同一个 nvidia-smi、
+     同一组序号的 --query-gpu=utilization.gpu，几张取最大；第二台与 nvidia-smi 起不来、退非 0、读到的不是整数的当读不到）。日志与 CPU 都满窗口不涨、而这一个窗口里
+     每一轮卡上都有它的负载、卡的利用率有一轮读到不为 0 的，不判 stalled、不停，从此刻再看一个窗口；每一轮都有负载而利用率每一轮都读到 0 的（显存占着、卡没在干活）
+     照原判法判（日志与 CPU 都不涨就停、记 stalled，说明写「卡上有它的计算进程而这几轮卡的利用率都是 0」）；有一轮读不到利用率的照有负载就免停，依据写「利用率读不到」；
+     有一轮没有负载的照原判法判，没分到卡的不读卡、照原判法判。远超记录用时那一条与贴着上限那一条照停，不看卡（同「卡在 IO 上」）。
+     这样免停的窗口一个接一个、连着满 GPU_BUSY_QUIET_ATTENTION_MINUTES 分钟的另报要处置的提醒 gpu-busy-quiet（下面）。第二台读不到卡上的进程与利用率、当有负载：
+     派到第二台的要卡任务日志与 CPU 都不涨也不停，停靠远超记录用时那一条，叫人靠 gpu-busy-quiet。弄坏开关 stall-card-load-ignored 下不看卡（卡上有它的负载的也照原判法停），
+     card-presence-counts-as-busy 下不看利用率（卡上有它的进程、利用率每一轮都是 0 的也免停）。
+     占着卡不干活的门槛（任务 9341：GPU 对拍的测试进程轮询死等、约 1% 一个核，卡上显存 14129 MiB、利用率 0%，日志半小时不动，0.01 核的门槛停不了它）：
+     分到了卡、这个窗口里每一轮卡上都有它的负载而利用率每一轮都读到 0 的，「CPU 在涨」的门槛是 CARD_IDLE_STALL_CPU_CORES（1 个核）：命令自己的 CPU（本机读这一次尝试各 scope
+     的合计，第二台读 MULTI_HOST_RUN_PEER_CPU，同上面）这一窗口平均不到 1 个核的照卡住停、记 stalled，说明写日志多久没涨、卡的利用率与命令自己的 CPU 三样读数；
+     不少于 1 个核的是在 CPU 上算（任务 9520：利用率 0、日志不涨、命令 CPU 13.8 核），不停，服务日志记一行「在 CPU 上算」，再看一个窗口。利用率有一轮不为 0 的
+     （任务 9604：日志 175 分钟不涨、命令 CPU 1483%、利用率 100%）、有一轮读不到利用率的、不分卡的，门槛照旧 STALL_CPU_CORES。
+     弄坏开关 card-idle-stall-threshold-ignored 下占着卡不干活的也照 STALL_CPU_CORES（CPU 上轮询死等的免停）。
+     跑满两小时（提交时的门禁之外一条任务不跑过两小时；judge_run_limit，判卡住之前先判）：这条任务各次尝试在跑的时长累加
+     （结束了的取记下的用时，在跑的取此刻已跑的；排队等的不算；撞了内存上限、照大一档重来的计时归零，只从最后一次撞上限之后那一次起算，
+     用户：「前三次都撞了内存上限 后重跑的任务两小时计时归零」），
+     满 RUN_LIMIT_SECONDS（7200 秒）的服务停掉、结局记 over-two-hours（task_server_lib.py 文件头「错误类型」），说明写累计与各次用时、命令、范围声明与日志末几行；
+     分片与估算的子任务按自己的尝试各自累计。豁免只有提交时的门禁（lib.commit_gate_exempt：提交时的六道门禁或 scripts/gate/gate-staged.sh、不带 --check 与 --item、
+     范围声明的「为什么」写了「提交前」）与带「长跑已确认」标识的（下面 ⑦「跑满两小时」）；任务 9604 那种带 --check 的门禁、merge-and-verify、入口脚本、实验都不豁免。
+     弄坏开关 over-two-hours-not-bounced 下不判，over-two-hours-cap-hits-counted 下撞上限的那几次也累加，over-two-hours-commit-exempt-by-command-only 下豁免只看起的是哪一道，
+     long-run-confirmed-still-bounced 下带标识的照判。
      疑似卡住（用户：「加 gpu任务看显卡。但是不自己终止，告诉负责的对话 自己检查」；check_suspect）：同一宽限过后，整个单元的 CPU 满 STALL_SECONDS 秒平均不到
      STALL_CPU_CORES 个核、要卡的这段时间它那张卡上又没有它的计算负载（本机读 nvidia-smi -i <序号> 的计算进程里有没有这一次尝试的子孙进程；第二台与量不到的当有负载，不报），
      不管日志涨不涨：不停它，尝试记 suspect（依据）、写告警 suspected-stall、叫醒在等的 wait（它打 TASK_SERVER_SUSPECT 一行、退 task_server_lib.SUSPECT_EXIT，任务照跑，
      再起 wait 接着等）、task status 写「疑似卡住」与依据。一段只报给提交它的会话一次（服务内存里记报过的段号）；之后 CPU 又涨了（相邻两次读之间平均不少于 STALL_CPU_CORES 个核）
      或卡上又有了它的负载，这一段结束、从此刻再量下一段；读不到 CPU 窗口作废重量。这一次照上面两条停了的不再报疑似。
      要处置的提醒（用户在弹窗里选「task wait 自己报」；三方判决 research/prompts/watchdog-task-half-r1-main-verification.md「三、怎么办」岔路表甲；attention_items）：
-     删掉看门狗盯任务那一半之后没人报的五种情形，加改主工作区的命令没正常结束那一种，服务不停、不改任务，只在 wait 那一侧交给提交它的会话。分片的任务连同它的子任务一起判（提醒点名的 task 是子任务号）：
-       queued-too-long   任务在 queued：从提交（重排的从上一次尝试结束）起排满头一档 QUEUE_ATTENTION_MINUTES 分钟，依据写已排多久与排队原因（waiting_reasons），出路写看 status、等不起就取消改小重交；
+     删掉看门狗盯任务那一半之后没人报的五种情形，加改主工作区的命令没正常结束、日志长期不涨而服务不停它、卡在 IO 上而服务不停它、卡上有它的计算进程而服务不停它那四种，
+     再加预算贴着整台、跑得久而核没用起来、按给的上限开并行那三种（用户：「既然加了给对应对话发消息的功能 就就该把异常和修改意见交给对应的对话」：依据写量到的数、why 写为什么、next 写修改意见），服务不停、不改任务，只在 wait 那一侧交给提交它的会话。
+     每一种怎么判、动作、修改意见与没处置时照 task_server_lib.py 文件头「异常表」那一行：next 的头一段是那一行的修改意见（attention_item 经 lib.anomaly_advice 取，
+     代码里不另写出路句），后面接这一回的具体数与多久再叫；下面每一种只写判法与依据。分片的任务连同它的子任务一起判（提醒点名的 task 是子任务号）：
+       queued-too-long   任务在 queued：从提交（重排的从上一次尝试结束）起排满头一档 QUEUE_ATTENTION_MINUTES 分钟，依据写已排多久与排队原因（waiting_reasons），出路照异常表 queued-too-long 那一行（核「在等：…」点名的是哪一台、哪一样）；
        overrun           在跑、有记录用时（estimated_seconds）：这一次尝试已跑的秒数到了 max(OVERRUN_ATTENTION_FACTOR × 记录用时, STALL_GRACE_SECONDS)；日志在涨时服务永远不停它，靠这一条叫人；
-       card-replaced     尝试的结局是 card-fault 且清场点名了坏卡（faulty_cards），后面还有尝试、或任务正排着等换卡（结局可能是 succeeded）；出路是请用户重置那张卡；
+       card-replaced     尝试的结局是 card-fault 且清场点名了坏卡（faulty_cards），后面还有尝试、或任务正排着等换卡（结局可能是 succeeded）；出路照异常表 card-replaced 那一行（请用户重置那张卡）；
+       quiet-log-busy    在跑、这一次尝试的日志（不算起法那一层的进度行，log_content）距上一次增长满头一档 QUIET_ATTENTION_MINUTES 分钟，而服务最近一个窗口没停它是因为
+                         CPU 在涨或读不到 CPU（上面「卡住」：日志与 CPU 都不涨才停；log_growth 记的免停缘由是 SPARED_CPU_BUSY、SPARED_CPU_UNREAD）：有没有记录用时都报
+                         （没有记录用时的连「远超记录用时」那一条也不停，任务 7723 那样在回收里打转的能跑上十个钟头）；按 D 状态（io-wait）或卡上负载（gpu-busy-quiet）免停的、
+                         还没判过一个窗口的不报这一条；依据写日志多久没涨，出路照异常表 quiet-log-busy 那一行（核停在哪一步、是不是把输出攒着不打）；弄坏开关 attention-quiet-busy-unreported 下不报，
+                         quiet-log-busy-any-exemption 下照改前不看免停缘由；
+       io-wait           在跑、这一次尝试日志没涨的每一轮都读到有进程在 D 状态（上面「卡在 IO 上」，io_waits 记的从哪一刻起），连着满头一档 IO_WAIT_ATTENTION_MINUTES 分钟
+                         （中间有一轮没有、读不到或日志涨了就从头算）；依据写最近一轮 D 状态的进程数与本机此刻 /proc/pressure/io 的 some avg60，出路照异常表 io-wait 那一行
+                         （核那台的盘与 NFS：/proc/pressure/io、谁在大量写盘、第二台的挂载），IO 缓过来它自己接着跑；弄坏开关 attention-io-wait-unreported 下不报；
+       gpu-busy-quiet    在跑、这一次尝试分到了卡，日志与 CPU 都满窗口不涨而每一轮卡上都有它的计算负载、卡的利用率有一轮不为 0 或读不到、服务照上面「卡上有它的计算进程」
+                         不停它，这样的窗口一个接一个（card_loads 记的从哪一刻起）连着满头一档 GPU_BUSY_QUIET_ATTENTION_MINUTES 分钟（有一轮卡上没有它的负载、CPU 涨了、
+                         读不到 CPU 或日志涨了就从头算；利用率一个窗口里都是 0 的照卡住停，不报这一条）；依据写卡的键、「卡上有这一次尝试的计算进程，日志与 CPU 都不涨」
+                         与卡的利用率（读到过不为 0 的写最近一轮的数，读不到的写「利用率读不到」），出路照异常表 gpu-busy-quiet 那一行
+                         （核那张卡的利用率与显存在不在动），后面接卡的键；弄坏开关 attention-gpu-busy-quiet-unreported 下不报；
        cleanup-pending   在跑的尝试 cleanup_pending（命令已退出、清场回读没收干净，资源占用保留；finish_attempt）；
        shard-advance-failed  drive_sharded_parents 推父任务抛错（note_advance_failure 记在内存里，推通了删）；
        workspace-write-interrupted  改主工作区的命令（modifies_workspace）有了结局而没正常结束：结局是 WORKSPACE_WRITER_INTERRUPTED_OUTCOMES 之一（撞上限、被挤掉、显存不够、
-         第二台没跑成、撞顶、取消、卡住被停、对不回来）或命令被信号杀（command-failed 而退出码 128 + 信号号，SIGNAL_EXIT_CODES），可能写了一半
+         第二台没跑成、撞顶、取消、卡住被停、对不回来、跑满两小时被停）或命令被信号杀（command-failed 而退出码 128 + 信号号，SIGNAL_EXIT_CODES），可能写了一半
          （用户：「这个问题很严重 因为可能会导致补丁没有正常写入」）；依据写哪一次尝试、什么结局，出路点名要核的文件或补丁目录与 git status。
          apply-writer-patch.py 有结局文件（补丁目录里的 PATCH_WRITER_OUTCOME_NAME）的照它判：服务起一次它的 --read-outcome，打全了（退 0）、已退回（退 1）的不报，
          别的报、依据带它打的那几行；结局文件不在的不报（它在动手换之前写开始与文件行）；带 --dry-run 这类只读参数的不报（workspace_write_item，结了局的只核一次）。
          只报给有结局的任务，所以这一行打在 TASK_SERVER_REASON 之前、退码仍是任务的（下面「wait 读到还没报的提醒」）。
          弄坏开关 workspace-write-interrupted-unreported 下不报，apply-outcome-ignored 下不读结局文件、一律照可能写了一半报。
+       oversized-budget  在排、在跑，排队那一刻判出这一条在某一台上的记账不小于那台的整片界（下面 ②「预算」，budget_check 记进 budget_notices）：档 1，每条只报一次；
+                         依据写各台的记账、可用上限、整片界与记账从哪来（记录峰值几次、编译族、钉值……），出路照异常表 oversized-budget 那一行（核实范围、分片与同时起的个数）；钉了上限的照样报。
+                         弄坏开关 oversized-budget-silent 下不记；
+       long-run-idle-cores  在跑、这一次尝试跑满 LONG_RUN_ATTENTION_SECONDS（3600 秒）、到此刻平均在用核数不到给的线程数的 LONG_RUN_IDLE_CORE_FRACTION（四分之一）
+                         （任务 8856 本机跑 146 分钟、给 31 线程平均只用 8.881 核、峰值 45.00 GiB）：档是尝试的次数（每次尝试只报一次），依据写跑了多久、平均核数与峰值，
+                         出路照异常表 long-run-idle-cores 那一行（核实脚本是否串行、范围是否点多）；只提醒、照跑，读不到 CPU 的不报（long_run_idle_items）。弄坏开关 long-run-idle-silent 下不报；
+       fills-any-cap     在排、在跑，这条命令键最近 FILLS_CAP_RUNS（3）次跑成的尝试峰值都不低于各自上限的 FILLS_CAP_FRACTION（90%）（任务 8979：按给的上限开工作进程，
+                         7 行也记了 45.6 GiB）：档 1，依据写三次的上限与峰值，出路照异常表 fills-any-cap 那一行（「这条命令按给的上限开并行，核实」；fills_any_cap_items；只读进程内存口径的行）。
+                         撞了上限的那几次不算：撞的那一次峰值本来就贴着上限，照上限一档档撞上去的（任务 9616 那条静态核 6.0、9.0、13.5 GiB）不是按上限开并行。
+                         弄坏开关 fills-any-cap-silent 下不报，fills-any-cap-counts-cap-hits 下撞了上限的也算进那几次。
      档（attention_tier）：到头一档是 1，到头一档的 2 倍、4 倍……每翻一倍加一档（cleanup-pending 的档是尝试的次数，card-replaced 的是换过卡的尝试数，shard-advance-failed 的是第几回开始推不动）。
-     同一条任务同一种提醒、同一档只报一次：报给提交它的会话就记下报过的档（服务内存里，同疑似卡住；别的会话来等照样看得到、不记），档跨过下一档才再叫；服务重启后再报一次。
+     同一条任务同一种提醒、同一档只报一次：报给提交它的会话就记下报过的档（别的会话来等照样看得到、不记），档跨过下一档才再叫。
+     报过的档记进库里提醒说的那一条任务的行（正文的 attention_reported：{种类: 最高档}，经 Store.change 只并进这一栏；note_attention_reported），服务重启后照库认、不重发
+     （会话 46 的任务 8819 那 30 片在第 3 档发过一轮，主 agent 重启服务换批之后同一档又发一轮）；服务内存里另留一份照读（attention_reported），库写不进时只记内存、照旧不重报。
+     弄坏开关 attention-reported-memory-only 下照改前只记在内存里，服务重启后再报一次。
+     排队过久那一种，排队原因还没判出来（服务刚起来、排队线程这一轮还没判到它；waiting_text 交空串）的这一轮不报、不发，等判出来那一轮再报，原因不空
+     （上面那一回重启后的第二轮原因写的是「排队原因此刻读不到」）；弄坏开关 attention-queue-reasonless-sent 下照改前照报、原因写读不到。
      wait 读到还没报的提醒就返回：任务没结局的回 {finished: false, attention}，客户端打 TASK_SERVER_ATTENTION 一行、退 ATTENTION_EXIT；结局已有的（换卡重排跑成）
-     {finished: true, attention} 打在理由行之前，退码仍是任务的。阈值取值的理由写在常量上（QUEUE_ATTENTION_MINUTES、OVERRUN_ATTENTION_FACTOR）。
-     服务健康（服务不通、库写不进、单元不在、NFS、第二台用不了）不归 wait，由 task-server/control watch 盯（主 agent 用 run_in_background 起，退出即处置）。
+     {finished: true, attention} 打在理由行之前，退码仍是任务的。阈值取值的理由写在常量上（QUEUE_ATTENTION_MINUTES、OVERRUN_ATTENTION_FACTOR、QUIET_ATTENTION_MINUTES、IO_WAIT_ATTENTION_MINUTES、
+     GPU_BUSY_QUIET_ATTENTION_MINUTES）。
+     这几种与疑似卡住、结局，服务另直接发消息给提交它的会话（下面 ⑥），与 wait 同一份记账：发过的 wait 不再报，wait 报过的不再发。
+     服务健康（库写不进、排头能起却一直没起成、看进展、单元不在、NFS、第二台用不了）不归 wait，服务自己盯、发给每个有任务在排在跑的会话（下面 ⑥「服务健康」）；
+     服务自己挂了发不了：task wait 连续连不上满 60 秒就退出报错，task submit 连不上当场报。
      弄坏开关 attention-queue-unreported、attention-overrun-unreported、attention-card-replaced-unreported、attention-cleanup-unreported、attention-shard-advance-unreported 各关一种，
      attention-finished-unreported 下结局有了的 wait 不带提醒，attention-reported-every-wait 下报过的照报。
   ② 排队：在排的任务按任务号从小到大逐个看（同一个队，轻重不分，不另设延迟；重排的回到原来的位置；分片的子任务与普通任务同一个队）。行核不过的不起、记 record-tampered、写告警。
@@ -132,8 +228,10 @@
        GPU 任务照下面「GPU」挑卡。
      提交时拒（用户：「改成提交时当场拒（推荐）：不再悄悄改派本机：碰到这三种就在提交时报错、点名是哪个路径或哪一族、出路写怎么改，任务不跑。」；placement_refusal）：
        POST /tasks 收到时判，命中头一种就回 400、不进库、不起尝试，task submit 退 3、打那一句与出路；分片的子任务不另判（父任务提交时判过）。
-       ① 共享根外的路径（find_outside_shared_path）：工作目录与命令里的绝对路径（整个词、「名字=绝对路径」的值、bash -c 词里的每一段 QUOTED_WORD_PATH；
-          两台相同的系统路径 HOST_INDEPENDENT_PATHS 不判）有不在多机配置 NFS_SHARED_ROOTS 任何一段下的：点名那个路径，出路是改放某一段下。
+       每一种在 task_server_lib.py 文件头「异常表」有一行（lib.SUBMIT_REFUSAL_KINDS；提交时警告两种是 lib.SUBMIT_WARNING_KINDS）。
+       ① 共享根外的路径（find_outside_shared_path）：工作目录与命令里的绝对路径（只认整个 shell 词：以 / 起头的整个词、「名字=绝对路径」「--选项=绝对路径」的值、
+          shell -c 脚本词照 shell 词切开之后的每一个；别的词中间夹着的 / 不算；两台相同的系统路径 HOST_INDEPENDENT_PATHS 不判）有不在多机配置 NFS_SHARED_ROOTS 任何一段下的：
+          点名那个路径，出路是改放某一段下。
           落在 VOLATILE_ROOT（/tmp）下的同样拒，那一句另说重启会清 /tmp（问题 93，用户：「防止重启后 内容丢失，但是被认为做完了」）。弄坏开关 outside-path-accepted 下不判。
        ② 共享根（shared_roots_problem）：这一次要交给命令的 SINGLEFS_DATA_ROOT、SINGLEFS_WORK_ROOT（服务自己的，或任务带的白名单变量）有不在 NFS 共享根下的：
           点名变量与值，出路是配多机配置。弄坏开关 shared-roots-outside-accepted 下不判。
@@ -153,9 +251,42 @@
           自带临时服务的两份脚本单独的 --selftest（prune_server_client_selftest.py 还有 --selftest-families、prune-server-load-simulation.py）不带 --server-binary 与 PRUNE_SERVER_BINARY 时
           同样自己现编，同样按会编的算（lib.own_server_selftest_split），两台都给编译目录；带了二进制的照旧不编。弄坏开关 temporary-service-own-server-unrecognized 下这两份不认。
           弄坏开关 temporary-service-heavy-accepted 下不判（改前的样子：照外层收下）。
+       ⑤ 不点名包的全仓编译（whole_workspace_cargo_refusal；用户：「8105打回 让他重新写重新确认范围」：任务 8105 不带 -p 的 cargo build --offline --all-targets
+          预测 49.0 GiB、第二台为它封组腾空，同一天 8275、8325 同一条，8104、8324 不带 -p 的 cargo clippy --all-targets --all-features，各会话撤掉后都带 -p 重交）：
+          提交的这一条在命令位置上直接起的、会编的 cargo（WHOLE_WORKSPACE_SUBCOMMANDS：build、check、clippy、test、run、bench、doc 与它们的单字母别名；认法同 compiles，
+          bash -c 与 cd 跟着走，入口脚本与门禁里面起的 cargo 不读、不判；fmt、metadata、tree、clean 不编，不判）带 --workspace / --all 的拒；没带 -p / --package 的，
+          照 cargo 找清单的走法（lib.cargo_manifest_scope：起的目录往上第一份 Cargo.toml）落到虚拟清单（只有 [workspace]、没有 [package]：不点名就编每一个成员）的拒，
+          起的目录认不出、清单读不了的同样拒（判不了）；落到包自己的清单（scripts/experiment-apparatus、prune-server 这类自成工作区的包，或 cd 进了一个成员的目录）只编那一个包，照收；
+          往上一份清单都没有的 cargo 自己就报错，不判。那一句点名哪一条 cargo、在哪个目录起、照哪一份清单；出路是点名要编的包（-p <包>，验证包 -p singlefs-verification），
+          整仓要跑的走 merge-and-verify 或提交时的门禁。弄坏开关 whole-workspace-cargo-accepted 下不判。
+       ⑥ 整包测试没带确认标识（whole_package_refusal；.claude/agent-common.md「日常开发的测试不跑整个包」；
+          异常表 whole-package-unconfirmed）：整包测试按命令判（判法在 task_server_lib.py 的 whole_package_cargo_test、whole_package_script）——命令位置上直接起的 cargo test
+          不点名 --test、--bin、带测试名的 --lib，或带 --lib --tests、--workspace（带 --workspace 的先被 ⑤ 拒）；.claude/gate.d/crash-point-replay.sh --check 把 crash-case-replay、
+          feature-gated-tests、product-gpu-real-card-tests 三格全点；不给补丁目录的 scripts/gate/merge-and-verify.sh。豁免只有提交时的门禁（lib.commit_gate_exempt，同 ① 的跑满两小时）。
+          没带 task submit --whole-package-confirmed <确认文件> 的拒；带了的只判形式（lib.whole_package_confirmation_problem：绝对路径、在共享根下、读得到、
+          有 ①②③ 起头的三段、每段去掉空白至少 12 个字），不合的同样拒、点名缺哪一段。核过照收，任务记 whole_package_confirmed（那份文件的路径），
+          task status、列表、推给会话的正文与日志头打一行「整包已确认：<文件>」（flag_lines）；带它照样受两小时限（① 的跑满两小时），requeue 新交的那一条照带。
+          形式不合的那一句不论是不是整包测试都拒（给了标识就判它）。弄坏开关 whole-package-unconfirmed-accepted 下整包测试没带标识也照收；
+          whole-package-confirmed-exempts-two-hours 下带标识的不按两小时打回；whole-package-flag-dropped-on-requeue 下 requeue 新交的那一条不带它。
+     提交时警告（用户：「绕过的 那个要做成提醒 谁做错了严厉警告」；repository_target_bypass）：照收照跑、不拒，服务当场打警告，警告进三处——提交回复（客户端打到标准错误）、
+       这条任务每一次尝试的日志头（start_attempt 在起单元之前写进日志，分片与估算的子任务照父任务的）、status（task status <号> 与不带号的会话列表）。头一行以「✗ 严厉警告：」起头，
+       点名交任务的会话号与任务号、绕过了什么；第二行以「→ 怎么办：」起头写该怎么改。判在 POST /tasks 收下之后、进库之前，记进任务的 target_bypass（几处说明），
+       三处照它与会话号、任务号现拼（bypass_warning_lines）。
+       ① 取仓根 target/ 下的二进制，绕过服务给的编译目录（任务 7937–7944：长跑脚本默认取仓根 target/ 下合并前的旧二进制，跑出缺包的红）：
+          仓根是服务的仓根与主工作树（草稿与临时目录下的仓副本不算）；命令里的词（整个词、「名=值」的值、bash -c 词里的每一段，相对的照工作目录解）落在仓根 target/ 下的，
+          或命令位置上起的本仓脚本正文里有指向仓根 target/ 的路径字面（前面接仓根变量、$(dirname …)/../.. 这类拼法、$(git rev-parse --show-toplevel)，接 target/release/ 或
+          target/debug/；工作目录就是仓根的另认裸写的 target/release/、target/debug/），就算命中（lib.repository_target_references，读法同读脚本头的声明：command_word_index 剥过之后那一个词）。
+          不算：服务给的编译目录与调用方给的 CARGO_TARGET_DIR 指的目录（都在仓外）、草稿与临时目录下的 target/、正文里的注释与弄坏开关那一支、
+          自证那一支（带 --selftest 起的不读正文；名字带 selftest 或以 cells 收尾的函数体不读：memory_peaks_lib.py 的 key_fold_cells 那种样本里造的假路径）。
+          弄坏开关 repository-target-bypass-unwarned 下不判。
+       ② 会话名下有结局没人取（用户同一句；unclaimed_before、unclaimed_warning_lines）：判在 POST /tasks 收下之后、进库之前：交任务的会话名下有父任务（子任务不算）
+          结局满 UNCLAIMED_WARNING_MINUTES（30 分钟）还没交给它（collected 为假：服务发的结局消息没送到，也没起 wait 取），记进新任务的 unclaimed_at_submit，
+          三处照它现拼：头一行「✗ 严厉警告：会话 <号> 有 <N> 条任务跑完了没人取（<号>、…）：…」，第二行「→ 怎么办：task-server/task wait <号> 取走（…）…」。
+          没有会话的（人手）不判。弄坏开关 unclaimed-unwarned 下不判。
+       三处都经 submit_warning_lines 取 ①、② 两样（分片与估算的子任务照父任务的）。
        第二台用不了要告警（note_peer）：余量那一轮判出它用不了（连不上、余量查不成、多机配置判不过、NFS 复核判出没挂上共享根、盘余量不到 DISK_FLOOR_BYTES）、
        或那一趟没跑成（peer-run-failed：ssh 被重置、第二台那边的准备没过），写告警 peer-unavailable（用得了变用不了、原因变了才再写一条；盘不够这一种按 DISK_FLOOR_KIND 只写一条），
-       /health 的 peer 一栏写明原因，control watch 报出来；这时只在本机排着的任务排队原因带「第二台此刻用不了：<那一句>」。
+       /health 的 peer 一栏写明原因，满 PEER_UNAVAILABLE_NOTIFY_SECONDS 服务发「服务健康」给会话（下面 ⑥）；这时只在本机排着的任务排队原因带「第二台此刻用不了：<那一句>」。
        盘余量（Resources.disk_problem；task_server_lib.py 文件头「挑机器」的「盘余量」）：两台同一个下限。读每台余量的那一次（同一个缓存周期）另判那台编译目录所在盘
        （本机是 TASK_SERVER_BUILD_DIRECTORY 所在盘；第二台是多机配置 BUILD_ROOT_BY_HOST 里它那一项，multi-host-run.sh 在它下面建每一趟的本地目录）的余量：
        报告里有 DISK_REPORT_KEY 照它，没有就照那一台的接口现量（Machine.disk_free：本机读盘，第二台起 PEER_DISK_PROBE_TEXT）；不到 DISK_FLOOR_BYTES（50G）或查不成，
@@ -165,17 +296,26 @@
        别的结局的峰值不进、不占名额。一次跑完的都没有的，预测、上限与记账都取 task_server_lib.UNRECORDED_MEMORY_DEFAULT_BYTES（4G）；只有没跑完的尝试、
        最近一次命令自己退非 0（command-failed）而量到了峰值的，上限不低于那个峰值 × 1.5（failed_peak_floor；任务 2045 第 1 次峰值 3.34 GiB 退 1，
        同一命令键的任务 2159 从 4096M 起、跑 8007 秒撞顶）。撞了 250 由 retry_decision 乘 1.5 重排；重排的照 retry_decision 定的上限（computed_prediction）。
-       每条任务的上限不低于 MEMORY_FLOOR_BYTES（4G；问题 92，用户：「按照我们的计划 默认是要给4gb的」）：重排、判红峰值定的上限低于 4G 的，上限与记账都取 4G，预测照记录；
-       钉值与服务自己的峰值记录定的除外（memory_floor_applied；用户：「如果有真实的使用数据 按照真实的使用数据来」：有记录的上限照峰值 × 1.5，撞了照重排乘 1.5、
-       重排那一次兜到 4G）。弄坏开关 memory-floor-ignored 下重排定到低于 4G 的也照用，recorded-cap-floored 下照改前记录定的也兜到 4G。
-       同一命令键最近一次结束的尝试撞了上限（lib.RECORD_CAP_HIT_OUTCOMES）的，新提交的那一条第一次尝试照「重排那一次」办（latest_attempt_hit_cap；用户：「这个问题很严重 交给 task-server去处理」）：
-       服务不自动重排的命令（改主工作区的）撞了上限，调用方自己再交一遍在服务看来是新任务，不照这一条就只有峰值 × 1.5 的小上限、一撞再撞；这时上限与记账兜到 4G，
-       比 4G 大的照撞过那次的上限 × 1.5，prediction 记 CAP_HIT_RERUN_HISTORY。没记录的从 4G 起、有真实峰值记录而最近一次没撞上限的不兜，两条照旧。
-       弄坏开关 cap-hit-rerun-unfloored 下不兜。
+       有记录的照记录、不设 4G 底（用户：「有记录的照记录、去掉 4G 底」）：没有记录的命令先记 4G（上面），有记录的照记录 × 1.5 定上限与记账，不往 4G 抬；
+       撞了照 retry_decision 乘 1.5 重排（重排那一次照乘出来的上限，不兜到 4G）；撞过上限的命令再交一遍，撞过的那一次的上限进记录窗口（recorded_measurements），
+       头一次照它 × 1.5 起（下面「按近几次最高起跑」同一个窗口），不另兜；钉值照旧（pinned_prediction）。
+       弄坏开关 recorded-cap-floored 下照改前把钉值之外低于 4G 的上限与记账抬到 4G（有记录的头一次、重排、撞过上限再交、改工作区的首趟都兜；memory_floor_applied）。
+       改主工作区的命令首趟给足（workspace_writer_headroom；任务 8367：hook-swap.py 带 --verify 的那条照同键窗口 × 1.5 只给 857M，撞了上限、打回、不重排，
+       换上做了一半、完成行没写，挡住了别的会话的 hook-swap；同一条验证命令单交的 8369 峰值 567 MiB）：modifies_workspace 认的命令撞了上限照旧不重排
+       （WORKSPACE_WRITER_NO_RETRY_OUTCOMES：重排会把写了一半的再写一遍），首趟就给到撞不上的额度：这把键近 RECORD_WINDOW 次最高（key_recent_peak）加它换上之后
+       要起的验证命令（WORKSPACE_VERIFY_OPTIONS：hook-swap.py 的 --verify，值是一整条命令，照命令键换算）那把键近 RECORD_WINDOW 次最高，相加 × 1.5（不设 4G 底），
+       比上面定出的上限大才换（只往上抬），prediction 记 WORKSPACE_WRITER_HISTORY。依据：同键窗口量的是这条命令以前起的验证命令，换了验证命令同键照旧，
+       相加是工具与验证命令在同一个 scope 里一齐占着的上界；两把键都没有记录的照没记录的 4G 起。
+       钉值不经这里；重排的那一次（next_cap）照 retry_decision。弄坏开关 workspace-writer-headroom-skipped 下照改前只看同键窗口。
        编译族（task_server_lib.py 文件头「资源记录」的编译族；records/2026-10-31-task-server巡检.md 批 60：会编的 cargo 同键没记录只从 4G 起，一天里撞上限 78 次）：同键一次跑完的记录都没有的，
-       照这一条的编译族（提交时记的 build_family：会编的 cargo 取包、档、特性那几样，入口脚本照文件头声明）最近 RECORD_WINDOW 次跑成而量到峰值的尝试
-       （别的命令键的也算）取最大 × 1.5 起步，比原来的上限大才换（raised_prediction：只往上抬），prediction 记 BUILD_FAMILY_HISTORY（build_family_peak）。
-       有自己记录的照自己的，不看族。弄坏开关 build-family-ignored 下不看族。
+       照这一条的编译族（提交时记的 build_family：会编的 cargo 取包、档、特性那几样，入口脚本照文件头声明，声明里取自参数的 $<n>、$<选项名> 照这一条命令填上，
+       填不上的不归族）已结束的尝试（别的命令键的也算）里，跑成的与撞了上限的那几次的编译段峰值（尝试的 build_phase_peak：日志里 cargo 打出「Finished … target(s) in …」
+       那一行之前按轮采到的进程内存的最大；本机 attempt_runner.py 文件头 ③ 采、写进 result.json，第二台照 multi-host-run.sh 打的 lib.PEER_BUILD_PHASE_PEAK_MARK 那一行；
+       日志里没有那一行的这一栏是 null、不借；task_server_lib.py 文件头「资源记录」的编译族），按结束时刻从新到旧取近 RECORD_WINDOW 个、取最大 × 1.5 起步
+       （与下面兄弟片、按近几次最高起跑同一个窗口，能升能降：之后几次都编得小，大的那一次出了窗口就回落），比原来的上限大才换（raised_prediction：只往上抬），
+       prediction 记 BUILD_FAMILY_HISTORY（build_family_peak）。整趟的峰值（memory_peak）与撞了上限那一次的上限只给同一命令键自己（定额度、按近几次最高、兄弟片）。
+       有自己记录的照自己的，不看族；重排的那一次另照族往上抬。弄坏开关 build-family-ignored 下不看族，family-cap-hit-not-counted 下族里只收跑成的那几次，
+       family-lends-run-peak 下族里借整趟的峰值与撞了上限那一次的上限。
        同一计划共用峰值（同一批：同一计划 11 片各一个键、各自从 4G 爬，一天里撞上限 48 次）：分片的一片（role=shard）不是重排的那一次时，同一父任务名下计划那一步与别的片
        已结束的尝试里跑成的峰值、撞了上限的那一次的上限，按结束时刻取近 RECORD_WINDOW 个、取最大 × 1.5，比这一片照自己记录（或没记录的 4G）定的上限大才换
        （只往上抬，不压到 4G 以下），prediction 记 SHARD_FAMILY_HISTORY（shard_family_peak）；排着的片起之前现算（fresh_prediction），兄弟片跑完之后起的看得到它的数。
@@ -184,7 +324,8 @@
        都照这把键近 RECORD_WINDOW 次里最高的一次（key_recent_peak：撞过的上限、跑成的峰值，按结束时刻从新到旧取，与上面定额度同一个窗口）× 1.5 往上抬，
        重排的那一次另照编译族与兄弟片往上抬，prediction 记 KEY_HISTORY_PEAK_HISTORY；没记录的照旧 4G。能升能降（用户：「资源的使用记录 服务要有升降的能力 不能只升不降」）：
        窗口里刚撞上去的那一档新提交与重排都看得到，出了窗口的不再算，后面几次都跑得小，起点跟着降。弄坏开关 history-peak-ignored 下不看，
-       history-peak-unwindowed 下照改前不截近几次、全部记录里取最大（一次大峰值永远压着后面），兄弟片那一段同样不截。
+       history-peak-unwindowed 下照改前不截近几次、全部记录里取最大（一次大峰值永远压着后面），兄弟片与编译族那两段同样不截（三处都经 window_maximum）。
+       上面每一段读尝试记录都只读峰值口径一栏是「进程内存」的行（current_metric；task_server_lib.py 文件头「资源记录」的峰值口径一栏），弄坏开关 old-metric-peaks-read 下照改前连旧行一起读。
        显存预测取 host-dispatch.py 的 DEFAULT_GPU_PREDICTION_MEBIBYTES。
      余量（用户：「这部分最大上限看起来要动态计算」「2gb 要动态计算 … 向上取整」；host_margin、host_capacity、host_limit）：每台单条能给到的最大上限 =
        那台 slice 的总上限（多机配置 SLICE_MEMORY_CAP_BY_HOST 里那台那一项，配多少就是多少；第二台另取它那一项的小者）− 那台此刻的余量。
@@ -210,19 +351,35 @@
        哪台都等多久也放不下记 never-fits；点名第二台而它用不了同样记 never-fits。
      整片与碎片按台交替（用户：「最好是 碎片50gb任务组 整片50gb 碎片50gb任务组 整片50gb 这样交替」「拼装碎片任务的时候也按照 85%一组算」；Alternation）：
        每台的界 = 可用上限（那台总上限减那台此刻的余量，booked_at_cap 收到的那个数）× WHOLE_FRACTION（85%，50G、余量 1G 的台是 41.65G）；这一条在那台上的记账不小于界的是整片，别的是碎片。
-       没满时限的照交替排：碎片按队列先后装进那台的这一组（一组的账 = 这一组里起过的碎片各自记账之和），再放下一条就超过界、而那台有没满时限的整片在等时封组，
-       封了组的那台不再放碎片；没有整片在等就开下一组。一条整片只在一台上等腾空、只封那一台（Alternation.waiting_hosts；用户：「一个 46.4G 的整片任务，
+       照交替排（满时限的整片照样算整片、封组等它，下面「满时限」）：碎片按队列先后装进那台的这一组（一组的账 = 这一组里起过的碎片各自记账之和），再放下一条就超过界、而那台有没满时限的整片在等时封组，
+       封了组的那台不再放碎片；没有整片在等就开下一组。组的账是这一组装过多少碎片：跑完的照算，装到界就封，整片才轮得到
+       （跑完就从账里减的话，碎片一条接一条地来、在跑的总量一直不到界，组永远不封，整片永远等不到腾空）；封着组时插空起的（下面「插空」）不进这一组、不记进账
+       （任务 8370 那一回本机这一组「已装到 95.1 GiB（界 41.6 GiB）」，比 slice 的总上限 50G 还大：插空起的一条条加在封着的组上）。
+       组另记这一组起的碎片里此刻还在跑的那几条（Alternation.__init__ 每轮照在跑的尝试剪，跑完的跟着减），封组那一句写「还在跑的 N 条记 X」；只用来看，判封不封不看它。
+       弄坏开关 fragment-group-never-drops 下照改前插空起的也记进账、还在跑的那几条跑完也不剪。一条整片只在一台上等腾空、只封那一台（Alternation.waiting_hosts；用户：「一个 46.4G 的整片任务，
        把大量几 GB 到 1 GB 级的小任务整体挡在后面。这是调度策略造成的，不是资源真不够。」任务 7585 两台都封组）：上一轮已在一台上封了组等它、那台它还算整片的，
        接着等那台；别的在它算整片的几台里挑此刻离放得下最近的那台（它在那台的记账减那台照公式 room_by_the_formula 还剩的最小，一样小取 candidate_hosts 里排在前面的）；
-       别的台不为它封组、照常起碎片，它在那几台放得下照样起。要卡的整片只算空卡凑得够它要的张数的台（卡被占着时腾空内存也起不了它），哪台都凑不够的不封组。
-       弄坏开关 whole-seals-every-host 下照改前它算整片的每一台都封，card-waiting-whole-seals 下要卡的不看空卡。整片在这一组已封、或起过碎片、或没有碎片在等那台时就起，放不放得下只看内存（booked_at_cap），不等那台腾空（在跑的小任务可能跑几个钟头：
+       只挑它在那台的记账不超过那台此刻能给的最大上限（host_limit）的台：booked_at_cap 把记账收到 host_limit 为止，只有预测峰值本身比那台的 host_limit 大时
+       记账才超过它，所以滤掉的只是峰值本身就装不下的台（那台腾空了也起不来它，为它封组只挡住那台的碎片）；一台都放不下的不封组，照下面「预算」打回。
+       弄坏开关 seal-host-that-cannot-fit 下放不下的台也挑、照样为它封组。
+       别的台不为它封组、照常起碎片，它在那几台放得下照样起。要卡的整片照那台卡的总张数算，不照此刻的空卡（任务 7934 要卡、记 45.6 GiB，两台的卡一直有人占：
+       照空卡数算它哪台都不算整片、从不封组，碎片一直占着内存，排了一个多钟头）：卡被占着的台照样封组，在跑的要卡任务跑完、卡空出来就起它，
+       封着的期间跑得完的碎片照下面「插空」放进去；那台卡的总张数都不够它要的不在那台算整片（哪台都不够的照「GPU」记 never-fits）。
+       弄坏开关 whole-seals-every-host 下照改前它算整片的每一台都封，card-whole-counts-free-cards-only 下要卡的照改前只算空卡凑得够它张数的台。整片在这一组已封、或起过碎片、或没有碎片在等那台时就起，放不放得下只看内存（booked_at_cap），不等那台腾空（在跑的小任务可能跑几个钟头：
        任务 2461 留成孤儿的两小时里本机只用 2G、10 条排着等「腾空」）；弄坏开关 whole-waits-for-empty-host 下照改前等腾空；
        起了整片那台的组清零，整片跑完回到下一组碎片。碎片能不能挨着在跑的整片起只看内存。组的账记在服务的内存里（重启从零起）。
        交替挡住的排队原因都带「在等这台腾空」；/health 不另判、不认排队原因里的字样，只读派活给排头的结论（文件头「接口」）。弄坏开关 alternation-disabled 下不交替。
        插空（用户：「我们应该允许长任务时候 可以插入短任务。 这个需要按照历史时间来对比计算。 如果短任务的历史最新执行时间 在长任务剩余执行时间内 那么可以不被锁定。」；
        Alternation.gap_fill）：封了组的那台，一条碎片先看它占不占排头整片将来要的那部分内存（用户：「多个短任务队列的时候 一个短任务进入 会导致其他时间比他长的短任务都进不去」）：
-       排头整片（在等那台的整片里任务号最小的那条）起来之后，照用户定的公式（room_by_the_formula：配置的总上限 − 余量 − 在跑的上限之和）那台减去排头在那台的记账
-       还放得下这一条的，不看时长，交替不挡它；会占排头那部分的，预计用时（estimated_seconds；task_server_lib.py 文件头「资源记录」的预计用时，点了 --item 的按项估）
+       排头整片（在等那台的整片里任务号最小的那条）在那台上照样空着的那一份 = 配置的总上限 − 余量 − 排头在那台的记账 − 那台此刻挨着整片插空在跑的上限之和
+       （beside_whole_capped：照这一支起的尝试记 gap_fill_beside_whole，跑完就不算），放得下这一条的，不看时长，交替不挡它：它跑着整片照样起得来。
+       封组之前起的碎片不减：整片本来就在等它们跑完（「在等这台腾空」），它们占的是整片要的那一份，跑完就还回来；插进这一份的碎片至多让整片等到封组之前起的那几条全跑完。
+       任务 8370（hook-swap.py --seal-outcome，只补写一行完成，没有预计用时、记 4G）两台都封着组排着：第二台的排头整片 8199 记 42.2 GiB，改前这一份照用户定的公式
+       （room_by_the_formula：配置的总上限 − 余量 − 在跑的上限之和）连封组之前起的碎片一起减，「起来之后这台照公式只剩 0 MiB」，碎片跑完之前这一支一直不放；
+       照这一份算，第二台整片之外还空着 6G 上下（推的：照界 41.6 GiB ÷ 85% 反推可用上限约 49 GiB），放得下它。排头整片记满那台可用上限的（本机的 8275、8325 记 49 GiB），
+       那台这一份是 0，没有预计用时的碎片照旧封着，等整片起来、跑完；两台都这样时它等其中一台的整片跑完，排队原因写排头起来之后这一份还剩多少——
+       记满一整台的整片多半是不点名包的全仓编译，提交时就拒了（②「提交时拒」⑤）。弄坏开关 gap-fill-room-counts-all-running 下照改前连封组之前起的碎片一起减。
+       会占排头那部分的，预计用时（estimated_seconds；task_server_lib.py 文件头「资源记录」的预计用时，点了 --item 的按项估）
        不是 None、又不超过挡路时长的，交替才不挡它。交替不挡的内存照常判（放得下才起，verdict_within_the_formula 照用户定的公式），起了照常记它的上限、组照封着
        （同一轮里先插进去的那几条已记进在跑的上限之和，后面的照减过的判）。挡路时长 = 那台此刻在跑的尝试各自还要跑多久里最大的一个（blocking_seconds）：
        预计用时减已跑；没有预计用时、或已跑过预计用时的取已跑（用户定：至少还要跑它已经跑了的那么久）。会占排头那部分而没有预计用时的照旧封着。
@@ -230,9 +387,21 @@
        （没有预计用时，或预计用时超过挡路时长，点名两个数；会占排头那部分的另写排头起来之后照公式只剩多少），插得进而内存放不下的写插空那一句与内存那一句。
        弄坏开关 sealed-gap-not-backfilled 下封着一律不放，sealed-gap-length-ignored 下有预计用时就放、不比挡路时长，
        blocker-remaining-unbounded 下没有预计用时、或已跑过的挡路尝试当成没有尽头，gap-fill-room-ignored 下照改前一律看时长、不看排头起来之后还剩多少。
-     满时限（Scheduler.aged、queue_order）：提交满 AGED_WAIT_SECONDS（两小时）还在排的排到最前、先判，不归交替管；放不下时不挡后面、不留份，后面放得下的照队列先后起
+     满时限（Scheduler.aged、queue_order）：提交满 AGED_WAIT_SECONDS（两小时）还在排的排到最前、先判；放不下时不挡后面、不留份，后面放得下的照队列先后起
        （用户：「现在不存在这个问题。 现在小任务插入 内存和时间两个小件。 因此不存在大任务被卡死不能进的。 因此 保底都可以删了。」，records/2026-10-31-task-server巡检.md 批 47）。
-       弄坏开关 aged-task-not-prioritized 下不往前排。
+       满时限的照样归交替管（任务 7934 记 45.6 GiB：满两小时就不算整片的话，封着的组撤掉，碎片又把内存占满，它永远起不来）：
+       满时限的整片照样算整片、照样封组等它，它自己在那台算整片时不受交替挡（封了的组不挡它，也不等「先起一组碎片」）；
+       满时限的碎片照样受封了的组挡、照样插空，只是挡它的整片只算队列先后排在它前面的那几条（排在它后面的整片不挡它：它先到）。
+       为满时限的整片封了组的那台一条都不插（用户：「一个任务都排了两个小时了 还要有任务插队 明显不合理」）：挡它的整片里有满时限的，碎片照封组那一句排着，
+       后面接 AGED_SEAL_NO_GAP_TEXT 那一句，不看排头起来之后还剩多少、也不看预计用时，等那台腾空起它；没满时限的整片封的组照上面「插空」（不留账那一句不变）。
+       弄坏开关 aged-seal-gap-filled 下照改前照样插空。
+       弄坏开关 aged-task-not-prioritized 下不往前排，aged-whole-not-counted 下满时限的不算整片、不为它封组（改前的样子），
+       aged-fragment-bypasses-seal 下满时限的碎片照改前不过交替（封了的组不挡它，碎片满两小时就把为整片腾的内存占掉）。
+     预算（用户：「一个任务预算是 50GB 明显是有问题的」；budget_check）：排队每一轮判过 never 与 unmet 之后，这一条在派得了的每一台上的记账（booked_at_cap：收到那台
+       可用上限为止，峰值本身装不下的照原样）都超过那台可用上限（host_limit）的——峰值装不下而还没大过 slice 总上限的、重排那一档在余量涨了之后装不下的，judge_host 判不出 never，
+       照改前排着永远起不来——当场打回 memory-cap-at-maximum（退 236，一次都不起），说明写各台的记账、可用上限与记账从哪来，maximum_peak_text 记预测的峰值；
+       不超过而在某一台上不小于整片界的照常排，同时记一条要处置的提醒 oversized-budget（上面 ①）。判不了的这一轮不判。
+       弄坏开关 budget-over-maxima-waits 下照改前不打回、排着。
      钉值（用户：「变异的内存上限直接按照 根目录设置的50gb走」「50 这个是读取的配置 不是随便给的」；pinned_prediction）：库的 history 表里 state=pin 的一行按命令键
        （task_server_lib.py 文件头「资源记录」的命令键）记「这条命令的上限取多机配置 SLICE_MEMORY_CAP_BY_HOST 里派到的那一台那一项」，不记字面的数；定额度先认它：
        预测、上限与记账都取此刻现读的那一项（configured_slice_caps：按台的键照 task_server_lib.py 的 configured_by_host 切、判，地址照 Resources.addresses 映到本机与第二台；
@@ -338,6 +507,69 @@
      pause-allow-waiting-paused（放行会话排着的任务也写暂停）、pause-allow-change-ignored（已暂停再带不同的放行会话不换）、resume-keeps-allowed-session（resume 之后下一次 pause 沿用旧放行）、
      pause-allow-memory-only（放行的会话不写库）、pause-allow-unsigned（放行的会话不进签名）、pause-allow-unreported（/health 与 check 不写放行的会话）、
      pause-other-running-miscounted（别的会话在跑数把放行会话的也数进去）各关一种。
+  ⑥ 发消息给会话（用户：「不是你通知 而是 task-server 通知发起的对话」「包括报错 长时间没有响应 都可以这样通知」；inbox_loop，一个后台线程，
+     每 INBOX_ROUND_SECONDS 一轮，记下结局时 notify_finished 当场叫醒它）：task submit 交来的收件地址记在任务上（上面「接口」POST /tasks），出事往会话的收件 socket 发一条。
+     收件地址（inbox_socket_of）：每次发之前按任务记的会话号读会话登记（~/.claude/sessions/*.json，一份一个进程；读法照
+     scripts/agents/lib_session_registry.py，lib.session_inbox_socket），取会话号相同、进程还活着的那几份里启动最晚的一份的 messagingSocketPath，一轮里同一个会话只读一次；
+     令牌取交任务时带的。会话重启换了 socket、交时的 socket 已经不在的，照新的发；找不到的（会话已关、登记读不了）照下面「发不出去」写告警 inbox-unreachable。
+     提醒、疑似卡住与服务健康只发给此刻找得到 socket 的（inbox_reachable；找不到的这一轮不发、不记发失败，wait 照取），结局照发、发不出写告警。
+     弄坏开关 inbox-socket-from-submit-only 下照交任务时记的那一个 socket。往那个 unix socket 发一条：
+     先发认证行 {"type":"auth","token":<会话令牌>}，再发一行 {"type":"user","message":{"role":"user","content":<正文>}}，两行先备好再连、一次写完（post_to_inbox；
+     行的写法与来源在 task-server/README.md「## 发消息给会话」，文档页没写行格式，升级 Claude Code 之后要复核）。收方空着时 Claude Code 照它起新的一轮。
+     正文第一行「task-server：任务 <号> <结局或提醒种类>…」或「task-server：服务健康 <哪一样>」，后面只写事实与出路（照 wait 打的那几行：原因、出路、日志），末尾是 wait 那一行原样。
+     发哪几样：
+       结局（push_outcomes）：父任务有了结局（wait 会打 TASK_SERVER_RESULT 的每一种）就发，先发还没报的提醒（换卡重排跑成、改主工作区的没正常结束），再发结局；
+         只发一次；发出去了记成已取（同 wait 把结局交给提交它的会话），会话已经用 wait 取了的不发。这一轮处理到某一条时抛错（库读不了、写不进这类），
+         那一条与排在它后面还没处理的放回待发、下一轮接着发，已经发出去记了已取的不放回（不是「发不出去」：那一种照下面不再发）。
+         弄坏开关 pushed-outcome-not-collected 下发出去了也不记已取，inbox-pending-dropped-on-error 下抛错时照改前不放回。
+       结局没人取（repush_unclaimed_outcomes；异常表 unclaimed-outcome）：父任务的结局满 UNCLAIMED_WARNING_MINUTES（30 分钟）还没交给提交它的会话的（发结局的那一条没送到、
+         也没起 wait），再推一回，之后每翻一倍（60、120 分钟…）再推；正文第一行「task-server：任务 <号> 结局还没人取（<结局>，退 <码>；第 <回> 回再推）」，写这条结局还没人取、
+         此刻还差什么（那一行的修改意见），后面接结局那一条整段；推出去了记成已取。推到第几回记进任务行的 outcome_repushed，服务重启后不重推同一回。
+         弄坏开关 unclaimed-outcome-not-repushed 下不再推。
+       要处置的提醒与疑似卡住（push_reminders）：在排、在跑的任务每一轮照 attention_items 与尝试的 suspect 判，还没报的发；记账与 wait 同一份（attention_reported、
+         suspect_reported）：同一条任务同一种提醒同一档只发一次，发过的 wait 不再报，wait 报过的不再发。弄坏开关 inbox-reported-every-round 下报过的照发。
+         没处置时（attention_repush；异常表那几行的「没处置时」）：时长判的照档每翻一倍升一档再推；档不随时长涨的（ANOMALY_REPUSHED_KINDS）同一档报过之后还在的，
+         这一档头一回报出去满 ANOMALY_REPUSH_SECONDS（30 分钟）再推第 1 回、之后每翻一倍再推，第一行写「（第 <档> 档，没处置、第 <回> 回再推）」，接两行：
+         「之前推过：…」（任务行 attention_history 记的最近几回：隔了多久、第几档、当时的依据）与「此刻还差：…」（这一回的修改意见）；只发消息，wait 那一侧不再报。
+         弄坏开关 anomaly-not-repushed 下不再推。
+         分片、按项估算的子任务那几项按父任务、种类、档、原因合成一条（attention_groups；任务 8819 拆成 30 片同时排满 30 分钟，逐片各发一条是 30 条
+         只差子任务号的消息）：第一行「task-server：任务 <父任务号> <种类>（第 <档> 档，子任务 <号的区间>，共 <几> 片）」，依据、出路与末尾那一行照号最小的那一片
+         （merged_attention_text）；只有一片的照旧单发。说子任务的头一轮先压一轮（各片各记提交时刻，相差几毫秒的跨过一轮的边界会拆开），下一轮连同新到档的一起发；
+         发结局之前那一次不压。task wait 那一侧照旧逐片各报一行。弄坏开关 inbox-attention-per-shard 下照改前逐片各发一条、不压。
+       服务健康（watch_health、health_problems）：库写不写得进（试写一行）、派活判排头能起却一直没起成与看进展（/health 的 problem 读的那两句）、自己的单元在不在
+         （systemctl --user is-active 的输出不在 RUNNING_UNIT_STATES）、NFS 共享前三项（nfs_loop 复核的那一份）、第二台用不了满 PEER_UNAVAILABLE_NOTIFY_SECONDS（180 秒）；
+         NFS 复核连第二台的 ssh 一次超时先当「慢」：隔一会儿复查一次（task_server_lib.py 文件头「NFS 共享」的挂载，peer_shell_rechecked），复查通了的那一次只往服务日志记一行
+         「第二台慢（超时、复查通了）：…」，不推、不当第二台用不了、照派第二台；复查还不通才算「挂载」不过，正文写「连不上第二台（ssh 超时 …，隔 … 秒复查仍不通…）」
+         （三个会话各报过一次 30 秒超时的「用不了」，同一刻手跑 ssh 秒回、ping 0.09 ms，第二台 load average 约 60）。弄坏开关 peer-health-single-timeout-reported 下头一次超时就报；
+         查出一样，往每个名下有在排、在跑任务又记着收件地址的会话发一条，出路是 HEALTH_NEXT_STEP；同一样对同一个会话只发一次，这一轮查不出了（好了）就忘掉，再坏再发；
+         没有要发给的会话时不查。服务自己挂了发不了：task wait 连续连不上满 60 秒退出报错、task submit 连不上当场报，不另加。
+         弄坏开关 health-unwatched 下不查不发，health-alerted-every-round 下每一轮照发。
+     发不出去（照会话号找不到、socket 不在、连不上、会话已关；send_to_session）：不重试到死，写一行告警 inbox-unreachable（服务日志、告警记录）、往那条任务最后一次尝试的日志接一行
+     lib.INBOX_LOG_MARK 起头的（不算日志在涨），任务照旧；那一样不再发（结局另照「结局没人取」满时限再推）。客户端读不到收件地址的当场拒（task 的 submit；异常表 inbox-missing），
+     没记会话令牌的任务（人手经接口直交的）服务日志记一行「这条任务没有会话的收件地址」，出事只经 wait 取。
+     要处置的提醒的记账与 wait 同一份，记在库里（上面 ①「要处置的提醒」），服务重启后照库认、不重发；疑似卡住、服务健康与发失败过的记在服务内存里，服务重启后再发一次；
+     重启前记下了结局而还没发的不补发（wait 照取，满 30 分钟没人取的照「结局没人取」再推，交任务时照上面 ②「提交时警告」②警告）。
+     弄坏开关 inbox-not-sent 下一条都不发，inbox-auth-omitted 下不发认证行。
+  ⑦ 交任务的二次确认（提交它的会话确认这一趟的范围与个数对不对；submit、confirmation、confirm、expire_unconfirmed）：
+     POST /tasks 收下的任务记 state=awaiting-confirmation（lib.AWAITING_CONFIRMATION_STATE）、awaiting_state 记确认之后该进的状态（queued，分片的 sharded，按项估算的 estimating），
+     不进队、不建子任务、不起尝试；回话带确认单（confirmation）：整条命令、SINGLEFS_RUN_SCOPE 的四段原文、服务从命令里认出的项数 N（lib.named_scope：--item、--check 的每一格、
+     点名的 --test、--bin、--lib 与 --exact 之后的测试名各几个，一个都没点的写「整包、不指定范围」）、这个会话此刻在排在跑的父任务条数 M（不算它自己与别的待确认的）
+     与其中命令键相同或点的项交叠（同一条入口里点了同一项）的逐条列号、预测内存与预计用时与记录来源（prediction_of、estimate_of、budget_source；算过的预测留着，进队之后照用）、
+     异常表里交的时候就判得出的几种（budget_check：超过每一台可用上限的、贴着整片界的 oversized-budget；fills_any_cap_items），连同那一行的修改意见。
+     确认写 task-server/task confirm <号> --items <N> --tasks <M>（lib.confirm_command）：只许提交它的会话；两个数都与服务此刻现算的相同才进队（拿这条任务的锁改 awaiting_state、
+     建子任务；任务号是提交时刻的，照它排位置），对不上回 409、打出服务算的两个数与确认单（异常表 confirm-counts-mismatch）。分片的父任务确认一次，子任务由服务建、不再要确认。
+     满 CONFIRM_TIMEOUT_SECONDS（1800 秒）没确认的服务取消（结局 cancelled，说明以「没确认，已取消」起头），照结局发给会话（异常表 unconfirmed）。待确认的取消当场收尾。
+     task status <号> 给待确认的打此刻现算的确认单。
+     弄坏开关 confirm-skipped 下交了就进队（不等确认），confirm-counts-unchecked 下不核两个数，unconfirmed-kept 下满时限也不取消。
+     跑满两小时（打回之后由提交它的会话确认对不对，对的排到队尾、记确认标识；requeue）：结局 over-two-hours 的那一条照结局推给会话，
+     出路写两条整行：范围不对的改了范围照常 task submit；确是要跑这么久的
+     task-server/task requeue <号> --long-run-confirmed --items <N> --tasks <M> --why '<为什么要跑这么久、范围为什么是这些>'（N、M 照收尾那一刻的确认单算，requeue_command_text）。
+     POST /tasks/{号}/requeue 只许提交它的会话、只对结局是 over-two-hours 的父任务；两个数与 confirm 同一个核法（counts_mismatch：对不上回 409、打出服务算的两个数与确认单，
+     异常表 requeue-counts-mismatch）；--why 去掉空白至少 LONG_RUN_WHY_MINIMUM_CHARACTERS（12）个字；同一个号只许一回（原号记 requeued_as），带标识的不能再 requeue。
+     核过就以原命令、原工作目录、原环境（范围声明在里面）与原收件地址新交一条：任务号是此刻的，排在此刻队尾（排位按 requeue 时刻，不按原任务号），不再要 task confirm，
+     记「长跑已确认」标识 {from: 原号, why}；带标识的（分片与估算的子任务照父任务的）不再按两小时打回，卡住、内存上限、占卡不用、封队列这些判法照旧。
+     标识在 task status、列表、推给会话的正文与日志头都打一行「长跑已确认（原号 <n>）：<why>」（long_run_lines，经 submit_warning_lines 进前三处）。原号不自动重排：会话不确认就停在 over-two-hours。
+     弄坏开关 requeue-keeps-original-position 下原号那一条重开回队里原来的位置，long-run-confirmed-flag-hidden 下不打标识那一行。
 弄坏开关读在 task_server_lib.py 的 broken（开关表在那份文件头）。
 """
 import os
@@ -390,18 +622,62 @@ PROGRESS_STALL_SECONDS = 600.0   # 看进展（Scheduler.progress_problem）：�
                                  # 2 秒、CPU 闸记刚起的 CPU_SETTLE_SECONDS 5 秒），等卡、等负载、等占盘与封着组等腾空这道另外不算；队列卡死 4 个多小时那一次 10 分钟就报得出来
 STALL_SECONDS = 600.0            # 用户定：一条任务的日志距上一次增长满 10 分钟、这段时间 CPU 也几乎没涨，服务停掉它、记 stalled
 PEER_CPU_LINE = re.compile(r"^MULTI_HOST_RUN_PEER_CPU poll=([0-9]+) usage_usec=([0-9]+) read=(yes|no)$")   # multi-host-run.sh 文件头 ⑤ 每轮一行
+# 第二台那一层内存包装 scope 这一轮进程用的内存（memory.stat 的 anon 加 shmem）与见过的最大，multi-host-run.sh 每轮一行（文件头 ①「顶在上限上卡住」；不算日志在涨）
+PEER_MEMORY_LINE = re.compile(r"^MULTI_HOST_RUN_PEER_MEMORY poll=([0-9]+) current_bytes=([0-9]+) peak_bytes=([0-9]+) read=(yes|no)$")
+# 第二台那条命令进程树里这一轮在 D 状态（不可中断的 IO 等待）的进程数，multi-host-run.sh 每轮一行（文件头 ①「卡在 IO 上」；不算日志在涨）
+PEER_IO_WAIT_LINE = re.compile(r"^MULTI_HOST_RUN_PEER_IO_WAIT poll=([0-9]+) blocked=([0-9]+) read=(yes|no)$")
+IO_PRESSURE_PATH = "/proc/pressure/io"   # 本机此刻的 IO 压力（io-wait 提醒的依据写它的 some avg60；读不到照写读不到）
 OVERRUN_STOP_FACTOR = 5.0        # 用户：跑得超过记录用时这么多倍、日志又满 STALL_SECONDS 不涨，就不看 CPU、停掉打回（工具里不限时，死循环靠这一条停）
 QUEUE_ATTENTION_MINUTES = 30     # 排队过久头一档（分钟；文件头 ①「要处置的提醒」）：排满这么久 wait 叫醒一次，之后每翻一倍（60、120 分钟…）再叫一次。取 30 的理由（推的）：常见排队几分钟到十几分钟，
                                  # 满 30 分钟多半是第二台用不了、余量被大任务占着或预测过大；比 AGED_WAIT_SECONDS（两小时升高优先）早，叫醒时人还来得及改命令重交
 OVERRUN_ATTENTION_FACTOR = 3.0   # 超过记录用时头一档（倍；同一节）：跑到记录用时的这么多倍 wait 叫醒一次，之后每翻一倍（6、12、24 倍…）再叫一次。取 3 的理由（推的）：低于 OVERRUN_STOP_FACTOR（5 倍且日志满
                                  # STALL_SECONDS 没涨才停），日志在涨时服务永远不停它，要靠这一档先叫人；status 的「已超过记录用时的两倍」只提示、不叫醒。不足 STALL_GRACE_SECONDS 的不叫（短任务抖动）
+QUIET_ATTENTION_MINUTES = 30     # 日志长期不涨而服务没停它头一档（分钟；文件头 ①「要处置的提醒」的 quiet-log-busy）：日志满这么久没涨 wait 叫醒一次，之后每翻一倍（60、120 分钟…）再叫一次。
+                                 # 取 30 的理由（推的）：项目规则要单项跑得超过 5 分钟的每 5 分钟至少打一行进度（.claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」），
+                                 # 满 30 分钟没涨是漏了六回；任务 7723 日志 37702 秒没涨、没有记录用时，服务一直不停也没人叫
+IO_WAIT_ATTENTION_MINUTES = 30   # 卡在 IO 上而服务没停它头一档（分钟；文件头 ①「要处置的提醒」的 io-wait）：每一轮都有进程在 D 状态满这么久 wait 叫醒一次，之后每翻一倍再叫一次。
+                                 # 取 30 的理由（推的）：任务 8608、8609、8611、8619 在第二台上 D 状态卡了十几分钟（本机根盘被一条全目标编译写到盘忙 84%，NFS 跟着慢），
+                                 # 盘忙过去就接着跑；满 30 分钟还在等多半是盘或 NFS 出了事，要人去看
+GPU_BUSY_QUIET_ATTENTION_MINUTES = 30   # 卡上有它的计算进程、日志与 CPU 都不涨而服务没停它头一档（分钟；文件头 ①「要处置的提醒」的 gpu-busy-quiet）：
+                                        # 这样免停的窗口连着满这么久 wait 叫醒一次，之后每翻一倍再叫一次。取 30 的理由（推的）：同 QUIET_ATTENTION_MINUTES 与 IO_WAIT_ATTENTION_MINUTES；
+                                        # 任务 8519、8520 日志 20 分钟上下没涨（GPU 在算，推的），满 30 分钟还不出声要人去看卡在不在算
+LONG_RUN_ATTENTION_SECONDS = 3600   # 跑得久而核没用起来（文件头 ①「要处置的提醒」的 long-run-idle-cores）：一次尝试跑满这么久才看它平均在用几个核（任务 8856 本机跑 146 分钟、
+                                    # 给 31 线程平均只用 8.881 核）；一小时以内的短任务启动、编译、收尾那几段核数本来就低，不看
+LONG_RUN_IDLE_CORE_FRACTION = 0.25  # 那一种的界：到此刻平均在用核数不到给的线程数的这么多（四分之一）才报，只提醒、照跑
+FILLS_CAP_RUNS = 3                  # fills-any-cap：同一命令键最近这么多次跑成的尝试（只读进程内存口径的行；撞了上限的不算）都贴着各自上限才报
+FILLS_CAP_FRACTION = 0.9            # 那一种的「贴着」：峰值不低于那一次上限的这么多（90%）
+INBOX_ROUND_SECONDS = 30.0       # 发消息那一路（Scheduler.inbox_loop；文件头 ⑥）每隔这么久扫一遍提醒、疑似卡住与服务健康（同排队线程一轮的长短）；结局一有就当场叫醒它，这个间隔只兜底
+FAST_INBOX_ROUND_SECONDS = 0.5   # 自证里的间隔（TASK_SERVER_SELFTEST_FAST=1）
+INBOX_SEND_SECONDS = 5.0         # 连会话的收件 socket、写完两行的时限：消息先备好再连，一次写完（Claude Code 30 秒里收不到一整行就关连接，cross-session-messaging 文档「The session's inbox socket」）
+INBOX_DRAIN_SECONDS = 0.5        # 写完、关了写的那一半之后等对面收完关连接至多这么久（同 socat 读到输入完了之后的缺省等法）
+PEER_UNAVAILABLE_NOTIFY_SECONDS = 180.0   # 第二台用不了满这么久才发「服务健康」：余量查不成这类一两轮就好的不叫醒人（note_peer 当场写告警）
+FAST_PEER_UNAVAILABLE_NOTIFY_SECONDS = 1.0
+UNCLAIMED_WARNING_MINUTES = 30   # 交任务时会话名下有结局满这么久没交给它（消息没送到、也没起 wait）的，打严厉警告（文件头 ②「提交时警告」②）：消息当场就发，满 30 分钟还没人取的是发不出去而会话也没取；
+                                 # 结局满这么久没人取的服务再推一回、之后每翻一倍再推（文件头 ⑥「结局没人取」，异常表 unclaimed-outcome）
+CONFIRM_TIMEOUT_SECONDS = 1800   # 交了没确认满这么久服务取消、推「没确认，已取消」（文件头 ⑦；异常表 unconfirmed）：与没人取的结局同一个时限
+ANOMALY_REPUSH_SECONDS = 1800    # 不随时长涨的提醒同一档推过之后满这么久还在的再推一回、之后每翻一倍再推（文件头 ⑥「没处置时」；异常表那几行的「没处置时」）
+ANOMALY_REPUSHED_KINDS = ("oversized-budget", "fills-any-cap", "long-run-idle-cores", "cleanup-pending", "card-replaced", "shard-advance-failed")   # 档不随时长涨的那几种（lib.ANOMALY_TABLE_HEAD 那一段同名）
+ATTENTION_HISTORY_KEPT = 8       # 任务行里每一种提醒记下的推过的那几回（attention_history）至多留这么多回：再推的正文照它写前几次推了什么
 STALL_GRACE_SECONDS = 600.0      # 用户：「至少要延迟十分钟后在判定吧」「如果准备时间或者编译时间长 这不是很容易被杀掉」：尝试起来后先宽限这么久不判，之后才量窗口
 CARD_QUARANTINE_SECONDS = 3600   # 清场判出坏的卡停用这么久（Scheduler.quarantined_cards），到点再进候选；还坏清场会再判出来、再停用，任务照样换卡
 CPU_OVERSUBSCRIPTION = 3         # CPU 闸：一台此刻的负载（1 分钟负载与可跑进程数的大者）加刚起的与这一条的线程，不超过核数的这个倍数（cpu_problem）
 CPU_SETTLE_SECONDS = 5           # CPU 闸：起了不到这么久的尝试，负载还没涨上来，按它的线程数整份记上（编译几秒内就把可跑进程数顶上去；记久了接连起的短任务会把整台挡死）
 STALL_CPU_CORES = 0.01           # 「CPU 几乎没涨」：这一个窗口里平均不到一个核的 1%（用户选「日志与 CPU 都不涨才停」）
-STALL_AT_CAP_FRACTION = 0.98     # 判卡住那一刻 scope 的内存峰值到了上限的这么多：顶在上限上卡在回收里，按撞上限办（任务 1866 第 4 次：上限 13824M、峰值 13.50 GiB）
+CARD_IDLE_STALL_CPU_CORES = 1.0  # 占着卡不干活（卡上有它的进程而利用率每一轮都是 0）的「CPU 几乎没涨」：命令自己的 CPU 这一窗口平均不到一个核（文件头 ①「卡上有它的计算进程」；
+                                 # 任务 9341 测试进程轮询死等约 1% 一个核、卡上显存 14129 MiB 利用率 0%；9520 利用率 0 而命令 CPU 13.8 核是在 CPU 上算）
+RUN_LIMIT_SECONDS = 7200         # 跑满两小时打回（task_server_lib.py 文件头「错误类型」over-two-hours）：从第一次尝试起跑各次尝试在跑的时长累加到这么多秒，提交时的门禁之外一律停
+LONG_RUN_WHY_MINIMUM_CHARACTERS = 12   # task requeue --why 去掉空白至少这么多个字（文件头 ⑦「跑满两小时」）
+# 日志满窗口没涨而服务没停它的缘由（judge_stall_stop 记进 log_growth；quiet_log_items 只对 SPARED_CPU_UNREAD、SPARED_CPU_BUSY 报 quiet-log-busy，文件头 ①「要处置的提醒」）
+SPARED_CPU_UNREAD = "cpu-unread"   # 窗口开头或此刻读不到 CPU
+SPARED_CPU_BUSY = "cpu-busy"       # CPU 在涨
+SPARED_IO_WAIT = "io-wait"         # 每一轮都有进程在 D 状态（文件头 ①「卡在 IO 上」）
+SPARED_CARD_LOAD = "card-load"     # 每一轮卡上都有它的计算负载（文件头 ①「卡上有它的计算进程」）
+STALL_AT_CAP_FRACTION = 0.98     # 判卡住那一刻 scope 的内存此刻或峰值到了上限的这么多：顶在上限上卡在回收里，按撞上限办（任务 1866 第 4 次：上限 13824M、峰值 13.50 GiB；
+                                 # 任务 7723 第 2 次：memory.current 6442393600、memory.max 6442450944，CPU 在回收里打转；文件头 ①「顶在上限上卡住」）
 AGED_WAIT_SECONDS = 7200.0       # 提交满这么久还在排的升成高优先：排到最前、先判（用户在 records/2026-10-30-编译绕过内存总上限.md 里定）；放不下时不挡后面、不留份（文件头 ②「满时限」）
+PEER_SCOPE_LEFTOVERS_MARK = "第二台这一趟内存包装的 scope 停了之后还留着进程："   # confirm_peer_cleanup 写进 cleanup_pending 的开头；cleanup-pending 提醒照它换修改意见
+PEER_SCOPE_LEFTOVERS_SHOWN = 10   # 那一句至多列这么多个留下的进程（multi-host-run.sh 记进清理回执的 scope_leftovers）
+AGED_SEAL_NO_GAP_TEXT = "没插空、满时限封台"   # Alternation.blocked 为满时限的整片封着台时接在封组那一句后面的那几个字（文件头 ②「满时限」）
 WHOLE_FRACTION = 0.85            # 整片的界：记账不小于那台可用上限（总上限减那台此刻的余量，host_capacity）的这么多（用户：「超过设定量85% 的算」「拼装碎片任务的时候也按照 85%一组算」）
 WAIT_LIMIT_SECONDS = 60.0
 BREAK_FIXED_MARGIN_BYTES = 2 * 1024 ** 3   # 只给弄坏开关 margin-fallback-fixed：哪台量不到余量时照改前退回的固定数（文件头 ②「余量」）
@@ -445,10 +721,16 @@ RESTORED_HOST_LISTS = {
     "peer_entries": ("scripts/experiment-apparatus/e185-r2-segment-run.sh",),   # 只在第二台跑的入口
 }
 VOLATILE_ROOT = "/tmp"   # 重启会清掉的目录：提交时拒的共享根外路径落在它下面的，拒绝说明另说一句重启会清（文件头 ②「提交时拒」①）
-# bash -c 这类整条写在一个词里的：词里的绝对路径（find_outside_shared_path）；前面紧挨着 \w、/（$VAR/…、a/b 的后半）、}（${X:?}/…）、)（$(cmd)/…）的是变量展开、命令替换
-# 之后的尾巴，真路径运行时才由展开给，不是命令写死的，不算；前面是空白、引号、=、: 一类的照判
+# 按子串认词里的绝对路径（find_outside_shared_path：shell -c 脚本词切不开时，与弄坏开关 path-check-substring 下每个带空白的词）；前面紧挨着 \w、/（$VAR/…、a/b 的后半）、
+# }（${X:?}/…）、)（$(cmd)/…）的是变量展开、命令替换之后的尾巴，真路径运行时才由展开给，不是命令写死的，不算；前面是空白、引号、=、: 一类的照判
 QUOTED_WORD_PATH = re.compile(r"(?<![\w/}).])/[^\s'\"`;|&()<>]+")
-QUOTED_WORD_PATH_BEFORE_EXPANSION_TAILS = re.compile(r"(?<![\w/])/[^\s'\"`;|&()<>]+")   # 弄坏开关 expansion-tail-as-path 下用的（改前的样子）
+# shell 的 -c 脚本那一个词（shell_script_word_indexes）：命令词名（basename）是这几个之一、选项里有带 c 的短选项串（-c、-ec、-lc）的，选项之后头一个词是脚本
+SHELL_COMMAND_NAMES = ("bash", "sh", "dash", "zsh", "ksh")
+SHELL_OPTIONS_WITH_VALUE = ("-o", "+o", "-O", "+O", "--rcfile", "--init-file")   # 后面跟一个值的 shell 选项（shell_script_word_indexes 跳过那个值）
+# 一个 shell 词里的绝对路径（shell_word_paths）：在词头，或紧跟在 =（名字=、--选项= 的值）、挨着写的 ;|& 与重定向 <>、开子 shell 的 ( 后面，到挨着写的 ;|&()<>` 为止；
+# 跟在 )、}、$… 后面的（$(pwd)/…、${X:?}/… 展开之后的尾巴）与词中间夹着的不算
+SHELL_WORD_PATH = re.compile(r"(?:^|(?<=[=;|&<>(]))/[^;|&()<>`]+")
+SHELL_WORD_PATH_WITH_EXPANSION_TAILS = re.compile(r"(?:^|(?<=[=;|&<>()}]))/[^;|&()<>`]+")   # 弄坏开关 expansion-tail-as-path 下用的：跟在 )、} 后面的展开之后的尾巴也取
 # 两台相同的系统路径（find_outside_shared_path 不判它们在不在共享根下；与 scripts/hosts/multi-host-run.sh 的 MULTI_HOST_HOST_INDEPENDENT_PATHS 同一组）：以 / 收尾的是整个目录
 HOST_INDEPENDENT_PATHS = ("/dev/null", "/dev/stdin", "/dev/stdout", "/dev/stderr", "/dev/fd/", "/usr/", "/bin/")
 # 走 python 入口、按参数认要不要卡的（入口文件名 → (子命令, 特性参数)）：子命令对得上、`--` 之前的特性参数里有一个带 gpu 这个词的就要卡（文件头 ②「GPU」）
@@ -464,10 +746,16 @@ HOOK_SWAP_ENTRY = "scripts/gate/hook-swap.py"   # 带 --feed-only 的只喂不�
 WRITER_PATCH_ENTRY = "scripts/gate/apply-writer-patch.py"   # 带 --dry-run 的只在临时树上核（modifies_workspace 不算它改工作区）
 WORKSPACE_READ_ONLY_ARGUMENTS = ("--selftest", "--list-items", "--dry-run", "--read-outcome", "--pending-status")   # 改工作区的工具带了这几样之一只读不写（自证、列项、干跑、读结局），modifies_workspace 不算（任务 7543、7549）
 WORKSPACE_WRITERS = {"scripts/gate/hook-swap.py", "scripts/gate/apply-writer-patch.py", "scripts/gate/stage-mine.py"}
+# 改工作区的工具换上之后在同一个 scope 里起的验证命令放在哪个选项的值里（值是一整条命令）：首趟上限把那条命令那把键的近几次最高也算上（文件头 ②「内存」的改主工作区的命令首趟给足）
+WORKSPACE_VERIFY_OPTIONS = {HOOK_SWAP_ENTRY: "--verify"}
+# 提交时拒 ⑤（文件头 ②「提交时拒」⑤）：这几种 cargo 不点名包就编整个工作区；fmt、metadata、tree、clean 不编，不在里面
+WHOLE_WORKSPACE_SUBCOMMANDS = {"build", "b", "check", "c", "clippy", "test", "t", "run", "r", "bench", "doc", "d"}
+WHOLE_WORKSPACE_FLAGS = ("--workspace", "--all")   # 带了就编整个工作区，点不点名包都一样
+WHOLE_WORKSPACE_NEXT_STEP = "点名要编的包：-p <包>（验证包写 -p singlefs-verification）；整仓要跑的走 scripts/gate/merge-and-verify.sh 或提交时的门禁"
 PATCH_APPLYING_ENTRY = "scripts/gate/merge-and-verify.sh"   # 不带 --skip-apply 的往工作区打补丁
 WORKSPACE_WRITER_NO_RETRY_OUTCOMES = ("memory-cap-hit", "squeezed-out", "gpu-memory-short", "peer-run-failed")   # 改主工作区的命令遇到这几种本会重排的结局一律打回、不重排
 # 改主工作区的命令以这几种结局收尾（连同被信号杀的 command-failed）：可能写了一半，wait 报 workspace-write-interrupted（文件头 ①「要处置的提醒」）
-WORKSPACE_WRITER_INTERRUPTED_OUTCOMES = WORKSPACE_WRITER_NO_RETRY_OUTCOMES + ("memory-cap-at-maximum", "cancelled", "stalled", "launcher-lost")
+WORKSPACE_WRITER_INTERRUPTED_OUTCOMES = WORKSPACE_WRITER_NO_RETRY_OUTCOMES + ("memory-cap-at-maximum", "cancelled", "stalled", "launcher-lost", "over-two-hours")
 SIGNAL_EXIT_CODES = range(129, 129 + 64)   # 128 + 信号号：attempt_runner 记被信号杀的命令就是这个码（attempt_runner.py 文件头 ⑥），bash 起的命令被信号杀同样退它
 PATCH_WRITER_OUTCOME_NAME = "apply-outcome.tsv"   # WRITER_PATCH_ENTRY 的结局文件：补丁目录里这一份，--read-outcome 判打全了没有
 PATCH_WRITER_READ_ONLY_ARGUMENTS = ("--dry-run", "--pending-status", "--read-outcome", "--selftest")   # 带这几样的不写主工作区
@@ -552,6 +840,81 @@ def log_tail(path):
             return handle.read().decode("utf-8", "replace")
     except OSError:
         return ""
+
+
+# multi-host-run.sh 的 ⑥ 删了第二台这一趟的本地目录与 runs/ 下三个文件、回读过之后打的那一行（它的 multi_host_remove_peer_run）里的两段原文：
+# 取消时在跑的第二台那一次照它认第二台那一份删了（Scheduler.cancelled_attempt_artifacts）
+PEER_TRIP_REMOVED_MARK = "⑥ 删了第二台这一趟的本地目录"
+PEER_TRIP_READ_BACK_MARK = "回读不在了"
+# multi-host-run.sh 建好第二台这一趟的本地目录 builds/<标签>/ 之后才打的两行（起第二台那条命令那一步的开头、⑤ 开跑）：日志里有其中一行就是那一趟的本地目录建过了
+PEER_TRIP_BUILT_MARKS = ("MULTI_HOST_RUN_STEP step=peer-command event=begin", "⑤ 第二台开跑")
+
+
+def artifact_size_text(byte_count, host):
+    """取消之后删产物那几行里的大小：量到的写多大（连同字节数），第二台本地盘上量不到的照写。"""
+    if isinstance(byte_count, int):
+        return f"{lib.size_text(byte_count)}（{byte_count} 字节）"
+    return "量不到（第二台本地盘，服务这一侧看不到）" if host == PEER else "量不到"
+
+
+def cancelled_artifact_lines(item):
+    """取消之后删的一份产物（Scheduler.cancelled_attempt_artifacts 交的）在回话与日志里的行：删了的一行，没删成的「✗」一行接「→ 怎么办：」一行。"""
+    where = f"任务 {item['task']} 第 {item['attempt']} 次尝试在{lib.HOST_NAMES.get(item['host'], item['host'])}的{item['kind']} {item['path']}"
+    sizes = f"删前 {artifact_size_text(item['bytes_before'], item['host'])}"
+    if item["gone"]:
+        return [f"  · 取消之后删了{where}：{sizes}、删后 不在（{item['how']}）"]
+    return [f"  ✗ 取消之后没删掉{where}：{sizes}、删后 {artifact_size_text(item['bytes_after'], item['host'])}：{item['why']}",
+            f"  → 怎么办：{item['howto']}"]
+
+
+def append_log_lines(path, lines):
+    """往一次尝试的日志末尾接几行（取消之后删产物、提交时警告的日志头）；日志路径空着或写不进不报错（回话里照样带这几行）。"""
+    if not path:
+        return
+    with contextlib.suppress(OSError):
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write("".join(line + "\n" for line in lines))
+
+
+def post_to_inbox(socket_path, token, text, environment):
+    """往会话的收件 socket 发一条消息（文件头 ⑥）：先发认证行 {"type":"auth","token":…}，再发一行 {"type":"user","message":{"role":"user","content":<正文>}}。
+    两行先备好再连、一次写完，写完关掉写的那一半，等对面收完关连接至多 INBOX_DRAIN_SECONDS。→ 发不出去的原因（socket 不在、连不上、写不进），发出去了交空串。
+    行的写法取自 Claude Code 二进制自己的调试日志（task-server/README.md「## 发消息给会话」），文档页没写，升级 Claude Code 之后要复核。
+    弄坏开关 inbox-auth-omitted 下不发认证行。"""
+    lines = [] if lib.broken("inbox-auth-omitted", environment) else [json.dumps({"type": "auth", "token": token}, ensure_ascii=False)]
+    lines.append(json.dumps({"type": "user", "message": {"role": "user", "content": text}}, ensure_ascii=False))
+    payload = "".join(line + "\n" for line in lines).encode("utf-8")
+    connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        connection.settimeout(INBOX_SEND_SECONDS)
+        connection.connect(socket_path)
+        connection.sendall(payload)
+        connection.shutdown(socket.SHUT_WR)
+        connection.settimeout(INBOX_DRAIN_SECONDS)
+        with contextlib.suppress(OSError):
+            while connection.recv(4096):
+                pass
+    except OSError as error:
+        return f"{type(error).__name__}: {error}"
+    finally:
+        connection.close()
+    return ""
+
+
+def own_unit_state(environment):
+    """服务自己那个用户级单元 is-active 打的状态（照输出判，同 control 的 unit_active_state；自证里 TASK_SERVER_CONTROL_SYSTEMCTL 换成假的）。"""
+    systemctl = lib.selftest_override("TASK_SERVER_CONTROL_SYSTEMCTL", environment) or "systemctl"
+    try:
+        completed = subprocess.run([systemctl, "--user", "is-active", lib.UNIT_NAME], capture_output=True, text=True, env=environment, stdin=subprocess.DEVNULL, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return f"读不到（{type(error).__name__}: {error}）"
+    lines = completed.stdout.strip().splitlines()
+    return lines[-1].strip() if lines else "（没打状态）"
+
+
+INBOX_HEADLINE = "task-server："   # 每条消息正文第一行的开头（文件头 ⑥）
+HEALTH_NEXT_STEP = (f"python3 task-server/control check 看卡在哪；起不来看 journalctl --user -u {lib.UNIT_NAME} -n 100；NFS 共享与第二台挂载照 {lib.NFS_README} 修，"
+                    "第二台用不了照上面那一句修（连法、双机开关）；在跑的任务在各自的单元里接着跑，修好之后服务对回它们")   # 服务健康那一条的出路
 
 
 # ── 库 ──
@@ -974,6 +1337,23 @@ def attention_tier(value, first):
     return tier
 
 
+def attention_event(item):
+    """发消息那一路认一项提醒的键（inbox_failed、attention_held）：(任务号, 种类, 档)；再推的那一回另接第几回（同一档再推的每一回各算一件，发失败的那一回不连累下一回）。"""
+    key = (item["task"], item["kind"], item["tier"])
+    return key + (item["repush"],) if item.get("repush") else key
+
+
+def task_id_ranges(task_ids):
+    """几个任务号写成区间（合成的那一条提醒点名几片子任务，Scheduler.merged_attention_text）：从小到大，连着的写「头–尾」、单个的写号，几段用「、」接。"""
+    numbers = sorted({int(task_id) for task_id in task_ids})
+    pieces, start = [], 0
+    for index, number in enumerate(numbers):
+        if index + 1 == len(numbers) or numbers[index + 1] != number + 1:
+            pieces.append(str(numbers[start]) if start == index else f"{numbers[start]}–{number}")
+            start = index + 1
+    return "、".join(pieces)
+
+
 # ── 两台：这一台怎么读、怎么起（文件头 ②「两台同一段逻辑」）──
 @dataclasses.dataclass
 class BuildDirectory:
@@ -1030,16 +1410,28 @@ class Machine:
         """这一次尝试的编译目录此刻的占盘（字节）；量不到交 None（记账照起的时候记的算）。"""
         return None
 
+    def memory_now(self, attempt):
+        """这一次尝试外层那一层内存包装 scope 此刻的内存与峰值（字节）：→ (此刻, 峰值)，读不到的那一样交 None（文件头 ①「顶在上限上卡住」）。"""
+        return None, None
+
     def card_busy(self, attempt):
         """这一次尝试此刻在它那张卡上有没有计算负载；量不到当有（不报疑似卡住）。"""
         return True
+
+    def card_utilization(self, attempt):
+        """这一次尝试分到的卡此刻的利用率（百分数，几张取最大）；读不到交 None（文件头 ①「卡上有它的计算进程」：照有进程就免停判，依据写「利用率读不到」）。"""
+        return None
+
+    def io_blocked(self, attempt):
+        """这一次尝试此刻在 D 状态（不可中断的 IO 等待）的进程数；读不到交 None（文件头 ①「卡在 IO 上」：照原判法判）。"""
+        return None
 
     def command_exit(self, exit_code, tail):
         """→ (定结局用的退出码, classify_attempt 的 host, 起法那一层自己退的码或 None)。"""
         return exit_code, self.name, None
 
     def ended_peaks(self, tail):
-        """尝试结束时起法那一层打进日志的峰值：{memory_peak, build_peak}（没打的不带）。"""
+        """尝试结束时起法那一层打进日志的峰值：{memory_peak, build_peak, build_phase_peak}（没打的不带）。"""
         return {}
 
     def kept_build_label(self, tail):
@@ -1098,6 +1490,12 @@ class LocalMachine(Machine):
     def cpu_usec(self, attempt):
         return self.scheduler.scope_cpu_usec(attempt)
 
+    def memory_now(self, attempt):
+        return self.scheduler.scope_memory_current(attempt), self.scheduler.scope_memory_peak(attempt)
+
+    def io_blocked(self, attempt):
+        return self.scheduler.scope_blocked_processes(attempt)
+
     def build_bytes(self, attempt):
         with contextlib.suppress(OSError, ValueError):
             with open(os.path.join(attempt.get("directory", ""), "build_bytes"), encoding="utf-8") as handle:
@@ -1127,6 +1525,23 @@ class LocalMachine(Machine):
         listed = {int(line.split(",")[0]) for line in completed.stdout.splitlines() if line.split(",")[0].strip().isdigit()}
         return bool(listed & family)
 
+    def card_utilization(self, attempt):
+        """nvidia-smi -i <序号> --query-gpu=utilization.gpu（与 card_busy 同一路：同一个 nvidia-smi、同一组序号）：几张取最大；没记卡、nvidia-smi 起不来或退非 0、
+        有一行不是整数（[N/A] 这类）交 None。"""
+        keys = card_keys(attempt.get("card"))
+        if not keys:
+            return None
+        scheduler = self.scheduler
+        try:
+            completed = subprocess.run([scheduler.nvidia_smi, "-i", ",".join(str(key[1]) for key in keys), "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+                                       capture_output=True, text=True, env=scheduler.environment, stdin=subprocess.DEVNULL, timeout=NVIDIA_SMI_SECONDS)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        values = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+        if completed.returncode != 0 or not values or not all(value.isdigit() for value in values):
+            return None
+        return max(int(value) for value in values)
+
     def command(self, task, placement, label, environment, capped, build):
         # 编译目录（连同重排接着用的那一份）经 environment 的 CARGO_TARGET_DIR 交给命令（start_attempt），这里不用 build
         return ["bash", self.scheduler.memory_wrapper, lib.mebibytes_text(placement.cap)] + capped + task["command"]
@@ -1146,8 +1561,8 @@ class LocalMachine(Machine):
 
 
 class PeerMachine(Machine):
-    """多机配置 HOSTS 里的另一台：经 host-dispatch.py 的 Peer（多机配置判法）连、probe_peer 在那台上量余量；CPU 读日志里 multi-host-run.sh 每轮打的
-    MULTI_HOST_RUN_PEER_CPU；起法是 multi-host-run.sh --peer，编译目录由它在那台本地盘上这一趟新建、跑完删（multi-host-run.sh 文件头 ⑤）。"""
+    """多机配置 HOSTS 里的另一台：经 host-dispatch.py 的 Peer（多机配置判法）连、probe_peer 在那台上量余量；CPU 与内存读日志里 multi-host-run.sh 每轮打的
+    MULTI_HOST_RUN_PEER_CPU 与 MULTI_HOST_RUN_PEER_MEMORY；起法是 multi-host-run.sh --peer，编译目录由它在那台本地盘上这一趟新建、跑完删（multi-host-run.sh 文件头 ⑤）。"""
     name = PEER
     starts_per_pass = PEER_STARTS_PER_PASS
     admission_variable = lib.PEER_ADMITTED_VARIABLE
@@ -1178,6 +1593,16 @@ class PeerMachine(Machine):
     def cpu_usec(self, attempt):
         return self.scheduler.log_offsets.get(attempt.get("id"), (0, 0, None))[2]
 
+    def memory_now(self, attempt):
+        # 日志里 multi-host-run.sh 每轮打的最近一行 MULTI_HOST_RUN_PEER_MEMORY（log_content 读进 peer_memory）；弄坏开关 peer-memory-line-unread 下不读
+        if lib.broken("peer-memory-line-unread", self.scheduler.environment):
+            return None, None
+        return self.scheduler.peer_memory.get(attempt.get("id"), (None, None))
+
+    def io_blocked(self, attempt):
+        # 日志里 multi-host-run.sh 每轮打的 MULTI_HOST_RUN_PEER_IO_WAIT（log_content 读进 peer_io_wait：上一回之后读到的几行取最少的，有一行 read=no 记 None）
+        return self.scheduler.peer_io_wait.get(attempt.get("id"))
+
     def command_exit(self, exit_code, tail):
         # 第二台那条命令自己的退出码（multi-host-run.sh 打的 MULTI_HOST_RUN_STEP step=peer-command event=end … exit=<码>）：有这一行照它定结局，
         # 命令自己退 255 记 command-failed；没有这一行才是 multi-host-run.sh 那一层没跑成（task_server_lib.py 文件头「错误类型」）
@@ -1187,10 +1612,10 @@ class PeerMachine(Machine):
         return command_exit, lib.PEER_COMMAND_HOST, exit_code
 
     def ended_peaks(self, tail):
-        # multi-host-run.sh 在第二台那条命令结束时打的 MULTI_HOST_RUN_PEER_MEMORY_PEAK 与 MULTI_HOST_RUN_PEER_BUILD_PEAK；读不到不打
+        # multi-host-run.sh 在第二台那条命令结束时打的 MULTI_HOST_RUN_PEER_MEMORY_PEAK、MULTI_HOST_RUN_PEER_BUILD_PEAK 与编译段峰值那一行（PEER_BUILD_PHASE_PEAK_MARK）；读不到不打
         environment = self.scheduler.environment
         peaks = {"memory_peak": None if lib.broken("peer-memory-peak-ignored", environment) else lib.peer_marked_bytes(tail, lib.PEER_MEMORY_PEAK_MARK),
-                 "build_peak": lib.peer_marked_bytes(tail, lib.PEER_BUILD_PEAK_MARK)}
+                 "build_peak": lib.peer_marked_bytes(tail, lib.PEER_BUILD_PEAK_MARK), "build_phase_peak": lib.peer_marked_bytes(tail, lib.PEER_BUILD_PHASE_PEAK_MARK)}
         return {name: value for name, value in peaks.items() if value is not None}
 
     def kept_build_label(self, tail):
@@ -1474,8 +1899,10 @@ class PassView:
 
 
 class Alternation:
-    """一轮排队里的整片与碎片交替（文件头 ②「整片与碎片按台交替」）：开轮时数每台服务起的在跑几条、在排的没满时限的里哪几条在等那台是整片（一条整片只算一台，waiting_hosts）、哪几条是碎片；
-    组的账（{台: {"booked": 字节, "sealed": 封了没有}}）在 Scheduler.fragment_groups 里，跨轮留着。"""
+    """一轮排队里的整片与碎片交替（文件头 ②「整片与碎片按台交替」）：开轮时数每台服务起的在跑几条、在排的里哪几条在等那台是整片（满时限的也算；一条整片只算一台，waiting_hosts）、
+    哪几条是碎片；queued 是照排队先后排好的（queue_order），position 记各条的先后、aged 记满时限的那几条（文件头 ②「满时限」：满时限的碎片只让排在它前面的整片）。
+    组的账（{台: {"booked": 这一组装过的碎片记账之和, "sealed": 封了没有, "running": {这一组起的、此刻还在跑的任务号: 记账}}}，opened_group 建）
+    在 Scheduler.fragment_groups 里，跨轮留着。"""
 
     def __init__(self, scheduler, view, queued, now):
         self.scheduler = scheduler
@@ -1483,15 +1910,22 @@ class Alternation:
         self.now = now
         self.estimates = {}    # {尝试的记录号: 它那条任务的预计用时或 None}：这一轮算挡路时长用（blocking_seconds），每条在跑的只算一次
         self.gap_fills = {}    # {(任务号, 台): 插空那一句}：这一轮封着组而插得进空的（gap_fill），起了记进尝试，内存放不下的写进排队原因
+        self.room_gap_fills = set()   # {(任务号, 台)}：gap_fills 里照内存那一支插进去的（挨着排头整片跑），起了尝试记 gap_fill_beside_whole
         self.whole_bookings = {}   # {(任务号, 台): 记账}：在等那台的整片在那台上的记账（gap_fill 算排头整片起来之后那台还剩多少）
         self.occupied = {}
+        running_tasks = {}   # {台: {任务号}}：此刻在跑的尝试（剪组里还在跑的那几条）
         for attempt, _ in scheduler.store.select("attempts", "state IN ('starting', 'running')"):
             self.occupied[attempt.get("host")] = self.occupied.get(attempt.get("host"), 0) + 1
+            running_tasks.setdefault(attempt.get("host"), set()).add(attempt.get("task_id"))
         self.wholes, self.fragments = {}, {}   # {台: {任务号}}
+        self.position = {task["id"]: index for index, (task, _) in enumerate(queued)}   # 排队的先后（queued 已照 queue_order 排好）
+        self.aged = {task["id"] for task, valid in queued if valid and scheduler.aged(task, now)}
         busy = scheduler.busy_cards()
         kept_hosts = {}
         for task, valid in queued:
-            if not valid or scheduler.aged(task, now):
+            # 满时限的照样算整片、封组等它（文件头 ②「满时限」；任务 7934 记 45.6 GiB：满两小时不算整片的话封着的组撤掉，碎片又把内存占满，它永远起不来）；
+            # 弄坏开关 aged-whole-not-counted 下照改前满时限的整条跳过（不算整片也不算碎片）
+            if not valid or (task["id"] in self.aged and lib.broken("aged-whole-not-counted", scheduler.environment)):
                 continue
             try:
                 snapshot = view.snapshot(bool(task.get("gpu")))
@@ -1500,7 +1934,12 @@ class Alternation:
                          and scheduler.host_limit(prediction, host, snapshot)[0] is not None]   # 余量量不到的台这一轮不派（文件头 ②「余量」），不算它在等那台
                 bookings = {host: int(scheduler.booked_at_cap(prediction, host, snapshot).memory_booked or 0) for host in hosts}
                 whole_on = [host for host in hosts if scheduler.is_whole(bookings[host], host, snapshot)]
-                chosen = self.waiting_hosts(task, whole_on, bookings, snapshot, busy)
+                # 只在放得下它的台上等腾空：记账不超过那台此刻能给的最大上限（host_limit）。booked_at_cap 把记账收到 host_limit 为止，
+                # 只有预测峰值本身比那台的 host_limit 大时记账才超过它，所以这一判只滤掉峰值本身就装不下的台：那台腾空了也起不来它，为它封组只挡住那台的碎片；
+                # 一台都放不下的不封组，预算那一判（budget_check）打回。弄坏开关 seal-host-that-cannot-fit 下放不下的台也挑、照样为它封组
+                fitting = whole_on if lib.broken("seal-host-that-cannot-fit", scheduler.environment) else [
+                    host for host in whole_on if bookings[host] <= int(scheduler.host_limit(prediction, host, snapshot)[0] or 0)]
+                chosen = self.waiting_hosts(task, fitting, bookings, snapshot, busy)
             except (OSError, ValueError, KeyError, subprocess.SubprocessError):
                 continue   # 判不了的这一条：place 那一步照样跳过它，这里不算它在等
             for host in hosts:
@@ -1514,21 +1953,32 @@ class Alternation:
         scheduler.whole_hosts = kept_hosts   # 不在队里了的、这一轮不算整片的不留
         for host, group in self.groups.items():
             if group["sealed"] and not self.wholes.get(host):
-                self.groups[host] = {"booked": 0, "sealed": False}   # 等着的整片不在了（起在别台、取消了）：开下一组
+                self.groups[host] = self.opened_group()   # 等着的整片不在了（起在别台、取消了）：开下一组
+            elif not lib.broken("fragment-group-never-drops", scheduler.environment):   # 弄坏开关：照改前跑完的照留
+                group["running"] = {task_id: booked for task_id, booked in group["running"].items() if task_id in running_tasks.get(host, set())}
+
+    @staticmethod
+    def opened_group(task_id=None, booked=0):
+        """新开的一组（文件头 ②「整片与碎片按台交替」的组的账）：给了 task_id 是从这一条碎片算起。"""
+        return {"booked": int(booked), "sealed": False, "running": {} if task_id is None else {task_id: int(booked)}}
 
     def group(self, host):
-        return self.groups.setdefault(host, {"booked": 0, "sealed": False})
+        return self.groups.setdefault(host, self.opened_group())
 
     def waiting_hosts(self, task, whole_on, bookings, snapshot, busy):
-        """这条整片在哪一台上等腾空（文件头 ②「整片与碎片按台交替」）：交至多一台的列表。whole_on 是它在上面算整片的那几台，bookings 是它在各台的记账。
-        要卡的只算空卡凑得够它要的张数的台（卡被占着时腾空内存也起不了它）；上一轮已在一台上封了组等它、那台还在 whole_on 里的接着等那台；
+        """这条整片在哪一台上等腾空（文件头 ②「整片与碎片按台交替」）：交至多一台的列表。whole_on 是它在上面算整片、记账又不超过那台此刻能给的最大上限（host_limit）的那几台，bookings 是它在各台的记账。
+        要卡的只算卡的总张数够它要的张数的台，不看此刻空几张（卡被占着的台照样封组：在跑的要卡任务跑完、卡空出来就起它；任务 7934）；
+        上一轮已在一台上封了组等它、那台还在 whole_on 里的接着等那台；
         别的挑此刻离放得下最近的那台：它的记账减那台照公式（room_by_the_formula）还剩的最小，一样小取排在前面的（candidate_hosts 的先后）。
-        弄坏开关 whole-seals-every-host 下照改前 whole_on 里每一台都算，card-waiting-whole-seals 下要卡的不看空卡。"""
+        弄坏开关 whole-seals-every-host 下照改前 whole_on 里每一台都算，card-whole-counts-free-cards-only 下要卡的照改前只算空卡凑得够张数的台。"""
         scheduler = self.scheduler
-        if task.get("gpu") and not lib.broken("card-waiting-whole-seals", scheduler.environment):
+        if task.get("gpu"):
             wanted = int(task.get("gpu_cards") or 1)
-            whole_on = [host for host in whole_on
-                        if sum(1 for card in snapshot.cards if card.side == host and (card.address, card.index) not in busy) >= wanted]
+            if lib.broken("card-whole-counts-free-cards-only", scheduler.environment):   # 弄坏开关：照改前只数空卡，卡一直有人占的台从不封组
+                whole_on = [host for host in whole_on
+                            if sum(1 for card in snapshot.cards if card.side == host and (card.address, card.index) not in busy) >= wanted]
+            else:
+                whole_on = [host for host in whole_on if sum(1 for card in snapshot.cards if card.side == host) >= wanted]
         if lib.broken("whole-seals-every-host", scheduler.environment) or not whole_on:
             return list(whole_on)
         previous = scheduler.whole_hosts.get(task["id"])
@@ -1542,14 +1992,20 @@ class Alternation:
         return [min(whole_on, key=lambda host: (shortfall(host), whole_on.index(host)))]
 
     def blocked(self, task, host, booked, snapshot):
-        """这一条（没满时限）此刻在这台上照交替起不起：起交空串，不起交排队原因（都带「在等这台腾空」）。判到下一条碎片放不下这一组、又有整片在等时封组；
+        """这一条此刻在这台上照交替起不起：起交空串，不起交排队原因（都带「在等这台腾空」）。判到下一条碎片放不下这一组、又有整片在等时封组；
         封着组而插得进空的（gap_fill）交空串、插空那一句记进 gap_fills，插不进的在封组那一句后面接上为什么。
-        整片：这一组已封、或起过碎片、或没有碎片在等就起，放不放得下只看内存、不等那台腾空（弄坏开关 whole-waits-for-empty-host 下照改前等服务起的都跑完）。"""
+        整片：这一组已封、或起过碎片、或没有碎片在等就起，放不放得下只看内存、不等那台腾空（弄坏开关 whole-waits-for-empty-host 下照改前等服务起的都跑完）。
+        满时限的（文件头 ②「满时限」）：在这台算整片的不受交替挡；算碎片的只让排队先后排在它前面的整片（排在它后面的整片不为它封组、不挡它）。"""
         scheduler = self.scheduler
         threshold = scheduler.whole_threshold(host, snapshot)
         group = self.group(host)
         human = scheduler.host_dispatch.human
         waiting = sorted(self.wholes.get(host, set()) - {task["id"]})
+        aged = task["id"] in self.aged
+        if aged and booked >= threshold:
+            return ""   # 满时限的整片：封了的组不挡它，也不等「先起一组碎片」
+        if aged:
+            waiting = [whole for whole in waiting if self.position.get(whole, math.inf) < self.position.get(task["id"], math.inf)]
         if booked >= threshold:
             if self.occupied.get(host, 0) and lib.broken("whole-waits-for-empty-host", scheduler.environment):
                 return (f"整片任务（这台上记 {human(booked)}，不小于可用上限的 {WHOLE_FRACTION:.0%}：{human(threshold)}）在等这台腾空："
@@ -1559,49 +2015,68 @@ class Alternation:
             return ""
         if group["sealed"] and not self.occupied.get(host, 0) and not lib.broken("sealed-group-held-when-drained", scheduler.environment):
             # 封了组、这台已腾空（服务在这台一条都没在跑）而整片仍没起（放不下）：等下去这台也只是空着，开下一组让碎片接着起
-            self.groups[host] = {"booked": 0, "sealed": False}
+            self.groups[host] = self.opened_group()
             group = self.groups[host]
         if not group["sealed"] and group["booked"] + booked > threshold and waiting:
             group["sealed"] = True   # 按队列先后装到再放这一条就超过界：封组，腾空之后先起整片
-        if group["sealed"]:
+        if group["sealed"] and (waiting or not aged):   # 满时限的碎片：封着组等的整片都排在它后面的，不挡它
             wholes = "、".join(map(str, waiting)) or "-"
-            fits_gap, note = self.gap_fill(task, host, wholes, waiting[0] if waiting else None, booked, snapshot)
+            aged_wholes = [whole for whole in waiting if whole in self.aged]
+            if aged_wholes and not lib.broken("aged-seal-gap-filled", scheduler.environment):
+                # 为满时限的整片封着的台一条都不插，等腾空起它（文件头 ②「满时限」；用户：「一个任务都排了两个小时了 还要有任务插队 明显不合理」）；弄坏开关下照改前照样插空
+                running = group["running"]
+                return (f"这台这一组碎片已装到 {human(group['booked'])}（界 {human(threshold)}；装过的照算，此刻还在跑的 {len(running)} 条记 {human(sum(running.values()))}）、"
+                        f"封组，在等这台腾空起整片任务 {wholes}；{AGED_SEAL_NO_GAP_TEXT}：整片任务 {'、'.join(map(str, aged_wholes))} 已排满时限"
+                        f"（{scheduler.aged_seconds / 3600:.1f} 小时），这台封着组一条都不插、等腾空起它")
+            fits_gap, note, beside_whole = self.gap_fill(task, host, wholes, waiting[0] if waiting else None, booked, snapshot)
             if fits_gap:   # 插空：不占排头整片要的那部分内存、或预计用时不超过挡路时长，交替不挡它，内存照常判（judge_placement）
                 self.gap_fills[(task["id"], host)] = note
+                if beside_whole:
+                    self.room_gap_fills.add((task["id"], host))
                 return ""
-            return (f"这台这一组碎片已装到 {human(group['booked'])}（界 {human(threshold)}）、封组，在等这台腾空起整片任务 {wholes}"
-                    + (f"；{note}" if note else ""))
+            running = group["running"]
+            return (f"这台这一组碎片已装到 {human(group['booked'])}（界 {human(threshold)}；装过的照算，此刻还在跑的 {len(running)} 条记 {human(sum(running.values()))}）、"
+                    f"封组，在等这台腾空起整片任务 {wholes}" + (f"；{note}" if note else ""))
         return ""
 
     def gap_fill(self, task, host, wholes, head, booked, snapshot):
-        """封了组的那台这一条插不插得进空（文件头 ②「整片与碎片按台交替」的插空）：交 (插得进, 那一句)。head 是在等这台的排头整片（任务号最小的那条），booked 是这一条在这台上的记账。
-        排头整片起来之后，照用户定的公式（room_by_the_formula：配置的总上限 − 余量 − 在跑的上限之和）这台减去排头的记账还放得下这一条的，不看时长就插得进；
-        会占排头那部分的，预计用时不是 None、不超过挡路时长（blocking_seconds）的才插得进。
-        弄坏开关 sealed-gap-not-backfilled 下一律插不进（不写那一句），sealed-gap-length-ignored 下有预计用时就插得进，gap-fill-room-ignored 下照改前一律看时长。"""
+        """封了组的那台这一条插不插得进空（文件头 ②「整片与碎片按台交替」的插空）：交 (插得进, 那一句, 是不是照内存那一支插进去的)。
+        head 是在等这台的排头整片（任务号最小的那条），booked 是这一条在这台上的记账。
+        排头整片在这台上照样空着的那一份（配置的总上限 − 余量 − 排头的记账 − 这台挨着整片插空在跑的上限之和，beside_whole_capped）放得下这一条的，不看时长就插得进，
+        第三样交 True（它挨着整片跑，起了尝试记 gap_fill_beside_whole）；会占排头那部分的，预计用时不是 None、不超过挡路时长（blocking_seconds）的才插得进。
+        弄坏开关 sealed-gap-not-backfilled 下一律插不进（不写那一句），sealed-gap-length-ignored 下有预计用时就插得进，gap-fill-room-ignored 下照改前一律看时长，
+        gap-fill-room-counts-all-running 下那一份照改前连封组之前起的碎片一起减（room_by_the_formula 减排头的记账）。"""
         scheduler = self.scheduler
         environment = scheduler.environment
         human = scheduler.host_dispatch.human
         if lib.broken("sealed-gap-not-backfilled", environment):
-            return False, ""
+            return False, "", False
         room_note = ""
         head_booked = self.whole_bookings.get((head, host)) if head is not None else None
-        room = scheduler.room_by_the_formula(host, snapshot) if head_booked is not None else None
-        if room is not None and not lib.broken("gap-fill-room-ignored", environment):
-            left = room - head_booked
+        margin = scheduler.host_margin(host, snapshot)[0] if head_booked is not None else None
+        if margin is not None and not lib.broken("gap-fill-room-ignored", environment):
+            if lib.broken("gap-fill-room-counts-all-running", environment):   # 弄坏开关：照改前减在跑的全部上限
+                left = scheduler.room_by_the_formula(host, snapshot) - head_booked
+                basis = "照配置的总上限减余量减在跑的上限之和"
+            else:
+                beside = scheduler.beside_whole_capped(host)
+                left = snapshot.total(host) - margin - head_booked - beside
+                basis = f"照配置的总上限减余量、再减挨着整片插空在跑的上限之和（{human(beside)}）"
             if int(booked or 0) <= left:
-                return True, (f"插空：这台封着组、为整片任务 {wholes} 腾空；排头整片任务 {head}（记 {human(head_booked)}）起来之后，照配置的总上限减余量减在跑的上限之和"
-                              f"这台还剩 {human(left)}，放得下这一条的 {human(int(booked or 0))}，不看预计用时")
-            room_note = f"；排头整片任务 {head}（记 {human(head_booked)}）起来之后这台照公式只剩 {human(max(left, 0))}，放不下这一条的 {human(int(booked or 0))}，要看预计用时"
+                return True, (f"插空：这台封着组、为整片任务 {wholes} 腾空；排头整片任务 {head}（记 {human(head_booked)}）起来之后，{basis}"
+                              f"这台还剩 {human(left)}，放得下这一条的 {human(int(booked or 0))}，不看预计用时"), True
+            room_note = (f"；排头整片任务 {head}（记 {human(head_booked)}）起来之后这台{basis}只剩 {human(max(left, 0))}，"
+                         f"放不下这一条的 {human(int(booked or 0))}，要看预计用时")
         estimate = scheduler.estimated_seconds(task)
         if estimate is None:
-            return False, f"没插空：这一条没有预计用时（同一条命令在服务里没跑成过，或按项估缺速率、估算没成）{room_note}"
+            return False, f"没插空：这一条没有预计用时（同一条命令在服务里没跑成过，或按项估缺速率、估算没成）{room_note}", False
         blocking, blocker = self.blocking_seconds(host)
         if blocking is None:
-            return False, f"没插空：服务在这台上此刻没有在跑的尝试{room_note}"
+            return False, f"没插空：服务在这台上此刻没有在跑的尝试{room_note}", False
         gap = f"挡路时长 {blocking:.1f} 秒（这台在跑的任务 {blocker} 还要跑这么久）"
         if estimate <= blocking or lib.broken("sealed-gap-length-ignored", environment):
-            return True, f"插空：这台封着组、为整片任务 {wholes} 腾空，这一条预计用时 {estimate:.1f} 秒，不超过{gap}{room_note}"
-        return False, f"没插空：这一条预计用时 {estimate:.1f} 秒，超过{gap}{room_note}"
+            return True, f"插空：这台封着组、为整片任务 {wholes} 腾空，这一条预计用时 {estimate:.1f} 秒，不超过{gap}{room_note}", False
+        return False, f"没插空：这一条预计用时 {estimate:.1f} 秒，超过{gap}{room_note}", False
 
     def blocking_seconds(self, host):
         """挡路时长（文件头 ②「整片与碎片按台交替」的插空）：服务在这台此刻在跑的尝试各自还要跑多久里最大的一个，交 (秒, 那一条的任务号)；一条都没有交 (None, None)。
@@ -1628,7 +2103,8 @@ class Alternation:
         return longest, blocker
 
     def started(self, host, task, booked, snapshot):
-        """这一轮在这台起了一条：数进在跑的；整片清零那台的组，碎片记进这一组（这一组再放它就超过界、又没整片在等的，开下一组从它算起）。"""
+        """这一轮在这台起了一条：数进在跑的；整片清零那台的组，碎片记进这一组、连同还在跑的那几条（这一组再放它就超过界、又没整片在等的，开下一组从它算起）；
+        封着组时起的（插空进去的、满时限而挡它的整片都排在它后面的）不进这一组，组照封着（弄坏开关 fragment-group-never-drops 下照改前记进账）。"""
         self.occupied[host] = self.occupied.get(host, 0) + 1
         for kind in (self.wholes, self.fragments):
             for ids in kind.values():
@@ -1636,13 +2112,15 @@ class Alternation:
         threshold = self.scheduler.whole_threshold(host, snapshot)
         group = self.group(host)
         if booked >= threshold:
-            self.groups[host] = {"booked": 0, "sealed": False}
+            self.groups[host] = self.opened_group()
         elif group["sealed"]:
-            group["booked"] += int(booked)   # 封着组时起的（满时限的不归交替管）：照记，组照封着
+            if lib.broken("fragment-group-never-drops", self.scheduler.environment):
+                group["booked"] += int(booked)   # 弄坏开关：照改前插空起的也加在封着的组上
         elif group["booked"] + booked > threshold:
-            self.groups[host] = {"booked": int(booked), "sealed": False}
+            self.groups[host] = self.opened_group(task["id"], booked)
         else:
             group["booked"] += int(booked)
+            group["running"][task["id"]] = int(booked)
 
 
 @dataclass
@@ -1658,6 +2136,7 @@ class Placement:
     waiting_for_card: bool = False
     why: str = ""
     gap_fill: str = ""         # 起的这一条是封着组插空进去的：插空那一句（Alternation.gap_fill），起的时候记进尝试
+    gap_fill_beside_whole: bool = False   # 照插空的内存那一支起的（挨着排头整片跑）：起的时候记进尝试，beside_whole_capped 照它数
 
 
 HEAD_STARTED = "started"                      # 派活这一轮判它能起，起了
@@ -1684,14 +2163,47 @@ class SuspectWindow:
     suspected: bool           # 这一段已报疑似卡住、还没结束
 
 
-def descendant_processes(root_process_id):
-    """root 的子孙进程号（照 /proc/<号>/stat 的父进程号一层层往下，不按名字找；读不到的那几个跳过）。"""
+@dataclass
+class IoWaitWindow:
+    """判卡住的一个 CPU 窗口里每一轮读到的 D 状态进程数（Scheduler.note_io_wait；文件头 ①「卡在 IO 上」）：时刻是 time.monotonic() 的钟。"""
+    window_started_at: float  # 这一个窗口开头的时刻（log_growth 记的那一个）：窗口换了从头记
+    polls: int                # 这个窗口里读了几轮
+    every_poll_blocked: bool  # 这个窗口里每一轮都读到了、都有进程在 D 状态
+    blocked_now: object       # 最近一轮读到的 D 状态进程数（int；读不到是 None）
+    blocked_since: object     # 从哪一刻起每一轮都有进程在 D 状态（float；跨窗口接着算，有一轮没有或读不到是 None；日志涨了整份删）
+
+
+@dataclass
+class CardLoadWindow:
+    """判卡住的一个 CPU 窗口里每一轮读到的卡上负载（Scheduler.note_card_load；文件头 ①「卡上有它的计算进程」）：时刻是 time.monotonic() 的钟。"""
+    window_started_at: float  # 这一个窗口开头的时刻（log_growth 记的那一个）：窗口换了从头记
+    polls: int                # 这个窗口里读了几轮
+    every_poll_busy: bool     # 这个窗口里每一轮卡上都有它的计算负载（量不到也算有）
+    quiet_since: object       # 从哪一刻起日志与 CPU 都不涨而卡上一直有它的负载（float）：上一个窗口照这一条免停（spared）才接着算，有一轮没有负载是 None；日志涨了整份删
+    spared: bool              # 这个窗口满了照这一条免停（下一个窗口接着算 quiet_since）
+    utilization_busy: bool    # 这个窗口里有一轮读到它的卡利用率不为 0
+    utilization_unread: bool  # 这个窗口里有一轮卡上有它的负载而利用率读不到（照有负载就免停判，依据写「利用率读不到」）
+    utilization_now: object   # 最近一轮读到的利用率（int，百分数；读不到或那一轮卡上没有它的负载是 None）
+
+
+def card_utilization_text(window):
+    """CardLoadWindow 里卡的利用率给人看的那半句（判卡住的说明与 gpu-busy-quiet 的依据）：读到过不为 0 的写最近一轮的数，有一轮读不到的写「利用率读不到」。"""
+    if window.utilization_busy:
+        latest = f"最近一轮 {window.utilization_now}%" if window.utilization_now is not None else "最近一轮读不到"
+        return f"这个窗口里卡的利用率读到过不为 0，{latest}"
+    if window.utilization_unread:
+        return "利用率读不到，照卡上有它的计算进程算在算"
+    return "卡的利用率每一轮都是 0"
+
+
+def descendant_processes(root_process_id, directory="/proc"):
+    """root 的子孙进程号（照 <directory>/<号>/stat 的父进程号一层层往下，不按名字找；读不到的那几个跳过）。directory 只在自证里换（TASK_SERVER_SELFTEST_PROC_ROOT）。"""
     children = {}
-    for name in os.listdir("/proc"):
+    for name in os.listdir(directory):
         if not name.isdigit():
             continue
         try:
-            with open(f"/proc/{name}/stat", encoding="utf-8", errors="replace") as handle:
+            with open(os.path.join(directory, name, "stat"), encoding="utf-8", errors="replace") as handle:
                 parent = int(handle.read().rsplit(")", 1)[1].split()[1])
         except (OSError, IndexError, ValueError):
             continue
@@ -1712,6 +2224,28 @@ def process_is_zombie(process_id):
             return handle.read().rsplit(")", 1)[1].split()[0] == "Z"
     except (OSError, IndexError):
         return False
+
+
+def process_run_state(process_id, directory="/proc"):
+    """<directory>/<号>/stat 的状态字段（R、S、D、Z 这类一个字母；进程名里有右括号也照最后一个右括号切）；读不到交空串。"""
+    try:
+        with open(os.path.join(directory, str(process_id), "stat"), encoding="utf-8", errors="replace") as handle:
+            return handle.read().rsplit(")", 1)[1].split()[0]
+    except (OSError, IndexError):
+        return ""
+
+
+def io_pressure_text(path=IO_PRESSURE_PATH):
+    """本机此刻 /proc/pressure/io 的 some avg60（「some avg60=12.34」）；文件不在、读不了、认不出交「/proc/pressure/io 读不到」。"""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                found = re.match(r"^some .*\bavg60=([0-9.]+)", line)
+                if found:
+                    return f"some avg60={found.group(1)}"
+    except OSError:
+        pass
+    return f"{path} 读不到"
 
 
 # ── GPU 的认法 ──
@@ -1804,6 +2338,44 @@ def mutation_gate_uses_gpu(command):
 
 def shell_path(directory, path):
     return path if os.path.isabs(path) else os.path.normpath(os.path.join(directory or lib.REPOSITORY_ROOT, path))
+
+
+def shell_script_word_indexes(command):
+    """命令里 shell 的 -c 脚本那一个词的下标（find_outside_shared_path 照 shell 词读它）：命令词名（basename）在 SHELL_COMMAND_NAMES 里的词后面，
+    选项（- 或 + 起头）里有一个带 c 的短选项串（-c、-ec、-lc）的，选项（与收尾的 --）之后头一个词；SHELL_OPTIONS_WITH_VALUE 后面那个词是选项的值，跳过。
+    套在包装里的（env、timeout、临时 prune-server 的 -- 后面）照认：每个命令词名对得上的词都往后看。"""
+    indexes = set()
+    for index, word in enumerate(command):
+        if os.path.basename(word) not in SHELL_COMMAND_NAMES:
+            continue
+        cursor, script = index + 1, False
+        while cursor < len(command) and command[cursor][:1] in ("-", "+") and command[cursor] != "--":
+            option = command[cursor]
+            if option in SHELL_OPTIONS_WITH_VALUE:
+                cursor += 1
+            elif not option.startswith("--") and "c" in option[1:]:
+                script = True
+            cursor += 1
+        if cursor < len(command) and command[cursor] == "--":
+            cursor += 1
+        if script and cursor < len(command):
+            indexes.add(cursor)
+    return indexes
+
+
+def shell_word_paths(script, pattern=SHELL_WORD_PATH):
+    """shell 脚本（-c 那一个词）里的绝对路径（find_outside_shared_path）：照 shlex（posix）切成 shell 词，每个词里照 SHELL_WORD_PATH 取：以 / 起头的整个词、
+    「名字=绝对路径」「--选项=绝对路径」的值，与挨着 ;|&<>( 写、没隔空白的下一个词（cmd;/x、>/x、(/x）。引号里的整段是一个词（"（接的是 /）" 里的 / 跟在空白后面，不算），
+    词中间夹着的 / 不算；${X:?}/…、$(pwd)/… 这类展开之后的尾巴不算（弄坏开关 expansion-tail-as-path 下调用方给 pattern=SHELL_WORD_PATH_WITH_EXPANSION_TAILS，尾巴也取）。
+    # 不当注释（注释里写的路径照认）。切不开的（引号不配对）照 QUOTED_WORD_PATH 按子串认：多拒不漏。"""
+    try:
+        lexer = shlex.shlex(script, posix=True)
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        words = list(lexer)
+    except ValueError:
+        return QUOTED_WORD_PATH.findall(script)
+    return [path for word in words for path in pattern.findall(word)]
 
 
 def script_uses_gpu(command):
@@ -1952,6 +2524,8 @@ class Scheduler:
         self.start_uncertain_grace_seconds = FAST_START_UNCERTAIN_GRACE_SECONDS if speedy else START_UNCERTAIN_GRACE_SECONDS
         self.scene_keep_seconds = FAST_SCENE_KEEP_AFTER_COLLECT_SECONDS if speedy else SCENE_KEEP_AFTER_COLLECT_SECONDS
         self.build_disk_predictions = {}   # {任务号: 编译目录占盘的预测（字节）}：与内存预测一样每条在排任务只算一次（文件头 ②「编译目录占盘」）
+        # 记下结局时删编译目录（remove_finished_build_directories）与取消之后删产物（remove_cancelled_artifacts）共用：同一份目录不两边一齐删（文件头「接口」的取消）
+        self.build_removal_lock = threading.RLock()
         self.starved_seconds = FAST_STARVED_SECONDS if speedy else STARVED_ROUNDS * self.tick_seconds
         self.aged_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_AGED_SECONDS", environment) or AGED_WAIT_SECONDS)
         self.placement_paused = lib.selftest_override("TASK_SERVER_SELFTEST_PLACEMENT_PAUSED", environment)
@@ -1959,15 +2533,31 @@ class Scheduler:
         self.progress_seconds = FAST_PROGRESS_STALL_SECONDS if speedy else PROGRESS_STALL_SECONDS
         self.stall_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_STALL_SECONDS", environment) or STALL_SECONDS)
         self.stall_grace_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS", environment) or STALL_GRACE_SECONDS)
-        self.log_growth = {}   # {尝试号: (日志字节数, 上一次看到它变的时刻, 这一个 CPU 窗口开头的时刻, 那时的 CPU, 窗口是不是因 CPU 在涨或读不到而接着开的)}（判卡住）
+        # {尝试号: (日志字节数, 上一次看到它变的时刻, 这一个 CPU 窗口开头的时刻, 那时的 CPU, 上一个窗口满了为什么没停：SPARED_* 之一，没判过或日志涨了是空串)}（判卡住）
+        self.log_growth = {}
         self.log_offsets = {}   # 第二台的尝试：{尝试号: (日志读到哪, 算在涨的字节数, 最近的 usage_usec)}
+        self.peer_memory = {}   # 第二台的尝试：{尝试号: (最近一行 MULTI_HOST_RUN_PEER_MEMORY 的此刻内存或 None, 读到过的峰值或 None)}（PeerMachine.memory_now）
+        self.peer_io_wait = {}   # 第二台的尝试：{尝试号: 上一回之后读到的几行 MULTI_HOST_RUN_PEER_IO_WAIT 里最少的 blocked，有一行 read=no 是 None}（PeerMachine.io_blocked）
+        self.io_waits = {}   # 判卡住：{尝试号: IoWaitWindow}（文件头 ①「卡在 IO 上」；日志涨了就删）
+        self.card_loads = {}   # 判卡住：{尝试号: CardLoadWindow}（文件头 ①「卡上有它的计算进程」；日志涨了就删）
+        self.proc_root = lib.selftest_override("TASK_SERVER_SELFTEST_PROC_ROOT", environment) or "/proc"   # 本机读进程状态的目录（只在自证里换成假的）
         self.cpu_windows = {}   # 判疑似卡住：{尝试号: SuspectWindow}（文件头 ①「疑似卡住」）
         self.suspect_reported = {}   # {尝试号: 报给提交它的会话的那一段的段号}：一段只报一次
         self.suspect_lock = threading.Lock()
-        # 要处置的提醒（文件头 ①「要处置的提醒」）：阈值的头一档；报过的档在内存里（同 suspect_reported，服务重启后再报一次）；分片父任务推不动的现状由 drive_sharded_parents 记
+        # 要处置的提醒（文件头 ①「要处置的提醒」）：阈值的头一档；报过的档记进库里任务的行、内存里另留一份（attention_reported）；分片父任务推不动的现状由 drive_sharded_parents 记
         self.queue_attention_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS", environment) or QUEUE_ATTENTION_MINUTES * 60)
         self.overrun_attention_factor = float(lib.selftest_override("TASK_SERVER_SELFTEST_OVERRUN_ATTENTION_FACTOR", environment) or OVERRUN_ATTENTION_FACTOR)
-        self.attention_reported = {}   # {(任务号, 种类): 报给提交它的会话的最高档}：同一种同一档只报一次
+        self.quiet_attention_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_QUIET_ATTENTION_SECONDS", environment) or QUIET_ATTENTION_MINUTES * 60)
+        self.io_wait_attention_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_IO_WAIT_ATTENTION_SECONDS", environment) or IO_WAIT_ATTENTION_MINUTES * 60)
+        self.gpu_busy_quiet_attention_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_GPU_BUSY_QUIET_ATTENTION_SECONDS", environment)
+                                                      or GPU_BUSY_QUIET_ATTENTION_MINUTES * 60)
+        self.long_run_attention_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_LONG_RUN_ATTENTION_SECONDS", environment) or LONG_RUN_ATTENTION_SECONDS)
+        # {任务号: oversized-budget 那一项}：排队那一刻判出记账不小于某一台整片界的（budget_check），attention_of_record 照它报；收尾时删（forget_prediction），
+        # 只在内存里：服务重启后下一轮排队照现算的预测再判一次，报过的档在库里（attention_reported），不重发
+        self.budget_notices = {}
+        self.attention_reported = {}   # {(任务号, 种类): 报给提交它的会话的最高档}：同一种同一档只报一次；库里那一份（任务行的 attention_reported）读过的也并进来
+        self.attention_held = set()    # {(任务号, 种类, 档)}：说的是子任务、发消息那一路头一轮先压着的提醒（push_attention；发了或发失败就删）
+        self.attention_histories = {}  # {(任务号, 种类): [{tier, repush, at, basis}…]}：报过的那几回（库里任务行的 attention_history 另存一份；attention_history_of 读）
         self.workspace_write_checks = {}   # {任务号: workspace-write-interrupted 那一项或 None}：结了局的改工作区命令只核一次（workspace_write_item）
         self.attention_lock = threading.Lock()
         self.advance_failures = {}   # {分片父任务号: {"episode": 第几回开始推不动, "why": 最近一次的错, "count": 这一回连着推不动几轮}}：推通了就删
@@ -1984,8 +2574,8 @@ class Scheduler:
         self.kept_allow_session = ""   # 只在弄坏开关 resume-keeps-allowed-session 下用：上一次 resume 时放行的会话
         self.predictions = {}   # {任务号: (算它时的 next_cap, 预测)}：每条在排任务的内存预测只算一次（文件头 ②「预测每条只算一次」）
         self.pin_unreadable_reasons = {}   # {任务号: 钉值读不到的那一句}：pinned_prediction 记、place 照它记 run-condition-unmet（文件头 ②「内存」的钉值）
-        self.fragment_groups = {}   # {台: {"booked": 字节, "sealed": 封了没有}}：每台这一组碎片的账（文件头 ②「整片与碎片按台交替」；Alternation）
-        self.whole_hosts = {}   # {任务号: 台}：没满时限的整片在哪一台上等腾空（一条只一台；Alternation.waiting_hosts），跨轮留着、不在队里了就删
+        self.fragment_groups = {}   # {台: Alternation.opened_group 建的那一份}：每台这一组碎片的账（文件头 ②「整片与碎片按台交替」；Alternation）
+        self.whole_hosts = {}   # {任务号: 台}：整片（满时限的也算）在哪一台上等腾空（一条只一台；Alternation.waiting_hosts），跨轮留着、不在队里了就删
         self.prediction_lock = threading.Lock()   # 排队线程与弄坏开关 health-judges-head 下 /health 的另判排头都取预测：同一条不算两遍
         self.view_numbers = itertools.count(1)   # PassView 的编号（自证的读数记录里分各轮）
         world = lib.selftest_override("TASK_SERVER_SELFTEST_WORLD", environment)
@@ -2024,6 +2614,21 @@ class Scheduler:
         self.peer_alerted = ""
         self.peer_status_lock = threading.Lock()
         self.quarantined_cards = {}   # {"<台>:<序号>"（清场那一行坏卡清单里的一项，attempt 的 faulty_cards）: 停用起点}：清场判出坏的卡，CARD_QUARANTINE_SECONDS 秒里不派（cards_in_service）
+        # 发消息给会话（文件头 ⑥）：一个后台线程；结局记下时 notify_finished 把任务号放进 inbox_pending、叫醒它
+        self.inbox_round_seconds = FAST_INBOX_ROUND_SECONDS if speedy else INBOX_ROUND_SECONDS
+        self.peer_unavailable_notify_seconds = FAST_PEER_UNAVAILABLE_NOTIFY_SECONDS if speedy else PEER_UNAVAILABLE_NOTIFY_SECONDS
+        self.unclaimed_warning_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_UNCLAIMED_WARNING_SECONDS", environment) or UNCLAIMED_WARNING_MINUTES * 60)
+        self.confirm_timeout_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_CONFIRM_TIMEOUT_SECONDS", environment) or CONFIRM_TIMEOUT_SECONDS)
+        self.run_limit_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS", environment) or RUN_LIMIT_SECONDS)
+        self.anomaly_repush_seconds = float(lib.selftest_override("TASK_SERVER_SELFTEST_ANOMALY_REPUSH_SECONDS", environment) or ANOMALY_REPUSH_SECONDS)
+        self.unclaimed_repushed = {}   # {任务号: 结局没人取再推到第几回}（repush_unclaimed_outcomes；只在内存里，服务重启后照时长重算、再推一回）
+        self.inbox_sockets = {}        # 这一轮发消息照会话号找到的收件 socket：{会话号: (路径, 找不到时的那一句)}（inbox_socket_of；每一轮开头清掉）
+        self.inbox_pending = set()   # 记下了结局、还没发给会话的任务号
+        self.inbox_failed = set()    # 发不出去过的事件（("outcome", 号)、(号, 种类, 档)、("suspect", 尝试号, 段号)）：不重试到死，写过告警就不再发
+        self.health_notified = {}    # {服务健康的种类: 已发过的会话}：同一样只发一次，好了（这一轮不再查出）就删，再坏再发
+        self.inbox_lock = threading.Lock()
+        self.inbox_event = threading.Event()
+        self.inbox_thread = threading.Thread(target=self.inbox_loop, name="task-server-inbox", daemon=True)
 
     # ── 记录 ──
     def operation(self, action, task_id, session, process_id=0, note=""):
@@ -2183,7 +2788,10 @@ class Scheduler:
         self.wake_event.set()
 
     def notify_finished(self, task_id):
-        """记下结局之后叫醒在等这条任务的 wait（文件头「通知」）；弄坏开关 wait-notify-skipped 时不叫，wait 只能等兜底那一轮。"""
+        """记下结局之后叫醒在等这条任务的 wait（文件头「通知」）与发消息那一路（文件头 ⑥：任务号进 inbox_pending）；弄坏开关 wait-notify-skipped 时不叫 wait，wait 只能等兜底那一轮。"""
+        with self.inbox_lock:
+            self.inbox_pending.add(task_id)
+        self.inbox_event.set()
         if lib.broken("wait-notify-skipped", self.environment):
             return
         for listener in list(self.finished_listeners):
@@ -2196,6 +2804,7 @@ class Scheduler:
             try:
                 if not (self.pause is not None and lib.broken("pause-halts-reconcile", self.environment)):   # 暂停着对账照做（在跑的照跑到结局）；弄坏开关下对账也停
                     self.reconcile()
+                self.expire_unconfirmed()   # 交了满时限没确认的取消（文件头 ⑦）
                 self.place_queued()
                 self.sweep_scenes()   # 取走结局满一段时间的现场删掉（task_server_lib.py 文件头「现场」）
                 if not lib.broken("health-judges-head", self.environment):
@@ -2209,11 +2818,12 @@ class Scheduler:
     def stop(self):
         self.stopping.set()
         self.wake()
+        self.inbox_event.set()
         if lib.broken("probe-children-left", self.environment):   # 弄坏开关：照改前只等排队线程、不管自己起的子进程
             self.thread.join(timeout=30)
-        else:   # 文件头 ③「停服务」：两个线程合计至多等 STOP_JOIN_SECONDS，再停还在的子进程
+        else:   # 文件头 ③「停服务」：三个线程合计至多等 STOP_JOIN_SECONDS，再停还在的子进程
             deadline = time.monotonic() + STOP_JOIN_SECONDS
-            for thread in (self.thread, self.nfs_thread):
+            for thread in (self.thread, self.nfs_thread, self.inbox_thread):
                 if thread.is_alive():
                     thread.join(timeout=max(0.0, deadline - time.monotonic()))
         if lib.broken("no-detach", self.environment):
@@ -2258,6 +2868,8 @@ class Scheduler:
                 probes = {entry["root"]: entry.get("probe") for entry in self.nfs.get("roots", [])}
             for entry in report["roots"]:
                 entry["probe"] = probes.get(entry["root"], entry.get("probe"))
+            for slow in report.get("slow") or []:   # 第二台一次超时、复查回了（task_server_lib.py 文件头「NFS 共享」的挂载）：只记进服务日志，不推提醒、照派第二台
+                say(f"  · 第二台慢（超时、复查通了）：{slow}")
             unmounted = next((entry for entry in report["roots"] if entry.get("mount") != lib.NFS_PASSED), None)
             self.mount_problem = (f"第二台没挂上共享根 {unmounted['root']}（{unmounted['mount']}；{lib.NFS_README}）" if unmounted else "")
             with self.nfs_lock:
@@ -2332,7 +2944,7 @@ class Scheduler:
                 return
             self.peer_alerted = kind or why
         self.alert("peer-unavailable", task_id, f"第二台此刻用不了：{why}；派得到第二台的任务这时只派本机",
-                   f"照那一句修第二台（连法、多机配置的双机开关、NFS 挂载照 {lib.NFS_README}），修好之后服务下一轮自己认回；python3 task-server/control watch 盯着")
+                   f"照那一句修第二台（连法、多机配置的双机开关、NFS 挂载照 {lib.NFS_README}），修好之后服务下一轮自己认回；用不了满 {self.peer_unavailable_notify_seconds:.0f} 秒服务发消息给有任务在排、在跑的会话")
 
     def note_peer_run_failure(self, task, attempt):
         """那一趟没跑成（peer-run-failed：树建不成、ssh 被重置、那边的准备没过）：每一次写一条告警 peer-unavailable，/health 的 peer 一栏记最近一次。"""
@@ -2471,56 +3083,113 @@ class Scheduler:
     def check_stall(self, task, attempt):
         """日志距上一次增长满 stall_seconds、这段时间 CPU 也几乎没涨就停掉这一条（文件头「卡住」）。两台同一段：日志里除起法那一层的进度行之外的字节数（log_content），
         CPU 照那一台的接口读（Machine.cpu_usec：本机读尝试目录的 cpu_usec，第二台读日志里最近一行 MULTI_HOST_RUN_PEER_CPU 的 usage_usec）。
-        这一回没停它的，再判疑似卡住（check_suspect：只通知、不停）。"""
-        if attempt.get("stalled"):
+        这一回没停它的，再判疑似卡住（check_suspect：只通知、不停）。要卡的这一轮读一次卡上有没有它的负载（card_load），两处共用。
+        这些之前先判跑满两小时（judge_run_limit），停了的不再判卡住。"""
+        if attempt.get("stalled") or attempt.get("over_limit"):
+            return
+        if self.judge_run_limit(task, attempt):
             return
         elapsed = time.time() - float(attempt.get("started_at") or time.time())
         if elapsed < self.stall_grace_seconds and not lib.broken("stall-grace-skipped", self.environment):
             self.log_growth.pop(attempt["id"], None)   # 宽限里不判、不量：宽限过了从那一刻起量窗口
             self.cpu_windows.pop(attempt["id"], None)
+            self.io_waits.pop(attempt["id"], None)
+            self.card_loads.pop(attempt["id"], None)
             self.selftest_read(f"stall-grace task={task['id']} attempt={attempt['number']} elapsed={elapsed:.3f}")   # 自证：宽限里判过一次（stall-waits-for-grace 照它放行）
             return
         size = self.log_content(attempt)
         now = time.monotonic()
         cpu = self.machines[attempt["host"]].cpu_usec(attempt)
-        if not self.judge_stall_stop(task, attempt, size, cpu, now):
-            self.check_suspect(task, attempt, cpu, now)
+        card_busy = self.card_load(attempt) if task.get("gpu") else None   # 不要卡的不读卡
+        if not self.judge_stall_stop(task, attempt, size, cpu, now, card_busy):
+            self.check_suspect(task, attempt, cpu, now, card_busy)
 
-    def judge_stall_stop(self, task, attempt, size, cpu, now):
-        """文件头 ①「卡住」那两条停的规矩：日志与 CPU 都满窗口不涨、远超记录用时而日志满窗口不涨；停了交 True。"""
+    def judge_stall_stop(self, task, attempt, size, cpu, now, card_busy=None):
+        """文件头 ①「卡住」那几条停的规矩：日志与 CPU 都满窗口不涨、远超记录用时而日志满窗口不涨、日志满窗口不涨而此刻内存贴着上限（CPU 在涨也停）；停了交 True。
+        停的那一刻内存此刻或峰值到了上限的 STALL_AT_CAP_FRACTION 的记 memory-cap-hit、照重试规矩重排（顶在上限上卡住）。内存照那一台的接口读（Machine.memory_now）。
+        日志与 CPU 都满窗口不涨、而这个窗口里每一轮都有进程在 D 状态的不停（卡在 IO 上；note_io_wait 记，D 状态照那一台的接口读 Machine.io_blocked）。
+        日志与 CPU 都满窗口不涨、这一次尝试分到了卡、而这个窗口里每一轮卡上都有它的计算负载、卡的利用率有一轮不为 0 或读不到的不停（卡上有它的计算进程；
+        card_busy 是 check_stall 这一轮读的 card_load，不要卡的是 None；利用率照那一台的接口读 Machine.card_utilization；note_card_load 记）。
+        每一轮卡上都有它的负载而利用率每一轮都读到 0 的（占着卡不干活），「CPU 在涨」的门槛是 CARD_IDLE_STALL_CPU_CORES，不是 STALL_CPU_CORES。"""
         if lib.broken("stall-ignored", self.environment):
             return False
         seen = self.log_growth.get(attempt["id"])
         if seen is None:
             # 头一回量（服务刚起来对账、或宽限刚过）：日志上一次涨的时刻取日志文件的修改时刻，不当成此刻（服务重启不把「日志多久没涨」清零）；
             # CPU 的窗口照旧从此刻起量（卡住判法不变）。读不到修改时刻、弄坏开关 stall-clock-reset-on-restart 下取此刻
-            self.log_growth[attempt["id"]] = (size, self.log_changed_at(attempt, now), now, cpu, False)
+            self.log_growth[attempt["id"]] = (size, self.log_changed_at(attempt, now), now, cpu, "")
+            self.io_waits.pop(attempt["id"], None)
+            self.card_loads.pop(attempt["id"], None)
             return False
         if seen[0] != size:
-            self.log_growth[attempt["id"]] = (size, now, now, cpu, False)
+            self.log_growth[attempt["id"]] = (size, now, now, cpu, "")
+            self.io_waits.pop(attempt["id"], None)   # 日志涨了：卡在 IO 上那一段从头算
+            self.card_loads.pop(attempt["id"], None)   # 卡上有它的计算进程那一段同样从头算
             return False
+        self.note_io_wait(attempt, seen[2], now)   # 日志没涨的每一轮读一次 D 状态（文件头 ①「卡在 IO 上」）
+        if task.get("gpu") and attempt.get("card"):   # 分到了卡的：日志没涨的每一轮记一次卡上有没有它的负载与卡的利用率（文件头 ①「卡上有它的计算进程」）
+            utilization = self.machines[attempt["host"]].card_utilization(attempt) if card_busy else None
+            self.note_card_load(attempt, seen[2], bool(card_busy), utilization)
         if now - seen[2] < self.stall_seconds:
             return False
         estimate = self.estimated_seconds(task)
         elapsed = time.time() - float(attempt.get("started_at") or time.time())
         # 用户：「一条任务跑得远超记录用时（例如超过五倍）而日志又满 10 分钟不涨，就停掉、打回」：这时不看 CPU（占着 CPU 的死循环也停）
         overran = bool(estimate) and elapsed > OVERRUN_STOP_FACTOR * estimate and not lib.broken("overrun-not-stopped", self.environment)
-        if not overran and (seen[3] is None or cpu is None) and not lib.broken("cpu-unread-counted-as-idle", self.environment):
+        # 此刻贴着上限（任务 7723：上限 6144M，memory.current 6442393600、日志 37702 秒没涨，CPU 平均 2.526 核在回收里打转、跑了 37775 秒）：CPU 在涨、读不到都不算在算，
+        # 往下走顶在上限上卡住那一支（记 memory-cap-hit、放大重排）。弄坏开关 at-cap-busy-cpu-kept-running 下不认，at-cap-fraction-ignored 下读得到就算贴着
+        current, peak = self.machines[attempt["host"]].memory_now(attempt)
+        cap = int(attempt.get("memory_cap") or 0)
+        pinned_at_cap = (current is not None and cap > 0 and not lib.broken("at-cap-busy-cpu-kept-running", self.environment)
+                         and (current >= STALL_AT_CAP_FRACTION * cap or lib.broken("at-cap-fraction-ignored", self.environment)))
+        if not overran and not pinned_at_cap and (seen[3] is None or cpu is None) and not lib.broken("cpu-unread-counted-as-idle", self.environment):
             # 窗口开头或此刻读不到 CPU（刚起、第二台那一趟还在起、换上读法之前起的尝试没有 cpu_usec）：读不到不等于不涨，不停，从此刻再看一个窗口
-            self.log_growth[attempt["id"]] = (size, seen[1], now, cpu, True)
+            self.log_growth[attempt["id"]] = (size, seen[1], now, cpu, SPARED_CPU_UNREAD)
             return False
-        if (not overran and cpu is not None and seen[3] is not None and (cpu - seen[3]) / 1e6 / (now - seen[2]) >= STALL_CPU_CORES
+        cores = (cpu - seen[3]) / 1e6 / (now - seen[2]) if cpu is not None and seen[3] is not None else None
+        loaded = self.card_loads.get(attempt["id"])
+        loaded = loaded if loaded is not None and loaded.window_started_at == seen[2] and loaded.polls > 0 else None
+        # 卡上有它的负载而这个窗口里卡的利用率一轮都没读到不为 0（读到的都是 0）：卡没在干活，不算 GPU 在算（文件头 ①「卡上有它的计算进程」）；
+        # 弄坏开关 card-presence-counts-as-busy 下不看利用率，卡上有它的进程就算在算
+        card_idle = (loaded is not None and loaded.every_poll_busy and not loaded.utilization_busy and not loaded.utilization_unread
+                     and not lib.broken("card-presence-counts-as-busy", self.environment))
+        # 占着卡不干活的，CPU 门槛提到 CARD_IDLE_STALL_CPU_CORES（CPU 上轮询死等的照停）；弄坏开关 card-idle-stall-threshold-ignored 下照不分卡的门槛
+        threshold = CARD_IDLE_STALL_CPU_CORES if card_idle and not lib.broken("card-idle-stall-threshold-ignored", self.environment) else STALL_CPU_CORES
+        if (not overran and not pinned_at_cap and cores is not None and cores >= threshold
                 and not lib.broken("cpu-ignored-for-stall", self.environment)):
-            self.log_growth[attempt["id"]] = (size, seen[1], now, cpu, True)   # 日志不涨而 CPU 在涨：在算，不停，从此刻再看一个窗口
+            if card_idle:
+                say(f"  · 任务 {task['id']} 第 {attempt['number']} 次尝试的日志 {now - seen[1]:.0f} 秒没涨、卡 {attempt.get('card')} 的利用率这 {loaded.polls} 轮都是 0，"
+                    f"而命令自己的 CPU 这 {now - seen[2]:.0f} 秒平均 {cores:.2f} 个核（不少于 {CARD_IDLE_STALL_CPU_CORES:g} 个核）：在 CPU 上算，不停，再看一个窗口")
+            self.log_growth[attempt["id"]] = (size, seen[1], now, cpu, SPARED_CPU_BUSY)   # 日志不涨而 CPU 在涨：在算，不停，从此刻再看一个窗口
+            return False
+        waited = self.io_waits.get(attempt["id"])
+        if (not overran and not pinned_at_cap and waited is not None and waited.polls > 0 and waited.every_poll_blocked
+                and not lib.broken("io-wait-ignored", self.environment)):
+            # 日志与 CPU 都不涨而这个窗口每一轮都有进程在 D 状态：在等盘或 NFS，不判 stalled、不停，从此刻再看一个窗口（满 io_wait_attention_seconds 由 io_wait_items 报 io-wait）
+            say(f"  · 任务 {task['id']} 第 {attempt['number']} 次尝试的日志 {now - seen[1]:.0f} 秒没涨、CPU 这 {now - seen[2]:.0f} 秒也几乎没涨，"
+                f"而这 {waited.polls} 轮每一轮都有进程在 D 状态（最近一轮 {waited.blocked_now} 个）：在等 IO，不停，再看一个窗口")
+            self.log_growth[attempt["id"]] = (size, seen[1], now, cpu, SPARED_IO_WAIT)
+            return False
+        if (not overran and not pinned_at_cap and loaded is not None and loaded.every_poll_busy and not card_idle
+                and not lib.broken("stall-card-load-ignored", self.environment)):
+            # 日志与 CPU 都不涨而这个窗口每一轮卡上都有它的计算负载、卡的利用率有一轮不为 0 或读不到：GPU 在算，不判 stalled、不停，从此刻再看一个窗口
+            # （quiet_since 记这样免停从哪一刻起，满 gpu_busy_quiet_attention_seconds 由 gpu_busy_quiet_items 报 gpu-busy-quiet）
+            self.card_loads[attempt["id"]] = dataclasses.replace(loaded, quiet_since=seen[2] if loaded.quiet_since is None else loaded.quiet_since, spared=True)
+            say(f"  · 任务 {task['id']} 第 {attempt['number']} 次尝试的日志 {now - seen[1]:.0f} 秒没涨、CPU 这 {now - seen[2]:.0f} 秒也几乎没涨，"
+                f"而这 {loaded.polls} 轮每一轮卡 {attempt.get('card')} 上都有它的计算进程（{card_utilization_text(loaded)}）：GPU 在算，不停，再看一个窗口")
+            self.log_growth[attempt["id"]] = (size, seen[1], now, cpu, SPARED_CARD_LOAD)
             return False
         attempt["stalled"] = True
         attempt["stalled_after"] = round(now - seen[1], 3)
-        peak, cap = self.scope_memory_peak(attempt), int(attempt.get("memory_cap") or 0)
-        if peak is not None and cap and peak >= STALL_AT_CAP_FRACTION * cap and not lib.broken("stalled-at-cap-not-retried", self.environment):
+        peak_at_cap = peak is not None and cap > 0 and peak >= STALL_AT_CAP_FRACTION * cap
+        if (pinned_at_cap or peak_at_cap) and not lib.broken("stalled-at-cap-not-retried", self.environment):
             # 顶在上限上卡在回收里：不记 stalled，停掉之后照撞上限办（finish_attempt 记 memory-cap-hit、照重试规矩乘 1.5 重排）
             attempt["stalled_at_cap"] = True
-            attempt["stall_note"] = (f"顶在上限上卡住：内存峰值 {lib.mebibytes_text(peak)}、上限 {attempt.get('memory_cap_text') or lib.mebibytes_text(cap)}"
-                                     f"（不低于 {STALL_AT_CAP_FRACTION:.0%}），日志 {now - seen[1]:.0f} 秒没涨")
+            measured = "、".join(text for text in (f"此刻内存 {lib.mebibytes_text(current)}" if current is not None else "",
+                                                   f"内存峰值 {lib.mebibytes_text(peak)}" if peak is not None else "") if text)
+            busy = f"，CPU 这 {now - seen[2]:.0f} 秒平均 {cores:.2f} 个核（在回收里打转，不算在算）" if pinned_at_cap and cores is not None and cores >= STALL_CPU_CORES else ""
+            attempt["stall_note"] = (f"顶在上限上卡住：{measured}、上限 {attempt.get('memory_cap_text') or lib.mebibytes_text(cap)}"
+                                     f"（不低于 {STALL_AT_CAP_FRACTION:.0%}），日志 {now - seen[1]:.0f} 秒没涨{busy}")
             self.store.update("attempts", attempt)
             say(f"  · 任务 {task['id']} 第 {attempt['number']} 次尝试{attempt['stall_note']}：停掉它，按撞上限办")
             threading.Thread(target=self.stop_running, args=(task["id"],), daemon=True).start()
@@ -2531,23 +3200,133 @@ class Scheduler:
             self.store.update("attempts", attempt)
             say(f"  · 任务 {task['id']} 第 {attempt['number']} 次尝试{attempt['stall_note']}：不看 CPU，停掉它，记 stalled")
         else:
-            attempt["stall_note"] = f"日志 {now - seen[1]:.0f} 秒没涨、CPU 这 {now - seen[2]:.0f} 秒也几乎没涨"   # 判卡住的依据记进尝试，结局说明接上它
+            if card_idle:   # 占着卡不干活：说明写三样读数（日志多久没涨、卡的利用率、命令自己的 CPU）
+                cpu_text = f"{cores:.4f} 个核" if cores is not None else "读不到"
+                attempt["stall_note"] = (f"日志 {now - seen[1]:.0f} 秒没涨、卡 {attempt.get('card')} 上有它的计算进程而这 {loaded.polls} 轮卡的利用率都是 0、"
+                                         f"命令自己的 CPU 这 {now - seen[2]:.0f} 秒平均 {cpu_text}（占着卡不干活的门槛 {threshold:g} 个核）")
+            else:
+                attempt["stall_note"] = f"日志 {now - seen[1]:.0f} 秒没涨、CPU 这 {now - seen[2]:.0f} 秒也几乎没涨"   # 判卡住的依据记进尝试，结局说明接上它
             self.store.update("attempts", attempt)
             say(f"  · 任务 {task['id']} 第 {attempt['number']} 次尝试的{attempt['stall_note']}：停掉它，记 stalled")
         threading.Thread(target=self.stop_running, args=(task["id"],), daemon=True).start()
         return True
 
-    def check_suspect(self, task, attempt, cpu, now):
+    def long_run_confirmed_of(self, task):
+        """这条任务（分片与估算的子任务照父任务）带的「长跑已确认」标识（文件头 ⑦「跑满两小时」）：{from, why} 或 None。"""
+        if task.get("long_run_confirmed"):
+            return task["long_run_confirmed"]
+        if task.get("parent_id"):
+            parent = self.store.task(task["parent_id"])
+            if parent is not None and parent[1] and parent[0].get("long_run_confirmed"):
+                return parent[0]["long_run_confirmed"]
+        return None
+
+    def long_run_lines(self, task):
+        """「长跑已确认（原号 <n>）：<why>」那一行（task status、列表、推给会话的正文与日志头都打它）；不带标识交 []。弄坏开关 long-run-confirmed-flag-hidden 下交 []。"""
+        flag = self.long_run_confirmed_of(task)
+        if not flag or lib.broken("long-run-confirmed-flag-hidden", self.environment):
+            return []
+        return [f"长跑已确认（原号 {flag.get('from')}）：{flag.get('why')}"]
+
+    def whole_package_of(self, task):
+        """这条任务（子任务照父任务）带的「整包已确认」标识：确认文件的路径或空串（文件头 ②「提交时拒」⑥）。"""
+        if task.get("whole_package_confirmed"):
+            return task["whole_package_confirmed"]
+        if task.get("parent_id"):
+            parent = self.store.task(task["parent_id"])
+            if parent is not None and parent[1]:
+                return parent[0].get("whole_package_confirmed") or ""
+        return ""
+
+    def flag_lines(self, task):
+        """两种确认标识的行（task status、列表、推给会话的正文与日志头都打）：「整包已确认：<文件>」与「长跑已确认（原号 <n>）：<why>」，没有的不打。"""
+        whole = self.whole_package_of(task)
+        return ([f"整包已确认：{whole}"] if whole else []) + self.long_run_lines(task)
+
+    def judge_run_limit(self, task, attempt):
+        """跑满两小时打回（task_server_lib.py 文件头「错误类型」over-two-hours）：这条任务（分片与估算的子任务按自己的）各次尝试在跑的时长累加，
+        撞了内存上限重来的计时归零、只从最后一次撞上限之后那一次起算（结束了的取记下的 seconds，这一次取此刻已跑的；排队等的不算），
+        满 run_limit_seconds 的，停掉、记 over_limit 与说明，结局在 finish_attempt 记 over-two-hours；停了交 True。
+        豁免：提交时的门禁（lib.commit_gate_exempt）、带「长跑已确认」标识的（long_run_confirmed_of）。
+        弄坏开关 over-two-hours-not-bounced 下不判，over-two-hours-cap-hits-counted 下撞上限的那几次也累加，long-run-confirmed-still-bounced 下带标识的照判。"""
+        if lib.broken("over-two-hours-not-bounced", self.environment):
+            return False
+        if self.long_run_confirmed_of(task) and not lib.broken("long-run-confirmed-still-bounced", self.environment):
+            return False
+        if self.whole_package_of(task) and lib.broken("whole-package-confirmed-exempts-two-hours", self.environment):
+            return False   # 弄坏开关：整包已确认的不按两小时打回（真的照判）
+        if lib.commit_gate_exempt(task.get("command") or [], task.get("cwd"), task.get("environment") or {}, self.environment):
+            return False
+        current = max(0.0, time.time() - float(attempt.get("started_at") or time.time()))
+        ended = sorted(((int(record.get("number") or 0), float(record.get("seconds") or 0), record.get("outcome")) for record, valid in self.store.attempts_of(task["id"])
+                        if valid and record.get("state") == "ended" and record.get("id") != attempt.get("id")))
+        if not lib.broken("over-two-hours-cap-hits-counted", self.environment):
+            # 撞了内存上限、照大一档重来的，计时归零（用户：「前三次都撞了内存上限 后重跑的任务两小时计时归零」）：只累加最后一次撞上限之后的那几次
+            last_cap_hit = max((number for number, _, outcome in ended if outcome in lib.RECORD_CAP_HIT_OUTCOMES), default=0)
+            ended = [entry for entry in ended if entry[0] > last_cap_hit]
+        earlier = [(number, seconds) for number, seconds, _ in ended]
+        total = current + sum(seconds for _, seconds in earlier)
+        if total < self.run_limit_seconds:
+            return False
+        each = "、".join(f"第 {number} 次 {seconds:.0f} 秒" for number, seconds in sorted(earlier)) + ("、" if earlier else "") + f"第 {attempt['number']} 次 {current:.0f} 秒（被停）"
+        scope = lib.scope_declaration_segments(task.get("environment") or {}, task.get("command") or [])
+        tail = [line for line in lib.log_lines(log_tail(attempt.get("log", ""))) if line.strip()][-3:]
+        attempt["over_limit"] = True
+        attempt["run_limit_note"] = (f"累计跑了 {total:.0f} 秒（{total / 60:.0f} 分钟），满 {self.run_limit_seconds:.0f} 秒的界：各次 {each}；命令：{shlex.join(task.get('command') or [])}；"
+                                     f"范围声明：{'；'.join(scope) if scope else '没带 SINGLEFS_RUN_SCOPE'}；日志末几行：{' ⏎ '.join(tail) if tail else '日志读不到'}")
+        self.store.update("attempts", attempt)
+        say(f"  · 任务 {task['id']} 第 {attempt['number']} 次尝试{attempt['run_limit_note']}：不是提交时的门禁，停掉它，记 over-two-hours")
+        threading.Thread(target=self.stop_running, args=(task["id"],), daemon=True).start()
+        return True
+
+    def requeue_command_text(self, task):
+        """跑满两小时那一条「对」的出路整行（文件头 ⑦「跑满两小时」）：两个数照此刻的确认单（confirmation），--why 留给会话填。"""
+        try:
+            sheet = self.confirmation(task)
+            items, tasks = sheet["items"], sheet["tasks"]
+        except Exception as error:   # 确认单算不出：两个数留空，会话照 task status 打的确认单填
+            say(f"  ! 任务 {task['id']} 的确认单算不出（{type(error).__name__}: {error}），requeue 那一行的两个数留空")
+            items, tasks = "<N>", "<M>"
+        return f"task-server/task requeue {task['id']} --long-run-confirmed --items {items} --tasks {tasks} --why '<为什么要跑这么久、范围为什么是这些>'"
+
+    def note_io_wait(self, attempt, window_started_at, now):
+        """日志没涨的这一轮读一次这一次尝试此刻在 D 状态的进程数（Machine.io_blocked），记进 io_waits（文件头 ①「卡在 IO 上」）：
+        窗口（window_started_at，log_growth 记的那一个）换了从头记这个窗口里是不是每一轮都有；从哪一刻起每一轮都有跨窗口接着算，有一轮没有或读不到就清掉。"""
+        blocked = self.machines[attempt["host"]].io_blocked(attempt)
+        previous = self.io_waits.get(attempt["id"])
+        fresh = previous is None or previous.window_started_at != window_started_at
+        every = (True if fresh else previous.every_poll_blocked) and bool(blocked)
+        since = None
+        if blocked:
+            since = previous.blocked_since if previous is not None and previous.blocked_since is not None else now
+        self.io_waits[attempt["id"]] = IoWaitWindow(window_started_at, (0 if fresh else previous.polls) + 1, every, blocked, since)
+
+    def note_card_load(self, attempt, window_started_at, busy, utilization):
+        """日志没涨的这一轮记一次这一次尝试分到的卡上有没有它的计算负载（busy：check_stall 这一轮读的 card_load，量不到当有）与卡的利用率
+        （utilization：Machine.card_utilization，卡上有它的负载时才读，读不到是 None），记进 card_loads（文件头 ①「卡上有它的计算进程」）：
+        窗口（window_started_at，log_growth 记的那一个）换了从头记这个窗口里是不是每一轮都有负载、有没有一轮利用率不为 0、有没有一轮读不到利用率；
+        quiet_since 只在上一个窗口照这一条免停了（spared）才接到新窗口，有一轮没有负载就清掉。"""
+        previous = self.card_loads.get(attempt["id"])
+        fresh = previous is None or previous.window_started_at != window_started_at
+        every = (True if fresh else previous.every_poll_busy) and busy
+        carried = previous.quiet_since if previous is not None and (not fresh or previous.spared) else None
+        used = (False if fresh else previous.utilization_busy) or (busy and utilization is not None and utilization > 0)
+        unread = (False if fresh else previous.utilization_unread) or (busy and utilization is None)
+        self.card_loads[attempt["id"]] = CardLoadWindow(window_started_at, (0 if fresh else previous.polls) + 1, every, carried if busy else None, False,
+                                                        used, unread, utilization if busy else None)
+
+    def check_suspect(self, task, attempt, cpu, now, card_load_now=None):
         """疑似卡住（文件头 ①「疑似卡住」）：整个单元的 CPU 满 stall_seconds 平均不到 STALL_CPU_CORES 个核、要卡的这段时间它那张卡上又没有它的计算负载
         （量不到当有负载），不管日志涨不涨：不停，记进尝试的 suspect、写告警、叫醒在等的 wait（它打 lib.SUSPECT_MARK 那一行、退 lib.SUSPECT_EXIT）。
         一段只报一次；疑似之后 CPU 又涨了（相邻两次读之间平均不少于 STALL_CPU_CORES 个核）或卡上又有了它的负载，这一段结束，从此刻再量下一段。读不到 CPU 不当不涨：窗口作废重量。
+        卡上有没有它的负载用 check_stall 这一轮读的那一次（card_load_now；不要卡的是 None）。
         弄坏开关 suspect-unreported 下不判；suspect-card-load-ignored 下不看卡上有没有它的负载。"""
         if lib.broken("suspect-unreported", self.environment):
             return
         if cpu is None:
             self.cpu_windows.pop(attempt["id"], None)
             return
-        card_busy = bool(task.get("gpu")) and self.card_load(attempt) and not lib.broken("suspect-card-load-ignored", self.environment)
+        card_busy = bool(task.get("gpu")) and bool(card_load_now) and not lib.broken("suspect-card-load-ignored", self.environment)
         window = self.cpu_windows.get(attempt["id"])
         if window is None or cpu < window.last_cpu:
             self.cpu_windows[attempt["id"]] = SuspectWindow(now, cpu, now, cpu, card_busy, False)
@@ -2608,8 +3387,8 @@ class Scheduler:
 
     def attention_items(self, task_id):
         """这条任务（分片的、按项估算的连同子任务）此刻要处置的提醒（文件头 ①「要处置的提醒」）：每项 {kind, tier, task, basis, why, next}，task 是提醒说的那一条
-        （子任务的是子任务号）。不改任务；六种判法在 attention_of_record 与下面的分片推不动（改主工作区的那一种另起一次 apply-writer-patch.py --read-outcome，workspace_write_item），档按 attention_tier。
-        弄坏开关 attention-shard-advance-unreported 下不报分片父任务推不动（别四种的开关在 attention_of_record）。"""
+        （子任务的是子任务号）。不改任务；十二种判法在 attention_of_record（预算贴着整台读 budget_check 排队时记下的那一项）与下面的分片推不动（改主工作区的那一种另起一次 apply-writer-patch.py --read-outcome，workspace_write_item），档按 attention_tier。
+        弄坏开关 attention-shard-advance-unreported 下不报分片父任务推不动（别几种的开关在 attention_of_record）。"""
         found = self.store.task(task_id)
         if found is None or not found[1]:
             return []
@@ -2625,16 +3404,150 @@ class Scheduler:
             items += self.attention_of_record(record, now)
         failure = dict(self.advance_failures.get(task_id) or {})
         if failure and found[0].get("state") in ("sharded", "estimating") and not lib.broken("attention-shard-advance-unreported", self.environment):
-            items.append({"kind": "shard-advance-failed", "tier": int(failure.get("episode") or 1), "task": task_id,
-                          "basis": f"推下一步连着出错 {failure.get('count')} 轮：{failure.get('why')}",
-                          "why": "服务每一轮对账都重推，一直推不动整件就停在原地",
-                          "next": (f"看 journalctl --user -u {lib.UNIT_NAME} -n 200 里「推下一步时出错」那一句前后的栈；修好之前任务 {task_id} 不会往下走，"
-                                   f"等不起 task-server/task cancel {task_id}")})
+            items.append(self.attention_item("shard-advance-failed", int(failure.get("episode") or 1), task_id,
+                                             f"推下一步连着出错 {failure.get('count')} 轮：{failure.get('why')}",
+                                             "服务每一轮对账都重推，一直推不动整件就停在原地"))
         return items
 
+    def attention_item(self, kind, tier, task_id, basis, why, follow=""):
+        """要处置的提醒的一项（文件头 ①「要处置的提醒」）：next 是异常表里这一种的修改意见（lib.anomaly_advice），follow 给了的接在后面（这一回的具体数、多久再叫）。
+        每一种都只经这里拼 next，不另写出路句。"""
+        advice = lib.anomaly_advice(kind, task_id, self.environment)
+        return {"kind": kind, "tier": tier, "task": task_id, "basis": basis, "why": why, "next": f"{advice}；{follow}" if follow else advice}
+
+    def quiet_log_items(self, record, attempts):
+        """日志长期不涨而服务没停它（文件头 ①「要处置的提醒」的 quiet-log-busy）：在跑的那一次尝试的日志（log_content 算的那部分）距上一次增长
+        满 quiet_attention_seconds 交一项，不然交空表。日志多久没涨照判卡住记的那一份（log_growth，宽限里还没量的不报）。
+        只在服务最近一个窗口因 CPU 在涨或读不到 CPU 没停它时报（log_growth 记的缘由是 SPARED_CPU_BUSY、SPARED_CPU_UNREAD）：按 D 状态、卡上负载免停的各由
+        io_wait_items、gpu_busy_quiet_items 报，还没判过一个窗口的不报。弄坏开关 quiet-log-busy-any-exemption 下照改前不看缘由。"""
+        task_id = record["id"]
+        active = [attempt for attempt in attempts if attempt.get("state") in ACTIVE_ATTEMPT_STATES]
+        seen = self.log_growth.get(active[-1]["id"]) if active else None
+        if seen is None:
+            return []
+        if seen[4] not in (SPARED_CPU_BUSY, SPARED_CPU_UNREAD) and not lib.broken("quiet-log-busy-any-exemption", self.environment):
+            return []
+        quiet = time.monotonic() - seen[1]
+        tier = attention_tier(quiet, self.quiet_attention_seconds)
+        if not tier:
+            return []
+        return [self.attention_item(
+            "quiet-log-busy", tier, task_id,
+            (f"第 {active[-1].get('number')} 次尝试的日志 {quiet:.0f} 秒（{quiet / 60:.0f} 分钟）没涨，"
+             f"第 {tier} 档（头一档 {self.quiet_attention_seconds:.0f} 秒，之后每档翻倍）"),
+            (f"日志不涨而{'读不到 CPU' if seen[4] == SPARED_CPU_UNREAD else 'CPU 在涨'}的服务不停它：日志与 CPU 都不涨才停，"
+             "没有记录用时的也不照「远超记录用时」那一条停"),
+            (f"还在算就再起 task-server/task wait {task_id}（日志满 {self.quiet_attention_seconds * 2 ** tier:.0f} 秒没涨再叫一次），"
+             f"在空转或在回收里打转 task-server/task cancel {task_id}、改了重交"))]
+
+    def io_wait_items(self, record, attempts):
+        """卡在 IO 上而服务没停它（文件头 ①「要处置的提醒」的 io-wait）：在跑的那一次尝试日志没涨的每一轮都读到有进程在 D 状态（io_waits 的 blocked_since），
+        连着满 io_wait_attention_seconds 交一项，不然交空表。依据写最近一轮 D 状态的进程数与本机此刻 /proc/pressure/io 的 some avg60。"""
+        task_id = record["id"]
+        active = [attempt for attempt in attempts if attempt.get("state") in ACTIVE_ATTEMPT_STATES]
+        waited = self.io_waits.get(active[-1]["id"]) if active and not active[-1].get("stalled") else None   # 已判停的那一次在等停下来，不再报
+        if waited is None or waited.blocked_since is None:
+            return []
+        blocked_for = time.monotonic() - waited.blocked_since
+        tier = attention_tier(blocked_for, self.io_wait_attention_seconds)
+        if not tier:
+            return []
+        host = lib.HOST_NAMES.get(active[-1].get("host"), active[-1].get("host"))
+        return [self.attention_item(
+            "io-wait", tier, task_id,
+            (f"第 {active[-1].get('number')} 次尝试（{host}）日志没涨，连着 {blocked_for:.0f} 秒（{blocked_for / 60:.0f} 分钟）每一轮都有进程在 D 状态"
+             f"（不可中断的 IO 等待），最近一轮 {waited.blocked_now} 个；本机此刻 /proc/pressure/io {io_pressure_text()}；"
+             f"第 {tier} 档（头一档 {self.io_wait_attention_seconds:.0f} 秒，之后每档翻倍）"),
+            "日志不涨而每一轮都有进程在等 IO（D 状态）：多半在等盘或 NFS，服务不因为日志不涨判它卡住、不停它，IO 缓过来它自己接着跑",
+            (f"这一次在{host}：等得起再起 task-server/task wait {task_id}（连着满 {self.io_wait_attention_seconds * 2 ** tier:.0f} 秒再叫一次），"
+             f"盘与 NFS 修不好 task-server/task cancel {task_id}、IO 缓过来再重交"))]
+
+    def gpu_busy_quiet_items(self, record, attempts):
+        """卡上有它的计算进程、日志与 CPU 都不涨而服务没停它（文件头 ①「要处置的提醒」的 gpu-busy-quiet）：在跑的那一次尝试照「卡上有它的计算进程」免停的窗口
+        （每一轮卡上都有它的负载、卡的利用率有一轮不为 0 或读不到）一个接一个（card_loads 的 quiet_since），连着满 gpu_busy_quiet_attention_seconds 交一项，不然交空表。
+        依据写卡的键与卡的利用率（card_utilization_text：读到过不为 0 的写最近一轮的数，读不到的写「利用率读不到」）。"""
+        task_id = record["id"]
+        active = [attempt for attempt in attempts if attempt.get("state") in ACTIVE_ATTEMPT_STATES]
+        loaded = self.card_loads.get(active[-1]["id"]) if active and not active[-1].get("stalled") else None   # 已判停的那一次在等停下来，不再报
+        if loaded is None or loaded.quiet_since is None:
+            return []
+        quiet_for = time.monotonic() - loaded.quiet_since
+        tier = attention_tier(quiet_for, self.gpu_busy_quiet_attention_seconds)
+        if not tier:
+            return []
+        host = lib.HOST_NAMES.get(active[-1].get("host"), active[-1].get("host"))
+        card = active[-1].get("card") or "（没记卡）"
+        return [self.attention_item(
+            "gpu-busy-quiet", tier, task_id,
+            (f"第 {active[-1].get('number')} 次尝试（{host}）卡 {card} 上有这一次尝试的计算进程，日志与 CPU 都不涨，连着 {quiet_for:.0f} 秒"
+             f"（{quiet_for / 60:.0f} 分钟）每一轮读卡都有它的计算负载（量不到的当有），{card_utilization_text(loaded)}；"
+             f"第 {tier} 档（头一档 {self.gpu_busy_quiet_attention_seconds:.0f} 秒，之后每档翻倍）"),
+            ("日志与 CPU 都不涨而每一轮卡上都有它的计算进程、卡的利用率有一轮不为 0 或读不到的服务不判卡住、不停它（用户定 GPU 任务「不自己终止，告诉负责的对话 自己检查」；"
+             "利用率一个窗口里都是 0 的照卡住停）：多半是 GPU 在算，也可能卡在卡上"),
+            (f"那张卡是 {card}；还在算就再起 task-server/task wait {task_id}（连着满 {self.gpu_busy_quiet_attention_seconds * 2 ** tier:.0f} 秒再叫一次）"))]
+
+    def long_run_idle_items(self, record, attempts, now):
+        """跑得久而核没用起来（文件头 ①「要处置的提醒」的 long-run-idle-cores；任务 8856 本机跑 146 分钟、给 31 线程平均只用 8.881 核、峰值 45.00 GiB）：
+        在跑的那一次尝试跑满 long_run_attention_seconds、到此刻平均在用核数（Machine.cpu_usec 除以已跑秒数，同 running_progress）不到给的线程数（threads_of）的
+        LONG_RUN_IDLE_CORE_FRACTION，交一项，档是尝试的次数（每次尝试只报一次）；读不到 CPU 的不报。只提醒、照跑。"""
+        active = [attempt for attempt in attempts if attempt.get("state") in ACTIVE_ATTEMPT_STATES]
+        if not active:
+            return []
+        attempt = active[-1]
+        elapsed = now - float(attempt.get("started_at") or now)
+        if elapsed < self.long_run_attention_seconds:
+            return []
+        machine = self.machines.get(attempt.get("host"))
+        usage = machine.cpu_usec(attempt) if machine is not None else None
+        threads = int(self.threads_of(record) or 0)
+        if usage is None or threads <= 0:
+            return []
+        cores = usage / 1e6 / elapsed
+        if cores >= threads * LONG_RUN_IDLE_CORE_FRACTION:
+            return []
+        peak = machine.memory_now(attempt)[1]
+        task_id = record["id"]
+        return [self.attention_item(
+            "long-run-idle-cores", max(1, int(attempt.get("number") or 1)), task_id,
+            (f"第 {attempt.get('number')} 次尝试已跑 {elapsed:.0f} 秒（{elapsed / 60:.0f} 分钟），给 {threads} 线程、到此刻平均只用 {cores:.3f} 核"
+             f"（不到 {LONG_RUN_IDLE_CORE_FRACTION:.0%}），进程内存峰值 {lib.size_text(peak)}"),
+            "跑了一个钟头以上而核大多空着：多半是脚本串行跑、或范围点多了在逐个排（服务照跑，不停它）",
+            f"照跑就再起 task-server/task wait {task_id}")]
+
+    def fills_any_cap_items(self, record):
+        """按给的上限开并行（文件头 ①「要处置的提醒」的 fills-any-cap）：这条命令键最近 FILLS_CAP_RUNS 次跑成的尝试（只读进程内存口径的行，current_metric）
+        峰值都不低于各自上限的 FILLS_CAP_FRACTION，交一项（档 1，每条任务只报一次）；不到这么多次的不报。撞了上限的那几次不算：撞的那一次峰值本来就贴着上限，
+        照上限一档档撞上去的（任务 9616 那条静态核 6.0、9.0、13.5 GiB）不是按上限开并行。弄坏开关 fills-any-cap-counts-cap-hits 下撞了上限的也算进那几次。"""
+        counted = lib.RECORD_COMPLETED_OUTCOMES + (lib.RECORD_CAP_HIT_OUTCOMES if lib.broken("fills-any-cap-counts-cap-hits", self.environment) else ())
+        runs = []
+        for attempt, valid in self.store.select("attempts", "command_key = ? AND state = 'ended'", (record.get("command_key"),), order="id DESC LIMIT 50"):
+            if not valid or not self.current_metric(attempt):
+                continue
+            outcome, peak, cap = attempt.get("outcome"), attempt.get("memory_peak"), attempt.get("memory_cap")
+            if outcome not in counted or not isinstance(peak, int) or not isinstance(cap, int) or cap <= 0:
+                continue
+            runs.append((float(attempt.get("ended_at") or 0), peak, cap))
+        runs = sorted(runs, reverse=True)[:FILLS_CAP_RUNS]
+        if len(runs) < FILLS_CAP_RUNS or any(peak < cap * FILLS_CAP_FRACTION for _, peak, cap in runs):
+            return []
+        human = self.host_dispatch.human
+        task_id = record["id"]
+        shown = "、".join(f"上限 {human(cap)} 峰值 {human(peak)}" for _, peak, cap in runs)
+        return [self.attention_item(
+            "fills-any-cap", 1, task_id, f"这条命令键最近 {FILLS_CAP_RUNS} 次：{shown}（每次都不低于上限的 {FILLS_CAP_FRACTION:.0%}）",
+            "给多少就用满多少：命令多半照服务交的上限（TASK_SERVER_MEMORY_CAP_BYTES）定同时起的个数，记录跟着上限涨，起步一次比一次大",
+            f"照跑就再起 task-server/task wait {task_id}")]
+
+    def current_metric(self, attempt):
+        """这一次尝试的峰值是不是这一版的口径（task_server_lib.py 文件头「资源记录」的峰值口径一栏）：peak_metric 是「进程内存」的才算。
+        弄坏开关 old-metric-peaks-read 下照改前不看这一栏，旧行也算。"""
+        return attempt.get("peak_metric") == lib.PROCESS_MEMORY_PEAK_METRIC or lib.broken("old-metric-peaks-read", self.environment)
+
     def attention_of_record(self, record, now):
-        """一条任务记录（父任务或子任务）此刻要处置的提醒：排队过久、跑到记录用时的很多倍、换卡重排（可能已跑成）、清场没收尾。
-        弄坏开关 attention-queue-unreported、attention-overrun-unreported、attention-card-replaced-unreported、attention-cleanup-unreported 各关一种。"""
+        """一条任务记录（父任务或子任务）此刻要处置的提醒：排队过久、跑到记录用时的很多倍、日志长期不涨而服务没停它、卡在 IO 上而服务没停它、
+        卡上有它的计算进程而服务没停它、换卡重排（可能已跑成）、清场没收尾。
+        弄坏开关 attention-queue-unreported、attention-overrun-unreported、attention-quiet-busy-unreported、attention-io-wait-unreported、attention-gpu-busy-quiet-unreported、
+        attention-card-replaced-unreported、attention-cleanup-unreported 各关一种。"""
         task_id, state = record["id"], record.get("state")
         attempts = [attempt for attempt, valid in self.store.attempts_of(task_id) if valid]
         items = []
@@ -2642,12 +3555,14 @@ class Scheduler:
             since = max([float(record.get("submitted_at") or now)] + [float(attempt.get("ended_at") or 0) for attempt in attempts])   # 重排的从上一次尝试结束起算
             waited = now - since
             tier = attention_tier(waited, self.queue_attention_seconds)
-            if tier:
-                items.append({"kind": "queued-too-long", "tier": tier, "task": task_id,
-                              "basis": f"已排 {waited:.0f} 秒（{waited / 60:.0f} 分钟），第 {tier} 档（头一档 {self.queue_attention_seconds:.0f} 秒，之后每档翻倍）",
-                              "why": self.waiting_text(record) or "排队原因此刻读不到（这一轮还没判到它）",
-                              "next": (f"task-server/task status {task_id} 看「在等：…」；前面在跑的占着余量或第二台用不了就等，等不起 task-server/task cancel {task_id}、"
-                                       f"改小命令重交；等得起再起 task-server/task wait {task_id}（排满 {self.queue_attention_seconds * 2 ** tier:.0f} 秒再叫一次）")})
+            why = self.waiting_text(record)
+            # 排队原因还没判出来（服务刚起来、这一轮还没判到它）的这一轮不报，等判出来那一轮再报（文件头 ①「要处置的提醒」）；弄坏开关 attention-queue-reasonless-sent 下照改前照报
+            if tier and (why or lib.broken("attention-queue-reasonless-sent", self.environment)):
+                items.append(self.attention_item(
+                    "queued-too-long", tier, task_id,
+                    f"已排 {waited:.0f} 秒（{waited / 60:.0f} 分钟），第 {tier} 档（头一档 {self.queue_attention_seconds:.0f} 秒，之后每档翻倍）",
+                    why or "排队原因此刻读不到（这一轮还没判到它）",
+                    f"等得起再起 task-server/task wait {task_id}（排满 {self.queue_attention_seconds * 2 ** tier:.0f} 秒再叫一次）"))
         if state == "running" and not lib.broken("attention-overrun-unreported", self.environment):
             active = [attempt for attempt in attempts if attempt.get("state") in ACTIVE_ATTEMPT_STATES]
             elapsed = now - float(active[-1].get("started_at") or now) if active else 0.0
@@ -2657,12 +3572,23 @@ class Scheduler:
                     first = max(self.overrun_attention_factor * estimate, self.stall_grace_seconds)
                     tier = attention_tier(elapsed, first)
                     if tier:
-                        items.append({"kind": "overrun", "tier": tier, "task": task_id,
-                                      "basis": (f"已跑 {elapsed:.0f} 秒，是记录用时 {estimate:.0f} 秒的 {elapsed / estimate:.1f} 倍，"
-                                                f"第 {tier} 档（头一档 {first:.0f} 秒，之后每档翻倍）"),
-                                      "why": "日志与 CPU 只要还在涨服务就不停它（日志满 10 分钟没涨且超过记录用时 5 倍才停）",
-                                      "next": (f"task-server/task log {task_id} 与 task-server/task status {task_id} 看是不是还在做有用的事；还在算就再起 task-server/task wait {task_id}"
-                                               f"（跑到 {first * 2 ** tier:.0f} 秒再叫一次），跑飞了 task-server/task cancel {task_id}、改了重交")})
+                        items.append(self.attention_item(
+                            "overrun", tier, task_id,
+                            f"已跑 {elapsed:.0f} 秒，是记录用时 {estimate:.0f} 秒的 {elapsed / estimate:.1f} 倍，第 {tier} 档（头一档 {first:.0f} 秒，之后每档翻倍）",
+                            "日志与 CPU 只要还在涨服务就不停它（日志满 10 分钟没涨且超过记录用时 5 倍才停）",
+                            f"还在推进就再起 task-server/task wait {task_id}（跑到 {first * 2 ** tier:.0f} 秒再叫一次）"))
+        if state == "running" and not lib.broken("attention-quiet-busy-unreported", self.environment):
+            items += self.quiet_log_items(record, attempts)
+        if state == "running" and not lib.broken("attention-io-wait-unreported", self.environment):
+            items += self.io_wait_items(record, attempts)
+        if state == "running" and not lib.broken("attention-gpu-busy-quiet-unreported", self.environment):
+            items += self.gpu_busy_quiet_items(record, attempts)
+        if state in ("queued", "running") and task_id in self.budget_notices:   # 排队那一刻判出的预算贴着整台（budget_check）
+            items.append(dict(self.budget_notices[task_id]))
+        if state == "running" and not lib.broken("long-run-idle-silent", self.environment):
+            items += self.long_run_idle_items(record, attempts, now)
+        if state in ("queued", "running") and not lib.broken("fills-any-cap-silent", self.environment):
+            items += self.fills_any_cap_items(record)
         if not lib.broken("attention-card-replaced-unreported", self.environment):
             last = max([int(attempt.get("number") or 0) for attempt in attempts] or [0])
             replaced = [attempt for attempt in attempts if attempt.get("outcome") == "card-fault" and attempt.get("faulty_cards")
@@ -2671,18 +3597,21 @@ class Scheduler:
                 cards = "、".join(dict.fromkeys(card for attempt in replaced for card in attempt["faulty_cards"]))
                 numbers = "、".join(str(attempt.get("number")) for attempt in replaced)
                 now_state = {"finished": f"任务已 {record.get('outcome')}", "queued": "任务重新排队、换别的卡", "running": "任务已换别的卡、还在跑"}.get(state, f"任务状态 {state}")
-                items.append({"kind": "card-replaced", "tier": len(replaced), "task": task_id,
-                              "basis": f"清场判出卡 {cards} 坏（第 {numbers} 次尝试），{now_state}；坏卡停用 {CARD_QUARANTINE_SECONDS // 60} 分钟",
-                              "why": "卡坏不是任务的错，服务已换别的卡重排；那张卡不修，之后要卡的任务还会撞上",
-                              "next": "弹窗请用户重置那张卡（日志里 GPU_QUIESCE 那一行写着哪台哪张卡与依据）；任务不用重交"})
+                items.append(self.attention_item(
+                    "card-replaced", len(replaced), task_id,
+                    f"清场判出卡 {cards} 坏（第 {numbers} 次尝试），{now_state}；坏卡停用 {CARD_QUARANTINE_SECONDS // 60} 分钟",
+                    "卡坏不是任务的错，服务已换别的卡重排；那张卡不修，之后要卡的任务还会撞上", f"坏的是 {cards}"))
         if not lib.broken("attention-cleanup-unreported", self.environment):
             for attempt in attempts:
                 if attempt.get("cleanup_pending") and attempt.get("state") in ACTIVE_ATTEMPT_STATES:
-                    items.append({"kind": "cleanup-pending", "tier": max(1, int(attempt.get("number") or 1)), "task": task_id,
-                                  "basis": f"第 {attempt.get('number')} 次尝试的命令已退出，清场没收尾：{attempt['cleanup_pending']}",
-                                  "why": "服务保留这一次的资源与显卡占用、每隔几秒重查，查清之前任务不记结局",
-                                  "next": (f"task-server/task log {task_id} 看这一次尝试的日志，查清留下的进程或远端连接；恢复之后服务自己重查收尾；"
-                                           "不要删进程号、退出码或清理状态文件来放行")})
+                    left_children = PEER_SCOPE_LEFTOVERS_MARK in attempt["cleanup_pending"]   # 第二台停了 scope 还留着进程（confirm_peer_cleanup）
+                    items.append(self.attention_item(
+                        "cleanup-pending", max(1, int(attempt.get("number") or 1)), task_id,
+                        f"第 {attempt.get('number')} 次尝试的命令已退出，清场没收尾：{attempt['cleanup_pending']}",
+                        ("命令退出之后它那一层内存包装的 scope 里还有进程，停了 scope 也没清掉；服务保留这一次的资源与显卡占用、每隔几秒重查" if left_children
+                         else "服务保留这一次的资源与显卡占用、每隔几秒重查，查清之前任务不记结局"),
+                        ("这条命令退出后还留着子进程（依据里列着第二台 scope 里留下的进程）" if left_children
+                         else "留下的也可能是第二台的远端连接：清理回执没收尾的看日志里 multi-host-run.sh ⑥ 那几行")))
         if state == "finished" and not record.get("parent_id") and not lib.broken("workspace-write-interrupted-unreported", self.environment):
             item = self.workspace_write_item(record, attempts)
             if item is not None:
@@ -2718,8 +3647,8 @@ class Scheduler:
         number = max([int(attempt.get("number") or 0) for attempt in attempts] or [0])
         basis = f"第 {number} 次尝试结局 {outcome}（退 {exit_code}）" + ("，命令被信号杀" if outcome == "command-failed" else "")
         status_hint = f"git -C {shlex.quote(cwd)} status --short 与 git -C {shlex.quote(cwd)} diff --stat 看主工作区此刻改了哪几份"
-        next_step = (f"核{('这几处：' + '、'.join(named)) if named else '它改的文件'}；{status_hint}；"
-                     f"没写全的照原样补齐或退回，核过再重交（task-server/task log {task_id} 看它停在哪一步）")
+        next_step = (f"要核的是{('这几处：' + '、'.join(named)) if named else '它改的文件'}；{status_hint}；"
+                     f"task-server/task log {task_id} 看它停在哪一步")
         if os.path.relpath(os.path.normpath(os.path.join(os.path.realpath(cwd), writer)), root) == WRITER_PATCH_ENTRY:
             if any(word in PATCH_WRITER_READ_ONLY_ARGUMENTS for word in after):
                 return None   # 只读的用法（--dry-run、--pending-status 这类）不写主工作区
@@ -2744,28 +3673,416 @@ class Scheduler:
                     basis += f"；结局文件 {outcome_file} 判{PATCH_WRITER_VERDICTS.get(verdict, f'退 {verdict}')}：" + " / ".join(line.strip() for line in lines[-6:])
                 next_step = (f"python3 {shlex.quote(writer)} --read-outcome {shlex.quote(outcome_file)} 逐个文件看已换上与没换上，"
                              f"再照 python3 {shlex.quote(writer)} --pending-status 的出路接着换完或退回；补丁目录 {named[0]}；{status_hint}")
-        return {"kind": "workspace-write-interrupted", "tier": 1, "task": task_id, "basis": basis,
-                "why": f"这条命令改主工作区（{writer}），没正常结束，可能写了一半",
-                "next": next_step}
+        return self.attention_item("workspace-write-interrupted", 1, task_id, basis, f"这条命令改主工作区（{writer}），没正常结束，可能写了一半", next_step)
+
+    def stored_attention_tiers(self, task_id):
+        """库里这一条任务的行记着的报过的档（正文的 attention_reported，{种类: 最高档}；文件头 ①「要处置的提醒」）：行不在、校验不过、写法不对的那几项交空。
+        弄坏开关 attention-reported-memory-only 下不读库、交空（改前的样子）。"""
+        if lib.broken("attention-reported-memory-only", self.environment):
+            return {}
+        found = self.store.task(task_id)
+        stored = found[0].get("attention_reported") if found is not None and found[1] else None
+        if not isinstance(stored, dict):
+            return {}
+        return {kind: tier for kind, tier in stored.items() if isinstance(kind, str) and isinstance(tier, int) and tier > 0}
+
+    def attention_history_of(self, task_id, kind):
+        """这条任务这一种提醒报过的那几回 [{tier, repush, at, basis}…]（旧的在前）：内存里有的照内存，没有的读库里任务行的 attention_history（服务重启之后）；都没有交 []。"""
+        with self.attention_lock:
+            remembered = list(self.attention_histories.get((task_id, kind)) or [])
+        if remembered or lib.broken("attention-reported-memory-only", self.environment):
+            return remembered
+        found = self.store.task(task_id)
+        stored = found[0].get("attention_history") if found is not None and found[1] else None
+        entries = stored.get(kind) if isinstance(stored, dict) else None
+        return [entry for entry in entries if isinstance(entry, dict)] if isinstance(entries, list) else []
+
+    def attention_repush(self, item):
+        """档不随时长涨的提醒（ANOMALY_REPUSHED_KINDS）同一档报过之后还在（文件头 ⑥「没处置时」）：这一档头一回报出去满 anomaly_repush_seconds 再推第 1 回、
+        之后每翻一倍再推（attention_tier），→ 此刻该推第几回（不该推交 0）；报过的那几回照 attention_history_of。弄坏开关 anomaly-not-repushed 下交 0。"""
+        if lib.broken("anomaly-not-repushed", self.environment):
+            return 0
+        history = [entry for entry in self.attention_history_of(item["task"], item["kind"]) if entry.get("tier") == item["tier"]]
+        if not history:
+            return 0
+        first = min(float(entry.get("at") or 0) for entry in history)
+        due = attention_tier(time.time() - first, self.anomaly_repush_seconds)
+        done = max(int(entry.get("repush") or 0) for entry in history)
+        return due if due > done else 0
+
+    def reported_attention_tier(self, item):
+        """这一项（attention_items 的项）报给提交它的会话的最高档：内存里那一份与库里那一份取大的，读到库里的并进内存（服务重启之后头一次读库）。"""
+        key = (item["task"], item["kind"])
+        with self.attention_lock:
+            remembered = self.attention_reported.get(key, 0)
+        if remembered >= item["tier"]:
+            return remembered
+        stored = self.stored_attention_tiers(item["task"]).get(item["kind"], 0)
+        with self.attention_lock:
+            self.attention_reported[key] = max(self.attention_reported.get(key, 0), stored)
+            return self.attention_reported[key]
+
+    def note_attention_reported(self, items):
+        """这几项报给了提交它的会话：记进内存，再逐条任务记进库里那一行的 attention_reported（Store.change 只并进这一栏、档只升不降；文件头 ①「要处置的提醒」）。
+        库写不进（行不在、校验不过、库出错）的说一句、只记内存。弄坏开关 attention-reported-memory-only 下只记内存（改前的样子）。"""
+        tiers, logged = {}, {}
+        now = round(time.time(), 3)
+        with self.attention_lock:
+            for item in items:
+                key = (item["task"], item["kind"])
+                self.attention_reported[key] = max(self.attention_reported.get(key, 0), item["tier"])
+                tiers.setdefault(item["task"], {})[item["kind"]] = self.attention_reported[key]
+                # 这一回报了什么（attention_history：再推的正文照它写前几次推了什么，attention_repush 照它算再推到第几回）
+                entry = {"tier": item["tier"], "repush": int(item.get("repush") or 0), "at": now, "basis": str(item.get("basis") or "")[:200]}
+                self.attention_histories[key] = (self.attention_histories.get(key, []) + [entry])[-ATTENTION_HISTORY_KEPT:]
+                logged.setdefault(item["task"], {}).setdefault(item["kind"], []).append(entry)
+        if lib.broken("attention-reported-memory-only", self.environment):
+            return
+        for task_id, reached in tiers.items():
+            def merged(record, reached=reached, entries=logged.get(task_id, {})):
+                stored = record.get("attention_reported") if isinstance(record.get("attention_reported"), dict) else {}
+                history = record.get("attention_history") if isinstance(record.get("attention_history"), dict) else {}
+                return {"attention_reported": dict(stored, **{kind: max(stored[kind] if isinstance(stored.get(kind), int) else 0, tier) for kind, tier in reached.items()}),
+                        "attention_history": dict(history, **{kind: (list(history.get(kind) or []) + added)[-ATTENTION_HISTORY_KEPT:] for kind, added in entries.items()})}
+            try:
+                self.store.change("tasks", task_id, merged)
+            except (StoreRefused, sqlite3.Error) as error:
+                say(f"  ! 任务 {task_id} 报过的提醒档没记进库（{error}），只记在内存里：服务重启之后这几档会再报一次")
 
     def unreported_attention(self, task_id, session):
         """wait 那一侧调：这条任务此刻要处置的提醒里还没报给提交它的会话、或档又跨过一档的，交这些项（attention_items 的项）；没有交空表。
-        报给提交它的会话就记下这一种这一档报过了（记在服务的内存里，同 unreported_suspect；服务重启后再报一次）；别的会话来等照样看得到、不记。
-        弄坏开关 attention-reported-every-wait 下报过的照报。"""
+        报给提交它的会话就记下这一种这一档报过了（内存里与库里各一份，note_attention_reported；服务重启后照库认、不再报）；别的会话来等照样看得到、不记。
+        内存里那一份的判与记在同一把锁里：两个 wait 一起来只报一次。弄坏开关 attention-reported-every-wait 下报过的照报。"""
         found = self.store.task(task_id)
         if found is None:
             return []
         owner = found[0].get("session") == session
-        reported = []
+        reported, noted = [], []
         for item in self.attention_items(task_id):
             key = (item["task"], item["kind"])
+            self.reported_attention_tier(item)   # 先把库里那一份并进内存
             with self.attention_lock:
                 if self.attention_reported.get(key, 0) >= item["tier"] and not lib.broken("attention-reported-every-wait", self.environment):
                     continue
                 if owner:
                     self.attention_reported[key] = max(self.attention_reported.get(key, 0), item["tier"])
+                    noted.append(item)
             reported.append(item)
+        if noted:
+            self.note_attention_reported(noted)
         return reported
+
+    # ── ⑥ 发消息给会话（文件头 ⑥）──
+    def inbox_loop(self):
+        """发消息那一路：每 inbox_round_seconds 一轮（notify_finished 当场叫醒）：先发记下了结局的，再扫在排、在跑的任务的疑似卡住与要处置的提醒，最后盯服务健康。
+        一轮出事不停服务：打出来、下一轮再判。"""
+        while not self.stopping.is_set():
+            self.inbox_event.clear()
+            with self.inbox_lock:
+                self.inbox_sockets.clear()   # 收件 socket 每一轮照会话登记现找（inbox_socket_of）：会话重启换了 socket 的下一轮就照新的发
+            try:
+                self.push_outcomes()
+                self.repush_unclaimed_outcomes()
+                self.push_reminders()
+                self.watch_health()
+            except Exception:
+                say("  ! 这一轮发消息出了异常（下一轮再判）：\n" + traceback.format_exc())
+            self.inbox_event.wait(self.inbox_round_seconds)
+
+    def task_log_path(self, task):
+        """这条任务最后一次尝试的日志（分片的父任务自己没有尝试，取子任务里最后起的那一次）；一次都没起交空串。"""
+        attempts = [attempt for attempt, valid in self.store.attempts_of(task["id"]) if valid]
+        if not attempts and (task.get("sharded_entry") or task.get("item_entry")):
+            with contextlib.suppress(StoreRefused):
+                attempts = [attempt for child in self.children_of(task["id"]) for attempt, valid in self.store.attempts_of(child["id"]) if valid]
+        return max(attempts, key=lambda attempt: float(attempt.get("started_at") or 0)).get("log", "") if attempts else ""
+
+    def inbox_socket_of(self, task):
+        """这条任务此刻该往哪个收件 socket 发（文件头 ⑥「收件地址」）→ (路径, 找不到时的那一句)：按任务记的会话号读会话登记（lib.session_inbox_socket：
+        会话号相同、进程还活着的那一份的 messagingSocketPath），一轮里同一个会话只读一次（inbox_sockets，inbox_loop 每一轮开头清掉）；令牌照交任务时带的。
+        弄坏开关 inbox-socket-from-submit-only 下照交任务时记的那一个 socket（会话重启换了 socket 就发不到）。"""
+        if lib.broken("inbox-socket-from-submit-only", self.environment):
+            submitted = (task.get("inbox") or {}).get("socket", "")
+            return submitted, ("" if submitted else "交任务时没记收件 socket")
+        session = task.get("session") or ""
+        with self.inbox_lock:
+            known = self.inbox_sockets.get(session)
+        if known is None:
+            known = lib.session_inbox_socket(session, self.environment)
+            with self.inbox_lock:
+                self.inbox_sockets[session] = known
+        return known
+
+    def inbox_reachable(self, task):
+        """这条任务记着会话令牌、此刻照会话号找得到收件 socket：提醒、疑似卡住与服务健康只发给这样的（找不到的不算一回发失败，wait 照取；结局另照 push_outcomes 发、发不出写告警）。"""
+        return bool((task.get("inbox") or {}).get("token")) and bool(self.inbox_socket_of(task)[0])
+
+    def send_to_session(self, task, text, event):
+        """往提交 task 的会话的收件 socket（inbox_socket_of 照会话号现找的，令牌是任务记着的）发 text → 发出去了没有。发不出去（找不到活着的会话、socket 不在、连不上、
+        会话已关）写一行告警：服务日志、告警记录与这条任务最后一次尝试的日志里 lib.INBOX_LOG_MARK 起头的一行；event 记进 inbox_failed，不重试到死；任务照旧。
+        弄坏开关 inbox-not-sent 下一条都不发、交 False。"""
+        if lib.broken("inbox-not-sent", self.environment):
+            return False
+        inbox = task.get("inbox") or {}
+        headline = text.splitlines()[0]
+        socket_path, missing = self.inbox_socket_of(task)
+        problem = missing or post_to_inbox(socket_path, inbox.get("token", ""), text, self.environment)
+        session = task.get("session") or "无（人手）"
+        if not problem:
+            say(f"  · 发给会话 {session}：{headline}")
+            return True
+        if event is not None:
+            with self.inbox_lock:
+                self.inbox_failed.add(event)
+        line = f"往会话 {session} 的收件 socket {socket_path or '（照会话号没找到）'} 发「{headline}」没发出去（{problem}）；不再重试，任务照旧"
+        next_step = f"会话已关的不用管；会话还在的用 task-server/task wait {task['id']} 取结局、task-server/task status {task['id']} 看在等什么"
+        append_log_lines(self.task_log_path(task), [f"{lib.INBOX_LOG_MARK} ✗ {line}；→ 怎么办：{next_step}"])
+        try:
+            self.alert("inbox-unreachable", task["id"], line, next_step)
+        except Exception:   # 库写不进（服务健康里的那一样）时告警记录写不进：服务日志照打
+            say(f"  ✗ 告警（inbox-unreachable）任务 {task['id']}：{line}")
+            say(f"     → 怎么办：{next_step}")
+        return False
+
+    def push_outcomes(self):
+        """记下了结局的（inbox_pending）：发给提交它的会话，先发还没报的提醒（换卡重排跑成、改主工作区的没正常结束这类，push_attention），再发结局；
+        结局发出去了记成已取（同 wait 把结局交给提交它的会话）。结局只发一次（处理完的任务号不再放回：发出去记了已取的、发不出去写了告警的，同文件头 ⑥ 不重试）；
+        会话已经用 wait 取了的不发；子任务不发（父任务的结局发）。处理某一条时抛错（读库、summary、push_attention、记已取），那一条与排在它后面还没处理的号放回
+        inbox_pending，异常照旧交给 inbox_loop，下一轮接着发（unsent 记还没处理完的）。
+        弄坏开关 pushed-outcome-not-collected 下发出去了也不记已取；inbox-pending-dropped-on-error 下抛错时照改前不放回。"""
+        with self.inbox_lock:
+            pending, self.inbox_pending = self.inbox_pending, set()
+        unsent = sorted(pending)
+        try:
+            while unsent:
+                task_id = unsent[0]
+                found = self.store.task(task_id)
+                task = found[0] if found is not None and found[1] else None
+                if (task is not None and not task.get("parent_id") and (task.get("inbox") or {}).get("token")
+                        and task.get("state") == "finished" and not task.get("collected")):
+                    self.push_attention(task, final=True)
+                    if (self.send_to_session(task, self.outcome_text(self.summary(task_id)), ("outcome", task_id))
+                            and not lib.broken("pushed-outcome-not-collected", self.environment)):
+                        self.mark_collected(task_id)
+                unsent.pop(0)
+        finally:
+            if unsent and not lib.broken("inbox-pending-dropped-on-error", self.environment):
+                with self.inbox_lock:
+                    self.inbox_pending.update(unsent)
+
+    def repush_unclaimed_outcomes(self):
+        """结局没人取（文件头 ⑥「结局没人取」；异常表 unclaimed-outcome）：父任务记着会话令牌、结局满 unclaimed_warning_seconds 还没交给提交它的会话（collected 为假：
+        发结局的那一条没送到，也没起 wait 取）的再推一回，之后每翻一倍再推（档照 attention_tier）；正文写这条结局还没人取、它是什么（outcome_text 整段接在后面）。
+        推出去了记成已取（同 push_outcomes）；推到第几回记进任务行的 outcome_repushed（内存里另留一份 unclaimed_repushed），服务重启后不重推同一回。
+        收件 socket 照会话号现找（send_to_session），会话重启换了 socket 的这一回照新的推。弄坏开关 unclaimed-outcome-not-repushed 下不再推。"""
+        if lib.broken("unclaimed-outcome-not-repushed", self.environment):
+            return
+        now = time.time()
+        for task, valid in self.store.select("tasks", "state = 'finished' AND json_extract(record, '$.collected') = 0"):
+            if not valid or task.get("parent_id") or task.get("collected") or not (task.get("inbox") or {}).get("token"):
+                continue
+            waited = now - float(task.get("finished_at") or now)
+            tier = attention_tier(waited, self.unclaimed_warning_seconds)
+            done = max(self.unclaimed_repushed.get(task["id"], 0), int(task.get("outcome_repushed") or 0))
+            if tier <= done:
+                continue
+            self.unclaimed_repushed[task["id"]] = tier
+            with contextlib.suppress(StoreRefused, sqlite3.Error):
+                self.store.change("tasks", task["id"], {"outcome_repushed": tier})
+            reply = self.summary(task["id"])
+            text = "\n".join([f"{INBOX_HEADLINE}任务 {task['id']} 结局还没人取（{task.get('outcome')}，退 {task.get('exit_code')}；第 {tier} 回再推）",
+                              f"依据：结局记下 {waited:.0f} 秒（{waited / 60:.0f} 分钟）了，还没交给提交它的会话（发结局的那一条没送到，也没起 task wait 取）",
+                              f"此刻还差：{lib.anomaly_advice('unclaimed-outcome', task['id'], self.environment)}（之后每翻一倍再推一回）",
+                              "这条结局是：", self.outcome_text(reply)])
+            if (self.send_to_session(task, text, ("unclaimed-outcome", task["id"], tier))
+                    and not lib.broken("pushed-outcome-not-collected", self.environment)):
+                self.mark_collected(task["id"])
+
+    def push_reminders(self):
+        """在排、在跑（连同分片与估算的父任务）而此刻照会话号找得到收件 socket 的任务（inbox_reachable）：疑似卡住与要处置的提醒里还没报的，逐项发给提交它的会话。"""
+        for task, valid in self.store.select("tasks", "state != 'finished'"):
+            if not valid or task.get("parent_id") or not self.inbox_reachable(task):
+                continue
+            self.push_suspects(task)
+            self.push_attention(task)
+
+    def push_attention(self, task, final=False):
+        """这条任务（分片的连同子任务）要处置的提醒里还没报给提交它的会话、也没发失败过的，发给它；记账与 wait 同一份 attention_reported
+        （同一种同一档只报一次：这里发过的 wait 不再报，wait 报过的这里不再发）。说的是子任务的那几项按 (种类, 档, 原因) 合成一条（attention_groups，
+        文件头 ⑥「要处置的提醒」）：发出去了每一项都记报过，发不出去每一项都记发失败过。合成的那一组头一轮先压一轮（attention_held）：各片各记提交时刻、相差几毫秒，
+        同一刻到档的兄弟片跨过一轮的边界会拆成两条，下一轮连同新到档的一起发（组里有一项压过就发）；final（发结局之前那一次，push_outcomes）不压，没有下一轮了。
+        弄坏开关 inbox-reported-every-round 下报过的照发。"""
+        per_shard = lib.broken("inbox-attention-per-shard", self.environment)
+        pending = []
+        for item in self.attention_items(task["id"]):
+            reported = self.reported_attention_tier(item) >= item["tier"] and not lib.broken("inbox-reported-every-round", self.environment)
+            if reported and item["kind"] in ANOMALY_REPUSHED_KINDS:   # 档不随时长涨的：同一档推过之后一直还在，满时限再推（attention_repush）
+                repush = self.attention_repush(item)
+                if repush:
+                    item, reported = dict(item, repush=repush), False
+            with self.inbox_lock:
+                failed = attention_event(item) in self.inbox_failed
+            if not (reported or failed):
+                pending.append(item)
+        for group in self.attention_groups(task, pending):
+            events = [attention_event(item) for item in group]
+            if group[0].get("task") != task["id"] and not per_shard and not final:
+                with self.attention_lock:
+                    held = any(event in self.attention_held for event in events)
+                    self.attention_held.update(events)
+                if not held:
+                    continue
+            text = self.attention_text(task, group[0]) if len(group) == 1 else self.merged_attention_text(task, group)
+            sent = self.send_to_session(task, text, events[0])
+            with self.attention_lock:
+                self.attention_held.difference_update(events)
+            if sent:
+                self.note_attention_reported(group)
+            if not sent:
+                with self.inbox_lock:
+                    self.inbox_failed.update(events)
+
+    def attention_groups(self, task, items):
+        """发给会话的提醒怎么合（文件头 ⑥「要处置的提醒」）：说的是父任务自己的一项一组；说的是子任务的，种类、档、原因都相同的合成一组（分片排久那一种，
+        几十片同一刻同一档、原因逐字相同），组里照任务号从小到大。→ [[项…]…]，次序照每组头一项在 items 里的次序。task wait 那一侧不经这里、照旧逐项报。
+        弄坏开关 inbox-attention-per-shard 下照改前一项一组（逐片各发一条）。"""
+        if lib.broken("inbox-attention-per-shard", self.environment):
+            return [[item] for item in items]
+        groups = {}
+        for index, item in enumerate(items):
+            key = ("own", index) if item.get("task") == task["id"] else ("children", item.get("kind"), item.get("tier"), item.get("repush", 0), item.get("why"))
+            groups.setdefault(key, []).append(item)
+        return [sorted(group, key=lambda item: int(item.get("task") or 0)) for group in groups.values()]
+
+    def merged_attention_text(self, task, group):
+        """几片子任务合成的那一条提醒的正文（attention_groups）：第一行「task-server：任务 <父任务号> <种类>（第 <档> 档，子任务 <号的区间>，共 <几> 片）」，
+        再写依据（照号最小的那一片）、原因、出路（照号最小的那一片，别的片换成那一片的号）、日志（那一片的），末尾是那一片的 TASK_SERVER_ATTENTION 一行原样。"""
+        first = group[0]
+        found = self.store.task(first["task"])
+        log = self.task_log_path(found[0]) if found is not None and found[1] else ""
+        repushed = f"，没处置、第 {first['repush']} 回再推" if first.get("repush") else ""
+        return "\n".join([f"{INBOX_HEADLINE}任务 {task['id']} {first['kind']}（第 {first['tier']} 档{repushed}，子任务 {task_id_ranges([item['task'] for item in group])}，共 {len(group)} 片）",
+                          *self.repush_lines(first),
+                          f"依据：{first.get('basis')}（子任务 {first['task']}；同一档同一原因的各片合成这一条）", f"原因：{first.get('why')}",
+                          f"出路：{first.get('next')}（以子任务 {first['task']} 为例，别的片换成那一片的号）", f"日志：{log or '无（还没起过）'}",
+                          lib.attention_line(task["id"], first)])
+
+    def push_suspects(self, task):
+        """这条任务（分片的连同子任务）在跑的尝试正疑似卡住、这一段还没报的，发给提交它的会话；记账与 wait 同一份 suspect_reported（一段只报一次）。
+        弄坏开关 inbox-reported-every-round 下报过的照发。"""
+        records = [task]
+        if task.get("sharded_entry") or task.get("item_entry"):
+            with contextlib.suppress(StoreRefused):
+                records += self.children_of(task["id"])
+        for record in records:
+            for attempt, valid in self.store.attempts_of(record["id"]):
+                suspect = attempt.get("suspect") or {}
+                if not valid or attempt.get("state") not in ACTIVE_ATTEMPT_STATES or not suspect.get("active"):
+                    continue
+                event = ("suspect", attempt["id"], suspect.get("segment"))
+                with self.suspect_lock:
+                    reported = self.suspect_reported.get(attempt["id"]) == suspect.get("segment") and not lib.broken("inbox-reported-every-round", self.environment)
+                with self.inbox_lock:
+                    failed = event in self.inbox_failed
+                if reported or failed:
+                    continue
+                if self.send_to_session(task, self.suspect_text(task, record, attempt, suspect), event):
+                    with self.suspect_lock:
+                        self.suspect_reported[attempt["id"]] = suspect.get("segment")
+
+    def outcome_text(self, reply):
+        """结局那一条的正文：第一行「task-server：任务 <号> <结局>（退 <码>）」，再写原因、出路、日志（照 wait 打的 TASK_SERVER_REASON 的 why、next 与末行的 log），末尾是 wait 的末行原样。"""
+        task = reply["task"]
+        fields = dict(lib.reply_reason_fields(reply))
+        attempts = lib.outcome_attempts(reply)
+        return "\n".join([f"{INBOX_HEADLINE}任务 {task['id']} {task.get('outcome')}（退 {task.get('exit_code')}）", *self.flag_lines(task),
+                          f"原因：{fields.get('why')}", f"出路：{fields.get('next')}",
+                          f"日志：{(attempts[-1].get('log') if attempts else '') or '无（一次都没起）'}", lib.reply_result_line(reply, self.environment)])
+
+    def attention_text(self, task, item):
+        """要处置的提醒那一条的正文：第一行「task-server：任务 <号> <种类>（第 <档> 档）」，再写依据、原因、出路、日志（照 wait 打的 TASK_SERVER_ATTENTION），末尾是那一行原样。"""
+        part = f"，子任务 {item['task']}" if item.get("task") != task["id"] else ""
+        repushed = f"，没处置、第 {item['repush']} 回再推" if item.get("repush") else ""
+        found = self.store.task(item["task"])
+        log = self.task_log_path(found[0]) if found is not None and found[1] else ""
+        return "\n".join([f"{INBOX_HEADLINE}任务 {task['id']} {item['kind']}（第 {item['tier']} 档{repushed}{part}）", *self.flag_lines(task), *self.repush_lines(item),
+                          f"依据：{item.get('basis')}", f"原因：{item.get('why')}",
+                          f"出路：{item.get('next')}", f"日志：{log or '无（还没起过）'}", lib.attention_line(task["id"], item)])
+
+    def repush_lines(self, item):
+        """再推的那一回（item 带 repush）正文另写的两行：之前推过什么（attention_history_of 里这一种最近几回：隔了多久、第几档、当时的依据），此刻还差什么（这一行的修改意见）；
+        不是再推的交 []。"""
+        if not item.get("repush"):
+            return []
+        now = time.time()
+        history = self.attention_history_of(item["task"], item["kind"])[-3:]
+        shown = "；".join(f"{(now - float(entry.get('at') or now)) / 60:.0f} 分钟前报过第 {entry.get('tier')} 档"
+                         + (f"（第 {entry['repush']} 回再推）" if entry.get("repush") else "") + f"：{entry.get('basis')}" for entry in history)
+        return [f"之前推过：{shown or '库里读不到推过的记录'}",
+                f"此刻还差：{item.get('next')}（满 {self.anomaly_repush_seconds * 2 ** (item['repush'] - 1):.0f} 秒还没人处置，服务再推这一回）"]
+
+    def suspect_text(self, task, record, attempt, suspect):
+        """疑似卡住那一条的正文：第一行「task-server：任务 <号> suspected-stall（疑似卡住，第 <段> 段）」，再写依据、出路、日志（照 wait 打的 TASK_SERVER_SUSPECT），末尾是那一行原样。"""
+        part = f"，子任务 {record['id']}" if record["id"] != task["id"] else ""
+        shown = dict(suspect, attempt=attempt.get("number"), host=attempt.get("host"), log=attempt.get("log"))
+        return "\n".join([f"{INBOX_HEADLINE}任务 {task['id']} suspected-stall（疑似卡住，第 {suspect.get('segment')} 段{part}）", f"依据：{suspect.get('why')}",
+                          f"出路：任务照跑、服务不停它；{lib.anomaly_advice('suspected-stall', task['id'], self.environment)}（结局照发）",
+                          f"日志：{attempt.get('log') or '无'}", lib.suspect_line(task["id"], shown)])
+
+    def health_recipients(self):
+        """名下有在排、在跑任务（分片与估算的父任务也算）、此刻照会话号找得到收件 socket 的会话（inbox_reachable）：{会话: 它最新那一条这样的任务}（服务健康发给它们）。"""
+        recipients = {}
+        for task, valid in self.store.select("tasks", "state != 'finished'"):
+            if valid and not task.get("parent_id") and self.inbox_reachable(task):
+                recipients[task.get("session", "")] = task   # 照任务号从小到大：留最新那一条的地址
+        return recipients
+
+    def health_problems(self):
+        """服务自己盯的健康（文件头 ⑥「服务健康」）：库写不写得进（试写一行）、派活判排头能起却一直没起成与看进展
+        （/health 的 problem 读的那两句，排队线程每一轮算好的）、自己的单元在不在（is-active 的输出）、NFS 共享前三项（nfs_loop 复核的那一份）、
+        第二台用不了满 peer_unavailable_notify_seconds（note_peer 记的）。→ [(种类, 名字, 那一句)]。"""
+        problems = []
+        writable, problem = self.store.health_write()
+        if not writable:
+            problems.append(("database-unwritable", "库写不进", f"库写不进：{problem}"))
+        if self.starved_text:
+            problems.append(("head-not-started", "派活判排头能起却一直没起成", self.starved_text))
+        if self.progress_text:
+            problems.append(("no-progress", "看进展：放得下却一直一条都没起", self.progress_text))
+        state = own_unit_state(self.environment)
+        if state not in lib.RUNNING_UNIT_STATES:
+            problems.append(("unit-missing", "单元不在", f"单元 {lib.UNIT_NAME} 不在（is-active 打的是「{state}」）"))
+        nfs = self.nfs_snapshot()
+        if not nfs.get("ok", True):
+            problems.append(("nfs", "NFS 共享判不过", f"NFS 共享判不过：{nfs.get('problem')}（出路：{nfs.get('next_step')}）"))
+        peer = self.peer_health()
+        since = peer.get("since")
+        if peer.get("available") is False and isinstance(since, (int, float)) and time.time() - since >= self.peer_unavailable_notify_seconds:
+            problems.append(("peer-unavailable", "第二台用不了", f"第二台用不了已 {time.time() - since:.0f} 秒：{peer.get('why')}（派得到第二台的这时只派本机）"))
+        return problems
+
+    def watch_health(self):
+        """服务健康（文件头 ⑥）：查出一样，往每个名下有在排、在跑任务的会话发一条「task-server：服务健康 <哪一样>」；同一样对同一个会话只发一次，
+        这一轮查不出了（好了）就忘掉，再坏再发。没有要发给的会话时不查（试写库、起 systemctl 都省掉），记下的也忘掉。
+        弄坏开关 health-unwatched 下不查不发，health-alerted-every-round 下每一轮照发。"""
+        if lib.broken("health-unwatched", self.environment):
+            return
+        recipients = self.health_recipients()
+        if not recipients:
+            self.health_notified.clear()
+            return
+        problems = self.health_problems()
+        found = {kind for kind, _, _ in problems}
+        for kind in [kind for kind in self.health_notified if kind not in found]:
+            say(f"  · 服务健康：{kind} 好了")
+            del self.health_notified[kind]
+        for kind, name, line in problems:
+            told = self.health_notified.setdefault(kind, set())
+            for session, task in recipients.items():
+                if session in told and not lib.broken("health-alerted-every-round", self.environment):
+                    continue
+                told.add(session)   # 发不出去也记下：同一样不对这个会话重试到死（send_to_session 写了告警）
+                self.send_to_session(task, "\n".join([f"{INBOX_HEADLINE}服务健康 {name}", f"问题：{line}", f"出路：{HEALTH_NEXT_STEP}"]), None)
 
     def selftest_advance_fault(self):
         """只在自证里：TASK_SERVER_SELFTEST_ADVANCE_FAILS=<文件>，那份文件在时 drive_sharded_parents 每推一个父任务先抛一个错（演分片父任务推不动）。"""
@@ -2818,24 +4135,72 @@ class Scheduler:
             return None
 
     def scope_memory_peak(self, attempt):
-        """这一次尝试外层 scope（内存包装给它开的、尝试目录的 scope 文件记着）此刻的 memory.peak，字节；读不到（第二台、还没采到 scope）交 None。"""
+        """这一次尝试进程内存（anon 加 shmem）见过的最大，字节：attempt_runner 每轮采、涨了就写进尝试目录的 memory_peak（文件头 ①「顶在上限上卡住」）；
+        读不到（还没采到）交 None。弄坏开关 memory-peak-with-page-cache 下照改前读外层 scope（尝试目录的 scope 文件记着）的 memory.peak（含页缓存）。"""
         try:
-            with open(self.attempt_paths(attempt)[2], encoding="utf-8") as handle:
-                scope = handle.read().strip()
-            with open(os.path.join(scope, "memory.peak"), encoding="utf-8") as handle:
+            if lib.broken("memory-peak-with-page-cache", self.environment):
+                with open(self.attempt_paths(attempt)[2], encoding="utf-8") as handle:
+                    scope = handle.read().strip()
+                with open(os.path.join(scope, "memory.peak"), encoding="utf-8") as handle:
+                    return int(handle.read().strip())
+            with open(os.path.join(attempt.get("directory", ""), lib.MEMORY_PEAK_FILE_NAME), encoding="utf-8") as handle:
                 return int(handle.read().strip())
         except (OSError, ValueError):
             return None
 
+    def scope_memory_current(self, attempt):
+        """这一次尝试外层 scope（内存包装给它开的、尝试目录的 scope 文件记着）此刻进程用的内存（memory.stat 的 anon 加 shmem，memory_peaks_lib 的 process_memory_bytes），
+        字节；读不到（还没采到 scope、scope 已收尾）交 None（本机的 Machine.memory_now；judge_stall_stop 判贴着上限用）。
+        弄坏开关 memory-peak-with-page-cache 下照改前读 memory.current（含页缓存）。"""
+        try:
+            with open(self.attempt_paths(attempt)[2], encoding="utf-8") as handle:
+                scope = handle.read().strip()
+            if lib.broken("memory-peak-with-page-cache", self.environment):
+                with open(os.path.join(scope, "memory.current"), encoding="utf-8") as handle:
+                    return int(handle.read().strip())
+        except (OSError, ValueError):
+            return None
+        return self.peaks.process_memory_bytes(scope) or None   # 0 是 scope 已收尾（目录不在）：同读不到
+
+    def scope_blocked_processes(self, attempt):
+        """这一次尝试此刻在 D 状态（不可中断的 IO 等待）的进程数（本机的 Machine.io_blocked；文件头 ①「卡在 IO 上」）：数的是尝试目录 started 记的 runner 进程号
+        连同它的子孙（照父进程号往下：单元里的与内存包装、里层包装各开的 scope 里的都在内）与外层 scope（尝试目录的 scope 文件记着）cgroup.procs 里的进程，
+        各读 <proc_root>/<号>/stat 的状态字段；进程号与 scope 两样都读不到交 None，读不到状态的那几个进程跳过。"""
+        _, started_path, scope_path = self.attempt_paths(attempt)
+        members, readable = set(), False
+        try:
+            with open(started_path, encoding="utf-8") as handle:
+                runner = int(handle.read().strip())
+            members |= descendant_processes(runner, self.proc_root) | {runner}
+            readable = True
+        except (OSError, ValueError):
+            pass
+        try:
+            with open(scope_path, encoding="utf-8") as handle:
+                scope = handle.read().strip()
+        except OSError:
+            scope = ""
+        listed = cgroup_processes(scope) if scope else None
+        if listed is not None:
+            members |= {int(word) for word in listed if word.isdigit()}
+            readable = True
+        if not readable:
+            return None
+        return sum(1 for member in members if process_run_state(member, self.proc_root) == "D")
+
     def log_content(self, attempt):
-        """→ 日志里算「在涨」的那部分字节数（读不到交 -1）。两台同一段：整份的大小减去起法那一层打的进度行（MULTI_HOST_RUN_STEP、MULTI_HOST_RUN_PEER_CPU）；
-        从上次读到的位置接着读整行，最近一行 MULTI_HOST_RUN_PEER_CPU 的 usage_usec 记进 log_offsets（第二台的 Machine.cpu_usec 读它）。"""
+        """→ 日志里算「在涨」的那部分字节数（读不到交 -1）。两台同一段：整份的大小减去起法那一层打的进度行（MULTI_HOST_RUN_STEP、MULTI_HOST_RUN_PEER_CPU、
+        MULTI_HOST_RUN_PEER_MEMORY、MULTI_HOST_RUN_PEER_IO_WAIT）与服务自己接的 lib.INBOX_LOG_MARK 那一行；从上次读到的位置接着读整行，最近一行 MULTI_HOST_RUN_PEER_CPU 的 usage_usec 记进 log_offsets（第二台的 Machine.cpu_usec 读它），
+        最近一行 MULTI_HOST_RUN_PEER_MEMORY 的此刻内存与读到过的峰值记进 peer_memory（第二台的 Machine.memory_now 读它），
+        这一回读到的几行 MULTI_HOST_RUN_PEER_IO_WAIT 里最少的 blocked（有一行 read=no 记 None；一行都没读到不动）记进 peer_io_wait（第二台的 Machine.io_blocked 读它）。"""
         path = attempt.get("log", "")
         try:
             size = os.path.getsize(path)
         except OSError:
             return -1
         offset, noise, cpu = self.log_offsets.get(attempt["id"], (0, 0, None))
+        memory = self.peer_memory.get(attempt["id"], (None, None))
+        blocked_rounds = []   # 这一回读到的每一行 MULTI_HOST_RUN_PEER_IO_WAIT：blocked，read=no 记 None
         with contextlib.suppress(OSError), open(path, "rb") as handle:
             while size > offset:   # 一次至多读 LOG_SCAN_BYTES：服务重启之后头一回接着读的是整份日志
                 handle.seek(offset)
@@ -2848,10 +4213,20 @@ class Scheduler:
                     found = PEER_CPU_LINE.match(text)
                     if found:
                         cpu = int(found.group(2)) if found.group(3) == "yes" else cpu
-                    if found or text.startswith("MULTI_HOST_RUN_STEP "):
+                    held = PEER_MEMORY_LINE.match(text)
+                    if held:   # read=no：这一轮没读到，此刻的不算数、峰值照留
+                        memory = (int(held.group(2)), max(int(held.group(3)), memory[1] or 0)) if held.group(4) == "yes" else (None, memory[1])
+                    waited = PEER_IO_WAIT_LINE.match(text)
+                    if waited:
+                        blocked_rounds.append(int(waited.group(2)) if waited.group(3) == "yes" else None)
+                    if found or held or waited or text.startswith(("MULTI_HOST_RUN_STEP ", lib.INBOX_LOG_MARK + " ")):   # 发消息没发出去的那一行（文件头 ⑥）同样不算在涨
                         noise += len(line)
                 offset += len(complete)
         self.log_offsets[attempt["id"]] = (offset, noise, cpu)
+        if memory != (None, None):
+            self.peer_memory[attempt["id"]] = memory
+        if blocked_rounds:   # 上一回之后的几轮取最少的：有一轮没有 D 状态的进程或读不到，就不算每一轮都在等 IO
+            self.peer_io_wait[attempt["id"]] = None if None in blocked_rounds else min(blocked_rounds)
         return size - noise
 
     def finish_attempt(self, task, attempt, result):
@@ -2871,6 +4246,11 @@ class Scheduler:
         outcome = lib.classify_attempt(exit_code, judged_host, tail, cancelled, self.environment)
         if attempt.get("stalled") and not cancelled and (result is None or result.get("stopped_signal")):
             outcome = "memory-cap-hit" if attempt.get("stalled_at_cap") else "stalled"   # 顶在上限上卡住的按撞上限办（judge_stall_stop）
+        if attempt.get("over_limit") and not cancelled and (result is None or result.get("stopped_signal")):
+            outcome = "over-two-hours"   # 跑满两小时被服务停的（judge_run_limit）
+        if outcome == "memory-cap-hit" and not attempt.get("stalled_at_cap") and not lib.broken("cap-hit-stat-unreported", self.environment):
+            # 内存包装判出撞上限那一刻打的内存明细（run-with-memory-cap.sh 文件头「撞上限那一刻的内存明细」）：抄进结局说明，分得清是堆还是页缓存
+            attempt["oom_stat_note"] = lib.oom_stat_note(tail)
         if outcome == "card-fault":   # 清场点名的坏卡（task_server_lib.py 文件头「错误类型」card-fault 那一行）：settle_attempt 停用、告警与结局句点名的都是它们
             attempt["faulty_cards"] = lib.card_fault_cards(tail)
             assigned = card_key(attempt.get("card"))
@@ -2906,17 +4286,22 @@ class Scheduler:
         say(f"TASK_CLEANUP time={time.time():.6f} attempt={attempt['id']} card={attempt.get('card', '')} status=confirmed")
         self.log_growth.pop(attempt.get("id"), None)
         self.log_offsets.pop(attempt.get("id"), None)
+        self.peer_memory.pop(attempt.get("id"), None)
+        self.peer_io_wait.pop(attempt.get("id"), None)
+        self.io_waits.pop(attempt.get("id"), None)
+        self.card_loads.pop(attempt.get("id"), None)
         self.cpu_windows.pop(attempt.get("id"), None)   # suspect_reported 不删：wait 那一侧可能刚读到这一次还在跑，删了会把报过的那一段再报一遍
-        attempt.update(state="ended", exit_code=exit_code, outcome=outcome, ended_at=round((result or {}).get("ended_at") or time.time(), 3))
+        attempt.update(state="ended", exit_code=exit_code, outcome=outcome, ended_at=round((result or {}).get("ended_at") or time.time(), 3),
+                       peak_metric=lib.PROCESS_MEMORY_PEAK_METRIC)   # 峰值口径一栏（task_server_lib.py 文件头「资源记录」）：这一版记的都是进程内存
         attempt["seconds"] = round(attempt["ended_at"] - attempt.get("started_at", attempt["ended_at"]), 3)
         if result and not lib.broken("resources-unrecorded", self.environment):
-            for name in ("memory_peak", "cpu_usec", "cores", "gpu_memory_peak"):
+            for name in ("memory_peak", "cpu_usec", "cores", "gpu_memory_peak", "build_phase_peak"):   # build_phase_peak：编译段峰值，编译族只借它（文件头 ②「内存」的编译族）
                 attempt[name] = result.get(name)
             attempt["build_peak"] = result.get("build_directory_peak")
             if result.get("seconds") is not None:
                 attempt["seconds"] = result["seconds"]
         if not lib.broken("resources-unrecorded", self.environment):
-            # 起法那一层打进日志的峰值（Machine.ended_peaks：第二台是 multi-host-run.sh 打的 MULTI_HOST_RUN_PEER_MEMORY_PEAK 与 MULTI_HOST_RUN_PEER_BUILD_PEAK）：
+            # 起法那一层打进日志的峰值（Machine.ended_peaks：第二台是 multi-host-run.sh 打的 MULTI_HOST_RUN_PEER_MEMORY_PEAK、MULTI_HOST_RUN_PEER_BUILD_PEAK 与编译段峰值那一行）：
             # attempt_runner 量不到的那一项照它记
             for name, value in machine.ended_peaks(tail).items():
                 if attempt.get(name) is None:
@@ -3041,6 +4426,9 @@ class Scheduler:
             record = read_json_file(path)
             if record and record.get("status") == "confirmed":
                 return True, ""
+        leftovers = [str(line)[:200] for line in ((record or {}).get("scope_leftovers") or [])][:PEER_SCOPE_LEFTOVERS_SHOWN]
+        if leftovers:   # multi-host-run.sh 停了第二台这一趟内存包装的 scope 还留着进程（它文件头 ⑥）：说明写留下的进程，提醒换成核脚本的那一句
+            return False, f"{PEER_SCOPE_LEFTOVERS_MARK}{'；'.join(leftovers)}（清理回执 {path}）"
         return False, f"远端清理回执未确认（{path}），尚不能归还显卡"
 
     def stop_leftovers(self, attempt, result):
@@ -3137,8 +4525,15 @@ class Scheduler:
             return
         counts = dict(task.get("outcome_counts") or {})
         counts[outcome] = counts.get(outcome, 0) + 1
+        if outcome == "over-two-hours":   # 跑满两小时打回（task_server_lib.py 文件头「错误类型」）：不重排，原号停在这一种，等提交它的会话确认（文件头 ⑦）
+            note = (attempt.get("run_limit_note") or "累计跑满两小时") + "；" + self.finished_preface(task, attempt, outcome)
+            self.finalize(task, outcome, exit_code, note.rstrip("；"), outcome_counts=counts,
+                          **({} if task.get("parent_id") else {"requeue_command": self.requeue_command_text(task)}))
+            return
         # 结局与重排的说明前面写明（task status 的说明一行看得见）：顶在上限上卡住的那一次（judge_stall_stop）
         at_cap = f"{attempt.get('stall_note')}；" if (outcome == "memory-cap-hit" and attempt.get("stalled_at_cap")) or (outcome == "stalled" and attempt.get("stall_note")) else ""   # 判卡住的依据写进说明，不再是「没有说明」
+        if outcome == "memory-cap-hit" and attempt.get("oom_stat_note"):   # 撞上限那一刻的内存明细（finish_attempt 记的）：重排与打回的说明同样写
+            at_cap += f"{attempt['oom_stat_note']}；"
         leftover = f"{attempt['leftover_note']}；" if attempt.get("leftover_note") else ""   # 命令退出之后留下的进程停掉了（stop_leftovers）：重排的说明同样写
         outcome_preface = at_cap
         if outcome == "memory-cap-hit" and attempt.get("prediction") == lib.PINNED_HISTORY and not lib.broken("pinned-cap-grown", self.environment):
@@ -3232,6 +4627,11 @@ class Scheduler:
         交给提交它的会话用 task clean 删；有进程还开着里面的文件就不删、写告警（同 remove_build_directory）。弄坏开关 finished-build-kept 下照改前留着。"""
         if lib.broken("finished-build-kept", self.environment):
             return
+        with self.build_removal_lock:   # 取消之后删产物那一侧同一把锁（remove_cancelled_artifacts）
+            self.remove_finished_build_directories_locked(task)
+
+    def remove_finished_build_directories_locked(self, task):
+        """remove_finished_build_directories 拿着 build_removal_lock 做的那一段。"""
         # 留现场的只留本机那几份（task clean 删的就是它们）；第二台留着的照删：task clean 不连第二台，改前第二台那一份跑完就删
         keep_local = (task.get("environment") or {}).get("SINGLEFS_KEEP_TEST_TEMPORARY_FILES") == "1"
         handled = set()   # 重排接着用的几次尝试记的是同一个目录：删一次，几条记录都记成已删
@@ -3260,6 +4660,122 @@ class Scheduler:
             if valid:
                 with contextlib.suppress(Exception):   # 一条删不成（记录坏了、文件在用）不挡别的条；没删成的已写告警
                     self.remove_finished_build_directories(task)
+
+    def cancel_artifact_sizes(self, task_id):
+        """取消一开始量（文件头「接口」的取消）：这条任务（分片与估算的连同子任务）各次尝试还没删的编译目录删前多大、此刻在起与在跑的尝试是哪几次。
+        → {"sizes": {(台, 目录): 字节，第二台本地盘上的是 None}, "active": {尝试记录的 id…}}；名下有校验不过的子任务行交空的（取消那一侧照 record-tampered 办，一份都不删）。"""
+        before = {"sizes": {}, "active": set()}
+        try:
+            owners = [task_id] + [child["id"] for child in self.children_of(task_id)]
+        except StoreRefused as refused:
+            if refused.kind != "tampered":
+                raise
+            return before
+        for owner in owners:
+            for attempt, valid in self.store.attempts_of(owner):
+                if not valid:
+                    continue
+                if attempt.get("state") in ACTIVE_ATTEMPT_STATES:
+                    before["active"].add(attempt.get("id"))
+                directory, host = attempt.get("build_directory"), attempt.get("host") or LOCAL
+                if directory and not attempt.get("build_directory_removed"):
+                    before["sizes"].setdefault((host, directory), directory_bytes(directory) if host == LOCAL and os.path.lexists(directory) else None)
+        return before
+
+    def remove_cancelled_artifacts(self, task_id, before):
+        """取消收尾之后删产物（文件头「接口」的取消；用户：「取消的任务要自己删掉产物 不要残留」「这个加入流程中 让task server去做」）：这条任务（分片与估算的连同子任务）
+        每一次尝试的编译目录与现场目录（设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 的也删），派到第二台那一趟的本地目录照日志里 multi-host-run.sh ⑥ 那一行认（cancelled_attempt_artifacts）。
+        before 是 cancel_artifact_sizes 在取消一开始量的。逐份写进每条任务最后一次尝试的日志；没删成的写告警 build-directory-left。
+        → {"removed": [份…], "left": [份…], "lines": [给回话与日志的行…]}。弄坏开关 cancelled-artifacts-kept 下不删、交空的。"""
+        if lib.broken("cancelled-artifacts-kept", self.environment):
+            return {"removed": [], "left": [], "lines": []}
+        try:
+            owners = [task_id] + [child["id"] for child in self.children_of(task_id)]
+        except StoreRefused as refused:
+            if refused.kind != "tampered":
+                raise
+            return {"removed": [], "left": [], "lines": [f"  ✗ {self.children_refused(task_id, refused, '取消之后一份产物都不删')}"]}
+        removed, left, every_line, handled = [], [], [], set()
+        with self.build_removal_lock:   # 记下结局时删的那一侧（remove_finished_build_directories）同一把锁：先到的删，后到的回读
+            for owner in owners:
+                attempts = [attempt for attempt, valid in self.store.attempts_of(owner) if valid]
+                lines = []
+                for attempt in attempts:
+                    for item in self.cancelled_attempt_artifacts(attempt, before, handled):
+                        (removed if item["gone"] else left).append(item)
+                        lines += cancelled_artifact_lines(item)
+                        if not item["gone"]:
+                            self.alert("build-directory-left", owner, f"任务 {owner} 取消之后{item['path']} 没删掉：{item['why']}", item["howto"])
+                if attempts and lines:
+                    append_log_lines(attempts[-1].get("log", ""), lines + [f"  · 取消之后删产物：这条任务删了 {sum(1 for line in lines if line.startswith('  · '))} 份、"
+                                                                           f"没删成 {sum(1 for line in lines if line.startswith('  ✗ '))} 份"])
+                every_line += lines
+        every_line.append(f"  · 取消之后删产物：删了 {len(removed)} 份、没删成 {len(left)} 份" if removed or left
+                          else "  · 取消之后删产物：各次尝试都没留下编译目录、现场目录与第二台的本地目录，没有要删的")
+        return {"removed": removed, "left": left, "lines": every_line}
+
+    def cancelled_attempt_artifacts(self, attempt, before, handled):
+        """一次尝试取消之后的产物（remove_cancelled_artifacts 用）：→ [{task, attempt, host, kind, path, bytes_before, bytes_after, gone, how, why, howto}]。
+        编译目录（本机就地删、第二台留着的经 multi-host-run.sh --remove-build-directory 删）：这里还在的删、回读，已被记下结局那一侧删了的照取消一开始量的报删前；
+        现场目录（共享工作根下 SCENES_ROOT_NAME/<尝试标签>，两台同一个绝对路径）：在的量了大小就地删、回读；
+        取消时在起、在跑的第二台那一次：日志里有 PEER_TRIP_REMOVED_MARK 那一行（「回读不在了」）算 multi-host-run.sh 删了这一趟的本地目录与 runs/ 下三个文件；
+        没有那一行的先读这一次的清理回执（peer_cleanup_file）：还是 not-started、日志里也没有 PEER_TRIP_BUILT_MARKS 那两行的，multi-host-run.sh 还没建这一趟的本地目录，
+        当已清理、不列（与 confirm_peer_cleanup 认 not-started 同一口径）；回执到过 pending（pending、confirmed）、读不了、没有回执，或建过目录的，算没删成。
+        弄坏开关 cancel-not-started-receipt-unread 下不读回执，没有那一行一律算没删成。
+        handled 记删过的（台, 目录）：重排接着用的几次记的是同一份，只报一次。"""
+        items = []
+        host = attempt.get("host") or LOCAL
+        machine = self.machines.get(host) or self.machines[LOCAL]
+        base = {"task": attempt.get("task_id"), "attempt": attempt.get("number"), "host": host}
+        directory = attempt.get("build_directory")
+        key = (host, directory)
+        if directory and key not in handled and (key in before["sizes"] or not attempt.get("build_directory_removed")):
+            handled.add(key)
+            size = before["sizes"].get(key)
+            item = dict(base, kind="编译目录", path=directory, bytes_before=size, bytes_after=0, gone=True, why="", howto=machine.removal_howto(directory))
+            present = (os.path.lexists(directory) if host == LOCAL else not attempt.get("build_directory_removed"))
+            if not present:
+                item["how"] = "记下结局时已删、回读不在了"
+            else:
+                if host == LOCAL and size is None:
+                    item["bytes_before"] = directory_bytes(directory)
+                done, lines = machine.remove_build_directory(directory)   # 本机删完回读不在了才交 True；第二台经 --remove-build-directory 回读
+                gone = done and (not os.path.lexists(directory) if host == LOCAL else True)
+                item.update(gone=gone, how="这一次取消删的、回读不在了" if gone else "",
+                            why="" if gone else ("；".join(line.strip() for line in lines if line.strip()) or "删完还在"),
+                            bytes_after=0 if gone else (directory_bytes(directory) if host == LOCAL else None))
+                if gone:
+                    attempt["build_directory_removed"] = True
+                    self.store.update("attempts", attempt)
+            items.append(item)
+        scene = attempt.get("scene_directory")
+        if scene and os.path.lexists(scene) and ("scene", scene) not in handled:   # 现场目录在共享工作根下，两台同一个绝对路径，就地删（task_server_lib.py 文件头「现场」）
+            handled.add(("scene", scene))
+            size = directory_bytes(scene)
+            shutil.rmtree(scene, ignore_errors=True)
+            gone = not os.path.lexists(scene)
+            items.append(dict(base, kind="现场目录", path=scene, bytes_before=size, bytes_after=0 if gone else directory_bytes(scene), gone=gone,
+                              how="这一次取消删的、回读不在了" if gone else "", why="" if gone else "rm 之后还在（权限不对或有进程在往里写）",
+                              howto=f"停掉往里写的进程，再 rm -r {shlex.quote(scene)}"))
+        if host == PEER and attempt.get("id") in before["active"]:
+            label = attempt.get("label") or "?"
+            trip = f"第二台这一趟的本地目录 builds/{label} 与 runs/ 下 {label}.pid、.exit、.log"
+            log_lines = log_tail(attempt.get("log", "")).splitlines()
+            reported = any(PEER_TRIP_REMOVED_MARK in line and PEER_TRIP_READ_BACK_MARK in line for line in log_lines)
+            receipt = read_json_file(attempt["peer_cleanup_file"]) if attempt.get("peer_cleanup_file") else None
+            receipt_status = receipt.get("status") if isinstance(receipt, dict) else None
+            built = any(mark in line for line in log_lines for mark in PEER_TRIP_BUILT_MARKS)
+            if not reported and receipt_status == "not-started" and not built and not lib.broken("cancel-not-started-receipt-unread", self.environment):
+                return items   # 第二台这一趟的本地目录还没建（同 confirm_peer_cleanup 认 not-started）：没有要删的，不列
+            receipt_text = ((f"清理回执 {receipt_status}" if receipt_status else "清理回执读不到" if attempt.get("peer_cleanup_file") else "这一次没有清理回执")
+                            + ("、日志里有建了这一趟的本地目录之后才打的那一行" if built else ""))
+            items.append(dict(base, kind="本地目录", path=trip, bytes_before=attempt.get("build_peak"), bytes_after=None if not reported else 0, gone=reported,
+                              how="multi-host-run.sh 的 ⑥ 删了、回读不在了" if reported else "",
+                              why="" if reported else (f"这一次尝试的日志里没有 multi-host-run.sh 打的「{PEER_TRIP_REMOVED_MARK} …{PEER_TRIP_READ_BACK_MARK}」那一行"
+                                                       f"（{receipt_text}），第二台那一份删没删判不了"),
+                              howto=(f"到第二台多机配置 BUILD_ROOT_BY_HOST 里它那一项的目录下核 builds/{label} 与 runs/{label}.pid / .exit / .log，"
+                                     "在的话先停开着它们的进程（python3 .claude/singlefs-ai-sop/scripts/proc.py stop <进程号>）再删")))
+        return items
 
     def remove_scenes(self, task_id):
         """删这条任务（分片的连同子任务）各次尝试的现场目录（task_server_lib.py 文件头「现场」）：→ (删了的 [{path, bytes}], 没删成的 [{path, bytes, kind, why}])。"""
@@ -3412,8 +4928,10 @@ class Scheduler:
             failed = {"task": child["id"], "role": child.get("role"), "index": child.get("shard_index", 0), "count": child.get("shard_count", 0),
                       "maximum_host": child.get("maximum_host", ""), "maximum_cap_text": child.get("maximum_cap_text", "")}
         try:
+            requeue = {"requeue_command": self.requeue_command_text(parent)} if outcome == "over-two-hours" else {}   # 分片的一片跑满两小时：确认的是整件（文件头 ⑦）
             parent = self.store.change("tasks", parent["id"], dict(state="finished", outcome=outcome, exit_code=lib.final_exit_code(outcome, child_exit),
-                                                                   finished_at=round(time.time(), 3), note=note or (child or {}).get("note", ""), failed_step=failed),
+                                                                   finished_at=round(time.time(), 3), note=note or (child or {}).get("note", ""), failed_step=failed,
+                                                                   **requeue),
                                        guard=lambda current: "已结了局" if current.get("state") == "finished" else "")
         except StoreRefused as refused:
             if refused.kind == "tampered":
@@ -3838,7 +5356,8 @@ class Scheduler:
         self.repass_soon = False
         started_on = {}   # {台: 这一轮在那台真起了几条（尝试在 starting 或 running）}：有的台一轮至多起 Machine.starts_per_pass 条
         queued = self.queue_order(queued, now)
-        self.keep_predictions_of({task["id"] for task, _ in queued})   # 不在队里了的（起了、收尾了）删掉存的预测
+        awaiting = {task["id"] for task, _ in self.store.select("tasks", "state = ?", (lib.AWAITING_CONFIRMATION_STATE,))}   # 确认单算过的预测留着，进队之后照用（文件头 ⑦）
+        self.keep_predictions_of({task["id"] for task, _ in queued} | awaiting)   # 不在队里了的（起了、收尾了）删掉存的预测
         view = PassView(self, "pass")   # 这一轮的余量：每台读一次、各条共用（文件头 ②「余量一轮只读一次」）
         gone = set()   # 这一轮起了或收尾了的任务号（判排头时跳过它们）
         self.pass_state = {"queued": queued, "gone": gone, "view": view}
@@ -3864,7 +5383,9 @@ class Scheduler:
                 if self.placement_refused and os.path.exists(self.placement_refused):
                     placement = Placement("blocked", why="自证：TASK_SERVER_SELFTEST_PLACEMENT_REFUSED 那份文件在，派活一律判不能起（演派活判法判错）")
                 else:
-                    placement = self.place(task, busy, view, None if self.aged(task, now) else alternation)
+                    # 满时限的照样过交替（文件头 ②「满时限」：整片不受挡、碎片只让排在它前面的整片）；弄坏开关 aged-fragment-bypasses-seal 下照改前满时限的一律不过交替
+                    bypass = self.aged(task, now) and lib.broken("aged-fragment-bypasses-seal", self.environment)
+                    placement = self.place(task, busy, view, None if bypass else alternation)
             except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
                 say(f"  ! 任务 {task['id']} 这一轮判不了放不放得下（{type(error).__name__}: {error}），留在队里")
                 waiting[task["id"]] = f"这一轮判不了放不放得下（{type(error).__name__}: {error}），下一轮再判"
@@ -3879,6 +5400,12 @@ class Scheduler:
                 continue
             if placement.kind == "unmet":
                 self.finalize(task, "run-condition-unmet", None, placement.why)
+                gone.add(task["id"])
+                continue
+            refusal = self.budget_check(task, view)   # 文件头 ②「预算」：记账超过每一台可用上限的当场打回，不进队空等；贴着整片界的记一条 oversized-budget
+            if refusal is not None:
+                self.finalize(task, "memory-cap-at-maximum", None, refusal["note"], maximum_host=refusal["host"], maximum_cap_text=refusal["cap_text"],
+                              maximum_peak_text=refusal["peak_text"])
                 gone.add(task["id"])
                 continue
             if placement.kind == "blocked":
@@ -3981,9 +5508,9 @@ class Scheduler:
         return any(path in WORKSPACE_WRITERS for path in relative)
 
     def placement_refusal(self, command, cwd, environment):
-        """提交时拒（文件头 ②「提交时拒」）：依次判 ① 共享根外的路径、② 共享根、③ 判定库、④ 临时 prune-server 包装里会编或要卡的，
+        """提交时拒（文件头 ②「提交时拒」）：依次判 ① 共享根外的路径、② 共享根、③ 判定库、④ 临时 prune-server 包装里会编或要卡的、⑤ 不点名包的全仓编译，
         命中头一种交 {problem: 那一句, next_step: 出路}，都没命中交 None。
-        environment 是这一条带进任务的环境（split_environment 收下的那几个）。四个弄坏开关各关一种。"""
+        environment 是这一条带进任务的环境（split_environment 收下的那几个）。五个弄坏开关各关一种。"""
         if not lib.broken("outside-path-accepted", self.environment):
             refusal = self.find_outside_shared_path(command, cwd)
             if refusal:
@@ -3997,7 +5524,55 @@ class Scheduler:
             if refusal:
                 return refusal
         if not lib.broken("temporary-service-heavy-accepted", self.environment):
-            return self.temporary_service_heavy_refusal(command, cwd, environment)
+            refusal = self.temporary_service_heavy_refusal(command, cwd, environment)
+            if refusal:
+                return refusal
+        if not lib.broken("whole-workspace-cargo-accepted", self.environment):
+            return self.whole_workspace_cargo_refusal(command, cwd, environment)
+        return None
+
+    def whole_package_refusal(self, command, cwd, environment, confirmation_path):
+        """⑥ 整包测试没带确认标识（文件头 ②「提交时拒」⑥）：给了确认文件的照 lib.whole_package_confirmation_problem 判形式，不合交 {problem, next_step}；
+        没给而命令是整包测试（cargo_runs 认的 cargo test 照 lib.whole_package_cargo_test，命令位置上的入口照 lib.whole_package_script）、又不是提交时的门禁的，交 {problem, next_step}；
+        别的交 None。弄坏开关 whole-package-unconfirmed-accepted 下没给标识的不判。"""
+        if confirmation_path:
+            problem = lib.whole_package_confirmation_problem(confirmation_path, self.containing_shared_root)
+            return {"problem": f"{problem}：这一条不收、不跑", "next_step": lib.WHOLE_PACKAGE_NEXT_STEP} if problem else None
+        if lib.broken("whole-package-unconfirmed-accepted", self.environment) or lib.commit_gate_exempt(list(command), cwd, environment, self.environment):
+            return None
+        reasons = [lib.whole_package_script(list(command), cwd)]
+        reasons += [lib.whole_package_cargo_test(run.rest) for run in self.cargo_runs({"command": list(command), "cwd": cwd, "environment": environment})
+                    if run.subcommand == "test"]
+        found = next((reason for reason in reasons if reason), "")
+        if not found:
+            return None
+        return {"problem": f"整包测试没带确认标识：{found}；日常开发的测试只点名改到的测试目标与测试函数，这一条不收、不跑", "next_step": lib.WHOLE_PACKAGE_NEXT_STEP}
+
+    def whole_workspace_cargo_refusal(self, command, cwd, environment):
+        """⑤ 不点名包的全仓编译（文件头 ②「提交时拒」⑤）：命令位置上直接起的 WHOLE_WORKSPACE_SUBCOMMANDS 那几种 cargo（cargo_runs 认的，入口脚本里面的不读）
+        带 --workspace / --all 的，或没带 -p / --package 而照 lib.cargo_manifest_scope 落到虚拟清单、起的目录认不出、清单读不了的，交 {problem, next_step}；
+        都点了包、落到包自己的清单、往上没有清单的交 None。"""
+        for run in self.cargo_runs({"command": list(command), "cwd": cwd, "environment": environment}):
+            if run.subcommand not in WHOLE_WORKSPACE_SUBCOMMANDS:
+                continue
+            values = lib.cargo_option_values(run.rest)
+            named = f"cargo {run.subcommand}"
+            flags = [flag for flag in WHOLE_WORKSPACE_FLAGS if values.get(flag)]
+            if flags:
+                problem = f"{named} 带了 {'、'.join(flags)}：编整个工作区的每一个包"
+            elif values["-p"]:
+                continue
+            elif run.directory is None:
+                problem = f"{named} 没点名包（-p / --package），起的目录认不出，判不了它编不编整个工作区"
+            else:
+                manifest, kind, why = lib.cargo_manifest_scope(run.directory)
+                if kind in (lib.MANIFEST_PACKAGE, lib.MANIFEST_NONE):
+                    continue
+                problem = (f"{named} 没点名包（-p / --package），在 {run.directory} 起，清单 {manifest} 读不了（{why}），判不了它编不编整个工作区"
+                           if kind == lib.MANIFEST_UNREADABLE else
+                           f"{named} 没点名包（-p / --package），在 {run.directory} 起、照工作区清单 {manifest} 编它的每一个成员")
+            return {"problem": f"{problem}：不点名包的全仓编译一条就占一整台，这一条不收、不跑",
+                    "next_step": WHOLE_WORKSPACE_NEXT_STEP}
         return None
 
     def temporary_service_heavy_refusal(self, command, cwd, environment):
@@ -4021,20 +5596,27 @@ class Scheduler:
                               "（会编或要卡的命令对真服务判，验证包的 cargo test 不套这层包装）")}
 
     def find_outside_shared_path(self, command, cwd):
-        """① 共享根外的路径（文件头 ②「提交时拒」）：读词与 scripts/hosts/multi-host-run.sh 的 multi_host_outside_shared_path 相同：整个词是绝对路径的、「名字=绝对路径」的值、
-        词里有空白的（bash -c 那一段）里每一段绝对路径（QUOTED_WORD_PATH；此刻在的、整个词就是一个带空白的路径的照整个词）；两台相同的系统路径（HOST_INDEPENDENT_PATHS）不判。
+        """① 共享根外的路径（文件头 ②「提交时拒」）：只认整个 shell 词是绝对路径的。命令的每个词：以 / 起头的整个词、「名字=绝对路径」「--选项=绝对路径」的值；
+        shell 的 -c 脚本那一个词（shell_script_word_indexes）照 shell 词切开（shell_word_paths），每个以 / 起头的 shell 词与「名字=」的值；
+        别的词中间夹着的 /（参数值里的「（接的是 /）」这类）不算。此刻在的、以 / 起头的整个词照整个词判；两台相同的系统路径（HOST_INDEPENDENT_PATHS）不判。
         相对路径照工作目录解，工作目录在共享根下它们也在。→ 头一个不在的 {problem, next_step}，都在交 None；落在 VOLATILE_ROOT 下的另说一句重启会清。
         紧跟在 ${…}、$(…) 后面的 /… 是展开之后的尾巴（编译目录这类运行时才给的），不当绝对路径；弄坏开关 expansion-tail-as-path 下照改前也当。
-        弄坏开关 quoted-word-paths-ignored 下不认词里的路径（改前的样子）。"""
+        弄坏开关 quoted-word-paths-ignored 下不认词里的路径（改前的样子）；path-check-substring 下每个带空白的词都按子串（QUOTED_WORD_PATH）认，词中间夹着的 / 也当路径。"""
         found = ""
         real_cwd = os.path.realpath(cwd)
         if not self.containing_shared_root(real_cwd):
             found, named = cwd, f"工作目录 {real_cwd}"
         else:
-            for word in command:
-                if any(character.isspace() for character in word) and not (word.startswith("/") and os.path.lexists(word)):
+            scripts = shell_script_word_indexes(command)
+            for index, word in enumerate(command):
+                if word.startswith("/") and os.path.lexists(word):
+                    candidates = [word]
+                elif lib.broken("path-check-substring", self.environment) and any(character.isspace() for character in word):
+                    candidates = QUOTED_WORD_PATH.findall(word)
+                elif index in scripts:
                     candidates = ([] if lib.broken("quoted-word-paths-ignored", self.environment)
-                                  else (QUOTED_WORD_PATH_BEFORE_EXPANSION_TAILS if lib.broken("expansion-tail-as-path", self.environment) else QUOTED_WORD_PATH).findall(word))
+                                  else shell_word_paths(word, SHELL_WORD_PATH_WITH_EXPANSION_TAILS) if lib.broken("expansion-tail-as-path", self.environment)
+                                  else shell_word_paths(word))
                 else:
                     value = word if word.startswith("/") else word.partition("=")[2]
                     candidates = [value] if value.startswith("/") else []
@@ -4241,6 +5823,67 @@ class Scheduler:
             result[host] = None if maximum is None else self.host_capacity(host, snapshot)[0]
         return result
 
+    def budget_check(self, task, view):
+        """预算（文件头 ②「预算」）：这一条在派得了的每一台上的记账（booked_at_cap）都超过那台可用上限（host_limit）的，交打回要的 {note, host, cap_text, peak_text}；
+        不打回的交 None，其中在某一台上不小于整片界（whole_threshold）的另把一项 oversized-budget 记进 budget_notices（同一条只记一次）。
+        判不了（量不到余量、预测读不了）的交 None、不记，下一轮再判。弄坏开关 budget-over-maxima-waits 下不打回，oversized-budget-silent 下不记。"""
+        human = self.host_dispatch.human
+        try:
+            prediction = self.prediction_of(task)
+            snapshot = view.snapshot(bool(task.get("gpu")))
+            judged = []   # [(台, 这台上的记账, 这台可用上限, 这台整片界)]
+            candidates = list(self.candidate_hosts(task, snapshot))
+            for host in candidates:
+                if host not in snapshot.reports:
+                    continue
+                limit = self.host_limit(prediction, host, snapshot)[0]
+                if limit is None:
+                    continue
+                booked = int(self.booked_at_cap(prediction, host, snapshot).memory_booked or 0)
+                judged.append((host, booked, limit, self.whole_threshold(host, snapshot)))
+        except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+            return None
+        if not judged:
+            return None
+        names = lib.HOST_NAMES
+        bookings = "、".join(f"{names.get(host, host)} {human(booked)}" for host, booked, _, _ in judged)
+        maxima = "、".join(f"{names.get(host, host)} {human(limit)}" for host, _, limit, _ in judged)
+        source = self.budget_source(task, prediction)
+        # 有一台此刻用不了（连不上、不在候选里）或量不到余量的不打回：它回来之后可能放得下（down-host-waits-not-never）；重排钉了台的只看那一台
+        every_host_judged = len(judged) == len(candidates) and (bool(task.get("next_host")) or all(snapshot.reachable.get(host) for host in MACHINE_ORDER))
+        if every_host_judged and all(booked > limit for _, booked, limit, _ in judged) and not lib.broken("budget-over-maxima-waits", self.environment):
+            host, booked, limit, _ = max(judged, key=lambda entry: entry[2])
+            return {"note": (f"预算超过整台：记账 {bookings}（{source}）比能派的每一台的可用上限（{maxima}，那台总上限减此刻的余量）都大，"
+                             "排着也永远起不来，一次都没起"),
+                    "host": host, "cap_text": lib.mebibytes_text(booked), "peak_text": lib.size_text(int(prediction.memory_predicted or 0) or None)}
+        whole_on = [host for host, booked, limit, threshold in judged if threshold <= booked <= limit]   # 不超过可用上限而不小于整片界：在那台上能起、起了占满一整台
+        if whole_on and task["id"] not in self.budget_notices and not lib.broken("oversized-budget-silent", self.environment):
+            thresholds = "、".join(f"{names.get(host, host)} {human(threshold)}" for host, _, _, threshold in judged)
+            self.budget_notices[task["id"]] = self.attention_item(
+                "oversized-budget", 1, task["id"], f"记账 {bookings}；可用上限 {maxima}；整片界（可用上限的 {WHOLE_FRACTION:.0%}）{thresholds}；记账从哪来：{source}",
+                (f"记账不小于{'、'.join(names.get(host, host) for host in whole_on)}的整片界：在那台上算整片，要等整台腾空才起，起了就占满一整台；"
+                 "一条命令要一整台的内存，多半是范围点多了、没分片或同时起的个数照上限开"))
+        return None
+
+    def budget_source(self, task, prediction):
+        """记账从哪来（budget_check 的依据）：照预测的 memory_history 说一句，照记录的另写近几次里用了几次。"""
+        human = self.host_dispatch.human
+        predicted = human(int(prediction.memory_predicted or 0))
+        history = prediction.memory_history
+        if history == lib.PINNED_HISTORY:
+            return f"钉值：多机配置 {lib.PIN_SOURCE} 里那一台那一项减余量（control pin-cap 钉的）"
+        if history == lib.RECORD_HISTORY:
+            measurements, _, _ = self.recorded_measurements(task)
+            return f"这把命令键记下的峰值（近 {min(len(measurements), RECORD_WINDOW)} 次里最大 {predicted}）× {lib.CAP_GROWTH_FACTOR}"
+        texts = {lib.BUILD_FAMILY_HISTORY: f"编译族 {task.get('build_family') or '?'} 近几次最高 {predicted} × {lib.CAP_GROWTH_FACTOR}",
+                 lib.KEY_HISTORY_PEAK_HISTORY: f"这把命令键近几次最高（撞过的上限、跑成的峰值）{predicted} × {lib.CAP_GROWTH_FACTOR}",
+                 lib.SHARD_FAMILY_HISTORY: f"同一计划的兄弟片近几次最高 {predicted} × {lib.CAP_GROWTH_FACTOR}",
+                 lib.WORKSPACE_WRITER_HISTORY: f"改主工作区的命令首趟给足：这把键与它的验证命令近几次最高之和 {predicted} × {lib.CAP_GROWTH_FACTOR}",
+                 lib.FAILED_PEAK_HISTORY: f"判红那一次的峰值 {predicted} × {lib.CAP_GROWTH_FACTOR}",
+                 lib.UNRECORDED_HISTORY: "没有记录的缺省",
+                 "retry": "撞了上限之后乘 1.5 重排的那一档"}
+        return texts.get(history, f"预测 {history}")
+
     def booked_at_cap(self, prediction, host, snapshot):
         """准入按上限记账（文件头 ②「内存」；用户：「谁超了杀谁 不要连累别人」）：这台上记的账取上限（收到这台的总上限减这台此刻的余量为止，host_limit），不取峰值；
         记账本来就比那个数大的（峰值就装不下）照原样，judge_host 照旧判永远放不下。只对 host_limit 交了数的台调，交不出数的抛 ValueError（不退回别的数）。
@@ -4270,6 +5913,11 @@ class Scheduler:
             return None
         capped = sum(int(attempt.get("memory_cap") or 0) for attempt, _ in self.store.select("attempts", "state IN ('starting', 'running')") if attempt.get("host") == host)
         return snapshot.total(host) - margin - capped
+
+    def beside_whole_capped(self, host):
+        """这台此刻挨着排头整片插空在跑的上限之和（字节）：尝试记了 gap_fill_beside_whole 的（Alternation.gap_fill 的内存那一支起的；文件头 ②「整片与碎片按台交替」的插空）。"""
+        return sum(int(attempt.get("memory_cap") or 0) for attempt, _ in self.store.select("attempts", "state IN ('starting', 'running')")
+                   if attempt.get("host") == host and attempt.get("gap_fill_beside_whole"))
 
     def verdict_within_the_formula(self, verdict, on_host, host, snapshot):
         """放得下的再过一遍公式（room_by_the_formula）：记账超过它就放不下。"""
@@ -4331,8 +5979,8 @@ class Scheduler:
         own_ended = completed_seen = False
         unfinished_counted = lib.broken("unfinished-peaks-counted", self.environment)   # 弄坏开关：哪种结局的峰值都进（改前的样子）
         for attempt, valid in self.store.select("attempts", "command_key = ? AND state = 'ended'", (task["command_key"],), order="id DESC LIMIT 200"):
-            if not valid:
-                continue
+            if not valid or not self.current_metric(attempt):
+                continue   # 没写峰值口径的旧行（批 92 之前记的含页缓存）不读（task_server_lib.py 文件头「资源记录」的峰值口径一栏）
             own_ended = True
             outcome = attempt.get("outcome")
             cap_hit = outcome in lib.RECORD_CAP_HIT_OUTCOMES and not lib.broken("cap-hit-not-counted", self.environment)
@@ -4356,13 +6004,39 @@ class Scheduler:
         if lib.broken("record-ignored-for-cap", self.environment):
             return None
         measurements, _, _ = self.recorded_measurements(task)
+        return self.window_maximum(measurements)
+
+    def attempt_measurement(self, attempt, cap_hits=True, build_phase=False):
+        """一次结束了的尝试进「近几次最高」窗口的那个量（字节）：撞了上限（outcome 在 lib.RECORD_CAP_HIT_OUTCOMES）的取那一次的上限，跑成的取量到的峰值（正整数）；
+        别的结局、量不到的交 None；cap_hits 为 False 时撞了上限的也交 None。build_family_peak 与 shard_family_peak 共用这一份（调用方先判 valid 与 state = ended）。
+        build_phase 为真（编译族借的，build_family_peak）：跑成的与撞了上限的都只取编译段峰值 build_phase_peak（finish_attempt 照 attempt_runner 的 result.json 或第二台那一行记的），
+        这一栏是 null 的交 None、不借；弄坏开关 family-lends-run-peak 下也取 memory_peak 与撞了上限那一次的上限。
+        recorded_measurements 不共用：它还要交「有没有结束了的尝试、有没有跑完的」，并带 unfinished-peaks-counted、cap-hit-not-counted、completed-peak-ignored、
+        unmeasured-recorded-as-zero 四个开关改每一次的归类。没写峰值口径的旧行交 None（current_metric）。"""
+        if not self.current_metric(attempt):
+            return None
+        if build_phase and not lib.broken("family-lends-run-peak", self.environment):
+            if attempt.get("outcome") not in lib.RECORD_COMPLETED_OUTCOMES + lib.RECORD_CAP_HIT_OUTCOMES or (attempt.get("outcome") in lib.RECORD_CAP_HIT_OUTCOMES and not cap_hits):
+                return None
+            value = attempt.get("build_phase_peak")
+            return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+        peak = attempt.get("memory_peak")
+        if attempt.get("outcome") in lib.RECORD_CAP_HIT_OUTCOMES and attempt.get("memory_cap"):
+            return int(attempt["memory_cap"]) if cap_hits else None   # 撞了这一次的上限：至少要到这个上限
+        if attempt.get("outcome") in lib.RECORD_COMPLETED_OUTCOMES and isinstance(peak, int) and not isinstance(peak, bool) and peak > 0:
+            return peak
+        return None
+
+    def window_maximum(self, measurements):
+        """[(结束时刻, 字节)] 按结束时刻从新到旧取 RECORD_WINDOW 个、取最大；没有交 None。key_recent_peak、build_family_peak、shard_family_peak 取窗口都走这一处，
+        窗口与 recorded_prediction 同一个大小：出了窗口的不再算，后面几次都跑得小，起点跟着降。弄坏开关 history-peak-unwindowed 下不截，全部取最大（一次大峰值永远压着后面，只升不降）。"""
         if not lib.broken("history-peak-unwindowed", self.environment):
             measurements = sorted(measurements, reverse=True)[:RECORD_WINDOW]
         return max((value for _, value in measurements), default=None)
 
     def history_raised_prediction(self, task, prediction):
         """新提交的头一次与撞上限之后的每次重排都直接起在近几次最高的那一档（文件头 ②「内存」的按近几次最高起跑）：这把键近 RECORD_WINDOW 次的最高（key_recent_peak）
-        × 1.5 比 prediction 的上限大就换上（只往上抬，下限照 memory_floor_applied 先兜过）；重排的那一次另照编译族（build_family_peak）与分片的兄弟片
+        × 1.5 比 prediction 的上限大就换上（只往上抬；memory_floor_applied 只在弄坏开关 recorded-cap-floored 下先兜过）；重排的那一次另照编译族（build_family_peak）与分片的兄弟片
         （shard_family_peak）往上抬（头一次在 computed_prediction 里已看过）。钉值不经这里。弄坏开关 history-peak-ignored 下照改前原样交回。"""
         if lib.broken("history-peak-ignored", self.environment):
             return prediction
@@ -4396,15 +6070,18 @@ class Scheduler:
         return seconds, lib.ESTIMATE_BASIS_NONE if seconds is None else lib.ESTIMATE_BASIS_COMMAND
 
     def command_estimate(self, task):
-        """按命令的预计用时：库里同一命令键（与内存记录同一把键：路径、条目照词折过，--check 的格名照留）最近一次跑成的尝试的用时；没有交 None。
+        """按命令的预计用时：库里同一命令键（与内存记录同一把键：路径、条目照词折过，--check 的格名照留）最近一次命令自己跑到退出的尝试的用时；没有交 None。
         弄坏开关 estimate-by-exact-command 下照改前只认命令逐词相同的（任务 7585 与 7447 只差补丁目录，内存认得同键、预计用时却没有，封组挡住后面），
-        failed-runs-estimated 下退非 0 的也算。"""
+        命令自己跑到退出的（lib.ESTIMATE_COMPLETED_OUTCOMES：succeeded、command-failed）都算，被信号杀的 command-failed（SIGNAL_EXIT_CODES）不算；
+        服务判出或打断的结局（撞上限、超时、卡住被停、被挤掉、取消、跑满两小时）不在里面。estimate-only-succeeded 下只认 succeeded。"""
         runs = []
+        counted = ("succeeded",) if lib.broken("estimate-only-succeeded", self.environment) else lib.ESTIMATE_COMPLETED_OUTCOMES
         for attempt, valid in self.store.select("attempts", "command_key = ? AND state = 'ended'", (task["command_key"],), order="id DESC LIMIT 200"):
-            counted = lib.RECORD_COMPLETED_OUTCOMES + (("command-failed",) if lib.broken("failed-runs-estimated", self.environment) else ())
             if lib.broken("estimate-by-exact-command", self.environment) and attempt.get("command") != task.get("command"):
                 continue
-            if valid and attempt.get("outcome") in counted and isinstance(attempt.get("seconds"), (int, float)):   # 退非 0 的可能是提前退，不当用时
+            if attempt.get("outcome") == "command-failed" and attempt.get("exit_code") in SIGNAL_EXIT_CODES:
+                continue   # 被信号杀的：不是命令自己跑到退出
+            if valid and attempt.get("outcome") in counted and isinstance(attempt.get("seconds"), (int, float)):
                 runs.append((float(attempt.get("ended_at") or 0), float(attempt["seconds"])))
         return max(runs)[1] if runs else None
 
@@ -4445,7 +6122,7 @@ class Scheduler:
             return prediction
         for attempt, valid in self.store.select("attempts", "command_key = ? AND state = 'ended'", (task["command_key"],), order="id DESC LIMIT 200"):
             peak = attempt.get("memory_peak")
-            if not valid or attempt.get("outcome") != "command-failed" or not isinstance(peak, int) or peak <= 0:
+            if not valid or not self.current_metric(attempt) or attempt.get("outcome") != "command-failed" or not isinstance(peak, int) or peak <= 0:
                 continue
             floor = math.ceil(peak * lib.CAP_GROWTH_FACTOR / lib.MEBIBYTE) * lib.MEBIBYTE
             if floor <= int(prediction.memory_cap or 0):
@@ -4493,6 +6170,7 @@ class Scheduler:
             self.predictions.pop(task_id, None)
             self.build_disk_predictions.pop(task_id, None)
             self.pin_unreadable_reasons.pop(task_id, None)
+            self.budget_notices.pop(task_id, None)
 
     def keep_predictions_of(self, task_ids):
         """只留还在队里的那几条存的预测。"""
@@ -4566,17 +6244,47 @@ class Scheduler:
                 # 服务自己只有没跑完的尝试：照没记录办，判红那一次量到的峰值当下界（文件头 ②「内存」）
                 prediction = self.failed_peak_floor(task, base)
             else:
-                prediction = recorded or base   # 服务的记录里没有：先记小，撞了再放大（文件头 ②「内存」）
-                if recorded is not None and self.latest_attempt_hit_cap(task):
-                    # 最近一次结束的尝试撞了上限，这一条是调用方再交的：第一次尝试照重排那一次办，兜到 4G（memory_floor_applied 不放过这一种 prediction）
-                    prediction = dataclasses.replace(recorded, memory_history=lib.CAP_HIT_RERUN_HISTORY)
+                prediction = recorded or base   # 服务的记录里没有：先记小，撞了再放大；有记录的照记录，不抬到 4G（文件头 ②「内存」）
             if recorded is None:
                 # 同键没有跑完的记录：会编的照同一编译族别的命令跑成的峰值起步（文件头 ②「内存」的编译族），只往上抬
                 prediction = self.raised_prediction(prediction, self.build_family_peak(task), lib.BUILD_FAMILY_HISTORY)
             if task.get("role") == "shard":
                 # 分片的一片：同一计划的计划那一步与兄弟片已结束的尝试里量到的最大值当下界（文件头 ②「内存」的同一计划共用峰值），只往上抬
                 prediction = self.raised_prediction(prediction, self.shard_family_peak(task), lib.SHARD_FAMILY_HISTORY)
-        return self.history_raised_prediction(task, self.memory_floor_applied(prediction))
+        return self.workspace_writer_headroom(task, self.history_raised_prediction(task, self.memory_floor_applied(prediction)))
+
+    def workspace_writer_headroom(self, task, prediction):
+        """改主工作区的命令首趟给足（文件头 ②「内存」的同名一段）：modifies_workspace 认的、不是重排的那一次（没有 next_cap）的，
+        上限与记账取 (这把键近几次最高 + 它要起的验证命令那几把键近几次最高之和) × 1.5，按 MiB 向上取整（不设 4G 底），比 prediction 的上限大才换，
+        prediction 记 WORKSPACE_WRITER_HISTORY。钉值在 computed_prediction 里先交了，不到这里。弄坏开关 workspace-writer-headroom-skipped 下照原样，
+        recorded-cap-floored 下照改前与下限（memory_floor）取大。"""
+        if lib.broken("workspace-writer-headroom-skipped", self.environment) or task.get("next_cap") or not self.modifies_workspace(task):
+            return prediction
+        measured = (self.key_recent_peak(task) or 0) + sum(self.key_recent_peak({"command_key": key}) or 0 for key in self.verify_command_keys(task))
+        cap = math.ceil(measured * lib.CAP_GROWTH_FACTOR / lib.MEBIBYTE) * lib.MEBIBYTE
+        if lib.broken("recorded-cap-floored", self.environment):
+            cap = max(self.memory_floor(), cap)
+        if cap <= int(prediction.memory_cap or 0):
+            return prediction
+        return dataclasses.replace(prediction, memory_predicted=max(int(measured), int(prediction.memory_predicted or 0)), memory_cap=cap,
+                                   memory_booked=max(cap, int(prediction.memory_booked or 0)), memory_history=lib.WORKSPACE_WRITER_HISTORY)
+
+    def verify_command_keys(self, task):
+        """这条改工作区的命令换上之后要起的验证命令（命令里点到 WORKSPACE_VERIFY_OPTIONS 那份工具之后，那个选项的值：一整条命令，照 shlex 切）各自的命令键；
+        没有、切不开的交空表。工具的路径照 modifies_workspace 的认法（相对仓根）。"""
+        root = os.path.realpath(self.peer_root)
+        cwd = os.path.realpath(task.get("cwd") or root)
+        keys = []
+        for index, word in enumerate(task["command"]):
+            option = None if word.startswith("-") else WORKSPACE_VERIFY_OPTIONS.get(os.path.relpath(os.path.normpath(os.path.join(cwd, word)), root))
+            text = lib.option_value_in_arguments(task["command"][index + 1:], option) if option else None
+            try:
+                words = shlex.split(text) if text else []
+            except ValueError:
+                words = []
+            if words:
+                keys.append(self.command_key(words, None))
+        return keys
 
     def raised_prediction(self, prediction, peak, history):
         """peak（字节；None 是没有）× 1.5（按 MiB 向上取整）比 prediction 的上限大才换上：上限与记账都取它、预测记 peak、prediction 记 history；
@@ -4590,18 +6298,21 @@ class Scheduler:
                                    memory_booked=max(cap, int(prediction.memory_booked or 0)), memory_history=history)
 
     def build_family_peak(self, task):
-        """这条的编译族（submit 记的 build_family）最近 RECORD_WINDOW 次跑成而量到峰值的尝试（别的命令键的也算）里最大的峰值；没有族、没有这样的尝试交 None。
-        弄坏开关 build-family-ignored 下交 None（改前的样子：会编的 cargo 同键没记录只从 4G 起）。"""
+        """这条的编译族（submit 记的 build_family）最近 RECORD_WINDOW 次的最高量（别的命令键的也算）：跑成的与撞了上限的都取编译段峰值
+        （attempt_measurement 的 build_phase：整趟的峰值与撞了上限那一次的上限不借），按结束时刻从新到旧取 RECORD_WINDOW 个、取最大（window_maximum，与 key_recent_peak、shard_family_peak 同一个窗口）；没有族、没有这样的尝试交 None。
+        同族另一条刚撞上去的那一档，后面的重试与新提交都看得到，不必各自一级级爬；之后几次都跑得小，撞过的出了窗口就回落。
+        弄坏开关 build-family-ignored 下交 None（改前的样子：会编的 cargo 同键没记录只从 4G 起）；family-cap-hit-not-counted 下只收跑成的
+        （改前的样子：族里没有跑成的，别条撞到的档就看不到）；history-peak-unwindowed 下不截近几次。"""
         family = task.get("build_family") or ""
         if not family or lib.broken("build-family-ignored", self.environment):
             return None
+        cap_hits = not lib.broken("family-cap-hit-not-counted", self.environment)
         measured = []
         for attempt, valid in self.store.select("attempts", "state = 'ended' AND json_extract(record, '$.build_family') = ?", (family,), order="id DESC LIMIT 200"):
-            peak = attempt.get("memory_peak")
-            if valid and attempt.get("outcome") in lib.RECORD_COMPLETED_OUTCOMES and isinstance(peak, int) and not isinstance(peak, bool) and peak > 0:
-                measured.append((float(attempt.get("ended_at") or 0), peak))
-        window = sorted(measured, reverse=True)[:RECORD_WINDOW]
-        return max(peak for _, peak in window) if window else None
+            value = self.attempt_measurement(attempt, cap_hits, build_phase=True) if valid else None
+            if value is not None:
+                measured.append((float(attempt.get("ended_at") or 0), value))
+        return self.window_maximum(measured)
 
     def shard_family_peak(self, task):
         """分片的一片的同一计划下界：同一父任务名下计划那一步与别的片已结束的尝试里，跑成的取量到的峰值、撞了上限的取那一次的上限，
@@ -4617,41 +6328,23 @@ class Scheduler:
         values = []
         for sibling in siblings:
             for attempt, valid in self.store.attempts_of(sibling["id"]):
-                if not valid or attempt.get("state") != "ended":
-                    continue
-                peak = attempt.get("memory_peak")
-                when = float(attempt.get("ended_at") or 0)
-                if attempt.get("outcome") in lib.RECORD_CAP_HIT_OUTCOMES and attempt.get("memory_cap"):
-                    values.append((when, int(attempt["memory_cap"])))   # 撞了这一次的上限：至少要到这个上限
-                elif attempt.get("outcome") in lib.RECORD_COMPLETED_OUTCOMES and isinstance(peak, int) and not isinstance(peak, bool) and peak > 0:
-                    values.append((when, peak))
-        if not lib.broken("history-peak-unwindowed", self.environment):
-            values = sorted(values, reverse=True)[:RECORD_WINDOW]
-        return max((value for _, value in values), default=None)
-
-    def latest_attempt_hit_cap(self, task):
-        """同一命令键服务自己最近一次结束的尝试（按尝试号从新到旧，校验过的头一条）撞了上限（outcome 在 lib.RECORD_CAP_HIT_OUTCOMES）交 True；没有结束的尝试、
-        最近一次是别的结局交 False。弄坏开关 cap-hit-rerun-unfloored 下一律 False（改前的样子：再交一遍只照记录 × 1.5）。"""
-        if lib.broken("cap-hit-rerun-unfloored", self.environment):
-            return False
-        for attempt, valid in self.store.select("attempts", "command_key = ? AND state = 'ended'", (task["command_key"],), order="id DESC LIMIT 200"):
-            if valid:
-                return attempt.get("outcome") in lib.RECORD_CAP_HIT_OUTCOMES
-        return False
+                value = self.attempt_measurement(attempt) if valid and attempt.get("state") == "ended" else None
+                if value is not None:
+                    values.append((float(attempt.get("ended_at") or 0), value))
+        return self.window_maximum(values)
 
     def memory_floor(self):
-        """每条任务上限的下限（文件头 ②「内存」）：lib.MEMORY_FLOOR_BYTES；自证的小世界里由 TASK_SERVER_SELFTEST_MEMORY_FLOOR_BYTES 换（task_server_lib.py 文件头
-        「只在自证里认的变量」）。"""
+        """改前的 4G 底（文件头 ②「内存」：只在弄坏开关 recorded-cap-floored 下兜）：lib.MEMORY_FLOOR_BYTES；自证的小世界里由 TASK_SERVER_SELFTEST_MEMORY_FLOOR_BYTES 换
+        （task_server_lib.py 文件头「只在自证里认的变量」：各格写 0，开关只红点名的几格）。"""
         override = lib.selftest_override(lib.MEMORY_FLOOR_VARIABLE, self.environment)
         return int(override) if override.isdigit() else lib.MEMORY_FLOOR_BYTES
 
     def memory_floor_applied(self, prediction):
-        """上限低于下限的上限与记账都取下限、预测照原样（问题 92：任务 2419 一条编译取到 371M 撞顶）；钉值与服务自己的峰值记录定的（RECORD_HISTORY）不兜，
-        照峰值 × 1.5（文件头 ②「内存」）。弄坏开关 memory-floor-ignored 下照原样，recorded-cap-floored 下记录定的也兜。"""
+        """有记录的照记录、不设 4G 底（文件头 ②「内存」）：平常照原样交回（没记录的从 4G 起、重排乘 1.5 都不低于 4G，有记录的与它的重排照乘出来的）。
+        弄坏开关 recorded-cap-floored 下照改前：钉值之外上限低于 memory_floor 的，上限与记账都取它、预测照原样。"""
         floor = self.memory_floor()
-        kept = (lib.PINNED_HISTORY,) if lib.broken("recorded-cap-floored", self.environment) else (lib.PINNED_HISTORY, lib.RECORD_HISTORY)
-        if (prediction.memory_history in kept or int(prediction.memory_cap or 0) >= floor
-                or lib.broken("memory-floor-ignored", self.environment)):
+        if (not lib.broken("recorded-cap-floored", self.environment) or prediction.memory_history == lib.PINNED_HISTORY
+                or int(prediction.memory_cap or 0) >= floor):
             return prediction
         return dataclasses.replace(prediction, memory_cap=floor, memory_booked=max(int(prediction.memory_booked or 0), floor))
 
@@ -4830,7 +6523,7 @@ class Scheduler:
 
     def judge_placement(self, task, busy_cards, view, alternation=None):
         """这一轮判这一条放不放得下、放哪台：预测用存的那一份（prediction_of），余量与待涨量用这一轮读的那一份（view）。
-        alternation 给了（没满时限的）：每台再照交替判（Alternation.blocked），内存放得下而交替不让起的改判放不下；封着组而插得进空的（Alternation.gap_fill）
+        alternation 给了（满时限的也给，弄坏开关 aged-fragment-bypasses-seal 下满时限的不给）：每台再照交替判（Alternation.blocked），内存放得下而交替不让起的改判放不下；封着组而插得进空的（Alternation.gap_fill）
         交替不挡、内存照常判，起的 Placement 记插空那一句（gap_filled），内存放不下的排队原因写插空那一句与内存那一句。"""
         gpu = bool(task.get("gpu"))
         snapshot = view.snapshot(gpu)
@@ -4922,10 +6615,12 @@ class Scheduler:
 
     @staticmethod
     def gap_filled(placement, task, alternation):
-        """起在一台上的这一条是封着组插空进去的（Alternation.gap_fill）：Placement 记上插空那一句，起的时候记进尝试的 gap_fill；别的照原样。"""
+        """起在一台上的这一条是封着组插空进去的（Alternation.gap_fill）：Placement 记上插空那一句与是不是照内存那一支插的，起的时候记进尝试的 gap_fill、gap_fill_beside_whole；
+        别的照原样。"""
         if placement.kind != "start" or alternation is None:
             return placement
-        return dataclasses.replace(placement, gap_fill=alternation.gap_fills.get((task["id"], placement.host), ""))
+        key = (task["id"], placement.host)
+        return dataclasses.replace(placement, gap_fill=alternation.gap_fills.get(key, ""), gap_fill_beside_whole=key in alternation.room_gap_fills)
 
     def launch_recheck(self, task, placement, view):
         """起之前复核（文件头 ②「起之前复核」）：现算这一条的预测、现读它要去的那台的余量与待涨量（缓存作废），按现读的数再判一次那台放不放得下。
@@ -5154,10 +6849,14 @@ class Scheduler:
             "nvidia_smi": lib.selftest_override("TASK_SERVER_NVIDIA_SMI", self.environment) or "nvidia-smi",
             "build_directory": build_directory if made_here else "", "wake_socket": self.configuration.socket,
             "wake_skipped": lib.broken("runner-wake-skipped", self.environment), "leftovers_kept": lib.broken("leftover-processes-kept", self.environment),
-            "leftovers_unit_unchecked": lib.broken("leftovers-outside-own-unit", self.environment), "exit_peak_file": exit_peak_file})
+            "leftovers_unit_unchecked": lib.broken("leftovers-outside-own-unit", self.environment), "exit_peak_file": exit_peak_file,
+            "leftovers_error_uncaught": lib.broken("leftovers-error-uncaught", self.environment),
+            "memory_peak_file": os.path.join(directory, lib.MEMORY_PEAK_FILE_NAME), "build_phase_file": os.path.join(directory, lib.BUILD_PHASE_FILE_NAME),
+            "memory_peak_with_page_cache": lib.broken("memory-peak-with-page-cache", self.environment),
+            "build_finished_pattern": lib.CARGO_FINISHED_PATTERN, "build_phase_past_finished": lib.broken("build-phase-past-finished", self.environment)})
         attempt = {"task_id": task["id"], "number": number, "host": placement.host, "memory_cap": placement.cap, "memory_cap_text": lib.mebibytes_text(placement.cap),
                    "booked": placement.booked, "gpu_booked": placement.gpu_booked, "disk_booked": placement.disk_booked, "card": placement.card,
-                   "prediction": placement.history, "gap_fill": placement.gap_fill, "label": label, "peer_cleanup_file": peer_cleanup_file,
+                   "prediction": placement.history, "gap_fill": placement.gap_fill, "gap_fill_beside_whole": placement.gap_fill_beside_whole, "label": label, "peer_cleanup_file": peer_cleanup_file,
                    "unit": unit, "log": log, "directory": directory,
                    "spec": specification, "state": "starting", "session": "", "command_key": task["command_key"], "command": task.get("command"), "started_at": round(time.time(), 3),
                    "threads": self.threads_of(task) if not lib.broken("threads-unset", self.environment) else None, "build_directory": build_directory,
@@ -5169,6 +6868,7 @@ class Scheduler:
             task.update(state="running", attempt_count=number)
             self.store.update("tasks", task, force=True)
             self.crash_point("before-unit")
+            append_log_lines(log, self.submit_warning_lines(task))
             self.launch(task, attempt)
             return attempt
         with self.store.task_lock(task["id"]):
@@ -5189,6 +6889,7 @@ class Scheduler:
                 return None
             self.crash_point("before-unit")
             self.selftest_pause("claimed")
+            append_log_lines(log, self.submit_warning_lines(task))   # 提交时警告进日志头（文件头 ②「提交时警告」）：起单元之前写，命令的输出接在后面
             self.launch(task, attempt)
         return attempt
 
@@ -5326,7 +7027,8 @@ class Scheduler:
             return []
 
     def build_family_of(self, task):
-        """这条命令的编译族（task_server_lib.py 文件头「资源记录」的编译族）：命令位置上起的入口脚本文件头声明了的照声明（lib.declared_build_family）；
+        """这条命令的编译族（task_server_lib.py 文件头「资源记录」的编译族）：命令位置上起的入口脚本文件头声明了的照声明（lib.declared_build_family，
+        声明里取自参数的词照这一条命令填上，填不上的当没声明）；
         不然会编的照它起的每一条会编的 cargo（lib.cargo_build_family，几条用「 ; 」接）；都不是交空串。弄坏开关 build-family-ignored 下交空串。"""
         if lib.broken("build-family-ignored", self.environment):
             return ""
@@ -5340,6 +7042,59 @@ class Scheduler:
                 workspace = os.path.relpath(run.directory, root) if root else os.path.basename(run.directory or "")
                 families.append(lib.cargo_build_family(run.rest, workspace))
         return " ; ".join(dict.fromkeys(families))
+
+    def repository_target_bypass(self, task):
+        """提交时警告（文件头 ②「提交时警告」）：这一条取仓根 target/ 下的东西的那几处说明（lib.repository_target_references），没有交 []。
+        仓根是服务的仓根（自证里是假仓根）与 lib.repository_roots 那几棵树。判法出事不挡提交（这一条只警告），写进服务日志、交 []。
+        弄坏开关 repository-target-bypass-unwarned 下交 []。"""
+        if lib.broken("repository-target-bypass-unwarned", self.environment):
+            return []
+        roots = list(dict.fromkeys(os.path.realpath(root) for root in [self.peer_root, *lib.repository_roots()]))
+        try:
+            return lib.repository_target_references(task["command"], task["cwd"], roots, task.get("environment") or {})
+        except Exception as error:
+            say(f"  ! 判命令取不取仓根 target/ 时出了事（{type(error).__name__}: {error}），这一条不警告")
+            return []
+
+    def submit_warning_lines(self, task):
+        """提交时警告的几行（文件头 ②「提交时警告」）：绕过编译目录的两行（bypass_warning_lines）接交任务时会话名下有结局满时限没人取的两行（unclaimed_warning_lines）；
+        分片与估算的子任务照父任务的。没有交 []。"""
+        owner = task
+        if task.get("parent_id"):
+            parent = self.store.task(task["parent_id"])
+            if parent is not None and parent[1]:
+                owner = parent[0]
+        return self.flag_lines(owner) + self.bypass_warning_lines(owner) + self.unclaimed_warning_lines(owner)
+
+    def unclaimed_before(self, session, now):
+        """交任务这一刻，这个会话名下结局满 unclaimed_warning_seconds 还没交给它的任务号（文件头 ②「提交时警告」②；消息没送到、也没起 wait；子任务不算，人手的空会话不判）。
+        弄坏开关 unclaimed-unwarned 下交 []。"""
+        if not session or lib.broken("unclaimed-unwarned", self.environment):
+            return []
+        return [task["id"] for task, valid in self.store.select("tasks", "session = ? AND state = 'finished'", (session,))
+                if valid and not task.get("parent_id") and not task.get("collected") and now - float(task.get("finished_at") or now) >= self.unclaimed_warning_seconds]
+
+    def unclaimed_warning_lines(self, task):
+        """交任务时会话名下有结局满时限没人取的两行（文件头 ②「提交时警告」②）：照任务记的 unclaimed_at_submit 与会话号、任务号现拼；没有交 []。"""
+        found = task.get("unclaimed_at_submit") or []
+        if not found:
+            return []
+        shown = found[:lib.BYPASS_HITS_SHOWN]
+        more = f"…另有 {len(found) - len(shown)} 条" if len(found) > len(shown) else ""
+        return [f"✗ 严厉警告：会话 {task.get('session')} 有 {len(found)} 条任务跑完了没人取（{'、'.join(str(number) for number in shown)}{more}）："
+                f"结局满 {self.unclaimed_warning_seconds / 60:.0f} 分钟没交给提交它的会话（服务发的消息没送到，也没起 task wait）；这一回交的任务 {task['id']} 照收照跑",
+                "→ 怎么办：task-server/task wait <号> 取走（" + "、".join(f"task-server/task wait {number}" for number in shown) + "），照结局办完再 task-server/task clean <号>"]
+
+    def bypass_warning_lines(self, owner):
+        """绕过编译目录的两行（文件头 ②「提交时警告」①）：照 owner（分片与估算的子任务由 submit_warning_lines 换成父任务）记的 target_bypass 与会话号、任务号现拼。没有交 []。"""
+        found = owner.get("target_bypass") or []
+        if not found:
+            return []
+        shown = "；".join(found[:lib.BYPASS_HITS_SHOWN]) + (f"；另有 {len(found) - lib.BYPASS_HITS_SHOWN} 处" if len(found) > lib.BYPASS_HITS_SHOWN else "")
+        return [f"✗ 严厉警告：会话 {owner.get('session') or '无（人手）'} 交的任务 {owner['id']} 绕过了服务给的编译目录，取仓根 target/ 下的二进制（{shown}）："
+                "仓根 target/ 下是早先编的那一份，可能是合并前的旧版本，别的会话的 cargo 随时会换掉它；服务照收照跑，跑出来的结果不算这一次的代码",
+                f"→ 怎么办：编译交给服务给的编译目录，二进制取这一趟编出来的位置（会编的命令拿到的 CARGO_TARGET_DIR 下，或 cargo build --message-format=json 报的 executable）；"
+                f"入口脚本里不写仓根 target/ 的路径，没给 CARGO_TARGET_DIR 时也不退回仓根 target/；改完 task-server/task cancel {owner['id']}、重交"]
 
     def gpu_cards_wanted(self, task):
         """要卡的这一条要同一台的几张卡（task_server_lib.py 文件头「GPU」的张数）：命令位置上起的脚本文件头、编出来的二进制的同名源、
@@ -5426,8 +7181,14 @@ class Scheduler:
             return f"{lib.TEMPORARY_SERVICE_KEY_MARK} {key}"[:self.peaks.KEY_LENGTH_LIMIT]
         return key
 
-    def submit(self, command, cwd, environment, session, process_id):
-        task = {"command": command, "cwd": cwd, "environment": environment, "session": session, "submitter_pid": process_id,
+    def submit(self, command, cwd, environment, session, process_id, inbox=None, long_run=None, whole_package=""):
+        """收下一条提交：inbox 是 task submit 交来的会话收件地址 {socket, token}（文件头 ⑥），两样都在才记，不然记 {} 并打一行「这条任务没有会话的收件地址」。
+        long_run 是 task requeue 给的「长跑已确认」标识 {from, why}（文件头 ⑦「跑满两小时」）：记在任务上，不再要 task confirm，收下就进队。
+        whole_package 是核过形式的整包确认文件（文件头 ②「提交时拒」⑥），记在任务上。"""
+        inbox = inbox or {}
+        inbox = {"socket": inbox["socket"], "token": inbox["token"]} if inbox.get("socket") and inbox.get("token") else {}
+        task = {"command": command, "cwd": cwd, "environment": environment, "session": session, "submitter_pid": process_id, "inbox": inbox,
+                "unclaimed_at_submit": self.unclaimed_before(session, time.time()),   # 提交时警告 ②：会话名下有结局满时限没人取的
                 "submitted_at": round(time.time(), 3), "command_key": self.command_key(command, environment.get("RUN_WITH_MEMORY_CAP_KEY")),
                 "state": "queued", "outcome": "", "exit_code": None, "collected": False, "next_cap": None, "next_host": "", "outcome_counts": {},
                 "note": "", "cancel_requested": False, "attempt_count": 0, "task_id": 0}
@@ -5435,25 +7196,199 @@ class Scheduler:
         task["gpu_cards"], task["gpu_cards_problem"] = self.gpu_cards_wanted(task)
         task["compiles"] = self.compiles(task)
         task["build_family"] = self.build_family_of(task)
+        task["target_bypass"] = self.repository_target_bypass(task)   # 提交时警告（文件头 ②「提交时警告」）：照收照跑，三处打警告
         entry = lib.sharded_entry(command, cwd, self.environment)
         if entry:   # 文件头 ④：父任务不进队，先排计划那一步
             task.update(state="sharded", sharded_entry=entry, phase="plan", shard_count=0)
         item_entry, items = lib.item_entry(command, cwd)
-        estimating = False
         if item_entry and items and not entry:   # 按项估预计用时（task_server_lib.py 文件头「资源记录」的预计用时）：先起估算子任务，它有了结局才进队
             task.update(item_entry=item_entry, items=items)
-            estimating = not lib.broken("item-estimate-skipped", self.environment)
-            if estimating:
+            if not lib.broken("item-estimate-skipped", self.environment):
                 task.update(state="estimating", phase="estimate")
+        # 交任务的二次确认（文件头 ⑦）：先记待确认、不进队、不建子任务；confirm 两个数对得上才照 awaiting_state 进队（照提交时刻的任务号排位置）
+        if long_run:
+            task["long_run_confirmed"] = dict(long_run)
+        if whole_package:
+            task["whole_package_confirmed"] = whole_package
+        awaiting = not lib.broken("confirm-skipped", self.environment) and not long_run
+        if awaiting:
+            task.update(awaiting_state=task["state"], state=lib.AWAITING_CONFIRMATION_STATE)
         task = self.store.insert("tasks", task)
         self.operation("submit", task["id"], session, process_id, shlex.join(command)[:300])
-        if entry:
+        for line in self.submit_warning_lines(task):
+            say(f"  {line}")
+        if not inbox:
+            say(f"  · 任务 {task['id']}：这条任务没有会话的收件地址（task submit 没交 {lib.INBOX_SOCKET_VARIABLE} 与 {lib.INBOX_TOKEN_VARIABLE}），出事不发消息，结局只经 task wait 取")
+        if not awaiting:
+            self.enter_queue(task)
+        return task
+
+    def enter_queue(self, task):
+        """这条任务进队（确认过的，或弄坏开关 confirm-skipped 下交了就进）：分片的先建计划那一步，按项估算的先建估算子任务（文件头 ④、task_server_lib.py 文件头「资源记录」的预计用时）。"""
+        if task.get("state") == "sharded":
             self.crash_point("parent-inserted")
             self.create_child(task, "plan")
-        if estimating:
+        if task.get("state") == "estimating":
             self.create_child(task, lib.ESTIMATE_ROLE)
         self.wake()
-        return task
+
+    def confirmation(self, task):
+        """待确认那一条的确认单（文件头 ⑦）→ {items, tasks, lines}：items 是命令里点名的项数（lib.named_scope），tasks 是这个会话此刻在排在跑的父任务条数（不算它自己，
+        也不算别的待确认的），lines 是给人看的几行：整条命令、范围声明四段原文、项数、在排在跑几条与其中命令键相同或点的项交叠的逐条列号、预测内存与预计用时与记录来源、
+        交的时候判得出的异常（预算贴整台或超过每台的可用上限、按给的上限开并行；照异常表那一行带修改意见）。算不出的那一样照写算不出，不挡确认。"""
+        named = lib.named_scope(task["command"], self.environment)
+        entry = lib.named_scope_entry(task["command"], self.environment)
+        mine = {(entry, name, value) for name, value in named}
+        others = [record for record, valid in self.store.select("tasks", "session = ? AND state IN ('queued', 'running', 'sharded', 'estimating')", (task.get("session") or "",))
+                  if valid and not record.get("parent_id") and record.get("id") != task["id"]]
+        overlaps = []
+        for other in others:
+            words = other.get("command") or []
+            shared = sorted(mine & {(lib.named_scope_entry(words, self.environment), name, value) for name, value in lib.named_scope(words, self.environment)})
+            if other.get("command_key") == task.get("command_key"):
+                overlaps.append(f"{other['id']}（命令键相同）")
+            elif shared:
+                overlaps.append(f"{other['id']}（都点了 " + "、".join(f"{name} {value}".strip() for _, name, value in shared[:5]) + "）")
+        human = self.host_dispatch.human
+        try:
+            prediction = self.prediction_of(task)
+            memory = (f"预测内存 {human(int(prediction.memory_predicted or 0))}、上限 {lib.mebibytes_text(int(prediction.memory_cap or 0))}"
+                      f"（记录来源：{self.budget_source(task, prediction)}）")
+        except Exception as error:   # 钉值读不到、库出错：照写算不出，确认之后排队那一轮照判
+            memory = f"预测内存此刻算不出（{type(error).__name__}: {error}）"
+        try:
+            seconds, basis = self.estimate_of(task)
+            duration = f"预计用时 {f'{seconds:.0f} 秒' if seconds else '没有记录'}{lib.ESTIMATE_BASIS_SENTENCES.get(basis, '')}"
+        except Exception as error:
+            duration = f"预计用时此刻算不出（{type(error).__name__}: {error}）"
+        found = []
+        try:
+            refused = self.budget_check(task, PassView(self, "confirm"))
+            if refused:
+                found.append(f"memory-cap-at-maximum：{refused['note']}；确认之后排队那一刻就打回；修改意见：{lib.anomaly_advice('memory-cap-at-maximum', task['id'], self.environment)}")
+            found += [f"{item['kind']}：{item['basis']}；修改意见：{item['next']}" for item in [self.budget_notices.get(task["id"])] + self.fills_any_cap_items(task) if item]
+        except Exception as error:
+            found.append(f"预算与按上限开并行此刻判不了（{type(error).__name__}: {error}）")
+        scope = lib.scope_declaration_segments(task.get("environment") or {}, task["command"])
+        lines = [f"确认单（任务 {task['id']}，待确认、不进队；满 {self.confirm_timeout_seconds:.0f} 秒不确认服务取消）：",
+                 f"  命令：{shlex.join(task['command'])}",
+                 "  范围声明：" + ("；".join(scope) if scope else "没带 SINGLEFS_RUN_SCOPE"),
+                 f"  项数 {len(named)}：{lib.named_scope_text(named)}",
+                 f"  这个会话此刻在排在跑 {len(others)} 条；其中命令键相同或点的项交叠的：{'、'.join(overlaps) or '没有'}",
+                 f"  {memory}；{duration}",
+                 "  交的时候判得出的异常：" + ("；".join(found) if found else "没有")]
+        return {"items": len(named), "tasks": len(others), "lines": lines}
+
+    def confirm(self, task_id, session, process_id, items, tasks):
+        """task confirm（文件头 ⑦）→ (HTTP 状态码, 回话)：只许提交它的会话；任务要在待确认；给的项数与条数都与服务此刻算的（confirmation）相同才进队
+        （照 awaiting_state 改状态、建子任务，任务号不变、照提交时刻排位置），对不上回 409、带服务算的两个数与确认单。拿这条任务的锁改，与取消、满时限取消不撞。
+        弄坏开关 confirm-counts-unchecked 下不核两个数。"""
+        found = self.store.task(task_id)
+        if found is None:
+            return 404, {"detail": f"没有任务 {task_id}"}
+        task, valid = found
+        if not valid:
+            self.tampered(task_id, task, "任务记录")
+            return 409, {"detail": f"任务 {task_id} 的记录校验不过，已记 record-tampered，不认这次确认"}
+        if task.get("session") != session:
+            self.operation("confirm-refused", task_id, session, process_id, "不是提交它的会话")
+            return 403, {"detail": f"任务 {task_id} 不是这个会话提交的，不许确认"}
+        if task.get("state") != lib.AWAITING_CONFIRMATION_STATE:
+            return 409, {"detail": f"任务 {task_id} 不在待确认（此刻 {task.get('state')}），不用确认"}
+        mismatch = self.counts_mismatch(task, items, tasks, session, process_id, "confirm-refused", "confirm-counts-mismatch")
+        if mismatch:
+            return mismatch
+        with self.store.task_lock(task_id):
+            try:
+                task = self.store.change("tasks", task_id, {"state": task.get("awaiting_state") or "queued", "confirmed_at": round(time.time(), 3)},
+                                         guard=lambda current: "" if current.get("state") == lib.AWAITING_CONFIRMATION_STATE else "不在待确认")
+            except StoreRefused as refused:
+                if refused.kind != "guard":
+                    raise
+                return 409, {"detail": f"任务 {task_id} 这一会儿已不在待确认（取消了，或满时限被服务取消）"}
+            self.operation("confirm", task_id, session, process_id, f"items={items} tasks={tasks}")
+        self.enter_queue(task)
+        return 200, {"confirmed": True, "state": task.get("state"), "detail": f"任务 {task_id} 确认了：项数 {items}、这个会话在排在跑 {tasks} 条，照提交时刻排进队"}
+
+    def counts_mismatch(self, task, items, tasks, session, process_id, refused_action, advice_kind):
+        """task confirm 与 task requeue 共用的核数（文件头 ⑦）：给的项数与在排在跑的条数都与服务此刻算的（confirmation）相同交 None；
+        对不上记一条 refused_action 操作、交 (409, {detail: {mismatch, items, tasks, lines, problem, next_step}})，出路照异常表 advice_kind 那一行。
+        弄坏开关 confirm-counts-unchecked 下不核。"""
+        sheet = self.confirmation(task)
+        if (items, tasks) == (sheet["items"], sheet["tasks"]) or lib.broken("confirm-counts-unchecked", self.environment):
+            return None
+        self.operation(refused_action, task["id"], session, process_id, f"给 items={items} tasks={tasks}，服务算 items={sheet['items']} tasks={sheet['tasks']}")
+        return 409, {"detail": {"mismatch": True, "items": sheet["items"], "tasks": sheet["tasks"], "lines": sheet["lines"],
+                                "problem": f"给的项数 {items}、条数 {tasks} 与服务此刻算的项数 {sheet['items']}、条数 {sheet['tasks']} 不同",
+                                "next_step": lib.anomaly_advice(advice_kind, task["id"], self.environment)}}
+
+    def requeue(self, task_id, session, process_id, items, tasks, why):
+        """task requeue <号> --long-run-confirmed（文件头 ⑦「跑满两小时」）→ (HTTP 状态码, 回话)：只许提交它的会话、只对结局是 over-two-hours 的父任务；
+        带「长跑已确认」标识的、已经 requeue 过的拒；--why 去掉空白不到 LONG_RUN_WHY_MINIMUM_CHARACTERS 个字的拒；两个数照 counts_mismatch 核（与 confirm 同一个核法）。
+        核过就以原命令、原工作目录、原环境（含范围声明）与原收件地址新交一条（submit 带 long_run，不再要确认，任务号是此刻的、排在队尾），
+        原号记 requeued_as（新号），新号记标识 {from, why}；原号不改结局。拿原号的锁做，同号两回只成一回。
+        弄坏开关 requeue-keeps-original-position 下不新交，把原号那一条重开回队里原来的位置（照原任务号排）。"""
+        found = self.store.task(task_id)
+        if found is None:
+            return 404, {"detail": f"没有任务 {task_id}"}
+        task, valid = found
+        if not valid:
+            self.tampered(task_id, task, "任务记录")
+            return 409, {"detail": f"任务 {task_id} 的记录校验不过，已记 record-tampered，不认这次 requeue"}
+        if task.get("session") != session:
+            self.operation("requeue-refused", task_id, session, process_id, "不是提交它的会话")
+            return 403, {"detail": f"任务 {task_id} 不是这个会话提交的，不许 requeue；要跑就自己 task-server/task submit"}
+        if task.get("parent_id"):
+            return 409, {"detail": f"任务 {task_id} 是分片或估算的子任务：requeue 父任务 {task['parent_id']}"}
+        if task.get("long_run_confirmed"):
+            return 409, {"detail": f"任务 {task_id} 已带「长跑已确认」标识（原号 {task['long_run_confirmed'].get('from')}），不能再 requeue"}
+        if task.get("requeued_as"):
+            return 409, {"detail": f"任务 {task_id} 已 requeue 过一回（新号 {task['requeued_as']}），同一个号只许一回：看 task-server/task status {task['requeued_as']}"}
+        if task.get("state") != "finished" or task.get("outcome") != "over-two-hours":
+            return 409, {"detail": f"任务 {task_id} 的结局不是 over-two-hours（此刻 {task.get('state')}、{task.get('outcome') or '没有结局'}）：requeue 只给跑满两小时被打回的；"
+                                   "别的照它的出路改了 task-server/task submit 重交"}
+        stated = "".join((why or "").split())
+        if len(stated) < LONG_RUN_WHY_MINIMUM_CHARACTERS:
+            return 400, {"detail": f"--why 去掉空白只有 {len(stated)} 个字，至少 {LONG_RUN_WHY_MINIMUM_CHARACTERS} 个：写为什么要跑这么久、范围为什么是这些"}
+        mismatch = self.counts_mismatch(task, items, tasks, session, process_id, "requeue-refused", "requeue-counts-mismatch")
+        if mismatch:
+            return mismatch
+        flag = {"from": task_id, "why": " ".join((why or "").split())}
+        with self.store.task_lock(task_id):
+            current = self.store.task(task_id)
+            if current is None or not current[1] or current[0].get("requeued_as") or current[0].get("outcome") != "over-two-hours":
+                return 409, {"detail": f"任务 {task_id} 这一会儿已 requeue 过或不在 over-two-hours，不再 requeue"}
+            if lib.broken("requeue-keeps-original-position", self.environment):
+                reopened = self.store.change("tasks", task_id, {"state": "queued", "outcome": "", "exit_code": None, "long_run_confirmed": flag, "requeued_as": task_id},
+                                             reopen=True)
+                self.operation("requeue", task_id, session, process_id, f"items={items} tasks={tasks}（弄坏开关：原号重开）")
+                self.wake()
+                return 200, {"requeued": True, "id": reopened["id"], "from": task_id, "detail": f"任务 {task_id} 重开回原位（弄坏开关 requeue-keeps-original-position）"}
+            whole = "" if lib.broken("whole-package-flag-dropped-on-requeue", self.environment) else task.get("whole_package_confirmed", "")   # 两种标识都带
+            fresh = self.submit(list(task["command"]), task["cwd"], dict(task.get("environment") or {}), session, process_id, task.get("inbox") or {}, long_run=flag,
+                                whole_package=whole)
+            self.store.change("tasks", task_id, {"requeued_as": fresh["id"]}, reopen=True)
+            self.operation("requeue", task_id, session, process_id, f"新号 {fresh['id']} items={items} tasks={tasks} why={flag['why'][:200]}")
+        say(f"  · 任务 {task_id}（over-two-hours）经提交它的会话确认，以原命令新进队尾：新号 {fresh['id']}；{'；'.join(self.flag_lines(fresh))}")
+        return 200, {"requeued": True, "id": fresh["id"], "from": task_id, "state": fresh.get("state"), "warnings": self.submit_warning_lines(fresh),
+                     "detail": f"任务 {task_id} 确认要跑这么久：以原命令、原范围声明新交一条，任务 {fresh['id']} 排在此刻队尾，记长跑已确认，不再按两小时打回"}
+
+    def expire_unconfirmed(self):
+        """交了满 confirm_timeout_seconds 没确认的（文件头 ⑦；异常表 unconfirmed）：拿这条任务的锁现读、还在待确认才收尾 cancelled，说明写「没确认，已取消」与修改意见；
+        结局照常发给提交它的会话（push_outcomes）。弄坏开关 unconfirmed-kept 下一直留着。"""
+        if lib.broken("unconfirmed-kept", self.environment):
+            return
+        now = time.time()
+        for task, valid in self.store.select("tasks", "state = ?", (lib.AWAITING_CONFIRMATION_STATE,)):
+            if not valid or now - float(task.get("submitted_at") or now) < self.confirm_timeout_seconds:
+                continue
+            with self.store.task_lock(task["id"]):
+                found = self.store.task(task["id"])
+                if found is None or not found[1] or found[0].get("state") != lib.AWAITING_CONFIRMATION_STATE:
+                    continue
+                self.finalize(found[0], "cancelled", None,
+                              (f"没确认，已取消：交了满 {self.confirm_timeout_seconds:.0f} 秒没 task-server/task confirm {task['id']}，一次都没起；"
+                               + lib.anomaly_advice("unconfirmed", task["id"], self.environment)))
 
     def clean(self, task_id, session, process_id):
         """→ (HTTP 状态码, 回话)。删这条任务（分片的连同子任务）留下的编译目录与现场：只许提交它的会话、有了结局才删（task_server_lib.py 文件头「编译目录」「现场」）。
@@ -5523,8 +7458,22 @@ class Scheduler:
         if task.get("session") != session and not lib.broken("cancel-session-unchecked", self.environment):
             self.operation("cancel-refused", task_id, session, process_id, "不是提交它的会话")
             return 403, {"detail": f"任务 {task_id} 不是这个会话提交的（提交它的会话与这一次的不同），不许取消"}
+        if task.get("state") == lib.AWAITING_CONFIRMATION_STATE:   # 待确认（文件头 ⑦）：没进队、没有子任务与尝试，拿锁现读还在待确认就当场收尾
+            with self.store.task_lock(task_id):
+                found = self.store.task(task_id)
+                if found is not None and found[1] and found[0].get("state") == lib.AWAITING_CONFIRMATION_STATE:
+                    self.operation("cancel", task_id, session, process_id)
+                    self.finalize(found[0], "cancelled", None, "待确认时被取消，没进队")
+                    return 200, {"stopped": True, "state": "finished", "outcome": "cancelled", "detail": "待确认时取消，没进队", "artifacts": {"removed": [], "left": [], "lines": []}}
+            found = self.store.task(task_id)   # 这一会儿确认了：照进了队的取消
+            if found is None or not found[1]:
+                return 409, {"detail": f"任务 {task_id} 的记录读不回或校验不过，不认这次取消"}
+            task = found[0]
+        # 取消的不留产物（文件头「接口」的取消）：删前的大小在停之前量，记下结局那一侧先删了的照这一份报
+        before = (self.cancel_artifact_sizes(task_id) if task.get("state") != "finished" or task.get("sharded_entry")
+                  else {"sizes": {}, "active": set()})
         if task.get("state") == "estimating":   # 还在估算（task_server_lib.py 文件头「资源记录」的预计用时）：停估算子任务，父任务不进队
-            reply = self.cancel_estimating(task, session, process_id)
+            reply = self.cancel_estimating(task, session, process_id, before)
             if reply is not None:
                 return reply
             found = self.store.task(task_id)   # 判的这一会儿估算收尾、父任务已进队：照不分片的任务取消
@@ -5539,7 +7488,7 @@ class Scheduler:
             has_children = True   # 名下有校验不过的子任务行：照分片的父任务办，cancel_sharded 判出来回 409、一个单元都不停
         parent = bool(task.get("sharded_entry")) or task.get("state") == "sharded" or has_children   # 分片的父任务：名下有分片子任务的也算
         if parent and not lib.broken("sharded-cancel-finished-first", self.environment):
-            return self.cancel_sharded(task, session, process_id)
+            return self.cancel_sharded(task, session, process_id, before)
         if not parent:
             refusal = self.tampered_cancel_refusal(task_id, task)
             if refusal is not None:
@@ -5572,15 +7521,25 @@ class Scheduler:
                     return self.tampered_cancel_refusal(task_id, dict(task, outcome=outcome))
                 return 200, {"stopped": True, "state": "finished", "outcome": outcome, "detail": "已经有结局了，没什么可取消"}
             self.operation("cancel", task_id, session, process_id)
-            if task.get("state") == "queued" and not lib.broken("queued-cancel-left-queued", self.environment):
+            queued = task.get("state") == "queued" and not lib.broken("queued-cancel-left-queued", self.environment)
+            if queued:
                 self.finalize(task, "cancelled", None, "在队里时被取消，没起")
-                return 200, {"stopped": True, "state": "finished", "outcome": "cancelled", "detail": "在队里时取消，没起"}
+        if queued:   # 撞上限重排回队、上一次留着编译目录的，出了这条任务的锁再删
+            return 200, self.with_cancelled_artifacts(task_id, before, {"stopped": True, "state": "finished", "outcome": "cancelled", "detail": "在队里时取消，没起"})
         self.selftest_pause("cancel-unlocked")
         status, reply = self.stop_running(task_id)
         if (status != 200 or lib.broken("cancel-outcome-unchecked", self.environment)   # 弄坏开关：照改前停了就回 stopped，不等结局写回、不核是不是 cancelled
                 or lib.broken("cancel-no-readback", self.environment)):
             return status, reply
-        return self.cancel_outcome_reply(task_id, reply)
+        status, reply = self.cancel_outcome_reply(task_id, reply)
+        return status, (self.with_cancelled_artifacts(task_id, before, reply) if status == 200 else reply)
+
+    def with_cancelled_artifacts(self, task_id, before, reply):
+        """取消回 stopped 之前删产物（remove_cancelled_artifacts），回话另带 artifacts、detail 后面接删了几份。"""
+        artifacts = self.remove_cancelled_artifacts(task_id, before)
+        if not artifacts["lines"]:   # 弄坏开关 cancelled-artifacts-kept：不删、不报
+            return reply
+        return dict(reply, artifacts=artifacts, detail=f"{reply.get('detail', '')}；{artifacts['lines'][-1].strip().lstrip('· ')}")
 
     def cancel_outcome_reply(self, task_id, stopped):
         """停了单元、回读过之后（stopped 是 stop_running 的回话）等对账把结局写回，照写回的结局回（TS-03）：结局是 cancelled 才回 stopped；
@@ -5619,7 +7578,7 @@ class Scheduler:
                                                      "要停由人照单元名核过再停"}
         return None
 
-    def cancel_estimating(self, parent, session, process_id):
+    def cancel_estimating(self, parent, session, process_id, before):
         """取消还在估算的任务（task_server_lib.py 文件头「资源记录」的预计用时）：拿父任务的锁、判还在估算才记 cancel_requested、阶段改 cancelling
         （drive_item_estimate 判 cancel_requested，记上之后就不进队）；估算子任务照取消整件那样停（cancel_children：在排的当场收尾，在跑的停单元、回读），
         都停了给父任务记 cancelled、回 stopped；有没停的回 500（父任务留在 cancelling，再取消照样重停）。判的时候估算已收尾、父任务已进队的交 None，调用方照不分片的任务取消。"""
@@ -5643,9 +7602,9 @@ class Scheduler:
             return 500, {"stopped": False, "accepted": True, "state": parent.get("state"), "phase": parent.get("phase"),
                          "detail": "取消已记下（任务留在估算的 cancelling，下一次 cancel 照样重停估算子任务）：" + "；".join(problems)}
         self.finalize_parent(parent, None, "cancelled", None, "提交它的会话在估算时取消了（估算子任务停了，没进队）")
-        return 200, {"stopped": True, "state": "finished", "outcome": "cancelled", "detail": "估算子任务停了、回读过，任务没进队"}
+        return 200, self.with_cancelled_artifacts(parent_id, before, {"stopped": True, "state": "finished", "outcome": "cancelled", "detail": "估算子任务停了、回读过，任务没进队"})
 
-    def cancel_sharded(self, parent, session, process_id):
+    def cancel_sharded(self, parent, session, process_id, before):
         """取消分片的整件（TS-04）：父任务没结局的先记 cancel_requested、阶段改成 cancelling（不先记结局）；在排的子任务当场收尾，在跑的逐个停、回读；
         都停了、读回过才给整件记 cancelled、回 stopped。有没停的回 500（取消已记下、整件留在 cancelling），再次取消照样重查、重停活动的子任务；
         父任务已有结局而子任务还在跑的同样停它们。弄坏开关 sharded-cancel-children-left 下照改前只给父任务记 cancelled、子任务不动。"""
@@ -5675,10 +7634,10 @@ class Scheduler:
             self.finalize_parent(current[0], None, "cancelled", None, "提交它的会话取消了整件")
         outcome = ((self.store.task(parent_id) or ({},))[0]).get("outcome")
         if not was_finished:
-            return 200, {"stopped": True, "state": "finished", "outcome": outcome, "detail": "整件取消了：在排的子任务没起，在跑的单元已停、回读过"}
+            return 200, self.with_cancelled_artifacts(parent_id, before, {"stopped": True, "state": "finished", "outcome": outcome, "detail": "整件取消了：在排的子任务没起，在跑的单元已停、回读过"})
         if not any(record.get("state") != "finished" for record in children):
             return 200, {"stopped": True, "state": "finished", "outcome": outcome, "detail": "已经有结局了，没什么可取消"}
-        return 200, {"stopped": True, "state": "finished", "outcome": outcome, "detail": "整件早有结局；还在跑的子任务单元已停、回读过"}
+        return 200, self.with_cancelled_artifacts(parent_id, before, {"stopped": True, "state": "finished", "outcome": outcome, "detail": "整件早有结局；还在跑的子任务单元已停、回读过"})
 
     def cancel_children(self, parent_id):
         """取消父任务名下还没结局的子任务（整件被取消，cancel_origin=parent）：在排的记 cancelled，在跑的停单元、回读；→ 没停成的那几句。
@@ -5769,10 +7728,17 @@ class Scheduler:
         for attempt in attempts:
             if attempt.get("state") in ACTIVE_ATTEMPT_STATES and not lib.broken("running-progress-unreported", self.environment):
                 attempt["progress"] = self.running_progress(task, attempt, now)
+        warnings = self.submit_warning_lines(task) if valid else []
+        if task.get("inbox"):   # 会话令牌不出服务（文件头 ⑥）：回话里只留收件 socket
+            task = dict(task, inbox={"socket": task["inbox"].get("socket", "")})
         summary = {"task": task, "valid": valid, "attempts": attempts}
+        if warnings:   # 提交时警告（文件头 ②「提交时警告」）：status 照打
+            summary["warnings"] = warnings
         pin = self.pin_record(task.get("command_key", "")) if task.get("command_key") else None
         if pin is not None:   # 这条命令钉了上限（文件头 ②「内存」的钉值）：status 写明是钉值、此刻多少
             summary["pinned_cap"] = self.pins_reply(task["command_key"])
+        if task.get("state") == lib.AWAITING_CONFIRMATION_STATE:   # 待确认（文件头 ⑦）：status 照此刻现算的确认单打
+            summary["confirmation"] = self.confirmation(task)
         if task.get("state") in ("queued", "sharded"):
             summary["estimated_seconds"], basis = self.estimate_of(task)
             if not lib.broken("estimate-basis-unreported", self.environment):
@@ -5808,7 +7774,7 @@ class Scheduler:
         return {"elapsed_seconds": round(elapsed, 3), "estimated_seconds": self.estimated_seconds(task),
                 "suspect": suspect if suspect.get("active") else None,
                 "log_quiet_seconds": None if seen is None else round(time.monotonic() - seen[1], 3), "cores": cores,
-                "computing_quietly": bool(seen) and seen[4],
+                "computing_quietly": bool(seen) and bool(seen[4]),
                 "threads": self.threads_of(task), "stall_seconds": self.stall_seconds}
 
     def session_tasks(self, session):
@@ -5823,7 +7789,7 @@ class Scheduler:
                 listed.append({"id": task["id"], "state": task.get("state"), "outcome": task.get("outcome"), "exit_code": task.get("exit_code"),
                                "unclaimed": unclaimed, "valid": valid, "command": shlex.join(task.get("command") or [])[:200],
                                "estimated_seconds": self.estimated_seconds(task) if task.get("state") in ("queued", "sharded") else None,
-                               "phase": task.get("phase", ""),
+                               "phase": task.get("phase", ""), "warnings": self.submit_warning_lines(task) if valid else [],
                                "waiting_for": "" if lib.broken("waiting-reason-unreported", self.environment) else self.waiting_text(task)})
         return listed
 
@@ -5857,6 +7823,8 @@ def build_application(scheduler):
         command: List[str]
         cwd: str
         environment: Dict[str, str] = {}
+        inbox: Dict[str, str] = {}   # 会话的收件地址 {socket, token}（文件头 ⑥；task submit 从会话的环境读）
+        whole_package_confirmed: str = ""   # 整包确认文件（task submit --whole-package-confirmed；文件头 ②「提交时拒」⑥）
 
     def peer_of(request):
         client = request.client
@@ -5907,9 +7875,41 @@ def build_application(scheduler):
         refusal = scheduler.placement_refusal(body.command, body.cwd, carried)   # 派不到第二台的三种当场拒、不进库（文件头 ②「提交时拒」）
         if refusal:
             raise HTTPException(status_code=400, detail={"placement": refusal})
-        task = scheduler.submit(body.command, body.cwd, carried, session_of(process_id), process_id)
-        return {"id": task["id"], "session": task["session"], "gpu": task["gpu"], "gpu_reason": task["gpu_reason"],
-                "sharded": task.get("sharded_entry", ""), "compiles": task.get("compiles", False)}
+        whole = scheduler.whole_package_refusal(body.command, body.cwd, carried, body.whole_package_confirmed)   # ⑥ 整包测试没带确认标识（文件头 ②「提交时拒」）
+        if whole:
+            raise HTTPException(status_code=400, detail={"placement": whole})
+        task = scheduler.submit(body.command, body.cwd, carried, session_of(process_id), process_id, body.inbox, whole_package=body.whole_package_confirmed)
+        reply = {"id": task["id"], "session": task["session"], "gpu": task["gpu"], "gpu_reason": task["gpu_reason"], "state": task.get("state"),
+                 "sharded": task.get("sharded_entry", ""), "compiles": task.get("compiles", False), "inbox": bool(task.get("inbox")),
+                 "warnings": scheduler.submit_warning_lines(task)}   # 提交时警告（文件头 ②「提交时警告」）：客户端打到标准错误
+        if task.get("state") == lib.AWAITING_CONFIRMATION_STATE:   # 交任务的二次确认（文件头 ⑦）：确认单与确认的时限
+            reply.update(confirmation=scheduler.confirmation(task), confirm_timeout_seconds=scheduler.confirm_timeout_seconds)
+        return reply
+
+    class ConfirmBody(BaseModel):
+        items: int
+        tasks: int
+
+    class RequeueBody(BaseModel):
+        items: int
+        tasks: int
+        why: str
+
+    @application.post("/tasks/{task_id}/requeue")
+    def requeue(task_id: int, body: RequeueBody, request: Request):
+        process_id = peer_of(request)
+        status, reply = scheduler.requeue(task_id, session_of(process_id), process_id, body.items, body.tasks, body.why)
+        if status != 200:
+            raise HTTPException(status_code=status, detail=reply.get("detail", reply))
+        return reply
+
+    @application.post("/tasks/{task_id}/confirm")
+    def confirm(task_id: int, body: ConfirmBody, request: Request):
+        process_id = peer_of(request)
+        status, reply = scheduler.confirm(task_id, session_of(process_id), process_id, body.items, body.tasks)
+        if status != 200:
+            raise HTTPException(status_code=status, detail=reply.get("detail", reply))
+        return reply
 
     @application.get("/tasks/{task_id}")
     def show(task_id: int, request: Request):
@@ -6114,6 +8114,7 @@ def serve():
     scheduler.revalidate_queued()   # 规则改了的：还在排的照现行提交规则再核，不合的打回提交方重发（文件头「排队」）
     scheduler.thread.start()
     scheduler.nfs_thread.start()
+    scheduler.inbox_thread.start()   # 发消息给会话、盯服务健康（文件头 ⑥）
     threading.Thread(target=scheduler.sweep_finished_build_directories, name="task-server-build-sweep", daemon=True).start()   # 起来时清掉已有结局的任务留下的编译目录
     say(f"  · task-server 起了（进程 {os.getpid()}，socket {configuration.socket}，库 {configuration.database}，标签 {store.tag}；"
         f"NFS 共享根 {'、'.join(entry['root'] for entry in nfs_report['roots']) or '没判（弄坏开关 nfs-unchecked）'} 四项都过）")

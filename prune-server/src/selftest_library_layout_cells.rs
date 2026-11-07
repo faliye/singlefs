@@ -1,15 +1,21 @@
-//! 自证里库布局那三格与删前缀那两格（格表在 `selftest.rs` 的 `CELLS`）：
+//! 自证里库布局那三格与删前缀那三格（格表在 `selftest.rs` 的 `CELLS`）：
 //! 服务只有自己那一份库、只有默认列族、记账行在客户端碰不到的那一段键里（`storage.rs` 文件头）；库对不上时拒起、退出码点名原因；
 //! 软上限压得比库的文件数低时服务开库之前抬到硬上限、开得了，硬上限也不够时退 8 说要几个（`storage.rs` 文件头「文件数上限」）。
 //!
-//! 删前缀那两格（`delete-prefix-only-under-prefix`、`delete-prefix-counts-before-deleting`）：按键前缀成批删（`protocol.rs` 文件头「删前缀」），
-//! 只删那个前缀底下的键、走出前缀就停；同一个请求能只数不删，数的口径和删一样。样本键用崩溃判定库表标签那样的单字节前缀，服务里没有哪张表的专门分支。
+//! 删前缀那三格（`delete-prefix-only-under-prefix`、`delete-prefix-counts-before-deleting`、`delete-prefix-releases-claims`）：
+//! 按键前缀成批删（`protocol.rs` 文件头「删前缀」），只删那个前缀底下的键、走出前缀就停；同一个请求能只数不删，数的口径和删一样；
+//! 删掉的键上的认领同时释放，只数不删不动认领。样本键用崩溃判定库表标签那样的单字节前缀，服务里没有哪张表的专门分支。
 //!
 //! 样本库照 `crates/singlefs-verification/src/verdict_store.rs` 的开法造与核：建库用 `library_options(LibraryCreation::CreateEmpty)`
 //! 那几项（建、目录已在就拒、LZ4）加 `synced_write_options` 的同步写；只读核用 `open_existing_for_reading_only` 那几项
 //! （不建、LZ4、RocksDB 的运行日志另放，`open_for_read_only` 不拿锁、只开默认列族）。行的键以表标签起头（`VerdictStoreTable::key_tag`），
 //! 库布局行是键 `00`、值布局号 6（大端）。
 //! 服务的弄坏开关只交这一格要证红的那几项（`BreakSwitches::only_these`），客户端不带开关。
+//!
+//! 另三格（records/2026-11-03-task-server与prune-server深入对攻审核.md 的 PS-02、PS-06 剩下那一半与多机配置位置拒算那一件）：
+//! `multi-host-configuration-from-the-main-worktree`（多机配置的缺省位置顺 git 找主工作树，`configuration.rs` 文件头）、
+//! `segmented-rewrite-survives-writer-death`（大值段键带版本，写方死在写清单之前读回的照旧是写之前的值，下一次写回收写到一半那一版）、
+//! `prefix-scan-resumes-after-the-last-key`（按前缀扫带续扫起点，一帧装不下时从上一帧最后一把键之后接着扫）。
 
 use std::collections::BTreeMap;
 use std::os::unix::process::CommandExt;
@@ -22,21 +28,32 @@ use rocksdb::{
     DEFAULT_COLUMN_FAMILY_NAME,
 };
 
+use crate::bench::SERVER_READY_TIMEOUT;
 use crate::break_switches::{BreakSwitch, BreakSwitches, BREAK_VARIABLE};
 use crate::client::{RouteAddress, SimpleClient};
-use crate::protocol::{ClaimOutcome, Table};
+use crate::committer::now_milliseconds;
+use crate::configuration::{
+    multi_host_configuration_path_from, ConfigurationLookup, MULTI_HOST_CONFIGURATION_FILE_NAME,
+};
+use crate::protocol::{ClaimOutcome, RejectionStatus, Table};
+use crate::reliable_client::{ClientFailure, ReliableClient, ReliableClientSettings, TableEntry};
+use crate::segmented_values::{
+    parse_version_registry, segment_key, version_registry_key, SEGMENT_BYTES,
+};
 use crate::selftest::{
     line_field, loopback_arguments, server_command, CellContext, CellDirectory,
-    SELFTEST_WORKER_THREADS, SERVER_READY_TIMEOUT,
+    SELFTEST_WORKER_THREADS,
 };
 use crate::server::{
     DESCRIPTOR_LIMIT_TOO_LOW_EXIT_CODE, LIBRARY_MISMATCHED_EXIT_CODE, LISTENING_LINE_PREFIX,
 };
+use crate::sha256::sha256_hexadecimal;
 use crate::spawned::{SpawnedProcess, StandardError};
-use crate::storage::{claim_key, descriptor_limit, entries_in, CLAIM_KEY_TAG, DESCRIPTOR_HEADROOM};
+use crate::storage::{
+    claim_key, descriptor_limit, encode_claim_record, entries_in, ClaimRecord,
+    APPLIED_REQUEST_KEY_TAG, CLAIM_KEY_TAG, DESCRIPTOR_HEADROOM,
+};
 
-/// 已生效的请求号那几行的键前缀（`storage.rs` 的同名常量；这里另写一份，是为了核服务写的前缀对不对）。
-const APPLIED_REQUEST_KEY_TAG: u8 = 0xF0;
 /// 崩溃判定库这一版的布局号（`verdict_store.rs` 的 `LIBRARY_LAYOUT_NUMBER_OF_THIS_VERSION`）。
 const SAMPLE_LIBRARY_LAYOUT_NUMBER: u32 = 6;
 /// 「选项对不上」那一份样本库用的比较器名字（与 RocksDB 缺省的按字节比较器不同名、次序相反）。
@@ -45,8 +62,8 @@ const REVERSED_COMPARATOR_NAME: &str = "prune-server-selftest.reversed-bytewise"
 const STOP_TIMEOUT: Duration = Duration::from_secs(30);
 /// 拒起的服务没打就绪行之后等它退出的上限。
 const REFUSAL_EXIT_TIMEOUT: Duration = Duration::from_secs(15);
-/// 认领那一把键的租期：格跑完之前不会过期。
-const CLAIM_LEASE_MILLISECONDS: u32 = 600_000;
+/// 库布局那一格核认领不分表：两个客户端用两张表的名义认领同一把键，租期在格跑完之前不会过期。
+const CROSS_TABLE_CLAIM_LEASE_MILLISECONDS: u32 = 600_000;
 /// 文件数上限那一格：服务子进程的软上限压到这么多（systemd 用户单元给的 1024 的八分之一，样本库不用造到上千个文件）。
 const LOW_DESCRIPTOR_SOFT_LIMIT: u64 = 128;
 /// 文件数上限那一格样本库的 SST 数：比压低的软上限多一倍有余，开库时 RocksDB 把它们全打开（`storage.rs` 文件头「文件数上限」）。
@@ -344,7 +361,7 @@ pub(crate) fn cell_single_library_layout(context: &CellContext) -> Result<String
     let claimed_key = tagged_key(0x0A, 0xE7, 105);
     let outcomes = client.claim(
         &[(Table::Conclusions, claimed_key.clone())],
-        CLAIM_LEASE_MILLISECONDS,
+        CROSS_TABLE_CLAIM_LEASE_MILLISECONDS,
     )?;
     if outcomes != [ClaimOutcome::Claimed] {
         return Err(format!("认领一把没人持有的键回 {outcomes:?}，该是认领到"));
@@ -352,7 +369,7 @@ pub(crate) fn cell_single_library_layout(context: &CellContext) -> Result<String
     let mut other_client = SimpleClient::connect(&route, BreakSwitches::none())?;
     let other_outcomes = other_client.claim(
         &[(Table::Facts, claimed_key.clone())],
-        CLAIM_LEASE_MILLISECONDS,
+        CROSS_TABLE_CLAIM_LEASE_MILLISECONDS,
     )?;
     if !matches!(
         other_outcomes.as_slice(),
@@ -897,4 +914,503 @@ pub(crate) fn cell_delete_prefix_counts_before_deleting(
         "只数不删：每帧至多 2 把分三帧数到 5 把、库里一把键不少；先数后删：数到 5、删掉 5、删完再数 0，前缀之外的键还在"
             .to_string(),
     )
+}
+
+/// 删前缀释放认领那一格样本库里认领行的持有者身份（不是哪个客户端随机生成的那种 32 位十六进制，撞不上）。
+const SAMPLE_CLAIM_HOLDER_IDENTITY: &[u8] = b"selftest-claim-holder";
+/// 样本库里认领行的租期：从造样本库那一刻起这么多毫秒，格跑完之前不会过期。
+const SAMPLE_CLAIM_LEASE_MILLISECONDS: u64 = 600_000;
+
+/// 删前缀删掉一把键时释放它的认领，只数不删时不动认领（`committer.rs` 文件头「删前缀」）。
+/// 服务正常跑时一把有认领的键不会同时在库里（写结论释放认领、认领已在库里的键回「已有结论」），这一格用样本库造出两样都在的状态：
+/// 两把键各有一行数据与一行别的身份持有、租期没到的认领。
+pub(crate) fn cell_delete_prefix_releases_claims(context: &CellContext) -> Result<String, String> {
+    let switches = context.break_switches.only_these(&[
+        BreakSwitch::DeletePrefixClaimsKept,
+        BreakSwitch::DeletePrefixCountReleasesClaims,
+    ]);
+    let directory = CellDirectory::create()?;
+    let library = directory.path.join("library");
+    let deleted_key = tagged_key(DELETE_PREFIX_TARGET_TAG, 0x44, 20);
+    let counted_prefix = DELETE_PREFIX_TARGET_TAG + 1;
+    let counted_key = tagged_key(counted_prefix, 0x43, 20);
+    let held_by_sample_holder = encode_claim_record(&ClaimRecord {
+        holder_identity: SAMPLE_CLAIM_HOLDER_IDENTITY.to_vec(),
+        lease_expiry_milliseconds: now_milliseconds() + SAMPLE_CLAIM_LEASE_MILLISECONDS,
+    });
+    build_sample_library(
+        &library,
+        &[
+            (deleted_key.clone(), b"concluded".to_vec()),
+            (claim_key(&deleted_key), held_by_sample_holder.clone()),
+            (counted_key.clone(), b"concluded".to_vec()),
+            (claim_key(&counted_key), held_by_sample_holder.clone()),
+        ],
+        SampleMismatch::Compatible,
+    )?;
+    let (mut server, route, _) =
+        start_server(context, &directory.path, Some(library.as_path()), &switches)?;
+    let mut deleter = SimpleClient::connect(&route, BreakSwitches::none())?;
+    let mut other_holder = SimpleClient::connect(&route, BreakSwitches::none())?;
+    let deleted = deleter.delete_prefix_frame(&[DELETE_PREFIX_TARGET_TAG], &[], 10, false)?;
+    if deleted.keys_in_frame != 1 || deleted.last_key != deleted_key {
+        return Err(format!(
+            "删前缀 0x{DELETE_PREFIX_TARGET_TAG:02X} 回 {deleted:?}，该是删掉 1 把、最后一把是样本库里那把带认领的键"
+        ));
+    }
+    let after_delete = other_holder.claim(
+        &[(Table::Conclusions, deleted_key.clone())],
+        CROSS_TABLE_CLAIM_LEASE_MILLISECONDS,
+    )?;
+    if after_delete != [ClaimOutcome::Claimed] {
+        return Err(format!(
+            "别的身份持有、租期没到的键被删前缀删掉之后，另一个身份立刻认领回 {after_delete:?}，该是认领到：删前缀要同时释放这把键上的认领"
+        ));
+    }
+    let counted = deleter.delete_prefix_frame(&[counted_prefix], &[], 10, true)?;
+    if counted.keys_in_frame != 1 || counted.last_key != counted_key {
+        return Err(format!(
+            "只数不删前缀 0x{counted_prefix:02X} 回 {counted:?}，该是数到 1 把、最后一把是样本库里那把带认领的键"
+        ));
+    }
+    let other_identity = other_holder.client_identity.clone();
+    drop(deleter);
+    drop(other_holder);
+    stop_server(&mut server)?;
+    let rows = rows_read_only(&library, &directory.path.join("read-only-log"))?;
+    if rows.get(&claim_key(&counted_key)) != Some(&held_by_sample_holder) {
+        return Err(format!(
+            "只数不删之后，数到的那把键上的认领行该原样还在（持有者 {}）：读回 {:02x?}",
+            String::from_utf8_lossy(SAMPLE_CLAIM_HOLDER_IDENTITY),
+            rows.get(&claim_key(&counted_key))
+        ));
+    }
+    let deleted_key_holder = rows
+        .get(&claim_key(&deleted_key))
+        .and_then(|value| value.get(8..));
+    if deleted_key_holder != Some(other_identity.as_slice()) || rows.contains_key(&deleted_key) {
+        return Err(format!(
+            "删掉的键在库里该没有数据行、认领行的持有者该是随后认领到的那个身份：数据行还在 {}、认领行持有者 {:?}",
+            rows.contains_key(&deleted_key),
+            deleted_key_holder.map(String::from_utf8_lossy)
+        ));
+    }
+    if !rows.contains_key(&counted_key) {
+        return Err("只数不删之后数到的那把键从库里没了".to_string());
+    }
+    Ok(format!(
+        "样本库两把键各带一行别的身份持有、租期没到的认领：删前缀删掉一把之后另一个身份立刻认领到；只数不删另一把之后它的认领行原样还在（持有者 {}）",
+        String::from_utf8_lossy(SAMPLE_CLAIM_HOLDER_IDENTITY)
+    ))
+}
+
+/// 多机配置那一格造的 git 仓、worktree 与不在 git 里的目录照这个身份提交（只给 `git commit` 用，不推、不读）。
+const CONFIGURATION_CELL_GIT_IDENTITY: [&str; 4] = [
+    "-c",
+    "user.name=prune-server-selftest",
+    "-c",
+    "user.email=prune-server-selftest@invalid",
+];
+/// 多机配置那一格起 git 时去掉的环境变量：这几样设着时 git 不看 `-C` 的目录。
+const CONFIGURATION_CELL_GIT_VARIABLES: [&str; 4] = [
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_INDEX_FILE",
+];
+
+/// 在 `directory` 里跑一条 git（去掉 `CONFIGURATION_CELL_GIT_VARIABLES`），退出码不是 0 就报错。
+fn run_git_in(directory: &Path, arguments: &[&str]) -> Result<(), String> {
+    let mut command = Command::new("git");
+    command.arg("-C").arg(directory).args(arguments);
+    for variable in CONFIGURATION_CELL_GIT_VARIABLES {
+        command.env_remove(variable);
+    }
+    let output = command
+        .output()
+        .map_err(|error| format!("起不了 git {arguments:?}：{error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {arguments:?}（在 {}）退 {:?}：{}",
+            directory.display(),
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(())
+}
+
+/// 两条路径指的是同一个文件位置：上一层目录照真实路径比（临时目录可能经符号链接），文件名逐字比。
+fn same_configuration_place(found: &Path, expected: &Path) -> bool {
+    let canonical_parent =
+        |path: &Path| path.parent().and_then(|parent| parent.canonicalize().ok());
+    found.file_name() == expected.file_name()
+        && canonical_parent(found).is_some()
+        && canonical_parent(found) == canonical_parent(expected)
+}
+
+/// 多机配置的缺省位置顺 git 找主工作树（`configuration.rs` 文件头「TCP 地址」）：临时目录里 `git init` 一份主仓、提交一次、加一个 worktree，
+/// 从主仓的子目录与 worktree 起找都落在主仓根下的 `multi-host.env`；从不在 git 里的目录起找落在它自己下面；`SINGLEFS_MULTI_HOST_CONFIG` 给了照它。
+pub(crate) fn cell_multi_host_configuration_from_the_main_worktree(
+    context: &CellContext,
+) -> Result<String, String> {
+    let lookup = if context
+        .break_switches
+        .is_enabled(BreakSwitch::MultiHostConfigurationFromWorkingDirectoryOnly)
+    {
+        ConfigurationLookup::StartDirectoryOnly
+    } else {
+        ConfigurationLookup::FollowGitToTheMainWorktree
+    };
+    let directory = CellDirectory::create()?;
+    let main = directory.path.join("main");
+    let worktree = directory.path.join("worktree");
+    let outside = directory.path.join("outside");
+    for created in [&main, &outside] {
+        std::fs::create_dir(created)
+            .map_err(|error| format!("建不了 {}：{error}", created.display()))?;
+    }
+    run_git_in(&main, &["init", "-q"])?;
+    let mut commit = CONFIGURATION_CELL_GIT_IDENTITY.to_vec();
+    commit.extend(["commit", "-q", "--allow-empty", "-m", "selftest"]);
+    run_git_in(&main, &commit)?;
+    run_git_in(
+        &main,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            worktree.to_str().ok_or("临时目录的路径不是 UTF-8")?,
+        ],
+    )?;
+    let nested = main.join("nested");
+    std::fs::create_dir(&nested)
+        .map_err(|error| format!("建不了 {}：{error}", nested.display()))?;
+    if run_git_in(&outside, &["rev-parse", "--git-dir"]).is_ok() {
+        return Err(format!(
+            "临时目录 {} 落在一棵 git 工作树里，判不了「不在 git 里取起点目录下那一份」：把 TMPDIR 指到 git 工作树之外再跑",
+            outside.display()
+        ));
+    }
+    let main_configuration = main.join(MULTI_HOST_CONFIGURATION_FILE_NAME);
+    let given = directory.path.join("given.env");
+    let cases = [
+        (
+            "主仓的子目录",
+            None,
+            nested.clone(),
+            main_configuration.clone(),
+        ),
+        (
+            "worktree",
+            None,
+            worktree.clone(),
+            main_configuration.clone(),
+        ),
+        (
+            "不在 git 里的目录",
+            None,
+            outside.clone(),
+            outside.join(MULTI_HOST_CONFIGURATION_FILE_NAME),
+        ),
+        (
+            "SINGLEFS_MULTI_HOST_CONFIG 给了",
+            Some(given.clone().into_os_string()),
+            worktree.clone(),
+            given.clone(),
+        ),
+    ];
+    let mut shown = Vec::new();
+    for (what, configured, start, expected) in cases {
+        let found = multi_host_configuration_path_from(configured, &start, lookup);
+        if !same_configuration_place(&found, &expected) {
+            return Err(format!(
+                "从{what}（{}）起找多机配置落在 {}，该是 {}：多机配置被 git 忽略、只在主工作树里有，缺省位置要顺 git 找到主工作树",
+                start.display(),
+                found.display(),
+                expected.display()
+            ));
+        }
+        shown.push(format!("{what}→{}", found.display()));
+    }
+    Ok(format!(
+        "多机配置的缺省位置：{}（主仓子目录与 worktree 都落在主仓根下，不在 git 里的落在起点目录下，给了变量照它）",
+        shown.join("；")
+    ))
+}
+
+/// 大值分段写读那两格的容错客户端：帧超时 30 秒，只带这一格的弄坏开关。
+fn layout_cell_client(
+    route: &RouteAddress,
+    journal_path: PathBuf,
+    switches: &BreakSwitches,
+) -> Result<ReliableClient, String> {
+    let mut settings = ReliableClientSettings::new(route.clone(), journal_path);
+    settings.frame_timeout = Duration::from_secs(30);
+    settings.break_switches = switches.clone();
+    ReliableClient::open(settings).map_err(|failure| format!("容错客户端开不了：{failure}"))
+}
+
+/// 一批写写完：先写段（`write_segments_of_large_values`），再写它交回的清单与别的条目、等确认（崩溃判定库 `write_rows` 的写法）。
+fn write_whole(client: &mut ReliableClient, entries: Vec<TableEntry>) -> Result<(), String> {
+    let entries_to_write_last = client
+        .write_segments_of_large_values(entries, SEGMENTED_CELL_WRITE_FRAME_BYTES)
+        .map_err(|failure| format!("写段不成：{failure}"))?;
+    client
+        .submit_write_entries(&entries_to_write_last)
+        .map_err(|failure| format!("写清单不成：{failure}"))?;
+    client
+        .wait_all_acknowledged()
+        .map_err(|failure| format!("等清单的确认不成：{failure}"))
+}
+
+/// 点读一把键在服务里的原样（清单、段、版本登记键照存着的交）。
+fn stored_raw(client: &mut ReliableClient, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    let mut values = client
+        .read(&[(Table::Conclusions, key.to_vec())])
+        .map_err(|failure| format!("点读 {key:02x?} 不成：{failure}"))?;
+    values
+        .pop()
+        .ok_or_else(|| format!("点读 {key:02x?} 没回值"))
+}
+
+/// 这把键的版本登记键里登记的版本。
+fn registered_versions(client: &mut ReliableClient, key: &[u8]) -> Result<Vec<String>, String> {
+    let stored = stored_raw(client, &version_registry_key(key))?;
+    parse_version_registry(key, stored.as_deref()).map_err(|failure| failure.to_string())
+}
+
+/// 大值分段那一格写的帧上限（与崩溃判定库 `PRUNE_SERVER_WRITE_FRAME_BYTES` 同量级：一段一帧）。
+const SEGMENTED_CELL_WRITE_FRAME_BYTES: usize = SEGMENT_BYTES;
+/// 写方死掉那一格的键：表标签起头、带 NUL（崩溃判定库的键那样）。
+const WRITER_DEATH_KEY: &[u8] = b"\x1cwriter-death\x00one";
+
+/// 写方死掉那一格的三个值：一整段加 `tail_bytes` 字节（两段），每个值的字节由 `seed` 定。
+fn two_segment_value(seed: u8, tail_bytes: usize) -> Vec<u8> {
+    (0..SEGMENT_BYTES + tail_bytes)
+        .map(|position| {
+            seed.wrapping_add(u8::try_from(position % 241).expect("取模 241 放得进 u8"))
+        })
+        .collect()
+}
+
+/// 写方死在「写完新一版的段、还没写清单」之间（Python 客户端文件头「键空间」大值分段「写」）：容错客户端存着旧值的键改写新值，
+/// `write_segments_of_large_values` 写完登记键与段之后不写它交回的清单、丢掉客户端；另一个客户端点读交回旧值（不报拼不回），登记着旧新两版；
+/// 再写第三个值：读回它、写到一半那一版的段被删掉，登记键是旧与第三两版；同一个值再写一遍：旧的那一版也删掉，登记键只剩第三个值那一版。
+pub(crate) fn cell_segmented_rewrite_survives_writer_death(
+    context: &CellContext,
+) -> Result<String, String> {
+    let switches = context
+        .break_switches
+        .only(BreakSwitch::SegmentsOverwrittenInPlace);
+    let directory = CellDirectory::create()?;
+    let library = directory.path.join("library");
+    let (mut server, route, _) = start_server(
+        context,
+        &directory.path,
+        Some(library.as_path()),
+        &BreakSwitches::none(),
+    )?;
+    let old = two_segment_value(3, 11);
+    let new = two_segment_value(5, 11);
+    let third = two_segment_value(7, 13);
+    let (old_version, new_version, third_version) = (
+        sha256_hexadecimal(&old),
+        sha256_hexadecimal(&new),
+        sha256_hexadecimal(&third),
+    );
+    let entry = |value: &[u8]| {
+        vec![(
+            Table::Conclusions,
+            WRITER_DEATH_KEY.to_vec(),
+            value.to_vec(),
+        )]
+    };
+    {
+        let mut writer = layout_cell_client(&route, directory.path.join("old.journal"), &switches)?;
+        write_whole(&mut writer, entry(&old))?;
+    }
+    {
+        let mut dying_writer =
+            layout_cell_client(&route, directory.path.join("dying.journal"), &switches)?;
+        let manifests_never_written = dying_writer
+            .write_segments_of_large_values(entry(&new), SEGMENTED_CELL_WRITE_FRAME_BYTES)
+            .map_err(|failure| format!("写新一版的段不成：{failure}"))?;
+        if manifests_never_written.len() != 1 {
+            return Err(format!(
+                "写新值交回 {} 条清单与别的条目，该是 1 条（这把键的清单）",
+                manifests_never_written.len()
+            ));
+        }
+    }
+    let mut reader = layout_cell_client(&route, directory.path.join("reader.journal"), &switches)?;
+    let read_after_death = reader
+        .read_assembling_segmented_values(&[(Table::Conclusions, WRITER_DEATH_KEY.to_vec())])
+        .map_err(|failure| {
+            format!("写方死在写完段、写清单之前，读这把键该交回旧值，却读不成：{failure}")
+        })?;
+    if read_after_death != [Some(old.clone())] {
+        return Err(format!(
+            "写方死在写完段、写清单之前，读这把键交回 {:?} 字节，该交回旧值（{} 字节）",
+            read_after_death
+                .first()
+                .map(|value| value.as_ref().map(Vec::len)),
+            old.len()
+        ));
+    }
+    let mut both = vec![old_version.clone(), new_version.clone()];
+    both.sort();
+    let registered_after_death = registered_versions(&mut reader, WRITER_DEATH_KEY)?;
+    if registered_after_death != both {
+        return Err(format!(
+            "写方死掉之后版本登记键登记着 {registered_after_death:?}，该是旧新两版 {both:?}（写到一半那一版要登记着，下一次写才删得掉）"
+        ));
+    }
+    write_whole(&mut reader, entry(&third))?;
+    let third_read = reader
+        .read_assembling_segmented_values(&[(Table::Conclusions, WRITER_DEATH_KEY.to_vec())])
+        .map_err(|failure| format!("写了第三个值之后读不成：{failure}"))?;
+    let dead_segment = stored_raw(
+        &mut reader,
+        &segment_key(WRITER_DEATH_KEY, Some(&new_version), 0),
+    )?;
+    let mut old_and_third = vec![old_version.clone(), third_version.clone()];
+    old_and_third.sort();
+    let registered_after_third = registered_versions(&mut reader, WRITER_DEATH_KEY)?;
+    if third_read != [Some(third.clone())]
+        || dead_segment.is_some()
+        || registered_after_third != old_and_third
+    {
+        return Err(format!(
+            "写第三个值之后：读回相同 {}、写到一半那一版的段 0 还在 {}（该删掉）、登记 {registered_after_third:?}（该是 {old_and_third:?}）",
+            third_read == [Some(third.clone())],
+            dead_segment.is_some()
+        ));
+    }
+    write_whole(&mut reader, entry(&third))?;
+    let old_segment = stored_raw(
+        &mut reader,
+        &segment_key(WRITER_DEATH_KEY, Some(&old_version), 0),
+    )?;
+    let registered_at_last = registered_versions(&mut reader, WRITER_DEATH_KEY)?;
+    if old_segment.is_some() || registered_at_last != [third_version.clone()] {
+        return Err(format!(
+            "同一个值再写一遍之后：旧的那一版段 0 还在 {}（该删掉）、登记 {registered_at_last:?}（该只剩 {third_version}）",
+            old_segment.is_some()
+        ));
+    }
+    drop(reader);
+    stop_server(&mut server)?;
+    Ok(format!(
+        "写方死在写完新一版的段、写清单之前：读回旧值（{} 字节）、登记旧新两版；写第三个值之后读回它、写到一半那一版的段删了；再写一遍之后只剩第三个值那一版",
+        old.len()
+    ))
+}
+
+/// 续扫那一格的前缀：表标签起头（崩溃判定库的键那样）。
+const RESUMED_SCAN_PREFIX: &[u8] = b"\x1dresumed/";
+/// 续扫那一格一帧至多几条：七条分三帧（3、3、1）。
+const RESUMED_SCAN_ENTRIES_PER_FRAME: u32 = 3;
+/// 续扫那一格至多扫几帧：续扫起点不认的服务每帧都从前缀起，扫到这么多帧还没完就判红。
+const RESUMED_SCAN_FRAME_LIMIT: usize = 10;
+
+/// 按前缀扫带续扫起点（`protocol.rs` 文件头「按前缀扫」）：前缀下七把键、前缀前后各一把，每帧至多三条，从上一帧最后一把键之后续扫：
+/// 三帧扫完（3、3、1，前两帧截断、最后一帧不截断），逐把与写进去的相同、按键升序、不重不漏；续扫起点不以前缀起头的回状态 1。
+pub(crate) fn cell_prefix_scan_resumes_after_the_last_key(
+    context: &CellContext,
+) -> Result<String, String> {
+    let switches = context
+        .break_switches
+        .only(BreakSwitch::ScanResumeKeyIgnored);
+    let directory = CellDirectory::create()?;
+    let library = directory.path.join("library");
+    let (mut server, route, _) =
+        start_server(context, &directory.path, Some(library.as_path()), &switches)?;
+    let resumed_keys: Vec<Vec<u8>> = (0..7_u8)
+        .map(|index| {
+            let mut key = RESUMED_SCAN_PREFIX.to_vec();
+            key.extend_from_slice(format!("key-{index}").as_bytes());
+            key
+        })
+        .collect();
+    let mut entries: Vec<TableEntry> = resumed_keys
+        .iter()
+        .map(|key| (Table::Conclusions, key.clone(), key.repeat(3)))
+        .collect();
+    entries.push((
+        Table::Conclusions,
+        b"\x1dresumed.".to_vec(),
+        b"before".to_vec(),
+    ));
+    entries.push((
+        Table::Conclusions,
+        b"\x1dresumed0".to_vec(),
+        b"after".to_vec(),
+    ));
+    let mut client = layout_cell_client(
+        &route,
+        directory.path.join("scan.journal"),
+        &BreakSwitches::none(),
+    )?;
+    client
+        .submit_write_entries(&entries)
+        .and_then(|_| client.wait_all_acknowledged())
+        .map_err(|failure| format!("写样本键不成：{failure}"))?;
+    let mut scanned = Vec::new();
+    let mut frames = Vec::new();
+    let mut after_key = Vec::new();
+    loop {
+        if frames.len() == RESUMED_SCAN_FRAME_LIMIT {
+            return Err(format!(
+                "扫了 {RESUMED_SCAN_FRAME_LIMIT} 帧还没扫完（每帧条数 {frames:?}）：续扫起点不认，每帧都从前缀起"
+            ));
+        }
+        let (is_truncated, frame) = client
+            .scan_after(
+                Table::Conclusions,
+                RESUMED_SCAN_PREFIX,
+                &after_key,
+                RESUMED_SCAN_ENTRIES_PER_FRAME,
+            )
+            .map_err(|failure| format!("从 {after_key:02x?} 之后续扫不成：{failure}"))?;
+        frames.push((frame.len(), is_truncated));
+        after_key = frame
+            .last()
+            .map(|entry| entry.key.clone())
+            .unwrap_or_default();
+        scanned.extend(frame.into_iter().map(|entry| (entry.key, entry.value)));
+        if !is_truncated {
+            break;
+        }
+    }
+    let expected: Vec<(Vec<u8>, Vec<u8>)> = resumed_keys
+        .iter()
+        .map(|key| (key.clone(), key.repeat(3)))
+        .collect();
+    if scanned != expected || frames != [(3, true), (3, true), (1, false)] {
+        return Err(format!(
+            "续扫回 {} 条（该是前缀下 7 条、逐把相同、按键升序、不重不漏：{}），每帧（条数, 截断）{frames:?}，该是 [(3, true), (3, true), (1, false)]",
+            scanned.len(),
+            scanned == expected
+        ));
+    }
+    match client.scan_after(
+        Table::Conclusions,
+        RESUMED_SCAN_PREFIX,
+        b"\x1dother",
+        RESUMED_SCAN_ENTRIES_PER_FRAME,
+    ) {
+        Err(ClientFailure::Rejected {
+            status: RejectionStatus::MalformedPayload,
+            ..
+        }) => {}
+        other => {
+            return Err(format!(
+                "续扫起点不以前缀起头该回状态 1（内容解不开），回的是 {other:?}"
+            ))
+        }
+    }
+    drop(client);
+    stop_server(&mut server)?;
+    Ok("前缀下 7 把键每帧至多 3 条：从上一帧最后一把键之后续扫三帧（3、3、1）扫完，逐把相同、按键升序、不重不漏；续扫起点不以前缀起头回状态 1".to_string())
 }

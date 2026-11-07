@@ -69,7 +69,7 @@
       「✗ 自证 total-within-margin-refused：」
   HOST_DISPATCH_BREAK=slice-room-ignores-margin  判记账放不放得下时 slice 放得下的不减这台此刻的余量（在跑的上限之和能记到总上限）
       「✗ 自证 slice-room-keeps-margin：」
-  HOST_DISPATCH_BREAK=probe-program-uncompressed  送第二台的探测程序照改前不压缩、整份 base64 当一个参数（过单个参数的界就查不成）
+  HOST_DISPATCH_BREAK=probe-program-uncompressed  送第二台的探测程序不压缩、整份 base64 当一个参数（过单个参数的界就查不成）
       「✗ 自证 probe-peer：」（此刻的探测程序不压缩已过界）、「✗ 自证 probe-program-large：」
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
@@ -97,7 +97,7 @@ import memory_peaks_lib as peaks  # noqa: E402
 
 MEBIBYTE = peaks.MEBIBYTE
 GIBIBYTE = 1024 * MEBIBYTE
-BREAK_FIXED_MARGIN_BYTES = 2 * GIBIBYTE   # 只给弄坏开关 margin-fallback-fixed：量不到余量时照改前退回的固定数
+BREAK_FIXED_MARGIN_BYTES = 2 * GIBIBYTE   # 只给弄坏开关 margin-fallback-fixed：量不到余量时退回的固定数
 GPU_MARGIN_MEBIBYTES = 2560
 DEFAULT_GPU_PREDICTION_MEBIBYTES = 8192
 PROBE_TIMEOUT_SECONDS = 60
@@ -261,7 +261,7 @@ def probe_peer(peer, gpu, apps_only=False):
     source = peer_probe_program().encode("utf-8")
     flags = "--apps" if apps_only else ("--gpu" if gpu else "")
     if broken("probe-program-uncompressed"):
-        # 弄坏开关：照改前不压缩、解出来的整份程序当 python3 -c 的一个参数（程序或它的 base64 过单个参数的界就撞 E2BIG）
+        # 弄坏开关：不压缩、解出来的整份程序当 python3 -c 的一个参数（程序或它的 base64 过单个参数的界就撞 E2BIG）
         program = base64.b64encode(source).decode("ascii")
         text = f'python3 -B -c "$(printf %s {program} | base64 -d)" {flags}'
     else:
@@ -333,7 +333,7 @@ def judge_host(host, report, prediction, gpu, pending_memory, pending_gpu, confi
     if margin is None:
         if not broken("margin-fallback-fixed"):
             return Verdict(host, False, False, cap, f"内存：这台此刻量不到余量（{report_margin(memory)[1]}），这一轮不派")
-        margin = BREAK_FIXED_MARGIN_BYTES   # 弄坏开关：照改前退回固定的数
+        margin = BREAK_FIXED_MARGIN_BYTES   # 弄坏开关：退回固定的数
     if configured_cap_bytes is not None and not broken("no-configured-cap-clamp"):
         if booked > configured_cap_bytes:
             return Verdict(host, False, True, cap, f"要记的 {human(booked)} 比多机配置 SLICE_MEMORY_CAP_BY_HOST 里这台那一项 {human(configured_cap_bytes)} 大",
@@ -635,7 +635,7 @@ def selftest_cells(root):
           f"实际 available {peer.available}（{peer.why}）、上限 {peer.memory_cap_bytes}、报告 {peer_report}、余量 {peer_margin}、问题「{peer_problem}」、ssh {len(world.ssh_calls())} 次")
 
     # probe-program-large：探测程序长过单个参数的界（照源码行写成注释，压缩比与真源码相近），压完再送、第二台照样量得到
-    #   （弄坏开关 probe-program-uncompressed 下照改前整份 base64 送，过界就查不成，这一格红）
+    #   （弄坏开关 probe-program-uncompressed 下整份 base64 送，过界就查不成，这一格红）
     world = SelftestWorld(root, "probe-program-large")
     world.meminfo(world.peer, 80, 33)
     world.slice_reading(world.local, 0.7)
@@ -715,7 +715,16 @@ def selftest():
         print("  → 怎么办：照上面逐格改 judge_host / probe_local / probe_peer / Peer / live_quiesce_holders；HOST_DISPATCH_BREAK 设着的话本来就该红")
         return 1
     # 弄坏开关轮：每个开关起一个子进程只跑各格，核它红在点名的格
-    jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), int(os.environ.get("SINGLEFS_THREAD_CAP") or 0) or os.cpu_count() or 1))
+    # 开关轮的并发：每台默认重活线程数（scripts/hosts/heavy_threads.py，登记位 .claude/heavy-thread-default），再按开关条数夹；取不了就拒，不退回按核数算
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import heavy_threads
+    try:
+        switch_round_threads = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        print(f"  ✗ 弄坏开关轮取不了每台默认重活线程数：{error}")
+        print(f"  → 怎么办：{error.howto}；不退回按核数算")
+        return 2
+    jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), switch_round_threads))
 
     def one(switch):
         completed = subprocess.run([sys.executable, "-B", os.path.realpath(__file__), "--selftest-cells"], capture_output=True, text=True,

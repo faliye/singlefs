@@ -1,12 +1,34 @@
 #!/usr/bin/env python3
-"""task-server 的客户端：一切跑项目代码的任务都经它交给服务。任务只由主 agent 与人手交；子 agent 只用 status、log 看结局，submit、wait、cancel、clean 由钩子在执行前拒（共用约束「子 agent 不交任务」）。提交时不选机器、不给内存、不给 GPU 参数。
+"""task-server 的客户端：一切跑项目代码的任务都经它交给服务。任务只由主 agent 与人手交；子 agent 只用 status、log 看结局，submit、confirm、wait、cancel、clean 由钩子在执行前拒（共用约束「子 agent 不交任务」）。提交时不选机器、不给内存、不给 GPU 参数。
 
-  task-server/task submit [--cwd <目录>] -- <命令…>   排进队、当场打任务号（stdout 一行「TASK_SERVER submit task=<号> session=<会话号> gpu=<0|1>」），退 0；
+  task-server/task submit [--cwd <目录>] [--whole-package-confirmed <确认文件>] -- <命令…>
+                                                    交给服务、当场打任务号（stdout 一行「TASK_SERVER submit task=<号> session=<会话号> gpu=<0|1> state=awaiting-confirmation」），退 0；
+                                                    交了的任务待确认、不进队：stdout 接着打服务回的确认单（整条命令、范围声明四段原文、项数 N、这个会话在排在跑的条数 M
+                                                    与其中命令键相同或点的项交叠的号、预测内存与预计用时与记录来源、交的时候就判得出的异常），末行
+                                                    「TASK_SERVER confirm-needed task=<号> items=<N> tasks=<M> timeout=<秒>」与「→ 核对之后确认：task-server/task confirm <号> --items <N> --tasks <M>」；
+                                                    不确认的满 30 分钟服务取消（task_server.py 文件头 ⑦）。
                                                     工作目录不给取此刻的目录。调用方环境里的变量照 task_server_lib.py 文件头「环境变量」分三种：白名单的带进去，
                                                     会话自带的不带，别的当场拒并点名（退 3）。命令自己套了内存包装或派发器的拒、给的编译目录指到仓里的拒（退 3）。
                                                     要分片的（task_server_lib.py 文件头「分片」）照样一条 submit，服务拆、合，stdout 那一行另带 sharded=<入口>；
                                                     派不到第二台的三种（工作目录或命令里有多机配置 NFS_SHARED_ROOTS 外的路径，/tmp 下的同样算；交给命令的共享根不在共享根下；
-                                                    带判定库而登记表第三列还没写 prune-server）服务当场拒（task_server.py 文件头 ②「提交时拒」）：打那一句与出路、退 3，任务不跑
+                                                    带判定库而登记表第三列还没写 prune-server）、临时 prune-server 包装里会编或要卡的、不点名包的全仓编译（命令位置上会编的 cargo
+                                                    带 --workspace / --all，或不带 -p / --package 而在虚拟清单的工作区里起）服务当场拒（task_server.py 文件头 ②「提交时拒」）：
+                                                    打那一句与出路、退 3，任务不跑。
+                                                    取仓根 target/ 下的二进制、绕过服务给的编译目录的（task_server.py 文件头 ②「提交时警告」）照收照跑，
+                                                    服务回的严厉警告（「✗ 严厉警告：…」与「→ 怎么办：…」两行）打到标准错误，退 0；会话名下有结局满 30 分钟没人取的
+                                                    （task_server.py 文件头 ②「提交时警告」②）同样照收照跑、打「✗ 严厉警告：会话 <号> 有 <N> 条任务跑完了没人取（<号>…）…」两行。
+                                                    会话的收件地址：读环境里的 CLAUDE_CODE_MESSAGING_SOCKET 与 CLAUDE_CODE_MESSAGING_TOKEN（Claude Code 导出给 Bash 命令的），
+                                                    随任务交给服务（令牌不打出来）；服务出事照会话号找这个会话此刻的收件 socket 发消息（task_server.py 文件头 ⑥「收件地址」）。
+                                                    读不到的当场拒（退 3；异常表 inbox-missing），出路是从 Claude Code 会话的 Bash 里交；子 agent 不交任务
+                                                    整包测试（task_server.py 文件头 ②「提交时拒」⑥）没带 --whole-package-confirmed 的服务当场拒（退 3）；带的那份确认文件
+                                                    要是共享根下读得到的绝对路径、有 ①②③ 起头的三段（.claude/agent-common.md「日常开发的测试不跑整个包」），不合的同样退 3、点名缺哪一段。
+  task-server/task requeue <号> --long-run-confirmed --items <N> --tasks <M> --why '<为什么要跑这么久、范围为什么是这些>'
+                                                    跑满两小时被打回（over-two-hours）的那一条确认确是要跑这么久（task_server.py 文件头 ⑦「跑满两小时」）：以原命令、原范围声明新交一条、
+                                                    排在此刻队尾、记「长跑已确认」，不再按两小时打回；stdout 一行「TASK_SERVER requeue task=<新号> from=<原号>」，退 0。两个数照 wait 那一行或确认单抄，
+                                                    对不上的打服务算的确认单、退 3（异常表 requeue-counts-mismatch）；不是你的会话、结局不是 over-two-hours、requeue 过、--why 太短退 3，没有这个任务退 4
+  task-server/task confirm <号> --items <N> --tasks <M>  确认待确认的那一条（task_server.py 文件头 ⑦）：两个数是确认单里服务算的项数与这个会话在排在跑的条数，
+                                                    核过范围对了照抄；都与服务此刻现算的相同才进队（照提交时刻排位置），退 0；对不上的打服务此刻算的确认单与
+                                                    「TASK_SERVER confirm-needed …」那一行、退 3（异常表 confirm-counts-mismatch）；不是你的会话、不在待确认的退 3，没有这个任务退 4
   task-server/task wait <号>                        阻塞到结局：逐次尝试一行（分片的逐个子任务），末行「TASK_SERVER_RESULT task=<号> type=<错误类型> exit=<码> attempts=<次数> log=<日志路径>」，
                                                     分片的另接 shards=<片数>，有一步没成再接 shard=<片号>/<片数> 或 step=plan|merge；memory-cap-at-maximum 再接
                                                     host=<本机|第二台> reached=<上限> next=<改什么再重投>（task_server_lib.py 文件头「撞顶到两台最大」）；
@@ -17,29 +39,37 @@
                                                     在跑的那一次疑似卡住（task_server.py 文件头 ①「疑似卡住」：CPU 满窗口几乎不涨，服务不停它）：打一行
                                                     「TASK_SERVER_SUSPECT task=<号> attempt=<第几次> host=<本机|第二台> window=<秒> cores=<平均核数> log=<日志> why=<依据>」、
                                                     退 231（SUSPECT_EXIT，错误类型表里没用过的码），不打 TASK_SERVER_RESULT；任务照跑，提交方自己查，再起 wait <号> 接着等（同一段只报一次）
-                                                    要处置的提醒（task_server.py 文件头 ①「要处置的提醒」：排队过久、跑到记录用时的很多倍、换卡重排、清场没收尾、分片父任务推不动、
-                                                    改主工作区的命令没正常结束（可能写了一半，只报有结局的），六种之一）：打一行
-                                                    「TASK_SERVER_ATTENTION task=<号> [part=<子任务号>] type=needs-attention kind=<种类> tier=<档> basis=<依据的数> why=<原因> next=<出路>」（值照 shlex 引）、
+                                                    要处置的提醒（task_server.py 文件头 ①「要处置的提醒」，十二种之一：排队过久 queued-too-long、跑到记录用时的很多倍 overrun、
+                                                    换卡重排 card-replaced、清场没收尾 cleanup-pending、分片父任务推不动 shard-advance-failed、
+                                                    日志长期不涨而服务没停它 quiet-log-busy、卡在 IO 上而服务没停它 io-wait、卡上有它的计算进程而服务没停它 gpu-busy-quiet、
+                                                    改主工作区的命令没正常结束 workspace-write-interrupted（可能写了一半，只报有结局的）、
+                                                    预算贴着整台 oversized-budget、跑得久而核没用起来 long-run-idle-cores、按给的上限开并行 fills-any-cap）：打一行
+                                                    「TASK_SERVER_ATTENTION task=<号> [part=<子任务号>] type=needs-attention kind=<种类> tier=<档> basis=<依据的数> why=<原因> next=<出路>」（值照 shlex 引；
+                                                    next= 的头一段是 task_server_lib.py 文件头「异常表」里这一种那一行的修改意见）、
                                                     退 230（ATTENTION_EXIT，错误类型表里没用过的码），不打 TASK_SERVER_RESULT；任务照旧在排或在跑，服务没动它，提交方按 next= 处置，再起 wait <号> 接着等
                                                     （同一条任务同一种提醒、同一档只叫一次，档跨过下一档才再叫）；任务已有结局的（换卡重排跑成、改主工作区的命令没正常结束）
                                                     这一行打在 TASK_SERVER_REASON 之前，退码仍是任务的。
-                                                    服务健康不归 wait：python3 task-server/control watch 盯，主 agent 用 run_in_background 起它，退出即处置
+                                                    wait 留着、照旧取得到结局与提醒；记着会话收件地址的任务，结局、提醒、疑似卡住与服务健康由服务直接发消息给会话
+                                                    （task_server.py 文件头 ⑥，与 wait 同一份记账），会话不必为了被叫醒起 wait。服务健康不归 wait
                                                     服务断线（重启）自己重连，不误报结局；结局交给提交它的会话时服务记成已取
-  task-server/task status [<号>] [--json]            不给号：这个会话在排、在跑与完成了没人取的任务（排着的带预计用时）；给号：那个任务（排着的写预计用时，后面一句说明这个数是照命令、
+  task-server/task status [<号>] [--json]            不给号：这个会话待确认、在排、在跑与完成了没人取的任务（排着的带预计用时）；给号：那个任务（待确认的打此刻现算的确认单；排着的写预计用时，后面一句说明这个数是照命令、
                                                     照点到的项还是没有记录，照服务回复里的 estimate_basis）与它每一次尝试的记录
                                                     （机器、上限、卡、线程数、退出码、类型、用时、内存峰值、核数、编译目录、日志），分片的连同各子任务；
                                                     排着的任务在等什么另打「在等：…」；服务暂停着（python3 task-server/control pause）写「在等：服务暂停中（原因：…）」，提交照收、排着不起；
-                                                    有了结局的另打 wait 那一行 TASK_SERVER_REASON（点到 /tmp 下的在提交时就拒，task_server.py 文件头 ②「提交时拒」①）
-  task-server/task cancel <号>                      只许提交它的会话取消：在队里的当场取消；在跑的服务停它的单元、回读停了才退 0
+                                                    有了结局的另打 wait 那一行 TASK_SERVER_REASON（点到 /tmp 下的在提交时就拒，task_server.py 文件头 ②「提交时拒」①）；
+                                                    提交时打过严厉警告的（task_server.py 文件头 ②「提交时警告」）两种 status 都照打那两行
+  task-server/task cancel <号>                      只许提交它的会话取消：在队里的当场取消；在跑的服务停它的单元、回读停了才退 0。服务在同一次取消里删这条任务各次尝试的
+                                                    编译目录与现场目录（task_server.py 文件头「接口」的取消），删了的逐份打一行删前删后多大；没删成的逐份打「✗」与出路、退 5
   task-server/task log <号> [--attempt <第几次>] [--all]  打那一次尝试（默认最后一次）的日志：默认最后 LOG_TAIL_LINES 行，--all 整份
   task-server/task clean <号>                       只许提交它的会话、有了结局才删：这条任务留下的编译目录（删完回读不在），打删了几份；
                                                     没删干净退 5，逐份写明哪个编译目录、为什么没删成（服务的 remove_run_build_directory 交回的原因），还没有结局的另说一句、同样退 5
 
-退出码（wait 之外）：0 成了；2 用法错，或只在自证里认的变量设在了别处；3 服务或客户端拒了（环境变量、套了包装、不是你的会话、工作目录不对）；
+退出码（wait 之外）：0 成了；2 用法错，或只在自证里认的变量设在了别处；3 服务或客户端拒了（环境变量、套了包装、读不到收件地址、确认的数对不上、不是你的会话、工作目录不对）；
   4 没有这个任务；5 取消没回读到停了；231 是 wait 报疑似卡住（任务照跑）；230 是 wait 报要处置的提醒（任务照旧在排或在跑）；78 运行条件不满足（fastapi、uvicorn 不在、多机配置 multi-host.env 不在、服务不通，出路写在 stderr），命令一行没跑，不退回直接执行。
 wait 的退出码是任务的（错误类型表右列）；它自己的 2、4、78 与任务退出码可能撞上，末行的 type= 分得开（没打末行就是 wait 自己的退出码）。
 弄坏开关读在 task_server_lib.py 的 broken（开关表在那份文件头）：fallback-run-when-unreachable、exit-code-dropped、wait-gives-up-on-disconnect、in-repository-target-accepted、
-maximum-line-vague、log-tail-unbounded、log-all-ignored、log-attempt-ignored、log-missing-exit-zero、reason-line-omitted、clean-failure-unexplained、estimate-basis-sentence-fixed。
+maximum-line-vague、log-tail-unbounded、log-all-ignored、log-attempt-ignored、log-missing-exit-zero、reason-line-omitted、clean-failure-unexplained、estimate-basis-sentence-fixed、
+inbox-missing-accepted。
 """
 import os
 import sys
@@ -66,7 +96,6 @@ FAST_STARTUP_RETRY_SECONDS = 2.0
 RECONNECT_REPORT_SECONDS = 60.0
 LOG_TAIL_LINES = 200
 HOST_NAMES = lib.HOST_NAMES
-ROLE_NAMES = {"plan": "计划", "merge": "合并"}
 
 
 def fail(line, next_step, code):
@@ -76,7 +105,9 @@ def fail(line, next_step, code):
 
 
 def usage(line):
-    fail(line, "写成 task-server/task submit [--cwd <目录>] -- <命令…> | wait <号> | status [<号>] [--json] | cancel <号> | log <号> [--attempt <第几次>] [--all]",
+    fail(line, "写成 task-server/task submit [--cwd <目录>] [--whole-package-confirmed <确认文件>] -- <命令…> | confirm <号> --items <N> --tasks <M> | "
+               "requeue <号> --long-run-confirmed --items <N> --tasks <M> --why '<…>' | wait <号> | status [<号>] [--json] | cancel <号> | "
+               "log <号> [--attempt <第几次>] [--all] | clean <号>",
          lib.USAGE_EXIT)
 
 
@@ -103,7 +134,6 @@ def task_number(text):
 
 
 size_text = lib.size_text
-LOG_REASON_BYTES = 65536   # 打回的理由取日志最后这么多字节（与 task_server.py 的 LOG_TAIL_BYTES 同一个数）
 
 
 def attempt_line(attempt, prefix=""):
@@ -136,36 +166,8 @@ def progress_line(progress):
             + (f"\n    疑似卡住（第 {suspect.get('segment')} 段，服务不停它）：{suspect.get('why')}；自己查 task log，还在算就接着等" if suspect else ""))
 
 
-def suspect_line(task_id, suspect):
-    """wait 报疑似卡住的那一行（文件头 wait 那一段）。"""
-    return (f"{lib.SUSPECT_MARK} task={task_id} attempt={suspect.get('attempt')} host={HOST_NAMES.get(suspect.get('host'), suspect.get('host') or '本机')} "
-            f"window={suspect.get('window_seconds')} cores={suspect.get('cores')} log={suspect.get('log') or '无'} why={suspect.get('why')}")
-
-
-def attention_line(task_id, item):
-    """wait 报要处置的提醒的那一行（文件头 wait 那一段）：值照 shlex 引（同 TASK_SERVER_REASON，shlex.split 拆得回）；part= 只在提醒说的是分片的子任务时写它的任务号。"""
-    part = f" part={item.get('task')}" if item.get("task") not in (None, task_id) else ""
-    values = [(name, item.get(name)) for name in ("basis", "why", "next")]
-    return (f"{lib.ATTENTION_MARK} task={task_id}{part} type={lib.ATTENTION_TYPE} kind={item.get('kind')} tier={item.get('tier')} "
-            + " ".join(f"{name}={shlex.quote(str(value))}" for name, value in values))
-
-
 def quiet_text(seconds):
     return f"{seconds:.0f} 秒" if isinstance(seconds, (int, float)) else "多久（还没量）"
-
-
-def child_prefix(child_task):
-    role = child_task.get("role")
-    if role == "shard":
-        return f"第 {child_task.get('shard_index')}/{child_task.get('shard_count')} 片（子任务 {child_task.get('id')}）"
-    return f"{ROLE_NAMES.get(role, role)}（子任务 {child_task.get('id')}）"
-
-
-def every_attempt(reply):
-    """[(前缀, 尝试)]：普通任务是它自己的；分片的父任务是各子任务的，按子任务号。"""
-    if reply.get("children"):
-        return [(child_prefix(child["task"]), attempt) for child in reply["children"] for attempt in child.get("attempts", [])]
-    return [("", attempt) for attempt in reply.get("attempts", [])]
 
 
 def estimate_text(seconds):
@@ -180,68 +182,27 @@ def estimate_sentence(reply):
     return lib.ESTIMATE_BASIS_SENTENCES.get(reply.get("estimate_basis"), "")
 
 
-def outcome_attempts(reply):
-    """结局所在的那几次尝试：分片的有一步没成的是那一步的子任务的，别的是全部（末行的 log= 与打回的理由取同一份）。"""
-    failed = reply["task"].get("failed_step") or {}
-    attempts = [attempt for _, attempt in every_attempt(reply)]
-    if failed and reply.get("children"):
-        attempts = next((child.get("attempts", []) for child in reply["children"] if child["task"].get("id") == failed.get("task")), attempts)
-    return attempts
-
-
-def reason_line(reply):
-    """末行之前那一行 TASK_SERVER_REASON（文件头 wait 那一段；task_server_lib.py 的 reason_line）：日志取结局那一次的最后 LOG_REASON_BYTES 字节。"""
-    attempts = outcome_attempts(reply)
-    log_text = ""
-    if attempts and attempts[-1].get("log"):
-        try:
-            with open(attempts[-1]["log"], "rb") as handle:
-                handle.seek(0, os.SEEK_END)
-                handle.seek(max(0, handle.tell() - LOG_REASON_BYTES))
-                log_text = handle.read().decode("utf-8", "replace")
-        except OSError:
-            log_text = ""
-    return lib.reason_line(reply["task"], attempts, log_text)
-
-
-def result_line(reply):
-    """末行（文件头 wait 那一段）。"""
-    task = reply["task"]
-    pairs = every_attempt(reply)
-    failed = task.get("failed_step") or {}
-    log_attempts = outcome_attempts(reply)
-    log = log_attempts[-1].get("log", "") if log_attempts else ""
-    line = (f"{lib.RESULT_MARK} task={task.get('id')} type={task.get('outcome')} exit={task.get('exit_code')} attempts={len(pairs)} "
-            f"log={log or '无（一次都没起）'}")
-    if task.get("sharded_entry"):
-        line += f" shards={task.get('shard_count', 0)}"
-    if failed.get("role") == "shard":
-        line += f" shard={failed.get('index')}/{failed.get('count')}"
-    elif failed.get("role") in ("plan", "merge"):
-        line += f" step={failed['role']}"
-    build = next((attempt.get("build_directory") for _, attempt in reversed(pairs) if attempt.get("build_directory") and not attempt.get("build_directory_removed")), "")
-    if build:   # 编译目录留给提交它的 agent：用完 task-server/task clean <号> 删（task_server_lib.py 文件头「编译目录」）
-        line += f" build={build}"
-    if task.get("outcome") == "memory-cap-at-maximum" and not lib.broken("maximum-line-vague"):
-        host = failed.get("maximum_host") or task.get("maximum_host", "")
-        cap_text = failed.get("maximum_cap_text") or task.get("maximum_cap_text", "")
-        line += f" host={HOST_NAMES.get(host, host or '本机')} reached={cap_text or '?'} next={lib.maximum_next_step(host, cap_text or '?')}"
-    return line
-
-
 def submit(arguments):
     cwd = os.getcwd()
-    if arguments[:1] == ["--cwd"]:
+    whole_package = ""   # 整包确认文件（task_server.py 文件头 ②「提交时拒」⑥）：照原样交给服务，形式由服务判
+    while arguments[:1] in (["--cwd"], ["--whole-package-confirmed"]):
         if len(arguments) < 2:
-            usage("--cwd 后面没给目录")
-        cwd = os.path.abspath(arguments[1])
+            usage(f"{arguments[0]} 后面没给值")
+        if arguments[0] == "--cwd":
+            cwd = os.path.abspath(arguments[1])
+        else:
+            whole_package = arguments[1]
         arguments = arguments[2:]
     if arguments[:1] != ["--"] or len(arguments) < 2:
-        usage("submit 要写成 submit [--cwd <目录>] -- <命令…>")
+        usage("submit 要写成 submit [--cwd <目录>] [--whole-package-confirmed <确认文件>] -- <命令…>")
     command = arguments[1:]
     if not os.path.isdir(cwd):
         fail(f"工作目录 {cwd} 不在", "--cwd 给一个在的目录", REFUSED_EXIT)
     configuration = prepare()
+    inbox = session_inbox()
+    if not inbox and not lib.broken("inbox-missing-accepted"):   # 读不到会话的收件地址（异常表 inbox-missing）：当场拒，任务不交
+        fail(f"读不到会话的收件地址（环境里没有 {lib.INBOX_SOCKET_VARIABLE} 与 {lib.INBOX_TOKEN_VARIABLE}）：出事服务没处发消息，这一条不交",
+             lib.anomaly_advice("inbox-missing", ""), REFUSED_EXIT)
     carried, refused = lib.split_environment(dict(os.environ))
     if refused:
         for line in lib.environment_refusal_lines(refused):
@@ -254,7 +215,8 @@ def submit(arguments):
     if target:
         fail(target, "去掉它再提交：服务给每一次尝试一个仓外的编译目录、跑完删（task_server_lib.py 文件头「编译目录」）；真要自己的，给仓外的路径", REFUSED_EXIT)
     try:
-        status, reply = lib.call_server(configuration.socket, "POST", "/tasks", {"command": command, "cwd": cwd, "environment": carried})
+        status, reply = lib.call_server(configuration.socket, "POST", "/tasks", {"command": command, "cwd": cwd, "environment": carried, "inbox": inbox,
+                                                                              "whole_package_confirmed": whole_package})
     except lib.ServerUnreachable as error:
         if lib.broken("fallback-run-when-unreachable"):
             os.chdir(cwd)
@@ -266,17 +228,84 @@ def submit(arguments):
             for line in lib.environment_refusal_lines([tuple(pair) for pair in detail["refused"]]):
                 print(line, file=sys.stderr)
             sys.exit(REFUSED_EXIT)
-        if isinstance(detail, dict) and isinstance(detail.get("placement"), dict):   # 派不到第二台的三种（task_server.py 文件头 ②「提交时拒」）
+        if isinstance(detail, dict) and isinstance(detail.get("placement"), dict):   # 提交时拒的五种（task_server.py 文件头 ②「提交时拒」）
             fail(detail["placement"].get("problem") or str(detail), detail["placement"].get("next_step") or "照上面那句改了再提交", REFUSED_EXIT)
         fail(f"服务拒了这一条：{detail}", "照上面那句改了再提交", REFUSED_EXIT)
     if status != 200:
         fail(f"服务回 HTTP {status}：{reply.get('detail', reply)}", "看服务的日志：journalctl --user -u singlefs-task-server.service -n 100", 1)
+    for line in reply.get("warnings") or []:   # 提交时警告（task_server.py 文件头 ②「提交时警告」）：照收照跑，警告打到标准错误
+        print(line, file=sys.stderr, flush=True)
     sharded = reply.get("sharded") or ""
     print(f"{lib.SUBMIT_MARK} task={reply['id']} session={reply.get('session') or '无（人手）'} gpu={1 if reply.get('gpu') else 0}"
-          f"{' sharded=' + sharded if sharded else ''}")
-    print(f"  · 任务 {reply['id']} 排进队了{('（要卡：' + reply['gpu_reason'] + '）') if reply.get('gpu') else ''}"
-          f"{'（服务按分片跑：先排计划，再按计划拆片、合并）' if sharded else ''}；等结局：task-server/task wait {reply['id']}（放后台起，完成时退出）")
+          f"{' sharded=' + sharded if sharded else ''} state={reply.get('state')}")
+    tail = f"结局、要处置的提醒与服务健康由服务直接发消息给这个会话，不必为了被叫醒起 wait；要取结局照样 task-server/task wait {reply['id']}"
+    what = f"{('（要卡：' + reply['gpu_reason'] + '）') if reply.get('gpu') else ''}{'（服务按分片跑：先排计划，再按计划拆片、合并）' if sharded else ''}"
+    confirmation = reply.get("confirmation")
+    if reply.get("state") == lib.AWAITING_CONFIRMATION_STATE and isinstance(confirmation, dict):   # 交任务的二次确认（task_server.py 文件头 ⑦）
+        print_confirmation(reply["id"], confirmation, reply.get("confirm_timeout_seconds") or 0)
+        print(f"  · 任务 {reply['id']} 待确认{what}：确认之后照提交时刻排进队；{tail}")
+        return 0
+    print(f"  · 任务 {reply['id']} 排进队了{what}；{tail}")
     return 0
+
+
+def print_confirmation(task_id, confirmation, timeout_seconds):
+    """确认单（服务回的 lines）照原样打到标准输出，末尾接 CONFIRM_NEEDED_MARK 那一行与确认的写法（数是服务算的）。"""
+    for line in confirmation.get("lines") or []:
+        print(line)
+    items, tasks = confirmation.get("items", 0), confirmation.get("tasks", 0)
+    print(lib.confirm_needed_line(task_id, items, tasks, timeout_seconds))
+    print(f"  → 核对上面的范围、项数与在排在跑的那几条之后确认：{lib.confirm_command(task_id, items, tasks)}；不对的 task-server/task cancel {task_id}、改了重交", flush=True)
+
+
+def confirm(arguments):
+    if len(arguments) != 5 or arguments[1:2] != ["--items"] or arguments[3:4] != ["--tasks"] or not arguments[2].isdigit() or not arguments[4].isdigit():
+        usage("confirm 要写成 confirm <号> --items <N> --tasks <M>（两个数照确认单抄）")
+    task_id = task_number(arguments[0])
+    configuration = prepare()
+    code, reply = call_or_exit(configuration, "POST", f"/tasks/{task_id}/confirm", {"items": int(arguments[2]), "tasks": int(arguments[4])})
+    detail = reply.get("detail", reply)
+    if code == 404:
+        fail(f"没有任务 {task_id}", "task-server/task status 看这个会话的任务号", NO_SUCH_TASK_EXIT)
+    if code == 403:
+        fail(f"服务拒了这次确认：{detail}", "只有提交它的那个会话能确认它", REFUSED_EXIT)
+    if code == 409 and isinstance(detail, dict) and detail.get("mismatch"):   # 两个数对不上（异常表 confirm-counts-mismatch）：打服务此刻算的确认单
+        print_confirmation(task_id, detail, 0)
+        fail(detail.get("problem") or "确认的数与服务此刻算的不同", detail.get("next_step") or "照上面确认单里的两个数再确认", REFUSED_EXIT)
+    if code != 200:
+        fail(f"服务没收这次确认（HTTP {code}：{detail}）", f"task-server/task status {task_id} 看它此刻的状态", REFUSED_EXIT)
+    print(f"  ✓ {reply.get('detail')}（状态 {reply.get('state')}）")
+    return 0
+
+
+def requeue(arguments):
+    """task requeue <号> --long-run-confirmed --items <N> --tasks <M> --why '<…>'（task_server.py 文件头 ⑦「跑满两小时」）。"""
+    if (len(arguments) != 8 or arguments[1] != "--long-run-confirmed" or arguments[2] != "--items" or arguments[4] != "--tasks" or arguments[6] != "--why"
+            or not arguments[3].isdigit() or not arguments[5].isdigit()):
+        usage("requeue 要写成 requeue <号> --long-run-confirmed --items <N> --tasks <M> --why '<为什么要跑这么久、范围为什么是这些>'（两个数照 wait 那一行或确认单抄）")
+    task_id = task_number(arguments[0])
+    configuration = prepare()
+    code, reply = call_or_exit(configuration, "POST", f"/tasks/{task_id}/requeue", {"items": int(arguments[3]), "tasks": int(arguments[5]), "why": arguments[7]})
+    detail = reply.get("detail", reply)
+    if code == 404:
+        fail(f"没有任务 {task_id}", "task-server/task status 看这个会话的任务号", NO_SUCH_TASK_EXIT)
+    if code == 409 and isinstance(detail, dict) and detail.get("mismatch"):   # 两个数对不上（异常表 requeue-counts-mismatch）：打服务此刻算的确认单
+        for line in detail.get("lines") or []:
+            print(line)
+        fail(detail.get("problem") or "给的数与服务此刻算的不同", detail.get("next_step") or "照上面确认单里的两个数再 requeue", REFUSED_EXIT)
+    if code != 200:
+        fail(f"服务拒了这次 requeue（HTTP {code}：{detail}）", f"照上面那句办；task-server/task status {task_id} 看它此刻的结局", REFUSED_EXIT)
+    for line in reply.get("warnings") or []:   # 两种确认标识与提交时警告（task_server.py 文件头 ⑦）
+        print(line, file=sys.stderr)
+    print(f"{lib.REQUEUE_MARK} task={reply.get('id')} from={reply.get('from')}")
+    print(f"  ✓ {reply.get('detail')}", flush=True)
+    return 0
+
+
+def session_inbox():
+    """会话的收件地址（task_server.py 文件头 ⑥）：Claude Code 导出给 Bash 命令的收件 socket 与会话令牌，两样都在才交，不然交 {}。令牌只交给服务，不打出来。"""
+    socket_path, token = os.environ.get(lib.INBOX_SOCKET_VARIABLE, ""), os.environ.get(lib.INBOX_TOKEN_VARIABLE, "")
+    return {"socket": socket_path, "token": token} if socket_path and token else {}
 
 
 def wait(arguments):
@@ -316,19 +345,19 @@ def wait(arguments):
             continue
         if not reply.get("finished"):
             if reply.get("suspect"):   # 疑似卡住（task_server.py 文件头 ①「疑似卡住」）：任务照跑，报一行、退 SUSPECT_EXIT
-                print(suspect_line(task_id, reply["suspect"]), flush=True)
+                print(lib.suspect_line(task_id, reply["suspect"]), flush=True)
                 print(f"  → 怎么办：任务 {task_id} 照跑、服务不停它；看 task-server/task log {task_id} 与 task-server/task status {task_id} 自己查，"
                       f"还在算就再起 task-server/task wait {task_id} 接着等，真卡住了 task-server/task cancel {task_id}", file=sys.stderr, flush=True)
                 return lib.SUSPECT_EXIT
             if reply.get("attention"):   # 要处置的提醒（task_server.py 文件头 ①「要处置的提醒」）：任务照旧在排或在跑，报一行、退 ATTENTION_EXIT
                 for item in reply["attention"]:
-                    print(attention_line(task_id, item), flush=True)
+                    print(lib.attention_line(task_id, item), flush=True)
                 print(f"  → 怎么办：任务 {task_id} 照旧在{'排' if reply.get('state') == 'queued' else '跑'}、服务没动它；照上面 next= 那一句处置，"
                       f"处置完或不用处置就再起 task-server/task wait {task_id} 接着等（同一种同一档不再叫，档跨过下一档才再叫）", file=sys.stderr, flush=True)
                 return lib.ATTENTION_EXIT
             continue
         task = reply["task"]
-        for prefix, attempt in every_attempt(reply):
+        for prefix, attempt in lib.reply_attempts(reply):
             print(attempt_line(attempt, prefix))
         if not reply.get("valid", True):
             print(f"  ✗ 任务 {task_id} 的记录校验不过（库被改过），结局记 record-tampered")
@@ -336,10 +365,10 @@ def wait(arguments):
         if task.get("note"):
             print(f"  · {task['note']}")
         for item in reply.get("attention") or []:   # 结局有了还没报的提醒（换卡重排跑成的）：打在理由行之前，退码仍是任务的
-            print(attention_line(task_id, item), flush=True)
+            print(lib.attention_line(task_id, item), flush=True)
         if not lib.broken("reason-line-omitted"):
-            print(reason_line(reply), flush=True)
-        print(result_line(reply), flush=True)
+            print(lib.reply_reason_line(reply), flush=True)
+        print(lib.reply_result_line(reply), flush=True)
         if lib.broken("exit-code-dropped"):
             return 0
         code = task.get("exit_code")
@@ -366,6 +395,10 @@ def status(arguments):
         print(f"任务 {task_id}：{task.get('state')}{'、结局 ' + str(task.get('outcome')) + '、退 ' + str(task.get('exit_code')) if task.get('state') == 'finished' else ''}"
               f"、会话 {task.get('session') or '无（人手）'}、{'要卡' if task.get('gpu') else '不要卡'}、命令 {shlex.join(task.get('command') or [])[:300]}"
               f"{'' if reply.get('valid', True) else '（记录校验不过）'}")
+        for line in reply.get("warnings") or []:   # 提交时警告（task_server.py 文件头 ②「提交时警告」）
+            print(line)
+        if isinstance(reply.get("confirmation"), dict):   # 待确认（task_server.py 文件头 ⑦）：此刻现算的确认单
+            print_confirmation(task_id, reply["confirmation"], 0)
         if "estimated_seconds" in reply:
             print(f"  · 预计用时 {estimate_text(reply.get('estimated_seconds'))}{estimate_sentence(reply)}")
         pinned = reply.get("pinned_cap") or {}
@@ -379,12 +412,12 @@ def status(arguments):
                   f"片数 {task.get('shard_count', 0)}")
         if task.get("note"):
             print(f"  · {task['note']}")
-        for prefix, attempt in every_attempt(reply):
+        for prefix, attempt in lib.reply_attempts(reply):
             print(attempt_line(attempt, prefix))
             if attempt.get("progress"):
                 print(progress_line(attempt["progress"]))
         if task.get("state") == "finished":
-            print(reason_line(reply))
+            print(lib.reply_reason_line(reply))
         return 0
     code, reply = call_or_exit(configuration, "GET", "/sessions/self")
     if code != 200:
@@ -396,6 +429,8 @@ def status(arguments):
     for item in reply.get("tasks", []):
         if item.get("unclaimed"):
             tail = f"完成了没人取：{item.get('outcome')}、退 {item.get('exit_code')}（task-server/task wait {item['id']} 取）"
+        elif item.get("state") == lib.AWAITING_CONFIRMATION_STATE:
+            tail = f"待确认、不进队（task-server/task status {item['id']} 看确认单，照它 task-server/task confirm；不确认的服务到时限取消）"
         elif item.get("state") in ("queued", "sharded"):
             tail = f"{item.get('state')}{'（' + item['phase'] + '）' if item.get('phase') else ''}、预计用时 {estimate_text(item.get('estimated_seconds'))}"
             if item.get("waiting_for"):
@@ -403,6 +438,8 @@ def status(arguments):
         else:
             tail = item.get("state")
         print(f"  · 任务 {item['id']}：{tail}；{item.get('command')}")
+        for line in item.get("warnings") or []:   # 提交时警告（task_server.py 文件头 ②「提交时警告」）
+            print(f"    {line}")
     return 0
 
 
@@ -448,6 +485,11 @@ def cancel(arguments):
         fail(f"服务拒了这次取消：{reply.get('detail')}", "只有提交它的那个会话能取消它；要停别的会话的任务，给那个会话发消息", REFUSED_EXIT)
     if code != 200 or not reply.get("stopped"):
         fail(f"取消没回读到停了（HTTP {code}：{reply.get('detail', reply)}）", f"task-server/task status {task_id} 看单元的状态；还在跑就再 cancel 一次", CANCEL_UNCONFIRMED_EXIT)
+    artifacts = reply.get("artifacts") or {}
+    for line in artifacts.get("lines") or []:   # 取消之后删产物（task_server.py 文件头「接口」的取消）：删了的、没删成的逐份一行
+        print(line, file=sys.stderr if line.lstrip().startswith(("✗", "→")) else sys.stdout)
+    if artifacts.get("left"):
+        fail(f"任务 {task_id} 停了，但取消之后有 {len(artifacts['left'])} 份产物没删掉（逐份在上面）", "照每份下面「→ 怎么办：」那一句处理", CANCEL_UNCONFIRMED_EXIT)
     print(f"  ✓ 任务 {task_id} 取消了：{reply.get('detail')}")
     return 0
 
@@ -470,7 +512,7 @@ def log(arguments):
     code, reply = call_or_exit(configuration, "GET", f"/tasks/{task_id}")
     if code == 404:
         fail(f"没有任务 {task_id}", "task-server/task status 看这个会话的任务号", missing_exit)
-    attempts = [attempt for _, attempt in every_attempt(reply)] if code == 200 else []   # 分片的父任务：各子任务的尝试，按子任务号排
+    attempts = [attempt for _, attempt in lib.reply_attempts(reply)] if code == 200 else []   # 分片的父任务：各子任务的尝试，按子任务号排
     chosen = [attempt for attempt in attempts if number is None or attempt.get("number") == number]
     if not chosen:
         fail(f"任务 {task_id} 没有{'第 ' + str(number) + ' 次' if number else '任何一次'}尝试", f"task-server/task status {task_id} 看起过几次", missing_exit)
@@ -489,7 +531,7 @@ def log(arguments):
 
 def main(arguments):
     lib.refuse_selftest_variables_or_continue()
-    commands = {"submit": submit, "wait": wait, "status": status, "cancel": cancel, "log": log, "clean": clean}
+    commands = {"submit": submit, "confirm": confirm, "requeue": requeue, "wait": wait, "status": status, "cancel": cancel, "log": log, "clean": clean}
     if not arguments or arguments[0] not in commands:
         usage(f"认不出子命令「{arguments[0] if arguments else ''}」")
     return commands[arguments[0]](arguments[1:])

@@ -3,8 +3,8 @@
 # run-condition: command git du
 """清盘：列（默认）或删（--delete）本会话在工作根与 Claude Code 的会话临时目录根下不再用的仓副本与编译目录。
 
-为什么：.claude/kb/milestone/03-third-txn.md「待优化」第 55 行——2026-10-18 清盘删 git 工作树前只 git stash push -u，被忽略的文件（规范副本、
-multi-host.env、qemu.env）跟着树丢了；删的范围按目录列，没先对 git worktree list 与用户给的排除名单逐个核，用户说不要动的那一个已被删。
+为什么：删 git 工作树前只 git stash push -u，被忽略的文件（规范副本、multi-host.env、qemu.env）跟着树丢；
+删的范围按目录列、不先对 git worktree list 与排除名单逐个核，排除名单里的目录会被删（.claude/kb/milestone/03-third-txn.md「待优化」第 55 行）。
 
 用法：
     clean-session-scratch.py [--session <会话号>] [--keep <路径或名字>]… [--delete] [--work-root <目录>] [--tmp-root <目录>] [--repository <仓根>]

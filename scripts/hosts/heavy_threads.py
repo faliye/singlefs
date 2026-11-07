@@ -22,7 +22,7 @@ import 进来用的 default_heavy_threads 只在环境里有自证设的 HEAVY_C
 打开后自证哪几格红（失败行「✗ heavy_threads.py 自证：<格名>：…」）：
   HEAVY_THREADS_BREAK=cap-unchecked  SINGLEFS_THREAD_CAP 原样交出、不判正整数
       「✗ heavy_threads.py 自证：SINGLEFS_THREAD_CAP=0 拒」、「✗ heavy_threads.py 自证：SINGLEFS_THREAD_CAP=abc 拒」、「✗ heavy_threads.py 自证：拒的时候带出路」
-  HEAVY_THREADS_BREAK=missing-registration-uses-core-count  登记文件不在时照改前取本机核数
+  HEAVY_THREADS_BREAK=missing-registration-uses-core-count  登记文件不在时取本机核数
       「✗ heavy_threads.py 自证：登记文件不在拒」
 """
 import os

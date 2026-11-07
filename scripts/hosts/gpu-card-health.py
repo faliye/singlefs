@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 每一次都现查各台此刻的卡与这次开机的内核日志，上一次的结论不替这一次作保
 # run-condition: command bash python3
-"""显卡本身的状态：按多机配置点名的卡逐卡判好坏（用户 2026-10-30：「需要检测卡状态 如果卡状态不对 要弹窗提醒」；
+"""显卡本身的状态：按多机配置点名的卡逐卡判好坏（卡状态不对要弹窗提醒；
 records/2026-10-28-崩溃轻型提速.md「教训：卡坏了没人知道」）。只读：不重置、不清场、不停任何进程。
 
 用法：
@@ -19,7 +19,7 @@ records/2026-10-28-崩溃轻型提速.md「教训：卡坏了没人知道」）�
   地址可以是 IPv6、自己带冒号；地址不是 HOSTS 里的一项判配置写坏（退 78）。环境变量 GPU_CARDS_BY_PRIORITY 不读。
   带了 --cards <显卡先后>（写法同上，空格隔开几项）只查这几张，多机配置那两个显卡键不读（HOSTS 与连第二台的键照读）：清场之前查卡只查服务分给这一次尝试的卡，
   没分到的卡坏了不挡这一次（查全部卡时，一张没分到的坏卡让每一条要卡的任务清场都判 card-fault）。
-  弄坏开关 assigned-cards-ignored 下不认 --cards 的值，照查配置点名的全部卡（改前的样子）。
+  弄坏开关 assigned-cards-ignored 下不认 --cards 的值，照查配置点名的全部卡。
 哪一台查哪几张（两台对称，没有起活一方与第二台的身份）：这一台是 HOSTS 里哪一项，照这一台网卡上的地址认（scripts/hosts/multi_host_addresses.py 的 resolve，
   判法只那一处）；台标签是这一台地址的那几项在本机查，是另一台地址的经 ssh 在那一台查。两台跑同一份配置查的是同一组卡，
   机读行的 host= 写那张卡的台标签（HOSTS 里的地址），在哪台跑都一样。
@@ -41,15 +41,15 @@ records/2026-10-28-崩溃轻型提速.md「教训：卡坏了没人知道」）�
   48 显存双比特 ECC、62 卡上微控制器停机、74 NVLink 出错、79 卡从总线上掉了、94 / 95 显存 ECC（95 是没圈住的）、119 / 120 GSP 超时与出错、
   154 恢复动作变了（变成 GPU Reset Required、Node Reboot Required 这类）：都要重置卡或重启机器才好。
   只计数不判坏的（应用层的、驱动自己清得掉的）：13 图形引擎异常、31 显存缺页、43 卡停了一个上下文、45 抢占清理、109 上下文切换超时，与表外的号。
-  2026-10-11、2026-10-30 第二台 0 号卡两次坏都是 62 接 154（「GPU Reset Required」）、之后 109 几千条（records 那一节）。
+  卡坏时是 62 接 154（「GPU Reset Required」）、之后 109 几千条（records 那一节）。
   154 那一行写着恢复动作变回 0x0 (None) 的，算这张卡已经恢复：它之前这张卡的 Xid 都不再判。
   这张卡在 PCI 层重新枚举过的同样算已经恢复：这张卡总线上功能号 0 的枚举行（pci <域>:<总线>:<设备>.0: [<厂商>:<设备号>] type …，开机与摘下扫回时
   内核各打一行）之前的 Xid 都不再判；同一张卡声卡功能（.1）单独的枚举行不算。PCI 层恢复（解绑驱动、写 sysfs 的 reset、摘下扫回）之后驱动不打
-  154 变回 None 那一行（第二台 2026-11-04 量的：0 号卡 62 接 154 之后摘下扫回，nvidia-smi 读恢复动作 None，内核日志里有扫回那一刻的枚举行、没有 154 变回 None）。
+  154 变回 None 那一行（第二台量的：0 号卡 62 接 154 之后摘下扫回，nvidia-smi 读恢复动作 None，内核日志里有扫回那一刻的枚举行、没有 154 变回 None）。
   清掉之后的 Xid 与 nvidia-smi 读数照判。推的：nvidia-smi -r 之后驱动打不打 154 变回 None、内核打不打枚举行都没量过；两样都不打的话，
   这次开机里这张卡一直判坏，要重启那台才清。
 内核日志：每台在自己那里读这次开机的 journalctl -k -b（nice -n 19），只认 NVRM: Xid (PCI:<域>:<总线>:<设备>): <号> 那一行与上面那种枚举行。
-  头一次整份读（本机 2026-10-30 量的：这次开机内核日志 115 万行，journalctl 读一遍 35–40 秒），读到的 Xid 与枚举行按出现次序、相邻同类合并记进
+  头一次整份读（本机量的：这次开机内核日志 115 万行，journalctl 读一遍 35–40 秒），读到的 Xid 与枚举行按出现次序、相邻同类合并记进
   ${XDG_DATA_HOME:-~/.local/share}/singlefs/gpu-card-health/kernel-xid-<开机号>.json 连同 journalctl 的游标与记了哪几种行（recorded）；
   之后只读游标之后的（--after-cursor），游标认不得、或 recorded 不是这一份记的那几种（只记 Xid 的旧记录：游标之前的枚举行它没记）就整份重读；
   别的开机号的那几份删掉。写入原子（临时文件再 os.replace）。
@@ -97,7 +97,7 @@ records/2026-10-28-崩溃轻型提速.md「教训：卡坏了没人知道」）�
       「✗ 自证 no-cards-named：」
   GPU_CARD_HEALTH_BREAK=missing-configuration-as-empty  多机配置不在时当一张卡都没点名（退 77），不报查不成
       「✗ 自证 configuration-missing：」
-  GPU_CARD_HEALTH_BREAK=assigned-cards-ignored  带了 --cards 也照查多机配置点名的全部卡（改前的样子：没分到的坏卡挡住这一次）
+  GPU_CARD_HEALTH_BREAK=assigned-cards-ignored  带了 --cards 也照查多机配置点名的全部卡，没分到的坏卡挡住这一次
       「✗ 自证 assigned-good-card：」、「✗ 自证 assigned-bad-card：」、「✗ 自证 assigned-label-outside-hosts：」
 
 常量的依据：HOST_TIMEOUT_SECONDS 420：第二台头一次整份读内核日志按本机量的 40 秒算，加 nvidia-smi 几次、ssh 起一份 python，留几倍余量；推的。

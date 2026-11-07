@@ -710,15 +710,16 @@ struct FaultRecord {
     recovered_at: Option<Instant>,
 }
 
-/// 故障调度线程与各路的驱动线程共用的故障记录。
+/// 故障调度线程与各路的驱动线程共用的故障记录：压测往服务注入的每一次故障与它之后的恢复时刻
+/// （服务自身出错时追加的故障行是另一样，在 `fault_log.rs`）。
 #[derive(Default)]
-struct FaultLog {
+struct InjectedFaultRecoveryLog {
     records: Mutex<Vec<FaultRecord>>,
     failure: Mutex<Option<String>>,
     schedule_done: AtomicBool,
 }
 
-impl FaultLog {
+impl InjectedFaultRecoveryLog {
     /// 记一次注入；`counts_now` 为假的，之后的确认先不算恢复，等 `start_counting_recovery`。
     fn record_injection(&self, kind: &'static str, counts_now: bool) {
         let now = Instant::now();
@@ -792,7 +793,7 @@ struct RouteDriver<'plan> {
     outstanding_blocks: u64,
     sent_frames: u64,
     frame_number: u64,
-    faults: Option<&'plan FaultLog>,
+    faults: Option<&'plan InjectedFaultRecoveryLog>,
     progress: &'plan RouteProgress,
     stalled: Arc<AtomicBool>,
 }
@@ -928,7 +929,7 @@ fn drive_route(
     plan: &RoutePlan,
     start: Instant,
     journal_directory: &Path,
-    faults: Option<&FaultLog>,
+    faults: Option<&InjectedFaultRecoveryLog>,
     progress: &RouteProgress,
     stalled: &Arc<AtomicBool>,
     client_switches: &BreakSwitches,
@@ -1183,10 +1184,13 @@ struct StartedServer {
     ticks_at_start: u64,
 }
 
-/// 服务就绪的等待上限：同机重活压着时开库也慢，给足。
-const SERVER_READY_TIMEOUT: Duration = Duration::from_secs(120);
+/// 等起的服务打出就绪行的上限（压测器与自证共用这一份）：同机重活压着时开库也慢，给足（只是上限，起得快就不等）。
+pub(crate) const SERVER_READY_TIMEOUT: Duration = Duration::from_secs(120);
 
-fn spawn_server(arguments: &[String]) -> Result<(SpawnedProcess, PathBuf, String), String> {
+/// 用这份可执行文件照 `arguments` 起一份服务、等它的就绪行，回服务进程与就绪行里的 unix socket 路径、TCP 地址。
+fn spawn_server_and_read_listening_addresses(
+    arguments: &[String],
+) -> Result<(SpawnedProcess, PathBuf, String), String> {
     let executable =
         std::env::current_exe().map_err(|error| format!("找不到自己的可执行文件：{error}"))?;
     let mut command = Command::new(executable);
@@ -1200,7 +1204,11 @@ fn spawn_server(arguments: &[String]) -> Result<(SpawnedProcess, PathBuf, String
     Ok((process, PathBuf::from(unix_socket), network_address))
 }
 
-fn start_server(settings: &BenchSettings, directory: &Path) -> Result<StartedServer, String> {
+/// 照压测设置（TCP 地址、工作线程数、组提交）在 `directory` 下起压测用的那一份服务：socket、状态目录与库都在这个目录里。
+fn start_server_from_bench_settings(
+    settings: &BenchSettings,
+    directory: &Path,
+) -> Result<StartedServer, String> {
     let socket_path = directory.join("server.sock");
     if let Some(problem) = socket_path_problem(&socket_path) {
         return Err(format!("{problem}；把 TMPDIR 换成短一些的目录"));
@@ -1228,7 +1236,8 @@ fn start_server(settings: &BenchSettings, directory: &Path) -> Result<StartedSer
     if let Some(frames) = settings.group_commit_frames {
         arguments.extend(["--group-commit-frames".to_string(), frames.to_string()]);
     }
-    let (process, unix_socket, network_address) = spawn_server(&arguments)?;
+    let (process, unix_socket, network_address) =
+        spawn_server_and_read_listening_addresses(&arguments)?;
     Ok(StartedServer {
         process,
         unix_socket,
@@ -1258,7 +1267,8 @@ impl StartedServer {
         self.process
             .wait_for_exit(SERVER_READY_TIMEOUT)
             .ok_or("服务收了 SIGKILL 还没退出")?;
-        let (process, unix_socket, network_address) = spawn_server(&self.arguments)?;
+        let (process, unix_socket, network_address) =
+            spawn_server_and_read_listening_addresses(&self.arguments)?;
         if unix_socket != self.unix_socket {
             return Err(format!(
                 "重起的服务挂在 {}，原来是 {}",
@@ -1350,7 +1360,7 @@ const FAULTS_PER_INJECTION_RUN: usize = 3;
 fn settle_faults(
     settings: &BenchSettings,
     proxy: Option<&FaultProxy>,
-    log: &FaultLog,
+    log: &InjectedFaultRecoveryLog,
     start: Instant,
     failures: &mut Vec<String>,
 ) -> Vec<String> {
@@ -1404,7 +1414,7 @@ fn settle_faults(
     lines
 }
 
-fn fault_recovery_maximum_milliseconds(log: &FaultLog) -> Option<f64> {
+fn fault_recovery_maximum_milliseconds(log: &InjectedFaultRecoveryLog) -> Option<f64> {
     log.records
         .lock()
         .expect("故障记录的锁只在记一笔时短暂持有")
@@ -1422,13 +1432,13 @@ const DUPLICATES_PER_INJECTION_RUN: u64 = 3;
 
 /// fault-injection 的故障调度：持续秒数的 25% 处起断在帧中间、50% 处起 `kill -9` 服务再重起、75% 处起注入迟到的帧重复。
 /// 每一次都等上一次恢复（之后收到写确认）才往下走，重复那一段等代理真注入够 `DUPLICATES_PER_INJECTION_RUN` 次才收；
-/// 机器忙、重起慢时整个调度往后推，压测的那一路在调度走完之前接着照目标速率发帧（`FaultLog::is_schedule_done`）。
+/// 机器忙、重起慢时整个调度往后推，压测的那一路在调度走完之前接着照目标速率发帧（`InjectedFaultRecoveryLog::is_schedule_done`）。
 fn run_fault_schedule(
     start: Instant,
     duration: Duration,
     control: &crate::fault_proxy::ProxyControl,
     restart_requests: &mpsc::Sender<RestartReply>,
-    log: &FaultLog,
+    log: &InjectedFaultRecoveryLog,
     phase: &PhaseCell,
     routes_finished: &AtomicBool,
 ) {
@@ -1451,7 +1461,7 @@ fn inject_scheduled_faults(
     duration: Duration,
     control: &crate::fault_proxy::ProxyControl,
     restart_requests: &mpsc::Sender<RestartReply>,
-    log: &FaultLog,
+    log: &InjectedFaultRecoveryLog,
     phase: &PhaseCell,
     routes_finished: &AtomicBool,
 ) {
@@ -1603,7 +1613,7 @@ fn run_with_server(
 ) -> Result<BenchReport, String> {
     let load_at_start = read_load_averages().map(|averages| averages[0]);
     let device = block_device_for_path(directory);
-    let mut started = start_server(settings, directory)?;
+    let mut started = start_server_from_bench_settings(settings, directory)?;
     println!(
         "{STARTED_LINE_PREFIX} server_process={} unix={} tcp={} worker_threads={}",
         started.process_identifier(),
@@ -1628,7 +1638,7 @@ fn run_with_server(
     let server_process = Arc::new(AtomicU32::new(started.process_identifier()));
     let mut server = started;
     let input_output_ticks_at_start = device.as_ref().and_then(read_input_output_ticks);
-    let fault_log = Arc::new(FaultLog::default());
+    let fault_log = Arc::new(InjectedFaultRecoveryLog::default());
     let routes_finished = Arc::new(AtomicBool::new(false));
     let phase = Arc::new(PhaseCell::new(if settings.mode.injects_faults() {
         BenchPhase::BeforeDisconnect

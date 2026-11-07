@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use rocksdb::statistics::Ticker;
 
+use crate::bench::SERVER_READY_TIMEOUT;
 use crate::break_switches::{BreakSwitch, BreakSwitches};
 use crate::client::{connect, random_client_identity, RouteAddress, SimpleClient};
 use crate::command_line::CLAIM_HOLDER_LINE_PREFIX;
@@ -28,7 +29,6 @@ use crate::reliable_client::{
 use crate::selftest::{
     bytes, counter, counter_delta, line_field, loopback_arguments, server_command,
     single_frame_single_sync, start_test_server, statistics_after_sync, CellContext, CellDirectory,
-    SERVER_READY_TIMEOUT,
 };
 use crate::server::{DUPLICATE_REQUESTS_COUNTER, LISTENING_LINE_PREFIX, PENDING_PEAK_COUNTER};
 use crate::spawned::{SpawnedProcess, StandardError};
@@ -61,7 +61,8 @@ fn failure_text(failure: &ClientFailure) -> String {
     failure.to_string()
 }
 
-/// 在一个线程里做 `work`，至多等 `deadline`；到点调 `on_timeout`（置停标记、停代理）让它收手，再等它退出、判卡住。
+/// 在一个线程里做 `work`，至多等 `deadline`；到点调 `on_timeout` 让它收手（各格给的是置停标记、停代理或关代理的连接），
+/// 再等它退出、判卡住。故障注入、加固与常驻服务那几格共用这一份。
 pub(crate) fn within_deadline<Output: Send>(
     deadline: Duration,
     on_timeout: impl FnOnce(),
@@ -80,7 +81,7 @@ pub(crate) fn within_deadline<Output: Send>(
                 on_timeout();
                 let _ = handle.join();
                 Err(format!(
-                    "{} 秒没做完，卡住了（到点置了停标记）",
+                    "{} 秒没做完，卡住了（到点叫它收手了）",
                     deadline.as_secs()
                 ))
             }

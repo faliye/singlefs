@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 起 cargo 的 shell 入口每一趟自己的编译目录（用户 2026-10-23 定案「自己用完自己删」「所有脚本自行编译，完成后自行删除 不再预留生成物」，不留给以后的趟复用）。
+# 起 cargo 的 shell 入口每一趟自己的编译目录（自己用完自己删，不预留生成物、不留给以后的趟复用）。
 # 两种用法：被 source（入口脚本调下面两个函数）；单独执行时包一层起一条命令（文件末尾「包一层起」一段）。
 # 被 source 时只定义函数与几个全局变量、不改 shell 选项。删之前核开着的文件那一判在 scripts/hosts/run_build_directory.py（python 入口直接 import 它），两种用法都经它删。
 #
@@ -110,7 +110,7 @@ run_build_directory_end() {
 #       「命令正常退出之后，这一趟的编译目录应当删掉」「命令出错退出之后，这一趟的编译目录应当删掉」「包装被 TERM 停之后，这一趟的编译目录应当删掉」
 #   RUN_BUILD_DIRECTORY_BREAK=foreground  命令在前台跑、不放后台用 wait 等（bash 等前台命令退出之前不跑 trap，TERM 转不到命令）
 #       「包装被 TERM 停之后，这一趟的编译目录应当删掉」（实际包装等命令自己睡完才退）
-#   RUN_BUILD_DIRECTORY_BREAK=owner-unrecorded  run_directory_owner_record 不写归属记录（改前的样子）
+#   RUN_BUILD_DIRECTORY_BREAK=owner-unrecorded  run_directory_owner_record 不写归属记录
 #       「run_build_directory_begin 建出来的运行目录里应当有归属记录 .owner」
 #   RUN_BUILD_DIRECTORY_BREAK=owner-left-alone  run_build_directory_end 删完编译目录之后不删只剩它自己的 .owner（运行目录 rmdir 不掉）
 #       「命令正常退出之后，这一趟的编译目录应当删掉」「命令出错退出之后，这一趟的编译目录应当删掉」「包装被 TERM 停之后，这一趟的编译目录应当删掉」
