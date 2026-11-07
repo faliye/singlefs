@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-source "$(dirname "${BASH_SOURCE[0]}")/../stublib.sh"
-stub_log 'strace' "$@"
-while [ "$#" -gt 0 ] && [[ "$1" == -* ]]; do
-  case "$1" in -o|-e|-p|-s|-u|-E|-O) shift 2 ;; *) shift ;; esac
-done
-"$@"; exit $?

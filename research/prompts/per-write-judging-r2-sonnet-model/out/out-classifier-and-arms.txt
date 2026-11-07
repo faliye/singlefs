@@ -1,0 +1,263 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling libc v0.2.189
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling pkg-config v0.3.34
+   Compiling glob v0.3.4
+   Compiling minimal-lexical v0.2.1
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.3
+   Compiling regex-syntax v0.8.11
+   Compiling either v1.18.0
+   Compiling bindgen v0.72.1
+   Compiling vcpkg v0.2.15
+   Compiling shlex v1.3.0
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling rustc-hash v2.1.3
+   Compiling bitflags v2.13.2
+   Compiling equivalent v1.0.2
+   Compiling rustflags v0.1.7
+   Compiling hashbrown v0.17.1
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/crates/singlefs-core)
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/crates/singlefs-reference-filesystem)
+   Compiling libloading v0.8.9
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/crates/singlefs-checker)
+   Compiling itertools v0.13.0
+   Compiling clang-sys v1.9.1
+   Compiling nom v7.1.3
+   Compiling indexmap v2.14.2
+   Compiling syn v2.0.119
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling jobserver v0.1.35
+   Compiling regex-automata v0.4.18
+   Compiling cc v1.5.1
+   Compiling cexpr v0.6.0
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling libz-sys v1.1.29
+   Compiling lz4-sys v1.11.1+lz4-1.10.0
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling regex v1.13.1
+   Compiling synstructure v0.13.2
+   Compiling singlefs-unit-graph v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/crates/singlefs-unit-graph)
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling librocksdb-sys v0.19.0+11.8.1
+   Compiling singlefs-verification v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/crates/singlefs-verification)
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/crates/singlefs-replay-prefix)
+   Compiling rocksdb v0.25.0
+   Compiling prune-server v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/prune-server)
+warning: field `segment_index` is never read
+    --> crates/singlefs-verification/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs:2127:13
+     |
+2126 |     pub struct SegmentVerdict {
+     |                -------------- field in this struct
+2127 |         pub segment_index: usize,
+     |             ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-verification` (test "crash_enumeration_unlink_after_the_multi_record_publish_stream") generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 57s
+     Running tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs (/home/faliye/coding/singlefs-layer0-shard/builds/task-b0f6b921-8700-4/target/release/deps/crash_enumeration_unlink_after_the_multi_record_publish_stream-2bea1e16119a2ef3)
+
+running 1 test
+test per_write_judging_tightened_dynamic::probe_tightened_criterion_over_the_unlink_stream_and_two_misordered_arms ... PROBE_TIGHT_AREA label=unmodified device=0 lowest_unit_write_offset=822149120 highest_non_unit_write_end=Some(16826368)
+PROBE_TIGHT_AREA label=unmodified device=1 lowest_unit_write_offset=822149120 highest_non_unit_write_end=Some(16826368)
+PROBE_TIGHT_FLOW_PUBLISHES label=unmodified publishes=9
+PROBE_TIGHT_SEGMENT label=unmodified segment=0 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=1 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=2 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=unmodified segment=3 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=4 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=5 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=unmodified segment=6 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=7 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=8 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 12} passes=true states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=unmodified segment=9 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=unmodified segment=10 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=11 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=12 writes=28 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 14} passes=false states_group_form=43 engine_states=Some(268435455)
+PROBE_TIGHT_SEGMENT label=unmodified segment=13 writes=4 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(15)
+PROBE_TIGHT_SEGMENT label=unmodified segment=14 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=15 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=16 writes=30 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 15} passes=false states_group_form=46 engine_states=Some(1073741823)
+PROBE_TIGHT_SEGMENT label=unmodified segment=17 writes=6 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(63)
+PROBE_TIGHT_SEGMENT label=unmodified segment=18 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=19 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=20 writes=26 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 13} passes=true states_group_form=40 engine_states=Some(67108863)
+PROBE_TIGHT_SEGMENT label=unmodified segment=21 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=unmodified segment=22 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=23 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=24 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=unmodified segment=25 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=unmodified segment=26 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=27 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=28 writes=22 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 11} passes=false states_group_form=34 engine_states=Some(4194303)
+PROBE_TIGHT_SEGMENT label=unmodified segment=29 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=unmodified segment=30 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=31 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=unmodified segment=32 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=unmodified segment=33 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=unmodified segment=34 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=unmodified segment=35 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_FLOW label=unmodified segments=36 unit_segments=7 passing_unit_segments=2 engine_total=1463812286 reduced_total_group_form=1379926285
+PROBE_TIGHT_FLOW_PUBLISHES label=late_unit publishes=9
+PROBE_TIGHT_SEGMENT label=late_unit segment=0 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=1 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=2 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=3 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=4 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=5 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=6 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=7 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=8 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 12} passes=true states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=9 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=10 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=11 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=12 writes=26 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 13} passes=false states_group_form=40 engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=13 writes=4 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=14 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=15 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=16 writes=32 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=2 diag_birth_differs_from_publish=2 e6_records_in_prefix_naming_a_slot=4 diag_records_of_same_identity=4 group_sizes={2: 16} passes=false states_group_form=49 engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=17 writes=6 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=18 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=19 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=20 writes=26 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 13} passes=true states_group_form=40 engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=21 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=22 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=23 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=24 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=25 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=26 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=27 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=28 writes=22 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 11} passes=false states_group_form=34 engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=29 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=30 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=31 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=32 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=33 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=34 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=late_unit segment=35 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_FLOW label=late_unit segments=36 unit_segments=7 passing_unit_segments=2 engine_total=1 reduced_total_group_form=1
+PROBE_TIGHT_FLOW_PUBLISHES label=record_before_units publishes=9
+PROBE_TIGHT_SEGMENT label=record_before_units segment=0 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=1 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=2 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=3 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=4 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=5 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=6 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=7 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=8 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 12} passes=true states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=9 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=10 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=11 writes=6 kinds={"JournalRecord", "SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=12 writes=28 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=6 diag_records_of_same_identity=4 group_sizes={2: 14} passes=false states_group_form=43 engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=14 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=15 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=16 writes=30 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 15} passes=false states_group_form=46 engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=17 writes=6 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=18 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=19 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=20 writes=26 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 13} passes=true states_group_form=40 engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=21 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=22 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=23 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=24 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=25 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=26 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=27 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=28 writes=22 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 11} passes=false states_group_form=34 engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=29 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=30 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=31 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=32 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=33 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=34 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=record_before_units segment=35 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_FLOW label=record_before_units segments=36 unit_segments=7 passing_unit_segments=2 engine_total=1 reduced_total_group_form=1
+PROBE_TIGHT_FLOW_PUBLISHES label=short_write publishes=9
+PROBE_TIGHT_SEGMENT label=short_write segment=0 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=1 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=2 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=3 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=4 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=5 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=6 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=7 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=8 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 12} passes=true states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=9 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=10 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=11 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=12 writes=28 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=1 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 14} passes=false states_group_form=43 engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=13 writes=4 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=14 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=15 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=16 writes=30 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 15} passes=false states_group_form=46 engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=17 writes=6 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=18 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=19 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=20 writes=26 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 13} passes=true states_group_form=40 engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=21 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=22 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=23 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=24 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=25 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=26 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=27 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=28 writes=22 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 11} passes=false states_group_form=34 engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=29 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=30 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=31 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=32 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=33 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=34 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=short_write segment=35 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_FLOW label=short_write segments=36 unit_segments=7 passing_unit_segments=2 engine_total=1 reduced_total_group_form=1
+PROBE_TIGHT_FLOW_PUBLISHES label=mixed_segment publishes=9
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=0 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=1 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=2 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=3 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=4 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=5 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=6 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=7 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=8 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 12} passes=true states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=9 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=10 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=12 writes=30 kinds={"SystemConfigurationSlot", "UnitWrite"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=13 writes=4 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=14 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=15 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=16 writes=30 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 15} passes=false states_group_form=46 engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=17 writes=6 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=18 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=19 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=20 writes=26 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 13} passes=true states_group_form=40 engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=21 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=22 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=23 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=24 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=25 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=26 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=27 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=28 writes=22 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 11} passes=false states_group_form=34 engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=29 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=30 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=31 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=32 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=33 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=34 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_SEGMENT label=mixed_segment segment=35 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=None
+PROBE_TIGHT_FLOW label=mixed_segment segments=36 unit_segments=6 passing_unit_segments=2 engine_total=1 reduced_total_group_form=1
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.15s
+

@@ -1,0 +1,367 @@
+
+/// 第三轮攻方腿探针（只拷进复跑副本、追加在测试文件末尾，不回主工作区）：收严判据 E6 在每个单元段上点名的槽与点名它的记录逐条读出。
+/// 点名项用实现自己的读者解（`singlefs_core::journal::JournalRecord::parse`，恢复走的同一份），另用第二轮辩方探针的手写字段表
+/// （`per_write_judging_tightened_classifier::named_locations_of_a_record`）再解一遍、逐条比：两条路不共用解码代码。
+/// 只读写表与基镜像，不判崩溃状态；每段的全量态数用 `crash_state_count_with_torn_in_place_overwrites` 按段算。
+mod per_write_judging_e6_readout {
+    use super::per_write_judging_tightened_classifier as tightened;
+    use singlefs_core::journal::JournalRecord;
+    use singlefs_verification::crash::{crash_state_count_with_torn_in_place_overwrites, full_expansion};
+    use singlefs_verification::memory_pool::{publishes_in, MemoryPool, RecordStreamContinuity, RetainedWrite};
+    use singlefs_verification::segments::StepKind;
+    use std::collections::BTreeSet;
+
+    const SLOT_BYTES_OF_THE_POOL: u64 = 16384;
+    const DATA_UNIT_BYTES_OF_THE_POOL: u64 = 32768;
+    const NODE_BYTES_OF_THE_POOL: u64 = 16384;
+    /// 记录头里 fsid 的偏移（`crates/singlefs-checker/src/lib.rs` 的 `JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET`）。
+    const FILESYSTEM_IDENTIFIER_OFFSET_OF_A_RECORD: usize = 472;
+
+    /// 读者验一个点名单元时读的字节数：码 2 节点 16384，码 1、码 3 与不认识的码 32768
+    /// （`crates/singlefs-core/src/recovery.rs` 的 `unit_bytes_for_class` 与 `span_in_slots_of_a_named_unit`）。
+    pub fn bytes_read_for_a_named_class(class: u8) -> u64 {
+        if class == 2 {
+            NODE_BYTES_OF_THE_POOL
+        } else {
+            DATA_UNIT_BYTES_OF_THE_POOL
+        }
+    }
+
+    /// 一条记录里的一个位置：点名项的一条位置条目（`source=named`），或新根段四条指针的一条位置条目（`source=new_root_pointer`）。
+    #[derive(Clone, Debug)]
+    pub struct PlaceOfARecord {
+        pub source: &'static str,
+        pub entry: usize,
+        pub copy: usize,
+        pub class: u8,
+        pub birth_tree: u64,
+        pub birth_txg: u64,
+        pub device: u32,
+        pub slot: u64,
+        pub bytes_read: u64,
+    }
+
+    pub struct ParsedRecord {
+        pub instance: u32,
+        pub counter: u64,
+        pub checkpoint_txg: u64,
+        pub places: Vec<PlaceOfARecord>,
+    }
+
+    /// 用实现的读者解一条记录写；fsid 取记录自己的那 8 字节（只为过读者的 fsid 一关）。读者拒的交 None。
+    pub fn parse_record(bytes: &[u8]) -> Option<ParsedRecord> {
+        let fsid_end = FILESYSTEM_IDENTIFIER_OFFSET_OF_A_RECORD + 8;
+        if bytes.len() < fsid_end {
+            return None;
+        }
+        let fsid = u64::from_le_bytes(bytes[FILESYSTEM_IDENTIFIER_OFFSET_OF_A_RECORD..fsid_end].try_into().expect("8 字节"));
+        let record = JournalRecord::parse(bytes, fsid)?;
+        let mut places = Vec::new();
+        for (entry, named) in record.named.iter().enumerate() {
+            for (copy, location) in named.locations.iter().enumerate() {
+                places.push(PlaceOfARecord {
+                    source: "named",
+                    entry,
+                    copy,
+                    class: named.unit_class,
+                    birth_tree: named.birth_tree.0,
+                    birth_txg: named.birth_txg.0,
+                    device: location.device.0,
+                    slot: location.slot.0,
+                    bytes_read: bytes_read_for_a_named_class(named.unit_class),
+                });
+            }
+        }
+        let pointers = [
+            &record.new_tree_table,
+            &record.new_mapping_root,
+            &record.new_instance_table,
+            &record.new_allocation_record_tree_root,
+        ];
+        for (entry, pointer) in pointers.into_iter().enumerate() {
+            for (copy, location) in pointer.locations.iter().enumerate() {
+                if location.slot.0 == 0 {
+                    continue;
+                }
+                places.push(PlaceOfARecord {
+                    source: "new_root_pointer",
+                    entry,
+                    copy,
+                    class: 2,
+                    birth_tree: pointer.head.birth_tree.0,
+                    birth_txg: pointer.head.birth_txg.0,
+                    device: location.device.0,
+                    slot: location.slot.0,
+                    bytes_read: NODE_BYTES_OF_THE_POOL,
+                });
+            }
+        }
+        Some(ParsedRecord {
+            instance: record.instance.0,
+            counter: record.counter,
+            checkpoint_txg: record.checkpoint_txg.0,
+            places,
+        })
+    }
+
+    fn overlaps(device: u32, start: u64, length: u64, write: &RetainedWrite) -> bool {
+        write.device.0 == device && write.offset.0 < start + length && start < write.offset.0 + write.length_in_bytes()
+    }
+
+    fn header_of(write: &RetainedWrite) -> (Option<u8>, Option<u64>) {
+        write
+            .bytes()
+            .and_then(tightened::parse_header)
+            .map_or((None, None), |header| (Some(header.class), Some(header.birth_txg)))
+    }
+
+    /// 一段的读数。`*_e6` 都是「前缀里有几个记录写」，与第二轮 `e6_records_in_prefix_naming_a_slot` 同一个量纲。
+    pub struct SegmentReadout {
+        pub segment_index: usize,
+        pub writes: usize,
+        /// 第二轮辩方的计法原样：手写字段表、每个点名位置按 32768 字节算。
+        pub r2_e6: usize,
+        /// 实现的读者解、每个点名位置按 32768 字节算（与上一列逐段相等说明两条解码路一致）。
+        pub wide_e6: usize,
+        /// 实现的读者解、按点名项的类标签取读者真读的宽（收窄后的 E6）。
+        pub class_width_e6: usize,
+        /// 点名位置的起点恰是这一段某个写的起点。
+        pub exact_start_e6: usize,
+        /// 新根段四条指针的位置罩住这一段的写（E6 两种宽度都不看的一条路）。
+        pub pointer_e6: usize,
+        pub parse_mismatches: usize,
+        pub unparsed_records: usize,
+        /// 收窄后的 E6 下被点名的这一段的写（真点名候选）。
+        pub truly_named_writes: BTreeSet<usize>,
+        pub other_criteria_clear: bool,
+        pub r2_passes: bool,
+        pub narrowed_passes: bool,
+        pub states_full: u64,
+        pub states_group_form: u64,
+    }
+
+    /// 这一段自己的全量态数（整条流只留这一段时的态数减去全不落那一个）；空段交 0。
+    fn states_of_one_segment(base: &MemoryPool, writes: &[RetainedWrite], segments: &[Vec<usize>], segment_index: usize) -> u64 {
+        if segments[segment_index].is_empty() {
+            return 0;
+        }
+        crash_state_count_with_torn_in_place_overwrites(base, writes, &segments[segment_index..=segment_index], &full_expansion)
+            .saturating_sub(1)
+    }
+
+    /// 读一段：只读全是单元写的段，别的段交 None。每个「点名位置 × 这一段的写」按 32768 或按类宽相交的，打一行 `PROBE_E6_HIT`。
+    fn read_segment(
+        label: &str,
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        segment_index: usize,
+        publishes: &[singlefs_verification::memory_pool::PublishWrites],
+        count_states: bool,
+    ) -> Option<SegmentReadout> {
+        let segment = &segments[segment_index];
+        let lowest = *segment.iter().min()?;
+        if !segment.iter().all(|index| writes[*index].kind == StepKind::UnitWrite) {
+            return None;
+        }
+        let verdict = tightened::classify_segment(base, writes, segments, segment_index, publishes)?;
+        let mut readout = SegmentReadout {
+            segment_index,
+            writes: segment.len(),
+            r2_e6: 0,
+            wide_e6: 0,
+            class_width_e6: 0,
+            exact_start_e6: 0,
+            pointer_e6: 0,
+            parse_mismatches: 0,
+            unparsed_records: 0,
+            truly_named_writes: BTreeSet::new(),
+            other_criteria_clear: false,
+            r2_passes: verdict.passes,
+            narrowed_passes: false,
+            states_full: if count_states { states_of_one_segment(base, writes, segments, segment_index) } else { 0 },
+            states_group_form: verdict.states_under_the_group_form,
+        };
+        for record_index in 0..lowest {
+            let record = &writes[record_index];
+            if record.kind != StepKind::JournalRecord {
+                continue;
+            }
+            let Some(bytes) = record.bytes() else {
+                continue;
+            };
+            let hand_parsed = tightened::named_locations_of_a_record(bytes);
+            let r2_hit = hand_parsed.iter().any(|(device, slot)| {
+                segment
+                    .iter()
+                    .any(|index| overlaps(*device, slot * SLOT_BYTES_OF_THE_POOL, DATA_UNIT_BYTES_OF_THE_POOL, &writes[*index]))
+            });
+            readout.r2_e6 += usize::from(r2_hit);
+            let Some(parsed) = parse_record(bytes) else {
+                readout.unparsed_records += 1;
+                // 实现的读者拒的记录退回第二轮的罩法（每项 32768）：收窄后的 E6 在这里不比 E6 松
+                readout.class_width_e6 += usize::from(r2_hit);
+                println!("PROBE_E6_UNPARSED label={label} segment={segment_index} record_index={record_index} r2_hit={r2_hit}");
+                continue;
+            };
+            let core_named: BTreeSet<(u32, u64)> =
+                parsed.places.iter().filter(|place| place.source == "named").map(|place| (place.device, place.slot)).collect();
+            let hand_named: BTreeSet<(u32, u64)> = hand_parsed.iter().copied().collect();
+            readout.parse_mismatches += usize::from(core_named != hand_named);
+            let (mut wide, mut class_width, mut exact, mut pointer) = (false, false, false, false);
+            for place in &parsed.places {
+                let start = place.slot * SLOT_BYTES_OF_THE_POOL;
+                let is_named = place.source == "named";
+                for write_index in segment {
+                    let write = &writes[*write_index];
+                    let wide_hit = is_named && overlaps(place.device, start, DATA_UNIT_BYTES_OF_THE_POOL, write);
+                    let class_hit = overlaps(place.device, start, place.bytes_read, write);
+                    if !wide_hit && !class_hit {
+                        continue;
+                    }
+                    let exact_hit = write.device.0 == place.device && write.offset.0 == start;
+                    if is_named {
+                        wide |= wide_hit;
+                        class_width |= class_hit;
+                        exact |= exact_hit;
+                    } else {
+                        pointer |= class_hit;
+                    }
+                    if class_hit {
+                        readout.truly_named_writes.insert(*write_index);
+                    }
+                    let earlier = writes[..record_index]
+                        .iter()
+                        .position(|earlier| earlier.kind == StepKind::UnitWrite && overlaps(place.device, start, place.bytes_read, earlier));
+                    let (write_class, write_birth) = header_of(write);
+                    let (earlier_class, earlier_birth) = earlier.map_or((None, None), |index| header_of(&writes[index]));
+                    let gap_slots = (i128::from(write.offset.0) - i128::from(start)) / i128::from(SLOT_BYTES_OF_THE_POOL);
+                    let same_unit = write_class == Some(place.class) && write_birth == Some(place.birth_txg);
+                    println!(
+                        "PROBE_E6_HIT label={label} segment={segment_index} record_index={record_index} record_device={} record_instance={} \
+                         record_counter={} record_checkpoint_txg={} source={} entry={} copy={} named_class={} named_birth_tree={} named_birth_txg={} \
+                         device={} slot={} named_start={start} bytes_read={} write_index={write_index} write_offset={} write_length={} \
+                         write_class={write_class:?} write_birth_txg={write_birth:?} gap_slots={gap_slots} overlaps_under_the_class_width={class_hit} \
+                         exact_start={exact_hit} named_region_written_earlier_at={earlier:?} earlier_class={earlier_class:?} \
+                         earlier_birth_txg={earlier_birth:?} same_unit_as_the_write={same_unit}",
+                        record.device.0,
+                        parsed.instance,
+                        parsed.counter,
+                        parsed.checkpoint_txg,
+                        place.source,
+                        place.entry,
+                        place.copy,
+                        place.class,
+                        place.birth_tree,
+                        place.birth_txg,
+                        place.device,
+                        place.slot,
+                        place.bytes_read,
+                        write.offset.0,
+                        write.length_in_bytes(),
+                    );
+                }
+            }
+            readout.wide_e6 += usize::from(wide);
+            readout.class_width_e6 += usize::from(class_width);
+            readout.exact_start_e6 += usize::from(exact);
+            readout.pointer_e6 += usize::from(pointer);
+        }
+        let groups: usize = verdict.group_size_histogram.values().sum();
+        readout.other_criteria_clear = verdict.only_unit_writes
+            && verdict.over_an_earlier_write == 0
+            && verdict.over_nonzero_base == 0
+            && verdict.without_a_parsable_header == 0
+            && verdict.unaligned_to_a_slot == 0
+            && verdict.claimed_bytes_differ_from_the_write == 0
+            && verdict.header_not_beyond_the_mount_root == 0
+            && groups >= 2;
+        readout.narrowed_passes = readout.other_criteria_clear && readout.class_width_e6 == 0 && readout.pointer_e6 == 0;
+        let judged = if readout.class_width_e6 > 0 || readout.pointer_e6 > 0 {
+            "truly_named"
+        } else if readout.r2_e6 > 0 {
+            "width_false_positive"
+        } else {
+            "no_reading"
+        };
+        println!(
+            "PROBE_E6_SEGMENT label={label} segment={segment_index} writes={} r2_classifier_e6={} r2_e6={} wide_e6={} class_width_e6={} \
+             exact_start_e6={} pointer_e6={} parse_mismatches={} unparsed_records={} judged={judged} other_criteria_clear={} r2_passes={} \
+             narrowed_passes={} states_full={} states_group_form={}",
+            readout.writes,
+            verdict.records_in_the_prefix_naming_a_slot_of_the_segment,
+            readout.r2_e6,
+            readout.wide_e6,
+            readout.class_width_e6,
+            readout.exact_start_e6,
+            readout.pointer_e6,
+            readout.parse_mismatches,
+            readout.unparsed_records,
+            readout.other_criteria_clear,
+            readout.r2_passes,
+            readout.narrowed_passes,
+            readout.states_full,
+            readout.states_group_form,
+        );
+        Some(readout)
+    }
+
+    /// 读过的段里满足 `predicate` 的有几段。
+    fn count_segments(read: &[&SegmentReadout], predicate: fn(&SegmentReadout) -> bool) -> usize {
+        read.iter().filter(|segment| predicate(segment)).count()
+    }
+
+    /// 一条流：逐段读、每个单元写段打一行 `PROBE_E6_SEGMENT`，整条流打一行 `PROBE_E6_FLOW`。`count_states` 给 true 时按段算全量态数，
+    /// 并算第二轮判据（`r2_passes`）与收窄后的 E6（`narrowed_passes`）各自收下的段换成组合态数之后整条流剩多少。
+    pub fn readout_flow(
+        label: &str,
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        count_states: bool,
+    ) -> Vec<Option<SegmentReadout>> {
+        let publishes = publishes_in(writes, &vec![true; writes.len()], RecordStreamContinuity::OneRecording);
+        let engine_total = if count_states {
+            Some(crash_state_count_with_torn_in_place_overwrites(base, writes, segments, &full_expansion))
+        } else {
+            None
+        };
+        let mut readouts = Vec::new();
+        let (mut summed, mut reduced_r2, mut reduced_narrowed): (u64, u64, u64) = (1, 1, 1);
+        for segment_index in 0..segments.len() {
+            let readout = read_segment(label, base, writes, segments, segment_index, &publishes, count_states);
+            let states = if count_states { states_of_one_segment(base, writes, segments, segment_index) } else { 0 };
+            summed += states;
+            match &readout {
+                Some(read) => {
+                    reduced_r2 += if read.r2_passes { read.states_group_form } else { states };
+                    reduced_narrowed += if read.narrowed_passes { read.states_group_form } else { states };
+                }
+                None => {
+                    reduced_r2 += states;
+                    reduced_narrowed += states;
+                }
+            }
+            readouts.push(readout);
+        }
+        let read: Vec<&SegmentReadout> = readouts.iter().flatten().collect();
+        println!(
+            "PROBE_E6_FLOW label={label} segments={} unit_segments={} segments_with_r2_e6={} segments_with_class_width_e6={} \
+             segments_with_exact_start_e6={} segments_with_pointer_e6={} segments_with_parse_mismatches={} r2_passing={} narrowed_passing={} \
+             engine_total={engine_total:?} summed_by_segment={} reduced_total_r2={} reduced_total_narrowed={}",
+            segments.len(),
+            read.len(),
+            count_segments(&read, |segment| segment.r2_e6 > 0),
+            count_segments(&read, |segment| segment.class_width_e6 > 0),
+            count_segments(&read, |segment| segment.exact_start_e6 > 0),
+            count_segments(&read, |segment| segment.pointer_e6 > 0),
+            count_segments(&read, |segment| segment.parse_mismatches > 0),
+            count_segments(&read, |segment| segment.r2_passes),
+            count_segments(&read, |segment| segment.narrowed_passes),
+            if count_states { summed.to_string() } else { "not_counted".to_string() },
+            if count_states { reduced_r2.to_string() } else { "not_counted".to_string() },
+            if count_states { reduced_narrowed.to_string() } else { "not_counted".to_string() },
+        );
+        readouts
+    }
+}

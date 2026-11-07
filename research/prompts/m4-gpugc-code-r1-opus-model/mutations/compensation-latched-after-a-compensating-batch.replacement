@@ -1,5 +1,0 @@
-                let compensated_before_in_this_stop = self
-                    .stopped_after_a_compute_error
-                    .iter()
-                    .any(|stopped| stopped.task == task && stopped.batches_compensated_on_the_cpu > 0);
-                if compensated_before_in_this_stop || reading.is_the_allocated_share_above_the_threshold() {

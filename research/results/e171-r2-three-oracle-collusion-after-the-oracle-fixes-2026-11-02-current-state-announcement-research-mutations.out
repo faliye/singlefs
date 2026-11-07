@@ -1,8 +1,0 @@
-E7RESULT name=config table_rows=2 unit_test_modules=test_revision_8 timeout_seconds=300
-E7RESULT name=anchor mutation=R2P-16_宣布行照第_1_次重跑的行首认 hits=1 files=frozen_tree_lines_revision_8.py
-E7RESULT name=anchor mutation=R2P-17_宣布行照第_1_次重跑的调度记录读 hits=1 files=frozen_tree_lines_revision_8.py
-E7RESULT name=baseline unit_tests=green
-E7RESULT name=mutation number=1 outcome=✅ mutation=R2P-16_宣布行照第_1_次重跑的行首认 unit_test_exit=1
-E7RESULT name=mutation number=2 outcome=✅ mutation=R2P-17_宣布行照第_1_次重跑的调度记录读 unit_test_exit=1
-E7RESULT name=verdict mutations=2 caught=2 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
-E7RESULT name=done emitted=8

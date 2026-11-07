@@ -1,0 +1,11 @@
+RECOUNT flow=unlink segments=36 unit_segments=[(8, 24), (12, 28), (16, 30), (20, 26), (24, 24), (28, 22), (32, 24)]
+RECOUNT   full=1463812286 measured=1463812286 same=True jia=382 yi=471
+RECOUNT flow=second-deletion-batch-quarantined-data-unit-records-carry-th segments=28 unit_segments=[(8, 24), (12, 30), (16, 26), (20, 24), (24, 22)]
+RECOUNT   full=1178599580 measured=1178599580 same=True jia=292 yi=355
+RECOUNT flow=three-unit-file-applied-only-by-its-records-beside-the-versi segments=32 unit_segments=[(8, 24), (12, 30), (16, 18), (20, 16), (24, 16), (28, 24)]
+RECOUNT   full=1107689646 measured=1107689646 same=True jia=314 yi=378
+RECOUNT flow=deletion-through-the-last-batch segments=32 unit_segments=[(8, 24), (12, 30), (16, 26), (20, 24), (24, 22), (28, 24)]
+RECOUNT   full=1195376807 measured=1195376807 same=True jia=329 yi=404
+RECOUNT unlink segment=12 writes=28 full=268435455 jia=29 yi=43
+RECOUNT unlink segment=16 writes=30 full=1073741823 jia=31 yi=46
+RECOUNT unlink segment=20 writes=26 full=67108863 jia=27 yi=40

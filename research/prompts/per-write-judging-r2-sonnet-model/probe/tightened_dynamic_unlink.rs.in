@@ -1,0 +1,363 @@
+
+/// 辩方腿探针（只拷进草稿副本、追加在删除流测试文件末尾，不回主工作区）：收严后的判据在删除流上的静态判定（含两条写错次序的臂）、
+/// 乙与甲的合成对真判的逐态对照（小宇宙全量、两组同被盖的阳性对照）。真判走 `judge_crash_image`，与调查员探针同一条。
+mod per_write_judging_tightened_dynamic {
+    use super::per_write_judging_tightened_classifier as classifier;
+    use super::{prepare, Prepared};
+    use singlefs_verification::crash::{crash_state_enumeration_tables, full_expansion, judge_crash_image};
+    use singlefs_verification::crash_state_enumeration::crash_point_replay_worker_threads;
+    use singlefs_verification::memory_pool::{CrashImage, RetainedWrite, WrittenContents};
+    use std::collections::BTreeSet;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    type Outcome = (bool, BTreeSet<String>);
+
+    fn judge_one(prepared: &Prepared, enumerated_writes: &[RetainedWrite], segment_index: usize, landed: &[usize]) -> Outcome {
+        let mut persisted = vec![false; enumerated_writes.len()];
+        for segment in &prepared.segments[..segment_index] {
+            for write_index in segment {
+                persisted[*write_index] = true;
+            }
+        }
+        for write_index in landed {
+            persisted[*write_index] = true;
+        }
+        let image = CrashImage {
+            base: &prepared.base,
+            writes: enumerated_writes,
+            persisted,
+        };
+        let judgement = judge_crash_image(&image, prepared.judged_root_index, &prepared.versions);
+        let items = judgement.red_items();
+        (!items.is_empty(), items.into_iter().collect())
+    }
+
+    fn judge_many(prepared: &Prepared, enumerated_writes: &[RetainedWrite], segment_index: usize, subsets: &[Vec<usize>]) -> Vec<Outcome> {
+        let (threads, _source) = crash_point_replay_worker_threads();
+        let results: Mutex<Vec<Option<Outcome>>> = Mutex::new(vec![None; subsets.len()]);
+        let next = AtomicUsize::new(0);
+        std::thread::scope(|scope| {
+            for _ in 0..threads.max(1) {
+                scope.spawn(|| loop {
+                    let position = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(landed) = subsets.get(position) else {
+                        break;
+                    };
+                    let outcome = judge_one(prepared, enumerated_writes, segment_index, landed);
+                    results.lock().expect("锁")[position] = Some(outcome);
+                });
+            }
+        });
+        results
+            .into_inner()
+            .expect("锁")
+            .into_iter()
+            .map(|outcome| outcome.expect("每个子集都判过"))
+            .collect()
+    }
+
+    struct XorShift(u64);
+    impl XorShift {
+        fn next(&mut self) -> u64 {
+            let mut value = self.0;
+            value ^= value << 13;
+            value ^= value >> 7;
+            value ^= value << 17;
+            self.0 = value;
+            value
+        }
+    }
+
+    fn pick_groups(groups: &[Vec<usize>], wanted: usize, seed: u64, must_include: Option<usize>) -> Vec<Vec<usize>> {
+        let mut generator = XorShift(seed | 1);
+        let mut order: Vec<usize> = (0..groups.len()).collect();
+        for position in (1..order.len()).rev() {
+            let other = usize::try_from(generator.next() % u64::try_from(position + 1).expect("位")).expect("位");
+            order.swap(position, other);
+        }
+        if let Some(required) = must_include {
+            order.retain(|position| *position != required);
+            order.insert(0, required);
+        }
+        order.into_iter().take(wanted).map(|position| groups[position].clone()).collect()
+    }
+
+    #[derive(Default)]
+    struct Tally {
+        states: usize,
+        yi_red_differs: usize,
+        yi_items_differ: usize,
+        jia_red_differs: usize,
+        jia_items_differ: usize,
+    }
+
+    /// 宇宙 = 所选几组的全部写（别的写一个不落）：2^宽度 个状态逐个真判，与乙（S∩组 各判一次、红项并 S=∅）和甲（每个单写判一次、红项并 S=∅）的合成逐态比。
+    fn compare_group_synthesis(label: &str, prepared: &Prepared, enumerated_writes: &[RetainedWrite], segment_index: usize, groups: &[Vec<usize>]) -> Tally {
+        let universe: Vec<usize> = groups.iter().flatten().copied().collect();
+        let width = universe.len();
+        assert!(width <= 18, "宇宙最多 18 个写（2^18 个状态）");
+        let mut group_masks: Vec<u32> = Vec::new();
+        let mut cursor = 0usize;
+        for group in groups {
+            group_masks.push(((1u32 << group.len()) - 1) << cursor);
+            cursor += group.len();
+        }
+        let subsets: Vec<Vec<usize>> = (0u32..(1u32 << width))
+            .map(|mask| (0..width).filter(|bit| (mask >> bit) & 1 == 1).map(|bit| universe[bit]).collect())
+            .collect();
+        let outcomes = judge_many(prepared, enumerated_writes, segment_index, &subsets);
+        let baseline = &outcomes[0];
+        let mut tally = Tally::default();
+        for mask in 0u32..(1u32 << width) {
+            let actual = &outcomes[usize::try_from(mask).expect("掩码")];
+            let mut yi_items: BTreeSet<String> = baseline.1.clone();
+            for group_mask in &group_masks {
+                yi_items.extend(outcomes[usize::try_from(mask & group_mask).expect("掩码")].1.iter().cloned());
+            }
+            let mut jia_items: BTreeSet<String> = baseline.1.clone();
+            for bit in 0..width {
+                if (mask >> bit) & 1 == 1 {
+                    jia_items.extend(outcomes[1usize << bit].1.iter().cloned());
+                }
+            }
+            tally.states += 1;
+            tally.yi_red_differs += usize::from(actual.0 != !yi_items.is_empty());
+            tally.yi_items_differ += usize::from(actual.1 != yi_items);
+            tally.jia_red_differs += usize::from(actual.0 != !jia_items.is_empty());
+            tally.jia_items_differ += usize::from(actual.1 != jia_items);
+            if actual.1 != yi_items && tally.yi_items_differ <= 3 {
+                println!(
+                    "PROBE_SYNTH_MISMATCH label={label} segment={segment_index} arm=yi mask={mask:#b} actual={:?} synthesized={yi_items:?}",
+                    actual.1
+                );
+            }
+        }
+        println!(
+            "PROBE_SYNTH label={label} segment={segment_index} groups={} writes={width} states={} baseline_red={} yi_red_differs={} yi_items_differ={} jia_red_differs={} jia_items_differ={}",
+            groups.len(),
+            tally.states,
+            baseline.0,
+            tally.yi_red_differs,
+            tally.yi_items_differ,
+            tally.jia_red_differs,
+            tally.jia_items_differ
+        );
+        tally
+    }
+
+    fn env_count(name: &str, default: usize) -> usize {
+        std::env::var(name).map_or(default, |text| text.parse::<usize>().expect("非负整数"))
+    }
+
+    /// 把一组写（两盘各一份）挪到另一组写的偏移上：同盘对同盘。
+    fn plant_over(enumerated_writes: &mut [RetainedWrite], planted_group: &[usize], target_group: &[usize]) {
+        for planted in planted_group {
+            let device = enumerated_writes[*planted].device;
+            let target = target_group
+                .iter()
+                .find(|target| enumerated_writes[**target].device == device)
+                .expect("目标组在同一块盘上有一份副本");
+            let target_offset = enumerated_writes[*target].offset;
+            enumerated_writes[*planted].offset = target_offset;
+        }
+    }
+
+    /// 取样点「小段全量对照」与「阳性对照」：未改动的段 12、16、20 取几组，宇宙内逐态与乙、甲的合成比；阳性对照把第 16 段一组挪到
+    /// 第 12 段一个单元的两份副本上、宇宙含这一组，看乙的合成在两层上还中不中，甲中不中。
+    #[test]
+    fn probe_group_synthesis_against_the_judged_states_of_small_universes() {
+        let prepared = prepare("probe-per-write-tightened-universes");
+        let tables = crash_state_enumeration_tables(&prepared.base, &prepared.writes, &prepared.segments, &full_expansion);
+        let enumerated = tables.enumerated_writes.clone();
+        let groups_per_universe = env_count("PROBE_UNIVERSE_GROUPS", 5);
+        let trials = env_count("PROBE_UNIVERSE_TRIALS", 3);
+        for segment_index in [12usize, 16, 20] {
+            let groups = classifier::groups_of_segment(&enumerated, &prepared.segments[segment_index]);
+            println!("PROBE_UNIVERSE_GROUPS label=unmodified segment={segment_index} groups={}", groups.len());
+            for trial in 0..trials {
+                let chosen = pick_groups(&groups, groups_per_universe, 0x7e57_u64 + u64::try_from(trial * 131 + segment_index).expect("种子"), None);
+                compare_group_synthesis(&format!("unmodified-trial{trial}"), &prepared, &enumerated, segment_index, &chosen);
+            }
+        }
+        let b_groups = classifier::groups_of_segment(&enumerated, &prepared.segments[12]);
+        let c_groups = classifier::groups_of_segment(&enumerated, &prepared.segments[16]);
+        let target = b_groups
+            .iter()
+            .find(|group| group.len() == 2 && enumerated[group[0]].length_in_bytes() == 32768)
+            .expect("第 12 段有一组两盘各一份的 32768 字节单元")
+            .clone();
+        let planted_position = c_groups
+            .iter()
+            .position(|group| group.len() == 2 && enumerated[group[0]].length_in_bytes() == 32768)
+            .expect("第 16 段有一组两盘各一份的 32768 字节单元");
+        let mut planted_writes = enumerated.clone();
+        plant_over(&mut planted_writes, &c_groups[planted_position], &target);
+        let groups_after = classifier::groups_of_segment(&planted_writes, &prepared.segments[16]);
+        let planted_group_position = groups_after
+            .iter()
+            .position(|group| group.contains(&c_groups[planted_position][0]))
+            .expect("挪过去的那一组还在");
+        for trial in 0..trials {
+            let chosen = pick_groups(&groups_after, groups_per_universe, 0x91a7_u64 + u64::try_from(trial).expect("种子"), Some(planted_group_position));
+            compare_group_synthesis(&format!("planted-trial{trial}"), &prepared, &planted_writes, 16, &chosen);
+        }
+    }
+
+    /// 取样点「多组同时被盖且有引用关系」：第 12 段（上一版）的每一对单元，把第 16 段两组（两盘各一份、长度相同）挪上去，
+    /// 宇宙 = 这两组 4 个写，16 个状态逐个真判，与乙、甲的合成比；哪一对不等，连这两个单元的类标签与偏移一起打出来。
+    #[test]
+    fn probe_two_planted_groups_over_every_pair_of_units_of_the_earlier_publish() {
+        let prepared = prepare("probe-per-write-tightened-two-groups");
+        let tables = crash_state_enumeration_tables(&prepared.base, &prepared.writes, &prepared.segments, &full_expansion);
+        let enumerated = tables.enumerated_writes.clone();
+        let b_groups = classifier::groups_of_segment(&enumerated, &prepared.segments[12]);
+        let c_groups = classifier::groups_of_segment(&enumerated, &prepared.segments[16]);
+        let length_of = |group: &Vec<usize>| enumerated[group[0]].length_in_bytes();
+        let class_of = |group: &Vec<usize>| {
+            enumerated[group[0]]
+                .bytes()
+                .and_then(classifier::parse_header)
+                .map_or(0u8, |header| header.class)
+        };
+        let mut pairs = 0usize;
+        let mut pairs_where_yi_items_differ = 0usize;
+        let mut pairs_where_jia_items_differ = 0usize;
+        let mut pairs_where_yi_red_differs = 0usize;
+        let mut skipped = 0usize;
+        for left in 0..b_groups.len() {
+            for right in left + 1..b_groups.len() {
+                let wanted = [&b_groups[left], &b_groups[right]];
+                let mut used: Vec<usize> = Vec::new();
+                let mut planted_over: Vec<(usize, usize)> = Vec::new();
+                for (which, target) in wanted.iter().enumerate() {
+                    let found = c_groups.iter().enumerate().find(|(position, group)| {
+                        !used.contains(position) && group.len() == 2 && target.len() == 2 && length_of(group) == length_of(target)
+                    });
+                    if let Some((position, _group)) = found {
+                        used.push(position);
+                        planted_over.push((position, which));
+                    }
+                }
+                if planted_over.len() < 2 {
+                    skipped += 1;
+                    continue;
+                }
+                let mut modified = enumerated.clone();
+                let mut universe_groups: Vec<Vec<usize>> = Vec::new();
+                for (position, which) in &planted_over {
+                    plant_over(&mut modified, &c_groups[*position], wanted[*which]);
+                    universe_groups.push(c_groups[*position].clone());
+                }
+                let label = format!("two-groups-{left}-{right}-classes-{}-{}", class_of(wanted[0]), class_of(wanted[1]));
+                let tally = compare_group_synthesis(&label, &prepared, &modified, 16, &universe_groups);
+                pairs += 1;
+                pairs_where_yi_items_differ += usize::from(tally.yi_items_differ > 0);
+                pairs_where_jia_items_differ += usize::from(tally.jia_items_differ > 0);
+                pairs_where_yi_red_differs += usize::from(tally.yi_red_differs > 0);
+            }
+        }
+        println!(
+            "PROBE_TWO_GROUPS_SUMMARY pairs={pairs} skipped={skipped} pairs_where_yi_items_differ={pairs_where_yi_items_differ} pairs_where_yi_red_differs={pairs_where_yi_red_differs} pairs_where_jia_items_differ={pairs_where_jia_items_differ}"
+        );
+    }
+
+    /// 把 `moved` 这几次写在写表里挪到原下标 `insert_before_old_index` 之前，段表跟着改：它们离开原来的段、进 `into_segment`。
+    fn move_writes(
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        moved: &[usize],
+        insert_before_old_index: usize,
+        into_segment: usize,
+    ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>) {
+        let mut new_position = vec![usize::MAX; writes.len()];
+        let mut new_writes: Vec<RetainedWrite> = Vec::with_capacity(writes.len());
+        for old_index in 0..writes.len() {
+            if old_index == insert_before_old_index {
+                for moved_index in moved {
+                    new_position[*moved_index] = new_writes.len();
+                    new_writes.push(writes[*moved_index].clone());
+                }
+            }
+            if moved.contains(&old_index) {
+                continue;
+            }
+            new_position[old_index] = new_writes.len();
+            new_writes.push(writes[old_index].clone());
+        }
+        let new_segments = segments
+            .iter()
+            .enumerate()
+            .map(|(segment_index, segment)| {
+                let mut kept: Vec<usize> = segment
+                    .iter()
+                    .filter(|index| !moved.contains(index))
+                    .map(|index| new_position[*index])
+                    .collect();
+                if segment_index == into_segment {
+                    let mut front: Vec<usize> = moved.iter().map(|index| new_position[*index]).collect();
+                    front.append(&mut kept);
+                    front
+                } else {
+                    kept
+                }
+            })
+            .collect();
+        (new_writes, new_segments)
+    }
+
+    /// 取样点「混合种类的段 / 写长与头声明不符 / 两条写错次序的臂」：判据在今天的删除流上逐段判；再造四条臂只判不枚举——
+    /// late_unit：第 12 段一个单元的两份副本挪到第 16 段开头（单元晚于引用它的根）；
+    /// record_before_units：第 13 段的记录挪到第 12 段单元之前（记录先于它点名的单元）；short_write、mixed_segment 见下。四臂上判据都应当拒，未改动那一条应当收。
+    #[test]
+    fn probe_tightened_criterion_over_the_unlink_stream_and_two_misordered_arms() {
+        let prepared = prepare("probe-per-write-tightened-classifier");
+        let tables = crash_state_enumeration_tables(&prepared.base, &prepared.writes, &prepared.segments, &full_expansion);
+        let engine_states: Vec<u64> = tables.state_ranges_by_segment.iter().map(|range| range.end - range.start).collect();
+        classifier::print_areas("unmodified", &prepared.writes);
+        classifier::classify_flow("unmodified", &prepared.base, &prepared.writes, &prepared.segments, Some(&engine_states));
+        let lowest_index_of = |segment_index: usize| *prepared.segments[segment_index].iter().min().expect("段不空");
+        let pair_of_copies = prepared.segments[12]
+            .iter()
+            .flat_map(|left_write| prepared.segments[12].iter().map(move |right_write| (*left_write, *right_write)))
+            .find(|(left_write, right_write)| {
+                let (zero, one) = (&prepared.writes[*left_write], &prepared.writes[*right_write]);
+                zero.device.0 == 0 && one.device.0 == 1 && zero.offset == one.offset && zero.length_in_bytes() == one.length_in_bytes()
+            })
+            .expect("第 12 段有两盘同偏移的一对副本");
+        let (late_writes, late_segments) = move_writes(
+            &prepared.writes,
+            &prepared.segments,
+            &[pair_of_copies.0, pair_of_copies.1],
+            lowest_index_of(16),
+            16,
+        );
+        classifier::classify_flow("late_unit", &prepared.base, &late_writes, &late_segments, None);
+        let records_of_the_publish: Vec<usize> = prepared.segments[13].clone();
+        let (record_writes, record_segments) = move_writes(
+            &prepared.writes,
+            &prepared.segments,
+            &records_of_the_publish,
+            lowest_index_of(12),
+            11,
+        );
+        classifier::classify_flow("record_before_units", &prepared.base, &record_writes, &record_segments, None);
+        // short_write：第 12 段一个 32768 字节的单元写截成 16384 字节（头声明两槽、写长一槽）：E3 应当拒
+        let mut shortened = prepared.writes.clone();
+        let shortened_index = prepared.segments[12]
+            .iter()
+            .copied()
+            .find(|index| prepared.writes[*index].length_in_bytes() == 32768)
+            .expect("第 12 段有 32768 字节的单元写");
+        if let WrittenContents::Bytes(bytes) = &mut shortened[shortened_index].contents {
+            bytes.truncate(16384);
+        }
+        classifier::classify_flow("short_write", &prepared.base, &shortened, &prepared.segments, None);
+        // mixed_segment：第 11 段（上一次发布的系统配置槽轮换）并进第 12 段（单元写），没有屏障隔开时引擎就是这样同段：E1 应当拒
+        let mut merged_segments = prepared.segments.clone();
+        let mut rotation_then_units = std::mem::take(&mut merged_segments[11]);
+        rotation_then_units.append(&mut merged_segments[12]);
+        merged_segments[12] = rotation_then_units;
+        classifier::classify_flow("mixed_segment", &prepared.base, &prepared.writes, &merged_segments, None);
+    }
+}

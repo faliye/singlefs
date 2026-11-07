@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-# 假的 tmux：记一笔；new-session / new-window / split-window / run-shell 把最后一个参数当 shell 命令放到脱离会话的地方跑
-source "$(dirname "${BASH_SOURCE[0]}")/../stublib.sh"
-stub_log 'tmux' "$@"
-case "$1" in
-  new-session|new|new-window|neww|split-window|splitw|run-shell|run)
-    last="${@: -1}"; setsid -f bash -c "$last" >/dev/null 2>&1 < /dev/null ;;
-esac
-exit 0

@@ -1,8 +1,0 @@
-# 世界名  门禁退出码（推的，照 doc-experiments.sh 第 3035–3093 行读出）  照定义字面该判成什么  这个世界说明什么
-control-single-line-red	1	1	对照：单行、走判段的 bin 没带 gpu，门禁红（装置本身能判）
-control-single-line-green	0	0	对照：单行、带 --features gpu，门禁绿
-continued-bin-on-next-line	77	1	续行把 --bin 拆到下一行：门禁一条都没判、退 77；照定义该红（没带 gpu）
-continued-features-on-next-line	1	0	续行把 --features gpu 拆到下一行：门禁误红；照定义该绿（带了 gpu）
-marker-without-judge	1	1	源文件只写 crash_state_enumeration:: 取崩溃点、不进判段：照定义字面与门禁都要 gpu（定义的括注比「走到判段」宽）
-alias-import-judge	0	1	use crash_amplification as amplification 之后调判段：源文件里没有「crash_amplification::」，门禁当不走判段放过；照「走到崩溃判段」该红
-declared-cargo-test-green	0	0	设计员照共用约束带范围声明的整条（cargo test 要声明）：门禁照样认得出特性

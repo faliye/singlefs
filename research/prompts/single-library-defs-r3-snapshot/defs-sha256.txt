@@ -1,4 +1,0 @@
-6dcc12f4017fc41f4f4a10054c57dd5af73c48b7e1337a79feebc021701cb467  .claude/agent-common.md
-6b03a035dde80f5cea35bd1f72f8b8479e6031391f74c1a9de7c96304fe10b29  .claude/main-agent.md
-87a059eecd24fd592b315a25842d04bc56ec2ca517c49433b4bfb23ba21e34a1  .claude/rules/verification.md
-c03bd929507434de4618bf712ec97dfc0a5d6103ac12c01074407380076249fa  .claude/kb/checks-owed.md

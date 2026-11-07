@@ -1,0 +1,83 @@
+diff -ru before/crates/singlefs-core/src/mounted_session.rs after/crates/singlefs-core/src/mounted_session.rs
+--- a/crates/singlefs-core/src/mounted_session.rs	2026-11-06 14:43:08.391836473 +0000
++++ b/crates/singlefs-core/src/mounted_session.rs	2026-11-06 14:43:08.415017949 +0000
+@@ -5076,7 +5076,10 @@
+         parameters,
+         devices,
+         allocator,
+-        Arc::make_mut(current),
++        {
++            eprintln!("OPUS_PROBE site=session_floor_raise_for_space strong_count={}", Arc::strong_count(current));
++            Arc::make_mut(current)
++        },
+         shadow_ledger,
+         publishes_pushed_in_this_admission,
+     ) {
+diff -ru before/crates/singlefs-core/src/mount.rs after/crates/singlefs-core/src/mount.rs
+--- a/crates/singlefs-core/src/mount.rs	2026-11-06 14:43:08.390554829 +0000
++++ b/crates/singlefs-core/src/mount.rs	2026-11-06 14:43:08.414033181 +0000
+@@ -4607,7 +4607,10 @@
+         parameters,
+         devices,
+         allocator,
+-        Arc::make_mut(current_file_version),
++        {
++            eprintln!("OPUS_PROBE site=unmount strong_count={}", Arc::strong_count(current_file_version));
++            Arc::make_mut(current_file_version)
++        },
+         rollback_floor,
+         shadow_ledger,
+     )?;
+@@ -8332,7 +8335,10 @@
+             parameters,
+             devices,
+             allocator,
+-            Arc::make_mut(&mut walked),
++            {
++                eprintln!("OPUS_PROBE site=mount_continuation_floor_raise strong_count={}", Arc::strong_count(&walked));
++                Arc::make_mut(&mut walked)
++            },
+             shadow_ledger,
+             publishes_pushed_in_this_admission,
+         ) {
+@@ -8705,7 +8711,10 @@
+                 parameters,
+                 devices,
+                 &mut allocator,
+-                Arc::make_mut(current_file_version),
++                {
++                    eprintln!("OPUS_PROBE site=floor_raise_after_the_row_publish strong_count={}", Arc::strong_count(current_file_version));
++                    Arc::make_mut(current_file_version)
++                },
+                 start.shadow_ledger,
+                 node_capacities_of_the_writer,
+                 refusal_before_acquisition,
+diff -ru before/crates/singlefs-core/src/transaction.rs after/crates/singlefs-core/src/transaction.rs
+--- a/crates/singlefs-core/src/transaction.rs	2026-11-06 14:43:08.389059317 +0000
++++ b/crates/singlefs-core/src/transaction.rs	2026-11-06 14:43:08.416379672 +0000
+@@ -2558,6 +2558,7 @@
+         match &mut self {
+             PoolVersion::WithoutFile(version) => version.writes = writes,
+             PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
++                eprintln!("OPUS_PROBE site=with_writes strong_count={}", Arc::strong_count(version));
+                 Arc::make_mut(version).writes = writes;
+             }
+         }
+@@ -17828,3 +17829,17 @@
+         let _ = pressed_back.watermark_of_a_publish_without_a_previous_version();
+     }
+ }
++
++#[cfg(test)]
++mod opus_probe_published_versions_carry_no_interior_mutability {
++    /// 编得过就说明这三样里没有 Cell / RefCell / UnsafeCell / Rc（它们不是 Sync）。
++    fn shared_across_threads<T: Send + Sync>() {}
++
++    #[test]
++    fn transaction_output_published_unit_and_pool_version_are_send_and_sync() {
++        shared_across_threads::<super::TransactionOutput>();
++        shared_across_threads::<super::PublishedUnit>();
++        shared_across_threads::<super::PoolVersion>();
++        eprintln!("OPUS_PROBE site=send_and_sync_compiled");
++    }
++}

@@ -1,9 +1,0 @@
-✗ kb-scribe 的写范围不含 /home/fy5090/code/singlefs/CLAUDE.md
-→ 它的写范围：.claude/kb/**、crates/singlefs-checker/invariants/*.md、crates/singlefs-checker/invariants/**/*.md、$SINGLEFS_WORK_ROOT/**（.claude/hooks/agent-write-scope.tsv；$SINGLEFS_WORK_ROOT 是工作根 ~/.local/share/singlefs/work；会话临时目录根 /tmp/claude-<uid> 不在里面）。
-→ 怎么办：范围外的改动不自己做，写进报告交回主 agent，由主 agent 改或派该写的 agent。
-name=w2b exit=2 expected=2
-✗ kb-scribe 没有项目定义（.claude/agents/kb-scribe.md 不在：内置类型、插件带来的或定义已删的旧实例），只许写工作根，不含 /home/fy5090/code/singlefs/CLAUDE.md
-→ 它能写的：/home/fy5090/.local/share/singlefs/work/ 下；仓里与别处（会话临时目录根 /tmp/claude-1000/ 在内）一律不写（用户 2026-10-26 定「只许写草稿目录」）。
-→ 怎么办：草稿、报告写进派发提示给的草稿目录；要改仓里的文件，写进报告交回主 agent，由主 agent 改或派有写范围的项目 agent（一次性的活派 clerk）。
-name=w2c exit=2 expected=2
-name=w2-again-cwd-scratch exit=0 expected=2

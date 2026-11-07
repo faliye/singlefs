@@ -1,0 +1,4 @@
+d26b45f96184a2f736b32844f91c80babd9f940495705c379b738c913278e730  .claude/kb/decisions/13-验证路线.md
+7b4a7c82bca9031e49d71200f0d87fcbd7dea1739f5f27447991db3942e1b1d0  .claude/kb/checks-owed.md
+c2b88323610cd4369ec800964fcbaadba6490540c1495cbfadf083bd2b64d47c  crates/singlefs-checker/invariants/04-校验和.md
+4917e95e24a15166c088058cc2f2523900234af340c312f565d0e063a93c9fd9  crates/singlefs-checker/invariants/02-根环.md

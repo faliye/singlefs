@@ -1,0 +1,46 @@
+== crates/singlefs-background-gpu/src/adapter_inventory.rs removed_tokens=61 added_tokens=72
+rename WAIT_LIMIT_UNDER_TEST -> WAIT_LIMIT_IN_THE_SETTINGS_UNDER_TEST one_to_one=True old_name_left_in_frozen_file=0
+residue insert old=[] new=[# [ cfg ( test ) ] pub ( crate )]
+== crates/singlefs-background-gpu/src/background_gpu_compute.rs removed_tokens=112 added_tokens=112
+rename card -> card_named_in_the_failures one_to_one=True old_name_left_in_frozen_file=0
+== crates/singlefs-background-gpu/src/checksum_kernels.rs removed_tokens=5 added_tokens=5
+rename the_two_kernels_are_separate_sources_with_their_own_entry_points -> the_table_driven_and_bitwise_checksum_kernels_are_separate_sources_with_their_own_entry_points one_to_one=True old_name_left_in_frozen_file=0
+== crates/singlefs-background-gpu/src/gpus_of_this_host.rs removed_tokens=15 added_tokens=8
+residue delete old=[const] new=[]
+residue replace old=[: u64 = 1 << 30 ;] new=[,]
+== crates/singlefs-background-gpu/src/live_slot_kernels.rs removed_tokens=87 added_tokens=93
+rename an_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word -> live_slot_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word one_to_one=True old_name_left_in_frozen_file=0
+rename outcome_bytes -> live_slot_outcome_bytes_of_the_words one_to_one=True old_name_left_in_frozen_file=0
+rename the_two_kernels_are_separate_sources_with_their_own_entry_points -> the_walking_and_searching_live_slot_kernels_are_separate_sources_with_their_own_entry_points one_to_one=True old_name_left_in_frozen_file=0
+residue insert old=[] new=[pub ( crate )]
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+== crates/singlefs-background-gpu/src/region_record_kernels.rs removed_tokens=627 added_tokens=581
+rename an_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word -> region_record_outcome_the_kernels_never_wrote_is_an_unrecognized_verdict_word one_to_one=True old_name_left_in_frozen_file=0
+rename entry -> central_mapping_entry one_to_one=True old_name_left_in_frozen_file=15
+rename outcome_bytes -> region_record_outcome_bytes_of_the_words one_to_one=True old_name_left_in_frozen_file=0
+rename the_two_kernels_are_separate_sources_with_their_own_entry_points -> the_walking_and_searching_region_record_kernels_are_separate_sources_with_their_own_entry_points one_to_one=True old_name_left_in_frozen_file=0
+residue insert old=[] new=[use crate :: live_slot_kernels :: low_and_high_words_of_the_slot ;]
+residue replace old=[low_and_high_words_of_the_slot ( slot : SlotNumber ) -> [ u32 ; 2 ] { [ u32 :: try_from ( slot . 0 & u64 :: from ( u32 :: MAX ) ) . expect ( "取了低 32 位" ) , u32 :: try_from ( slot . 0 >> 32 ) . expect ( "盘上槽号是 6 字节，高 32 位装得进 u32" ) , ] } fn entry] new=[central_mapping_entry]
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+== crates/singlefs-background-gpu/src/two_kernel_reconciliation.rs removed_tokens=311 added_tokens=317
+rename cpu_reference_outcome -> outcome_the_cpu_reference_gives_at_the_position one_to_one=True old_name_left_in_frozen_file=0
+rename entry -> two_kernel_outcomes_of_the_entry one_to_one=True old_name_left_in_frozen_file=9
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+residue delete old=[{] new=[]
+residue replace old=[}] new=[,]
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+residue insert old=[] new=[,]
+residue delete old=[{] new=[]
+residue replace old=[}] new=[,]
+residue delete old=[{] new=[]
+residue replace old=[}] new=[,]
+residue insert old=[] new=[,]
+== low_and_high_words_of_the_slot removed_copy_diff_lines=1543-1549 kept_copy_live_slot_kernels_lines=73-78 identical_after_dropping_pub_crate=True

@@ -1,9 +1,0 @@
-q3 writer=admission S=8 J=32 p_rootfail=0.0 cfg=today legal_raise_roots=25678 reaches_ding=12717 final[holds=16082 red=0 partial=9296 not_judged=300] partial_why[journal0:8878,ambiguous:418] partial_ratio=0.3620
-q3 writer=admission S=8 J=32 p_rootfail=0.0 cfg=verdict legal_raise_roots=25678 reaches_ding=12717 final[holds=15042 red=0 partial=10336 not_judged=300] partial_why[journal0:10249,ambiguous:87] partial_ratio=0.4025
-q3 writer=admission S=8 J=32 p_rootfail=0.0 cfg=today_known_genesis legal_raise_roots=25678 reaches_ding=12717 final[holds=16351 red=0 partial=9027 not_judged=300] partial_why[journal0:8878,ambiguous:149] partial_ratio=0.3515
-q3 writer=admission S=8 J=32 p_rootfail=0.0 cfg=today_genesis_only legal_raise_roots=25678 reaches_ding=12717 final[holds=16082 red=0 partial=9296 not_judged=300] partial_why[journal0:8878,ambiguous:152,between:266] partial_ratio=0.3620
-q3 writer=admission S=8 J=32 p_rootfail=0.0 cfg=today_both_fixed legal_raise_roots=25678 reaches_ding=12717 final[holds=16351 red=0 partial=9027 not_judged=300] partial_why[journal0:8878,ambiguous:149] partial_ratio=0.3515
-q3 writer=admission S=8 J=32 p_rootfail=0.0 cfg=today_no_stop legal_raise_roots=25678 reaches_ding=12717 final[holds=14773 red=0 partial=10605 not_judged=300] partial_why[journal0:10249,ambiguous:356] partial_ratio=0.4130
-q3enum writer=admission S=8 J=32 p_rootfail=0.0 legal slots_overwritten_since_the_raise=190088 covered=128249 NOT_COVERED=0 not_recognized=61839
-q3stop writer=admission S=8 J=32 p_rootfail=0.0 legal DIFFERENT_partial_vs_partial=62 same=24307 stop_resolves_what_no_stop_leaves_partial_journal0=1309
-example ('stop_different', 'legal') (230, 43, {'floor_before': 14, 'final': ('partial', 'ambiguous'), 'window': 'holds_undetermined'}, {'floor_before': 14, 'final': ('partial', 'journal0'), 'window': 'holds_undetermined'})

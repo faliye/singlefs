@@ -1,8 +1,0 @@
-q3 writer=admission S=4 J=128 p_rootfail=0.0 cfg=today legal_raise_roots=15627 reaches_ding=13876 final[holds=13922 red=0 partial=1348 not_judged=357] partial_why[ambiguous:1348] partial_ratio=0.0863
-q3 writer=admission S=4 J=128 p_rootfail=0.0 cfg=verdict legal_raise_roots=15627 reaches_ding=13876 final[holds=13977 red=0 partial=1293 not_judged=357] partial_why[ambiguous:1293] partial_ratio=0.0827
-q3 writer=admission S=4 J=128 p_rootfail=0.0 cfg=today_known_genesis legal_raise_roots=15627 reaches_ding=13876 final[holds=13977 red=0 partial=1293 not_judged=357] partial_why[ambiguous:1293] partial_ratio=0.0827
-q3 writer=admission S=4 J=128 p_rootfail=0.0 cfg=today_genesis_only legal_raise_roots=15627 reaches_ding=13876 final[holds=13922 red=0 partial=1348 not_judged=357] partial_why[ambiguous:1335,between:13] partial_ratio=0.0863
-q3 writer=admission S=4 J=128 p_rootfail=0.0 cfg=today_both_fixed legal_raise_roots=15627 reaches_ding=13876 final[holds=13977 red=0 partial=1293 not_judged=357] partial_why[ambiguous:1293] partial_ratio=0.0827
-q3 writer=admission S=4 J=128 p_rootfail=0.0 cfg=today_no_stop legal_raise_roots=15627 reaches_ding=13876 final[holds=13922 red=0 partial=1348 not_judged=357] partial_why[ambiguous:1348] partial_ratio=0.0863
-q3enum writer=admission S=4 J=128 p_rootfail=0.0 legal slots_overwritten_since_the_raise=85060 covered=85060 NOT_COVERED=0 not_recognized=0
-q3stop writer=admission S=4 J=128 p_rootfail=0.0 legal same=15627

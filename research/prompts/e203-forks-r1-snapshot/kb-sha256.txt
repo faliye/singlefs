@@ -1,0 +1,2 @@
+0c03fba0e3015e4f1d51ff0f3ed5c6ca256b5874d5c83d2812f9ddad0301f8d8  .claude/kb/decisions/08-核心索引结构.md
+c1497ac592c4af166f83028000dd4b1a36882e8a83420c51a9d74de49d542ca4  .claude/kb/experiments/203-准入之前扫类的步代价.md

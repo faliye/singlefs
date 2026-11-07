@@ -1,1 +1,0 @@
-            gpus_dropped_leaking_those_still_running(gpus_on_this_host, |_gpu_in_use| true);

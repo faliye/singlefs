@@ -1,6 +1,0 @@
-            gpus_dropped_leaking_those_still_running(gpus_on_this_host, |gpu_in_use| {
-                gpu_in_use
-                    .budget
-                    .memory_account()
-                    .has_a_submission_running_past_its_wait()
-            });

@@ -1,5 +1,0 @@
-[
- {"id": "r1-line33-bash-env-function-script-on-disk", "role": "main", "command": "f(){ bash -c true; }; BASH_ENV={S}/e-heavy.sh f"},
- {"id": "r1-line34-control-bash-env-direct-on-disk", "role": "main", "command": "BASH_ENV={S}/e-heavy.sh bash -c true"},
- {"id": "r1-line30-alias-one-line", "role": "main", "command": "shopt -s expand_aliases; alias t='cargo test --all'; t"}
-]

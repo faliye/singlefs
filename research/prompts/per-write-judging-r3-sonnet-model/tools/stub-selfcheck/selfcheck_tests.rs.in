@@ -1,0 +1,162 @@
+
+/// 对着桩类型自检探针里纯逻辑的几处（记录解析、宽读法与按类取宽度的点名、乙的合成逐态对照）；不碰仓里的任何代码。
+mod selfcheck {
+    use super::per_write_judging_exhaustive as exhaustive;
+    use super::per_write_judging_named_slots as named;
+    use singlefs_verification::memory_pool::{DeviceIdentity, DeviceOffsetInBytes, MemoryPool, RetainedWrite, WrittenContents};
+    use singlefs_verification::segments::StepKind;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    fn unit_bytes(class: u8, birth_txg: u64, length: usize) -> Vec<u8> {
+        let mut bytes = vec![0u8; length];
+        bytes[..4].copy_from_slice(b"SFSU");
+        bytes[6] = class;
+        match class {
+            2 => {
+                bytes[51] = 0;
+                bytes[52..60].copy_from_slice(&birth_txg.to_le_bytes());
+            }
+            1 => bytes[75..83].copy_from_slice(&birth_txg.to_le_bytes()),
+            _ => bytes[73..81].copy_from_slice(&birth_txg.to_le_bytes()),
+        }
+        bytes
+    }
+
+    fn record_bytes(named_items: &[(u64, u8, u64)]) -> Vec<u8> {
+        let mut bytes = vec![0u8; 4096];
+        bytes[..4].copy_from_slice(b"SFSJ");
+        bytes[12..16].copy_from_slice(&(named_items.len() as u32).to_le_bytes());
+        bytes[16..20].copy_from_slice(&7u32.to_le_bytes());
+        bytes[20..26].copy_from_slice(&[9, 0, 0, 0, 0, 0]);
+        bytes[26..34].copy_from_slice(&5u64.to_le_bytes());
+        for (index, (slot, class, birth_txg)) in named_items.iter().enumerate() {
+            let start = 496 + index * 56;
+            for (which, device) in [0u32, 1u32].iter().enumerate() {
+                let location = start + which * 14;
+                bytes[location..location + 4].copy_from_slice(&device.to_le_bytes());
+                bytes[location + 4..location + 10].copy_from_slice(&slot.to_le_bytes()[..6]);
+            }
+            bytes[start + 28] = *class;
+            bytes[start + 37..start + 45].copy_from_slice(&birth_txg.to_le_bytes());
+        }
+        bytes
+    }
+
+    fn write(device: u32, kind: StepKind, offset: u64, bytes: Vec<u8>) -> RetainedWrite {
+        RetainedWrite {
+            device: DeviceIdentity(device),
+            kind,
+            is_force_unit_access: false,
+            offset: DeviceOffsetInBytes(offset),
+            contents: WrittenContents::Bytes(bytes),
+        }
+    }
+
+    #[test]
+    fn the_record_parses_and_the_class_width_separates_a_wide_only_hit_from_a_true_one() {
+        let parsed = named::parse_record(&record_bytes(&[(100, 2, 5)])).expect("解得出");
+        assert_eq!((parsed.instance, parsed.counter, parsed.checkpoint_txg, parsed.items.len()), (7, 9, 5, 1));
+        assert_eq!(parsed.items[0].locations, [(0, 100), (1, 100)]);
+        assert_eq!((parsed.items[0].unit_class, parsed.items[0].birth_txg), (2, 5));
+        assert_eq!(named::parse_record(&[0u8; 100]).err(), Some("shorter_than_the_header"));
+        let mut bad = record_bytes(&[(100, 2, 5)]);
+        bad[12..16].copy_from_slice(&1000u32.to_le_bytes());
+        assert_eq!(named::parse_record(&bad).err(), Some("named_area_beyond_the_record"));
+        let slot = 16384u64;
+        // 0、1：点名的节点（槽 100、码 2）在两盘上的单元写；2：记录写；3、4：下一个槽 101 上的写（宽读法罩得到、按类罩不到）；5、6：槽 100 上的写（真重叠）
+        let writes = vec![
+            write(0, StepKind::UnitWrite, 100 * slot, unit_bytes(2, 5, 16384)),
+            write(1, StepKind::UnitWrite, 100 * slot, unit_bytes(2, 5, 16384)),
+            write(0, StepKind::JournalRecord, 0, record_bytes(&[(100, 2, 5)])),
+            write(0, StepKind::UnitWrite, 101 * slot, unit_bytes(2, 6, 16384)),
+            write(1, StepKind::UnitWrite, 101 * slot, unit_bytes(2, 6, 16384)),
+            write(0, StepKind::UnitWrite, 100 * slot, unit_bytes(2, 6, 16384)),
+        ];
+        let base = MemoryPool { devices: BTreeMap::new() };
+        let wide_only = named::census_of_the_prefix(&base, &writes, &[3, 4]);
+        assert_eq!((wide_only.old_wide_record_writes, wide_only.narrow_record_writes), (1, 0));
+        assert_eq!(wide_only.hits.len(), 2);
+        assert_eq!(wide_only.nearest_gap_after_a_named_extent, Some(0));
+        assert!(wide_only.hits.iter().all(|hit| hit.touching && !hit.same_slot && !hit.overlaps_by_class));
+        assert_eq!((wide_only.named_locations, wide_only.matched_earlier_unit_write, wide_only.matched_class_and_birth, wide_only.unmatched), (2, 2, 2, 0));
+        let truly = named::census_of_the_prefix(&base, &writes, &[5]);
+        assert_eq!((truly.old_wide_record_writes, truly.narrow_record_writes), (1, 1));
+        assert_eq!(truly.hits.len(), 1);
+        assert!(truly.hits[0].same_slot && !truly.hits[0].same_birth_txg && truly.hits[0].overlaps_by_class);
+        let unknown_class_writes = vec![write(0, StepKind::JournalRecord, 0, record_bytes(&[(100, 9, 5)])), write(0, StepKind::UnitWrite, 200 * slot, unit_bytes(2, 6, 16384))];
+        let unknown = named::census_of_the_prefix(&base, &unknown_class_writes, &[1]);
+        assert_eq!((unknown.unknown_class_locations, unknown.unmatched), (2, 2));
+    }
+
+    #[test]
+    fn the_fault_flips_the_last_byte_of_the_named_writes_only() {
+        let fresh = || {
+            vec![
+                write(0, StepKind::UnitWrite, 0, vec![1u8; 16]),
+                write(1, StepKind::UnitWrite, 0, vec![2u8; 16]),
+                write(0, StepKind::UnitWrite, 16, vec![3u8; 16]),
+                write(1, StepKind::UnitWrite, 16, vec![4u8; 16]),
+            ]
+        };
+        let groups = vec![vec![0, 1], vec![2, 3]];
+        let segment = [0usize, 1, 2, 3];
+        let last = |writes: &Vec<RetainedWrite>, index: usize| writes[index].bytes().expect("字节")[15];
+        let mut by_position = fresh();
+        std::env::set_var("PROBE_EXHAUST_FAULT", "flip:0+2");
+        let flipped = exhaustive::apply_the_fault_from_the_environment(&mut by_position, &segment, &groups);
+        assert_eq!(flipped, vec![0, 2]);
+        assert_eq!((last(&by_position, 0), last(&by_position, 1), last(&by_position, 2), last(&by_position, 3)), (!1u8, 2u8, !3u8, 4u8));
+        let mut by_copy = fresh();
+        std::env::set_var("PROBE_EXHAUST_FAULT", "copy:1");
+        assert_eq!(exhaustive::apply_the_fault_from_the_environment(&mut by_copy, &segment, &groups), vec![2]);
+        let mut by_group = fresh();
+        std::env::set_var("PROBE_EXHAUST_FAULT", "group:0");
+        assert_eq!(exhaustive::apply_the_fault_from_the_environment(&mut by_group, &segment, &groups), vec![0, 1]);
+        assert_eq!((last(&by_group, 0), last(&by_group, 1), last(&by_group, 2)), (!1u8, !2u8, 3u8));
+        std::env::remove_var("PROBE_EXHAUST_FAULT");
+        assert_eq!(writes_untouched(&fresh()), 4);
+    }
+
+    fn writes_untouched(writes: &Vec<RetainedWrite>) -> usize {
+        writes.len()
+    }
+
+    fn toy_outcome(landed: &[usize], with_cross_group_item: bool) -> exhaustive::Outcome {
+        let mut items: BTreeSet<String> = BTreeSet::new();
+        for write_index in landed {
+            items.insert(format!("w{write_index}"));
+        }
+        if with_cross_group_item && (0..3).all(|group| landed.iter().any(|index| index / 2 == group)) {
+            items.insert("cross".to_string());
+        }
+        (!items.is_empty(), items)
+    }
+
+    #[test]
+    fn the_exhaustive_comparer_is_silent_on_an_additive_judge_and_red_on_a_cross_group_one_and_slices_add_up() {
+        let universe: Vec<usize> = (10..16).collect();
+        let groups = vec![vec![10, 11], vec![12, 13], vec![14, 15]];
+        let shift = |landed: &[usize]| -> Vec<usize> { landed.iter().map(|index| index - 10).collect() };
+        let additive = |landed: &[usize]| toy_outcome(&shift(landed), false);
+        let tally = exhaustive::run("selfcheck", 0, &universe, &groups, &additive, None, 0, 1, false);
+        assert_eq!((tally.states, tally.union_items_differ, tally.delta_items_differ), (64, 0, 0));
+        let crossing = |landed: &[usize]| toy_outcome(&shift(landed), true);
+        let whole = exhaustive::run("selfcheck", 0, &universe, &groups, &crossing, None, 0, 1, false);
+        assert_eq!((whole.states, whole.union_items_differ, whole.union_items_missing_from_the_synthesis, whole.delta_items_differ), (64, 27, 27, 27));
+        let mut summed = exhaustive::Tally::default();
+        for slice in 0..5u64 {
+            let part = exhaustive::run("selfcheck", 0, &universe, &groups, &crossing, None, slice, 5, false);
+            summed.states += part.states;
+            summed.union_items_differ += part.union_items_differ;
+        }
+        assert_eq!((summed.states, summed.union_items_differ), (64, 27));
+        // 按阶：至多 1 组有写落下 = 1 + 3 × 3 = 10 个状态，跨组那一项要三组都有写才出现，所以看不见（差 0）；至多 3 组 = 全部 64 个，差 27
+        let first_order = exhaustive::run("selfcheck", 0, &universe, &groups, &crossing, Some(1), 0, 1, false);
+        assert_eq!((first_order.states, first_order.union_items_differ), (10, 0));
+        let second_order = exhaustive::run("selfcheck", 0, &universe, &groups, &crossing, Some(2), 0, 1, false);
+        assert_eq!((second_order.states, second_order.union_items_differ), (37, 0));
+        let third_order = exhaustive::run("selfcheck", 0, &universe, &groups, &crossing, Some(3), 0, 1, false);
+        assert_eq!((third_order.states, third_order.union_items_differ), (64, 27));
+        assert_eq!(exhaustive::parse_plan("28, 20@1/4"), vec![(28, 0, 1), (20, 1, 4)]);
+    }
+}

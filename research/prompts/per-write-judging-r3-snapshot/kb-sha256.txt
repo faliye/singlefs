@@ -1,0 +1,5 @@
+344a4b3a0100966e7b8e2d6b950ffa4aca2828c3af170a1a32b572466b998caf  .claude/kb/experiments/06-加密算法选型.md
+a700ff6cb40e0844ec59c72d3f31a84874f9a5fe45c59a9e4cf7e9f9d2f2b1f4  .claude/kb/experiments/01-节点大小vs可恢复性.md
+88383a56708376cce349526bf06b0e08883ee1d27005c24a827c7b9f4b42f247  .claude/kb/experiments/02-key布局对递归遍历的影响.md
+260f6a60dbf573a7ae25db0907595d9161e4e3202718ee72767e1986d0399cb8  .claude/kb/experiments/03-意图日志的断电语义.md
+3207a0be45bf871e96f2efa9fef11c673a0c1c6cf010500c17a0953c9b66a434  .claude/kb/experiments/04-范围重建vs逐项修改的交叉点.md

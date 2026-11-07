@@ -1,8 +1,0 @@
-q3 writer=bad S=8 J=128 p_rootfail=0.0 cfg=today illegal_raise_roots=23360 reaches_ding=9185 final[holds=0 red=22765 partial=333 not_judged=262] partial_why[combos:3,ambiguous:330] partial_ratio=0.0143
-q3 writer=bad S=8 J=128 p_rootfail=0.0 cfg=verdict illegal_raise_roots=23360 reaches_ding=9185 final[holds=0 red=22768 partial=330 not_judged=262] partial_why[combos:1,ambiguous:329] partial_ratio=0.0141
-q3 writer=bad S=8 J=128 p_rootfail=0.0 cfg=today_known_genesis illegal_raise_roots=23360 reaches_ding=9185 final[holds=0 red=22765 partial=333 not_judged=262] partial_why[combos:3,ambiguous:330] partial_ratio=0.0143
-q3 writer=bad S=8 J=128 p_rootfail=0.0 cfg=today_genesis_only illegal_raise_roots=23360 reaches_ding=9185 final[holds=0 red=22767 partial=331 not_judged=262] partial_why[combos:1,ambiguous:330] partial_ratio=0.0142
-q3 writer=bad S=8 J=128 p_rootfail=0.0 cfg=today_both_fixed illegal_raise_roots=23360 reaches_ding=9185 final[holds=0 red=22768 partial=330 not_judged=262] partial_why[combos:1,ambiguous:329] partial_ratio=0.0141
-q3 writer=bad S=8 J=128 p_rootfail=0.0 cfg=today_no_stop illegal_raise_roots=23360 reaches_ding=9185 final[holds=0 red=22765 partial=333 not_judged=262] partial_why[combos:3,ambiguous:330] partial_ratio=0.0143
-q3enum writer=bad S=8 J=128 p_rootfail=0.0 illegal slots_overwritten_since_the_raise=146341 covered=146341 NOT_COVERED=0 not_recognized=0
-q3stop writer=bad S=8 J=128 p_rootfail=0.0 illegal same=23360

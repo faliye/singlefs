@@ -1,4 +1,0 @@
-a607cb99eaece928d0bc9287eb40cb0c8c2e0d23bf8d2d28de416034e162bada  .claude/kb/decisions/26-后台整理与放置回收.md
-346813e6c253bcdf7d61b430dd3ae3977c926f508e0eb7b4e8a7b6fa8b80dc76  .claude/kb/milestone/04-fourth-txn.md
-9ba1f7d9999866c1e146395656ddf451fd2ca0c6984f782037dc4fdf7022d1cb  .claude/kb/mount-parameters.md
-bdc6ccc6103c89199ec3ffe796aba411855139ed44c86dc9e8c70aaeff0704cd  .claude/kb/checks-owed.md

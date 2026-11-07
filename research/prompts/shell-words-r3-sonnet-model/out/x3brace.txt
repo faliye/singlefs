@@ -1,6 +1,0 @@
-r2 seq 种子 3 共 1500 条（去重、bash 能跑的），不同： {'shell_tokens': 12, 'brace_sequence': 12}
-    ('shell_tokens', 'q{100..09..-2}r', ['q100r', 'q098r', 'q096r', 'q094r'], ['q100r', 'q98r', 'q96r', 'q94r'])
-    ('brace_sequence', 'q{100..09..-2}r', ['q100r', 'q098r', 'q096r', 'q094r'], ['q100r', 'q98r', 'q96r', 'q94r'])
-r2 mix 种子 4 共 3000 条（去重、bash 能跑的），不同： 无
-now seq 种子 3 共 1500 条（去重、bash 能跑的），不同： 无
-now mix 种子 4 共 3000 条（去重、bash 能跑的），不同： 无

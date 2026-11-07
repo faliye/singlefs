@@ -1,0 +1,21 @@
+# 逐写独立判第二轮攻方腿的原型（报告 research/prompts/per-write-judging-r2-opus-output.md）。
+# 自己一个 workspace，不进仓根的 workspace；path 依赖由 tools/rerun.sh 或手搭时把 @TREE@ 换成一棵仓树（冻结副本）的绝对路径。
+[package]
+name = "per-write-judging-r2-attack"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+singlefs-checker = { path = "@TREE@/crates/singlefs-checker" }
+singlefs-core = { path = "@TREE@/crates/singlefs-core" }
+singlefs-format = { path = "@TREE@/crates/singlefs-format" }
+singlefs-verification = { path = "@TREE@/crates/singlefs-verification" }
+
+[profile.release]
+opt-level = 3
+debug = true
+overflow-checks = true
+debug-assertions = true

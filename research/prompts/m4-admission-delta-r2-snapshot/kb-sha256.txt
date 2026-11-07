@@ -1,3 +1,0 @@
-1cc88698299ea57eb15ac65c51da414f74a23188fb83d3c17bf8a9295734fd90  .claude/kb/decisions-history.md
-83427662ba8e9d3f0c0e1d7f5a4c2b6dd5cb65b324b9df045eab0d04ebd7e0fb  .claude/kb/decisions/08-核心索引结构.md
-bd36fa955cf594636dd5584dd5cf69ca35a29767ff01ac3c9216cdc834409845  .claude/kb/decisions/28-挂载期承诺量.md

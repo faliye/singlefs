@@ -585,6 +585,237 @@ Q1 撤项那一格与 Q2 不动：Q1 撤项那一格仍是 Z12 重跑之后三�
 
 没有开着的行。
 
+### 修订 10（2026-11-06，实验设计员；第 2 次重跑已照修订 9 收尾、现状整表段不跑；这一条只改已冻结装置里两份单元脚本取线程的写法，写这一条时装置一处没改、单测与门禁一条没跑）
+
+依据：
+- 用户 2026-11-05 原话，`records/2026-11-05-删轻型并入重型.md` 第 338 行整行：「- 用户：「除了变异哪个 需要用线程来控制内存大小的。 其他的全部应该给 31线程」「变异给 31线程的话 内存oom ，因此限制了变异的线程。但是其他的不是这样分配的内容不应该这样做。」」
+- 登记位 `.claude/heavy-thread-default` 文件头第 2 行与第 4 行：「# 取法：shell 经 scripts/hosts/heavy-threads.sh 的 heavy_thread_default，python 经 scripts/hosts/heavy_threads.py 的 default_heavy_threads，」「#   SINGLEFS_THREAD_CAP 设了照它，脚本的参数给了照参数。双机时每台各取这一个数。」
+- 门禁 code-tooling 的 heavy-thread-defaults 格，任务 8521（`task-server/task log 8521 --all`）点名的两行原样：
+  「scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh:275  读自己的线程变量 THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「--lanes 1 --threads "$THREADS" --output-root "$REPO/$DUMPS/empty-control-$slug$TAG" "$@"」」
+  「scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_8.sh:224  读自己的线程变量 THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「--lanes 1 --threads "$THREADS" --output-root "$REPO/$DUMPS/empty-control-$slug$TAG" "$@"」」
+  同一格另七处点名的是别的实验装置、验证包里两份测试与排除表，不归这一条。
+- 派发提示（批次 `records/2026-11-05-删轻型并入重型.md#并包`）：用户 2026-11-06 弹窗定「另开登记修订」，这一件只写登记修订、不起重跑。
+
+第一至十一节、修订 1–9 原文一字不改；判据、阈值、作废与停机条款一个没动，第六、七、九节每一条的去留与报告方式不动；没有收严判据，也没有补臂。本条是跑法（装置取线程的写法），外加一条补实现的单测（第 10.6 条）。现状整表段照修订 9 第 9.1 条仍不跑，这一条不重开它。
+
+10.1 **这一条替掉的原句**（原文照留，只对下面两份单元脚本取线程那一处与它们的文件头失效）：
+   - 修订 5 第 5.5 条末句：「修订 8 单元脚本 `segment_one_unit_revision_8.sh` 不改（修订 11 单元编排起的是修订 11 那一份）。」
+   - 修订 7 第 7.2 条第三点末句：「单元脚本只改文件头一句说明。」
+   - 修订 8 第 8.2 条第四点末句：「修订 8 那一份单元脚本由单元编排起，环境里已经是分到的数（等于 `THREADS`），只删包装。」
+   - 研究目录 `segment_one_units_revision_11.py` 文件头第 5 行「segment_one_units_revision_8.py 与单元脚本 segment_one_unit_revision_8.sh 一个字节不改」（出自第 1 次重跑登记修订 11 第 11.10 节「修订 8、10 的文件一个字节不改」）：对单元脚本那一半，这一条之后不再成立。
+
+10.2 **改什么**（两份同改，执行员照做）：
+   - `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_8.sh`（此刻 376 行，sha256 `58981365aea4a056a5c5aa819db58c5a1bbde27f61daaea91b77ee8fb1b7e81e`）与同目录 `segment_one_unit_revision_11.sh`（此刻 457 行，sha256 `3fa8f3b8f85b47c69015b4fea2daa61c6490090a3933eed0176f7c9b2c800435`）：在 `UNIT=${1:?要单元名}` 与 `cd "$REPO" || exit 2` 两行之间（两份都是第 17、18 行）插两行，字面照抄：
+
+     ```bash
+     source "$(dirname "${BASH_SOURCE[0]}")/../../hosts/heavy-threads.sh" || exit 2
+     THREADS="$(heavy_thread_default)" || exit 2
+     ```
+
+     第二行后面可以接一句行尾注释（写明「取每台默认重活线程数；单元编排起的单元里 SINGLEFS_THREAD_CAP 就是它分到的数」），注释不许写在这一行前面、也不许把 `|| exit 2` 换成别的写法（理由在第 10.3 条第三点）。
+   - 读 `$THREADS` 的几处一个字不改：修订 8 那一份第 224 行（第 4 步十个空变异对照的逐行驱动 `--threads`）、第 264 行（第 5、8 步冻结执行器的工作线程）；修订 11 那一份第 275、321 行（同上两处）与第 431 行（RP2 那一趟的 `--threads`）。插两行之后行号各加 2。
+   - 两份文件头跟着改成真话：修订 8 那一份第 5–6 行「判法、阈值、线程一个字不动（…线程数变量由单元编排设成这个单元分到的线程，等于 THREADS…）」、修订 11 那一份第 4 行「判法、阈值、线程那几行一个字不动 … 里面各进程读到的上限就是 THREADS」，改成「判法、阈值一个字不动；线程取每台默认重活线程数（`scripts/hosts/heavy-threads.sh` 的 `heavy_thread_default`，第 2 次重跑登记修订 10），单元编排起的单元里 SINGLEFS_THREAD_CAP 是它分到的数，取到的就是那个数」这一意思；两份第 13 行「环境：」里的 `THREADS` 注明「编排照旧给，这一份不读」。
+   - `segment_one_units_revision_11.py` 文件头第 5 行那半句改成真话：括号里接一句「修订 10 把两份单元脚本取线程那一处改成取每台默认重活线程数」。代码不改。
+   - 不改的：`segment_one_units_revision_8.py`、三份逐行编排、`reuse_library.py`、`frozen_o3.py`、`row_driver.py`、四份跑法脚本、各张变异表。
+
+10.3 **为什么这样改**：
+   - **取到的数与改前在真跑里相同**（读代码，量的是文件内容）：单元编排起单元时 `segment_one_units_revision_8.py` 第 424 行设 `THREADS=str(unit.threads)`，第 448 行 `env=within_share(unit.threads, environment)`；`within_share`（第 375–377 行）调同目录 `frozen_o3.py` 第 302–306 行 `thread_environment`，把第 51–55 行 `CHILD_THREAD_VARIABLES` 二十个变量（含 `SINGLEFS_THREAD_CAP`）都设成分到的数；`heavy_thread_default` 在 `SINGLEFS_THREAD_CAP` 设了时照打它（`scripts/hosts/heavy-threads.sh` 文件头「判法」）。所以单元里改前读到的 `THREADS` 与改后取到的值，都等于这个单元分到的数（第 4、5、8 步与 RP2 都是读数单元，额度 31 时各 10，`unit_table` 第 126 行）。这也就是用户那句里「给 31 线程」在单元这一层的样子：任务拿到登记的 31，单元里不再有脚本自己的线程变量，取的都是登记位那一条路。
+   - **为什么不留 `THREADS="${THREADS:-$(heavy_thread_default)}"`**：那样照旧读脚本自己的线程变量，派发提示与门禁的出路都是取登记位；外面给了 `THREADS` 就盖过登记值，与 `.claude/heavy-thread-default` 第 4 行只认 `SINGLEFS_THREAD_CAP` 与脚本参数不合。
+   - **为什么是这个字面**：门禁那一格把「同一份文件里在行首赋过值、右边不读它自己」的 shell 变量当文件内的局部变量，读它不算读环境（`.claude/gate.d/code-tooling.sh` 第 4610 行注释，正则在第 4870–4871 行 `SHELL_ASSIGNMENT`）。设计时拿那两行正则对第二行试过：认出 `name='THREADS'`、`rhs='"$(heavy_thread_default)" '`、右边不含 `THREADS`（量的，第 10.8 条第二条命令）。写成 `if ! THREADS=…`、`local THREADS=…` 以外的前缀、或把赋值放进函数里，都可能不再算行首赋值，照红。
+   - **为什么照脚本自己的位置 source、并且在 `cd "$REPO"` 之前**：单测与自证给的 `REPO` 是假仓（`test_revision_8.py` 第 338 行 `REPO=self.scratch`），里面没有 `scripts/hosts/`；`heavy-threads.sh` 按它自己所在的位置往上两级找登记文件（文件头「判法」）。`BASH_SOURCE[0]` 可能是相对路径，`cd` 之后就指错。研究一侧变异驱动的副本（修订 5 第 5.2 条）里 `scripts/hosts` 链回真仓，照样取得到。
+   - **为什么取不到就退 2**：`heavy_thread_default` 拒的时候自己往标准错误写 ✗ 与 →、返回 2（`heavy-threads.sh` 文件头）；单元退非 0 就是这个单元红（两份文件头第 3 行），不退回别的数。
+
+10.4 **对已有产物、T 与逐行限时的影响**：
+   - **已有产物与结论：没有影响**。`research/results/` 里没有一份产物出自这两份单元脚本：第 2 次重跑的现状整表段没跑（修订 9 第 9.1 条），第 1 次重跑修订 8 那一趟从没跑过（第四节第 4 条），修订 11 是叠在那一趟上的一层。第 1 次重跑修订 6 那一趟的产物出自 `run_segment_one_on_the_revision_6_tree_multi_host.sh`（脚本里自己写死 `THREADS=10`，修订 8 第 8.2 条第四点），这一条不碰它。第 2 次重跑的 Q1 撤项那一格（甲）与 Q2（有）出自名单核对与三份撤项核算（修订 3 第 3.1 条、修订 9 第 9.5 条），与单元脚本无关。
+   - **T（修订 7 第 7.3 条）：不变**。T 是第 7 步那个单元的进程挂钟；第 7 步走 `device_step`，不读 `$THREADS`（读它的只有第 10.2 条列的第 4、5、8 步与 RP2），装置读的是编排经 `within_share` 设进环境的线程数变量（10）。这一条不碰编排，第 7 步分到 10、经同一条路落到装置，量法照旧。
+   - **逐行限时 max(1800 秒, 3T)：不变**。逐行驱动每道 5 线程由逐行编排定（修订 7 第 7.2 条第二点 `rows_threads`、`allocate`），不经单元脚本；T 不变，比例 10 : 5 照旧。
+   - **真跑里第 4、5、8 步与 RP2 读到的数：不变**（第 10.3 条第一点）。
+   - **会变的只有不经 `within_share` 起单元脚本的地方**：
+     1. 单元编排的 `plan`（`segment_one_units_revision_8.py` 第 701–705 行）只用 `unit_environment` 的环境、不套 `within_share`。改前各单元打出的命令里第 4 步驱动 `--threads`、第 5、8 步执行器的工作线程、RP2 的 `--threads` 是 10（`THREADS`）；改后是 `plan` 那一条任务自己的 `SINGLEFS_THREAD_CAP`（经服务起是登记的 31），与真跑分到的 10 不同。`plan` 第 671 行那句「每个读数单元分 10 线程」照旧。`plan` 只打命令、不出读数，不进任何判据；要它打得与真跑一样，得改 `segment_one_units_revision_8.py` 并连着重钉，不在这一条（第 10.7 条第 2 项）。
+     2. 自证与单测里直接起单元脚本、设了 `THREADS` 而没设 `SINGLEFS_THREAD_CAP` 的几处（`test_revision_8.py` 第 339 行、`segment_one_units_revision_11.py` 第 523 行的 `THREADS="1"`，`segment_one_units_revision_8.py` 自证格 `unit-script-commands` 经 `unit_environment` 给的 10）：改后取的是它们所在环境的 `heavy_thread_default`。读过它们的断言（`test_revision_8.py` 第 343–345 行、`cell_unit_script_commands` 的期望表、`real_script_step_1` 只交回退出码与读数），没有一条核单元脚本打出的线程数，推的：照旧绿；由第 10.8 条的命令坐实。
+   - **研究一侧变异表的产物：推的不变**。变异驱动只在研究目录的 `.py`（不含 `test_` 开头的）里找锚点（`mutation_driver.py` 第 49–51 行 `source_files`），单元脚本不是变异对象；结果行只有 `outcome` 与 `unit_test_exit`（第 151 行），第 10.6 条加的用例不改哪一条变异抓没抓到。
+
+10.5 **要改的文件与要重钉的值**（执行员改、重钉；值都在改完之后照 `sha256sum` 现算，写进这一节的接续修订或交回报告）：
+
+| 文件 | 改前 sha256 | 改什么 | 钉它的地方与要重钉的值 |
+|---|---|---|---|
+| `segment_one_unit_revision_8.sh` | `58981365aea4a056a5c5aa819db58c5a1bbde27f61daaea91b77ee8fb1b7e81e` | 第 10.2 条两行与文件头 | 没有按 sha256 钉它的地方（研究目录、`replay.sh`、`.claude/gate.d/`、`.claude/hooks/`、`scripts/mutation/` 里 `grep` 改前 sha256 前 16 位 0 处）；`revision_8_placeholders.py` 第 74 行 H17 必登清单只列它的名字，`revision_8_placeholders.json` 的 H17 `files` 是 `null`（修订 9 第 9.4 条），没有值要重钉 |
+| `segment_one_unit_revision_11.sh` | `3fa8f3b8f85b47c69015b4fea2daa61c6490090a3933eed0176f7c9b2c800435` | 同上 | `revision_11_placeholders.json` 第 18 行 H31 的这一项 → 改后的 sha256 |
+| `segment_one_units_revision_11.py` | `67082bfbb0b2db000111b33b5e90ada23eac8c199d2a9c57897edd7877228e18` | 文件头第 5 行半句（第 10.2 条） | `revision_11_placeholders.json` 第 17 行 H31 的这一项 → 改后的 sha256；它不在 `reuse_library.py` 第 1895–1900 行 `PIN_SITES` 的被钉文件里，没有一串要连着重钉 |
+| `test_revision_8.py` | （不钉） | 第 10.6 条的用例 | 不在 H31，也没有按 sha256 钉它的地方 |
+| `revision_11_placeholders.json` | （不钉） | H31 两项 | 没有按 sha256 钉它的地方 |
+
+   H31 其余八项不动：2026-11-06 现算十项都与登记值相同（量的，第 10.8 条第三条命令）。改完照同一条命令再算一遍，十项都 `same` 才算重钉完。`segment_one_units_revision_8.py`、三份逐行编排与 `reuse_library.py` 都不改，冻结层的六个钉值（修订 8 第 8.6 条）不动。
+
+10.6 **补一条会红的单测（补实现，判据不动）**：`test_revision_8.py` 加一个用例类，起两份真单元脚本、`PRINT_ONLY=1`，环境照 `segment_one_units_revision_8.py` 自证格 `unit-script-commands` 的造法（`fake_world`、`settings_from_config`、`unit_table`、`unit_environment`；修订 11 那一份另给它要的 `REUSE_*` 几个），再把 `THREADS` 设成 10、`SINGLEFS_THREAD_CAP` 设成 7：
+   - 两份的 `step-4-o1-comparison` 打出的驱动命令里有 `--threads 7`、没有 `--threads 10`；
+   - 两份的 `step-5` 打出的 `frozen_o3.run_executor(…)` 那一条，按 `show` 的 `printf %q` 打法解开（`shlex.split`）之后工作线程那一位是 7；
+   - 修订 11 那一份的 `reuse-selfproof` 打出的命令里有 `--threads 7`；
+   - 另一格 `SINGLEFS_THREAD_CAP=abc`：两份都退 2、标准输出里没有一行以 `  $ ` 起头、标准错误里有 ✗。
+   用例名写场景（例：`test_unit_scripts_take_the_thread_count_from_the_registered_default_not_from_their_own_variable`、`test_unit_scripts_stop_with_exit_2_when_the_registered_default_is_refused`）。
+   **证红**：在一份仓副本里放新用例、单元脚本留改前那两份，跑这几条必须红：改前打的是 `--threads 10`、`abc` 那一格退 0。单元脚本是 `.sh`，研究一侧变异驱动改不到它，这一组的判别力靠这一次证红，不加变异行。
+
+10.7 **这一条没定、交主 agent 的两项**：
+   1. **用户那句管不管修订 7 的进程内分法**。用户原话的后半「变异给 31线程的话 内存oom ，因此限制了变异的线程。但是其他的不是这样分配的内容不应该这样做」，可以读成也管单元编排在一条任务里分额度的那一套：读数单元各分 10（`segment_one_units_revision_8.py` 第 95 行 `READING_UNIT_THREADS`）、逐行驱动每道 5、逐行编排分 5 × ⌊额度 / 5⌋（修订 7 第 7.2、7.3 条，主 agent 定的 T 的量法）。这一条不动它，单元里取到的仍是分到的 10。要改成每个单元各拿 31，是另一条修订：改 `segment_one_units_revision_8.py`（`segment_one_units_revision_11.py` 的 `UNITS_R8_SHA256` 钉它，要连着重钉、H31 重填），T 改在 31 线程上量，max(1800 秒, 3T) 依据的 10 : 5 比例没了，三个读数单元也不能在一条 31 线程的任务里同时跑。第 2 次重跑已收尾，这件只在这套装置再被用起来时才有后果。
+   2. **`plan` 打出的线程与真跑不同**（第 10.4 条第 1 项）。要一致，把 `segment_one_units_revision_8.py` 第 702–704 行起单元脚本的环境也套 `within_share(units[name].threads, …)`，连着重钉 `UNITS_R8_SHA256`、重填 H31，重跑盯这份文件的两张研究一侧变异表（修订 8 那张与第四张）。这一条不做，只记下差别。
+
+10.8 **执行员照做的次序与交主 agent 的验证**：
+   - 次序：`python3 scripts/agents/copy-originals.py copy <草稿目录> <三份要改的文件> <test_revision_8.py> <revision_11_placeholders.json>` 留改前那几份 → 照第 10.2 条改两份单元脚本与 `segment_one_units_revision_11.py` 文件头 → `bash -n` 两份单元脚本 → 加第 10.6 条用例 → 照第 10.5 条重算 sha256、填 H31 两项 → 照下面第三条命令核十项都 `same`。
+   - 交主 agent 的（执行员写进「要主 agent 跑的命令」，子 agent 不交任务）：门禁 `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-tooling 的 heavy-thread-defaults 格; 范围=1 格; 为什么=三oracle合谋测试第 2 次重跑登记修订 10 改了两份单元脚本取线程的写法，只核这一格不再点名这两份' task-server/task submit -- bash .claude/gate.d/code-tooling.sh --check heavy-thread-defaults`，判法：日志里没有一行点名 `segment_one_unit_revision_8.sh` 或 `segment_one_unit_revision_11.sh`（这一格可能因别的装置照旧红，那几处不归这一条）；研究目录里 `python3 -B -m unittest test_revision_8 test_revision_11 test_thread_shares`（`--cwd` 给研究目录），末行 `OK`；`segment_one_units_revision_8.py --selftest` 与 `segment_one_units_revision_11.py --selftest` 末行「红 0」；第 10.6 条的证红（仓副本里单元脚本是改前那两份，新用例红在 `--threads 7` 与 `abc` 退 2 那几条断言上）。
+   - 不用跑的：现状整表段、两段干跑、`stream-constants`、各张变异表（第 10.4 条末项，推的不变；提交时照准入另判）。
+
+**设计这一条时读过的文件与跑过的命令**（2026-11-06，HEAD `ff5dca7d22b1c6f95b2ac64a8c79e0467d580d1c`，研究目录与本登记 `git status --porcelain` 为空）：
+- `.claude/agent-common.md`「规则怎么读」「写」「不做」三节；规则整份：`.claude/singlefs-ai-sop/rules/test-discipline.md`、`.claude/rules/three-way-inference.md`、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`、`.claude/rules/mutation-sampling.md`、`.claude/rules/implementation-first.md`、`.claude/rules/test-script-discipline.md`。
+- 本登记第 1–639 行（整份）；`research/prompts/e171-r1-prereg.md` 只有 `grep -n '一个字节不改'` 命中的第 1751、1843、1981、2032、2347、2448 行；`research/prompts/e200-preregistration.md` 第 1–8、112–120 行与 `grep -n '线程'` 命中行。实验页、`research/results/` 下产物的内容都没读（只列了文件名）。
+- `.claude/heavy-thread-default`（整份）、`scripts/hosts/heavy-threads.sh`（整份）、`scripts/hosts/capped.sh` 第 1–60 行里 `grep` 命中的第 8–38 行；`.claude/gate.d/code-tooling.sh` 第 4600–4625、5090–5160 行与 `grep` 命中的第 4764、4868–4873 行；`.claude/hooks/run-scope-guard.sh` 第 1–40 行；`.claude/hooks/agent-write-scope.tsv` 第 1–27 行；`.claude/hooks/selftest-temporary-service.tsv` 第 1–12 行；`.claude/gate.d/counted-claims.tsv` 第 1–15 行；`.claude/gate.d/doc-experiments.sh` 里 `grep '修订'` 命中行；`records/2026-11-05-删轻型并入重型.md` 第 330–350 行与 `grep` 命中行；`records/2026-10-19-里程碑四GPU垃圾回收开工.md` 第 862 行（`grep` 命中）。
+- 研究目录：两份单元脚本第 1–40 行与第 200–280 行附近、`grep 'THREADS'` 命中行与 `case` 表；`revision_11_placeholders.json`（整份）；`segment_one_units_revision_8.py` 第 120–130、370–380、415–430、690–712、975–1010 行与 `grep` 命中行；`segment_one_units_revision_11.py` 第 1–12、425–440、505–535 行；`frozen_o3.py` 第 51–58 行与 `grep` 命中的第 302–306 行；`test_revision_8.py` 第 325–360 行；`mutation_driver.py` 第 45–75 行与 `grep` 命中行；`reuse_library.py` 第 1868–1910 行与 `grep` 命中行；`scripts/experiment-apparatus/replay.sh` 第 3215–3265 行。
+- 命令：`bash scripts/hosts/work-directory-ownership.sh claim <草稿目录> --purpose …`；`task-server/task log 8521 --all`（落进草稿目录 `task-8521.log`，46 行）；`sha256sum`、`wc -l` 两份单元脚本与占位文件；`grep -rn '<两份单元脚本改前 sha256 前 16 位>'` 与 `grep -rln 'segment_one_unit_revision_8\.sh\|segment_one_unit_revision_11\.sh'`（研究目录、`replay.sh`、`.claude/`、`scripts/mutation/`、`crates/`、`research/prompts/`）；H31 十项现算（`python3 -I -c` 读 `revision_11_placeholders.json`、逐项 `hashlib.sha256`，十项 `same`）；拿门禁第 4764、4870–4871 行的正则在 `python3 -I -c` 里试第 10.2 条第二行（`'THREADS' '"$(heavy_thread_default)" ' False`）；`TZ=Asia/Tokyo date +%F`（2026-11-06）。没跑项目代码，没往统一任务服务交任务。
+
+### 修订 11（2026-11-06，实验设计员；第 2 次重跑已照修订 9 收尾、现状整表段不跑；这一条改已冻结装置里单元编排与两段逐行编排在一条任务里分线程的写法，让单元编排的 plan 与真跑取同一个数，并给逐行限时的「超时」一类加一道读数门槛；写这一条时装置一处没改，单测、自证、变异与门禁一条没跑）
+
+依据：
+- 用户 2026-11-05 原话，`records/2026-11-05-删轻型并入重型.md` 第 338 行整行：「- 用户：「除了变异哪个 需要用线程来控制内存大小的。 其他的全部应该给 31线程」「变异给 31线程的话 内存oom ，因此限制了变异的线程。但是其他的不是这样分配的内容不应该这样做。」」
+- 用户 2026-11-06 弹窗，同一份记录第 622 行整行：「- E171 修订 10 写好（e171-r2-prereg.md 第 588–672 行，两份分段脚本改取登记线程数，要重钉 H31 两项）。弹窗定案：修订 7 的进程内分线程（读数单元各 10、每道 5）「也改成 31，另开修订」，派设计员写修订 11（e171-thread-amendment-11），同时让 plan 与真跑取同一个数。两条修订齐了再派一个执行员一起改装置、重钉。batch-scope 里这几份是旧批次，本批的范围要加。」
+- 登记位 `.claude/heavy-thread-default` 第 7 行：「31  # 用户 2026-10-12 定：所有重活默认每台 31 线程，双机两台各 31、合计 62，给了参数照参数；机器忙时也固定 31、不看忙闲（records/2026-10-12-里程碑三工具与治理批.md）」。准许按内存上限定并发的入口表 `.claude/memory-bounded-parallelism.tsv` 非注释行只有 1 行（`.claude/gate.d/crates-mutation-replay.sh`）。
+- 修订 7 依据里转述的服务那一层的写法（第 468 行）：「(b) 每个单元各要吃满一台的，拆成服务的分片子任务 …；串着跑也合规」。
+- 修订 10 第 10.7 条交主 agent 的两项（前一件设计员的报告 `~/.local/share/singlefs/work/e171-thread-amendment/result.md`「待主 agent 认的项」第 1、2 条），这一条把两项都定了。
+
+第一至十一节、修订 1–10 原文一字不改。照 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」的三步：没有失败条款打中，「记一次输」不适用；各行判甲判乙的条件、阈值、作废条款与已有的停机条款一个不动；收严两处（第 11.4 条读数门槛、第 11.5 条停机条款），各自写明收严在哪；其余是跑法（修订 7 自己把线程分法记为「本条都是跑法，判据不动」）。现状整表段照修订 9 第 9.1 条仍不跑，这一条不重开它；后果只在这套装置再被用起来时出现（第 11.9 条点名的 E200）。修订 10 与这一条由同一个执行员一次改完、一次重钉。
+
+11.1 **替掉的原句**（原文照留，只对线程那几处失效）：
+   - 修订 7 第 7.2 条：第一点从「读数单元各分 10」到「一个都放不下退 78」那几句；第二点「分 5 × ⌊额度 / 5⌋（`rows_threads`；额度 31 分 30，除不尽的 1 不给），它照分到的数排线道（`rows_orchestrator.py` 的 `allocate` 原样：30 → 6 道、每道 5）」；第四点「每台槽数 × 每槽线程 = ⌊额度 / 5⌋ × ⌊额度 / 槽数⌋ ≤ 额度（`allocate`，原样）」；第五点「读数单元各分 10，不吃满一台」那半句。
+   - 修订 7 第 7.3 条整条（T 在 10 : 5 上量、第 7 步与第 9 步和第 3 步带流三那一项同时起、入库记 `threads=10`、单测钉比例）。
+   - 修订 10 第 10.4 条第二点「T（修订 7 第 7.3 条）：不变」、第三点「逐行限时 max(1800 秒, 3T)：不变」、「会变的只有不经 `within_share` 起单元脚本的地方」那一点第 1 项里「`plan` 第 671 行那句「每个读数单元分 10 线程」照旧」与「要它打得与真跑一样……不在这一条」；第 10.5 条末段「`segment_one_units_revision_8.py`、三份逐行编排与 `reuse_library.py` 都不改，冻结层的六个钉值（修订 8 第 8.6 条）不动」；第 10.7 条两项。
+   - 研究目录三处文件头：`segment_one_units_revision_8.py` 第 23–26 行、`rows_orchestrator.py` 第 31 行「每台槽数 = ⌊每台线程 / 5⌋；每槽线程 = ⌊每台线程 / 槽数⌋（≥ 5：原跑法每道 5，限时基线在这个量级上量的）」、`rows_orchestrator_segment_two.py` 第 31–34 行里「每槽 5 线程起，槽数 = ⌊每台线程 / 5⌋」那几句，改成第 11.2 条的真话。
+
+11.2 **每个单元、每条线道各取多少线程**。额度 Q：这一条任务（第二段：那一片）的 `SINGLEFS_THREAD_CAP`，没设取登记值；取法原样（`segment_one_units_revision_8.py` 第 344 行 `registered_threads`、`rows_orchestrator.py` 第 260 行 `registered_host_threads`，都经 `scripts/hosts/heavy_threads.py` 的 `default_heavy_threads`），服务起的任务里 Q 就是登记的 31。
+   - **第一段每个单元都取 Q**：32 个读数单元、Z1 与 Z7 两个小单元、`research-mutations`、修订 11 那一层的 RP2 自证单元（`segment_one_units_revision_11.py` 第 123 行）。`fits`（第 359 行）不改：在跑的合起来加上要起的不超过 Q，所以同一时刻本机至多一个单元在跑；队首照旧 `step-7`（`queue_order`，第 166 行），之后照推的用时从长到短一个接一个起。`research-mutations` 也取 Q：用户那句的例外是「需要用线程来控制内存大小的」变异，入口表里只有 `crates-mutation-replay.sh`，研究一侧变异驱动只跑 Python 单测、不在表里。
+   - **第 11–13 步的逐行编排**照旧等要跑的单元全部绿、一个都不在跑才起（`rows_may_start` 原样），环境里线程数变量都设成 Q（不再去除不尽 5 的余数）。
+   - **线道**：每台一槽，那一槽的线程 = 那一台的每台线程（`allocate` 交回槽数 1、每槽线程 = 每台线程；每台线程为 0 的记 0 槽，「线程不够一条线道」那一支照旧退 78）。第一段第 11、12 步同一个队列，在编排那一台上一次一行；第 13 步单线道照旧取每台线程（`single_lane_host` 原样）。第二段每台一片一槽，本机与转交到别的台的驱动都是 `--lanes 1 --threads <那一台的每台线程>`；修订 10 那一层本机闸没开时本机记 0 槽（`allocate_behind_the_local_gate` 原样）。
+   - **重报**（第一段 `run_carry`、第二段 `run_carry_two`）取每台线程。前提：重报在那一步的队列收完之后才起（第一段 `merge_step` 在 `run_queue` 交回之后调，第二段 `merge_step_two` 在 `run_queue_two` 交回之后调）；执行员读调用处核，核出来会与一条线道同时跑的，停下交回，不自己改派法。
+   - **写法（以登记值为准、不写死）**：删 `segment_one_units_revision_8.py` 第 95–98 行 `READING_UNIT_THREADS`、`SMALL_UNIT_THREADS`、`ROW_LANE_THREADS`，`rows_orchestrator.py` 第 118 行 `LANE_THREADS_MINIMUM`、第 121 行 `CARRY_THREADS`；单元的线程在 `unit_table` 里取 `registered_threads()`（与 `local_budget` 同一个数），`rows_threads` 删掉、`rows_environment` 直接用 Q。新写的代码里不出现 31、10、5 这类线程字面，只喂假世界的自证样本（`rows_orchestrator.py` 的 `SAMPLE_HOST_THREADS`、`rows_orchestrator_segment_two.py` 的 `SAMPLE_THREAD_CAP`、各格的 `thread_cap=`）除外。三处文件头（第 11.1 条末项）、`plan` 第 671–673 行与 `run` 第 558–559、605–606 行的日志句、`rows_orchestrator.py` 第 285、1162 行与 `rows_orchestrator_segment_two.py` 第 857 行「每槽要 5 线程」的报错句跟着改成真话；`rows_orchestrator_segment_two.py` 第 733 行改读重报的新取法。
+   - **弄坏开关**：`rows_orchestrator.py` 的 `slots-ignore-lane-minimum`（第 72–73 行，红在 `allocation-threads`、`allocation-registered`）换成 `slots-split-by-five`（照改前按每槽 5 线程分槽；红在同两格），`BREAK_SWITCHES`（第 140 行）与 `SWITCH_CELLS`（第 1891 行）同改。单元编排的 `threads-ignored` 与 `dependency-ignored` 两条开关红的格里去掉 `e2e-no-room`（第 11.7 条删这一格）；`threads-ignored` 仍要红在 `allocation-threads`（不看额度时三个单元在零时刻一起起）。
+
+11.3 **T 怎么重新量**：
+   - T 的定义不改：第 7 步单元的进程挂钟（第 1 次重跑登记修订 2 第 2.5 节、修订 8 第 8.4 节），进程挂钟要包住各流 `elapsed_ns` 之和才算（原样）。变的是量它的条件：第 7 步取 Q（登记的 31），按第 11.2 条本机同一时刻只有它一个单元在跑。第 7 步计时产物末行 `E7TIMING name=concurrent_units_during_step_7` 应写 `units=none`（`finish_unit` 原样追加，只描述，不进判定；不是 `none` 走第 11.5 条）。
+   - T₂（第二段，第 1 次重跑登记修订 10 第 10.1 节）的定义同样不改：第 1 步单元的进程挂钟；第 1 步取 Q，它本来就在第 0、1、2、2b 步那条链上依次跑。
+   - 这两个数在这一条的跑法上都还没有读数：修订 8 那一趟从没跑过，第 2 次重跑的现状整表段不跑。
+
+11.4 **逐行限时的依据怎么重写（收严一处：「超时」一类的读数门槛）**：
+   - **杀进程的限时不改**：逐行驱动照旧以 max(1800, ⌈3 × T⌉) 秒杀装置那一步，第 13 步超时重跑那一次再乘 3（`device_timing.py` 第 58 行 `row_time_limit_seconds`）。`device_timing.py`、`row_driver.py` 一个字节不改：E201（三oracle合谋今树整表） 的装置按路径 import 它们、计划那一步记它们的 sha256（`scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/e171_research_side.py` 第 19–22 行），它的登记 `research/prompts/e201-preregistration.md` 第 414 行写「按路径 import 或原样起，不改、不拷」。
+   - **旧依据不成立**：修订 7 第 7.3 条的依据是第 7 步 10 线程、每道 5 线程，比例 10 : 5。这一条之后第 7 步与每条线道都是 Q，比例 1 : 1，两边都独占本机。
+   - **新依据**：T 那一趟与每行装置那一步线程相同、本机上都只有它一个占线程的进程，两边之比只剩坏实现行自己多出的写数、段数与取样态数——第 1 次重跑登记修订 2 第 2.5 节「3 倍不从任何一行的读数来：坏实现行会让写数、段数与取样态数跟着变，两条线道并跑会互相抢核」的前半句；后半句「两条线道并跑会互相抢核」在一台一槽下不再有。
+   - **只留 3T 会放宽（推的）**：装置用时按 n^(−a) 随线程数 n 变，a 没量过，取 0 ≤ a ≤ 1。修订 7 的跑法下，一行的杀进程限时与它在同样条件下预期用时之比是 3 × (5 / 10)^a = 3 × 2^(−a)，在 1.5 与 3 之间；这一条的跑法下若只留 3T，这个比恒为 3。a > 0 时比修订 7 宽，落进超时一类的行更少；第 1 次重跑登记修订 2 第 2.5 节的修订表把限时变宽记成「对读法 5「超时」一类是放宽」。
+   - **所以另加读数门槛 R = max(1800, ⌈1.5 × T⌉) 秒**（第二段把 T 换成 T₂；1.5 = 3 × 5 / 10）。读法：
+     1. 第一段与第二段各行，行目录 `row-result.tsv` 里 `device_ns` 大于 R × 10⁹ 的（含被驱动以 253 杀掉的），记读法 5 的「超时」一类。
+     2. 第一段第 13 步重跑的那一次（`row-result.tsv` 里 `timed_out_before` 为真），门槛是 3R；两次都超过才记超时（第 1 次重跑登记修订 2 第 2.5 节「两次都超时才记」原样）。
+     3. `device_ns` 落在 R 与杀进程限时之间的行，编排不会让它进第 13 步（第 13 步只重跑 `device_exit=253` 的行，`rows_orchestrator.py` 文件头「第 13 步」），这种行第一次超过 R 就记超时。
+     4. 比对器（`segment_one_comparator.py`、`segment_two_comparator.py`，E201 照用）不改。判之前先列出照 1–3 记超时、而比对器当成判过的行（下称门槛行）：门槛行是空的，各格照比对器的判定词；不空，凡判定词的输入行里有门槛行的那一格报「不够判（逐行读数门槛）」并列出门槛行，不取比对器那一格的判定词。
+     列门槛行的命令（`<行输出根>` 是那一步的行输出根）：`grep -H -P '^(device_ns|device_exit|timed_out_before)\t' <行输出根>/row-*/row-result.tsv`，逐个行目录拿 `device_ns` 比 R × 10⁹（`timed_out_before` 为真时比 3R × 10⁹）。读的是驱动在进程起止取时刻算的 `device_ns`，不是转发循环里的到达时刻。
+   - **收严在哪**：a ≤ 1 时这一条的比 1.5 不大于修订 7 的 3 × 2^(−a)（a = 1 时相等）：修订 7 跑法下按读数算超时的行，在这一条跑法下照样超时；另多要求第 3 项那种行一次就记超时（原规则要两次）。下限 1800 秒照旧（第 1 次重跑登记修订 2 第 2.5 节「限时只升不降」说的是不低于原来的 1800 秒，这一层不动）。各行判甲判乙的条件一个不变。
+   - **前提与推翻条件（推的）**：a 在 0 与 1 之间，两边本机负载相当（修订 7 跑法下第 7 步跑时三个读数单元合 30 线程、逐行 6 道合 30 线程；这一条两边都是一个 Q 线程的进程）。量出 a > 1（多给线程超线性变快）时 1.5 比修订 7 宽，这一条的「收严」不成立，交主 agent。
+
+11.5 **停机条款「线道线程与 T 那一趟不等」（收严一处）**：
+   - 触发观测：第 7 步单元的日志行「▶ 单元 step-7 起（…）：N 线程」（`segment_one_units_revision_8.py` 第 450 行）里的 N，与第 11、12 步逐行驱动打的 `table lanes=1 threads_per_lane=M`（`row_driver.py` 第 769 行）里的 M 不等；或第 7 步计时末行不是 `units=none`。第二段同理比第 1 步单元的 N 与第二段各驱动的 M。
+   - 处置：第 11.4 条的读数门槛不适用，超时一类不判，交主 agent；不作废、不当结果，照 `.claude/rules/implementation-first.md` 第 4 条两边都查。
+   - 收严在哪：第 11.4 条的 1.5 只在两边同线程、同样独占本机时推得出；条件不满足就不判，不悄悄照比对器的超时一类判。
+
+11.6 **单元编排的 plan 与真跑取同一个数**（修订 10 第 10.7 条第 2 项）：
+   - `segment_one_units_revision_8.py` 第 702–704 行 `plan` 起单元脚本的环境，也经 `within_share(units[name].threads, …)`，与 `launch` 第 448 行同一个函数。这一条之后 `units[name].threads` 是 Q：`plan` 这条任务取 Q 与 `run` 起单元时设进环境的是同一个取法（`registered_threads`），单元脚本经修订 10 的 `heavy_thread_default` 读 `SINGLEFS_THREAD_CAP` 取到的也是它。
+   - 单测（`test_revision_8.py` 加一条）：`SINGLEFS_THREAD_CAP` 设成 7、`THREADS` 设成 10，`plan` 打出的第 4 步驱动 `--threads`、第 5 步执行器的工作线程、修订 11 那一份 RP2 的 `--threads` 都是 7，且等于 `launch` 设进环境的 `SINGLEFS_THREAD_CAP`（`subprocess.Popen` 换成只记命令的假件，同 `test_thread_shares.py` 第 55 行 `LaunchRecorder`）。证红：仓副本里 `unit_table` 退回改前（读数单元 10）、`plan` 留改前（不套 `within_share`），这一条要红在「`launch` 设的 10 ≠ `plan` 打的 7」。
+   - 等价变异留档：这一条之后「`plan` 起单元脚本不套 `within_share`」与原式在打出的线程上同值（两边都等于 `registered_threads()`），照 `.claude/singlefs-ai-sop/rules/test-discipline.md`「变异测试证明的是断言会红，不是覆盖」第 2 条记等价、不进变异表；等价性另写一条用例留档：同一个单元，`unit_environment` 的环境直接给单元脚本与套 `within_share(units[name].threads, …)` 之后再给，`PRINT_ONLY=1` 打出的三处线程逐字相同（`SINGLEFS_THREAD_CAP` 设 7 与不设两个取样点）。
+
+11.7 **单测、自证与变异跟着改的**（执行员照做；新用例名写场景）：
+   - `test_thread_shares.py`：第 86–94 行（第 7 步 10、每道 5 的比例）换成「第 7 步取额度，逐行编排每台一槽、那一槽线程等于额度」；第 96–100 行换成「每个单元（含 Z1、Z7、`research-mutations`）都取额度」，额度取 31 与 12 两个取样点；第 102–108 行（去余数）换成「逐行编排环境里的线程数变量等于额度、不去余数」（31 得 31、14 得 14）；第 117–125 行换成「额度 31 时同一时刻至多一个单元在跑，链尾那一刻起的只有 `step-7`」；第 127–133 行（余数给小单元）删，换成「本机一个都没在跑时哪个单元都放得下，有一个在跑时别的都放不下」（这一条抓第四张表的 R2P-45）；第 146–155 行期望改成两个单元的线程数变量都是 31；第 157–164 行期望改成 31；第 257–262 行改成「5 到 64 每个额度都是一槽、那一槽线程等于额度」；第二段两条（第 241–255 行）传进去的槽线程从 5 改成 31，断言照旧核驱动拿到的是传进去的那一槽的数。
+   - `test_default_threads.py` 第 52–60 行加一句：每台恰一槽、那一槽线程等于登记值。`test_revision_10.py` 第 141–147 行期望从 `([(1, 0), (2, 2)], [(1, 2), (2, 2)])` 改成 `([(1, 0), (2, 1)], [(1, 1), (2, 1)])`。
+   - `segment_one_units_revision_8.py` 自证：删「此刻一个单元都放不下」那一支（第 624–626 行；每个单元取的就是额度，本机一个都没在跑时总放得下，到不了）与格 `e2e-no-room`（第 937 行起，第 1018 行登记），第 627–628 行「还有单元没做完、却没有一个依赖齐了」那一支留着；格 `allocation-threads`（第 826 行）改成三个单元只放得下队首的 `step-7`；`e2e-two-rounds`（第 859 行）改成第 7 步计时末行写 `units=none`；`e2e-threads-within-quota`（第 955 行）里 `step-7` 与 `rows-run` 读到的上限都等于额度（第 974 行的 `"10"`）。修订 6 第 6.2 条当时做过同形的三处改动（原文照留，这里只借写法）。
+   - `rows_orchestrator.py` 自证：`allocation-threads`（第 1524–1525 行）期望改成两台各 `(1, 31)`；`allocation-short`（第 1526–1527 行）改成每台线程 0 时 `(0, 0)`；`allocation-registered`（第 1529–1532 行）期望改成 `(登记值, 1, 登记值)`。`rows_orchestrator_segment_two.py` 的自证假世界（第 122 行 `SAMPLE_THREAD_CAP = "10"`，注释「两槽、每槽 5 线程」）变成每台一槽 10 线程；要一台上两槽才判得出的格改到两台的假世界上判，判不出的格写进交回，不悄悄删。
+   - 第四张变异表 `scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_threads_and_contrast.tsv`（此刻 23 条）：R2P-39（原文 `READING_UNIT_THREADS = 10`）、R2P-40（`rows_threads` 去余数那一行）、R2P-43（`within_share(rows_threads(budget.threads), …)`）的原文随改动没了，换成同一意图、锚在新写法上的三条：单元不取额度（取一个固定数）、逐行编排的线程去掉除不尽 5 的余数、逐行编排不照额度起；另加一条「小单元不取额度」。R2P-45（`<=` 改 `<`）原文还在，由上面第一项新用例抓。`rows_orchestrator.py` 的分法照旧不进表（表头那一句的理由原样），由 `test_thread_shares` 与 `rows_orchestrator.py` 自证的 `allocation-*` 格盯。改完每条原文在研究目录里恰命中 1 次（修订 5 第 5.3 条 `anchor_hits.py` 那一种数法）。
+   - 修订 8 那张表（25 条，`…_revision_8.tsv`）：R8-18 的原文 `sum(item.threads for item in running) + unit.threads <= budget.threads` 照旧在，表不改；它盯的 `segment_one_units_revision_8.py` 改了，重跑。
+
+11.8 **要改的文件与要重钉的值**（修订 10 与这一条合起来一张；改前 sha256 是 2026-11-06 现算的，量的；改后的值照 `sha256sum` 现算，写进交回或接续修订）。研究目录 `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/`：
+
+| 文件 | 改前 sha256 | 改什么（出处） | 钉它的地方 → 要重钉的值 |
+|---|---|---|---|
+| `segment_one_unit_revision_8.sh` | `58981365aea4a056a5c5aa819db58c5a1bbde27f61daaea91b77ee8fb1b7e81e` | 修订 10 第 10.2 条 | 没有（修订 10 第 10.5 条） |
+| `segment_one_unit_revision_11.sh` | `3fa8f3b8f85b47c69015b4fea2daa61c6490090a3933eed0176f7c9b2c800435` | 修订 10 第 10.2 条 | H31 |
+| `segment_one_units_revision_8.py` | `b2d4c89a8e1a7c63c264d5841d4f5e3bedfe405df91d7fadf525229c71f7411f` | 第 11.2、11.6、11.7 条 | `segment_one_units_revision_11.py` 第 61 行 `UNITS_R8_SHA256` |
+| `segment_one_units_revision_11.py` | `67082bfbb0b2db000111b33b5e90ada23eac8c199d2a9c57897edd7877228e18` | 修订 10 第 10.2 条文件头半句；第 11.2 条第 123 行；`UNITS_R8_SHA256` | H31 |
+| `rows_orchestrator.py` | `d2ebaaaf914db01f384004676d9e127593c11d1796a4694b50924db38b2255c1` | 第 11.2、11.7 条（`allocate`、两个常量、文件头、报错句、开关、自证） | `cross_host_o3_check.py` 第 56 行 `ORCHESTRATOR_SHA256`；`rows_orchestrator_revision_8.py` 第 64 行、`rows_orchestrator_segment_two.py` 第 114 行 `SEGMENT_ONE_ORCHESTRATOR_SHA256`；`reuse_library.py` 第 454 行 `ORCHESTRATOR_SHA256` |
+| `cross_host_o3_check.py` | `7247276e8046551e18bbfe2a3402babfb3e4e8554f467bac56796c2e6975fc42` | 只换钉值 | `rows_orchestrator_revision_8.py` 第 66 行、`reuse_library.py` 第 457 行 `CROSS_HOST_CHECK_SHA256` |
+| `rows_orchestrator_segment_two.py` | `accb1cbd108660668b2180b4f4e8b847c24140b85229c41e12c35d43d41cebd3` | 钉值；文件头、第 733 行重报、第 857 行报错句、自证假世界（第 11.2、11.7 条） | `reuse_library.py` 第 455 行、`rows_orchestrator_segment_two_revision_10.py` 第 99 行 `SEGMENT_TWO_ORCHESTRATOR_SHA256` |
+| `rows_orchestrator_revision_8.py` | `d5bf6305ff1f95fb1cf2360cdb385627e9e2e989ef68d699730e4c321b8bbb80` | 只换两个钉值 | `rows_orchestrator_revision_11.py` 第 66 行 `ROWS_R8_SHA256` |
+| `rows_orchestrator_segment_two_revision_10.py` | `ab4f6a78fb489e88c62dfd6070993f2c65a4dbb07c75d8805a8076d436f4703e` | 只换钉值 | `rows_orchestrator_segment_two_revision_11.py` 第 60 行 `SEGMENT_TWO_R10_SHA256` |
+| `reuse_library.py` | `5c513fa59546f483bcbfe4c9e7ecdee9db52923ac6677f23372d0041f328c24d` | 只换三个钉值，存法那一块不碰 | H31 |
+| `rows_orchestrator_revision_11.py` | `15224dc26382e66ba5aedaa37891ee91614f74846b1f0d6f0a64ed4dbbeb8a4f` | 只换钉值 | H31 |
+| `rows_orchestrator_segment_two_revision_11.py` | `bc99c5f3565f75771f51a7703e0ce84c50667630962195b94d457b18fc626cb8` | 只换钉值 | H31 |
+| `test_thread_shares.py` | `1d1ad862064d99c11565ec7b0fa0eec6a1dde3da49e5c76a52ff7beb25587be0` | 第 11.7 条 | 不钉 |
+| `test_revision_8.py` | `f6f3566baf9d0af32b418329eaa40d37f117cf74112bbdf0bf34663a25ad4925` | 修订 10 第 10.6 条；第 11.6 条两条 | 不钉 |
+| `test_default_threads.py` | `89ec438f0bbb689ba3cd2143d476ab25bba722dedd442915778a4f047051c8ea` | 第 11.7 条 | 不钉 |
+| `test_revision_10.py` | `58814cd751bc82ce7b7558d800767096b485974620264a863451f7a6f8d59065` | 第 11.7 条 | 不钉 |
+| `revision_11_placeholders.json` | `00e9776742d390622255ce00921a100f1f4d8e918af5698a0fde654fcef17116` | H31 五项 | 不钉 |
+| 第四张表 `…_current_state_threads_and_contrast.tsv` | `b239116cd8dec8764d42924f0f1fe2e743c27a609137690f3a7b9a7c62e8ee49` | 第 11.7 条 | 不钉；产物新名，`replay.sh` 第 2041 行改指它 |
+| 修订 8 那张表 `…_revision_8.tsv` | `d037e74e65ad105ca0acab4c135c83c2715eb6d383898f88b2d01191b4f38d03` | 不改，重跑 | 产物与 `replay.sh` 第 2029 行登记的那一份不同才另起新名、改登记行 |
+
+   - **重钉次序**（依赖次序，到不动点：每个钉值等于被钉那份此刻的 sha256）：先改 `rows_orchestrator.py`、`segment_one_units_revision_8.py` 与别的内容改动 → `cross_host_o3_check.py` → `rows_orchestrator_segment_two.py` → `rows_orchestrator_revision_8.py`、`rows_orchestrator_segment_two_revision_10.py` → `reuse_library.py`、`rows_orchestrator_revision_11.py`、`rows_orchestrator_segment_two_revision_11.py`、`segment_one_units_revision_11.py`。钉值共 11 处（上表第四列）；`reuse_library.py` 第 1895–1900 行 `PIN_SITES` 列的六处是其中一部分，另五处（`cross_host_o3_check.py` 一处、`rows_orchestrator_revision_8.py` 两处、`rows_orchestrator_segment_two.py` 一处、`rows_orchestrator_segment_two_revision_10.py` 一处）不在 `PIN_SITES` 里，一样要换。修订 7 第 7.7 条、修订 8 第 8.6 条的草稿 `repin_chain.py` 若已不在，照这张表手改，改完逐处现算。
+   - **H31**（`revision_11_placeholders.json` 第 15–24 行，十项）：变五项——`reuse_library.py`、`segment_one_units_revision_11.py`、`segment_one_unit_revision_11.sh`、`rows_orchestrator_revision_11.py`、`rows_orchestrator_segment_two_revision_11.py`；另五项（`count_reusable_units.py`、两份 `run_segment_*_revision_11_multi_host.sh`、`test_revision_11.py`、`reuse_library_root.py`）不动，改完逐项现算 sha256 与登记值比（修订 10 第 10.5 条末段那一种算法），十项都 `same` 才算重钉完。
+   - 不改的：`device_timing.py`、`row_driver.py`、两份比对器、`frozen_o3.py`（第 11.4 条）；四份跑法脚本；另八张研究一侧变异表的内容（产物照第 11.9 条重跑核）；`revision_8_placeholders.json`（H17 照修订 9 第 9.4 条是 `null`）与 `revision_10_placeholders.json`（H25、H26 只列名字）。
+
+11.9 **对已有产物、结论与别的实验的影响**：
+   - **第 2 次重跑的结论：不受影响**。Q1 撤项那一格（甲）与 Q2（有）出自名单核对与三份撤项核算（修订 3 第 3.1 条、修订 9 第 9.5 条），不经单元编排与逐行编排。
+   - **`research/results/` 里没有一份产物出自这一条改的跑法**：现状整表段没跑（修订 9 第 9.1 条），第 1 次重跑修订 8 那一趟从没跑过；第 1 次重跑修订 6 那一趟的产物出自 `run_segment_one_on_the_revision_6_tree_multi_host.sh`（脚本里写死 `THREADS=10`，修订 8 第 8.2 条第四点）与当时那一版 `rows_orchestrator.py`（`revision_8_research_side_of_the_revision_6_run.json` 钉的旧版），复跑经 `replay.sh` 的 `e171_r1_view` 起冻结的那一份，这一条一样不碰。T 与逐行限时在这一条的跑法上没有读数（第 11.3 条）。
+   - **研究一侧变异表的产物**：第四张表（内容变）与修订 8 那张表（盯的文件与单测变）的产物必与 `replay.sh` 登记的不同；修订 10 那张表的单测 `test_revision_10` 变；另七张的内容不变，但它们跑的单测与被变异的源文件有变的（推的不变，没量）。十张都在改完之后重跑，逐字节比 `replay.sh` 第 2026–2041 行十个研究一侧变异驱动登记的产物；不同的照本登记修订 1 第 1.12 条的做法另起新名、改登记行，旧产物留着。实验页第 2 次重跑一节整行引这些产物的句子照新产物回对，归写回员。
+   - **E200（修订6近似树重跑）**：它的登记 `research/prompts/e200-preregistration.md` 第 44 行写它「用今天研究一侧的修订 11 单元编排（`segment_one_units_revision_11.py`、`segment_one_unit_revision_11.sh`、`run_segment_one_revision_11_multi_host.sh`）」、「各步判法、阈值、限时公式照修订 6、修订 2 第 2.5 节」；修订 9 第 9.3 条末段引 E200 页，它停在停机 S40。这一条之后 E200 再起跑，单元与线道都取 Q、T 在 Q 上量；第 11.4 条的读数门槛只进 E171 这一份登记，不进 E200。E200 要不要另写修订认这件事交主 agent（第 11.12 条第 1 项）。
+   - **E201（三oracle合谋今树整表）：不受影响**。它的目录里 `grep -l 'rows_orchestrator\|segment_one_units\|allocate('` 零份；它 import 的 `device_timing.py`、`row_driver.py`、两份比对器与 `frozen_o3.py` 这一条不碰（第 11.4 条）。
+
+11.10 **并行与挂钟**（现状整表段不跑，只给这套装置再被用起来时排机器；数都是推的，没量）：
+   - 独立单位：第一段各单元照依赖图独立，但每个都吃满额度，本机同一时刻至多一个；第一段逐行在编排那一台一次一行；第二段每台一槽。
+   - 线程：每个单元、每条线道各取登记值 `.claude/heavy-thread-default` 的 31（每台）。
+   - 串行：第一段全部单元串起来（每个都要整份额度）；不拆成服务分片子任务的理由在第 11.12 条第 3 项。
+   - 预计挂钟：第一段单元——`unit_table` 第 128–148 行各单元推的用时相加约 52 400 秒（在修订 7 跑法 10 线程上推的），按第 11.4 条的 n^(−a) 缩成 52 400 × (10 / 31)^a 秒，约 4.7–14.6 小时；第一段逐行——不分片时只用一台、一次一行，16 行（带探针 2 行各约 T、不带探针 14 行各约 9 698 秒，照 `rows_orchestrator.py` 文件头「每行推的用时」；每行另加 120 秒；跨机对照那一行不分片时不跑），约 (2 × 14 582 + 14 × 9 698) × (10 / 31)^a + 16 × 120 秒，约 15.3–46.3 小时；合约 20–61 小时。修订 7 的跑法推约 15 小时（单元约 5.3 小时：链 1 200 秒 + 第 7 步 14 582 秒 + 修订 7 第 7.2 条那 3 244 秒；逐行约 9.5 小时，修订 7 第 7.2 条）。第二段——278 行 × 约 97 秒（第 1 次重跑修订 6 那一趟每行平均，那一趟每道 6 或 10 线程）÷ 两台各一槽，约 1–3.7 小时；修订 7 跑法两台各 6 槽约 0.6 小时。
+   - 预计在用核数：每台约 31 核（一个单元或一条线道吃满）；第二段两台合约 62 核。
+   - 超过 2 小时：分片单元与续跑入口照旧（第十四节、第 1 次重跑登记修订 8 第 8.4 节「续跑」：单元按单元续，逐行按行目录里有没有 `row-result.tsv` 续）。
+
+11.11 **执行员照做的次序与交主 agent 的验证**：
+   - 次序：`python3 scripts/agents/copy-originals.py copy <草稿目录> <第 11.8 条表里要改的文件>` 留改前那几份 → 核冻结层钉值此刻是不是不动点（第 11.12 条第 4 项；不是就停下交回）→ 修订 10 第 10.2 条两份单元脚本与 `segment_one_units_revision_11.py` 文件头 → 第 11.2 条（`segment_one_units_revision_8.py`、`segment_one_units_revision_11.py` 第 123 行、`rows_orchestrator.py`、`rows_orchestrator_segment_two.py`）→ 第 11.6 条 `plan` → 第 11.7 条单测、自证与第四张表 → `bash -n` 两份单元脚本、`python3 -m py_compile` 改过的 `.py` → 照第 11.8 条次序重钉到不动点 → 填 H31 → 现算 H31 十项都 `same`、11 处钉值都等于被钉那份此刻的 sha256。
+   - 交主 agent 的（执行员写进「要主 agent 跑的命令」，子 agent 不交任务）：研究目录（`--cwd`）里 `python3 -B -m unittest test_thread_shares test_revision_8 test_revision_10 test_revision_11 test_default_threads`，末行 `OK`；`.claude/hooks/selftest-registry.tsv` 登记的 E171 研究目录 14 份 `--selftest` 与 `rows_orchestrator.py --selftest`，各末行「红 0」，开关轮里 `slots-split-by-five` 红在 `allocation-threads`；十张研究一侧变异表各经研究目录的 `mutation_driver.py` 跑一遍（表头写的 `--unit-test-module`），输出写草稿目录，与 `replay.sh` 第 2026–2041 行登记的产物 `cmp`；修订 10 第 10.8 条的门禁那一格；修订 10 第 10.6 条与第 11.6 条的证红（仓副本里）。
+   - 不用跑的：现状整表段、两段干跑、`stream-constants`。
+
+11.12 **交主 agent 的项**：
+   1. **E200**（第 11.9 条）：这一条改的是 E200 登记里点名照用的单元编排；E200 再起跑之前它的登记要不要另写修订（线程、T 的条件、要不要也加读数门槛），由主 agent 定。
+   2. **`.claude/batch-scope`**：第 11.8 条表里的文件多数登记在旧批次，本批（`records/2026-11-05-删轻型并入重型.md#并包`）的范围要加（修订 10 那件报告第 3 条同一件）。
+   3. **不拆成服务分片子任务的理由**：第一段单元由一份冻结的编排在一条任务里排，拆成分片要重写它的派发、续跑与日志判法；第 2 次重跑已收尾，这套装置只在再被用起来时跑；串着跑合规（修订 7 依据里转述的服务那一层写法）。代价是挂钟（第 11.10 条：约 20–61 小时，修订 7 跑法约 15 小时，推的）。要压挂钟就另写修订拆分片。
+   4. **冻结层钉值此刻不全是不动点**（量的，2026-11-06 `sha256sum`）：`reuse_library.py` 第 455 行与 `rows_orchestrator_segment_two_revision_10.py` 第 99 行钉 `rows_orchestrator_segment_two.py` 为 `413ce4a869667696acd62b05caba6441d3936e022d49db5fce72f437df5f0b39`，那份此刻是 `accb1cbd…`；`rows_orchestrator_revision_11.py` 第 66 行钉 `rows_orchestrator_revision_8.py` 为 `055844678056bfd032017b7a6c35671aa17b6d5f92620716b16aaed02e090526`，那份此刻是 `d5bf6305…`。`reuse_library.py` 第 466 行 `pinned_sha256_now` 按搬迁登记倒换之后认不认得上没核（要载入研究目录的模块，是跑项目代码）。执行员开工先照它核：认得上照常重钉；认不上是这一条之前就有的另一件，停下交回，不顺手改。
+   5. **读数门槛（第 11.4 条）是这一条自己加的收严**：只看限时公式字面、不加门槛的写法，按第 11.4 条第四点对超时一类是放宽，不合「判据只收严或不变」。
+
+11.13 **设计这一条时已经存在的数**（照第四节的写法，不删）：
+   1. 第 1 次重跑登记里读到的：修订 6 那一趟第二段 T₂ = 75.274 秒、限时取下限 1800 秒（第 1763 行）；修订 8 第 8.4 节推的第 7、9 步各 14 582 秒、第 3 步带流三两项 9 698 与 8 128 秒（经本登记修订 7 第 7.2 条与 `unit_table` 第 128–148 行）。影响：只进第 11.10 条挂钟；1.5 出自 3 × 5 / 10，不从这些数来。
+   2. E201 登记第 345 行（`grep` 命中行）引的第 1 次重跑修订 6 那一趟第二段每行平均 97.2 秒。影响：只进第 11.10 条。
+   3. 修订 9 第 9.3 条末段：E200 页量的两棵近似树都停在停机 S40。影响：只进第 11.9 条。
+   4. 门槛在已有读数上的值（推的）：拿第 1 项的 T₂ = 75.274 秒代进去，R = 1800 秒，与杀进程限时相同，第二段没有门槛行；第一段在这一条的跑法上没有 T。
+   5. 第 11.12 条第 4 项那两处钉值与被钉文件此刻的 sha256 不同（量的）。
+   6. 装置是否随线程数变快（a）：`crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 里 `grep -n 'thread\|rayon\|par_iter\|available_parallelism\|THREAD_CAP\|spawn'` 零命中，它经 `GivenStatesEngine` 与 `crash_state_enumeration` 判态（文件第 2、32、109 行），那两处用不用多线程这一次没读；a 照第 11.4 条当未知。
+
+11.14 **设计这一条时读过的文件与跑过的命令**（2026-11-06，HEAD `ff5dca7d22b1c6f95b2ac64a8c79e0467d580d1c`；研究目录 `git status --porcelain` 为空，本登记是 ` M`，改前 sha256 `8aea17911c4c155c89162027bc7bf058e8c5470590c06d106be383b142b8bf77`）：
+   - `.claude/agent-common.md`（整份）；规则整份：`.claude/singlefs-ai-sop/rules/test-discipline.md`、`.claude/rules/three-way-inference.md`、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`、`.claude/rules/mutation-sampling.md`、`.claude/rules/implementation-first.md`、`.claude/rules/test-script-discipline.md`。
+   - 本登记第 1–184 行、第 410–726 行与 `grep -n '^#'`、`grep -n '3T\|max(1800\|1800'`、`grep -n '1\.12'` 命中行；`research/prompts/e171-r1-prereg.md` 第 690–697、790–806、1555–1562、1820–1828 行与 `grep -n '3T\|3 T\|1800 秒\|max(1800'` 命中行；`research/prompts/e200-preregistration.md` 与 `research/prompts/e201-preregistration.md` 只有 `grep` 命中行（前者第 32、44、113、116、117、370、386 行，后者第 138、143、329、345、414、420、630 行）。实验页与 `research/results/` 下产物的内容都没读。
+   - 前一件设计员的报告 `~/.local/share/singlefs/work/e171-thread-amendment/result.md`（整份）；`records/2026-11-05-删轻型并入重型.md` 第 338、622 行（`grep` 命中）；`.claude/heavy-thread-default`（整份）；`.claude/memory-bounded-parallelism.tsv` 第 1–12 行；`.claude/hooks/selftest-registry.tsv` 里 `grep` E171 研究目录的 14 行；`scripts/experiment-apparatus/replay.sh` 第 1–12、3105–3175、3252–3262 行与 `grep` 命中的第 2026–2041 行；`scripts/kb/replace-once.py` 第 1–40、307–317 行。
+   - 研究目录：`segment_one_units_revision_8.py` 第 1–720 行与第 820–1000 行里 `grep` 命中行、第 622–628、826–841 行；`test_thread_shares.py`（整份）；`rows_orchestrator.py` 第 25–45、105–125、255–300、1050–1080、1515–1540 行与 `grep` 命中行；`rows_orchestrator_segment_two_revision_10.py` 第 170–200 行；`device_timing.py` 第 40–62 行与 `grep` 命中行；`row_driver.py` `grep` 命中的第 6–102、568–602、653–699、769 行；`test_default_threads.py` 第 45–70 行；`test_revision_10.py` 第 138–150 行；`revision_11_placeholders.json`（整份）；`reuse_library.py` 第 466–491、1885–1905 行；另几份的 `grep` 命中行（`rows_orchestrator_segment_two.py`、`segment_one_units_revision_11.py`、`test_revision_11.py`、`cross_host_o3_check.py`、`rows_orchestrator_revision_8.py`、`rows_orchestrator_revision_11.py`、`rows_orchestrator_segment_two_revision_11.py`、`mutation_driver.py`）。第四张变异表与修订 8 那张表的 `grep`、`awk` 命中行，十张 E171 研究一侧表的条数。E201 目录 `e171_research_side.py` 第 12–40 行与 `current_tree_row_driver.py` 的 `grep` 命中行。
+   - 命令：认领草稿目录；`sha256sum`、`wc -l` 第 11.8 条表里各文件；`grep -nE` 研究目录里按 64 位十六进制钉文件的常量（11 处）；`grep -rn` 线程常量与 `unit_table(` 的引用；`grep -ln` E200、E201 目录里有没有起 E171 编排的写法（零份）；`grep -n` 装置源文件的线程写法（零命中）；`git log --oneline -3` 两份被钉文件；`TZ=Asia/Tokyo date +%F`（2026-11-06）。没跑项目代码，没往统一任务服务交任务。
+
+11.15 **第 11.12 条第 4 项核出来的原有对不上**（2026-11-06，执行员照派发提示「在登记里写明这处原来就有的对不上……然后照重钉链往下做」补写；写这一节时装置一处没改、重钉链没开始；判据、阈值、作废与停机条款不动）：
+   - **哪几处、钉值与此刻值**（量的，`sha256sum` 与 `awk 'NR==行'`）：
+
+| 钉它的地方 | 钉值 | 被钉文件 | 被钉文件此刻 sha256 |
+|---|---|---|---|
+| `reuse_library.py` 第 455 行 `SEGMENT_TWO_ORCHESTRATOR_SHA256` | `413ce4a869667696acd62b05caba6441d3936e022d49db5fce72f437df5f0b39` | `rows_orchestrator_segment_two.py` | `accb1cbd108660668b2180b4f4e8b847c24140b85229c41e12c35d43d41cebd3` |
+| `rows_orchestrator_segment_two_revision_10.py` 第 99 行 `SEGMENT_TWO_ORCHESTRATOR_SHA256` | 同上 | 同上 | 同上 |
+| `rows_orchestrator_revision_11.py` 第 66 行 `ROWS_R8_SHA256` | `055844678056bfd032017b7a6c35671aa17b6d5f92620716b16aaed02e090526` | `rows_orchestrator_revision_8.py` | `d5bf6305ff1f95fb1cf2360cdb385627e9e2e989ef68d699730e4c321b8bbb80` |
+
+   - **从哪一次提交起就不对**：提交 ee47e22d9（2026-11-05）同时改了两份被钉文件与这三处钉值；那一次提交里两份被钉文件已经是 `accb1cbd…` 与 `d5bf6305…`（`git show ee47e22d9:<路径> | sha256sum`），三处钉值写的是 `413ce4a8…` 与 `05584467…`（`git show ee47e22d9:<路径> | grep -n '_SHA256 = "'`）。它的上一次提交 48c98a3fa 里 `reuse_library.py` 第 425 行钉 `7dda75bc…`，被钉文件那时也是 `7dda75bc…`。`git log --all` 动过两份被钉文件的各版（新旧路径都查）没有一版是 `413ce4a8…` 或 `05584467…`，这两个值对应的内容不在 git 里。
+   - **怎么查出来的**：前一段执行员照第 11.11 条次序第二步核冻结层钉值，先用文本模拟（读 `.claude/gate.d/path-moves.tsv`，对两份被钉文件里搬迁登记的新前缀做每一处换不换的全组合倒换，2² 与 2⁴ 种，没有一种等于钉值；把两份里钉上游的值换回旧值的组合也等不出），报告 `~/.local/share/singlefs/work/e171-thread-landing/result.md`；主 agent 交的任务 8541 用研究目录的真函数 `reuse_library.pinned_sha256_now` 核，`task-server/task log 8541 --all` 两行原样「segment_two None」「rows_revision_8 None」，即认不上。
+   - **怎么处置**：主 agent 定照第 11.8 条重钉链往下做，这三处随重钉链一并换成改后被钉文件的 sha256，换完逐处现算到不动点。换掉之前载入这两份冻结文件的那几条路（`reuse_library.py` 的 `load_repinned` 认不上就抛 RuntimeError，推的，读第 529 行起那一段）此刻会拒；这一节不量它此刻拒了哪几条单测或自证。改后的新值写进执行员的交回报告。
+
 ## 十三、读过的文件与跑过的命令
 
 **读过的文件**（行号是读那一刻的；grep 命中行也列）：

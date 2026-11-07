@@ -1,0 +1,369 @@
+
+/// 辩方腿探针（只拷进草稿副本、追加在测试文件末尾，不回主工作区）：收严后的判据（E1 到 E6）逐段、逐写的静态判定，不判崩溃状态。
+/// 只读写表（种类、盘、偏移、字节）、基镜像与按写表次序归的发布（`publishes_in`），不读任何判定结果。
+mod per_write_judging_tightened_classifier {
+    use singlefs_verification::memory_pool::{
+        publishes_in, MemoryPool, PublishWrites, RecordStreamContinuity, RetainedWrite,
+    };
+    use singlefs_verification::segments::StepKind;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    const SLOT_BYTES_OF_THE_POOL: u64 = 16384;
+    const DATA_UNIT_BYTES_OF_THE_POOL: u64 = 32768;
+    const NODE_BYTES_OF_THE_POOL: u64 = 16384;
+
+    fn u64_at(bytes: &[u8], offset: usize) -> u64 {
+        u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
+    }
+
+    fn u32_at(bytes: &[u8], offset: usize) -> u32 {
+        u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 字节"))
+    }
+
+    /// 单元头里判据要读的几样。偏移照 `crates/singlefs-checker/src/lib.rs` 的 `header_offsets`（码 1：诞生代号 75、写序 91；码 3：73、93）
+    /// 与 `crates/singlefs-checker/src/walk.rs` 的 `scanned_tree_identifiers`（码 2：诞生代号 52 + 2k、写序 68 + 2k，k 是 bytes[51]）另写一份。
+    pub struct UnitHeader {
+        pub class: u8,
+        pub birth_txg: u64,
+        pub instance: u32,
+        pub claimed_bytes: u64,
+        /// 码 1、码 3 的归并键（类身份段去掉载荷校验和，加写序）；码 2 不进 I-1.8，没有。
+        pub merge_key: Option<Vec<u8>>,
+    }
+
+    pub fn parse_header(bytes: &[u8]) -> Option<UnitHeader> {
+        if bytes.len() < 112 || &bytes[..4] != b"SFSU" {
+            return None;
+        }
+        match bytes[6] {
+            1 => Some(UnitHeader {
+                class: 1,
+                birth_txg: u64_at(bytes, 75),
+                instance: u32_at(bytes, 91),
+                claimed_bytes: DATA_UNIT_BYTES_OF_THE_POOL,
+                merge_key: Some(bytes[42..101].to_vec()),
+            }),
+            3 => Some(UnitHeader {
+                class: 3,
+                birth_txg: u64_at(bytes, 73),
+                instance: u32_at(bytes, 93),
+                claimed_bytes: DATA_UNIT_BYTES_OF_THE_POOL,
+                merge_key: Some([&bytes[42..89], &bytes[93..107]].concat()),
+            }),
+            2 => {
+                let extra = 2 * usize::from(bytes[51]);
+                if 72 + extra + 4 > bytes.len() {
+                    return None;
+                }
+                Some(UnitHeader {
+                    class: 2,
+                    birth_txg: u64_at(bytes, 52 + extra),
+                    instance: u32_at(bytes, 68 + extra),
+                    claimed_bytes: NODE_BYTES_OF_THE_POOL,
+                    merge_key: None,
+                })
+            }
+            _outside_the_three_unit_classes => None,
+        }
+    }
+
+    /// 这次写罩住的范围在它之前有没有被写过：写表里更早的、同一块盘上重叠的写，或基镜像那一段有非零字节（与撕裂判据同形，
+    /// `crates/singlefs-verification/src/crash.rs` 的 `base_holds_nonzero_bytes_there` 与 `an_earlier_write_with_bytes_overlaps`）。
+    pub fn overwrites_something(base: &MemoryPool, writes: &[RetainedWrite], index: usize) -> (bool, bool) {
+        let write = &writes[index];
+        let end = write.offset.0 + write.length_in_bytes();
+        let earlier = writes[..index].iter().any(|earlier| {
+            earlier.device == write.device
+                && earlier.offset.0 < end
+                && write.offset.0 < earlier.offset.0 + earlier.length_in_bytes()
+        });
+        let base_nonzero = base.devices.get(&write.device).is_some_and(|device| {
+            device
+                .written_sectors()
+                .range(write.offset.0 / 512..end.div_ceil(512))
+                .any(|(_, bytes)| bytes.iter().any(|byte| *byte != 0))
+        });
+        (earlier, base_nonzero)
+    }
+
+    /// 一条 journal 记录写（4096 字节）点名的 (盘身份, 槽号)：头 496 字节，之后每项 56 字节，两份位置各 (盘 4、槽号 6、校验和 4)，
+    /// 第二份从项内偏移 14 起；点名项数在偏移 12（`crates/singlefs-checker/src/lib.rs` 的 `check_journal_record` 同一份字段表另写一份）。
+    pub fn named_locations_of_a_record(bytes: &[u8]) -> Vec<(u32, u64)> {
+        if bytes.len() < 496 || &bytes[..4] != b"SFSJ" {
+            return Vec::new();
+        }
+        let count = usize::try_from(u32_at(bytes, 12)).expect("点名项数");
+        let mut locations = Vec::new();
+        for index in 0..count {
+            let entry_start = 496 + index * 56;
+            if entry_start + 56 > bytes.len() {
+                break;
+            }
+            for location_start in [entry_start, entry_start + 14] {
+                let mut six_bytes = [0u8; 8];
+                six_bytes[..6].copy_from_slice(&bytes[location_start + 4..location_start + 10]);
+                locations.push((u32_at(bytes, location_start), u64::from_le_bytes(six_bytes)));
+            }
+        }
+        locations
+    }
+
+    /// 段里的写按「同一个单元的几份副本」分组：两条边都连——同偏移（记录核对器的分法，`crash.rs` 的 `copies_by_offset`）、
+    /// 同归并键（I-1.8 的分法，`walk.rs` 的 `judge_merged_version_total_order`）。返回每组的写表下标。
+    pub fn groups_of_segment(writes: &[RetainedWrite], segment: &[usize]) -> Vec<Vec<usize>> {
+        let mut parent: Vec<usize> = (0..segment.len()).collect();
+        fn find(parent: &mut Vec<usize>, position: usize) -> usize {
+            let mut root = position;
+            while parent[root] != root {
+                root = parent[root];
+            }
+            let mut walker = position;
+            while parent[walker] != root {
+                let next = parent[walker];
+                parent[walker] = root;
+                walker = next;
+            }
+            root
+        }
+        let mut by_offset: BTreeMap<u64, usize> = BTreeMap::new();
+        let mut by_merge_key: BTreeMap<Vec<u8>, usize> = BTreeMap::new();
+        for (position, write_index) in segment.iter().enumerate() {
+            let write = &writes[*write_index];
+            let mut seen_before_at: Vec<usize> = Vec::new();
+            if let Some(earlier) = by_offset.insert(write.offset.0, position) {
+                seen_before_at.push(earlier);
+            }
+            if let Some(header) = write.bytes().and_then(parse_header) {
+                if let Some(key) = header.merge_key {
+                    if let Some(earlier) = by_merge_key.insert(key, position) {
+                        seen_before_at.push(earlier);
+                    }
+                }
+            }
+            for earlier in seen_before_at {
+                let (left, right) = (find(&mut parent, position), find(&mut parent, earlier));
+                if left != right {
+                    parent[left] = right;
+                }
+            }
+        }
+        let mut grouped: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for (position, write_index) in segment.iter().enumerate() {
+            let root = find(&mut parent, position);
+            grouped.entry(root).or_default().push(*write_index);
+        }
+        grouped.into_values().collect()
+    }
+
+    /// 一段的判定结果：每一条判据各自的不过数，加这一段在乙下的态数。
+    pub struct SegmentVerdict {
+        pub segment_index: usize,
+        pub writes: usize,
+        pub only_unit_writes: bool,
+        pub over_an_earlier_write: usize,
+        pub over_nonzero_base: usize,
+        pub without_a_parsable_header: usize,
+        pub unaligned_to_a_slot: usize,
+        pub claimed_bytes_differ_from_the_write: usize,
+        pub header_not_beyond_the_mount_root: usize,
+        pub birth_differs_from_the_publish: usize,
+        pub records_in_the_prefix_naming_a_slot_of_the_segment: usize,
+        pub diag_records_in_the_prefix_of_the_same_identity: usize,
+        pub group_size_histogram: BTreeMap<usize, usize>,
+        pub passes: bool,
+        pub states_under_the_group_form: u64,
+    }
+
+    /// 判一段。`segment` 为空返回 `None`。
+    pub fn classify_segment(
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        segment_index: usize,
+        publishes: &[PublishWrites],
+    ) -> Option<SegmentVerdict> {
+        let segment = &segments[segment_index];
+        let lowest_write_index = *segment.iter().min()?;
+        let only_unit_writes = segment.iter().all(|index| writes[*index].kind == StepKind::UnitWrite);
+        // 前缀里没有根槽写时挂载根只在基镜像里、写表里读不出来：E4 判不了，按「不超」处理（整段退回）
+        let mount_root: Option<(u32, u64)> = publishes
+            .iter()
+            .filter(|publish| publish.root < lowest_write_index)
+            .max_by_key(|publish| publish.root)
+            .map(|publish| (publish.instance, publish.checkpoint_txg));
+        let mut verdict = SegmentVerdict {
+            segment_index,
+            writes: segment.len(),
+            only_unit_writes,
+            over_an_earlier_write: 0,
+            over_nonzero_base: 0,
+            without_a_parsable_header: 0,
+            unaligned_to_a_slot: 0,
+            claimed_bytes_differ_from_the_write: 0,
+            header_not_beyond_the_mount_root: 0,
+            birth_differs_from_the_publish: 0,
+            records_in_the_prefix_naming_a_slot_of_the_segment: 0,
+            diag_records_in_the_prefix_of_the_same_identity: 0,
+            group_size_histogram: BTreeMap::new(),
+            passes: false,
+            states_under_the_group_form: 0,
+        };
+        for write_index in segment {
+            let write = &writes[*write_index];
+            let (earlier, base_nonzero) = overwrites_something(base, writes, *write_index);
+            verdict.over_an_earlier_write += usize::from(earlier);
+            verdict.over_nonzero_base += usize::from(base_nonzero);
+            verdict.unaligned_to_a_slot += usize::from(write.offset.0 % SLOT_BYTES_OF_THE_POOL != 0);
+            let Some(header) = write.bytes().and_then(parse_header) else {
+                verdict.without_a_parsable_header += 1;
+                continue;
+            };
+            verdict.claimed_bytes_differ_from_the_write +=
+                usize::from(header.claimed_bytes != write.length_in_bytes());
+            let beyond_the_mount_root = mount_root.is_some_and(|(mount_root_instance, mount_root_txg)| {
+                header.instance > mount_root_instance
+                    || (header.instance == mount_root_instance && header.birth_txg > mount_root_txg)
+            });
+            verdict.header_not_beyond_the_mount_root += usize::from(!beyond_the_mount_root);
+            if let Some(publish) = publishes.iter().find(|publish| publish.units.contains(write_index)) {
+                verdict.birth_differs_from_the_publish += usize::from(header.birth_txg != publish.checkpoint_txg);
+            }
+        }
+        // E6：前缀里（写表下标比这一段最低的写小）的 journal 记录没有一条点名了这一段某个写罩住的槽；
+        // 诊断另数：前缀里与这一段单元头 (实例, 诞生代号) 相同的记录条数（按身份认，不靠写表次序归发布）。
+        let segment_identities: BTreeSet<(u32, u64)> = segment
+            .iter()
+            .filter_map(|index| writes[*index].bytes().and_then(parse_header))
+            .map(|header| (header.instance, header.birth_txg))
+            .collect();
+        for (record_index, record) in writes[..lowest_write_index].iter().enumerate() {
+            if record.kind != StepKind::JournalRecord {
+                continue;
+            }
+            let Some(bytes) = record.bytes() else {
+                continue;
+            };
+            let names_a_slot_of_the_segment = named_locations_of_a_record(bytes).iter().any(|(device, slot)| {
+                let named_start = slot * SLOT_BYTES_OF_THE_POOL;
+                let named_end = named_start + DATA_UNIT_BYTES_OF_THE_POOL;
+                segment.iter().any(|index| {
+                    let write = &writes[*index];
+                    write.device.0 == *device
+                        && write.offset.0 < named_end
+                        && named_start < write.offset.0 + write.length_in_bytes()
+                })
+            });
+            verdict.records_in_the_prefix_naming_a_slot_of_the_segment += usize::from(names_a_slot_of_the_segment);
+            if bytes.len() >= 34 && &bytes[..4] == b"SFSJ" {
+                let identity = (u32_at(bytes, 16), u64_at(bytes, 26));
+                verdict.diag_records_in_the_prefix_of_the_same_identity += usize::from(segment_identities.contains(&identity));
+            }
+            let _ = record_index;
+        }
+        let groups = groups_of_segment(writes, segment);
+        for group in &groups {
+            *verdict.group_size_histogram.entry(group.len()).or_insert(0) += 1;
+        }
+        verdict.passes = only_unit_writes
+            && verdict.over_an_earlier_write == 0
+            && verdict.over_nonzero_base == 0
+            && verdict.without_a_parsable_header == 0
+            && verdict.unaligned_to_a_slot == 0
+            && verdict.claimed_bytes_differ_from_the_write == 0
+            && verdict.header_not_beyond_the_mount_root == 0
+            && verdict.records_in_the_prefix_naming_a_slot_of_the_segment == 0
+            && groups.len() >= 2;
+        verdict.states_under_the_group_form = 1 + groups
+            .iter()
+            .map(|group| (1u64 << group.len().min(40)) - 1)
+            .sum::<u64>();
+        Some(verdict)
+    }
+
+    fn describe_kinds(writes: &[RetainedWrite], segment: &[usize]) -> String {
+        let kinds: BTreeSet<String> = segment.iter().map(|index| format!("{:?}", writes[*index].kind)).collect();
+        format!("{kinds:?}")
+    }
+
+    /// 一条流：逐段判、打每段一行与整条流一行。`engine_states_by_segment` 给了就把过判据的段换成乙下的态数、算整条流剩多少。
+    pub fn classify_flow(
+        label: &str,
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        engine_states_by_segment: Option<&[u64]>,
+    ) -> Vec<SegmentVerdict> {
+        let publishes = publishes_in(writes, &vec![true; writes.len()], RecordStreamContinuity::OneRecording);
+        println!("PROBE_TIGHT_FLOW_PUBLISHES label={label} publishes={}", publishes.len());
+        let mut verdicts = Vec::new();
+        let mut reduced_total: u64 = 1;
+        let mut engine_total: u64 = 1;
+        for segment_index in 0..segments.len() {
+            let Some(verdict) = classify_segment(base, writes, segments, segment_index, &publishes) else {
+                continue;
+            };
+            let engine_states = engine_states_by_segment.map(|states| states[segment_index]);
+            if verdict.only_unit_writes {
+                println!(
+                    "PROBE_TIGHT_SEGMENT label={label} segment={segment_index} writes={} kinds={} e2_over_an_earlier_write={} e2_over_nonzero_base={} \
+                     e3_without_header={} e3_unaligned={} e3_claimed_bytes_differ={} e4_not_beyond_mount_root={} diag_birth_differs_from_publish={} \
+                     e6_records_in_prefix_naming_a_slot={} diag_records_of_same_identity={} group_sizes={:?} passes={} states_group_form={} engine_states={engine_states:?}",
+                    verdict.writes,
+                    describe_kinds(writes, &segments[segment_index]),
+                    verdict.over_an_earlier_write,
+                    verdict.over_nonzero_base,
+                    verdict.without_a_parsable_header,
+                    verdict.unaligned_to_a_slot,
+                    verdict.claimed_bytes_differ_from_the_write,
+                    verdict.header_not_beyond_the_mount_root,
+                    verdict.birth_differs_from_the_publish,
+                    verdict.records_in_the_prefix_naming_a_slot_of_the_segment,
+                    verdict.diag_records_in_the_prefix_of_the_same_identity,
+                    verdict.group_size_histogram,
+                    verdict.passes,
+                    verdict.states_under_the_group_form,
+                );
+            } else {
+                println!(
+                    "PROBE_TIGHT_SEGMENT label={label} segment={segment_index} writes={} kinds={} e1_only_unit_writes=false engine_states={engine_states:?}",
+                    verdict.writes,
+                    describe_kinds(writes, &segments[segment_index]),
+                );
+            }
+            if let Some(engine_states) = engine_states {
+                engine_total += engine_states;
+                reduced_total += if verdict.passes { verdict.states_under_the_group_form } else { engine_states };
+            }
+            verdicts.push(verdict);
+        }
+        let unit_segments = verdicts.iter().filter(|verdict| verdict.only_unit_writes).count();
+        let passing = verdicts.iter().filter(|verdict| verdict.passes).count();
+        println!(
+            "PROBE_TIGHT_FLOW label={label} segments={} unit_segments={unit_segments} passing_unit_segments={passing} engine_total={engine_total} reduced_total_group_form={reduced_total}",
+            segments.len()
+        );
+        verdicts
+    }
+
+    /// 每块盘上单元写最低的偏移与非单元写（系统配置槽、根环、journal 环、清零）最高的末尾：单元写落在单元区里这一条（E3 的区间半句）。
+    pub fn print_areas(label: &str, writes: &[RetainedWrite]) {
+        let mut lowest_unit_offset: BTreeMap<u32, u64> = BTreeMap::new();
+        let mut highest_other_end: BTreeMap<u32, u64> = BTreeMap::new();
+        for write in writes {
+            let end = write.offset.0 + write.length_in_bytes();
+            if write.kind == StepKind::UnitWrite {
+                let entry = lowest_unit_offset.entry(write.device.0).or_insert(u64::MAX);
+                *entry = (*entry).min(write.offset.0);
+            } else {
+                let entry = highest_other_end.entry(write.device.0).or_insert(0);
+                *entry = (*entry).max(end);
+            }
+        }
+        for (device, lowest) in &lowest_unit_offset {
+            println!(
+                "PROBE_TIGHT_AREA label={label} device={device} lowest_unit_write_offset={lowest} highest_non_unit_write_end={:?}",
+                highest_other_end.get(device)
+            );
+        }
+    }
+}

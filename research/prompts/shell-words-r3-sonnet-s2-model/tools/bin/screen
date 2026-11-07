@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-# 假的 screen：记一笔；-dm 开头的把后面的命令放到脱离会话的地方跑
-source "$(dirname "${BASH_SOURCE[0]}")/../stublib.sh"
-stub_log 'screen' "$@"
-if [[ "$1" == -d* ]]; then
-  while [ "$#" -gt 0 ] && [[ "$1" == -* ]]; do shift; done
-  [ "$#" -gt 0 ] && setsid -f "$@" >/dev/null 2>&1 < /dev/null
-fi
-exit 0

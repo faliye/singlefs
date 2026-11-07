@@ -1,0 +1,295 @@
+
+/// 第三轮辩方腿探针（只拷进草稿副本、追加在测试文件末尾，不回主工作区）：一段（或一个宇宙）里每个状态都真判，
+/// 与候选乙（按单元副本组判、两种合成：并、增减）的合成逐状态比。不取样：宇宙里 2^宽度 个落不落的组合一个不漏，
+/// 可以按序号切片分给几个任务（`slice_index` / `slices`），几片合起来恰好盖满。
+mod per_write_judging_exhaustive {
+    use singlefs_verification::crash_state_enumeration::crash_point_replay_worker_threads;
+    use singlefs_verification::memory_pool::{RetainedWrite, WrittenContents};
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Mutex;
+    use std::time::Instant;
+
+    pub type Outcome = (bool, BTreeSet<String>);
+
+    const CHUNK_OF_STATES: u64 = 2048;
+    const PROGRESS_EVERY_STATES: u64 = 4_194_304;
+
+    /// 并合成：S=∅ 的红项并上每个组内子态的红项。
+    fn union_of(baseline: &Outcome, parts: &[&Outcome]) -> BTreeSet<String> {
+        let mut items = baseline.1.clone();
+        for part in parts {
+            items.extend(part.1.iter().cloned());
+        }
+        items
+    }
+
+    /// 增减合成（与第二轮攻方原型的 `delta_of` 同一个写法）：S=∅ 的红项，减去各部分比 S=∅ 少掉的项，再加上各部分比 S=∅ 多出的项。
+    fn delta_of(baseline: &Outcome, parts: &[&Outcome]) -> BTreeSet<String> {
+        let mut items = baseline.1.clone();
+        for part in parts {
+            for removed in baseline.1.difference(&part.1) {
+                items.remove(removed);
+            }
+        }
+        for part in parts {
+            items.extend(part.1.difference(&baseline.1).cloned());
+        }
+        items
+    }
+
+    #[derive(Default, Clone, Debug)]
+    pub struct Tally {
+        pub states: u64,
+        pub real_red: u64,
+        pub union_red_differs: u64,
+        pub union_items_differ: u64,
+        pub union_items_missing_from_the_synthesis: u64,
+        pub union_items_not_in_the_real_judgement: u64,
+        pub delta_red_differs: u64,
+        pub delta_items_differ: u64,
+        pub delta_items_missing_from_the_synthesis: u64,
+        pub delta_items_not_in_the_real_judgement: u64,
+    }
+
+    impl Tally {
+        fn add(&mut self, other: &Tally) {
+            self.states += other.states;
+            self.real_red += other.real_red;
+            self.union_red_differs += other.union_red_differs;
+            self.union_items_differ += other.union_items_differ;
+            self.union_items_missing_from_the_synthesis += other.union_items_missing_from_the_synthesis;
+            self.union_items_not_in_the_real_judgement += other.union_items_not_in_the_real_judgement;
+            self.delta_red_differs += other.delta_red_differs;
+            self.delta_items_differ += other.delta_items_differ;
+            self.delta_items_missing_from_the_synthesis += other.delta_items_missing_from_the_synthesis;
+            self.delta_items_not_in_the_real_judgement += other.delta_items_not_in_the_real_judgement;
+        }
+    }
+
+    /// 环境变量 PROBE_EXHAUST_FAULT 点名的造坏，三种写法（都把写的字节最后一个字节取反）：
+    /// `flip:<段内位置>[+<段内位置>…]`（段里第几个写，从 0 数，次序同写表）、`copy:<组号>[+<组号>…]`（那一组的第一份副本）、
+    /// `group:<组号>[+<组号>…]`（那一组的每一份副本）；组号是 `groups` 里的次序（`groups_of_segment` 交出来的次序）。
+    /// 单元头不动（E1 到 E4 与 E6n 读的东西都不变），只让这份副本的整单元校验和对不上：这一段仍被判据收下，状态里却有红。
+    /// 没有这一步，真实流的段是全绿对全绿，比较没有牙。改的是传进来的这张写表（枚举用的那一张拷贝），不是写表本体；返回改了哪几个写表下标。
+    pub fn apply_the_fault_from_the_environment(writes: &mut [RetainedWrite], segment: &[usize], groups: &[Vec<usize>]) -> Vec<usize> {
+        let Ok(text) = std::env::var("PROBE_EXHAUST_FAULT") else {
+            return Vec::new();
+        };
+        let (kind, numbers_text) = text
+            .split_once(':')
+            .expect("PROBE_EXHAUST_FAULT 写成 flip:<段内位置>… 或 copy:<组号>… 或 group:<组号>…");
+        let mut targets: Vec<usize> = Vec::new();
+        for number_text in numbers_text.split('+') {
+            let number = number_text.trim().parse::<usize>().expect("位置与组号是非负整数");
+            match kind {
+                "flip" => targets.push(segment[number]),
+                "copy" => targets.push(groups[number][0]),
+                "group" => targets.extend(groups[number].iter().copied()),
+                other => panic!("PROBE_EXHAUST_FAULT 只认 flip、copy、group，给的是 {other}"),
+            }
+        }
+        for write_index in &targets {
+            let WrittenContents::Bytes(bytes) = &mut writes[*write_index].contents else {
+                panic!("写表下标 {write_index} 不是带字节的写");
+            };
+            let last = bytes.len() - 1;
+            bytes[last] = !bytes[last];
+        }
+        println!("PROBE_EXHAUST_FAULT fault={text} write_indices={targets:?}");
+        targets
+    }
+
+    /// 环境变量里的计划：逗号分隔，每项是 `段号` 或 `段号@片号/片数`（例：`28`、`20@1/4`）。认不出的项 panic，不悄悄跳过。
+    pub fn parse_plan(text: &str) -> Vec<(usize, u64, u64)> {
+        text.split(',')
+            .filter(|item| !item.trim().is_empty())
+            .map(|item| {
+                let item = item.trim();
+                match item.split_once('@') {
+                    None => (item.parse::<usize>().expect("段号是非负整数"), 0u64, 1u64),
+                    Some((segment, slice)) => {
+                        let (index, count) = slice.split_once('/').expect("片写成 片号/片数");
+                        let (index, count) = (index.parse::<u64>().expect("片号"), count.parse::<u64>().expect("片数"));
+                        assert!(count >= 1 && index < count, "片号小于片数：{item}");
+                        (segment.parse::<usize>().expect("段号是非负整数"), index, count)
+                    }
+                }
+            })
+            .collect()
+    }
+
+    /// 至多 `max_groups` 个副本组里有写落下的所有状态（含一个都没落的 S=∅）：每个被碰到的组取它的每个非空子集，没碰的组一个都不落。
+    /// 一共 Σ_{j≤k} C(G, j) · (每组非空子集数的 j 次乘积) 个，一个不漏、一个不重；k = G 就是全部 2^宽度 个。
+    fn masks_touching_at_most(group_masks: &[u64], max_groups: usize) -> Vec<u64> {
+        fn walk(group_masks: &[u64], index: usize, touched: usize, max_groups: usize, current: u64, out: &mut Vec<u64>) {
+            if index == group_masks.len() {
+                out.push(current);
+                return;
+            }
+            walk(group_masks, index + 1, touched, max_groups, current, out);
+            if touched < max_groups {
+                let group_mask = group_masks[index];
+                let mut submask = group_mask;
+                while submask != 0 {
+                    walk(group_masks, index + 1, touched + 1, max_groups, current | submask, out);
+                    submask = (submask - 1) & group_mask;
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(group_masks, 0, 0, max_groups, 0, &mut out);
+        out
+    }
+
+    /// `universe` 里每个写落或不落的 2^宽度 种组合，序号 `[片起点, 片终点)` 之间的每一种都真判（`judge` 收落下去的写表下标），
+    /// 与乙的两种合成比。`groups` 把宇宙分成副本组（每个写恰在一组里，组不超过 16 个写）；组内子态各判一次、S=∅ 判一次。
+    /// `max_groups` 给了就只判至多这么多个组里有写落下的状态（按阶全量：低阶相互作用一个不漏，高阶不判；不给就是全部 2^宽度 个）。
+    /// `print` 为真时打一行 `PROBE_EXHAUST_SLICE`，进度每 4194304 个状态一行。
+    pub fn run(
+        label: &str,
+        segment_index: usize,
+        universe: &[usize],
+        groups: &[Vec<usize>],
+        judge: &(dyn Fn(&[usize]) -> Outcome + Sync),
+        max_groups: Option<usize>,
+        slice_index: u64,
+        slices: u64,
+        print: bool,
+    ) -> Tally {
+        let width = universe.len();
+        assert!(width <= 40, "宇宙最多 40 个写");
+        let position_of: BTreeMap<usize, usize> = universe.iter().enumerate().map(|(position, index)| (*index, position)).collect();
+        let mut group_masks: Vec<u64> = Vec::new();
+        let mut covered: u64 = 0;
+        for group in groups {
+            assert!(group.len() <= 16, "组不超过 16 个写");
+            let mut mask: u64 = 0;
+            for write_index in group {
+                mask |= 1u64 << position_of[write_index];
+            }
+            assert_eq!(mask & covered, 0, "每个写恰在一组里");
+            covered |= mask;
+            group_masks.push(mask);
+        }
+        assert_eq!(covered.count_ones() as usize, width, "每个写恰在一组里：宇宙里的写都分了组");
+        let landed_of = |mask: u64| -> Vec<usize> { (0..width).filter(|bit| (mask >> bit) & 1 == 1).map(|bit| universe[bit]).collect() };
+        let baseline = judge(&[]);
+        let tables: Vec<BTreeMap<u64, Outcome>> = group_masks
+            .iter()
+            .map(|group_mask| {
+                let mut table = BTreeMap::new();
+                let mut submask = *group_mask;
+                while submask != 0 {
+                    table.insert(submask, judge(&landed_of(submask)));
+                    submask = (submask - 1) & group_mask;
+                }
+                table
+            })
+            .collect();
+        let listed: Option<Vec<u64>> = max_groups.map(|k| masks_touching_at_most(&group_masks, k));
+        let total: u64 = match &listed {
+            Some(list) => u64::try_from(list.len()).expect("状态数"),
+            None => 1u64 << width,
+        };
+        let from = u64::try_from(u128::from(total) * u128::from(slice_index) / u128::from(slices)).expect("片起点");
+        let to = u64::try_from(u128::from(total) * u128::from(slice_index + 1) / u128::from(slices)).expect("片终点");
+        let (threads, _source) = crash_point_replay_worker_threads();
+        let next_chunk = AtomicU64::new(0);
+        let done = AtomicU64::new(0);
+        let printed_mismatches = AtomicU64::new(0);
+        let mismatch_lines: Mutex<Vec<String>> = Mutex::new(Vec::new());
+        let started = Instant::now();
+        let merged = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..threads.max(1))
+                .map(|_| {
+                    scope.spawn(|| {
+                        let mut local = Tally::default();
+                        loop {
+                            let chunk = next_chunk.fetch_add(1, Ordering::Relaxed);
+                            let chunk_start = from.saturating_add(chunk.saturating_mul(CHUNK_OF_STATES));
+                            if chunk_start >= to {
+                                break;
+                            }
+                            let chunk_end = to.min(chunk_start + CHUNK_OF_STATES);
+                            for position in chunk_start..chunk_end {
+                                let mask = match &listed {
+                                    Some(list) => list[usize::try_from(position).expect("序号")],
+                                    None => position,
+                                };
+                                let actual = judge(&landed_of(mask));
+                                let parts: Vec<&Outcome> = group_masks
+                                    .iter()
+                                    .zip(tables.iter())
+                                    .filter_map(|(group_mask, table)| {
+                                        let submask = mask & group_mask;
+                                        if submask == 0 {
+                                            None
+                                        } else {
+                                            table.get(&submask)
+                                        }
+                                    })
+                                    .collect();
+                                let union_items = union_of(&baseline, &parts);
+                                let delta_items = delta_of(&baseline, &parts);
+                                local.states += 1;
+                                local.real_red += u64::from(actual.0);
+                                local.union_red_differs += u64::from(actual.0 != !union_items.is_empty());
+                                local.union_items_differ += u64::from(actual.1 != union_items);
+                                local.union_items_missing_from_the_synthesis += u64::from(!actual.1.is_subset(&union_items));
+                                local.union_items_not_in_the_real_judgement += u64::from(!union_items.is_subset(&actual.1));
+                                local.delta_red_differs += u64::from(actual.0 != !delta_items.is_empty());
+                                local.delta_items_differ += u64::from(actual.1 != delta_items);
+                                local.delta_items_missing_from_the_synthesis += u64::from(!actual.1.is_subset(&delta_items));
+                                local.delta_items_not_in_the_real_judgement += u64::from(!delta_items.is_subset(&actual.1));
+                                if (actual.1 != union_items || actual.1 != delta_items) && printed_mismatches.fetch_add(1, Ordering::Relaxed) < 8 {
+                                    mismatch_lines.lock().expect("锁").push(format!(
+                                        "PROBE_EXHAUST_MISMATCH label={label} segment={segment_index} mask={mask:#x} real={:?} union={union_items:?} delta={delta_items:?}",
+                                        actual.1
+                                    ));
+                                }
+                            }
+                            let before = done.fetch_add(chunk_end - chunk_start, Ordering::Relaxed);
+                            let after = before + (chunk_end - chunk_start);
+                            if print && before / PROGRESS_EVERY_STATES != after / PROGRESS_EVERY_STATES {
+                                println!("PROBE_EXHAUST_PROGRESS label={label} segment={segment_index} done={after} of={}", to - from);
+                            }
+                        }
+                        local
+                    })
+                })
+                .collect();
+            let mut merged = Tally::default();
+            for handle in handles {
+                merged.add(&handle.join().expect("判定线程没有 panic"));
+            }
+            merged
+        });
+        assert_eq!(merged.states, to - from, "片里每个序号恰判一次");
+        if print {
+            for line in mismatch_lines.lock().expect("锁").iter() {
+                println!("{line}");
+            }
+            let seconds = started.elapsed().as_secs_f64();
+            println!(
+                "PROBE_EXHAUST_SLICE label={label} segment={segment_index} writes={width} groups={} max_groups={max_groups:?} slice={slice_index}/{slices} masks_from={from} masks_to={to} of={total} \
+                 judged={} seconds={seconds:.1} states_per_second={:.1} real_red={} union_red_differs={} union_items_differ={} \
+                 union_items_missing_from_the_synthesis={} union_items_not_in_the_real_judgement={} delta_red_differs={} delta_items_differ={} \
+                 delta_items_missing_from_the_synthesis={} delta_items_not_in_the_real_judgement={}",
+                groups.len(),
+                merged.states,
+                merged.states as f64 / seconds.max(0.000_001),
+                merged.real_red,
+                merged.union_red_differs,
+                merged.union_items_differ,
+                merged.union_items_missing_from_the_synthesis,
+                merged.union_items_not_in_the_real_judgement,
+                merged.delta_red_differs,
+                merged.delta_items_differ,
+                merged.delta_items_missing_from_the_synthesis,
+                merged.delta_items_not_in_the_real_judgement,
+            );
+        }
+        merged
+    }
+}

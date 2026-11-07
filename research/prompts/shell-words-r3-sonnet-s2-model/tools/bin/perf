@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-# 假的 perf：记一笔；perf stat|record|trace [选项] 命令 → 前台跑那条命令
-source "$(dirname "${BASH_SOURCE[0]}")/../stublib.sh"
-stub_log 'perf' "$@"
-shift
-while [ "$#" -gt 0 ] && [[ "$1" == -* ]]; do shift; done
-"$@"; exit $?

@@ -1,7 +1,0 @@
-E7RESULT name=config table_rows=4 unit_test_modules=test_revision_11 timeout_seconds=300
-E7RESULT name=anchor mutation=R2P-12_H30_库根经_~_或相对路径也收（两台各是一份库） hits=1 files=reuse_library_root.py
-E7RESULT name=anchor mutation=R2P-13_H30_没填时取家目录下那一份（改前的取法） hits=1 files=reuse_library_root.py
-E7RESULT name=anchor mutation=R2P-14_单元编排层_run_不拒经_~_取的库根 hits=1 files=segment_one_units_revision_11.py
-E7RESULT name=anchor mutation=R2P-15_require_library_root_不抛 hits=1 files=reuse_library_root.py
-E7RESULT name=baseline unit_tests=red
-E7RESULT name=done emitted=7

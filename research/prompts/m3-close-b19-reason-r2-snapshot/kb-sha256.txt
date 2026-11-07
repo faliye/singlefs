@@ -1,6 +1,0 @@
-70d8beba108c05c12805e4cf35a6fed2b3cd11d517bebb993068aea0f312be6f  crates/singlefs-checker/invariants/05-空间记账.md
-659bb3eb51268bc1d3b4143c1b1380c0dc951b9f662c1ad2b8e6627a30e8ff2f  crates/singlefs-checker/invariants/02-根环.md
-bdc6ccc6103c89199ec3ffe796aba411855139ed44c86dc9e8c70aaeff0704cd  .claude/kb/checks-owed.md
-cd991ff2a3df5f9a68558f31eda30a139aaa6bea91b452cccf5311f83b7ee0d8  crates/singlefs-checker/invariants/07-分配器.md
-0ac0470cfa93b2fd5b2e48e165a9d788a7bb61e2504f35fde726a376d6646fd1  .claude/kb/experiments/112-legacy-writer-encountering-unknown-trees.en.md
-3e86833b26841f6de0b0443a481a40535d305ae9aebfda14ab655a83b1963ef1  .claude/kb/experiments/112-旧ライターが未知のツリーに遭遇した場合.ja.md

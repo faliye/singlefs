@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-source "$(dirname "${BASH_SOURCE[0]}")/../stublib.sh"
-stub_log 'rustup' "$@"
-[ "$1" = run ] && { shift 2; "$@"; exit $?; }
-exit 0

@@ -1,3 +1,0 @@
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in Ns
-test two_genesis_ring_slots_pinned_at_txg_zero_carry_the_lower_ring_slot_as_the_pinned_ring_slot ... FAILED
-thread 'two_genesis_ring_slots_pinned_at_txg_zero_carry_the_lower_ring_slot_as_the_pinned_ring_slot' panicked at crates/singlefs-harness/tests/common_images_for_the_checker_tier/root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot.rs:858:9:

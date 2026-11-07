@@ -1,4 +1,0 @@
-PROBE name=u6_rows_deleted mount_number=366 deleted=364 rows_after_the_mount=2
-PROBE name=u6_summary mounts=420 not_swept=419 rows_deleted=1 no_row_deleted=0 other=0 max_rows_at_a_not_swept_decision=365 max_rows_after_a_mount=365 mounts_with_rows_over_one_page=0
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in Ns
-test u6_the_default_threshold_starts_the_sweep_at_366_rows_and_the_chain_stays_in_one_page ... PROBE name=u6_first_sweep mount_number=366 last_not_swept_rows=365 rows_after_the_mount=2

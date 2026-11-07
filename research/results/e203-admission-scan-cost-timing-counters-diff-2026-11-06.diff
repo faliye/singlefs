@@ -1,0 +1,1001 @@
+--- a/crates/singlefs-core/src/admission.rs
++++ b/crates/singlefs-core/src/admission.rs
+@@ -1032,6 +1032,7 @@
+             .all(|role| space_budget_of_role(*role) == SpaceBudgetOfARole::OrdinaryAllocation),
+         "只交普通分配那一半的角色：{ordinary_allocation_roles:?}"
+     );
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::UnitsOfAPublishToLand);
+     let data_units = ordinary_allocation_roles
+         .iter()
+         .filter(|role| role.is_a_data_unit())
+@@ -1345,6 +1346,8 @@
+             value: entry.value,
+             sequence: entry.sequence,
+         });
++    let _e203_attribution = crate::transaction::e203_scan::attribute(crate::transaction::e203_scan::Row::CheckpointCostAccountingTreePlan);
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::CheckpointCostAccountingTreePlan);
+     let keys_after_that_publish: BTreeSet<CodeTwoTreeKey> = rows_written_by_that_publish
+         .chain(version_to_build_on.inode_number_watermark_steps())
+         .map(|entry| CodeTwoTreeKey::new(&entry.key_bytes(), CodeTwoKeyFieldWidths::ACCOUNTING))
+--- a/crates/singlefs-core/src/allocation_record_tree.rs
++++ b/crates/singlefs-core/src/allocation_record_tree.rs
+@@ -312,6 +312,7 @@
+     geometry: &AllocationRecordTreeGeometry,
+     records: &[AllocationRecord],
+ ) -> BTreeMap<AllocationRecordTreeNode, Vec<AllocationRecord>> {
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::RecordsOfEachLeaf);
+     let mut by_leaf: BTreeMap<AllocationRecordTreeNode, Vec<AllocationRecord>> = BTreeMap::new();
+     for record in records {
+         assert!(
+@@ -369,6 +370,7 @@
+     previous_records: &[AllocationRecord],
+     records_after: &[AllocationRecord],
+ ) -> BTreeSet<AllocationRecordTreeNode> {
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::RecordsOfEachLeaf);
+     let before = records_of_each_leaf(geometry, previous_records);
+     let after = records_of_each_leaf(geometry, records_after);
+     let mut changed = BTreeSet::new();
+@@ -431,6 +433,7 @@
+     nodes_after: &BTreeSet<AllocationRecordTreeNode>,
+     rewritten: &BTreeSet<AllocationRecordTreeNode>,
+ ) -> AllocationRecordTreePlan {
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::AllocationRecordTreePlan);
+     let nodes = nodes_after
+         .iter()
+         .map(|node| {
+--- a/crates/singlefs-core/src/allocator.rs
++++ b/crates/singlefs-core/src/allocator.rs
+@@ -575,6 +575,7 @@
+         &self,
+         cluster_segments: &BTreeSet<SlotNumber>,
+     ) -> u64 {
++        let _e203_timer_s14_timing = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::ClusterSegmentSum);
+         let pairs_inside_the_cluster_segments: u64 = cluster_segments
+             .iter()
+             .map(|segment_start| {
+@@ -594,6 +595,7 @@
+                     .expect("聚簇段在这块盘的单元区里：各盘一致答出来的整段")
+             })
+             .sum();
++        drop(_e203_timer_s14_timing);
+         self.unblocked_slot_pairs - pairs_inside_the_cluster_segments
+     }
+ 
+@@ -970,6 +972,7 @@
+         // 起点在聚簇段边界上（`UnitAreaStart` 的不变量）⇒ 是偶数槽，按 2 槽步进的候选都 32768 对齐。
+         let mut candidate = self.unit_area_start.slot().0;
+         let end = self.unit_area_end_slot();
++        let _e203_timer_s26_timing = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::UserDataSlotLinearScan);
+         while candidate + 1 < end {
+             let inside_cluster_segment = cluster_segments.iter().any(|segment| {
+                 candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS
+@@ -985,6 +988,7 @@
+             }
+             candidate += 2;
+         }
++        drop(_e203_timer_s26_timing);
+         None
+     }
+ 
+@@ -1002,6 +1006,7 @@
+     ) -> Option<SlotNumber> {
+         let per_segment = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+         let full_segments = self.allocated.len() / per_segment;
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::EmptySegmentLinearScan);
+         (0..full_segments)
+             .find(|segment| {
+                 self.used_per_segment[*segment] == 0
+@@ -1039,6 +1044,7 @@
+     ) -> Option<SlotNumber> {
+         let unit_area_end = self.unit_area_end_slot();
+         let mut candidate = self.unit_area_start.slot().0;
++        let _e203_timer_s29_timing = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::FallbackSlotLinearScan);
+         while candidate + footprint.slots() <= unit_area_end {
+             let is_whole_span_unblocked = (candidate..candidate + footprint.slots()).all(|slot| {
+                 !self.is_blocked_for_commit_generated(SlotNumber(slot))
+@@ -1049,6 +1055,7 @@
+             }
+             candidate += footprint.alignment_in_slots();
+         }
++        drop(_e203_timer_s29_timing);
+         None
+     }
+ 
+@@ -1149,6 +1156,7 @@
+     generation: CheckpointTxg,
+ ) -> RecordAtThePlacementSlot {
+     let placement_end = placement.slot.0 + placement.span;
++    let _e203_timer_s27_filter_timing = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::RecordIntersectionFilter);
+     let intersecting_record_slots: Vec<SlotNumber> = records
+         .iter()
+         .filter(|record| {
+@@ -1158,6 +1166,7 @@
+         })
+         .map(|record| record.slot)
+         .collect();
++    drop(_e203_timer_s27_filter_timing);
+     let placement_slot_was_reclaimed = reclaimed.contains(&(device, placement.slot));
+     let mut record_at_the_placement_slot = RecordAtThePlacementSlot::Absent;
+     for record_slot in intersecting_record_slots {
+@@ -1169,17 +1178,22 @@
+             placement.span
+         );
+         if record_slot == placement.slot {
++            let _e203_timer_s27_find_timing = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::RecordIntersectionFilter);
+             let existing = records
+                 .iter_mut()
+                 .find(|record| record.device == device && record.slot == record_slot)
+                 .expect("上面刚从记录里找出这个槽");
++            drop(_e203_timer_s27_find_timing);
+             assert!(existing.is_released, "回收过的落点的记录该是已释放");
+             existing.span_slots = u16::try_from(placement.span).expect("跨度 2 字节");
+             existing.generation = generation;
+             existing.is_released = false;
+             record_at_the_placement_slot = RecordAtThePlacementSlot::RewrittenFromReclaimed;
+         } else {
+-            records.retain(|record| !(record.device == device && record.slot == record_slot));
++            {
++                let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::RecordIntersectionFilter);
++                records.retain(|record| !(record.device == device && record.slot == record_slot));
++            }
+         }
+     }
+     assert!(
+@@ -2206,6 +2220,7 @@
+         device: DeviceIdentity,
+         slot: SlotNumber,
+     ) -> Option<&AllocationRecord> {
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::AllocatorReleaseLinearFind);
+         self.records
+             .iter()
+             .find(|record| record.device == device && record.slot == slot)
+@@ -4568,3 +4583,46 @@
+         }
+     }
+ }
++
++/// E203（准入之前扫类的步代价）只读出的帮助：一份整份拷贝要拷的集合元素个数，与这次挂载开过的聚簇段数。不进任何判定。
++impl PoolAllocator {
++    #[must_use]
++    pub fn e203_whole_copy_elements(&self) -> usize {
++        let per_device: usize = self.devices.iter().map(DeviceFreeMap::e203_whole_copy_elements).sum();
++        per_device
++            + self.records.len()
++            + self.cluster_segments.len()
++            + self.reclaimed.len()
++            + self.root_ring.as_ref().map_or(0, RootRingOccupancy::e203_elements)
++    }
++
++    #[must_use]
++    pub fn e203_cluster_segments_opened(&self) -> usize {
++        self.cluster_segments.len()
++    }
++}
++
++impl DeviceFreeMap {
++    fn e203_whole_copy_elements(&self) -> usize {
++        self.allocated.len()
++            + self.isolated.len()
++            + self.held_until_floor_takes_effect.len()
++            + self.used_per_segment.len()
++            + self.unreleased_per_segment.len()
++            + self.isolated_per_segment.len()
++            + self.held_per_segment.len()
++            + self.unblocked_slot_pairs_per_segment.len()
++            + self.segments_reclaimed_not_yet_discarded.len()
++    }
++}
++
++impl RootRingOccupancy {
++    fn e203_elements(&self) -> usize {
++        self.occupants.len()
++            + self
++                .placements_named_by_unapplied_journal_records
++                .values()
++                .map(Vec::len)
++                .sum::<usize>()
++    }
++}
+--- a/crates/singlefs-core/src/code_two_tree.rs
++++ b/crates/singlefs-core/src/code_two_tree.rs
+@@ -647,6 +647,7 @@
+         capacity.leaf_entries >= 1 && capacity.internal_entries >= 2,
+         "叶至少装 1 条、内部节点至少装 2 个孩子：切出来的两半才都不空、根分裂才装得下两个孩子"
+     );
++    let _e203_timer = crate::transaction::e203_scan::timer_attributed();
+     let previous_keys: BTreeSet<CodeTwoTreeKey> =
+         previous.keys_in_order().into_iter().cloned().collect();
+     let mut root = match previous.root() {
+--- a/crates/singlefs-core/src/extent_tree.rs
++++ b/crates/singlefs-core/src/extent_tree.rs
+@@ -214,6 +214,7 @@
+     inodes_with_an_entry_after_this_publish: &BTreeSet<u64>,
+     inodes_whose_entry_changed: &BTreeSet<u64>,
+ ) -> ExtentUpperSegmentPlan {
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::ExtentUpperSegmentPlan);
+     let (_, positions_after_this_publish) = canonical_upper_segment_of_the_inodes_with_an_entry(
+         inodes_with_an_entry_after_this_publish,
+     );
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -3698,6 +3698,7 @@
+         table: &'table [Entry],
+         identity_of: impl Fn(&'table Entry) -> Identity,
+     ) -> Self {
++        let _e203_timer = crate::transaction::e203_scan::timer_attributed();
+         let mut identities_with_their_entries = Vec::with_capacity(table.len());
+         // 迭代上界是表长；按表的次序收：同一身份留最先那一项靠的就是这个次序（`keeping_the_first_value_of_each_identity`）。
+         for entry in table {
+@@ -4114,6 +4115,7 @@
+     /// 与装上段叶写不写第一个文件那一条（`build_extent_tree`）同一条判法，形状与条目才对得上。
+     #[must_use]
+     pub fn inodes_with_an_extent_upper_leaf_entry(&self) -> BTreeSet<u64> {
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::InodesWithAnExtentEntrySet);
+         let first_file_has_an_entry = !self.data_pointers.is_empty()
+             || ExtentUpperLeafTarget::of_a_file_without_data_units(
+                 self.inode_record.map(|record| record.size),
+@@ -4192,6 +4194,7 @@
+         &self,
+         inode: InodeNumber,
+     ) -> Option<&FileOfAnInodeOtherThanTheFirst> {
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::FileOtherThanTheFirstLinearFind);
+         self.files_other_than_the_first
+             .iter()
+             .find(|file| file.inode == inode)
+@@ -4200,6 +4203,7 @@
+     /// 这一版 inode 树里号是 `inode` 的那条记录（删除中的也在）。
+     #[must_use]
+     pub fn inode_record_of(&self, inode: InodeNumber) -> Option<InodeRecord> {
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::InodeRecordLinearFind);
+         self.inode_leaf_containers
+             .iter()
+             .flat_map(|container| container.contents.records.iter())
+@@ -4229,6 +4233,7 @@
+     /// 这一版 inode 树里的叶容器内容，交给 `crate::inode_tree` 算下一次发布的落法。
+     #[must_use]
+     pub fn inode_leaf_container_contents(&self) -> Vec<InodeLeafContainer> {
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::InodeLeafContainerCopy);
+         self.inode_leaf_containers
+             .iter()
+             .map(|container| container.contents.clone())
+@@ -4267,6 +4272,7 @@
+     // （`mount::roll_back_by_a_forward_publish` 遇到树 ID 集合不同就拒），这里不按树段分；做克隆时按树段分开取、建克隆那次给新头留一行。
+     #[must_use]
+     pub fn inode_number_watermark_steps(&self) -> Vec<AccountingEntry> {
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::InodeNumberWatermarkSteps);
+         let version_txg = self.root.checkpoint_txg;
+         let mut steps: Vec<AccountingEntry> = self
+             .accounting_entries
+@@ -4372,6 +4378,7 @@
+     /// 要对约 P 个角色各查一次的（照抄全部单元、整理读全部映射条目）先建 [`TransactionOutput::units_by_role`]（七·6）。
+     #[must_use]
+     pub fn unit(&self, identity: TransactionUnit) -> &PublishedUnit {
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::RootHeaderLinearFind);
+         self.units
+             .iter()
+             .find(|unit| unit.identity == identity)
+@@ -4632,6 +4639,7 @@
+     roles: &[TransactionUnit],
+     kept_for_the_snapshots: &[TransactionUnit],
+ ) -> Result<Vec<Placement>, PublishError> {
++    let _e203_attribution = crate::transaction::e203_scan::attribute(crate::transaction::e203_scan::Row::ReleaseJudgementVersionIndexes);
+     let _inside_the_releases =
+         lookup_work::entering(LookupSite::MappingEntriesOfTheReleaseJudgement);
+     let mut placements = Vec::new();
+@@ -4725,6 +4733,7 @@
+     replaced_chain: &[NodePointer],
+     allocator: &PoolAllocator,
+ ) -> Result<Vec<Placement>, PublishError> {
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::InstanceTableChain);
+     replaced_chain
+         .iter()
+         .enumerate()
+@@ -6575,6 +6584,7 @@
+     let Some(previous_version) = previous else {
+         return Ok(DeadlistChangesOfThisPublish::default());
+     };
++    let _e203_attribution = crate::transaction::e203_scan::attribute(crate::transaction::e203_scan::Row::DeadlistChangesIndexes);
+     let _inside_the_snapshot_judgement = lookup_work::entering(LookupSite::SnapshotJudgement);
+     // 换下的用户可见角色问在上一版里有没有落点：按 inode 号找文件的那份读者每走一遍建至多一次，这一遍进一次这一处。
+     let inside_the_file_lookups =
+@@ -6682,6 +6692,7 @@
+         entries_released_by_the_destruction.push((entry, locations));
+     }
+     drop(inside_the_destruction);
++    let _e203_timer_s19_entries_after = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::DeadlistChangesIndexes);
+     let mut entries_after: BTreeMap<CodeTwoTreeKey, DeadlistEntry> = previous_version
+         .deadlist_entries
+         .iter()
+@@ -6703,6 +6714,7 @@
+                 )
+             })
+             .collect();
++    drop(_e203_timer_s19_entries_after);
+     for (entry, _) in &entries_released_by_the_destruction {
+         let released_entry = entries_after.remove(&CodeTwoTreeKey::new(
+             &entry.key_bytes(),
+@@ -6941,6 +6953,7 @@
+     key_of_a_unit_born_in_this_publish: &dyn Fn(u8, usize) -> Vec<u8>,
+     key_carried_from_the_previous_version: &dyn Fn(TransactionUnit) -> Vec<u8>,
+ ) -> Vec<(TransactionUnit, Vec<u8>)> {
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::MappedUnitsOfContainerTrees);
+     let mut mapped_units = Vec::new();
+     let mut birth_sequence = 0;
+     // 重写的是最右端连着的那几片：序号不小于头一片就重写了，不在重写清单上逐个找（运行时决策路径，`.claude/rules/fs-design.md`
+@@ -7694,6 +7707,7 @@
+         "第一个文件的单元不进第一个文件之外的那一族"
+     );
+     let changed_inode = change.inode();
++    let _e203_timer_s5_timing = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::FilesOtherThanTheFirstPlan);
+     let mut files: Vec<FileOtherThanTheFirstPlan> = previous
+         .map(|previous_version| {
+             previous_version
+@@ -7719,6 +7733,7 @@
+                 .collect()
+         })
+         .unwrap_or_default();
++    drop(_e203_timer_s5_timing);
+     let previous_file_of = |inode: InodeNumber| {
+         previous.and_then(|previous_version| previous_version.file_other_than_the_first(inode))
+     };
+@@ -7874,6 +7889,7 @@
+     extent_tree: &ExtentTreePlan,
+     files_other_than_the_first: &FilesOtherThanTheFirstPlan,
+ ) -> Vec<TransactionUnit> {
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::ExtentRolesRewrittenScan);
+     let upper_root_level = extent_tree.upper_root_level();
+     let first_file_lower = extent_tree
+         .lower_nodes
+@@ -8017,6 +8033,7 @@
+             .all(|step| step.statistic == STATISTIC_INODE_WATERMARK && step.generation < txg),
+         "照抄来的台阶行是上一版 inode 号水位那一统计量的行，代段都早于这次的 txg {txg:?}（上一版的 txg 小于这次的）"
+     );
++    let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::AccountingEntriesOfThisPublish);
+     let mut entries: Vec<AccountingEntry> = PoolWideAccountingRow::ALL
+         .into_iter()
+         .map(|row| AccountingEntry {
+@@ -8384,6 +8401,7 @@
+             | DeletionStepOfThePublish::TruncationFinalBatch { .. }
+             | DeletionStepOfThePublish::NotADeletion => {}
+         }
++        let _e203_timer_s3_inode_leaf_writer_copy = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::InodeLeafWriterCopy);
+         let inode_tree = match deletion_and_lineage.step {
+             DeletionStepOfThePublish::FinalBatch { inode } => {
+                 assert!(
+@@ -8408,6 +8426,7 @@
+         };
+         // n_live 与 n_记录随一版带着、按这次写进与删掉的那几条改（准入读它，`.claude/rules/fs-design.md`「空间统计与配额落在第一格」）：
+         // 上一版里那个号的记录按叶序折半找，不遍历 inode 树。
++        drop(_e203_timer_s3_inode_leaf_writer_copy);
+         let inode_record_counts_before = previous
+             .map_or(InodeRecordCounts::OF_AN_EMPTY_INODE_TREE, |version| {
+                 version.inode_record_counts
+@@ -8624,6 +8643,7 @@
+         } else {
+             DeletedInodesRootOrigin::RewrittenThisPublish
+         };
++        let _e203_timer_s9_tombstone_container_copy = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::TombstoneContainerCopy);
+         let tombstone_containers_before: Vec<TombstoneContainer> = previous
+             .map(|version| {
+                 version
+@@ -8634,6 +8654,7 @@
+             })
+             .unwrap_or_default();
+         // 上一版的形状借过来用，不先照抄一份：追加那一支只拿它的引用（新一版的形状在追加里从它造），照抄那一支才要一份自己的。
++        drop(_e203_timer_s9_tombstone_container_copy);
+         let zero_root_shape = ContainerTreeShape::zero_root();
+         let tombstone_shape_before: &ContainerTreeShape = previous
+             .map_or(&zero_root_shape, |version| {
+@@ -8669,6 +8690,7 @@
+         // 退役树（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 3–5 条）：这次身份消失的每一片 inode 叶容器
+         // （删空摘掉、被左邻吸收）追加一条，死亡 txg = 这次发布的 checkpoint_txg，按它们在上一版里的叶序；写者只追加，不去重、不覆盖。
+         // 借不写（右片保留身份，不在 `retired` 里）。没有身份消失的发布整棵照抄。
++        let _e203_timer_s10_retirement_container_copy = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::RetirementContainerCopy);
+         let retirement_containers_before: Vec<RetirementContainer> = previous
+             .map(|version| {
+                 version
+@@ -8678,6 +8700,7 @@
+                     .collect()
+             })
+             .unwrap_or_default();
++        drop(_e203_timer_s10_retirement_container_copy);
+         let retirement_shape_before: &ContainerTreeShape = previous
+             .map_or(&zero_root_shape, |version| {
+                 &version.retirement_tree_index_nodes.shape
+@@ -8957,6 +8980,7 @@
+         trees: &FileVersionTreeIdentifiers,
+         deletion_and_lineage: &DeletionAndLineageOfThePublish,
+     ) -> Result<LineageTreeAfterThisPublish, PublishError> {
++        let _e203_timer_s17_lineage_container_copy = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::LineageContainerCopy);
+         let containers_before: Vec<LineageContainer> = previous
+             .map(|version| {
+                 version
+@@ -8967,6 +8991,7 @@
+             })
+             .unwrap_or_default();
+         // 上一版的形状借过来用（同墓碑树那一处）：追加那一支只拿引用，照抄那一支才要一份自己的。
++        drop(_e203_timer_s17_lineage_container_copy);
+         let zero_root_shape = ContainerTreeShape::zero_root();
+         let shape_before: &ContainerTreeShape = previous.map_or(&zero_root_shape, |version| {
+             &version.lineage_tree_index_nodes.shape
+@@ -9011,6 +9036,7 @@
+         capacities: CodeTwoTreeNodeCapacities,
+         mapping_keys_moved_by_this_publish: &[Vec<u8>],
+     ) -> Result<MultiLevelTreesOfThisPublish, PublishError> {
++        let _e203_attribution = crate::transaction::e203_scan::attribute(crate::transaction::e203_scan::Row::MultiLevelTreePlanning);
+         let txg = self.txg;
+         let instance = self.instance;
+         let empty_shape = CodeTwoTreeShape::default();
+@@ -9027,6 +9053,7 @@
+         // 记账树：每次发布整批重写（代 = 这次的 txg），key 只看统计量、树、盘与代，不看值；inode 号水位的台阶行照抄上一版的。
+         let inode_number_watermark_steps_carried =
+             previous.map_or_else(Vec::new, TransactionOutput::inode_number_watermark_steps);
++        let _e203_timer_s20_accounting_keys = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::MultiLevelTreePlanning);
+         let accounting_keys: BTreeSet<CodeTwoTreeKey> = accounting_entries_of_this_publish(
+             txg,
+             trees.inode,
+@@ -9038,6 +9065,7 @@
+         .iter()
+         .map(|entry| CodeTwoTreeKey::new(&entry.key_bytes(), CodeTwoKeyFieldWidths::ACCOUNTING))
+         .collect();
++        drop(_e203_timer_s20_accounting_keys);
+         let accounting_tree = plan_the_tree_after_this_publish(
+             previous_shape_of(MultiLevelCodeTwoTree::Accounting),
+             &accounting_keys,
+@@ -9045,11 +9073,13 @@
+         )
+         .map_err(refused(MultiLevelCodeTwoTree::Accounting))?;
+         // deadlist 树（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3）：按这次之后的条目规划，一条都不剩时零根。
++        let _e203_timer_s20_deadlist_keys = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::MultiLevelTreePlanning);
+         let deadlist_keys: BTreeSet<CodeTwoTreeKey> = deadlist
+             .entries_after_this_publish
+             .iter()
+             .map(|entry| CodeTwoTreeKey::new(&entry.key_bytes(), CodeTwoKeyFieldWidths::DEADLIST))
+             .collect();
++        drop(_e203_timer_s20_deadlist_keys);
+         let deadlist_tree = plan_the_tree_after_this_publish_down_to_a_zero_root(
+             previous_shape_of(MultiLevelCodeTwoTree::Deadlist),
+             &deadlist_keys,
+@@ -9071,6 +9101,8 @@
+             )
+         };
+         // 照抄的角色约有上一版那么多个，每个按角色取上一版的 key：先建上一版 `mapped_units` 的索引（七·6），不逐个在表上找。
++        let _e203_attribution_s36_mapped_units_table = crate::transaction::e203_scan::attribute(crate::transaction::e203_scan::Row::MappedUnitsWholeTable);
++        let _e203_timer_s36_mapped_units_table = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::MappedUnitsWholeTable);
+         let mapped_units_of_the_previous_version =
+             previous.map(TransactionOutput::mapped_units_by_role);
+         let carried = |identity: TransactionUnit| {
+@@ -9422,6 +9454,9 @@
+             &carried,
+         ));
+         // 被活快照钉住的单元的映射条目留在树里（判决 S3 的 α）：它们的 key 与这一版的单元的 key 一起排。
++        drop(_e203_timer_s36_mapped_units_table);
++        drop(_e203_attribution_s36_mapped_units_table);
++        let _e203_timer_s20_mapping_keys = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::MultiLevelTreePlanning);
+         let mapping_keys: BTreeSet<CodeTwoTreeKey> = mapped_units
+             .iter()
+             .map(|(_, key)| key)
+@@ -9433,6 +9468,7 @@
+             )
+             .map(|key| CodeTwoTreeKey::new(key, CodeTwoKeyFieldWidths::CENTRAL_MAPPING))
+             .collect();
++        drop(_e203_timer_s20_mapping_keys);
+         assert_eq!(
+             mapping_keys.len(),
+             mapped_units.len() + deadlist.kept_mapping_entries_after_this_publish.len(),
+@@ -9511,12 +9547,14 @@
+             CodeTwoTreeNodeOrigin::RewrittenThisPublish => None,
+         })
+         .collect();
++    let _e203_timer_s22_moved_tail = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::MovedEntriesPathTailFilter);
+     plan.replaced_previous_nodes = previous_shape
+         .nodes()
+         .iter()
+         .map(|node| node.position)
+         .filter(|position| !carried.contains(position))
+         .collect();
++    drop(_e203_timer_s22_moved_tail);
+     plan
+ }
+ 
+@@ -12605,8 +12643,12 @@
+ {
+     // 第一道：冻结着一次没重发的发布就在任何读写之前拒（D23（journal 的角色与格式） 已定项 14「这一版的失败处置」）。
+     refuse_while_a_publish_is_frozen(allocator)?;
++    crate::transaction::e203_scan::segment(crate::transaction::e203_scan::Segment::CallerBeforeTheJudgement);
+     // 整个分配器拷一份、失败就换回去：第一版每次发布约 450 KiB 的拷贝（两盘各一张 211968 位的位图），换来失败路径不留半新的池。
+-    let allocator_before_this_publish = allocator.clone();
++    let allocator_before_this_publish = {
++        let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::WholeAllocatorCopyBeforeTheJudgement);
++        allocator.clone()
++    };
+     let built = prepare_the_version_publish_relocating_units(
+         pool,
+         allocator,
+@@ -12620,6 +12662,7 @@
+         mapping_keys_whose_entries_change_without_a_relocation,
+         payloads_of_the_rewritten_data_units,
+     );
++    crate::transaction::e203_scan::segment(crate::transaction::e203_scan::Segment::Outside);
+     let (writes, output) = match built {
+         Ok(built) => built,
+         Err(refusal) => {
+@@ -12711,7 +12754,7 @@
+     unmount_marker: UnmountMarker,
+     deletion_and_lineage: &DeletionAndLineageOfThePublish,
+ ) -> Result<(PublishWrites, TransactionOutput), PublishError> {
+-    prepare_the_version_publish_relocating_units(
++    let e203_built = prepare_the_version_publish_relocating_units(
+         pool,
+         allocator,
+         plan,
+@@ -12723,7 +12766,9 @@
+         &[],
+         &[],
+         &[],
+-    )
++    );
++    crate::transaction::e203_scan::segment(crate::transaction::e203_scan::Segment::Outside);
++    e203_built
+ }
+ 
+ /// 合取 7（`全空聚簇段数 ≥ N₀`）管不管这一次发布（[`EmptyClusterSegmentsConjunctReach`]，D3（空间分配） 已定项 7 登记表第 7 行）：
+@@ -12793,6 +12838,7 @@
+ ) -> Result<PublishJudgedBeforeAnyReadOrWrite, PublishError> {
+     // 先算这次之后每棵树是什么样、这次重写哪些角色、换下哪些：只读（固定点在分配器的拷贝上走），条款没写的那几格与多层码 2 树的拒绝、
+     // 释放判定的错、取不到落点都在这里交回，盘上逐字节不变。记账行按分配器里的那几块盘展开（装记账行时读的是同一批）。
++    crate::transaction::e203_scan::segment(crate::transaction::e203_scan::Segment::BeforeTheLandingJudgement);
+     let device_identities_of_the_accounting_rows: Vec<DeviceIdentity> = allocator
+         .devices
+         .iter()
+@@ -12828,6 +12874,7 @@
+         )
+         .map_err(PublishError::SpaceAdmissionRefused)?;
+     }
++    crate::transaction::e203_scan::segment(crate::transaction::e203_scan::Segment::BetweenTheTwoJudgements);
+     let settled = settle_the_allocation_record_tree(
+         plan,
+         previous,
+@@ -12929,6 +12976,7 @@
+         )
+         .map_err(PublishError::SpaceAdmissionRefused)?;
+     }
++    crate::transaction::e203_scan::segment(crate::transaction::e203_scan::Segment::AfterTheJudgements);
+     Ok(PublishJudgedBeforeAnyReadOrWrite {
+         settled,
+         device_identities_of_the_accounting_rows,
+@@ -13332,6 +13380,7 @@
+                 .cloned(),
+         )
+         .collect();
++    let _e203_timer_s15_timing = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::AllocationRecordTreeNodeSet);
+     let (previous_nodes, previous_records): (
+         BTreeSet<AllocationRecordTreeNode>,
+         &[AllocationRecord],
+@@ -13345,9 +13394,12 @@
+     let mut rewritten: BTreeSet<AllocationRecordTreeNode> = BTreeSet::new();
+     let mut nodes_after: BTreeSet<AllocationRecordTreeNode> = previous_nodes.clone();
+     // 迭代上界是 ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT 轮；跨轮携带的是重写集（只增不减）与这一版的节点（换成上一轮走出来的那一批）。
++    drop(_e203_timer_s15_timing);
+     for _round in 0..ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT {
++        let _e203_timer_s16_intersection_timing = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::AllocationRecordTreePlan);
+         let rewritten_among_the_nodes_after: BTreeSet<AllocationRecordTreeNode> =
+             rewritten.intersection(&nodes_after).copied().collect();
++        drop(_e203_timer_s16_intersection_timing);
+         let allocation_plan = crate::allocation_record_tree::plan_the_tree_after_this_publish(
+             &previous_nodes,
+             &nodes_after,
+@@ -13390,7 +13442,10 @@
+             );
+             release.push(source);
+         }
+-        let mut rehearsal = allocator.clone();
++        let mut rehearsal = {
++            let _e203_timer = crate::transaction::e203_scan::timer(crate::transaction::e203_scan::Row::WholeAllocatorCopyInASettlingRound);
++            allocator.clone()
++        };
+         for placement in &release {
+             rehearsal.release(*placement, plan.txg);
+         }
+@@ -17791,3 +17846,393 @@
+         let _ = pressed_back.watermark_of_a_publish_without_a_previous_version();
+     }
+ }
++
++/// E203（准入之前扫类的步代价）只在副本里套上的读数：发布路径在两道准入之前每一行扫类的步数或独占计时，只读出、不进任何判定。
++pub mod e203_scan_timing {
++    use std::cell::RefCell;
++    use std::time::Instant;
++
++    /// 一次发布在哪一段：登记读法第 1 条（调用方段、落点判之前、两道之间、准入之后）。
++    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
++    pub enum Segment {
++        Outside,
++        CallerBeforeTheJudgement,
++        BeforeTheLandingJudgement,
++        BetweenTheTwoJudgements,
++        AfterTheJudgements,
++    }
++    const SEGMENTS: usize = 5;
++    impl Segment {
++        /// 产物里的段标记。
++        #[must_use]
++        pub fn tag(self) -> &'static str {
++            match self {
++                Segment::Outside => "outside",
++                Segment::CallerBeforeTheJudgement => "caller",
++                Segment::BeforeTheLandingJudgement => "before_landing",
++                Segment::BetweenTheTwoJudgements => "between",
++                Segment::AfterTheJudgements => "after",
++            }
++        }
++    }
++    const ALL_SEGMENTS: [Segment; SEGMENTS] = [
++        Segment::Outside,
++        Segment::CallerBeforeTheJudgement,
++        Segment::BeforeTheLandingJudgement,
++        Segment::BetweenTheTwoJudgements,
++        Segment::AfterTheJudgements,
++    ];
++
++    /// 登记第三节清单里的一行（计数名）。
++    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
++    pub enum Row {
++        WholeAllocatorCopyBeforeTheJudgement,
++        InodeLeafContainerCopy,
++        InodeLeafWriterCopy,
++        InodeRecordLinearFind,
++        FilesOtherThanTheFirstPlan,
++        FilesOtherThanTheFirstLowerNodeCopy,
++        FileOtherThanTheFirstLinearFind,
++        InodesWithAnExtentEntrySet,
++        ExtentUpperSegmentPlan,
++        TombstoneContainerCopy,
++        RetirementContainerCopy,
++        ExtentRolesRewrittenScan,
++        RootHeaderLinearFind,
++        CheckpointCostAccountingTreePlan,
++        ClusterSegmentSum,
++        AllocationRecordTreeNodeSet,
++        AllocationRecordTreePlan,
++        LineageContainerCopy,
++        InodeNumberWatermarkSteps,
++        DeadlistChangesIndexes,
++        MultiLevelTreePlanning,
++        MappedUnitsOfContainerTrees,
++        MovedEntriesPathTailFilter,
++        ReleaseJudgementVersionIndexes,
++        WholeAllocatorCopyInASettlingRound,
++        AllocatorReleaseLinearFind,
++        UserDataSlotLinearScan,
++        RecordIntersectionFilter,
++        EmptySegmentLinearScan,
++        FallbackSlotLinearScan,
++        RecordsOfEachLeaf,
++        AccountingEntriesOfThisPublish,
++        InstanceTableChain,
++        UnitsOfAPublishToLand,
++        MappedUnitsWholeTable,
++        UnlistedIndexOrPlanWork,
++    }
++    pub const ROW_COUNT: usize = 36;
++    const ALL_ROWS: [Row; ROW_COUNT] = [
++        Row::WholeAllocatorCopyBeforeTheJudgement,
++        Row::InodeLeafContainerCopy,
++        Row::InodeLeafWriterCopy,
++        Row::InodeRecordLinearFind,
++        Row::FilesOtherThanTheFirstPlan,
++        Row::FilesOtherThanTheFirstLowerNodeCopy,
++        Row::FileOtherThanTheFirstLinearFind,
++        Row::InodesWithAnExtentEntrySet,
++        Row::ExtentUpperSegmentPlan,
++        Row::TombstoneContainerCopy,
++        Row::RetirementContainerCopy,
++        Row::ExtentRolesRewrittenScan,
++        Row::RootHeaderLinearFind,
++        Row::CheckpointCostAccountingTreePlan,
++        Row::ClusterSegmentSum,
++        Row::AllocationRecordTreeNodeSet,
++        Row::AllocationRecordTreePlan,
++        Row::LineageContainerCopy,
++        Row::InodeNumberWatermarkSteps,
++        Row::DeadlistChangesIndexes,
++        Row::MultiLevelTreePlanning,
++        Row::MappedUnitsOfContainerTrees,
++        Row::MovedEntriesPathTailFilter,
++        Row::ReleaseJudgementVersionIndexes,
++        Row::WholeAllocatorCopyInASettlingRound,
++        Row::AllocatorReleaseLinearFind,
++        Row::UserDataSlotLinearScan,
++        Row::RecordIntersectionFilter,
++        Row::EmptySegmentLinearScan,
++        Row::FallbackSlotLinearScan,
++        Row::RecordsOfEachLeaf,
++        Row::AccountingEntriesOfThisPublish,
++        Row::InstanceTableChain,
++        Row::UnitsOfAPublishToLand,
++        Row::MappedUnitsWholeTable,
++        Row::UnlistedIndexOrPlanWork,
++    ];
++    impl Row {
++        #[must_use]
++        pub fn name(self) -> &'static str {
++            match self {
++                Row::WholeAllocatorCopyBeforeTheJudgement => "whole_allocator_copy_before_the_judgement",
++                Row::InodeLeafContainerCopy => "inode_leaf_container_copy",
++                Row::InodeLeafWriterCopy => "inode_leaf_writer_copy",
++                Row::InodeRecordLinearFind => "inode_record_linear_find",
++                Row::FilesOtherThanTheFirstPlan => "files_other_than_the_first_plan",
++                Row::FilesOtherThanTheFirstLowerNodeCopy => "files_other_than_the_first_lower_node_copy",
++                Row::FileOtherThanTheFirstLinearFind => "file_other_than_the_first_linear_find",
++                Row::InodesWithAnExtentEntrySet => "inodes_with_an_extent_entry_set",
++                Row::ExtentUpperSegmentPlan => "extent_upper_segment_plan",
++                Row::TombstoneContainerCopy => "tombstone_container_copy",
++                Row::RetirementContainerCopy => "retirement_container_copy",
++                Row::ExtentRolesRewrittenScan => "extent_roles_rewritten_scan",
++                Row::RootHeaderLinearFind => "root_header_linear_find",
++                Row::CheckpointCostAccountingTreePlan => "checkpoint_cost_accounting_tree_plan",
++                Row::ClusterSegmentSum => "cluster_segment_sum",
++                Row::AllocationRecordTreeNodeSet => "allocation_record_tree_node_set",
++                Row::AllocationRecordTreePlan => "allocation_record_tree_plan",
++                Row::LineageContainerCopy => "lineage_container_copy",
++                Row::InodeNumberWatermarkSteps => "inode_number_watermark_steps",
++                Row::DeadlistChangesIndexes => "deadlist_changes_indexes",
++                Row::MultiLevelTreePlanning => "multi_level_tree_planning",
++                Row::MappedUnitsOfContainerTrees => "mapped_units_of_container_trees",
++                Row::MovedEntriesPathTailFilter => "moved_entries_path_tail_filter",
++                Row::ReleaseJudgementVersionIndexes => "release_judgement_version_indexes",
++                Row::WholeAllocatorCopyInASettlingRound => "whole_allocator_copy_in_a_settling_round",
++                Row::AllocatorReleaseLinearFind => "allocator_release_linear_find",
++                Row::UserDataSlotLinearScan => "user_data_slot_linear_scan",
++                Row::RecordIntersectionFilter => "record_intersection_filter",
++                Row::EmptySegmentLinearScan => "empty_segment_linear_scan",
++                Row::FallbackSlotLinearScan => "fallback_slot_linear_scan",
++                Row::RecordsOfEachLeaf => "records_of_each_leaf",
++                Row::AccountingEntriesOfThisPublish => "accounting_entries_of_this_publish",
++                Row::InstanceTableChain => "instance_table_chain",
++                Row::UnitsOfAPublishToLand => "units_of_a_publish_to_land",
++                Row::MappedUnitsWholeTable => "mapped_units_whole_table",
++                Row::UnlistedIndexOrPlanWork => "unlisted_index_or_plan_work",
++            }
++        }
++    }
++
++    /// 一段里一行的读数。
++    #[derive(Clone, Debug)]
++    pub struct RowReading {
++        pub segment: &'static str,
++        pub row: &'static str,
++        pub calls: u64,
++        pub steps: u64,
++        pub scale: u64,
++        pub exclusive_nanos: u64,
++        /// 按身份建的索引上这一行归口到的查询次数，与每次查询的 ⌈log₂(索引项数 + 1)⌉ 之和（登记第五节 s19、s23、s36 的“查询次数 × lg”）。
++        pub queries: u64,
++        pub query_levels: u64,
++    }
++    /// 一条差量读数：哪一段、第几轮（固定点）、名字、值。
++    #[derive(Clone, Debug)]
++    pub struct DeltaReading {
++        pub segment: &'static str,
++        pub round: u32,
++        pub key: &'static str,
++        pub value: u64,
++    }
++    /// 一次发布准入之前读到的全部。
++    #[derive(Clone, Debug, Default)]
++    pub struct PublishRecord {
++        /// 经调用方进门（有调用方段）；抬 F 预演直接进 `prepare_the_version_publish` 的是 false。
++        pub had_caller_segment: bool,
++        pub rows: Vec<RowReading>,
++        /// 每段的段挂钟纳秒（计数构建里为空）。
++        pub segment_nanos: Vec<(&'static str, u64)>,
++        pub deltas: Vec<DeltaReading>,
++        /// 固定点走了几轮。
++        pub rounds: u32,
++    }
++
++    struct Open {
++        had_caller_segment: bool,
++        calls: Vec<u64>,
++        steps: Vec<u64>,
++        scale: Vec<u64>,
++        nanos: Vec<u64>,
++        queries: Vec<u64>,
++        query_levels: Vec<u64>,
++        segment_nanos: [u64; SEGMENTS],
++        deltas: Vec<DeltaReading>,
++        rounds: u32,
++    }
++    impl Open {
++        fn new(had_caller_segment: bool) -> Self {
++            let cells = SEGMENTS * ROW_COUNT;
++            Self {
++                had_caller_segment,
++                calls: vec![0; cells],
++                steps: vec![0; cells],
++                scale: vec![0; cells],
++                nanos: vec![0; cells],
++                queries: vec![0; cells],
++                query_levels: vec![0; cells],
++                segment_nanos: [0; SEGMENTS],
++                deltas: Vec::new(),
++                rounds: 0,
++            }
++        }
++        fn into_record(self) -> PublishRecord {
++            let mut rows = Vec::new();
++            for (segment_index, segment) in ALL_SEGMENTS.iter().enumerate() {
++                for (row_index, row) in ALL_ROWS.iter().enumerate() {
++                    let cell = segment_index * ROW_COUNT + row_index;
++                    if self.calls[cell] + self.steps[cell] + self.scale[cell] + self.nanos[cell] + self.queries[cell] > 0 {
++                        rows.push(RowReading {
++                            segment: segment.tag(),
++                            row: row.name(),
++                            calls: self.calls[cell],
++                            steps: self.steps[cell],
++                            scale: self.scale[cell],
++                            exclusive_nanos: self.nanos[cell],
++                            queries: self.queries[cell],
++                            query_levels: self.query_levels[cell],
++                        });
++                    }
++                }
++            }
++            let segment_nanos = ALL_SEGMENTS
++                .iter()
++                .enumerate()
++                .filter(|(index, _)| self.segment_nanos[*index] > 0)
++                .map(|(index, segment)| (segment.tag(), self.segment_nanos[index]))
++                .collect();
++            PublishRecord {
++                had_caller_segment: self.had_caller_segment,
++                rows,
++                segment_nanos,
++                deltas: self.deltas,
++                rounds: self.rounds,
++            }
++        }
++    }
++
++    struct Thread {
++        segment: Segment,
++        round: u32,
++        open: Option<Open>,
++        finished: Vec<PublishRecord>,
++        attribution: Vec<Row>,
++        since: Option<Instant>,
++        stack: Vec<(Row, Instant, u64)>,
++    }
++    thread_local! {
++        static THREAD: RefCell<Thread> = const {
++            RefCell::new(Thread {
++                segment: Segment::Outside,
++                round: 0,
++                open: None,
++                finished: Vec::new(),
++                attribution: Vec::new(),
++                since: None,
++                stack: Vec::new(),
++            })
++        };
++    }
++
++    /// 换段。离开 `Outside` 开一条记录（从调用方段进门的记 `had_caller_segment`），回到 `Outside` 收一条。
++    pub fn segment(next: Segment) {
++        THREAD.with(|cell| {
++            let thread = &mut *cell.borrow_mut();
++            let now = Instant::now();
++            if let (Some(since), Some(open)) = (thread.since, thread.open.as_mut()) {
++                open.segment_nanos[thread.segment as usize] +=
++                    u64::try_from(now.duration_since(since).as_nanos()).expect("纳秒装得进 u64");
++            }
++            thread.since = Some(now);
++            if next == Segment::Outside {
++                if let Some(open) = thread.open.take() {
++                    thread.finished.push(open.into_record());
++                }
++            } else if thread.segment == Segment::Outside {
++                thread.open = Some(Open::new(next == Segment::CallerBeforeTheJudgement));
++            }
++            thread.segment = next;
++            thread.round = 0;
++        });
++    }
++
++    /// 固定点每轮开头记一次。
++    pub fn round_begin() {
++        THREAD.with(|cell| {
++            let thread = &mut *cell.borrow_mut();
++            thread.round += 1;
++            let round = thread.round;
++            if let Some(open) = thread.open.as_mut() {
++                open.rounds = open.rounds.max(round);
++            }
++        });
++    }
++
++    /// 交回到此刻收好的记录并清空；没收完的那条不交。
++    #[must_use]
++    pub fn take_finished() -> Vec<PublishRecord> {
++        THREAD.with(|cell| std::mem::take(&mut cell.borrow_mut().finished))
++    }
++
++    /// 归口：在它活着的这一段里，不属于某一行函数的步（码 2 规划、按身份建索引）记到哪一行。
++    pub struct AttributionGuard;
++    #[must_use]
++    pub fn attribute(row: Row) -> AttributionGuard {
++        THREAD.with(|cell| cell.borrow_mut().attribution.push(row));
++        AttributionGuard
++    }
++    impl Drop for AttributionGuard {
++        fn drop(&mut self) {
++            THREAD.with(|cell| {
++                cell.borrow_mut().attribution.pop();
++            });
++        }
++    }
++
++    pub fn call(_row: Row) {}
++    pub fn step(_row: Row) {}
++    pub fn steps(_row: Row, _count: usize) {}
++    pub fn call_attributed() {}
++    pub fn steps_attributed(_count: usize) {}
++    pub fn scale(_row: Row, _count: usize) {}
++    pub fn delta(_key: &'static str, _value: usize) {}
++    pub fn query_attributed(_index_entries: u64) {}
++    pub fn delta_if_attributed(_row: Row, _key: &'static str, _value: usize) {}
++
++    /// 计时：守卫活着的这一段是这一行的独占计时（内层守卫的时间从外层减去）。
++    pub struct TimerGuard {
++        active: bool,
++    }
++    #[must_use]
++    pub fn timer(row: Row) -> TimerGuard {
++        THREAD.with(|cell| {
++            let thread = &mut *cell.borrow_mut();
++            if thread.open.is_none() {
++                return TimerGuard { active: false };
++            }
++            thread.stack.push((row, Instant::now(), 0));
++            TimerGuard { active: true }
++        })
++    }
++    #[must_use]
++    pub fn timer_attributed() -> TimerGuard {
++        let row = THREAD
++            .with(|cell| cell.borrow().attribution.last().copied())
++            .unwrap_or(Row::UnlistedIndexOrPlanWork);
++        timer(row)
++    }
++    impl Drop for TimerGuard {
++        fn drop(&mut self) {
++            if !self.active {
++                return;
++            }
++            THREAD.with(|cell| {
++                let thread = &mut *cell.borrow_mut();
++                let Some((row, started, children)) = thread.stack.pop() else {
++                    return;
++                };
++                let elapsed = u64::try_from(started.elapsed().as_nanos()).expect("纳秒装得进 u64");
++                if let Some(parent) = thread.stack.last_mut() {
++                    parent.2 += elapsed;
++                }
++                let segment = thread.segment as usize;
++                if let Some(open) = thread.open.as_mut() {
++                    open.nanos[segment * ROW_COUNT + row as usize] += elapsed.saturating_sub(children);
++                }
++            });
++        }
++    }
++}
++pub use e203_scan_timing as e203_scan;
+--- a/crates/singlefs-verification/Cargo.toml
++++ b/crates/singlefs-verification/Cargo.toml
+@@ -41,4 +41,4 @@
+ [dev-dependencies]
+ # 七·6 的用例读核心层各处按身份查的计数（`singlefs_core::transaction::lookup_work`），只在测试构建打开（核心层的特性默认关）。
+ # 发布触发阈值的只供测试来源（`system_configuration::PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring`）同样只在测试构建打开。
+-singlefs-core = { path = "../singlefs-core", features = ["lookup-work-counters", "test-only-publish-thresholds"] }
++singlefs-core = { path = "../singlefs-core", features = ["test-only-publish-thresholds"] }

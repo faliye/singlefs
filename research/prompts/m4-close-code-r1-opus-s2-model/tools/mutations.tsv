@@ -1,5 +1,0 @@
-# 攻方腿 s2 的变异：名字<TAB>文件（相对 crates/singlefs-core/src）<TAB>原文<TAB>替换文。原文在冻结副本那一份里恰好命中一次。
-ancestors-only-the-first-child-counts	container_tree.rs	if marked_below[child] {	if marked_below[child] && child == first_child {
-rewritten-list-keeps-duplicates	inode_tree.rs	if insertion_point < noted_so_far.len() && noted_so_far[insertion_point].0 == index.0 {	if false && insertion_point < noted_so_far.len() && noted_so_far[insertion_point].0 == index.0 {
-binary-search-drops-the-last-candidate	inode_tree.rs	    while low < high	    while low + 1 < high
-retired-ties-go-before-the-existing	inode_tree.rs	self.retired[insertion_point].previous_index.0 <= entry.previous_index.0	self.retired[insertion_point].previous_index.0 < entry.previous_index.0

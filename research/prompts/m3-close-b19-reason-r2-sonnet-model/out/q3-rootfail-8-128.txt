@@ -1,5 +1,0 @@
-q3 writer=admission S=8 J=128 p_rootfail=0.03 cfg=today legal_raise_roots=25829 reaches_ding=12830 final[holds=24077 red=246 partial=955 not_judged=551] partial_why[combos:4,ambiguous:951] partial_ratio=0.0370
-q3 writer=admission S=8 J=128 p_rootfail=0.03 cfg=today_no_stop legal_raise_roots=25829 reaches_ding=12830 final[holds=24077 red=246 partial=955 not_judged=551] partial_why[combos:4,ambiguous:951] partial_ratio=0.0370
-q3enum writer=admission S=8 J=128 p_rootfail=0.03 legal slots_overwritten_since_the_raise=185603 covered=181882 NOT_COVERED=3721 not_recognized=0
-q3stop writer=admission S=8 J=128 p_rootfail=0.03 legal same=25829
-example ('not_covered', 'legal') (4, 35, 2, 3, None, 2, {1: 2, 2: 22, 3: 25, 4: 35}, [11, 30])

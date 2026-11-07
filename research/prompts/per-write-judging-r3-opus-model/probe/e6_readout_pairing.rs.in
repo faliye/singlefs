@@ -1,0 +1,31 @@
+
+/// 第三轮攻方腿探针（对拍测试文件那一份，接在 `per_write_judging_e6_readout` 之后）：对拍三条十亿级流上逐段读出 E6 点名，不上卡、不判状态。
+mod per_write_judging_e6_readout_pairing {
+    use super::per_write_judging_e6_readout as readout;
+    use super::{
+        leave_the_records_before_the_mount_as_they_are, record_new_pool_through_the_last_deletion_batch,
+        record_three_unit_file_applied_only_by_its_records_after_a_mount,
+        record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined, QuarantineMarkOfTheRecords,
+    };
+
+    #[test]
+    fn probe_e6_readout_over_the_three_pairing_flows() {
+        println!();
+        let flows = [
+            record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
+                "probe-e6-readout-quarantined",
+                QuarantineMarkOfTheRecords::OnBothDevices,
+            ),
+            record_three_unit_file_applied_only_by_its_records_after_a_mount(
+                "probe-e6-readout-applied-by-records",
+                "three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first",
+                &leave_the_records_before_the_mount_as_they_are,
+            ),
+            record_new_pool_through_the_last_deletion_batch("probe-e6-readout-last-batch", "deletion-through-the-last-batch"),
+        ];
+        for flow in &flows {
+            readout::readout_flow(flow.name, &flow.base, &flow.writes, &flow.segments, true);
+        }
+        println!("PROBE_E6_DONE test=pairing flows={}", flows.len());
+    }
+}

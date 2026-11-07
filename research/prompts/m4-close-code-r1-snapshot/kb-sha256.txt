@@ -1,6 +1,0 @@
-76bd8d67abab90a56334806c7fe1f8bb0fd82bb81fb4175660735fd87ee3824d  .claude/kb/checks-owed.md
-4d8f8f33175b1f45553b8e9dd60338c3a86355bacacad19dd668dad8ea77499e  .claude/kb/decisions/08-核心索引结构.md
-04e9668d52d704009c6ea063398adbb3dab480b9d1145ab086dedbd769967309  .claude/kb/decisions/04-校验和位置.md
-bdcfc477eb2b7206ea34706006d644ae647a1264e831fc9adb54713f4735ac80  .claude/kb/decisions/16-发布语义.md
-762701aebcd3e9016180424d03ee393f157c8661250e49019dadb99433063bdb  .claude/kb/decisions/13-验证路线.md
-ce654ed0d3bb2ee6bc4ff128ac2bac645d7a618a4058c7307ecca9043ce1a8e6  .claude/kb/experiments/197-扫环胶水内存随盘数.md

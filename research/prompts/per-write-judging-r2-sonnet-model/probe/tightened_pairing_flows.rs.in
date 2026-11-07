@@ -1,0 +1,29 @@
+
+/// 辩方腿探针（只拷进草稿副本、追加在对拍测试文件末尾，不回主工作区）：收严后的判据在对拍三条十亿级流上逐段判，不上卡、不判状态。
+#[test]
+fn probe_tightened_criterion_over_the_three_billion_state_pairing_flows() {
+    let flows = [
+        record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
+            "probe-tightened-quarantined",
+            QuarantineMarkOfTheRecords::OnBothDevices,
+        ),
+        record_three_unit_file_applied_only_by_its_records_after_a_mount(
+            "probe-tightened-applied-by-records",
+            "three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first",
+            &leave_the_records_before_the_mount_as_they_are,
+        ),
+        record_new_pool_through_the_last_deletion_batch("probe-tightened-last-batch", "deletion-through-the-last-batch"),
+    ];
+    for flow in &flows {
+        let tables = singlefs_verification::crash::crash_state_enumeration_tables(
+            &flow.base,
+            &flow.writes,
+            &flow.segments,
+            &singlefs_verification::crash::full_expansion,
+        );
+        let engine_states: Vec<u64> = tables.state_ranges_by_segment.iter().map(|range| range.end - range.start).collect();
+        println!("PROBE_TIGHT_ENGINE flow={} states={}", flow.name, tables.state_count);
+        per_write_judging_tightened_classifier::print_areas(flow.name, &flow.writes);
+        per_write_judging_tightened_classifier::classify_flow(flow.name, &flow.base, &flow.writes, &flow.segments, Some(&engine_states));
+    }
+}

@@ -1,2 +1,0 @@
-name=a-class-heredoc-shape total_a=207 cd-then-and-or-chain=13 cd-then-semicolon-or-newline=13 no-cd-match=1 no-script-name=67 script-not-heredoc-written=113
-name=a-class-heredoc-shape-lines lines=14014,14737,14745,14839,14852,14854,14875,14879,14881,14883,14893,14903,18779

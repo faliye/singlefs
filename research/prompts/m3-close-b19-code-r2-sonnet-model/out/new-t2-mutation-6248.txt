@@ -1,5 +1,0 @@
-test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in Ns
-test the_public_admission_ceiling_entry_returns_no_valid_root_when_every_root_ring_slot_reads_back_zeros ... FAILED
-test the_public_admission_ceiling_entry_returns_no_valid_root_when_every_root_ring_slot_reports_a_device_error ... FAILED
-thread 'the_public_admission_ceiling_entry_returns_no_valid_root_when_every_root_ring_slot_reads_back_zeros' panicked at crates/singlefs-core/src/mount.rs:4429:9:
-thread 'the_public_admission_ceiling_entry_returns_no_valid_root_when_every_root_ring_slot_reports_a_device_error' panicked at crates/singlefs-core/src/mount.rs:4429:9:

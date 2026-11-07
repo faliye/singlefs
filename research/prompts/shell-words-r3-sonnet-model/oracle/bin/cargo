@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# 假 cargo：参数逐个 %q 转义记进沙盒根的 .oracle-log，不编译
-d="$PWD"; while [ "$d" != / ] && [ ! -e "$d/.oracle-log" ]; do d="$(dirname "$d")"; done
-l="cargo"; for a in "$@"; do l+=" $(printf '%q' "$a")"; done
-printf '%s\n' "$l" >> "$d/.oracle-log"

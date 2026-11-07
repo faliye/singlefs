@@ -1,0 +1,792 @@
+PROTO_RUN part=small_segments_exhaustive threads=31 source=environment_variable
+PROTO_FLOW flow=overwrite writes=101 segments=20 first_units=12 second_units=16
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823345152x16384、UnitWrite@dev1+823345152x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823394304x16384、UnitWrite@dev1+823394304x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823410688x16384、UnitWrite@dev1+823410688x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823427072x16384、UnitWrite@dev1+823427072x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823443456x16384、UnitWrite@dev1+823443456x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823459840x16384、UnitWrite@dev1+823459840x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823476224x16384、UnitWrite@dev1+823476224x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823492608x16384、UnitWrite@dev1+823492608x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823508992x16384、UnitWrite@dev1+823508992x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_PLANT_CHOICE flow=overwrite node=UnitWrite@dev0+823525376x16384、UnitWrite@dev1+823525376x16384 file_unreadable=true red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"}
+PROTO_ARM arm=overwrite/unmodified/chunked moved=无；被判段按副本组切成不超过 12 个写的小段 judged_segments=[12, 13, 17, 18] judged_root_index=98 torn_images=0
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=12 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=13 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=14 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=15 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=16 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=17 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=18 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=19 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=20 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/unmodified/chunked segment=21 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=overwrite/late_unit/chunked moved=C1 单元段的 UnitWrite@dev0+822181888x32768、UnitWrite@dev1+822181888x32768 挪到 C2 单元段开头；被判段按副本组切成不超过 12 个写的小段 judged_segments=[12, 13, 17, 18, 19] judged_root_index=98 torn_images=0
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=12 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=13 writes=10 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=5 tearable=0 judged=true full_domain_states=1023 judged_states=1023 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=14 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=15 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=16 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=17 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=18 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=19 writes=2 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=1 tearable=0 judged=true full_domain_states=3 judged_states=3 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=20 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=21 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_unit/chunked segment=22 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=overwrite/late_two_units/chunked moved=C1 单元段的 UnitWrite@dev0+822181888x32768、UnitWrite@dev1+822181888x32768、UnitWrite@dev0+823361536x32768、UnitWrite@dev1+823361536x32768 挪到 C2 单元段开头；被判段按副本组切成不超过 12 个写的小段 judged_segments=[12, 13, 17, 18, 19] judged_root_index=98 torn_images=0
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=12 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=13 writes=8 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=4 tearable=0 judged=true full_domain_states=255 judged_states=255 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=14 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=15 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=16 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=17 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=18 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=19 writes=4 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=2 tearable=0 judged=true full_domain_states=15 judged_states=15 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=20 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=21 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/late_two_units/chunked segment=22 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=overwrite/record_before_units/chunked moved=C2 的记录段（JournalRecord@dev0+16793600x4096、JournalRecord@dev1+16793600x4096）挪到 C2 单元段之前；被判段按副本组切成不超过 12 个写的小段 judged_segments=[12, 13, 18, 19] judged_root_index=98 torn_images=0
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=12 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=13 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=14 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=15 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=16 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=17 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=18 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=19 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=20 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/record_before_units/chunked segment=21 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=overwrite/planted_two_groups/chunked moved=C2 单元段末尾接四次写，盖住 C1 的 UnitWrite@dev0+822181888x32768、UnitWrite@dev1+822181888x32768（字节取 UnitWrite@dev0+823361536x32768、UnitWrite@dev1+823361536x32768）与 UnitWrite@dev0+823345152x16384、UnitWrite@dev1+823345152x16384（字节取 UnitWrite@dev0+823394304x16384、UnitWrite@dev1+823394304x16384）；被判段按副本组切成不超过 12 个写的小段 judged_segments=[16, 17, 18] judged_root_index=102 torn_images=0
+PROTO_SEGMENT arm=overwrite/planted_two_groups/chunked segment=16 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/planted_two_groups/chunked segment=17 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/planted_two_groups/chunked segment=18 writes=4 kinds=UnitWrite over_an_earlier_write=4 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=2 tearable=0 judged=true full_domain_states=15 judged_states=15 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/planted_two_groups/chunked segment=19 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/planted_two_groups/chunked segment=20 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/planted_two_groups/chunked segment=21 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=overwrite/relocation_copies/chunked moved=C2 单元段开头多写 UnitWrite@dev0+822181888x32768、UnitWrite@dev1+822181888x32768 两份的原样拷贝到两盘偏移 823803904；被判段按副本组切成不超过 12 个写的小段 judged_segments=[16, 17, 18] judged_root_index=100 torn_images=0
+PROTO_SEGMENT arm=overwrite/relocation_copies/chunked segment=16 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/relocation_copies/chunked segment=17 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/relocation_copies/chunked segment=18 writes=2 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=1 tearable=0 judged=true full_domain_states=3 judged_states=3 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/relocation_copies/chunked segment=19 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/relocation_copies/chunked segment=20 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/relocation_copies/chunked segment=21 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=overwrite/relocation_copies_over_a_missing_source/chunked moved=C2 单元段开头多写 UnitWrite@dev0+822181888x32768、UnitWrite@dev1+822181888x32768 两份的原样拷贝到两盘偏移 823803904；C1 单元段里 UnitWrite@dev1+822181888x32768 拿掉；被判段按副本组切成不超过 12 个写的小段 judged_segments=[12, 13, 17, 18, 19] judged_root_index=99 torn_images=0
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 writes=11 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=2047 judged_states=2047 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=14 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=15 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=16 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 writes=12 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=6 tearable=0 judged=true full_domain_states=4095 judged_states=4095 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 writes=2 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=1 tearable=0 judged=true full_domain_states=3 judged_states=3 judged_is_full_domain=true
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=20 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=21 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=22 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_PLANNED_STATES part=small_segments_exhaustive judged=89359 full_domain_of_the_judged_segments=89359 ceiling=1000000
+PROTO_ESTIMATE part=small_segments_exhaustive sample_states=13 per_state_seconds=0.0082 threads=31 estimated_seconds=24
+PROTO_BASELINE arm=overwrite/unmodified/chunked segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/unmodified/chunked segment=12 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=12 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=12 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=12 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=12 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=12 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/unmodified/chunked segment=12 seconds=1.3
+PROTO_BASELINE arm=overwrite/unmodified/chunked segment=13 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/unmodified/chunked segment=13 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=13 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=13 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=13 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=13 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=13 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/unmodified/chunked segment=13 seconds=1.3
+PROTO_BASELINE arm=overwrite/unmodified/chunked segment=17 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/unmodified/chunked segment=17 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=17 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=17 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=17 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=17 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=17 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/unmodified/chunked segment=17 seconds=2.1
+PROTO_BASELINE arm=overwrite/unmodified/chunked segment=18 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/unmodified/chunked segment=18 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=18 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=18 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=18 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/unmodified/chunked segment=18 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/unmodified/chunked segment=18 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/unmodified/chunked segment=18 seconds=2.2
+PROTO_BASELINE arm=overwrite/late_unit/chunked segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/late_unit/chunked segment=12 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=12 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=12 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=12 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=12 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=12 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/late_unit/chunked segment=12 seconds=1.3
+PROTO_BASELINE arm=overwrite/late_unit/chunked segment=13 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/late_unit/chunked segment=13 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=13 family=support states=15 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=support representation=per_write_union compared=15 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=support representation=per_write_delta compared=15 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=support representation=copy_group_union compared=15 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=support representation=copy_group_delta compared=15 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=13 family=single states=10 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=single representation=per_write_union compared=10 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=single representation=per_write_delta compared=10 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=single representation=copy_group_union compared=10 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=single representation=copy_group_delta compared=10 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=13 family=every_proper_subset states=1022 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=every_proper_subset representation=per_write_union compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=every_proper_subset representation=per_write_delta compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=every_proper_subset representation=copy_group_union compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=every_proper_subset representation=copy_group_delta compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=13 family=all states=1022 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=all representation=per_write_union compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=all representation=per_write_delta compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=all representation=copy_group_union compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=13 family=all representation=copy_group_delta compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/late_unit/chunked segment=13 seconds=0.4
+PROTO_BASELINE arm=overwrite/late_unit/chunked segment=17 red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"} whole=consulted=failed@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=1 ignored=failed@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=1 checker=HHHHHHHHHVHHHHHHHHHVHHHHVHVHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHPHHHHHNHNNNNNNNNHHHHNNNNHNNVHHHNHNHPHHNHHHHHNNHHH records=false/false
+PROTO_SINGLE_DIFFERS arm=overwrite/late_unit/chunked segment=17 state=[0] write=UnitWrite@dev0+822181888x32768 red_items={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLE_DIFFERS arm=overwrite/late_unit/chunked segment=17 state=[1] write=UnitWrite@dev1+822181888x32768 red_items={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLES arm=overwrite/late_unit/chunked segment=17 differing_from_empty=2
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=17 family=support states=18 red=17 whole_differs_from_empty=3
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=support representation=per_write_union compared=18 red_or_not_differs=1 red_items_differ=3 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=support representation=per_write_delta compared=18 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=support representation=copy_group_union compared=18 red_or_not_differs=1 red_items_differ=3 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=17 family=single states=12 red=12 whole_differs_from_empty=2
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=2 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=2 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=17 family=every_proper_subset states=4094 red=3071 whole_differs_from_empty=3071
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=1023 red_items_differ=3071 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=1023 red_items_differ=1023 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=1023 red_items_differ=3071 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=17 family=all states=4094 red=3071 whole_differs_from_empty=3071
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=all representation=per_write_union compared=4094 red_or_not_differs=1023 red_items_differ=3071 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=all representation=per_write_delta compared=4094 red_or_not_differs=1023 red_items_differ=1023 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=all representation=copy_group_union compared=4094 red_or_not_differs=1023 red_items_differ=3071 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=17 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=per_write_union state=[0] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=per_write_union state=[1] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=per_write_union state=[0,1] actual={} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=per_write_delta state=[0,1] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=per_write_delta state=[0,1,2] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=per_write_delta state=[0,1,3] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=copy_group_union state=[0] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=copy_group_union state=[1] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_unit/chunked segment=17 representation=copy_group_union state=[0,1] actual={} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_SEGMENT_DONE arm=overwrite/late_unit/chunked segment=17 seconds=2.2
+PROTO_BASELINE arm=overwrite/late_unit/chunked segment=18 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/late_unit/chunked segment=18 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=18 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=18 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=18 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=18 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=18 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/late_unit/chunked segment=18 seconds=2.1
+PROTO_BASELINE arm=overwrite/late_unit/chunked segment=19 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/late_unit/chunked segment=19 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=19 family=support states=2 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=support representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=support representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=support representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=support representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=19 family=single states=2 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=single representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=single representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=single representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=single representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=19 family=every_proper_subset states=2 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=every_proper_subset representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=every_proper_subset representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=every_proper_subset representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=every_proper_subset representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_unit/chunked segment=19 family=all states=2 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=all representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=all representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=all representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_unit/chunked segment=19 family=all representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/late_unit/chunked segment=19 seconds=0.0
+PROTO_BASELINE arm=overwrite/late_two_units/chunked segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/late_two_units/chunked segment=12 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=12 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=12 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=12 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=12 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=12 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/late_two_units/chunked segment=12 seconds=1.3
+PROTO_BASELINE arm=overwrite/late_two_units/chunked segment=13 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/late_two_units/chunked segment=13 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=13 family=support states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=support representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=support representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=support representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=support representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=13 family=single states=8 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=single representation=per_write_union compared=8 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=single representation=per_write_delta compared=8 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=single representation=copy_group_union compared=8 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=single representation=copy_group_delta compared=8 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=13 family=every_proper_subset states=254 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=every_proper_subset representation=per_write_union compared=254 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=every_proper_subset representation=per_write_delta compared=254 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=every_proper_subset representation=copy_group_union compared=254 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=every_proper_subset representation=copy_group_delta compared=254 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=13 family=all states=254 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=all representation=per_write_union compared=254 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=all representation=per_write_delta compared=254 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=all representation=copy_group_union compared=254 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=13 family=all representation=copy_group_delta compared=254 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/late_two_units/chunked segment=13 seconds=0.1
+PROTO_BASELINE arm=overwrite/late_two_units/chunked segment=17 red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"} whole=consulted=failed@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=1 ignored=failed@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=1 checker=HHHHHHHHHVHHHHHHHHHVHHHHVHVHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHPHHHPHPPNNNPNNNNHPHPNNNNHNNNHHHNHNPPPHNHHHHHNNHPH records=false/false
+PROTO_SINGLE_DIFFERS arm=overwrite/late_two_units/chunked segment=17 state=[2] write=UnitWrite@dev0+823361536x32768 red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLE_DIFFERS arm=overwrite/late_two_units/chunked segment=17 state=[3] write=UnitWrite@dev1+823361536x32768 red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLES arm=overwrite/late_two_units/chunked segment=17 differing_from_empty=2
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=17 family=support states=18 red=18 whole_differs_from_empty=3
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=17 family=single states=12 red=12 whole_differs_from_empty=2
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=17 family=every_proper_subset states=4094 red=3839 whole_differs_from_empty=3071
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=255 red_items_differ=2303 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=255 red_items_differ=2303 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=255 red_items_differ=2303 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=255 red_items_differ=2303 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=17 family=all states=4094 red=3839 whole_differs_from_empty=3071
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=all representation=per_write_union compared=4094 red_or_not_differs=255 red_items_differ=2303 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=all representation=per_write_delta compared=4094 red_or_not_differs=255 red_items_differ=2303 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=all representation=copy_group_union compared=4094 red_or_not_differs=255 red_items_differ=2303 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=17 family=all representation=copy_group_delta compared=4094 red_or_not_differs=255 red_items_differ=2303 unrepresentable=0
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=per_write_union state=[0,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=per_write_union state=[1,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=per_write_union state=[0,1,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=per_write_delta state=[0,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=per_write_delta state=[1,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=per_write_delta state=[0,1,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=copy_group_union state=[0,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=copy_group_union state=[1,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=copy_group_union state=[0,1,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=copy_group_delta state=[0,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=copy_group_delta state=[1,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/late_two_units/chunked segment=17 representation=copy_group_delta state=[0,1,2] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_SEGMENT_DONE arm=overwrite/late_two_units/chunked segment=17 seconds=2.2
+PROTO_BASELINE arm=overwrite/late_two_units/chunked segment=18 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/late_two_units/chunked segment=18 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=18 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=18 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=18 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=18 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=18 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/late_two_units/chunked segment=18 seconds=2.1
+PROTO_BASELINE arm=overwrite/late_two_units/chunked segment=19 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/late_two_units/chunked segment=19 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=19 family=support states=6 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=support representation=per_write_union compared=6 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=support representation=per_write_delta compared=6 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=support representation=copy_group_union compared=6 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=support representation=copy_group_delta compared=6 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=19 family=single states=4 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=single representation=per_write_union compared=4 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=single representation=per_write_delta compared=4 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=single representation=copy_group_union compared=4 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=single representation=copy_group_delta compared=4 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=19 family=every_proper_subset states=14 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=every_proper_subset representation=per_write_union compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=every_proper_subset representation=per_write_delta compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=every_proper_subset representation=copy_group_union compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=every_proper_subset representation=copy_group_delta compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/late_two_units/chunked segment=19 family=all states=14 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=all representation=per_write_union compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=all representation=per_write_delta compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=all representation=copy_group_union compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/late_two_units/chunked segment=19 family=all representation=copy_group_delta compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/late_two_units/chunked segment=19 seconds=0.1
+PROTO_BASELINE arm=overwrite/record_before_units/chunked segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/record_before_units/chunked segment=12 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=12 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=12 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=12 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=12 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=12 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/record_before_units/chunked segment=12 seconds=1.3
+PROTO_BASELINE arm=overwrite/record_before_units/chunked segment=13 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/record_before_units/chunked segment=13 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=13 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=13 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=13 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=13 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=13 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/record_before_units/chunked segment=13 seconds=1.3
+PROTO_BASELINE arm=overwrite/record_before_units/chunked segment=18 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/record_before_units/chunked segment=18 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=18 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=18 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=18 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=18 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=18 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/record_before_units/chunked segment=18 seconds=2.4
+PROTO_BASELINE arm=overwrite/record_before_units/chunked segment=19 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/record_before_units/chunked segment=19 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=19 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=19 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=19 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/record_before_units/chunked segment=19 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/record_before_units/chunked segment=19 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/record_before_units/chunked segment=19 seconds=2.5
+PROTO_BASELINE arm=overwrite/planted_two_groups/chunked segment=16 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/planted_two_groups/chunked segment=16 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=16 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=16 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=16 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=16 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=16 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/planted_two_groups/chunked segment=16 seconds=2.1
+PROTO_BASELINE arm=overwrite/planted_two_groups/chunked segment=17 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/planted_two_groups/chunked segment=17 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=17 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=17 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=17 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=17 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=17 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/planted_two_groups/chunked segment=17 seconds=2.1
+PROTO_BASELINE arm=overwrite/planted_two_groups/chunked segment=18 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLE_DIFFERS arm=overwrite/planted_two_groups/chunked segment=18 state=[0] write=UnitWrite@dev0+822181888x32768 red_items={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLE_DIFFERS arm=overwrite/planted_two_groups/chunked segment=18 state=[1] write=UnitWrite@dev1+822181888x32768 red_items={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLE_DIFFERS arm=overwrite/planted_two_groups/chunked segment=18 state=[2] write=UnitWrite@dev0+823345152x16384 red_items={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLE_DIFFERS arm=overwrite/planted_two_groups/chunked segment=18 state=[3] write=UnitWrite@dev1+823345152x16384 red_items={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLES arm=overwrite/planted_two_groups/chunked segment=18 differing_from_empty=4
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=18 family=support states=6 red=6 whole_differs_from_empty=6
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=support representation=per_write_union compared=6 red_or_not_differs=0 red_items_differ=2 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=support representation=per_write_delta compared=6 red_or_not_differs=0 red_items_differ=2 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=support representation=copy_group_union compared=6 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=support representation=copy_group_delta compared=6 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=18 family=single states=4 red=4 whole_differs_from_empty=4
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=single representation=per_write_union compared=4 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=single representation=per_write_delta compared=4 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=single representation=copy_group_union compared=4 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=single representation=copy_group_delta compared=4 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=18 family=every_proper_subset states=14 red=14 whole_differs_from_empty=14
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=every_proper_subset representation=per_write_union compared=14 red_or_not_differs=0 red_items_differ=6 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=every_proper_subset representation=per_write_delta compared=14 red_or_not_differs=0 red_items_differ=6 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=every_proper_subset representation=copy_group_union compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=every_proper_subset representation=copy_group_delta compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/planted_two_groups/chunked segment=18 family=all states=14 red=14 whole_differs_from_empty=14
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=all representation=per_write_union compared=14 red_or_not_differs=0 red_items_differ=6 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=all representation=per_write_delta compared=14 red_or_not_differs=0 red_items_differ=6 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=all representation=copy_group_union compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/planted_two_groups/chunked segment=18 family=all representation=copy_group_delta compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_EXAMPLE arm=overwrite/planted_two_groups/chunked segment=18 representation=per_write_union state=[0,1] actual={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"} represented={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/planted_two_groups/chunked segment=18 representation=per_write_union state=[0,1,2] actual={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"} represented={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/planted_two_groups/chunked segment=18 representation=per_write_union state=[0,1,3] actual={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"} represented={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/planted_two_groups/chunked segment=18 representation=per_write_delta state=[0,1] actual={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"} represented={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/planted_two_groups/chunked segment=18 representation=per_write_delta state=[0,1,2] actual={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"} represented={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=overwrite/planted_two_groups/chunked segment=18 representation=per_write_delta state=[0,1,3] actual={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4", "record_checker:claimed_state_missing_unit"} represented={"pool_checker:I-2.1", "pool_checker:I-3.15", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_SEGMENT_DONE arm=overwrite/planted_two_groups/chunked segment=18 seconds=0.1
+PROTO_BASELINE arm=overwrite/relocation_copies/chunked segment=16 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/relocation_copies/chunked segment=16 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=16 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=16 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=16 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=16 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=16 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/relocation_copies/chunked segment=16 seconds=2.1
+PROTO_BASELINE arm=overwrite/relocation_copies/chunked segment=17 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/relocation_copies/chunked segment=17 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=17 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=17 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=17 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=17 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=17 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/relocation_copies/chunked segment=17 seconds=2.1
+PROTO_BASELINE arm=overwrite/relocation_copies/chunked segment=18 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/relocation_copies/chunked segment=18 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=18 family=support states=2 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=support representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=support representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=support representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=support representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=18 family=single states=2 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=single representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=single representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=single representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=single representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=18 family=every_proper_subset states=2 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=every_proper_subset representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=every_proper_subset representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=every_proper_subset representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=every_proper_subset representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies/chunked segment=18 family=all states=2 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=all representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=all representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=all representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies/chunked segment=18 family=all representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/relocation_copies/chunked segment=18 seconds=0.0
+PROTO_BASELINE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=support states=16 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=support representation=per_write_union compared=16 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=support representation=per_write_delta compared=16 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=support representation=copy_group_union compared=16 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=support representation=copy_group_delta compared=16 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=single states=11 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=single representation=per_write_union compared=11 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=single representation=per_write_delta compared=11 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=single representation=copy_group_union compared=11 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=single representation=copy_group_delta compared=11 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=every_proper_subset states=2046 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=every_proper_subset representation=per_write_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=every_proper_subset representation=per_write_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=every_proper_subset representation=copy_group_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=every_proper_subset representation=copy_group_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=all states=2046 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=all representation=per_write_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=all representation=per_write_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=all representation=copy_group_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 family=all representation=copy_group_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=12 seconds=0.6
+PROTO_BASELINE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=support states=18 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=single states=12 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=every_proper_subset states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=all states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=13 seconds=1.3
+PROTO_BASELINE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 red_items={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHVHHHHHHHHHVHHHHHHVHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLE_DIFFERS arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 state=[0] write=UnitWrite@dev0+823803904x32768 red_items={"pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLE_DIFFERS arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 state=[1] write=UnitWrite@dev1+823803904x32768 red_items={"pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLES arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 differing_from_empty=2
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=support states=18 red=18 whole_differs_from_empty=3
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=single states=12 red=12 whole_differs_from_empty=2
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=every_proper_subset states=4094 red=4094 whole_differs_from_empty=3071
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=all states=4094 red=4094 whole_differs_from_empty=3071
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=17 seconds=2.1
+PROTO_BASELINE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 red_items={"pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHVHHHHHHHHHVHHHHHHVHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNVHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=support states=18 red=18 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=support representation=per_write_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=support representation=per_write_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=support representation=copy_group_union compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=support representation=copy_group_delta compared=18 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=single states=12 red=12 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=single representation=per_write_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=single representation=per_write_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=single representation=copy_group_union compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=single representation=copy_group_delta compared=12 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=every_proper_subset states=4094 red=4094 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=every_proper_subset representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=every_proper_subset representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=every_proper_subset representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=every_proper_subset representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=all states=4094 red=4094 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=all representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=all representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=all representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 family=all representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=18 seconds=2.2
+PROTO_BASELINE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 red_items={"pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHVHHHHHHHHHVHHHHHHVHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNVHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 differing_from_empty=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=support states=2 red=2 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=support representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=support representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=support representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=support representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=single states=2 red=2 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=single representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=single representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=single representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=single representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=every_proper_subset states=2 red=2 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=every_proper_subset representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=every_proper_subset representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=every_proper_subset representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=every_proper_subset representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=all states=2 red=2 whole_differs_from_empty=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=all representation=per_write_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=all representation=per_write_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=all representation=copy_group_union compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 family=all representation=copy_group_delta compared=2 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=overwrite/relocation_copies_over_a_missing_source/chunked segment=19 seconds=0.0
+PROTO_JUDGED part=small_segments_exhaustive states=89359 seconds=41.0
+PROTO_FINISHED part=small_segments_exhaustive

@@ -1,5 +1,0 @@
-PROBE name=plain_with_blank_device_one result=SystemConfigurationUnreadableAfterTheReadStage(SystemConfigurationUnreadableAfterTheReadStage { read_stage: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in Ns
-test u1_c841_image_unmodified_returns_c841 ... PROBE name=c841_unmodified result=Publish cause=C841 writes_before_any_publish_empty=true
-test u1_c841_image_with_both_slots_of_device_one_zeroed_returns_c841_when_the_check_comes_first ... PROBE name=c841_with_zeroed_slots result=Publish cause=C841 writes_before_any_publish_empty=true
-test u1_c841_image_with_device_one_blank_reports_the_check_not_c841_when_the_check_comes_first ... PROBE name=c841_with_blank_device_one result=SystemConfigurationUnreadableAfterTheReadStage(SystemConfigurationUnreadableAfterTheReadStage { read_stage: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg

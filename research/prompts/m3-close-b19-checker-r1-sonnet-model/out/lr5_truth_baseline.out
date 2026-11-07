@@ -1,2 +1,0 @@
-truth(nfull,orig_bad_full,lr5_bad_full,orig_bad_any,lr5_bad_any)= (180794, 0, 0, 24720, 23654)
-worlds,judged,orig_nonempty,differ,assertion_violations = (180794, 2710980, 10204, 1082, 0)

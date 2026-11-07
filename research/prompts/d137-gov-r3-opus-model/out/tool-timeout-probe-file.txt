@@ -1,2 +1,0 @@
-pid=738740 started
-late: survived the tool timeout

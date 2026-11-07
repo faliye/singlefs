@@ -1,6 +1,0 @@
-8c30fd68308a9ce2ea9b20363edf2b997a33539f85692ba36c5c93b7ebd61ac8  .claude/hooks/lib_shell_words.py
-72e7601c6cb82f28a41124c2be561d0c65a9544e6ec6fe48700dc79b5c7a5df7  .claude/hooks/bash-command-detector.sh
-5930a55c0b4fd35f61894b6ed8cfe2a00cf150f911852c2a2fd9f4280ad504ef  .claude/hooks/heavy-test-guard.sh
-49151d8025e28ce18eb82b7bdbb27e10732dd75cf42e96c9638b4d229fa07d0b  .claude/hooks/lib_heavy_tests.py
-011ccbf38054a91f7b1ab692709ff82e72cad2f976e1a4f558d3c3dbb0f52382  .claude/hooks/lib_workspace_cargo_lock.py
-c5aeda2d2fab2d6cc5bfc5c80b9cd10aaacd8fa6120bb9d0d42a2501fe36413e  research/prompts/_shell-words-r3-body.md

@@ -1,0 +1,265 @@
+
+/// 第三轮攻方腿探针（删除流测试文件那一份，接在 `per_write_judging_e6_readout` 之后）：未改动的删除流与两条写错次序的臂上逐段读出 E6 点名；
+/// 再在小宇宙上逐态真判（`judge_crash_image`），与几种合成比：候选乙按单元副本组的增减合成、并合成，与只判 S=∅ 的退化候选。
+mod per_write_judging_e6_readout_unlink {
+    use super::per_write_judging_e6_readout as readout;
+    use super::per_write_judging_tightened_classifier as tightened;
+    use super::prepare;
+    use singlefs_verification::crash::judge_crash_image;
+    use singlefs_verification::crash_state_enumeration::crash_point_replay_worker_threads;
+    use singlefs_verification::memory_pool::{CrashImage, MemoryPool, PublishedVersion, RetainedWrite};
+    use std::collections::BTreeSet;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    type Outcome = (bool, BTreeSet<String>);
+
+    /// 判一条流里一个崩溃状态要的全部输入。
+    struct JudgedFlow<'flow> {
+        base: &'flow MemoryPool,
+        writes: &'flow [RetainedWrite],
+        segments: &'flow [Vec<usize>],
+        judged_root_index: usize,
+        versions: &'flow [PublishedVersion],
+    }
+
+    /// 前缀各段全落、这一段只落 `landed` 的那个状态，真判一次。
+    fn judge_one(flow: &JudgedFlow<'_>, segment_index: usize, landed: &[usize]) -> Outcome {
+        let mut persisted = vec![false; flow.writes.len()];
+        for segment in &flow.segments[..segment_index] {
+            for write_index in segment {
+                persisted[*write_index] = true;
+            }
+        }
+        for write_index in landed {
+            persisted[*write_index] = true;
+        }
+        let image = CrashImage {
+            base: flow.base,
+            writes: flow.writes,
+            persisted,
+        };
+        let items = judge_crash_image(&image, flow.judged_root_index, flow.versions).red_items();
+        (!items.is_empty(), items.into_iter().collect())
+    }
+
+    fn judge_many(flow: &JudgedFlow<'_>, segment_index: usize, subsets: &[Vec<usize>]) -> Vec<Outcome> {
+        let (threads, _source) = crash_point_replay_worker_threads();
+        let results: Mutex<Vec<Option<Outcome>>> = Mutex::new(vec![None; subsets.len()]);
+        let next = AtomicUsize::new(0);
+        std::thread::scope(|scope| {
+            for _ in 0..threads.max(1) {
+                scope.spawn(|| loop {
+                    let position = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(landed) = subsets.get(position) else {
+                        break;
+                    };
+                    let outcome = judge_one(flow, segment_index, landed);
+                    results.lock().expect("锁")[position] = Some(outcome);
+                });
+            }
+        });
+        results.into_inner().expect("锁").into_iter().map(|outcome| outcome.expect("每个子集都判过")).collect()
+    }
+
+    /// 宇宙 = 所选几组的全部写（这一段别的写一个不落）：2^宽度 个状态逐个真判，与三种合成逐态比——
+    /// 乙·增减：(R(∅) 去掉任一组的子态里不再出现的项) 并上 (各组子态里新出现的项)；乙·并：R(∅) 并各组子态；退化候选：只取 R(∅)。
+    fn compare_syntheses(label: &str, flow: &JudgedFlow<'_>, segment_index: usize, groups: &[Vec<usize>]) {
+        let universe: Vec<usize> = groups.iter().flatten().copied().collect();
+        let width = universe.len();
+        assert!(width <= 12, "宇宙最多 12 个写（4096 个状态）");
+        let mut group_masks: Vec<usize> = Vec::new();
+        let mut cursor = 0usize;
+        for group in groups {
+            group_masks.push(((1usize << group.len()) - 1) << cursor);
+            cursor += group.len();
+        }
+        let subsets: Vec<Vec<usize>> = (0usize..(1usize << width))
+            .map(|mask| (0..width).filter(|bit| (mask >> bit) & 1 == 1).map(|bit| universe[bit]).collect())
+            .collect();
+        let outcomes = judge_many(flow, segment_index, &subsets);
+        let empty_set = &outcomes[0].1;
+        let (mut actual_red, mut delta_red, mut delta_items, mut union_red, mut union_items, mut empty_only_red, mut empty_only_items) =
+            (0usize, 0usize, 0usize, 0usize, 0usize, 0usize, 0usize);
+        for mask in 0usize..(1usize << width) {
+            let actual = &outcomes[mask];
+            let mut union: BTreeSet<String> = empty_set.clone();
+            let mut removed: BTreeSet<String> = BTreeSet::new();
+            let mut added: BTreeSet<String> = BTreeSet::new();
+            for group_mask in &group_masks {
+                let part = &outcomes[mask & group_mask].1;
+                union.extend(part.iter().cloned());
+                removed.extend(empty_set.iter().filter(|item| !part.contains(*item)).cloned());
+                added.extend(part.iter().filter(|item| !empty_set.contains(*item)).cloned());
+            }
+            let mut delta: BTreeSet<String> = empty_set.difference(&removed).cloned().collect();
+            delta.extend(added);
+            actual_red += usize::from(actual.0);
+            delta_red += usize::from(actual.0 != !delta.is_empty());
+            delta_items += usize::from(actual.1 != delta);
+            union_red += usize::from(actual.0 != !union.is_empty());
+            union_items += usize::from(actual.1 != union);
+            empty_only_red += usize::from(actual.0 != !empty_set.is_empty());
+            empty_only_items += usize::from(actual.1 != *empty_set);
+            if actual.1 != delta && delta_items <= 3 {
+                println!(
+                    "PROBE_E6_SYNTH_MISMATCH label={label} segment={segment_index} candidate=group_delta mask={mask:#b} actual={:?} synthesized={delta:?}",
+                    actual.1
+                );
+            }
+        }
+        println!(
+            "PROBE_E6_SYNTH label={label} segment={segment_index} groups={} writes={width} states={} empty_set_red={} actual_red_states={actual_red} \
+             group_delta_red_differs={delta_red} group_delta_items_differ={delta_items} group_union_red_differs={union_red} \
+             group_union_items_differ={union_items} empty_set_only_red_differs={empty_only_red} empty_set_only_items_differ={empty_only_items}",
+            groups.len(),
+            1usize << width,
+            outcomes[0].0,
+        );
+    }
+
+    /// 把 `moved` 这几次写在写表里挪到原下标 `insert_before_old_index` 之前，段表跟着改：它们离开原来的段、进 `into_segment`。
+    /// 交回新写表、新段表与「原下标 → 新下标」。
+    fn move_writes(
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        moved: &[usize],
+        insert_before_old_index: usize,
+        into_segment: usize,
+    ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>, Vec<usize>) {
+        let mut new_position = vec![usize::MAX; writes.len()];
+        let mut new_writes: Vec<RetainedWrite> = Vec::with_capacity(writes.len());
+        for old_index in 0..writes.len() {
+            if old_index == insert_before_old_index {
+                for moved_index in moved {
+                    new_position[*moved_index] = new_writes.len();
+                    new_writes.push(writes[*moved_index].clone());
+                }
+            }
+            if moved.contains(&old_index) {
+                continue;
+            }
+            new_position[old_index] = new_writes.len();
+            new_writes.push(writes[old_index].clone());
+        }
+        let new_segments = segments
+            .iter()
+            .enumerate()
+            .map(|(segment_index, segment)| {
+                let mut kept: Vec<usize> =
+                    segment.iter().filter(|index| !moved.contains(index)).map(|index| new_position[*index]).collect();
+                if segment_index == into_segment {
+                    kept.extend(moved.iter().map(|index| new_position[*index]));
+                    kept.sort_unstable();
+                }
+                kept
+            })
+            .collect();
+        (new_writes, new_segments, new_position)
+    }
+
+    /// 一条流里这一段收窄后的 E6 下被点名的写（没读这一段的交空集）。
+    fn named_in(readouts: &[Option<readout::SegmentReadout>], segment_index: usize) -> BTreeSet<usize> {
+        readouts[segment_index].as_ref().map(|read| read.truly_named_writes.clone()).unwrap_or_default()
+    }
+
+    /// 这一段的组（`groups_of_segment`）里，含被点名的写的组排在前面，按每宇宙 `groups_per_universe` 组切出至多 `universes` 个宇宙。
+    fn universes_of(
+        writes: &[RetainedWrite],
+        segment: &[usize],
+        named: &BTreeSet<usize>,
+        universes: usize,
+        groups_per_universe: usize,
+    ) -> Vec<Vec<Vec<usize>>> {
+        let groups = tightened::groups_of_segment(writes, segment);
+        let (named_groups, other_groups): (Vec<Vec<usize>>, Vec<Vec<usize>>) =
+            groups.into_iter().partition(|group| group.iter().any(|write| named.contains(write)));
+        let ordered: Vec<Vec<usize>> = named_groups.into_iter().chain(other_groups).collect();
+        (0..universes)
+            .map(|which| ordered.iter().skip(which * groups_per_universe).take(groups_per_universe).cloned().collect::<Vec<_>>())
+            .filter(|universe| !universe.is_empty())
+            .collect()
+    }
+
+    /// 取样点：删除流未改动时逐段读出 E6 点名（每段一行 `PROBE_E6_SEGMENT`、每个点名位置一行 `PROBE_E6_HIT`），两条写错次序的臂同样读
+    /// （record_before_units：第 13 段的记录挪到第 12 段单元之前，反例 B 的形状；late_unit：第 12 段一个单元的两份副本挪到第 16 段开头）。
+    /// 之后真判：未改动流里收窄后仍有点名的段各一个宇宙（真点名时找乙与全组合不同的状态）；第 12、16 段各一个宇宙（第二轮被 E6 挡下的两段）；
+    /// record_before_units 第 12 段两个宇宙、late_unit 第 16 段一个宇宙。
+    #[test]
+    fn probe_e6_readout_over_the_unlink_stream_and_two_misordered_arms() {
+        println!();
+        let prepared = prepare("probe-e6-readout");
+        let unmodified = readout::readout_flow("unmodified", &prepared.base, &prepared.writes, &prepared.segments, true);
+        let lowest_index_of = |segment_index: usize| *prepared.segments[segment_index].iter().min().expect("段不空");
+        let records_of_the_second_publish = prepared.segments[13].clone();
+        let (record_writes, record_segments, record_positions) = move_writes(
+            &prepared.writes,
+            &prepared.segments,
+            &records_of_the_second_publish,
+            lowest_index_of(12),
+            11,
+        );
+        let record_before = readout::readout_flow("record_before_units", &prepared.base, &record_writes, &record_segments, false);
+        let pair_of_copies = prepared.segments[12]
+            .iter()
+            .flat_map(|left| prepared.segments[12].iter().map(move |right| (*left, *right)))
+            .find(|(left, right)| {
+                let (zero, one) = (&prepared.writes[*left], &prepared.writes[*right]);
+                zero.device.0 == 0 && one.device.0 == 1 && zero.offset == one.offset && zero.length_in_bytes() == one.length_in_bytes()
+            })
+            .expect("第 12 段有两盘同偏移的一对副本");
+        let (late_writes, late_segments, late_positions) = move_writes(
+            &prepared.writes,
+            &prepared.segments,
+            &[pair_of_copies.0, pair_of_copies.1],
+            lowest_index_of(16),
+            16,
+        );
+        let late = readout::readout_flow("late_unit", &prepared.base, &late_writes, &late_segments, false);
+
+        let unmodified_flow = JudgedFlow {
+            base: &prepared.base,
+            writes: &prepared.writes,
+            segments: &prepared.segments,
+            judged_root_index: prepared.judged_root_index,
+            versions: &prepared.versions,
+        };
+        let record_flow = JudgedFlow {
+            base: &prepared.base,
+            writes: &record_writes,
+            segments: &record_segments,
+            judged_root_index: record_positions[prepared.judged_root_index],
+            versions: &prepared.versions,
+        };
+        let late_flow = JudgedFlow {
+            base: &prepared.base,
+            writes: &late_writes,
+            segments: &late_segments,
+            judged_root_index: late_positions[prepared.judged_root_index],
+            versions: &prepared.versions,
+        };
+        let mut plan: Vec<(String, &JudgedFlow<'_>, usize, Vec<Vec<usize>>)> = Vec::new();
+        for read in unmodified.iter().flatten() {
+            let truly_named = read.class_width_e6 > 0 || read.pointer_e6 > 0;
+            if truly_named || read.segment_index == 12 || read.segment_index == 16 {
+                let tag = if truly_named { "unmodified-truly-named" } else { "unmodified-rejected-in-round-two" };
+                for universe in universes_of(&prepared.writes, &prepared.segments[read.segment_index], &read.truly_named_writes, 1, 5) {
+                    plan.push((tag.to_string(), &unmodified_flow, read.segment_index, universe));
+                }
+            }
+        }
+        for (which, universe) in universes_of(&record_writes, &record_segments[12], &named_in(&record_before, 12), 2, 5).into_iter().enumerate() {
+            plan.push((format!("record_before_units-universe{which}"), &record_flow, 12, universe));
+        }
+        for universe in universes_of(&late_writes, &late_segments[16], &named_in(&late, 16), 1, 5) {
+            plan.push(("late_unit-universe0".to_string(), &late_flow, 16, universe));
+        }
+        let planned: usize = plan.iter().map(|(_, _, _, universe)| 1usize << universe.iter().map(Vec::len).sum::<usize>()).sum();
+        println!("PROBE_E6_PLANNED_STATES universes={} total={planned}", plan.len());
+        assert!(planned <= 1_000_000, "这一次真判的状态数不超过 10^6");
+        for (label, flow, segment_index, universe) in &plan {
+            compare_syntheses(label, flow, *segment_index, universe);
+        }
+        println!("PROBE_E6_DONE test=unlink universes={}", plan.len());
+    }
+}

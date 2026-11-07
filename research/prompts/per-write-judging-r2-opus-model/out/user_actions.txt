@@ -1,0 +1,645 @@
+PROTO_RUN part=user_actions threads=31 source=environment_variable
+PROTO_FLOW flow=sequential_write_two_data_units writes=107 segments=20 first_units=12 second_units=16
+PROTO_FLOW flow=new_inode writes=97 segments=20 first_units=12 second_units=16
+PROTO_ARM arm=sequential_write_two_data_units/unmodified moved=无 judged_segments=[12, 16] judged_root_index=104 torn_images=0
+PROTO_SEGMENT arm=sequential_write_two_data_units/unmodified segment=12 writes=24 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=12 tearable=0 judged=true full_domain_states=16777215 judged_states=13441 judged_is_full_domain=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/unmodified segment=13 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/unmodified segment=14 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/unmodified segment=15 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/unmodified segment=16 writes=28 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=14 tearable=0 judged=true full_domain_states=268435455 judged_states=15008 judged_is_full_domain=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/unmodified segment=17 writes=4 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=2 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/unmodified segment=18 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/unmodified segment=19 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=sequential_write_two_data_units/late_unit moved=C1 单元段的 UnitWrite@dev0+822181888x32768、UnitWrite@dev1+822181888x32768 挪到 C2 单元段开头 judged_segments=[12, 16] judged_root_index=104 torn_images=0
+PROTO_SEGMENT arm=sequential_write_two_data_units/late_unit segment=12 writes=22 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=11 tearable=0 judged=true full_domain_states=4194303 judged_states=7271 judged_is_full_domain=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/late_unit segment=13 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/late_unit segment=14 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/late_unit segment=15 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/late_unit segment=16 writes=30 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=15 tearable=0 judged=true full_domain_states=1073741823 judged_states=16406 judged_is_full_domain=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/late_unit segment=17 writes=4 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=2 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/late_unit segment=18 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/late_unit segment=19 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=sequential_write_two_data_units/record_before_units moved=C2 的记录段（JournalRecord@dev0+16793600x4096、JournalRecord@dev1+16793600x4096、JournalRecord@dev0+16797696x4096、JournalRecord@dev1+16797696x4096）挪到 C2 单元段之前 judged_segments=[12, 17] judged_root_index=104 torn_images=0
+PROTO_SEGMENT arm=sequential_write_two_data_units/record_before_units segment=12 writes=24 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=12 tearable=0 judged=true full_domain_states=16777215 judged_states=13441 judged_is_full_domain=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/record_before_units segment=13 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/record_before_units segment=14 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/record_before_units segment=15 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/record_before_units segment=16 writes=4 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=2 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/record_before_units segment=17 writes=28 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=14 tearable=0 judged=true full_domain_states=268435455 judged_states=15066 judged_is_full_domain=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/record_before_units segment=18 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=sequential_write_two_data_units/record_before_units segment=19 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=new_inode/unmodified moved=无 judged_segments=[12, 16] judged_root_index=94 torn_images=0
+PROTO_SEGMENT arm=new_inode/unmodified segment=12 writes=24 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=12 tearable=0 judged=true full_domain_states=16777215 judged_states=13441 judged_is_full_domain=false
+PROTO_SEGMENT arm=new_inode/unmodified segment=13 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/unmodified segment=14 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/unmodified segment=15 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/unmodified segment=16 writes=20 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=10 tearable=0 judged=true full_domain_states=1048575 judged_states=4177 judged_is_full_domain=false
+PROTO_SEGMENT arm=new_inode/unmodified segment=17 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/unmodified segment=18 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/unmodified segment=19 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=new_inode/late_unit moved=C1 单元段的 UnitWrite@dev0+822181888x32768、UnitWrite@dev1+822181888x32768 挪到 C2 单元段开头 judged_segments=[12, 16] judged_root_index=94 torn_images=0
+PROTO_SEGMENT arm=new_inode/late_unit segment=12 writes=22 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=11 tearable=0 judged=true full_domain_states=4194303 judged_states=7273 judged_is_full_domain=false
+PROTO_SEGMENT arm=new_inode/late_unit segment=13 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/late_unit segment=14 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/late_unit segment=15 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/late_unit segment=16 writes=22 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=11 tearable=0 judged=true full_domain_states=4194303 judged_states=7270 judged_is_full_domain=false
+PROTO_SEGMENT arm=new_inode/late_unit segment=17 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/late_unit segment=18 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/late_unit segment=19 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_ARM arm=new_inode/record_before_units moved=C2 的记录段（JournalRecord@dev0+16793600x4096、JournalRecord@dev1+16793600x4096）挪到 C2 单元段之前 judged_segments=[12, 17] judged_root_index=94 torn_images=0
+PROTO_SEGMENT arm=new_inode/record_before_units segment=12 writes=24 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=12 tearable=0 judged=true full_domain_states=16777215 judged_states=13441 judged_is_full_domain=false
+PROTO_SEGMENT arm=new_inode/record_before_units segment=13 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/record_before_units segment=14 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/record_before_units segment=15 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/record_before_units segment=16 writes=2 kinds=JournalRecord over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/record_before_units segment=17 writes=20 kinds=UnitWrite over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=true copy_groups=10 tearable=0 judged=true full_domain_states=1048575 judged_states=4178 judged_is_full_domain=false
+PROTO_SEGMENT arm=new_inode/record_before_units segment=18 writes=1 kinds=RootRecordFua over_an_earlier_write=0 over_nonzero_base=0 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_SEGMENT arm=new_inode/record_before_units segment=19 writes=2 kinds=SystemConfigurationSlot over_an_earlier_write=2 over_nonzero_base=2 readable_criterion_accepts=false copy_groups=1 tearable=0 judged=false
+PROTO_PLANNED_STATES part=user_actions judged=130413 full_domain_of_the_judged_segments=1692401652 ceiling=1000000
+PROTO_ESTIMATE part=user_actions sample_states=25 per_state_seconds=0.0080 threads=31 estimated_seconds=34
+PROTO_BASELINE arm=sequential_write_two_data_units/unmodified segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=sequential_write_two_data_units/unmodified segment=12 differing_from_empty=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=12 family=support states=36 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=support representation=per_write_union compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=support representation=per_write_delta compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=support representation=copy_group_union compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=support representation=copy_group_delta compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=12 family=single states=24 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=single representation=per_write_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=single representation=per_write_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=single representation=copy_group_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=single representation=copy_group_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=12 family=pair states=276 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=pair representation=per_write_union compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=pair representation=per_write_delta compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=pair representation=copy_group_union compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=pair representation=copy_group_delta compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=12 family=all_but_one states=24 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=all_but_one representation=per_write_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=all_but_one representation=per_write_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=all_but_one representation=copy_group_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=all_but_one representation=copy_group_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=12 family=group_lattice states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=group_lattice representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=group_lattice representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=group_lattice representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=group_lattice representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=12 family=device_lattice states=8190 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=device_lattice representation=per_write_union compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=device_lattice representation=per_write_delta compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=device_lattice representation=copy_group_union compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=device_lattice representation=copy_group_delta compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=12 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=12 family=all states=13440 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=all representation=per_write_union compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=all representation=per_write_delta compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=all representation=copy_group_union compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=12 family=all representation=copy_group_delta compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=sequential_write_two_data_units/unmodified segment=12 seconds=4.5
+PROTO_BASELINE arm=sequential_write_two_data_units/unmodified segment=16 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=sequential_write_two_data_units/unmodified segment=16 differing_from_empty=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=16 family=support states=42 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=support representation=per_write_union compared=42 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=support representation=per_write_delta compared=42 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=support representation=copy_group_union compared=42 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=support representation=copy_group_delta compared=42 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=16 family=single states=28 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=single representation=per_write_union compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=single representation=per_write_delta compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=single representation=copy_group_union compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=single representation=copy_group_delta compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=16 family=pair states=378 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=pair representation=per_write_union compared=378 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=pair representation=per_write_delta compared=378 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=pair representation=copy_group_union compared=378 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=pair representation=copy_group_delta compared=378 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=16 family=all_but_one states=28 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=all_but_one representation=per_write_union compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=all_but_one representation=per_write_delta compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=all_but_one representation=copy_group_union compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=all_but_one representation=copy_group_delta compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=16 family=group_lattice states=6395 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=group_lattice representation=per_write_union compared=6395 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=group_lattice representation=per_write_delta compared=6395 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=group_lattice representation=copy_group_union compared=6395 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=group_lattice representation=copy_group_delta compared=6395 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=16 family=device_lattice states=7226 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=device_lattice representation=per_write_union compared=7226 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=device_lattice representation=per_write_delta compared=7226 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=device_lattice representation=copy_group_union compared=7226 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=device_lattice representation=copy_group_delta compared=7226 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=16 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/unmodified segment=16 family=all states=15007 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=all representation=per_write_union compared=15007 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=all representation=per_write_delta compared=15007 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=all representation=copy_group_union compared=15007 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/unmodified segment=16 family=all representation=copy_group_delta compared=15007 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=sequential_write_two_data_units/unmodified segment=16 seconds=8.2
+PROTO_BASELINE arm=sequential_write_two_data_units/late_unit segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=sequential_write_two_data_units/late_unit segment=12 differing_from_empty=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=12 family=support states=33 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=support representation=per_write_union compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=support representation=per_write_delta compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=support representation=copy_group_union compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=support representation=copy_group_delta compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=12 family=single states=22 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=single representation=per_write_union compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=single representation=per_write_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=single representation=copy_group_union compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=single representation=copy_group_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=12 family=pair states=231 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=pair representation=per_write_union compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=pair representation=per_write_delta compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=pair representation=copy_group_union compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=pair representation=copy_group_delta compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=12 family=all_but_one states=22 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=all_but_one representation=per_write_union compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=all_but_one representation=per_write_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=all_but_one representation=copy_group_union compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=all_but_one representation=copy_group_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=12 family=group_lattice states=2046 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=group_lattice representation=per_write_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=group_lattice representation=per_write_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=group_lattice representation=copy_group_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=group_lattice representation=copy_group_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=12 family=device_lattice states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=device_lattice representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=device_lattice representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=device_lattice representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=device_lattice representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=12 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=12 family=all states=7270 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=all representation=per_write_union compared=7270 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=all representation=per_write_delta compared=7270 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=all representation=copy_group_union compared=7270 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=12 family=all representation=copy_group_delta compared=7270 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=sequential_write_two_data_units/late_unit segment=12 seconds=2.5
+PROTO_BASELINE arm=sequential_write_two_data_units/late_unit segment=16 red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"} whole=consulted=failed@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=1 ignored=failed@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=1 checker=HHHHHHHHHVHHHHHHHHHVHHHHVHVHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHPHHHHHNHNNNNNNNNHHHHNNNNHNNVHHHNHNHPHHNHHHHHNNHHH records=false/false
+PROTO_SINGLE_DIFFERS arm=sequential_write_two_data_units/late_unit segment=16 state=[0] write=UnitWrite@dev0+822181888x32768 red_items={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLE_DIFFERS arm=sequential_write_two_data_units/late_unit segment=16 state=[1] write=UnitWrite@dev1+822181888x32768 red_items={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLES arm=sequential_write_two_data_units/late_unit segment=16 differing_from_empty=2
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=support states=45 red=44 whole_differs_from_empty=3
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=support representation=per_write_union compared=45 red_or_not_differs=1 red_items_differ=3 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=support representation=per_write_delta compared=45 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=support representation=copy_group_union compared=45 red_or_not_differs=1 red_items_differ=3 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=support representation=copy_group_delta compared=45 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=single states=30 red=30 whole_differs_from_empty=2
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=single representation=per_write_union compared=30 red_or_not_differs=0 red_items_differ=2 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=single representation=per_write_delta compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=single representation=copy_group_union compared=30 red_or_not_differs=0 red_items_differ=2 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=single representation=copy_group_delta compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=pair states=435 red=434 whole_differs_from_empty=57
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=pair representation=per_write_union compared=435 red_or_not_differs=1 red_items_differ=57 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=pair representation=per_write_delta compared=435 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=pair representation=copy_group_union compared=435 red_or_not_differs=1 red_items_differ=57 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=pair representation=copy_group_delta compared=435 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=all_but_one states=30 red=2 whole_differs_from_empty=30
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=all_but_one representation=per_write_union compared=30 red_or_not_differs=28 red_items_differ=30 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=all_but_one representation=per_write_delta compared=30 red_or_not_differs=28 red_items_differ=28 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=all_but_one representation=copy_group_union compared=30 red_or_not_differs=28 red_items_differ=30 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=all_but_one representation=copy_group_delta compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=group_lattice states=7260 red=3697 whole_differs_from_empty=3563
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=group_lattice representation=per_write_union compared=7260 red_or_not_differs=3563 red_items_differ=3563 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=group_lattice representation=per_write_delta compared=7260 red_or_not_differs=3563 red_items_differ=3563 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=group_lattice representation=copy_group_union compared=7260 red_or_not_differs=3563 red_items_differ=3563 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=group_lattice representation=copy_group_delta compared=7260 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=device_lattice states=7680 red=7680 whole_differs_from_empty=3802
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=device_lattice representation=per_write_union compared=7680 red_or_not_differs=0 red_items_differ=3802 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=device_lattice representation=per_write_delta compared=7680 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=device_lattice representation=copy_group_union compared=7680 red_or_not_differs=0 red_items_differ=3802 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=device_lattice representation=copy_group_delta compared=7680 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=random states=1000 red=734 whole_differs_from_empty=775
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=random representation=per_write_union compared=1000 red_or_not_differs=266 red_items_differ=775 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=random representation=per_write_delta compared=1000 red_or_not_differs=266 red_items_differ=266 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=random representation=copy_group_union compared=1000 red_or_not_differs=266 red_items_differ=775 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=target states=1 red=0 whole_differs_from_empty=1
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=target representation=per_write_union compared=1 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=target representation=per_write_delta compared=1 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=target representation=copy_group_union compared=1 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=target representation=copy_group_delta compared=1 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/late_unit segment=16 family=all states=16405 red=12547 whole_differs_from_empty=8227
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=all representation=per_write_union compared=16405 red_or_not_differs=3858 red_items_differ=8227 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=all representation=per_write_delta compared=16405 red_or_not_differs=3858 red_items_differ=3858 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=all representation=copy_group_union compared=16405 red_or_not_differs=3858 red_items_differ=8227 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/late_unit segment=16 family=all representation=copy_group_delta compared=16405 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=per_write_union state=[0] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=per_write_union state=[1] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=per_write_union state=[0,1] actual={} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=per_write_delta state=[0,1] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=per_write_delta state=[0,1,6,7] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=per_write_delta state=[0,1,2,3,6,7,8,9] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=copy_group_union state=[0] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=copy_group_union state=[1] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=sequential_write_two_data_units/late_unit segment=16 representation=copy_group_union state=[0,1] actual={} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_TARGET arm=sequential_write_two_data_units/late_unit segment=16 target=moved_copies_only state=[0,1] actual={} whole_equals_empty=false per_write_union=Some({"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}) copy_group_union=Some({"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"})
+PROTO_SEGMENT_DONE arm=sequential_write_two_data_units/late_unit segment=16 seconds=9.1
+PROTO_BASELINE arm=sequential_write_two_data_units/record_before_units segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=sequential_write_two_data_units/record_before_units segment=12 differing_from_empty=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=12 family=support states=36 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=support representation=per_write_union compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=support representation=per_write_delta compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=support representation=copy_group_union compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=support representation=copy_group_delta compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=12 family=single states=24 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=single representation=per_write_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=single representation=per_write_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=single representation=copy_group_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=single representation=copy_group_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=12 family=pair states=276 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=pair representation=per_write_union compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=pair representation=per_write_delta compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=pair representation=copy_group_union compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=pair representation=copy_group_delta compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=12 family=all_but_one states=24 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=all_but_one representation=per_write_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=all_but_one representation=per_write_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=all_but_one representation=copy_group_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=all_but_one representation=copy_group_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=12 family=group_lattice states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=group_lattice representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=group_lattice representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=group_lattice representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=group_lattice representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=12 family=device_lattice states=8190 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=device_lattice representation=per_write_union compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=device_lattice representation=per_write_delta compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=device_lattice representation=copy_group_union compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=device_lattice representation=copy_group_delta compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=12 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=12 family=all states=13440 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=all representation=per_write_union compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=all representation=per_write_delta compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=all representation=copy_group_union compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=12 family=all representation=copy_group_delta compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=sequential_write_two_data_units/record_before_units segment=12 seconds=4.5
+PROTO_BASELINE arm=sequential_write_two_data_units/record_before_units segment=17 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=sequential_write_two_data_units/record_before_units segment=17 differing_from_empty=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=support states=42 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=support representation=per_write_union compared=42 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=support representation=per_write_delta compared=42 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=support representation=copy_group_union compared=42 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=support representation=copy_group_delta compared=42 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=single states=28 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=single representation=per_write_union compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=single representation=per_write_delta compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=single representation=copy_group_union compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=single representation=copy_group_delta compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=pair states=378 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=pair representation=per_write_union compared=378 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=pair representation=per_write_delta compared=378 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=pair representation=copy_group_union compared=378 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=pair representation=copy_group_delta compared=378 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=all_but_one states=28 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=all_but_one representation=per_write_union compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=all_but_one representation=per_write_delta compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=all_but_one representation=copy_group_union compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=all_but_one representation=copy_group_delta compared=28 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=group_lattice states=6436 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=group_lattice representation=per_write_union compared=6436 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=group_lattice representation=per_write_delta compared=6436 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=group_lattice representation=copy_group_union compared=6436 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=group_lattice representation=copy_group_delta compared=6436 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=device_lattice states=7237 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=device_lattice representation=per_write_union compared=7237 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=device_lattice representation=per_write_delta compared=7237 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=device_lattice representation=copy_group_union compared=7237 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=device_lattice representation=copy_group_delta compared=7237 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=target states=14 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=target representation=per_write_union compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=target representation=per_write_delta compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=target representation=copy_group_union compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=target representation=copy_group_delta compared=14 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=sequential_write_two_data_units/record_before_units segment=17 family=all states=15065 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=all representation=per_write_union compared=15065 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=all representation=per_write_delta compared=15065 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=all representation=copy_group_union compared=15065 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=sequential_write_two_data_units/record_before_units segment=17 family=all representation=copy_group_delta compared=15065 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_822214656 state=[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_822247424 state=[0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823541760 state=[0,1,2,3,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823558144 state=[0,1,2,3,4,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823590912 state=[0,1,2,3,4,5,6,7,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823623680 state=[0,1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823640064 state=[0,1,2,3,4,5,6,7,8,9,10,11,14,15,16,17,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823656448 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,16,17,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823672832 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,18,19,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823689216 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,20,21,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823705600 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,22,23,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823721984 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,24,25,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823738368 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,26,27] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=sequential_write_two_data_units/record_before_units segment=17 target=every_group_but_823754752 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_SEGMENT_DONE arm=sequential_write_two_data_units/record_before_units segment=17 seconds=9.4
+PROTO_BASELINE arm=new_inode/unmodified segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=new_inode/unmodified segment=12 differing_from_empty=0
+PROTO_FAMILY arm=new_inode/unmodified segment=12 family=support states=36 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=support representation=per_write_union compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=support representation=per_write_delta compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=support representation=copy_group_union compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=support representation=copy_group_delta compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=12 family=single states=24 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=single representation=per_write_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=single representation=per_write_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=single representation=copy_group_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=single representation=copy_group_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=12 family=pair states=276 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=pair representation=per_write_union compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=pair representation=per_write_delta compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=pair representation=copy_group_union compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=pair representation=copy_group_delta compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=12 family=all_but_one states=24 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=all_but_one representation=per_write_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=all_but_one representation=per_write_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=all_but_one representation=copy_group_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=all_but_one representation=copy_group_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=12 family=group_lattice states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=group_lattice representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=group_lattice representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=group_lattice representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=group_lattice representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=12 family=device_lattice states=8190 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=device_lattice representation=per_write_union compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=device_lattice representation=per_write_delta compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=device_lattice representation=copy_group_union compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=device_lattice representation=copy_group_delta compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=12 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=12 family=all states=13440 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=all representation=per_write_union compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=all representation=per_write_delta compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=all representation=copy_group_union compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=12 family=all representation=copy_group_delta compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=new_inode/unmodified segment=12 seconds=4.4
+PROTO_BASELINE arm=new_inode/unmodified segment=16 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=new_inode/unmodified segment=16 differing_from_empty=0
+PROTO_FAMILY arm=new_inode/unmodified segment=16 family=support states=30 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=support representation=per_write_union compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=support representation=per_write_delta compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=support representation=copy_group_union compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=support representation=copy_group_delta compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=16 family=single states=20 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=single representation=per_write_union compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=single representation=per_write_delta compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=single representation=copy_group_union compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=single representation=copy_group_delta compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=16 family=pair states=190 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=pair representation=per_write_union compared=190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=pair representation=per_write_delta compared=190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=pair representation=copy_group_union compared=190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=pair representation=copy_group_delta compared=190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=16 family=all_but_one states=20 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=all_but_one representation=per_write_union compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=all_but_one representation=per_write_delta compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=all_but_one representation=copy_group_union compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=all_but_one representation=copy_group_delta compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=16 family=group_lattice states=1022 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=group_lattice representation=per_write_union compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=group_lattice representation=per_write_delta compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=group_lattice representation=copy_group_union compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=group_lattice representation=copy_group_delta compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=16 family=device_lattice states=2046 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=device_lattice representation=per_write_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=device_lattice representation=per_write_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=device_lattice representation=copy_group_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=device_lattice representation=copy_group_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=16 family=random states=999 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=random representation=per_write_union compared=999 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=random representation=per_write_delta compared=999 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=random representation=copy_group_union compared=999 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=random representation=copy_group_delta compared=999 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/unmodified segment=16 family=all states=4176 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=all representation=per_write_union compared=4176 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=all representation=per_write_delta compared=4176 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=all representation=copy_group_union compared=4176 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/unmodified segment=16 family=all representation=copy_group_delta compared=4176 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=new_inode/unmodified segment=16 seconds=2.4
+PROTO_BASELINE arm=new_inode/late_unit segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=new_inode/late_unit segment=12 differing_from_empty=0
+PROTO_FAMILY arm=new_inode/late_unit segment=12 family=support states=33 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=support representation=per_write_union compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=support representation=per_write_delta compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=support representation=copy_group_union compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=support representation=copy_group_delta compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=12 family=single states=22 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=single representation=per_write_union compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=single representation=per_write_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=single representation=copy_group_union compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=single representation=copy_group_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=12 family=pair states=231 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=pair representation=per_write_union compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=pair representation=per_write_delta compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=pair representation=copy_group_union compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=pair representation=copy_group_delta compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=12 family=all_but_one states=22 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=all_but_one representation=per_write_union compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=all_but_one representation=per_write_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=all_but_one representation=copy_group_union compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=all_but_one representation=copy_group_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=12 family=group_lattice states=2046 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=group_lattice representation=per_write_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=group_lattice representation=per_write_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=group_lattice representation=copy_group_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=group_lattice representation=copy_group_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=12 family=device_lattice states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=device_lattice representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=device_lattice representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=device_lattice representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=device_lattice representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=12 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=12 family=all states=7272 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=all representation=per_write_union compared=7272 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=all representation=per_write_delta compared=7272 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=all representation=copy_group_union compared=7272 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=12 family=all representation=copy_group_delta compared=7272 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=new_inode/late_unit segment=12 seconds=2.5
+PROTO_BASELINE arm=new_inode/late_unit segment=16 red_items={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"} whole=consulted=failed@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=1 ignored=failed@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=1 checker=HHHHHHHHHVHHHHHHHHHVHHHHVHVHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHPHHHHHNHNNNNNNNNHHHHNNNNHNNVHHHNHNHPHHNHHHHHNNHHH records=false/false
+PROTO_SINGLE_DIFFERS arm=new_inode/late_unit segment=16 state=[0] write=UnitWrite@dev0+822181888x32768 red_items={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLE_DIFFERS arm=new_inode/late_unit segment=16 state=[1] write=UnitWrite@dev1+822181888x32768 red_items={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} red_items_equal_empty=false
+PROTO_SINGLES arm=new_inode/late_unit segment=16 differing_from_empty=2
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=support states=33 red=32 whole_differs_from_empty=3
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=support representation=per_write_union compared=33 red_or_not_differs=1 red_items_differ=3 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=support representation=per_write_delta compared=33 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=support representation=copy_group_union compared=33 red_or_not_differs=1 red_items_differ=3 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=support representation=copy_group_delta compared=33 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=single states=22 red=22 whole_differs_from_empty=2
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=single representation=per_write_union compared=22 red_or_not_differs=0 red_items_differ=2 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=single representation=per_write_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=single representation=copy_group_union compared=22 red_or_not_differs=0 red_items_differ=2 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=single representation=copy_group_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=pair states=231 red=230 whole_differs_from_empty=41
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=pair representation=per_write_union compared=231 red_or_not_differs=1 red_items_differ=41 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=pair representation=per_write_delta compared=231 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=pair representation=copy_group_union compared=231 red_or_not_differs=1 red_items_differ=41 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=pair representation=copy_group_delta compared=231 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=all_but_one states=22 red=2 whole_differs_from_empty=22
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=all_but_one representation=per_write_union compared=22 red_or_not_differs=20 red_items_differ=22 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=all_but_one representation=per_write_delta compared=22 red_or_not_differs=20 red_items_differ=20 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=all_but_one representation=copy_group_union compared=22 red_or_not_differs=20 red_items_differ=22 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=all_but_one representation=copy_group_delta compared=22 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=group_lattice states=2046 red=1023 whole_differs_from_empty=1023
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=group_lattice representation=per_write_union compared=2046 red_or_not_differs=1023 red_items_differ=1023 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=group_lattice representation=per_write_delta compared=2046 red_or_not_differs=1023 red_items_differ=1023 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=group_lattice representation=copy_group_union compared=2046 red_or_not_differs=1023 red_items_differ=1023 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=group_lattice representation=copy_group_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=device_lattice states=4094 red=4094 whole_differs_from_empty=2048
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=device_lattice representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=2048 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=device_lattice representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=device_lattice representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=2048 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=device_lattice representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=random states=1000 red=730 whole_differs_from_empty=758
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=random representation=per_write_union compared=1000 red_or_not_differs=270 red_items_differ=758 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=random representation=per_write_delta compared=1000 red_or_not_differs=270 red_items_differ=270 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=random representation=copy_group_union compared=1000 red_or_not_differs=270 red_items_differ=758 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=target states=1 red=0 whole_differs_from_empty=1
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=target representation=per_write_union compared=1 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=target representation=per_write_delta compared=1 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=target representation=copy_group_union compared=1 red_or_not_differs=1 red_items_differ=1 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=target representation=copy_group_delta compared=1 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/late_unit segment=16 family=all states=7269 red=5958 whole_differs_from_empty=3868
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=all representation=per_write_union compared=7269 red_or_not_differs=1311 red_items_differ=3868 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=all representation=per_write_delta compared=7269 red_or_not_differs=1311 red_items_differ=1311 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=all representation=copy_group_union compared=7269 red_or_not_differs=1311 red_items_differ=3868 unrepresentable=0
+PROTO_COMPARE arm=new_inode/late_unit segment=16 family=all representation=copy_group_delta compared=7269 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=per_write_union state=[0] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=per_write_union state=[1] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=per_write_union state=[0,1] actual={} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=per_write_delta state=[0,1] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=per_write_delta state=[0,1,2,3] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=per_write_delta state=[0,1,4,5] actual={} represented={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=copy_group_union state=[0] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=copy_group_union state=[1] actual={"pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.4"} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_EXAMPLE arm=new_inode/late_unit segment=16 representation=copy_group_union state=[0,1] actual={} represented={"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}
+PROTO_TARGET arm=new_inode/late_unit segment=16 target=moved_copies_only state=[0,1] actual={} whole_equals_empty=false per_write_union=Some({"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"}) copy_group_union=Some({"journal_consulted_oracle:read_failed", "journal_ignored_oracle:read_failed", "pool_checker:I-1.13", "pool_checker:I-2.1", "pool_checker:I-4.8", "pool_checker:I-7.2", "pool_checker:I-7.4"})
+PROTO_SEGMENT_DONE arm=new_inode/late_unit segment=16 seconds=4.2
+PROTO_BASELINE arm=new_inode/record_before_units segment=12 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(3)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHNNHHHHHHHHHNHHHHHHHHHNHHHHNHHHHHHNHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=new_inode/record_before_units segment=12 differing_from_empty=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=12 family=support states=36 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=support representation=per_write_union compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=support representation=per_write_delta compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=support representation=copy_group_union compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=support representation=copy_group_delta compared=36 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=12 family=single states=24 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=single representation=per_write_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=single representation=per_write_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=single representation=copy_group_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=single representation=copy_group_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=12 family=pair states=276 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=pair representation=per_write_union compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=pair representation=per_write_delta compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=pair representation=copy_group_union compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=pair representation=copy_group_delta compared=276 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=12 family=all_but_one states=24 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=all_but_one representation=per_write_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=all_but_one representation=per_write_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=all_but_one representation=copy_group_union compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=all_but_one representation=copy_group_delta compared=24 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=12 family=group_lattice states=4094 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=group_lattice representation=per_write_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=group_lattice representation=per_write_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=group_lattice representation=copy_group_union compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=group_lattice representation=copy_group_delta compared=4094 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=12 family=device_lattice states=8190 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=device_lattice representation=per_write_union compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=device_lattice representation=per_write_delta compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=device_lattice representation=copy_group_union compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=device_lattice representation=copy_group_delta compared=8190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=12 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=12 family=all states=13440 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=all representation=per_write_union compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=all representation=per_write_delta compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=all representation=copy_group_union compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=12 family=all representation=copy_group_delta compared=13440 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_SEGMENT_DONE arm=new_inode/record_before_units segment=12 seconds=4.5
+PROTO_BASELINE arm=new_inode/record_before_units segment=17 red_items={} whole=consulted=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 ignored=file_read@Some((InstanceGeneration(1), CheckpointTxg(4)))/fallbacks=0 checker=HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNHHHHHNHHHHHHHHHHHHHHHHHHHNHHHHNHHHHHHHHHNHNNNNNNNNHHHHNNNNHNNHHHHNHNHHHHNHHHHHNNHHH records=false/false
+PROTO_SINGLES arm=new_inode/record_before_units segment=17 differing_from_empty=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=support states=30 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=support representation=per_write_union compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=support representation=per_write_delta compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=support representation=copy_group_union compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=support representation=copy_group_delta compared=30 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=single states=20 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=single representation=per_write_union compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=single representation=per_write_delta compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=single representation=copy_group_union compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=single representation=copy_group_delta compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=pair states=190 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=pair representation=per_write_union compared=190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=pair representation=per_write_delta compared=190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=pair representation=copy_group_union compared=190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=pair representation=copy_group_delta compared=190 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=all_but_one states=20 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=all_but_one representation=per_write_union compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=all_but_one representation=per_write_delta compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=all_but_one representation=copy_group_union compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=all_but_one representation=copy_group_delta compared=20 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=group_lattice states=1022 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=group_lattice representation=per_write_union compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=group_lattice representation=per_write_delta compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=group_lattice representation=copy_group_union compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=group_lattice representation=copy_group_delta compared=1022 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=device_lattice states=2046 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=device_lattice representation=per_write_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=device_lattice representation=per_write_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=device_lattice representation=copy_group_union compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=device_lattice representation=copy_group_delta compared=2046 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=random states=1000 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=random representation=per_write_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=random representation=per_write_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=random representation=copy_group_union compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=random representation=copy_group_delta compared=1000 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=target states=10 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=target representation=per_write_union compared=10 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=target representation=per_write_delta compared=10 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=target representation=copy_group_union compared=10 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=target representation=copy_group_delta compared=10 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_FAMILY arm=new_inode/record_before_units segment=17 family=all states=4177 red=0 whole_differs_from_empty=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=all representation=per_write_union compared=4177 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=all representation=per_write_delta compared=4177 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=all representation=copy_group_union compared=4177 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_COMPARE arm=new_inode/record_before_units segment=17 family=all representation=copy_group_delta compared=4177 red_or_not_differs=0 red_items_differ=0 unrepresentable=0
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823558144 state=[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823590912 state=[0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823607296 state=[0,1,2,3,6,7,8,9,10,11,12,13,14,15,16,17,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823623680 state=[0,1,2,3,4,5,8,9,10,11,12,13,14,15,16,17,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823640064 state=[0,1,2,3,4,5,6,7,10,11,12,13,14,15,16,17,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823656448 state=[0,1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823672832 state=[0,1,2,3,4,5,6,7,8,9,10,11,14,15,16,17,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823689216 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,16,17,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823705600 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,18,19] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_TARGET arm=new_inode/record_before_units segment=17 target=every_group_but_823721984 state=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] actual={} whole_equals_empty=true per_write_union=Some({}) copy_group_union=Some({})
+PROTO_SEGMENT_DONE arm=new_inode/record_before_units segment=17 seconds=2.5
+PROTO_JUDGED part=user_actions states=130413 seconds=58.6
+PROTO_FINISHED part=user_actions

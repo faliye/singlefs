@@ -1,0 +1,581 @@
+
+/// 第三轮辩方腿探针（只拷进草稿副本、追加在测试文件末尾，不回主工作区）：逐段读出 E6 点名的槽与点名它的记录，
+/// 并给出按单元类取宽度的收窄判据 E6n。只读写表、基镜像与记录字节，不判崩溃状态。
+/// 与第二轮的静态分类器（`per_write_judging_tightened_classifier`）互不依赖：用到的几处读法（单元头偏移、同偏移同归并键的分组、
+/// 盖不盖更早的写）在这里另抄一份，抄的是那份分类器在任务 8700 里编过也跑过的写法。
+mod per_write_judging_named_slots {
+    use singlefs_verification::memory_pool::{publishes_in, MemoryPool, PublishWrites, RecordStreamContinuity, RetainedWrite};
+    use singlefs_verification::segments::StepKind;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    pub const SLOT_BYTES_OF_THE_POOL: u64 = 16384;
+    const DATA_UNIT_BYTES_OF_THE_POOL: u64 = 32768;
+    const NODE_BYTES_OF_THE_POOL: u64 = 16384;
+
+    fn u64_at(bytes: &[u8], offset: usize) -> u64 {
+        u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
+    }
+
+    fn u32_at(bytes: &[u8], offset: usize) -> u32 {
+        u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 字节"))
+    }
+
+    /// 单元类标签对应的字节数：照 `crates/singlefs-core/src/recovery.rs` 的 `unit_bytes_for_class`（码 1、码 3 是 32768，码 2 是 16384，别的不认）。
+    pub fn width_of_class(class: u8) -> Option<u64> {
+        match class {
+            1 | 3 => Some(DATA_UNIT_BYTES_OF_THE_POOL),
+            2 => Some(NODE_BYTES_OF_THE_POOL),
+            _outside_the_three_unit_classes => None,
+        }
+    }
+
+    pub struct UnitHeader {
+        pub class: u8,
+        pub birth_txg: u64,
+        pub instance: u32,
+        pub claimed_bytes: u64,
+        pub merge_key: Option<Vec<u8>>,
+    }
+
+    /// 单元头里要读的几样：偏移与第二轮分类器同一份（码 1：诞生代号 75、写序 91；码 3：73、93；码 2：52 + 2k、68 + 2k，k 是 bytes[51]）。
+    pub fn parse_header(bytes: &[u8]) -> Option<UnitHeader> {
+        if bytes.len() < 112 || &bytes[..4] != b"SFSU" {
+            return None;
+        }
+        match bytes[6] {
+            1 => Some(UnitHeader {
+                class: 1,
+                birth_txg: u64_at(bytes, 75),
+                instance: u32_at(bytes, 91),
+                claimed_bytes: DATA_UNIT_BYTES_OF_THE_POOL,
+                merge_key: Some(bytes[42..101].to_vec()),
+            }),
+            3 => Some(UnitHeader {
+                class: 3,
+                birth_txg: u64_at(bytes, 73),
+                instance: u32_at(bytes, 93),
+                claimed_bytes: DATA_UNIT_BYTES_OF_THE_POOL,
+                merge_key: Some([&bytes[42..89], &bytes[93..107]].concat()),
+            }),
+            2 => {
+                let extra = 2 * usize::from(bytes[51]);
+                if 72 + extra + 4 > bytes.len() {
+                    return None;
+                }
+                Some(UnitHeader {
+                    class: 2,
+                    birth_txg: u64_at(bytes, 52 + extra),
+                    instance: u32_at(bytes, 68 + extra),
+                    claimed_bytes: NODE_BYTES_OF_THE_POOL,
+                    merge_key: None,
+                })
+            }
+            _outside_the_three_unit_classes => None,
+        }
+    }
+
+    /// 一条记录里的一个点名项（56 字节：两条位置条目各 盘 4、槽号 6、校验和 4，之后类标签 1、出生树 8、出生 txg 8、key 尾段 10、flags 1；
+    /// `crates/singlefs-core/src/journal.rs` 的 `NamedUnit::write_to` 同一个次序）。
+    #[derive(Clone, Debug)]
+    pub struct NamedItem {
+        pub index_in_record: usize,
+        pub locations: [(u32, u64); 2],
+        pub unit_class: u8,
+        pub birth_tree: u64,
+        pub birth_txg: u64,
+        pub key_tail: [u8; 10],
+    }
+
+    pub struct ParsedRecord {
+        pub instance: u32,
+        pub counter: u64,
+        pub checkpoint_txg: u64,
+        pub items: Vec<NamedItem>,
+    }
+
+    /// 记录头：魔数 0..4、点名项数 12..16、实例代号 16..20、计数器 20..26（6 字节）、checkpoint_txg 26..34、头 496 字节、之后每项 56 字节
+    /// （`crates/singlefs-core/src/journal.rs` 的 `to_bytes`）。点名区越过记录末尾、魔数不对、头不全都交回原因，不悄悄丢项。
+    pub fn parse_record(bytes: &[u8]) -> Result<ParsedRecord, &'static str> {
+        if bytes.len() < 496 {
+            return Err("shorter_than_the_header");
+        }
+        if &bytes[..4] != b"SFSJ" {
+            return Err("magic_is_not_a_journal_record");
+        }
+        let count = usize::try_from(u32_at(bytes, 12)).expect("点名项数");
+        if 496usize.saturating_add(count.saturating_mul(56)) > bytes.len() {
+            return Err("named_area_beyond_the_record");
+        }
+        let mut counter_bytes = [0u8; 8];
+        counter_bytes[..6].copy_from_slice(&bytes[20..26]);
+        let mut items = Vec::with_capacity(count);
+        for index in 0..count {
+            let start = 496 + index * 56;
+            let mut locations = [(0u32, 0u64); 2];
+            for (which, location_start) in [start, start + 14].iter().copied().enumerate() {
+                let mut six_bytes = [0u8; 8];
+                six_bytes[..6].copy_from_slice(&bytes[location_start + 4..location_start + 10]);
+                locations[which] = (u32_at(bytes, location_start), u64::from_le_bytes(six_bytes));
+            }
+            let mut key_tail = [0u8; 10];
+            key_tail.copy_from_slice(&bytes[start + 45..start + 55]);
+            items.push(NamedItem {
+                index_in_record: index,
+                locations,
+                unit_class: bytes[start + 28],
+                birth_tree: u64_at(bytes, start + 29),
+                birth_txg: u64_at(bytes, start + 37),
+                key_tail,
+            });
+        }
+        Ok(ParsedRecord {
+            instance: u32_at(bytes, 16),
+            counter: u64::from_le_bytes(counter_bytes),
+            checkpoint_txg: u64_at(bytes, 26),
+            items,
+        })
+    }
+
+    /// 这次写罩住的范围在它之前有没有被写过：（写表里更早的同盘重叠写，基镜像那一段有非零字节）。
+    pub fn overwrites_something(base: &MemoryPool, writes: &[RetainedWrite], index: usize) -> (bool, bool) {
+        let write = &writes[index];
+        let end = write.offset.0 + write.length_in_bytes();
+        let earlier = writes[..index].iter().any(|earlier| {
+            earlier.device == write.device
+                && earlier.offset.0 < end
+                && write.offset.0 < earlier.offset.0 + earlier.length_in_bytes()
+        });
+        let base_nonzero = base.devices.get(&write.device).is_some_and(|device| {
+            device
+                .written_sectors()
+                .range(write.offset.0 / 512..end.div_ceil(512))
+                .any(|(_, bytes)| bytes.iter().any(|byte| *byte != 0))
+        });
+        (earlier, base_nonzero)
+    }
+
+    /// 基镜像里 (盘身份, 起点, 长度) 这一段有没有非零字节。
+    fn base_holds_nonzero_bytes(base: &MemoryPool, device: u32, start: u64, length: u64) -> bool {
+        base.devices.iter().any(|(identity, sparse)| {
+            identity.0 == device
+                && sparse
+                    .written_sectors()
+                    .range(start / 512..(start + length).div_ceil(512))
+                    .any(|(_, bytes)| bytes.iter().any(|byte| *byte != 0))
+        })
+    }
+
+    /// 段里的写按「同一个单元的几份副本」分组：同偏移、同归并键两条边连通（同第二轮分类器）。
+    pub fn groups_of_segment(writes: &[RetainedWrite], segment: &[usize]) -> Vec<Vec<usize>> {
+        let mut parent: Vec<usize> = (0..segment.len()).collect();
+        fn find(parent: &mut Vec<usize>, position: usize) -> usize {
+            let mut root = position;
+            while parent[root] != root {
+                root = parent[root];
+            }
+            let mut walker = position;
+            while parent[walker] != root {
+                let next = parent[walker];
+                parent[walker] = root;
+                walker = next;
+            }
+            root
+        }
+        let mut by_offset: BTreeMap<u64, usize> = BTreeMap::new();
+        let mut by_merge_key: BTreeMap<Vec<u8>, usize> = BTreeMap::new();
+        for (position, write_index) in segment.iter().enumerate() {
+            let write = &writes[*write_index];
+            let mut seen_before_at: Vec<usize> = Vec::new();
+            if let Some(earlier) = by_offset.insert(write.offset.0, position) {
+                seen_before_at.push(earlier);
+            }
+            if let Some(header) = write.bytes().and_then(parse_header) {
+                if let Some(key) = header.merge_key {
+                    if let Some(earlier) = by_merge_key.insert(key, position) {
+                        seen_before_at.push(earlier);
+                    }
+                }
+            }
+            for earlier in seen_before_at {
+                let (left, right) = (find(&mut parent, position), find(&mut parent, earlier));
+                if left != right {
+                    parent[left] = right;
+                }
+            }
+        }
+        let mut grouped: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for (position, write_index) in segment.iter().enumerate() {
+            let root = find(&mut parent, position);
+            grouped.entry(root).or_default().push(*write_index);
+        }
+        grouped.into_values().collect()
+    }
+
+    /// 一次「宽读法点名」：前缀里一条记录写的一个点名项的一条位置条目，按 32768 字节算（第二轮 E6 的写法）罩住了这一段的某个写。
+    /// `overlaps_by_class` 为假：只在点名单元自己的字节数（按类标签）之外那一截与这个写相交，是宽度造成的。
+    #[derive(Clone, Debug)]
+    pub struct Hit {
+        pub record_write_index: usize,
+        pub record_counter: u64,
+        pub record_instance: u32,
+        pub record_checkpoint_txg: u64,
+        pub item: NamedItem,
+        pub location_device: u32,
+        pub location_slot: u64,
+        pub named_start: u64,
+        pub named_end_by_class: Option<u64>,
+        pub named_end_wide: u64,
+        pub write_index: usize,
+        pub write_device: u32,
+        pub write_offset: u64,
+        pub write_length: u64,
+        pub write_class: Option<u8>,
+        pub write_birth_txg: Option<u64>,
+        pub write_instance: Option<u32>,
+        pub same_slot: bool,
+        pub same_birth_txg: bool,
+        pub overlaps_by_class: bool,
+        pub touching: bool,
+        pub named_unit_written_earlier_at: Option<usize>,
+        pub named_unit_matches_class_and_birth: bool,
+    }
+
+    #[derive(Default)]
+    pub struct NamedCensus {
+        pub prefix_record_writes: usize,
+        pub unparsable_record_writes: usize,
+        pub named_locations: usize,
+        pub matched_earlier_unit_write: usize,
+        pub matched_class_and_birth: usize,
+        pub no_earlier_write_but_base_nonzero: usize,
+        pub unmatched: usize,
+        pub unknown_class_locations: usize,
+        pub old_wide_record_writes: usize,
+        pub narrow_record_writes: usize,
+        /// 前缀里任一点名单元（按类取宽度）的末尾到这一段某个同盘写的起点的最小距离（起点不在末尾之前的才算）：0 是紧挨着，没有就是 `None`。
+        pub nearest_gap_after_a_named_extent: Option<u64>,
+        pub hits: Vec<Hit>,
+    }
+
+    /// 前缀（写表下标比这一段最低的写小）里每条 journal 记录写的每个点名项的每条位置条目：
+    /// 它点名的单元在写表更早处有没有同盘同偏移的单元写、类标签与诞生代号对不对得上；
+    /// 按宽读法（32768）与按类取宽度两种读法各罩住这一段的哪几个写。
+    pub fn census_of_the_prefix(base: &MemoryPool, writes: &[RetainedWrite], segment: &[usize]) -> NamedCensus {
+        let mut census = NamedCensus::default();
+        let Some(lowest_write_index) = segment.iter().min().copied() else {
+            return census;
+        };
+        for (record_index, record) in writes[..lowest_write_index].iter().enumerate() {
+            if record.kind != StepKind::JournalRecord {
+                continue;
+            }
+            let Some(bytes) = record.bytes() else {
+                continue;
+            };
+            census.prefix_record_writes += 1;
+            let parsed = match parse_record(bytes) {
+                Ok(parsed) => parsed,
+                Err(_reason) => {
+                    census.unparsable_record_writes += 1;
+                    continue;
+                }
+            };
+            let mut wide_hit = false;
+            let mut narrow_hit = false;
+            for item in &parsed.items {
+                let class_width = width_of_class(item.unit_class);
+                for (device, slot) in item.locations.iter().copied() {
+                    census.named_locations += 1;
+                    if class_width.is_none() {
+                        census.unknown_class_locations += 1;
+                    }
+                    let named_start = slot * SLOT_BYTES_OF_THE_POOL;
+                    let named_end_wide = named_start + DATA_UNIT_BYTES_OF_THE_POOL;
+                    let named_end_by_class = class_width.map(|width| named_start + width);
+                    let earlier_unit_write = writes[..record_index].iter().position(|earlier| {
+                        earlier.kind == StepKind::UnitWrite && earlier.device.0 == device && earlier.offset.0 == named_start
+                    });
+                    let matches_class_and_birth = earlier_unit_write.is_some_and(|earlier_index| {
+                        writes[earlier_index]
+                            .bytes()
+                            .and_then(parse_header)
+                            .is_some_and(|header| header.class == item.unit_class && header.birth_txg == item.birth_txg)
+                    });
+                    if earlier_unit_write.is_some() {
+                        census.matched_earlier_unit_write += 1;
+                        census.matched_class_and_birth += usize::from(matches_class_and_birth);
+                    } else if base_holds_nonzero_bytes(base, device, named_start, class_width.unwrap_or(DATA_UNIT_BYTES_OF_THE_POOL)) {
+                        census.no_earlier_write_but_base_nonzero += 1;
+                    } else {
+                        census.unmatched += 1;
+                    }
+                    for write_index in segment {
+                        let write = &writes[*write_index];
+                        let write_end = write.offset.0 + write.length_in_bytes();
+                        if write.device.0 == device {
+                            if let Some(end) = named_end_by_class {
+                                if write.offset.0 >= end {
+                                    let gap = write.offset.0 - end;
+                                    census.nearest_gap_after_a_named_extent =
+                                        Some(census.nearest_gap_after_a_named_extent.map_or(gap, |nearest| nearest.min(gap)));
+                                }
+                            }
+                        }
+                        if write.device.0 != device || !(write.offset.0 < named_end_wide && named_start < write_end) {
+                            continue;
+                        }
+                        wide_hit = true;
+                        let overlaps_by_class =
+                            named_end_by_class.map_or(true, |end| write.offset.0 < end && named_start < write_end);
+                        narrow_hit |= overlaps_by_class;
+                        let header = write.bytes().and_then(parse_header);
+                        census.hits.push(Hit {
+                            record_write_index: record_index,
+                            record_counter: parsed.counter,
+                            record_instance: parsed.instance,
+                            record_checkpoint_txg: parsed.checkpoint_txg,
+                            item: item.clone(),
+                            location_device: device,
+                            location_slot: slot,
+                            named_start,
+                            named_end_by_class,
+                            named_end_wide,
+                            write_index: *write_index,
+                            write_device: write.device.0,
+                            write_offset: write.offset.0,
+                            write_length: write.length_in_bytes(),
+                            write_class: header.as_ref().map(|header| header.class),
+                            write_birth_txg: header.as_ref().map(|header| header.birth_txg),
+                            write_instance: header.as_ref().map(|header| header.instance),
+                            same_slot: named_start == write.offset.0,
+                            same_birth_txg: header.as_ref().is_some_and(|header| header.birth_txg == item.birth_txg),
+                            overlaps_by_class,
+                            touching: named_end_by_class == Some(write.offset.0),
+                            named_unit_written_earlier_at: earlier_unit_write,
+                            named_unit_matches_class_and_birth: matches_class_and_birth,
+                        });
+                    }
+                }
+            }
+            census.old_wide_record_writes += usize::from(wide_hit);
+            census.narrow_record_writes += usize::from(narrow_hit);
+        }
+        census
+    }
+
+    pub struct NamedVerdict {
+        pub segment_index: usize,
+        pub writes: usize,
+        pub only_unit_writes: bool,
+        pub over_an_earlier_write: usize,
+        pub over_nonzero_base: usize,
+        pub without_a_parsable_header: usize,
+        pub unaligned_to_a_slot: usize,
+        pub claimed_bytes_differ_from_the_write: usize,
+        pub header_not_beyond_the_mount_root: usize,
+        pub census: NamedCensus,
+        pub group_size_histogram: BTreeMap<usize, usize>,
+        pub passes_with_the_old_e6: bool,
+        pub passes_with_e6n: bool,
+        pub states_under_the_group_form: u64,
+    }
+
+    /// 判一段：E1 到 E4 照第二轮的写法，E6 两种读法并排（旧的宽读法与按类取宽度的 E6n）。`segment` 为空返回 `None`。
+    pub fn classify_segment_named(
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        segment_index: usize,
+        publishes: &[PublishWrites],
+    ) -> Option<NamedVerdict> {
+        let segment = &segments[segment_index];
+        let lowest_write_index = *segment.iter().min()?;
+        let only_unit_writes = segment.iter().all(|index| writes[*index].kind == StepKind::UnitWrite);
+        let mount_root: Option<(u32, u64)> = publishes
+            .iter()
+            .filter(|publish| publish.root < lowest_write_index)
+            .max_by_key(|publish| publish.root)
+            .map(|publish| (publish.instance, publish.checkpoint_txg));
+        let mut verdict = NamedVerdict {
+            segment_index,
+            writes: segment.len(),
+            only_unit_writes,
+            over_an_earlier_write: 0,
+            over_nonzero_base: 0,
+            without_a_parsable_header: 0,
+            unaligned_to_a_slot: 0,
+            claimed_bytes_differ_from_the_write: 0,
+            header_not_beyond_the_mount_root: 0,
+            census: NamedCensus::default(),
+            group_size_histogram: BTreeMap::new(),
+            passes_with_the_old_e6: false,
+            passes_with_e6n: false,
+            states_under_the_group_form: 0,
+        };
+        for write_index in segment {
+            let write = &writes[*write_index];
+            let (earlier, base_nonzero) = overwrites_something(base, writes, *write_index);
+            verdict.over_an_earlier_write += usize::from(earlier);
+            verdict.over_nonzero_base += usize::from(base_nonzero);
+            verdict.unaligned_to_a_slot += usize::from(write.offset.0 % SLOT_BYTES_OF_THE_POOL != 0);
+            let Some(header) = write.bytes().and_then(parse_header) else {
+                verdict.without_a_parsable_header += 1;
+                continue;
+            };
+            verdict.claimed_bytes_differ_from_the_write += usize::from(header.claimed_bytes != write.length_in_bytes());
+            let beyond_the_mount_root = mount_root.is_some_and(|(mount_root_instance, mount_root_txg)| {
+                header.instance > mount_root_instance
+                    || (header.instance == mount_root_instance && header.birth_txg > mount_root_txg)
+            });
+            verdict.header_not_beyond_the_mount_root += usize::from(!beyond_the_mount_root);
+        }
+        verdict.census = census_of_the_prefix(base, writes, segment);
+        let groups = groups_of_segment(writes, segment);
+        for group in &groups {
+            *verdict.group_size_histogram.entry(group.len()).or_insert(0) += 1;
+        }
+        let e1_to_e4_and_groups = only_unit_writes
+            && verdict.over_an_earlier_write == 0
+            && verdict.over_nonzero_base == 0
+            && verdict.without_a_parsable_header == 0
+            && verdict.unaligned_to_a_slot == 0
+            && verdict.claimed_bytes_differ_from_the_write == 0
+            && verdict.header_not_beyond_the_mount_root == 0
+            && groups.len() >= 2;
+        verdict.passes_with_the_old_e6 = e1_to_e4_and_groups && verdict.census.old_wide_record_writes == 0;
+        verdict.passes_with_e6n = e1_to_e4_and_groups
+            && verdict.census.narrow_record_writes == 0
+            && verdict.census.unparsable_record_writes == 0
+            && verdict.census.unknown_class_locations == 0;
+        verdict.states_under_the_group_form = 1 + groups.iter().map(|group| (1u64 << group.len().min(40)) - 1).sum::<u64>();
+        Some(verdict)
+    }
+
+    fn key_tail_hex(key_tail: &[u8; 10]) -> String {
+        key_tail.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    fn describe_kinds(writes: &[RetainedWrite], segment: &[usize]) -> String {
+        let kinds: BTreeSet<String> = segment.iter().map(|index| format!("{:?}", writes[*index].kind)).collect();
+        format!("{kinds:?}")
+    }
+
+    /// 打一段的一行汇总，与这一段每个宽读法点名的一行明细。
+    pub fn print_segment(label: &str, verdict: &NamedVerdict, engine_states: Option<u64>) {
+        let census = &verdict.census;
+        println!(
+            "PROBE_E6N_SEGMENT label={label} segment={} writes={} e2_over_an_earlier_write={} e2_over_nonzero_base={} e3_without_header={} e3_unaligned={} \
+             e3_claimed_bytes_differ={} e4_not_beyond_mount_root={} prefix_record_writes={} prefix_unparsable_record_writes={} prefix_named_locations={} \
+             prefix_matched_earlier_unit_write={} prefix_matched_class_and_birth={} prefix_no_earlier_write_but_base_nonzero={} prefix_unmatched={} \
+             prefix_unknown_class_locations={} prefix_nearest_gap_after_a_named_extent={:?} e6_old_wide_record_writes={} e6n_narrow_record_writes={} wide_only_record_writes={} group_sizes={:?} \
+             passes_old={} passes_e6n={} states_group_form={} engine_states={engine_states:?}",
+            verdict.segment_index,
+            verdict.writes,
+            verdict.over_an_earlier_write,
+            verdict.over_nonzero_base,
+            verdict.without_a_parsable_header,
+            verdict.unaligned_to_a_slot,
+            verdict.claimed_bytes_differ_from_the_write,
+            verdict.header_not_beyond_the_mount_root,
+            census.prefix_record_writes,
+            census.unparsable_record_writes,
+            census.named_locations,
+            census.matched_earlier_unit_write,
+            census.matched_class_and_birth,
+            census.no_earlier_write_but_base_nonzero,
+            census.unmatched,
+            census.unknown_class_locations,
+            census.nearest_gap_after_a_named_extent,
+            census.old_wide_record_writes,
+            census.narrow_record_writes,
+            census.old_wide_record_writes.saturating_sub(census.narrow_record_writes),
+            verdict.group_size_histogram,
+            verdict.passes_with_the_old_e6,
+            verdict.passes_with_e6n,
+            verdict.states_under_the_group_form,
+        );
+        for hit in &census.hits {
+            println!(
+                "PROBE_E6_HIT label={label} segment={} record_write_index={} record_counter={} record_instance={} record_checkpoint_txg={} named_index={} \
+                 named_class={} named_birth_tree={} named_birth_txg={} named_key_tail={} location_device={} location_slot={} named_start={} \
+                 named_end_by_class={:?} named_end_wide={} touching={} in_flight_write_index={} in_flight_device={} in_flight_offset={} in_flight_length={} \
+                 in_flight_class={:?} in_flight_birth_txg={:?} in_flight_instance={:?} same_slot={} same_birth_txg={} overlaps_by_class={} \
+                 named_unit_written_earlier_at={:?} named_unit_matches_class_and_birth={}",
+                verdict.segment_index,
+                hit.record_write_index,
+                hit.record_counter,
+                hit.record_instance,
+                hit.record_checkpoint_txg,
+                hit.item.index_in_record,
+                hit.item.unit_class,
+                hit.item.birth_tree,
+                hit.item.birth_txg,
+                key_tail_hex(&hit.item.key_tail),
+                hit.location_device,
+                hit.location_slot,
+                hit.named_start,
+                hit.named_end_by_class,
+                hit.named_end_wide,
+                hit.touching,
+                hit.write_index,
+                hit.write_device,
+                hit.write_offset,
+                hit.write_length,
+                hit.write_class,
+                hit.write_birth_txg,
+                hit.write_instance,
+                hit.same_slot,
+                hit.same_birth_txg,
+                hit.overlaps_by_class,
+                hit.named_unit_written_earlier_at,
+                hit.named_unit_matches_class_and_birth,
+            );
+        }
+    }
+
+    /// 一条流：逐个单元段判，打每段的汇总与明细，再打整条流一行。`engine_states_by_segment` 给了就把过判据的段换成乙下的态数、算整条流剩多少。
+    pub fn classify_flow_named(
+        label: &str,
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        engine_states_by_segment: Option<&[u64]>,
+    ) -> Vec<NamedVerdict> {
+        let publishes = publishes_in(writes, &vec![true; writes.len()], RecordStreamContinuity::OneRecording);
+        println!("PROBE_E6N_FLOW_PUBLISHES label={label} publishes={}", publishes.len());
+        let mut verdicts = Vec::new();
+        let mut engine_total: u64 = 1;
+        let mut reduced_total_old: u64 = 1;
+        let mut reduced_total_e6n: u64 = 1;
+        for segment_index in 0..segments.len() {
+            let Some(verdict) = classify_segment_named(base, writes, segments, segment_index, &publishes) else {
+                continue;
+            };
+            let engine_states = engine_states_by_segment.map(|states| states[segment_index]);
+            if verdict.only_unit_writes {
+                print_segment(label, &verdict, engine_states);
+            } else {
+                println!(
+                    "PROBE_E6N_SEGMENT label={label} segment={segment_index} writes={} kinds={} not_a_unit_segment=true engine_states={engine_states:?}",
+                    verdict.writes,
+                    describe_kinds(writes, &segments[segment_index]),
+                );
+            }
+            if let Some(engine_states) = engine_states {
+                engine_total += engine_states;
+                reduced_total_old += if verdict.passes_with_the_old_e6 { verdict.states_under_the_group_form } else { engine_states };
+                reduced_total_e6n += if verdict.passes_with_e6n { verdict.states_under_the_group_form } else { engine_states };
+            }
+            verdicts.push(verdict);
+        }
+        let unit_segments = verdicts.iter().filter(|verdict| verdict.only_unit_writes).count();
+        let passing_old = verdicts.iter().filter(|verdict| verdict.passes_with_the_old_e6).count();
+        let passing_e6n = verdicts.iter().filter(|verdict| verdict.passes_with_e6n).count();
+        println!(
+            "PROBE_E6N_FLOW label={label} segments={} unit_segments={unit_segments} passing_old={passing_old} passing_e6n={passing_e6n} \
+             engine_total={engine_total} reduced_total_old={reduced_total_old} reduced_total_e6n={reduced_total_e6n}",
+            segments.len()
+        );
+        verdicts
+    }
+}

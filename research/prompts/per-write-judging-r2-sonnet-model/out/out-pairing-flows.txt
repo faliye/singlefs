@@ -1,0 +1,189 @@
+   Compiling cfg_aliases v0.2.2
+   Compiling foldhash v0.2.0
+   Compiling cfg-if v1.0.4
+   Compiling libm v0.2.16
+   Compiling thiserror v2.0.21
+   Compiling autocfg v1.5.1
+   Compiling equivalent v1.0.2
+   Compiling zerocopy v0.8.59
+   Compiling rustc-hash v1.1.0
+   Compiling log v0.4.34
+   Compiling bitflags v2.13.2
+   Compiling ash v0.38.0+1.3.281
+   Compiling unicode-width v0.2.2
+   Compiling parking_lot_core v0.9.12
+   Compiling bit-vec v0.9.1
+   Compiling allocator-api2 v0.2.21
+   Compiling static_assertions v1.1.0
+   Compiling scopeguard v1.2.0
+   Compiling smallvec v1.16.2
+   Compiling once_cell v1.21.4
+   Compiling raw-window-handle v0.6.2
+   Compiling arrayvec v0.7.8
+   Compiling syn v3.0.6
+   Compiling naga v30.0.1
+   Compiling libloading v0.8.9
+   Compiling wgpu-hal v30.0.1
+   Compiling zerocopy-derive v0.8.59
+   Compiling presser v0.3.1
+   Compiling profiling v1.0.18
+   Compiling renderdoc-sys v1.1.0
+   Compiling lock_api v0.4.14
+   Compiling wgpu-core v30.0.1
+   Compiling litrs v1.0.0
+   Compiling wgpu v30.0.1
+   Compiling singlefs-verification v0.1.0 (/home/fy5090/.local/share/singlefs/work/per-write-judging-r2-defense-rerun/tree/crates/singlefs-verification)
+   Compiling pollster v1.0.1
+   Compiling hashbrown v0.17.1
+   Compiling spirv v0.4.0+sdk-1.4.341.0
+   Compiling codespan-reporting v0.13.1
+   Compiling bit-set v0.10.0
+   Compiling num-traits v0.2.19
+   Compiling hashbrown v0.16.1
+   Compiling parking_lot v0.12.5
+   Compiling document-features v0.2.12
+   Compiling indexmap v2.14.2
+   Compiling thiserror-impl v2.0.21
+   Compiling bytemuck_derive v1.12.1
+   Compiling ordered-float v5.5.0
+   Compiling naga-types v30.0.1
+   Compiling bytemuck v1.25.2
+   Compiling wgpu-types v30.0.1
+   Compiling half v2.7.1
+   Compiling gpu-allocator v0.28.0
+   Compiling wgpu-naga-bridge v30.0.1
+   Compiling wgpu-core-deps-windows-linux-android v30.0.1
+warning: field `class` is never read
+     --> crates/singlefs-verification/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs:20456:13
+      |
+20455 |     pub struct UnitHeader {
+      |                ---------- field in this struct
+20456 |         pub class: u8,
+      |             ^^^^^
+      |
+      = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `segment_index` is never read
+     --> crates/singlefs-verification/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs:20590:13
+      |
+20589 |     pub struct SegmentVerdict {
+      |                -------------- field in this struct
+20590 |         pub segment_index: usize,
+      |             ^^^^^^^^^^^^^
+
+warning: `singlefs-verification` (test "crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state") generated 2 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 54s
+     Running tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs (/home/faliye/coding/singlefs-layer0-shard/builds/task-b0f6b921-8700-4/target/release/deps/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state-1ba9099bca80964e)
+
+running 1 test
+test probe_tightened_criterion_over_the_three_billion_state_pairing_flows ... PROBE_TIGHT_ENGINE flow=second-deletion-batch-quarantined-data-unit-records-carry-the-mark states=1178599580
+PROBE_TIGHT_AREA label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark device=0 lowest_unit_write_offset=822149120 highest_non_unit_write_end=Some(16814080)
+PROBE_TIGHT_AREA label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark device=1 lowest_unit_write_offset=822149120 highest_non_unit_write_end=Some(16814080)
+PROBE_TIGHT_FLOW_PUBLISHES label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark publishes=7
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=0 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=1 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=2 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=3 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=4 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=5 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=6 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=7 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=8 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 12} passes=true states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=9 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=10 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=11 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=12 writes=30 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 15} passes=false states_group_form=46 engine_states=Some(1073741823)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=13 writes=6 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(63)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=14 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=15 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=16 writes=26 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 13} passes=true states_group_form=40 engine_states=Some(67108863)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=17 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=18 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=19 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=20 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=21 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=22 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=23 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=24 writes=22 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 11} passes=false states_group_form=34 engine_states=Some(4194303)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=25 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=26 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segment=27 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_FLOW label=second-deletion-batch-quarantined-data-unit-records-carry-the-mark segments=28 unit_segments=5 passing_unit_segments=2 engine_total=1178599580 reduced_total_group_form=1094713579
+PROBE_TIGHT_ENGINE flow=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first states=1107689646
+PROBE_TIGHT_AREA label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first device=0 lowest_unit_write_offset=822149120 highest_non_unit_write_end=Some(16818176)
+PROBE_TIGHT_AREA label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first device=1 lowest_unit_write_offset=822149120 highest_non_unit_write_end=Some(16818176)
+PROBE_TIGHT_FLOW_PUBLISHES label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first publishes=7
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=0 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=1 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=2 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=3 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=4 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=5 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=6 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=7 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=8 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 12} passes=true states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=9 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=10 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=11 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=12 writes=30 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=30 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 15} passes=false states_group_form=46 engine_states=Some(1073741823)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=13 writes=6 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(63)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=14 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=15 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=16 writes=18 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 9} passes=true states_group_form=28 engine_states=Some(262143)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=17 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=18 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=19 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=20 writes=16 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 8} passes=false states_group_form=25 engine_states=Some(65535)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=21 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=22 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=23 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=24 writes=16 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 8} passes=false states_group_form=25 engine_states=Some(65535)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=25 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=26 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=27 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=28 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=29 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=30 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segment=31 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_FLOW label=three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first segments=32 unit_segments=6 passing_unit_segments=2 engine_total=1107689646 reduced_total_group_form=1090650353
+PROBE_TIGHT_ENGINE flow=deletion-through-the-last-batch states=1195376807
+PROBE_TIGHT_AREA label=deletion-through-the-last-batch device=0 lowest_unit_write_offset=822149120 highest_non_unit_write_end=Some(16818176)
+PROBE_TIGHT_AREA label=deletion-through-the-last-batch device=1 lowest_unit_write_offset=822149120 highest_non_unit_write_end=Some(16818176)
+PROBE_TIGHT_FLOW_PUBLISHES label=deletion-through-the-last-batch publishes=8
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=0 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=1 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=2 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=3 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=4 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=5 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=6 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=7 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=8 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 12} passes=true states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=9 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=10 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=11 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=12 writes=30 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 15} passes=false states_group_form=46 engine_states=Some(1073741823)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=13 writes=6 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(63)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=14 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=15 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=16 writes=26 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=0 diag_records_of_same_identity=0 group_sizes={2: 13} passes=true states_group_form=40 engine_states=Some(67108863)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=17 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=18 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=19 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=20 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=21 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=22 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=23 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=24 writes=22 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 11} passes=false states_group_form=34 engine_states=Some(4194303)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=25 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=26 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=27 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=28 writes=24 kinds={"UnitWrite"} e2_over_an_earlier_write=0 e2_over_nonzero_base=0 e3_without_header=0 e3_unaligned=0 e3_claimed_bytes_differ=0 e4_not_beyond_mount_root=0 diag_birth_differs_from_publish=0 e6_records_in_prefix_naming_a_slot=2 diag_records_of_same_identity=0 group_sizes={2: 12} passes=false states_group_form=37 engine_states=Some(16777215)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=29 writes=2 kinds={"JournalRecord"} e1_only_unit_writes=false engine_states=Some(3)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=30 writes=1 kinds={"RootRecordFua"} e1_only_unit_writes=false engine_states=Some(1)
+PROBE_TIGHT_SEGMENT label=deletion-through-the-last-batch segment=31 writes=2 kinds={"SystemConfigurationSlot"} e1_only_unit_writes=false engine_states=Some(8)
+PROBE_TIGHT_FLOW label=deletion-through-the-last-batch segments=32 unit_segments=6 passing_unit_segments=2 engine_total=1195376807 reduced_total_group_form=1111490806
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 265 filtered out; finished in 0.28s
+

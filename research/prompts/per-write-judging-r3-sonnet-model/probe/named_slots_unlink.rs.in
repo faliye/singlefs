@@ -1,0 +1,268 @@
+
+/// 第三轮辩方腿探针（只拷进草稿副本、追加在删除流测试文件末尾，不回主工作区）：删除流上逐段读出 E6 点名的槽与点名它的记录；
+/// 几条造坏的臂上看收窄后的 E6n 拒不拒；乙的合成逐态全量对照（环境变量点名哪几段、切几片）；对照自己会不会红（阳性对照）。
+mod per_write_judging_named_slots_tests {
+    use super::per_write_judging_exhaustive as exhaustive;
+    use super::per_write_judging_named_slots as named;
+    use super::{prepare, Prepared};
+    use singlefs_verification::crash::{crash_state_enumeration_tables, full_expansion, judge_crash_image};
+    use singlefs_verification::memory_pool::{publishes_in, CrashImage, RecordStreamContinuity, RetainedWrite};
+
+    /// 把 `moved` 这几次写在写表里挪到原下标 `insert_before_old_index` 之前，段表跟着改：它们离开原来的段、进 `into_segment`
+    /// （第二轮 `move_writes` 同一个写法）。
+    fn move_writes(
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        moved: &[usize],
+        insert_before_old_index: usize,
+        into_segment: usize,
+    ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>) {
+        let mut new_position = vec![usize::MAX; writes.len()];
+        let mut new_writes: Vec<RetainedWrite> = Vec::with_capacity(writes.len());
+        for old_index in 0..writes.len() {
+            if old_index == insert_before_old_index {
+                for moved_index in moved {
+                    new_position[*moved_index] = new_writes.len();
+                    new_writes.push(writes[*moved_index].clone());
+                }
+            }
+            if moved.contains(&old_index) {
+                continue;
+            }
+            new_position[old_index] = new_writes.len();
+            new_writes.push(writes[old_index].clone());
+        }
+        let new_segments = segments
+            .iter()
+            .enumerate()
+            .map(|(segment_index, segment)| {
+                let mut kept: Vec<usize> = segment
+                    .iter()
+                    .filter(|index| !moved.contains(index))
+                    .map(|index| new_position[*index])
+                    .collect();
+                if segment_index == into_segment {
+                    let mut front: Vec<usize> = moved.iter().map(|index| new_position[*index]).collect();
+                    front.append(&mut kept);
+                    front
+                } else {
+                    kept
+                }
+            })
+            .collect();
+        (new_writes, new_segments)
+    }
+
+    /// 把一组写（两盘各一份）挪到另一组写的偏移上：同盘对同盘（第二轮 `plant_over` 同一个写法）。
+    fn plant_over(enumerated_writes: &mut [RetainedWrite], planted_group: &[usize], target_group: &[usize]) {
+        for planted in planted_group {
+            let device = enumerated_writes[*planted].device;
+            let target = target_group
+                .iter()
+                .find(|target| enumerated_writes[**target].device == device)
+                .expect("目标组在同一块盘上有一份副本");
+            let target_offset = enumerated_writes[*target].offset;
+            enumerated_writes[*planted].offset = target_offset;
+        }
+    }
+
+    fn judge_landed(
+        prepared: &Prepared,
+        enumerated_writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        segment_index: usize,
+        landed: &[usize],
+    ) -> exhaustive::Outcome {
+        let mut persisted = vec![false; enumerated_writes.len()];
+        for segment in &segments[..segment_index] {
+            for write_index in segment {
+                persisted[*write_index] = true;
+            }
+        }
+        for write_index in landed {
+            persisted[*write_index] = true;
+        }
+        let image = CrashImage {
+            base: &prepared.base,
+            writes: enumerated_writes,
+            persisted,
+        };
+        let judgement = judge_crash_image(&image, prepared.judged_root_index, &prepared.versions);
+        let items = judgement.red_items();
+        (!items.is_empty(), items.into_iter().collect())
+    }
+
+    /// 取样点「逐段读 E6 点名的槽」：真实删除流每个单元段打汇总一行（旧的宽读法与收窄后的 E6n 并排）与每个宽读法点名一行明细；
+    /// 再造几条臂，看 E6n 在「记录先于它点名的单元」上还拒不拒：
+    /// record_before_units（第 13 段四个记录写整段挪到第 12 段单元之前）、record_before_units_single（只挪点名一个单元的那条记录的两份）、
+    /// record_before_units_shared_nodes（只挪点名共享节点的那条记录的两份）、late_unit（第 12 段一个单元的两份副本挪到第 16 段开头）、
+    /// planted_one_group 与 planted_two_groups（第 16 段的组挪到第 12 段单元的偏移上，E2 该拒，E6n 不是拦它们的那一条）。
+    #[test]
+    fn probe_named_slot_census_over_the_unlink_stream_and_the_misordered_arms() {
+        println!();
+        let prepared = prepare("probe-r3-named-slots-census");
+        let tables = crash_state_enumeration_tables(&prepared.base, &prepared.writes, &prepared.segments, &full_expansion);
+        let engine_states: Vec<u64> = tables.state_ranges_by_segment.iter().map(|range| range.end - range.start).collect();
+        named::classify_flow_named("unmodified", &prepared.base, &prepared.writes, &prepared.segments, Some(&engine_states));
+        let lowest_index_of = |segment_index: usize| *prepared.segments[segment_index].iter().min().expect("段不空");
+
+        let record_writes = prepared.segments[13].clone();
+        let named_count_of = |index: usize| {
+            named::parse_record(prepared.writes[index].bytes().expect("记录写带字节"))
+                .map(|record| record.items.len())
+                .expect("第 13 段的记录写解得出")
+        };
+        let single_named: Vec<usize> = record_writes.iter().copied().filter(|index| named_count_of(*index) == 1).collect();
+        let shared_nodes: Vec<usize> = record_writes.iter().copied().filter(|index| named_count_of(*index) > 1).collect();
+        println!(
+            "PROBE_E6N_ARM_SHAPE records_in_segment_13={} named_counts={:?} single_named_writes={} shared_nodes_writes={}",
+            record_writes.len(),
+            record_writes.iter().map(|index| named_count_of(*index)).collect::<Vec<_>>(),
+            single_named.len(),
+            shared_nodes.len()
+        );
+        for (label, moved) in [
+            ("record_before_units", record_writes.clone()),
+            ("record_before_units_single", single_named),
+            ("record_before_units_shared_nodes", shared_nodes),
+        ] {
+            let (arm_writes, arm_segments) = move_writes(&prepared.writes, &prepared.segments, &moved, lowest_index_of(12), 11);
+            named::classify_flow_named(label, &prepared.base, &arm_writes, &arm_segments, None);
+        }
+
+        let pair_of_copies = prepared.segments[12]
+            .iter()
+            .flat_map(|left_write| prepared.segments[12].iter().map(move |right_write| (*left_write, *right_write)))
+            .find(|(left_write, right_write)| {
+                let (zero, one) = (&prepared.writes[*left_write], &prepared.writes[*right_write]);
+                zero.device.0 == 0 && one.device.0 == 1 && zero.offset == one.offset && zero.length_in_bytes() == one.length_in_bytes()
+            })
+            .expect("第 12 段有两盘同偏移的一对副本");
+        let (late_writes, late_segments) = move_writes(
+            &prepared.writes,
+            &prepared.segments,
+            &[pair_of_copies.0, pair_of_copies.1],
+            lowest_index_of(16),
+            16,
+        );
+        named::classify_flow_named("late_unit", &prepared.base, &late_writes, &late_segments, None);
+
+        let enumerated = tables.enumerated_writes.clone();
+        let b_groups = named::groups_of_segment(&enumerated, &prepared.segments[12]);
+        let c_groups = named::groups_of_segment(&enumerated, &prepared.segments[16]);
+        let same_length = |left: &Vec<usize>, right: &Vec<usize>| enumerated[left[0]].length_in_bytes() == enumerated[right[0]].length_in_bytes();
+        let mut one_group = prepared.writes.clone();
+        let one_target = b_groups.iter().find(|group| group.len() == 2 && enumerated[group[0]].length_in_bytes() == 32768).expect("第 12 段有 32768 字节的一组");
+        let one_planted = c_groups
+            .iter()
+            .find(|group| group.len() == 2 && same_length(group, one_target))
+            .expect("第 16 段有 32768 字节的一组");
+        plant_over(&mut one_group, one_planted, one_target);
+        named::classify_flow_named("planted_one_group", &prepared.base, &one_group, &prepared.segments, None);
+
+        let mut two_groups = prepared.writes.clone();
+        let mut used: Vec<usize> = Vec::new();
+        for target in [&b_groups[0], &b_groups[1]] {
+            let position = c_groups
+                .iter()
+                .enumerate()
+                .position(|(position, group)| !used.contains(&position) && group.len() == 2 && target.len() == 2 && same_length(group, target))
+                .expect("第 16 段有长度相同的一组");
+            used.push(position);
+            plant_over(&mut two_groups, &c_groups[position], target);
+        }
+        named::classify_flow_named("planted_two_groups", &prepared.base, &two_groups, &prepared.segments, None);
+    }
+
+    /// 逐态全量：环境变量 PROBE_EXHAUST 点名哪几段（`28` 或 `20@1/4`，逗号分隔），每段 2^写数 个状态一个不漏地真判，与乙的并合成、增减合成逐状态比。
+    /// 先按 E1 到 E4 加 E6n 判这一段收不收，不收就打 PROBE_EXHAUST_SKIPPED 跳过（PROBE_EXHAUST_FORCE=1 时照样跑）。没设变量就什么都不做。
+    #[test]
+    fn probe_exhaustive_comparison_over_the_requested_segments_of_the_unlink_stream() {
+        println!();
+        let Ok(plan_text) = std::env::var("PROBE_EXHAUST") else {
+            println!("PROBE_EXHAUST_NOT_REQUESTED flow=unlink");
+            return;
+        };
+        let force = std::env::var("PROBE_EXHAUST_FORCE").is_ok_and(|value| value == "1");
+        let max_groups: Option<usize> = std::env::var("PROBE_EXHAUST_MAX_GROUPS").ok().map(|text| text.parse::<usize>().expect("PROBE_EXHAUST_MAX_GROUPS 是非负整数"));
+        let prepared = prepare("probe-r3-named-slots-exhaustive");
+        let tables = crash_state_enumeration_tables(&prepared.base, &prepared.writes, &prepared.segments, &full_expansion);
+        let enumerated = tables.enumerated_writes.clone();
+        let publishes = publishes_in(&prepared.writes, &vec![true; prepared.writes.len()], RecordStreamContinuity::OneRecording);
+        for (segment_index, slice_index, slices) in exhaustive::parse_plan(&plan_text) {
+            let verdict = named::classify_segment_named(&prepared.base, &prepared.writes, &prepared.segments, segment_index, &publishes)
+                .expect("段不空");
+            named::print_segment("unlink", &verdict, None);
+            if !verdict.passes_with_e6n && !force {
+                println!("PROBE_EXHAUST_SKIPPED label=unlink segment={segment_index} reason=not_accepted_by_e1_to_e4_and_e6n");
+                continue;
+            }
+            let universe = prepared.segments[segment_index].clone();
+            let mut faulted = enumerated.clone();
+            let groups = named::groups_of_segment(&enumerated, &universe);
+            exhaustive::apply_the_fault_from_the_environment(&mut faulted, &universe, &groups);
+            let judge = |landed: &[usize]| judge_landed(&prepared, &faulted, &prepared.segments, segment_index, landed);
+            exhaustive::run("unlink", segment_index, &universe, &groups, &judge, max_groups, slice_index, slices, true);
+        }
+    }
+
+    /// 阳性对照：对照自己会不会红。第 12 段每一对单元被第 16 段两组（两盘各一份、长度相同）盖上（第二轮「两组同被盖」同一个造法），
+    /// 宇宙 = 这两组 4 个写、16 个状态，经逐态全量对照的同一个 `run` 判；第二轮量到并合成 91 对里 78 对红项不同、共 243 个状态。
+    /// 这一趟并合成的数要与它相同；增减合成的数是新读数。
+    #[test]
+    fn probe_exhaustive_comparer_flags_the_planted_two_group_pairs() {
+        println!();
+        let prepared = prepare("probe-r3-named-slots-control");
+        let tables = crash_state_enumeration_tables(&prepared.base, &prepared.writes, &prepared.segments, &full_expansion);
+        let enumerated = tables.enumerated_writes.clone();
+        let b_groups = named::groups_of_segment(&enumerated, &prepared.segments[12]);
+        let c_groups = named::groups_of_segment(&enumerated, &prepared.segments[16]);
+        let length_of = |group: &Vec<usize>| enumerated[group[0]].length_in_bytes();
+        let mut pairs = 0u64;
+        let mut skipped = 0u64;
+        let mut pairs_union_items_differ = 0u64;
+        let mut pairs_delta_items_differ = 0u64;
+        let mut states = 0u64;
+        let mut states_union_items_differ = 0u64;
+        let mut states_delta_items_differ = 0u64;
+        for left in 0..b_groups.len() {
+            for right in left + 1..b_groups.len() {
+                let wanted = [&b_groups[left], &b_groups[right]];
+                let mut used: Vec<usize> = Vec::new();
+                let mut planted_over: Vec<(usize, usize)> = Vec::new();
+                for (which, target) in wanted.iter().enumerate() {
+                    let found = c_groups.iter().enumerate().find(|(position, group)| {
+                        !used.contains(position) && group.len() == 2 && target.len() == 2 && length_of(group) == length_of(target)
+                    });
+                    if let Some((position, _group)) = found {
+                        used.push(position);
+                        planted_over.push((position, which));
+                    }
+                }
+                if planted_over.len() < 2 {
+                    skipped += 1;
+                    continue;
+                }
+                let mut modified = enumerated.clone();
+                let mut universe_groups: Vec<Vec<usize>> = Vec::new();
+                for (position, which) in &planted_over {
+                    plant_over(&mut modified, &c_groups[*position], wanted[*which]);
+                    universe_groups.push(c_groups[*position].clone());
+                }
+                let universe: Vec<usize> = universe_groups.iter().flatten().copied().collect();
+                let judge = |landed: &[usize]| judge_landed(&prepared, &modified, &prepared.segments, 16, landed);
+                let tally = exhaustive::run("control", 16, &universe, &universe_groups, &judge, None, 0, 1, false);
+                pairs += 1;
+                states += tally.states;
+                states_union_items_differ += tally.union_items_differ;
+                states_delta_items_differ += tally.delta_items_differ;
+                pairs_union_items_differ += u64::from(tally.union_items_differ > 0);
+                pairs_delta_items_differ += u64::from(tally.delta_items_differ > 0);
+            }
+        }
+        println!(
+            "PROBE_EXHAUST_CONTROL pairs={pairs} skipped={skipped} states={states} pairs_union_items_differ={pairs_union_items_differ} \
+             states_union_items_differ={states_union_items_differ} pairs_delta_items_differ={pairs_delta_items_differ} states_delta_items_differ={states_delta_items_differ}"
+        );
+    }
+}

@@ -1,0 +1,92 @@
+
+/// 第三轮辩方腿探针（只拷进草稿副本、追加在对拍测试文件末尾，不回主工作区）：对拍三条十亿级流上逐段读出 E6 点名的槽（旧的宽读法与
+/// 收窄后的 E6n 并排）；逐态全量对照（环境变量点名哪条流、哪几段、切几片）。不上卡。
+fn per_write_judging_named_slots_flow_by_name(name: &str) -> RecordedFlow {
+    match name {
+        "quarantined" => record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
+            "probe-r3-named-quarantined",
+            QuarantineMarkOfTheRecords::OnBothDevices,
+        ),
+        "applied-by-records" => record_three_unit_file_applied_only_by_its_records_after_a_mount(
+            "probe-r3-named-applied-by-records",
+            "three-unit-file-applied-only-by-its-records-beside-the-version-the-next-mount-applies-first",
+            &leave_the_records_before_the_mount_as_they_are,
+        ),
+        "last-batch" => record_new_pool_through_the_last_deletion_batch("probe-r3-named-last-batch", "deletion-through-the-last-batch"),
+        other => panic!("PROBE_EXHAUST_FLOW 只认 quarantined、applied-by-records、last-batch，给的是 {other}"),
+    }
+}
+
+#[test]
+fn probe_named_slot_census_over_the_three_pairing_flows() {
+    println!();
+    for name in ["quarantined", "applied-by-records", "last-batch"] {
+        let flow = per_write_judging_named_slots_flow_by_name(name);
+        let tables = singlefs_verification::crash::crash_state_enumeration_tables(
+            &flow.base,
+            &flow.writes,
+            &flow.segments,
+            &singlefs_verification::crash::full_expansion,
+        );
+        let engine_states: Vec<u64> = tables.state_ranges_by_segment.iter().map(|range| range.end - range.start).collect();
+        println!("PROBE_E6N_ENGINE flow={} states={}", flow.name, tables.state_count);
+        per_write_judging_named_slots::classify_flow_named(flow.name, &flow.base, &flow.writes, &flow.segments, Some(&engine_states));
+    }
+}
+
+#[test]
+fn probe_exhaustive_comparison_over_the_requested_segments_of_a_pairing_flow() {
+    println!();
+    let (Ok(plan_text), Ok(flow_name)) = (std::env::var("PROBE_EXHAUST"), std::env::var("PROBE_EXHAUST_FLOW")) else {
+        println!("PROBE_EXHAUST_NOT_REQUESTED flow=pairing");
+        return;
+    };
+    let force = std::env::var("PROBE_EXHAUST_FORCE").is_ok_and(|value| value == "1");
+    let max_groups: Option<usize> = std::env::var("PROBE_EXHAUST_MAX_GROUPS").ok().map(|text| text.parse::<usize>().expect("PROBE_EXHAUST_MAX_GROUPS 是非负整数"));
+    let flow = per_write_judging_named_slots_flow_by_name(&flow_name);
+    let tables = singlefs_verification::crash::crash_state_enumeration_tables(
+        &flow.base,
+        &flow.writes,
+        &flow.segments,
+        &singlefs_verification::crash::full_expansion,
+    );
+    let enumerated = tables.enumerated_writes.clone();
+    let publishes = singlefs_verification::memory_pool::publishes_in(
+        &flow.writes,
+        &vec![true; flow.writes.len()],
+        singlefs_verification::memory_pool::RecordStreamContinuity::OneRecording,
+    );
+    for (segment_index, slice_index, slices) in per_write_judging_exhaustive::parse_plan(&plan_text) {
+        let verdict = per_write_judging_named_slots::classify_segment_named(&flow.base, &flow.writes, &flow.segments, segment_index, &publishes)
+            .expect("段不空");
+        per_write_judging_named_slots::print_segment(flow.name, &verdict, None);
+        if !verdict.passes_with_e6n && !force {
+            println!("PROBE_EXHAUST_SKIPPED label={} segment={segment_index} reason=not_accepted_by_e1_to_e4_and_e6n", flow.name);
+            continue;
+        }
+        let universe = flow.segments[segment_index].clone();
+        let mut faulted = enumerated.clone();
+        let groups = per_write_judging_named_slots::groups_of_segment(&enumerated, &universe);
+        per_write_judging_exhaustive::apply_the_fault_from_the_environment(&mut faulted, &universe, &groups);
+        let judge = |landed: &[usize]| -> per_write_judging_exhaustive::Outcome {
+            let mut persisted = vec![false; faulted.len()];
+            for segment in &flow.segments[..segment_index] {
+                for write_index in segment {
+                    persisted[*write_index] = true;
+                }
+            }
+            for write_index in landed {
+                persisted[*write_index] = true;
+            }
+            let image = singlefs_verification::memory_pool::CrashImage {
+                base: &flow.base,
+                writes: &faulted,
+                persisted,
+            };
+            let judgement = singlefs_verification::crash::judge_crash_image(&image, flow.judged_root_index, &flow.versions);
+            let items = judgement.red_items();
+            (!items.is_empty(), items.into_iter().collect())
+        };
+        per_write_judging_exhaustive::run(flow.name, segment_index, &universe, &groups, &judge, max_groups, slice_index, slices, true);
+    }
+}
