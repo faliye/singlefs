@@ -1,0 +1,914 @@
+//! 池级 checker 的三处盲区（代码审阅 6c 第 5、6、8 条，里程碑二收尾批「实审 B1」）各配会红的坏镜像：
+//! ① 同一个根（或由记录施加出来的同一版）里第二次引用同一个单元，判 I-5.1（物理范围不重叠）；不同根之间共享没改过的单元照旧合法；
+//! ② 盘上自述的 key 宽 / 层级 / journal 计数器是坏值时 checker 不许 panic（panic 等于那个状态上一条不变量都没判）；
+//! ③ 中央映射条目：key 的类标签与出生身份要与它指的单元头相符，认不得的类标签不按 32 KiB 硬读；映射条目改坏或改指别处时，
+//! 未释放记录罩住的那个单元在映射里找不到相符的 key（I-3.15（未释放记录罩住的单元由映射指在这一槽），判决
+//! `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3 的 N2 反查）跟着红。
+//! 镜像都从 `TreeSplitPool` 的第一个文件版本（或再覆盖写一次）出发，改一处，被改单元重封、新校验和沿引用链补到根槽。
+
+mod common;
+mod common_tree_split;
+
+use common::parameters;
+use common_tree_split::{
+    capacities, propagate_the_new_checksum, read_unit_on_device,
+    write_unit_to_the_same_slot_on_both_devices, TreeSplitPool, ACCOUNTING_OF_THE_NODE_FORMAT,
+    CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
+};
+use singlefs_checker::image::{
+    ImageReader, InvariantVerdict,
+    FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
+    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
+    WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS,
+};
+use singlefs_checker::walk::check_pool_image;
+use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
+use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
+use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
+use singlefs_core::unit::{build_index_node, parse_index_node, IndexNodeHeader};
+use singlefs_format::{DATA_UNIT_BYTES, JOURNAL_RING_DEFAULT_BYTES};
+use singlefs_verification::memory_pool::MemoryPool;
+
+/// 已分配统计对得上（I-3.1，记账对记录三判）：池级 checker 判定表里的名字（`singlefs_checker::image` 没有给它起常量）。
+const ALLOCATED_STATISTIC: &str = "I-3.1";
+
+/// 中央映射树叶压到 3 条：第一个文件版本的映射树长成两层（根是内部节点）。
+const SMALL_CENTRAL_MAPPING: (usize, usize) = (3, 3);
+
+/// extent 树上段叶条目（113）：locality 8、inode 8、offset 8、标签 1、载荷 88（标签 2 = 内联数据指针）。
+const EXTENT_UPPER_LEAF_ENTRY_INODE_OFFSET: usize = 8;
+const EXTENT_UPPER_LEAF_ENTRY_TAG_OFFSET: usize = 24;
+const EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT: u8 = 2;
+
+/// 中央映射条目 55（D19（块指针的结构与宽度预算） 已定项 6 / 10）：key 27 = 类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 尾段 6，
+/// value 28 = 位置条目 14 × 2（设备身份 4 + 槽号 6 + 整单元校验和 4）。
+const MAPPING_KEY_CLASS_OFFSET: usize = 0;
+const MAPPING_KEY_BIRTH_TREE_OFFSET: usize = 1;
+const MAPPING_KEY_BIRTH_TXG_OFFSET: usize = 9;
+const MAPPING_KEY_INSTANCE_OFFSET: usize = 17;
+const MAPPING_KEY_TAIL_OFFSET: usize = 21;
+const MAPPING_KEY_BYTES: usize = 27;
+const MAPPING_LOCATION_ENTRY_BYTES: usize = 14;
+const UNIT_CLASS_DATA: u8 = 1;
+const UNIT_CLASS_PACKED: u8 = 3;
+
+/// journal 记录头（D23（journal 的角色与格式） 已定项 17）：计数器 6 字节在 20；自证校验和 32 字节在 46、罩整条 4096。
+const JOURNAL_RECORD_COUNTER_OFFSET: usize = 20;
+const JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET: usize = 46;
+const JOURNAL_RECORD_BYTES: usize = 4096;
+
+/// 第一个文件版本的单元区只用到 50 26x 附近：这个槽在两块盘上都没被分配、没被引用。
+const SLOT_NOBODY_ALLOCATED: u64 = 50_400;
+
+fn product_capacity_pool() -> TreeSplitPool {
+    TreeSplitPool::with_the_first_file_version_under(capacities(
+        ACCOUNTING_OF_THE_NODE_FORMAT,
+        CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
+    ))
+}
+
+fn two_level_central_mapping_pool() -> TreeSplitPool {
+    TreeSplitPool::with_the_first_file_version_under(capacities(
+        ACCOUNTING_OF_THE_NODE_FORMAT,
+        SMALL_CENTRAL_MAPPING,
+    ))
+}
+
+/// 一份镜像上判红的不变量（带说明）。
+fn violations(image: &MemoryPool) -> Vec<(&'static str, String)> {
+    check_pool_image(image)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect()
+}
+
+fn violated_names(violations: &[(&'static str, String)]) -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = violations.iter().map(|(name, _)| *name).collect();
+    names.dedup();
+    names
+}
+
+fn verdict_of(image: &MemoryPool, invariant: &str) -> InvariantVerdict {
+    check_pool_image(image)
+        .into_iter()
+        .find(|(name, _)| *name == invariant)
+        .expect("清单里有")
+        .1
+}
+
+/// 这一版引用得到的单元（槽, 字节数）：补校验和时按它找父单元。
+fn units_of(output: &TransactionOutput) -> Vec<(u64, usize)> {
+    output
+        .units
+        .iter()
+        .map(|unit| (unit.slot.0, unit.bytes.len()))
+        .collect()
+}
+
+/// 按解开的头重建一个码 2 节点：只换给定的几样，别的字段照原样。
+fn rebuilt_index_node(
+    header: &IndexNodeHeader,
+    level: u8,
+    key_width: usize,
+    smallest_key: &[u8],
+    largest_key: &[u8],
+    entries: &[Vec<u8>],
+) -> Vec<u8> {
+    build_index_node(
+        header.tree,
+        level,
+        key_width,
+        smallest_key,
+        largest_key,
+        header.birth_txg,
+        &parameters().filesystem_identifier,
+        header.instance,
+        header.birth_sequence,
+        u16::try_from(header.entry_width).expect("条目宽"),
+        entries,
+    )
+}
+
+/// 一版里某个角色的码 2 单元换成 `replacement`（写回原槽），新整单元校验和沿引用链补到根槽；交回改过的镜像。
+fn image_with_the_node_replaced(
+    image: &MemoryPool,
+    output: &TransactionOutput,
+    role: TransactionUnit,
+    replacement: &[u8],
+) -> MemoryPool {
+    let unit = output.unit(role);
+    let mut damaged = image.clone();
+    write_unit_to_the_same_slot_on_both_devices(&mut damaged, unit.slot.0, replacement);
+    propagate_the_new_checksum(
+        &mut damaged,
+        &units_of(output),
+        (
+            unit.slot.0,
+            crc32_castagnoli(&unit.bytes),
+            crc32_castagnoli(replacement),
+        ),
+    );
+    damaged
+}
+
+/// 重建时先核一遍：原样的字段重建出来的字节与发布写出的逐字节相同（重建没有改到别的字段）。
+fn assert_the_rebuild_reproduces(unit_bytes: &[u8], header: &IndexNodeHeader) {
+    assert_eq!(
+        rebuilt_index_node(
+            header,
+            header.level,
+            header.key_width,
+            &header.smallest_key,
+            &header.largest_key,
+            &header.entries,
+        ),
+        unit_bytes,
+        "原样重建要与发布写出的逐字节相同"
+    );
+}
+
+// ─── ① 同一个根里第二次引用同一个单元 ───
+
+/// 第一个文件版本的 extent 根兼叶里，把那条内联数据指针抄一份给下一个 inode 号：同一个根里两个 inode 的 extent 指向同一个数据单元。
+/// checker 若在第二次遇到这个单元时直接跳过（整个走读共用一份「走过的单元」），五元组、出生身份、I-5.1 全不判，全绿。
+/// 抄出来的下一个 inode 号在 inode 树里没有记录，extent 树里却有数据单元、号也不在 `deleted_inodes` 里：照 I-4.7 的对象（取丙）
+/// 它处于删除中而没有账，I-4.7 跟着红；判红的恰好是 I-5.1 与 I-4.7 两条。
+#[test]
+fn two_inodes_whose_extents_name_one_data_unit_in_one_root_redden_the_disjoint_ranges_and_the_deletion_accounting_invariants(
+) {
+    let pool = product_capacity_pool();
+    let clean = pool.memory_pool();
+    assert_eq!(violations(&clean), Vec::new(), "干净镜像全绿");
+    let extent_root = pool.output.unit(TransactionUnit::ExtentRoot);
+    let header = parse_index_node(&extent_root.bytes).expect("extent 根解得开");
+    assert_the_rebuild_reproduces(&extent_root.bytes, &header);
+    assert_eq!(header.level, 0, "第一个文件版本的 extent 上段只有根兼叶");
+    let inline_entry = header
+        .entries
+        .iter()
+        .find(|entry| {
+            entry[EXTENT_UPPER_LEAF_ENTRY_TAG_OFFSET]
+                == EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT
+        })
+        .expect("一个数据单元的文件内联在上段叶里")
+        .clone();
+    let inode = u64::from_le_bytes(
+        inline_entry
+            [EXTENT_UPPER_LEAF_ENTRY_INODE_OFFSET..EXTENT_UPPER_LEAF_ENTRY_INODE_OFFSET + 8]
+            .try_into()
+            .expect("8 字节"),
+    );
+    let mut second_inode_entry = inline_entry.clone();
+    second_inode_entry
+        [EXTENT_UPPER_LEAF_ENTRY_INODE_OFFSET..EXTENT_UPPER_LEAF_ENTRY_INODE_OFFSET + 8]
+        .copy_from_slice(&(inode + 1).to_le_bytes());
+    let mut entries = header.entries.clone();
+    entries.push(second_inode_entry);
+    entries.sort_by_key(|entry| {
+        let field = |offset: usize| {
+            u64::from_le_bytes(entry[offset..offset + 8].try_into().expect("8 字节"))
+        };
+        (field(0), field(8), field(16))
+    });
+    let damaged_root = rebuilt_index_node(
+        &header,
+        header.level,
+        header.key_width,
+        &header.smallest_key,
+        &header.largest_key,
+        &entries,
+    );
+    let image = image_with_the_node_replaced(
+        &clean,
+        &pool.output,
+        TransactionUnit::ExtentRoot,
+        &damaged_root,
+    );
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        ["I-1.1", "I-5.1", "I-4.7"],
+        "判红的该恰好是 I-1.1、I-5.1 与 I-4.7（inode 2 那条 extent 指着五元组写对象 1 的数据单元，I-1.1）：{red:?}"
+    );
+    let disjoint_ranges_detail = &red
+        .iter()
+        .find(|(name, _)| *name == "I-5.1")
+        .expect("上一条断言钉了 I-5.1 判红")
+        .1;
+    assert!(
+        disjoint_ranges_detail.contains("被同一版引用了两次"),
+        "说明要点出同一版里的第二次引用：{disjoint_ranges_detail}"
+    );
+    let inode_without_a_record = inode + 1;
+    let deletion_accounting_detail = &red
+        .iter()
+        .find(|(name, _)| *name == "I-4.7")
+        .expect("上一条断言钉了 I-4.7 判红")
+        .1;
+    assert!(
+        deletion_accounting_detail.contains(&format!(
+            "inode {inode_without_a_record} 处于删除中（inode 树里没有它的记录）"
+        )),
+        "I-4.7 的说明要点出没有记录的 inode {inode_without_a_record}：{deletion_accounting_detail}"
+    );
+}
+
+/// 一条指针自己的两条位置条目写成同一个 (设备, 槽)（第二条抄第一条）：那是 I-2.5（位置条目按设备身份升序） 的事，
+/// 一条指针是一个引用，不算「同一版里引用了两次」，I-5.1 不跟着红。
+#[test]
+fn one_pointer_whose_two_location_entries_name_one_placement_is_one_reference_not_a_cross_link() {
+    /// 上段叶条目里内联数据指针的两条位置条目：载荷从 25 起，指针头部 50 之后各 14 字节。
+    const FIRST_LOCATION_ENTRY_OFFSET: usize = 25 + 50;
+    const SECOND_LOCATION_ENTRY_OFFSET: usize = 25 + 50 + 14;
+    let pool = product_capacity_pool();
+    let extent_root = pool.output.unit(TransactionUnit::ExtentRoot);
+    let header = parse_index_node(&extent_root.bytes).expect("extent 根解得开");
+    let mut entries = header.entries.clone();
+    let inline_entry = entries
+        .iter_mut()
+        .find(|entry| {
+            entry[EXTENT_UPPER_LEAF_ENTRY_TAG_OFFSET]
+                == EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT
+        })
+        .expect("一个数据单元的文件内联在上段叶里");
+    let first_location =
+        inline_entry[FIRST_LOCATION_ENTRY_OFFSET..FIRST_LOCATION_ENTRY_OFFSET + 14].to_vec();
+    inline_entry[SECOND_LOCATION_ENTRY_OFFSET..SECOND_LOCATION_ENTRY_OFFSET + 14]
+        .copy_from_slice(&first_location);
+    let damaged_root = rebuilt_index_node(
+        &header,
+        header.level,
+        header.key_width,
+        &header.smallest_key,
+        &header.largest_key,
+        &entries,
+    );
+    let image = image_with_the_node_replaced(
+        &pool.memory_pool(),
+        &pool.output,
+        TransactionUnit::ExtentRoot,
+        &damaged_root,
+    );
+    let red = violations(&image);
+    let names = violated_names(&red);
+    assert!(
+        names.contains(&"I-2.5"),
+        "两条位置条目设备身份相同：I-2.5 红：{red:?}"
+    );
+    assert!(
+        !names.contains(&"I-5.1"),
+        "一条指针是一个引用：I-5.1 不红：{red:?}"
+    );
+}
+
+/// 不同根之间共享没改过的单元是合法的 COW：覆盖写一次之后，新旧两版（连同暖机那两代）都指着 mkfs 种的实例表单元，
+/// 一版一版地走、每版各记一份「这一版引用过什么」，不把别的版引用过的算成第二次。
+#[test]
+fn a_unit_shared_by_the_roots_of_two_versions_is_not_a_cross_link() {
+    let mut pool = product_capacity_pool();
+    let content: Vec<u8> = (0..4100usize)
+        .map(|index| u8::try_from((index * 7 + 3) % 253).expect("小于 256"))
+        .collect();
+    pool.overwrite(
+        &content,
+        capacities(
+            ACCOUNTING_OF_THE_NODE_FORMAT,
+            CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
+        ),
+    );
+    let image = pool.memory_pool();
+    assert_eq!(
+        pool.output.root.instance_table, pool.earlier_versions[0].root.instance_table,
+        "覆盖写照抄实例表：两版的根指着同一个实例表单元"
+    );
+    assert_eq!(verdict_of(&image, "I-5.1"), InvariantVerdict::Holds);
+    assert_eq!(violations(&image), Vec::new(), "覆盖写之后的干净镜像全绿");
+}
+
+// ─── ② 盘上自述的坏值不许让 checker panic ───
+
+/// 两层中央映射树的根把自述的 key 宽改成 60（映射 key 是 27），条目宽 113 照旧：checker 若按头里的 key 宽切子指针
+/// `entry[60..146]`，条目只有 113 字节，当场越界 panic。
+#[test]
+fn a_central_mapping_root_whose_key_width_is_not_the_mapping_key_width_is_judged_without_a_panic() {
+    let pool = two_level_central_mapping_pool();
+    let clean = pool.memory_pool();
+    assert_eq!(violations(&clean), Vec::new(), "干净镜像全绿");
+    let root = pool.output.unit(TransactionUnit::MappingTree);
+    let header = parse_index_node(&root.bytes).expect("映射根解得开");
+    assert_the_rebuild_reproduces(&root.bytes, &header);
+    assert!(header.level >= 1, "压小之后映射根是内部节点");
+    let widened_key = |key: &[u8]| -> Vec<u8> {
+        let mut widened = key.to_vec();
+        widened.resize(60, 0);
+        widened
+    };
+    let damaged_root = rebuilt_index_node(
+        &header,
+        header.level,
+        60,
+        &widened_key(&header.smallest_key),
+        &widened_key(&header.largest_key),
+        &header.entries,
+    );
+    let image = image_with_the_node_replaced(
+        &clean,
+        &pool.output,
+        TransactionUnit::MappingTree,
+        &damaged_root,
+    );
+    let red = violations(&image);
+    let names = violated_names(&red);
+    assert!(
+        names.contains(&"I-1.1"),
+        "key 宽不是映射 key 的宽：I-1.1 红：{red:?}"
+    );
+    assert!(
+        names.contains(&"I-7.2"),
+        "最新根的映射树走不下去：I-7.2 红：{red:?}"
+    );
+}
+
+/// 两层中央映射树的一片叶把自述的 key 宽改成 20：checker 若把叶头里 20 字节的最小 key 交回父节点、按 27 字节的映射 key
+/// 形态逐字段读，读出切片之外，当场 panic。
+#[test]
+fn a_central_mapping_leaf_whose_key_width_is_narrower_than_the_mapping_key_is_judged_without_a_panic(
+) {
+    let pool = two_level_central_mapping_pool();
+    let clean = pool.memory_pool();
+    let leaf_role = pool
+        .output
+        .units
+        .iter()
+        .find(|unit| {
+            matches!(
+                unit.identity,
+                TransactionUnit::MappingTreeNodeBelowTheRoot(_)
+            ) && parse_index_node(&unit.bytes).expect("映射节点解得开").level == 0
+        })
+        .expect("两层映射树有叶")
+        .identity;
+    let leaf = pool.output.unit(leaf_role);
+    let header = parse_index_node(&leaf.bytes).expect("叶解得开");
+    assert_the_rebuild_reproduces(&leaf.bytes, &header);
+    let damaged_leaf = rebuilt_index_node(
+        &header,
+        header.level,
+        20,
+        &header.smallest_key[..20],
+        &header.largest_key[..20],
+        &header.entries,
+    );
+    let image = image_with_the_node_replaced(&clean, &pool.output, leaf_role, &damaged_leaf);
+    let red = violations(&image);
+    let names = violated_names(&red);
+    assert!(
+        names.contains(&"I-1.1"),
+        "叶的 key 宽不是映射 key 的宽：I-1.1 红：{red:?}"
+    );
+    assert!(
+        names.contains(&"I-7.2"),
+        "最新根的映射树走不全：I-7.2 红：{red:?}"
+    );
+}
+
+/// 覆盖写之后（最新根的账里有已释放的记录，引用集合那一遍要把每条候选根走到叶），两层中央映射树的一片叶把头里的层级改成 255：
+/// 「按条目往下数全部节点」那一遍若拿孩子的层级加一去比父层级，u8 在 255 上溢出，当场 panic。
+#[test]
+fn a_central_mapping_leaf_whose_level_is_the_largest_level_byte_is_judged_without_a_panic() {
+    let mut pool = two_level_central_mapping_pool();
+    let content: Vec<u8> = (0..4100usize)
+        .map(|index| u8::try_from((index * 7 + 3) % 253).expect("小于 256"))
+        .collect();
+    pool.overwrite(
+        &content,
+        capacities(ACCOUNTING_OF_THE_NODE_FORMAT, SMALL_CENTRAL_MAPPING),
+    );
+    let clean = pool.memory_pool();
+    assert_eq!(violations(&clean), Vec::new(), "覆盖写之后的干净镜像全绿");
+    let leaf_role = pool
+        .output
+        .units
+        .iter()
+        .find(|unit| {
+            matches!(
+                unit.identity,
+                TransactionUnit::MappingTreeNodeBelowTheRoot(_)
+            ) && parse_index_node(&unit.bytes).expect("映射节点解得开").level == 0
+        })
+        .expect("两层映射树有叶")
+        .identity;
+    let leaf = pool.output.unit(leaf_role);
+    let header = parse_index_node(&leaf.bytes).expect("叶解得开");
+    assert_the_rebuild_reproduces(&leaf.bytes, &header);
+    let damaged_leaf = rebuilt_index_node(
+        &header,
+        u8::MAX,
+        header.key_width,
+        &header.smallest_key,
+        &header.largest_key,
+        &header.entries,
+    );
+    let image = image_with_the_node_replaced(&clean, &pool.output, leaf_role, &damaged_leaf);
+    let red = violations(&image);
+    assert!(
+        violated_names(&red).contains(&"I-1.1"),
+        "叶的层级不是父层级减一：I-1.1 红：{red:?}"
+    );
+}
+
+/// journal 环里一条记录的计数器改成 0（头校验和重封，两盘一起改）：反向链那一判若拿「计数器 − 1」去找逻辑前一条，
+/// 在 0 上下溢，当场 panic。计数器从 1 起，计数器 0 没有本实例内逻辑前一条、链无从定义，I-8.6 判违例。
+#[test]
+fn a_journal_record_whose_counter_is_zero_is_judged_without_a_panic() {
+    let pool = product_capacity_pool();
+    let mut image = pool.memory_pool();
+    let offset = singlefs_core::journal::record_offset(2, JOURNAL_RING_DEFAULT_BYTES).0;
+    for device in [0u32, 1] {
+        let mut record = image
+            .devices
+            .get(&DeviceIdentity(device))
+            .expect("盘")
+            .read(DeviceOffsetInBytes(offset), JOURNAL_RECORD_BYTES);
+        assert_eq!(
+            record[JOURNAL_RECORD_COUNTER_OFFSET..JOURNAL_RECORD_COUNTER_OFFSET + 6],
+            2u64.to_le_bytes()[..6],
+            "计数器 2 那条记录在它的环槽上"
+        );
+        record[JOURNAL_RECORD_COUNTER_OFFSET..JOURNAL_RECORD_COUNTER_OFFSET + 6].fill(0);
+        let digest = wide_checksum_with_field_zeroed(
+            &record,
+            JOURNAL_RECORD_BYTES,
+            JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET,
+        );
+        record[JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET..JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET + 32]
+            .copy_from_slice(&digest);
+        image
+            .devices
+            .get_mut(&DeviceIdentity(device))
+            .expect("盘")
+            .write(DeviceOffsetInBytes(offset), &record);
+    }
+    match verdict_of(&image, "I-8.6") {
+        InvariantVerdict::Violated(detail) => assert!(
+            detail.contains("计数器 0"),
+            "I-8.6 的说明要点出是计数器 0 那一条：{detail}"
+        ),
+        other_verdict @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
+            panic!("计数器 0 那一条没有本实例内逻辑前一条，I-8.6 该判违例，实际 {other_verdict:?}")
+        }
+    }
+}
+
+/// 系统配置槽（4096）：自证校验和 32 字节在 155、罩整槽；单元区起点 8 字节在 417；槽距 4 字节在 429（槽 1 的偏移）。
+const SYSTEM_CONFIGURATION_SLOT_BYTES: usize = 4096;
+const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
+const SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET: usize = 417;
+const SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET: usize = 429;
+
+/// 两块盘各两个系统配置槽里的单元区起点都改成 2^40（4 GiB 的盘只有 2^18 个槽），自证校验和重封：
+/// checker 若拿「盘上槽数 − 单元区起点」算单元区容量，u64 下溢，当场 panic。起点越过盘末，单元区没有容量可比，I-5.2 判红。
+/// checker 先判单元区起始槽号等不等环长现算的那个槽（I-7.13 与 core 收同一张表）：
+/// 2^40 不是 50176，I-7.13 判违例、整池不作保，别的每一条报不适用，走不到算容量那一步——这一条改钉「不 panic、只红 I-7.13、
+/// 点名 `UnitAreaStartNotTheSlotAfterTheJournalRing`」（合入后验证二，照改法 A 报告「停下交主 agent 的」第 1 条同一个算法）。
+#[test]
+fn a_system_configuration_whose_unit_area_starts_past_the_device_end_is_judged_without_a_panic() {
+    let pool = product_capacity_pool();
+    let mut image = pool.memory_pool();
+    for device in [0u32, 1] {
+        let slot_zero = image
+            .devices
+            .get(&DeviceIdentity(device))
+            .expect("盘")
+            .read(DeviceOffsetInBytes(0), SYSTEM_CONFIGURATION_SLOT_BYTES);
+        let slot_spacing = u64::from(u32::from_le_bytes(
+            slot_zero[SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET
+                ..SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET + 4]
+                .try_into()
+                .expect("4 字节"),
+        ));
+        for slot_offset in [0, slot_spacing] {
+            let mut slot = image
+                .devices
+                .get(&DeviceIdentity(device))
+                .expect("盘")
+                .read(
+                    DeviceOffsetInBytes(slot_offset),
+                    SYSTEM_CONFIGURATION_SLOT_BYTES,
+                );
+            slot[SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET
+                ..SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET + 8]
+                .copy_from_slice(&(1u64 << 40).to_le_bytes());
+            let digest = wide_checksum_with_field_zeroed(
+                &slot,
+                SYSTEM_CONFIGURATION_SLOT_BYTES,
+                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+            );
+            slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+                .copy_from_slice(&digest);
+            image
+                .devices
+                .get_mut(&DeviceIdentity(device))
+                .expect("盘")
+                .write(DeviceOffsetInBytes(slot_offset), &slot);
+        }
+    }
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        vec!["I-7.13"],
+        "单元区起点越过盘末：先被 I-7.13 的表拦下，只红 I-7.13：{red:?}"
+    );
+    assert!(
+        red[0]
+            .1
+            .contains("UnitAreaStartNotTheSlotAfterTheJournalRing"),
+        "I-7.13 的说明点名单元区起始槽号不是环长现算的那个槽：{red:?}"
+    );
+}
+
+/// 一份镜像，其中一块盘自报的字节数换成 `reported_device_bytes`，读照原样：盘上的内容一个字节不动，只是 checker 问盘多大时拿到一个
+/// 比单元区起点还小的数。
+struct ImageWithOneDeviceReportingFewerBytes<'image> {
+    image: &'image MemoryPool,
+    device: u32,
+    reported_device_bytes: u64,
+}
+
+impl ImageReader for ImageWithOneDeviceReportingFewerBytes<'_> {
+    fn devices(&self) -> Vec<u32> {
+        ImageReader::devices(self.image)
+    }
+    fn device_bytes(&self, device: u32) -> Option<u64> {
+        if device == self.device {
+            return Some(self.reported_device_bytes);
+        }
+        ImageReader::device_bytes(self.image, device)
+    }
+    fn read(&self, device: u32, offset: u64, length: usize) -> Option<Vec<u8>> {
+        ImageReader::read(self.image, device, offset, length)
+    }
+    fn candidate_unit_slots(&self, device: u32) -> Option<Vec<u64>> {
+        ImageReader::candidate_unit_slots(self.image, device)
+    }
+    fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
+        ImageReader::candidate_journal_slots(self.image, device)
+    }
+}
+
+/// 同一族的另一个取样点：系统配置几何字段全照原样（I-7.13 的表放行），盘 1 自报 512 MiB（32768 个槽）、读照原样——
+/// 单元区起点 50176 越过它自报的盘末，记账行照样读得到。改法 A 之后上一条在 I-7.13 那一判就被拦下、走不到算单元区容量那一步，
+/// 那一步的下溢由这一条钉：起点越过盘末，单元区没有容量可比，盘 1 的 I-5.2 判红，不 panic
+/// （合入后验证二，`crates/mutations.tsv` 实审 B1 第 6 条那一行换靶到这里）。
+#[test]
+fn a_device_reporting_an_end_before_the_unit_area_start_is_judged_without_a_panic() {
+    let pool = product_capacity_pool();
+    let image = pool.memory_pool();
+    let short = ImageWithOneDeviceReportingFewerBytes {
+        image: &image,
+        device: 1,
+        reported_device_bytes: 512 * 1024 * 1024,
+    };
+    let red: Vec<(&'static str, String)> = check_pool_image(&short)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect();
+    assert!(
+        red.iter().any(|(invariant, detail)| *invariant == "I-5.2"
+            && detail.contains("盘 1")
+            && detail.contains("单元区 None")),
+        "盘 1 自报的盘末在单元区起点之前：盘 1 的 I-5.2 红、单元区容量 None：{red:?}"
+    );
+    assert!(
+        !violated_names(&red).contains(&"I-7.13"),
+        "几何字段没动，I-7.13 的表放行：{red:?}"
+    );
+}
+
+/// 记账树（第一个文件版本是根兼叶）里盘 0 的「空闲」那一行改成 u64 的最大值：checker 若拿「空闲 + 已分配」去比单元区容量，
+/// u64 上溢，当场 panic。加起来溢出就是对不上，I-5.2 判红。
+#[test]
+fn an_accounting_row_whose_free_bytes_overflow_the_sum_is_judged_without_a_panic() {
+    const ACCOUNTING_ROW_STATISTIC_OFFSET: usize = 0;
+    const ACCOUNTING_ROW_DEVICE_OFFSET: usize = 2 + 8;
+    const ACCOUNTING_ROW_VALUE_OFFSET: usize = 2 + 8 + 4 + 8;
+    const STATISTIC_FREE_BYTES: u16 = 2;
+    let pool = product_capacity_pool();
+    let accounting = pool.output.unit(TransactionUnit::AccountingTree);
+    let header = parse_index_node(&accounting.bytes).expect("记账树解得开");
+    assert_the_rebuild_reproduces(&accounting.bytes, &header);
+    let mut entries = header.entries.clone();
+    let free_row_of_device_zero = entries
+        .iter_mut()
+        .find(|row| {
+            row[ACCOUNTING_ROW_STATISTIC_OFFSET..ACCOUNTING_ROW_STATISTIC_OFFSET + 2]
+                == STATISTIC_FREE_BYTES.to_le_bytes()
+                && row[ACCOUNTING_ROW_DEVICE_OFFSET..ACCOUNTING_ROW_DEVICE_OFFSET + 4]
+                    == 0u32.to_le_bytes()
+        })
+        .expect("盘 0 有一行「空闲」");
+    free_row_of_device_zero[ACCOUNTING_ROW_VALUE_OFFSET..ACCOUNTING_ROW_VALUE_OFFSET + 8]
+        .copy_from_slice(&u64::MAX.to_le_bytes());
+    let damaged = rebuilt_index_node(
+        &header,
+        header.level,
+        header.key_width,
+        &header.smallest_key,
+        &header.largest_key,
+        &entries,
+    );
+    let image = image_with_the_node_replaced(
+        &pool.memory_pool(),
+        &pool.output,
+        TransactionUnit::AccountingTree,
+        &damaged,
+    );
+    let red = violations(&image);
+    assert!(
+        violated_names(&red).contains(&"I-5.2"),
+        "空闲 + 已分配溢出：I-5.2 红：{red:?}"
+    );
+}
+
+// ─── ③ 中央映射条目 ───
+
+/// 映射 key 的字段序（类标签, 出生树, 出生 txg, 实例代号, 尾段 6 字节），按字段比无符号整数（D8（核心索引结构） 已定项 11）。
+fn mapping_key_order(entry: &[u8]) -> (u8, u64, u64, u32, u64) {
+    let read_u64 =
+        |offset: usize| u64::from_le_bytes(entry[offset..offset + 8].try_into().expect("8 字节"));
+    let mut tail = [0u8; 8];
+    tail[..6].copy_from_slice(&entry[MAPPING_KEY_TAIL_OFFSET..MAPPING_KEY_TAIL_OFFSET + 6]);
+    (
+        entry[MAPPING_KEY_CLASS_OFFSET],
+        read_u64(MAPPING_KEY_BIRTH_TREE_OFFSET),
+        read_u64(MAPPING_KEY_BIRTH_TXG_OFFSET),
+        u32::from_le_bytes(
+            entry[MAPPING_KEY_INSTANCE_OFFSET..MAPPING_KEY_INSTANCE_OFFSET + 4]
+                .try_into()
+                .expect("4 字节"),
+        ),
+        u64::from_le_bytes(tail),
+    )
+}
+
+/// 第一个文件版本的中央映射树（根兼叶）里的条目按 `change` 改，改完按 key 重新排序、头里的区间贴紧首末条目，重建、补校验和。
+fn image_with_the_mapping_entries_changed(
+    pool: &TreeSplitPool,
+    change: impl Fn(&mut Vec<Vec<u8>>),
+) -> MemoryPool {
+    let mapping = pool.output.unit(TransactionUnit::MappingTree);
+    let header = parse_index_node(&mapping.bytes).expect("映射根解得开");
+    assert_the_rebuild_reproduces(&mapping.bytes, &header);
+    assert_eq!(header.level, 0, "产品容量下第一个文件版本的映射树是根兼叶");
+    let mut entries = header.entries.clone();
+    change(&mut entries);
+    entries.sort_by_key(|entry| mapping_key_order(entry));
+    let smallest_key = entries.first().expect("有条目")[..MAPPING_KEY_BYTES].to_vec();
+    let largest_key = entries.last().expect("有条目")[..MAPPING_KEY_BYTES].to_vec();
+    let damaged = rebuilt_index_node(
+        &header,
+        header.level,
+        header.key_width,
+        &smallest_key,
+        &largest_key,
+        &entries,
+    );
+    image_with_the_node_replaced(
+        &pool.memory_pool(),
+        &pool.output,
+        TransactionUnit::MappingTree,
+        &damaged,
+    )
+}
+
+fn entry_of_class(entries: &mut [Vec<u8>], unit_class: u8) -> &mut Vec<u8> {
+    let mut matching = entries
+        .iter_mut()
+        .filter(|entry| entry[MAPPING_KEY_CLASS_OFFSET] == unit_class);
+    let entry = matching.next().expect("这一类有一条映射条目");
+    assert!(
+        matching.next().is_none(),
+        "第一个文件版本里这一类只有一条映射条目"
+    );
+    entry
+}
+
+/// 数据单元那条映射条目的 key 尾段（码 1 的事务号）加一：key 说的出生身份与它指的数据单元头里的不再相同，
+/// 判映射 key 与单元头相符那一条（实审 B2 从 I-1.2 搬过去）。checker 只核映射条目的校验和与升序的话，全绿。
+/// 从分配记录那一头看是同一处对不上：那个数据单元的未释放记录在映射里找不到出生身份相符的 key（I-3.15，N2 反查）。
+#[test]
+fn a_mapping_key_whose_birth_identity_is_not_the_one_in_the_unit_header_reddens_the_mapping_key_and_the_reverse_lookup_invariants(
+) {
+    let pool = product_capacity_pool();
+    let image = image_with_the_mapping_entries_changed(&pool, |entries| {
+        let entry = entry_of_class(entries, UNIT_CLASS_DATA);
+        entry[MAPPING_KEY_TAIL_OFFSET] = entry[MAPPING_KEY_TAIL_OFFSET].wrapping_add(1);
+    });
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        [
+            MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+            UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE
+        ],
+        "判红的该只有映射 key 与单元头相符那一条与反查那一条：{red:?}"
+    );
+    assert!(
+        red[0].1.contains("映射条目"),
+        "说明要点出是映射条目：{}",
+        red[0].1
+    );
+}
+
+/// inode 叶容器（码 3）那条映射条目的 key 类标签改成 1：key 说它是数据单元，指的单元头里是码 3（两者都是 32 KiB，读得出、校验和对得上），
+/// 判映射 key 与单元头相符那一条（实审 B2 从 I-1.6 搬过去）。叶容器的未释放记录在映射里找不到码 3 的相符 key（I-3.15）。
+#[test]
+fn a_mapping_key_whose_class_is_not_the_class_of_the_unit_it_names_reddens_the_mapping_key_and_the_reverse_lookup_invariants(
+) {
+    let pool = product_capacity_pool();
+    let image = image_with_the_mapping_entries_changed(&pool, |entries| {
+        entry_of_class(entries, UNIT_CLASS_PACKED)[MAPPING_KEY_CLASS_OFFSET] = UNIT_CLASS_DATA;
+    });
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        [
+            MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+            UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE
+        ],
+        "判红的该只有映射 key 与单元头相符那一条与反查那一条：{red:?}"
+    );
+    assert!(
+        red[0].1.contains("映射条目"),
+        "说明要点出是映射条目：{}",
+        red[0].1
+    );
+}
+
+/// 数据单元那条映射条目的 key 类标签改成登记表之外的码（0、4、255），同时把它两条位置条目里的整单元校验和改坏：
+/// 认不得的类标签判映射 key 与单元头相符那一条（实审 B2 从 I-1.6 搬过去）、不去读那个单元——读了就会在校验和上再红 I-2.1。
+/// 按 32 KiB 硬读的话，红在 I-2.1 上。数据单元的未释放记录在映射里找不到码 1 的相符 key（I-3.15）。
+#[test]
+fn a_mapping_key_with_an_unregistered_class_reddens_the_mapping_key_and_the_reverse_lookup_invariants_and_is_not_read(
+) {
+    let pool = product_capacity_pool();
+    for unregistered_class in [0u8, 4, u8::MAX] {
+        let image = image_with_the_mapping_entries_changed(&pool, |entries| {
+            let entry = entry_of_class(entries, UNIT_CLASS_DATA);
+            entry[MAPPING_KEY_CLASS_OFFSET] = unregistered_class;
+            for location in 0..2 {
+                let checksum_offset =
+                    MAPPING_KEY_BYTES + location * MAPPING_LOCATION_ENTRY_BYTES + 10;
+                entry[checksum_offset] ^= 0xff;
+            }
+        });
+        let red = violations(&image);
+        assert_eq!(
+            violated_names(&red),
+            [
+                MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+                UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE
+            ],
+            "类标签 {unregistered_class}：判红的该只有映射 key 与单元头相符那一条与反查那一条（不读、I-2.1 不红）：{red:?}"
+        );
+    }
+}
+
+/// 数据单元那条映射条目的两条位置条目改指一个没人分配的槽，那里放一份逐字节相同的数据单元（校验和对得上），分配记录一条不动：
+/// 映射是解引用的唯一入口（D19（块指针的结构与宽度预算） 已定项 5），走读按映射认位置，引用集合记 50400、不再记过期的提示 50180
+/// （判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3），按槽数加总 I-3.11 看不见（源换成目的，槽数不变），
+/// 扫描重建在 50180 多扫到的同一版副本也按子集读法对得上（I-1.13）。看得见的是三条：
+/// 目的那一侧，遍历走到的 50400、50401 不在任何一条记录里（I-3.1 记账对记录的 (P) 那一判，采 RCW 之后才判；
+/// 三判里只有它不成立，记账与上下沿的槽数照旧相等）；
+/// 这一版是从 mkfs 水位第一次建树的那一版，落点按它的中央映射认过的位置取（D19（块指针的结构与宽度预算） 已定项 8 射程「引用集合记映射位置」），
+/// 盘上落点最小的数据单元在 50400、不是分配记录算出的 50180（I-5.5）；源那一侧，50180 的未释放记录罩住的数据单元在映射里的位置不含 50180
+/// （I-3.15，N2）。
+/// I-3.1 不是 I-5.5、I-3.15 已判红的那一块：I-3.15 判的是源槽那条记录没有映射指着，I-5.5 判的是写者的落点次序（只在从 mkfs 水位建树的那一版上判），
+/// 「被引用的槽没有分配记录」（目的那一侧）只有 I-3.1 的 (P) 判，那一判在这里照判红、不报部分没判。
+/// 目的那一侧走到的引用起点 50400 在最新根的分配记录里没有一条起点在它的记录，I-3.21（走到的引用起点是最新根计入的分配记录的起点，C944） 也红、点名它
+/// （新立 I-3.21 之后这一张多红这一条，合入后验证任务 6223 量的）。
+#[test]
+fn a_mapping_entry_moved_to_an_unallocated_copy_reddens_the_first_data_unit_placement_and_the_reverse_lookup_at_the_allocated_source(
+) {
+    let pool = product_capacity_pool();
+    let data_unit = pool
+        .output
+        .units
+        .iter()
+        .find(|unit| matches!(unit.identity, TransactionUnit::Data(_)))
+        .expect("第一个文件有一个数据单元");
+    let data_unit_bytes = usize::try_from(DATA_UNIT_BYTES).expect("32768");
+    let copy = read_unit_on_device(&pool.memory_pool(), 0, data_unit.slot.0, data_unit_bytes);
+    assert_eq!(copy[..], data_unit.bytes[..], "盘上那一份就是发布写出的");
+    let checksum = crc32_castagnoli(&copy);
+    let mut image = image_with_the_mapping_entries_changed(&pool, |entries| {
+        let entry = entry_of_class(entries, UNIT_CLASS_DATA);
+        for (location, device) in [0u32, 1].into_iter().enumerate() {
+            let start = MAPPING_KEY_BYTES + location * MAPPING_LOCATION_ENTRY_BYTES;
+            entry[start..start + 4].copy_from_slice(&device.to_le_bytes());
+            entry[start + 4..start + 10].copy_from_slice(&SLOT_NOBODY_ALLOCATED.to_le_bytes()[..6]);
+            entry[start + 10..start + 14].copy_from_slice(&checksum.to_le_bytes());
+        }
+    });
+    write_unit_to_the_same_slot_on_both_devices(&mut image, SLOT_NOBODY_ALLOCATED, &copy);
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        [
+            ALLOCATED_STATISTIC,
+            FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
+            UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
+            WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS
+        ],
+        "映射条目改指一份没人分配的副本：看得见的是记账对记录的 (P) 那一判、建树落点那一条、反查那一条与走到的引用起点那一条：{red:?}"
+    );
+    let detail_of = |invariant: &str| {
+        red.iter()
+            .find(|(name, _)| *name == invariant)
+            .map(|(_, detail)| detail.as_str())
+            .expect("上面核过判红的集合里有这一条")
+    };
+    let source_slot = data_unit.slot.0;
+    let destination_slots = [SLOT_NOBODY_ALLOCATED, SLOT_NOBODY_ALLOCATED + 1];
+    let allocated_statistic_detail = detail_of(ALLOCATED_STATISTIC);
+    assert!(
+        allocated_statistic_detail
+            .contains(&format!("遍历走到而不在下沿那一份里的槽 {destination_slots:?}")),
+        "记账对记录那一条红在 (P) 那一判：说明点名遍历走到、没有记录的目的槽 {destination_slots:?}：{allocated_statistic_detail}"
+    );
+    let placement_detail =
+        detail_of(FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK);
+    assert!(
+        placement_detail.contains(&format!("槽 {SLOT_NOBODY_ALLOCATED}，"))
+            && placement_detail.contains(&format!("落点 {source_slot}")),
+        "建树落点那一条的说明点名映射给的 {SLOT_NOBODY_ALLOCATED} 与分配记录算出的 {source_slot}：{placement_detail}"
+    );
+    let reverse_lookup_detail =
+        detail_of(UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE);
+    assert!(
+        reverse_lookup_detail.contains(&format!("槽 {source_slot} 的分配记录"))
+            && reverse_lookup_detail.contains(&format!("{SLOT_NOBODY_ALLOCATED})")),
+        "反查那一条的说明点名源槽 {source_slot} 的记录、映射里相符的 key 落在 {SLOT_NOBODY_ALLOCATED}：{reverse_lookup_detail}"
+    );
+    let walked_reference_start_detail =
+        detail_of(WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS);
+    assert!(
+        walked_reference_start_detail.contains(&format!(
+            "槽 {SLOT_NOBODY_ALLOCATED}：遍历走到的引用从这一槽起"
+        )),
+        "走到的引用起点那一条点名目的槽 {SLOT_NOBODY_ALLOCATED}：{walked_reference_start_detail}"
+    );
+}

@@ -1,0 +1,1863 @@
+//! 池级 checker 查窄的几条不变量补全（代码审阅 6c 第 7、9 条与实审 B1 留下的几件），
+//! 每一格配一份会红的坏镜像（或一份不许误判的合法镜像）：
+//! ① I-7.4（近 K 代块未被复用） 对被抛弃、还在根环里的根也判；根环有读不出的槽时这一半判不了，整条不报成立；
+//! ② 老一版引用一棵已被前一版走过的共享子树时，子树里的落点并进这一版再比交叉（I-5.1（物理范围不重叠））；
+//! ③ I-2.5（位置条目按设备身份升序） 判 journal 点名项；④ I-9.2（条目身份与子头相符） 认类型段 0、往下走；
+//! ⑤ I-9.4（容器号不超最小 key） 三句都判；⑥ I-3.9 / I-5.4 读根记录直接持有的那棵分配记录树（C512）；
+//! ⑦ I-7.7（系统配置实例代号不低于根环） 一个槽读不出时 ① ② 分开报；
+//! ⑧ 新立的「中央映射条目的 key 与它指的单元头相符」（I-1.11（映射 key 与单元头相符）） 补上补零两字节与
+//!    码 1 / 码 3 的出生树，码 2 的出生树随 C289（码 2 的出生树取哪个字段没写） 不判；
+//! ⑨ journal 计数器 0 判 I-8.6（反向链算法） 违例。
+//! 镜像都从合法历史出发，改一处；被改单元重封、新整单元校验和沿引用链补到根槽。
+
+mod common;
+mod common_tree_split;
+
+use common::{
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before,
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before_with_the_shadow_ledger,
+    build_pool, crash_state_devices, memory_pool_of_sparse_devices, parameters,
+    publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+};
+use common_tree_split::{
+    capacities, propagate_the_new_checksum, read_unit_on_device, reseal_unit_by_its_class,
+    root_ring_slot_offsets, write_unit_to_the_same_slot_on_both_devices, TreeSplitPool,
+    ACCOUNTING_OF_THE_NODE_FORMAT, CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
+};
+use singlefs_checker::image::{ImageReader, InvariantVerdict};
+use singlefs_checker::walk::check_pool_image;
+use singlefs_core::address::{
+    DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+};
+use singlefs_core::admission::{
+    RETIREMENT_PREPAY_BYTES_PER_INODE_RECORD_ON_ONE_REPLICA,
+    TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA,
+};
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
+use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
+use singlefs_core::make_filesystem::{make_filesystem, INSTANCE_TABLE_SLOT};
+use singlefs_core::mount::{mount_writable, ShadowLedger};
+use singlefs_core::pointer::BirthSequence;
+use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
+use singlefs_core::unit::{build_index_node, parse_index_node, IndexNodeHeader};
+use singlefs_format::{
+    CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES, JOURNAL_RING_DEFAULT_BYTES, NODE_BYTES, SLOT_BYTES,
+    TREE_IDENTIFIER_ALLOCATION_RECORDS,
+};
+use singlefs_verification::memory_pool::{MemoryPool, SparseBlockDevice};
+use singlefs_verification::{RecordingBlockDevice, SharedStream};
+
+/// 新立那一条不变量：I-1.11（映射 key 与单元头相符），登记在 `crates/singlefs-checker/invariants/01-块自描述.md`。
+const MAPPING_KEY_INVARIANT: &str = "I-1.11";
+/// I-3.15（未释放记录罩住的单元由映射指在这一槽，N2 反查）。
+const REVERSE_LOOKUP_INVARIANT: &str = "I-3.15";
+
+/// 第一个文件版本的单元区只用到 50 26x 附近：这两个槽在两块盘上都没被分配、没被引用。落在每块盘分配记录树的叶 61 罩的槽
+/// [61 × 812, 62 × 812) = [49 532, 50 344) 里（D8（核心索引结构） 已定项 14 按位置寻址），手放的单元的分配记录补进那一片已有的叶、不另长一片；
+/// 所在的那一段 [50 304, 50 368) 在第一个文件版本里一条未释放记录都没有（全空聚簇段）。
+const SLOT_NOBODY_ALLOCATED: u64 = 50_320;
+/// 手放进 [`SLOT_NOBODY_ALLOCATED`] 的第二片 inode 叶容器的出生序号：inode 树在第一个文件那一版（txg 3）里发过的号之外的一个。
+const SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE: u32 = 200;
+/// 码 3 单元头里出生序号 4 字节的偏移（D18（块里携带什么信息） 已定项 11）。
+const PACKED_BIRTH_SEQUENCE_OFFSET: usize = 103;
+
+/// 根槽：判定宽度 512，自证校验和 32 字节在 138；实例代号在 24、checkpoint_txg 在 28；实例表指针 86 字节在 170
+/// （D22（单元原子性怎么合成） 已定项 7 的偏移表）。
+const ROOT_SLOT_BYTES: usize = 512;
+const ROOT_SLOT_CHECKSUM_OFFSET: usize = 138;
+const ROOT_RECORD_INSTANCE_OFFSET: usize = 24;
+const ROOT_RECORD_CHECKPOINT_TXG_OFFSET: usize = 28;
+const ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET: usize = 170;
+
+/// 指针 86 / 88 里的几段（D19（块指针的结构与宽度预算） 的字段表）：出生树 34、出生 txg 42、两条位置条目 50 与 64
+/// （设备身份 4 + 槽号 6 + 整单元校验和 4）、码 2 / 码 3 指针的实例代号 78 与出生序号 82。
+const POINTER_BIRTH_TREE_OFFSET: usize = 34;
+const POINTER_BIRTH_TXG_OFFSET: usize = 42;
+const POINTER_LOCATION_ENTRY_OFFSETS: [usize; 2] = [50, 64];
+const POINTER_INSTANCE_OFFSET: usize = 78;
+const POINTER_BIRTH_SEQUENCE_OFFSET: usize = 82;
+const LOCATION_ENTRY_SLOT_OFFSET: usize = 4;
+const LOCATION_ENTRY_CHECKSUM_OFFSET: usize = 10;
+const LOCATION_ENTRY_BYTES: usize = 14;
+
+/// inode 树内部条目 120（D8（核心索引结构） 已定项 6）：分隔 key 8 + 身份引用 26（出生树 8、打包记录类型 2、容器号 8、容器出生代 8）+ 子指针 86。
+const INODE_ENTRY_BIRTH_TREE_OFFSET: usize = 8;
+const INODE_ENTRY_RECORD_TYPE_OFFSET: usize = 16;
+const INODE_ENTRY_CONTAINER_OFFSET: usize = 18;
+const INODE_ENTRY_CONTAINER_BIRTH_OFFSET: usize = 26;
+const INODE_ENTRY_CHILD_POINTER_OFFSET: usize = 34;
+const INODE_ENTRY_BYTES: u16 = 120;
+/// 类型段 0：子单元是码 2 的 inode 树内部节点（I-9.2（条目身份与子头相符））。
+const INODE_ENTRY_TYPE_INTERNAL_NODE: u16 = 0;
+
+/// 码 3 打包记录单元（D18（块里携带什么信息） 已定项 11）：声明长度 2 在 8、容器号 8 在 53、记录数 2 在 69、记录区从 136 起；
+/// 打包记录类型 2 的记录 140，inode 号在记录偏移 0。
+const PACKED_DECLARED_LENGTH_OFFSET: usize = 8;
+const PACKED_CONTAINER_OFFSET: usize = 53;
+const PACKED_RECORD_COUNT_OFFSET: usize = 69;
+const PACKED_RECORDS_START: usize = 136;
+const INODE_RECORD_BYTES: usize = 140;
+/// inode 记录 140 里 inode 号（偏移 0）、size（偏移 40）与 blocks（偏移 48，⌈size ÷ 512⌉，I-9.15），D8（核心索引结构） 已定项 6 的字段表。
+const INODE_RECORD_INODE_NUMBER_OFFSET: usize = 0;
+const INODE_RECORD_SIZE_OFFSET: usize = 40;
+const INODE_RECORD_BLOCKS_OFFSET: usize = 48;
+
+/// 记账条目 34（D5（快照 / 空间记账机制） 已定项 10）：统计量 2 在 0、设备 4 在 10、值 8 在 22。
+const ACCOUNTING_ROW_STATISTIC_OFFSET: usize = 0;
+const ACCOUNTING_ROW_DEVICE_OFFSET: usize = 2 + 8;
+const ACCOUNTING_ROW_VALUE_OFFSET: usize = 2 + 8 + 4 + 8;
+const STATISTIC_ALLOCATED_BYTES: u16 = 1;
+const STATISTIC_FREE_BYTES: u16 = 2;
+const STATISTIC_INODE_WATERMARK: u16 = 12;
+/// runs（D5（快照 / 空间记账机制） 已定项 4 第 10 项：单元区空闲槽的连续段数，带设备维）。
+const STATISTIC_FRAGMENTATION_RUNS: u16 = 10;
+/// 全空聚簇段数（第 11 项，带设备维）与已承诺预留（标签 6，不带设备维）。
+const STATISTIC_EMPTY_CLUSTER_SEGMENTS: u16 = 11;
+const STATISTIC_COMMITTED_RESERVATION_BYTES: u16 = 6;
+const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
+
+/// 中央映射条目 55（D19（块指针的结构与宽度预算） 已定项 6 / 10）：key 27 = 类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 尾段 6，
+/// 码 2 / 码 3 的尾段是出生序号 4 + 补零 2；value 28 = 位置条目 14 × 2。
+const MAPPING_KEY_CLASS_OFFSET: usize = 0;
+const MAPPING_KEY_BIRTH_TREE_OFFSET: usize = 1;
+const MAPPING_KEY_TAIL_OFFSET: usize = 21;
+const MAPPING_KEY_PADDING_OFFSET: usize = 25;
+const MAPPING_KEY_BYTES: usize = 27;
+const UNIT_CLASS_DATA: u8 = 1;
+const UNIT_CLASS_INDEX_NODE: u8 = 2;
+const UNIT_CLASS_PACKED: u8 = 3;
+
+/// journal 记录（D23（journal 的角色与格式） 已定项 4 / 已定项 17）：点名项数 4 在 12、计数器 6 在 20、
+/// 自证校验和 32 在 46（罩整条 4096）、载荷校验和 4 在 95（罩头之后的点名项）、头 496、点名项 56（两条位置条目在前）。
+const JOURNAL_RECORD_NAMED_COUNT_OFFSET: usize = 12;
+const JOURNAL_RECORD_COUNTER_OFFSET: usize = 20;
+const JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET: usize = 46;
+const JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET: usize = 95;
+const JOURNAL_RECORD_HEADER_BYTES: usize = 496;
+const JOURNAL_NAMED_ENTRY_BYTES: usize = 56;
+const JOURNAL_RECORD_BYTES: usize = 4096;
+
+/// 分配记录 20（D3（空间分配） 已定项 7 / 已定项 11）：设备 4 + 槽号 6 + 跨度段 2（最高位是已释放标志）+ 分配代或释放代 8。
+const ALLOCATION_RECORD_SLOT_OFFSET: usize = 4;
+const ALLOCATION_RECORD_SPAN_OFFSET: usize = 10;
+const ALLOCATION_RECORD_GENERATION_OFFSET: usize = 12;
+const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
+/// 分配记录树（按位置寻址）的节点 key 宽 10。树 ID：树表里种类 3 那一条指着的是 [`TREE_IDENTIFIER_ALLOCATION_RECORDS`]；
+/// 树表 0 条那一版由根记录直接持有的那一棵是 0（C512：与树表、实例表同是树 ID 0）。
+const ALLOCATION_RECORD_TREE_KEY_WIDTH: usize = 10;
+const ALLOCATION_RECORD_TREE_HELD_BY_THE_ROOT_RECORD: u64 = 0;
+
+fn read_u32_at(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 字节"))
+}
+
+fn read_u64_at(bytes: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
+}
+
+fn read_six_byte_slot_at(bytes: &[u8], offset: usize) -> u64 {
+    let mut slot = [0u8; 8];
+    slot[..6].copy_from_slice(&bytes[offset..offset + 6]);
+    u64::from_le_bytes(slot)
+}
+
+fn read_bytes(image: &MemoryPool, device: u32, offset: u64, length: usize) -> Vec<u8> {
+    image
+        .devices
+        .get(&DeviceIdentity(device))
+        .expect("盘")
+        .read(DeviceOffsetInBytes(offset), length)
+}
+
+fn write_bytes(image: &mut MemoryPool, device: u32, offset: u64, bytes: &[u8]) {
+    image
+        .devices
+        .get_mut(&DeviceIdentity(device))
+        .expect("盘")
+        .write(DeviceOffsetInBytes(offset), bytes);
+}
+
+fn node_bytes() -> usize {
+    usize::try_from(NODE_BYTES).expect("16384")
+}
+
+fn data_unit_bytes() -> usize {
+    usize::try_from(DATA_UNIT_BYTES).expect("32768")
+}
+
+/// 一份镜像上判红的不变量（带说明）。
+fn violations(image: &dyn ImageReader) -> Vec<(&'static str, String)> {
+    check_pool_image(image)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect()
+}
+
+fn violated_names(violations: &[(&'static str, String)]) -> Vec<&'static str> {
+    violations.iter().map(|(name, _)| *name).collect()
+}
+
+fn verdict_of(image: &dyn ImageReader, invariant: &str) -> InvariantVerdict {
+    check_pool_image(image)
+        .into_iter()
+        .find(|(name, _)| *name == invariant)
+        .expect("清单里有")
+        .1
+}
+
+fn detail_of_the_violation(image: &dyn ImageReader, invariant: &str) -> String {
+    match verdict_of(image, invariant) {
+        InvariantVerdict::Violated(detail) => detail,
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
+            panic!("{invariant} 该判违例，实际 {other:?}")
+        }
+    }
+}
+
+/// 一份镜像，其中一块盘上的一段字节读不出（暂时读错的样子）：读到跟这一段有交叠的都交 None，别的照原样读。
+struct ImageWithAnUnreadableRange<'image> {
+    image: &'image MemoryPool,
+    device: u32,
+    unreadable_offsets: std::ops::Range<u64>,
+}
+
+impl ImageReader for ImageWithAnUnreadableRange<'_> {
+    fn devices(&self) -> Vec<u32> {
+        ImageReader::devices(self.image)
+    }
+    fn device_bytes(&self, device: u32) -> Option<u64> {
+        ImageReader::device_bytes(self.image, device)
+    }
+    fn read(&self, device: u32, offset: u64, length: usize) -> Option<Vec<u8>> {
+        let end = offset + u64::try_from(length).expect("长度");
+        if device == self.device
+            && offset < self.unreadable_offsets.end
+            && self.unreadable_offsets.start < end
+        {
+            return None;
+        }
+        ImageReader::read(self.image, device, offset, length)
+    }
+    fn candidate_unit_slots(&self, device: u32) -> Option<Vec<u64>> {
+        ImageReader::candidate_unit_slots(self.image, device)
+    }
+    fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
+        ImageReader::candidate_journal_slots(self.image, device)
+    }
+}
+
+/// 根环里一个此刻没有根的槽（自证不过的槽）：(盘, 偏移)。读不出的那一段放在这里，择根一条都不少。
+fn an_empty_root_ring_slot(image: &MemoryPool) -> (u32, u64) {
+    root_ring_slot_offsets()
+        .into_iter()
+        .rev()
+        .find(|(device, offset)| {
+            &read_bytes(image, *device, *offset, ROOT_SLOT_BYTES)[..4] != b"SFSR"
+        })
+        .expect("根环 24 个槽里有空着的")
+}
+
+/// 根环里那条 (实例, txg) 的根住的槽：(盘, 偏移)。
+fn root_slot_holding(image: &MemoryPool, instance: u32, checkpoint_txg: u64) -> (u32, u64) {
+    root_ring_slot_offsets()
+        .into_iter()
+        .find(|(device, offset)| {
+            let bytes = read_bytes(image, *device, *offset, ROOT_SLOT_BYTES);
+            &bytes[..4] == b"SFSR"
+                && read_u32_at(&bytes, ROOT_RECORD_INSTANCE_OFFSET) == instance
+                && read_u64_at(&bytes, ROOT_RECORD_CHECKPOINT_TXG_OFFSET) == checkpoint_txg
+        })
+        .expect("根环里有这条根")
+}
+
+fn reseal_root_slot(bytes: &mut [u8]) {
+    let digest = wide_checksum_with_field_zeroed(bytes, ROOT_SLOT_BYTES, ROOT_SLOT_CHECKSUM_OFFSET);
+    bytes[ROOT_SLOT_CHECKSUM_OFFSET..ROOT_SLOT_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
+}
+
+/// journal 记录改过之后重封：先算载荷校验和（罩点名项），再算头自证校验和（罩整条 4096）。
+fn reseal_journal_record(record: &mut [u8]) {
+    let named_count =
+        usize::try_from(read_u32_at(record, JOURNAL_RECORD_NAMED_COUNT_OFFSET)).expect("点名项数");
+    let payload_end = JOURNAL_RECORD_HEADER_BYTES + named_count * JOURNAL_NAMED_ENTRY_BYTES;
+    let payload_checksum = crc32_castagnoli(&record[JOURNAL_RECORD_HEADER_BYTES..payload_end]);
+    record[JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET..JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET + 4]
+        .copy_from_slice(&payload_checksum.to_le_bytes());
+    let digest = wide_checksum_with_field_zeroed(
+        record,
+        JOURNAL_RECORD_BYTES,
+        JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET,
+    );
+    record[JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET..JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET + 32]
+        .copy_from_slice(&digest);
+}
+
+/// 单元区起点（mkfs 种的实例表落在这里）与从它往后扫多少个槽：这几份镜像上用到的落点都在前几百个槽里。
+const UNIT_AREA_FIRST_SLOT: u64 = 50_176;
+const SLOTS_SCANNED_FOR_UNITS: u64 = 1024;
+
+/// 单元区里盘 0 上此刻的单元：(起点槽, 字节数)，按头里的类标签认（码 2 一槽，码 1 / 码 3 两槽）。
+/// 沿引用链补校验和（`propagate_the_new_checksum`）要一张单元表，镜像是现造的、没有写死的表时拿它。
+fn units_found_on_device_zero(image: &MemoryPool) -> Vec<(u64, usize)> {
+    let mut units = Vec::new();
+    let mut slot = UNIT_AREA_FIRST_SLOT;
+    while slot < UNIT_AREA_FIRST_SLOT + SLOTS_SCANNED_FOR_UNITS {
+        let header = read_bytes(image, 0, slot * SLOT_BYTES, 512);
+        let slots_taken = if &header[..4] == b"SFSU" {
+            match header[6] {
+                UNIT_CLASS_INDEX_NODE => {
+                    units.push((slot, node_bytes()));
+                    1
+                }
+                UNIT_CLASS_DATA | UNIT_CLASS_PACKED => {
+                    units.push((slot, data_unit_bytes()));
+                    2
+                }
+                _unregistered_unit_class => 1,
+            }
+        } else {
+            1
+        };
+        slot += slots_taken;
+    }
+    units
+}
+
+/// 按解开的头重建一个码 2 节点：只换给定的几样，别的字段照原样。
+fn rebuilt_index_node(
+    header: &IndexNodeHeader,
+    level: u8,
+    smallest_key: &[u8],
+    largest_key: &[u8],
+    birth_sequence: BirthSequence,
+    entries: &[Vec<u8>],
+) -> Vec<u8> {
+    build_index_node(
+        header.tree,
+        level,
+        header.key_width,
+        smallest_key,
+        largest_key,
+        header.birth_txg,
+        &parameters().filesystem_identifier,
+        header.instance,
+        birth_sequence,
+        u16::try_from(header.entry_width).expect("条目宽"),
+        entries,
+    )
+}
+
+/// 一个码 2 单元原样重建一遍，核它与盘上的逐字节相同（重建没有改到别的字段）。
+fn assert_the_rebuild_reproduces(unit_bytes: &[u8], header: &IndexNodeHeader) {
+    assert_eq!(
+        rebuilt_index_node(
+            header,
+            header.level,
+            &header.smallest_key,
+            &header.largest_key,
+            header.birth_sequence,
+            &header.entries,
+        ),
+        unit_bytes,
+        "原样重建要与盘上的逐字节相同"
+    );
+}
+
+/// 一个单元（两盘同槽）换成 `replacement`，新整单元校验和沿引用链补到根槽。
+fn replace_unit(image: &mut MemoryPool, units: &[(u64, usize)], slot: u64, replacement: &[u8]) {
+    let before = read_unit_on_device(image, 0, slot, replacement.len());
+    write_unit_to_the_same_slot_on_both_devices(image, slot, replacement);
+    propagate_the_new_checksum(
+        image,
+        units,
+        (
+            slot,
+            crc32_castagnoli(&before),
+            crc32_castagnoli(replacement),
+        ),
+    );
+}
+
+/// 记账树（产品容量下第一个文件版本是根兼叶）里的行按 `change` 改，重建、补校验和。
+fn change_accounting_rows(
+    image: &mut MemoryPool,
+    output: &TransactionOutput,
+    change: impl Fn(&mut Vec<Vec<u8>>),
+) {
+    let accounting_slot = output.unit(TransactionUnit::AccountingTree).slot.0;
+    let accounting = read_unit_on_device(image, 0, accounting_slot, node_bytes());
+    let header = parse_index_node(&accounting).expect("记账树解得开");
+    assert_eq!(header.level, 0, "产品容量下记账树是根兼叶");
+    let mut rows = header.entries.clone();
+    change(&mut rows);
+    let rebuilt = rebuilt_index_node(
+        &header,
+        header.level,
+        &header.smallest_key,
+        &header.largest_key,
+        header.birth_sequence,
+        &rows,
+    );
+    replace_unit(
+        image,
+        &units_found_on_device_zero(image),
+        accounting_slot,
+        &rebuilt,
+    );
+}
+
+/// 一行记账（统计量, 设备）的值加上 `delta`（可以是负数）。
+fn adjust_accounting_row(rows: &mut [Vec<u8>], statistic: u16, device: u32, delta: i64) {
+    let row = rows
+        .iter_mut()
+        .find(|row| {
+            row[ACCOUNTING_ROW_STATISTIC_OFFSET..ACCOUNTING_ROW_STATISTIC_OFFSET + 2]
+                == statistic.to_le_bytes()
+                && row[ACCOUNTING_ROW_DEVICE_OFFSET..ACCOUNTING_ROW_DEVICE_OFFSET + 4]
+                    == device.to_le_bytes()
+        })
+        .expect("记账里有这一行");
+    let value = read_u64_at(row, ACCOUNTING_ROW_VALUE_OFFSET)
+        .checked_add_signed(delta)
+        .expect("调完不越界");
+    row[ACCOUNTING_ROW_VALUE_OFFSET..ACCOUNTING_ROW_VALUE_OFFSET + 8]
+        .copy_from_slice(&value.to_le_bytes());
+}
+
+/// 手放进 [`SLOT_NOBODY_ALLOCATED`] 的一个单元（两块盘同槽各一份），照写路径那样记账：
+/// ① 每块盘那一片分配记录树叶里补一条未释放的记录（起点槽、跨 `span_slots`；分配代照这一版 inode 根那条记录抄），按槽号插进去；
+/// ② 记账的「已分配」加、「空闲」减（I-3.1（已分配统计对得上） 的记录与遍历、I-3.11、I-5.2 仍对得上）；
+/// ③ runs 加一：手放的单元离第一个文件版本用到的槽隔着一大段空闲，一个新的占用块把一段空闲劈成两段（I-3.16（碎片度与全空段统计对得上） 照全扫重算比它）；
+/// ④ 全空聚簇段数减一：它落的那一段原来一条未释放记录都没有（下面核），补了记录之后按记录口径不再全空；
+/// ⑤ 已承诺预留（标签 6）照 D3（空间分配） 已定项 2 的闭式加上 `inode_records_added` 条活记录摊的那一份
+/// （墓碑 41 + 退役 35 字节、每份副本，两份副本；I-3.20（空闲已分配不可回收之和与已承诺预留的闭式） 照闭式现算比它）；
+/// `inode_watermark` 给了的话 inode 号水位那一行改成它。中央映射里那一条由各搭建自己补（[`add_the_mapping_entry_of_a_unit_placed_by_hand`]）。
+fn account_for_units_placed_by_hand(
+    image: &mut MemoryPool,
+    output: &TransactionOutput,
+    span_slots: u16,
+    inode_records_added: u64,
+    inode_watermark: Option<u64>,
+) {
+    let inode_root_slot = output.unit(TransactionUnit::InodeRoot).slot.0;
+    let segment_of = |slot: u64| (slot - UNIT_AREA_FIRST_SLOT) / CLUSTER_SEGMENT_SLOTS;
+    let records_added = change_allocation_record_leaves(image, |records| {
+        let slot_of =
+            |record: &Vec<u8>| read_six_byte_slot_at(record, ALLOCATION_RECORD_SLOT_OFFSET);
+        let Some(template) = records
+            .iter()
+            .find(|record| slot_of(record) == inode_root_slot)
+            .cloned()
+        else {
+            return 0;
+        };
+        assert!(
+            records
+                .iter()
+                .all(|record| allocation_record_is_released(record)
+                    || segment_of(slot_of(record)) != segment_of(SLOT_NOBODY_ALLOCATED)),
+            "手放的单元落的那一段原来一条未释放记录都没有"
+        );
+        let mut added = template;
+        added[ALLOCATION_RECORD_SLOT_OFFSET..ALLOCATION_RECORD_SLOT_OFFSET + 6]
+            .copy_from_slice(&SLOT_NOBODY_ALLOCATED.to_le_bytes()[..6]);
+        added[ALLOCATION_RECORD_SPAN_OFFSET..ALLOCATION_RECORD_SPAN_OFFSET + 2]
+            .copy_from_slice(&span_slots.to_le_bytes());
+        let position = records
+            .iter()
+            .position(|record| slot_of(record) > SLOT_NOBODY_ALLOCATED)
+            .unwrap_or(records.len());
+        records.insert(position, added);
+        1
+    });
+    assert_eq!(
+        records_added, 2,
+        "两块盘各自那一片叶里各补一条（叶里有 inode 根那条记录的就是那块盘的叶 61）"
+    );
+    let bytes = i64::try_from(u64::from(span_slots) * SLOT_BYTES).expect("字节数");
+    let replicas = 2u64;
+    let committed_reservation_added = i64::try_from(
+        replicas
+            * inode_records_added
+            * (TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA
+                + RETIREMENT_PREPAY_BYTES_PER_INODE_RECORD_ON_ONE_REPLICA),
+    )
+    .expect("字节数");
+    change_accounting_rows(image, output, |rows| {
+        for device in [0u32, 1] {
+            adjust_accounting_row(rows, STATISTIC_ALLOCATED_BYTES, device, bytes);
+            adjust_accounting_row(rows, STATISTIC_FREE_BYTES, device, -bytes);
+            adjust_accounting_row(rows, STATISTIC_FRAGMENTATION_RUNS, device, 1);
+            adjust_accounting_row(rows, STATISTIC_EMPTY_CLUSTER_SEGMENTS, device, -1);
+        }
+        if inode_records_added > 0 {
+            adjust_accounting_row(
+                rows,
+                STATISTIC_COMMITTED_RESERVATION_BYTES,
+                STATISTIC_NO_DEVICE_DIMENSION,
+                committed_reservation_added,
+            );
+        }
+        if let Some(watermark) = inode_watermark {
+            // 台阶行与每次发布写的那一行同统计量、同设备段，代段更早、排在前面：改的是排在最后（代段最大）的那一行。
+            let row = rows
+                .iter_mut()
+                .rev()
+                .find(|row| {
+                    row[ACCOUNTING_ROW_STATISTIC_OFFSET..ACCOUNTING_ROW_STATISTIC_OFFSET + 2]
+                        == STATISTIC_INODE_WATERMARK.to_le_bytes()
+                        && row[ACCOUNTING_ROW_DEVICE_OFFSET..ACCOUNTING_ROW_DEVICE_OFFSET + 4]
+                            == STATISTIC_NO_DEVICE_DIMENSION.to_le_bytes()
+                })
+                .expect("记账里有 inode 号水位那一行");
+            row[ACCOUNTING_ROW_VALUE_OFFSET..ACCOUNTING_ROW_VALUE_OFFSET + 8]
+                .copy_from_slice(&watermark.to_le_bytes());
+        }
+    });
+}
+
+fn product_capacity_pool() -> TreeSplitPool {
+    TreeSplitPool::with_the_first_file_version_under(capacities(
+        ACCOUNTING_OF_THE_NODE_FORMAT,
+        CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
+    ))
+}
+
+// ─── ① I-7.4（近 K 代块未被复用） 被抛弃根那一半 ───
+
+/// A (1, 3)、B (1, 4) → 重开取号 2、写行、暖机、C (2, 8)（与 `checker_known_bad_images.rs` 的同名搭建同一段）。交回池与 C 那一版。
+fn pool_through_the_third_version(tag: &str) -> (BuiltPool, TransactionOutput) {
+    let mut pool = build_pool(tag);
+    let first = pool.output.clone();
+    let second_content: Vec<u8> = (0..4100usize)
+        .map(|index| u8::try_from((index * 7 + 3) % 253).expect("小于 256"))
+        .collect();
+    pool.output = publish_overwrite_in_process(
+        &mut pool,
+        &first,
+        &second_content,
+        FIXED_WRITE_TIME_SECONDS + 60,
+        InstanceGeneration(1),
+    )
+    .expect("覆盖写 B");
+    let mut devices_reopened_for_the_second_instance = pool.reopen_recorded();
+    let mounted = mount_writable(&parameters(), &mut devices_reopened_for_the_second_instance)
+        .expect("重开取号 2");
+    pool.devices = Some(devices_reopened_for_the_second_instance);
+    pool.allocator = mounted.allocator;
+    let current = mounted
+        .current
+        .into_file_version()
+        .expect("B 之后重开，现行那一版带文件");
+    let third_content: Vec<u8> = (0..2500usize)
+        .map(|index| u8::try_from((index * 7 + 11) % 253).expect("小于 256"))
+        .collect();
+    let third = publish_overwrite_in_process(
+        &mut pool,
+        &current,
+        &third_content,
+        FIXED_WRITE_TIME_SECONDS + 120,
+        InstanceGeneration(2),
+    )
+    .expect("覆盖写 C");
+    pool.output = third.clone();
+    (pool, third)
+}
+
+/// 崩溃恢复抛弃 C 之后的镜像（`common::abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`：C 的根槽与数据单元
+/// 暂时读不出，恢复落到 (2, 7)，实例 3 写行与暖机，再把 C 写回）：C (2, 8) 读得出、按实例 3 的实例表判出局。
+/// 实例 3 那次挂载看不见 C，影子账隔离 0（C554（崩溃恢复抛弃的根暂时读不出时影子账算不到））：它的分配器把 C 独占的槽当空闲槽，
+/// 写行与暖机这几次还没分到它们（接着写才会，见 [`image_after_the_blind_mount_handed_out_a_unit_of_the_abandoned_root`]）。
+/// 交回镜像与 C 那一版。
+fn image_after_a_recovery_abandoned_the_third_root(tag: &str) -> (MemoryPool, TransactionOutput) {
+    let (mut pool, third) = pool_through_the_third_version(tag);
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &third);
+    (pool.memory_pool(), third)
+}
+
+/// C 那一版写出的单元里，此刻盘上逐字节已不是 C 写的那几个（被实例 3 那次挂载重新分配、写了别的）。
+fn units_of_the_abandoned_version_overwritten_since(
+    image: &MemoryPool,
+    abandoned: &TransactionOutput,
+) -> Vec<u64> {
+    abandoned
+        .units
+        .iter()
+        .filter(|unit| {
+            read_unit_on_device(image, 0, unit.slot.0, unit.bytes.len())[..] != unit.bytes[..]
+        })
+        .map(|unit| unit.slot.0)
+        .collect()
+}
+
+/// 看不见 C 的那次挂载（实例 3）里最多接着覆盖写几次：它的分配器把 C 独占的槽当空闲槽，接着写总会分到其中一个。
+const OVERWRITES_IN_THE_BLIND_MOUNT_AT_MOST: u64 = 6;
+
+/// C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 那一形：崩溃恢复抛弃 C 之后，看不见 C 的那次挂载（实例 3，影子账隔离 0）
+/// 里接着覆盖写，直到它写的单元落在 C 独占的槽上。交回那一刻的镜像、C 那一版与被重写的 C 的槽。
+fn image_after_the_blind_mount_handed_out_a_unit_of_the_abandoned_root(
+    tag: &str,
+) -> (MemoryPool, TransactionOutput, Vec<u64>) {
+    let (mut pool, third) = pool_through_the_third_version(tag);
+    // 那次挂载关着影子账（连 C694 的 C 一起关）：C 之后 C 的记录读得出时产品路径看得见 C、隔离它写出的单元，造不出这一形。
+    let blind_mount =
+        abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before_with_the_shadow_ledger(
+            &mut pool,
+            &third,
+            ShadowLedger::Off,
+        );
+    let instance = blind_mount.output.instance;
+    for round in 0..OVERWRITES_IN_THE_BLIND_MOUNT_AT_MOST {
+        let round_index = usize::try_from(round).expect("轮次");
+        let content: Vec<u8> = (0..(1800 + round_index * 53))
+            .map(|index| u8::try_from((index * 13 + round_index) % 251).expect("小于 256"))
+            .collect();
+        let previous = pool.output.clone();
+        pool.output = publish_overwrite_in_process(
+            &mut pool,
+            &previous,
+            &content,
+            FIXED_WRITE_TIME_SECONDS + 300 + round,
+            instance,
+        )
+        .expect("看不见 C 的那次挂载里接着覆盖写");
+        let image = pool.memory_pool();
+        let overwritten = units_of_the_abandoned_version_overwritten_since(&image, &third);
+        if !overwritten.is_empty() {
+            return (image, third, overwritten);
+        }
+    }
+    panic!("看不见 C 的那次挂载写了 {OVERWRITES_IN_THE_BLIND_MOUNT_AT_MOST} 版，一个都没落在 C 独占的槽上");
+}
+
+/// C554 那一形（实现照实会红、不放宽，C554 修好之后转绿）：C 还在根环里、读得出，
+/// 按 I-7.4（近 K 代块未被复用） 那一行「被抛弃时间线的根引用的块在离开根环之前同样不许重新分配」，从 C 出发读回来对不上
+/// ⇒ 只红 I-7.4，说明点出是被抛弃的根。只判回退候选集的 checker 对 C 一格都不判，这里就全绿。
+#[test]
+fn an_abandoned_root_whose_units_a_mount_blind_to_it_handed_out_again_reddens_only_the_reuse_invariant(
+) {
+    let (image, _, overwritten) =
+        image_after_the_blind_mount_handed_out_a_unit_of_the_abandoned_root(
+            "b2-abandoned-root-reused-by-a-blind-mount",
+        );
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        ["I-7.4"],
+        "C 的槽 {overwritten:?} 被重写：只该红 I-7.4：{red:?}"
+    );
+    assert!(
+        red[0].1.contains("被抛弃"),
+        "红在被抛弃的根上：{}",
+        red[0].1
+    );
+}
+
+/// 崩溃恢复抛弃 C 之后那一刻（看不见 C 的那次挂载只写了行与暖机，没落在 C 的槽上）：一条都不红。把 C 的数据单元（只有被抛弃的 C 引用）
+/// 两份都抹成 0 ⇒ 只红 I-7.4，说明点出被抛弃的根与读回来对不上的数据单元。不走被抛弃的根的 checker，抹了照样全绿。
+#[test]
+fn erasing_a_unit_only_an_abandoned_root_references_reddens_only_the_reuse_invariant() {
+    let (mut image, abandoned) =
+        image_after_a_recovery_abandoned_the_third_root("b2-abandoned-root-erased-unit");
+    assert_eq!(
+        units_of_the_abandoned_version_overwritten_since(&image, &abandoned),
+        Vec::<u64>::new(),
+        "那次挂载只写行与暖机，C 的单元都还在"
+    );
+    assert_eq!(violations(&image), Vec::new(), "抛弃 C 之后那一刻全绿");
+    let data_unit = abandoned.unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST));
+    for device in [0u32, 1] {
+        write_bytes(
+            &mut image,
+            device,
+            data_unit.slot.0 * SLOT_BYTES,
+            &vec![0u8; data_unit.bytes.len()],
+        );
+    }
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        ["I-7.4"],
+        "C 的数据单元只有被抛弃的 C 引用：抹掉它只红 I-7.4：{red:?}"
+    );
+    assert!(
+        red[0].1.contains("被抛弃") && red[0].1.contains("数据单元"),
+        "说明点出被抛弃的根与读回来对不上的数据单元：{}",
+        red[0].1
+    );
+}
+
+/// 根环有一个读不出的槽、最新根的实例表里又有行（有根可以被判抛弃）时：那个槽里可能坐着一条被抛弃的根，它引用的块有没有被复用判不了——
+/// I-7.4 被抛弃根那一半报「判不了」，整条不报成立（被抛弃的根读不出时报判不了、不报绿）：
+/// 候选集那一半判到了，整条报部分没判，不报不适用（C701（别的判法静默跳过读不出的部分））。候选集那一半判成立也不让整条报成立。
+#[test]
+fn an_unreadable_root_ring_slot_leaves_the_abandoned_half_of_the_reuse_invariant_not_judged() {
+    let (pool, _) = pool_through_the_third_version("b2-unreadable-root-slot-with-rows");
+    let image = pool.memory_pool();
+    assert_eq!(
+        verdict_of(&image, "I-7.4"),
+        InvariantVerdict::Holds,
+        "读得全的时候 I-7.4 真被评估过且成立"
+    );
+    let (device, offset) = an_empty_root_ring_slot(&image);
+    let with_an_unreadable_slot = ImageWithAnUnreadableRange {
+        image: &image,
+        device,
+        unreadable_offsets: offset..offset + 512,
+    };
+    match verdict_of(&with_an_unreadable_slot, "I-7.4") {
+        InvariantVerdict::PartiallyJudged(detail) => assert!(
+            detail.contains("读不出") && detail.contains("被抛弃的根"),
+            "部分没判的说明要说根环有读不出的槽、被抛弃的根那一半没判：{detail}"
+        ),
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::Violated(_)
+        | InvariantVerdict::NotApplicable(_)) => {
+            panic!("被抛弃根那一半判不了，I-7.4 报部分没判、不许报成立：{other:?}")
+        }
+    }
+}
+
+// ─── ② 共享子树里的落点并进老一版 ───
+
+/// 第一个文件版本 F 之后推一次空发布 N：extent 树没动，F 与 N 的树表都指着同一个 extent 根 E，E 内联着 F 的数据单元 D。
+/// 把 F 那条根的实例表指针改指 D（位置条目带 D 的整单元校验和，读得出）：F 这一版里 D 被引用了两次（一次经实例表指针，一次经 E），
+/// 是一个交叉链接。先走的 N 已经走过 E，F 走到 E 不重走——D 若不进 F 这一版的集合，I-5.1（物理范围不重叠） 不红；
+/// 把 E 下面缓存的落点并进 F 之后红，而且只红它。
+#[test]
+fn an_older_version_naming_again_a_placement_inside_a_subtree_it_shares_with_a_newer_version_reddens_the_disjoint_ranges_invariant(
+) {
+    let mut pool = product_capacity_pool();
+    pool.empty_publish(capacities(
+        ACCOUNTING_OF_THE_NODE_FORMAT,
+        CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
+    ));
+    let older = pool.version_before_the_current_one().clone();
+    let clean = pool.memory_pool();
+    assert_eq!(violations(&clean), Vec::new(), "空发布之后的干净镜像全绿");
+    let extent_root_of = |output: &TransactionOutput| {
+        let tree_table = read_unit_on_device(
+            &clean,
+            0,
+            output.unit(TransactionUnit::TreeTable).slot.0,
+            node_bytes(),
+        );
+        let header = parse_index_node(&tree_table).expect("树表解得开");
+        header
+            .entries
+            .iter()
+            .find(|entry| u16::from_le_bytes([entry[10], entry[11]]) == 1)
+            .expect("树表里有 extent 树那一条")[14..100]
+            .to_vec()
+    };
+    assert_eq!(
+        extent_root_of(&older),
+        extent_root_of(&pool.output),
+        "空发布照抄 extent 树：两版的树表指着同一个 extent 根"
+    );
+    let data_unit = older.unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST));
+    let data_unit_checksum = crc32_castagnoli(&data_unit.bytes);
+    let mut image = clean.clone();
+    let (root_device, root_offset) =
+        root_slot_holding(&image, older.root.instance.0, older.root.checkpoint_txg.0);
+    let mut root_slot = read_bytes(&image, root_device, root_offset, ROOT_SLOT_BYTES);
+    for location in POINTER_LOCATION_ENTRY_OFFSETS {
+        let start = ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET + location;
+        root_slot[start + LOCATION_ENTRY_SLOT_OFFSET..start + LOCATION_ENTRY_SLOT_OFFSET + 6]
+            .copy_from_slice(&data_unit.slot.0.to_le_bytes()[..6]);
+        root_slot
+            [start + LOCATION_ENTRY_CHECKSUM_OFFSET..start + LOCATION_ENTRY_CHECKSUM_OFFSET + 4]
+            .copy_from_slice(&data_unit_checksum.to_le_bytes());
+    }
+    reseal_root_slot(&mut root_slot);
+    write_bytes(&mut image, root_device, root_offset, &root_slot);
+    let red = violations(&image);
+    // 另红两条，都是改了 F 那条根的实例表指针连带的：F 那条记录新根段里的实例表指针没跟着改（I-8.10 比七段，有它）；
+    // F 不再引用实例表单元而 N 照旧引用，那个单元在 N 里像是新出现、诞生代号 0 不大于 F 的 txg（I-3.5 的出现规则）；
+    // 实例表指针要码 3，D 头里是码 1（I-1.6 的类那一半）。
+    assert_eq!(
+        violated_names(&red),
+        ["I-1.6", "I-5.1", "I-8.10", "I-3.5"],
+        "F 这一版里 D 被引用两次，红 I-5.1（另加改实例表指针连带的 I-1.6、I-8.10 与 I-3.5）：{red:?}"
+    );
+    let disjoint_ranges_detail = &red
+        .iter()
+        .find(|(name, _)| *name == "I-5.1")
+        .expect("上一条断言钉了 I-5.1 判红")
+        .1;
+    assert!(
+        disjoint_ranges_detail.contains("被同一版引用了两次")
+            && disjoint_ranges_detail.contains(&format!("槽 {}", data_unit.slot.0)),
+        "说明要点出 D 那一槽被同一版引用了两次：{disjoint_ranges_detail}"
+    );
+}
+
+// ─── ③ I-2.5（位置条目按设备身份升序） 判 journal 点名项 ───
+
+/// 第一个文件版本那条 journal 记录（环里最后一条，后面没有同实例的记录接它的链）第一个点名项的两条位置条目对调（盘 1 在前），
+/// 两盘各一份都改、重封：I-2.5 逐字罩「journal 点名项里的位置条目数组」。解出点名项就丢的 checker 全绿。
+#[test]
+fn a_journal_named_entry_whose_location_entries_are_not_in_ascending_device_order_reddens_only_the_location_order_invariant(
+) {
+    let pool = product_capacity_pool();
+    let mut image = pool.memory_pool();
+    let counter = pool.output.record.counter;
+    let offset = singlefs_core::journal::record_offset(counter, JOURNAL_RING_DEFAULT_BYTES).0;
+    for device in [0u32, 1] {
+        let mut record = read_bytes(&image, device, offset, JOURNAL_RECORD_BYTES);
+        assert!(
+            read_u32_at(&record, JOURNAL_RECORD_NAMED_COUNT_OFFSET) > 0,
+            "第一个文件版本那条记录点名了它写的单元"
+        );
+        let entry = JOURNAL_RECORD_HEADER_BYTES;
+        let first: Vec<u8> = record[entry..entry + LOCATION_ENTRY_BYTES].to_vec();
+        let second: Vec<u8> =
+            record[entry + LOCATION_ENTRY_BYTES..entry + 2 * LOCATION_ENTRY_BYTES].to_vec();
+        assert_eq!(
+            (read_u32_at(&first, 0), read_u32_at(&second, 0)),
+            (0, 1),
+            "点名项的两条位置条目本来按设备身份升序"
+        );
+        record[entry..entry + LOCATION_ENTRY_BYTES].copy_from_slice(&second);
+        record[entry + LOCATION_ENTRY_BYTES..entry + 2 * LOCATION_ENTRY_BYTES]
+            .copy_from_slice(&first);
+        reseal_journal_record(&mut record);
+        write_bytes(&mut image, device, offset, &record);
+    }
+    let red = violations(&image);
+    assert_eq!(violated_names(&red), ["I-2.5"], "只该红 I-2.5：{red:?}");
+    assert!(
+        red[0].1.contains("点名项"),
+        "说明要点出是 journal 点名项：{}",
+        red[0].1
+    );
+}
+
+// ─── ④ I-9.2（条目身份与子头相符） 认类型段 0 ───
+
+/// 第一个文件版本的 inode 树（根层级 1，一条类型段 2 的条目指着唯一那片叶容器）改成三层：新放一个层级 1 的码 2 节点 M，
+/// 装原来那条条目；根改成层级 2、只装一条类型段 0 的条目指着 M（身份引用的出生树、容器号、出生代三段 `identity_segments`）。
+/// M 照写路径那样进中央映射（照 inode 根那一条抄，出生序号另取），它占的两盘各一槽补分配记录、记进记账（[`account_for_units_placed_by_hand`]）。交回镜像。
+fn image_with_the_inode_tree_grown_to_three_levels(
+    pool: &TreeSplitPool,
+    identity_segments: (u64, u64, u64),
+) -> MemoryPool {
+    let mut image = pool.memory_pool();
+    let inode_root = pool.output.unit(TransactionUnit::InodeRoot);
+    let root_header = parse_index_node(&inode_root.bytes).expect("inode 根解得开");
+    assert_the_rebuild_reproduces(&inode_root.bytes, &root_header);
+    assert_eq!(
+        (root_header.level, root_header.entries.len()),
+        (1, 1),
+        "第一个文件版本的 inode 根层级 1、一条条目"
+    );
+    let middle_birth_sequence = BirthSequence(root_header.birth_sequence.0 + 1000);
+    let middle = rebuilt_index_node(
+        &root_header,
+        1,
+        &root_header.smallest_key,
+        &root_header.largest_key,
+        middle_birth_sequence,
+        &root_header.entries,
+    );
+    write_unit_to_the_same_slot_on_both_devices(&mut image, SLOT_NOBODY_ALLOCATED, &middle);
+    let leaf_entry = &root_header.entries[0];
+    let mut middle_pointer = leaf_entry[INODE_ENTRY_CHILD_POINTER_OFFSET..].to_vec();
+    middle_pointer[POINTER_BIRTH_TREE_OFFSET..POINTER_BIRTH_TREE_OFFSET + 8]
+        .copy_from_slice(&root_header.tree.0.to_le_bytes());
+    middle_pointer[POINTER_BIRTH_TXG_OFFSET..POINTER_BIRTH_TXG_OFFSET + 8]
+        .copy_from_slice(&root_header.birth_txg.0.to_le_bytes());
+    for location in POINTER_LOCATION_ENTRY_OFFSETS {
+        middle_pointer
+            [location + LOCATION_ENTRY_SLOT_OFFSET..location + LOCATION_ENTRY_SLOT_OFFSET + 6]
+            .copy_from_slice(&SLOT_NOBODY_ALLOCATED.to_le_bytes()[..6]);
+        middle_pointer[location + LOCATION_ENTRY_CHECKSUM_OFFSET
+            ..location + LOCATION_ENTRY_CHECKSUM_OFFSET + 4]
+            .copy_from_slice(&crc32_castagnoli(&middle).to_le_bytes());
+    }
+    middle_pointer[POINTER_INSTANCE_OFFSET..POINTER_INSTANCE_OFFSET + 4]
+        .copy_from_slice(&root_header.instance.0.to_le_bytes());
+    middle_pointer[POINTER_BIRTH_SEQUENCE_OFFSET..POINTER_BIRTH_SEQUENCE_OFFSET + 4]
+        .copy_from_slice(&middle_birth_sequence.0.to_le_bytes());
+    let (birth_tree, container, container_birth) = identity_segments;
+    let mut entry_to_the_middle = leaf_entry[..INODE_ENTRY_CHILD_POINTER_OFFSET].to_vec();
+    entry_to_the_middle[INODE_ENTRY_BIRTH_TREE_OFFSET..INODE_ENTRY_BIRTH_TREE_OFFSET + 8]
+        .copy_from_slice(&birth_tree.to_le_bytes());
+    entry_to_the_middle[INODE_ENTRY_RECORD_TYPE_OFFSET..INODE_ENTRY_RECORD_TYPE_OFFSET + 2]
+        .copy_from_slice(&INODE_ENTRY_TYPE_INTERNAL_NODE.to_le_bytes());
+    entry_to_the_middle[INODE_ENTRY_CONTAINER_OFFSET..INODE_ENTRY_CONTAINER_OFFSET + 8]
+        .copy_from_slice(&container.to_le_bytes());
+    entry_to_the_middle[INODE_ENTRY_CONTAINER_BIRTH_OFFSET..INODE_ENTRY_CONTAINER_BIRTH_OFFSET + 8]
+        .copy_from_slice(&container_birth.to_le_bytes());
+    entry_to_the_middle.extend_from_slice(&middle_pointer);
+    assert_eq!(entry_to_the_middle.len(), usize::from(INODE_ENTRY_BYTES));
+    let grown_root = rebuilt_index_node(
+        &root_header,
+        2,
+        &root_header.smallest_key,
+        &root_header.largest_key,
+        root_header.birth_sequence,
+        &[entry_to_the_middle],
+    );
+    replace_unit(
+        &mut image,
+        &units_found_on_device_zero(&pool.memory_pool()),
+        inode_root.slot.0,
+        &grown_root,
+    );
+    add_the_mapping_entry_of_a_unit_placed_by_hand(
+        &mut image,
+        &pool.output,
+        inode_root.slot.0,
+        middle_birth_sequence.0,
+        &middle,
+    );
+    account_for_units_placed_by_hand(&mut image, &pool.output, 1, 0, None);
+    image
+}
+
+/// 合法的三层 inode 树：根的类型段 0 条目（三段为 0）指着一个码 2 的层级 1 节点，它下面是那片叶容器。
+/// I-9.2 逐字「类型段 ∈ {0, 2}；类型段 0 ⇒ 子单元偏移 6 = 2 且三段为 0」：这条条目合法，一条都不许红，
+/// 叶容器那几条（I-9.4 / I-9.7 / I-9.12 / I-9.13 / I-9.15）照样判到。只认类型段 2 的 checker：I-9.2 误红，
+/// 接着把码 2 节点当码 3 读（I-1.3 / I-1.6 误红），叶从不被走。
+#[test]
+fn a_legal_type_zero_inode_entry_is_walked_down_to_the_leaf_and_every_invariant_holds() {
+    let pool = product_capacity_pool();
+    let image = image_with_the_inode_tree_grown_to_three_levels(&pool, (0, 0, 0));
+    let red = violations(&image);
+    assert_eq!(red, Vec::new(), "合法的三层 inode 树一条都不许红：{red:?}");
+    for invariant in ["I-9.2", "I-9.4", "I-9.12", "I-9.13", "I-9.15"] {
+        assert_eq!(
+            verdict_of(&image, invariant),
+            InvariantVerdict::Holds,
+            "{invariant} 要走到叶、真被评估过且成立"
+        );
+    }
+}
+
+/// 同一棵三层树，类型段 0 那条条目的容器号写成 7（条款要三段为 0）：只红 I-9.2。
+#[test]
+fn a_type_zero_inode_entry_whose_container_segment_is_not_zero_reddens_only_the_entry_identity_invariant(
+) {
+    let pool = product_capacity_pool();
+    let image = image_with_the_inode_tree_grown_to_three_levels(&pool, (0, 7, 0));
+    let red = violations(&image);
+    assert_eq!(violated_names(&red), ["I-9.2"], "只该红 I-9.2：{red:?}");
+}
+
+// ─── ⑤ I-9.4（容器号不超最小 key） 三句都判 ───
+
+/// 第一个文件版本那片叶容器 C1（容器号 1）改成装 inode 1 与 10 两条记录；新放一片 C2（容器号 `second_container`，装 inode 20 与 30），
+/// 根里加一条分隔 key 15 的类型段 2 条目指它。C2 照写路径那样有自己的出生序号（头里与指它的指针里同写），中央映射里也给它加一条条目
+/// （I-1.13（扫描重建与遍历方向的索引相同） 在这几份上才真比得上）。C2 占的两槽补分配记录、记进记账（连同三条新记录摊的已承诺预留），inode 号水位抬到 31。
+/// inode 10、20、30 那三条抄自第一个文件那条记录、只换号，没有上段叶条目也没有单元，size 与 blocks 清成 0（I-4.6（中间态其余不变量成立）、I-9.15）。
+/// I-9.12（分隔 key 落在孩子区间之外） 在这几份上都成立：15 ≤ 20、15 > 1、15 > 10。
+fn image_with_two_leaf_containers(pool: &TreeSplitPool, second_container: u64) -> MemoryPool {
+    let mut image = pool.memory_pool();
+    let leaf_role = TransactionUnit::InodeLeafContainer(InodeLeafContainerIndexInTree::LEFTMOST);
+    let leaf = pool.output.unit(leaf_role);
+    let record_count = u16::from_le_bytes([
+        leaf.bytes[PACKED_RECORD_COUNT_OFFSET],
+        leaf.bytes[PACKED_RECORD_COUNT_OFFSET + 1],
+    ]);
+    assert_eq!(record_count, 1, "第一个文件版本的叶容器装一条记录");
+    assert_eq!(
+        read_u64_at(&leaf.bytes, PACKED_CONTAINER_OFFSET),
+        1,
+        "那片叶的容器号是 1"
+    );
+    let first_record =
+        leaf.bytes[PACKED_RECORDS_START..PACKED_RECORDS_START + INODE_RECORD_BYTES].to_vec();
+    let inode_of_the_first_file = read_u64_at(&first_record, INODE_RECORD_INODE_NUMBER_OFFSET);
+    assert_eq!(inode_of_the_first_file, 1, "第一个文件那条记录是 inode 1");
+    // 抄给别的号的记录在 extent 树里没有上段叶条目、一个单元都没有：I-4.6 要「没有上段叶条目的号一个单元都没有、而且 size 是 0」，
+    // I-9.15 跟着要 blocks 是 ⌈0 ÷ 512⌉ = 0，两段一起清。第一个文件自己那条照原样留着 size、blocks 与它的单元。
+    let record_of_inode = |inode: u64| {
+        let mut record = first_record.clone();
+        record[INODE_RECORD_INODE_NUMBER_OFFSET..INODE_RECORD_INODE_NUMBER_OFFSET + 8]
+            .copy_from_slice(&inode.to_le_bytes());
+        if inode != inode_of_the_first_file {
+            record[INODE_RECORD_SIZE_OFFSET..INODE_RECORD_SIZE_OFFSET + 8]
+                .copy_from_slice(&0u64.to_le_bytes());
+            record[INODE_RECORD_BLOCKS_OFFSET..INODE_RECORD_BLOCKS_OFFSET + 8]
+                .copy_from_slice(&0u64.to_le_bytes());
+        }
+        record
+    };
+    let container_with = |container: u64, inodes: [u64; 2]| {
+        let mut unit = leaf.bytes.to_vec();
+        unit[PACKED_CONTAINER_OFFSET..PACKED_CONTAINER_OFFSET + 8]
+            .copy_from_slice(&container.to_le_bytes());
+        unit[PACKED_RECORD_COUNT_OFFSET..PACKED_RECORD_COUNT_OFFSET + 2]
+            .copy_from_slice(&2u16.to_le_bytes());
+        let declared = u16::try_from(2 * INODE_RECORD_BYTES).expect("声明长度");
+        unit[PACKED_DECLARED_LENGTH_OFFSET..PACKED_DECLARED_LENGTH_OFFSET + 2]
+            .copy_from_slice(&declared.to_le_bytes());
+        for (index, inode) in inodes.into_iter().enumerate() {
+            let start = PACKED_RECORDS_START + index * INODE_RECORD_BYTES;
+            unit[start..start + INODE_RECORD_BYTES].copy_from_slice(&record_of_inode(inode));
+        }
+        reseal_unit_by_its_class(&mut unit);
+        unit
+    };
+    let first_container = container_with(1, [1, 10]);
+    // 第二片照写路径那样有自己的出生序号（同一棵树、同一 txg 里每片叶各发一个号），映射 key 才与第一片不同。
+    let mut second_container_unit = container_with(second_container, [20, 30]);
+    second_container_unit[PACKED_BIRTH_SEQUENCE_OFFSET..PACKED_BIRTH_SEQUENCE_OFFSET + 4]
+        .copy_from_slice(&SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE.to_le_bytes());
+    reseal_unit_by_its_class(&mut second_container_unit);
+    let units = units_found_on_device_zero(&image);
+    replace_unit(&mut image, &units, leaf.slot.0, &first_container);
+    write_unit_to_the_same_slot_on_both_devices(
+        &mut image,
+        SLOT_NOBODY_ALLOCATED,
+        &second_container_unit,
+    );
+    let inode_root_slot = pool.output.unit(TransactionUnit::InodeRoot).slot.0;
+    let inode_root = read_unit_on_device(&image, 0, inode_root_slot, node_bytes());
+    let root_header = parse_index_node(&inode_root).expect("inode 根解得开");
+    let mut entry_to_the_second = root_header.entries[0].clone();
+    entry_to_the_second[..8].copy_from_slice(&15u64.to_le_bytes());
+    entry_to_the_second[INODE_ENTRY_CONTAINER_OFFSET..INODE_ENTRY_CONTAINER_OFFSET + 8]
+        .copy_from_slice(&second_container.to_le_bytes());
+    for location in POINTER_LOCATION_ENTRY_OFFSETS {
+        let start = INODE_ENTRY_CHILD_POINTER_OFFSET + location;
+        entry_to_the_second
+            [start + LOCATION_ENTRY_SLOT_OFFSET..start + LOCATION_ENTRY_SLOT_OFFSET + 6]
+            .copy_from_slice(&SLOT_NOBODY_ALLOCATED.to_le_bytes()[..6]);
+        entry_to_the_second
+            [start + LOCATION_ENTRY_CHECKSUM_OFFSET..start + LOCATION_ENTRY_CHECKSUM_OFFSET + 4]
+            .copy_from_slice(&crc32_castagnoli(&second_container_unit).to_le_bytes());
+    }
+    let pointer_birth_sequence = INODE_ENTRY_CHILD_POINTER_OFFSET + POINTER_BIRTH_SEQUENCE_OFFSET;
+    entry_to_the_second[pointer_birth_sequence..pointer_birth_sequence + 4]
+        .copy_from_slice(&SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE.to_le_bytes());
+    let entries = vec![root_header.entries[0].clone(), entry_to_the_second];
+    // 根头里的 key 区间是子树覆盖区间（D18（块里携带什么信息） 已定项 2，C478）：[C1 的最小记录号 1, C2 的最大记录号 30]，
+    // 不是首末两条条目的分隔 key [1, 15]。
+    let grown_root = rebuilt_index_node(
+        &root_header,
+        root_header.level,
+        &1u64.to_le_bytes(),
+        &30u64.to_le_bytes(),
+        root_header.birth_sequence,
+        &entries,
+    );
+    replace_unit(&mut image, &units, inode_root_slot, &grown_root);
+    add_the_mapping_entry_of_a_unit_placed_by_hand(
+        &mut image,
+        &pool.output,
+        leaf.slot.0,
+        SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE,
+        &second_container_unit,
+    );
+    account_for_units_placed_by_hand(&mut image, &pool.output, 2, 3, Some(31));
+    image
+}
+
+/// 中央映射（产品容量下第一个文件版本是根兼叶）里给手放进 [`SLOT_NOBODY_ALLOCATED`] 的那个单元（码 3 叶容器，或码 2 的 inode 树节点）
+/// 加一条条目：照 `template_slot` 那个单元（同类、同树、同 txg、同实例）的条目抄，key 尾段的出生序号换成 `birth_sequence`，
+/// 两条位置条目改指那个槽、整单元校验和换成它的；按 key 重新排序、头里的区间贴紧首末条目，重建、补校验和。
+/// 写路径上每片码 3、每个树节点都进映射（D19（块指针的结构与宽度预算） 已定项 5），未释放记录罩住的单元要由映射指在那一槽（I-3.15）。
+fn add_the_mapping_entry_of_a_unit_placed_by_hand(
+    image: &mut MemoryPool,
+    output: &TransactionOutput,
+    template_slot: u64,
+    birth_sequence: u32,
+    unit_placed_by_hand: &[u8],
+) {
+    let mapping_slot = output.unit(TransactionUnit::MappingTree).slot.0;
+    let mapping = read_unit_on_device(image, 0, mapping_slot, node_bytes());
+    let header = parse_index_node(&mapping).expect("映射根解得开");
+    assert_eq!(header.level, 0, "产品容量下第一个文件版本的映射树是根兼叶");
+    let mut entries = header.entries.clone();
+    let mut added = entries
+        .iter()
+        .find(|entry| {
+            read_six_byte_slot_at(entry, MAPPING_KEY_BYTES + LOCATION_ENTRY_SLOT_OFFSET)
+                == template_slot
+        })
+        .expect("映射里有照着抄的那个单元的条目")
+        .clone();
+    added[MAPPING_KEY_TAIL_OFFSET..MAPPING_KEY_TAIL_OFFSET + 4]
+        .copy_from_slice(&birth_sequence.to_le_bytes());
+    for location in 0..2 {
+        let start = MAPPING_KEY_BYTES + location * LOCATION_ENTRY_BYTES;
+        added[start + LOCATION_ENTRY_SLOT_OFFSET..start + LOCATION_ENTRY_SLOT_OFFSET + 6]
+            .copy_from_slice(&SLOT_NOBODY_ALLOCATED.to_le_bytes()[..6]);
+        added[start + LOCATION_ENTRY_CHECKSUM_OFFSET..start + LOCATION_ENTRY_CHECKSUM_OFFSET + 4]
+            .copy_from_slice(&crc32_castagnoli(unit_placed_by_hand).to_le_bytes());
+    }
+    entries.push(added);
+    entries.sort_by_key(|entry| mapping_key_order(entry));
+    let smallest_key = entries.first().expect("有条目")[..MAPPING_KEY_BYTES].to_vec();
+    let largest_key = entries.last().expect("有条目")[..MAPPING_KEY_BYTES].to_vec();
+    let grown = rebuilt_index_node(
+        &header,
+        header.level,
+        &smallest_key,
+        &largest_key,
+        header.birth_sequence,
+        &entries,
+    );
+    let units = units_found_on_device_zero(image);
+    replace_unit(image, &units, mapping_slot, &grown);
+}
+
+/// 阳性对照：第二片的容器号 11（> 左边最大 key 10、> 左边容器号 1）：三句都成立，一条都不红，I-9.4 真被评估过。
+#[test]
+fn two_leaf_containers_in_key_order_hold_every_invariant() {
+    let pool = product_capacity_pool();
+    let image = image_with_two_leaf_containers(&pool, 11);
+    let red = violations(&image);
+    assert_eq!(red, Vec::new(), "两片叶按序排好，一条都不许红：{red:?}");
+    assert_eq!(verdict_of(&image, "I-9.4"), InvariantVerdict::Holds);
+    assert_eq!(
+        verdict_of(&image, "I-1.13"),
+        InvariantVerdict::Holds,
+        "两片叶各有自己的出生序号与映射条目：扫描重建的三张表与遍历方向逐项相同，真比过、成立"
+    );
+}
+
+/// 第二片的容器号 8：它装的 20、30 都 ≥ 8（第一句成立），容器号 1 < 8（第二句成立），左边容器的最大 key 10 不小于右边的容器号 8，
+/// 分隔 key 落在左片最大 key 之后（I-9.12 的两条不等式都过）——这正是左从右借之后右片保留身份、分隔 key 改成它这一版最小 key 的形状（N1）。
+/// 没有「左容器的最大 key < 右容器号」这第三句（N1，X4）：
+/// 这张镜像一条都不红，I-9.4 照样真被评估过、成立。
+#[test]
+fn a_borrowed_right_container_numbered_below_the_largest_key_on_its_left_holds_every_invariant() {
+    let pool = product_capacity_pool();
+    let image = image_with_two_leaf_containers(&pool, 8);
+    let red = violations(&image);
+    assert_eq!(
+        red,
+        Vec::new(),
+        "借之后的两片叶是合法形状，一条都不许红：{red:?}"
+    );
+    assert_eq!(verdict_of(&image, "I-9.4"), InvariantVerdict::Holds);
+    assert_eq!(
+        verdict_of(&image, "I-1.13"),
+        InvariantVerdict::Holds,
+        "借之后的两片叶各有自己的出生序号与映射条目：扫描重建与遍历方向逐项相同"
+    );
+}
+
+/// 第二片的容器号 0：沿叶序容器号 1 → 0 往回走（第二句不成立；第三句跟着不成立）。违例说明取第一处，要是第二句那一格。
+#[test]
+fn container_numbers_going_backwards_along_the_leaf_order_redden_only_the_container_number_invariant(
+) {
+    let pool = product_capacity_pool();
+    let image = image_with_two_leaf_containers(&pool, 0);
+    let red = violations(&image);
+    assert_eq!(violated_names(&red), ["I-9.4"], "只该红 I-9.4：{red:?}");
+    assert!(
+        red[0].1.contains("严格递增"),
+        "第一处违例是「沿叶序容器号严格递增」那一句：{}",
+        red[0].1
+    );
+}
+
+// ─── ⑥ I-3.9 / I-5.4 读根记录直接持有的那棵分配记录树（C512） ───
+
+/// 两块内存盘上 mkfs → 可写挂载（取号 1、不写行、零单元发布 txg 1、暖机 txg 2）→ 进程退出 → 再可写挂载（取号 2、写行 (1, 2, 0)：
+/// 写行那次发布 txg 3 重写实例表，被换下的 mkfs 实例表记在根记录直接持有的那棵分配记录树里、带已释放标志、释放代 3；暖机 txg 4）。
+/// 与 `writable_mount_of_a_formatted_pool.rs` 那条零故障历史的前两次挂载同一段。
+fn image_after_the_row_publish_of_a_version_without_file() -> MemoryPool {
+    let stream = SharedStream::new();
+    let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = [0u32, 1]
+        .into_iter()
+        .map(|device| {
+            (
+                DeviceIdentity(device),
+                RecordingBlockDevice::with_shared_stream(
+                    DeviceIdentity(device),
+                    SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+                    stream.clone(),
+                ),
+            )
+        })
+        .collect();
+    make_filesystem(&parameters(), &mut devices).expect("mkfs");
+    let first_mount = mount_writable(&parameters(), &mut devices).expect("第一次可写挂载");
+    assert!(
+        first_mount.output.rows_written.is_empty(),
+        "上一个实例是 0：不写行"
+    );
+    drop(first_mount);
+    let image_after_the_first_mount = memory_pool_of_sparse_devices(&devices);
+    let mut reopened = crash_state_devices(&image_after_the_first_mount, &[], &[], &stream);
+    let second_mount = mount_writable(&parameters(), &mut reopened).expect("第二次可写挂载");
+    assert_eq!(
+        second_mount.output.rows_written.len(),
+        1,
+        "上一个实例 1 那一行"
+    );
+    drop(second_mount);
+    memory_pool_of_sparse_devices(&reopened)
+}
+
+/// 单元区里盘 0 上的分配记录树叶（树 ID 0 或树表里那一棵的树 ID、key 宽 10、层级 0）逐片按 `change` 改（交回这一片改了几条），改过的重建、
+/// 新整单元校验和沿引用链（第 1 层节点、根、根记录里那条指针）补上。交回一共改了几条。
+fn change_allocation_record_leaves(
+    image: &mut MemoryPool,
+    change: impl Fn(&mut Vec<Vec<u8>>) -> usize,
+) -> usize {
+    let units = units_found_on_device_zero(image);
+    let mut changed_records = 0;
+    for (slot, length) in units.iter().copied() {
+        if length != node_bytes() {
+            continue;
+        }
+        let bytes = read_unit_on_device(image, 0, slot, length);
+        let Ok(header) = parse_index_node(&bytes) else {
+            continue;
+        };
+        if (header.tree.0 != ALLOCATION_RECORD_TREE_HELD_BY_THE_ROOT_RECORD
+            && header.tree.0 != TREE_IDENTIFIER_ALLOCATION_RECORDS)
+            || header.key_width != ALLOCATION_RECORD_TREE_KEY_WIDTH
+            || header.level != 0
+        {
+            continue;
+        }
+        assert_the_rebuild_reproduces(&bytes, &header);
+        let mut entries = header.entries.clone();
+        let changed_here = change(&mut entries);
+        if changed_here == 0 {
+            continue;
+        }
+        changed_records += changed_here;
+        let rebuilt = rebuilt_index_node(
+            &header,
+            header.level,
+            &header.smallest_key,
+            &header.largest_key,
+            header.birth_sequence,
+            &entries,
+        );
+        replace_unit(image, &units, slot, &rebuilt);
+    }
+    changed_records
+}
+
+fn allocation_record_is_released(record: &[u8]) -> bool {
+    u16::from_le_bytes([
+        record[ALLOCATION_RECORD_SPAN_OFFSET],
+        record[ALLOCATION_RECORD_SPAN_OFFSET + 1],
+    ]) & ALLOCATION_RECORD_RELEASED_FLAG
+        != 0
+}
+
+/// 阳性对照与坏镜像：树表 0 条、写过行的那一版上，被换下的 mkfs 实例表记在根记录直接持有的那棵分配记录树里（已释放、释放代 3）。
+/// 干净镜像上 I-3.9（释放代落在停止引用它的那一格区间里） 真被评估过且成立（还引用它的最新一条有效根是 txg 2，最早不再引用它的是 txg 3）；
+/// 把释放代写成 2 ⇒ 只红 I-3.9。只读树表里种类 3 那一棵的话，这一版上两份镜像 I-3.9 都报不适用。
+#[test]
+fn a_released_record_in_the_allocation_record_tree_the_root_record_holds_is_judged_by_the_release_generation_invariant(
+) {
+    let clean = image_after_the_row_publish_of_a_version_without_file();
+    assert_eq!(violations(&clean), Vec::new(), "写行之后的干净镜像全绿");
+    assert_eq!(
+        verdict_of(&clean, "I-3.9"),
+        InvariantVerdict::Holds,
+        "根记录持有的那棵树里的已释放记录要真被评估过且成立"
+    );
+    let mut image = clean.clone();
+    let rewritten = change_allocation_record_leaves(&mut image, |records| {
+        let mut rewritten_here = 0;
+        for record in records.iter_mut() {
+            if allocation_record_is_released(record)
+                && read_six_byte_slot_at(record, ALLOCATION_RECORD_SLOT_OFFSET)
+                    == INSTANCE_TABLE_SLOT.0
+            {
+                assert_eq!(
+                    read_u64_at(record, ALLOCATION_RECORD_GENERATION_OFFSET),
+                    3,
+                    "换下的 mkfs 实例表释放代本来是 3"
+                );
+                record
+                    [ALLOCATION_RECORD_GENERATION_OFFSET..ALLOCATION_RECORD_GENERATION_OFFSET + 8]
+                    .copy_from_slice(&2u64.to_le_bytes());
+                rewritten_here += 1;
+            }
+        }
+        rewritten_here
+    });
+    assert!(rewritten >= 2, "两块盘各一条已释放记录（两片叶各一条）");
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        ["I-3.9"],
+        "释放代 2 不在 (2, 3] 里，只该红 I-3.9：{red:?}"
+    );
+}
+
+/// 同一份写行之后的镜像：根记录直接持有的那棵分配记录树里，盘 0 那片叶上 mkfs 树表那条记录（槽 50178、跨 1）的跨度改宽到罩住下一条记录的起点槽
+/// ⇒ 红 I-5.4（分配记录罩住的槽互不相交）。只读树表里种类 3 那一棵的话，这一版上报不适用。
+/// 那条记录未释放、罩住的 mkfs 树表是码 2 一槽，改宽之后同时是 I-3.18（分配记录的跨度等于它罩住的单元那一类的槽数，
+/// C411（分配记录的跨度段与单元类别不符没检查）） 的违例：红的恰是这两条。
+#[test]
+fn overlapping_records_in_the_allocation_record_tree_the_root_record_holds_redden_only_the_disjointness_invariant(
+) {
+    const GENESIS_TREE_TABLE_SLOT: u64 = 50_178;
+    let mut image = image_after_the_row_publish_of_a_version_without_file();
+    let widened = change_allocation_record_leaves(&mut image, |records| {
+        let on_device_zero = |record: &Vec<u8>| read_u32_at(record, 0) == 0;
+        let Some(next_start) = records
+            .iter()
+            .filter(|record| on_device_zero(record))
+            .map(|record| read_six_byte_slot_at(record, ALLOCATION_RECORD_SLOT_OFFSET))
+            .filter(|slot| *slot > GENESIS_TREE_TABLE_SLOT)
+            .min()
+        else {
+            return 0;
+        };
+        let mut widened_here = 0;
+        for record in records.iter_mut() {
+            if on_device_zero(record)
+                && read_six_byte_slot_at(record, ALLOCATION_RECORD_SLOT_OFFSET)
+                    == GENESIS_TREE_TABLE_SLOT
+            {
+                let span = u16::try_from(next_start - GENESIS_TREE_TABLE_SLOT + 1).expect("跨度");
+                record[ALLOCATION_RECORD_SPAN_OFFSET..ALLOCATION_RECORD_SPAN_OFFSET + 2]
+                    .copy_from_slice(&span.to_le_bytes());
+                widened_here += 1;
+            }
+        }
+        widened_here
+    });
+    assert!(widened >= 1, "盘 0 那片叶上有 mkfs 树表那条记录");
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        [
+            "I-5.4",
+            singlefs_checker::image::ALLOCATION_RECORD_SPAN_EQUALS_THE_SLOTS_OF_THE_CLASS_OF_THE_UNIT_IT_COVERS
+        ],
+        "两条记录罩住同一个槽，红 I-5.4 与改宽那条记录自己的 I-3.18：{red:?}"
+    );
+}
+
+// ─── ⑥b I-3.21 比根记录直接持有的那棵分配记录树（C963 候选一） ───
+
+/// 走到的引用起点是最新根计入的分配记录的起点（I-3.21，C944）。
+const WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS: &str =
+    singlefs_checker::image::WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS;
+
+/// 写行那次发布写的那片实例表（新链的一片，码 1 两槽）与这次重写的分配记录树节点（码 2 一槽）的分配代：写行那次发布的 txg。
+const TXG_OF_THE_ROW_PUBLISH_ON_THE_VERSION_WITHOUT_FILE: u64 = 3;
+
+/// 分配记录的跨度值（去掉已释放标志）。
+fn allocation_record_span_slots(record: &[u8]) -> u16 {
+    u16::from_le_bytes([
+        record[ALLOCATION_RECORD_SPAN_OFFSET],
+        record[ALLOCATION_RECORD_SPAN_OFFSET + 1],
+    ]) & !ALLOCATION_RECORD_RELEASED_FLAG
+}
+
+/// 根记录直接持有的那棵分配记录树里满足 `dropped` 的记录（两块盘各一份叶里各自那几条）整条拿掉，交回拿掉了几条。
+fn drop_the_records_from_the_allocation_record_tree_the_root_record_holds(
+    image: &mut MemoryPool,
+    dropped: impl Fn(&[u8]) -> bool,
+) -> usize {
+    change_allocation_record_leaves(image, |records| {
+        let before = records.len();
+        records.retain(|record| !dropped(record));
+        before - records.len()
+    })
+}
+
+/// C963（树表 0 条写过行的版上写行发布漏记新单元）候选一（判决 `research/prompts/m3-close-b19-reason-r3-main-verification.md` 第五节，
+/// 主 agent 定、零轮；调查与探针在合入前那一批）：树表 0 条、写过行的那一版（写行 txg 3、暖机 txg 4）上，写行那次发布新写的那片实例表
+/// （未释放、跨 2 槽、分配代 3：这一版上只有它是这一形，mkfs 那片实例表已释放、树表与节点各跨 1 槽）的记录从根记录直接持有的那棵分配记录树里拿掉
+/// （两块盘各一条）——坏写者在建树之前把这次取的一个落点的记录滤掉了。那片实例表是最新根走到的引用起点、记录里没有一条起点在它：
+/// I-3.21 照根记录持有的那一棵比、只红它；干净镜像上它真被评估过且成立。只读树表里种类 3 的那几棵的话，在这一版上报不适用，
+/// I-3.1 没有记账可比，这张坏镜像一条都不红。
+#[test]
+fn a_record_of_the_new_instance_table_page_missing_from_the_tree_the_root_record_holds_reddens_only_the_walked_reference_start_invariant(
+) {
+    let clean = image_after_the_row_publish_of_a_version_without_file();
+    assert_eq!(violations(&clean), Vec::new(), "写行之后的干净镜像全绿");
+    assert_eq!(
+        verdict_of(
+            &clean,
+            WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS
+        ),
+        InvariantVerdict::Holds,
+        "根记录持有的那棵树比得上：I-3.21 真被评估过且成立"
+    );
+    let mut image = clean.clone();
+    let removed = drop_the_records_from_the_allocation_record_tree_the_root_record_holds(
+        &mut image,
+        |record| {
+            !allocation_record_is_released(record) && allocation_record_span_slots(record) == 2
+        },
+    );
+    assert_eq!(removed, 2, "新写的那片实例表，两块盘各一条");
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        [WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS],
+        "漏记新写的那片实例表：只红 I-3.21：{red:?}"
+    );
+}
+
+/// 同一份写行之后的镜像，拿掉的是写行那次发布重写的分配记录树节点自己的记录（未释放、跨 1 槽、分配代 3；mkfs 那片树表那条分配代 0、不拿）：
+/// 这几个节点也是最新根走到的引用起点，只红 I-3.21（C963 候选一）。
+#[test]
+fn the_records_of_the_rewritten_allocation_record_tree_nodes_missing_from_the_tree_the_root_record_holds_redden_only_the_walked_reference_start_invariant(
+) {
+    let mut image = image_after_the_row_publish_of_a_version_without_file();
+    let removed = drop_the_records_from_the_allocation_record_tree_the_root_record_holds(
+        &mut image,
+        |record| {
+            !allocation_record_is_released(record)
+                && allocation_record_span_slots(record) == 1
+                && read_u64_at(record, ALLOCATION_RECORD_GENERATION_OFFSET)
+                    == TXG_OF_THE_ROW_PUBLISH_ON_THE_VERSION_WITHOUT_FILE
+        },
+    );
+    assert!(
+        removed >= 2,
+        "这次重写的分配记录树节点在两块盘上各有记录：拿掉了 {removed} 条"
+    );
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        [WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS],
+        "漏记这次重写的分配记录树节点：只红 I-3.21：{red:?}"
+    );
+}
+
+/// 同 [`image_after_the_row_publish_of_a_version_without_file`]，再多一次可写挂载（取号 3、写行 (2, 4, 0)）：写行那次发布又在树表 0 条、
+/// 写过行的那一版上换下上一次写的实例表与分配记录树重写的节点（它们在新的那棵树里是已释放、释放代高于走到它们的候选根的 txg）。
+fn image_after_the_third_writable_mount_of_a_version_without_file() -> MemoryPool {
+    let stream = SharedStream::new();
+    let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = [0u32, 1]
+        .into_iter()
+        .map(|device| {
+            (
+                DeviceIdentity(device),
+                RecordingBlockDevice::with_shared_stream(
+                    DeviceIdentity(device),
+                    SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+                    stream.clone(),
+                ),
+            )
+        })
+        .collect();
+    make_filesystem(&parameters(), &mut devices).expect("mkfs");
+    let first_mount = mount_writable(&parameters(), &mut devices).expect("第一次可写挂载");
+    drop(first_mount);
+    let image_after_the_first_mount = memory_pool_of_sparse_devices(&devices);
+    let mut second = crash_state_devices(&image_after_the_first_mount, &[], &[], &stream);
+    let second_mount = mount_writable(&parameters(), &mut second).expect("第二次可写挂载");
+    drop(second_mount);
+    let image_after_the_second_mount = memory_pool_of_sparse_devices(&second);
+    let mut third = crash_state_devices(&image_after_the_second_mount, &[], &[], &stream);
+    let third_mount = mount_writable(&parameters(), &mut third).expect("第三次可写挂载");
+    assert!(
+        !third_mount.output.rows_written.is_empty(),
+        "上一个实例 2 那一行：第三次挂载照样写行"
+    );
+    drop(third_mount);
+    memory_pool_of_sparse_devices(&third)
+}
+
+/// 合法写者不误红（C963 候选一，探针在合入前那一批量过）：第三次可写挂载之后（又一次写行，树表照旧 0 条），I-3.21 照根记录持有的那一棵比，
+/// 真被评估过且成立，别的也一条不红——被换下的上一片实例表与节点在新那棵树里已释放、释放代高于 θ_high，更早的候选根走到它们照样对得上。
+#[test]
+fn walked_reference_starts_hold_against_the_tree_the_root_record_holds_after_the_third_writable_mount(
+) {
+    let image = image_after_the_third_writable_mount_of_a_version_without_file();
+    assert_eq!(violations(&image), Vec::new(), "第三次可写挂载之后全绿");
+    assert_eq!(
+        verdict_of(
+            &image,
+            WALKED_REFERENCE_STARTS_ARE_STARTS_OF_ALLOCATION_RECORDS_THE_NEWEST_ROOT_COUNTS
+        ),
+        InvariantVerdict::Holds,
+        "I-3.21 真被评估过且成立"
+    );
+}
+
+// ─── ⑦ I-7.7（系统配置实例代号不低于根环） 一个槽读不出时 ① ② 分开报 ───
+
+/// 写完新池新建文件的镜像上放一份写序实例代号 2 的孤儿数据单元（没人引用的槽 50302，头与载荷校验和都过）；`raise_disk_zero` 为真时
+/// 盘 0 较新那个系统配置槽的实例代号改成 2（各盘最大号 [2, 1] 不等）。与 `checker_known_bad_images.rs` 那两份 I-7.7 坏镜像同形。
+fn image_with_an_orphan_of_instance_two(raise_disk_zero: bool) -> MemoryPool {
+    const ORPHAN_SLOT: u64 = 50_302;
+    const SYSTEM_CONFIGURATION_SLOT_ONE_OFFSET: u64 = 4096;
+    const SYSTEM_CONFIGURATION_INSTANCE_OFFSET: usize = 477;
+    const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
+    const SYSTEM_CONFIGURATION_SLOT_BYTES: usize = 4096;
+    let pool = build_pool(if raise_disk_zero {
+        "b2-instance-carriers-second-sentence"
+    } else {
+        "b2-instance-carriers-first-sentence"
+    });
+    let mut image = pool.memory_pool();
+    let data_unit = pool
+        .output
+        .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST));
+    let mut orphan = data_unit.bytes.to_vec();
+    orphan[91..95].copy_from_slice(&2u32.to_le_bytes());
+    reseal_unit_by_its_class(&mut orphan);
+    write_bytes(&mut image, 0, ORPHAN_SLOT * SLOT_BYTES, &orphan);
+    if raise_disk_zero {
+        let mut slot = read_bytes(
+            &image,
+            0,
+            SYSTEM_CONFIGURATION_SLOT_ONE_OFFSET,
+            SYSTEM_CONFIGURATION_SLOT_BYTES,
+        );
+        slot[SYSTEM_CONFIGURATION_INSTANCE_OFFSET..SYSTEM_CONFIGURATION_INSTANCE_OFFSET + 4]
+            .copy_from_slice(&2u32.to_le_bytes());
+        let digest = wide_checksum_with_field_zeroed(
+            &slot,
+            SYSTEM_CONFIGURATION_SLOT_BYTES,
+            SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+        );
+        slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+            .copy_from_slice(&digest);
+        write_bytes(&mut image, 0, SYSTEM_CONFIGURATION_SLOT_ONE_OFFSET, &slot);
+    }
+    image
+}
+
+/// ② 那一形（各盘最大号 [2, 1] 不等、孤儿带着较大的 2）再加根环一个空槽读不出：① 按条款报不适用，② 在读得出的载体上照判、找到就红。
+/// 两半捆在一起的话，一个槽读不出就整条报不适用，② 的违例看不见。
+#[test]
+fn the_second_sentence_of_the_instance_carrier_invariant_is_judged_on_the_readable_carriers_when_a_slot_is_unreadable(
+) {
+    let image = image_with_an_orphan_of_instance_two(true);
+    let (device, offset) = an_empty_root_ring_slot(&image);
+    let with_an_unreadable_slot = ImageWithAnUnreadableRange {
+        image: &image,
+        device,
+        unreadable_offsets: offset..offset + 512,
+    };
+    let detail = detail_of_the_violation(&with_an_unreadable_slot, "I-7.7");
+    assert!(detail.contains("（②）"), "红在第二句上：{detail}");
+}
+
+/// ① 那一形（两盘都还是实例 1，孤儿带 2）再加根环一个空槽读不出：① 那一半读不出的载体没判，
+/// ② 这里没有对象（各盘相等）——整条报部分没判（C701（别的判法静默跳过读不出的部分） 之前报不适用），不报红也不报成立。
+/// 读得全的时候这份照红（阳性对照）。
+#[test]
+fn the_first_sentence_of_the_instance_carrier_invariant_is_not_judged_when_a_slot_is_unreadable() {
+    let image = image_with_an_orphan_of_instance_two(false);
+    assert!(
+        matches!(verdict_of(&image, "I-7.7"), InvariantVerdict::Violated(_)),
+        "读得全的时候 ① 红"
+    );
+    let (device, offset) = an_empty_root_ring_slot(&image);
+    let with_an_unreadable_slot = ImageWithAnUnreadableRange {
+        image: &image,
+        device,
+        unreadable_offsets: offset..offset + 512,
+    };
+    let verdict_with_an_unreadable_slot = verdict_of(&with_an_unreadable_slot, "I-7.7");
+    assert!(
+        matches!(
+            &verdict_with_an_unreadable_slot,
+            InvariantVerdict::PartiallyJudged(detail) if detail.contains("读不出的载体没判")
+        ),
+        "有槽读不出：① 那一半读不出的载体没判、② 没有对象，整条报部分没判：{verdict_with_an_unreadable_slot:?}"
+    );
+}
+
+/// 槽距 8192（io_min 8192）的池，mkfs 之后盘 0 的系统配置槽 0 翻一个只有整槽校验和罩着的保留字节（读得出、自证不过）：
+/// 盘 1 的槽 0 自证过、记着槽距 8192，盘 0 的槽 1 就在 8192。checker 照恢复（实审 A2a 第 37 条改的 `choose_system_configuration`）
+/// 借池里第一块槽 0 有效的盘记的槽距去找，找得到盘 0 的槽 1。按最小槽距 4096 找的话，盘 0 一个自证过的槽都没有。
+#[test]
+fn a_device_whose_slot_zero_does_not_verify_has_its_slot_one_looked_for_at_the_spacing_another_device_records(
+) {
+    const SPACING: u32 = 8192;
+    const BYTE_IN_THE_RESERVED_AREA_OF_A_SYSTEM_CONFIGURATION_SLOT: usize = 2048;
+    let mut make_filesystem_parameters = parameters();
+    make_filesystem_parameters
+        .geometry
+        .minimum_input_output_bytes = SPACING;
+    make_filesystem_parameters
+        .geometry
+        .fixed_structure_slot_spacing = SPACING;
+    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = [0u32, 1]
+        .into_iter()
+        .map(|device| {
+            (
+                DeviceIdentity(device),
+                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+            )
+        })
+        .collect();
+    make_filesystem(&make_filesystem_parameters, &mut devices).expect("槽距 8192 的池");
+    let mut image = MemoryPool {
+        devices: devices
+            .iter()
+            .map(|(identity, device)| (*identity, device.image.clone()))
+            .collect(),
+        device_size_in_bytes: IMAGE_BYTES,
+    };
+    let mut slot_zero = read_bytes(&image, 0, 0, 4096);
+    slot_zero[BYTE_IN_THE_RESERVED_AREA_OF_A_SYSTEM_CONFIGURATION_SLOT] ^= 0xff;
+    write_bytes(&mut image, 0, 0, &slot_zero);
+    let verified = singlefs_checker::image::verified_system_configuration_slots(&image);
+    let verified_slot_count_of = |device: u32| {
+        verified
+            .iter()
+            .find(|(identity, _)| *identity == device)
+            .map_or(0, |(_, slots)| slots.len())
+    };
+    assert_eq!(
+        (verified_slot_count_of(0), verified_slot_count_of(1)),
+        (1, 2),
+        "盘 0 的槽 1 在盘 1 记的槽距 8192 处找到；盘 1 两槽都自证过"
+    );
+    assert_eq!(
+        verdict_of(&image, "I-7.7"),
+        InvariantVerdict::Holds,
+        "每块盘都交得出本池的系统配置槽，I-7.7 判得了且成立"
+    );
+}
+
+/// 同一个槽距 8192 的池、盘 0 的槽 0 自证不过，再在盘 0 的偏移 4096 放一份自述槽距 4096、世代号 9 的系统配置
+/// （盘 0 槽 1 的拷贝改这两处、重封整槽校验和）：借盘 1 记的槽距（②）只在 8192 那一档找槽 1，
+/// 读到 mkfs 写的世代号 1；逐档（③，全池槽 0 都不可用时才走，C651）会在 4096 那一档收下世代号更大的那一份。
+/// 两档在这个取样点上结局不同，删掉 ② 落到 ③ 的变异在这里红（上一条用例 ② 与 ③ 同值，分不开）。
+#[test]
+fn a_device_whose_slot_zero_does_not_verify_takes_slot_one_only_at_the_borrowed_spacing_not_a_newer_slot_at_another_spacing(
+) {
+    const SPACING: u32 = 8192;
+    const ANOTHER_SPACING: u32 = 4096;
+    const BYTE_IN_THE_RESERVED_AREA_OF_A_SYSTEM_CONFIGURATION_SLOT: usize = 2048;
+    const SYSTEM_CONFIGURATION_SLOT_BYTES: usize = 4096;
+    const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
+    /// 槽世代号 8 字节在 147（fsid 102 起 16 字节、之后 20 + 1、本盘设备号 4、设备数 4；`singlefs_checker::check_system_configuration_slot`），
+    /// 固定结构槽距 4 字节在 429（`singlefs_checker::image::geometry_of`）。
+    const SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET: usize = 147;
+    const SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET: usize = 429;
+    const GENERATION_OF_THE_SLOT_AT_ANOTHER_SPACING: u64 = 9;
+    let mut make_filesystem_parameters = parameters();
+    make_filesystem_parameters
+        .geometry
+        .minimum_input_output_bytes = SPACING;
+    make_filesystem_parameters
+        .geometry
+        .fixed_structure_slot_spacing = SPACING;
+    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = [0u32, 1]
+        .into_iter()
+        .map(|device| {
+            (
+                DeviceIdentity(device),
+                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+            )
+        })
+        .collect();
+    make_filesystem(&make_filesystem_parameters, &mut devices).expect("槽距 8192 的池");
+    let mut image = MemoryPool {
+        devices: devices
+            .iter()
+            .map(|(identity, device)| (*identity, device.image.clone()))
+            .collect(),
+        device_size_in_bytes: IMAGE_BYTES,
+    };
+    let mut slot_zero = read_bytes(&image, 0, 0, SYSTEM_CONFIGURATION_SLOT_BYTES);
+    slot_zero[BYTE_IN_THE_RESERVED_AREA_OF_A_SYSTEM_CONFIGURATION_SLOT] ^= 0xff;
+    write_bytes(&mut image, 0, 0, &slot_zero);
+    let mut slot_at_another_spacing = read_bytes(
+        &image,
+        0,
+        u64::from(SPACING),
+        SYSTEM_CONFIGURATION_SLOT_BYTES,
+    );
+    slot_at_another_spacing[SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET
+        ..SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET + 8]
+        .copy_from_slice(&GENERATION_OF_THE_SLOT_AT_ANOTHER_SPACING.to_le_bytes());
+    slot_at_another_spacing
+        [SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET..SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET + 4]
+        .copy_from_slice(&ANOTHER_SPACING.to_le_bytes());
+    let digest = wide_checksum_with_field_zeroed(
+        &slot_at_another_spacing,
+        SYSTEM_CONFIGURATION_SLOT_BYTES,
+        SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+    );
+    slot_at_another_spacing
+        [SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+        .copy_from_slice(&digest);
+    write_bytes(
+        &mut image,
+        0,
+        u64::from(ANOTHER_SPACING),
+        &slot_at_another_spacing,
+    );
+    let verified = singlefs_checker::image::verified_system_configuration_slots(&image);
+    let generations_and_spacings_on_device_zero: Vec<(u64, u64)> = verified
+        .iter()
+        .find(|(identity, _)| *identity == 0)
+        .map(|(_, slots)| {
+            slots
+                .iter()
+                .map(|(view, geometry)| (view.slot_generation, geometry.slot_spacing))
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        generations_and_spacings_on_device_zero,
+        vec![(1, u64::from(SPACING))],
+        "盘 0 的槽 1 只在盘 1 记的槽距 8192 处找，取 mkfs 写的世代号 1；4096 处那一份世代号 9 不收"
+    );
+}
+
+// ─── ⑧ 新立的「中央映射条目的 key 与它指的单元头相符」（I-1.11（映射 key 与单元头相符）） ───
+
+/// 映射 key 的字段序（类标签, 出生树, 出生 txg, 实例代号, 尾段 6 字节），按字段比无符号整数（D8（核心索引结构） 已定项 11）。
+fn mapping_key_order(entry: &[u8]) -> (u8, u64, u64, u32, u64) {
+    (
+        entry[MAPPING_KEY_CLASS_OFFSET],
+        read_u64_at(entry, MAPPING_KEY_BIRTH_TREE_OFFSET),
+        read_u64_at(entry, MAPPING_KEY_BIRTH_TREE_OFFSET + 8),
+        read_u32_at(entry, MAPPING_KEY_TAIL_OFFSET - 4),
+        read_six_byte_slot_at(entry, MAPPING_KEY_TAIL_OFFSET),
+    )
+}
+
+/// 第一个文件版本的中央映射树（产品容量下是根兼叶）里的条目按 `change` 改，改完按 key 重新排序、头里的区间贴紧首末条目，重建、补校验和。
+fn image_with_the_mapping_entries_changed(
+    pool: &TreeSplitPool,
+    change: impl Fn(&mut Vec<Vec<u8>>),
+) -> MemoryPool {
+    let mapping = pool.output.unit(TransactionUnit::MappingTree);
+    let header = parse_index_node(&mapping.bytes).expect("映射根解得开");
+    assert_the_rebuild_reproduces(&mapping.bytes, &header);
+    assert_eq!(header.level, 0, "产品容量下第一个文件版本的映射树是根兼叶");
+    let mut entries = header.entries.clone();
+    change(&mut entries);
+    entries.sort_by_key(|entry| mapping_key_order(entry));
+    let smallest_key = entries.first().expect("有条目")[..MAPPING_KEY_BYTES].to_vec();
+    let largest_key = entries.last().expect("有条目")[..MAPPING_KEY_BYTES].to_vec();
+    let damaged = rebuilt_index_node(
+        &header,
+        header.level,
+        &smallest_key,
+        &largest_key,
+        header.birth_sequence,
+        &entries,
+    );
+    let mut image = pool.memory_pool();
+    let units = units_found_on_device_zero(&image);
+    replace_unit(&mut image, &units, mapping.slot.0, &damaged);
+    image
+}
+
+fn first_entry_of_class(entries: &mut [Vec<u8>], unit_class: u8) -> &mut Vec<u8> {
+    entries
+        .iter_mut()
+        .find(|entry| entry[MAPPING_KEY_CLASS_OFFSET] == unit_class)
+        .expect("这一类有映射条目")
+}
+
+/// inode 叶容器（码 3）那条映射条目的 key 尾段后面那 2 字节补零写成 1：条款「码 2 / 码 3 是出生序号 4 字节，其后 2 字节补零恒 0」。
+/// 只读尾段前 4 字节的 checker 全绿。
+#[test]
+fn a_mapping_key_whose_padding_after_the_birth_sequence_is_not_zero_reddens_only_the_mapping_key_invariant(
+) {
+    let pool = product_capacity_pool();
+    let image = image_with_the_mapping_entries_changed(&pool, |entries| {
+        first_entry_of_class(entries, UNIT_CLASS_PACKED)[MAPPING_KEY_PADDING_OFFSET] = 1;
+    });
+    let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        [MAPPING_KEY_INVARIANT],
+        "只该红映射 key 那一条：{red:?}"
+    );
+    assert!(red[0].1.contains("补零"), "说明要点出补零：{}", red[0].1);
+    match verdict_of(&image, "I-1.13") {
+        InvariantVerdict::NotApplicable(reason) => assert!(
+            reason.contains("I-1.11"),
+            "遍历方向的映射 key 已判损坏：I-1.13 报不适用，理由点名红的那一条，实际 {reason}"
+        ),
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::Violated(_)
+        | InvariantVerdict::PartiallyJudged(_)) => panic!(
+            "映射 key 已被 I-1.11 判损坏的镜像上 I-1.13 应当报不适用（主 agent 2026-10-13 定的口径），实际 {other:?}"
+        ),
+    }
+}
+
+/// 数据单元（码 1）与 inode 叶容器（码 3）那条映射条目 key 里的出生树加一：与被指单元头里偏移 43 的出生树不再相等。不判它的 checker 全绿。
+/// 从分配记录那一头看是同一处对不上：那个单元的未释放记录在映射里找不到出生树相符的 key（I-3.15（未释放记录罩住的单元由映射指在这一槽），N2 反查）。
+#[test]
+fn a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_the_mapping_key_and_the_reverse_lookup_invariants(
+) {
+    let pool = product_capacity_pool();
+    for unit_class in [UNIT_CLASS_DATA, UNIT_CLASS_PACKED] {
+        let image = image_with_the_mapping_entries_changed(&pool, |entries| {
+            let entry = first_entry_of_class(entries, unit_class);
+            let birth_tree = read_u64_at(entry, MAPPING_KEY_BIRTH_TREE_OFFSET) + 1;
+            entry[MAPPING_KEY_BIRTH_TREE_OFFSET..MAPPING_KEY_BIRTH_TREE_OFFSET + 8]
+                .copy_from_slice(&birth_tree.to_le_bytes());
+        });
+        let red = violations(&image);
+        assert_eq!(
+            violated_names(&red),
+            [MAPPING_KEY_INVARIANT, REVERSE_LOOKUP_INVARIANT],
+            "类标签 {unit_class}：只该红映射 key 那一条与反查那一条：{red:?}"
+        );
+        assert!(
+            red[0].1.contains("出生树"),
+            "说明要点出出生树：{}",
+            red[0].1
+        );
+    }
+}
+
+/// 码 2 节点那条映射条目 key 里的出生树加一：码 2 的出生树取哪个字段还开着（C289（码 2 的出生树取哪个字段没写）），今天不判，一条都不红。
+#[test]
+fn the_birth_tree_in_a_mapping_key_of_an_index_node_is_not_judged_while_its_field_is_open() {
+    let pool = product_capacity_pool();
+    let image = image_with_the_mapping_entries_changed(&pool, |entries| {
+        let entry = first_entry_of_class(entries, UNIT_CLASS_INDEX_NODE);
+        let birth_tree = read_u64_at(entry, MAPPING_KEY_BIRTH_TREE_OFFSET) + 1;
+        entry[MAPPING_KEY_BIRTH_TREE_OFFSET..MAPPING_KEY_BIRTH_TREE_OFFSET + 8]
+            .copy_from_slice(&birth_tree.to_le_bytes());
+    });
+    assert_eq!(
+        violations(&image),
+        Vec::new(),
+        "码 2 的出生树随 C289 定，今天不判"
+    );
+}
+
+// ─── ⑨ journal 计数器 0 判 I-8.6（反向链算法） 违例 ───
+
+/// journal 环里一条记录的计数器改成 0（头校验和重封，两盘一起改）：计数器从 1 起（D23（journal 的角色与格式） 已定项 18：
+/// 记录 n 落在 `(计数器 − 1) mod 槽数`），0 这一格没有「本实例内逻辑前一条」可言、链无从定义 ⇒ 判违例，记在 I-8.6 下。
+#[test]
+fn a_journal_record_whose_counter_is_zero_reddens_the_back_chain_invariant() {
+    let pool = product_capacity_pool();
+    let mut image = pool.memory_pool();
+    let offset = singlefs_core::journal::record_offset(2, JOURNAL_RING_DEFAULT_BYTES).0;
+    for device in [0u32, 1] {
+        let mut record = read_bytes(&image, device, offset, JOURNAL_RECORD_BYTES);
+        assert_eq!(
+            record[JOURNAL_RECORD_COUNTER_OFFSET..JOURNAL_RECORD_COUNTER_OFFSET + 6],
+            2u64.to_le_bytes()[..6],
+            "计数器 2 那条记录在它的环槽上"
+        );
+        record[JOURNAL_RECORD_COUNTER_OFFSET..JOURNAL_RECORD_COUNTER_OFFSET + 6].fill(0);
+        reseal_journal_record(&mut record);
+        write_bytes(&mut image, device, offset, &record);
+    }
+    let detail = detail_of_the_violation(&image, "I-8.6");
+    assert!(
+        detail.contains("计数器 0"),
+        "红在计数器 0 那一条上：{detail}"
+    );
+}

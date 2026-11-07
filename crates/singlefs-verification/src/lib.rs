@@ -1,0 +1,969 @@
+//! 验证包（`crates/singlefs-verification`）。脚手架：录制器（包在块设备外面，把每个写请求与屏障记成一条流）、内存池、理想模型、随机历史、故障注入设备、场景。
+//! 崩溃这一侧：崩溃态枚举引擎与记录核对器（`crash`）、崩溃点重放的工具链身份与发现日志（`crash_point_replay_progress`）、
+//! 崩溃注入（`crash_injection`，可写挂载的分段与崩溃镜像落池在 `writable_mount_phases`）与坏盘输入（`bad_disk_input`）两场战役、真设备一侧的设备日志比对（`device_log`）与运行模式（`on_device_modes`），
+//! 崩溃放量（里程碑二「增补 4」）：崩溃点的身份与复用键（`crash_identity`）、先录后核的流水线（`crash_amplification`：崩溃点计划、路径编号、
+//! 按块录入与核对、按权重分工、对账、门禁读一次）、判定存储（`verdict_store`，经 prune-server 读写，不挂特性）、
+//! 单元两道校验和上 GPU 与 CPU 对拍（`gpu_unit_checks`，特性 `gpu`）、崩溃放量取卡与 GPU 用例的卡池共用的显卡配置读法（`gpu_card_configuration`）、GPU 判器的判法（`crash_judge_gpu`）与它的派活（`crash_judge_dispatch`，回读归位那一段在 GPU 判器的入口集合里）、
+//! 崩溃判定库（`crash_library`：几类测试各一份长期存放、按键复用的库，录入段与判段只经它交接）、
+//! 崩溃点重放枚举用例的两段入口（`crash_state_enumeration`：录入段写流进库，判段读回、按块上卡或 CPU 判、存结论、复用，崩溃点重放计数从库里重建）、
+//! 崩溃点重放各条流的来历表与按来历统一挂的观察者（`crash_point_replay_provenance`：两槽全废盘面观察者、并集对走读观察者，跑流的两处按表挂）、
+//! 两个判器共用、不挂特性的结论写法（`crash_judge_conclusions`：红项编码、恢复字与失败点码表、计数向量、逐盘自证槽数）、
+//! CPU 路线判一块（`crash_judge_cpu_blocks`：崩溃放量判段没配 GPU 时一条核对线程判一段，入口登在判镜像的定义那一组）；
+//! 判法单元的入口登记表（`judging_units_entries`：构建脚本按它逐组算判器键写进 `OUT_DIR`，`crash_identity` 读回）。
+//! 随机历史两项的给定状态表、它的判器 trait 与 CPU 判法（`crash_given_states`，不引随机历史：流水线引它，崩溃枚举用例的判法闭包里因此没有崩溃注入；崩溃注入照旧转出）。
+//! 池级 checker 判决器在 `singlefs_checker`。
+//!
+//! 每条记：设备身份、偏移、长度、内容哈希、种类（普通写 / FUA 写 / 整段清零 / 屏障，[`RecordedOperationKind`]）。读不记——崩溃状态只由写与屏障切段（D13（验证路线） 已定项 4）。
+#![forbid(unsafe_code)]
+
+use std::cell::RefCell;
+use std::fmt::Write as _;
+use std::rc::Rc;
+
+use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
+use singlefs_core::block_device::{
+    BlockDevice, BlockDeviceError, DiscardOutcome, DiscardOutcomeCounts, PhysicalBlockSizeInBytes,
+    WriteDurability,
+};
+
+pub mod bad_disk_input;
+pub mod crash;
+pub mod crash_amplification;
+pub mod crash_facts;
+pub mod crash_given_states;
+pub mod crash_identity;
+pub mod crash_injection;
+pub mod crash_judge_conclusions;
+pub mod crash_judge_cpu_blocks;
+#[cfg(feature = "gpu")]
+pub mod crash_judge_dispatch;
+#[cfg(feature = "gpu")]
+pub mod crash_judge_gpu;
+pub mod crash_judge_tables;
+pub mod crash_library;
+pub mod crash_point_replay_progress;
+pub mod crash_point_replay_provenance;
+pub mod crash_state_enumeration;
+#[cfg(feature = "gpu")]
+pub mod crash_verify_gpu;
+pub mod device_log;
+pub mod fault_injection;
+pub mod gpu_card_configuration;
+pub mod gpu_memory_ledger;
+#[cfg(feature = "gpu")]
+pub mod gpu_unit_checks;
+pub mod heavy_threads;
+pub mod hexadecimal;
+pub mod history;
+pub mod judging_units_entries;
+pub mod memory_pool;
+pub mod model;
+pub mod model_comparison;
+pub mod mount_transparency;
+pub mod new_pool_file_creation_regions;
+pub mod numeric_environment_variable;
+pub mod on_device_modes;
+pub mod read_tally;
+pub mod reference_filesystem_translation;
+pub mod scenario;
+pub mod segments;
+pub mod sha256;
+pub mod temporary_files;
+pub mod verdict_store;
+mod verification_read;
+pub mod writable_mount_phases;
+
+singlefs_core::enum_listing_every_member! {
+/// 一条录制流里能出现的操作种类，封闭集合，`match` 不写通配臂；成员表经 `enum_listing_every_member!` 生成 `ALL`（装置按名字反查种类时逐个比 [`RecordedOperationKind::name`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecordedOperationKind {
+    Write,
+    WriteForceUnitAccess,
+    /// 整段清零：一次 [`BlockDevice::write_zeroes_at`] 记成**一步**，不是底下拆出来的那几次写
+    /// （「录制流登记成一种新步骤、崩溃点重放认它」）。内容由 `offset` 与 `length` 全定：整段全 0。
+    WriteZeroes,
+    /// discard：一次 [`BlockDevice::discard_at`] 交回 [`DiscardOutcome::Applied`] 时记**一步**；交回「不支持」的不记
+    /// （那一段一个字节没动，与「录制器只录落下了的写」同一个口径），只记进 [`SharedStream::discard_outcome_counts`]。
+    /// 长度 0 的没有动作，不记一步也不计数（与后端同一口径，`singlefs_core::block_device::BlockDevice::discard_at` 的文档）。
+    /// 崩溃点重放按「范围写零」重建它（持久 → 0、没持久 → 旧字节），取几态照 D13（验证路线） 已定项 4（长于一个扇区、罩住的范围里
+    /// 原来有东西的多取第三态），切段时算一次普通写。内容由 `offset` 与 `length` 全定，不留字节。
+    Discard,
+    Barrier,
+}
+}
+
+impl RecordedOperationKind {
+    /// 流文本（[`RecordedOperation::to_stream_line`] 的 `kind=`）与各导出装置结果行（`kind=`）里的种类名，只有这一份：
+    /// 装置写种类名都调它，按名字反查种类的照 [`RecordedOperationKind::ALL`] 逐个比它，不另抄名字。
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            RecordedOperationKind::Write => "write",
+            RecordedOperationKind::WriteForceUnitAccess => "write_fua",
+            RecordedOperationKind::WriteZeroes => "write_zeroes",
+            RecordedOperationKind::Discard => "discard",
+            RecordedOperationKind::Barrier => "barrier",
+        }
+    }
+}
+
+/// 录制流的一条。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordedOperation {
+    pub device: DeviceIdentity,
+    pub kind: RecordedOperationKind,
+    /// 屏障没有偏移与长度，记 0。
+    pub offset: DeviceOffsetInBytes,
+    pub length: u64,
+    /// 写内容的 FNV-1a 64 位哈希；屏障记 0。只用来认出「同一份内容」，不承担完整性。
+    pub content_hash: u64,
+}
+
+impl RecordedOperation {
+    /// 一行一条，机器能重新解析；字段顺序固定。
+    #[must_use]
+    pub fn to_stream_line(&self) -> String {
+        let kind = self.kind.name();
+        format!(
+            "device={} kind={kind} offset={} length={} hash={:016x}",
+            self.device.0, self.offset.0, self.length, self.content_hash
+        )
+    }
+}
+
+/// FNV-1a 64 位；本地实现，步 0 不引第三方 crate。
+#[must_use]
+pub fn fnv1a_64(bytes: &[u8]) -> u64 {
+    let mut hash: u64 = FNV1A_64_OFFSET_BASIS;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV1A_64_PRIME);
+    }
+    hash
+}
+
+const FNV1A_64_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV1A_64_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+/// `length` 个 0 字节的 FNV-1a 64 位哈希，不把那几百 MiB 全 0 真的摆出来。
+///
+/// 每吃一个 0 字节，`hash ^= 0` 什么都不做，只剩 `hash *= prime`，所以整串的哈希是
+/// `offset_basis * prime^length`（模 2^64）。用平方乘算 `prime^length`，与
+/// [`fnv1a_64`] 对同一串全 0 的结果逐位相同（本模块用例 `zero_hash_shortcut_agrees_with_hashing_real_zeros` 钉住）。
+#[must_use]
+pub fn fnv1a_64_of_zeros(length: u64) -> u64 {
+    let mut result: u64 = FNV1A_64_OFFSET_BASIS;
+    let mut factor: u64 = FNV1A_64_PRIME;
+    let mut remaining = length;
+    while remaining > 0 {
+        if remaining % 2 == 1 {
+            result = result.wrapping_mul(factor);
+        }
+        factor = factor.wrapping_mul(factor);
+        remaining /= 2;
+    }
+    result
+}
+
+/// 一条录制流里的一步，带上写的内容（只在开了内容保留的流里有；屏障没有内容）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RetainedOperation {
+    pub operation: RecordedOperation,
+    pub contents: Option<Vec<u8>>,
+}
+
+impl RetainedOperation {
+    /// 这一步写到盘上的字节：普通写与 FUA 写是留下的内容（没开内容保留的流里是 `None`）；写清零与 discard 按长度现铺 0
+    /// （录制器不为它留内容，整段全 0 由偏移与长度全定，见 [`RecordingBlockDevice`] 的 `write_zeroes_at`）；屏障没有字节，`None`。
+    /// 写清零真的摆进内存：mkfs 那一次清 768 MiB，调用方只对窗口里的写调它。
+    ///
+    /// # Panics
+    /// 写清零的长度装不进 `usize`（只在 32 位目标上可能）。
+    #[must_use]
+    pub fn written_bytes_rebuilding_zero_fills(&self) -> Option<Vec<u8>> {
+        match self.operation.kind {
+            RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
+                self.contents.clone()
+            }
+            RecordedOperationKind::WriteZeroes => Some(vec![
+                0u8;
+                usize::try_from(self.operation.length)
+                    .expect(
+                        "写清零的长度装得进 usize：64 位目标上恒成立"
+                    )
+            ]),
+            // discard 按「范围写零」重建（持久那一态读回 0），与写清零一样不留内容、按长度铺 0。
+            RecordedOperationKind::Discard => Some(
+                std::iter::repeat_n(
+                    0u8,
+                    usize::try_from(self.operation.length)
+                        .expect("discard 的长度装得进 usize：64 位目标上恒成立"),
+                )
+                .collect(),
+            ),
+            RecordedOperationKind::Barrier => None,
+        }
+    }
+}
+
+/// 录制流里一段操作是从哪个入口发出来的（C557（卸载记号只由卸载入口打没有检查）：录制流要记每次发布的入口）。
+/// 块设备一层看不见入口，由驱动这条流的一方在调入口时记（[`SharedStream::record_entry`]）。
+/// 只登记要核的那一个：正常卸载那一串；没记下入口的操作一律按「不是卸载入口发的」算。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecordedPublishEntry {
+    /// `singlefs_core::mount::unmount` 发的那一串：先写系统配置那一步与那几次带卸载记号的空发布。
+    Unmount,
+}
+
+/// 录制流里一个入口发出的那一段：`operations` 是录制流下标的半开区间 [起, 止)（与 [`SharedStream::operations`] 同一套下标）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordedEntrySpan {
+    pub entry: RecordedPublishEntry,
+    pub operations: std::ops::Range<usize>,
+}
+
+/// 录制设备上一次读到的一段，或一次 journal 记录槽提示问到的一段（提示的答案由那一段里哪些扇区写过定，所以也算读了那一段）：
+/// 观察者录入段按它算读集见证（`crash_amplification` 的观察者去重）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RecordedReadRange {
+    pub device: DeviceIdentity,
+    pub offset: DeviceOffsetInBytes,
+    pub length: u64,
+}
+
+#[derive(Default)]
+struct StreamState {
+    operations: Vec<RecordedOperation>,
+    contents: Vec<Option<Vec<u8>>>,
+    retain_contents: bool,
+    entry_spans: Vec<RecordedEntrySpan>,
+    /// 经这条流的录制器发下去的 discard 各交回了哪一种结局：「不支持」的不进流，只在这里看得见。
+    discard_outcome_counts: DiscardOutcomeCounts,
+    /// `Some` 时记每一次读与每一次槽提示问到的段（[`SharedStream::retaining_contents_and_reads`]）。
+    read_ranges: Option<Vec<RecordedReadRange>>,
+}
+
+/// 一个池里几块设备共用的录制流：按发出次序记，谁先发谁在前。
+/// 屏障按设备记（代码审阅第 1 条「按设备记屏障」）：一块盘的屏障只让这块盘上它之前的写持久，
+/// 不同设备的屏障各记一步，不并成一道池屏障——并了，一块盘漏发屏障时录下来的流与每盘都发的逐步相同，切段看不出来。
+/// 只有同一块盘上连着的几道（一串连着的屏障里这块盘已经记过一道）记成一道：它们之间这块盘一个写都没有。
+/// 开了内容保留的流把每次写的字节也留下来，崩溃点重放拿它在内存里重建镜像（步 7）。
+#[derive(Clone, Default)]
+pub struct SharedStream(Rc<RefCell<StreamState>>);
+
+impl SharedStream {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    #[must_use]
+    pub fn retaining_contents() -> Self {
+        Self(Rc::new(RefCell::new(StreamState {
+            operations: Vec::new(),
+            contents: Vec::new(),
+            retain_contents: true,
+            entry_spans: Vec::new(),
+            discard_outcome_counts: DiscardOutcomeCounts::NONE,
+            read_ranges: None,
+        })))
+    }
+
+    /// 既留每次写的字节，又记每一次读与每一次槽提示问到的段（[`SharedStream::read_ranges`]）：交回镜像的观察者拿读过的段算读集见证。
+    #[must_use]
+    pub fn retaining_contents_and_reads() -> Self {
+        Self(Rc::new(RefCell::new(StreamState {
+            operations: Vec::new(),
+            contents: Vec::new(),
+            retain_contents: true,
+            entry_spans: Vec::new(),
+            discard_outcome_counts: DiscardOutcomeCounts::NONE,
+            read_ranges: Some(Vec::new()),
+        })))
+    }
+
+    fn push_read_range(&self, range: RecordedReadRange) {
+        if let Some(read_ranges) = self.0.borrow_mut().read_ranges.as_mut() {
+            read_ranges.push(range);
+        }
+    }
+
+    /// 记下来的每一段读（按发出次序；没开记读的流交回空）。
+    #[must_use]
+    pub fn read_ranges(&self) -> Vec<RecordedReadRange> {
+        self.0.borrow().read_ranges.clone().unwrap_or_default()
+    }
+
+    /// 经这条流的录制器发下去的 discard 各交回了哪一种结局（`.claude/rules/fs-design.md`「五条硬要求」第 4 条：分支可观测）。
+    #[must_use]
+    pub fn discard_outcome_counts(&self) -> DiscardOutcomeCounts {
+        self.0.borrow().discard_outcome_counts
+    }
+
+    fn note_discard_outcome(&self, outcome: DiscardOutcome) {
+        self.0.borrow_mut().discard_outcome_counts.note(outcome);
+    }
+
+    /// 调 `run`（驱动这条流的一方调一个入口），把它期间录下的操作记成 `entry` 发的一段（[`RecordedEntrySpan`]）。
+    /// `run` 报错也照记：报错之前已经发出去的写同样是这个入口发的。
+    pub fn record_entry<Output>(
+        &self,
+        entry: RecordedPublishEntry,
+        run: impl FnOnce() -> Output,
+    ) -> Output {
+        let start = self.operation_count();
+        let output = run();
+        let end = self.operation_count();
+        self.0.borrow_mut().entry_spans.push(RecordedEntrySpan {
+            entry,
+            operations: start..end,
+        });
+        output
+    }
+
+    /// 记下来的每一段入口，按记的先后。
+    #[must_use]
+    pub fn entry_spans(&self) -> Vec<RecordedEntrySpan> {
+        self.0.borrow().entry_spans.clone()
+    }
+    fn push(&self, operation: RecordedOperation, contents: Option<&[u8]>) {
+        let mut state = self.0.borrow_mut();
+        let this_device_already_barriered_in_the_trailing_run_of_barriers = state
+            .operations
+            .iter()
+            .rev()
+            .take_while(|previous| previous.kind == RecordedOperationKind::Barrier)
+            .any(|previous| previous.device == operation.device);
+        if operation.kind == RecordedOperationKind::Barrier
+            && this_device_already_barriered_in_the_trailing_run_of_barriers
+        {
+            return;
+        }
+        let retained = if state.retain_contents {
+            contents.map(<[u8]>::to_vec)
+        } else {
+            None
+        };
+        state.operations.push(operation);
+        state.contents.push(retained);
+    }
+    #[must_use]
+    pub fn operations(&self) -> Vec<RecordedOperation> {
+        self.0.borrow().operations.clone()
+    }
+    /// 流里已有几步（不拷整条流）：随机历史拿它判「这一步发没发写」。
+    #[must_use]
+    pub fn operation_count(&self) -> usize {
+        self.0.borrow().operations.len()
+    }
+    /// 每一步连同它的内容；没开内容保留的流里 `contents` 全是 None。
+    #[must_use]
+    pub fn retained_operations(&self) -> Vec<RetainedOperation> {
+        let state = self.0.borrow();
+        state
+            .operations
+            .iter()
+            .zip(&state.contents)
+            .map(|(operation, contents)| RetainedOperation {
+                operation: operation.clone(),
+                contents: contents.clone(),
+            })
+            .collect()
+    }
+    #[must_use]
+    pub fn render(&self) -> String {
+        render_stream(&self.0.borrow().operations)
+    }
+}
+
+/// 包在一块设备外面的录制器；几块盘可以共用一条 [`SharedStream`]。
+pub struct RecordingBlockDevice<Inner: BlockDevice> {
+    inner: Inner,
+    device: DeviceIdentity,
+    stream: SharedStream,
+}
+
+impl<Inner: BlockDevice> RecordingBlockDevice<Inner> {
+    pub fn new(device: DeviceIdentity, inner: Inner) -> Self {
+        Self {
+            inner,
+            device,
+            stream: SharedStream::new(),
+        }
+    }
+
+    pub fn with_shared_stream(device: DeviceIdentity, inner: Inner, stream: SharedStream) -> Self {
+        Self {
+            inner,
+            device,
+            stream,
+        }
+    }
+
+    #[must_use]
+    pub fn recorded_operations(&self) -> Vec<RecordedOperation> {
+        self.stream.operations()
+    }
+
+    #[must_use]
+    pub fn into_inner_and_operations(self) -> (Inner, Vec<RecordedOperation>) {
+        let operations = self.stream.operations();
+        (self.inner, operations)
+    }
+
+    #[must_use]
+    pub fn wrapped_device(&self) -> &Inner {
+        &self.inner
+    }
+
+    /// 故障注入要在两次发布之间改里面那块设备的状态（虚机档的「漏一道屏障」）。
+    pub fn wrapped_device_mut(&mut self) -> &mut Inner {
+        &mut self.inner
+    }
+
+    /// 整条流写成文本，末行报总条数：抓取方比对条数，对不上整轮作废（`command-safety.md` 的完整性闸）。
+    #[must_use]
+    pub fn render_stream(&self) -> String {
+        self.stream.render()
+    }
+
+    /// 普通读与两种专用读共用的一份记账：开了记读的流记下这一段读。
+    fn record_a_read_of(&self, offset: DeviceOffsetInBytes, buffer: &[u8]) {
+        self.stream.push_read_range(RecordedReadRange {
+            device: self.device,
+            offset,
+            length: u64::try_from(buffer.len()).expect("读长度装得进 u64"),
+        });
+    }
+}
+
+/// 把一批操作渲染成流文本，末行 `count=N`。
+#[must_use]
+pub fn render_stream(operations: &[RecordedOperation]) -> String {
+    let mut text = String::new();
+    for operation in operations {
+        text.push_str(&operation.to_stream_line());
+        text.push('\n');
+    }
+    let _ = writeln!(text, "count={}", operations.len());
+    text
+}
+
+/// 流文本的完整性闸：末行声明的条数与实际行数对不上就拒绝。
+#[derive(Debug, PartialEq, Eq)]
+pub enum StreamIntegrity {
+    Consistent { operations: usize },
+    Inconsistent { declared: usize, actual: usize },
+    MissingCountLine,
+}
+
+#[must_use]
+pub fn check_stream_integrity(stream_text: &str) -> StreamIntegrity {
+    let lines: Vec<&str> = stream_text.lines().collect();
+    let Some(last) = lines.last() else {
+        return StreamIntegrity::MissingCountLine;
+    };
+    let Some(declared_text) = last.strip_prefix("count=") else {
+        return StreamIntegrity::MissingCountLine;
+    };
+    let Ok(declared) = declared_text.parse::<usize>() else {
+        return StreamIntegrity::MissingCountLine;
+    };
+    let actual = lines.len() - 1;
+    if declared == actual {
+        StreamIntegrity::Consistent { operations: actual }
+    } else {
+        StreamIntegrity::Inconsistent { declared, actual }
+    }
+}
+
+impl<Inner: BlockDevice> BlockDevice for RecordingBlockDevice<Inner> {
+    fn read_at(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.record_a_read_of(offset, buffer);
+        self.inner.read_at(offset, buffer)
+    }
+
+    /// 照普通读记这一段，交给里面那块盘的重读（里面那块盘可能是记着这次挂载读过什么的那一层，它在这里绕过记下的那一份）。
+    fn reread_at_after_a_bad_read(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.record_a_read_of(offset, buffer);
+        self.inner.reread_at_after_a_bad_read(offset, buffer)
+    }
+
+    /// 照普通读记这一段，交给里面那块盘的这一刻读盘。
+    fn read_at_straight_from_the_disk(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.record_a_read_of(offset, buffer);
+        self.inner.read_at_straight_from_the_disk(offset, buffer)
+    }
+
+    /// 通知不是读、不改盘：不进流、不记读，原样转给里面那块盘。
+    fn keep_the_self_verified_reread(&self, offset: DeviceOffsetInBytes, bytes: &[u8]) {
+        self.inner.keep_the_self_verified_reread(offset, bytes);
+    }
+
+    /// 通知不是读、不改盘：不进流、不记读，原样转给里面那块盘。
+    fn note_the_read_failing_self_verification_and_forget_its_bytes(
+        &self,
+        offset: DeviceOffsetInBytes,
+        length_in_bytes: u64,
+    ) {
+        self.inner
+            .note_the_read_failing_self_verification_and_forget_its_bytes(offset, length_in_bytes);
+    }
+
+    fn write_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+        durability: WriteDurability,
+    ) -> Result<(), BlockDeviceError> {
+        self.inner.write_at(offset, bytes, durability)?;
+        let kind = match durability {
+            WriteDurability::Plain => RecordedOperationKind::Write,
+            WriteDurability::ForceUnitAccess => RecordedOperationKind::WriteForceUnitAccess,
+        };
+        self.stream.push(
+            RecordedOperation {
+                device: self.device,
+                kind,
+                offset,
+                length: u64::try_from(bytes.len()).expect("写长度装得进 u64"),
+                content_hash: fnv1a_64(bytes),
+            },
+            Some(bytes),
+        );
+        Ok(())
+    }
+
+    /// 整段清零记成**一步**（`RecordedOperationKind::WriteZeroes`）：底下拆成几次 I/O 是后端的事，上层看到的是一个动作。
+    ///
+    /// 内容不留（`contents: None`），即使这条流开了内容保留：整段全 0 由 `offset` 与 `length` 全定，
+    /// 而 mkfs 一次清 768 MiB，留下来就是每条流多背 768 MiB 的 0。要重放它的人按长度铺 0
+    /// （[`crash::SparseDevice::zero_fill`]），不从 `contents` 里拿。
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        self.inner.write_zeroes_at(offset, length)?;
+        self.stream.push(
+            RecordedOperation {
+                device: self.device,
+                kind: RecordedOperationKind::WriteZeroes,
+                offset,
+                length,
+                content_hash: fnv1a_64_of_zeros(length),
+            },
+            None,
+        );
+        Ok(())
+    }
+
+    /// 转给里面那块盘，交回它的结局。「交给了底层」的记成**一步**（`RecordedOperationKind::Discard`，内容不留、哈希按全 0 记：
+    /// 崩溃点重放按「范围写零」重建它）；「不支持」的那一段一个字节没动，不进流，只记进这条流的
+    /// [`SharedStream::discard_outcome_counts`]。报错的不记。长度 0 的照样转给里面那块盘（偏移对齐与越界由它核），
+    /// 核过了没有动作：不记一步、不计数，与后端同一口径（判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S5）。
+    fn discard_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<DiscardOutcome, BlockDeviceError> {
+        let outcome = self.inner.discard_at(offset, length)?;
+        if length == 0 {
+            return Ok(outcome);
+        }
+        self.stream.note_discard_outcome(outcome);
+        match outcome {
+            DiscardOutcome::Applied => self.stream.push(
+                RecordedOperation {
+                    device: self.device,
+                    kind: RecordedOperationKind::Discard,
+                    offset,
+                    length,
+                    content_hash: fnv1a_64_of_zeros(length),
+                },
+                None,
+            ),
+            DiscardOutcome::Unsupported => {}
+        }
+        Ok(outcome)
+    }
+
+    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+        self.inner.barrier()?;
+        self.stream.push(
+            RecordedOperation {
+                device: self.device,
+                kind: RecordedOperationKind::Barrier,
+                offset: DeviceOffsetInBytes(0),
+                length: 0,
+                content_hash: 0,
+            },
+            None,
+        );
+        Ok(())
+    }
+
+    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.inner.probe_physical_block_size()
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.inner.size_in_bytes()
+    }
+
+    /// 录制不改盘上有什么，提示照里面那块盘答；答案由问到的那一段里哪些扇区写过定，开了记读的流把整段记成读过。
+    fn journal_record_offsets_hint(
+        &self,
+        ring_start: DeviceOffsetInBytes,
+        ring_bytes: u64,
+    ) -> Option<Vec<DeviceOffsetInBytes>> {
+        self.stream.push_read_range(RecordedReadRange {
+            device: self.device,
+            offset: ring_start,
+            length: ring_bytes,
+        });
+        self.inner
+            .journal_record_offsets_hint(ring_start, ring_bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 内存里的假设备：正常那一种，每个写都做。
+    struct MemoryDevice {
+        bytes: Vec<u8>,
+    }
+
+    impl BlockDevice for MemoryDevice {
+        fn read_at(
+            &self,
+            offset: DeviceOffsetInBytes,
+            buffer: &mut [u8],
+        ) -> Result<(), BlockDeviceError> {
+            let start = usize::try_from(offset.0).expect("测试偏移装得进 usize");
+            buffer.copy_from_slice(&self.bytes[start..start + buffer.len()]);
+            Ok(())
+        }
+        fn write_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            bytes: &[u8],
+            _durability: WriteDurability,
+        ) -> Result<(), BlockDeviceError> {
+            let start = usize::try_from(offset.0).expect("测试偏移装得进 usize");
+            self.bytes[start..start + bytes.len()].copy_from_slice(bytes);
+            Ok(())
+        }
+        fn write_zeroes_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            length: u64,
+        ) -> Result<(), BlockDeviceError> {
+            let start = usize::try_from(offset.0).expect("测试偏移装得进 usize");
+            let end = start + usize::try_from(length).expect("测试长度装得进 usize");
+            self.bytes[start..end].fill(0);
+            Ok(())
+        }
+        fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+            Ok(())
+        }
+        fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+            PhysicalBlockSizeInBytes(512)
+        }
+        fn size_in_bytes(&self) -> u64 {
+            u64::try_from(self.bytes.len()).expect("测试镜像装得进 u64")
+        }
+    }
+
+    fn drive_three_writes_and_a_barrier<Device: BlockDevice>(device: &mut Device) {
+        device
+            .write_at(DeviceOffsetInBytes(0), &[1u8; 512], WriteDurability::Plain)
+            .expect("写 1");
+        device
+            .write_at(
+                DeviceOffsetInBytes(512),
+                &[2u8; 512],
+                WriteDurability::Plain,
+            )
+            .expect("写 2");
+        device.barrier().expect("屏障");
+        device
+            .write_at(
+                DeviceOffsetInBytes(1024),
+                &[3u8; 512],
+                WriteDurability::ForceUnitAccess,
+            )
+            .expect("FUA 写");
+    }
+
+    #[test]
+    fn recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds() {
+        let mut recorder = RecordingBlockDevice::new(
+            DeviceIdentity(0),
+            MemoryDevice {
+                bytes: vec![0; 4096],
+            },
+        );
+        drive_three_writes_and_a_barrier(&mut recorder);
+        let operations = recorder.recorded_operations();
+        let kinds: Vec<RecordedOperationKind> =
+            operations.iter().map(|operation| operation.kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                RecordedOperationKind::Write,
+                RecordedOperationKind::Write,
+                RecordedOperationKind::Barrier,
+                RecordedOperationKind::WriteForceUnitAccess
+            ]
+        );
+        assert_eq!(operations[1].offset, DeviceOffsetInBytes(512));
+        assert_eq!(operations[1].content_hash, fnv1a_64(&[2u8; 512]));
+        assert_eq!(operations[2].length, 0, "屏障没有长度");
+        let mut read_back = [0u8; 512];
+        recorder
+            .read_at(DeviceOffsetInBytes(1024), &mut read_back)
+            .expect("读");
+        assert_eq!(read_back, [3u8; 512], "录制器把写透传给了里面的设备");
+    }
+
+    /// 开了记读的流记每一次读与每一次 journal 记录槽提示问到的段（按发出次序）；没开的流一段都不记。
+    #[test]
+    fn a_stream_retaining_reads_records_every_read_and_every_slot_hint_range_in_issue_order() {
+        let stream = SharedStream::retaining_contents_and_reads();
+        let recorder = RecordingBlockDevice::with_shared_stream(
+            DeviceIdentity(3),
+            MemoryDevice {
+                bytes: vec![0; 4096],
+            },
+            stream.clone(),
+        );
+        let mut buffer = [0u8; 512];
+        recorder
+            .read_at(DeviceOffsetInBytes(1024), &mut buffer)
+            .expect("读");
+        let _hint = recorder.journal_record_offsets_hint(DeviceOffsetInBytes(2048), 1024);
+        assert_eq!(
+            stream.read_ranges(),
+            vec![
+                RecordedReadRange {
+                    device: DeviceIdentity(3),
+                    offset: DeviceOffsetInBytes(1024),
+                    length: 512,
+                },
+                RecordedReadRange {
+                    device: DeviceIdentity(3),
+                    offset: DeviceOffsetInBytes(2048),
+                    length: 1024,
+                },
+            ]
+        );
+        let plain = SharedStream::retaining_contents();
+        let plain_recorder = RecordingBlockDevice::with_shared_stream(
+            DeviceIdentity(3),
+            MemoryDevice {
+                bytes: vec![0; 4096],
+            },
+            plain.clone(),
+        );
+        plain_recorder
+            .read_at(DeviceOffsetInBytes(0), &mut buffer)
+            .expect("读");
+        assert!(plain.read_ranges().is_empty(), "没开记读的流一段都不记");
+    }
+
+    /// 录制器自证：喂一个少发一条写的假流，条数闸必须判红；正常的流判绿。
+    #[test]
+    fn stream_count_gate_rejects_a_stream_that_lost_one_write() {
+        let mut recorder = RecordingBlockDevice::new(
+            DeviceIdentity(1),
+            MemoryDevice {
+                bytes: vec![0; 4096],
+            },
+        );
+        drive_three_writes_and_a_barrier(&mut recorder);
+        let complete = recorder.render_stream();
+        assert_eq!(
+            check_stream_integrity(&complete),
+            StreamIntegrity::Consistent { operations: 4 }
+        );
+
+        let (_, mut operations) = recorder.into_inner_and_operations();
+        let lost_one = operations.remove(1);
+        assert_eq!(lost_one.kind, RecordedOperationKind::Write);
+        let declared_four = format!(
+            "{}count=4\n",
+            render_stream(&operations).trim_end_matches("count=3\n")
+        );
+        assert_eq!(
+            check_stream_integrity(&declared_four),
+            StreamIntegrity::Inconsistent {
+                declared: 4,
+                actual: 3
+            }
+        );
+        assert_eq!(
+            check_stream_integrity("device=0 kind=write offset=0 length=512 hash=0\n"),
+            StreamIntegrity::MissingCountLine
+        );
+    }
+
+    #[test]
+    fn stream_lines_are_stable_text() {
+        let operation = RecordedOperation {
+            device: DeviceIdentity(1),
+            kind: RecordedOperationKind::WriteForceUnitAccess,
+            offset: DeviceOffsetInBytes(4096),
+            length: 512,
+            content_hash: 0x1234,
+        };
+        assert_eq!(
+            operation.to_stream_line(),
+            "device=1 kind=write_fua offset=4096 length=512 hash=0000000000001234"
+        );
+        assert_eq!(fnv1a_64(b""), 0xcbf2_9ce4_8422_2325, "FNV-1a 64 的空串值");
+    }
+
+    /// 整段清零记一步：录制流多的是一条 `write_zeroes`，不是底下拆出来的那几次写；
+    /// 内层设备真的被清了；开了内容保留的流也不为它留字节（768 MiB 的 0 不进内存）。
+    #[test]
+    fn zero_fill_is_recorded_as_one_step_and_keeps_no_contents() {
+        let stream = SharedStream::retaining_contents();
+        let mut recorder = RecordingBlockDevice::with_shared_stream(
+            DeviceIdentity(0),
+            MemoryDevice {
+                bytes: vec![0xD7; 4096],
+            },
+            stream.clone(),
+        );
+        recorder
+            .write_at(DeviceOffsetInBytes(0), &[1u8; 512], WriteDurability::Plain)
+            .expect("先写一扇区");
+        recorder
+            .write_zeroes_at(DeviceOffsetInBytes(512), 2048)
+            .expect("写零");
+        let operations = recorder.recorded_operations();
+        assert_eq!(
+            operations.len(),
+            2,
+            "一次写 + 一次清零 = 两步，清零不按块拆成多条"
+        );
+        assert_eq!(operations[1].kind, RecordedOperationKind::WriteZeroes);
+        assert_eq!(operations[1].offset, DeviceOffsetInBytes(512));
+        assert_eq!(operations[1].length, 2048);
+        assert_eq!(operations[1].content_hash, fnv1a_64(&[0u8; 2048]));
+        assert_eq!(
+            operations[1].to_stream_line(),
+            format!(
+                "device=0 kind=write_zeroes offset=512 length=2048 hash={:016x}",
+                fnv1a_64(&[0u8; 2048])
+            )
+        );
+        let retained = stream.retained_operations();
+        assert!(
+            retained[1].contents.is_none(),
+            "清零不留内容：整段全 0 由偏移与长度全定"
+        );
+        assert!(
+            retained[0].contents.is_some(),
+            "普通写照样留内容（这条流开了内容保留）"
+        );
+        let mut read_back = [0xFFu8; 2048];
+        recorder
+            .read_at(DeviceOffsetInBytes(512), &mut read_back)
+            .expect("读");
+        assert!(
+            read_back.iter().all(|byte| *byte == 0),
+            "内层设备那一段真的清了"
+        );
+        let mut before = [0u8; 512];
+        recorder
+            .read_at(DeviceOffsetInBytes(0), &mut before)
+            .expect("读清零段之前");
+        assert_eq!(before, [1u8; 512], "清零段之外一个字节不动");
+    }
+
+    /// 种类名是流文本与各导出结果行里的 `kind=`：每一种一个名字，四个互不相同（E142、E172 的比对侧按这几个字面认种类）。
+    #[test]
+    fn recorded_operation_kind_names_are_the_four_literals_the_dumps_print() {
+        assert_eq!(RecordedOperationKind::Write.name(), "write");
+        assert_eq!(
+            RecordedOperationKind::WriteForceUnitAccess.name(),
+            "write_fua"
+        );
+        assert_eq!(
+            RecordedOperationKind::WriteZeroes.name(),
+            "write_zeroes",
+            "写清零打成 write 的话，比对侧会去流里找它没留的内容"
+        );
+        assert_eq!(RecordedOperationKind::Barrier.name(), "barrier");
+    }
+
+    /// 普通写与 FUA 写交回留下的内容；写清零没留内容也按长度铺 0；屏障没有字节。
+    #[test]
+    fn written_bytes_are_the_retained_content_the_zero_fill_by_length_and_none_for_a_barrier() {
+        let retained = |kind, length, contents| RetainedOperation {
+            operation: RecordedOperation {
+                device: DeviceIdentity(0),
+                kind,
+                offset: DeviceOffsetInBytes(0),
+                length,
+                content_hash: 0,
+            },
+            contents,
+        };
+        assert_eq!(
+            retained(RecordedOperationKind::Write, 3, Some(vec![1, 2, 3]))
+                .written_bytes_rebuilding_zero_fills(),
+            Some(vec![1, 2, 3]),
+            "普通写是留下的内容"
+        );
+        assert_eq!(
+            retained(
+                RecordedOperationKind::WriteForceUnitAccess,
+                2,
+                Some(vec![9, 9])
+            )
+            .written_bytes_rebuilding_zero_fills(),
+            Some(vec![9, 9]),
+            "FUA 写是留下的内容"
+        );
+        assert_eq!(
+            retained(RecordedOperationKind::WriteZeroes, 4, None)
+                .written_bytes_rebuilding_zero_fills(),
+            Some(vec![0, 0, 0, 0]),
+            "写清零没留内容，按长度铺 4 个 0"
+        );
+        assert_eq!(
+            retained(RecordedOperationKind::Barrier, 0, None).written_bytes_rebuilding_zero_fills(),
+            None,
+            "屏障没有字节（不算一次写）"
+        );
+    }
+
+    /// 全 0 串的哈希走的是平方乘的捷径，必须与真的把那一串 0 喂给 [`fnv1a_64`] 逐位相同。
+    /// 长度取 0、1、2、3、512、4096 与一个不是 2 的幂的奇数长（平方乘的两条臂都要走到）。
+    #[test]
+    fn zero_hash_shortcut_agrees_with_hashing_real_zeros() {
+        for length in [0u64, 1, 2, 3, 512, 4096, 5001] {
+            assert_eq!(
+                fnv1a_64_of_zeros(length),
+                fnv1a_64(&vec![0u8; usize::try_from(length).expect("测试长度")]),
+                "长度 {length} 的全 0 串"
+            );
+        }
+    }
+}

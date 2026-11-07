@@ -1,0 +1,47 @@
+[package]
+name = "singlefs-verification"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "验证包：单元测试与集成测试，连同它们用的脚手架库（录制器、内存池、理想模型、随机历史、故障注入设备、场景）；崩溃态枚举引擎、记录核对器、oracle、断点续跑、崩溃注入与坏盘输入战役、真设备与实验装置，以及它们的用例（.claude/rules/verification.md）。判决器库在 singlefs-checker"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+# RefFS（D13（验证路线） 已定项 3）：调用方的翻译层（src/reference_filesystem_translation.rs）依赖它，装置只读它、只调它判允许集合，不改它的源码
+# （E171 第 1 次重跑登记修订 2 第 2.3 节）；方向只许本包 → RefFS（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格 ⑤⑥⑦）。
+singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
+# 判法单元（4-2a）：库读回构建脚本写进 OUT_DIR 的那份判器键表（`singlefs_unit_graph::entry_groups`），测试在临时拷贝上照同一套算法重算键。
+# 只用 std，不依赖工作区任何 crate。
+singlefs-unit-graph = { path = "../singlefs-unit-graph" }
+# E197（扫环胶水内存随盘数） 的装置直接调扫环核 `first_copy_of_each_record_key`：singlefs-core 只 use 它、不转出。
+singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
+# E185（GC一批搬迁的挂钟拆分） 装置读线程钟、进程钟、单调钟与绑核调的系统调用（src/bin/e185_gc_batch_wall_clock_split.rs）：
+# 取这份声明，不在源码里手写外部函数块（判法单元闭包遇到它拒算，D13（验证路线） 已定项 17）；与 Cargo.lock 里已有的 libc 同一份，不新增包。
+libc = "0.2"
+# 崩溃放量的 GPU 核对（src/gpu_unit_checks.rs）：版本与特性钉成 E163（GPU多卡算单元校验和） 装置用的那一份（scripts/experiment-apparatus/Cargo.toml）。
+wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "wgsl", "std"], optional = true }
+pollster = { version = "=1.0.1", optional = true }
+# 判定库服务 prune-server 的客户端：崩溃判定库只经它读写（src/verdict_store.rs「prune-server 那一侧」一节；.claude/rules/verification.md
+# 「判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB」），本 crate 不直接依赖 rocksdb、本机不开任何一份库。仓根下的独立工程（它自己的空
+# [workspace]，仓根 Cargo.toml 的 exclude 列了它），只调它的 reliable_client、client、protocol 与 configuration。判定库只经服务这一条路（用户 2026-11-02 定：不设兼容开关），它常在、不可选。
+# 它那一个包把服务与客户端编在一起，服务那一半依赖 rocksdb，所以编译时 librocksdb-sys 照旧随它进依赖图（只当服务的代码编，这里不调）。
+prune-server = { path = "../../prune-server" }
+# 实验装置读写判定库的口子（E205（多处读坏倒挂三条改法的代价） 的装置 src/bin/e205_c971_inverted_first_txg_arm_costs.rs 用）：经 device-code-key.py run 开的管道
+# 转给 prune-server；按 path 依赖引，不用 `#[path]`（从仓根算单元键时 unit-graph 看不到 `#[path]` 引进来的文件）。
+singlefs-device-library = { path = "../singlefs-device-library" }
+
+# 构建脚本按判法单元的入口登记表（src/judging_units_entries.rs）逐组算判器键与组成清单，写进 OUT_DIR（build.rs 文件头）。
+[build-dependencies]
+singlefs-unit-graph = { path = "../singlefs-unit-graph" }
+
+[features]
+# 判定存储（src/verdict_store.rs）与 prune-server 的客户端不挂特性、一律编：崩溃点重放枚举与按序号段判只吃从库里读回的流（src/crash_library.rs）。
+# GPU 核对默认不编：配置里 ENABLE_GPU=1 的跑法才开（单机或双机的 CPU + GPU）。
+gpu = ["dep:wgpu", "dep:pollster"]
+
+[dev-dependencies]
+# 七·6 的用例读核心层各处按身份查的计数（`singlefs_core::transaction::lookup_work`），只在测试构建打开（核心层的特性默认关）。
+# 发布触发阈值的只供测试来源（`system_configuration::PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring`）同样只在测试构建打开。
+singlefs-core = { path = "../singlefs-core", features = ["lookup-work-counters", "test-only-publish-thresholds"] }
