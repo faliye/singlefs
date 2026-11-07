@@ -660,6 +660,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
+name = "prune-server"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "rocksdb",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -806,43 +814,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "singlefs-checker-tier"
-version = "0.1.0"
-dependencies = [
- "pollster",
- "rocksdb",
- "singlefs-checker",
- "singlefs-core",
- "singlefs-format",
- "singlefs-harness",
- "singlefs-reference-filesystem",
- "singlefs-replay-prefix",
- "singlefs-unit-graph",
- "wgpu",
-]
-
-[[package]]
 name = "singlefs-core"
 version = "0.1.0"
 dependencies = [
  "libc",
  "singlefs-format",
  "singlefs-replay-prefix",
+ "vstd",
 ]
+
+[[package]]
+name = "singlefs-device-library"
+version = "0.1.0"
 
 [[package]]
 name = "singlefs-format"
 version = "0.1.0"
-
-[[package]]
-name = "singlefs-harness"
-version = "0.1.0"
-dependencies = [
- "singlefs-checker",
- "singlefs-core",
- "singlefs-format",
- "singlefs-reference-filesystem",
-]
 
 [[package]]
 name = "singlefs-reference-filesystem"
@@ -862,6 +849,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "verus_syn",
+]
+
+[[package]]
+name = "singlefs-verification"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "pollster",
+ "prune-server",
+ "singlefs-checker",
+ "singlefs-core",
+ "singlefs-device-library",
+ "singlefs-format",
+ "singlefs-reference-filesystem",
+ "singlefs-replay-prefix",
+ "singlefs-unit-graph",
+ "wgpu",
 ]
 
 [[package]]
